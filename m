@@ -1,54 +1,72 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 11 Jan 2016 14:19:10 +0100
-Subject: [PATCH v3 16/21] scripts/sortextable: add support for ET_DYN binaries
+Date: Mon, 11 Jan 2016 14:19:14 +0100
+Subject: [PATCH v3 20/21] efi: stub: use high allocation for converted command
+ line
 In-Reply-To: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1452518355-4606-18-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1452518355-4606-22-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to scripts/sortextable for handling relocatable (PIE)
-executables, whose ELF type is ET_DYN, not ET_EXEC. Other than adding
-support for the new type, no changes are needed.
+Before we can move the command line processing before the allocation
+of the kernel, which is required for detecting the 'nokaslr' option
+which controls that allocation, move the converted command line higher
+up in memory, to prevent it from interfering with the kernel itself.
 
+Since x86 needs the address to fit in 32 bits, use UINT_MAX as the upper
+bound there. Otherwise, use ULONG_MAX (i.e., no limit)
+
+Cc: Matt Fleming <matt@codeblueprint.co.uk>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- scripts/sortextable.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/x86/include/asm/efi.h                     |  2 ++
+ drivers/firmware/efi/libstub/efi-stub-helper.c | 14 +++++++++++++-
+ 2 files changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/scripts/sortextable.c b/scripts/sortextable.c
-index af247c70fb66..19d83647846c 100644
---- a/scripts/sortextable.c
-+++ b/scripts/sortextable.c
-@@ -266,9 +266,9 @@ do_file(char const *const fname)
- 		break;
- 	}  /* end switch */
- 	if (memcmp(ELFMAG, ehdr->e_ident, SELFMAG) != 0
--	||  r2(&ehdr->e_type) != ET_EXEC
-+	||  (r2(&ehdr->e_type) != ET_EXEC && r2(&ehdr->e_type) != ET_DYN)
- 	||  ehdr->e_ident[EI_VERSION] != EV_CURRENT) {
--		fprintf(stderr, "unrecognized ET_EXEC file %s\n", fname);
-+		fprintf(stderr, "unrecognized ET_EXEC/ET_DYN file %s\n", fname);
- 		fail_file();
- 	}
+diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
+index 0010c78c4998..08b1f2f6ea50 100644
+--- a/arch/x86/include/asm/efi.h
++++ b/arch/x86/include/asm/efi.h
+@@ -25,6 +25,8 @@
+ #define EFI32_LOADER_SIGNATURE	"EL32"
+ #define EFI64_LOADER_SIGNATURE	"EL64"
  
-@@ -304,7 +304,7 @@ do_file(char const *const fname)
- 		if (r2(&ehdr->e_ehsize) != sizeof(Elf32_Ehdr)
- 		||  r2(&ehdr->e_shentsize) != sizeof(Elf32_Shdr)) {
- 			fprintf(stderr,
--				"unrecognized ET_EXEC file: %s\n", fname);
-+				"unrecognized ET_EXEC/ET_DYN file: %s\n", fname);
- 			fail_file();
- 		}
- 		do32(ehdr, fname, custom_sort);
-@@ -314,7 +314,7 @@ do_file(char const *const fname)
- 		if (r2(&ghdr->e_ehsize) != sizeof(Elf64_Ehdr)
- 		||  r2(&ghdr->e_shentsize) != sizeof(Elf64_Shdr)) {
- 			fprintf(stderr,
--				"unrecognized ET_EXEC file: %s\n", fname);
-+				"unrecognized ET_EXEC/ET_DYN file: %s\n", fname);
- 			fail_file();
- 		}
- 		do64(ghdr, fname, custom_sort);
++#define MAX_CMDLINE_ADDRESS	UINT_MAX
++
+ #ifdef CONFIG_X86_32
+ 
+ 
+diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
+index f07d4a67fa76..2a7a3015d7e0 100644
+--- a/drivers/firmware/efi/libstub/efi-stub-helper.c
++++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
+@@ -649,6 +649,10 @@ static u8 *efi_utf16_to_utf8(u8 *dst, const u16 *src, int n)
+ 	return dst;
+ }
+ 
++#ifndef MAX_CMDLINE_ADDRESS
++#define MAX_CMDLINE_ADDRESS	ULONG_MAX
++#endif
++
+ /*
+  * Convert the unicode UEFI command line to ASCII to pass to kernel.
+  * Size of memory allocated return in *cmd_line_len.
+@@ -684,7 +688,15 @@ char *efi_convert_cmdline(efi_system_table_t *sys_table_arg,
+ 
+ 	options_bytes++;	/* NUL termination */
+ 
+-	status = efi_low_alloc(sys_table_arg, options_bytes, 0, &cmdline_addr);
++	/*
++	 * Allocate a buffer for the converted command line as high up
++	 * in memory as is feasible: x86 needs the command line allocation
++	 * to be below 4 GB, but non-x86 architectures may not have any
++	 * memory there. So prefer below 4 GB, and allocate anywhere if
++	 * that fails.
++	 */
++	status = efi_high_alloc(sys_table_arg, options_bytes, 0,
++				&cmdline_addr, MAX_CMDLINE_ADDRESS);
+ 	if (status != EFI_SUCCESS)
+ 		return NULL;
+ 
 -- 
 2.5.0
