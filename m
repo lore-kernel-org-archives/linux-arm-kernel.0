@@ -1,104 +1,142 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 11 Jan 2016 22:09:58 +0100
-Subject: [PATCH v11 2/4] PM / Domains: add setter for dev.pm_domain
-In-Reply-To: <2574144.OjYZBRkjZl@vostro.rjw.lan>
-References: <1445956731-6304-1-git-send-email-tomeu.vizoso@collabora.com>
- <CAAObsKC1jTzLWmMtwGWVStuMtzZwvMuA_731dsn4YX7aKMtFKQ@mail.gmail.com>
- <CAOMZO5A7p6iZTdnZtnzMPED1e7rPp=1Q9UiZ_598QNTWSL5jMw@mail.gmail.com>
- <2574144.OjYZBRkjZl@vostro.rjw.lan>
-Message-ID: <CAPDyKFqGU64o+ov5r1pHRHb1QdaR2ZTY1Yfbi+HsoTyVPYhTLw@mail.gmail.com>
+From: dpetigara@broadcom.com (Danesh Petigara)
+Date: Mon, 11 Jan 2016 13:22:26 -0800
+Subject: [PATCH v2] drivers: ata: wake port before DMA stop for ALPM
+Message-ID: <1452547346-31735-1-git-send-email-dpetigara@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+The AHCI driver code stops and starts port DMA engines at will
+without considering the power state of the particular port. The
+AHCI specification isn't very clear on how to handle this scenario,
+leaving implementation open to interpretation.
 
->> >
->> > Hi Rafael, Alan and Ulf,
->> >
->> > do you have any suggestion about this? I don't really understand why
->> > the device is detached from the domain on shutdown.
+Broadcom's STB SATA host controller is unable to handle port DMA
+controller restarts when the port in question is in low power mode.
+When a port enters partial or slumber mode, its PHY is powered down.
+When a controller restart is requested, the controller's internal
+state machine expects the PHY to be brought back up by software which
+never happens in this case, resulting in failures.
 
-Sorry for the delay.
+To avoid this situation, logic is added to manually wake up the port
+just before its DMA engine is stopped, if the port happens to be in
+a low power state. HBA initiated power management ensures that the port
+eventually returns to its configured low power state, when the link is
+idle (as per the conditions listed in the spec). A new host flag is also
+added to ensure this logic is only exercised for hosts with the above
+limitation.
 
-I fully agree with you Rafael, it shouldn't be detached. It's a bug.
+Signed-off-by: Danesh Petigara <dpetigara@broadcom.com>
+Reviewed-by: Markus Mayer <mmayer@broadcom.com>
+---
+This patch is against ata/for-next branch.
 
->>
->> I am running linux-next and this commit causes the same problem for me
->> on a mx6 after running a 'reboot' command:
->>
->> Requesting system reboot
->> [   15.058782] ------------[ cut here ]------------
->> [   15.063459] WARNING: CPU: 3 PID: 1122 at
->> drivers/base/power/common.c:150 dev_pm_domain_set+0x4c/0x58()
->> [   15.072838] PM domains can only be changed for unbound devices
->> [   15.078735] Modules linked in:
->> [   15.081849] CPU: 3 PID: 1122 Comm: init Not tainted
->> 4.4.0-rc8-next-20160111-dirty #207
->> [   15.089826] Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
->> [   15.096375] Backtrace:
->> [   15.098941] [<c00136d8>] (dump_backtrace) from [<c0013874>]
->> (show_stack+0x18/0x1c)
->> [   15.106532]  r6:00000096 r5:00000000 r4:00000000 r3:00000000
->> [   15.112390] [<c001385c>] (show_stack) from [<c02de89c>]
->> (dump_stack+0x88/0xa4)
->> [   15.119708] [<c02de814>] (dump_stack) from [<c002bcac>]
->> (warn_slowpath_common+0x80/0xbc)
->> [   15.127860]  r5:c03da810 r4:ee63bd68
->> [   15.131533] [<c002bc2c>] (warn_slowpath_common) from [<c002bd8c>]
->> (warn_slowpath_fmt+0x38/0x40)
->> [   15.140292]  r8:eea01db0 r7:c0b0f87c r6:eea01d80 r5:00000000 r4:ef181410
->> [   15.147165] [<c002bd58>] (warn_slowpath_fmt) from [<c03da810>]
->> (dev_pm_domain_set+0x4c/0x58)
->> [   15.155661]  r3:c0b0f7f0 r2:c09e82dc
->> [   15.159373] [<c03da7c4>] (dev_pm_domain_set) from [<c03e4e5c>]
->> (genpd_free_dev_data+0x20/0x50)
->> [   15.168065]  r5:ef1814a0 r4:ef181410
->> [   15.171737] [<c03e4e3c>] (genpd_free_dev_data) from [<c03e5fe4>]
->> (pm_genpd_remove_device+0xb4/0xe0)
->> [   15.180842]  r6:ef181410 r5:eea01d80 r4:c0b0f7f0 r3:00000000
->> [   15.186644] [<c03e5f30>] (pm_genpd_remove_device) from [<c03e6040>]
->> (genpd_dev_pm_detach+0x30/0xac)
->> [   15.195743]  r8:c0b0f7f0 r7:c1379734 r6:00000001 r5:c0b209c4
->> r4:ef181410 r3:00000000
->> [   15.203694] [<c03e6010>] (genpd_dev_pm_detach) from [<c03da7c0>]
->> (dev_pm_domain_detach+0x28/0x2c)
->> [   15.212621]  r10:ef181444 r8:c0b6f560 r7:c1379734 r6:ef181410
->> r5:ef173c10 r4:ef181410
->> [   15.220683] [<c03da798>] (dev_pm_domain_detach) from [<c03d3ea0>]
->> (platform_drv_shutdown+0x34/0x38)
->> [   15.229817] [<c03d3e6c>] (platform_drv_shutdown) from [<c03d05b0>]
->> (device_shutdown+0x3c/0x194)
->
-> OK, so does the appended patch help?
->
-> Rafael
->
-> ---
-> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> Subject: [PATCH] platform: Do not detach from PM domains on shutdown
->
-> Shutdown is carried out when the driver is still bound to the
-> device, so it is incorrect to detach it from a PM domain (if any)
-> at this point.
->
-> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Changes since v1 (https://lkml.org/lkml/2016/1/7/778)
+- Moved wakeup flag to AHCI_HFLAG_* space
+- Called an updated ahci_set_lpm from ahci_stop_engine to wakeup link
+- Made minor changes to commit message
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+ drivers/ata/ahci.h         |  1 +
+ drivers/ata/ahci_brcmstb.c |  1 +
+ drivers/ata/libahci.c      | 27 ++++++++++++++++++++++++++-
+ include/linux/libata.h     |  1 +
+ 4 files changed, 29 insertions(+), 1 deletion(-)
 
-> ---
->  drivers/base/platform.c |    1 -
->  1 file changed, 1 deletion(-)
->
-> Index: linux-pm/drivers/base/platform.c
-> ===================================================================
-> --- linux-pm.orig/drivers/base/platform.c
-> +++ linux-pm/drivers/base/platform.c
-> @@ -577,7 +577,6 @@ static void platform_drv_shutdown(struct
->
->         if (drv->shutdown)
->                 drv->shutdown(dev);
-> -       dev_pm_domain_detach(_dev, true);
->  }
->
->  /**
->
+diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
+index a4faa43..a44c75d 100644
+--- a/drivers/ata/ahci.h
++++ b/drivers/ata/ahci.h
+@@ -250,6 +250,7 @@ enum {
+ 	AHCI_HFLAG_MULTI_MSI		= 0,
+ 	AHCI_HFLAG_MULTI_MSIX		= 0,
+ #endif
++	AHCI_HFLAG_WAKE_BEFORE_STOP	= (1 << 22), /* wake before DMA stop */
+ 
+ 	/* ap->flags bits */
+ 
+diff --git a/drivers/ata/ahci_brcmstb.c b/drivers/ata/ahci_brcmstb.c
+index b36cae2..e87bcec 100644
+--- a/drivers/ata/ahci_brcmstb.c
++++ b/drivers/ata/ahci_brcmstb.c
+@@ -317,6 +317,7 @@ static int brcm_ahci_probe(struct platform_device *pdev)
+ 	if (IS_ERR(hpriv))
+ 		return PTR_ERR(hpriv);
+ 	hpriv->plat_data = priv;
++	hpriv->flags = AHCI_HFLAG_WAKE_BEFORE_STOP;
+ 
+ 	brcm_sata_alpm_init(hpriv);
+ 
+diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
+index eda3cf2..dee56d0 100644
+--- a/drivers/ata/libahci.c
++++ b/drivers/ata/libahci.c
+@@ -593,8 +593,26 @@ EXPORT_SYMBOL_GPL(ahci_start_engine);
+ int ahci_stop_engine(struct ata_port *ap)
+ {
+ 	void __iomem *port_mmio = ahci_port_base(ap);
++	struct ahci_host_priv *hpriv = ap->host->private_data;
+ 	u32 tmp;
+ 
++	/*
++	 * On some controllers, stopping a port's DMA engine
++	 * while the port is in ALPM state (partial or slumber)
++	 * results in failures on subsequent DMA engine starts.
++	 * For those controllers, put the port back in active
++	 * state before stopping it's DMA engine.
++	 */
++	if ((hpriv->flags & AHCI_HFLAG_WAKE_BEFORE_STOP) &&
++	    (ap->link.lpm_policy > ATA_LPM_MAX_POWER)) {
++		if (ahci_set_lpm(&ap->link,
++			ATA_LPM_MAX_POWER, ATA_LPM_WAKE_ONLY)) {
++			dev_err(ap->host->dev,
++				"failed to wake up port\n");
++			return -EIO;
++		}
++	}
++
+ 	tmp = readl(port_mmio + PORT_CMD);
+ 
+ 	/* check if the HBA is idle */
+@@ -689,6 +707,9 @@ static int ahci_set_lpm(struct ata_link *link, enum ata_lpm_policy policy,
+ 	void __iomem *port_mmio = ahci_port_base(ap);
+ 
+ 	if (policy != ATA_LPM_MAX_POWER) {
++		/* Wakeup flag only applies to the max power policy */
++		hints &= ~ATA_LPM_WAKE_ONLY;
++
+ 		/*
+ 		 * Disable interrupts on Phy Ready. This keeps us from
+ 		 * getting woken up due to spurious phy ready
+@@ -704,7 +725,8 @@ static int ahci_set_lpm(struct ata_link *link, enum ata_lpm_policy policy,
+ 		u32 cmd = readl(port_mmio + PORT_CMD);
+ 
+ 		if (policy == ATA_LPM_MAX_POWER || !(hints & ATA_LPM_HIPM)) {
+-			cmd &= ~(PORT_CMD_ASP | PORT_CMD_ALPE);
++			if (!(hints & ATA_LPM_WAKE_ONLY))
++				cmd &= ~(PORT_CMD_ASP | PORT_CMD_ALPE);
+ 			cmd |= PORT_CMD_ICC_ACTIVE;
+ 
+ 			writel(cmd, port_mmio + PORT_CMD);
+@@ -712,6 +734,9 @@ static int ahci_set_lpm(struct ata_link *link, enum ata_lpm_policy policy,
+ 
+ 			/* wait 10ms to be sure we've come out of LPM state */
+ 			ata_msleep(ap, 10);
++
++			if (hints & ATA_LPM_WAKE_ONLY)
++				return 0;
+ 		} else {
+ 			cmd |= PORT_CMD_ALPE;
+ 			if (policy == ATA_LPM_MIN_POWER)
+diff --git a/include/linux/libata.h b/include/linux/libata.h
+index 088ed92..f33640e 100644
+--- a/include/linux/libata.h
++++ b/include/linux/libata.h
+@@ -525,6 +525,7 @@ enum ata_lpm_policy {
+ enum ata_lpm_hints {
+ 	ATA_LPM_EMPTY		= (1 << 0), /* port empty/probing */
+ 	ATA_LPM_HIPM		= (1 << 1), /* may use HIPM */
++	ATA_LPM_WAKE_ONLY	= (1 << 2), /* only wake up link */
+ };
+ 
+ /* forward declarations */
+-- 
+1.9.1
