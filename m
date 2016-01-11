@@ -1,77 +1,290 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 11 Jan 2016 14:18:59 +0100
-Subject: [PATCH v3 06/21] arm64: pgtable: implement static
- [pte|pmd|pud]_offset variants
+Date: Mon, 11 Jan 2016 14:19:01 +0100
+Subject: [PATCH v3 08/21] arm64: add support for module PLTs
 In-Reply-To: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1452518355-4606-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1452518355-4606-9-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The page table accessors pte_offset(), pud_offset() and pmd_offset()
-rely on __va translations, so they can only be used after the linear
-mapping has been installed. For the early fixmap and kasan init routines,
-whose page tables are allocated statically in the kernel image, these
-functions will return bogus values. So implement pmd_offset_kimg() and
-pud_offset_kimg(), which can be used instead before any page tables have
-been allocated dynamically.
+This adds support for emitting PLTs at module load time for relative
+branches that are out of range. This is a prerequisite for KASLR, which
+may place the kernel and the modules anywhere in the vmalloc area,
+making it more likely that branch target offsets exceed the maximum
+range of +/- 128 MB.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/pgtable.h | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm64/Kconfig              |   9 ++
+ arch/arm64/Makefile             |   6 +-
+ arch/arm64/include/asm/module.h |  11 ++
+ arch/arm64/kernel/Makefile      |   1 +
+ arch/arm64/kernel/module-plts.c | 137 ++++++++++++++++++++
+ arch/arm64/kernel/module.c      |  12 ++
+ arch/arm64/kernel/module.lds    |   4 +
+ 7 files changed, 179 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 6129f6755081..7b4e16068c9f 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -449,6 +449,9 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index ffa3c549a4ba..778df20bf623 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -363,6 +363,7 @@ config ARM64_ERRATUM_843419
+ 	bool "Cortex-A53: 843419: A load or store might access an incorrect address"
+ 	depends on MODULES
+ 	default y
++	select ARM64_MODULE_CMODEL_LARGE
+ 	help
+ 	  This option builds kernel modules using the large memory model in
+ 	  order to avoid the use of the ADRP instruction, which can cause
+@@ -702,6 +703,14 @@ config ARM64_LSE_ATOMICS
  
- #define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
+ endmenu
  
-+/* use ONLY for statically allocated translation tables */
-+#define pte_offset_kimg(dir,addr)	((pte_t *)__phys_to_kimg(pte_offset_phys((dir), (addr))))
++config ARM64_MODULE_CMODEL_LARGE
++	bool
 +
- /*
-  * Conversion functions: convert a page and protection to a page entry,
-  * and a page entry and page directory to the page they refer to.
-@@ -492,6 +495,9 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
- 
- #define pud_page(pud)		pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
- 
-+/* use ONLY for statically allocated translation tables */
-+#define pmd_offset_kimg(dir,addr)	((pmd_t *)__phys_to_kimg(pmd_offset_phys((dir), (addr))))
++config ARM64_MODULE_PLTS
++	bool
++	select ARM64_MODULE_CMODEL_LARGE
++	select HAVE_MOD_ARCH_SPECIFIC
 +
- #else
+ endmenu
  
- #define pud_page_paddr(pud)	({ BUILD_BUG(); 0; })
-@@ -502,6 +508,8 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
- #define pmd_set_fixmap_offset(pudp, addr)	((pmd_t *)pudp)
- #define pmd_clear_fixmap()
+ menu "Boot options"
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index cd822d8454c0..db462980c6be 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -41,10 +41,14 @@ endif
  
-+#define pmd_offset_kimg(dir,addr)	((pmd_t *)dir)
+ CHECKFLAGS	+= -D__aarch64__
+ 
+-ifeq ($(CONFIG_ARM64_ERRATUM_843419), y)
++ifeq ($(CONFIG_ARM64_MODULE_CMODEL_LARGE), y)
+ KBUILD_CFLAGS_MODULE	+= -mcmodel=large
+ endif
+ 
++ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
++KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module.lds
++endif
 +
- #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
+ # Default value
+ head-y		:= arch/arm64/kernel/head.o
  
- #if CONFIG_PGTABLE_LEVELS > 3
-@@ -540,6 +548,9 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
+index e80e232b730e..7b8cd3dc9d8e 100644
+--- a/arch/arm64/include/asm/module.h
++++ b/arch/arm64/include/asm/module.h
+@@ -20,4 +20,15 @@
  
- #define pgd_page(pgd)		pfn_to_page(__phys_to_pfn(pgd_val(pgd) & PHYS_MASK))
+ #define MODULE_ARCH_VERMAGIC	"aarch64"
  
-+/* use ONLY for statically allocated translation tables */
-+#define pud_offset_kimg(dir,addr)	((pud_t *)__phys_to_kimg(pud_offset_phys((dir), (addr))))
++#ifdef CONFIG_ARM64_MODULE_PLTS
++struct mod_arch_specific {
++	struct elf64_shdr	*core_plt;
++	struct elf64_shdr	*init_plt;
++	int			core_plt_count;
++	int			init_plt_count;
++};
++#endif
 +
- #else
- 
- #define pgd_page_paddr(pgd)	({ BUILD_BUG(); 0;})
-@@ -550,6 +561,8 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
- #define pud_set_fixmap_offset(pgdp, addr)	((pud_t *)pgdp)
- #define pud_clear_fixmap()
- 
-+#define pud_offset_kimg(dir,addr)	((pud_t *)dir)
++u64 get_module_plt(struct module *mod, void *loc, u64 val);
 +
- #endif  /* CONFIG_PGTABLE_LEVELS > 3 */
+ #endif /* __ASM_MODULE_H */
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 474691f8b13a..f42b0fff607f 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -30,6 +30,7 @@ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
+ 					   ../../arm/kernel/opcodes.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
++arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+ arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
+ arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+ arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
+diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
+new file mode 100644
+index 000000000000..4a8ef9ea01ee
+--- /dev/null
++++ b/arch/arm64/kernel/module-plts.c
+@@ -0,0 +1,137 @@
++/*
++ * Copyright (C) 2014-2015 Linaro Ltd. <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/elf.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++
++struct plt_entry {
++	__le32	mov0;	/* movn	x16, #0x....			*/
++	__le32	mov1;	/* movk	x16, #0x...., lsl #16		*/
++	__le32	mov2;	/* movk	x16, #0x...., lsl #32		*/
++	__le32	br;	/* br	x16				*/
++} __aligned(8);
++
++static bool in_init(const struct module *mod, void *addr)
++{
++	return (u64)addr - (u64)mod->module_init < mod->init_size;
++}
++
++u64 get_module_plt(struct module *mod, void *loc, u64 val)
++{
++	struct plt_entry entry = {
++		cpu_to_le32(0x92800010 | (((~val      ) & 0xffff)) << 5),
++		cpu_to_le32(0xf2a00010 | ((( val >> 16) & 0xffff)) << 5),
++		cpu_to_le32(0xf2c00010 | ((( val >> 32) & 0xffff)) << 5),
++		cpu_to_le32(0xd61f0200)
++	}, *plt;
++	int i, *count;
++
++	if (in_init(mod, loc)) {
++		plt = (struct plt_entry *)mod->arch.init_plt->sh_addr;
++		count = &mod->arch.init_plt_count;
++	} else {
++		plt = (struct plt_entry *)mod->arch.core_plt->sh_addr;
++		count = &mod->arch.core_plt_count;
++	}
++
++	/* Look for an existing entry pointing to 'val' */
++	for (i = 0; i < *count; i++)
++		if (plt[i].mov0 == entry.mov0 &&
++		    plt[i].mov1 == entry.mov1 &&
++		    plt[i].mov2 == entry.mov2)
++			return (u64)&plt[i];
++
++	i = (*count)++;
++	plt[i] = entry;
++	return (u64)&plt[i];
++}
++
++static int duplicate_rel(Elf64_Addr base, const Elf64_Rela *rela, int num)
++{
++	int i;
++
++	for (i = 0; i < num; i++) {
++		if (rela[i].r_info == rela[num].r_info &&
++		    rela[i].r_addend == rela[num].r_addend)
++			return 1;
++	}
++	return 0;
++}
++
++/* Count how many PLT entries we may need */
++static unsigned int count_plts(Elf64_Addr base, const Elf64_Rela *rela, int num)
++{
++	unsigned int ret = 0;
++	int i;
++
++	/*
++	 * Sure, this is order(n^2), but it's usually short, and not
++	 * time critical
++	 */
++	for (i = 0; i < num; i++)
++		switch (ELF64_R_TYPE(rela[i].r_info)) {
++		case R_AARCH64_JUMP26:
++		case R_AARCH64_CALL26:
++			if (!duplicate_rel(base, rela, i))
++				ret++;
++			break;
++		}
++	return ret;
++}
++
++int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
++			      char *secstrings, struct module *mod)
++{
++	unsigned long core_plts = 0, init_plts = 0;
++	Elf64_Shdr *s, *sechdrs_end = sechdrs + ehdr->e_shnum;
++
++	/*
++	 * To store the PLTs, we expand the .text section for core module code
++	 * and the .init.text section for initialization code.
++	 */
++	for (s = sechdrs; s < sechdrs_end; ++s)
++		if (strcmp(".core.plt", secstrings + s->sh_name) == 0)
++			mod->arch.core_plt = s;
++		else if (strcmp(".init.plt", secstrings + s->sh_name) == 0)
++			mod->arch.init_plt = s;
++
++	if (!mod->arch.core_plt || !mod->arch.init_plt) {
++		pr_err("%s: sections missing\n", mod->name);
++		return -ENOEXEC;
++	}
++
++	for (s = sechdrs + 1; s < sechdrs_end; ++s) {
++		const Elf64_Rela *rels = (void *)ehdr + s->sh_offset;
++		int numrels = s->sh_size / sizeof(Elf64_Rela);
++		Elf64_Shdr *dstsec = sechdrs + s->sh_info;
++
++		if (s->sh_type != SHT_RELA)
++			continue;
++
++		if (strstr(secstrings + s->sh_name, ".init"))
++			init_plts += count_plts(dstsec->sh_addr, rels, numrels);
++		else
++			core_plts += count_plts(dstsec->sh_addr, rels, numrels);
++	}
++
++	mod->arch.core_plt->sh_type = SHT_NOBITS;
++	mod->arch.core_plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
++	mod->arch.core_plt->sh_addralign = L1_CACHE_BYTES;
++	mod->arch.core_plt->sh_size = core_plts * sizeof(struct plt_entry);
++	mod->arch.core_plt_count = 0;
++
++	mod->arch.init_plt->sh_type = SHT_NOBITS;
++	mod->arch.init_plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
++	mod->arch.init_plt->sh_addralign = L1_CACHE_BYTES;
++	mod->arch.init_plt->sh_size = init_plts * sizeof(struct plt_entry);
++	mod->arch.init_plt_count = 0;
++	pr_debug("%s: core.plt=%lld, init.plt=%lld\n", __func__,
++		 mod->arch.core_plt->sh_size, mod->arch.init_plt->sh_size);
++	return 0;
++}
+diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+index 93e970231ca9..3a298b0e21bb 100644
+--- a/arch/arm64/kernel/module.c
++++ b/arch/arm64/kernel/module.c
+@@ -38,6 +38,11 @@ void *module_alloc(unsigned long size)
+ 				GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
+ 				NUMA_NO_NODE, __builtin_return_address(0));
  
- #define pgd_ERROR(pgd)		__pgd_error(__FILE__, __LINE__, pgd_val(pgd))
++	if (!p && IS_ENABLED(CONFIG_ARM64_MODULE_PLTS))
++		p = __vmalloc_node_range(size, MODULE_ALIGN, VMALLOC_START,
++				VMALLOC_END, GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
++				NUMA_NO_NODE, __builtin_return_address(0));
++
+ 	if (p && (kasan_module_alloc(p, size) < 0)) {
+ 		vfree(p);
+ 		return NULL;
+@@ -361,6 +366,13 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
+ 		case R_AARCH64_CALL26:
+ 			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 26,
+ 					     AARCH64_INSN_IMM_26);
++
++			if (IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) &&
++			    ovf == -ERANGE) {
++				val = get_module_plt(me, loc, val);
++				ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2,
++						     26, AARCH64_INSN_IMM_26);
++			}
+ 			break;
+ 
+ 		default:
+diff --git a/arch/arm64/kernel/module.lds b/arch/arm64/kernel/module.lds
+new file mode 100644
+index 000000000000..3682fa107918
+--- /dev/null
++++ b/arch/arm64/kernel/module.lds
+@@ -0,0 +1,4 @@
++SECTIONS {
++        .core.plt : { BYTE(0) }
++        .init.plt : { BYTE(0) }
++}
 -- 
 2.5.0
