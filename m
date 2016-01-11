@@ -1,51 +1,97 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 11 Jan 2016 16:29:03 +0000
-Subject: [PATCH v8 20/20] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <20160111162159.GG3924@hawk.localdomain>
-References: <1450771695-11948-21-git-send-email-zhaoshenglong@huawei.com>
- <CAFEAcA_MDiOphseZ7RGNE3G=4ZDF5SFV5krOjanPbVuhgg9gnQ@mail.gmail.com>
- <568E7AF1.9040103@huawei.com>
- <CAFEAcA-Qcda7TSFLSeykLHqZYdP6tYdEjPe2uHN6f_+omqWFZg@mail.gmail.com>
- <20160107203647.GJ6199@hawk.localdomain> <20160109122956.GA30867@cbox>
- <20160109150339.10576e81@arm.com> <20160111140717.GD3924@hawk.localdomain>
- <20160111150929.GB15554@cbox> <20160111160927.GF3924@hawk.localdomain>
- <20160111162159.GG3924@hawk.localdomain>
-Message-ID: <CAFEAcA_=7nJz3Wh8py9OaSM_t0eFUcCUcb23-W2cDi-M65ZPYA@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 11 Jan 2016 17:29:58 +0100
+Subject: [PATCH] ARM: mvebu: use usb-nop-xceiv PHY for the xhci nodes on
+ Armada 388 GP
+In-Reply-To: <1450880267-20558-1-git-send-email-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Wed, 23 Dec 2015 15:17:47 +0100")
+References: <1450880267-20558-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <878u3wyt89.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 January 2016 at 16:21, Andrew Jones <drjones@redhat.com> wrote:
-> On Mon, Jan 11, 2016 at 05:09:27PM +0100, Andrew Jones wrote:
->> On Mon, Jan 11, 2016 at 04:09:29PM +0100, Christoffer Dall wrote:
->> > Are vcpu ids already exposed to userspace (beyond the stupid
->> > KVM_IRQ_LINE) ioctl and as such we're bound to whatever upper limit and
->> > format they have?
->>
->> The only other place I found is KVM_CREATE_VCPU. I suppose we could move
->> to MPIDR for that, and it would be a nice way to handle the "userspace
->> determines MPIDR" work that I plan to do. Both KVM and its userspaces
->> would still use some counter-based vcpu identifiers internally, to avoid
->> large, sparse structures, but I guess the advantage is that they don't
->> have to agree on how they do that. The 'vcpu id' used by KVM_CREATE_VCPU
->> is already 32-bits, and is supposed to be an arbitrary identifier. That
->> all looks good for converting to MPIDR.
->>
->
-> Correction. I understand that vcpu-id is "supposed" to be an arbitrary
-> identifier now, but it doesn't appear that all the assumptions that it's
-> a counter are gone yet... virt/kvm/kvm_main.c has
->
-> static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
-> ...
->         if (id >= KVM_MAX_VCPUS)
->                 return -EINVAL;
+Hi,
+ 
+ On mer., d?c. 23 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-I think the last time we talked about supporting "userspace
-determines MPIDR" the idea was to do it by allowing userspace to
-write to the MPIDR register with KVM_SET_ONE_REG. So you'd
-create a bunch of CPUs with vcpu-ids as usual, and then the
-MPIDRs would be set for them later as appropriate (or not
-at all, if userspace was an older qemu).
+> Using the usb-nop-xceiv PHY for the xhci nodes allows a better
+> representation of the hardware but also a better handling of the
+> regulator. By linking the regulator to the PHY there is no more need to
+> use the regulator-always-on property, then it allows a better power
+> management.
+>
+> The remaining usb node uses the ehci-orion driver which can't be used
+> with the usb-nop-xceiv PHY and must keeps the direct link to the
+> regulator with the regulator-always-on property.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-thanks
--- PMM
+
+I applied this one on mvebu/dt-for-4.6
+
+Gregory
+
+> ---
+>  arch/arm/boot/dts/armada-388-gp.dts | 16 ++++++++++++----
+>  1 file changed, 12 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
+> index ac3c9445ce57..51943598d858 100644
+> --- a/arch/arm/boot/dts/armada-388-gp.dts
+> +++ b/arch/arm/boot/dts/armada-388-gp.dts
+> @@ -229,13 +229,13 @@
+>  
+>  			/* CON5 */
+>  			usb3 at f0000 {
+> -				vcc-supply = <&reg_usb2_1_vbus>;
+> +				usb-phy = <&usb2_1_phy>;
+>  				status = "okay";
+>  			};
+>  
+>  			/* CON7 */
+>  			usb3 at f8000 {
+> -				vcc-supply = <&reg_usb3_vbus>;
+> +				usb-phy = <&usb3_phy>;
+>  				status = "okay";
+>  			};
+>  		};
+> @@ -273,13 +273,22 @@
+>  		};
+>  	};
+>  
+> +	usb2_1_phy: usb2_1_phy {
+> +		compatible = "usb-nop-xceiv";
+> +		vcc-supply = <&reg_usb2_1_vbus>;
+> +	};
+> +
+> +	usb3_phy: usb3_phy {
+> +		compatible = "usb-nop-xceiv";
+> +		vcc-supply = <&reg_usb3_vbus>;
+> +	};
+> +
+>  	reg_usb3_vbus: usb3-vbus {
+>  		compatible = "regulator-fixed";
+>  		regulator-name = "usb3-vbus";
+>  		regulator-min-microvolt = <5000000>;
+>  		regulator-max-microvolt = <5000000>;
+>  		enable-active-high;
+> -		regulator-always-on;
+>  		gpio = <&expander1 15 GPIO_ACTIVE_HIGH>;
+>  	};
+>  
+> @@ -299,7 +308,6 @@
+>  		regulator-min-microvolt = <5000000>;
+>  		regulator-max-microvolt = <5000000>;
+>  		enable-active-high;
+> -		regulator-always-on;
+>  		gpio = <&expander0 4 GPIO_ACTIVE_HIGH>;
+>  	};
+>  
+> -- 
+> 2.5.0
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
