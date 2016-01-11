@@ -1,50 +1,33 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sun, 10 Jan 2016 20:06:18 -0600
-Subject: [RFC PATCH v2 4/4] dt-bindings: add document for rk3229-hdmi
-In-Reply-To: <1452157511-18891-1-git-send-email-ykk@rock-chips.com>
-References: <1452156811-18150-1-git-send-email-ykk@rock-chips.com>
- <1452157511-18891-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <20160111020618.GA20680@rob-hp-laptop>
+From: xuejiancheng@huawei.com (xuejiancheng)
+Date: Mon, 11 Jan 2016 10:05:57 +0800
+Subject: [PATCH v5 6/6] ARM: dts: add dts files for Hi3519
+In-Reply-To: <20160108151058.GN19062@n2100.arm.linux.org.uk>
+References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
+ <1452219400-32478-7-git-send-email-xuejiancheng@huawei.com>
+ <20160108151058.GN19062@n2100.arm.linux.org.uk>
+Message-ID: <56930E05.1050009@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 07, 2016 at 05:05:11PM +0800, Yakir Yang wrote:
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> ---
-> Changes in v2: None
+Hello Russell,
+
+On 2016/1/8 23:10, Russell King - ARM Linux wrote:
+> On Fri, Jan 08, 2016 at 10:16:40AM +0800, Jiancheng Xue wrote:
+>> +		uart0: serial at 12100000 {
+>> +			compatible = "arm,pl011", "arm,primecell";
+>> +			reg = <0x12100000 0x1000>;
+>> +			interrupts = <0 4 4>;
 > 
->  .../devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt         | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+> Should the last digit there be IRQ_TYPE_LEVEL_HIGH (and same for the
+> other interrupts= after this?)
 > 
-> diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-> index 668091f..1cdc627 100644
-> --- a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-> +++ b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-> @@ -2,7 +2,7 @@ Rockchip specific extensions to the Synopsys Designware HDMI
->  ================================
->  
->  Required properties:
-> -- compatible: "rockchip,rk3288-dw-hdmi";
-> +- compatible: "rockchip,rk3288-dw-hdmi", "rockchip,rk3229-dw-hdmi";
->  - reg: Physical base address and length of the controller's registers.
->  - clocks: phandle to hdmi iahb and isfr clocks.
->  - clock-names: should be "iahb" "isfr"
-> @@ -15,8 +15,10 @@ Required properties:
->    rk3288 platform
->  
->  Optional properties
-> +- reg: Physical base address and length of the external HDMI PHY's registers.
+> Thanks.
+> 
 
-This is already required...
+I'll include <dt-bindings/interrupt-controller/arm-gic.h> and use
+IRQ_TYPE_LEVEL_HIGH instead. The interrupts specifier will be wrote
+like this "interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;".
 
->  - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
->  - clocks, clock-names: phandle to the HDMI CEC clock, name should be "cec"
-> +		       phandle to the external HDMI PHY clock, name should be "extphy"
+Thank you.
 
-Does this change apply to rk3288 or just rk3229? If the latter, you 
-should make that clear. The driver needs to allow for old dtb's that 
-only have 1 clock.
-
-Based on Philipp's feedback, you also need to add a phys property.
-
-Rob
+Jiancheng
