@@ -1,147 +1,38 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 11 Jan 2016 16:40:19 +0200
-Subject: [PATCH v5 1/2] ACPI: introduce a function to find the first
- physical device
-In-Reply-To: <1452518790-27053-2-git-send-email-aleksey.makarov@linaro.org>
-References: <1452518790-27053-1-git-send-email-aleksey.makarov@linaro.org>
- <1452518790-27053-2-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <CAHp75Vdxu8pwheDyz_EPx=gFaOpANqFkJkkSsSGnb=CtUwqLeA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Jan 2016 15:40:20 +0100
+Subject: [PATCH V2 1/2] dt/bindings: serial: bcm2835: add binding
+ documentation for bcm2835-aux-uart
+In-Reply-To: <6035A0DD-AD61-48F7-B641-272BB23F3CD8@martin.sperl.org>
+References: <1452344854-2576-1-git-send-email-kernel@martin.sperl.org>
+ <4288762.bCLxQBDvy4@wuerfel>
+ <6035A0DD-AD61-48F7-B641-272BB23F3CD8@martin.sperl.org>
+Message-ID: <4799423.86Gz9JKjiK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 3:26 PM, Aleksey Makarov
-<aleksey.makarov@linaro.org> wrote:
-> Factor out the code that finds the first physical device
-> of a given ACPI device.  It is used in several places.
+On Monday 11 January 2016 14:57:46 Martin Sperl wrote:
+> > On 11.01.2016, at 13:21, Arnd Bergmann <arnd@arndb.de> wrote:
+> > 
+> > Please just add another patch to rename the existing uarts appropriately
+> > first, then add this one on top with the correct name.
+> 
+> I can do that with the next incarnation of the patch.
+> 
+> But would that not break dt-source files, that refer to uart0?
+> Is this not considered an API change as well or does this only apply
+> to the binary files?
 
-My comments below.
+To clarify: I meant you should change the node name, not the label.
 
-Otherwise good look to me if Rafael has no objections.
+The label is not part of the dtb data that gets passed to the kernel
+and can have any value, including "uart0".
 
-FWIW:
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+The node name is part of the dtb and should follow common naming
+conventions (per ePAPR), but the kernel doesn't actually care, so
+it won't break anything.
 
-> --- a/drivers/acpi/acpi_platform.c
-> +++ b/drivers/acpi/acpi_platform.c
-> @@ -43,7 +43,6 @@ static const struct acpi_device_id forbidden_id_list[] = {
->  struct platform_device *acpi_create_platform_device(struct acpi_device *adev)
->  {
->         struct platform_device *pdev = NULL;
-> -       struct acpi_device *acpi_parent;
->         struct platform_device_info pdevinfo;
->         struct resource_entry *rentry;
->         struct list_head resource_list;
-> @@ -83,21 +82,8 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *adev)
->          * platform device we are about to create.
->          */
->         pdevinfo.parent = NULL;
+There are cases where a bootloader relies on a particular node name
+in order to find a device node and patch its properties, but I don't
+think this is the case here.
 
-No need to twice assign that, perhaps you may move to else branch of
-the condition.
-
-> -       acpi_parent = adev->parent;
-> -       if (acpi_parent) {
-> -               struct acpi_device_physical_node *entry;
-> -               struct list_head *list;
-> -
-> -               mutex_lock(&acpi_parent->physical_node_lock);
-> -               list = &acpi_parent->physical_node_list;
-> -               if (!list_empty(list)) {
-> -                       entry = list_first_entry(list,
-> -                                       struct acpi_device_physical_node,
-> -                                       node);
-> -                       pdevinfo.parent = entry->dev;
-> -               }
-> -               mutex_unlock(&acpi_parent->physical_node_lock);
-> -       }
-> +       if (adev->parent)
-> +               pdevinfo.parent = acpi_get_first_physical_node(adev->parent);
-
-else
-         pdevinfo.parent = NULL;
-
-
->         pdevinfo.name = dev_name(&adev->dev);
->         pdevinfo.id = -1;
->         pdevinfo.res = resources;
-> diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
-> index a212cef..2048c69 100644
-> --- a/drivers/acpi/bus.c
-> +++ b/drivers/acpi/bus.c
-> @@ -478,24 +478,36 @@ static void acpi_device_remove_notify_handler(struct acpi_device *device)
->                               Device Matching
->     -------------------------------------------------------------------------- */
->
-> -static struct acpi_device *acpi_primary_dev_companion(struct acpi_device *adev,
-> -                                                     const struct device *dev)
-> +/**
-> + * acpi_device_fix_parent - Get first physical node of an ACPI device
-> + * @adev: ACPI device in question
-> + */
-> +struct device *acpi_get_first_physical_node(
-> +       struct acpi_device *adev)
->  {
->         struct mutex *physical_node_lock = &adev->physical_node_lock;
-> +       struct device *ret = NULL;
-
-I would use ret -> node.
-
->
->         mutex_lock(physical_node_lock);
-> -       if (list_empty(&adev->physical_node_list)) {
-> -               adev = NULL;
-> -       } else {
-> -               const struct acpi_device_physical_node *node;
->
-> -               node = list_first_entry(&adev->physical_node_list,
-> -                                       struct acpi_device_physical_node, node);
-> -               if (node->dev != dev)
-> -                       adev = NULL;
-> -       }
-> +       if (!list_empty(&adev->physical_node_list))
-> +               ret = list_first_entry(&adev->physical_node_list,
-> +                               struct acpi_device_physical_node, node)->dev;
-> +
->         mutex_unlock(physical_node_lock);
-> -       return adev;
-> +
-> +       return ret;
-> +}
-> +
-> +static struct acpi_device *acpi_primary_dev_companion(struct acpi_device *adev,
-> +                                                     const struct device *dev)
-> +{
-> +       const struct device *pdev = acpi_get_first_physical_node(adev);
-
-Similar
-pdev -> node.
-
-> +
-> +       if (pdev && pdev == dev)
-> +               return adev;
-> +
-> +       return NULL;
->  }
->
->  /**
-> diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
-> index 11d87bf..ee9312ba 100644
-> --- a/drivers/acpi/internal.h
-> +++ b/drivers/acpi/internal.h
-> @@ -98,6 +98,7 @@ bool acpi_device_is_present(struct acpi_device *adev);
->  bool acpi_device_is_battery(struct acpi_device *adev);
->  bool acpi_device_is_first_physical_node(struct acpi_device *adev,
->                                         const struct device *dev);
-> +struct device *acpi_get_first_physical_node(struct acpi_device *adev);
->
->  /* --------------------------------------------------------------------------
->                       Device Matching and Notification
-> --
-> 2.7.0
->
-
-
-
--- 
-With Best Regards,
-Andy Shevchenko
+	Arnd
