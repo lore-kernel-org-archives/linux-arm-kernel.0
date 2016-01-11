@@ -1,176 +1,153 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 11 Jan 2016 16:26:27 +0100
-Subject: [PATCH] spi: atmel: improve internal vs gpio chip-select choice
-In-Reply-To: <1452211907-16074-1-git-send-email-mans@mansr.com>
-References: <1452211907-16074-1-git-send-email-mans@mansr.com>
-Message-ID: <5693C9A3.9040403@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Jan 2016 15:27:32 +0000
+Subject: [PATCH v5 2/2] ACPI: amba bus probing support
+In-Reply-To: <CAHp75Vew8HMMrc2vdKbSVuB2reOCrwZZg3-a4nBUyfiQ=c0Y4A@mail.gmail.com>
+References: <1452518790-27053-1-git-send-email-aleksey.makarov@linaro.org>
+ <1452518790-27053-3-git-send-email-aleksey.makarov@linaro.org>
+ <CAHp75Vew8HMMrc2vdKbSVuB2reOCrwZZg3-a4nBUyfiQ=c0Y4A@mail.gmail.com>
+Message-ID: <20160111152732.GU19062@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 08/01/2016 01:11, Mans Rullgard a ?crit :
-> The driver currently chooses between internal chip-select or gpio
-> based on the existence of the cs-gpios DT property which fails on
-> non-DT systems and also enforces the same choice for all devices.
-
-Well, I fear that such a per-device choice may impact further the driver
-than just moving a field from one structure to another... Moreover, I
-have the feeling that it was not the objective of this patch.
-
-> This patch makes the method per device instead of per controller
-> and fixes the selection on non-DT systems.  With these changes,
-> the chip-select method for each device is chosen according to the
-> following priority:
+On Mon, Jan 11, 2016 at 05:13:20PM +0200, Andy Shevchenko wrote:
+> On Mon, Jan 11, 2016 at 3:26 PM, Aleksey Makarov
+> <aleksey.makarov@linaro.org> wrote:
+> > From: Graeme Gregory <graeme.gregory@linaro.org>
+> >
+> > On ARM64 some devices use the AMBA device and not the platform bus for
+> > probing so add support for this. Uses a dummy clock for apb_pclk as ACPI
+> > does not have a suitable clock representation and to keep the core
+> > AMBA bus code unchanged between probing methods.
+> >
 > 
-> 1. GPIO from device tree
-> 2. GPIO from platform data
-> 3. Internal chip-select
+> My comments below.
 > 
-> Tested on AVR32 ATSTK1000.
-
-This patch breaks the SAMA5D2 SPI support at least on most recent
-linux-next (tested by Cyrille).
-
-more remarks below...
-
-> Signed-off-by: Mans Rullgard <mans@mansr.com>
-> ---
->  drivers/spi/spi-atmel.c | 44 ++++++++++++++++++++++----------------------
->  1 file changed, 22 insertions(+), 22 deletions(-)
+> > +++ b/drivers/acpi/acpi_amba.c
+> > @@ -0,0 +1,122 @@
+> > +
+> > +/*
+> > + * ACPI support for platform bus type.
+> > + *
+> > + * Copyright (C) 2015, Linaro Ltd
+> > + * Author: Graeme Gregory <graeme.gregory@linaro.org>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +
+> > +#include <linux/acpi.h>
+> > +#include <linux/amba/bus.h>
+> > +#include <linux/clkdev.h>
+> > +#include <linux/clk-provider.h>
+> > +#include <linux/device.h>
+> > +#include <linux/err.h>
+> > +#include <linux/ioport.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/module.h>
+> > +
+> > +#include "internal.h"
+> > +
+> > +static const struct acpi_device_id amba_id_list[] = {
+> > +       {"ARMH0061", 0}, /* PL061 GPIO Device */
+> > +       {"", 0},
+> > +};
+> > +
+> > +static void amba_register_dummy_clk(void)
+> > +{
+> > +       static struct clk *amba_dummy_clk;
+> > +
+> > +       /* If clock already registered */
+> > +       if (amba_dummy_clk)
+> > +               return;
+> > +
+> > +       amba_dummy_clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL,
+> > +                                               CLK_IS_ROOT, 0);
+> > +       clk_register_clkdev(amba_dummy_clk, "apb_pclk", NULL);
+> > +}
+> > +
+> > +static int amba_handler_attach(struct acpi_device *adev,
+> > +                               const struct acpi_device_id *id)
+> > +{
+> > +       struct amba_device *dev;
+> > +       struct resource_entry *rentry;
+> > +       struct list_head resource_list;
+> > +       bool address_found = false;
+> > +       int irq_no = 0;
+> > +       int ret;
+> > +
+> > +       /* If the ACPI node already has a physical device attached, skip it. */
+> > +       if (adev->physical_node_count)
+> > +               return 0;
+> > +
+> > +       dev = amba_device_alloc(dev_name(&adev->dev), 0, 0);
+> > +       if (!dev) {
+> > +               dev_err(&adev->dev, "%s(): amba_device_alloc() failed\n",
+> > +                       __func__);
+> > +               return -ENOMEM;
+> > +       }
+> > +
+> > +       INIT_LIST_HEAD(&resource_list);
+> > +       ret = acpi_dev_get_resources(adev, &resource_list, NULL, NULL);
+> > +       if (ret < 0)
+> > +               goto err_free;
+> > +
+> > +       list_for_each_entry(rentry, &resource_list, node) {
+> > +               switch (resource_type(rentry->res)) {
+> > +               case IORESOURCE_MEM:
+> > +                       if (!address_found) {
+> > +                               dev->res = *rentry->res;
 > 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index aebad36391c9..8be07fb67d4d 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -310,7 +310,6 @@ struct atmel_spi {
->  
->  	bool			use_dma;
->  	bool			use_pdc;
-> -	bool			use_cs_gpios;
->  	/* dmaengine data */
->  	struct atmel_spi_dma	dma;
->  
-> @@ -324,6 +323,7 @@ struct atmel_spi {
->  struct atmel_spi_device {
->  	unsigned int		npcs_pin;
->  	u32			csr;
-> +	bool			use_cs_gpio;
->  };
->  
->  #define BUFFER_SIZE		PAGE_SIZE
-> @@ -388,7 +388,7 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
->  		}
->  
->  		mr = spi_readl(as, MR);
-> -		if (as->use_cs_gpios)
-> +		if (asd->use_cs_gpio)
->  			gpio_set_value(asd->npcs_pin, active);
->  	} else {
->  		u32 cpol = (spi->mode & SPI_CPOL) ? SPI_BIT(CPOL) : 0;
-> @@ -405,7 +405,7 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
->  
->  		mr = spi_readl(as, MR);
->  		mr = SPI_BFINS(PCS, ~(1 << spi->chip_select), mr);
-> -		if (as->use_cs_gpios && spi->chip_select != 0)
-> +		if (asd->use_cs_gpio && spi->chip_select != 0)
->  			gpio_set_value(asd->npcs_pin, active);
->  		spi_writel(as, MR, mr);
->  	}
-> @@ -434,7 +434,7 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
->  			asd->npcs_pin, active ? " (low)" : "",
->  			mr);
->  
-> -	if (!as->use_cs_gpios)
-> +	if (!asd->use_cs_gpio)
->  		spi_writel(as, CR, SPI_BIT(LASTXFER));
->  	else if (atmel_spi_is_v2(as) || spi->chip_select != 0)
->  		gpio_set_value(asd->npcs_pin, !active);
-> @@ -1221,8 +1221,6 @@ static int atmel_spi_setup(struct spi_device *spi)
->  		csr |= SPI_BIT(CPOL);
->  	if (!(spi->mode & SPI_CPHA))
->  		csr |= SPI_BIT(NCPHA);
-> -	if (!as->use_cs_gpios)
-> -		csr |= SPI_BIT(CSAAT);
->  
->  	/* DLYBS is mostly irrelevant since we manage chipselect using GPIOs.
->  	 *
-> @@ -1233,21 +1231,28 @@ static int atmel_spi_setup(struct spi_device *spi)
->  	csr |= SPI_BF(DLYBS, 0);
->  	csr |= SPI_BF(DLYBCT, 0);
->  
-> -	/* chipselect must have been muxed as GPIO (e.g. in board setup) */
-> -	npcs_pin = (unsigned long)spi->controller_data;
-> -
-> -	if (!as->use_cs_gpios)
-> -		npcs_pin = spi->chip_select;
-> -	else if (gpio_is_valid(spi->cs_gpio))
-> -		npcs_pin = spi->cs_gpio;
-> -
->  	asd = spi->controller_state;
->  	if (!asd) {
->  		asd = kzalloc(sizeof(struct atmel_spi_device), GFP_KERNEL);
->  		if (!asd)
->  			return -ENOMEM;
->  
-> -		if (as->use_cs_gpios) {
-> +		npcs_pin = (unsigned long)spi->controller_data;
-> +
-> +		if (gpio_is_valid(spi->cs_gpio)) {
+> dev->res is 0 before this one, right? Could you use this fact instead
+> of address_found flag?
 
-The bug may come from here as the logic is somehow inverted and a "0" is
-a valid gpio according to this gpio_is_valid() function. So we may take
-this conditional branch instead of the third one in the sama5d2 case.
+amba_device_alloc() zero-initialises everything.  However, dev->res is
+a struct resource, and I'd prefer _this_ method that the OT is using
+to testing some random part of struct resource.
 
-> +			/* GPIO from DT */
-> +			npcs_pin = spi->cs_gpio;
-> +			asd->use_cs_gpio = true;
-> +		} else if (npcs_pin && gpio_is_valid(npcs_pin)) {
-> +			/* GPIO from platform data */
-> +			asd->use_cs_gpio = true;
-> +		} else {
-> +			/* internal chip-select */
-> +			npcs_pin = spi->chip_select;
-> +			asd->use_cs_gpio = false;
-> +		}
-> +
-> +		if (asd->use_cs_gpio) {
->  			ret = gpio_request(npcs_pin, dev_name(&spi->dev));
->  			if (ret) {
->  				kfree(asd);
-> @@ -1262,6 +1267,8 @@ static int atmel_spi_setup(struct spi_device *spi)
->  		spi->controller_state = asd;
->  	}
->  
-> +	if (!asd->use_cs_gpio)
-> +		csr |= SPI_BIT(CSAAT);
->  	asd->csr = csr;
->  
->  	dev_dbg(&spi->dev,
-> @@ -1569,13 +1576,6 @@ static int atmel_spi_probe(struct platform_device *pdev)
->  
->  	atmel_get_caps(as);
->  
-> -	as->use_cs_gpios = true;
-> -	if (atmel_spi_is_v2(as) &&
-
-I don't see this atmel_spi_is_v2() test in the resulting code anymore:
-did you make sure that the v1 of the peripheral is protected?
-
-> -	    !of_get_property(pdev->dev.of_node, "cs-gpios", NULL)) {
-> -		as->use_cs_gpios = false;
-> -		master->num_chipselect = 4;
-
-This line is pretty important: you mustn't remove it blindly!
-
-
-> -	}
-> -
->  	as->use_dma = false;
->  	as->use_pdc = false;
->  	if (as->caps.has_dma_support) {
+> > +                               address_found = true;
+> > +                       }
+> > +                       break;
+> > +               case IORESOURCE_IRQ:
+> > +                       if (irq_no < AMBA_NR_IRQS)
+> > +                               dev->irq[irq_no++] = rentry->res->start;
+> > +                       break;
+> > +               default:
+> > +                       dev_warn(&adev->dev, "Invalid resource\n");
 > 
+> Why? Isn't possible to have other resources for the devices?
 
-So, sorry but it's a NACK for me.
+AMBA primecell devices have one memory region, and a number of
+interrupts.  Other resource types don't make sense.
 
-Bye,
+> > +                       break;
+> > +               }
+> > +       }
+> > +
+> > +       acpi_dev_free_resource_list(&resource_list);
+> > +
+> > +       /*
+> > +        * If the ACPI node has a parent and that parent has a physical device
+> > +        * attached to it, that physical device should be the parent of
+> > +        * the amba device we are about to create.
+> > +        */
+> > +       if (adev->parent)
+> > +               dev->dev.parent = acpi_get_first_physical_node(adev->parent);
+> > +
+> > +       ACPI_COMPANION_SET(&dev->dev, adev);
+> > +
+> > +       ret = amba_device_add(dev, &iomem_resource);
+> > +       if (ret) {
+> 
+> ret < 0?
+> 
+> What to do if ret > 0? It will be considered as not error. Please,
+> check what function returns and adjust this.
+
+Non-zero is treated as an error by amba_device_add().  Doing otherwise
+here puts it at odds to the outcome of that function.  This code is fine.
+
 -- 
-Nicolas Ferre
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
