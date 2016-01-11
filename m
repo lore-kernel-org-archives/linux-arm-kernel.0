@@ -1,70 +1,51 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 11 Jan 2016 15:39:39 -0800
-Subject: arm qemu boot failures in -next due to 'PM / Domains: add setter
- for dev.pm_domain'
-In-Reply-To: <7302125.veLBHLkdLG@vostro.rjw.lan>
-References: <5693EB8A.40802@roeck-us.net> <20160111185459.GZ12777@atomide.com>
- <20160111200450.GA16902@roeck-us.net>
- <7302125.veLBHLkdLG@vostro.rjw.lan>
-Message-ID: <56943D3B.8010600@roeck-us.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 12 Jan 2016 00:43:37 +0100
+Subject: I/O issues with writing to mtdblock devices on kirkwood
+In-Reply-To: <20160111232231.GS6588@sirena.org.uk>
+References: <1440159857.19360.50.camel@debian.org>
+ <20150905210846.GF6040@lunn.ch>
+ <CAKzmTe0Bq8itvKoOTwZ+ZjY5pTqFYWt0-ihO4jn0qew_NYGhFg@mail.gmail.com>
+ <20151011153548.GA9808@lunn.ch>
+ <20160111230059.GA12286@jirafa.cyrius.com>
+ <20160111232231.GS6588@sirena.org.uk>
+Message-ID: <20160111234337.GF28292@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2016 02:49 PM, Rafael J. Wysocki wrote:
-> On Monday, January 11, 2016 12:04:50 PM Guenter Roeck wrote:
->> On Mon, Jan 11, 2016 at 10:55:00AM -0800, Tony Lindgren wrote:
->>> * Guenter Roeck <linux@roeck-us.net> [160111 09:51]:
->>>> Hi,
->>>>
->>>> I see 6 out of 24 arm qemu tests failing in next-20160111. Bisect points
->>>> to commit 989561de9b51 ("PM / Domains: add setter for dev.pm_domain").
->>>> Failures are silent - there is no output on the console.
->>>> Affected tests are
->>>>
->>>> arm:beagle:multi_v7_defconfig:omap3-beagle
->>>> arm:beaglexm:multi_v7_defconfig:omap3-beagle-xm
->>>> arm:overo:multi_v7_defconfig:omap3-overo-tobi
->>>> arm:beagle:omap2plus_defconfig:omap3-beagle
->>>> arm:beaglexm:omap2plus_defconfig:omap3-beagle-xm
->>>> arm:overo:omap2plus_defconfig:omap3-overo-tobi
->>>>
->>>> For details please see the 'next' column at http://server.roeck-us.net:8010/builders.
->>>>
->>>> Reverting the offending commit fixes the problems.
->>>>
->>>> Please let me know if there is anything I can do to help tracking down the problem.
->>>
->>> The following fixes the booting, but I wonder if it's a
->>
->> Yes, it does.
->>
->> Tested-by: Guenter Roeck <linux@roeck-us.net>
->>
->>> proper fix?
->>>
->> That I don't know.
->
-> If I'm not mistaken, what happens is that device_is_bound() tries to
-> dereference dev->p which is NULL.  If that's the case, the appended one
-> should help too.
->
-> Can you please check?
->
-> ---
->   drivers/base/dd.c |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> Index: linux-pm/drivers/base/dd.c
-> ===================================================================
-> --- linux-pm.orig/drivers/base/dd.c
-> +++ linux-pm/drivers/base/dd.c
-> @@ -234,7 +234,7 @@ late_initcall(deferred_probe_initcall);
->    */
->   bool device_is_bound(struct device *dev)
->   {
-> -	return klist_node_attached(&dev->p->knode_driver);
-> +	return dev->p && klist_node_attached(&dev->p->knode_driver);
+On Mon, Jan 11, 2016 at 11:22:31PM +0000, Mark Brown wrote:
+> On Mon, Jan 11, 2016 at 03:00:59PM -0800, Martin Michlmayr wrote:
+> > A few months ago Debian users with QNAP devices (ARM Kirkwood)
+> > reported issues (mostly SATA timeouts) when doing kernel upgrades,
+> > specifically when the new ramdisk was being written to flash.
+> 
+> > cat file > /dev/mtdblockX worked fine on a 2 MB flash partition but
+> > resulted in SATA timeouts on a 9 MB flash partition.
+> 
+> > flascp file /dev/mtd2 works fine.
+> 
+> > I've now bisected it down to this change:
+> 
+> >  commit 0461a4149836c792d186027c8c859637a4cfb11a
+> >  Author: Mark Brown <broonie@kernel.org>
+> >  Date:   Tue Dec 9 21:38:05 2014 +0000
+> 
+> >      spi: Pump transfers inside calling context for spi_sync()
+> 
+> Can you please clarify?  You're saying this causes SATA timeouts but
+> this is a change in the SPI subsystem and you're talking about MTD
+> devices.  You've also not said which kernel version this is with...
 
-Yes, that fixes the problem as well.
+Hi Mark
 
-Guenter
+I've done a little testing. What appears to happen is that while the
+cat file > /dev/mtdblockX is going on, all access to filesystems on
+SATA are blocked. I set off a "find ." and it busily prints
+filenames. But as soon as i start the cat, it grinds to a halt, and
+only continues once the cat has finished.
+
+My guess is that the locking behaviour has changed somehow. SPI or MTD
+is now holding onto a lock so preventing other filesystems making
+progress? Maybe before this change the lock was release and grabbed every
+message?
+
+   Andrew
