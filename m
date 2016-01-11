@@ -1,94 +1,66 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 11 Jan 2016 08:16:31 +0100
-Subject: imxfb does not turn on automatically
-In-Reply-To: <CAD7j7Q8gANUxM5zGmn3YyhUr9yZv02x4oxi_WWLnxCYemBRYZA@mail.gmail.com>
-References: <CAOMZO5CZ3aFGbfb39XoXpFvbn4TTrCbTHOXtQKruruCis3Ptvw@mail.gmail.com>
- <CAD7j7Q8gANUxM5zGmn3YyhUr9yZv02x4oxi_WWLnxCYemBRYZA@mail.gmail.com>
-Message-ID: <20160111071631.GI13058@pengutronix.de>
+From: Annie.Wang@amd.com (Wang, Annie)
+Date: Mon, 11 Jan 2016 07:26:39 +0000
+Subject: [PATCH 1/6] 8250/Kconfig: add config option CONFIG_SERIAL_8250_AMD
+In-Reply-To: <20160106104602.GA19507@pd.tnic>
+References: <1451885501-2710-1-git-send-email-annie.wang@amd.com>
+ <1451885501-2710-2-git-send-email-annie.wang@amd.com>
+ <20160104144118.GJ22941@pd.tnic>
+ <BLUPR12MB0433ABAC5C5D27D3FD0F4BF381F40@BLUPR12MB0433.namprd12.prod.outlook.com>
+ <20160106104602.GA19507@pd.tnic>
+Message-ID: <BLUPR12MB043368006316A2FB11A0DE8B81C90@BLUPR12MB0433.namprd12.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Carlos,
 
-On Fri, Jan 08, 2016 at 09:18:41PM +0100, Carlos Soto wrote:
-> 2015-02-21 16:18 GMT+01:00 Fabio Estevam <festevam@gmail.com>:
-> >
-> > Hi,
-> >
-> > Carlos Soto uses a Karo mx25 and he noticed that the LCD only works if we do:
-> >
-> > echo 1 > /sys/class/graphics/fb0/blank
-> > echo 0 > /sys/class/graphics/fb0/blank
-> >
-> > I can confirm the same on mx25pdk running 3.19 [1], but I could not
-> > understand why the display does not start turned on by default.
-> >
-> > [1] http://www.spinics.net/lists/arm-kernel/msg399949.html
-> >
-> > Any ideas?
-> >
-> > Thanks,
-> >
-> > Fabio Estevam
-> 
-> 
-> 
-> Hi,
-> I know it's been a long time since Fabio posted the issue but recently
-> I had some time to work on it again, and I've narrowed it down a
-> little.
-> 
-> The problem seems to be related to the IPG clock used by the iMX25
-> framebuffer. All clocks used by the fb are enabled in
-> imxfb_enable_controller(...)
-> 
-> ...
-> clk_prepare_enable(fbi->clk_ipg);
-> clk_prepare_enable(fbi->clk_ahb);
-> clk_prepare_enable(fbi->clk_per);
-> fbi->enabled = true;
-> 
-> ...
-> 
-> 
-> But if the IPG clock is disabled and enabled right after, the LCD
-> works fine.
-> 
-> The changes made in imxfb.c were:
-> ...
-> 
-> clk_prepare_enable(fbi->clk_ipg);
-> clk_disable_unprepare(fbi->clk_ipg);
-> clk_prepare_enable(fbi->clk_ipg);
-> 
-> clk_prepare_enable(fbi->clk_ahb);
-> clk_prepare_enable(fbi->clk_per);
-> fbi->enabled = true;
-> 
-> ...
-> 
-> It was suggested by Fabio that this could be caused by a wrong clock
-> reference count which prevented the IPG fb clock to be enabled, but
-> I've checked in debugfs, and both enable_cnt  and prepare_cnt seem OK
-> for all three FB clocks.
 
-Unfortunately this LCD controller does not have an enable bit. The
-controller starts directly when the clocks are enabled. If the clocks
-are enabled when the controller is not yet programmed with proper
-register values then it just goes into some undefined state. What I
-suspect is that the clocks already were enabled before driver probe,
-presumably by the bootloader, so the controller is already in undefined
-state when entering Linux. Now by dis/enabling the ipg clock you
-effectively reset the controller. Since you have programmed it with
-valid register values in the mean time it starts working after this
-reset.
-To verify you could try to disable the LCDC related clock gates with
-direct register writes in drivers/clk/imx/clk-imx25.c.
+>-----Original Message-----
+>From: Borislav Petkov [mailto:bp at alien8.de]
+>Sent: Wednesday, January 06, 2016 6:46 PM
+>To: Wang, Annie
+>Cc: Andy Shevchenko; Vinod Koul; Mika Westerberg; Greg Kroah-Hartman; Rafael
+>J. Wysocki; linux-acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
+>serial at vger.kernel.org; dmaengine at vger.kernel.org; Huang, Ray; Wan, Vincent;
+>Xue, Ken; Robin Murphy; Graeme Gregory; Li, Tony; Yu, Xiangliang
+>Subject: Re: [PATCH 1/6] 8250/Kconfig: add config option
+>CONFIG_SERIAL_8250_AMD
+>
+>On Wed, Jan 06, 2016 at 02:08:18AM +0000, Wang, Annie wrote:
+>> How about I add select ARM_AMBA and SERIAL_8250 in arch/x86/Kconfig?
+>
+>Yeah, select sounds good in that case, except in that particular case ...
+>
+>>
+>> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig index
+>> db3622f..0fe6657 100644
+>> --- a/arch/x86/Kconfig
+>> +++ b/arch/x86/Kconfig
+>> @@ -537,11 +537,15 @@ config X86_AMD_PLATFORM_DEVICE
+>>         depends on ACPI
+>>         select COMMON_CLK
+>>         select PINCTRL
+>> +       select SERIAL_8250
+>> +       select ARM_AMBA
+>
+>... that's a X86_AMD_PLATFORM_DEVICE which selects ARM thing? i.e.,
+>ARM_AMBA. Can that even work?
+>
+>[ Rant on the side: And that ARM_AMBA thing has, of course, no effing
+>  help text. Dammit, people need to start explaining those cryptic
+>  abbreviations. Somewhere in the code I found "Advanced Microcontroller
+>  Bus Architecture". This is clearly suboptimal. ]
+>
+>So why does the X86 platform device need to select the AMBA crap?
 
-Sascha
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Russell, 
+
+The AMBA bus is already leveraged  in AMD X86 arch hardware design for UART
+controller and UART DMA. And may will be used in other arch as well, however,
+it is rather confusing if we select ARM_AMBA in other arch, such as X86.
+
+How about rename  CONFIG_ARM_AMBA to CONFIG_AMBA? So different arch
+can select it without causing misunderstanding. 
+
+Thank you very much.
+Regards,
+Hongcheng(Annie)
