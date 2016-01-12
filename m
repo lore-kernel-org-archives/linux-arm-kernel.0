@@ -1,40 +1,53 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 12 Jan 2016 11:40:12 +0100
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160112102555.GV6373@twins.programming.kicks-ass.net>
-References: <1452426622-4471-12-git-send-email-mst@redhat.com>
- <56945366.2090504@imgtec.com>
- <20160112092711.GP6344@twins.programming.kicks-ass.net>
- <20160112102555.GV6373@twins.programming.kicks-ass.net>
-Message-ID: <20160112104012.GW6373@twins.programming.kicks-ass.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 12 Jan 2016 10:53:19 +0000
+Subject: [RESEND v4 2/6] remoteproc: debugfs: Add ability to boot remote
+ processor using debugfs
+In-Reply-To: <CAJAp7OhvwxkS5WkvBgd0ncBRMRCijnU2LggY8oyJ5sHg+5aohQ@mail.gmail.com>
+References: <1448370862-19120-1-git-send-email-lee.jones@linaro.org>
+ <2600153.9u9Z7N2IT1@wuerfel> <20151203172830.GB26902@x1>
+ <2473673.tSymyNlg3h@wuerfel> <20151204082427.GC26902@x1>
+ <CAJAp7OhvwxkS5WkvBgd0ncBRMRCijnU2LggY8oyJ5sHg+5aohQ@mail.gmail.com>
+Message-ID: <20160112105319.GB27358@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 11:25:55AM +0100, Peter Zijlstra wrote:
-> On Tue, Jan 12, 2016 at 10:27:11AM +0100, Peter Zijlstra wrote:
-> > 2) the changelog _completely_ fails to explain the sync 0x11 and sync
-> > 0x12 semantics nor does it provide a publicly accessible link to
-> > documentation that does.
-> 
-> Ralf pointed me at: https://imgtec.com/mips/architectures/mips64/
-> 
-> > 3) it really should have explained what you did with
-> > smp_llsc_mb/smp_mb__before_llsc() in _detail_.
-> 
-> And reading the MIPS64 v6.04 instruction set manual, I think 0x11/0x12
-> are _NOT_ transitive and therefore cannot be used to implement the
-> smp_mb__{before,after} stuff.
-> 
-> That is, in MIPS speak, those SYNC types are Ordering Barriers, not
-> Completion Barriers. They need not be globally performed.
+On Mon, 28 Dec 2015, Bjorn Andersson wrote:
 
-Which if true; and I know Will has some questions here; would also mean
-that you 'cannot' use the ACQUIRE/RELEASE barriers for your locks as was
-recently suggested by David Daney.
+> On Fri, Dec 4, 2015 at 12:24 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Thu, 03 Dec 2015, Arnd Bergmann wrote:
+> >
+> >> On Thursday 03 December 2015 17:28:30 Lee Jones wrote:
+> >> > >
+> >> > > Ah, interesting. I haven't tried myself, and just tried to read the
+> >> > > code. Maybe glibc already catches zero-length writes before it gets
+> >> > > into the kernel, or I just missed the part of the syscall that checks
+> >> > > for this.
+> >> >
+> >> > Glibc is responsible indeed:
+> >> >
+> >> >   http://osxr.org/glibc/source/io/write.c
+> >>
+> >> Ok, so an attacker can force the stack overflow by calling
+> >> syscall(__NR_write, fd, p, 0) if that has any potential value,
+> >> but normal users won't hit this case.
+> >
+> > Right.  I have fixed the issue (and another one I found) anyway, if
+> > only to rid the GCC warning.
+> >
+> 
+> Sorry, but I'm unable to find a new version of this patch, did I miss
+> it or could you resend it?
 
-That is, currently all architectures -- with exception of PPC -- have
-RCsc locks, but using these non-transitive things will get you RCpc
-locks.
+I didn't send it out.  Just looking at this again, post-vacation.
 
-So yes, MIPS can go RCpc for its locks and share the burden of pain with
-PPC, but that needs to be a very concious decision.
+> Also, as I looked at this again, we should probably return an error if
+> count >= sizeof(buf) rather than just acknowledging the input (same in
+> the other debugfs write function in this file).
+
+Sure.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
