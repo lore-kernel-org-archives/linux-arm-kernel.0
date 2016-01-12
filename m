@@ -1,7 +1,7 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Tue, 12 Jan 2016 18:21:30 +0100
-Subject: [PATCH 13/14] ARM: dts: imx6ul: add gpmi support
-In-Reply-To: <1452619291-13625-13-git-send-email-LW@KARO-electronics.de>
+Date: Tue, 12 Jan 2016 18:21:24 +0100
+Subject: [PATCH 07/14] ARM: dts: imx6ul: add pwm[1-4] nodes
+In-Reply-To: <1452619291-13625-7-git-send-email-LW@KARO-electronics.de>
 References: <1452619291-13625-1-git-send-email-LW@KARO-electronics.de>
  <1452619291-13625-2-git-send-email-LW@KARO-electronics.de>
  <1452619291-13625-3-git-send-email-LW@KARO-electronics.de>
@@ -9,64 +9,69 @@ References: <1452619291-13625-1-git-send-email-LW@KARO-electronics.de>
  <1452619291-13625-5-git-send-email-LW@KARO-electronics.de>
  <1452619291-13625-6-git-send-email-LW@KARO-electronics.de>
  <1452619291-13625-7-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-8-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-9-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-10-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-11-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-12-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-13-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1452619291-13625-14-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1452619291-13625-8-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx6ul.dtsi | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ arch/arm/boot/dts/imx6ul.dtsi | 44 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 0123480..710e6ca 100644
+index 863777e..40ea5f0 100644
 --- a/arch/arm/boot/dts/imx6ul.dtsi
 +++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -141,6 +141,39 @@
- 			reg = <0x00900000 0x20000>;
- 		};
+@@ -248,6 +248,50 @@
+ 				status = "disabled";
+ 			};
  
-+		dma_apbh: dma-apbh at 01804000 {
-+			compatible = "fsl,imx6q-dma-apbh", "fsl,imx28-dma-apbh";
-+			reg = <0x01804000 0x2000>;
-+			interrupts = <0 13 IRQ_TYPE_LEVEL_HIGH>,
-+				     <0 13 IRQ_TYPE_LEVEL_HIGH>,
-+				     <0 13 IRQ_TYPE_LEVEL_HIGH>,
-+				     <0 13 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "gpmi0", "gpmi1", "gpmi2", "gpmi3";
-+			#dma-cells = <1>;
-+			dma-channels = <4>;
-+			clocks = <&clks IMX6UL_CLK_APBHDMA>;
-+		};
++			pwm1: pwm at 02080000 {
++				compatible = "fsl,imx6ul-pwm", "fsl,imx27-pwm";
++				reg = <0x02080000 0x4000>;
++				interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6UL_CLK_PWM1>,
++					 <&clks IMX6UL_CLK_PWM1>;
++				clock-names = "ipg", "per";
++				#pwm-cells = <2>;
++				status = "disabled";
++			};
 +
-+		gpmi: gpmi-nand at 01806000         {
-+			compatible = "fsl,imx6q-gpmi-nand";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x01806000 0x2000>, <0x01808000 0x2000>;
-+			reg-names = "gpmi-nand", "bch";
-+			interrupts = <0 15 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "bch";
-+			clocks = <&clks IMX6UL_CLK_GPMI_IO>,
-+				 <&clks IMX6UL_CLK_GPMI_APB>,
-+				 <&clks IMX6UL_CLK_GPMI_BCH>,
-+				 <&clks IMX6UL_CLK_GPMI_BCH_APB>,
-+				 <&clks IMX6UL_CLK_PER_BCH>;
-+			clock-names = "gpmi_io", "gpmi_apb", "gpmi_bch",
-+				      "gpmi_bch_apb", "per1_bch";
-+			dmas = <&dma_apbh 0>;
-+			dma-names = "rx-tx";
-+			status = "disabled";
-+		};
++			pwm2: pwm at 02084000 {
++				compatible = "fsl,imx6ul-pwm", "fsl,imx27-pwm";
++				reg = <0x02084000 0x4000>;
++				interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6UL_CLK_PWM2>,
++					 <&clks IMX6UL_CLK_PWM2>;
++				clock-names = "ipg", "per";
++				#pwm-cells = <2>;
++				status = "disabled";
++			};
 +
- 		aips1: aips-bus at 02000000 {
- 			compatible = "fsl,aips-bus", "simple-bus";
- 			#address-cells = <1>;
++			pwm3: pwm at 02088000 {
++				compatible = "fsl,imx6ul-pwm", "fsl,imx27-pwm";
++				reg = <0x02088000 0x4000>;
++				interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6UL_CLK_PWM3>,
++					 <&clks IMX6UL_CLK_PWM3>;
++				clock-names = "ipg", "per";
++				#pwm-cells = <2>;
++				status = "disabled";
++			};
++
++			pwm4: pwm at 0208c000 {
++				compatible = "fsl,imx6ul-pwm", "fsl,imx27-pwm";
++				reg = <0x0208c000 0x4000>;
++				interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6UL_CLK_PWM4>,
++					 <&clks IMX6UL_CLK_PWM4>;
++				clock-names = "ipg", "per";
++				#pwm-cells = <2>;
++				status = "disabled";
++			};
++
+ 			gpt1: gpt at 02098000 {
+ 				compatible = "fsl,imx6ul-gpt", "fsl,imx6sx-gpt";
+ 				reg = <0x02098000 0x4000>;
 -- 
 2.1.4
