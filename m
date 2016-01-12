@@ -1,104 +1,40 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Tue, 12 Jan 2016 09:37:37 +0100
-Subject: [PATCH 05/10] arm64: dts: r8a7795: Add pmu device nodes
-In-Reply-To: <20160111103916.GC6499@leverpostej>
-References: <cover.1450401186.git.horms+renesas@verge.net.au>
- <a6b6b478459be0c5614626ba6ac95df05a7fc5e9.1450401186.git.horms+renesas@verge.net.au>
- <5673DCF7.1050008@arm.com> <5673E39C.6050206@gmail.com>
- <5673E437.7020300@arm.com> <5690AA7A.4000303@gmail.com>
- <20160111103916.GC6499@leverpostej>
-Message-ID: <5694BB51.9000800@de.bosch.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Tue, 12 Jan 2016 09:39:41 +0100
+Subject: [PATCH v2] spi: atmel: improve internal vs gpio chip-select choice
+In-Reply-To: <1452528102-26458-1-git-send-email-mans@mansr.com>
+References: <1452528102-26458-1-git-send-email-mans@mansr.com>
+Message-ID: <5694BBCD.8020700@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.01.2016 11:39, Mark Rutland wrote:
-> On Sat, Jan 09, 2016 at 07:36:42AM +0100, Dirk Behme wrote:
->> On 18.12.2015 11:47, Sudeep Holla wrote:
->>>
->>>
->>> On 18/12/15 10:44, Dirk Behme wrote:
->>>> On 18.12.2015 11:16, Sudeep Holla wrote:
->>>>>
->>>>>
->>>>> On 18/12/15 02:29, Simon Horman wrote:
->>>>>> From: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
->>>>>>
->>>>>> Enabling the performance monitor unit on r8a7795.
->>>>>>
->>>>>> Signed-off-by: Masaru Nagai <masaru.nagai.vx@renesas.com>
->>>>>> Signed-off-by: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
->>>>>> Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
->>>>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>>>>> ---
->>>>>>   arch/arm64/boot/dts/renesas/r8a7795.dtsi | 12 ++++++++++++
->>>>>>   1 file changed, 12 insertions(+)
->>>>>>
->>>>>> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->>>>>> b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->>>>>> index 4d43cf31418f..b9229a49dabc 100644
->>>>>> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->>>>>> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->>>>>> @@ -230,6 +230,18 @@
->>>>>>               power-domains = <&cpg>;
->>>>>>           };
->>>>>>
->>>>>> +        pmu {
->>>>>> +            compatible = "arm,armv8-pmuv3";
->>>>>
->>>>> Please use arm,cortex-a57-pmu to be more specific. IIRC I mentioned
->>>>> this
->>>>> for some shmobile platform recently.
->>>>
->>>>
->>>> Yes. But as this patch has been applied already to some branches, I
->>>> incorporated your a57-pmu hint with an additional update patch:
->>>>
->>>> http://marc.info/?l=linux-sh&m=145011467914857
->>>>
->>>> Feel free to squash if still possible.
->>>>
->>>
->>> Ah OK, I didn't know the exact dts name, sorry for the noise.
->>> Better if it was posted as part of this series :)
->>
->>
->> I finally found some time to test this
->>
->> http://marc.info/?l=linux-sh&m=145011467914857
->>
->> and surprisingly it doesn't seem to work:
->>
->> Using "arm,cortex-a57-pmu" results in
->>
->> hw perfevents: enabled with armv8_cortex_a57 PMU driver, 7 counters
->> available
->
-> This means all the probing logic worked for the A57 PMU.
->
->> hw perfevents: failed to probe PMU!
->> hw perfevents: failed to register PMU devices!
->
-> These are printed in arm_pmu_device_probe, and following the logic we
-> must have succesfully allocated the struct pmu, but failed in either
-> of_pmu_irq_cfg or init_fn (AKA armv8_a53_pmu_init).
->
-> In armv8_a53_pmu_init we call armv8pmu_probe_num_events, which will try
-> to SMP cross-call to an A53 core to probe the number of countesr
-> implemented. Perhaps the cross-call is failing.
->
-> Were the A53s online at this point?
+Hi Mans,
 
+I've tried to apply your patch on a next-20160112 branch to test it but it
+failed. I've also looked at the for-next branch of the SPI sub-system git
+tree.
 
-Ah, indeed, the A53s failed to run.
+It seems that one issue occurred within a chunk patching the atmel_spi_setup()
+function. Please see below.
 
-Maybe anything like
+Le 11/01/2016 17:01, Mans Rullgard a ?crit :
+[...]
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index 08cbb3e43c76..d4a806e24060 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+[...]
+> @@ -1603,6 +1611,7 @@ static int atmel_spi_setup(struct spi_device *spi)
+>  		}
+>  
+>  		asd->npcs_pin = npcs_pin;
+> +		asd->use_cs_gpio = use_cs_gpio;
+>  		spi->controller_state = asd;
+>  	} else {
+>  		atmel_spi_lock(as);
+[...]
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/398773.html
+There is no 'else' statement in the source code I'm looking at.
 
-helps to make this more obvious, then?
+Best regards,
 
-Thanks!
-
-Best regards
-
-Dirk
+Cyrille
