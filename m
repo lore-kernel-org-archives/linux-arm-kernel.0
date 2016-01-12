@@ -1,63 +1,33 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Tue, 12 Jan 2016 20:17:08 +0100
-Subject: [PATCHv2] net: bpf: reject invalid shifts
-In-Reply-To: <20160112185121.GA34045@ast-mbp.thefacebook.com>
-References: <20160112185121.GA34045@ast-mbp.thefacebook.com>
-Message-ID: <1452626228-15742-1-git-send-email-rabin@rab.in>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 12 Jan 2016 20:21:17 +0100
+Subject: [PATCH v3 1/2] acpi: Fix proper return code for function
+ acpi_gsi_to_irq
+In-Reply-To: <CAGDN=zbbfr8HVKhg4YEieyxzb6jT6eMJ2mTyn6zV9HFD_AA3aA@mail.gmail.com>
+References: <1446857519-5908-1-git-send-email-lho@apm.com>
+ <1446857519-5908-2-git-send-email-lho@apm.com>
+ <20160110110714.GA22896@pd.tnic>
+ <CAGDN=zYa1r23EphdYQTFe2YXRhg_P-RDiaZVms9rdbFA3Y-x3g@mail.gmail.com>
+ <20160111221305.GH4665@pd.tnic>
+ <CAGDN=zZOr6+q8aAdXB3gnSLfCm6gX-6KLaFPr+A4QMf+TPwR-w@mail.gmail.com>
+ <20160112143653.GB30558@pd.tnic>
+ <CAGDN=za9Pjm0B0OMJevgesBdkm=XOGyU7jXXfWqk+dLSo7BVtQ@mail.gmail.com>
+ <20160112183228.GK30558@pd.tnic>
+ <CAGDN=zbbfr8HVKhg4YEieyxzb6jT6eMJ2mTyn6zV9HFD_AA3aA@mail.gmail.com>
+Message-ID: <20160112192117.GL30558@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM64, a BUG() is triggered in the eBPF JIT if a filter with a
-constant shift that can't be encoded in the immediate field of the
-UBFM/SBFM instructions is passed to the JIT.  Since these shifts
-amounts, which are negative or >= regsize, are invalid, reject them in
-the eBPF verifier and the classic BPF filter checker, for all
-architectures.
+On Tue, Jan 12, 2016 at 10:46:15AM -0800, Tuan Phan wrote:
+> Well, it basically the same as old code except the change of API
+> interface. And it requires some changes in ACPI core and X86/I64 arch
+> code.
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
-v2: handle BPF_ARSH too
+That's why I said:
 
- kernel/bpf/verifier.c | 10 ++++++++++
- net/core/filter.c     |  5 +++++
- 2 files changed, 15 insertions(+)
+"Patch 1 could be improved. It is Rafael's call in the end of the day."
 
-diff --git a/kernel/bpf/verifier.c b/kernel/bpf/verifier.c
-index a7945d10b378..d1d3e8f57de9 100644
---- a/kernel/bpf/verifier.c
-+++ b/kernel/bpf/verifier.c
-@@ -1121,6 +1121,16 @@ static int check_alu_op(struct verifier_env *env, struct bpf_insn *insn)
- 			return -EINVAL;
- 		}
- 
-+		if ((opcode == BPF_LSH || opcode == BPF_RSH ||
-+		     opcode == BPF_ARSH) && BPF_SRC(insn->code) == BPF_K) {
-+			int size = BPF_CLASS(insn->code) == BPF_ALU64 ? 64 : 32;
-+
-+			if (insn->imm < 0 || insn->imm >= size) {
-+				verbose("invalid shift %d\n", insn->imm);
-+				return -EINVAL;
-+			}
-+		}
-+
- 		/* pattern match 'bpf_add Rx, imm' instruction */
- 		if (opcode == BPF_ADD && BPF_CLASS(insn->code) == BPF_ALU64 &&
- 		    regs[insn->dst_reg].type == FRAME_PTR &&
-diff --git a/net/core/filter.c b/net/core/filter.c
-index 672eefbfbe99..37157c4c1a78 100644
---- a/net/core/filter.c
-+++ b/net/core/filter.c
-@@ -777,6 +777,11 @@ static int bpf_check_classic(const struct sock_filter *filter,
- 			if (ftest->k == 0)
- 				return -EINVAL;
- 			break;
-+		case BPF_ALU | BPF_LSH | BPF_K:
-+		case BPF_ALU | BPF_RSH | BPF_K:
-+			if (ftest->k >= 32)
-+				return -EINVAL;
-+			break;
- 		case BPF_LD | BPF_MEM:
- 		case BPF_LDX | BPF_MEM:
- 		case BPF_ST:
 -- 
-2.6.4
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
