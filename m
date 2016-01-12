@@ -1,40 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Jan 2016 22:53:15 +0100
-Subject: [PATCH v3 0/2] pci: Add host controller driver for Cavium
- ThunderX PCIe
-In-Reply-To: <1452297553-19911-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1452297553-19911-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <4279902.J8lISZqg4v@wuerfel>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 12 Jan 2016 22:53:52 +0100
+Subject: /sys/class/power_supply/bq27200-0/capacity changed meaning
+ between 4.1 and 4.4?
+In-Reply-To: <56951A2C.9010602@ti.com>
+References: <20160109230709.GA30551@amd> <5693BB75.70409@ti.com>
+ <20160111214247.GA9735@amd> <56942344.9070609@ti.com>
+ <56951A2C.9010602@ti.com>
+Message-ID: <20160112215352.GA5248@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 08 January 2016 15:59:11 David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
-> 
-> Some Cavium ThunderX processors require quirky access methods for the
-> config space of the PCIe bridge.
-> 
-> There are two patches:
-> 
-> 1) Refactor code in pci-host-generic so that it can more easily be
->    used by other drivers.  This splits the driver for CAM and ECAM
->    access methods to a separate file from the common host driver code.
-> 
-> 2) Add the ThunderX PCIe driver, which leverages the code in
->    pci-host-generic
-> 
-> Changes from v2: Improve device tree binding example as noted by Rob
-> Herring.  Rename pcie-thunder-pem.* to pci-thunder-pem.* for better
-> consistency.  Update MAINTAINERS to reflect the changes.
-> 
-> Changes from v1: Split CAM and ECAM code from common driver code as
-> suggested by Arnd Bergmann.  Fix spelling errors in
-> pcie-thunder-pem.txt
-> 
+Hi!
 
-Sorry for the late reply (I didn't comment on v2 either). This version
-looks fine to me. There are probably cleanups we can do on the generic
-code later on, but splitting it up the way you do here fully addresses
-my earlier concerns. Thanks for your patience.
+> >>If not, tell me, and I can do it, but it will involve a lot of swaring...
+> >
+> >I'll give it a look over.
+> 
+> OK, I'm still looking for a test setup, but this was definitely a problem,
+> could you give this a try?:
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Well, search no more. I tested it and seems to work ok. There's one
+more blank line in the source, so I had to apply patch by hand.
+
+Tested-by: Pavel Machek <pavel@ucw.cz>
+Acked-by: Pavel Machek <pavel@ucw.cz>
+Reported-by: Pavel Machek <pavel@ucw.cz>
+Cc: stable at vger.kernel.org
+
+? :-).
+
+And... thanks!
+									Pavel
+
+> diff --git a/drivers/power/bq27xxx_battery.c b/drivers/power/bq27xxx_battery.c
+> index 880233c..4fec3cf 100644
+> --- a/drivers/power/bq27xxx_battery.c
+> +++ b/drivers/power/bq27xxx_battery.c
+> @@ -470,8 +470,9 @@ static inline int bq27xxx_read(struct bq27xxx_device_info *di, int reg_index,
+>  static int bq27xxx_battery_read_soc(struct bq27xxx_device_info *di)
+>  {
+>  	int soc;
+> +	bool single = di->chip == BQ27000 || di->chip == BQ27010;
+> -	soc = bq27xxx_read(di, BQ27XXX_REG_SOC, false);
+> +	soc = bq27xxx_read(di, BQ27XXX_REG_SOC, single);
+>  	if (soc < 0)
+>  		dev_dbg(di->dev, "error reading State-of-Charge\n");
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
