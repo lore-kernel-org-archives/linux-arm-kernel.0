@@ -1,64 +1,30 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 12 Jan 2016 20:10:28 +0100
-Subject: [PATCH net-next 04/10] ARM: mvebu: add buffer manager nodes to
- armada-38x.dtsi
+Date: Tue, 12 Jan 2016 20:10:32 +0100
+Subject: [PATCH net-next 08/10] bus: mvenus-mbus: Fix size test for
+ mvebu_mbus_get_dram_win_info
 In-Reply-To: <1452625834-22166-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1452625834-22166-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1452625834-22166-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1452625834-22166-9-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcin Wojtas <mw@semihalf.com>
-
-Armada 38x network controller supports hardware buffer management (BM).
-Since it is now enabled in mvneta driver, appropriate nodes can be added
-to armada-38x.dtsi - for the actual common BM unit (bm at c8000) and its
-internal SRAM (bm-bppi), which is used for indirect access to buffer
-pointer ring residing in DRAM.
-
-Pools - ports mapping, bm-bppi entry in 'soc' node's ranges and optional
-parameters are supposed to be set in board files.
-
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-38x.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ drivers/bus/mvebu-mbus.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index e8b7f6726772..1b7d690d8e10 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -540,6 +540,14 @@
- 				status = "disabled";
- 			};
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index 3d1c0c3880ec..214bb964165b 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -964,7 +964,7 @@ int mvebu_mbus_get_dram_win_info(phys_addr_t phyaddr, u8 *target, u8 *attr)
+ 	for (i = 0; i < dram->num_cs; i++) {
+ 		const struct mbus_dram_window *cs = dram->cs + i;
  
-+			bm: bm at c8000 {
-+				compatible = "marvell,armada-380-neta-bm";
-+				reg = <0xc8000 0xac>;
-+				clocks = <&gateclk 13>;
-+				internal-mem = <&bm_bppi>;
-+				status = "disabled";
-+			};
-+
- 			sata at e0000 {
- 				compatible = "marvell,armada-380-ahci";
- 				reg = <0xe0000 0x2000>;
-@@ -618,6 +626,16 @@
- 			#size-cells = <1>;
- 			ranges = <0 MBUS_ID(0x09, 0x15) 0 0x800>;
- 		};
-+
-+		bm_bppi: bm-bppi {
-+			compatible = "mmio-sram";
-+			reg = <MBUS_ID(0x0c, 0x04) 0 0x100000>;
-+			ranges = <0 MBUS_ID(0x0c, 0x04) 0 0x100000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&gateclk 13>;
-+			status = "disabled";
-+		};
- 	};
- 
- 	clocks {
+-		if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size)) {
++		if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size - 1)) {
+ 			*target = dram->mbus_dram_target_id;
+ 			*attr = cs->mbus_attr;
+ 			return 0;
 -- 
 2.5.0
