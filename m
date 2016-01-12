@@ -1,147 +1,85 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 12 Jan 2016 10:08:00 +0000 (UTC)
-Subject: OMAP baseline test results for v4.4-rc8
-Message-ID: <alpine.DEB.2.02.1601121006400.25857@utopia.booyaka.com>
+From: blogic@openwrt.org (John Crispin)
+Date: Tue, 12 Jan 2016 11:10:14 +0100
+Subject: [PATCH v3 0/6] Add clock support for Mediatek MT2701
+In-Reply-To: <1452587470-61506-1-git-send-email-jamesjj.liao@mediatek.com>
+References: <1452587470-61506-1-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <5694D106.2030009@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi James,
 
-Here are some basic OMAP test results for Linux v4.4-rc8.
-Logs and other details at:
+On 12/01/2016 09:31, James Liao wrote:
+> This patchset is based on 4.4-rc7, add clock and reset controller support
+> for Mediatek MT2701.
+> 
+> This patchset also refined makefile and Kconfig to support configurable
+> multiple SoC clock support.
+> 
+> changes since v2:
+> - Fix ethsys definition.
+> - Replace read-modify-write with regmap_update_bits() in clock operations.
+> - Move mt2701-resets.h to include/dt-bindings/reset/.
+> - Add hifsys reset patch from John Crispin.
 
-    http://www.pwsan.com/omap/testlogs/test_v4.4-rc8/20160112021054/
+thanks for folding the fixup.
 
+i have been testing your V2 on MT7623 for several days now and updated
+to V3 this morning which works just as well. feel free to add
 
-Test summary
-------------
-
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build: uImage+dtb:
-    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/omap4-var-stk-om44,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-sbc-t3517,
-		  omap2plus_defconfig/omap5-uevm,
-		  omap2plus_defconfig/omap5-sbc-t54
-
-Build: zImage:
-    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
-
-Build warnings from toolchain: uImage:
-    FAIL ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build warnings from toolchain: uImage+dtb:
-    (none)
-
-Build warnings from toolchain: zImage:
-    FAIL ( 3/17): rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
-
-Boot to userspace:
-    FAIL ( 1/17): 2430sdp
-    skip ( 3/17): 5912osk, 3517evm, 5430es2sbct54
-    Pass (13/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
-		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
-		  2420n800
-
-Kernel warnings during boot to userspace:
-    FAIL ( 2/17): 4430es2panda, cmt3517
-
-PM: chip retention via suspend:
-    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
-		  2430sdp, 5430es2uevm
-    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 9/11): am335xbonelt, 4430es2panda, 4460pandaes,
-		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  2430sdp, 5430es2uevm
-    Pass ( 2/11): 3730beaglexm, 3730es12beaglexm
-
-PM: chip off (except CORE, due to errata) via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off (except CORE, due to errata) via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 2/ 4): 37xxevm, 3530es3beagle
-    Pass ( 2/ 4): 3530es31beagle, 3730es12beaglexm
-
-PM: chip off via dynamic idle:
-    FAIL ( 3/ 4): 37xxevm, 3530es3beagle, 3530es31beagle
-    Pass ( 1/ 4): 3730es12beaglexm
-
-Kernel warnings during PM test:
-    FAIL ( 1/17): 4430es2panda
-
-Obsolete Kconfig symbols:
-    FAIL ( 3/20): omap1_defconfig, omap2plus_defconfig,
-		  multi_v7_defconfig
+Tested-by: John Crispin <blogic@openwrt.org>
 
 
-vmlinux object size
-(delta in bytes from test_v4.4-rc7 (74bf8efb5fa6e958d2d7c7917b8bb672085ec0c6)):
-   text     data      bss    total  kernel
-    +49        0        0      +49  omap1_defconfig
-  +4145        0        0    +4145  omap1_defconfig_1510innovator_only
-    +49        0        0      +49  omap1_defconfig_5912osk_only
-   +185        0        0     +185  multi_v7_defconfig
-  +3286        0        0    +3286  omap2plus_defconfig
-   -746        0        0     -746  omap2plus_defconfig_2430sdp_only
-   -678        0        0     -678  omap2plus_defconfig_am33xx_only
-   -742        0        0     -742  omap2plus_defconfig_am43xx_only
-   -746        0        0     -746  omap2plus_defconfig_cpupm
-  +3354        0        0    +3354  omap2plus_defconfig_dra7xx_only
-   -294        0        0     -294  omap2plus_defconfig_n800_multi_omap2xxx
-   +146        0        0     +146  omap2plus_defconfig_n800_only_a
-   -742        0        0     -742  omap2plus_defconfig_no_pm
-   -746        0        0     -746  omap2plus_defconfig_omap2_4_only
-   -682        0        0     -682  omap2plus_defconfig_omap3_4_only
-   -742        0        0     -742  omap2plus_defconfig_omap5_only
-    +64        0      -32      +32  rmk_omap3430_ldp_allnoconfig
-   -198        0        0     -198  rmk_omap3430_ldp_oldconfig
-    +16        0      -16        0  rmk_omap4430_sdp_allnoconfig
-  +4222        0        0    +4222  rmk_omap4430_sdp_oldconfig
+	John
 
-Boot-time memory difference
-(delta in bytes from test_v4.4-rc7 (74bf8efb5fa6e958d2d7c7917b8bb672085ec0c6))
-  avail  rsrvd   high  freed  board          kconfig
- -117292k -13780k      .  -180k  2420n800       omap2plus_defconfig_n800_only_a
-      .      .      .    -4k  3530es31beagle omap2plus_defconfig
-      .      .      .    -4k  3530es3beagle  omap2plus_defconfig
-      .      .      .    -4k  3730beaglexm   omap2plus_defconfig
-      .      .      .    -4k  3730es12beaglexmomap2plus_defconfig
-      .      .      .    -4k  37xxevm        omap2plus_defconfig
-      .      .      .    -4k  4430es2panda   omap2plus_defconfig
-      .      .      .    -4k  4460pandaes    omap2plus_defconfig
-      .      .      .    -4k  4460varsomom   omap2plus_defconfig
-      .      .      .    -4k  5430es2uevm    omap2plus_defconfig
-     8k    -8k      .    -4k  am335xbone     omap2plus_defconfig_am33xx_only
-      .      .      .    -4k  am335xbonelt   omap2plus_defconfig
+
+> changes since v1:
+> - Document MT2701 compatible strings.
+> 
+> James Liao (2):
+>   clk: mediatek: Refine the makefile to support multiple clock drivers
+>   dt-bindings: ARM: Mediatek: Document bindings for MT2701
+> 
+> Shunli Wang (4):
+>   clk: mediatek: Add dt-bindings for MT2701 clocks
+>   clk: mediatek: Add MT2701 clock support
+>   reset: mediatek: Add MT2701 reset controller dt-binding file
+>   reset: mediatek: Add MT2701 reset driver
+> 
+>  .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |    1 +
+>  .../bindings/arm/mediatek/mediatek,bdpsys.txt      |   22 +
+>  .../bindings/arm/mediatek/mediatek,ethsys.txt      |   22 +
+>  .../bindings/arm/mediatek/mediatek,hifsys.txt      |   22 +
+>  .../bindings/arm/mediatek/mediatek,imgsys.txt      |    1 +
+>  .../bindings/arm/mediatek/mediatek,infracfg.txt    |    1 +
+>  .../bindings/arm/mediatek/mediatek,mmsys.txt       |    1 +
+>  .../bindings/arm/mediatek/mediatek,pericfg.txt     |    1 +
+>  .../bindings/arm/mediatek/mediatek,topckgen.txt    |    1 +
+>  .../bindings/arm/mediatek/mediatek,vdecsys.txt     |    1 +
+>  drivers/clk/Kconfig                                |    1 +
+>  drivers/clk/mediatek/Kconfig                       |   31 +
+>  drivers/clk/mediatek/Makefile                      |    7 +-
+>  drivers/clk/mediatek/clk-gate.c                    |   52 +
+>  drivers/clk/mediatek/clk-gate.h                    |    2 +
+>  drivers/clk/mediatek/clk-mt2701.c                  | 1216 ++++++++++++++++++++
+>  drivers/clk/mediatek/clk-mtk.c                     |   25 +
+>  drivers/clk/mediatek/clk-mtk.h                     |   35 +-
+>  include/dt-bindings/clock/mt2701-clk.h             |  481 ++++++++
+>  include/dt-bindings/reset/mt2701-resets.h          |   83 ++
+>  20 files changed, 2000 insertions(+), 6 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
+>  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
+>  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,hifsys.txt
+>  create mode 100644 drivers/clk/mediatek/Kconfig
+>  create mode 100644 drivers/clk/mediatek/clk-mt2701.c
+>  create mode 100644 include/dt-bindings/clock/mt2701-clk.h
+>  create mode 100644 include/dt-bindings/reset/mt2701-resets.h
+> 
+> --
+> 1.9.1
+> 
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+> 
