@@ -1,38 +1,51 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 12 Jan 2016 02:19:04 +0100
-Subject: I/O issues with writing to mtdblock devices on kirkwood
-In-Reply-To: <20160112004749.GT6588@sirena.org.uk>
-References: <1440159857.19360.50.camel@debian.org>
- <20150905210846.GF6040@lunn.ch>
- <CAKzmTe0Bq8itvKoOTwZ+ZjY5pTqFYWt0-ihO4jn0qew_NYGhFg@mail.gmail.com>
- <20151011153548.GA9808@lunn.ch>
- <20160111230059.GA12286@jirafa.cyrius.com>
- <20160111232231.GS6588@sirena.org.uk>
- <20160112000721.GB12286@jirafa.cyrius.com>
- <20160112004749.GT6588@sirena.org.uk>
-Message-ID: <20160112011904.GC7690@lunn.ch>
+From: qiuxishi@huawei.com (Xishi Qiu)
+Date: Tue, 12 Jan 2016 09:20:54 +0800
+Subject: Have any influence on set_memory_** about below patch ??
+In-Reply-To: <20160111133145.GM6499@leverpostej>
+References: <5693A740.7070408@huawei.com> <20160111133145.GM6499@leverpostej>
+Message-ID: <569454F6.1060207@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Oh, right.  This sounds like everything is working fine with SPI - that
-> commit was supposed to improve throughput with single threaded workloads
-> by avoiding pointless context switches and it seems it is in fact doing
-> that.  Most likely you are using a bitbanging SPI controller driver and
-> that's causing lots of I/O wait states which is upsetting the scheduler
-> but it's hard to be sure.
+On 2016/1/11 21:31, Mark Rutland wrote:
 
-drivers/spi/spi-orion.c
+> Hi,
+> 
+> On Mon, Jan 11, 2016 at 08:59:44PM +0800, zhong jiang wrote:
+>>
+>> http://www.spinics.net/lists/arm-kernel/msg472090.html
+>>
+>> Hi, Can I ask you a question? Say, This patch tells that the section spilting
+>> and merging wiil produce confilct in the liner mapping area. Based on the
+>> situation, Assume that set up page table in 4kb page table way in the liner
+>> mapping area, Does the set_memroy_** will work without any conplict??
+> 
+> I'm not sure I understand the question.
+> 
+> I'm also not a fan of responding to off-list queries as information gets
+> lost.
+> 
+> Please ask your question on the mailing list. I am more than happy to
+> respond there.
+> 
+> Thanks,
+> Mark.
+> 
 
-Not bitbanging, but it is polled IO, not DMA.
- 
-> Possibly whatever SPI driver this system uses is doing something really
-> rude (perhaps limited by the hardware), possibly it isn't using DMA when
-> it should be, or possibly the scheduler just isn't doing a good job with
-> the workload you're giving it.
+Hi Mark,
 
-When i played with this, i added a reschedule point at the end of the
-drivers transfer_one_message() function, to see if that would help. It
-did not, which is why i made a guess it has something to do with a
-lock.
+In your patch it said "The presence of conflicting TLB entries may result in
+a variety of behaviours detrimental to the system " and "but this(break-before-make
+approach) cannot work for modifications to the swapper page tables that cover the
+kernel text and data."
 
-	Andrew
+I'm not quite understand this, why the direct mapping can't work?
+flush tlb can't resolve it?
+
+I find x86 does not have this limit. e.g. set_memory_r*.
+
+Thanks,
+Xishi Qiu
+
+> .
+> 
