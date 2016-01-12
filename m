@@ -1,60 +1,56 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Tue, 12 Jan 2016 19:11:12 +0900
-Subject: [PATCH v3] arm: irq: l2c: do not print error in case of missing l2c
- from dtb
-In-Reply-To: <5694BABF.3070200@samsung.com>
-References: <5694BABF.3070200@samsung.com>
-Message-ID: <1452593472-10703-1-git-send-email-andi.shyti@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 12 Jan 2016 10:13:58 +0000
+Subject: [PATCH RFC] spi: orion.c: Add direct write mode
+In-Reply-To: <1452589339-21402-1-git-send-email-sr@denx.de>
+References: <1452589339-21402-1-git-send-email-sr@denx.de>
+Message-ID: <20160112101358.GY6588@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some architectures the L2 cache controller is integrated in the
-processor's block itself and it doesn't use any external cache
-controller. This means that an entry in the board's dtb related
-to the l2c is not necessary.
+On Tue, Jan 12, 2016 at 10:02:19AM +0100, Stefan Roese wrote:
 
-Distinguish between error codes and do not print anything in case
-l2x0_of_init() doesn't find any L2C DTB entry and returns -ENODEV.
+> +- direct-addr : The phandle to the node containing the base address
+> +                of the direct-mapped MBus window for this SPI device.
 
-This patch mutes the following error message:
+Why are we not just making the MBus window a normal resource on the SPI
+controller and why do we need to use this only for a single device?  If
+we can program which device is used then we can just reconfigure
+whenever we change devices and use this optimisation for everything.
 
-   L2C: failed to init: -19
+> +		spidev at 1 {
+> +			compatible = "spidev";
+> +			direct-addr = <&spi0_cs1>;
+> +			reg = <1>;
+> +		};
 
-on boards like odroid-xu4, cortex A7/A15, which don't have
-external cache controller.
+This is broken, spidev should never appear in a DT (and the driver will
+complain loudly if it does).  Describe the actual hardware.
 
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
-Hi,
+> +	/* Use SPI direct write mode if such an address is provided via DT */
+> +	orion_spi = spi_master_get_devdata(spi->master);
+> +	direct_addr = orion_spi->slave_direct_addr[spi->chip_select];
+> +	if (direct_addr && xfer->tx_buf) {
+> +		/* Deassert CS between the SPI transfers */
+> +		writel(0x00010000, spi_reg(orion_spi,
+> +					   SPI_DIRECT_WRITE_CONFIG_REG));
 
-here is a second version. An alternative would be to print with
-pr_dbg, but then it's a matter of taste.
+This is badly broken, we should be asserting /CS over the entire message
+unless the individual transfer says otherwise.  I'm surprised this
+works.
 
-V1, and V2 print a message in case the l2c dtb entry is not found
-(the V2 has a better print rephrase suggested by Joe)
+> +		/*
+> +		 * Send the tx-data to the SPI device via the direct mapped
+> +		 * address window
+> +		 */
+> +		memcpy(direct_addr, xfer->tx_buf, count);
 
-V3 ignores the case of -enodev for l2c and doesn't print anything
-
-Thanks,
-Andi
-
- arch/arm/kernel/irq.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 1d45320..ece04a4 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -95,7 +95,7 @@ void __init init_IRQ(void)
- 			outer_cache.write_sec = machine_desc->l2c_write_sec;
- 		ret = l2x0_of_init(machine_desc->l2c_aux_val,
- 				   machine_desc->l2c_aux_mask);
--		if (ret)
-+		if (ret && ret != -ENODEV)
- 			pr_err("L2C: failed to init: %d\n", ret);
- 	}
- 
--- 
-2.6.4
+What if we are transferring more data than the window mapped in
+direct_addr and what if the transfer is bidirectional?  It looks like we
+can only do this for transmit only transfers.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160112/c6201ed0/attachment.sig>
