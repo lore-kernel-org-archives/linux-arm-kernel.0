@@ -1,42 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 Jan 2016 17:17:10 +0000
-Subject: [PATCH] arm64: net: bpf: don't BUG() on large shifts
-In-Reply-To: <20160108190943.GA11561@ast-mbp.thefacebook.com>
-References: <1452015543-6790-1-git-send-email-rabin@rab.in>
- <20160108154423.GC11228@arm.com>
- <20160108190943.GA11561@ast-mbp.thefacebook.com>
-Message-ID: <20160112171710.GK15737@arm.com>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Tue, 12 Jan 2016 18:21:21 +0100
+Subject: [PATCH 04/14] ARM: dts: imx6ul: specify proper clocks for GPT node
+In-Reply-To: <1452619291-13625-4-git-send-email-LW@KARO-electronics.de>
+References: <1452619291-13625-1-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-2-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-3-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-4-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1452619291-13625-5-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 08, 2016 at 11:09:44AM -0800, Alexei Starovoitov wrote:
-> On Fri, Jan 08, 2016 at 03:44:23PM +0000, Will Deacon wrote:
-> > On Tue, Jan 05, 2016 at 06:39:03PM +0100, Rabin Vincent wrote:
-> > > Attempting to generate UBFM/SBFM instructions with shifts that can't be
-> > > encoded in the immediate fields of the opcodes leads to a trigger of a
-> > > BUG() in the instruction generation code.  As the ARMv8 ARM says: "The
-> > > shift amounts must be in the range 0 to one less than the register width
-> > > of the instruction, inclusive."  Make the JIT reject unencodable shifts
-> > > instead of crashing.
-> > 
-> > I moaned about those BUG_ONs when they were introduced:
-> > 
-> >   https://lkml.org/lkml/2014/7/17/438
-> > 
-> > The response then was that the verifier would catch these issues so
-> > there was nothing to worry about. Has something changed so that is no
-> > longer the case? Do we need to consider a different way of rejecting
-> > invalid instructions at the encoding stage rather than bringing down the
-> > kernel?
-> 
-> that discussion lead to replacement of all BUG_ONs in
-> arch/arm64/net/bpf_jit_comp.c with pr_err_once(), but looks like
-> arch/arm64/kernel/insn.c wasn't addressed.
-> The amount of BUG_ONs there is indeed overkill regardless of what
-> verifier and other JITs do. btw, x64 JIT doesn't have runtime BUG_ONs.
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/boot/dts/imx6ul.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Maybe, but insn.c is also used by the alternatives patching code, so we
-really need a way to communicate failure back to the BPF JIT when passed
-an invalid instruction description.
-
-Will
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index e4c3a80..e6e3e54 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -499,8 +499,8 @@
+ 				compatible = "fsl,imx6ul-gpt", "fsl,imx6sx-gpt";
+ 				reg = <0x020e8000 0x4000>;
+ 				interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
+-				clocks = <&clks IMX6UL_CLK_DUMMY>,
+-					 <&clks IMX6UL_CLK_DUMMY>;
++				clocks = <&clks IMX6UL_CLK_GPT2_BUS>,
++					 <&clks IMX6UL_CLK_GPT2_SERIAL>;
+ 				clock-names = "ipg", "per";
+ 			};
+ 
+-- 
+2.1.4
