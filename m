@@ -1,38 +1,70 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 12 Jan 2016 01:31:40 +0000
-Subject: I/O issues with writing to mtdblock devices on kirkwood
-In-Reply-To: <20160112011904.GC7690@lunn.ch>
-References: <1440159857.19360.50.camel@debian.org>
- <20150905210846.GF6040@lunn.ch>
- <CAKzmTe0Bq8itvKoOTwZ+ZjY5pTqFYWt0-ihO4jn0qew_NYGhFg@mail.gmail.com>
- <20151011153548.GA9808@lunn.ch>
- <20160111230059.GA12286@jirafa.cyrius.com>
- <20160111232231.GS6588@sirena.org.uk>
- <20160112000721.GB12286@jirafa.cyrius.com>
- <20160112004749.GT6588@sirena.org.uk>
- <20160112011904.GC7690@lunn.ch>
-Message-ID: <20160112013140.GV6588@sirena.org.uk>
+From: xuejiancheng@huawei.com (xuejiancheng)
+Date: Tue, 12 Jan 2016 09:35:09 +0800
+Subject: [PATCH v5 5/6] mfd: dt-bindings: add device tree bindings for
+ Hi3519 sysctrl
+In-Reply-To: <20160111085555.GE14104@x1>
+References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
+ <1452219400-32478-6-git-send-email-xuejiancheng@huawei.com>
+ <20160111054846.GD3331@x1> <56935EA8.4060801@huawei.com>
+ <20160111085555.GE14104@x1>
+Message-ID: <5694584D.7040301@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 02:19:04AM +0100, Andrew Lunn wrote:
 
-> When i played with this, i added a reschedule point at the end of the
-> drivers transfer_one_message() function, to see if that would help. It
-> did not, which is why i made a guess it has something to do with a
-> lock.
 
-The SPI core doesn't hold any locks while it pushes things into the
-driver.  It has a spin lock to queue and deque messages but it drops
-that before it hands off to the driver (many of which sleep so we'd
-expect people to notice if we forgot to drop the lock).  It's possible
-there's something going on there but I'd be very surprised if we messed
-up the locking and only managed to notice over a period of years via an
-interaction with another subsystem with no direct ties...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160112/bac3e762/attachment.sig>
+On 2016/1/11 16:55, Lee Jones wrote:
+> On Mon, 11 Jan 2016, xuejiancheng wrote:
+>> On 2016/1/11 13:48, Lee Jones wrote:
+>>> On Fri, 08 Jan 2016, Jiancheng Xue wrote:
+>>>
+>>>> Add device tree bindings for Hi3519 system controller.
+>>>>
+>>>> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/mfd/hi3519.txt | 14 ++++++++++++++
+>>>>  1 file changed, 14 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/mfd/hi3519.txt
+>>>
+>>> I have this patch, but none of the others in the set, thus I am
+>>> lacking context.
+>>>
+>> I can forward other patches in the set to you. Thank you.
+>>
+>>>> diff --git a/Documentation/devicetree/bindings/mfd/hi3519.txt b/Documentation/devicetree/bindings/mfd/hi3519.txt
+>>>> new file mode 100644
+>>>> index 0000000..115c5be
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/mfd/hi3519.txt
+>>>> @@ -0,0 +1,14 @@
+>>>> +* Hisilicon Hi3519 System Controller Block
+>>>> +
+>>>> +This bindings use the following binding:
+>>>> +Documentation/devicetree/bindings/mfd/syscon.txt
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible: "hisilicon,hi3519-sysctrl".
+>>>> +- reg: the register region of this block
+>>>> +
+>>>> +Examples:
+>>>> +sysctrl: system-controller at 12010000 {
+>>>> +	compatible = "hisilicon,hi3519-sysctrl", "syscon";
+>>>> +	reg = <0x12010000 0x1000>;
+>>>> +};
+>>>
+>>> There is no requirement (nor want) for binding documents where the
+>>> given device is simply using highly generic bindings.  This just
+>>> amounts to churn.
+>>>
+>> This block is specific for Hi3519 SOC, and may has its own driver.
+> 
+> Does it have its own driver currently?
+> 
+Not yet.
+Arnd Bergmann and Rob Herring all suggested adding a specific compatible string
+with the SOC name. This binding is just used for describing the compatible string now.
+When more functions on hi3519 SOC are added later, the specific driver will be also
+needed.
+
+>> So I think it's better to keep this binding.
+> 
