@@ -1,57 +1,47 @@
-From: pc.liao@mediatek.com (PC Liao)
-Date: Tue, 12 Jan 2016 10:54:44 +0800
-Subject: [PATCH] ASoC: mediatek: Enable 33bit memory address to support
- 4GB DRAM
-In-Reply-To: <s5hwprgcwv6.wl-tiwai@suse.de>
-References: <1452499250-5202-1-git-send-email-pc.liao@mediatek.com>
- <s5hwprgcwv6.wl-tiwai@suse.de>
-Message-ID: <1452567284.8331.12.camel@mtksdaap41>
+From: qiuxishi@huawei.com (Xishi Qiu)
+Date: Tue, 12 Jan 2016 11:32:02 +0800
+Subject: [RFC] arm64: failed when run the command: timedatectl set-timezone
+ Asia/Shanghai
+In-Reply-To: <56946932.70601@huawei.com>
+References: <56946932.70601@huawei.com>
+Message-ID: <569473B2.3030909@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-01-11 at 17:02 +0800, Takashi Iwai wrote:
-> On Mon, 11 Jan 2016 09:00:50 +0100,
-> PC Liao wrote:
-> > 
-> > @@ -603,7 +606,10 @@ static int mtk_afe_dais_hw_params(struct snd_pcm_substream *substream,
-> >  	if (ret < 0)
-> >  		return ret;
-> >  
-> > -	memif->phys_buf_addr = substream->runtime->dma_addr;
-> > +	if (sizeof(dma_addr_t) > 4)
-> > +		msb_at_bit33 = (substream->runtime->dma_addr & 0x100000000) ? 1 : 0;
+On 2016/1/12 10:47, Xishi Qiu wrote:
+
+> Failed when run the command: timedatectl set-timezone Asia/Shanghai
+> But CONFIG_PGTABLE_LEVELS=3 is OK, and CONFIG_PGTABLE_LEVELS=4 is failed.
+> The kernel is v4.1, and this command need the lib polikit.
 > 
-> Better to put a proper suffix for the constant over 32bit.
+> Is this the bug of kernel?
 > 
-> Or use upper_32_bits().  Then sizeof() check can be omitted, as the
-> compiler should be smart enough to know it beforehand.
-> 
-> 
-> Takashi
+> Thanks,
+> Xishi Qiu
 
+[  241.310558] polkitd[3531]: unhandled level 0 translation fault (11) at 0x7fff9010c040, esr 0x92000004
+[  241.319838] pgd = ffff801fb3e05000
+[  241.323259] [7fff9010c040] *pgd=0000000000000000
 
-Hi Takashi,
-
-Thanks for your comment.
-I change as below:
-@@ -606,10 +606,8 @@ static int mtk_afe_dais_hw_params(struct
-snd_pcm_substream
-        if (ret < 0)
-                return ret;
-
--       if (sizeof(dma_addr_t) > 4)
--               msb_at_bit33 = (substream->runtime->dma_addr &
-0x100000000) ? 1
--
--       memif->phys_buf_addr = substream->runtime->dma_addr &
-0xffffffff;
-+       msb_at_bit33 = upper_32_bits(substream->runtime->dma_addr) ? 1 :
-0;
-+       memif->phys_buf_addr =
-lower_32_bits(substream->runtime->dma_addr);
-
-
-Dose this change follow your idea?
-Thanks! 
-
-PC Liao
+[  241.329407] CPU: 0 PID: 3531 Comm: polkitd Not tainted 4.1.12+ #1
+[  241.336312] Hardware name: Huawei Taishan 2160 /BC11SPCA, BIOS 1.12 12/30/2015
+[  241.343566] task: ffff801fb8772f00 ti: ffff80003f454000 task.ti: ffff80003f454000
+[  241.351089] PC is at 0xffff91d281ec
+[  241.354594] LR is at 0xffff91cb5b24
+[  241.358099] pc : [<0000ffff91d281ec>] lr : [<0000ffff91cb5b24>] pstate: 20000000
+[  241.365526] sp : 0000ffffd47a4380
+[  241.368858] x29: 0000ffffd47a47c0 x28: 0000000078e8107e
+[  241.374215] x27: 0000aaaafaf68020 x26: 00007fff9010c040
+[  241.379571] x25: 0000aaaafaf6c2b0 x24: 0000ffff91ed4000
+[  241.384931] x23: 0000000000000005 x22: 0000000000000000
+[  241.390288] x21: 0000000000000000 x20: 0000000000000008
+[  241.395644] x19: 0000ffff91ed4000 x18: 00000000000007df
+[  241.401004] x17: 0000ffff91ed5740 x16: 0000ffff91ce84ec
+[  241.406360] x15: 0000ffffd47a46a0 x14: 0000ffff91c07370
+[  241.411716] x13: 00000000000003d0 x12: 0000ffff92340000
+[  241.417074] x11: 0000000000000000 x10: 0101010101010101
+[  241.422431] x9 : 0000ffff90108218 x8 : 00000000f20217f7
+[  241.427786] x7 : 0000aaaafaf6db40 x6 : 0000ffff90109060
+[  241.433146] x5 : 0000000000000000 x4 : 0000aaaafaf6dc30
+[  241.438502] x3 : 0000000000000001 x2 : 0000000000000008
+[  241.443858] x1 : 0000aaaafaf68020 x0 : 00007fff9010c040
