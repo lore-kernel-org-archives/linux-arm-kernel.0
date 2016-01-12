@@ -1,31 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 Jan 2016 18:28:58 +0000
-Subject: [PATCH v2 2/3] iommu/io-pgtable: Add helper functions for TLB ops
-In-Reply-To: <a2a13711c528af068e932ce6af4c3be50bef5812.1450383740.git.robin.murphy@arm.com>
-References: <cover.1450383740.git.robin.murphy@arm.com>
- <a2a13711c528af068e932ce6af4c3be50bef5812.1450383740.git.robin.murphy@arm.com>
-Message-ID: <20160112182857.GD22186@arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 12 Jan 2016 19:32:28 +0100
+Subject: [PATCH v3 1/2] acpi: Fix proper return code for function
+ acpi_gsi_to_irq
+In-Reply-To: <CAGDN=za9Pjm0B0OMJevgesBdkm=XOGyU7jXXfWqk+dLSo7BVtQ@mail.gmail.com>
+References: <1446857519-5908-1-git-send-email-lho@apm.com>
+ <1446857519-5908-2-git-send-email-lho@apm.com>
+ <20160110110714.GA22896@pd.tnic>
+ <CAGDN=zYa1r23EphdYQTFe2YXRhg_P-RDiaZVms9rdbFA3Y-x3g@mail.gmail.com>
+ <20160111221305.GH4665@pd.tnic>
+ <CAGDN=zZOr6+q8aAdXB3gnSLfCm6gX-6KLaFPr+A4QMf+TPwR-w@mail.gmail.com>
+ <20160112143653.GB30558@pd.tnic>
+ <CAGDN=za9Pjm0B0OMJevgesBdkm=XOGyU7jXXfWqk+dLSo7BVtQ@mail.gmail.com>
+Message-ID: <20160112183228.GK30558@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 17, 2015 at 08:50:58PM +0000, Robin Murphy wrote:
-> Add some simple wrappers to avoid having the guts of the TLB operations
-> spilled all over the page table implementations, and to provide a point
-> to implement extra common functionality.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/iommu/io-pgtable-arm-v7s.c | 48 ++++++++++++++++----------------------
->  drivers/iommu/io-pgtable-arm.c     | 21 +++++++----------
->  drivers/iommu/io-pgtable.c         |  2 +-
->  drivers/iommu/io-pgtable.h         | 16 +++++++++++++
->  4 files changed, 46 insertions(+), 41 deletions(-)
+On Tue, Jan 12, 2016 at 10:26:04AM -0800, Tuan Phan wrote:
+> So are you good with it?
 
-Looks sensible to me:
+How about this instead:
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+---
+diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
+index fa4585a6914e..e42f6b7eac13 100644
+--- a/drivers/acpi/gsi.c
++++ b/drivers/acpi/gsi.c
+@@ -46,17 +46,22 @@ static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
+  * Returns: linux IRQ number on success (>0)
+  *          -EINVAL on failure
+  */
+-int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
++int acpi_gsi_to_irq(u32 gsi)
+ {
++	unsigned int irq;
++
+ 	struct irq_domain *d = irq_find_matching_fwnode(acpi_gsi_domain_id,
+ 							DOMAIN_BUS_ANY);
+ 
+-	*irq = irq_find_mapping(d, gsi);
++	irq = irq_find_mapping(d, gsi);
+ 	/*
+ 	 * *irq == 0 means no mapping, that should
+ 	 * be reported as a failure
+ 	 */
+-	return (*irq > 0) ? *irq : -EINVAL;
++	if (irq > 0)
++		return irq;
++	else
++		return -EINVAL;
+ }
+ EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+ 
 
-I'd like to see a review from Yong Wu on the short descriptor stuff
-before I queue any of this, though.
+-- 
+Regards/Gruss,
+    Boris.
 
-Will
+ECO tip #101: Trim your mails when you reply.
