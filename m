@@ -1,127 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 Jan 2016 08:52:07 +0000
-Subject: [PATCH v2 2/2] mfd: add documentation for ACT8945A DT bindings
-In-Reply-To: <1452585915-551-3-git-send-email-wenyou.yang@atmel.com>
-References: <1452585915-551-1-git-send-email-wenyou.yang@atmel.com>
- <1452585915-551-3-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20160112085207.GQ19803@x1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Jan 2016 10:02:04 +0100
+Subject: [PATCH] mfd: asic3: remove extraneous ')'
+Message-ID: <5507931.oM3h7nKshR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Jan 2016, Wenyou Yang wrote:
+A cleanup patch introduced an extra closing ')' that leads to a
+build error:
 
-> The Active-semi ACT8945A PMIC is a Multi-Function Device, it has
-> two subdevices:
->  - Regulator
->  - Charger
-> 
-> This patch adds documentation for ACT8945A DT bindings.
-> 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
-> 
-> Changes in v2:
->  - use more specific label in Example.
->  - add pmic and charger nodes in Example.
-> 
->  Documentation/devicetree/bindings/mfd/act8945a.txt |   82 ++++++++++++++++++++
->  1 file changed, 82 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/act8945a.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/act8945a.txt b/Documentation/devicetree/bindings/mfd/act8945a.txt
-> new file mode 100644
-> index 0000000..e4a8aaf
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/act8945a.txt
-> @@ -0,0 +1,82 @@
-> +Device-Tree bindings for Active-semi ACT8945A MFD driver
-> +
-> +Required properties:
-> + - compatible: "active-semi,act8945a".
-> + - reg: the I2C slave address for the ACT8945A chip
-> +
-> +The chip exposes two subdevices:
-> + - a regulators: see ../regulator/act8945a-regulator.txt
-> + - a charger: see ../power/act8945a-charger.txt
-> +
-> +Example:
-> +	act8945a at 5b {
-> +		compatible = "active-semi,act8945a";
-> +		reg = <0x5b>;
-> +		status = "okay";
-> +
-> +		pmic {
-> +			compatible = "active-semi,act8945a-regulator";
-> +			active-semi,vsel-high;
-> +
-> +				regulators {
+drivers/mfd/asic3.c: In function 'asic3_gpio_get':
+drivers/mfd/asic3.c:505:12: error: expected ';' before ')' token
 
-Your tabbing here is not correct.
+This removes the extra character to get it to build again.
 
-> +					vdd_1v35_reg: DCDC_REG1 {
-> +						regulator-name = "VDD_1V35";
-> +						regulator-min-microvolt = <1350000>;
-> +						regulator-max-microvolt = <1350000>;
-> +						regulator-always-on;
-> +					};
-> +
-> +					vdd_1v2_reg: DCDC_REG2 {
-> +						regulator-name = "VDD_1V2";
-> +						regulator-min-microvolt = <1100000>;
-> +						regulator-max-microvolt = <1300000>;
-> +						regulator-always-on;
-> +					};
-> +
-> +					vdd_3v3_reg: DCDC_REG3 {
-> +						regulator-name = "VDD_3V3";
-> +						regulator-min-microvolt = <3300000>;
-> +						regulator-max-microvolt = <3300000>;
-> +						regulator-always-on;
-> +					};
-> +
-> +					vdd_fuse_reg: LDO_REG1 {
-> +						regulator-name = "VDD_FUSE";
-> +						regulator-min-microvolt = <2500000>;
-> +						regulator-max-microvolt = <2500000>;
-> +						regulator-always-on;
-> +					};
-> +
-> +					vdd_3v3_lp_reg: LDO_REG2 {
-> +						regulator-name = "VDD_3V3_LP";
-> +						regulator-min-microvolt = <3300000>;
-> +						regulator-max-microvolt = <3300000>;
-> +						regulator-always-on;
-> +					};
-> +
-> +					vdd_led_reg: LDO_REG3 {
-> +						regulator-name = "VDD_LED";
-> +						regulator-min-microvolt = <3300000>;
-> +						regulator-max-microvolt = <3300000>;
-> +						regulator-always-on;
-> +					};
-> +
-> +					vdd_sdhc_1v8_reg: LDO_REG4 {
-> +						regulator-name = "VDD_SDHC_1V8";
-> +						regulator-min-microvolt = <1800000>;
-> +						regulator-max-microvolt = <1800000>;
-> +						regulator-always-on;
-> +					};
-> +				};
-> +			};
-> +
-> +		charger {
-> +			compatible = "active-semi,act8945a-charger";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_charger_chglev>;
-> +			active-semi,chglev-gpio = <&pioA 12 GPIO_ACTIVE_HIGH>;
-> +			active-semi,input_voltage_threshold = <6600>;
-> +			active-semi,precondition_timeout = <40>;
-> +			active-semi,total_timeout = <3>;
-> +		};
-> +	};
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: fd5b4d01a638 ("mfd: asic3: Be sure to clamp return value")
+---
+This came up today on linux-next. I took the liberty to adjust formatting
+of that line as well, if you prefer the original line wrapping please
+undo that part when applying.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+diff --git a/drivers/mfd/asic3.c b/drivers/mfd/asic3.c
+index c8d46e51faf1..4dca6bc61f5b 100644
+--- a/drivers/mfd/asic3.c
++++ b/drivers/mfd/asic3.c
+@@ -501,8 +501,8 @@ static int asic3_gpio_get(struct gpio_chip *chip,
+ 		return -EINVAL;
+ 	}
+ 
+-	return !!(asic3_read_register(asic, gpio_base + ASIC3_GPIO_STATUS)
+-		  & mask));
++	return !!(asic3_read_register(asic,
++				      gpio_base + ASIC3_GPIO_STATUS) & mask);
+ }
+ 
+ static void asic3_gpio_set(struct gpio_chip *chip,
