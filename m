@@ -1,110 +1,48 @@
-From: xuejiancheng@huawei.com (xuejiancheng)
-Date: Tue, 12 Jan 2016 17:28:05 +0800
-Subject: [PATCH v5 5/6] mfd: dt-bindings: add device tree bindings for
- Hi3519 sysctrl
-In-Reply-To: <20160112083946.GN19803@x1>
-References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
- <1452219400-32478-6-git-send-email-xuejiancheng@huawei.com>
- <20160111054846.GD3331@x1> <56935EA8.4060801@huawei.com>
- <20160111085555.GE14104@x1> <5694584D.7040301@huawei.com>
- <20160112074107.GK19803@x1> <5694B68A.6040300@huawei.com>
- <20160112083946.GN19803@x1>
-Message-ID: <5694C725.6010502@huawei.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Tue, 12 Jan 2016 17:46:53 +0800
+Subject: [PATCH v3 0/2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD driver
+Message-ID: <1452592015-22173-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch set adds support for the Active-semi ACT8945A PMIC
+MFD driver. It is a Multi Function Device with the following
+subdevices:
+ - Regulator
+ - Charger
 
+It is interfaced to the host controller using I2C interface,
+ACT8945A is a child device of the I2C.
 
-On 2016/1/12 16:39, Lee Jones wrote:
-> On Tue, 12 Jan 2016, xuejiancheng wrote:
-> 
->> Hello Lee,
->>
->> On 2016/1/12 15:41, Lee Jones wrote:
->>> On Tue, 12 Jan 2016, xuejiancheng wrote:
->>>
->>>>
->>>>
->>>> On 2016/1/11 16:55, Lee Jones wrote:
->>>>> On Mon, 11 Jan 2016, xuejiancheng wrote:
->>>>>> On 2016/1/11 13:48, Lee Jones wrote:
->>>>>>> On Fri, 08 Jan 2016, Jiancheng Xue wrote:
->>>>>>>
->>>>>>>> Add device tree bindings for Hi3519 system controller.
->>>>>>>>
->>>>>>>> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
->>>>>>>> ---
->>>>>>>>  Documentation/devicetree/bindings/mfd/hi3519.txt | 14 ++++++++++++++
->>>>>>>>  1 file changed, 14 insertions(+)
->>>>>>>>  create mode 100644 Documentation/devicetree/bindings/mfd/hi3519.txt
->>>>>>>
->>>>>>> I have this patch, but none of the others in the set, thus I am
->>>>>>> lacking context.
->>>>>>>
->>>>>> I can forward other patches in the set to you. Thank you.
->>>>>>
->>>>>>>> diff --git a/Documentation/devicetree/bindings/mfd/hi3519.txt b/Documentation/devicetree/bindings/mfd/hi3519.txt
->>>>>>>> new file mode 100644
->>>>>>>> index 0000000..115c5be
->>>>>>>> --- /dev/null
->>>>>>>> +++ b/Documentation/devicetree/bindings/mfd/hi3519.txt
->>>>>>>> @@ -0,0 +1,14 @@
->>>>>>>> +* Hisilicon Hi3519 System Controller Block
->>>>>>>> +
->>>>>>>> +This bindings use the following binding:
->>>>>>>> +Documentation/devicetree/bindings/mfd/syscon.txt
->>>>>>>> +
->>>>>>>> +Required properties:
->>>>>>>> +- compatible: "hisilicon,hi3519-sysctrl".
->>>>>>>> +- reg: the register region of this block
->>>>>>>> +
->>>>>>>> +Examples:
->>>>>>>> +sysctrl: system-controller at 12010000 {
->>>>>>>> +	compatible = "hisilicon,hi3519-sysctrl", "syscon";
->>>>>>>> +	reg = <0x12010000 0x1000>;
->>>>>>>> +};
->>>>>>>
->>>>>>> There is no requirement (nor want) for binding documents where the
->>>>>>> given device is simply using highly generic bindings.  This just
->>>>>>> amounts to churn.
->>>>>>>
->>>>>> This block is specific for Hi3519 SOC, and may has its own driver.
->>>>>
->>>>> Does it have its own driver currently?
->>>>>
->>>> Not yet.
->>>> Arnd Bergmann and Rob Herring all suggested adding a specific compatible string
->>>> with the SOC name. This binding is just used for describing the compatible string now.
->>>> When more functions on hi3519 SOC are added later, the specific driver will be also
->>>> needed.
->>>
->>> Save this binding until it has more functionality.  We here "I'll add
->>> to this later" all too often.
->>>
->>
->> In the hi3519.dtsi file, there is a system-controller device node described like below:
->> sysctrl: system-controller at 12010000 {
->> 	compatible = "hisilicon,hi3519-sysctrl", "syscon";
->> 	reg = <0x12010000 0x1000>;
->> };
->> Do you mean that I should remove "hisilicon,hi3519-sysctrl" and just use "syscon" as the
->> compatible string??
-> 
-> Where is this compatible string _used_?
-> 
->> If I want to add "hisilicon,hi3519-sysctrl" for hi3519. where should I put this binding?
->> Could you give some suggestions?  Thank you very much!
-> 
-> If you're not using the compatible i.e. the device doesn't have its
-> own driver yet, then there is no need to supply the binding at all, is
-> there?
-> 
+Changes in v3:
+ - fix the tabbing errors in Example.
+ - use "pmic at 5b" label, not "act8945a at 5b" in Example.
+ - collect Acked-by from Rob.
 
-OK. Thank you.
+Changes in v2:
+ - add more help information in Kconfig.
+ - update the file header with short version license and author line.
+ - remove unused structure members (dev, i2c_client) of stuct act8945a_dev.
+ - use define "PLATFORM_DEVID_NONE" for mfd_add_devices(), instead of '-1'.
+ - use more explicit info to indicate the failure to add sub devices.
+ - remove the unnecessary print out.
+ - substitute MODULE_LICENSE("GPL") for MODULE_LICENSE("GPL v2").
+ - use more specific label in Example.
+ - add pmic and charger nodes in Example.
 
->>>>>> So I think it's better to keep this binding.
->>>>>
->>>>
->>>
->>
-> 
+Wenyou Yang (2):
+  mfd: act8945a: add Active-semi ACT8945A PMIC MFD driver
+  mfd: add documentation for ACT8945A DT bindings
+
+ Documentation/devicetree/bindings/mfd/act8945a.txt |   82 +++++++++++++++
+ drivers/mfd/Kconfig                                |   11 ++
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/act8945a.c                             |  109 ++++++++++++++++++++
+ include/linux/mfd/act8945a.h                       |   21 ++++
+ 5 files changed, 224 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/act8945a.txt
+ create mode 100644 drivers/mfd/act8945a.c
+ create mode 100644 include/linux/mfd/act8945a.h
+
+-- 
+1.7.9.5
