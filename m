@@ -1,33 +1,29 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 Jan 2016 12:46:15 +0000
-Subject: [PATCH v5 1/7] remoteproc: debugfs: Check of invalid 'count' value
+Date: Tue, 12 Jan 2016 12:46:19 +0000
+Subject: [PATCH v5 5/7] MAINTAINERS: Add ST's Remote Processor Driver to
+ ARM/STI ARCHITECTURE
 In-Reply-To: <1452602781-22424-1-git-send-email-lee.jones@linaro.org>
 References: <1452602781-22424-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1452602781-22424-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1452602781-22424-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If 'count' value is invalid, return early with an error.
-
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/remoteproc/remoteproc_debugfs.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/remoteproc/remoteproc_debugfs.c b/drivers/remoteproc/remoteproc_debugfs.c
-index 9d30809..f63464c 100644
---- a/drivers/remoteproc/remoteproc_debugfs.c
-+++ b/drivers/remoteproc/remoteproc_debugfs.c
-@@ -156,8 +156,8 @@ rproc_recovery_write(struct file *filp, const char __user *user_buf,
- 	char buf[10];
- 	int ret;
- 
--	if (count > sizeof(buf))
--		return count;
-+	if (count > sizeof(buf) || count <= 0)
-+		return -EINVAL;
- 
- 	ret = copy_from_user(buf, user_buf, count);
- 	if (ret)
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 5f46784..322f5b4 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1538,6 +1538,7 @@ F:	drivers/phy/phy-miphy365x.c
+ F:	drivers/phy/phy-stih407-usb.c
+ F:	drivers/phy/phy-stih41x-usb.c
+ F:	drivers/pinctrl/pinctrl-st.c
++F:	drivers/remoteproc/st_remoteproc.c
+ F:	drivers/reset/sti/
+ F:	drivers/rtc/rtc-st-lpc.c
+ F:	drivers/tty/serial/st-asc.c
 -- 
 1.9.1
