@@ -1,69 +1,111 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Jan 2016 22:37:54 +0100
-Subject: [PATCH V2 00/23] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <20160112183854.GB5139@red-moon>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <4945809.OlUZI8D7JL@wuerfel> <20160112183854.GB5139@red-moon>
-Message-ID: <4627437.88HpJxySSc@wuerfel>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 12 Jan 2016 22:40:03 +0100
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <569565DA.2010903@imgtec.com>
+References: <1452426622-4471-12-git-send-email-mst@redhat.com>
+ <56945366.2090504@imgtec.com>
+ <20160112092711.GP6344@twins.programming.kicks-ass.net>
+ <20160112102555.GV6373@twins.programming.kicks-ass.net>
+ <20160112104012.GW6373@twins.programming.kicks-ass.net>
+ <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
+Message-ID: <20160112214003.GQ6357@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 January 2016 18:38:54 Lorenzo Pieralisi wrote:
-> On Tue, Jan 12, 2016 at 03:30:25PM +0100, Arnd Bergmann wrote:
-> > On Monday 11 January 2016 10:56:30 Sinan Kaya wrote:
-> > > 
-> > > #_dmesg_|_grep_resource
-> > > [    2.945762] pci_bus 0000:00: root bus resource [io  0x0000-0xefff window] (bus address [0x1000-0xffff])
-> > > [    3.652201] pci_bus 0002:00: root bus resource [io  0xf000-0x1dfff window] (bus address [0x1000-0xffff])
-> > > [    6.546716] pci_bus 0006:00: root bus resource [io  0x1e000-0x2cfff window] (bus address [0x1000-0xffff])
-> > > / #
-> > 
-> > This is bad. We normally want to stay out of the first 0x1000 bytes of
-> > the Linux space, to prevent drivers from poking into the ISA
-> > registers.
+On Tue, Jan 12, 2016 at 12:45:14PM -0800, Leonid Yegoshin wrote:
+> (I try to answer on multiple mails in one)
 > 
-> You are referring to:
+> First of all, it seems like some generic notes should be given here:
 > 
-> pci_bus 0000:00: root bus resource [io  0x0000-0xefff window]
->                                         ^^^^^^
-> here, right ? [0x0 - PCIBIOS_MIN_IO] is not assigned by the PCI
-> code that reassigns resources anyway, so devices with IO BARs won't
-> get assigned [0x0 - PCIBIOS_MIN_IO] address space (Linux space).
-> 
-> Are you saying we should disallow the [0x0 - 0x1000] in the PCI busses
-> IO resource (Linux space) ?
-> 
-> In pci_address_to_pio() the offset (Linux IO resource) we assign starts
-> from 0x0, so we always allocate that chunk of IO address space (that is
-> an offset into the Linux virtual address space), am I correct ?
+> 1. Generic MIPS "SYNC" (aka "SYNC 0") instruction is a very heavy in some
+> CPUs. On that CPUs it basically kills pipelines in each CPU, can do a
+> special memory/IO bus transaction (similar to "fence") and hold a system
+> until all R/W is completed. It is like Big Kernel Lock but worse. So, the
+> move to SMP_* kind of barriers is needed to improve performance, especially
+> on newest CPUs with long pipelines.
 
-I think we can assign the address zero of the Linux I/O port range, but
-we should never assign it to a bus port range that does not also start
-at zero.
+The MIPS SYNC isn't any worse than the PPC SYNC, x86 MFENCE or arm DSB
+SY, yes they're heavy, so what.
 
-If we encounter a firmware description that has bus range which excludes
-the first 1k, we should probably assign it to somewhere after 0x10000
-(65536), so we can later assign a primary I/O space to a bus that has an
-ISA or LPC bridge with actual devices below 0x1000 (4096).
+> 2. MIPS Arch document may be misleading because words "ordering" and
+> "completion" means different from Linux, the SYNC instruction description is
+> written for HW engineers. I wrote that in a separate patch of the same
+> patchset - http://patchwork.linux-mips.org/patch/10505/ "MIPS: R6: Use
+> lightweight SYNC instruction in smp_* memory barriers":
 
-> > We can have one of the buses be the "primary" bus that has its first
-> > 0x1000 bytes of I/O space mapped into the respective Linux addresses,
-> > but mapping the second 0x1000 bytes into the reserved space is the
-> > worst possible outcome here, as legacy ISA drivers will now poke at
-> > random other devices that are intentionally moved to high addresses to
-> > stay of of that range.
+Did you actually say anything here?
+
+> >This instructions were specifically designed to work for smp_*() sort of
+> >memory barriers in MIPS R2/R3/R5 and R6.
+> >
+> >Unfortunately, it's description is very cryptic and is done in HW engineering
+> >style which prevents use of it by SW.
 > 
-> And you are referring to:
-> 
-> root bus resource [io  0x0000-0xefff window] (bus address [0x1000-0xffff])
-> 		       ^^^^^^                              ^^^^^^
-> 
-> here ? If ISA drivers poke at addresses in the [0x0 - 0x1000]
-> range (Linux space IO offset) they end up on the PCI bus with addresses
-> above 0x1000, is that what you are saying when you refer to "moved to
-> high addresses to stay out of that range" ?
+> 3. I bother MIPS Arch team long time until I completely understood that MIPS
+> SYNC_WMB, SYNC_MB, SYNC_RMB, SYNC_RELEASE and SYNC_ACQUIRE do an exactly
+> that is required in Documentation/memory-barriers.txt
 
-Correct.
+Ha! and you think that document covers all the really fun details?
 
-	Arnd
+In particular we're very much all 'confused' about the various notions
+of transitivity and what barriers imply how much of it.
+
+> In Peter Zijlstra mail:
+> 
+> >1) you do not make such things selectable; either the hardware needs
+> >them or it doesn't. If it does you_must_  use them, however unlikely.
+
+> It is selectable only for MIPS R2 but not MIPS R6. The reason is - most of
+> MIPS R2 CPUs have short pipeline and that SYNC is just waste of CPU
+> resource, especially taking into account that "lightweight syncs" are
+> converted to a heavy "SYNC 0" in many of that CPUs. However the latest
+> MIPS/Imagination CPU have a pipeline long enough to hit a problem - absence
+> of SYNC at LL/SC inside atomics, barriers etc.
+
+What ?! Are you saying that because R2 has short pipelines its unlikely
+to hit the reordering issues and we can omit barriers?
+
+> >And reading the MIPS64 v6.04 instruction set manual, I think 0x11/0x12
+> >are_NOT_  transitive and therefore cannot be used to implement the
+> >smp_mb__{before,after} stuff.
+> >
+> >That is, in MIPS speak, those SYNC types are Ordering Barriers, not
+> >Completion Barriers.
+> 
+> Please see above, point 2.
+
+That did not in fact enlighten things. Are they transitive/multi-copy
+atomic or not?
+
+(and here Will will go into great detail on the differences between the
+two and make our collective brains explode :-)
+
+> >That is, currently all architectures -- with exception of PPC -- have
+> >RCsc locks, but using these non-transitive things will get you RCpc
+> >locks.
+> >
+> >So yes, MIPS can go RCpc for its locks and share the burden of pain with
+> >PPC, but that needs to be a very concious decision.
+> 
+> I don't understand that - I tried hard but I can't find any word like
+> "RCsc", "RCpc" in Documents/ directory. Web search goes nowhere, of course.
+
+From: lkml.kernel.org/r/20150828153921.GF19282@twins.programming.kicks-ass.net
+
+Yes, the difference between RCpc and RCsc is in the meaning of RELEASE +
+ACQUIRE. With RCsc that implies a full memory barrier, with RCpc it does
+not.
+
+Currently PowerPC is the only arch that (can, and) does RCpc and gives a
+weaker RELEASE + ACQUIRE. Only the CPU who did the ACQUIRE is guaranteed
+to see the stores of the CPU which did the RELEASE in order.
+
+As it stands, RCU is the only _known_ codebase where this matters, but
+we did in fact write code for a fair number of years 'assuming' RELEASE
++ ACQUIRE was a full barrier, so who knows what else is out there.
+
+
+RCsc - release consistency sequential consistency
+RCpc - release consistency processor consistency
+
+https://en.wikipedia.org/wiki/Processor_consistency
