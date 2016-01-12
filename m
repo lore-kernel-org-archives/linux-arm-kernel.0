@@ -1,7 +1,7 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Tue, 12 Jan 2016 18:21:26 +0100
-Subject: [PATCH 09/14] ARM: dts: imx6ul: add sdma support
-In-Reply-To: <1452619291-13625-9-git-send-email-LW@KARO-electronics.de>
+Date: Tue, 12 Jan 2016 18:21:27 +0100
+Subject: [PATCH 10/14] ARM: dts: imx6ul: add flexcan support
+In-Reply-To: <1452619291-13625-10-git-send-email-LW@KARO-electronics.de>
 References: <1452619291-13625-1-git-send-email-LW@KARO-electronics.de>
  <1452619291-13625-2-git-send-email-LW@KARO-electronics.de>
  <1452619291-13625-3-git-send-email-LW@KARO-electronics.de>
@@ -11,36 +11,46 @@ References: <1452619291-13625-1-git-send-email-LW@KARO-electronics.de>
  <1452619291-13625-7-git-send-email-LW@KARO-electronics.de>
  <1452619291-13625-8-git-send-email-LW@KARO-electronics.de>
  <1452619291-13625-9-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1452619291-13625-10-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-10-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1452619291-13625-11-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx6ul.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/imx6ul.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index a578b23..96b78a9 100644
+index 96b78a9..f1db53e 100644
 --- a/arch/arm/boot/dts/imx6ul.dtsi
 +++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -556,6 +556,17 @@
- 				clock-names = "ipg", "per";
+@@ -292,6 +292,26 @@
+ 				status = "disabled";
  			};
  
-+			sdma: sdma at 020ec000 {
-+				compatible = "fsl,imx6q-sdma", "fsl,imx35-sdma";
-+				reg = <0x020ec000 0x4000>;
-+				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6UL_CLK_SDMA>,
-+					 <&clks IMX6UL_CLK_SDMA>;
-+				clock-names = "ipg", "ahb";
-+				#dma-cells = <3>;
-+				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q.bin";
++			can1: flexcan at 02090000 {
++				compatible = "fsl,imx6q-flexcan";
++				reg = <0x02090000 0x4000>;
++				interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6UL_CLK_CAN1_IPG>,
++					 <&clks IMX6UL_CLK_CAN1_SERIAL>;
++				clock-names = "ipg", "per";
++				status = "disabled";
 +			};
 +
- 			pwm5: pwm at 020f0000 {
- 				compatible = "fsl,imx6ul-pwm", "fsl,imx27-pwm";
- 				reg = <0x020f0000 0x4000>;
++			can2: flexcan at 02094000 {
++				compatible = "fsl,imx6q-flexcan";
++				reg = <0x02094000 0x4000>;
++				interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6UL_CLK_CAN2_IPG>,
++					 <&clks IMX6UL_CLK_CAN2_SERIAL>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
++
+ 			gpt1: gpt at 02098000 {
+ 				compatible = "fsl,imx6ul-gpt", "fsl,imx6sx-gpt";
+ 				reg = <0x02098000 0x4000>;
 -- 
 2.1.4
