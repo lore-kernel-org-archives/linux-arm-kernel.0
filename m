@@ -1,31 +1,55 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Tue, 12 Jan 2016 10:43:36 +0200
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <56945366.2090504@imgtec.com>
-References: <1452426622-4471-12-git-send-email-mst@redhat.com>
- <56945366.2090504@imgtec.com>
-Message-ID: <20160112103913-mutt-send-email-mst@redhat.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue, 12 Jan 2016 14:13:47 +0530
+Subject: [PATCH V6 0/6] i2c: qup: Add support for v2 tags and bam dma
+Message-ID: <1452588233-1803-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 05:14:14PM -0800, Leonid Yegoshin wrote:
-> On 01/10/2016 06:18 AM, Michael S. Tsirkin wrote:
-> >On mips dma_rmb, dma_wmb, smp_store_mb, read_barrier_depends,
-> >smp_read_barrier_depends, smp_store_release and smp_load_acquire  match
-> >the asm-generic variants exactly. Drop the local definitions and pull in
-> >asm-generic/barrier.h instead.
-> >
-> This statement doesn't fit MIPS barriers variations. Moreover, there is a
-> reason to extend that even more specific, at least for smp_store_release and
-> smp_load_acquire, look into
-> 
->     http://patchwork.linux-mips.org/patch/10506/
-> 
-> - Leonid.
+i2c: qup: Add support for v2 tags and bam dma
 
-Fine, but it matches what current code is doing.  Since that
-MIPS_LIGHTWEIGHT_SYNC patch didn't go into linux-next yet, do
-you see a problem reworking it on top of this patchset?
+QUP from version 2.1.1 onwards, supports a new format of i2c command tags.
+Tag codes instructs the controller to perform a operation like read/write.
+This new tagging version supports and is required for adding bam dma
+capabilities. V2 tags supports transfer of more than 256 bytes in a single i2c
+transaction. Also adding bam dma support facilitates transferring each i2c_msg
+in i2c_msgs without a 'stop' bit in between which is required for some of
+the clients.
+
+Tested this series on apq8074 dragon board eeprom client on i2c bus1
+
+[V6] Added review tags and fixed a checkpatch warning in patch 4/6.
+
+[V5] Addressed few more comments from Ivan T. Ivanov.
+     Squashed patch 2 and 3 as no point in having only few lines of
+     common code between v1 and v2 tags for increased complexity.
+     Couple of non functional review comments fixes in patch 3, 4.
+     Added a change in patch 4 to have proper transfer completion in
+     a corner case. patch 5, 6 unchanged.
+
+[V4] Added a patch to factor out some common code.
+     Removed support for freq > 400KHZ as per comments.
+     Addressed comments from Ivan T. Ivanov to keep the code for
+     V2 support in a separate path.
+     Changed the authorship of V2 tags support patch.
+
+[V3] Added support to coalesce each i2c_msg in i2c_msgs for fifo and
+     block mode in Patch 2. Also addressed further code comments.
+
+     http://comments.gmane.org/gmane.linux.drivers.i2c/22497
+
+[V2] Addressed comments from Ivan T. Ivanov, Andy Gross [v1] Initial Version
+
+Sricharan R (6):
+  i2c: qup: Change qup_wait_writeready function to use for all timeouts
+  i2c: qup: Add V2 tags support
+  i2c: qup: Transfer each i2c_msg in i2c_msgs without a stop bit
+  i2c: qup: Add bam dma capabilities
+  dts: msm8974: Add blsp2_bam dma node
+  dts: msm8974: Add dma channels for blsp2_i2c1 node
+
+ arch/arm/boot/dts/qcom-msm8974.dtsi |  14 +-
+ drivers/i2c/busses/i2c-qup.c        | 922 ++++++++++++++++++++++++++++++++++--
+ 2 files changed, 887 insertions(+), 49 deletions(-)
 
 -- 
-MST
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
