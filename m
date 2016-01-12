@@ -1,69 +1,45 @@
-From: tphan@apm.com (Tuan Phan)
-Date: Tue, 12 Jan 2016 10:46:15 -0800
-Subject: [PATCH v3 1/2] acpi: Fix proper return code for function
- acpi_gsi_to_irq
-In-Reply-To: <20160112183228.GK30558@pd.tnic>
-References: <1446857519-5908-1-git-send-email-lho@apm.com>
- <1446857519-5908-2-git-send-email-lho@apm.com>
- <20160110110714.GA22896@pd.tnic>
- <CAGDN=zYa1r23EphdYQTFe2YXRhg_P-RDiaZVms9rdbFA3Y-x3g@mail.gmail.com>
- <20160111221305.GH4665@pd.tnic>
- <CAGDN=zZOr6+q8aAdXB3gnSLfCm6gX-6KLaFPr+A4QMf+TPwR-w@mail.gmail.com>
- <20160112143653.GB30558@pd.tnic>
- <CAGDN=za9Pjm0B0OMJevgesBdkm=XOGyU7jXXfWqk+dLSo7BVtQ@mail.gmail.com>
- <20160112183228.GK30558@pd.tnic>
-Message-ID: <CAGDN=zbbfr8HVKhg4YEieyxzb6jT6eMJ2mTyn6zV9HFD_AA3aA@mail.gmail.com>
+From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
+Date: Tue, 12 Jan 2016 10:51:22 -0800
+Subject: [PATCH] net: bpf: reject invalid shifts
+In-Reply-To: <1452621307-2213-1-git-send-email-rabin@rab.in>
+References: <1452621307-2213-1-git-send-email-rabin@rab.in>
+Message-ID: <20160112185121.GA34045@ast-mbp.thefacebook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 10:32 AM, Borislav Petkov <bp@alien8.de> wrote:
-> On Tue, Jan 12, 2016 at 10:26:04AM -0800, Tuan Phan wrote:
->> So are you good with it?
->
-> How about this instead:
->
+On Tue, Jan 12, 2016 at 06:55:07PM +0100, Rabin Vincent wrote:
+> On ARM64, a BUG() is triggered in the eBPF JIT if a filter with a
+> constant shift that can't be encoded in the immediate field of the
+> UBFM/SBFM instructions is passed to the JIT.  Since these shifts
+> amounts, which are negative or >= regsize, are invalid, reject then in
+> the eBPF verifier and the classic BPF filter checker, for all
+> architectures.
+> 
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
 > ---
-> diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
-> index fa4585a6914e..e42f6b7eac13 100644
-> --- a/drivers/acpi/gsi.c
-> +++ b/drivers/acpi/gsi.c
-> @@ -46,17 +46,22 @@ static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
->   * Returns: linux IRQ number on success (>0)
->   *          -EINVAL on failure
->   */
-> -int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
-> +int acpi_gsi_to_irq(u32 gsi)
->  {
-> +       unsigned int irq;
-> +
->         struct irq_domain *d = irq_find_matching_fwnode(acpi_gsi_domain_id,
->                                                         DOMAIN_BUS_ANY);
->
-> -       *irq = irq_find_mapping(d, gsi);
-> +       irq = irq_find_mapping(d, gsi);
->         /*
->          * *irq == 0 means no mapping, that should
->          * be reported as a failure
->          */
-> -       return (*irq > 0) ? *irq : -EINVAL;
-> +       if (irq > 0)
-> +               return irq;
-> +       else
-> +               return -EINVAL;
->  }
->  EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+>  kernel/bpf/verifier.c | 10 ++++++++++
+>  net/core/filter.c     |  5 +++++
+>  2 files changed, 15 insertions(+)
+> 
+> diff --git a/kernel/bpf/verifier.c b/kernel/bpf/verifier.c
+> index a7945d10b378..3643df0dfaa9 100644
+> --- a/kernel/bpf/verifier.c
+> +++ b/kernel/bpf/verifier.c
+> @@ -1121,6 +1121,16 @@ static int check_alu_op(struct verifier_env *env, struct bpf_insn *insn)
+>  			return -EINVAL;
+>  		}
+>  
+> +		if ((opcode == BPF_LSH || opcode == BPF_RSH) &&
 
-Well, it basically the same as old code except the change of API
-interface. And it requires some changes in ACPI core and X86/I64 arch
-code. Do we really want to go with this solution instead of just
-return 0 on success and -EINVAL on failure?
+Missing check for opcode == BPF_ARSH
 
--- 
-CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, is 
-for the sole use of the intended recipient(s) and contains information that 
-is confidential and proprietary to Applied Micro Circuits Corporation or 
-its subsidiaries. It is to be used solely for the purpose of furthering the 
-parties' business relationship. All unauthorized review, use, disclosure or 
-distribution is prohibited. If you are not the intended recipient, please 
-contact the sender by reply e-mail and destroy all copies of the original 
-message.
+Otherwise looks good. Thank you for fixing this!
+
+> @@ -777,6 +777,11 @@ static int bpf_check_classic(const struct sock_filter *filter,
+>  			if (ftest->k == 0)
+>  				return -EINVAL;
+>  			break;
+> +		case BPF_ALU | BPF_LSH | BPF_K:
+> +		case BPF_ALU | BPF_RSH | BPF_K:
+
+here it's good. ARSH is eBPF only.
