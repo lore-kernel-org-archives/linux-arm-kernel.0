@@ -1,101 +1,38 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 12 Jan 2016 08:28:44 -0800
-Subject: [PATCH v3 01/41] lcoking/barriers, arch: Use smp barriers in
- smp_store_release()
-In-Reply-To: <1452426622-4471-2-git-send-email-mst@redhat.com>
-References: <1452426622-4471-1-git-send-email-mst@redhat.com>
- <1452426622-4471-2-git-send-email-mst@redhat.com>
-Message-ID: <20160112162844.GD3818@linux.vnet.ibm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Jan 2016 17:29:40 +0100
+Subject: I/O issues with writing to mtdblock devices on kirkwood
+In-Reply-To: <20160112011904.GC7690@lunn.ch>
+References: <1440159857.19360.50.camel@debian.org>
+ <20160112004749.GT6588@sirena.org.uk> <20160112011904.GC7690@lunn.ch>
+Message-ID: <4004455.tVDpSpUXxo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 10, 2016 at 04:16:32PM +0200, Michael S. Tsirkin wrote:
-> From: Davidlohr Bueso <dave@stgolabs.net>
+On Tuesday 12 January 2016 02:19:04 Andrew Lunn wrote:
+> > Oh, right.  This sounds like everything is working fine with SPI - that
+> > commit was supposed to improve throughput with single threaded workloads
+> > by avoiding pointless context switches and it seems it is in fact doing
+> > that.  Most likely you are using a bitbanging SPI controller driver and
+> > that's causing lots of I/O wait states which is upsetting the scheduler
+> > but it's hard to be sure.
 > 
-> With commit b92b8b35a2e ("locking/arch: Rename set_mb() to smp_store_mb()")
-> it was made clear that the context of this call (and thus set_mb)
-> is strictly for CPU ordering, as opposed to IO. As such all archs
-> should use the smp variant of mb(), respecting the semantics and
-> saving a mandatory barrier on UP.
+> drivers/spi/spi-orion.c
 > 
-> Signed-off-by: Davidlohr Bueso <dbueso@suse.de>
-> Signed-off-by: Peter Zijlstra (Intel) <peterz@infradead.org>
-> Cc: <linux-arch@vger.kernel.org>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-> Cc: Linus Torvalds <torvalds@linux-foundation.org>
-> Cc: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Tony Luck <tony.luck@intel.com>
-> Cc: dave at stgolabs.net
-> Link: http://lkml.kernel.org/r/1445975631-17047-3-git-send-email-dave at stgolabs.net
-> Signed-off-by: Ingo Molnar <mingo@kernel.org>
+> Not bitbanging, but it is polled IO, not DMA.
+>  
+> > Possibly whatever SPI driver this system uses is doing something really
+> > rude (perhaps limited by the hardware), possibly it isn't using DMA when
+> > it should be, or possibly the scheduler just isn't doing a good job with
+> > the workload you're giving it.
+> 
+> When i played with this, i added a reschedule point at the end of the
+> drivers transfer_one_message() function, to see if that would help. It
+> did not, which is why i made a guess it has something to do with a
+> lock.
 
-Aside from a need for s/lcoking/locking/ in the subject line:
+Can you try using usleep_range() instead of udelay()? It might also
+be worth trying what the actual delay is for each byte to see if a
+longer sleep time would help, but I guess that time is highly
+device specific.
 
-Reviewed-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-
-> ---
->  arch/ia64/include/asm/barrier.h    | 2 +-
->  arch/powerpc/include/asm/barrier.h | 2 +-
->  arch/s390/include/asm/barrier.h    | 2 +-
->  include/asm-generic/barrier.h      | 2 +-
->  4 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/ia64/include/asm/barrier.h b/arch/ia64/include/asm/barrier.h
-> index df896a1..209c4b8 100644
-> --- a/arch/ia64/include/asm/barrier.h
-> +++ b/arch/ia64/include/asm/barrier.h
-> @@ -77,7 +77,7 @@ do {									\
->  	___p1;								\
->  })
-> 
-> -#define smp_store_mb(var, value)	do { WRITE_ONCE(var, value); mb(); } while (0)
-> +#define smp_store_mb(var, value) do { WRITE_ONCE(var, value); smp_mb(); } while (0)
-> 
->  /*
->   * The group barrier in front of the rsm & ssm are necessary to ensure
-> diff --git a/arch/powerpc/include/asm/barrier.h b/arch/powerpc/include/asm/barrier.h
-> index 0eca6ef..a7af5fb 100644
-> --- a/arch/powerpc/include/asm/barrier.h
-> +++ b/arch/powerpc/include/asm/barrier.h
-> @@ -34,7 +34,7 @@
->  #define rmb()  __asm__ __volatile__ ("sync" : : : "memory")
->  #define wmb()  __asm__ __volatile__ ("sync" : : : "memory")
-> 
-> -#define smp_store_mb(var, value)	do { WRITE_ONCE(var, value); mb(); } while (0)
-> +#define smp_store_mb(var, value) do { WRITE_ONCE(var, value); smp_mb(); } while (0)
-> 
->  #ifdef __SUBARCH_HAS_LWSYNC
->  #    define SMPWMB      LWSYNC
-> diff --git a/arch/s390/include/asm/barrier.h b/arch/s390/include/asm/barrier.h
-> index d68e11e..7ffd0b1 100644
-> --- a/arch/s390/include/asm/barrier.h
-> +++ b/arch/s390/include/asm/barrier.h
-> @@ -36,7 +36,7 @@
->  #define smp_mb__before_atomic()		smp_mb()
->  #define smp_mb__after_atomic()		smp_mb()
-> 
-> -#define smp_store_mb(var, value)		do { WRITE_ONCE(var, value); mb(); } while (0)
-> +#define smp_store_mb(var, value)	do { WRITE_ONCE(var, value); smp_mb(); } while (0)
-> 
->  #define smp_store_release(p, v)						\
->  do {									\
-> diff --git a/include/asm-generic/barrier.h b/include/asm-generic/barrier.h
-> index b42afad..0f45f93 100644
-> --- a/include/asm-generic/barrier.h
-> +++ b/include/asm-generic/barrier.h
-> @@ -93,7 +93,7 @@
->  #endif	/* CONFIG_SMP */
-> 
->  #ifndef smp_store_mb
-> -#define smp_store_mb(var, value)  do { WRITE_ONCE(var, value); mb(); } while (0)
-> +#define smp_store_mb(var, value)  do { WRITE_ONCE(var, value); smp_mb(); } while (0)
->  #endif
-> 
->  #ifndef smp_mb__before_atomic
-> -- 
-> MST
-> 
+	Arnd
