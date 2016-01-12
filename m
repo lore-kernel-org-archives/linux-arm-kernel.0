@@ -1,66 +1,30 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 12 Jan 2016 08:31:02 -0800
-Subject: [PATCH v3 05/41] powerpc: reuse asm-generic/barrier.h
-In-Reply-To: <1452426622-4471-6-git-send-email-mst@redhat.com>
-References: <1452426622-4471-1-git-send-email-mst@redhat.com>
- <1452426622-4471-6-git-send-email-mst@redhat.com>
-Message-ID: <20160112163102.GE3818@linux.vnet.ibm.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Tue, 12 Jan 2016 19:46:41 +0300
+Subject: [PATCH v6 11/21] arm64: ilp32: introduce binfmt_ilp32.c
+In-Reply-To: <5115829.mX1Uk4EoYk@wuerfel>
+References: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
+ <1452209679-19445-12-git-send-email-ynorov@caviumnetworks.com>
+ <5115829.mX1Uk4EoYk@wuerfel>
+Message-ID: <20160112164641.GA9246@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 10, 2016 at 04:17:09PM +0200, Michael S. Tsirkin wrote:
-> On powerpc read_barrier_depends, smp_read_barrier_depends
-> smp_store_mb(), smp_mb__before_atomic and smp_mb__after_atomic match the
-> asm-generic variants exactly. Drop the local definitions and pull in
-> asm-generic/barrier.h instead.
+On Fri, Jan 08, 2016 at 10:08:44AM +0100, Arnd Bergmann wrote:
+> On Friday 08 January 2016 02:34:29 Yury Norov wrote:
+> > +
+> > +#include "../../../fs/compat_binfmt_elf.c"
+> > 
 > 
-> This is in preparation to refactoring this code area.
+> This is the wrong file, you have to include fs/binfmt_elf.c, otherwise
+> you pick up the same definitions that you have for the other one.
 > 
-> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Looks sane to me.
+I chose compat as it's how it wokrs now. It redefines some types like
+user_long_t, and I think it's neccessary for ILP32, as for aarch32.
 
-Reviewed-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-
-> ---
->  arch/powerpc/include/asm/barrier.h | 9 ++-------
->  1 file changed, 2 insertions(+), 7 deletions(-)
+> Alternatively, you can also change binfmt_elf32.c to include fs/binfmt_elf.c
+> and use fs/compat_binfmt_elf.c here if that makes the code nicer, you
+> just can use the compat file for both or things get ugly because of
+> the extra indirections.
 > 
-> diff --git a/arch/powerpc/include/asm/barrier.h b/arch/powerpc/include/asm/barrier.h
-> index a7af5fb..980ad0c 100644
-> --- a/arch/powerpc/include/asm/barrier.h
-> +++ b/arch/powerpc/include/asm/barrier.h
-> @@ -34,8 +34,6 @@
->  #define rmb()  __asm__ __volatile__ ("sync" : : : "memory")
->  #define wmb()  __asm__ __volatile__ ("sync" : : : "memory")
-> 
-> -#define smp_store_mb(var, value) do { WRITE_ONCE(var, value); smp_mb(); } while (0)
-> -
->  #ifdef __SUBARCH_HAS_LWSYNC
->  #    define SMPWMB      LWSYNC
->  #else
-> @@ -60,9 +58,6 @@
->  #define smp_wmb()	barrier()
->  #endif /* CONFIG_SMP */
-> 
-> -#define read_barrier_depends()		do { } while (0)
-> -#define smp_read_barrier_depends()	do { } while (0)
-> -
->  /*
->   * This is a barrier which prevents following instructions from being
->   * started until the value of the argument x is known.  For example, if
-> @@ -87,8 +82,8 @@ do {									\
->  	___p1;								\
->  })
-> 
-> -#define smp_mb__before_atomic()     smp_mb()
-> -#define smp_mb__after_atomic()      smp_mb()
->  #define smp_mb__before_spinlock()   smp_mb()
-> 
-> +#include <asm-generic/barrier.h>
-> +
->  #endif /* _ASM_POWERPC_BARRIER_H */
-> -- 
-> MST
-> 
+> 	Arnd
