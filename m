@@ -1,165 +1,35 @@
 From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Tue, 12 Jan 2016 10:56:39 +0530
-Subject: [PATCH 5/5] Microblaze: Modifying microblaze PCI subsytem to support
- generic Xilinx AXI PCIe Host Bridge IP driver
-In-Reply-To: <1452576399-1513-1-git-send-email-bharatku@xilinx.com>
-References: <1452576399-1513-1-git-send-email-bharatku@xilinx.com>
-Message-ID: <1452576399-1513-6-git-send-email-bharatku@xilinx.com>
+Date: Tue, 12 Jan 2016 10:56:34 +0530
+Subject: [PATCH 0/5] PCIe Xilinx with generic driver for Microblaze and 
+Message-ID: <1452576399-1513-1-git-send-email-bharatku@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch does required modifications to microblaze PCI subsystem, to
-work with generic driver (drivers/pci/host/pcie-xilinx.c) on Microblaze
-and Zynq.
+This patch series does modifications to pcie-xilinx.c, to support common
+driver on both Zynq and Microblaze architectures.
+Microblaze pci-common.c has been modified to support generic driver.
 
-Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
----
-Modified pcibios_fixup_bus in pci-common.c, as per generic architecuture.
-Modified pcibios_align_resource in pci-common.c, as per generic
-architecuture.
-Modified pcibios_get_phb_of_node function in pci-common.c, to remove
-dependency on struct pci_controller.
-Removed pci_domain_nr in pci-common.c, instead using generic code.
-Added pcibios_add_device in pci-common.c, as per generic architecuture.
-Adding Kernel configuration in arch/microblaze as required for generic PCI
-domains.
-Added kernel configuration for driver to support Microblaze.
----
- arch/microblaze/Kconfig          |  3 ++
- arch/microblaze/pci/pci-common.c | 61 +++++++++++++++-------------------------
- drivers/pci/host/Kconfig         |  2 +-
- 3 files changed, 27 insertions(+), 39 deletions(-)
+I'm aware Paul Burton <paul.burton@imgtec.com> has also sent patches
+related to pcie-xilinx.c, but I'm unable to comment on them. 
+I request Paul Burton to please add me in cc list so that I can comment on
+those patches.
 
-diff --git a/arch/microblaze/Kconfig b/arch/microblaze/Kconfig
-index 0bce820..c3702b9 100644
---- a/arch/microblaze/Kconfig
-+++ b/arch/microblaze/Kconfig
-@@ -271,6 +271,9 @@ config PCI
- config PCI_DOMAINS
- 	def_bool PCI
- 
-+config PCI_DOMAINS_GENERIC
-+	def_bool PCI_DOMAINS
-+
- config PCI_SYSCALL
- 	def_bool PCI
- 
-diff --git a/arch/microblaze/pci/pci-common.c b/arch/microblaze/pci/pci-common.c
-index ae838ed..bc72856 100644
---- a/arch/microblaze/pci/pci-common.c
-+++ b/arch/microblaze/pci/pci-common.c
-@@ -123,17 +123,6 @@ unsigned long pci_address_to_pio(phys_addr_t address)
- }
- EXPORT_SYMBOL_GPL(pci_address_to_pio);
- 
--/*
-- * Return the domain number for this bus.
-- */
--int pci_domain_nr(struct pci_bus *bus)
--{
--	struct pci_controller *hose = pci_bus_to_host(bus);
--
--	return hose->global_number;
--}
--EXPORT_SYMBOL(pci_domain_nr);
--
- /* This routine is meant to be used early during boot, when the
-  * PCI bus numbers have not yet been assigned, and you need to
-  * issue PCI config cycles to an OF device.
-@@ -863,26 +852,10 @@ void pcibios_setup_bus_devices(struct pci_bus *bus)
- 
- void pcibios_fixup_bus(struct pci_bus *bus)
- {
--	/* When called from the generic PCI probe, read PCI<->PCI bridge
--	 * bases. This is -not- called when generating the PCI tree from
--	 * the OF device-tree.
--	 */
--	if (bus->self != NULL)
--		pci_read_bridge_bases(bus);
--
--	/* Now fixup the bus bus */
--	pcibios_setup_bus_self(bus);
--
--	/* Now fixup devices on that bus */
--	pcibios_setup_bus_devices(bus);
-+	/* nothing to do */
- }
- EXPORT_SYMBOL(pcibios_fixup_bus);
- 
--static int skip_isa_ioresource_align(struct pci_dev *dev)
--{
--	return 0;
--}
--
- /*
-  * We need to avoid collisions with `mirrored' VGA ports
-  * and other strange ISA hardware, so we always want the
-@@ -899,20 +872,20 @@ static int skip_isa_ioresource_align(struct pci_dev *dev)
- resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 				resource_size_t size, resource_size_t align)
- {
--	struct pci_dev *dev = data;
- 	resource_size_t start = res->start;
- 
--	if (res->flags & IORESOURCE_IO) {
--		if (skip_isa_ioresource_align(dev))
--			return start;
--		if (start & 0x300)
--			start = (start + 0x3ff) & ~0x3ff;
--	}
--
- 	return start;
- }
- EXPORT_SYMBOL(pcibios_align_resource);
- 
-+int pcibios_add_device(struct pci_dev *dev)
-+{
-+	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(pcibios_add_device);
-+
- /*
-  * Reparent resource children of pr that conflict with res
-  * under res, and make res replace those children.
-@@ -1335,9 +1308,21 @@ static void pcibios_setup_phb_resources(struct pci_controller *hose,
- 
- struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
- {
--	struct pci_controller *hose = bus->sysdata;
-+	struct device_node *np;
-+
-+	for_each_node_by_type(np, "pci") {
-+		const void *prop;
-+		unsigned int bus_min;
-+
-+		prop = of_get_property(np, "bus-range", NULL);
-+		if (!prop)
-+			continue;
-+		bus_min = be32_to_cpup(prop);
-+		if (bus->number == bus_min)
-+			return np;
-+	}
- 
--	return of_node_get(hose->dn);
-+	return NULL;
- }
- 
- static void pcibios_scan_phb(struct pci_controller *hose)
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index d5e58ba..7c56c2e 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -79,7 +79,7 @@ config PCI_KEYSTONE
- 
- config PCIE_XILINX
- 	bool "Xilinx AXI PCIe host bridge support"
--	depends on ARCH_ZYNQ
-+	depends on ARCH_ZYNQ || MICROBLAZE
- 	help
- 	  Say 'Y' here if you want kernel to support the Xilinx AXI PCIe
- 	  Host Bridge driver.
+Bharat Kumar Gogada (5):
+  PCI: xilinx: Removing xilinx_pcie_parse_and_add_res function
+  PCI: xilinx: Removing struct hw_irq structure.
+  PCI: xilinx: Modifying AXI PCIe Host Bridge driver to work on both    
+     Zynq and Microblaze
+  PCI: xilinx: Updating Zynq PCI binding documentation with Microblaze
+    node.
+  Microblaze: Modifying microblaze PCI subsytem to support generic
+    Xilinx      AXI PCIe Host Bridge IP driver
+
+ .../devicetree/bindings/pci/xilinx-pcie.txt        |  36 +++-
+ arch/microblaze/Kconfig                            |   3 +
+ arch/microblaze/pci/pci-common.c                   |  61 +++---
+ drivers/pci/host/Kconfig                           |   2 +-
+ drivers/pci/host/pcie-xilinx.c                     | 208 ++++-----------------
+ 5 files changed, 97 insertions(+), 213 deletions(-)
+
 -- 
 2.1.1
