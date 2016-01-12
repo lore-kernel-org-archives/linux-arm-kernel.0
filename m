@@ -1,51 +1,42 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 12 Jan 2016 18:14:25 +0100
-Subject: [PATCH V2 03/10] irqchip,GICv3,ACPI: Add redistributor support
- via GICC structures.
-In-Reply-To: <569526C3.1090701@arm.com>
-References: <1450353133-15992-1-git-send-email-tn@semihalf.com>
- <1450353133-15992-4-git-send-email-tn@semihalf.com>
- <5694EB92.9030109@arm.com> <56951645.6070704@linaro.org>
- <569526C3.1090701@arm.com>
-Message-ID: <56953471.5000505@semihalf.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 12 Jan 2016 17:17:10 +0000
+Subject: [PATCH] arm64: net: bpf: don't BUG() on large shifts
+In-Reply-To: <20160108190943.GA11561@ast-mbp.thefacebook.com>
+References: <1452015543-6790-1-git-send-email-rabin@rab.in>
+ <20160108154423.GC11228@arm.com>
+ <20160108190943.GA11561@ast-mbp.thefacebook.com>
+Message-ID: <20160112171710.GK15737@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.01.2016 17:16, Marc Zyngier wrote:
->>> >>Also, the spec says:
->>> >>
->>> >>"On systems supporting GICv3 and above, this field holds the 64-bit
->>> >>physical address of the associated Redistributor. If all of the GIC
->>> >>Redistributors are in the always-on power domain, GICR structures should
->>> >>be used to describe the Redistributors instead, and this field must be
->>> >>set to 0."
->>> >>
->>> >>which triggers two questions:
->>> >>- Can you access always the GICR_TYPER register without waking the
->>> >>redistributor up?
->> >
->> >I missed this part, can you suggest how can we do that? accessing some
->> >register before access to redistributor?
-> This redistributor may be in a power-domain that is off. Are you
-> guaranteed that you can access GICR_TYPER even when it is off?
->
->> >
->>> >>- How do you cope with situations where some redistributors are in the
->>> >>always-on domain, and some are not?
->> >
->> >I'm not sure if there is such hardware, if yes, do we need to fix
->> >the spec first?
-> It is something that should definitely be clarified. Can we end-up in a
-> situation where some redistributors are described via the GICR
-> structure, and some via the GICC structure? The spec is a bit ambiguous.
->
+On Fri, Jan 08, 2016 at 11:09:44AM -0800, Alexei Starovoitov wrote:
+> On Fri, Jan 08, 2016 at 03:44:23PM +0000, Will Deacon wrote:
+> > On Tue, Jan 05, 2016 at 06:39:03PM +0100, Rabin Vincent wrote:
+> > > Attempting to generate UBFM/SBFM instructions with shifts that can't be
+> > > encoded in the immediate fields of the opcodes leads to a trigger of a
+> > > BUG() in the instruction generation code.  As the ARMv8 ARM says: "The
+> > > shift amounts must be in the range 0 to one less than the register width
+> > > of the instruction, inclusive."  Make the JIT reject unencodable shifts
+> > > instead of crashing.
+> > 
+> > I moaned about those BUG_ONs when they were introduced:
+> > 
+> >   https://lkml.org/lkml/2014/7/17/438
+> > 
+> > The response then was that the verifier would catch these issues so
+> > there was nothing to worry about. Has something changed so that is no
+> > longer the case? Do we need to consider a different way of rejecting
+> > invalid instructions at the encoding stage rather than bringing down the
+> > kernel?
+> 
+> that discussion lead to replacement of all BUG_ONs in
+> arch/arm64/net/bpf_jit_comp.c with pr_err_once(), but looks like
+> arch/arm64/kernel/insn.c wasn't addressed.
+> The amount of BUG_ONs there is indeed overkill regardless of what
+> verifier and other JITs do. btw, x64 JIT doesn't have runtime BUG_ONs.
 
-To recap:
-1. GICR and GICC subtables should be mutually exclusive, but ACPI spec 
-should be clear about this.
-2. We need to know if we can access GICR_TYPER without waking the 
-redistributor up.
+Maybe, but insn.c is also used by the alternatives patching code, so we
+really need a way to communicate failure back to the BPF JIT when passed
+an invalid instruction description.
 
-Tirumalesh, can you please advice?
-
-Tomasz
+Will
