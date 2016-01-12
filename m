@@ -1,53 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Jan 2016 23:51:21 +0100
-Subject: [PATCH v5 5/6] mfd: dt-bindings: add device tree bindings for
- Hi3519 sysctrl
-In-Reply-To: <5694C725.6010502@huawei.com>
-References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
- <20160112083946.GN19803@x1> <5694C725.6010502@huawei.com>
-Message-ID: <5675031.hi9rRCqFXs@wuerfel>
+Date: Tue, 12 Jan 2016 23:52:48 +0100
+Subject: [PATCH v1 3/3] ARM64 LPC: update binding doc
+In-Reply-To: <20160112151335.GS13633@e106497-lin.cambridge.arm.com>
+References: <568912EE.9030009@huawei.com> <5694E9FF.6030904@huawei.com>
+ <20160112151335.GS13633@e106497-lin.cambridge.arm.com>
+Message-ID: <4731036.9QlepWb5cE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 January 2016 17:28:05 xuejiancheng wrote:
-> >>>>>
-> >>>> Not yet.
-> >>>> Arnd Bergmann and Rob Herring all suggested adding a specific compatible string
-> >>>> with the SOC name. This binding is just used for describing the compatible string now.
-> >>>> When more functions on hi3519 SOC are added later, the specific driver will be also
-> >>>> needed.
-> >>>
-> >>> Save this binding until it has more functionality.  We here "I'll add
-> >>> to this later" all too often.
-> >>>
-> >>
-> >> In the hi3519.dtsi file, there is a system-controller device node described like below:
-> >> sysctrl: system-controller at 12010000 {
-> >>      compatible = "hisilicon,hi3519-sysctrl", "syscon";
-> >>      reg = <0x12010000 0x1000>;
-> >> };
-> >> Do you mean that I should remove "hisilicon,hi3519-sysctrl" and just use "syscon" as the
-> >> compatible string??
-> > 
-> > Where is this compatible string _used_?
-> > 
-> >> If I want to add "hisilicon,hi3519-sysctrl" for hi3519. where should I put this binding?
-> >> Could you give some suggestions?  Thank you very much!
-> > 
-> > If you're not using the compatible i.e. the device doesn't have its
-> > own driver yet, then there is no need to supply the binding at all, is
-> > there?
-> > 
+On Tuesday 12 January 2016 15:13:35 liviu.dudau at arm.com wrote:
+> > int of_address_to_resource(struct device_node *dev, int index,
+> >                          struct resource *r)
+> > {
+> >       ...
+> >       /* flags can be get here, without ranges property reqired.
+> >        * if the reg = <0x0 0xe4 4>, I can get flag of IORESOURCE_MEM,
+> >        * if the reg = <0x1 0xe4 4>, I can get flag of IORESOURCE_IO,
 > 
-> OK. Thank you.
+> That is strange, the parent node has #address-cells = <2> so the first two numbers should be part
+> of the address and not influence the flags. Can you add some debugging in of_get_address() and
+> try to figure out what bus is used in  *flags = bus->get_flags(prop) ?
+> 
 > 
 
-Sorry for stepping in late here. I still think that every syscon device should
-come with a specific compatible string, so we have the option of creating a
-driver later on, and I'd like to see a binding document that lists those strings
-(which I believe exists here).
-
-It's really hard to add compatible strings later on, anything else we can
-work around by keying off that string and adding a workaround in the kernel.
+This is the standard ISA binding. The first cell is the address space
+(IO or MEM), the second cell is the address within that space. This
+is similar to how PCI works.
 
 	Arnd
