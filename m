@@ -1,65 +1,41 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 12 Jan 2016 16:09:45 +0800
-Subject: [PATCH v3 2/2] power: add documentation for ACT8945A's charger DT
- bindings
-In-Reply-To: <1452586185-818-1-git-send-email-wenyou.yang@atmel.com>
-References: <1452586185-818-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1452586185-818-3-git-send-email-wenyou.yang@atmel.com>
+Date: Tue, 12 Jan 2016 16:17:07 +0800
+Subject: [PATCH v2 0/2] regulator: act8945a: add regulator driver for the
+ sub-device of ACT8945A MFD
+Message-ID: <1452586629-1117-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for the DT bindings of the charger
-subdevice of ACT8945A MFD.
+The ACT8945A is a Multi Function Device with the following subdevices:
+ - Regulator
+ - Charger
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
+This patch set is to add regulator driver for ACT8945A.
+It is based on the patch set:
+	[PATCH v2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD driver
 
-Changes in v3: None
-Changes in v2: None
+Changes in v2:
+ - add more help information in Kconfig.
+ - update the file header with short version license and author line.
+ - remove unused structure, struct act8945a_pmic.
+ - substitute of_property_read_bool() for of_get_property().
+ - due to removing the member of stuct act8945a_dev, dev.
+ - remove the unnecessary print out.
+ - use module_platform_driver(), instead of subsys_initcall().
+ - substitute MODULE_LICENSE("GPL") for MODULE_LICENSE("GPL v2").
+ - add Acked-by Rob Herring.
 
- .../devicetree/bindings/power/act8945a-charger.txt |   34 ++++++++++++++++++++
- 1 file changed, 34 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/act8945a-charger.txt
+Wenyou Yang (2):
+  regulator: act8945a: add regulator driver for ACT8945A
+  regulator: add documentation for ACT8945A's regulator DT bindings
 
-diff --git a/Documentation/devicetree/bindings/power/act8945a-charger.txt b/Documentation/devicetree/bindings/power/act8945a-charger.txt
-new file mode 100644
-index 0000000..868e0164
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/act8945a-charger.txt
-@@ -0,0 +1,34 @@
-+Device-Tree bindings for charger of Active-semi ACT8945A Multi-Function Device
-+
-+Required properties:
-+ - compatible: "active-semi,act8945a-charger"
-+ - active-semi,chglev-gpio = Specifies a gpio that uses to select
-+   the charge current level.
-+
-+Optional properties:
-+ - active-semi,battery_temperature: Indicates if it is allowed to check
-+   the battery temperature. If it is missing, assume the battery temperature
-+   is not allowed to check.
-+ - active-semi,input_voltage_threshold: unit: mV;
-+   Specifies the charger's input over-voltage threshold value;
-+   The value can be: 6600, 7000, 7500, 8000; default: 6600
-+ - active-semi,precondition_timeout: unit: minutes;
-+   Specifies the charger's PRECONDITION safety timer setting value;
-+   The value can be: 40, 60, 80, 0; If 0, it means to disable this timer;
-+   default: 40.
-+ - active-semi,total_timeout: unit: hours;
-+   Specifies the charger's total safety timer setting value;
-+   The value can be: 3, 4, 5, 0; If 0, it means to disable this timer;
-+   default: 3.
-+
-+Example:
-+
-+	charger {
-+		compatible = "active-semi,act8945a-charger";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_charger_chglev>;
-+		active-semi,chglev-gpio = <&pioA 12 GPIO_ACTIVE_HIGH>;
-+		active-semi,input_voltage_threshold = <6600>;
-+		active-semi,precondition_timeout = <40>;
-+		active-semi,total_timeout = <3>;
-+	};
+ .../bindings/regulator/act8945a-regulator.txt      |   78 ++++++
+ drivers/regulator/Kconfig                          |    9 +
+ drivers/regulator/Makefile                         |    1 +
+ drivers/regulator/act8945a-regulator.c             |  267 ++++++++++++++++++++
+ 4 files changed, 355 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
+ create mode 100644 drivers/regulator/act8945a-regulator.c
+
 -- 
 1.7.9.5
