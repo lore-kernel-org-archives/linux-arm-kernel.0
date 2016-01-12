@@ -1,26 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 12 Jan 2016 18:59:36 +0000
-Subject: [PATCH v3 1/2] acpi: Fix proper return code for function
- acpi_gsi_to_irq
-In-Reply-To: <1446857519-5908-2-git-send-email-lho@apm.com>
-References: <1446857519-5908-1-git-send-email-lho@apm.com>
- <1446857519-5908-2-git-send-email-lho@apm.com>
-Message-ID: <56954D18.1010306@arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 12 Jan 2016 14:09:53 -0500 (EST)
+Subject: [PATCH] ARM: Runtime patch udiv/sdiv instructions into
+ __aeabi_{u}idiv()
+In-Reply-To: <20160108024429.GF22188@codeaurora.org>
+References: <alpine.LFD.2.20.1512110105450.26920@knanqh.ubzr>
+ <alpine.LFD.2.20.1512111125330.26920@knanqh.ubzr>
+ <alpine.LFD.2.20.1512111216350.26920@knanqh.ubzr>
+ <1941958.3p422lB7Mz@wuerfel>
+ <alpine.LFD.2.20.1512111842280.26920@knanqh.ubzr>
+ <20160105012319.GC22188@codeaurora.org>
+ <alpine.LFD.2.20.1601042035190.3603@knanqh.ubzr>
+ <20160108024429.GF22188@codeaurora.org>
+Message-ID: <alpine.LFD.2.20.1601121347480.7882@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/15 00:51, Loc Ho wrote:
-> The function acpi_gsi_to_irq should returns 0 on success as upper function
-> caller expect an 0 for sucesss.
+On Thu, 7 Jan 2016, Stephen Boyd wrote:
 
-I have to ask: why do you feel the need to change an API that behaves
-like the rest of the IRQ allocation functions (at least when it comes to
-its return value)?
+> On 01/04, Nicolas Pitre wrote:
+> > On Mon, 4 Jan 2016, Stephen Boyd wrote:
+> > > 
+> > > I can update the patches to be based on this patch here and
+> > > handle the conditional branches and tail call optimization cases
+> > > by adding some safety checks like we have for the ftrace branch
+> > > patching. But I'd rather not do that work unless we all agree
+> > > that it's worthwhile pursuing it.
+> > > 
+> > > Is there still any concern about the benefit of patching each
+> > > call site vs. patching the functions? The micro benchmark seems
+> > > to show some theoretical improvement on cortex-a7 and I can run
+> > > it on Scorpion and Krait processors to look for any potential
+> > > benefits there, but I'm not sure of any good kernel benchmark for
+> > > this. If it will be rejected due to complexity vs. benefit
+> > > arguments I'd rather work on something else.
+> > 
+> > You could run the benchmark on Scorpion and Krait to start with. If 
+> > there is no improvement what so ever like on A15's then the answer might 
+> > be rather simple.
+> > 
+> 
+> So running the benchmark on Scorpion is not useful because we
+> don't have the idiv instruction there. On Krait I get the
+> following results. I ran this on a dragonboard apq8074 with
+> maxcpus=1 on the kernel command line.
+> 
+> Testing INLINE_DIV ...
+> real    0m 13.56s
+> user    0m 13.56s
+> sys     0m 0.00s
+> 
+> Testing PATCHED_DIV ...
+> real    0m 15.15s
+> user    0m 15.14s
+> sys     0m 0.00s
+> 
+> Testing OUTOFLINE_DIV ...
+> real    0m 18.09s
+> user    0m 18.09s
+> sys     0m 0.00s
+> 
+> Testing LIBGCC_DIV ...
+> real    0m 24.26s
+> user    0m 24.25s
+> sys     0m 0.00s
+> 
+> It looks like the branch actually costs us some time here.
+> Patching isn't as good as the compiler inserting the instruction
+> itself, but it is better than branching to the division routine.
 
-0 is defined as an invalid interrupt, and I wish it stayed that way.
+I think it is up to you at this point whether or not you feel the call 
+site patching complexity is worth it. Personally I'd rather go directly 
+for the compiler flag solution to close the final performance gap, but I 
+won't stand in the way of a call site patching patch.
 
-Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Nicolas
