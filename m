@@ -1,63 +1,73 @@
-From: tbm@cyrius.com (Martin Michlmayr)
-Date: Mon, 11 Jan 2016 16:07:21 -0800
-Subject: I/O issues with writing to mtdblock devices on kirkwood
-In-Reply-To: <20160111232231.GS6588@sirena.org.uk>
-References: <1440159857.19360.50.camel@debian.org>
- <20150905210846.GF6040@lunn.ch>
- <CAKzmTe0Bq8itvKoOTwZ+ZjY5pTqFYWt0-ihO4jn0qew_NYGhFg@mail.gmail.com>
- <20151011153548.GA9808@lunn.ch>
- <20160111230059.GA12286@jirafa.cyrius.com>
- <20160111232231.GS6588@sirena.org.uk>
-Message-ID: <20160112000721.GB12286@jirafa.cyrius.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Jan 2016 16:15:32 -0800
+Subject: arm qemu boot failures in -next due to 'PM / Domains: add setter
+ for dev.pm_domain'
+In-Reply-To: <56943D3B.8010600@roeck-us.net>
+References: <5693EB8A.40802@roeck-us.net> <20160111185459.GZ12777@atomide.com>
+ <20160111200450.GA16902@roeck-us.net>
+ <7302125.veLBHLkdLG@vostro.rjw.lan> <56943D3B.8010600@roeck-us.net>
+Message-ID: <20160112001532.GD12777@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Brown <broonie@debian.org> [2016-01-11 23:22]:
-> >      spi: Pump transfers inside calling context for spi_sync()
+* Guenter Roeck <linux@roeck-us.net> [160111 15:40]:
+> On 01/11/2016 02:49 PM, Rafael J. Wysocki wrote:
+> >On Monday, January 11, 2016 12:04:50 PM Guenter Roeck wrote:
+> >>On Mon, Jan 11, 2016 at 10:55:00AM -0800, Tony Lindgren wrote:
+> >>>* Guenter Roeck <linux@roeck-us.net> [160111 09:51]:
+> >>>>Hi,
+> >>>>
+> >>>>I see 6 out of 24 arm qemu tests failing in next-20160111. Bisect points
+> >>>>to commit 989561de9b51 ("PM / Domains: add setter for dev.pm_domain").
+> >>>>Failures are silent - there is no output on the console.
+> >>>>Affected tests are
+> >>>>
+> >>>>arm:beagle:multi_v7_defconfig:omap3-beagle
+> >>>>arm:beaglexm:multi_v7_defconfig:omap3-beagle-xm
+> >>>>arm:overo:multi_v7_defconfig:omap3-overo-tobi
+> >>>>arm:beagle:omap2plus_defconfig:omap3-beagle
+> >>>>arm:beaglexm:omap2plus_defconfig:omap3-beagle-xm
+> >>>>arm:overo:omap2plus_defconfig:omap3-overo-tobi
+> >>>>
+> >>>>For details please see the 'next' column at http://server.roeck-us.net:8010/builders.
+> >>>>
+> >>>>Reverting the offending commit fixes the problems.
+> >>>>
+> >>>>Please let me know if there is anything I can do to help tracking down the problem.
+> >>>
+> >>>The following fixes the booting, but I wonder if it's a
+> >>
+> >>Yes, it does.
+> >>
+> >>Tested-by: Guenter Roeck <linux@roeck-us.net>
+> >>
+> >>>proper fix?
+> >>>
+> >>That I don't know.
+> >
+> >If I'm not mistaken, what happens is that device_is_bound() tries to
+> >dereference dev->p which is NULL.  If that's the case, the appended one
+> >should help too.
+> >
+> >Can you please check?
+> >
+> >---
+> >  drivers/base/dd.c |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> >Index: linux-pm/drivers/base/dd.c
+> >===================================================================
+> >--- linux-pm.orig/drivers/base/dd.c
+> >+++ linux-pm/drivers/base/dd.c
+> >@@ -234,7 +234,7 @@ late_initcall(deferred_probe_initcall);
+> >   */
+> >  bool device_is_bound(struct device *dev)
+> >  {
+> >-	return klist_node_attached(&dev->p->knode_driver);
+> >+	return dev->p && klist_node_attached(&dev->p->knode_driver);
 > 
-> Can you please clarify?  You're saying this causes SATA timeouts but
-> this is a change in the SPI subsystem and you're talking about MTD
-> devices.  You've also not said which kernel version this is with...
+> Yes, that fixes the problem as well.
 
-Sorry for being unclear.  The problem is that other activities get
-blocked (most notably SATA) when writing a 9 MB file to an SPI flash
-chip.  The problem does not happen when writing a smaller (2 MB) file.
-It only happens when writing to mtdblock, not to mtd (maybe flashcp
-writes the file in smaller blocks?).
+Yeah works for me too:
 
-The problem still exists in 4.4.  I started with 3.16 which was known
-to be good.  This was using the ARM board file for QNAP.  I then tried
-Device Tree with 3.16 since someone suggested to try that.  I verified
-that 3.19 works and that 4.0 shows the problem, and bisected it to the
-commit I mentioned.
-
-> In any case, please provide traces from ftrace with all the SPI trace
-> enabled (via /sys/kernel/debug/trace/events/spi/enable).
-
-I've never used ftrace so I need to look into that (or maybe Andrew
-can help).
-
-Anyway, here's the original log:
-
-root at debian:~# cat mtd2 > /dev/mtdblock2
-ata1.00: exception Emask 0x0 SAct 0x0 SErr 0x0 action 0x6 frozen
-ata1.00: failed command: FLUSH CACHE EXT
-ata1.00: cmd ea/00:00:00:00:00/00:00:00:00:00/a0 tag 20
-         res 40/00:00:00:00:00/00:00:00:00:00/00 Emask 0x4 (timeout)
-ata1.00: status: { DRDY }
-ata1: hard resetting link
-ata1: SATA link up 3.0 Gbps (SStatus 123 SControl F300)
-ata1.00: qc timeout (cmd 0xec)
-ata1.00: failed to IDENTIFY (I/O error, err_mask=0x4)
-ata1.00: revalidation failed (errno=-5)
-ata1: hard resetting link
-ata1: SATA link up 3.0 Gbps (SStatus 123 SControl F300)
-ata1.00: qc timeout (cmd 0xec)
-ata1.00: failed to IDENTIFY (I/O error, err_mask=0x4)
-ata1.00: revalidation failed (errno=-5)
-ata1: limiting SATA link speed to 1.5 Gbps
-ata1: hard resetting link
-
--- 
-Martin Michlmayr
-http://www.cyrius.com/
+Tested-by: Tony Lindgren <tony@atomide.com>
