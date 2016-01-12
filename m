@@ -1,22 +1,40 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 12 Jan 2016 13:50:07 +0100
-Subject: [PATCH v3 00/41] arch: barrier cleanup + barriers for virt
-In-Reply-To: <1452426622-4471-1-git-send-email-mst@redhat.com>
-References: <1452426622-4471-1-git-send-email-mst@redhat.com>
-Message-ID: <20160112125007.GR6344@twins.programming.kicks-ass.net>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 12 Jan 2016 20:54:39 +0800
+Subject: [PATCH v2 2/2] mfd: add documentation for ACT8945A DT bindings
+In-Reply-To: <1452585915-551-3-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <201601122010.TpAuObtz%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 10, 2016 at 04:16:22PM +0200, Michael S. Tsirkin wrote:
-> I parked this in vhost tree for now, though the inclusion of patch 1 from tip
-> creates a merge conflict - but one that is trivial to resolve.
-> 
-> So I intend to just merge it all through my tree, including the
-> duplicate patch, and assume conflict will be resolved.
-> 
-> I would really appreciate some feedback on arch bits (especially the x86 bits),
-> and acks for merging this through the vhost tree.
+Hi Wenyou,
 
-Thanks for doing this, looks good to me.
+[auto build test ERROR on ljones-mfd/for-mfd-next]
+[also build test ERROR on v4.4 next-20160111]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+url:    https://github.com/0day-ci/linux/commits/Wenyou-Yang/mfd-act8945a-add-Active-semi-ACT8945A-PMIC-MFD-driver/20160112-161159
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git for-mfd-next
+config: x86_64-allmodconfig (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
+
+All errors (new ones prefixed by >>):
+
+   drivers/built-in.o: In function `act8945a_i2c_probe':
+>> act8945a.c:(.text+0x229476): undefined reference to `__devm_regmap_init_i2c'
+   drivers/built-in.o: In function `act8945a_i2c_init':
+>> act8945a.c:(.init.text+0x1a536): undefined reference to `i2c_register_driver'
+   drivers/built-in.o: In function `act8945a_i2c_exit':
+>> act8945a.c:(.exit.text+0x66f): undefined reference to `i2c_del_driver'
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 51062 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160112/6b7364c9/attachment-0001.obj>
