@@ -1,153 +1,32 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 12 Jan 2016 16:28:34 +0100
-Subject: [PATCHv2 2/2] net: fec: Reset ethernet PHY whenever the
- enet_out clock is being enabled
-In-Reply-To: <1452611876-451-3-git-send-email-LW@KARO-electronics.de>
-References: <1452611876-451-1-git-send-email-LW@KARO-electronics.de>
- <1452611876-451-2-git-send-email-LW@KARO-electronics.de>
- <1452611876-451-3-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1452612514.3694.46.camel@pengutronix.de>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Tue, 12 Jan 2016 16:52:12 +0100
+Subject: [PATCH V2 3/3] dt-bindings: bsm2835: fix bindings documentation
+ to use new clock framework
+In-Reply-To: <20160112143601.GA29373@rob-hp-laptop>
+References: <1452602149-5875-1-git-send-email-kernel@martin.sperl.org>
+ <1452602149-5875-4-git-send-email-kernel@martin.sperl.org>
+ <20160112143601.GA29373@rob-hp-laptop>
+Message-ID: <2EC555E0-91B9-45AA-8804-848C445E052E@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 12.01.2016, 16:17 +0100 schrieb Lothar Wa?mann:
-> If a PHY uses ENET_OUT as reference clock, it may need a RESET to get
-> functional after the clock had been disabled.
+
+> On 12.01.2016, at 15:36, Rob Herring <robh@kernel.org> wrote:
 > 
-> Failure to do this results in the link state constantly toggling
-> between up and down:
-> fec 02188000.ethernet eth0: Link is Up - 100Mbps/Full - flow control rx/tx
-> fec 02188000.ethernet eth0: Link is Down
-> fec 02188000.ethernet eth0: Link is Up - 100Mbps/Full - flow control rx/tx
-> fec 02188000.ethernet eth0: Link is Down
-> [...]
+> On Tue, Jan 12, 2016 at 12:35:48PM +0000, kernel at martin.sperl.org wrote:
+>> From: Martin Sperl <kernel@martin.sperl.org>
 > 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> ---
->  drivers/net/ethernet/freescale/fec.h      |  1 +
->  drivers/net/ethernet/freescale/fec_main.c | 38 +++++++++++++++++++++++++------
->  2 files changed, 32 insertions(+), 7 deletions(-)
+> Typo in the subject (bsm).
 > 
-> diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
-> index 99d33e2..33228df 100644
-> --- a/drivers/net/ethernet/freescale/fec.h
-> +++ b/drivers/net/ethernet/freescale/fec.h
-> @@ -519,6 +519,7 @@ struct fec_enet_private {
->  	int	pause_flag;
->  	int	wol_flag;
->  	u32	quirks;
-> +	int	phy_reset_gpio;
->  
->  	struct	napi_struct napi;
->  	int	csum_flags;
-> diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-> index 592a7a4..fb0b0eb 100644
-> --- a/drivers/net/ethernet/freescale/fec_main.c
-> +++ b/drivers/net/ethernet/freescale/fec_main.c
-> @@ -67,6 +67,7 @@
->  
->  static void set_multicast_list(struct net_device *ndev);
->  static void fec_enet_itr_coal_init(struct net_device *ndev);
-> +static void fec_reset_phy(struct platform_device *pdev);
->  
->  #define DRIVER_NAME	"fec"
->  
-> @@ -1862,6 +1863,8 @@ static int fec_enet_clk_enable(struct net_device *ndev, bool enable)
->  			ret = clk_prepare_enable(fep->clk_enet_out);
->  			if (ret)
->  				goto failed_clk_enet_out;
-> +
-> +			fec_reset_phy(fep->pdev);
->  		}
->  		if (fep->clk_ptp) {
->  			mutex_lock(&fep->ptp_clk_mutex);
-> @@ -3216,11 +3219,12 @@ static int fec_enet_init(struct net_device *ndev)
->  #ifdef CONFIG_OF
->  static void fec_reset_phy(struct platform_device *pdev)
->  {
-> -	int err, phy_reset;
-> -	int msec = 1;
-> +	struct net_device *ndev = platform_get_drvdata(pdev);
-> +	struct fec_enet_private *fep = netdev_priv(ndev);
->  	struct device_node *np = pdev->dev.of_node;
-> +	int msec = 1;
->  
-> -	if (!np)
-> +	if (!gpio_is_valid(fep->phy_reset_gpio))
->  		return;
->  
->  	of_property_read_u32(np, "phy-reset-duration", &msec);
+>> 
+>> The bcm2835-i2s driver has been updated to use the new clock framework
+>> for the bcm2835 SOC.
+>> 
+>> This patch documents the required changes to the bindings.
+>> 
+>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+> 
+> Please add acks when you post new versions.
+> 
 
-While this isn't in a hot path I still want to see this
-of_property_read() moved to the fec_get_reset_gpio() function below.
-It's really inconsistent otherwise.
-
-
-> @@ -3228,18 +3232,27 @@ static void fec_reset_phy(struct platform_device *pdev)
->  	if (msec > 1000)
->  		msec = 1;
->  
-> +	gpio_set_value_cansleep(fep->phy_reset_gpio, 0);
-> +	msleep(msec);
-> +	gpio_set_value_cansleep(fep->phy_reset_gpio, 1);
-> +}
-> +
-> +static int fec_get_reset_gpio(struct platform_device *pdev)
-> +{
-> +	int err, phy_reset;
-> +	struct device_node *np = pdev->dev.of_node;
-> +
->  	phy_reset = of_get_named_gpio(np, "phy-reset-gpios", 0);
->  	if (!gpio_is_valid(phy_reset))
-> -		return;
-> +		return phy_reset;
->  
->  	err = devm_gpio_request_one(&pdev->dev, phy_reset,
->  				    GPIOF_OUT_INIT_LOW, "phy-reset");
->  	if (err) {
->  		dev_err(&pdev->dev, "failed to get phy-reset-gpios: %d\n", err);
-> -		return;
-> +		return err;
->  	}
-> -	msleep(msec);
-> -	gpio_set_value_cansleep(phy_reset, 1);
-> +	return phy_reset;
->  }
->  #else /* CONFIG_OF */
->  static void fec_reset_phy(struct platform_device *pdev)
-> @@ -3249,6 +3262,11 @@ static void fec_reset_phy(struct platform_device *pdev)
->  	 * by machine code.
->  	 */
->  }
-> +
-> +static inline int fec_get_reset_gpio(struct platform_device *pdev)
-> +{
-> +	return -EINVAL;
-> +}
->  #endif /* CONFIG_OF */
->  
->  static void
-> @@ -3339,6 +3357,11 @@ fec_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, ndev);
->  
-> +	ret = fec_get_reset_gpio(pdev);
-> +	if (ret == -EPROBE_DEFER)
-> +		goto gpio_defer;
-> +	fep->phy_reset_gpio = ret;
-> +
->  	if (of_get_property(np, "fsl,magic-packet", NULL))
->  		fep->wol_flag |= FEC_WOL_HAS_MAGIC_PACKET;
->  
-> @@ -3493,6 +3516,7 @@ failed_clk_ipg:
->  failed_clk:
->  failed_phy:
->  	of_node_put(phy_node);
-> +gpio_defer:
->  failed_ioremap:
->  	free_netdev(ndev);
->  
-
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+You want it resent with the typo fixed and signed-off?
