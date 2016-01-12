@@ -1,81 +1,49 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 12 Jan 2016 15:54:32 -0800
-Subject: [PATCHv2] arm64: Allow vmalloc regions to be set with set_memory_*
-In-Reply-To: <1452640955-25491-1-git-send-email-labbott@fedoraproject.org>
-References: <1452640955-25491-1-git-send-email-labbott@fedoraproject.org>
-Message-ID: <CAGXu5jJgYqkEkmfRdtgbtns=EyHc2UvzhkLFGgsYTTB3EKXJDQ@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 13 Jan 2016 08:55:33 +0900
+Subject: [PATCH v3] arm: irq: l2c: do not print error in case of missing
+ l2c from dtb
+In-Reply-To: <1452593472-10703-1-git-send-email-andi.shyti@samsung.com>
+References: <5694BABF.3070200@samsung.com>
+ <1452593472-10703-1-git-send-email-andi.shyti@samsung.com>
+Message-ID: <56959275.80404@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 3:22 PM, Laura Abbott <labbott@fedoraproject.org> wrote:
->
-> The range of set_memory_* is currently restricted to the module address
-> range because of difficulties in breaking down larger block sizes.
-> vmalloc maps PAGE_SIZE pages so it is safe to use as well. Update the
-> function ranges and add a comment explaining why the range is restricted
-> the way it is.
->
-> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
-
-Acked-by: Kees Cook <keescook@chromium.org>
-
--Kees
-
+On 12.01.2016 19:11, Andi Shyti wrote:
+> In some architectures the L2 cache controller is integrated in the
+> processor's block itself and it doesn't use any external cache
+> controller. This means that an entry in the board's dtb related
+> to the l2c is not necessary.
+> 
+> Distinguish between error codes and do not print anything in case
+> l2x0_of_init() doesn't find any L2C DTB entry and returns -ENODEV.
+> 
+> This patch mutes the following error message:
+> 
+>    L2C: failed to init: -19
+> 
+> on boards like odroid-xu4, cortex A7/A15, which don't have
+> external cache controller.
+> 
+> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
-> v2: Old version was sent out with vmalloc warnings. Sorry for the noise.
-> ---
->  arch/arm64/mm/pageattr.c | 25 +++++++++++++++++++++----
->  1 file changed, 21 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-> index 3571c73..88c8e54 100644
-> --- a/arch/arm64/mm/pageattr.c
-> +++ b/arch/arm64/mm/pageattr.c
-> @@ -36,6 +36,26 @@ static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
->         return 0;
->  }
->
-> +static bool validate_addr(unsigned long start, unsigned long end)
-> +{
-> +       /*
-> +        * This check explicitly excludes most kernel memory. Most kernel
-> +        * memory is mapped with a larger page size and breaking down the
-> +        * larger page size without causing TLB conflicts is very difficult.
-> +        *
-> +        * If you need to call set_memory_* on a range, the recommendation is
-> +        * to use vmalloc since that range is mapped with pages.
-> +        */
-> +       if (start >= MODULES_VADDR && start < MODULES_END &&
-> +           end >= MODULES_VADDR && end < MODULES_END)
-> +               return true;
-> +
-> +       if (is_vmalloc_addr((void *)start) && is_vmalloc_addr((void *)end))
-> +               return true;
-> +
-> +       return false;
-> +}
-> +
->  static int change_memory_common(unsigned long addr, int numpages,
->                                 pgprot_t set_mask, pgprot_t clear_mask)
->  {
-> @@ -51,10 +71,7 @@ static int change_memory_common(unsigned long addr, int numpages,
->                 WARN_ON_ONCE(1);
->         }
->
-> -       if (start < MODULES_VADDR || start >= MODULES_END)
-> -               return -EINVAL;
-> -
-> -       if (end < MODULES_VADDR || end >= MODULES_END)
-> +       if (!validate_addr(start, end))
->                 return -EINVAL;
->
->         data.set_mask = set_mask;
-> --
-> 2.5.0
->
+> Hi,
+> 
+> here is a second version. An alternative would be to print with
+> pr_dbg, but then it's a matter of taste.
+> 
+> V1, and V2 print a message in case the l2c dtb entry is not found
+> (the V2 has a better print rephrase suggested by Joe)
+> 
+> V3 ignores the case of -enodev for l2c and doesn't print anything
+> 
+> Thanks,
+> Andi
 
+Looks good to me, as v2 did. Works fine:
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+BR,
+KRzysztof
