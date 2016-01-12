@@ -1,5 +1,5 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 12 Jan 2016 00:43:37 +0100
+From: tbm@cyrius.com (Martin Michlmayr)
+Date: Mon, 11 Jan 2016 16:07:21 -0800
 Subject: I/O issues with writing to mtdblock devices on kirkwood
 In-Reply-To: <20160111232231.GS6588@sirena.org.uk>
 References: <1440159857.19360.50.camel@debian.org>
@@ -8,44 +8,56 @@ References: <1440159857.19360.50.camel@debian.org>
  <20151011153548.GA9808@lunn.ch>
  <20160111230059.GA12286@jirafa.cyrius.com>
  <20160111232231.GS6588@sirena.org.uk>
-Message-ID: <20160111234337.GF28292@lunn.ch>
+Message-ID: <20160112000721.GB12286@jirafa.cyrius.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 11:22:31PM +0000, Mark Brown wrote:
-> On Mon, Jan 11, 2016 at 03:00:59PM -0800, Martin Michlmayr wrote:
-> > A few months ago Debian users with QNAP devices (ARM Kirkwood)
-> > reported issues (mostly SATA timeouts) when doing kernel upgrades,
-> > specifically when the new ramdisk was being written to flash.
-> 
-> > cat file > /dev/mtdblockX worked fine on a 2 MB flash partition but
-> > resulted in SATA timeouts on a 9 MB flash partition.
-> 
-> > flascp file /dev/mtd2 works fine.
-> 
-> > I've now bisected it down to this change:
-> 
-> >  commit 0461a4149836c792d186027c8c859637a4cfb11a
-> >  Author: Mark Brown <broonie@kernel.org>
-> >  Date:   Tue Dec 9 21:38:05 2014 +0000
-> 
+* Mark Brown <broonie@debian.org> [2016-01-11 23:22]:
 > >      spi: Pump transfers inside calling context for spi_sync()
 > 
 > Can you please clarify?  You're saying this causes SATA timeouts but
 > this is a change in the SPI subsystem and you're talking about MTD
 > devices.  You've also not said which kernel version this is with...
 
-Hi Mark
+Sorry for being unclear.  The problem is that other activities get
+blocked (most notably SATA) when writing a 9 MB file to an SPI flash
+chip.  The problem does not happen when writing a smaller (2 MB) file.
+It only happens when writing to mtdblock, not to mtd (maybe flashcp
+writes the file in smaller blocks?).
 
-I've done a little testing. What appears to happen is that while the
-cat file > /dev/mtdblockX is going on, all access to filesystems on
-SATA are blocked. I set off a "find ." and it busily prints
-filenames. But as soon as i start the cat, it grinds to a halt, and
-only continues once the cat has finished.
+The problem still exists in 4.4.  I started with 3.16 which was known
+to be good.  This was using the ARM board file for QNAP.  I then tried
+Device Tree with 3.16 since someone suggested to try that.  I verified
+that 3.19 works and that 4.0 shows the problem, and bisected it to the
+commit I mentioned.
 
-My guess is that the locking behaviour has changed somehow. SPI or MTD
-is now holding onto a lock so preventing other filesystems making
-progress? Maybe before this change the lock was release and grabbed every
-message?
+> In any case, please provide traces from ftrace with all the SPI trace
+> enabled (via /sys/kernel/debug/trace/events/spi/enable).
 
-   Andrew
+I've never used ftrace so I need to look into that (or maybe Andrew
+can help).
+
+Anyway, here's the original log:
+
+root at debian:~# cat mtd2 > /dev/mtdblock2
+ata1.00: exception Emask 0x0 SAct 0x0 SErr 0x0 action 0x6 frozen
+ata1.00: failed command: FLUSH CACHE EXT
+ata1.00: cmd ea/00:00:00:00:00/00:00:00:00:00/a0 tag 20
+         res 40/00:00:00:00:00/00:00:00:00:00/00 Emask 0x4 (timeout)
+ata1.00: status: { DRDY }
+ata1: hard resetting link
+ata1: SATA link up 3.0 Gbps (SStatus 123 SControl F300)
+ata1.00: qc timeout (cmd 0xec)
+ata1.00: failed to IDENTIFY (I/O error, err_mask=0x4)
+ata1.00: revalidation failed (errno=-5)
+ata1: hard resetting link
+ata1: SATA link up 3.0 Gbps (SStatus 123 SControl F300)
+ata1.00: qc timeout (cmd 0xec)
+ata1.00: failed to IDENTIFY (I/O error, err_mask=0x4)
+ata1.00: revalidation failed (errno=-5)
+ata1: limiting SATA link speed to 1.5 Gbps
+ata1: hard resetting link
+
+-- 
+Martin Michlmayr
+http://www.cyrius.com/
