@@ -1,82 +1,109 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 12 Jan 2016 01:24:28 +0100
-Subject: arm qemu boot failures in -next due to 'PM / Domains: add setter
- for dev.pm_domain'
-In-Reply-To: <20160112001532.GD12777@atomide.com>
-References: <5693EB8A.40802@roeck-us.net> <20160111185459.GZ12777@atomide.com>
- <20160111200450.GA16902@roeck-us.net>
- <7302125.veLBHLkdLG@vostro.rjw.lan> <56943D3B.8010600@roeck-us.net>
- <20160112001532.GD12777@atomide.com>
-Message-ID: <CAJZ5v0gvvXkj16Ac_dWnx4ew+Y7biaR54HCsyHkqo_f9PPPmAQ@mail.gmail.com>
+From: laura@labbott.name (Laura Abbott)
+Date: Mon, 11 Jan 2016 16:26:28 -0800
+Subject: [RESEND][PATCHv2 1/3] ion: Devicetree bindings for Ion
+In-Reply-To: <CAL_JsqLBk1TAa2bKnA6TpEfrXxVZ7JYojOgmszEKoWC0+Huuug@mail.gmail.com>
+References: <1452548364-9522-1-git-send-email-laura@labbott.name>
+ <1452548364-9522-2-git-send-email-laura@labbott.name>
+ <CAL_JsqLBk1TAa2bKnA6TpEfrXxVZ7JYojOgmszEKoWC0+Huuug@mail.gmail.com>
+Message-ID: <56944834.4040108@labbott.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 1:15 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Guenter Roeck <linux@roeck-us.net> [160111 15:40]:
->> On 01/11/2016 02:49 PM, Rafael J. Wysocki wrote:
->> >On Monday, January 11, 2016 12:04:50 PM Guenter Roeck wrote:
->> >>On Mon, Jan 11, 2016 at 10:55:00AM -0800, Tony Lindgren wrote:
->> >>>* Guenter Roeck <linux@roeck-us.net> [160111 09:51]:
->> >>>>Hi,
->> >>>>
->> >>>>I see 6 out of 24 arm qemu tests failing in next-20160111. Bisect points
->> >>>>to commit 989561de9b51 ("PM / Domains: add setter for dev.pm_domain").
->> >>>>Failures are silent - there is no output on the console.
->> >>>>Affected tests are
->> >>>>
->> >>>>arm:beagle:multi_v7_defconfig:omap3-beagle
->> >>>>arm:beaglexm:multi_v7_defconfig:omap3-beagle-xm
->> >>>>arm:overo:multi_v7_defconfig:omap3-overo-tobi
->> >>>>arm:beagle:omap2plus_defconfig:omap3-beagle
->> >>>>arm:beaglexm:omap2plus_defconfig:omap3-beagle-xm
->> >>>>arm:overo:omap2plus_defconfig:omap3-overo-tobi
->> >>>>
->> >>>>For details please see the 'next' column at http://server.roeck-us.net:8010/builders.
->> >>>>
->> >>>>Reverting the offending commit fixes the problems.
->> >>>>
->> >>>>Please let me know if there is anything I can do to help tracking down the problem.
->> >>>
->> >>>The following fixes the booting, but I wonder if it's a
->> >>
->> >>Yes, it does.
->> >>
->> >>Tested-by: Guenter Roeck <linux@roeck-us.net>
->> >>
->> >>>proper fix?
->> >>>
->> >>That I don't know.
->> >
->> >If I'm not mistaken, what happens is that device_is_bound() tries to
->> >dereference dev->p which is NULL.  If that's the case, the appended one
->> >should help too.
->> >
->> >Can you please check?
->> >
->> >---
->> >  drivers/base/dd.c |    2 +-
->> >  1 file changed, 1 insertion(+), 1 deletion(-)
->> >
->> >Index: linux-pm/drivers/base/dd.c
->> >===================================================================
->> >--- linux-pm.orig/drivers/base/dd.c
->> >+++ linux-pm/drivers/base/dd.c
->> >@@ -234,7 +234,7 @@ late_initcall(deferred_probe_initcall);
->> >   */
->> >  bool device_is_bound(struct device *dev)
->> >  {
->> >-    return klist_node_attached(&dev->p->knode_driver);
->> >+    return dev->p && klist_node_attached(&dev->p->knode_driver);
+On 1/11/16 3:28 PM, Rob Herring wrote:
+> On Mon, Jan 11, 2016 at 3:39 PM, Laura Abbott <laura@labbott.name> wrote:
 >>
->> Yes, that fixes the problem as well.
+>> This adds a base set of devicetree bindings for the Ion memory
+>> manager. This supports setting up the generic set of heaps and
+>> their properties.
+>>
+>> Signed-off-by: Laura Abbott <laura@labbott.name>
+>> ---
+>>   drivers/staging/android/ion/devicetree.txt | 50 ++++++++++++++++++++++++++++++
+>>   1 file changed, 50 insertions(+)
+>>   create mode 100644 drivers/staging/android/ion/devicetree.txt
+>>
+>> diff --git a/drivers/staging/android/ion/devicetree.txt b/drivers/staging/android/ion/devicetree.txt
+>> new file mode 100644
+>> index 0000000..e1ea537
+>> --- /dev/null
+>> +++ b/drivers/staging/android/ion/devicetree.txt
+>> @@ -0,0 +1,50 @@
+>> +Ion Memory Manager
+>> +
+>> +Ion is a memory manager that allows for sharing of buffers via dma-buf.
+>> +Ion allows for different types of allocation via an abstraction called
+>> +a 'heap'. A heap represents a specific type of memory. Each heap has
+>> +a different type. There can be multiple instances of the same heap
+>> +type.
+>> +
+>> +Required properties for Ion
+>> +
+>> +- compatible: "linux,ion" PLUS a compatible property for the device
+>> +
+>> +All child nodes of a linux,ion node are interpreted as heaps
+>> +
+>> +required properties for heaps
+>> +
+>> +- compatible: compatible string for a heap type PLUS a compatible property
+>> +for the specific instance of the heap. Current heap types
+>> +-- linux,ion-heap-system
+>> +-- linux,ion-heap-system-contig
+>> +-- linux,ion-heap-carveout
+>> +-- linux,ion-heap-chunk
+>> +-- linux,ion-heap-dma
+>> +-- linux,ion-heap-custom
+>> +
+>> +Optional properties
+>> +- memory-region: A phandle to a memory region. Required for DMA heap type
+>> +(see reserved-memory.txt for details on the reservation)
 >
-> Yeah works for me too:
+> Why would all of them not require a memory region other than system heap?
 >
-> Tested-by: Tony Lindgren <tony@atomide.com>
+>> +
+>> +Example:
+>> +
+>> +       ion {
+>> +               compatbile = "qcom,msm8916-ion", "linux,ion";
+>> +               #address-cells = <1>;
+>> +               #size-cells = <0>;
+>> +
+>> +               ion-system-heap {
+>> +                       compatbile = "qcom,system-heap", "linux,ion-heap-system"
+>> +               };
+>
+> What is the purpose of this in DT? Don't we always want/need a system
+> heap? How does it vary by platform?
+>
+>> +               ion-camera-region {
+>> +                       compatible = "qcom,camera-heap", "linux,ion-heap-dma"
+>> +                       memory-region = <&camera_region>;
+>
+> Why not just add a property (or properties) to the camera_region node
+> that ION drivers can search for?
+>
+> Rob
+>
 
-OK, thanks!
+Thinking about all of this put together with the general comments, would the
+following be more acceptable:
 
-I'll add a changelog to this one and queue it up then.
+- Keep the approach of this patch series with having the heaps specified
+in an array in a file
+- For each array of heaps, have a list of machine compatible strings that
+work with the heaps.
+- Call of_machine_is_compatible on all the heaps until one is found
+- When setting up the heaps, check for a property like Rob suggested
+to get the appropriate memory node
+- Add appropriate documentation in the devicetree directory explaining
+the entire approach
+
+The only Ion data in the DT with this approach would be the property in the
+appropriate memory node. There is no ABI except the memory property so as
+Ion changes there would be no breakage. This approach does go a little
+bit out outside of the traditional way devicetree works. A more
+traditional approach would be to just have an ion node with a compatible
+string and then just find the memory node via a property (although this
+does taint the DT more with Ion even if the ABI may be relatively stable)
 
 Thanks,
-Rafael
+Laura
