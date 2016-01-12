@@ -1,77 +1,70 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Tue, 12 Jan 2016 19:33:47 +0800
-Subject: [PATCH v2 4/4] ARM64: dts: rockchip: add syscon-reboot-mode DT node
-In-Reply-To: <1452598029-8222-1-git-send-email-andy.yan@rock-chips.com>
-References: <1452598029-8222-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1452598427-8418-1-git-send-email-andy.yan@rock-chips.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 12 Jan 2016 11:41:11 +0000
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160112104012.GW6373@twins.programming.kicks-ass.net>
+References: <1452426622-4471-12-git-send-email-mst@redhat.com>
+ <56945366.2090504@imgtec.com>
+ <20160112092711.GP6344@twins.programming.kicks-ass.net>
+ <20160112102555.GV6373@twins.programming.kicks-ass.net>
+ <20160112104012.GW6373@twins.programming.kicks-ass.net>
+Message-ID: <20160112114111.GB15737@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add syscon-reboot-mode driver DT node for rk3368 platform
+On Tue, Jan 12, 2016 at 11:40:12AM +0100, Peter Zijlstra wrote:
+> On Tue, Jan 12, 2016 at 11:25:55AM +0100, Peter Zijlstra wrote:
+> > On Tue, Jan 12, 2016 at 10:27:11AM +0100, Peter Zijlstra wrote:
+> > > 2) the changelog _completely_ fails to explain the sync 0x11 and sync
+> > > 0x12 semantics nor does it provide a publicly accessible link to
+> > > documentation that does.
+> > 
+> > Ralf pointed me at: https://imgtec.com/mips/architectures/mips64/
+> > 
+> > > 3) it really should have explained what you did with
+> > > smp_llsc_mb/smp_mb__before_llsc() in _detail_.
+> > 
+> > And reading the MIPS64 v6.04 instruction set manual, I think 0x11/0x12
+> > are _NOT_ transitive and therefore cannot be used to implement the
+> > smp_mb__{before,after} stuff.
+> > 
+> > That is, in MIPS speak, those SYNC types are Ordering Barriers, not
+> > Completion Barriers. They need not be globally performed.
+> 
+> Which if true; and I know Will has some questions here; would also mean
+> that you 'cannot' use the ACQUIRE/RELEASE barriers for your locks as was
+> recently suggested by David Daney.
 
-Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+The issue I have with the SYNC description in the text above is that it
+describes the single CPU (program order) and the dual-CPU (confusingly
+named global order) cases, but then doesn't generalise any further. That
+means we can't sensibly reason about transitivity properties when a third
+agent is involved. For example, the WRC+sync+addr test:
 
----
 
-Changes in v2:
-- make this node as a subnode of pmugrf
+P0:
+Wx = 1
 
-Changes in v1: None
+P1:
+Rx == 1
+SYNC
+Wy = 1
 
- arch/arm64/boot/dts/rockchip/rk3368.dtsi | 33 +++++++++++++++++++++++++++++++-
- 1 file changed, 32 insertions(+), 1 deletion(-)
+P2:
+Ry == 1
+<address dep>
+Rx = 0
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-index cc093a4..20997a2 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-@@ -45,6 +45,7 @@
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/pinctrl/rockchip.h>
-+#include <dt-bindings/soc/rockchip_boot-mode.h>
- 
- / {
- 	compatible = "rockchip,rk3368";
-@@ -485,8 +486,38 @@
- 	};
- 
- 	pmugrf: syscon at ff738000 {
--		compatible = "rockchip,rk3368-pmugrf", "syscon";
-+		compatible = "rockchip,rk3368-pmugrf", "syscon", "simple-mfd";
- 		reg = <0x0 0xff738000 0x0 0x1000>;
-+
-+		reboot-mode {
-+			compatible = "syscon-reboot-mode";
-+			offset = <0x200>;
-+
-+			normal {
-+				linux,mode = "normal";
-+				loader,magic = <BOOT_NORMAL>;
-+			};
-+
-+			loader {
-+				linux,mode = "loader";
-+				loader,magic = <BOOT_LOADER>;
-+			};
-+
-+			maskrom {
-+				linux,mode = "maskrom";
-+				loader,magic = <BOOT_MASKROM>;
-+			};
-+
-+			recovery {
-+				linux,mode = "recovery";
-+				loader,magic = <BOOT_RECOVERY>;
-+			};
-+
-+			fastboot {
-+				linux,mode = "fastboot";
-+				loader,magic = <BOOT_FASTBOOT>;
-+			};
-+		};
- 	};
- 
- 	cru: clock-controller at ff760000 {
--- 
-1.9.1
+
+I can't find anything to forbid that, given the text. The main problem
+is having the SYNC on P1 affect the write by P0.
+
+> That is, currently all architectures -- with exception of PPC -- have
+> RCsc locks, but using these non-transitive things will get you RCpc
+> locks.
+> 
+> So yes, MIPS can go RCpc for its locks and share the burden of pain with
+> PPC, but that needs to be a very concious decision.
+
+I think it's much worse than RCpc, given my interpretation of the wording.
+
+Will
