@@ -1,153 +1,38 @@
-From: pc.liao@mediatek.com (PC Liao)
-Date: Tue, 12 Jan 2016 14:33:42 +0800
-Subject: [PATCH v2] ASoC: mediatek: Enable 33bit memory address to support 4GB
- DRAM
-Message-ID: <1452580422-23078-1-git-send-email-pc.liao@mediatek.com>
+From: joe@perches.com (Joe Perches)
+Date: Mon, 11 Jan 2016 23:11:23 -0800
+Subject: [PATCH] arm: irq: l2c: do not print error in case of missing
+ l2c from dtb
+In-Reply-To: <1452580473-10073-1-git-send-email-andi.shyti@samsung.com>
+References: <1452580473-10073-1-git-send-email-andi.shyti@samsung.com>
+Message-ID: <1452582683.7773.102.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If platform is embedded with memory more than 3GB, the address will
-go out of the scope that 32-bit can handle with. This patch sets the
-dma_mask and MSB properly to describe its address to 33-bit.
+On Tue, 2016-01-12 at 15:34 +0900, Andi Shyti wrote:
+> In some architectures the L2 cache controller is integrated in the
+> processor's block itself and it doesn't use any external cache
+> controller. This means that an entry in the board's dtb related
+> to the l2c is not necessary.
+> 
+> Distinguish between error codes and print just an information in
+> case of -ENODEV.
 
-Signed-off-by: Hidalgo Huang <hidalgo.huang@mediatek.com>
-Signed-off-by: PC Liao <pc.liao@mediatek.com>
----
-Changes since v1:
-Use upper_32_bits() and lower_32_bits() to change the code. 
----
- sound/soc/mediatek/mtk-afe-common.h |    1 +
- sound/soc/mediatek/mtk-afe-pcm.c    |   22 +++++++++++++++++++++-
- 2 files changed, 22 insertions(+), 1 deletion(-)
+trivia:
 
-diff --git a/sound/soc/mediatek/mtk-afe-common.h b/sound/soc/mediatek/mtk-afe-common.h
-index 9b1af1a..f341f62 100644
---- a/sound/soc/mediatek/mtk-afe-common.h
-+++ b/sound/soc/mediatek/mtk-afe-common.h
-@@ -87,6 +87,7 @@ struct mtk_afe_memif_data {
- 	int irq_en_shift;
- 	int irq_fs_shift;
- 	int irq_clr_shift;
-+	int msb_shift;
- };
- 
- struct mtk_afe_memif {
-diff --git a/sound/soc/mediatek/mtk-afe-pcm.c b/sound/soc/mediatek/mtk-afe-pcm.c
-index 08af9f5..689c51f 100644
---- a/sound/soc/mediatek/mtk-afe-pcm.c
-+++ b/sound/soc/mediatek/mtk-afe-pcm.c
-@@ -21,6 +21,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/dma-mapping.h>
- #include <linux/pm_runtime.h>
- #include <sound/soc.h>
- #include "mtk-afe-common.h"
-@@ -35,6 +36,7 @@
- #define AFE_I2S_CON1		0x0034
- #define AFE_I2S_CON2		0x0038
- #define AFE_CONN_24BIT		0x006c
-+#define AFE_MEMIF_MSB		0x00cc
- 
- #define AFE_CONN1		0x0024
- #define AFE_CONN2		0x0028
-@@ -592,6 +594,7 @@ static int mtk_afe_dais_hw_params(struct snd_pcm_substream *substream,
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
- 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
- 	struct mtk_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
-+	int msb_at_bit33 = 0;
- 	int ret;
- 
- 	dev_dbg(afe->dev,
-@@ -603,7 +606,8 @@ static int mtk_afe_dais_hw_params(struct snd_pcm_substream *substream,
- 	if (ret < 0)
- 		return ret;
- 
--	memif->phys_buf_addr = substream->runtime->dma_addr;
-+	msb_at_bit33 = upper_32_bits(substream->runtime->dma_addr) ? 1 : 0;
-+	memif->phys_buf_addr = lower_32_bits(substream->runtime->dma_addr);
- 	memif->buffer_size = substream->runtime->dma_bytes;
- 
- 	/* start */
-@@ -614,6 +618,11 @@ static int mtk_afe_dais_hw_params(struct snd_pcm_substream *substream,
- 		     memif->data->reg_ofs_base + AFE_BASE_END_OFFSET,
- 		     memif->phys_buf_addr + memif->buffer_size - 1);
- 
-+	/* set MSB to 33-bit */
-+	regmap_update_bits(afe->regmap, AFE_MEMIF_MSB,
-+			   1 << memif->data->msb_shift,
-+			   msb_at_bit33 << memif->data->msb_shift);
-+
- 	/* set channel */
- 	if (memif->data->mono_shift >= 0) {
- 		unsigned int mono = (params_channels(params) == 1) ? 1 : 0;
-@@ -978,6 +987,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
- 		.irq_en_shift = 0,
- 		.irq_fs_shift = 4,
- 		.irq_clr_shift = 0,
-+		.msb_shift = 0,
- 	}, {
- 		.name = "DL2",
- 		.id = MTK_AFE_MEMIF_DL2,
-@@ -991,6 +1001,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
- 		.irq_en_shift = 2,
- 		.irq_fs_shift = 16,
- 		.irq_clr_shift = 2,
-+		.msb_shift = 1,
- 	}, {
- 		.name = "VUL",
- 		.id = MTK_AFE_MEMIF_VUL,
-@@ -1004,6 +1015,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
- 		.irq_en_shift = 1,
- 		.irq_fs_shift = 8,
- 		.irq_clr_shift = 1,
-+		.msb_shift = 6,
- 	}, {
- 		.name = "DAI",
- 		.id = MTK_AFE_MEMIF_DAI,
-@@ -1017,6 +1029,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
- 		.irq_en_shift = 3,
- 		.irq_fs_shift = 20,
- 		.irq_clr_shift = 3,
-+		.msb_shift = 5,
- 	}, {
- 		.name = "AWB",
- 		.id = MTK_AFE_MEMIF_AWB,
-@@ -1030,6 +1043,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
- 		.irq_en_shift = 14,
- 		.irq_fs_shift = 24,
- 		.irq_clr_shift = 6,
-+		.msb_shift = 3,
- 	}, {
- 		.name = "MOD_DAI",
- 		.id = MTK_AFE_MEMIF_MOD_DAI,
-@@ -1043,6 +1057,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
- 		.irq_en_shift = 3,
- 		.irq_fs_shift = 20,
- 		.irq_clr_shift = 3,
-+		.msb_shift = 4,
- 	}, {
- 		.name = "HDMI",
- 		.id = MTK_AFE_MEMIF_HDMI,
-@@ -1056,6 +1071,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
- 		.irq_en_shift = 12,
- 		.irq_fs_shift = -1,
- 		.irq_clr_shift = 4,
-+		.msb_shift = 8,
- 	},
- };
- 
-@@ -1189,6 +1205,10 @@ static int mtk_afe_pcm_dev_probe(struct platform_device *pdev)
- 	struct mtk_afe *afe;
- 	struct resource *res;
- 
-+	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(33));
-+	if (ret)
-+		return ret;
-+
- 	afe = devm_kzalloc(&pdev->dev, sizeof(*afe), GFP_KERNEL);
- 	if (!afe)
- 		return -ENOMEM;
--- 
-1.7.9.5
+> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+[]
+> @@ -95,7 +95,9 @@ void __init init_IRQ(void)
+> ?			outer_cache.write_sec = machine_desc->l2c_write_sec;
+> ?		ret = l2x0_of_init(machine_desc->l2c_aux_val,
+> ?				???machine_desc->l2c_aux_mask);
+> -		if (ret)
+> +		if (ret == -ENODEV)
+> +			pr_info("no L2C controller entry found in the dtb\n");
+
+Perhaps this would be more consistent if it was
+			pr_info("L2C: no controller entry found in the dtb\n");
+> 
+> +		else if (ret)
+> ?			pr_err("L2C: failed to init: %d\n", ret);
+> ?	}
+> ?
