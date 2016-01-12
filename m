@@ -1,50 +1,84 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 Jan 2016 14:26:58 +0000
-Subject: [PATCH 1/3] ARM: STi: Add DT defines for co-processor reset lines
-In-Reply-To: <1452606099.4292.20.camel@pengutronix.de>
-References: <1445856969-19424-1-git-send-email-lee.jones@linaro.org>
- <20160112133437.GH27358@x1>
- <1452606099.4292.20.camel@pengutronix.de>
-Message-ID: <20160112142658.GI27358@x1>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 12 Jan 2016 14:30:34 +0000
+Subject: [PATCH 1/5] arm64: dts: apq8016-sbc: add regulators support
+In-Reply-To: <7998607.BblzgPxGPW@wuerfel>
+References: <1452606358-24569-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1452606392-24614-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <7998607.BblzgPxGPW@wuerfel>
+Message-ID: <56950E0A.2000005@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Jan 2016, Philipp Zabel wrote:
 
-> Hi Lee,
-> 
-> Am Dienstag, den 12.01.2016, 13:34 +0000 schrieb Lee Jones:
-> > On Mon, 26 Oct 2015, Lee Jones wrote:
-> > 
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  include/dt-bindings/reset-controller/stih407-resets.h | 4 ++++
-> > >  1 file changed, 4 insertions(+)
-> > > 
-> > > diff --git a/include/dt-bindings/reset-controller/stih407-resets.h b/include/dt-bindings/reset-controller/stih407-resets.h
-> > > index 02d4328..4ab3a1c 100644
-> > > --- a/include/dt-bindings/reset-controller/stih407-resets.h
-> > > +++ b/include/dt-bindings/reset-controller/stih407-resets.h
-> > > @@ -52,6 +52,10 @@
-> > >  #define STIH407_KEYSCAN_SOFTRESET	26
-> > >  #define STIH407_USB2_PORT0_SOFTRESET	27
-> > >  #define STIH407_USB2_PORT1_SOFTRESET	28
-> > > +#define STIH407_ST231_AUD_SOFTRESET	29
-> > > +#define STIH407_ST231_DMU_SOFTRESET	30
-> > > +#define STIH407_ST231_GP0_SOFTRESET	31
-> > > +#define STIH407_ST231_GP1_SOFTRESET	32
-> > >  
-> > >  /* Picophy reset defines */
-> > >  #define STIH407_PICOPHY0_RESET		0
-> > 
-> > Has anyone seen this patch?
-> 
-> c9bfec0032fb, sorry I missed 4.4.
 
-What about v4.5?  The merge window has only just opened.
+On 12/01/16 13:59, Arnd Bergmann wrote:
+> On Tuesday 12 January 2016 13:46:32 Srinivas Kandagatla wrote:
+>>          };
+>>
+>> +       smd {
+>> +               rpm {
+>> +                       rpm-requests {
+>> +                               pm8916-regulators {
+>> +
+>> +                                       vdd_l1_l2_l3-supply = <&pm8916_s3>;
+>> +                                       vdd_l5-supply = <&pm8916_s3>;
+>> +                                       vdd_l4_l5_l6-supply = <&pm8916_s4>;
+>> +                                       vdd_l7-supply = <&pm8916_s4>;
+>> +
+>>
+>
+> If you're nested this deeply, you should consider using labels, e.g.
+>
+Labels are good and works for me.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Stephen/Andy are you ok to use labels for such deeply nested nodes in 
+board dts?
+
+> / {
+>         ...
+>
+>         smd {
+>                 rpm {
+>                        rpm-requests {
+>                                 regulators: pm8916-regulators {
+>
+> 				};
+> 			};
+> 		};
+> 	};
+>
+> 	...
+> };
+>
+>
+> &regulators {
+>          vdd_l1_l2_l3-supply = <&pm8916_s3>;
+>          vdd_l5-supply = <&pm8916_s3>;
+>          vdd_l4_l5_l6-supply = <&pm8916_s4>;
+>          vdd_l7-supply = <&pm8916_s4>;
+>
+> 	s1 {
+>                   regulator-min-microvolt = <375000>;
+>                   regulator-max-microvolt = <1562000>;
+> 	};
+>
+>          s3 {
+> 	        regulator-min-microvolt = <375000>;
+> 	        regulator-max-microvolt = <1562000>;
+>          };
+>
+> 	...
+> };
+>
+> btw, it seems odd to me that all those nodes under 'smd'
+> have names but no addresses.
+These regulators are identified by the node names, and have no addresses 
+associated with it as control goes over SMD based IPC to the rpm.
+
+https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/Documentation/devicetree/bindings/regulator/qcom,smd-rpm-regulator.txt?id=refs/tags/next-20160112
+
+--srini
+
+>
+> 	Arnd
+>
