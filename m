@@ -1,47 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 12 Jan 2016 12:36:57 +0000
-Subject: [PATCH v3 05/21] arm64: kvm: deal with kernel symbols outside of
- linear mapping
-In-Reply-To: <1452518355-4606-6-git-send-email-ard.biesheuvel@linaro.org>
-References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
- <1452518355-4606-6-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160112123656.GC4858@leverpostej>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 12 Jan 2016 12:46:14 +0000
+Subject: [PATCH v5 0/7] remoteproc: Add driver for STMicroelectronics platforms
+Message-ID: <1452602781-22424-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 02:18:58PM +0100, Ard Biesheuvel wrote:
-> KVM on arm64 uses a fixed offset between the linear mapping at EL1 and
-> the HYP mapping at EL2. Before we can move the kernel virtual mapping
-> out of the linear mapping, we have to make sure that references to kernel
-> symbols that are accessed via the HYP mapping are translated to their
-> linear equivalent.
-> 
-> To prevent inadvertent direct references from sneaking in later, change
-> the type of all extern declarations to HYP kernel symbols to the opaque
-> 'struct kvm_ksym', which does not decay to a pointer type like char arrays
-> and function references. This is not bullet proof, but at least forces the
-> user to take the address explicitly rather than referencing it directly.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+ST's platforms often have multiple co-processors (usually ST40s or ST231s)
+on-board.  This provides the Linux-side infrastructure to flash and boot
+them successfully.
+  
+This set has been tested on an STiH410-B2120.
 
-Cool feature!
+v4 => v5:
+ - Check for invalid 'count' (command read length) in write fn()s
+  
+v3 => v4:
+ Suggested-by: Suman Anna <s-anna@ti.com>
+ - Move to using 'reserved-memory' API
+   - New 'reserved-memory' nodes
+   - Remove memory locations from RemoteProc's DT node's reg properties
+   - Remove C code obtaining/allocating DMA memory
+ - Re-order .start() and .stop() ops
+ - Add protection around Reset API in error path
+ - Explicitly set .has_iommu to false
+  
+v2 => v3:
+ - Generify syscon property (st,syscfg-boot => st,syscfg)
+ - Rename IP in DT bindings doc (Remote Processor => Co-Processor)
+ - Remove superfluous 'clock-names' property
+ - Remove superfluous 'reg-names' property
+ - Populate MAINTAINERS
+ - Clean-up DTS formatting
+ - Use strings in debugfs to control procs ('1|0' => 'start|stop')
+ - Align copyright statement with MODULE() macros
+ - Rename driver data structure ('st_rproc' => 'ddata')
+ - Addition of a full error path in .start()
 
-> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> index 5e377101f919..e3865845d3e1 100644
-> --- a/arch/arm64/include/asm/kvm_asm.h
-> +++ b/arch/arm64/include/asm/kvm_asm.h
-> @@ -105,24 +105,29 @@
->  #ifndef __ASSEMBLY__
->  struct kvm;
->  struct kvm_vcpu;
-> +struct kvm_ksym;
+v1 => v2:
+ - Remove Linux implementation specific comment from binding document
+ - Force debugfs '0' to shutdown co-processor - rather than !1
+ - Supply more detailed commit message
+ - Propagate errors back from .stop()
+ - Review GPL wording
+ - Supply original author's SoBs
 
-So that one doesn't have to trawl git logs, it might be worth a comment
-as to the purpose of struct kvm_ksym (and thus why we never need to
-actually define it).
+Lee Jones (7):
+  remoteproc: debugfs: Check of invalid 'count' value
+  remoteproc: dt: Provide bindings for ST's Remote Processor Controller
+    driver
+  remoteproc: debugfs: Add ability to boot remote processor using
+    debugfs
+  remoteproc: Supply controller driver for ST's Remote Processors
+  MAINTAINERS: Add ST's Remote Processor Driver to ARM/STI ARCHITECTURE
+  ARM: STiH407: Add nodes for RemoteProc
+  ARM: STiH407: Move over to using the 'reserved-memory' API for
+    obtaining DMA memory
 
-Either way:
+ .../devicetree/bindings/remoteproc/st-rproc.txt    |  41 +++
+ MAINTAINERS                                        |   1 +
+ arch/arm/boot/dts/stih407-family.dtsi              |  70 +++++
+ drivers/remoteproc/Kconfig                         |   9 +
+ drivers/remoteproc/Makefile                        |   1 +
+ drivers/remoteproc/remoteproc_debugfs.c            |  38 ++-
+ drivers/remoteproc/st_remoteproc.c                 | 297 +++++++++++++++++++++
+ 7 files changed, 455 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+ create mode 100644 drivers/remoteproc/st_remoteproc.c
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
+-- 
+1.9.1
