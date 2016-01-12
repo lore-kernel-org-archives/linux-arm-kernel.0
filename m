@@ -1,25 +1,27 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 12 Jan 2016 11:22:12 +0100
-Subject: [PATCH v3 6/6] reset: mediatek: Add MT2701 reset driver
-In-Reply-To: <1452587470-61506-7-git-send-email-jamesjj.liao@mediatek.com>
-References: <1452587470-61506-1-git-send-email-jamesjj.liao@mediatek.com>
- <1452587470-61506-7-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1452594132.4292.17.camel@pengutronix.de>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 12 Jan 2016 11:25:55 +0100
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160112092711.GP6344@twins.programming.kicks-ass.net>
+References: <1452426622-4471-12-git-send-email-mst@redhat.com>
+ <56945366.2090504@imgtec.com>
+ <20160112092711.GP6344@twins.programming.kicks-ass.net>
+Message-ID: <20160112102555.GV6373@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 12.01.2016, 16:31 +0800 schrieb James Liao:
-> From: Shunli Wang <shunli.wang@mediatek.com>
-> 
-> In infrasys and perifsys, there are many reset
-> control bits for kinds of modules. These bits are
-> used as actual reset controllers to be registered
-> into kernel's generic reset controller framework.
-> 
-> Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+On Tue, Jan 12, 2016 at 10:27:11AM +0100, Peter Zijlstra wrote:
+> 2) the changelog _completely_ fails to explain the sync 0x11 and sync
+> 0x12 semantics nor does it provide a publicly accessible link to
+> documentation that does.
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Ralf pointed me at: https://imgtec.com/mips/architectures/mips64/
 
-regards
-Philipp
+> 3) it really should have explained what you did with
+> smp_llsc_mb/smp_mb__before_llsc() in _detail_.
+
+And reading the MIPS64 v6.04 instruction set manual, I think 0x11/0x12
+are _NOT_ transitive and therefore cannot be used to implement the
+smp_mb__{before,after} stuff.
+
+That is, in MIPS speak, those SYNC types are Ordering Barriers, not
+Completion Barriers. They need not be globally performed.
