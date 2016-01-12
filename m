@@ -1,230 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 12 Jan 2016 12:03:30 +0000
-Subject: [PATCH V2 03/10] irqchip,GICv3,ACPI: Add redistributor support
- via GICC structures.
-In-Reply-To: <1450353133-15992-4-git-send-email-tn@semihalf.com>
-References: <1450353133-15992-1-git-send-email-tn@semihalf.com>
- <1450353133-15992-4-git-send-email-tn@semihalf.com>
-Message-ID: <5694EB92.9030109@arm.com>
+From: Gang.Liu@nxp.com (Liu Gang)
+Date: Tue, 12 Jan 2016 20:10:09 +0800
+Subject: [PATCH 1/2 V3] gpio/qoriq: Add qoriq platforms support
+Message-ID: <1452600610-17400-1-git-send-email-Gang.Liu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/12/15 11:52, Tomasz Nowicki wrote:
-> On systems supporting GICv3 and above, in MADT GICC structures, the
-> field of GICR Base Address holds the 64-bit physical address of the
-> associated Redistributor if the GIC Redistributors are not in the
-> always-on power domain, so instead of init GICR regions via GIC
-> redistributor structure(s), init it with GICR base address in GICC
-> structures in that case.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> ---
->  drivers/irqchip/irq-gic-v3.c | 98 ++++++++++++++++++++++++++++++++++++++++----
->  1 file changed, 89 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index c4b929c..0528e82 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -39,6 +39,7 @@
->  struct redist_region {
->  	void __iomem		*redist_base;
->  	phys_addr_t		phys_base;
-> +	bool			single_redist;
->  };
->  
->  struct gic_chip_data {
-> @@ -435,6 +436,9 @@ static int gic_populate_rdist(void)
->  				return 0;
->  			}
->  
-> +			if (gic_data.redist_regions[i].single_redist)
-> +				break;
-> +
->  			if (gic_data.redist_stride) {
->  				ptr += gic_data.redist_stride;
->  			} else {
-> @@ -965,6 +969,7 @@ IRQCHIP_DECLARE(gic_v3, "arm,gic-v3", gic_of_init);
->  #ifdef CONFIG_ACPI
->  static struct redist_region *redist_regs __initdata;
->  static u32 nr_redist_regions __initdata;
-> +static bool single_redist;
->  
->  static int __init
->  gic_acpi_register_redist(phys_addr_t phys_base, u64 size)
-> @@ -979,7 +984,8 @@ gic_acpi_register_redist(phys_addr_t phys_base, u64 size)
->  	}
->  
->  	redist_regs[count].phys_base = phys_base;
-> -	redist_regs[count++].redist_base = redist_base;
-> +	redist_regs[count].redist_base = redist_base;
+The gpio-mpc8xxx.c should can support qoriq and
+Layerscape platforms.
 
-nit: move the count++ out of the access in the previous patch, this will
-make this series a bit easier to follow.
+Signed-off-by: Liu Gang <Gang.Liu@nxp.com>
+---
+-V3: No changes
 
-> +	redist_regs[count++].single_redist = single_redist;
+ drivers/gpio/Kconfig | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-What is that single_redist for? Is that because you can't rely on
-GICR_TYPER.Last?
-
->  	return 0;
->  }
->  
-> @@ -993,6 +999,48 @@ gic_acpi_parse_madt_redist(struct acpi_subtable_header *header,
->  	return gic_acpi_register_redist(redist->base_address, redist->length);
->  }
->  
-> +static int __init
-> +gic_acpi_parse_madt_gicc(struct acpi_subtable_header *header,
-> +			 const unsigned long end)
-> +{
-> +	struct acpi_madt_generic_interrupt *gicc;
-> +	void __iomem *redist_base;
-> +	u64 typer;
-> +	u32 size;
-> +
-> +	gicc = (struct acpi_madt_generic_interrupt *)header;
-> +	redist_base = ioremap(gicc->gicr_base_address, SZ_64K * 2);
-> +	if (!redist_base)
-> +		return -ENOMEM;
-> +
-> +	typer = readq_relaxed(redist_base + GICR_TYPER);
-> +	/* don't map reserved page as it's buggy to access it */
-> +	size = (typer & GICR_TYPER_VLPIS) ? SZ_64K * 3 : SZ_64K * 2;
-> +	iounmap(redist_base);
-
-What a mess. If you discover a !VLPIS redistributor, why do you have to
-unmap it to remap it again? Also, please map the whole region for the
-redistributor as we have on the DT side (4 64kB pages for VLPIS capable
-redistributors).
-
-Also, the spec says:
-
-"On systems supporting GICv3 and above, this field holds the 64-bit
-physical address of the associated Redistributor. If all of the GIC
-Redistributors are in the always-on power domain, GICR structures should
-be used to describe the Redistributors instead, and this field must be
-set to 0."
-
-which triggers two questions:
-- Can you access always the GICR_TYPER register without waking the
-redistributor up?
-- How do you cope with situations where some redistributors are in the
-always-on domain, and some are not?
-
-> +	return gic_acpi_register_redist(gicc->gicr_base_address, size);
-> +}
-> +
-> +static int __init gic_acpi_collect_gicr_base(void)
-> +{
-> +	acpi_tbl_entry_handler redist_parser;
-> +	enum acpi_madt_type type;
-> +
-> +	if (single_redist) {
-> +		type = ACPI_MADT_TYPE_GENERIC_INTERRUPT;
-> +		redist_parser = gic_acpi_parse_madt_gicc;
-> +	} else {
-> +		type = ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR;
-> +		redist_parser = gic_acpi_parse_madt_redist;
-> +	}
-> +
-> +	/* Collect redistributor base addresses in GICR entries */
-> +	if (acpi_table_parse_madt(type, redist_parser, 0) > 0)
-> +		return 0;
-> +
-> +	pr_info("No valid GICR entries exist\n");
-> +	return -ENODEV;
-> +}
-> +
->  static int __init gic_acpi_match_gicr(struct acpi_subtable_header *header,
->  				  const unsigned long end)
->  {
-> @@ -1000,6 +1048,42 @@ static int __init gic_acpi_match_gicr(struct acpi_subtable_header *header,
->  	return 0;
->  }
->  
-> +static int __init gic_acpi_match_gicc(struct acpi_subtable_header *header,
-> +				      const unsigned long end)
-> +{
-> +	struct acpi_madt_generic_interrupt *gicc =
-> +				(struct acpi_madt_generic_interrupt *)header;
-> +
-> +	/*
-> +	 * If GICC is enabled and has valid gicr base address, then it means
-> +	 * GICR base is presented via GICC
-> +	 */
-> +	if ((gicc->flags & ACPI_MADT_ENABLED) && gicc->gicr_base_address)
-> +		return 0;
-> +
-> +	return -ENODEV;
-> +}
-> +
-> +static int __init gic_acpi_count_gicr_regions(void)
-> +{
-> +	int count;
-> +
-> +	/* Count how many redistributor regions we have */
-> +	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
-> +				      gic_acpi_match_gicr, 0);
-> +	if (count > 0) {
-> +		single_redist = false;
-> +		return count;
-> +	}
-> +
-> +	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
-> +				      gic_acpi_match_gicc, 0);
-> +	if (count > 0)
-> +		single_redist = true;
-> +
-> +	return count;
-> +}
-> +
-
-Here, you seem to consider GICR and GICC tables to be mutually
-exclusive. I don't think the spec says so.
-
->  static bool __init acpi_validate_gic_table(struct acpi_subtable_header *header,
->  					   struct acpi_probe_entry *ape)
->  {
-> @@ -1011,8 +1095,7 @@ static bool __init acpi_validate_gic_table(struct acpi_subtable_header *header,
->  		return false;
->  
->  	/* We need to do that exercise anyway, the sooner the better */
-> -	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
-> -				      gic_acpi_match_gicr, 0);
-> +	count = gic_acpi_count_gicr_regions();
->  	if (count <= 0)
->  		return false;
->  
-> @@ -1028,7 +1111,7 @@ gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
->  	struct acpi_madt_generic_distributor *dist;
->  	struct fwnode_handle *domain_handle;
->  	void __iomem *dist_base;
-> -	int i, err, count;
-> +	int i, err;
->  
->  	/* Get distributor base address */
->  	dist = (struct acpi_madt_generic_distributor *)header;
-> @@ -1051,12 +1134,9 @@ gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
->  		goto out_dist_unmap;
->  	}
->  
-> -	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
-> -				      gic_acpi_parse_madt_redist, 0);
-> -	if (count <= 0) {
-> -		err = -ENODEV;
-> +	err = gic_acpi_collect_gicr_base();
-> +	if (err)
->  		goto out_redist_unmap;
-> -	}
->  
->  	domain_handle = irq_domain_alloc_fwnode(dist_base);
->  	if (!domain_handle) {
-> 
-
-Thanks,
-
-	M.
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 5e4e9f5..e315cf4 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -281,12 +281,14 @@ config GPIO_MPC5200
+ 	depends on PPC_MPC52xx
+ 
+ config GPIO_MPC8XXX
+-	bool "MPC512x/MPC8xxx GPIO support"
++	bool "MPC512x/MPC8xxx/QorIQ GPIO support"
+ 	depends on PPC_MPC512x || PPC_MPC831x || PPC_MPC834x || PPC_MPC837x || \
+-		   FSL_SOC_BOOKE || PPC_86xx
++		   FSL_SOC_BOOKE || PPC_86xx || ARCH_LAYERSCAPE || ARM || \
++		   COMPILE_TEST
++	select GPIO_GENERIC
+ 	help
+ 	  Say Y here if you're going to use hardware that connects to the
+-	  MPC512x/831x/834x/837x/8572/8610 GPIOs.
++	  MPC512x/831x/834x/837x/8572/8610/QorIQ GPIOs.
+ 
+ config GPIO_MVEBU
+ 	def_bool y
 -- 
-Jazz is not dead. It just smells funny...
+2.1.0.27.g96db324
