@@ -1,54 +1,170 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 12 Jan 2016 09:23:57 +0000
-Subject: Tegra baseline test results for v4.4
-Message-ID: <5694C62D.7040507@nvidia.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Tue, 12 Jan 2016 09:26:15 +0000
+Subject: [PATCH v2 2/2] mfd: add documentation for ACT8945A DT bindings
+In-Reply-To: <20160112085207.GQ19803@x1>
+References: <1452585915-551-1-git-send-email-wenyou.yang@atmel.com>
+ <1452585915-551-3-git-send-email-wenyou.yang@atmel.com>
+ <20160112085207.GQ19803@x1>
+Message-ID: <B256D81BAE5131468A838E5D7A243641D63E8A0D@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.4.
-Logs and other details at:
-
-    https://nvtb.github.io//linux/test_v4.4/20160110153104/
+Hi Lee,
 
 
-Test summary
-------------
+> -----Original Message-----
+> From: Lee Jones [mailto:lee.jones at linaro.org]
+> Sent: 2016?1?12? 16:52
+> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
+> Cc: Rob Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>;
+> Mark Rutland <mark.rutland@arm.com>; Ian Campbell
+> <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>; Javier
+> Martinez Canillas <javier@dowhile0.org>; Krzysztof Kozlowski
+> <k.kozlowski@samsung.com>; Ferre, Nicolas <Nicolas.FERRE@atmel.com>;
+> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> devicetree at vger.kernel.org
+> Subject: Re: [PATCH v2 2/2] mfd: add documentation for ACT8945A DT bindings
+> 
+> On Tue, 12 Jan 2016, Wenyou Yang wrote:
+> 
+> > The Active-semi ACT8945A PMIC is a Multi-Function Device, it has two
+> > subdevices:
+> >  - Regulator
+> >  - Charger
+> >
+> > This patch adds documentation for ACT8945A DT bindings.
+> >
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > ---
+> >
+> > Changes in v2:
+> >  - use more specific label in Example.
+> >  - add pmic and charger nodes in Example.
+> >
+> >  Documentation/devicetree/bindings/mfd/act8945a.txt |   82
+> ++++++++++++++++++++
+> >  1 file changed, 82 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/mfd/act8945a.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/mfd/act8945a.txt
+> > b/Documentation/devicetree/bindings/mfd/act8945a.txt
+> > new file mode 100644
+> > index 0000000..e4a8aaf
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mfd/act8945a.txt
+> > @@ -0,0 +1,82 @@
+> > +Device-Tree bindings for Active-semi ACT8945A MFD driver
+> > +
+> > +Required properties:
+> > + - compatible: "active-semi,act8945a".
+> > + - reg: the I2C slave address for the ACT8945A chip
+> > +
+> > +The chip exposes two subdevices:
+> > + - a regulators: see ../regulator/act8945a-regulator.txt
+> > + - a charger: see ../power/act8945a-charger.txt
+> > +
+> > +Example:
+> > +	act8945a at 5b {
+> > +		compatible = "active-semi,act8945a";
+> > +		reg = <0x5b>;
+> > +		status = "okay";
+> > +
+> > +		pmic {
+> > +			compatible = "active-semi,act8945a-regulator";
+> > +			active-semi,vsel-high;
+> > +
+> > +				regulators {
+> 
+> Your tabbing here is not correct.
 
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+Oh, Yes, it is not correct, I will correct it.
 
-Build: Image:
-    Pass: ( 1/ 1): defconfig
+Thanks.
 
-Boot to userspace: defconfig:
-    Pass: ( 1/ 1): qemu-vexpress64
+> 
+> > +					vdd_1v35_reg: DCDC_REG1 {
+> > +						regulator-name = "VDD_1V35";
+> > +						regulator-min-microvolt =
+> <1350000>;
+> > +						regulator-max-microvolt =
+> <1350000>;
+> > +						regulator-always-on;
+> > +					};
+> > +
+> > +					vdd_1v2_reg: DCDC_REG2 {
+> > +						regulator-name = "VDD_1V2";
+> > +						regulator-min-microvolt =
+> <1100000>;
+> > +						regulator-max-microvolt =
+> <1300000>;
+> > +						regulator-always-on;
+> > +					};
+> > +
+> > +					vdd_3v3_reg: DCDC_REG3 {
+> > +						regulator-name = "VDD_3V3";
+> > +						regulator-min-microvolt =
+> <3300000>;
+> > +						regulator-max-microvolt =
+> <3300000>;
+> > +						regulator-always-on;
+> > +					};
+> > +
+> > +					vdd_fuse_reg: LDO_REG1 {
+> > +						regulator-name = "VDD_FUSE";
+> > +						regulator-min-microvolt =
+> <2500000>;
+> > +						regulator-max-microvolt =
+> <2500000>;
+> > +						regulator-always-on;
+> > +					};
+> > +
+> > +					vdd_3v3_lp_reg: LDO_REG2 {
+> > +						regulator-name = "VDD_3V3_LP";
+> > +						regulator-min-microvolt =
+> <3300000>;
+> > +						regulator-max-microvolt =
+> <3300000>;
+> > +						regulator-always-on;
+> > +					};
+> > +
+> > +					vdd_led_reg: LDO_REG3 {
+> > +						regulator-name = "VDD_LED";
+> > +						regulator-min-microvolt =
+> <3300000>;
+> > +						regulator-max-microvolt =
+> <3300000>;
+> > +						regulator-always-on;
+> > +					};
+> > +
+> > +					vdd_sdhc_1v8_reg: LDO_REG4 {
+> > +						regulator-name =
+> "VDD_SDHC_1V8";
+> > +						regulator-min-microvolt =
+> <1800000>;
+> > +						regulator-max-microvolt =
+> <1800000>;
+> > +						regulator-always-on;
+> > +					};
+> > +				};
+> > +			};
+> > +
+> > +		charger {
+> > +			compatible = "active-semi,act8945a-charger";
+> > +			pinctrl-names = "default";
+> > +			pinctrl-0 = <&pinctrl_charger_chglev>;
+> > +			active-semi,chglev-gpio = <&pioA 12
+> GPIO_ACTIVE_HIGH>;
+> > +			active-semi,input_voltage_threshold = <6600>;
+> > +			active-semi,precondition_timeout = <40>;
+> > +			active-semi,total_timeout = <3>;
+> > +		};
+> > +	};
+> 
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead Linaro.org ? Open source
+> software for ARM SoCs Follow Linaro: Facebook | Twitter | Blog
 
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
 
-Boot to userspace: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.4-rc8 (168309855a7d1e16db751e9c647119fe2d2dc878)):
-   text     data      bss    total  kernel
-    -12        0        0      -12  defconfig
-      0        0        0        0  multi_v7_defconfig
-   +200      -64        0     +136  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.4-rc8 (168309855a7d1e16db751e9c647119fe2d2dc878))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+Best Regards,
+Wenyou Yang
