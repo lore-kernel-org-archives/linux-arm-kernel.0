@@ -1,38 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 Jan 2016 12:30:45 +0000
-Subject: [RESEND v4 0/6] remoteproc: Add driver for STMicroelectronics
- platforms
-In-Reply-To: <CAK=Wgba-JuidsUgrTZM+vZc7p3cWeYuKwKYUD7ru_nWm7Jybew@mail.gmail.com>
-References: <1448370862-19120-1-git-send-email-lee.jones@linaro.org>
- <CAK=WgbZbiq_BAUEti9tWUtWqZPU_4gDJ5Mfqur=Ou2N4Ea+2GQ@mail.gmail.com>
- <20151126091043.GO12874@x1>
- <CAK=WgbbWTdDGMYOFjVO3s1bt1r5iou6Q-hHOh4SZG=rQuEa2eQ@mail.gmail.com>
- <CAJAp7OgZwf-Cd+Drypqo92YNJBYtB-XCbW-noy-4BB5JZojRnw@mail.gmail.com>
- <CAK=Wgba-JuidsUgrTZM+vZc7p3cWeYuKwKYUD7ru_nWm7Jybew@mail.gmail.com>
-Message-ID: <20160112123045.GG27358@x1>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Tue, 12 Jan 2016 12:35:45 +0000
+Subject: [PATCH V2 0/3] ASOC: bcm2835: move bcm2835-i2s to use clock framework
+Message-ID: <1452602149-5875-1-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Dec 2015, Ohad Ben-Cohen wrote:
+From: Martin Sperl <kernel@martin.sperl.org>
 
-> On Mon, Dec 28, 2015 at 8:41 PM, Bjorn Andersson <bjorn@kryo.se> wrote:
-> > I interpreted this as you picked patch 1-4 and didn't pay more
-> > attention to them, but I can't find them in your kernel.org trees. So
-> > I've looked through them again.
-> >
-> > Please apply patch 1, 3 and 4 to your tree Ohad. I was unable to find
-> > a v5 of patch 2, but it's unrelated so no need to wait for a new
-> > version of that.
-> 
-> I was under the impression that Lee plans to resubmit once the
-> discussion around patch 2 settles, so I haven't picked the series yet.
-> 
-> Lee please let me know - I can take 1/3/4 and wait for the new 2 as well.
+This patchset enables the bcm2835-i2s driver to use the clock
+framework which was introduced with commit 94cb7f76caa0
+("ARM: bcm2835: Switch to using the new clock driver support.").
 
-Yes, that's correct.  Will re-submit the set in a wee-mo.
+This commit resulted in the fact that the bcm2835-i2s driver was
+no longer working due to some register addresses used by 2 drivers
+(clk-bcm2835 and bcm2835-i2s).
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+This patchset requires that the patchset for PCM-clock
+support as well as fractional/mash support is applied to
+the clk-bcm2835 driver and the corresponding device tree,
+but as the current version of the driver is not working,
+that should not be a problem.
+
+Note that there is one change:
+right now the current driver tries to calculate an optimal
+bclk_ratio based on its knowledge that it is using the 19.2Mhz
+oscillator. This computation would recommend the use of 40
+or 80 bits instead of 32/64 bits that are required.
+
+Some of the DACs can not handle this, so most downstream
+drivers would set snd_soc_dai_set_bclk_ratio explicitly to
+disable this "non-power-of-2" automatic selection.
+
+So it seems wise to leave it out of the current patchset.
+
+If it is deemed necessary, then I can provide a separate
+patch that implements this again.
+
+Changelog:
+  V1->V2: * moving clock patches into a separate patchset,
+            which fixes also other issues in the clock framework
+          * remove unnecessary bclk_size assignments
+
+Martin Sperl (3):
+  ASoC: bcm2835: move to use the clock framework
+  ARM: bcm2835: I2S: use new register-range and clock framework
+  dt-bindings: bsm2835: fix bindings documentation to use new clock
+    framework
+
+ .../devicetree/bindings/sound/brcm,bcm2835-i2s.txt |    7 +-
+ arch/arm/boot/dts/bcm2835.dtsi                     |    5 +-
+ sound/soc/bcm/bcm2835-i2s.c                        |  284 +++++---------------
+ 3 files changed, 69 insertions(+), 227 deletions(-)
+
+--
+1.7.10.4
