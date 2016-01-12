@@ -1,152 +1,148 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 12 Jan 2016 20:10:31 +0100
-Subject: [PATCH net-next 07/10] ARM: mvebu: enable buffer manager support on
- Armada XP boards
+Date: Tue, 12 Jan 2016 20:10:33 +0100
+Subject: [PATCH net-next 09/10] net: Add a hardware buffer management helper
+ API
 In-Reply-To: <1452625834-22166-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1452625834-22166-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1452625834-22166-8-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1452625834-22166-10-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcin Wojtas <mw@semihalf.com>
+This basic implementation allows to share code between driver using
+hardware buffer management. As the code is hardware agnostic, there is
+few helpers, most of the optimization brought by the an HW BM has to be
+done at driver level.
 
-Since mvneta driver supports using hardware buffer management (BM), in
-order to use it, board files have to be adjusted accordingly. This commit
-enables BM on AXP-DB and AXP-GP in same manner - because number of ports
-on those boards is the same as number of possible pools, each port is
-supposed to use single pool for all kind of packets.
-
-Moreover appropriate entry is added to 'soc' node ranges, as well as "okay"
-status for 'bm' and 'bm-bppi' (internal SRAM) nodes.
-
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-db.dts | 19 ++++++++++++++++++-
- arch/arm/boot/dts/armada-xp-gp.dts | 19 ++++++++++++++++++-
- 2 files changed, 36 insertions(+), 2 deletions(-)
+ include/net/hwbm.h | 19 +++++++++++++
+ net/core/Makefile  |  2 +-
+ net/core/hwbm.c    | 78 ++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 98 insertions(+), 1 deletion(-)
+ create mode 100644 include/net/hwbm.h
+ create mode 100644 net/core/hwbm.c
 
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index f774101416a5..30657302305d 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -77,7 +77,8 @@
- 			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
- 			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
- 			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
--			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
-+			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0 0xf1200000 0x100000>;
- 
- 		devbus-bootcs {
- 			status = "okay";
-@@ -181,21 +182,33 @@
- 				status = "okay";
- 				phy = <&phy0>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
- 			};
- 			ethernet at 74000 {
- 				status = "okay";
- 				phy = <&phy1>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <1>;
- 			};
- 			ethernet at 30000 {
- 				status = "okay";
- 				phy = <&phy2>;
- 				phy-mode = "sgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <2>;
- 			};
- 			ethernet at 34000 {
- 				status = "okay";
- 				phy = <&phy3>;
- 				phy-mode = "sgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <3>;
-+			};
+diff --git a/include/net/hwbm.h b/include/net/hwbm.h
+new file mode 100644
+index 000000000000..898ccd2fb58d
+--- /dev/null
++++ b/include/net/hwbm.h
+@@ -0,0 +1,19 @@
++#ifndef _HWBM_H
++#define _HWBM_H
 +
-+			bm at c0000 {
-+				status = "okay";
- 			};
- 
- 			mvsdio at d4000 {
-@@ -230,5 +243,9 @@
- 				};
- 			};
- 		};
++struct hwbm_pool {
++	/* Size of the buffers managed */
++	int size;
++	/* Number of buffers currently used by this pool */
++	int buf_num;
++	/* constructor called during alocation */
++	int (*construct)(struct hwbm_pool *bm_pool, void *buf);
++	/* private data */
++	void *priv;
++};
 +
-+		bm-bppi {
-+			status = "okay";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
-index 4878d7353069..a1ded01d0c07 100644
---- a/arch/arm/boot/dts/armada-xp-gp.dts
-+++ b/arch/arm/boot/dts/armada-xp-gp.dts
-@@ -96,7 +96,8 @@
- 			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
- 			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
- 			  MBUS_ID(0x09, 0x09) 0 0 0xf8100000 0x10000
--			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000>;
-+			  MBUS_ID(0x09, 0x05) 0 0 0xf8110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0 0xf1200000 0x100000>;
- 
- 		devbus-bootcs {
- 			status = "okay";
-@@ -196,21 +197,29 @@
- 				status = "okay";
- 				phy = <&phy0>;
- 				phy-mode = "qsgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
- 			};
- 			ethernet at 74000 {
- 				status = "okay";
- 				phy = <&phy1>;
- 				phy-mode = "qsgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <1>;
- 			};
- 			ethernet at 30000 {
- 				status = "okay";
- 				phy = <&phy2>;
- 				phy-mode = "qsgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <2>;
- 			};
- 			ethernet at 34000 {
- 				status = "okay";
- 				phy = <&phy3>;
- 				phy-mode = "qsgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <3>;
- 			};
- 
- 			/* Front-side USB slot */
-@@ -235,6 +244,10 @@
- 				};
- 			};
- 
-+			bm at c0000 {
-+				status = "okay";
-+			};
++void hwbm_buf_free(struct hwbm_pool *bm_pool, void *buf);
++int hwbm_pool_refill(struct hwbm_pool *bm_pool);
++int hwbm_pool_add(struct hwbm_pool *bm_pool, int buf_num);
 +
- 			nand at d0000 {
- 				status = "okay";
- 				num-cs = <1>;
-@@ -243,5 +256,9 @@
- 				nand-on-flash-bbt;
- 			};
- 		};
++#endif /* _HWBM_H */
+diff --git a/net/core/Makefile b/net/core/Makefile
+index 0b835de04de3..df81bf11f072 100644
+--- a/net/core/Makefile
++++ b/net/core/Makefile
+@@ -9,7 +9,7 @@ obj-$(CONFIG_SYSCTL) += sysctl_net_core.o
+ 
+ obj-y		     += dev.o ethtool.o dev_addr_lists.o dst.o netevent.o \
+ 			neighbour.o rtnetlink.o utils.o link_watch.o filter.o \
+-			sock_diag.o dev_ioctl.o tso.o sock_reuseport.o
++			sock_diag.o dev_ioctl.o tso.o sock_reuseport.o hwbm.o
+ 
+ obj-$(CONFIG_XFRM) += flow.o
+ obj-y += net-sysfs.o
+diff --git a/net/core/hwbm.c b/net/core/hwbm.c
+new file mode 100644
+index 000000000000..d5d40d63cb34
+--- /dev/null
++++ b/net/core/hwbm.c
+@@ -0,0 +1,78 @@
++/* Support for hardware buffer manager.
++ *
++ * Copyright (C) 2016 Marvell
++ *
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *  (at your option) any later version.
++ */
++#include <linux/kernel.h>
++#include <linux/printk.h>
++#include <linux/skbuff.h>
++#include <net/hwbm.h>
 +
-+		bm-bppi {
-+			status = "okay";
-+		};
- 	};
- };
++void hwbm_buf_free(struct hwbm_pool *bm_pool, void *buf)
++{
++	if (likely(bm_pool->size <= PAGE_SIZE))
++		skb_free_frag(buf);
++	else
++		kfree(buf);
++}
++EXPORT_SYMBOL_GPL(hwbm_buf_free);
++
++/* Refill processing for HW buffer management */
++int hwbm_pool_refill(struct hwbm_pool *bm_pool)
++{
++	void *buf;
++	int frag_size = bm_pool->size;
++
++	if (likely(frag_size <= PAGE_SIZE))
++		buf = netdev_alloc_frag(frag_size);
++	else
++		buf = kmalloc(frag_size, GFP_ATOMIC);
++
++	if (!buf)
++		return -ENOMEM;
++
++	if (bm_pool->construct)
++		if (bm_pool->construct(bm_pool, buf)) {
++			hwbm_buf_free(bm_pool, buf);
++			return -ENOMEM;
++		}
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(hwbm_pool_refill);
++
++int hwbm_pool_add(struct hwbm_pool *bm_pool, int buf_num)
++{
++	int err, i;
++
++	if (bm_pool->buf_num == bm_pool->size) {
++		pr_debug("pool already filled\n");
++		return bm_pool->buf_num;
++	}
++
++	if (buf_num + bm_pool->buf_num > bm_pool->size) {
++		pr_debug("cannot allocate %d buffers for pool\n",
++			 buf_num);
++		return 0;
++	}
++
++	for (i = 0; i < buf_num; i++) {
++		err = hwbm_pool_refill(bm_pool);
++		if (err < 0)
++			break;
++	}
++
++	/* Update BM driver with number of buffers added to pool */
++	bm_pool->buf_num += i;
++
++	pr_debug("hwpm pool: %d of %d buffers added\n", i, buf_num);
++
++	return i;
++}
++EXPORT_SYMBOL_GPL(hwbm_pool_add);
 -- 
 2.5.0
