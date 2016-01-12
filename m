@@ -1,51 +1,43 @@
-From: lho@apm.com (Loc Ho)
-Date: Tue, 12 Jan 2016 15:24:41 -0800
-Subject: [PATCH 1/3] Documentation: Update the APM X-Gene SoC EDAC DTS
- binding for missing RB
-In-Reply-To: <4027351.WdK3AXxgBQ@wuerfel>
-References: <1452639900-30919-1-git-send-email-lho@apm.com>
- <1452639900-30919-2-git-send-email-lho@apm.com>
- <4027351.WdK3AXxgBQ@wuerfel>
-Message-ID: <CAPw-ZTmuavkEd0_7W+86m_RQHZHGCwWr4dRNCxjrgBPLa_Qg0w@mail.gmail.com>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Tue, 12 Jan 2016 15:28:22 -0800
+Subject: [PATCHv2] net: bpf: reject invalid shifts
+In-Reply-To: <20160112204620.GA35080@ast-mbp.thefacebook.com>
+References: <20160112185121.GA34045@ast-mbp.thefacebook.com>
+ <1452626228-15742-1-git-send-email-rabin@rab.in>
+ <1452628118.1223.25.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20160112195356.GA34598@ast-mbp.thefacebook.com>
+ <5695653F.6030001@iogearbox.net>
+ <20160112204620.GA35080@ast-mbp.thefacebook.com>
+Message-ID: <1452641302.1223.35.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, 2016-01-12 at 12:46 -0800, Alexei Starovoitov wrote:
+> On Tue, Jan 12, 2016 at 09:42:39PM +0100, Daniel Borkmann wrote:
 
->> --- a/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
->> +++ b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
->> @@ -16,6 +16,7 @@ Required properties:
->>  - regmap-mcba          : Regmap of the MCB-A (memory bridge) resource.
->>  - regmap-mcbb          : Regmap of the MCB-B (memory bridge) resource.
->>  - regmap-efuse         : Regmap of the PMD efuse resource.
->> +- regmap-rb            : Regmap of the register bus resource.
->>  - reg                  : First resource shall be the CPU bus (PCP) resource.
->>  - interrupts            : Interrupt-specifier for MCU, PMD, L3, or SoC error
->>                           IRQ(s).
->> @@ -64,6 +65,11 @@ Example:
->>                 reg = <0x0 0x1054a000 0x0 0x20>;
->>         };
->>
->> +       rb: rb at 7e000000 {
->> +               compatible = "apm,xgene-rb", "syscon";
->> +               reg = <0x0 0x7e000000 0x0 0x10>;
->> +       };
->> +
->>         edac at 78800000 {
->>                 compatible = "apm,xgene-edac";
->>
->
-> When you add a property, please list that as "optional", not "required",
-> to ensure that the old dtb files still conform to the binding.
->
-> In the driver, make sure it is not a fatal error when the property is
-> missing and the driver can keep working without it.
+> > >yep and we all know who was able to code hundreds of cBPF insns by hand ;)
+> > >But I'm sure that code doesn't have such broken shifts. :)))
+> > 
+> > libpcap certainly supports raw filters now thanks to Chema [1]. Alternative
+> > could be to just mask them here, but not in eBPF verifier, but that would be
+> > even more inconsistent (on the other hand, we also allow holes in BPF but not
+> > in eBPF, so wouldn't be the first time we make things different), hmm.
+> 
+> I would rather see broken classic bpf program fixed instead of continue
+> running them with undefined behavior.
 
->From my view, this is required. Otherwise, the error condition will
-NOT be cleared correctly and will get constant interrupt. Though, for
-compatibility, we can make it optional but system will be unusable
-should such error occurred. Though, it would be rare or with bad FW. I
-will fix in the next version by making it optional such as it will
-still probe correctly with older DT binding.
+This is your choice, because you are a developer.
 
--Loc
+Some people might be stuck with old software they can not update,
+because they do not have the money to pay developers.
+
+And no, I did not code BPF programs like that, but maybe others did, and
+I feel the pain of customers that might be stuck.
+
+Linus Torvalds always made clear we must provide backward compatibility,
+and really this discussion should not even take place.
+
+As I said, we used to load such BPF program in the past.
+
+The fact that ARM64 crashes because of a faulty JIT implementation is
+not an excuse.
