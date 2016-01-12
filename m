@@ -1,95 +1,56 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue, 12 Jan 2016 21:12:25 +0100
-Subject: [PATCH net-next 03/10] net: mvneta: bm: add support for hardware
- buffer management
-In-Reply-To: <1452625834-22166-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1452625834-22166-1-git-send-email-gregory.clement@free-electrons.com>
- <1452625834-22166-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <CAPv3WKeEXUmH4gqBm7=gkNYwjhR1YybCBZJND_Vidj+Q6U_8=g@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 12 Jan 2016 21:30:02 +0100
+Subject: [PATCHv2 0/2] net: fec: Reset ethernet PHY whenever the enet_out
+ clock is being enabled
+In-Reply-To: <20160112170444.11c412c5@ipc1.ka-ro>
+References: <1452611876-451-1-git-send-email-LW@KARO-electronics.de>
+ <20160112152405.GZ19062@n2100.arm.linux.org.uk>
+ <20160112170444.11c412c5@ipc1.ka-ro>
+Message-ID: <20160112203002.GZ24441@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+Hello,
 
-I have two remarks to my own code. Please let me know before patch v2,
-I will provide you with corrected version (I already did it locally).
+On Tue, Jan 12, 2016 at 05:04:44PM +0100, Lothar Wa?mann wrote:
+> > On Tue, Jan 12, 2016 at 04:17:54PM +0100, Lothar Wa?mann wrote:
+> > > This patchset fixes a regression introduced by
+> > > commit e8fcfcd5684a ("net: fec: optimize the clock management to save power")
+> > > for ethernet PHYs that are using ENET_OUT as reference clock (on i.MX6 or i.MX28)
+> > > 
+> > > Changes vs. v1:
+> > > - fixed reference to the commit that introduced the regression.
+> > > - dropped patch to use gpiod framework. This should be added later,
+> > >   after the affected DTBs have been updated to specify the correct
+> > >   gpio_flags.
+> > > 
+> > > Patch overview:
+> > > 1. cleanup patch to remove redundant NULL checks
+> > > 2. call fec_reset_phy() after the ENET_OUT clock has been enabled
+> > 
+> > I definitely want to test these on my SolidRun boards before these get
+> > merged: the AR8035 on there is configured via pin-straps, and then
+> > further tweaked with PHY quirks.  Resetting with the iMX6 in the
+> > wrong state may result in the AR8035 being reconfigured (even jumping
+> > to a different MDIO address) and certainly would need the PHY quirks
+> > re-running.
+> > 
+> As far as I can tell, all SolidRun boards do not specify the enet_out
+> clock in the dtb, so the PHY reset behaviour should be unaffected by
+> this patch on those boards, since the additional fec_reset_phy() call is
+> framed by:
+> if (fep->clk_enet_out) {
+> 	...
+> }
+> 
+> But verifying this explicitly is of course a good idea.
 
-> @@ -1556,17 +1777,20 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
->         int rx_done, i;
->
->         rx_done = mvneta_rxq_busy_desc_num_get(pp, rxq);
-> +       if (rx_done)
-> +               mvneta_rxq_desc_num_update(pp, rxq, rx_done, rx_done);
-> +
-> +       if (pp->bm_priv)
-> +               return;
-> +
+If the SolidRun boards don't do this, this doesn't mean it's safe in
+general. The problem is real, isn't it?
 
-This is wrong - buffers that are supposed to be dropped should return
-to bm_pool.
+Best regards
+Uwe
 
-> @@ -1587,23 +1812,35 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
->
->         rx_done = 0;
->
-> +       bm_in_use = pp->bm_priv ? true : false;
-> +
->         /* Fairness NAPI loop */
->         while (rx_done < rx_todo) {
->                 struct mvneta_rx_desc *rx_desc = mvneta_rxq_next_desc_get(rxq);
-> +               struct mvneta_bm_pool *bm_pool = NULL;
->                 struct sk_buff *skb;
->                 unsigned char *data;
->                 dma_addr_t phys_addr;
-> -               u32 rx_status;
-> +               u32 rx_status, frag_size;
->                 int rx_bytes, err;
-> +               u8 pool_id;
->
->                 rx_done++;
->                 rx_status = rx_desc->status;
->                 rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
->                 data = (unsigned char *)rx_desc->buf_cookie;
->                 phys_addr = rx_desc->buf_phys_addr;
-> +               if (bm_in_use) {
-> +                       pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc);
-> +                       bm_pool = &pp->bm_priv->bm_pools[pool_id];
-> +               }
->
->                 if (!mvneta_rxq_desc_is_first_last(rx_status) ||
->                     (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
-> +                       /* Return the buffer to the pool */
-> +                       if (bm_in_use)
-> +                               mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
-> +                                                     rx_desc->buf_phys_addr);
->                 err_drop_frame:
->                         dev->stats.rx_errors++;
->                         mvneta_rx_error(pp, rx_desc);
-> @@ -1633,25 +1870,38 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
->                         rcvd_pkts++;
->                         rcvd_bytes += rx_bytes;
->
-> +                       /* Return the buffer to the pool */
-> +                       if (bm_in_use)
-> +                               mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
-> +                                                     rx_desc->buf_phys_addr);
-> +
->                         /* leave the descriptor and buffer untouched */
->                         continue;
->                 }
->
->                 /* Refill processing */
-> -               err = mvneta_rx_refill(pp, rx_desc);
-> +               err = bm_in_use ? mvneta_bm_pool_refill(pp->bm_priv, bm_pool) :
-> +                                 mvneta_rx_refill(pp, rx_desc);
->                 if (err) {
->                         netdev_err(dev, "Linux processing - Can't refill\n");
->                         rxq->missed++;
->                         goto err_drop_frame;
-
-Wrong - on refill fail, original buffer should be returned to bm_pool.
-Same case is, when netdev_alloc_skb_ip_align fail inside copybreak
-(this should also be fixed).
-
-Best regards,
-Marcin
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
