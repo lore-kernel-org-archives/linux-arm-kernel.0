@@ -1,110 +1,92 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 12 Jan 2016 16:17:09 +0800
-Subject: [PATCH v2 2/2] regulator: add documentation for ACT8945A's regulator
- DT bindings
-In-Reply-To: <1452586629-1117-1-git-send-email-wenyou.yang@atmel.com>
-References: <1452586629-1117-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1452586629-1117-3-git-send-email-wenyou.yang@atmel.com>
+From: xuejiancheng@huawei.com (xuejiancheng)
+Date: Tue, 12 Jan 2016 16:17:14 +0800
+Subject: [PATCH v5 5/6] mfd: dt-bindings: add device tree bindings for
+ Hi3519 sysctrl
+In-Reply-To: <20160112074107.GK19803@x1>
+References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
+ <1452219400-32478-6-git-send-email-xuejiancheng@huawei.com>
+ <20160111054846.GD3331@x1> <56935EA8.4060801@huawei.com>
+ <20160111085555.GE14104@x1> <5694584D.7040301@huawei.com>
+ <20160112074107.GK19803@x1>
+Message-ID: <5694B68A.6040300@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for the DT bindings of the regulator
-subdevice of ACT8945A MFD.
+Hello Lee,
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
+On 2016/1/12 15:41, Lee Jones wrote:
+> On Tue, 12 Jan 2016, xuejiancheng wrote:
+> 
+>>
+>>
+>> On 2016/1/11 16:55, Lee Jones wrote:
+>>> On Mon, 11 Jan 2016, xuejiancheng wrote:
+>>>> On 2016/1/11 13:48, Lee Jones wrote:
+>>>>> On Fri, 08 Jan 2016, Jiancheng Xue wrote:
+>>>>>
+>>>>>> Add device tree bindings for Hi3519 system controller.
+>>>>>>
+>>>>>> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+>>>>>> ---
+>>>>>>  Documentation/devicetree/bindings/mfd/hi3519.txt | 14 ++++++++++++++
+>>>>>>  1 file changed, 14 insertions(+)
+>>>>>>  create mode 100644 Documentation/devicetree/bindings/mfd/hi3519.txt
+>>>>>
+>>>>> I have this patch, but none of the others in the set, thus I am
+>>>>> lacking context.
+>>>>>
+>>>> I can forward other patches in the set to you. Thank you.
+>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/mfd/hi3519.txt b/Documentation/devicetree/bindings/mfd/hi3519.txt
+>>>>>> new file mode 100644
+>>>>>> index 0000000..115c5be
+>>>>>> --- /dev/null
+>>>>>> +++ b/Documentation/devicetree/bindings/mfd/hi3519.txt
+>>>>>> @@ -0,0 +1,14 @@
+>>>>>> +* Hisilicon Hi3519 System Controller Block
+>>>>>> +
+>>>>>> +This bindings use the following binding:
+>>>>>> +Documentation/devicetree/bindings/mfd/syscon.txt
+>>>>>> +
+>>>>>> +Required properties:
+>>>>>> +- compatible: "hisilicon,hi3519-sysctrl".
+>>>>>> +- reg: the register region of this block
+>>>>>> +
+>>>>>> +Examples:
+>>>>>> +sysctrl: system-controller at 12010000 {
+>>>>>> +	compatible = "hisilicon,hi3519-sysctrl", "syscon";
+>>>>>> +	reg = <0x12010000 0x1000>;
+>>>>>> +};
+>>>>>
+>>>>> There is no requirement (nor want) for binding documents where the
+>>>>> given device is simply using highly generic bindings.  This just
+>>>>> amounts to churn.
+>>>>>
+>>>> This block is specific for Hi3519 SOC, and may has its own driver.
+>>>
+>>> Does it have its own driver currently?
+>>>
+>> Not yet.
+>> Arnd Bergmann and Rob Herring all suggested adding a specific compatible string
+>> with the SOC name. This binding is just used for describing the compatible string now.
+>> When more functions on hi3519 SOC are added later, the specific driver will be also
+>> needed.
+> 
+> Save this binding until it has more functionality.  We here "I'll add
+> to this later" all too often.
+> 
 
-Changes in v2:
- - add Acked-by Rob Herring.
+In the hi3519.dtsi file, there is a system-controller device node described like below:
+sysctrl: system-controller at 12010000 {
+	compatible = "hisilicon,hi3519-sysctrl", "syscon";
+	reg = <0x12010000 0x1000>;
+};
+Do you mean that I should remove "hisilicon,hi3519-sysctrl" and just use "syscon" as the
+compatible string??
+If I want to add "hisilicon,hi3519-sysctrl" for hi3519. where should I put this binding?
+Could you give some suggestions?  Thank you very much!
 
- .../bindings/regulator/act8945a-regulator.txt      |   78 ++++++++++++++++++++
- 1 file changed, 78 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
-
-diff --git a/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt b/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
-new file mode 100644
-index 0000000..f67ff86
---- /dev/null
-+++ b/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
-@@ -0,0 +1,78 @@
-+Device-Tree bindings for regulators of Active-semi ACT8945A Multi-Function Device
-+
-+Required properties:
-+ - compatible: "active-semi,act8945a-regulator"
-+
-+Optional properties:
-+- active-semi,vsel-high: Indicates if the VSEL pin is set to logic-high.
-+  If this property is missing, assume the VSEL pin is set to logic-low.
-+
-+Optional input supply properties:
-+  - vp1-supply: The input supply for DCDC_REG1
-+  - vp2-supply: The input supply for DCDC_REG2
-+  - vp3-supply: The input supply for DCDC_REG3
-+  - inl45-supply: The input supply for LDO_REG1 and LDO_REG2
-+  - inl67-supply: The input supply for LDO_REG3 and LDO_REG4
-+
-+Any standard regulator properties can be used to configure the single regulator.
-+
-+The valid names for regulators are:
-+	DCDC_REG1, DCDC_REG2, DCDC_REG3, LDO_REG1, LDO_REG2, LDO_REG3, LDO_REG4.
-+
-+Example:
-+
-+	pmic {
-+		compatible = "active-semi,act8945a-regulator";
-+		active-semi,vsel-high;
-+
-+		regulators {
-+			vdd_1v35_reg: DCDC_REG1 {
-+				regulator-name = "VDD_1V35";
-+				regulator-min-microvolt = <1350000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_1v2_reg: DCDC_REG2 {
-+				regulator-name = "VDD_1V2";
-+				regulator-min-microvolt = <1100000>;
-+				regulator-max-microvolt = <1300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_3v3_reg: DCDC_REG3 {
-+				regulator-name = "VDD_3V3";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_fuse_reg: LDO_REG1 {
-+				regulator-name = "VDD_FUSE";
-+				regulator-min-microvolt = <2500000>;
-+				regulator-max-microvolt = <2500000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_3v3_lp_reg: LDO_REG2 {
-+				regulator-name = "VDD_3V3_LP";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_led_reg: LDO_REG3 {
-+				regulator-name = "VDD_LED";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_sdhc_1v8_reg: LDO_REG4 {
-+				regulator-name = "VDD_SDHC_1V8";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
--- 
-1.7.9.5
+>>>> So I think it's better to keep this binding.
+>>>
+>>
+> 
