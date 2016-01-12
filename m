@@ -1,30 +1,27 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Tue, 12 Jan 2016 19:46:41 +0300
-Subject: [PATCH v6 11/21] arm64: ilp32: introduce binfmt_ilp32.c
-In-Reply-To: <5115829.mX1Uk4EoYk@wuerfel>
-References: <1452209679-19445-1-git-send-email-ynorov@caviumnetworks.com>
- <1452209679-19445-12-git-send-email-ynorov@caviumnetworks.com>
- <5115829.mX1Uk4EoYk@wuerfel>
-Message-ID: <20160112164641.GA9246@yury-N73SV>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 12 Jan 2016 17:45:21 +0100
+Subject: [PATCH V2 03/10] irqchip,GICv3,ACPI: Add redistributor support
+ via GICC structures.
+In-Reply-To: <5694EB92.9030109@arm.com>
+References: <1450353133-15992-1-git-send-email-tn@semihalf.com>
+ <1450353133-15992-4-git-send-email-tn@semihalf.com>
+ <5694EB92.9030109@arm.com>
+Message-ID: <56952DA1.4030401@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 08, 2016 at 10:08:44AM +0100, Arnd Bergmann wrote:
-> On Friday 08 January 2016 02:34:29 Yury Norov wrote:
-> > +
-> > +#include "../../../fs/compat_binfmt_elf.c"
-> > 
-> 
-> This is the wrong file, you have to include fs/binfmt_elf.c, otherwise
-> you pick up the same definitions that you have for the other one.
-> 
+On 12.01.2016 13:03, Marc Zyngier wrote:
 
-I chose compat as it's how it wokrs now. It redefines some types like
-user_long_t, and I think it's neccessary for ILP32, as for aarch32.
+ > +	typer = readq_relaxed(redist_base + GICR_TYPER);
+ > +	/* don't map reserved page as it's buggy to access it */
+ > +	size = (typer & GICR_TYPER_VLPIS) ? SZ_64K * 3 : SZ_64K * 2;
 
-> Alternatively, you can also change binfmt_elf32.c to include fs/binfmt_elf.c
-> and use fs/compat_binfmt_elf.c here if that makes the code nicer, you
-> just can use the compat file for both or things get ugly because of
-> the extra indirections.
-> 
-> 	Arnd
+[...]
+
+> Also, please map the whole region for the
+> redistributor as we have on the DT side (4 64kB pages for VLPIS capable
+> redistributors).
+
+Hanjun, is it something you had problem with?
+
+Tomasz
