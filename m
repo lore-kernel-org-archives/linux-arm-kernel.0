@@ -1,68 +1,37 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Mon, 11 Jan 2016 17:41:36 -0800
-Subject: [PATCH LINUX 1/6] tty: xuartps: Move request_irq to after setting up
- the HW
-In-Reply-To: <1452562901-17848-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1452562901-17848-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1452562901-17848-2-git-send-email-soren.brinkmann@xilinx.com>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Tue, 12 Jan 2016 09:48:24 +0800
+Subject: [RESEND PATCH v2] usb: xhci-mtk: fix AHB bus hang up caused by
+ roothubs polling
+In-Reply-To: <5693B5C8.6090201@linux.intel.com>
+References: <1452216517-3765-1-git-send-email-chunfeng.yun@mediatek.com>
+ <5693B5C8.6090201@linux.intel.com>
+Message-ID: <1452563304.28863.1.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Request_irq() should be _after_ h/w programming, otherwise an
-interrupt could be triggered and in-progress before the h/w has been
-setup.
+Hi,
+On Mon, 2016-01-11 at 16:01 +0200, Mathias Nyman wrote:
+> On 08.01.2016 03:28, Chunfeng Yun wrote:
+> > when ip fails to enter sleep mode, register access protection will
+> > be disabled, at the same time if all clocks are disabled, access
+> > register will hang up AHB bus.
+> > the common case causes ip sleep failure is that after all ports
+> > enter U3 but before ip enters sleep mode, a port receives a resume
+> > signal('K'). this will happens when such as clicks mouse to try to
+> > do remote-wakeup to stop system enter suspend.
+> > so stop polling root hubs to avoid access xHCI register on bus
+> > suspend, and restart it when bus resumes.
+> >
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > ---
+> >   drivers/usb/host/xhci-mtk.c | 23 +++++++++++++++++++++++
+> 
+> The xhci Mediatek (xhci-mtk etc) support is in usb-next and should be available first time
+> in 4.5-rc1 kernel.
+> 
+> I'll forward fixes for it once 4.5-rc1 is out, they should end up in final 4.5
+> 
+Thank you!
 
-Reported-by: Peter Hurley <peter@hurleysoftware.com>
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- drivers/tty/serial/xilinx_uartps.c | 21 ++++++++++++---------
- 1 file changed, 12 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index db9e23eaf300..5da1c51e9e40 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -762,13 +762,9 @@ static void cdns_uart_set_termios(struct uart_port *port,
-  */
- static int cdns_uart_startup(struct uart_port *port)
- {
-+	int ret;
- 	unsigned long flags;
--	unsigned int retval = 0, status = 0;
--
--	retval = request_irq(port->irq, cdns_uart_isr, 0, CDNS_UART_NAME,
--								(void *)port);
--	if (retval)
--		return retval;
-+	unsigned int status = 0;
- 
- 	spin_lock_irqsave(&port->lock, flags);
- 
-@@ -814,15 +810,22 @@ static int cdns_uart_startup(struct uart_port *port)
- 	writel(readl(port->membase + CDNS_UART_ISR_OFFSET),
- 			port->membase + CDNS_UART_ISR_OFFSET);
- 
-+	spin_unlock_irqrestore(&port->lock, flags);
-+
-+	ret = request_irq(port->irq, cdns_uart_isr, 0, CDNS_UART_NAME, port);
-+	if (ret) {
-+		dev_err(port->dev, "request_irq '%d' failed with %d\n",
-+			port->irq, ret);
-+		return ret;
-+	}
-+
- 	/* Set the Interrupt Registers with desired interrupts */
- 	writel(CDNS_UART_IXR_TXEMPTY | CDNS_UART_IXR_PARITY |
- 		CDNS_UART_IXR_FRAMING | CDNS_UART_IXR_OVERRUN |
- 		CDNS_UART_IXR_RXTRIG | CDNS_UART_IXR_TOUT,
- 		port->membase + CDNS_UART_IER_OFFSET);
- 
--	spin_unlock_irqrestore(&port->lock, flags);
--
--	return retval;
-+	return 0;
- }
- 
- /**
--- 
-2.7.0.3.g497ea1e
+> -Mathias
+> 
