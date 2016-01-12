@@ -1,192 +1,100 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Tue, 12 Jan 2016 14:02:54 +0000
-Subject: [PATCH v11] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
- PCIe Host Controller
-In-Reply-To: <20160110220819.GA25883@localhost>
-References: <1448798633-12697-1-git-send-email-bharatku@xilinx.com>
- <20151209231921.GI31930@localhost>
- <8520D5D51A55D047800579B09414719825869A85@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20151210201817.GB367@localhost>
- <8520D5D51A55D047800579B09414719825869EDC@XAP-PVEXMBX01.xlnx.xilinx.com>
- <8520D5D51A55D047800579B0941471982586BC8D@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20160110220819.GA25883@localhost>
-Message-ID: <8520D5D51A55D047800579B09414719825870721@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 12 Jan 2016 11:03:58 -0300
+Subject: [PATCH 1/2] power: act8945a: add charger driver for ACT8945A
+In-Reply-To: <B256D81BAE5131468A838E5D7A243641D63E880D@penmbx01>
+References: <1452219225-10510-1-git-send-email-wenyou.yang@atmel.com>
+ <1452219225-10510-2-git-send-email-wenyou.yang@atmel.com>
+ <CABxcv=mQoDxb7oHh0DdC_t1_m-j=4Hp-sPNoq4Apy4c7CneSng@mail.gmail.com>
+ <B256D81BAE5131468A838E5D7A243641D63E880D@penmbx01>
+Message-ID: <CABxcv=mZfch6XwshXCTzdsSs2RR-4EMwf2jO1n=oPQ_epP8LQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- > On Mon, Dec 21, 2015 at 05:23:47AM +0000, Bharat Kumar Gogada wrote:
-> > Hi Bjorn, can you comment on this. Marc has also replied for query on
-> irq_dispose_mapping().
-> 
-> I'm not sure exactly what you want me to comment on.
-I wanted you to check for Marc's reply.
-> 
-> > > Subject: RE: [PATCH v11] PCI: Xilinx-NWL-PCIe: Added support for
-> > > Xilinx NWL PCIe Host Controller
-> > >
-> > > > Subject: Re: [PATCH v11] PCI: Xilinx-NWL-PCIe: Added support for
-> > > > Xilinx NWL PCIe Host Controller
-> > > >
-> > > > [+cc Marc for irq_dispose_mapping() question]
-> > > >
-> > > > On Thu, Dec 10, 2015 at 02:10:34PM +0000, Bharat Kumar Gogada
-> wrote:
-> > > > I'm trying to figure out what the difference is between these two
-> > > > checks and why you have both of them:
-> > > >
-> > > > > +	if (bus->number == pcie->root_busno && devfn > 0)
-> > > > > +	if (bus->primary == pcie->root_busno && devfn > 0)
-> > > >
-> > > > If I understand correctly, pcie->root_busno is the bus number of
-> > > > the Root Port device (likely 00).  I think the "bus->number ==
-> > > > pcie->root_busno && devfn > 0" check means that the Root Port,
-> > > > pcie->e.g.,
-> > > > 00:00.0, is the only device allowed on bus 00.  Often a Root
-> > > > Complex contains several Root Ports and other integrated devices
-> > > > that typically are
-> > > on bus 00.
-> > > > But in your case, I think you're saying there is only the single
-> > > > Root Port and no other devices.
-> > > >
-> > > > I think that first check takes care of everything on bus 00, so
-> > > > I'm trying to figure out what the second check is for.  Assume
-> > > > your Root Port is device
-> > > > 00:00.0 and it is a bridge to [bus 01-ff].  Then we have two
-> > > > pci_bus structs with these values:
-> > > >
-> > > >   bus->number = 00
-> > > >   bus->primary = 00
-> > > >   bus->busn_res = [bus 00-ff]
-> > > >
-> > > >   bus->number = 01
-> > > >   bus->primary = 00
-> > > >   bus->busn_res = [bus 01-ff]
-> > > >
-> > > > Because of the first check, 00:00.0 is the only possible device on
-> > > > bus 00, and because of the second check, 01:00.0 is the only
-> > > > possible device on
-> > > bus 01.
-> > > > Therefore, you don't support a multifunction device connected to
-> > > > the Root Port.  Right?
-> > > >
-> > > We support multifunction devices also, so this check should not be
-> > > there, will remove this check in next patch.
-> 
-> It looks like you're planning to change this.
-No, our core supports multifunction devices it was my misunderstanding, due to which 
-this condition was present.
-> > > > > > > +		return false;
-> > > > > > > +
-> > > > > > > +	return true;
-> > > > > > > +}
-> > > > > > > + * nwl_setup_sspl - Set Slot Power limit
-> > > > > > > + *
-> > > > > > > + * @pcie: PCIe port information  */ static int
-> > > > > > > +nwl_setup_sspl(struct nwl_pcie *pcie)
-> > > > > >
-> > > > > The Set_Slot_Power_Limit Message includes a one DW data payload.
-> > > > > The data payload is copied from the Slot Capabilities register
-> > > > > of the Downstream Port and is written into the Device
-> > > > > Capabilities register of the Upstream Port on the other side of
-> > > > > the Link. Bits 9:8 of the data payload map to the Slot Power
-> > > > > Limit Scale field and bits 7:0 map to the Slot Power Limit Value
-> > > > > field. Bits 31:10 of the data payload must be set to all 0's by
-> > > > > the Transmitter and ignored by the
-> > > Receiver.
-> > > >
-> > > > > This Message is sent automatically by the Downstream Port (of a
-> > > > > Root Complex or a Switch) when one of the following events occurs:
-> > > > > -> On a Configuration Write to the Slot Capabilities register
-> > > > > -> (see
-> > > > > Section 7.8.9) when the Data Link Layer reports DL_Up status.
-> > > >
-> > > > I interpret this as meaning "the *hardware* automatically sends a
-> > > > Set_Slot_Power_Limit Message."  There's no mention of software
-> > > > doing anything other than the configuration write.
-> > > >
-> > > > If your hardware doesn't do that, I think it's a defect.  It's
-> > > > fine to work around it, but we should have a comment to that
-> > > > effect so people don't copy the code to new drivers that don't need it.
-> > >
-> > > Our hardware is not capable of doing it, so we are doing it
-> > > software. Yes I will add some comments.
-> 
-> And add a comment here.
-> 
-You meant to add comments for the function clearly mentioning that hardware 
-doesn't support this so doing it software ?
+Hello Wenyou,
 
-> > > > It's a little strange that 7.8.9 talks about writing to this
-> > > > register when all of its fields are HwInit and supposedly
-> > > > read-only.  I had assumed devices would use strapping or
-> > > > implementation-specific registers to set the Slot Power values,
-> > > > but maybe some devices use direct
-> > > writes to Slot Capabilities instead.
-> > > >
-> > > > BTW, I noticed a related lspci bug: it didn't decode the Capture
-> > > > Slot Power Limit in Device Capabilities of Endpoints.  I posted a
-> > > > fix for that
-> > > separately.
-> > > >
-> > > > The Slot Power Limit (in Slot Capabilities) indicates how much
-> > > > power the slot can supply to a downstream device.  That's a
-> > > > function of the platform design, so it seems like this is
-> > > > something you want to set via DT or some other mechanism that knows
-> about the platform.
-> > > > Intercepting all config writes and updating it with whatever the
-> > > > caller supplies doesn't sound wise.  The value might be coming
-> > > > from setpci or some other source with no knowledge of the platform.
-> > >
-> > > Agreed, but this is what can be done, it is difficult to determine
-> > > who does what.
-> 
-> Your driver is based on DT.  What prevents you from adding a DT property
-> that shows the slot power capability?
-> 
-You meant to add a DT property, Example: xlnx,slot_power_cap; as required property, 
-and use this property to call nwl_setup_sspl function. Currently this function is being invoked 
-in config write function if the condition meets a write to slot power capabilities register.
-> > > > > > > +			status = nwl_bridge_readl(pcie,
-> > > TX_PCIE_MSG)
-> > > > > > > +						  & MSG_DONE_BIT;
-> > > > > > > +			if (status) {
-> > > > > > > +				status = nwl_bridge_readl(pcie,
-> > > > > > TX_PCIE_MSG)
-> > > > > > > +						  &
-> > > MSG_DONE_STATUS_BIT;
-> > > >
-> > > > > > It's not clear to me whether you need to re-read TX_PCIE_MSG
-> here.
-> > > > >
-> > > > > MSG_DONE_BIT qualifies MSG_DONE_STATUS_BIT; so value of
-> > > > > MSG_DONE_STATUS_BIT is valid only when MSG_DONE_BIT = 1
-> > > >
-> > > > That doesn't answer the question of whether another read is required.
-> > > > In fact, I would argue that if MSG_DONE_STATUS_BIT is only valid
-> > > > when MSG_DONE_BIT = 1, you *should* only do one read, because
-> you
-> > > > want to capture both bits simultaneously so you know they're
-> > > > consistent, e.g.,
-> > > >
-> > > >   status = nwl_bridge_readl(pcie, TX_PCIE_MSG);
-> > > >   if (status & MSG_DONE_BIT) {
-> > > >     if (status & MSG_DONE_STATUS_BIT)
-> > > >       ...
-> > > >   }
-> > > >
-> > > > If you read the register twice, you always have to worry about
-> > > > what changes MSG_DONE_BIT, and how you guarantee that the
-> second
-> > > > read happens before MSG_DONE_BIT changes.
-> > > >
-> > > Agreed, will do it in this way, once will also confirm with IP owner
-> > > regarding both bits being updated parallel.
-> 
-> It sounds like you're working on resolving this.
-> 
-> Did I miss a question for me?
+On Tue, Jan 12, 2016 at 5:23 AM, Yang, Wenyou <Wenyou.Yang@atmel.com> wrote:
+> Hi Javier,
+>
+> Thank you for your review.
+>
+>> -----Original Message-----
+>> From: Javier Martinez Canillas [mailto:javier at dowhile0.org]
+>> Sent: 2016?1?8? 23:00
+>> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
+>> Cc: Sebastian Reichel <sre@kernel.org>; Dmitry Eremin-Solenikov
+>> <dbaryshkov@gmail.com>; David Woodhouse <dwmw2@infradead.org>; Rob
+>> Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>; Mark
+>> Rutland <mark.rutland@arm.com>; Ian Campbell <ijc+devicetree@hellion.org.uk>;
+>> Kumar Gala <galak@codeaurora.org>; Ferre, Nicolas
+>> <Nicolas.FERRE@atmel.com>; linux-arm-kernel at lists.infradead.org; Linux
+>> Kernel <linux-kernel@vger.kernel.org>; linux-pm at vger.kernel.org
+>> Subject: Re: [PATCH 1/2] power: act8945a: add charger driver for ACT8945A
+>>
+>> Hello Wenyou,
+>>
+>> On Thu, Jan 7, 2016 at 11:13 PM, Wenyou Yang <wenyou.yang@atmel.com>
+>> wrote:
+>> > This patch adds new driver for Active-semi ACT8945A ActivePath charger
+>> > (part of ACT8945A MFD driver) providing power supply class information
+>> > to userspace.
+>> >
+>> > The driver is configured through DTS (battery and system related
+>> > settings) and sysfs entries (timers and input over-voltage threshold).
+>> >
+>> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+>> > ---
+>> >
+>>
+>> [snip]
+>>
+>> > +
+>> > +static struct platform_driver act8945a_charger_driver = {
+>> > +       .driver = {
+>> > +               .name = "act8945a-charger",
+>> > +       },
+>> > +       .probe  = act8945a_charger_probe,
+>> > +       .remove = act8945a_charger_remove, };
+>> > +
+>>
+>> The driver is missing an OF match table (and also a platform ID match table if
+>> non-DT is supported) so this means that module autoloading will be broken for this
+>> driver since the platform uevent function will report a MODALIAS=of:N*T*Cactive-
+>> semi,act8945a-charger
+>
+> This is an MFD device, it compatible is declared in the ../mfd/act8945a.c file.
+>
+>         .of_compatible = "active-semi,act8945a-charger".
+>
 
-Since IP owner is different, we don't have exact information by that time we commented, now we got 
-Information from owner that both buts simultaneously. 
+I know that the device is instantiated from a MFD driver but having a
+.of_compatible property in the MFD cell, it only means that the
+pdev->dev.of_node field will be filled by the mfd-core [0]. It has
+nothing to do with how the platform device is matched to the platform
+driver.
 
-Bharat
+The mfd-core calls platform_device_add() to add the device so the
+platform bus_type .match function callback [1] will be used to match
+the device with the driver and since the driver doesn't have a OF
+device ID table to match, it means that this function will fallback to
+match the device name with the platform driver name.
+
+Also, you didn't answer my question about module auto-loading. The
+platform bus_type .uevent callback calls of_device_uevent_modalias()
+and since the device has an .of_node filled by the mfd-core (since you
+provided an .of_compatible for the MFD cell), this means that an OF
+modalias will be reported but since the driver doesn't have neither a
+.of_match_table nor a MODULE_DEVICE_TABLE(of,...) so udev/kmod won't
+be able to load the driver's module based on the modalias uevent
+reported by the kernel.
+
+> The non-DT  is not supported in this patch. So a platform ID match table is not included.
+>
+
+Ok, I just asked for completeness.
+
+[0]: http://lxr.free-electrons.com/source/drivers/mfd/mfd-core.c#L177
+[1]: http://lxr.free-electrons.com/source/drivers/base/platform.c#L833
+[2]: http://lxr.free-electrons.com/source/drivers/base/platform.c#L787
+
+Best regards,
+Javier
