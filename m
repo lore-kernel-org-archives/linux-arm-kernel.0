@@ -1,245 +1,230 @@
-From: zourongrong@huawei.com (Rongrong Zou)
-Date: Tue, 12 Jan 2016 19:56:47 +0800
-Subject: [PATCH v1 3/3] ARM64 LPC: update binding doc
-In-Reply-To: <20160112112741.GP13633@e106497-lin.cambridge.arm.com>
-References: <1451396032-23708-1-git-send-email-zourongrong@gmail.com>
- <CABTftiT1+AmrNjiAie-T6on-oWA4Zz73+Tj2pQrixMT3o475uw@mail.gmail.com>
- <568912EE.9030009@huawei.com> <15026471.7nGZ0rWlIf@wuerfel>
- <20160111161415.GM13633@e106497-lin.cambridge.arm.com>
- <56946768.7090805@gmail.com>
- <20160112090722.GN13633@e106497-lin.cambridge.arm.com>
- <5694C6A4.8060308@huawei.com>
- <20160112101418.GO13633@e106497-lin.cambridge.arm.com>
- <5694DDF9.1050902@huawei.com>
- <20160112112741.GP13633@e106497-lin.cambridge.arm.com>
-Message-ID: <5694E9FF.6030904@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 12 Jan 2016 12:03:30 +0000
+Subject: [PATCH V2 03/10] irqchip,GICv3,ACPI: Add redistributor support
+ via GICC structures.
+In-Reply-To: <1450353133-15992-4-git-send-email-tn@semihalf.com>
+References: <1450353133-15992-1-git-send-email-tn@semihalf.com>
+ <1450353133-15992-4-git-send-email-tn@semihalf.com>
+Message-ID: <5694EB92.9030109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/1/12 19:27, liviu.dudau at arm.com ??:
-> On Tue, Jan 12, 2016 at 07:05:29PM +0800, Rongrong Zou wrote:
->> ? 2016/1/12 18:14, liviu.dudau at arm.com ??:
->>> On Tue, Jan 12, 2016 at 05:25:56PM +0800, Rongrong Zou wrote:
->>>> ? 2016/1/12 17:07, liviu.dudau at arm.com ??:
->>>>> On Tue, Jan 12, 2016 at 10:39:36AM +0800, Rongrong Zou wrote:
->>>>>> On 2016/1/12 0:14, liviu.dudau at arm.com wrote:
->>>>>>> On Mon, Jan 04, 2016 at 12:13:05PM +0100, Arnd Bergmann wrote:
->>>>>>>> On Sunday 03 January 2016 20:24:14 Rongrong Zou wrote:
->>>>>>>>> ? 2015/12/31 23:00, Rongrong Zou ??:
->>>>>>>>>> 2015-12-31 22:40 GMT+08:00 Arnd Bergmann <arnd at arndb.de <mailto:arnd@arndb.de>>:
->>>>>>>>>>   > On Thursday 31 December 2015 22:12:19 Rongrong Zou wrote:
->>>>>>>>>>   > > ? 2015/12/30 17:06, Arnd Bergmann ??:
->>>>>>>>>>   > > > On Tuesday 29 December 2015 21:33:52 Rongrong Zou wrote:
->>>>>>>>>>   >
->>>>>>>>>>   > The DT sample above looks good in principle. I believe what you are missing
->>>>>>>>>>   > here is code in your driver to scan the child nodes to create the platform
->>>>>>>>>>   > devices. of_bus_isa_translate() should work with your definition here
->>>>>>>>>>   > and create the correct IORESOURCE_IO resources. You don't have any MMIO
->>>>>>>>>>   > resources, so the absence of a ranges property is ok. Maybe all you
->>>>>>>>>>   > are missing is a call to of_platform_populate() or of_platform_bus_probe()?
->>>>>>>>>>   >
->>>>>>>>>>
->>>>>>>>>> You are right. thanks, i'll try on test board .  if i get the correct result , the new patch
->>>>>>>>>> will be sent later. By the way, it's my another email account use when i at home.
->>>>>>>>>
->>>>>>>>> I tried, and there need some additional changes.
->>>>>>>>>
->>>>>>>>> isa at a01b0000 {
->>>>>>>>>
->>>>>>>>> /*the node name should start with "isa", because of below definition
->>>>>>>>> * static int of_bus_isa_match(struct device_node *np)
->>>>>>>>> * {
->>>>>>>>> *	return !strcmp(np->name, "isa");
->>>>>>>>> * }
->>>>>>>>
->>>>>>>> Looks good. It would be nicer to match on device_type than on name,
->>>>>>>> but this is ancient code and it's probably best not to touch it
->>>>>>>> so we don't accidentally break some old SPARC or PPC system.
->>>>>>>>
->>>>>>>>> */
->>>>>>>>> 	compatible = "low-pin-count";
->>>>>>>>> 	device_type = "isa";
->>>>>>>>> 	#address-cells = <2>;
->>>>>>>>> 	#size-cells = <1>;
->>>>>>>>> 	reg = <0x0 0xa01b0000 0x0 0x10000>;
->>>>>>>>> 	ranges = <0x1 0x0 0x0 0x0 0x1000>;
->>>>>>>>> /*
->>>>>>>>> *  ranges is required, then i can get the IORESOURCE_IO <0xe4,4> from "reg = <0x1, 0x000000e4, 4>".
->>>>>>>>> *
->>>>>>>>> */
->>>>>>>>> 	ipmi_0:ipmi at 000000e4{
->>>>>>>>> 		device_type = "ipmi";
->>>>>>>>> 		compatible = "ipmi-bt";
->>>>>>>>> 		reg = <0x1 0x000000e4 0x4>;
->>>>>>>>> };
->>>>>>>>>
->>>>>>>>
->>>>>>>> This looks wrong: the property above says that the I/O port range is
->>>>>>>> translated to MMIO address 0x00000000 to 0x00010000, which is not
->>>>>>>> true on your hardware. I think this needs to be changed in the code
->>>>>>>> so the ranges property is not required for I/O ports.
->>>>>>>>
->>>>>>>>> drivers\of\address.c
->>>>>>>>> static int __of_address_to_resource(struct device_node *dev,
->>>>>>>>>                   const __be32 *addrp, u64 size, unsigned int flags,
->>>>>>>>>                   const char *name, struct resource *r)
->>>>>>>>> {
->>>>>>>>>           u64 taddr;
->>>>>>>>>
->>>>>>>>>           if ((flags & (IORESOURCE_IO | IORESOURCE_MEM)) == 0)
->>>>>>>>>                   return -EINVAL;
->>>>>>>>>           taddr = of_translate_address(dev, addrp);
->>>>>>>>>           if (taddr == OF_BAD_ADDR)
->>>>>>>>>                   return -EINVAL;
->>>>>>>>>           memset(r, 0, sizeof(struct resource));
->>>>>>>>>           if (flags & IORESOURCE_IO) {
->>>>>>>>>                   unsigned long port;
->>>>>>>>>
->>>>>>>>> /*****************************************************************/
->>>>>>>>> /*legacy port(< 0x1000) is reserved, and need no translation here*/
->>>>>>>>> /*****************************************************************/
->>>>>>>>>                   if(taddr + size < PCIBIOS_MIN_IO){
->>>>>>>>>                           r->start = taddr;
->>>>>>>>>                           r->end = taddr + size - 1;
->>>>>>>>>                   }
->>>>>>>>
->>>>>>>> I don't like having a special case based on the address here,
->>>>>>>> the same kind of hack might be needed for PCI I/O spaces in
->>>>>>>> hardware that uses an indirect method like your LPC bus
->>>>>>>> does, and the code above will not work on any LPC implementation
->>>>>>>> that correctly multiplexes its I/O ports with the first PCI domain.
->>>>>>>>
->>>>>>>> I think it would be better to avoid translating the port into
->>>>>>>> a physical address to start with just to translate it back into
->>>>>>>> a port number, what we need instead is the offset between the
->>>>>>>> bus specific port number and the linux port number. I've added
->>>>>>>> Liviu to Cc, he wrote this code originally and may have some idea
->>>>>>>> of how we could do that.
->>>>>>>
->>>>>>> Hi,
->>>>>>
->>>>>> Hi Liviu,
->>>>>>
->>>>>> Thanks for reviewing this.
->>>>>>
->>>>>>>
->>>>>>> Getting back to work after a longer holiday, my brain might not be running
->>>>>>> at full speed here, so I'm trying to clarify things a bit here.
->>>>>>>
->>>>>>> It looks to me like Rongrong is trying to trap the inb()/outb() calls that he
->>>>>>> added to arm64 by patch 1/3 and redirect those operations to the memory
->>>>>>> mapped LPC driver. I think the whole redirection and registration of inb/outb
->>>>>>> ops can be made cleaner, so that the general concept resembles the DMA ops
->>>>>>> registration? (I have this mental picture that what Rongrong is trying to do
->>>>>>> is similar to what a DMA engine does, except this is slowing down things to
->>>>>>> byte level). If that is done properly in the parent node, then we should not
->>>>>>> care what the PCIBIOS_MIN_IO value is as the inb()/outb() calls will always
->>>>>>> go through the redirection for the children.
->>>>>>>
->>>>>>> As for the ranges property: does he wants the ipmi-bt driver to see in the
->>>>>>> reg property the legacy ISA I/O ports values or the CPU addresses? If the former,
->>>>>>> then I agree that the range property should not be required, but also the
->>>>>>> reg values need to be changed (drop the top bit). If the later, then the
->>>>>>> ranges property is required to do the proper translation.
->>>>>>
->>>>>> The former, thanks.
->>>>>>
->>>>>>>
->>>>>>> Rongrong, removing the ranges property and with a reg = <0xe4 0x4> property
->>>>>>> in the ipmi-bt node, what IO_RESOURCE type resources do you get back from
->>>>>>> the of_address_to_resource() translation?
->>>>>>
->>>>>> I want to get IORESOURCE_IO type resource, but if the parent node drop the
->>>>>> "rangs" property, the of_address_to_resource() translation will return with -EINVAL.
->>>>>
->>>>> Have you tracked what part of the code is sensitive to the presence of "ranges"
->>>>> property? Does of_get_address() call returns the IO_RESOURCE flag set without "ranges"?
->>>>>
->>>>
->>>>
->>>> Yes, IO_RESOURCE flag can be get without "ranges".
->
-> Earlier, you said this ^
->
->>>> I tracked the code, it is at of_translate_one(), Below is the calling infomation.
->>>>
->>>> of_address_to_resource-> __of_address_to_resource ->of_translate_address->
->>>> __of_translate_address(dev, in_addr, "ranges")->of_translate_one()
->>>>
->>>>
->>>> static int of_translate_one(struct device_node *parent, struct of_bus *bus,
->>>> 			    struct of_bus *pbus, __be32 *addr,
->>>> 			    int na, int ns, int pna, const char *rprop)
->>>> {
->>>> 	const __be32 *ranges;
->>>> 	unsigned int rlen;
->>>> 	int rone;
->>>> 	u64 offset = OF_BAD_ADDR;
->>>>
->>>> 	ranges = of_get_property(parent, rprop, &rlen);
->>>> 	if (ranges == NULL && !of_empty_ranges_quirk(parent)) {
->>>> 		pr_debug("OF: no ranges; cannot translate\n");
->>>> 		return 1;
->>>> 	}
->>>> 	...
->>>> }
->>>
->>> OK, looking at of_translate_one() comments it looks like a missing "ranges" property is
->>> only accepted on PowerPC. I suggest you have an empty "ranges" property in your isa
->>> parent node, that will signal to the OF parsing code that the mapping is 1:1. Then have
->>> the IPMI node use the reg = <0x0 0xe4 4>; property values instead of reg = <0x1 0xe4 4>;
->>
->> But in this condition, I still can't get the right resource type IORESOURCE_IO, I just get
->> the MMIO resource E4:E7. Please see the url at https://lkml.org/lkml/2016/1/5/199, the empty
->> ranges has been discussed.
->
-> So, when you use an empty "ranges" of_get_address() doesn't return the right flags? What resource
-> do you actually get, MMIO is not a valid value.
+On 17/12/15 11:52, Tomasz Nowicki wrote:
+> On systems supporting GICv3 and above, in MADT GICC structures, the
+> field of GICR Base Address holds the 64-bit physical address of the
+> associated Redistributor if the GIC Redistributors are not in the
+> always-on power domain, so instead of init GICR regions via GIC
+> redistributor structure(s), init it with GICR base address in GICC
+> structures in that case.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> ---
+>  drivers/irqchip/irq-gic-v3.c | 98 ++++++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 89 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> index c4b929c..0528e82 100644
+> --- a/drivers/irqchip/irq-gic-v3.c
+> +++ b/drivers/irqchip/irq-gic-v3.c
+> @@ -39,6 +39,7 @@
+>  struct redist_region {
+>  	void __iomem		*redist_base;
+>  	phys_addr_t		phys_base;
+> +	bool			single_redist;
+>  };
+>  
+>  struct gic_chip_data {
+> @@ -435,6 +436,9 @@ static int gic_populate_rdist(void)
+>  				return 0;
+>  			}
+>  
+> +			if (gic_data.redist_regions[i].single_redist)
+> +				break;
+> +
+>  			if (gic_data.redist_stride) {
+>  				ptr += gic_data.redist_stride;
+>  			} else {
+> @@ -965,6 +969,7 @@ IRQCHIP_DECLARE(gic_v3, "arm,gic-v3", gic_of_init);
+>  #ifdef CONFIG_ACPI
+>  static struct redist_region *redist_regs __initdata;
+>  static u32 nr_redist_regions __initdata;
+> +static bool single_redist;
+>  
+>  static int __init
+>  gic_acpi_register_redist(phys_addr_t phys_base, u64 size)
+> @@ -979,7 +984,8 @@ gic_acpi_register_redist(phys_addr_t phys_base, u64 size)
+>  	}
+>  
+>  	redist_regs[count].phys_base = phys_base;
+> -	redist_regs[count++].redist_base = redist_base;
+> +	redist_regs[count].redist_base = redist_base;
 
+nit: move the count++ out of the access in the previous patch, this will
+make this series a bit easier to follow.
 
+> +	redist_regs[count++].single_redist = single_redist;
 
-I'm sorry I did not describe clearly.
-Without "ranges", of_get_address() will return with valid value, but of_address_to_resource()
-will return with -EINVAL;
+What is that single_redist for? Is that because you can't rely on
+GICR_TYPER.Last?
 
-int of_address_to_resource(struct device_node *dev, int index,
-			   struct resource *r)
-{
-	...
-	/* flags can be get here, without ranges property reqired.
-	 * if the reg = <0x0 0xe4 4>, I can get flag of IORESOURCE_MEM,
-	 * if the reg = <0x1 0xe4 4>, I can get flag of IORESOURCE_IO,
-	 */
-	addrp = of_get_address(dev, index, &size, &flags);
+>  	return 0;
+>  }
+>  
+> @@ -993,6 +999,48 @@ gic_acpi_parse_madt_redist(struct acpi_subtable_header *header,
+>  	return gic_acpi_register_redist(redist->base_address, redist->length);
+>  }
+>  
+> +static int __init
+> +gic_acpi_parse_madt_gicc(struct acpi_subtable_header *header,
+> +			 const unsigned long end)
+> +{
+> +	struct acpi_madt_generic_interrupt *gicc;
+> +	void __iomem *redist_base;
+> +	u64 typer;
+> +	u32 size;
+> +
+> +	gicc = (struct acpi_madt_generic_interrupt *)header;
+> +	redist_base = ioremap(gicc->gicr_base_address, SZ_64K * 2);
+> +	if (!redist_base)
+> +		return -ENOMEM;
+> +
+> +	typer = readq_relaxed(redist_base + GICR_TYPER);
+> +	/* don't map reserved page as it's buggy to access it */
+> +	size = (typer & GICR_TYPER_VLPIS) ? SZ_64K * 3 : SZ_64K * 2;
+> +	iounmap(redist_base);
 
-	if (addrp == NULL)
-		return -EINVAL;
+What a mess. If you discover a !VLPIS redistributor, why do you have to
+unmap it to remap it again? Also, please map the whole region for the
+redistributor as we have on the DT side (4 64kB pages for VLPIS capable
+redistributors).
 
-	/* Get optional "reg-names" property to add a name to a resource */
-	of_property_read_string_index(dev, "reg-names",	index, &name);
+Also, the spec says:
 
+"On systems supporting GICv3 and above, this field holds the 64-bit
+physical address of the associated Redistributor. If all of the GIC
+Redistributors are in the always-on power domain, GICR structures should
+be used to describe the Redistributors instead, and this field must be
+set to 0."
 
-	/* If it is empty ranges, and the flag is IORESOURCE_MEM then the below  __of_address_to_resource return with valid addr,
-	 * if it is empty ranges, and the flag is IORESOURCE_IO then return with -EINVAL, because
-	 *    pci_address_to_pio() will be called when flag is IORESOURCE_IO.
-	 * if the ranges is absent, then return with -EINVAL.
-	 */
-	return __of_address_to_resource(dev, addrp, size, flags, name, r);
-}
+which triggers two questions:
+- Can you access always the GICR_TYPER register without waking the
+redistributor up?
+- How do you cope with situations where some redistributors are in the
+always-on domain, and some are not?
 
-I want to get resource with flag = IORESOURCE_IO, resource.start=0XE4, resource.size=0X4,
+> +	return gic_acpi_register_redist(gicc->gicr_base_address, size);
+> +}
+> +
+> +static int __init gic_acpi_collect_gicr_base(void)
+> +{
+> +	acpi_tbl_entry_handler redist_parser;
+> +	enum acpi_madt_type type;
+> +
+> +	if (single_redist) {
+> +		type = ACPI_MADT_TYPE_GENERIC_INTERRUPT;
+> +		redist_parser = gic_acpi_parse_madt_gicc;
+> +	} else {
+> +		type = ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR;
+> +		redist_parser = gic_acpi_parse_madt_redist;
+> +	}
+> +
+> +	/* Collect redistributor base addresses in GICR entries */
+> +	if (acpi_table_parse_madt(type, redist_parser, 0) > 0)
+> +		return 0;
+> +
+> +	pr_info("No valid GICR entries exist\n");
+> +	return -ENODEV;
+> +}
+> +
+>  static int __init gic_acpi_match_gicr(struct acpi_subtable_header *header,
+>  				  const unsigned long end)
+>  {
+> @@ -1000,6 +1048,42 @@ static int __init gic_acpi_match_gicr(struct acpi_subtable_header *header,
+>  	return 0;
+>  }
+>  
+> +static int __init gic_acpi_match_gicc(struct acpi_subtable_header *header,
+> +				      const unsigned long end)
+> +{
+> +	struct acpi_madt_generic_interrupt *gicc =
+> +				(struct acpi_madt_generic_interrupt *)header;
+> +
+> +	/*
+> +	 * If GICC is enabled and has valid gicr base address, then it means
+> +	 * GICR base is presented via GICC
+> +	 */
+> +	if ((gicc->flags & ACPI_MADT_ENABLED) && gicc->gicr_base_address)
+> +		return 0;
+> +
+> +	return -ENODEV;
+> +}
+> +
+> +static int __init gic_acpi_count_gicr_regions(void)
+> +{
+> +	int count;
+> +
+> +	/* Count how many redistributor regions we have */
+> +	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
+> +				      gic_acpi_match_gicr, 0);
+> +	if (count > 0) {
+> +		single_redist = false;
+> +		return count;
+> +	}
+> +
+> +	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+> +				      gic_acpi_match_gicc, 0);
+> +	if (count > 0)
+> +		single_redist = true;
+> +
+> +	return count;
+> +}
+> +
 
->
-> Liviu
->
->>
->> --
->> Regards,
->> Rongrong
->>
->
+Here, you seem to consider GICR and GICC tables to be mutually
+exclusive. I don't think the spec says so.
 
+>  static bool __init acpi_validate_gic_table(struct acpi_subtable_header *header,
+>  					   struct acpi_probe_entry *ape)
+>  {
+> @@ -1011,8 +1095,7 @@ static bool __init acpi_validate_gic_table(struct acpi_subtable_header *header,
+>  		return false;
+>  
+>  	/* We need to do that exercise anyway, the sooner the better */
+> -	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
+> -				      gic_acpi_match_gicr, 0);
+> +	count = gic_acpi_count_gicr_regions();
+>  	if (count <= 0)
+>  		return false;
+>  
+> @@ -1028,7 +1111,7 @@ gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
+>  	struct acpi_madt_generic_distributor *dist;
+>  	struct fwnode_handle *domain_handle;
+>  	void __iomem *dist_base;
+> -	int i, err, count;
+> +	int i, err;
+>  
+>  	/* Get distributor base address */
+>  	dist = (struct acpi_madt_generic_distributor *)header;
+> @@ -1051,12 +1134,9 @@ gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
+>  		goto out_dist_unmap;
+>  	}
+>  
+> -	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
+> -				      gic_acpi_parse_madt_redist, 0);
+> -	if (count <= 0) {
+> -		err = -ENODEV;
+> +	err = gic_acpi_collect_gicr_base();
+> +	if (err)
+>  		goto out_redist_unmap;
+> -	}
+>  
+>  	domain_handle = irq_domain_alloc_fwnode(dist_base);
+>  	if (!domain_handle) {
+> 
 
+Thanks,
+
+	M.
 -- 
-Regards,
-Rongrong
+Jazz is not dead. It just smells funny...
