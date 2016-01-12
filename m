@@ -1,189 +1,173 @@
-From: sr@denx.de (Stefan Roese)
-Date: Tue, 12 Jan 2016 10:02:19 +0100
-Subject: [PATCH RFC] spi: orion.c: Add direct write mode
-Message-ID: <1452589339-21402-1-git-send-email-sr@denx.de>
+From: liviu.dudau@arm.com (liviu.dudau at arm.com)
+Date: Tue, 12 Jan 2016 09:07:22 +0000
+Subject: [PATCH v1 3/3] ARM64 LPC: update binding doc
+In-Reply-To: <56946768.7090805@gmail.com>
+References: <1451396032-23708-1-git-send-email-zourongrong@gmail.com>
+ <CABTftiT1+AmrNjiAie-T6on-oWA4Zz73+Tj2pQrixMT3o475uw@mail.gmail.com>
+ <568912EE.9030009@huawei.com> <15026471.7nGZ0rWlIf@wuerfel>
+ <20160111161415.GM13633@e106497-lin.cambridge.arm.com>
+ <56946768.7090805@gmail.com>
+Message-ID: <20160112090722.GN13633@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the direct write mode to the Orion SPI
-driver which is used on the Marvell Armada based SoCs. In this direct
-mode, all data written to a specifically mapped MBus window (linked
-to only one SPI chip-select on one of the SPI controllers) will be
-transferred directly to the SPI bus. Without the need to control the
-SPI registers in between. This can improve the SPI transfer rate in
-such cases.
+On Tue, Jan 12, 2016 at 10:39:36AM +0800, Rongrong Zou wrote:
+> On 2016/1/12 0:14, liviu.dudau at arm.com wrote:
+> >On Mon, Jan 04, 2016 at 12:13:05PM +0100, Arnd Bergmann wrote:
+> >>On Sunday 03 January 2016 20:24:14 Rongrong Zou wrote:
+> >>>? 2015/12/31 23:00, Rongrong Zou ??:
+> >>>>2015-12-31 22:40 GMT+08:00 Arnd Bergmann <arnd at arndb.de <mailto:arnd@arndb.de>>:
+> >>>>  > On Thursday 31 December 2015 22:12:19 Rongrong Zou wrote:
+> >>>>  > > ? 2015/12/30 17:06, Arnd Bergmann ??:
+> >>>>  > > > On Tuesday 29 December 2015 21:33:52 Rongrong Zou wrote:
+> >>>>  >
+> >>>>  > The DT sample above looks good in principle. I believe what you are missing
+> >>>>  > here is code in your driver to scan the child nodes to create the platform
+> >>>>  > devices. of_bus_isa_translate() should work with your definition here
+> >>>>  > and create the correct IORESOURCE_IO resources. You don't have any MMIO
+> >>>>  > resources, so the absence of a ranges property is ok. Maybe all you
+> >>>>  > are missing is a call to of_platform_populate() or of_platform_bus_probe()?
+> >>>>  >
+> >>>>
+> >>>>You are right. thanks, i'll try on test board .  if i get the correct result , the new patch
+> >>>>will be sent later. By the way, it's my another email account use when i at home.
+> >>>
+> >>>I tried, and there need some additional changes.
+> >>>
+> >>>isa at a01b0000 {
+> >>>
+> >>>/*the node name should start with "isa", because of below definition
+> >>>* static int of_bus_isa_match(struct device_node *np)
+> >>>* {
+> >>>*	return !strcmp(np->name, "isa");
+> >>>* }
+> >>
+> >>Looks good. It would be nicer to match on device_type than on name,
+> >>but this is ancient code and it's probably best not to touch it
+> >>so we don't accidentally break some old SPARC or PPC system.
+> >>
+> >>>*/
+> >>>	compatible = "low-pin-count";
+> >>>	device_type = "isa";
+> >>>	#address-cells = <2>;
+> >>>	#size-cells = <1>;
+> >>>	reg = <0x0 0xa01b0000 0x0 0x10000>;
+> >>>	ranges = <0x1 0x0 0x0 0x0 0x1000>;
+> >>>/*
+> >>>*  ranges is required, then i can get the IORESOURCE_IO <0xe4,4> from "reg = <0x1, 0x000000e4, 4>".
+> >>>*
+> >>>*/
+> >>>	ipmi_0:ipmi at 000000e4{
+> >>>		device_type = "ipmi";
+> >>>		compatible = "ipmi-bt";
+> >>>		reg = <0x1 0x000000e4 0x4>;
+> >>>};
+> >>>
+> >>
+> >>This looks wrong: the property above says that the I/O port range is
+> >>translated to MMIO address 0x00000000 to 0x00010000, which is not
+> >>true on your hardware. I think this needs to be changed in the code
+> >>so the ranges property is not required for I/O ports.
+> >>
+> >>>drivers\of\address.c
+> >>>static int __of_address_to_resource(struct device_node *dev,
+> >>>                  const __be32 *addrp, u64 size, unsigned int flags,
+> >>>                  const char *name, struct resource *r)
+> >>>{
+> >>>          u64 taddr;
+> >>>
+> >>>          if ((flags & (IORESOURCE_IO | IORESOURCE_MEM)) == 0)
+> >>>                  return -EINVAL;
+> >>>          taddr = of_translate_address(dev, addrp);
+> >>>          if (taddr == OF_BAD_ADDR)
+> >>>                  return -EINVAL;
+> >>>          memset(r, 0, sizeof(struct resource));
+> >>>          if (flags & IORESOURCE_IO) {
+> >>>                  unsigned long port;
+> >>>
+> >>>/*****************************************************************/
+> >>>/*legacy port(< 0x1000) is reserved, and need no translation here*/
+> >>>/*****************************************************************/
+> >>>                  if(taddr + size < PCIBIOS_MIN_IO){
+> >>>                          r->start = taddr;
+> >>>                          r->end = taddr + size - 1;
+> >>>                  }
+> >>
+> >>I don't like having a special case based on the address here,
+> >>the same kind of hack might be needed for PCI I/O spaces in
+> >>hardware that uses an indirect method like your LPC bus
+> >>does, and the code above will not work on any LPC implementation
+> >>that correctly multiplexes its I/O ports with the first PCI domain.
+> >>
+> >>I think it would be better to avoid translating the port into
+> >>a physical address to start with just to translate it back into
+> >>a port number, what we need instead is the offset between the
+> >>bus specific port number and the linux port number. I've added
+> >>Liviu to Cc, he wrote this code originally and may have some idea
+> >>of how we could do that.
+> >
+> >Hi,
+> 
+> Hi Liviu,
+> 
+> Thanks for reviewing this.
+> 
+> >
+> >Getting back to work after a longer holiday, my brain might not be running
+> >at full speed here, so I'm trying to clarify things a bit here.
+> >
+> >It looks to me like Rongrong is trying to trap the inb()/outb() calls that he
+> >added to arm64 by patch 1/3 and redirect those operations to the memory
+> >mapped LPC driver. I think the whole redirection and registration of inb/outb
+> >ops can be made cleaner, so that the general concept resembles the DMA ops
+> >registration? (I have this mental picture that what Rongrong is trying to do
+> >is similar to what a DMA engine does, except this is slowing down things to
+> >byte level). If that is done properly in the parent node, then we should not
+> >care what the PCIBIOS_MIN_IO value is as the inb()/outb() calls will always
+> >go through the redirection for the children.
+> >
+> >As for the ranges property: does he wants the ipmi-bt driver to see in the
+> >reg property the legacy ISA I/O ports values or the CPU addresses? If the former,
+> >then I agree that the range property should not be required, but also the
+> >reg values need to be changed (drop the top bit). If the later, then the
+> >ranges property is required to do the proper translation.
+> 
+> The former, thanks.
+> 
+> >
+> >Rongrong, removing the ranges property and with a reg = <0xe4 0x4> property
+> >in the ipmi-bt node, what IO_RESOURCE type resources do you get back from
+> >the of_address_to_resource() translation?
+> 
+> I want to get IORESOURCE_IO type resource, but if the parent node drop the
+> "rangs" property, the of_address_to_resource() translation will return with -EINVAL.
 
-Currently only the direct write mode is supported. This mode especially
-benefits from the SPI direct mode, as the data bytes are written
-head-to-head to the SPI bus, without any additional addresses, that
-are also written in the direct read mode.
+Have you tracked what part of the code is sensitive to the presence of "ranges"
+property? Does of_get_address() call returns the IO_RESOURCE flag set without "ranges"?
 
-One use-case for this direct write mode is, programming a FPGA bitstream
-image into the FPGA connected to the SPI bus at maximum speed.
+Best regards,
+Liviu
 
-This mode is described in chapter "22.5.2 Direct Write to SPI" in the
-Marvell Armada XP Functional Spec Datasheet.
+> 
+> >
+> >Best regards,
+> >Liviu
+> >
+> >
+> >>
+> >>	Arnd
+> >>
+> >
+> Regards,
+> Rongrong
+> 
 
-Signed-off-by: Stefan Roese <sr@denx.de>
-Cc: Nadav Haklai <nadavh@marvell.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: Mark Brown <broonie@kernel.org>
----
-
- .../devicetree/bindings/spi/spi-orion.txt          | 26 ++++++++++
- drivers/spi/spi-orion.c                            | 59 ++++++++++++++++++++++
- 2 files changed, 85 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/spi/spi-orion.txt b/Documentation/devicetree/bindings/spi/spi-orion.txt
-index 98bc698..b22ebc5 100644
---- a/Documentation/devicetree/bindings/spi/spi-orion.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-orion.txt
-@@ -12,6 +12,8 @@ Required properties:
- - cell-index : Which of multiple SPI controllers is this.
- Optional properties:
- - interrupts : Is currently not used.
-+- direct-addr : The phandle to the node containing the base address
-+                of the direct-mapped MBus window for this SPI device.
- 
- Example:
-        spi at 10600 {
-@@ -23,3 +25,27 @@ Example:
- 	       interrupts = <23>;
- 	       status = "disabled";
-        };
-+
-+Example with direct-write mode:
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000	/* internal regs */
-+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000	/* BootROM       */
-+			  MBUS_ID(0x01, 0x5e) 0 0 0xf2000000 0x100000>;	/* SPI0 CS1      */
-+
-+		spi0_cs1: spi at 015e {
-+			compatible = "marvell,spi-direct-mode";
-+			reg = <MBUS_ID(0x01, 0x5e) 0 0x100000>;
-+		};
-+
-+	...
-+
-+	spi at 10600 {
-+		compatible = "marvell,orion-spi";
-+		status = "okay";
-+
-+		spidev at 1 {
-+			compatible = "spidev";
-+			direct-addr = <&spi0_cs1>;
-+			reg = <1>;
-+		};
-+	};
-diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
-index a87cfd4..c028679 100644
---- a/drivers/spi/spi-orion.c
-+++ b/drivers/spi/spi-orion.c
-@@ -18,6 +18,7 @@
- #include <linux/module.h>
- #include <linux/pm_runtime.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/of_device.h>
- #include <linux/clk.h>
- #include <linux/sizes.h>
-@@ -43,6 +44,9 @@
- #define ORION_SPI_INT_CAUSE_REG		0x10
- #define ORION_SPI_TIMING_PARAMS_REG	0x18
- 
-+/* Register for the "Direct Mode" */
-+#define SPI_DIRECT_WRITE_CONFIG_REG	0x20
-+
- #define ORION_SPI_TMISO_SAMPLE_MASK	(0x3 << 6)
- #define ORION_SPI_TMISO_SAMPLE_1	(1 << 6)
- #define ORION_SPI_TMISO_SAMPLE_2	(2 << 6)
-@@ -83,6 +87,7 @@ struct orion_spi {
- 	void __iomem		*base;
- 	struct clk              *clk;
- 	const struct orion_spi_dev *devdata;
-+	void __iomem		*slave_direct_addr[8];
- };
- 
- static inline void __iomem *spi_reg(struct orion_spi *orion_spi, u32 reg)
-@@ -372,10 +377,29 @@ orion_spi_write_read(struct spi_device *spi, struct spi_transfer *xfer)
- {
- 	unsigned int count;
- 	int word_len;
-+	struct orion_spi *orion_spi;
-+	void __iomem *direct_addr;
- 
- 	word_len = spi->bits_per_word;
- 	count = xfer->len;
- 
-+	/* Use SPI direct write mode if such an address is provided via DT */
-+	orion_spi = spi_master_get_devdata(spi->master);
-+	direct_addr = orion_spi->slave_direct_addr[spi->chip_select];
-+	if (direct_addr && xfer->tx_buf) {
-+		/* Deassert CS between the SPI transfers */
-+		writel(0x00010000, spi_reg(orion_spi,
-+					   SPI_DIRECT_WRITE_CONFIG_REG));
-+
-+		/*
-+		 * Send the tx-data to the SPI device via the direct mapped
-+		 * address window
-+		 */
-+		memcpy(direct_addr, xfer->tx_buf, count);
-+
-+		return count;
-+	}
-+
- 	if (word_len == 8) {
- 		const u8 *tx = xfer->tx_buf;
- 		u8 *rx = xfer->rx_buf;
-@@ -501,6 +525,7 @@ static int orion_spi_probe(struct platform_device *pdev)
- 	const struct orion_spi_dev *devdata;
- 	struct spi_master *master;
- 	struct orion_spi *spi;
-+	struct device_node *np;
- 	struct resource *r;
- 	unsigned long tclk_hz;
- 	int status = 0;
-@@ -576,6 +601,40 @@ static int orion_spi_probe(struct platform_device *pdev)
- 		goto out_rel_clk;
- 	}
- 
-+	/*
-+	 * Scan all SPI devices of this controller for direct mapped devices
-+	 */
-+	for_each_available_child_of_node(pdev->dev.of_node, np) {
-+		struct device_node *direct_addr_np;
-+
-+		/*
-+		 * Get "direct-addr" device node with the mapping info
-+		 */
-+		direct_addr_np = of_parse_phandle(np, "direct-addr", 0);
-+		if (direct_addr_np) {
-+			struct resource res;
-+			u32 cs;
-+			int rc;
-+
-+			/* Get chip-select number from the "reg" property */
-+			rc = of_property_read_u32(np, "reg", &cs);
-+			if (rc) {
-+				dev_err(&pdev->dev,
-+					"%s has no valid 'reg' property (%d)\n",
-+					direct_addr_np->full_name, rc);
-+				continue;
-+			}
-+
-+			/*
-+			 * Store the address to use it later for the direct
-+			 * access
-+			 */
-+			rc = of_address_to_resource(direct_addr_np, 0, &res);
-+			spi->slave_direct_addr[cs] =
-+				devm_ioremap_resource(&pdev->dev, &res);
-+		}
-+	}
-+
- 	pm_runtime_set_active(&pdev->dev);
- 	pm_runtime_use_autosuspend(&pdev->dev);
- 	pm_runtime_set_autosuspend_delay(&pdev->dev, SPI_AUTOSUSPEND_TIMEOUT);
 -- 
-2.6.5
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
