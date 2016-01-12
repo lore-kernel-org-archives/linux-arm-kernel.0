@@ -1,48 +1,82 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Tue, 12 Jan 2016 18:21:20 +0100
-Subject: [PATCH 03/14] ARM: dts: imx6ul: move dt-bindings/input/input.h
- include to dtsi file
-In-Reply-To: <1452619291-13625-3-git-send-email-LW@KARO-electronics.de>
+Date: Tue, 12 Jan 2016 18:21:28 +0100
+Subject: [PATCH 11/14] ARM: dts: imx6ul: add sai support
+In-Reply-To: <1452619291-13625-11-git-send-email-LW@KARO-electronics.de>
 References: <1452619291-13625-1-git-send-email-LW@KARO-electronics.de>
  <1452619291-13625-2-git-send-email-LW@KARO-electronics.de>
  <1452619291-13625-3-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1452619291-13625-4-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-4-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-5-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-6-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-7-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-8-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-9-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-10-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-11-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1452619291-13625-12-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx6ul.dtsi references the macro 'KEY_POWER' from
-dt-bindings/input/input.h. Thus, move the include statement for this
-file from imx6ul-14x14-evk.dts to imx6ul.dtsi itself.
-
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx6ul-14x14-evk.dts | 1 -
- arch/arm/boot/dts/imx6ul.dtsi          | 1 +
- 2 files changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6ul.dtsi | 45 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-index 6aaa5ec..a6f459a 100644
---- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-+++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-@@ -8,7 +8,6 @@
- 
- /dts-v1/;
- 
--#include <dt-bindings/input/input.h>
- #include "imx6ul.dtsi"
- 
- / {
 diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 7e27d76..e4c3a80 100644
+index f1db53e..3d43321f 100644
 --- a/arch/arm/boot/dts/imx6ul.dtsi
 +++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -8,6 +8,7 @@
+@@ -235,6 +235,51 @@
+ 					clock-names = "ipg", "per";
+ 					status = "disabled";
+ 				};
++
++				sai1: sai at 02028000 {
++					#sound-dai-cells = <0>;
++					compatible = "fsl,imx6sx-sai";
++					reg = <0x02028000 0x4000>;
++					interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
++					clocks = <&clks IMX6UL_CLK_SAI1_IPG>,
++						 <&clks IMX6UL_CLK_SAI1>,
++						 <&clks 0>, <&clks 0>;
++					clock-names = "bus", "mclk1", "mclk2", "mclk3";
++					dmas = <&sdma 35 24 0>,
++					       <&sdma 36 24 0>;
++					dma-names = "rx", "tx";
++					status = "disabled";
++				};
++
++				sai2: sai at 0202c000 {
++					#sound-dai-cells = <0>;
++					compatible = "fsl,imx6sx-sai";
++					reg = <0x0202c000 0x4000>;
++					interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
++					clocks = <&clks IMX6UL_CLK_SAI2_IPG>,
++						 <&clks IMX6UL_CLK_SAI2>,
++						 <&clks 0>, <&clks 0>;
++					clock-names = "bus", "mclk1", "mclk2", "mclk3";
++					dmas = <&sdma 37 24 0>,
++					       <&sdma 38 24 0>;
++					dma-names = "rx", "tx";
++					status = "disabled";
++				};
++
++				sai3: sai at 02030000 {
++					#sound-dai-cells = <0>;
++					compatible = "fsl,imx6sx-sai";
++					reg = <0x02030000 0x4000>;
++					interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
++					clocks = <&clks IMX6UL_CLK_SAI3_IPG>,
++						 <&clks IMX6UL_CLK_SAI3>,
++						 <&clks 0>, <&clks 0>;
++					clock-names = "bus", "mclk1", "mclk2", "mclk3";
++					dmas = <&sdma 39 24 0>,
++					       <&sdma 40 24 0>;
++					dma-names = "rx", "tx";
++					status = "disabled";
++				};
+ 			};
  
- #include <dt-bindings/clock/imx6ul-clock.h>
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include "imx6ul-pinfunc.h"
- #include "skeleton.dtsi"
+ 			tsc: tsc at 02040000 {
 -- 
 2.1.4
