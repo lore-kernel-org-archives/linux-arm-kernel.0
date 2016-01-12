@@ -1,42 +1,67 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue, 12 Jan 2016 22:42:49 +0100
-Subject: [PATCH net-next 08/10] bus: mvenus-mbus: Fix size test for
- mvebu_mbus_get_dram_win_info
-In-Reply-To: <1452625834-22166-9-git-send-email-gregory.clement@free-electrons.com>
-References: <1452625834-22166-1-git-send-email-gregory.clement@free-electrons.com>
- <1452625834-22166-9-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <CAPv3WKcDNPY=h37ZiVp8nESmeCZYHBuU0q30D0NoymWoTvz+wA@mail.gmail.com>
+From: labbott@fedoraproject.org (Laura Abbott)
+Date: Tue, 12 Jan 2016 13:46:27 -0800
+Subject: [PATCH] arm64: Allow vmalloc regions to be set with set_memory_*
+Message-ID: <1452635187-8057-1-git-send-email-labbott@fedoraproject.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gregory,
 
+The range of set_memory_* is currently restricted to the module address
+range because of difficulties in breaking down larger block sizes.
+vmalloc maps PAGE_SIZE pages so it is safe to use as well. Update the
+function ranges and add a comment explaining why the range is restricted
+the way it is.
 
+Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+---
+This should let the protections for the eBPF work as expected, I don't
+know if there is some sort of self test for thatL.
+---
+ arch/arm64/mm/pageattr.c | 25 +++++++++++++++++++++----
+ 1 file changed, 21 insertions(+), 4 deletions(-)
 
-2016-01-12 20:10 GMT+01:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  drivers/bus/mvebu-mbus.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-> index 3d1c0c3880ec..214bb964165b 100644
-> --- a/drivers/bus/mvebu-mbus.c
-> +++ b/drivers/bus/mvebu-mbus.c
-> @@ -964,7 +964,7 @@ int mvebu_mbus_get_dram_win_info(phys_addr_t phyaddr, u8 *target, u8 *attr)
->         for (i = 0; i < dram->num_cs; i++) {
->                 const struct mbus_dram_window *cs = dram->cs + i;
->
-> -               if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size)) {
-> +               if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size - 1)) {
->                         *target = dram->mbus_dram_target_id;
->                         *attr = cs->mbus_attr;
->                         return 0;
-> --
-
-Except for a typo in the commit log, the fix is good.
-If you wish you can add
-Reviewed-by: Marcin Wojtas <mw@semihalf.com>
-
-Best regards,
-Marcin
+diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+index 3571c73..274208e 100644
+--- a/arch/arm64/mm/pageattr.c
++++ b/arch/arm64/mm/pageattr.c
+@@ -36,6 +36,26 @@ static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
+ 	return 0;
+ }
+ 
++static bool validate_addr(unsigned long start, unsigned long end)
++{
++	/*
++	 * This check explicitly excludes most kernel memory. Most kernel
++	 * memory is mapped with a larger page size and breaking down the
++	 * larger page size without causing TLB conflicts is very difficult.
++	 *
++	 * If you need to call set_memory_* on a range, the recommendation is
++	 * to use vmalloc since that range is mapped with pages.
++	 */
++	if (start >= MODULES_VADDR && start < MODULES_END &&
++	    end >= MODULES_VADDR && end < MODULES_END)
++		return true;
++
++	if (is_vmalloc_addr(start) && is_vmalloc_addr(end))
++		return true;
++
++	return false;
++}
++
+ static int change_memory_common(unsigned long addr, int numpages,
+ 				pgprot_t set_mask, pgprot_t clear_mask)
+ {
+@@ -51,10 +71,7 @@ static int change_memory_common(unsigned long addr, int numpages,
+ 		WARN_ON_ONCE(1);
+ 	}
+ 
+-	if (start < MODULES_VADDR || start >= MODULES_END)
+-		return -EINVAL;
+-
+-	if (end < MODULES_VADDR || end >= MODULES_END)
++	if (!validate_addr(start, end))
+ 		return -EINVAL;
+ 
+ 	data.set_mask = set_mask;
+-- 
+2.5.0
