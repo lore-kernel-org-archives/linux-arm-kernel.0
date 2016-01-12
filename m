@@ -1,28 +1,49 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Tue, 12 Jan 2016 14:34:48 -0800
-Subject: [PATCHv2] net: bpf: reject invalid shifts
-In-Reply-To: <20160112195356.GA34598@ast-mbp.thefacebook.com>
-References: <20160112185121.GA34045@ast-mbp.thefacebook.com>
- <1452626228-15742-1-git-send-email-rabin@rab.in>
- <1452628118.1223.25.camel@edumazet-glaptop2.roam.corp.google.com>
- <20160112195356.GA34598@ast-mbp.thefacebook.com>
-Message-ID: <1452638088.1223.28.camel@edumazet-glaptop2.roam.corp.google.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Tue, 12 Jan 2016 23:40:40 +0100
+Subject: [PATCH net-next 10/10] net: mvneta: Use the new hwbm framework
+In-Reply-To: <1452625834-22166-11-git-send-email-gregory.clement@free-electrons.com>
+References: <1452625834-22166-1-git-send-email-gregory.clement@free-electrons.com>
+ <1452625834-22166-11-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <CAPv3WKcKK8fS-6koSgV7ABi8bvkRgzaqJDpOETCpGoTc2sWV=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-01-12 at 11:53 -0800, Alexei Starovoitov wrote:
-> On Tue, Jan 12, 2016 at 11:48:38AM -0800, Eric Dumazet wrote:
+Hi Gregory,
 
-> > 
-> > I believe we should add a one time warning to give a clue to poor users
-> > hitting this problem.
-> 
-> you mean like warn_on_once() here?
-> Makes sense I guess.
+A quick remark below. All changes look fine to me at a first look, but
+I will test and dig more into code soon.
 
+>
+> @@ -3946,11 +3965,6 @@ static int mvneta_probe(struct platform_device *pdev)
+>         dev->priv_flags |= IFF_UNICAST_FLT;
+>         dev->gso_max_segs = MVNETA_MAX_TSO_SEGS;
+>
+> -       err = register_netdev(dev);
+> -       if (err < 0) {
+> -               dev_err(&pdev->dev, "failed to register\n");
+> -               goto err_free_stats;
+> -       }
 
-pr_err(DEPRECATED, "%s (pid %d) "
-                   "invalid shift in BPF program.\n"
-                   current->comm, task_pid_nr(current));
+The purpose of shifting register_netdev() was to be able to obtain
+pp->id from net_device, before mvneta_bm_port_init is called. It is
+needed for proper port - pool mapping control.
 
-Or something like that.
+>
+>         pp->id = dev->ifindex;
+>
+> @@ -3965,6 +3979,12 @@ static int mvneta_probe(struct platform_device *pdev)
+>                 }
+>         }
+>
+> +       err = register_netdev(dev);
+> +       if (err < 0) {
+> +               dev_err(&pdev->dev, "failed to register\n");
+> +               goto err_free_stats;
+> +       }
+> +
+>         err = mvneta_init(&pdev->dev, pp);
+>         if (err < 0)
+>                 goto err_netdev;
+
+Best regards,
+Marcin
