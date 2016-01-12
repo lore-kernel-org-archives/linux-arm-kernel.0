@@ -1,67 +1,44 @@
-From: labbott@fedoraproject.org (Laura Abbott)
-Date: Tue, 12 Jan 2016 13:46:27 -0800
-Subject: [PATCH] arm64: Allow vmalloc regions to be set with set_memory_*
-Message-ID: <1452635187-8057-1-git-send-email-labbott@fedoraproject.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Jan 2016 22:49:57 +0100
+Subject: I/O issues with writing to mtdblock devices on kirkwood
+In-Reply-To: <20160112180223.GA6588@sirena.org.uk>
+References: <1440159857.19360.50.camel@debian.org>
+ <4004455.tVDpSpUXxo@wuerfel> <20160112180223.GA6588@sirena.org.uk>
+Message-ID: <4468027.N4Q71mzei0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday 12 January 2016 18:02:23 Mark Brown wrote:
+> On Tue, Jan 12, 2016 at 05:29:40PM +0100, Arnd Bergmann wrote:
+> > On Tuesday 12 January 2016 02:19:04 Andrew Lunn wrote:
+> 
+> > > When i played with this, i added a reschedule point at the end of the
+> > > drivers transfer_one_message() function, to see if that would help. It
+> > > did not, which is why i made a guess it has something to do with a
+> > > lock.
+> 
+> > Can you try using usleep_range() instead of udelay()? It might also
+> 
+> Oh, indeed - should've thought of that!
+> 
+> > be worth trying what the actual delay is for each byte to see if a
+> > longer sleep time would help, but I guess that time is highly
+> > device specific.
+> 
+> I expect that the delay will depend on the clock speed of the SPI bus
+> which is system dependant.  Might actually be worth checking if the bus
+> is clocked excessively slowly.
 
-The range of set_memory_* is currently restricted to the module address
-range because of difficulties in breaking down larger block sizes.
-vmalloc maps PAGE_SIZE pages so it is safe to use as well. Update the
-function ranges and add a comment explaining why the range is restricted
-the way it is.
+Definitely worth checking, bug if we are transferring large enough amounts
+of data, we will always incur a long delay even if the SPI bus is
+clocked relatively fast. Doing a usleep_range() will likely make the
+throughput much lower, as we will have longer times during which we
+are not transferring any data here.
 
-Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
----
-This should let the protections for the eBPF work as expected, I don't
-know if there is some sort of self test for thatL.
----
- arch/arm64/mm/pageattr.c | 25 +++++++++++++++++++++----
- 1 file changed, 21 insertions(+), 4 deletions(-)
+I see in the Armada 370 datasheet that the controller actually supports an
+interrupt driven mode, which should be much better in principle than blocking
+the CPU during the entire transfer. There may of course be a good reason
+why the driver has never used interrupts, but it was originally introduced
+in Orion5x, so maybe there was a bug that has been fixed in the meantime.
 
-diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-index 3571c73..274208e 100644
---- a/arch/arm64/mm/pageattr.c
-+++ b/arch/arm64/mm/pageattr.c
-@@ -36,6 +36,26 @@ static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
- 	return 0;
- }
- 
-+static bool validate_addr(unsigned long start, unsigned long end)
-+{
-+	/*
-+	 * This check explicitly excludes most kernel memory. Most kernel
-+	 * memory is mapped with a larger page size and breaking down the
-+	 * larger page size without causing TLB conflicts is very difficult.
-+	 *
-+	 * If you need to call set_memory_* on a range, the recommendation is
-+	 * to use vmalloc since that range is mapped with pages.
-+	 */
-+	if (start >= MODULES_VADDR && start < MODULES_END &&
-+	    end >= MODULES_VADDR && end < MODULES_END)
-+		return true;
-+
-+	if (is_vmalloc_addr(start) && is_vmalloc_addr(end))
-+		return true;
-+
-+	return false;
-+}
-+
- static int change_memory_common(unsigned long addr, int numpages,
- 				pgprot_t set_mask, pgprot_t clear_mask)
- {
-@@ -51,10 +71,7 @@ static int change_memory_common(unsigned long addr, int numpages,
- 		WARN_ON_ONCE(1);
- 	}
- 
--	if (start < MODULES_VADDR || start >= MODULES_END)
--		return -EINVAL;
--
--	if (end < MODULES_VADDR || end >= MODULES_END)
-+	if (!validate_addr(start, end))
- 		return -EINVAL;
- 
- 	data.set_mask = set_mask;
--- 
-2.5.0
+	Arnd
