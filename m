@@ -1,38 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Jan 2016 17:29:40 +0100
-Subject: I/O issues with writing to mtdblock devices on kirkwood
-In-Reply-To: <20160112011904.GC7690@lunn.ch>
-References: <1440159857.19360.50.camel@debian.org>
- <20160112004749.GT6588@sirena.org.uk> <20160112011904.GC7690@lunn.ch>
-Message-ID: <4004455.tVDpSpUXxo@wuerfel>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 12 Jan 2016 08:31:02 -0800
+Subject: [PATCH v3 05/41] powerpc: reuse asm-generic/barrier.h
+In-Reply-To: <1452426622-4471-6-git-send-email-mst@redhat.com>
+References: <1452426622-4471-1-git-send-email-mst@redhat.com>
+ <1452426622-4471-6-git-send-email-mst@redhat.com>
+Message-ID: <20160112163102.GE3818@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 January 2016 02:19:04 Andrew Lunn wrote:
-> > Oh, right.  This sounds like everything is working fine with SPI - that
-> > commit was supposed to improve throughput with single threaded workloads
-> > by avoiding pointless context switches and it seems it is in fact doing
-> > that.  Most likely you are using a bitbanging SPI controller driver and
-> > that's causing lots of I/O wait states which is upsetting the scheduler
-> > but it's hard to be sure.
+On Sun, Jan 10, 2016 at 04:17:09PM +0200, Michael S. Tsirkin wrote:
+> On powerpc read_barrier_depends, smp_read_barrier_depends
+> smp_store_mb(), smp_mb__before_atomic and smp_mb__after_atomic match the
+> asm-generic variants exactly. Drop the local definitions and pull in
+> asm-generic/barrier.h instead.
 > 
-> drivers/spi/spi-orion.c
+> This is in preparation to refactoring this code area.
 > 
-> Not bitbanging, but it is polled IO, not DMA.
->  
-> > Possibly whatever SPI driver this system uses is doing something really
-> > rude (perhaps limited by the hardware), possibly it isn't using DMA when
-> > it should be, or possibly the scheduler just isn't doing a good job with
-> > the workload you're giving it.
-> 
-> When i played with this, i added a reschedule point at the end of the
-> drivers transfer_one_message() function, to see if that would help. It
-> did not, which is why i made a guess it has something to do with a
-> lock.
+> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Can you try using usleep_range() instead of udelay()? It might also
-be worth trying what the actual delay is for each byte to see if a
-longer sleep time would help, but I guess that time is highly
-device specific.
+Looks sane to me.
 
-	Arnd
+Reviewed-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+
+> ---
+>  arch/powerpc/include/asm/barrier.h | 9 ++-------
+>  1 file changed, 2 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/powerpc/include/asm/barrier.h b/arch/powerpc/include/asm/barrier.h
+> index a7af5fb..980ad0c 100644
+> --- a/arch/powerpc/include/asm/barrier.h
+> +++ b/arch/powerpc/include/asm/barrier.h
+> @@ -34,8 +34,6 @@
+>  #define rmb()  __asm__ __volatile__ ("sync" : : : "memory")
+>  #define wmb()  __asm__ __volatile__ ("sync" : : : "memory")
+> 
+> -#define smp_store_mb(var, value) do { WRITE_ONCE(var, value); smp_mb(); } while (0)
+> -
+>  #ifdef __SUBARCH_HAS_LWSYNC
+>  #    define SMPWMB      LWSYNC
+>  #else
+> @@ -60,9 +58,6 @@
+>  #define smp_wmb()	barrier()
+>  #endif /* CONFIG_SMP */
+> 
+> -#define read_barrier_depends()		do { } while (0)
+> -#define smp_read_barrier_depends()	do { } while (0)
+> -
+>  /*
+>   * This is a barrier which prevents following instructions from being
+>   * started until the value of the argument x is known.  For example, if
+> @@ -87,8 +82,8 @@ do {									\
+>  	___p1;								\
+>  })
+> 
+> -#define smp_mb__before_atomic()     smp_mb()
+> -#define smp_mb__after_atomic()      smp_mb()
+>  #define smp_mb__before_spinlock()   smp_mb()
+> 
+> +#include <asm-generic/barrier.h>
+> +
+>  #endif /* _ASM_POWERPC_BARRIER_H */
+> -- 
+> MST
+> 
