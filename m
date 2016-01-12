@@ -1,38 +1,31 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Tue, 12 Jan 2016 10:15:05 +0800
-Subject: [PATCH] iommu/arm-smmu: add a shortcut when the @dev_node is NULL
-Message-ID: <1452564905-2662-1-git-send-email-shijie.huang@arm.com>
+From: wangkefeng.wang@huawei.com (wangkefeng.wang at huawei.com)
+Date: Tue, 12 Jan 2016 10:22:50 +0800
+Subject: [PATCH] arm/mm: use PAGE_ALIGNED instead of IS_ALIGNED
+Message-ID: <1452565370-11143-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a device is added to a bus, it will trigger the chain notifier hook,
-such as iommu_bus_notifier. The find_smmu_for_device() can be called here.
+From: Kefeng Wang <wangkefeng.wang@huawei.com>
 
-In some cases, the @device_node can be NULL. For example, when the device
-is one of the following:
-    alarmtime, serial, rtc or snd_soc.
+Use PAGE_ALIGEND macro in <linux/mm.h> to simplify code.
 
-This patch adds a shortcut for the code when the @device_node is NULL.
-In my juno-r1 board, the boot time can be faster by 0.004014s.
-
-Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- drivers/iommu/arm-smmu.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/mm/pageattr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 59ee4b8..6724a46 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -506,6 +506,9 @@ static struct arm_smmu_device *find_smmu_for_device(struct device *dev)
- 	struct arm_smmu_master *master = NULL;
- 	struct device_node *dev_node = dev_get_dev_node(dev);
+diff --git a/arch/arm/mm/pageattr.c b/arch/arm/mm/pageattr.c
+index cf30daf..fa1c0f1 100644
+--- a/arch/arm/mm/pageattr.c
++++ b/arch/arm/mm/pageattr.c
+@@ -43,7 +43,7 @@ static int change_memory_common(unsigned long addr, int numpages,
+ 	int ret;
+ 	struct page_change_data data;
  
-+	if (!dev_node)
-+		return NULL;
-+
- 	spin_lock(&arm_smmu_devices_lock);
- 	list_for_each_entry(smmu, &arm_smmu_devices, list) {
- 		master = find_smmu_master(smmu, dev_node);
+-	if (!IS_ALIGNED(addr, PAGE_SIZE)) {
++	if (!PAGE_ALIGNED(addr)) {
+ 		start &= PAGE_MASK;
+ 		end = start + size;
+ 		WARN_ON_ONCE(1);
 -- 
-2.5.0
+2.6.0.GIT
