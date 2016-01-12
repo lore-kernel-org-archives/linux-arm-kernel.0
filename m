@@ -1,46 +1,43 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Tue, 12 Jan 2016 07:55:45 +0000
-Subject: [PATCH 2/2] regulator: add documentation for ACT8945A's
- regulator DT bindings
-In-Reply-To: <20160109153554.GA25800@rob-hp-laptop>
-References: <1452218938-10621-1-git-send-email-wenyou.yang@atmel.com>
- <1452218938-10621-3-git-send-email-wenyou.yang@atmel.com>
- <20160109153554.GA25800@rob-hp-laptop>
-Message-ID: <B256D81BAE5131468A838E5D7A243641D63E8796@penmbx01>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Tue, 12 Jan 2016 16:05:13 +0800
+Subject: [PATCH v2 0/2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD driver
+Message-ID: <1452585915-551-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+This patch set adds support for the Active-semi ACT8945A PMIC
+MFD driver. It is a Multi Function Device with the following
+subdevices:
+ - Regulator
+ - Charger
 
-Thank you for your acked.
+It is interfaced to the host controller using I2C interface,
+ACT8945A is a child device of the I2C.
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: 2016?1?9? 23:36
-> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
-> Cc: Liam Girdwood <lgirdwood@gmail.com>; Mark Brown <broonie@kernel.org>;
-> Pawel Moll <pawel.moll@arm.com>; Mark Rutland <mark.rutland@arm.com>; Ian
-> Campbell <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>;
-> Ferre, Nicolas <Nicolas.FERRE@atmel.com>; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> devicetree at vger.kernel.org
-> Subject: Re: [PATCH 2/2] regulator: add documentation for ACT8945A's regulator
-> DT bindings
-> 
-> On Fri, Jan 08, 2016 at 10:08:58AM +0800, Wenyou Yang wrote:
-> > This patch adds documentation for the DT bindings of the regulator
-> > subdevice of ACT8945A MFD.
-> >
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > ---
-> >
-> >  .../bindings/regulator/act8945a-regulator.txt      |   78 ++++++++++++++++++++
-> >  1 file changed, 78 insertions(+)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
+Changes in v2:
+ - add more help information in Kconfig.
+ - update the file header with short version license and author line.
+ - remove unused structure members (dev, i2c_client) of stuct act8945a_dev.
+ - use define "PLATFORM_DEVID_NONE" for mfd_add_devices(), instead of '-1'.
+ - use more explicit info to indicate the failure to add sub devices.
+ - remove the unnecessary print out.
+ - substitute MODULE_LICENSE("GPL") for MODULE_LICENSE("GPL v2").
+ - use more specific label in Example.
+ - add pmic and charger nodes in Example.
 
+Wenyou Yang (2):
+  mfd: act8945a: add Active-semi ACT8945A PMIC MFD driver
+  mfd: add documentation for ACT8945A DT bindings
 
-Best Regards,
-Wenyou Yang
+ Documentation/devicetree/bindings/mfd/act8945a.txt |   82 +++++++++++++++
+ drivers/mfd/Kconfig                                |   11 ++
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/act8945a.c                             |  109 ++++++++++++++++++++
+ include/linux/mfd/act8945a.h                       |   21 ++++
+ 5 files changed, 224 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/act8945a.txt
+ create mode 100644 drivers/mfd/act8945a.c
+ create mode 100644 include/linux/mfd/act8945a.h
+
+-- 
+1.7.9.5
