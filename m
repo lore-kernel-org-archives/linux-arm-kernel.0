@@ -1,75 +1,36 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 12 Jan 2016 16:25:58 +0100
-Subject: [PATCHv2 1/2] remove redundant struct clk NULL checks
-In-Reply-To: <1452611876-451-2-git-send-email-LW@KARO-electronics.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Jan 2016 15:24:05 +0000
+Subject: [PATCHv2 0/2] net: fec: Reset ethernet PHY whenever the enet_out
+ clock is being enabled
+In-Reply-To: <1452611876-451-1-git-send-email-LW@KARO-electronics.de>
 References: <1452611876-451-1-git-send-email-LW@KARO-electronics.de>
- <1452611876-451-2-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1452612358.3694.44.camel@pengutronix.de>
+Message-ID: <20160112152405.GZ19062@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 12.01.2016, 16:17 +0100 schrieb Lothar Wa?mann:
-> NULL is a valid argument to clk_enable()/clk_disable(). Remove
-> redundant checks before calling those functions.
+On Tue, Jan 12, 2016 at 04:17:54PM +0100, Lothar Wa?mann wrote:
+> This patchset fixes a regression introduced by
+> commit e8fcfcd5684a ("net: fec: optimize the clock management to save power")
+> for ethernet PHYs that are using ENET_OUT as reference clock (on i.MX6 or i.MX28)
 > 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-
-> ---
->  drivers/net/ethernet/freescale/fec_main.c | 23 +++++++++--------------
->  1 file changed, 9 insertions(+), 14 deletions(-)
+> Changes vs. v1:
+> - fixed reference to the commit that introduced the regression.
+> - dropped patch to use gpiod framework. This should be added later,
+>   after the affected DTBs have been updated to specify the correct
+>   gpio_flags.
 > 
-> diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-> index 502da6f..592a7a4 100644
-> --- a/drivers/net/ethernet/freescale/fec_main.c
-> +++ b/drivers/net/ethernet/freescale/fec_main.c
-> @@ -1874,35 +1874,30 @@ static int fec_enet_clk_enable(struct net_device *ndev, bool enable)
->  			}
->  			mutex_unlock(&fep->ptp_clk_mutex);
->  		}
-> -		if (fep->clk_ref) {
-> -			ret = clk_prepare_enable(fep->clk_ref);
-> -			if (ret)
-> -				goto failed_clk_ref;
-> -		}
-> +
-> +		ret = clk_prepare_enable(fep->clk_ref);
-> +		if (ret)
-> +			goto failed_clk_ref;
->  	} else {
->  		clk_disable_unprepare(fep->clk_ahb);
-> -		if (fep->clk_enet_out)
-> -			clk_disable_unprepare(fep->clk_enet_out);
-> +		clk_disable_unprepare(fep->clk_enet_out);
->  		if (fep->clk_ptp) {
->  			mutex_lock(&fep->ptp_clk_mutex);
->  			clk_disable_unprepare(fep->clk_ptp);
->  			fep->ptp_clk_on = false;
->  			mutex_unlock(&fep->ptp_clk_mutex);
->  		}
-> -		if (fep->clk_ref)
-> -			clk_disable_unprepare(fep->clk_ref);
-> +		clk_disable_unprepare(fep->clk_ref);
->  	}
->  
->  	return 0;
->  
->  failed_clk_ref:
-> -	if (fep->clk_ref)
-> -		clk_disable_unprepare(fep->clk_ref);
-> +	clk_disable_unprepare(fep->clk_ref);
->  failed_clk_ptp:
-> -	if (fep->clk_enet_out)
-> -		clk_disable_unprepare(fep->clk_enet_out);
-> +	clk_disable_unprepare(fep->clk_enet_out);
->  failed_clk_enet_out:
-> -		clk_disable_unprepare(fep->clk_ahb);
-> +	clk_disable_unprepare(fep->clk_ahb);
->  
->  	return ret;
->  }
+> Patch overview:
+> 1. cleanup patch to remove redundant NULL checks
+> 2. call fec_reset_phy() after the ENET_OUT clock has been enabled
+
+I definitely want to test these on my SolidRun boards before these get
+merged: the AR8035 on there is configured via pin-straps, and then
+further tweaked with PHY quirks.  Resetting with the iMX6 in the
+wrong state may result in the AR8035 being reconfigured (even jumping
+to a different MDIO address) and certainly would need the PHY quirks
+re-running.
 
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
