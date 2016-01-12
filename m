@@ -1,56 +1,69 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 12 Jan 2016 21:30:02 +0100
-Subject: [PATCHv2 0/2] net: fec: Reset ethernet PHY whenever the enet_out
- clock is being enabled
-In-Reply-To: <20160112170444.11c412c5@ipc1.ka-ro>
-References: <1452611876-451-1-git-send-email-LW@KARO-electronics.de>
- <20160112152405.GZ19062@n2100.arm.linux.org.uk>
- <20160112170444.11c412c5@ipc1.ka-ro>
-Message-ID: <20160112203002.GZ24441@pengutronix.de>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Tue, 12 Jan 2016 21:42:39 +0100
+Subject: [PATCHv2] net: bpf: reject invalid shifts
+In-Reply-To: <20160112195356.GA34598@ast-mbp.thefacebook.com>
+References: <20160112185121.GA34045@ast-mbp.thefacebook.com>
+ <1452626228-15742-1-git-send-email-rabin@rab.in>
+ <1452628118.1223.25.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20160112195356.GA34598@ast-mbp.thefacebook.com>
+Message-ID: <5695653F.6030001@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 01/12/2016 08:53 PM, Alexei Starovoitov wrote:
+> On Tue, Jan 12, 2016 at 11:48:38AM -0800, Eric Dumazet wrote:
+>> On Tue, 2016-01-12 at 20:17 +0100, Rabin Vincent wrote:
+>>> On ARM64, a BUG() is triggered in the eBPF JIT if a filter with a
+>>> constant shift that can't be encoded in the immediate field of the
+>>> UBFM/SBFM instructions is passed to the JIT.  Since these shifts
+>>> amounts, which are negative or >= regsize, are invalid, reject them in
+>>> the eBPF verifier and the classic BPF filter checker, for all
+>>> architectures.
+>>>
+>>
+>> Hmm...
+>>
+>>> diff --git a/net/core/filter.c b/net/core/filter.c
+>>> index 672eefbfbe99..37157c4c1a78 100644
+>>> --- a/net/core/filter.c
+>>> +++ b/net/core/filter.c
+>>> @@ -777,6 +777,11 @@ static int bpf_check_classic(const struct sock_filter *filter,
+>>>   			if (ftest->k == 0)
+>>>   				return -EINVAL;
+>>>   			break;
+>>> +		case BPF_ALU | BPF_LSH | BPF_K:
+>>> +		case BPF_ALU | BPF_RSH | BPF_K:
+>>> +			if (ftest->k >= 32)
+>>> +				return -EINVAL;
+>>> +			break;
+>>>   		case BPF_LD | BPF_MEM:
+>>>   		case BPF_LDX | BPF_MEM:
+>>>   		case BPF_ST:
+>>
+>> These weak filters used to have undefined behavior, maybe in a never
+>> taken branch, and will now fail hard, possibly breaking old
+>> applications.
+>>
+>> I believe we should add a one time warning to give a clue to poor users
+>> hitting this problem.
+>
+> you mean like warn_on_once() here?
+> Makes sense I guess.
 
-On Tue, Jan 12, 2016 at 05:04:44PM +0100, Lothar Wa?mann wrote:
-> > On Tue, Jan 12, 2016 at 04:17:54PM +0100, Lothar Wa?mann wrote:
-> > > This patchset fixes a regression introduced by
-> > > commit e8fcfcd5684a ("net: fec: optimize the clock management to save power")
-> > > for ethernet PHYs that are using ENET_OUT as reference clock (on i.MX6 or i.MX28)
-> > > 
-> > > Changes vs. v1:
-> > > - fixed reference to the commit that introduced the regression.
-> > > - dropped patch to use gpiod framework. This should be added later,
-> > >   after the affected DTBs have been updated to specify the correct
-> > >   gpio_flags.
-> > > 
-> > > Patch overview:
-> > > 1. cleanup patch to remove redundant NULL checks
-> > > 2. call fec_reset_phy() after the ENET_OUT clock has been enabled
-> > 
-> > I definitely want to test these on my SolidRun boards before these get
-> > merged: the AR8035 on there is configured via pin-straps, and then
-> > further tweaked with PHY quirks.  Resetting with the iMX6 in the
-> > wrong state may result in the AR8035 being reconfigured (even jumping
-> > to a different MDIO address) and certainly would need the PHY quirks
-> > re-running.
-> > 
-> As far as I can tell, all SolidRun boards do not specify the enet_out
-> clock in the dtb, so the PHY reset behaviour should be unaffected by
-> this patch on those boards, since the additional fec_reset_phy() call is
-> framed by:
-> if (fep->clk_enet_out) {
-> 	...
-> }
-> 
-> But verifying this explicitly is of course a good idea.
+Hmm, WARN_ON_ONCE() would then throw a stack trace also for unprived users,
+I doubt we want to scare admins. ;)
 
-If the SolidRun boards don't do this, this doesn't mean it's safe in
-general. The problem is real, isn't it?
+Or, you mean pr_warn_once()?
 
-Best regards
-Uwe
+>> Not everybody has perfect BPF filters, since most of the time they were
+>> hand coded.
+>
+> yep and we all know who was able to code hundreds of cBPF insns by hand ;)
+> But I'm sure that code doesn't have such broken shifts. :)))
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+libpcap certainly supports raw filters now thanks to Chema [1]. Alternative
+could be to just mask them here, but not in eBPF verifier, but that would be
+even more inconsistent (on the other hand, we also allow holes in BPF but not
+in eBPF, so wouldn't be the first time we make things different), hmm.
+
+   [1] https://github.com/the-tcpdump-group/libpcap/commit/273455d58b3bbd83d757bda4f4544e3e5cc8c20a
