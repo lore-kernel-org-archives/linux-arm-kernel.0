@@ -1,51 +1,63 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 12 Jan 2016 17:28:55 +0900
-Subject: [PATCH v2] arm: irq: l2c: do not print error in case of missing
- l2c from dtb
-In-Reply-To: <1452583474-11729-1-git-send-email-andi.shyti@samsung.com>
-References: <1452582683.7773.102.camel@perches.com>
- <1452583474-11729-1-git-send-email-andi.shyti@samsung.com>
-Message-ID: <5694B947.7040207@samsung.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Tue, 12 Jan 2016 16:31:04 +0800
+Subject: [PATCH v3 0/6] Add clock support for Mediatek MT2701
+Message-ID: <1452587470-61506-1-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.01.2016 16:24, Andi Shyti wrote:
-> In some architectures the L2 cache controller is integrated in the
-> processor's block itself and it doesn't use any external cache
-> controller. This means that an entry in the board's dtb related
-> to the l2c is not necessary.
-> 
-> Distinguish between error codes and print just an information in
-> case of -ENODEV.
-> 
-> This patch converts the following error message:
-> 
->    L2C: failed to init: -19
-> 
-> to the following info:
-> 
->    L2C: no controller entry found in the dtb
-> 
-> on boards like odroid-xu4, cortex A7/A15, which don't have
-> external cache controller.
-> 
-> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
-> 
-> Thanks Joe,
-> 
-> makes sense!
-> 
-> Andi
-> 
->  arch/arm/kernel/irq.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+This patchset is based on 4.4-rc7, add clock and reset controller support
+for Mediatek MT2701.
 
-Works (Odroid XU3, Exynos5422) and looks good for me:
+This patchset also refined makefile and Kconfig to support configurable
+multiple SoC clock support.
 
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+changes since v2:
+- Fix ethsys definition.
+- Replace read-modify-write with regmap_update_bits() in clock operations.
+- Move mt2701-resets.h to include/dt-bindings/reset/.
+- Add hifsys reset patch from John Crispin.
 
-Best regards,
-Krzysztof
+changes since v1:
+- Document MT2701 compatible strings.
+
+James Liao (2):
+  clk: mediatek: Refine the makefile to support multiple clock drivers
+  dt-bindings: ARM: Mediatek: Document bindings for MT2701
+
+Shunli Wang (4):
+  clk: mediatek: Add dt-bindings for MT2701 clocks
+  clk: mediatek: Add MT2701 clock support
+  reset: mediatek: Add MT2701 reset controller dt-binding file
+  reset: mediatek: Add MT2701 reset driver
+
+ .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |    1 +
+ .../bindings/arm/mediatek/mediatek,bdpsys.txt      |   22 +
+ .../bindings/arm/mediatek/mediatek,ethsys.txt      |   22 +
+ .../bindings/arm/mediatek/mediatek,hifsys.txt      |   22 +
+ .../bindings/arm/mediatek/mediatek,imgsys.txt      |    1 +
+ .../bindings/arm/mediatek/mediatek,infracfg.txt    |    1 +
+ .../bindings/arm/mediatek/mediatek,mmsys.txt       |    1 +
+ .../bindings/arm/mediatek/mediatek,pericfg.txt     |    1 +
+ .../bindings/arm/mediatek/mediatek,topckgen.txt    |    1 +
+ .../bindings/arm/mediatek/mediatek,vdecsys.txt     |    1 +
+ drivers/clk/Kconfig                                |    1 +
+ drivers/clk/mediatek/Kconfig                       |   31 +
+ drivers/clk/mediatek/Makefile                      |    7 +-
+ drivers/clk/mediatek/clk-gate.c                    |   52 +
+ drivers/clk/mediatek/clk-gate.h                    |    2 +
+ drivers/clk/mediatek/clk-mt2701.c                  | 1216 ++++++++++++++++++++
+ drivers/clk/mediatek/clk-mtk.c                     |   25 +
+ drivers/clk/mediatek/clk-mtk.h                     |   35 +-
+ include/dt-bindings/clock/mt2701-clk.h             |  481 ++++++++
+ include/dt-bindings/reset/mt2701-resets.h          |   83 ++
+ 20 files changed, 2000 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,hifsys.txt
+ create mode 100644 drivers/clk/mediatek/Kconfig
+ create mode 100644 drivers/clk/mediatek/clk-mt2701.c
+ create mode 100644 include/dt-bindings/clock/mt2701-clk.h
+ create mode 100644 include/dt-bindings/reset/mt2701-resets.h
+
+--
+1.9.1
