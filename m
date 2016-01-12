@@ -1,174 +1,267 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Tue, 12 Jan 2016 11:31:03 +0000
-Subject: [PATCH 1/5] PCI: xilinx: Removing xilinx_pcie_parse_and_add_res
- function
-In-Reply-To: <201601121728.WfQgEwJr%fengguang.wu@intel.com>
-References: <1452576399-1513-2-git-send-email-bharatku@xilinx.com>
- <201601121728.WfQgEwJr%fengguang.wu@intel.com>
-Message-ID: <8520D5D51A55D047800579B094147198258706A4@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Tue, 12 Jan 2016 19:31:59 +0800
+Subject: [PATCH v2 2/4] power: reset: add reboot mode driver
+In-Reply-To: <1452598029-8222-1-git-send-email-andy.yan@rock-chips.com>
+References: <1452598029-8222-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1452598319-8324-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will resend the patches.
+This driver parse the reboot commands like "reboot loader"
+and "reboot recovery" to get a boot mode described in the
+device tree , then call the write interfae to store the boot
+mode in some persistent storage  like special register or ram,
+which can be read by the bootloader after system reboot, then
+the bootloader can take different action according to the mode
+stored.
 
-> Hi Bharat,
-> 
-> [auto build test ERROR on pci/next]
-> [also build test ERROR on v4.4 next-20160111] [if your patch is applied to the
-> wrong git tree, please drop us a note to help improving the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Bharat-Kumar-Gogada/PCI-
-> xilinx-Removing-xilinx_pcie_parse_and_add_res-function/20160112-133224
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
-> config: arm-allyesconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-
-> tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm
-> 
-> Note: the linux-review/Bharat-Kumar-Gogada/PCI-xilinx-Removing-
-> xilinx_pcie_parse_and_add_res-function/20160112-133224 HEAD
-> 8ae5c17c14eb5023b68a0c2bc9fabb3b24eab051 builds fine.
->       It only hurts bisectibility.
-> 
-> All errors (new ones prefixed by >>):
-> 
-> >> drivers/pci/host/pcie-xilinx.c:657:25: error: expected '=', ',', ';',
-> >> 'asm' or '__attribute__' before '-' token
->      * xilinx_pcie_parse_dt - Parse Device tree
->                             ^
-> >> drivers/pci/host/pcie-xilinx.c:658:4: error: stray '@' in program
->      * @port: PCIe port information
->        ^
->    drivers/pci/host/pcie-xilinx.c: In function 'xilinx_pcie_probe':
-> >> drivers/pci/host/pcie-xilinx.c:722:2: error: implicit declaration of
-> >> function 'xilinx_pcie_parse_dt'
-> >> [-Werror=implicit-function-declaration]
->      err = xilinx_pcie_parse_dt(port);
->      ^
->    drivers/pci/host/pcie-xilinx.c: At top level:
->    drivers/pci/host/pcie-xilinx.c:391:20: warning: 'xilinx_pcie_intr_handler'
-> defined but not used [-Wunused-function]
->     static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
->                        ^
->    cc1: some warnings being treated as errors
-> 
-> vim +657 drivers/pci/host/pcie-xilinx.c
-> 
-> 8953aab1 Lorenzo Pieralisi   2015-07-29  651  	else
-> 8953aab1 Lorenzo Pieralisi   2015-07-29  652  		bus =
-> pci_scan_root_bus(port->dev, sys->busnr,
-> 8953aab1 Lorenzo Pieralisi   2015-07-29  653
-> 	&xilinx_pcie_ops, sys, &sys->resources);
-> 8961def5 Srikanth Thokala    2014-08-20  654  	return bus;
-> 8961def5 Srikanth Thokala    2014-08-20  655  }
-> 8961def5 Srikanth Thokala    2014-08-20  656
-> 8961def5 Srikanth Thokala    2014-08-20 @657   * xilinx_pcie_parse_dt - Parse
-> Device tree
-> 8961def5 Srikanth Thokala    2014-08-20 @658   * @port: PCIe port
-> information
-> 8961def5 Srikanth Thokala    2014-08-20  659   *
-> 8961def5 Srikanth Thokala    2014-08-20  660   * Return: '0' on success and
-> error value on failure
-> 8961def5 Srikanth Thokala    2014-08-20  661   */
-> 8961def5 Srikanth Thokala    2014-08-20  662  static int
-> xilinx_pcie_parse_dt(struct xilinx_pcie_port *port)
-> 8961def5 Srikanth Thokala    2014-08-20  663  {
-> 8961def5 Srikanth Thokala    2014-08-20  664  	struct device *dev = port-
-> >dev;
-> 8961def5 Srikanth Thokala    2014-08-20  665  	struct device_node *node =
-> dev->of_node;
-> 8961def5 Srikanth Thokala    2014-08-20  666  	struct resource regs;
-> 8961def5 Srikanth Thokala    2014-08-20  667  	const char *type;
-> 8961def5 Srikanth Thokala    2014-08-20  668  	int err;
-> 8961def5 Srikanth Thokala    2014-08-20  669
-> 8961def5 Srikanth Thokala    2014-08-20  670  	type =
-> of_get_property(node, "device_type", NULL);
-> 8961def5 Srikanth Thokala    2014-08-20  671  	if (!type || strcmp(type,
-> "pci")) {
-> 8961def5 Srikanth Thokala    2014-08-20  672  		dev_err(dev, "invalid
-> \"device_type\" %s\n", type);
-> 8961def5 Srikanth Thokala    2014-08-20  673  		return -EINVAL;
-> 8961def5 Srikanth Thokala    2014-08-20  674  	}
-> 8961def5 Srikanth Thokala    2014-08-20  675
-> 8961def5 Srikanth Thokala    2014-08-20  676  	err =
-> of_address_to_resource(node, 0, &regs);
-> 8961def5 Srikanth Thokala    2014-08-20  677  	if (err) {
-> 8961def5 Srikanth Thokala    2014-08-20  678  		dev_err(dev,
-> "missing \"reg\" property\n");
-> 8961def5 Srikanth Thokala    2014-08-20  679  		return err;
-> 8961def5 Srikanth Thokala    2014-08-20  680  	}
-> 8961def5 Srikanth Thokala    2014-08-20  681
-> 8961def5 Srikanth Thokala    2014-08-20  682  	port->reg_base =
-> devm_ioremap_resource(dev, &regs);
-> 8961def5 Srikanth Thokala    2014-08-20  683  	if (IS_ERR(port->reg_base))
-> 8961def5 Srikanth Thokala    2014-08-20  684  		return PTR_ERR(port-
-> >reg_base);
-> 8961def5 Srikanth Thokala    2014-08-20  685
-> 8961def5 Srikanth Thokala    2014-08-20  686  	port->irq =
-> irq_of_parse_and_map(node, 0);
-> 8961def5 Srikanth Thokala    2014-08-20  687  	err = devm_request_irq(dev,
-> port->irq, xilinx_pcie_intr_handler,
-> 9dd875f8 Grygorii Strashko   2015-12-10  688
-> IRQF_SHARED | IRQF_NO_THREAD,
-> 9dd875f8 Grygorii Strashko   2015-12-10  689  			       "xilinx-
-> pcie", port);
-> 8961def5 Srikanth Thokala    2014-08-20  690  	if (err) {
-> 8961def5 Srikanth Thokala    2014-08-20  691  		dev_err(dev, "unable
-> to request irq %d\n", port->irq);
-> 8961def5 Srikanth Thokala    2014-08-20  692  		return err;
-> 8961def5 Srikanth Thokala    2014-08-20  693  	}
-> 8961def5 Srikanth Thokala    2014-08-20  694
-> 8961def5 Srikanth Thokala    2014-08-20  695  	return 0;
-> 8961def5 Srikanth Thokala    2014-08-20  696  }
-> 8961def5 Srikanth Thokala    2014-08-20  697
-> 8961def5 Srikanth Thokala    2014-08-20  698  /**
-> 8961def5 Srikanth Thokala    2014-08-20  699   * xilinx_pcie_probe - Probe
-> function
-> 8961def5 Srikanth Thokala    2014-08-20  700   * @pdev: Platform device
-> pointer
-> 8961def5 Srikanth Thokala    2014-08-20  701   *
-> 8961def5 Srikanth Thokala    2014-08-20  702   * Return: '0' on success and
-> error value on failure
-> 8961def5 Srikanth Thokala    2014-08-20  703   */
-> 8961def5 Srikanth Thokala    2014-08-20  704  static int
-> xilinx_pcie_probe(struct platform_device *pdev)
-> 8961def5 Srikanth Thokala    2014-08-20  705  {
-> 8961def5 Srikanth Thokala    2014-08-20  706  	struct xilinx_pcie_port *port;
-> 8961def5 Srikanth Thokala    2014-08-20  707  	struct hw_pci hw;
-> 8961def5 Srikanth Thokala    2014-08-20  708  	struct device *dev = &pdev-
-> >dev;
-> 8961def5 Srikanth Thokala    2014-08-20  709  	int err;
-> aefcb31a Bharat Kumar Gogada 2016-01-12  710  	resource_size_t
-> iobase = 0;
-> aefcb31a Bharat Kumar Gogada 2016-01-12  711  	LIST_HEAD(res);
-> 8961def5 Srikanth Thokala    2014-08-20  712
-> 8961def5 Srikanth Thokala    2014-08-20  713  	if (!dev->of_node)
-> 8961def5 Srikanth Thokala    2014-08-20  714  		return -ENODEV;
-> 8961def5 Srikanth Thokala    2014-08-20  715
-> 8961def5 Srikanth Thokala    2014-08-20  716  	port = devm_kzalloc(dev,
-> sizeof(*port), GFP_KERNEL);
-> 8961def5 Srikanth Thokala    2014-08-20  717  	if (!port)
-> 8961def5 Srikanth Thokala    2014-08-20  718  		return -ENOMEM;
-> 8961def5 Srikanth Thokala    2014-08-20  719
-> 8961def5 Srikanth Thokala    2014-08-20  720  	port->dev = dev;
-> 8961def5 Srikanth Thokala    2014-08-20  721
-> 8961def5 Srikanth Thokala    2014-08-20 @722  	err =
-> xilinx_pcie_parse_dt(port);
-> 8961def5 Srikanth Thokala    2014-08-20  723  	if (err) {
-> 8961def5 Srikanth Thokala    2014-08-20  724  		dev_err(dev, "Parsing
-> DT failed\n");
-> 8961def5 Srikanth Thokala    2014-08-20  725  		return err;
-> 
-> :::::: The code at line 657 was first introduced by commit
-> :::::: 8961def56845593f22ce85474e428f6e4892fdd3 PCI: xilinx: Add Xilinx AXI
-> PCIe Host Bridge IP driver
-> 
-> :::::: TO: Srikanth Thokala <sthokal@xilinx.com>
-> :::::: CC: Bjorn Helgaas <bhelgaas@google.com>
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+This is commonly used on Android based devices, which in order
+to reboot the device into fastboot or recovery mode.
+
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+
+---
+
+Changes in v2:
+- move to dir drivers/power/reset/
+- make syscon-reboot-mode a generic driver
+
+Changes in v1:
+- fix the embarrassed compile warning
+- correct the maskrom magic number
+- check for the normal reboot
+
+ drivers/power/reset/Kconfig              |  16 +++++
+ drivers/power/reset/Makefile             |   2 +
+ drivers/power/reset/reboot-mode.c        | 100 +++++++++++++++++++++++++++++++
+ drivers/power/reset/reboot-mode.h        |   6 ++
+ drivers/power/reset/syscon-reboot-mode.c |  62 +++++++++++++++++++
+ 5 files changed, 186 insertions(+)
+ create mode 100644 drivers/power/reset/reboot-mode.c
+ create mode 100644 drivers/power/reset/reboot-mode.h
+ create mode 100644 drivers/power/reset/syscon-reboot-mode.c
+
+diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+index 1131cf7..2e6d873 100644
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -173,5 +173,21 @@ config POWER_RESET_ZX
+ 	help
+ 	  Reboot support for ZTE SoCs.
+ 
++config REBOOT_MODE
++	tristate
++	depends on OF
++	help
++	 This driver will help to pass the system reboot mode
++	 to bootloader
++
++config SYSCON_REBOOT_MODE
++	bool "Generic SYSCON regmap reboot mode driver"
++	select REBOOT_MODE
++	help
++	 Say y here will enable reboot mode driver. This will
++	 get reboot mode arguments and store it in SYSCON mapped
++	 register, then the bootloader can read it to take different
++	 action according to the mode.
++
+ endif
+ 
+diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+index 096fa67..a63865b 100644
+--- a/drivers/power/reset/Makefile
++++ b/drivers/power/reset/Makefile
+@@ -20,3 +20,5 @@ obj-$(CONFIG_POWER_RESET_SYSCON) += syscon-reboot.o
+ obj-$(CONFIG_POWER_RESET_SYSCON_POWEROFF) += syscon-poweroff.o
+ obj-$(CONFIG_POWER_RESET_RMOBILE) += rmobile-reset.o
+ obj-$(CONFIG_POWER_RESET_ZX) += zx-reboot.o
++obj-$(CONFIG_REBOOT_MODE) += reboot-mode.o
++obj-$(CONFIG_SYSCON_REBOOT_MODE) += syscon-reboot-mode.o
+diff --git a/drivers/power/reset/reboot-mode.c b/drivers/power/reset/reboot-mode.c
+new file mode 100644
+index 0000000..92b7b4d
+--- /dev/null
++++ b/drivers/power/reset/reboot-mode.c
+@@ -0,0 +1,100 @@
++/*
++ * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++#include <linux/device.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/reboot.h>
++#include "reboot-mode.h"
++
++struct mode_info {
++	const char *mode;
++	int magic;
++	struct list_head list;
++};
++
++struct reboot_mode_driver {
++	struct list_head head;
++	int (*write)(int magic);
++	struct notifier_block reboot_notifier;
++};
++
++static int get_reboot_mode_magic(struct reboot_mode_driver *reboot,
++				 const char *cmd)
++{
++	const char *normal = "normal";
++	int magic = 0;
++	struct mode_info *info;
++
++	if (!cmd)
++		cmd = normal;
++
++	list_for_each_entry(info, &reboot->head, list) {
++		if (!strcmp(info->mode, cmd)) {
++			magic = info->magic;
++			break;
++		}
++	}
++
++	return magic;
++}
++
++static int reboot_mode_notify(struct notifier_block *this,
++			      unsigned long mode, void *cmd)
++{
++	struct reboot_mode_driver *reboot;
++	int magic;
++
++	reboot = container_of(this, struct reboot_mode_driver, reboot_notifier);
++	magic = get_reboot_mode_magic(reboot, cmd);
++	if (magic)
++		reboot->write(magic);
++
++	return NOTIFY_DONE;
++}
++
++int reboot_mode_register(struct device *dev, int (*write)(int))
++{
++	struct reboot_mode_driver *reboot;
++	struct mode_info *info;
++	struct device_node *child;
++	int ret;
++
++	reboot = devm_kzalloc(dev, sizeof(*reboot), GFP_KERNEL);
++	if (!reboot)
++		return -ENOMEM;
++
++	reboot->write = write;
++	INIT_LIST_HEAD(&reboot->head);
++	for_each_child_of_node(dev->of_node, child) {
++		info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
++		if (!info)
++			return -ENOMEM;
++		info->mode = of_get_property(child, "linux,mode", NULL);
++		if (of_property_read_u32(child, "loader,magic", &info->magic)) {
++			dev_err(dev, "reboot mode %s without magic number\n",
++				info->mode);
++			devm_kfree(dev, info);
++			continue;
++		}
++		list_add_tail(&info->list, &reboot->head);
++	}
++	reboot->reboot_notifier.notifier_call = reboot_mode_notify;
++	ret = register_reboot_notifier(&reboot->reboot_notifier);
++	if (ret)
++		dev_err(dev, "can't register reboot notifier\n");
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(reboot_mode_register);
++
++MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com");
++MODULE_DESCRIPTION("System reboot mode driver");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/power/reset/reboot-mode.h b/drivers/power/reset/reboot-mode.h
+new file mode 100644
+index 0000000..76646e7
+--- /dev/null
++++ b/drivers/power/reset/reboot-mode.h
+@@ -0,0 +1,6 @@
++#ifndef __REBOOT_MODE_H__
++#define __REBOOT_MODE_H__
++
++extern int reboot_mode_register(struct device *dev, int (*write)(int));
++
++#endif
+diff --git a/drivers/power/reset/syscon-reboot-mode.c b/drivers/power/reset/syscon-reboot-mode.c
+new file mode 100644
+index 0000000..b9370f3
+--- /dev/null
++++ b/drivers/power/reset/syscon-reboot-mode.c
+@@ -0,0 +1,62 @@
++/*
++ * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/reboot.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
++#include "reboot-mode.h"
++
++static struct regmap *map;
++static u32 offset;
++
++static int syscon_reboot_mode_write(int magic)
++{
++	regmap_write(map, offset, magic);
++
++	return 0;
++}
++
++static int syscon_reboot_mode_probe(struct platform_device *pdev)
++{
++	int ret;
++
++	map = syscon_node_to_regmap(pdev->dev.parent->of_node);
++	if (IS_ERR(map))
++		return PTR_ERR(map);
++	if (of_property_read_u32(pdev->dev.of_node, "offset", &offset))
++		return -EINVAL;
++	ret = reboot_mode_register(&pdev->dev, syscon_reboot_mode_write);
++	if (ret)
++		dev_err(&pdev->dev, "can't register reboot mode\n");
++
++	return ret;
++}
++
++static const struct of_device_id syscon_reboot_mode_of_match[] = {
++	{ .compatible = "syscon-reboot-mode" },
++	{}
++};
++
++static struct platform_driver syscon_reboot_mode_driver = {
++	.probe = syscon_reboot_mode_probe,
++	.driver = {
++		.name = "syscon-reboot-mode",
++		.of_match_table = syscon_reboot_mode_of_match,
++	},
++};
++module_platform_driver(syscon_reboot_mode_driver);
++
++MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com");
++MODULE_DESCRIPTION("SYSCON reboot mode driver");
++MODULE_LICENSE("GPL v2");
+-- 
+1.9.1
