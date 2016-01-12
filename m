@@ -1,52 +1,47 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Tue, 12 Jan 2016 12:35:48 +0000
-Subject: [PATCH V2 3/3] dt-bindings: bsm2835: fix bindings documentation to
- use new clock framework
-In-Reply-To: <1452602149-5875-1-git-send-email-kernel@martin.sperl.org>
-References: <1452602149-5875-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1452602149-5875-4-git-send-email-kernel@martin.sperl.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 12 Jan 2016 12:36:57 +0000
+Subject: [PATCH v3 05/21] arm64: kvm: deal with kernel symbols outside of
+ linear mapping
+In-Reply-To: <1452518355-4606-6-git-send-email-ard.biesheuvel@linaro.org>
+References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1452518355-4606-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160112123656.GC4858@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Sperl <kernel@martin.sperl.org>
+On Mon, Jan 11, 2016 at 02:18:58PM +0100, Ard Biesheuvel wrote:
+> KVM on arm64 uses a fixed offset between the linear mapping at EL1 and
+> the HYP mapping at EL2. Before we can move the kernel virtual mapping
+> out of the linear mapping, we have to make sure that references to kernel
+> symbols that are accessed via the HYP mapping are translated to their
+> linear equivalent.
+> 
+> To prevent inadvertent direct references from sneaking in later, change
+> the type of all extern declarations to HYP kernel symbols to the opaque
+> 'struct kvm_ksym', which does not decay to a pointer type like char arrays
+> and function references. This is not bullet proof, but at least forces the
+> user to take the address explicitly rather than referencing it directly.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-The bcm2835-i2s driver has been updated to use the new clock framework
-for the bcm2835 SOC.
+Cool feature!
 
-This patch documents the required changes to the bindings.
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index 5e377101f919..e3865845d3e1 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -105,24 +105,29 @@
+>  #ifndef __ASSEMBLY__
+>  struct kvm;
+>  struct kvm_vcpu;
+> +struct kvm_ksym;
 
-Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
----
- Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt |    7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+So that one doesn't have to trawl git logs, it might be worth a comment
+as to the purpose of struct kvm_ksym (and thus why we never need to
+actually define it).
 
-diff --git a/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt b/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
-index 65783de..b331f26 100644
---- a/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
-@@ -4,11 +4,10 @@ Required properties:
- - compatible: "brcm,bcm2835-i2s"
- - reg: A list of base address and size entries:
- 	* The first entry should cover the PCM registers
--	* The second entry should cover the PCM clock registers
-+- clocks: the (PCM) clock to use
- - dmas: List of DMA controller phandle and DMA request line ordered pairs.
- - dma-names: Identifier string for each DMA request line in the dmas property.
-   These strings correspond 1:1 with the ordered pairs in dmas.
--
-   One of the DMA channels will be responsible for transmission (should be
-   named "tx") and one for reception (should be named "rx").
- 
-@@ -16,8 +15,8 @@ Example:
- 
- bcm2835_i2s: i2s at 7e203000 {
- 	compatible = "brcm,bcm2835-i2s";
--	reg = <0x7e203000 0x20>,
--	      <0x7e101098 0x02>;
-+	reg = <0x7e203000 0x24>;
-+	clocks = <&clocks BCM2835_CLOCK_PCM>;
- 
- 	dmas = <&dma 2>,
- 	       <&dma 3>;
--- 
-1.7.10.4
+Either way:
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
