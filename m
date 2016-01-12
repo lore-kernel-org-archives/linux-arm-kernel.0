@@ -1,47 +1,145 @@
-From: qiuxishi@huawei.com (Xishi Qiu)
-Date: Tue, 12 Jan 2016 11:32:02 +0800
-Subject: [RFC] arm64: failed when run the command: timedatectl set-timezone
- Asia/Shanghai
-In-Reply-To: <56946932.70601@huawei.com>
-References: <56946932.70601@huawei.com>
-Message-ID: <569473B2.3030909@huawei.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 12 Jan 2016 04:43:52 +0000 (UTC)
+Subject: OMAP baseline test results for v4.4-rc5
+Message-ID: <alpine.DEB.2.02.1601120443070.25857@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/1/12 10:47, Xishi Qiu wrote:
 
-> Failed when run the command: timedatectl set-timezone Asia/Shanghai
-> But CONFIG_PGTABLE_LEVELS=3 is OK, and CONFIG_PGTABLE_LEVELS=4 is failed.
-> The kernel is v4.1, and this command need the lib polikit.
-> 
-> Is this the bug of kernel?
-> 
-> Thanks,
-> Xishi Qiu
+Here are some basic OMAP test results for Linux v4.4-rc5.
+Logs and other details at:
 
-[  241.310558] polkitd[3531]: unhandled level 0 translation fault (11) at 0x7fff9010c040, esr 0x92000004
-[  241.319838] pgd = ffff801fb3e05000
-[  241.323259] [7fff9010c040] *pgd=0000000000000000
+    http://www.pwsan.com/omap/testlogs/test_v4.4-rc5/20151220165226/
 
-[  241.329407] CPU: 0 PID: 3531 Comm: polkitd Not tainted 4.1.12+ #1
-[  241.336312] Hardware name: Huawei Taishan 2160 /BC11SPCA, BIOS 1.12 12/30/2015
-[  241.343566] task: ffff801fb8772f00 ti: ffff80003f454000 task.ti: ffff80003f454000
-[  241.351089] PC is at 0xffff91d281ec
-[  241.354594] LR is at 0xffff91cb5b24
-[  241.358099] pc : [<0000ffff91d281ec>] lr : [<0000ffff91cb5b24>] pstate: 20000000
-[  241.365526] sp : 0000ffffd47a4380
-[  241.368858] x29: 0000ffffd47a47c0 x28: 0000000078e8107e
-[  241.374215] x27: 0000aaaafaf68020 x26: 00007fff9010c040
-[  241.379571] x25: 0000aaaafaf6c2b0 x24: 0000ffff91ed4000
-[  241.384931] x23: 0000000000000005 x22: 0000000000000000
-[  241.390288] x21: 0000000000000000 x20: 0000000000000008
-[  241.395644] x19: 0000ffff91ed4000 x18: 00000000000007df
-[  241.401004] x17: 0000ffff91ed5740 x16: 0000ffff91ce84ec
-[  241.406360] x15: 0000ffffd47a46a0 x14: 0000ffff91c07370
-[  241.411716] x13: 00000000000003d0 x12: 0000ffff92340000
-[  241.417074] x11: 0000000000000000 x10: 0101010101010101
-[  241.422431] x9 : 0000ffff90108218 x8 : 00000000f20217f7
-[  241.427786] x7 : 0000aaaafaf6db40 x6 : 0000ffff90109060
-[  241.433146] x5 : 0000000000000000 x4 : 0000aaaafaf6dc30
-[  241.438502] x3 : 0000000000000001 x2 : 0000000000000008
-[  241.443858] x1 : 0000aaaafaf68020 x0 : 00007fff9010c040
+
+Test summary
+------------
+
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-stk-om44,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
+
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+
+Build warnings from toolchain: uImage:
+    FAIL ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Build warnings from toolchain: uImage+dtb:
+    (none)
+
+Build warnings from toolchain: zImage:
+    FAIL ( 3/17): rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+
+Boot to userspace:
+    FAIL ( 1/17): 2430sdp
+    skip ( 3/17): 5912osk, 3517evm, 5430es2sbct54
+    Pass (13/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
+		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
+		  2420n800
+
+Kernel warnings during boot to userspace:
+    FAIL ( 2/17): 4430es2panda, cmt3517
+
+PM: chip retention via suspend:
+    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
+		  2430sdp, 5430es2uevm
+    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 8/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
+		  3530es3beagle, 3530es31beagle, 2430sdp, 5430es2uevm
+    Pass ( 3/11): 4460pandaes, 3730beaglexm, 3730es12beaglexm
+
+PM: chip off (except CORE, due to errata) via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 2/ 4): 37xxevm, 3530es3beagle
+    Pass ( 2/ 4): 3530es31beagle, 3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    FAIL ( 3/ 4): 37xxevm, 3530es3beagle, 3530es31beagle
+    Pass ( 1/ 4): 3730es12beaglexm
+
+Kernel warnings during PM test:
+    FAIL ( 1/17): 4430es2panda
+
+Obsolete Kconfig symbols:
+    FAIL ( 3/20): omap1_defconfig, omap2plus_defconfig,
+		  multi_v7_defconfig
+
+
+vmlinux object size
+(delta in bytes from test_v4.4-rc4 (527e9316f8ec44bd53d90fb9f611fa7ffff52bb9)):
+   text     data      bss    total  kernel
+    +52        0        0      +52  omap1_defconfig
+    +84        0        0      +84  omap1_defconfig_1510innovator_only
+    +52        0        0      +52  omap1_defconfig_5912osk_only
+  +5843     +448        0    +6291  multi_v7_defconfig
+  +6719     +128      -64    +6783  omap2plus_defconfig
+  +2411      +32      -32    +2411  omap2plus_defconfig_2430sdp_only
+  +2571      +64      -64    +2571  omap2plus_defconfig_am33xx_only
+  +2507      +64      -64    +2507  omap2plus_defconfig_am43xx_only
+  +2559     +128      -64    +2623  omap2plus_defconfig_cpupm
+  +6603      +64      -64    +6603  omap2plus_defconfig_dra7xx_only
+  +2203      +64      -32    +2235  omap2plus_defconfig_n800_multi_omap2xxx
+   +467      +96        0     +563  omap2plus_defconfig_n800_only_a
+  +2559     +128      -64    +2623  omap2plus_defconfig_no_pm
+  +2623      +64      -64    +2623  omap2plus_defconfig_omap2_4_only
+  +2511      +64      -64    +2511  omap2plus_defconfig_omap3_4_only
+  +2507      +64      -64    +2507  omap2plus_defconfig_omap5_only
+   +144      +64      -64     +144  rmk_omap3430_ldp_allnoconfig
+   +199     +128        0     +327  rmk_omap3430_ldp_oldconfig
+  +1692     +164     -544    +1312  rmk_omap4430_sdp_allnoconfig
+   +343      +64        0     +407  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v4.4-rc4 (527e9316f8ec44bd53d90fb9f611fa7ffff52bb9))
+  avail  rsrvd   high  freed  board          kconfig
+    -8k     8k      .      .  2430sdp        omap2plus_defconfig
+    -8k     8k      .      .  3530es31beagle omap2plus_defconfig
+    -8k     8k      .      .  3530es3beagle  omap2plus_defconfig
+    -8k     8k      .      .  3730beaglexm   omap2plus_defconfig
+    -8k     8k      .      .  3730es12beaglexmomap2plus_defconfig
+    -8k     8k      .      .  37xxevm        omap2plus_defconfig
+    -8k     8k      .      .  4430es2panda   omap2plus_defconfig
+    -8k     8k      .      .  4460pandaes    omap2plus_defconfig
+    -8k     8k      .      .  4460varsomom   omap2plus_defconfig
+    -8k     8k      .      .  5430es2uevm    omap2plus_defconfig
+   -16k    16k      .      .  am335xbonelt   omap2plus_defconfig
