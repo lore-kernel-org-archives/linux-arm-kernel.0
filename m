@@ -1,41 +1,47 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 12 Jan 2016 10:52:08 -0600
-Subject: [PATCH] arm: omap2plus_defconfig: enable SPLIT and DWARF4
-In-Reply-To: <20160111233438.GB12777@atomide.com>
-References: <1452547572-23515-1-git-send-email-balbi@ti.com>
- <20160111233438.GB12777@atomide.com>
-Message-ID: <87mvsad9l3.fsf@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 12 Jan 2016 17:06:50 +0000
+Subject: [PATCH v2] arm64: Store breakpoint single step state into pstate
+In-Reply-To: <568B4F47.5080307@huawei.com>
+References: <1450860731-194418-1-git-send-email-wangnan0@huawei.com>
+ <1450921362-198371-1-git-send-email-wangnan0@huawei.com>
+ <20160104165535.GI1616@arm.com> <568B4F47.5080307@huawei.com>
+Message-ID: <20160112170650.GI15737@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jan 05, 2016 at 01:06:15PM +0800, Wangnan (F) wrote:
+> On 2016/1/5 0:55, Will Deacon wrote:
+> >The problem seems to be that we take the debug exception before the
+> >breakpointed instruction has been executed and call perf_bp_event at
+> >that moment, so when we single-step the faulting instruction we actually
+> >step into the SIGIO handler and end up getting stuck.
+> >
+> >Your fix doesn't really address this afaict, in that you don't (can't?)
+> >handle:
+> >
+> >   * A longjmp out of a signal handler
+> >   * A watchpoint and a breakpoint that fire on the same instruction
+> >   * User-controlled single-step from a signal handler that enables a
+> >     breakpoint explicitly
+> >   * Nested signals
+> 
+> Please have a look at [1], which I improve test__bp_signal() to
+> check bullet 2 and 4 you mentioned above. Seems my fix is correct.
+> 
+> [1] http://lkml.kernel.org/g/1451969880-14877-1-git-send-email-wangnan0 at huawei.com
 
-Hi,
+I'm still really uneasy about this change. Pairing up the signal delivery
+with the sigreturn to keep track of the debug state is extremely fragile
+and I'm not keen on adding this logic there. I also think we need to
+track the address that the breakpoint is originally taken on so that we
+can only perform the extra sigreturn work if we're returning to the same
+instruction. Furthermore, I wouldn't want to do this for signals other
+than those generated directly by a breakpoint.
 
-Tony Lindgren <tony@atomide.com> writes:
-> * Felipe Balbi <balbi@ti.com> [160111 13:26]:
->> CONFIG_DEBUG_INFO_SPLIT will split debug info on
->> .dwo files. This will generate a smaller vmlinux and
->> smaller .ko modules, which will be easier to ship on
->> certain products.
->> 
->> CONFIG_DEBUG_INFO_DWARF4 will generate debug info in
->> DWARF4 format, which ends up being larger, but
->> improves the probability of resolving variables in
->> optmized code.
->
-> Nice, this makes my initramfs go down from about 17MB
-> to 4.7 MB :)
+An alternative would be to postpone the signal delivery until after the
+stepping has been taken care of, but that's a change in ABI and I worry
+we'll break somebody relying on the current behaviour.
 
-That's nice, let's just hope nobody has issues with this patch.
+What exactly does x86 do? I couldn't figure it out from the code.
 
-cheers
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160112/9e4b631d/attachment.sig>
+Will
