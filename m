@@ -1,122 +1,47 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Tue, 12 Jan 2016 19:23:59 +0100
-Subject: [PATCH] arm64: KVM: Fix AArch64 guest userspace exception
- injection
-In-Reply-To: <1452157416-9435-1-git-send-email-marc.zyngier@arm.com>
-References: <1452157416-9435-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160112182359.GA5795@hawk.localdomain>
+From: tphan@apm.com (Tuan Phan)
+Date: Tue, 12 Jan 2016 10:26:04 -0800
+Subject: [PATCH v3 1/2] acpi: Fix proper return code for function
+ acpi_gsi_to_irq
+In-Reply-To: <20160112143653.GB30558@pd.tnic>
+References: <1446857519-5908-1-git-send-email-lho@apm.com>
+ <1446857519-5908-2-git-send-email-lho@apm.com>
+ <20160110110714.GA22896@pd.tnic>
+ <CAGDN=zYa1r23EphdYQTFe2YXRhg_P-RDiaZVms9rdbFA3Y-x3g@mail.gmail.com>
+ <20160111221305.GH4665@pd.tnic>
+ <CAGDN=zZOr6+q8aAdXB3gnSLfCm6gX-6KLaFPr+A4QMf+TPwR-w@mail.gmail.com>
+ <20160112143653.GB30558@pd.tnic>
+Message-ID: <CAGDN=za9Pjm0B0OMJevgesBdkm=XOGyU7jXXfWqk+dLSo7BVtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 07, 2016 at 09:03:36AM +0000, Marc Zyngier wrote:
-> At the moment, our fault injection is pretty limited. We always
-> generate a SYNC exception into EL1, as if the fault was actually
-> from EL1h, no matter how it was generated.
-> 
-> This is obviously wrong, as EL0 can generate faults of its own
-> (not to mention the pretty-much unused EL1t mode).
-> 
-> This patch fixes it by implementing section D1.10.2 of the ARMv8 ARM,
-> and in particular table D1-7 ("Vector offsets from vector table base
-> address"), which describes which vector to use depending on the source
-> exception level and type (synchronous, IRQ, FIQ or SError).
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/inject_fault.c | 38 +++++++++++++++++++++++++++++++++++---
->  1 file changed, 35 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
-> index 648112e..4d1ac81 100644
-> --- a/arch/arm64/kvm/inject_fault.c
-> +++ b/arch/arm64/kvm/inject_fault.c
-> @@ -27,7 +27,11 @@
->  
->  #define PSTATE_FAULT_BITS_64 	(PSR_MODE_EL1h | PSR_A_BIT | PSR_F_BIT | \
->  				 PSR_I_BIT | PSR_D_BIT)
-> -#define EL1_EXCEPT_SYNC_OFFSET	0x200
-> +
-> +#define CURRENT_EL_SP_EL0_VECTOR	0x0
-> +#define CURRENT_EL_SP_ELx_VECTOR	0x200
-> +#define LOWER_EL_AArch64_VECTOR		0x400
-> +#define LOWER_EL_AArch32_VECTOR		0x600
->  
->  static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
->  {
-> @@ -97,6 +101,34 @@ static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
->  		*fsr = 0x14;
->  }
->  
-> +enum exception_type {
-> +	except_type_sync	= 0,
-> +	except_type_irq		= 0x80,
-> +	except_type_fiq		= 0x100,
-> +	except_type_serror	= 0x180,
-> +};
-> +
-> +static u64 get_except_vector(struct kvm_vcpu *vcpu, enum exception_type type)
-> +{
-> +	u64 exc_offset;
-> +
-> +	switch (*vcpu_cpsr(vcpu) & (PSR_MODE_MASK | PSR_MODE32_BIT)) {
-> +	case PSR_MODE_EL1t:
-> +		exc_offset = CURRENT_EL_SP_EL0_VECTOR;
-> +		break;
-> +	case PSR_MODE_EL1h:
-> +		exc_offset = CURRENT_EL_SP_ELx_VECTOR;
-> +		break;
-> +	case PSR_MODE_EL0t:
-> +		exc_offset = LOWER_EL_AArch64_VECTOR;
-> +		break;
-> +	default:
-> +		exc_offset = LOWER_EL_AArch32_VECTOR;
-> +	}
-> +
-> +	return vcpu_sys_reg(vcpu, VBAR_EL1) + exc_offset + type;
-> +}
-> +
->  static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr)
->  {
->  	unsigned long cpsr = *vcpu_cpsr(vcpu);
-> @@ -108,8 +140,8 @@ static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr
->  	*vcpu_spsr(vcpu) = cpsr;
->  	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
->  
-> +	*vcpu_pc(vcpu) = get_except_vector(vcpu, except_type_sync);
->  	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
-> -	*vcpu_pc(vcpu) = vcpu_sys_reg(vcpu, VBAR_EL1) + EL1_EXCEPT_SYNC_OFFSET;
->  
->  	vcpu_sys_reg(vcpu, FAR_EL1) = addr;
->  
-> @@ -143,8 +175,8 @@ static void inject_undef64(struct kvm_vcpu *vcpu)
->  	*vcpu_spsr(vcpu) = cpsr;
->  	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
->  
-> +	*vcpu_pc(vcpu) = get_except_vector(vcpu, except_type_sync);
->  	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
-> -	*vcpu_pc(vcpu) = vcpu_sys_reg(vcpu, VBAR_EL1) + EL1_EXCEPT_SYNC_OFFSET;
->  
->  	/*
->  	 * Build an unknown exception, depending on the instruction
+On Tue, Jan 12, 2016 at 6:36 AM, Borislav Petkov <bp@alien8.de> wrote:
+> On Mon, Jan 11, 2016 at 02:41:41PM -0800, Tuan Phan wrote:
+>> It will be problem because irq number can be 0 on X86?
+>
+> tglx says not really but historically irq 0 has been the timer irq.
+>
+> How about returning a negative value on error and positive or 0 for an
+> IRQ?
+>
 
-Hi Marc,
+That's exactly the patch tries to do:
+int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+@@ -56,7 +56,7 @@ int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+         * *irq == 0 means no mapping, that should
+         * be reported as a failure
+         */
+-       return (*irq > 0) ? *irq : -EINVAL;
++       return (*irq > 0) ? 0 : -EINVAL;
+ }
 
-Please shoot me if the following statement is false.
+So are you good with it?
 
-Without this patch, if a guest that is running in, e.g. PSR_MODE_EL0t,
-tries to do, e.g. 'smc #0', then KVM will inject an undef exception,
-which should lead to the guest resuming at VBAR_EL1 + 0x400, but instead
-it resumes at VBAR_EL1 + 0x200.
-
-Now, if you haven't started loading your gun to shoot me yet, then I'm
-quite confused as to why the unit test[1] I wrote for this works just
-fine without this patch.
-
-(If you're suspicious of the vector table in kvm-unit-tests, take a
- look at the bottom of [2] to see it.)
-
-Thanks,
-drew
-
-[1] https://github.com/rhdrjones/kvm-unit-tests/blob/arm64/test-exinj/arm/test-exinj.c
-[2] https://github.com/rhdrjones/kvm-unit-tests/blob/arm64/test-exinj/arm/cstart64.S
+-- 
+CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, is 
+for the sole use of the intended recipient(s) and contains information that 
+is confidential and proprietary to Applied Micro Circuits Corporation or 
+its subsidiaries. It is to be used solely for the purpose of furthering the 
+parties' business relationship. All unauthorized review, use, disclosure or 
+distribution is prohibited. If you are not the intended recipient, please 
+contact the sender by reply e-mail and destroy all copies of the original 
+message.
