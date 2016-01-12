@@ -1,51 +1,81 @@
-From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
-Date: Tue, 12 Jan 2016 15:47:09 -0800
-Subject: [PATCHv2] net: bpf: reject invalid shifts
-In-Reply-To: <1452641302.1223.35.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <20160112185121.GA34045@ast-mbp.thefacebook.com>
- <1452626228-15742-1-git-send-email-rabin@rab.in>
- <1452628118.1223.25.camel@edumazet-glaptop2.roam.corp.google.com>
- <20160112195356.GA34598@ast-mbp.thefacebook.com>
- <5695653F.6030001@iogearbox.net>
- <20160112204620.GA35080@ast-mbp.thefacebook.com>
- <1452641302.1223.35.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <20160112234707.GA36167@ast-mbp.thefacebook.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 12 Jan 2016 15:54:32 -0800
+Subject: [PATCHv2] arm64: Allow vmalloc regions to be set with set_memory_*
+In-Reply-To: <1452640955-25491-1-git-send-email-labbott@fedoraproject.org>
+References: <1452640955-25491-1-git-send-email-labbott@fedoraproject.org>
+Message-ID: <CAGXu5jJgYqkEkmfRdtgbtns=EyHc2UvzhkLFGgsYTTB3EKXJDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 03:28:22PM -0800, Eric Dumazet wrote:
-> On Tue, 2016-01-12 at 12:46 -0800, Alexei Starovoitov wrote:
-> > On Tue, Jan 12, 2016 at 09:42:39PM +0100, Daniel Borkmann wrote:
-> 
-> > > >yep and we all know who was able to code hundreds of cBPF insns by hand ;)
-> > > >But I'm sure that code doesn't have such broken shifts. :)))
-> > > 
-> > > libpcap certainly supports raw filters now thanks to Chema [1]. Alternative
-> > > could be to just mask them here, but not in eBPF verifier, but that would be
-> > > even more inconsistent (on the other hand, we also allow holes in BPF but not
-> > > in eBPF, so wouldn't be the first time we make things different), hmm.
-> > 
-> > I would rather see broken classic bpf program fixed instead of continue
-> > running them with undefined behavior.
-> 
-> This is your choice, because you are a developer.
-> 
-> Some people might be stuck with old software they can not update,
-> because they do not have the money to pay developers.
-> 
-> And no, I did not code BPF programs like that, but maybe others did, and
-> I feel the pain of customers that might be stuck.
-> 
-> Linus Torvalds always made clear we must provide backward compatibility,
-> and really this discussion should not even take place.
-> 
-> As I said, we used to load such BPF program in the past.
-> 
-> The fact that ARM64 crashes because of a faulty JIT implementation is
-> not an excuse.
+On Tue, Jan 12, 2016 at 3:22 PM, Laura Abbott <labbott@fedoraproject.org> wrote:
+>
+> The range of set_memory_* is currently restricted to the module address
+> range because of difficulties in breaking down larger block sizes.
+> vmalloc maps PAGE_SIZE pages so it is safe to use as well. Update the
+> function ranges and add a comment explaining why the range is restricted
+> the way it is.
+>
+> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
 
-I would agree if those loaded programs would do something sensible,
-but they're broken. As shown arm and arm64 would execute them
-differently without JIT, because HW treats such shifts differently.
-I also checked that libpcap is sane and doesn't generate broken shifts.
-imo we're not breaking backward compatiblity here.
+Acked-by: Kees Cook <keescook@chromium.org>
+
+-Kees
+
+> ---
+> v2: Old version was sent out with vmalloc warnings. Sorry for the noise.
+> ---
+>  arch/arm64/mm/pageattr.c | 25 +++++++++++++++++++++----
+>  1 file changed, 21 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+> index 3571c73..88c8e54 100644
+> --- a/arch/arm64/mm/pageattr.c
+> +++ b/arch/arm64/mm/pageattr.c
+> @@ -36,6 +36,26 @@ static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
+>         return 0;
+>  }
+>
+> +static bool validate_addr(unsigned long start, unsigned long end)
+> +{
+> +       /*
+> +        * This check explicitly excludes most kernel memory. Most kernel
+> +        * memory is mapped with a larger page size and breaking down the
+> +        * larger page size without causing TLB conflicts is very difficult.
+> +        *
+> +        * If you need to call set_memory_* on a range, the recommendation is
+> +        * to use vmalloc since that range is mapped with pages.
+> +        */
+> +       if (start >= MODULES_VADDR && start < MODULES_END &&
+> +           end >= MODULES_VADDR && end < MODULES_END)
+> +               return true;
+> +
+> +       if (is_vmalloc_addr((void *)start) && is_vmalloc_addr((void *)end))
+> +               return true;
+> +
+> +       return false;
+> +}
+> +
+>  static int change_memory_common(unsigned long addr, int numpages,
+>                                 pgprot_t set_mask, pgprot_t clear_mask)
+>  {
+> @@ -51,10 +71,7 @@ static int change_memory_common(unsigned long addr, int numpages,
+>                 WARN_ON_ONCE(1);
+>         }
+>
+> -       if (start < MODULES_VADDR || start >= MODULES_END)
+> -               return -EINVAL;
+> -
+> -       if (end < MODULES_VADDR || end >= MODULES_END)
+> +       if (!validate_addr(start, end))
+>                 return -EINVAL;
+>
+>         data.set_mask = set_mask;
+> --
+> 2.5.0
+>
+
+
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
