@@ -1,67 +1,25 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Tue, 12 Jan 2016 15:49:43 +0530
-Subject: [PATCH V6 0/6] i2c: qup: Add support for v2 tags and bam dma
-In-Reply-To: <1452588233-1803-1-git-send-email-sricharan@codeaurora.org>
-References: <1452588233-1803-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <5694D33F.7040205@codeaurora.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 12 Jan 2016 11:22:04 +0100
+Subject: [PATCH v3 5/6] reset: mediatek: Add MT2701 reset controller
+ dt-binding file
+In-Reply-To: <1452587470-61506-6-git-send-email-jamesjj.liao@mediatek.com>
+References: <1452587470-61506-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1452587470-61506-6-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1452594124.4292.16.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am Dienstag, den 12.01.2016, 16:31 +0800 schrieb James Liao:
+> From: Shunli Wang <shunli.wang@mediatek.com>
+> 
+> Dt-binding file about reset controller is used to provide
+> kinds of definition, which is referenced by dts file and
+> IC-specified reset controller driver code.
+> 
+> Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
 
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-On 01/12/2016 02:13 PM, Sricharan R wrote:
-> i2c: qup: Add support for v2 tags and bam dma
->
-> QUP from version 2.1.1 onwards, supports a new format of i2c command tags.
-> Tag codes instructs the controller to perform a operation like read/write.
-> This new tagging version supports and is required for adding bam dma
-> capabilities. V2 tags supports transfer of more than 256 bytes in a single i2c
-> transaction. Also adding bam dma support facilitates transferring each i2c_msg
-> in i2c_msgs without a 'stop' bit in between which is required for some of
-> the clients.
->
-> Tested this series on apq8074 dragon board eeprom client on i2c bus1
->
-> [V6] Added review tags and fixed a checkpatch warning in patch 4/6.
->
-> [V5] Addressed few more comments from Ivan T. Ivanov.
->       Squashed patch 2 and 3 as no point in having only few lines of
->       common code between v1 and v2 tags for increased complexity.
->       Couple of non functional review comments fixes in patch 3, 4.
->       Added a change in patch 4 to have proper transfer completion in
->       a corner case. patch 5, 6 unchanged.
->
-> [V4] Added a patch to factor out some common code.
->       Removed support for freq > 400KHZ as per comments.
->       Addressed comments from Ivan T. Ivanov to keep the code for
->       V2 support in a separate path.
->       Changed the authorship of V2 tags support patch.
->
-> [V3] Added support to coalesce each i2c_msg in i2c_msgs for fifo and
->       block mode in Patch 2. Also addressed further code comments.
->
->       http://comments.gmane.org/gmane.linux.drivers.i2c/22497
->
-> [V2] Addressed comments from Ivan T. Ivanov, Andy Gross [v1] Initial Version
-
-For the series:
-
-Tested-by: Archit Taneja <architt@codeaurora.org>
-
->
-> Sricharan R (6):
->    i2c: qup: Change qup_wait_writeready function to use for all timeouts
->    i2c: qup: Add V2 tags support
->    i2c: qup: Transfer each i2c_msg in i2c_msgs without a stop bit
->    i2c: qup: Add bam dma capabilities
->    dts: msm8974: Add blsp2_bam dma node
->    dts: msm8974: Add dma channels for blsp2_i2c1 node
->
->   arch/arm/boot/dts/qcom-msm8974.dtsi |  14 +-
->   drivers/i2c/busses/i2c-qup.c        | 922 ++++++++++++++++++++++++++++++++++--
->   2 files changed, 887 insertions(+), 49 deletions(-)
->
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
-Forum, hosted by The Linux Foundation
+regards
+Philipp
