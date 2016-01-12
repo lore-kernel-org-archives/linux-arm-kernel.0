@@ -1,16 +1,57 @@
-From: qiuxishi@huawei.com (Xishi Qiu)
-Date: Tue, 12 Jan 2016 10:47:14 +0800
-Subject: [RFC] arm64: failed when run the command: timedatectl set-timezone
- Asia/Shanghai
-Message-ID: <56946932.70601@huawei.com>
+From: pc.liao@mediatek.com (PC Liao)
+Date: Tue, 12 Jan 2016 10:54:44 +0800
+Subject: [PATCH] ASoC: mediatek: Enable 33bit memory address to support
+ 4GB DRAM
+In-Reply-To: <s5hwprgcwv6.wl-tiwai@suse.de>
+References: <1452499250-5202-1-git-send-email-pc.liao@mediatek.com>
+ <s5hwprgcwv6.wl-tiwai@suse.de>
+Message-ID: <1452567284.8331.12.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Failed when run the command: timedatectl set-timezone Asia/Shanghai
-But CONFIG_PGTABLE_LEVELS=3 is OK, and CONFIG_PGTABLE_LEVELS=4 is failed.
-The kernel is v4.1, and this command need the lib polikit.
+On Mon, 2016-01-11 at 17:02 +0800, Takashi Iwai wrote:
+> On Mon, 11 Jan 2016 09:00:50 +0100,
+> PC Liao wrote:
+> > 
+> > @@ -603,7 +606,10 @@ static int mtk_afe_dais_hw_params(struct snd_pcm_substream *substream,
+> >  	if (ret < 0)
+> >  		return ret;
+> >  
+> > -	memif->phys_buf_addr = substream->runtime->dma_addr;
+> > +	if (sizeof(dma_addr_t) > 4)
+> > +		msb_at_bit33 = (substream->runtime->dma_addr & 0x100000000) ? 1 : 0;
+> 
+> Better to put a proper suffix for the constant over 32bit.
+> 
+> Or use upper_32_bits().  Then sizeof() check can be omitted, as the
+> compiler should be smart enough to know it beforehand.
+> 
+> 
+> Takashi
 
-Is this the bug of kernel?
 
-Thanks,
-Xishi Qiu
+Hi Takashi,
+
+Thanks for your comment.
+I change as below:
+@@ -606,10 +606,8 @@ static int mtk_afe_dais_hw_params(struct
+snd_pcm_substream
+        if (ret < 0)
+                return ret;
+
+-       if (sizeof(dma_addr_t) > 4)
+-               msb_at_bit33 = (substream->runtime->dma_addr &
+0x100000000) ? 1
+-
+-       memif->phys_buf_addr = substream->runtime->dma_addr &
+0xffffffff;
++       msb_at_bit33 = upper_32_bits(substream->runtime->dma_addr) ? 1 :
+0;
++       memif->phys_buf_addr =
+lower_32_bits(substream->runtime->dma_addr);
+
+
+Dose this change follow your idea?
+Thanks! 
+
+PC Liao
