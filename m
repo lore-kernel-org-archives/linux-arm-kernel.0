@@ -1,12 +1,48 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Tue, 12 Jan 2016 18:21:17 +0100
-Subject: [PATCH 0/14] ARM: dts: imx6ul: add more functionality to i.MX6UL
-Message-ID: <1452619291-13625-1-git-send-email-LW@KARO-electronics.de>
+Date: Tue, 12 Jan 2016 18:21:20 +0100
+Subject: [PATCH 03/14] ARM: dts: imx6ul: move dt-bindings/input/input.h
+ include to dtsi file
+In-Reply-To: <1452619291-13625-3-git-send-email-LW@KARO-electronics.de>
+References: <1452619291-13625-1-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-2-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-3-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1452619291-13625-4-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds more functionality to the i.MX6UL machines.
+imx6ul.dtsi references the macro 'KEY_POWER' from
+dt-bindings/input/input.h. Thus, move the include statement for this
+file from imx6ul-14x14-evk.dts to imx6ul.dtsi itself.
 
-The first thre patches are cleanup patches with no functional changes
-intended.
-The other patches make various subsystems functional.
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/boot/dts/imx6ul-14x14-evk.dts | 1 -
+ arch/arm/boot/dts/imx6ul.dtsi          | 1 +
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+index 6aaa5ec..a6f459a 100644
+--- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
++++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+@@ -8,7 +8,6 @@
+ 
+ /dts-v1/;
+ 
+-#include <dt-bindings/input/input.h>
+ #include "imx6ul.dtsi"
+ 
+ / {
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index 7e27d76..e4c3a80 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -8,6 +8,7 @@
+ 
+ #include <dt-bindings/clock/imx6ul-clock.h>
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include "imx6ul-pinfunc.h"
+ #include "skeleton.dtsi"
+-- 
+2.1.4
