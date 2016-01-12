@@ -1,39 +1,97 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Jan 2016 15:05:20 +0100
-Subject: [PATCH] kbuild: Demote 'sign-compare' warning to W=2
-In-Reply-To: <1452605519-26797-1-git-send-email-lee.jones@linaro.org>
-References: <1452605519-26797-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <5357543.n41BTU6AbM@wuerfel>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 12 Jan 2016 15:12:07 +0100
+Subject: [PATCH v6 1/6] arm/arm64: KVM: Introduce armv7 fp/simd vcpu
+ fields and helpers
+In-Reply-To: <56943D29.3000002@samsung.com>
+References: <1451166900-3711-1-git-send-email-m.smarduch@samsung.com>
+ <1451166900-3711-2-git-send-email-m.smarduch@samsung.com>
+ <20160110163204.GD30867@cbox> <56943D29.3000002@samsung.com>
+Message-ID: <20160112141207.GF15554@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 January 2016 13:31:59 Lee Jones wrote:
-> Ideally, a kernel compile with W=1 enabled should complete cleanly;
-> however, when we run one currently we are presented with ~25k warnings.
-> 'sign-compare' accounts for ~22k of those ~25k.
+On Mon, Jan 11, 2016 at 03:39:21PM -0800, Mario Smarduch wrote:
 > 
-> In this patch we're demoting 'sign-compare' warnings to W=2, with a view
-> to fixing the remaining 3k W=1 warnings required for a clean build.
 > 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> On 1/10/2016 8:32 AM, Christoffer Dall wrote:
+> > Hi Mario,
+> > 
+> > I spotted one more potential issue...
+> > 
+> > On Sat, Dec 26, 2015 at 01:54:55PM -0800, Mario Smarduch wrote:
+> >> Add helper functions to enable access to fp/smid on guest entry and save host
+> >> fpexc on vcpu put, check if fp/simd registers are dirty and add new vcpu
+> >> fields.
+> >>
+> >> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> >> ---
+> >>  arch/arm/include/asm/kvm_emulate.h   | 42 ++++++++++++++++++++++++++++++++++++
+> >>  arch/arm/include/asm/kvm_host.h      |  6 ++++++
+> >>  arch/arm64/include/asm/kvm_emulate.h |  8 +++++++
+> >>  3 files changed, 56 insertions(+)
+> >>
+> >> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+> >> index 3095df0..d4d9da1 100644
+> >> --- a/arch/arm/include/asm/kvm_emulate.h
+> >> +++ b/arch/arm/include/asm/kvm_emulate.h
+> >> @@ -24,6 +24,8 @@
+> >>  #include <asm/kvm_mmio.h>
+> >>  #include <asm/kvm_arm.h>
+> >>  #include <asm/cputype.h>
+> >> +#include <asm/vfp.h>
+> >> +#include "../vfp/vfpinstr.h"
+> >>  
+> >>  unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
+> >>  unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
+> >> @@ -255,4 +257,44 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+> >>  	}
+> >>  }
+> >>  
+> >> +#ifdef CONFIG_VFPv3
+> >> +/* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
+> >> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
+> >> +{
+> >> +	u32 fpexc;
+> >> +
+> >> +	/* Save host fpexc, and enable guest access to fp unit */
+> >> +	fpexc = fmrx(FPEXC);
+> >> +	vcpu->arch.host_fpexc = fpexc;
+> >> +	fpexc |= FPEXC_EN;
+> >> +	fmxr(FPEXC, fpexc);
+> >> +
+> >> +	/* Configure HCPTR to trap on tracing and fp/simd access */
+> >> +	vcpu->arch.hcptr = HCPTR_TTA | HCPTR_TCP(10)  | HCPTR_TCP(11);
+> >> +}
+> >> +
+> >> +/* Called from vcpu_put - restore host fpexc */
+> >> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu)
+> >> +{
+> >> +	fmxr(FPEXC, vcpu->arch.host_fpexc);
+> >> +}
+> >> +
+> >> +/* If trap bits are reset then fp/simd registers are dirty */
+> >> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
+> >> +{
+> >> +	return !(vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
+> >> +}
+> >> +#else
+> >> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
+> >> +{
+> >> +	vcpu->arch.hcptr = HCPTR_TTA;
+> > 
+> > Is it correct not to trap VFP registers when the host kernel does not
+> > have CONFIG_VFPv3?  I think this is a change in functionality compared
+> > to the current kernels is it not?
+> 
+> With CPU_V7 VFPv3 gets selected, without it fp should be emulated,
+> with exceptions taken in guest kernel. I don't see a reason why
+> fp hcptr access should be enabled in that case.
 > 
 
-As per our discussion, I'd add that this was inadvertedly introduced
-by Behan when he moved the clang specific warnings into an ifdef block
-and did not notice that -Wsign-compare was interpreted by both gcc
-and clang.
+If you have to guests with CONFIG_VFPV3 but your host doesn't have
+CONFIG_VFPV3, you will never context-switch the VFP registers between
+the two VMs, and mayhem will ensue.
 
-Earlier, it was introduced in just the same way by Jan-Simon as part
-of 3d3d6b847420 ("kbuild: LLVMLinux: Adapt warnings for compilation with clang").
+Unless I'm missing something very obvious?
 
-The new patch looks good to me, please add
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 26ea6bb1fef0 ("kbuild, LLVMLinux: Supress warnings unless W=1-3")
-
-I've started looking into building the kernel with clang, and will likely
-follow up with further unrelated changes to the list, as clang-3.9
-seems to generate a couple of extra warnings we want to suppress.
-
-	Arnd
+-Christoffer
