@@ -1,29 +1,40 @@
-From: tphan@apm.com (Tuan Phan)
-Date: Tue, 12 Jan 2016 12:01:42 -0800
-Subject: [PATCH v3 1/2] acpi: Fix proper return code for function
- acpi_gsi_to_irq
-In-Reply-To: <569554D0.2000406@arm.com>
-References: <1446857519-5908-1-git-send-email-lho@apm.com>
- <1446857519-5908-2-git-send-email-lho@apm.com>
- <56954D18.1010306@arm.com>
- <CAGDN=zYVvU9=Qj8_szqYW3qh7G=phr_Bc_dm8+KVO=yhp=YTVQ@mail.gmail.com>
- <569554D0.2000406@arm.com>
-Message-ID: <CAGDN=zY5wVwOC=o8f1nmYyUrgo5gdRVgB7W1jsKu0RKyazp+BA@mail.gmail.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Tue, 12 Jan 2016 22:07:33 +0200
+Subject: [PATCH 2/2] ARM: DTS: kirkwood-openrd: fix SD slot default
+ configuration
+In-Reply-To: <1452629253-21748-1-git-send-email-aaro.koskinen@iki.fi>
+References: <1452629253-21748-1-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <1452629253-21748-2-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 11:32 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Right. In which case please document this properly in the commit log.
->
+The SD card slot was enabled by default with legacy booting.
+It does not work anymore with DT boot. Fix by providing GPIO configuration
+that matches the old default.
 
-Do we need to post a new patch with updated description or wait Rafael's input?
+Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+---
+ arch/arm/boot/dts/kirkwood-openrd.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
+diff --git a/arch/arm/boot/dts/kirkwood-openrd.dtsi b/arch/arm/boot/dts/kirkwood-openrd.dtsi
+index 2a3dafd..f65b727 100644
+--- a/arch/arm/boot/dts/kirkwood-openrd.dtsi
++++ b/arch/arm/boot/dts/kirkwood-openrd.dtsi
+@@ -65,6 +65,14 @@
+ 			status = "okay";
+ 			cd-gpios = <&gpio0 29 9>;
+ 		};
++		gpio at 10140 {
++			p2 {
++				gpio-hog;
++				gpios = <2 GPIO_ACTIVE_HIGH>;
++				output-high; /* Select SD by default */
++				line-name = "SelUARTorSD";
++			};
++		};
+ 	};
+ };
+ 
 -- 
-CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, is 
-for the sole use of the intended recipient(s) and contains information that 
-is confidential and proprietary to Applied Micro Circuits Corporation or 
-its subsidiaries. It is to be used solely for the purpose of furthering the 
-parties' business relationship. All unauthorized review, use, disclosure or 
-distribution is prohibited. If you are not the intended recipient, please 
-contact the sender by reply e-mail and destroy all copies of the original 
-message.
+2.4.0
