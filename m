@@ -1,64 +1,78 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Tue, 12 Jan 2016 10:03:13 +0800
-Subject: [PATCH v3 1/3] dt-bindings: add power-domain header for RK3368
- SoCs
-In-Reply-To: <1452508600-3512-2-git-send-email-zhangqing@rock-chips.com>
-References: <1452508600-3512-1-git-send-email-zhangqing@rock-chips.com>
- <1452508600-3512-2-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <56945EE1.6020602@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 12 Jan 2016 10:06:13 +0800
+Subject: [PATCH v6 4/9] mfd: axp20x: Split the driver into core and i2c
+ bits
+In-Reply-To: <20160111092530.GL14104@x1>
+References: <1450283538-25067-1-git-send-email-wens@csie.org>
+ <1450283538-25067-5-git-send-email-wens@csie.org> <20160111092530.GL14104@x1>
+Message-ID: <CAGb2v65hCaCJAhBvuLugfD=5mzFQdMfktOTwbCO_CM04UtYemw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi,
 
-? 2016?01?11? 18:36, zhangqing ??:
-> According to a description from TRM, add all the power domains.
+On Mon, Jan 11, 2016 at 5:25 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 17 Dec 2015, Chen-Yu Tsai wrote:
 >
-> Signed-off-by: zhangqing <zhangqing@rock-chips.com>
-
-Reviewed-by: Caesar Wang <wxt@rock-chips.com>
-
-> ---
->   include/dt-bindings/power/rk3368-power.h | 28 ++++++++++++++++++++++++++++
->   1 file changed, 28 insertions(+)
->   create mode 100644 include/dt-bindings/power/rk3368-power.h
+>> The axp20x driver assumes the device is i2c based. This is not the
+>> case with later chips, which use a proprietary 2 wire serial bus
+>> by Allwinner called "Reduced Serial Bus".
+>>
+>> This patch follows the example of mfd/wm831x and splits it into
+>> an interface independent core, and an i2c specific glue layer.
+>> MFD_AXP20X and the new MFD_AXP20X_I2C are changed to tristate
+>> symbols, allowing the driver to be built as modules.
+>>
+>> Whitespace and other style errors in the moved i2c specific code
+>> have been fixed. Included but unused header files are removed as
+>> well.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  drivers/mfd/Kconfig        |  14 ++++---
+>>  drivers/mfd/Makefile       |   1 +
+>>  drivers/mfd/axp20x-i2c.c   | 102 +++++++++++++++++++++++++++++++++++++++++++++
+>>  drivers/mfd/axp20x.c       |  88 +++++++-------------------------------
+>>  include/linux/mfd/axp20x.h |  33 ++++++++++++++-
+>>  5 files changed, 158 insertions(+), 80 deletions(-)
+>>  create mode 100644 drivers/mfd/axp20x-i2c.c
 >
-> diff --git a/include/dt-bindings/power/rk3368-power.h b/include/dt-bindings/power/rk3368-power.h
-> new file mode 100644
-> index 0000000..93633d5
-> --- /dev/null
-> +++ b/include/dt-bindings/power/rk3368-power.h
-> @@ -0,0 +1,28 @@
-> +#ifndef __DT_BINDINGS_POWER_RK3368_POWER_H__
-> +#define __DT_BINDINGS_POWER_RK3368_POWER_H__
-> +
-> +/* VD_CORE */
-> +#define RK3368_PD_A53_L0	0
-> +#define RK3368_PD_A53_L1	1
-> +#define RK3368_PD_A53_L2	2
-> +#define RK3368_PD_A53_L3	3
-> +#define RK3368_PD_SCU_L		4
-> +#define RK3368_PD_A53_B0	5
-> +#define RK3368_PD_A53_B1	6
-> +#define RK3368_PD_A53_B2	7
-> +#define RK3368_PD_A53_B3	8
-> +#define RK3368_PD_SCU_B		9
-> +
-> +/* VD_LOGIC */
-> +#define RK3368_PD_BUS		10
-> +#define RK3368_PD_PERI		11
-> +#define RK3368_PD_VIO		12
-> +#define RK3368_PD_ALIVE		13
-> +#define RK3368_PD_VIDEO		14
-> +#define RK3368_PD_GPU_0		15
-> +#define RK3368_PD_GPU_1		16
-> +
-> +/* VD_PMU */
-> +#define RK3368_PD_PMU		17
-> +
-> +#endif
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+>
 
+[..]
 
--- 
-Thanks,
-Caesar
+>> diff --git a/drivers/mfd/axp20x-i2c.c b/drivers/mfd/axp20x-i2c.c
+>> new file mode 100644
+>> index 000000000000..b54205677bb2
+>> --- /dev/null
+>> +++ b/drivers/mfd/axp20x-i2c.c
+>> @@ -0,0 +1,102 @@
+>> +/*
+>> + * axp20x-i2c.c - I2C driver for the X-Powers' Power Management ICs
+
+Do you want me to remove the filenames from these 2 files (axp20x.c and
+axp20x-i2c.c) as well?
+
+>> + *
+>> + * AXP20x typically comprises an adaptive USB-Compatible PWM charger, BUCK DC-DC
+>> + * converters, LDOs, multiple 12-bit ADCs of voltage, current and temperature
+>> + * as well as configurable GPIOs.
+>> + *
+>> + * This driver supports the I2C variants.
+>> + *
+>> + * Author: Carlo Caione <carlo@caione.org>
+
+Not sure about the copyright, since it's not mine.
+
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+
+[..]
+
+Regards
+ChenYu
