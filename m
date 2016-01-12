@@ -1,62 +1,163 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 12 Jan 2016 00:47:49 +0000
-Subject: I/O issues with writing to mtdblock devices on kirkwood
-In-Reply-To: <20160112000721.GB12286@jirafa.cyrius.com>
-References: <1440159857.19360.50.camel@debian.org>
- <20150905210846.GF6040@lunn.ch>
- <CAKzmTe0Bq8itvKoOTwZ+ZjY5pTqFYWt0-ihO4jn0qew_NYGhFg@mail.gmail.com>
- <20151011153548.GA9808@lunn.ch>
- <20160111230059.GA12286@jirafa.cyrius.com>
- <20160111232231.GS6588@sirena.org.uk>
- <20160112000721.GB12286@jirafa.cyrius.com>
-Message-ID: <20160112004749.GT6588@sirena.org.uk>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 11 Jan 2016 16:51:58 -0800
+Subject: [PATCH v6 6/6] arm/arm64: KVM: Enable armv8 fp/simd enhanced
+ context switch
+In-Reply-To: <20160110163223.GH30867@cbox>
+References: <1451167016-3787-1-git-send-email-m.smarduch@samsung.com>
+ <20160110163223.GH30867@cbox>
+Message-ID: <56944E2E.4030600@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 04:07:21PM -0800, Martin Michlmayr wrote:
-> * Mark Brown <broonie@debian.org> [2016-01-11 23:22]:
 
-I've just noticed that you're asking about the kernel SPI subsystem on
-the Debian ARM list, please don't do things like this - please include
-the kernel community, you'll be able to get more help that way.
 
-> > >      spi: Pump transfers inside calling context for spi_sync()
+On 1/10/2016 8:32 AM, Christoffer Dall wrote:
+> On Sat, Dec 26, 2015 at 01:56:56PM -0800, Mario Smarduch wrote:
+>> Enable armv8 enhanced fp/simd context switch. Guest and host registers are only
+>> context switched on first access and vcpu put.
+>>
+>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>> ---
+>>  arch/arm/kvm/arm.c              | 13 +++++++++++--
+>>  arch/arm64/kernel/asm-offsets.c |  1 +
+>>  arch/arm64/kvm/hyp/entry.S      |  1 +
+>>  arch/arm64/kvm/hyp/switch.c     | 26 ++------------------------
+>>  4 files changed, 15 insertions(+), 26 deletions(-)
+>>
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index b16ed98..633a208 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -316,10 +316,19 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+>>  void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+>>  {
+>>  	/* If the fp/simd registers are dirty save guest, restore host. */
+>> -	if (vcpu_vfp_isdirty(vcpu))
+>> +	if (vcpu_vfp_isdirty(vcpu)) {
+>> +
+>>  		vcpu_restore_host_vfp_state(vcpu);
+>>  
+>> -	/* Restore host FPEXC trashed in vcpu_load */
+>> +		/*
+>> +		 * For 32bit guest on arm64 save the guest fpexc register
+>> +		 * in EL2 mode.
+>> +		 */
+>> +		if (vcpu_guest_is_32bit(vcpu))
+>> +			vcpu_save_fpexc(vcpu);
+>> +	}
+>> +
+>> +	/* For arm32 restore host FPEXC trashed in vcpu_load. */
+>>  	vcpu_restore_host_fpexc(vcpu);
+>>  
+>>  	/*
+>> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+>> index 94090a6..d69145c 100644
+>> --- a/arch/arm64/kernel/asm-offsets.c
+>> +++ b/arch/arm64/kernel/asm-offsets.c
+>> @@ -112,6 +112,7 @@ int main(void)
+>>    DEFINE(VCPU_ESR_EL2,		offsetof(struct kvm_vcpu, arch.fault.esr_el2));
+>>    DEFINE(VCPU_FAR_EL2,		offsetof(struct kvm_vcpu, arch.fault.far_el2));
+>>    DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
+>> +  DEFINE(VCPU_CPTR_EL2,		offsetof(struct kvm_vcpu, arch.cptr_el2));
+>>    DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
+>>  #endif
+>>  #ifdef CONFIG_CPU_PM
+>> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+>> index fd0fbe9..ce7e903 100644
+>> --- a/arch/arm64/kvm/hyp/entry.S
+>> +++ b/arch/arm64/kvm/hyp/entry.S
+>> @@ -136,6 +136,7 @@ ENTRY(__fpsimd_guest_restore)
+>>  	isb
+>>  
+>>  	mrs	x3, tpidr_el2
+>> +	str	w2, [x3, #VCPU_CPTR_EL2]
+> 
+> I'm confused here, why do we need to do this now and not in the previous
+> patch?
 
-> > Can you please clarify?  You're saying this causes SATA timeouts but
-> > this is a change in the SPI subsystem and you're talking about MTD
-> > devices.  You've also not said which kernel version this is with...
+There should be no harm doing it in previous patch, but this patch
+activates the lazy switch and I thought this would be a better
+place for it.
 
-> Sorry for being unclear.  The problem is that other activities get
-> blocked (most notably SATA) when writing a 9 MB file to an SPI flash
-> chip.  The problem does not happen when writing a smaller (2 MB) file.
-> It only happens when writing to mtdblock, not to mtd (maybe flashcp
-> writes the file in smaller blocks?).
+> 
+> Maybe it helps if we merge these last two patches into one.
+> 
+>>  
+>>  	ldr	x0, [x3, #VCPU_HOST_CONTEXT]
+>>  	kern_hyp_va x0
+>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+>> index ca8f5a5..962d179 100644
+>> --- a/arch/arm64/kvm/hyp/switch.c
+>> +++ b/arch/arm64/kvm/hyp/switch.c
+>> @@ -19,24 +19,10 @@
+>>  
+>>  static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+>>  {
+>> -	u64 val;
+>> -
+>> -	/*
+>> -	 * We are about to set CPTR_EL2.TFP to trap all floating point
+>> -	 * register accesses to EL2, however, the ARM ARM clearly states that
+>> -	 * traps are only taken to EL2 if the operation would not otherwise
+>> -	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
+>> -	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
+>> -	 */
+>> -	val = vcpu->arch.hcr_el2;
+>> -	if (!(val & HCR_RW)) {
+>> -		write_sysreg(1 << 30, fpexc32_el2);
+>> -		isb();
+>> -	}
+>> -	write_sysreg(val, hcr_el2);
+>> +	write_sysreg(vcpu->arch.hcr_el2, hcr_el2);
+>>  	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+>>  	write_sysreg(1 << 15, hstr_el2);
+>> -	write_sysreg(CPTR_EL2_TTA | CPTR_EL2_TFP, cptr_el2);
+>> +	write_sysreg(vcpu->arch.cptr_el2, cptr_el2);
+>>  	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
+>>  }
+>>  
+>> @@ -89,7 +75,6 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+>>  {
+>>  	struct kvm_cpu_context *host_ctxt;
+>>  	struct kvm_cpu_context *guest_ctxt;
+>> -	bool fp_enabled;
+>>  	u64 exit_code;
+>>  
+>>  	vcpu = kern_hyp_va(vcpu);
+>> @@ -119,8 +104,6 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+>>  	exit_code = __guest_enter(vcpu, host_ctxt);
+>>  	/* And we're baaack! */
+>>  
+>> -	fp_enabled = __fpsimd_enabled();
+>> -
+>>  	__sysreg_save_state(guest_ctxt);
+>>  	__sysreg32_save_state(vcpu);
+>>  	__timer_save_state(vcpu);
+>> @@ -131,11 +114,6 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+>>  
+>>  	__sysreg_restore_state(host_ctxt);
+>>  
+>> -	if (fp_enabled) {
+>> -		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+>> -		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
+>> -	}
+>> -
+> 
+> why do we remove this logic here but preserve something in
+> __sysreg32_save_state() ?
 
-Oh, right.  This sounds like everything is working fine with SPI - that
-commit was supposed to improve throughput with single threaded workloads
-by avoiding pointless context switches and it seems it is in fact doing
-that.  Most likely you are using a bitbanging SPI controller driver and
-that's causing lots of I/O wait states which is upsetting the scheduler
-but it's hard to be sure.
+Missed it, fpexec code should be removed, that's taken care of
+in vcpu_put which stores it to same memory. Thanks for spotting it.
 
-Possibly whatever SPI driver this system uses is doing something really
-rude (perhaps limited by the hardware), possibly it isn't using DMA when
-it should be, or possibly the scheduler just isn't doing a good job with
-the workload you're giving it.
-
-> > In any case, please provide traces from ftrace with all the SPI trace
-> > enabled (via /sys/kernel/debug/trace/events/spi/enable).
-
-> I've never used ftrace so I need to look into that (or maybe Andrew
-> can help).
-
-cat /sys/kernel/debug/tracing/trace
-https://www.kernel.org/doc/Documentation/trace/ftrace.txt
-http://www.sirena.org.uk/2011/01/22/tracing-asoc-with-trace-points/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160112/6a85d0fc/attachment.sig>
+> 
+> 
+> 
+>>  	__debug_save_state(vcpu, kern_hyp_va(vcpu->arch.debug_ptr), guest_ctxt);
+>>  	__debug_cond_restore_host_state(vcpu);
+>>  
+>> -- 
+>> 1.9.1
+>>
+> Thanks,
+> -Christoffer
+> 
