@@ -1,37 +1,61 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 12 Jan 2016 18:02:23 +0000
-Subject: I/O issues with writing to mtdblock devices on kirkwood
-In-Reply-To: <4004455.tVDpSpUXxo@wuerfel>
-References: <1440159857.19360.50.camel@debian.org>
- <20160112004749.GT6588@sirena.org.uk>
- <20160112011904.GC7690@lunn.ch> <4004455.tVDpSpUXxo@wuerfel>
-Message-ID: <20160112180223.GA6588@sirena.org.uk>
+From: john@metanate.com (John Keeping)
+Date: Tue, 12 Jan 2016 18:05:18 +0000
+Subject: [PATCH] drm/rockchip: vop: fix mask when updating interrupts
+Message-ID: <1452621918-32239-1-git-send-email-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 05:29:40PM +0100, Arnd Bergmann wrote:
-> On Tuesday 12 January 2016 02:19:04 Andrew Lunn wrote:
+Commit dbb3d94 (drm/rockchip: vop: move interrupt registers into
+vop_data) introduced new macros for updating the interrupt control
+registers but these always use the mask from the register definition
+without refining it for the particular bits that are being changed.
 
-> > When i played with this, i added a reschedule point at the end of the
-> > drivers transfer_one_message() function, to see if that would help. It
-> > did not, which is why i made a guess it has something to do with a
-> > lock.
+This means that whenever we enable/disable a particular interrupt we end
+up disabling all of the others as a side effect.
 
-> Can you try using usleep_range() instead of udelay()? It might also
+Signed-off-by: John Keeping <john@metanate.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 16 +++++++++-------
+ 1 file changed, 9 insertions(+), 7 deletions(-)
 
-Oh, indeed - should've thought of that!
-
-> be worth trying what the actual delay is for each byte to see if a
-> longer sleep time would help, but I guess that time is highly
-> device specific.
-
-I expect that the delay will depend on the clock speed of the SPI bus
-which is system dependant.  Might actually be worth checking if the bus
-is clocked excessively slowly.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160112/6a0c55c1/attachment.sig>
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 46c2a8d..fd37054 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -43,8 +43,8 @@
+ 
+ #define REG_SET(x, base, reg, v, mode) \
+ 		__REG_SET_##mode(x, base + reg.offset, reg.mask, reg.shift, v)
+-#define REG_SET_MASK(x, base, reg, v, mode) \
+-		__REG_SET_##mode(x, base + reg.offset, reg.mask, reg.shift, v)
++#define REG_SET_MASK(x, base, reg, mask, v, mode) \
++		__REG_SET_##mode(x, base + reg.offset, mask, reg.shift, v)
+ 
+ #define VOP_WIN_SET(x, win, name, v) \
+ 		REG_SET(x, win->base, win->phy->name, v, RELAXED)
+@@ -58,16 +58,18 @@
+ #define VOP_INTR_GET(vop, name) \
+ 		vop_read_reg(vop, 0, &vop->data->ctrl->name)
+ 
+-#define VOP_INTR_SET(vop, name, v) \
+-		REG_SET(vop, 0, vop->data->intr->name, v, NORMAL)
++#define VOP_INTR_SET(vop, name, mask, v) \
++		REG_SET_MASK(vop, 0, vop->data->intr->name, mask, v, NORMAL)
+ #define VOP_INTR_SET_TYPE(vop, name, type, v) \
+ 	do { \
+-		int i, reg = 0; \
++		int i, reg = 0, mask = 0; \
+ 		for (i = 0; i < vop->data->intr->nintrs; i++) { \
+-			if (vop->data->intr->intrs[i] & type) \
++			if (vop->data->intr->intrs[i] & type) { \
+ 				reg |= (v) << i; \
++				mask |= 1 << i; \
++			} \
+ 		} \
+-		VOP_INTR_SET(vop, name, reg); \
++		VOP_INTR_SET(vop, name, mask, reg); \
+ 	} while (0)
+ #define VOP_INTR_GET_TYPE(vop, name, type) \
+ 		vop_get_intr_type(vop, &vop->data->intr->name, type)
+-- 
+2.7.0.rc3.140.g520a093
