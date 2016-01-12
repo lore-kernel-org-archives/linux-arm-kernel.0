@@ -1,57 +1,24 @@
 From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
-Date: Tue, 12 Jan 2016 11:23:03 -0800
-Subject: [PATCH] arm64: net: bpf: don't BUG() on large shifts
-In-Reply-To: <20160112171710.GK15737@arm.com>
-References: <1452015543-6790-1-git-send-email-rabin@rab.in>
- <20160108154423.GC11228@arm.com>
- <20160108190943.GA11561@ast-mbp.thefacebook.com>
- <20160112171710.GK15737@arm.com>
-Message-ID: <20160112192302.GA34276@ast-mbp.thefacebook.com>
+Date: Tue, 12 Jan 2016 11:26:21 -0800
+Subject: [PATCHv2] net: bpf: reject invalid shifts
+In-Reply-To: <1452626228-15742-1-git-send-email-rabin@rab.in>
+References: <20160112185121.GA34045@ast-mbp.thefacebook.com>
+ <1452626228-15742-1-git-send-email-rabin@rab.in>
+Message-ID: <20160112192620.GB34276@ast-mbp.thefacebook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 05:17:10PM +0000, Will Deacon wrote:
-> On Fri, Jan 08, 2016 at 11:09:44AM -0800, Alexei Starovoitov wrote:
-> > On Fri, Jan 08, 2016 at 03:44:23PM +0000, Will Deacon wrote:
-> > > On Tue, Jan 05, 2016 at 06:39:03PM +0100, Rabin Vincent wrote:
-> > > > Attempting to generate UBFM/SBFM instructions with shifts that can't be
-> > > > encoded in the immediate fields of the opcodes leads to a trigger of a
-> > > > BUG() in the instruction generation code.  As the ARMv8 ARM says: "The
-> > > > shift amounts must be in the range 0 to one less than the register width
-> > > > of the instruction, inclusive."  Make the JIT reject unencodable shifts
-> > > > instead of crashing.
-> > > 
-> > > I moaned about those BUG_ONs when they were introduced:
-> > > 
-> > >   https://lkml.org/lkml/2014/7/17/438
-> > > 
-> > > The response then was that the verifier would catch these issues so
-> > > there was nothing to worry about. Has something changed so that is no
-> > > longer the case? Do we need to consider a different way of rejecting
-> > > invalid instructions at the encoding stage rather than bringing down the
-> > > kernel?
-> > 
-> > that discussion lead to replacement of all BUG_ONs in
-> > arch/arm64/net/bpf_jit_comp.c with pr_err_once(), but looks like
-> > arch/arm64/kernel/insn.c wasn't addressed.
-> > The amount of BUG_ONs there is indeed overkill regardless of what
-> > verifier and other JITs do. btw, x64 JIT doesn't have runtime BUG_ONs.
+On Tue, Jan 12, 2016 at 08:17:08PM +0100, Rabin Vincent wrote:
+> On ARM64, a BUG() is triggered in the eBPF JIT if a filter with a
+> constant shift that can't be encoded in the immediate field of the
+> UBFM/SBFM instructions is passed to the JIT.  Since these shifts
+> amounts, which are negative or >= regsize, are invalid, reject them in
+> the eBPF verifier and the classic BPF filter checker, for all
+> architectures.
 > 
-> Maybe, but insn.c is also used by the alternatives patching code, so we
-> really need a way to communicate failure back to the BPF JIT when passed
-> an invalid instruction description.
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+> v2: handle BPF_ARSH too
 
-agree. I think there are several options to achieve that after
-all BUG_ONs are removed:
-- change interface for all insn generating macros to check for
-  AARCH64_BREAK_FAULT opcode as error.
-  That will require all of emit*() functions in bpf_jit_comp.c to
-  be changed to accept/return error.
-  Overall that looks like massive change.
-- ignore AARCH64_BREAK_FAULT during emit and add another pass after
-  all code is generated. If such insn is found in a jited code,
-  discard the jit.
-  I think that's better option.
-
-Zi, any comments?
- 
+Thanks.
+Acked-by: Alexei Starovoitov <ast@kernel.org>
