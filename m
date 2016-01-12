@@ -1,112 +1,74 @@
-From: Leonid.Yegoshin@imgtec.com (Leonid Yegoshin)
-Date: Tue, 12 Jan 2016 12:45:14 -0800
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160112114111.GB15737@arm.com>
-References: <1452426622-4471-12-git-send-email-mst@redhat.com>
- <56945366.2090504@imgtec.com>
- <20160112092711.GP6344@twins.programming.kicks-ass.net>
- <20160112102555.GV6373@twins.programming.kicks-ass.net>
- <20160112104012.GW6373@twins.programming.kicks-ass.net>
- <20160112114111.GB15737@arm.com>
-Message-ID: <569565DA.2010903@imgtec.com>
+From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
+Date: Tue, 12 Jan 2016 12:46:21 -0800
+Subject: [PATCHv2] net: bpf: reject invalid shifts
+In-Reply-To: <5695653F.6030001@iogearbox.net>
+References: <20160112185121.GA34045@ast-mbp.thefacebook.com>
+ <1452626228-15742-1-git-send-email-rabin@rab.in>
+ <1452628118.1223.25.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20160112195356.GA34598@ast-mbp.thefacebook.com>
+ <5695653F.6030001@iogearbox.net>
+Message-ID: <20160112204620.GA35080@ast-mbp.thefacebook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(I try to answer on multiple mails in one)
+On Tue, Jan 12, 2016 at 09:42:39PM +0100, Daniel Borkmann wrote:
+> On 01/12/2016 08:53 PM, Alexei Starovoitov wrote:
+> >On Tue, Jan 12, 2016 at 11:48:38AM -0800, Eric Dumazet wrote:
+> >>On Tue, 2016-01-12 at 20:17 +0100, Rabin Vincent wrote:
+> >>>On ARM64, a BUG() is triggered in the eBPF JIT if a filter with a
+> >>>constant shift that can't be encoded in the immediate field of the
+> >>>UBFM/SBFM instructions is passed to the JIT.  Since these shifts
+> >>>amounts, which are negative or >= regsize, are invalid, reject them in
+> >>>the eBPF verifier and the classic BPF filter checker, for all
+> >>>architectures.
+> >>>
+> >>
+> >>Hmm...
+> >>
+> >>>diff --git a/net/core/filter.c b/net/core/filter.c
+> >>>index 672eefbfbe99..37157c4c1a78 100644
+> >>>--- a/net/core/filter.c
+> >>>+++ b/net/core/filter.c
+> >>>@@ -777,6 +777,11 @@ static int bpf_check_classic(const struct sock_filter *filter,
+> >>>  			if (ftest->k == 0)
+> >>>  				return -EINVAL;
+> >>>  			break;
+> >>>+		case BPF_ALU | BPF_LSH | BPF_K:
+> >>>+		case BPF_ALU | BPF_RSH | BPF_K:
+> >>>+			if (ftest->k >= 32)
+> >>>+				return -EINVAL;
+> >>>+			break;
+> >>>  		case BPF_LD | BPF_MEM:
+> >>>  		case BPF_LDX | BPF_MEM:
+> >>>  		case BPF_ST:
+> >>
+> >>These weak filters used to have undefined behavior, maybe in a never
+> >>taken branch, and will now fail hard, possibly breaking old
+> >>applications.
+> >>
+> >>I believe we should add a one time warning to give a clue to poor users
+> >>hitting this problem.
+> >
+> >you mean like warn_on_once() here?
+> >Makes sense I guess.
+> 
+> Hmm, WARN_ON_ONCE() would then throw a stack trace also for unprived users,
+> I doubt we want to scare admins. ;)
+> 
+> Or, you mean pr_warn_once()?
 
-First of all, it seems like some generic notes should be given here:
+yes. there is no need for stack trace of course.
 
-1. Generic MIPS "SYNC" (aka "SYNC 0") instruction is a very heavy in 
-some CPUs. On that CPUs it basically kills pipelines in each CPU, can do 
-a special memory/IO bus transaction (similar to "fence") and hold a 
-system until all R/W is completed. It is like Big Kernel Lock but worse. 
-So, the move to SMP_* kind of barriers is needed to improve performance, 
-especially on newest CPUs with long pipelines.
+> >>Not everybody has perfect BPF filters, since most of the time they were
+> >>hand coded.
+> >
+> >yep and we all know who was able to code hundreds of cBPF insns by hand ;)
+> >But I'm sure that code doesn't have such broken shifts. :)))
+> 
+> libpcap certainly supports raw filters now thanks to Chema [1]. Alternative
+> could be to just mask them here, but not in eBPF verifier, but that would be
+> even more inconsistent (on the other hand, we also allow holes in BPF but not
+> in eBPF, so wouldn't be the first time we make things different), hmm.
 
-2. MIPS Arch document may be misleading because words "ordering" and 
-"completion" means different from Linux, the SYNC instruction 
-description is written for HW engineers. I wrote that in a separate 
-patch of the same patchset - 
-http://patchwork.linux-mips.org/patch/10505/ "MIPS: R6: Use lightweight 
-SYNC instruction in smp_* memory barriers":
-
-> This instructions were specifically designed to work for smp_*() sort of
-> memory barriers in MIPS R2/R3/R5 and R6.
->
-> Unfortunately, it's description is very cryptic and is done in HW engineering
-> style which prevents use of it by SW.
-
-3. I bother MIPS Arch team long time until I completely understood that 
-MIPS SYNC_WMB, SYNC_MB, SYNC_RMB, SYNC_RELEASE and SYNC_ACQUIRE do an 
-exactly that is required in Documentation/memory-barriers.txt
-
-
-In Peter Zijlstra mail:
-
-> 1) you do not make such things selectable; either the hardware needs
-> them or it doesn't. If it does you_must_  use them, however unlikely.
-It is selectable only for MIPS R2 but not MIPS R6. The reason is - most 
-of MIPS R2 CPUs have short pipeline and that SYNC is just waste of CPU 
-resource, especially taking into account that "lightweight syncs" are 
-converted to a heavy "SYNC 0" in many of that CPUs. However the latest 
-MIPS/Imagination CPU have a pipeline long enough to hit a problem - 
-absence of SYNC at LL/SC inside atomics, barriers etc.
-
-> And reading the MIPS64 v6.04 instruction set manual, I think 0x11/0x12
-> are_NOT_  transitive and therefore cannot be used to implement the
-> smp_mb__{before,after} stuff.
->
-> That is, in MIPS speak, those SYNC types are Ordering Barriers, not
-> Completion Barriers.
-
-Please see above, point 2.
-
-> That is, currently all architectures -- with exception of PPC -- have
-> RCsc locks, but using these non-transitive things will get you RCpc
-> locks.
->
-> So yes, MIPS can go RCpc for its locks and share the burden of pain with
-> PPC, but that needs to be a very concious decision.
-
-I don't understand that - I tried hard but I can't find any word like 
-"RCsc", "RCpc" in Documents/ directory. Web search goes nowhere, of course.
-
-
-In Will Deacon mail:
-
-> The issue I have with the SYNC description in the text above is that it
-> describes the single CPU (program order) and the dual-CPU (confusingly
-> named global order) cases, but then doesn't generalise any further. That
-> means we can't sensibly reason about transitivity properties when a third
-> agent is involved. For example, the WRC+sync+addr test:
->
->
-> P0:
-> Wx = 1
->
-> P1:
-> Rx == 1
-> SYNC
-> Wy = 1
->
-> P2:
-> Ry == 1
-> <address dep>
-> Rx = 0
->
->
-> I can't find anything to forbid that, given the text. The main problem
-> is having the SYNC on P1 affect the write by P0.
-
-As I understand that test, the visibility of P0: W[x] = 1 is identical 
-to P1 and P2 here. If P1 got X before SYNC and write to Y after SYNC 
-then instruction source register dependency tracking in P2 prevents a 
-speculative load of X before P2 obtains Y from the same place as P0/P1 
-and calculate address of X. If some load of X in P2 happens before 
-address dependency calculation it's result is discarded.
-
-Yes, you can't find that in MIPS SYNC instruction description, it is 
-more likely in CM (Coherence Manager) area. I just pointed our arch team 
-member responsible for documents and he will think how to explain that.
-
-- Leonid.
+I would rather see broken classic bpf program fixed instead of continue
+running them with undefined behavior.
