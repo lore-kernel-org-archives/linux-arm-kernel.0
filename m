@@ -1,55 +1,52 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Tue, 12 Jan 2016 09:08:04 +0000
-Subject: [PATCH] spi: atmel: improve internal vs gpio chip-select choice
-In-Reply-To: <5694BE36.7060702@atmel.com> (Nicolas Ferre's message of "Tue, 12
- Jan 2016 09:49:58 +0100")
-References: <1452211907-16074-1-git-send-email-mans@mansr.com>
- <5693C9A3.9040403@atmel.com> <yw1xh9ikw29c.fsf@unicorn.mansr.com>
- <5694BE36.7060702@atmel.com>
-Message-ID: <yw1xfuy3upvv.fsf@unicorn.mansr.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 12 Jan 2016 09:16:06 +0000
+Subject: [PATCH] mfd: asic3: remove extraneous ')'
+In-Reply-To: <5507931.oM3h7nKshR@wuerfel>
+References: <5507931.oM3h7nKshR@wuerfel>
+Message-ID: <20160112091606.GV19803@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Ferre <nicolas.ferre@atmel.com> writes:
+On Tue, 12 Jan 2016, Arnd Bergmann wrote:
+> A cleanup patch introduced an extra closing ')' that leads to a
+> build error:
+> 
+> drivers/mfd/asic3.c: In function 'asic3_gpio_get':
+> drivers/mfd/asic3.c:505:12: error: expected ';' before ')' token
+> 
+> This removes the extra character to get it to build again.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: fd5b4d01a638 ("mfd: asic3: Be sure to clamp return value")
+> ---
+> This came up today on linux-next. I took the liberty to adjust formatting
+> of that line as well, if you prefer the original line wrapping please
+> undo that part when applying.
 
-> Le 11/01/2016 16:43, M?ns Rullg?rd a ?crit :
->> Nicolas Ferre <nicolas.ferre@atmel.com> writes:
->> 
->>> Le 08/01/2016 01:11, Mans Rullgard a ?crit :
->>>> The driver currently chooses between internal chip-select or gpio
->>>> based on the existence of the cs-gpios DT property which fails on
->>>> non-DT systems and also enforces the same choice for all devices.
->>>
->>> Well, I fear that such a per-device choice may impact further the driver
->>> than just moving a field from one structure to another...
->> 
->> Could you please elaborate?
->
-> Well, the first thing that comes to my mind is that the DT property may
-> need to be  to the SPI device node and not the controller anymore, for a
-> need of coherency.
-> That would imply modifying the binding and I don't want that for such an
-> useless "improvement".
->
->>> Moreover, I have the feeling that it was not the objective of this
->>> patch.
->> 
->> Your feeling is mistaken.  If it's somehow impossible to mix CS types,
->> please explain why.
->
-> Please only fix the avr32 issue with CS gpio selection that I admit we
-> have. I don't need nor want to mix CS types: it just doesn't make sense
-> to allow it.
+Please ignore MFD in next, as it's not quite ready.  I've been on
+vacation for 4 weeks and only returned to work yesterday.  I am
+currently running MFD through AIAIAI and will fix-up any issues I
+find.
 
-OK, fine.  I thought it could be useful (and it works), but apparently
-you disagree.
-
-Now the trouble with a global gpio vs internal setting is that we don't
-know whether the non-DT platform data provides a gpio for the slave
-devices when the master device is probed.  One possibility is to make
-the choice based on the first slave to be registered and insist that the
-rest follow suit.  I don't really like it, but I can't think of anything
-else off the top of my head.  Do you have any better suggestions?
+> diff --git a/drivers/mfd/asic3.c b/drivers/mfd/asic3.c
+> index c8d46e51faf1..4dca6bc61f5b 100644
+> --- a/drivers/mfd/asic3.c
+> +++ b/drivers/mfd/asic3.c
+> @@ -501,8 +501,8 @@ static int asic3_gpio_get(struct gpio_chip *chip,
+>  		return -EINVAL;
+>  	}
+>  
+> -	return !!(asic3_read_register(asic, gpio_base + ASIC3_GPIO_STATUS)
+> -		  & mask));
+> +	return !!(asic3_read_register(asic,
+> +				      gpio_base + ASIC3_GPIO_STATUS) & mask);
+>  }
+>  
+>  static void asic3_gpio_set(struct gpio_chip *chip,
+> 
 
 -- 
-M?ns Rullg?rd
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
