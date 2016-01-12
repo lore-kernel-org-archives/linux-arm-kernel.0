@@ -1,20 +1,25 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 12 Jan 2016 08:33:05 -0600
-Subject: [PATCH v5 2/7] remoteproc: dt: Provide bindings for ST's Remote
- Processor Controller driver
-In-Reply-To: <1452602781-22424-3-git-send-email-lee.jones@linaro.org>
-References: <1452602781-22424-1-git-send-email-lee.jones@linaro.org>
- <1452602781-22424-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <20160112143305.GA28251@rob-hp-laptop>
+Date: Tue, 12 Jan 2016 08:36:01 -0600
+Subject: [PATCH V2 3/3] dt-bindings: bsm2835: fix bindings documentation
+ to use new clock framework
+In-Reply-To: <1452602149-5875-4-git-send-email-kernel@martin.sperl.org>
+References: <1452602149-5875-1-git-send-email-kernel@martin.sperl.org>
+ <1452602149-5875-4-git-send-email-kernel@martin.sperl.org>
+Message-ID: <20160112143601.GA29373@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 12:46:16PM +0000, Lee Jones wrote:
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  .../devicetree/bindings/remoteproc/st-rproc.txt    | 41 ++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+On Tue, Jan 12, 2016 at 12:35:48PM +0000, kernel at martin.sperl.org wrote:
+> From: Martin Sperl <kernel@martin.sperl.org>
 
-Acked-by: Rob Herring <robh@kernel.org>
+Typo in the subject (bsm).
+
+> 
+> The bcm2835-i2s driver has been updated to use the new clock framework
+> for the bcm2835 SOC.
+> 
+> This patch documents the required changes to the bindings.
+> 
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+
+Please add acks when you post new versions.
