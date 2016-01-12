@@ -1,87 +1,79 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 Jan 2016 07:39:34 +0000
-Subject: [PATCH v6 4/9] mfd: axp20x: Split the driver into core and i2c
- bits
-In-Reply-To: <CAGb2v65hCaCJAhBvuLugfD=5mzFQdMfktOTwbCO_CM04UtYemw@mail.gmail.com>
-References: <1450283538-25067-1-git-send-email-wens@csie.org>
- <1450283538-25067-5-git-send-email-wens@csie.org>
- <20160111092530.GL14104@x1>
- <CAGb2v65hCaCJAhBvuLugfD=5mzFQdMfktOTwbCO_CM04UtYemw@mail.gmail.com>
-Message-ID: <20160112073934.GJ19803@x1>
+Date: Tue, 12 Jan 2016 07:41:07 +0000
+Subject: [PATCH v5 5/6] mfd: dt-bindings: add device tree bindings for
+ Hi3519 sysctrl
+In-Reply-To: <5694584D.7040301@huawei.com>
+References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
+ <1452219400-32478-6-git-send-email-xuejiancheng@huawei.com>
+ <20160111054846.GD3331@x1> <56935EA8.4060801@huawei.com>
+ <20160111085555.GE14104@x1> <5694584D.7040301@huawei.com>
+Message-ID: <20160112074107.GK19803@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Jan 2016, Chen-Yu Tsai wrote:
+On Tue, 12 Jan 2016, xuejiancheng wrote:
 
-> Hi,
 > 
-> On Mon, Jan 11, 2016 at 5:25 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Thu, 17 Dec 2015, Chen-Yu Tsai wrote:
-> >
-> >> The axp20x driver assumes the device is i2c based. This is not the
-> >> case with later chips, which use a proprietary 2 wire serial bus
-> >> by Allwinner called "Reduced Serial Bus".
+> 
+> On 2016/1/11 16:55, Lee Jones wrote:
+> > On Mon, 11 Jan 2016, xuejiancheng wrote:
+> >> On 2016/1/11 13:48, Lee Jones wrote:
+> >>> On Fri, 08 Jan 2016, Jiancheng Xue wrote:
+> >>>
+> >>>> Add device tree bindings for Hi3519 system controller.
+> >>>>
+> >>>> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+> >>>> ---
+> >>>>  Documentation/devicetree/bindings/mfd/hi3519.txt | 14 ++++++++++++++
+> >>>>  1 file changed, 14 insertions(+)
+> >>>>  create mode 100644 Documentation/devicetree/bindings/mfd/hi3519.txt
+> >>>
+> >>> I have this patch, but none of the others in the set, thus I am
+> >>> lacking context.
+> >>>
+> >> I can forward other patches in the set to you. Thank you.
 > >>
-> >> This patch follows the example of mfd/wm831x and splits it into
-> >> an interface independent core, and an i2c specific glue layer.
-> >> MFD_AXP20X and the new MFD_AXP20X_I2C are changed to tristate
-> >> symbols, allowing the driver to be built as modules.
-> >>
-> >> Whitespace and other style errors in the moved i2c specific code
-> >> have been fixed. Included but unused header files are removed as
-> >> well.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >>  drivers/mfd/Kconfig        |  14 ++++---
-> >>  drivers/mfd/Makefile       |   1 +
-> >>  drivers/mfd/axp20x-i2c.c   | 102 +++++++++++++++++++++++++++++++++++++++++++++
-> >>  drivers/mfd/axp20x.c       |  88 +++++++-------------------------------
-> >>  include/linux/mfd/axp20x.h |  33 ++++++++++++++-
-> >>  5 files changed, 158 insertions(+), 80 deletions(-)
-> >>  create mode 100644 drivers/mfd/axp20x-i2c.c
-> >
-> > Acked-by: Lee Jones <lee.jones@linaro.org>
-> >
-> 
-> [..]
-> 
-> >> diff --git a/drivers/mfd/axp20x-i2c.c b/drivers/mfd/axp20x-i2c.c
-> >> new file mode 100644
-> >> index 000000000000..b54205677bb2
-> >> --- /dev/null
-> >> +++ b/drivers/mfd/axp20x-i2c.c
-> >> @@ -0,0 +1,102 @@
-> >> +/*
-> >> + * axp20x-i2c.c - I2C driver for the X-Powers' Power Management ICs
-> 
-> Do you want me to remove the filenames from these 2 files (axp20x.c and
-> axp20x-i2c.c) as well?
+> >>>> diff --git a/Documentation/devicetree/bindings/mfd/hi3519.txt b/Documentation/devicetree/bindings/mfd/hi3519.txt
+> >>>> new file mode 100644
+> >>>> index 0000000..115c5be
+> >>>> --- /dev/null
+> >>>> +++ b/Documentation/devicetree/bindings/mfd/hi3519.txt
+> >>>> @@ -0,0 +1,14 @@
+> >>>> +* Hisilicon Hi3519 System Controller Block
+> >>>> +
+> >>>> +This bindings use the following binding:
+> >>>> +Documentation/devicetree/bindings/mfd/syscon.txt
+> >>>> +
+> >>>> +Required properties:
+> >>>> +- compatible: "hisilicon,hi3519-sysctrl".
+> >>>> +- reg: the register region of this block
+> >>>> +
+> >>>> +Examples:
+> >>>> +sysctrl: system-controller at 12010000 {
+> >>>> +	compatible = "hisilicon,hi3519-sysctrl", "syscon";
+> >>>> +	reg = <0x12010000 0x1000>;
+> >>>> +};
+> >>>
+> >>> There is no requirement (nor want) for binding documents where the
+> >>> given device is simply using highly generic bindings.  This just
+> >>> amounts to churn.
+> >>>
+> >> This block is specific for Hi3519 SOC, and may has its own driver.
+> > 
+> > Does it have its own driver currently?
+> > 
+> Not yet.
+> Arnd Bergmann and Rob Herring all suggested adding a specific compatible string
+> with the SOC name. This binding is just used for describing the compatible string now.
+> When more functions on hi3519 SOC are added later, the specific driver will be also
+> needed.
 
-Yes, that would be good.
+Save this binding until it has more functionality.  We here "I'll add
+to this later" all too often.
 
-> >> + * AXP20x typically comprises an adaptive USB-Compatible PWM charger, BUCK DC-DC
-> >> + * converters, LDOs, multiple 12-bit ADCs of voltage, current and temperature
-> >> + * as well as configurable GPIOs.
-> >> + *
-> >> + * This driver supports the I2C variants.
-> >> + *
-> >> + * Author: Carlo Caione <carlo@caione.org>
+> >> So I think it's better to keep this binding.
+> > 
 > 
-> Not sure about the copyright, since it's not mine.
-
-Perhaps shoot Carlo an email to see what he thinks.
-
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * published by the Free Software Foundation.
-> >> + */
-> >> +
-> 
-> [..]
-> 
-> Regards
-> ChenYu
 
 -- 
 Lee Jones
