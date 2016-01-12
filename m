@@ -1,59 +1,62 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 11 Jan 2016 16:47:27 -0800
-Subject: [PATCHv2 0/2] Support for set_memory_* outside of module space
-In-Reply-To: <20151125120511.GB27359@arm.com>
-References: <1447207057-11323-1-git-send-email-labbott@fedoraproject.org>
- <5654F544.1060208@redhat.com> <20151125120511.GB27359@arm.com>
-Message-ID: <56944D1F.6000404@redhat.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 12 Jan 2016 00:47:49 +0000
+Subject: I/O issues with writing to mtdblock devices on kirkwood
+In-Reply-To: <20160112000721.GB12286@jirafa.cyrius.com>
+References: <1440159857.19360.50.camel@debian.org>
+ <20150905210846.GF6040@lunn.ch>
+ <CAKzmTe0Bq8itvKoOTwZ+ZjY5pTqFYWt0-ihO4jn0qew_NYGhFg@mail.gmail.com>
+ <20151011153548.GA9808@lunn.ch>
+ <20160111230059.GA12286@jirafa.cyrius.com>
+ <20160111232231.GS6588@sirena.org.uk>
+ <20160112000721.GB12286@jirafa.cyrius.com>
+Message-ID: <20160112004749.GT6588@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2015 04:05 AM, Will Deacon wrote:
-> On Tue, Nov 24, 2015 at 03:39:48PM -0800, Laura Abbott wrote:
->> On 11/10/2015 05:57 PM, Laura Abbott wrote:
->>> Hi,
->>>
->>> This is v2 of the series to allow set_memory_* to work on kernel memory
->>> for security and other use cases. Should have addressed most comments
->>> although another look might be necessary for the contiguous bit.
->>>
->>> Thanks,
->>> Laura
->>>
->>> Laura Abbott (2):
->>>    arm64: Get existing page protections in split_pmd
->>>    arm64: Allow changing of attributes outside of modules
->>>
->>>   arch/arm64/Kconfig       |  12 ++++
->>>   arch/arm64/mm/mm.h       |   3 +
->>>   arch/arm64/mm/mmu.c      |  12 ++--
->>>   arch/arm64/mm/pageattr.c | 174 +++++++++++++++++++++++++++++++++++++++++------
->>>   4 files changed, 174 insertions(+), 27 deletions(-)
->>>
->>
->> Given what seems to have popped up via
->> https://lkml.kernel.org/r/<1448387338-27851-1-git-send-email-catalin.marinas@arm.com>
->> I'm going to hold off on this until the issues there are worked out.
->> Once that is fixed up this work can be picked up again.
->
-> Thanks, Laura, and sorry for the disruption.
->
-> Will
->
+On Mon, Jan 11, 2016 at 04:07:21PM -0800, Martin Michlmayr wrote:
+> * Mark Brown <broonie@debian.org> [2016-01-11 23:22]:
 
-Closing the loop once more, it turns out that splitting the larger block sizes
-is very difficult to do correctly. As of right now, the recommendation is to
-either use vmalloc since that is mapped with pages or create a separate region
-which can be placed in an appropriate section.
+I've just noticed that you're asking about the kernel SPI subsystem on
+the Debian ARM list, please don't do things like this - please include
+the kernel community, you'll be able to get more help that way.
 
-Theoretically, if something like DEBUG_PAGEALLOC were to be setup for arm64
-set_memory_* could be used everywhere since that would have to force all
-memory to be mapped with pages. DEBUG_PAGEALLOC should be fairly easy
-to do on top of Mark Rutland's recent re-working of pagetable creation
-and it's on my TODO list sometime.
+> > >      spi: Pump transfers inside calling context for spi_sync()
 
-I'll submit a patch allowing set_memory_* to use vmalloc and a comment
-explaining why this is disallowed on most kernel memory.
+> > Can you please clarify?  You're saying this causes SATA timeouts but
+> > this is a change in the SPI subsystem and you're talking about MTD
+> > devices.  You've also not said which kernel version this is with...
 
-Thanks,
-Laura
+> Sorry for being unclear.  The problem is that other activities get
+> blocked (most notably SATA) when writing a 9 MB file to an SPI flash
+> chip.  The problem does not happen when writing a smaller (2 MB) file.
+> It only happens when writing to mtdblock, not to mtd (maybe flashcp
+> writes the file in smaller blocks?).
+
+Oh, right.  This sounds like everything is working fine with SPI - that
+commit was supposed to improve throughput with single threaded workloads
+by avoiding pointless context switches and it seems it is in fact doing
+that.  Most likely you are using a bitbanging SPI controller driver and
+that's causing lots of I/O wait states which is upsetting the scheduler
+but it's hard to be sure.
+
+Possibly whatever SPI driver this system uses is doing something really
+rude (perhaps limited by the hardware), possibly it isn't using DMA when
+it should be, or possibly the scheduler just isn't doing a good job with
+the workload you're giving it.
+
+> > In any case, please provide traces from ftrace with all the SPI trace
+> > enabled (via /sys/kernel/debug/trace/events/spi/enable).
+
+> I've never used ftrace so I need to look into that (or maybe Andrew
+> can help).
+
+cat /sys/kernel/debug/tracing/trace
+https://www.kernel.org/doc/Documentation/trace/ftrace.txt
+http://www.sirena.org.uk/2011/01/22/tracing-asoc-with-trace-points/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160112/6a85d0fc/attachment.sig>
