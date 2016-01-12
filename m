@@ -1,59 +1,101 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 Jan 2016 16:25:22 +0000
-Subject: [PATCH 1/3] ARM: STi: Add DT defines for co-processor reset lines
-In-Reply-To: <1452614214.4292.24.camel@pengutronix.de>
-References: <1445856969-19424-1-git-send-email-lee.jones@linaro.org>
- <20160112133437.GH27358@x1>
- <1452606099.4292.20.camel@pengutronix.de>
- <20160112142658.GI27358@x1>
- <1452614214.4292.24.camel@pengutronix.de>
-Message-ID: <20160112162522.GL27358@x1>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 12 Jan 2016 08:28:44 -0800
+Subject: [PATCH v3 01/41] lcoking/barriers, arch: Use smp barriers in
+ smp_store_release()
+In-Reply-To: <1452426622-4471-2-git-send-email-mst@redhat.com>
+References: <1452426622-4471-1-git-send-email-mst@redhat.com>
+ <1452426622-4471-2-git-send-email-mst@redhat.com>
+Message-ID: <20160112162844.GD3818@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Jan 2016, Philipp Zabel wrote:
-> Am Dienstag, den 12.01.2016, 14:26 +0000 schrieb Lee Jones:
-> > On Tue, 12 Jan 2016, Philipp Zabel wrote:
-> > 
-> > > Hi Lee,
-> > > 
-> > > Am Dienstag, den 12.01.2016, 13:34 +0000 schrieb Lee Jones:
-> > > > On Mon, 26 Oct 2015, Lee Jones wrote:
-> > > > 
-> > > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > > > ---
-> > > > >  include/dt-bindings/reset-controller/stih407-resets.h | 4 ++++
-> > > > >  1 file changed, 4 insertions(+)
-> > > > > 
-> > > > > diff --git a/include/dt-bindings/reset-controller/stih407-resets.h b/include/dt-bindings/reset-controller/stih407-resets.h
-> > > > > index 02d4328..4ab3a1c 100644
-> > > > > --- a/include/dt-bindings/reset-controller/stih407-resets.h
-> > > > > +++ b/include/dt-bindings/reset-controller/stih407-resets.h
-> > > > > @@ -52,6 +52,10 @@
-> > > > >  #define STIH407_KEYSCAN_SOFTRESET	26
-> > > > >  #define STIH407_USB2_PORT0_SOFTRESET	27
-> > > > >  #define STIH407_USB2_PORT1_SOFTRESET	28
-> > > > > +#define STIH407_ST231_AUD_SOFTRESET	29
-> > > > > +#define STIH407_ST231_DMU_SOFTRESET	30
-> > > > > +#define STIH407_ST231_GP0_SOFTRESET	31
-> > > > > +#define STIH407_ST231_GP1_SOFTRESET	32
-> > > > >  
-> > > > >  /* Picophy reset defines */
-> > > > >  #define STIH407_PICOPHY0_RESET		0
-> > > > 
-> > > > Has anyone seen this patch?
-> > > 
-> > > c9bfec0032fb, sorry I missed 4.4.
-> > 
-> > What about v4.5?  The merge window has only just opened.
+On Sun, Jan 10, 2016 at 04:16:32PM +0200, Michael S. Tsirkin wrote:
+> From: Davidlohr Bueso <dave@stgolabs.net>
 > 
-> It's sitting in arm-soc/for-next, so it should hit mainline during this
-> merge window.
+> With commit b92b8b35a2e ("locking/arch: Rename set_mb() to smp_store_mb()")
+> it was made clear that the context of this call (and thus set_mb)
+> is strictly for CPU ordering, as opposed to IO. As such all archs
+> should use the smp variant of mb(), respecting the semantics and
+> saving a mandatory barrier on UP.
+> 
+> Signed-off-by: Davidlohr Bueso <dbueso@suse.de>
+> Signed-off-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+> Cc: <linux-arch@vger.kernel.org>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+> Cc: Linus Torvalds <torvalds@linux-foundation.org>
+> Cc: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> Cc: Peter Zijlstra <peterz@infradead.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Tony Luck <tony.luck@intel.com>
+> Cc: dave at stgolabs.net
+> Link: http://lkml.kernel.org/r/1445975631-17047-3-git-send-email-dave at stgolabs.net
+> Signed-off-by: Ingo Molnar <mingo@kernel.org>
 
-Wonderful, thanks.
+Aside from a need for s/lcoking/locking/ in the subject line:
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Reviewed-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+
+> ---
+>  arch/ia64/include/asm/barrier.h    | 2 +-
+>  arch/powerpc/include/asm/barrier.h | 2 +-
+>  arch/s390/include/asm/barrier.h    | 2 +-
+>  include/asm-generic/barrier.h      | 2 +-
+>  4 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/ia64/include/asm/barrier.h b/arch/ia64/include/asm/barrier.h
+> index df896a1..209c4b8 100644
+> --- a/arch/ia64/include/asm/barrier.h
+> +++ b/arch/ia64/include/asm/barrier.h
+> @@ -77,7 +77,7 @@ do {									\
+>  	___p1;								\
+>  })
+> 
+> -#define smp_store_mb(var, value)	do { WRITE_ONCE(var, value); mb(); } while (0)
+> +#define smp_store_mb(var, value) do { WRITE_ONCE(var, value); smp_mb(); } while (0)
+> 
+>  /*
+>   * The group barrier in front of the rsm & ssm are necessary to ensure
+> diff --git a/arch/powerpc/include/asm/barrier.h b/arch/powerpc/include/asm/barrier.h
+> index 0eca6ef..a7af5fb 100644
+> --- a/arch/powerpc/include/asm/barrier.h
+> +++ b/arch/powerpc/include/asm/barrier.h
+> @@ -34,7 +34,7 @@
+>  #define rmb()  __asm__ __volatile__ ("sync" : : : "memory")
+>  #define wmb()  __asm__ __volatile__ ("sync" : : : "memory")
+> 
+> -#define smp_store_mb(var, value)	do { WRITE_ONCE(var, value); mb(); } while (0)
+> +#define smp_store_mb(var, value) do { WRITE_ONCE(var, value); smp_mb(); } while (0)
+> 
+>  #ifdef __SUBARCH_HAS_LWSYNC
+>  #    define SMPWMB      LWSYNC
+> diff --git a/arch/s390/include/asm/barrier.h b/arch/s390/include/asm/barrier.h
+> index d68e11e..7ffd0b1 100644
+> --- a/arch/s390/include/asm/barrier.h
+> +++ b/arch/s390/include/asm/barrier.h
+> @@ -36,7 +36,7 @@
+>  #define smp_mb__before_atomic()		smp_mb()
+>  #define smp_mb__after_atomic()		smp_mb()
+> 
+> -#define smp_store_mb(var, value)		do { WRITE_ONCE(var, value); mb(); } while (0)
+> +#define smp_store_mb(var, value)	do { WRITE_ONCE(var, value); smp_mb(); } while (0)
+> 
+>  #define smp_store_release(p, v)						\
+>  do {									\
+> diff --git a/include/asm-generic/barrier.h b/include/asm-generic/barrier.h
+> index b42afad..0f45f93 100644
+> --- a/include/asm-generic/barrier.h
+> +++ b/include/asm-generic/barrier.h
+> @@ -93,7 +93,7 @@
+>  #endif	/* CONFIG_SMP */
+> 
+>  #ifndef smp_store_mb
+> -#define smp_store_mb(var, value)  do { WRITE_ONCE(var, value); mb(); } while (0)
+> +#define smp_store_mb(var, value)  do { WRITE_ONCE(var, value); smp_mb(); } while (0)
+>  #endif
+> 
+>  #ifndef smp_mb__before_atomic
+> -- 
+> MST
+> 
