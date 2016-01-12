@@ -1,44 +1,63 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Tue, 12 Jan 2016 20:13:35 +0100
-Subject: [PATCH] arm64: KVM: Fix AArch64 guest userspace exception
- injection
-In-Reply-To: <56954992.7000307@arm.com>
-References: <1452157416-9435-1-git-send-email-marc.zyngier@arm.com>
- <20160112182359.GA5795@hawk.localdomain> <56954992.7000307@arm.com>
-Message-ID: <20160112191335.GB5795@hawk.localdomain>
+From: rabin@rab.in (Rabin Vincent)
+Date: Tue, 12 Jan 2016 20:17:08 +0100
+Subject: [PATCHv2] net: bpf: reject invalid shifts
+In-Reply-To: <20160112185121.GA34045@ast-mbp.thefacebook.com>
+References: <20160112185121.GA34045@ast-mbp.thefacebook.com>
+Message-ID: <1452626228-15742-1-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 06:44:34PM +0000, Marc Zyngier wrote:
-> On 12/01/16 18:23, Andrew Jones wrote:
-> > Hi Marc,
-> > 
-> > Please shoot me if the following statement is false.
-> 
-> I wouldn't do that. Having had the privilege to waste 10 months of my
-> life doing a military service, I quickly discovered I didn't like
-> weapons nor those who carry them...
-> 
-> > Without this patch, if a guest that is running in, e.g. PSR_MODE_EL0t,
-> > tries to do, e.g. 'smc #0', then KVM will inject an undef exception,
-> > which should lead to the guest resuming at VBAR_EL1 + 0x400, but instead
-> > it resumes at VBAR_EL1 + 0x200.
-> 
-> Not quite. SMC is undefined at EL0 (see C6.6.165), so it is not trapped
-> to EL2, but to EL1. KVM is not in the loop at all in that case.
-> 
-> > Now, if you haven't started loading your gun to shoot me yet, then I'm
-> > quite confused as to why the unit test[1] I wrote for this works just
-> > fine without this patch.
-> 
-> If you want to exercise that path, you have to access something that
-> wouldn't trap to EL1, but that EL2 traps. I don't think we have much
-> stuff so far that can be used at EL0 and would be trapped to EL2,
-> unfortunately (the PMU code is probably the first thing we'll merge).
->
-> In the meantime, this test case is fairly pointless, I'm afraid...
+On ARM64, a BUG() is triggered in the eBPF JIT if a filter with a
+constant shift that can't be encoded in the immediate field of the
+UBFM/SBFM instructions is passed to the JIT.  Since these shifts
+amounts, which are negative or >= regsize, are invalid, reject them in
+the eBPF verifier and the classic BPF filter checker, for all
+architectures.
 
-Ah, thanks for the clarification, and the lack of desire to shoot me.
-I'll stash this test case for a later day.
+Signed-off-by: Rabin Vincent <rabin@rab.in>
+---
+v2: handle BPF_ARSH too
 
-drew
+ kernel/bpf/verifier.c | 10 ++++++++++
+ net/core/filter.c     |  5 +++++
+ 2 files changed, 15 insertions(+)
+
+diff --git a/kernel/bpf/verifier.c b/kernel/bpf/verifier.c
+index a7945d10b378..d1d3e8f57de9 100644
+--- a/kernel/bpf/verifier.c
++++ b/kernel/bpf/verifier.c
+@@ -1121,6 +1121,16 @@ static int check_alu_op(struct verifier_env *env, struct bpf_insn *insn)
+ 			return -EINVAL;
+ 		}
+ 
++		if ((opcode == BPF_LSH || opcode == BPF_RSH ||
++		     opcode == BPF_ARSH) && BPF_SRC(insn->code) == BPF_K) {
++			int size = BPF_CLASS(insn->code) == BPF_ALU64 ? 64 : 32;
++
++			if (insn->imm < 0 || insn->imm >= size) {
++				verbose("invalid shift %d\n", insn->imm);
++				return -EINVAL;
++			}
++		}
++
+ 		/* pattern match 'bpf_add Rx, imm' instruction */
+ 		if (opcode == BPF_ADD && BPF_CLASS(insn->code) == BPF_ALU64 &&
+ 		    regs[insn->dst_reg].type == FRAME_PTR &&
+diff --git a/net/core/filter.c b/net/core/filter.c
+index 672eefbfbe99..37157c4c1a78 100644
+--- a/net/core/filter.c
++++ b/net/core/filter.c
+@@ -777,6 +777,11 @@ static int bpf_check_classic(const struct sock_filter *filter,
+ 			if (ftest->k == 0)
+ 				return -EINVAL;
+ 			break;
++		case BPF_ALU | BPF_LSH | BPF_K:
++		case BPF_ALU | BPF_RSH | BPF_K:
++			if (ftest->k >= 32)
++				return -EINVAL;
++			break;
+ 		case BPF_LD | BPF_MEM:
+ 		case BPF_LDX | BPF_MEM:
+ 		case BPF_ST:
+-- 
+2.6.4
