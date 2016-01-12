@@ -1,81 +1,43 @@
-From: leoli@freescale.com (Li Yang)
-Date: Tue, 12 Jan 2016 22:17:50 +0800
-Subject: [PATCH v3 2/2] dts/ls2080a: Update DTSI to add support of SP805
- WDT
-In-Reply-To: <20151225015616.GA27329@dragon>
-References: <1450189825-29065-1-git-send-email-bhupesh.sharma@freescale.com>
- <1450189825-29065-3-git-send-email-bhupesh.sharma@freescale.com>
- <CAFTCetS7P6wF3MhgMSXSXP_jnLQvBc-NSY0TW3OOnCjtbL0N_w@mail.gmail.com>
- <201512241118.32946.arnd@arndb.de>
- <BN3PR0301MB1298AF2C5A88FCA392D0E9DD82E70@BN3PR0301MB1298.namprd03.prod.outlook.com>
- <20151225015616.GA27329@dragon>
-Message-ID: <CADRPPNTS4yD6LEJTZy-307jT0n+sQcCWf3Gj1mrUWoaTyMZB6w@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 12 Jan 2016 22:17:31 +0800
+Subject: [PATCH] ARM: sunxi: Add CPU regulator for cpufreq
+In-Reply-To: <1452607153-8698-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1452607153-8698-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v67a7DATu-sesVPE9Aypn_n0-K++TjdpXmxRSMZRiyHJ7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 25, 2015 at 9:56 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Thu, Dec 24, 2015 at 08:41:54PM +0000, Sharma Bhupesh wrote:
->>
->>
->> > -----Original Message-----
->> > From: Arnd Bergmann [mailto:arnd at arndb.de]
->> > Sent: Thursday, December 24, 2015 3:49 PM
->> > To: Bhupesh SHARMA
->> > Cc: Sharma Bhupesh-B45370; Mark Rutland; linux-arm-
->> > kernel at lists.infradead.org; Olof Johansson; devicetree at vger.kernel.org;
->> > Rob Herring; Will Deacon; Catalin Marinas; Li Yang-Leo-R58472; Wood
->> > Scott-B07421; Yoder Stuart-B08248; shawn.guo at linaro.org
->> > Subject: Re: [PATCH v3 2/2] dts/ls2080a: Update DTSI to add support of
->> > SP805 WDT
->> >
->> > On Wednesday 23 December 2015, Bhupesh SHARMA wrote:
->> > >
->> > > Hi Arnd, Olof, Kevin
->> > >
->> > > On Tue, Dec 15, 2015 at 8:00 PM, Bhupesh Sharma
->> > > <bhupesh.sharma@freescale.com> wrote:
->> > > > This patch updates the LS2080a DTSI (DTS Include) file to add
->> > > > support for eight SP805 Watchdog units which can be used to reset
->> > > > the eight Cortex-A57 cores available on LS2080A.
->> > > >
->> > > > Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
->> > > > ---
->> > > >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |   56
->> > ++++++++++++++++++++++++
->> > > >  1 file changed, 56 insertions(+)
->> > >
->> > > Since Rob has acked the SP805 WDT binding documentation patch (patch
->> > > 1/2 of this series),
->> > > can this DTSI change, please be considered for absorption in the arm-
->> > soc tree.
->> >
->> > Sure, please submit it for inclusion. Who is the maintainer for
->> > arch/arm64/boot/dts/freescale/ ? Can they pick up all the freescale
->> > related dts changes and submit them as a pull request? Should they go
->> > through Shawn's tree maybe?
->>
->> Thanks Arnd. For now, may-be I can send this patchset with Rob's Acked-by added
->> for 1/2 to 'arm at kernel.org'. So that this can be picked by via the arm-soc tree.
->> Shawn, I hope it's ok with you.
+On Tue, Jan 12, 2016 at 9:59 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The current DT doesn't have a phandle to the CPU regulator in the CPU node,
+> which disables the CPU voltage scaling entirely.
+
+Commit message doesn't say which chip (family).
+
+ChenYu
+
+> Add that phandle.
 >
-> Yeah.  I'm maintaining a git tree, collecting all Freescale arm32
-> platform patches, and sending them to arm-soc for each merge window.
-> If I can be copied on those arm64 patches, I do not mind handling them
-> together with arm32 ones.
-
-Shawn,  Thanks a lot for offering to help.
-
-Sorry for a very delayed response as I was on vacation.  I have
-recently been made responsible by the company to push and track the
-upstreaming of all armv8 related software within the Digital
-Networking group of FSL/NXP which is currently the only business unit
-to use ARMv8 cores.  We also agreed in an internal discussion that it
-will be good for me to also help organize patches for upstream
-acceptance.  I think I can help to make it more effective in
-communicating community requirements and feedback to all related
-developers and their management.  And I can also help to enable the
-internal test team to better test the staging patches before they hit
-the mainline.
-
-Regards,
-Leo
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun5i-r8-chip.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
+> index 530ab28e9ca2..f6898c6b84d4 100644
+> --- a/arch/arm/boot/dts/sun5i-r8-chip.dts
+> +++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
+> @@ -70,6 +70,10 @@
+>         status = "okay";
+>  };
+>
+> +&cpu0 {
+> +       cpu-supply = <&reg_dcdc2>;
+> +};
+> +
+>  &ehci0 {
+>         status = "okay";
+>  };
+> --
+> 2.6.4
+>
