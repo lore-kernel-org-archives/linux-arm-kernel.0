@@ -1,42 +1,39 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 Jan 2016 13:31:59 +0000
-Subject: [PATCH] kbuild: Demote 'sign-compare' warning to W=2
-Message-ID: <1452605519-26797-1-git-send-email-lee.jones@linaro.org>
+Date: Tue, 12 Jan 2016 13:34:37 +0000
+Subject: [PATCH 1/3] ARM: STi: Add DT defines for co-processor reset lines
+In-Reply-To: <1445856969-19424-1-git-send-email-lee.jones@linaro.org>
+References: <1445856969-19424-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20160112133437.GH27358@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ideally, a kernel compile with W=1 enabled should complete cleanly;
-however, when we run one currently we are presented with ~25k warnings.
-'sign-compare' accounts for ~22k of those ~25k.
+On Mon, 26 Oct 2015, Lee Jones wrote:
 
-In this patch we're demoting 'sign-compare' warnings to W=2, with a view
-to fixing the remaining 3k W=1 warnings required for a clean build.
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  include/dt-bindings/reset-controller/stih407-resets.h | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/include/dt-bindings/reset-controller/stih407-resets.h b/include/dt-bindings/reset-controller/stih407-resets.h
+> index 02d4328..4ab3a1c 100644
+> --- a/include/dt-bindings/reset-controller/stih407-resets.h
+> +++ b/include/dt-bindings/reset-controller/stih407-resets.h
+> @@ -52,6 +52,10 @@
+>  #define STIH407_KEYSCAN_SOFTRESET	26
+>  #define STIH407_USB2_PORT0_SOFTRESET	27
+>  #define STIH407_USB2_PORT1_SOFTRESET	28
+> +#define STIH407_ST231_AUD_SOFTRESET	29
+> +#define STIH407_ST231_DMU_SOFTRESET	30
+> +#define STIH407_ST231_GP0_SOFTRESET	31
+> +#define STIH407_ST231_GP1_SOFTRESET	32
+>  
+>  /* Picophy reset defines */
+>  #define STIH407_PICOPHY0_RESET		0
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- scripts/Makefile.extrawarn | 2 ++
- 1 file changed, 2 insertions(+)
+Has anyone seen this patch?
 
-diff --git a/scripts/Makefile.extrawarn b/scripts/Makefile.extrawarn
-index 4efedcb..f9e47a7 100644
---- a/scripts/Makefile.extrawarn
-+++ b/scripts/Makefile.extrawarn
-@@ -25,6 +25,7 @@ warning-1 += -Wold-style-definition
- warning-1 += $(call cc-option, -Wmissing-include-dirs)
- warning-1 += $(call cc-option, -Wunused-but-set-variable)
- warning-1 += $(call cc-disable-warning, missing-field-initializers)
-+warning-1 += $(call cc-disable-warning, sign-compare)
- 
- warning-2 := -Waggregate-return
- warning-2 += -Wcast-align
-@@ -33,6 +34,7 @@ warning-2 += -Wnested-externs
- warning-2 += -Wshadow
- warning-2 += $(call cc-option, -Wlogical-op)
- warning-2 += $(call cc-option, -Wmissing-field-initializers)
-+warning-2 += $(call cc-option, -Wsign-compare)
- 
- warning-3 := -Wbad-function-cast
- warning-3 += -Wcast-qual
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
