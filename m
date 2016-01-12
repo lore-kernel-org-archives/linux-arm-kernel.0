@@ -1,217 +1,40 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 12 Jan 2016 18:32:38 +0800
-Subject: [PATCH v2 1/1] USB: core: let USB device know device node
-Message-ID: <1452594758-23417-1-git-send-email-peter.chen@freescale.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 12 Jan 2016 11:40:12 +0100
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160112102555.GV6373@twins.programming.kicks-ass.net>
+References: <1452426622-4471-12-git-send-email-mst@redhat.com>
+ <56945366.2090504@imgtec.com>
+ <20160112092711.GP6344@twins.programming.kicks-ass.net>
+ <20160112102555.GV6373@twins.programming.kicks-ass.net>
+Message-ID: <20160112104012.GW6373@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although most of USB devices are hot-plug's, there are still some devices
-are hard wired on the board, eg, for HSIC and SSIC interface USB devices.
-If these kinds of USB devices are multiple functions, and they can supply
-other interfaces like i2c, gpios for other devices, we may need to
-descirbe these at device tree.
+On Tue, Jan 12, 2016 at 11:25:55AM +0100, Peter Zijlstra wrote:
+> On Tue, Jan 12, 2016 at 10:27:11AM +0100, Peter Zijlstra wrote:
+> > 2) the changelog _completely_ fails to explain the sync 0x11 and sync
+> > 0x12 semantics nor does it provide a publicly accessible link to
+> > documentation that does.
+> 
+> Ralf pointed me at: https://imgtec.com/mips/architectures/mips64/
+> 
+> > 3) it really should have explained what you did with
+> > smp_llsc_mb/smp_mb__before_llsc() in _detail_.
+> 
+> And reading the MIPS64 v6.04 instruction set manual, I think 0x11/0x12
+> are _NOT_ transitive and therefore cannot be used to implement the
+> smp_mb__{before,after} stuff.
+> 
+> That is, in MIPS speak, those SYNC types are Ordering Barriers, not
+> Completion Barriers. They need not be globally performed.
 
-In this commit, it uses "reg" in dts as port number to match the port
-number decided by USB core, if they are the same, then the device node
-is for the device we are creating for USB core.
+Which if true; and I know Will has some questions here; would also mean
+that you 'cannot' use the ACQUIRE/RELEASE barriers for your locks as was
+recently suggested by David Daney.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
+That is, currently all architectures -- with exception of PPC -- have
+RCsc locks, but using these non-transitive things will get you RCpc
+locks.
 
----
-
-Changes for v2:
-- Fix build error reported by kbuild robot, lack of "static" for
-  inline usb_of_get_child_node  
-- Fix typo, "devcie_node" -> "device_node"
-- Add kernel-doc for of_node at struct usb_device
-
-Changes from RFC:
-- Fix the error address for binding doc, and add compatible for binding doc
-- Change get child node API from "usb_of_find_node" to
-  "usb_of_get_child_node"
-- Delete unecessary header files
-- One typo
-
- .../devicetree/bindings/usb/usb-device.txt         | 17 ++++++++
- drivers/usb/core/Makefile                          |  2 +-
- drivers/usb/core/of.c                              | 47 ++++++++++++++++++++++
- drivers/usb/core/usb.c                             |  8 +++-
- include/linux/usb.h                                |  3 ++
- include/linux/usb/of.h                             |  7 ++++
- 6 files changed, 81 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/usb/usb-device.txt
- create mode 100644 drivers/usb/core/of.c
-
-diff --git a/Documentation/devicetree/bindings/usb/usb-device.txt b/Documentation/devicetree/bindings/usb/usb-device.txt
-new file mode 100644
-index 0000000..0468834
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/usb-device.txt
-@@ -0,0 +1,17 @@
-+Generic USB Device Properties
-+
-+Usually, we only use device tree for hard wired USB device.
-+The reference binding doc is from:
-+http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
-+
-+Required properties:
-+- compatible: usbVID,PID
-+- reg: the port number which this device is connecting to.
-+
-+
-+Example:
-+
-+hub: genesys at 01 {
-+	compatible = "usb05e3,0608";
-+	reg = <0x01>;
-+};
-diff --git a/drivers/usb/core/Makefile b/drivers/usb/core/Makefile
-index 2f6f932..9780877 100644
---- a/drivers/usb/core/Makefile
-+++ b/drivers/usb/core/Makefile
-@@ -5,7 +5,7 @@
- usbcore-y := usb.o hub.o hcd.o urb.o message.o driver.o
- usbcore-y += config.o file.o buffer.o sysfs.o endpoint.o
- usbcore-y += devio.o notify.o generic.o quirks.o devices.o
--usbcore-y += port.o
-+usbcore-y += port.o of.o
- 
- usbcore-$(CONFIG_PCI)		+= hcd-pci.o
- usbcore-$(CONFIG_ACPI)		+= usb-acpi.o
-diff --git a/drivers/usb/core/of.c b/drivers/usb/core/of.c
-new file mode 100644
-index 0000000..2289700
---- /dev/null
-+++ b/drivers/usb/core/of.c
-@@ -0,0 +1,47 @@
-+/*
-+ * of.c		The helpers for hcd device tree support
-+ *
-+ * Copyright (C) 2016 Freescale Semiconductor, Inc.
-+ * Author: Peter Chen <peter.chen@freescale.com>
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2  of
-+ * the License as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/of.h>
-+
-+/**
-+ * usb_of_get_child_node - Find the device node match port number
-+ * @parent: the parent device node
-+ * @portnum: the port number which device is connecting
-+ *
-+ * Find the node from device tree according to its port number.
-+ *
-+ * Return: On success, a pointer to the device node, %NULL on failure.
-+ */
-+struct device_node *usb_of_get_child_node(struct device_node *parent,
-+					int portnum)
-+{
-+	struct device_node *node;
-+	u32 port;
-+
-+	for_each_child_of_node(parent, node) {
-+		if (!of_property_read_u32(node, "reg", &port)) {
-+			if (port == portnum)
-+				return node;
-+		}
-+	}
-+
-+	return NULL;
-+}
-+EXPORT_SYMBOL_GPL(usb_of_get_child_node);
-+
-diff --git a/drivers/usb/core/usb.c b/drivers/usb/core/usb.c
-index 77e4c9b..64c094e 100644
---- a/drivers/usb/core/usb.c
-+++ b/drivers/usb/core/usb.c
-@@ -36,6 +36,7 @@
- #include <linux/mutex.h>
- #include <linux/workqueue.h>
- #include <linux/debugfs.h>
-+#include <linux/usb/of.h>
- 
- #include <asm/io.h>
- #include <linux/scatterlist.h>
-@@ -502,11 +503,14 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
- 	dev->connect_time = jiffies;
- 	dev->active_duration = -jiffies;
- #endif
--	if (root_hub)	/* Root hub always ok [and always wired] */
-+	if (root_hub) {	/* Root hub always ok [and always wired] */
- 		dev->authorized = 1;
--	else {
-+		dev->of_node = bus->controller->of_node;
-+	} else {
- 		dev->authorized = !!HCD_DEV_AUTHORIZED(usb_hcd);
- 		dev->wusb = usb_bus_is_wusb(bus) ? 1 : 0;
-+		dev->dev.of_node = usb_of_get_child_node
-+			(parent->of_node, dev->portnum);
- 	}
- 	return dev;
- }
-diff --git a/include/linux/usb.h b/include/linux/usb.h
-index 89533ba..98fa1f4 100644
---- a/include/linux/usb.h
-+++ b/include/linux/usb.h
-@@ -25,6 +25,7 @@
- struct usb_device;
- struct usb_driver;
- struct wusb_dev;
-+struct device_node;
- 
- /*-------------------------------------------------------------------------*/
- 
-@@ -536,6 +537,7 @@ struct usb3_lpm_parameters {
-  *	to keep track of the number of functions that require USB 3.0 Link Power
-  *	Management to be disabled for this usb_device.  This count should only
-  *	be manipulated by those functions, with the bandwidth_mutex is held.
-+ * @of_node: Associated device tree node
-  *
-  * Notes:
-  * Usbcore drivers should not set usbdev->state directly.  Instead use
-@@ -616,6 +618,7 @@ struct usb_device {
- 	struct usb3_lpm_parameters u1_params;
- 	struct usb3_lpm_parameters u2_params;
- 	unsigned lpm_disable_count;
-+	struct device_node	*of_node;
- };
- #define	to_usb_device(d) container_of(d, struct usb_device, dev)
- 
-diff --git a/include/linux/usb/of.h b/include/linux/usb/of.h
-index 974bce9..de3237f 100644
---- a/include/linux/usb/of.h
-+++ b/include/linux/usb/of.h
-@@ -16,6 +16,8 @@ enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *phy_np);
- bool of_usb_host_tpl_support(struct device_node *np);
- int of_usb_update_otg_caps(struct device_node *np,
- 			struct usb_otg_caps *otg_caps);
-+struct device_node *usb_of_get_child_node(struct device_node *parent,
-+			int portnum);
- #else
- static inline enum usb_dr_mode
- of_usb_get_dr_mode_by_phy(struct device_node *phy_np)
-@@ -31,6 +33,11 @@ static inline int of_usb_update_otg_caps(struct device_node *np,
- {
- 	return 0;
- }
-+static inline struct device_node *usb_of_get_child_node
-+		(struct device_node *parent, int portnum)
-+{
-+	return NULL;
-+}
- #endif
- 
- #if IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_USB_SUPPORT)
--- 
-1.9.1
+So yes, MIPS can go RCpc for its locks and share the burden of pain with
+PPC, but that needs to be a very concious decision.
