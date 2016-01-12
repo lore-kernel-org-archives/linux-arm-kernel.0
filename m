@@ -1,163 +1,95 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 11 Jan 2016 16:51:58 -0800
-Subject: [PATCH v6 6/6] arm/arm64: KVM: Enable armv8 fp/simd enhanced
- context switch
-In-Reply-To: <20160110163223.GH30867@cbox>
-References: <1451167016-3787-1-git-send-email-m.smarduch@samsung.com>
- <20160110163223.GH30867@cbox>
-Message-ID: <56944E2E.4030600@samsung.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 12 Jan 2016 09:52:25 +0900
+Subject: [PATCH -next] arm: Select GPIO_GENERIC_PLATFORM for CRAGG_6410
+In-Reply-To: <1452531649-14940-1-git-send-email-linux@roeck-us.net>
+References: <1452531649-14940-1-git-send-email-linux@roeck-us.net>
+Message-ID: <56944E49.3040707@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12.01.2016 02:00, Guenter Roeck wrote:
+> Since commit 0f4630f3720e ("gpio: generic: factor into gpio_chip struct"),
+> all users of struct bgpio_pdata depend on GPIO_GENERIC.
+> 
+> This results in the following build error.
+> 
+> arch/arm/mach-s3c64xx/mach-crag6410.c:270:3: warning:
+> 	excess elements in struct initializer
+> arch/arm/mach-s3c64xx/mach-crag6410.c:270:3: warning:
+> 	(near initialization for '(anonymous)')
+> arch/arm/mach-s3c64xx/mach-crag6410.c:271:2: error:
+> 	invalid use of undefined type 'struct bgpio_pdata'
+> 
+> Fixes: 0f4630f3720e ("gpio: generic: factor into gpio_chip struct")
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+> I don't know if this is the correct way to fix this problem.
+> If not, please consider this to be a bug report.
+> 
+>  arch/arm/mach-s3c64xx/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+
+Thanks for the report! I think that:
+
+1. Other boards using the bgpio_pdata might be also affected:
+mach-clps711x/board-autcpu12.c
+mach-clps711x/board-p720t.c
+mach-imx/mach-mx21ads.c
+
+2. The boards does not directly depend on the GPIO_GENERIC.
+If GPIO_GENERIC is not selected then it still might create
+a basic-mmio-gpio device. The device of course won't be in
+such case supported by any driver.
 
 
-On 1/10/2016 8:32 AM, Christoffer Dall wrote:
-> On Sat, Dec 26, 2015 at 01:56:56PM -0800, Mario Smarduch wrote:
->> Enable armv8 enhanced fp/simd context switch. Guest and host registers are only
->> context switched on first access and vcpu put.
->>
->> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->> ---
->>  arch/arm/kvm/arm.c              | 13 +++++++++++--
->>  arch/arm64/kernel/asm-offsets.c |  1 +
->>  arch/arm64/kvm/hyp/entry.S      |  1 +
->>  arch/arm64/kvm/hyp/switch.c     | 26 ++------------------------
->>  4 files changed, 15 insertions(+), 26 deletions(-)
->>
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index b16ed98..633a208 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -316,10 +316,19 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
->>  void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
->>  {
->>  	/* If the fp/simd registers are dirty save guest, restore host. */
->> -	if (vcpu_vfp_isdirty(vcpu))
->> +	if (vcpu_vfp_isdirty(vcpu)) {
->> +
->>  		vcpu_restore_host_vfp_state(vcpu);
->>  
->> -	/* Restore host FPEXC trashed in vcpu_load */
->> +		/*
->> +		 * For 32bit guest on arm64 save the guest fpexc register
->> +		 * in EL2 mode.
->> +		 */
->> +		if (vcpu_guest_is_32bit(vcpu))
->> +			vcpu_save_fpexc(vcpu);
->> +	}
->> +
->> +	/* For arm32 restore host FPEXC trashed in vcpu_load. */
->>  	vcpu_restore_host_fpexc(vcpu);
->>  
->>  	/*
->> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
->> index 94090a6..d69145c 100644
->> --- a/arch/arm64/kernel/asm-offsets.c
->> +++ b/arch/arm64/kernel/asm-offsets.c
->> @@ -112,6 +112,7 @@ int main(void)
->>    DEFINE(VCPU_ESR_EL2,		offsetof(struct kvm_vcpu, arch.fault.esr_el2));
->>    DEFINE(VCPU_FAR_EL2,		offsetof(struct kvm_vcpu, arch.fault.far_el2));
->>    DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
->> +  DEFINE(VCPU_CPTR_EL2,		offsetof(struct kvm_vcpu, arch.cptr_el2));
->>    DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
->>  #endif
->>  #ifdef CONFIG_CPU_PM
->> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
->> index fd0fbe9..ce7e903 100644
->> --- a/arch/arm64/kvm/hyp/entry.S
->> +++ b/arch/arm64/kvm/hyp/entry.S
->> @@ -136,6 +136,7 @@ ENTRY(__fpsimd_guest_restore)
->>  	isb
->>  
->>  	mrs	x3, tpidr_el2
->> +	str	w2, [x3, #VCPU_CPTR_EL2]
-> 
-> I'm confused here, why do we need to do this now and not in the previous
-> patch?
+Instead to solve the error the structure should be
+always visible so:
 
-There should be no harm doing it in previous patch, but this patch
-activates the lazy switch and I thought this would be a better
-place for it.
 
-> 
-> Maybe it helps if we merge these last two patches into one.
-> 
->>  
->>  	ldr	x0, [x3, #VCPU_HOST_CONTEXT]
->>  	kern_hyp_va x0
->> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
->> index ca8f5a5..962d179 100644
->> --- a/arch/arm64/kvm/hyp/switch.c
->> +++ b/arch/arm64/kvm/hyp/switch.c
->> @@ -19,24 +19,10 @@
->>  
->>  static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
->>  {
->> -	u64 val;
->> -
->> -	/*
->> -	 * We are about to set CPTR_EL2.TFP to trap all floating point
->> -	 * register accesses to EL2, however, the ARM ARM clearly states that
->> -	 * traps are only taken to EL2 if the operation would not otherwise
->> -	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
->> -	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
->> -	 */
->> -	val = vcpu->arch.hcr_el2;
->> -	if (!(val & HCR_RW)) {
->> -		write_sysreg(1 << 30, fpexc32_el2);
->> -		isb();
->> -	}
->> -	write_sysreg(val, hcr_el2);
->> +	write_sysreg(vcpu->arch.hcr_el2, hcr_el2);
->>  	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
->>  	write_sysreg(1 << 15, hstr_el2);
->> -	write_sysreg(CPTR_EL2_TTA | CPTR_EL2_TFP, cptr_el2);
->> +	write_sysreg(vcpu->arch.cptr_el2, cptr_el2);
->>  	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
->>  }
->>  
->> @@ -89,7 +75,6 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
->>  {
->>  	struct kvm_cpu_context *host_ctxt;
->>  	struct kvm_cpu_context *guest_ctxt;
->> -	bool fp_enabled;
->>  	u64 exit_code;
->>  
->>  	vcpu = kern_hyp_va(vcpu);
->> @@ -119,8 +104,6 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
->>  	exit_code = __guest_enter(vcpu, host_ctxt);
->>  	/* And we're baaack! */
->>  
->> -	fp_enabled = __fpsimd_enabled();
->> -
->>  	__sysreg_save_state(guest_ctxt);
->>  	__sysreg32_save_state(vcpu);
->>  	__timer_save_state(vcpu);
->> @@ -131,11 +114,6 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
->>  
->>  	__sysreg_restore_state(host_ctxt);
->>  
->> -	if (fp_enabled) {
->> -		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
->> -		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
->> -	}
->> -
-> 
-> why do we remove this logic here but preserve something in
-> __sysreg32_save_state() ?
+-- >8 --
+From: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Date: Tue, 12 Jan 2016 09:46:06 +0900
+Subject: [PATCH] gpio: generic: Fix build error of missing bgpio_pdata
+ declaration
 
-Missed it, fpexec code should be removed, that's taken care of
-in vcpu_put which stores it to same memory. Thanks for spotting it.
+Commit 0f4630f3720e ("gpio: generic: factor into gpio_chip struct")
+introduced struct bgpio_pdata along with users but made the declaration
+hidden by CONFIG_GPIO_GENERIC.
 
-> 
-> 
-> 
->>  	__debug_save_state(vcpu, kern_hyp_va(vcpu->arch.debug_ptr), guest_ctxt);
->>  	__debug_cond_restore_host_state(vcpu);
->>  
->> -- 
->> 1.9.1
->>
-> Thanks,
-> -Christoffer
-> 
+This results in the following build error:
+
+arch/arm/mach-s3c64xx/mach-crag6410.c:270:3: warning: 	excess elements in struct initializer
+arch/arm/mach-s3c64xx/mach-crag6410.c:270:3: warning:	(near initialization for '(anonymous)')
+arch/arm/mach-s3c64xx/mach-crag6410.c:271:2: error:	invalid use of undefined type 'struct bgpio_pdata'
+
+Fixes: 0f4630f3720e ("gpio: generic: factor into gpio_chip struct")
+Reported-by: Guenter Roeck <linux@roeck-us.net>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ include/linux/gpio/driver.h | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/include/linux/gpio/driver.h b/include/linux/gpio/driver.h
+index e2d05fd0e6e3..7b9054366e7a 100644
+--- a/include/linux/gpio/driver.h
++++ b/include/linux/gpio/driver.h
+@@ -220,14 +220,13 @@ static inline void *gpiochip_get_data(struct gpio_chip *chip)
+ 
+ struct gpio_chip *gpiod_to_chip(const struct gpio_desc *desc);
+ 
+-#if IS_ENABLED(CONFIG_GPIO_GENERIC)
+-
+ struct bgpio_pdata {
+ 	const char *label;
+ 	int base;
+ 	int ngpio;
+ };
+ 
++#if IS_ENABLED(CONFIG_GPIO_GENERIC)
+ int bgpio_init(struct gpio_chip *gc, struct device *dev,
+ 	       unsigned long sz, void __iomem *dat, void __iomem *set,
+ 	       void __iomem *clr, void __iomem *dirout, void __iomem *dirin,
+-- 
+1.9.1
