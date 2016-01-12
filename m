@@ -1,63 +1,50 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Tue, 12 Jan 2016 06:42:42 +0100
-Subject: [PATCH] ASoC: mediatek: Enable 33bit memory address to support
- 4GB DRAM
-In-Reply-To: <1452567284.8331.12.camel@mtksdaap41>
-References: <1452499250-5202-1-git-send-email-pc.liao@mediatek.com>
- <s5hwprgcwv6.wl-tiwai@suse.de>
- <1452567284.8331.12.camel@mtksdaap41>
-Message-ID: <s5h37u3pd4d.wl-tiwai@suse.de>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Tue, 12 Jan 2016 15:34:33 +0900
+Subject: [PATCH] arm: irq: l2c: do not print error in case of missing l2c from
+ dtb
+Message-ID: <1452580473-10073-1-git-send-email-andi.shyti@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Jan 2016 03:54:44 +0100,
-PC Liao wrote:
-> 
-> On Mon, 2016-01-11 at 17:02 +0800, Takashi Iwai wrote:
-> > On Mon, 11 Jan 2016 09:00:50 +0100,
-> > PC Liao wrote:
-> > > 
-> > > @@ -603,7 +606,10 @@ static int mtk_afe_dais_hw_params(struct snd_pcm_substream *substream,
-> > >  	if (ret < 0)
-> > >  		return ret;
-> > >  
-> > > -	memif->phys_buf_addr = substream->runtime->dma_addr;
-> > > +	if (sizeof(dma_addr_t) > 4)
-> > > +		msb_at_bit33 = (substream->runtime->dma_addr & 0x100000000) ? 1 : 0;
-> > 
-> > Better to put a proper suffix for the constant over 32bit.
-> > 
-> > Or use upper_32_bits().  Then sizeof() check can be omitted, as the
-> > compiler should be smart enough to know it beforehand.
-> > 
-> > 
-> > Takashi
-> 
-> 
-> Hi Takashi,
-> 
-> Thanks for your comment.
-> I change as below:
-> @@ -606,10 +606,8 @@ static int mtk_afe_dais_hw_params(struct
-> snd_pcm_substream
->         if (ret < 0)
->                 return ret;
-> 
-> -       if (sizeof(dma_addr_t) > 4)
-> -               msb_at_bit33 = (substream->runtime->dma_addr &
-> 0x100000000) ? 1
-> -
-> -       memif->phys_buf_addr = substream->runtime->dma_addr &
-> 0xffffffff;
-> +       msb_at_bit33 = upper_32_bits(substream->runtime->dma_addr) ? 1 :
-> 0;
-> +       memif->phys_buf_addr =
-> lower_32_bits(substream->runtime->dma_addr);
-> 
-> 
-> Dose this change follow your idea?
+In some architectures the L2 cache controller is integrated in the
+processor's block itself and it doesn't use any external cache
+controller. This means that an entry in the board's dtb related
+to the l2c is not necessary.
 
-Yes.
+Distinguish between error codes and print just an information in
+case of -ENODEV.
 
+This patch converts the following error message:
 
-Takashi
+   L2C: failed to init: -19
+
+to the following info:
+
+   no L2C controller entry found in the dtb
+
+on boards like odroid-xu4, cortex A7/A15, which don't have
+external cache controller.
+
+Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/kernel/irq.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 1d45320..abe1ad8 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -95,7 +95,9 @@ void __init init_IRQ(void)
+ 			outer_cache.write_sec = machine_desc->l2c_write_sec;
+ 		ret = l2x0_of_init(machine_desc->l2c_aux_val,
+ 				   machine_desc->l2c_aux_mask);
+-		if (ret)
++		if (ret == -ENODEV)
++			pr_info("no L2C controller entry found in the dtb\n");
++		else if (ret)
+ 			pr_err("L2C: failed to init: %d\n", ret);
+ 	}
+ 
+-- 
+2.6.4
