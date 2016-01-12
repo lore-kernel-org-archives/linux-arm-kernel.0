@@ -1,68 +1,75 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Tue, 12 Jan 2016 09:22:20 -0600
-Subject: /sys/class/power_supply/bq27200-0/capacity changed meaning
- between 4.1 and 4.4?
-In-Reply-To: <56942344.9070609@ti.com>
-References: <20160109230709.GA30551@amd> <5693BB75.70409@ti.com>
- <20160111214247.GA9735@amd> <56942344.9070609@ti.com>
-Message-ID: <56951A2C.9010602@ti.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 12 Jan 2016 16:25:58 +0100
+Subject: [PATCHv2 1/2] remove redundant struct clk NULL checks
+In-Reply-To: <1452611876-451-2-git-send-email-LW@KARO-electronics.de>
+References: <1452611876-451-1-git-send-email-LW@KARO-electronics.de>
+ <1452611876-451-2-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1452612358.3694.44.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2016 03:48 PM, Andrew F. Davis wrote:
-> On 01/11/2016 03:42 PM, Pavel Machek wrote:
->> Hi!
->>
->>>> Did /sys/class/power_supply/bq27200-0/capacity change meaning between
->>>> 4.1 and 4.4?
->>
->>> There was a resent overhaul of this driver and a lot of code is
->>> vestigial as you have seen. I've been meaning to continue
->>> cleaning it up, my next step would probably to bring up regmap
->>
->> Ok, 1wire is probably reasonable approach. But we have an regression
->> between 4.1 and 4.4, and to debug it is probably by reading code.
->>
->> I can't prove you caused the regression, but you basically rewrote the
->> driver, so it should be easier for you to spot the bug.
->>
->
-> Makes sense.
->
->> n900 has this variant:
->>
->>             bq27200: bq27200 at 55 {
->>                      compatible = "ti,bq27200";
->>                reg = <0x55>;
->>       };
->>
->
-> Hmmm, not sure if I have this one on hand, I'll see if I can find an
-> n900 around here (they seem to be pretty popular around here for testing
-> (had a lot of TI parts)).
->
->> Will you try?
->>
->> If not, tell me, and I can do it, but it will involve a lot of swaring...
->>
->
-> I'll give it a look over.
+Am Dienstag, den 12.01.2016, 16:17 +0100 schrieb Lothar Wa?mann:
+> NULL is a valid argument to clk_enable()/clk_disable(). Remove
+> redundant checks before calling those functions.
+> 
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 
-OK, I'm still looking for a test setup, but this was definitely a problem,
-could you give this a try?:
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
-diff --git a/drivers/power/bq27xxx_battery.c b/drivers/power/bq27xxx_battery.c
-index 880233c..4fec3cf 100644
---- a/drivers/power/bq27xxx_battery.c
-+++ b/drivers/power/bq27xxx_battery.c
-@@ -470,8 +470,9 @@ static inline int bq27xxx_read(struct bq27xxx_device_info *di, int reg_index,
-  static int bq27xxx_battery_read_soc(struct bq27xxx_device_info *di)
-  {
-  	int soc;
-+	bool single = di->chip == BQ27000 || di->chip == BQ27010;
-  
--	soc = bq27xxx_read(di, BQ27XXX_REG_SOC, false);
-+	soc = bq27xxx_read(di, BQ27XXX_REG_SOC, single);
-  
-  	if (soc < 0)
-  		dev_dbg(di->dev, "error reading State-of-Charge\n");
+> ---
+>  drivers/net/ethernet/freescale/fec_main.c | 23 +++++++++--------------
+>  1 file changed, 9 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+> index 502da6f..592a7a4 100644
+> --- a/drivers/net/ethernet/freescale/fec_main.c
+> +++ b/drivers/net/ethernet/freescale/fec_main.c
+> @@ -1874,35 +1874,30 @@ static int fec_enet_clk_enable(struct net_device *ndev, bool enable)
+>  			}
+>  			mutex_unlock(&fep->ptp_clk_mutex);
+>  		}
+> -		if (fep->clk_ref) {
+> -			ret = clk_prepare_enable(fep->clk_ref);
+> -			if (ret)
+> -				goto failed_clk_ref;
+> -		}
+> +
+> +		ret = clk_prepare_enable(fep->clk_ref);
+> +		if (ret)
+> +			goto failed_clk_ref;
+>  	} else {
+>  		clk_disable_unprepare(fep->clk_ahb);
+> -		if (fep->clk_enet_out)
+> -			clk_disable_unprepare(fep->clk_enet_out);
+> +		clk_disable_unprepare(fep->clk_enet_out);
+>  		if (fep->clk_ptp) {
+>  			mutex_lock(&fep->ptp_clk_mutex);
+>  			clk_disable_unprepare(fep->clk_ptp);
+>  			fep->ptp_clk_on = false;
+>  			mutex_unlock(&fep->ptp_clk_mutex);
+>  		}
+> -		if (fep->clk_ref)
+> -			clk_disable_unprepare(fep->clk_ref);
+> +		clk_disable_unprepare(fep->clk_ref);
+>  	}
+>  
+>  	return 0;
+>  
+>  failed_clk_ref:
+> -	if (fep->clk_ref)
+> -		clk_disable_unprepare(fep->clk_ref);
+> +	clk_disable_unprepare(fep->clk_ref);
+>  failed_clk_ptp:
+> -	if (fep->clk_enet_out)
+> -		clk_disable_unprepare(fep->clk_enet_out);
+> +	clk_disable_unprepare(fep->clk_enet_out);
+>  failed_clk_enet_out:
+> -		clk_disable_unprepare(fep->clk_ahb);
+> +	clk_disable_unprepare(fep->clk_ahb);
+>  
+>  	return ret;
+>  }
+
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
