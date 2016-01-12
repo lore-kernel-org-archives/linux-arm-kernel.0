@@ -1,33 +1,57 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 12 Jan 2016 20:21:17 +0100
-Subject: [PATCH v3 1/2] acpi: Fix proper return code for function
- acpi_gsi_to_irq
-In-Reply-To: <CAGDN=zbbfr8HVKhg4YEieyxzb6jT6eMJ2mTyn6zV9HFD_AA3aA@mail.gmail.com>
-References: <1446857519-5908-1-git-send-email-lho@apm.com>
- <1446857519-5908-2-git-send-email-lho@apm.com>
- <20160110110714.GA22896@pd.tnic>
- <CAGDN=zYa1r23EphdYQTFe2YXRhg_P-RDiaZVms9rdbFA3Y-x3g@mail.gmail.com>
- <20160111221305.GH4665@pd.tnic>
- <CAGDN=zZOr6+q8aAdXB3gnSLfCm6gX-6KLaFPr+A4QMf+TPwR-w@mail.gmail.com>
- <20160112143653.GB30558@pd.tnic>
- <CAGDN=za9Pjm0B0OMJevgesBdkm=XOGyU7jXXfWqk+dLSo7BVtQ@mail.gmail.com>
- <20160112183228.GK30558@pd.tnic>
- <CAGDN=zbbfr8HVKhg4YEieyxzb6jT6eMJ2mTyn6zV9HFD_AA3aA@mail.gmail.com>
-Message-ID: <20160112192117.GL30558@pd.tnic>
+From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
+Date: Tue, 12 Jan 2016 11:23:03 -0800
+Subject: [PATCH] arm64: net: bpf: don't BUG() on large shifts
+In-Reply-To: <20160112171710.GK15737@arm.com>
+References: <1452015543-6790-1-git-send-email-rabin@rab.in>
+ <20160108154423.GC11228@arm.com>
+ <20160108190943.GA11561@ast-mbp.thefacebook.com>
+ <20160112171710.GK15737@arm.com>
+Message-ID: <20160112192302.GA34276@ast-mbp.thefacebook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 10:46:15AM -0800, Tuan Phan wrote:
-> Well, it basically the same as old code except the change of API
-> interface. And it requires some changes in ACPI core and X86/I64 arch
-> code.
+On Tue, Jan 12, 2016 at 05:17:10PM +0000, Will Deacon wrote:
+> On Fri, Jan 08, 2016 at 11:09:44AM -0800, Alexei Starovoitov wrote:
+> > On Fri, Jan 08, 2016 at 03:44:23PM +0000, Will Deacon wrote:
+> > > On Tue, Jan 05, 2016 at 06:39:03PM +0100, Rabin Vincent wrote:
+> > > > Attempting to generate UBFM/SBFM instructions with shifts that can't be
+> > > > encoded in the immediate fields of the opcodes leads to a trigger of a
+> > > > BUG() in the instruction generation code.  As the ARMv8 ARM says: "The
+> > > > shift amounts must be in the range 0 to one less than the register width
+> > > > of the instruction, inclusive."  Make the JIT reject unencodable shifts
+> > > > instead of crashing.
+> > > 
+> > > I moaned about those BUG_ONs when they were introduced:
+> > > 
+> > >   https://lkml.org/lkml/2014/7/17/438
+> > > 
+> > > The response then was that the verifier would catch these issues so
+> > > there was nothing to worry about. Has something changed so that is no
+> > > longer the case? Do we need to consider a different way of rejecting
+> > > invalid instructions at the encoding stage rather than bringing down the
+> > > kernel?
+> > 
+> > that discussion lead to replacement of all BUG_ONs in
+> > arch/arm64/net/bpf_jit_comp.c with pr_err_once(), but looks like
+> > arch/arm64/kernel/insn.c wasn't addressed.
+> > The amount of BUG_ONs there is indeed overkill regardless of what
+> > verifier and other JITs do. btw, x64 JIT doesn't have runtime BUG_ONs.
+> 
+> Maybe, but insn.c is also used by the alternatives patching code, so we
+> really need a way to communicate failure back to the BPF JIT when passed
+> an invalid instruction description.
 
-That's why I said:
+agree. I think there are several options to achieve that after
+all BUG_ONs are removed:
+- change interface for all insn generating macros to check for
+  AARCH64_BREAK_FAULT opcode as error.
+  That will require all of emit*() functions in bpf_jit_comp.c to
+  be changed to accept/return error.
+  Overall that looks like massive change.
+- ignore AARCH64_BREAK_FAULT during emit and add another pass after
+  all code is generated. If such insn is found in a jited code,
+  discard the jit.
+  I think that's better option.
 
-"Patch 1 could be improved. It is Rafael's call in the end of the day."
-
--- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
+Zi, any comments?
+ 
