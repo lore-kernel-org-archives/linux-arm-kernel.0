@@ -1,155 +1,42 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 13 Jan 2016 02:06:08 +0300
-Subject: [PATCH] ARM: shmobile: silk: add DU DT support
-In-Reply-To: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
-References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
-Message-ID: <20467499.tt8XqkxVqn@wasted.cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Jan 2016 00:07:15 +0100
+Subject: [PATCH 1/3] Documentation: Update the APM X-Gene SoC EDAC DTS
+ binding for missing RB
+In-Reply-To: <1452639900-30919-2-git-send-email-lho@apm.com>
+References: <1452639900-30919-1-git-send-email-lho@apm.com>
+ <1452639900-30919-2-git-send-email-lho@apm.com>
+Message-ID: <4027351.WdK3AXxgBQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define  the SILK board dependent part of the DU device node.
-Add the device nodes for the Analog Devices ADV7511W HDMI transmitter
-(connected to DU0) and ADV7123  video DAC (connected to DU1). Add the
-necessary subnodes to interconnect DU, HDMI/VDAC devices, and HDMI/VGA
-connectors.
+On Tuesday 12 January 2016 16:04:58 Loc Ho wrote:
+> --- a/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+> +++ b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+> @@ -16,6 +16,7 @@ Required properties:
+>  - regmap-mcba          : Regmap of the MCB-A (memory bridge) resource.
+>  - regmap-mcbb          : Regmap of the MCB-B (memory bridge) resource.
+>  - regmap-efuse         : Regmap of the PMD efuse resource.
+> +- regmap-rb            : Regmap of the register bus resource.
+>  - reg                  : First resource shall be the CPU bus (PCP) resource.
+>  - interrupts            : Interrupt-specifier for MCU, PMD, L3, or SoC error
+>                           IRQ(s).
+> @@ -64,6 +65,11 @@ Example:
+>                 reg = <0x0 0x1054a000 0x0 0x20>;
+>         };
+>  
+> +       rb: rb at 7e000000 {
+> +               compatible = "apm,xgene-rb", "syscon";
+> +               reg = <0x0 0x7e000000 0x0 0x10>;
+> +       };
+> +
+>         edac at 78800000 {
+>                 compatible = "apm,xgene-edac";
+> 
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+When you add a property, please list that as "optional", not "required",
+to ensure that the old dtb files still conform to the binding.
 
----
-This patch is against the 'renesas-devel-20160111-v4.4' tag of Simon Horman's
-'renesas.git' repo.
+In the driver, make sure it is not a fatal error when the property is
+missing and the driver can keep working without it.
 
- arch/arm/boot/dts/r8a7794-silk.dts |  109 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 109 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7794-silk.dts
-+++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -64,6 +64,61 @@
- 		states = <3300000 1
- 			  1800000 0>;
- 	};
-+
-+	vga-encoder {
-+		compatible = "adi,adv7123";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				adv7123_in: endpoint {
-+					remote-endpoint = <&du_out_rgb1>;
-+				};
-+			};
-+			port at 1 {
-+				reg = <1>;
-+				adv7123_out: endpoint {
-+					remote-endpoint = <&vga_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	hdmi-out {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con: endpoint {
-+				remote-endpoint = <&adv7511_out>;
-+			};
-+		};
-+	};
-+
-+	vga {
-+		compatible = "vga-connector";
-+
-+		port {
-+			vga_in: endpoint {
-+				remote-endpoint = <&adv7123_out>;
-+			};
-+		};
-+	};
-+
-+	x2_clk: x2-clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <148500000>;
-+	};
-+
-+	x3_clk: x3-clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <74250000>;
-+	};
- };
- 
- &extal_clk {
-@@ -164,6 +219,38 @@
- 			};
- 		};
- 	};
-+
-+	hdmi at 39 {
-+		compatible = "adi,adv7511w";
-+		reg = <0x39>;
-+		interrupt-parent = <&gpio5>;
-+		interrupts = <23 IRQ_TYPE_LEVEL_LOW>;
-+
-+		adi,input-depth = <8>;
-+		adi,input-colorspace = "rgb";
-+		adi,input-clock = "1x";
-+		adi,input-style = <1>;
-+		adi,input-justification = "evenly";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				adv7511_in: endpoint {
-+					remote-endpoint = <&du_out_rgb0>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				adv7511_out: endpoint {
-+					remote-endpoint = <&hdmi_con>;
-+				};
-+			};
-+		};
-+	};
- };
- 
- &mmcif0 {
-@@ -258,3 +345,25 @@
- &usbphy {
- 	status = "okay";
- };
-+
-+&du {
-+	status = "okay";
-+
-+	clocks = <&mstp7_clks R8A7794_CLK_DU0>,
-+		 <&mstp7_clks R8A7794_CLK_DU0>,
-+		 <&x2_clk>, <&x3_clk>;
-+	clock-names = "du.0", "du.1", "dclkin.0", "dclkin.1";
-+
-+	ports {
-+		port at 0 {
-+			endpoint {
-+				remote-endpoint = <&adv7511_in>;
-+			};
-+		};
-+		port at 1 {
-+			endpoint {
-+				remote-endpoint = <&adv7123_in>;
-+			};
-+		};
-+	};
-+};
+	Arnd
