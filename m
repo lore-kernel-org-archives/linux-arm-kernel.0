@@ -1,61 +1,42 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 12 Jan 2016 09:56:03 -0800
-Subject: [PATCH V2 11/23] arm64,
- pci: Remove useless boot time IRQ assignment when booting with DT.
-In-Reply-To: <56952619.7010602@semihalf.com>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <1450278993-12664-12-git-send-email-tn@semihalf.com>
- <20160112135023.GC3601@red-moon> <56952619.7010602@semihalf.com>
-Message-ID: <56953E33.6030003@caviumnetworks.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 12 Jan 2016 17:59:58 +0000
+Subject: [PATCH v3 1/2] PCI: generic: Refactor code to enable reuse by
+ other drivers.
+In-Reply-To: <1452297553-19911-2-git-send-email-ddaney.cavm@gmail.com>
+References: <1452297553-19911-1-git-send-email-ddaney.cavm@gmail.com>
+ <1452297553-19911-2-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20160112175958.GA22186@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2016 08:13 AM, Tomasz Nowicki wrote:
-> On 12.01.2016 14:50, Lorenzo Pieralisi wrote:
->> On Wed, Dec 16, 2015 at 04:16:21PM +0100, Tomasz Nowicki wrote:
->>> In order to probe PCIe host controller when booting with DT,
->>> ARM64 is using drivers which defer IRQ assignment to device
->>> enable time. It means that boot time DT specific irq map initialization
->>> is always overridden, so lets remove that code.
->>>
->>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->>> ---
->>>   arch/arm64/kernel/pci.c | 10 ----------
->>>   1 file changed, 10 deletions(-)
->>>
->>> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
->>> index 023b983..f7948f5 100644
->>> --- a/arch/arm64/kernel/pci.c
->>> +++ b/arch/arm64/kernel/pci.c
->>> @@ -51,16 +51,6 @@ int pcibios_enable_device(struct pci_dev *dev, int
->>> mask)
->>>       return pci_enable_resources(dev, mask);
->>>   }
->>>
->>> -/*
->>> - * Try to assign the IRQ number from DT when adding a new device
->>> - */
->>> -int pcibios_add_device(struct pci_dev *dev)
->>> -{
->>> -    dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
->>> -
->>> -    return 0;
->>> -}
->>> -
+On Fri, Jan 08, 2016 at 03:59:12PM -0800, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> No change in functionality.
+> 
+> Move structure definitions into a separate header file.  Move common
+> code to new file with Kconfig machinery to build it.  Split probe
+> function in to two parts:
+> 
+>    - a small driver specific probe function (gen_pci_probe)
+> 
+>    - a common probe that can be used by other drivers
+>      (pci_host_common_probe)
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  MAINTAINERS                         |   1 +
+>  drivers/pci/host/Kconfig            |   4 +
+>  drivers/pci/host/Makefile           |   1 +
+>  drivers/pci/host/pci-host-common.c  | 194 ++++++++++++++++++++++++++++++++++++
+>  drivers/pci/host/pci-host-common.h  |  56 +++++++++++
+>  drivers/pci/host/pci-host-generic.c | 190 +----------------------------------
+>  6 files changed, 260 insertions(+), 186 deletions(-)
+>  create mode 100644 drivers/pci/host/pci-host-common.c
+>  create mode 100644 drivers/pci/host/pci-host-common.h
 
-How was this tested?  Or in other words, what PCI devices that use 
-legacy INT{A,B,C,D} interrupts were used in testing this patch?
+Looks fine to me:
 
-David Daney
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-
->>
->> Actually, this patch should be part of Matthew's series:
->>
->
-> Agree.
->
-> Matthew can you please add this patch to your series?
->
-> Thanks,
-> Tomasz
+Will
