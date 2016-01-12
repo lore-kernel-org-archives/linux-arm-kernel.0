@@ -1,66 +1,51 @@
-From: labbott@fedoraproject.org (Laura Abbott)
-Date: Tue, 12 Jan 2016 15:22:35 -0800
-Subject: [PATCHv2] arm64: Allow vmalloc regions to be set with set_memory_*
-Message-ID: <1452640955-25491-1-git-send-email-labbott@fedoraproject.org>
+From: lho@apm.com (Loc Ho)
+Date: Tue, 12 Jan 2016 15:24:41 -0800
+Subject: [PATCH 1/3] Documentation: Update the APM X-Gene SoC EDAC DTS
+ binding for missing RB
+In-Reply-To: <4027351.WdK3AXxgBQ@wuerfel>
+References: <1452639900-30919-1-git-send-email-lho@apm.com>
+ <1452639900-30919-2-git-send-email-lho@apm.com>
+ <4027351.WdK3AXxgBQ@wuerfel>
+Message-ID: <CAPw-ZTmuavkEd0_7W+86m_RQHZHGCwWr4dRNCxjrgBPLa_Qg0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd,
 
-The range of set_memory_* is currently restricted to the module address
-range because of difficulties in breaking down larger block sizes.
-vmalloc maps PAGE_SIZE pages so it is safe to use as well. Update the
-function ranges and add a comment explaining why the range is restricted
-the way it is.
+>> --- a/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+>> +++ b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+>> @@ -16,6 +16,7 @@ Required properties:
+>>  - regmap-mcba          : Regmap of the MCB-A (memory bridge) resource.
+>>  - regmap-mcbb          : Regmap of the MCB-B (memory bridge) resource.
+>>  - regmap-efuse         : Regmap of the PMD efuse resource.
+>> +- regmap-rb            : Regmap of the register bus resource.
+>>  - reg                  : First resource shall be the CPU bus (PCP) resource.
+>>  - interrupts            : Interrupt-specifier for MCU, PMD, L3, or SoC error
+>>                           IRQ(s).
+>> @@ -64,6 +65,11 @@ Example:
+>>                 reg = <0x0 0x1054a000 0x0 0x20>;
+>>         };
+>>
+>> +       rb: rb at 7e000000 {
+>> +               compatible = "apm,xgene-rb", "syscon";
+>> +               reg = <0x0 0x7e000000 0x0 0x10>;
+>> +       };
+>> +
+>>         edac at 78800000 {
+>>                 compatible = "apm,xgene-edac";
+>>
+>
+> When you add a property, please list that as "optional", not "required",
+> to ensure that the old dtb files still conform to the binding.
+>
+> In the driver, make sure it is not a fatal error when the property is
+> missing and the driver can keep working without it.
 
-Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
----
-v2: Old version was sent out with vmalloc warnings. Sorry for the noise.
----
- arch/arm64/mm/pageattr.c | 25 +++++++++++++++++++++----
- 1 file changed, 21 insertions(+), 4 deletions(-)
+>From my view, this is required. Otherwise, the error condition will
+NOT be cleared correctly and will get constant interrupt. Though, for
+compatibility, we can make it optional but system will be unusable
+should such error occurred. Though, it would be rare or with bad FW. I
+will fix in the next version by making it optional such as it will
+still probe correctly with older DT binding.
 
-diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-index 3571c73..88c8e54 100644
---- a/arch/arm64/mm/pageattr.c
-+++ b/arch/arm64/mm/pageattr.c
-@@ -36,6 +36,26 @@ static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
- 	return 0;
- }
- 
-+static bool validate_addr(unsigned long start, unsigned long end)
-+{
-+	/*
-+	 * This check explicitly excludes most kernel memory. Most kernel
-+	 * memory is mapped with a larger page size and breaking down the
-+	 * larger page size without causing TLB conflicts is very difficult.
-+	 *
-+	 * If you need to call set_memory_* on a range, the recommendation is
-+	 * to use vmalloc since that range is mapped with pages.
-+	 */
-+	if (start >= MODULES_VADDR && start < MODULES_END &&
-+	    end >= MODULES_VADDR && end < MODULES_END)
-+		return true;
-+
-+	if (is_vmalloc_addr((void *)start) && is_vmalloc_addr((void *)end))
-+		return true;
-+
-+	return false;
-+}
-+
- static int change_memory_common(unsigned long addr, int numpages,
- 				pgprot_t set_mask, pgprot_t clear_mask)
- {
-@@ -51,10 +71,7 @@ static int change_memory_common(unsigned long addr, int numpages,
- 		WARN_ON_ONCE(1);
- 	}
- 
--	if (start < MODULES_VADDR || start >= MODULES_END)
--		return -EINVAL;
--
--	if (end < MODULES_VADDR || end >= MODULES_END)
-+	if (!validate_addr(start, end))
- 		return -EINVAL;
- 
- 	data.set_mask = set_mask;
--- 
-2.5.0
+-Loc
