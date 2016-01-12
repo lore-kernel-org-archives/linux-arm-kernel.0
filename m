@@ -1,171 +1,296 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Tue, 12 Jan 2016 19:01:50 +0100
-Subject: [PATCH 3/3] ARM: dts: imx6: add display timing for NL12880BC20
- display to Ka-Ro electronics TX6 LVDS modules
-In-Reply-To: <1452621710-15336-3-git-send-email-LW@KARO-electronics.de>
+Date: Tue, 12 Jan 2016 19:01:48 +0100
+Subject: [PATCH 1/3] ARM: dts: imx6: add support for Ka-Ro electronics
+ TX6S-8034 module
+In-Reply-To: <1452621710-15336-1-git-send-email-LW@KARO-electronics.de>
 References: <1452621710-15336-1-git-send-email-LW@KARO-electronics.de>
- <1452621710-15336-2-git-send-email-LW@KARO-electronics.de>
- <1452621710-15336-3-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1452621710-15336-4-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1452621710-15336-2-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the NLT Technologies WXGA LVDS display NL12880BC20 to
-the TX6 LVDS modules from Ka-Ro electronics.
+Add support for the TX6S-8034 module from Ka-Ro electronics.
+The module is equipped with an i.MX6SOLO at 792MHz, 256MiB DDR3 SDRAM
+and 128MiB NAND flash.
 
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx6dl-tx6u-811x.dts | 42 ++++++++++++++++++++++++++++++----
- arch/arm/boot/dts/imx6q-tx6q-1110.dts  | 42 ++++++++++++++++++++++++++++++----
- 2 files changed, 76 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/Makefile             |   1 +
+ arch/arm/boot/dts/imx6dl-tx6s-8034.dts | 255 +++++++++++++++++++++++++++++++++
+ 2 files changed, 256 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-tx6s-8034.dts
 
-diff --git a/arch/arm/boot/dts/imx6dl-tx6u-811x.dts b/arch/arm/boot/dts/imx6dl-tx6u-811x.dts
-index c275eec..c14ee8f 100644
---- a/arch/arm/boot/dts/imx6dl-tx6u-811x.dts
-+++ b/arch/arm/boot/dts/imx6dl-tx6u-811x.dts
-@@ -104,8 +104,9 @@
- 		status = "okay";
- 
- 		display-timings {
--			native-mode = <&lvds_timing0>;
--			lvds_timing0: hsd100pxn1 {
-+			native-mode = <&lvds0_timing0>;
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a4a6d70..ac406d8 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -312,6 +312,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6dl-sabrelite.dtb \
+ 	imx6dl-sabresd.dtb \
+ 	imx6dl-tx6dl-comtft.dtb \
++	imx6dl-tx6s-8034.dtb \
+ 	imx6dl-tx6u-801x.dtb \
+ 	imx6dl-tx6u-811x.dtb \
+ 	imx6dl-udoo.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-tx6s-8034.dts b/arch/arm/boot/dts/imx6dl-tx6s-8034.dts
+new file mode 100644
+index 0000000..6545335
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6dl-tx6s-8034.dts
+@@ -0,0 +1,255 @@
++/*
++ * Copyright 2015 Lothar Wa?mann <LW@KARO-electronics.de>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+			lvds0_timing0: hsd100pxn1 {
- 				clock-frequency = <65000000>;
- 				hactive = <1024>;
- 				vactive = <768>;
-@@ -118,6 +119,22 @@
- 				de-active = <1>;
- 				pixelclk-active = <1>;
- 			};
++/dts-v1/;
++#include "imx6dl.dtsi"
++#include "imx6qdl-tx6.dtsi"
 +
-+			lvds0_timing1: nl12880bc20 {
-+				clock-frequency = <71000000>;
-+				hactive = <1280>;
-+				vactive = <800>;
-+				hback-porch = <50>;
-+				hsync-len = <60>;
-+				hfront-porch = <50>;
-+				vback-porch = <5>;
-+				vsync-len = <13>;
-+				vfront-porch = <5>;
++/ {
++	model = "Ka-Ro electronics TX6S-8034 Module";
++	compatible = "karo,imx6dl-tx6dl", "fsl,imx6dl";
++	timestamp = __DATE__, __TIME__;
++
++	aliases {
++		display = &display;
++		ipu1 = &ipu1;
++	};
++
++	cpus {
++		/delete-node/ cpu at 1;
++	};
++
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm2 0 500000 PWM_POLARITY_INVERTED>;
++		power-supply = <&reg_3v3>;
++		/*
++		 * a poor man's way to create a 1:1 relationship between
++		 * the PWM value and the actual duty cycle
++		 */
++		brightness-levels = < 0  1  2  3  4  5  6  7  8  9
++				     10 11 12 13 14 15 16 17 18 19
++				     20 21 22 23 24 25 26 27 28 29
++				     30 31 32 33 34 35 36 37 38 39
++				     40 41 42 43 44 45 46 47 48 49
++				     50 51 52 53 54 55 56 57 58 59
++				     60 61 62 63 64 65 66 67 68 69
++				     70 71 72 73 74 75 76 77 78 79
++				     80 81 82 83 84 85 86 87 88 89
++				     90 91 92 93 94 95 96 97 98 99
++				    100>;
++		default-brightness-level = <50>;
++	};
++
++	display: display at di0 {
++		compatible = "fsl,imx-parallel-display";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_disp0_1>;
++		interface-pix-fmt = "rgb24";
++//		fsl,panel = <&lcd0_panel>;
++		status = "okay";
++
++		port {
++			display0_in: endpoint {
++				remote-endpoint = <&ipu1_di0_disp0>;
++			};
++		};
++
++		display-timings {
++			VGA {
++				clock-frequency = <25200000>;
++				hactive = <640>;
++				vactive = <480>;
++				hback-porch = <48>;
++				hsync-len = <96>;
++				hfront-porch = <16>;
++				vback-porch = <31>;
++				vsync-len = <2>;
++				vfront-porch = <12>;
++				hsync-active = <0>;
++				vsync-active = <0>;
++				de-active = <1>;
++				pixelclk-active = <0>;
++			};
++
++			ETV570 {
++				clock-frequency = <25200000>;
++				hactive = <640>;
++				vactive = <480>;
++				hback-porch = <114>;
++				hsync-len = <30>;
++				hfront-porch = <16>;
++				vback-porch = <32>;
++				vsync-len = <3>;
++				vfront-porch = <10>;
++				hsync-active = <0>;
++				vsync-active = <0>;
++				de-active = <1>;
++				pixelclk-active = <0>;
++			};
++
++			ET0350 {
++				clock-frequency = <6413760>;
++				hactive = <320>;
++				vactive = <240>;
++				hback-porch = <34>;
++				hsync-len = <34>;
++				hfront-porch = <20>;
++				vback-porch = <15>;
++				vsync-len = <3>;
++				vfront-porch = <4>;
++				hsync-active = <0>;
++				vsync-active = <0>;
++				de-active = <1>;
++				pixelclk-active = <0>;
++			};
++
++			ET0430 {
++				clock-frequency = <9009000>;
++				hactive = <480>;
++				vactive = <272>;
++				hback-porch = <2>;
++				hsync-len = <41>;
++				hfront-porch = <2>;
++				vback-porch = <2>;
++				vsync-len = <10>;
++				vfront-porch = <2>;
 +				hsync-active = <0>;
 +				vsync-active = <0>;
 +				de-active = <1>;
 +				pixelclk-active = <1>;
 +			};
- 		};
- 	};
- 
-@@ -127,8 +144,9 @@
- 		status = "disabled";
- 
- 		display-timings {
--			native-mode = <&lvds_timing1>;
--			lvds_timing1: hsd100pxn1 {
-+			native-mode = <&lvds1_timing0>;
 +
-+			lvds1_timing0: hsd100pxn1 {
- 				clock-frequency = <65000000>;
- 				hactive = <1024>;
- 				vactive = <768>;
-@@ -141,6 +159,22 @@
- 				de-active = <1>;
- 				pixelclk-active = <1>;
- 			};
-+
-+			lvds1_timing1: nl12880bc20 {
-+				clock-frequency = <71000000>;
-+				hactive = <1280>;
-+				vactive = <800>;
-+				hback-porch = <50>;
-+				hsync-len = <60>;
-+				hfront-porch = <50>;
-+				vback-porch = <5>;
-+				vsync-len = <13>;
-+				vfront-porch = <5>;
++			ET0500 {
++				clock-frequency = <33264000>;
++				hactive = <800>;
++				vactive = <480>;
++				hback-porch = <88>;
++				hsync-len = <128>;
++				hfront-porch = <40>;
++				vback-porch = <33>;
++				vsync-len = <2>;
++				vfront-porch = <10>;
 +				hsync-active = <0>;
 +				vsync-active = <0>;
 +				de-active = <1>;
-+				pixelclk-active = <1>;
++				pixelclk-active = <0>;
 +			};
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6q-tx6q-1110.dts b/arch/arm/boot/dts/imx6q-tx6q-1110.dts
-index 88aa1e4..7a8be02 100644
---- a/arch/arm/boot/dts/imx6q-tx6q-1110.dts
-+++ b/arch/arm/boot/dts/imx6q-tx6q-1110.dts
-@@ -104,8 +104,9 @@
- 		status = "okay";
- 
- 		display-timings {
--			native-mode = <&lvds_timing0>;
--			lvds_timing0: hsd100pxn1 {
-+			native-mode = <&lvds0_timing0>;
 +
-+			lvds0_timing0: hsd100pxn1 {
- 				clock-frequency = <65000000>;
- 				hactive = <1024>;
- 				vactive = <768>;
-@@ -118,6 +119,22 @@
- 				de-active = <1>;
- 				pixelclk-active = <1>;
- 			};
-+
-+			lvds0_timing1: nl12880bc20 {
-+				clock-frequency = <71000000>;
-+				hactive = <1280>;
-+				vactive = <800>;
-+				hback-porch = <50>;
-+				hsync-len = <60>;
-+				hfront-porch = <50>;
-+				vback-porch = <5>;
-+				vsync-len = <13>;
-+				vfront-porch = <5>;
++			ET0700 { /* same as ET0500 */
++				clock-frequency = <33264000>;
++				hactive = <800>;
++				vactive = <480>;
++				hback-porch = <88>;
++				hsync-len = <128>;
++				hfront-porch = <40>;
++				vback-porch = <33>;
++				vsync-len = <2>;
++				vfront-porch = <10>;
 +				hsync-active = <0>;
 +				vsync-active = <0>;
 +				de-active = <1>;
-+				pixelclk-active = <1>;
++				pixelclk-active = <0>;
 +			};
- 		};
- 	};
- 
-@@ -127,8 +144,9 @@
- 		status = "disabled";
- 
- 		display-timings {
--			native-mode = <&lvds_timing1>;
--			lvds_timing1: hsd100pxn1 {
-+			native-mode = <&lvds1_timing0>;
 +
-+			lvds1_timing0: hsd100pxn1 {
- 				clock-frequency = <65000000>;
- 				hactive = <1024>;
- 				vactive = <768>;
-@@ -141,6 +159,22 @@
- 				de-active = <1>;
- 				pixelclk-active = <1>;
- 			};
-+
-+			lvds1_timing1: nl12880bc20 {
-+				clock-frequency = <71000000>;
-+				hactive = <1280>;
-+				vactive = <800>;
-+				hback-porch = <50>;
-+				hsync-len = <60>;
-+				hfront-porch = <50>;
-+				vback-porch = <5>;
-+				vsync-len = <13>;
-+				vfront-porch = <5>;
++			ETQ570 {
++				clock-frequency = <6596040>;
++				hactive = <320>;
++				vactive = <240>;
++				hback-porch = <38>;
++				hsync-len = <30>;
++				hfront-porch = <30>;
++				vback-porch = <16>;
++				vsync-len = <3>;
++				vfront-porch = <4>;
 +				hsync-active = <0>;
 +				vsync-active = <0>;
 +				de-active = <1>;
-+				pixelclk-active = <1>;
++				pixelclk-active = <0>;
 +			};
- 		};
- 	};
- };
++		};
++	};
++
++	lcd0_panel: lcd-panel {
++		compatible = "edt,et070080dh6", "simple-panel";
++		power-supply = <&reg_lcd0_pwr>;
++		enable-gpios = <&gpio2 31 GPIO_ACTIVE_HIGH>;
++		backlight = <&backlight>;
++		status = "disabled";
++	};
++};
++
++&ds1339 {
++	status = "disabled";
++};
++
++&pinctrl_hog {
++	fsl,pins = <
++		MX6QDL_PAD_EIM_A18__GPIO2_IO20		0x1b0b1 /* LED */
++		MX6QDL_PAD_SD3_DAT2__GPIO7_IO06		0x1b0b1 /* ETN PHY RESET */
++		MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x1b0b1 /* ETN PHY INT */
++		MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x1b0b1 /* PWR BTN */
++	>;
++};
++
++&pinctrl_usdhc1 {
++	fsl,pins = <
++		MX6QDL_PAD_SD1_CMD__SD1_CMD		0x070b1
++		MX6QDL_PAD_SD1_CLK__SD1_CLK		0x07099
++		MX6QDL_PAD_SD1_DAT0__SD1_DATA0		0x070b1
++		MX6QDL_PAD_SD1_DAT1__SD1_DATA1		0x070b1
++		MX6QDL_PAD_SD1_DAT2__SD1_DATA2		0x070b1
++		MX6QDL_PAD_SD1_DAT3__SD1_DATA3		0x070b1
++		MX6QDL_PAD_SD3_CMD__GPIO7_IO02		0x170b0 /* SD1 CD */
++	>;
++};
++
++&ipu1_di0_disp0 {
++	remote-endpoint = <&display0_in>;
++};
++
++&reg_lcd0_pwr {
++	status = "disabled";
++};
++
++&reg_lcd1_pwr {
++	status = "disabled";
++};
 -- 
 2.1.4
