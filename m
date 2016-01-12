@@ -1,30 +1,57 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue, 12 Jan 2016 14:13:53 +0530
-Subject: [PATCH V6 6/6] dts: msm8974: Add dma channels for blsp2_i2c1 node
-In-Reply-To: <1452588233-1803-1-git-send-email-sricharan@codeaurora.org>
-References: <1452588233-1803-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1452588233-1803-7-git-send-email-sricharan@codeaurora.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 12 Jan 2016 08:45:43 +0000
+Subject: [PATCH v2 0/2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD
+ driver
+In-Reply-To: <1452585915-551-1-git-send-email-wenyou.yang@atmel.com>
+References: <1452585915-551-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20160112084543.GP19803@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-Reviewed-by: Andy Gross <andy.gross@linaro.org>
----
- arch/arm/boot/dts/qcom-msm8974.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+On Tue, 12 Jan 2016, Wenyou Yang wrote:
 
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index 7786408..bd1be53 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -328,6 +328,8 @@
- 			clock-names = "core", "iface";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+			dmas = <&blsp2_dma 20>, <&blsp2_dma 21>;
-+			dma-names = "tx", "rx";
- 		};
- 
- 		spmi_bus: spmi at fc4cf000 {
+> This patch set adds support for the Active-semi ACT8945A PMIC
+> MFD driver. It is a Multi Function Device with the following
+> subdevices:
+>  - Regulator
+>  - Charger
+> 
+> It is interfaced to the host controller using I2C interface,
+> ACT8945A is a child device of the I2C.
+> 
+> Changes in v2:
+>  - add more help information in Kconfig.
+>  - update the file header with short version license and author line.
+>  - remove unused structure members (dev, i2c_client) of stuct act8945a_dev.
+>  - use define "PLATFORM_DEVID_NONE" for mfd_add_devices(), instead of '-1'.
+>  - use more explicit info to indicate the failure to add sub devices.
+>  - remove the unnecessary print out.
+>  - substitute MODULE_LICENSE("GPL") for MODULE_LICENSE("GPL v2").
+>  - use more specific label in Example.
+>  - add pmic and charger nodes in Example.
+> 
+> Wenyou Yang (2):
+>   mfd: act8945a: add Active-semi ACT8945A PMIC MFD driver
+>   mfd: add documentation for ACT8945A DT bindings
+
+Sending out 3 patch-sets for related changes is a pretty
+unconventional way of doing things.  In future could you place them
+all in the same place, that way all of the patches stay together whist
+hopping around our inboxes.
+
+>  Documentation/devicetree/bindings/mfd/act8945a.txt |   82 +++++++++++++++
+>  drivers/mfd/Kconfig                                |   11 ++
+>  drivers/mfd/Makefile                               |    1 +
+>  drivers/mfd/act8945a.c                             |  109 ++++++++++++++++++++
+>  include/linux/mfd/act8945a.h                       |   21 ++++
+>  5 files changed, 224 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/act8945a.txt
+>  create mode 100644 drivers/mfd/act8945a.c
+>  create mode 100644 include/linux/mfd/act8945a.h
+> 
+
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
