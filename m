@@ -1,70 +1,33 @@
-From: xuejiancheng@huawei.com (xuejiancheng)
-Date: Tue, 12 Jan 2016 09:35:09 +0800
-Subject: [PATCH v5 5/6] mfd: dt-bindings: add device tree bindings for
- Hi3519 sysctrl
-In-Reply-To: <20160111085555.GE14104@x1>
-References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
- <1452219400-32478-6-git-send-email-xuejiancheng@huawei.com>
- <20160111054846.GD3331@x1> <56935EA8.4060801@huawei.com>
- <20160111085555.GE14104@x1>
-Message-ID: <5694584D.7040301@huawei.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Mon, 11 Jan 2016 17:41:35 -0800
+Subject: [PATCH LINUX 0/6] Second part of xuartps fixes
+Message-ID: <1452562901-17848-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+this is the second part of fixes for xuartps that evolved from this
+series: https://lkml.org/lkml/2015/12/26/26.
 
-On 2016/1/11 16:55, Lee Jones wrote:
-> On Mon, 11 Jan 2016, xuejiancheng wrote:
->> On 2016/1/11 13:48, Lee Jones wrote:
->>> On Fri, 08 Jan 2016, Jiancheng Xue wrote:
->>>
->>>> Add device tree bindings for Hi3519 system controller.
->>>>
->>>> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
->>>> ---
->>>>  Documentation/devicetree/bindings/mfd/hi3519.txt | 14 ++++++++++++++
->>>>  1 file changed, 14 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/mfd/hi3519.txt
->>>
->>> I have this patch, but none of the others in the set, thus I am
->>> lacking context.
->>>
->> I can forward other patches in the set to you. Thank you.
->>
->>>> diff --git a/Documentation/devicetree/bindings/mfd/hi3519.txt b/Documentation/devicetree/bindings/mfd/hi3519.txt
->>>> new file mode 100644
->>>> index 0000000..115c5be
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/mfd/hi3519.txt
->>>> @@ -0,0 +1,14 @@
->>>> +* Hisilicon Hi3519 System Controller Block
->>>> +
->>>> +This bindings use the following binding:
->>>> +Documentation/devicetree/bindings/mfd/syscon.txt
->>>> +
->>>> +Required properties:
->>>> +- compatible: "hisilicon,hi3519-sysctrl".
->>>> +- reg: the register region of this block
->>>> +
->>>> +Examples:
->>>> +sysctrl: system-controller at 12010000 {
->>>> +	compatible = "hisilicon,hi3519-sysctrl", "syscon";
->>>> +	reg = <0x12010000 0x1000>;
->>>> +};
->>>
->>> There is no requirement (nor want) for binding documents where the
->>> given device is simply using highly generic bindings.  This just
->>> amounts to churn.
->>>
->> This block is specific for Hi3519 SOC, and may has its own driver.
-> 
-> Does it have its own driver currently?
-> 
-Not yet.
-Arnd Bergmann and Rob Herring all suggested adding a specific compatible string
-with the SOC name. This binding is just used for describing the compatible string now.
-When more functions on hi3519 SOC are added later, the specific driver will be also
-needed.
+This series, obviously, depends on the patches mentioned above. It
+includes several minor improvements and refactoring and the refactoring
+of the IRQ management, which prevents lock ups that could happen when
+RX-related IRQs fired while the receiver was disabled.
 
->> So I think it's better to keep this binding.
-> 
+	Thanks,
+	S?ren
+
+S?ren Brinkmann (6):
+  tty: xuartps: Move request_irq to after setting up the HW
+  tty: xuartps: Refactor IRQ handling
+  tty: xuartps: Cleanup: Reformat if-else
+  tty: xuartps: Improve sysrq handling
+  tty: xuartps: Remove '_OFFSET' suffix from #defines
+  tty: xuartps: Consolidate TX handling
+
+ drivers/tty/serial/xilinx_uartps.c | 460 +++++++++++++++++--------------------
+ 1 file changed, 216 insertions(+), 244 deletions(-)
+
+-- 
+2.7.0.3.g497ea1e
