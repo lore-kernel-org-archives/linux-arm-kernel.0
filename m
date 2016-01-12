@@ -1,40 +1,108 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Tue, 12 Jan 2016 09:39:41 +0100
-Subject: [PATCH v2] spi: atmel: improve internal vs gpio chip-select choice
-In-Reply-To: <1452528102-26458-1-git-send-email-mans@mansr.com>
-References: <1452528102-26458-1-git-send-email-mans@mansr.com>
-Message-ID: <5694BBCD.8020700@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 12 Jan 2016 08:39:46 +0000
+Subject: [PATCH v5 5/6] mfd: dt-bindings: add device tree bindings for
+ Hi3519 sysctrl
+In-Reply-To: <5694B68A.6040300@huawei.com>
+References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
+ <1452219400-32478-6-git-send-email-xuejiancheng@huawei.com>
+ <20160111054846.GD3331@x1> <56935EA8.4060801@huawei.com>
+ <20160111085555.GE14104@x1> <5694584D.7040301@huawei.com>
+ <20160112074107.GK19803@x1> <5694B68A.6040300@huawei.com>
+Message-ID: <20160112083946.GN19803@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mans,
+On Tue, 12 Jan 2016, xuejiancheng wrote:
 
-I've tried to apply your patch on a next-20160112 branch to test it but it
-failed. I've also looked at the for-next branch of the SPI sub-system git
-tree.
+> Hello Lee,
+> 
+> On 2016/1/12 15:41, Lee Jones wrote:
+> > On Tue, 12 Jan 2016, xuejiancheng wrote:
+> > 
+> >>
+> >>
+> >> On 2016/1/11 16:55, Lee Jones wrote:
+> >>> On Mon, 11 Jan 2016, xuejiancheng wrote:
+> >>>> On 2016/1/11 13:48, Lee Jones wrote:
+> >>>>> On Fri, 08 Jan 2016, Jiancheng Xue wrote:
+> >>>>>
+> >>>>>> Add device tree bindings for Hi3519 system controller.
+> >>>>>>
+> >>>>>> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+> >>>>>> ---
+> >>>>>>  Documentation/devicetree/bindings/mfd/hi3519.txt | 14 ++++++++++++++
+> >>>>>>  1 file changed, 14 insertions(+)
+> >>>>>>  create mode 100644 Documentation/devicetree/bindings/mfd/hi3519.txt
+> >>>>>
+> >>>>> I have this patch, but none of the others in the set, thus I am
+> >>>>> lacking context.
+> >>>>>
+> >>>> I can forward other patches in the set to you. Thank you.
+> >>>>
+> >>>>>> diff --git a/Documentation/devicetree/bindings/mfd/hi3519.txt b/Documentation/devicetree/bindings/mfd/hi3519.txt
+> >>>>>> new file mode 100644
+> >>>>>> index 0000000..115c5be
+> >>>>>> --- /dev/null
+> >>>>>> +++ b/Documentation/devicetree/bindings/mfd/hi3519.txt
+> >>>>>> @@ -0,0 +1,14 @@
+> >>>>>> +* Hisilicon Hi3519 System Controller Block
+> >>>>>> +
+> >>>>>> +This bindings use the following binding:
+> >>>>>> +Documentation/devicetree/bindings/mfd/syscon.txt
+> >>>>>> +
+> >>>>>> +Required properties:
+> >>>>>> +- compatible: "hisilicon,hi3519-sysctrl".
+> >>>>>> +- reg: the register region of this block
+> >>>>>> +
+> >>>>>> +Examples:
+> >>>>>> +sysctrl: system-controller at 12010000 {
+> >>>>>> +	compatible = "hisilicon,hi3519-sysctrl", "syscon";
+> >>>>>> +	reg = <0x12010000 0x1000>;
+> >>>>>> +};
+> >>>>>
+> >>>>> There is no requirement (nor want) for binding documents where the
+> >>>>> given device is simply using highly generic bindings.  This just
+> >>>>> amounts to churn.
+> >>>>>
+> >>>> This block is specific for Hi3519 SOC, and may has its own driver.
+> >>>
+> >>> Does it have its own driver currently?
+> >>>
+> >> Not yet.
+> >> Arnd Bergmann and Rob Herring all suggested adding a specific compatible string
+> >> with the SOC name. This binding is just used for describing the compatible string now.
+> >> When more functions on hi3519 SOC are added later, the specific driver will be also
+> >> needed.
+> > 
+> > Save this binding until it has more functionality.  We here "I'll add
+> > to this later" all too often.
+> > 
+> 
+> In the hi3519.dtsi file, there is a system-controller device node described like below:
+> sysctrl: system-controller at 12010000 {
+> 	compatible = "hisilicon,hi3519-sysctrl", "syscon";
+> 	reg = <0x12010000 0x1000>;
+> };
+> Do you mean that I should remove "hisilicon,hi3519-sysctrl" and just use "syscon" as the
+> compatible string??
 
-It seems that one issue occurred within a chunk patching the atmel_spi_setup()
-function. Please see below.
+Where is this compatible string _used_?
 
-Le 11/01/2016 17:01, Mans Rullgard a ?crit :
-[...]
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 08cbb3e43c76..d4a806e24060 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-[...]
-> @@ -1603,6 +1611,7 @@ static int atmel_spi_setup(struct spi_device *spi)
->  		}
->  
->  		asd->npcs_pin = npcs_pin;
-> +		asd->use_cs_gpio = use_cs_gpio;
->  		spi->controller_state = asd;
->  	} else {
->  		atmel_spi_lock(as);
-[...]
+> If I want to add "hisilicon,hi3519-sysctrl" for hi3519. where should I put this binding?
+> Could you give some suggestions?  Thank you very much!
 
-There is no 'else' statement in the source code I'm looking at.
+If you're not using the compatible i.e. the device doesn't have its
+own driver yet, then there is no need to supply the binding at all, is
+there?
 
-Best regards,
+> >>>> So I think it's better to keep this binding.
+> >>>
+> >>
+> > 
+> 
 
-Cyrille
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
