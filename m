@@ -1,76 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 Jan 2016 12:30:19 +0000
-Subject: [GIT PULL] arm64: perf updates for 4.5
-Message-ID: <20160112123018.GF15737@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 12 Jan 2016 12:30:45 +0000
+Subject: [RESEND v4 0/6] remoteproc: Add driver for STMicroelectronics
+ platforms
+In-Reply-To: <CAK=Wgba-JuidsUgrTZM+vZc7p3cWeYuKwKYUD7ru_nWm7Jybew@mail.gmail.com>
+References: <1448370862-19120-1-git-send-email-lee.jones@linaro.org>
+ <CAK=WgbZbiq_BAUEti9tWUtWqZPU_4gDJ5Mfqur=Ou2N4Ea+2GQ@mail.gmail.com>
+ <20151126091043.GO12874@x1>
+ <CAK=WgbbWTdDGMYOFjVO3s1bt1r5iou6Q-hHOh4SZG=rQuEa2eQ@mail.gmail.com>
+ <CAJAp7OgZwf-Cd+Drypqo92YNJBYtB-XCbW-noy-4BB5JZojRnw@mail.gmail.com>
+ <CAK=Wgba-JuidsUgrTZM+vZc7p3cWeYuKwKYUD7ru_nWm7Jybew@mail.gmail.com>
+Message-ID: <20160112123045.GG27358@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Tue, 29 Dec 2015, Ohad Ben-Cohen wrote:
 
-In the past, I have funnelled perf updates through the respective
-architecture trees, but now that the arm/arm64 perf driver has been
-largely consolidated under drivers/perf/, it makes more sense to send a
-separate pull, particularly as I'm listed as maintainer for all the
-files involved. I offered the branch to arm-soc, but Arnd suggested that
-I just send it to you directly.
+> On Mon, Dec 28, 2015 at 8:41 PM, Bjorn Andersson <bjorn@kryo.se> wrote:
+> > I interpreted this as you picked patch 1-4 and didn't pay more
+> > attention to them, but I can't find them in your kernel.org trees. So
+> > I've looked through them again.
+> >
+> > Please apply patch 1, 3 and 4 to your tree Ohad. I was unable to find
+> > a v5 of patch 2, but it's unrelated so no need to wait for a new
+> > version of that.
+> 
+> I was under the impression that Lee plans to resubmit once the
+> discussion around patch 2 settles, so I haven't picked the series yet.
+> 
+> Lee please let me know - I can take 1/3/4 and wait for the new 2 as well.
 
-So, here is the arm/arm64 perf queue for 4.5. The main features are
-described in the tag, but the most useful change is from Drew, which
-advertises our architected event mapping in sysfs so that the perf tool
-is a lot more user friendly and no longer requires the use of magic hex
-constants for profiling common events.
+Yes, that's correct.  Will re-submit the set in a wee-mo.
 
-Please pull,
-
-Will
-
---->8
-
-The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
-
-  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-perf
-
-for you to fetch changes up to 5d7ee87708d4d86fcc32afc9552d05f7625d303d:
-
-  arm64: perf: add support for Cortex-A72 (2015-12-22 14:45:35 +0000)
-
-----------------------------------------------------------------
-arm[64] perf updates for 4.5:
-
-- Support for the CPU PMU in Cortex-A72
-
-- Add sysfs entries to describe the architected events and their
-  mappings for PMUv{1-3}
-
-----------------------------------------------------------------
-Drew Richardson (4):
-      arm: perf: Convert event enums to #defines
-      arm: perf: Add event descriptions
-      arm64: perf: Convert event enums to #defines
-      arm64: perf: Add event descriptions
-
-Geert Uytterhoeven (1):
-      arm64: perf: Correct Cortex-A53/A57 compatible values
-
-Lorenzo Pieralisi (1):
-      arm64: kernel: enforce pmuserenr_el0 initialization and restore
-
-Mark Rutland (1):
-      drivers/perf: kill armpmu_register
-
-Will Deacon (3):
-      ARM: perf: add format entry to describe event -> config mapping
-      arm64: perf: add format entry to describe event -> config mapping
-      arm64: perf: add support for Cortex-A72
-
- Documentation/devicetree/bindings/arm/pmu.txt |   5 +-
- arch/arm/kernel/perf_event_v7.c               | 321 ++++++++++++++++++--------
- arch/arm64/kernel/perf_event.c                | 263 ++++++++++++++++-----
- arch/arm64/mm/proc.S                          |   2 +
- drivers/perf/arm_pmu.c                        |  15 +-
- include/linux/perf/arm_pmu.h                  |   2 -
- 6 files changed, 440 insertions(+), 168 deletions(-)
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
