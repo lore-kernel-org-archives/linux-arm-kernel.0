@@ -1,56 +1,61 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Tue, 12 Jan 2016 18:21:27 +0100
-Subject: [PATCH 10/14] ARM: dts: imx6ul: add flexcan support
-In-Reply-To: <1452619291-13625-10-git-send-email-LW@KARO-electronics.de>
+Date: Tue, 12 Jan 2016 18:21:23 +0100
+Subject: [PATCH 06/14] ARM: dts: imx6ul: disable PWMs by default
+In-Reply-To: <1452619291-13625-6-git-send-email-LW@KARO-electronics.de>
 References: <1452619291-13625-1-git-send-email-LW@KARO-electronics.de>
  <1452619291-13625-2-git-send-email-LW@KARO-electronics.de>
  <1452619291-13625-3-git-send-email-LW@KARO-electronics.de>
  <1452619291-13625-4-git-send-email-LW@KARO-electronics.de>
  <1452619291-13625-5-git-send-email-LW@KARO-electronics.de>
  <1452619291-13625-6-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-7-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-8-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-9-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-10-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1452619291-13625-11-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1452619291-13625-7-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Since PWMs are only useful if they are actually connected to an output pin,
+let users enable them explicitly in their device trees where they should
+also set up the pin configuration.
+
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx6ul.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/imx6ul.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 96b78a9..f1db53e 100644
+index 3aba0bb..863777e 100644
 --- a/arch/arm/boot/dts/imx6ul.dtsi
 +++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -292,6 +292,26 @@
- 				status = "disabled";
+@@ -512,6 +512,7 @@
+ 					 <&clks IMX6UL_CLK_PWM5>;
+ 				clock-names = "ipg", "per";
+ 				#pwm-cells = <2>;
++				status = "disabled";
  			};
  
-+			can1: flexcan at 02090000 {
-+				compatible = "fsl,imx6q-flexcan";
-+				reg = <0x02090000 0x4000>;
-+				interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6UL_CLK_CAN1_IPG>,
-+					 <&clks IMX6UL_CLK_CAN1_SERIAL>;
-+				clock-names = "ipg", "per";
+ 			pwm6: pwm at 020f4000 {
+@@ -522,6 +523,7 @@
+ 					 <&clks IMX6UL_CLK_PWM6>;
+ 				clock-names = "ipg", "per";
+ 				#pwm-cells = <2>;
 +				status = "disabled";
-+			};
-+
-+			can2: flexcan at 02094000 {
-+				compatible = "fsl,imx6q-flexcan";
-+				reg = <0x02094000 0x4000>;
-+				interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6UL_CLK_CAN2_IPG>,
-+					 <&clks IMX6UL_CLK_CAN2_SERIAL>;
-+				clock-names = "ipg", "per";
+ 			};
+ 
+ 			pwm7: pwm at 020f8000 {
+@@ -532,6 +534,7 @@
+ 					 <&clks IMX6UL_CLK_PWM7>;
+ 				clock-names = "ipg", "per";
+ 				#pwm-cells = <2>;
 +				status = "disabled";
-+			};
-+
- 			gpt1: gpt at 02098000 {
- 				compatible = "fsl,imx6ul-gpt", "fsl,imx6sx-gpt";
- 				reg = <0x02098000 0x4000>;
+ 			};
+ 
+ 			pwm8: pwm at 020fc000 {
+@@ -542,6 +545,7 @@
+ 					 <&clks IMX6UL_CLK_PWM8>;
+ 				clock-names = "ipg", "per";
+ 				#pwm-cells = <2>;
++				status = "disabled";
+ 			};
+ 		};
+ 
 -- 
 2.1.4
