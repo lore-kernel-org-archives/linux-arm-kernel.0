@@ -1,24 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Jan 2016 23:29:21 +0100
-Subject: [PATCH V2 0/5] PCIe Xilinx generic driver for Microblaze and
-In-Reply-To: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
-References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
-Message-ID: <33382572.XZxh3toaBY@wuerfel>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Tue, 12 Jan 2016 14:34:48 -0800
+Subject: [PATCHv2] net: bpf: reject invalid shifts
+In-Reply-To: <20160112195356.GA34598@ast-mbp.thefacebook.com>
+References: <20160112185121.GA34045@ast-mbp.thefacebook.com>
+ <1452626228-15742-1-git-send-email-rabin@rab.in>
+ <1452628118.1223.25.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20160112195356.GA34598@ast-mbp.thefacebook.com>
+Message-ID: <1452638088.1223.28.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 January 2016 23:06:08 Bharat Kumar Gogada wrote:
-> This patch series does modifications to pcie-xilinx.c, to support common
-> driver on both Zynq and Microblaze architectures.
-> Microblaze pci-common.c has been modified to support generic driver.
+On Tue, 2016-01-12 at 11:53 -0800, Alexei Starovoitov wrote:
+> On Tue, Jan 12, 2016 at 11:48:38AM -0800, Eric Dumazet wrote:
+
+> > 
+> > I believe we should add a one time warning to give a clue to poor users
+> > hitting this problem.
 > 
-> I'm aware Paul Burton <paul.burton@imgtec.com> has also sent patches
-> related to pcie-xilinx.c, but I'm unable to comment on them. 
-> I request Paul Burton to please add me in cc list so that I can comment on
-> those patches.
+> you mean like warn_on_once() here?
+> Makes sense I guess.
 
-Very nice work overall!
 
-I've commented on a few smaller things that I think could be improved.
+pr_err(DEPRECATED, "%s (pid %d) "
+                   "invalid shift in BPF program.\n"
+                   current->comm, task_pid_nr(current));
 
-	Arnd
+Or something like that.
