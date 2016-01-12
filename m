@@ -1,79 +1,127 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Tue, 12 Jan 2016 08:49:48 +0000
-Subject: [PATCH v2 0/2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD
- driver
-In-Reply-To: <20160112084543.GP19803@x1>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 12 Jan 2016 08:52:07 +0000
+Subject: [PATCH v2 2/2] mfd: add documentation for ACT8945A DT bindings
+In-Reply-To: <1452585915-551-3-git-send-email-wenyou.yang@atmel.com>
 References: <1452585915-551-1-git-send-email-wenyou.yang@atmel.com>
- <20160112084543.GP19803@x1>
-Message-ID: <B256D81BAE5131468A838E5D7A243641D63E8931@penmbx01>
+ <1452585915-551-3-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20160112085207.GQ19803@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On Tue, 12 Jan 2016, Wenyou Yang wrote:
 
-> -----Original Message-----
-> From: Lee Jones [mailto:lee.jones at linaro.org]
-> Sent: 2016?1?12? 16:46
-> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
-> Cc: Rob Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>;
-> Mark Rutland <mark.rutland@arm.com>; Ian Campbell
-> <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>; Javier
-> Martinez Canillas <javier@dowhile0.org>; Krzysztof Kozlowski
-> <k.kozlowski@samsung.com>; Ferre, Nicolas <Nicolas.FERRE@atmel.com>;
-> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> devicetree at vger.kernel.org
-> Subject: Re: [PATCH v2 0/2] mfd: act8945a: add Active-semi ACT8945A PMIC
-> MFD driver
+> The Active-semi ACT8945A PMIC is a Multi-Function Device, it has
+> two subdevices:
+>  - Regulator
+>  - Charger
 > 
-> On Tue, 12 Jan 2016, Wenyou Yang wrote:
+> This patch adds documentation for ACT8945A DT bindings.
 > 
-> > This patch set adds support for the Active-semi ACT8945A PMIC MFD
-> > driver. It is a Multi Function Device with the following
-> > subdevices:
-> >  - Regulator
-> >  - Charger
-> >
-> > It is interfaced to the host controller using I2C interface, ACT8945A
-> > is a child device of the I2C.
-> >
-> > Changes in v2:
-> >  - add more help information in Kconfig.
-> >  - update the file header with short version license and author line.
-> >  - remove unused structure members (dev, i2c_client) of stuct act8945a_dev.
-> >  - use define "PLATFORM_DEVID_NONE" for mfd_add_devices(), instead of '-1'.
-> >  - use more explicit info to indicate the failure to add sub devices.
-> >  - remove the unnecessary print out.
-> >  - substitute MODULE_LICENSE("GPL") for MODULE_LICENSE("GPL v2").
-> >  - use more specific label in Example.
-> >  - add pmic and charger nodes in Example.
-> >
-> > Wenyou Yang (2):
-> >   mfd: act8945a: add Active-semi ACT8945A PMIC MFD driver
-> >   mfd: add documentation for ACT8945A DT bindings
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> ---
 > 
-> Sending out 3 patch-sets for related changes is a pretty unconventional way of
-> doing things.  In future could you place them all in the same place, that way all of
-> the patches stay together whist hopping around our inboxes.
+> Changes in v2:
+>  - use more specific label in Example.
+>  - add pmic and charger nodes in Example.
+> 
+>  Documentation/devicetree/bindings/mfd/act8945a.txt |   82 ++++++++++++++++++++
+>  1 file changed, 82 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/act8945a.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/act8945a.txt b/Documentation/devicetree/bindings/mfd/act8945a.txt
+> new file mode 100644
+> index 0000000..e4a8aaf
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/act8945a.txt
+> @@ -0,0 +1,82 @@
+> +Device-Tree bindings for Active-semi ACT8945A MFD driver
+> +
+> +Required properties:
+> + - compatible: "active-semi,act8945a".
+> + - reg: the I2C slave address for the ACT8945A chip
+> +
+> +The chip exposes two subdevices:
+> + - a regulators: see ../regulator/act8945a-regulator.txt
+> + - a charger: see ../power/act8945a-charger.txt
+> +
+> +Example:
+> +	act8945a at 5b {
+> +		compatible = "active-semi,act8945a";
+> +		reg = <0x5b>;
+> +		status = "okay";
+> +
+> +		pmic {
+> +			compatible = "active-semi,act8945a-regulator";
+> +			active-semi,vsel-high;
+> +
+> +				regulators {
 
-Thank you for your advice, I will keep in mind next time.
+Your tabbing here is not correct.
 
-> 
-> >  Documentation/devicetree/bindings/mfd/act8945a.txt |   82 +++++++++++++++
-> >  drivers/mfd/Kconfig                                |   11 ++
-> >  drivers/mfd/Makefile                               |    1 +
-> >  drivers/mfd/act8945a.c                             |  109 ++++++++++++++++++++
-> >  include/linux/mfd/act8945a.h                       |   21 ++++
-> >  5 files changed, 224 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/mfd/act8945a.txt
-> >  create mode 100644 drivers/mfd/act8945a.c  create mode 100644
-> > include/linux/mfd/act8945a.h
-> >
-> 
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead Linaro.org ? Open source
-> software for ARM SoCs Follow Linaro: Facebook | Twitter | Blog
+> +					vdd_1v35_reg: DCDC_REG1 {
+> +						regulator-name = "VDD_1V35";
+> +						regulator-min-microvolt = <1350000>;
+> +						regulator-max-microvolt = <1350000>;
+> +						regulator-always-on;
+> +					};
+> +
+> +					vdd_1v2_reg: DCDC_REG2 {
+> +						regulator-name = "VDD_1V2";
+> +						regulator-min-microvolt = <1100000>;
+> +						regulator-max-microvolt = <1300000>;
+> +						regulator-always-on;
+> +					};
+> +
+> +					vdd_3v3_reg: DCDC_REG3 {
+> +						regulator-name = "VDD_3V3";
+> +						regulator-min-microvolt = <3300000>;
+> +						regulator-max-microvolt = <3300000>;
+> +						regulator-always-on;
+> +					};
+> +
+> +					vdd_fuse_reg: LDO_REG1 {
+> +						regulator-name = "VDD_FUSE";
+> +						regulator-min-microvolt = <2500000>;
+> +						regulator-max-microvolt = <2500000>;
+> +						regulator-always-on;
+> +					};
+> +
+> +					vdd_3v3_lp_reg: LDO_REG2 {
+> +						regulator-name = "VDD_3V3_LP";
+> +						regulator-min-microvolt = <3300000>;
+> +						regulator-max-microvolt = <3300000>;
+> +						regulator-always-on;
+> +					};
+> +
+> +					vdd_led_reg: LDO_REG3 {
+> +						regulator-name = "VDD_LED";
+> +						regulator-min-microvolt = <3300000>;
+> +						regulator-max-microvolt = <3300000>;
+> +						regulator-always-on;
+> +					};
+> +
+> +					vdd_sdhc_1v8_reg: LDO_REG4 {
+> +						regulator-name = "VDD_SDHC_1V8";
+> +						regulator-min-microvolt = <1800000>;
+> +						regulator-max-microvolt = <1800000>;
+> +						regulator-always-on;
+> +					};
+> +				};
+> +			};
+> +
+> +		charger {
+> +			compatible = "active-semi,act8945a-charger";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_charger_chglev>;
+> +			active-semi,chglev-gpio = <&pioA 12 GPIO_ACTIVE_HIGH>;
+> +			active-semi,input_voltage_threshold = <6600>;
+> +			active-semi,precondition_timeout = <40>;
+> +			active-semi,total_timeout = <3>;
+> +		};
+> +	};
 
-
-Best Regards,
-Wenyou Yang
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
