@@ -1,17 +1,25 @@
 From: davem@davemloft.net (David Miller)
-Date: Tue, 12 Jan 2016 15:52:24 -0500 (EST)
-Subject: [PATCH net-next 00/10] Proposal for a API set for HW Buffer
- management
-In-Reply-To: <1452625834-22166-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1452625834-22166-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20160112.155224.1322028826893670746.davem@davemloft.net>
+Date: Tue, 12 Jan 2016 15:56:09 -0500 (EST)
+Subject: [PATCHv2] net: bpf: reject invalid shifts
+In-Reply-To: <1452626228-15742-1-git-send-email-rabin@rab.in>
+References: <20160112185121.GA34045@ast-mbp.thefacebook.com>
+ <1452626228-15742-1-git-send-email-rabin@rab.in>
+Message-ID: <20160112.155609.526505451119578505.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Rabin Vincent <rabin@rab.in>
+Date: Tue, 12 Jan 2016 20:17:08 +0100
 
-If you are going to contribute to netdev you must follow the mailing
-list and make not of important announcements such as:
+> On ARM64, a BUG() is triggered in the eBPF JIT if a filter with a
+> constant shift that can't be encoded in the immediate field of the
+> UBFM/SBFM instructions is passed to the JIT.  Since these shifts
+> amounts, which are negative or >= regsize, are invalid, reject them in
+> the eBPF verifier and the classic BPF filter checker, for all
+> architectures.
+> 
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+> v2: handle BPF_ARSH too
 
-http://marc.info/?l=linux-netdev&m=145248145925834&w=2
-
-Thank you.
+Applied and queued up for -stable, thanks.
