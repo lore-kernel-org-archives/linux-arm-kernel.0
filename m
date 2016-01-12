@@ -1,41 +1,53 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Jan 2016 23:41:45 +0100
-Subject: I/O issues with writing to mtdblock devices on kirkwood
-In-Reply-To: <20160112220058.GE6588@sirena.org.uk>
-References: <1440159857.19360.50.camel@debian.org>
- <4468027.N4Q71mzei0@wuerfel> <20160112220058.GE6588@sirena.org.uk>
-Message-ID: <6044522.tqmlJ5a48h@wuerfel>
+Date: Tue, 12 Jan 2016 23:51:21 +0100
+Subject: [PATCH v5 5/6] mfd: dt-bindings: add device tree bindings for
+ Hi3519 sysctrl
+In-Reply-To: <5694C725.6010502@huawei.com>
+References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
+ <20160112083946.GN19803@x1> <5694C725.6010502@huawei.com>
+Message-ID: <5675031.hi9rRCqFXs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 January 2016 22:00:58 Mark Brown wrote:
-> On Tue, Jan 12, 2016 at 10:49:57PM +0100, Arnd Bergmann wrote:
+On Tuesday 12 January 2016 17:28:05 xuejiancheng wrote:
+> >>>>>
+> >>>> Not yet.
+> >>>> Arnd Bergmann and Rob Herring all suggested adding a specific compatible string
+> >>>> with the SOC name. This binding is just used for describing the compatible string now.
+> >>>> When more functions on hi3519 SOC are added later, the specific driver will be also
+> >>>> needed.
+> >>>
+> >>> Save this binding until it has more functionality.  We here "I'll add
+> >>> to this later" all too often.
+> >>>
+> >>
+> >> In the hi3519.dtsi file, there is a system-controller device node described like below:
+> >> sysctrl: system-controller at 12010000 {
+> >>      compatible = "hisilicon,hi3519-sysctrl", "syscon";
+> >>      reg = <0x12010000 0x1000>;
+> >> };
+> >> Do you mean that I should remove "hisilicon,hi3519-sysctrl" and just use "syscon" as the
+> >> compatible string??
+> > 
+> > Where is this compatible string _used_?
+> > 
+> >> If I want to add "hisilicon,hi3519-sysctrl" for hi3519. where should I put this binding?
+> >> Could you give some suggestions?  Thank you very much!
+> > 
+> > If you're not using the compatible i.e. the device doesn't have its
+> > own driver yet, then there is no need to supply the binding at all, is
+> > there?
+> > 
 > 
-> > I see in the Armada 370 datasheet that the controller actually supports an
-> > interrupt driven mode, which should be much better in principle than blocking
-> > the CPU during the entire transfer. There may of course be a good reason
-> > why the driver has never used interrupts, but it was originally introduced
-> > in Orion5x, so maybe there was a bug that has been fixed in the meantime.
+> OK. Thank you.
 > 
-> There's also the potential for the overhead from interrupts to be worse
-> than the overhead for busy waiting, but given how badly we're coping now
-> it's worth another look.
 
-Possible, yes. Right now, we do a udelay(1), which I think waits between one and
-two microseconds normally, so we are probably adding extra latency of under
-one microsecond per byte by not polling constantly. If the interrupt latency
-from device-ready to entering the code is more than that, we can assume that
-the transfer ends up being slower. There is also some time spent for getting
-back out of the interrupt handler, but that's no worse than doing nothing
-in udelay().
+Sorry for stepping in late here. I still think that every syscon device should
+come with a specific compatible string, so we have the option of creating a
+driver later on, and I'd like to see a binding document that lists those strings
+(which I believe exists here).
 
-> I did also see a patch today that suggested that at least some of these
-> controllers have some kind of memory mapped mode but I don't know
-> exactly how that works (the patch was a little unclear).  There was some
-> suggestion that it performed well and if there's a free general purpose
-> DMA controller it might be able to work with this mode too.
-
-There is the "xor" DMA engine that has a memcpy mode, but setting this up
-to point at the right mbus translation window is going to be interesting.
+It's really hard to add compatible strings later on, anything else we can
+work around by keying off that string and adding a workaround in the kernel.
 
 	Arnd
