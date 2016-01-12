@@ -1,46 +1,34 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 12 Jan 2016 13:50:23 +0000
-Subject: [PATCH V2 11/23] arm64, pci: Remove useless boot time IRQ
- assignment when booting with DT.
-In-Reply-To: <1450278993-12664-12-git-send-email-tn@semihalf.com>
-References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
- <1450278993-12664-12-git-send-email-tn@semihalf.com>
-Message-ID: <20160112135023.GC3601@red-moon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 12 Jan 2016 14:59:13 +0100
+Subject: [PATCH] ARM: sunxi: Add CPU regulator for cpufreq
+Message-ID: <1452607153-8698-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 16, 2015 at 04:16:21PM +0100, Tomasz Nowicki wrote:
-> In order to probe PCIe host controller when booting with DT,
-> ARM64 is using drivers which defer IRQ assignment to device
-> enable time. It means that boot time DT specific irq map initialization
-> is always overridden, so lets remove that code.
-> 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> ---
->  arch/arm64/kernel/pci.c | 10 ----------
->  1 file changed, 10 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index 023b983..f7948f5 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -51,16 +51,6 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
->  	return pci_enable_resources(dev, mask);
->  }
->  
-> -/*
-> - * Try to assign the IRQ number from DT when adding a new device
-> - */
-> -int pcibios_add_device(struct pci_dev *dev)
-> -{
-> -	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> -
-> -	return 0;
-> -}
-> -
+The current DT doesn't have a phandle to the CPU regulator in the CPU node,
+which disables the CPU voltage scaling entirely.
 
-Actually, this patch should be part of Matthew's series:
+Add that phandle.
 
-http://comments.gmane.org/gmane.linux.kernel.pci/46461
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun5i-r8-chip.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Lorenzo
+diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
+index 530ab28e9ca2..f6898c6b84d4 100644
+--- a/arch/arm/boot/dts/sun5i-r8-chip.dts
++++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
+@@ -70,6 +70,10 @@
+ 	status = "okay";
+ };
+ 
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+-- 
+2.6.4
