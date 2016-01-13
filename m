@@ -1,39 +1,39 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Tue, 12 Jan 2016 18:11:38 -0800
-Subject: [PATCHv2] net: bpf: reject invalid shifts
-In-Reply-To: <20160112234707.GA36167@ast-mbp.thefacebook.com>
-References: <20160112185121.GA34045@ast-mbp.thefacebook.com>
- <1452626228-15742-1-git-send-email-rabin@rab.in>
- <1452628118.1223.25.camel@edumazet-glaptop2.roam.corp.google.com>
- <20160112195356.GA34598@ast-mbp.thefacebook.com>
- <5695653F.6030001@iogearbox.net>
- <20160112204620.GA35080@ast-mbp.thefacebook.com>
- <1452641302.1223.35.camel@edumazet-glaptop2.roam.corp.google.com>
- <20160112234707.GA36167@ast-mbp.thefacebook.com>
-Message-ID: <1452651098.1223.41.camel@edumazet-glaptop2.roam.corp.google.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 13 Jan 2016 11:13:49 +0900
+Subject: [PATCH v3 0/2] power: act8945a: add charger driver for the
+ sub-device of ACT8945A MFD
+In-Reply-To: <5695ACE7.3050505@samsung.com>
+References: <1452586185-818-1-git-send-email-wenyou.yang@atmel.com>
+ <5695ACE7.3050505@samsung.com>
+Message-ID: <5695B2DD.3000504@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-01-12 at 15:47 -0800, Alexei Starovoitov wrote:
-
-> I would agree if those loaded programs would do something sensible,
-> but they're broken. As shown arm and arm64 would execute them
-> differently without JIT, because HW treats such shifts differently.
-> I also checked that libpcap is sane and doesn't generate broken shifts.
-> imo we're not breaking backward compatiblity here.
+On 13.01.2016 10:48, Krzysztof Kozlowski wrote:
+> On 12.01.2016 17:09, Wenyou Yang wrote:
+>> The ACT8945A is a Multi Function Device with the following subdevices:
+>>  - Regulator
+>>  - Charger
+>>
+>> This patch set is to add regulator driver for ACT8945A.
+>> It is based on the patch set:
+>> 	[PATCH v2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD driver
+>>
 > 
+> The useful information would be can be applied independently to other
+> tree than MFD.
 
-How did you prove a particular code path was even taken in a BPF
-program ? This is new to me.
+Oh damn, that was far from English. I meant:
 
-As I said, it is possible some guys never noticed their BPF program were
-'broken' because this invalid shift was hidden in a dead code part.
+The useful information would be whether it can be applied independently
+from that patchset.
 
-So a program might appear as 'weak' when in fact its behavior was
-absolutely correct.
+>From the sentence above I would guess not (in that
+case don't send it as separate patchset)... but from the code I think it
+could (because it depends on MFD_ACT8945A so no build errors).
 
-You assume everybody uses libpcap, this is wrong, and for very obvious
-reasons.
+Anyway please mark it explicitly - it helps the maintainer to make the
+decision.
 
-Try to encode the QUEUE, RXHASH, or CPU instructions in libpcap, for a
-start.
+Best regards,
+Krzysztof
