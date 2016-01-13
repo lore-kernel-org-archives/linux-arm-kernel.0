@@ -1,62 +1,53 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Wed, 13 Jan 2016 09:44:24 +0100
-Subject: /sys/class/power_supply/bq27200-0/capacity changed meaning
- between 4.1 and 4.4?
-In-Reply-To: <20160112215352.GA5248@amd>
-References: <20160109230709.GA30551@amd> <5693BB75.70409@ti.com>
- <20160111214247.GA9735@amd> <56942344.9070609@ti.com>
- <56951A2C.9010602@ti.com> <20160112215352.GA5248@amd>
-Message-ID: <20160113084424.GC11560@pali>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Wed, 13 Jan 2016 17:11:24 +0800
+Subject: [PATCH v3 0/4] Mediatek MT2701 SCPSYS power domain support
+Message-ID: <1452676288-62711-1-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 January 2016 22:53:52 Pavel Machek wrote:
-> Hi!
-> 
-> > >>If not, tell me, and I can do it, but it will involve a lot of swaring...
-> > >
-> > >I'll give it a look over.
-> > 
-> > OK, I'm still looking for a test setup, but this was definitely a problem,
-> > could you give this a try?:
-> 
-> Well, search no more. I tested it and seems to work ok. There's one
-> more blank line in the source, so I had to apply patch by hand.
-> 
-> Tested-by: Pavel Machek <pavel@ucw.cz>
-> Acked-by: Pavel Machek <pavel@ucw.cz>
-> Reported-by: Pavel Machek <pavel@ucw.cz>
-> Cc: stable at vger.kernel.org
-> 
-> ? :-).
-> 
-> And... thanks!
-> 									Pavel
+This patchset is based on v4.4-next/soc from Matthias [1], which is 4.4-rc1
+plus 2 patches. This patchset adds scpsys power domain support for
+Mediatek MT2701.
 
-There are more pending fixes for bq27xxx... Maybe your is duplicate?
+This patchset also separate MT8173 scpsys driver into common part
+(mtk-scpsys.c) and platform part (mtk-scpsys-mt8173.c), so that MT2701
+scpsys driver can share most implementation with MT8173.
 
-http://thread.gmane.org/gmane.linux.power-management.general/70090
-http://thread.gmane.org/gmane.linux.power-management.general/69716/focus=69714
-http://thread.gmane.org/gmane.linux.power-management.general/69716/focus=2110580
+MT8173 and MT2701 scpsys init level are now subsys_init. Please refer to [2]
+to see discussion details.
 
-Sebastian, please take them and ideally send to stable@ for backporting.
+changes since v2:
+- Rebase to mbgg/linux-mediatek v4.4-next/soc [1].
+- Remove MTK_SCPSYS_MT8173 and MTK_SCPSYS_MT2701.
+- Modify scpsys dt-binding document to support MT2701.
 
-> 
-> > diff --git a/drivers/power/bq27xxx_battery.c b/drivers/power/bq27xxx_battery.c
-> > index 880233c..4fec3cf 100644
-> > --- a/drivers/power/bq27xxx_battery.c
-> > +++ b/drivers/power/bq27xxx_battery.c
-> > @@ -470,8 +470,9 @@ static inline int bq27xxx_read(struct bq27xxx_device_info *di, int reg_index,
-> >  static int bq27xxx_battery_read_soc(struct bq27xxx_device_info *di)
-> >  {
-> >  	int soc;
-> > +	bool single = di->chip == BQ27000 || di->chip == BQ27010;
-> > -	soc = bq27xxx_read(di, BQ27XXX_REG_SOC, false);
-> > +	soc = bq27xxx_read(di, BQ27XXX_REG_SOC, single);
-> >  	if (soc < 0)
-> >  		dev_dbg(di->dev, "error reading State-of-Charge\n");
-> 
+changes since v1:
+- Make MTK_SCPSYS in Kconfig invisible from users.
+- Add comments for changing scpsys init level to subsys_init.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+[1] https://github.com/mbgg/linux-mediatek/commits/v4.4-next/soc
+[2] http://lists.infradead.org/pipermail/linux-mediatek/2015-December/003416.html
+
+James Liao (2):
+  soc: mediatek: Separate scpsys driver common code
+  soc: mediatek: Init MT8173 scpsys driver earlier
+
+Shunli Wang (2):
+  soc: mediatek: Add MT2701 power dt-bindings
+  soc: mediatek: Add MT2701 scpsys driver
+
+ .../devicetree/bindings/soc/mediatek/scpsys.txt    |   6 +-
+ drivers/soc/mediatek/Makefile                      |   2 +
+ drivers/soc/mediatek/mtk-scpsys-mt2701.c           | 170 ++++++++++++
+ drivers/soc/mediatek/mtk-scpsys-mt8173.c           | 195 +++++++++++++
+ drivers/soc/mediatek/mtk-scpsys.c                  | 307 ++++++---------------
+ drivers/soc/mediatek/mtk-scpsys.h                  |  55 ++++
+ include/dt-bindings/power/mt2701-power.h           |  27 ++
+ 7 files changed, 531 insertions(+), 231 deletions(-)
+ create mode 100644 drivers/soc/mediatek/mtk-scpsys-mt2701.c
+ create mode 100644 drivers/soc/mediatek/mtk-scpsys-mt8173.c
+ create mode 100644 drivers/soc/mediatek/mtk-scpsys.h
+ create mode 100644 include/dt-bindings/power/mt2701-power.h
+
+--
+1.9.1
