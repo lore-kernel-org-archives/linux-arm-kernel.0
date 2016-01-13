@@ -1,129 +1,81 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 13 Jan 2016 12:37:50 -0800
-Subject: [RESEND][PATCH v2] clk_register_clkdev: remove format string
- interface
-In-Reply-To: <20160107193216.GA6824@www.outflux.net>
-References: <20160107193216.GA6824@www.outflux.net>
-Message-ID: <CAGXu5jKvOwL-EhsR7kmBFMeFzq=ra10u2LqL9R1MVOv5N0PH5A@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 13 Jan 2016 12:39:18 -0800
+Subject: [PATCH] logfs: clarify MTD dependency
+In-Reply-To: <5776957.XLg438VUOx@wuerfel>
+References: <5776957.XLg438VUOx@wuerfel>
+Message-ID: <20160113123918.544497b48bf4c03591c75747@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 7, 2016 at 11:32 AM, Kees Cook <keescook@chromium.org> wrote:
-> Many callers either use NULL or const strings for the third argument of
-> clk_register_clkdev. For those that do not and use a non-const string,
-> this is a risk for format strings being accidentally processed (for
-> example in device names). As this interface is already used as if it
-> weren't a format string (prints nothing when NULL), and there are zero
-> users of the format strings, remove the format string interface to make
-> sure format strings will not leak into the clkdev.
->
-> $ git grep '\bclk_register_clkdev\b' | grep % | wc -l
-> 0
->
-> Unfortunately, all the internals expect a va_list even though they treat
-> a NULL format string as special. To deal with this, we must pass either
-> (..., "%s", string) or (..., NULL) so that a the va_list will be created
-> correctly (passing the name as an argument, not as a format string).
->
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
-> v2:
-> - make calling logic more clear, thanks to rmk.
+On Wed, 13 Jan 2016 14:25:55 +0100 Arnd Bergmann <arnd@arndb.de> wrote:
 
-Should this go via -mm, a clk tree, or through the ARM patch tracker?
+> After a change to the way that composite modules work, we get
+> a logfs build error:
+> 
+> fs/built-in.o: In function `logfs_mount':
+> :(.text+0x139d34): undefined reference to `logfs_get_sb_mtd'
+> fs/built-in.o: In function `logfs_get_sb_bdev':
+> :(.text+0x13aa08): undefined reference to `logfs_get_sb_mtd'
+> 
+> This patch avoids the error by changing the dependencies of
+> logfs in a way that we can no longer configure logfs as built-in
+> when the MTD core is a loadable module, while leaving the
+> dependency to require at least one of MTD or BLOCK to be
+> enabled.
+> 
+> Another patch tried to work around the problem, but accidentally
+> dropped the dependency on 'BLOCK || MTD', allowing the file
+> system to be built if neither is selected.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: cf4f21938e13 ("kbuild: Allow to specify composite modules with modname-m")
+> Fixes: e6be296f680c ("logfs: fix logfs build errors and dependencies")
 
-Thanks!
+Randy's "logfs: fix logfs build errors and dependencies" is an
+only-in-mm thing.  So it would make sense to combine the two patches
+into a single one and to give that an appropriate changelog.
 
--Kees
-
-> ---
->  drivers/clk/clkdev.c   | 31 +++++++++++++++++++++++++------
->  include/linux/clkdev.h |  3 +--
->  2 files changed, 26 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index 779b6ff0c7ad..eb20b941154b 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -353,11 +353,25 @@ void clkdev_drop(struct clk_lookup *cl)
->  }
->  EXPORT_SYMBOL(clkdev_drop);
->
-> +static struct clk_lookup *__clk_register_clkdev(struct clk_hw *hw,
-> +                                               const char *con_id,
-> +                                               const char *dev_id, ...)
-> +{
-> +       struct clk_lookup *cl;
-> +       va_list ap;
-> +
-> +       va_start(ap, dev_id);
-> +       cl = vclkdev_create(hw, con_id, dev_id, ap);
-> +       va_end(ap);
-> +
-> +       return cl;
-> +}
-> +
->  /**
->   * clk_register_clkdev - register one clock lookup for a struct clk
->   * @clk: struct clk to associate with all clk_lookups
->   * @con_id: connection ID string on device
-> - * @dev_id: format string describing device name
-> + * @dev_id: string describing device name
->   *
->   * con_id or dev_id may be NULL as a wildcard, just as in the rest of
->   * clkdev.
-> @@ -368,17 +382,22 @@ EXPORT_SYMBOL(clkdev_drop);
->   * after clk_register().
->   */
->  int clk_register_clkdev(struct clk *clk, const char *con_id,
-> -       const char *dev_fmt, ...)
-> +       const char *dev_id)
->  {
->         struct clk_lookup *cl;
-> -       va_list ap;
->
->         if (IS_ERR(clk))
->                 return PTR_ERR(clk);
->
-> -       va_start(ap, dev_fmt);
-> -       cl = vclkdev_create(__clk_get_hw(clk), con_id, dev_fmt, ap);
-> -       va_end(ap);
-> +       /*
-> +        * Since dev_id can be NULL, and NULL is handled specially, we must
-> +        * pass it as either a NULL format string, or with "%s".
-> +        */
-> +       if (dev_id)
-> +               cl = __clk_register_clkdev(__clk_get_hw(clk), con_id, "%s",
-> +                                          dev_id);
-> +       else
-> +               cl = __clk_register_clkdev(__clk_get_hw(clk), con_id, NULL);
->
->         return cl ? 0 : -ENOMEM;
->  }
-> diff --git a/include/linux/clkdev.h b/include/linux/clkdev.h
-> index 08bffcc466de..c2c04f7cbe8a 100644
-> --- a/include/linux/clkdev.h
-> +++ b/include/linux/clkdev.h
-> @@ -44,8 +44,7 @@ struct clk_lookup *clkdev_create(struct clk *clk, const char *con_id,
->  void clkdev_add_table(struct clk_lookup *, size_t);
->  int clk_add_alias(const char *, const char *, const char *, struct device *);
->
-> -int clk_register_clkdev(struct clk *, const char *, const char *, ...)
-> -       __printf(3, 4);
-> +int clk_register_clkdev(struct clk *, const char *, const char *);
->  int clk_register_clkdevs(struct clk *, struct clk_lookup *, size_t);
->
->  #ifdef CONFIG_COMMON_CLK
-> --
-> 2.6.3
->
->
-> --
-> Kees Cook
-> Chrome OS & Brillo Security
+How does this look? (Primary author was chosen randomly)
 
 
+From: Arnd Bergmann <arnd@arndb.de>
+Subject: logfs: fix logfs build errors and dependencies
 
--- 
-Kees Cook
-Chrome OS & Brillo Security
+Fix build errors that happen when CONFIG_LOGFS=y and CONFIG_MTD=m:
+
+fs/built-in.o: In function `logfs_mount':
+super.c:(.text+0x92a6f): undefined reference to `logfs_get_sb_mtd'
+fs/built-in.o: In function `logfs_get_sb_bdev':
+(.text+0x93530): undefined reference to `logfs_get_sb_mtd'
+
+This patch avoids the error by changing the dependencies of
+logfs in a way that we can no longer configure logfs as built-in
+when the MTD core is a loadable module, while leaving the
+dependency to require at least one of MTD or BLOCK to be
+enabled.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Randy Dunlap <rdunlap@infradead.org>
+Cc: Michal Marek <mmarek@suse.cz>
+Cc: Peter Chen <peter.chen@freescale.com>
+Cc: Randy Dunlap <rdunlap@infradead.org>
+Cc: Joern Engel <joern@logfs.org>
+Cc: Prasad Joshi <prasadjoshi.linux@gmail.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+---
+
+ fs/logfs/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff -puN fs/logfs/Kconfig~logfs-fix-logfs-build-errors-and-dependencies fs/logfs/Kconfig
+--- a/fs/logfs/Kconfig~logfs-fix-logfs-build-errors-and-dependencies
++++ a/fs/logfs/Kconfig
+@@ -1,6 +1,6 @@
+ config LOGFS
+ 	tristate "LogFS file system"
+-	depends on (MTD || BLOCK)
++	depends on MTD || (!MTD && BLOCK)
+ 	select ZLIB_INFLATE
+ 	select ZLIB_DEFLATE
+ 	select CRC32
+_
