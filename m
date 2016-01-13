@@ -1,121 +1,53 @@
-From: qiuxishi@huawei.com (Xishi Qiu)
-Date: Wed, 13 Jan 2016 13:02:31 +0800
-Subject: Have any influence on set_memory_** about below patch ??
-In-Reply-To: <20160112111531.GA4858@leverpostej>
-References: <5693A740.7070408@huawei.com> <20160111133145.GM6499@leverpostej>
- <569454F6.1060207@huawei.com> <20160112111531.GA4858@leverpostej>
-Message-ID: <5695DA67.5080201@huawei.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Wed, 13 Jan 2016 08:00:34 +0200
+Subject: [PATCH v4 3/3] wlcore/wl12xx: spi: add wifi support to cm-t335
+In-Reply-To: <87io35lq2p.fsf@kamboji.qca.qualcomm.com>
+References: <1451482533-8624-1-git-send-email-uri.mashiach@compulab.co.il>
+ <1451482533-8624-4-git-send-email-uri.mashiach@compulab.co.il>
+ <87io35lq2p.fsf@kamboji.qca.qualcomm.com>
+Message-ID: <5695E802.7050909@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/1/12 19:15, Mark Rutland wrote:
+Hi Kalle Valo,
 
-> On Tue, Jan 12, 2016 at 09:20:54AM +0800, Xishi Qiu wrote:
->> On 2016/1/11 21:31, Mark Rutland wrote:
+On 01/07/16 11:02, Kalle Valo wrote:
+> Uri Mashiach <uri.mashiach@compulab.co.il> writes:
+> 
+>> Device tree modifications:
+>> - Pinmux for SPI0 and WiFi GPIOs.
+>> - SPI0 node with wlcore as a child node.
 >>
->>> Hi,
->>>
->>> On Mon, Jan 11, 2016 at 08:59:44PM +0800, zhong jiang wrote:
->>>>
->>>> http://www.spinics.net/lists/arm-kernel/msg472090.html
->>>>
->>>> Hi, Can I ask you a question? Say, This patch tells that the section spilting
->>>> and merging wiil produce confilct in the liner mapping area. Based on the
->>>> situation, Assume that set up page table in 4kb page table way in the liner
->>>> mapping area, Does the set_memroy_** will work without any conplict??
->>>
->>> I'm not sure I understand the question.
->>>
->>> I'm also not a fan of responding to off-list queries as information gets
->>> lost.
->>>
->>> Please ask your question on the mailing list. I am more than happy to
->>> respond there.
->>>
->>> Thanks,
->>> Mark.
->>>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Signed-off-by: Uri Mashiach <uri.mashiach@compulab.co.il>
+>> ---
+
+Uri, please document the dependencies next time. Thanks!
+
+>> v1 -> v2: Replace interrupts and interrupt-parent with interrupts-extended.
+>> v2 -> v3: Move the pinctrl-0 = <&wifi_pins> to the wlcore node.
+>> v3 -> v4: replace interrupts-extended with interrupts and interrupt-parent. (revert v2 modification).
+>>           According to Rob Herring and Documentation/devicetree/bindings/interrupt-controller/interrupts.txt,
+>> 	  interrupts-extended should only be used when a device has multiple interrupt parents.
 >>
->> Hi Mark,
->>
->> In your patch it said "The presence of conflicting TLB entries may result in
->> a variety of behaviours detrimental to the system " and "but this(break-before-make
->> approach) cannot work for modifications to the swapper page tables that cover the
->> kernel text and data."
->>
->> I'm not quite understand this, why the direct mapping can't work?
+>>  arch/arm/boot/dts/am335x-cm-t335.dts | 55 ++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 55 insertions(+)
 > 
-> The problem is that the TLB hardware can operate asynchronously to the
-> rest of the CPU. At any point in time, for any reason, it can decide to
-> destroy TLB entries, to allocate new ones, or to perform a walk based on
-> the existing contents of the TLB.
+> To what tree should this patch go? My wireless-drivers-next tree doesn't
+> even have this file.
+
+Right. It will hit the mainline during this merge window through Tony's and
+arm-soc trees.
+
+Do you think it will be sensible if you take 1/3 and 2/3 patches and Tony
+will take the 3/3 (there is no code dependency between first two and the last one),
+or we can just wait till arm-soc hits the mainline, so you will have the
+needed code?
+
 > 
-> When the TLB contains conflicting entries, TLB lookups may result in TLB
-> conflict aborts, or may return an "amalgamation" of the conflicting
-> entries (e.g. you could get an erroneous output address).
-> 
-> The direct mapping is in active use (and hence live in TLBs). Modifying
-> it without break-before-make (BBM) risks the allocation of conflicting
-> TLB entries. Modifying it with BBM risks unmapping the portion of the
-> kernel performing the modification, resulting in an unrecoverable abort.
-> 
->> flush tlb can't resolve it?
-> 
-> Flushing the TLB doesn't help because the page table update, TLB
-> invalidate, and corresponding barrier(s) are separate operations. The
-> TLB can allocate or destroy entries at any point during the sequence.
-> 
-> For example, without BBM a page table update would look something like:
-> 
-> 1)	str	<newpte>, [<*pte>]
-> 2)	dsb	ish
-> 3)	tlbi	vmalle1is
-> 4)	dsb	ish
-> 5)	isb
-> 
-> After step 1, the new pte value may become visible to the TLBs, and the
-> TLBs may allocate a new entry for it. Until step 4 completes, this entry
-> may remain active in the TLB, and may conflict with an existing entry.
-> 
-> If that entry covers the kernel text for steps 2-5, executing the
-> sequence may result in an unrecoverable TLB conflict abort, or some
-> other behaviour resulting from an amalgamated TLB, e.g. the I-cache
-> might fetch instructions from the wrong address such that steps 2-5
-> cannot be executed.
-> 
-> If the kernel doesn't explicitly access the address covered by that pte,
-> there may still be a problem. The TLB may perform an internal lookup
-> when performing a page table walk, and could then use an erroneous
-> result to continue the walk, resulting in a variety of potential issues
-> (e.g. reading from an MMIO peripheral register).
-> 
-> BBM avoids the conflict, but as that would mean kernel text and/or data
-> would be unmapped, you can't execute the code to finish the update.
-> 
->> I find x86 does not have this limit. e.g. set_memory_r*.
-> 
-> I don't know much about x86; it's probably worth asking the x86 guys
-> about that. It may be that the x86 architecture requires that a conflict
-> or amalgamation is never visible to software, or it could be that
-> contemporary implementations happen to provide that property.
-> 
-> Thanks,
-> Mark.
+> https://patchwork.kernel.org/patch/7933441/
 > 
 
-Hi Mark,
-
-If I do like this, does it have the problem too?
-
-kmalloc a size
-no access
-flush tlb
-call set_memory_ro to change the page table flag
-flush tlb
-start access
-
-Thanks,
-Xishi Qiu 
-
-> .
-> 
+-- 
+Regards,
+Igor.
