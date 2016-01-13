@@ -1,75 +1,208 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Wed, 13 Jan 2016 17:11:27 +0800
-Subject: [PATCH v3 3/4] soc: mediatek: Add MT2701 power dt-bindings
+Date: Wed, 13 Jan 2016 17:11:28 +0800
+Subject: [PATCH v3 4/4] soc: mediatek: Add MT2701 scpsys driver
 In-Reply-To: <1452676288-62711-1-git-send-email-jamesjj.liao@mediatek.com>
 References: <1452676288-62711-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1452676288-62711-4-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1452676288-62711-5-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shunli Wang <shunli.wang@mediatek.com>
 
-Add power dt-bindings for MT2701.
+Add scpsys driver for MT2701.
 
 Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
 Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
 ---
- .../devicetree/bindings/soc/mediatek/scpsys.txt    |  6 +++--
- include/dt-bindings/power/mt2701-power.h           | 27 ++++++++++++++++++++++
- 2 files changed, 31 insertions(+), 2 deletions(-)
- create mode 100644 include/dt-bindings/power/mt2701-power.h
+ drivers/soc/mediatek/Makefile            |   1 +
+ drivers/soc/mediatek/mtk-scpsys-mt2701.c | 170 +++++++++++++++++++++++++++++++
+ 2 files changed, 171 insertions(+)
+ create mode 100644 drivers/soc/mediatek/mtk-scpsys-mt2701.c
 
-diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-index a6c8afc..807d87f 100644
---- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-+++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-@@ -9,10 +9,12 @@ domain control.
- 
- The driver implements the Generic PM domain bindings described in
- power/power_domain.txt. It provides the power domains defined in
--include/dt-bindings/power/mt8173-power.h.
-+include/dt-bindings/power/mt8173-power.h and mt2701-power.h.
- 
- Required properties:
--- compatible: Must be "mediatek,mt8173-scpsys"
-+- compatible: Should be:
-+	- "mediatek,mt8173-scpsys"
-+	- "mediatek,mt2701-scpsys"
- - #power-domain-cells: Must be 1
- - reg: Address range of the SCPSYS unit
- - infracfg: must contain a phandle to the infracfg controller
-diff --git a/include/dt-bindings/power/mt2701-power.h b/include/dt-bindings/power/mt2701-power.h
+diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
+index 13f7d21..d693f7d 100644
+--- a/drivers/soc/mediatek/Makefile
++++ b/drivers/soc/mediatek/Makefile
+@@ -2,3 +2,4 @@ obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
+ obj-$(CONFIG_MTK_PMIC_WRAP) += mtk-pmic-wrap.o
+ obj-$(CONFIG_MTK_SCPSYS) += mtk-scpsys.o
+ obj-$(CONFIG_MTK_SCPSYS) += mtk-scpsys-mt8173.o
++obj-$(CONFIG_MTK_SCPSYS) += mtk-scpsys-mt2701.o
+diff --git a/drivers/soc/mediatek/mtk-scpsys-mt2701.c b/drivers/soc/mediatek/mtk-scpsys-mt2701.c
 new file mode 100644
-index 0000000..64cc826
+index 0000000..82c00ed
 --- /dev/null
-+++ b/include/dt-bindings/power/mt2701-power.h
-@@ -0,0 +1,27 @@
++++ b/drivers/soc/mediatek/mtk-scpsys-mt2701.c
+@@ -0,0 +1,170 @@
 +/*
-+ * Copyright (C) 2015 MediaTek Inc.
++ * Copyright (c) 2015 Mediatek, Shunli Wang <shunli.wang@mediatek.com>
 + *
-+ * This program is free software: you can redistribute it and/or modify
++ * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + *
 + * This program is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
 + */
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/of_device.h>
++#include <linux/pm_domain.h>
++#include <linux/soc/mediatek/infracfg.h>
++#include <dt-bindings/power/mt2701-power.h>
 +
-+#ifndef _DT_BINDINGS_POWER_MT2701_POWER_H
-+#define _DT_BINDINGS_POWER_MT2701_POWER_H
++#include "mtk-scpsys.h"
 +
-+#define MT2701_POWER_DOMAIN_CONN	0
-+#define MT2701_POWER_DOMAIN_DISP	1
-+#define MT2701_POWER_DOMAIN_MFG		2
-+#define MT2701_POWER_DOMAIN_VDEC	3
-+#define MT2701_POWER_DOMAIN_ISP		4
-+#define MT2701_POWER_DOMAIN_BDP		5
-+#define MT2701_POWER_DOMAIN_ETH		6
-+#define MT2701_POWER_DOMAIN_HIF		7
-+#define MT2701_POWER_DOMAIN_IFR_MSC	8
++#define SPM_VDE_PWR_CON			0x0210
++#define SPM_MFG_PWR_CON			0x0214
++#define SPM_ISP_PWR_CON			0x0238
++#define SPM_DIS_PWR_CON			0x023C
++#define SPM_CONN_PWR_CON		0x0280
++#define SPM_BDP_PWR_CON			0x029C
++#define SPM_ETH_PWR_CON			0x02A0
++#define SPM_HIF_PWR_CON			0x02A4
++#define SPM_IFR_MSC_PWR_CON		0x02A8
++#define SPM_PWR_STATUS			0x060c
++#define SPM_PWR_STATUS_2ND		0x0610
 +
-+#endif /* _DT_BINDINGS_POWER_MT2701_POWER_H */
++#define CONN_PWR_STA_MASK		BIT(1)
++#define DIS_PWR_STA_MASK		BIT(3)
++#define MFG_PWR_STA_MASK		BIT(4)
++#define ISP_PWR_STA_MASK		BIT(5)
++#define VDE_PWR_STA_MASK		BIT(7)
++#define BDP_PWR_STA_MASK		BIT(14)
++#define ETH_PWR_STA_MASK		BIT(15)
++#define HIF_PWR_STA_MASK		BIT(16)
++#define IFR_MSC_PWR_STA_MASK		BIT(17)
++
++#define MT2701_TOP_AXI_PROT_EN_CONN	0x0104
++#define MT2701_TOP_AXI_PROT_EN_DISP	0x0002
++
++static const struct scp_domain_data scp_domain_data[] = {
++	[MT2701_POWER_DOMAIN_CONN] = {
++		.name = "conn",
++		.sta_mask = CONN_PWR_STA_MASK,
++		.ctl_offs = SPM_CONN_PWR_CON,
++		.bus_prot_mask = MT2701_TOP_AXI_PROT_EN_CONN,
++		.active_wakeup = true,
++	},
++	[MT2701_POWER_DOMAIN_DISP] = {
++		.name = "disp",
++		.sta_mask = DIS_PWR_STA_MASK,
++		.ctl_offs = SPM_DIS_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.clk_id = {CLK_MM},
++		.bus_prot_mask = MT2701_TOP_AXI_PROT_EN_DISP,
++		.active_wakeup = true,
++	},
++	[MT2701_POWER_DOMAIN_MFG] = {
++		.name = "mfg",
++		.sta_mask = MFG_PWR_STA_MASK,
++		.ctl_offs = SPM_MFG_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(12, 12),
++		.active_wakeup = true,
++	},
++	[MT2701_POWER_DOMAIN_VDEC] = {
++		.name = "vdec",
++		.sta_mask = VDE_PWR_STA_MASK,
++		.ctl_offs = SPM_VDE_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(12, 12),
++		.clk_id = {CLK_MM},
++		.active_wakeup = true,
++	},
++	[MT2701_POWER_DOMAIN_ISP] = {
++		.name = "isp",
++		.sta_mask = ISP_PWR_STA_MASK,
++		.ctl_offs = SPM_ISP_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(13, 12),
++		.active_wakeup = true,
++	},
++	[MT2701_POWER_DOMAIN_BDP] = {
++		.name = "bdp",
++		.sta_mask = BDP_PWR_STA_MASK,
++		.ctl_offs = SPM_BDP_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.active_wakeup = true,
++	},
++	[MT2701_POWER_DOMAIN_ETH] = {
++		.name = "eth",
++		.sta_mask = ETH_PWR_STA_MASK,
++		.ctl_offs = SPM_ETH_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(15, 12),
++		.active_wakeup = true,
++	},
++	[MT2701_POWER_DOMAIN_HIF] = {
++		.name = "hif",
++		.sta_mask = HIF_PWR_STA_MASK,
++		.ctl_offs = SPM_HIF_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(15, 12),
++		.active_wakeup = true,
++	},
++	[MT2701_POWER_DOMAIN_IFR_MSC] = {
++		.name = "ifr_msc",
++		.sta_mask = IFR_MSC_PWR_STA_MASK,
++		.ctl_offs = SPM_IFR_MSC_PWR_CON,
++		.active_wakeup = true,
++	},
++};
++
++#define NUM_DOMAINS	ARRAY_SIZE(scp_domain_data)
++
++static int __init scpsys_probe(struct platform_device *pdev)
++{
++	struct scp *scp;
++
++	scp = init_scp(pdev, scp_domain_data, NUM_DOMAINS);
++	if (IS_ERR(scp))
++		return PTR_ERR(scp);
++
++	mtk_register_power_domains(pdev, scp, NUM_DOMAINS);
++
++	return 0;
++}
++
++static const struct of_device_id of_scpsys_match_tbl[] = {
++	{
++		.compatible = "mediatek,mt2701-scpsys",
++	}, {
++		/* sentinel */
++	}
++};
++
++static struct platform_driver scpsys_drv = {
++	.driver = {
++		.name = "mtk-scpsys-mt2701",
++		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(of_scpsys_match_tbl),
++	},
++};
++
++static int __init scpsys_drv_init(void)
++{
++	return platform_driver_probe(&scpsys_drv, scpsys_probe);
++}
++
++/*
++ * There are some Mediatek drivers which depend on the power domain driver need
++ * to probe in earlier initcall levels. So scpsys driver also need to probe
++ * earlier.
++ *
++ * IOMMU(M4U) and SMI drivers for example. SMI is a bridge between IOMMU and
++ * multimedia HW. IOMMU depends on SMI, and SMI is a power domain consumer,
++ * so the proper probe sequence should be scpsys -> SMI -> IOMMU driver.
++ * IOMMU drivers are initialized during subsys_init by default, so we need to
++ * move SMI and scpsys drivers to subsys_init or earlier init levels.
++ */
++subsys_initcall(scpsys_drv_init);
++
++MODULE_DESCRIPTION("MediaTek MT2701 scpsys driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
