@@ -1,40 +1,37 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 13 Jan 2016 11:28:13 +0000
-Subject: Have any influence on set_memory_** about below patch ??
-In-Reply-To: <5695DA67.5080201@huawei.com>
-References: <5693A740.7070408@huawei.com> <20160111133145.GM6499@leverpostej>
- <569454F6.1060207@huawei.com> <20160112111531.GA4858@leverpostej>
- <5695DA67.5080201@huawei.com>
-Message-ID: <20160113112813.GE23370@leverpostej>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 13 Jan 2016 12:36:28 +0100
+Subject: [PATCH 2/3] ARM: dts: imx6ul: add support for Ka-Ro electronics
+ TXUL modules
+In-Reply-To: <CAOMZO5Dhho3whg8p0t6FARG8vyU158mFc7d8BHxThjojm-dcQg@mail.gmail.com>
+References: <1452621710-15336-1-git-send-email-LW@KARO-electronics.de>
+ <1452621710-15336-2-git-send-email-LW@KARO-electronics.de>
+ <1452621710-15336-3-git-send-email-LW@KARO-electronics.de>
+ <CAOMZO5Dhho3whg8p0t6FARG8vyU158mFc7d8BHxThjojm-dcQg@mail.gmail.com>
+Message-ID: <20160113123628.303ef0d6@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 01:02:31PM +0800, Xishi Qiu wrote:
-> Hi Mark,
+Hi,
+
+> On Tue, Jan 12, 2016 at 4:01 PM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
 > 
-> If I do like this, does it have the problem too?
+> > +               spi at 0 {
+> > +                       compatible = "spidev";
+> > +                       reg = <0>;
+> > +                       spi-max-frequency = <54000000>;
+> > +               };
+> > +
+> > +               spi at 1 {
+> > +                       compatible = "spidev";
+> > +                       reg = <1>;
+> > +                       spi-max-frequency = <54000000>;
+> > +               };
+> > +       };
 > 
-> kmalloc a size
-> no access
-> flush tlb
-> call set_memory_ro to change the page table flag
-> flush tlb
-> start access
+> If you leave the spidev node, the spi core will complain loudly about it.
+>
+I know. But this gives the opportunity to test the SPI interface
+without any bogus chip definitions.
 
-This is broken.
 
-The kmalloc will give you memory form the linear mapping. Even if you
-allocate a page, that page could have been mapped with a section at the
-PMD/PUD/PGD level.
-
-Other data could fall within that section (e.g. a kernel stack,
-perhaps).
-
-Additional TLB flushees do not help. There's still a race against the
-asynchronous TLB logic. The TLB can allocate or destroy entries at any
-tim. If there were no page table changes prior to the invalidate, the
-TLB could re-allocate all existing entries immediately after the TLB
-invalidate, leaving you in the same state as before.
-
-Thanks,
-Mark.
+Lothar Wa?mann
