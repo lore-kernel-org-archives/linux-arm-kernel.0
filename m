@@ -1,52 +1,59 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 13 Jan 2016 11:30:45 +0800
-Subject: [PATCH v7 01/10] mfd: axp20x: Add AXP223 to list of supported PMICs
- in DT bindings
+Date: Wed, 13 Jan 2016 11:30:50 +0800
+Subject: [PATCH v7 06/10] mfd: axp20x: Whitespace,
+ open parenthesis alignment code style fixes
 In-Reply-To: <1452655854-1528-1-git-send-email-wens@csie.org>
 References: <1452655854-1528-1-git-send-email-wens@csie.org>
-Message-ID: <1452655854-1528-2-git-send-email-wens@csie.org>
+Message-ID: <1452655854-1528-7-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
-It is functionally identical to AXP221; only the regulator default
-voltage/status and the external host interface are different.
+This fixes some leftover code style issues in the axp20x core.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Rob Herring <robh@kernel.org>
 Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- Documentation/devicetree/bindings/mfd/axp20x.txt | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/mfd/axp20x.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-index a474359dd206..fd39fa54571b 100644
---- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-+++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-@@ -5,11 +5,12 @@ axp152 (X-Powers)
- axp202 (X-Powers)
- axp209 (X-Powers)
- axp221 (X-Powers)
-+axp223 (X-Powers)
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index 8e569bcfe3bc..3054ea4b95e8 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -593,14 +593,14 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
+ 			dev_err(dev, "Unable to match OF ID\n");
+ 			return -ENODEV;
+ 		}
+-		axp20x->variant = (long) of_id->data;
++		axp20x->variant = (long)of_id->data;
+ 	} else {
+ 		acpi_id = acpi_match_device(dev->driver->acpi_match_table, dev);
+ 		if (!acpi_id || !acpi_id->driver_data) {
+ 			dev_err(dev, "Unable to match ACPI ID and data\n");
+ 			return -ENODEV;
+ 		}
+-		axp20x->variant = (long) acpi_id->driver_data;
++		axp20x->variant = (long)acpi_id->driver_data;
+ 	}
  
- Required properties:
- - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
--	      "x-powers,axp221"
--- reg: The I2C slave address for the AXP chip
-+	      "x-powers,axp221", "x-powers,axp223"
-+- reg: The I2C slave address or RSB hardware address for the AXP chip
- - interrupt-parent: The parent interrupt controller
- - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
- - interrupt-controller: The PMIC has its own internal IRQs
-@@ -51,7 +52,7 @@ LDO3		: LDO		: ldo3in-supply
- LDO4		: LDO		: ldo24in-supply	: shared supply
- LDO5		: LDO		: ldo5in-supply
+ 	switch (axp20x->variant) {
+@@ -634,7 +634,7 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
+ 		return -EINVAL;
+ 	}
+ 	dev_info(dev, "AXP20x variant %s found\n",
+-		axp20x_model_names[axp20x->variant]);
++		 axp20x_model_names[axp20x->variant]);
  
--AXP221 regulators, type, and corresponding input supply names:
-+AXP221/AXP223 regulators, type, and corresponding input supply names:
+ 	return 0;
+ }
+@@ -654,7 +654,7 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
+ 	}
  
- Regulator	  Type		  Supply Name		  Notes
- ---------	  ----		  -----------		  -----
+ 	ret = mfd_add_devices(axp20x->dev, -1, axp20x->cells,
+-			axp20x->nr_cells, NULL, 0, NULL);
++			      axp20x->nr_cells, NULL, 0, NULL);
+ 
+ 	if (ret) {
+ 		dev_err(axp20x->dev, "failed to add MFD devices: %d\n", ret);
 -- 
 2.6.4
