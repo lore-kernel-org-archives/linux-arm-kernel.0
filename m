@@ -1,59 +1,66 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 13 Jan 2016 11:26:13 +0100
-Subject: /sys/class/power_supply/bq27200-0/capacity changed meaning
- between 4.1 and 4.4?
-In-Reply-To: <20160113084424.GC11560@pali>
-References: <20160109230709.GA30551@amd> <5693BB75.70409@ti.com>
- <20160111214247.GA9735@amd> <56942344.9070609@ti.com>
- <56951A2C.9010602@ti.com> <20160112215352.GA5248@amd>
- <20160113084424.GC11560@pali>
-Message-ID: <20160113102613.GA28729@earth>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 13 Jan 2016 10:26:23 +0000
+Subject: [PATCH] arm64: reenable interrupt when handling ptrace breakpoint
+In-Reply-To: <56955B3A.5010303@linaro.org>
+References: <1450225088-2456-1-git-send-email-yang.shi@linaro.org>
+ <20151216111316.GD4308@arm.com> <5671CD5B.9030907@linaro.org>
+ <20151221104818.GF23092@arm.com>
+ <alpine.DEB.2.11.1512211749180.28591@nanos>
+ <20151221170028.GT23092@arm.com> <56955B3A.5010303@linaro.org>
+Message-ID: <20160113102622.GC25458@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 09:44:24AM +0100, Pali Roh?r wrote:
-> On Tuesday 12 January 2016 22:53:52 Pavel Machek wrote:
-> > Hi!
-> > 
-> > > >>If not, tell me, and I can do it, but it will involve a lot of swaring...
-> > > >
-> > > >I'll give it a look over.
-> > > 
-> > > OK, I'm still looking for a test setup, but this was definitely a problem,
-> > > could you give this a try?:
-> > 
-> > Well, search no more. I tested it and seems to work ok. There's one
-> > more blank line in the source, so I had to apply patch by hand.
-> > 
-> > Tested-by: Pavel Machek <pavel@ucw.cz>
-> > Acked-by: Pavel Machek <pavel@ucw.cz>
-> > Reported-by: Pavel Machek <pavel@ucw.cz>
-> > Cc: stable at vger.kernel.org
-> > 
-> > ? :-).
-> > 
-> > And... thanks!
-> > 									Pavel
+On Tue, Jan 12, 2016 at 11:59:54AM -0800, Shi, Yang wrote:
+> On 12/21/2015 9:00 AM, Will Deacon wrote:
+> >On Mon, Dec 21, 2015 at 05:51:22PM +0100, Thomas Gleixner wrote:
+> >>On Mon, 21 Dec 2015, Will Deacon wrote:
+> >>>+static void send_user_sigtrap(int si_code)
+> >>>+{
+> >>>+	struct pt_regs *regs = current_pt_regs();
+> >>>+	siginfo_t info = {
+> >>>+		.si_signo	= SIGTRAP,
+> >>>+		.si_errno	= 0,
+> >>>+		.si_code	= si_code,
+> >>>+		.si_addr	= (void __user *)instruction_pointer(regs),
+> >>>+	};
+> >>>+
+> >>>+	if (WARN_ON(!user_mode(regs)))
+> >>>+		return;
+> >>>+
+> >>>+	preempt_disable();
+> >>
+> >>That doesn't work on RT either. force_sig_info() takes task->sighand->siglock,
+> >>which is a 'sleeping' spinlock on RT.
+> >
+> >Ah, I missed that :/
+> >
+> >>Why would we need to disable preemption here at all? What's the problem of
+> >>being preempted or even migrated?
+> >
+> >There *might* not be a problem, I'm just really nervous about changing
+> >the behaviour on the debug path and subtly changing how ptrace behaves.
+> >
+> >My worry was that you could somehow get back into the tracer, and it
+> >could remove a software breakpoint in the knowledge that it wouldn't
+> >see any future (spurious) SIGTRAPs for that location.
+> >
+> >Without a concrete example, however, I guess I'll bite the bullet and
+> >enable irqs across the call to force_sig_info, since there is clearly a
+> >real issue here on RT.
 > 
-> There are more pending fixes for bq27xxx... Maybe your is duplicate?
+> This might be buried in email storm during the holiday. Just want to double
+> check the status. I'm supposed there is no objection for getting it merged
+> in upstream?
 
-No, it's not a duplicate.
+Sorry, when you replied with:
 
-> http://thread.gmane.org/gmane.linux.power-management.general/70090
-> http://thread.gmane.org/gmane.linux.power-management.general/69716/focus=69714
-> http://thread.gmane.org/gmane.linux.power-management.general/69716/focus=2110580
-> 
-> Sebastian, please take them and ideally send to stable@ for backporting.
+> I think we could just extend the "signal delay send" approach from x86-64
+> to arm64, which is currently used by x86-64 on -rt kernel only.
 
-There is no need to send them to stable@, if they are properly
-tagged with a 'Fixes: <sha1> ("title")' tag, so please always
-include it in your commit messages, if possible :)
+I understood that you were going to fix -rt, so I dropped this pending
+anything more from you.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160113/b74fb73d/attachment-0001.sig>
+What's the plan?
+
+Will
