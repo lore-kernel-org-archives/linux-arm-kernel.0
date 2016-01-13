@@ -1,195 +1,111 @@
 From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Wed, 13 Jan 2016 03:48:39 +0000
-Subject: [PATCH v3 1/2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD
- driver
-In-Reply-To: <5695AC5E.9000804@samsung.com>
-References: <1452592015-22173-1-git-send-email-wenyou.yang@atmel.com>
- <1452592015-22173-2-git-send-email-wenyou.yang@atmel.com>
- <5695AC5E.9000804@samsung.com>
-Message-ID: <B256D81BAE5131468A838E5D7A243641D63E957A@penmbx01>
+Date: Wed, 13 Jan 2016 03:50:09 +0000
+Subject: [PATCH v3 2/2] power: add documentation for ACT8945A's charger
+ DT bindings
+In-Reply-To: <5695AFAD.4030307@samsung.com>
+References: <1452586185-818-1-git-send-email-wenyou.yang@atmel.com>
+ <1452586185-818-3-git-send-email-wenyou.yang@atmel.com>
+ <5695AFAD.4030307@samsung.com>
+Message-ID: <B256D81BAE5131468A838E5D7A243641D63E9586@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Krzysztof,
 
+Thank you for your so much feedback.
+
+I will change it in next version.
+
 > -----Original Message-----
 > From: Krzysztof Kozlowski [mailto:k.kozlowski at samsung.com]
-> Sent: 2016?1?13? 9:46
-> To: Yang, Wenyou <Wenyou.Yang@atmel.com>; Lee Jones
-> <lee.jones@linaro.org>; Rob Herring <robh+dt@kernel.org>; Pawel Moll
-> <pawel.moll@arm.com>; Mark Rutland <mark.rutland@arm.com>; Ian Campbell
-> <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>
-> Cc: Javier Martinez Canillas <javier@dowhile0.org>; Ferre, Nicolas
-> <Nicolas.FERRE@atmel.com>; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; devicetree at vger.kernel.org
-> Subject: Re: [PATCH v3 1/2] mfd: act8945a: add Active-semi ACT8945A PMIC
-> MFD driver
+> Sent: 2016?1?13? 10:00
+> To: Yang, Wenyou <Wenyou.Yang@atmel.com>; Sebastian Reichel
+> <sre@kernel.org>; Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>; David
+> Woodhouse <dwmw2@infradead.org>; Rob Herring <robh+dt@kernel.org>; Pawel
+> Moll <pawel.moll@arm.com>; Mark Rutland <mark.rutland@arm.com>; Ian
+> Campbell <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>
+> Cc: Javier Martinez Canillas <javier@dowhile0.org>; Lee Jones
+> <lee.jones@linaro.org>; Ferre, Nicolas <Nicolas.FERRE@atmel.com>; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-
+> pm at vger.kernel.org
+> Subject: Re: [PATCH v3 2/2] power: add documentation for ACT8945A's charger
+> DT bindings
 > 
-> On 12.01.2016 18:46, Wenyou Yang wrote:
-> > This patch adds support for the Active-semi ACT8945A PMIC.
-> > It is a Multi Function Device with the following subdevices:
-> >  - Regulator
-> >  - Charger
-> >
-> > It is interfaced to the host controller using I2C interface, ACT8945A
-> > is a child device of the I2C.
+> On 12.01.2016 17:09, Wenyou Yang wrote:
+> > This patch adds documentation for the DT bindings of the charger
+> > subdevice of ACT8945A MFD.
 > >
 > > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 > > ---
 > >
 > > Changes in v3: None
-> > Changes in v2:
-> >  - add more help information in Kconfig.
-> >  - update the file header with short version license and author line.
-> >  - remove unused structure members (dev, i2c_client) of stuct act8945a_dev.
-> >  - use define "PLATFORM_DEVID_NONE" for mfd_add_devices(), instead of '-1'.
-> >  - use more explicit info to indicate the failure to add sub devices.
-> >  - remove the unnecessary print out.
-> >  - substitute MODULE_LICENSE("GPL") for MODULE_LICENSE("GPL v2").
+> > Changes in v2: None
 > >
-> >  drivers/mfd/Kconfig          |   11 +++++
-> >  drivers/mfd/Makefile         |    1 +
-> >  drivers/mfd/act8945a.c       |  109
-> ++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/mfd/act8945a.h |   21 ++++++++
-> >  4 files changed, 142 insertions(+)
-> >  create mode 100644 drivers/mfd/act8945a.c  create mode 100644
-> > include/linux/mfd/act8945a.h
+> >  .../devicetree/bindings/power/act8945a-charger.txt |   34
+> ++++++++++++++++++++
+> >  1 file changed, 34 insertions(+)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/power/act8945a-charger.txt
 > >
-> > diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig index
-> > 9ca66de..34375a9 100644
-> > --- a/drivers/mfd/Kconfig
-> > +++ b/drivers/mfd/Kconfig
-> > @@ -18,6 +18,17 @@ config MFD_CS5535
-> >  	  This is the core driver for CS5535/CS5536 MFD functions.  This is
-> >            necessary for using the board's GPIO and MFGPT functionality.
-> >
-> > +config MFD_ACT8945A
-> > +	bool "Active-semi ACT8945A"
-> > +	select MFD_CORE
-> > +	select REGMAP_I2C
-> > +	depends on I2C && OF
-> > +	help
-> > +	  Support for the ACT8945A PMIC from Active-semi. This device
-> > +	  features three step-down DC/DC converters and four low-dropout
-> > +	  linear regulators, along with a complete ActivePath battery
-> > +	  charger.
-> > +
-> >  config MFD_AS3711
-> >  	bool "AMS AS3711"
-> >  	select MFD_CORE
-> > diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile index
-> > 0f230a6..2f1ca82 100644
-> > --- a/drivers/mfd/Makefile
-> > +++ b/drivers/mfd/Makefile
-> > @@ -6,6 +6,7 @@
-> >  obj-$(CONFIG_MFD_88PM860X)	+= 88pm860x.o
-> >  obj-$(CONFIG_MFD_88PM800)	+= 88pm800.o 88pm80x.o
-> >  obj-$(CONFIG_MFD_88PM805)	+= 88pm805.o 88pm80x.o
-> > +obj-$(CONFIG_MFD_ACT8945A)	+= act8945a.o
-> >  obj-$(CONFIG_MFD_SM501)		+= sm501.o
-> >  obj-$(CONFIG_MFD_ASIC3)		+= asic3.o tmio_core.o
-> >  obj-$(CONFIG_MFD_BCM590XX)	+= bcm590xx.o
-> > diff --git a/drivers/mfd/act8945a.c b/drivers/mfd/act8945a.c new file
-> > mode 100644 index 0000000..7f8c50a
+> > diff --git
+> > a/Documentation/devicetree/bindings/power/act8945a-charger.txt
+> > b/Documentation/devicetree/bindings/power/act8945a-charger.txt
+> > new file mode 100644
+> > index 0000000..868e0164
 > > --- /dev/null
-> > +++ b/drivers/mfd/act8945a.c
-> > @@ -0,0 +1,109 @@
-> > +/*
-> > + * MFD driver for Active-semi ACT8945a PMIC
-> > + *
-> > + * Copyright (C) 2015 Atmel Corporation.
-> > + *
-> > + * Author: Wenyou Yang <wenyou.yang@atmel.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > +modify it
-> > + * under  the terms of the GNU General  Public License as published
-> > +by the
-> > + * Free Software Foundation;  either version 2 of the License, or (at
-> > +your
-> > + * option) any later version.
-> > + */
+> > +++ b/Documentation/devicetree/bindings/power/act8945a-charger.txt
+> > @@ -0,0 +1,34 @@
+> > +Device-Tree bindings for charger of Active-semi ACT8945A
+> > +Multi-Function Device
 > > +
-> > +#include <linux/i2c.h>
-> > +#include <linux/mfd/act8945a.h>
-> > +#include <linux/mfd/core.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of_device.h>
-> > +#include <linux/regmap.h>
-> > +
-> > +static const struct mfd_cell act8945a_devs[] = {
-> > +	{
-> > +		.name = "act8945a-pmic",
-> > +		.of_compatible = "active-semi,act8945a-regulator",
-> > +	},
-> > +	{
-> > +		.name = "act8945a-charger",
-> > +		.of_compatible = "active-semi,act8945a-charger",
-> > +	},
-> > +};
-> > +
-> > +static const struct regmap_config act8945a_regmap_config = {
-> > +	.reg_bits = 8,
-> > +	.val_bits = 8,
-> > +};
-> > +
-> > +static int act8945a_i2c_probe(struct i2c_client *i2c,
-> > +			      const struct i2c_device_id *id) {
-> > +	struct act8945a_dev *act8945a;
-> > +	int ret;
-> > +
-> > +	act8945a = devm_kzalloc(&i2c->dev, sizeof(*act8945a), GFP_KERNEL);
-> > +	if (!act8945a)
-> > +		return -ENOMEM;
-> > +
-> > +	i2c_set_clientdata(i2c, act8945a);
-> > +
-> > +	act8945a->regmap = devm_regmap_init_i2c(i2c,
-> &act8945a_regmap_config);
-> > +	if (IS_ERR(act8945a->regmap)) {
-> > +		ret = PTR_ERR(act8945a->regmap);
-> > +		dev_err(&i2c->dev, "regmap init failed: %d\n", ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	ret = mfd_add_devices(&i2c->dev, PLATFORM_DEVID_NONE,
-> act8945a_devs,
-> > +			      ARRAY_SIZE(act8945a_devs), NULL, 0, NULL);
-> > +	if (ret) {
-> > +		dev_err(&i2c->dev, "Failed to add sub devices\n");
-> > +		return ret;
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int act8945a_i2c_remove(struct i2c_client *i2c) {
-> > +	mfd_remove_devices(&i2c->dev);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct i2c_device_id act8945a_i2c_id[] = {
-> > +	{ "act8945a", 0 },
-> > +	{}
-> > +};
-> > +MODULE_DEVICE_TABLE(i2c, act8945a_i2c_id);
-> > +
-> > +static const struct of_device_id act8945a_of_match[] = {
-> > +	{.compatible = "active-semi,act8945a", },
+> > +Required properties:
+> > + - compatible: "active-semi,act8945a-charger"
+> > + - active-semi,chglev-gpio = Specifies a gpio that uses to select
+> > +   the charge current level.
 > 
-> Nit: a space before .compatible
+> active-semi,chglev-gpios
+> See: Documentation/devicetree/bindings/gpio/gpio.txt
 > 
-> Overall it looks good:
+> > +
+> > +Optional properties:
+> > + - active-semi,battery_temperature: Indicates if it is allowed to check
+> > +   the battery temperature. If it is missing, assume the battery temperature
+> > +   is not allowed to check.
 > 
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Thank you for your Reviewed-by.
-
+> Here and in rest of properties - no underscores but hyphens. The name suggests
+> that this is a value... but this is a boolean?
+> 
+> > + - active-semi,input_voltage_threshold: unit: mV;
+> > +   Specifies the charger's input over-voltage threshold value;
+> > +   The value can be: 6600, 7000, 7500, 8000; default: 6600
+> 
+> I think adding units suffix in binding is preferred. so "-microvolt"?
 > 
 > Best regards,
 > Krzysztof
+> 
+> 
+> > + - active-semi,precondition_timeout: unit: minutes;
+> > +   Specifies the charger's PRECONDITION safety timer setting value;
+> > +   The value can be: 40, 60, 80, 0; If 0, it means to disable this timer;
+> > +   default: 40.
+> > + - active-semi,total_timeout: unit: hours;
+> > +   Specifies the charger's total safety timer setting value;
+> > +   The value can be: 3, 4, 5, 0; If 0, it means to disable this timer;
+> > +   default: 3.
+> > +
+> > +Example:
+> > +
+> > +	charger {
+> > +		compatible = "active-semi,act8945a-charger";
+> > +		pinctrl-names = "default";
+> > +		pinctrl-0 = <&pinctrl_charger_chglev>;
+> > +		active-semi,chglev-gpio = <&pioA 12 GPIO_ACTIVE_HIGH>;
+> > +		active-semi,input_voltage_threshold = <6600>;
+> > +		active-semi,precondition_timeout = <40>;
+> > +		active-semi,total_timeout = <3>;
+> > +	};
+> >
 
 
 Best Regards,
