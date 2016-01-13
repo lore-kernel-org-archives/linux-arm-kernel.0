@@ -1,58 +1,40 @@
-From: liviu.dudau@arm.com (liviu.dudau at arm.com)
-Date: Wed, 13 Jan 2016 11:25:59 +0000
-Subject: [PATCH v1 3/3] ARM64 LPC: update binding doc
-In-Reply-To: <56962FC2.1070101@gmail.com>
-References: <1451396032-23708-1-git-send-email-zourongrong@gmail.com>
- <5694C6A4.8060308@huawei.com>
- <20160112101418.GO13633@e106497-lin.cambridge.arm.com>
- <4052627.BRvFkUij6q@wuerfel>
- <20160113100911.GU13633@e106497-lin.cambridge.arm.com>
- <56962FC2.1070101@gmail.com>
-Message-ID: <20160113112559.GX13633@e106497-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 13 Jan 2016 11:28:13 +0000
+Subject: Have any influence on set_memory_** about below patch ??
+In-Reply-To: <5695DA67.5080201@huawei.com>
+References: <5693A740.7070408@huawei.com> <20160111133145.GM6499@leverpostej>
+ <569454F6.1060207@huawei.com> <20160112111531.GA4858@leverpostej>
+ <5695DA67.5080201@huawei.com>
+Message-ID: <20160113112813.GE23370@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 07:06:42PM +0800, Rongrong Zou wrote:
-> On 2016/1/13 18:09, liviu.dudau at arm.com wrote:
-> >On Tue, Jan 12, 2016 at 11:54:59PM +0100, Arnd Bergmann wrote:
-> >>On Tuesday 12 January 2016 10:14:18 liviu.dudau at arm.com wrote:
-> >>>
-> >>>OK, looking at of_translate_one() comments it looks like a missing "ranges" property is
-> >>>only accepted on PowerPC. I suggest you have an empty "ranges" property in your isa
-> >>>parent node, that will signal to the OF parsing code that the mapping is 1:1. Then have
-> >>>the IPMI node use the reg = <0x0 0xe4 4>; property values instead of reg = <0x1 0xe4 4>;
-> >>>
-> >>>
-> >>
-> >>A missing ranges property means that there is no translation, while an
-> >>empty ranges means a 1:1 translation to the parent bus.
-> >>
-> >>We really want the former here, as I/O port addresses are not mapped into
-> >>the MMIO space of the parent bus.
-> >
-> >Agree. However of_translate_one()'s behaviour doesn't match our expectations and I have no
-> >useful suggestions on what the right behaviour should be.
-> >
+On Wed, Jan 13, 2016 at 01:02:31PM +0800, Xishi Qiu wrote:
+> Hi Mark,
 > 
-> I had tried to modify the drivers/of/address.c to address this problem, but it looks
-> not so general. I'm not sure you have seen this: https://lkml.org/lkml/2016/1/10/89 .
-
-Yes, I have seen it. Based on Arnd's suggestion, it is probably the way to go.
-
-Best regards,
-Liviu
-
+> If I do like this, does it have the problem too?
 > 
-> Regards,
-> Rongrong
-> 
+> kmalloc a size
+> no access
+> flush tlb
+> call set_memory_ro to change the page table flag
+> flush tlb
+> start access
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+This is broken.
+
+The kmalloc will give you memory form the linear mapping. Even if you
+allocate a page, that page could have been mapped with a section at the
+PMD/PUD/PGD level.
+
+Other data could fall within that section (e.g. a kernel stack,
+perhaps).
+
+Additional TLB flushees do not help. There's still a race against the
+asynchronous TLB logic. The TLB can allocate or destroy entries at any
+tim. If there were no page table changes prior to the invalidate, the
+TLB could re-allocate all existing entries immediately after the TLB
+invalidate, leaving you in the same state as before.
+
+Thanks,
+Mark.
