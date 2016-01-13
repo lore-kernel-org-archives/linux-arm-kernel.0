@@ -1,43 +1,129 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Jan 2016 21:26:55 +0100
-Subject: [PATCH] drm: avoid uninitialized timestamp use in wait_vblank
-Message-ID: <4063054.9IPA0UdbYa@wuerfel>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 13 Jan 2016 12:37:50 -0800
+Subject: [RESEND][PATCH v2] clk_register_clkdev: remove format string
+ interface
+In-Reply-To: <20160107193216.GA6824@www.outflux.net>
+References: <20160107193216.GA6824@www.outflux.net>
+Message-ID: <CAGXu5jKvOwL-EhsR7kmBFMeFzq=ra10u2LqL9R1MVOv5N0PH5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc warns about the timestamp in drm_wait_vblank being possibly
-used without an initialization:
+On Thu, Jan 7, 2016 at 11:32 AM, Kees Cook <keescook@chromium.org> wrote:
+> Many callers either use NULL or const strings for the third argument of
+> clk_register_clkdev. For those that do not and use a non-const string,
+> this is a risk for format strings being accidentally processed (for
+> example in device names). As this interface is already used as if it
+> weren't a format string (prints nothing when NULL), and there are zero
+> users of the format strings, remove the format string interface to make
+> sure format strings will not leak into the clkdev.
+>
+> $ git grep '\bclk_register_clkdev\b' | grep % | wc -l
+> 0
+>
+> Unfortunately, all the internals expect a va_list even though they treat
+> a NULL format string as special. To deal with this, we must pass either
+> (..., "%s", string) or (..., NULL) so that a the va_list will be created
+> correctly (passing the name as an argument, not as a format string).
+>
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> ---
+> v2:
+> - make calling logic more clear, thanks to rmk.
 
-drivers/gpu/drm/drm_irq.c: In function 'drm_wait_vblank':
-drivers/gpu/drm/drm_irq.c:1755:28: warning: 'now.tv_usec' may be used uninitialized in this function [-Wmaybe-uninitialized]
-   vblwait->reply.tval_usec = now.tv_usec;
-drivers/gpu/drm/drm_irq.c:1754:27: warning: 'now.tv_sec' may be used uninitialized in this function [-Wmaybe-uninitialized]
-   vblwait->reply.tval_sec = now.tv_sec;
+Should this go via -mm, a clk tree, or through the ARM patch tracker?
 
-This can happen if drm_vblank_count_and_time() returns 0 in its
-error path. To sanitize the error case, I'm changing that function
-to return a zero timestamp when it fails.
+Thanks!
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: e6ae8687a87b ("drm: idiot-proof vblank")
----
-I'm going through the maybe-unused warnings in randconfig builds, this one is
-apparently not a false positive, although it only happens if something
-else has already gone wrong.
+-Kees
 
-diff --git a/drivers/gpu/drm/drm_irq.c b/drivers/gpu/drm/drm_irq.c
-index d12a4efa651b..d32ff169fdb8 100644
---- a/drivers/gpu/drm/drm_irq.c
-+++ b/drivers/gpu/drm/drm_irq.c
-@@ -939,8 +939,10 @@ u32 drm_vblank_count_and_time(struct drm_device *dev, unsigned int pipe,
- 	int count = DRM_TIMESTAMP_MAXRETRIES;
- 	u32 cur_vblank;
- 
--	if (WARN_ON(pipe >= dev->num_crtcs))
-+	if (WARN_ON(pipe >= dev->num_crtcs)) {
-+		*vblanktime = (struct timeval) { 0 };
- 		return 0;
-+	}
- 
- 	/*
- 	 * Vblank timestamps are read lockless. To ensure consistency the vblank
+> ---
+>  drivers/clk/clkdev.c   | 31 +++++++++++++++++++++++++------
+>  include/linux/clkdev.h |  3 +--
+>  2 files changed, 26 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+> index 779b6ff0c7ad..eb20b941154b 100644
+> --- a/drivers/clk/clkdev.c
+> +++ b/drivers/clk/clkdev.c
+> @@ -353,11 +353,25 @@ void clkdev_drop(struct clk_lookup *cl)
+>  }
+>  EXPORT_SYMBOL(clkdev_drop);
+>
+> +static struct clk_lookup *__clk_register_clkdev(struct clk_hw *hw,
+> +                                               const char *con_id,
+> +                                               const char *dev_id, ...)
+> +{
+> +       struct clk_lookup *cl;
+> +       va_list ap;
+> +
+> +       va_start(ap, dev_id);
+> +       cl = vclkdev_create(hw, con_id, dev_id, ap);
+> +       va_end(ap);
+> +
+> +       return cl;
+> +}
+> +
+>  /**
+>   * clk_register_clkdev - register one clock lookup for a struct clk
+>   * @clk: struct clk to associate with all clk_lookups
+>   * @con_id: connection ID string on device
+> - * @dev_id: format string describing device name
+> + * @dev_id: string describing device name
+>   *
+>   * con_id or dev_id may be NULL as a wildcard, just as in the rest of
+>   * clkdev.
+> @@ -368,17 +382,22 @@ EXPORT_SYMBOL(clkdev_drop);
+>   * after clk_register().
+>   */
+>  int clk_register_clkdev(struct clk *clk, const char *con_id,
+> -       const char *dev_fmt, ...)
+> +       const char *dev_id)
+>  {
+>         struct clk_lookup *cl;
+> -       va_list ap;
+>
+>         if (IS_ERR(clk))
+>                 return PTR_ERR(clk);
+>
+> -       va_start(ap, dev_fmt);
+> -       cl = vclkdev_create(__clk_get_hw(clk), con_id, dev_fmt, ap);
+> -       va_end(ap);
+> +       /*
+> +        * Since dev_id can be NULL, and NULL is handled specially, we must
+> +        * pass it as either a NULL format string, or with "%s".
+> +        */
+> +       if (dev_id)
+> +               cl = __clk_register_clkdev(__clk_get_hw(clk), con_id, "%s",
+> +                                          dev_id);
+> +       else
+> +               cl = __clk_register_clkdev(__clk_get_hw(clk), con_id, NULL);
+>
+>         return cl ? 0 : -ENOMEM;
+>  }
+> diff --git a/include/linux/clkdev.h b/include/linux/clkdev.h
+> index 08bffcc466de..c2c04f7cbe8a 100644
+> --- a/include/linux/clkdev.h
+> +++ b/include/linux/clkdev.h
+> @@ -44,8 +44,7 @@ struct clk_lookup *clkdev_create(struct clk *clk, const char *con_id,
+>  void clkdev_add_table(struct clk_lookup *, size_t);
+>  int clk_add_alias(const char *, const char *, const char *, struct device *);
+>
+> -int clk_register_clkdev(struct clk *, const char *, const char *, ...)
+> -       __printf(3, 4);
+> +int clk_register_clkdev(struct clk *, const char *, const char *);
+>  int clk_register_clkdevs(struct clk *, struct clk_lookup *, size_t);
+>
+>  #ifdef CONFIG_COMMON_CLK
+> --
+> 2.6.3
+>
+>
+> --
+> Kees Cook
+> Chrome OS & Brillo Security
+
+
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
