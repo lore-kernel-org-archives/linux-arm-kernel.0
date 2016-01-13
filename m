@@ -1,96 +1,75 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 13 Jan 2016 11:46:01 -0600
-Subject: [PATCH v2 1/3] ARM: DRA7: hwmod: Add reset data for PCIe
-In-Reply-To: <20160113171328.GG12777@atomide.com>
-References: <1452667666-17533-1-git-send-email-kishon@ti.com>
- <1452667666-17533-2-git-send-email-kishon@ti.com>
- <20160113171328.GG12777@atomide.com>
-Message-ID: <56968D59.3010608@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 13 Jan 2016 18:47:25 +0100
+Subject: [PATCH net-next 10/10] net: mvneta: Use the new hwbm framework
+In-Reply-To: <CAPv3WKcKK8fS-6koSgV7ABi8bvkRgzaqJDpOETCpGoTc2sWV=w@mail.gmail.com>
+ (Marcin Wojtas's message of "Tue, 12 Jan 2016 23:40:40 +0100")
+References: <1452625834-22166-1-git-send-email-gregory.clement@free-electrons.com>
+ <1452625834-22166-11-git-send-email-gregory.clement@free-electrons.com>
+ <CAPv3WKcKK8fS-6koSgV7ABi8bvkRgzaqJDpOETCpGoTc2sWV=w@mail.gmail.com>
+Message-ID: <87h9ihwevm.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2016 11:13 AM, Tony Lindgren wrote:
-> * Kishon Vijay Abraham I <kishon@ti.com> [160112 22:48]:
->> Add PCIe reset data to PCIe hwmods on DRA7x.
-> 
-> Adding Paul and Tero to Cc. I don't see other solution to get
-> the PCI driver working until the reset driver is available.
-> 
-> Regards,
-> 
-> Tony
-> 
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+Hi Marcin,
+ 
+ On mar., janv. 12 2016, Marcin Wojtas <mw@semihalf.com> wrote:
 
-Reviewed-by: Suman Anna <s-anna@ti.com>
+> Hi Gregory,
+>
+> A quick remark below. All changes look fine to me at a first look, but
+> I will test and dig more into code soon.
 
->> ---
->>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   15 +++++++++++++++
->>  arch/arm/mach-omap2/prm7xx.h              |    1 +
->>  2 files changed, 16 insertions(+)
+Great! A test would be nice because I have just did basic tests: mainly an
+iperf.
+
+>
 >>
->> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
->> index ee4e044..1281deb 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
->> @@ -1532,14 +1532,21 @@ static struct omap_hwmod_class dra7xx_pciess_hwmod_class = {
->>  };
->>  
->>  /* pcie1 */
->> +static struct omap_hwmod_rst_info dra7xx_pciess1_resets[] = {
->> +	{ .name = "pcie", .rst_shift = 0 },
->> +};
->> +
->>  static struct omap_hwmod dra7xx_pciess1_hwmod = {
->>  	.name		= "pcie1",
->>  	.class		= &dra7xx_pciess_hwmod_class,
->>  	.clkdm_name	= "pcie_clkdm",
->> +	.rst_lines	= dra7xx_pciess1_resets,
->> +	.rst_lines_cnt	= ARRAY_SIZE(dra7xx_pciess1_resets),
->>  	.main_clk	= "l4_root_clk_div",
->>  	.prcm = {
->>  		.omap4 = {
->>  			.clkctrl_offs = DRA7XX_CM_L3INIT_PCIESS1_CLKCTRL_OFFSET,
->> +			.rstctrl_offs = DRA7XX_RM_L3INIT_PCIESS_RSTCTRL_OFFSET,
->>  			.context_offs = DRA7XX_RM_L3INIT_PCIESS1_CONTEXT_OFFSET,
->>  			.modulemode   = MODULEMODE_SWCTRL,
->>  		},
->> @@ -1547,14 +1554,22 @@ static struct omap_hwmod dra7xx_pciess1_hwmod = {
->>  };
->>  
->>  /* pcie2 */
->> +static struct omap_hwmod_rst_info dra7xx_pciess2_resets[] = {
->> +	{ .name = "pcie", .rst_shift = 1 },
->> +};
->> +
->> +/* pcie2 */
->>  static struct omap_hwmod dra7xx_pciess2_hwmod = {
->>  	.name		= "pcie2",
->>  	.class		= &dra7xx_pciess_hwmod_class,
->>  	.clkdm_name	= "pcie_clkdm",
->> +	.rst_lines	= dra7xx_pciess2_resets,
->> +	.rst_lines_cnt	= ARRAY_SIZE(dra7xx_pciess2_resets),
->>  	.main_clk	= "l4_root_clk_div",
->>  	.prcm = {
->>  		.omap4 = {
->>  			.clkctrl_offs = DRA7XX_CM_L3INIT_PCIESS2_CLKCTRL_OFFSET,
->> +			.rstctrl_offs = DRA7XX_RM_L3INIT_PCIESS_RSTCTRL_OFFSET,
->>  			.context_offs = DRA7XX_RM_L3INIT_PCIESS2_CONTEXT_OFFSET,
->>  			.modulemode   = MODULEMODE_SWCTRL,
->>  		},
->> diff --git a/arch/arm/mach-omap2/prm7xx.h b/arch/arm/mach-omap2/prm7xx.h
->> index cc1e6a2..294deed 100644
->> --- a/arch/arm/mach-omap2/prm7xx.h
->> +++ b/arch/arm/mach-omap2/prm7xx.h
->> @@ -360,6 +360,7 @@
->>  /* PRM.L3INIT_PRM register offsets */
->>  #define DRA7XX_PM_L3INIT_PWRSTCTRL_OFFSET			0x0000
->>  #define DRA7XX_PM_L3INIT_PWRSTST_OFFSET				0x0004
->> +#define DRA7XX_RM_L3INIT_PCIESS_RSTCTRL_OFFSET			0x0010
->>  #define DRA7XX_PM_L3INIT_MMC1_WKDEP_OFFSET			0x0028
->>  #define DRA7XX_RM_L3INIT_MMC1_CONTEXT_OFFSET			0x002c
->>  #define DRA7XX_PM_L3INIT_MMC2_WKDEP_OFFSET			0x0030
->> -- 
->> 1.7.9.5
+>> @@ -3946,11 +3965,6 @@ static int mvneta_probe(struct platform_device *pdev)
+>>         dev->priv_flags |= IFF_UNICAST_FLT;
+>>         dev->gso_max_segs = MVNETA_MAX_TSO_SEGS;
 >>
+>> -       err = register_netdev(dev);
+>> -       if (err < 0) {
+>> -               dev_err(&pdev->dev, "failed to register\n");
+>> -               goto err_free_stats;
+>> -       }
+>
+> The purpose of shifting register_netdev() was to be able to obtain
+> pp->id from net_device, before mvneta_bm_port_init is called. It is
+> needed for proper port - pool mapping control.
+
+I can revert this change, initially I moved this chunk because I wanted
+to add a netdev_ops before registering it and this netdev_op depend on
+the bm support. As for now I don't have this this netdev_op this change
+is pointless. But if in future I need it, then I will look for how to do
+it in a different way.
+
+Thanks,
+
+
+>
+>>
+>>         pp->id = dev->ifindex;
+>>
+>> @@ -3965,6 +3979,12 @@ static int mvneta_probe(struct platform_device *pdev)
+>>                 }
+>>         }
+>>
+>> +       err = register_netdev(dev);
+>> +       if (err < 0) {
+>> +               dev_err(&pdev->dev, "failed to register\n");
+>> +               goto err_free_stats;
+>> +       }
+>> +
+>>         err = mvneta_init(&pdev->dev, pp);
+>>         if (err < 0)
+>>                 goto err_netdev;
+>
+> Best regards,
+> Marcin
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
