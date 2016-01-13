@@ -1,78 +1,63 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 13 Jan 2016 14:20:59 +0100
-Subject: [PATCH V3 13/21] pci,
- acpi: Provide generic way to assign bus domain number.
+Date: Wed, 13 Jan 2016 14:21:07 +0100
+Subject: [PATCH V3 21/21] arm64, pci,
+ acpi: Start using ACPI based PCI host bridge driver for ARM64.
 In-Reply-To: <1452691267-32240-1-git-send-email-tn@semihalf.com>
 References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
-Message-ID: <1452691267-32240-14-git-send-email-tn@semihalf.com>
+Message-ID: <1452691267-32240-22-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we now have valid PCI host bridge device reference we can
-introduce code that is going to find its bus domain number using
-ACPI _SEG method.
-
-Note that _SEG method is optional, therefore _SEG absence means
-that all PCI buses belong to domain 0.
+Lets get rid of empty PCI init stub, related ACPI header and
+go with full-blown PCI host bridge driver.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Liviu Dudau <Liviu.Dudau@arm.com>
+CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
 ---
- drivers/pci/pci.c | 29 +++++++++++++++++++++++++----
- 1 file changed, 25 insertions(+), 4 deletions(-)
+ arch/arm64/Kconfig      |  1 +
+ arch/arm64/kernel/pci.c | 10 ----------
+ 2 files changed, 1 insertion(+), 10 deletions(-)
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 7274006..39a985b 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -25,6 +25,7 @@
- #include <linux/device.h>
- #include <linux/pm_runtime.h>
- #include <linux/pci_hotplug.h>
-+#include <linux/acpi.h>
- #include <asm-generic/pci-bridge.h>
- #include <asm/setup.h>
- #include <linux/aer.h>
-@@ -4796,14 +4797,34 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
- 	 * API and update the use_dt_domains value to keep track of method we
- 	 * are using to assign domain numbers (use_dt_domains = 0).
- 	 *
-+	 * IF ACPI, we expect non-DT method (use_dt_domains == -1)
-+	 * and call _SEG method for corresponding host bridge device.
-+	 * If _SEG method does not exist, following ACPI spec (6.5.6)
-+	 * all PCI buses belong to domain 0.
-+	 *
- 	 * All other combinations imply we have a platform that is trying
--	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
--	 * which is a recipe for domain mishandling and it is prevented by
--	 * invalidating the domain value (domain = -1) and printing a
--	 * corresponding error.
-+	 * to mix domain numbers obtained from DT, ACPI and
-+	 * pci_get_new_domain_nr(), which is a recipe for domain mishandling and
-+	 * it is prevented by invalidating the domain value (domain = -1) and
-+	 * printing a corresponding error.
- 	 */
-+
- 	if (domain >= 0 && use_dt_domains) {
- 		use_dt_domains = 1;
-+#ifdef CONFIG_ACPI
-+	} else if (!acpi_disabled && use_dt_domains == -1) {
-+		struct acpi_device *acpi_dev = to_acpi_device(parent);
-+		unsigned long long segment = 0;
-+		acpi_status status;
-+
-+		status = acpi_evaluate_integer(acpi_dev->handle,
-+					       METHOD_NAME__SEG, NULL,
-+					       &segment);
-+		if (ACPI_FAILURE(status) && status != AE_NOT_FOUND)
-+			dev_err(&acpi_dev->dev,  "can't evaluate _SEG\n");
-+
-+		domain = segment;
-+#endif
- 	} else if (domain < 0 && use_dt_domains != 1) {
- 		use_dt_domains = 0;
- 		domain = pci_get_new_domain_nr();
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index d65d315..573bebc 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -2,6 +2,7 @@ config ARM64
+ 	def_bool y
+ 	select ACPI_CCA_REQUIRED if ACPI
+ 	select ACPI_GENERIC_GSI if ACPI
++	select ACPI_PCI_HOST_GENERIC if ACPI
+ 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+ 	select ARCH_HAS_ELF_RANDOMIZE
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index 023b983..a0929a6 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -10,7 +10,6 @@
+  *
+  */
+ 
+-#include <linux/acpi.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <linux/kernel.h>
+@@ -60,12 +59,3 @@ int pcibios_add_device(struct pci_dev *dev)
+ 
+ 	return 0;
+ }
+-
+-#ifdef CONFIG_ACPI
+-/* Root bridge scanning */
+-struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+-{
+-	/* TODO: Should be revisited when implementing PCI on ACPI */
+-	return NULL;
+-}
+-#endif
 -- 
 1.9.1
