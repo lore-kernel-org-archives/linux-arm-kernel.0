@@ -1,29 +1,56 @@
-From: pablo@netfilter.org (Pablo Neira Ayuso)
-Date: Wed, 13 Jan 2016 17:49:03 +0100
-Subject: [PATCH] netfilter: nft_ct: mark nft_ct_get_eval_counter
- __maybe_unused
-In-Reply-To: <20160113155424.GA1581@salvia>
-References: <6200241.eeH6DHXzHj@wuerfel>
- <20160113155424.GA1581@salvia>
-Message-ID: <20160113164903.GA4121@salvia>
+From: brijesh.singh@amd.com (Brijesh Singh)
+Date: Wed, 13 Jan 2016 10:55:04 -0600
+Subject: [PATCH] ata: add AMD Seattle platform driver
+In-Reply-To: <4689728.Nn3Rl2cUeP@wuerfel>
+References: <1452200002-31590-1-git-send-email-brijesh.singh@amd.com>
+ <9923043.nz8DJ6lRiJ@wuerfel> <5693FAC2.4070003@amd.com>
+ <4689728.Nn3Rl2cUeP@wuerfel>
+Message-ID: <56968168.4010606@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 04:54:24PM +0100, Pablo Neira Ayuso wrote:
-> On Wed, Jan 13, 2016 at 02:58:11PM +0100, Arnd Bergmann wrote:
-> > The newly added nft_ct_get_eval_counter() function is only used when
-> > CONFIG_NF_CONNTRACK_LABELS is set, otherwise gcc warns about the
-> > unused definition:
-> > 
-> > netfilter/nft_ct.c:34:12: warning: 'nft_ct_get_eval_counter' defined but not used [-Wunused-function]
-> >  static u64 nft_ct_get_eval_counter(const struct nf_conn_counter *c,
-> > 
-> > This marks the function __maybe_unused to shut up the warning.
+Hi,
+
+On 01/12/2016 08:24 AM, Arnd Bergmann wrote:
+>>>
+>>> Isn't this the thing that ACPI based firmware would handle using AML anyway?
+>>> I don't think the server people would be too happy to add a new driver
+>>> each time a SATA controller does the LEDs slightly differently, and this
+>>> is really the kind of platform specific hack that AML is meant for.
+>>>
+>> Sorry I am not able understand your comment, Could you please explain me what you mean by AML is meant for this kind of platform specific hack ?
+>>
 > 
-> It seems that function doesn't below to CONFIG_NF_CONNTRACK_LABELS as
-> it is part of the new counter support. Will be sending an alternate
-> patch instead.
+> I meant the sgpio register should not be exposed through a resource on
+> an ACPI based system but the access be hidden behind a call into an AML
+> method.
+> 
+> You basically extend the generic AHCI driver to understand three ways of
+> blinking the LEDS:
+> 
+> a) standard AHCI enclosure management
+> b) the Linux LED subsystem using whatever LED implementation the platform provides
 
-Just for the record, I submitted this fix:
+Yes I could look into exploring LED implementation for DT case.
 
-http://patchwork.ozlabs.org/patch/567063/
+> c) calling into the ACPI interpreter to do platform specific hacks
+
+Thanks for explaining. Now I understood your comment on AML however we need to consider the following:
+
+a) activity LED blinking routines are called very frequent (10 to 100ms based on emp->state) and executing AML method that often would introduces its own overhead.
+
+b) all BIOS vendors need to implement a new methods in their DSDT and release a new BIOS.
+
+c) other OS'es (mainly Windows) driver need to be updated.
+
+
+We don't know how many other SoC's have similar hacky implementation which can take advantage of extending generic
+AHCI driver to call into AML methods for LED blink. Given some of these causes I think having a platform driver is much cleaner. I can drop DT binding part from this driver and keep just ACPI binding.
+
+Thoughts ?
+
+-Brijesh
+
+> 
+> 	Arnd
+> 
