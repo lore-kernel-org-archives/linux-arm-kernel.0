@@ -1,118 +1,84 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Tue, 12 Jan 2016 16:57:15 -0800
-Subject: [PATCH v6 1/6] arm/arm64: KVM: Introduce armv7 fp/simd vcpu fields
- and helpers
-In-Reply-To: <20160112141207.GF15554@cbox>
-References: <1451166900-3711-1-git-send-email-m.smarduch@samsung.com>
- <1451166900-3711-2-git-send-email-m.smarduch@samsung.com>
- <20160110163204.GD30867@cbox> <56943D29.3000002@samsung.com>
- <20160112141207.GF15554@cbox>
-Message-ID: <5695A0EB.5020609@samsung.com>
+From: qiuxishi@huawei.com (Xishi Qiu)
+Date: Wed, 13 Jan 2016 09:16:43 +0800
+Subject: [RFC] arm64: failed when run the command: timedatectl set-timezone
+ Asia/Shanghai
+In-Reply-To: <CAPvkgC3HkZ5nP4qxDO+LRCeK5dd29zEpz9ZeK7J_mrCWXrszGA@mail.gmail.com>
+References: <56946932.70601@huawei.com> <569473B2.3030909@huawei.com>
+ <CAPvkgC3HkZ5nP4qxDO+LRCeK5dd29zEpz9ZeK7J_mrCWXrszGA@mail.gmail.com>
+Message-ID: <5695A57B.1060905@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2016/1/12 18:59, Steve Capper wrote:
 
-
-On 1/12/2016 6:12 AM, Christoffer Dall wrote:
-> On Mon, Jan 11, 2016 at 03:39:21PM -0800, Mario Smarduch wrote:
+> On 12 January 2016 at 03:32, Xishi Qiu <qiuxishi@huawei.com> wrote:
+>> On 2016/1/12 10:47, Xishi Qiu wrote:
 >>
->>
->> On 1/10/2016 8:32 AM, Christoffer Dall wrote:
->>> Hi Mario,
+>>> Failed when run the command: timedatectl set-timezone Asia/Shanghai
+>>> But CONFIG_PGTABLE_LEVELS=3 is OK, and CONFIG_PGTABLE_LEVELS=4 is failed.
+>>> The kernel is v4.1, and this command need the lib polikit.
 >>>
->>> I spotted one more potential issue...
+>>> Is this the bug of kernel?
 >>>
->>> On Sat, Dec 26, 2015 at 01:54:55PM -0800, Mario Smarduch wrote:
->>>> Add helper functions to enable access to fp/smid on guest entry and save host
->>>> fpexc on vcpu put, check if fp/simd registers are dirty and add new vcpu
->>>> fields.
->>>>
->>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->>>> ---
->>>>  arch/arm/include/asm/kvm_emulate.h   | 42 ++++++++++++++++++++++++++++++++++++
->>>>  arch/arm/include/asm/kvm_host.h      |  6 ++++++
->>>>  arch/arm64/include/asm/kvm_emulate.h |  8 +++++++
->>>>  3 files changed, 56 insertions(+)
->>>>
->>>> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
->>>> index 3095df0..d4d9da1 100644
->>>> --- a/arch/arm/include/asm/kvm_emulate.h
->>>> +++ b/arch/arm/include/asm/kvm_emulate.h
->>>> @@ -24,6 +24,8 @@
->>>>  #include <asm/kvm_mmio.h>
->>>>  #include <asm/kvm_arm.h>
->>>>  #include <asm/cputype.h>
->>>> +#include <asm/vfp.h>
->>>> +#include "../vfp/vfpinstr.h"
->>>>  
->>>>  unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
->>>>  unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
->>>> @@ -255,4 +257,44 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
->>>>  	}
->>>>  }
->>>>  
->>>> +#ifdef CONFIG_VFPv3
->>>> +/* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
->>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
->>>> +{
->>>> +	u32 fpexc;
->>>> +
->>>> +	/* Save host fpexc, and enable guest access to fp unit */
->>>> +	fpexc = fmrx(FPEXC);
->>>> +	vcpu->arch.host_fpexc = fpexc;
->>>> +	fpexc |= FPEXC_EN;
->>>> +	fmxr(FPEXC, fpexc);
->>>> +
->>>> +	/* Configure HCPTR to trap on tracing and fp/simd access */
->>>> +	vcpu->arch.hcptr = HCPTR_TTA | HCPTR_TCP(10)  | HCPTR_TCP(11);
->>>> +}
->>>> +
->>>> +/* Called from vcpu_put - restore host fpexc */
->>>> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu)
->>>> +{
->>>> +	fmxr(FPEXC, vcpu->arch.host_fpexc);
->>>> +}
->>>> +
->>>> +/* If trap bits are reset then fp/simd registers are dirty */
->>>> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
->>>> +{
->>>> +	return !(vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
->>>> +}
->>>> +#else
->>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
->>>> +{
->>>> +	vcpu->arch.hcptr = HCPTR_TTA;
->>>
->>> Is it correct not to trap VFP registers when the host kernel does not
->>> have CONFIG_VFPv3?  I think this is a change in functionality compared
->>> to the current kernels is it not?
+>>> Thanks,
+>>> Xishi Qiu
 >>
->> With CPU_V7 VFPv3 gets selected, without it fp should be emulated,
->> with exceptions taken in guest kernel. I don't see a reason why
->> fp hcptr access should be enabled in that case.
+>> [  241.310558] polkitd[3531]: unhandled level 0 translation fault (11) at 0x7fff9010c040, esr 0x92000004
+>> [  241.319838] pgd = ffff801fb3e05000
+>> [  241.323259] [7fff9010c040] *pgd=0000000000000000
+>>
+>> [  241.329407] CPU: 0 PID: 3531 Comm: polkitd Not tainted 4.1.12+ #1
+>> [  241.336312] Hardware name: Huawei Taishan 2160 /BC11SPCA, BIOS 1.12 12/30/2015
+>> [  241.343566] task: ffff801fb8772f00 ti: ffff80003f454000 task.ti: ffff80003f454000
+>> [  241.351089] PC is at 0xffff91d281ec
+>> [  241.354594] LR is at 0xffff91cb5b24
+>> [  241.358099] pc : [<0000ffff91d281ec>] lr : [<0000ffff91cb5b24>] pstate: 20000000
+>> [  241.365526] sp : 0000ffffd47a4380
+>> [  241.368858] x29: 0000ffffd47a47c0 x28: 0000000078e8107e
+>> [  241.374215] x27: 0000aaaafaf68020 x26: 00007fff9010c040
+>> [  241.379571] x25: 0000aaaafaf6c2b0 x24: 0000ffff91ed4000
+>> [  241.384931] x23: 0000000000000005 x22: 0000000000000000
+>> [  241.390288] x21: 0000000000000000 x20: 0000000000000008
+>> [  241.395644] x19: 0000ffff91ed4000 x18: 00000000000007df
+>> [  241.401004] x17: 0000ffff91ed5740 x16: 0000ffff91ce84ec
+>> [  241.406360] x15: 0000ffffd47a46a0 x14: 0000ffff91c07370
+>> [  241.411716] x13: 00000000000003d0 x12: 0000ffff92340000
+>> [  241.417074] x11: 0000000000000000 x10: 0101010101010101
+>> [  241.422431] x9 : 0000ffff90108218 x8 : 00000000f20217f7
+>> [  241.427786] x7 : 0000aaaafaf6db40 x6 : 0000ffff90109060
+>> [  241.433146] x5 : 0000000000000000 x4 : 0000aaaafaf6dc30
+>> [  241.438502] x3 : 0000000000000001 x2 : 0000000000000008
+>> [  241.443858] x1 : 0000aaaafaf68020 x0 : 00007fff9010c040
+>>
+>>
 >>
 > 
-> If you have to guests with CONFIG_VFPV3 but your host doesn't have
-> CONFIG_VFPV3, you will never context-switch the VFP registers between
-> the two VMs, and mayhem will ensue.
+> Hi Xishi,
+> This looks like a bug in the Mozilla Javascript engine (which is used
+> by polkitd). It incorrectly assumes that virtual addresses are at most
+> 47 bit and uses the upper bits for pointer tagging.
+> When we enable a 48-bit VA on arm64, this then exacerbates the problem
+> (your VA of 0x7fff9010c040 should likely be 0xffff9010c040).
 > 
-> Unless I'm missing something very obvious?
-
-Hi Christoffer,
-   - on host I disabled VFP/VFPv3 and got a lot of Illegal instructions
-     and many other problems. Perhaps disabling for armv7 this option may need
-     re-evaluation.
-   - Enabling VFPv3 on host and running guest with no vfpv3 appears
-     to work with few glitches.
-   - and vpfv3 host/guest works just fine.
-
-Appears disabling vfpv3 on armv7 requires another investigation (atleast
-on my end).
-
-BTW this is on fast models.
-
-- Mario
-
+> I have raised this issue at:
+> https://bugzilla.mozilla.org/show_bug.cgi?id=1143022
 > 
-> -Christoffer
+> I'm not sure as to the best way of getting this fixed, I would suggest
+> adding to the bug report above as a first step.
 > 
+
+Hi Steve,
+
+I find another issue at:
+https://bugzilla.redhat.com/show_bug.cgi?id=1242326
+
+In your issue, Tom Schuster said it sounds like bug 910845
+https://bugzilla.mozilla.org/show_bug.cgi?id=910845
+Does "__ia64__" mean Itanium arch or all the 64-bit arch?
+
+I'm not familiar with these rpms, so which fix is correct?
+
+Thanks,
+Xishi Qiu
+
+> Cheers,
