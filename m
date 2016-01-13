@@ -1,96 +1,109 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 13 Jan 2016 13:14:29 +0000
-Subject: [PATCHv2] arm64: Allow vmalloc regions to be set with set_memory_*
-In-Reply-To: <1452640955-25491-1-git-send-email-labbott@fedoraproject.org>
-References: <1452640955-25491-1-git-send-email-labbott@fedoraproject.org>
-Message-ID: <20160113131428.GH23370@leverpostej>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 13 Jan 2016 18:53:33 +0530
+Subject: [PATCH V2 6/8] dmaengine: bcm2835: move controlblock chain
+ generation into separate method
+In-Reply-To: <1452187987-2605-7-git-send-email-kernel@martin.sperl.org>
+References: <1452187987-2605-1-git-send-email-kernel@martin.sperl.org>
+ <1452187987-2605-7-git-send-email-kernel@martin.sperl.org>
+Message-ID: <20160113132333.GC11130@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 03:22:35PM -0800, Laura Abbott wrote:
-> 
-> The range of set_memory_* is currently restricted to the module address
-> range because of difficulties in breaking down larger block sizes.
-> vmalloc maps PAGE_SIZE pages so it is safe to use as well. Update the
-> function ranges and add a comment explaining why the range is restricted
-> the way it is.
-> 
-> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
-> ---
-> v2: Old version was sent out with vmalloc warnings. Sorry for the noise.
-> ---
->  arch/arm64/mm/pageattr.c | 25 +++++++++++++++++++++----
->  1 file changed, 21 insertions(+), 4 deletions(-)
+On Thu, Jan 07, 2016 at 05:33:04PM +0000, kernel at martin.sperl.org wrote:
 
-Conceptually this looks fine.
-
-Implementation comments below.
-
-> 
-> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-> index 3571c73..88c8e54 100644
-> --- a/arch/arm64/mm/pageattr.c
-> +++ b/arch/arm64/mm/pageattr.c
-> @@ -36,6 +36,26 @@ static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
->  	return 0;
->  }
->  
-> +static bool validate_addr(unsigned long start, unsigned long end)
+> +static inline bool bcm2835_dma_is_lite(struct bcm2835_chan *c)
 > +{
-> +	/*
-> +	 * This check explicitly excludes most kernel memory. Most kernel
-> +	 * memory is mapped with a larger page size and breaking down the
-> +	 * larger page size without causing TLB conflicts is very difficult.
-> +	 *
-> +	 * If you need to call set_memory_* on a range, the recommendation is
-> +	 * to use vmalloc since that range is mapped with pages.
-> +	 */
-> +	if (start >= MODULES_VADDR && start < MODULES_END &&
-> +	    end >= MODULES_VADDR && end < MODULES_END)
-> +		return true;
+> +	/* dma channels >= 7 are LITE channels */
+> +	return (c->ch >= 7);
 
-I think we had an existing fencepost error that we carried across.
+Why not DT data here as well
 
-Say my module gets the very last page of the modules area. If I try to
-change the permissions of that page, I'd call:
-
-change_memory_common(MODULES_END - PAGE_SIZE, 1, foo, far);
-
-We then calculate end as MODULES_END, sice we simply add one page.
-
-Then we fail the check above, because end >= MODULES_END.
-
-> +
-> +	if (is_vmalloc_addr((void *)start) && is_vmalloc_addr((void *)end))
-> +		return true;
-
-Similarly here we would fail the check if this were the last page of the
-vmalloc area, as addr == VMALLOC_END.
-
-Other that that this looks good!
-
-Thanks,
-Mark.
-
-> +
-> +	return false;
 > +}
 > +
->  static int change_memory_common(unsigned long addr, int numpages,
->  				pgprot_t set_mask, pgprot_t clear_mask)
->  {
-> @@ -51,10 +71,7 @@ static int change_memory_common(unsigned long addr, int numpages,
->  		WARN_ON_ONCE(1);
->  	}
->  
-> -	if (start < MODULES_VADDR || start >= MODULES_END)
-> -		return -EINVAL;
-> -
-> -	if (end < MODULES_VADDR || end >= MODULES_END)
-> +	if (!validate_addr(start, end))
->  		return -EINVAL;
->  
->  	data.set_mask = set_mask;
-> -- 
-> 2.5.0
-> 
+> +static inline size_t bcm2835_dma_max_frame_length(struct bcm2835_chan *c)
+> +{
+> +	/* lite and normal channels have different max frame length */
+> +	return bcm2835_dma_is_lite(c) ? MAX_LITE_DMA_LEN : MAX_DMA_LEN;
+
+Or rather get length from DT..
+
+> +static struct bcm2835_desc *bcm2835_dma_create_cb_chain(
+> +	struct dma_chan *chan, enum dma_transfer_direction direction,
+> +	bool cyclic, u32 info, u32 finalextrainfo, size_t frames,
+> +	dma_addr_t src, dma_addr_t dst, size_t buf_len,
+> +	size_t period_len, gfp_t gfp)
+> +{
+> +	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
+> +	size_t len = buf_len, total_len;
+> +	size_t frame;
+> +	struct bcm2835_desc *d;
+> +	struct bcm2835_cb_entry *cb_entry;
+> +	struct bcm2835_dma_cb *control_block;
+> +	size_t max_len = bcm2835_dma_max_frame_length(c);
+> +
+> +	/* allocate and setup the descriptor. */
+> +	d = kzalloc(sizeof(*d) + frames * sizeof(struct bcm2835_cb_entry),
+> +		    gfp);
+
+odd style.. btw should flag be GFP_NOWAIT ..?
+
+> +		/* fill in the control block */
+> +		control_block = cb_entry->cb;
+> +		control_block->info = info;
+> +		control_block->src = src;
+> +		control_block->dst = dst;
+> +		if (buf_len) {
+> +			control_block->length = min(max_len, len);
+> +			if (period_len &&
+> +			    (total_len + control_block->length >=
+> +			     period_len)) {
+> +				/* set to end of period_len */
+> +				control_block->length =
+> +					period_len - total_len;
+> +				/* add extrainfo when cyclic */
+> +				if (cyclic)
+> +					control_block->info |=
+> +						finalextrainfo;
+> +				/* and reset total_len */
+> +				total_len = 0;
+> +			}
+
+this looks hard to read, perhpas a helper will make it look better
+
+> +	/* the last frame requires extra flags */
+> +	d->cb_list[d->frames - 1].cb->info |= finalextrainfo;
+> +
+> +	/* check the size - if there is some missmatch,
+> +	 * then this is detected here
+> +	 */
+
+this is not kernel style for multi-line comments
+
+>  	/* Grab configuration */
+>  	if (!is_slave_direction(direction)) {
+> -		dev_err(chan->device->dev, "%s: bad direction?\n", __func__);
+> +		dev_err(chan->device->dev,
+> +			"%s: bad direction?\n", __func__);
+
+unrelated change
+
+> -	/* Now allocate and setup the descriptor. */
+> -	d = kzalloc(sizeof(*d), GFP_NOWAIT);
+> -	if (!d)
+> -		return NULL;
+> +	/* warn if buf_len is not a multiple of period_lenas this may leed
+> +	 * to unexpected latencies for interrupts and thus audiable clicks
+> +	 */
+
+here too
+
+>  	/*
+> -	 * Iterate over all frames, create a control block
+> -	 * for each frame and link them together.
+> +	 * allocate the CB chain
+> +	 * note that we need to use GFP_ATOMIC, as the ALSA i2s dmaengine
+
+dmaengine drivers use GFP_NOWAIT in these cases
+
+-- 
+~Vinod
