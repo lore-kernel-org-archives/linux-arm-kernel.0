@@ -1,394 +1,128 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 13 Jan 2016 13:09:46 +0900
-Subject: [PATCH v3 1/2] power: act8945a: add charger driver for ACT8945A
-In-Reply-To: <B256D81BAE5131468A838E5D7A243641D63E959B@penmbx01>
-References: <1452586185-818-1-git-send-email-wenyou.yang@atmel.com>
- <1452586185-818-2-git-send-email-wenyou.yang@atmel.com>
- <5695B252.4060606@samsung.com>
- <B256D81BAE5131468A838E5D7A243641D63E959B@penmbx01>
-Message-ID: <5695CE0A.5010705@samsung.com>
+From: qiuxishi@huawei.com (Xishi Qiu)
+Date: Wed, 13 Jan 2016 12:10:29 +0800
+Subject: Have any influence on set_memory_** about below patch ??
+In-Reply-To: <20160112111531.GA4858@leverpostej>
+References: <5693A740.7070408@huawei.com> <20160111133145.GM6499@leverpostej>
+ <569454F6.1060207@huawei.com> <20160112111531.GA4858@leverpostej>
+Message-ID: <5695CE35.5060406@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.01.2016 12:53, Yang, Wenyou wrote:
-> Hi Krzysztof,
-> 
-> Thank you!
-> 
->> -----Original Message-----
->> From: Krzysztof Kozlowski [mailto:k.kozlowski at samsung.com]
->> Sent: 2016?1?13? 10:12
->> To: Yang, Wenyou <Wenyou.Yang@atmel.com>; Sebastian Reichel
->> <sre@kernel.org>; Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>; David
->> Woodhouse <dwmw2@infradead.org>; Rob Herring <robh+dt@kernel.org>; Pawel
->> Moll <pawel.moll@arm.com>; Mark Rutland <mark.rutland@arm.com>; Ian
->> Campbell <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>
->> Cc: Javier Martinez Canillas <javier@dowhile0.org>; Lee Jones
->> <lee.jones@linaro.org>; Ferre, Nicolas <Nicolas.FERRE@atmel.com>; linux-arm-
->> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-
->> pm at vger.kernel.org
->> Subject: Re: [PATCH v3 1/2] power: act8945a: add charger driver for ACT8945A
->>
->> On 12.01.2016 17:09, Wenyou Yang wrote:
->>> This patch adds new driver for Active-semi ACT8945A ActivePath charger
->>> (part of ACT8945A MFD driver) providing power supply class information
->>> to userspace.
->>>
->>> The driver is configured through DTS (battery and system related
->>> settings) and sysfs entries (timers and input over-voltage threshold).
->>>
->>> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
->>> ---
->>>
->>> Changes in v3:
->>>  - update the file header with short version license and author line.
->>>  - remove unused member of struct act8945a_charger, dev.
->>>  - action due to removing the member of stuct act8945a_dev, dev.
->>>  - remove the unnecessary print out.
->>>  - remove the unnecessary act8945a_charger_remove().
->>>  - fix align of the code-style.
->>>
->>> Changes in v2:
->>>  1./ Substitute of_property_read_bool() for of_get_property().
->>>  2./ Substitute devm_power_supply_register() for power_supply_register().
->>>  3./ Use module_platform_driver(), instead of subsys_initcall().
->>>  4./ Substitute MODULE_LICENSE("GPL") for MODULE_LICENSE("GPL v2").
->>>
->>>  drivers/power/Kconfig            |    7 +
->>>  drivers/power/Makefile           |    1 +
->>>  drivers/power/act8945a_charger.c |  367
->>> ++++++++++++++++++++++++++++++++++++++
->>>  3 files changed, 375 insertions(+)
->>>  create mode 100644 drivers/power/act8945a_charger.c
->>>
->>> diff --git a/drivers/power/Kconfig b/drivers/power/Kconfig index
->>> 1ddd13c..ae75211 100644
->>> --- a/drivers/power/Kconfig
->>> +++ b/drivers/power/Kconfig
->>> @@ -75,6 +75,13 @@ config BATTERY_88PM860X
->>>  	help
->>>  	  Say Y here to enable battery monitor for Marvell 88PM860x chip.
->>>
->>> +config BATTERY_ACT8945A
->>> +	tristate "Active-semi ACT8945A charger driver"
->>> +	depends on MFD_ACT8945A
->>> +	help
->>> +	  Say Y here to enable support for power supply provided by
->>> +	  Active-semi ActivePath ACT8945A charger.
->>> +
->>>  config BATTERY_DS2760
->>>  	tristate "DS2760 battery driver (HP iPAQ & others)"
->>>  	depends on W1 && W1_SLAVE_DS2760
->>> diff --git a/drivers/power/Makefile b/drivers/power/Makefile index
->>> 0e4eab5..e46b75d 100644
->>> --- a/drivers/power/Makefile
->>> +++ b/drivers/power/Makefile
->>> @@ -17,6 +17,7 @@ obj-$(CONFIG_WM8350_POWER)	+=
->> wm8350_power.o
->>>  obj-$(CONFIG_TEST_POWER)	+= test_power.o
->>>
->>>  obj-$(CONFIG_BATTERY_88PM860X)	+= 88pm860x_battery.o
->>> +obj-$(CONFIG_BATTERY_ACT8945A)	+= act8945a_charger.o
->>>  obj-$(CONFIG_BATTERY_DS2760)	+= ds2760_battery.o
->>>  obj-$(CONFIG_BATTERY_DS2780)	+= ds2780_battery.o
->>>  obj-$(CONFIG_BATTERY_DS2781)	+= ds2781_battery.o
->>> diff --git a/drivers/power/act8945a_charger.c
->>> b/drivers/power/act8945a_charger.c
->>> new file mode 100644
->>> index 0000000..643a2ed
->>> --- /dev/null
->>> +++ b/drivers/power/act8945a_charger.c
->>> @@ -0,0 +1,367 @@
->>> +/*
->>> + * Power supply driver for the Active-semi ACT8945A PMIC
->>> + *
->>> + * Copyright (C) 2015 Atmel Corporation
->>> + *
->>> + * Author: Wenyou Yang <wenyou.yang@atmel.com>
->>> + *
->>> + * This program is free software; you can redistribute it and/or
->>> +modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + *
->>> + */
->>> +#include <linux/module.h>
->>> +#include <linux/mfd/act8945a.h>
->>> +#include <linux/of.h>
->>> +#include <linux/of_gpio.h>
->>> +#include <linux/platform_device.h>
->>> +#include <linux/power_supply.h>
->>> +#include <linux/regmap.h>
->>> +
->>> +static const char *act8945a_charger_model = "ACT8945A"; static const
->>> +char *act8945a_charger_manufacturer = "Active-semi";
->>> +
->>> +/**
->>> + * ACT8945A Charger Register Map
->>> + */
->>> +
->>> +/* 0x70: Reserved */
->>> +#define ACT8945A_APCH_CFG		0x71
->>> +#define ACT8945A_APCH_STATUS		0x78
->>> +#define ACT8945A_APCH_CTRL		0x79
->>> +#define ACT8945A_APCH_STATE		0x7A
->>> +
->>> +/* ACT8945A_APCH_CFG */
->>> +#define APCH_CFG_OVPSET		(0x03 << 0)
->>> +#define		APCH_CFG_OVPSET_6V6	(0x0 << 0)
->>> +#define		APCH_CFG_OVPSET_7V	(0x1 << 0)
->>> +#define		APCH_CFG_OVPSET_7V5	(0x2 << 0)
->>> +#define		APCH_CFG_OVPSET_8V	(0x3 << 0)
->>
->> Why the tabs after #define? Nooooo...
->>
->>> +#define APCH_CFG_PRETIMO	(0x03 << 2)
->>> +#define		APCH_CFG_PRETIMO_40_MIN		(0x0 << 2)
->>> +#define		APCH_CFG_PRETIMO_60_MIN		(0x1 << 2)
->>> +#define		APCH_CFG_PRETIMO_80_MIN		(0x2 << 2)
->>> +#define		APCH_CFG_PRETIMO_DISABLED	(0x3 << 2)
->>> +#define APCH_CFG_TOTTIMO	(0x03 << 4)
->>> +#define		APCH_CFG_TOTTIMO_3_HOUR		(0x0 << 4)
->>> +#define		APCH_CFG_TOTTIMO_4_HOUR		(0x1 << 4)
->>> +#define		APCH_CFG_TOTTIMO_5_HOUR		(0x2 << 4)
->>> +#define		APCH_CFG_TOTTIMO_DISABLED	(0x3 << 4)
->>> +#define APCH_CFG_SUSCHG		(0x01 << 7)
->>> +
->>> +#define APCH_STATUS_CHGDAT	(0x01 << 0)
->>> +#define APCH_STATUS_INDAT	(0x01 << 1)
->>> +#define APCH_STATUS_TEMPDAT	(0x01 << 2)
->>> +#define APCH_STATUS_TIMRDAT	(0x01 << 3)
->>> +#define APCH_STATUS_CHGSTAT	(0x01 << 4)
->>> +#define APCH_STATUS_INSTAT	(0x01 << 5)
->>> +#define APCH_STATUS_TEMPSTAT	(0x01 << 6)
->>> +#define APCH_STATUS_TIMRSTAT	(0x01 << 7)
->>> +
->>> +#define APCH_CTRL_CHGEOCOUT	(0x01 << 0)
->>> +#define APCH_CTRL_INDIS		(0x01 << 1)
->>> +#define APCH_CTRL_TEMPOUT	(0x01 << 2)
->>> +#define APCH_CTRL_TIMRPRE	(0x01 << 3)
->>> +#define APCH_CTRL_CHGEOCIN	(0x01 << 4)
->>> +#define APCH_CTRL_INCON		(0x01 << 5)
->>> +#define APCH_CTRL_TEMPIN	(0x01 << 6)
->>> +#define APCH_CTRL_TIMRTOT	(0x01 << 7)
->>
->> For the STATUS and CTRL use BIT(n) macro.
->>
->>
->>> +
->>> +#define APCH_STATE_ACINSTAT	(0x01 << 1)
->>> +#define APCH_STATE_CSTATE	(0x03 << 4)
->>> +#define APCH_STATE_CSTATE_SHIFT		4
->>> +#define		APCH_STATE_CSTATE_DISABLED	0x00
->>> +#define		APCH_STATE_CSTATE_EOC		0x01
->>> +#define		APCH_STATE_CSTATE_FAST		0x02
->>> +#define		APCH_STATE_CSTATE_PRE		0x03
->>> +
->>> +struct act8945a_charger {
->>> +	struct act8945a_dev *act8945a_dev;
->>> +	struct power_supply *psy;
->>> +
->>> +	u32 tolal_time_out;
->>> +	u32 pre_time_out;
->>> +	u32 input_voltage_threshold;
->>> +	bool battery_temperature;
->>> +	int chglev_pin;
->>> +	int chglev_value;
->>> +};
->>> +
->>> +static int act8945a_get_charger_state(struct regmap *regmap, int
->>> +*val) {
->>> +	int ret;
->>> +	unsigned int status, state;
->>> +
->>> +	ret = regmap_read(regmap, ACT8945A_APCH_STATUS, &status);
->>> +	if (ret < 0)
->>> +		return ret;
->>> +
->>> +	ret = regmap_read(regmap, ACT8945A_APCH_STATE, &state);
->>> +	if (ret < 0)
->>> +		return ret;
->>> +
->>> +	state &= APCH_STATE_CSTATE;
->>> +	state >>= APCH_STATE_CSTATE_SHIFT;
->>> +
->>> +	if (state == APCH_STATE_CSTATE_EOC) {
->>> +		if (status & APCH_STATUS_CHGDAT)
->>> +			*val = POWER_SUPPLY_STATUS_FULL;
->>> +		else
->>> +			*val = POWER_SUPPLY_STATUS_NOT_CHARGING;
->>> +	} else if ((state == APCH_STATE_CSTATE_FAST) ||
->>> +		   (state == APCH_STATE_CSTATE_PRE)) {
->>> +		*val = POWER_SUPPLY_STATUS_CHARGING;
->>> +	} else {
->>> +		*val = POWER_SUPPLY_STATUS_NOT_CHARGING;
->>> +	}
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static int act8945a_get_charge_type(struct regmap *regmap, int *val)
->>> +{
->>> +	int ret;
->>> +	unsigned int state;
->>> +
->>> +	ret = regmap_read(regmap, ACT8945A_APCH_STATE, &state);
->>> +	if (ret < 0)
->>> +		return ret;
->>> +
->>> +	state &= APCH_STATE_CSTATE;
->>> +	state >>= APCH_STATE_CSTATE_SHIFT;
->>> +
->>> +	switch (state) {
->>> +	case APCH_STATE_CSTATE_PRE:
->>> +		*val = POWER_SUPPLY_CHARGE_TYPE_TRICKLE;
->>> +		break;
->>> +	case APCH_STATE_CSTATE_FAST:
->>> +		*val = POWER_SUPPLY_CHARGE_TYPE_FAST;
->>> +		break;
->>> +	case APCH_STATE_CSTATE_EOC:
->>> +	case APCH_STATE_CSTATE_DISABLED:
->>> +	default:
->>> +		*val = POWER_SUPPLY_CHARGE_TYPE_NONE;
->>> +	}
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static int act8945a_get_battery_health(struct act8945a_charger *charger,
->>> +				       struct regmap *regmap, int *val) {
->>> +	int ret;
->>> +	unsigned int status;
->>> +
->>> +	ret = regmap_read(regmap, ACT8945A_APCH_STATUS, &status);
->>> +	if (ret < 0)
->>> +		return ret;
->>> +
->>> +	if (charger->battery_temperature && !(status &
->> APCH_STATUS_TEMPDAT))
->>> +		*val = POWER_SUPPLY_HEALTH_OVERHEAT;
->>> +	else if (!(status & APCH_STATUS_INDAT))
->>> +		*val = POWER_SUPPLY_HEALTH_OVERVOLTAGE;
->>> +	else if (status & APCH_STATUS_TIMRDAT)
->>> +		*val = POWER_SUPPLY_HEALTH_SAFETY_TIMER_EXPIRE;
->>> +	else
->>> +		*val = POWER_SUPPLY_HEALTH_GOOD;
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static enum power_supply_property act8945a_charger_props[] = {
->>> +	POWER_SUPPLY_PROP_STATUS,
->>> +	POWER_SUPPLY_PROP_CHARGE_TYPE,
->>> +	POWER_SUPPLY_PROP_TECHNOLOGY,
->>> +	POWER_SUPPLY_PROP_HEALTH,
->>> +	POWER_SUPPLY_PROP_MODEL_NAME,
->>> +	POWER_SUPPLY_PROP_MANUFACTURER
->>> +};
->>> +
->>> +static int act8945a_charger_get_property(struct power_supply *psy,
->>> +					 enum power_supply_property prop,
->>> +					 union power_supply_propval *val) {
->>> +	struct act8945a_charger *charger = power_supply_get_drvdata(psy);
->>> +	struct regmap *regmap = charger->act8945a_dev->regmap;
->>> +	int ret = 0;
->>> +
->>> +	switch (prop) {
->>> +	case POWER_SUPPLY_PROP_STATUS:
->>> +		ret = act8945a_get_charger_state(regmap, &val->intval);
->>> +		break;
->>> +	case POWER_SUPPLY_PROP_CHARGE_TYPE:
->>> +		ret = act8945a_get_charge_type(regmap, &val->intval);
->>> +		break;
->>> +	case POWER_SUPPLY_PROP_TECHNOLOGY:
->>> +		val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
->>> +		break;
->>> +	case POWER_SUPPLY_PROP_HEALTH:
->>> +		ret = act8945a_get_battery_health(charger,
->>> +						  regmap, &val->intval);
->>> +		break;
->>> +	case POWER_SUPPLY_PROP_MODEL_NAME:
->>> +		val->strval = act8945a_charger_model;
->>> +		break;
->>> +	case POWER_SUPPLY_PROP_MANUFACTURER:
->>> +		val->strval = act8945a_charger_manufacturer;
->>> +		break;
->>> +	default:
->>> +		return -EINVAL;
->>> +	}
->>> +
->>> +	return ret;
->>> +}
->>> +
->>> +static const struct power_supply_desc act8945a_charger_desc = {
->>> +	.name		= "act8945a-charger",
->>> +	.type		= POWER_SUPPLY_TYPE_BATTERY,
->>> +	.get_property	= act8945a_charger_get_property,
->>> +	.properties	= act8945a_charger_props,
->>> +	.num_properties	= ARRAY_SIZE(act8945a_charger_props),
->>> +};
->>> +
->>> +#define DEFAULT_TOTAL_TIME_OUT		3
->>> +#define DEFAULT_PRE_TIME_OUT		40
->>> +#define DEFAULT_INPUT_OVP_THRESHOLD	6600
->>> +
->>> +static int act8945a_charger_parse_dt(struct device *dev,
->>> +				     struct act8945a_charger *charger) {
->>> +	struct device_node *np = dev->of_node;
->>> +	enum of_gpio_flags flags;
->>> +
->>> +	if (!np) {
->>> +		dev_err(dev, "no charger of node\n");
->>> +		return -EINVAL;
->>> +	}
->>> +
->>> +	charger->chglev_pin = of_get_named_gpio_flags(np,
->>> +				"active-semi,chglev-gpio", 0, &flags);
->>> +
->>> +	charger->chglev_value = (flags == OF_GPIO_ACTIVE_LOW) ? 0 : 1;
->>> +
->>> +	charger->battery_temperature = of_property_read_bool(np,
->>> +					"active-semi,battery_temperature");
->>> +
->>> +	if (of_property_read_u32(np, "active-semi,input_voltage_threshold",
->>> +				 &charger->input_voltage_threshold))
->>> +		charger->input_voltage_threshold = DEFAULT_PRE_TIME_OUT;
->>> +
->>> +	if (of_property_read_u32(np, "active-semi,precondition_timeout",
->>> +				 &charger->pre_time_out))
->>> +		charger->pre_time_out = DEFAULT_PRE_TIME_OUT;
->>> +
->>> +	if (of_property_read_u32(np, "active-semi,total_timeout",
->>> +				 &charger->tolal_time_out))
->>> +		charger->tolal_time_out = DEFAULT_TOTAL_TIME_OUT;
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static int act8945a_charger_config(struct act8945a_charger *charger)
->>> +{
->>> +	struct regmap *regmap = charger->act8945a_dev->regmap;
->>> +	u8 value = 0;
->>
->> Regmap uses "unsigned int". I think it is better not to mix it so use in the driver
->> "unsigned int" for interactions with regmap.
-> 
-> I checked, it seems they are not mixed in the patch. Or I am wrong?
+On 2016/1/12 19:15, Mark Rutland wrote:
 
-I mean that use "unsigned int value = 0;" here. You're going cast it
-anyway to unsigned int when calling regmap functions.
-
-> 
+> On Tue, Jan 12, 2016 at 09:20:54AM +0800, Xishi Qiu wrote:
+>> On 2016/1/11 21:31, Mark Rutland wrote:
 >>
->> [...]
+>>> Hi,
+>>>
+>>> On Mon, Jan 11, 2016 at 08:59:44PM +0800, zhong jiang wrote:
+>>>>
+>>>> http://www.spinics.net/lists/arm-kernel/msg472090.html
+>>>>
+>>>> Hi, Can I ask you a question? Say, This patch tells that the section spilting
+>>>> and merging wiil produce confilct in the liner mapping area. Based on the
+>>>> situation, Assume that set up page table in 4kb page table way in the liner
+>>>> mapping area, Does the set_memroy_** will work without any conplict??
+>>>
+>>> I'm not sure I understand the question.
+>>>
+>>> I'm also not a fan of responding to off-list queries as information gets
+>>> lost.
+>>>
+>>> Please ask your question on the mailing list. I am more than happy to
+>>> respond there.
+>>>
+>>> Thanks,
+>>> Mark.
+>>>
 >>
->> Javier pointed the auto-loading issue before (because you are not providing any
->> device table). Probably that is not what you want.
+>> Hi Mark,
+>>
+>> In your patch it said "The presence of conflicting TLB entries may result in
+>> a variety of behaviours detrimental to the system " and "but this(break-before-make
+>> approach) cannot work for modifications to the swapper page tables that cover the
+>> kernel text and data."
+>>
+>> I'm not quite understand this, why the direct mapping can't work?
 > 
-> Yes, but I  still don't understand for now ...
+> The problem is that the TLB hardware can operate asynchronously to the
+> rest of the CPU. At any point in time, for any reason, it can decide to
+> destroy TLB entries, to allocate new ones, or to perform a walk based on
+> the existing contents of the TLB.
+> 
+> When the TLB contains conflicting entries, TLB lookups may result in TLB
+> conflict aborts, or may return an "amalgamation" of the conflicting
+> entries (e.g. you could get an erroneous output address).
+> 
+> The direct mapping is in active use (and hence live in TLBs). Modifying
+> it without break-before-make (BBM) risks the allocation of conflicting
+> TLB entries. Modifying it with BBM risks unmapping the portion of the
+> kernel performing the modification, resulting in an unrecoverable abort.
+> 
+>> flush tlb can't resolve it?
+> 
+> Flushing the TLB doesn't help because the page table update, TLB
+> invalidate, and corresponding barrier(s) are separate operations. The
+> TLB can allocate or destroy entries at any point during the sequence.
+> 
+> For example, without BBM a page table update would look something like:
+> 
+> 1)	str	<newpte>, [<*pte>]
+> 2)	dsb	ish
+> 3)	tlbi	vmalle1is
+> 4)	dsb	ish
+> 5)	isb
+> 
+> After step 1, the new pte value may become visible to the TLBs, and the
+> TLBs may allocate a new entry for it. Until step 4 completes, this entry
+> may remain active in the TLB, and may conflict with an existing entry.
+> 
+> If that entry covers the kernel text for steps 2-5, executing the
+> sequence may result in an unrecoverable TLB conflict abort, or some
+> other behaviour resulting from an amalgamated TLB, e.g. the I-cache
+> might fetch instructions from the wrong address such that steps 2-5
+> cannot be executed.
+> 
+> If the kernel doesn't explicitly access the address covered by that pte,
+> there may still be a problem. The TLB may perform an internal lookup
+> when performing a page table walk, and could then use an erroneous
+> result to continue the walk, resulting in a variety of potential issues
+> (e.g. reading from an MMIO peripheral register).
+> 
+> BBM avoids the conflict, but as that would mean kernel text and/or data
+> would be unmapped, you can't execute the code to finish the update.
+> 
+>> I find x86 does not have this limit. e.g. set_memory_r*.
+> 
+> I don't know much about x86; it's probably worth asking the x86 guys
+> about that. It may be that the x86 architecture requires that a conflict
+> or amalgamation is never visible to software, or it could be that
+> contemporary implementations happen to provide that property.
+> 
+> Thanks,
+> Mark.
+> 
 
-Try building this as module and check whether it got automatically
-loaded during boot. :)
+Hi Mark,
 
-Best regards,
-Krzysztof
+Thank you for your reply, I find this code in /arch/arm64/mm/mmu.c
+
+...
+#ifdef CONFIG_DEBUG_RODATA
+void mark_rodata_ro(void)
+{
+	create_mapping_late(__pa(_stext), (unsigned long)_stext,
+				(unsigned long)_etext - (unsigned long)_stext,
+				PAGE_KERNEL_EXEC | PTE_RDONLY);
+
+}
+#endif
+...
+
+So does it also have this problem?
+
+Thanks,
+Xishi Qiu
+
+> .
+> 
