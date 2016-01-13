@@ -1,61 +1,76 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Wed, 13 Jan 2016 11:32:41 +0100
-Subject: /sys/class/power_supply/bq27200-0/capacity changed meaning
- between 4.1 and 4.4?
-In-Reply-To: <20160113102613.GA28729@earth>
-References: <20160109230709.GA30551@amd> <5693BB75.70409@ti.com>
- <20160111214247.GA9735@amd> <56942344.9070609@ti.com>
- <56951A2C.9010602@ti.com> <20160112215352.GA5248@amd>
- <20160113084424.GC11560@pali> <20160113102613.GA28729@earth>
-Message-ID: <20160113103241.GH11560@pali>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 13 Jan 2016 10:45:17 +0000
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <569565DA.2010903@imgtec.com>
+References: <1452426622-4471-12-git-send-email-mst@redhat.com>
+ <56945366.2090504@imgtec.com>
+ <20160112092711.GP6344@twins.programming.kicks-ass.net>
+ <20160112102555.GV6373@twins.programming.kicks-ass.net>
+ <20160112104012.GW6373@twins.programming.kicks-ass.net>
+ <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
+Message-ID: <20160113104516.GE25458@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 January 2016 11:26:13 Sebastian Reichel wrote:
-> On Wed, Jan 13, 2016 at 09:44:24AM +0100, Pali Roh?r wrote:
-> > On Tuesday 12 January 2016 22:53:52 Pavel Machek wrote:
-> > > Hi!
-> > > 
-> > > > >>If not, tell me, and I can do it, but it will involve a lot of swaring...
-> > > > >
-> > > > >I'll give it a look over.
-> > > > 
-> > > > OK, I'm still looking for a test setup, but this was definitely a problem,
-> > > > could you give this a try?:
-> > > 
-> > > Well, search no more. I tested it and seems to work ok. There's one
-> > > more blank line in the source, so I had to apply patch by hand.
-> > > 
-> > > Tested-by: Pavel Machek <pavel@ucw.cz>
-> > > Acked-by: Pavel Machek <pavel@ucw.cz>
-> > > Reported-by: Pavel Machek <pavel@ucw.cz>
-> > > Cc: stable at vger.kernel.org
-> > > 
-> > > ? :-).
-> > > 
-> > > And... thanks!
-> > > 									Pavel
-> > 
-> > There are more pending fixes for bq27xxx... Maybe your is duplicate?
+On Tue, Jan 12, 2016 at 12:45:14PM -0800, Leonid Yegoshin wrote:
+> >The issue I have with the SYNC description in the text above is that it
+> >describes the single CPU (program order) and the dual-CPU (confusingly
+> >named global order) cases, but then doesn't generalise any further. That
+> >means we can't sensibly reason about transitivity properties when a third
+> >agent is involved. For example, the WRC+sync+addr test:
+> >
+> >
+> >P0:
+> >Wx = 1
+> >
+> >P1:
+> >Rx == 1
+> >SYNC
+> >Wy = 1
+> >
+> >P2:
+> >Ry == 1
+> ><address dep>
+> >Rx = 0
+> >
+> >
+> >I can't find anything to forbid that, given the text. The main problem
+> >is having the SYNC on P1 affect the write by P0.
 > 
-> No, it's not a duplicate.
-> 
-> > http://thread.gmane.org/gmane.linux.power-management.general/70090
-> > http://thread.gmane.org/gmane.linux.power-management.general/69716/focus=69714
-> > http://thread.gmane.org/gmane.linux.power-management.general/69716/focus=2110580
+> As I understand that test, the visibility of P0: W[x] = 1 is identical to P1
+> and P2 here. If P1 got X before SYNC and write to Y after SYNC then
+> instruction source register dependency tracking in P2 prevents a speculative
+> load of X before P2 obtains Y from the same place as P0/P1 and calculate
+> address of X. If some load of X in P2 happens before address dependency
+> calculation it's result is discarded.
 
-Hm... It looks like Pavel's patch is subset of this 3rd patch as it fix
-function bq27xxx_battery_read_soc()
+I don't think the address dependency is enough on its own. By that
+reasoning, the following variant (WRC+addr+addr) would work too:
 
-> > Sebastian, please take them and ideally send to stable@ for backporting.
-> 
-> There is no need to send them to stable@, if they are properly
-> tagged with a 'Fixes: <sha1> ("title")' tag, so please always
-> include it in your commit messages, if possible :)
 
-I have not sent those patches, but OK. In that email thread you can find
-sha1 commit id which broke it.
+P0:
+Wx = 1
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+P1:
+Rx == 1
+<address dep>
+Wy = 1
+
+P2:
+Ry == 1
+<address dep>
+Rx = 0
+
+
+So are you saying that this is also forbidden?
+Imagine that P0 and P1 are two threads that share a store buffer. What
+then?
+
+> Yes, you can't find that in MIPS SYNC instruction description, it is more
+> likely in CM (Coherence Manager) area. I just pointed our arch team member
+> responsible for documents and he will think how to explain that.
+
+I tried grepping the linked documents for "coherence manager" but couldn't
+find anything. Is the description you refer to available anywhere?
+
+Will
