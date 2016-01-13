@@ -1,41 +1,50 @@
-From: hannes@stressinduktion.org (Hannes Frederic Sowa)
-Date: Wed, 13 Jan 2016 05:27:02 +0100
-Subject: [PATCHv2] net: bpf: reject invalid shifts
-In-Reply-To: <20160112.214315.2135966842775837844.davem@davemloft.net>
-References: <1452641302.1223.35.camel@edumazet-glaptop2.roam.corp.google.com>
- <20160112234707.GA36167@ast-mbp.thefacebook.com>
- <1452651098.1223.41.camel@edumazet-glaptop2.roam.corp.google.com>
- <20160112.214315.2135966842775837844.davem@davemloft.net>
-Message-ID: <1452659222.2823039.490580066.3C283CF6@webmail.messagingengine.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Wed, 13 Jan 2016 12:28:06 +0800
+Subject: [PATCH v4 0/2] power: act8945a: add charger driver for the sub-device
+ of ACT8945A MFD
+Message-ID: <1452659289-30837-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016, at 03:43, David Miller wrote:
-> From: Eric Dumazet <eric.dumazet@gmail.com>
-> Date: Tue, 12 Jan 2016 18:11:38 -0800
-> 
-> > As I said, it is possible some guys never noticed their BPF program
-> > were 'broken' because this invalid shift was hidden in a dead code
-> > part.
-> 
-> We should not hide bugs and unintended uses of operations with
-> undefined behavior.
+The ACT8945A is a Multi Function Device with the following subdevices:
+ - Regulator
+ - Charger
 
-The term 'undefined behavior' is defined in terms of the C
-specification. We tend to implement the BPF interpreter with C in the
-kernel, so we get in contact with that, but BPF programs were mostly
-written by hand in BPF assembler or by generators. So the term
-'undefined behavior' seems not to be fitting well here. As pointed out
-BPF sadly does rely on some specific processors ISAs but not on the C
-specification. This also is an advantage as otherwise the JITs would
-need to handle all those invalid shifts at runtime and generate checking
-code.
+This patch set is to add regulator driver for ACT8945A.
+It is based on the patch set:
+	http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/399102.html
 
-I think it makes sense to adapt BPF towards the the ISAs or in case of
-the interpreter, towards gcc behavior (which sadly can change, too).
-ISAs describe the behavior quite strict what the CPUs do in case of a
-variable shift operand that is larger than the register bit size is
-applied.
+Changes in v4:
+ - use spaces after #define, not tabs.
+ - use BIT(n) macros to substitute (0x01 << x).
+ - change dt properties with more legible name.
+ - change the properties with more legible name, clearer description.
 
-Bye,
-Hannes
+Changes in v3:
+ - update the file header with short version license and author line.
+ - remove unused member of struct act8945a_charger, dev.
+ - action due to removing the member of stuct act8945a_dev, dev.
+ - remove the unnecessary print out.
+ - remove the unnecessary act8945a_charger_remove().
+ - fix align of the code-style.
+
+Changes in v2:
+ 1./ Substitute of_property_read_bool() for of_get_property().
+ 2./ Substitute devm_power_supply_register() for power_supply_register().
+ 3./ Use module_platform_driver(), instead of subsys_initcall().
+ 4./ Substitute MODULE_LICENSE("GPL") for MODULE_LICENSE("GPL v2").
+
+Wenyou Yang (2):
+  power: act8945a: add charger driver for ACT8945A
+  power: add documentation for ACT8945A's charger DT bindings
+
+ .../devicetree/bindings/power/act8945a-charger.txt |   33 ++
+ drivers/power/Kconfig                              |    7 +
+ drivers/power/Makefile                             |    1 +
+ drivers/power/act8945a_charger.c                   |  368 ++++++++++++++++++++
+ 4 files changed, 409 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power/act8945a-charger.txt
+ create mode 100644 drivers/power/act8945a_charger.c
+
+-- 
+1.7.9.5
