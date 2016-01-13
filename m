@@ -1,35 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Jan 2016 21:51:29 +0100
-Subject: [PATCH] spi: fix counting in spi-loopback-test code
-Message-ID: <7416604.jejCLcpcOT@wuerfel>
+From: Leonid.Yegoshin@imgtec.com (Leonid Yegoshin)
+Date: Wed, 13 Jan 2016 12:58:22 -0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160113204844.GV6357@twins.programming.kicks-ass.net>
+References: <1452426622-4471-12-git-send-email-mst@redhat.com>
+ <56945366.2090504@imgtec.com>
+ <20160112092711.GP6344@twins.programming.kicks-ass.net>
+ <20160112102555.GV6373@twins.programming.kicks-ass.net>
+ <20160112104012.GW6373@twins.programming.kicks-ass.net>
+ <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
+ <20160113104516.GE25458@arm.com> <56969F4B.7070001@imgtec.com>
+ <20160113204844.GV6357@twins.programming.kicks-ass.net>
+Message-ID: <5696BA6E.4070508@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These variables are always used uninitialized:
+On 01/13/2016 12:48 PM, Peter Zijlstra wrote:
+> On Wed, Jan 13, 2016 at 11:02:35AM -0800, Leonid Yegoshin wrote:
+>
+>> I ask HW team about it but I have a question - has it any relationship with
+>> replacing MIPS SYNC with lightweight SYNCs (SYNC_WMB etc)?
+> Of course. If you cannot explain the semantics of the primitives you
+> introduce, how can we judge the patch.
+>
+>
+You missed a point - it is a question about replacement of SYNC with 
+lightweight primitives. It is NOT a question about multithread system 
+behavior without any SYNC. The answer on a latest Will's question lies 
+in different area.
 
-drivers/spi/spi-loopback-test.c: In function 'spi_test_run_iter':
-drivers/spi/spi-loopback-test.c:768:17: warning: 'rx_count' may be used uninitialized in this function [-Wmaybe-uninitialized]
-drivers/spi/spi-loopback-test.c:762:17: warning: 'tx_count' may be used uninitialized in this function [-Wmaybe-uninitialized]
-
-Adding an explicit initialization seems to be the only
-workable solution here, to make the code behave correctly
-and build without warning.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 84e0c4e5e2c4 ("spi: add loopback test driver to allow for spi_master regression tests")
----
-The warning is hidden in allmodconfig at the moment because we build
-that with -Os rather than -O2, which shows it.
-
-diff --git a/drivers/spi/spi-loopback-test.c b/drivers/spi/spi-loopback-test.c
-index 894616f687b0..cf4bb36bee25 100644
---- a/drivers/spi/spi-loopback-test.c
-+++ b/drivers/spi/spi-loopback-test.c
-@@ -761,6 +761,7 @@ static int spi_test_run_iter(struct spi_device *spi,
- 		test.iterate_transfer_mask = 1;
- 
- 	/* count number of transfers with tx/rx_buf != NULL */
-+	rx_count = tx_count = 0;
- 	for (i = 0; i < test.transfer_count; i++) {
- 		if (test.transfers[i].tx_buf)
- 			tx_count++;
+- Leonid.
