@@ -1,56 +1,71 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Tue, 12 Jan 2016 17:07:49 -0700
-Subject: [RFC 0/5] console/acpi: add DBG2 and SPCR console configuration
-In-Reply-To: <56951841.4010101@codeaurora.org>
-References: <1441716217-23786-1-git-send-email-leif.lindholm@linaro.org>
- <56951841.4010101@codeaurora.org>
-Message-ID: <56959555.6090705@linaro.org>
+From: hannes@stressinduktion.org (Hannes Frederic Sowa)
+Date: Wed, 13 Jan 2016 01:17:01 +0100
+Subject: [PATCHv2] net: bpf: reject invalid shifts
+In-Reply-To: <56959372.3040409@stressinduktion.org>
+References: <20160112185121.GA34045@ast-mbp.thefacebook.com>
+ <1452626228-15742-1-git-send-email-rabin@rab.in>
+ <1452628118.1223.25.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20160112195356.GA34598@ast-mbp.thefacebook.com>
+ <5695653F.6030001@iogearbox.net>
+ <20160112204620.GA35080@ast-mbp.thefacebook.com>
+ <1452641302.1223.35.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20160112234707.GA36167@ast-mbp.thefacebook.com>
+ <56959372.3040409@stressinduktion.org>
+Message-ID: <5695977D.6060100@stressinduktion.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2016 08:14 AM, Christopher Covington wrote:
-> Hi,
-> 
-> On 09/08/2015 08:43 AM, Leif Lindholm wrote:
->> Support for configuring bootconsole and console via the ACPI tables
->> DBG2 (Debug Port Table 2) [1] and SPCR (Serial Port Console Redirection
->> Table) [2], defined by Microsoft, has been discussed on and off over the
->> years.
+On 13.01.2016 00:59, Hannes Frederic Sowa wrote:
+> On 13.01.2016 00:47, Alexei Starovoitov wrote:
+>> On Tue, Jan 12, 2016 at 03:28:22PM -0800, Eric Dumazet wrote:
+>>> On Tue, 2016-01-12 at 12:46 -0800, Alexei Starovoitov wrote:
+>>>> On Tue, Jan 12, 2016 at 09:42:39PM +0100, Daniel Borkmann wrote:
+>>>
+>>>>>> yep and we all know who was able to code hundreds of cBPF insns by
+>>>>>> hand ;)
+>>>>>> But I'm sure that code doesn't have such broken shifts. :)))
+>>>>>
+>>>>> libpcap certainly supports raw filters now thanks to Chema [1].
+>>>>> Alternative
+>>>>> could be to just mask them here, but not in eBPF verifier, but that
+>>>>> would be
+>>>>> even more inconsistent (on the other hand, we also allow holes in
+>>>>> BPF but not
+>>>>> in eBPF, so wouldn't be the first time we make things different), hmm.
+>>>>
+>>>> I would rather see broken classic bpf program fixed instead of continue
+>>>> running them with undefined behavior.
+>>>
+>>> This is your choice, because you are a developer.
+>>>
+>>> Some people might be stuck with old software they can not update,
+>>> because they do not have the money to pay developers.
+>>>
+>>> And no, I did not code BPF programs like that, but maybe others did, and
+>>> I feel the pain of customers that might be stuck.
+>>>
+>>> Linus Torvalds always made clear we must provide backward compatibility,
+>>> and really this discussion should not even take place.
+>>>
+>>> As I said, we used to load such BPF program in the past.
+>>>
+>>> The fact that ARM64 crashes because of a faulty JIT implementation is
+>>> not an excuse.
 >>
->> [1] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639131(v=vs.85).aspx
->> [2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
->>
->> Licensing concerns have prevented this happening in the past, but as of
->> 10 August 2015, these tables have both been released also under OWF 1.0
->> (http://www.openwebfoundation.org/legal/the-owf-1-0-agreements/owfa-1-0)
->> which is think is noncontroversially GPL-compatible?
->>
->> This set is a first attempt at implementing this.
->>
->> Submitting as an RFC since the SPCR handling currently depends on the
->> console driver being initialized after subsystem initcalls. Workaround
->> to enable testing surrounding infrastructure in 5/5, _really_ not
->> intended to be merged.
->> (Suggestions for acceptable ways of working around this appreciated.)
-> 
-> What's required for this to graduate from RFC status? Is anyone working
-> on it?
-> 
-> Thanks,
-> Christopher Covington
-> 
+>> I would agree if those loaded programs would do something sensible,
+>> but they're broken. As shown arm and arm64 would execute them
+>> differently without JIT, because HW treats such shifts differently.
+>> I also checked that libpcap is sane and doesn't generate broken shifts.
+>> imo we're not breaking backward compatiblity here.
+>
+> But on one specific platform those programs did something deterministic,
+> reproducible and observable, no? Probably most developers only cared
+> about that, probably especially in the embedded segment.
 
-Well, we have asked Aleksey Makarov <aleksy.makarov@linaro.org> to pick
-this task up from Leif within Linaro.  Perhaps drop him a line and see
-if the two of you can collaborate on this somehow?  I think it just needs
-nudging and a bit of TLC to get it past being an RFC.
+By the way, we can annotate the JIT interpreter with an 
+__attribute__((no_sanitize_undefined)) to get away with the ubsan report.
 
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+Then only the BUG_ONs in arm64 code emit lib are a problem, no?
+
+Bye,
+Hannes
