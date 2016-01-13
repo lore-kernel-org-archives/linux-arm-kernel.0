@@ -1,37 +1,36 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Wed, 13 Jan 2016 12:36:28 +0100
-Subject: [PATCH 2/3] ARM: dts: imx6ul: add support for Ka-Ro electronics
- TXUL modules
-In-Reply-To: <CAOMZO5Dhho3whg8p0t6FARG8vyU158mFc7d8BHxThjojm-dcQg@mail.gmail.com>
-References: <1452621710-15336-1-git-send-email-LW@KARO-electronics.de>
- <1452621710-15336-2-git-send-email-LW@KARO-electronics.de>
- <1452621710-15336-3-git-send-email-LW@KARO-electronics.de>
- <CAOMZO5Dhho3whg8p0t6FARG8vyU158mFc7d8BHxThjojm-dcQg@mail.gmail.com>
-Message-ID: <20160113123628.303ef0d6@ipc1.ka-ro>
+From: broonie@debian.org (Mark Brown)
+Date: Wed, 13 Jan 2016 11:42:27 +0000
+Subject: I/O issues with writing to mtdblock devices on kirkwood
+In-Reply-To: <6044522.tqmlJ5a48h@wuerfel>
+References: <1440159857.19360.50.camel@debian.org> <4468027.N4Q71mzei0@wuerfel>
+ <20160112220058.GE6588@sirena.org.uk> <6044522.tqmlJ5a48h@wuerfel>
+Message-ID: <20160113114227.GI6588@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jan 12, 2016 at 11:41:45PM +0100, Arnd Bergmann wrote:
+> On Tuesday 12 January 2016 22:00:58 Mark Brown wrote:
 
-> On Tue, Jan 12, 2016 at 4:01 PM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
-> 
-> > +               spi at 0 {
-> > +                       compatible = "spidev";
-> > +                       reg = <0>;
-> > +                       spi-max-frequency = <54000000>;
-> > +               };
-> > +
-> > +               spi at 1 {
-> > +                       compatible = "spidev";
-> > +                       reg = <1>;
-> > +                       spi-max-frequency = <54000000>;
-> > +               };
-> > +       };
-> 
-> If you leave the spidev node, the spi core will complain loudly about it.
->
-I know. But this gives the opportunity to test the SPI interface
-without any bogus chip definitions.
+> > There's also the potential for the overhead from interrupts to be worse
+> > than the overhead for busy waiting, but given how badly we're coping now
+> > it's worth another look.
 
+> Possible, yes. Right now, we do a udelay(1), which I think waits between one and
+> two microseconds normally, so we are probably adding extra latency of under
+> one microsecond per byte by not polling constantly. If the interrupt latency
+> from device-ready to entering the code is more than that, we can assume that
+> the transfer ends up being slower. There is also some time spent for getting
+> back out of the interrupt handler, but that's no worse than doing nothing
+> in udelay().
 
-Lothar Wa?mann
+Indeed.  It may also make the cache performance worse as a result of
+frequently switching to the interrupt handler but if nothing else it
+should make it easier for something else to get access to the CPU which
+seems to be the issue here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160113/1928c3a6/attachment.sig>
