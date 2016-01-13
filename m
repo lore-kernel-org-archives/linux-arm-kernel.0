@@ -1,74 +1,36 @@
-From: zlim.lnx@gmail.com (Z Lim)
-Date: Tue, 12 Jan 2016 20:45:43 -0800
-Subject: [PATCH] arm64: net: bpf: don't BUG() on large shifts
-In-Reply-To: <20160112192302.GA34276@ast-mbp.thefacebook.com>
-References: <1452015543-6790-1-git-send-email-rabin@rab.in>
- <20160108154423.GC11228@arm.com>
- <20160108190943.GA11561@ast-mbp.thefacebook.com>
- <20160112171710.GK15737@arm.com>
- <20160112192302.GA34276@ast-mbp.thefacebook.com>
-Message-ID: <CABg9mcsnNeXPk1ifFMsV7oy8E1ZjprXu1_7KwoMp=RQ29UEFFQ@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 13 Jan 2016 00:00:16 -0500 (EST)
+Subject: [PATCHv2] net: bpf: reject invalid shifts
+In-Reply-To: <1452658064.1223.58.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <1452651098.1223.41.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20160112.214315.2135966842775837844.davem@davemloft.net>
+ <1452658064.1223.58.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <20160113.000016.2304166666171388740.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 11:23 AM, Alexei Starovoitov
-<alexei.starovoitov@gmail.com> wrote:
-> On Tue, Jan 12, 2016 at 05:17:10PM +0000, Will Deacon wrote:
->> On Fri, Jan 08, 2016 at 11:09:44AM -0800, Alexei Starovoitov wrote:
->> > On Fri, Jan 08, 2016 at 03:44:23PM +0000, Will Deacon wrote:
->> > > On Tue, Jan 05, 2016 at 06:39:03PM +0100, Rabin Vincent wrote:
->> > > > Attempting to generate UBFM/SBFM instructions with shifts that can't be
->> > > > encoded in the immediate fields of the opcodes leads to a trigger of a
->> > > > BUG() in the instruction generation code.  As the ARMv8 ARM says: "The
->> > > > shift amounts must be in the range 0 to one less than the register width
->> > > > of the instruction, inclusive."  Make the JIT reject unencodable shifts
->> > > > instead of crashing.
->> > >
->> > > I moaned about those BUG_ONs when they were introduced:
->> > >
->> > >   https://lkml.org/lkml/2014/7/17/438
->> > >
->> > > The response then was that the verifier would catch these issues so
->> > > there was nothing to worry about. Has something changed so that is no
->> > > longer the case? Do we need to consider a different way of rejecting
->> > > invalid instructions at the encoding stage rather than bringing down the
->> > > kernel?
->> >
->> > that discussion lead to replacement of all BUG_ONs in
->> > arch/arm64/net/bpf_jit_comp.c with pr_err_once(), but looks like
->> > arch/arm64/kernel/insn.c wasn't addressed.
->> > The amount of BUG_ONs there is indeed overkill regardless of what
->> > verifier and other JITs do. btw, x64 JIT doesn't have runtime BUG_ONs.
->>
->> Maybe, but insn.c is also used by the alternatives patching code, so we
->> really need a way to communicate failure back to the BPF JIT when passed
->> an invalid instruction description.
->
-> agree. I think there are several options to achieve that after
-> all BUG_ONs are removed:
-> - change interface for all insn generating macros to check for
->   AARCH64_BREAK_FAULT opcode as error.
->   That will require all of emit*() functions in bpf_jit_comp.c to
->   be changed to accept/return error.
->   Overall that looks like massive change.
-> - ignore AARCH64_BREAK_FAULT during emit and add another pass after
->   all code is generated. If such insn is found in a jited code,
->   discard the jit.
->   I think that's better option.
->
-> Zi, any comments?
->
+From: Eric Dumazet <eric.dumazet@gmail.com>
+Date: Tue, 12 Jan 2016 20:07:44 -0800
 
-Alexei, agreed. Second approach is cleaner. Full disclosure: I did not
-look at other callers beyond JIT.
+> On Tue, 2016-01-12 at 21:43 -0500, David Miller wrote:
+>> From: Eric Dumazet <eric.dumazet@gmail.com>
+>> Date: Tue, 12 Jan 2016 18:11:38 -0800
+>> 
+>> > As I said, it is possible some guys never noticed their BPF program
+>> > were 'broken' because this invalid shift was hidden in a dead code
+>> > part.
+>> 
+>> We should not hide bugs and unintended uses of operations with
+>> undefined behavior.
+> 
+>    JUMP 2:
+>    SHR  45
+> 2: RET  10
+> 
+> 
+> was a valid program.
+> 
+> But a dumb loader decided to know better.
 
-Separately, sounds like there's now preference and consensus to
-removing all BUGs and BUG_ONs in insn.c. Did a quick grep of insn.c
-and noticed a legacy instance, followed by many introduced around the
-same time as JIT, and new additions since.
-
-Will, any thoughts on the following replacement scheme?
-
-BUG_ON() for codegen ==> pr_err(); return AARCH64_BREAK_FAULT;
-BUG() for decoding ==> leave as is.
-remaining BUG_ON() ==> leave as is.
+I guess you are uninterested in knowing your programs contains such
+garbage.
