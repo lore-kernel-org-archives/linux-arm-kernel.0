@@ -1,99 +1,60 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 13 Jan 2016 14:21:01 +0100
-Subject: [PATCH V3 15/21] acpi,
- mcfg: Implement two calls that might be used to inject/remove MCFG
- region.
+Date: Wed, 13 Jan 2016 14:21:02 +0100
+Subject: [PATCH V3 16/21] x86, acpi,
+ pci: Use equivalent function introduced in previous patch.
 In-Reply-To: <1452691267-32240-1-git-send-email-tn@semihalf.com>
 References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
-Message-ID: <1452691267-32240-16-git-send-email-tn@semihalf.com>
+Message-ID: <1452691267-32240-17-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lets abstract two calls which allow to inject and remove MCFG regions
-which may come from DSDT table. These calls will be used for x86 and ARM64
-PCI host bridge driver in the later patches.
-
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 ---
- drivers/acpi/mcfg.c      | 38 ++++++++++++++++++++++++++++++++++++++
- include/linux/pci-acpi.h |  9 +++++++++
- 2 files changed, 47 insertions(+)
+ arch/x86/pci/acpi.c | 20 +-------------------
+ 1 file changed, 1 insertion(+), 19 deletions(-)
 
-diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
-index 3e1e7be..dca4c4e 100644
---- a/drivers/acpi/mcfg.c
-+++ b/drivers/acpi/mcfg.c
-@@ -10,6 +10,7 @@
- #include <linux/acpi.h>
- #include <linux/ecam.h>
- #include <linux/pci.h>
-+#include <linux/pci-acpi.h>
+diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+index 286e0f5..c4d79d2 100644
+--- a/arch/x86/pci/acpi.c
++++ b/arch/x86/pci/acpi.c
+@@ -201,29 +201,11 @@ static int setup_mcfg_map(struct acpi_pci_root_info *ci)
  
- #define	PREFIX	"MCFG: "
- 
-@@ -77,6 +78,43 @@ int __init acpi_parse_mcfg(struct acpi_table_header *header)
  	return 0;
  }
- 
-+int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci)
-+{
-+	struct pci_mmcfg_region *cfg;
-+	struct acpi_pci_root *root;
-+	int seg, start, end, err;
-+
-+	root = ci->root;
-+	seg = root->segment;
-+	start = root->secondary.start;
-+	end = root->secondary.end;
-+
-+	cfg = pci_mmconfig_lookup(seg, start);
-+	if (cfg)
-+		return 0;
-+
-+	cfg = pci_mmconfig_alloc(seg, start, end, root->mcfg_addr);
-+	if (!cfg)
-+		return -ENOMEM;
-+
-+	err = pci_mmconfig_inject(cfg);
-+	return err;
-+}
-+
-+void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci)
-+{
-+	struct acpi_pci_root *root = ci->root;
-+	struct pci_mmcfg_region *cfg;
-+
-+	cfg = pci_mmconfig_lookup(root->segment, root->secondary.start);
-+	if (!cfg)
-+		return;
-+
-+	if (cfg->hot_added)
-+		pci_mmconfig_delete(root->segment, root->secondary.start,
-+				    root->secondary.end);
-+}
-+
- int __init __weak acpi_mcfg_check_entry(struct acpi_table_mcfg *mcfg,
- 					struct acpi_mcfg_allocation *cfg)
+-
+-static void teardown_mcfg_map(struct acpi_pci_root_info *ci)
+-{
+-	struct acpi_pci_root *root = ci->root;
+-	struct pci_mmcfg_region *cfg;
+-
+-	cfg = pci_mmconfig_lookup(root->segment, root->secondary.start);
+-	if (!cfg)
+-		return;
+-
+-	if (cfg->hot_added)
+-		pci_mmconfig_delete(root->segment, root->secondary.start,
+-				    root->secondary.end);
+-}
+ #else
+ static int setup_mcfg_map(struct acpi_pci_root_info *ci)
  {
-diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-index 89ab057..c277415 100644
---- a/include/linux/pci-acpi.h
-+++ b/include/linux/pci-acpi.h
-@@ -79,6 +79,15 @@ extern struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
- void acpi_pci_add_bus(struct pci_bus *bus);
- void acpi_pci_remove_bus(struct pci_bus *bus);
+ 	return 0;
+ }
+-
+-static void teardown_mcfg_map(struct acpi_pci_root_info *ci)
+-{
+-}
+ #endif
  
-+#ifdef	CONFIG_PCI_MMCONFIG
-+int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci);
-+void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci);
-+#else
-+static inline int pci_mmcfg_setup_map(struct acpi_pci_root_info *ci)
-+{ return 0; }
-+static inline void pci_mmcfg_teardown_map(struct acpi_pci_root_info *ci) { }
-+#endif
-+
- #ifdef	CONFIG_ACPI_PCI_SLOT
- void acpi_pci_slot_init(void);
- void acpi_pci_slot_enumerate(struct pci_bus *bus);
+ static int pci_acpi_root_get_node(struct acpi_pci_root *root)
+@@ -251,7 +233,7 @@ static int pci_acpi_root_init_info(struct acpi_pci_root_info *ci)
+ 
+ static void pci_acpi_root_release_info(struct acpi_pci_root_info *ci)
+ {
+-	teardown_mcfg_map(ci);
++	pci_mmcfg_teardown_map(ci);
+ 	kfree(container_of(ci, struct pci_root_info, common));
+ }
+ 
 -- 
 1.9.1
