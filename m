@@ -1,34 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Jan 2016 15:36:17 +0100
-Subject: [PATCH] staging: wilc1000: remove extraneous variable
-Message-ID: <17929596.uVo1cdZGxo@wuerfel>
+From: Lada.Trimasova@synopsys.com (Lada Trimasova)
+Date: Wed, 13 Jan 2016 17:48:01 +0300
+Subject: [PATCH] Fixing io-pgtable-arm build failure
+Message-ID: <1452696481-2030-1-git-send-email-ltrimas@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building wilc1000 with clang currently fails in the staging-next branch:
+Trying to build kernel for ARC with both options
+CONFIG_COMPILE_TEST and CONFIG_IOMMU_IO_PGTABLE_LPAE enabled
+(which happened really in "allyesconfig") I'm seeing this:
+---------------->8----------------
+$ make ARCH=arc
+...sic...
+CC drivers/iommu/io-pgtable-arm.o
+linux/drivers/iommu/io-pgtable-arm.c: In
+function ?__arm_lpae_alloc_pages?:
+linux/drivers/iommu/io-pgtable-arm.c:221:3:
+error: implicit declaration of function ?dma_map_single?
+[-Werror=implicit-function-declaration]
+dma = dma_map_single(dev, pages, size, DMA_TO_DEVICE);
+^
+linux/drivers/iommu/io-pgtable-arm.c:221:42:
+error: ?DMA_TO_DEVICE? undeclared (first use in this function)
+dma = dma_map_single(dev, pages, size, DMA_TO_DEVICE);
+^
+---------------->8----------------
+and so on.
 
-drivers/staging/wilc1000/wilc_spi.c:123:34: warning: tentative definition of variable with internal linkage has incomplete non-array type 'const struct wilc1000_ops' [-Wtentative-definition-incomplete-type]
-static const struct wilc1000_ops wilc1000_spi_ops;
+IOMMU_IO_PGTABLE_LPAE depends on DMA API.
+So io-pgtable-arm.c should include linux/dma-mapping.h.
 
-The reason is that wilc1000_ops was left behind after a recent cleanup,
-and is completely unused and also uninitialized and const and has an
-incomplete type.
+Signed-off-by: Lada Trimasova <ltrimas@synopsys.com>
+Cc: Alexey Brodkin <abrodkin@synopsys.com>
+Cc: Vineet Gupta <vgupta@synopsys.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Joerg Roedel <joro@8bytes.org>
+---
+ drivers/iommu/io-pgtable-arm.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Removing the variable is obviously correct, and gets rid of the warning.
-No idea why gcc does not complain about it though.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/staging/wilc1000/wilc_spi.c b/drivers/staging/wilc1000/wilc_spi.c
-index 86de50c9f7f5..b3d6541b3896 100644
---- a/drivers/staging/wilc1000/wilc_spi.c
-+++ b/drivers/staging/wilc1000/wilc_spi.c
-@@ -120,8 +120,6 @@ static u8 crc7(u8 crc, const u8 *buffer, u32 len)
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index 7df9777..0b1aca0 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -25,6 +25,7 @@
+ #include <linux/sizes.h>
+ #include <linux/slab.h>
+ #include <linux/types.h>
++#include <linux/dma-mapping.h>
  
- #define USE_SPI_DMA     0
+ #include <asm/barrier.h>
  
--static const struct wilc1000_ops wilc1000_spi_ops;
--
- static int wilc_bus_probe(struct spi_device *spi)
- {
- 	int ret, gpio;
+-- 
+2.5.0
