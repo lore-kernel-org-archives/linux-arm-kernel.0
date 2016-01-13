@@ -1,80 +1,45 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 13 Jan 2016 12:17:46 +0530
-Subject: [PATCH v2 3/3] pci: dra7xx: use pdata callbacks to perform reset
-In-Reply-To: <1452667666-17533-1-git-send-email-kishon@ti.com>
-References: <1452667666-17533-1-git-send-email-kishon@ti.com>
-Message-ID: <1452667666-17533-4-git-send-email-kishon@ti.com>
+From: yankejian@huawei.com (Kejian Yan)
+Date: Wed, 13 Jan 2016 15:09:59 +0800
+Subject: [patch v3 net-next 2/2] net: hns: fixes no syscon error when init mdio
+In-Reply-To: <1452668999-443-1-git-send-email-yankejian@huawei.com>
+References: <1452668999-443-1-git-send-email-yankejian@huawei.com>
+Message-ID: <1452668999-443-3-git-send-email-yankejian@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use platform populated reset assert and deassert
-callbacks to perform reset of PCIe.
+As dtsi files use the normal naming conventions using '-' instead of '_'
+inside of property names, the driver needs to update the phandle name
+strings of the of_parse_phandle func.
 
-Use these callbacks until a reset interface using drivers/reset
-is available for the purpose.
-
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Kejian Yan <yankejian@huawei.com>
 ---
- drivers/pci/host/pci-dra7xx.c |   32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+change log:
+v3:
+ same as v2
 
-diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
-index 8c36880..049083d 100644
---- a/drivers/pci/host/pci-dra7xx.c
-+++ b/drivers/pci/host/pci-dra7xx.c
-@@ -25,6 +25,8 @@
- #include <linux/resource.h>
- #include <linux/types.h>
+v2:
+ adds the initial version, because using '-' instead of '_'
+
+v1:
+ does not exist.
+
+v2 patch link: https://lkml.org/lkml/2015/12/7/77
+---
+ drivers/net/ethernet/hisilicon/hns_mdio.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/hisilicon/hns_mdio.c b/drivers/net/ethernet/hisilicon/hns_mdio.c
+index 37491c8..1e07e91 100644
+--- a/drivers/net/ethernet/hisilicon/hns_mdio.c
++++ b/drivers/net/ethernet/hisilicon/hns_mdio.c
+@@ -458,7 +458,7 @@ static int hns_mdio_probe(struct platform_device *pdev)
+ 	}
  
-+#include <linux/platform_data/pci-dra7xx.h>
-+
- #include "pcie-designware.h"
- 
- /* PCIe controller wrapper DRA7XX configuration registers */
-@@ -329,6 +331,32 @@ static int __init dra7xx_add_pcie_port(struct dra7xx_pcie *dra7xx,
- 	return 0;
- }
- 
-+static int dra7xx_pcie_reset(struct platform_device *pdev)
-+{
-+	int ret;
-+	struct device *dev = &pdev->dev;
-+	struct pci_dra7xx_platform_data *pdata = pdev->dev.platform_data;
-+
-+	if (!(pdata && pdata->deassert_reset && pdata->assert_reset)) {
-+		dev_err(dev, "platform data for reset not found!\n");
-+		return -EINVAL;
-+	}
-+
-+	ret = pdata->assert_reset(pdev, pdata->reset_name);
-+	if (ret) {
-+		dev_err(dev, "assert_reset failed: %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = pdata->deassert_reset(pdev, pdata->reset_name);
-+	if (ret) {
-+		dev_err(dev, "deassert_reset failed: %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
- static int __init dra7xx_pcie_probe(struct platform_device *pdev)
- {
- 	u32 reg;
-@@ -347,6 +375,10 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
- 	enum of_gpio_flags flags;
- 	unsigned long gpio_flags;
- 
-+	ret = dra7xx_pcie_reset(pdev);
-+	if (ret)
-+		return ret;
-+
- 	dra7xx = devm_kzalloc(dev, sizeof(*dra7xx), GFP_KERNEL);
- 	if (!dra7xx)
- 		return -ENOMEM;
+ 	mdio_dev->subctrl_vbase =
+-		syscon_node_to_regmap(of_parse_phandle(np, "subctrl_vbase", 0));
++		syscon_node_to_regmap(of_parse_phandle(np, "subctrl-vbase", 0));
+ 	if (IS_ERR(mdio_dev->subctrl_vbase)) {
+ 		dev_warn(&pdev->dev, "no syscon hisilicon,peri-c-subctrl\n");
+ 		mdio_dev->subctrl_vbase = NULL;
 -- 
-1.7.9.5
+2.4.1
