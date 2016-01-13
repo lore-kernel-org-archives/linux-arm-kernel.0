@@ -1,54 +1,103 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Jan 2016 09:27:12 -0800
-Subject: [PATCH v4 3/3] wlcore/wl12xx: spi: add wifi support to cm-t335
-In-Reply-To: <5695E802.7050909@compulab.co.il>
-References: <1451482533-8624-1-git-send-email-uri.mashiach@compulab.co.il>
- <1451482533-8624-4-git-send-email-uri.mashiach@compulab.co.il>
- <87io35lq2p.fsf@kamboji.qca.qualcomm.com>
- <5695E802.7050909@compulab.co.il>
-Message-ID: <20160113172712.GI12777@atomide.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 13 Jan 2016 11:35:19 -0600
+Subject: [PATCH v2 2/3] ARM: DRA7: add pdata-quirks to do reset of PCIe
+In-Reply-To: <1452667666-17533-3-git-send-email-kishon@ti.com>
+References: <1452667666-17533-1-git-send-email-kishon@ti.com>
+ <1452667666-17533-3-git-send-email-kishon@ti.com>
+Message-ID: <56968AD7.3010108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Igor Grinberg <grinberg@compulab.co.il> [160112 22:01]:
-> Hi Kalle Valo,
-> 
-> On 01/07/16 11:02, Kalle Valo wrote:
-> > Uri Mashiach <uri.mashiach@compulab.co.il> writes:
-> > 
-> >> Device tree modifications:
-> >> - Pinmux for SPI0 and WiFi GPIOs.
-> >> - SPI0 node with wlcore as a child node.
-> >>
-> >> Cc: Tony Lindgren <tony@atomide.com>
-> >> Signed-off-by: Uri Mashiach <uri.mashiach@compulab.co.il>
-> >> ---
-> 
-> Uri, please document the dependencies next time. Thanks!
-> 
-> >> v1 -> v2: Replace interrupts and interrupt-parent with interrupts-extended.
-> >> v2 -> v3: Move the pinctrl-0 = <&wifi_pins> to the wlcore node.
-> >> v3 -> v4: replace interrupts-extended with interrupts and interrupt-parent. (revert v2 modification).
-> >>           According to Rob Herring and Documentation/devicetree/bindings/interrupt-controller/interrupts.txt,
-> >> 	  interrupts-extended should only be used when a device has multiple interrupt parents.
-> >>
-> >>  arch/arm/boot/dts/am335x-cm-t335.dts | 55 ++++++++++++++++++++++++++++++++++++
-> >>  1 file changed, 55 insertions(+)
-> > 
-> > To what tree should this patch go? My wireless-drivers-next tree doesn't
-> > even have this file.
-> 
-> Right. It will hit the mainline during this merge window through Tony's and
-> arm-soc trees.
-> 
-> Do you think it will be sensible if you take 1/3 and 2/3 patches and Tony
-> will take the 3/3 (there is no code dependency between first two and the last one),
-> or we can just wait till arm-soc hits the mainline, so you will have the
-> needed code?
+Hi Kishon,
 
-Yeah I'll pick the dts changes separately after the merge window as
-there is no dependency to the driver changes.
+On 01/13/2016 12:47 AM, Kishon Vijay Abraham I wrote:
+> Use pdata-quirks to reset PCIe IP. 
 
-Regards,
+This can do with some clarity. The patch adds the platform data, doesn't
+do reset.
 
-Tony
+This is to be used until
+> a drivers/reset/ interface is available for this purpose.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> ---
+>  arch/arm/mach-omap2/pdata-quirks.c       |   11 +++++++++++
+>  include/linux/platform_data/pci-dra7xx.h |   22 ++++++++++++++++++++++
+>  2 files changed, 33 insertions(+)
+>  create mode 100644 include/linux/platform_data/pci-dra7xx.h
+> 
+> diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+> index 5814477..f5a65fe 100644
+> --- a/arch/arm/mach-omap2/pdata-quirks.c
+> +++ b/arch/arm/mach-omap2/pdata-quirks.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/platform_data/pinctrl-single.h>
+>  #include <linux/platform_data/iommu-omap.h>
+>  #include <linux/platform_data/wkup_m3.h>
+> +#include <linux/platform_data/pci-dra7xx.h>
+>  
+>  #include "common.h"
+>  #include "common-board-devices.h"
+> @@ -404,6 +405,14 @@ static void __init omap5_uevm_legacy_init(void)
+>  }
+>  #endif
+>  
+> +#ifdef CONFIG_SOC_DRA7XX
+> +static struct pci_dra7xx_platform_data dra7xx_pci_pdata = {
+> +	.reset_name = "pcie",
+> +	.assert_reset = omap_device_assert_hardreset,
+> +	.deassert_reset = omap_device_deassert_hardreset,
+> +};
+> +#endif
+> +
+>  static struct pcs_pdata pcs_pdata;
+>  
+>  void omap_pcs_legacy_init(int irq, void (*rearm)(void))
+> @@ -474,6 +483,8 @@ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+>  #endif
+>  #ifdef CONFIG_SOC_DRA7XX
+>  	OF_DEV_AUXDATA("ti,dra7-padconf", 0x4a003400, "4a003400.pinmux", &pcs_pdata),
+> +	OF_DEV_AUXDATA("ti,dra7-pcie", 0x51000000, "51000000.pcie", &dra7xx_pci_pdata),
+> +	OF_DEV_AUXDATA("ti,dra7-pcie", 0x51800000, "51800000.pcie", &dra7xx_pci_pdata),
+>  #endif
+>  #ifdef CONFIG_SOC_AM43XX
+>  	OF_DEV_AUXDATA("ti,am437-padconf", 0x44e10800, "44e10800.pinmux", &pcs_pdata),
+> diff --git a/include/linux/platform_data/pci-dra7xx.h b/include/linux/platform_data/pci-dra7xx.h
+> new file mode 100644
+> index 0000000..792c8ed
+> --- /dev/null
+> +++ b/include/linux/platform_data/pci-dra7xx.h
+> @@ -0,0 +1,22 @@
+> +/*
+> + * pcie-dra7xx - Platform data for PCIe controller
+> + *
+> + * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * Authors: Kishon Vijay Abraham I <kishon@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __PCI_DRA7XX_H
+> +#define __PCI_DRA7XX_H
+> +
+> +struct pci_dra7xx_platform_data {
+
+can you add kernel-doc comments for the structure?
+
+> +	const char *reset_name;
+> +
+> +	int (*assert_reset)(struct platform_device *pdev, const char *name);
+> +	int (*deassert_reset)(struct platform_device *pdev, const char *name);
+> +};
+
+nit, would like to see a blank line here
+
+regards
+Suman
+
+> +#endif /* __PCI_DRA7XX_H */
+> 
