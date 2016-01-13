@@ -1,36 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 13 Jan 2016 11:18:07 +0000
-Subject: Have any influence on set_memory_** about below patch ??
-In-Reply-To: <5696272E.8090408@huawei.com>
-References: <5693A740.7070408@huawei.com> <20160111133145.GM6499@leverpostej>
- <569454F6.1060207@huawei.com> <20160112111531.GA4858@leverpostej>
- <5696272E.8090408@huawei.com>
-Message-ID: <20160113111806.GC23370@leverpostej>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 13 Jan 2016 11:18:47 +0000
+Subject: [PATCH v2 3/3] iommu/io-pgtable: Avoid redundant TLB syncs
+In-Reply-To: <20160112182754.GC22186@arm.com>
+References: <cover.1450383740.git.robin.murphy@arm.com>
+ <eb7458ed51b800f035976e879530ab1e90d02858.1450383740.git.robin.murphy@arm.com>
+ <20160112182754.GC22186@arm.com>
+Message-ID: <56963297.7090605@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 06:30:06PM +0800, Xishi Qiu wrote:
-> Hi Mark,
-> 
-> If I create swapper page tables by 4kb, not large page, then I use
-> set_memory_ro() to change the pate table flag, does it have the problem
-> too?
+On 12/01/16 18:27, Will Deacon wrote:
+> On Thu, Dec 17, 2015 at 08:50:59PM +0000, Robin Murphy wrote:
+>> In certain unmapping situations it is quite possible to end up issuing
+>> back-to-back TLB synchronisations, which at best is a waste of time and
+>> effort, and at worst causes some hardware to get rather confused. Whilst
+>> the pagetable implementations, or the IOMMU drivers, or both, could keep
+>> track of things to avoid this happening, it seems to make the most sense
+>> to prevent code duplication and add some simple state tracking in the
+>> common interface between the two.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>   drivers/iommu/io-pgtable.h | 9 ++++++++-
+>>   1 file changed, 8 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+>> index 95c5565..d06219b 100644
+>> --- a/drivers/iommu/io-pgtable.h
+>> +++ b/drivers/iommu/io-pgtable.h
+>> @@ -132,12 +132,14 @@ void free_io_pgtable_ops(struct io_pgtable_ops *ops);
+>>    * @fmt:    The page table format.
+>>    * @cookie: An opaque token provided by the IOMMU driver and passed back to
+>>    *          any callback routines.
+>> + * @sync_flag: Private flag for optimising out redundant syncs.
+>
+> It makes sense to factor this out like you're proposing, but maybe we
+> can think of a better name? How about "tlb_sync_pending", to follow
+> "tlb_flush_pending" in the core code?
 
-The splitting/merging problem would not apply.
+Ooh, tlb_flush_pending is a much nicer name indeed. It's almost as if I 
+threw this together in a pre-holiday rush and put very little thought 
+into it...
 
-However, you're going to waste a reasonable amount of memory by not
-using section mappings in the swapper, and we gain additional complexity
-in the page table setup code (which is shared with others things that
-want section mappings).
-
-What are you exactly actually trying to achieve?
-
-What memory do you want to mark RO, and why?
-
->From a previous discussion [1], we figured out alternative approaches
-for common cases. Do none of those work for your case?
+I've fixed it up locally, but I'll save the repost until after -rc1, 
+especially in case Yong has any further comments in the meantime.
 
 Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/397320.html
+Robin.
