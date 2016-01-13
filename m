@@ -1,61 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Jan 2016 10:26:54 +0100
-Subject: [PATCH v1 3/3] ARM64 LPC: update binding doc
-In-Reply-To: <5695F007.3070005@gmail.com>
-References: <568912EE.9030009@huawei.com>
- <1452664413.2403.20.camel@kernel.crashing.org> <5695F007.3070005@gmail.com>
-Message-ID: <4302652.ztAKMKjFNQ@wuerfel>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 13 Jan 2016 10:40:36 +0100
+Subject: [PATCH 08/14] ARM: dts: imx6ul: add kpp support
+In-Reply-To: <1452619291-13625-9-git-send-email-LW@KARO-electronics.de>
+References: <1452619291-13625-1-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-2-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-3-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-4-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-5-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-6-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-7-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-8-git-send-email-LW@KARO-electronics.de>
+ <1452619291-13625-9-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1452678036.3694.51.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 January 2016 14:34:47 Rongrong Zou wrote:
-> On 2016/1/13 13:53, Benjamin Herrenschmidt wrote:
-> > On Tue, 2016-01-12 at 23:52 +0100, Arnd Bergmann wrote:
-> >> On Tuesday 12 January 2016 15:13:35 liviu.dudau at arm.com wrote:
-> >>>> int of_address_to_resource(struct device_node *dev, int index,
-> >>>>                            struct resource *r)
-> >>>> {
-> >>>>         ...
-> >>>>         /* flags can be get here, without ranges property reqired.
-> >>>>          * if the reg = <0x0 0xe4 4>, I can get flag of
-> >> IORESOURCE_MEM,
-> >>>>          * if the reg = <0x1 0xe4 4>, I can get flag of
-> >> IORESOURCE_IO,
-> >>>
-> >>> That is strange, the parent node has #address-cells = <2> so the
-> >> first two numbers should be part
-> >>> of the address and not influence the flags. Can you add some
-> >> debugging in of_get_address() and
-> >>> try to figure out what bus is used in  *flags = bus-
-> >>> get_flags(prop) ?
-> >>>
-> >>>
-> >>
-> >> This is the standard ISA binding. The first cell is the address space
-> >> (IO or MEM), the second cell is the address within that space. This
-> >> is similar to how PCI works.
-> >
-> > Picking up that mid-way, I have LPC busses on power and am using a
-> > similar binding. I'll try to grab some examples and review the
-> > document tomorrow (only just noticed it while unpiling emails post-
-> > vacation).
+Am Dienstag, den 12.01.2016, 18:21 +0100 schrieb Lothar Wa?mann:
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> ---
+>  arch/arm/boot/dts/imx6ul.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+> index 40ea5f0..a578b23 100644
+> --- a/arch/arm/boot/dts/imx6ul.dtsi
+> +++ b/arch/arm/boot/dts/imx6ul.dtsi
+> @@ -373,6 +373,14 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			kpp: kpp at 020b8000 {
+> +				compatible = "fsl,imx6q-kpp", "fsl,imx21-kpp";
 
-I really should have thought of that, as you mentioned already that
-there is an ast2400 on those machines, and no I/O space on the PCI
-bus.
+Please always add a new chip specific compatible here, even if the units
+are fully working with the compatible of an older chip. This allows to
+implement chip specific workarounds in the respective drivers without
+changing the DT again if any bugs are found in the integration later on.
 
-Too bad we have to keep the I/O workarounds alive on PowerPC now,
-I was already hoping they could go away after spider-pci gets phased
-out.
+So the above should be:
+compatible = "fsl,imx6ul-kpp", "fsl,imx6q-kpp", "fsl,imx21-kpp";
 
-> Thanks for reviewing this, I found a similar implementation at arch/powerpc/
-> platform/powernv/opal-lpc.c and I had get some ideas from your work. It is
-> nice to me. I'm expecting your suggestion.Thanks in advance.
+This comment applies to most of the patches in this series following
+this one.
 
-Unfortunately, the way that PCI host bridges on PowerPC are handled
-is a bit different from what we do on ARM64, otherwise the obvious
-solution would be to move the I/O workarounds to an architecture
-independent location. Maybe it's still possible, but that also requires
-some refactoring then.
+Regards,
+Lucas
 
-	Arnd
+> +				reg = <0x020b8000 0x4000>;
+> +				interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6UL_CLK_KPP>;
+> +				status = "disabled";
+> +			};
+> +
+>  			wdog1: wdog at 020bc000 {
+>  				compatible = "fsl,imx6ul-wdt", "fsl,imx21-wdt";
+>  				reg = <0x020bc000 0x4000>;
+
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
