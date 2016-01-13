@@ -1,114 +1,90 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 13 Jan 2016 18:38:35 +0100
-Subject: [PATCH net-next 03/10] net: mvneta: bm: add support for hardware
- buffer management
-In-Reply-To: <CAPv3WKeEXUmH4gqBm7=gkNYwjhR1YybCBZJND_Vidj+Q6U_8=g@mail.gmail.com>
- (Marcin Wojtas's message of "Tue, 12 Jan 2016 21:12:25 +0100")
-References: <1452625834-22166-1-git-send-email-gregory.clement@free-electrons.com>
- <1452625834-22166-4-git-send-email-gregory.clement@free-electrons.com>
- <CAPv3WKeEXUmH4gqBm7=gkNYwjhR1YybCBZJND_Vidj+Q6U_8=g@mail.gmail.com>
-Message-ID: <87lh7twfac.fsf@free-electrons.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Thu, 14 Jan 2016 02:33:00 +0900
+Subject: [PATCH v5 1/5] ARM: dma-mapping: Optimize allocation
+In-Reply-To: <56964070.1020303@arm.com>
+References: <1452294332-23415-1-git-send-email-dianders@chromium.org>
+ <1452294332-23415-2-git-send-email-dianders@chromium.org>
+ <56964070.1020303@arm.com>
+Message-ID: <CAAFQd5C8asfo8wSa=jKvp4Vmg6A83R-vG7vQXtsHyOTADLo+9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
- 
- On mar., janv. 12 2016, Marcin Wojtas <mw@semihalf.com> wrote:
-
-> Hi Gregory,
+On Wed, Jan 13, 2016 at 9:17 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> Hi Doug,
 >
-> I have two remarks to my own code. Please let me know before patch v2,
-> I will provide you with corrected version (I already did it locally).
-
-OK I will asked your version before the next submitting.
-
-Thanks,
-
-Gregory
-
 >
->> @@ -1556,17 +1777,20 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
->>         int rx_done, i;
+> On 08/01/16 23:05, Douglas Anderson wrote:
 >>
->>         rx_done = mvneta_rxq_busy_desc_num_get(pp, rxq);
->> +       if (rx_done)
->> +               mvneta_rxq_desc_num_update(pp, rxq, rx_done, rx_done);
->> +
->> +       if (pp->bm_priv)
->> +               return;
->> +
+>> The __iommu_alloc_buffer() is expected to be called to allocate pretty
+>> sizeable buffers.  Upon simple tests of video I saw it trying to
+>> allocate 4,194,304 bytes.  The function tries to allocate large chunks
+>> in order to optimize IOMMU TLB usage.
+>>
+>> The current function is very, very slow.
+>>
+>> One problem is the way it keeps trying and trying to allocate big
+>> chunks.  Imagine a very fragmented memory that has 4M free but no
+>> contiguous pages at all.  Further imagine allocating 4M (1024 pages).
+>> We'll do the following memory allocations:
+>> - For page 1:
+>>    - Try to allocate order 10 (no retry)
+>>    - Try to allocate order 9 (no retry)
+>>    - ...
+>>    - Try to allocate order 0 (with retry, but not needed)
+>> - For page 2:
+>>    - Try to allocate order 9 (no retry)
+>>    - Try to allocate order 8 (no retry)
+>>    - ...
+>>    - Try to allocate order 0 (with retry, but not needed)
+>> - ...
+>> - ...
+>>
+>> Total number of calls to alloc() calls for this case is:
+>>    sum(int(math.log(i, 2)) + 1 for i in range(1, 1025))
+>>    => 9228
+>>
+>> The above is obviously worse case, but given how slow alloc can be we
+>> really want to try to avoid even somewhat bad cases.  I timed the old
+>> code with a device under memory pressure and it wasn't hard to see it
+>> take more than 120 seconds to allocate 4 megs of memory! (NOTE: testing
+>> was done on kernel 3.14, so possibly mainline would behave
+>> differently).
+>>
+>> A second problem is that allocating big chunks under memory pressure
+>> when we don't need them is just not a great idea anyway unless we really
+>> need them.  We can make due pretty well with smaller chunks so it's
+>> probably wise to leave bigger chunks for other users once memory
+>> pressure is on.
+>>
+>> Let's adjust the allocation like this:
+>>
+>> 1. If a big chunk fails, stop trying to hard and bump down to lower
+>>     order allocations.
+>> 2. Don't try useless orders.  The whole point of big chunks is to
+>>     optimize the TLB and it can really only make use of 2M, 1M, 64K and
+>>     4K sizes.
+>>
+>> We'll still tend to eat up a bunch of big chunks, but that might be the
+>> right answer for some users.  A future patch could possibly add a new
+>> DMA_ATTR that would let the caller decide that TLB optimization isn't
+>> important and that we should use smaller chunks.  Presumably this would
+>> be a sane strategy for some callers.
 >
-> This is wrong - buffers that are supposed to be dropped should return
-> to bm_pool.
 >
->> @@ -1587,23 +1812,35 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
->>
->>         rx_done = 0;
->>
->> +       bm_in_use = pp->bm_priv ? true : false;
->> +
->>         /* Fairness NAPI loop */
->>         while (rx_done < rx_todo) {
->>                 struct mvneta_rx_desc *rx_desc = mvneta_rxq_next_desc_get(rxq);
->> +               struct mvneta_bm_pool *bm_pool = NULL;
->>                 struct sk_buff *skb;
->>                 unsigned char *data;
->>                 dma_addr_t phys_addr;
->> -               u32 rx_status;
->> +               u32 rx_status, frag_size;
->>                 int rx_bytes, err;
->> +               u8 pool_id;
->>
->>                 rx_done++;
->>                 rx_status = rx_desc->status;
->>                 rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
->>                 data = (unsigned char *)rx_desc->buf_cookie;
->>                 phys_addr = rx_desc->buf_phys_addr;
->> +               if (bm_in_use) {
->> +                       pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc);
->> +                       bm_pool = &pp->bm_priv->bm_pools[pool_id];
->> +               }
->>
->>                 if (!mvneta_rxq_desc_is_first_last(rx_status) ||
->>                     (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
->> +                       /* Return the buffer to the pool */
->> +                       if (bm_in_use)
->> +                               mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
->> +                                                     rx_desc->buf_phys_addr);
->>                 err_drop_frame:
->>                         dev->stats.rx_errors++;
->>                         mvneta_rx_error(pp, rx_desc);
->> @@ -1633,25 +1870,38 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
->>                         rcvd_pkts++;
->>                         rcvd_bytes += rx_bytes;
->>
->> +                       /* Return the buffer to the pool */
->> +                       if (bm_in_use)
->> +                               mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
->> +                                                     rx_desc->buf_phys_addr);
->> +
->>                         /* leave the descriptor and buffer untouched */
->>                         continue;
->>                 }
->>
->>                 /* Refill processing */
->> -               err = mvneta_rx_refill(pp, rx_desc);
->> +               err = bm_in_use ? mvneta_bm_pool_refill(pp->bm_priv, bm_pool) :
->> +                                 mvneta_rx_refill(pp, rx_desc);
->>                 if (err) {
->>                         netdev_err(dev, "Linux processing - Can't refill\n");
->>                         rxq->missed++;
->>                         goto err_drop_frame;
+> Now that I've had time to think about it properly:
 >
-> Wrong - on refill fail, original buffer should be returned to bm_pool.
-> Same case is, when netdev_alloc_skb_ip_align fail inside copybreak
-> (this should also be fixed).
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 >
-> Best regards,
-> Marcin
+> I just had an absolutely disgusting idea of how to get the same progression
+> with just a single variable and no static array, but I'll keep that firmly
+> to myself as it's almost IOCCC-grade WTF :D
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Just out of curiosity, a bitmap and loop with fls() and clearing bit
+on failure or something more freaky? :)
+
+Anyway:
+
+Reviewed-by: Tomasz Figa <tfiga@chromium.org>
+
+Best regards,
+Tomasz
