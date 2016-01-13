@@ -1,57 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Jan 2016 10:20:18 +0100
-Subject: [Y2038] [RFC 02/15] vfs: Change all structures to support 64 bit
- time
-In-Reply-To: <20160113062716.GJ6033@dastard>
-References: <1452144972-15802-1-git-send-email-deepa.kernel@gmail.com>
- <4788428.RCG4WOvRdT@wuerfel> <20160113062716.GJ6033@dastard>
-Message-ID: <8960550.YnDr3xSm6r@wuerfel>
+From: xuejiancheng@huawei.com (xuejiancheng)
+Date: Wed, 13 Jan 2016 17:08:20 +0800
+Subject: [PATCH v5 5/6] mfd: dt-bindings: add device tree bindings for
+ Hi3519 sysctrl
+In-Reply-To: <5675031.hi9rRCqFXs@wuerfel>
+References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
+ <20160112083946.GN19803@x1> <5694C725.6010502@huawei.com>
+ <5675031.hi9rRCqFXs@wuerfel>
+Message-ID: <56961404.1000602@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 January 2016 17:27:16 Dave Chinner wrote:
-> > I think
-> > it was more than that when I first looked, so it's between 0.2% and 0.3%
-> > of savings in total memory, which is certainly worth discussing about,
-> > given the renewed interest in conserving RAM in general.  If we want to
-> > save this memory, then doing it at the same time as the timespec64 conversion
-> > is the right time so we don't need to touch every file twice.
-> 
-> You just uttered the key words: "If we want to save this memory"
-> 
-> So let's stop conflating two different lines of development because
-> we only actually *need* y2038k support.
-> 
-> The fact we haven't made timestamp space optimisations means
-> that nobody has thought it necessary or worthwhile. y2038k support
-> doesn't change the landscape under which we might consider the
-> optimisation, so we need to determine if the benefit outweighs the
-> cost in terms of code complexity and maintainability.
-> 
-> So separate the two changes - make the y2038k change simple and
-> obviously correct first by changing everything to timespec64. Then it
-> won't get delayed by bikeshedding about an optimisation of that is
-> of questionable benefit.
+Hi Arnd,
 
-Fine with me. I think Deepa already started simplifying the series
-already. I agree that for 64-bit machines, there is no need to optimize
-that code now, since we are not regressing in terms of memory size.
+On 2016/1/13 6:51, Arnd Bergmann wrote:
+> On Tuesday 12 January 2016 17:28:05 xuejiancheng wrote:
+>>>>>>>
+>>>>>> Not yet.
+>>>>>> Arnd Bergmann and Rob Herring all suggested adding a specific compatible string
+>>>>>> with the SOC name. This binding is just used for describing the compatible string now.
+>>>>>> When more functions on hi3519 SOC are added later, the specific driver will be also
+>>>>>> needed.
+>>>>>
+>>>>> Save this binding until it has more functionality.  We here "I'll add
+>>>>> to this later" all too often.
+>>>>>
+>>>>
+>>>> In the hi3519.dtsi file, there is a system-controller device node described like below:
+>>>> sysctrl: system-controller at 12010000 {
+>>>>      compatible = "hisilicon,hi3519-sysctrl", "syscon";
+>>>>      reg = <0x12010000 0x1000>;
+>>>> };
+>>>> Do you mean that I should remove "hisilicon,hi3519-sysctrl" and just use "syscon" as the
+>>>> compatible string??
+>>>
+>>> Where is this compatible string _used_?
+>>>
+>>>> If I want to add "hisilicon,hi3519-sysctrl" for hi3519. where should I put this binding?
+>>>> Could you give some suggestions?  Thank you very much!
+>>>
+>>> If you're not using the compatible i.e. the device doesn't have its
+>>> own driver yet, then there is no need to supply the binding at all, is
+>>> there?
+>>>
+>>
+>> OK. Thank you.
+>>
+> 
+> Sorry for stepping in late here. I still think that every syscon device should
+> come with a specific compatible string, so we have the option of creating a
+> driver later on, and I'd like to see a binding document that lists those strings
+> (which I believe exists here).
+> 
+> It's really hard to add compatible strings later on, anything else we can
+> work around by keying off that string and adding a workaround in the kernel.
+> 
 
-For 32-bit machines, we are regressing anyway, the question is whether
-it's by 12 or 24 bytes per inode. Let me try to estimate the worse-case
-scenario here: let's assume that we have 1GB of RAM (anything more
-on a 32-bit system gets you into trouble, and if you have less, there
-will be less of a problem). Filling all of system ram with small tmpfs
-files means a single 4K page plus 280 bytes for the minimum inode,
-so we need an additional 6MB or 12MB to store the extra timespec
-bits. Probably not too bad for a worst-case scenario, but there is
-also the case of storing just the inodes but no pages, and that would
-be worse.
+Is it OK if I put this binding document into the directory "Documentation/devicetree/bindings/arm/hisilicon"?
 
-I've added the linux-arm and linux-mips lists to cc, to see if anyone has
-strong opinions on this matter. We don't have to worry about x86-32 here,
-because sizeof(struct timespec64) is 12 bytes there anyway, and I don't
-think there are any other 32-bit architectures that have large-scale
-deployments or additional requirements we don't already have on ARM.
+Thank you.
 
-	Arnd
+> 	Arnd
+> 
+> .
+> 
