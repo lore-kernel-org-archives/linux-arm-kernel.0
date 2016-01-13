@@ -1,89 +1,116 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 13 Jan 2016 16:26:17 +0000
-Subject: [PATCH v3 07/21] arm64: move kernel image to base of vmalloc area
-In-Reply-To: <CAKv+Gu9ka7EOJq9BsAw9ON2qYiERJYKkzyYG7XYn0uw93fpTgg@mail.gmail.com>
-References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
- <1452518355-4606-8-git-send-email-ard.biesheuvel@linaro.org>
- <20160112181336.GF4858@leverpostej>
- <CAKv+Gu-TS7w=AVBceGhsQkQzVCv+u7Gh6ojftwW1iaE+d0yrYw@mail.gmail.com>
- <20160113135109.GJ23370@leverpostej>
- <CAKv+Gu9ka7EOJq9BsAw9ON2qYiERJYKkzyYG7XYn0uw93fpTgg@mail.gmail.com>
-Message-ID: <20160113162616.GK23370@leverpostej>
+From: john@metanate.com (John Keeping)
+Date: Wed, 13 Jan 2016 16:40:38 +0000
+Subject: [RFC/PATCH] drm/rockchip: don't wait for vblank if fb hasn't
+ changed
+In-Reply-To: <20160113162156.GA19130@phenom.ffwll.local>
+References: <1452689614-6570-1-git-send-email-john@metanate.com>
+ <20160113142320.GQ19130@phenom.ffwll.local>
+ <20160113143425.363ce07a.john@metanate.com>
+ <20160113154005.GT19130@phenom.ffwll.local>
+ <20160113155529.6048b2c1.john@metanate.com>
+ <20160113162156.GA19130@phenom.ffwll.local>
+Message-ID: <20160113164038.5fcf670f.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 04:50:24PM +0100, Ard Biesheuvel wrote:
-> On 13 January 2016 at 14:51, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Wed, Jan 13, 2016 at 09:39:41AM +0100, Ard Biesheuvel wrote:
-> >> But since KASAN always uses the first 1/8 of that VA space, I am going
-> >> to rework this so that the non-KASAN constants never depend on the
-> >> actual values but only on CONFIG_KASAN
-> >
-> > Personally I'd prefer that they were obviously defined in terms of each
-> > other if possible (as this means that the definitions are obviously
-> > consistent by construction).
-> >
-> > So if it's not too much of a pain to keep them that way it would be
-> > nice to do so.
-> >
-> > [...]
-> >
+On Wed, 13 Jan 2016 17:21:56 +0100, Daniel Vetter wrote:
+
+> On Wed, Jan 13, 2016 at 03:55:29PM +0000, John Keeping wrote:
+> > On Wed, 13 Jan 2016 16:40:05 +0100, Daniel Vetter wrote:
+> >   
+> > > On Wed, Jan 13, 2016 at 02:34:25PM +0000, John Keeping wrote:  
+> > > > On Wed, 13 Jan 2016 15:23:20 +0100, Daniel Vetter wrote:
+> > > >     
+> > > > > On Wed, Jan 13, 2016 at 12:53:34PM +0000, John Keeping wrote:    
+> > > > > > As commented in drm_atomic_helper_wait_for_vblanks(), userspace
+> > > > > > relies on cursor ioctls being unsynced.  Converting the rockchip
+> > > > > > driver to atomic has significantly impacted cursor performance by
+> > > > > > making every cursor update wait for vblank.
+> > > > > > 
+> > > > > > By skipping the vblank sync when the framebuffer has not changed
+> > > > > > (as is done in drm_atomic_helper_wait_for_vblanks()) we can avoid
+> > > > > > this for the common case of moving the cursor and only need to
+> > > > > > delay the cursor ioctl when the cursor icon changes.
+> > > > > > 
+> > > > > > I originally inserted a check on legacy_cursor_update as well, but
+> > > > > > that caused a storm of iommu page faults.  I didn't investigate the
+> > > > > > cause of those since this change gives enough of a performance
+> > > > > > improvement for my use case.
+> > > > > > 
+> > > > > > This is RFC because of that and because the framebuffer_changed()
+> > > > > > function is copied from drm_atomic_helper.c as a quick way to test
+> > > > > > the result.
+> > > > > > 
+> > > > > > Signed-off-by: John Keeping <john@metanate.com>
+> > > > > > ---
+> > > > > >  drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 27
+> > > > > > +++++++++++++++++++++++++-- 1 file changed, 25 insertions(+), 2
+> > > > > > deletions(-)
+> > > > > > 
+> > > > > > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> > > > > > b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c index f784488..8fd9821
+> > > > > > 100644 --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> > > > > > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> > > > > > @@ -177,8 +177,28 @@ static void
+> > > > > > rockchip_crtc_wait_for_update(struct drm_crtc *crtc)
+> > > > > > crtc_funcs->wait_for_update(crtc); }
+> > > > > >  
+> > > > > > +static bool framebuffer_changed(struct drm_device *dev,
+> > > > > > +				struct drm_atomic_state *old_state,
+> > > > > > +				struct drm_crtc *crtc)
+> > > > > > +{
+> > > > > > +	struct drm_plane *plane;
+> > > > > > +	struct drm_plane_state *old_plane_state;
+> > > > > > +	int i;
+> > > > > > +
+> > > > > > +	for_each_plane_in_state(old_state, plane, old_plane_state,
+> > > > > > i) {
+> > > > > > +		if (plane->state->crtc != crtc &&
+> > > > > > +		    old_plane_state->crtc != crtc)
+> > > > > > +			continue;
+> > > > > > +
+> > > > > > +		if (plane->state->fb != old_plane_state->fb)
+> > > > > > +			return true;
+> > > > > > +	}
+> > > > > > +
+> > > > > > +	return false;
+> > > > > > +}      
+> > > > > 
+> > > > > Please don't hand-roll logic that affects semantics like this. Instead
+> > > > > please use drm_atomic_helper_wait_for_vblanks(), which should do this
+> > > > > correctly for you.
+> > > > > 
+> > > > > If that's not the case then we need to improve the generic helper, or
+> > > > > figure out what's different with rockhip.    
+> > > > 
+> > > > According to commit 63ebb9f (drm/rockchip: Convert to support atomic
+> > > > API) it's because rockchip doesn't have a hardware vblank counter.
+> > > > 
+> > > > I'm not entirely clear on why this prevents the use of
+> > > > drm_atomic_helper_wait_for_vblanks().    
+> > > 
+> > > Hm, that commit isn't terribly helpful. If that's really needed then imo I
+> > > think we should extract a "drm_atomic_helper_plane_needs_vblank_wait()"
+> > > helper that's used by both. But since rockchip does vblank_get/put calls
+> > > I'd hope vblanks actually work correctly. And then the helper should work
+> > > too.  
+> > 
+> > I tried switching the call to rockchip_crtc_wait_for_update() to
+> > drm_atomic_helper_wait_for_vblanks() and it works fine until I switch
+> > the buffer associated with a cursor, at which point I get iommu page
+> > faults, presumably because the GEM buffer is unreferenced too early.
+> > 
+> > AFAICT the buffer will be released via drm_atomic_state_free()
+> > unconditionally, but I suspect I'm missing something since that would
+> > mean every driver would hit a similar problem.  
 > 
-> I am leaning towards adding this to asm/memory.h
-> 
-> #ifdef CONFIG_KASAN
-> #define KASAN_SHADOW_SIZE (UL(1) << (VA_BITS - 3))
-> #else
-> #define KASAN_SHADOW_SIZE (0)
-> #endif
-> 
-> and remove the #ifdef CONFIG_KASAN block from asm/pgtable.h. Then
-> asm/kasan.h, which already includes asm/memory.h, can use it as region
-> size, and none of the reshuffling I had to do before is necessary.
+> Yeah, with the helper we always skip, which means when the cursor bo
+> changes you indeed unmap too early. So can't even share the overall
+> condition, but we could definitely share the little framebuffer_changed
+> helper.
 
-FWIW, that looks good to me.
+That leaves me with the question: why do other atomic drivers work?
 
-[...]
-
-> >> I do wonder what that means for memblocks that are not multiples of 16
-> >> MB, though (below)
-> >
-> > Indeed.
-> >
-> > On a related note, something I've been thinking about is PA layout
-> > fuzzing using VMs.
-> >
-> > It sounds like being able to test memory layouts would be useful for
-> > cases like the above, and I suspect there are plenty of other edge cases
-> > that we aren't yet aware of due to typical physical memory layouts being
-> > fairly simple.
-> >
-> > It doesn't seem to be possible to force a particular physical memory
-> > layout (and particular kernel, dtb, etc addresses) for QEMU or KVM
-> > tool. I started looking into adding support to KVM tool, but there's a
-> > fair amount of refactoring needed first.
-> >
-> > Another option might be a special EFI application that carves up memory
-> > in a deliberate fashion to ensure particular fragmentation cases (e.g. a
-> > bank that's SWAPPER_BLOCK_SIZE - PAGE_SIZE in length).
-> >
-> 
-> I use mem= for this, in fact, and boot most of my machines and VMs
-> with some value slightly below the actual available DRAM that is not a
-> multiple of 2M
-
-Sure. I do some testing with mem= to find some bugs. The problem is that
-you can only vary the end address (prior to your patches), and don't get
-much variation on the portions in the middle.
-
-It's difficult to test for bugs with not-quite-adjacent regions, or
-where particular sizes, alignment, or addresses are important.
-
-For example, having memory that extends right to the end of the
-kernel-supported PA range (even with gaps in the middle) is an edge case
-we don't currently test. I have a suspicion that KASAN's shadow
-lookahead (and allocation to account for this) wouldn't be quite right,
-and I want to be able to properly test and verify that.
-
-Thanks,
-Mark.
+If drm_atomic_helper_wait_for_vblanks() skipping vblanks results in the
+cursor bo being unmapped too early for rockchip, why is it not unmapped
+too early for all of the other drivers using that helper?
