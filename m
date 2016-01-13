@@ -1,40 +1,62 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 13 Jan 2016 08:40:23 +0000
-Subject: [PATCH v3 1/2] acpi: Fix proper return code for function
- acpi_gsi_to_irq
-In-Reply-To: <CAGDN=zY5wVwOC=o8f1nmYyUrgo5gdRVgB7W1jsKu0RKyazp+BA@mail.gmail.com>
-References: <1446857519-5908-1-git-send-email-lho@apm.com>
- <1446857519-5908-2-git-send-email-lho@apm.com> <56954D18.1010306@arm.com>
- <CAGDN=zYVvU9=Qj8_szqYW3qh7G=phr_Bc_dm8+KVO=yhp=YTVQ@mail.gmail.com>
- <569554D0.2000406@arm.com>
- <CAGDN=zY5wVwOC=o8f1nmYyUrgo5gdRVgB7W1jsKu0RKyazp+BA@mail.gmail.com>
-Message-ID: <56960D77.5010805@arm.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Wed, 13 Jan 2016 09:44:24 +0100
+Subject: /sys/class/power_supply/bq27200-0/capacity changed meaning
+ between 4.1 and 4.4?
+In-Reply-To: <20160112215352.GA5248@amd>
+References: <20160109230709.GA30551@amd> <5693BB75.70409@ti.com>
+ <20160111214247.GA9735@amd> <56942344.9070609@ti.com>
+ <56951A2C.9010602@ti.com> <20160112215352.GA5248@amd>
+Message-ID: <20160113084424.GC11560@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/16 20:01, Tuan Phan wrote:
-> On Tue, Jan 12, 2016 at 11:32 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> > Right. In which case please document this properly in the commit log.
->> >
-> Do we need to post a new patch with updated description or wait Rafael's input?
+On Tuesday 12 January 2016 22:53:52 Pavel Machek wrote:
+> Hi!
+> 
+> > >>If not, tell me, and I can do it, but it will involve a lot of swaring...
+> > >
+> > >I'll give it a look over.
+> > 
+> > OK, I'm still looking for a test setup, but this was definitely a problem,
+> > could you give this a try?:
+> 
+> Well, search no more. I tested it and seems to work ok. There's one
+> more blank line in the source, so I had to apply patch by hand.
+> 
+> Tested-by: Pavel Machek <pavel@ucw.cz>
+> Acked-by: Pavel Machek <pavel@ucw.cz>
+> Reported-by: Pavel Machek <pavel@ucw.cz>
+> Cc: stable at vger.kernel.org
+> 
+> ? :-).
+> 
+> And... thanks!
+> 									Pavel
 
-Given that there is quite a few comments on this series already, it
-would make sense to update it and repost it.
+There are more pending fixes for bq27xxx... Maybe your is duplicate?
 
-> -- CONFIDENTIALITY NOTICE: This e-mail message, including any
-> attachments, is for the sole use of the intended recipient(s) and
-> contains information that is confidential and proprietary to Applied
-> Micro Circuits Corporation or its subsidiaries. It is to be used solely
-> for the purpose of furthering the parties' business relationship. All
-> unauthorized review, use, disclosure or distribution is prohibited. If
-> you are not the intended recipient, please contact the sender by reply
-> e-mail and destroy all copies of the original message.
+http://thread.gmane.org/gmane.linux.power-management.general/70090
+http://thread.gmane.org/gmane.linux.power-management.general/69716/focus=69714
+http://thread.gmane.org/gmane.linux.power-management.general/69716/focus=2110580
 
-And please fix your email setup. By the look of it, I'm not even
-supposed to read this.
+Sebastian, please take them and ideally send to stable@ for backporting.
 
-Thanks,
+> 
+> > diff --git a/drivers/power/bq27xxx_battery.c b/drivers/power/bq27xxx_battery.c
+> > index 880233c..4fec3cf 100644
+> > --- a/drivers/power/bq27xxx_battery.c
+> > +++ b/drivers/power/bq27xxx_battery.c
+> > @@ -470,8 +470,9 @@ static inline int bq27xxx_read(struct bq27xxx_device_info *di, int reg_index,
+> >  static int bq27xxx_battery_read_soc(struct bq27xxx_device_info *di)
+> >  {
+> >  	int soc;
+> > +	bool single = di->chip == BQ27000 || di->chip == BQ27010;
+> > -	soc = bq27xxx_read(di, BQ27XXX_REG_SOC, false);
+> > +	soc = bq27xxx_read(di, BQ27XXX_REG_SOC, single);
+> >  	if (soc < 0)
+> >  		dev_dbg(di->dev, "error reading State-of-Charge\n");
+> 
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Pali Roh?r
+pali.rohar at gmail.com
