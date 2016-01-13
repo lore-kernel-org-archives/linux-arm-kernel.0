@@ -1,135 +1,416 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 13 Jan 2016 11:30:54 +0800
-Subject: [PATCH v7 10/10] ARM: dts: sun8i: q8-common: Add AXP223 PMIC device
- and regulator nodes
+Date: Wed, 13 Jan 2016 11:30:49 +0800
+Subject: [PATCH v7 05/10] mfd: axp20x: Split the driver into core and i2c bits
 In-Reply-To: <1452655854-1528-1-git-send-email-wens@csie.org>
 References: <1452655854-1528-1-git-send-email-wens@csie.org>
-Message-ID: <1452655854-1528-11-git-send-email-wens@csie.org>
+Message-ID: <1452655854-1528-6-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A23/A33 Q8 tablets have an X-Powers AXP223 PMIC connected via RSB. Its
-regulators provide power to various parts of the SoC and the board.
+The axp20x driver assumes the device is i2c based. This is not the
+case with later chips, which use a proprietary 2 wire serial bus
+by Allwinner called "Reduced Serial Bus".
 
-Also add lcd regulator supply for simplefb and update the existing
-vmmc-supply for mmc0.
+This patch follows the example of mfd/wm831x and splits it into
+an interface independent core, and an i2c specific glue layer.
+MFD_AXP20X and the new MFD_AXP20X_I2C are changed to tristate
+symbols, allowing the driver to be built as modules.
+
+Whitespace and other style errors in the moved i2c specific code
+have been fixed. Included but unused header files are removed as
+well.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-q8-common.dtsi | 83 +++++++++++++++++++++++++++++++++-
- 1 file changed, 81 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-index 1a69231d2da5..9d2b7e2f5975 100644
---- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
-+++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-@@ -56,7 +56,6 @@
- 		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
- 		default-brightness-level = <8>;
- 		enable-gpios = <&pio 7 6 GPIO_ACTIVE_HIGH>; /* PH6 */
--		/* backlight is powered by AXP223 DC1SW */
- 	};
+Changes since v6:
+
+  - Drop filenames from file headers
+
+---
+ drivers/mfd/Kconfig        |  14 +++---
+ drivers/mfd/Makefile       |   1 +
+ drivers/mfd/axp20x-i2c.c   | 104 +++++++++++++++++++++++++++++++++++++++++++++
+ drivers/mfd/axp20x.c       |  90 +++++++--------------------------------
+ include/linux/mfd/axp20x.h |  33 +++++++++++++-
+ 5 files changed, 161 insertions(+), 81 deletions(-)
+ create mode 100644 drivers/mfd/axp20x-i2c.c
+
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 4d92df6ef9fe..804cd3dcce32 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -91,14 +91,18 @@ config MFD_BCM590XX
+ 	  Support for the BCM590xx PMUs from Broadcom
  
- 	chosen {
-@@ -67,7 +66,7 @@
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_q8>;
--	vmmc-supply = <&reg_vcc3v0>;
-+	vmmc-supply = <&reg_dcdc1>;
- 	bus-width = <4>;
- 	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
- 	cd-inverted;
-@@ -92,6 +91,82 @@
+ config MFD_AXP20X
+-	bool "X-Powers AXP20X"
++	tristate
+ 	select MFD_CORE
+-	select REGMAP_I2C
+ 	select REGMAP_IRQ
+-	depends on I2C=y
++
++config MFD_AXP20X_I2C
++	tristate "X-Powers AXP series PMICs with I2C"
++	select MFD_AXP20X
++	select REGMAP_I2C
++	depends on I2C
+ 	help
+-	  If you say Y here you get support for the X-Powers AXP202, AXP209 and
+-	  AXP288 power management IC (PMIC).
++	  If you say Y here you get support for the X-Powers AXP series power
++	  management ICs (PMICs) controlled with I2C.
+ 	  This driver include only the core APIs. You have to select individual
+ 	  components like regulators or the PEK (Power Enable Key) under the
+ 	  corresponding menus.
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index a8b76b81b467..a6913007d667 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -107,6 +107,7 @@ obj-$(CONFIG_PMIC_DA9052)	+= da9052-core.o
+ obj-$(CONFIG_MFD_DA9052_SPI)	+= da9052-spi.o
+ obj-$(CONFIG_MFD_DA9052_I2C)	+= da9052-i2c.o
+ obj-$(CONFIG_MFD_AXP20X)	+= axp20x.o
++obj-$(CONFIG_MFD_AXP20X_I2C)	+= axp20x-i2c.o
  
- &r_rsb {
- 	status = "okay";
+ obj-$(CONFIG_MFD_LP3943)	+= lp3943.o
+ obj-$(CONFIG_MFD_LP8788)	+= lp8788.o lp8788-irq.o
+diff --git a/drivers/mfd/axp20x-i2c.c b/drivers/mfd/axp20x-i2c.c
+new file mode 100644
+index 000000000000..b1b865822c07
+--- /dev/null
++++ b/drivers/mfd/axp20x-i2c.c
+@@ -0,0 +1,104 @@
++/*
++ * I2C driver for the X-Powers' Power Management ICs
++ *
++ * AXP20x typically comprises an adaptive USB-Compatible PWM charger, BUCK DC-DC
++ * converters, LDOs, multiple 12-bit ADCs of voltage, current and temperature
++ * as well as configurable GPIOs.
++ *
++ * This driver supports the I2C variants.
++ *
++ * Copyright (C) 2014 Carlo Caione
++ *
++ * Author: Carlo Caione <carlo@caione.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+	axp22x: pmic at 3a3 {
-+		compatible = "x-powers,axp223";
-+		reg = <0x3a3>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		eldoin-supply = <&reg_dcdc1>;
-+	};
++#include <linux/acpi.h>
++#include <linux/err.h>
++#include <linux/i2c.h>
++#include <linux/module.h>
++#include <linux/mfd/axp20x.h>
++#include <linux/of.h>
++#include <linux/regmap.h>
++#include <linux/slab.h>
++
++static int axp20x_i2c_probe(struct i2c_client *i2c,
++			    const struct i2c_device_id *id)
++{
++	struct axp20x_dev *axp20x;
++	int ret;
++
++	axp20x = devm_kzalloc(&i2c->dev, sizeof(*axp20x), GFP_KERNEL);
++	if (!axp20x)
++		return -ENOMEM;
++
++	axp20x->dev = &i2c->dev;
++	axp20x->irq = i2c->irq;
++	dev_set_drvdata(axp20x->dev, axp20x);
++
++	ret = axp20x_match_device(axp20x);
++	if (ret)
++		return ret;
++
++	axp20x->regmap = devm_regmap_init_i2c(i2c, axp20x->regmap_cfg);
++	if (IS_ERR(axp20x->regmap)) {
++		ret = PTR_ERR(axp20x->regmap);
++		dev_err(&i2c->dev, "regmap init failed: %d\n", ret);
++		return ret;
++	}
++
++	return axp20x_device_probe(axp20x);
++}
++
++static int axp20x_i2c_remove(struct i2c_client *i2c)
++{
++	struct axp20x_dev *axp20x = i2c_get_clientdata(i2c);
++
++	return axp20x_device_remove(axp20x);
++}
++
++static const struct of_device_id axp20x_i2c_of_match[] = {
++	{ .compatible = "x-powers,axp152", .data = (void *)AXP152_ID },
++	{ .compatible = "x-powers,axp202", .data = (void *)AXP202_ID },
++	{ .compatible = "x-powers,axp209", .data = (void *)AXP209_ID },
++	{ .compatible = "x-powers,axp221", .data = (void *)AXP221_ID },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, axp20x_i2c_of_match);
++
++/*
++ * This is useless for OF-enabled devices, but it is needed by I2C subsystem
++ */
++static const struct i2c_device_id axp20x_i2c_id[] = {
++	{ },
++};
++MODULE_DEVICE_TABLE(i2c, axp20x_i2c_id);
++
++static const struct acpi_device_id axp20x_i2c_acpi_match[] = {
++	{
++		.id = "INT33F4",
++		.driver_data = AXP288_ID,
++	},
++	{ },
++};
++MODULE_DEVICE_TABLE(acpi, axp20x_i2c_acpi_match);
++
++static struct i2c_driver axp20x_i2c_driver = {
++	.driver = {
++		.name	= "axp20x-i2c",
++		.of_match_table	= of_match_ptr(axp20x_i2c_of_match),
++		.acpi_match_table = ACPI_PTR(axp20x_i2c_acpi_match),
++	},
++	.probe		= axp20x_i2c_probe,
++	.remove		= axp20x_i2c_remove,
++	.id_table	= axp20x_i2c_id,
 +};
 +
-+#include "axp22x.dtsi"
++module_i2c_driver(axp20x_i2c_driver);
 +
-+&reg_aldo1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-io";
-+};
-+
-+&reg_aldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2350000>;
-+	regulator-max-microvolt = <2650000>;
-+	regulator-name = "vdd-dll";
-+};
-+
-+&reg_aldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2700000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-pll-avcc";
-+};
-+
-+&reg_dc1sw {
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-lcd";
-+};
-+
-+&reg_dc5ldo {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpus";
-+};
-+
-+&reg_dcdc1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-3v0";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-sys";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc5 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1500000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "vcc-dram";
-+};
-+
-+&reg_rtc_ldo {
-+	regulator-name = "vcc-rtc";
++MODULE_DESCRIPTION("PMIC MFD I2C driver for AXP20X");
++MODULE_AUTHOR("Carlo Caione <carlo@caione.org>");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index cec51e689d1d..8e569bcfe3bc 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -1,10 +1,12 @@
+ /*
+- * axp20x.c - MFD core driver for the X-Powers' Power Management ICs
++ * MFD core driver for the X-Powers' Power Management ICs
+  *
+  * AXP20x typically comprises an adaptive USB-Compatible PWM charger, BUCK DC-DC
+  * converters, LDOs, multiple 12-bit ADCs of voltage, current and temperature
+  * as well as configurable GPIOs.
+  *
++ * This file contains the interface independent core functions.
++ *
+  * Copyright (C) 2014 Carlo Caione
+  *
+  * Author: Carlo Caione <carlo@caione.org>
+@@ -15,18 +17,15 @@
+  */
+ 
+ #include <linux/err.h>
+-#include <linux/i2c.h>
+ #include <linux/interrupt.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/regmap.h>
+-#include <linux/slab.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/mfd/axp20x.h>
+ #include <linux/mfd/core.h>
+ #include <linux/of_device.h>
+-#include <linux/of_irq.h>
+ #include <linux/acpi.h>
+ 
+ #define AXP20X_OFF	0x80
+@@ -378,32 +377,6 @@ static const struct regmap_irq axp288_regmap_irqs[] = {
+ 	INIT_REGMAP_IRQ(AXP288, BC_USB_CHNG,            5, 1),
  };
  
- &r_uart {
-@@ -99,3 +174,7 @@
- 	pinctrl-0 = <&r_uart_pins_a>;
- 	status = "okay";
- };
+-static const struct of_device_id axp20x_of_match[] = {
+-	{ .compatible = "x-powers,axp152", .data = (void *) AXP152_ID },
+-	{ .compatible = "x-powers,axp202", .data = (void *) AXP202_ID },
+-	{ .compatible = "x-powers,axp209", .data = (void *) AXP209_ID },
+-	{ .compatible = "x-powers,axp221", .data = (void *) AXP221_ID },
+-	{ },
+-};
+-MODULE_DEVICE_TABLE(of, axp20x_of_match);
+-
+-/*
+- * This is useless for OF-enabled devices, but it is needed by I2C subsystem
+- */
+-static const struct i2c_device_id axp20x_i2c_id[] = {
+-	{ },
+-};
+-MODULE_DEVICE_TABLE(i2c, axp20x_i2c_id);
+-
+-static const struct acpi_device_id axp20x_acpi_match[] = {
+-	{
+-		.id = "INT33F4",
+-		.driver_data = AXP288_ID,
+-	},
+-	{ },
+-};
+-MODULE_DEVICE_TABLE(acpi, axp20x_acpi_match);
+-
+ static const struct regmap_irq_chip axp152_regmap_irq_chip = {
+ 	.name			= "axp152_irq_chip",
+ 	.status_base		= AXP152_IRQ1_STATE,
+@@ -608,7 +581,7 @@ static void axp20x_power_off(void)
+ 		     AXP20X_OFF);
+ }
+ 
+-static int axp20x_match_device(struct axp20x_dev *axp20x)
++int axp20x_match_device(struct axp20x_dev *axp20x)
+ {
+ 	struct device *dev = axp20x->dev;
+ 	const struct acpi_device_id *acpi_id;
+@@ -665,38 +638,18 @@ static int axp20x_match_device(struct axp20x_dev *axp20x)
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL(axp20x_match_device);
+ 
+-static int axp20x_i2c_probe(struct i2c_client *i2c,
+-			 const struct i2c_device_id *id)
++int axp20x_device_probe(struct axp20x_dev *axp20x)
+ {
+-	struct axp20x_dev *axp20x;
+ 	int ret;
+ 
+-	axp20x = devm_kzalloc(&i2c->dev, sizeof(*axp20x), GFP_KERNEL);
+-	if (!axp20x)
+-		return -ENOMEM;
+-
+-	axp20x->i2c_client = i2c;
+-	axp20x->dev = &i2c->dev;
+-	dev_set_drvdata(axp20x->dev, axp20x);
+-
+-	ret = axp20x_match_device(axp20x);
+-	if (ret)
+-		return ret;
+-
+-	axp20x->regmap = devm_regmap_init_i2c(i2c, axp20x->regmap_cfg);
+-	if (IS_ERR(axp20x->regmap)) {
+-		ret = PTR_ERR(axp20x->regmap);
+-		dev_err(&i2c->dev, "regmap init failed: %d\n", ret);
+-		return ret;
+-	}
+-
+-	ret = regmap_add_irq_chip(axp20x->regmap, i2c->irq,
++	ret = regmap_add_irq_chip(axp20x->regmap, axp20x->irq,
+ 				  IRQF_ONESHOT | IRQF_SHARED, -1,
+ 				  axp20x->regmap_irq_chip,
+ 				  &axp20x->regmap_irqc);
+ 	if (ret) {
+-		dev_err(&i2c->dev, "failed to add irq chip: %d\n", ret);
++		dev_err(axp20x->dev, "failed to add irq chip: %d\n", ret);
+ 		return ret;
+ 	}
+ 
+@@ -704,8 +657,8 @@ static int axp20x_i2c_probe(struct i2c_client *i2c,
+ 			axp20x->nr_cells, NULL, 0, NULL);
+ 
+ 	if (ret) {
+-		dev_err(&i2c->dev, "failed to add MFD devices: %d\n", ret);
+-		regmap_del_irq_chip(i2c->irq, axp20x->regmap_irqc);
++		dev_err(axp20x->dev, "failed to add MFD devices: %d\n", ret);
++		regmap_del_irq_chip(axp20x->irq, axp20x->regmap_irqc);
+ 		return ret;
+ 	}
+ 
+@@ -714,38 +667,25 @@ static int axp20x_i2c_probe(struct i2c_client *i2c,
+ 		pm_power_off = axp20x_power_off;
+ 	}
+ 
+-	dev_info(&i2c->dev, "AXP20X driver loaded\n");
++	dev_info(axp20x->dev, "AXP20X driver loaded\n");
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL(axp20x_device_probe);
+ 
+-static int axp20x_i2c_remove(struct i2c_client *i2c)
++int axp20x_device_remove(struct axp20x_dev *axp20x)
+ {
+-	struct axp20x_dev *axp20x = i2c_get_clientdata(i2c);
+-
+ 	if (axp20x == axp20x_pm_power_off) {
+ 		axp20x_pm_power_off = NULL;
+ 		pm_power_off = NULL;
+ 	}
+ 
+ 	mfd_remove_devices(axp20x->dev);
+-	regmap_del_irq_chip(axp20x->i2c_client->irq, axp20x->regmap_irqc);
++	regmap_del_irq_chip(axp20x->irq, axp20x->regmap_irqc);
+ 
+ 	return 0;
+ }
+-
+-static struct i2c_driver axp20x_i2c_driver = {
+-	.driver = {
+-		.name	= "axp20x",
+-		.of_match_table	= of_match_ptr(axp20x_of_match),
+-		.acpi_match_table = ACPI_PTR(axp20x_acpi_match),
+-	},
+-	.probe		= axp20x_i2c_probe,
+-	.remove		= axp20x_i2c_remove,
+-	.id_table	= axp20x_i2c_id,
+-};
+-
+-module_i2c_driver(axp20x_i2c_driver);
++EXPORT_SYMBOL(axp20x_device_remove);
+ 
+ MODULE_DESCRIPTION("PMIC MFD core driver for AXP20X");
+ MODULE_AUTHOR("Carlo Caione <carlo@caione.org>");
+diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+index b24c771cebd5..00697c6ad8b0 100644
+--- a/include/linux/mfd/axp20x.h
++++ b/include/linux/mfd/axp20x.h
+@@ -396,7 +396,7 @@ enum axp288_irqs {
+ 
+ struct axp20x_dev {
+ 	struct device			*dev;
+-	struct i2c_client		*i2c_client;
++	int				irq;
+ 	struct regmap			*regmap;
+ 	struct regmap_irq_chip_data	*regmap_irqc;
+ 	long				variant;
+@@ -462,4 +462,35 @@ static inline int axp20x_read_variable_width(struct regmap *regmap,
+ 	return result;
+ }
+ 
++/**
++ * axp20x_match_device(): Setup axp20x variant related fields
++ *
++ * @axp20x: axp20x device to setup (.dev field must be set)
++ * @dev: device associated with this axp20x device
++ *
++ * This lets the axp20x core configure the mfd cells and register maps
++ * for later use.
++ */
++int axp20x_match_device(struct axp20x_dev *axp20x);
 +
-+&simplefb_lcd {
-+	vcc-lcd-supply = <&reg_dc1sw>;
-+};
++/**
++ * axp20x_device_probe(): Probe a configured axp20x device
++ *
++ * @axp20x: axp20x device to probe (must be configured)
++ *
++ * This function lets the axp20x core register the axp20x mfd devices
++ * and irqchip. The axp20x device passed in must be fully configured
++ * with axp20x_match_device, its irq set, and regmap created.
++ */
++int axp20x_device_probe(struct axp20x_dev *axp20x);
++
++/**
++ * axp20x_device_probe(): Remove a axp20x device
++ *
++ * @axp20x: axp20x device to remove
++ *
++ * This tells the axp20x core to remove the associated mfd devices
++ */
++int axp20x_device_remove(struct axp20x_dev *axp20x);
++
+ #endif /* __LINUX_MFD_AXP20X_H */
 -- 
 2.6.4
