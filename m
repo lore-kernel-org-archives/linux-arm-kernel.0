@@ -1,33 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Jan 2016 09:19:14 -0800
-Subject: [PATCH v2 3/3] pci: dra7xx: use pdata callbacks to perform reset
-In-Reply-To: <1452667666-17533-4-git-send-email-kishon@ti.com>
-References: <1452667666-17533-1-git-send-email-kishon@ti.com>
- <1452667666-17533-4-git-send-email-kishon@ti.com>
-Message-ID: <20160113171913.GH12777@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 13 Jan 2016 17:23:03 +0000
+Subject: [PATCH] arm64: reenable interrupt when handling ptrace breakpoint
+In-Reply-To: <569686BA.6050703@linaro.org>
+References: <1450225088-2456-1-git-send-email-yang.shi@linaro.org>
+ <20151216111316.GD4308@arm.com> <5671CD5B.9030907@linaro.org>
+ <20151221104818.GF23092@arm.com>
+ <alpine.DEB.2.11.1512211749180.28591@nanos>
+ <20151221170028.GT23092@arm.com> <56955B3A.5010303@linaro.org>
+ <20160113102622.GC25458@arm.com> <569686BA.6050703@linaro.org>
+Message-ID: <20160113172303.GH25458@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [160112 22:48]:
-> Use platform populated reset assert and deassert
-> callbacks to perform reset of PCIe.
+On Wed, Jan 13, 2016 at 09:17:46AM -0800, Shi, Yang wrote:
+> On 1/13/2016 2:26 AM, Will Deacon wrote:
+> >On Tue, Jan 12, 2016 at 11:59:54AM -0800, Shi, Yang wrote:
+> >>This might be buried in email storm during the holiday. Just want to double
+> >>check the status. I'm supposed there is no objection for getting it merged
+> >>in upstream?
+> >
+> >Sorry, when you replied with:
+> >
+> >>I think we could just extend the "signal delay send" approach from x86-64
+> >>to arm64, which is currently used by x86-64 on -rt kernel only.
+> >
+> >I understood that you were going to fix -rt, so I dropped this pending
+> >anything more from you.
+> >
+> >What's the plan?
 > 
-> Use these callbacks until a reset interface using drivers/reset
-> is available for the purpose.
+> Sorry for the confusion. The "signal delay send" approach used by x86-64 -rt
+> should be not necessary for arm64 right now. Reenabling interrupt is still
+> the preferred approach.
+> 
+> Since x86-64 has per-CPU IST exception stack, so preemption has to be
+> disabled all the time. However, it is not applicable to other architectures
+> for now, including arm64.
 
-This one has a dependency to the second patch for the platform
-data.
+Actually, we grew support for a separate IRQ stack in the recent merge
+window. Does that change things here, or are you referring to something
+else?
 
-Bjorn, how do you prefer to merge this once there are no more
-comments?
-
-How about I set up an immutable branch against v4.5-rc1 with
-just these three patches that we can both then merge in?
-
-My preference is to add this to linux next after the merge
-window for v4.6. Bjorn, if you want it merged as fixes, I'm
-fine with that too naturally.
-
-Regards,
-
-Tony
+Will
