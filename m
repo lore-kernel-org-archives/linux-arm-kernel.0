@@ -1,44 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Jan 2016 23:14:54 +0100
-Subject: [PATCH] ASoC: mediatek: add i2c dependency
-Message-ID: <5346380.rqT2CVl4PH@wuerfel>
+Date: Wed, 13 Jan 2016 23:24:02 +0100
+Subject: lib: sw842: select crc32
+Message-ID: <4168537.6I1FVkp3DA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added mediatek drivers for mt8173 select codes that depend
-on I2C, which cuases a build failure if I2C is disabled:
+The sw842 library code was merged in linux-4.1 and causes a very rare randconfig
+failure when CONFIG_CRC32 is not set:
+    
+    lib/built-in.o: In function `sw842_compress':
+    oid_registry.c:(.text+0x12ddc): undefined reference to `crc32_be'
+    lib/built-in.o: In function `sw842_decompress':
+    oid_registry.c:(.text+0x137e4): undefined reference to `crc32_be'
 
-warning: (SND_SOC_ADAU1761_I2C && SND_SOC_ADAU1781_I2C && SND_SOC_ADAU1977_I2C && SND_SOC_RT5677 && EXTCON_MAX14577 && EXTCON_MAX77693 && EXTCON_MAX77843 && BMC150_ACCEL_I2C && BMG160_I2C) selects REGMAP_I2C which has unmet direct dependencies (I2C)
-codecs/rt5645.c:3854:1: warning: data definition has no type or storage class
-codecs/rt5645.c:3854:1: error: type defaults to 'int' in declaration of 'module_i2c_driver' [-Werror=implicit-int]
-codecs/rt5677.c:5270:1: warning: data definition has no type or storage class
-77_i2c_driver);
-
-codecs/rt5677.c:5270:1: error: type defaults to 'int' in declaration of 'module_i2c_driver' [-Werror=implicit-int]
-
-This adds an explicit dependency.
+This adds an explict 'select CRC32' statement, similar to what the other users
+of the crc32 code have. In practice, CRC32 is always enabled anyway because
+over 100 other symbols select it.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 2da572c959dd ("lib: add software 842 compression/decompression")
 
-diff --git a/sound/soc/mediatek/Kconfig b/sound/soc/mediatek/Kconfig
-index 15c04e2eae34..976967675387 100644
---- a/sound/soc/mediatek/Kconfig
-+++ b/sound/soc/mediatek/Kconfig
-@@ -9,7 +9,7 @@ config SND_SOC_MEDIATEK
+diff --git a/lib/Kconfig b/lib/Kconfig
+index 1ce5af9cc418..ee38a3fd2814 100644
+--- a/lib/Kconfig
++++ b/lib/Kconfig
+@@ -217,9 +217,11 @@ config RANDOM32_SELFTEST
+ # compression support is select'ed if needed
+ #
+ config 842_COMPRESS
++	select CRC32
+ 	tristate
  
- config SND_SOC_MT8173_MAX98090
- 	tristate "ASoC Audio driver for MT8173 with MAX98090 codec"
--	depends on SND_SOC_MEDIATEK
-+	depends on SND_SOC_MEDIATEK && I2C
- 	select SND_SOC_MAX98090
- 	help
- 	  This adds ASoC driver for Mediatek MT8173 boards
-@@ -19,7 +19,7 @@ config SND_SOC_MT8173_MAX98090
+ config 842_DECOMPRESS
++	select CRC32
+ 	tristate
  
- config SND_SOC_MT8173_RT5650_RT5676
- 	tristate "ASoC Audio driver for MT8173 with RT5650 RT5676 codecs"
--	depends on SND_SOC_MEDIATEK
-+	depends on SND_SOC_MEDIATEK && I2C
- 	select SND_SOC_RT5645
- 	select SND_SOC_RT5677
- 	help
+ config ZLIB_INFLATE
