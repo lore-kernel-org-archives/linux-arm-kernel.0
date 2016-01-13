@@ -1,52 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 13 Jan 2016 18:47:07 +0000
-Subject: [RFC] arm64: failed when run the command: timedatectl
- set-timezone Asia/Shanghai
-In-Reply-To: <569682AE.3020300@codeaurora.org>
-References: <56946932.70601@huawei.com> <569473B2.3030909@huawei.com>
- <CAPvkgC3HkZ5nP4qxDO+LRCeK5dd29zEpz9ZeK7J_mrCWXrszGA@mail.gmail.com>
- <5695A57B.1060905@huawei.com> <20160113110900.GA23370@leverpostej>
- <569682AE.3020300@codeaurora.org>
-Message-ID: <20160113184707.GN23370@leverpostej>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 13 Jan 2016 20:48:03 +0200
+Subject: [PATCH v3] PCI: hosts: mark pcie/pci (msi) irq cascade handler as
+ IRQF_NO_THREAD
+In-Reply-To: <20160113175016.GB28453@localhost>
+References: <1449775100-30877-1-git-send-email-grygorii.strashko@ti.com>
+ <20160106221827.GD16231@localhost> <20160113133904.GD29964@linutronix.de>
+ <20160113175016.GB28453@localhost>
+Message-ID: <56969BE3.6000804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 12:00:30PM -0500, Christopher Covington wrote:
-> On 01/13/2016 06:09 AM, Mark Rutland wrote:
-> > On Wed, Jan 13, 2016 at 09:16:43AM +0800, Xishi Qiu wrote:
-> >> In your issue, Tom Schuster said it sounds like bug 910845
-> >> https://bugzilla.mozilla.org/show_bug.cgi?id=910845
-> > 
-> > Controlled allocation as in this patch is probably a workable approach.
-> > 
-> > However, the arm64 kernel can be built with a very small VA range, and
-> > the base chosen is outside of the minimum range. The kernel currently
-> > goes as low as 36 bits (with 16K pages), though the architectural
-> > minimum seems to be 24 currently.
-> > 
-> > To be safe for all configurations, I guess the best option is to
-> > allocate as close to zero as possible, or to dynamically choose a base
-> > depending on the VA range. I'm not sure how to correctly determine the
-> > VA range from userspace, however.
-> 
-> Below is how I ended up determining TASK_SIZE for Checkpoint/Restore In
-> Userspace (CRIU).
-> 
-> https://github.com/xemul/criu/commit/c0c0546c31e6df4932669f4740197bb830a24c8d
+On 01/13/2016 07:50 PM, Bjorn Helgaas wrote:
+> On Wed, Jan 13, 2016 at 02:39:04PM +0100, Sebastian Andrzej Siewior wrote:
+>> * Bjorn Helgaas | 2016-01-06 16:18:27 [-0600]:
+>>
+>>> Hi Bjorn,
+>>
+>>>> diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
+>>>> index 8c36880..0415192 100644
+>>>> --- a/drivers/pci/host/pci-dra7xx.c
+>>>> +++ b/drivers/pci/host/pci-dra7xx.c
+>>>> @@ -301,8 +301,19 @@ static int __init dra7xx_add_pcie_port(struct dra7xx_pcie *dra7xx,
+>>>>   		return -EINVAL;
+>>>>   	}
+>>>>
+>>>> +	/*
+>>>> +	 * Mark dra7xx_pcie_msi IRQ as IRQF_NO_THREAD
+>>>> +	 * On -RT and if kernel is booting with "threadirqs" cmd line parameter
+>>>> +	 * the dra7xx_pcie_msi_irq_handler() will be forced threaded but,
+>>>> +	 * in the same time, it's IRQ dispatcher and calls generic_handle_irq(),
+>>>> +	 * which, in turn, will be resolved to handle_simple_irq() call.
+>>>> +	 * The handle_simple_irq() expected to be called with IRQ disabled, as
+>>>> +	 * result kernle will display warning:
+>>>> +	 * "irq XXX handler YYY+0x0/0x14 enabled interrupts".
+>>>> +	 */
+>>
+>> could you _please_ remove this coment? This kind of comment (if at all)
+>> should be part of the commit message (which is the case more or less).
+>
+> IIRC, Grygorii specifically wanted to keep this comment in dra7xx, but
 
-That's very scary. Any pages on a power of two boundary would get
-unmapped, silently. That will corrupt data.
+True.
 
-As above, the hard-code assumptions of a 39-bit minimum and a 48-bit
-maximum are erroneous.
+> I do agree that this level of detail is more appropriate for a changelog.
+>
+> If Grygorii and Kishon don't object, I can update the patch to remove it.
 
-> If this is too hacky, my thought on a more proper interface would be to
-> parallel how PAGE_SIZE is communicated. TASK_SIZE could be added to the
-> ELF auxiliary vector, such that one could simply run `getconf TASK_SIZE`
-> and sysconf(TASK_SIZE).
+But no objections from my side. Thanks a lot.
 
-Assuming we don't have a reliable and safe mechanism already, something
-like that sounds sensible to me.
-
-Thanks,
-Mark.
+-- 
+regards,
+-grygorii
