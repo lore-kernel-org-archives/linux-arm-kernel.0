@@ -1,49 +1,90 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 13 Jan 2016 18:03:24 +0100
-Subject: [PATCH V4 16/16] ARM64: tegra: select PM_GENERIC_DOMAINS
-In-Reply-To: <1449241037-22193-17-git-send-email-jonathanh@nvidia.com>
-References: <1449241037-22193-1-git-send-email-jonathanh@nvidia.com>
- <1449241037-22193-17-git-send-email-jonathanh@nvidia.com>
-Message-ID: <20160113170324.GO2588@ulmo>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 13 Jan 2016 18:04:25 +0100
+Subject: [PATCH v1 5/5] ARM: at91/dt: sama5d2: add nand0 and nfc0 nodes
+In-Reply-To: <1452702857-2240-6-git-send-email-romain.izard.pro@gmail.com>
+References: <1452702857-2240-1-git-send-email-romain.izard.pro@gmail.com>
+ <1452702857-2240-6-git-send-email-romain.izard.pro@gmail.com>
+Message-ID: <56968399.5070706@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2015 at 02:57:17PM +0000, Jon Hunter wrote:
-> Enable PM_GENERIC_DOMAINS for tegra 64-bit devices. To ensure that devices
-> dependent upon a particular power-domain are only probed when that power
-> domain has been powered up, requires that PM is made mandatory for tegra
-> 64-bit devices and so select this option for tegra as well.
+Le 13/01/2016 17:34, Romain Izard a ?crit :
+> Both nodes are required to access NAND Flash memory. Additional
+> settings will be necessary at the board level to use it.
 > 
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 > ---
->  arch/arm64/Kconfig.platforms | 2 ++
->  1 file changed, 2 insertions(+)
+>  arch/arm/boot/dts/sama5d2.dtsi | 38 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
 > 
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index 9806324fa215..e0b5bd0aff0f 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -93,6 +93,8 @@ config ARCH_TEGRA
->  	select GENERIC_CLOCKEVENTS
->  	select HAVE_CLK
->  	select PINCTRL
-> +	select PM
-> +	select PM_GENERIC_DOMAINS
->  	select RESET_CONTROLLER
->  	help
->  	  This enables support for the NVIDIA Tegra SoC family.
+> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+> index aee571448342..80420177ec1a 100644
+> --- a/arch/arm/boot/dts/sama5d2.dtsi
+> +++ b/arch/arm/boot/dts/sama5d2.dtsi
+> @@ -265,6 +265,44 @@
+>  			cache-level = <2>;
+>  		};
+>  
+> +		nand0: nand at 80000000 {
+> +			compatible = "atmel,sama5d2-nand";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +			reg = < /* EBI CS3 */
+> +				0x80000000 0x08000000
+> +				/* SMC PMECC regs */
+> +				0xf8014070 0x00000490
+> +				/* SMC PMECC Error Location regs */
+> +				0xf8014500 0x00000200
+> +				/* ROM Galois tables */
+> +				0x00040000 0x00018000
+> +				>;
+> +			interrupts = <17 IRQ_TYPE_LEVEL_HIGH 6>;
+> +			atmel,nand-addr-offset = <21>;
+> +			atmel,nand-cmd-offset = <22>;
+> +			atmel,nand-has-dma;
+> +			atmel,has-pmecc;
+> +			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
+> +			status = "disabled";
+> +
+> +			nfc at 90000000 {
 
-This has potential consequences for multi-platform builds, doesn't it?
-All of a sudden any combination of builds that includes Tegra won't be
-possible to build without PM support.
+It's nfc at c0000000
 
-Adding linux-arm-kernel at lists.infradead.org for visibility.
+> +				compatible = "atmel,sama5d4-nfc";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				reg = < /* NFC Command Registers */
+> +					0xC0000000 0x08000000
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160113/34d55c3f/attachment.sig>
+Lower case please
+
+> +					/* NFC HSMC regs */
+> +					0xf8014000 0x00000070
+> +					/* NFC SRAM banks */
+> +					0x00100000 0x00100000
+> +					>;
+> +				clocks = <&hsmc_clk>;
+> +				atmel,write-by-sram;
+> +			};
+> +		};
+> +
+
+Otherwise, it seems okay. When corrected, you can add my:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Brian, Wenyou,
+I'm okay if this patch goes to Mainline with the mtd subsystem: there
+should be no conflict with arm-soc for the upcoming kernel revisions.
+
+Thanks, bye.
+
+
+>  		sdmmc0: sdio-host at a0000000 {
+>  			compatible = "atmel,sama5d2-sdhci";
+>  			reg = <0xa0000000 0x300>;
+> 
+
+
+-- 
+Nicolas Ferre
