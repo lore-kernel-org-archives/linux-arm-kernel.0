@@ -1,192 +1,47 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 13 Jan 2016 14:21:06 +0100
-Subject: [PATCH V3 20/21] pci,
- acpi: Match PCI config space accessors against platfrom specific
- quirks.
-In-Reply-To: <1452691267-32240-1-git-send-email-tn@semihalf.com>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
-Message-ID: <1452691267-32240-21-git-send-email-tn@semihalf.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Jan 2016 14:25:55 +0100
+Subject: [PATCH] logfs: clarify MTD dependency
+Message-ID: <5776957.XLg438VUOx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some platforms may not be fully compliant with generic set of PCI config
-accessors. For these cases we implement the way to overwrite accessors
-set prior to PCI buses enumeration. Algorithm traverses available quirk
-list, matches against <platform ID (DMI), domain, bus number> tuple and
-returns corresponding accessors. All quirks can be defined using:
-DECLARE_ACPI_MCFG_FIXUP() and keep self contained. Example,
+After a change to the way that composite modules work, we get
+a logfs build error:
 
-static const struct dmi_system_id foo_dmi[] = {
-        {
-                .ident = "<Platform ident string>",
-                .callback = <handler>,
-                .matches = {
-                        DMI_MATCH(DMI_SYS_VENDOR, "<system vendor>"),
-                        DMI_MATCH(DMI_PRODUCT_NAME, "<product name>"),
-                        DMI_MATCH(DMI_PRODUCT_VERSION, "product version"),
-                },
-        },
-        { }
-};
+fs/built-in.o: In function `logfs_mount':
+:(.text+0x139d34): undefined reference to `logfs_get_sb_mtd'
+fs/built-in.o: In function `logfs_get_sb_bdev':
+:(.text+0x13aa08): undefined reference to `logfs_get_sb_mtd'
 
-static struct pci_ops foo_ecam_pci_ops = {
-        .map_bus = pci_mcfg_dev_base,
-        .read = foo_ecam_config_read,
-        .write = foo_ecam_config_write,
-};
-DECLARE_ACPI_MCFG_FIXUP(foo_dmi, NULL, &foo_ecam_pci_ops, <domain_nr>, <bus_nr>);
+This patch avoids the error by changing the dependencies of
+logfs in a way that we can no longer configure logfs as built-in
+when the MTD core is a loadable module, while leaving the
+dependency to require at least one of MTD or BLOCK to be
+enabled.
 
-More custom (non-DMI) matching can be done via an alternative call.
-Note that there is possibility to assign quirk related private data to
-root->sysdata which will be available along read/wriate accessor, example:
+Another patch tried to work around the problem, but accidentally
+dropped the dependency on 'BLOCK || MTD', allowing the file
+system to be built if neither is selected.
 
-static int boo_match(struct pci_mcfg_fixup *fixup, struct acpi_pci_root *root)
-{
-        return [condition] ? 1 : 0;
-}
-
-int boo_ecam_config_read(struct pci_bus *bus, unsigned int devfn,
-                          int where, int size, u32 *val)
-{
-        struct acpi_pci_root *root = bus->sysdata;
-        struct boo_priv_data *boo_data = root->sysdata;
-
-        [..]
-}
-
-static struct pci_ops boo_ecam_pci_ops = {
-	.map_bus = pci_mcfg_dev_base,
-	.read = boo_ecam_config_read,
-	.write = boo_ecam_config_write,
-};
-DECLARE_ACPI_MCFG_FIXUP(NULL, boo_match, &boo_ecam_pci_ops, <domain_nr>, <bus_nr>);
-
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: cf4f21938e13 ("kbuild: Allow to specify composite modules with modname-m")
+Fixes: e6be296f680c ("logfs: fix logfs build errors and dependencies")
 ---
- drivers/acpi/mcfg.c               | 33 +++++++++++++++++++++++++++++++--
- include/acpi/acpi_bus.h           |  1 +
- include/asm-generic/vmlinux.lds.h |  7 +++++++
- include/linux/ecam.h              | 18 ++++++++++++++++++
- 4 files changed, 57 insertions(+), 2 deletions(-)
+I originally sent the patch November 27, but the discussion did not
+conclude, see https://lkml.org/lkml/2015/11/27/299
 
-diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
-index dfc2d14..ec5fe7b 100644
---- a/drivers/acpi/mcfg.c
-+++ b/drivers/acpi/mcfg.c
-@@ -8,6 +8,7 @@
-  */
- 
- #include <linux/acpi.h>
-+#include <linux/dmi.h>
- #include <linux/ecam.h>
- #include <linux/pci.h>
- #include <linux/pci-acpi.h>
-@@ -34,6 +35,29 @@ int __weak raw_pci_write(unsigned int domain, unsigned int bus,
- 	return PCIBIOS_DEVICE_NOT_FOUND;
- }
- 
-+extern struct pci_mcfg_fixup __start_acpi_mcfg_fixups[];
-+extern struct pci_mcfg_fixup __end_acpi_mcfg_fixups[];
-+
-+static struct pci_ops *pci_mcfg_check_quirks(struct acpi_pci_root *root)
-+{
-+	struct pci_mcfg_fixup *f;
-+	int bus_num = root->secondary.start;
-+	int domain = root->segment;
-+
-+	/*
-+	 * First match against PCI topology <domain:bus> then use DMI or
-+	 * custom match handler.
-+	 */
-+	for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
-+		if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
-+		    (f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
-+		    (f->system ? dmi_check_system(f->system) : 0 ||
-+		     f->match ? f->match(f, root) : 0))
-+			return f->ops;
-+	}
-+	return NULL;
-+}
-+
- void __iomem *
- pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn, int offset)
- {
-@@ -56,10 +80,15 @@ static struct pci_ops default_pci_mcfg_ops = {
- 
- struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
- {
-+	struct pci_ops *pci_mcfg_ops_quirk;
-+
- 	/*
--	 * TODO: Match against platform specific quirks and return
--	 * corresponding PCI config space accessor set.
-+	 * Match against platform specific quirks and return corresponding
-+	 * PCI config space accessor set.
- 	 */
-+	pci_mcfg_ops_quirk = pci_mcfg_check_quirks(root);
-+	if (pci_mcfg_ops_quirk)
-+		return pci_mcfg_ops_quirk;
- 
- 	return &default_pci_mcfg_ops;
- }
-diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
-index ad0a5ff..ea4d2b5 100644
---- a/include/acpi/acpi_bus.h
-+++ b/include/acpi/acpi_bus.h
-@@ -554,6 +554,7 @@ struct acpi_pci_root {
- 	struct pci_bus *bus;
- 	u16 segment;
- 	struct resource secondary;	/* downstream bus range */
-+	void *sysdata;
- 
- 	u32 osc_support_set;	/* _OSC state of support bits */
- 	u32 osc_control_set;	/* _OSC state of control bits */
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index c4bd0e2..c93fc97 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -298,6 +298,13 @@
- 		VMLINUX_SYMBOL(__end_pci_fixups_suspend_late) = .;	\
- 	}								\
- 									\
-+	/* ACPI MCFG quirks */						\
-+	.acpi_fixup        : AT(ADDR(.acpi_fixup) - LOAD_OFFSET) {	\
-+		VMLINUX_SYMBOL(__start_acpi_mcfg_fixups) = .;		\
-+		*(.acpi_fixup_mcfg)					\
-+		VMLINUX_SYMBOL(__end_acpi_mcfg_fixups) = .;		\
-+	}								\
-+									\
- 	/* Built-in firmware blobs */					\
- 	.builtin_fw        : AT(ADDR(.builtin_fw) - LOAD_OFFSET) {	\
- 		VMLINUX_SYMBOL(__start_builtin_fw) = .;			\
-diff --git a/include/linux/ecam.h b/include/linux/ecam.h
-index e0f322e..21215be 100644
---- a/include/linux/ecam.h
-+++ b/include/linux/ecam.h
-@@ -20,6 +20,24 @@ struct pci_mmcfg_region {
- 	bool hot_added;
- };
- 
-+struct pci_mcfg_fixup {
-+	const struct dmi_system_id *system;
-+	int (*match)(struct pci_mcfg_fixup *, struct acpi_pci_root *);
-+	struct pci_ops *ops;
-+	int domain;
-+	int bus_num;
-+};
-+
-+#define PCI_MCFG_DOMAIN_ANY	-1
-+#define PCI_MCFG_BUS_ANY	-1
-+
-+/* Designate a routine to fix up buggy MCFG */
-+#define DECLARE_ACPI_MCFG_FIXUP(system, match, ops, dom, bus)		\
-+	static const struct pci_mcfg_fixup __mcfg_fixup_##system##dom##bus\
-+	 __used	__attribute__((__section__(".acpi_fixup_mcfg"),		\
-+				aligned((sizeof(void *))))) =		\
-+	{ system, match, ops, dom, bus };
-+
- struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus);
- struct pci_mmcfg_region *pci_mmconfig_alloc(int segment, int start,
- 						   int end, u64 addr);
--- 
-1.9.1
+This version is rebased on the patch that got applied yesterday.
+
+diff --git a/fs/logfs/Kconfig b/fs/logfs/Kconfig
+index 2b1485a5c086..2b4503163930 100644
+--- a/fs/logfs/Kconfig
++++ b/fs/logfs/Kconfig
+@@ -1,7 +1,6 @@
+ config LOGFS
+ 	tristate "LogFS file system"
+-	depends on BLOCK || BLOCK=n
+-	depends on MTD || MTD=n
++	depends on MTD || (!MTD && BLOCK)
+ 	select ZLIB_INFLATE
+ 	select ZLIB_DEFLATE
+ 	select CRC32
