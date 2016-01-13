@@ -1,40 +1,51 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Wed, 13 Jan 2016 12:10:12 +0100
-Subject: [PATCH 1/3] ARM: dts: imx6: add support for Ka-Ro electronics
- TX6S-8034 module
-In-Reply-To: <87h9iigce7.fsf@gmail.com>
-References: <1452621710-15336-1-git-send-email-LW@KARO-electronics.de>
- <1452621710-15336-2-git-send-email-LW@KARO-electronics.de>
- <87h9iigce7.fsf@gmail.com>
-Message-ID: <20160113121012.0c924bc8@ipc1.ka-ro>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 13 Jan 2016 11:11:53 +0000
+Subject: [PATCH v3 07/21] arm64: move kernel image to base of vmalloc area
+In-Reply-To: <CAKv+Gu86oVvGb75S2x-44ct4sdQt4zT-3HbPqMJo_X+Cm3EPVQ@mail.gmail.com>
+References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1452518355-4606-8-git-send-email-ard.biesheuvel@linaro.org>
+ <20160112181336.GF4858@leverpostej>
+ <CAKv+Gu-TS7w=AVBceGhsQkQzVCv+u7Gh6ojftwW1iaE+d0yrYw@mail.gmail.com>
+ <CAKv+Gu86oVvGb75S2x-44ct4sdQt4zT-3HbPqMJo_X+Cm3EPVQ@mail.gmail.com>
+Message-ID: <20160113111152.GB23370@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jan 13, 2016 at 10:58:55AM +0100, Ard Biesheuvel wrote:
+> On 13 January 2016 at 09:39, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 12 January 2016 at 19:14, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> On Mon, Jan 11, 2016 at 02:19:00PM +0100, Ard Biesheuvel wrote:
+> >>> @@ -438,12 +442,29 @@ static void __init map_kernel(pgd_t *pgd)
+> >>>       map_kernel_chunk(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC);
+> >>>       map_kernel_chunk(pgd, _data, _end, PAGE_KERNEL);
+> >>>
+> >>> -     /*
+> >>> -      * The fixmap falls in a separate pgd to the kernel, and doesn't live
+> >>> -      * in the carveout for the swapper_pg_dir. We can simply re-use the
+> >>> -      * existing dir for the fixmap.
+> >>> -      */
+> >>> -     set_pgd(pgd_offset_raw(pgd, FIXADDR_START), *pgd_offset_k(FIXADDR_START));
+> >>> +     if (pgd_index(FIXADDR_START) != pgd_index((u64)_end)) {
+> >>
+> >> To match the style of early_fixmap_init, and given we already mapped the
+> >> kernel image, this could be:
+> >>
+> >>         if (pgd_none(pgd_offset_raw(pgd, FIXADDR_START))) {
+> >>
+> >> Which also serves as a run-time check that the pgd entry really was
+> >> clear.
+> >>
+> >
+> > Yes, that looks better. I will steal that :-)
+> >
+> 
+> OK, that doesn't work. pgd_none() is hardcoded to 'false' when running
+> with fewer than 4 pgtable levels, and so we always hit the BUG() here.
 
-> Lothar Wa?mann <LW@KARO-electronics.de> writes:
-> 
-> > +/ {
-> > +	model = "Ka-Ro electronics TX6S-8034 Module";
-> > +	compatible = "karo,imx6dl-tx6dl", "fsl,imx6dl";
-> > +	timestamp = __DATE__, __TIME__;
-> 
-> Is this needed or useful?
-> 
-> There's a movement that aims to do "reproducible builds" ...   being
-> able to recompile an image and verify it against the supplied can be
-> helpful for security audit purposes.
-> 
-Ooops. I was on the wrong branch when creating these patches. Will
-resend this patch series soon.
+Ah, sorry.
 
-> > +	display: display at di0 {
-> > +		compatible = "fsl,imx-parallel-display";
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&pinctrl_disp0_1>;
-> > +		interface-pix-fmt = "rgb24";
-> > +//		fsl,panel = <&lcd0_panel>;
-> 
-> Probably not for upstream inclusion?
->
-see above.
+We could also check CONFIG_PGTABLE_LEVELS > 3 check, as with
+fixmap_init, perhaps?
+
+Thanks,
+Mark.
