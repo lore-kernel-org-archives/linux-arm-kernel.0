@@ -1,54 +1,113 @@
-From: Lada.Trimasova@synopsys.com (Lada Trimasova)
-Date: Wed, 13 Jan 2016 17:48:01 +0300
-Subject: [PATCH] Fixing io-pgtable-arm build failure
-Message-ID: <1452696481-2030-1-git-send-email-ltrimas@synopsys.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 13 Jan 2016 14:50:03 +0000
+Subject: [PATCH v2] arm64: kernel: fix architected PMU registers unconditional
+ access
+Message-ID: <1452696603-27611-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Trying to build kernel for ARC with both options
-CONFIG_COMPILE_TEST and CONFIG_IOMMU_IO_PGTABLE_LPAE enabled
-(which happened really in "allyesconfig") I'm seeing this:
----------------->8----------------
-$ make ARCH=arc
-...sic...
-CC drivers/iommu/io-pgtable-arm.o
-linux/drivers/iommu/io-pgtable-arm.c: In
-function ?__arm_lpae_alloc_pages?:
-linux/drivers/iommu/io-pgtable-arm.c:221:3:
-error: implicit declaration of function ?dma_map_single?
-[-Werror=implicit-function-declaration]
-dma = dma_map_single(dev, pages, size, DMA_TO_DEVICE);
-^
-linux/drivers/iommu/io-pgtable-arm.c:221:42:
-error: ?DMA_TO_DEVICE? undeclared (first use in this function)
-dma = dma_map_single(dev, pages, size, DMA_TO_DEVICE);
-^
----------------->8----------------
-and so on.
+The Performance Monitors extension is an optional feature of the
+AArch64 architecture, therefore, in order to access Performance
+Monitors registers safely, the kernel should detect the architected
+PMU unit presence through the ID_AA64DFR0_EL1 register PMUVer field
+before accessing them.
 
-IOMMU_IO_PGTABLE_LPAE depends on DMA API.
-So io-pgtable-arm.c should include linux/dma-mapping.h.
+This patch implements a guard by reading the ID_AA64DFR0_EL1 register
+PMUVer field to detect the architected PMU presence and prevent accessing
+PMU system registers if the Performance Monitors extension is not
+implemented in the core.
 
-Signed-off-by: Lada Trimasova <ltrimas@synopsys.com>
-Cc: Alexey Brodkin <abrodkin@synopsys.com>
-Cc: Vineet Gupta <vgupta@synopsys.com>
+Fixes: 60792ad349f3 ("arm64: kernel: enforce pmuserenr_el0 initialization and restore")
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reported-by: Guenter Roeck <linux@roeck-us.net>
+Tested-by: Guenter Roeck <linux@roeck-us.net>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Peter Maydell <peter.maydell@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
 ---
- drivers/iommu/io-pgtable-arm.c | 1 +
- 1 file changed, 1 insertion(+)
+v1 -> v2
 
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 7df9777..0b1aca0 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -25,6 +25,7 @@
- #include <linux/sizes.h>
- #include <linux/slab.h>
- #include <linux/types.h>
-+#include <linux/dma-mapping.h>
+- Updated the PMUVer field conditional check to take into account
+  future PMU versions
+
+v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/398090.html
+
+Will,
+
+rebased on top of mainline, we should be tagging stable before merging.
+
+It applies to current mainline (commit 67990608c8b9).
+
+Tested on Juno and QEMU.
+
+Thanks,
+Lorenzo
+
+ arch/arm64/kernel/head.S    |  5 +++++
+ arch/arm64/mm/proc-macros.S | 12 ++++++++++++
+ arch/arm64/mm/proc.S        |  4 ++--
+ 3 files changed, 19 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index ffe9c2b..917d981 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -514,9 +514,14 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
+ #endif
  
- #include <asm/barrier.h>
+ 	/* EL2 debug */
++	mrs	x0, id_aa64dfr0_el1		// Check ID_AA64DFR0_EL1 PMUVer
++	sbfx	x0, x0, #8, #4
++	cmp	x0, #1
++	b.lt	4f				// Skip if no PMU present
+ 	mrs	x0, pmcr_el0			// Disable debug access traps
+ 	ubfx	x0, x0, #11, #5			// to EL2 and allow access to
+ 	msr	mdcr_el2, x0			// all PMU counters from EL1
++4:
  
+ 	/* Stage-2 translation */
+ 	msr	vttbr_el2, xzr
+diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
+index 146bd99..e6a30e1 100644
+--- a/arch/arm64/mm/proc-macros.S
++++ b/arch/arm64/mm/proc-macros.S
+@@ -84,3 +84,15 @@
+ 	b.lo	9998b
+ 	dsb	\domain
+ 	.endm
++
++/*
++ * reset_pmuserenr_el0 - reset PMUSERENR_EL0 if PMUv3 present
++ */
++	.macro	reset_pmuserenr_el0, tmpreg
++	mrs	\tmpreg, id_aa64dfr0_el1	// Check ID_AA64DFR0_EL1 PMUVer
++	sbfx	\tmpreg, \tmpreg, #8, #4
++	cmp	\tmpreg, #1			// Skip if no PMU present
++	b.lt	9000f
++	msr	pmuserenr_el0, xzr		// Disable PMU access from EL0
++9000:
++	.endm
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index a3d867e..c164d2c 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -117,7 +117,7 @@ ENTRY(cpu_do_resume)
+ 	 */
+ 	ubfx	x11, x11, #1, #1
+ 	msr	oslar_el1, x11
+-	msr	pmuserenr_el0, xzr		// Disable PMU access from EL0
++	reset_pmuserenr_el0 x0			// Disable PMU access from EL0
+ 	mov	x0, x12
+ 	dsb	nsh		// Make sure local tlb invalidation completed
+ 	isb
+@@ -154,7 +154,7 @@ ENTRY(__cpu_setup)
+ 	msr	cpacr_el1, x0			// Enable FP/ASIMD
+ 	mov	x0, #1 << 12			// Reset mdscr_el1 and disable
+ 	msr	mdscr_el1, x0			// access to the DCC from EL0
+-	msr	pmuserenr_el0, xzr		// Disable PMU access from EL0
++	reset_pmuserenr_el0 x0			// Disable PMU access from EL0
+ 	/*
+ 	 * Memory region attributes for LPAE:
+ 	 *
 -- 
-2.5.0
+2.5.1
