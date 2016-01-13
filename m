@@ -1,205 +1,154 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 13 Jan 2016 14:21:05 +0100
-Subject: [PATCH V3 19/21] pci,
- acpi: Support for ACPI based generic PCI host controller init
+Date: Wed, 13 Jan 2016 14:20:50 +0100
+Subject: [PATCH V3 04/21] x86, pci: mmconfig_{32,
+ 64}.c code refactoring - remove code duplication.
 In-Reply-To: <1452691267-32240-1-git-send-email-tn@semihalf.com>
 References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
-Message-ID: <1452691267-32240-20-git-send-email-tn@semihalf.com>
+Message-ID: <1452691267-32240-5-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because of two patch series:
-1. Jiang Liu's common interface to support PCI host controller init
-2. MMCONFIG refactoring (part of this patch set)
-now we can think about generic ACPI based PCI host controller init
-implementation out of arch/ directory.
-
-These calls use information from MCFG table (PCI config space regions)
-and _CRS method (IO/irq resources) to initialize PCI hostbridge.
-
-TBD: We are still not sure whether we should reassign resources
-after PCI bus enumeration or trust firmware to do all that work for
-us properly.
+mmconfig_64.c version is going to be default implementation for low-level
+operation on mmconfig regions. However, now it initializes raw_pci_ext_ops pointer which is specific for
+x86 only. Moreover, mmconfig_32.c is doing the same thing at the same time.
+So lets move it to mmconfig_shared.c so it becomes common for both and
+mmconfig_64.c turns out to be purely arch agnostic.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-CC: Arnd Bergmann <arnd@arndb.de>
-CC: Catalin Marinas <catalin.marinas@arm.com>
-CC: Liviu Dudau <Liviu.Dudau@arm.com>
-CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
-CC: Will Deacon <will.deacon@arm.com>
 Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 Tested-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- drivers/acpi/Kconfig    |   5 ++
- drivers/acpi/pci_root.c | 131 ++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 136 insertions(+)
+ arch/x86/include/asm/pci_x86.h |  5 +++++
+ arch/x86/pci/mmconfig-shared.c | 10 ++++++++--
+ arch/x86/pci/mmconfig_32.c     | 10 ++--------
+ arch/x86/pci/mmconfig_64.c     | 11 ++---------
+ 4 files changed, 17 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index c3664be..e315061 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -335,6 +335,11 @@ config ACPI_PCI_SLOT
- 	  i.e., segment/bus/device/function tuples, with physical slots in
- 	  the system.  If you are unsure, say N.
+diff --git a/arch/x86/include/asm/pci_x86.h b/arch/x86/include/asm/pci_x86.h
+index c1c0f37..0482807 100644
+--- a/arch/x86/include/asm/pci_x86.h
++++ b/arch/x86/include/asm/pci_x86.h
+@@ -130,6 +130,11 @@ extern void pci_mmcfg_arch_unmap(struct pci_mmcfg_region *cfg);
+ extern int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
+ 			       phys_addr_t addr);
  
-+config ACPI_PCI_HOST_GENERIC
-+	bool "Generic ACPI PCI host controller"
-+	help
-+	  Say Y here if you want to support generic ACPI PCI host controller.
++int pci_mmcfg_read(unsigned int seg, unsigned int bus, unsigned int devfn,
++		   int reg, int len, u32 *value);
++int pci_mmcfg_write(unsigned int seg, unsigned int bus, unsigned int devfn,
++		    int reg, int len, u32 value);
 +
- config X86_PM_TIMER
- 	bool "Power Management Timer Support" if EXPERT
- 	depends on X86
-diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-index a65c8c2..d483e2a 100644
---- a/drivers/acpi/pci_root.c
-+++ b/drivers/acpi/pci_root.c
-@@ -24,6 +24,7 @@
- #include <linux/init.h>
- #include <linux/types.h>
- #include <linux/mutex.h>
-+#include <linux/of_address.h>
- #include <linux/pm.h>
- #include <linux/pm_runtime.h>
- #include <linux/pci.h>
-@@ -514,6 +515,136 @@ static void negotiate_os_control(struct acpi_pci_root *root, int *no_aspm)
+ /*
+  * AMD Fam10h CPUs are buggy, and cannot access MMIO config space
+  * on their northbrige except through the * %eax register. As such, you MUST
+diff --git a/arch/x86/pci/mmconfig-shared.c b/arch/x86/pci/mmconfig-shared.c
+index ce2c2e4..980f304 100644
+--- a/arch/x86/pci/mmconfig-shared.c
++++ b/arch/x86/pci/mmconfig-shared.c
+@@ -29,6 +29,11 @@
+ static bool pci_mmcfg_running_state;
+ static bool pci_mmcfg_arch_init_failed;
+ 
++const struct pci_raw_ops pci_mmcfg = {
++	.read =		pci_mmcfg_read,
++	.write =	pci_mmcfg_write,
++};
++
+ static const char *__init pci_mmcfg_e7520(void)
+ {
+ 	u32 win;
+@@ -512,9 +517,10 @@ static void __init __pci_mmcfg_init(int early)
+ 		}
+ 	}
+ 
+-	if (pci_mmcfg_arch_init())
++	if (pci_mmcfg_arch_init()) {
++		raw_pci_ext_ops = &pci_mmcfg;
+ 		pci_probe = (pci_probe & ~PCI_PROBE_MASK) | PCI_PROBE_MMCONF;
+-	else {
++	} else {
+ 		free_all_mmcfg();
+ 		pci_mmcfg_arch_init_failed = true;
+ 	}
+diff --git a/arch/x86/pci/mmconfig_32.c b/arch/x86/pci/mmconfig_32.c
+index 246f135..2ded56f 100644
+--- a/arch/x86/pci/mmconfig_32.c
++++ b/arch/x86/pci/mmconfig_32.c
+@@ -50,7 +50,7 @@ static void pci_exp_set_dev_base(unsigned int base, int bus, int devfn)
  	}
  }
  
-+#ifdef CONFIG_ACPI_PCI_HOST_GENERIC
-+static int pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
-+{
-+	if (pci_dev_msi_enabled(dev))
-+		return 0;
-+
-+	acpi_pci_irq_enable(dev);
-+	return dev->irq;
-+}
-+
-+static void pci_mcfg_release_info(struct acpi_pci_root_info *ci)
-+{
-+	pci_mmcfg_teardown_map(ci);
-+	kfree(ci);
-+}
-+
-+static int pci_acpi_root_prepare_resources(struct acpi_pci_root_info *ci)
-+{
-+	struct list_head *list = &ci->resources;
-+	struct acpi_device *device = ci->bridge;
-+	struct resource_entry *entry, *tmp;
-+	unsigned long flags;
-+	int ret;
-+
-+	flags = IORESOURCE_IO | IORESOURCE_MEM;
-+	ret = acpi_dev_get_resources(device, list,
-+				     acpi_dev_filter_resource_type_cb,
-+				     (void *)flags);
-+	if (ret < 0) {
-+		dev_warn(&device->dev,
-+			 "failed to parse _CRS method, error code %d\n", ret);
-+		return ret;
-+	} else if (ret == 0)
-+		dev_dbg(&device->dev,
-+			"no IO and memory resources present in _CRS\n");
-+
-+	resource_list_for_each_entry_safe(entry, tmp, &ci->resources) {
-+		resource_size_t cpu_addr, length;
-+		struct resource *res = entry->res;
-+
-+		if (entry->res->flags & IORESOURCE_DISABLED)
-+			resource_list_destroy_entry(entry);
-+		else
-+			res->name = ci->name;
-+
-+		/* PCI -> CPU space translation */
-+		cpu_addr = res->start + entry->offset;
-+		length = res->end - res->start + 1;
-+
-+		if (res->flags & IORESOURCE_MEM) {
-+			res->start = cpu_addr;
-+			res->end = cpu_addr + length - 1;
-+		} else if (res->flags & IORESOURCE_IO) {
-+			resource_size_t pci_addr = res->start;
-+			unsigned long port;
-+
-+			if (pci_register_io_range(cpu_addr, length)) {
-+				resource_list_destroy_entry(entry);
-+				continue;
-+			}
-+
-+			port = pci_address_to_pio(cpu_addr);
-+			if (port == (unsigned long)-1) {
-+				resource_list_destroy_entry(entry);
-+				continue;
-+			}
-+
-+			res->start = port;
-+			res->end = port + length - 1;
-+			entry->offset = port - pci_addr;
-+
-+			if (pci_remap_iospace(res, cpu_addr) < 0)
-+				resource_list_destroy_entry(entry);
-+		}
-+	}
-+	return ret;
-+}
-+
-+static struct acpi_pci_root_ops acpi_pci_root_ops = {
-+	.init_info = pci_mmcfg_setup_map,
-+	.release_info = pci_mcfg_release_info,
-+	.prepare_resources = pci_acpi_root_prepare_resources,
-+};
-+
-+/* Root bridge scanning */
-+struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
-+{
-+	int node = acpi_get_node(root->device->handle);
-+	int domain = root->segment;
-+	int busnum = root->secondary.start;
-+	struct acpi_pci_root_info *info;
-+	struct pci_host_bridge *bridge;
-+	struct pci_bus *bus, *child;
-+
-+	if (domain && !pci_domains_supported) {
-+		pr_warn("PCI %04x:%02x: multiple domains not supported.\n",
-+			domain, busnum);
-+		return NULL;
-+	}
-+
-+	info = kzalloc_node(sizeof(*info), GFP_KERNEL, node);
-+	if (!info) {
-+		dev_err(&root->device->dev,
-+			"pci_bus %04x:%02x: ignored (out of memory)\n",
-+			domain, busnum);
-+		return NULL;
-+	}
-+
-+	acpi_pci_root_ops.pci_ops = pci_mcfg_get_ops(root);
-+	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, info, root);
-+	if (!bus)
-+		return NULL;
-+
-+	bridge = pci_find_host_bridge(bus);
-+	bridge->map_irq = pcibios_map_irq;
-+
-+	pci_bus_size_bridges(bus);
-+	pci_bus_assign_resources(bus);
-+
-+	/*
-+	 * After the PCI-E bus has been walked and all devices discovered,
-+	 * configure any settings of the fabric that might be necessary.
-+	 */
-+	list_for_each_entry(child, &bus->children, node)
-+		pcie_bus_configure_settings(child);
-+
-+	return bus;
-+}
-+#endif /* CONFIG_ARCH_PCI_HOST_GENERIC_ACPI */
-+
- static int acpi_pci_root_add(struct acpi_device *device,
- 			     const struct acpi_device_id *not_used)
+-static int pci_mmcfg_read(unsigned int seg, unsigned int bus,
++int pci_mmcfg_read(unsigned int seg, unsigned int bus,
+ 			  unsigned int devfn, int reg, int len, u32 *value)
  {
+ 	unsigned long flags;
+@@ -89,7 +89,7 @@ err:		*value = -1;
+ 	return 0;
+ }
+ 
+-static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
++int pci_mmcfg_write(unsigned int seg, unsigned int bus,
+ 			   unsigned int devfn, int reg, int len, u32 value)
+ {
+ 	unsigned long flags;
+@@ -126,15 +126,9 @@ static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
+ 	return 0;
+ }
+ 
+-const struct pci_raw_ops pci_mmcfg = {
+-	.read =		pci_mmcfg_read,
+-	.write =	pci_mmcfg_write,
+-};
+-
+ int __init pci_mmcfg_arch_init(void)
+ {
+ 	printk(KERN_INFO "PCI: Using MMCONFIG for extended config space\n");
+-	raw_pci_ext_ops = &pci_mmcfg;
+ 	return 1;
+ }
+ 
+diff --git a/arch/x86/pci/mmconfig_64.c b/arch/x86/pci/mmconfig_64.c
+index b14fcd3..d0c48eb 100644
+--- a/arch/x86/pci/mmconfig_64.c
++++ b/arch/x86/pci/mmconfig_64.c
+@@ -25,7 +25,7 @@ static char __iomem *pci_dev_base(unsigned int seg, unsigned int bus, unsigned i
+ 	return NULL;
+ }
+ 
+-static int pci_mmcfg_read(unsigned int seg, unsigned int bus,
++int pci_mmcfg_read(unsigned int seg, unsigned int bus,
+ 			  unsigned int devfn, int reg, int len, u32 *value)
+ {
+ 	char __iomem *addr;
+@@ -59,7 +59,7 @@ err:		*value = -1;
+ 	return 0;
+ }
+ 
+-static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
++int pci_mmcfg_write(unsigned int seg, unsigned int bus,
+ 			   unsigned int devfn, int reg, int len, u32 value)
+ {
+ 	char __iomem *addr;
+@@ -91,11 +91,6 @@ static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
+ 	return 0;
+ }
+ 
+-const struct pci_raw_ops pci_mmcfg = {
+-	.read =		pci_mmcfg_read,
+-	.write =	pci_mmcfg_write,
+-};
+-
+ static void __iomem *mcfg_ioremap(struct pci_mmcfg_region *cfg)
+ {
+ 	void __iomem *addr;
+@@ -121,8 +116,6 @@ int __init pci_mmcfg_arch_init(void)
+ 			return 0;
+ 		}
+ 
+-	raw_pci_ext_ops = &pci_mmcfg;
+-
+ 	return 1;
+ }
+ 
 -- 
 1.9.1
