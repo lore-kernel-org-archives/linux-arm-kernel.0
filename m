@@ -1,56 +1,39 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Wed, 13 Jan 2016 13:31:32 -0800
-Subject: [PATCH] logfs: clarify MTD dependency
-In-Reply-To: <6116283.ubGS0D0e49@wuerfel>
-References: <5776957.XLg438VUOx@wuerfel>
- <20160113123918.544497b48bf4c03591c75747@linux-foundation.org>
- <6116283.ubGS0D0e49@wuerfel>
-Message-ID: <5696C234.1020500@infradead.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Jan 2016 22:38:08 +0100
+Subject: [PATCH] mtd: nuc900_nand: read correct SMISR register
+Message-ID: <9019174.GYajdpGP8V@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/16 12:45, Arnd Bergmann wrote:
-> On Wednesday 13 January 2016 12:39:18 Andrew Morton wrote:
->>
->> Randy's "logfs: fix logfs build errors and dependencies" is an
->> only-in-mm thing.  So it would make sense to combine the two patches
->> into a single one and to give that an appropriate changelog.
->>
->> How does this look? (Primary author was chosen randomly)
->>
->>
->> From: Arnd Bergmann <arnd@arndb.de>
->> Subject: logfs: fix logfs build errors and dependencies
->>
->> Fix build errors that happen when CONFIG_LOGFS=y and CONFIG_MTD=m:
->>
->> fs/built-in.o: In function `logfs_mount':
->> super.c:(.text+0x92a6f): undefined reference to `logfs_get_sb_mtd'
->> fs/built-in.o: In function `logfs_get_sb_bdev':
->> (.text+0x93530): undefined reference to `logfs_get_sb_mtd'
->>
->> This patch avoids the error by changing the dependencies of
->> logfs in a way that we can no longer configure logfs as built-in
->> when the MTD core is a loadable module, while leaving the
->> dependency to require at least one of MTD or BLOCK to be
->> enabled.
->>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Randy Dunlap <rdunlap@infradead.org>
->> Cc: Michal Marek <mmarek@suse.cz>
->> Cc: Peter Chen <peter.chen@freescale.com>
->> Cc: Randy Dunlap <rdunlap@infradead.org>
->> Cc: Joern Engel <joern@logfs.org>
->> Cc: Prasad Joshi <prasadjoshi.linux@gmail.com>
->> Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
->>
-> 
-> Looks good, thanks!
-> 
-> 	Arnd
-> 
+The nuc900_nand driver has always passed an incorrect register
+address in its nuc900_check_rb() function, which cannot possibly
+work, and in some configurations gives us a build warning:
 
-Thanks also.
+drivers/mtd/nand/nuc900_nand.c: In function 'nuc900_check_rb':
+drivers/mtd/nand/nuc900_nand.c:27:23: warning: passing argument 1 of '__raw_readl' makes pointer from integer without a cast [-Wint-conversion]
+ #define REG_SMISR     0xac
+drivers/mtd/nand/nuc900_nand.c:118:20: note: in expansion of macro 'REG_SMISR'
+  val = __raw_readl(REG_SMISR);
 
--- 
-~Randy
+This makes sure we actually read from the register rather than
+from (void *)0x000000ac in user space.
+
+I suspect nobody noticed this before because the nuc900_nand_devready()
+function never gets called, or nobody uses this driver on an upstream
+kernel. Possibly even both.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/mtd/nand/nuc900_nand.c b/drivers/mtd/nand/nuc900_nand.c
+index 220ddfcf29f5..dbc5b571c2bb 100644
+--- a/drivers/mtd/nand/nuc900_nand.c
++++ b/drivers/mtd/nand/nuc900_nand.c
+@@ -113,7 +113,7 @@ static int nuc900_check_rb(struct nuc900_nand *nand)
+ {
+ 	unsigned int val;
+ 	spin_lock(&nand->lock);
+-	val = __raw_readl(REG_SMISR);
++	val = __raw_readl(nand->reg + REG_SMISR);
+ 	val &= READYBUSY;
+ 	spin_unlock(&nand->lock);
+ 
