@@ -1,75 +1,69 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Wed, 13 Jan 2016 16:10:46 +0800
-Subject: [PATCH v2 04/12] clk: rockchip: rk3036: enable the
- CLK_IGNORE_UNUSED flag for sclk_i2s_out
-In-Reply-To: <20757797.djuaztrzGE@phil>
-References: <1452155155-16232-1-git-send-email-wxt@rock-chips.com>
- <290434099.8XFZ9qmNRz@phil> <568F80BA.6060209@gmail.com>
- <20757797.djuaztrzGE@phil>
-Message-ID: <56960686.7030903@gmail.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Wed, 13 Jan 2016 16:12:08 +0800
+Subject: [PATCH] drm/rockchip: vop: fix mask when updating interrupts
+In-Reply-To: <1452621918-32239-1-git-send-email-john@metanate.com>
+References: <1452621918-32239-1-git-send-email-john@metanate.com>
+Message-ID: <569606D8.8060309@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
-
-? 2016?01?08? 17:46, Heiko Stuebner ??:
-> Hi Caesar,
+On 2016?01?13? 02:05, John Keeping wrote:
+> Commit dbb3d94 (drm/rockchip: vop: move interrupt registers into
+> vop_data) introduced new macros for updating the interrupt control
+> registers but these always use the mask from the register definition
+> without refining it for the particular bits that are being changed.
 >
-> Am Freitag, 8. Januar 2016, 17:26:18 schrieb Caesar Wang:
->> ? 2016?01?07? 18:05, Heiko Stuebner ??:
->>> Am Donnerstag, 7. Januar 2016, 16:25:47 schrieb Caesar Wang:
->>>> SCLk_I2S_OUT is the noc bus clock for i2s module, this clock is used by
->>>> extra codecs.
->>>>
->>>> Due to it shouldn't belong to any driver, but we need it enabled,
->>>> so just mark it as the CLK_IGNORE_UNUSED flag.
->>> What makes you think it shouldn't belong to any driver?
->>>
->>> In most schematics I have, i2s_clkout is going to some clock-input of
->>> the
->>> audio codec - probably the MCLK input on your rt5616. And while the new
->>> rt5616 driver does not seem to do clock handling, it should just handle
->>> the clock using the normal APIs.
->> You are right,  that's seem has to find the root cause.
->> I'm wonder that the codec/i2s is working in kernel v4.1 patch without it.
->>
->> In general,  the MLCK will be handled in i2s driver if the cpu side is
->> master.
-> looking at the rt5616 datasheet, that would be BCLK1 instead I think. This
-> one does differentiate between being master/slave.
+> This means that whenever we enable/disable a particular interrupt we end
+> up disabling all of the others as a side effect.
 >
-> The master/sysclk (mclk) is also handled in other drivers in all cases.
-> (da7213.c, da7219.c, max98090.c, max98095.c, probably more)
-
-Saw the patch:
-https://patchwork.kernel.org/patch/5427131/
-
-Add the follow that's working.
-
---- a/arch/arm/boot/dts/rk3036.dtsi
-+++ b/arch/arm/boot/dts/rk3036.dtsi
-@@ -288,8 +288,8 @@
-                 interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
-                 #address-cells = <1>;
-                 #size-cells = <0>;
--               clock-names = "i2s_clk", "i2s_hclk";
--               clocks = <&cru SCLK_I2S>, <&cru HCLK_I2S>;
-+               clock-names = "i2s_clk", "i2s_hclk", "i2s_clk_out";
-+               clocks = <&cru SCLK_I2S>, <&cru HCLK_I2S>, <&cru 
-SCLK_I2S_OUT>;
-
-Okay, I believe Mark likes that works in codec driver.
-
+> Signed-off-by: John Keeping <john@metanate.com>
+> ---
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 16 +++++++++-------
+>   1 file changed, 9 insertions(+), 7 deletions(-)
 >
->
-> Heiko
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 46c2a8d..fd37054 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -43,8 +43,8 @@
+>   
+>   #define REG_SET(x, base, reg, v, mode) \
+>   		__REG_SET_##mode(x, base + reg.offset, reg.mask, reg.shift, v)
+> -#define REG_SET_MASK(x, base, reg, v, mode) \
+> -		__REG_SET_##mode(x, base + reg.offset, reg.mask, reg.shift, v)
+> +#define REG_SET_MASK(x, base, reg, mask, v, mode) \
+> +		__REG_SET_##mode(x, base + reg.offset, mask, reg.shift, v)
+>   
+>   #define VOP_WIN_SET(x, win, name, v) \
+>   		REG_SET(x, win->base, win->phy->name, v, RELAXED)
+> @@ -58,16 +58,18 @@
+>   #define VOP_INTR_GET(vop, name) \
+>   		vop_read_reg(vop, 0, &vop->data->ctrl->name)
+>   
+> -#define VOP_INTR_SET(vop, name, v) \
+> -		REG_SET(vop, 0, vop->data->intr->name, v, NORMAL)
+> +#define VOP_INTR_SET(vop, name, mask, v) \
+> +		REG_SET_MASK(vop, 0, vop->data->intr->name, mask, v, NORMAL)
+>   #define VOP_INTR_SET_TYPE(vop, name, type, v) \
+>   	do { \
+> -		int i, reg = 0; \
+> +		int i, reg = 0, mask = 0; \
+>   		for (i = 0; i < vop->data->intr->nintrs; i++) { \
+> -			if (vop->data->intr->intrs[i] & type) \
+> +			if (vop->data->intr->intrs[i] & type) { \
+>   				reg |= (v) << i; \
+> +				mask |= 1 << i; \
+> +			} \
+>   		} \
+> -		VOP_INTR_SET(vop, name, reg); \
+> +		VOP_INTR_SET(vop, name, mask, reg); \
+>   	} while (0)
+>   #define VOP_INTR_GET_TYPE(vop, name, type) \
+>   		vop_get_intr_type(vop, &vop->data->intr->name, type)
+Hi John
 
+Great, it works for me, Thanks for this fix.
 
--- 
-Thanks,
-Caesar
+Applied to my drm-next branch.
+
+-- ?ark Yao
