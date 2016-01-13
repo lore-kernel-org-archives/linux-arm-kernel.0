@@ -1,32 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Jan 2016 23:33:59 +0100
-Subject: [PATCH] 8250: uniphier: allow modular build with 8250 console
-Message-ID: <3965359.aMgb8o9MaG@wuerfel>
+Date: Wed, 13 Jan 2016 23:51:43 +0100
+Subject: [PATCH] ssb: host_soc depends on sprom
+Message-ID: <8128014.DbbgBtKY3z@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recently added uniphier 8250 port driver supports early console
-probing, and it supports being built as a module, but the combination
-of the two fails to link:
+Drivers that use the SSB sprom functionality typically 'select SSB_SPROM'
+from Kconfig, but CONFIG_SSB_HOST_SOC misses this, which results in
+a build failure unless at least one of the other drivers that selects
+it is enabled:
 
-ERROR: "early_serial8250_setup" [drivers/tty/serial/8250/8250_uniphier.ko] undefined!
+drivers/built-in.o: In function `ssb_host_soc_get_invariants':
+(.text+0x459494): undefined reference to `ssb_fill_sprom_with_fallback'
 
-Given that earlycon support in a loadable module makes no sense,
-making that code conditional on 'MODULE' is a correct solution.
+This adds the same select statement that is used elsewhere.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: b8d20e06eaad ("serial: 8250_uniphier: add earlycon support")
+Fixes: 541c9a84cd85 ("ssb: pick SoC invariants code from MIPS BCM47xx arch")
+---
+I'm not sure who the right person is to pick up the fix. The patch that
+introduced the problem was merged by Kalle through the iwlwifi tree.
 
-diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
-index bab6b3ae2540..1b7bd26555b7 100644
---- a/drivers/tty/serial/8250/8250_uniphier.c
-+++ b/drivers/tty/serial/8250/8250_uniphier.c
-@@ -35,7 +35,7 @@ struct uniphier8250_priv {
- 	spinlock_t atomic_write_lock;
- };
- 
--#ifdef CONFIG_SERIAL_8250_CONSOLE
-+#if defined(CONFIG_SERIAL_8250_CONSOLE) && !defined(MODULE)
- static int __init uniphier_early_console_setup(struct earlycon_device *device,
- 					       const char *options)
- {
+diff --git a/drivers/ssb/Kconfig b/drivers/ssb/Kconfig
+index 0c675861623f..d8e4219c2324 100644
+--- a/drivers/ssb/Kconfig
++++ b/drivers/ssb/Kconfig
+@@ -83,6 +83,7 @@ config SSB_SDIOHOST
+ config SSB_HOST_SOC
+ 	bool "Support for SSB bus on SoC"
+ 	depends on SSB && BCM47XX_NVRAM
++	select SSB_SPROM
+ 	help
+ 	  Host interface for a SSB directly mapped into memory. This is
+ 	  for some Broadcom SoCs from the BCM47xx and BCM53xx lines.
