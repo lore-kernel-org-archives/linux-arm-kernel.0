@@ -1,50 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Jan 2016 22:49:45 +0100
-Subject: [PATCH v2] null_blk: use sector_div instead of do_div
-Message-ID: <4700074.VeZkC8vNVV@wuerfel>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 13 Jan 2016 13:50:13 -0800
+Subject: [PATCH] mtd: nuc900_nand: read correct SMISR register
+In-Reply-To: <9019174.GYajdpGP8V@wuerfel>
+References: <9019174.GYajdpGP8V@wuerfel>
+Message-ID: <20160113215013.GS109450@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dividing a sector_t number should be done using sector_div rather than do_div
-to optimize the 32-bit sector_t case, and with the latest do_div optimizations,
-we now get a compile-time warning for this:
+On Wed, Jan 13, 2016 at 10:38:08PM +0100, Arnd Bergmann wrote:
+> The nuc900_nand driver has always passed an incorrect register
+> address in its nuc900_check_rb() function, which cannot possibly
+> work, and in some configurations gives us a build warning:
+> 
+> drivers/mtd/nand/nuc900_nand.c: In function 'nuc900_check_rb':
+> drivers/mtd/nand/nuc900_nand.c:27:23: warning: passing argument 1 of '__raw_readl' makes pointer from integer without a cast [-Wint-conversion]
+>  #define REG_SMISR     0xac
+> drivers/mtd/nand/nuc900_nand.c:118:20: note: in expansion of macro 'REG_SMISR'
+>   val = __raw_readl(REG_SMISR);
+> 
+> This makes sure we actually read from the register rather than
+> from (void *)0x000000ac in user space.
+> 
+> I suspect nobody noticed this before because the nuc900_nand_devready()
+> function never gets called, or nobody uses this driver on an upstream
+> kernel. Possibly even both.
 
-arch/arm/include/asm/div64.h:32:95: note: expected 'uint64_t * {aka long long unsigned int *}' but argument is of type 'sector_t * {aka long unsigned int *}'
-drivers/block/null_blk.c:521:81: warning: comparison of distinct pointer types lacks a cast
+Almost definitely not the first. That's an absolutely essential
+function for this driver (it doesn't have ->waitfunc(), so we use
+->dev_ready() all the time). Quite likely the latter.
 
-This changes the newly added code to use sector_div. It is a simplified version
-of the original patch, as Linus Torvalds pointed out that we should not be using
-an expensive division function in the first place.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/drivers/mtd/nand/nuc900_nand.c b/drivers/mtd/nand/nuc900_nand.c
+> index 220ddfcf29f5..dbc5b571c2bb 100644
+> --- a/drivers/mtd/nand/nuc900_nand.c
+> +++ b/drivers/mtd/nand/nuc900_nand.c
+> @@ -113,7 +113,7 @@ static int nuc900_check_rb(struct nuc900_nand *nand)
+>  {
+>  	unsigned int val;
+>  	spin_lock(&nand->lock);
+> -	val = __raw_readl(REG_SMISR);
+> +	val = __raw_readl(nand->reg + REG_SMISR);
+>  	val &= READYBUSY;
+>  	spin_unlock(&nand->lock);
+>  
 
-This version was suggested by Matias Bjorling.
+Looks OK to me, though I kinda hate dragging on support for
+obviously-unused drivers...
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Matias Bjorling <m@bjorling.me>
-Fixes: b2b7e00148a2 ("null_blk: register as a LightNVM device")
-
-diff --git a/drivers/block/null_blk.c b/drivers/block/null_blk.c
-index 95dff91135ad..6f9587156569 100644
---- a/drivers/block/null_blk.c
-+++ b/drivers/block/null_blk.c
-@@ -495,17 +495,17 @@ static int null_lnvm_id(struct nvm_dev *dev, struct nvm_id *id)
- 	id->ppaf.ch_offset = 56;
- 	id->ppaf.ch_len = 8;
- 
--	do_div(size, bs); /* convert size to pages */
--	do_div(size, 256); /* concert size to pgs pr blk */
-+	sector_div(size, bs); /* convert size to pages */
-+	size >>= 8; /* concert size to pgs pr blk */
- 	grp = &id->groups[0];
- 	grp->mtype = 0;
- 	grp->fmtype = 0;
- 	grp->num_ch = 1;
- 	grp->num_pg = 256;
- 	blksize = size;
--	do_div(size, (1 << 16));
-+	size >>= 16;
- 	grp->num_lun = size + 1;
--	do_div(blksize, grp->num_lun);
-+	sector_div(blksize, grp->num_lun);
- 	grp->num_blk = blksize;
- 	grp->num_pln = 1;
- 
+Brian
