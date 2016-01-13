@@ -1,61 +1,99 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 13 Jan 2016 10:40:36 +0100
-Subject: [PATCH 08/14] ARM: dts: imx6ul: add kpp support
-In-Reply-To: <1452619291-13625-9-git-send-email-LW@KARO-electronics.de>
-References: <1452619291-13625-1-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-2-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-3-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-4-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-5-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-6-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-7-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-8-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-9-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1452678036.3694.51.camel@pengutronix.de>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 13 Jan 2016 10:43:07 +0100
+Subject: [PATCH V2 11/23] arm64, pci: Remove useless boot time IRQ
+ assignment when booting with DT.
+In-Reply-To: <56953E33.6030003@caviumnetworks.com>
+References: <1450278993-12664-1-git-send-email-tn@semihalf.com>
+ <1450278993-12664-12-git-send-email-tn@semihalf.com>
+ <20160112135023.GC3601@red-moon> <56952619.7010602@semihalf.com>
+ <56953E33.6030003@caviumnetworks.com>
+Message-ID: <56961C2B.3030600@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 12.01.2016, 18:21 +0100 schrieb Lothar Wa?mann:
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> ---
->  arch/arm/boot/dts/imx6ul.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-> index 40ea5f0..a578b23 100644
-> --- a/arch/arm/boot/dts/imx6ul.dtsi
-> +++ b/arch/arm/boot/dts/imx6ul.dtsi
-> @@ -373,6 +373,14 @@
->  				status = "disabled";
->  			};
->  
-> +			kpp: kpp at 020b8000 {
-> +				compatible = "fsl,imx6q-kpp", "fsl,imx21-kpp";
+On 12.01.2016 18:56, David Daney wrote:
+> On 01/12/2016 08:13 AM, Tomasz Nowicki wrote:
+>> On 12.01.2016 14:50, Lorenzo Pieralisi wrote:
+>>> On Wed, Dec 16, 2015 at 04:16:21PM +0100, Tomasz Nowicki wrote:
+>>>> In order to probe PCIe host controller when booting with DT,
+>>>> ARM64 is using drivers which defer IRQ assignment to device
+>>>> enable time. It means that boot time DT specific irq map initialization
+>>>> is always overridden, so lets remove that code.
+>>>>
+>>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>>>> ---
+>>>>   arch/arm64/kernel/pci.c | 10 ----------
+>>>>   1 file changed, 10 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+>>>> index 023b983..f7948f5 100644
+>>>> --- a/arch/arm64/kernel/pci.c
+>>>> +++ b/arch/arm64/kernel/pci.c
+>>>> @@ -51,16 +51,6 @@ int pcibios_enable_device(struct pci_dev *dev, int
+>>>> mask)
+>>>>       return pci_enable_resources(dev, mask);
+>>>>   }
+>>>>
+>>>> -/*
+>>>> - * Try to assign the IRQ number from DT when adding a new device
+>>>> - */
+>>>> -int pcibios_add_device(struct pci_dev *dev)
+>>>> -{
+>>>> -    dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+>>>> -
+>>>> -    return 0;
+>>>> -}
+>>>> -
+>
+> How was this tested?  Or in other words, what PCI devices that use
+> legacy INT{A,B,C,D} interrupts were used in testing this patch?
+>
 
-Please always add a new chip specific compatible here, even if the units
-are fully working with the compatible of an older chip. This allows to
-implement chip specific workarounds in the respective drivers without
-changing the DT again if any bugs are found in the integration later on.
+I used QEMU and e1000 NIC:
 
-So the above should be:
-compatible = "fsl,imx6ul-kpp", "fsl,imx6q-kpp", "fsl,imx21-kpp";
+sudo ./qemu/aarch64-softmmu/qemu-system-aarch64 -smp 1 -m 1024 -M virt 
+-cpu cortex-a57 -nographic -device 
+e1000,netdev=net1,mac=52:54:00:12:34:56 -netdev 
+type=tap,ifname=tun1,id=net1,script=no,downscript=no -drive 
+file=qemu/ubuntu.img,id=root,if=none,format=raw -device 
+virtio-blk-device,drive=root -kernel linux-aarch64/arch/arm64/boot/Image 
+-append "console=ttyAMA0 earlycon=pl011,0x9000000 rw root=/dev/vda"
 
-This comment applies to most of the patches in this series following
-this one.
+root at ubuntu:~# ifconfig
+eth0      Link encap:Ethernet  HWaddr 52:54:00:12:34:56
+           inet addr:10.0.0.48  Bcast:10.0.255.255  Mask:255.255.0.0
+           UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+           RX packets:107 errors:0 dropped:0 overruns:0 frame:0
+           TX packets:32 errors:0 dropped:0 overruns:0 carrier:0
+           collisions:0 txqueuelen:1000
+           RX bytes:18087 (18.0 KB)  TX bytes:3818 (3.8 KB)
 
-Regards,
-Lucas
+root at ubuntu:~# cat /proc/interrupts
+            CPU0
+  39:        280       GIC  36 Level     eth0
 
-> +				reg = <0x020b8000 0x4000>;
-> +				interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX6UL_CLK_KPP>;
-> +				status = "disabled";
-> +			};
-> +
->  			wdog1: wdog at 020bc000 {
->  				compatible = "fsl,imx6ul-wdt", "fsl,imx21-wdt";
->  				reg = <0x020bc000 0x4000>;
+root at ubuntu:~# lspci -vvv
+00:00.0 Host bridge: Red Hat, Inc. Device 0008
+         Subsystem: Red Hat, Inc Device 1100
+         Control: I/O- Mem- BusMaster- SpecCycle- MemWINV- VGASnoop- 
+ParErr- Stepping- SERR- FastB2B- DisINTx-
+         Status: Cap- 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- 
+<TAbort- <MAbort- >SERR- <PERR- INTx-
 
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+00:01.0 Ethernet controller: Intel Corporation 82540EM Gigabit Ethernet 
+Controller (rev 03)
+         Subsystem: Red Hat, Inc QEMU Virtual Machine
+         Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- 
+ParErr- Stepping- SERR- FastB2B- DisINTx-
+         Status: Cap- 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- 
+<TAbort- <MAbort- >SERR- <PERR- INTx-
+         Latency: 0
+         Interrupt: pin A routed to IRQ 39
+         Region 0: Memory at 10040000 (32-bit, non-prefetchable) [size=128K]
+         Region 1: I/O ports at 1000 [size=64]
+         [virtual] Expansion ROM@10000000 [disabled] [size=256K]
+         Kernel driver in use: e1000
+
+Any specific concern w.r.t. this patch?
+
+Tomasz
