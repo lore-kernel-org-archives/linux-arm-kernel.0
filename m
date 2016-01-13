@@ -1,69 +1,90 @@
-From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
-Date: Tue, 12 Jan 2016 16:19:20 -0800
-Subject: [PATCHv2] net: bpf: reject invalid shifts
-In-Reply-To: <56959372.3040409@stressinduktion.org>
-References: <20160112185121.GA34045@ast-mbp.thefacebook.com>
- <1452626228-15742-1-git-send-email-rabin@rab.in>
- <1452628118.1223.25.camel@edumazet-glaptop2.roam.corp.google.com>
- <20160112195356.GA34598@ast-mbp.thefacebook.com>
- <5695653F.6030001@iogearbox.net>
- <20160112204620.GA35080@ast-mbp.thefacebook.com>
- <1452641302.1223.35.camel@edumazet-glaptop2.roam.corp.google.com>
- <20160112234707.GA36167@ast-mbp.thefacebook.com>
- <56959372.3040409@stressinduktion.org>
-Message-ID: <20160113001919.GA36335@ast-mbp.thefacebook.com>
+From: Leonid.Yegoshin@imgtec.com (Leonid Yegoshin)
+Date: Tue, 12 Jan 2016 16:21:36 -0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160112214003.GQ6357@twins.programming.kicks-ass.net>
+References: <1452426622-4471-12-git-send-email-mst@redhat.com>
+ <56945366.2090504@imgtec.com>
+ <20160112092711.GP6344@twins.programming.kicks-ass.net>
+ <20160112102555.GV6373@twins.programming.kicks-ass.net>
+ <20160112104012.GW6373@twins.programming.kicks-ass.net>
+ <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
+ <20160112214003.GQ6357@twins.programming.kicks-ass.net>
+Message-ID: <56959890.80101@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 12:59:46AM +0100, Hannes Frederic Sowa wrote:
-> On 13.01.2016 00:47, Alexei Starovoitov wrote:
-> >On Tue, Jan 12, 2016 at 03:28:22PM -0800, Eric Dumazet wrote:
-> >>On Tue, 2016-01-12 at 12:46 -0800, Alexei Starovoitov wrote:
-> >>>On Tue, Jan 12, 2016 at 09:42:39PM +0100, Daniel Borkmann wrote:
-> >>
-> >>>>>yep and we all know who was able to code hundreds of cBPF insns by hand ;)
-> >>>>>But I'm sure that code doesn't have such broken shifts. :)))
-> >>>>
-> >>>>libpcap certainly supports raw filters now thanks to Chema [1]. Alternative
-> >>>>could be to just mask them here, but not in eBPF verifier, but that would be
-> >>>>even more inconsistent (on the other hand, we also allow holes in BPF but not
-> >>>>in eBPF, so wouldn't be the first time we make things different), hmm.
-> >>>
-> >>>I would rather see broken classic bpf program fixed instead of continue
-> >>>running them with undefined behavior.
-> >>
-> >>This is your choice, because you are a developer.
-> >>
-> >>Some people might be stuck with old software they can not update,
-> >>because they do not have the money to pay developers.
-> >>
-> >>And no, I did not code BPF programs like that, but maybe others did, and
-> >>I feel the pain of customers that might be stuck.
-> >>
-> >>Linus Torvalds always made clear we must provide backward compatibility,
-> >>and really this discussion should not even take place.
-> >>
-> >>As I said, we used to load such BPF program in the past.
-> >>
-> >>The fact that ARM64 crashes because of a faulty JIT implementation is
-> >>not an excuse.
-> >
-> >I would agree if those loaded programs would do something sensible,
-> >but they're broken. As shown arm and arm64 would execute them
-> >differently without JIT, because HW treats such shifts differently.
-> >I also checked that libpcap is sane and doesn't generate broken shifts.
-> >imo we're not breaking backward compatiblity here.
-> 
-> But on one specific platform those programs did something deterministic,
-> reproducible and observable, no? Probably most developers only cared about
-> that, probably especially in the embedded segment.
+On 01/12/2016 01:40 PM, Peter Zijlstra wrote:
+>
+>> It is selectable only for MIPS R2 but not MIPS R6. The reason is - most of
+>> MIPS R2 CPUs have short pipeline and that SYNC is just waste of CPU
+>> resource, especially taking into account that "lightweight syncs" are
+>> converted to a heavy "SYNC 0" in many of that CPUs. However the latest
+>> MIPS/Imagination CPU have a pipeline long enough to hit a problem - absence
+>> of SYNC at LL/SC inside atomics, barriers etc.
+> What ?! Are you saying that because R2 has short pipelines its unlikely
+> to hit the reordering issues and we can omit barriers?
 
-No, they were not. Say we do mask K&31 instead. That may match
-what x86 cpu do, but it will not match arm. You just cannot
-define previously undefined behavior without breaking something.
-And with error the users can actually fix their stuff.
-If their software is so old and cannot be upgraded, then
-they shouldn't be upgrading the kernel either, something else will break.
-Starting from kernel version. Remember 2.x -> 3.x -> 4.x ?
-Also the arm64 JIT crash was noticed only because of fancy fuzzing,
-so let's be sensible in our risk estimations.
+It was my guess to explain - why barriers was not included originally. 
+You can check with Ralf, he knows more about that time MIPS Linux code.
+
+I bother with this more than 2 years and I just try to solve that issue 
+- in recent CPUs the load after LL/SC synchronization instruction loop 
+can get ahead of SC for sure, it was tested.
+
+>
+>>> And reading the MIPS64 v6.04 instruction set manual, I think 0x11/0x12
+>>> are_NOT_  transitive and therefore cannot be used to implement the
+>>> smp_mb__{before,after} stuff.
+>>>
+>>> That is, in MIPS speak, those SYNC types are Ordering Barriers, not
+>>> Completion Barriers.
+>> Please see above, point 2.
+> That did not in fact enlighten things. Are they transitive/multi-copy
+> atomic or not?
+
+Peter Zijlstra recently wrote: "In particular we're very much all 
+'confused' about the various notions of transitivity". I am actually 
+confused too and need some examples here.
+
+>
+> (and here Will will go into great detail on the differences between the
+> two and make our collective brains explode :-)
+>
+>>> That is, currently all architectures -- with exception of PPC -- have
+>>> RCsc locks, but using these non-transitive things will get you RCpc
+>>> locks.
+>>>
+>>> So yes, MIPS can go RCpc for its locks and share the burden of pain with
+>>> PPC, but that needs to be a very concious decision.
+>> I don't understand that - I tried hard but I can't find any word like
+>> "RCsc", "RCpc" in Documents/ directory. Web search goes nowhere, of course.
+> From: lkml.kernel.org/r/20150828153921.GF19282 at twins.programming.kicks-ass.net
+>
+> Yes, the difference between RCpc and RCsc is in the meaning of RELEASE +
+> ACQUIRE. With RCsc that implies a full memory barrier, with RCpc it does
+> not.
+
+MIPS Arch starting from R2 requires that. If some CPU can't, it should 
+execute a full "SYNC 0" instead, which is a full memory barrier.
+
+>
+> Currently PowerPC is the only arch that (can, and) does RCpc and gives a
+> weaker RELEASE + ACQUIRE. Only the CPU who did the ACQUIRE is guaranteed
+> to see the stores of the CPU which did the RELEASE in order.
+
+Yes, it was a goal for SYNC_ACQUIRE and SYNC_RELEASE.
+
+Caveats:
+
+     - "Full memory barrier" on MIPS means - full barrier for any device 
+in coherent domain. In MIPS Tech/Imagination Tech MIPS-based CPU it is 
+"for any device connected to CM or IOCU + directly connected memory".
+
+     - It is not applied to instruction fetch. However, I-Cache flushes 
+and SYNCI are consistent with that. There is also hazard barrier 
+instructions to clear CPU pipeline to some extent - to help with this 
+limitation.
+
+I don't think that these caveats prevent a correct Acquire/Release semantic.
+
+- Leonid.
