@@ -1,90 +1,39 @@
-From: Leonid.Yegoshin@imgtec.com (Leonid Yegoshin)
-Date: Tue, 12 Jan 2016 16:21:36 -0800
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160112214003.GQ6357@twins.programming.kicks-ass.net>
-References: <1452426622-4471-12-git-send-email-mst@redhat.com>
- <56945366.2090504@imgtec.com>
- <20160112092711.GP6344@twins.programming.kicks-ass.net>
- <20160112102555.GV6373@twins.programming.kicks-ass.net>
- <20160112104012.GW6373@twins.programming.kicks-ass.net>
- <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
- <20160112214003.GQ6357@twins.programming.kicks-ass.net>
-Message-ID: <56959890.80101@imgtec.com>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Wed, 13 Jan 2016 01:31:20 +0100
+Subject: [PATCH] arm64: Allow vmalloc regions to be set with set_memory_*
+In-Reply-To: <20160113000112.GA36310@ast-mbp.thefacebook.com>
+References: <1452635187-8057-1-git-send-email-labbott@fedoraproject.org>
+ <20160113000112.GA36310@ast-mbp.thefacebook.com>
+Message-ID: <56959AD8.90206@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2016 01:40 PM, Peter Zijlstra wrote:
+On 01/13/2016 01:01 AM, Alexei Starovoitov wrote:
+> On Tue, Jan 12, 2016 at 01:46:27PM -0800, Laura Abbott wrote:
+>>
+>> The range of set_memory_* is currently restricted to the module address
+>> range because of difficulties in breaking down larger block sizes.
+>> vmalloc maps PAGE_SIZE pages so it is safe to use as well. Update the
+>> function ranges and add a comment explaining why the range is restricted
+>> the way it is.
+>>
+>> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+>> ---
+>> This should let the protections for the eBPF work as expected, I don't
+>> know if there is some sort of self test for thatL.
 >
->> It is selectable only for MIPS R2 but not MIPS R6. The reason is - most of
->> MIPS R2 CPUs have short pipeline and that SYNC is just waste of CPU
->> resource, especially taking into account that "lightweight syncs" are
->> converted to a heavy "SYNC 0" in many of that CPUs. However the latest
->> MIPS/Imagination CPU have a pipeline long enough to hit a problem - absence
->> of SYNC at LL/SC inside atomics, barriers etc.
-> What ?! Are you saying that because R2 has short pipelines its unlikely
-> to hit the reordering issues and we can omit barriers?
-
-It was my guess to explain - why barriers was not included originally. 
-You can check with Ralf, he knows more about that time MIPS Linux code.
-
-I bother with this more than 2 years and I just try to solve that issue 
-- in recent CPUs the load after LL/SC synchronization instruction loop 
-can get ahead of SC for sure, it was tested.
-
+> you can test it with:
+> # sysctl net.core.bpf_jit_enable=1
+> # insmod test_bpf.ko
 >
->>> And reading the MIPS64 v6.04 instruction set manual, I think 0x11/0x12
->>> are_NOT_  transitive and therefore cannot be used to implement the
->>> smp_mb__{before,after} stuff.
->>>
->>> That is, in MIPS speak, those SYNC types are Ordering Barriers, not
->>> Completion Barriers.
->> Please see above, point 2.
-> That did not in fact enlighten things. Are they transitive/multi-copy
-> atomic or not?
-
-Peter Zijlstra recently wrote: "In particular we're very much all 
-'confused' about the various notions of transitivity". I am actually 
-confused too and need some examples here.
-
+> On x64 it shows:
+> test_bpf: Summary: 291 PASSED, 0 FAILED, [282/283 JIT'ed]
 >
-> (and here Will will go into great detail on the differences between the
-> two and make our collective brains explode :-)
->
->>> That is, currently all architectures -- with exception of PPC -- have
->>> RCsc locks, but using these non-transitive things will get you RCpc
->>> locks.
->>>
->>> So yes, MIPS can go RCpc for its locks and share the burden of pain with
->>> PPC, but that needs to be a very concious decision.
->> I don't understand that - I tried hard but I can't find any word like
->> "RCsc", "RCpc" in Documents/ directory. Web search goes nowhere, of course.
-> From: lkml.kernel.org/r/20150828153921.GF19282 at twins.programming.kicks-ass.net
->
-> Yes, the difference between RCpc and RCsc is in the meaning of RELEASE +
-> ACQUIRE. With RCsc that implies a full memory barrier, with RCpc it does
-> not.
+> arm64 may have less JIT'ed tests.
 
-MIPS Arch starting from R2 requires that. If some CPU can't, it should 
-execute a full "SYNC 0" instead, which is a full memory barrier.
+Also, in that lib/test_bpf.c file, you can do a test by overwriting/'corrupting'
+part of the fp->insnsi instructions right after bpf_prog_select_runtime(fp) to
+see if setting the bpf_prog as RO works.
 
->
-> Currently PowerPC is the only arch that (can, and) does RCpc and gives a
-> weaker RELEASE + ACQUIRE. Only the CPU who did the ACQUIRE is guaranteed
-> to see the stores of the CPU which did the RELEASE in order.
-
-Yes, it was a goal for SYNC_ACQUIRE and SYNC_RELEASE.
-
-Caveats:
-
-     - "Full memory barrier" on MIPS means - full barrier for any device 
-in coherent domain. In MIPS Tech/Imagination Tech MIPS-based CPU it is 
-"for any device connected to CM or IOCU + directly connected memory".
-
-     - It is not applied to instruction fetch. However, I-Cache flushes 
-and SYNCI are consistent with that. There is also hazard barrier 
-instructions to clear CPU pipeline to some extent - to help with this 
-limitation.
-
-I don't think that these caveats prevent a correct Acquire/Release semantic.
-
-- Leonid.
+Thanks,
+Daniel
