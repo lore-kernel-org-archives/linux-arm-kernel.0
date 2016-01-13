@@ -1,61 +1,126 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 13 Jan 2016 12:14:01 +0100
-Subject: [PATCH v3 07/21] arm64: move kernel image to base of vmalloc area
-In-Reply-To: <20160113111152.GB23370@leverpostej>
-References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
- <1452518355-4606-8-git-send-email-ard.biesheuvel@linaro.org>
- <20160112181336.GF4858@leverpostej>
- <CAKv+Gu-TS7w=AVBceGhsQkQzVCv+u7Gh6ojftwW1iaE+d0yrYw@mail.gmail.com>
- <CAKv+Gu86oVvGb75S2x-44ct4sdQt4zT-3HbPqMJo_X+Cm3EPVQ@mail.gmail.com>
- <20160113111152.GB23370@leverpostej>
-Message-ID: <CAKv+Gu9X2rN8gTu5DE8c-mTUNZeEHSB5bxj5oC82HeiTzRoufQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 13 Jan 2016 12:18:09 +0100
+Subject: [PATCH] clk: sunxi: Fix mod0 clock calculation to return stable
+ results and check divisor size limits
+In-Reply-To: <1451323892-13060-1-git-send-email-mweseloh42@gmail.com>
+References: <1451323892-13060-1-git-send-email-mweseloh42@gmail.com>
+Message-ID: <20160113111809.GA9905@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 January 2016 at 12:11, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Jan 13, 2016 at 10:58:55AM +0100, Ard Biesheuvel wrote:
->> On 13 January 2016 at 09:39, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> > On 12 January 2016 at 19:14, Mark Rutland <mark.rutland@arm.com> wrote:
->> >> On Mon, Jan 11, 2016 at 02:19:00PM +0100, Ard Biesheuvel wrote:
->> >>> @@ -438,12 +442,29 @@ static void __init map_kernel(pgd_t *pgd)
->> >>>       map_kernel_chunk(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC);
->> >>>       map_kernel_chunk(pgd, _data, _end, PAGE_KERNEL);
->> >>>
->> >>> -     /*
->> >>> -      * The fixmap falls in a separate pgd to the kernel, and doesn't live
->> >>> -      * in the carveout for the swapper_pg_dir. We can simply re-use the
->> >>> -      * existing dir for the fixmap.
->> >>> -      */
->> >>> -     set_pgd(pgd_offset_raw(pgd, FIXADDR_START), *pgd_offset_k(FIXADDR_START));
->> >>> +     if (pgd_index(FIXADDR_START) != pgd_index((u64)_end)) {
->> >>
->> >> To match the style of early_fixmap_init, and given we already mapped the
->> >> kernel image, this could be:
->> >>
->> >>         if (pgd_none(pgd_offset_raw(pgd, FIXADDR_START))) {
->> >>
->> >> Which also serves as a run-time check that the pgd entry really was
->> >> clear.
->> >>
->> >
->> > Yes, that looks better. I will steal that :-)
->> >
->>
->> OK, that doesn't work. pgd_none() is hardcoded to 'false' when running
->> with fewer than 4 pgtable levels, and so we always hit the BUG() here.
->
-> Ah, sorry.
->
-> We could also check CONFIG_PGTABLE_LEVELS > 3 check, as with
-> fixmap_init, perhaps?
->
+Hi Marcus,
 
-I'm using this now:
+Sorry for the reviewing delay.
 
-if (!pgd_val(*pgd_offset_raw(pgd, FIXADDR_START))) {
+On Mon, Dec 28, 2015 at 06:31:32PM +0100, Marcus Weseloh wrote:
+> This patch fixes some problems in the mod0 clock calculation. It has
+> the potential to break stuff, as the issues explained below had the
+> effect that clk_set_rate would always return successfully, sometimes
+> setting a frequency that is higher than the requested value.
 
-which I think is appropriate, since we don't expect to share any top
-level entry, folded or not.
+That's actually the expected behaviour of clk_set_rate.
+
+clk_set_rate is supposed to adjust the given clock rate to something
+that the clock drivers seems fit. It should only return an error in a
+case where you can't change the rate at all (because you didn't pass a
+valid struct clk pointer, because changing the rate would violate some
+clock flags, etc.). Otherwise, clk_set_rate should succeed.
+
+By returning an error code the clock is higher than the one passed,
+you violate that expectation, especially since that is relative to the
+clock you passed.
+
+It makes sense in your case to never exceed the given rate, it might
+not for a different clock in the tree, or even for a different
+instance of the same clock. For example, you could very well have
+another case in your system where you should not have rates set that
+are below the one given because that would prevent the consumer
+device to be usable.
+
+This is why the adjustment is left to the clock driver, and is not
+enforced by the framework itself, simply because the framework has no
+idea how you want to round your clock rate on that particular clock in
+your system.
+
+> Code that "accidentally worked" because of this might fail after
+> applying this patch.
+> 
+> The problems in detail:
+> 
+> 1. If a very low frequency is requested from a high parent clock, the
+> divisors "div" and "calcm" might be > 255. This patch changes the type
+> of both variables to unsigned int, because the silent cast to u8 will
+> result in invalid frequencies and register values.
+> 
+> 2. The width of the "m" divisor in the clock control registers is only
+> 4 bit, but that limitation is not checked when calculating the divisor
+> and the resulting frequency. This patch adds a check that m never
+> exceeds the field width.
+> 
+> 3. During a call to clk_set_rate, the sun4i_a10_get_mod0_factors
+> function is called multiple times: first to find the best parent and
+> frequency, then again to calculate the p and m divisors, passing the
+> frequencies returned by the previous call(s). In certain cases
+> those chained calls do not result in the best frequency choice.
+
+You know the drill by now :)
+
+You're fixing three different issues, please send three different
+patches.
+
+> 
+> An example:
+> parent_rate = 24Mhz, freq = 1.4Mhz results in p=1, m=9, freq=1333333,3333
+> (which gets rounded down to 1333333).
+> Calling the function again with parent_rate = 24Mhz and freq = 1333333
+> results in p=1, m=10, freq=1200000.
+> 
+> Rounding up the returned frequency removes this problem.
+> 
+> Signed-off-by: Marcus Weseloh <mweseloh42@gmail.com>
+> ---
+>  drivers/clk/sunxi/clk-mod0.c | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
+> index d167e1e..d03f099 100644
+> --- a/drivers/clk/sunxi/clk-mod0.c
+> +++ b/drivers/clk/sunxi/clk-mod0.c
+> @@ -31,7 +31,8 @@
+>  static void sun4i_a10_get_mod0_factors(u32 *freq, u32 parent_rate,
+>  				       u8 *n, u8 *k, u8 *m, u8 *p)
+>  {
+> -	u8 div, calcm, calcp;
+> +	unsigned int div, calcm;
+> +	u8 calcp;
+>  
+>  	/* These clocks can only divide, so we will never be able to achieve
+>  	 * frequencies higher than the parent frequency */
+> @@ -50,8 +51,10 @@ static void sun4i_a10_get_mod0_factors(u32 *freq, u32 parent_rate,
+>  		calcp = 3;
+>  
+>  	calcm = DIV_ROUND_UP(div, 1 << calcp);
+> +	if (calcm > 16)
+> +		calcm = 16;
+>  
+> -	*freq = (parent_rate >> calcp) / calcm;
+> +	*freq = DIV_ROUND_UP(parent_rate >> calcp, calcm);
+
+While the two above seems harmless, this one concerns me a bit. Did
+you test the various mod0 clock users and made sure that they were
+still working as they used to?
+
+Thanks,
+Maxime
 
 -- 
-Ard.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160113/75d1b26b/attachment.sig>
