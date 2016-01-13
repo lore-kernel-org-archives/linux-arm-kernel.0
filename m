@@ -1,66 +1,73 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 13 Jan 2016 14:20:52 +0100
-Subject: [PATCH V3 06/21] XEN / PCI: Remove the dependence on arch x86 when
- PCI_MMCONFIG=y
+Date: Wed, 13 Jan 2016 14:20:54 +0100
+Subject: [PATCH V3 08/21] arm64,
+ acpi: Use empty PCI config space accessors from mcfg.c file.
 In-Reply-To: <1452691267-32240-1-git-send-email-tn@semihalf.com>
 References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
-Message-ID: <1452691267-32240-7-git-send-email-tn@semihalf.com>
+Message-ID: <1452691267-32240-9-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In drivers/xen/pci.c, there are arch x86 dependent codes when
-CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
-depends on ACPI, so this will prevent XEN PCI running on other
-architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
+We can now use previously prepared empty ACPI RAW accessors
+and cleanup a bit before adding full support for PCI host bridge driver.
 
-Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
-the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) == 0),
-and it's defined in asm/pci_x86.h, the code means that
-if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
-ingnore the xen mcfg init. Actually this is duplicate, because
-if PCI resource is not probed in PCI_PROBE_MMCONF way, the
-pci_mmconfig_list will be empty, and the if (list_empty())
-after it will do the same job.
-
-So just remove the arch related code and the head file, this
-will be no functional change for x86, and also makes xen/pci.c
-usable for other architectures.
-
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: Stefano Stabellini <Stefano.Stabellini@eu.citrix.com>
+Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 Tested-by: Jeremy Linton <jeremy.linton@arm.com>
-Reviewed-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- drivers/xen/pci.c | 6 ------
- 1 file changed, 6 deletions(-)
+ arch/arm64/Kconfig      |  6 ++++++
+ arch/arm64/kernel/pci.c | 15 ---------------
+ 2 files changed, 6 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
-index 6785ebb..9a8dbe3 100644
---- a/drivers/xen/pci.c
-+++ b/drivers/xen/pci.c
-@@ -28,9 +28,6 @@
- #include <asm/xen/hypervisor.h>
- #include <asm/xen/hypercall.h>
- #include "../pci/pci.h"
--#ifdef CONFIG_PCI_MMCONFIG
--#include <asm/pci_x86.h>
--#endif
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 871f217..d65d315 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -92,6 +92,7 @@ config ARM64
+ 	select SPARSE_IRQ
+ 	select SYSCTL_EXCEPTION_TRACE
+ 	select HAVE_CONTEXT_TRACKING
++	select HAVE_PCI_ECAM
+ 	help
+ 	  ARM 64-bit (AArch64) Linux support.
  
- static bool __read_mostly pci_seg_supported = true;
+@@ -207,6 +208,11 @@ source "drivers/pci/Kconfig"
+ source "drivers/pci/pcie/Kconfig"
+ source "drivers/pci/hotplug/Kconfig"
  
-@@ -222,9 +219,6 @@ static int __init xen_mcfg_late(void)
- 	if (!xen_initial_domain())
- 		return 0;
++config PCI_MMCONFIG
++	def_bool y
++	select PCI_ECAM
++	depends on ACPI
++
+ endmenu
  
--	if ((pci_probe & PCI_PROBE_MMCONF) == 0)
--		return 0;
+ menu "Kernel Features"
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index b3d098b..023b983 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -61,21 +61,6 @@ int pcibios_add_device(struct pci_dev *dev)
+ 	return 0;
+ }
+ 
+-/*
+- * raw_pci_read/write - Platform-specific PCI config space access.
+- */
+-int raw_pci_read(unsigned int domain, unsigned int bus,
+-		  unsigned int devfn, int reg, int len, u32 *val)
+-{
+-	return -ENXIO;
+-}
 -
- 	if (list_empty(&pci_mmcfg_list))
- 		return 0;
- 
+-int raw_pci_write(unsigned int domain, unsigned int bus,
+-		unsigned int devfn, int reg, int len, u32 val)
+-{
+-	return -ENXIO;
+-}
+-
+ #ifdef CONFIG_ACPI
+ /* Root bridge scanning */
+ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
 -- 
 1.9.1
