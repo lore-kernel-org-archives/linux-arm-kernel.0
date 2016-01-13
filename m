@@ -1,80 +1,156 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 13 Jan 2016 12:08:44 +0000
-Subject: [PATCH] arm64: net: bpf: don't BUG() on large shifts
-In-Reply-To: <CABg9mcsnNeXPk1ifFMsV7oy8E1ZjprXu1_7KwoMp=RQ29UEFFQ@mail.gmail.com>
-References: <1452015543-6790-1-git-send-email-rabin@rab.in>
- <20160108154423.GC11228@arm.com>
- <20160108190943.GA11561@ast-mbp.thefacebook.com>
- <20160112171710.GK15737@arm.com>
- <20160112192302.GA34276@ast-mbp.thefacebook.com>
- <CABg9mcsnNeXPk1ifFMsV7oy8E1ZjprXu1_7KwoMp=RQ29UEFFQ@mail.gmail.com>
-Message-ID: <20160113120844.GF25458@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 13 Jan 2016 12:17:52 +0000
+Subject: [PATCH v5 1/5] ARM: dma-mapping: Optimize allocation
+In-Reply-To: <1452294332-23415-2-git-send-email-dianders@chromium.org>
+References: <1452294332-23415-1-git-send-email-dianders@chromium.org>
+ <1452294332-23415-2-git-send-email-dianders@chromium.org>
+Message-ID: <56964070.1020303@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 08:45:43PM -0800, Z Lim wrote:
-> On Tue, Jan 12, 2016 at 11:23 AM, Alexei Starovoitov
-> <alexei.starovoitov@gmail.com> wrote:
-> > On Tue, Jan 12, 2016 at 05:17:10PM +0000, Will Deacon wrote:
-> >> On Fri, Jan 08, 2016 at 11:09:44AM -0800, Alexei Starovoitov wrote:
-> >> > On Fri, Jan 08, 2016 at 03:44:23PM +0000, Will Deacon wrote:
-> >> > > On Tue, Jan 05, 2016 at 06:39:03PM +0100, Rabin Vincent wrote:
-> >> > > > Attempting to generate UBFM/SBFM instructions with shifts that can't be
-> >> > > > encoded in the immediate fields of the opcodes leads to a trigger of a
-> >> > > > BUG() in the instruction generation code.  As the ARMv8 ARM says: "The
-> >> > > > shift amounts must be in the range 0 to one less than the register width
-> >> > > > of the instruction, inclusive."  Make the JIT reject unencodable shifts
-> >> > > > instead of crashing.
-> >> > >
-> >> > > I moaned about those BUG_ONs when they were introduced:
-> >> > >
-> >> > >   https://lkml.org/lkml/2014/7/17/438
-> >> > >
-> >> > > The response then was that the verifier would catch these issues so
-> >> > > there was nothing to worry about. Has something changed so that is no
-> >> > > longer the case? Do we need to consider a different way of rejecting
-> >> > > invalid instructions at the encoding stage rather than bringing down the
-> >> > > kernel?
-> >> >
-> >> > that discussion lead to replacement of all BUG_ONs in
-> >> > arch/arm64/net/bpf_jit_comp.c with pr_err_once(), but looks like
-> >> > arch/arm64/kernel/insn.c wasn't addressed.
-> >> > The amount of BUG_ONs there is indeed overkill regardless of what
-> >> > verifier and other JITs do. btw, x64 JIT doesn't have runtime BUG_ONs.
-> >>
-> >> Maybe, but insn.c is also used by the alternatives patching code, so we
-> >> really need a way to communicate failure back to the BPF JIT when passed
-> >> an invalid instruction description.
-> >
-> > agree. I think there are several options to achieve that after
-> > all BUG_ONs are removed:
-> > - change interface for all insn generating macros to check for
-> >   AARCH64_BREAK_FAULT opcode as error.
-> >   That will require all of emit*() functions in bpf_jit_comp.c to
-> >   be changed to accept/return error.
-> >   Overall that looks like massive change.
-> > - ignore AARCH64_BREAK_FAULT during emit and add another pass after
-> >   all code is generated. If such insn is found in a jited code,
-> >   discard the jit.
-> >   I think that's better option.
-> >
-> > Zi, any comments?
-> >
-> 
-> Alexei, agreed. Second approach is cleaner. Full disclosure: I did not
-> look at other callers beyond JIT.
-> 
-> Separately, sounds like there's now preference and consensus to
-> removing all BUGs and BUG_ONs in insn.c. Did a quick grep of insn.c
-> and noticed a legacy instance, followed by many introduced around the
-> same time as JIT, and new additions since.
-> 
-> Will, any thoughts on the following replacement scheme?
-> 
-> BUG_ON() for codegen ==> pr_err(); return AARCH64_BREAK_FAULT;
-> BUG() for decoding ==> leave as is.
-> remaining BUG_ON() ==> leave as is.
+Hi Doug,
 
-That sounds good to me, thanks.
+On 08/01/16 23:05, Douglas Anderson wrote:
+> The __iommu_alloc_buffer() is expected to be called to allocate pretty
+> sizeable buffers.  Upon simple tests of video I saw it trying to
+> allocate 4,194,304 bytes.  The function tries to allocate large chunks
+> in order to optimize IOMMU TLB usage.
+>
+> The current function is very, very slow.
+>
+> One problem is the way it keeps trying and trying to allocate big
+> chunks.  Imagine a very fragmented memory that has 4M free but no
+> contiguous pages at all.  Further imagine allocating 4M (1024 pages).
+> We'll do the following memory allocations:
+> - For page 1:
+>    - Try to allocate order 10 (no retry)
+>    - Try to allocate order 9 (no retry)
+>    - ...
+>    - Try to allocate order 0 (with retry, but not needed)
+> - For page 2:
+>    - Try to allocate order 9 (no retry)
+>    - Try to allocate order 8 (no retry)
+>    - ...
+>    - Try to allocate order 0 (with retry, but not needed)
+> - ...
+> - ...
+>
+> Total number of calls to alloc() calls for this case is:
+>    sum(int(math.log(i, 2)) + 1 for i in range(1, 1025))
+>    => 9228
+>
+> The above is obviously worse case, but given how slow alloc can be we
+> really want to try to avoid even somewhat bad cases.  I timed the old
+> code with a device under memory pressure and it wasn't hard to see it
+> take more than 120 seconds to allocate 4 megs of memory! (NOTE: testing
+> was done on kernel 3.14, so possibly mainline would behave
+> differently).
+>
+> A second problem is that allocating big chunks under memory pressure
+> when we don't need them is just not a great idea anyway unless we really
+> need them.  We can make due pretty well with smaller chunks so it's
+> probably wise to leave bigger chunks for other users once memory
+> pressure is on.
+>
+> Let's adjust the allocation like this:
+>
+> 1. If a big chunk fails, stop trying to hard and bump down to lower
+>     order allocations.
+> 2. Don't try useless orders.  The whole point of big chunks is to
+>     optimize the TLB and it can really only make use of 2M, 1M, 64K and
+>     4K sizes.
+>
+> We'll still tend to eat up a bunch of big chunks, but that might be the
+> right answer for some users.  A future patch could possibly add a new
+> DMA_ATTR that would let the caller decide that TLB optimization isn't
+> important and that we should use smaller chunks.  Presumably this would
+> be a sane strategy for some callers.
 
-Will
+Now that I've had time to think about it properly:
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+I just had an absolutely disgusting idea of how to get the same 
+progression with just a single variable and no static array, but I'll 
+keep that firmly to myself as it's almost IOCCC-grade WTF :D
+
+Thanks,
+Robin.
+
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+> Changes in v5: None
+> Changes in v4:
+> - Added Marek's ack
+>
+> Changes in v3: None
+> Changes in v2:
+> - No longer just 1 page at a time, but gives up higher order quickly.
+> - Only tries important higher order allocations that might help us.
+>
+>   arch/arm/mm/dma-mapping.c | 34 ++++++++++++++++++++--------------
+>   1 file changed, 20 insertions(+), 14 deletions(-)
+>
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 0eca3812527e..bc9cebfa0891 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1122,6 +1122,9 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
+>   	spin_unlock_irqrestore(&mapping->lock, flags);
+>   }
+>
+> +/* We'll try 2M, 1M, 64K, and finally 4K; array must end with 0! */
+> +static const int iommu_order_array[] = { 9, 8, 4, 0 };
+> +
+>   static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
+>   					  gfp_t gfp, struct dma_attrs *attrs)
+>   {
+> @@ -1129,6 +1132,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
+>   	int count = size >> PAGE_SHIFT;
+>   	int array_size = count * sizeof(struct page *);
+>   	int i = 0;
+> +	int order_idx = 0;
+>
+>   	if (array_size <= PAGE_SIZE)
+>   		pages = kzalloc(array_size, GFP_KERNEL);
+> @@ -1162,22 +1166,24 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
+>   	while (count) {
+>   		int j, order;
+>
+> -		for (order = __fls(count); order > 0; --order) {
+> -			/*
+> -			 * We do not want OOM killer to be invoked as long
+> -			 * as we can fall back to single pages, so we force
+> -			 * __GFP_NORETRY for orders higher than zero.
+> -			 */
+> -			pages[i] = alloc_pages(gfp | __GFP_NORETRY, order);
+> -			if (pages[i])
+> -				break;
+> +		order = iommu_order_array[order_idx];
+> +
+> +		/* Drop down when we get small */
+> +		if (__fls(count) < order) {
+> +			order_idx++;
+> +			continue;
+>   		}
+>
+> -		if (!pages[i]) {
+> -			/*
+> -			 * Fall back to single page allocation.
+> -			 * Might invoke OOM killer as last resort.
+> -			 */
+> +		if (order) {
+> +			/* See if it's easy to allocate a high-order chunk */
+> +			pages[i] = alloc_pages(gfp | __GFP_NORETRY, order);
+> +
+> +			/* Go down a notch at first sign of pressure */
+> +			if (!pages[i]) {
+> +				order_idx++;
+> +				continue;
+> +			}
+> +		} else {
+>   			pages[i] = alloc_pages(gfp, 0);
+>   			if (!pages[i])
+>   				goto error;
+>
