@@ -1,109 +1,122 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 13 Jan 2016 18:53:33 +0530
-Subject: [PATCH V2 6/8] dmaengine: bcm2835: move controlblock chain
- generation into separate method
-In-Reply-To: <1452187987-2605-7-git-send-email-kernel@martin.sperl.org>
-References: <1452187987-2605-1-git-send-email-kernel@martin.sperl.org>
- <1452187987-2605-7-git-send-email-kernel@martin.sperl.org>
-Message-ID: <20160113132333.GC11130@localhost>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 13 Jan 2016 14:20:46 +0100
+Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
+ hostbridge init based on ACPI
+Message-ID: <1452691267-32240-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 07, 2016 at 05:33:04PM +0000, kernel at martin.sperl.org wrote:
+>From the functionality point of view this series might be split into the
+following logic parts:
+1. Make MMCONFIG code arch-agnostic which allows all architectures to collect
+   PCI config regions and used when necessary.
+2. Move non-arch specific bits to the core code.
+3. Use MMCONFIG code and implement generic ACPI based PCI host controller driver.
+4. Enable above driver on ARM64
 
-> +static inline bool bcm2835_dma_is_lite(struct bcm2835_chan *c)
-> +{
-> +	/* dma channels >= 7 are LITE channels */
-> +	return (c->ch >= 7);
+Patches has been built on top of 4.4 and can be found here:
+git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v3)
 
-Why not DT data here as well
+NOTE, this patch set depends on Matthew's patches:
+http://www.spinics.net/lists/linux-pci/msg45950.html
+https://github.com/Vality/linux/tree/pci-fixes
 
-> +}
-> +
-> +static inline size_t bcm2835_dma_max_frame_length(struct bcm2835_chan *c)
-> +{
-> +	/* lite and normal channels have different max frame length */
-> +	return bcm2835_dma_is_lite(c) ? MAX_LITE_DMA_LEN : MAX_DMA_LEN;
+This has been tested on Cavium ThunderX server and QEMU.
+Any help in reviewing and testing is very appreciated.
 
-Or rather get length from DT..
+v2 -> v3
+- fix legacy IRQ assigning and IO ports registration
+- remove reference to arch specific companion device for ia64
+- move ACPI PCI host controller driver to pci_root.c
+- drop generic domain assignment for x86 and ia64 as I am not
+  able to run all necessary test variants
+- drop patch which cleaned legacy IRQ assignment since it belongs to
+  Mathew's series:
+  https://patchwork.ozlabs.org/patch/557504/
+- extend MCFG quirk code
+- rebased to 4.4
 
-> +static struct bcm2835_desc *bcm2835_dma_create_cb_chain(
-> +	struct dma_chan *chan, enum dma_transfer_direction direction,
-> +	bool cyclic, u32 info, u32 finalextrainfo, size_t frames,
-> +	dma_addr_t src, dma_addr_t dst, size_t buf_len,
-> +	size_t period_len, gfp_t gfp)
-> +{
-> +	struct bcm2835_chan *c = to_bcm2835_dma_chan(chan);
-> +	size_t len = buf_len, total_len;
-> +	size_t frame;
-> +	struct bcm2835_desc *d;
-> +	struct bcm2835_cb_entry *cb_entry;
-> +	struct bcm2835_dma_cb *control_block;
-> +	size_t max_len = bcm2835_dma_max_frame_length(c);
-> +
-> +	/* allocate and setup the descriptor. */
-> +	d = kzalloc(sizeof(*d) + frames * sizeof(struct bcm2835_cb_entry),
-> +		    gfp);
+v1 -> v2
+- moved non-arch specific piece of code to dirver/acpi/ directory
+- fixed IO resource handling
+- introduced PCI config accessors quirks matching
+- moved ACPI_COMPANION_SET to generic code
 
-odd style.. btw should flag be GFP_NOWAIT ..?
+Liu Jiang (1):
+  ACPI, PCI: Refine the way to handle translation_offset for ACPI
+    resources
 
-> +		/* fill in the control block */
-> +		control_block = cb_entry->cb;
-> +		control_block->info = info;
-> +		control_block->src = src;
-> +		control_block->dst = dst;
-> +		if (buf_len) {
-> +			control_block->length = min(max_len, len);
-> +			if (period_len &&
-> +			    (total_len + control_block->length >=
-> +			     period_len)) {
-> +				/* set to end of period_len */
-> +				control_block->length =
-> +					period_len - total_len;
-> +				/* add extrainfo when cyclic */
-> +				if (cyclic)
-> +					control_block->info |=
-> +						finalextrainfo;
-> +				/* and reset total_len */
-> +				total_len = 0;
-> +			}
+Tomasz Nowicki (20):
+  x86, pci: Reorder logic of pci_mmconfig_insert() function
+  x86, pci, acpi: Move arch-agnostic MMCONFIG (aka ECAM) and ACPI code
+    out of arch/x86/ directory
+  pci, acpi, mcfg: Provide generic implementation of MCFG code
+    initialization.
+  x86, pci: mmconfig_{32,64}.c code refactoring - remove code
+    duplication.
+  x86, pci, ecam: mmconfig_64.c becomes default implementation for ECAM
+    driver.
+  XEN / PCI: Remove the dependence on arch x86 when PCI_MMCONFIG=y
+  pci, acpi, mcfg: Provide default RAW ACPI PCI config space accessors.
+  arm64, acpi: Use empty PCI config space accessors from mcfg.c file.
+  pci, acpi, ecam: Add flag to indicate whether ECAM region was hot
+    added or not.
+  x86, pci: Cleanup platform specific MCFG data using previously added
+    ECAM hot_added flag.
+  pci, acpi: Move ACPI host bridge device companion assignment to core
+    code.
+  x86, ia64, pci: Remove ACPI companion device from platform specific
+    data.
+  pci, acpi: Provide generic way to assign bus domain number.
+  x86, ia64: Include acpi_pci_{add|remove}_bus to the default
+    pcibios_{add|remove}_bus implementation.
+  acpi, mcfg: Implement two calls that might be used to inject/remove
+    MCFG region.
+  x86, acpi, pci: Use equivalent function introduced in previous patch.
+  acpi, mcfg: Add default PCI config accessors implementation and
+    initial support for related quirks.
+  pci, acpi: Support for ACPI based generic PCI host controller init
+  pci, acpi: Match PCI config space accessors against platfrom specific
+    quirks.
+  arm64, pci, acpi: Start using ACPI based PCI host bridge driver for
+    ARM64.
 
-this looks hard to read, perhpas a helper will make it look better
-
-> +	/* the last frame requires extra flags */
-> +	d->cb_list[d->frames - 1].cb->info |= finalextrainfo;
-> +
-> +	/* check the size - if there is some missmatch,
-> +	 * then this is detected here
-> +	 */
-
-this is not kernel style for multi-line comments
-
->  	/* Grab configuration */
->  	if (!is_slave_direction(direction)) {
-> -		dev_err(chan->device->dev, "%s: bad direction?\n", __func__);
-> +		dev_err(chan->device->dev,
-> +			"%s: bad direction?\n", __func__);
-
-unrelated change
-
-> -	/* Now allocate and setup the descriptor. */
-> -	d = kzalloc(sizeof(*d), GFP_NOWAIT);
-> -	if (!d)
-> -		return NULL;
-> +	/* warn if buf_len is not a multiple of period_lenas this may leed
-> +	 * to unexpected latencies for interrupts and thus audiable clicks
-> +	 */
-
-here too
-
->  	/*
-> -	 * Iterate over all frames, create a control block
-> -	 * for each frame and link them together.
-> +	 * allocate the CB chain
-> +	 * note that we need to use GFP_ATOMIC, as the ALSA i2s dmaengine
-
-dmaengine drivers use GFP_NOWAIT in these cases
+ arch/arm64/Kconfig                 |   7 ++
+ arch/arm64/kernel/pci.c            |  25 ----
+ arch/ia64/hp/common/sba_iommu.c    |   2 +-
+ arch/ia64/include/asm/pci.h        |   1 -
+ arch/ia64/pci/pci.c                |  52 +++-----
+ arch/ia64/sn/kernel/io_acpi_init.c |   4 +-
+ arch/x86/Kconfig                   |   4 +
+ arch/x86/include/asm/pci.h         |   3 -
+ arch/x86/include/asm/pci_x86.h     |  28 +----
+ arch/x86/pci/acpi.c                |  41 ++----
+ arch/x86/pci/common.c              |  10 --
+ arch/x86/pci/irq.c                 |  10 --
+ arch/x86/pci/mmconfig-shared.c     | 250 ++++++-------------------------------
+ arch/x86/pci/mmconfig_32.c         |  11 +-
+ arch/x86/pci/mmconfig_64.c         |  67 +---------
+ arch/x86/pci/numachip.c            |   1 +
+ drivers/acpi/Kconfig               |   5 +
+ drivers/acpi/Makefile              |   1 +
+ drivers/acpi/mcfg.c                | 201 +++++++++++++++++++++++++++++
+ drivers/acpi/pci_root.c            | 136 +++++++++++++++++++-
+ drivers/acpi/resource.c            |  12 +-
+ drivers/pci/Kconfig                |  10 ++
+ drivers/pci/Makefile               |   5 +
+ drivers/pci/ecam.c                 | 234 ++++++++++++++++++++++++++++++++++
+ drivers/pci/pci.c                  |  29 ++++-
+ drivers/pci/probe.c                |   5 +
+ drivers/xen/pci.c                  |   7 +-
+ include/acpi/acpi_bus.h            |   1 +
+ include/asm-generic/vmlinux.lds.h  |   7 ++
+ include/linux/acpi.h               |   2 +
+ include/linux/ecam.h               |  62 +++++++++
+ include/linux/pci-acpi.h           |  17 +++
+ 32 files changed, 802 insertions(+), 448 deletions(-)
+ create mode 100644 drivers/acpi/mcfg.c
+ create mode 100644 drivers/pci/ecam.c
+ create mode 100644 include/linux/ecam.h
 
 -- 
-~Vinod
+1.9.1
