@@ -1,237 +1,115 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Wed, 13 Jan 2016 15:24:59 +0100
-Subject: [PATCH V2 3/8] dmaengine: bcm2835: use shared interrupt for
- channel 11 to 14.
-In-Reply-To: <20160113134338.GH11130@localhost>
-References: <1452187987-2605-1-git-send-email-kernel@martin.sperl.org>
- <1452187987-2605-4-git-send-email-kernel@martin.sperl.org>
- <20160113122621.GA11130@localhost> <56965178.7070700@martin.sperl.org>
- <20160113134338.GH11130@localhost>
-Message-ID: <56965E3B.7060104@martin.sperl.org>
+From: john@metanate.com (John Keeping)
+Date: Wed, 13 Jan 2016 14:34:25 +0000
+Subject: [RFC/PATCH] drm/rockchip: don't wait for vblank if fb hasn't
+ changed
+In-Reply-To: <20160113142320.GQ19130@phenom.ffwll.local>
+References: <1452689614-6570-1-git-send-email-john@metanate.com>
+ <20160113142320.GQ19130@phenom.ffwll.local>
+Message-ID: <20160113143425.363ce07a.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 13 Jan 2016 15:23:20 +0100, Daniel Vetter wrote:
 
+> On Wed, Jan 13, 2016 at 12:53:34PM +0000, John Keeping wrote:
+> > As commented in drm_atomic_helper_wait_for_vblanks(), userspace
+> > relies on cursor ioctls being unsynced.  Converting the rockchip
+> > driver to atomic has significantly impacted cursor performance by
+> > making every cursor update wait for vblank.
+> > 
+> > By skipping the vblank sync when the framebuffer has not changed
+> > (as is done in drm_atomic_helper_wait_for_vblanks()) we can avoid
+> > this for the common case of moving the cursor and only need to
+> > delay the cursor ioctl when the cursor icon changes.
+> > 
+> > I originally inserted a check on legacy_cursor_update as well, but
+> > that caused a storm of iommu page faults.  I didn't investigate the
+> > cause of those since this change gives enough of a performance
+> > improvement for my use case.
+> > 
+> > This is RFC because of that and because the framebuffer_changed()
+> > function is copied from drm_atomic_helper.c as a quick way to test
+> > the result.
+> > 
+> > Signed-off-by: John Keeping <john@metanate.com>
+> > ---
+> >  drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 27
+> > +++++++++++++++++++++++++-- 1 file changed, 25 insertions(+), 2
+> > deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> > b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c index f784488..8fd9821
+> > 100644 --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> > @@ -177,8 +177,28 @@ static void
+> > rockchip_crtc_wait_for_update(struct drm_crtc *crtc)
+> > crtc_funcs->wait_for_update(crtc); }
+> >  
+> > +static bool framebuffer_changed(struct drm_device *dev,
+> > +				struct drm_atomic_state *old_state,
+> > +				struct drm_crtc *crtc)
+> > +{
+> > +	struct drm_plane *plane;
+> > +	struct drm_plane_state *old_plane_state;
+> > +	int i;
+> > +
+> > +	for_each_plane_in_state(old_state, plane, old_plane_state,
+> > i) {
+> > +		if (plane->state->crtc != crtc &&
+> > +		    old_plane_state->crtc != crtc)
+> > +			continue;
+> > +
+> > +		if (plane->state->fb != old_plane_state->fb)
+> > +			return true;
+> > +	}
+> > +
+> > +	return false;
+> > +}  
+> 
+> Please don't hand-roll logic that affects semantics like this. Instead
+> please use drm_atomic_helper_wait_for_vblanks(), which should do this
+> correctly for you.
+> 
+> If that's not the case then we need to improve the generic helper, or
+> figure out what's different with rockhip.
 
-On 13.01.2016 14:43, Vinod Koul wrote:
-> On Wed, Jan 13, 2016 at 02:30:32PM +0100, Martin Sperl wrote:
->> On 13.01.2016 13:26, Vinod Koul wrote:
->>> On Thu, Jan 07, 2016 at 05:33:01PM +0000, kernel at martin.sperl.org wrote:
->>>> @@ -638,13 +666,21 @@ static int bcm2835_dma_probe(struct platform_device *pdev)
->>>>   		goto err_no_dma;
->>>>   	}
->>>>
->>>> -	for (i = 0; i < pdev->num_resources; i++) {
->>>> -		irq = platform_get_irq(pdev, i);
->>>> +	for (i = 0; i <= BCM2835_DMA_MAX_CHANNEL_NUMBER; i++) {
->>>> +		if (BCM2835_DMA_IRQ_SHARED_MASK & BIT(i)) {
->>>
->>> Ideally this should be done thru DT data and not hard coded in kernel. I
->>> dont think this assumption will hold good for next gen of this device, so
->>> better to get this from DT!
->>
->> The ideal solution would be breaking the DT in such a way that we could
->> define a register range and interrupt per dma-channel looking something
->> like this:
->>
->> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
->> index 83d9787..9526b91 100644
->> --- a/arch/arm/boot/dts/bcm2835.dtsi
->> +++ b/arch/arm/boot/dts/bcm2835.dtsi
->> @@ -31,8 +31,28 @@
->>
->>                  dma: dma at 7e007000 {
->>                          compatible = "brcm,bcm2835-dma";
->> -                       reg = <0x7e007000 0xf00>;
->> -                       interrupts = <1 16>,
->> +                       reg = <0x7e007f00 0x100>, /* status reg */
->> +                             <0x7e007000 0x100>,
->> +                             <0x7e007100 0x100>,
->> +                             <0x7e007200 0x100>,
->> +                             <0x7e007300 0x100>,
->> +                             <0x7e007400 0x100>,
->> +                             <0x7e007500 0x100>,
->> +                             <0x7e007600 0x100>,
->> +                             <0x7e007700 0x100>,
->> +                             <0x7e007800 0x100>,
->> +                             <0x7e007900 0x100>,
->> +                             <0x7e007a00 0x100>,
->> +                             <0x7e007b00 0x100>,
->> +                             <0x7e007c00 0x100>,
->> +                             <0x7e007d00 0x100>,
->> +                             <0x7e007e00 0x100>,
->> +                             /* dma channel 15 uses a different base */
->> +                             <0x7ee05000 0x100>;
->> +                       interrupts = <1 28>, /* catch all DMA-interrupts */
->> +                                    /* dma channel 0-10 interrupts */
->> +                                    <1 16>,
->>                                       <1 17>,
->>                                       <1 18>,
->>                                       <1 19>,
->> @@ -43,9 +63,30 @@
->>                                       <1 24>,
->>                                       <1 25>,
->>                                       <1 26>,
->> +                                    /* dma channel 11-14 share irq */
->>                                       <1 27>,
->> -                                    <1 28>;
->> -
->> +                                    <1 27>,
->> +                                    <1 27>,
->> +                                    <1 27>,
->> +                                    /* no irq support for dma channel 15 */
->> +                                    < 0 >;
->> +                       dma-names = "shared",
->> +                                   "dma0",
->> +                                   "dma1",
->> +                                   "dma2",
->> +                                   "dma3",
->> +                                   "dma4",
->> +                                   "dma5",
->> +                                   "dma6",
->> +                                   "dma7",
->> +                                   "dma8",
->> +                                   "dma9",
->> +                                   "dma10",
->> +                                   "dma11",
->> +                                   "dma12",
->> +                                   "dma13",
->> +                                   "dma14",
->> +                                   "dma15";
->>                          #dma-cells = <1>;
->>                          brcm,dma-channel-mask = <0x7f35>;
->> (or similar)
->>
->> This actually would allow us to make "brcm,dma-channel-mask" redundant,
->> as we could remove those dma channels that are owned by the firmware
->> directly from the list.
->>
->> That way we could also map other capabilities via the DT.
->>
->> It would also allow a transparent addition of additional dma channels
->> with newer versions of the HW - mostly - by modifying the DT.
->
-> Precisely
->
->>
->> But that would be frowned upon, so I had to come up with the approach
->> taken, which makes the following assumptions:
->
-> DT was designed to move this info and hardcoding from kernel into
-> DT, so why cant we do that?
-We still need to be backwards-compatible - at least that is what
-everyone tells me, so I need to hard-code fallbacks for those values.
->
->> * the DT maps only the interrupts that are assigned to the HW block
->> * the driver knows about the number of DMA channels in HW
-that could be a DT property, yes.
->> * the driver knows about the mapping of shared interrupts
->>    (11-14 share irq).
-OK - how would you define that "mapping" in a "sane" manner in the DT
-that allows us to have multiple such mappings in the future?
+According to commit 63ebb9f (drm/rockchip: Convert to support atomic
+API) it's because rockchip doesn't have a hardware vblank counter.
 
->>
->> It is not optimal, but at least it works with the least amount of
->> change to the DT - and what about all those assumptions that we
->> would need to hard-code to be backwards compatible to the DT without?
->>
->> I guess we could replace BCM2835_DMA_MAX_CHANNEL_NUMBER with:
->>    /* we do not support dma channel 15 with this driver */
->>    #define BCM2835_DMA_MAX_CHANNEL_SUPPORTED 14
->>    ...
->>    for (i = 0;
->>         i <= min_t(int, flv(chans_available),
->> BCM2835_DMA_MAX_CHANNEL_SUPPORTED);
->>         i++) {
->>
->> So which way would you prefer this to go - I got another few days
->> before I leave on vacation.
->
-> I still think DT is the right way to go here, unless I hear some other
-> convincing answer..
->
+I'm not entirely clear on why this prevents the use of
+drm_atomic_helper_wait_for_vblanks().
 
-The point is that the way the DT is right now it becomes very hard to
-extend it in a sane manner - It would be bitmaps/lists here,
-bitmaps/lists there...
-
-Breaking the DT would make all of it go away.
-
-If I think of it (reading your other comments), then here how the
-"new" DT could look like:
-dma: dma at 7e007f00 {
-	/* new compatible name to map to new driver */
-	compatible = "brcm,bcm2835-dma-v2";
-
-	/* the status/enable registers */
-	reg = <0x7e007f00 0x100>;
-
-	/* the catch all interrupt */
-	interrupts = <1 28>;
-
-	dma0: dma-channel at 0x7e007000 {
-		reg = <0x7e007000 0x100>;
-		interrupts = <1 16>;
-	};
-	...
-	dma7: dma-channel at 0x7e007700 {
-		reg = <0x7e007700 0x100>;
-		interrupts = <1 23>;
-		dma-channel-type = <BCM2835_DMA_LITE>;
-		dma-max-length = <65532>; /* 64K - 4 */
-	};
-	...
-	dma11: dma-channel at 0x7e007b00 {
-		reg = <0x7e007b00 0x100>;
-		interrupts = <1 27>;
-		shared-interrupt;
-		dma-channel-type = <BCM2835_DMA_LITE>;
-	};
-	...
-	dma14: dma-channel at 0x7e007e00 {
-		reg = <0x7e007e00 0x100>;
-		interrupts = <1 27>;
-		shared-interrupt;
-		dma-channel-type = <BCM2835_DMA_LITE>;
-	};
-	dma15: dma-channel at 0x7ee05000 {
-		reg = <0x7ee05000 0x100>;
-	};
-};
-
-Adding additional "features" would make it easy like:
-* dma-channel priority on AXI bus
-* setting warn/alert levels for DREQs
-* eventually mapping of drivers to the explicit dma channel
-   e.g: SPI has a limit of 65534 bytes per dma transfer in HW,
-   so the use of a DMA-LITE engine would be sufficient - no need
-   to waste a "normal" DMA-engine with 2D support,...
-   So the spi dt node  could then look like this:
-     dmas = <&dma11 BCM2835_DREQ_SPI_TX>, <&dma12 BCM2835_DREQ_SPI_RX>;
-     dma-names = "tx", "rx";
-
-Is this the approach I should try to take?
-
-Or do you want me to continue on the "patchwork" route:
-dma: dma at 7e007000 {
-	interrupt-names = "dma0", ..., "dma10", "shared", "catch-all";
-
-	bcrm,dma-lite-channel-mask = <0x7f80>;
-	bcrm,dma-max-channels = 14;
-
-	bcrm,catch-all-interrupt-name = "catch-all";
-	bcrm,shared-interrupt-name = "shared";
-	bcrm,shared-interrupt-channel-mapping = <0x7800>;
-}
-
-For all of the above we would need to define defaults in the driver
-to make it work in a backwards compatible way.
-
-That would not support the registers for each dma channel and not lend
-itself towards extending only via the DT - say support DMA channel 15.
-
-I have another 5 days before I leave on vacation - there is only so
-much I can do...
-
-Thanks,
-	Martin
+> > +
+> >  static void
+> > -rockchip_atomic_wait_for_complete(struct drm_atomic_state
+> > *old_state) +rockchip_atomic_wait_for_complete(struct drm_device
+> > *dev, struct drm_atomic_state *old_state) {
+> >  	struct drm_crtc_state *old_crtc_state;
+> >  	struct drm_crtc *crtc;
+> > @@ -194,6 +214,9 @@ rockchip_atomic_wait_for_complete(struct
+> > drm_atomic_state *old_state) if (!crtc->state->active)
+> >  			continue;
+> >  
+> > +		if (!framebuffer_changed(dev, old_state, crtc))
+> > +			continue;
+> > +
+> >  		ret = drm_crtc_vblank_get(crtc);
+> >  		if (ret != 0)
+> >  			continue;
+> > @@ -241,7 +264,7 @@ rockchip_atomic_commit_complete(struct
+> > rockchip_atomic_commit *commit) 
+> >  	drm_atomic_helper_commit_planes(dev, state, true);
+> >  
+> > -	rockchip_atomic_wait_for_complete(state);
+> > +	rockchip_atomic_wait_for_complete(dev, state);
+> >  
+> >  	drm_atomic_helper_cleanup_planes(dev, state);
+> >  
+> > -- 
+> > 2.7.0.rc3.140.g520a093
+> > 
+> > _______________________________________________
+> > dri-devel mailing list
+> > dri-devel at lists.freedesktop.org
+> > http://lists.freedesktop.org/mailman/listinfo/dri-devel  
+> 
