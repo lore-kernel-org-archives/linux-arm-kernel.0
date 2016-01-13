@@ -1,78 +1,43 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 13 Jan 2016 12:11:15 -0800
-Subject: [PATCH V2 3/4] clk: bcm2835: enable management of PCM clock
-In-Reply-To: <1452542157-2387-4-git-send-email-kernel@martin.sperl.org>
-References: <1452542157-2387-1-git-send-email-kernel@martin.sperl.org>
- <1452542157-2387-4-git-send-email-kernel@martin.sperl.org>
-Message-ID: <20160113201115.1168.91766@quark.deferred.io>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Jan 2016 21:26:55 +0100
+Subject: [PATCH] drm: avoid uninitialized timestamp use in wait_vblank
+Message-ID: <4063054.9IPA0UdbYa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting kernel at martin.sperl.org (2016-01-11 11:55:55)
-> From: Martin Sperl <kernel@martin.sperl.org>
-> 
-> Enable the PCM clock in the SOC, which is used by the
-> bcm2835-i2s driver.
-> 
-> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+gcc warns about the timestamp in drm_wait_vblank being possibly
+used without an initialization:
 
-Looks OK to me.
+drivers/gpu/drm/drm_irq.c: In function 'drm_wait_vblank':
+drivers/gpu/drm/drm_irq.c:1755:28: warning: 'now.tv_usec' may be used uninitialized in this function [-Wmaybe-uninitialized]
+   vblwait->reply.tval_usec = now.tv_usec;
+drivers/gpu/drm/drm_irq.c:1754:27: warning: 'now.tv_sec' may be used uninitialized in this function [-Wmaybe-uninitialized]
+   vblwait->reply.tval_sec = now.tv_sec;
 
-Regards,
-Mike
+This can happen if drm_vblank_count_and_time() returns 0 in its
+error path. To sanitize the error case, I'm changing that function
+to return a zero timestamp when it fails.
 
-> ---
->  drivers/clk/bcm/clk-bcm2835.c       |   13 +++++++++++++
->  include/dt-bindings/clock/bcm2835.h |    1 +
->  2 files changed, 14 insertions(+)
-> 
-> diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-> index 7c782d3..573b5b1 100644
-> --- a/drivers/clk/bcm/clk-bcm2835.c
-> +++ b/drivers/clk/bcm/clk-bcm2835.c
-> @@ -88,6 +88,8 @@
->  #define CM_HSMDIV              0x08c
->  #define CM_OTPCTL              0x090
->  #define CM_OTPDIV              0x094
-> +#define CM_PCMCTL              0x098
-> +#define CM_PCMDIV              0x09c
->  #define CM_PWMCTL              0x0a0
->  #define CM_PWMDIV              0x0a4
->  #define CM_SMICTL              0x0b0
-> @@ -826,6 +828,16 @@ static const struct bcm2835_clock_data bcm2835_clock_pwm_data = {
->         .frac_bits = 12,
->  };
->  
-> +static const struct bcm2835_clock_data bcm2835_clock_pcm_data = {
-> +       .name = "pcm",
-> +       .num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
-> +       .parents = bcm2835_clock_per_parents,
-> +       .ctl_reg = CM_PCMCTL,
-> +       .div_reg = CM_PCMDIV,
-> +       .int_bits = 12,
-> +       .frac_bits = 12,
-> +};
-> +
->  struct bcm2835_pll {
->         struct clk_hw hw;
->         struct bcm2835_cprman *cprman;
-> @@ -1616,6 +1628,7 @@ static const struct bcm2835_register_clock bcm2835_register_clocks[] = {
->         REGISTER_CLOCK(BCM2835_CLOCK_HSM, &bcm2835_clock_hsm_data),
->         REGISTER_CLOCK(BCM2835_CLOCK_EMMC, &bcm2835_clock_emmc_data),
->         REGISTER_CLOCK(BCM2835_CLOCK_PWM, &bcm2835_clock_pwm_data),
-> +       REGISTER_CLOCK(BCM2835_CLOCK_PCM, &bcm2835_clock_pcm_data),
->  };
->  
->  void bcm2835_register_duplicate_index(
-> diff --git a/include/dt-bindings/clock/bcm2835.h b/include/dt-bindings/clock/bcm2835.h
-> index 87235ac..9a7b4a5 100644
-> --- a/include/dt-bindings/clock/bcm2835.h
-> +++ b/include/dt-bindings/clock/bcm2835.h
-> @@ -44,3 +44,4 @@
->  #define BCM2835_CLOCK_EMMC             28
->  #define BCM2835_CLOCK_PERI_IMAGE       29
->  #define BCM2835_CLOCK_PWM              30
-> +#define BCM2835_CLOCK_PCM              31
-> -- 
-> 1.7.10.4
-> 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: e6ae8687a87b ("drm: idiot-proof vblank")
+---
+I'm going through the maybe-unused warnings in randconfig builds, this one is
+apparently not a false positive, although it only happens if something
+else has already gone wrong.
+
+diff --git a/drivers/gpu/drm/drm_irq.c b/drivers/gpu/drm/drm_irq.c
+index d12a4efa651b..d32ff169fdb8 100644
+--- a/drivers/gpu/drm/drm_irq.c
++++ b/drivers/gpu/drm/drm_irq.c
+@@ -939,8 +939,10 @@ u32 drm_vblank_count_and_time(struct drm_device *dev, unsigned int pipe,
+ 	int count = DRM_TIMESTAMP_MAXRETRIES;
+ 	u32 cur_vblank;
+ 
+-	if (WARN_ON(pipe >= dev->num_crtcs))
++	if (WARN_ON(pipe >= dev->num_crtcs)) {
++		*vblanktime = (struct timeval) { 0 };
+ 		return 0;
++	}
+ 
+ 	/*
+ 	 * Vblank timestamps are read lockless. To ensure consistency the vblank
