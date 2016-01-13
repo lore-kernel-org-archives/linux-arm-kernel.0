@@ -1,135 +1,86 @@
-From: songjun.wu@atmel.com (Songjun Wu)
-Date: Wed, 13 Jan 2016 14:35:10 +0800
-Subject: [PATCH] ASoC: atmel_ssc_dai: distinguish the different SSC
-Message-ID: <1452666910-23586-1-git-send-email-songjun.wu@atmel.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 13 Jan 2016 12:17:45 +0530
+Subject: [PATCH v2 2/3] ARM: DRA7: add pdata-quirks to do reset of PCIe
+In-Reply-To: <1452667666-17533-1-git-send-email-kishon@ti.com>
+References: <1452667666-17533-1-git-send-email-kishon@ti.com>
+Message-ID: <1452667666-17533-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cpu_dai id always equals 0, can't distinguish the
-different SSC. Use platform_device id to record
-and distinguish the different SSC.
+Use pdata-quirks to reset PCIe IP. This is to be used until
+a drivers/reset/ interface is available for this purpose.
 
-Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
+ arch/arm/mach-omap2/pdata-quirks.c       |   11 +++++++++++
+ include/linux/platform_data/pci-dra7xx.h |   22 ++++++++++++++++++++++
+ 2 files changed, 33 insertions(+)
+ create mode 100644 include/linux/platform_data/pci-dra7xx.h
 
- drivers/misc/atmel-ssc.c        |    1 +
- sound/soc/atmel/atmel_ssc_dai.c |   27 ++++++++++++++++++---------
- 2 files changed, 19 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
-index e11a0bd..0516ecd 100644
---- a/drivers/misc/atmel-ssc.c
-+++ b/drivers/misc/atmel-ssc.c
-@@ -34,6 +34,7 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
- 		if (ssc->pdev->dev.of_node) {
- 			if (of_alias_get_id(ssc->pdev->dev.of_node, "ssc")
- 				== ssc_num) {
-+				ssc->pdev->id = ssc_num;
- 				ssc_valid = 1;
- 				break;
- 			}
-diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-index ba8def5..2768970 100644
---- a/sound/soc/atmel/atmel_ssc_dai.c
-+++ b/sound/soc/atmel/atmel_ssc_dai.c
-@@ -285,7 +285,8 @@ static int atmel_ssc_hw_rule_rate(struct snd_pcm_hw_params *params,
- static int atmel_ssc_startup(struct snd_pcm_substream *substream,
- 			     struct snd_soc_dai *dai)
- {
--	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
-+	struct platform_device *pdev = to_platform_device(dai->dev);
-+	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
- 	struct atmel_pcm_dma_params *dma_params;
- 	int dir, dir_mask;
- 	int ret;
-@@ -346,7 +347,8 @@ static int atmel_ssc_startup(struct snd_pcm_substream *substream,
- static void atmel_ssc_shutdown(struct snd_pcm_substream *substream,
- 			       struct snd_soc_dai *dai)
- {
--	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
-+	struct platform_device *pdev = to_platform_device(dai->dev);
-+	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
- 	struct atmel_pcm_dma_params *dma_params;
- 	int dir, dir_mask;
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index 5814477..f5a65fe 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -23,6 +23,7 @@
+ #include <linux/platform_data/pinctrl-single.h>
+ #include <linux/platform_data/iommu-omap.h>
+ #include <linux/platform_data/wkup_m3.h>
++#include <linux/platform_data/pci-dra7xx.h>
  
-@@ -392,7 +394,8 @@ static void atmel_ssc_shutdown(struct snd_pcm_substream *substream,
- static int atmel_ssc_set_dai_fmt(struct snd_soc_dai *cpu_dai,
- 		unsigned int fmt)
- {
--	struct atmel_ssc_info *ssc_p = &ssc_info[cpu_dai->id];
-+	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
-+	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
+ #include "common.h"
+ #include "common-board-devices.h"
+@@ -404,6 +405,14 @@ static void __init omap5_uevm_legacy_init(void)
+ }
+ #endif
  
- 	ssc_p->daifmt = fmt;
- 	return 0;
-@@ -404,7 +407,8 @@ static int atmel_ssc_set_dai_fmt(struct snd_soc_dai *cpu_dai,
- static int atmel_ssc_set_dai_clkdiv(struct snd_soc_dai *cpu_dai,
- 	int div_id, int div)
- {
--	struct atmel_ssc_info *ssc_p = &ssc_info[cpu_dai->id];
-+	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
-+	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
++#ifdef CONFIG_SOC_DRA7XX
++static struct pci_dra7xx_platform_data dra7xx_pci_pdata = {
++	.reset_name = "pcie",
++	.assert_reset = omap_device_assert_hardreset,
++	.deassert_reset = omap_device_deassert_hardreset,
++};
++#endif
++
+ static struct pcs_pdata pcs_pdata;
  
- 	switch (div_id) {
- 	case ATMEL_SSC_CMR_DIV:
-@@ -445,7 +449,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
- 	struct snd_pcm_hw_params *params,
- 	struct snd_soc_dai *dai)
- {
--	int id = dai->id;
-+	struct platform_device *pdev = to_platform_device(dai->dev);
-+	int id = pdev->id;
- 	struct atmel_ssc_info *ssc_p = &ssc_info[id];
- 	struct ssc_device *ssc = ssc_p->ssc;
- 	struct atmel_pcm_dma_params *dma_params;
-@@ -772,7 +777,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
- static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
- 			     struct snd_soc_dai *dai)
- {
--	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
-+	struct platform_device *pdev = to_platform_device(dai->dev);
-+	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
- 	struct atmel_pcm_dma_params *dma_params;
- 	int dir;
- 
-@@ -795,7 +801,8 @@ static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
- static int atmel_ssc_trigger(struct snd_pcm_substream *substream,
- 			     int cmd, struct snd_soc_dai *dai)
- {
--	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
-+	struct platform_device *pdev = to_platform_device(dai->dev);
-+	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
- 	struct atmel_pcm_dma_params *dma_params;
- 	int dir;
- 
-@@ -824,11 +831,12 @@ static int atmel_ssc_trigger(struct snd_pcm_substream *substream,
- static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
- {
- 	struct atmel_ssc_info *ssc_p;
-+	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
- 
- 	if (!cpu_dai->active)
- 		return 0;
- 
--	ssc_p = &ssc_info[cpu_dai->id];
-+	ssc_p = &ssc_info[pdev->id];
- 
- 	/* Save the status register before disabling transmit and receive */
- 	ssc_p->ssc_state.ssc_sr = ssc_readl(ssc_p->ssc->regs, SR);
-@@ -852,12 +860,13 @@ static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
- static int atmel_ssc_resume(struct snd_soc_dai *cpu_dai)
- {
- 	struct atmel_ssc_info *ssc_p;
-+	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
- 	u32 cr;
- 
- 	if (!cpu_dai->active)
- 		return 0;
- 
--	ssc_p = &ssc_info[cpu_dai->id];
-+	ssc_p = &ssc_info[pdev->id];
- 
- 	/* restore SSC register settings */
- 	ssc_writel(ssc_p->ssc->regs, TFMR, ssc_p->ssc_state.ssc_tfmr);
+ void omap_pcs_legacy_init(int irq, void (*rearm)(void))
+@@ -474,6 +483,8 @@ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ #endif
+ #ifdef CONFIG_SOC_DRA7XX
+ 	OF_DEV_AUXDATA("ti,dra7-padconf", 0x4a003400, "4a003400.pinmux", &pcs_pdata),
++	OF_DEV_AUXDATA("ti,dra7-pcie", 0x51000000, "51000000.pcie", &dra7xx_pci_pdata),
++	OF_DEV_AUXDATA("ti,dra7-pcie", 0x51800000, "51800000.pcie", &dra7xx_pci_pdata),
+ #endif
+ #ifdef CONFIG_SOC_AM43XX
+ 	OF_DEV_AUXDATA("ti,am437-padconf", 0x44e10800, "44e10800.pinmux", &pcs_pdata),
+diff --git a/include/linux/platform_data/pci-dra7xx.h b/include/linux/platform_data/pci-dra7xx.h
+new file mode 100644
+index 0000000..792c8ed
+--- /dev/null
++++ b/include/linux/platform_data/pci-dra7xx.h
+@@ -0,0 +1,22 @@
++/*
++ * pcie-dra7xx - Platform data for PCIe controller
++ *
++ * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * Authors: Kishon Vijay Abraham I <kishon@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __PCI_DRA7XX_H
++#define __PCI_DRA7XX_H
++
++struct pci_dra7xx_platform_data {
++	const char *reset_name;
++
++	int (*assert_reset)(struct platform_device *pdev, const char *name);
++	int (*deassert_reset)(struct platform_device *pdev, const char *name);
++};
++#endif /* __PCI_DRA7XX_H */
 -- 
 1.7.9.5
