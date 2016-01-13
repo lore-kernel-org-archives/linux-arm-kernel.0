@@ -1,29 +1,48 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Wed, 13 Jan 2016 12:45:11 -0800
-Subject: [PATCH 1/2] of: add vendor prefix for UniWest
-Message-ID: <b11bf2208fe30b96c4d82e634e8abe04343754de.1452717014.git.stillcompiling@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Jan 2016 21:45:05 +0100
+Subject: [PATCH] logfs: clarify MTD dependency
+In-Reply-To: <20160113123918.544497b48bf4c03591c75747@linux-foundation.org>
+References: <5776957.XLg438VUOx@wuerfel>
+ <20160113123918.544497b48bf4c03591c75747@linux-foundation.org>
+Message-ID: <6116283.ubGS0D0e49@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-United Western Technologies Corp, known primarily as UniWest,
-is a manufacturer of eddy current and ultrasonic testing equipment.
+On Wednesday 13 January 2016 12:39:18 Andrew Morton wrote:
+> 
+> Randy's "logfs: fix logfs build errors and dependencies" is an
+> only-in-mm thing.  So it would make sense to combine the two patches
+> into a single one and to give that an appropriate changelog.
+> 
+> How does this look? (Primary author was chosen randomly)
+> 
+> 
+> From: Arnd Bergmann <arnd@arndb.de>
+> Subject: logfs: fix logfs build errors and dependencies
+> 
+> Fix build errors that happen when CONFIG_LOGFS=y and CONFIG_MTD=m:
+> 
+> fs/built-in.o: In function `logfs_mount':
+> super.c:(.text+0x92a6f): undefined reference to `logfs_get_sb_mtd'
+> fs/built-in.o: In function `logfs_get_sb_bdev':
+> (.text+0x93530): undefined reference to `logfs_get_sb_mtd'
+> 
+> This patch avoids the error by changing the dependencies of
+> logfs in a way that we can no longer configure logfs as built-in
+> when the MTD core is a loadable module, while leaving the
+> dependency to require at least one of MTD or BLOCK to be
+> enabled.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Randy Dunlap <rdunlap@infradead.org>
+> Cc: Michal Marek <mmarek@suse.cz>
+> Cc: Peter Chen <peter.chen@freescale.com>
+> Cc: Randy Dunlap <rdunlap@infradead.org>
+> Cc: Joern Engel <joern@logfs.org>
+> Cc: Prasad Joshi <prasadjoshi.linux@gmail.com>
+> Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+> 
 
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
----
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+Looks good, thanks!
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 55df1d4..7dabdee 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -230,6 +230,7 @@ toradex	Toradex AG
- toshiba	Toshiba Corporation
- toumaz	Toumaz
- tplink	TP-LINK Technologies Co., Ltd.
-+uniwest	United Western Technologies Corp (UniWest)
- tronfy	Tronfy
- truly	Truly Semiconductors Limited
- upisemi	uPI Semiconductor Corp.
--- 
-2.5.0
+	Arnd
