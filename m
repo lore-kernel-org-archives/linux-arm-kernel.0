@@ -1,35 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Jan 2016 23:51:43 +0100
-Subject: [PATCH] ssb: host_soc depends on sprom
-Message-ID: <8128014.DbbgBtKY3z@wuerfel>
+Date: Thu, 14 Jan 2016 00:02:13 +0100
+Subject: [PATCH] clocksource: ftm: select CLKSRC_MMIO
+Message-ID: <11970328.RVc8t0Mk1C@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drivers that use the SSB sprom functionality typically 'select SSB_SPROM'
-from Kconfig, but CONFIG_SSB_HOST_SOC misses this, which results in
-a build failure unless at least one of the other drivers that selects
-it is enabled:
+The ftm clocksource driver does not build if CLKSRC_MMIO is disabled:
 
-drivers/built-in.o: In function `ssb_host_soc_get_invariants':
-(.text+0x459494): undefined reference to `ssb_fill_sprom_with_fallback'
+drivers/built-in.o: In function `ftm_timer_init':
+(init.text+0xd324): undefined reference to `clocksource_mmio_init'
+(init.text+0xd484): undefined reference to `clocksource_mmio_readl_up'
 
-This adds the same select statement that is used elsewhere.
+This adds the same 'select' statement that the other similar drivers
+use. Prior to allowing this driver to be enabled with COMPILE_TEST,
+it was apparently unused. I'm not entirely sure who is using this
+hardware, but it certainly can't hurt to ensure it builds cleanly.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 541c9a84cd85 ("ssb: pick SoC invariants code from MIPS BCM47xx arch")
----
-I'm not sure who the right person is to pick up the fix. The patch that
-introduced the problem was merged by Kalle through the iwlwifi tree.
+Fixes: ef49336bbd15 ("clocksource/drivers/fsl-ftm: Add the COMPILE_TEST option")
 
-diff --git a/drivers/ssb/Kconfig b/drivers/ssb/Kconfig
-index 0c675861623f..d8e4219c2324 100644
---- a/drivers/ssb/Kconfig
-+++ b/drivers/ssb/Kconfig
-@@ -83,6 +83,7 @@ config SSB_SDIOHOST
- config SSB_HOST_SOC
- 	bool "Support for SSB bus on SoC"
- 	depends on SSB && BCM47XX_NVRAM
-+	select SSB_SPROM
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index b251013eef0a..d3ad9512312b 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -256,6 +256,7 @@ config CLKSRC_SAMSUNG_PWM
+ config FSL_FTM_TIMER
+ 	bool "Freescale FlexTimer Module driver" if COMPILE_TEST
+ 	depends on GENERIC_CLOCKEVENTS
++	select CLKSRC_MMIO
  	help
- 	  Host interface for a SSB directly mapped into memory. This is
- 	  for some Broadcom SoCs from the BCM47xx and BCM53xx lines.
+ 	  Support for Freescale FlexTimer Module (FTM) timer.
+ 
