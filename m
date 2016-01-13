@@ -1,38 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Jan 2016 14:58:11 +0100
-Subject: [PATCH] netfilter: nft_ct: mark nft_ct_get_eval_counter __maybe_unused
-Message-ID: <6200241.eeH6DHXzHj@wuerfel>
+From: peter@korsgaard.com (Peter Korsgaard)
+Date: Wed, 13 Jan 2016 15:22:12 +0100
+Subject: [PATCH v2 1/2] regulator: act8945a: add regulator driver for
+ ACT8945A
+In-Reply-To: <1452586629-1117-2-git-send-email-wenyou.yang@atmel.com> (Wenyou
+ Yang's message of "Tue, 12 Jan 2016 16:17:08 +0800")
+References: <1452586629-1117-1-git-send-email-wenyou.yang@atmel.com>
+ <1452586629-1117-2-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <87oacp5zl7.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added nft_ct_get_eval_counter() function is only used when
-CONFIG_NF_CONNTRACK_LABELS is set, otherwise gcc warns about the
-unused definition:
+>>>>> "Wenyou" == Wenyou Yang <wenyou.yang@atmel.com> writes:
 
-netfilter/nft_ct.c:34:12: warning: 'nft_ct_get_eval_counter' defined but not used [-Wunused-function]
- static u64 nft_ct_get_eval_counter(const struct nf_conn_counter *c,
+ > This patch adds new regulator driver to support ACT8945A MFD
+ > chip's regulators.
 
-This marks the function __maybe_unused to shut up the warning.
+ > The ACT8945A has three step-down DC/DC converters and four
+ > low-dropout regulators.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 48f66c905a97 ("netfilter: nft_ct: add byte/packet counter support")
----
-Found on ARM randconfig builds this week
+ > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 
-diff --git a/net/netfilter/nft_ct.c b/net/netfilter/nft_ct.c
-index a0eb2161e3ef..3496929bbc54 100644
---- a/net/netfilter/nft_ct.c
-+++ b/net/netfilter/nft_ct.c
-@@ -31,9 +31,9 @@ struct nft_ct {
- 	};
- };
- 
--static u64 nft_ct_get_eval_counter(const struct nf_conn_counter *c,
--				   enum nft_ct_keys k,
--				   enum ip_conntrack_dir d)
-+static u64 __maybe_unused nft_ct_get_eval_counter(const struct nf_conn_counter *c,
-+						  enum nft_ct_keys k,
-+						  enum ip_conntrack_dir d)
- {
- 	if (d < IP_CT_DIR_MAX)
- 		return k == NFT_CT_BYTES ? atomic64_read(&c[d].bytes) :
+Isn't the regulator part of the act8945a identical to act8865? Can't we
+just use the existing act8865-regulator.c driver? (E.G. support 8865
+variant in the mfd driver, but only register the regulator sub device?)
+
+-- 
+Bye, Peter Korsgaard
