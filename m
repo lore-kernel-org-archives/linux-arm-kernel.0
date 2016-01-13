@@ -1,36 +1,80 @@
-From: broonie@debian.org (Mark Brown)
-Date: Wed, 13 Jan 2016 11:42:27 +0000
-Subject: I/O issues with writing to mtdblock devices on kirkwood
-In-Reply-To: <6044522.tqmlJ5a48h@wuerfel>
-References: <1440159857.19360.50.camel@debian.org> <4468027.N4Q71mzei0@wuerfel>
- <20160112220058.GE6588@sirena.org.uk> <6044522.tqmlJ5a48h@wuerfel>
-Message-ID: <20160113114227.GI6588@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 13 Jan 2016 12:08:44 +0000
+Subject: [PATCH] arm64: net: bpf: don't BUG() on large shifts
+In-Reply-To: <CABg9mcsnNeXPk1ifFMsV7oy8E1ZjprXu1_7KwoMp=RQ29UEFFQ@mail.gmail.com>
+References: <1452015543-6790-1-git-send-email-rabin@rab.in>
+ <20160108154423.GC11228@arm.com>
+ <20160108190943.GA11561@ast-mbp.thefacebook.com>
+ <20160112171710.GK15737@arm.com>
+ <20160112192302.GA34276@ast-mbp.thefacebook.com>
+ <CABg9mcsnNeXPk1ifFMsV7oy8E1ZjprXu1_7KwoMp=RQ29UEFFQ@mail.gmail.com>
+Message-ID: <20160113120844.GF25458@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 11:41:45PM +0100, Arnd Bergmann wrote:
-> On Tuesday 12 January 2016 22:00:58 Mark Brown wrote:
+On Tue, Jan 12, 2016 at 08:45:43PM -0800, Z Lim wrote:
+> On Tue, Jan 12, 2016 at 11:23 AM, Alexei Starovoitov
+> <alexei.starovoitov@gmail.com> wrote:
+> > On Tue, Jan 12, 2016 at 05:17:10PM +0000, Will Deacon wrote:
+> >> On Fri, Jan 08, 2016 at 11:09:44AM -0800, Alexei Starovoitov wrote:
+> >> > On Fri, Jan 08, 2016 at 03:44:23PM +0000, Will Deacon wrote:
+> >> > > On Tue, Jan 05, 2016 at 06:39:03PM +0100, Rabin Vincent wrote:
+> >> > > > Attempting to generate UBFM/SBFM instructions with shifts that can't be
+> >> > > > encoded in the immediate fields of the opcodes leads to a trigger of a
+> >> > > > BUG() in the instruction generation code.  As the ARMv8 ARM says: "The
+> >> > > > shift amounts must be in the range 0 to one less than the register width
+> >> > > > of the instruction, inclusive."  Make the JIT reject unencodable shifts
+> >> > > > instead of crashing.
+> >> > >
+> >> > > I moaned about those BUG_ONs when they were introduced:
+> >> > >
+> >> > >   https://lkml.org/lkml/2014/7/17/438
+> >> > >
+> >> > > The response then was that the verifier would catch these issues so
+> >> > > there was nothing to worry about. Has something changed so that is no
+> >> > > longer the case? Do we need to consider a different way of rejecting
+> >> > > invalid instructions at the encoding stage rather than bringing down the
+> >> > > kernel?
+> >> >
+> >> > that discussion lead to replacement of all BUG_ONs in
+> >> > arch/arm64/net/bpf_jit_comp.c with pr_err_once(), but looks like
+> >> > arch/arm64/kernel/insn.c wasn't addressed.
+> >> > The amount of BUG_ONs there is indeed overkill regardless of what
+> >> > verifier and other JITs do. btw, x64 JIT doesn't have runtime BUG_ONs.
+> >>
+> >> Maybe, but insn.c is also used by the alternatives patching code, so we
+> >> really need a way to communicate failure back to the BPF JIT when passed
+> >> an invalid instruction description.
+> >
+> > agree. I think there are several options to achieve that after
+> > all BUG_ONs are removed:
+> > - change interface for all insn generating macros to check for
+> >   AARCH64_BREAK_FAULT opcode as error.
+> >   That will require all of emit*() functions in bpf_jit_comp.c to
+> >   be changed to accept/return error.
+> >   Overall that looks like massive change.
+> > - ignore AARCH64_BREAK_FAULT during emit and add another pass after
+> >   all code is generated. If such insn is found in a jited code,
+> >   discard the jit.
+> >   I think that's better option.
+> >
+> > Zi, any comments?
+> >
+> 
+> Alexei, agreed. Second approach is cleaner. Full disclosure: I did not
+> look at other callers beyond JIT.
+> 
+> Separately, sounds like there's now preference and consensus to
+> removing all BUGs and BUG_ONs in insn.c. Did a quick grep of insn.c
+> and noticed a legacy instance, followed by many introduced around the
+> same time as JIT, and new additions since.
+> 
+> Will, any thoughts on the following replacement scheme?
+> 
+> BUG_ON() for codegen ==> pr_err(); return AARCH64_BREAK_FAULT;
+> BUG() for decoding ==> leave as is.
+> remaining BUG_ON() ==> leave as is.
 
-> > There's also the potential for the overhead from interrupts to be worse
-> > than the overhead for busy waiting, but given how badly we're coping now
-> > it's worth another look.
+That sounds good to me, thanks.
 
-> Possible, yes. Right now, we do a udelay(1), which I think waits between one and
-> two microseconds normally, so we are probably adding extra latency of under
-> one microsecond per byte by not polling constantly. If the interrupt latency
-> from device-ready to entering the code is more than that, we can assume that
-> the transfer ends up being slower. There is also some time spent for getting
-> back out of the interrupt handler, but that's no worse than doing nothing
-> in udelay().
-
-Indeed.  It may also make the cache performance worse as a result of
-frequently switching to the interrupt handler but if nothing else it
-should make it easier for something else to get access to the CPU which
-seems to be the issue here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160113/1928c3a6/attachment.sig>
+Will
