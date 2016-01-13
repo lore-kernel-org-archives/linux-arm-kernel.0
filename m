@@ -1,35 +1,98 @@
-From: holgerschurig@gmail.com (Holger Schurig)
-Date: Wed, 13 Jan 2016 08:35:28 +0100
-Subject: [PATCH 1/3] ARM: dts: imx6: add support for Ka-Ro electronics
- TX6S-8034 module
-In-Reply-To: <1452621710-15336-2-git-send-email-LW@KARO-electronics.de>
- ("Lothar \=\?utf-8\?Q\?Wa\=C3\=9Fmann\=22's\?\= message of "Tue, 12 Jan 2016
- 19:01:48 +0100")
-References: <1452621710-15336-1-git-send-email-LW@KARO-electronics.de>
- <1452621710-15336-2-git-send-email-LW@KARO-electronics.de>
-Message-ID: <87h9iigce7.fsf@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 13 Jan 2016 08:47:28 +0100
+Subject: mtd: pxa3xx_nand: issue with command time out
+In-Reply-To: <5695CEF0.1080100@alliedtelesis.co.nz> (Michael Wang's message of
+ "Wed, 13 Jan 2016 04:13:37 +0000")
+References: <5695CEF0.1080100@alliedtelesis.co.nz>
+Message-ID: <87a8o9ex9r.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lothar Wa?mann <LW@KARO-electronics.de> writes:
+Michael Wang <Michael.Wang@alliedtelesis.co.nz> writes:
 
-> +/ {
-> +	model = "Ka-Ro electronics TX6S-8034 Module";
-> +	compatible = "karo,imx6dl-tx6dl", "fsl,imx6dl";
-> +	timestamp = __DATE__, __TIME__;
+> Hi Robert,
+>
+> I am currently working with Marvell 98DX4251 switchchip with control and
+> management subsystem SOC based on ARMADA XP, and after upgrading kernel from
+...zip...
 
-Is this needed or useful?
+> 3.16.7 to 4.3, the nand controller command have a high chance of timing out.
+> -#define        CHIP_DELAY_TIMEOUT      msecs_to_jiffies(200)
+> +#define        CHIP_DELAY_TIMEOUT      msecs_to_jiffies(300)
+>   #define NAND_STOP_DELAY                msecs_to_jiffies(40)
+>   #define PAGE_CHUNK_SIZE                (2048)
+>
+> So I guess my question is whether the CHIP_DELAY_TIMEOUT should be increased
+> for 98DX4251, or is this likely to be caused by some other issue?
 
-There's a movement that aims to do "reproducible builds" ...   being
-able to recompile an image and verify it against the supplied can be
-helpful for security audit purposes.
+Hi Michael,
 
+> Any suggestion, help or hint will be very much appreciated.
+Actually I have one.
+Before we change the timeout, I'd like to see the sequence of register accesses.
 
-> +	display: display at di0 {
-> +		compatible = "fsl,imx-parallel-display";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_disp0_1>;
-> +		interface-pix-fmt = "rgb24";
-> +//		fsl,panel = <&lcd0_panel>;
+As I owe a patch to Brian on this topic, I'd like to have you as a tester. In
+return, I'll analyse the output of debug traces it generates for you.
 
-Probably not for upstream inclusion?
+The patch is at the bottom of this mail, and a "git am" on the mail should apply
+it to your kernel. It leaves up to you to add the "#define VERBOSE_DEBUG 1" in
+pxa3xx-nand.c, recompile, and take the traces.
+
+Once I have the traces, I will be able to compare with my traces on pxa3xx
+platforms and spot if there is a difference. Then we'll be able to see if
+increasing the timeout is the only option.
+
+Cheers.
+
+-- 
+Robert
+
+--->8---
+>From 2ab54517c4162e0041d11dd9ae376818d9a3a3e3 Mon Sep 17 00:00:00 2001
+From: Robert Jarzmik <robert.jarzmik@free.fr>
+Date: Tue, 11 Aug 2015 21:54:11 +0200
+Subject: [PATCH v2] mtd: nand: pxa3xx_nand: add register access debug
+
+Add verbose debug for register accesses. This enables easier debugging
+by following where and how hardware is stimulated, and how it answers.
+
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ drivers/mtd/nand/pxa3xx_nand.c | 22 +++++++++++++++++-----
+ 1 file changed, 17 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index e453ae9a17fa..0845d09e14c1 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -136,11 +136,23 @@
+ #define READ_ID_BYTES		7
+ 
+ /* macros for registers read/write */
+-#define nand_writel(info, off, val)	\
+-	writel_relaxed((val), (info)->mmio_base + (off))
+-
+-#define nand_readl(info, off)		\
+-	readl_relaxed((info)->mmio_base + (off))
++#define nand_writel(info, off, val)					\
++	do {								\
++		dev_vdbg(&info->pdev->dev,				\
++			 "%s():%d nand_writel(0x%x, 0x%04x)\n",		\
++			 __func__, __LINE__, (val), (off));		\
++		writel_relaxed((val), (info)->mmio_base + (off));	\
++	} while (0)
++
++#define nand_readl(info, off)						\
++	({								\
++		unsigned int _v;					\
++		_v = readl_relaxed((info)->mmio_base + (off));		\
++		dev_vdbg(&info->pdev->dev,				\
++			 "%s():%d nand_readl(0x%04x): 0x%x\n",		\
++			 __func__, __LINE__, (off), _v);		\
++		_v;							\
++	})
+ 
+ /* error code and state */
+ enum {
+-- 
+2.1.4
