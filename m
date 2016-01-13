@@ -1,30 +1,145 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 13 Jan 2016 16:01:19 +0100
-Subject: [PATCH] gpio: generic: make bgpio_pdata always visible
-In-Reply-To: <21095568.bdP2eOAsBs@wuerfel>
-References: <21095568.bdP2eOAsBs@wuerfel>
-Message-ID: <CACRpkdZd6sToPvGXtjrXEvoHyARfL9gz=t91Q_Qmawwu5_A8Jw@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 13 Jan 2016 16:08:02 +0100
+Subject: [PATCH] ASoC: atmel_ssc_dai: distinguish the different SSC
+In-Reply-To: <1452666910-23586-1-git-send-email-songjun.wu@atmel.com>
+References: <1452666910-23586-1-git-send-email-songjun.wu@atmel.com>
+Message-ID: <56966852.8050205@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 9, 2016 at 10:16 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+Le 13/01/2016 07:35, Songjun Wu a ?crit :
+> Cpu_dai id always equals 0, can't distinguish the
+> different SSC. Use platform_device id to record
+> and distinguish the different SSC.
+> 
+> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
 
-> Board files that define their own bgpio_pdata are broken when
-> CONFIG_GPIO_GENERIC is disabled and the bgpio_pdata structure
-> definition is hidden by the #ifdef:
->
-> arch/arm/mach-clps711x/board-autcpu12.c:148:15: error: variable 'autcpu12_mmgpio_pdata' has initializer but incomplete type
->  static struct bgpio_pdata autcpu12_mmgpio_pdata __initdata = {
-> arch/arm/mach-clps711x/board-autcpu12.c:149:2: error: unknown field 'base' specified in initializer
->   .base = AUTCPU12_MMGPIO_BASE,
->
-> Since the board files should generally not care what drivers are
-> enabled, this makes the structure definition visible again.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 0f4630f3720e ("gpio: generic: factor into gpio_chip struct")
+It seems okay:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Thanks a lot, patch applied!
+> ---
+> 
+>  drivers/misc/atmel-ssc.c        |    1 +
+>  sound/soc/atmel/atmel_ssc_dai.c |   27 ++++++++++++++++++---------
+>  2 files changed, 19 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
+> index e11a0bd..0516ecd 100644
+> --- a/drivers/misc/atmel-ssc.c
+> +++ b/drivers/misc/atmel-ssc.c
+> @@ -34,6 +34,7 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
+>  		if (ssc->pdev->dev.of_node) {
+>  			if (of_alias_get_id(ssc->pdev->dev.of_node, "ssc")
+>  				== ssc_num) {
+> +				ssc->pdev->id = ssc_num;
+>  				ssc_valid = 1;
+>  				break;
+>  			}
+> diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+> index ba8def5..2768970 100644
+> --- a/sound/soc/atmel/atmel_ssc_dai.c
+> +++ b/sound/soc/atmel/atmel_ssc_dai.c
+> @@ -285,7 +285,8 @@ static int atmel_ssc_hw_rule_rate(struct snd_pcm_hw_params *params,
+>  static int atmel_ssc_startup(struct snd_pcm_substream *substream,
+>  			     struct snd_soc_dai *dai)
+>  {
+> -	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
+> +	struct platform_device *pdev = to_platform_device(dai->dev);
+> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
+>  	struct atmel_pcm_dma_params *dma_params;
+>  	int dir, dir_mask;
+>  	int ret;
+> @@ -346,7 +347,8 @@ static int atmel_ssc_startup(struct snd_pcm_substream *substream,
+>  static void atmel_ssc_shutdown(struct snd_pcm_substream *substream,
+>  			       struct snd_soc_dai *dai)
+>  {
+> -	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
+> +	struct platform_device *pdev = to_platform_device(dai->dev);
+> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
+>  	struct atmel_pcm_dma_params *dma_params;
+>  	int dir, dir_mask;
+>  
+> @@ -392,7 +394,8 @@ static void atmel_ssc_shutdown(struct snd_pcm_substream *substream,
+>  static int atmel_ssc_set_dai_fmt(struct snd_soc_dai *cpu_dai,
+>  		unsigned int fmt)
+>  {
+> -	struct atmel_ssc_info *ssc_p = &ssc_info[cpu_dai->id];
+> +	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
+> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
+>  
+>  	ssc_p->daifmt = fmt;
+>  	return 0;
+> @@ -404,7 +407,8 @@ static int atmel_ssc_set_dai_fmt(struct snd_soc_dai *cpu_dai,
+>  static int atmel_ssc_set_dai_clkdiv(struct snd_soc_dai *cpu_dai,
+>  	int div_id, int div)
+>  {
+> -	struct atmel_ssc_info *ssc_p = &ssc_info[cpu_dai->id];
+> +	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
+> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
+>  
+>  	switch (div_id) {
+>  	case ATMEL_SSC_CMR_DIV:
+> @@ -445,7 +449,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+>  	struct snd_pcm_hw_params *params,
+>  	struct snd_soc_dai *dai)
+>  {
+> -	int id = dai->id;
+> +	struct platform_device *pdev = to_platform_device(dai->dev);
+> +	int id = pdev->id;
+>  	struct atmel_ssc_info *ssc_p = &ssc_info[id];
+>  	struct ssc_device *ssc = ssc_p->ssc;
+>  	struct atmel_pcm_dma_params *dma_params;
+> @@ -772,7 +777,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+>  static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
+>  			     struct snd_soc_dai *dai)
+>  {
+> -	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
+> +	struct platform_device *pdev = to_platform_device(dai->dev);
+> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
+>  	struct atmel_pcm_dma_params *dma_params;
+>  	int dir;
+>  
+> @@ -795,7 +801,8 @@ static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
+>  static int atmel_ssc_trigger(struct snd_pcm_substream *substream,
+>  			     int cmd, struct snd_soc_dai *dai)
+>  {
+> -	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
+> +	struct platform_device *pdev = to_platform_device(dai->dev);
+> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
+>  	struct atmel_pcm_dma_params *dma_params;
+>  	int dir;
+>  
+> @@ -824,11 +831,12 @@ static int atmel_ssc_trigger(struct snd_pcm_substream *substream,
+>  static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
+>  {
+>  	struct atmel_ssc_info *ssc_p;
+> +	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
+>  
+>  	if (!cpu_dai->active)
+>  		return 0;
+>  
+> -	ssc_p = &ssc_info[cpu_dai->id];
+> +	ssc_p = &ssc_info[pdev->id];
+>  
+>  	/* Save the status register before disabling transmit and receive */
+>  	ssc_p->ssc_state.ssc_sr = ssc_readl(ssc_p->ssc->regs, SR);
+> @@ -852,12 +860,13 @@ static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
+>  static int atmel_ssc_resume(struct snd_soc_dai *cpu_dai)
+>  {
+>  	struct atmel_ssc_info *ssc_p;
+> +	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
+>  	u32 cr;
+>  
+>  	if (!cpu_dai->active)
+>  		return 0;
+>  
+> -	ssc_p = &ssc_info[cpu_dai->id];
+> +	ssc_p = &ssc_info[pdev->id];
+>  
+>  	/* restore SSC register settings */
+>  	ssc_writel(ssc_p->ssc->regs, TFMR, ssc_p->ssc_state.ssc_tfmr);
+> 
 
-Yours,
-Linus Walleij
+
+-- 
+Nicolas Ferre
