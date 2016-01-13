@@ -1,28 +1,110 @@
-From: peter@korsgaard.com (Peter Korsgaard)
-Date: Wed, 13 Jan 2016 15:22:12 +0100
-Subject: [PATCH v2 1/2] regulator: act8945a: add regulator driver for
- ACT8945A
-In-Reply-To: <1452586629-1117-2-git-send-email-wenyou.yang@atmel.com> (Wenyou
- Yang's message of "Tue, 12 Jan 2016 16:17:08 +0800")
-References: <1452586629-1117-1-git-send-email-wenyou.yang@atmel.com>
- <1452586629-1117-2-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <87oacp5zl7.fsf@dell.be.48ers.dk>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 13 Jan 2016 15:23:20 +0100
+Subject: [RFC/PATCH] drm/rockchip: don't wait for vblank if fb hasn't
+ changed
+In-Reply-To: <1452689614-6570-1-git-send-email-john@metanate.com>
+References: <1452689614-6570-1-git-send-email-john@metanate.com>
+Message-ID: <20160113142320.GQ19130@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Wenyou" == Wenyou Yang <wenyou.yang@atmel.com> writes:
+On Wed, Jan 13, 2016 at 12:53:34PM +0000, John Keeping wrote:
+> As commented in drm_atomic_helper_wait_for_vblanks(), userspace relies
+> on cursor ioctls being unsynced.  Converting the rockchip driver to
+> atomic has significantly impacted cursor performance by making every
+> cursor update wait for vblank.
+> 
+> By skipping the vblank sync when the framebuffer has not changed (as is
+> done in drm_atomic_helper_wait_for_vblanks()) we can avoid this for the
+> common case of moving the cursor and only need to delay the cursor ioctl
+> when the cursor icon changes.
+> 
+> I originally inserted a check on legacy_cursor_update as well, but that
+> caused a storm of iommu page faults.  I didn't investigate the cause of
+> those since this change gives enough of a performance improvement for my
+> use case.
+> 
+> This is RFC because of that and because the framebuffer_changed()
+> function is copied from drm_atomic_helper.c as a quick way to test the
+> result.
+> 
+> Signed-off-by: John Keeping <john@metanate.com>
+> ---
+>  drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 27 +++++++++++++++++++++++++--
+>  1 file changed, 25 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> index f784488..8fd9821 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> @@ -177,8 +177,28 @@ static void rockchip_crtc_wait_for_update(struct drm_crtc *crtc)
+>  		crtc_funcs->wait_for_update(crtc);
+>  }
+>  
+> +static bool framebuffer_changed(struct drm_device *dev,
+> +				struct drm_atomic_state *old_state,
+> +				struct drm_crtc *crtc)
+> +{
+> +	struct drm_plane *plane;
+> +	struct drm_plane_state *old_plane_state;
+> +	int i;
+> +
+> +	for_each_plane_in_state(old_state, plane, old_plane_state, i) {
+> +		if (plane->state->crtc != crtc &&
+> +		    old_plane_state->crtc != crtc)
+> +			continue;
+> +
+> +		if (plane->state->fb != old_plane_state->fb)
+> +			return true;
+> +	}
+> +
+> +	return false;
+> +}
 
- > This patch adds new regulator driver to support ACT8945A MFD
- > chip's regulators.
+Please don't hand-roll logic that affects semantics like this. Instead
+please use drm_atomic_helper_wait_for_vblanks(), which should do this
+correctly for you.
 
- > The ACT8945A has three step-down DC/DC converters and four
- > low-dropout regulators.
+If that's not the case then we need to improve the generic helper, or
+figure out what's different with rockhip.
 
- > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Thanks, Daniel
 
-Isn't the regulator part of the act8945a identical to act8865? Can't we
-just use the existing act8865-regulator.c driver? (E.G. support 8865
-variant in the mfd driver, but only register the regulator sub device?)
+> +
+>  static void
+> -rockchip_atomic_wait_for_complete(struct drm_atomic_state *old_state)
+> +rockchip_atomic_wait_for_complete(struct drm_device *dev, struct drm_atomic_state *old_state)
+>  {
+>  	struct drm_crtc_state *old_crtc_state;
+>  	struct drm_crtc *crtc;
+> @@ -194,6 +214,9 @@ rockchip_atomic_wait_for_complete(struct drm_atomic_state *old_state)
+>  		if (!crtc->state->active)
+>  			continue;
+>  
+> +		if (!framebuffer_changed(dev, old_state, crtc))
+> +			continue;
+> +
+>  		ret = drm_crtc_vblank_get(crtc);
+>  		if (ret != 0)
+>  			continue;
+> @@ -241,7 +264,7 @@ rockchip_atomic_commit_complete(struct rockchip_atomic_commit *commit)
+>  
+>  	drm_atomic_helper_commit_planes(dev, state, true);
+>  
+> -	rockchip_atomic_wait_for_complete(state);
+> +	rockchip_atomic_wait_for_complete(dev, state);
+>  
+>  	drm_atomic_helper_cleanup_planes(dev, state);
+>  
+> -- 
+> 2.7.0.rc3.140.g520a093
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 -- 
-Bye, Peter Korsgaard
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
