@@ -1,145 +1,105 @@
-From: john@metanate.com (John Keeping)
-Date: Wed, 13 Jan 2016 17:39:54 +0000
-Subject: [RFC/PATCH] drm/rockchip: don't wait for vblank if fb hasn't
- changed
-In-Reply-To: <20160113171917.GC19130@phenom.ffwll.local>
-References: <1452689614-6570-1-git-send-email-john@metanate.com>
- <20160113142320.GQ19130@phenom.ffwll.local>
- <20160113143425.363ce07a.john@metanate.com>
- <20160113154005.GT19130@phenom.ffwll.local>
- <20160113155529.6048b2c1.john@metanate.com>
- <20160113162156.GA19130@phenom.ffwll.local>
- <20160113164038.5fcf670f.john@metanate.com>
- <20160113171917.GC19130@phenom.ffwll.local>
-Message-ID: <20160113173954.52e688fc.john@metanate.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 13 Jan 2016 17:44:18 +0000
+Subject: [PATCH v5 1/5] ARM: dma-mapping: Optimize allocation
+In-Reply-To: <CAAFQd5C8asfo8wSa=jKvp4Vmg6A83R-vG7vQXtsHyOTADLo+9g@mail.gmail.com>
+References: <1452294332-23415-1-git-send-email-dianders@chromium.org>
+ <1452294332-23415-2-git-send-email-dianders@chromium.org>
+ <56964070.1020303@arm.com>
+ <CAAFQd5C8asfo8wSa=jKvp4Vmg6A83R-vG7vQXtsHyOTADLo+9g@mail.gmail.com>
+Message-ID: <56968CF2.1020409@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Jan 2016 18:19:17 +0100, Daniel Vetter wrote:
+On 13/01/16 17:33, Tomasz Figa wrote:
+> On Wed, Jan 13, 2016 at 9:17 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+>> Hi Doug,
+>>
+>>
+>> On 08/01/16 23:05, Douglas Anderson wrote:
+>>>
+>>> The __iommu_alloc_buffer() is expected to be called to allocate pretty
+>>> sizeable buffers.  Upon simple tests of video I saw it trying to
+>>> allocate 4,194,304 bytes.  The function tries to allocate large chunks
+>>> in order to optimize IOMMU TLB usage.
+>>>
+>>> The current function is very, very slow.
+>>>
+>>> One problem is the way it keeps trying and trying to allocate big
+>>> chunks.  Imagine a very fragmented memory that has 4M free but no
+>>> contiguous pages at all.  Further imagine allocating 4M (1024 pages).
+>>> We'll do the following memory allocations:
+>>> - For page 1:
+>>>     - Try to allocate order 10 (no retry)
+>>>     - Try to allocate order 9 (no retry)
+>>>     - ...
+>>>     - Try to allocate order 0 (with retry, but not needed)
+>>> - For page 2:
+>>>     - Try to allocate order 9 (no retry)
+>>>     - Try to allocate order 8 (no retry)
+>>>     - ...
+>>>     - Try to allocate order 0 (with retry, but not needed)
+>>> - ...
+>>> - ...
+>>>
+>>> Total number of calls to alloc() calls for this case is:
+>>>     sum(int(math.log(i, 2)) + 1 for i in range(1, 1025))
+>>>     => 9228
+>>>
+>>> The above is obviously worse case, but given how slow alloc can be we
+>>> really want to try to avoid even somewhat bad cases.  I timed the old
+>>> code with a device under memory pressure and it wasn't hard to see it
+>>> take more than 120 seconds to allocate 4 megs of memory! (NOTE: testing
+>>> was done on kernel 3.14, so possibly mainline would behave
+>>> differently).
+>>>
+>>> A second problem is that allocating big chunks under memory pressure
+>>> when we don't need them is just not a great idea anyway unless we really
+>>> need them.  We can make due pretty well with smaller chunks so it's
+>>> probably wise to leave bigger chunks for other users once memory
+>>> pressure is on.
+>>>
+>>> Let's adjust the allocation like this:
+>>>
+>>> 1. If a big chunk fails, stop trying to hard and bump down to lower
+>>>      order allocations.
+>>> 2. Don't try useless orders.  The whole point of big chunks is to
+>>>      optimize the TLB and it can really only make use of 2M, 1M, 64K and
+>>>      4K sizes.
+>>>
+>>> We'll still tend to eat up a bunch of big chunks, but that might be the
+>>> right answer for some users.  A future patch could possibly add a new
+>>> DMA_ATTR that would let the caller decide that TLB optimization isn't
+>>> important and that we should use smaller chunks.  Presumably this would
+>>> be a sane strategy for some callers.
+>>
+>>
+>> Now that I've had time to think about it properly:
+>>
+>> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+>>
+>> I just had an absolutely disgusting idea of how to get the same progression
+>> with just a single variable and no static array, but I'll keep that firmly
+>> to myself as it's almost IOCCC-grade WTF :D
+>
+> Just out of curiosity, a bitmap and loop with fls() and clearing bit
+> on failure or something more freaky? :)
 
-> On Wed, Jan 13, 2016 at 04:40:38PM +0000, John Keeping wrote:
-> > On Wed, 13 Jan 2016 17:21:56 +0100, Daniel Vetter wrote:
-> >   
-> > > On Wed, Jan 13, 2016 at 03:55:29PM +0000, John Keeping wrote:  
-> > > > On Wed, 13 Jan 2016 16:40:05 +0100, Daniel Vetter wrote:
-> > > >     
-> > > > > On Wed, Jan 13, 2016 at 02:34:25PM +0000, John Keeping wrote:    
-> > > > > > On Wed, 13 Jan 2016 15:23:20 +0100, Daniel Vetter wrote:
-> > > > > >       
-> > > > > > > On Wed, Jan 13, 2016 at 12:53:34PM +0000, John Keeping wrote:      
-> > > > > > > > As commented in drm_atomic_helper_wait_for_vblanks(), userspace
-> > > > > > > > relies on cursor ioctls being unsynced.  Converting the rockchip
-> > > > > > > > driver to atomic has significantly impacted cursor performance by
-> > > > > > > > making every cursor update wait for vblank.
-> > > > > > > > 
-> > > > > > > > By skipping the vblank sync when the framebuffer has not changed
-> > > > > > > > (as is done in drm_atomic_helper_wait_for_vblanks()) we can avoid
-> > > > > > > > this for the common case of moving the cursor and only need to
-> > > > > > > > delay the cursor ioctl when the cursor icon changes.
-> > > > > > > > 
-> > > > > > > > I originally inserted a check on legacy_cursor_update as well, but
-> > > > > > > > that caused a storm of iommu page faults.  I didn't investigate the
-> > > > > > > > cause of those since this change gives enough of a performance
-> > > > > > > > improvement for my use case.
-> > > > > > > > 
-> > > > > > > > This is RFC because of that and because the framebuffer_changed()
-> > > > > > > > function is copied from drm_atomic_helper.c as a quick way to test
-> > > > > > > > the result.
-> > > > > > > > 
-> > > > > > > > Signed-off-by: John Keeping <john@metanate.com>
-> > > > > > > > ---
-> > > > > > > >  drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 27
-> > > > > > > > +++++++++++++++++++++++++-- 1 file changed, 25 insertions(+), 2
-> > > > > > > > deletions(-)
-> > > > > > > > 
-> > > > > > > > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> > > > > > > > b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c index f784488..8fd9821
-> > > > > > > > 100644 --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> > > > > > > > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> > > > > > > > @@ -177,8 +177,28 @@ static void
-> > > > > > > > rockchip_crtc_wait_for_update(struct drm_crtc *crtc)
-> > > > > > > > crtc_funcs->wait_for_update(crtc); }
-> > > > > > > >  
-> > > > > > > > +static bool framebuffer_changed(struct drm_device *dev,
-> > > > > > > > +				struct drm_atomic_state *old_state,
-> > > > > > > > +				struct drm_crtc *crtc)
-> > > > > > > > +{
-> > > > > > > > +	struct drm_plane *plane;
-> > > > > > > > +	struct drm_plane_state *old_plane_state;
-> > > > > > > > +	int i;
-> > > > > > > > +
-> > > > > > > > +	for_each_plane_in_state(old_state, plane, old_plane_state,
-> > > > > > > > i) {
-> > > > > > > > +		if (plane->state->crtc != crtc &&
-> > > > > > > > +		    old_plane_state->crtc != crtc)
-> > > > > > > > +			continue;
-> > > > > > > > +
-> > > > > > > > +		if (plane->state->fb != old_plane_state->fb)
-> > > > > > > > +			return true;
-> > > > > > > > +	}
-> > > > > > > > +
-> > > > > > > > +	return false;
-> > > > > > > > +}        
-> > > > > > > 
-> > > > > > > Please don't hand-roll logic that affects semantics like this. Instead
-> > > > > > > please use drm_atomic_helper_wait_for_vblanks(), which should do this
-> > > > > > > correctly for you.
-> > > > > > > 
-> > > > > > > If that's not the case then we need to improve the generic helper, or
-> > > > > > > figure out what's different with rockhip.      
-> > > > > > 
-> > > > > > According to commit 63ebb9f (drm/rockchip: Convert to support atomic
-> > > > > > API) it's because rockchip doesn't have a hardware vblank counter.
-> > > > > > 
-> > > > > > I'm not entirely clear on why this prevents the use of
-> > > > > > drm_atomic_helper_wait_for_vblanks().      
-> > > > > 
-> > > > > Hm, that commit isn't terribly helpful. If that's really needed then imo I
-> > > > > think we should extract a "drm_atomic_helper_plane_needs_vblank_wait()"
-> > > > > helper that's used by both. But since rockchip does vblank_get/put calls
-> > > > > I'd hope vblanks actually work correctly. And then the helper should work
-> > > > > too.    
-> > > > 
-> > > > I tried switching the call to rockchip_crtc_wait_for_update() to
-> > > > drm_atomic_helper_wait_for_vblanks() and it works fine until I switch
-> > > > the buffer associated with a cursor, at which point I get iommu page
-> > > > faults, presumably because the GEM buffer is unreferenced too early.
-> > > > 
-> > > > AFAICT the buffer will be released via drm_atomic_state_free()
-> > > > unconditionally, but I suspect I'm missing something since that would
-> > > > mean every driver would hit a similar problem.    
-> > > 
-> > > Yeah, with the helper we always skip, which means when the cursor bo
-> > > changes you indeed unmap too early. So can't even share the overall
-> > > condition, but we could definitely share the little framebuffer_changed
-> > > helper.  
-> > 
-> > That leaves me with the question: why do other atomic drivers work?
-> > 
-> > If drm_atomic_helper_wait_for_vblanks() skipping vblanks results in the
-> > cursor bo being unmapped too early for rockchip, why is it not unmapped
-> > too early for all of the other drivers using that helper?  
-> 
-> It's unmapped too early for everyone, it's just that normally that doesn't
-> result in a fireworks show. What we maybe could/should do is do the
-> unmapping asynchronously, but that runs into the overall "current atomic
-> helpers don't do async yet" problem. Might be a good point to start fixing
-> this up though.
+Got a Python interpreter handy?
 
-OK, thanks, I think I'm beginning to understand how this all fits
-together.
+order = 9
+for i in range(4):
+     print order
+     order = (order - 1) & 0xc
 
-It looks like there are two options for me to get reasonable cursor
-performance on rockchip in the short term:
+Like I said, disgusting :D
 
-1) Export the current framebuffer_changed() function as
-   drm_atomic_helper_framebuffer_changed() and use it in
-   rockchip_crtc_wait_for_update().
+Robin.
 
-2) Add a mechanism to suppress the legacy_cursor_update check in
-   drm_atomic_helper_wait_for_vblanks() and switch the rockchip driver
-   over to it.
-
-In both of these cases we're only restoring the unsynced cursor ioctls
-behaviour when the cursor is moved but it will still be expensive when
-the cursor bo changes.  That gives sufficient performance in my testing.
+>
+> Anyway:
+>
+> Reviewed-by: Tomasz Figa <tfiga@chromium.org>
+>
+> Best regards,
+> Tomasz
+>
