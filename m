@@ -1,35 +1,81 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 13 Jan 2016 09:52:37 +0800
-Subject: [PATCH V2 03/10] irqchip,GICv3,ACPI: Add redistributor support
- via GICC structures.
-In-Reply-To: <56952DA1.4030401@semihalf.com>
-References: <1450353133-15992-1-git-send-email-tn@semihalf.com>
- <1450353133-15992-4-git-send-email-tn@semihalf.com>
- <5694EB92.9030109@arm.com> <56952DA1.4030401@semihalf.com>
-Message-ID: <5695ADE5.7010501@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 13 Jan 2016 11:00:13 +0900
+Subject: [PATCH v3 2/2] power: add documentation for ACT8945A's charger DT
+ bindings
+In-Reply-To: <1452586185-818-3-git-send-email-wenyou.yang@atmel.com>
+References: <1452586185-818-1-git-send-email-wenyou.yang@atmel.com>
+ <1452586185-818-3-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <5695AFAD.4030307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12.01.2016 17:09, Wenyou Yang wrote:
+> This patch adds documentation for the DT bindings of the charger
+> subdevice of ACT8945A MFD.
+> 
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> ---
+> 
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  .../devicetree/bindings/power/act8945a-charger.txt |   34 ++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power/act8945a-charger.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/power/act8945a-charger.txt b/Documentation/devicetree/bindings/power/act8945a-charger.txt
+> new file mode 100644
+> index 0000000..868e0164
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/act8945a-charger.txt
+> @@ -0,0 +1,34 @@
+> +Device-Tree bindings for charger of Active-semi ACT8945A Multi-Function Device
+> +
+> +Required properties:
+> + - compatible: "active-semi,act8945a-charger"
+> + - active-semi,chglev-gpio = Specifies a gpio that uses to select
+> +   the charge current level.
+
+active-semi,chglev-gpios
+See: Documentation/devicetree/bindings/gpio/gpio.txt
+
+> +
+> +Optional properties:
+> + - active-semi,battery_temperature: Indicates if it is allowed to check
+> +   the battery temperature. If it is missing, assume the battery temperature
+> +   is not allowed to check.
+
+Here and in rest of properties - no underscores but hyphens. The name
+suggests that this is a value... but this is a boolean?
+
+> + - active-semi,input_voltage_threshold: unit: mV;
+> +   Specifies the charger's input over-voltage threshold value;
+> +   The value can be: 6600, 7000, 7500, 8000; default: 6600
+
+I think adding units suffix in binding is preferred. so "-microvolt"?
+
+Best regards,
+Krzysztof
 
 
-On 2016/1/13 0:45, Tomasz Nowicki wrote:
-> On 12.01.2016 13:03, Marc Zyngier wrote:
->
->  > +    typer = readq_relaxed(redist_base + GICR_TYPER);
->  > +    /* don't map reserved page as it's buggy to access it */
->  > +    size = (typer & GICR_TYPER_VLPIS) ? SZ_64K * 3 : SZ_64K * 2;
->
-> [...]
->
->> Also, please map the whole region for the
->> redistributor as we have on the DT side (4 64kB pages for VLPIS capable
->> redistributors).
->
-> Hanjun, is it something you had problem with?
-
-Yes, for D02, it use 3 64kB pages for GICv4, it removed the reserved
-page. In DT case, it has "stride" binding so it can support no standard
-cases, seems that we can introduce "stride" for ACPI too.
-
-Thanks
-Hanjun
+> + - active-semi,precondition_timeout: unit: minutes;
+> +   Specifies the charger's PRECONDITION safety timer setting value;
+> +   The value can be: 40, 60, 80, 0; If 0, it means to disable this timer;
+> +   default: 40.
+> + - active-semi,total_timeout: unit: hours;
+> +   Specifies the charger's total safety timer setting value;
+> +   The value can be: 3, 4, 5, 0; If 0, it means to disable this timer;
+> +   default: 3.
+> +
+> +Example:
+> +
+> +	charger {
+> +		compatible = "active-semi,act8945a-charger";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_charger_chglev>;
+> +		active-semi,chglev-gpio = <&pioA 12 GPIO_ACTIVE_HIGH>;
+> +		active-semi,input_voltage_threshold = <6600>;
+> +		active-semi,precondition_timeout = <40>;
+> +		active-semi,total_timeout = <3>;
+> +	};
+> 
