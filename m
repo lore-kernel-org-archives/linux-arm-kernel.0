@@ -1,81 +1,32 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 13 Jan 2016 12:17:44 +0530
-Subject: [PATCH v2 1/3] ARM: DRA7: hwmod: Add reset data for PCIe
-In-Reply-To: <1452667666-17533-1-git-send-email-kishon@ti.com>
-References: <1452667666-17533-1-git-send-email-kishon@ti.com>
-Message-ID: <1452667666-17533-2-git-send-email-kishon@ti.com>
+Date: Wed, 13 Jan 2016 12:17:43 +0530
+Subject: [PATCH v2 0/3] dra7xx: get pcie working in mainline
+Message-ID: <1452667666-17533-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PCIe reset data to PCIe hwmods on DRA7x.
+This series adds pdata-quirk mechanism to reset PCIe as a temporary
+fix till reset controller driver is added in mainline.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   15 +++++++++++++++
+Without this series, a stall is observed if pci dra7xx driver
+is enabled.
+
+Changes from v1:
+*) Removed 'HACK' from $subject
+*) removed reviewed-by Suman
+
+Kishon Vijay Abraham I (3):
+  ARM: DRA7: hwmod: Add reset data for PCIe
+  ARM: DRA7: add pdata-quirks to do reset of PCIe
+  pci: dra7xx: use pdata callbacks to perform reset
+
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   15 ++++++++++++++
+ arch/arm/mach-omap2/pdata-quirks.c        |   11 ++++++++++
  arch/arm/mach-omap2/prm7xx.h              |    1 +
- 2 files changed, 16 insertions(+)
+ drivers/pci/host/pci-dra7xx.c             |   32 +++++++++++++++++++++++++++++
+ include/linux/platform_data/pci-dra7xx.h  |   22 ++++++++++++++++++++
+ 5 files changed, 81 insertions(+)
+ create mode 100644 include/linux/platform_data/pci-dra7xx.h
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index ee4e044..1281deb 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -1532,14 +1532,21 @@ static struct omap_hwmod_class dra7xx_pciess_hwmod_class = {
- };
- 
- /* pcie1 */
-+static struct omap_hwmod_rst_info dra7xx_pciess1_resets[] = {
-+	{ .name = "pcie", .rst_shift = 0 },
-+};
-+
- static struct omap_hwmod dra7xx_pciess1_hwmod = {
- 	.name		= "pcie1",
- 	.class		= &dra7xx_pciess_hwmod_class,
- 	.clkdm_name	= "pcie_clkdm",
-+	.rst_lines	= dra7xx_pciess1_resets,
-+	.rst_lines_cnt	= ARRAY_SIZE(dra7xx_pciess1_resets),
- 	.main_clk	= "l4_root_clk_div",
- 	.prcm = {
- 		.omap4 = {
- 			.clkctrl_offs = DRA7XX_CM_L3INIT_PCIESS1_CLKCTRL_OFFSET,
-+			.rstctrl_offs = DRA7XX_RM_L3INIT_PCIESS_RSTCTRL_OFFSET,
- 			.context_offs = DRA7XX_RM_L3INIT_PCIESS1_CONTEXT_OFFSET,
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
-@@ -1547,14 +1554,22 @@ static struct omap_hwmod dra7xx_pciess1_hwmod = {
- };
- 
- /* pcie2 */
-+static struct omap_hwmod_rst_info dra7xx_pciess2_resets[] = {
-+	{ .name = "pcie", .rst_shift = 1 },
-+};
-+
-+/* pcie2 */
- static struct omap_hwmod dra7xx_pciess2_hwmod = {
- 	.name		= "pcie2",
- 	.class		= &dra7xx_pciess_hwmod_class,
- 	.clkdm_name	= "pcie_clkdm",
-+	.rst_lines	= dra7xx_pciess2_resets,
-+	.rst_lines_cnt	= ARRAY_SIZE(dra7xx_pciess2_resets),
- 	.main_clk	= "l4_root_clk_div",
- 	.prcm = {
- 		.omap4 = {
- 			.clkctrl_offs = DRA7XX_CM_L3INIT_PCIESS2_CLKCTRL_OFFSET,
-+			.rstctrl_offs = DRA7XX_RM_L3INIT_PCIESS_RSTCTRL_OFFSET,
- 			.context_offs = DRA7XX_RM_L3INIT_PCIESS2_CONTEXT_OFFSET,
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
-diff --git a/arch/arm/mach-omap2/prm7xx.h b/arch/arm/mach-omap2/prm7xx.h
-index cc1e6a2..294deed 100644
---- a/arch/arm/mach-omap2/prm7xx.h
-+++ b/arch/arm/mach-omap2/prm7xx.h
-@@ -360,6 +360,7 @@
- /* PRM.L3INIT_PRM register offsets */
- #define DRA7XX_PM_L3INIT_PWRSTCTRL_OFFSET			0x0000
- #define DRA7XX_PM_L3INIT_PWRSTST_OFFSET				0x0004
-+#define DRA7XX_RM_L3INIT_PCIESS_RSTCTRL_OFFSET			0x0010
- #define DRA7XX_PM_L3INIT_MMC1_WKDEP_OFFSET			0x0028
- #define DRA7XX_RM_L3INIT_MMC1_CONTEXT_OFFSET			0x002c
- #define DRA7XX_PM_L3INIT_MMC2_WKDEP_OFFSET			0x0030
 -- 
 1.7.9.5
