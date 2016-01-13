@@ -1,145 +1,152 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 13 Jan 2016 16:08:02 +0100
-Subject: [PATCH] ASoC: atmel_ssc_dai: distinguish the different SSC
-In-Reply-To: <1452666910-23586-1-git-send-email-songjun.wu@atmel.com>
-References: <1452666910-23586-1-git-send-email-songjun.wu@atmel.com>
-Message-ID: <56966852.8050205@atmel.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 13 Jan 2016 10:24:12 -0500
+Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
+ hostbridge init based on ACPI
+In-Reply-To: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+Message-ID: <56966C1C.1050902@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 13/01/2016 07:35, Songjun Wu a ?crit :
-> Cpu_dai id always equals 0, can't distinguish the
-> different SSC. Use platform_device id to record
-> and distinguish the different SSC.
+On 1/13/2016 8:20 AM, Tomasz Nowicki wrote:
+> From the functionality point of view this series might be split into the
+> following logic parts:
+> 1. Make MMCONFIG code arch-agnostic which allows all architectures to collect
+>    PCI config regions and used when necessary.
+> 2. Move non-arch specific bits to the core code.
+> 3. Use MMCONFIG code and implement generic ACPI based PCI host controller driver.
+> 4. Enable above driver on ARM64
 > 
-> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
+> Patches has been built on top of 4.4 and can be found here:
+> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v3)
+> 
+> NOTE, this patch set depends on Matthew's patches:
+> http://www.spinics.net/lists/linux-pci/msg45950.html
+> https://github.com/Vality/linux/tree/pci-fixes
+> 
+> This has been tested on Cavium ThunderX server and QEMU.
+> Any help in reviewing and testing is very appreciated.
+> 
+> v2 -> v3
+> - fix legacy IRQ assigning and IO ports registration
+> - remove reference to arch specific companion device for ia64
+> - move ACPI PCI host controller driver to pci_root.c
+> - drop generic domain assignment for x86 and ia64 as I am not
+>   able to run all necessary test variants
+> - drop patch which cleaned legacy IRQ assignment since it belongs to
+>   Mathew's series:
+>   https://patchwork.ozlabs.org/patch/557504/
+> - extend MCFG quirk code
+> - rebased to 4.4
+> 
+> v1 -> v2
+> - moved non-arch specific piece of code to dirver/acpi/ directory
+> - fixed IO resource handling
+> - introduced PCI config accessors quirks matching
+> - moved ACPI_COMPANION_SET to generic code
+> 
+> Liu Jiang (1):
+>   ACPI, PCI: Refine the way to handle translation_offset for ACPI
+>     resources
+> 
+> Tomasz Nowicki (20):
+>   x86, pci: Reorder logic of pci_mmconfig_insert() function
+>   x86, pci, acpi: Move arch-agnostic MMCONFIG (aka ECAM) and ACPI code
+>     out of arch/x86/ directory
+>   pci, acpi, mcfg: Provide generic implementation of MCFG code
+>     initialization.
+>   x86, pci: mmconfig_{32,64}.c code refactoring - remove code
+>     duplication.
+>   x86, pci, ecam: mmconfig_64.c becomes default implementation for ECAM
+>     driver.
+>   XEN / PCI: Remove the dependence on arch x86 when PCI_MMCONFIG=y
+>   pci, acpi, mcfg: Provide default RAW ACPI PCI config space accessors.
+>   arm64, acpi: Use empty PCI config space accessors from mcfg.c file.
+>   pci, acpi, ecam: Add flag to indicate whether ECAM region was hot
+>     added or not.
+>   x86, pci: Cleanup platform specific MCFG data using previously added
+>     ECAM hot_added flag.
+>   pci, acpi: Move ACPI host bridge device companion assignment to core
+>     code.
+>   x86, ia64, pci: Remove ACPI companion device from platform specific
+>     data.
+>   pci, acpi: Provide generic way to assign bus domain number.
+>   x86, ia64: Include acpi_pci_{add|remove}_bus to the default
+>     pcibios_{add|remove}_bus implementation.
+>   acpi, mcfg: Implement two calls that might be used to inject/remove
+>     MCFG region.
+>   x86, acpi, pci: Use equivalent function introduced in previous patch.
+>   acpi, mcfg: Add default PCI config accessors implementation and
+>     initial support for related quirks.
+>   pci, acpi: Support for ACPI based generic PCI host controller init
+>   pci, acpi: Match PCI config space accessors against platfrom specific
+>     quirks.
+>   arm64, pci, acpi: Start using ACPI based PCI host bridge driver for
+>     ARM64.
+> 
+>  arch/arm64/Kconfig                 |   7 ++
+>  arch/arm64/kernel/pci.c            |  25 ----
+>  arch/ia64/hp/common/sba_iommu.c    |   2 +-
+>  arch/ia64/include/asm/pci.h        |   1 -
+>  arch/ia64/pci/pci.c                |  52 +++-----
+>  arch/ia64/sn/kernel/io_acpi_init.c |   4 +-
+>  arch/x86/Kconfig                   |   4 +
+>  arch/x86/include/asm/pci.h         |   3 -
+>  arch/x86/include/asm/pci_x86.h     |  28 +----
+>  arch/x86/pci/acpi.c                |  41 ++----
+>  arch/x86/pci/common.c              |  10 --
+>  arch/x86/pci/irq.c                 |  10 --
+>  arch/x86/pci/mmconfig-shared.c     | 250 ++++++-------------------------------
+>  arch/x86/pci/mmconfig_32.c         |  11 +-
+>  arch/x86/pci/mmconfig_64.c         |  67 +---------
+>  arch/x86/pci/numachip.c            |   1 +
+>  drivers/acpi/Kconfig               |   5 +
+>  drivers/acpi/Makefile              |   1 +
+>  drivers/acpi/mcfg.c                | 201 +++++++++++++++++++++++++++++
+>  drivers/acpi/pci_root.c            | 136 +++++++++++++++++++-
+>  drivers/acpi/resource.c            |  12 +-
+>  drivers/pci/Kconfig                |  10 ++
+>  drivers/pci/Makefile               |   5 +
+>  drivers/pci/ecam.c                 | 234 ++++++++++++++++++++++++++++++++++
+>  drivers/pci/pci.c                  |  29 ++++-
+>  drivers/pci/probe.c                |   5 +
+>  drivers/xen/pci.c                  |   7 +-
+>  include/acpi/acpi_bus.h            |   1 +
+>  include/asm-generic/vmlinux.lds.h  |   7 ++
+>  include/linux/acpi.h               |   2 +
+>  include/linux/ecam.h               |  62 +++++++++
+>  include/linux/pci-acpi.h           |  17 +++
+>  32 files changed, 802 insertions(+), 448 deletions(-)
+>  create mode 100644 drivers/acpi/mcfg.c
+>  create mode 100644 drivers/pci/ecam.c
+>  create mode 100644 include/linux/ecam.h
+> 
 
-It seems okay:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Tested-by: Sinan Kaya <okaya@codeaurora.org>
 
-> ---
-> 
->  drivers/misc/atmel-ssc.c        |    1 +
->  sound/soc/atmel/atmel_ssc_dai.c |   27 ++++++++++++++++++---------
->  2 files changed, 19 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
-> index e11a0bd..0516ecd 100644
-> --- a/drivers/misc/atmel-ssc.c
-> +++ b/drivers/misc/atmel-ssc.c
-> @@ -34,6 +34,7 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
->  		if (ssc->pdev->dev.of_node) {
->  			if (of_alias_get_id(ssc->pdev->dev.of_node, "ssc")
->  				== ssc_num) {
-> +				ssc->pdev->id = ssc_num;
->  				ssc_valid = 1;
->  				break;
->  			}
-> diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-> index ba8def5..2768970 100644
-> --- a/sound/soc/atmel/atmel_ssc_dai.c
-> +++ b/sound/soc/atmel/atmel_ssc_dai.c
-> @@ -285,7 +285,8 @@ static int atmel_ssc_hw_rule_rate(struct snd_pcm_hw_params *params,
->  static int atmel_ssc_startup(struct snd_pcm_substream *substream,
->  			     struct snd_soc_dai *dai)
->  {
-> -	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
-> +	struct platform_device *pdev = to_platform_device(dai->dev);
-> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
->  	struct atmel_pcm_dma_params *dma_params;
->  	int dir, dir_mask;
->  	int ret;
-> @@ -346,7 +347,8 @@ static int atmel_ssc_startup(struct snd_pcm_substream *substream,
->  static void atmel_ssc_shutdown(struct snd_pcm_substream *substream,
->  			       struct snd_soc_dai *dai)
->  {
-> -	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
-> +	struct platform_device *pdev = to_platform_device(dai->dev);
-> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
->  	struct atmel_pcm_dma_params *dma_params;
->  	int dir, dir_mask;
->  
-> @@ -392,7 +394,8 @@ static void atmel_ssc_shutdown(struct snd_pcm_substream *substream,
->  static int atmel_ssc_set_dai_fmt(struct snd_soc_dai *cpu_dai,
->  		unsigned int fmt)
->  {
-> -	struct atmel_ssc_info *ssc_p = &ssc_info[cpu_dai->id];
-> +	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
-> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
->  
->  	ssc_p->daifmt = fmt;
->  	return 0;
-> @@ -404,7 +407,8 @@ static int atmel_ssc_set_dai_fmt(struct snd_soc_dai *cpu_dai,
->  static int atmel_ssc_set_dai_clkdiv(struct snd_soc_dai *cpu_dai,
->  	int div_id, int div)
->  {
-> -	struct atmel_ssc_info *ssc_p = &ssc_info[cpu_dai->id];
-> +	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
-> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
->  
->  	switch (div_id) {
->  	case ATMEL_SSC_CMR_DIV:
-> @@ -445,7 +449,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
->  	struct snd_pcm_hw_params *params,
->  	struct snd_soc_dai *dai)
->  {
-> -	int id = dai->id;
-> +	struct platform_device *pdev = to_platform_device(dai->dev);
-> +	int id = pdev->id;
->  	struct atmel_ssc_info *ssc_p = &ssc_info[id];
->  	struct ssc_device *ssc = ssc_p->ssc;
->  	struct atmel_pcm_dma_params *dma_params;
-> @@ -772,7 +777,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
->  static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
->  			     struct snd_soc_dai *dai)
->  {
-> -	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
-> +	struct platform_device *pdev = to_platform_device(dai->dev);
-> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
->  	struct atmel_pcm_dma_params *dma_params;
->  	int dir;
->  
-> @@ -795,7 +801,8 @@ static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
->  static int atmel_ssc_trigger(struct snd_pcm_substream *substream,
->  			     int cmd, struct snd_soc_dai *dai)
->  {
-> -	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
-> +	struct platform_device *pdev = to_platform_device(dai->dev);
-> +	struct atmel_ssc_info *ssc_p = &ssc_info[pdev->id];
->  	struct atmel_pcm_dma_params *dma_params;
->  	int dir;
->  
-> @@ -824,11 +831,12 @@ static int atmel_ssc_trigger(struct snd_pcm_substream *substream,
->  static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
->  {
->  	struct atmel_ssc_info *ssc_p;
-> +	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
->  
->  	if (!cpu_dai->active)
->  		return 0;
->  
-> -	ssc_p = &ssc_info[cpu_dai->id];
-> +	ssc_p = &ssc_info[pdev->id];
->  
->  	/* Save the status register before disabling transmit and receive */
->  	ssc_p->ssc_state.ssc_sr = ssc_readl(ssc_p->ssc->regs, SR);
-> @@ -852,12 +860,13 @@ static int atmel_ssc_suspend(struct snd_soc_dai *cpu_dai)
->  static int atmel_ssc_resume(struct snd_soc_dai *cpu_dai)
->  {
->  	struct atmel_ssc_info *ssc_p;
-> +	struct platform_device *pdev = to_platform_device(cpu_dai->dev);
->  	u32 cr;
->  
->  	if (!cpu_dai->active)
->  		return 0;
->  
-> -	ssc_p = &ssc_info[cpu_dai->id];
-> +	ssc_p = &ssc_info[pdev->id];
->  
->  	/* restore SSC register settings */
->  	ssc_writel(ssc_p->ssc->regs, TFMR, ssc_p->ssc_state.ssc_tfmr);
-> 
+on an ARM64 server with some nits.
+
+I started seeing these on an ACPI system. I didn't have these before when I tested Tomasz's
+branch yesterday. It must have been introduced after a rebase or a recent change.
+
+_#_dmesg_|_grep_of_irq
+[    3.130774] pci 0002:00:00.0: of_irq_parse_pci() failed with rc=-22
+[    4.182526] pci 0002:00:00.0: of_irq_parse_pci() failed with rc=-22
+[    5.187764] pci 0002:00:00.0: of_irq_parse_pci() failed with rc=-22
+[    5.868518] pci 0003:00:00.0: of_irq_parse_pci() failed with rc=-22
+[    5.910629] pci 0003:00:00.0: of_irq_parse_pci() failed with rc=-22
+[    6.732817] pci 0006:00:00.0: of_irq_parse_pci() failed with rc=-22
+[    7.777698] pci 0006:00:00.0: of_irq_parse_pci() failed with rc=-22
+[    8.782882] pci 0006:00:00.0: of_irq_parse_pci() failed with rc=-22
+/ #
+
+I'm also seeing an IO resource free problem with ACPI hotplug. The mappings created by pci_remap_iospace 
+are not being freed in ACPI root port free function. Second call to pci_remap_iospace fails after a hotplug
+insertion as the kernel mapping already exists. I had a chat with Tomasz about this. 
+We'll discuss the issue later.
 
 
 -- 
-Nicolas Ferre
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
