@@ -1,49 +1,56 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 13 Jan 2016 08:55:33 +0900
-Subject: [PATCH v3] arm: irq: l2c: do not print error in case of missing
- l2c from dtb
-In-Reply-To: <1452593472-10703-1-git-send-email-andi.shyti@samsung.com>
-References: <5694BABF.3070200@samsung.com>
- <1452593472-10703-1-git-send-email-andi.shyti@samsung.com>
-Message-ID: <56959275.80404@samsung.com>
+From: al.stone@linaro.org (Al Stone)
+Date: Tue, 12 Jan 2016 17:07:49 -0700
+Subject: [RFC 0/5] console/acpi: add DBG2 and SPCR console configuration
+In-Reply-To: <56951841.4010101@codeaurora.org>
+References: <1441716217-23786-1-git-send-email-leif.lindholm@linaro.org>
+ <56951841.4010101@codeaurora.org>
+Message-ID: <56959555.6090705@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.01.2016 19:11, Andi Shyti wrote:
-> In some architectures the L2 cache controller is integrated in the
-> processor's block itself and it doesn't use any external cache
-> controller. This means that an entry in the board's dtb related
-> to the l2c is not necessary.
-> 
-> Distinguish between error codes and do not print anything in case
-> l2x0_of_init() doesn't find any L2C DTB entry and returns -ENODEV.
-> 
-> This patch mutes the following error message:
-> 
->    L2C: failed to init: -19
-> 
-> on boards like odroid-xu4, cortex A7/A15, which don't have
-> external cache controller.
-> 
-> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
+On 01/12/2016 08:14 AM, Christopher Covington wrote:
 > Hi,
 > 
-> here is a second version. An alternative would be to print with
-> pr_dbg, but then it's a matter of taste.
+> On 09/08/2015 08:43 AM, Leif Lindholm wrote:
+>> Support for configuring bootconsole and console via the ACPI tables
+>> DBG2 (Debug Port Table 2) [1] and SPCR (Serial Port Console Redirection
+>> Table) [2], defined by Microsoft, has been discussed on and off over the
+>> years.
+>>
+>> [1] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639131(v=vs.85).aspx
+>> [2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
+>>
+>> Licensing concerns have prevented this happening in the past, but as of
+>> 10 August 2015, these tables have both been released also under OWF 1.0
+>> (http://www.openwebfoundation.org/legal/the-owf-1-0-agreements/owfa-1-0)
+>> which is think is noncontroversially GPL-compatible?
+>>
+>> This set is a first attempt at implementing this.
+>>
+>> Submitting as an RFC since the SPCR handling currently depends on the
+>> console driver being initialized after subsystem initcalls. Workaround
+>> to enable testing surrounding infrastructure in 5/5, _really_ not
+>> intended to be merged.
+>> (Suggestions for acceptable ways of working around this appreciated.)
 > 
-> V1, and V2 print a message in case the l2c dtb entry is not found
-> (the V2 has a better print rephrase suggested by Joe)
-> 
-> V3 ignores the case of -enodev for l2c and doesn't print anything
+> What's required for this to graduate from RFC status? Is anyone working
+> on it?
 > 
 > Thanks,
-> Andi
+> Christopher Covington
+> 
 
-Looks good to me, as v2 did. Works fine:
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Well, we have asked Aleksey Makarov <aleksy.makarov@linaro.org> to pick
+this task up from Leif within Linaro.  Perhaps drop him a line and see
+if the two of you can collaborate on this somehow?  I think it just needs
+nudging and a bit of TLC to get it past being an RFC.
 
-BR,
-KRzysztof
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Linaro Enterprise Group
+al.stone at linaro.org
+-----------------------------------
