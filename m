@@ -1,60 +1,118 @@
-From: hannes@stressinduktion.org (Hannes Frederic Sowa)
-Date: Wed, 13 Jan 2016 00:59:46 +0100
-Subject: [PATCHv2] net: bpf: reject invalid shifts
-In-Reply-To: <20160112234707.GA36167@ast-mbp.thefacebook.com>
-References: <20160112185121.GA34045@ast-mbp.thefacebook.com>
- <1452626228-15742-1-git-send-email-rabin@rab.in>
- <1452628118.1223.25.camel@edumazet-glaptop2.roam.corp.google.com>
- <20160112195356.GA34598@ast-mbp.thefacebook.com>
- <5695653F.6030001@iogearbox.net>
- <20160112204620.GA35080@ast-mbp.thefacebook.com>
- <1452641302.1223.35.camel@edumazet-glaptop2.roam.corp.google.com>
- <20160112234707.GA36167@ast-mbp.thefacebook.com>
-Message-ID: <56959372.3040409@stressinduktion.org>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Tue, 12 Jan 2016 16:57:15 -0800
+Subject: [PATCH v6 1/6] arm/arm64: KVM: Introduce armv7 fp/simd vcpu fields
+ and helpers
+In-Reply-To: <20160112141207.GF15554@cbox>
+References: <1451166900-3711-1-git-send-email-m.smarduch@samsung.com>
+ <1451166900-3711-2-git-send-email-m.smarduch@samsung.com>
+ <20160110163204.GD30867@cbox> <56943D29.3000002@samsung.com>
+ <20160112141207.GF15554@cbox>
+Message-ID: <5695A0EB.5020609@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.01.2016 00:47, Alexei Starovoitov wrote:
-> On Tue, Jan 12, 2016 at 03:28:22PM -0800, Eric Dumazet wrote:
->> On Tue, 2016-01-12 at 12:46 -0800, Alexei Starovoitov wrote:
->>> On Tue, Jan 12, 2016 at 09:42:39PM +0100, Daniel Borkmann wrote:
+
+
+On 1/12/2016 6:12 AM, Christoffer Dall wrote:
+> On Mon, Jan 11, 2016 at 03:39:21PM -0800, Mario Smarduch wrote:
 >>
->>>>> yep and we all know who was able to code hundreds of cBPF insns by hand ;)
->>>>> But I'm sure that code doesn't have such broken shifts. :)))
->>>>
->>>> libpcap certainly supports raw filters now thanks to Chema [1]. Alternative
->>>> could be to just mask them here, but not in eBPF verifier, but that would be
->>>> even more inconsistent (on the other hand, we also allow holes in BPF but not
->>>> in eBPF, so wouldn't be the first time we make things different), hmm.
+>>
+>> On 1/10/2016 8:32 AM, Christoffer Dall wrote:
+>>> Hi Mario,
 >>>
->>> I would rather see broken classic bpf program fixed instead of continue
->>> running them with undefined behavior.
+>>> I spotted one more potential issue...
+>>>
+>>> On Sat, Dec 26, 2015 at 01:54:55PM -0800, Mario Smarduch wrote:
+>>>> Add helper functions to enable access to fp/smid on guest entry and save host
+>>>> fpexc on vcpu put, check if fp/simd registers are dirty and add new vcpu
+>>>> fields.
+>>>>
+>>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>>>> ---
+>>>>  arch/arm/include/asm/kvm_emulate.h   | 42 ++++++++++++++++++++++++++++++++++++
+>>>>  arch/arm/include/asm/kvm_host.h      |  6 ++++++
+>>>>  arch/arm64/include/asm/kvm_emulate.h |  8 +++++++
+>>>>  3 files changed, 56 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+>>>> index 3095df0..d4d9da1 100644
+>>>> --- a/arch/arm/include/asm/kvm_emulate.h
+>>>> +++ b/arch/arm/include/asm/kvm_emulate.h
+>>>> @@ -24,6 +24,8 @@
+>>>>  #include <asm/kvm_mmio.h>
+>>>>  #include <asm/kvm_arm.h>
+>>>>  #include <asm/cputype.h>
+>>>> +#include <asm/vfp.h>
+>>>> +#include "../vfp/vfpinstr.h"
+>>>>  
+>>>>  unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
+>>>>  unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
+>>>> @@ -255,4 +257,44 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+>>>>  	}
+>>>>  }
+>>>>  
+>>>> +#ifdef CONFIG_VFPv3
+>>>> +/* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
+>>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
+>>>> +{
+>>>> +	u32 fpexc;
+>>>> +
+>>>> +	/* Save host fpexc, and enable guest access to fp unit */
+>>>> +	fpexc = fmrx(FPEXC);
+>>>> +	vcpu->arch.host_fpexc = fpexc;
+>>>> +	fpexc |= FPEXC_EN;
+>>>> +	fmxr(FPEXC, fpexc);
+>>>> +
+>>>> +	/* Configure HCPTR to trap on tracing and fp/simd access */
+>>>> +	vcpu->arch.hcptr = HCPTR_TTA | HCPTR_TCP(10)  | HCPTR_TCP(11);
+>>>> +}
+>>>> +
+>>>> +/* Called from vcpu_put - restore host fpexc */
+>>>> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu)
+>>>> +{
+>>>> +	fmxr(FPEXC, vcpu->arch.host_fpexc);
+>>>> +}
+>>>> +
+>>>> +/* If trap bits are reset then fp/simd registers are dirty */
+>>>> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
+>>>> +{
+>>>> +	return !(vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
+>>>> +}
+>>>> +#else
+>>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
+>>>> +{
+>>>> +	vcpu->arch.hcptr = HCPTR_TTA;
+>>>
+>>> Is it correct not to trap VFP registers when the host kernel does not
+>>> have CONFIG_VFPv3?  I think this is a change in functionality compared
+>>> to the current kernels is it not?
 >>
->> This is your choice, because you are a developer.
+>> With CPU_V7 VFPv3 gets selected, without it fp should be emulated,
+>> with exceptions taken in guest kernel. I don't see a reason why
+>> fp hcptr access should be enabled in that case.
 >>
->> Some people might be stuck with old software they can not update,
->> because they do not have the money to pay developers.
->>
->> And no, I did not code BPF programs like that, but maybe others did, and
->> I feel the pain of customers that might be stuck.
->>
->> Linus Torvalds always made clear we must provide backward compatibility,
->> and really this discussion should not even take place.
->>
->> As I said, we used to load such BPF program in the past.
->>
->> The fact that ARM64 crashes because of a faulty JIT implementation is
->> not an excuse.
->
-> I would agree if those loaded programs would do something sensible,
-> but they're broken. As shown arm and arm64 would execute them
-> differently without JIT, because HW treats such shifts differently.
-> I also checked that libpcap is sane and doesn't generate broken shifts.
-> imo we're not breaking backward compatiblity here.
+> 
+> If you have to guests with CONFIG_VFPV3 but your host doesn't have
+> CONFIG_VFPV3, you will never context-switch the VFP registers between
+> the two VMs, and mayhem will ensue.
+> 
+> Unless I'm missing something very obvious?
 
-But on one specific platform those programs did something deterministic, 
-reproducible and observable, no? Probably most developers only cared 
-about that, probably especially in the embedded segment.
+Hi Christoffer,
+   - on host I disabled VFP/VFPv3 and got a lot of Illegal instructions
+     and many other problems. Perhaps disabling for armv7 this option may need
+     re-evaluation.
+   - Enabling VFPv3 on host and running guest with no vfpv3 appears
+     to work with few glitches.
+   - and vpfv3 host/guest works just fine.
 
-Bye,
-Hannes
+Appears disabling vfpv3 on armv7 requires another investigation (atleast
+on my end).
+
+BTW this is on fast models.
+
+- Mario
+
+> 
+> -Christoffer
+> 
