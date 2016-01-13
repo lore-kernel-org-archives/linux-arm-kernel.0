@@ -1,82 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Jan 2016 22:25:41 +0100
-Subject: [PATCH] mmc: tmio_mmc_dma: don't print invalid DMA cookie
-Message-ID: <5032992.kTQ6Oyibpy@wuerfel>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Wed, 13 Jan 2016 13:31:32 -0800
+Subject: [PATCH] logfs: clarify MTD dependency
+In-Reply-To: <6116283.ubGS0D0e49@wuerfel>
+References: <5776957.XLg438VUOx@wuerfel>
+ <20160113123918.544497b48bf4c03591c75747@linux-foundation.org>
+ <6116283.ubGS0D0e49@wuerfel>
+Message-ID: <5696C234.1020500@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tmio_mmc_start_dma_{rx,tx} function functions contain debug
-code that prints the dma cookie among other things. However,
-in case we fall back to PIO mode for some reason, the cookie
-variable is never initialized, and gcc warns about this:
+On 01/13/16 12:45, Arnd Bergmann wrote:
+> On Wednesday 13 January 2016 12:39:18 Andrew Morton wrote:
+>>
+>> Randy's "logfs: fix logfs build errors and dependencies" is an
+>> only-in-mm thing.  So it would make sense to combine the two patches
+>> into a single one and to give that an appropriate changelog.
+>>
+>> How does this look? (Primary author was chosen randomly)
+>>
+>>
+>> From: Arnd Bergmann <arnd@arndb.de>
+>> Subject: logfs: fix logfs build errors and dependencies
+>>
+>> Fix build errors that happen when CONFIG_LOGFS=y and CONFIG_MTD=m:
+>>
+>> fs/built-in.o: In function `logfs_mount':
+>> super.c:(.text+0x92a6f): undefined reference to `logfs_get_sb_mtd'
+>> fs/built-in.o: In function `logfs_get_sb_bdev':
+>> (.text+0x93530): undefined reference to `logfs_get_sb_mtd'
+>>
+>> This patch avoids the error by changing the dependencies of
+>> logfs in a way that we can no longer configure logfs as built-in
+>> when the MTD core is a loadable module, while leaving the
+>> dependency to require at least one of MTD or BLOCK to be
+>> enabled.
+>>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Signed-off-by: Randy Dunlap <rdunlap@infradead.org>
+>> Cc: Michal Marek <mmarek@suse.cz>
+>> Cc: Peter Chen <peter.chen@freescale.com>
+>> Cc: Randy Dunlap <rdunlap@infradead.org>
+>> Cc: Joern Engel <joern@logfs.org>
+>> Cc: Prasad Joshi <prasadjoshi.linux@gmail.com>
+>> Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+>>
+> 
+> Looks good, thanks!
+> 
+> 	Arnd
+> 
 
-In file included from ../include/linux/printk.h:277:0,
-                 from ../include/linux/kernel.h:13,
-                 from ../include/linux/list.h:8,
-                 from ../include/linux/kobject.h:20,
-                 from ../include/linux/device.h:17,
-                 from ../drivers/mmc/host/tmio_mmc_dma.c:13:
-../drivers/mmc/host/tmio_mmc_dma.c: In function 'tmio_mmc_start_dma':
-../include/linux/dynamic_debug.h:86:3: warning: 'cookie' may be used uninitialized in this function [-Wmaybe-uninitialized]
-   __dynamic_dev_dbg(&descriptor, dev, fmt, \
-   ^
-../drivers/mmc/host/tmio_mmc_dma.c:128:15: note: 'cookie' was declared here
-  dma_cookie_t cookie;
+Thanks also.
 
-This modifies the dev_dbg() statements so we only print the cookie
-when we are already in the DMA path.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-This warning has existed for a long time, and it's only in debug code,
-so probably nobody cared.
-
-diff --git a/drivers/mmc/host/tmio_mmc_dma.c b/drivers/mmc/host/tmio_mmc_dma.c
-index e4b05dbb9ca8..4a0d6b80eaa3 100644
---- a/drivers/mmc/host/tmio_mmc_dma.c
-+++ b/drivers/mmc/host/tmio_mmc_dma.c
-@@ -94,9 +94,9 @@ static void tmio_mmc_start_dma_rx(struct tmio_mmc_host *host)
- 			desc = NULL;
- 			ret = cookie;
- 		}
-+		dev_dbg(&host->pdev->dev, "%s(): mapped %d -> %d, cookie %d, rq %p\n",
-+			__func__, host->sg_len, ret, cookie, host->mrq);
- 	}
--	dev_dbg(&host->pdev->dev, "%s(): mapped %d -> %d, cookie %d, rq %p\n",
--		__func__, host->sg_len, ret, cookie, host->mrq);
- 
- pio:
- 	if (!desc) {
-@@ -116,8 +116,8 @@ pio:
- 			 "DMA failed: %d, falling back to PIO\n", ret);
- 	}
- 
--	dev_dbg(&host->pdev->dev, "%s(): desc %p, cookie %d, sg[%d]\n", __func__,
--		desc, cookie, host->sg_len);
-+	dev_dbg(&host->pdev->dev, "%s(): desc %p, sg[%d]\n", __func__,
-+		desc, host->sg_len);
- }
- 
- static void tmio_mmc_start_dma_tx(struct tmio_mmc_host *host)
-@@ -174,9 +174,9 @@ static void tmio_mmc_start_dma_tx(struct tmio_mmc_host *host)
- 			desc = NULL;
- 			ret = cookie;
- 		}
-+		dev_dbg(&host->pdev->dev, "%s(): mapped %d -> %d, cookie %d, rq %p\n",
-+			__func__, host->sg_len, ret, cookie, host->mrq);
- 	}
--	dev_dbg(&host->pdev->dev, "%s(): mapped %d -> %d, cookie %d, rq %p\n",
--		__func__, host->sg_len, ret, cookie, host->mrq);
- 
- pio:
- 	if (!desc) {
-@@ -196,8 +196,7 @@ pio:
- 			 "DMA failed: %d, falling back to PIO\n", ret);
- 	}
- 
--	dev_dbg(&host->pdev->dev, "%s(): desc %p, cookie %d\n", __func__,
--		desc, cookie);
-+	dev_dbg(&host->pdev->dev, "%s(): desc %p\n", __func__, desc);
- }
- 
- void tmio_mmc_start_dma(struct tmio_mmc_host *host,
+-- 
+~Randy
