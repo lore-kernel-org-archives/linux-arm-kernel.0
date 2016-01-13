@@ -1,59 +1,58 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 13 Jan 2016 11:30:50 +0800
-Subject: [PATCH v7 06/10] mfd: axp20x: Whitespace,
- open parenthesis alignment code style fixes
+Date: Wed, 13 Jan 2016 11:30:46 +0800
+Subject: [PATCH v7 02/10] mfd: axp20x: Remove second struct device * parameter
+ for axp20x_match_device()
 In-Reply-To: <1452655854-1528-1-git-send-email-wens@csie.org>
 References: <1452655854-1528-1-git-send-email-wens@csie.org>
-Message-ID: <1452655854-1528-7-git-send-email-wens@csie.org>
+Message-ID: <1452655854-1528-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes some leftover code style issues in the axp20x core.
+The first argument passed to axp20x_match_device(), struct axp20x_dev *,
+already contains a pointer to the device. By rearranging some code,
+moving the assignment of the pointer before axp20x_match_device() is
+called, we can eliminate the second parameter.
 
+Suggested-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/axp20x.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/mfd/axp20x.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index 8e569bcfe3bc..3054ea4b95e8 100644
+index 9842199e2e6c..685a78614f83 100644
 --- a/drivers/mfd/axp20x.c
 +++ b/drivers/mfd/axp20x.c
-@@ -593,14 +593,14 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
- 			dev_err(dev, "Unable to match OF ID\n");
- 			return -ENODEV;
- 		}
--		axp20x->variant = (long) of_id->data;
-+		axp20x->variant = (long)of_id->data;
- 	} else {
- 		acpi_id = acpi_match_device(dev->driver->acpi_match_table, dev);
- 		if (!acpi_id || !acpi_id->driver_data) {
- 			dev_err(dev, "Unable to match ACPI ID and data\n");
- 			return -ENODEV;
- 		}
--		axp20x->variant = (long) acpi_id->driver_data;
-+		axp20x->variant = (long)acpi_id->driver_data;
- 	}
- 
- 	switch (axp20x->variant) {
-@@ -634,7 +634,7 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
- 		return -EINVAL;
- 	}
- 	dev_info(dev, "AXP20x variant %s found\n",
--		axp20x_model_names[axp20x->variant]);
-+		 axp20x_model_names[axp20x->variant]);
- 
- 	return 0;
+@@ -606,8 +606,9 @@ static void axp20x_power_off(void)
+ 		     AXP20X_OFF);
  }
-@@ -654,7 +654,7 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
- 	}
  
- 	ret = mfd_add_devices(axp20x->dev, -1, axp20x->cells,
--			axp20x->nr_cells, NULL, 0, NULL);
-+			      axp20x->nr_cells, NULL, 0, NULL);
+-static int axp20x_match_device(struct axp20x_dev *axp20x, struct device *dev)
++static int axp20x_match_device(struct axp20x_dev *axp20x)
+ {
++	struct device *dev = axp20x->dev;
+ 	const struct acpi_device_id *acpi_id;
+ 	const struct of_device_id *of_id;
  
- 	if (ret) {
- 		dev_err(axp20x->dev, "failed to add MFD devices: %d\n", ret);
+@@ -673,14 +674,14 @@ static int axp20x_i2c_probe(struct i2c_client *i2c,
+ 	if (!axp20x)
+ 		return -ENOMEM;
+ 
+-	ret = axp20x_match_device(axp20x, &i2c->dev);
+-	if (ret)
+-		return ret;
+-
+ 	axp20x->i2c_client = i2c;
+ 	axp20x->dev = &i2c->dev;
+ 	dev_set_drvdata(axp20x->dev, axp20x);
+ 
++	ret = axp20x_match_device(axp20x);
++	if (ret)
++		return ret;
++
+ 	axp20x->regmap = devm_regmap_init_i2c(i2c, axp20x->regmap_cfg);
+ 	if (IS_ERR(axp20x->regmap)) {
+ 		ret = PTR_ERR(axp20x->regmap);
 -- 
 2.6.4
