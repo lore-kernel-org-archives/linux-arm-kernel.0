@@ -1,225 +1,204 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 13 Jan 2016 16:46:57 +0100
-Subject: [PATCH v3 4/4] soc: mediatek: Add MT2701 scpsys driver
-In-Reply-To: <1452676288-62711-5-git-send-email-jamesjj.liao@mediatek.com>
-References: <1452676288-62711-1-git-send-email-jamesjj.liao@mediatek.com>
- <1452676288-62711-5-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <56967171.2070007@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 13 Jan 2016 16:50:24 +0100
+Subject: [PATCH v3 07/21] arm64: move kernel image to base of vmalloc area
+In-Reply-To: <20160113135109.GJ23370@leverpostej>
+References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1452518355-4606-8-git-send-email-ard.biesheuvel@linaro.org>
+ <20160112181336.GF4858@leverpostej>
+ <CAKv+Gu-TS7w=AVBceGhsQkQzVCv+u7Gh6ojftwW1iaE+d0yrYw@mail.gmail.com>
+ <20160113135109.GJ23370@leverpostej>
+Message-ID: <CAKv+Gu9ka7EOJq9BsAw9ON2qYiERJYKkzyYG7XYn0uw93fpTgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 13/01/16 10:11, James Liao wrote:
-> From: Shunli Wang <shunli.wang@mediatek.com>
+On 13 January 2016 at 14:51, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, Jan 13, 2016 at 09:39:41AM +0100, Ard Biesheuvel wrote:
+>> On 12 January 2016 at 19:14, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Mon, Jan 11, 2016 at 02:19:00PM +0100, Ard Biesheuvel wrote:
+>> >> This moves the module area to right before the vmalloc area, and
+>> >> moves the kernel image to the base of the vmalloc area. This is
+>> >> an intermediate step towards implementing kASLR, where the kernel
+>> >> image can be located anywhere in the vmalloc area.
+>> >>
+>> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >> ---
+>> >>  arch/arm64/include/asm/kasan.h          | 20 ++++---
+>> >>  arch/arm64/include/asm/kernel-pgtable.h |  5 +-
+>> >>  arch/arm64/include/asm/memory.h         | 18 ++++--
+>> >>  arch/arm64/include/asm/pgtable.h        |  7 ---
+>> >>  arch/arm64/kernel/setup.c               | 12 ++++
+>> >>  arch/arm64/mm/dump.c                    | 12 ++--
+>> >>  arch/arm64/mm/init.c                    | 20 +++----
+>> >>  arch/arm64/mm/kasan_init.c              | 21 +++++--
+>> >>  arch/arm64/mm/mmu.c                     | 62 ++++++++++++++------
+>> >>  9 files changed, 118 insertions(+), 59 deletions(-)
+>> >>
+>> >> diff --git a/arch/arm64/include/asm/kasan.h b/arch/arm64/include/asm/kasan.h
+>> >> index de0d21211c34..2c583dbf4746 100644
+>> >> --- a/arch/arm64/include/asm/kasan.h
+>> >> +++ b/arch/arm64/include/asm/kasan.h
+>> >> @@ -1,20 +1,16 @@
+>> >>  #ifndef __ASM_KASAN_H
+>> >>  #define __ASM_KASAN_H
+>> >>
+>> >> -#ifndef __ASSEMBLY__
+>> >> -
+>> >>  #ifdef CONFIG_KASAN
+>> >>
+>> >>  #include <linux/linkage.h>
+>> >> -#include <asm/memory.h>
+>> >> -#include <asm/pgtable-types.h>
+>> >>
+>> >>  /*
+>> >>   * KASAN_SHADOW_START: beginning of the kernel virtual addresses.
+>> >>   * KASAN_SHADOW_END: KASAN_SHADOW_START + 1/8 of kernel virtual addresses.
+>> >>   */
+>> >> -#define KASAN_SHADOW_START      (VA_START)
+>> >> -#define KASAN_SHADOW_END        (KASAN_SHADOW_START + (1UL << (VA_BITS - 3)))
+>> >> +#define KASAN_SHADOW_START   (VA_START)
+>> >> +#define KASAN_SHADOW_END     (KASAN_SHADOW_START + (_AC(1, UL) << (VA_BITS - 3)))
+>> >>
+>> >>  /*
+>> >>   * This value is used to map an address to the corresponding shadow
+>> >> @@ -26,16 +22,22 @@
+>> >>   * should satisfy the following equation:
+>> >>   *      KASAN_SHADOW_OFFSET = KASAN_SHADOW_END - (1ULL << 61)
+>> >>   */
+>> >> -#define KASAN_SHADOW_OFFSET     (KASAN_SHADOW_END - (1ULL << (64 - 3)))
+>> >> +#define KASAN_SHADOW_OFFSET  (KASAN_SHADOW_END - (_AC(1, ULL) << (64 - 3)))
+>> >> +
+>> >
+>> > I couldn't immediately spot where KASAN_SHADOW_* were used in assembly.
+>> > I guess there's some other definition built atop of them that I've
+>> > missed.
+>> >
+>> > Where should I be looking?
+>> >
+>>
+>> Well, the problem is that KIMAGE_VADDR will be defined in terms of
+>> KASAN_SHADOW_END if KASAN is enabled.
 >
-> Add scpsys driver for MT2701.
+> Ah. I'd somehow managed to overlook that. Thanks for pointing that out!
 >
-> Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> ---
-
-NAK, same as in v1. Please don't split up the driver in several code 
-files, but find a a way to share the common code elegantly.
-Comments below.
-
->   drivers/soc/mediatek/Makefile            |   1 +
->   drivers/soc/mediatek/mtk-scpsys-mt2701.c | 170 +++++++++++++++++++++++++++++++
->   2 files changed, 171 insertions(+)
->   create mode 100644 drivers/soc/mediatek/mtk-scpsys-mt2701.c
+>> But since KASAN always uses the first 1/8 of that VA space, I am going
+>> to rework this so that the non-KASAN constants never depend on the
+>> actual values but only on CONFIG_KASAN
 >
-> diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
-> index 13f7d21..d693f7d 100644
-> --- a/drivers/soc/mediatek/Makefile
-> +++ b/drivers/soc/mediatek/Makefile
-> @@ -2,3 +2,4 @@ obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
->   obj-$(CONFIG_MTK_PMIC_WRAP) += mtk-pmic-wrap.o
->   obj-$(CONFIG_MTK_SCPSYS) += mtk-scpsys.o
->   obj-$(CONFIG_MTK_SCPSYS) += mtk-scpsys-mt8173.o
-> +obj-$(CONFIG_MTK_SCPSYS) += mtk-scpsys-mt2701.o
-> diff --git a/drivers/soc/mediatek/mtk-scpsys-mt2701.c b/drivers/soc/mediatek/mtk-scpsys-mt2701.c
-> new file mode 100644
-> index 0000000..82c00ed
-> --- /dev/null
-> +++ b/drivers/soc/mediatek/mtk-scpsys-mt2701.c
-> @@ -0,0 +1,170 @@
-> +/*
-> + * Copyright (c) 2015 Mediatek, Shunli Wang <shunli.wang@mediatek.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/module.h>
-> +#include <linux/of_device.h>
-> +#include <linux/pm_domain.h>
-> +#include <linux/soc/mediatek/infracfg.h>
-> +#include <dt-bindings/power/mt2701-power.h>
-> +
-> +#include "mtk-scpsys.h"
-> +
-> +#define SPM_VDE_PWR_CON			0x0210
-> +#define SPM_MFG_PWR_CON			0x0214
-> +#define SPM_ISP_PWR_CON			0x0238
-> +#define SPM_DIS_PWR_CON			0x023C
-> +#define SPM_CONN_PWR_CON		0x0280
-> +#define SPM_BDP_PWR_CON			0x029C
-> +#define SPM_ETH_PWR_CON			0x02A0
-> +#define SPM_HIF_PWR_CON			0x02A4
-> +#define SPM_IFR_MSC_PWR_CON		0x02A8
-> +#define SPM_PWR_STATUS			0x060c
-> +#define SPM_PWR_STATUS_2ND		0x0610
-> +
-> +#define CONN_PWR_STA_MASK		BIT(1)
-> +#define DIS_PWR_STA_MASK		BIT(3)
-> +#define MFG_PWR_STA_MASK		BIT(4)
-> +#define ISP_PWR_STA_MASK		BIT(5)
-> +#define VDE_PWR_STA_MASK		BIT(7)
-> +#define BDP_PWR_STA_MASK		BIT(14)
-> +#define ETH_PWR_STA_MASK		BIT(15)
-> +#define HIF_PWR_STA_MASK		BIT(16)
-> +#define IFR_MSC_PWR_STA_MASK		BIT(17)
-
-Apart from SPM_BDP_PWR_CON and BDP_PWR_STA_MASK this are compatible with 
-mt8173. So please avoid code duplication.
-Apart you changed the define names from PWR_STATUS_* to *_STA_MASK, 
-please keep a uniform naming across the driver.
-
-Regards,
-Matthias
-
-> +
-> +#define MT2701_TOP_AXI_PROT_EN_CONN	0x0104
-> +#define MT2701_TOP_AXI_PROT_EN_DISP	0x0002
-> +
-> +static const struct scp_domain_data scp_domain_data[] = {
-> +	[MT2701_POWER_DOMAIN_CONN] = {
-> +		.name = "conn",
-> +		.sta_mask = CONN_PWR_STA_MASK,
-> +		.ctl_offs = SPM_CONN_PWR_CON,
-> +		.bus_prot_mask = MT2701_TOP_AXI_PROT_EN_CONN,
-> +		.active_wakeup = true,
-> +	},
-> +	[MT2701_POWER_DOMAIN_DISP] = {
-> +		.name = "disp",
-> +		.sta_mask = DIS_PWR_STA_MASK,
-> +		.ctl_offs = SPM_DIS_PWR_CON,
-> +		.sram_pdn_bits = GENMASK(11, 8),
-> +		.clk_id = {CLK_MM},
-> +		.bus_prot_mask = MT2701_TOP_AXI_PROT_EN_DISP,
-> +		.active_wakeup = true,
-> +	},
-> +	[MT2701_POWER_DOMAIN_MFG] = {
-> +		.name = "mfg",
-> +		.sta_mask = MFG_PWR_STA_MASK,
-> +		.ctl_offs = SPM_MFG_PWR_CON,
-> +		.sram_pdn_bits = GENMASK(11, 8),
-> +		.sram_pdn_ack_bits = GENMASK(12, 12),
-> +		.active_wakeup = true,
-> +	},
-> +	[MT2701_POWER_DOMAIN_VDEC] = {
-> +		.name = "vdec",
-> +		.sta_mask = VDE_PWR_STA_MASK,
-> +		.ctl_offs = SPM_VDE_PWR_CON,
-> +		.sram_pdn_bits = GENMASK(11, 8),
-> +		.sram_pdn_ack_bits = GENMASK(12, 12),
-> +		.clk_id = {CLK_MM},
-> +		.active_wakeup = true,
-> +	},
-> +	[MT2701_POWER_DOMAIN_ISP] = {
-> +		.name = "isp",
-> +		.sta_mask = ISP_PWR_STA_MASK,
-> +		.ctl_offs = SPM_ISP_PWR_CON,
-> +		.sram_pdn_bits = GENMASK(11, 8),
-> +		.sram_pdn_ack_bits = GENMASK(13, 12),
-> +		.active_wakeup = true,
-> +	},
-> +	[MT2701_POWER_DOMAIN_BDP] = {
-> +		.name = "bdp",
-> +		.sta_mask = BDP_PWR_STA_MASK,
-> +		.ctl_offs = SPM_BDP_PWR_CON,
-> +		.sram_pdn_bits = GENMASK(11, 8),
-> +		.active_wakeup = true,
-> +	},
-> +	[MT2701_POWER_DOMAIN_ETH] = {
-> +		.name = "eth",
-> +		.sta_mask = ETH_PWR_STA_MASK,
-> +		.ctl_offs = SPM_ETH_PWR_CON,
-> +		.sram_pdn_bits = GENMASK(11, 8),
-> +		.sram_pdn_ack_bits = GENMASK(15, 12),
-> +		.active_wakeup = true,
-> +	},
-> +	[MT2701_POWER_DOMAIN_HIF] = {
-> +		.name = "hif",
-> +		.sta_mask = HIF_PWR_STA_MASK,
-> +		.ctl_offs = SPM_HIF_PWR_CON,
-> +		.sram_pdn_bits = GENMASK(11, 8),
-> +		.sram_pdn_ack_bits = GENMASK(15, 12),
-> +		.active_wakeup = true,
-> +	},
-> +	[MT2701_POWER_DOMAIN_IFR_MSC] = {
-> +		.name = "ifr_msc",
-> +		.sta_mask = IFR_MSC_PWR_STA_MASK,
-> +		.ctl_offs = SPM_IFR_MSC_PWR_CON,
-> +		.active_wakeup = true,
-> +	},
-> +};
-> +
-> +#define NUM_DOMAINS	ARRAY_SIZE(scp_domain_data)
-> +
-> +static int __init scpsys_probe(struct platform_device *pdev)
-> +{
-> +	struct scp *scp;
-> +
-> +	scp = init_scp(pdev, scp_domain_data, NUM_DOMAINS);
-> +	if (IS_ERR(scp))
-> +		return PTR_ERR(scp);
-> +
-> +	mtk_register_power_domains(pdev, scp, NUM_DOMAINS);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id of_scpsys_match_tbl[] = {
-> +	{
-> +		.compatible = "mediatek,mt2701-scpsys",
-> +	}, {
-> +		/* sentinel */
-> +	}
-> +};
-> +
-> +static struct platform_driver scpsys_drv = {
-> +	.driver = {
-> +		.name = "mtk-scpsys-mt2701",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = of_match_ptr(of_scpsys_match_tbl),
-> +	},
-> +};
-> +
-> +static int __init scpsys_drv_init(void)
-> +{
-> +	return platform_driver_probe(&scpsys_drv, scpsys_probe);
-> +}
-> +
-> +/*
-> + * There are some Mediatek drivers which depend on the power domain driver need
-> + * to probe in earlier initcall levels. So scpsys driver also need to probe
-> + * earlier.
-> + *
-> + * IOMMU(M4U) and SMI drivers for example. SMI is a bridge between IOMMU and
-> + * multimedia HW. IOMMU depends on SMI, and SMI is a power domain consumer,
-> + * so the proper probe sequence should be scpsys -> SMI -> IOMMU driver.
-> + * IOMMU drivers are initialized during subsys_init by default, so we need to
-> + * move SMI and scpsys drivers to subsys_init or earlier init levels.
-> + */
-> +subsys_initcall(scpsys_drv_init);
-> +
-> +MODULE_DESCRIPTION("MediaTek MT2701 scpsys driver");
-> +MODULE_LICENSE("GPL v2");
+> Personally I'd prefer that they were obviously defined in terms of each
+> other if possible (as this means that the definitions are obviously
+> consistent by construction).
 >
+> So if it's not too much of a pain to keep them that way it would be
+> nice to do so.
+>
+> [...]
+>
+
+I am leaning towards adding this to asm/memory.h
+
+#ifdef CONFIG_KASAN
+#define KASAN_SHADOW_SIZE (UL(1) << (VA_BITS - 3))
+#else
+#define KASAN_SHADOW_SIZE (0)
+#endif
+
+and remove the #ifdef CONFIG_KASAN block from asm/pgtable.h. Then
+asm/kasan.h, which already includes asm/memory.h, can use it as region
+size, and none of the reshuffling I had to do before is necessary.
+
+>> >> +     vmlinux_vm.flags        = VM_MAP;
+>> >
+>> > I was going to say we should set VM_KASAN also per its description in
+>> > include/vmalloc.h, though per its uses its not clear if it will ever
+>> > matter.
+>> >
+>>
+>> No, we shouldn't. Even if we are never going to unmap this vma,
+>> setting the flag will result in the shadow area being freed using
+>> vfree(), while it was not allocated via vmalloc() so that is likely to
+>> cause trouble.
+>
+> Ok.
+>
+>> >> +     vm_area_add_early(&vmlinux_vm);
+>> >
+>> > Do we need to register the kernel VA range quite this early, or could we
+>> > do this around paging_init/map_kernel time?
+>> >
+>>
+>> No. Locally, I moved it into map_kernel_chunk, so that we have
+>> separate areas for _text, _init and _data, and we can unmap the _init
+>> entirely rather than only stripping the exec bit. I haven't quite
+>> figured out how to get rid of the vma area, but perhaps it make sense
+>> to keep it reserved, so that modules don't end up there later (which
+>> is possible with the module region randomization I have implemented
+>> for v4) since I don't know how well things like kallsyms etc cope with
+>> that.
+>
+> Keeping that reserved sounds reasonable to me.
+>
+> [...]
+>
+>> >>  void __init kasan_init(void)
+>> >>  {
+>> >> +     u64 kimg_shadow_start, kimg_shadow_end;
+>> >>       struct memblock_region *reg;
+>> >>
+>> >> +     kimg_shadow_start = round_down((u64)kasan_mem_to_shadow(_text),
+>> >> +                                    SWAPPER_BLOCK_SIZE);
+>> >> +     kimg_shadow_end = round_up((u64)kasan_mem_to_shadow(_end),
+>> >> +                                SWAPPER_BLOCK_SIZE);
+>> >
+>> > This rounding looks suspect to me, given it's applied to the shadow
+>> > addresses rather than the kimage addresses. That's roughly equivalent to
+>> > kasan_mem_to_shadow(round_up(_end, 8 * SWAPPER_BLOCK_SIZE).
+>> >
+>> > I don't think we need any rounding for the kimage addresses. The image
+>> > end is page-granular (and the fine-grained mapping will reflect that).
+>> > Any accesses between _end and roud_up(_end, SWAPPER_BLOCK_SIZE) would be
+>> > bugs (and would most likely fault) regardless of KASAN.
+>> >
+>> > Or am I just being thick here?
+>> >
+>>
+>> Well, the problem here is that vmemmap_populate() is used as a
+>> surrogate vmalloc() since that is not available yet, and
+>> vmemmap_populate() allocates in SWAPPER_BLOCK_SIZE granularity.
+>> If I remove the rounding, I get false positive kasan errors which I
+>> have not quite diagnosed yet, but are probably due to the fact that
+>> the rounding performed by vmemmap_populate() goes in the wrong
+>> direction.
+>
+> Ah. :(
+>
+> I'll also take a peek.
+>
+
+Yes, please.
+
+>> I do wonder what that means for memblocks that are not multiples of 16
+>> MB, though (below)
+>
+> Indeed.
+>
+> On a related note, something I've been thinking about is PA layout
+> fuzzing using VMs.
+>
+> It sounds like being able to test memory layouts would be useful for
+> cases like the above, and I suspect there are plenty of other edge cases
+> that we aren't yet aware of due to typical physical memory layouts being
+> fairly simple.
+>
+> It doesn't seem to be possible to force a particular physical memory
+> layout (and particular kernel, dtb, etc addresses) for QEMU or KVM
+> tool. I started looking into adding support to KVM tool, but there's a
+> fair amount of refactoring needed first.
+>
+> Another option might be a special EFI application that carves up memory
+> in a deliberate fashion to ensure particular fragmentation cases (e.g. a
+> bank that's SWAPPER_BLOCK_SIZE - PAGE_SIZE in length).
+>
+
+I use mem= for this, in fact, and boot most of my machines and VMs
+with some value slightly below the actual available DRAM that is not a
+multiple of 2M
