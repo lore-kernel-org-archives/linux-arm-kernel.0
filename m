@@ -1,122 +1,86 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 13 Jan 2016 18:03:25 +0530
-Subject: [PATCH v2] reboot: Backup orderly_poweroff 
-Message-ID: <1452688405-15087-1-git-send-email-j-keerthy@ti.com>
+From: john@metanate.com (John Keeping)
+Date: Wed, 13 Jan 2016 12:53:34 +0000
+Subject: [RFC/PATCH] drm/rockchip: don't wait for vblank if fb hasn't changed
+Message-ID: <1452689614-6570-1-git-send-email-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-orderly_poweroff is triggered when a graceful shutdown
-of system is desired. This may be used in many critical states of the
-kernel such as when subsystems detects conditions such as critical
-temperature conditions. However, in certain conditions in system
-boot up sequences like those in the middle of driver probes being
-initiated, userspace will be unable to power off the system in a clean
-manner and leaves the system in a critical state. In cases like these,
-the /sbin/poweroff will return success (having forked off to attempt
-powering off the system. However, the system overall will fail to
-completely poweroff (since other modules will be probed) and the system
-is still functional with no userspace (since that would have shut itself
-off).
+As commented in drm_atomic_helper_wait_for_vblanks(), userspace relies
+on cursor ioctls being unsynced.  Converting the rockchip driver to
+atomic has significantly impacted cursor performance by making every
+cursor update wait for vblank.
 
-However, there is no clean way of detecting such failure of userspace
-powering off the system. In such scenarios, it is necessary for a backup
-workqueue to be able to force a shutdown of the system when orderly
-shutdown is not successful after a configurable time period.
+By skipping the vblank sync when the framebuffer has not changed (as is
+done in drm_atomic_helper_wait_for_vblanks()) we can avoid this for the
+common case of moving the cursor and only need to delay the cursor ioctl
+when the cursor icon changes.
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
-Suggested-by: Eduardo Valentin <edubezval@gmail.com> 
-Reported-by: Nishanth Menon <nm@ti.com>
+I originally inserted a check on legacy_cursor_update as well, but that
+caused a storm of iommu page faults.  I didn't investigate the cause of
+those since this change gives enough of a performance improvement for my
+use case.
+
+This is RFC because of that and because the framebuffer_changed()
+function is copied from drm_atomic_helper.c as a quick way to test the
+result.
+
+Signed-off-by: John Keeping <john@metanate.com>
 ---
-Links to previous discussion can be found here:
+ drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 27 +++++++++++++++++++++++++--
+ 1 file changed, 25 insertions(+), 2 deletions(-)
 
-http://www.spinics.net/lists/linux-omap/msg124925.html
-
-Boot tested on DRA7.
-
-changes in v2:
-
-	* Changed #ifdef to #if CONFIG_SHUTDOWN_BACKUP_DELAY_MS
-
- arch/Kconfig    |  7 +++++++
- kernel/reboot.c | 23 ++++++++++++++++++-----
- 2 files changed, 25 insertions(+), 5 deletions(-)
-
-Index: linux/arch/Kconfig
-===================================================================
---- linux.orig/arch/Kconfig	2016-01-11 15:26:07.732173131 +0530
-+++ linux/arch/Kconfig	2016-01-11 15:26:07.728173205 +0530
-@@ -37,6 +37,18 @@
- 	def_bool y
- 	depends on PERF_EVENTS && HAVE_PERF_EVENTS_NMI && !PPC64
- 
-+config SHUTDOWN_BACKUP_DELAY_MS
-+	int "Backup shutdown delay in milli-seconds"
-+	default 0
-+	help
-+	  The number of milliseconds to delay before backup workqueue
-+	  executes attempting to poweroff the system after the
-+	  orderly_poweroff function has failed to complete.
-+
-+	  If set to 0, the backup workqueue is not active. The value
-+	  should be conservatively configured based on userspace latencies
-+	  expected for a given system.
-+
- config KPROBES
- 	bool "Kprobes"
- 	depends on MODULES
-Index: linux/kernel/reboot.c
-===================================================================
---- linux.orig/kernel/reboot.c	2016-01-11 15:26:07.732173131 +0530
-+++ linux/kernel/reboot.c	2016-01-11 15:38:33.502341511 +0530
-@@ -424,6 +424,38 @@
- 	return ret;
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+index f784488..8fd9821 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+@@ -177,8 +177,28 @@ static void rockchip_crtc_wait_for_update(struct drm_crtc *crtc)
+ 		crtc_funcs->wait_for_update(crtc);
  }
  
-+#if CONFIG_SHUTDOWN_BACKUP_DELAY_MS
-+
-+/**
-+ * shutdown_backup_func - shutdown backup work after a known delay
-+ * @work: work_struct associated with the backup shutdown function
-+ *
-+ * In system bootup sequences like those in the middle of driver probes being
-+ * initiated, userspace will be unable to power off the system in a clean
-+ * manner and leaves the system in a critical state.
-+ * In such scenarios, this backup workqueue forces a shutdown of the system
-+ * when orderly shutdown is not successful after a configurable time period.
-+ */
-+static void shutdown_backup_func(struct work_struct *work)
++static bool framebuffer_changed(struct drm_device *dev,
++				struct drm_atomic_state *old_state,
++				struct drm_crtc *crtc)
 +{
-+	pr_warn("Orderly_poweroff has failed! Attempting kernel_power_off\n");
-+	kernel_power_off();
++	struct drm_plane *plane;
++	struct drm_plane_state *old_plane_state;
++	int i;
 +
-+	pr_warn("kernel_power_off has failed! Attempting emergency_restart\n");
-+	emergency_restart();
++	for_each_plane_in_state(old_state, plane, old_plane_state, i) {
++		if (plane->state->crtc != crtc &&
++		    old_plane_state->crtc != crtc)
++			continue;
++
++		if (plane->state->fb != old_plane_state->fb)
++			return true;
++	}
++
++	return false;
 +}
 +
-+static DECLARE_DELAYED_WORK(bkup_shutdown_work, shutdown_backup_func);
-+
-+static inline void setup_backup_shutdown_workqueue(void)
-+{
-+	schedule_delayed_work(&bkup_shutdown_work,
-+		      msecs_to_jiffies(CONFIG_SHUTDOWN_BACKUP_DELAY_MS));
-+}
-+#else
-+static inline void setup_backup_shutdown_workqueue(void) { }
-+#endif
-+
- static int __orderly_poweroff(bool force)
+ static void
+-rockchip_atomic_wait_for_complete(struct drm_atomic_state *old_state)
++rockchip_atomic_wait_for_complete(struct drm_device *dev, struct drm_atomic_state *old_state)
  {
- 	int ret;
-@@ -442,6 +474,12 @@
- 		kernel_power_off();
- 	}
+ 	struct drm_crtc_state *old_crtc_state;
+ 	struct drm_crtc *crtc;
+@@ -194,6 +214,9 @@ rockchip_atomic_wait_for_complete(struct drm_atomic_state *old_state)
+ 		if (!crtc->state->active)
+ 			continue;
  
-+	/*
-+	 * Schedule a backup work function to execute after a known time
-+	 * when orderly shutdown fails.
-+	 */
-+	setup_backup_shutdown_workqueue();
++		if (!framebuffer_changed(dev, old_state, crtc))
++			continue;
 +
- 	return ret;
- }
+ 		ret = drm_crtc_vblank_get(crtc);
+ 		if (ret != 0)
+ 			continue;
+@@ -241,7 +264,7 @@ rockchip_atomic_commit_complete(struct rockchip_atomic_commit *commit)
  
+ 	drm_atomic_helper_commit_planes(dev, state, true);
+ 
+-	rockchip_atomic_wait_for_complete(state);
++	rockchip_atomic_wait_for_complete(dev, state);
+ 
+ 	drm_atomic_helper_cleanup_planes(dev, state);
+ 
+-- 
+2.7.0.rc3.140.g520a093
