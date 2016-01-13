@@ -1,93 +1,225 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 13 Jan 2016 16:40:05 +0100
-Subject: [RFC/PATCH] drm/rockchip: don't wait for vblank if fb hasn't
- changed
-In-Reply-To: <20160113143425.363ce07a.john@metanate.com>
-References: <1452689614-6570-1-git-send-email-john@metanate.com>
- <20160113142320.GQ19130@phenom.ffwll.local>
- <20160113143425.363ce07a.john@metanate.com>
-Message-ID: <20160113154005.GT19130@phenom.ffwll.local>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 13 Jan 2016 16:46:57 +0100
+Subject: [PATCH v3 4/4] soc: mediatek: Add MT2701 scpsys driver
+In-Reply-To: <1452676288-62711-5-git-send-email-jamesjj.liao@mediatek.com>
+References: <1452676288-62711-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1452676288-62711-5-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <56967171.2070007@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 02:34:25PM +0000, John Keeping wrote:
-> On Wed, 13 Jan 2016 15:23:20 +0100, Daniel Vetter wrote:
-> 
-> > On Wed, Jan 13, 2016 at 12:53:34PM +0000, John Keeping wrote:
-> > > As commented in drm_atomic_helper_wait_for_vblanks(), userspace
-> > > relies on cursor ioctls being unsynced.  Converting the rockchip
-> > > driver to atomic has significantly impacted cursor performance by
-> > > making every cursor update wait for vblank.
-> > > 
-> > > By skipping the vblank sync when the framebuffer has not changed
-> > > (as is done in drm_atomic_helper_wait_for_vblanks()) we can avoid
-> > > this for the common case of moving the cursor and only need to
-> > > delay the cursor ioctl when the cursor icon changes.
-> > > 
-> > > I originally inserted a check on legacy_cursor_update as well, but
-> > > that caused a storm of iommu page faults.  I didn't investigate the
-> > > cause of those since this change gives enough of a performance
-> > > improvement for my use case.
-> > > 
-> > > This is RFC because of that and because the framebuffer_changed()
-> > > function is copied from drm_atomic_helper.c as a quick way to test
-> > > the result.
-> > > 
-> > > Signed-off-by: John Keeping <john@metanate.com>
-> > > ---
-> > >  drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 27
-> > > +++++++++++++++++++++++++-- 1 file changed, 25 insertions(+), 2
-> > > deletions(-)
-> > > 
-> > > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> > > b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c index f784488..8fd9821
-> > > 100644 --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> > > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> > > @@ -177,8 +177,28 @@ static void
-> > > rockchip_crtc_wait_for_update(struct drm_crtc *crtc)
-> > > crtc_funcs->wait_for_update(crtc); }
-> > >  
-> > > +static bool framebuffer_changed(struct drm_device *dev,
-> > > +				struct drm_atomic_state *old_state,
-> > > +				struct drm_crtc *crtc)
-> > > +{
-> > > +	struct drm_plane *plane;
-> > > +	struct drm_plane_state *old_plane_state;
-> > > +	int i;
-> > > +
-> > > +	for_each_plane_in_state(old_state, plane, old_plane_state,
-> > > i) {
-> > > +		if (plane->state->crtc != crtc &&
-> > > +		    old_plane_state->crtc != crtc)
-> > > +			continue;
-> > > +
-> > > +		if (plane->state->fb != old_plane_state->fb)
-> > > +			return true;
-> > > +	}
-> > > +
-> > > +	return false;
-> > > +}  
-> > 
-> > Please don't hand-roll logic that affects semantics like this. Instead
-> > please use drm_atomic_helper_wait_for_vblanks(), which should do this
-> > correctly for you.
-> > 
-> > If that's not the case then we need to improve the generic helper, or
-> > figure out what's different with rockhip.
-> 
-> According to commit 63ebb9f (drm/rockchip: Convert to support atomic
-> API) it's because rockchip doesn't have a hardware vblank counter.
-> 
-> I'm not entirely clear on why this prevents the use of
-> drm_atomic_helper_wait_for_vblanks().
 
-Hm, that commit isn't terribly helpful. If that's really needed then imo I
-think we should extract a "drm_atomic_helper_plane_needs_vblank_wait()"
-helper that's used by both. But since rockchip does vblank_get/put calls
-I'd hope vblanks actually work correctly. And then the helper should work
-too.
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+
+On 13/01/16 10:11, James Liao wrote:
+> From: Shunli Wang <shunli.wang@mediatek.com>
+>
+> Add scpsys driver for MT2701.
+>
+> Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> ---
+
+NAK, same as in v1. Please don't split up the driver in several code 
+files, but find a a way to share the common code elegantly.
+Comments below.
+
+>   drivers/soc/mediatek/Makefile            |   1 +
+>   drivers/soc/mediatek/mtk-scpsys-mt2701.c | 170 +++++++++++++++++++++++++++++++
+>   2 files changed, 171 insertions(+)
+>   create mode 100644 drivers/soc/mediatek/mtk-scpsys-mt2701.c
+>
+> diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
+> index 13f7d21..d693f7d 100644
+> --- a/drivers/soc/mediatek/Makefile
+> +++ b/drivers/soc/mediatek/Makefile
+> @@ -2,3 +2,4 @@ obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
+>   obj-$(CONFIG_MTK_PMIC_WRAP) += mtk-pmic-wrap.o
+>   obj-$(CONFIG_MTK_SCPSYS) += mtk-scpsys.o
+>   obj-$(CONFIG_MTK_SCPSYS) += mtk-scpsys-mt8173.o
+> +obj-$(CONFIG_MTK_SCPSYS) += mtk-scpsys-mt2701.o
+> diff --git a/drivers/soc/mediatek/mtk-scpsys-mt2701.c b/drivers/soc/mediatek/mtk-scpsys-mt2701.c
+> new file mode 100644
+> index 0000000..82c00ed
+> --- /dev/null
+> +++ b/drivers/soc/mediatek/mtk-scpsys-mt2701.c
+> @@ -0,0 +1,170 @@
+> +/*
+> + * Copyright (c) 2015 Mediatek, Shunli Wang <shunli.wang@mediatek.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/module.h>
+> +#include <linux/of_device.h>
+> +#include <linux/pm_domain.h>
+> +#include <linux/soc/mediatek/infracfg.h>
+> +#include <dt-bindings/power/mt2701-power.h>
+> +
+> +#include "mtk-scpsys.h"
+> +
+> +#define SPM_VDE_PWR_CON			0x0210
+> +#define SPM_MFG_PWR_CON			0x0214
+> +#define SPM_ISP_PWR_CON			0x0238
+> +#define SPM_DIS_PWR_CON			0x023C
+> +#define SPM_CONN_PWR_CON		0x0280
+> +#define SPM_BDP_PWR_CON			0x029C
+> +#define SPM_ETH_PWR_CON			0x02A0
+> +#define SPM_HIF_PWR_CON			0x02A4
+> +#define SPM_IFR_MSC_PWR_CON		0x02A8
+> +#define SPM_PWR_STATUS			0x060c
+> +#define SPM_PWR_STATUS_2ND		0x0610
+> +
+> +#define CONN_PWR_STA_MASK		BIT(1)
+> +#define DIS_PWR_STA_MASK		BIT(3)
+> +#define MFG_PWR_STA_MASK		BIT(4)
+> +#define ISP_PWR_STA_MASK		BIT(5)
+> +#define VDE_PWR_STA_MASK		BIT(7)
+> +#define BDP_PWR_STA_MASK		BIT(14)
+> +#define ETH_PWR_STA_MASK		BIT(15)
+> +#define HIF_PWR_STA_MASK		BIT(16)
+> +#define IFR_MSC_PWR_STA_MASK		BIT(17)
+
+Apart from SPM_BDP_PWR_CON and BDP_PWR_STA_MASK this are compatible with 
+mt8173. So please avoid code duplication.
+Apart you changed the define names from PWR_STATUS_* to *_STA_MASK, 
+please keep a uniform naming across the driver.
+
+Regards,
+Matthias
+
+> +
+> +#define MT2701_TOP_AXI_PROT_EN_CONN	0x0104
+> +#define MT2701_TOP_AXI_PROT_EN_DISP	0x0002
+> +
+> +static const struct scp_domain_data scp_domain_data[] = {
+> +	[MT2701_POWER_DOMAIN_CONN] = {
+> +		.name = "conn",
+> +		.sta_mask = CONN_PWR_STA_MASK,
+> +		.ctl_offs = SPM_CONN_PWR_CON,
+> +		.bus_prot_mask = MT2701_TOP_AXI_PROT_EN_CONN,
+> +		.active_wakeup = true,
+> +	},
+> +	[MT2701_POWER_DOMAIN_DISP] = {
+> +		.name = "disp",
+> +		.sta_mask = DIS_PWR_STA_MASK,
+> +		.ctl_offs = SPM_DIS_PWR_CON,
+> +		.sram_pdn_bits = GENMASK(11, 8),
+> +		.clk_id = {CLK_MM},
+> +		.bus_prot_mask = MT2701_TOP_AXI_PROT_EN_DISP,
+> +		.active_wakeup = true,
+> +	},
+> +	[MT2701_POWER_DOMAIN_MFG] = {
+> +		.name = "mfg",
+> +		.sta_mask = MFG_PWR_STA_MASK,
+> +		.ctl_offs = SPM_MFG_PWR_CON,
+> +		.sram_pdn_bits = GENMASK(11, 8),
+> +		.sram_pdn_ack_bits = GENMASK(12, 12),
+> +		.active_wakeup = true,
+> +	},
+> +	[MT2701_POWER_DOMAIN_VDEC] = {
+> +		.name = "vdec",
+> +		.sta_mask = VDE_PWR_STA_MASK,
+> +		.ctl_offs = SPM_VDE_PWR_CON,
+> +		.sram_pdn_bits = GENMASK(11, 8),
+> +		.sram_pdn_ack_bits = GENMASK(12, 12),
+> +		.clk_id = {CLK_MM},
+> +		.active_wakeup = true,
+> +	},
+> +	[MT2701_POWER_DOMAIN_ISP] = {
+> +		.name = "isp",
+> +		.sta_mask = ISP_PWR_STA_MASK,
+> +		.ctl_offs = SPM_ISP_PWR_CON,
+> +		.sram_pdn_bits = GENMASK(11, 8),
+> +		.sram_pdn_ack_bits = GENMASK(13, 12),
+> +		.active_wakeup = true,
+> +	},
+> +	[MT2701_POWER_DOMAIN_BDP] = {
+> +		.name = "bdp",
+> +		.sta_mask = BDP_PWR_STA_MASK,
+> +		.ctl_offs = SPM_BDP_PWR_CON,
+> +		.sram_pdn_bits = GENMASK(11, 8),
+> +		.active_wakeup = true,
+> +	},
+> +	[MT2701_POWER_DOMAIN_ETH] = {
+> +		.name = "eth",
+> +		.sta_mask = ETH_PWR_STA_MASK,
+> +		.ctl_offs = SPM_ETH_PWR_CON,
+> +		.sram_pdn_bits = GENMASK(11, 8),
+> +		.sram_pdn_ack_bits = GENMASK(15, 12),
+> +		.active_wakeup = true,
+> +	},
+> +	[MT2701_POWER_DOMAIN_HIF] = {
+> +		.name = "hif",
+> +		.sta_mask = HIF_PWR_STA_MASK,
+> +		.ctl_offs = SPM_HIF_PWR_CON,
+> +		.sram_pdn_bits = GENMASK(11, 8),
+> +		.sram_pdn_ack_bits = GENMASK(15, 12),
+> +		.active_wakeup = true,
+> +	},
+> +	[MT2701_POWER_DOMAIN_IFR_MSC] = {
+> +		.name = "ifr_msc",
+> +		.sta_mask = IFR_MSC_PWR_STA_MASK,
+> +		.ctl_offs = SPM_IFR_MSC_PWR_CON,
+> +		.active_wakeup = true,
+> +	},
+> +};
+> +
+> +#define NUM_DOMAINS	ARRAY_SIZE(scp_domain_data)
+> +
+> +static int __init scpsys_probe(struct platform_device *pdev)
+> +{
+> +	struct scp *scp;
+> +
+> +	scp = init_scp(pdev, scp_domain_data, NUM_DOMAINS);
+> +	if (IS_ERR(scp))
+> +		return PTR_ERR(scp);
+> +
+> +	mtk_register_power_domains(pdev, scp, NUM_DOMAINS);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id of_scpsys_match_tbl[] = {
+> +	{
+> +		.compatible = "mediatek,mt2701-scpsys",
+> +	}, {
+> +		/* sentinel */
+> +	}
+> +};
+> +
+> +static struct platform_driver scpsys_drv = {
+> +	.driver = {
+> +		.name = "mtk-scpsys-mt2701",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = of_match_ptr(of_scpsys_match_tbl),
+> +	},
+> +};
+> +
+> +static int __init scpsys_drv_init(void)
+> +{
+> +	return platform_driver_probe(&scpsys_drv, scpsys_probe);
+> +}
+> +
+> +/*
+> + * There are some Mediatek drivers which depend on the power domain driver need
+> + * to probe in earlier initcall levels. So scpsys driver also need to probe
+> + * earlier.
+> + *
+> + * IOMMU(M4U) and SMI drivers for example. SMI is a bridge between IOMMU and
+> + * multimedia HW. IOMMU depends on SMI, and SMI is a power domain consumer,
+> + * so the proper probe sequence should be scpsys -> SMI -> IOMMU driver.
+> + * IOMMU drivers are initialized during subsys_init by default, so we need to
+> + * move SMI and scpsys drivers to subsys_init or earlier init levels.
+> + */
+> +subsys_initcall(scpsys_drv_init);
+> +
+> +MODULE_DESCRIPTION("MediaTek MT2701 scpsys driver");
+> +MODULE_LICENSE("GPL v2");
+>
