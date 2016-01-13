@@ -1,66 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 13 Jan 2016 10:26:23 +0000
-Subject: [PATCH] arm64: reenable interrupt when handling ptrace breakpoint
-In-Reply-To: <56955B3A.5010303@linaro.org>
-References: <1450225088-2456-1-git-send-email-yang.shi@linaro.org>
- <20151216111316.GD4308@arm.com> <5671CD5B.9030907@linaro.org>
- <20151221104818.GF23092@arm.com>
- <alpine.DEB.2.11.1512211749180.28591@nanos>
- <20151221170028.GT23092@arm.com> <56955B3A.5010303@linaro.org>
-Message-ID: <20160113102622.GC25458@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Jan 2016 11:29:53 +0100
+Subject: [PATCH v1 3/3] ARM64 LPC: update binding doc
+In-Reply-To: <20160113100911.GU13633@e106497-lin.cambridge.arm.com>
+References: <1451396032-23708-1-git-send-email-zourongrong@gmail.com>
+ <4052627.BRvFkUij6q@wuerfel>
+ <20160113100911.GU13633@e106497-lin.cambridge.arm.com>
+Message-ID: <10121075.WaQr9PQ2xh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 11:59:54AM -0800, Shi, Yang wrote:
-> On 12/21/2015 9:00 AM, Will Deacon wrote:
-> >On Mon, Dec 21, 2015 at 05:51:22PM +0100, Thomas Gleixner wrote:
-> >>On Mon, 21 Dec 2015, Will Deacon wrote:
-> >>>+static void send_user_sigtrap(int si_code)
-> >>>+{
-> >>>+	struct pt_regs *regs = current_pt_regs();
-> >>>+	siginfo_t info = {
-> >>>+		.si_signo	= SIGTRAP,
-> >>>+		.si_errno	= 0,
-> >>>+		.si_code	= si_code,
-> >>>+		.si_addr	= (void __user *)instruction_pointer(regs),
-> >>>+	};
-> >>>+
-> >>>+	if (WARN_ON(!user_mode(regs)))
-> >>>+		return;
-> >>>+
-> >>>+	preempt_disable();
-> >>
-> >>That doesn't work on RT either. force_sig_info() takes task->sighand->siglock,
-> >>which is a 'sleeping' spinlock on RT.
-> >
-> >Ah, I missed that :/
-> >
-> >>Why would we need to disable preemption here at all? What's the problem of
-> >>being preempted or even migrated?
-> >
-> >There *might* not be a problem, I'm just really nervous about changing
-> >the behaviour on the debug path and subtly changing how ptrace behaves.
-> >
-> >My worry was that you could somehow get back into the tracer, and it
-> >could remove a software breakpoint in the knowledge that it wouldn't
-> >see any future (spurious) SIGTRAPs for that location.
-> >
-> >Without a concrete example, however, I guess I'll bite the bullet and
-> >enable irqs across the call to force_sig_info, since there is clearly a
-> >real issue here on RT.
+On Wednesday 13 January 2016 10:09:11 liviu.dudau at arm.com wrote:
+> On Tue, Jan 12, 2016 at 11:54:59PM +0100, Arnd Bergmann wrote:
+> > On Tuesday 12 January 2016 10:14:18 liviu.dudau at arm.com wrote:
+> > > 
+> > > OK, looking at of_translate_one() comments it looks like a missing "ranges" property is
+> > > only accepted on PowerPC. I suggest you have an empty "ranges" property in your isa
+> > > parent node, that will signal to the OF parsing code that the mapping is 1:1. Then have
+> > > the IPMI node use the reg = <0x0 0xe4 4>; property values instead of reg = <0x1 0xe4 4>;
+> > > 
+> > > 
+> > 
+> > A missing ranges property means that there is no translation, while an
+> > empty ranges means a 1:1 translation to the parent bus.
+> > 
+> > We really want the former here, as I/O port addresses are not mapped into
+> > the MMIO space of the parent bus.
 > 
-> This might be buried in email storm during the holiday. Just want to double
-> check the status. I'm supposed there is no objection for getting it merged
-> in upstream?
+> Agree. However of_translate_one()'s behaviour doesn't match our expectations and I have no
+> useful suggestions on what the right behaviour should be.
 
-Sorry, when you replied with:
+I believe of_get_address() already has the correct number (local to the
+ISA/LPC bus here), an we just need to teach __of_address_to_resource
+about ISA buses that have their own translation. We have the device
+node of the ISA bus here, so we just need to stop translating further
+using the ranges property and instead use the io_offset for that bus.
 
-> I think we could just extend the "signal delay send" approach from x86-64
-> to arm64, which is currently used by x86-64 on -rt kernel only.
+In fact we can use the same method for both ISA and PCI buses, if
+we just remember which device node is the root for an I/O space
+and what its offset is relative to the Linux I/O space. Going all
+the way to a physical CPU address and then back to an I/O port number
+through pci_address_to_pio() is awkward anyway, but here it's wrong
+specifically because there is no physical address for it.
 
-I understood that you were going to fix -rt, so I dropped this pending
-anything more from you.
-
-What's the plan?
-
-Will
+	Arnd
