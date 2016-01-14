@@ -1,234 +1,378 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Thu, 14 Jan 2016 13:45:38 +0000
-Subject: [PATCH V3 3/6] clk: bcm2835: enable fractional and mash support
+Date: Thu, 14 Jan 2016 13:45:41 +0000
+Subject: [PATCH V3 6/6] clk: bcm2835: add missing 22 HW-clocks.
 In-Reply-To: <1452779142-20615-1-git-send-email-kernel@martin.sperl.org>
 References: <1452779142-20615-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1452779142-20615-4-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1452779142-20615-7-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-The clk-bcm2835 driver right now does the correct calculation
-of the fractional clock divider, but it does not set the FRAC
-bit.
+There were 22 HW clocks missing from the clock driver.
 
-This patch enables FRAC for all clocks with frac_bits > 0
-but allows to define the selection of a higher-order MASH
-support instead of just FRAC.
+These have been included and int_bits and frac_bits
+have been set correctly based on information extracted
+from the broadcom videocore headers
+(http://www.broadcom.com/docs/support/videocore/Brcm_Android_ICS_Graphics_Stack.tar.gz)
 
-Right now there are no limits imposed on maximum frequencies
-when using MASH/FRAC is enabled.
+For an extracted view of the registers please see:
+https://github.com/msperl/rpi-registers/blob/master/md/Region_CM.md
 
-We also implement all the documented limitations for
-MASH=2/3 with regards to Divider upper/lower limits
-(switching to a lower "MASH-level" if needed).
+bcm2835_clock_per_parents has been assigned as the parent
+clock for all new clocks, but this may not be correct
+in all cases - documentation on this is not publicly
+available, so some modifications may be needed in the
+future.
+
+There are a 3 more clocks that possibly could get implemented
+as gates.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- drivers/clk/bcm/clk-bcm2835.c |  122 +++++++++++++++++++++++++++++++++++++----
- 1 file changed, 110 insertions(+), 12 deletions(-)
-
-Changelog:
-	V1->V2: added this patch
-	V2->V3: added checks on limits defined for mash
+ drivers/clk/bcm/clk-bcm2835.c       |  260 ++++++++++++++++++++++++++++++++++-
+ include/dt-bindings/clock/bcm2835.h |   22 +++
+ 2 files changed, 276 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 3d6490f..f5d483e 100644
+index 7bbe310..77bef0c 100644
 --- a/drivers/clk/bcm/clk-bcm2835.c
 +++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -51,6 +51,7 @@
- #define CM_GNRICCTL		0x000
- #define CM_GNRICDIV		0x004
- # define CM_DIV_FRAC_BITS	12
-+# define CM_DIV_INT_BITS	12
+@@ -93,8 +93,18 @@
+ #define CM_PCMDIV		0x09c
+ #define CM_PWMCTL		0x0a0
+ #define CM_PWMDIV		0x0a4
++#define CM_SLIMCTL		0x0a8
++#define CM_SLIMDIV		0x0ac
+ #define CM_SMICTL		0x0b0
+ #define CM_SMIDIV		0x0b4
++#define CM_TCNTCTL		0x0c0
++#define CM_TCNTDIV		0x0c4
++#define CM_TECCTL		0x0c8
++#define CM_TECDIV		0x0cc
++#define CM_TD0CTL		0x0d0
++#define CM_TD0DIV		0x0d4
++#define CM_TD1CTL		0x0d8
++#define CM_TD1DIV		0x0dc
+ #define CM_TSENSCTL		0x0e0
+ #define CM_TSENSDIV		0x0e4
+ #define CM_TIMERCTL		0x0e8
+@@ -108,6 +118,9 @@
+ #define CM_SDCCTL		0x1a8
+ #define CM_SDCDIV		0x1ac
+ #define CM_ARMCTL		0x1b0
++#define CM_ARMDIV		0x1b4
++#define CM_AVEOCTL		0x1b8
++#define CM_AVEODIV		0x1bc
+ #define CM_EMMCCTL		0x1c0
+ #define CM_EMMCDIV		0x1c4
 
- #define CM_VPUCTL		0x008
- #define CM_VPUDIV		0x00c
-@@ -115,6 +116,10 @@
- # define CM_GATE			BIT(CM_GATE_BIT)
- # define CM_BUSY			BIT(7)
- # define CM_BUSYD			BIT(8)
-+# define CM_MASH_BITS			2
-+# define CM_MASH_SHIFT			9
-+# define CM_MASH_MASK			GENMASK(10, 9)
-+# define CM_MASH(v)			((v << CM_MASH_SHIFT) & CM_MASH_MASK)
- # define CM_SRC_SHIFT			0
- # define CM_SRC_BITS			4
- # define CM_SRC_MASK			0xf
-@@ -281,6 +286,42 @@
- #define LOCK_TIMEOUT_NS		100000000
- #define BCM2835_MAX_FB_RATE	1750000000u
+@@ -872,6 +885,219 @@ static const struct bcm2835_clock_data bcm2835_clock_pcm_data = {
+ 	.frac_bits = 12,
+ };
 
-+enum bcm2835_clock_mash_type {
-+	MASH_NONE = 0,
-+	MASH_FRAC = 1,
-+	MASH_2ND_ORDER = 2,
-+	MASH_3RD_ORDER = 3
++static const struct bcm2835_clock_data bcm2835_clock_aveo_data = {
++	.name = "aveo",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_AVEOCTL,
++	.div_reg = CM_AVEODIV,
++	.int_bits = 4,
++	.frac_bits = 12,
 +};
 +
-+/* Helpers for Mash support */
-+#define BCM2835_MASH_MAX_FREQ	25000000u
-+#define DIVMASH_OFFSET (CM_DIV_INT_BITS + CM_DIV_FRAC_BITS)
-+static inline u32 divmash_calc(enum bcm2835_clock_mash_type mash, u32 div)
-+{
-+	return div | (mash << DIVMASH_OFFSET);
-+}
++static const struct bcm2835_clock_data bcm2835_clock_cam0_data = {
++	.name = "cam0",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_CAM0CTL,
++	.div_reg = CM_CAM0DIV,
++	.int_bits = 4,
++	.frac_bits = 8,
++};
 +
-+static inline enum bcm2835_clock_mash_type divmash_get_mash(u32 divmash)
-+{
-+	return (divmash >> DIVMASH_OFFSET);
-+}
++static const struct bcm2835_clock_data bcm2835_clock_cam1_data = {
++	.name = "cam1",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_CAM1CTL,
++	.div_reg = CM_CAM1DIV,
++	.int_bits = 4,
++	.frac_bits = 8,
++};
 +
-+static inline u32 divmash_get_div(u32 divmash)
-+{
-+	return (divmash & GENMASK(DIVMASH_OFFSET - 1, 0));
-+}
++static const struct bcm2835_clock_data bcm2835_clock_ccp2_data = {
++	/* this is possibly a gate */
++	.name = "ccp2",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_CCP2CTL,
++	.div_reg = CM_CCP2DIV,
++	.int_bits = 1,
++	.frac_bits = 0,
++};
 +
-+static inline u32 divmash_get_divi(u32 divmash)
-+{
-+	return (divmash >> CM_DIV_FRAC_BITS) &
-+	       GENMASK(CM_DIV_INT_BITS - 1, 0);
-+}
++static const struct bcm2835_clock_data bcm2835_clock_dft_data = {
++	.name = "dft",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_DFTCTL,
++	.div_reg = CM_DFTDIV,
++	.int_bits = 5,
++	.frac_bits = 0,
++};
 +
-+static inline u32 divmash_get_divf(u32 divmash)
-+{
-+	return divmash & GENMASK(CM_DIV_FRAC_BITS - 1, 0);
-+}
++static const struct bcm2835_clock_data bcm2835_clock_dpi_data = {
++	.name = "dpi",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_DPICTL,
++	.div_reg = CM_DPIDIV,
++	.int_bits = 4,
++	.frac_bits = 8,
++};
 +
- struct bcm2835_cprman {
- 	struct device *dev;
- 	void __iomem *regs;
-@@ -632,6 +673,8 @@ struct bcm2835_clock_data {
- 	u32 int_bits;
- 	/* Number of fractional bits in the divider */
- 	u32 frac_bits;
-+	/* the mash value to use - see CM_MASH */
-+	enum bcm2835_clock_mash_type mash;
-
- 	bool is_vpu_clock;
++static const struct bcm2835_clock_data bcm2835_clock_dsi0e_data = {
++	.name = "dsi0e",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_DSI0ECTL,
++	.div_reg = CM_DSI0EDIV,
++	.int_bits = 4,
++	.frac_bits = 8,
++};
++
++static const struct bcm2835_clock_data bcm2835_clock_dsi0p_data = {
++	/* this is possibly a gate */
++	.name = "dsi0p",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_DSI0PCTL,
++	.div_reg = CM_DSI0PDIV,
++	.int_bits = 1,
++	.frac_bits = 0,
++};
++
++static const struct bcm2835_clock_data bcm2835_clock_dsi1e_data = {
++	.name = "dsi1e",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_DSI1ECTL,
++	.div_reg = CM_DSI1EDIV,
++	.int_bits = 4,
++	.frac_bits = 8,
++};
++
++static const struct bcm2835_clock_data bcm2835_clock_dsi1p_data = {
++	/* this is possibly a gate */
++	.name = "dsi1p",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_DSI1PCTL,
++	.div_reg = CM_DSI1PDIV,
++	.int_bits = 1,
++	.frac_bits = 0,
++};
++
++static const struct bcm2835_clock_data bcm2835_clock_gnric_data = {
++	.name = "gnric",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_GNRICCTL,
++	.div_reg = CM_GNRICDIV,
++	.int_bits = 12,
++	.frac_bits = 12,
++};
++
++static const struct bcm2835_clock_data bcm2835_clock_gp0_data = {
++	.name = "gp0",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_GP0CTL,
++	.div_reg = CM_GP0DIV,
++	.int_bits = 12,
++	.frac_bits = 12,
++};
++
++static const struct bcm2835_clock_data bcm2835_clock_gp1_data = {
++	.name = "gp1",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_GP1CTL,
++	.div_reg = CM_GP1DIV,
++	.int_bits = 12,
++	.frac_bits = 12,
++};
++
++static const struct bcm2835_clock_data bcm2835_clock_gp2_data = {
++	.name = "gp2",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_GP2CTL,
++	.div_reg = CM_GP2DIV,
++	.int_bits = 12,
++	.frac_bits = 12,
++};
++
++static const struct bcm2835_clock_data bcm2835_clock_peria_data = {
++	.name = "peria",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_PERIACTL,
++	.div_reg = CM_PERIADIV,
++	.int_bits = 12,
++	.frac_bits = 12,
++};
++
++static const struct bcm2835_clock_data bcm2835_clock_pulse_data = {
++	.name = "pulse",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_PULSECTL,
++	.div_reg = CM_PULSEDIV,
++	.int_bits = 12,
++	.frac_bits = 0,
++};
++
++static const struct bcm2835_clock_data bcm2835_clock_slim_data = {
++	.name = "slim",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_SLIMCTL,
++	.div_reg = CM_SLIMDIV,
++	.int_bits = 12,
++	.frac_bits = 12,
++};
++
++static const struct bcm2835_clock_data bcm2835_clock_smi_data = {
++	.name = "smi",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_SMICTL,
++	.div_reg = CM_SMIDIV,
++	.int_bits = 4,
++	.frac_bits = 8,
++};
++
++static const struct bcm2835_clock_data bcm2835_clock_td0_data = {
++	.name = "td0",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_TD0CTL,
++	.div_reg = CM_TD0DIV,
++	.int_bits = 12,
++	.frac_bits = 12,
++};
++
++static const struct bcm2835_clock_data bcm2835_clock_td1_data = {
++	.name = "td1",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_TD1CTL,
++	.div_reg = CM_TD1DIV,
++	.int_bits = 12,
++	.frac_bits = 12,
++};
++
++static const struct bcm2835_clock_data bcm2835_clock_tec_data = {
++	.name = "tec",
++	.num_mux_parents = ARRAY_SIZE(bcm2835_clock_per_parents),
++	.parents = bcm2835_clock_per_parents,
++	.ctl_reg = CM_TECCTL,
++	.div_reg = CM_TECDIV,
++	.int_bits = 6,
++	.frac_bits = 0,
++};
++
+ struct bcm2835_gate_data {
+ 	const char *name;
+ 	const char *parent;
+@@ -879,18 +1105,18 @@ struct bcm2835_gate_data {
+ 	u32 ctl_reg;
  };
-@@ -1167,26 +1210,61 @@ static u32 bcm2835_clock_choose_div(struct clk_hw *hw,
- 		GENMASK(CM_DIV_FRAC_BITS - data->frac_bits, 0) >> 1;
- 	u64 temp = (u64)parent_rate << CM_DIV_FRAC_BITS;
- 	u64 rem;
--	u32 div;
-+	u32 div, divi, divf;
-+	const u32 divi_max = BIT(data->int_bits) - 1;
-+	const u32 divi_min = 2;
 
- 	rem = do_div(temp, rate);
- 	div = temp;
-+	divi = divmash_get_divi(div);
-+	divf = divmash_get_divf(div);
+-/*
+- * CM_PERIICTL (and CM_PERIACTL, CM_SYSCTL and CM_VPUCTL if
+- * you have the debug bit set in the power manager, which we
+- * don't bother exposing) are individual gates off of the
+- * non-stop vpu clock.
+- */
+ static const struct bcm2835_gate_data bcm2835_clock_peri_image_data = {
+ 	.name = "peri_image",
+ 	.parent = "vpu",
+ 	.ctl_reg = CM_PERIICTL,
+ };
 
- 	/* Round up and mask off the unused bits */
- 	if (round_up && ((div & unused_frac_mask) != 0 || rem != 0))
- 		div += unused_frac_mask + 1;
- 	div &= ~unused_frac_mask;
-
--	/* Clamp to the limits. */
-+	/*
-+	 * Check if we are within bounds for fractional/MASH dividers
-+	 * For offset values see Table 6-32 in BCM2835-ARM-Peripherials
-+	 * as well as the errata at:
-+	 *   http://elinux.org/BCM2835_datasheet_errata#p105_table
-+	 */
-+	if (divf) {
-+		switch (data->mash) {
-+		case MASH_3RD_ORDER:
-+			if ((divi - 3 >= divi_min) &&
-+			    (divi + 4 <= divi_max) &&
-+			    (parent_rate / (divi - 3) <=
-+				    BCM2835_MASH_MAX_FREQ))
-+				return divmash_calc(MASH_3RD_ORDER, div);
-+			/* fall tru */
-+		case MASH_2ND_ORDER:
-+			if ((divi - 1 >= divi_min) &&
-+			    (divi + 2 <= divi_max) &&
-+			    (parent_rate / (divi - 1) <=
-+				    BCM2835_MASH_MAX_FREQ))
-+				return divmash_calc(MASH_2ND_ORDER, div);
-+			/* fall tru */
-+		case MASH_FRAC:
-+			if ((divi >= divi_min) &&
-+			    (divi + 1 <= divi_max))
-+				return divmash_calc(MASH_FRAC, div);
-+			/* fall tru to integer case */
-+		case MASH_NONE:
-+			break;
-+		}
-+	}
-+	/* the non-frac case or frac out of bound case */
-
--	/* divider must be >= 2 */
--	div = max_t(u32, div, (2 << CM_DIV_FRAC_BITS));
-+	/* must be <= max possible integer divider for this clock */
-+	divi = min_t(u32, divi_max, divi);
-
--	/* clamp to max divider allowed - max is integer divider */
--	div = min_t(u32, div, GENMASK(data->int_bits + CM_DIV_FRAC_BITS - 1,
--				      CM_DIV_FRAC_BITS));
-+	/* minimum divider is 2 */
-+	divi = max_t(u32, 2, divi);
-
--	return div;
-+	/* return the divmash value based only on divi */
-+	return divmash_calc(MASH_NONE, divi << CM_DIV_FRAC_BITS);
- }
-
- static long bcm2835_clock_rate_from_divisor(struct bcm2835_clock *clock,
-@@ -1277,10 +1355,28 @@ static int bcm2835_clock_set_rate(struct clk_hw *hw,
- 	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
- 	struct bcm2835_cprman *cprman = clock->cprman;
- 	const struct bcm2835_clock_data *data = clock->data;
--	u32 div = bcm2835_clock_choose_div(hw, rate, parent_rate, false);
-+	u32 divmash = bcm2835_clock_choose_div(hw, rate, parent_rate, false);
-+	enum bcm2835_clock_mash_type mash = divmash_get_mash(divmash);
-+	u32 div = divmash_get_div(divmash);
-+	u32 ctl;
++static const struct bcm2835_gate_data bcm2835_clock_sys_data = {
++	.name = "sys",
++	.parent = "vpu",
++	.ctl_reg = CM_SYSCTL,
++};
 +
-+	spin_lock(&cprman->regs_lock);
-+	/* check if divider is identical, then return */
-+	if (div == cprman_read(cprman, data->div_reg))
-+		goto unlock;
+ struct bcm2835_pll {
+ 	struct clk_hw hw;
+ 	struct bcm2835_cprman *cprman;
+@@ -1689,9 +1915,31 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 	[BCM2835_CLOCK_EMMC]	= REGISTER_CLK(&bcm2835_clock_emmc_data),
+ 	[BCM2835_CLOCK_PWM]	= REGISTER_CLK(&bcm2835_clock_pwm_data),
+ 	[BCM2835_CLOCK_PCM]	= REGISTER_CLK(&bcm2835_clock_pcm_data),
++	[BCM2835_CLOCK_AVEO]	= REGISTER_CLK(&bcm2835_clock_aveo_data),
++	[BCM2835_CLOCK_CAM0]	= REGISTER_CLK(&bcm2835_clock_cam0_data),
++	[BCM2835_CLOCK_CAM1]	= REGISTER_CLK(&bcm2835_clock_cam1_data),
++	[BCM2835_CLOCK_CCP2]	= REGISTER_CLK(&bcm2835_clock_ccp2_data),
++	[BCM2835_CLOCK_DFT]	= REGISTER_CLK(&bcm2835_clock_dft_data),
++	[BCM2835_CLOCK_DPI]	= REGISTER_CLK(&bcm2835_clock_dpi_data),
++	[BCM2835_CLOCK_DSI0E]	= REGISTER_CLK(&bcm2835_clock_dsi0e_data),
++	[BCM2835_CLOCK_DSI0P]	= REGISTER_CLK(&bcm2835_clock_dsi0p_data),
++	[BCM2835_CLOCK_DSI1E]	= REGISTER_CLK(&bcm2835_clock_dsi1e_data),
++	[BCM2835_CLOCK_DSI1P]	= REGISTER_CLK(&bcm2835_clock_dsi1p_data),
++	[BCM2835_CLOCK_GNRIC]	= REGISTER_CLK(&bcm2835_clock_gnric_data),
++	[BCM2835_CLOCK_GP0]	= REGISTER_CLK(&bcm2835_clock_gp0_data),
++	[BCM2835_CLOCK_GP1]	= REGISTER_CLK(&bcm2835_clock_gp1_data),
++	[BCM2835_CLOCK_GP2]	= REGISTER_CLK(&bcm2835_clock_gp2_data),
++	[BCM2835_CLOCK_PERIA]	= REGISTER_CLK(&bcm2835_clock_peria_data),
++	[BCM2835_CLOCK_PULSE]	= REGISTER_CLK(&bcm2835_clock_pulse_data),
++	[BCM2835_CLOCK_SLIM]	= REGISTER_CLK(&bcm2835_clock_slim_data),
++	[BCM2835_CLOCK_SMI]	= REGISTER_CLK(&bcm2835_clock_smi_data),
++	[BCM2835_CLOCK_TD0]	= REGISTER_CLK(&bcm2835_clock_td0_data),
++	[BCM2835_CLOCK_TD1]	= REGISTER_CLK(&bcm2835_clock_td1_data),
++	[BCM2835_CLOCK_TEC]	= REGISTER_CLK(&bcm2835_clock_tec_data),
+ 	/* the gates */
+ 	[BCM2835_CLOCK_PERI_IMAGE] = REGISTER_GATE(
+ 		&bcm2835_clock_peri_image_data),
++	[BCM2835_CLOCK_SYS]	= REGISTER_GATE(&bcm2835_clock_sys_data),
+ };
 
-+	/* set the divider */
- 	cprman_write(cprman, data->div_reg, div);
-
-+	/* set mash to the selected value */
-+	ctl = cprman_read(cprman, data->ctl_reg);
-+	ctl &= ~CM_MASH_MASK;
-+	ctl |= CM_MASH(mash) & CM_MASH_MASK;
-+	cprman_write(cprman, data->ctl_reg, ctl);
-+
-+unlock:
-+	spin_unlock(&cprman->regs_lock);
-+
- 	return 0;
- }
-
-@@ -1292,7 +1388,7 @@ static int bcm2835_clock_determine_rate(struct clk_hw *hw,
- 	unsigned long rate, best_rate = 0;
- 	unsigned long prate, best_prate = 0;
- 	size_t i;
--	u32 div;
-+	u32 divmash, div;
-
- 	/*
- 	 * Select parent clock that results in the closest but lower rate
-@@ -1302,8 +1398,10 @@ static int bcm2835_clock_determine_rate(struct clk_hw *hw,
- 		if (!parent)
- 			continue;
- 		prate = clk_hw_get_rate(parent);
--		div = bcm2835_clock_choose_div(hw, req->rate, prate, true);
--		rate = bcm2835_clock_rate_from_divisor(clock, prate, div);
-+		divmash = bcm2835_clock_choose_div(hw, req->rate, prate,
-+						   true);
-+		div = divmash_get_div(divmash);
-+		rate = bcm2835_clock_rate_from_divisor(clock, prate, divmash);
- 		if (rate > best_rate && rate <= req->rate) {
- 			best_parent = parent;
- 			best_prate = prate;
+ static int bcm2835_clk_probe(struct platform_device *pdev)
+diff --git a/include/dt-bindings/clock/bcm2835.h b/include/dt-bindings/clock/bcm2835.h
+index 9a7b4a5..d29f181 100644
+--- a/include/dt-bindings/clock/bcm2835.h
++++ b/include/dt-bindings/clock/bcm2835.h
+@@ -45,3 +45,25 @@
+ #define BCM2835_CLOCK_PERI_IMAGE	29
+ #define BCM2835_CLOCK_PWM		30
+ #define BCM2835_CLOCK_PCM		31
++#define BCM2835_CLOCK_AVEO		32
++#define BCM2835_CLOCK_CAM0		33
++#define BCM2835_CLOCK_CAM1		34
++#define BCM2835_CLOCK_CCP2		35
++#define BCM2835_CLOCK_DFT		36
++#define BCM2835_CLOCK_DPI		37
++#define BCM2835_CLOCK_DSI0E		38
++#define BCM2835_CLOCK_DSI0P		39
++#define BCM2835_CLOCK_DSI1E		40
++#define BCM2835_CLOCK_DSI1P		41
++#define BCM2835_CLOCK_GNRIC		42
++#define BCM2835_CLOCK_GP0		43
++#define BCM2835_CLOCK_GP1		44
++#define BCM2835_CLOCK_GP2		45
++#define BCM2835_CLOCK_PERIA		46
++#define BCM2835_CLOCK_PULSE		47
++#define BCM2835_CLOCK_SLIM		48
++#define BCM2835_CLOCK_SMI		49
++#define BCM2835_CLOCK_SYS		50
++#define BCM2835_CLOCK_TD0		51
++#define BCM2835_CLOCK_TD1		52
++#define BCM2835_CLOCK_TEC		53
 --
 1.7.10.4
