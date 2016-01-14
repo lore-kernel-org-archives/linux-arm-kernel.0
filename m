@@ -1,76 +1,117 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 14 Jan 2016 14:46:13 -0700
-Subject: [PATCH V8 19/23] coresight: introducing a global trace ID function
+Date: Thu, 14 Jan 2016 14:46:16 -0700
+Subject: [PATCH V8 22/23] perf tools: making coresight PMU listable
 In-Reply-To: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1452807977-8069-20-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1452807977-8069-23-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TraceID values have to be unique for all tracers and
-consistent between drivers and user space.  As such
-introducing a central function to be used whenever a
-traceID value is required.
+Adding the required mechanic allowing 'perf list pmu' to
+discover coresight ETM/PTM tracers.
 
-The patch also account for data traceIDs, which are usually
-I(N) + 1.
-
+Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm3x.c |  7 ++-----
- include/linux/coresight-pmu.h                 | 12 ++++++++++++
- 2 files changed, 14 insertions(+), 5 deletions(-)
+ MAINTAINERS                    |  1 +
+ tools/perf/arch/arm/util/Build |  2 ++
+ tools/perf/arch/arm/util/pmu.c | 34 ++++++++++++++++++++++++++++++++++
+ tools/perf/config/Makefile     | 17 ++++++++++++-----
+ 4 files changed, 49 insertions(+), 5 deletions(-)
+ create mode 100644 tools/perf/arch/arm/util/pmu.c
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 8055b2d246ad..70146865ff0d 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -27,6 +27,7 @@
- #include <linux/cpu.h>
- #include <linux/of.h>
- #include <linux/coresight.h>
-+#include <linux/coresight-pmu.h>
- #include <linux/amba/bus.h>
- #include <linux/seq_file.h>
- #include <linux/uaccess.h>
-@@ -740,11 +741,7 @@ static void etm_init_arch_data(void *info)
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 233f83464814..b2a92245eece 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1007,6 +1007,7 @@ F:	drivers/hwtracing/coresight/*
+ F:	Documentation/trace/coresight.txt
+ F:	Documentation/devicetree/bindings/arm/coresight.txt
+ F:	Documentation/ABI/testing/sysfs-bus-coresight-devices-*
++F:	tools/perf/arch/arm/util/pmu.c
  
- static void etm_init_trace_id(struct etm_drvdata *drvdata)
- {
--	/*
--	 * A trace ID of value 0 is invalid, so let's start at some
--	 * random value that fits in 7 bits and go from there.
--	 */
--	drvdata->traceid = 0x10 + drvdata->cpu;
-+	drvdata->traceid = coresight_get_trace_id(drvdata->cpu);
- }
+ ARM/CORGI MACHINE SUPPORT
+ M:	Richard Purdie <rpurdie@rpsys.net>
+diff --git a/tools/perf/arch/arm/util/Build b/tools/perf/arch/arm/util/Build
+index d22e3d07de3d..66ab0b05549c 100644
+--- a/tools/perf/arch/arm/util/Build
++++ b/tools/perf/arch/arm/util/Build
+@@ -2,3 +2,5 @@ libperf-$(CONFIG_DWARF) += dwarf-regs.o
  
- static int etm_probe(struct amba_device *adev, const struct amba_id *id)
-diff --git a/include/linux/coresight-pmu.h b/include/linux/coresight-pmu.h
-index 6c5386b23b10..7d410260661b 100644
---- a/include/linux/coresight-pmu.h
-+++ b/include/linux/coresight-pmu.h
-@@ -19,9 +19,21 @@
- #define _LINUX_CORESIGHT_PMU_H
- 
- #define CORESIGHT_ETM_PMU_NAME "cs_etm"
-+#define CORESIGHT_ETM_PMU_SEED  0x10
- 
- /* ETMv3.5/PTM's ETMCR config bit */
- #define ETM_OPT_CYCACC  12
- #define ETM_OPT_TS      28
- 
-+static inline int coresight_get_trace_id(int cpu)
-+{
-+	/*
-+	 * A trace ID of value 0 is invalid, so let's start at some
-+	 * random value that fits in 7 bits and go from there.  Since
-+	 * the common convention is to have data trace IDs be I(N) + 1,
-+	 * set instruction trace IDs as a function of the CPU number.
-+	 */
-+	return (CORESIGHT_ETM_PMU_SEED + (cpu * 2));
-+}
+ libperf-$(CONFIG_LIBUNWIND)          += unwind-libunwind.o
+ libperf-$(CONFIG_LIBDW_DWARF_UNWIND) += unwind-libdw.o
 +
- #endif
++libperf-$(CONFIG_AUXTRACE) += pmu.o
+diff --git a/tools/perf/arch/arm/util/pmu.c b/tools/perf/arch/arm/util/pmu.c
+new file mode 100644
+index 000000000000..af9fb666b44f
+--- /dev/null
++++ b/tools/perf/arch/arm/util/pmu.c
+@@ -0,0 +1,34 @@
++/*
++ * Copyright(C) 2015 Linaro Limited. All rights reserved.
++ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <string.h>
++#include <linux/coresight-pmu.h>
++#include <linux/perf_event.h>
++
++#include "../../util/pmu.h"
++
++struct perf_event_attr
++*perf_pmu__get_default_config(struct perf_pmu *pmu __maybe_unused)
++{
++#ifdef HAVE_AUXTRACE_SUPPORT
++	if (!strcmp(pmu->name, CORESIGHT_ETM_PMU_NAME)) {
++		/* add ETM default config here */
++		pmu->selectable = true;
++	}
++#endif
++	return NULL;
++}
+diff --git a/tools/perf/config/Makefile b/tools/perf/config/Makefile
+index de89ec574361..905faabff8b1 100644
+--- a/tools/perf/config/Makefile
++++ b/tools/perf/config/Makefile
+@@ -647,12 +647,19 @@ ifdef LIBBABELTRACE
+ endif
+ 
+ ifndef NO_AUXTRACE
+-  ifeq ($(feature-get_cpuid), 0)
+-    msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
+-    NO_AUXTRACE := 1
++  ifeq ($(ARCH),x86)
++    ifeq ($(feature-get_cpuid), 0)
++      msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
++      NO_AUXTRACE := 1
++    else
++      $(call detected,CONFIG_AUXTRACE)
++      CFLAGS += -DHAVE_AUXTRACE_SUPPORT
++    endif
+   else
+-    $(call detected,CONFIG_AUXTRACE)
+-    CFLAGS += -DHAVE_AUXTRACE_SUPPORT
++    ifeq ($(ARCH),$(filter $(ARCH), arm arm64))
++      $(call detected,CONFIG_AUXTRACE)
++      CFLAGS += -DHAVE_AUXTRACE_SUPPORT
++    endif
+   endif
+ endif
+ 
 -- 
 2.1.4
