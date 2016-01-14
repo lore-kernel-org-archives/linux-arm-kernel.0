@@ -1,256 +1,201 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 14 Jan 2016 16:25:00 +0100
-Subject: [PATCH v2 17/26] drm: sun4i: Add DT bindings documentation
-In-Reply-To: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1452785109-6172-18-git-send-email-maxime.ripard@free-electrons.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 14 Jan 2016 10:36:16 -0500
+Subject: [PATCH V3 20/21] pci, acpi: Match PCI config space accessors
+ against platfrom specific quirks.
+In-Reply-To: <1452691267-32240-21-git-send-email-tn@semihalf.com>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <1452691267-32240-21-git-send-email-tn@semihalf.com>
+Message-ID: <1452785776.28109.22.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The display pipeline of the Allwinner A10 is involving several loosely
-coupled components.
+On Wed, 2016-01-13 at 14:21 +0100, Tomasz Nowicki wrote:
+> Some platforms may not be fully compliant with generic set of PCI config
+> accessors. For these cases we implement the way to overwrite accessors
+> set prior to PCI buses enumeration. Algorithm traverses available quirk
+> list, matches against <platform ID (DMI), domain, bus number> tuple and
+> returns corresponding accessors. All quirks can be defined using:
+> DECLARE_ACPI_MCFG_FIXUP() and keep self contained. Example,
+> 
+> static const struct dmi_system_id foo_dmi[] = {
+> ????????{
+> ????????????????.ident = "<Platform ident string>",
+> ????????????????.callback = <handler>,
+> ????????????????.matches = {
+> ????????????????????????DMI_MATCH(DMI_SYS_VENDOR, "<system vendor>"),
+> ????????????????????????DMI_MATCH(DMI_PRODUCT_NAME, "<product name>"),
+> ????????????????????????DMI_MATCH(DMI_PRODUCT_VERSION, "product version"),
+> ????????????????},
+> ????????},
+> ????????{ }
+> };
+> 
+> static struct pci_ops foo_ecam_pci_ops = {
+> ????????.map_bus = pci_mcfg_dev_base,
+> ????????.read = foo_ecam_config_read,
+> ????????.write = foo_ecam_config_write,
+> };
+> DECLARE_ACPI_MCFG_FIXUP(foo_dmi, NULL, &foo_ecam_pci_ops, <domain_nr>, <bus_nr>);
+> 
+> More custom (non-DMI) matching can be done via an alternative call.
+> Note that there is possibility to assign quirk related private data to
+> root->sysdata which will be available along read/wriate accessor, example:
+> 
+> static int boo_match(struct pci_mcfg_fixup *fixup, struct acpi_pci_root *root)
+> {
+> ????????return [condition] ? 1 : 0;
+> }
+> 
+> int boo_ecam_config_read(struct pci_bus *bus, unsigned int devfn,
+> ??????????????????????????int where, int size, u32 *val)
+> {
+> ????????struct acpi_pci_root *root = bus->sysdata;
+> ????????struct boo_priv_data *boo_data = root->sysdata;
+> 
+> ????????[..]
+> }
+> 
+> static struct pci_ops boo_ecam_pci_ops = {
+> 	.map_bus = pci_mcfg_dev_base,
+> 	.read = boo_ecam_config_read,
+> 	.write = boo_ecam_config_write,
+> };
+> DECLARE_ACPI_MCFG_FIXUP(NULL, boo_match, &boo_ecam_pci_ops, <domain_nr>, <bus_nr>);
+> 
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> ---
+> ?drivers/acpi/mcfg.c???????????????| 33 +++++++++++++++++++++++++++++++--
+> ?include/acpi/acpi_bus.h???????????|??1 +
+> ?include/asm-generic/vmlinux.lds.h |??7 +++++++
+> ?include/linux/ecam.h??????????????| 18 ++++++++++++++++++
+> ?4 files changed, 57 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
+> index dfc2d14..ec5fe7b 100644
+> --- a/drivers/acpi/mcfg.c
+> +++ b/drivers/acpi/mcfg.c
+> @@ -8,6 +8,7 @@
+> ? */
+> ?
+> ?#include <linux/acpi.h>
+> +#include <linux/dmi.h>
+> ?#include <linux/ecam.h>
+> ?#include <linux/pci.h>
+> ?#include <linux/pci-acpi.h>
+> @@ -34,6 +35,29 @@ int __weak raw_pci_write(unsigned int domain, unsigned int bus,
+> ?	return PCIBIOS_DEVICE_NOT_FOUND;
+> ?}
+> ?
+> +extern struct pci_mcfg_fixup __start_acpi_mcfg_fixups[];
+> +extern struct pci_mcfg_fixup __end_acpi_mcfg_fixups[];
+> +
+> +static struct pci_ops *pci_mcfg_check_quirks(struct acpi_pci_root *root)
+> +{
+> +	struct pci_mcfg_fixup *f;
+> +	int bus_num = root->secondary.start;
+> +	int domain = root->segment;
+> +
+> +	/*
+> +	?* First match against PCI topology <domain:bus> then use DMI or
+> +	?* custom match handler.
+> +	?*/
+> +	for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
+> +		if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
+> +		????(f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
+> +		????(f->system ? dmi_check_system(f->system) : 0 ||
+> +		?????f->match ? f->match(f, root) : 0))
+> +			return f->ops;
 
-Add a documentation for the bindings.
+I think this would be better as:
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- .../bindings/display/sunxi/sun4i-drm.txt           | 228 +++++++++++++++++++++
- 1 file changed, 228 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+		????(f->system ? dmi_check_system(f->system) : 1 &&
+		?????f->match ? f->match(f, root) : 1))
+			return f->ops;
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-new file mode 100644
-index 000000000000..061bc87147a3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -0,0 +1,228 @@
-+Allwinner A10 Display Pipeline
-+==============================
-+
-+The Allwinner A10 Display pipeline is composed of several components
-+that are going to be documented below:
-+
-+TV Encoder
-+----------
-+
-+The TV Encoder supports the composite and VGA output. It is one end of
-+the pipeline.
-+
-+Required properties:
-+ - compatible: value should be "allwinner,sun4i-a10-tv-encoder".
-+ - reg: base address and size of memory-mapped region
-+ - clocks: the clocks driving the TV encoder
-+
-+- ports: A ports node with endpoint definitions as defined in
-+  Documentation/devicetree/bindings/media/video-interfaces.txt. The
-+  first port should be the input endpoint.
-+
-+TCON
-+----
-+
-+The TCON acts as a timing controller for RGB, LVDS and TV interfaces.
-+
-+Required properties:
-+ - compatible: value should be "allwinner,sun4i-a10-tcon".
-+ - reg: base address and size of memory-mapped region
-+ - interrupts: interrupt associated to this IP
-+ - clocks: phandles to the clocks feeding the TCON. Three are needed:
-+   - 'ahb': the interface clocks
-+   - 'tcon-ch0': The clock driving the TCON channel 0
-+   - 'tcon-ch1': The clock driving the TCON channel 1
-+
-+ - clock-names: the clock names mentioned above
-+ - clock-output-names: Name of the pixel clock created
-+
-+- ports: A ports node with endpoint definitions as defined in
-+  Documentation/devicetree/bindings/media/video-interfaces.txt. The
-+  first port should be the input endpoint, the second one the output
-+
-+Optional properties:
-+  - allwinner,panel: phandle to the panel used in our RGB interface
-+
-+
-+Display Engine Backend
-+----------------------
-+
-+The display engine backend exposes layers and sprites to the
-+system.
-+
-+Required properties:
-+  - compatible: value must be one of:
-+    * allwinner,sun5i-a13-display-backend
-+  - reg: base address and size of the memory-mapped region.
-+  - clocks: phandles to the clocks feeding the frontend and backend
-+    * ahb: the backend interface clock
-+    * mod: the backend module clock
-+    * ram: the backend DRAM clock
-+  - clock-names: the clock names mentioned above
-+  - resets: phandles to the reset controllers driving the backend
-+
-+- ports: A ports node with endpoint definitions as defined in
-+  Documentation/devicetree/bindings/media/video-interfaces.txt. The
-+  first port should be the input endpoints, the second one the output
-+
-+Display Engine Frontend
-+-----------------------
-+
-+The display engine frontend does formats conversion, scaling,
-+deinterlacing and color space conversion.
-+
-+Required properties:
-+  - compatible: value must be one of:
-+    * allwinner,sun5i-a13-display-frontend
-+  - reg: base address and size of the memory-mapped region.
-+  - interrupts: interrupt associated to this IP
-+  - clocks: phandles to the clocks feeding the frontend and backend
-+    * ahb: the backend interface clock
-+    * mod: the backend module clock
-+    * ram: the backend DRAM clock
-+  - clock-names: the clock names mentioned above
-+  - resets: phandles to the reset controllers driving the backend
-+
-+Display Engine Pipeline
-+-----------------------
-+
-+The display engine pipeline (and its entry point, since it can be
-+either directly the backend or the frontend) is represented as an
-+extra node.
-+
-+Required properties:
-+  - compatible: value must be one of:
-+    * allwinner,sun5i-a13-display-engine
-+  - allwinner,pipelines: list of phandle to the entry points of the
-+    pipelines (either to the frontend or backend)
-+
-+Example:
-+
-+panel: panel {
-+	compatible = "olimex,lcd-olinuxino-43-ts";
-+};
-+
-+tve0: tv-encoder at 01c0a000 {
-+	compatible = "allwinner,sun4i-a10-tv-encoder";
-+	reg = <0x01c0a000 0x1000>;
-+	clocks = <&ahb_gates 34>;
-+
-+	port {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		tve0_in_tcon0: endpoint at 0 {
-+			reg = <0>;
-+			remote-endpoint = <&tcon0_out_tve0>;
-+		};
-+	};
-+};
-+
-+tcon0: lcd-controller at 01c0c000 {
-+	compatible = "allwinner,sun4i-a10-tcon";
-+	reg = <0x01c0c000 0x1000>;
-+	interrupts = <44>;
-+	clocks = <&ahb_gates 36>,
-+		 <&tcon_ch0_clk>,
-+		 <&tcon_ch1_clk>;
-+	clock-names = "ahb",
-+		      "tcon-ch0",
-+		      "tcon-ch1";
-+	clock-output-names = "tcon-pixel-clock";
-+	allwinner,panel = <&panel>;
-+
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		tcon0_in: port at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+
-+			tcon0_in_be0: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&be0_out_tcon0>;
-+			};
-+		};
-+
-+		tcon0_out: port at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+
-+			tcon0_out_tve0: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&tve0_in_tcon0>;
-+			};
-+		};
-+	};
-+};
-+
-+fe0: display-frontend at 01e00000 {
-+	compatible = "allwinner,sun5i-a13-display-frontend";
-+	reg = <0x01e00000 0x20000>;
-+	interrupts = <47>;
-+	clocks = <&ahb_gates 46>, <&de_fe_clk>,
-+		 <&dram_gates 25>;
-+	clock-names = "ahb", "mod",
-+		      "ram";
-+	resets = <&de_fe_clk>;
-+
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		fe0_out: port at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+
-+			fe0_out_be0: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&be0_in_fe0>;
-+			};
-+		};
-+	};
-+};
-+
-+be0: display-backend at 01e60000 {
-+	compatible = "allwinner,sun5i-a13-display-backend";
-+	reg = <0x01e60000 0x10000>;
-+	clocks = <&ahb_gates 44>, <&de_be_clk>,
-+		 <&dram_gates 26>;
-+	clock-names = "ahb", "mod",
-+		      "ram";
-+	resets = <&de_be_clk>;
-+
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		be0_in: port at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+
-+			be0_in_fe0: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&fe0_out_be0>;
-+			};
-+		};
-+
-+		be0_out: port at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+
-+			be0_out_tcon0: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&tcon0_in_be0>;
-+		};
-+	};
-+};
-+
-+display-engine {
-+	compatible = "allwinner,sun5i-a13-display-engine";
-+	pipelines = <&be0>;
-+};
--- 
-2.6.4
+Otherwise, one has to call dmi_check_system() from f->match() if
+access to root is needed.
+??
+> +	}
+> +	return NULL;
+> +}
+> +
+> ?void __iomem *
+> ?pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn, int offset)
+> ?{
+> @@ -56,10 +80,15 @@ static struct pci_ops default_pci_mcfg_ops = {
+> ?
+> ?struct pci_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
+> ?{
+> +	struct pci_ops *pci_mcfg_ops_quirk;
+> +
+> ?	/*
+> -	?* TODO: Match against platform specific quirks and return
+> -	?* corresponding PCI config space accessor set.
+> +	?* Match against platform specific quirks and return corresponding
+> +	?* PCI config space accessor set.
+> ?	?*/
+> +	pci_mcfg_ops_quirk = pci_mcfg_check_quirks(root);
+> +	if (pci_mcfg_ops_quirk)
+> +		return pci_mcfg_ops_quirk;
+> ?
+> ?	return &default_pci_mcfg_ops;
+> ?}
+> diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+> index ad0a5ff..ea4d2b5 100644
+> --- a/include/acpi/acpi_bus.h
+> +++ b/include/acpi/acpi_bus.h
+> @@ -554,6 +554,7 @@ struct acpi_pci_root {
+> ?	struct pci_bus *bus;
+> ?	u16 segment;
+> ?	struct resource secondary;	/* downstream bus range */
+> +	void *sysdata;
+> ?
+> ?	u32 osc_support_set;	/* _OSC state of support bits */
+> ?	u32 osc_control_set;	/* _OSC state of control bits */
+> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+> index c4bd0e2..c93fc97 100644
+> --- a/include/asm-generic/vmlinux.lds.h
+> +++ b/include/asm-generic/vmlinux.lds.h
+> @@ -298,6 +298,13 @@
+> ?		VMLINUX_SYMBOL(__end_pci_fixups_suspend_late) = .;	\
+> ?	}								\
+> ?									\
+> +	/* ACPI MCFG quirks */						\
+> +	.acpi_fixup????????: AT(ADDR(.acpi_fixup) - LOAD_OFFSET) {	\
+> +		VMLINUX_SYMBOL(__start_acpi_mcfg_fixups) = .;		\
+> +		*(.acpi_fixup_mcfg)					\
+> +		VMLINUX_SYMBOL(__end_acpi_mcfg_fixups) = .;		\
+> +	}								\
+> +									\
+> ?	/* Built-in firmware blobs */					\
+> ?	.builtin_fw????????: AT(ADDR(.builtin_fw) - LOAD_OFFSET) {	\
+> ?		VMLINUX_SYMBOL(__start_builtin_fw) = .;			\
+> diff --git a/include/linux/ecam.h b/include/linux/ecam.h
+> index e0f322e..21215be 100644
+> --- a/include/linux/ecam.h
+> +++ b/include/linux/ecam.h
+> @@ -20,6 +20,24 @@ struct pci_mmcfg_region {
+> ?	bool hot_added;
+> ?};
+> ?
+> +struct pci_mcfg_fixup {
+> +	const struct dmi_system_id *system;
+> +	int (*match)(struct pci_mcfg_fixup *, struct acpi_pci_root *);
+> +	struct pci_ops *ops;
+> +	int domain;
+> +	int bus_num;
+> +};
+> +
+> +#define PCI_MCFG_DOMAIN_ANY	-1
+> +#define PCI_MCFG_BUS_ANY	-1
+> +
+> +/* Designate a routine to fix up buggy MCFG */
+> +#define DECLARE_ACPI_MCFG_FIXUP(system, match, ops, dom, bus)		\
+> +	static const struct pci_mcfg_fixup __mcfg_fixup_##system##dom##bus\
+> +	?__used	__attribute__((__section__(".acpi_fixup_mcfg"),		\
+> +				aligned((sizeof(void *))))) =		\
+> +	{ system, match, ops, dom, bus };
+> +
+> ?struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus);
+> ?struct pci_mmcfg_region *pci_mmconfig_alloc(int segment, int start,
+> ?						???int end, u64 addr);
