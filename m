@@ -1,49 +1,380 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 14 Jan 2016 10:38:19 -0500
-Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <1452785393.28109.16.camel@redhat.com>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <1452785393.28109.16.camel@redhat.com>
-Message-ID: <5697C0EB.4020404@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 14 Jan 2016 16:24:57 +0100
+Subject: [PATCH v2 14/26] drm/modes: Rewrite the command line parser
+In-Reply-To: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1452785109-6172-15-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/14/2016 10:29 AM, Mark Salter wrote:
-On Wed, 2016-01-13 at 14:20 +0100, Tomasz Nowicki wrote:
-> IO resources on Mustang get disabled unless I do:
-> 
-> @@ -126,9 +126,10 @@ static void acpi_dev_ioresource_flags(struct
-> resource *res, u64 len, if (!acpi_dev_resource_len_valid(res->start,
-> res->end, len, true)) res->flags |= IORESOURCE_DISABLED |
-> IORESOURCE_UNSET;
-> 
-> +#if 0 if (res->end >= 0x10003) res->flags |= IORESOURCE_DISABLED |
-> IORESOURCE_UNSET; - +#endif
-> 
-> res->end is way beyond 0x10003 on Mustang:
-> 
-> pci_bus 0000:00: root bus resource [io  0x0000-0xffff window] (bus
-> address [0x10000000-0x1000ffff])
-> 
-> 
+Rewrite the command line parser in order to get away from the state machine
+parsing the video mode lines.
 
-Join the club. I complained about this and I got the message that we just do what Intel does. 
-See Arnd Bergmann's reply.
+Hopefully, this will allow to extend it more easily to support named modes
+and / or properties set directly on the command line.
 
-[PATCH V2 00/23] MMCONFIG refactoring and support for ARM64 PCI hostbridge init based on ACPI
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/gpu/drm/drm_modes.c | 308 +++++++++++++++++++++++++++-----------------
+ 1 file changed, 191 insertions(+), 117 deletions(-)
 
-1/12/2016 9:30 AM
-
-It is an artificial limit coming from the x86 world introduced into common code.
-
-> -- To unsubscribe from this list: send the line "unsubscribe
-> linux-pci" in the body of a message to majordomo at vger.kernel.org More
-> majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
-
+diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
+index cd74a0953f42..5b1921b22dd6 100644
+--- a/drivers/gpu/drm/drm_modes.c
++++ b/drivers/gpu/drm/drm_modes.c
+@@ -30,6 +30,7 @@
+  * authorization from the copyright holder(s) and author(s).
+  */
+ 
++#include <linux/ctype.h>
+ #include <linux/list.h>
+ #include <linux/list_sort.h>
+ #include <linux/export.h>
+@@ -1199,6 +1200,131 @@ void drm_mode_connector_list_update(struct drm_connector *connector,
+ }
+ EXPORT_SYMBOL(drm_mode_connector_list_update);
+ 
++static int drm_mode_parse_cmdline_bpp(const char *str, char **end_ptr,
++				      struct drm_cmdline_mode *mode)
++{
++	if (str[0] != '-')
++		return -EINVAL;
++
++	mode->bpp = simple_strtol(str + 1, end_ptr, 10);
++	mode->bpp_specified = true;
++
++	return 0;
++}
++
++static int drm_mode_parse_cmdline_refresh(const char *str, char **end_ptr,
++					  struct drm_cmdline_mode *mode)
++{
++	if (str[0] != '@')
++		return -EINVAL;
++
++	mode->refresh = simple_strtol(str + 1, end_ptr, 10);
++	mode->refresh_specified = true;
++
++	return 0;
++}
++
++static int drm_mode_parse_cmdline_extra(const char *str, int length,
++					struct drm_connector *connector,
++					struct drm_cmdline_mode *mode)
++{
++	int i;
++
++	for (i = 0; i < length; i++) {
++		switch (str[i]) {
++		case 'i':
++			mode->interlace = true;
++			break;
++		case 'm':
++			mode->margins = true;
++			break;
++		case 'D':
++			if (mode->force != DRM_FORCE_UNSPECIFIED)
++				return -EINVAL;
++
++			if ((connector->connector_type != DRM_MODE_CONNECTOR_DVII) &&
++			    (connector->connector_type != DRM_MODE_CONNECTOR_HDMIB))
++				mode->force = DRM_FORCE_ON;
++			else
++				mode->force = DRM_FORCE_ON_DIGITAL;
++			break;
++		case 'd':
++			if (mode->force != DRM_FORCE_UNSPECIFIED)
++				return -EINVAL;
++
++			mode->force = DRM_FORCE_OFF;
++			break;
++		case 'e':
++			if (mode->force != DRM_FORCE_UNSPECIFIED)
++				return -EINVAL;
++
++			mode->force = DRM_FORCE_ON;
++			break;
++		default:
++			return -EINVAL;
++		}
++	}
++
++	return 0;
++}
++
++static int drm_mode_parse_cmdline_res_mode(const char *str, unsigned int length,
++					   bool extras,
++					   struct drm_connector *connector,
++					   struct drm_cmdline_mode *mode)
++{
++	bool rb = false, cvt = false;
++	int xres = 0, yres = 0;
++	int remaining, i;
++	char *end_ptr;
++
++	xres = simple_strtol(str, &end_ptr, 10);
++
++	if (end_ptr[0] != 'x')
++		return -EINVAL;
++	end_ptr++;
++
++	yres = simple_strtol(end_ptr, &end_ptr, 10);
++
++	remaining = length - (end_ptr - str);
++	if (remaining < 0)
++		return -EINVAL;
++
++	for (i = 0; i < remaining; i++) {
++		switch (end_ptr[i]) {
++		case 'M':
++			cvt = true;
++			break;
++		case 'R':
++			rb = true;
++			break;
++		default:
++			/*
++			 * Try to pass that to our extras parsing
++			 * function to handle the case where the
++			 * extras are directly after the resolution
++			 */
++			if (extras) {
++				int ret = drm_mode_parse_cmdline_extra(end_ptr + i,
++								       1,
++								       connector,
++								       mode);
++				if (ret)
++					return ret;
++			} else {
++				return -EINVAL;
++			}
++		}
++	}
++
++	mode->xres = xres;
++	mode->yres = yres;
++	mode->cvt = cvt;
++	mode->rb = rb;
++
++	return 0;
++}
++
+ /**
+  * drm_mode_parse_command_line_for_connector - parse command line modeline for connector
+  * @mode_option: optional per connector mode option
+@@ -1225,13 +1351,12 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
+ 					       struct drm_cmdline_mode *mode)
+ {
+ 	const char *name;
+-	unsigned int namelen;
+-	bool res_specified = false, bpp_specified = false, refresh_specified = false;
+-	unsigned int xres = 0, yres = 0, bpp = 32, refresh = 0;
+-	bool yres_specified = false, cvt = false, rb = false;
+-	bool interlace = false, margins = false, was_digit = false;
+-	int i;
+-	enum drm_connector_force force = DRM_FORCE_UNSPECIFIED;
++	bool parse_extras = false;
++	unsigned int bpp_off = 0, refresh_off = 0;
++	unsigned int mode_end = 0;
++	char *bpp_ptr = NULL, *refresh_ptr = NULL, *extra_ptr = NULL;
++	char *bpp_end_ptr = NULL, *refresh_end_ptr = NULL;
++	int ret;
+ 
+ #ifdef CONFIG_FB
+ 	if (!mode_option)
+@@ -1244,128 +1369,77 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
+ 	}
+ 
+ 	name = mode_option;
+-	namelen = strlen(name);
+-	for (i = namelen-1; i >= 0; i--) {
+-		switch (name[i]) {
+-		case '@':
+-			if (!refresh_specified && !bpp_specified &&
+-			    !yres_specified && !cvt && !rb && was_digit) {
+-				refresh = simple_strtol(&name[i+1], NULL, 10);
+-				refresh_specified = true;
+-				was_digit = false;
+-			} else
+-				goto done;
+-			break;
+-		case '-':
+-			if (!bpp_specified && !yres_specified && !cvt &&
+-			    !rb && was_digit) {
+-				bpp = simple_strtol(&name[i+1], NULL, 10);
+-				bpp_specified = true;
+-				was_digit = false;
+-			} else
+-				goto done;
+-			break;
+-		case 'x':
+-			if (!yres_specified && was_digit) {
+-				yres = simple_strtol(&name[i+1], NULL, 10);
+-				yres_specified = true;
+-				was_digit = false;
+-			} else
+-				goto done;
+-			break;
+-		case '0' ... '9':
+-			was_digit = true;
+-			break;
+-		case 'M':
+-			if (yres_specified || cvt || was_digit)
+-				goto done;
+-			cvt = true;
+-			break;
+-		case 'R':
+-			if (yres_specified || cvt || rb || was_digit)
+-				goto done;
+-			rb = true;
+-			break;
+-		case 'm':
+-			if (cvt || yres_specified || was_digit)
+-				goto done;
+-			margins = true;
+-			break;
+-		case 'i':
+-			if (cvt || yres_specified || was_digit)
+-				goto done;
+-			interlace = true;
+-			break;
+-		case 'e':
+-			if (yres_specified || bpp_specified || refresh_specified ||
+-			    was_digit || (force != DRM_FORCE_UNSPECIFIED))
+-				goto done;
+ 
+-			force = DRM_FORCE_ON;
+-			break;
+-		case 'D':
+-			if (yres_specified || bpp_specified || refresh_specified ||
+-			    was_digit || (force != DRM_FORCE_UNSPECIFIED))
+-				goto done;
++	if (!isdigit(name[0]))
++		return false;
+ 
+-			if ((connector->connector_type != DRM_MODE_CONNECTOR_DVII) &&
+-			    (connector->connector_type != DRM_MODE_CONNECTOR_HDMIB))
+-				force = DRM_FORCE_ON;
+-			else
+-				force = DRM_FORCE_ON_DIGITAL;
+-			break;
+-		case 'd':
+-			if (yres_specified || bpp_specified || refresh_specified ||
+-			    was_digit || (force != DRM_FORCE_UNSPECIFIED))
+-				goto done;
++	/* Try to locate the bpp and refresh specifiers, if any */
++	bpp_ptr = strchr(name, '-');
++	if (bpp_ptr) {
++		bpp_off = bpp_ptr - name;
++		mode->bpp_specified = true;
++	}
+ 
+-			force = DRM_FORCE_OFF;
+-			break;
+-		default:
+-			goto done;
+-		}
++	refresh_ptr = strchr(name, '@');
++	if (refresh_ptr) {
++		refresh_off = refresh_ptr - name;
++		mode->refresh_specified = true;
+ 	}
+ 
+-	if (i < 0 && yres_specified) {
+-		char *ch;
+-		xres = simple_strtol(name, &ch, 10);
+-		if ((ch != NULL) && (*ch == 'x'))
+-			res_specified = true;
+-		else
+-			i = ch - name;
+-	} else if (!yres_specified && was_digit) {
+-		/* catch mode that begins with digits but has no 'x' */
+-		i = 0;
++	/* Locate the end of the name / resolution, and parse it */
++	if (bpp_ptr && refresh_ptr) {
++		mode_end = min(bpp_off, refresh_off);
++	} else if (bpp_ptr) {
++		mode_end = bpp_off;
++	} else if (refresh_ptr) {
++		mode_end = refresh_off;
++	} else {
++		mode_end = strlen(name);
++		parse_extras = true;
+ 	}
+-done:
+-	if (i >= 0) {
+-		printk(KERN_WARNING
+-			"parse error at position %i in video mode '%s'\n",
+-			i, name);
+-		mode->specified = false;
++
++	ret = drm_mode_parse_cmdline_res_mode(name, mode_end,
++					      parse_extras,
++					      connector,
++					      mode);
++	if (ret)
+ 		return false;
+-	}
++	mode->specified = true;
+ 
+-	if (res_specified) {
+-		mode->specified = true;
+-		mode->xres = xres;
+-		mode->yres = yres;
++	if (bpp_ptr) {
++		ret = drm_mode_parse_cmdline_bpp(bpp_ptr, &bpp_end_ptr, mode);
++		if (ret)
++			return false;
+ 	}
+ 
+-	if (refresh_specified) {
+-		mode->refresh_specified = true;
+-		mode->refresh = refresh;
++	if (refresh_ptr) {
++		ret = drm_mode_parse_cmdline_refresh(refresh_ptr,
++						     &refresh_end_ptr, mode);
++		if (ret)
++			return false;
+ 	}
+ 
+-	if (bpp_specified) {
+-		mode->bpp_specified = true;
+-		mode->bpp = bpp;
++	/*
++	 * Locate the end of the bpp / refresh, and parse the extras
++	 * if relevant
++	 */
++	if (bpp_ptr && refresh_ptr)
++		extra_ptr = max(bpp_end_ptr, refresh_end_ptr);
++	else if (bpp_ptr)
++		extra_ptr = bpp_end_ptr;
++	else if (refresh_ptr)
++		extra_ptr = refresh_end_ptr;
++
++	if (extra_ptr) {
++		int remaining = strlen(name) - (extra_ptr - name);
++
++		/*
++		 * We still have characters to process, while
++		 * we shouldn't have any
++		 */
++		if (remaining > 0)
++			return false;
+ 	}
+-	mode->rb = rb;
+-	mode->cvt = cvt;
+-	mode->interlace = interlace;
+-	mode->margins = margins;
+-	mode->force = force;
+ 
+ 	return true;
+ }
+@@ -1491,4 +1565,4 @@ int drm_mode_convert_umode(struct drm_display_mode *out,
+ 
+ out:
+ 	return ret;
+-}
+\ No newline at end of file
++}
 -- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+2.6.4
