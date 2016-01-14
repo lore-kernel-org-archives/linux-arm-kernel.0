@@ -1,106 +1,77 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 14 Jan 2016 12:14:50 +0000
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <5696CF08.8080700@imgtec.com>
-References: <1452426622-4471-12-git-send-email-mst@redhat.com>
- <56945366.2090504@imgtec.com>
- <20160112092711.GP6344@twins.programming.kicks-ass.net>
- <20160112102555.GV6373@twins.programming.kicks-ass.net>
- <20160112104012.GW6373@twins.programming.kicks-ass.net>
- <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
- <20160113104516.GE25458@arm.com> <5696CF08.8080700@imgtec.com>
-Message-ID: <20160114121449.GC15828@arm.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Thu, 14 Jan 2016 13:16:26 +0100
+Subject: [PATCH v4 0/9] Add STM32 pinctrl/GPIO driver
+Message-ID: <1452773795-24216-1-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 02:26:16PM -0800, Leonid Yegoshin wrote:
-> On 01/13/2016 02:45 AM, Will Deacon wrote:
-> >>
-> >I don't think the address dependency is enough on its own. By that
-> >reasoning, the following variant (WRC+addr+addr) would work too:
-> >
-> >
-> >P0:
-> >Wx = 1
-> >
-> >P1:
-> >Rx == 1
-> ><address dep>
-> >Wy = 1
-> >
-> >P2:
-> >Ry == 1
-> ><address dep>
-> >Rx = 0
-> >
-> >
-> >So are you saying that this is also forbidden?
-> >Imagine that P0 and P1 are two threads that share a store buffer. What
-> >then?
-> 
-> OK, I collected answers and it is:
-> 
->     In MIPS R6 this test passes OK, I mean - P2: Rx = 1 if Ry is read as 1.
-> By design.
-> 
->     However, it is unclear that happens in MIPS R2 1004K.
+This is the fourth round of STM32 pinctrl series, which takes into
+account comments made by Patrice on patch 4.
 
-How can it be unclear? If, for example, the outcome is permitted on that
-CPU, then your original reasoning for the WRC+sync+addr doesn't apply
-there and SYNC is not transitive. That's what I'm trying to get to the
-bottom of.
+The STM32 family has 16 pins per GPIO bank, and the number of bank varies
+depending on the model.
 
-Does the MIPS kernel target a particular CPU at compile time?
+Pins can be multiplexed either in GPIO mode, alternate function (up to 15
+functions per pin) or analog (for ADC/DAC).
 
->     Moreover, there are voices against guarantee that it will be in future
-> and that voices point me to Documentation/memory-barriers.txt section "DATA
-> DEPENDENCY BARRIERS" examples which require SYNC_RMB between loading
-> address/index and using that for loading data based on that address or index
-> for shared data (look on CPU2 pseudo-code):
-> >To deal with this, a data dependency barrier or better must be inserted
-> >between the address load and the data load:
-> >
-> >        CPU 1                 CPU 2
-> >        ===============       ===============
-> >        { A == 1, B == 2, C = 3, P == &A, Q == &C }
-> >        B = 4;
-> >        <write barrier>
-> >        WRITE_ONCE(P, &B);
-> >                              Q = READ_ONCE(P);
-> >                              <data dependency barrier> <-----------
-> >SYNC_RMB is here
-> >                              D = *Q;
-> ...
-> >Another example of where data dependency barriers might be required is
-> >where a
-> >number is read from memory and then used to calculate the index for an
-> >array
-> >access:
-> >
-> >        CPU 1                 CPU 2
-> >        ===============       ===============
-> >        { M[0] == 1, M[1] == 2, M[3] = 3, P == 0, Q == 3 }
-> >        M[1] = 4;
-> >        <write barrier>
-> >        WRITE_ONCE(P, 1);
-> >                              Q = READ_ONCE(P);
-> >                              <data dependency barrier> <------------
-> >SYNC_RMB is here
-> >                              D = M[Q];
-> 
-> That voices say that there is a legitimate reason to relax HW here for
-> performance if SYNC_RMB is needed anyway to work with this sequence of
-> shared data.
+Changes since v3:
+-----------------
+ - Rebase on v4.4
+ - Fix error paths in stm32_pctrl_dt_subnode_to_map() (Patrice)
+ - Remove useless stm32_pctrl_find_function_by_pin function (Patrice)
 
-Are you saying that MIPS needs to implement [smp_]read_barrier_depends?
+Changes since v2:
+-----------------
+ - Rebase on v4.4-rc1
+ - Declare leds also for Eval board
+ - Set green led as heartbeat
+ - Collect some acks
 
-> And all that is out-of-topic here in my mind. I just want to be sure that
-> this patchset still provides a use of a specific lightweight SYNCs on MIPS
-> vs bold and heavy generalized "SYNC 0" in any case.
+Changes since v1:
+-----------------
+ - Add GPIO LEDs support in DT and defconfig
+ - Changes pinmux DT bindings from macros to raw values (Daniel)
+ - Improve DT bindings documentation (Daniel)
+ - Fix some commit fixup and rebase issues.
 
-We may be highjacking the thread slightly, but there are much bigger
-issues at play here if you want to start using lightweight barriers to
-implement relaxed kernel primitives such as smp_load_acquire and
-smp_store_release.
+Kind regards,
+Maxime
 
-Will
+Maxime Coquelin (9):
+  ARM: Kconfig: Introduce MACH_STM32F429 flag
+  Documentation: dt-bindings: Document STM32 pinctrl driver DT bindings
+  includes: dt-bindings: Add STM32F429 pinctrl DT bindings
+  pinctrl: Add STM32 MCUs support
+  ARM: mach-stm32: Select pinctrl
+  ARM: dts: Add pinctrl node to STM32F429
+  ARM: dts: Add USART1 pin config to STM32F429 boards
+  ARM: dts: Add leds support to STM32F429 boards
+  ARM: config: Enable GPIO Led driver in stm32_defconfig
+
+ .../bindings/pinctrl/st,stm32-pinctrl.txt          |  126 ++
+ arch/arm/Kconfig                                   |    6 +
+ arch/arm/boot/dts/stm32429i-eval.dts               |   19 +
+ arch/arm/boot/dts/stm32f429-disco.dts              |   13 +
+ arch/arm/boot/dts/stm32f429.dtsi                   |  110 ++
+ arch/arm/configs/stm32_defconfig                   |    1 +
+ drivers/pinctrl/Kconfig                            |    1 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/stm32/Kconfig                      |   16 +
+ drivers/pinctrl/stm32/Makefile                     |    5 +
+ drivers/pinctrl/stm32/pinctrl-stm32.c              |  834 ++++++++++
+ drivers/pinctrl/stm32/pinctrl-stm32.h              |   43 +
+ drivers/pinctrl/stm32/pinctrl-stm32f429.c          | 1598 ++++++++++++++++++++
+ include/dt-bindings/pinctrl/pinctrl-stm32.h        |   12 +
+ include/dt-bindings/pinctrl/stm32f429-pinfunc.h    | 1241 +++++++++++++++
+ 15 files changed, 4026 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+ create mode 100644 drivers/pinctrl/stm32/Kconfig
+ create mode 100644 drivers/pinctrl/stm32/Makefile
+ create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.c
+ create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.h
+ create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32f429.c
+ create mode 100644 include/dt-bindings/pinctrl/pinctrl-stm32.h
+ create mode 100644 include/dt-bindings/pinctrl/stm32f429-pinfunc.h
+
+-- 
+1.9.1
