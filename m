@@ -1,88 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Jan 2016 21:30:48 +0000
-Subject: [4.4-rc6-rt1 PATCH 0/2] ARM: am437x: boot test report
-In-Reply-To: <569800DD.7090102@ti.com>
-References: <1451325611-21678-1-git-send-email-grygorii.strashko@ti.com>
- <20160112171556.GB31009@linutronix.de> <569637ED.1030304@ti.com>
- <5696B025.8020909@ti.com> <569800DD.7090102@ti.com>
-Message-ID: <20160114213048.GB19062@n2100.arm.linux.org.uk>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Thu, 14 Jan 2016 13:34:40 -0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <56980933.2020801@imgtec.com>
+References: <569565DA.2010903@imgtec.com> <20160113104516.GE25458@arm.com>
+ <56969F4B.7070001@imgtec.com>
+ <20160113204844.GV6357@twins.programming.kicks-ass.net>
+ <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
+ <20160114161604.GT3818@linux.vnet.ibm.com>
+ <5697FA0A.6040601@imgtec.com>
+ <20160114201513.GI6357@twins.programming.kicks-ass.net>
+ <56980933.2020801@imgtec.com>
+Message-ID: <20160114213440.GG3818@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 10:11:09PM +0200, Grygorii Strashko wrote:
-> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-> index deabc36..b9b4f9c 100644
-> --- a/arch/arm/mm/highmem.c
-> +++ b/arch/arm/mm/highmem.c
-> @@ -167,7 +167,7 @@ void switch_kmaps(struct task_struct *prev_p, struct task_struct *next_p)
->          * Clear @prev's kmap_atomic mappings
->          */
->         for (i = 0; i < prev_p->kmap_idx; i++) {
-> -               int idx = i + KM_TYPE_NR * smp_processor_id();
-> +               int idx = FIX_KMAP_BEGIN + i + KM_TYPE_NR * smp_processor_id();
->  
->                 set_fixmap_pte(idx, __pte(0));
->         }
-> @@ -175,7 +175,7 @@ void switch_kmaps(struct task_struct *prev_p, struct task_struct *next_p)
->          * Restore @next_p's kmap_atomic mappings
->          */
->         for (i = 0; i < next_p->kmap_idx; i++) {
-> -               int idx = i + KM_TYPE_NR * smp_processor_id();
-> +               int idx = FIX_KMAP_BEGIN + i + KM_TYPE_NR * smp_processor_id();
->  
->                 if (!pte_none(next_p->kmap_pte[i]))
->                         set_fixmap_pte(idx, next_p->kmap_pte[i]);
+On Thu, Jan 14, 2016 at 12:46:43PM -0800, Leonid Yegoshin wrote:
+> On 01/14/2016 12:15 PM, Peter Zijlstra wrote:
+> >On Thu, Jan 14, 2016 at 11:42:02AM -0800, Leonid Yegoshin wrote:
+> >>An the only point - please use an appropriate SYNC_* barriers instead of
+> >>heavy bold hammer. That stuff was design explicitly to support the
+> >>requirements of Documentation/memory-barriers.txt
+> >That's madness. That document changes from version to version as to what
+> >we _think_ the actual hardware does. It is _NOT_ a specification.
+> >
+> >You cannot design hardware from that. Its incomplete and fails to
+> >specify a bunch of things. It not a mathematically sound definition of a
+> >memory model.
+> >
+> >Please stop referring to that document for what a particular barrier
+> >_should_ do.  Explain what MIPS does, so we can attempt to integrate
+> >this knowledge with our knowledge of PPC/ARM/Alpha/x86/etc. and improve
+> >upon our understanding of hardware and improve the Linux memory model.
+> 
+> I am afraid I can't help you here. It is very complicated stuff and
+> a model is actually doesn't fit your assumptions about CPUs well
+> without some simplifications which are based on what you want to
+> have.
+> 
+> I say that SYNC_ACQUIRE/etc follows what you expect for smp_acquire
+> etc (basing on that document). And at least two CPU models were
+> tested with my patches (see it in LMO) for that last year and that
+> instructions are implemented now in engineering kernel.
+> 
+> If you have something else in mind, you can ask me. But I prefer to
+> do not deviate too much from Documentation/memory-barriers.txt, for
+> exam - if it asks to have memory barrier somewhere, then I assume
+> the code should have it, and please - don't ask me a test which
+> violates the current version of document recommendations.
+> 
+> For a moment I don't see a significant changes in this document for
+> MIPS Arch at least 1.5 year, and the only significant point is that
+> MIPS CPU Arch doesn't have yet smp_read_barrier_depends() and
+> smp_rmb() should be used instead.
 
-This looks like it introduces the 4th and 5th copies of the same
-calcuation, so can I suggest that we do this to prevent this kind
-of error?
+Is SYNC_ACQUIRE a memory-barrier instruction that orders prior loads
+against later loads and stores?  If so, and if MIPS does not do
+ordering based on address and data dependencies, I suggest making
+read_barrier_depends() be a SYNC_ACQUIRE rather than SYNC_RMB.
 
-diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-index d02f8187b1cc..61f0d5941116 100644
---- a/arch/arm/mm/highmem.c
-+++ b/arch/arm/mm/highmem.c
-@@ -34,6 +34,11 @@ static inline pte_t get_fixmap_pte(unsigned long vaddr)
- 	return *ptep;
- }
- 
-+static unsigned int fixmap_idx(int type)
-+{
-+	return FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
-+}
-+
- void *kmap(struct page *page)
- {
- 	might_sleep();
-@@ -79,7 +84,7 @@ void *kmap_atomic(struct page *page)
- 
- 	type = kmap_atomic_idx_push();
- 
--	idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
-+	idx = fixmap_idx(type);
- 	vaddr = __fix_to_virt(idx);
- #ifdef CONFIG_DEBUG_HIGHMEM
- 	/*
-@@ -106,7 +111,7 @@ void __kunmap_atomic(void *kvaddr)
- 
- 	if (kvaddr >= (void *)FIXADDR_START) {
- 		type = kmap_atomic_idx();
--		idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
-+		idx = fixmap_idx(type);
- 
- 		if (cache_is_vivt())
- 			__cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
-@@ -138,7 +143,7 @@ void *kmap_atomic_pfn(unsigned long pfn)
- 		return page_address(page);
- 
- 	type = kmap_atomic_idx_push();
--	idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
-+	idx = fixmap_idx(type);
- 	vaddr = __fix_to_virt(idx);
- #ifdef CONFIG_DEBUG_HIGHMEM
- 	BUG_ON(!pte_none(get_fixmap_pte(vaddr)));
-
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+							Thanx, Paul
