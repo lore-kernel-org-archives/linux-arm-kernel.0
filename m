@@ -1,118 +1,85 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 14 Jan 2016 14:27:18 +0100
-Subject: [PATCH v6 1/6] arm/arm64: KVM: Introduce armv7 fp/simd vcpu
- fields and helpers
-In-Reply-To: <56970FE8.4020805@samsung.com>
-References: <1451166900-3711-1-git-send-email-m.smarduch@samsung.com>
- <1451166900-3711-2-git-send-email-m.smarduch@samsung.com>
- <20160110163204.GD30867@cbox> <56943D29.3000002@samsung.com>
- <20160112141207.GF15554@cbox> <5695A0EB.5020609@samsung.com>
- <56970FE8.4020805@samsung.com>
-Message-ID: <20160114132718.GA4329@cbox>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 14 Jan 2016 18:58:25 +0530
+Subject: [PATCH v2 3/3] pci: dra7xx: use pdata callbacks to perform reset
+In-Reply-To: <56975E5D.50603@ti.com>
+References: <1452667666-17533-1-git-send-email-kishon@ti.com>
+ <1452667666-17533-4-git-send-email-kishon@ti.com> <56968EA6.2060408@ti.com>
+ <56975E5D.50603@ti.com>
+Message-ID: <5697A279.3020506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 07:03:04PM -0800, Mario Smarduch wrote:
-> 
-> 
-> On 1/12/2016 4:57 PM, Mario Smarduch wrote:
-> > 
-> > 
-> > On 1/12/2016 6:12 AM, Christoffer Dall wrote:
-> >> On Mon, Jan 11, 2016 at 03:39:21PM -0800, Mario Smarduch wrote:
-> >>>
-> >>>
-> >>> On 1/10/2016 8:32 AM, Christoffer Dall wrote:
-> >>>> Hi Mario,
-> >>>>
-> >>>> I spotted one more potential issue...
-> >>>>
-> >>>> On Sat, Dec 26, 2015 at 01:54:55PM -0800, Mario Smarduch wrote:
-> >>>>> Add helper functions to enable access to fp/smid on guest entry and save host
-> >>>>> fpexc on vcpu put, check if fp/simd registers are dirty and add new vcpu
-> >>>>> fields.
-> >>>>>
-> >>>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> >>>>> ---
-> >>>>>  arch/arm/include/asm/kvm_emulate.h   | 42 ++++++++++++++++++++++++++++++++++++
-> >>>>>  arch/arm/include/asm/kvm_host.h      |  6 ++++++
-> >>>>>  arch/arm64/include/asm/kvm_emulate.h |  8 +++++++
-> >>>>>  3 files changed, 56 insertions(+)
-> >>>>>
-> >>>>> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-> >>>>> index 3095df0..d4d9da1 100644
-> >>>>> --- a/arch/arm/include/asm/kvm_emulate.h
-> >>>>> +++ b/arch/arm/include/asm/kvm_emulate.h
-> >>>>> @@ -24,6 +24,8 @@
-> >>>>>  #include <asm/kvm_mmio.h>
-> >>>>>  #include <asm/kvm_arm.h>
-> >>>>>  #include <asm/cputype.h>
-> >>>>> +#include <asm/vfp.h>
-> >>>>> +#include "../vfp/vfpinstr.h"
-> >>>>>  
-> >>>>>  unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
-> >>>>>  unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
-> >>>>> @@ -255,4 +257,44 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
-> >>>>>  	}
-> >>>>>  }
-> >>>>>  
-> >>>>> +#ifdef CONFIG_VFPv3
-> >>>>> +/* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
-> >>>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
-> >>>>> +{
-> >>>>> +	u32 fpexc;
-> >>>>> +
-> >>>>> +	/* Save host fpexc, and enable guest access to fp unit */
-> >>>>> +	fpexc = fmrx(FPEXC);
-> >>>>> +	vcpu->arch.host_fpexc = fpexc;
-> >>>>> +	fpexc |= FPEXC_EN;
-> >>>>> +	fmxr(FPEXC, fpexc);
-> >>>>> +
-> >>>>> +	/* Configure HCPTR to trap on tracing and fp/simd access */
-> >>>>> +	vcpu->arch.hcptr = HCPTR_TTA | HCPTR_TCP(10)  | HCPTR_TCP(11);
-> >>>>> +}
-> >>>>> +
-> >>>>> +/* Called from vcpu_put - restore host fpexc */
-> >>>>> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu)
-> >>>>> +{
-> >>>>> +	fmxr(FPEXC, vcpu->arch.host_fpexc);
-> >>>>> +}
-> >>>>> +
-> >>>>> +/* If trap bits are reset then fp/simd registers are dirty */
-> >>>>> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
-> >>>>> +{
-> >>>>> +	return !(vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
-> >>>>> +}
-> >>>>> +#else
-> >>>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
-> >>>>> +{
-> >>>>> +	vcpu->arch.hcptr = HCPTR_TTA;
-> >>>>
-> >>>> Is it correct not to trap VFP registers when the host kernel does not
-> >>>> have CONFIG_VFPv3?  I think this is a change in functionality compared
-> >>>> to the current kernels is it not?
-> >>>
-> >>> With CPU_V7 VFPv3 gets selected, without it fp should be emulated,
-> >>> with exceptions taken in guest kernel. I don't see a reason why
-> >>> fp hcptr access should be enabled in that case.
-> >>>
-> >>
-> >> If you have to guests with CONFIG_VFPV3 but your host doesn't have
-> >> CONFIG_VFPV3, you will never context-switch the VFP registers between
-> >> the two VMs, and mayhem will ensue.
-> >>
-> >> Unless I'm missing something very obvious?
-> 
-> Did more testing on this enabling OABI_COMPAT and selecting
-> NWFPE/FastFPE breaks the boot. So far can't find a way to boot host
-> without VFP/VFPv3 enabled on ARMv7. CPU_V7 defaults to VFPv3
-> selection. I'm wondering if !VFPv3 path should be removed from
-> the patches?
-> 
-I think this is related to your particular choice of userspace.  I think
-it's fair to assume VFP is enabled for a KVM host, but I don't have
-enough familiarity with this to be sure.
+Hi,
 
-Marc, any thoughts?
+On Thursday 14 January 2016 02:07 PM, Kishon Vijay Abraham I wrote:
+> Hi Suman,
+> 
+> On Wednesday 13 January 2016 11:21 PM, Suman Anna wrote:
+>> On 01/13/2016 12:47 AM, Kishon Vijay Abraham I wrote:
+>>> Use platform populated reset assert and deassert
+>>> callbacks to perform reset of PCIe.
+>>>
+>>> Use these callbacks until a reset interface using drivers/reset
+>>> is available for the purpose.
+>>>
+>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>>> ---
+>>>  drivers/pci/host/pci-dra7xx.c |   32 ++++++++++++++++++++++++++++++++
+>>>  1 file changed, 32 insertions(+)
+>>>
+>>> diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
+>>> index 8c36880..049083d 100644
+>>> --- a/drivers/pci/host/pci-dra7xx.c
+>>> +++ b/drivers/pci/host/pci-dra7xx.c
+>>> @@ -25,6 +25,8 @@
+>>>  #include <linux/resource.h>
+>>>  #include <linux/types.h>
+>>>  
+>>> +#include <linux/platform_data/pci-dra7xx.h>
+>>> +
+>>>  #include "pcie-designware.h"
+>>>  
+>>>  /* PCIe controller wrapper DRA7XX configuration registers */
+>>> @@ -329,6 +331,32 @@ static int __init dra7xx_add_pcie_port(struct dra7xx_pcie *dra7xx,
+>>>  	return 0;
+>>>  }
+>>>  
+>>> +static int dra7xx_pcie_reset(struct platform_device *pdev)
+>>> +{
+>>> +	int ret;
+>>> +	struct device *dev = &pdev->dev;
+>>> +	struct pci_dra7xx_platform_data *pdata = pdev->dev.platform_data;
+>>> +
+>>> +	if (!(pdata && pdata->deassert_reset && pdata->assert_reset)) {
+>>> +		dev_err(dev, "platform data for reset not found!\n");
+>>> +		return -EINVAL;
+>>> +	}
+>>> +
+>>> +	ret = pdata->assert_reset(pdev, pdata->reset_name);
+>>> +	if (ret) {
+>>> +		dev_err(dev, "assert_reset failed: %d\n", ret);
+>>> +		return ret;
+>>> +	}
+>>> +
+>>> +	ret = pdata->deassert_reset(pdev, pdata->reset_name);
+>>> +	if (ret) {
+>>> +		dev_err(dev, "deassert_reset failed: %d\n", ret);
+>>> +		return ret;
+>>> +	}
+>>
+>> The only comment I have on this is the symmetry (assert_reset invocation
+>> in driver remove). If you install and remove the module once, then the
+>> reset stays deasserted. On Power-On-Reset, the resets by default will be
+>> in asserted state.
+> 
+> hmm.. not sure of the benefits of leaving the reset lines de-asserted during
+> remove. The idea is irrespective of the initial sate or power-on state, during
+> probe the driver should assert and de-assert the reset lines.
 
--Christoffer
+Also right now the pci-dra7xx can't be inserted as a module. However since that
+might be added in the future, I'll add assert_reset in the remove path of this
+driver.
+
+Thanks
+Kishon
