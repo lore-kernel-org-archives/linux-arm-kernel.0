@@ -1,31 +1,111 @@
-From: Leonid.Yegoshin@imgtec.com (Leonid Yegoshin)
-Date: Thu, 14 Jan 2016 15:04:18 -0800
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160114222433.GI3818@linux.vnet.ibm.com>
-References: <56969F4B.7070001@imgtec.com>
- <20160113204844.GV6357@twins.programming.kicks-ass.net>
- <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
- <20160114161604.GT3818@linux.vnet.ibm.com> <5697FA0A.6040601@imgtec.com>
- <20160114201513.GI6357@twins.programming.kicks-ass.net>
- <56980933.2020801@imgtec.com> <20160114213440.GG3818@linux.vnet.ibm.com>
- <56981708.4000007@imgtec.com> <20160114222433.GI3818@linux.vnet.ibm.com>
-Message-ID: <56982972.7050609@imgtec.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 15 Jan 2016 01:13:05 +0200
+Subject: [PATCH v2 13/26] drm/fb_cma_helper: Remove implicit call to
+ disable_unused_functions
+In-Reply-To: <1452785109-6172-14-git-send-email-maxime.ripard@free-electrons.com>
+References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1452785109-6172-14-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <2014724.QmjXVju9UW@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/2016 02:24 PM, Paul E. McKenney wrote:
-> Actually, the Linux kernel doesn't have an acquire barrier, just an 
-> smp_load_acquire(). Or did someone sneak one in while I wasn't looking?
-That was an exactly starting point for this discussion. This patch just 
-pulls out from MIPS files smp_load_acquire() and smp_store_release(). 
-However, I put into LMO half year ago the patch 
-http://patchwork.linux-mips.org/patch/10506/ which replaces a generic 
-smp_mb with MIPS specific smp_release/acquire in that functions. This 
-patch also fixes use of SYNCs barriers in spin_locks/atomics/bitops for 
-Imagination MIPS CPUs too - it is just absent now for any Imagination 
-MIPS CPUs!
+Hi Maxime,
 
-Michael later pointed me that it can be returned back with his series of 
-patches but discussion was already here.
+Thank you for the patch.
 
-- Leonid.
+On Thursday 14 January 2016 16:24:56 Maxime Ripard wrote:
+> The drm_fbdev_cma_init function always calls the
+> drm_helper_disable_unused_functions. Since it's part of the usual probe
+> process, all the drivers using that helper will end up having their encoder
+> and CRTC disable functions called at probe if their device has not been
+> reported as enabled.
+> 
+> This could be fixed by reading out from the registers the current state of
+> the device if it is enabled, but even that will not handle the case where
+> the device is actually disabled.
+> 
+> Moreover, the drivers using the atomic modesetting expect that their enable
+> and disable callback to be called when the device is already enabled or
+> disabled (respectively).
+> 
+> We can however fix this issue by moving the call to
+> drm_helper_disable_unused_functions out of drm_fbdev_cma_init and make the
+> drivers needing it (all the drivers calling drm_fbdev_cma_init and not
+> using the atomic modesetting) explicitly call it.
+
+I'd rather add it to all drivers that call drm_fbdev_cma_init(). All the 
+atomic ones must have special code to cope with it that could be rendered 
+useless by the removal of the drm_helper_disable_unused_functions() call. That 
+code should be removed too, and it would be easier to check drivers one by one 
+and fixing them individually (outside of this patch series, unless you insist 
+;-)) when removing the explicit drm_helper_disable_unused_functions() call. 
+Other than that the patch looks fine to me.
+
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/gpu/drm/drm_fb_cma_helper.c | 3 ---
+>  drivers/gpu/drm/imx/imx-drm-core.c  | 1 +
+>  drivers/gpu/drm/sti/sti_drv.c       | 1 +
+>  drivers/gpu/drm/tilcdc/tilcdc_drv.c | 1 +
+>  4 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/drm_fb_cma_helper.c
+> b/drivers/gpu/drm/drm_fb_cma_helper.c index c19a62561183..daa98d881142
+> 100644
+> --- a/drivers/gpu/drm/drm_fb_cma_helper.c
+> +++ b/drivers/gpu/drm/drm_fb_cma_helper.c
+> @@ -348,9 +348,6 @@ struct drm_fbdev_cma *drm_fbdev_cma_init(struct
+> drm_device *dev,
+> 
+>  	}
+> 
+> -	/* disable all the possible outputs/crtcs before entering KMS mode */
+> -	drm_helper_disable_unused_functions(dev);
+> -
+>  	ret = drm_fb_helper_initial_config(helper, preferred_bpp);
+>  	if (ret < 0) {
+>  		dev_err(dev->dev, "Failed to set initial hw configuration.\n");
+> diff --git a/drivers/gpu/drm/imx/imx-drm-core.c
+> b/drivers/gpu/drm/imx/imx-drm-core.c index 7b990b4e96d2..e1db57791fc9
+> 100644
+> --- a/drivers/gpu/drm/imx/imx-drm-core.c
+> +++ b/drivers/gpu/drm/imx/imx-drm-core.c
+> @@ -312,6 +312,7 @@ static int imx_drm_driver_load(struct drm_device *drm,
+> unsigned long flags) dev_warn(drm->dev, "Invalid legacyfb_depth. 
+> Defaulting to 16bpp\n"); legacyfb_depth = 16;
+>  	}
+> +	drm_helper_disable_unused_functions(drm);
+>  	imxdrm->fbhelper = drm_fbdev_cma_init(drm, legacyfb_depth,
+>  				drm->mode_config.num_crtc, MAX_CRTC);
+>  	if (IS_ERR(imxdrm->fbhelper)) {
+> diff --git a/drivers/gpu/drm/sti/sti_drv.c b/drivers/gpu/drm/sti/sti_drv.c
+> index 1469987949d8..506b5626f3ed 100644
+> --- a/drivers/gpu/drm/sti/sti_drv.c
+> +++ b/drivers/gpu/drm/sti/sti_drv.c
+> @@ -160,6 +160,7 @@ static int sti_load(struct drm_device *dev, unsigned
+> long flags)
+> 
+>  	drm_mode_config_reset(dev);
+> 
+> +	drm_helper_disable_unused_functions(dev);
+>  	drm_fbdev_cma_init(dev, 32,
+>  			   dev->mode_config.num_crtc,
+>  			   dev->mode_config.num_connector);
+> diff --git a/drivers/gpu/drm/tilcdc/tilcdc_drv.c
+> b/drivers/gpu/drm/tilcdc/tilcdc_drv.c index 876cad58b1f9..24be31d69701
+> 100644
+> --- a/drivers/gpu/drm/tilcdc/tilcdc_drv.c
+> +++ b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
+> @@ -294,6 +294,7 @@ static int tilcdc_load(struct drm_device *dev, unsigned
+> long flags) break;
+>  	}
+> 
+> +	drm_helper_disable_unused_functions(dev);
+>  	priv->fbdev = drm_fbdev_cma_init(dev, bpp,
+>  			dev->mode_config.num_crtc,
+>  			dev->mode_config.num_connector);
+
+-- 
+Regards,
+
+Laurent Pinchart
