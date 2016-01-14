@@ -1,21 +1,32 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Thu, 14 Jan 2016 13:55:18 +0100
-Subject: [PATCH RESEND v3 0/9] Add STM32 pinctrl/GPIO driver
-In-Reply-To: <567197A7.5000903@st.com>
-References: <1449822306-9035-1-git-send-email-mcoquelin.stm32@gmail.com>
- <567197A7.5000903@st.com>
-Message-ID: <CALszF6CJi72CgX_pGu-YgAeGc1LSEFLdCCvvyH3uzGYPJ-z2qg@mail.gmail.com>
+From: jan.glauber@gmail.com (Jan Glauber)
+Date: Thu, 14 Jan 2016 13:55:40 +0100
+Subject: [RFC PATCH 0/5] Cavium ThunderX PMU support
+Message-ID: <cover.1452766568.git.jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Patrice,
+Hi Will & Mark,
 
-2015-12-16 17:56 GMT+01:00 Patrice Chotard <patrice.chotard@st.com>:
-> Hi Maxime
->
-> You can add my Acked-by after fixing the patch 4/9
+please have a look at these patches for perf PMU support. The Cavium
+PMU stuff should be pretty generic but the long cycle counter bit
+will change all ARMv8 PMUs and needs careful review.
 
-Thanks a lot for the review, I taken into account all your comments and sent v4.
+Thanks,
+Jan
 
-Best regards,
-Maxime
+Jan Glauber (5):
+  arm64/perf: Rename Cortex A57 events
+  arm64/perf: Add Cavium ThunderX PMU support
+  arm64: dts: Add Cavium ThunderX specific PMU
+  arm64/perf: Enable PMCR long cycle counter bit
+  arm64/perf: Extend event mask for ARMv8.1
+
+ Documentation/devicetree/bindings/arm/pmu.txt |   1 +
+ arch/arm64/boot/dts/cavium/thunder-88xx.dtsi  |   5 +
+ arch/arm64/kernel/perf_event.c                | 145 ++++++++++++++++++++------
+ drivers/perf/arm_pmu.c                        |   5 +-
+ include/linux/perf/arm_pmu.h                  |   4 +-
+ 5 files changed, 125 insertions(+), 35 deletions(-)
+
+-- 
+1.9.1
