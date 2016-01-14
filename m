@@ -1,56 +1,58 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 14 Jan 2016 06:19:36 +0000
-Subject: [PATCH v2 1/2] regulator: act8945a: add regulator driver for
- ACT8945A
-In-Reply-To: <B256D81BAE5131468A838E5D7A243641D63EBC6E@penmbx01>
-References: <1452586629-1117-1-git-send-email-wenyou.yang@atmel.com>
- <1452586629-1117-2-git-send-email-wenyou.yang@atmel.com>
- <87oacp5zl7.fsf@dell.be.48ers.dk>
- <B256D81BAE5131468A838E5D7A243641D63EBC6E@penmbx01>
-Message-ID: <20160114061936.GM27358@x1>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 14 Jan 2016 11:49:24 +0530
+Subject: [PATCH v3] PCI: hosts: mark pcie/pci (msi) irq cascade handler as
+ IRQF_NO_THREAD
+In-Reply-To: <56969BE3.6000804@ti.com>
+References: <1449775100-30877-1-git-send-email-grygorii.strashko@ti.com>
+ <20160106221827.GD16231@localhost> <20160113133904.GD29964@linutronix.de>
+ <20160113175016.GB28453@localhost> <56969BE3.6000804@ti.com>
+Message-ID: <56973DEC.2000108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Jan 2016, Yang, Wenyou wrote:
+Hi,
 
-> > -----Original Message-----
-> > From: Peter Korsgaard [mailto:jacmet at gmail.com] On Behalf Of Peter Korsgaard
-> > Sent: 2016?1?13? 22:22
-> > To: Yang, Wenyou <Wenyou.Yang@atmel.com>
-> > Cc: Liam Girdwood <lgirdwood@gmail.com>; Mark Brown <broonie@kernel.org>;
-> > Rob Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>; Mark
-> > Rutland <mark.rutland@arm.com>; Ian Campbell <ijc+devicetree@hellion.org.uk>;
-> > Kumar Gala <galak@codeaurora.org>; Krzysztof Kozlowski
-> > <k.kozlowski@samsung.com>; devicetree at vger.kernel.org; Ferre, Nicolas
-> > <Nicolas.FERRE@atmel.com>; linux-kernel at vger.kernel.org; Javier Martinez
-> > Canillas <javier@dowhile0.org>; Lee Jones <lee.jones@linaro.org>; linux-arm-
-> > kernel at lists.infradead.org
-> > Subject: Re: [PATCH v2 1/2] regulator: act8945a: add regulator driver for
-> > ACT8945A
-> > 
-> > >>>>> "Wenyou" == Wenyou Yang <wenyou.yang@atmel.com> writes:
-> > 
-> >  > This patch adds new regulator driver to support ACT8945A MFD  > chip's
-> > regulators.
-> > 
-> >  > The ACT8945A has three step-down DC/DC converters and four  > low-dropout
-> > regulators.
-> > 
-> >  > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > 
-> > Isn't the regulator part of the act8945a identical to act8865? Can't we just use the
-> > existing act8865-regulator.c driver? (E.G. support 8865 variant in the mfd driver,
-> > but only register the regulator sub device?)
+On Thursday 14 January 2016 12:18 AM, Grygorii Strashko wrote:
+> On 01/13/2016 07:50 PM, Bjorn Helgaas wrote:
+>> On Wed, Jan 13, 2016 at 02:39:04PM +0100, Sebastian Andrzej Siewior wrote:
+>>> * Bjorn Helgaas | 2016-01-06 16:18:27 [-0600]:
+>>>
+>>>> Hi Bjorn,
+>>>
+>>>>> diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
+>>>>> index 8c36880..0415192 100644
+>>>>> --- a/drivers/pci/host/pci-dra7xx.c
+>>>>> +++ b/drivers/pci/host/pci-dra7xx.c
+>>>>> @@ -301,8 +301,19 @@ static int __init dra7xx_add_pcie_port(struct
+>>>>> dra7xx_pcie *dra7xx,
+>>>>>           return -EINVAL;
+>>>>>       }
+>>>>>
+>>>>> +    /*
+>>>>> +     * Mark dra7xx_pcie_msi IRQ as IRQF_NO_THREAD
+>>>>> +     * On -RT and if kernel is booting with "threadirqs" cmd line parameter
+>>>>> +     * the dra7xx_pcie_msi_irq_handler() will be forced threaded but,
+>>>>> +     * in the same time, it's IRQ dispatcher and calls generic_handle_irq(),
+>>>>> +     * which, in turn, will be resolved to handle_simple_irq() call.
+>>>>> +     * The handle_simple_irq() expected to be called with IRQ disabled, as
+>>>>> +     * result kernle will display warning:
+>>>>> +     * "irq XXX handler YYY+0x0/0x14 enabled interrupts".
+>>>>> +     */
+>>>
+>>> could you _please_ remove this coment? This kind of comment (if at all)
+>>> should be part of the commit message (which is the case more or less).
+>>
+>> IIRC, Grygorii specifically wanted to keep this comment in dra7xx, but
 > 
-> Yes, the regulator part of the act8945a is identical to act8865.
+> True.
 > 
-> But the act8865-regulator driver is a struct i2c_driver,  and the mfd sub-device driver is a platform_driver driver, it is not easy to use it.
+>> I do agree that this level of detail is more appropriate for a changelog.
+>>
+>> If Grygorii and Kishon don't object, I can update the patch to remove it.
+> 
+> But no objections from my side. Thanks a lot.
 
-Take a look at some existing files with the pattern
-drivers/mfd/*{spi,i2c,core}.c to see how this might be possible.
+I don't have any objections.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks
+Kishon
