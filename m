@@ -1,76 +1,114 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Thu, 14 Jan 2016 12:48:27 -0800
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <56980145.5030901@imgtec.com>
-References: <20160112102555.GV6373@twins.programming.kicks-ass.net>
- <20160112104012.GW6373@twins.programming.kicks-ass.net>
- <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
- <20160113104516.GE25458@arm.com> <56969F4B.7070001@imgtec.com>
- <20160113204844.GV6357@twins.programming.kicks-ass.net>
- <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
- <56980145.5030901@imgtec.com>
-Message-ID: <20160114204827.GE3818@linux.vnet.ibm.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 14 Jan 2016 12:41:19 -0800
+Subject: [PATCH v2] clk: mediatek: Allow changing PLL rate when it is off
+In-Reply-To: <1452750917.5384.24.camel@mtksdaap41>
+References: <1452482936-51852-1-git-send-email-jamesjj.liao@mediatek.com>
+ <20160114022637.1942.4564@quark.deferred.io>
+ <1452750917.5384.24.camel@mtksdaap41>
+Message-ID: <20160114204119.1942.69629@quark.deferred.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 12:12:53PM -0800, Leonid Yegoshin wrote:
-> On 01/14/2016 04:04 AM, Will Deacon wrote:
-> >Consequently, it's important that the architecture back-ends
-> >implement these portable primitives (e.g. smp_mb()) in a way that
-> >satisfies the kernel memory model so that core code doesn't need
-> >to worry about the underlying architecture for synchronisation
-> >purposes.
+Quoting James Liao (2016-01-13 21:55:17)
+> Hi Mike,
 > 
-> It seems you don't listen me. I said multiple times - MIPS
-> implementation of
-> SYNC_RMB/SYNC_WMB/SYNC_MB/SYNC_ACQUIRE/SYNC_RELEASE instructions
-> matches the description of
-> smp_rmb/smp_wmb/smp_mb/sync_acquire/sync_release from
-> Documentation/memory-barriers.txt file.
+> On Wed, 2016-01-13 at 18:26 -0800, Michael Turquette wrote:
+> > Hi James,
+> > 
+> > Quoting James Liao (2016-01-10 19:28:56)
+> > > Some modules may need to change its clock rate before turn on it.
+> > > So changing PLL's rate when it is off should be allowed.
+> > > This patch removes PLL enabled check before set rate, so that
+> > > PLLs can set new frequency even if they are off.
+> > > 
+> > > On MT8173 for example, ARMPLL's enable bit can be controlled by
+> > > other HW. That means ARMPLL may be turned on even if we (CPU / SW)
+> > > set ARMPLL's enable bit as 0. In this case, SW may want and can
+> > > still change ARMPLL's rate by changing its pcw and postdiv settings.
+> > > But without this patch, new pcw setting will not be applied because
+> > > its enable bit is 0.
+> > 
+> > Must the clock signal be enabled to change the PLL rate? If so, does
+> > ARMPLL set the CLK_SET_RATE_GATE flag?
 > 
-> What else do you want from me - RTL or microArch design for that?
+> No. The controlling of PLL's rate and enable are independent. So we can
+> change the PLL's rate when it's enabled or disabled.
 
-I suspect that it is more likely that we are talking past each other.
-This stuff is subtle and although we have better ways of talking about
-it than (say) ten years ago, it is subtle.  Two ways of talking about
-it are herd and ppcmem.
+Thanks for the clarification.
 
-The overview of ppcmem (AKA armmem and cppmem) is here:
-https://www.cl.cam.ac.uk/~pes20/ppcmem/help.html
+> 
+> > > 
+> > > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> > > ---
+> > >  drivers/clk/mediatek/clk-pll.c | 9 ++-------
+> > >  1 file changed, 2 insertions(+), 7 deletions(-)
+> > > 
+> > > diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
+> > > index 966cab1..8e31fae 100644
+> > > --- a/drivers/clk/mediatek/clk-pll.c
+> > > +++ b/drivers/clk/mediatek/clk-pll.c
+> > > @@ -91,9 +91,6 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
+> > >                 int postdiv)
+> > >  {
+> > >         u32 con1, val;
+> > > -       int pll_en;
+> > > -
+> > > -       pll_en = readl(pll->base_addr + REG_CON0) & CON0_BASE_EN;
+> > >  
+> > >         /* set postdiv */
+> > >         val = readl(pll->pd_addr);
+> > > @@ -114,15 +111,13 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
+> > >  
+> > >         con1 = readl(pll->base_addr + REG_CON1);
+> > >  
+> > > -       if (pll_en)
+> > > -               con1 |= CON0_PCW_CHG;
+> > > +       con1 |= CON0_PCW_CHG;
+> > 
+> > This unconditionally enables the PLL whenever clk_set_rate is called,
+> > changing the previous behavior. The clk framework still tracks the
+> > intent of ARMPLLs users with the enable_count. How about something like
+> > the following:
+> 
+> Not really. This patch will not enable or disable PLL when we change its
+> rate. The PLL enable bit is bit[0], we didn't change bit[0] in
+> mtk_pll_set_rate_regs(), so its state will not be changed.
+> 
+> This patch set CON0_PCW_CHG (bit[31]) no matter the PLL is enabled or
+> not. So we don't need to check the enable bit[0] nor PLL state in the
+> framework before set bit[31].
 
-The intro to herd is here: http://arxiv.org/pdf/1308.6810v5.pdf
-It may be downloaded here: http://diy.inria.fr/herd/
+Ah, I mistakenly thought that CON0_PCW_CHG was the enable bit, since
+setting it was guarded by the pll_en conditional. Your explanation makes
+perfect sense to me.
 
-As a very rough rule of thumb, herd is faster and easier to use
-and ppcmem is more precise.
+Acked-by: Michael Turquette <mturuqette@baylibre.com>
 
-So SYNC_RMB is intended to implement smp_rmb(), correct?
+Regards,
+Mike
 
-You could use SYNC_ACQUIRE() to implement read_barrier_depends() and
-smp_read_barrier_depends(), but SYNC_RMB probably does not suffice.
-The reason for this is that smp_read_barrier_depends() must order the
-pointer load against any subsequent read or write through a dereference
-of that pointer.  For example:
-
-	p = READ_ONCE(gp);
-	smp_rmb();
-	r1 = p->a; /* ordered by smp_rmb(). */
-	p->b = 42; /* NOT ordered by smp_rmb(), BUG!!! */
-	r2 = x; /* ordered by smp_rmb(), but doesn't need to be. */
-
-In contrast:
-
-	p = READ_ONCE(gp);
-	smp_read_barrier_depends();
-	r1 = p->a; /* ordered by smp_read_barrier_depends(). */
-	p->b = 42; /* ordered by smp_read_barrier_depends(). */
-	r2 = x; /* not ordered by smp_read_barrier_depends(), which is OK. */
-
-Again, if your hardware maintains local ordering for address
-and data dependencies, you can have read_barrier_depends() and
-smp_read_barrier_depends() be no-ops like they are for most
-architectures.
-
-Does that help?
-
-							Thanx, Paul
+> 
+> >       bool pll_en = clk_hw_is_enabled(&pll->hw);
+> > 
+> >       if (pll_en)
+> >               con1 |= CON0_PCW_CHG;
+> > 
+> >       writel(con1, pll->base_addr + REG_CON1);
+> >       if (pll->tuner_addr)
+> >               writel(con1 + 1, pll->tuner_addr);
+> > 
+> >       if (pll_en)
+> >               udelay(20);
+> > 
+> > This does not rely on the hardware to tell us the intent of the user,
+> > but instead on our framework usecounting.
+> 
+> 
+> Best regards,
+> 
+> James
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
