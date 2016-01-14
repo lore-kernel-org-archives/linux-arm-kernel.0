@@ -1,47 +1,30 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 14 Jan 2016 16:24:55 +0100
-Subject: [PATCH v2 12/26] ARM: sun5i: Add TV encoder gate to the DTSI
+Date: Thu, 14 Jan 2016 16:25:07 +0100
+Subject: [PATCH v2 24/26] devicetree: Add olimex vendor prefix
 In-Reply-To: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1452785109-6172-13-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1452785109-6172-25-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It turns out that the A13 / R8 also have a tve encoder block, and a gate
-for it.
-
-Add it to the DT.
+Olimex is an open source hardware boards vendors based in Bulgaria.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun5i-a13.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index f29163650ca8..618086e0694c 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -111,8 +111,8 @@
- 					<10>, <13>,
- 					<14>, <20>,
- 					<21>, <22>,
--				        <28>, <32>, <36>,
--				        <40>, <44>,
-+					<28>, <32>, <34>,
-+					<36>, <40>, <44>,
- 					<46>, <51>,
- 					<52>;
- 			clock-output-names = "ahb_usbotg", "ahb_ehci",
-@@ -121,8 +121,8 @@
- 					     "ahb_mmc2", "ahb_nand",
- 					     "ahb_sdram", "ahb_spi0",
- 					     "ahb_spi1", "ahb_spi2",
--					     "ahb_stimer", "ahb_ve", "ahb_lcd",
--					     "ahb_csi", "ahb_de_be",
-+					     "ahb_stimer", "ahb_ve", "ahb_tve",
-+					     "ahb_lcd", "ahb_csi", "ahb_de_be",
- 					     "ahb_de_fe", "ahb_iep",
- 					     "ahb_mali400";
- 		};
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 55df1d444e9f..de4eb72b3adc 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -161,6 +161,7 @@ nuvoton	Nuvoton Technology Corporation
+ nvidia	NVIDIA
+ nxp	NXP Semiconductors
+ okaya	Okaya Electric America, Inc.
++olimex	Olimex
+ onnn	ON Semiconductor Corp.
+ opencores	OpenCores.org
+ option	Option NV
 -- 
 2.6.4
