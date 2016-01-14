@@ -1,58 +1,33 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 14 Jan 2016 11:49:24 +0530
-Subject: [PATCH v3] PCI: hosts: mark pcie/pci (msi) irq cascade handler as
- IRQF_NO_THREAD
-In-Reply-To: <56969BE3.6000804@ti.com>
-References: <1449775100-30877-1-git-send-email-grygorii.strashko@ti.com>
- <20160106221827.GD16231@localhost> <20160113133904.GD29964@linutronix.de>
- <20160113175016.GB28453@localhost> <56969BE3.6000804@ti.com>
-Message-ID: <56973DEC.2000108@ti.com>
+From: kvalo@codeaurora.org (Kalle Valo)
+Date: Thu, 14 Jan 2016 08:46:29 +0200
+Subject: [PATCH] ssb: host_soc depends on sprom
+In-Reply-To: <8128014.DbbgBtKY3z@wuerfel> (Arnd Bergmann's message of "Wed, 13
+ Jan 2016 23:51:43 +0100")
+References: <8128014.DbbgBtKY3z@wuerfel>
+Message-ID: <8760ywd5fe.fsf@kamboji.qca.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Arnd Bergmann <arnd@arndb.de> writes:
 
-On Thursday 14 January 2016 12:18 AM, Grygorii Strashko wrote:
-> On 01/13/2016 07:50 PM, Bjorn Helgaas wrote:
->> On Wed, Jan 13, 2016 at 02:39:04PM +0100, Sebastian Andrzej Siewior wrote:
->>> * Bjorn Helgaas | 2016-01-06 16:18:27 [-0600]:
->>>
->>>> Hi Bjorn,
->>>
->>>>> diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
->>>>> index 8c36880..0415192 100644
->>>>> --- a/drivers/pci/host/pci-dra7xx.c
->>>>> +++ b/drivers/pci/host/pci-dra7xx.c
->>>>> @@ -301,8 +301,19 @@ static int __init dra7xx_add_pcie_port(struct
->>>>> dra7xx_pcie *dra7xx,
->>>>>           return -EINVAL;
->>>>>       }
->>>>>
->>>>> +    /*
->>>>> +     * Mark dra7xx_pcie_msi IRQ as IRQF_NO_THREAD
->>>>> +     * On -RT and if kernel is booting with "threadirqs" cmd line parameter
->>>>> +     * the dra7xx_pcie_msi_irq_handler() will be forced threaded but,
->>>>> +     * in the same time, it's IRQ dispatcher and calls generic_handle_irq(),
->>>>> +     * which, in turn, will be resolved to handle_simple_irq() call.
->>>>> +     * The handle_simple_irq() expected to be called with IRQ disabled, as
->>>>> +     * result kernle will display warning:
->>>>> +     * "irq XXX handler YYY+0x0/0x14 enabled interrupts".
->>>>> +     */
->>>
->>> could you _please_ remove this coment? This kind of comment (if at all)
->>> should be part of the commit message (which is the case more or less).
->>
->> IIRC, Grygorii specifically wanted to keep this comment in dra7xx, but
-> 
-> True.
-> 
->> I do agree that this level of detail is more appropriate for a changelog.
->>
->> If Grygorii and Kishon don't object, I can update the patch to remove it.
-> 
-> But no objections from my side. Thanks a lot.
+> Drivers that use the SSB sprom functionality typically 'select SSB_SPROM'
+> from Kconfig, but CONFIG_SSB_HOST_SOC misses this, which results in
+> a build failure unless at least one of the other drivers that selects
+> it is enabled:
+>
+> drivers/built-in.o: In function `ssb_host_soc_get_invariants':
+> (.text+0x459494): undefined reference to `ssb_fill_sprom_with_fallback'
+>
+> This adds the same select statement that is used elsewhere.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 541c9a84cd85 ("ssb: pick SoC invariants code from MIPS BCM47xx arch")
+> ---
+> I'm not sure who the right person is to pick up the fix. The patch that
+> introduced the problem was merged by Kalle through the iwlwifi tree.
 
-I don't have any objections.
+I can take it. For historical reasons ssb patches go through my
+wireless-drivers trees.
 
-Thanks
-Kishon
+-- 
+Kalle Valo
