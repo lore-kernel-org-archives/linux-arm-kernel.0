@@ -1,41 +1,54 @@
-From: heiko.carstens@de.ibm.com (Heiko Carstens)
-Date: Thu, 14 Jan 2016 08:57:20 +0100
-Subject: [PATCH v2 0/6] generic relative extable support
-In-Reply-To: <CAKv+Gu8WW7opaa2ck9kEP91BF=amBo=jejcjnKQB1DgLWvtK3w@mail.gmail.com>
-References: <1452007180-27411-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu8WW7opaa2ck9kEP91BF=amBo=jejcjnKQB1DgLWvtK3w@mail.gmail.com>
-Message-ID: <20160114075720.GB4073@osiris>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Thu, 14 Jan 2016 08:07:40 +0000
+Subject: [PATCH v2 1/2] regulator: act8945a: add regulator driver for
+ ACT8945A
+In-Reply-To: <87egdk39ji.fsf@dell.be.48ers.dk>
+References: <1452586629-1117-1-git-send-email-wenyou.yang@atmel.com>
+ <1452586629-1117-2-git-send-email-wenyou.yang@atmel.com>
+ <87oacp5zl7.fsf@dell.be.48ers.dk>
+ <B256D81BAE5131468A838E5D7A243641D63EBC6E@penmbx01>
+ <87egdk39ji.fsf@dell.be.48ers.dk>
+Message-ID: <B256D81BAE5131468A838E5D7A243641D63EBEC7@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 02:59:46PM +0100, Ard Biesheuvel wrote:
-> On 5 January 2016 at 16:19, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > There are currently four architectures (x86, ia64, alpha and s390) whose
-> > user-access exception tables are relative to the table entry address rather
-> > than absolute. Each of these architectures has its own search_extable() and
-> > sort_extable() implementation, which are not only mostly identical to each
-> > other, but also deviate very little from the generic absolute implementations
-> > in lib/extable.c that they override.
-> >
-> > So before making arm64 the fifth architecture that reimplements this, let's
-> > refactor the existing code so that all of these architectures use common code
-> > for searching and sorting the relative extables. Archs may set
-> > ARCH_HAS_RELATIVE_EXTABLE to indicate that the table consists of a pair of
-> > relative ints, and may define swap_ex_entry_fixup() if the fixup member needs
-> > special treatment in the swapping step of the sorting routine (such as alpha).
-> >
-> 
-> [...]
-> 
-> Now that I have collected acks for all the patches, I think this is
-> good to go in.
-> 
-> @Andrew: since this touches 5 different architectures, is this perhaps
-> something that could go in via your tree after -rc1?
-> (assuming that the s390 bugfix has been merged by then)
 
-Your s390 bugfix has been merged.  See git commit id bcb7825a77f4 ("s390:
-fix normalization bug in exception table sorting").
 
-Thanks,
-Heiko
+> -----Original Message-----
+> From: Peter Korsgaard [mailto:jacmet at gmail.com] On Behalf Of Peter Korsgaard
+> Sent: 2016?1?14? 15:28
+> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
+> Cc: Liam Girdwood <lgirdwood@gmail.com>; Mark Brown <broonie@kernel.org>;
+> Rob Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>; Mark
+> Rutland <mark.rutland@arm.com>; Ian Campbell <ijc+devicetree@hellion.org.uk>;
+> Kumar Gala <galak@codeaurora.org>; Krzysztof Kozlowski
+> <k.kozlowski@samsung.com>; devicetree at vger.kernel.org; Ferre, Nicolas
+> <Nicolas.FERRE@atmel.com>; linux-kernel at vger.kernel.org; Javier Martinez
+> Canillas <javier@dowhile0.org>; Lee Jones <lee.jones@linaro.org>; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 1/2] regulator: act8945a: add regulator driver for
+> ACT8945A
+> 
+> >>>>> "Yang," == Yang, Wenyou <Wenyou.Yang@atmel.com> writes:
+> 
+>  >> Isn't the regulator part of the act8945a identical to act8865? Can't we just use
+> the  >> existing act8865-regulator.c driver? (E.G. support 8865 variant in the mfd
+> driver,  >> but only register the regulator sub device?)
+> 
+>  > Yes, the regulator part of the act8945a is identical to act8865.
+> 
+>  > But the act8865-regulator driver is a struct i2c_driver, and the mfd  > sub-
+> device driver is a platform_driver driver, it is not easy to use  > it.
+> 
+> But the mfd driver could support the act8865 variant as well (by only registering
+> the regulator mfd cell).
+
+I still don't understand.
+
+The MFD sub device is registered as a platform device, the existing act8865 driver is registered as an i2c_driver. How do they match? :)
+
+Could you point out which exiting driver for me to reference.  Thank you!
+
+
+Best Regards,
+Wenyou Yang
