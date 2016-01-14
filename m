@@ -1,166 +1,154 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 14 Jan 2016 16:25:05 +0100
-Subject: [PATCH v2 22/26] ARM: sun5i: r8: Add display blocks to the DTSI
+Date: Thu, 14 Jan 2016 16:24:58 +0100
+Subject: [PATCH v2 15/26] drm/modes: Support modes names on the command line
 In-Reply-To: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1452785109-6172-23-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1452785109-6172-16-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TCON, tv-encoder and display engine backends and frontends are combined
-to create our display pipeline.
+The drm subsystem also uses the video= kernel parameter, and in the
+documentation refers to the fbdev documentation for that parameter.
 
-Add them to the R8 DTSI. It's supposed to be perfectly compatible with the
-A10s and A13, but since we haven't tested it on them yet, it's safer to
-just enable it on the R8. Eventually, it should be moved to sun5i.dtsi
+However, that documentation also says that instead of giving the mode using
+its resolution we can also give a name. However, DRM doesn't handle that
+case at the moment. Even though in most case it shouldn't make any
+difference, it might be useful for analog modes, where different standards
+might have the same resolution, but still have a few different parameters
+that are not encoded in the modes (NTSC vs NTSC-J vs PAL-M for example).
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun5i-r8.dtsi | 134 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 134 insertions(+)
+ drivers/gpu/drm/drm_crtc.c      |  3 ++-
+ drivers/gpu/drm/drm_fb_helper.c |  4 ++++
+ drivers/gpu/drm/drm_modes.c     | 49 ++++++++++++++++++++++++++++-------------
+ include/drm/drm_modes.h         |  1 +
+ 4 files changed, 41 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun5i-r8.dtsi b/arch/arm/boot/dts/sun5i-r8.dtsi
-index 691d3de75b35..b3bf91516a80 100644
---- a/arch/arm/boot/dts/sun5i-r8.dtsi
-+++ b/arch/arm/boot/dts/sun5i-r8.dtsi
-@@ -57,4 +57,138 @@
- 			status = "disabled";
- 		};
- 	};
+diff --git a/drivers/gpu/drm/drm_crtc.c b/drivers/gpu/drm/drm_crtc.c
+index 24c5434abd1c..c3267d695e4e 100644
+--- a/drivers/gpu/drm/drm_crtc.c
++++ b/drivers/gpu/drm/drm_crtc.c
+@@ -846,8 +846,9 @@ static void drm_connector_get_cmdline_mode(struct drm_connector *connector)
+ 		connector->force = mode->force;
+ 	}
+ 
+-	DRM_DEBUG_KMS("cmdline mode for connector %s %dx%d@%dHz%s%s%s\n",
++	DRM_DEBUG_KMS("cmdline mode for connector %s %s %dx%d@%dHz%s%s%s\n",
+ 		      connector->name,
++		      mode->name ? mode->name : "",
+ 		      mode->xres, mode->yres,
+ 		      mode->refresh_specified ? mode->refresh : 60,
+ 		      mode->rb ? " reduced blanking" : "",
+diff --git a/drivers/gpu/drm/drm_fb_helper.c b/drivers/gpu/drm/drm_fb_helper.c
+index 69cbab5e5c81..fcb7ba796202 100644
+--- a/drivers/gpu/drm/drm_fb_helper.c
++++ b/drivers/gpu/drm/drm_fb_helper.c
+@@ -1649,6 +1649,10 @@ struct drm_display_mode *drm_pick_cmdline_mode(struct drm_fb_helper_connector *f
+ 	prefer_non_interlace = !cmdline_mode->interlace;
+ again:
+ 	list_for_each_entry(mode, &fb_helper_conn->connector->modes, head) {
++		/* Check (optional) mode name first */
++		if (!strcmp(mode->name, cmdline_mode->name))
++			return mode;
 +
-+	soc at 01c00000 {
-+		tve0: tv-encoder at 01c0a000 {
-+			compatible = "allwinner,sun4i-a10-tv-encoder";
-+			reg = <0x01c0a000 0x1000>;
-+			clocks = <&ahb_gates 34>;
-+			status = "disabled";
+ 		/* check width/height */
+ 		if (mode->hdisplay != cmdline_mode->xres ||
+ 		    mode->vdisplay != cmdline_mode->yres)
+diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
+index 5b1921b22dd6..bbb23000eb5b 100644
+--- a/drivers/gpu/drm/drm_modes.c
++++ b/drivers/gpu/drm/drm_modes.c
+@@ -1351,7 +1351,7 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
+ 					       struct drm_cmdline_mode *mode)
+ {
+ 	const char *name;
+-	bool parse_extras = false;
++	bool named_mode = false, parse_extras = false;
+ 	unsigned int bpp_off = 0, refresh_off = 0;
+ 	unsigned int mode_end = 0;
+ 	char *bpp_ptr = NULL, *refresh_ptr = NULL, *extra_ptr = NULL;
+@@ -1370,8 +1370,14 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
+ 
+ 	name = mode_option;
+ 
++	/*
++	 * If the first character is not a digit, then it means that
++	 * we have a named mode.
++	 */
+ 	if (!isdigit(name[0]))
+-		return false;
++		named_mode = true;
++	else
++		named_mode = false;
+ 
+ 	/* Try to locate the bpp and refresh specifiers, if any */
+ 	bpp_ptr = strchr(name, '-');
+@@ -1398,12 +1404,16 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
+ 		parse_extras = true;
+ 	}
+ 
+-	ret = drm_mode_parse_cmdline_res_mode(name, mode_end,
+-					      parse_extras,
+-					      connector,
+-					      mode);
+-	if (ret)
+-		return false;
++	if (named_mode) {
++		strncpy(mode->name, name, mode_end);
++	} else {
++		ret = drm_mode_parse_cmdline_res_mode(name, mode_end,
++						      parse_extras,
++						      connector,
++						      mode);
++		if (ret)
++			return false;
++	}
+ 	mode->specified = true;
+ 
+ 	if (bpp_ptr) {
+@@ -1431,14 +1441,23 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
+ 		extra_ptr = refresh_end_ptr;
+ 
+ 	if (extra_ptr) {
+-		int remaining = strlen(name) - (extra_ptr - name);
++		if (!named_mode) {
++			int len = strlen(name) - (extra_ptr - name);
+ 
+-		/*
+-		 * We still have characters to process, while
+-		 * we shouldn't have any
+-		 */
+-		if (remaining > 0)
+-			return false;
++			ret = drm_mode_parse_cmdline_extra(extra_ptr, len,
++							   connector, mode);
++			if (ret)
++				return false;
++		} else {
++			int remaining = strlen(name) - (extra_ptr - name);
 +
-+			port {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				tve0_in_tcon0: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&tcon0_out_tve0>;
-+				};
-+			};
-+		};
-+
-+		tcon0: lcd-controller at 01c0c000 {
-+			compatible = "allwinner,sun4i-a10-tcon";
-+			reg = <0x01c0c000 0x1000>;
-+			interrupts = <44>;
-+			clocks = <&ahb_gates 36>,
-+				 <&tcon_ch0_clk>,
-+				 <&tcon_ch1_clk>;
-+			clock-names = "ahb",
-+				      "tcon-ch0",
-+				      "tcon-ch1";
-+			clock-output-names = "tcon-pixel-clock";
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				tcon0_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					tcon0_in_be0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&be0_out_tcon0>;
-+					};
-+				};
-+
-+				tcon0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					tcon0_out_tve0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tve0_in_tcon0>;
-+					};
-+				};
-+			};
-+		};
-+
-+		fe0: display-frontend at 01e00000 {
-+			compatible = "allwinner,sun5i-a13-display-frontend";
-+			reg = <0x01e00000 0x20000>;
-+			interrupts = <47>;
-+			clocks = <&ahb_gates 46>, <&de_fe_clk>,
-+				 <&dram_gates 25>;
-+			clock-names = "ahb", "mod",
-+				      "ram";
-+			resets = <&de_fe_clk>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				fe0_out: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					fe0_out_be0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&be0_in_fe0>;
-+					};
-+				};
-+			};
-+		};
-+
-+		be0: display-backend at 01e60000 {
-+			compatible = "allwinner,sun5i-a13-display-backend";
-+			reg = <0x01e60000 0x10000>;
-+			clocks = <&ahb_gates 44>, <&de_be_clk>,
-+				 <&dram_gates 26>;
-+			clock-names = "ahb", "mod",
-+				      "ram";
-+			resets = <&de_be_clk>;
-+			status = "disabled";
-+
-+			assigned-clocks = <&de_be_clk>;
-+			assigned-clock-rates = <300000000>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				be0_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					be0_in_fe0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&fe0_out_be0>;
-+					};
-+				};
-+
-+				be0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					be0_out_tcon0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon0_in_be0>;
-+					};
-+				};
-+			};
-+		};
-+	};
-+
-+	display-engine {
-+		compatible = "allwinner,sun5i-a13-display-engine";
-+		pipelines = <&be0>;
-+	};
- };
++			/*
++			 * We still have characters to process, while
++			 * we shouldn't have any
++			 */
++			if (remaining > 0)
++				return false;
++		}
+ 	}
+ 
+ 	return true;
+diff --git a/include/drm/drm_modes.h b/include/drm/drm_modes.h
+index 08a8cac9e555..709d43f3515e 100644
+--- a/include/drm/drm_modes.h
++++ b/include/drm/drm_modes.h
+@@ -151,6 +151,7 @@ struct drm_display_mode {
+ 
+ /* mode specified on the command line */
+ struct drm_cmdline_mode {
++	char name[DRM_DISPLAY_MODE_LEN];
+ 	bool specified;
+ 	bool refresh_specified;
+ 	bool bpp_specified;
 -- 
 2.6.4
