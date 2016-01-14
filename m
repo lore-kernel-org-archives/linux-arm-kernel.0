@@ -1,56 +1,43 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Thu, 14 Jan 2016 13:45:35 +0000
-Subject: [PATCH V3 0/6] clk: bcm2835: add additinal clocks and add frac support
-Message-ID: <1452779142-20615-1-git-send-email-kernel@martin.sperl.org>
+Date: Thu, 14 Jan 2016 13:45:36 +0000
+Subject: [PATCH V3 1/6] clk: bcm2835: the minimum clock divider is 2
+In-Reply-To: <1452779142-20615-1-git-send-email-kernel@martin.sperl.org>
+References: <1452779142-20615-1-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1452779142-20615-2-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-The clk-bcm2835 driver right now relies on BCM2835_CLOCK_COUNT defined
-in include/dt-binding/clocks/bcm2835.h
-With every new clock introduced this value needs to increase,
-which is not what should happen for bindings.
+Testing with different clock divider values has shown
+that (at least for the PCM clock) the clock divider
+has to be at least 2, otherwise the clock will not
+output a signal.
 
-So we reorganize the driver so that it is no longer necessary
-to define BCM2835_CLOCK_COUNT.
+So the clamping has changed from 1 to 2 and comments
+about the kind of clamping applied have been added.
 
-Also the driver calculates fractional clock dividers correctly,
-but it does not enable the bit to enable support in the register.
-As a minimal extension we now can also define higher order MASH
-support when defining the clocks.
+Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+---
+ drivers/clk/bcm/clk-bcm2835.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-There is also an issue when the clock divider is < 2 - in that
-case no clock-outputis generate. The clamping code has been
-enhanced to handle this as well.
-
-Similarly there is also the clamping of the highest divider now
-limited to the highest possible integer divider instead of the
-highest possible fractional diviver.
-
-Finally we add all the 23 different HW clocks that have not been
-configured in the driver.
-
-Changelog:
-	V1 -> V2: split the asoc/sound patches from the clock patches
-	      	  enable frac/mash support
-	V2 -> V3: clamp clock divider to be >= 2
-		  clamp max clock divider to be integer (not fractional)
-		  added additional limit checks for divider selection
-		    allowing fallback to lower mash levels.
-		  use a newer probing mechanism based on a single array
-
-Martin Sperl (6):
-  clk: bcm2835: the minimum clock divider is 2
-  clk: bcm2835: clamp clock divider to highest integer only
-  clk: bcm2835: enable fractional and mash support
-  clk: bcm2835: remove use of BCM2835_CLOCK_COUNT in driver
-  clk: bcm2835: enable management of PCM clock
-  clk: bcm2835: add missing 22 HW-clocks.
-
- drivers/clk/bcm/clk-bcm2835.c       |  550 +++++++++++++++++++++++++++++------
- include/dt-bindings/clock/bcm2835.h |   25 +-
- 2 files changed, 490 insertions(+), 85 deletions(-)
-
---
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index 015e687..10e97b7 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -1178,7 +1178,11 @@ static u32 bcm2835_clock_choose_div(struct clk_hw *hw,
+ 	div &= ~unused_frac_mask;
+ 
+ 	/* Clamp to the limits. */
+-	div = max(div, unused_frac_mask + 1);
++
++	/* divider must be >= 2 */
++	div = max_t(u32, div, (2 << CM_DIV_FRAC_BITS));
++
++	/* clamp to max divider allowed */
+ 	div = min_t(u32, div, GENMASK(data->int_bits + CM_DIV_FRAC_BITS - 1,
+ 				      CM_DIV_FRAC_BITS - data->frac_bits));
+ 
+-- 
 1.7.10.4
