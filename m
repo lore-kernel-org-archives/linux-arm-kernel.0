@@ -1,40 +1,59 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 14 Jan 2016 08:12:50 -0800
-Subject: [PATCH v3 3/4] i2c: rk3x: new method to caculate i2c clocks
-In-Reply-To: <1452774699-57455-4-git-send-email-david.wu@rock-chips.com>
-References: <1452774699-57455-1-git-send-email-david.wu@rock-chips.com>
- <1452774699-57455-4-git-send-email-david.wu@rock-chips.com>
-Message-ID: <CAD=FV=UXMzEQiKcMa7VjDx+arcbRo1e-0HPHBnG8GP7k6uFt1g@mail.gmail.com>
+From: john@metanate.com (John Keeping)
+Date: Thu, 14 Jan 2016 16:26:19 +0000
+Subject: [PATCH 3/3] drm/rockchip: explain why we can't wait_for_vblanks
+In-Reply-To: <20160114145705.GA24005@ulmo>
+References: <20160114142047.GD19130@phenom.ffwll.local>
+ <cover.1452782114.git.john@metanate.com>
+ <107bbc36a316ed0ddc7b5a8bcd9b6db6cbc71d4f.1452782114.git.john@metanate.com>
+ <20160114145705.GA24005@ulmo>
+Message-ID: <20160114162619.233ab39c.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 14 Jan 2016 15:57:05 +0100, Thierry Reding wrote:
 
-On Thu, Jan 14, 2016 at 4:31 AM, David Wu <david.wu@rock-chips.com> wrote:
-> There was an timing issue about "repeated start" time at the I2C
-> controller of version0, controller appears to drop SDA at .875x (7/8)
-> programmed clk high. The rule(.875x) isn't enough to meet tSU;STA
-> requirements on 100k's Standard-mode. To resolve this issue,
-> data_upd_st, start_setup_cnt and stop_setup_cnt configs for I2C
-> timing information are added, new rules are designed to calculate
-> the timing information at new v1.
+> On Thu, Jan 14, 2016 at 02:39:42PM +0000, John Keeping wrote:
+> > Signed-off-by: John Keeping <john@metanate.com>
+> > ---
+> >  drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 6 ++++++
+> >  1 file changed, 6 insertions(+)
+> > 
+> > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> > index 679d23a..b267ce4 100644
+> > --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> > @@ -177,6 +177,12 @@ static void rockchip_crtc_wait_for_update(struct drm_crtc *crtc)
+> >  		crtc_funcs->wait_for_update(crtc);
+> >  }
+> >  
+> > +/*
+> > + * We can't use drm_atomic_helper_wait_for_vblanks() because rk3288 and rk3066
+> > + * have hardware counters for neither vblanks nor scanlines.  This function is
+> > + * equivalent but uses rockchip_crtc_wait_for_update() instead of waiting for
+> > + * vblank_count to change.
+> > + */  
+> 
+> This is kind of misleading. From reading earlier parts of the thread the
+> reason why drm_atomic_helper_wait_for_vblanks() won't work is because it
+> has a potential race condition that can't be detected unless you also
+> have a vblank counter. However, the above comment makes it work like
+> drm_atomic_helper_wait_for_vblanks() doesn't work in the absence of a
+> vblank counter, which isn't quite true.
 
-I'm curious: does new hardware behave differently and that's why you
-need v1?  ...or does old and new hardware behave the same and you're
-just introducing v1 so you don't mess with how old boards are working?
+How about something like this (using the sequence from Mark's message):
 
->From the description it sounds as if the old code had problems as 100k too...
-
-If the new controller is different, I'd probably reword like the
-following (you'd have to re-wordwrap):
-
-There was an timing issue about "repeated start" time at the I2C
-controller of version0, controller appears to drop SDA at .875x (7/8)
-programmed clk high. On version 1 of the controller, the rule(.875x)
-isn't enough to meet tSU;STA
-requirements on 100k's Standard-mode. To resolve this issue,
-data_upd_st, start_setup_cnt and stop_setup_cnt configs for I2C
-timing information are added, new rules are designed to calculate
-the timing information at new v1.
-
--Doug
+/*
+ * We can't use drm_atomic_helper_wait_for_vblanks() because rk3288 and rk3066
+ * have hardware counters for neither vblanks nor scanlines, which results in
+ * a race where:
+ *				| <-- HW vsync irq and reg take effect
+ *	       plane_commit --> |
+ *	get_vblank and wait --> |
+ *				| <-- handle_vblank, vblank->count + 1
+ *		 cleanup_fb --> |
+ *		iommu crash --> |
+ *				| <-- HW vsync irq and reg take effect
+ *
+ * This function is equivalent but uses rockchip_crtc_wait_for_update() instead
+ * of waiting for vblank_count to change.
+ */
