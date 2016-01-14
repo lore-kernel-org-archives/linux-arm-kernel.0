@@ -1,56 +1,59 @@
-From: qiuxishi@huawei.com (Xishi Qiu)
-Date: Thu, 14 Jan 2016 20:35:45 +0800
-Subject: Have any influence on set_memory_** about below patch ??
-In-Reply-To: <20160113111806.GC23370@leverpostej>
-References: <5693A740.7070408@huawei.com> <20160111133145.GM6499@leverpostej>
- <569454F6.1060207@huawei.com> <20160112111531.GA4858@leverpostej>
- <5696272E.8090408@huawei.com> <20160113111806.GC23370@leverpostej>
-Message-ID: <56979621.1060102@huawei.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 14 Jan 2016 18:09:10 +0530
+Subject: [PATCH] mmc: host: omap_hsmmc: add a verbose print to enable
+ CONFIG_REGULATOR_PBIAS
+In-Reply-To: <20160114120706.GA12774@earth>
+References: <1452762920-2588-1-git-send-email-kishon@ti.com>
+ <20160114120706.GA12774@earth>
+Message-ID: <569796EE.7030506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/1/13 19:18, Mark Rutland wrote:
+Hi,
 
-> On Wed, Jan 13, 2016 at 06:30:06PM +0800, Xishi Qiu wrote:
->> Hi Mark,
+On Thursday 14 January 2016 05:37 PM, Sebastian Reichel wrote:
+> Hi,
+> 
+> On Thu, Jan 14, 2016 at 02:45:20PM +0530, Kishon Vijay Abraham I wrote:
+>> Since v4.3+, CONFIG_REGULATOR_PBIAS should be enabled (for platforms that
+>> have PBIAS regulator) in order for MMC1 to work.
 >>
->> If I create swapper page tables by 4kb, not large page, then I use
->> set_memory_ro() to change the pate table flag, does it have the problem
->> too?
+>> Add a more verbose print to help enable CONFIG_REGULATOR_PBIAS for users
+>> using a olddefconfig or a custom .config.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>  drivers/mmc/host/omap_hsmmc.c |    5 ++++-
+>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+>> index 7fb0753..7086bd6 100644
+>> --- a/drivers/mmc/host/omap_hsmmc.c
+>> +++ b/drivers/mmc/host/omap_hsmmc.c
+>> @@ -503,8 +503,11 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+>>  	host->pbias = devm_regulator_get_optional(host->dev, "pbias");
+>>  	if (IS_ERR(host->pbias)) {
+>>  		ret = PTR_ERR(host->pbias);
+>> -		if ((ret != -ENODEV) && host->dev->of_node)
+>> +		if ((ret != -ENODEV) && host->dev->of_node) {
+>> +			dev_err(host->dev,
+>> +			"SD card detect fail? enable CONFIG_REGULATOR_PBIAS\n");
+>>  			return ret;
+>> +		}
+>>  		dev_dbg(host->dev, "unable to get pbias regulator %ld\n",
+>>  			PTR_ERR(host->pbias));
+>>  		host->pbias = NULL;
 > 
-> The splitting/merging problem would not apply.
 > 
-> However, you're going to waste a reasonable amount of memory by not
-> using section mappings in the swapper, and we gain additional complexity
-> in the page table setup code (which is shared with others things that
-> want section mappings).
-> 
-> What are you exactly actually trying to achieve?
-> 
+> Is there a good reason against adding "depends on REGULATOR_PBIAS"
+> to MMC_OMAP_HS? I guess it's required for most systems and the regulator
+> driver is just 250 loc. I am aware, that this will disable the
+> hsmmc driver for 'make oldconfig', but I guess that will be noticed
+> in a similar way your warning is noticed.
 
-If module allocates some pages and save data on them, and the data will
-not be changed during the module running. So we want to use set_memory_ro()
-to increase the security. If the data is changed, we can catch someone.
+hmm.. only MMC1 requires PBIAS so I'm not sure if it's okay to add depends on
+REGULATOR_PBIAS for the HSMMC driver as such. And as you said it'll also
+disable the hsmmc driver if oldconfig is used. But do we get a warning?
 
-> What memory do you want to mark RO, and why?
-> 
-
-The key data, and it will not be changed during the running time.
-
->>From a previous discussion [1], we figured out alternative approaches
-> for common cases. Do none of those work for your case?
-> 
-
-I have not read the patchset carefully, could you tell me the general meaning
-of the approaches?
-
-Thanks,
-Xishi Qiu
-
-> Thanks,
-> Mark.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/397320.html
-> 
-> .
-> 
+Thanks
+Kishon
