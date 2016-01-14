@@ -1,118 +1,24 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Thu, 14 Jan 2016 11:09:13 +0100
-Subject: [PATCH v2] reboot: Backup orderly_poweroff
-In-Reply-To: <569767EC.2010704@ti.com>
-References: <1452688405-15087-1-git-send-email-j-keerthy@ti.com>
- <20160114090520.GA4351@gmail.com> <569767EC.2010704@ti.com>
-Message-ID: <20160114100913.GB15857@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Jan 2016 11:14:58 +0100
+Subject: [PATCH] of: drop symbols declared by _OF_DECLARE() from modules
+In-Reply-To: <1452745987-22146-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1452745987-22146-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <34759085.vISMJm6PEF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-* Keerthy <a0393675@ti.com> wrote:
-
-> Hi Ingo,
+On Thursday 14 January 2016 13:33:06 Masahiro Yamada wrote:
 > 
-> On Thursday 14 January 2016 02:35 PM, Ingo Molnar wrote:
-> >
-> >* Keerthy <j-keerthy@ti.com> wrote:
-> >
-> >>orderly_poweroff is triggered when a graceful shutdown
-> >>of system is desired. This may be used in many critical states of the
-> >>kernel such as when subsystems detects conditions such as critical
-> >>temperature conditions. However, in certain conditions in system
-> >>boot up sequences like those in the middle of driver probes being
-> >>initiated, userspace will be unable to power off the system in a clean
-> >>manner and leaves the system in a critical state. In cases like these,
-> >>the /sbin/poweroff will return success (having forked off to attempt
-> >>powering off the system. However, the system overall will fail to
-> >>completely poweroff (since other modules will be probed) and the system
-> >>is still functional with no userspace (since that would have shut itself
-> >>off).
-> >>
-> >>However, there is no clean way of detecting such failure of userspace
-> >>powering off the system. In such scenarios, it is necessary for a backup
-> >>workqueue to be able to force a shutdown of the system when orderly
-> >>shutdown is not successful after a configurable time period.
-> >>
-> >>Signed-off-by: Keerthy <j-keerthy@ti.com>
-> >>Suggested-by: Eduardo Valentin <edubezval@gmail.com>
-> >>Reported-by: Nishanth Menon <nm@ti.com>
-> >>---
-> >>Links to previous discussion can be found here:
-> >>
-> >>http://www.spinics.net/lists/linux-omap/msg124925.html
-> >>
-> >>Boot tested on DRA7.
-> >>
-> >>changes in v2:
-> >>
-> >>	* Changed #ifdef to #if CONFIG_SHUTDOWN_BACKUP_DELAY_MS
-> >>
-> >>  arch/Kconfig    |  7 +++++++
-> >>  kernel/reboot.c | 23 ++++++++++++++++++-----
-> >>  2 files changed, 25 insertions(+), 5 deletions(-)
-> >>
-> >>Index: linux/arch/Kconfig
-> >>===================================================================
-> >>--- linux.orig/arch/Kconfig	2016-01-11 15:26:07.732173131 +0530
-> >>+++ linux/arch/Kconfig	2016-01-11 15:26:07.728173205 +0530
-> >>@@ -37,6 +37,18 @@
-> >>  	def_bool y
-> >>  	depends on PERF_EVENTS && HAVE_PERF_EVENTS_NMI && !PPC64
-> >>
-> >>+config SHUTDOWN_BACKUP_DELAY_MS
-> >>+	int "Backup shutdown delay in milli-seconds"
-> >>+	default 0
-> >>+	help
-> >>+	  The number of milliseconds to delay before backup workqueue
-> >>+	  executes attempting to poweroff the system after the
-> >>+	  orderly_poweroff function has failed to complete.
-> >>+
-> >>+	  If set to 0, the backup workqueue is not active. The value
-> >>+	  should be conservatively configured based on userspace latencies
-> >>+	  expected for a given system.
-> >
-> >I don't really understand this. In what circumstances can a reboot fail?
-> >
-> >I think that is what should be fixed: a reboot should never fail, instead of
-> >introducing some sort of fragile timeout based method.
+> -#ifdef CONFIG_OF
+> +#if defined(CONFIG_OF) && !defined(MODULE)
+>  #define _OF_DECLARE(table, name, compat, fn, fn_type)                  \
+>         static const struct of_device_id __of_table_##name              \
+>                 __used __section(__##table##_of_table)                  \
+> -- 
 > 
-> Here is the complete description of the scenario which was reported by Nishanth 
-> who encountered the issue. The link has bootlogs and description of the exact 
-> case which led to this patch.
-> 
-> http://www.spinics.net/lists/linux-omap/msg124923.html
 
-it's a reply in the middle of a discussion ...
+Doesn't this lead to "unused function" warnings? Maybe we can change the "__used"
+into "__unused" when MODULE is set, so the compiler will automatically
+drop all code that is only referenced from the entry.
 
-What I managed to decode is that this:
-
-static int __orderly_poweroff(bool force)
-{
-        int ret;
-
-        ret = run_cmd(poweroff_cmd);
-
-        if (ret && force) {
-                pr_warn("Failed to start orderly shutdown: forcing the issue\n");
-
-                /*
-                 * I guess this should try to kick off some daemon to sync and
-                 * poweroff asap.  Or not even bother syncing if we're doing an
-                 * emergency shutdown?
-                 */
-                emergency_sync();
-                kernel_power_off();
-        }
-
-        return ret;
-}
-
-could fail to actually power the system off, if the run_cmd(poweroff_cmd) 
-'succeeds', but due to a user-space bug it does not actually call the real 
-poweroff system call?
-
-Thanks,
-
-	Ingo
+	Arnd
