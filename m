@@ -1,198 +1,217 @@
 From: david.wu@rock-chips.com (David Wu)
-Date: Thu, 14 Jan 2016 20:31:36 +0800
-Subject: [PATCH v3 1/4] i2c: rk3x: switch to i2c generic dt parsing
+Date: Thu, 14 Jan 2016 20:31:37 +0800
+Subject: [PATCH v3 2/4] i2c: rk3x: add ops to caculate i2c clocks
 In-Reply-To: <1452774699-57455-1-git-send-email-david.wu@rock-chips.com>
 References: <1452774699-57455-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <1452774699-57455-2-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1452774699-57455-3-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to the new generic functions: i2c_parse_fw_timings().
+From: David Wu <wdc@rock-chips.com>
+
+I2c Controller of rk3x is updated for the rules to caculate clocks.
+So it need a new method to caculate i2c clock timing information
+for new version. The current method is defined as v0, and new is
+v1, next maybe v2......
 
 Signed-off-by: David Wu <david.wu@rock-chips.com>
 ---
-changes in v3:
-- parse timing information with common interface(Wolfram, Andy)
+Changes in v3:
+- use GENMASK(Andy)
+- Too many arguments for ops func, use struct for them(Andy)
 
- drivers/i2c/busses/i2c-rk3x.c | 87 ++++++++++++-------------------------------
- 1 file changed, 24 insertions(+), 63 deletions(-)
+changes in v2:
+- split patch to three patches(Heiko)
+
+ drivers/i2c/busses/i2c-rk3x.c | 80 +++++++++++++++++++++++++++++--------------
+ 1 file changed, 54 insertions(+), 26 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-index 9096d17..1d86e8c 100644
+index 1d86e8c..185e0f9 100644
 --- a/drivers/i2c/busses/i2c-rk3x.c
 +++ b/drivers/i2c/busses/i2c-rk3x.c
-@@ -101,10 +101,7 @@ struct rk3x_i2c {
- 	struct notifier_block clk_rate_nb;
+@@ -58,6 +58,11 @@ enum {
+ #define REG_CON_LASTACK   BIT(5) /* 1: send NACK after last received byte */
+ #define REG_CON_ACTACK    BIT(6) /* 1: stop if NACK is received */
+ 
++#define VERSION_MASK	  GENMASK(31, 16)
++#define VERSION_SHIFT	  16
++
++#define RK3X_I2C_V0	  0x0
++
+ /* REG_MRXADDR bits */
+ #define REG_MRXADDR_VALID(x) BIT(24 + (x)) /* [x*8+7:x*8] of MRX[R]ADDR valid */
+ 
+@@ -90,10 +95,27 @@ struct rk3x_i2c_soc_data {
+ 	int grf_offset;
+ };
+ 
++/**
++ * struct rk3x_priv_i2c_timings - rk3x I2C timing information
++ * @div_low: Divider output for low
++ * @div_high: Divider output for high
++ */
++struct rk3x_priv_i2c_timings {
++	unsigned long div_low;
++	unsigned long div_high;
++};
++
++struct rk3x_i2c_ops {
++	int (*calc_clock)(unsigned long,
++			  struct i2c_timings *,
++			  struct rk3x_priv_i2c_timings *);
++};
++
+ struct rk3x_i2c {
+ 	struct i2c_adapter adap;
+ 	struct device *dev;
+ 	struct rk3x_i2c_soc_data *soc_data;
++	struct rk3x_i2c_ops ops;
+ 
+ 	/* Hardware resources */
+ 	void __iomem *regs;
+@@ -102,6 +124,7 @@ struct rk3x_i2c {
  
  	/* Settings */
--	unsigned int scl_frequency;
--	unsigned int scl_rise_ns;
--	unsigned int scl_fall_ns;
--	unsigned int sda_fall_ns;
-+	struct i2c_timings t;
+ 	struct i2c_timings t;
++	struct rk3x_priv_i2c_timings t_priv;
  
  	/* Synchronization & notification */
  	spinlock_t lock;
-@@ -437,10 +434,7 @@ out:
-  * Calculate divider values for desired SCL frequency
+@@ -431,21 +454,20 @@ out:
+ }
+ 
+ /**
+- * Calculate divider values for desired SCL frequency
++ * Calculate timing clock info values for desired SCL frequency
   *
   * @clk_rate: I2C input clock rate
-- * @scl_rate: Desired SCL rate
-- * @scl_rise_ns: How many ns it takes for SCL to rise.
-- * @scl_fall_ns: How many ns it takes for SCL to fall.
-- * @sda_fall_ns: How many ns it takes for SDA to fall.
-+ * @t_input: Known I2C timing information.
-  * @div_low: Divider output for low
-  * @div_high: Divider output for high
+- * @t_input: Known I2C timing information.
+- * @div_low: Divider output for low
+- * @div_high: Divider output for high
++ * @t_input: Known I2C timing information
++ * @t_output: Caculated rk3x private timing information that would
++ * be written into regs
   *
-@@ -448,11 +442,10 @@ out:
+  * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
   * a best-effort divider value is returned in divs. If the target rate is
   * too high, we silently use the highest possible rate.
   */
--static int rk3x_i2c_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
--			      unsigned long scl_rise_ns,
--			      unsigned long scl_fall_ns,
--			      unsigned long sda_fall_ns,
--			      unsigned long *div_low, unsigned long *div_high)
-+static int rk3x_i2c_calc_divs(unsigned long clk_rate,
-+			      struct i2c_timings *t_input,
-+			      unsigned long *div_low,
-+			      unsigned long *div_high)
+-static int rk3x_i2c_calc_divs(unsigned long clk_rate,
+-			      struct i2c_timings *t_input,
+-			      unsigned long *div_low,
+-			      unsigned long *div_high)
++static int rk3x_i2c_v0_calc_clock(unsigned long clk_rate,
++				  struct i2c_timings *t_input,
++				  struct rk3x_priv_i2c_timings *t_output)
  {
  	unsigned long spec_min_low_ns, spec_min_high_ns;
  	unsigned long spec_setup_start, spec_max_data_hold_ns;
-@@ -472,12 +465,12 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
- 	int ret = 0;
+@@ -553,8 +575,8 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate,
+ 		 * Time needed to meet hold requirements is important.
+ 		 * Just use that.
+ 		 */
+-		*div_low = min_low_div;
+-		*div_high = min_high_div;
++		t_output->div_low = min_low_div;
++		t_output->div_high = min_high_div;
+ 	} else {
+ 		/*
+ 		 * We've got to distribute some time among the low and high
+@@ -583,25 +605,25 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate,
  
- 	/* Only support standard-mode and fast-mode */
--	if (WARN_ON(scl_rate > 400000))
--		scl_rate = 400000;
-+	if (WARN_ON(t_input->bus_freq_hz > 400000))
-+		t_input->bus_freq_hz = 400000;
- 
- 	/* prevent scl_rate_khz from becoming 0 */
--	if (WARN_ON(scl_rate < 1000))
--		scl_rate = 1000;
-+	if (WARN_ON(t_input->bus_freq_hz < 1000))
-+		t_input->bus_freq_hz = 1000;
- 
- 	/*
- 	 * min_low_ns:  The minimum number of ns we need to hold low to
-@@ -491,7 +484,7 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
- 	 *	 This is because the i2c host on Rockchip holds the data line
- 	 *	 for half the low time.
- 	 */
--	if (scl_rate <= 100000) {
-+	if (t_input->bus_freq_hz <= 100000) {
- 		/* Standard-mode */
- 		spec_min_low_ns = 4700;
- 		spec_setup_start = 4700;
-@@ -506,7 +499,7 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
- 		spec_max_data_hold_ns = 900;
- 		data_hold_buffer_ns = 50;
+ 		/* Give low the "ideal" and give high whatever extra is left */
+ 		extra_low_div = ideal_low_div - min_low_div;
+-		*div_low = ideal_low_div;
+-		*div_high = min_high_div + (extra_div - extra_low_div);
++		t_output->div_low = ideal_low_div;
++		t_output->div_high = min_high_div + (extra_div - extra_low_div);
  	}
--	min_high_ns = scl_rise_ns + spec_min_high_ns;
-+	min_high_ns = t_input->scl_rise_ns + spec_min_high_ns;
  
  	/*
- 	 * Timings for repeated start:
-@@ -517,18 +510,19 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
- 	 * we meet tSU;STA and tHD;STA times.
+ 	 * Adjust to the fact that the hardware has an implicit "+1".
+ 	 * NOTE: Above calculations always produce div_low > 0 and div_high > 0.
  	 */
- 	min_high_ns = max(min_high_ns,
--		DIV_ROUND_UP((scl_rise_ns + spec_setup_start) * 1000, 875));
-+		DIV_ROUND_UP((t_input->scl_rise_ns + spec_setup_start) * 1000,
-+			     875));
- 	min_high_ns = max(min_high_ns,
--		DIV_ROUND_UP((scl_rise_ns + spec_setup_start +
--			      sda_fall_ns + spec_min_high_ns), 2));
-+		DIV_ROUND_UP((t_input->scl_rise_ns + spec_setup_start +
-+			      t_input->sda_fall_ns + spec_min_high_ns), 2));
+-	*div_low = *div_low - 1;
+-	*div_high = *div_high - 1;
++	t_output->div_low = t_output->div_low - 1;
++	t_output->div_high = t_output->div_high - 1;
  
--	min_low_ns = scl_fall_ns + spec_min_low_ns;
-+	min_low_ns = t_input->scl_fall_ns + spec_min_low_ns;
- 	max_low_ns = spec_max_data_hold_ns * 2 - data_hold_buffer_ns;
- 	min_total_ns = min_low_ns + min_high_ns;
+ 	/* Maximum divider supported by hw is 0xffff */
+-	if (*div_low > 0xffff) {
+-		*div_low = 0xffff;
++	if (t_output->div_low > 0xffff) {
++		t_output->div_low = 0xffff;
+ 		ret = -EINVAL;
+ 	}
  
- 	/* Adjust to avoid overflow */
- 	clk_rate_khz = DIV_ROUND_UP(clk_rate, 1000);
--	scl_rate_khz = scl_rate / 1000;
-+	scl_rate_khz = t_input->bus_freq_hz / 1000;
+-	if (*div_high > 0xffff) {
+-		*div_high = 0xffff;
++	if (t_output->div_high > 0xffff) {
++		t_output->div_high = 0xffff;
+ 		ret = -EINVAL;
+ 	}
  
- 	/*
- 	 * We need the total div to be >= this number
-@@ -620,10 +614,8 @@ static void rk3x_i2c_adapt_div(struct rk3x_i2c *i2c, unsigned long clk_rate)
+@@ -610,19 +632,21 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate,
+ 
+ static void rk3x_i2c_adapt_div(struct rk3x_i2c *i2c, unsigned long clk_rate)
+ {
+-	unsigned long div_low, div_high;
  	u64 t_low_ns, t_high_ns;
  	int ret;
  
--	ret = rk3x_i2c_calc_divs(clk_rate, i2c->scl_frequency, i2c->scl_rise_ns,
--				 i2c->scl_fall_ns, i2c->sda_fall_ns,
--				 &div_low, &div_high);
--	WARN_ONCE(ret != 0, "Could not reach SCL freq %u", i2c->scl_frequency);
-+	ret = rk3x_i2c_calc_divs(clk_rate, &i2c->t, &div_low, &div_high);
-+	WARN_ONCE(ret != 0, "Could not reach SCL freq %u", i2c->t.bus_freq_hz);
+-	ret = rk3x_i2c_calc_divs(clk_rate, &i2c->t, &div_low, &div_high);
++	ret = i2c->ops.calc_clock(clk_rate, &i2c->t, &i2c->t_priv);
+ 	WARN_ONCE(ret != 0, "Could not reach SCL freq %u", i2c->t.bus_freq_hz);
  
  	clk_enable(i2c->clk);
- 	i2c_writel(i2c, (div_high << 16) | (div_low & 0xffff), REG_CLKDIV);
-@@ -634,7 +626,7 @@ static void rk3x_i2c_adapt_div(struct rk3x_i2c *i2c, unsigned long clk_rate)
+-	i2c_writel(i2c, (div_high << 16) | (div_low & 0xffff), REG_CLKDIV);
++	i2c_writel(i2c, (i2c->t_priv.div_high << 16) |
++		  (i2c->t_priv.div_low & 0xffff), REG_CLKDIV);
+ 	clk_disable(i2c->clk);
+ 
+-	t_low_ns = div_u64(((u64)div_low + 1) * 8 * 1000000000, clk_rate);
+-	t_high_ns = div_u64(((u64)div_high + 1) * 8 * 1000000000, clk_rate);
++	t_low_ns = div_u64(((u64)i2c->t_priv.div_low + 1) * 8 * 1000000000,
++			   clk_rate);
++	t_high_ns = div_u64(((u64)i2c->t_priv.div_high + 1) * 8 * 1000000000,
++			    clk_rate);
  	dev_dbg(i2c->dev,
  		"CLK %lukhz, Req %uns, Act low %lluns high %lluns\n",
  		clk_rate / 1000,
--		1000000000 / i2c->scl_frequency,
-+		1000000000 / i2c->t.bus_freq_hz,
- 		t_low_ns, t_high_ns);
- }
- 
-@@ -664,9 +656,7 @@ static int rk3x_i2c_clk_notifier_cb(struct notifier_block *nb, unsigned long
+@@ -652,12 +676,11 @@ static int rk3x_i2c_clk_notifier_cb(struct notifier_block *nb, unsigned long
+ {
+ 	struct clk_notifier_data *ndata = data;
+ 	struct rk3x_i2c *i2c = container_of(nb, struct rk3x_i2c, clk_rate_nb);
+-	unsigned long div_low, div_high;
  
  	switch (event) {
  	case PRE_RATE_CHANGE:
--		if (rk3x_i2c_calc_divs(ndata->new_rate, i2c->scl_frequency,
--				       i2c->scl_rise_ns, i2c->scl_fall_ns,
--				       i2c->sda_fall_ns,
-+		if (rk3x_i2c_calc_divs(ndata->new_rate, &i2c->t,
- 				       &div_low, &div_high) != 0)
+-		if (rk3x_i2c_calc_divs(ndata->new_rate, &i2c->t,
+-				       &div_low, &div_high) != 0)
++		if (i2c->ops.calc_clock(ndata->new_rate, &i2c->t,
++					&i2c->t_priv) != 0)
  			return NOTIFY_STOP;
  
-@@ -879,37 +869,8 @@ static int rk3x_i2c_probe(struct platform_device *pdev)
- 	match = of_match_node(rk3x_i2c_match, np);
- 	i2c->soc_data = (struct rk3x_i2c_soc_data *)match->data;
+ 		/* scale up */
+@@ -861,6 +884,7 @@ static int rk3x_i2c_probe(struct platform_device *pdev)
+ 	u32 value;
+ 	int irq;
+ 	unsigned long clk_rate;
++	unsigned int version;
  
--	if (of_property_read_u32(pdev->dev.of_node, "clock-frequency",
--				 &i2c->scl_frequency)) {
--		dev_info(&pdev->dev, "using default SCL frequency: %d\n",
--			 DEFAULT_SCL_RATE);
--		i2c->scl_frequency = DEFAULT_SCL_RATE;
--	}
--
--	if (i2c->scl_frequency == 0 || i2c->scl_frequency > 400 * 1000) {
--		dev_warn(&pdev->dev, "invalid SCL frequency specified.\n");
--		dev_warn(&pdev->dev, "using default SCL frequency: %d\n",
--			 DEFAULT_SCL_RATE);
--		i2c->scl_frequency = DEFAULT_SCL_RATE;
--	}
--
--	/*
--	 * Read rise and fall time from device tree. If not available use
--	 * the default maximum timing from the specification.
--	 */
--	if (of_property_read_u32(pdev->dev.of_node, "i2c-scl-rising-time-ns",
--				 &i2c->scl_rise_ns)) {
--		if (i2c->scl_frequency <= 100000)
--			i2c->scl_rise_ns = 1000;
--		else
--			i2c->scl_rise_ns = 300;
--	}
--	if (of_property_read_u32(pdev->dev.of_node, "i2c-scl-falling-time-ns",
--				 &i2c->scl_fall_ns))
--		i2c->scl_fall_ns = 300;
--	if (of_property_read_u32(pdev->dev.of_node, "i2c-sda-falling-time-ns",
--				 &i2c->sda_fall_ns))
--		i2c->sda_fall_ns = i2c->scl_fall_ns;
-+	/* use common interface to get I2C timing properties */
-+	i2c_parse_fw_timings(&pdev->dev, &i2c->t, true);
+ 	i2c = devm_kzalloc(&pdev->dev, sizeof(struct rk3x_i2c), GFP_KERNEL);
+ 	if (!i2c)
+@@ -944,6 +968,10 @@ static int rk3x_i2c_probe(struct platform_device *pdev)
  
- 	strlcpy(i2c->adap.name, "rk3x-i2c", sizeof(i2c->adap.name));
- 	i2c->adap.owner = THIS_MODULE;
+ 	platform_set_drvdata(pdev, i2c);
+ 
++	version = (readl(i2c->regs + REG_CON) & VERSION_MASK) >> VERSION_SHIFT;
++	if (version == RK3X_I2C_V0)
++		i2c->ops.calc_clock = rk3x_i2c_v0_calc_clock;
++
+ 	ret = clk_prepare(i2c->clk);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "Could not prepare clock\n");
 -- 
 1.9.1
