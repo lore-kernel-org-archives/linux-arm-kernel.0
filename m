@@ -1,138 +1,77 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Thu, 14 Jan 2016 12:23:30 -0800
-Subject: [PATCH V2 1/4] clk: bcm2835: avoid the use of BCM2835_CLOCK_COUNT
- in clk-bcm2835
-In-Reply-To: <56979056.6010407@martin.sperl.org>
-References: <1452542157-2387-1-git-send-email-kernel@martin.sperl.org>
- <1452542157-2387-2-git-send-email-kernel@martin.sperl.org>
- <20160113200012.1168.74515@quark.deferred.io>
- <20160114001358.1168.5768@quark.deferred.io>
- <56979056.6010407@martin.sperl.org>
-Message-ID: <20160114202330.1942.96295@quark.deferred.io>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 14 Jan 2016 21:46:10 +0100
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160114201513.GI6357@twins.programming.kicks-ass.net>
+References: <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
+ <20160113104516.GE25458@arm.com> <56969F4B.7070001@imgtec.com>
+ <20160113204844.GV6357@twins.programming.kicks-ass.net>
+ <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
+ <20160114161604.GT3818@linux.vnet.ibm.com>
+ <5697FA0A.6040601@imgtec.com>
+ <20160114201513.GI6357@twins.programming.kicks-ass.net>
+Message-ID: <20160114204610.GA6373@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Martin Sperl (2016-01-14 04:11:02)
+On Thu, Jan 14, 2016 at 09:15:13PM +0100, Peter Zijlstra wrote:
+> On Thu, Jan 14, 2016 at 11:42:02AM -0800, Leonid Yegoshin wrote:
+> > An the only point - please use an appropriate SYNC_* barriers instead of
+> > heavy bold hammer. That stuff was design explicitly to support the
+> > requirements of Documentation/memory-barriers.txt
 > 
+> That's madness. That document changes from version to version as to what
+> we _think_ the actual hardware does. It is _NOT_ a specification.
 > 
-> On 14.01.2016 01:13, Michael Turquette wrote:
-> > Quoting Michael Turquette (2016-01-13 12:00:12)
-> >> Hi Martin,
-> >>
-> >> Quoting kernel at martin.sperl.org (2016-01-11 11:55:53)
-> >>>   static int bcm2835_clk_probe(struct platform_device *pdev)
-> >>>   {
-> >>>          struct device *dev = &pdev->dev;
-> >>>          struct clk **clks;
-> >>> +       size_t clk_cnt;
-> >>>          struct bcm2835_cprman *cprman;
-> >>>          struct resource *res;
-> >>> +       size_t i;
-> >>> +
-> >>> +       /* find the max clock index */
-> >>> +       clk_cnt = BCM2835_CLOCK_PERI_IMAGE; /* see below */
-> >>> +       for (i = 0; i < ARRAY_SIZE(bcm2835_register_clocks); i++)
-> >>> +               clk_cnt = max(clk_cnt, bcm2835_register_clocks[i].index);
-> >>> +       clk_cnt += 1;
-> >>
-> >> I'm not sure how this solution is better than using CLOCK_COUNT. Some
-> >> other bindings use a max value, NR_CLKS or other sentinel.
-> >>
-> >> Why did you not choose to set clk_cnt equal to BCM2835_CLOCK_PWM? Why
-> >> not initialize it to zero?
-> >
-> > OK, I just caught up on the asoc/bcm2835 thread.
-> >
-> > Really the best solution would be to have an array of all of the clks in
-> > the driver and just use ARRAY_SIZE on it.
-> >
-> > For your driver, could you make an array of clk_hw pointers and call
-> > devm_clk_register on all of them in a loop? This gets rid of the big
-> > pile of explicit calls in bcm2835_clk_probe.
-> >
-> > You can also get rid of stuff like bcm2835_plla_core_data by just
-> > stuffing that data into a single struct initialization. Here is a
-> > snippet for how the qcom clk drivers do it:
-> >
-> > static struct clk_pll gpll0 = {
-> >       .l_reg = 0x0004,
-> >       .m_reg = 0x0008,
-> >       .n_reg = 0x000c,
-> >       .config_reg = 0x0014,
-> >       .mode_reg = 0x0000,
-> >       .status_reg = 0x001c,
-> >       .status_bit = 17,
-> >       .clkr.hw.init = &(struct clk_init_data){
-> >               .name = "gpll0",
-> >               .parent_names = (const char *[]){ "xo" },
-> >               .num_parents = 1,
-> >               .ops = &clk_pll_ops,
-> >       },
-> > };
+> You cannot design hardware from that. Its incomplete and fails to
+> specify a bunch of things. It not a mathematically sound definition of a
+> memory model.
 > 
-> I did not know you could do that - that could make life easier...
-> 
-> But a quick look shows that this approach probably would require a
-> major rewrite of all the methods.
-> 
-> > static int bcm2835_clk_probe(struct platform_device *pdev)
-> > {
-> >       ...
-> >       for (i = 0; i < num_clks; i++) {
-> >               clk = devm_clk_register(dev, array_of_clks[i].hw)
-> >       ...
-> > }
-> 
-> I guess I can use a slightly different approach that does not
-> require as many changes, that looks like this:
-> 
-> static const struct bcm2835_clk_desc clk_desc_array[] = {
->         /* register PLL */
->         [BCM2835_PLLA]          = REGISTER_PLL(&bcm2835_plla_data),
->         ...
-> };
-> ...
-> static int bcm2835_clk_probe(struct platform_device *pdev)
-> {
->         const size_t asize = ARRAY_SIZE(clk_desc_array);
->         ...
->         for (i = 0; i < asize; i++) {
->                 desc = &clk_desc_array[i];
->                 if (desc)
->                         clks[i] = desc->clk_register(cprman,
->                                                      desc->data);
+> Please stop referring to that document for what a particular barrier
+> _should_ do.  Explain what MIPS does, so we can attempt to integrate
+> this knowledge with our knowledge of PPC/ARM/Alpha/x86/etc. and improve
+> upon our understanding of hardware and improve the Linux memory model.
 
-Interesting. I have been playing with the idea of putting a .register()
-callback into struct clk_init_data. Then it would be called by a new
-clk_register_desc() top-level registration function.
+That is, if you'd managed to read that file at the right point in time,
+you might have through we'd be OK with requiring a barrier for
+control dependencies.
 
-You've done that here, but you've put the registration function in your
-machine-specific struct. Nothing wrong with that.
+We got rid of that mistake. It was based on a flawed reading of the
+Alpha docs. See: 105ff3cbf225 ("atomic: remove all traces of
+READ_ONCE_CTRL() and atomic*_read_ctrl()")
 
-Do you actually need a machine-specific registration function? Many clk
-drivers only use their machine-specific registration functions to
-allocate a stuct clk_hw and populate the contents of struct
-clk_init_data, which can be done by the framework and reduce duplicate
-code in drivers.
+Similarly, while the document goes to great length to explain the
+read_barrier_depends thing, nobody actually thinks its a brilliant idea
+to have. Ideally we'd kill the thing the moment we drop Alpha support.
 
-(they do this because the basic clk types like clk-divider, clk-gate,
-etc do it, and everyone loves to copy/paste that code)
+Again, memory-barriers.txt is _NOT_, I repeat, _NOT_ a hardware spec, it
+is not even a recommendation. It are our best effort (but flawed)
+scribbles of what we think is makes sense given the huge amount of
+actual hardware we have to run on.
 
-bcm2835 seems to register two clks in the PLL registration function (one
-of which is a fixed factor divider), but you could just add those
-post-PLL dividers to your array of clk data?
 
->         }
->         ...
-> }
-> 
-> If we need to order the initialization then we can add some
-> priority field to clk_desc_array and iterate over all the priority
-> values.
+As to the ACQUIRE/RELEASE semantics, ARM64 actually has
+multi-copy-atomic acquire/release (as does ia64, although in reality it
+doesn't actually have acquire/release). PPC otoh does _NOT_ have this,
+and is currently the only arch to suffer RCpc locks.
 
-I guess that you can order them in your array? Just start with the root
-clocks at the beginning of the array (regardless of "clk type") and walk
-through the array registering them.
+Now for a long long time we assumed our locks were RCsc, and we've
+written code assuming UNLOCK x + LOCK y was in fact a full barrier with
+transitiviy. Then we figured out PPC didn't actually match that. RCU is
+the only piece of code we _know_ relied on that, but there might be more
+out there...
 
-Regards,
-Mike
+So we document, for new code, that UNLOCK+LOCK isn't a MB, while at the
+same time we lobby PPC to stick a full barrier in and get rid of this
+stuff.
+
+Nobody really likes RCpc locks, esp. given the history we have of
+assuming RCsc.
+
+The current document allowing for RCpc is not an endorsement thereof.
+Ideally we'd _NOT_ have to worry about that. We can do without these
+head-aches.
+
+
+So again, stop referring to our document as a spec. Also please don't
+make MIPS push the limits of weak memory models, we really can do
+without the pain.
