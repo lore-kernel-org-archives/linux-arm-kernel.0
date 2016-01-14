@@ -1,84 +1,36 @@
-From: sr@denx.de (Stefan Roese)
-Date: Thu, 14 Jan 2016 08:01:56 +0100
-Subject: [PATCH RFC] spi: orion.c: Add direct write mode
-In-Reply-To: <20160112101358.GY6588@sirena.org.uk>
-References: <1452589339-21402-1-git-send-email-sr@denx.de>
- <20160112101358.GY6588@sirena.org.uk>
-Message-ID: <569747E4.2080402@denx.de>
+From: kvalo@codeaurora.org (Kalle Valo)
+Date: Thu, 14 Jan 2016 09:05:48 +0200
+Subject: [PATCH v4 3/3] wlcore/wl12xx: spi: add wifi support to cm-t335
+In-Reply-To: <20160113172712.GI12777@atomide.com> (Tony Lindgren's message of
+ "Wed, 13 Jan 2016 09:27:12 -0800")
+References: <1451482533-8624-1-git-send-email-uri.mashiach@compulab.co.il>
+ <1451482533-8624-4-git-send-email-uri.mashiach@compulab.co.il>
+ <87io35lq2p.fsf@kamboji.qca.qualcomm.com>
+ <5695E802.7050909@compulab.co.il> <20160113172712.GI12777@atomide.com>
+Message-ID: <87wprcbpyr.fsf@kamboji.qca.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.01.2016 11:13, Mark Brown wrote:
-> On Tue, Jan 12, 2016 at 10:02:19AM +0100, Stefan Roese wrote:
+Tony Lindgren <tony@atomide.com> writes:
+
+>> >>  arch/arm/boot/dts/am335x-cm-t335.dts | 55 ++++++++++++++++++++++++++++++++++++
+>> >>  1 file changed, 55 insertions(+)
+>> > 
+>> > To what tree should this patch go? My wireless-drivers-next tree doesn't
+>> > even have this file.
+>> 
+>> Right. It will hit the mainline during this merge window through Tony's and
+>> arm-soc trees.
+>> 
+>> Do you think it will be sensible if you take 1/3 and 2/3 patches and Tony
+>> will take the 3/3 (there is no code dependency between first two and the last one),
+>> or we can just wait till arm-soc hits the mainline, so you will have the
+>> needed code?
 >
->> +- direct-addr : The phandle to the node containing the base address
->> +                of the direct-mapped MBus window for this SPI device.
->
-> Why are we not just making the MBus window a normal resource on the SPI
-> controller and why do we need to use this only for a single device?  If
-> we can program which device is used then we can just reconfigure
-> whenever we change devices and use this optimisation for everything.
+> Yeah I'll pick the dts changes separately after the merge window as
+> there is no dependency to the driver changes.
 
-Interesting idea. It should be possible to add a dynamic MBus
-window allocation / configuration, similar to what pci-mvebu.c
-does. I'll give it a try to implement this dynamic MBus
-configuration in the next version.
+Ok, I'll then take patches 1 and 2 once the merge window opens.
 
->> +		spidev at 1 {
->> +			compatible = "spidev";
->> +			direct-addr = <&spi0_cs1>;
->> +			reg = <1>;
->> +		};
->
-> This is broken, spidev should never appear in a DT (and the driver will
-> complain loudly if it does).  Describe the actual hardware.
-
-Yes. This was meant just as an example - a quite bad one, I agree.
-I'll change this.
-
->> +	/* Use SPI direct write mode if such an address is provided via DT */
->> +	orion_spi = spi_master_get_devdata(spi->master);
->> +	direct_addr = orion_spi->slave_direct_addr[spi->chip_select];
->> +	if (direct_addr && xfer->tx_buf) {
->> +		/* Deassert CS between the SPI transfers */
->> +		writel(0x00010000, spi_reg(orion_spi,
->> +					   SPI_DIRECT_WRITE_CONFIG_REG));
->
-> This is badly broken, we should be asserting /CS over the entire message
-> unless the individual transfer says otherwise.  I'm surprised this
-> works.
-
-It works, at least on the FPGA that I'm programming the bitstream into
-right now. The reason for deasserting the CS after each SPI transfer
-was, to work around potential problems with concurrent accesses to
-other SPI devices connected to the same SPI controller. Like SPI NOR
-flash devices using the "normal" indirect mode. Deasserting the CS
-seemed like the "safe" way to me here.
-
->> +		/*
->> +		 * Send the tx-data to the SPI device via the direct mapped
->> +		 * address window
->> +		 */
->> +		memcpy(direct_addr, xfer->tx_buf, count);
->
-> What if we are transferring more data than the window mapped in
-> direct_addr
-
-Right, a check is missing here.
-
-> and what if the transfer is bidirectional?  It looks like we
-> can only do this for transmit only transfers.
-
-This patch only adds support for the direct write mode. As the main
-purpose is to speed up the SPI TX throughput for FPGA bitstream
-programming. It could be extended to support also the direct read
-mode. But this would need more configuration options, like the
-number of address-bytes to transfer in each read access. Not sure
-how this should interact with the SPI flash driver from the MTD
-subsystem.
-
-I would prefer to not adding this direct read mode just yet. It
-can be added later, if really needed.
-
-Thanks,
-Stefan
+-- 
+Kalle Valo
