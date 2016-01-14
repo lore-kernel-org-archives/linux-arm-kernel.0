@@ -1,37 +1,76 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 14 Jan 2016 10:02:12 +0100
-Subject: [PATCH -next] arm: Select GPIO_GENERIC_PLATFORM for CRAGG_6410
-In-Reply-To: <1452531649-14940-1-git-send-email-linux@roeck-us.net>
-References: <1452531649-14940-1-git-send-email-linux@roeck-us.net>
-Message-ID: <CACRpkdbH6jCyzJK=LM4mPpdLPrQ4KMkHuedAPfWU4tg1K6FaBQ@mail.gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 14 Jan 2016 10:05:21 +0100
+Subject: [PATCH v2] reboot: Backup orderly_poweroff
+In-Reply-To: <1452688405-15087-1-git-send-email-j-keerthy@ti.com>
+References: <1452688405-15087-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <20160114090520.GA4351@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 6:00 PM, Guenter Roeck <linux@roeck-us.net> wrote:
 
-> Since commit 0f4630f3720e ("gpio: generic: factor into gpio_chip struct"),
-> all users of struct bgpio_pdata depend on GPIO_GENERIC.
->
-> This results in the following build error.
->
-> arch/arm/mach-s3c64xx/mach-crag6410.c:270:3: warning:
->         excess elements in struct initializer
-> arch/arm/mach-s3c64xx/mach-crag6410.c:270:3: warning:
->         (near initialization for '(anonymous)')
-> arch/arm/mach-s3c64xx/mach-crag6410.c:271:2: error:
->         invalid use of undefined type 'struct bgpio_pdata'
->
-> Fixes: 0f4630f3720e ("gpio: generic: factor into gpio_chip struct")
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+* Keerthy <j-keerthy@ti.com> wrote:
+
+> orderly_poweroff is triggered when a graceful shutdown
+> of system is desired. This may be used in many critical states of the
+> kernel such as when subsystems detects conditions such as critical
+> temperature conditions. However, in certain conditions in system
+> boot up sequences like those in the middle of driver probes being
+> initiated, userspace will be unable to power off the system in a clean
+> manner and leaves the system in a critical state. In cases like these,
+> the /sbin/poweroff will return success (having forked off to attempt
+> powering off the system. However, the system overall will fail to
+> completely poweroff (since other modules will be probed) and the system
+> is still functional with no userspace (since that would have shut itself
+> off).
+> 
+> However, there is no clean way of detecting such failure of userspace
+> powering off the system. In such scenarios, it is necessary for a backup
+> workqueue to be able to force a shutdown of the system when orderly
+> shutdown is not successful after a configurable time period.
+> 
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> Suggested-by: Eduardo Valentin <edubezval@gmail.com> 
+> Reported-by: Nishanth Menon <nm@ti.com>
 > ---
-> I don't know if this is the correct way to fix this problem.
-> If not, please consider this to be a bug report.
+> Links to previous discussion can be found here:
+> 
+> http://www.spinics.net/lists/linux-omap/msg124925.html
+> 
+> Boot tested on DRA7.
+> 
+> changes in v2:
+> 
+> 	* Changed #ifdef to #if CONFIG_SHUTDOWN_BACKUP_DELAY_MS
+> 
+>  arch/Kconfig    |  7 +++++++
+>  kernel/reboot.c | 23 ++++++++++++++++++-----
+>  2 files changed, 25 insertions(+), 5 deletions(-)
+> 
+> Index: linux/arch/Kconfig
+> ===================================================================
+> --- linux.orig/arch/Kconfig	2016-01-11 15:26:07.732173131 +0530
+> +++ linux/arch/Kconfig	2016-01-11 15:26:07.728173205 +0530
+> @@ -37,6 +37,18 @@
+>  	def_bool y
+>  	depends on PERF_EVENTS && HAVE_PERF_EVENTS_NMI && !PPC64
+>  
+> +config SHUTDOWN_BACKUP_DELAY_MS
+> +	int "Backup shutdown delay in milli-seconds"
+> +	default 0
+> +	help
+> +	  The number of milliseconds to delay before backup workqueue
+> +	  executes attempting to poweroff the system after the
+> +	  orderly_poweroff function has failed to complete.
+> +
+> +	  If set to 0, the backup workqueue is not active. The value
+> +	  should be conservatively configured based on userspace latencies
+> +	  expected for a given system.
 
-I think this is fixed by Arnds patch:
-http://marc.info/?l=linux-gpio&m=145237423205247&w=2
+I don't really understand this. In what circumstances can a reboot fail?
 
-Can you verify that?
+I think that is what should be fixed: a reboot should never fail, instead of 
+introducing some sort of fragile timeout based method.
 
-Yours,
-Linus Walleij
+Thanks,
+
+	Ingo
