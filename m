@@ -1,30 +1,51 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Thu, 14 Jan 2016 11:15:52 +0100
-Subject: [linux-sunxi][PATCH v3 2/5] ARM: dts: sun7i: Add Itead A20 Core
- support
+Date: Thu, 14 Jan 2016 11:15:53 +0100
+Subject: [linux-sunxi][PATCH v3 3/5] ARM: dts: sun7i: Add Itead Ibox support
 In-Reply-To: <1452766555-16409-1-git-send-email-codekipper@gmail.com>
 References: <1452766555-16409-1-git-send-email-codekipper@gmail.com>
-Message-ID: <1452766555-16409-3-git-send-email-codekipper@gmail.com>
+Message-ID: <1452766555-16409-4-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-The A20 Itead Core module comes with 4GB NAND and 1GB DDR RAM. All of the
-I/O interfaces are exposed via 4 groups of 2*30 1mm pitched female headers.
+The Itead Ibox is a multi board device based on the Allwinner A20 SoC.
+It contains the A20 Itead Core module and a base board for the external
+interfaces.
+
+The core module comes with 4GB NAND and 1GB DDR RAM.
+
+The base board to which the core board is connected provides 3 USB 2.0 Host
+ports, 1 USB 2.0 OTG, 1 uSD slot, 10/100 Ethernet port, HDMI, IR receiver,
+SPDIF and a 32-pin GPIO header. This header expands the features of core
+board by exposing the VGA pins, audio In/Out pins, SATA, SPI, I2C, UARTS,
+USB-OTG and power.
 
 Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
- arch/arm/boot/dts/sun7i-a20-itead-core.dtsi | 87 +++++++++++++++++++++++++++++
- 1 file changed, 87 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-itead-core.dtsi
+ arch/arm/boot/dts/Makefile                 |   1 +
+ arch/arm/boot/dts/sun7i-a20-itead-ibox.dts | 124 +++++++++++++++++++++++++++++
+ 2 files changed, 125 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-itead-core.dtsi b/arch/arm/boot/dts/sun7i-a20-itead-core.dtsi
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index da910b2..5c5e8f4 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -638,6 +638,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-cubieboard2.dtb \
+ 	sun7i-a20-cubietruck.dtb \
+ 	sun7i-a20-hummingbird.dtb \
++	sun7i-a20-itead-ibox.dtb \
+ 	sun7i-a20-i12-tvbox.dtb \
+ 	sun7i-a20-icnova-swac.dtb \
+ 	sun7i-a20-m3.dtb \
+diff --git a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
 new file mode 100644
-index 0000000..db8c0f9
+index 0000000..66b8dec
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun7i-a20-itead-core.dtsi
-@@ -0,0 +1,87 @@
++++ b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+@@ -0,0 +1,124 @@
 +/*
 + * Copyright 2015 - Marcus Cooper <codekipper@gmail.com>
 + *
@@ -67,50 +88,87 @@ index 0000000..db8c0f9
 + *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+#include "sun7i-a20.dtsi"
-+#include "sunxi-itead-core-common.dtsi"
++/dts-v1/;
++#include "sun7i-a20-itead-core.dtsi"
 +
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
-+};
++/ {
++	model = "Itead Ibox A20";
++	compatible = "itead,itead_ibox_a20", "allwinner,sun7i-a20";
 +
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_itead_core>;
 +
-+	axp209: pmic at 34 {
-+		reg = <0x34>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++		green {
++			label = "itead_core:green:usr";
++			gpios = <&pio 7 20 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++
++		blue {
++			label = "itead_core:blue:usr";
++			gpios = <&pio 7 21 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
 +	};
 +};
 +
-+#include "axp209.dtsi"
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpu";
++&ahci {
++	target-supply = <&reg_ahci_5v>;
++	status = "okay";
 +};
 +
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-int-dll";
++&codec {
++	status = "okay";
 +};
 +
-+&reg_ldo1 {
-+	regulator-name = "vdd-rtc";
++&gmac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&gmac_pins_mii_a>;
++	phy = <&phy1>;
++	phy-mode = "mii";
++	status = "okay";
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++	};
 +};
 +
-+&reg_ldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "avcc";
++&ir0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&ir0_rx_pins_a>;
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
++	cd-inverted;
++	status = "okay";
++};
++
++&pio {
++	led_pins_itead_core: led_pins at 0 {
++		allwinner,pins = "PH20","PH21";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&reg_ahci_5v {
++	status = "okay";
++};
++
++&spi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi0_pins_a>,
++		    <&spi0_cs0_pins_a>;
++	status = "okay";
 +};
 -- 
 2.7.0
