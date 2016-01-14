@@ -1,212 +1,225 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Thu, 14 Jan 2016 15:19:56 +0200
-Subject: [PATCH v3 2/4] i2c: rk3x: add ops to caculate i2c clocks
-In-Reply-To: <1452774699-57455-3-git-send-email-david.wu@rock-chips.com>
-References: <1452774699-57455-1-git-send-email-david.wu@rock-chips.com>
- <1452774699-57455-3-git-send-email-david.wu@rock-chips.com>
-Message-ID: <CAHp75VdR01_suo3nTWuuT2OEusy6z6KGSg29LKD8T3kY9eGMPA@mail.gmail.com>
+From: xuejiancheng@huawei.com (xuejiancheng)
+Date: Thu, 14 Jan 2016 21:16:15 +0800
+Subject: [PATCH v5 1/6] clk: hisilicon: add CRG driver for hi3519 soc
+In-Reply-To: <20160113185707.1168.85601@quark.deferred.io>
+References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
+ <1452219400-32478-2-git-send-email-xuejiancheng@huawei.com>
+ <20160112221211.GB22188@codeaurora.org> <5695BE65.3070409@huawei.com>
+ <20160113185707.1168.85601@quark.deferred.io>
+Message-ID: <56979F9F.5080201@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 2:31 PM, David Wu <david.wu@rock-chips.com> wrote:
-> From: David Wu <wdc@rock-chips.com>
->
-> I2c Controller of rk3x is updated for the rules to caculate clocks.
-> So it need a new method to caculate i2c clock timing information
-> for new version. The current method is defined as v0, and new is
-> v1, next maybe v2......
+Hi Mike,
 
-Thanks for an update. My comments below.
+On 2016/1/14 2:57, Michael Turquette wrote:
+> Quoting xuejiancheng (2016-01-12 19:03:01)
+>> Hi Stephen,
+>>    Thank you very much for your reply.
+>>
+>> On 2016/1/13 6:12, Stephen Boyd wrote:
+>>> On 01/08, Jiancheng Xue wrote:
+>>>> diff --git a/drivers/clk/hisilicon/Kconfig b/drivers/clk/hisilicon/Kconfig
+>>>> index e434854..b6baebf 100644
+>>>> --- a/drivers/clk/hisilicon/Kconfig
+>>>> +++ b/drivers/clk/hisilicon/Kconfig
+>>>> @@ -1,3 +1,10 @@
+>>>> +config COMMON_CLK_HI3519
+>>>> +    tristate "Clock Driver for Hi3519"
+>>>
+>>> It looks like this has to be bool. Otherwise it needs to be a
+>>> platform driver and the hisilicon APIs need to be exported and
+>>> lose their __init markings.
+>>>
+>> Yes,it's a problem. I will fix it in next version. Thank you.
+> 
+> The best solution would be to make this clock driver a real platform
+> driver.
+> 
+Now the work clock of the clocksource timer-sp804 is provided by this driver. So
+it need to be registered early by CLK_OF_DECLARE. If the timer clock is treated
+as a fixed-clock provider, this driver can be implemented as a platform driver.
+Then the crg device must be registered before other clock consumer devices.Accordingly
+the crg device node must be written above all other clock consumer devices node in dts files.
+I think it is also a dependence.
 
-> --- a/drivers/i2c/busses/i2c-rk3x.c
-> +++ b/drivers/i2c/busses/i2c-rk3x.c
+Can you help me understand why it is better to make this driver a platform driver?
+Thank you very much!
 
-> @@ -90,10 +95,27 @@ struct rk3x_i2c_soc_data {
->         int grf_offset;
->  };
->
-> +/**
-> + * struct rk3x_priv_i2c_timings - rk3x I2C timing information
-> + * @div_low: Divider output for low
-> + * @div_high: Divider output for high
-> + */
-> +struct rk3x_priv_i2c_timings {
-> +       unsigned long div_low;
-> +       unsigned long div_high;
-> +};
-> +
-> +struct rk3x_i2c_ops {
-> +       int (*calc_clock)(unsigned long,
-> +                         struct i2c_timings *,
-> +                         struct rk3x_priv_i2c_timings *);
-> +};
-> +
->  struct rk3x_i2c {
->         struct i2c_adapter adap;
->         struct device *dev;
->         struct rk3x_i2c_soc_data *soc_data;
-> +       struct rk3x_i2c_ops ops;
-
-Not much sense for now to have a struct for one member.
-
->
->         /* Hardware resources */
->         void __iomem *regs;
-> @@ -102,6 +124,7 @@ struct rk3x_i2c {
->
-
-What about
-      /* I2C timing settings */
-      struct i2c_timings t;
-
-      /* Divider settings */
-      int (*calc_divs)(unsigned long,
-                        struct i2c_timings *,
-                        unsigned long *div_low,
-                        unsigned long *div_high);
-      unsigned long div_low;
-      unsigned long div_high;
-?
-
-As far as I understand you still calculate divider values.
-
->
->         /* Synchronization & notification */
->         spinlock_t lock;
-> @@ -431,21 +454,20 @@ out:
->  }
->
->  /**
-> - * Calculate divider values for desired SCL frequency
-> + * Calculate timing clock info values for desired SCL frequency
->   *
->   * @clk_rate: I2C input clock rate
-> - * @t_input: Known I2C timing information.
-> - * @div_low: Divider output for low
-> - * @div_high: Divider output for high
-
-For now seems better to leave this prototype.
-
-> + * @t_input: Known I2C timing information
-> + * @t_output: Caculated rk3x private timing information that would
-> + * be written into regs
->   *
->   * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
->   * a best-effort divider value is returned in divs. If the target rate is
->   * too high, we silently use the highest possible rate.
->   */
-> -static int rk3x_i2c_calc_divs(unsigned long clk_rate,
-> -                             struct i2c_timings *t_input,
-> -                             unsigned long *div_low,
-> -                             unsigned long *div_high)
-> +static int rk3x_i2c_v0_calc_clock(unsigned long clk_rate,
-> +                                 struct i2c_timings *t_input,
-> +                                 struct rk3x_priv_i2c_timings *t_output)
->  {
->         unsigned long spec_min_low_ns, spec_min_high_ns;
->         unsigned long spec_setup_start, spec_max_data_hold_ns;
-
-
-> @@ -583,25 +605,25 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate,
->
->                 /* Give low the "ideal" and give high whatever extra is left */
->                 extra_low_div = ideal_low_div - min_low_div;
-> -               *div_low = ideal_low_div;
-> -               *div_high = min_high_div + (extra_div - extra_low_div);
-> +               t_output->div_low = ideal_low_div;
-> +               t_output->div_high = min_high_div + (extra_div - extra_low_div);
->         }
->
->         /*
->          * Adjust to the fact that the hardware has an implicit "+1".
->          * NOTE: Above calculations always produce div_low > 0 and div_high > 0.
->          */
-> -       *div_low = *div_low - 1;
-> -       *div_high = *div_high - 1;
-> +       t_output->div_low = t_output->div_low - 1;
-
--= 1
-
-> +       t_output->div_high = t_output->div_high - 1;
-
-Ditto.
-
-But without change of prototype those no needed.
-
->
->         /* Maximum divider supported by hw is 0xffff */
-> -       if (*div_low > 0xffff) {
-> -               *div_low = 0xffff;
-> +       if (t_output->div_low > 0xffff) {
-> +               t_output->div_low = 0xffff;
->                 ret = -EINVAL;
->         }
->
-> -       if (*div_high > 0xffff) {
-> -               *div_high = 0xffff;
-> +       if (t_output->div_high > 0xffff) {
-> +               t_output->div_high = 0xffff;
->                 ret = -EINVAL;
->         }
->
-> @@ -610,19 +632,21 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate,
->
->  static void rk3x_i2c_adapt_div(struct rk3x_i2c *i2c, unsigned long clk_rate)
->  {
-> -       unsigned long div_low, div_high;
->         u64 t_low_ns, t_high_ns;
->         int ret;
->
-> -       ret = rk3x_i2c_calc_divs(clk_rate, &i2c->t, &div_low, &div_high);
-> +       ret = i2c->ops.calc_clock(clk_rate, &i2c->t, &i2c->t_priv);
->         WARN_ONCE(ret != 0, "Could not reach SCL freq %u", i2c->t.bus_freq_hz);
->
->         clk_enable(i2c->clk);
-> -       i2c_writel(i2c, (div_high << 16) | (div_low & 0xffff), REG_CLKDIV);
-> +       i2c_writel(i2c, (i2c->t_priv.div_high << 16) |
-> +                 (i2c->t_priv.div_low & 0xffff), REG_CLKDIV);
->         clk_disable(i2c->clk);
->
-> -       t_low_ns = div_u64(((u64)div_low + 1) * 8 * 1000000000, clk_rate);
-> -       t_high_ns = div_u64(((u64)div_high + 1) * 8 * 1000000000, clk_rate);
-> +       t_low_ns = div_u64(((u64)i2c->t_priv.div_low + 1) * 8 * 1000000000,
-> +                          clk_rate);
-> +       t_high_ns = div_u64(((u64)i2c->t_priv.div_high + 1) * 8 * 1000000000,
-> +                           clk_rate);
->         dev_dbg(i2c->dev,
->                 "CLK %lukhz, Req %uns, Act low %lluns high %lluns\n",
->                 clk_rate / 1000,
-> @@ -652,12 +676,11 @@ static int rk3x_i2c_clk_notifier_cb(struct notifier_block *nb, unsigned long
->  {
->         struct clk_notifier_data *ndata = data;
->         struct rk3x_i2c *i2c = container_of(nb, struct rk3x_i2c, clk_rate_nb);
-> -       unsigned long div_low, div_high;
->
->         switch (event) {
->         case PRE_RATE_CHANGE:
-> -               if (rk3x_i2c_calc_divs(ndata->new_rate, &i2c->t,
-> -                                      &div_low, &div_high) != 0)
-> +               if (i2c->ops.calc_clock(ndata->new_rate, &i2c->t,
-> +                                       &i2c->t_priv) != 0)
->                         return NOTIFY_STOP;
->
->                 /* scale up */
-> @@ -861,6 +884,7 @@ static int rk3x_i2c_probe(struct platform_device *pdev)
->         u32 value;
->         int irq;
->         unsigned long clk_rate;
-> +       unsigned int version;
-
-No need to have a separate variable?
-
-> +       version = (readl(i2c->regs + REG_CON) & VERSION_MASK) >> VERSION_SHIFT;
-> +       if (version == RK3X_I2C_V0)
-> +               i2c->ops.calc_clock = rk3x_i2c_v0_calc_clock;
-
-value = readl(i2c->regs + REG_CON);
-if ((value & VERSION_MASK) >> VERSION_SHIFT) == RK3X_I2C_V0)
-  i2c->ops.calc_clock = rk3x_i2c_v0_calc_clock;
-
--- 
-With Best Regards,
-Andy Shevchenko
+> Regards,
+> Mike
+> 
+>>
+>>>> +    depends on ARCH_HISI
+>>>> +    default y
+>>>> +    help
+>>>> +      Build the clock driver for hi3519.
+>>>> +
+>>>>  config COMMON_CLK_HI6220
+>>>>      bool "Hi6220 Clock Driver"
+>>>>      depends on ARCH_HISI || COMPILE_TEST
+>>>> diff --git a/drivers/clk/hisilicon/clk-hi3519.c b/drivers/clk/hisilicon/clk-hi3519.c
+>>>> new file mode 100644
+>>>> index 0000000..72d3a7b0
+>>>> --- /dev/null
+>>>> +++ b/drivers/clk/hisilicon/clk-hi3519.c
+>>>> @@ -0,0 +1,105 @@
+>>>> +
+>>>> +#define HI3519_FIXED_24M    (HI3519_EXT_CLKS + 1)
+>>>> +#define HI3519_FIXED_50M    (HI3519_EXT_CLKS + 2)
+>>>> +#define HI3519_FIXED_75M    (HI3519_EXT_CLKS + 3)
+>>>> +#define HI3519_FIXED_125M   (HI3519_EXT_CLKS + 4)
+>>>> +#define HI3519_FIXED_150M   (HI3519_EXT_CLKS + 5)
+>>>> +#define HI3519_FIXED_200M   (HI3519_EXT_CLKS + 6)
+>>>> +#define HI3519_FIXED_250M   (HI3519_EXT_CLKS + 7)
+>>>> +#define HI3519_FIXED_300M   (HI3519_EXT_CLKS + 8)
+>>>> +#define HI3519_FIXED_400M   (HI3519_EXT_CLKS + 9)
+>>>> +#define HI3519_FMC_MUX              (HI3519_EXT_CLKS + 10)
+>>>> +
+>>>> +#define HI3519_NR_CLKS      128
+>>>
+>>> Is this the same clock provider as the external clocks? I don't
+>>> understand why we're offsetting the clock numbering if we have
+>>> different providers. And if these are truly fixed clocks (except
+>>> for the mux) perhaps they're not even provided by this hardware
+>>> block, and are clocks that come from the board? If that's true
+>>> then I would expect them to be described in DT as fixed rate
+>>> clocks.
+>>>
+>> External clocks mentioned here are used directly as work clocks of other modules.
+>> Clocks defined in this file (internal clocks) are used as parents of external
+>> clocks. Internal clocks won't be referred by dts files and are just used in this driver.
+>> So they are moved here from the header file.
+>>
+>> External clocks and internal clocks are all generated by this CRG block. The input clock
+>> of the CRG block is always connected to a crystal oscillator on the board. So only one
+>> clock provider is defined here.
+>>
+>> Some clocks generated by CRG won't change their rate during the system running. These clocks
+>> are treated as fixed clocks here.
+>>
+>>>> +
+>>>> +static struct hisi_fixed_rate_clock hi3519_fixed_rate_clks[] __initdata = {
+>>>> +    { HI3519_FIXED_3M, "3m", NULL, CLK_IS_ROOT, 3000000, },
+>>>> +    { HI3519_FIXED_24M, "24m", NULL, CLK_IS_ROOT, 24000000, },
+>>>> +    { HI3519_FIXED_50M, "50m", NULL, CLK_IS_ROOT, 50000000, },
+>>>> +    { HI3519_FIXED_75M, "75m", NULL, CLK_IS_ROOT, 75000000, },
+>>>> +    { HI3519_FIXED_125M, "125m", NULL, CLK_IS_ROOT, 125000000, },
+>>>> +    { HI3519_FIXED_150M, "150m", NULL, CLK_IS_ROOT, 150000000, },
+>>>> +    { HI3519_FIXED_200M, "200m", NULL, CLK_IS_ROOT, 200000000, },
+>>>> +    { HI3519_FIXED_250M, "250m", NULL, CLK_IS_ROOT, 250000000, },
+>>>> +    { HI3519_FIXED_300M, "300m", NULL, CLK_IS_ROOT, 300000000, },
+>>>> +    { HI3519_FIXED_400M, "400m", NULL, CLK_IS_ROOT, 400000000, },
+>>>> +};
+>>>> +
+>>>> +static const char *fmc_mux_p[] __initconst = {
+>>>
+>>> const char * const ?
+>>>
+>>
+>> OK.
+>>
+>>>> +            "24m", "75m", "125m", "150m", "200m", "250m", "300m", "400m", };
+>>>> +static u32 fmc_mux_table[] = {0, 1, 2, 3, 4, 5, 6, 7};
+>>>> +
+>>>> +static struct hisi_mux_clock hi3519_mux_clks[] __initdata = {
+>>>> +    { HI3519_FMC_MUX, "fmc_mux", fmc_mux_p, ARRAY_SIZE(fmc_mux_p),
+>>>> +            CLK_SET_RATE_PARENT, 0xc0, 2, 3, 0, fmc_mux_table, },
+>>>> +};
+>>>> +
+>>>> +static struct hisi_gate_clock hi3519_gate_clks[] __initdata = {
+>>>
+>>> We should look into making these things const.
+>>>
+>> OK. I'll add this in next version.
+>>
+>>>> +    /* fmc */
+>>>> +    { HI3519_FMC_CLK, "clk_fmc", "fmc_mux",
+>>>> +            CLK_SET_RATE_PARENT, 0xc0, 1, 0, },
+>>>> +    /* uart */
+>>>> +    { HI3519_UART0_CLK, "clk_uart0", "24m",
+>>>> +            CLK_SET_RATE_PARENT, 0xe4, 20, 0, },
+>>>> +    { HI3519_UART1_CLK, "clk_uart1", "24m",
+>>>> +            CLK_SET_RATE_PARENT, 0xe4, 21, 0, },
+>>>> +    { HI3519_UART2_CLK, "clk_uart2", "24m",
+>>>> +            CLK_SET_RATE_PARENT, 0xe4, 22, 0, },
+>>>> +    { HI3519_UART3_CLK, "clk_uart3", "24m",
+>>>> +            CLK_SET_RATE_PARENT, 0xe4, 23, 0, },
+>>>> +    { HI3519_UART4_CLK, "clk_uart4", "24m",
+>>>> +            CLK_SET_RATE_PARENT, 0xe4, 24, 0, },
+>>>> +    { HI3519_SPI0_CLK, "clk_spi0", "50m",
+>>>> +            CLK_SET_RATE_PARENT, 0xe4, 16, 0, },
+>>>> +    { HI3519_SPI1_CLK, "clk_spi1", "50m",
+>>>> +            CLK_SET_RATE_PARENT, 0xe4, 17, 0, },
+>>>> +    { HI3519_SPI2_CLK, "clk_spi2", "50m",
+>>>> +            CLK_SET_RATE_PARENT, 0xe4, 18, 0, },
+>>>> +};
+>>>> +
+>>>> +static void __init hi3519_clk_init(struct device_node *np)
+>>>> +{
+>>>> +    struct hisi_clock_data *clk_data;
+>>>> +
+>>>> +
+>>>> +    clk_data = hisi_clk_init(np, HI3519_NR_CLKS);
+>>>> +    if (!clk_data)
+>>>> +            return;
+>>>> +
+>>>> +    hisi_clk_register_fixed_rate(hi3519_fixed_rate_clks,
+>>>> +                                 ARRAY_SIZE(hi3519_fixed_rate_clks),
+>>>> +                                 clk_data);
+>>>> +    hisi_clk_register_mux(hi3519_mux_clks, ARRAY_SIZE(hi3519_mux_clks),
+>>>> +                                    clk_data);
+>>>> +    hisi_clk_register_gate(hi3519_gate_clks,
+>>>> +                    ARRAY_SIZE(hi3519_gate_clks), clk_data);
+>>>> +
+>>>> +    hisi_reset_init(np);
+>>>> +}
+>>>> +
+>>>> +CLK_OF_DECLARE(hi3519_clk, "hisilicon,hi3519-crg", hi3519_clk_init);
+>>>> diff --git a/drivers/clk/hisilicon/reset.h b/drivers/clk/hisilicon/reset.h
+>>>> new file mode 100644
+>>>> index 0000000..37856089
+>>>> --- /dev/null
+>>>> +++ b/drivers/clk/hisilicon/reset.h
+>>>> @@ -0,0 +1,32 @@
+>>>> +/*
+>>>> + * Copyright (c) 2015 HiSilicon Technologies Co., Ltd.
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or modify
+>>>> + * it under the terms of the GNU General Public License as published by
+>>>> + * the Free Software Foundation; either version 2 of the License, or
+>>>> + * (at your option) any later version.
+>>>> + *
+>>>> + * This program is distributed in the hope that it will be useful,
+>>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>>> + * GNU General Public License for more details.
+>>>> + *
+>>>> + * You should have received a copy of the GNU General Public License
+>>>> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
+>>>> + */
+>>>> +
+>>>> +#ifndef     __HISI_RESET_H
+>>>> +#define     __HISI_RESET_H
+>>>> +
+>>>> +#include <linux/of.h>
+>>>
+>>> Drop this include and forward declare struct device_node instead.
+>>>
+>>
+>> OK.
+>>
+>>>> +
+>>>> +#ifdef CONFIG_RESET_CONTROLLER
+>>>> +int __init hisi_reset_init(struct device_node *np);
+>>>
+>>> We don't need __init in header files.
+>>>
+>> OK. I'll remove it. Thank you.
+>>
+>> Jiancheng
+>> .
+>>
+> 
+> .
+> 
