@@ -1,148 +1,72 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu, 14 Jan 2016 20:23:04 +0300
-Subject: [PATCH v6 07/21] thread: move thread bits accessors to separated file
-In-Reply-To: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1452792198-10718-8-git-send-email-ynorov@caviumnetworks.com>
+From: k.debski@samsung.com (Kamil Debski)
+Date: Thu, 14 Jan 2016 18:25:26 +0100
+Subject: [PATCH v3 2/2] s5p-mfc: add the support of
+ V4L2_CID_MPEG_VIDEO_FORCE_I_FRAME.
+In-Reply-To: <1452783007-80883-3-git-send-email-wuchengli@chromium.org>
+References: <1452783007-80883-1-git-send-email-wuchengli@chromium.org>
+ <1452783007-80883-3-git-send-email-wuchengli@chromium.org>
+Message-ID: <00b301d14ef0$8f51df00$adf59d00$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-They may be accessed from low-level code, so isolating is a measure to
-avoid circular dependencies in header files.
+Hi,
 
-The exact reason for circular dependency is WARN_ON() macro added by Al
-Viro in patch "set_restore_sigmask() is never called without SIGPENDING
-(and never should be)" [edd63a27]
+> From: Wu-Cheng Li [mailto:wuchengli at chromium.org]
+> Sent: Thursday, January 14, 2016 3:50 PM
+> To: pawel at osciak.com; mchehab at osg.samsung.com; hverkuil at xs4all.nl;
+> k.debski at samsung.com; crope at iki.fi; standby24x7 at gmail.com;
+> wuchengli at chromium.org; nicolas.dufresne at collabora.com;
+> ricardo.ribalda at gmail.com; ao2 at ao2.it; bparrot at ti.com;
+> kyungmin.park at samsung.com; jtp.park at samsung.com
+> Cc: linux-media at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
+> api at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> tiffany.lin at mediatek.com; djkurtz at chromium.org
+> Subject: [PATCH v3 2/2] s5p-mfc: add the support of
+> V4L2_CID_MPEG_VIDEO_FORCE_I_FRAME.
 
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
----
- include/linux/thread_bits.h | 55 +++++++++++++++++++++++++++++++++++++++++++++
- include/linux/thread_info.h | 44 +-----------------------------------
- 2 files changed, 56 insertions(+), 43 deletions(-)
- create mode 100644 include/linux/thread_bits.h
+However simple the patch is, please do provide a commit message.
+Please write something. 
 
-diff --git a/include/linux/thread_bits.h b/include/linux/thread_bits.h
-new file mode 100644
-index 0000000..0d05d16
---- /dev/null
-+++ b/include/linux/thread_bits.h
-@@ -0,0 +1,55 @@
-+
-+/* thread_bits.h: common low-level thread bits accessors */
-+
-+#ifndef _LINUX_THREAD_BITS_H
-+#define _LINUX_THREAD_BITS_H
-+
-+#ifndef __ASSEMBLY__
-+
-+#include <linux/bitops.h>
-+#include <asm/thread_info.h>
-+
-+/*
-+ * flag set/clear/test wrappers
-+ * - pass TIF_xxxx constants to these functions
-+ */
-+
-+static inline void set_ti_thread_flag(struct thread_info *ti, int flag)
-+{
-+	set_bit(flag, (unsigned long *)&ti->flags);
-+}
-+
-+static inline void clear_ti_thread_flag(struct thread_info *ti, int flag)
-+{
-+	clear_bit(flag, (unsigned long *)&ti->flags);
-+}
-+
-+static inline int test_and_set_ti_thread_flag(struct thread_info *ti, int flag)
-+{
-+	return test_and_set_bit(flag, (unsigned long *)&ti->flags);
-+}
-+
-+static inline int test_and_clear_ti_thread_flag(struct thread_info *ti, int flag)
-+{
-+	return test_and_clear_bit(flag, (unsigned long *)&ti->flags);
-+}
-+
-+static inline int test_ti_thread_flag(struct thread_info *ti, int flag)
-+{
-+	return test_bit(flag, (unsigned long *)&ti->flags);
-+}
-+
-+#define set_thread_flag(flag) \
-+	set_ti_thread_flag(current_thread_info(), flag)
-+#define clear_thread_flag(flag) \
-+	clear_ti_thread_flag(current_thread_info(), flag)
-+#define test_and_set_thread_flag(flag) \
-+	test_and_set_ti_thread_flag(current_thread_info(), flag)
-+#define test_and_clear_thread_flag(flag) \
-+	test_and_clear_ti_thread_flag(current_thread_info(), flag)
-+#define test_thread_flag(flag) \
-+	test_ti_thread_flag(current_thread_info(), flag)
-+
-+#endif /* !__ASSEMBLY__ */
-+#endif /* _LINUX_THREAD_BITS_H */
-+
-diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
-index ff307b5..c905fec 100644
---- a/include/linux/thread_info.h
-+++ b/include/linux/thread_info.h
-@@ -50,8 +50,7 @@ struct restart_block {
- 
- extern long do_no_restart_syscall(struct restart_block *parm);
- 
--#include <linux/bitops.h>
--#include <asm/thread_info.h>
-+#include <linux/thread_bits.h>
- 
- #ifdef __KERNEL__
- 
-@@ -61,47 +60,6 @@ extern long do_no_restart_syscall(struct restart_block *parm);
- # define THREADINFO_GFP		(GFP_KERNEL | __GFP_NOTRACK)
- #endif
- 
--/*
-- * flag set/clear/test wrappers
-- * - pass TIF_xxxx constants to these functions
-- */
--
--static inline void set_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	set_bit(flag, (unsigned long *)&ti->flags);
--}
--
--static inline void clear_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	clear_bit(flag, (unsigned long *)&ti->flags);
--}
--
--static inline int test_and_set_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	return test_and_set_bit(flag, (unsigned long *)&ti->flags);
--}
--
--static inline int test_and_clear_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	return test_and_clear_bit(flag, (unsigned long *)&ti->flags);
--}
--
--static inline int test_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	return test_bit(flag, (unsigned long *)&ti->flags);
--}
--
--#define set_thread_flag(flag) \
--	set_ti_thread_flag(current_thread_info(), flag)
--#define clear_thread_flag(flag) \
--	clear_ti_thread_flag(current_thread_info(), flag)
--#define test_and_set_thread_flag(flag) \
--	test_and_set_ti_thread_flag(current_thread_info(), flag)
--#define test_and_clear_thread_flag(flag) \
--	test_and_clear_ti_thread_flag(current_thread_info(), flag)
--#define test_thread_flag(flag) \
--	test_ti_thread_flag(current_thread_info(), flag)
--
- #define tif_need_resched() test_thread_flag(TIF_NEED_RESCHED)
- 
- #if defined TIF_RESTORE_SIGMASK && !defined HAVE_SET_RESTORE_SIGMASK
--- 
-2.5.0
+Best wishes,
+Kamil
+
+> Signed-off-by: Wu-Cheng Li <wuchengli@chromium.org>
+> ---
+>  drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+> b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+> index 0434f02..974b4c5 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+> @@ -212,6 +212,14 @@ static struct mfc_control controls[] = {
+>  		.menu_skip_mask = 0,
+>  	},
+>  	{
+> +		.id = V4L2_CID_MPEG_VIDEO_FORCE_I_FRAME,
+> +		.type = V4L2_CTRL_TYPE_BUTTON,
+> +		.minimum = 0,
+> +		.maximum = 0,
+> +		.step = 0,
+> +		.default_value = 0,
+> +	},
+> +	{
+>  		.id = V4L2_CID_MPEG_VIDEO_VBV_SIZE,
+>  		.type = V4L2_CTRL_TYPE_INTEGER,
+>  		.minimum = 0,
+> @@ -1423,6 +1431,10 @@ static int s5p_mfc_enc_s_ctrl(struct v4l2_ctrl
+*ctrl)
+>  	case V4L2_CID_MPEG_MFC51_VIDEO_FORCE_FRAME_TYPE:
+>  		ctx->force_frame_type = ctrl->val;
+>  		break;
+> +	case V4L2_CID_MPEG_VIDEO_FORCE_I_FRAME:
+> +		ctx->force_frame_type =
+> +
+> 	V4L2_MPEG_MFC51_VIDEO_FORCE_FRAME_TYPE_I_FRAME;
+> +		break;
+>  	case V4L2_CID_MPEG_VIDEO_VBV_SIZE:
+>  		p->vbv_size = ctrl->val;
+>  		break;
+> --
+> 2.6.0.rc2.230.g3dd15c0
