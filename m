@@ -1,55 +1,73 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 14 Jan 2016 13:45:02 +0100
-Subject: [PATCH 1/2] ARM: dts: rockchip: increase vdd_arm voltage for
- rk3066a-rayeager board
-In-Reply-To: <1452774860-16572-1-git-send-email-andy.yan@rock-chips.com>
-References: <1452774780-16493-1-git-send-email-andy.yan@rock-chips.com>
- <1452774860-16572-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1709463.R522kSjgXB@phil>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Thu, 14 Jan 2016 12:46:05 +0000
+Subject: [PATCH v2 1/2] regulator: act8945a: add regulator driver for
+ ACT8945A
+In-Reply-To: <87a8o82xq3.fsf@dell.be.48ers.dk>
+References: <1452586629-1117-1-git-send-email-wenyou.yang@atmel.com>
+ <1452586629-1117-2-git-send-email-wenyou.yang@atmel.com>
+ <87oacp5zl7.fsf@dell.be.48ers.dk>
+ <B256D81BAE5131468A838E5D7A243641D63EBC6E@penmbx01>
+ <87egdk39ji.fsf@dell.be.48ers.dk>
+ <B256D81BAE5131468A838E5D7A243641D63EBEC7@penmbx01>
+ <87a8o82xq3.fsf@dell.be.48ers.dk>
+Message-ID: <B256D81BAE5131468A838E5D7A243641D63EC13F@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+Hi Peter,
 
-Am Donnerstag, 14. Januar 2016, 20:34:20 schrieb Andy Yan:
-> The current vdd_arm voltage is too low, increase it will make
-> the system more stable.
+> -----Original Message-----
+> From: Peter Korsgaard [mailto:jacmet at gmail.com] On Behalf Of Peter Korsgaard
+> Sent: 2016?1?14? 19:43
+> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
+> Cc: Liam Girdwood <lgirdwood@gmail.com>; Mark Brown <broonie@kernel.org>;
+> Rob Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>; Mark
+> Rutland <mark.rutland@arm.com>; Ian Campbell <ijc+devicetree@hellion.org.uk>;
+> Kumar Gala <galak@codeaurora.org>; Krzysztof Kozlowski
+> <k.kozlowski@samsung.com>; devicetree at vger.kernel.org; Ferre, Nicolas
+> <Nicolas.FERRE@atmel.com>; linux-kernel at vger.kernel.org; Javier Martinez
+> Canillas <javier@dowhile0.org>; Lee Jones <lee.jones@linaro.org>; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 1/2] regulator: act8945a: add regulator driver for
+> ACT8945A
 > 
-> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-> ---
+> >>>>> "Yang," == Yang, Wenyou <Wenyou.Yang@atmel.com> writes:
 > 
->  arch/arm/boot/dts/rk3066a-rayeager.dts | 8 ++++++++
->  1 file changed, 8 insertions(+)
+> Hi,
 > 
-> diff --git a/arch/arm/boot/dts/rk3066a-rayeager.dts
-> b/arch/arm/boot/dts/rk3066a-rayeager.dts index 0bf6876..3d4c104 100644
-> --- a/arch/arm/boot/dts/rk3066a-rayeager.dts
-> +++ b/arch/arm/boot/dts/rk3066a-rayeager.dts
-> @@ -159,6 +159,14 @@
+> >>
+>  >>> Isn't the regulator part of the act8945a identical to act8865? Can't we just
+> use  >>> the existing act8865-regulator.c driver? (E.G. support 8865 variant in the
+> mfd  >>> driver, but only register the regulator sub device?)  >>  >> > Yes, the
+> regulator part of the act8945a is identical to act8865.
+>  >>
+>  >> > But the act8865-regulator driver is a struct i2c_driver, and the mfd  > sub-
+>   >> device driver is a platform_driver driver, it is not easy to use  > it.
+>  >>
+>  >> But the mfd driver could support the act8865 variant as well (by only
+> registering  >> the regulator mfd cell).
 > 
->  &cpu0 {
->  	cpu0-supply = <&vdd_arm>;
-> +	operating-points = <
-> +		/* kHz    uV */
-> +		1008000 1125000
-> +		816000  1125000
-> +		600000  1100000
-> +		504000  1100000
-> +		312000  1075000
-> +	>;
->  };
+>  > I still don't understand.
 > 
->  &emac {
+>  > The MFD sub device is registered as a platform device, the existing  > act8865
+> driver is registered as an i2c_driver. How do they match? :)
+> 
+>  > Could you point out which exiting driver for me to reference.  Thank you!
+> 
+> What I'm saying is that it isn't nice that we end up with both act8865-regulator.c
+> and act8954-regulator.c doing 95% the same. This can either be fixed by:
+> 
+> - Adding act8865 support to your mfd driver (but only registering the
+>   regulator subdev for act8865) and changing the existing
+>   act8865-regulator driver to work as a mfd subdev (platform device)
+> 
+> - Extending the act8865-regulator driver to register as a platform
+>   driver in ADDITION to a i2c driver so it can be used with mfd. The
+>   driver already uses regmap so it should only be a matter of adding the
+>   pdev probe/remove functions.
 
-Does this only apply to the rayeager-board / px2 soc or for all rk3066a/px2 
-boards? I.e. the original values come from some sdk kernel and I might've 
-transcribed that wrong at the time and I remember having problems trying to 
-reach higher frequencies as well.
-
-So could you check what the full operating points looks like for both and if 
-this can move to the rk3066a.dtsi, as both should be able to reach at least 
-1.4GHz / 1.6GHz.
+Thank you for so detail information, I will do as you said.
 
 
-Thanks
-Heiko
+Thanks & Best Regards,
+Wenyou Yang
