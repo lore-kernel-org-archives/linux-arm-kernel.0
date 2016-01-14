@@ -1,76 +1,41 @@
-From: zlim.lnx@gmail.com (Zi Shen Lim)
-Date: Wed, 13 Jan 2016 23:33:22 -0800
-Subject: [PATCH 2/2] arm64: bpf: add extra pass to handle faulty codegen
-In-Reply-To: <1452756802-16511-1-git-send-email-zlim.lnx@gmail.com>
-References: <1452756802-16511-1-git-send-email-zlim.lnx@gmail.com>
-Message-ID: <1452756802-16511-2-git-send-email-zlim.lnx@gmail.com>
+From: heiko.carstens@de.ibm.com (Heiko Carstens)
+Date: Thu, 14 Jan 2016 08:57:20 +0100
+Subject: [PATCH v2 0/6] generic relative extable support
+In-Reply-To: <CAKv+Gu8WW7opaa2ck9kEP91BF=amBo=jejcjnKQB1DgLWvtK3w@mail.gmail.com>
+References: <1452007180-27411-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu8WW7opaa2ck9kEP91BF=amBo=jejcjnKQB1DgLWvtK3w@mail.gmail.com>
+Message-ID: <20160114075720.GB4073@osiris>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code generation functions in arch/arm64/kernel/insn.c previously
-BUG_ON invalid parameters. Following change of that behavior, now we
-need to handle the error case where AARCH64_BREAK_FAULT is returned.
+On Mon, Jan 11, 2016 at 02:59:46PM +0100, Ard Biesheuvel wrote:
+> On 5 January 2016 at 16:19, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > There are currently four architectures (x86, ia64, alpha and s390) whose
+> > user-access exception tables are relative to the table entry address rather
+> > than absolute. Each of these architectures has its own search_extable() and
+> > sort_extable() implementation, which are not only mostly identical to each
+> > other, but also deviate very little from the generic absolute implementations
+> > in lib/extable.c that they override.
+> >
+> > So before making arm64 the fifth architecture that reimplements this, let's
+> > refactor the existing code so that all of these architectures use common code
+> > for searching and sorting the relative extables. Archs may set
+> > ARCH_HAS_RELATIVE_EXTABLE to indicate that the table consists of a pair of
+> > relative ints, and may define swap_ex_entry_fixup() if the fixup member needs
+> > special treatment in the swapping step of the sorting routine (such as alpha).
+> >
+> 
+> [...]
+> 
+> Now that I have collected acks for all the patches, I think this is
+> good to go in.
+> 
+> @Andrew: since this touches 5 different architectures, is this perhaps
+> something that could go in via your tree after -rc1?
+> (assuming that the s390 bugfix has been merged by then)
 
-Instead of error-handling on every emit() in JIT, we add a new
-validation pass at the end of JIT compilation. There's no point in
-running JITed code at run-time only to trap due to AARCH64_BREAK_FAULT.
-Instead, we drop this failed JIT compilation and allow the system to
-gracefully fallback on the BPF interpreter.
+Your s390 bugfix has been merged.  See git commit id bcb7825a77f4 ("s390:
+fix normalization bug in exception table sorting").
 
-Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
-Suggested-by: Alexei Starovoitov <ast@kernel.org>
----
-Per discussion here: http://www.spinics.net/lists/arm-kernel/msg474179.html
-
-arch/arm64/net/bpf_jit_comp.c | 22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index d6a53ef..d66bc1f 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -1,7 +1,7 @@
- /*
-  * BPF JIT compiler for ARM64
-  *
-- * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
-+ * Copyright (C) 2014-2016 Zi Shen Lim <zlim.lnx@gmail.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -726,6 +726,20 @@ static int build_body(struct jit_ctx *ctx)
- 	return 0;
- }
- 
-+static int validate_code(struct jit_ctx *ctx)
-+{
-+	int i;
-+
-+	for (i = 0; i < ctx->idx; i++) {
-+		u32 a64_insn = le32_to_cpu(ctx->image[i]);
-+
-+		if (a64_insn == AARCH64_BREAK_FAULT)
-+			return -1;
-+	}
-+
-+	return 0;
-+}
-+
- static inline void bpf_flush_icache(void *start, void *end)
- {
- 	flush_icache_range((unsigned long)start, (unsigned long)end);
-@@ -788,6 +802,12 @@ void bpf_int_jit_compile(struct bpf_prog *prog)
- 
- 	build_epilogue(&ctx);
- 
-+	/* 3. Extra pass to validate JITed code. */
-+	if (validate_code(&ctx)) {
-+		bpf_jit_binary_free(header);
-+		goto out;
-+	}
-+
- 	/* And we're done. */
- 	if (bpf_jit_enable > 1)
- 		bpf_jit_dump(prog->len, image_size, 2, ctx.image);
--- 
-1.9.1
+Thanks,
+Heiko
