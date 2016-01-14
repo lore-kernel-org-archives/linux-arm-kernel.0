@@ -1,111 +1,69 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 14 Jan 2016 14:46:15 -0700
-Subject: [PATCH V8 21/23] perf tools: adding perf_evlist to *info_priv_size()
+Date: Thu, 14 Jan 2016 14:46:08 -0700
+Subject: [PATCH V8 14/23] coresight: etb10: moving to local atomic operations
 In-Reply-To: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1452807977-8069-22-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1452807977-8069-15-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some architecture the size of the private header may
-be dependent on the number of tracers used in the session.  As
-such adding a "struct perf_evlist *" parameter, which should
-contain all the required information.
+Moving to use local atomic operations to take advantage of the
+lockless implementation, something that will come handy when
+the ETB is accessed from the Perf subsystem. Also changing the
+name of the variable to something more meaningful.
 
-Also adjusting the existing client of the interface to take
-the new parameter into account.
-
-Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- tools/perf/arch/x86/util/intel-bts.c | 4 +++-
- tools/perf/arch/x86/util/intel-pt.c  | 4 +++-
- tools/perf/util/auxtrace.c           | 7 ++++---
- tools/perf/util/auxtrace.h           | 6 ++++--
- 4 files changed, 14 insertions(+), 7 deletions(-)
+ drivers/hwtracing/coresight/coresight-etb10.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/tools/perf/arch/x86/util/intel-bts.c b/tools/perf/arch/x86/util/intel-bts.c
-index 9b94ce520917..4685a40777cc 100644
---- a/tools/perf/arch/x86/util/intel-bts.c
-+++ b/tools/perf/arch/x86/util/intel-bts.c
-@@ -60,7 +60,9 @@ struct branch {
- 	u64 misc;
- };
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index 1301edc44629..09e306361e4f 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -10,6 +10,7 @@
+  * GNU General Public License for more details.
+  */
  
--static size_t intel_bts_info_priv_size(struct auxtrace_record *itr __maybe_unused)
-+static size_t
-+intel_bts_info_priv_size(struct auxtrace_record *itr __maybe_unused,
-+			 struct perf_evlist *evlist __maybe_unused)
- {
- 	return INTEL_BTS_AUXTRACE_PRIV_SIZE;
- }
-diff --git a/tools/perf/arch/x86/util/intel-pt.c b/tools/perf/arch/x86/util/intel-pt.c
-index b02af064f0f9..e5c1f2e21f87 100644
---- a/tools/perf/arch/x86/util/intel-pt.c
-+++ b/tools/perf/arch/x86/util/intel-pt.c
-@@ -273,7 +273,9 @@ intel_pt_pmu_default_config(struct perf_pmu *intel_pt_pmu)
- 	return attr;
- }
++#include <asm/local.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/init.h>
+@@ -71,7 +72,7 @@
+  * @csdev:	component vitals needed by the framework.
+  * @miscdev:	specifics to handle "/dev/xyz.etb" entry.
+  * @spinlock:	only one at a time pls.
+- * @in_use:	synchronise user space access to etb buffer.
++ * @reading:	synchronise user space access to etb buffer.
+  * @buf:	area of memory where ETB buffer content gets sent.
+  * @buffer_depth: size of @buf.
+  * @enable:	this ETB is being used.
+@@ -84,7 +85,7 @@ struct etb_drvdata {
+ 	struct coresight_device	*csdev;
+ 	struct miscdevice	miscdev;
+ 	spinlock_t		spinlock;
+-	atomic_t		in_use;
++	local_t			reading;
+ 	u8			*buf;
+ 	u32			buffer_depth;
+ 	bool			enable;
+@@ -277,7 +278,7 @@ static int etb_open(struct inode *inode, struct file *file)
+ 	struct etb_drvdata *drvdata = container_of(file->private_data,
+ 						   struct etb_drvdata, miscdev);
  
--static size_t intel_pt_info_priv_size(struct auxtrace_record *itr __maybe_unused)
-+static size_t
-+intel_pt_info_priv_size(struct auxtrace_record *itr __maybe_unused,
-+			struct perf_evlist *evlist __maybe_unused)
- {
- 	return INTEL_PT_AUXTRACE_PRIV_SIZE;
- }
-diff --git a/tools/perf/util/auxtrace.c b/tools/perf/util/auxtrace.c
-index 7f10430af39c..cc1c9ce5cc56 100644
---- a/tools/perf/util/auxtrace.c
-+++ b/tools/perf/util/auxtrace.c
-@@ -478,10 +478,11 @@ void auxtrace_heap__pop(struct auxtrace_heap *heap)
- 			 heap_array[last].ordinal);
- }
+-	if (atomic_cmpxchg(&drvdata->in_use, 0, 1))
++	if (local_cmpxchg(&drvdata->reading, 0, 1))
+ 		return -EBUSY;
  
--size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr)
-+size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr,
-+				       struct perf_evlist *evlist)
+ 	dev_dbg(drvdata->dev, "%s: successfully opened\n", __func__);
+@@ -313,7 +314,7 @@ static int etb_release(struct inode *inode, struct file *file)
  {
- 	if (itr)
--		return itr->info_priv_size(itr);
-+		return itr->info_priv_size(itr, evlist);
+ 	struct etb_drvdata *drvdata = container_of(file->private_data,
+ 						   struct etb_drvdata, miscdev);
+-	atomic_set(&drvdata->in_use, 0);
++	local_set(&drvdata->reading, 0);
+ 
+ 	dev_dbg(drvdata->dev, "%s: released\n", __func__);
  	return 0;
- }
- 
-@@ -852,7 +853,7 @@ int perf_event__synthesize_auxtrace_info(struct auxtrace_record *itr,
- 	int err;
- 
- 	pr_debug2("Synthesizing auxtrace information\n");
--	priv_size = auxtrace_record__info_priv_size(itr);
-+	priv_size = auxtrace_record__info_priv_size(itr, session->evlist);
- 	ev = zalloc(sizeof(struct auxtrace_info_event) + priv_size);
- 	if (!ev)
- 		return -ENOMEM;
-diff --git a/tools/perf/util/auxtrace.h b/tools/perf/util/auxtrace.h
-index b86f90db1352..e5a8e2d4f2af 100644
---- a/tools/perf/util/auxtrace.h
-+++ b/tools/perf/util/auxtrace.h
-@@ -293,7 +293,8 @@ struct auxtrace_record {
- 	int (*recording_options)(struct auxtrace_record *itr,
- 				 struct perf_evlist *evlist,
- 				 struct record_opts *opts);
--	size_t (*info_priv_size)(struct auxtrace_record *itr);
-+	size_t (*info_priv_size)(struct auxtrace_record *itr,
-+				 struct perf_evlist *evlist);
- 	int (*info_fill)(struct auxtrace_record *itr,
- 			 struct perf_session *session,
- 			 struct auxtrace_info_event *auxtrace_info,
-@@ -429,7 +430,8 @@ int auxtrace_parse_snapshot_options(struct auxtrace_record *itr,
- int auxtrace_record__options(struct auxtrace_record *itr,
- 			     struct perf_evlist *evlist,
- 			     struct record_opts *opts);
--size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr);
-+size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr,
-+				       struct perf_evlist *evlist);
- int auxtrace_record__info_fill(struct auxtrace_record *itr,
- 			       struct perf_session *session,
- 			       struct auxtrace_info_event *auxtrace_info,
 -- 
 2.1.4
