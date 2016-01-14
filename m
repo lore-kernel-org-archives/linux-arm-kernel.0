@@ -1,58 +1,39 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 14 Jan 2016 09:09:59 -0500
-Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <20160114140038.GE2071@e104818-lin.cambridge.arm.com>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <20160114134440.GA8520@xora-haswell.xora.org.uk>
- <20160114140038.GE2071@e104818-lin.cambridge.arm.com>
-Message-ID: <1452780599.28109.5.camel@redhat.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 14 Jan 2016 19:41:09 +0530
+Subject: [PATCH v3 0/3] dra7xx: get pcie working in mainline
+Message-ID: <1452780672-14339-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-01-14 at 14:00 +0000, Catalin Marinas wrote:
-> On Thu, Jan 14, 2016 at 01:44:40PM +0000, Graeme Gregory wrote:
-> > On Wed, Jan 13, 2016 at 02:20:46PM +0100, Tomasz Nowicki wrote:
-> > > From the functionality point of view this series might be split into the
-> > > following logic parts:
-> > > 1. Make MMCONFIG code arch-agnostic which allows all architectures to collect
-> > > ???PCI config regions and used when necessary.
-> > > 2. Move non-arch specific bits to the core code.
-> > > 3. Use MMCONFIG code and implement generic ACPI based PCI host controller driver.
-> > > 4. Enable above driver on ARM64
-> > > 
-> > > Patches has been built on top of 4.4 and can be found here:
-> > > git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v3)
-> > > 
-> > > NOTE, this patch set depends on Matthew's patches:
-> > > http://www.spinics.net/lists/linux-pci/msg45950.html
-> > > https://github.com/Vality/linux/tree/pci-fixes
-> > > 
-> > > This has been tested on Cavium ThunderX server and QEMU.
-> > > Any help in reviewing and testing is very appreciated.
-> > 
-> > I have tested this on my AMD Overdrive so
-> > 
-> > Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
-> > 
-> > But to actually get my r8169 network card working I also need the
-> > following patch.
-> > 
-> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> > index 2fbf840..40e24e2 100644
-> > --- a/drivers/pci/probe.c
-> > +++ b/drivers/pci/probe.c
-> > @@ -1717,7 +1717,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
-> > ????????set_dev_node(&dev->dev, pcibus_to_node(bus));
-> > ????????dev->dev.dma_mask = &dev->dma_mask;
-> > ????????dev->dev.dma_parms = &dev->dma_parms;
-> > -???????dev->dev.coherent_dma_mask = 0xffffffffull;
-> > +???????dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
-> > ????????pci_dma_configure(dev);
-> > 
-> > ????????pci_set_dma_max_seg_size(dev, 65536);
-> 
-> With OF, we get the coherent_dma_mask set by of_dma_configure(). But I
-> have no idea how you do this with ACPI.
-> 
-That doesn't get called for a PCI device (not listed in DT) does it?
+This series adds pdata-quirk mechanism to reset PCIe as a temporary
+fix till reset controller driver is added in mainline.
+
+Without this series, a stall is observed if pci dra7xx driver
+is enabled.
+
+Changes from v2:
+*) Now assert reset line during driver removal (will be useful
+   when module insert/removal functionality is added)
+*) Added kernel-doc comments for pci_dra7xx_platform_data
+*) Better commit logs
+*) Misc cleanup
+
+Changes from v1:
+*) Removed 'HACK' from $subject
+*) removed reviewed-by Suman
+
+Kishon Vijay Abraham I (3):
+  ARM: DRA7: hwmod: Add reset data for PCIe
+  ARM: DRA7: add pdata-quirks to do reset of PCIe
+  pci: dra7xx: use pdata callbacks to perform reset
+
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c |   15 +++++++
+ arch/arm/mach-omap2/pdata-quirks.c        |   11 +++++
+ arch/arm/mach-omap2/prm7xx.h              |    1 +
+ drivers/pci/host/pci-dra7xx.c             |   66 +++++++++++++++++++++++++++++
+ include/linux/platform_data/pci-dra7xx.h  |   29 +++++++++++++
+ 5 files changed, 122 insertions(+)
+ create mode 100644 include/linux/platform_data/pci-dra7xx.h
+
+-- 
+1.7.9.5
