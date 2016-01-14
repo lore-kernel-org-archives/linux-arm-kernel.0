@@ -1,77 +1,31 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 14 Jan 2016 22:11:09 +0200
-Subject: [4.4-rc6-rt1 PATCH 0/2] ARM: am437x: boot test report
-In-Reply-To: <5696B025.8020909@ti.com>
-References: <1451325611-21678-1-git-send-email-grygorii.strashko@ti.com>
- <20160112171556.GB31009@linutronix.de> <569637ED.1030304@ti.com>
- <5696B025.8020909@ti.com>
-Message-ID: <569800DD.7090102@ti.com>
+From: Leonid.Yegoshin@imgtec.com (Leonid Yegoshin)
+Date: Thu, 14 Jan 2016 12:12:53 -0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160114120445.GB15828@arm.com>
+References: <56945366.2090504@imgtec.com>
+ <20160112092711.GP6344@twins.programming.kicks-ass.net>
+ <20160112102555.GV6373@twins.programming.kicks-ass.net>
+ <20160112104012.GW6373@twins.programming.kicks-ass.net>
+ <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
+ <20160113104516.GE25458@arm.com> <56969F4B.7070001@imgtec.com>
+ <20160113204844.GV6357@twins.programming.kicks-ass.net>
+ <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
+Message-ID: <56980145.5030901@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+On 01/14/2016 04:04 AM, Will Deacon wrote:
+> Consequently, it's important that the architecture back-ends implement 
+> these portable primitives (e.g. smp_mb()) in a way that satisfies the 
+> kernel memory model so that core code doesn't need to worry about the 
+> underlying architecture for synchronisation purposes.
 
-On 01/13/2016 10:14 PM, Grygorii Strashko wrote:
-> On 01/13/2016 01:41 PM, Grygorii Strashko wrote:
->> On 01/12/2016 07:15 PM, Sebastian Andrzej Siewior wrote:
->>> * Grygorii Strashko | 2015-12-28 20:00:09 [+0200]:
->>>
->>>
->>>> 3) Seems there are some problem with HIGHMEM :(. System crashes if I'm trying
->>>>      to run hackbench (see log 1). I can run hackbench only if HIGHMEM is disabled.
->>>>      I've also tried to disable CONFIG_CPU_SW_DOMAIN_PAN, CONFIG_ARM_PATCH_PHYS_VIRT,
->>>>      and CONFIG_CPUSETS, before disabling HIGHMEM.
->>>>      Sorry, I'll not able to investigate it further because of Christmas holidays here.
->>>
->>> I see. It seems not to trigger anything on x86.
->>
->> Yah. I saw other reports - it seems this issue is not triggered on ARM SMP also
->> (as per report from Tim Sander). Will try to dig deeper.
->>
-> 
-> I did more tests, but still don't know what is wrong.
-> 1) vanilla 4.4 - no issue
-> 2) 4.4-rt: CONFIG_PREEMPT_RT_BASE=n and CONFIG_PREEMPT_RT_FULL=n -- no issue
-> 3) 4.4-rt: CONFIG_DEBUG_HIGHMEM=y -- issue is present log1
-> 4) 4.4-rt: this is interesting ;)
-> I can run hackbench few times without issues If I run hackbench with RT priority (log2)
-> But I got crash immediately once I run it using non-RT priorities.
+It seems you don't listen me. I said multiple times - MIPS 
+implementation of SYNC_RMB/SYNC_WMB/SYNC_MB/SYNC_ACQUIRE/SYNC_RELEASE 
+instructions matches the description of 
+smp_rmb/smp_wmb/smp_mb/sync_acquire/sync_release from 
+Documentation/memory-barriers.txt file.
 
+What else do you want from me - RTL or microArch design for that?
 
-Seems I've found root cause of the issue - FIX_KMAP_BEGIN offset need to be taken into
-account in switch_kmaps() and below diff fixes this issue for me.
-What I'm not fully understand is why I'm the only one who hit this issue :(
-New functionality was added by commit:
-commit a5f4c561b3b19a9bc43a81da6382b0098ebbc1fb
-    ARM: 8415/1: early fixmap support for earlycon
-
-and it is enabled by default.
-
-Luckiness :(
-
-diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-index deabc36..b9b4f9c 100644
---- a/arch/arm/mm/highmem.c
-+++ b/arch/arm/mm/highmem.c
-@@ -167,7 +167,7 @@ void switch_kmaps(struct task_struct *prev_p, struct task_struct *next_p)
-         * Clear @prev's kmap_atomic mappings
-         */
-        for (i = 0; i < prev_p->kmap_idx; i++) {
--               int idx = i + KM_TYPE_NR * smp_processor_id();
-+               int idx = FIX_KMAP_BEGIN + i + KM_TYPE_NR * smp_processor_id();
- 
-                set_fixmap_pte(idx, __pte(0));
-        }
-@@ -175,7 +175,7 @@ void switch_kmaps(struct task_struct *prev_p, struct task_struct *next_p)
-         * Restore @next_p's kmap_atomic mappings
-         */
-        for (i = 0; i < next_p->kmap_idx; i++) {
--               int idx = i + KM_TYPE_NR * smp_processor_id();
-+               int idx = FIX_KMAP_BEGIN + i + KM_TYPE_NR * smp_processor_id();
- 
-                if (!pte_none(next_p->kmap_pte[i]))
-                        set_fixmap_pte(idx, next_p->kmap_pte[i]);
-
--- 
-regards,
--grygorii
+- Leonid.
