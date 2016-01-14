@@ -1,51 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 14 Jan 2016 12:04:45 +0000
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <5696BA6E.4070508@imgtec.com>
-References: <56945366.2090504@imgtec.com>
- <20160112092711.GP6344@twins.programming.kicks-ass.net>
- <20160112102555.GV6373@twins.programming.kicks-ass.net>
- <20160112104012.GW6373@twins.programming.kicks-ass.net>
- <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
- <20160113104516.GE25458@arm.com> <56969F4B.7070001@imgtec.com>
- <20160113204844.GV6357@twins.programming.kicks-ass.net>
- <5696BA6E.4070508@imgtec.com>
-Message-ID: <20160114120445.GB15828@arm.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 14 Jan 2016 13:07:06 +0100
+Subject: [PATCH] mmc: host: omap_hsmmc: add a verbose print to enable
+ CONFIG_REGULATOR_PBIAS
+In-Reply-To: <1452762920-2588-1-git-send-email-kishon@ti.com>
+References: <1452762920-2588-1-git-send-email-kishon@ti.com>
+Message-ID: <20160114120706.GA12774@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 12:58:22PM -0800, Leonid Yegoshin wrote:
-> On 01/13/2016 12:48 PM, Peter Zijlstra wrote:
-> >On Wed, Jan 13, 2016 at 11:02:35AM -0800, Leonid Yegoshin wrote:
-> >
-> >>I ask HW team about it but I have a question - has it any relationship with
-> >>replacing MIPS SYNC with lightweight SYNCs (SYNC_WMB etc)?
-> >Of course. If you cannot explain the semantics of the primitives you
-> >introduce, how can we judge the patch.
-> >
-> >
-> You missed a point - it is a question about replacement of SYNC with
-> lightweight primitives. It is NOT a question about multithread system
-> behavior without any SYNC. The answer on a latest Will's question lies in
-> different area.
+Hi,
 
-The reason we (Peter and I) care about this isn't because we enjoy being
-obstructive. It's because there is a whole load of core (i.e. portable)
-kernel code that is written to the *kernel* memory model. For example,
-the scheduler, RCU, mutex implementations, perf, drivers, you name it.
+On Thu, Jan 14, 2016 at 02:45:20PM +0530, Kishon Vijay Abraham I wrote:
+> Since v4.3+, CONFIG_REGULATOR_PBIAS should be enabled (for platforms that
+> have PBIAS regulator) in order for MMC1 to work.
+> 
+> Add a more verbose print to help enable CONFIG_REGULATOR_PBIAS for users
+> using a olddefconfig or a custom .config.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/mmc/host/omap_hsmmc.c |    5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index 7fb0753..7086bd6 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -503,8 +503,11 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+>  	host->pbias = devm_regulator_get_optional(host->dev, "pbias");
+>  	if (IS_ERR(host->pbias)) {
+>  		ret = PTR_ERR(host->pbias);
+> -		if ((ret != -ENODEV) && host->dev->of_node)
+> +		if ((ret != -ENODEV) && host->dev->of_node) {
+> +			dev_err(host->dev,
+> +			"SD card detect fail? enable CONFIG_REGULATOR_PBIAS\n");
+>  			return ret;
+> +		}
+>  		dev_dbg(host->dev, "unable to get pbias regulator %ld\n",
+>  			PTR_ERR(host->pbias));
+>  		host->pbias = NULL;
 
-Consequently, it's important that the architecture back-ends implement
-these portable primitives (e.g. smp_mb()) in a way that satisfies the
-kernel memory model so that core code doesn't need to worry about the
-underlying architecture for synchronisation purposes. You could turn
-around and say "but if MIPS gets it wrong, then that's MIPS's problem",
-but actually not having a general understanding of the ordering guarantees
-provided by each architecture makes it very difficult for us to extend
-the kernel memory model in such a way that it can be implemented
-efficiently across the board *and* relied upon by core code.
 
-The virtio patch at the start of the thread doesn't particularly concern
-me. It's the other patches you linked to that implement acquire/release
-that have me worried.
+Is there a good reason against adding "depends on REGULATOR_PBIAS"
+to MMC_OMAP_HS? I guess it's required for most systems and the regulator
+driver is just 250 loc. I am aware, that this will disable the
+hsmmc driver for 'make oldconfig', but I guess that will be noticed
+in a similar way your warning is noticed.
 
-Will
+The advantage of having the depends line is, that people configuring
+their kernel have a chance to notice the regulator requirement
+during configuration.
+
+Anyways, this message improves the situation, so:
+
+Acked-By: Sebastian Reichel <sre@kernel.org>
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160114/a84cc700/attachment.sig>
