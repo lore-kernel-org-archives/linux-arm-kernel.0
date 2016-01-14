@@ -1,51 +1,166 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 14 Jan 2016 16:25:06 +0100
-Subject: [PATCH v2 23/26] ARM: sun5i: chip: Enable the TV Encoder
+Date: Thu, 14 Jan 2016 16:25:05 +0100
+Subject: [PATCH v2 22/26] ARM: sun5i: r8: Add display blocks to the DTSI
 In-Reply-To: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1452785109-6172-24-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1452785109-6172-23-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CHIP has a composite output available muxed with the microphone in the
-micro-jack plug.
+The TCON, tv-encoder and display engine backends and frontends are combined
+to create our display pipeline.
 
-Enable the composite output in its DTS.
+Add them to the R8 DTSI. It's supposed to be perfectly compatible with the
+A10s and A13, but since we haven't tested it on them yet, it's safer to
+just enable it on the R8. Eventually, it should be moved to sun5i.dtsi
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun5i-r8-chip.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/sun5i-r8.dtsi | 134 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 134 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
-index c976c7618118..c26c095b42c6 100644
---- a/arch/arm/boot/dts/sun5i-r8-chip.dts
-+++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
-@@ -84,6 +84,10 @@
+diff --git a/arch/arm/boot/dts/sun5i-r8.dtsi b/arch/arm/boot/dts/sun5i-r8.dtsi
+index 691d3de75b35..b3bf91516a80 100644
+--- a/arch/arm/boot/dts/sun5i-r8.dtsi
++++ b/arch/arm/boot/dts/sun5i-r8.dtsi
+@@ -57,4 +57,138 @@
+ 			status = "disabled";
+ 		};
  	};
- };
- 
-+&be0 {
-+	status = "okay";
-+};
 +
- &codec {
- 	status = "okay";
- };
-@@ -230,6 +234,14 @@
- 	status = "okay";
- };
- 
-+&tcon0 {
-+	status = "okay";
-+};
++	soc at 01c00000 {
++		tve0: tv-encoder at 01c0a000 {
++			compatible = "allwinner,sun4i-a10-tv-encoder";
++			reg = <0x01c0a000 0x1000>;
++			clocks = <&ahb_gates 34>;
++			status = "disabled";
 +
-+&tve0 {
-+	status = "okay";
-+};
++			port {
++				#address-cells = <1>;
++				#size-cells = <0>;
 +
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart1_pins_b>;
++				tve0_in_tcon0: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&tcon0_out_tve0>;
++				};
++			};
++		};
++
++		tcon0: lcd-controller at 01c0c000 {
++			compatible = "allwinner,sun4i-a10-tcon";
++			reg = <0x01c0c000 0x1000>;
++			interrupts = <44>;
++			clocks = <&ahb_gates 36>,
++				 <&tcon_ch0_clk>,
++				 <&tcon_ch1_clk>;
++			clock-names = "ahb",
++				      "tcon-ch0",
++				      "tcon-ch1";
++			clock-output-names = "tcon-pixel-clock";
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tcon0_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					tcon0_in_be0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&be0_out_tcon0>;
++					};
++				};
++
++				tcon0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					tcon0_out_tve0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&tve0_in_tcon0>;
++					};
++				};
++			};
++		};
++
++		fe0: display-frontend at 01e00000 {
++			compatible = "allwinner,sun5i-a13-display-frontend";
++			reg = <0x01e00000 0x20000>;
++			interrupts = <47>;
++			clocks = <&ahb_gates 46>, <&de_fe_clk>,
++				 <&dram_gates 25>;
++			clock-names = "ahb", "mod",
++				      "ram";
++			resets = <&de_fe_clk>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				fe0_out: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					fe0_out_be0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&be0_in_fe0>;
++					};
++				};
++			};
++		};
++
++		be0: display-backend at 01e60000 {
++			compatible = "allwinner,sun5i-a13-display-backend";
++			reg = <0x01e60000 0x10000>;
++			clocks = <&ahb_gates 44>, <&de_be_clk>,
++				 <&dram_gates 26>;
++			clock-names = "ahb", "mod",
++				      "ram";
++			resets = <&de_be_clk>;
++			status = "disabled";
++
++			assigned-clocks = <&de_be_clk>;
++			assigned-clock-rates = <300000000>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				be0_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					be0_in_fe0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&fe0_out_be0>;
++					};
++				};
++
++				be0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					be0_out_tcon0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&tcon0_in_be0>;
++					};
++				};
++			};
++		};
++	};
++
++	display-engine {
++		compatible = "allwinner,sun5i-a13-display-engine";
++		pipelines = <&be0>;
++	};
+ };
 -- 
 2.6.4
