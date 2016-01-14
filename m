@@ -1,77 +1,171 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Thu, 14 Jan 2016 09:08:41 +0800
-Subject: [PATCH] ARM: dts: rockchip: make more compatible for rk3036 SoCs
-Message-ID: <1452733721-28110-1-git-send-email-wxt@rock-chips.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Thu, 14 Jan 2016 09:16:36 +0800
+Subject: [RFC/PATCH] drm/rockchip: don't wait for vblank if fb hasn't
+ changed
+In-Reply-To: <20160113173954.52e688fc.john@metanate.com>
+References: <1452689614-6570-1-git-send-email-john@metanate.com>	<20160113142320.GQ19130@phenom.ffwll.local>	<20160113143425.363ce07a.john@metanate.com>	<20160113154005.GT19130@phenom.ffwll.local>	<20160113155529.6048b2c1.john@metanate.com>	<20160113162156.GA19130@phenom.ffwll.local>	<20160113164038.5fcf670f.john@metanate.com>	<20160113171917.GC19130@phenom.ffwll.local>
+ <20160113173954.52e688fc.john@metanate.com>
+Message-ID: <5696F6F4.5060908@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch will be better to support and compatible for rk3036.
-Although some other SoCs drivers also can work for rk3036, that will
-prevent some mutatin factors for drivers.
+On 2016?01?14? 01:39, John Keeping wrote:
+> On Wed, 13 Jan 2016 18:19:17 +0100, Daniel Vetter wrote:
+>
+>> On Wed, Jan 13, 2016 at 04:40:38PM +0000, John Keeping wrote:
+>>> On Wed, 13 Jan 2016 17:21:56 +0100, Daniel Vetter wrote:
+>>>    
+>>>> On Wed, Jan 13, 2016 at 03:55:29PM +0000, John Keeping wrote:
+>>>>> On Wed, 13 Jan 2016 16:40:05 +0100, Daniel Vetter wrote:
+>>>>>      
+>>>>>> On Wed, Jan 13, 2016 at 02:34:25PM +0000, John Keeping wrote:
+>>>>>>> On Wed, 13 Jan 2016 15:23:20 +0100, Daniel Vetter wrote:
+>>>>>>>        
+>>>>>>>> On Wed, Jan 13, 2016 at 12:53:34PM +0000, John Keeping wrote:
+>>>>>>>>> As commented in drm_atomic_helper_wait_for_vblanks(), userspace
+>>>>>>>>> relies on cursor ioctls being unsynced.  Converting the rockchip
+>>>>>>>>> driver to atomic has significantly impacted cursor performance by
+>>>>>>>>> making every cursor update wait for vblank.
+>>>>>>>>>
+>>>>>>>>> By skipping the vblank sync when the framebuffer has not changed
+>>>>>>>>> (as is done in drm_atomic_helper_wait_for_vblanks()) we can avoid
+>>>>>>>>> this for the common case of moving the cursor and only need to
+>>>>>>>>> delay the cursor ioctl when the cursor icon changes.
+>>>>>>>>>
+>>>>>>>>> I originally inserted a check on legacy_cursor_update as well, but
+>>>>>>>>> that caused a storm of iommu page faults.  I didn't investigate the
+>>>>>>>>> cause of those since this change gives enough of a performance
+>>>>>>>>> improvement for my use case.
+>>>>>>>>>
+>>>>>>>>> This is RFC because of that and because the framebuffer_changed()
+>>>>>>>>> function is copied from drm_atomic_helper.c as a quick way to test
+>>>>>>>>> the result.
+>>>>>>>>>
+>>>>>>>>> Signed-off-by: John Keeping <john@metanate.com>
+>>>>>>>>> ---
+>>>>>>>>>   drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 27
+>>>>>>>>> +++++++++++++++++++++++++-- 1 file changed, 25 insertions(+), 2
+>>>>>>>>> deletions(-)
+>>>>>>>>>
+>>>>>>>>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>>>>>>>>> b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c index f784488..8fd9821
+>>>>>>>>> 100644 --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>>>>>>>>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>>>>>>>>> @@ -177,8 +177,28 @@ static void
+>>>>>>>>> rockchip_crtc_wait_for_update(struct drm_crtc *crtc)
+>>>>>>>>> crtc_funcs->wait_for_update(crtc); }
+>>>>>>>>>   
+>>>>>>>>> +static bool framebuffer_changed(struct drm_device *dev,
+>>>>>>>>> +				struct drm_atomic_state *old_state,
+>>>>>>>>> +				struct drm_crtc *crtc)
+>>>>>>>>> +{
+>>>>>>>>> +	struct drm_plane *plane;
+>>>>>>>>> +	struct drm_plane_state *old_plane_state;
+>>>>>>>>> +	int i;
+>>>>>>>>> +
+>>>>>>>>> +	for_each_plane_in_state(old_state, plane, old_plane_state,
+>>>>>>>>> i) {
+>>>>>>>>> +		if (plane->state->crtc != crtc &&
+>>>>>>>>> +		    old_plane_state->crtc != crtc)
+>>>>>>>>> +			continue;
+>>>>>>>>> +
+>>>>>>>>> +		if (plane->state->fb != old_plane_state->fb)
+>>>>>>>>> +			return true;
+>>>>>>>>> +	}
+>>>>>>>>> +
+>>>>>>>>> +	return false;
+>>>>>>>>> +}
+>>>>>>>> Please don't hand-roll logic that affects semantics like this. Instead
+>>>>>>>> please use drm_atomic_helper_wait_for_vblanks(), which should do this
+>>>>>>>> correctly for you.
+>>>>>>>>
+>>>>>>>> If that's not the case then we need to improve the generic helper, or
+>>>>>>>> figure out what's different with rockhip.
+>>>>>>> According to commit 63ebb9f (drm/rockchip: Convert to support atomic
+>>>>>>> API) it's because rockchip doesn't have a hardware vblank counter.
+>>>>>>>
+>>>>>>> I'm not entirely clear on why this prevents the use of
+>>>>>>> drm_atomic_helper_wait_for_vblanks().
+>>>>>> Hm, that commit isn't terribly helpful. If that's really needed then imo I
+>>>>>> think we should extract a "drm_atomic_helper_plane_needs_vblank_wait()"
+>>>>>> helper that's used by both. But since rockchip does vblank_get/put calls
+>>>>>> I'd hope vblanks actually work correctly. And then the helper should work
+>>>>>> too.
+>>>>> I tried switching the call to rockchip_crtc_wait_for_update() to
+>>>>> drm_atomic_helper_wait_for_vblanks() and it works fine until I switch
+>>>>> the buffer associated with a cursor, at which point I get iommu page
+>>>>> faults, presumably because the GEM buffer is unreferenced too early.
+>>>>>
+>>>>> AFAICT the buffer will be released via drm_atomic_state_free()
+>>>>> unconditionally, but I suspect I'm missing something since that would
+>>>>> mean every driver would hit a similar problem.
+>>>> Yeah, with the helper we always skip, which means when the cursor bo
+>>>> changes you indeed unmap too early. So can't even share the overall
+>>>> condition, but we could definitely share the little framebuffer_changed
+>>>> helper.
+>>> That leaves me with the question: why do other atomic drivers work?
+>>>
+>>> If drm_atomic_helper_wait_for_vblanks() skipping vblanks results in the
+>>> cursor bo being unmapped too early for rockchip, why is it not unmapped
+>>> too early for all of the other drivers using that helper?
+>> It's unmapped too early for everyone, it's just that normally that doesn't
+>> result in a fireworks show. What we maybe could/should do is do the
+>> unmapping asynchronously, but that runs into the overall "current atomic
+>> helpers don't do async yet" problem. Might be a good point to start fixing
+>> this up though.
+> OK, thanks, I think I'm beginning to understand how this all fits
+> together.
+>
+> It looks like there are two options for me to get reasonable cursor
+> performance on rockchip in the short term:
+>
+> 1) Export the current framebuffer_changed() function as
+>     drm_atomic_helper_framebuffer_changed() and use it in
+>     rockchip_crtc_wait_for_update().
+>
+> 2) Add a mechanism to suppress the legacy_cursor_update check in
+>     drm_atomic_helper_wait_for_vblanks() and switch the rockchip driver
+>     over to it.
+>
+> In both of these cases we're only restoring the unsynced cursor ioctls
+> behaviour when the cursor is moved but it will still be expensive when
+> the cursor bo changes.  That gives sufficient performance in my testing.
+>
+>
+>
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
----
+Thanks for point that.
 
- arch/arm/boot/dts/rk3036.dtsi | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+because rockchip not support hardware vblank counter, use 
+drm_atomic_helper_wait_for_vblanks have under issues:
 
-diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
-index ee457a2..7897449 100644
---- a/arch/arm/boot/dts/rk3036.dtsi
-+++ b/arch/arm/boot/dts/rk3036.dtsi
-@@ -161,7 +161,7 @@
- 	};
- 
- 	usb_otg: usb at 10180000 {
--		compatible = "rockchip,rk3288-usb", "rockchip,rk3066-usb",
-+		compatible = "rockchip,rk3036-usb", "rockchip,rk3066-usb",
- 				"snps,dwc2";
- 		reg = <0x10180000 0x40000>;
- 		interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
-@@ -176,7 +176,7 @@
- 	};
- 
- 	usb_host: usb at 101c0000 {
--		compatible = "rockchip,rk3288-usb", "rockchip,rk3066-usb",
-+		compatible = "rockchip,rk3036-usb", "rockchip,rk3066-usb",
- 				"snps,dwc2";
- 		reg = <0x101c0000 0x40000>;
- 		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-@@ -211,7 +211,7 @@
- 	};
- 
- 	emmc: dwmmc at 1021c000 {
--		compatible = "rockchip,rk3288-dw-mshc";
-+		compatible = "rockchip,rk3036-dw-mshc", "rockchip,rk3288-dw-mshc";
- 		reg = <0x1021c000 0x4000>;
- 		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
- 		broken-cd;
-@@ -327,7 +327,7 @@
- 	};
- 
- 	i2c1: i2c at 20056000 {
--		compatible = "rockchip,rk3288-i2c";
-+		compatible = "rockchip,rk3036-i2c", "rockchip,rk3288-i2c";
- 		reg = <0x20056000 0x1000>;
- 		interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
-@@ -340,7 +340,7 @@
- 	};
- 
- 	i2c2: i2c at 2005a000 {
--		compatible = "rockchip,rk3288-i2c";
-+		compatible = "rockchip,rk3036-i2c", "rockchip,rk3288-i2c";
- 		reg = <0x2005a000 0x1000>;
- 		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
-@@ -395,7 +395,7 @@
- 	};
- 
- 	i2c0: i2c at 20072000 {
--		compatible = "rockchip,rk3288-i2c";
-+		compatible = "rockchip,rk3036-i2c", "rockchip,rk3288-i2c";
- 		reg = <0x20072000 0x1000>;
- 		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
--- 
-1.9.1
+                                              | <-- HW vsync irq and reg 
+take effect
+             plane_commit  --->  |
+      get_vblank and wait ->   |
+                                              | <-- handle_vblank, 
+vblank->count + 1
+                  cleanup_fb   ---> |
+               iommu crash  --->  |
+                                              | <-- HW vsync irq and reg 
+take effect
+there is no hardware vblank counter on rockchip vop, we can't ensure the 
+consistency of reg take effect and vblank->count,
+if plane commit hit into the period of  reg take effect and 
+vblank->count, cleanup_fb happen before old_fb swap out from vop,
+then iommu crash.
+
+That is why I special the wait_for_vblanks, we need check the reg really 
+take effect before clean up old fb.
+at vop_win_pending_is_complete function, check win enable and win 
+address, to ensure that.
+
+Not only rockchip drm do that thing:
+
+exynos also check address before cleanup fb
+         if (start == start_s)
+             exynos_drm_crtc_finish_update(ctx->crtc, plane);
+
+Thanks.
+
+-- ?ark Yao
