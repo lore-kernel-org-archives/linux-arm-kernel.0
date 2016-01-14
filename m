@@ -1,63 +1,165 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Jan 2016 17:25:49 +0000
-Subject: [PATCH] mmc: host: omap_hsmmc: add a verbose print to enable
- CONFIG_REGULATOR_PBIAS
-In-Reply-To: <20160114120706.GA12774@earth>
-References: <1452762920-2588-1-git-send-email-kishon@ti.com>
- <20160114120706.GA12774@earth>
-Message-ID: <20160114172549.GC5783@n2100.arm.linux.org.uk>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 14 Jan 2016 20:23:10 +0300
+Subject: [PATCH v6 13/21] arm64:ilp32: add sys_ilp32.c and a separate table
+ (in entry.S) to use it
+In-Reply-To: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1452792198-10718-14-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 01:07:06PM +0100, Sebastian Reichel wrote:
-> Hi,
-> 
-> On Thu, Jan 14, 2016 at 02:45:20PM +0530, Kishon Vijay Abraham I wrote:
-> > Since v4.3+, CONFIG_REGULATOR_PBIAS should be enabled (for platforms that
-> > have PBIAS regulator) in order for MMC1 to work.
-> > 
-> > Add a more verbose print to help enable CONFIG_REGULATOR_PBIAS for users
-> > using a olddefconfig or a custom .config.
-> > 
-> > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> > ---
-> >  drivers/mmc/host/omap_hsmmc.c |    5 ++++-
-> >  1 file changed, 4 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> > index 7fb0753..7086bd6 100644
-> > --- a/drivers/mmc/host/omap_hsmmc.c
-> > +++ b/drivers/mmc/host/omap_hsmmc.c
-> > @@ -503,8 +503,11 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
-> >  	host->pbias = devm_regulator_get_optional(host->dev, "pbias");
-> >  	if (IS_ERR(host->pbias)) {
-> >  		ret = PTR_ERR(host->pbias);
-> > -		if ((ret != -ENODEV) && host->dev->of_node)
-> > +		if ((ret != -ENODEV) && host->dev->of_node) {
-> > +			dev_err(host->dev,
-> > +			"SD card detect fail? enable CONFIG_REGULATOR_PBIAS\n");
-> >  			return ret;
-> > +		}
-> >  		dev_dbg(host->dev, "unable to get pbias regulator %ld\n",
-> >  			PTR_ERR(host->pbias));
-> >  		host->pbias = NULL;
-> 
-> 
-> Is there a good reason against adding "depends on REGULATOR_PBIAS"
-> to MMC_OMAP_HS?
+From: Andrew Pinski <apinski@cavium.com>
 
-There are very good reasons not to do this: that will result in
-configurations where MMC_OMAP_HS was set but without REGULATOR_PBIAS
-ending up with MMC_OMAP_HS being disabled.  That doesn't help the
-root problem, which is "why has the kernel boot regressed for my
-previous working configuration?"
+Add a separate syscall-table for ILP32, which dispatches either to native
+LP64 system call implementation or to compat-syscalls, as appropriate.
 
-The solution proposed here adds a message to the boot which points
-out fair and square what needs to be done to rectify the boot
-failure.  Adding a dependency just brings up the question "where
-has my MMC driver gone?"
+Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+---
+ arch/arm64/include/asm/unistd.h | 11 ++++++-
+ arch/arm64/kernel/Makefile      |  2 +-
+ arch/arm64/kernel/entry.S       | 12 +++++++-
+ arch/arm64/kernel/sys_ilp32.c   | 63 +++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 85 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm64/kernel/sys_ilp32.c
 
+diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+index 2971dea..5ea18ef 100644
+--- a/arch/arm64/include/asm/unistd.h
++++ b/arch/arm64/include/asm/unistd.h
+@@ -13,9 +13,18 @@
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
++
++#ifdef CONFIG_COMPAT
++#define __ARCH_WANT_COMPAT_STAT64
++#endif
++
++#ifdef CONFIG_ARM64_ILP32
++#define __ARCH_WANT_COMPAT_SYS_PREADV64
++#define __ARCH_WANT_COMPAT_SYS_PWRITEV64
++#endif
++
+ #ifdef CONFIG_AARCH32_EL0
+ #define __ARCH_WANT_COMPAT_SYS_GETDENTS64
+-#define __ARCH_WANT_COMPAT_STAT64
+ #define __ARCH_WANT_SYS_GETHOSTNAME
+ #define __ARCH_WANT_SYS_PAUSE
+ #define __ARCH_WANT_SYS_GETPGRP
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index ad7158c..a35f2f8 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -28,7 +28,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
+ arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o entry32.o		\
+ 					   ../../arm/kernel/opcodes.o binfmt_elf32.o
+-arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o
++arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o sys_ilp32.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+ arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 5eb1bb7..f348f58 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -666,9 +666,13 @@ ENDPROC(ret_from_fork)
+  */
+ 	.align	6
+ el0_svc:
+-	adrp	stbl, sys_call_table		// load syscall table pointer
+ 	uxtw	scno, w8			// syscall number in w8
+ 	mov	sc_nr, #__NR_syscalls
++#ifdef CONFIG_ARM64_ILP32
++	ldr	x16, [tsk, #TI_FLAGS]
++	tbnz	x16, #TIF_32BIT_AARCH64, el0_ilp32_svc // We are using ILP32
++#endif
++	adrp	stbl, sys_call_table		// load syscall table pointer
+ el0_svc_naked:					// compat entry point
+ 	stp	x0, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
+ 	enable_dbg_and_irq
+@@ -688,6 +692,12 @@ ni_sys:
+ 	b	ret_fast_syscall
+ ENDPROC(el0_svc)
+ 
++#ifdef CONFIG_ARM64_ILP32
++el0_ilp32_svc:
++	adrp	stbl, sys_call_ilp32_table // load syscall table pointer
++	b el0_svc_naked
++#endif
++
+ 	/*
+ 	 * This is the really slow path.  We're going to be doing context
+ 	 * switches, and waiting for our parent to respond.
+diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
+new file mode 100644
+index 0000000..0659b89
+--- /dev/null
++++ b/arch/arm64/kernel/sys_ilp32.c
+@@ -0,0 +1,63 @@
++/*
++ * AArch64- ILP32 specific system calls implementation
++ *
++ * Copyright (C) 2016 Cavium Inc.
++ * Author: Andrew Pinski <apinski@cavium.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/compiler.h>
++#include <linux/errno.h>
++#include <linux/fs.h>
++#include <linux/mm.h>
++#include <linux/msg.h>
++#include <linux/export.h>
++#include <linux/sched.h>
++#include <linux/slab.h>
++#include <linux/syscalls.h>
++#include <linux/compat.h>
++#include <asm-generic/syscalls.h>
++
++/* Using non-compat syscalls where necessary */
++#define compat_sys_fadvise64_64        sys_fadvise64_64
++#define compat_sys_fallocate           sys_fallocate
++#define compat_sys_ftruncate64         sys_ftruncate
++#define compat_sys_lookup_dcookie      sys_lookup_dcookie
++#define compat_sys_pread64             sys_pread64
++#define compat_sys_pwrite64            sys_pwrite64
++#define compat_sys_readahead           sys_readahead
++#define compat_sys_shmat               sys_shmat
++#define compat_sys_sync_file_range     sys_sync_file_range
++#define compat_sys_truncate64          sys_truncate
++#define sys_llseek                     sys_lseek
++#define sys_mmap2		       sys_mmap
++
++#include <asm/syscall.h>
++
++#undef __SYSCALL
++#undef __SC_COMP
++#undef __SC_3264
++#undef __SC_COMP_3264
++
++#define __SYSCALL_COMPAT
++#define __SYSCALL(nr, sym)	[nr] = sym,
++
++/*
++ * The sys_call_ilp32_table array must be 4K aligned to be accessible from
++ * kernel/entry.S.
++ */
++void *sys_call_ilp32_table[__NR_syscalls] __aligned(4096) = {
++	[0 ... __NR_syscalls - 1] = sys_ni_syscall,
++#include <asm/unistd.h>
++};
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.5.0
