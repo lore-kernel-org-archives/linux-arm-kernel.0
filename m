@@ -1,39 +1,32 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Thu, 14 Jan 2016 10:08:24 +0100
-Subject: [PATCH v4 3/3] wlcore/wl12xx: spi: add wifi support to cm-t335
-In-Reply-To: <87wprcbpyr.fsf@kamboji.qca.qualcomm.com>
-References: <1451482533-8624-1-git-send-email-uri.mashiach@compulab.co.il>	<1451482533-8624-4-git-send-email-uri.mashiach@compulab.co.il>	<87io35lq2p.fsf@kamboji.qca.qualcomm.com>	<5695E802.7050909@compulab.co.il>
- <20160113172712.GI12777@atomide.com>
- <87wprcbpyr.fsf@kamboji.qca.qualcomm.com>
-Message-ID: <56976588.3060707@broadcom.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 14 Jan 2016 10:09:16 +0100
+Subject: [PATCH] mfd: asic3: remove extraneous ')'
+In-Reply-To: <5507931.oM3h7nKshR@wuerfel>
+References: <5507931.oM3h7nKshR@wuerfel>
+Message-ID: <CACRpkdYJW2Z1BCKa0f9b8j0kP2EBrkVEggXyZ8ZZwqpfi-c3gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/2016 08:05 AM, Kalle Valo wrote:
-> Tony Lindgren <tony@atomide.com> writes:
+On Tue, Jan 12, 2016 at 10:02 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> A cleanup patch introduced an extra closing ')' that leads to a
+> build error:
 >
->>>>>   arch/arm/boot/dts/am335x-cm-t335.dts | 55 ++++++++++++++++++++++++++++++++++++
->>>>>   1 file changed, 55 insertions(+)
->>>>
->>>> To what tree should this patch go? My wireless-drivers-next tree doesn't
->>>> even have this file.
->>>
->>> Right. It will hit the mainline during this merge window through Tony's and
->>> arm-soc trees.
->>>
->>> Do you think it will be sensible if you take 1/3 and 2/3 patches and Tony
->>> will take the 3/3 (there is no code dependency between first two and the last one),
->>> or we can just wait till arm-soc hits the mainline, so you will have the
->>> needed code?
->>
->> Yeah I'll pick the dts changes separately after the merge window as
->> there is no dependency to the driver changes.
+> drivers/mfd/asic3.c: In function 'asic3_gpio_get':
+> drivers/mfd/asic3.c:505:12: error: expected ';' before ')' token
 >
-> Ok, I'll then take patches 1 and 2 once the merge window opens.
+> This removes the extra character to get it to build again.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: fd5b4d01a638 ("mfd: asic3: Be sure to clamp return value")
+> ---
+> This came up today on linux-next. I took the liberty to adjust formatting
+> of that line as well, if you prefer the original line wrapping please
+> undo that part when applying.
 
-I guess it is semantics, but the merge window is open right now so you 
-probably mean to say after the merge window closes, ie. when 4.5-rc1 is 
-ready.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Regards,
-Arend
+Sorry for the mess, apparently one of those I didn't find a good
+way of building...
+
+Yours,
+Linus Walleij
