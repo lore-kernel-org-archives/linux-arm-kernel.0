@@ -1,72 +1,56 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 14 Jan 2016 09:24:27 +0800
-Subject: [PATCH v7 2/2] drm/bridge: Add I2C based driver for ps8640 bridge
-In-Reply-To: <1452651494-16806-2-git-send-email-jitao.shi@mediatek.com>
-Message-ID: <201601140940.uXzmZfZZ%fengguang.wu@intel.com>
+From: koro.chen@mediatek.com (Koro Chen)
+Date: Thu, 14 Jan 2016 09:43:15 +0800
+Subject: [alsa-devel] [PATCH] ASoC: mediatek: add i2c dependency
+In-Reply-To: <5346380.rqT2CVl4PH@wuerfel>
+References: <5346380.rqT2CVl4PH@wuerfel>
+Message-ID: <1452735795.28205.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jitao,
+On Wed, 2016-01-13 at 23:14 +0100, Arnd Bergmann wrote:
+> The newly added mediatek drivers for mt8173 select codes that depend
+> on I2C, which cuases a build failure if I2C is disabled:
+> 
+> warning: (SND_SOC_ADAU1761_I2C && SND_SOC_ADAU1781_I2C && SND_SOC_ADAU1977_I2C && SND_SOC_RT5677 && EXTCON_MAX14577 && EXTCON_MAX77693 && EXTCON_MAX77843 && BMC150_ACCEL_I2C && BMG160_I2C) selects REGMAP_I2C which has unmet direct dependencies (I2C)
+> codecs/rt5645.c:3854:1: warning: data definition has no type or storage class
+> codecs/rt5645.c:3854:1: error: type defaults to 'int' in declaration of 'module_i2c_driver' [-Werror=implicit-int]
+> codecs/rt5677.c:5270:1: warning: data definition has no type or storage class
+> 77_i2c_driver);
+> 
+> codecs/rt5677.c:5270:1: error: type defaults to 'int' in declaration of 'module_i2c_driver' [-Werror=implicit-int]
+> 
+> This adds an explicit dependency.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/sound/soc/mediatek/Kconfig b/sound/soc/mediatek/Kconfig
+> index 15c04e2eae34..976967675387 100644
+> --- a/sound/soc/mediatek/Kconfig
+> +++ b/sound/soc/mediatek/Kconfig
+> @@ -9,7 +9,7 @@ config SND_SOC_MEDIATEK
+>  
+>  config SND_SOC_MT8173_MAX98090
+>  	tristate "ASoC Audio driver for MT8173 with MAX98090 codec"
+> -	depends on SND_SOC_MEDIATEK
+> +	depends on SND_SOC_MEDIATEK && I2C
+>  	select SND_SOC_MAX98090
+>  	help
+>  	  This adds ASoC driver for Mediatek MT8173 boards
+> @@ -19,7 +19,7 @@ config SND_SOC_MT8173_MAX98090
+>  
+>  config SND_SOC_MT8173_RT5650_RT5676
+>  	tristate "ASoC Audio driver for MT8173 with RT5650 RT5676 codecs"
+> -	depends on SND_SOC_MEDIATEK
+> +	depends on SND_SOC_MEDIATEK && I2C
+>  	select SND_SOC_RT5645
+>  	select SND_SOC_RT5677
+>  	help
+> 
+Acked-by: Koro Chen <koro.chen@mediatek.com>
 
-[auto build test WARNING on v4.4-rc8]
-[also build test WARNING on next-20160113]
-[cannot apply to drm/drm-next]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Thank you!
 
-url:    https://github.com/0day-ci/linux/commits/Jitao-Shi/Documentation-bridge-Add-documentation-for-ps8640-DT-properties/20160113-102004
-config: i386-randconfig-sb0-01140840 (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
-http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
-
-All warnings (new ones prefixed by >>):
-
-   drivers/gpu/drm/bridge/parade-ps8640.c: In function 'ps8640_update_fw_store':
->> drivers/gpu/drm/bridge/parade-ps8640.c:788:20: warning: 'progress_cnt' may be used uninitialized in this function [-Wmaybe-uninitialized]
-      if (progress_cnt != (pos * 100) / fw->size) {
-                       ^
-   drivers/gpu/drm/bridge/parade-ps8640.c:770:5: note: 'progress_cnt' was declared here
-     u8 progress_cnt, rom_page_id[2];
-        ^
-
-vim +/progress_cnt +788 drivers/gpu/drm/bridge/parade-ps8640.c
-
-   772	
-   773		ps8640_regw_byte(client2, PAGE2_SPI_CFG3, I2C_TO_SPI_RESET);
-   774		msleep(100);
-   775		ps8640_regw_byte(client2, PAGE2_SPI_CFG3, 0x00);
-   776	
-   777		while (pos < fw->size) {
-   778			rom_page_id[0] = (pos >> 8) & 0xFF;
-   779			rom_page_id[1] = (pos >> 16) & 0xFF;
-   780			ret = ps8640_regw(client2, PAGE2_ROMADD_BYTE1, rom_page_id, 2);
-   781			if (ret)
-   782				goto error;
-   783			ret = ps8640_regw(client7, 0, fw->data + pos, 256);
-   784			if (ret)
-   785				goto error;
-   786	
-   787			pos += 256;
- > 788			if (progress_cnt != (pos * 100) / fw->size) {
-   789				progress_cnt = (pos * 100) / fw->size;
-   790				dev_info(dev, "fw update progress percent %d\n",
-   791					 progress_cnt);
-   792			}
-   793		}
-   794		return 0;
-   795	
-   796	error:
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 22464 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160114/c378da16/attachment-0001.obj>
+> _______________________________________________
+> Alsa-devel mailing list
+> Alsa-devel at alsa-project.org
+> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
