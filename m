@@ -1,71 +1,60 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 14 Jan 2016 12:32:03 -0500
-Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <20160114170723.GB20706@red-moon>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <1452785393.28109.16.camel@redhat.com> <5697C0EB.4020404@codeaurora.org>
- <20160114161238.GA20706@red-moon> <1452789524.28109.24.camel@redhat.com>
- <20160114170723.GB20706@red-moon>
-Message-ID: <1452792723.28109.31.camel@redhat.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Thu, 14 Jan 2016 08:16:04 -0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160114120445.GB15828@arm.com>
+References: <20160112092711.GP6344@twins.programming.kicks-ass.net>
+ <20160112102555.GV6373@twins.programming.kicks-ass.net>
+ <20160112104012.GW6373@twins.programming.kicks-ass.net>
+ <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
+ <20160113104516.GE25458@arm.com> <56969F4B.7070001@imgtec.com>
+ <20160113204844.GV6357@twins.programming.kicks-ass.net>
+ <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
+Message-ID: <20160114161604.GT3818@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-01-14 at 17:07 +0000, Lorenzo Pieralisi wrote:
-> On Thu, Jan 14, 2016 at 11:38:44AM -0500, Mark Salter wrote:
+On Thu, Jan 14, 2016 at 12:04:45PM +0000, Will Deacon wrote:
+> On Wed, Jan 13, 2016 at 12:58:22PM -0800, Leonid Yegoshin wrote:
+> > On 01/13/2016 12:48 PM, Peter Zijlstra wrote:
+> > >On Wed, Jan 13, 2016 at 11:02:35AM -0800, Leonid Yegoshin wrote:
+> > >
+> > >>I ask HW team about it but I have a question - has it any relationship with
+> > >>replacing MIPS SYNC with lightweight SYNCs (SYNC_WMB etc)?
+> > >Of course. If you cannot explain the semantics of the primitives you
+> > >introduce, how can we judge the patch.
+> > >
+> > >
+> > You missed a point - it is a question about replacement of SYNC with
+> > lightweight primitives. It is NOT a question about multithread system
+> > behavior without any SYNC. The answer on a latest Will's question lies in
+> > different area.
 > 
-> [...]
+> The reason we (Peter and I) care about this isn't because we enjoy being
+> obstructive. It's because there is a whole load of core (i.e. portable)
+> kernel code that is written to the *kernel* memory model. For example,
+> the scheduler, RCU, mutex implementations, perf, drivers, you name it.
 > 
-> > You would lose that bet. AddressMinimum/Maximum describe the
-> > PCI bus addresses.
-> 
-> In the mainline DT (APM Mustang), the CPU physical address corresponding
-> to IO space is 0xe010000000, PCI bus address is 0x0.
-> 
-> > ? ? ? ? ? ? ? ? QWordIO (ResourceProducer, MinFixed, MaxFixed, PosDecode, EntireRange,
-> > ????????????????????0x0000000000000000, // Granularity
-> > ????????????????????0x0000000010000000, // Range Minimum
-> 
-> 
-> > ????????????????????0x000000001000FFFF, // Range Maximum
-> > ????????????????????0x000000E000000000, // Translation Offset
-> 
-> See above, I will get the APM specifications to countercheck.
+> Consequently, it's important that the architecture back-ends implement
+> these portable primitives (e.g. smp_mb()) in a way that satisfies the
+> kernel memory model so that core code doesn't need to worry about the
+> underlying architecture for synchronisation purposes. You could turn
+> around and say "but if MIPS gets it wrong, then that's MIPS's problem",
+> but actually not having a general understanding of the ordering guarantees
+> provided by each architecture makes it very difficult for us to extend
+> the kernel memory model in such a way that it can be implemented
+> efficiently across the board *and* relied upon by core code.
 
-The spec won't help other than to verify that the PCIe bridge supports a 32-bit
-IO address space. The firmware sets the PCI bus base @ 0x10000000 with a CPU base
-address for that window @ 0xe010000000. The pci-xgene.c driver sets the PCI
-bus IO base address to whatever DT tells it too. For ACPI, we have to use whatever
-the firmware set it to and described it in the ACPI table.
+What Will said!
 
-When I looked at this a while back, neither ACPI nor PCI had anything which
-disallowed 32-bit IO space on the PCI bus. The 16-bit limit is an x86 limit
-in the instruction set.
+Yes, you can cut corners within MIPS architecture-specific code,
+but primitives that are used in the core kernel really do need to
+work as expected.
 
+							Thanx, Paul
+
+> The virtio patch at the start of the thread doesn't particularly concern
+> me. It's the other patches you linked to that implement acquire/release
+> that have me worried.
 > 
-> I agree with you we have to verify if this IO space limitation is
-> real or it is just an x86ism, in which case we remove that check.
+> Will
 > 
-> Lorenzo
-> > ????????????????????0x0000000000010000, // Length
-> > ????????????????????,, , TypeStatic)
-> 
-> > 
-> > 
-> > > Jiang's patch:
-> > > 
-> > > https://lkml.org/lkml/2015/12/16/249
-> > > 
-> > > parses the IO descriptors and stores the AddressMinimum, AddressMaximum
-> > > in the IO resource (with AddressTranslation as offset which must be the
-> > > *CPU* physical address mapping IO), from the log above it seems to me in
-> > > AddressMinimum APM specifies the *CPU* physical address generating IO
-> > > cycles.
-> > > 
-> > > All in all, I was right to fear this would happen, and I already
-> > > raised the point within the ACPI spec working group, ACPI IO
-> > > descriptors specification is ambiguous and we must agree on how
-> > > they have to be specified once for all.
-> > > 
-> > > Lorenzo
-> > 
