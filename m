@@ -1,52 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Jan 2016 00:13 +0100
-Subject: [PATCH, RESEND] ssb: mark ssb_bus_register as __maybe_unused
-In-Reply-To: <8760ywd5fe.fsf@kamboji.qca.qualcomm.com>
-References: <8128014.DbbgBtKY3z@wuerfel>
- <8760ywd5fe.fsf@kamboji.qca.qualcomm.com>
-Message-ID: <4037550.DMaVTE01Aq@wuerfel>
+From: Leonid.Yegoshin@imgtec.com (Leonid Yegoshin)
+Date: Thu, 14 Jan 2016 15:33:40 -0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160114225510.GJ3818@linux.vnet.ibm.com>
+References: <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
+ <20160113104516.GE25458@arm.com> <5696CF08.8080700@imgtec.com>
+ <20160114121449.GC15828@arm.com> <5697F6D2.60409@imgtec.com>
+ <20160114203430.GC3818@linux.vnet.ibm.com> <56980C91.1010403@imgtec.com>
+ <20160114212913.GF3818@linux.vnet.ibm.com> <569814F2.50801@imgtec.com>
+ <20160114225510.GJ3818@linux.vnet.ibm.com>
+Message-ID: <56983054.4070807@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SoC variant of the ssb code is now optional like the other
-ones, which means we can build the framwork without any
-front-end, but that results in a warning:
+On 01/14/2016 02:55 PM, Paul E. McKenney wrote:
+> OK, so it looks like Will was asking not about WRC+addr+addr, but instead
+> about WRC+sync+addr.
+(He actually asked twice about this and that too but skip this)
 
-drivers/ssb/main.c:616:12: warning: 'ssb_bus_register' defined but not used [-Wunused-function]
+> I am guessing that the manual's "Older instructions which must be globally
+> performed when the SYNC instruction completes" provides the equivalent
+> of ARM/Power A-cumulativity, which can be thought of as transitivity
+> backwards in time.  This leads me to believe that your smp_mb() needs
+> to use SYNC rather than SYNC_MB, as was the subject of earlier spirited
+> discussion in this thread.
 
-This annotates the ssb_bus_register function as __maybe_unused to
-shut up the warning. A configuration like this will not work on
-any hardware of course, but we still want this to silently build
-without warnings if the configuration is allowed in the first
-place.
+Don't be fooled here by words "ordered" and "completed" - it is HW 
+design items and actually written poorly.
+Just assume that SYNC_MB is absolutely the same as SYNC for any CPU and 
+coherent device (besides performance). The difference can be in 
+non-coherent devices because SYNC actually tries to make a barrier for 
+them too. In some SoCs it is just the same because there is no need to 
+barrier a non-coherent device (device register access usually strictly 
+ordered... if there is no bridge in between).
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 845da6e58e19 ("ssb: add Kconfig entry for compiling SoC related code")
-Acked-by: Michael Buesch <m@bues.ch>
----
+>
+> Suppose you have something like this:
+> ...
+> Does your hardware guarantee that it is not possible for all of r0,
+> r1, r2, and r3 to be equal to zero at the end of the test, assuming
+> that a, b, c, and d are all initially zero, and the four functions
+> above run concurrently?
 
-On Thursday 14 January 2016 08:46:29 Kalle Valo wrote:
-> I can take it. For historical reasons ssb patches go through my
-> wireless-drivers trees.
+It is assumed to be so from Arch point of view. HW bugs are possible, of 
+course.
 
-I found this in my backlog, and I believe it still applies. Can you take
-that one too?
+> Another (more academic) case is this one, with x and y initially zero:
+>
+> ...
+> Does SYNC_MB() prohibit r1 == 1 && r2 == 0 && r3 == 1 && r4 == 0?
 
-diff --git a/drivers/ssb/main.c b/drivers/ssb/main.c
-index cde5ff7529eb..d1a750760cf3 100644
---- a/drivers/ssb/main.c
-+++ b/drivers/ssb/main.c
-@@ -613,9 +613,10 @@ out:
- 	return err;
- }
- 
--static int ssb_bus_register(struct ssb_bus *bus,
--			    ssb_invariants_func_t get_invariants,
--			    unsigned long baseaddr)
-+static int __maybe_unused
-+ssb_bus_register(struct ssb_bus *bus,
-+		 ssb_invariants_func_t get_invariants,
-+		 unsigned long baseaddr)
- {
- 	int err;
- 
+It is assumed to be so from Arch point of view. HW bugs are possible, of 
+course.
+
+Note: I am not sure about ANY past MIPS R2 CPU because that stuff is 
+implemented some time but nobody made it in Linux kernel (it was used by 
+some vendor for non-Linux system). For that reason my patch for 
+lightweight SYNCs has an option - implement it or implement a generic 
+SYNC. It is possible that some vendor did it in different way but nobody 
+knows or test it. But as a minimum - SYNC must be implemented in 
+spinlocks/atomics/bitops, in recent P5600 it is proven that read can 
+pass write in atomics.
+
+MIPS R6 is a different story, I verified lightweight SYNCs from the 
+beginning and it also should use SYNCs.
+
+- Leonid.
