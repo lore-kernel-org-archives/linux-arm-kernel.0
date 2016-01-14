@@ -1,59 +1,116 @@
-From: john@metanate.com (John Keeping)
-Date: Thu, 14 Jan 2016 16:26:19 +0000
-Subject: [PATCH 3/3] drm/rockchip: explain why we can't wait_for_vblanks
-In-Reply-To: <20160114145705.GA24005@ulmo>
-References: <20160114142047.GD19130@phenom.ffwll.local>
- <cover.1452782114.git.john@metanate.com>
- <107bbc36a316ed0ddc7b5a8bcd9b6db6cbc71d4f.1452782114.git.john@metanate.com>
- <20160114145705.GA24005@ulmo>
-Message-ID: <20160114162619.233ab39c.john@metanate.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 14 Jan 2016 16:33:13 +0000
+Subject: [PATCH V3 14/21] x86, ia64: Include acpi_pci_{add|remove}_bus to
+ the default pcibios_{add|remove}_bus implementation.
+In-Reply-To: <1452691267-32240-15-git-send-email-tn@semihalf.com>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <1452691267-32240-15-git-send-email-tn@semihalf.com>
+Message-ID: <20160114163313.GB19513@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Jan 2016 15:57:05 +0100, Thierry Reding wrote:
+On Wed, Jan 13, 2016 at 02:21:00PM +0100, Tomasz Nowicki wrote:
+> Arches in subject are the only one who use pcibios_{add|remove}_bus hooks
 
-> On Thu, Jan 14, 2016 at 02:39:42PM +0000, John Keeping wrote:
-> > Signed-off-by: John Keeping <john@metanate.com>
-> > ---
-> >  drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> > index 679d23a..b267ce4 100644
-> > --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> > @@ -177,6 +177,12 @@ static void rockchip_crtc_wait_for_update(struct drm_crtc *crtc)
-> >  		crtc_funcs->wait_for_update(crtc);
-> >  }
-> >  
-> > +/*
-> > + * We can't use drm_atomic_helper_wait_for_vblanks() because rk3288 and rk3066
-> > + * have hardware counters for neither vblanks nor scanlines.  This function is
-> > + * equivalent but uses rockchip_crtc_wait_for_update() instead of waiting for
-> > + * vblank_count to change.
-> > + */  
+"x86 and ia64 are the only arches that implement..."
+
+> and implement it in the same way. Moreover ARM64 is going to do the same.
+
+"implement them"
+
+> So it seams that acpi_pci_{add|remove}_bus is generic enough to be default
+
+s/seams/seems
+
+> option for pcibios_{add|remove}_bus hooks. Also, it is always safe to run
+> acpi_pci_{add|remove}_bus as they have empty stubs for !ACPI case and
+> return if ACPI has been switched off in run time.
 > 
-> This is kind of misleading. From reading earlier parts of the thread the
-> reason why drm_atomic_helper_wait_for_vblanks() won't work is because it
-> has a potential race condition that can't be detected unless you also
-> have a vblank counter. However, the above comment makes it work like
-> drm_atomic_helper_wait_for_vblanks() doesn't work in the absence of a
-> vblank counter, which isn't quite true.
+> After all we can remove x86 and ia64 pcibios_{add|remove}_bus
+> implementation.
 
-How about something like this (using the sequence from Mark's message):
+I think you should rephrase the commit log and fix the typos.
 
-/*
- * We can't use drm_atomic_helper_wait_for_vblanks() because rk3288 and rk3066
- * have hardware counters for neither vblanks nor scanlines, which results in
- * a race where:
- *				| <-- HW vsync irq and reg take effect
- *	       plane_commit --> |
- *	get_vblank and wait --> |
- *				| <-- handle_vblank, vblank->count + 1
- *		 cleanup_fb --> |
- *		iommu crash --> |
- *				| <-- HW vsync irq and reg take effect
- *
- * This function is equivalent but uses rockchip_crtc_wait_for_update() instead
- * of waiting for vblank_count to change.
- */
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> ---
+>  arch/ia64/pci/pci.c   | 10 ----------
+>  arch/x86/pci/common.c | 10 ----------
+>  drivers/pci/probe.c   |  3 +++
+>  3 files changed, 3 insertions(+), 20 deletions(-)
+
+Patch seems fine to me, I do not see why moving the acpi calls into
+generic code would create issues (and why it has not been done before)
+as you mentioned in the commit log, so:
+
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+> diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
+> index 978d6af..be4c9ef 100644
+> --- a/arch/ia64/pci/pci.c
+> +++ b/arch/ia64/pci/pci.c
+> @@ -358,16 +358,6 @@ void pcibios_fixup_bus(struct pci_bus *b)
+>  	platform_pci_fixup_bus(b);
+>  }
+>  
+> -void pcibios_add_bus(struct pci_bus *bus)
+> -{
+> -	acpi_pci_add_bus(bus);
+> -}
+> -
+> -void pcibios_remove_bus(struct pci_bus *bus)
+> -{
+> -	acpi_pci_remove_bus(bus);
+> -}
+> -
+>  void pcibios_set_master (struct pci_dev *dev)
+>  {
+>  	/* No special bus mastering setup handling */
+> diff --git a/arch/x86/pci/common.c b/arch/x86/pci/common.c
+> index eccd4d9..ed3236d 100644
+> --- a/arch/x86/pci/common.c
+> +++ b/arch/x86/pci/common.c
+> @@ -171,16 +171,6 @@ void pcibios_fixup_bus(struct pci_bus *b)
+>  		pcibios_fixup_device_resources(dev);
+>  }
+>  
+> -void pcibios_add_bus(struct pci_bus *bus)
+> -{
+> -	acpi_pci_add_bus(bus);
+> -}
+> -
+> -void pcibios_remove_bus(struct pci_bus *bus)
+> -{
+> -	acpi_pci_remove_bus(bus);
+> -}
+> -
+>  /*
+>   * Only use DMI information to set this if nothing was passed
+>   * on the kernel command line (which was parsed earlier).
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index cad836f..2fbf840 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -12,6 +12,7 @@
+>  #include <linux/slab.h>
+>  #include <linux/module.h>
+>  #include <linux/cpumask.h>
+> +#include <linux/pci-acpi.h>
+>  #include <linux/pci-aspm.h>
+>  #include <linux/aer.h>
+>  #include <linux/acpi.h>
+> @@ -2067,10 +2068,12 @@ int __weak pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+>  
+>  void __weak pcibios_add_bus(struct pci_bus *bus)
+>  {
+> +	acpi_pci_add_bus(bus);
+>  }
+>  
+>  void __weak pcibios_remove_bus(struct pci_bus *bus)
+>  {
+> +	acpi_pci_remove_bus(bus);
+>  }
+>  
+>  struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+> -- 
+> 1.9.1
+> 
