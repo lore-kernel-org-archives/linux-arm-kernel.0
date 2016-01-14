@@ -1,92 +1,71 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu, 14 Jan 2016 20:23:18 +0300
-Subject: [PATCH v6 21/21] arm64: ilp32: wrap syscalls to remove top 32-bit
- vulnerability
-In-Reply-To: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1452792198-10718-22-git-send-email-ynorov@caviumnetworks.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 14 Jan 2016 12:32:03 -0500
+Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
+ hostbridge init based on ACPI
+In-Reply-To: <20160114170723.GB20706@red-moon>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <1452785393.28109.16.camel@redhat.com> <5697C0EB.4020404@codeaurora.org>
+ <20160114161238.GA20706@red-moon> <1452789524.28109.24.camel@redhat.com>
+ <20160114170723.GB20706@red-moon>
+Message-ID: <1452792723.28109.31.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The wrapper that clears top halves of registers looks like this:
+On Thu, 2016-01-14 at 17:07 +0000, Lorenzo Pieralisi wrote:
+> On Thu, Jan 14, 2016 at 11:38:44AM -0500, Mark Salter wrote:
+> 
+> [...]
+> 
+> > You would lose that bet. AddressMinimum/Maximum describe the
+> > PCI bus addresses.
+> 
+> In the mainline DT (APM Mustang), the CPU physical address corresponding
+> to IO space is 0xe010000000, PCI bus address is 0x0.
+> 
+> > ? ? ? ? ? ? ? ? QWordIO (ResourceProducer, MinFixed, MaxFixed, PosDecode, EntireRange,
+> > ????????????????????0x0000000000000000, // Granularity
+> > ????????????????????0x0000000010000000, // Range Minimum
+> 
+> 
+> > ????????????????????0x000000001000FFFF, // Range Maximum
+> > ????????????????????0x000000E000000000, // Translation Offset
+> 
+> See above, I will get the APM specifications to countercheck.
 
-0000000000000068 <compat_SyS_mknod>:
-COMPAT_SYSCALL_WRAP3(mknod, const char __user *, filename, umode_t, mode, unsigned, dev);
-68:   a9bf7bfd        stp     x29, x30, [sp,#-16]!
-6c:   910003fd        mov     x29, sp
-70:   2a0003e0        mov     w0, w0
-74:   94000000        bl      0 <sys_mknod>
-78:   a8c17bfd        ldp     x29, x30, [sp],#16
-7c:   d65f03c0        ret
+The spec won't help other than to verify that the PCIe bridge supports a 32-bit
+IO address space. The firmware sets the PCI bus base @ 0x10000000 with a CPU base
+address for that window @ 0xe010000000. The pci-xgene.c driver sets the PCI
+bus IO base address to whatever DT tells it too. For ACPI, we have to use whatever
+the firmware set it to and described it in the ACPI table.
 
-It looks quite nice overall. Unsafe pointer type is fixed with
-"mov w0, w0", and safe types are untouched.
+When I looked at this a while back, neither ACPI nor PCI had anything which
+disallowed 32-bit IO space on the PCI bus. The 16-bit limit is an x86 limit
+in the instruction set.
 
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
----
- arch/arm64/Kconfig                      |  1 +
- arch/arm64/include/asm/compat_wrapper.h | 14 ++++++++++++++
- arch/arm64/kernel/sys_ilp32.c           |  3 +++
- 3 files changed, 18 insertions(+)
- create mode 100644 arch/arm64/include/asm/compat_wrapper.h
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 8606c15..0344fc0 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -785,6 +785,7 @@ config AARCH32_EL0
- 
- config ARM64_ILP32
- 	bool "Kernel support for ILP32"
-+	select COMPAT_WRAPPER
- 	help
- 	  This option enables support for AArch64 ILP32 user space.  ILP32
- 	  is an ABI where long and pointers are 32bits but it uses the AARCH64
-diff --git a/arch/arm64/include/asm/compat_wrapper.h b/arch/arm64/include/asm/compat_wrapper.h
-new file mode 100644
-index 0000000..651b4e8
---- /dev/null
-+++ b/arch/arm64/include/asm/compat_wrapper.h
-@@ -0,0 +1,14 @@
-+#ifndef __ASM_COMPAT_WRAPPER
-+#define __ASM_COMPAT_WRAPPER
-+
-+/*
-+ *  Compat system call wrappers.
-+ */
-+
-+/*
-+ * This file is empty as arm64 is satisfied with generic
-+ * definitions of __SC_COMPAT_TYPE, _SC_COMPAT_CAST and
-+ * COMPAT_SYSCALL_WRAPx.
-+ */
-+
-+#endif /* __ASM_COMPAT_WRAPPER */
-diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
-index bed308c..c63725b 100644
---- a/arch/arm64/kernel/sys_ilp32.c
-+++ b/arch/arm64/kernel/sys_ilp32.c
-@@ -27,6 +27,7 @@
- #include <linux/slab.h>
- #include <linux/syscalls.h>
- #include <linux/compat.h>
-+#include <linux/compat_wrapper.h>
- #include <asm-generic/syscalls.h>
- 
- /* Using non-compat syscalls where necessary */
-@@ -50,11 +51,13 @@ asmlinkage long ilp32_sys_rt_sigreturn_wrapper(void);
- 
- #undef __SYSCALL
- #undef __SC_COMP
-+#undef __SC_WRAP
- #undef __SC_3264
- #undef __SC_COMP_3264
- 
- #define __SYSCALL_COMPAT
- #define __SYSCALL(nr, sym)	[nr] = sym,
-+#define __SC_WRAP(nr, sym)	[nr] = compat_##sym,
- 
- /*
-  * The sys_call_ilp32_table array must be 4K aligned to be accessible from
--- 
-2.5.0
+> 
+> I agree with you we have to verify if this IO space limitation is
+> real or it is just an x86ism, in which case we remove that check.
+> 
+> Lorenzo
+> > ????????????????????0x0000000000010000, // Length
+> > ????????????????????,, , TypeStatic)
+> 
+> > 
+> > 
+> > > Jiang's patch:
+> > > 
+> > > https://lkml.org/lkml/2015/12/16/249
+> > > 
+> > > parses the IO descriptors and stores the AddressMinimum, AddressMaximum
+> > > in the IO resource (with AddressTranslation as offset which must be the
+> > > *CPU* physical address mapping IO), from the log above it seems to me in
+> > > AddressMinimum APM specifies the *CPU* physical address generating IO
+> > > cycles.
+> > > 
+> > > All in all, I was right to fear this would happen, and I already
+> > > raised the point within the ACPI spec working group, ACPI IO
+> > > descriptors specification is ambiguous and we must agree on how
+> > > they have to be specified once for all.
+> > > 
+> > > Lorenzo
+> > 
