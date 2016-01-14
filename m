@@ -1,207 +1,870 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Thu, 14 Jan 2016 16:46:37 +0800
-Subject: [RFC/PATCH] drm/rockchip: don't wait for vblank if fb hasn't
- changed
-In-Reply-To: <CAKMK7uGQ47eLS2HxUP2+tQcf5cZm+eoGryCRrBzA2b8=77ox-Q@mail.gmail.com>
-References: <1452689614-6570-1-git-send-email-john@metanate.com>	<20160113142320.GQ19130@phenom.ffwll.local>	<20160113143425.363ce07a.john@metanate.com>	<20160113154005.GT19130@phenom.ffwll.local>	<20160113155529.6048b2c1.john@metanate.com>	<20160113162156.GA19130@phenom.ffwll.local>	<20160113164038.5fcf670f.john@metanate.com>	<20160113171917.GC19130@phenom.ffwll.local>	<20160113173954.52e688fc.john@metanate.com>	<5696F6F4.5060908@rock-chips.com>
- <CAKMK7uGQ47eLS2HxUP2+tQcf5cZm+eoGryCRrBzA2b8=77ox-Q@mail.gmail.com>
-Message-ID: <5697606D.50603@rock-chips.com>
+From: kernel.org.gnu@gmail.com (Dennis Chen)
+Date: Thu, 14 Jan 2016 16:48:36 +0800
+Subject: [PATCH v6 1/5] APCI: MCFG: Move mmcfg_list management to
+ drivers/acpi
+In-Reply-To: <1452756761-29584-2-git-send-email-jchandra@broadcom.com>
+References: <1452756761-29584-1-git-send-email-jchandra@broadcom.com>
+ <1452756761-29584-2-git-send-email-jchandra@broadcom.com>
+Message-ID: <CA+U0gVjFOBGSvMdqu3hCnr79SjBkwNFgd4qfvWckDKSuHdPgsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?01?14? 16:32, Daniel Vetter wrote:
-> On Thu, Jan 14, 2016 at 2:16 AM, Mark yao <mark.yao@rock-chips.com> wrote:
->> On 2016?01?14? 01:39, John Keeping wrote:
->>> On Wed, 13 Jan 2016 18:19:17 +0100, Daniel Vetter wrote:
->>>
->>>> On Wed, Jan 13, 2016 at 04:40:38PM +0000, John Keeping wrote:
->>>>> On Wed, 13 Jan 2016 17:21:56 +0100, Daniel Vetter wrote:
->>>>>
->>>>>> On Wed, Jan 13, 2016 at 03:55:29PM +0000, John Keeping wrote:
->>>>>>> On Wed, 13 Jan 2016 16:40:05 +0100, Daniel Vetter wrote:
->>>>>>>
->>>>>>>> On Wed, Jan 13, 2016 at 02:34:25PM +0000, John Keeping wrote:
->>>>>>>>> On Wed, 13 Jan 2016 15:23:20 +0100, Daniel Vetter wrote:
->>>>>>>>>
->>>>>>>>>> On Wed, Jan 13, 2016 at 12:53:34PM +0000, John Keeping wrote:
->>>>>>>>>>> As commented in drm_atomic_helper_wait_for_vblanks(), userspace
->>>>>>>>>>> relies on cursor ioctls being unsynced.  Converting the rockchip
->>>>>>>>>>> driver to atomic has significantly impacted cursor performance by
->>>>>>>>>>> making every cursor update wait for vblank.
->>>>>>>>>>>
->>>>>>>>>>> By skipping the vblank sync when the framebuffer has not changed
->>>>>>>>>>> (as is done in drm_atomic_helper_wait_for_vblanks()) we can avoid
->>>>>>>>>>> this for the common case of moving the cursor and only need to
->>>>>>>>>>> delay the cursor ioctl when the cursor icon changes.
->>>>>>>>>>>
->>>>>>>>>>> I originally inserted a check on legacy_cursor_update as well, but
->>>>>>>>>>> that caused a storm of iommu page faults.  I didn't investigate
->>>>>>>>>>> the
->>>>>>>>>>> cause of those since this change gives enough of a performance
->>>>>>>>>>> improvement for my use case.
->>>>>>>>>>>
->>>>>>>>>>> This is RFC because of that and because the framebuffer_changed()
->>>>>>>>>>> function is copied from drm_atomic_helper.c as a quick way to test
->>>>>>>>>>> the result.
->>>>>>>>>>>
->>>>>>>>>>> Signed-off-by: John Keeping <john@metanate.com>
->>>>>>>>>>> ---
->>>>>>>>>>>    drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 27
->>>>>>>>>>> +++++++++++++++++++++++++-- 1 file changed, 25 insertions(+), 2
->>>>>>>>>>> deletions(-)
->>>>>>>>>>>
->>>>>>>>>>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
->>>>>>>>>>> b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c index
->>>>>>>>>>> f784488..8fd9821
->>>>>>>>>>> 100644 --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
->>>>>>>>>>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
->>>>>>>>>>> @@ -177,8 +177,28 @@ static void
->>>>>>>>>>> rockchip_crtc_wait_for_update(struct drm_crtc *crtc)
->>>>>>>>>>> crtc_funcs->wait_for_update(crtc); }
->>>>>>>>>>>    +static bool framebuffer_changed(struct drm_device *dev,
->>>>>>>>>>> +                               struct drm_atomic_state
->>>>>>>>>>> *old_state,
->>>>>>>>>>> +                               struct drm_crtc *crtc)
->>>>>>>>>>> +{
->>>>>>>>>>> +       struct drm_plane *plane;
->>>>>>>>>>> +       struct drm_plane_state *old_plane_state;
->>>>>>>>>>> +       int i;
->>>>>>>>>>> +
->>>>>>>>>>> +       for_each_plane_in_state(old_state, plane, old_plane_state,
->>>>>>>>>>> i) {
->>>>>>>>>>> +               if (plane->state->crtc != crtc &&
->>>>>>>>>>> +                   old_plane_state->crtc != crtc)
->>>>>>>>>>> +                       continue;
->>>>>>>>>>> +
->>>>>>>>>>> +               if (plane->state->fb != old_plane_state->fb)
->>>>>>>>>>> +                       return true;
->>>>>>>>>>> +       }
->>>>>>>>>>> +
->>>>>>>>>>> +       return false;
->>>>>>>>>>> +}
->>>>>>>>>> Please don't hand-roll logic that affects semantics like this.
->>>>>>>>>> Instead
->>>>>>>>>> please use drm_atomic_helper_wait_for_vblanks(), which should do
->>>>>>>>>> this
->>>>>>>>>> correctly for you.
->>>>>>>>>>
->>>>>>>>>> If that's not the case then we need to improve the generic helper,
->>>>>>>>>> or
->>>>>>>>>> figure out what's different with rockhip.
->>>>>>>>> According to commit 63ebb9f (drm/rockchip: Convert to support atomic
->>>>>>>>> API) it's because rockchip doesn't have a hardware vblank counter.
->>>>>>>>>
->>>>>>>>> I'm not entirely clear on why this prevents the use of
->>>>>>>>> drm_atomic_helper_wait_for_vblanks().
->>>>>>>> Hm, that commit isn't terribly helpful. If that's really needed then
->>>>>>>> imo I
->>>>>>>> think we should extract a
->>>>>>>> "drm_atomic_helper_plane_needs_vblank_wait()"
->>>>>>>> helper that's used by both. But since rockchip does vblank_get/put
->>>>>>>> calls
->>>>>>>> I'd hope vblanks actually work correctly. And then the helper should
->>>>>>>> work
->>>>>>>> too.
->>>>>>> I tried switching the call to rockchip_crtc_wait_for_update() to
->>>>>>> drm_atomic_helper_wait_for_vblanks() and it works fine until I switch
->>>>>>> the buffer associated with a cursor, at which point I get iommu page
->>>>>>> faults, presumably because the GEM buffer is unreferenced too early.
->>>>>>>
->>>>>>> AFAICT the buffer will be released via drm_atomic_state_free()
->>>>>>> unconditionally, but I suspect I'm missing something since that would
->>>>>>> mean every driver would hit a similar problem.
->>>>>> Yeah, with the helper we always skip, which means when the cursor bo
->>>>>> changes you indeed unmap too early. So can't even share the overall
->>>>>> condition, but we could definitely share the little framebuffer_changed
->>>>>> helper.
->>>>> That leaves me with the question: why do other atomic drivers work?
->>>>>
->>>>> If drm_atomic_helper_wait_for_vblanks() skipping vblanks results in the
->>>>> cursor bo being unmapped too early for rockchip, why is it not unmapped
->>>>> too early for all of the other drivers using that helper?
->>>> It's unmapped too early for everyone, it's just that normally that
->>>> doesn't
->>>> result in a fireworks show. What we maybe could/should do is do the
->>>> unmapping asynchronously, but that runs into the overall "current atomic
->>>> helpers don't do async yet" problem. Might be a good point to start
->>>> fixing
->>>> this up though.
->>> OK, thanks, I think I'm beginning to understand how this all fits
->>> together.
->>>
->>> It looks like there are two options for me to get reasonable cursor
->>> performance on rockchip in the short term:
->>>
->>> 1) Export the current framebuffer_changed() function as
->>>      drm_atomic_helper_framebuffer_changed() and use it in
->>>      rockchip_crtc_wait_for_update().
->>>
->>> 2) Add a mechanism to suppress the legacy_cursor_update check in
->>>      drm_atomic_helper_wait_for_vblanks() and switch the rockchip driver
->>>      over to it.
->>>
->>> In both of these cases we're only restoring the unsynced cursor ioctls
->>> behaviour when the cursor is moved but it will still be expensive when
->>> the cursor bo changes.  That gives sufficient performance in my testing.
->>>
->>>
->>>
->> Thanks for point that.
->>
->> because rockchip not support hardware vblank counter, use
->> drm_atomic_helper_wait_for_vblanks have under issues:
->>
->>                                               | <-- HW vsync irq and reg take
->> effect
->>              plane_commit  --->  |
->>       get_vblank and wait ->   |
->>                                               | <-- handle_vblank,
->> vblank->count + 1
->>                   cleanup_fb   ---> |
->>                iommu crash  --->  |
->>                                               | <-- HW vsync irq and reg take
->> effect
->> there is no hardware vblank counter on rockchip vop, we can't ensure the
->> consistency of reg take effect and vblank->count,
->> if plane commit hit into the period of  reg take effect and vblank->count,
->> cleanup_fb happen before old_fb swap out from vop,
->> then iommu crash.
->>
->> That is why I special the wait_for_vblanks, we need check the reg really
->> take effect before clean up old fb.
->> at vop_win_pending_is_complete function, check win enable and win address,
->> to ensure that.
->>
->> Not only rockchip drm do that thing:
->>
->> exynos also check address before cleanup fb
->>          if (start == start_s)
->>              exynos_drm_crtc_finish_update(ctx->crtc, plane);
->>
->> Thanks.
-> Do you have a scanline counter or something similar at least? Any
-> other indication about how far along the chip is with scanning out? We
-> use that in i915 to avoid races with the interrupt handler and detect
-> this w/a scenario.
+On Thu, Jan 14, 2016 at 3:32 PM, Jayachandran C <jchandra@broadcom.com> wrote:
+> Move pci_mmcfg_list handling to a drivers/acpi/pci_mcfg.c. This is
+> to share the API and code with ARM64 later. The corresponding
+> declarations are moved from asm/pci_x86.h to linux/pci-acpi.h
 >
-> I think if you have a scanline counter then it should magically work,
-> since the vblank code will realize that you're already past the last
-> vblank interrupt and /should/ have incremented already. Or something
-> like that.
+> As a part of this we introduce three functions that can be
+> implemented by the arch code: pci_mmconfig_map_resource() to map a
+> mcfg entry, pci_mmconfig_unmap_resource to do the corresponding
+> unmap and pci_mmconfig_enabled to see if the arch setup of
+> mcfg entries was successful. We also provide weak implementations
+> of these, which will be used from ARM64. On x86, we retain the
+> old logic by providing platform specific implementation.
 >
-> Otherwise if this is common we might want to figure out how to solve
-> this in a generic way. It's one of these problems that will make
-> generic async support almost impossible.
-> -Daniel
+> This patch is purely rearranging code, it should not have any
+> impact on the logic of MCFG parsing or list handling.
+>
+> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> ---
+>  arch/x86/include/asm/pci_x86.h |  24 +---
+>  arch/x86/pci/mmconfig-shared.c | 269 +++++------------------------------
+>  arch/x86/pci/mmconfig_32.c     |   1 +
+>  arch/x86/pci/mmconfig_64.c     |   1 +
+>  arch/x86/pci/numachip.c        |   1 +
+>  drivers/acpi/Makefile          |   1 +
+>  drivers/acpi/pci_mcfg.c        | 312 +++++++++++++++++++++++++++++++++++++++++
+>  drivers/xen/pci.c              |   5 +-
+>  include/linux/pci-acpi.h       |  33 +++++
+>  9 files changed, 386 insertions(+), 261 deletions(-)
+>  create mode 100644 drivers/acpi/pci_mcfg.c
+>
+> diff --git a/arch/x86/include/asm/pci_x86.h b/arch/x86/include/asm/pci_x86.h
+> index fa1195d..83d74cb 100644
+> --- a/arch/x86/include/asm/pci_x86.h
+> +++ b/arch/x86/include/asm/pci_x86.h
+> @@ -122,33 +122,11 @@ extern int pci_legacy_init(void);
+>  extern void pcibios_fixup_irqs(void);
+>
+>  /* pci-mmconfig.c */
+> -
+> -/* "PCI MMCONFIG %04x [bus %02x-%02x]" */
+> -#define PCI_MMCFG_RESOURCE_NAME_LEN (22 + 4 + 2 + 2)
+> -
+> -struct pci_mmcfg_region {
+> -       struct list_head list;
+> -       struct resource res;
+> -       u64 address;
+> -       char __iomem *virt;
+> -       u16 segment;
+> -       u8 start_bus;
+> -       u8 end_bus;
+> -       char name[PCI_MMCFG_RESOURCE_NAME_LEN];
+> -};
+> -
+> +struct pci_mmcfg_region;
+>  extern int __init pci_mmcfg_arch_init(void);
+>  extern void __init pci_mmcfg_arch_free(void);
+>  extern int pci_mmcfg_arch_map(struct pci_mmcfg_region *cfg);
+>  extern void pci_mmcfg_arch_unmap(struct pci_mmcfg_region *cfg);
+> -extern int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
+> -                              phys_addr_t addr);
+> -extern int pci_mmconfig_delete(u16 seg, u8 start, u8 end);
+> -extern struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus);
+> -
+> -extern struct list_head pci_mmcfg_list;
+> -
+> -#define PCI_MMCFG_BUS_OFFSET(bus)      ((bus) << 20)
+>
+>  /*
+>   * AMD Fam10h CPUs are buggy, and cannot access MMIO config space
+> diff --git a/arch/x86/pci/mmconfig-shared.c b/arch/x86/pci/mmconfig-shared.c
+> index dd30b7e..626710b 100644
+> --- a/arch/x86/pci/mmconfig-shared.c
+> +++ b/arch/x86/pci/mmconfig-shared.c
+> @@ -12,13 +12,12 @@
+>
+>  #include <linux/pci.h>
+>  #include <linux/init.h>
+> -#include <linux/sfi_acpi.h>
+>  #include <linux/bitmap.h>
+> -#include <linux/dmi.h>
+>  #include <linux/slab.h>
+>  #include <linux/mutex.h>
+>  #include <linux/rculist.h>
+>  #include <asm/e820.h>
+> +#include <linux/pci-acpi.h>
+>  #include <asm/pci_x86.h>
+>  #include <asm/acpi.h>
+>
+> @@ -27,9 +26,6 @@
+>  /* Indicate if the mmcfg resources have been placed into the resource table. */
+>  static bool pci_mmcfg_running_state;
+>  static bool pci_mmcfg_arch_init_failed;
+> -static DEFINE_MUTEX(pci_mmcfg_lock);
+> -
+> -LIST_HEAD(pci_mmcfg_list);
+>
+>  static void __init pci_mmconfig_remove(struct pci_mmcfg_region *cfg)
+>  {
+> @@ -48,83 +44,6 @@ static void __init free_all_mmcfg(void)
+>                 pci_mmconfig_remove(cfg);
+>  }
+>
+> -static void list_add_sorted(struct pci_mmcfg_region *new)
+> -{
+> -       struct pci_mmcfg_region *cfg;
+> -
+> -       /* keep list sorted by segment and starting bus number */
+> -       list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list) {
+> -               if (cfg->segment > new->segment ||
+> -                   (cfg->segment == new->segment &&
+> -                    cfg->start_bus >= new->start_bus)) {
+> -                       list_add_tail_rcu(&new->list, &cfg->list);
+> -                       return;
+> -               }
+> -       }
+> -       list_add_tail_rcu(&new->list, &pci_mmcfg_list);
+> -}
+> -
+> -static struct pci_mmcfg_region *pci_mmconfig_alloc(int segment, int start,
+> -                                                  int end, u64 addr)
+> -{
+> -       struct pci_mmcfg_region *new;
+> -       struct resource *res;
+> -
+> -       if (addr == 0)
+> -               return NULL;
+> -
+> -       new = kzalloc(sizeof(*new), GFP_KERNEL);
+> -       if (!new)
+> -               return NULL;
+> -
+> -       new->address = addr;
+> -       new->segment = segment;
+> -       new->start_bus = start;
+> -       new->end_bus = end;
+> -
+> -       res = &new->res;
+> -       res->start = addr + PCI_MMCFG_BUS_OFFSET(start);
+> -       res->end = addr + PCI_MMCFG_BUS_OFFSET(end + 1) - 1;
+> -       res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
+> -       snprintf(new->name, PCI_MMCFG_RESOURCE_NAME_LEN,
+> -                "PCI MMCONFIG %04x [bus %02x-%02x]", segment, start, end);
+> -       res->name = new->name;
+> -
+> -       return new;
+> -}
 
-No, both rk3288 or rk3036 not support hardware vblank counter and 
-scanline counter.
+Hmm, long long story about this refactor of pci code under x86 folder.
+I think everyone who as long as has the brain in his head knows these
+are the common code, not arch specific. But those kind of patches
+repeats again and again and again in the mail list while our
+maintainers are selective blind to this.
 
-At android side, we use same way, check address and enable bit to ensure 
-register take effect.
-
-On future chips,  scanline counter and hardware counter would be 
-support, but not now.
-
--- 
-?ark Yao
+> -
+> -static struct pci_mmcfg_region *__init pci_mmconfig_add(int segment, int start,
+> -                                                       int end, u64 addr)
+> -{
+> -       struct pci_mmcfg_region *new;
+> -
+> -       new = pci_mmconfig_alloc(segment, start, end, addr);
+> -       if (new) {
+> -               mutex_lock(&pci_mmcfg_lock);
+> -               list_add_sorted(new);
+> -               mutex_unlock(&pci_mmcfg_lock);
+> -
+> -               pr_info(PREFIX
+> -                      "MMCONFIG for domain %04x [bus %02x-%02x] at %pR "
+> -                      "(base %#lx)\n",
+> -                      segment, start, end, &new->res, (unsigned long)addr);
+> -       }
+> -
+> -       return new;
+> -}
+> -
+> -struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus)
+> -{
+> -       struct pci_mmcfg_region *cfg;
+> -
+> -       list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list)
+> -               if (cfg->segment == segment &&
+> -                   cfg->start_bus <= bus && bus <= cfg->end_bus)
+> -                       return cfg;
+> -
+> -       return NULL;
+> -}
+> -
+>  static const char *__init pci_mmcfg_e7520(void)
+>  {
+>         u32 win;
+> @@ -543,73 +462,6 @@ static void __init pci_mmcfg_reject_broken(int early)
+>         }
+>  }
+>
+> -static int __init acpi_mcfg_check_entry(struct acpi_table_mcfg *mcfg,
+> -                                       struct acpi_mcfg_allocation *cfg)
+> -{
+> -       int year;
+> -
+> -       if (cfg->address < 0xFFFFFFFF)
+> -               return 0;
+> -
+> -       if (!strncmp(mcfg->header.oem_id, "SGI", 3))
+> -               return 0;
+> -
+> -       if (mcfg->header.revision >= 1) {
+> -               if (dmi_get_date(DMI_BIOS_DATE, &year, NULL, NULL) &&
+> -                   year >= 2010)
+> -                       return 0;
+> -       }
+> -
+> -       pr_err(PREFIX "MCFG region for %04x [bus %02x-%02x] at %#llx "
+> -              "is above 4GB, ignored\n", cfg->pci_segment,
+> -              cfg->start_bus_number, cfg->end_bus_number, cfg->address);
+> -       return -EINVAL;
+> -}
+> -
+> -static int __init pci_parse_mcfg(struct acpi_table_header *header)
+> -{
+> -       struct acpi_table_mcfg *mcfg;
+> -       struct acpi_mcfg_allocation *cfg_table, *cfg;
+> -       unsigned long i;
+> -       int entries;
+> -
+> -       if (!header)
+> -               return -EINVAL;
+> -
+> -       mcfg = (struct acpi_table_mcfg *)header;
+> -
+> -       /* how many config structures do we have */
+> -       free_all_mmcfg();
+> -       entries = 0;
+> -       i = header->length - sizeof(struct acpi_table_mcfg);
+> -       while (i >= sizeof(struct acpi_mcfg_allocation)) {
+> -               entries++;
+> -               i -= sizeof(struct acpi_mcfg_allocation);
+> -       }
+> -       if (entries == 0) {
+> -               pr_err(PREFIX "MMCONFIG has no entries\n");
+> -               return -ENODEV;
+> -       }
+> -
+> -       cfg_table = (struct acpi_mcfg_allocation *) &mcfg[1];
+> -       for (i = 0; i < entries; i++) {
+> -               cfg = &cfg_table[i];
+> -               if (acpi_mcfg_check_entry(mcfg, cfg)) {
+> -                       free_all_mmcfg();
+> -                       return -ENODEV;
+> -               }
+> -
+> -               if (pci_mmconfig_add(cfg->pci_segment, cfg->start_bus_number,
+> -                                  cfg->end_bus_number, cfg->address) == NULL) {
+> -                       pr_warn(PREFIX "no memory for MCFG entries\n");
+> -                       free_all_mmcfg();
+> -                       return -ENOMEM;
+> -               }
+> -       }
+> -
+> -       return 0;
+> -}
+> -
+>  #ifdef CONFIG_ACPI_APEI
+>  extern int (*arch_apei_filter_addr)(int (*func)(__u64 start, __u64 size,
+>                                      void *data), void *data);
+> @@ -662,13 +514,20 @@ static void __init __pci_mmcfg_init(int early)
+>
+>  static int __initdata known_bridge;
+>
+> +static void __init pci_mmcfg_list_setup(void)
+> +{
+> +       free_all_mmcfg();
+> +       if (pci_mmconfig_parse_table())
+> +               free_all_mmcfg();
+> +}
+> +
+>  void __init pci_mmcfg_early_init(void)
+>  {
+>         if (pci_probe & PCI_PROBE_MMCONF) {
+>                 if (pci_mmcfg_check_hostbridge())
+>                         known_bridge = 1;
+>                 else
+> -                       acpi_sfi_table_parse(ACPI_SIG_MCFG, pci_parse_mcfg);
+> +                       pci_mmcfg_list_setup();
+>                 __pci_mmcfg_init(1);
+>
+>                 set_apei_filter();
+> @@ -686,7 +545,7 @@ void __init pci_mmcfg_late_init(void)
+>
+>         /* MMCONFIG hasn't been enabled yet, try again */
+>         if (pci_probe & PCI_PROBE_MASK & ~PCI_PROBE_MMCONF) {
+> -               acpi_sfi_table_parse(ACPI_SIG_MCFG, pci_parse_mcfg);
+> +               pci_mmcfg_list_setup();
+>                 __pci_mmcfg_init(0);
+>         }
+>  }
+> @@ -720,99 +579,41 @@ static int __init pci_mmcfg_late_insert_resources(void)
+>   */
+>  late_initcall(pci_mmcfg_late_insert_resources);
+>
+> -/* Add MMCFG information for host bridges */
+> -int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
+> -                       phys_addr_t addr)
+> +int pci_mmconfig_map_resource(struct device *dev, struct pci_mmcfg_region *cfg)
+>  {
+> -       int rc;
+> -       struct resource *tmp = NULL;
+> -       struct pci_mmcfg_region *cfg;
+> +       struct resource *tmp;
+>
+> -       if (!(pci_probe & PCI_PROBE_MMCONF) || pci_mmcfg_arch_init_failed)
+> -               return -ENODEV;
+> -
+> -       if (start > end)
+> -               return -EINVAL;
+> -
+> -       mutex_lock(&pci_mmcfg_lock);
+> -       cfg = pci_mmconfig_lookup(seg, start);
+> -       if (cfg) {
+> -               if (cfg->end_bus < end)
+> -                       dev_info(dev, FW_INFO
+> -                                "MMCONFIG for "
+> -                                "domain %04x [bus %02x-%02x] "
+> -                                "only partially covers this bridge\n",
+> -                                 cfg->segment, cfg->start_bus, cfg->end_bus);
+> -               mutex_unlock(&pci_mmcfg_lock);
+> -               return -EEXIST;
+> -       }
+> -
+> -       if (!addr) {
+> -               mutex_unlock(&pci_mmcfg_lock);
+> -               return -EINVAL;
+> -       }
+> -
+> -       rc = -EBUSY;
+> -       cfg = pci_mmconfig_alloc(seg, start, end, addr);
+> -       if (cfg == NULL) {
+> -               dev_warn(dev, "fail to add MMCONFIG (out of memory)\n");
+> -               rc = -ENOMEM;
+> -       } else if (!pci_mmcfg_check_reserved(dev, cfg, 0)) {
+> +       if (!pci_mmcfg_check_reserved(dev, cfg, 0)) {
+>                 dev_warn(dev, FW_BUG "MMCONFIG %pR isn't reserved\n",
+>                          &cfg->res);
+> -       } else {
+> -               /* Insert resource if it's not in boot stage */
+> -               if (pci_mmcfg_running_state)
+> -                       tmp = insert_resource_conflict(&iomem_resource,
+> -                                                      &cfg->res);
+> -
+> +               return -EBUSY;
+> +       }
+> +       /* Insert resource if it's not in boot stage */
+> +       if (pci_mmcfg_running_state) {
+> +               tmp = insert_resource_conflict(&iomem_resource,
+> +                                              &cfg->res);
+>                 if (tmp) {
+> -                       dev_warn(dev,
+> -                                "MMCONFIG %pR conflicts with "
+> -                                "%s %pR\n",
+> -                                &cfg->res, tmp->name, tmp);
+> -               } else if (pci_mmcfg_arch_map(cfg)) {
+> -                       dev_warn(dev, "fail to map MMCONFIG %pR.\n",
+> -                                &cfg->res);
+> -               } else {
+> -                       list_add_sorted(cfg);
+> -                       dev_info(dev, "MMCONFIG at %pR (base %#lx)\n",
+> -                                &cfg->res, (unsigned long)addr);
+> -                       cfg = NULL;
+> -                       rc = 0;
+> +                       dev_warn(dev, "MMCONFIG %pR conflicts with %s %pR\n",
+> +                               &cfg->res, tmp->name, tmp);
+> +                       return -EBUSY;
+>                 }
+>         }
+> -
+> -       if (cfg) {
+> -               if (cfg->res.parent)
+> -                       release_resource(&cfg->res);
+> -               kfree(cfg);
+> +       if (pci_mmcfg_arch_map(cfg)) {
+> +               dev_warn(dev, "fail to map MMCONFIG %pR.\n", &cfg->res);
+> +               return -EBUSY;
+>         }
+> -
+> -       mutex_unlock(&pci_mmcfg_lock);
+> -
+> -       return rc;
+> +       return 0;
+>  }
+>
+> -/* Delete MMCFG information for host bridges */
+> -int pci_mmconfig_delete(u16 seg, u8 start, u8 end)
+> +void pci_mmconfig_unmap_resource(struct pci_mmcfg_region *cfg)
+>  {
+> -       struct pci_mmcfg_region *cfg;
+> -
+> -       mutex_lock(&pci_mmcfg_lock);
+> -       list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list)
+> -               if (cfg->segment == seg && cfg->start_bus == start &&
+> -                   cfg->end_bus == end) {
+> -                       list_del_rcu(&cfg->list);
+> -                       synchronize_rcu();
+> -                       pci_mmcfg_arch_unmap(cfg);
+> -                       if (cfg->res.parent)
+> -                               release_resource(&cfg->res);
+> -                       mutex_unlock(&pci_mmcfg_lock);
+> -                       kfree(cfg);
+> -                       return 0;
+> -               }
+> -       mutex_unlock(&pci_mmcfg_lock);
+> +       pci_mmcfg_arch_unmap(cfg);
+> +       if (cfg->res.parent)
+> +               release_resource(&cfg->res);
+> +       cfg->res.parent = NULL;
+> +}
+>
+> -       return -ENOENT;
+> +int pci_mmconfig_enabled(void)
+> +{
+> +       return (pci_probe & PCI_PROBE_MMCONF) && !pci_mmcfg_arch_init_failed;
+>  }
+> diff --git a/arch/x86/pci/mmconfig_32.c b/arch/x86/pci/mmconfig_32.c
+> index 43984bc..38a37f8 100644
+> --- a/arch/x86/pci/mmconfig_32.c
+> +++ b/arch/x86/pci/mmconfig_32.c
+> @@ -12,6 +12,7 @@
+>  #include <linux/pci.h>
+>  #include <linux/init.h>
+>  #include <linux/rcupdate.h>
+> +#include <linux/pci-acpi.h>
+>  #include <asm/e820.h>
+>  #include <asm/pci_x86.h>
+>
+> diff --git a/arch/x86/pci/mmconfig_64.c b/arch/x86/pci/mmconfig_64.c
+> index bea5249..29253ec 100644
+> --- a/arch/x86/pci/mmconfig_64.c
+> +++ b/arch/x86/pci/mmconfig_64.c
+> @@ -10,6 +10,7 @@
+>  #include <linux/acpi.h>
+>  #include <linux/bitmap.h>
+>  #include <linux/rcupdate.h>
+> +#include <linux/pci-acpi.h>
+>  #include <asm/e820.h>
+>  #include <asm/pci_x86.h>
+>
+> diff --git a/arch/x86/pci/numachip.c b/arch/x86/pci/numachip.c
+> index 2e565e6..c181eeb 100644
+> --- a/arch/x86/pci/numachip.c
+> +++ b/arch/x86/pci/numachip.c
+> @@ -14,6 +14,7 @@
+>   */
+>
+>  #include <linux/pci.h>
+> +#include <linux/pci-acpi.h>
+>  #include <asm/pci_x86.h>
+>
+>  static u8 limit __read_mostly;
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index 675eaf3..3f65311 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -40,6 +40,7 @@ acpi-$(CONFIG_ARCH_MIGHT_HAVE_ACPI_PDC) += processor_pdc.o
+>  acpi-y                         += ec.o
+>  acpi-$(CONFIG_ACPI_DOCK)       += dock.o
+>  acpi-y                         += pci_root.o pci_link.o pci_irq.o
+> +acpi-$(CONFIG_PCI_MMCONFIG)    += pci_mcfg.o
+>  acpi-y                         += acpi_lpss.o acpi_apd.o
+>  acpi-y                         += acpi_platform.o
+>  acpi-y                         += acpi_pnp.o
+> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+> new file mode 100644
+> index 0000000..ea84365
+> --- /dev/null
+> +++ b/drivers/acpi/pci_mcfg.c
+> @@ -0,0 +1,312 @@
+> +/*
+> + * pci_mcfg.c
+> + *
+> + * Common code to maintain the MCFG areas and mappings
+> + *
+> + * This has been extracted from arch/x86/pci/mmconfig-shared.c
+> + * and moved here so that other architectures can use this code.
+> + */
+> +
+> +#include <linux/pci.h>
+> +#include <linux/init.h>
+> +#include <linux/dmi.h>
+> +#include <linux/pci-acpi.h>
+> +#include <linux/sfi_acpi.h>
+> +#include <linux/slab.h>
+> +#include <linux/mutex.h>
+> +#include <linux/rculist.h>
+> +
+> +#define PREFIX "ACPI: "
+> +
+> +static DEFINE_MUTEX(pci_mmcfg_lock);
+> +LIST_HEAD(pci_mmcfg_list);
+> +
+> +static void list_add_sorted(struct pci_mmcfg_region *new)
+> +{
+> +       struct pci_mmcfg_region *cfg;
+> +
+> +       /* keep list sorted by segment and starting bus number */
+> +       list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list) {
+> +               if (cfg->segment > new->segment ||
+> +                   (cfg->segment == new->segment &&
+> +                    cfg->start_bus >= new->start_bus)) {
+> +                       list_add_tail_rcu(&new->list, &cfg->list);
+> +                       return;
+> +               }
+> +       }
+> +       list_add_tail_rcu(&new->list, &pci_mmcfg_list);
+> +}
+> +
+> +static struct pci_mmcfg_region *pci_mmconfig_alloc(int segment, int start,
+> +                                                  int end, u64 addr)
+> +{
+> +       struct pci_mmcfg_region *new;
+> +       struct resource *res;
+> +
+> +       if (addr == 0)
+> +               return NULL;
+> +
+> +       new = kzalloc(sizeof(*new), GFP_KERNEL);
+> +       if (!new)
+> +               return NULL;
+> +
+> +       new->address = addr;
+> +       new->segment = segment;
+> +       new->start_bus = start;
+> +       new->end_bus = end;
+> +
+> +       res = &new->res;
+> +       res->start = addr + PCI_MMCFG_BUS_OFFSET(start);
+> +       res->end = addr + PCI_MMCFG_BUS_OFFSET(end + 1) - 1;
+> +       res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
+> +       snprintf(new->name, PCI_MMCFG_RESOURCE_NAME_LEN,
+> +                "PCI MMCONFIG %04x [bus %02x-%02x]", segment, start, end);
+> +       res->name = new->name;
+> +
+> +       return new;
+> +}
+> +
+> +struct pci_mmcfg_region *pci_mmconfig_add(int segment, int start,
+> +                                                       int end, u64 addr)
+> +{
+> +       struct pci_mmcfg_region *new;
+> +
+> +       new = pci_mmconfig_alloc(segment, start, end, addr);
+> +       if (new) {
+> +               mutex_lock(&pci_mmcfg_lock);
+> +               list_add_sorted(new);
+> +               mutex_unlock(&pci_mmcfg_lock);
+> +
+> +               pr_info(PREFIX
+> +                      "MMCONFIG for domain %04x [bus %02x-%02x] at %pR "
+> +                      "(base %#lx)\n",
+> +                      segment, start, end, &new->res, (unsigned long)addr);
+> +       }
+> +
+> +       return new;
+> +}
+> +
+> +struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus)
+> +{
+> +       struct pci_mmcfg_region *cfg;
+> +
+> +       list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list)
+> +               if (cfg->segment == segment &&
+> +                   cfg->start_bus <= bus && bus <= cfg->end_bus)
+> +                       return cfg;
+> +
+> +       return NULL;
+> +}
+> +
+> +/*
+> + * Map a pci_mmcfg_region, can be overrriden by arch
+> + */
+> +int __weak pci_mmconfig_map_resource(struct device *dev,
+> +       struct pci_mmcfg_region *mcfg)
+> +{
+> +       struct resource *tmp;
+> +       void __iomem *vaddr;
+> +
+> +       tmp = insert_resource_conflict(&iomem_resource, &mcfg->res);
+> +       if (tmp) {
+> +               dev_warn(dev, "MMCONFIG %pR conflicts with %s %pR\n",
+> +                       &mcfg->res, tmp->name, tmp);
+> +               return -EBUSY;
+> +       }
+> +
+> +       vaddr =  ioremap(mcfg->res.start, resource_size(&mcfg->res));
+> +       if (!vaddr) {
+> +               release_resource(&mcfg->res);
+> +               return -ENOMEM;
+> +       }
+> +
+> +       mcfg->virt = vaddr;
+> +       return 0;
+> +}
+> +
+> +/*
+> + * Unmap a pci_mmcfg_region, can be overrriden by arch
+> + */
+> +void __weak pci_mmconfig_unmap_resource(struct pci_mmcfg_region *mcfg)
+> +{
+> +       if (mcfg->virt) {
+> +               iounmap(mcfg->virt);
+> +               mcfg->virt = NULL;
+> +       }
+> +       if (mcfg->res.parent) {
+> +               release_resource(&mcfg->res);
+> +               mcfg->res.parent = NULL;
+> +       }
+> +}
+> +
+> +/*
+> + * check if the mmconfig is enabled and configured
+> + */
+> +int __weak pci_mmconfig_enabled(void)
+> +{
+> +       return 1;
+> +}
+> +
+> +/* Add MMCFG information for host bridges */
+> +int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
+> +                       phys_addr_t addr)
+> +{
+> +       struct pci_mmcfg_region *cfg;
+> +       int rc;
+> +
+> +       if (!pci_mmconfig_enabled())
+> +               return -ENODEV;
+> +       if (start > end)
+> +               return -EINVAL;
+> +
+> +       mutex_lock(&pci_mmcfg_lock);
+> +       cfg = pci_mmconfig_lookup(seg, start);
+> +       if (cfg) {
+> +               if (cfg->end_bus < end)
+> +                       dev_info(dev, FW_INFO
+> +                                "MMCONFIG for "
+> +                                "domain %04x [bus %02x-%02x] "
+> +                                "only partially covers this bridge\n",
+> +                                 cfg->segment, cfg->start_bus, cfg->end_bus);
+> +               rc = -EEXIST;
+> +               goto err;
+> +       }
+> +
+> +       if (!addr) {
+> +               rc = -EINVAL;
+> +               goto err;
+> +       }
+> +
+> +       cfg = pci_mmconfig_alloc(seg, start, end, addr);
+> +       if (cfg == NULL) {
+> +               dev_warn(dev, "fail to add MMCONFIG (out of memory)\n");
+> +               rc = -ENOMEM;
+> +               goto err;
+> +       }
+> +       rc = pci_mmconfig_map_resource(dev, cfg);
+> +       if (!rc) {
+> +               list_add_sorted(cfg);
+> +               dev_info(dev, "MMCONFIG at %pR (base %#lx)\n",
+> +                                &cfg->res, (unsigned long)addr);
+> +               return 0;
+> +       } else {
+> +               if (cfg->res.parent)
+> +                       release_resource(&cfg->res);
+> +               kfree(cfg);
+> +       }
+> +
+> +err:
+> +       mutex_unlock(&pci_mmcfg_lock);
+> +       return rc;
+> +}
+> +
+> +/* Delete MMCFG information for host bridges */
+> +int pci_mmconfig_delete(u16 seg, u8 start, u8 end)
+> +{
+> +       struct pci_mmcfg_region *cfg;
+> +
+> +       mutex_lock(&pci_mmcfg_lock);
+> +       list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list)
+> +               if (cfg->segment == seg && cfg->start_bus == start &&
+> +                   cfg->end_bus == end) {
+> +                       list_del_rcu(&cfg->list);
+> +                       synchronize_rcu();
+> +                       pci_mmconfig_unmap_resource(cfg);
+> +                       mutex_unlock(&pci_mmcfg_lock);
+> +                       kfree(cfg);
+> +                       return 0;
+> +               }
+> +       mutex_unlock(&pci_mmcfg_lock);
+> +
+> +       return -ENOENT;
+> +}
+> +
+> +static int __init acpi_mcfg_check_entry(struct acpi_table_mcfg *mcfg,
+> +                                       struct acpi_mcfg_allocation *cfg)
+> +{
+> +       int year;
+> +
+> +       if (!config_enabled(CONFIG_X86))
+> +               return 0;
+> +
+> +       if (cfg->address < 0xFFFFFFFF)
+> +               return 0;
+> +
+> +       if (!strncmp(mcfg->header.oem_id, "SGI", 3))
+> +               return 0;
+> +
+> +       if (mcfg->header.revision >= 1) {
+> +               if (dmi_get_date(DMI_BIOS_DATE, &year, NULL, NULL) &&
+> +                   year >= 2010)
+> +                       return 0;
+> +       }
+> +
+> +       pr_err(PREFIX "MCFG region for %04x [bus %02x-%02x] at %#llx "
+> +              "is above 4GB, ignored\n", cfg->pci_segment,
+> +              cfg->start_bus_number, cfg->end_bus_number, cfg->address);
+> +       return -EINVAL;
+> +}
+> +
+> +static int __init pci_parse_mcfg(struct acpi_table_header *header)
+> +{
+> +       struct acpi_table_mcfg *mcfg;
+> +       struct acpi_mcfg_allocation *cfg_table, *cfg;
+> +       unsigned long i;
+> +       int entries;
+> +
+> +       if (!header)
+> +               return -EINVAL;
+> +
+> +       mcfg = (struct acpi_table_mcfg *)header;
+> +
+> +       /* how many config structures do we have */
+> +       entries = 0;
+> +       i = header->length - sizeof(struct acpi_table_mcfg);
+> +       while (i >= sizeof(struct acpi_mcfg_allocation)) {
+> +               entries++;
+> +               i -= sizeof(struct acpi_mcfg_allocation);
+> +       }
+> +       if (entries == 0) {
+> +               pr_err(PREFIX "MMCONFIG has no entries\n");
+> +               return -ENODEV;
+> +       }
+> +
+> +       cfg_table = (struct acpi_mcfg_allocation *) &mcfg[1];
+> +       for (i = 0; i < entries; i++) {
+> +               cfg = &cfg_table[i];
+> +               if (acpi_mcfg_check_entry(mcfg, cfg))
+> +                       return -ENODEV;
+> +
+> +               if (pci_mmconfig_add(cfg->pci_segment, cfg->start_bus_number,
+> +                                  cfg->end_bus_number, cfg->address) == NULL) {
+> +                       pr_warn(PREFIX "no memory for MCFG entries\n");
+> +                       return -ENOMEM;
+> +               }
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +int __init pci_mmconfig_parse_table(void)
+> +{
+> +       return acpi_sfi_table_parse(ACPI_SIG_MCFG, pci_parse_mcfg);
+> +}
+> +
+> +void __weak __init pci_mmcfg_late_init(void)
+> +{
+> +       int err, n = 0;
+> +       struct pci_mmcfg_region *cfg;
+> +
+> +       err = pci_mmconfig_parse_table();
+> +       if (err) {
+> +               pr_err(PREFIX " Failed to parse MCFG (%d)\n", err);
+> +               return;
+> +       }
+> +
+> +       list_for_each_entry(cfg, &pci_mmcfg_list, list) {
+> +               pci_mmconfig_map_resource(NULL, cfg);
+> +               n++;
+> +       }
+> +
+> +       pr_info(PREFIX " MCFG table loaded %d entries\n", n);
+> +}
+> diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
+> index 7494dbe..97aa9d3 100644
+> --- a/drivers/xen/pci.c
+> +++ b/drivers/xen/pci.c
+> @@ -27,9 +27,6 @@
+>  #include <asm/xen/hypervisor.h>
+>  #include <asm/xen/hypercall.h>
+>  #include "../pci/pci.h"
+> -#ifdef CONFIG_PCI_MMCONFIG
+> -#include <asm/pci_x86.h>
+> -#endif
+>
+>  static bool __read_mostly pci_seg_supported = true;
+>
+> @@ -221,7 +218,7 @@ static int __init xen_mcfg_late(void)
+>         if (!xen_initial_domain())
+>                 return 0;
+>
+> -       if ((pci_probe & PCI_PROBE_MMCONF) == 0)
+> +       if (!pci_mmconfig_enabled())
+>                 return 0;
+>
+>         if (list_empty(&pci_mmcfg_list))
+> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+> index 89ab057..e9450ef 100644
+> --- a/include/linux/pci-acpi.h
+> +++ b/include/linux/pci-acpi.h
+> @@ -106,6 +106,39 @@ extern const u8 pci_acpi_dsm_uuid[];
+>  #define RESET_DELAY_DSM                0x08
+>  #define FUNCTION_DELAY_DSM     0x09
+>
+> +/* common API to maintain list of MCFG regions */
+> +/* "PCI MMCONFIG %04x [bus %02x-%02x]" */
+> +#define PCI_MMCFG_RESOURCE_NAME_LEN (22 + 4 + 2 + 2)
+> +
+> +struct pci_mmcfg_region {
+> +       struct list_head list;
+> +       struct resource res;
+> +       u64 address;
+> +       char __iomem *virt;
+> +       u16 segment;
+> +       u8 start_bus;
+> +       u8 end_bus;
+> +       char name[PCI_MMCFG_RESOURCE_NAME_LEN];
+> +};
+> +
+> +extern int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
+> +                              phys_addr_t addr);
+> +extern int pci_mmconfig_delete(u16 seg, u8 start, u8 end);
+> +
+> +extern struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus);
+> +extern struct pci_mmcfg_region *pci_mmconfig_add(int segment, int start,
+> +                                                       int end, u64 addr);
+> +extern int pci_mmconfig_map_resource(struct device *dev,
+> +       struct pci_mmcfg_region *mcfg);
+> +extern void pci_mmconfig_unmap_resource(struct pci_mmcfg_region *mcfg);
+> +extern int pci_mmconfig_enabled(void);
+> +extern int __init pci_mmconfig_parse_table(void);
+> +
+> +extern struct list_head pci_mmcfg_list;
+> +
+> +#define PCI_MMCFG_BUS_OFFSET(bus)      ((bus) << 20)
+> +#define PCI_MMCFG_OFFSET(bus, devfn)   ((bus) << 20 | (devfn) << 12)
+> +
+>  #else  /* CONFIG_ACPI */
+>  static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
+>  static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
+> --
+> 1.9.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
