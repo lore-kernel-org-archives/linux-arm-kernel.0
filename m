@@ -1,88 +1,92 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 14 Jan 2016 16:24:52 +0100
-Subject: [PATCH v2 09/26] ARM: sun5i: dt: Add pll3 and pll7 clocks
+Date: Thu, 14 Jan 2016 16:24:53 +0100
+Subject: [PATCH v2 10/26] ARM: sun5i: a13: Add display and TCON clocks
 In-Reply-To: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1452785109-6172-10-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1452785109-6172-11-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the pll3 and pll7 clocks in the DT that are used to drive the
-display-related clocks.
+Enable the display and TCON (channel 0 and channel 1) clocks that are going
+to be needed to drive the display engine, tcon and TV encoders.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun5i.dtsi | 43 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+ arch/arm/boot/dts/sun5i-a13.dtsi | 38 +++++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/sun5i-r8.dtsi  |  5 +++--
+ 2 files changed, 40 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-index 59a9426e3bd4..0840612b5ed6 100644
---- a/arch/arm/boot/dts/sun5i.dtsi
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -88,6 +88,15 @@
- 			clock-output-names = "osc24M";
+diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+index d910d3a6c41c..9669b03f20f3 100644
+--- a/arch/arm/boot/dts/sun5i-a13.dtsi
++++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+@@ -61,7 +61,8 @@
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0";
+-			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 44>;
++			clocks = <&ahb_gates 36>, <&ahb_gates 44>, <&de_be_clk>,
++				 <&tcon_ch0_clk>;
+ 			status = "disabled";
  		};
- 
-+		osc3M: osc3M_clk {
-+			compatible = "fixed-factor-clock";
-+			#clock-cells = <0>;
-+			clock-div = <8>;
-+			clock-mult = <1>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "osc3M";
-+		};
-+
- 		osc32k: clk at 0 {
- 			#clock-cells = <0>;
- 			compatible = "fixed-clock";
-@@ -112,6 +121,23 @@
- 					     "pll2-4x", "pll2-8x";
+ 	};
+@@ -149,6 +150,41 @@
+ 					     "apb1_i2c2", "apb1_uart1",
+ 					     "apb1_uart3";
  		};
++
++		de_be_clk: clk at 01c20104 {
++			#clock-cells = <0>;
++			#reset-cells = <0>;
++			compatible = "allwinner,sun4i-a10-display-clk";
++			reg = <0x01c20104 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll5 1>;
++			clock-output-names = "de-be";
++		};
++
++		de_fe_clk: clk at 01c2010c {
++			#clock-cells = <0>;
++			#reset-cells = <0>;
++			compatible = "allwinner,sun4i-a10-display-clk";
++			reg = <0x01c2010c 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll5 1>;
++			clock-output-names = "de-fe";
++		};
++
++		tcon_ch0_clk: clk at 01c20118 {
++			#clock-cells = <0>;
++			#reset-cells = <1>;
++			compatible = "allwinner,sun4i-a10-tcon-ch0-clk";
++			reg = <0x01c20118 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
++			clock-output-names = "tcon-ch0-sclk";
++		};
++
++		tcon_ch1_clk: clk at 01c2012c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-tcon-ch1-clk";
++			reg = <0x01c2012c 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
++			clock-output-names = "tcon-ch1-sclk";
++		};
+ 	};
  
-+		pll3: clk at 01c20010 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-pll3-clk";
-+			reg = <0x01c20010 0x4>;
-+			clocks = <&osc3M>;
-+			clock-output-names = "pll3";
-+		};
-+
-+		pll3x2: pll3x2_clk {
-+			compatible = "fixed-factor-clock";
-+			#clock-cells = <0>;
-+			clock-div = <1>;
-+			clock-mult = <2>;
-+			clocks = <&pll3>;
-+			clock-output-names = "pll3-2x";
-+		};
-+
- 		pll4: clk at 01c20018 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-pll1-clk";
-@@ -136,6 +162,23 @@
- 			clock-output-names = "pll6_sata", "pll6_other", "pll6";
+ 	soc at 01c00000 {
+diff --git a/arch/arm/boot/dts/sun5i-r8.dtsi b/arch/arm/boot/dts/sun5i-r8.dtsi
+index 0ef865601ac9..b1e4e0170d51 100644
+--- a/arch/arm/boot/dts/sun5i-r8.dtsi
++++ b/arch/arm/boot/dts/sun5i-r8.dtsi
+@@ -51,8 +51,9 @@
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0-tve0";
+-			clocks = <&pll5 1>, <&ahb_gates 34>, <&ahb_gates 36>,
+-				 <&ahb_gates 44>;
++			clocks = <&ahb_gates 34>, <&ahb_gates 36>,
++				 <&ahb_gates 44>, <&de_be_clk>,
++				 <&tcon_ch1_clk>;
+ 			status = "disabled";
  		};
- 
-+		pll7: clk at 01c20030 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-pll3-clk";
-+			reg = <0x01c20030 0x4>;
-+			clocks = <&osc3M>;
-+			clock-output-names = "pll7";
-+		};
-+
-+		pll7x2: pll7x2_clk {
-+			compatible = "fixed-factor-clock";
-+			#clock-cells = <0>;
-+			clock-div = <1>;
-+			clock-mult = <2>;
-+			clocks = <&pll7>;
-+			clock-output-names = "pll7-2x";
-+		};
-+
- 		/* dummy is 200M */
- 		cpu: cpu at 01c20054 {
- 			#clock-cells = <0>;
+ 	};
 -- 
 2.6.4
