@@ -1,100 +1,59 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 14 Jan 2016 14:45:58 -0700
-Subject: [PATCH V8 04/23] coresight: etm3x: moving etm_readl/writel to header
- file
+Date: Thu, 14 Jan 2016 14:45:56 -0700
+Subject: [PATCH V8 02/23] coresight: add API to get sink from path
 In-Reply-To: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1452807977-8069-5-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1452807977-8069-3-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moving functions etm_readl/writel to file "coresight-etm.h"
-so that the main ETM3x driver can be split in more than one
-file.
+Add an API allowing external code to quickly get a handle on the
+sink within a path.  The sink is always last, but adding an API allows
+to keep the path's node structure private and remove redundant checks.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm.h   | 29 +++++++++++++++++++++++++++
- drivers/hwtracing/coresight/coresight-etm3x.c | 29 ---------------------------
- 2 files changed, 29 insertions(+), 29 deletions(-)
+ drivers/hwtracing/coresight/coresight-priv.h |  1 +
+ drivers/hwtracing/coresight/coresight.c      | 15 +++++++++++++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
-index b4481eb29304..34f7db881fa7 100644
---- a/drivers/hwtracing/coresight/coresight-etm.h
-+++ b/drivers/hwtracing/coresight/coresight-etm.h
-@@ -251,4 +251,33 @@ enum etm_addr_type {
- 	ETM_ADDR_TYPE_START,
- 	ETM_ADDR_TYPE_STOP,
- };
-+
-+static inline void etm_writel(struct etm_drvdata *drvdata,
-+			      u32 val, u32 off)
-+{
-+	if (drvdata->use_cp14) {
-+		if (etm_writel_cp14(off, val)) {
-+			dev_err(drvdata->dev,
-+				"invalid CP14 access to ETM reg: %#x", off);
-+		}
-+	} else {
-+		writel_relaxed(val, drvdata->base + off);
-+	}
-+}
-+
-+static inline unsigned int etm_readl(struct etm_drvdata *drvdata, u32 off)
-+{
-+	u32 val;
-+
-+	if (drvdata->use_cp14) {
-+		if (etm_readl_cp14(off, &val)) {
-+			dev_err(drvdata->dev,
-+				"invalid CP14 access to ETM reg: %#x", off);
-+		}
-+	} else {
-+		val = readl_relaxed(drvdata->base + off);
-+	}
-+
-+	return val;
-+}
- #endif
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index fae66cb45424..3be1f14da44c 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -42,35 +42,6 @@ module_param_named(boot_enable, boot_enable, int, S_IRUGO);
- static int etm_count;
- static struct etm_drvdata *etmdrvdata[NR_CPUS];
+diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
+index 7b193a34d709..14f245a2018d 100644
+--- a/drivers/hwtracing/coresight/coresight-priv.h
++++ b/drivers/hwtracing/coresight/coresight-priv.h
+@@ -54,6 +54,7 @@ static inline void CS_UNLOCK(void __iomem *addr)
  
--static inline void etm_writel(struct etm_drvdata *drvdata,
--			      u32 val, u32 off)
--{
--	if (drvdata->use_cp14) {
--		if (etm_writel_cp14(off, val)) {
--			dev_err(drvdata->dev,
--				"invalid CP14 access to ETM reg: %#x", off);
--		}
--	} else {
--		writel_relaxed(val, drvdata->base + off);
--	}
--}
--
--static inline unsigned int etm_readl(struct etm_drvdata *drvdata, u32 off)
--{
--	u32 val;
--
--	if (drvdata->use_cp14) {
--		if (etm_readl_cp14(off, &val)) {
--			dev_err(drvdata->dev,
--				"invalid CP14 access to ETM reg: %#x", off);
--		}
--	} else {
--		val = readl_relaxed(drvdata->base + off);
--	}
--
--	return val;
--}
--
- /*
-  * Memory mapped writes to clear os lock are not supported on some processors
-  * and OS lock must be unlocked before any memory mapped access on such
+ void coresight_disable_path(struct list_head *path);
+ int coresight_enable_path(struct list_head *path);
++struct coresight_device *coresight_get_sink(struct list_head *path);
+ struct list_head *coresight_build_path(struct coresight_device *csdev);
+ void coresight_release_path(struct list_head *path);
+ 
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index f26589effb70..2ed48545df26 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -321,6 +321,21 @@ err:
+ 	goto out;
+ }
+ 
++struct coresight_device *coresight_get_sink(struct list_head *path)
++{
++	struct coresight_device *csdev;
++
++	if (!path)
++		return NULL;
++
++	csdev = list_last_entry(path, struct coresight_node, link)->csdev;
++	if (csdev->type != CORESIGHT_DEV_TYPE_SINK &&
++	    csdev->type != CORESIGHT_DEV_TYPE_LINKSINK)
++		return NULL;
++
++	return csdev;
++}
++
+ /**
+  * _coresight_build_path - recursively build a path from a @csdev to a sink.
+  * @csdev:	The device to start from.
 -- 
 2.1.4
