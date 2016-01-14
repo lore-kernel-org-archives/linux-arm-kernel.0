@@ -1,102 +1,54 @@
-From: peter@korsgaard.com (Peter Korsgaard)
-Date: Thu, 14 Jan 2016 14:35:26 +0100
-Subject: [PATCH v5 1/2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD
- driver
-In-Reply-To: <1452747845-2962-2-git-send-email-wenyou.yang@atmel.com> (Wenyou
- Yang's message of "Thu, 14 Jan 2016 13:04:04 +0800")
-References: <1452747845-2962-1-git-send-email-wenyou.yang@atmel.com>
- <1452747845-2962-2-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <87pox41dy9.fsf@dell.be.48ers.dk>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Thu, 14 Jan 2016 13:44:40 +0000
+Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
+ hostbridge init based on ACPI
+In-Reply-To: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+Message-ID: <20160114134440.GA8520@xora-haswell.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Wenyou" == Wenyou Yang <wenyou.yang@atmel.com> writes:
+On Wed, Jan 13, 2016 at 02:20:46PM +0100, Tomasz Nowicki wrote:
+> From the functionality point of view this series might be split into the
+> following logic parts:
+> 1. Make MMCONFIG code arch-agnostic which allows all architectures to collect
+>    PCI config regions and used when necessary.
+> 2. Move non-arch specific bits to the core code.
+> 3. Use MMCONFIG code and implement generic ACPI based PCI host controller driver.
+> 4. Enable above driver on ARM64
+> 
+> Patches has been built on top of 4.4 and can be found here:
+> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v3)
+> 
+> NOTE, this patch set depends on Matthew's patches:
+> http://www.spinics.net/lists/linux-pci/msg45950.html
+> https://github.com/Vality/linux/tree/pci-fixes
+> 
+> This has been tested on Cavium ThunderX server and QEMU.
+> Any help in reviewing and testing is very appreciated.
 
- > This patch adds support for the Active-semi ACT8945A PMIC.
- > It is a Multi Function Device with the following subdevices:
- >  - Regulator
- >  - Charger
+I have tested this on my AMD Overdrive so
 
- > It is interfaced to the host controller using I2C interface,
- > ACT8945A is a child device of the I2C.
+Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
 
- > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
- > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
- > ---
+But to actually get my r8169 network card working I also need the
+following patch.
 
- > Changes in v5:
- >  - change depends on to 'I2C=y'.
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 2fbf840..40e24e2 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1717,7 +1717,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+        set_dev_node(&dev->dev, pcibus_to_node(bus));
+        dev->dev.dma_mask = &dev->dma_mask;
+        dev->dev.dma_parms = &dev->dma_parms;
+-       dev->dev.coherent_dma_mask = 0xffffffffull;
++       dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
+        pci_dma_configure(dev);
 
-Why not make it a tristate instead? Having regulators as modules is
-perhaps not a very wise thing to do, but conceptually I don't see why
-this code couldn't be a module.
- 
- > +config MFD_ACT8945A
- > +	bool "Active-semi ACT8945A"
- > +	select MFD_CORE
- > +	select REGMAP_I2C
- > +	depends on I2C=y && OF
- > +	help
- > +	  Support for the ACT8945A PMIC from Active-semi. This device
- > +	  features three step-down DC/DC converters and four low-dropout
- > +	  linear regulators, along with a complete ActivePath battery
- > +	  charger.
- > +
+        pci_set_dma_max_seg_size(dev, 65536);
 
-[snip]
+I suspect we need to set coherent_dma_mask somewhere in the platform but I do
+not know where this should happen. Hopefully an ARM64 expert can help.
 
-> +++ b/drivers/mfd/act8945a.c
- > @@ -0,0 +1,109 @@
- > +/*
- > + * MFD driver for Active-semi ACT8945a PMIC
- > + *
- > + * Copyright (C) 2015 Atmel Corporation.
- > + *
- > + * Author: Wenyou Yang <wenyou.yang@atmel.com>
- > + *
- > + * This program is free software; you can redistribute it and/or modify it
- > + * under  the terms of the GNU General  Public License as published by the
- > + * Free Software Foundation;  either version 2 of the License, or (at your
- > + * option) any later version.
- > + */
- > +
- > +#include <linux/i2c.h>
- > +#include <linux/mfd/act8945a.h>
- > +#include <linux/mfd/core.h>
- > +#include <linux/module.h>
- > +#include <linux/of_device.h>
- > +#include <linux/regmap.h>
- > +
- > +static const struct mfd_cell act8945a_devs[] = {
- > +	{
- > +		.name = "act8945a-pmic",
- > +		.of_compatible = "active-semi,act8945a-regulator",
- > +	},
- > +	{
- > +		.name = "act8945a-charger",
- > +		.of_compatible = "active-semi,act8945a-charger",
- > +	},
- > +};
- > +
- > +static const struct regmap_config act8945a_regmap_config = {
- > +	.reg_bits = 8,
- > +	.val_bits = 8,
- > +};
- > +
- > +static int act8945a_i2c_probe(struct i2c_client *i2c,
- > +			      const struct i2c_device_id *id)
- > +{
- > +	struct act8945a_dev *act8945a;
- > +	int ret;
- > +
- > +	act8945a = devm_kzalloc(&i2c->dev, sizeof(*act8945a), GFP_KERNEL);
- > +	if (!act8945a)
- > +		return -ENOMEM;
- > +
-
-What is the point of this structure (and the header file)? Can't the
-subdevices just do dev_get_regmap(dev->parent)? regulator_register()
-afaik already does this by default.
-
--- 
-Bye, Peter Korsgaard
+Graeme
