@@ -1,192 +1,63 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu, 14 Jan 2016 20:23:09 +0300
-Subject: [PATCH v6 12/21] arm64: ptrace: handle ptrace_request differently for
- aarch32 and ilp32
-In-Reply-To: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1452792198-10718-13-git-send-email-ynorov@caviumnetworks.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 14 Jan 2016 17:25:49 +0000
+Subject: [PATCH] mmc: host: omap_hsmmc: add a verbose print to enable
+ CONFIG_REGULATOR_PBIAS
+In-Reply-To: <20160114120706.GA12774@earth>
+References: <1452762920-2588-1-git-send-email-kishon@ti.com>
+ <20160114120706.GA12774@earth>
+Message-ID: <20160114172549.GC5783@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here new ptrace syscall handler is introsuced to avoid run-time detection of the
-task type.
+On Thu, Jan 14, 2016 at 01:07:06PM +0100, Sebastian Reichel wrote:
+> Hi,
+> 
+> On Thu, Jan 14, 2016 at 02:45:20PM +0530, Kishon Vijay Abraham I wrote:
+> > Since v4.3+, CONFIG_REGULATOR_PBIAS should be enabled (for platforms that
+> > have PBIAS regulator) in order for MMC1 to work.
+> > 
+> > Add a more verbose print to help enable CONFIG_REGULATOR_PBIAS for users
+> > using a olddefconfig or a custom .config.
+> > 
+> > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> > ---
+> >  drivers/mmc/host/omap_hsmmc.c |    5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> > index 7fb0753..7086bd6 100644
+> > --- a/drivers/mmc/host/omap_hsmmc.c
+> > +++ b/drivers/mmc/host/omap_hsmmc.c
+> > @@ -503,8 +503,11 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+> >  	host->pbias = devm_regulator_get_optional(host->dev, "pbias");
+> >  	if (IS_ERR(host->pbias)) {
+> >  		ret = PTR_ERR(host->pbias);
+> > -		if ((ret != -ENODEV) && host->dev->of_node)
+> > +		if ((ret != -ENODEV) && host->dev->of_node) {
+> > +			dev_err(host->dev,
+> > +			"SD card detect fail? enable CONFIG_REGULATOR_PBIAS\n");
+> >  			return ret;
+> > +		}
+> >  		dev_dbg(host->dev, "unable to get pbias regulator %ld\n",
+> >  			PTR_ERR(host->pbias));
+> >  		host->pbias = NULL;
+> 
+> 
+> Is there a good reason against adding "depends on REGULATOR_PBIAS"
+> to MMC_OMAP_HS?
 
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
----
- arch/arm64/include/asm/unistd32.h |  2 +-
- arch/arm64/kernel/ptrace.c        | 50 ++++++++++++++++++++++++++++++++++++++-
- arch/arm64/kernel/sys32.c         |  1 +
- include/linux/ptrace.h            |  6 +++++
- kernel/ptrace.c                   | 10 ++++----
- 5 files changed, 62 insertions(+), 7 deletions(-)
+There are very good reasons not to do this: that will result in
+configurations where MMC_OMAP_HS was set but without REGULATOR_PBIAS
+ending up with MMC_OMAP_HS being disabled.  That doesn't help the
+root problem, which is "why has the kernel boot regressed for my
+previous working configuration?"
 
-diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
-index 5b925b7..f57bbe3 100644
---- a/arch/arm64/include/asm/unistd32.h
-+++ b/arch/arm64/include/asm/unistd32.h
-@@ -74,7 +74,7 @@ __SYSCALL(__NR_getuid, sys_getuid16)
- 			/* 25 was sys_stime */
- __SYSCALL(25, sys_ni_syscall)
- #define __NR_ptrace 26
--__SYSCALL(__NR_ptrace, compat_sys_ptrace)
-+__SYSCALL(__NR_ptrace, compat_sys_aarch32_ptrace)
- 			/* 27 was sys_alarm */
- __SYSCALL(27, sys_ni_syscall)
- 			/* 28 was sys_fstat */
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index c166548..607a140 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -29,6 +29,7 @@
- #include <linux/user.h>
- #include <linux/seccomp.h>
- #include <linux/security.h>
-+#include <linux/syscalls.h>
- #include <linux/init.h>
- #include <linux/signal.h>
- #include <linux/uaccess.h>
-@@ -1108,7 +1109,7 @@ static int compat_ptrace_sethbpregs(struct task_struct *tsk, compat_long_t num,
- }
- #endif	/* CONFIG_HAVE_HW_BREAKPOINT */
- 
--long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
-+static long compat_a32_ptrace(struct task_struct *child, compat_long_t request,
- 			compat_ulong_t caddr, compat_ulong_t cdata)
- {
- 	unsigned long addr = caddr;
-@@ -1185,8 +1186,55 @@ long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
- 
- 	return ret;
- }
-+
-+COMPAT_SYSCALL_DEFINE4(aarch32_ptrace, compat_long_t, request, compat_long_t, pid,
-+		       compat_long_t, addr, compat_long_t, data)
-+{
-+	struct task_struct *child;
-+	long ret;
-+
-+	if (request == PTRACE_TRACEME) {
-+		ret = ptrace_traceme();
-+		goto out;
-+	}
-+
-+	child = ptrace_get_task_struct(pid);
-+	if (IS_ERR(child)) {
-+		ret = PTR_ERR(child);
-+		goto out;
-+	}
-+
-+	if (request == PTRACE_ATTACH || request == PTRACE_SEIZE) {
-+		ret = ptrace_attach(child, request, addr, data);
-+		goto out_put_task_struct;
-+	}
-+
-+	ret = ptrace_check_attach(child, request == PTRACE_KILL ||
-+				  request == PTRACE_INTERRUPT);
-+	if (!ret) {
-+		ret = compat_a32_ptrace(child, request, addr, data);
-+		if (ret || request != PTRACE_DETACH)
-+			ptrace_unfreeze_traced(child);
-+	}
-+
-+ out_put_task_struct:
-+	put_task_struct(child);
-+ out:
-+	return ret;
-+}
-+
- #endif /* CONFIG_AARCH32_EL0 */
- 
-+#ifdef CONFIG_COMPAT
-+
-+long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
-+			compat_ulong_t caddr, compat_ulong_t cdata)
-+{
-+	return compat_ptrace_request(child, request, caddr, cdata);
-+}
-+
-+#endif /* CONFIG_COMPAT */
-+
- const struct user_regset_view *task_user_regset_view(struct task_struct *task)
- {
- #ifdef CONFIG_AARCH32_EL0
-diff --git a/arch/arm64/kernel/sys32.c b/arch/arm64/kernel/sys32.c
-index a40b134..3752443 100644
---- a/arch/arm64/kernel/sys32.c
-+++ b/arch/arm64/kernel/sys32.c
-@@ -38,6 +38,7 @@ asmlinkage long compat_sys_fadvise64_64_wrapper(void);
- asmlinkage long compat_sys_sync_file_range2_wrapper(void);
- asmlinkage long compat_sys_fallocate_wrapper(void);
- asmlinkage long compat_sys_mmap2_wrapper(void);
-+asmlinkage long compat_sys_aarch32_ptrace(void);
- 
- #undef __SYSCALL
- #define __SYSCALL(nr, sym)	[nr] = sym,
-diff --git a/include/linux/ptrace.h b/include/linux/ptrace.h
-index 061265f..c38d068 100644
---- a/include/linux/ptrace.h
-+++ b/include/linux/ptrace.h
-@@ -75,6 +75,12 @@ int generic_ptrace_peekdata(struct task_struct *tsk, unsigned long addr,
- 			    unsigned long data);
- int generic_ptrace_pokedata(struct task_struct *tsk, unsigned long addr,
- 			    unsigned long data);
-+int ptrace_traceme(void);
-+struct task_struct *ptrace_get_task_struct(pid_t pid);
-+int ptrace_attach(struct task_struct *task, long request,
-+			 unsigned long addr, unsigned long flags);
-+int ptrace_check_attach(struct task_struct *child, bool ignore_state);
-+void ptrace_unfreeze_traced(struct task_struct *task);
- 
- /**
-  * ptrace_parent - return the task that is tracing the given task
-diff --git a/kernel/ptrace.c b/kernel/ptrace.c
-index b760bae..8f688ae 100644
---- a/kernel/ptrace.c
-+++ b/kernel/ptrace.c
-@@ -137,7 +137,7 @@ static bool ptrace_freeze_traced(struct task_struct *task)
- 	return ret;
- }
- 
--static void ptrace_unfreeze_traced(struct task_struct *task)
-+void ptrace_unfreeze_traced(struct task_struct *task)
- {
- 	if (task->state != __TASK_TRACED)
- 		return;
-@@ -169,7 +169,7 @@ static void ptrace_unfreeze_traced(struct task_struct *task)
-  * RETURNS:
-  * 0 on success, -ESRCH if %child is not ready.
-  */
--static int ptrace_check_attach(struct task_struct *child, bool ignore_state)
-+int ptrace_check_attach(struct task_struct *child, bool ignore_state)
- {
- 	int ret = -ESRCH;
- 
-@@ -270,7 +270,7 @@ bool ptrace_may_access(struct task_struct *task, unsigned int mode)
- 	return !err;
- }
- 
--static int ptrace_attach(struct task_struct *task, long request,
-+int ptrace_attach(struct task_struct *task, long request,
- 			 unsigned long addr,
- 			 unsigned long flags)
- {
-@@ -378,7 +378,7 @@ out:
-  * Performs checks and sets PT_PTRACED.
-  * Should be used by all ptrace implementations for PTRACE_TRACEME.
-  */
--static int ptrace_traceme(void)
-+ int ptrace_traceme(void)
- {
- 	int ret = -EPERM;
- 
-@@ -1028,7 +1028,7 @@ int ptrace_request(struct task_struct *child, long request,
- 	return ret;
- }
- 
--static struct task_struct *ptrace_get_task_struct(pid_t pid)
-+struct task_struct *ptrace_get_task_struct(pid_t pid)
- {
- 	struct task_struct *child;
- 
+The solution proposed here adds a message to the boot which points
+out fair and square what needs to be done to rectify the boot
+failure.  Adding a dependency just brings up the question "where
+has my MMC driver gone?"
+
 -- 
-2.5.0
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
