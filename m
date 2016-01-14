@@ -1,33 +1,38 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Thu, 14 Jan 2016 11:11:30 +0200
-Subject: [PATCH v4 3/3] wlcore/wl12xx: spi: add wifi support to cm-t335
-In-Reply-To: <56976588.3060707@broadcom.com> (Arend van Spriel's message of
- "Thu, 14 Jan 2016 10:08:24 +0100")
-References: <1451482533-8624-1-git-send-email-uri.mashiach@compulab.co.il>
- <1451482533-8624-4-git-send-email-uri.mashiach@compulab.co.il>
- <87io35lq2p.fsf@kamboji.qca.qualcomm.com>
- <5695E802.7050909@compulab.co.il> <20160113172712.GI12777@atomide.com>
- <87wprcbpyr.fsf@kamboji.qca.qualcomm.com>
- <56976588.3060707@broadcom.com>
-Message-ID: <87y4bsa5kt.fsf@kamboji.qca.qualcomm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 14 Jan 2016 14:45:20 +0530
+Subject: [PATCH] mmc: host: omap_hsmmc: add a verbose print to enable
+ CONFIG_REGULATOR_PBIAS
+Message-ID: <1452762920-2588-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arend van Spriel <arend@broadcom.com> writes:
+Since v4.3+, CONFIG_REGULATOR_PBIAS should be enabled (for platforms that
+have PBIAS regulator) in order for MMC1 to work.
 
-> On 01/14/2016 08:05 AM, Kalle Valo wrote:
->> Tony Lindgren <tony@atomide.com> writes:
->>
->>> Yeah I'll pick the dts changes separately after the merge window as
->>> there is no dependency to the driver changes.
->>
->> Ok, I'll then take patches 1 and 2 once the merge window opens.
->
-> I guess it is semantics, but the merge window is open right now so you
-> probably mean to say after the merge window closes, ie. when 4.5-rc1
-> is ready.
+Add a more verbose print to help enable CONFIG_REGULATOR_PBIAS for users
+using a olddefconfig or a custom .config.
 
-Exactly. Sorry, I suck in multitasking :)
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/mmc/host/omap_hsmmc.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 7fb0753..7086bd6 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -503,8 +503,11 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+ 	host->pbias = devm_regulator_get_optional(host->dev, "pbias");
+ 	if (IS_ERR(host->pbias)) {
+ 		ret = PTR_ERR(host->pbias);
+-		if ((ret != -ENODEV) && host->dev->of_node)
++		if ((ret != -ENODEV) && host->dev->of_node) {
++			dev_err(host->dev,
++			"SD card detect fail? enable CONFIG_REGULATOR_PBIAS\n");
+ 			return ret;
++		}
+ 		dev_dbg(host->dev, "unable to get pbias regulator %ld\n",
+ 			PTR_ERR(host->pbias));
+ 		host->pbias = NULL;
 -- 
-Kalle Valo
+1.7.9.5
