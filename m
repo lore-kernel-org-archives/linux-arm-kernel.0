@@ -1,36 +1,25 @@
-From: nicolas.dufresne@collabora.com (Nicolas Dufresne)
-Date: Thu, 14 Jan 2016 10:05:47 -0500
-Subject: [PATCH v3 0/2] new control V4L2_CID_MPEG_VIDEO_FORCE_I_FRAME
-In-Reply-To: <1452783007-80883-1-git-send-email-wuchengli@chromium.org>
-References: <1452783007-80883-1-git-send-email-wuchengli@chromium.org>
-Message-ID: <1452783947.10009.20.camel@collabora.com>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Thu, 14 Jan 2016 16:16:46 +0100
+Subject: [PATCH V3 4/6] clk: bcm2835: remove use of BCM2835_CLOCK_COUNT in
+ driver
+In-Reply-To: <1452779142-20615-5-git-send-email-kernel@martin.sperl.org>
+References: <1452779142-20615-1-git-send-email-kernel@martin.sperl.org>
+ <1452779142-20615-5-git-send-email-kernel@martin.sperl.org>
+Message-ID: <6E590181-FFFB-4396-8B8A-61F277ED27B7@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le jeudi 14 janvier 2016 ? 22:50 +0800, Wu-Cheng Li a ?crit?:
-> v3 addressed Hans' comment to remove the name of the control in s5p-
-> mfc.
-> 
-> Wu-Cheng Li (2):
-> ? v4l: add V4L2_CID_MPEG_VIDEO_FORCE_I_FRAME.
 
-Hans suggested to name it V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME.
-
-regards,
-Nicolas
-
-> ? s5p-mfc: add the support of V4L2_CID_MPEG_VIDEO_FORCE_I_FRAME.
+> On 14.01.2016, at 14:45, kernel at martin.sperl.org wrote:
 > 
-> ?Documentation/DocBook/media/v4l/controls.xml |??8 ++++++++
-> ?drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 12 ++++++++++++
-> ?drivers/media/v4l2-core/v4l2-ctrls.c?????????|??2 ++
-> ?include/uapi/linux/v4l2-controls.h???????????|??1 +
-> ?4 files changed, 23 insertions(+)
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160114/4a6cbbb3/attachment.sig>
+> -
+> -	clks[BCM2835_CLOCK_PWM] =
+> -		bcm2835_register_clock(cprman, &bcm2835_clock_pwm_data);
+> +	for (i = 0; i < asize; i++) {
+> +		desc = &clk_desc_array[i];
+> +		if (desc)
+		if (desc->data && desc->clk_register)
+> +			clks[i] = desc->clk_register(cprman, desc->data);
+> +	}
+
+I will wait for other feedback before sending V4, which would fix this...
