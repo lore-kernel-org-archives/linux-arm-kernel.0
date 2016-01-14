@@ -1,43 +1,32 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 14 Jan 2016 07:11:29 +0000
-Subject: [PATCH 4/4] mailbox: Stop using ENOSYS for anything other than
- unimplemented syscalls
-In-Reply-To: <1452755489-18736-1-git-send-email-lee.jones@linaro.org>
-References: <1452755489-18736-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1452755489-18736-5-git-send-email-lee.jones@linaro.org>
+From: peter@korsgaard.com (Peter Korsgaard)
+Date: Thu, 14 Jan 2016 08:27:45 +0100
+Subject: [PATCH v2 1/2] regulator: act8945a: add regulator driver for
+ ACT8945A
+In-Reply-To: <B256D81BAE5131468A838E5D7A243641D63EBC6E@penmbx01> (Wenyou
+ Yang's message of "Thu, 14 Jan 2016 01:23:39 +0000")
+References: <1452586629-1117-1-git-send-email-wenyou.yang@atmel.com>
+ <1452586629-1117-2-git-send-email-wenyou.yang@atmel.com>
+ <87oacp5zl7.fsf@dell.be.48ers.dk>
+ <B256D81BAE5131468A838E5D7A243641D63EBC6E@penmbx01>
+Message-ID: <87egdk39ji.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In accordance with e15f431fe2d5 ("errno.h: Improve ENOSYS's comment") and
-91c9afaf97ee ("checkpatch.pl: new instances of ENOSYS are errors") we're
-converting from the old meaning of: ENOSYS "Function not implemented" to
-a more standard EINVAL.
+>>>>> "Yang," == Yang, Wenyou <Wenyou.Yang@atmel.com> writes:
 
-Reported-by: Seraphin Bonnaffe <seraphin.bonnaffe@st.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mailbox/mailbox.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ >> Isn't the regulator part of the act8945a identical to act8865? Can't we just use the
+ >> existing act8865-regulator.c driver? (E.G. support 8865 variant in the mfd driver,
+ >> but only register the regulator sub device?)
 
-diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-index 6a4811f..4a36632 100644
---- a/drivers/mailbox/mailbox.c
-+++ b/drivers/mailbox/mailbox.c
-@@ -375,13 +375,13 @@ struct mbox_chan *mbox_request_channel_byname(struct mbox_client *cl,
- 
- 	if (!np) {
- 		dev_err(cl->dev, "%s() currently only supports DT\n", __func__);
--		return ERR_PTR(-ENOSYS);
-+		return ERR_PTR(-EINVAL);
- 	}
- 
- 	if (!of_get_property(np, "mbox-names", NULL)) {
- 		dev_err(cl->dev,
- 			"%s() requires an \"mbox-names\" property\n", __func__);
--		return ERR_PTR(-ENOSYS);
-+		return ERR_PTR(-EINVAL);
- 	}
- 
- 	of_property_for_each_string(np, "mbox-names", prop, mbox_name) {
+ > Yes, the regulator part of the act8945a is identical to act8865.
+
+ > But the act8865-regulator driver is a struct i2c_driver, and the mfd
+ > sub-device driver is a platform_driver driver, it is not easy to use
+ > it.
+
+But the mfd driver could support the act8865 variant as well (by only
+registering the regulator mfd cell).
+
 -- 
-1.9.1
+Venlig hilsen,
+Peter Korsgaard 
