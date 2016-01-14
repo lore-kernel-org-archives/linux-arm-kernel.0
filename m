@@ -1,108 +1,162 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Thu, 14 Jan 2016 13:11:02 +0100
-Subject: [PATCH V2 1/4] clk: bcm2835: avoid the use of BCM2835_CLOCK_COUNT
- in clk-bcm2835
-In-Reply-To: <20160114001358.1168.5768@quark.deferred.io>
-References: <1452542157-2387-1-git-send-email-kernel@martin.sperl.org>
- <1452542157-2387-2-git-send-email-kernel@martin.sperl.org>
- <20160113200012.1168.74515@quark.deferred.io>
- <20160114001358.1168.5768@quark.deferred.io>
-Message-ID: <56979056.6010407@martin.sperl.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 14 Jan 2016 12:13:41 +0000
+Subject: [PATCH V3 18/21] ACPI, PCI: Refine the way to handle
+ translation_offset for ACPI resources
+In-Reply-To: <1452691267-32240-19-git-send-email-tn@semihalf.com>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <1452691267-32240-19-git-send-email-tn@semihalf.com>
+Message-ID: <20160114121341.GA19513@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Gerry, Tomasz,
 
-
-On 14.01.2016 01:13, Michael Turquette wrote:
-> Quoting Michael Turquette (2016-01-13 12:00:12)
->> Hi Martin,
->>
->> Quoting kernel at martin.sperl.org (2016-01-11 11:55:53)
->>>   static int bcm2835_clk_probe(struct platform_device *pdev)
->>>   {
->>>          struct device *dev = &pdev->dev;
->>>          struct clk **clks;
->>> +       size_t clk_cnt;
->>>          struct bcm2835_cprman *cprman;
->>>          struct resource *res;
->>> +       size_t i;
->>> +
->>> +       /* find the max clock index */
->>> +       clk_cnt = BCM2835_CLOCK_PERI_IMAGE; /* see below */
->>> +       for (i = 0; i < ARRAY_SIZE(bcm2835_register_clocks); i++)
->>> +               clk_cnt = max(clk_cnt, bcm2835_register_clocks[i].index);
->>> +       clk_cnt += 1;
->>
->> I'm not sure how this solution is better than using CLOCK_COUNT. Some
->> other bindings use a max value, NR_CLKS or other sentinel.
->>
->> Why did you not choose to set clk_cnt equal to BCM2835_CLOCK_PWM? Why
->> not initialize it to zero?
->
-> OK, I just caught up on the asoc/bcm2835 thread.
->
-> Really the best solution would be to have an array of all of the clks in
-> the driver and just use ARRAY_SIZE on it.
->
-> For your driver, could you make an array of clk_hw pointers and call
-> devm_clk_register on all of them in a loop? This gets rid of the big
-> pile of explicit calls in bcm2835_clk_probe.
->
-> You can also get rid of stuff like bcm2835_plla_core_data by just
-> stuffing that data into a single struct initialization. Here is a
-> snippet for how the qcom clk drivers do it:
->
-> static struct clk_pll gpll0 = {
-> 	.l_reg = 0x0004,
-> 	.m_reg = 0x0008,
-> 	.n_reg = 0x000c,
-> 	.config_reg = 0x0014,
-> 	.mode_reg = 0x0000,
-> 	.status_reg = 0x001c,
-> 	.status_bit = 17,
-> 	.clkr.hw.init = &(struct clk_init_data){
-> 		.name = "gpll0",
-> 		.parent_names = (const char *[]){ "xo" },
-> 		.num_parents = 1,
-> 		.ops = &clk_pll_ops,
-> 	},
-> };
-
-I did not know you could do that - that could make life easier...
-
-But a quick look shows that this approach probably would require a
-major rewrite of all the methods.
-
-> static int bcm2835_clk_probe(struct platform_device *pdev)
+On Wed, Jan 13, 2016 at 02:21:04PM +0100, Tomasz Nowicki wrote:
+> From: Liu Jiang <jiang.liu@linux.intel.com>
+> 
+> Some architectures, such as IA64 and ARM64, have no instructions to
+> directly access PCI IO ports, so they map PCI IO ports into PCI MMIO
+> address space. Typically PCI host bridges on those architectures take
+> the responsibility to map (translate) PCI IO port transactions into
+> Memory-Mapped IO transactions. ACPI specification provides support
+> of such a usage case by using resource translation_offset.
+> 
+> But current ACPI resource parsing interface isn't neutral enough,
+> it still has some special logic for IA64. So refine the ACPI resource
+> parsing interface and IA64 code to neutrally handle translation_offset
+> by:
+> 1) ACPI resource parsing interface doesn't do any translation, it just
+>    save the translation_offset to be used by arch code.
+> 2) Arch code will do the mapping(translation) based on arch specific
+>    information. Typically it does:
+> 2.a) Translate per PCI domain IO port address space into system global
+>    IO port address space.
+> 2.b) Setup MMIO address mapping for IO ports.
+> void handle_io_resource(struct resource_entry *io_entry)
 > {
-> 	...
-> 	for (i = 0; i < num_clks; i++) {
-> 		clk = devm_clk_register(dev, array_of_clks[i].hw)
-> 	...
+> 	struct resource *mmio_res;
+> 
+> 	mmio_res = kzalloc(sizeof(*mmio_res), GFP_KERNEL);
+> 	mmio_res->flags = IORESOURCE_MEM;
+> 	mmio_res->start = io_entry->offset + io_entry->res->start;
+> 	mmio_res->end = io_entry->offset + io_entry->res->end;
+> 	insert_resource(&iomem_resource, mmio_res)
+> 
+> 	base = map_to_system_ioport_address(entry);
+> 	io_entry->offset = base;
+> 	io_entry->res->start += base;
+> 	io_entry->res->end += base;
 > }
+> 
+> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+> ---
+>  arch/ia64/pci/pci.c     | 26 ++++++++++++++++----------
+>  drivers/acpi/resource.c | 12 +++++-------
+>  2 files changed, 21 insertions(+), 17 deletions(-)
 
-I guess I can use a slightly different approach that does not
-require as many changes, that looks like this:
+I still do not understand what TranslationType argument means in the
+ACPI specifications Resource descriptors (if you do not check it in
+generic code that info is not propagated to arches through the resources
+so basically we ignore it - I do not think we can do anything else given
+that on ia64 it is missing from ACPI tables), but this patch makes sense
+to me (it needs testing/reviewing for ia64 though):
 
-static const struct bcm2835_clk_desc clk_desc_array[] = {
-	/* register PLL */
-	[BCM2835_PLLA]          = REGISTER_PLL(&bcm2835_plla_data),
-	...
-};
-...
-static int bcm2835_clk_probe(struct platform_device *pdev)
-{
-	const size_t asize = ARRAY_SIZE(clk_desc_array);
-	...
-	for (i = 0; i < asize; i++) {
-		desc = &clk_desc_array[i];
-		if (desc)
-			clks[i] = desc->clk_register(cprman,
-						     desc->data);
-	}
-	...
-}
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-If we need to order the initialization then we can add some
-priority field to clk_desc_array and iterate over all the priority
-values.
+> diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
+> index be4c9ef..c75356b 100644
+> --- a/arch/ia64/pci/pci.c
+> +++ b/arch/ia64/pci/pci.c
+> @@ -154,7 +154,7 @@ static int add_io_space(struct device *dev, struct pci_root_info *info,
+>  	struct resource_entry *iospace;
+>  	struct resource *resource, *res = entry->res;
+>  	char *name;
+> -	unsigned long base, min, max, base_port;
+> +	unsigned long base_mmio, base_port;
+>  	unsigned int sparse = 0, space_nr, len;
+>  
+>  	len = strlen(info->common.name) + 32;
+> @@ -172,12 +172,10 @@ static int add_io_space(struct device *dev, struct pci_root_info *info,
+>  		goto free_resource;
+>  
+>  	name = (char *)(iospace + 1);
+> -	min = res->start - entry->offset;
+> -	max = res->end - entry->offset;
+> -	base = __pa(io_space[space_nr].mmio_base);
+> +	base_mmio = __pa(io_space[space_nr].mmio_base);
+>  	base_port = IO_SPACE_BASE(space_nr);
+>  	snprintf(name, len, "%s I/O Ports %08lx-%08lx", info->common.name,
+> -		 base_port + min, base_port + max);
+> +		 base_port + res->start, base_port + res->end);
+>  
+>  	/*
+>  	 * The SDM guarantees the legacy 0-64K space is sparse, but if the
+> @@ -190,19 +188,27 @@ static int add_io_space(struct device *dev, struct pci_root_info *info,
+>  	resource = iospace->res;
+>  	resource->name  = name;
+>  	resource->flags = IORESOURCE_MEM;
+> -	resource->start = base + (sparse ? IO_SPACE_SPARSE_ENCODING(min) : min);
+> -	resource->end   = base + (sparse ? IO_SPACE_SPARSE_ENCODING(max) : max);
+> +	resource->start = base_mmio;
+> +	resource->end = base_mmio;
+> +	if (sparse) {
+> +		resource->start += IO_SPACE_SPARSE_ENCODING(res->start);
+> +		resource->end += IO_SPACE_SPARSE_ENCODING(res->end);
+> +	} else {
+> +		resource->start += res->start;
+> +		resource->end += res->end;
+> +	}
+>  	if (insert_resource(&iomem_resource, resource)) {
+>  		dev_err(dev,
+>  			"can't allocate host bridge io space resource  %pR\n",
+>  			resource);
+>  		goto free_resource;
+>  	}
+> +	resource_list_add_tail(iospace, &info->io_resources);
+>  
+> +	/* Adjust base of original IO port resource descriptor */
+>  	entry->offset = base_port;
+> -	res->start = min + base_port;
+> -	res->end = max + base_port;
+> -	resource_list_add_tail(iospace, &info->io_resources);
+> +	res->start += base_port;
+> +	res->end += base_port;
+>  
+>  	return 0;
+>  
+> diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
+> index cdc5c25..6578f68 100644
+> --- a/drivers/acpi/resource.c
+> +++ b/drivers/acpi/resource.c
+> @@ -190,8 +190,7 @@ static bool acpi_decode_space(struct resource_win *win,
+>  {
+>  	u8 iodec = attr->granularity == 0xfff ? ACPI_DECODE_10 : ACPI_DECODE_16;
+>  	bool wp = addr->info.mem.write_protect;
+> -	u64 len = attr->address_length;
+> -	u64 start, end, offset = 0;
+> +	u64 len = attr->address_length, offset = 0;
+>  	struct resource *res = &win->res;
+>  
+>  	/*
+> @@ -215,14 +214,13 @@ static bool acpi_decode_space(struct resource_win *win,
+>  	else if (attr->translation_offset)
+>  		pr_debug("ACPI: translation_offset(%lld) is invalid for non-bridge device.\n",
+>  			 attr->translation_offset);
+> -	start = attr->minimum + offset;
+> -	end = attr->maximum + offset;
+>  
+>  	win->offset = offset;
+> -	res->start = start;
+> -	res->end = end;
+> +	res->start = attr->minimum;
+> +	res->end = attr->maximum;
+>  	if (sizeof(resource_size_t) < sizeof(u64) &&
+> -	    (offset != win->offset || start != res->start || end != res->end)) {
+> +	    (offset != win->offset || attr->minimum != res->start ||
+> +	     attr->maximum != res->end)) {
+>  		pr_warn("acpi resource window ([%#llx-%#llx] ignored, not CPU addressable)\n",
+>  			attr->minimum, attr->maximum);
+>  		return false;
+> -- 
+> 1.9.1
+> 
