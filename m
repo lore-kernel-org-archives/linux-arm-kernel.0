@@ -1,77 +1,38 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Thu, 14 Jan 2016 13:16:26 +0100
-Subject: [PATCH v4 0/9] Add STM32 pinctrl/GPIO driver
-Message-ID: <1452773795-24216-1-git-send-email-mcoquelin.stm32@gmail.com>
+Date: Thu, 14 Jan 2016 13:16:27 +0100
+Subject: [PATCH v4 1/9] ARM: Kconfig: Introduce MACH_STM32F429 flag
+In-Reply-To: <1452773795-24216-1-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1452773795-24216-1-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1452773795-24216-2-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the fourth round of STM32 pinctrl series, which takes into
-account comments made by Patrice on patch 4.
+This patch introduces the MACH_STM32F429 to make possible to only select
+STM32F429 pinctrl driver.
 
-The STM32 family has 16 pins per GPIO bank, and the number of bank varies
-depending on the model.
+By default, all the MACH_STM32Fxxx flags will be set with STM32 defconfig.
 
-Pins can be multiplexed either in GPIO mode, alternate function (up to 15
-functions per pin) or analog (for ADC/DAC).
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
+Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+---
+ arch/arm/Kconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Changes since v3:
------------------
- - Rebase on v4.4
- - Fix error paths in stm32_pctrl_dt_subnode_to_map() (Patrice)
- - Remove useless stm32_pctrl_find_function_by_pin function (Patrice)
-
-Changes since v2:
------------------
- - Rebase on v4.4-rc1
- - Declare leds also for Eval board
- - Set green led as heartbeat
- - Collect some acks
-
-Changes since v1:
------------------
- - Add GPIO LEDs support in DT and defconfig
- - Changes pinmux DT bindings from macros to raw values (Daniel)
- - Improve DT bindings documentation (Daniel)
- - Fix some commit fixup and rebase issues.
-
-Kind regards,
-Maxime
-
-Maxime Coquelin (9):
-  ARM: Kconfig: Introduce MACH_STM32F429 flag
-  Documentation: dt-bindings: Document STM32 pinctrl driver DT bindings
-  includes: dt-bindings: Add STM32F429 pinctrl DT bindings
-  pinctrl: Add STM32 MCUs support
-  ARM: mach-stm32: Select pinctrl
-  ARM: dts: Add pinctrl node to STM32F429
-  ARM: dts: Add USART1 pin config to STM32F429 boards
-  ARM: dts: Add leds support to STM32F429 boards
-  ARM: config: Enable GPIO Led driver in stm32_defconfig
-
- .../bindings/pinctrl/st,stm32-pinctrl.txt          |  126 ++
- arch/arm/Kconfig                                   |    6 +
- arch/arm/boot/dts/stm32429i-eval.dts               |   19 +
- arch/arm/boot/dts/stm32f429-disco.dts              |   13 +
- arch/arm/boot/dts/stm32f429.dtsi                   |  110 ++
- arch/arm/configs/stm32_defconfig                   |    1 +
- drivers/pinctrl/Kconfig                            |    1 +
- drivers/pinctrl/Makefile                           |    1 +
- drivers/pinctrl/stm32/Kconfig                      |   16 +
- drivers/pinctrl/stm32/Makefile                     |    5 +
- drivers/pinctrl/stm32/pinctrl-stm32.c              |  834 ++++++++++
- drivers/pinctrl/stm32/pinctrl-stm32.h              |   43 +
- drivers/pinctrl/stm32/pinctrl-stm32f429.c          | 1598 ++++++++++++++++++++
- include/dt-bindings/pinctrl/pinctrl-stm32.h        |   12 +
- include/dt-bindings/pinctrl/stm32f429-pinfunc.h    | 1241 +++++++++++++++
- 15 files changed, 4026 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
- create mode 100644 drivers/pinctrl/stm32/Kconfig
- create mode 100644 drivers/pinctrl/stm32/Makefile
- create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.c
- create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.h
- create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32f429.c
- create mode 100644 include/dt-bindings/pinctrl/pinctrl-stm32.h
- create mode 100644 include/dt-bindings/pinctrl/stm32f429-pinfunc.h
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 34e1569..b7aa567 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -969,6 +969,11 @@ config ARCH_STM32
+ 	help
+ 	  Support for STMicroelectronics STM32 processors.
+ 
++config MACH_STM32F429
++	bool "STMicrolectronics STM32F429"
++	depends on ARCH_STM32
++	default y
++
+ # Definitions to make life easier
+ config ARCH_ACORN
+ 	bool
 -- 
 1.9.1
