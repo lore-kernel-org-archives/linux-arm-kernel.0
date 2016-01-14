@@ -1,72 +1,212 @@
-From: qiuxishi@huawei.com (Xishi Qiu)
-Date: Thu, 14 Jan 2016 21:06:08 +0800
-Subject: Have any influence on set_memory_** about below patch ??
-In-Reply-To: <56979621.1060102@huawei.com>
-References: <5693A740.7070408@huawei.com> <20160111133145.GM6499@leverpostej>
- <569454F6.1060207@huawei.com> <20160112111531.GA4858@leverpostej>
- <5696272E.8090408@huawei.com> <20160113111806.GC23370@leverpostej>
- <56979621.1060102@huawei.com>
-Message-ID: <56979D40.4060602@huawei.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Thu, 14 Jan 2016 15:19:56 +0200
+Subject: [PATCH v3 2/4] i2c: rk3x: add ops to caculate i2c clocks
+In-Reply-To: <1452774699-57455-3-git-send-email-david.wu@rock-chips.com>
+References: <1452774699-57455-1-git-send-email-david.wu@rock-chips.com>
+ <1452774699-57455-3-git-send-email-david.wu@rock-chips.com>
+Message-ID: <CAHp75VdR01_suo3nTWuuT2OEusy6z6KGSg29LKD8T3kY9eGMPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/1/14 20:35, Xishi Qiu wrote:
+On Thu, Jan 14, 2016 at 2:31 PM, David Wu <david.wu@rock-chips.com> wrote:
+> From: David Wu <wdc@rock-chips.com>
+>
+> I2c Controller of rk3x is updated for the rules to caculate clocks.
+> So it need a new method to caculate i2c clock timing information
+> for new version. The current method is defined as v0, and new is
+> v1, next maybe v2......
 
-> On 2016/1/13 19:18, Mark Rutland wrote:
-> 
->> On Wed, Jan 13, 2016 at 06:30:06PM +0800, Xishi Qiu wrote:
->>> Hi Mark,
->>>
->>> If I create swapper page tables by 4kb, not large page, then I use
->>> set_memory_ro() to change the pate table flag, does it have the problem
->>> too?
->>
->> The splitting/merging problem would not apply.
->>
->> However, you're going to waste a reasonable amount of memory by not
->> using section mappings in the swapper, and we gain additional complexity
->> in the page table setup code (which is shared with others things that
->> want section mappings).
->>
->> What are you exactly actually trying to achieve?
->>
-> 
-> If module allocates some pages and save data on them, and the data will
-> not be changed during the module running. So we want to use set_memory_ro()
-> to increase the security. If the data is changed, we can catch someone.
-> 
->> What memory do you want to mark RO, and why?
->>
-> 
-> The key data, and it will not be changed during the running time.
-> 
->> >From a previous discussion [1], we figured out alternative approaches
->> for common cases. Do none of those work for your case?
->>
-> 
-> I have not read the patchset carefully, could you tell me the general meaning
-> of the approaches?
-> 
+Thanks for an update. My comments below.
 
-Hi Mark,
+> --- a/drivers/i2c/busses/i2c-rk3x.c
+> +++ b/drivers/i2c/busses/i2c-rk3x.c
 
-Is the two approaches like following?
-1. use create_mapping to map the data in read only, then use fixmap to create a
-temp page table, and change the data when necessary.
-2. use vmalloc, then we can use set_memory_ro to change the page table prot.
+> @@ -90,10 +95,27 @@ struct rk3x_i2c_soc_data {
+>         int grf_offset;
+>  };
+>
+> +/**
+> + * struct rk3x_priv_i2c_timings - rk3x I2C timing information
+> + * @div_low: Divider output for low
+> + * @div_high: Divider output for high
+> + */
+> +struct rk3x_priv_i2c_timings {
+> +       unsigned long div_low;
+> +       unsigned long div_high;
+> +};
+> +
+> +struct rk3x_i2c_ops {
+> +       int (*calc_clock)(unsigned long,
+> +                         struct i2c_timings *,
+> +                         struct rk3x_priv_i2c_timings *);
+> +};
+> +
+>  struct rk3x_i2c {
+>         struct i2c_adapter adap;
+>         struct device *dev;
+>         struct rk3x_i2c_soc_data *soc_data;
+> +       struct rk3x_i2c_ops ops;
 
-Thanks,
-Xishi Qiu
+Not much sense for now to have a struct for one member.
 
-> Thanks,
-> Xishi Qiu
-> 
->> Thanks,
->> Mark.
->>
->> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/397320.html
->>
->> .
->>
-> 
-> 
+>
+>         /* Hardware resources */
+>         void __iomem *regs;
+> @@ -102,6 +124,7 @@ struct rk3x_i2c {
+>
+
+What about
+      /* I2C timing settings */
+      struct i2c_timings t;
+
+      /* Divider settings */
+      int (*calc_divs)(unsigned long,
+                        struct i2c_timings *,
+                        unsigned long *div_low,
+                        unsigned long *div_high);
+      unsigned long div_low;
+      unsigned long div_high;
+?
+
+As far as I understand you still calculate divider values.
+
+>
+>         /* Synchronization & notification */
+>         spinlock_t lock;
+> @@ -431,21 +454,20 @@ out:
+>  }
+>
+>  /**
+> - * Calculate divider values for desired SCL frequency
+> + * Calculate timing clock info values for desired SCL frequency
+>   *
+>   * @clk_rate: I2C input clock rate
+> - * @t_input: Known I2C timing information.
+> - * @div_low: Divider output for low
+> - * @div_high: Divider output for high
+
+For now seems better to leave this prototype.
+
+> + * @t_input: Known I2C timing information
+> + * @t_output: Caculated rk3x private timing information that would
+> + * be written into regs
+>   *
+>   * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
+>   * a best-effort divider value is returned in divs. If the target rate is
+>   * too high, we silently use the highest possible rate.
+>   */
+> -static int rk3x_i2c_calc_divs(unsigned long clk_rate,
+> -                             struct i2c_timings *t_input,
+> -                             unsigned long *div_low,
+> -                             unsigned long *div_high)
+> +static int rk3x_i2c_v0_calc_clock(unsigned long clk_rate,
+> +                                 struct i2c_timings *t_input,
+> +                                 struct rk3x_priv_i2c_timings *t_output)
+>  {
+>         unsigned long spec_min_low_ns, spec_min_high_ns;
+>         unsigned long spec_setup_start, spec_max_data_hold_ns;
+
+
+> @@ -583,25 +605,25 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate,
+>
+>                 /* Give low the "ideal" and give high whatever extra is left */
+>                 extra_low_div = ideal_low_div - min_low_div;
+> -               *div_low = ideal_low_div;
+> -               *div_high = min_high_div + (extra_div - extra_low_div);
+> +               t_output->div_low = ideal_low_div;
+> +               t_output->div_high = min_high_div + (extra_div - extra_low_div);
+>         }
+>
+>         /*
+>          * Adjust to the fact that the hardware has an implicit "+1".
+>          * NOTE: Above calculations always produce div_low > 0 and div_high > 0.
+>          */
+> -       *div_low = *div_low - 1;
+> -       *div_high = *div_high - 1;
+> +       t_output->div_low = t_output->div_low - 1;
+
+-= 1
+
+> +       t_output->div_high = t_output->div_high - 1;
+
+Ditto.
+
+But without change of prototype those no needed.
+
+>
+>         /* Maximum divider supported by hw is 0xffff */
+> -       if (*div_low > 0xffff) {
+> -               *div_low = 0xffff;
+> +       if (t_output->div_low > 0xffff) {
+> +               t_output->div_low = 0xffff;
+>                 ret = -EINVAL;
+>         }
+>
+> -       if (*div_high > 0xffff) {
+> -               *div_high = 0xffff;
+> +       if (t_output->div_high > 0xffff) {
+> +               t_output->div_high = 0xffff;
+>                 ret = -EINVAL;
+>         }
+>
+> @@ -610,19 +632,21 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate,
+>
+>  static void rk3x_i2c_adapt_div(struct rk3x_i2c *i2c, unsigned long clk_rate)
+>  {
+> -       unsigned long div_low, div_high;
+>         u64 t_low_ns, t_high_ns;
+>         int ret;
+>
+> -       ret = rk3x_i2c_calc_divs(clk_rate, &i2c->t, &div_low, &div_high);
+> +       ret = i2c->ops.calc_clock(clk_rate, &i2c->t, &i2c->t_priv);
+>         WARN_ONCE(ret != 0, "Could not reach SCL freq %u", i2c->t.bus_freq_hz);
+>
+>         clk_enable(i2c->clk);
+> -       i2c_writel(i2c, (div_high << 16) | (div_low & 0xffff), REG_CLKDIV);
+> +       i2c_writel(i2c, (i2c->t_priv.div_high << 16) |
+> +                 (i2c->t_priv.div_low & 0xffff), REG_CLKDIV);
+>         clk_disable(i2c->clk);
+>
+> -       t_low_ns = div_u64(((u64)div_low + 1) * 8 * 1000000000, clk_rate);
+> -       t_high_ns = div_u64(((u64)div_high + 1) * 8 * 1000000000, clk_rate);
+> +       t_low_ns = div_u64(((u64)i2c->t_priv.div_low + 1) * 8 * 1000000000,
+> +                          clk_rate);
+> +       t_high_ns = div_u64(((u64)i2c->t_priv.div_high + 1) * 8 * 1000000000,
+> +                           clk_rate);
+>         dev_dbg(i2c->dev,
+>                 "CLK %lukhz, Req %uns, Act low %lluns high %lluns\n",
+>                 clk_rate / 1000,
+> @@ -652,12 +676,11 @@ static int rk3x_i2c_clk_notifier_cb(struct notifier_block *nb, unsigned long
+>  {
+>         struct clk_notifier_data *ndata = data;
+>         struct rk3x_i2c *i2c = container_of(nb, struct rk3x_i2c, clk_rate_nb);
+> -       unsigned long div_low, div_high;
+>
+>         switch (event) {
+>         case PRE_RATE_CHANGE:
+> -               if (rk3x_i2c_calc_divs(ndata->new_rate, &i2c->t,
+> -                                      &div_low, &div_high) != 0)
+> +               if (i2c->ops.calc_clock(ndata->new_rate, &i2c->t,
+> +                                       &i2c->t_priv) != 0)
+>                         return NOTIFY_STOP;
+>
+>                 /* scale up */
+> @@ -861,6 +884,7 @@ static int rk3x_i2c_probe(struct platform_device *pdev)
+>         u32 value;
+>         int irq;
+>         unsigned long clk_rate;
+> +       unsigned int version;
+
+No need to have a separate variable?
+
+> +       version = (readl(i2c->regs + REG_CON) & VERSION_MASK) >> VERSION_SHIFT;
+> +       if (version == RK3X_I2C_V0)
+> +               i2c->ops.calc_clock = rk3x_i2c_v0_calc_clock;
+
+value = readl(i2c->regs + REG_CON);
+if ((value & VERSION_MASK) >> VERSION_SHIFT) == RK3X_I2C_V0)
+  i2c->ops.calc_clock = rk3x_i2c_v0_calc_clock;
+
+-- 
+With Best Regards,
+Andy Shevchenko
