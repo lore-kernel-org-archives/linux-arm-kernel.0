@@ -1,32 +1,41 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Thu, 14 Jan 2016 11:24:01 +0200
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <5696CF08.8080700@imgtec.com>
-References: <1452426622-4471-12-git-send-email-mst@redhat.com>
- <56945366.2090504@imgtec.com>
- <20160112092711.GP6344@twins.programming.kicks-ass.net>
- <20160112102555.GV6373@twins.programming.kicks-ass.net>
- <20160112104012.GW6373@twins.programming.kicks-ass.net>
- <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
- <20160113104516.GE25458@arm.com> <5696CF08.8080700@imgtec.com>
-Message-ID: <20160114111632-mutt-send-email-mst@redhat.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 14 Jan 2016 10:25:40 +0100
+Subject: [PATCH] clocksource: ftm: select CLKSRC_MMIO
+In-Reply-To: <11970328.RVc8t0Mk1C@wuerfel>
+References: <11970328.RVc8t0Mk1C@wuerfel>
+Message-ID: <56976994.2060205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 02:26:16PM -0800, Leonid Yegoshin wrote:
-> And all that is out-of-topic here in my mind. I just want to be sure that
-> this patchset still provides a use of a specific lightweight SYNCs on MIPS
-> vs bold and heavy generalized "SYNC 0" in any case.
-> 
-> - Leonid.
+On 01/14/2016 12:02 AM, Arnd Bergmann wrote:
+> The ftm clocksource driver does not build if CLKSRC_MMIO is disabled:
+>
+> drivers/built-in.o: In function `ftm_timer_init':
+> (init.text+0xd324): undefined reference to `clocksource_mmio_init'
+> (init.text+0xd484): undefined reference to `clocksource_mmio_readl_up'
+>
+> This adds the same 'select' statement that the other similar drivers
+> use. Prior to allowing this driver to be enabled with COMPILE_TEST,
+> it was apparently unused. I'm not entirely sure who is using this
+> hardware, but it certainly can't hurt to ensure it builds cleanly.
 
-Of course it does. All this patchset does is rename smp_mb/rmb/wmb
-to __smp_mb()/__smp_rmb()/__smp_wmb()
-and then asm-generic does #define smp_mb __smp_mb
-or #define smp_mb barrier depending on CONFIG_SMP.
+Hi Arnd,
 
-Why is that needed? So we can implement
-[PATCH v3 28/41] asm-generic: implement virt_xxx memory barriers
+Thanks for the fix. It is already in Thomas's tree [1].
+
+It has been merged in tip/timers/urgent. You will have to wait a bit 
+this branch to be merged with tip/timers/core.
+
+   -- Daniel
+
+[1] 
+https://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?h=timers/urgent&id=03724ac3d48f8f0e3caf1d30fa134f8fd96c94e2
+
+
 
 -- 
-MST
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
