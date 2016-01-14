@@ -1,29 +1,29 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 14 Jan 2016 11:57:55 -0700
-Subject: [PATCH 0/5] coresight: miscellaneous fix and cleanup 
-Message-ID: <1452797880-4365-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Thu, 14 Jan 2016 11:57:56 -0700
+Subject: [PATCH 1/5] coresight: fixing indentation problem
+In-Reply-To: <1452797880-4365-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1452797880-4365-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1452797880-4365-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches present a few fix and some cleanup code for the coresight
-subsystem. The set serves as a foundation for the upcoming 8th iteration
-of the "coresight: integration with perf" patch set but not part of the
-new functionality, hence choosing to send separately.
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This set is based on [1].
-
-Thanks,
-Mathieu
-
-Mathieu Poirier (5):
-  coresight: fixing indentation problem
-  coresight: fixing lockdep error
-  coresight: coresight_unregister() function cleanup
-  coresight: release reference taken by 'bus_find_device()'
-  coresight: remove csdev's link from topology
-
- drivers/hwtracing/coresight/coresight.c | 57 +++++++++++++++++++++++++++++----
- 1 file changed, 51 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 93738dfbf631..4236a02cdab2 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -536,7 +536,7 @@ static void coresight_fixup_orphan_conns(struct coresight_device *csdev)
+ 	 * are hooked-up with each newly added component.
+ 	 */
+ 	bus_for_each_dev(&coresight_bustype, NULL,
+-				 csdev, coresight_orphan_match);
++			 csdev, coresight_orphan_match);
+ }
+ 
+ 
 -- 
 2.1.4
