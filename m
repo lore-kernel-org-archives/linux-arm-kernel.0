@@ -1,59 +1,19 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 14 Jan 2016 17:07:23 +0000
-Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <1452789524.28109.24.camel@redhat.com>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <1452785393.28109.16.camel@redhat.com>
- <5697C0EB.4020404@codeaurora.org> <20160114161238.GA20706@red-moon>
- <1452789524.28109.24.camel@redhat.com>
-Message-ID: <20160114170723.GB20706@red-moon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 14 Jan 2016 09:07:46 -0800
+Subject: [PATCH 1/3] ti-st: use device handles and add device tree binding
+In-Reply-To: <8665E2433BC68541A24DFFCA87B70F5B23769B75@DFRE01.ent.ti.com>
+References: <1450870253-8694-1-git-send-email-eyalr@ti.com>
+ <8665E2433BC68541A24DFFCA87B70F5B23769B75@DFRE01.ent.ti.com>
+Message-ID: <20160114170746.GO12777@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 11:38:44AM -0500, Mark Salter wrote:
+* Reizer, Eyal <eyalr@ti.com> [160114 06:23]:
+> Ping on this patchset
 
-[...]
+I think there are several comments pending from Rob as
+a reply to this thread on December 29th?
 
-> You would lose that bet. AddressMinimum/Maximum describe the
-> PCI bus addresses.
+Regards,
 
-In the mainline DT (APM Mustang), the CPU physical address corresponding
-to IO space is 0xe010000000, PCI bus address is 0x0.
-
-> ? ? ? ? ? ? ? ? QWordIO (ResourceProducer, MinFixed, MaxFixed, PosDecode, EntireRange,
-> ????????????????????0x0000000000000000, // Granularity
-> ????????????????????0x0000000010000000, // Range Minimum
-
-
-> ????????????????????0x000000001000FFFF, // Range Maximum
-> ????????????????????0x000000E000000000, // Translation Offset
-
-See above, I will get the APM specifications to countercheck.
-
-I agree with you we have to verify if this IO space limitation is
-real or it is just an x86ism, in which case we remove that check.
-
-Lorenzo
-> ????????????????????0x0000000000010000, // Length
-> ????????????????????,, , TypeStatic)
-
-> 
-> 
-> > Jiang's patch:
-> > 
-> > https://lkml.org/lkml/2015/12/16/249
-> > 
-> > parses the IO descriptors and stores the AddressMinimum, AddressMaximum
-> > in the IO resource (with AddressTranslation as offset which must be the
-> > *CPU* physical address mapping IO), from the log above it seems to me in
-> > AddressMinimum APM specifies the *CPU* physical address generating IO
-> > cycles.
-> > 
-> > All in all, I was right to fear this would happen, and I already
-> > raised the point within the ACPI spec working group, ACPI IO
-> > descriptors specification is ambiguous and we must agree on how
-> > they have to be specified once for all.
-> > 
-> > Lorenzo
-> 
+Tony
