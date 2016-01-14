@@ -1,43 +1,146 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Thu, 14 Jan 2016 10:33:54 +0000
-Subject: [Xen-devel] [PATCH v6 1/5] APCI: MCFG: Move mmcfg_list management
- to drivers/acpi
-In-Reply-To: <1452756761-29584-2-git-send-email-jchandra@broadcom.com>
-References: <1452756761-29584-1-git-send-email-jchandra@broadcom.com>
- <1452756761-29584-2-git-send-email-jchandra@broadcom.com>
-Message-ID: <56977992.7060808@citrix.com>
+From: a0393675@ti.com (Keerthy)
+Date: Thu, 14 Jan 2016 16:12:47 +0530
+Subject: [PATCH v2] reboot: Backup orderly_poweroff
+In-Reply-To: <20160114100913.GB15857@gmail.com>
+References: <1452688405-15087-1-git-send-email-j-keerthy@ti.com>
+ <20160114090520.GA4351@gmail.com> <569767EC.2010704@ti.com>
+ <20160114100913.GB15857@gmail.com>
+Message-ID: <56977BA7.702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/01/16 07:32, Jayachandran C wrote:
-> Move pci_mmcfg_list handling to a drivers/acpi/pci_mcfg.c. This is
-> to share the API and code with ARM64 later. The corresponding
-> declarations are moved from asm/pci_x86.h to linux/pci-acpi.h
-[...]
-> --- a/drivers/xen/pci.c
-> +++ b/drivers/xen/pci.c
-> @@ -27,9 +27,6 @@
->  #include <asm/xen/hypervisor.h>
->  #include <asm/xen/hypercall.h>
->  #include "../pci/pci.h"
-> -#ifdef CONFIG_PCI_MMCONFIG
-> -#include <asm/pci_x86.h>
-> -#endif
->  
->  static bool __read_mostly pci_seg_supported = true;
->  
-> @@ -221,7 +218,7 @@ static int __init xen_mcfg_late(void)
->  	if (!xen_initial_domain())
->  		return 0;
->  
-> -	if ((pci_probe & PCI_PROBE_MMCONF) == 0)
-> +	if (!pci_mmconfig_enabled())
->  		return 0;
->  
->  	if (list_empty(&pci_mmcfg_list))
+Hi Ingo,
 
-Xen parts:
+On Thursday 14 January 2016 03:39 PM, Ingo Molnar wrote:
+>
+> * Keerthy <a0393675@ti.com> wrote:
+>
+>> Hi Ingo,
+>>
+>> On Thursday 14 January 2016 02:35 PM, Ingo Molnar wrote:
+>>>
+>>> * Keerthy <j-keerthy@ti.com> wrote:
+>>>
+>>>> orderly_poweroff is triggered when a graceful shutdown
+>>>> of system is desired. This may be used in many critical states of the
+>>>> kernel such as when subsystems detects conditions such as critical
+>>>> temperature conditions. However, in certain conditions in system
+>>>> boot up sequences like those in the middle of driver probes being
+>>>> initiated, userspace will be unable to power off the system in a clean
+>>>> manner and leaves the system in a critical state. In cases like these,
+>>>> the /sbin/poweroff will return success (having forked off to attempt
+>>>> powering off the system. However, the system overall will fail to
+>>>> completely poweroff (since other modules will be probed) and the system
+>>>> is still functional with no userspace (since that would have shut itself
+>>>> off).
+>>>>
+>>>> However, there is no clean way of detecting such failure of userspace
+>>>> powering off the system. In such scenarios, it is necessary for a backup
+>>>> workqueue to be able to force a shutdown of the system when orderly
+>>>> shutdown is not successful after a configurable time period.
+>>>>
+>>>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>>>> Suggested-by: Eduardo Valentin <edubezval@gmail.com>
+>>>> Reported-by: Nishanth Menon <nm@ti.com>
+>>>> ---
+>>>> Links to previous discussion can be found here:
+>>>>
+>>>> http://www.spinics.net/lists/linux-omap/msg124925.html
+>>>>
+>>>> Boot tested on DRA7.
+>>>>
+>>>> changes in v2:
+>>>>
+>>>> 	* Changed #ifdef to #if CONFIG_SHUTDOWN_BACKUP_DELAY_MS
+>>>>
+>>>>   arch/Kconfig    |  7 +++++++
+>>>>   kernel/reboot.c | 23 ++++++++++++++++++-----
+>>>>   2 files changed, 25 insertions(+), 5 deletions(-)
+>>>>
+>>>> Index: linux/arch/Kconfig
+>>>> ===================================================================
+>>>> --- linux.orig/arch/Kconfig	2016-01-11 15:26:07.732173131 +0530
+>>>> +++ linux/arch/Kconfig	2016-01-11 15:26:07.728173205 +0530
+>>>> @@ -37,6 +37,18 @@
+>>>>   	def_bool y
+>>>>   	depends on PERF_EVENTS && HAVE_PERF_EVENTS_NMI && !PPC64
+>>>>
+>>>> +config SHUTDOWN_BACKUP_DELAY_MS
+>>>> +	int "Backup shutdown delay in milli-seconds"
+>>>> +	default 0
+>>>> +	help
+>>>> +	  The number of milliseconds to delay before backup workqueue
+>>>> +	  executes attempting to poweroff the system after the
+>>>> +	  orderly_poweroff function has failed to complete.
+>>>> +
+>>>> +	  If set to 0, the backup workqueue is not active. The value
+>>>> +	  should be conservatively configured based on userspace latencies
+>>>> +	  expected for a given system.
+>>>
+>>> I don't really understand this. In what circumstances can a reboot fail?
+>>>
+>>> I think that is what should be fixed: a reboot should never fail, instead of
+>>> introducing some sort of fragile timeout based method.
+>>
+>> Here is the complete description of the scenario which was reported by Nishanth
+>> who encountered the issue. The link has bootlogs and description of the exact
+>> case which led to this patch.
+>>
+>> http://www.spinics.net/lists/linux-omap/msg124923.html
+>
+> it's a reply in the middle of a discussion ...
+>
+> What I managed to decode is that this:
+>
+> static int __orderly_poweroff(bool force)
+> {
+>          int ret;
+>
+>          ret = run_cmd(poweroff_cmd);
+>
+>          if (ret && force) {
+>                  pr_warn("Failed to start orderly shutdown: forcing the issue\n");
+>
+>                  /*
+>                   * I guess this should try to kick off some daemon to sync and
+>                   * poweroff asap.  Or not even bother syncing if we're doing an
+>                   * emergency shutdown?
+>                   */
+>                  emergency_sync();
+>                  kernel_power_off();
+>          }
+>
+>          return ret;
+> }
+>
+> could fail to actually power the system off, if the run_cmd(poweroff_cmd)
+> 'succeeds', but due to a user-space bug it does not actually call the real
+> poweroff system call?
+>
 
-Acked-by: David Vrabel <david.vrabel@citrix.com>
+I tried to simulate the issue.
 
-David
+In the probe function of drivers/thermal/ti-soc-thermal/ti-bandgap.c
+ti_bandgap_probe i call
+
+orderly_poweroff(true);
+
+This is while driver probes are still on going. I observe that
+ret = run_cmd(poweroff_cmd);
+
+ret is a non-zero value and we enter the if condition:
+
+Even after the
+
+emergency_sync();
+kernel_power_off();
+
+calls
+
+the console remained active in weird state.
+
+
+> Thanks,
+>
+> 	Ingo
+>
