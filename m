@@ -1,41 +1,92 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 14 Jan 2016 01:54:07 -0800
-Subject: [PATCH -next] arm: Select GPIO_GENERIC_PLATFORM for CRAGG_6410
-In-Reply-To: <CACRpkdbH6jCyzJK=LM4mPpdLPrQ4KMkHuedAPfWU4tg1K6FaBQ@mail.gmail.com>
-References: <1452531649-14940-1-git-send-email-linux@roeck-us.net>
- <CACRpkdbH6jCyzJK=LM4mPpdLPrQ4KMkHuedAPfWU4tg1K6FaBQ@mail.gmail.com>
-Message-ID: <5697703F.8040801@roeck-us.net>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 14 Jan 2016 11:02:33 +0100
+Subject: [PATCH] mmc: tmio_mmc_dma: don't print invalid DMA cookie
+In-Reply-To: <5032992.kTQ6Oyibpy@wuerfel>
+References: <5032992.kTQ6Oyibpy@wuerfel>
+Message-ID: <CAPDyKFr-Y+pnhkTLYO2k-XHieA1rOEX9Ov129fFtZac8MksooQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/2016 01:02 AM, Linus Walleij wrote:
-> On Mon, Jan 11, 2016 at 6:00 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+On 13 January 2016 at 22:25, Arnd Bergmann <arnd@arndb.de> wrote:
+> The tmio_mmc_start_dma_{rx,tx} function functions contain debug
+> code that prints the dma cookie among other things. However,
+> in case we fall back to PIO mode for some reason, the cookie
+> variable is never initialized, and gcc warns about this:
 >
->> Since commit 0f4630f3720e ("gpio: generic: factor into gpio_chip struct"),
->> all users of struct bgpio_pdata depend on GPIO_GENERIC.
->>
->> This results in the following build error.
->>
->> arch/arm/mach-s3c64xx/mach-crag6410.c:270:3: warning:
->>          excess elements in struct initializer
->> arch/arm/mach-s3c64xx/mach-crag6410.c:270:3: warning:
->>          (near initialization for '(anonymous)')
->> arch/arm/mach-s3c64xx/mach-crag6410.c:271:2: error:
->>          invalid use of undefined type 'struct bgpio_pdata'
->>
->> Fixes: 0f4630f3720e ("gpio: generic: factor into gpio_chip struct")
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
->> ---
->> I don't know if this is the correct way to fix this problem.
->> If not, please consider this to be a bug report.
+> In file included from ../include/linux/printk.h:277:0,
+>                  from ../include/linux/kernel.h:13,
+>                  from ../include/linux/list.h:8,
+>                  from ../include/linux/kobject.h:20,
+>                  from ../include/linux/device.h:17,
+>                  from ../drivers/mmc/host/tmio_mmc_dma.c:13:
+> ../drivers/mmc/host/tmio_mmc_dma.c: In function 'tmio_mmc_start_dma':
+> ../include/linux/dynamic_debug.h:86:3: warning: 'cookie' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>    __dynamic_dev_dbg(&descriptor, dev, fmt, \
+>    ^
+> ../drivers/mmc/host/tmio_mmc_dma.c:128:15: note: 'cookie' was declared here
+>   dma_cookie_t cookie;
 >
-> I think this is fixed by Arnds patch:
-> http://marc.info/?l=linux-gpio&m=145237423205247&w=2
+> This modifies the dev_dbg() statements so we only print the cookie
+> when we are already in the DMA path.
 >
-> Can you verify that?
->
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Correct.
+Thanks, applied for fixes!
 
-Guenter
+Kind regards
+Uffe
+
+> ---
+> This warning has existed for a long time, and it's only in debug code,
+> so probably nobody cared.
+>
+> diff --git a/drivers/mmc/host/tmio_mmc_dma.c b/drivers/mmc/host/tmio_mmc_dma.c
+> index e4b05dbb9ca8..4a0d6b80eaa3 100644
+> --- a/drivers/mmc/host/tmio_mmc_dma.c
+> +++ b/drivers/mmc/host/tmio_mmc_dma.c
+> @@ -94,9 +94,9 @@ static void tmio_mmc_start_dma_rx(struct tmio_mmc_host *host)
+>                         desc = NULL;
+>                         ret = cookie;
+>                 }
+> +               dev_dbg(&host->pdev->dev, "%s(): mapped %d -> %d, cookie %d, rq %p\n",
+> +                       __func__, host->sg_len, ret, cookie, host->mrq);
+>         }
+> -       dev_dbg(&host->pdev->dev, "%s(): mapped %d -> %d, cookie %d, rq %p\n",
+> -               __func__, host->sg_len, ret, cookie, host->mrq);
+>
+>  pio:
+>         if (!desc) {
+> @@ -116,8 +116,8 @@ pio:
+>                          "DMA failed: %d, falling back to PIO\n", ret);
+>         }
+>
+> -       dev_dbg(&host->pdev->dev, "%s(): desc %p, cookie %d, sg[%d]\n", __func__,
+> -               desc, cookie, host->sg_len);
+> +       dev_dbg(&host->pdev->dev, "%s(): desc %p, sg[%d]\n", __func__,
+> +               desc, host->sg_len);
+>  }
+>
+>  static void tmio_mmc_start_dma_tx(struct tmio_mmc_host *host)
+> @@ -174,9 +174,9 @@ static void tmio_mmc_start_dma_tx(struct tmio_mmc_host *host)
+>                         desc = NULL;
+>                         ret = cookie;
+>                 }
+> +               dev_dbg(&host->pdev->dev, "%s(): mapped %d -> %d, cookie %d, rq %p\n",
+> +                       __func__, host->sg_len, ret, cookie, host->mrq);
+>         }
+> -       dev_dbg(&host->pdev->dev, "%s(): mapped %d -> %d, cookie %d, rq %p\n",
+> -               __func__, host->sg_len, ret, cookie, host->mrq);
+>
+>  pio:
+>         if (!desc) {
+> @@ -196,8 +196,7 @@ pio:
+>                          "DMA failed: %d, falling back to PIO\n", ret);
+>         }
+>
+> -       dev_dbg(&host->pdev->dev, "%s(): desc %p, cookie %d\n", __func__,
+> -               desc, cookie);
+> +       dev_dbg(&host->pdev->dev, "%s(): desc %p\n", __func__, desc);
+>  }
+>
+>  void tmio_mmc_start_dma(struct tmio_mmc_host *host,
+>
