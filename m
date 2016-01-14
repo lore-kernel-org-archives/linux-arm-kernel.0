@@ -1,226 +1,107 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 14 Jan 2016 15:20:47 +0100
-Subject: [RFC/PATCH] drm/rockchip: don't wait for vblank if fb hasn't
- changed
-In-Reply-To: <5697606D.50603@rock-chips.com>
-References: <20160113143425.363ce07a.john@metanate.com>
- <20160113154005.GT19130@phenom.ffwll.local>
- <20160113155529.6048b2c1.john@metanate.com>
- <20160113162156.GA19130@phenom.ffwll.local>
- <20160113164038.5fcf670f.john@metanate.com>
- <20160113171917.GC19130@phenom.ffwll.local>
- <20160113173954.52e688fc.john@metanate.com>
- <5696F6F4.5060908@rock-chips.com>
- <CAKMK7uGQ47eLS2HxUP2+tQcf5cZm+eoGryCRrBzA2b8=77ox-Q@mail.gmail.com>
- <5697606D.50603@rock-chips.com>
-Message-ID: <20160114142047.GD19130@phenom.ffwll.local>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 14 Jan 2016 14:22:27 +0000
+Subject: [PATCH v2] reboot: Backup orderly_poweroff
+In-Reply-To: <20160114112354.GA17869@gmail.com>
+References: <1452688405-15087-1-git-send-email-j-keerthy@ti.com>
+ <20160114090520.GA4351@gmail.com> <569767EC.2010704@ti.com>
+ <20160114100913.GB15857@gmail.com> <56977BA7.702@ti.com>
+ <20160114112354.GA17869@gmail.com>
+Message-ID: <20160114142227.GB5783@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 04:46:37PM +0800, Mark yao wrote:
-> On 2016?01?14? 16:32, Daniel Vetter wrote:
-> >On Thu, Jan 14, 2016 at 2:16 AM, Mark yao <mark.yao@rock-chips.com> wrote:
-> >>On 2016?01?14? 01:39, John Keeping wrote:
-> >>>On Wed, 13 Jan 2016 18:19:17 +0100, Daniel Vetter wrote:
-> >>>
-> >>>>On Wed, Jan 13, 2016 at 04:40:38PM +0000, John Keeping wrote:
-> >>>>>On Wed, 13 Jan 2016 17:21:56 +0100, Daniel Vetter wrote:
-> >>>>>
-> >>>>>>On Wed, Jan 13, 2016 at 03:55:29PM +0000, John Keeping wrote:
-> >>>>>>>On Wed, 13 Jan 2016 16:40:05 +0100, Daniel Vetter wrote:
-> >>>>>>>
-> >>>>>>>>On Wed, Jan 13, 2016 at 02:34:25PM +0000, John Keeping wrote:
-> >>>>>>>>>On Wed, 13 Jan 2016 15:23:20 +0100, Daniel Vetter wrote:
-> >>>>>>>>>
-> >>>>>>>>>>On Wed, Jan 13, 2016 at 12:53:34PM +0000, John Keeping wrote:
-> >>>>>>>>>>>As commented in drm_atomic_helper_wait_for_vblanks(), userspace
-> >>>>>>>>>>>relies on cursor ioctls being unsynced.  Converting the rockchip
-> >>>>>>>>>>>driver to atomic has significantly impacted cursor performance by
-> >>>>>>>>>>>making every cursor update wait for vblank.
-> >>>>>>>>>>>
-> >>>>>>>>>>>By skipping the vblank sync when the framebuffer has not changed
-> >>>>>>>>>>>(as is done in drm_atomic_helper_wait_for_vblanks()) we can avoid
-> >>>>>>>>>>>this for the common case of moving the cursor and only need to
-> >>>>>>>>>>>delay the cursor ioctl when the cursor icon changes.
-> >>>>>>>>>>>
-> >>>>>>>>>>>I originally inserted a check on legacy_cursor_update as well, but
-> >>>>>>>>>>>that caused a storm of iommu page faults.  I didn't investigate
-> >>>>>>>>>>>the
-> >>>>>>>>>>>cause of those since this change gives enough of a performance
-> >>>>>>>>>>>improvement for my use case.
-> >>>>>>>>>>>
-> >>>>>>>>>>>This is RFC because of that and because the framebuffer_changed()
-> >>>>>>>>>>>function is copied from drm_atomic_helper.c as a quick way to test
-> >>>>>>>>>>>the result.
-> >>>>>>>>>>>
-> >>>>>>>>>>>Signed-off-by: John Keeping <john@metanate.com>
-> >>>>>>>>>>>---
-> >>>>>>>>>>>   drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 27
-> >>>>>>>>>>>+++++++++++++++++++++++++-- 1 file changed, 25 insertions(+), 2
-> >>>>>>>>>>>deletions(-)
-> >>>>>>>>>>>
-> >>>>>>>>>>>diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> >>>>>>>>>>>b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c index
-> >>>>>>>>>>>f784488..8fd9821
-> >>>>>>>>>>>100644 --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> >>>>>>>>>>>+++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> >>>>>>>>>>>@@ -177,8 +177,28 @@ static void
-> >>>>>>>>>>>rockchip_crtc_wait_for_update(struct drm_crtc *crtc)
-> >>>>>>>>>>>crtc_funcs->wait_for_update(crtc); }
-> >>>>>>>>>>>   +static bool framebuffer_changed(struct drm_device *dev,
-> >>>>>>>>>>>+                               struct drm_atomic_state
-> >>>>>>>>>>>*old_state,
-> >>>>>>>>>>>+                               struct drm_crtc *crtc)
-> >>>>>>>>>>>+{
-> >>>>>>>>>>>+       struct drm_plane *plane;
-> >>>>>>>>>>>+       struct drm_plane_state *old_plane_state;
-> >>>>>>>>>>>+       int i;
-> >>>>>>>>>>>+
-> >>>>>>>>>>>+       for_each_plane_in_state(old_state, plane, old_plane_state,
-> >>>>>>>>>>>i) {
-> >>>>>>>>>>>+               if (plane->state->crtc != crtc &&
-> >>>>>>>>>>>+                   old_plane_state->crtc != crtc)
-> >>>>>>>>>>>+                       continue;
-> >>>>>>>>>>>+
-> >>>>>>>>>>>+               if (plane->state->fb != old_plane_state->fb)
-> >>>>>>>>>>>+                       return true;
-> >>>>>>>>>>>+       }
-> >>>>>>>>>>>+
-> >>>>>>>>>>>+       return false;
-> >>>>>>>>>>>+}
-> >>>>>>>>>>Please don't hand-roll logic that affects semantics like this.
-> >>>>>>>>>>Instead
-> >>>>>>>>>>please use drm_atomic_helper_wait_for_vblanks(), which should do
-> >>>>>>>>>>this
-> >>>>>>>>>>correctly for you.
-> >>>>>>>>>>
-> >>>>>>>>>>If that's not the case then we need to improve the generic helper,
-> >>>>>>>>>>or
-> >>>>>>>>>>figure out what's different with rockhip.
-> >>>>>>>>>According to commit 63ebb9f (drm/rockchip: Convert to support atomic
-> >>>>>>>>>API) it's because rockchip doesn't have a hardware vblank counter.
-> >>>>>>>>>
-> >>>>>>>>>I'm not entirely clear on why this prevents the use of
-> >>>>>>>>>drm_atomic_helper_wait_for_vblanks().
-> >>>>>>>>Hm, that commit isn't terribly helpful. If that's really needed then
-> >>>>>>>>imo I
-> >>>>>>>>think we should extract a
-> >>>>>>>>"drm_atomic_helper_plane_needs_vblank_wait()"
-> >>>>>>>>helper that's used by both. But since rockchip does vblank_get/put
-> >>>>>>>>calls
-> >>>>>>>>I'd hope vblanks actually work correctly. And then the helper should
-> >>>>>>>>work
-> >>>>>>>>too.
-> >>>>>>>I tried switching the call to rockchip_crtc_wait_for_update() to
-> >>>>>>>drm_atomic_helper_wait_for_vblanks() and it works fine until I switch
-> >>>>>>>the buffer associated with a cursor, at which point I get iommu page
-> >>>>>>>faults, presumably because the GEM buffer is unreferenced too early.
-> >>>>>>>
-> >>>>>>>AFAICT the buffer will be released via drm_atomic_state_free()
-> >>>>>>>unconditionally, but I suspect I'm missing something since that would
-> >>>>>>>mean every driver would hit a similar problem.
-> >>>>>>Yeah, with the helper we always skip, which means when the cursor bo
-> >>>>>>changes you indeed unmap too early. So can't even share the overall
-> >>>>>>condition, but we could definitely share the little framebuffer_changed
-> >>>>>>helper.
-> >>>>>That leaves me with the question: why do other atomic drivers work?
-> >>>>>
-> >>>>>If drm_atomic_helper_wait_for_vblanks() skipping vblanks results in the
-> >>>>>cursor bo being unmapped too early for rockchip, why is it not unmapped
-> >>>>>too early for all of the other drivers using that helper?
-> >>>>It's unmapped too early for everyone, it's just that normally that
-> >>>>doesn't
-> >>>>result in a fireworks show. What we maybe could/should do is do the
-> >>>>unmapping asynchronously, but that runs into the overall "current atomic
-> >>>>helpers don't do async yet" problem. Might be a good point to start
-> >>>>fixing
-> >>>>this up though.
-> >>>OK, thanks, I think I'm beginning to understand how this all fits
-> >>>together.
-> >>>
-> >>>It looks like there are two options for me to get reasonable cursor
-> >>>performance on rockchip in the short term:
-> >>>
-> >>>1) Export the current framebuffer_changed() function as
-> >>>     drm_atomic_helper_framebuffer_changed() and use it in
-> >>>     rockchip_crtc_wait_for_update().
-> >>>
-> >>>2) Add a mechanism to suppress the legacy_cursor_update check in
-> >>>     drm_atomic_helper_wait_for_vblanks() and switch the rockchip driver
-> >>>     over to it.
-> >>>
-> >>>In both of these cases we're only restoring the unsynced cursor ioctls
-> >>>behaviour when the cursor is moved but it will still be expensive when
-> >>>the cursor bo changes.  That gives sufficient performance in my testing.
-> >>>
-> >>>
-> >>>
-> >>Thanks for point that.
-> >>
-> >>because rockchip not support hardware vblank counter, use
-> >>drm_atomic_helper_wait_for_vblanks have under issues:
-> >>
-> >>                                              | <-- HW vsync irq and reg take
-> >>effect
-> >>             plane_commit  --->  |
-> >>      get_vblank and wait ->   |
-> >>                                              | <-- handle_vblank,
-> >>vblank->count + 1
-> >>                  cleanup_fb   ---> |
-> >>               iommu crash  --->  |
-> >>                                              | <-- HW vsync irq and reg take
-> >>effect
-> >>there is no hardware vblank counter on rockchip vop, we can't ensure the
-> >>consistency of reg take effect and vblank->count,
-> >>if plane commit hit into the period of  reg take effect and vblank->count,
-> >>cleanup_fb happen before old_fb swap out from vop,
-> >>then iommu crash.
-> >>
-> >>That is why I special the wait_for_vblanks, we need check the reg really
-> >>take effect before clean up old fb.
-> >>at vop_win_pending_is_complete function, check win enable and win address,
-> >>to ensure that.
-> >>
-> >>Not only rockchip drm do that thing:
-> >>
-> >>exynos also check address before cleanup fb
-> >>         if (start == start_s)
-> >>             exynos_drm_crtc_finish_update(ctx->crtc, plane);
-> >>
-> >>Thanks.
-> >Do you have a scanline counter or something similar at least? Any
-> >other indication about how far along the chip is with scanning out? We
-> >use that in i915 to avoid races with the interrupt handler and detect
-> >this w/a scenario.
-> >
-> >I think if you have a scanline counter then it should magically work,
-> >since the vblank code will realize that you're already past the last
-> >vblank interrupt and /should/ have incremented already. Or something
-> >like that.
-> >
-> >Otherwise if this is common we might want to figure out how to solve
-> >this in a generic way. It's one of these problems that will make
-> >generic async support almost impossible.
-> >-Daniel
+On Thu, Jan 14, 2016 at 12:23:54PM +0100, Ingo Molnar wrote:
+> * Keerthy <a0393675@ti.com> wrote:
+> > I tried to simulate the issue.
+> > 
+> > In the probe function of drivers/thermal/ti-soc-thermal/ti-bandgap.c
+> > ti_bandgap_probe i call
+> > 
+> > orderly_poweroff(true);
+> > 
+> > This is while driver probes are still on going. I observe that
+> > ret = run_cmd(poweroff_cmd);
+> > 
+> > ret is a non-zero value and we enter the if condition:
+> > 
+> > Even after the
+> > 
+> > emergency_sync();
+> > kernel_power_off();
+> > 
+> > calls
+> > 
+> > the console remained active in weird state.
 > 
-> No, both rk3288 or rk3036 not support hardware vblank counter and scanline
-> counter.
-> 
-> At android side, we use same way, check address and enable bit to ensure
-> register take effect.
-> 
-> On future chips,  scanline counter and hardware counter would be support,
-> but not now.
+> Now _that_ is clearly an architecture bug that should not be papered over ...
 
-Ugh. Oh well, there's not really anything we can do in core nore helpers
-to make this easier for drivers. This really only can be fixed sensibly at
-the hardware level.
+No, it's not an architecture bug - it's a platform bug.  The ARM
+architecture has no standard way to control CPU reset or system
+power, all that is up to the platform.
 
-So yeah I think exposing framebuffer_changed as a helper is the way to go
-here.
+> If kernel_power_off() is called then the system should power off. No
+> ifs and whens.
 
-Thanks, Daniel
+There definitely are ifs and whens.  Only if the platform has support,
+and when that support works.
+
+If the platform does not provide such support, or that support is
+broken, there's nothing that can be done at the architecture level.
+
+Looking at the log given via the message that was referred to in a
+previous message in this thread, it looks like userspace fails to get
+to the point of calling into the kernel:
+
+159.636627] rc              S c0756104     0   527      1 0x00000000
+159.643027] [<c0756104>] (__schedule) from [<c0756778>] (schedule+0x40/0x98)
+159.650108] [<c0756778>] (schedule) from [<c0193c50>] (pipe_wait+0x60/0x9c)
+159.657102] [<c0193c50>] (pipe_wait) from [<c0193cc0>] (wait_for_partner+0x34/0x
+159.664792] [<c0193cc0>] (wait_for_partner) from [<c01947fc>] (fifo_open+0x1a4/0
+159.672658] [<c01947fc>] (fifo_open) from [<c018a5c0>] (do_dentry_open+0x1c8/0x3
+159.680351] [<c018a5c0>] (do_dentry_open) from [<c019855c>] (do_last+0x64c/0xce0
+159.687867] [<c019855c>] (do_last) from [<c019adf8>] (path_openat+0x80/0x608)
+159.695036] [<c019adf8>] (path_openat) from [<c019be34>] (do_filp_open+0x2c/0x88
+159.702555] [<c019be34>] (do_filp_open) from [<c018b94c>] (do_sys_open+0xfc/0x1c
+159.710158] [<c018b94c>] (do_sys_open) from [<c00102a0>] (ret_fast_syscall+0x0/0
+
+and later on, it's still there:
+
+219.253041] rc              S c0756104     0   527      1 0x00000000
+219.259443] [<c0756104>] (__schedule) from [<c0756778>] (schedule+0x40/0x98)
+219.266524] [<c0756778>] (schedule) from [<c0193c50>] (pipe_wait+0x60/0x9c)
+219.273516] [<c0193c50>] (pipe_wait) from [<c0193cc0>] (wait_for_partner+0x34/0x
+219.281206] [<c0193cc0>] (wait_for_partner) from [<c01947fc>] (fifo_open+0x1a4/0
+219.289071] [<c01947fc>] (fifo_open) from [<c018a5c0>] (do_dentry_open+0x1c8/0x3
+219.296762] [<c018a5c0>] (do_dentry_open) from [<c019855c>] (do_last+0x64c/0xce0
+
+The 'rc' script in sysvinit/upstart is normally responsible for walking
+through /etc/rc?.d/* running the scripts in order.  It looks like this
+has wedged, and so it's not getting anywhere near to asking the kernel
+to shut down.
+
+That's even more confirmed by there being no "Power down" message in
+the log, which is printed by kernel_power_off().  So I'm not convinced
+that the pointed to log is actually an illustration of the problem
+that its being discussed here: it looks to me like some other failure,
+and it looks like 'rc' is stuck trying to open a fifo.
+
+It would be nice to see an example of a log where we have proof that
+kernel_power_off() was called (via the "Power down" message being in
+the log.)
+
+In any case, at the architecture level, if a platform code fails to
+reboot, we print "Reboot failed -- System halted", disable IRQs and
+spin.
+
+We don't print anything if a platform hasn't provided a "pm_power_off()"
+hook, or that hook fails though - we just fall back to the generic
+code which does a do_exit(0) for the caller.
+
+I think some people have their power off/reboot stuff as part of their
+watchdog driver, which can be a loadable module - if the module isn't
+loaded, then these facilities are not available.
+
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
