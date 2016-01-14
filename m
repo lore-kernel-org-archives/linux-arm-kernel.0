@@ -1,146 +1,228 @@
-From: a0393675@ti.com (Keerthy)
-Date: Thu, 14 Jan 2016 16:12:47 +0530
-Subject: [PATCH v2] reboot: Backup orderly_poweroff
-In-Reply-To: <20160114100913.GB15857@gmail.com>
-References: <1452688405-15087-1-git-send-email-j-keerthy@ti.com>
- <20160114090520.GA4351@gmail.com> <569767EC.2010704@ti.com>
- <20160114100913.GB15857@gmail.com>
-Message-ID: <56977BA7.702@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 14 Jan 2016 10:46:56 +0000
+Subject: [PATCH v3 11/21] arm64: avoid R_AARCH64_ABS64 relocations for
+ Image header fields
+In-Reply-To: <CAKv+Gu-O+6TzfnWkNUaVU+w-e4TtCs08atMhcWCcYOQwyZ2B=A@mail.gmail.com>
+References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1452518355-4606-12-git-send-email-ard.biesheuvel@linaro.org>
+ <20160113181211.GL23370@leverpostej>
+ <CAKv+Gu9YWCgNwiJ2x+Ni-GQC-CjPJB-N633AsWP1YmAh0E39qA@mail.gmail.com>
+ <CAKv+Gu8vdk-9N_VVG6XWYLp1SM9ynfcsbxwk2xx1mXYq7qN0Cg@mail.gmail.com>
+ <CAKv+Gu-O+6TzfnWkNUaVU+w-e4TtCs08atMhcWCcYOQwyZ2B=A@mail.gmail.com>
+Message-ID: <20160114104656.GB25670@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ingo,
+On Thu, Jan 14, 2016 at 10:05:42AM +0100, Ard Biesheuvel wrote:
+> On 14 January 2016 at 09:51, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 13 January 2016 at 19:48, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> >> On 13 January 2016 at 19:12, Mark Rutland <mark.rutland@arm.com> wrote:
+> >>> On Mon, Jan 11, 2016 at 02:19:04PM +0100, Ard Biesheuvel wrote:
+> >>>> Unfortunately, the current way of using the linker to emit build time
+> >>>> constants into the Image header will no longer work once we switch to
+> >>>> the use of PIE executables. The reason is that such constants are emitted
+> >>>> into the binary using R_AARCH64_ABS64 relocations, which we will resolve
+> >>>> at runtime, not at build time, and the places targeted by those
+> >>>> relocations will contain zeroes before that.
+> >>>>
+> >>>> So move back to assembly time constants or R_AARCH64_ABS32 relocations
+> >>>> (which, interestingly enough, do get resolved at build time)
+> >>>
+> >>> To me it seems very odd that ABS64 and ABS32 are treated differently,
+> >>> and it makes me somewhat uncomfortable becuase it feels like a bug.
+> >>>
+> >>> Do we know whether the inconsistency between ABS64 and ABS32 was
+> >>> deliberate?
+> >>>
+> >>> I couldn't spot anything declaring a difference in the AArch64 ELF
+> >>> spec, and I'm not sure where else to look.
+> >>>
+> >>
+> >> My assumption is that PIE only defers resolving R_AARCH64_ABS64
+> >> relocations since those are the only ones that can be used to refer to
+> >> memory addresses
+> >>
+> >
+> > OK, digging into the binutils source code, it turns out that indeed,
+> > ABSnn relocations where nn equals the ELFnn memory size are treated
+> > differently, but only if they have default visibility. This is simply
+> > a result of the fact the code path is shared between shared libraries
+> > and PIE executables, since PIE executable are fully linked. It also
+> > means that we can simply work around it by emitting the linker symbols
+> > as hidden.
+> >
+> 
+> ... and the bad news is that, while emitting the symbols as hidden
+> turns them from R_AARCH64_ABS64 into a R_AARCH64_RELATIVE relocations,
+> it does not actually force the value to be emitted at build time.
+> 
+> So I am going to stick with the patch, but elaborate in a comment
+> about why R_AARCH64_ABSnn are treated differently if nn equals the
+> pointer size. (look at elfNN_aarch64_final_link_relocate() in binutils
+> if you are keen to look at the code yourself)
 
-On Thursday 14 January 2016 03:39 PM, Ingo Molnar wrote:
->
-> * Keerthy <a0393675@ti.com> wrote:
->
->> Hi Ingo,
->>
->> On Thursday 14 January 2016 02:35 PM, Ingo Molnar wrote:
->>>
->>> * Keerthy <j-keerthy@ti.com> wrote:
->>>
->>>> orderly_poweroff is triggered when a graceful shutdown
->>>> of system is desired. This may be used in many critical states of the
->>>> kernel such as when subsystems detects conditions such as critical
->>>> temperature conditions. However, in certain conditions in system
->>>> boot up sequences like those in the middle of driver probes being
->>>> initiated, userspace will be unable to power off the system in a clean
->>>> manner and leaves the system in a critical state. In cases like these,
->>>> the /sbin/poweroff will return success (having forked off to attempt
->>>> powering off the system. However, the system overall will fail to
->>>> completely poweroff (since other modules will be probed) and the system
->>>> is still functional with no userspace (since that would have shut itself
->>>> off).
->>>>
->>>> However, there is no clean way of detecting such failure of userspace
->>>> powering off the system. In such scenarios, it is necessary for a backup
->>>> workqueue to be able to force a shutdown of the system when orderly
->>>> shutdown is not successful after a configurable time period.
->>>>
->>>> Signed-off-by: Keerthy <j-keerthy@ti.com>
->>>> Suggested-by: Eduardo Valentin <edubezval@gmail.com>
->>>> Reported-by: Nishanth Menon <nm@ti.com>
->>>> ---
->>>> Links to previous discussion can be found here:
->>>>
->>>> http://www.spinics.net/lists/linux-omap/msg124925.html
->>>>
->>>> Boot tested on DRA7.
->>>>
->>>> changes in v2:
->>>>
->>>> 	* Changed #ifdef to #if CONFIG_SHUTDOWN_BACKUP_DELAY_MS
->>>>
->>>>   arch/Kconfig    |  7 +++++++
->>>>   kernel/reboot.c | 23 ++++++++++++++++++-----
->>>>   2 files changed, 25 insertions(+), 5 deletions(-)
->>>>
->>>> Index: linux/arch/Kconfig
->>>> ===================================================================
->>>> --- linux.orig/arch/Kconfig	2016-01-11 15:26:07.732173131 +0530
->>>> +++ linux/arch/Kconfig	2016-01-11 15:26:07.728173205 +0530
->>>> @@ -37,6 +37,18 @@
->>>>   	def_bool y
->>>>   	depends on PERF_EVENTS && HAVE_PERF_EVENTS_NMI && !PPC64
->>>>
->>>> +config SHUTDOWN_BACKUP_DELAY_MS
->>>> +	int "Backup shutdown delay in milli-seconds"
->>>> +	default 0
->>>> +	help
->>>> +	  The number of milliseconds to delay before backup workqueue
->>>> +	  executes attempting to poweroff the system after the
->>>> +	  orderly_poweroff function has failed to complete.
->>>> +
->>>> +	  If set to 0, the backup workqueue is not active. The value
->>>> +	  should be conservatively configured based on userspace latencies
->>>> +	  expected for a given system.
->>>
->>> I don't really understand this. In what circumstances can a reboot fail?
->>>
->>> I think that is what should be fixed: a reboot should never fail, instead of
->>> introducing some sort of fragile timeout based method.
->>
->> Here is the complete description of the scenario which was reported by Nishanth
->> who encountered the issue. The link has bootlogs and description of the exact
->> case which led to this patch.
->>
->> http://www.spinics.net/lists/linux-omap/msg124923.html
->
-> it's a reply in the middle of a discussion ...
->
-> What I managed to decode is that this:
->
-> static int __orderly_poweroff(bool force)
-> {
->          int ret;
->
->          ret = run_cmd(poweroff_cmd);
->
->          if (ret && force) {
->                  pr_warn("Failed to start orderly shutdown: forcing the issue\n");
->
->                  /*
->                   * I guess this should try to kick off some daemon to sync and
->                   * poweroff asap.  Or not even bother syncing if we're doing an
->                   * emergency shutdown?
->                   */
->                  emergency_sync();
->                  kernel_power_off();
->          }
->
->          return ret;
-> }
->
-> could fail to actually power the system off, if the run_cmd(poweroff_cmd)
-> 'succeeds', but due to a user-space bug it does not actually call the real
-> poweroff system call?
->
+Ok. Thanks for digging into that.
 
-I tried to simulate the issue.
+One thing though: I would prefer if we could still keep all the LE64
+image header values together, to have them dealt with consistently.
 
-In the probe function of drivers/thermal/ti-soc-thermal/ti-bandgap.c
-ti_bandgap_probe i call
+Could we hide the ABS32 usage behind some macros to do so, e.g.
 
-orderly_poweroff(true);
+in image.h:
 
-This is while driver probes are still on going. I observe that
-ret = run_cmd(poweroff_cmd);
+#define DEFINE_IMAGE_LE64(sym, data) 				\
+	sym##_lo32 = DATA_LE32(data & 0xffffffff);		\
+	sym##_hi32 = DATA_LE32(data >> 32);
 
-ret is a non-zero value and we enter the if condition:
+#define HEAD_SYMBOLS						\
+	DEFINE_IMAGE_LE64(_kernel_size_le, _end - _text);	\
+	DEFINE_IMAGE_LE64(_kernel_offset_le, TEXT_OFFSET);	\
+	DEFINE_IMAGE_LE64(_kernel_flags_le, __HEAD_FLAGS);
 
-Even after the
+and in head.S:
 
-emergency_sync();
-kernel_power_off();
+#define IMAGE_LE64(sym)	.long sym##_lo32, sym##_hi32
 
-calls
+	...
+	IMAGE_LE64(_kernel_size_le)	// Image load offset from start	of RAM, little-endian
+	IMAGE_LE64(_kernel_offset_le)	// Effective size of kernel image, little-endian
+	IMAGE_LE64(_kernel_flags_le)	// Informative flags, little-endian
+	...
 
-the console remained active in weird state.
+Thanks,
+Mark.
 
-
-> Thanks,
->
-> 	Ingo
->
+> 
+> -- 
+> Ard.
+> 
+> 
+> 
+> >
+> >>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >>>> ---
+> >>>>  arch/arm64/include/asm/assembler.h | 15 ++++++++
+> >>>>  arch/arm64/kernel/head.S           | 17 +++++++--
+> >>>>  arch/arm64/kernel/image.h          | 37 ++++++--------------
+> >>>>  3 files changed, 40 insertions(+), 29 deletions(-)
+> >>>>
+> >>>> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+> >>>> index d8bfcc1ce923..e211af783a3d 100644
+> >>>> --- a/arch/arm64/include/asm/assembler.h
+> >>>> +++ b/arch/arm64/include/asm/assembler.h
+> >>>> @@ -222,4 +222,19 @@ lr       .req    x30             // link register
+> >>>>       .size   __pi_##x, . - x;        \
+> >>>>       ENDPROC(x)
+> >>>>
+> >>>> +     .macro  le16, val
+> >>>> +     .byte   \val & 0xff
+> >>>> +     .byte   (\val >> 8) & 0xff
+> >>>> +     .endm
+> >>>> +
+> >>>> +     .macro  le32, val
+> >>>> +     le16    \val
+> >>>> +     le16    (\val >> 16)
+> >>>> +     .endm
+> >>>> +
+> >>>> +     .macro  le64, val
+> >>>> +     le32    \val
+> >>>> +     le32    (\val >> 32)
+> >>>> +     .endm
+> >>>> +
+> >>>>  #endif       /* __ASM_ASSEMBLER_H */
+> >>>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> >>>> index 350515276541..211f75e673f4 100644
+> >>>> --- a/arch/arm64/kernel/head.S
+> >>>> +++ b/arch/arm64/kernel/head.S
+> >>>> @@ -51,6 +51,17 @@
+> >>>>  #define KERNEL_START _text
+> >>>>  #define KERNEL_END   _end
+> >>>>
+> >>>> +#ifdef CONFIG_CPU_BIG_ENDIAN
+> >>>> +#define __HEAD_FLAG_BE       1
+> >>>> +#else
+> >>>> +#define __HEAD_FLAG_BE       0
+> >>>> +#endif
+> >>>> +
+> >>>> +#define __HEAD_FLAG_PAGE_SIZE ((PAGE_SHIFT - 10) / 2)
+> >>>> +
+> >>>> +#define __HEAD_FLAGS ((__HEAD_FLAG_BE << 0) |        \
+> >>>> +                      (__HEAD_FLAG_PAGE_SIZE << 1))
+> >>>> +
+> >>>>  /*
+> >>>>   * Kernel startup entry point.
+> >>>>   * ---------------------------
+> >>>> @@ -83,9 +94,9 @@ efi_head:
+> >>>>       b       stext                           // branch to kernel start, magic
+> >>>>       .long   0                               // reserved
+> >>>>  #endif
+> >>>> -     .quad   _kernel_offset_le               // Image load offset from start of RAM, little-endian
+> >>>> -     .quad   _kernel_size_le                 // Effective size of kernel image, little-endian
+> >>>> -     .quad   _kernel_flags_le                // Informative flags, little-endian
+> >>>> +     le64    TEXT_OFFSET                     // Image load offset from start of RAM, little-endian
+> >>>> +     .long   _kernel_size_le, 0              // Effective size of kernel image, little-endian
+> >>>> +     le64    __HEAD_FLAGS                    // Informative flags, little-endian
+> >>>>       .quad   0                               // reserved
+> >>>>       .quad   0                               // reserved
+> >>>>       .quad   0                               // reserved
+> >>>> diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+> >>>> index bc2abb8b1599..bb6b0e69d0a4 100644
+> >>>> --- a/arch/arm64/kernel/image.h
+> >>>> +++ b/arch/arm64/kernel/image.h
+> >>>> @@ -26,41 +26,26 @@
+> >>>>   * There aren't any ELF relocations we can use to endian-swap values known only
+> >>>>   * at link time (e.g. the subtraction of two symbol addresses), so we must get
+> >>>>   * the linker to endian-swap certain values before emitting them.
+> >>>> + * Note that this will not work for 64-bit values: these are resolved using
+> >>>> + * R_AARCH64_ABS64 relocations, which are fixed up at runtime rather than at
+> >>>> + * build time when building the PIE executable (for KASLR).
+> >>>>   */
+> >>>>  #ifdef CONFIG_CPU_BIG_ENDIAN
+> >>>> -#define DATA_LE64(data)                                      \
+> >>>> -     ((((data) & 0x00000000000000ff) << 56) |        \
+> >>>> -      (((data) & 0x000000000000ff00) << 40) |        \
+> >>>> -      (((data) & 0x0000000000ff0000) << 24) |        \
+> >>>> -      (((data) & 0x00000000ff000000) << 8)  |        \
+> >>>> -      (((data) & 0x000000ff00000000) >> 8)  |        \
+> >>>> -      (((data) & 0x0000ff0000000000) >> 24) |        \
+> >>>> -      (((data) & 0x00ff000000000000) >> 40) |        \
+> >>>> -      (((data) & 0xff00000000000000) >> 56))
+> >>>> +#define DATA_LE32(data)                              \
+> >>>> +     ((((data) & 0x000000ff) << 24) |        \
+> >>>> +      (((data) & 0x0000ff00) << 8)  |        \
+> >>>> +      (((data) & 0x00ff0000) >> 8)  |        \
+> >>>> +      (((data) & 0xff000000) >> 24))
+> >>>>  #else
+> >>>> -#define DATA_LE64(data) ((data) & 0xffffffffffffffff)
+> >>>> +#define DATA_LE32(data) ((data) & 0xffffffff)
+> >>>>  #endif
+> >>>>
+> >>>> -#ifdef CONFIG_CPU_BIG_ENDIAN
+> >>>> -#define __HEAD_FLAG_BE       1
+> >>>> -#else
+> >>>> -#define __HEAD_FLAG_BE       0
+> >>>> -#endif
+> >>>> -
+> >>>> -#define __HEAD_FLAG_PAGE_SIZE ((PAGE_SHIFT - 10) / 2)
+> >>>> -
+> >>>> -#define __HEAD_FLAGS ((__HEAD_FLAG_BE << 0) |        \
+> >>>> -                      (__HEAD_FLAG_PAGE_SIZE << 1))
+> >>>> -
+> >>>>  /*
+> >>>>   * These will output as part of the Image header, which should be little-endian
+> >>>> - * regardless of the endianness of the kernel. While constant values could be
+> >>>> - * endian swapped in head.S, all are done here for consistency.
+> >>>> + * regardless of the endianness of the kernel.
+> >>>>   */
+> >>>>  #define HEAD_SYMBOLS                                         \
+> >>>> -     _kernel_size_le         = DATA_LE64(_end - _text);      \
+> >>>> -     _kernel_offset_le       = DATA_LE64(TEXT_OFFSET);       \
+> >>>> -     _kernel_flags_le        = DATA_LE64(__HEAD_FLAGS);
+> >>>> +     _kernel_size_le         = DATA_LE32(_end - _text);
+> >>>>
+> >>>>  #ifdef CONFIG_EFI
+> >>>>
+> >>>> --
+> >>>> 2.5.0
+> >>>>
+> 
