@@ -1,52 +1,72 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Thu, 14 Jan 2016 01:23:39 +0000
-Subject: [PATCH v2 1/2] regulator: act8945a: add regulator driver for
- ACT8945A
-In-Reply-To: <87oacp5zl7.fsf@dell.be.48ers.dk>
-References: <1452586629-1117-1-git-send-email-wenyou.yang@atmel.com>
- <1452586629-1117-2-git-send-email-wenyou.yang@atmel.com>
- <87oacp5zl7.fsf@dell.be.48ers.dk>
-Message-ID: <B256D81BAE5131468A838E5D7A243641D63EBC6E@penmbx01>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 14 Jan 2016 09:24:27 +0800
+Subject: [PATCH v7 2/2] drm/bridge: Add I2C based driver for ps8640 bridge
+In-Reply-To: <1452651494-16806-2-git-send-email-jitao.shi@mediatek.com>
+Message-ID: <201601140940.uXzmZfZZ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Peter Korsgaard [mailto:jacmet at gmail.com] On Behalf Of Peter Korsgaard
-> Sent: 2016?1?13? 22:22
-> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
-> Cc: Liam Girdwood <lgirdwood@gmail.com>; Mark Brown <broonie@kernel.org>;
-> Rob Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>; Mark
-> Rutland <mark.rutland@arm.com>; Ian Campbell <ijc+devicetree@hellion.org.uk>;
-> Kumar Gala <galak@codeaurora.org>; Krzysztof Kozlowski
-> <k.kozlowski@samsung.com>; devicetree at vger.kernel.org; Ferre, Nicolas
-> <Nicolas.FERRE@atmel.com>; linux-kernel at vger.kernel.org; Javier Martinez
-> Canillas <javier@dowhile0.org>; Lee Jones <lee.jones@linaro.org>; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v2 1/2] regulator: act8945a: add regulator driver for
-> ACT8945A
-> 
-> >>>>> "Wenyou" == Wenyou Yang <wenyou.yang@atmel.com> writes:
-> 
->  > This patch adds new regulator driver to support ACT8945A MFD  > chip's
-> regulators.
-> 
->  > The ACT8945A has three step-down DC/DC converters and four  > low-dropout
-> regulators.
-> 
->  > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> 
-> Isn't the regulator part of the act8945a identical to act8865? Can't we just use the
-> existing act8865-regulator.c driver? (E.G. support 8865 variant in the mfd driver,
-> but only register the regulator sub device?)
+Hi Jitao,
 
-Yes, the regulator part of the act8945a is identical to act8865.
+[auto build test WARNING on v4.4-rc8]
+[also build test WARNING on next-20160113]
+[cannot apply to drm/drm-next]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-But the act8865-regulator driver is a struct i2c_driver,  and the mfd sub-device driver is a platform_driver driver, it is not easy to use it.
+url:    https://github.com/0day-ci/linux/commits/Jitao-Shi/Documentation-bridge-Add-documentation-for-ps8640-DT-properties/20160113-102004
+config: i386-randconfig-sb0-01140840 (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-> 
-> --
-> Bye, Peter Korsgaard
+Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
+http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
 
+All warnings (new ones prefixed by >>):
 
-Best Regards,
-Wenyou Yang
+   drivers/gpu/drm/bridge/parade-ps8640.c: In function 'ps8640_update_fw_store':
+>> drivers/gpu/drm/bridge/parade-ps8640.c:788:20: warning: 'progress_cnt' may be used uninitialized in this function [-Wmaybe-uninitialized]
+      if (progress_cnt != (pos * 100) / fw->size) {
+                       ^
+   drivers/gpu/drm/bridge/parade-ps8640.c:770:5: note: 'progress_cnt' was declared here
+     u8 progress_cnt, rom_page_id[2];
+        ^
+
+vim +/progress_cnt +788 drivers/gpu/drm/bridge/parade-ps8640.c
+
+   772	
+   773		ps8640_regw_byte(client2, PAGE2_SPI_CFG3, I2C_TO_SPI_RESET);
+   774		msleep(100);
+   775		ps8640_regw_byte(client2, PAGE2_SPI_CFG3, 0x00);
+   776	
+   777		while (pos < fw->size) {
+   778			rom_page_id[0] = (pos >> 8) & 0xFF;
+   779			rom_page_id[1] = (pos >> 16) & 0xFF;
+   780			ret = ps8640_regw(client2, PAGE2_ROMADD_BYTE1, rom_page_id, 2);
+   781			if (ret)
+   782				goto error;
+   783			ret = ps8640_regw(client7, 0, fw->data + pos, 256);
+   784			if (ret)
+   785				goto error;
+   786	
+   787			pos += 256;
+ > 788			if (progress_cnt != (pos * 100) / fw->size) {
+   789				progress_cnt = (pos * 100) / fw->size;
+   790				dev_info(dev, "fw update progress percent %d\n",
+   791					 progress_cnt);
+   792			}
+   793		}
+   794		return 0;
+   795	
+   796	error:
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 22464 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160114/c378da16/attachment-0001.obj>
