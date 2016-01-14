@@ -1,31 +1,58 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Thu, 14 Jan 2016 12:18:16 -0800
-Subject: [PATCH 1/3] ti-st: use device handles and add device tree binding
-In-Reply-To: <20160114170746.GO12777@atomide.com>
-References: <1450870253-8694-1-git-send-email-eyalr@ti.com>
- <8665E2433BC68541A24DFFCA87B70F5B23769B75@DFRE01.ent.ti.com>
- <20160114170746.GO12777@atomide.com>
-Message-ID: <56980288.9030404@hurleysoftware.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 14 Jan 2016 15:31:26 -0500
+Subject: [PATCH v1 1/2] libahci: Implement the capability to override the
+ generic ahci interrupt handler
+In-Reply-To: <1452749424-28919-2-git-send-email-stripathi@apm.com>
+References: <1452749424-28919-1-git-send-email-stripathi@apm.com>
+ <1452749424-28919-2-git-send-email-stripathi@apm.com>
+Message-ID: <20160114203126.GB3520@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/2016 09:07 AM, Tony Lindgren wrote:
-> * Reizer, Eyal <eyalr@ti.com> [160114 06:23]:
->> Ping on this patchset
+Hello, Suman.
+
+Your mails ended up in spam again and it looks to be from SPF failure.
+
+  Received-SPF: softfail (google.com: domain of transitioning stripath at apm.com does not designate 198.145.29.136 as permitted sender) client-ip=198.145.29.136;
+  Authentication-Results: mx.google.com;
+	 spf=softfail (google.com: domain of transitioning stripath at apm.com does not designate 198.145.29.136 as permitted sender) smtp.mailfrom=stripath at apm.com;
+	 dmarc=fail (p=QUARANTINE dis=NONE) header.from=apm.com
+
+Can you please look into it?
+
+On Thu, Jan 14, 2016 at 11:00:23AM +0530, Suman Tripathi wrote:
+>  static irqreturn_t ahci_single_edge_irq_intr(int irq, void *dev_instance)
+>  {
+> @@ -2517,16 +2518,21 @@ int ahci_host_activate(struct ata_host *host, struct scsi_host_template *sht)
+>  {
+>  	struct ahci_host_priv *hpriv = host->private_data;
+>  	int irq = hpriv->irq;
+> +	irqreturn_t (*ahci_irq_handler)(int irq, void *dev_instance);
+>  	int rc;
 > 
-> I think there are several comments pending from Rob as
-> a reply to this thread on December 29th?
+>  	if (hpriv->flags & AHCI_HFLAG_MULTI_MSI)
+>  		rc = ahci_host_activate_multi_irqs(host, irq, sht);
+> -	else if (hpriv->flags & AHCI_HFLAG_EDGE_IRQ)
+> -		rc = ata_host_activate(host, irq, ahci_single_edge_irq_intr,
+> -				       IRQF_SHARED, sht);
+> -	else
+> -		rc = ata_host_activate(host, irq, ahci_single_level_irq_intr,
+> +	else {
+> +		ahci_irq_handler = hpriv->ahci_irq_intr ? hpriv->ahci_irq_intr :
+> +				   (hpriv->flags & AHCI_HFLAG_EDGE_IRQ ?
+> +				   ahci_single_edge_irq_intr :
+> +				   ahci_single_level_irq_intr);
+> +
+> +		rc = ata_host_activate(host, irq, ahci_irq_handler,
+>  				       IRQF_SHARED, sht);
+> +	}
+> +
 
-That, and this driver has _serious_ architectural problems that I don't
-see being worked on at all.
+So, if we have ->ahci_irq_intr, we don't need AHCI_HFLAG_EDGE_IRQ at
+all, right?  Just initialize ->ahci_irq_intr to
+ahci_single_level_irq_intr and let specific drivers overrie it?
 
-For example, when this driver loads and *waits for up to 5 seconds* [1]
-for a userspace component _that may not even be loaded at the time_
-is ridiculous.
+Thanks.
 
-Please fix the serious flaws first.
-
-Regards,
-Peter Hurley
-
-[1] see st_kim_start()
+-- 
+tejun
