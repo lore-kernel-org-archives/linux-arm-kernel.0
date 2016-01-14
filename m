@@ -1,79 +1,74 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Thu, 14 Jan 2016 14:24:33 -0800
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <56981708.4000007@imgtec.com>
-References: <56969F4B.7070001@imgtec.com>
- <20160113204844.GV6357@twins.programming.kicks-ass.net>
- <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
- <20160114161604.GT3818@linux.vnet.ibm.com>
- <5697FA0A.6040601@imgtec.com>
- <20160114201513.GI6357@twins.programming.kicks-ass.net>
- <56980933.2020801@imgtec.com>
- <20160114213440.GG3818@linux.vnet.ibm.com>
- <56981708.4000007@imgtec.com>
-Message-ID: <20160114222433.GI3818@linux.vnet.ibm.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 14 Jan 2016 23:40:25 +0100
+Subject: [PATCH] mmc: host: omap_hsmmc: add a verbose print to enable
+ CONFIG_REGULATOR_PBIAS
+In-Reply-To: <20160114172549.GC5783@n2100.arm.linux.org.uk>
+References: <1452762920-2588-1-git-send-email-kishon@ti.com>
+ <20160114120706.GA12774@earth>
+ <20160114172549.GC5783@n2100.arm.linux.org.uk>
+Message-ID: <20160114224025.GA26988@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 01:45:44PM -0800, Leonid Yegoshin wrote:
-> On 01/14/2016 01:34 PM, Paul E. McKenney wrote:
-> >On Thu, Jan 14, 2016 at 12:46:43PM -0800, Leonid Yegoshin wrote:
-> >>On 01/14/2016 12:15 PM, Peter Zijlstra wrote:
-> >>>On Thu, Jan 14, 2016 at 11:42:02AM -0800, Leonid Yegoshin wrote:
-> >>>>An the only point - please use an appropriate SYNC_* barriers instead of
-> >>>>heavy bold hammer. That stuff was design explicitly to support the
-> >>>>requirements of Documentation/memory-barriers.txt
-> >>>That's madness. That document changes from version to version as to what
-> >>>we _think_ the actual hardware does. It is _NOT_ a specification.
-> >>>
-> >>>You cannot design hardware from that. Its incomplete and fails to
-> >>>specify a bunch of things. It not a mathematically sound definition of a
-> >>>memory model.
-> >>>
-> >>>Please stop referring to that document for what a particular barrier
-> >>>_should_ do.  Explain what MIPS does, so we can attempt to integrate
-> >>>this knowledge with our knowledge of PPC/ARM/Alpha/x86/etc. and improve
-> >>>upon our understanding of hardware and improve the Linux memory model.
-> >>I am afraid I can't help you here. It is very complicated stuff and
-> >>a model is actually doesn't fit your assumptions about CPUs well
-> >>without some simplifications which are based on what you want to
-> >>have.
-> >>
-> >>I say that SYNC_ACQUIRE/etc follows what you expect for smp_acquire
-> >>etc (basing on that document). And at least two CPU models were
-> >>tested with my patches (see it in LMO) for that last year and that
-> >>instructions are implemented now in engineering kernel.
-> >>
-> >>If you have something else in mind, you can ask me. But I prefer to
-> >>do not deviate too much from Documentation/memory-barriers.txt, for
-> >>exam - if it asks to have memory barrier somewhere, then I assume
-> >>the code should have it, and please - don't ask me a test which
-> >>violates the current version of document recommendations.
-> >>
-> >>For a moment I don't see a significant changes in this document for
-> >>MIPS Arch at least 1.5 year, and the only significant point is that
-> >>MIPS CPU Arch doesn't have yet smp_read_barrier_depends() and
-> >>smp_rmb() should be used instead.
+Hi,
+
+On Thu, Jan 14, 2016 at 05:25:49PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Jan 14, 2016 at 01:07:06PM +0100, Sebastian Reichel wrote:
+> > On Thu, Jan 14, 2016 at 02:45:20PM +0530, Kishon Vijay Abraham I wrote:
+> > > Since v4.3+, CONFIG_REGULATOR_PBIAS should be enabled (for platforms that
+> > > have PBIAS regulator) in order for MMC1 to work.
+> > > 
+> > > Add a more verbose print to help enable CONFIG_REGULATOR_PBIAS for users
+> > > using a olddefconfig or a custom .config.
+> > > 
+> > > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> > > ---
+> > >  drivers/mmc/host/omap_hsmmc.c |    5 ++++-
+> > >  1 file changed, 4 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> > > index 7fb0753..7086bd6 100644
+> > > --- a/drivers/mmc/host/omap_hsmmc.c
+> > > +++ b/drivers/mmc/host/omap_hsmmc.c
+> > > @@ -503,8 +503,11 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+> > >  	host->pbias = devm_regulator_get_optional(host->dev, "pbias");
+> > >  	if (IS_ERR(host->pbias)) {
+> > >  		ret = PTR_ERR(host->pbias);
+> > > -		if ((ret != -ENODEV) && host->dev->of_node)
+> > > +		if ((ret != -ENODEV) && host->dev->of_node) {
+> > > +			dev_err(host->dev,
+> > > +			"SD card detect fail? enable CONFIG_REGULATOR_PBIAS\n");
+> > >  			return ret;
+> > > +		}
+> > >  		dev_dbg(host->dev, "unable to get pbias regulator %ld\n",
+> > >  			PTR_ERR(host->pbias));
+> > >  		host->pbias = NULL;
+> > 
+> > 
+> > Is there a good reason against adding "depends on REGULATOR_PBIAS"
+> > to MMC_OMAP_HS?
 > 
-> >Is SYNC_ACQUIRE a memory-barrier instruction that orders prior loads
-> >against later loads and stores?
+> There are very good reasons not to do this: that will result in
+> configurations where MMC_OMAP_HS was set but without REGULATOR_PBIAS
+> ending up with MMC_OMAP_HS being disabled.  That doesn't help the
+> root problem, which is "why has the kernel boot regressed for my
+> previous working configuration?"
 > 
-> Yes, it is in MD00087 (table 6.6 of document Ver 6.04) -
-> https://imgtec.com/?do-download=4302
+> The solution proposed here adds a message to the boot which points
+> out fair and square what needs to be done to rectify the boot
+> failure.  Adding a dependency just brings up the question "where
+> has my MMC driver gone?"
 
-OK, it does look like it should work.  Of course, if you can rely
-on straight address/data dependencies, that would be even better.
+The best thing would be to have no regression. Just printing a
+message means I have to build another kernel. But more importantly
+the message may not be visible by the user - e.g. if the display has
+not yet been initialized.
 
-> >   If so, and if MIPS does not do
-> >ordering based on address and data dependencies, I suggest making
-> >read_barrier_depends() be a SYNC_ACQUIRE rather than SYNC_RMB.
-> 
-> I understood that, after I see the example of using it.
-> Please consider to add that into Documentation/memory-barriers.txt
-> (it is not easy to find that this barrier is used for shared WRITE
-> basing on shared pointer), it would be helpful.
-
-Actually, the Linux kernel doesn't have an acquire barrier, just an
-smp_load_acquire().  Or did someone sneak one in while I wasn't looking?  ;-)
-
-							Thanx, Paul
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160114/f85226fa/attachment.sig>
