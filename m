@@ -1,183 +1,72 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Thu, 14 Jan 2016 21:05:04 +0800
-Subject: [PATCH v2 1/3] iommu/io-pgtable: Add ARMv7 short descriptor
- support
-In-Reply-To: <ddfe960ef1da22e5264811bfcafeb412fa976f4a.1450383740.git.robin.murphy@arm.com>
-References: <cover.1450383740.git.robin.murphy@arm.com>
- <ddfe960ef1da22e5264811bfcafeb412fa976f4a.1450383740.git.robin.murphy@arm.com>
-Message-ID: <1452776704.15636.59.camel@mhfsdcap03>
+From: qiuxishi@huawei.com (Xishi Qiu)
+Date: Thu, 14 Jan 2016 21:06:08 +0800
+Subject: Have any influence on set_memory_** about below patch ??
+In-Reply-To: <56979621.1060102@huawei.com>
+References: <5693A740.7070408@huawei.com> <20160111133145.GM6499@leverpostej>
+ <569454F6.1060207@huawei.com> <20160112111531.GA4858@leverpostej>
+ <5696272E.8090408@huawei.com> <20160113111806.GC23370@leverpostej>
+ <56979621.1060102@huawei.com>
+Message-ID: <56979D40.4060602@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-12-17 at 20:50 +0000, Robin Murphy wrote:
-> Add a nearly-complete ARMv7 short descriptor implementation, omitting
-> only a few legacy and CPU-centric aspects which shouldn't be necessary
-> for IOMMU API use anyway.
+On 2016/1/14 20:35, Xishi Qiu wrote:
 
-[...]
+> On 2016/1/13 19:18, Mark Rutland wrote:
+> 
+>> On Wed, Jan 13, 2016 at 06:30:06PM +0800, Xishi Qiu wrote:
+>>> Hi Mark,
+>>>
+>>> If I create swapper page tables by 4kb, not large page, then I use
+>>> set_memory_ro() to change the pate table flag, does it have the problem
+>>> too?
+>>
+>> The splitting/merging problem would not apply.
+>>
+>> However, you're going to waste a reasonable amount of memory by not
+>> using section mappings in the swapper, and we gain additional complexity
+>> in the page table setup code (which is shared with others things that
+>> want section mappings).
+>>
+>> What are you exactly actually trying to achieve?
+>>
+> 
+> If module allocates some pages and save data on them, and the data will
+> not be changed during the module running. So we want to use set_memory_ro()
+> to increase the security. If the data is changed, we can catch someone.
+> 
+>> What memory do you want to mark RO, and why?
+>>
+> 
+> The key data, and it will not be changed during the running time.
+> 
+>> >From a previous discussion [1], we figured out alternative approaches
+>> for common cases. Do none of those work for your case?
+>>
+> 
+> I have not read the patchset carefully, could you tell me the general meaning
+> of the approaches?
+> 
 
-> +
-> +#define ARM_V7S_BLOCK_SIZE(lvl)		(1UL << ARM_V7S_LVL_SHIFT(lvl))
-> +#define ARM_V7S_LVL_MASK(lvl)		((u32)(~0U << ARM_V7S_LVL_SHIFT(lvl)))
-> +#define ARM_V7S_TABLE_MASK		((u32)(~0U << ARM_V7S_TABLE_SHIFT))
-> +#define _ARM_V7S_IDX_MASK(lvl)		(ARM_V7S_PTES_PER_LVL(lvl) - 1)
-> +#define ARM_V7S_LVL_IDX(addr, lvl)	({				\
-> +	int _l = lvl;							\
-> +	((u32)(addr) >> ARM_V7S_LVL_SHIFT(_l)) & _ARM_V7S_IDX_MASK(_l); \
-> +})
+Hi Mark,
 
-lvl here is not a function, it is 1 or 2, Could we use for simple?
+Is the two approaches like following?
+1. use create_mapping to map the data in read only, then use fixmap to create a
+temp page table, and change the data when necessary.
+2. use vmalloc, then we can use set_memory_ro to change the page table prot.
 
-#define ARM_V7S_LVL_IDX(addr, lvl)		\
-	((u32)(addr) >> ARM_V7S_LVL_SHIFT(lvl)) & _ARM_V7S_IDX_MASK(lvl)
+Thanks,
+Xishi Qiu
 
-
-> +static arm_v7s_iopte arm_v7s_cont_to_pte(arm_v7s_iopte pte, int lvl)
-> +{
-> +	if (lvl == 1) {
-> +		pte &= ~ARM_V7S_CONT_SECTION;
-> +	} else if (lvl == 2) {
-> +		arm_v7s_iopte xn = pte & BIT(ARM_V7S_CONT_PAGE_XN_SHIFT);
-> +		arm_v7s_iopte tex = pte & (ARM_V7S_CONT_PAGE_TEX_MASK <<
-> +					   ARM_V7S_CONT_PAGE_TEX_SHIFT);
-> +
-> +		pte ^= xn | tex;
-> +		pte |= (xn >> ARM_V7S_CONT_PAGE_XN_SHIFT) |
-> +		       (tex >> ARM_V7S_CONT_PAGE_TEX_SHIFT);
-> +		pte ^= ARM_V7S_PTE_TYPE_PAGE | ARM_V7S_PTE_TYPE_CONT_PAGE;
-
-    If XN bit is 1, We may lost XN bit for small page here.
-    
-    We could runs ok as we have IO_PGTABLE_QUIRK_NO_PERMS.
-
-    Maybe this is enough: pte ^= ARM_V7S_PTE_TYPE_PAGE;
-
-> +	}
-> +	return pte;
-> +}
-> +
-> +static bool arm_v7s_pte_is_cont(arm_v7s_iopte pte, int lvl)
-> +{
-> +	if (lvl == 1 && !ARM_V7S_PTE_IS_TABLE(pte, lvl))
-> +		return pte & ARM_V7S_CONT_SECTION;
-> +	else if (lvl == 2)
-> +		return !(pte & ARM_V7S_PTE_TYPE_PAGE);
-> +	return false;
-> +}
-> +
-> +static int __arm_v7s_unmap(struct arm_v7s_io_pgtable *, unsigned long,
-> +			   size_t, int, arm_v7s_iopte *);
-> +
-> +static int arm_v7s_init_pte(struct arm_v7s_io_pgtable *data,
-> +			    unsigned long iova, phys_addr_t paddr, int prot,
-> +			    int lvl, int num_entries, arm_v7s_iopte *ptep)
-> +{
-> +	struct io_pgtable_cfg *cfg = &data->iop.cfg;
-> +	arm_v7s_iopte pte = arm_v7s_prot_to_pte(prot, lvl, cfg);
-> +	int i;
-> +
-> +	for (i = 0; i < num_entries; i++)
-> +		if (ARM_V7S_PTE_IS_TABLE(ptep[i], lvl)) {
-
-   If somebody abuse the mapping, He map 4K firstly, then map 1M in the
-same iova address(don't unmap the 4K before), then it will also enter
-here to free the existed lvl2 pagetable silently. Should we add a
-checking whether the existed pagetable is empty? if the pagetable is not
-empty, return a warning.
-
-> +			/*
-> +			 * We need to unmap and free the old table before
-> +			 * overwriting it with a block entry.
-> +			 */
-> +			arm_v7s_iopte *tblp;
-> +			size_t sz = ARM_V7S_BLOCK_SIZE(lvl);
-> +
-> +			tblp = ptep + i - ARM_V7S_LVL_IDX(iova, lvl);
-> +			if (WARN_ON(__arm_v7s_unmap(data, iova, sz, lvl, tblp)
-> +					!= sz))
-
-    if "i" isn't 0 here(There is a pgtable item in a supersection), it
-seems not right. Maybe:
-        
-    tblp = ptep + i - ARM_V7S_LVL_IDX(iova + i * sz, lvl);
-    if (WARN_ON(__arm_v7s_unmap(data, iova + i * sz, sz, lvl, tblp)
-		!= sz))
-
-> +				return -EINVAL;
-> +		} else if (ptep[i]) {
-> +			/* We require an unmap first */
-> +			WARN_ON(!selftest_running);
-> +			return -EEXIST;
-> +		}
-> +
-
-[...]
-
-> +static int arm_v7s_split_blk_unmap(struct arm_v7s_io_pgtable *data,
-> +				   unsigned long iova, size_t size,
-> +				   arm_v7s_iopte *ptep)
-> +{
-> +	unsigned long blk_start, blk_end, blk_size;
-> +	phys_addr_t blk_paddr;
-> +	arm_v7s_iopte table = 0;
-> +	struct io_pgtable_cfg *cfg = &data->iop.cfg;
-> +	int prot = arm_v7s_pte_to_prot(*ptep, 1);
-> +
-> +	blk_size = ARM_V7S_BLOCK_SIZE(1);
-> +	blk_start = iova & ARM_V7S_LVL_MASK(1);
-> +	blk_end = blk_start + ARM_V7S_BLOCK_SIZE(1);
-> +	blk_paddr = *ptep & ARM_V7S_LVL_MASK(1);
-> +
-> +	for (; blk_start < blk_end; blk_start += size, blk_paddr += size) {
-> +		arm_v7s_iopte *tablep;
-> +
-> +		/* Unmap! */
-> +		if (blk_start == iova)
-> +			continue;
-> +
-> +		/* __arm_v7s_map expects a pointer to the start of the table */
-> +		tablep = &table - ARM_V7S_LVL_IDX(blk_start, 1);
-
-   The "table" seems not be initialized here. (LPAE too.) maybe I don't
-get it here.
-
-   If we would like to get the start of the table, maybe :
-
-   tablep = ptep - ARM_V7S_LVL_IDX(blk_start, 1);
-
-    Even though we change "tablep" here, it will also fail in the
-__arm_v7s_map since there is a value in current ptep(the pa of the
-section), then it will call iopte_deref instread of creating a new
-pgtable in the __arm_v7s_map below, then it will abort.
-
-so maybe we need unmap the ptep before this "for" loop.
-__arm_v7s_set_pte(ptep, 0, 1, cfg);
-
-> +		if (__arm_v7s_map(data, blk_start, blk_paddr, size, prot, 1,
-> +				  tablep) < 0) {
-> +			if (table) {
-> +				/* Free the table we allocated */
-> +				tablep = iopte_deref(table, 1);
-> +				__arm_v7s_free_table(tablep, 2, data);
-
-Following Will's quesion before, do we need flush tlb here?
-
-> +			}
-> +			return 0; /* Bytes unmapped */
-> +		}
-> +	}
-> +
-> +	__arm_v7s_set_pte(ptep, table, 1, cfg);
-
-    Is this in order to update the lvl2 pgtable base address? why it's
-not updated in __arm_v7s_map which create a lvl2 pgtable?
-
-> +	iova &= ~(blk_size - 1);
-> +	cfg->tlb->tlb_add_flush(iova, blk_size, blk_size, true, data->iop.cookie);
-> +	return size;
-> +}
-> +
-
-All the others looks good for me. Thanks.
-
-[...]
+> Thanks,
+> Xishi Qiu
+> 
+>> Thanks,
+>> Mark.
+>>
+>> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/397320.html
+>>
+>> .
+>>
+> 
+> 
