@@ -1,58 +1,184 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Thu, 14 Jan 2016 15:31:26 -0500
-Subject: [PATCH v1 1/2] libahci: Implement the capability to override the
- generic ahci interrupt handler
-In-Reply-To: <1452749424-28919-2-git-send-email-stripathi@apm.com>
-References: <1452749424-28919-1-git-send-email-stripathi@apm.com>
- <1452749424-28919-2-git-send-email-stripathi@apm.com>
-Message-ID: <20160114203126.GB3520@mtj.duckdns.org>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Thu, 14 Jan 2016 12:34:30 -0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <5697F6D2.60409@imgtec.com>
+References: <56945366.2090504@imgtec.com>
+ <20160112092711.GP6344@twins.programming.kicks-ass.net>
+ <20160112102555.GV6373@twins.programming.kicks-ass.net>
+ <20160112104012.GW6373@twins.programming.kicks-ass.net>
+ <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
+ <20160113104516.GE25458@arm.com> <5696CF08.8080700@imgtec.com>
+ <20160114121449.GC15828@arm.com> <5697F6D2.60409@imgtec.com>
+Message-ID: <20160114203430.GC3818@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Suman.
-
-Your mails ended up in spam again and it looks to be from SPF failure.
-
-  Received-SPF: softfail (google.com: domain of transitioning stripath at apm.com does not designate 198.145.29.136 as permitted sender) client-ip=198.145.29.136;
-  Authentication-Results: mx.google.com;
-	 spf=softfail (google.com: domain of transitioning stripath at apm.com does not designate 198.145.29.136 as permitted sender) smtp.mailfrom=stripath at apm.com;
-	 dmarc=fail (p=QUARANTINE dis=NONE) header.from=apm.com
-
-Can you please look into it?
-
-On Thu, Jan 14, 2016 at 11:00:23AM +0530, Suman Tripathi wrote:
->  static irqreturn_t ahci_single_edge_irq_intr(int irq, void *dev_instance)
->  {
-> @@ -2517,16 +2518,21 @@ int ahci_host_activate(struct ata_host *host, struct scsi_host_template *sht)
->  {
->  	struct ahci_host_priv *hpriv = host->private_data;
->  	int irq = hpriv->irq;
-> +	irqreturn_t (*ahci_irq_handler)(int irq, void *dev_instance);
->  	int rc;
+On Thu, Jan 14, 2016 at 11:28:18AM -0800, Leonid Yegoshin wrote:
+> On 01/14/2016 04:14 AM, Will Deacon wrote:
+> >On Wed, Jan 13, 2016 at 02:26:16PM -0800, Leonid Yegoshin wrote:
+> >
+> >>     Moreover, there are voices against guarantee that it will be in future
+> >>and that voices point me to Documentation/memory-barriers.txt section "DATA
+> >>DEPENDENCY BARRIERS" examples which require SYNC_RMB between loading
+> >>address/index and using that for loading data based on that address or index
+> >>for shared data (look on CPU2 pseudo-code):
+> >>>To deal with this, a data dependency barrier or better must be inserted
+> >>>between the address load and the data load:
+> >>>
+> >>>        CPU 1                 CPU 2
+> >>>        ===============       ===============
+> >>>        { A == 1, B == 2, C = 3, P == &A, Q == &C }
+> >>>        B = 4;
+> >>>        <write barrier>
+> >>>        WRITE_ONCE(P, &B);
+> >>>                              Q = READ_ONCE(P);
+> >>>                              <data dependency barrier> <-----------
+> >>>SYNC_RMB is here
+> >>>                              D = *Q;
+> >>...
+> >>>Another example of where data dependency barriers might be required is
+> >>>where a
+> >>>number is read from memory and then used to calculate the index for an
+> >>>array
+> >>>access:
+> >>>
+> >>>        CPU 1                 CPU 2
+> >>>        ===============       ===============
+> >>>        { M[0] == 1, M[1] == 2, M[3] = 3, P == 0, Q == 3 }
+> >>>        M[1] = 4;
+> >>>        <write barrier>
+> >>>        WRITE_ONCE(P, 1);
+> >>>                              Q = READ_ONCE(P);
+> >>>                              <data dependency barrier> <------------
+> >>>SYNC_RMB is here
+> >>>                              D = M[Q];
+> >>That voices say that there is a legitimate reason to relax HW here for
+> >>performance if SYNC_RMB is needed anyway to work with this sequence of
+> >>shared data.
+> >Are you saying that MIPS needs to implement [smp_]read_barrier_depends?
 > 
->  	if (hpriv->flags & AHCI_HFLAG_MULTI_MSI)
->  		rc = ahci_host_activate_multi_irqs(host, irq, sht);
-> -	else if (hpriv->flags & AHCI_HFLAG_EDGE_IRQ)
-> -		rc = ata_host_activate(host, irq, ahci_single_edge_irq_intr,
-> -				       IRQF_SHARED, sht);
-> -	else
-> -		rc = ata_host_activate(host, irq, ahci_single_level_irq_intr,
-> +	else {
-> +		ahci_irq_handler = hpriv->ahci_irq_intr ? hpriv->ahci_irq_intr :
-> +				   (hpriv->flags & AHCI_HFLAG_EDGE_IRQ ?
-> +				   ahci_single_edge_irq_intr :
-> +				   ahci_single_level_irq_intr);
-> +
-> +		rc = ata_host_activate(host, irq, ahci_irq_handler,
->  				       IRQF_SHARED, sht);
-> +	}
-> +
+> It is not me, it is Documentation/memory-barriers.txt from kernel sources.
+> 
+> HW team can't work on voice statements, it should do a work on
+> written documents. If that is written (see above the lines which I
+> marked by "SYNC_RMB") then anybody should use it and never mind how
+> many CPUs/Threads are in play. This examples explicitly requires to
+> insert "data dependency barrier" between reading a shared
+> pointer/index and using it to fetch a shared data. So, your
+> WRC+addr+addr test is a violation of that recommendation.
 
-So, if we have ->ahci_irq_intr, we don't need AHCI_HFLAG_EDGE_IRQ at
-all, right?  Just initialize ->ahci_irq_intr to
-ahci_single_level_irq_intr and let specific drivers overrie it?
+Perhaps Documentation/memory-barriers.txt needs additional clarification.
+It would not be the first time.
 
-Thanks.
+If your CPU implicitly maintains ordering based on address and
+data dependencies, then you don't need any instructions for
+<data dependency barrier>.
 
--- 
-tejun
+The WRC+addr+addr is OK because data dependencies are not required to be
+transitive, in other words, they are not required to flow from one CPU to
+another without the help of an explicit memory barrier.  Transitivity is
+instead supplied by smp_mb() and by smp_store_release()-smp_load_acquire()
+chains.  Here is the Linux kernel code for WRC+addr+addr, give or take
+(and no, I have no idea why anyone would want to write code like this):
+
+	struct foo {
+		struct foo **a;
+	};
+	struct foo b;
+	struct foo c;
+	struct foo d;
+	struct foo e;
+	struct foo f = { &d };
+	struct foo g = { &e };
+	struct foo *x = &b;
+
+	void cpu0(void)
+	{
+		WRITE_ONCE(x, &f);
+	}
+
+	void cpu1(void)
+	{
+		struct foo *p;
+
+		p = lockless_dereference(x);
+		WRITE_ONCE(p->a, &x);
+	}
+
+	void cpu2(void)
+	{
+		r1 = lockless_dereference(f.a);
+		WRITE_ONCE(*r1, &c);
+	}
+
+It is legal to end the run with x==&f and r1==&x.  To prevent this outcome,
+we do the following:
+
+	struct foo {
+		struct foo **a;
+	};
+	struct foo b;
+	struct foo c;
+	struct foo d;
+	struct foo e;
+	struct foo f = { &d };
+	struct foo g = { &e };
+	struct foo *x = &b;
+
+	void cpu0(void)
+	{
+		WRITE_ONCE(x, &f);
+	}
+
+	void cpu1(void)
+	{
+		struct foo *p;
+
+		p = lockless_dereference(x);
+		smp_store_release(&p->a, &x); /* Additional ordering. */
+	}
+
+	void cpu2(void)
+	{
+		r1 = lockless_dereference(f.a);
+		WRITE_ONCE(*r1, &c);
+	}
+
+And I still don't know why anyone would need this sort of code.  ;-)
+
+Alternatively, we pull cpu2() into cpu1():
+
+	struct foo {
+		struct foo **a;
+	};
+	struct foo b;
+	struct foo c;
+	struct foo d;
+	struct foo e;
+	struct foo f = { &d };
+	struct foo g = { &e };
+	struct foo *x = &b;
+
+	void cpu0(void)
+	{
+		WRITE_ONCE(x, &f);
+	}
+
+	void cpu1(void)
+	{
+		struct foo *p;
+
+		p = lockless_dereference(x);
+		WRITE_ONCE(p->a, &x);
+		r1 = lockless_dereference(f.a);
+		WRITE_ONCE(*r1, &c);
+	}
+
+The ordering is now enforced by being within a single thread.  In fact,
+the second lockless_dereference() can be READ_ONCE().
+
+So, does MIPS maintain ordering within a given CPU based on address and
+data dependencies?  If so, you don't need to emit memory-barrier instructions
+for read_barrier_depends().
+
+							Thanx, Paul
