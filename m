@@ -1,36 +1,100 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Thu, 14 Jan 2016 09:05:48 +0200
-Subject: [PATCH v4 3/3] wlcore/wl12xx: spi: add wifi support to cm-t335
-In-Reply-To: <20160113172712.GI12777@atomide.com> (Tony Lindgren's message of
- "Wed, 13 Jan 2016 09:27:12 -0800")
-References: <1451482533-8624-1-git-send-email-uri.mashiach@compulab.co.il>
- <1451482533-8624-4-git-send-email-uri.mashiach@compulab.co.il>
- <87io35lq2p.fsf@kamboji.qca.qualcomm.com>
- <5695E802.7050909@compulab.co.il> <20160113172712.GI12777@atomide.com>
-Message-ID: <87wprcbpyr.fsf@kamboji.qca.qualcomm.com>
+From: jchandra@broadcom.com (Jayachandran C)
+Date: Thu, 14 Jan 2016 13:02:36 +0530
+Subject: [PATCH v6 0/5] ACPI based PCI support for arm64
+Message-ID: <1452756761-29584-1-git-send-email-jchandra@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+This patchset provides a generic ACPI based PCI host controller
+implementation and uses it on arm64.
 
->> >>  arch/arm/boot/dts/am335x-cm-t335.dts | 55 ++++++++++++++++++++++++++++++++++++
->> >>  1 file changed, 55 insertions(+)
->> > 
->> > To what tree should this patch go? My wireless-drivers-next tree doesn't
->> > even have this file.
->> 
->> Right. It will hit the mainline during this merge window through Tony's and
->> arm-soc trees.
->> 
->> Do you think it will be sensible if you take 1/3 and 2/3 patches and Tony
->> will take the 3/3 (there is no code dependency between first two and the last one),
->> or we can just wait till arm-soc hits the mainline, so you will have the
->> needed code?
->
-> Yeah I'll pick the dts changes separately after the merge window as
-> there is no dependency to the driver changes.
+The first patch moves the common code to handle MCFG ACPI table from
+arch/x86 to drivers/acpi/pci_mcfg.c. The last patch in the patchset
+provides the generic implementation of an ACPI based PCI host
+controller with a new file drivers/acpi/pci_host_acpi.c. The other
+patches are to fix up arm64 and ACPI code to work with these two
+patches.
 
-Ok, I'll then take patches 1 and 2 once the merge window opens.
+The pci host controller implementation keeps a reference to
+pci_mmcfg_region entry so that config space access is done with a
+simple mapping and generic PCI config read/write. There is also an
+implementation of raw_pci_read/raw_pci_write provided by walking the
+pci_mmcfg_list
+
+The patchset is against 4.4, but it can be applied to pci/next
+with a very minor fixup.  This is tested with arm64 QEMU and OVMF
+and on x86 with qemu.
+
+More testing or comments are welcome. The idea is to provide a
+simpler alternative for ACPI PCI support in arm64, any feedback
+from PCI or ACPI maintainers would be appreciated on this front.
+
+Thanks,
+JC.
+
+v5->v6:
+ - fix arm64 with xen compile issue reported by kbuild bot
+
+v4->v5:
+ - Fix arm build issue reported by the kbuild bot
+ - Use config_enabled instead of ifdef in pci_mcfg.c
+
+v3->v4:
+ - Handle suggestions from Arnd Bergmann <arnd@arndb.de>
+    * move the implementation of host controller to drivers/acpi
+      under config option CONFIG_ACPI_PCI_HOST_GENERIC
+    * remove unnecessary arch hooks (this done as much as possible
+      without affecting the scope of the patch, will need another
+      separate patchset for the rest).
+    * remove pcibios_assign_resources fs_initcall that was added
+ - fixup domain_nr assignment code, and move ACPI companion set
+   to PCI code.
+ - Call map resource correctly in setup code
+ - fix kbuild robot report
+ - More testing
+
+v2->v3:
+ - Move maintenance of the pci_mmcfg_list to drivers/acpi/pci_mcfg.c
+   without changing x86 logic
+ - use the pci_mmcfg_list in ARM64 implementation
+ - provide raw_pci_read/raw_pci_write
+
+v1->v2:
+ - use CONFIG_PCI_MMCONFIG on arm64, provide a weak implementation
+   of pci_mmcfg_late_init for arm64.
+ - The real implementation of pci_mmcfg_late_init is in pci-host-acpi.c
+   and it will save the MCFG table entries to an array. Earlier this
+   was done with an arch_init call
+ - remove unneeded pci_bus_add_devices call and fix MCFG saving code
+ - Added a patch to ACPI pci_root.c to handle arm64 PCI IO resources
+
+Jayachandran C (5):
+  APCI: MCFG: Move mmcfg_list management to drivers/acpi
+  PCI: Handle ACPI companion and domain number
+  ACPI: PCI: Support platforms that need pci_remap_iospace
+  arm64: pci: Add ACPI support
+  PCI: ACPI: Add a generic ACPI based host controller
+
+ arch/arm64/Kconfig             |   3 +
+ arch/arm64/kernel/pci.c        |  34 ++++-
+ arch/x86/include/asm/pci_x86.h |  24 +---
+ arch/x86/pci/mmconfig-shared.c | 269 +++++------------------------------
+ arch/x86/pci/mmconfig_32.c     |   1 +
+ arch/x86/pci/mmconfig_64.c     |   1 +
+ arch/x86/pci/numachip.c        |   1 +
+ drivers/acpi/Kconfig           |   8 ++
+ drivers/acpi/Makefile          |   2 +
+ drivers/acpi/pci_host_acpi.c   | 186 ++++++++++++++++++++++++
+ drivers/acpi/pci_mcfg.c        | 312 +++++++++++++++++++++++++++++++++++++++++
+ drivers/acpi/pci_root.c        |  62 +++++++-
+ drivers/acpi/resource.c        |   2 +
+ drivers/pci/pci.c              |  15 +-
+ drivers/pci/probe.c            |   2 +
+ drivers/xen/pci.c              |   5 +-
+ include/linux/pci-acpi.h       |  59 ++++++++
+ 17 files changed, 717 insertions(+), 269 deletions(-)
+ create mode 100644 drivers/acpi/pci_host_acpi.c
+ create mode 100644 drivers/acpi/pci_mcfg.c
 
 -- 
-Kalle Valo
+1.9.1
