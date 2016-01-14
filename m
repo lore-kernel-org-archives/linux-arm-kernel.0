@@ -1,43 +1,49 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Thu, 14 Jan 2016 13:45:36 +0000
-Subject: [PATCH V3 1/6] clk: bcm2835: the minimum clock divider is 2
+Date: Thu, 14 Jan 2016 13:45:37 +0000
+Subject: [PATCH V3 2/6] clk: bcm2835: clamp clock divider to highest integer
+ only
 In-Reply-To: <1452779142-20615-1-git-send-email-kernel@martin.sperl.org>
 References: <1452779142-20615-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1452779142-20615-2-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1452779142-20615-3-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-Testing with different clock divider values has shown
-that (at least for the PCM clock) the clock divider
-has to be at least 2, otherwise the clock will not
-output a signal.
+The clock divider calculation right now clamps the
+divider to the highest possible fractional divider.
+So typically (BIT(div_int_bits) - 1) + 4095 / 4096.
 
-So the clamping has changed from 1 to 2 and comments
-about the kind of clamping applied have been added.
+As the fractional clock divider is alterating between
+(Fosc / div_int) and (Fosc / (div_int + 1))
+the divider will overflow for the (div_int + 1) case.
+As with the "underflow" case we have seen for (div < 2),
+we can assume that the same applies on the upper limit
+as well.
+
+So this patch will instead clamp to the divider to
+(BIT(div_int_bits) - 1)
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- drivers/clk/bcm/clk-bcm2835.c |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/clk/bcm/clk-bcm2835.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 015e687..10e97b7 100644
+index 10e97b7..3d6490f 100644
 --- a/drivers/clk/bcm/clk-bcm2835.c
 +++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -1178,7 +1178,11 @@ static u32 bcm2835_clock_choose_div(struct clk_hw *hw,
- 	div &= ~unused_frac_mask;
- 
- 	/* Clamp to the limits. */
--	div = max(div, unused_frac_mask + 1);
-+
-+	/* divider must be >= 2 */
-+	div = max_t(u32, div, (2 << CM_DIV_FRAC_BITS));
-+
-+	/* clamp to max divider allowed */
+@@ -1182,9 +1182,9 @@ static u32 bcm2835_clock_choose_div(struct clk_hw *hw,
+ 	/* divider must be >= 2 */
+ 	div = max_t(u32, div, (2 << CM_DIV_FRAC_BITS));
+
+-	/* clamp to max divider allowed */
++	/* clamp to max divider allowed - max is integer divider */
  	div = min_t(u32, div, GENMASK(data->int_bits + CM_DIV_FRAC_BITS - 1,
- 				      CM_DIV_FRAC_BITS - data->frac_bits));
- 
--- 
+-				      CM_DIV_FRAC_BITS - data->frac_bits));
++				      CM_DIV_FRAC_BITS));
+
+ 	return div;
+ }
+--
 1.7.10.4
