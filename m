@@ -1,105 +1,88 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Thu, 14 Jan 2016 13:29:13 -0800
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <56980C91.1010403@imgtec.com>
-References: <20160112102555.GV6373@twins.programming.kicks-ass.net>
- <20160112104012.GW6373@twins.programming.kicks-ass.net>
- <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
- <20160113104516.GE25458@arm.com> <5696CF08.8080700@imgtec.com>
- <20160114121449.GC15828@arm.com> <5697F6D2.60409@imgtec.com>
- <20160114203430.GC3818@linux.vnet.ibm.com>
- <56980C91.1010403@imgtec.com>
-Message-ID: <20160114212913.GF3818@linux.vnet.ibm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 14 Jan 2016 21:30:48 +0000
+Subject: [4.4-rc6-rt1 PATCH 0/2] ARM: am437x: boot test report
+In-Reply-To: <569800DD.7090102@ti.com>
+References: <1451325611-21678-1-git-send-email-grygorii.strashko@ti.com>
+ <20160112171556.GB31009@linutronix.de> <569637ED.1030304@ti.com>
+ <5696B025.8020909@ti.com> <569800DD.7090102@ti.com>
+Message-ID: <20160114213048.GB19062@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 01:01:05PM -0800, Leonid Yegoshin wrote:
-> I need some time to understand your test examples. However,
+On Thu, Jan 14, 2016 at 10:11:09PM +0200, Grygorii Strashko wrote:
+> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+> index deabc36..b9b4f9c 100644
+> --- a/arch/arm/mm/highmem.c
+> +++ b/arch/arm/mm/highmem.c
+> @@ -167,7 +167,7 @@ void switch_kmaps(struct task_struct *prev_p, struct task_struct *next_p)
+>          * Clear @prev's kmap_atomic mappings
+>          */
+>         for (i = 0; i < prev_p->kmap_idx; i++) {
+> -               int idx = i + KM_TYPE_NR * smp_processor_id();
+> +               int idx = FIX_KMAP_BEGIN + i + KM_TYPE_NR * smp_processor_id();
+>  
+>                 set_fixmap_pte(idx, __pte(0));
+>         }
+> @@ -175,7 +175,7 @@ void switch_kmaps(struct task_struct *prev_p, struct task_struct *next_p)
+>          * Restore @next_p's kmap_atomic mappings
+>          */
+>         for (i = 0; i < next_p->kmap_idx; i++) {
+> -               int idx = i + KM_TYPE_NR * smp_processor_id();
+> +               int idx = FIX_KMAP_BEGIN + i + KM_TYPE_NR * smp_processor_id();
+>  
+>                 if (!pte_none(next_p->kmap_pte[i]))
+>                         set_fixmap_pte(idx, next_p->kmap_pte[i]);
 
-Understood.
+This looks like it introduces the 4th and 5th copies of the same
+calcuation, so can I suggest that we do this to prevent this kind
+of error?
 
-> On 01/14/2016 12:34 PM, Paul E. McKenney wrote:
-> >
-> >
-> >The WRC+addr+addr is OK because data dependencies are not required to be
-> >transitive, in other words, they are not required to flow from one CPU to
-> >another without the help of an explicit memory barrier.
-> 
-> I don't see any reliable way to fit WRC+addr+addr into "DATA
-> DEPENDENCY BARRIERS" section recommendation to have data dependency
-> barrier between read of a shared pointer/index and read the shared
-> data based on that pointer. If you have this two reads, it doesn't
-> matter the rest of scenario, you should put the dependency barrier
-> in code anyway. If you don't do it in WRC+addr+addr scenario then
-> after years it can be easily changed to different scenario which
-> fits some of scenario in "DATA DEPENDENCY BARRIERS" section and
-> fails.
+diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+index d02f8187b1cc..61f0d5941116 100644
+--- a/arch/arm/mm/highmem.c
++++ b/arch/arm/mm/highmem.c
+@@ -34,6 +34,11 @@ static inline pte_t get_fixmap_pte(unsigned long vaddr)
+ 	return *ptep;
+ }
+ 
++static unsigned int fixmap_idx(int type)
++{
++	return FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
++}
++
+ void *kmap(struct page *page)
+ {
+ 	might_sleep();
+@@ -79,7 +84,7 @@ void *kmap_atomic(struct page *page)
+ 
+ 	type = kmap_atomic_idx_push();
+ 
+-	idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
++	idx = fixmap_idx(type);
+ 	vaddr = __fix_to_virt(idx);
+ #ifdef CONFIG_DEBUG_HIGHMEM
+ 	/*
+@@ -106,7 +111,7 @@ void __kunmap_atomic(void *kvaddr)
+ 
+ 	if (kvaddr >= (void *)FIXADDR_START) {
+ 		type = kmap_atomic_idx();
+-		idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
++		idx = fixmap_idx(type);
+ 
+ 		if (cache_is_vivt())
+ 			__cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
+@@ -138,7 +143,7 @@ void *kmap_atomic_pfn(unsigned long pfn)
+ 		return page_address(page);
+ 
+ 	type = kmap_atomic_idx_push();
+-	idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
++	idx = fixmap_idx(type);
+ 	vaddr = __fix_to_virt(idx);
+ #ifdef CONFIG_DEBUG_HIGHMEM
+ 	BUG_ON(!pte_none(get_fixmap_pte(vaddr)));
 
-The trick is that lockless_dereference() contains an
-smp_read_barrier_depends():
 
-#define lockless_dereference(p) \
-({ \
-	typeof(p) _________p1 = READ_ONCE(p); \
-	smp_read_barrier_depends(); /* Dependency order vs. p above. */ \
-	(_________p1); \
-})
-
-Or am I missing your point?
-
-> >   Transitivity is
-> 
-> Peter Zijlstra recently wrote: "In particular we're very much all
-> 'confused' about the various notions of transitivity". I am confused
-> too, so - please use some more simple way to explain your words.
-> Sorry, but we need a common ground first.
-
-OK, how about an example?  (Z6.3 in the ppcmem naming scheme.)
-
-	int x, y, z;
-
-	void cpu0(void)
-	{
-		WRITE_ONCE(x, 1);
-		smp_wmb();
-		WRITE_ONCE(y, 1);
-	}
-
-	void cpu1(void)
-	{
-		WRITE_ONCE(y, 2);
-		smp_wmb();
-		WRITE_ONCE(z, 1);
-	}
-
-	void cpu2(void)
-	{
-		r1 = READ_ONCE(z);
-		smp_rmb();
-		r2 = read_once(x);
-	}
-
-If smp_rmb() and smp_wmb() provided transitive ordering, then cpu2()
-would see cpu0()'s ordering.  But they do not, so the ordering is
-visible at best to the adjacent CPU.  This means that the final value
-of y can be 2, while at the same time r1==1 && r2==0.
-
-Now the full barrier, smp_mb(), does provide transitive ordering,
-so if the three barriers in the above example are replaced with
-smp_mb() the y==2 && r1==1 && r2==0 outcome will be prohibited.
-
-So smp_mb() provides transitivity, as do pairs of smp_store_release()
-and smp_read_acquire(), as do RCU grace periods.  The exact interactions
-between transitive and non-transitive ordering is a work in progress.
-That said, if a series of transitive segments ends in a write, which
-connects to a single non-transitive segment starting with a read,
-you should be good.  And in fact in the example above, you can replace
-the smp_wmb()s with smp_mb() and leave the smp_rmb() and still
-prohibit the "cyclic" outcome.
-
-If you want a more formal definition, I must refer you back to the
-ppcmem and herd references.
-
-Does that help?
-
-							Thanx, Paul
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
