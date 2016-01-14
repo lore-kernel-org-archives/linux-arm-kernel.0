@@ -1,104 +1,183 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Thu, 14 Jan 2016 15:05:15 +0200
-Subject: [PATCH v3 1/4] i2c: rk3x: switch to i2c generic dt parsing
-In-Reply-To: <1452774699-57455-2-git-send-email-david.wu@rock-chips.com>
-References: <1452774699-57455-1-git-send-email-david.wu@rock-chips.com>
- <1452774699-57455-2-git-send-email-david.wu@rock-chips.com>
-Message-ID: <CAHp75VdtDjNMLH2szW=u-+iogoTc3t5wnOpoGndoadMCetLtDw@mail.gmail.com>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Thu, 14 Jan 2016 21:05:04 +0800
+Subject: [PATCH v2 1/3] iommu/io-pgtable: Add ARMv7 short descriptor
+ support
+In-Reply-To: <ddfe960ef1da22e5264811bfcafeb412fa976f4a.1450383740.git.robin.murphy@arm.com>
+References: <cover.1450383740.git.robin.murphy@arm.com>
+ <ddfe960ef1da22e5264811bfcafeb412fa976f4a.1450383740.git.robin.murphy@arm.com>
+Message-ID: <1452776704.15636.59.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 2:31 PM, David Wu <david.wu@rock-chips.com> wrote:
-> Switch to the new generic functions: i2c_parse_fw_timings().
+On Thu, 2015-12-17 at 20:50 +0000, Robin Murphy wrote:
+> Add a nearly-complete ARMv7 short descriptor implementation, omitting
+> only a few legacy and CPU-centric aspects which shouldn't be necessary
+> for IOMMU API use anyway.
 
-Nice one!
-Reviwed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+[...]
 
-Minor comments below.
+> +
+> +#define ARM_V7S_BLOCK_SIZE(lvl)		(1UL << ARM_V7S_LVL_SHIFT(lvl))
+> +#define ARM_V7S_LVL_MASK(lvl)		((u32)(~0U << ARM_V7S_LVL_SHIFT(lvl)))
+> +#define ARM_V7S_TABLE_MASK		((u32)(~0U << ARM_V7S_TABLE_SHIFT))
+> +#define _ARM_V7S_IDX_MASK(lvl)		(ARM_V7S_PTES_PER_LVL(lvl) - 1)
+> +#define ARM_V7S_LVL_IDX(addr, lvl)	({				\
+> +	int _l = lvl;							\
+> +	((u32)(addr) >> ARM_V7S_LVL_SHIFT(_l)) & _ARM_V7S_IDX_MASK(_l); \
+> +})
 
-> --- a/drivers/i2c/busses/i2c-rk3x.c
-> +++ b/drivers/i2c/busses/i2c-rk3x.c
+lvl here is not a function, it is 1 or 2, Could we use for simple?
 
-> @@ -437,10 +434,7 @@ out:
->   * Calculate divider values for desired SCL frequency
->   *
->   * @clk_rate: I2C input clock rate
-> - * @scl_rate: Desired SCL rate
-> - * @scl_rise_ns: How many ns it takes for SCL to rise.
-> - * @scl_fall_ns: How many ns it takes for SCL to fall.
-> - * @sda_fall_ns: How many ns it takes for SDA to fall.
-> + * @t_input: Known I2C timing information.
+#define ARM_V7S_LVL_IDX(addr, lvl)		\
+	((u32)(addr) >> ARM_V7S_LVL_SHIFT(lvl)) & _ARM_V7S_IDX_MASK(lvl)
 
-Perhaps t_input -> t.
 
->   * @div_low: Divider output for low
->   * @div_high: Divider output for high
->   *
-> @@ -448,11 +442,10 @@ out:
->   * a best-effort divider value is returned in divs. If the target rate is
->   * too high, we silently use the highest possible rate.
->   */
-> -static int rk3x_i2c_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
-> -                             unsigned long scl_rise_ns,
-> -                             unsigned long scl_fall_ns,
-> -                             unsigned long sda_fall_ns,
-> -                             unsigned long *div_low, unsigned long *div_high)
-> +static int rk3x_i2c_calc_divs(unsigned long clk_rate,
-> +                             struct i2c_timings *t_input,
+> +static arm_v7s_iopte arm_v7s_cont_to_pte(arm_v7s_iopte pte, int lvl)
+> +{
+> +	if (lvl == 1) {
+> +		pte &= ~ARM_V7S_CONT_SECTION;
+> +	} else if (lvl == 2) {
+> +		arm_v7s_iopte xn = pte & BIT(ARM_V7S_CONT_PAGE_XN_SHIFT);
+> +		arm_v7s_iopte tex = pte & (ARM_V7S_CONT_PAGE_TEX_MASK <<
+> +					   ARM_V7S_CONT_PAGE_TEX_SHIFT);
+> +
+> +		pte ^= xn | tex;
+> +		pte |= (xn >> ARM_V7S_CONT_PAGE_XN_SHIFT) |
+> +		       (tex >> ARM_V7S_CONT_PAGE_TEX_SHIFT);
+> +		pte ^= ARM_V7S_PTE_TYPE_PAGE | ARM_V7S_PTE_TYPE_CONT_PAGE;
 
-Ditto.
+    If XN bit is 1, We may lost XN bit for small page here.
+    
+    We could runs ok as we have IO_PGTABLE_QUIRK_NO_PERMS.
 
-> +                             unsigned long *div_low,
-> +                             unsigned long *div_high)
->  {
->         unsigned long spec_min_low_ns, spec_min_high_ns;
->         unsigned long spec_setup_start, spec_max_data_hold_ns;
+    Maybe this is enough: pte ^= ARM_V7S_PTE_TYPE_PAGE;
 
-> @@ -517,18 +510,19 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate, unsigned long scl_rate,
->          * we meet tSU;STA and tHD;STA times.
->          */
->         min_high_ns = max(min_high_ns,
-> -               DIV_ROUND_UP((scl_rise_ns + spec_setup_start) * 1000, 875));
-> +               DIV_ROUND_UP((t_input->scl_rise_ns + spec_setup_start) * 1000,
-> +                            875));
+> +	}
+> +	return pte;
+> +}
+> +
+> +static bool arm_v7s_pte_is_cont(arm_v7s_iopte pte, int lvl)
+> +{
+> +	if (lvl == 1 && !ARM_V7S_PTE_IS_TABLE(pte, lvl))
+> +		return pte & ARM_V7S_CONT_SECTION;
+> +	else if (lvl == 2)
+> +		return !(pte & ARM_V7S_PTE_TYPE_PAGE);
+> +	return false;
+> +}
+> +
+> +static int __arm_v7s_unmap(struct arm_v7s_io_pgtable *, unsigned long,
+> +			   size_t, int, arm_v7s_iopte *);
+> +
+> +static int arm_v7s_init_pte(struct arm_v7s_io_pgtable *data,
+> +			    unsigned long iova, phys_addr_t paddr, int prot,
+> +			    int lvl, int num_entries, arm_v7s_iopte *ptep)
+> +{
+> +	struct io_pgtable_cfg *cfg = &data->iop.cfg;
+> +	arm_v7s_iopte pte = arm_v7s_prot_to_pte(prot, lvl, cfg);
+> +	int i;
+> +
+> +	for (i = 0; i < num_entries; i++)
+> +		if (ARM_V7S_PTE_IS_TABLE(ptep[i], lvl)) {
 
-To one line (after above change).
+   If somebody abuse the mapping, He map 4K firstly, then map 1M in the
+same iova address(don't unmap the 4K before), then it will also enter
+here to free the existed lvl2 pagetable silently. Should we add a
+checking whether the existed pagetable is empty? if the pagetable is not
+empty, return a warning.
 
->         min_high_ns = max(min_high_ns,
-> -               DIV_ROUND_UP((scl_rise_ns + spec_setup_start +
-> -                             sda_fall_ns + spec_min_high_ns), 2));
-> +               DIV_ROUND_UP((t_input->scl_rise_ns + spec_setup_start +
-> +                             t_input->sda_fall_ns + spec_min_high_ns), 2));
+> +			/*
+> +			 * We need to unmap and free the old table before
+> +			 * overwriting it with a block entry.
+> +			 */
+> +			arm_v7s_iopte *tblp;
+> +			size_t sz = ARM_V7S_BLOCK_SIZE(lvl);
+> +
+> +			tblp = ptep + i - ARM_V7S_LVL_IDX(iova, lvl);
+> +			if (WARN_ON(__arm_v7s_unmap(data, iova, sz, lvl, tblp)
+> +					!= sz))
 
-Ditto.
+    if "i" isn't 0 here(There is a pgtable item in a supersection), it
+seems not right. Maybe:
+        
+    tblp = ptep + i - ARM_V7S_LVL_IDX(iova + i * sz, lvl);
+    if (WARN_ON(__arm_v7s_unmap(data, iova + i * sz, sz, lvl, tblp)
+		!= sz))
 
-> @@ -620,10 +614,8 @@ static void rk3x_i2c_adapt_div(struct rk3x_i2c *i2c, unsigned long clk_rate)
->         u64 t_low_ns, t_high_ns;
->         int ret;
->
-> -       ret = rk3x_i2c_calc_divs(clk_rate, i2c->scl_frequency, i2c->scl_rise_ns,
-> -                                i2c->scl_fall_ns, i2c->sda_fall_ns,
-> -                                &div_low, &div_high);
-> -       WARN_ONCE(ret != 0, "Could not reach SCL freq %u", i2c->scl_frequency);
-> +       ret = rk3x_i2c_calc_divs(clk_rate, &i2c->t, &div_low, &div_high);
-> +       WARN_ONCE(ret != 0, "Could not reach SCL freq %u", i2c->t.bus_freq_hz);
+> +				return -EINVAL;
+> +		} else if (ptep[i]) {
+> +			/* We require an unmap first */
+> +			WARN_ON(!selftest_running);
+> +			return -EEXIST;
+> +		}
+> +
 
-I would recommend to
+[...]
 
-struct i2c_timings *t = &i2c->t;
+> +static int arm_v7s_split_blk_unmap(struct arm_v7s_io_pgtable *data,
+> +				   unsigned long iova, size_t size,
+> +				   arm_v7s_iopte *ptep)
+> +{
+> +	unsigned long blk_start, blk_end, blk_size;
+> +	phys_addr_t blk_paddr;
+> +	arm_v7s_iopte table = 0;
+> +	struct io_pgtable_cfg *cfg = &data->iop.cfg;
+> +	int prot = arm_v7s_pte_to_prot(*ptep, 1);
+> +
+> +	blk_size = ARM_V7S_BLOCK_SIZE(1);
+> +	blk_start = iova & ARM_V7S_LVL_MASK(1);
+> +	blk_end = blk_start + ARM_V7S_BLOCK_SIZE(1);
+> +	blk_paddr = *ptep & ARM_V7S_LVL_MASK(1);
+> +
+> +	for (; blk_start < blk_end; blk_start += size, blk_paddr += size) {
+> +		arm_v7s_iopte *tablep;
+> +
+> +		/* Unmap! */
+> +		if (blk_start == iova)
+> +			continue;
+> +
+> +		/* __arm_v7s_map expects a pointer to the start of the table */
+> +		tablep = &table - ARM_V7S_LVL_IDX(blk_start, 1);
 
-+       ret = rk3x_i2c_calc_divs(clk_rate, t, &div_low, &div_high);
-+       WARN_ONCE(ret != 0, "Could not reach SCL freq %u", t->bus_freq_hz);
+   The "table" seems not be initialized here. (LPAE too.) maybe I don't
+get it here.
 
-> @@ -634,7 +626,7 @@ static void rk3x_i2c_adapt_div(struct rk3x_i2c *i2c, unsigned long clk_rate)
->         dev_dbg(i2c->dev,
->                 "CLK %lukhz, Req %uns, Act low %lluns high %lluns\n",
->                 clk_rate / 1000,
-> -               1000000000 / i2c->scl_frequency,
-> +               1000000000 / i2c->t.bus_freq_hz,
+   If we would like to get the start of the table, maybe :
 
-Ditto.
+   tablep = ptep - ARM_V7S_LVL_IDX(blk_start, 1);
 
--- 
-With Best Regards,
-Andy Shevchenko
+    Even though we change "tablep" here, it will also fail in the
+__arm_v7s_map since there is a value in current ptep(the pa of the
+section), then it will call iopte_deref instread of creating a new
+pgtable in the __arm_v7s_map below, then it will abort.
+
+so maybe we need unmap the ptep before this "for" loop.
+__arm_v7s_set_pte(ptep, 0, 1, cfg);
+
+> +		if (__arm_v7s_map(data, blk_start, blk_paddr, size, prot, 1,
+> +				  tablep) < 0) {
+> +			if (table) {
+> +				/* Free the table we allocated */
+> +				tablep = iopte_deref(table, 1);
+> +				__arm_v7s_free_table(tablep, 2, data);
+
+Following Will's quesion before, do we need flush tlb here?
+
+> +			}
+> +			return 0; /* Bytes unmapped */
+> +		}
+> +	}
+> +
+> +	__arm_v7s_set_pte(ptep, table, 1, cfg);
+
+    Is this in order to update the lvl2 pgtable base address? why it's
+not updated in __arm_v7s_map which create a lvl2 pgtable?
+
+> +	iova &= ~(blk_size - 1);
+> +	cfg->tlb->tlb_add_flush(iova, blk_size, blk_size, true, data->iop.cookie);
+> +	return size;
+> +}
+> +
+
+All the others looks good for me. Thanks.
+
+[...]
