@@ -1,89 +1,49 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 14 Jan 2016 16:24:56 +0100
-Subject: [PATCH v2 13/26] drm/fb_cma_helper: Remove implicit call to
- disable_unused_functions
+Date: Thu, 14 Jan 2016 16:24:51 +0100
+Subject: [PATCH v2 08/26] clk: sun5i: add DRAM gates
 In-Reply-To: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1452785109-6172-14-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1452785109-6172-9-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The drm_fbdev_cma_init function always calls the
-drm_helper_disable_unused_functions. Since it's part of the usual probe
-process, all the drivers using that helper will end up having their encoder
-and CRTC disable functions called at probe if their device has not been
-reported as enabled.
+The Allwinner SoCs have a gate controller to gate the access to the DRAM
+clock to the some devices that need to access the DRAM directly (mostly
+display / image related IPs).
 
-This could be fixed by reading out from the registers the current state of
-the device if it is enabled, but even that will not handle the case where
-the device is actually disabled.
-
-Moreover, the drivers using the atomic modesetting expect that their enable
-and disable callback to be called when the device is already enabled or
-disabled (respectively).
-
-We can however fix this issue by moving the call to
-drm_helper_disable_unused_functions out of drm_fbdev_cma_init and make the
-drivers needing it (all the drivers calling drm_fbdev_cma_init and not
-using the atomic modesetting) explicitly call it.
+Use a simple gates driver to support the one found in the A13 / R8 SoCs.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/drm_fb_cma_helper.c | 3 ---
- drivers/gpu/drm/imx/imx-drm-core.c  | 1 +
- drivers/gpu/drm/sti/sti_drv.c       | 1 +
- drivers/gpu/drm/tilcdc/tilcdc_drv.c | 1 +
- 4 files changed, 3 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/clock/sunxi.txt | 1 +
+ drivers/clk/sunxi/clk-simple-gates.c              | 2 ++
+ 2 files changed, 3 insertions(+)
 
-diff --git a/drivers/gpu/drm/drm_fb_cma_helper.c b/drivers/gpu/drm/drm_fb_cma_helper.c
-index c19a62561183..daa98d881142 100644
---- a/drivers/gpu/drm/drm_fb_cma_helper.c
-+++ b/drivers/gpu/drm/drm_fb_cma_helper.c
-@@ -348,9 +348,6 @@ struct drm_fbdev_cma *drm_fbdev_cma_init(struct drm_device *dev,
- 
- 	}
- 
--	/* disable all the possible outputs/crtcs before entering KMS mode */
--	drm_helper_disable_unused_functions(dev);
--
- 	ret = drm_fb_helper_initial_config(helper, preferred_bpp);
- 	if (ret < 0) {
- 		dev_err(dev->dev, "Failed to set initial hw configuration.\n");
-diff --git a/drivers/gpu/drm/imx/imx-drm-core.c b/drivers/gpu/drm/imx/imx-drm-core.c
-index 7b990b4e96d2..e1db57791fc9 100644
---- a/drivers/gpu/drm/imx/imx-drm-core.c
-+++ b/drivers/gpu/drm/imx/imx-drm-core.c
-@@ -312,6 +312,7 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
- 		dev_warn(drm->dev, "Invalid legacyfb_depth.  Defaulting to 16bpp\n");
- 		legacyfb_depth = 16;
- 	}
-+	drm_helper_disable_unused_functions(drm);
- 	imxdrm->fbhelper = drm_fbdev_cma_init(drm, legacyfb_depth,
- 				drm->mode_config.num_crtc, MAX_CRTC);
- 	if (IS_ERR(imxdrm->fbhelper)) {
-diff --git a/drivers/gpu/drm/sti/sti_drv.c b/drivers/gpu/drm/sti/sti_drv.c
-index 1469987949d8..506b5626f3ed 100644
---- a/drivers/gpu/drm/sti/sti_drv.c
-+++ b/drivers/gpu/drm/sti/sti_drv.c
-@@ -160,6 +160,7 @@ static int sti_load(struct drm_device *dev, unsigned long flags)
- 
- 	drm_mode_config_reset(dev);
- 
-+	drm_helper_disable_unused_functions(dev);
- 	drm_fbdev_cma_init(dev, 32,
- 			   dev->mode_config.num_crtc,
- 			   dev->mode_config.num_connector);
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_drv.c b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-index 876cad58b1f9..24be31d69701 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-@@ -294,6 +294,7 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
- 			break;
- 	}
- 
-+	drm_helper_disable_unused_functions(dev);
- 	priv->fbdev = drm_fbdev_cma_init(dev, bpp,
- 			dev->mode_config.num_crtc,
- 			dev->mode_config.num_connector);
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index fe34fc56e803..2a76cc3718d4 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -57,6 +57,7 @@ Required properties:
+ 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+ 	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
+ 	"allwinner,sun4i-a10-display-clk" - for the display clocks on the A10
++	"allwinner,sun5i-a13-dram-gates-clk" - for the DRAM gates on A13
+ 	"allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
+ 	"allwinner,sun4i-a10-mmc-clk" - for the MMC clock
+ 	"allwinner,sun9i-a80-mmc-clk" - for mmc module clocks on A80
+diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
+index 0214c6548afd..5666c767fa14 100644
+--- a/drivers/clk/sunxi/clk-simple-gates.c
++++ b/drivers/clk/sunxi/clk-simple-gates.c
+@@ -112,6 +112,8 @@ CLK_OF_DECLARE(sun5i_a13_apb0, "allwinner,sun5i-a13-apb0-gates-clk",
+ 	       sunxi_simple_gates_init);
+ CLK_OF_DECLARE(sun5i_a13_apb1, "allwinner,sun5i-a13-apb1-gates-clk",
+ 	       sunxi_simple_gates_init);
++CLK_OF_DECLARE(sun5i_a13_dram, "allwinner,sun5i-a13-dram-gates-clk",
++	       sunxi_simple_gates_init);
+ CLK_OF_DECLARE(sun6i_a31_ahb1, "allwinner,sun6i-a31-ahb1-gates-clk",
+ 	       sunxi_simple_gates_init);
+ CLK_OF_DECLARE(sun6i_a31_apb1, "allwinner,sun6i-a31-apb1-gates-clk",
 -- 
 2.6.4
