@@ -1,31 +1,30 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Thu, 14 Jan 2016 11:15:51 +0100
-Subject: [linux-sunxi][PATCH v3 1/5] ARM: dts: sunxi: Add
- sunxi-itead-core-common.dtsi
+Date: Thu, 14 Jan 2016 11:15:52 +0100
+Subject: [linux-sunxi][PATCH v3 2/5] ARM: dts: sun7i: Add Itead A20 Core
+ support
 In-Reply-To: <1452766555-16409-1-git-send-email-codekipper@gmail.com>
 References: <1452766555-16409-1-git-send-email-codekipper@gmail.com>
-Message-ID: <1452766555-16409-2-git-send-email-codekipper@gmail.com>
+Message-ID: <1452766555-16409-3-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-Itead have a core module board that can be populated with either
-an Allwinner A10 or A20 SoC. This patch creates a common dtsi
-which these boards can use.
+The A20 Itead Core module comes with 4GB NAND and 1GB DDR RAM. All of the
+I/O interfaces are exposed via 4 groups of 2*30 1mm pitched female headers.
 
 Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
- arch/arm/boot/dts/sunxi-itead-core-common.dtsi | 99 ++++++++++++++++++++++++++
- 1 file changed, 99 insertions(+)
- create mode 100644 arch/arm/boot/dts/sunxi-itead-core-common.dtsi
+ arch/arm/boot/dts/sun7i-a20-itead-core.dtsi | 87 +++++++++++++++++++++++++++++
+ 1 file changed, 87 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-itead-core.dtsi
 
-diff --git a/arch/arm/boot/dts/sunxi-itead-core-common.dtsi b/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
+diff --git a/arch/arm/boot/dts/sun7i-a20-itead-core.dtsi b/arch/arm/boot/dts/sun7i-a20-itead-core.dtsi
 new file mode 100644
-index 0000000..0074f7b
+index 0000000..db8c0f9
 --- /dev/null
-+++ b/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
-@@ -0,0 +1,99 @@
++++ b/arch/arm/boot/dts/sun7i-a20-itead-core.dtsi
+@@ -0,0 +1,87 @@
 +/*
 + * Copyright 2015 - Marcus Cooper <codekipper@gmail.com>
 + *
@@ -68,62 +67,50 @@ index 0000000..0074f7b
 + *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+#include "sunxi-common-regulators.dtsi"
++#include "sun7i-a20.dtsi"
++#include "sunxi-itead-core-common.dtsi"
 +
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
 +};
 +
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&i2c1 {
++&i2c0 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
++	pinctrl-0 = <&i2c0_pins_a>;
 +	status = "okay";
++
++	axp209: pmic at 34 {
++		reg = <0x34>;
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	};
 +};
 +
-+&ohci0 {
-+	status = "okay";
++#include "axp209.dtsi"
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-cpu";
 +};
 +
-+&ohci1 {
-+	status = "okay";
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-int-dll";
 +};
 +
-+&reg_usb1_vbus {
-+	status = "okay";
++&reg_ldo1 {
++	regulator-name = "vdd-rtc";
 +};
 +
-+&reg_usb2_vbus {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
-+	status = "okay";
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
 +};
 -- 
 2.7.0
