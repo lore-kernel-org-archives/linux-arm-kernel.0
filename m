@@ -1,106 +1,73 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 14 Jan 2016 11:29:24 +0100
-Subject: [PATCH V4 16/16] ARM64: tegra: select PM_GENERIC_DOMAINS
-In-Reply-To: <11122786.kKumQ3Dhls@wuerfel>
-References: <1449241037-22193-1-git-send-email-jonathanh@nvidia.com>
- <8579242.omBpg1aLr2@wuerfel>
- <CAPDyKFrewx5CbS9QKZAxqq0Gu+TywQ3nkDGZFURR=PJLtkDuyQ@mail.gmail.com>
- <11122786.kKumQ3Dhls@wuerfel>
-Message-ID: <20160114102924.GA22340@ulmo>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 14 Jan 2016 10:34:30 +0000
+Subject: [RFC] arm64: failed when run the command: timedatectl
+ set-timezone Asia/Shanghai
+In-Reply-To: <5696FE81.8070904@huawei.com>
+References: <56946932.70601@huawei.com> <569473B2.3030909@huawei.com>
+ <CAPvkgC3HkZ5nP4qxDO+LRCeK5dd29zEpz9ZeK7J_mrCWXrszGA@mail.gmail.com>
+ <5695A57B.1060905@huawei.com> <20160113110900.GA23370@leverpostej>
+ <5696FE81.8070904@huawei.com>
+Message-ID: <20160114103430.GA25670@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 10:21:06AM +0100, Arnd Bergmann wrote:
-> On Thursday 14 January 2016 09:57:14 Ulf Hansson wrote:
-> > On 13 January 2016 at 21:43, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Wednesday 13 January 2016 18:03:24 Thierry Reding wrote:
-> > >> On Fri, Dec 04, 2015 at 02:57:17PM +0000, Jon Hunter wrote:
-> > >> > Enable PM_GENERIC_DOMAINS for tegra 64-bit devices. To ensure that devices
-> > >> > dependent upon a particular power-domain are only probed when that power
-> > >> > domain has been powered up, requires that PM is made mandatory for tegra
-> > >> > 64-bit devices and so select this option for tegra as well.
-> > >> >
-> > >> > Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> > >> > ---
-> > >> >  arch/arm64/Kconfig.platforms | 2 ++
-> > >> >  1 file changed, 2 insertions(+)
-> > >> >
-> > >> > diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> > >> > index 9806324fa215..e0b5bd0aff0f 100644
-> > >> > --- a/arch/arm64/Kconfig.platforms
-> > >> > +++ b/arch/arm64/Kconfig.platforms
-> > >> > @@ -93,6 +93,8 @@ config ARCH_TEGRA
-> > >> >       select GENERIC_CLOCKEVENTS
-> > >> >       select HAVE_CLK
-> > >> >       select PINCTRL
-> > >> > +     select PM
-> > >> > +     select PM_GENERIC_DOMAINS
-> > >> >       select RESET_CONTROLLER
-> > >> >       help
-> > >> >         This enables support for the NVIDIA Tegra SoC family.
-> > >>
-> > >> This has potential consequences for multi-platform builds, doesn't it?
-> > >> All of a sudden any combination of builds that includes Tegra won't be
-> > >> possible to build without PM support.
-> > >>
-> > >> Adding linux-arm-kernel at lists.infradead.org for visibility.
-> > >>
-> > >>
-> > >
-> > > Agreed, it would be better to add 'depends on PM_GENERIC_DOMAINS'
-> > > dependencies in the drivers that require it.
-> > >
-> > 
-> > The problem with that approach is that if those drivers are cross SoC
-> > drivers. In some cases PM isn't needed and it is.
-> > 
-> > Of course I don't have the in depth knowledge about the drivers being
-> > used in Tegra which may need PM, perhaps it's not that many?
-> > 
-> > Anyway, to me it seems like ARCH_TEGRA should depend on PM instead.
-> > Would that work?
+On Thu, Jan 14, 2016 at 09:48:49AM +0800, Xishi Qiu wrote:
+> On 2016/1/13 19:09, Mark Rutland wrote:
 > 
-> That seems a little over-restrictive, as it prevents you from
-> building a tegra kernel even if none of the drivers that rely
-> on the pm domains are used, but it would work.
+> > On Wed, Jan 13, 2016 at 09:16:43AM +0800, Xishi Qiu wrote:
+> >> On 2016/1/12 18:59, Steve Capper wrote:
+> >>> Hi Xishi,
+> >>> This looks like a bug in the Mozilla Javascript engine (which is used
+> >>> by polkitd). It incorrectly assumes that virtual addresses are at most
+> >>> 47 bit and uses the upper bits for pointer tagging.
+> >>> When we enable a 48-bit VA on arm64, this then exacerbates the problem
+> >>> (your VA of 0x7fff9010c040 should likely be 0xffff9010c040).
+> >>>
+> >>> I have raised this issue at:
+> >>> https://bugzilla.mozilla.org/show_bug.cgi?id=1143022
+> >>>
+> >>> I'm not sure as to the best way of getting this fixed, I would suggest
+> >>> adding to the bug report above as a first step.
+> >>>
+> >>
+> >> Hi Steve,
+> >>
+> >> I find another issue at:
+> >> https://bugzilla.redhat.com/show_bug.cgi?id=1242326
+> > 
+> > Per your question below, the proposed patch is incorrect.
+> > 
+> > Userspace can only assume ownership of the upper 8 bits, and only in the
+> > cases described in [1]. Userspace MUST NOT assume it can use other bits
+> > for its own purposes.
+> > 
+> > This was a deliberate decision such that the address space can be
+> > enlarged in future. For example, ARMv8.2 expands addresses to 52 bits
+> > [2], and addresses could grow further in future.
+> > 
+> >> In your issue, Tom Schuster said it sounds like bug 910845
+> >> https://bugzilla.mozilla.org/show_bug.cgi?id=910845
+> > 
 > 
-> I've looked again at how other platforms (on arm32) do it, and
-> a lot of them use "select PM_GENERIC_DOMAINS if PM", so they don't
-> automatically enable PM, but they enable the pmdomain code if
-> PM is already set. No driver really "depends on PM_GENERIC_DOMAINS",
-> so we shouldn't really start that now or we end up with circular
-> dependencies in the long run.
+> Hi Mark,
+> 
+> Thank you very much. So the patch above only cover Itanium, and there is
+> no solution for arm64 now, right? 
 
-It just occurred to me that none of these options really make much of a
-difference. As Jon mentioned once we merge this series a lot of features
-on Tegra will start to rely on PM_GENERIC_DOMAINS and hence PM. So if we
-do want to build a kernel with a maximum of Tegra features enabled (and
-I think a multi_v7_defconfig should include that) we'll end up with a PM
-dependency anyway, whether forced via select or implied via depends on.
+Yes, the patch only covers Itanium.
 
-I'm beginning to wonder if PM really should be an option these days. The
-disadvantages of making it optional do outweigh the advantages in my
-opinion. I'm not saying that, in general, it's totally useless to build
-a kernel that has no PM support, but for the more specific case where
-you would want to enable multi-platform support I don't think there's
-much practical advantage in allowing !PM. One of the most common build
-warnings are triggered because of this option. Also multi-platform
-kernels are really big already, so much so that I doubt it would make a
-significant difference if we unconditionally built PM support. Also the
-chances are that we'll be seeing more and more SoCs support PM and rely
-on it, much like Tegra would with the addition of this series.
+I am not aware of a patch solving the issue for arm64. I have not been
+following the development of the Mozilla javasript engine.
 
-I imagine that we could save ourselves a lot of headaches by simply
-enabling PM by default, whether that be via the PM Kconfig option or by
-selecting it from ARCH_TEGRA and any other architectures that may come
-to rely on it. Doing so would also reduce the amount of test coverage
-that we need to do, both at compile- and runtime.
+The best thing to do is probably to respond to the first ticket
+(https://bugzilla.mozilla.org/show_bug.cgi?id=1143022), querying whether
+or not anyone is able to take a look at it. 
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160114/e891b13c/attachment.sig>
+If you do, please cite this thread, in particular:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/399178.html), 
+
+Which should help to avoid an erroneous solution.
+
+Thanks,
+Mark.
