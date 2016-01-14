@@ -1,145 +1,89 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 14 Jan 2016 16:24:49 +0100
-Subject: [PATCH v2 06/26] clk: sunxi: Add PLL3 clock
+Date: Thu, 14 Jan 2016 16:24:56 +0100
+Subject: [PATCH v2 13/26] drm/fb_cma_helper: Remove implicit call to
+ disable_unused_functions
 In-Reply-To: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1452785109-6172-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1452785109-6172-14-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A10 SoCs and relatives have a PLL controller to drive the PLL3 and
-PLL7, clocked from a 3MHz oscillator, that drives the display related
-clocks (GPU, display engine, TCON, etc.)
+The drm_fbdev_cma_init function always calls the
+drm_helper_disable_unused_functions. Since it's part of the usual probe
+process, all the drivers using that helper will end up having their encoder
+and CRTC disable functions called at probe if their device has not been
+reported as enabled.
 
-Add a driver for it.
+This could be fixed by reading out from the registers the current state of
+the device if it is enabled, but even that will not handle the case where
+the device is actually disabled.
+
+Moreover, the drivers using the atomic modesetting expect that their enable
+and disable callback to be called when the device is already enabled or
+disabled (respectively).
+
+We can however fix this issue by moving the call to
+drm_helper_disable_unused_functions out of drm_fbdev_cma_init and make the
+drivers needing it (all the drivers calling drm_fbdev_cma_init and not
+using the atomic modesetting) explicitly call it.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
- drivers/clk/sunxi/Makefile                        |  1 +
- drivers/clk/sunxi/clk-sun4i-pll3.c                | 90 +++++++++++++++++++++++
- 3 files changed, 92 insertions(+)
- create mode 100644 drivers/clk/sunxi/clk-sun4i-pll3.c
+ drivers/gpu/drm/drm_fb_cma_helper.c | 3 ---
+ drivers/gpu/drm/imx/imx-drm-core.c  | 1 +
+ drivers/gpu/drm/sti/sti_drv.c       | 1 +
+ drivers/gpu/drm/tilcdc/tilcdc_drv.c | 1 +
+ 4 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index 5360554a7d3f..bb9fb78dcff8 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -10,6 +10,7 @@ Required properties:
- 	"allwinner,sun4i-a10-pll1-clk" - for the main PLL clock and PLL4
- 	"allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
- 	"allwinner,sun8i-a23-pll1-clk" - for the main PLL clock on A23
-+	"allwinner,sun4i-a10-pll3-clk" - for the video PLL clock on A10
- 	"allwinner,sun9i-a80-pll4-clk" - for the peripheral PLLs on A80
- 	"allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
- 	"allwinner,sun4i-a10-pll6-clk" - for the PLL6 clock
-diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index a991cd8ca509..40c32ffd912c 100644
---- a/drivers/clk/sunxi/Makefile
-+++ b/drivers/clk/sunxi/Makefile
-@@ -11,6 +11,7 @@ obj-y += clk-a20-gmac.o
- obj-y += clk-mod0.o
- obj-y += clk-simple-gates.o
- obj-y += clk-sun4i-display.o
-+obj-y += clk-sun4i-pll3.o
- obj-y += clk-sun8i-mbus.o
- obj-y += clk-sun9i-core.o
- obj-y += clk-sun9i-mmc.o
-diff --git a/drivers/clk/sunxi/clk-sun4i-pll3.c b/drivers/clk/sunxi/clk-sun4i-pll3.c
-new file mode 100644
-index 000000000000..6c9c2210b6b2
---- /dev/null
-+++ b/drivers/clk/sunxi/clk-sun4i-pll3.c
-@@ -0,0 +1,90 @@
-+/*
-+ * Copyright 2015 Maxime Ripard
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
-+
-+#define SUN4I_A10_PLL3_GATE_BIT	31
-+#define SUN4I_A10_PLL3_DIV_WIDTH	7
-+#define SUN4I_A10_PLL3_DIV_SHIFT	0
-+
-+static DEFINE_SPINLOCK(sun4i_a10_pll3_lock);
-+
-+static void __init sun4i_a10_pll3_setup(struct device_node *node)
-+{
-+	const char *clk_name = node->name, *parent;
-+	struct clk_multiplier *mult;
-+	struct clk_gate *gate;
-+	void __iomem *reg;
-+	struct clk *clk;
-+	int ret;
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+	parent = of_clk_get_parent_name(node, 0);
-+
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+	if (IS_ERR(reg)) {
-+		pr_err("%s: Could not map the clock registers\n", clk_name);
-+		return;
-+	}
-+
-+	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-+	if (!gate)
-+		return;
-+
-+	gate->reg = reg;
-+	gate->bit_idx = SUN4I_A10_PLL3_GATE_BIT;
-+	gate->lock = &sun4i_a10_pll3_lock;
-+
-+	mult = kzalloc(sizeof(*mult), GFP_KERNEL);
-+	if (!mult)
-+		goto err_free_gate;
-+
-+	mult->reg = reg;
-+	mult->shift = SUN4I_A10_PLL3_DIV_SHIFT;
-+	mult->width = SUN4I_A10_PLL3_DIV_WIDTH;
-+	mult->lock = &sun4i_a10_pll3_lock;
-+
-+	clk = clk_register_composite(NULL, clk_name,
-+				     &parent, 1,
-+				     NULL, NULL,
-+				     &mult->hw, &clk_multiplier_ops,
-+				     &gate->hw, &clk_gate_ops,
-+				     0);
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: Couldn't register the clock\n", clk_name);
-+		goto err_free_mult;
-+	}
-+
-+	ret = of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+	if (WARN_ON(ret))
-+		goto err_clk_unregister;
-+
-+	return;
-+
-+err_clk_unregister:
-+	clk_unregister_composite(clk);
-+err_free_mult:
-+	kfree(mult);
-+err_free_gate:
-+	kfree(gate);
-+}
-+
-+CLK_OF_DECLARE(sun4i_a10_pll3, "allwinner,sun4i-a10-pll3-clk",
-+	       sun4i_a10_pll3_setup);
+diff --git a/drivers/gpu/drm/drm_fb_cma_helper.c b/drivers/gpu/drm/drm_fb_cma_helper.c
+index c19a62561183..daa98d881142 100644
+--- a/drivers/gpu/drm/drm_fb_cma_helper.c
++++ b/drivers/gpu/drm/drm_fb_cma_helper.c
+@@ -348,9 +348,6 @@ struct drm_fbdev_cma *drm_fbdev_cma_init(struct drm_device *dev,
+ 
+ 	}
+ 
+-	/* disable all the possible outputs/crtcs before entering KMS mode */
+-	drm_helper_disable_unused_functions(dev);
+-
+ 	ret = drm_fb_helper_initial_config(helper, preferred_bpp);
+ 	if (ret < 0) {
+ 		dev_err(dev->dev, "Failed to set initial hw configuration.\n");
+diff --git a/drivers/gpu/drm/imx/imx-drm-core.c b/drivers/gpu/drm/imx/imx-drm-core.c
+index 7b990b4e96d2..e1db57791fc9 100644
+--- a/drivers/gpu/drm/imx/imx-drm-core.c
++++ b/drivers/gpu/drm/imx/imx-drm-core.c
+@@ -312,6 +312,7 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
+ 		dev_warn(drm->dev, "Invalid legacyfb_depth.  Defaulting to 16bpp\n");
+ 		legacyfb_depth = 16;
+ 	}
++	drm_helper_disable_unused_functions(drm);
+ 	imxdrm->fbhelper = drm_fbdev_cma_init(drm, legacyfb_depth,
+ 				drm->mode_config.num_crtc, MAX_CRTC);
+ 	if (IS_ERR(imxdrm->fbhelper)) {
+diff --git a/drivers/gpu/drm/sti/sti_drv.c b/drivers/gpu/drm/sti/sti_drv.c
+index 1469987949d8..506b5626f3ed 100644
+--- a/drivers/gpu/drm/sti/sti_drv.c
++++ b/drivers/gpu/drm/sti/sti_drv.c
+@@ -160,6 +160,7 @@ static int sti_load(struct drm_device *dev, unsigned long flags)
+ 
+ 	drm_mode_config_reset(dev);
+ 
++	drm_helper_disable_unused_functions(dev);
+ 	drm_fbdev_cma_init(dev, 32,
+ 			   dev->mode_config.num_crtc,
+ 			   dev->mode_config.num_connector);
+diff --git a/drivers/gpu/drm/tilcdc/tilcdc_drv.c b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
+index 876cad58b1f9..24be31d69701 100644
+--- a/drivers/gpu/drm/tilcdc/tilcdc_drv.c
++++ b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
+@@ -294,6 +294,7 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
+ 			break;
+ 	}
+ 
++	drm_helper_disable_unused_functions(dev);
+ 	priv->fbdev = drm_fbdev_cma_init(dev, bpp,
+ 			dev->mode_config.num_crtc,
+ 			dev->mode_config.num_connector);
 -- 
 2.6.4
