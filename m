@@ -1,91 +1,67 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Wed, 13 Jan 2016 18:26:37 -0800
-Subject: [PATCH v2] clk: mediatek: Allow changing PLL rate when it is off
-In-Reply-To: <1452482936-51852-1-git-send-email-jamesjj.liao@mediatek.com>
-References: <1452482936-51852-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <20160114022637.1942.4564@quark.deferred.io>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Thu, 14 Jan 2016 10:55:24 +0800
+Subject: [PATCH v2] ARM: dts: rockchip: add reboot-mode node for rk3036 SoCs
+In-Reply-To: <1452650930-22883-1-git-send-email-wxt@rock-chips.com>
+References: <1452650930-22883-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1452740124-32558-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Add reboot mode driver DT node for rk3036 platform.
 
-Quoting James Liao (2016-01-10 19:28:56)
-> Some modules may need to change its clock rate before turn on it.
-> So changing PLL's rate when it is off should be allowed.
-> This patch removes PLL enabled check before set rate, so that
-> PLLs can set new frequency even if they are off.
-> 
-> On MT8173 for example, ARMPLL's enable bit can be controlled by
-> other HW. That means ARMPLL may be turned on even if we (CPU / SW)
-> set ARMPLL's enable bit as 0. In this case, SW may want and can
-> still change ARMPLL's rate by changing its pcw and postdiv settings.
-> But without this patch, new pcw setting will not be applied because
-> its enable bit is 0.
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
-Must the clock signal be enabled to change the PLL rate? If so, does
-ARMPLL set the CLK_SET_RATE_GATE flag?
+---
 
-> 
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> ---
->  drivers/clk/mediatek/clk-pll.c | 9 ++-------
->  1 file changed, 2 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
-> index 966cab1..8e31fae 100644
-> --- a/drivers/clk/mediatek/clk-pll.c
-> +++ b/drivers/clk/mediatek/clk-pll.c
-> @@ -91,9 +91,6 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
->                 int postdiv)
->  {
->         u32 con1, val;
-> -       int pll_en;
-> -
-> -       pll_en = readl(pll->base_addr + REG_CON0) & CON0_BASE_EN;
->  
->         /* set postdiv */
->         val = readl(pll->pd_addr);
-> @@ -114,15 +111,13 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
->  
->         con1 = readl(pll->base_addr + REG_CON1);
->  
-> -       if (pll_en)
-> -               con1 |= CON0_PCW_CHG;
-> +       con1 |= CON0_PCW_CHG;
+ arch/arm/boot/dts/rk3036.dtsi | 28 +++++++++++++++++++++++++++-
+ 1 file changed, 27 insertions(+), 1 deletion(-)
 
-This unconditionally enables the PLL whenever clk_set_rate is called,
-changing the previous behavior. The clk framework still tracks the
-intent of ARMPLLs users with the enable_count. How about something like
-the following:
-
-	bool pll_en = clk_hw_is_enabled(&pll->hw);
-
-	if (pll_en)
-		con1 |= CON0_PCW_CHG;
-
-	writel(con1, pll->base_addr + REG_CON1);
-	if (pll->tuner_addr)
-		writel(con1 + 1, pll->tuner_addr);
-
-	if (pll_en)
-		udelay(20);
-
-This does not rely on the hardware to tell us the intent of the user,
-but instead on our framework usecounting.
-
-Regards,
-Mike
-
->         writel(con1, pll->base_addr + REG_CON1);
->         if (pll->tuner_addr)
->                 writel(con1 + 1, pll->tuner_addr);
->  
-> -       if (pll_en)
-> -               udelay(20);
-> +       udelay(20);
->  }
->  
->  /*
-> -- 
-> 1.9.1
-> 
+diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+index ccc69ab..74e3bc1 100644
+--- a/arch/arm/boot/dts/rk3036.dtsi
++++ b/arch/arm/boot/dts/rk3036.dtsi
+@@ -43,6 +43,7 @@
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/pinctrl/rockchip.h>
+ #include <dt-bindings/clock/rk3036-cru.h>
++#include <dt-bindings/soc/rockchip_boot-mode.h>
+ #include "skeleton.dtsi"
+ 
+ / {
+@@ -307,8 +308,33 @@
+ 	};
+ 
+ 	grf: syscon at 20008000 {
+-		compatible = "rockchip,rk3036-grf", "syscon";
++		compatible = "rockchip,rk3036-grf", "syscon", "simple-mfd";
+ 		reg = <0x20008000 0x1000>;
++
++		reboot-mode {
++			compatible = "syscon-reboot-mode";
++			offset = <0x1d8>;
++
++			normal {
++				linux,mode = "normal";
++				loader,magic = <BOOT_NORMAL>;
++			};
++
++			loader {
++				linux,mode = "loader";
++				loader,magic = <BOOT_LOADER>;
++			};
++
++			recovery {
++				linux,mode = "recovery";
++				loader,magic = <BOOT_RECOVERY>;
++			};
++
++			fastboot {
++				linux,mode = "fastboot";
++				loader,magic = <BOOT_FASTBOOT>;
++			};
++		};
+ 	};
+ 
+ 	acodec: acodec-ana at 20030000 {
+-- 
+1.9.1
