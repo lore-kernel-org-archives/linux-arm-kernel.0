@@ -1,43 +1,56 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Thu, 14 Jan 2016 12:23:54 +0100
-Subject: [PATCH v2] reboot: Backup orderly_poweroff
-In-Reply-To: <56977BA7.702@ti.com>
-References: <1452688405-15087-1-git-send-email-j-keerthy@ti.com>
- <20160114090520.GA4351@gmail.com> <569767EC.2010704@ti.com>
- <20160114100913.GB15857@gmail.com> <56977BA7.702@ti.com>
-Message-ID: <20160114112354.GA17869@gmail.com>
+From: peter@korsgaard.com (Peter Korsgaard)
+Date: Thu, 14 Jan 2016 12:43:00 +0100
+Subject: [PATCH v2 1/2] regulator: act8945a: add regulator driver for
+ ACT8945A
+In-Reply-To: <B256D81BAE5131468A838E5D7A243641D63EBEC7@penmbx01> (Wenyou
+ Yang's message of "Thu, 14 Jan 2016 08:07:40 +0000")
+References: <1452586629-1117-1-git-send-email-wenyou.yang@atmel.com>
+ <1452586629-1117-2-git-send-email-wenyou.yang@atmel.com>
+ <87oacp5zl7.fsf@dell.be.48ers.dk>
+ <B256D81BAE5131468A838E5D7A243641D63EBC6E@penmbx01>
+ <87egdk39ji.fsf@dell.be.48ers.dk>
+ <B256D81BAE5131468A838E5D7A243641D63EBEC7@penmbx01>
+Message-ID: <87a8o82xq3.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+>>>>> "Yang," == Yang, Wenyou <Wenyou.Yang@atmel.com> writes:
 
-* Keerthy <a0393675@ti.com> wrote:
+Hi,
 
-> I tried to simulate the issue.
-> 
-> In the probe function of drivers/thermal/ti-soc-thermal/ti-bandgap.c
-> ti_bandgap_probe i call
-> 
-> orderly_poweroff(true);
-> 
-> This is while driver probes are still on going. I observe that
-> ret = run_cmd(poweroff_cmd);
-> 
-> ret is a non-zero value and we enter the if condition:
-> 
-> Even after the
-> 
-> emergency_sync();
-> kernel_power_off();
-> 
-> calls
-> 
-> the console remained active in weird state.
+>> 
+ >>> Isn't the regulator part of the act8945a identical to act8865? Can't we just use
+ >>> the existing act8865-regulator.c driver? (E.G. support 8865 variant in the mfd
+ >>> driver, but only register the regulator sub device?)
+ >> 
+ >> > Yes, the regulator part of the act8945a is identical to act8865.
+ >> 
+ >> > But the act8865-regulator driver is a struct i2c_driver, and the mfd  > sub-
+ >> device driver is a platform_driver driver, it is not easy to use  > it.
+ >> 
+ >> But the mfd driver could support the act8865 variant as well (by only registering
+ >> the regulator mfd cell).
 
-Now _that_ is clearly an architecture bug that should not be papered over ...
+ > I still don't understand.
 
-If kernel_power_off() is called then the system should power off. No ifs and 
-whens.
+ > The MFD sub device is registered as a platform device, the existing
+ > act8865 driver is registered as an i2c_driver. How do they match? :)
 
-Thanks,
+ > Could you point out which exiting driver for me to reference.  Thank you!
 
-	Ingo
+What I'm saying is that it isn't nice that we end up with both
+act8865-regulator.c and act8954-regulator.c doing 95% the same. This can
+either be fixed by:
+
+- Adding act8865 support to your mfd driver (but only registering the
+  regulator subdev for act8865) and changing the existing
+  act8865-regulator driver to work as a mfd subdev (platform device)
+
+- Extending the act8865-regulator driver to register as a platform
+  driver in ADDITION to a i2c driver so it can be used with mfd. The
+  driver already uses regmap so it should only be a matter of adding the
+  pdev probe/remove functions.
+
+-- 
+Venlig hilsen,
+Peter Korsgaard 
