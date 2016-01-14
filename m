@@ -1,150 +1,31 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Thu, 14 Jan 2016 15:01:21 -0800
-Subject: [PATCH] arm64: Allow vmalloc regions to be set with set_memory_*
-In-Reply-To: <CAKv+Gu-73QKAsFQCa=yO5+=DihLXp_AKYyY6QRTVM4nuDH=-8g@mail.gmail.com>
-References: <1452635187-8057-1-git-send-email-labbott@fedoraproject.org>
- <CAKv+Gu_A1C9hXgqrYDekoy1YHaRXi_mUF-kYx-TqsOBkWMVjmQ@mail.gmail.com>
- <CAKv+Gu-73QKAsFQCa=yO5+=DihLXp_AKYyY6QRTVM4nuDH=-8g@mail.gmail.com>
-Message-ID: <569828C1.90505@redhat.com>
+From: Leonid.Yegoshin@imgtec.com (Leonid Yegoshin)
+Date: Thu, 14 Jan 2016 15:04:18 -0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160114222433.GI3818@linux.vnet.ibm.com>
+References: <56969F4B.7070001@imgtec.com>
+ <20160113204844.GV6357@twins.programming.kicks-ass.net>
+ <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
+ <20160114161604.GT3818@linux.vnet.ibm.com> <5697FA0A.6040601@imgtec.com>
+ <20160114201513.GI6357@twins.programming.kicks-ass.net>
+ <56980933.2020801@imgtec.com> <20160114213440.GG3818@linux.vnet.ibm.com>
+ <56981708.4000007@imgtec.com> <20160114222433.GI3818@linux.vnet.ibm.com>
+Message-ID: <56982972.7050609@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2016 08:10 AM, Ard Biesheuvel wrote:
-> On 13 January 2016 at 15:03, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> On 12 January 2016 at 22:46, Laura Abbott <labbott@fedoraproject.org> wrote:
->>>
->>> The range of set_memory_* is currently restricted to the module address
->>> range because of difficulties in breaking down larger block sizes.
->>> vmalloc maps PAGE_SIZE pages so it is safe to use as well. Update the
->>> function ranges and add a comment explaining why the range is restricted
->>> the way it is.
->>>
->>> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
->>> ---
->>> This should let the protections for the eBPF work as expected, I don't
->>> know if there is some sort of self test for thatL.
->>
->>
->> This is going to conflict with my KASLR implementation, since it puts
->> the kernel image right in the middle of the vmalloc area, and the
->> kernel is obviously mapped with block mappings. In fact, I am
->> proposing enabling huge-vmap for arm64 as well, since it seems an
->> improvement generally, but also specifically allows me to unmap the
->> __init section using the generic vunmap code (remove_vm_area). But in
->> general, I think the assumption that the whole vmalloc area is mapped
->> using pages is not tenable.
->>
->> AFAICT, vmalloc still use pages exclusively even with huge-vmap (but
->> ioremap does not). So perhaps it would make sense to check for the
->> VM_ALLOC bit in the VMA flags (which I will not set for the kernel
->> regions either)
->>
->
-> Something along these lines, perhaps?
->
-> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-> index 3571c7309c5e..bda0a776c58e 100644
-> --- a/arch/arm64/mm/pageattr.c
-> +++ b/arch/arm64/mm/pageattr.c
-> @@ -13,6 +13,7 @@
->   #include <linux/kernel.h>
->   #include <linux/mm.h>
->   #include <linux/module.h>
-> +#include <linux/vmalloc.h>
->   #include <linux/sched.h>
->
->   #include <asm/pgtable.h>
-> @@ -44,6 +45,7 @@ static int change_memory_common(unsigned long addr
->          unsigned long end = start + size;
->          int ret;
->          struct page_change_data data;
-> +       struct vm_struct *area;
->
->          if (!PAGE_ALIGNED(addr)) {
->                  start &= PAGE_MASK;
-> @@ -51,10 +53,14 @@ static int change_memory_common(unsigned long addr,
->                  WARN_ON_ONCE(1);
->          }
->
-> -       if (start < MODULES_VADDR || start >= MODULES_END)
-> -               return -EINVAL;
-> -
-> -       if (end < MODULES_VADDR || end >= MODULES_END)
-> +       /*
-> +        * Check whether the [addr, addr + size) interval is entirely
-> +        * covered by precisely one VM area that has the VM_ALLOC flag set
-> +        */
-> +       area = find_vm_area((void *)addr);
-> +       if (!area ||
-> +           end > (unsigned long)area->addr + area->size ||
-> +           !(area->flags & VM_ALLOC))
->                  return -EINVAL;
->
->          data.set_mask = set_mask;
->
->
+On 01/14/2016 02:24 PM, Paul E. McKenney wrote:
+> Actually, the Linux kernel doesn't have an acquire barrier, just an 
+> smp_load_acquire(). Or did someone sneak one in while I wasn't looking?
+That was an exactly starting point for this discussion. This patch just 
+pulls out from MIPS files smp_load_acquire() and smp_store_release(). 
+However, I put into LMO half year ago the patch 
+http://patchwork.linux-mips.org/patch/10506/ which replaces a generic 
+smp_mb with MIPS specific smp_release/acquire in that functions. This 
+patch also fixes use of SYNCs barriers in spin_locks/atomics/bitops for 
+Imagination MIPS CPUs too - it is just absent now for any Imagination 
+MIPS CPUs!
 
-The patch works in my test for both vmalloc and module spaces. Can we either
-keep my comment or add another that explains why we are excluding the rest
-of the kernel range?
+Michael later pointed me that it can be returned back with his series of 
+patches but discussion was already here.
 
-Thanks,
-Laura
-
-  
->>
->>> ---
->>>   arch/arm64/mm/pageattr.c | 25 +++++++++++++++++++++----
->>>   1 file changed, 21 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
->>> index 3571c73..274208e 100644
->>> --- a/arch/arm64/mm/pageattr.c
->>> +++ b/arch/arm64/mm/pageattr.c
->>> @@ -36,6 +36,26 @@ static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
->>>          return 0;
->>>   }
->>>
->>> +static bool validate_addr(unsigned long start, unsigned long end)
->>> +{
->>> +       /*
->>> +        * This check explicitly excludes most kernel memory. Most kernel
->>> +        * memory is mapped with a larger page size and breaking down the
->>> +        * larger page size without causing TLB conflicts is very difficult.
->>> +        *
->>> +        * If you need to call set_memory_* on a range, the recommendation is
->>> +        * to use vmalloc since that range is mapped with pages.
->>> +        */
->>> +       if (start >= MODULES_VADDR && start < MODULES_END &&
->>> +           end >= MODULES_VADDR && end < MODULES_END)
->>> +               return true;
->>> +
->>> +       if (is_vmalloc_addr(start) && is_vmalloc_addr(end))
->>> +               return true;
->>> +
->>> +       return false;
->>> +}
->>> +
->>>   static int change_memory_common(unsigned long addr, int numpages,
->>>                                  pgprot_t set_mask, pgprot_t clear_mask)
->>>   {
->>> @@ -51,10 +71,7 @@ static int change_memory_common(unsigned long addr, int numpages,
->>>                  WARN_ON_ONCE(1);
->>>          }
->>>
->>> -       if (start < MODULES_VADDR || start >= MODULES_END)
->>> -               return -EINVAL;
->>> -
->>> -       if (end < MODULES_VADDR || end >= MODULES_END)
->>> +       if (!validate_addr(start, end))
->>>                  return -EINVAL;
->>>
->>>          data.set_mask = set_mask;
->>> --
->>> 2.5.0
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+- Leonid.
