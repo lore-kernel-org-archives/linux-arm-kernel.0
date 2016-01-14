@@ -1,41 +1,43 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 14 Jan 2016 07:11:28 +0000
-Subject: [PATCH 3/4] mailbox: mailbox-test: Prevent memory leak
+Date: Thu, 14 Jan 2016 07:11:29 +0000
+Subject: [PATCH 4/4] mailbox: Stop using ENOSYS for anything other than
+ unimplemented syscalls
 In-Reply-To: <1452755489-18736-1-git-send-email-lee.jones@linaro.org>
 References: <1452755489-18736-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1452755489-18736-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1452755489-18736-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we set the Signal twice or more, without using it as part of a message,
-memory will be re-allocated and the pointer over-written.  Prevent this
-potential leak by only allocating memory when there isn't any already.
+In accordance with e15f431fe2d5 ("errno.h: Improve ENOSYS's comment") and
+91c9afaf97ee ("checkpatch.pl: new instances of ENOSYS are errors") we're
+converting from the old meaning of: ENOSYS "Function not implemented" to
+a more standard EINVAL.
 
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Reported-by: Seraphin Bonnaffe <seraphin.bonnaffe@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mailbox/mailbox-test.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ drivers/mailbox/mailbox.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mailbox/mailbox-test.c b/drivers/mailbox/mailbox-test.c
-index e370aa6..539d475 100644
---- a/drivers/mailbox/mailbox-test.c
-+++ b/drivers/mailbox/mailbox-test.c
-@@ -58,9 +58,12 @@ static ssize_t mbox_test_signal_write(struct file *filp,
- 		return -EINVAL;
+diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+index 6a4811f..4a36632 100644
+--- a/drivers/mailbox/mailbox.c
++++ b/drivers/mailbox/mailbox.c
+@@ -375,13 +375,13 @@ struct mbox_chan *mbox_request_channel_byname(struct mbox_client *cl,
+ 
+ 	if (!np) {
+ 		dev_err(cl->dev, "%s() currently only supports DT\n", __func__);
+-		return ERR_PTR(-ENOSYS);
++		return ERR_PTR(-EINVAL);
  	}
  
--	tdev->signal = kzalloc(MBOX_MAX_SIG_LEN, GFP_KERNEL);
--	if (!tdev->signal)
--		return -ENOMEM;
-+	/* Only allocate memory if we need to */
-+	if (!tdev->signal) {
-+		tdev->signal = kzalloc(MBOX_MAX_SIG_LEN, GFP_KERNEL);
-+		if (!tdev->signal)
-+			return -ENOMEM;
-+	}
+ 	if (!of_get_property(np, "mbox-names", NULL)) {
+ 		dev_err(cl->dev,
+ 			"%s() requires an \"mbox-names\" property\n", __func__);
+-		return ERR_PTR(-ENOSYS);
++		return ERR_PTR(-EINVAL);
+ 	}
  
- 	if (copy_from_user(tdev->signal, userbuf, count)) {
- 		kfree(tdev->signal);
+ 	of_property_for_each_string(np, "mbox-names", prop, mbox_name) {
 -- 
 1.9.1
