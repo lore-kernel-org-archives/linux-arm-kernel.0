@@ -1,57 +1,61 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Thu, 14 Jan 2016 09:56:46 +0100
-Subject: [PATCH v2 2/2] s5p-mfc: add the support of
- V4L2_CID_MPEG_VIDEO_FORCE_I_FRAME.
-In-Reply-To: <1452760439-35564-3-git-send-email-wuchengli@chromium.org>
-References: <1452760439-35564-1-git-send-email-wuchengli@chromium.org>
- <1452760439-35564-3-git-send-email-wuchengli@chromium.org>
-Message-ID: <569762CE.2000104@xs4all.nl>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 14 Jan 2016 09:57:14 +0100
+Subject: [PATCH V4 16/16] ARM64: tegra: select PM_GENERIC_DOMAINS
+In-Reply-To: <8579242.omBpg1aLr2@wuerfel>
+References: <1449241037-22193-1-git-send-email-jonathanh@nvidia.com>
+ <1449241037-22193-17-git-send-email-jonathanh@nvidia.com>
+ <20160113170324.GO2588@ulmo> <8579242.omBpg1aLr2@wuerfel>
+Message-ID: <CAPDyKFrewx5CbS9QKZAxqq0Gu+TywQ3nkDGZFURR=PJLtkDuyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/16 09:33, Wu-Cheng Li wrote:
-> Signed-off-by: Wu-Cheng Li <wuchengli@chromium.org>
-> ---
->  drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-> index 0434f02..de1d68d 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-> @@ -212,6 +212,15 @@ static struct mfc_control controls[] = {
->  		.menu_skip_mask = 0,
->  	},
->  	{
-> +		.id = V4L2_CID_MPEG_VIDEO_FORCE_I_FRAME,
-> +		.type = V4L2_CTRL_TYPE_BUTTON,
-> +		.name = "Force an I frame",
+On 13 January 2016 at 21:43, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 13 January 2016 18:03:24 Thierry Reding wrote:
+>> On Fri, Dec 04, 2015 at 02:57:17PM +0000, Jon Hunter wrote:
+>> > Enable PM_GENERIC_DOMAINS for tegra 64-bit devices. To ensure that devices
+>> > dependent upon a particular power-domain are only probed when that power
+>> > domain has been powered up, requires that PM is made mandatory for tegra
+>> > 64-bit devices and so select this option for tegra as well.
+>> >
+>> > Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+>> > ---
+>> >  arch/arm64/Kconfig.platforms | 2 ++
+>> >  1 file changed, 2 insertions(+)
+>> >
+>> > diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+>> > index 9806324fa215..e0b5bd0aff0f 100644
+>> > --- a/arch/arm64/Kconfig.platforms
+>> > +++ b/arch/arm64/Kconfig.platforms
+>> > @@ -93,6 +93,8 @@ config ARCH_TEGRA
+>> >       select GENERIC_CLOCKEVENTS
+>> >       select HAVE_CLK
+>> >       select PINCTRL
+>> > +     select PM
+>> > +     select PM_GENERIC_DOMAINS
+>> >       select RESET_CONTROLLER
+>> >       help
+>> >         This enables support for the NVIDIA Tegra SoC family.
+>>
+>> This has potential consequences for multi-platform builds, doesn't it?
+>> All of a sudden any combination of builds that includes Tegra won't be
+>> possible to build without PM support.
+>>
+>> Adding linux-arm-kernel at lists.infradead.org for visibility.
+>>
+>>
+>
+> Agreed, it would be better to add 'depends on PM_GENERIC_DOMAINS'
+> dependencies in the drivers that require it.
+>
 
-Drop the name: this is a standard control, so the name will be filled in from
-v4l2-ctrls.c.
+The problem with that approach is that if those drivers are cross SoC
+drivers. In some cases PM isn't needed and it is.
 
-Regards,
+Of course I don't have the in depth knowledge about the drivers being
+used in Tegra which may need PM, perhaps it's not that many?
 
-	Hans
+Anyway, to me it seems like ARCH_TEGRA should depend on PM instead.
+Would that work?
 
-> +		.minimum = 0,
-> +		.maximum = 0,
-> +		.step = 0,
-> +		.default_value = 0,
-> +	},
-> +	{
->  		.id = V4L2_CID_MPEG_VIDEO_VBV_SIZE,
->  		.type = V4L2_CTRL_TYPE_INTEGER,
->  		.minimum = 0,
-> @@ -1423,6 +1432,10 @@ static int s5p_mfc_enc_s_ctrl(struct v4l2_ctrl *ctrl)
->  	case V4L2_CID_MPEG_MFC51_VIDEO_FORCE_FRAME_TYPE:
->  		ctx->force_frame_type = ctrl->val;
->  		break;
-> +	case V4L2_CID_MPEG_VIDEO_FORCE_I_FRAME:
-> +		ctx->force_frame_type
-> +			= V4L2_MPEG_MFC51_VIDEO_FORCE_FRAME_TYPE_I_FRAME;
-> +		break;
->  	case V4L2_CID_MPEG_VIDEO_VBV_SIZE:
->  		p->vbv_size = ctrl->val;
->  		break;
-> 
+Kind regards
+Uffe
