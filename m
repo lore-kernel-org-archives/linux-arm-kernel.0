@@ -1,52 +1,41 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 14 Jan 2016 10:52:02 +0100
-Subject: [PATCH 1/2] mmc: mmci: fix an ages old detection error
-In-Reply-To: <1451870515-21049-1-git-send-email-linus.walleij@linaro.org>
-References: <1451870515-21049-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAPDyKFqADAro2vY+u_ZDidRqS3QpHxqsTJFcLLx4rzr-k2nurg@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 14 Jan 2016 01:54:07 -0800
+Subject: [PATCH -next] arm: Select GPIO_GENERIC_PLATFORM for CRAGG_6410
+In-Reply-To: <CACRpkdbH6jCyzJK=LM4mPpdLPrQ4KMkHuedAPfWU4tg1K6FaBQ@mail.gmail.com>
+References: <1452531649-14940-1-git-send-email-linux@roeck-us.net>
+ <CACRpkdbH6jCyzJK=LM4mPpdLPrQ4KMkHuedAPfWU4tg1K6FaBQ@mail.gmail.com>
+Message-ID: <5697703F.8040801@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 January 2016 at 02:21, Linus Walleij <linus.walleij@linaro.org> wrote:
-> commit 4956e10903fd3459306dd9438c1e714ba3068a2a
-> "ARM: 6244/1: mmci: add variant data and default MCICLOCK support"
-> added variant data for ARM, U300 and Ux500 variants. The
-> Nomadik NHK8815/8820 variant was erroneously labeled as a
-> U300 variant, and when the proper Nomadik variant was
-> later introduced in commit
-> 34fd421349ffc6a4280b71276bf7c6d48f92156f
-> "ARM: 7378/1: mmci: add support for the Nomadik MMCI variant"
-> this was not fixes. Let's say this fixes the latter commit
-> as there was no proper Nomadik support until then.
+On 01/14/2016 01:02 AM, Linus Walleij wrote:
+> On Mon, Jan 11, 2016 at 6:00 PM, Guenter Roeck <linux@roeck-us.net> wrote:
 >
-> Cc: stable at vger.kernel.org
-> Fixes: 34fd421349ff "ARM: 7378/1: mmci: add support for the Nomadik MMCI variant"
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-Thanks, applied patch 1 and patch2 for fixes.
-
-Patch1 had some checkpatch issues regarding the changelog, I fixed it up myself.
-
-Kind regards
-Uffe
-
-> ---
->  drivers/mmc/host/mmci.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>> Since commit 0f4630f3720e ("gpio: generic: factor into gpio_chip struct"),
+>> all users of struct bgpio_pdata depend on GPIO_GENERIC.
+>>
+>> This results in the following build error.
+>>
+>> arch/arm/mach-s3c64xx/mach-crag6410.c:270:3: warning:
+>>          excess elements in struct initializer
+>> arch/arm/mach-s3c64xx/mach-crag6410.c:270:3: warning:
+>>          (near initialization for '(anonymous)')
+>> arch/arm/mach-s3c64xx/mach-crag6410.c:271:2: error:
+>>          invalid use of undefined type 'struct bgpio_pdata'
+>>
+>> Fixes: 0f4630f3720e ("gpio: generic: factor into gpio_chip struct")
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+>> ---
+>> I don't know if this is the correct way to fix this problem.
+>> If not, please consider this to be a bug report.
 >
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index fb266745f824..acece3299756 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -1886,7 +1886,7 @@ static struct amba_id mmci_ids[] = {
->         {
->                 .id     = 0x00280180,
->                 .mask   = 0x00ffffff,
-> -               .data   = &variant_u300,
-> +               .data   = &variant_nomadik,
->         },
->         {
->                 .id     = 0x00480180,
-> --
-> 2.4.3
+> I think this is fixed by Arnds patch:
+> http://marc.info/?l=linux-gpio&m=145237423205247&w=2
 >
+> Can you verify that?
+>
+
+Correct.
+
+Guenter
