@@ -1,92 +1,118 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 14 Jan 2016 11:02:33 +0100
-Subject: [PATCH] mmc: tmio_mmc_dma: don't print invalid DMA cookie
-In-Reply-To: <5032992.kTQ6Oyibpy@wuerfel>
-References: <5032992.kTQ6Oyibpy@wuerfel>
-Message-ID: <CAPDyKFr-Y+pnhkTLYO2k-XHieA1rOEX9Ov129fFtZac8MksooQ@mail.gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 14 Jan 2016 11:09:13 +0100
+Subject: [PATCH v2] reboot: Backup orderly_poweroff
+In-Reply-To: <569767EC.2010704@ti.com>
+References: <1452688405-15087-1-git-send-email-j-keerthy@ti.com>
+ <20160114090520.GA4351@gmail.com> <569767EC.2010704@ti.com>
+Message-ID: <20160114100913.GB15857@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 January 2016 at 22:25, Arnd Bergmann <arnd@arndb.de> wrote:
-> The tmio_mmc_start_dma_{rx,tx} function functions contain debug
-> code that prints the dma cookie among other things. However,
-> in case we fall back to PIO mode for some reason, the cookie
-> variable is never initialized, and gcc warns about this:
->
-> In file included from ../include/linux/printk.h:277:0,
->                  from ../include/linux/kernel.h:13,
->                  from ../include/linux/list.h:8,
->                  from ../include/linux/kobject.h:20,
->                  from ../include/linux/device.h:17,
->                  from ../drivers/mmc/host/tmio_mmc_dma.c:13:
-> ../drivers/mmc/host/tmio_mmc_dma.c: In function 'tmio_mmc_start_dma':
-> ../include/linux/dynamic_debug.h:86:3: warning: 'cookie' may be used uninitialized in this function [-Wmaybe-uninitialized]
->    __dynamic_dev_dbg(&descriptor, dev, fmt, \
->    ^
-> ../drivers/mmc/host/tmio_mmc_dma.c:128:15: note: 'cookie' was declared here
->   dma_cookie_t cookie;
->
-> This modifies the dev_dbg() statements so we only print the cookie
-> when we are already in the DMA path.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Thanks, applied for fixes!
+* Keerthy <a0393675@ti.com> wrote:
 
-Kind regards
-Uffe
+> Hi Ingo,
+> 
+> On Thursday 14 January 2016 02:35 PM, Ingo Molnar wrote:
+> >
+> >* Keerthy <j-keerthy@ti.com> wrote:
+> >
+> >>orderly_poweroff is triggered when a graceful shutdown
+> >>of system is desired. This may be used in many critical states of the
+> >>kernel such as when subsystems detects conditions such as critical
+> >>temperature conditions. However, in certain conditions in system
+> >>boot up sequences like those in the middle of driver probes being
+> >>initiated, userspace will be unable to power off the system in a clean
+> >>manner and leaves the system in a critical state. In cases like these,
+> >>the /sbin/poweroff will return success (having forked off to attempt
+> >>powering off the system. However, the system overall will fail to
+> >>completely poweroff (since other modules will be probed) and the system
+> >>is still functional with no userspace (since that would have shut itself
+> >>off).
+> >>
+> >>However, there is no clean way of detecting such failure of userspace
+> >>powering off the system. In such scenarios, it is necessary for a backup
+> >>workqueue to be able to force a shutdown of the system when orderly
+> >>shutdown is not successful after a configurable time period.
+> >>
+> >>Signed-off-by: Keerthy <j-keerthy@ti.com>
+> >>Suggested-by: Eduardo Valentin <edubezval@gmail.com>
+> >>Reported-by: Nishanth Menon <nm@ti.com>
+> >>---
+> >>Links to previous discussion can be found here:
+> >>
+> >>http://www.spinics.net/lists/linux-omap/msg124925.html
+> >>
+> >>Boot tested on DRA7.
+> >>
+> >>changes in v2:
+> >>
+> >>	* Changed #ifdef to #if CONFIG_SHUTDOWN_BACKUP_DELAY_MS
+> >>
+> >>  arch/Kconfig    |  7 +++++++
+> >>  kernel/reboot.c | 23 ++++++++++++++++++-----
+> >>  2 files changed, 25 insertions(+), 5 deletions(-)
+> >>
+> >>Index: linux/arch/Kconfig
+> >>===================================================================
+> >>--- linux.orig/arch/Kconfig	2016-01-11 15:26:07.732173131 +0530
+> >>+++ linux/arch/Kconfig	2016-01-11 15:26:07.728173205 +0530
+> >>@@ -37,6 +37,18 @@
+> >>  	def_bool y
+> >>  	depends on PERF_EVENTS && HAVE_PERF_EVENTS_NMI && !PPC64
+> >>
+> >>+config SHUTDOWN_BACKUP_DELAY_MS
+> >>+	int "Backup shutdown delay in milli-seconds"
+> >>+	default 0
+> >>+	help
+> >>+	  The number of milliseconds to delay before backup workqueue
+> >>+	  executes attempting to poweroff the system after the
+> >>+	  orderly_poweroff function has failed to complete.
+> >>+
+> >>+	  If set to 0, the backup workqueue is not active. The value
+> >>+	  should be conservatively configured based on userspace latencies
+> >>+	  expected for a given system.
+> >
+> >I don't really understand this. In what circumstances can a reboot fail?
+> >
+> >I think that is what should be fixed: a reboot should never fail, instead of
+> >introducing some sort of fragile timeout based method.
+> 
+> Here is the complete description of the scenario which was reported by Nishanth 
+> who encountered the issue. The link has bootlogs and description of the exact 
+> case which led to this patch.
+> 
+> http://www.spinics.net/lists/linux-omap/msg124923.html
 
-> ---
-> This warning has existed for a long time, and it's only in debug code,
-> so probably nobody cared.
->
-> diff --git a/drivers/mmc/host/tmio_mmc_dma.c b/drivers/mmc/host/tmio_mmc_dma.c
-> index e4b05dbb9ca8..4a0d6b80eaa3 100644
-> --- a/drivers/mmc/host/tmio_mmc_dma.c
-> +++ b/drivers/mmc/host/tmio_mmc_dma.c
-> @@ -94,9 +94,9 @@ static void tmio_mmc_start_dma_rx(struct tmio_mmc_host *host)
->                         desc = NULL;
->                         ret = cookie;
->                 }
-> +               dev_dbg(&host->pdev->dev, "%s(): mapped %d -> %d, cookie %d, rq %p\n",
-> +                       __func__, host->sg_len, ret, cookie, host->mrq);
->         }
-> -       dev_dbg(&host->pdev->dev, "%s(): mapped %d -> %d, cookie %d, rq %p\n",
-> -               __func__, host->sg_len, ret, cookie, host->mrq);
->
->  pio:
->         if (!desc) {
-> @@ -116,8 +116,8 @@ pio:
->                          "DMA failed: %d, falling back to PIO\n", ret);
->         }
->
-> -       dev_dbg(&host->pdev->dev, "%s(): desc %p, cookie %d, sg[%d]\n", __func__,
-> -               desc, cookie, host->sg_len);
-> +       dev_dbg(&host->pdev->dev, "%s(): desc %p, sg[%d]\n", __func__,
-> +               desc, host->sg_len);
->  }
->
->  static void tmio_mmc_start_dma_tx(struct tmio_mmc_host *host)
-> @@ -174,9 +174,9 @@ static void tmio_mmc_start_dma_tx(struct tmio_mmc_host *host)
->                         desc = NULL;
->                         ret = cookie;
->                 }
-> +               dev_dbg(&host->pdev->dev, "%s(): mapped %d -> %d, cookie %d, rq %p\n",
-> +                       __func__, host->sg_len, ret, cookie, host->mrq);
->         }
-> -       dev_dbg(&host->pdev->dev, "%s(): mapped %d -> %d, cookie %d, rq %p\n",
-> -               __func__, host->sg_len, ret, cookie, host->mrq);
->
->  pio:
->         if (!desc) {
-> @@ -196,8 +196,7 @@ pio:
->                          "DMA failed: %d, falling back to PIO\n", ret);
->         }
->
-> -       dev_dbg(&host->pdev->dev, "%s(): desc %p, cookie %d\n", __func__,
-> -               desc, cookie);
-> +       dev_dbg(&host->pdev->dev, "%s(): desc %p\n", __func__, desc);
->  }
->
->  void tmio_mmc_start_dma(struct tmio_mmc_host *host,
->
+it's a reply in the middle of a discussion ...
+
+What I managed to decode is that this:
+
+static int __orderly_poweroff(bool force)
+{
+        int ret;
+
+        ret = run_cmd(poweroff_cmd);
+
+        if (ret && force) {
+                pr_warn("Failed to start orderly shutdown: forcing the issue\n");
+
+                /*
+                 * I guess this should try to kick off some daemon to sync and
+                 * poweroff asap.  Or not even bother syncing if we're doing an
+                 * emergency shutdown?
+                 */
+                emergency_sync();
+                kernel_power_off();
+        }
+
+        return ret;
+}
+
+could fail to actually power the system off, if the run_cmd(poweroff_cmd) 
+'succeeds', but due to a user-space bug it does not actually call the real 
+poweroff system call?
+
+Thanks,
+
+	Ingo
