@@ -1,20 +1,20 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 14 Jan 2016 14:00:39 +0000
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 14 Jan 2016 09:01:40 -0500
 Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
  hostbridge init based on ACPI
 In-Reply-To: <20160114134440.GA8520@xora-haswell.xora.org.uk>
 References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
  <20160114134440.GA8520@xora-haswell.xora.org.uk>
-Message-ID: <20160114140038.GE2071@e104818-lin.cambridge.arm.com>
+Message-ID: <1452780100.28109.3.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 01:44:40PM +0000, Graeme Gregory wrote:
+On Thu, 2016-01-14 at 13:44 +0000, Graeme Gregory wrote:
 > On Wed, Jan 13, 2016 at 02:20:46PM +0100, Tomasz Nowicki wrote:
 > > From the functionality point of view this series might be split into the
 > > following logic parts:
 > > 1. Make MMCONFIG code arch-agnostic which allows all architectures to collect
-> >    PCI config regions and used when necessary.
+> > ???PCI config regions and used when necessary.
 > > 2. Move non-arch specific bits to the core code.
 > > 3. Use MMCONFIG code and implement generic ACPI based PCI host controller driver.
 > > 4. Enable above driver on ARM64
@@ -41,17 +41,22 @@ On Thu, Jan 14, 2016 at 01:44:40PM +0000, Graeme Gregory wrote:
 > --- a/drivers/pci/probe.c
 > +++ b/drivers/pci/probe.c
 > @@ -1717,7 +1717,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
->         set_dev_node(&dev->dev, pcibus_to_node(bus));
->         dev->dev.dma_mask = &dev->dma_mask;
->         dev->dev.dma_parms = &dev->dma_parms;
-> -       dev->dev.coherent_dma_mask = 0xffffffffull;
-> +       dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
->         pci_dma_configure(dev);
+> ????????set_dev_node(&dev->dev, pcibus_to_node(bus));
+> ????????dev->dev.dma_mask = &dev->dma_mask;
+> ????????dev->dev.dma_parms = &dev->dma_parms;
+> -???????dev->dev.coherent_dma_mask = 0xffffffffull;
+> +???????dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
+> ????????pci_dma_configure(dev);
 > 
->         pci_set_dma_max_seg_size(dev, 65536);
+> ????????pci_set_dma_max_seg_size(dev, 65536);
+> 
+> I suspect we need to set coherent_dma_mask somewhere in the platform but I do
+> not know where this should happen. Hopefully an ARM64 expert can help.
 
-With OF, we get the coherent_dma_mask set by of_dma_configure(). But I
-have no idea how you do this with ACPI.
+I've run into a number of cards which don't work on some arm64 machines where there are
+no DMA address below 4G. For the realtek card you can use r8169.use_dac=1 on the cmdline
+to get it to work.
 
--- 
-Catalin
+> 
+> Graeme
+> 
