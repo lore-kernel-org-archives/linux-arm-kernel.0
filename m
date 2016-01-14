@@ -1,68 +1,75 @@
-From: Leonid.Yegoshin@imgtec.com (Leonid Yegoshin)
-Date: Thu, 14 Jan 2016 13:24:34 -0800
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160114204827.GE3818@linux.vnet.ibm.com>
-References: <20160112102555.GV6373@twins.programming.kicks-ass.net>
- <20160112104012.GW6373@twins.programming.kicks-ass.net>
- <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
- <20160113104516.GE25458@arm.com> <56969F4B.7070001@imgtec.com>
- <20160113204844.GV6357@twins.programming.kicks-ass.net>
- <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
- <56980145.5030901@imgtec.com> <20160114204827.GE3818@linux.vnet.ibm.com>
-Message-ID: <56981212.7050301@imgtec.com>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Thu, 14 Jan 2016 22:24:41 +0100
+Subject: [PATCH V2 1/4] clk: bcm2835: avoid the use of BCM2835_CLOCK_COUNT
+ in clk-bcm2835
+In-Reply-To: <20160114202330.1942.96295@quark.deferred.io>
+References: <1452542157-2387-1-git-send-email-kernel@martin.sperl.org>
+ <1452542157-2387-2-git-send-email-kernel@martin.sperl.org>
+ <20160113200012.1168.74515@quark.deferred.io>
+ <20160114001358.1168.5768@quark.deferred.io>
+ <56979056.6010407@martin.sperl.org>
+ <20160114202330.1942.96295@quark.deferred.io>
+Message-ID: <B33A54DE-453D-4F3E-BE0F-A8A9E3796D55@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/2016 12:48 PM, Paul E. McKenney wrote:
->
-> So SYNC_RMB is intended to implement smp_rmb(), correct?
-Yes.
->
-> You could use SYNC_ACQUIRE() to implement read_barrier_depends() and
-> smp_read_barrier_depends(), but SYNC_RMB probably does not suffice.
+> 
+> On 14.01.2016, at 21:23, Michael Turquette <mturquette@baylibre.com> wrote:
+>> static int bcm2835_clk_probe(struct platform_device *pdev)
+>> {
+>>        const size_t asize = ARRAY_SIZE(clk_desc_array);
+>>        ...
+>>        for (i = 0; i < asize; i++) {
+>>                desc = &clk_desc_array[i];
+>>                if (desc)
+>>                        clks[i] = desc->clk_register(cprman,
+>>                                                     desc->data);
+> 
+> Interesting. I have been playing with the idea of putting a .register()
+> callback into struct clk_init_data. Then it would be called by a new
+> clk_register_desc() top-level registration function.
+> 
+> You've done that here, but you've put the registration function in your
+> machine-specific struct. Nothing wrong with that.
+> 
+> Do you actually need a machine-specific registration function? Many clk
+> drivers only use their machine-specific registration functions to
+> allocate a stuct clk_hw and populate the contents of struct
+> clk_init_data, which can be done by the framework and reduce duplicate
+> code in drivers.
+> 
+> (they do this because the basic clk types like clk-divider, clk-gate,
+> etc do it, and everyone loves to copy/paste that code)
+> 
+> bcm2835 seems to register two clks in the PLL registration function (one
+> of which is a fixed factor divider), but you could just add those
+> post-PLL dividers to your array of clk data?
+> 
 
-If smp_read_barrier_depends() is used to separate not only two reads but 
-read pointer and WRITE basing on that pointer (example below) - yes. I 
-just doesn't see any example of this in famous 
-Documentation/memory-barriers.txt and had no chance to know what you use 
-it in this way too.
+My goal was to limit the changes of the patch as much as possible.
 
-> The reason for this is that smp_read_barrier_depends() must order the
-> pointer load against any subsequent read or write through a dereference
-> of that pointer.
+Also that way I know it will continue to work as there real
+registration code has not changed - it was just wrapped (and I
+have to admit: I did not want to go into the details of understanding
+the existing registration code.
 
-I can't see that requirement anywhere in Documents directory. I mean - 
-the words "write through a dereference of that pointer" or similar for 
-smp_read_barrier_depends.
+If there is ever a change in the framework, then we may make use of it.
 
->    For example:
->
-> 	p = READ_ONCE(gp);
-> 	smp_rmb();
-> 	r1 = p->a; /* ordered by smp_rmb(). */
-> 	p->b = 42; /* NOT ordered by smp_rmb(), BUG!!! */
-> 	r2 = x; /* ordered by smp_rmb(), but doesn't need to be. */
->
-> In contrast:
->
-> 	p = READ_ONCE(gp);
-> 	smp_read_barrier_depends();
-> 	r1 = p->a; /* ordered by smp_read_barrier_depends(). */
-> 	p->b = 42; /* ordered by smp_read_barrier_depends(). */
-> 	r2 = x; /* not ordered by smp_read_barrier_depends(), which is OK. */
->
-> Again, if your hardware maintains local ordering for address
-> and data dependencies, you can have read_barrier_depends() and
-> smp_read_barrier_depends() be no-ops like they are for most
-> architectures.
+>> 
+>> If we need to order the initialization then we can add some
+>> priority field to clk_desc_array and iterate over all the priority
+>> values.
+> 
+> I guess that you can order them in your array? Just start with the root
+> clocks at the beginning of the array (regardless of "clk type") and walk
+> through the array registering them.
+That was what my earlier patch was doing, but right now we have a sparse
+array wo we do not have to check for duplicates.
 
-It is not so simple, I mean "local ordering for address and data 
-dependencies". Local ordering is NOT enough. It happens that current 
-MIPS R6 doesn't require in your example smp_read_barrier_depends() but 
-in discussion it comes out that it may not. Because without 
-smp_read_barrier_depends() your example can be a part of Will's 
-WRC+addr+addr and we found some design which easily can bump into this 
-test. And that design actually performs "local ordering for address and 
-data dependencies" too.
+Anyway: my interpretation is that the clocks only become really
+available to the device-tree with of_clk_add_provider
+so that means there should not be any race? (but this may not be
+the absolute truth?
 
-- Leonid.
+So I hope this is acceptable (besides the bug I have mentioned
+earlier for which I will send a version 4)
