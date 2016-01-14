@@ -1,64 +1,226 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Thu, 14 Jan 2016 14:15:01 +0000
-Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <1452780100.28109.3.camel@redhat.com>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <20160114134440.GA8520@xora-haswell.xora.org.uk>
- <1452780100.28109.3.camel@redhat.com>
-Message-ID: <20160114141501.GC8520@xora-haswell.xora.org.uk>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 14 Jan 2016 15:20:47 +0100
+Subject: [RFC/PATCH] drm/rockchip: don't wait for vblank if fb hasn't
+ changed
+In-Reply-To: <5697606D.50603@rock-chips.com>
+References: <20160113143425.363ce07a.john@metanate.com>
+ <20160113154005.GT19130@phenom.ffwll.local>
+ <20160113155529.6048b2c1.john@metanate.com>
+ <20160113162156.GA19130@phenom.ffwll.local>
+ <20160113164038.5fcf670f.john@metanate.com>
+ <20160113171917.GC19130@phenom.ffwll.local>
+ <20160113173954.52e688fc.john@metanate.com>
+ <5696F6F4.5060908@rock-chips.com>
+ <CAKMK7uGQ47eLS2HxUP2+tQcf5cZm+eoGryCRrBzA2b8=77ox-Q@mail.gmail.com>
+ <5697606D.50603@rock-chips.com>
+Message-ID: <20160114142047.GD19130@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 09:01:40AM -0500, Mark Salter wrote:
-> On Thu, 2016-01-14 at 13:44 +0000, Graeme Gregory wrote:
-> > On Wed, Jan 13, 2016 at 02:20:46PM +0100, Tomasz Nowicki wrote:
-> > > From the functionality point of view this series might be split into the
-> > > following logic parts:
-> > > 1. Make MMCONFIG code arch-agnostic which allows all architectures to collect
-> > > ???PCI config regions and used when necessary.
-> > > 2. Move non-arch specific bits to the core code.
-> > > 3. Use MMCONFIG code and implement generic ACPI based PCI host controller driver.
-> > > 4. Enable above driver on ARM64
-> > > 
-> > > Patches has been built on top of 4.4 and can be found here:
-> > > git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v3)
-> > > 
-> > > NOTE, this patch set depends on Matthew's patches:
-> > > http://www.spinics.net/lists/linux-pci/msg45950.html
-> > > https://github.com/Vality/linux/tree/pci-fixes
-> > > 
-> > > This has been tested on Cavium ThunderX server and QEMU.
-> > > Any help in reviewing and testing is very appreciated.
-> > 
-> > I have tested this on my AMD Overdrive so
-> > 
-> > Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
-> > 
-> > But to actually get my r8169 network card working I also need the
-> > following patch.
-> > 
-> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> > index 2fbf840..40e24e2 100644
-> > --- a/drivers/pci/probe.c
-> > +++ b/drivers/pci/probe.c
-> > @@ -1717,7 +1717,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
-> > ????????set_dev_node(&dev->dev, pcibus_to_node(bus));
-> > ????????dev->dev.dma_mask = &dev->dma_mask;
-> > ????????dev->dev.dma_parms = &dev->dma_parms;
-> > -???????dev->dev.coherent_dma_mask = 0xffffffffull;
-> > +???????dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
-> > ????????pci_dma_configure(dev);
-> > 
-> > ????????pci_set_dma_max_seg_size(dev, 65536);
-> > 
-> > I suspect we need to set coherent_dma_mask somewhere in the platform but I do
-> > not know where this should happen. Hopefully an ARM64 expert can help.
+On Thu, Jan 14, 2016 at 04:46:37PM +0800, Mark yao wrote:
+> On 2016?01?14? 16:32, Daniel Vetter wrote:
+> >On Thu, Jan 14, 2016 at 2:16 AM, Mark yao <mark.yao@rock-chips.com> wrote:
+> >>On 2016?01?14? 01:39, John Keeping wrote:
+> >>>On Wed, 13 Jan 2016 18:19:17 +0100, Daniel Vetter wrote:
+> >>>
+> >>>>On Wed, Jan 13, 2016 at 04:40:38PM +0000, John Keeping wrote:
+> >>>>>On Wed, 13 Jan 2016 17:21:56 +0100, Daniel Vetter wrote:
+> >>>>>
+> >>>>>>On Wed, Jan 13, 2016 at 03:55:29PM +0000, John Keeping wrote:
+> >>>>>>>On Wed, 13 Jan 2016 16:40:05 +0100, Daniel Vetter wrote:
+> >>>>>>>
+> >>>>>>>>On Wed, Jan 13, 2016 at 02:34:25PM +0000, John Keeping wrote:
+> >>>>>>>>>On Wed, 13 Jan 2016 15:23:20 +0100, Daniel Vetter wrote:
+> >>>>>>>>>
+> >>>>>>>>>>On Wed, Jan 13, 2016 at 12:53:34PM +0000, John Keeping wrote:
+> >>>>>>>>>>>As commented in drm_atomic_helper_wait_for_vblanks(), userspace
+> >>>>>>>>>>>relies on cursor ioctls being unsynced.  Converting the rockchip
+> >>>>>>>>>>>driver to atomic has significantly impacted cursor performance by
+> >>>>>>>>>>>making every cursor update wait for vblank.
+> >>>>>>>>>>>
+> >>>>>>>>>>>By skipping the vblank sync when the framebuffer has not changed
+> >>>>>>>>>>>(as is done in drm_atomic_helper_wait_for_vblanks()) we can avoid
+> >>>>>>>>>>>this for the common case of moving the cursor and only need to
+> >>>>>>>>>>>delay the cursor ioctl when the cursor icon changes.
+> >>>>>>>>>>>
+> >>>>>>>>>>>I originally inserted a check on legacy_cursor_update as well, but
+> >>>>>>>>>>>that caused a storm of iommu page faults.  I didn't investigate
+> >>>>>>>>>>>the
+> >>>>>>>>>>>cause of those since this change gives enough of a performance
+> >>>>>>>>>>>improvement for my use case.
+> >>>>>>>>>>>
+> >>>>>>>>>>>This is RFC because of that and because the framebuffer_changed()
+> >>>>>>>>>>>function is copied from drm_atomic_helper.c as a quick way to test
+> >>>>>>>>>>>the result.
+> >>>>>>>>>>>
+> >>>>>>>>>>>Signed-off-by: John Keeping <john@metanate.com>
+> >>>>>>>>>>>---
+> >>>>>>>>>>>   drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 27
+> >>>>>>>>>>>+++++++++++++++++++++++++-- 1 file changed, 25 insertions(+), 2
+> >>>>>>>>>>>deletions(-)
+> >>>>>>>>>>>
+> >>>>>>>>>>>diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> >>>>>>>>>>>b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c index
+> >>>>>>>>>>>f784488..8fd9821
+> >>>>>>>>>>>100644 --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> >>>>>>>>>>>+++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> >>>>>>>>>>>@@ -177,8 +177,28 @@ static void
+> >>>>>>>>>>>rockchip_crtc_wait_for_update(struct drm_crtc *crtc)
+> >>>>>>>>>>>crtc_funcs->wait_for_update(crtc); }
+> >>>>>>>>>>>   +static bool framebuffer_changed(struct drm_device *dev,
+> >>>>>>>>>>>+                               struct drm_atomic_state
+> >>>>>>>>>>>*old_state,
+> >>>>>>>>>>>+                               struct drm_crtc *crtc)
+> >>>>>>>>>>>+{
+> >>>>>>>>>>>+       struct drm_plane *plane;
+> >>>>>>>>>>>+       struct drm_plane_state *old_plane_state;
+> >>>>>>>>>>>+       int i;
+> >>>>>>>>>>>+
+> >>>>>>>>>>>+       for_each_plane_in_state(old_state, plane, old_plane_state,
+> >>>>>>>>>>>i) {
+> >>>>>>>>>>>+               if (plane->state->crtc != crtc &&
+> >>>>>>>>>>>+                   old_plane_state->crtc != crtc)
+> >>>>>>>>>>>+                       continue;
+> >>>>>>>>>>>+
+> >>>>>>>>>>>+               if (plane->state->fb != old_plane_state->fb)
+> >>>>>>>>>>>+                       return true;
+> >>>>>>>>>>>+       }
+> >>>>>>>>>>>+
+> >>>>>>>>>>>+       return false;
+> >>>>>>>>>>>+}
+> >>>>>>>>>>Please don't hand-roll logic that affects semantics like this.
+> >>>>>>>>>>Instead
+> >>>>>>>>>>please use drm_atomic_helper_wait_for_vblanks(), which should do
+> >>>>>>>>>>this
+> >>>>>>>>>>correctly for you.
+> >>>>>>>>>>
+> >>>>>>>>>>If that's not the case then we need to improve the generic helper,
+> >>>>>>>>>>or
+> >>>>>>>>>>figure out what's different with rockhip.
+> >>>>>>>>>According to commit 63ebb9f (drm/rockchip: Convert to support atomic
+> >>>>>>>>>API) it's because rockchip doesn't have a hardware vblank counter.
+> >>>>>>>>>
+> >>>>>>>>>I'm not entirely clear on why this prevents the use of
+> >>>>>>>>>drm_atomic_helper_wait_for_vblanks().
+> >>>>>>>>Hm, that commit isn't terribly helpful. If that's really needed then
+> >>>>>>>>imo I
+> >>>>>>>>think we should extract a
+> >>>>>>>>"drm_atomic_helper_plane_needs_vblank_wait()"
+> >>>>>>>>helper that's used by both. But since rockchip does vblank_get/put
+> >>>>>>>>calls
+> >>>>>>>>I'd hope vblanks actually work correctly. And then the helper should
+> >>>>>>>>work
+> >>>>>>>>too.
+> >>>>>>>I tried switching the call to rockchip_crtc_wait_for_update() to
+> >>>>>>>drm_atomic_helper_wait_for_vblanks() and it works fine until I switch
+> >>>>>>>the buffer associated with a cursor, at which point I get iommu page
+> >>>>>>>faults, presumably because the GEM buffer is unreferenced too early.
+> >>>>>>>
+> >>>>>>>AFAICT the buffer will be released via drm_atomic_state_free()
+> >>>>>>>unconditionally, but I suspect I'm missing something since that would
+> >>>>>>>mean every driver would hit a similar problem.
+> >>>>>>Yeah, with the helper we always skip, which means when the cursor bo
+> >>>>>>changes you indeed unmap too early. So can't even share the overall
+> >>>>>>condition, but we could definitely share the little framebuffer_changed
+> >>>>>>helper.
+> >>>>>That leaves me with the question: why do other atomic drivers work?
+> >>>>>
+> >>>>>If drm_atomic_helper_wait_for_vblanks() skipping vblanks results in the
+> >>>>>cursor bo being unmapped too early for rockchip, why is it not unmapped
+> >>>>>too early for all of the other drivers using that helper?
+> >>>>It's unmapped too early for everyone, it's just that normally that
+> >>>>doesn't
+> >>>>result in a fireworks show. What we maybe could/should do is do the
+> >>>>unmapping asynchronously, but that runs into the overall "current atomic
+> >>>>helpers don't do async yet" problem. Might be a good point to start
+> >>>>fixing
+> >>>>this up though.
+> >>>OK, thanks, I think I'm beginning to understand how this all fits
+> >>>together.
+> >>>
+> >>>It looks like there are two options for me to get reasonable cursor
+> >>>performance on rockchip in the short term:
+> >>>
+> >>>1) Export the current framebuffer_changed() function as
+> >>>     drm_atomic_helper_framebuffer_changed() and use it in
+> >>>     rockchip_crtc_wait_for_update().
+> >>>
+> >>>2) Add a mechanism to suppress the legacy_cursor_update check in
+> >>>     drm_atomic_helper_wait_for_vblanks() and switch the rockchip driver
+> >>>     over to it.
+> >>>
+> >>>In both of these cases we're only restoring the unsynced cursor ioctls
+> >>>behaviour when the cursor is moved but it will still be expensive when
+> >>>the cursor bo changes.  That gives sufficient performance in my testing.
+> >>>
+> >>>
+> >>>
+> >>Thanks for point that.
+> >>
+> >>because rockchip not support hardware vblank counter, use
+> >>drm_atomic_helper_wait_for_vblanks have under issues:
+> >>
+> >>                                              | <-- HW vsync irq and reg take
+> >>effect
+> >>             plane_commit  --->  |
+> >>      get_vblank and wait ->   |
+> >>                                              | <-- handle_vblank,
+> >>vblank->count + 1
+> >>                  cleanup_fb   ---> |
+> >>               iommu crash  --->  |
+> >>                                              | <-- HW vsync irq and reg take
+> >>effect
+> >>there is no hardware vblank counter on rockchip vop, we can't ensure the
+> >>consistency of reg take effect and vblank->count,
+> >>if plane commit hit into the period of  reg take effect and vblank->count,
+> >>cleanup_fb happen before old_fb swap out from vop,
+> >>then iommu crash.
+> >>
+> >>That is why I special the wait_for_vblanks, we need check the reg really
+> >>take effect before clean up old fb.
+> >>at vop_win_pending_is_complete function, check win enable and win address,
+> >>to ensure that.
+> >>
+> >>Not only rockchip drm do that thing:
+> >>
+> >>exynos also check address before cleanup fb
+> >>         if (start == start_s)
+> >>             exynos_drm_crtc_finish_update(ctx->crtc, plane);
+> >>
+> >>Thanks.
+> >Do you have a scanline counter or something similar at least? Any
+> >other indication about how far along the chip is with scanning out? We
+> >use that in i915 to avoid races with the interrupt handler and detect
+> >this w/a scenario.
+> >
+> >I think if you have a scanline counter then it should magically work,
+> >since the vblank code will realize that you're already past the last
+> >vblank interrupt and /should/ have incremented already. Or something
+> >like that.
+> >
+> >Otherwise if this is common we might want to figure out how to solve
+> >this in a generic way. It's one of these problems that will make
+> >generic async support almost impossible.
+> >-Daniel
 > 
-> I've run into a number of cards which don't work on some arm64 machines where there are
-> no DMA address below 4G. For the realtek card you can use r8169.use_dac=1 on the cmdline
-> to get it to work.
+> No, both rk3288 or rk3036 not support hardware vblank counter and scanline
+> counter.
 > 
-I need r8169.use_dac=1 and this patch to get card to work.
+> At android side, we use same way, check address and enable bit to ensure
+> register take effect.
+> 
+> On future chips,  scanline counter and hardware counter would be support,
+> but not now.
 
-Graeme
+Ugh. Oh well, there's not really anything we can do in core nore helpers
+to make this easier for drivers. This really only can be fixed sensibly at
+the hardware level.
+
+So yeah I think exposing framebuffer_changed as a helper is the way to go
+here.
+
+Thanks, Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
