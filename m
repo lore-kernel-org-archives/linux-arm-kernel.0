@@ -1,132 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 14 Jan 2016 13:55:21 +0000
-Subject: [PATCH v6 1/6] arm/arm64: KVM: Introduce armv7 fp/simd vcpu fields
- and helpers
-In-Reply-To: <20160114132718.GA4329@cbox>
-References: <1451166900-3711-1-git-send-email-m.smarduch@samsung.com>
- <1451166900-3711-2-git-send-email-m.smarduch@samsung.com>
- <20160110163204.GD30867@cbox> <56943D29.3000002@samsung.com>
- <20160112141207.GF15554@cbox> <5695A0EB.5020609@samsung.com>
- <56970FE8.4020805@samsung.com> <20160114132718.GA4329@cbox>
-Message-ID: <5697A8C9.7080204@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 14 Jan 2016 14:00:39 +0000
+Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
+ hostbridge init based on ACPI
+In-Reply-To: <20160114134440.GA8520@xora-haswell.xora.org.uk>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <20160114134440.GA8520@xora-haswell.xora.org.uk>
+Message-ID: <20160114140038.GE2071@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/01/16 13:27, Christoffer Dall wrote:
-> On Wed, Jan 13, 2016 at 07:03:04PM -0800, Mario Smarduch wrote:
->>
->>
->> On 1/12/2016 4:57 PM, Mario Smarduch wrote:
->>>
->>>
->>> On 1/12/2016 6:12 AM, Christoffer Dall wrote:
->>>> On Mon, Jan 11, 2016 at 03:39:21PM -0800, Mario Smarduch wrote:
->>>>>
->>>>>
->>>>> On 1/10/2016 8:32 AM, Christoffer Dall wrote:
->>>>>> Hi Mario,
->>>>>>
->>>>>> I spotted one more potential issue...
->>>>>>
->>>>>> On Sat, Dec 26, 2015 at 01:54:55PM -0800, Mario Smarduch wrote:
->>>>>>> Add helper functions to enable access to fp/smid on guest entry and save host
->>>>>>> fpexc on vcpu put, check if fp/simd registers are dirty and add new vcpu
->>>>>>> fields.
->>>>>>>
->>>>>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->>>>>>> ---
->>>>>>>  arch/arm/include/asm/kvm_emulate.h   | 42 ++++++++++++++++++++++++++++++++++++
->>>>>>>  arch/arm/include/asm/kvm_host.h      |  6 ++++++
->>>>>>>  arch/arm64/include/asm/kvm_emulate.h |  8 +++++++
->>>>>>>  3 files changed, 56 insertions(+)
->>>>>>>
->>>>>>> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
->>>>>>> index 3095df0..d4d9da1 100644
->>>>>>> --- a/arch/arm/include/asm/kvm_emulate.h
->>>>>>> +++ b/arch/arm/include/asm/kvm_emulate.h
->>>>>>> @@ -24,6 +24,8 @@
->>>>>>>  #include <asm/kvm_mmio.h>
->>>>>>>  #include <asm/kvm_arm.h>
->>>>>>>  #include <asm/cputype.h>
->>>>>>> +#include <asm/vfp.h>
->>>>>>> +#include "../vfp/vfpinstr.h"
->>>>>>>  
->>>>>>>  unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
->>>>>>>  unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
->>>>>>> @@ -255,4 +257,44 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
->>>>>>>  	}
->>>>>>>  }
->>>>>>>  
->>>>>>> +#ifdef CONFIG_VFPv3
->>>>>>> +/* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
->>>>>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
->>>>>>> +{
->>>>>>> +	u32 fpexc;
->>>>>>> +
->>>>>>> +	/* Save host fpexc, and enable guest access to fp unit */
->>>>>>> +	fpexc = fmrx(FPEXC);
->>>>>>> +	vcpu->arch.host_fpexc = fpexc;
->>>>>>> +	fpexc |= FPEXC_EN;
->>>>>>> +	fmxr(FPEXC, fpexc);
->>>>>>> +
->>>>>>> +	/* Configure HCPTR to trap on tracing and fp/simd access */
->>>>>>> +	vcpu->arch.hcptr = HCPTR_TTA | HCPTR_TCP(10)  | HCPTR_TCP(11);
->>>>>>> +}
->>>>>>> +
->>>>>>> +/* Called from vcpu_put - restore host fpexc */
->>>>>>> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu)
->>>>>>> +{
->>>>>>> +	fmxr(FPEXC, vcpu->arch.host_fpexc);
->>>>>>> +}
->>>>>>> +
->>>>>>> +/* If trap bits are reset then fp/simd registers are dirty */
->>>>>>> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
->>>>>>> +{
->>>>>>> +	return !(vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
->>>>>>> +}
->>>>>>> +#else
->>>>>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
->>>>>>> +{
->>>>>>> +	vcpu->arch.hcptr = HCPTR_TTA;
->>>>>>
->>>>>> Is it correct not to trap VFP registers when the host kernel does not
->>>>>> have CONFIG_VFPv3?  I think this is a change in functionality compared
->>>>>> to the current kernels is it not?
->>>>>
->>>>> With CPU_V7 VFPv3 gets selected, without it fp should be emulated,
->>>>> with exceptions taken in guest kernel. I don't see a reason why
->>>>> fp hcptr access should be enabled in that case.
->>>>>
->>>>
->>>> If you have to guests with CONFIG_VFPV3 but your host doesn't have
->>>> CONFIG_VFPV3, you will never context-switch the VFP registers between
->>>> the two VMs, and mayhem will ensue.
->>>>
->>>> Unless I'm missing something very obvious?
->>
->> Did more testing on this enabling OABI_COMPAT and selecting
->> NWFPE/FastFPE breaks the boot. So far can't find a way to boot host
->> without VFP/VFPv3 enabled on ARMv7. CPU_V7 defaults to VFPv3
->> selection. I'm wondering if !VFPv3 path should be removed from
->> the patches?
->>
-> I think this is related to your particular choice of userspace.  I think
-> it's fair to assume VFP is enabled for a KVM host, but I don't have
-> enough familiarity with this to be sure.
+On Thu, Jan 14, 2016 at 01:44:40PM +0000, Graeme Gregory wrote:
+> On Wed, Jan 13, 2016 at 02:20:46PM +0100, Tomasz Nowicki wrote:
+> > From the functionality point of view this series might be split into the
+> > following logic parts:
+> > 1. Make MMCONFIG code arch-agnostic which allows all architectures to collect
+> >    PCI config regions and used when necessary.
+> > 2. Move non-arch specific bits to the core code.
+> > 3. Use MMCONFIG code and implement generic ACPI based PCI host controller driver.
+> > 4. Enable above driver on ARM64
+> > 
+> > Patches has been built on top of 4.4 and can be found here:
+> > git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v3)
+> > 
+> > NOTE, this patch set depends on Matthew's patches:
+> > http://www.spinics.net/lists/linux-pci/msg45950.html
+> > https://github.com/Vality/linux/tree/pci-fixes
+> > 
+> > This has been tested on Cavium ThunderX server and QEMU.
+> > Any help in reviewing and testing is very appreciated.
 > 
-> Marc, any thoughts?
+> I have tested this on my AMD Overdrive so
+> 
+> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
+> 
+> But to actually get my r8169 network card working I also need the
+> following patch.
+> 
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 2fbf840..40e24e2 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -1717,7 +1717,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+>         set_dev_node(&dev->dev, pcibus_to_node(bus));
+>         dev->dev.dma_mask = &dev->dma_mask;
+>         dev->dev.dma_parms = &dev->dma_parms;
+> -       dev->dev.coherent_dma_mask = 0xffffffffull;
+> +       dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
+>         pci_dma_configure(dev);
+> 
+>         pci_set_dma_max_seg_size(dev, 65536);
 
-I'm not so sure about the host kernel configuration - after all, you
-could have a very specialized host that doesn't use VFP at all
-(softfloat), and yet offers VFP support to guests.
+With OF, we get the coherent_dma_mask set by of_dma_configure(). But I
+have no idea how you do this with ACPI.
 
-But what I'm worried about is the case where someone has built an
-ARMv7+VE without VFP. We may end-up exploding in that case. What we
-could do is to probe for the VFP HW, and not enable KVM if absent. This
-would give us the freedom to remove the #ifdefery.
-
-What do you think?
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
