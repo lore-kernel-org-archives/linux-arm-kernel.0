@@ -1,114 +1,42 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Thu, 14 Jan 2016 12:41:19 -0800
-Subject: [PATCH v2] clk: mediatek: Allow changing PLL rate when it is off
-In-Reply-To: <1452750917.5384.24.camel@mtksdaap41>
-References: <1452482936-51852-1-git-send-email-jamesjj.liao@mediatek.com>
- <20160114022637.1942.4564@quark.deferred.io>
- <1452750917.5384.24.camel@mtksdaap41>
-Message-ID: <20160114204119.1942.69629@quark.deferred.io>
+From: Leonid.Yegoshin@imgtec.com (Leonid Yegoshin)
+Date: Thu, 14 Jan 2016 13:01:05 -0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160114203430.GC3818@linux.vnet.ibm.com>
+References: <56945366.2090504@imgtec.com>
+ <20160112092711.GP6344@twins.programming.kicks-ass.net>
+ <20160112102555.GV6373@twins.programming.kicks-ass.net>
+ <20160112104012.GW6373@twins.programming.kicks-ass.net>
+ <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
+ <20160113104516.GE25458@arm.com> <5696CF08.8080700@imgtec.com>
+ <20160114121449.GC15828@arm.com> <5697F6D2.60409@imgtec.com>
+ <20160114203430.GC3818@linux.vnet.ibm.com>
+Message-ID: <56980C91.1010403@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting James Liao (2016-01-13 21:55:17)
-> Hi Mike,
-> 
-> On Wed, 2016-01-13 at 18:26 -0800, Michael Turquette wrote:
-> > Hi James,
-> > 
-> > Quoting James Liao (2016-01-10 19:28:56)
-> > > Some modules may need to change its clock rate before turn on it.
-> > > So changing PLL's rate when it is off should be allowed.
-> > > This patch removes PLL enabled check before set rate, so that
-> > > PLLs can set new frequency even if they are off.
-> > > 
-> > > On MT8173 for example, ARMPLL's enable bit can be controlled by
-> > > other HW. That means ARMPLL may be turned on even if we (CPU / SW)
-> > > set ARMPLL's enable bit as 0. In this case, SW may want and can
-> > > still change ARMPLL's rate by changing its pcw and postdiv settings.
-> > > But without this patch, new pcw setting will not be applied because
-> > > its enable bit is 0.
-> > 
-> > Must the clock signal be enabled to change the PLL rate? If so, does
-> > ARMPLL set the CLK_SET_RATE_GATE flag?
-> 
-> No. The controlling of PLL's rate and enable are independent. So we can
-> change the PLL's rate when it's enabled or disabled.
+I need some time to understand your test examples. However,
 
-Thanks for the clarification.
+On 01/14/2016 12:34 PM, Paul E. McKenney wrote:
+>
+>
+> The WRC+addr+addr is OK because data dependencies are not required to be
+> transitive, in other words, they are not required to flow from one CPU to
+> another without the help of an explicit memory barrier.
 
-> 
-> > > 
-> > > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> > > ---
-> > >  drivers/clk/mediatek/clk-pll.c | 9 ++-------
-> > >  1 file changed, 2 insertions(+), 7 deletions(-)
-> > > 
-> > > diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
-> > > index 966cab1..8e31fae 100644
-> > > --- a/drivers/clk/mediatek/clk-pll.c
-> > > +++ b/drivers/clk/mediatek/clk-pll.c
-> > > @@ -91,9 +91,6 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
-> > >                 int postdiv)
-> > >  {
-> > >         u32 con1, val;
-> > > -       int pll_en;
-> > > -
-> > > -       pll_en = readl(pll->base_addr + REG_CON0) & CON0_BASE_EN;
-> > >  
-> > >         /* set postdiv */
-> > >         val = readl(pll->pd_addr);
-> > > @@ -114,15 +111,13 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
-> > >  
-> > >         con1 = readl(pll->base_addr + REG_CON1);
-> > >  
-> > > -       if (pll_en)
-> > > -               con1 |= CON0_PCW_CHG;
-> > > +       con1 |= CON0_PCW_CHG;
-> > 
-> > This unconditionally enables the PLL whenever clk_set_rate is called,
-> > changing the previous behavior. The clk framework still tracks the
-> > intent of ARMPLLs users with the enable_count. How about something like
-> > the following:
-> 
-> Not really. This patch will not enable or disable PLL when we change its
-> rate. The PLL enable bit is bit[0], we didn't change bit[0] in
-> mtk_pll_set_rate_regs(), so its state will not be changed.
-> 
-> This patch set CON0_PCW_CHG (bit[31]) no matter the PLL is enabled or
-> not. So we don't need to check the enable bit[0] nor PLL state in the
-> framework before set bit[31].
+I don't see any reliable way to fit WRC+addr+addr into "DATA DEPENDENCY 
+BARRIERS" section recommendation to have data dependency barrier between 
+read of a shared pointer/index and read the shared data based on that 
+pointer. If you have this two reads, it doesn't matter the rest of 
+scenario, you should put the dependency barrier in code anyway. If you 
+don't do it in WRC+addr+addr scenario then after years it can be easily 
+changed to different scenario which fits some of scenario in "DATA 
+DEPENDENCY BARRIERS" section and fails.
 
-Ah, I mistakenly thought that CON0_PCW_CHG was the enable bit, since
-setting it was guarded by the pll_en conditional. Your explanation makes
-perfect sense to me.
+>    Transitivity is
 
-Acked-by: Michael Turquette <mturuqette@baylibre.com>
+Peter Zijlstra recently wrote: "In particular we're very much all 
+'confused' about the various notions of transitivity". I am confused 
+too, so - please use some more simple way to explain your words. Sorry, 
+but we need a common ground first.
 
-Regards,
-Mike
-
-> 
-> >       bool pll_en = clk_hw_is_enabled(&pll->hw);
-> > 
-> >       if (pll_en)
-> >               con1 |= CON0_PCW_CHG;
-> > 
-> >       writel(con1, pll->base_addr + REG_CON1);
-> >       if (pll->tuner_addr)
-> >               writel(con1 + 1, pll->tuner_addr);
-> > 
-> >       if (pll_en)
-> >               udelay(20);
-> > 
-> > This does not rely on the hardware to tell us the intent of the user,
-> > but instead on our framework usecounting.
-> 
-> 
-> Best regards,
-> 
-> James
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+- Leonid.
