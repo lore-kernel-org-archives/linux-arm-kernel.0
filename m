@@ -1,36 +1,36 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 15 Jan 2016 12:24:16 +0100
-Subject: [PATCH] spi: fix counting in spi-loopback-test code
-In-Reply-To: <7416604.jejCLcpcOT@wuerfel>
-References: <7416604.jejCLcpcOT@wuerfel>
-Message-ID: <CAMuHMdUT500KRLsnxf_PzfU3sSxVACES-NZxENRcX+x_NxPeaQ@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Fri, 15 Jan 2016 11:29:35 +0000
+Subject: [PATCH] arm-cci: simplify sysfs attr handling
+In-Reply-To: <20160115112054.GB3262@leverpostej>
+References: <1443523283-6248-1-git-send-email-mark.rutland@arm.com>
+ <20151104111112.GA23860@leverpostej> <5698C9E2.7040405@arm.com>
+ <20160115112054.GB3262@leverpostej>
+Message-ID: <5698D81F.3030305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 9:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> These variables are always used uninitialized:
+On 15/01/16 11:20, Mark Rutland wrote:
+> On Fri, Jan 15, 2016 at 10:28:50AM +0000, Suzuki K. Poulose wrote:
+>> On 04/11/15 11:11, Mark Rutland wrote:
+>>> On Tue, Sep 29, 2015 at 11:41:23AM +0100, Mark Rutland wrote:
+
+>> fyi,
+>>
+>> This hasn't made into arm-soc tree yet.
 >
-> drivers/spi/spi-loopback-test.c: In function 'spi_test_run_iter':
-> drivers/spi/spi-loopback-test.c:768:17: warning: 'rx_count' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> drivers/spi/spi-loopback-test.c:762:17: warning: 'tx_count' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> Ok. We're in the middle of the merge window, so it's understandable if
+> this isn't picked up.
+
+I know, and I meant it didn't get picked up before the merge window. Also I
+don't expect the maintainers to do anything at the moment. Instead, wanted
+to know what the next steps should be.
+
 >
-> Adding an explicit initialization seems to be the only
-> workable solution here, to make the code behave correctly
-> and build without warning.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 84e0c4e5e2c4 ("spi: add loopback test driver to allow for spi_master regression tests")
+> Suzuki, would you be happy to pick this up as a prefix of your CCI patch
+> series for now?
 
-Just noticed the same, so
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+And ^^ that was an option I was considering, but didn't mention it.
+I will pick this one up.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Cheers
+Suzuki
