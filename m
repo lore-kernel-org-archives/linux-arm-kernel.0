@@ -1,79 +1,76 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Fri, 15 Jan 2016 12:12:31 +0000
-Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <1452781481.28109.8.camel@redhat.com>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <20160114134440.GA8520@xora-haswell.xora.org.uk>
- <1452780100.28109.3.camel@redhat.com>
- <20160114141501.GC8520@xora-haswell.xora.org.uk>
- <1452781481.28109.8.camel@redhat.com>
-Message-ID: <20160115121231.GD8520@xora-haswell.xora.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 15 Jan 2016 21:14:10 +0900
+Subject: [PATCH v3 14/14] ARM: shmobile: r8a7793: enable audio DMAC in
+ device tree
+In-Reply-To: <CAMuHMdXHixAuiYayxmvOLLm39w4iTosVucRtN7ASuHGuY7p5-Q@mail.gmail.com>
+References: <1452825487-15931-1-git-send-email-horms+renesas@verge.net.au>
+ <1452825487-15931-15-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdXHixAuiYayxmvOLLm39w4iTosVucRtN7ASuHGuY7p5-Q@mail.gmail.com>
+Message-ID: <20160115121405.GA4005@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 09:24:41AM -0500, Mark Salter wrote:
-> On Thu, 2016-01-14 at 14:15 +0000, Graeme Gregory wrote:
-> > On Thu, Jan 14, 2016 at 09:01:40AM -0500, Mark Salter wrote:
-> > > On Thu, 2016-01-14 at 13:44 +0000, Graeme Gregory wrote:
-> > > > On Wed, Jan 13, 2016 at 02:20:46PM +0100, Tomasz Nowicki wrote:
-> > > > > From the functionality point of view this series might be split into the
-> > > > > following logic parts:
-> > > > > 1. Make MMCONFIG code arch-agnostic which allows all architectures to collect
-> > > > > ???PCI config regions and used when necessary.
-> > > > > 2. Move non-arch specific bits to the core code.
-> > > > > 3. Use MMCONFIG code and implement generic ACPI based PCI host controller driver.
-> > > > > 4. Enable above driver on ARM64
-> > > > > 
-> > > > > Patches has been built on top of 4.4 and can be found here:
-> > > > > git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v3)
-> > > > > 
-> > > > > NOTE, this patch set depends on Matthew's patches:
-> > > > > http://www.spinics.net/lists/linux-pci/msg45950.html
-> > > > > https://github.com/Vality/linux/tree/pci-fixes
-> > > > > 
-> > > > > This has been tested on Cavium ThunderX server and QEMU.
-> > > > > Any help in reviewing and testing is very appreciated.
-> > > > 
-> > > > I have tested this on my AMD Overdrive so
-> > > > 
-> > > > Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
-> > > > 
-> > > > But to actually get my r8169 network card working I also need the
-> > > > following patch.
-> > > > 
-> > > > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> > > > index 2fbf840..40e24e2 100644
-> > > > --- a/drivers/pci/probe.c
-> > > > +++ b/drivers/pci/probe.c
-> > > > @@ -1717,7 +1717,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
-> > > > ????????set_dev_node(&dev->dev, pcibus_to_node(bus));
-> > > > ????????dev->dev.dma_mask = &dev->dma_mask;
-> > > > ????????dev->dev.dma_parms = &dev->dma_parms;
-> > > > -???????dev->dev.coherent_dma_mask = 0xffffffffull;
-> > > > +???????dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
-> > > > ????????pci_dma_configure(dev);
-> > > > 
-> > > > ????????pci_set_dma_max_seg_size(dev, 65536);
-> > > > 
-> > > > I suspect we need to set coherent_dma_mask somewhere in the platform but I do
-> > > > not know where this should happen. Hopefully an ARM64 expert can help.
-> > > 
-> > > I've run into a number of cards which don't work on some arm64 machines where there are
-> > > no DMA address below 4G. For the realtek card you can use r8169.use_dac=1 on the cmdline
-> > > to get it to work.
-> > > 
-> > I need r8169.use_dac=1 and this patch to get card to work.
-> > 
+On Fri, Jan 15, 2016 at 11:45:35AM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> Hmm. I didn't need a patch in the past but I don't think I've used that card with
-> this patch series. I will try that when I get a chance...
+> On Fri, Jan 15, 2016 at 3:38 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > --- a/arch/arm/boot/dts/r8a7793.dtsi
+> > +++ b/arch/arm/boot/dts/r8a7793.dtsi
+> > @@ -1201,52 +1201,119 @@
+> >                 status = "disabled";
+> >
+> >                 rcar_sound,dvc {
+> > -                       dvc0: dvc at 0 { };
+> > -                       dvc1: dvc at 1 { };
+> > +                       dvc0: dvc at 0 {
+> > +                               dmas = <&audma0 0xbc>;
+> > +                               dma-names = "tx";
+> > +                       };
+> > +                       dvc1: dvc at 1 {
+> > +                               dmas = <&audma0 0xbe>;
+> > +                               dma-names = "tx";
+> > +                       };
+> >                 };
+> > +
+> >                 rcar_sound,src {
+> > -                       src0: src at 0 { };
+> > -                       src1: src at 1 { };
+> > -                       src2: src at 2 { };
+> > -                       src3: src at 3 { };
+> > -                       src4: src at 4 { };
+> > -                       src5: src at 5 { };
+> > -                       src6: src at 6 { };
+> > -                       src7: src at 7 { };
+> > -                       src8: src at 8 { };
+> > -                       src9: src at 9 { };
+> > +                       src0: src at 0 {
+> > +                               interrupts = <0 352 IRQ_TYPE_LEVEL_HIGH>;
 > 
+> <GIC_SPI ...> (and more below)
+> 
+> >                 rcar_sound,ssi {
+> >                         ssi0: ssi at 0 {
+> >                                 interrupts = <0 370 IRQ_TYPE_LEVEL_HIGH>;
+> 
+> <GIC_SPI ...>
+> 
+> Ah, you already let a few pass through before ;-)
 
->From my previous debugging on this issue I was getting an address bigger
-than 32bits. As r8169 is a whole range of chips are guess they are not
-all equal?
+Thanks, I'll fix this up.
 
-I can stick debug stuff in if someone tells me where to put them.
-
-Graeme
+> > +                               dmas = <&audma0 0x01>, <&audma1 0x02>, <&audma0 0x15>, <&audma1 0x16>;
+> > +                               dma-names = "rx", "tx", "rxu", "txu";
+> >                         };
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
