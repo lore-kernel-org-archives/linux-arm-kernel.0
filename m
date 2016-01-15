@@ -1,46 +1,49 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 15 Jan 2016 11:20:54 +0000
-Subject: [PATCH] arm-cci: simplify sysfs attr handling
-In-Reply-To: <5698C9E2.7040405@arm.com>
-References: <1443523283-6248-1-git-send-email-mark.rutland@arm.com>
- <20151104111112.GA23860@leverpostej> <5698C9E2.7040405@arm.com>
-Message-ID: <20160115112054.GB3262@leverpostej>
+Date: Fri, 15 Jan 2016 11:23:07 +0000
+Subject: [PATCH v3 07/21] arm64: move kernel image to base of vmalloc area
+In-Reply-To: <CAKv+Gu-mPcXBTpENRaM5qo0nV_z93ZKw=5o5xVLNMU7QfiRCHQ@mail.gmail.com>
+References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1452518355-4606-8-git-send-email-ard.biesheuvel@linaro.org>
+ <20160112181336.GF4858@leverpostej>
+ <CAKv+Gu-TS7w=AVBceGhsQkQzVCv+u7Gh6ojftwW1iaE+d0yrYw@mail.gmail.com>
+ <20160113135109.GJ23370@leverpostej>
+ <20160114185701.GA28181@leverpostej>
+ <CAKv+Gu-mPcXBTpENRaM5qo0nV_z93ZKw=5o5xVLNMU7QfiRCHQ@mail.gmail.com>
+Message-ID: <20160115112306.GC3262@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 10:28:50AM +0000, Suzuki K. Poulose wrote:
-> On 04/11/15 11:11, Mark Rutland wrote:
-> >On Tue, Sep 29, 2015 at 11:41:23AM +0100, Mark Rutland wrote:
-> >>There's no need to dynamically initialise attribute pointers when we can
-> >>get the compiler to do it for us. We also don't need a dev_ext_attribute
-> >>for the cpumask, as the drvdata for a PMU device is a pointer to struct
-> >>pmu.
-> >>
-> >>Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> >>Acked-by: Punit Agrawal <punit.agrawal@arm.com>
-> >>Reviewed-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> >>Tested-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> >>Cc: Arnd Bergmann <arnd@arndb.de>
-> >>Cc: Olof Johansson <olof@lixom.net>
-> >>---
-> >>  drivers/bus/arm-cci.c | 100 +++++++++++++-------------------------------------
-> >>  1 file changed, 25 insertions(+), 75 deletions(-)
+On Fri, Jan 15, 2016 at 10:54:26AM +0100, Ard Biesheuvel wrote:
+> On 14 January 2016 at 19:57, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Wed, Jan 13, 2016 at 01:51:10PM +0000, Mark Rutland wrote:
+> >> On Wed, Jan 13, 2016 at 09:39:41AM +0100, Ard Biesheuvel wrote:
+> >> > If I remove the rounding, I get false positive kasan errors which I
+> >> > have not quite diagnosed yet, but are probably due to the fact that
+> >> > the rounding performed by vmemmap_populate() goes in the wrong
+> >> > direction.
 > >
-> >Arnd/Olof, are you happy to pick this up?
+> > As far as I can see, it implicitly rounds the base down and end up to
+> > SWAPPER_BLOCK_SIZE granularity.
 > >
-> >I don't believe there are any other pending changes to the CCI code, and
-> >haven't been since I posted this so it still applies atop of v4.3.
+> > I can see that it might map too much memory, but I can't see why that
+> > should trigger KASAN failures. Regardless of what was mapped KASAN
+> > should stick to the region it cares about, and everything else should
+> > stay out of that.
+> >
+> > When do you see the failures, and are they in any way consistent?
+> >
+> > Do you have an example to hand?
 > >
 > 
-> fyi,
-> 
-> This hasn't made into arm-soc tree yet.
+> For some reason, this issue has evaporated, i.e., I can no longer
+> reproduce it on my WIP v4 branch.
+> So I will remove the rounding.
 
-Ok. We're in the middle of the merge window, so it's understandable if
-this isn't picked up.
+Ok.
 
-Suzuki, would you be happy to pick this up as a prefix of your CCI patch
-series for now?
+I'll let you know if I stumble across anything that looks like a
+potential cause of the KASAN failures, and I'll try to give v4 a go at
+some point soon.
 
 Thanks,
 Mark.
