@@ -1,131 +1,138 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Fri, 15 Jan 2016 01:16:11 +0000
-Subject: [PATCH v5 1/2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD
- driver
-In-Reply-To: <87pox41dy9.fsf@dell.be.48ers.dk>
-References: <1452747845-2962-1-git-send-email-wenyou.yang@atmel.com>
- <1452747845-2962-2-git-send-email-wenyou.yang@atmel.com>
- <87pox41dy9.fsf@dell.be.48ers.dk>
-Message-ID: <B256D81BAE5131468A838E5D7A243641D63ECA51@penmbx01>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 14 Jan 2016 18:02:06 -0800
+Subject: [PATCH v6 1/6] arm/arm64: KVM: Introduce armv7 fp/simd vcpu fields
+ and helpers
+In-Reply-To: <20160114132718.GA4329@cbox>
+References: <1451166900-3711-1-git-send-email-m.smarduch@samsung.com>
+ <1451166900-3711-2-git-send-email-m.smarduch@samsung.com>
+ <20160110163204.GD30867@cbox> <56943D29.3000002@samsung.com>
+ <20160112141207.GF15554@cbox> <5695A0EB.5020609@samsung.com>
+ <56970FE8.4020805@samsung.com> <20160114132718.GA4329@cbox>
+Message-ID: <5698531E.1090606@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-> -----Original Message-----
-> From: Peter Korsgaard [mailto:jacmet at gmail.com] On Behalf Of Peter Korsgaard
-> Sent: 2016?1?14? 21:35
-> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
-> Cc: Lee Jones <lee.jones@linaro.org>; Rob Herring <robh+dt@kernel.org>;
-> Pawel Moll <pawel.moll@arm.com>; Mark Rutland <mark.rutland@arm.com>; Ian
-> Campbell <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>;
-> devicetree at vger.kernel.org; Krzysztof Kozlowski <k.kozlowski@samsung.com>;
-> Ferre, Nicolas <Nicolas.FERRE@atmel.com>; linux-kernel at vger.kernel.org;
-> Javier Martinez Canillas <javier@dowhile0.org>; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v5 1/2] mfd: act8945a: add Active-semi ACT8945A PMIC
-> MFD driver
-> 
-> >>>>> "Wenyou" == Wenyou Yang <wenyou.yang@atmel.com> writes:
-> 
->  > This patch adds support for the Active-semi ACT8945A PMIC.
->  > It is a Multi Function Device with the following subdevices:
->  >  - Regulator
->  >  - Charger
-> 
->  > It is interfaced to the host controller using I2C interface,  > ACT8945A is a child
-> device of the I2C.
-> 
->  > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>  > Reviewed-by:
-> Krzysztof Kozlowski <k.kozlowski@samsung.com>  > ---
-> 
->  > Changes in v5:
->  >  - change depends on to 'I2C=y'.
-> 
-> Why not make it a tristate instead? Having regulators as modules is perhaps not a
-> very wise thing to do, but conceptually I don't see why this code couldn't be a
-> module.
-
-Yes, you are right. it can be use a tristate.
-
-> 
->  > +config MFD_ACT8945A
->  > +	bool "Active-semi ACT8945A"
->  > +	select MFD_CORE
->  > +	select REGMAP_I2C
->  > +	depends on I2C=y && OF
->  > +	help
->  > +	  Support for the ACT8945A PMIC from Active-semi. This device
->  > +	  features three step-down DC/DC converters and four low-dropout
->  > +	  linear regulators, along with a complete ActivePath battery
->  > +	  charger.
->  > +
-> 
-> [snip]
-> 
-> > +++ b/drivers/mfd/act8945a.c
->  > @@ -0,0 +1,109 @@
->  > +/*
->  > + * MFD driver for Active-semi ACT8945a PMIC  > + *  > + * Copyright (C)
-> 2015 Atmel Corporation.
->  > + *
->  > + * Author: Wenyou Yang <wenyou.yang@atmel.com>  > + *  > + * This
-> program is free software; you can redistribute it and/or modify it  > + * under  the
-> terms of the GNU General  Public License as published by the  > + * Free
-> Software Foundation;  either version 2 of the License, or (at your  > + * option) any
-> later version.
->  > + */
->  > +
->  > +#include <linux/i2c.h>
->  > +#include <linux/mfd/act8945a.h>
->  > +#include <linux/mfd/core.h>
->  > +#include <linux/module.h>
->  > +#include <linux/of_device.h>
->  > +#include <linux/regmap.h>
->  > +
->  > +static const struct mfd_cell act8945a_devs[] = {
->  > +	{
->  > +		.name = "act8945a-pmic",
->  > +		.of_compatible = "active-semi,act8945a-regulator",
->  > +	},
->  > +	{
->  > +		.name = "act8945a-charger",
->  > +		.of_compatible = "active-semi,act8945a-charger",
->  > +	},
->  > +};
->  > +
->  > +static const struct regmap_config act8945a_regmap_config = {
->  > +	.reg_bits = 8,
->  > +	.val_bits = 8,
->  > +};
->  > +
->  > +static int act8945a_i2c_probe(struct i2c_client *i2c,
->  > +			      const struct i2c_device_id *id)
->  > +{
->  > +	struct act8945a_dev *act8945a;
->  > +	int ret;
->  > +
->  > +	act8945a = devm_kzalloc(&i2c->dev, sizeof(*act8945a), GFP_KERNEL);
->  > +	if (!act8945a)
->  > +		return -ENOMEM;
->  > +
-> 
-> What is the point of this structure (and the header file)? Can't the subdevices just
-> do dev_get_regmap(dev->parent)? regulator_register() afaik already does this by
-> default.
-
-Yes, I re-read regulator_register() code. It did do dev_get_regmap(dev->parent).
-
-I think this structure should be pointed by dev->parent, this structure is necessary.
-
-Yes regulator driver should be simpler.
-
-Moreover, it is used by another sub device, charger. Which don't such code.
-
-> 
-> --
-> Bye, Peter Korsgaard
 
 
-Best Regards,
-Wenyou Yang
+On 1/14/2016 5:27 AM, Christoffer Dall wrote:
+> On Wed, Jan 13, 2016 at 07:03:04PM -0800, Mario Smarduch wrote:
+>>
+>>
+>> On 1/12/2016 4:57 PM, Mario Smarduch wrote:
+>>>
+>>>
+>>> On 1/12/2016 6:12 AM, Christoffer Dall wrote:
+>>>> On Mon, Jan 11, 2016 at 03:39:21PM -0800, Mario Smarduch wrote:
+>>>>>
+>>>>>
+>>>>> On 1/10/2016 8:32 AM, Christoffer Dall wrote:
+>>>>>> Hi Mario,
+>>>>>>
+>>>>>> I spotted one more potential issue...
+>>>>>>
+>>>>>> On Sat, Dec 26, 2015 at 01:54:55PM -0800, Mario Smarduch wrote:
+>>>>>>> Add helper functions to enable access to fp/smid on guest entry and save host
+>>>>>>> fpexc on vcpu put, check if fp/simd registers are dirty and add new vcpu
+>>>>>>> fields.
+>>>>>>>
+>>>>>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>>>>>>> ---
+>>>>>>>  arch/arm/include/asm/kvm_emulate.h   | 42 ++++++++++++++++++++++++++++++++++++
+>>>>>>>  arch/arm/include/asm/kvm_host.h      |  6 ++++++
+>>>>>>>  arch/arm64/include/asm/kvm_emulate.h |  8 +++++++
+>>>>>>>  3 files changed, 56 insertions(+)
+>>>>>>>
+>>>>>>> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+>>>>>>> index 3095df0..d4d9da1 100644
+>>>>>>> --- a/arch/arm/include/asm/kvm_emulate.h
+>>>>>>> +++ b/arch/arm/include/asm/kvm_emulate.h
+>>>>>>> @@ -24,6 +24,8 @@
+>>>>>>>  #include <asm/kvm_mmio.h>
+>>>>>>>  #include <asm/kvm_arm.h>
+>>>>>>>  #include <asm/cputype.h>
+>>>>>>> +#include <asm/vfp.h>
+>>>>>>> +#include "../vfp/vfpinstr.h"
+>>>>>>>  
+>>>>>>>  unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
+>>>>>>>  unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
+>>>>>>> @@ -255,4 +257,44 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+>>>>>>>  	}
+>>>>>>>  }
+>>>>>>>  
+>>>>>>> +#ifdef CONFIG_VFPv3
+>>>>>>> +/* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
+>>>>>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
+>>>>>>> +{
+>>>>>>> +	u32 fpexc;
+>>>>>>> +
+>>>>>>> +	/* Save host fpexc, and enable guest access to fp unit */
+>>>>>>> +	fpexc = fmrx(FPEXC);
+>>>>>>> +	vcpu->arch.host_fpexc = fpexc;
+>>>>>>> +	fpexc |= FPEXC_EN;
+>>>>>>> +	fmxr(FPEXC, fpexc);
+>>>>>>> +
+>>>>>>> +	/* Configure HCPTR to trap on tracing and fp/simd access */
+>>>>>>> +	vcpu->arch.hcptr = HCPTR_TTA | HCPTR_TCP(10)  | HCPTR_TCP(11);
+>>>>>>> +}
+>>>>>>> +
+>>>>>>> +/* Called from vcpu_put - restore host fpexc */
+>>>>>>> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu)
+>>>>>>> +{
+>>>>>>> +	fmxr(FPEXC, vcpu->arch.host_fpexc);
+>>>>>>> +}
+>>>>>>> +
+>>>>>>> +/* If trap bits are reset then fp/simd registers are dirty */
+>>>>>>> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
+>>>>>>> +{
+>>>>>>> +	return !(vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
+>>>>>>> +}
+>>>>>>> +#else
+>>>>>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
+>>>>>>> +{
+>>>>>>> +	vcpu->arch.hcptr = HCPTR_TTA;
+>>>>>>
+>>>>>> Is it correct not to trap VFP registers when the host kernel does not
+>>>>>> have CONFIG_VFPv3?  I think this is a change in functionality compared
+>>>>>> to the current kernels is it not?
+>>>>>
+>>>>> With CPU_V7 VFPv3 gets selected, without it fp should be emulated,
+>>>>> with exceptions taken in guest kernel. I don't see a reason why
+>>>>> fp hcptr access should be enabled in that case.
+>>>>>
+>>>>
+>>>> If you have to guests with CONFIG_VFPV3 but your host doesn't have
+>>>> CONFIG_VFPV3, you will never context-switch the VFP registers between
+>>>> the two VMs, and mayhem will ensue.
+>>>>
+>>>> Unless I'm missing something very obvious?
+>>
+>> Did more testing on this enabling OABI_COMPAT and selecting
+>> NWFPE/FastFPE breaks the boot. So far can't find a way to boot host
+>> without VFP/VFPv3 enabled on ARMv7. CPU_V7 defaults to VFPv3
+>> selection. I'm wondering if !VFPv3 path should be removed from
+>> the patches?
+>>
+> I think this is related to your particular choice of userspace. 
+
+It appears like there are two soft float implementations.
+
+FastFPE - but that's missing arch/arm/fastfpe directory, the option
+can still be selected but nothing is built.
+
+And the Netwidner FPE arch/arm/nwfpe, that doesn't appear to be
+hooked into the kernel. The hook nwfpe_enter is not referenced
+anywhere.
+
+I could make this change but have no way to bring the host up to
+test it.
+
+- Mario
+
+> I think
+> it's fair to assume VFP is enabled for a KVM host, but I don't have
+> enough familiarity with this to be sure.
+> 
+> Marc, any thoughts?
+> 
+> -Christoffer
+> 
