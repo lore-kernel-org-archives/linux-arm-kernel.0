@@ -1,71 +1,74 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 15 Jan 2016 11:45:35 +0100
-Subject: [PATCH v3 14/14] ARM: shmobile: r8a7793: enable audio DMAC in
- device tree
-In-Reply-To: <1452825487-15931-15-git-send-email-horms+renesas@verge.net.au>
-References: <1452825487-15931-1-git-send-email-horms+renesas@verge.net.au>
- <1452825487-15931-15-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXHixAuiYayxmvOLLm39w4iTosVucRtN7ASuHGuY7p5-Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Jan 2016 11:52:54 +0100
+Subject: [PATCH] drm: omap dss: add missing includes
+Message-ID: <6010313.rYeAixWRHJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+The omapdrm dss driver currently fails to build in some configurations when
+the pinctrl and seq_print declarations are not visible:
 
-On Fri, Jan 15, 2016 at 3:38 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> --- a/arch/arm/boot/dts/r8a7793.dtsi
-> +++ b/arch/arm/boot/dts/r8a7793.dtsi
-> @@ -1201,52 +1201,119 @@
->                 status = "disabled";
->
->                 rcar_sound,dvc {
-> -                       dvc0: dvc at 0 { };
-> -                       dvc1: dvc at 1 { };
-> +                       dvc0: dvc at 0 {
-> +                               dmas = <&audma0 0xbc>;
-> +                               dma-names = "tx";
-> +                       };
-> +                       dvc1: dvc at 1 {
-> +                               dmas = <&audma0 0xbe>;
-> +                               dma-names = "tx";
-> +                       };
->                 };
-> +
->                 rcar_sound,src {
-> -                       src0: src at 0 { };
-> -                       src1: src at 1 { };
-> -                       src2: src at 2 { };
-> -                       src3: src at 3 { };
-> -                       src4: src at 4 { };
-> -                       src5: src at 5 { };
-> -                       src6: src at 6 { };
-> -                       src7: src at 7 { };
-> -                       src8: src at 8 { };
-> -                       src9: src at 9 { };
-> +                       src0: src at 0 {
-> +                               interrupts = <0 352 IRQ_TYPE_LEVEL_HIGH>;
+omapdrm/dss/dss.c:1268:2: error: implicit declaration of function 'pinctrl_pm_select_sleep_state' [-Werror=implicit-function-declaration]
+omapdrm/dss/dss.c:1277:2: error: implicit declaration of function 'pinctrl_pm_select_default_state' [-Werror=implicit-function-declaration]
+omapdrm/dss/hdmi_wp.c:26:2: error: implicit declaration of function 'seq_printf' [-Werror=implicit-function-declaration]
+omapdrm/dss/hdmi_pll.c:30:2: error: implicit declaration of function 'seq_printf' [-Werror=implicit-function-declaration]
+omapdrm/dss/hdmi_phy.c:34:2: error: implicit declaration of function 'seq_printf' [-Werror=implicit-function-declaration]
 
-<GIC_SPI ...> (and more below)
+This adds the appropriate include statements.
 
->                 rcar_sound,ssi {
->                         ssi0: ssi at 0 {
->                                 interrupts = <0 370 IRQ_TYPE_LEVEL_HIGH>;
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 9960aa7cb58c ("drm/omap: move omapdss & displays under omapdrm")
+---
+Found on ARM randconfig builds. I assume there are also configurations in which this is
+not needed because the headers get included through other headers, and I have not
+investigated exactly what options cause this as the fix seems obvious and harmless.
 
-<GIC_SPI ...>
-
-Ah, you already let a few pass through before ;-)
-
-> +                               dmas = <&audma0 0x01>, <&audma1 0x02>, <&audma0 0x15>, <&audma1 0x16>;
-> +                               dma-names = "rx", "tx", "rxu", "txu";
->                         };
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/gpu/drm/omapdrm/dss/dss.c b/drivers/gpu/drm/omapdrm/dss/dss.c
+index f95ff319e68e..839b1b6bdbe4 100644
+--- a/drivers/gpu/drm/omapdrm/dss/dss.c
++++ b/drivers/gpu/drm/omapdrm/dss/dss.c
+@@ -37,6 +37,7 @@
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
+ #include <linux/of.h>
++#include <linux/pinctrl/consumer.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/suspend.h>
+ #include <linux/component.h>
+diff --git a/drivers/gpu/drm/omapdrm/dss/hdmi_phy.c b/drivers/gpu/drm/omapdrm/dss/hdmi_phy.c
+index 1f5d19c119ce..a872721a03a2 100644
+--- a/drivers/gpu/drm/omapdrm/dss/hdmi_phy.c
++++ b/drivers/gpu/drm/omapdrm/dss/hdmi_phy.c
+@@ -13,6 +13,8 @@
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
++#include <linux/seq_file.h>
++
+ #include <video/omapdss.h>
+ 
+ #include "dss.h"
+diff --git a/drivers/gpu/drm/omapdrm/dss/hdmi_pll.c b/drivers/gpu/drm/omapdrm/dss/hdmi_pll.c
+index 06e23a7c432c..f1015e8b8267 100644
+--- a/drivers/gpu/drm/omapdrm/dss/hdmi_pll.c
++++ b/drivers/gpu/drm/omapdrm/dss/hdmi_pll.c
+@@ -16,6 +16,7 @@
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
+ #include <linux/clk.h>
++#include <linux/seq_file.h>
+ 
+ #include <video/omapdss.h>
+ 
+diff --git a/drivers/gpu/drm/omapdrm/dss/hdmi_wp.c b/drivers/gpu/drm/omapdrm/dss/hdmi_wp.c
+index 7c544bc56fb5..753ac305d32a 100644
+--- a/drivers/gpu/drm/omapdrm/dss/hdmi_wp.c
++++ b/drivers/gpu/drm/omapdrm/dss/hdmi_wp.c
+@@ -14,6 +14,7 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
++#include <linux/seq_file.h>
+ #include <video/omapdss.h>
+ 
+ #include "dss.h"
