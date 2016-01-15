@@ -1,80 +1,49 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 15 Jan 2016 13:58:53 -0800
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160115212714.GM3421@worktop>
-References: <5696CF08.8080700@imgtec.com> <20160114121449.GC15828@arm.com>
- <5697F6D2.60409@imgtec.com>
- <20160114203430.GC3818@linux.vnet.ibm.com>
- <56980C91.1010403@imgtec.com>
- <20160114212913.GF3818@linux.vnet.ibm.com>
- <20160115085554.GF3421@worktop> <20160115091348.GA27936@worktop>
- <20160115174612.GV3818@linux.vnet.ibm.com>
- <20160115212714.GM3421@worktop>
-Message-ID: <20160115215853.GC3818@linux.vnet.ibm.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Sat, 16 Jan 2016 00:00:39 +0200
+Subject: mvsdio not working on OpenRD
+In-Reply-To: <20160115192217.GA12145@jirafa.cyrius.com>
+References: <20160110042619.GA22738@jirafa.cyrius.com>
+ <20160110153843.GA22229@lunn.ch>
+ <20160115180339.GC18908@darkstar.musicnaut.iki.fi>
+ <20160115192217.GA12145@jirafa.cyrius.com>
+Message-ID: <20160115220039.GD18908@darkstar.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 10:27:14PM +0100, Peter Zijlstra wrote:
-> On Fri, Jan 15, 2016 at 09:46:12AM -0800, Paul E. McKenney wrote:
-> > On Fri, Jan 15, 2016 at 10:13:48AM +0100, Peter Zijlstra wrote:
+Hi,
+
+On Fri, Jan 15, 2016 at 11:22:17AM -0800, Martin Michlmayr wrote:
+> * Aaro Koskinen <aaro.koskinen@iki.fi> [2016-01-15 20:03]:
+> > On Sun, Jan 10, 2016 at 04:38:43PM +0100, Andrew Lunn wrote:
+> > > If i remember correctly, the OpenRD has some odd muxing going on with
+> > > MMC and the second serial port. This fits the error message:
 > 
-> > > And the stuff we're confused about is how best to express the difference
-> > > and guarantees of these two forms of transitivity and how exactly they
-> > > interact.
-> > 
-> > Hoping my memory-barrier.txt patch helps here...
+> Andrew, your memory is good!  I looked at the old board file and
+> noticed there used to be a kw_openrd_init_uart1 kernel option to
+> choose.  The default was MMC (this was not a Debian choice, but one
+> from kernel.org), so I think that should become the default again.
 > 
-> Yes, that seems a good start. But yesterday you raised the 'fun' point
-> of two globally ordered sequences connected by a single local link.
+> See https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/diff/arch/arm/mach-kirkwood/openrd-setup.c?id=ba364fc752daeded072a5ef31e43b84cb1f9e5fd
+> 
+> Rick Thomas did some tests we came to the conclusion that MMC on DTB
+> doesn't work, even with your patch.  We established that the same
+> kernel (3.16) works with the board file but not with DTB.  I was about
+> to send an udpate when I saw Aaro's email.
+> 
+> I suggested we put in both of these patches.  I'll produce a test
+> kernel for Rick with Aaro's patch.
+> 
+> > In addition, the UART/SD selection GPIO needs to be set up. I sent a
+> > patch proposal for this:
+> > 	http://marc.info/?l=linux-arm-kernel&m=145262936504783&w=2
+> 
+> Thanks!
 
-The conclusion that I am slowly coming to is that litmus tests should
-not be thought of as linear chains, but rather as cycles.  If you think
-of it as a cycle, then it doesn't matter where the local link is, just
-how many of them and how they are connected.
+BTW, the GPIO hogging binding used in the patch might not be supported
+by the old Debian 3.16 kernel. :-(
 
-But I will admit that there are some rather strange litmus tests that
-challenge this cycle-centric view, for example, the one shown below.
-It turns out that herd and ppcmem disagree on the outcome.  (The Power
-architects side with ppcmem.)
+One workaround would be to setup the GPIO from userspace using sysfs,
+but that would need replug of the SD card (unbind/bind, or if the driver
+a module unload/reload, might work), but that's quite clumsy...
 
-> And I think I'm still confused on LWSYNC (in the smp_wmb case) when one
-> of the stores looses a conflict, and if that scenario matters. If it
-> does, we should inspect the same case for other barriers.
-
-Indeed.  I am still working on how these should be described.  My
-current thought is to be quite conservative on what ordering is
-actually respected, however, the current task is formalizing how
-RCU plays with the rest of the memory model.
-
-							Thanx, Paul
-
-------------------------------------------------------------------------
-
-PPC Overlapping Group-B sets version 4
-""
-(* When the Group-B sets from two different barriers involve instructions in
-   the same thread, within that thread one set must contain the other.
-
-	P0	P1	P2
-	Rx=1	Wy=1	Wz=2
-	dep.	lwsync	lwsync
-	Ry=0	Wz=1	Wx=1
-	Rz=1
-
-	assert(!(z=2))
-
-   Forbidden by ppcmem, allowed by herd.
-*)
-{
-0:r1=x; 0:r2=y; 0:r3=z;
-1:r1=x; 1:r2=y; 1:r3=z; 1:r4=1;
-2:r1=x; 2:r2=y; 2:r3=z; 2:r4=1; 2:r5=2;
-}
- P0		| P1		| P2		;
- lwz r6,0(r1)	| stw r4,0(r2)	| stw r5,0(r3)	;
- xor r7,r6,r6	| lwsync	| lwsync	;
- lwzx r7,r7,r2	| stw r4,0(r3)	| stw r4,0(r1)	;
- lwz r8,0(r3)	|		|		;
-
-exists
-(z=2 /\ 0:r6=1 /\ 0:r7=0 /\ 0:r8=1)
+A.
