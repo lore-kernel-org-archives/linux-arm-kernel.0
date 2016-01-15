@@ -1,138 +1,61 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 14 Jan 2016 18:02:06 -0800
-Subject: [PATCH v6 1/6] arm/arm64: KVM: Introduce armv7 fp/simd vcpu fields
- and helpers
-In-Reply-To: <20160114132718.GA4329@cbox>
-References: <1451166900-3711-1-git-send-email-m.smarduch@samsung.com>
- <1451166900-3711-2-git-send-email-m.smarduch@samsung.com>
- <20160110163204.GD30867@cbox> <56943D29.3000002@samsung.com>
- <20160112141207.GF15554@cbox> <5695A0EB.5020609@samsung.com>
- <56970FE8.4020805@samsung.com> <20160114132718.GA4329@cbox>
-Message-ID: <5698531E.1090606@samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 14 Jan 2016 18:02:37 -0800
+Subject: [PATCH v3 04/13] clk: at91: make IRQ optional and register them
+ later
+In-Reply-To: <1449248628-3486-5-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1449248628-3486-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1449248628-3486-5-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20160115020237.GJ22188@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12/04, Alexandre Belloni wrote:
+> @@ -686,3 +652,45 @@ static void __init of_at91sam9x5_clk_main_setup(struct device_node *np)
+>  }
+>  CLK_OF_DECLARE(at91sam9x5_clk_main, "atmel,at91sam9x5-clk-main",
+>  	       of_at91sam9x5_clk_main_setup);
+> +
+> +static const struct of_device_id atmel_clk_main_dt_ids[] = {
+> +	{ .compatible = "atmel,at91rm9200-clk-main-osc" },
+> +	{ .compatible = "atmel,at91sam9x5-clk-main-rc-osc" },
+> +	{ .compatible = "atmel,at91sam9x5-clk-main" },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static int __init atmel_clk_main_probe(struct platform_device *pdev)
+> +{
+> +	struct of_phandle_args clkspec = { .np = pdev->dev.of_node};
+> +	struct clk_main *clkmain;
+> +	struct clk_hw *hw;
+> +	int ret;
+> +
+> +	hw = __clk_get_hw(of_clk_get_from_provider(&clkspec));
+> +	if (!hw)
+> +		return -ENODEV;
+> +
+> +	clkmain = to_clk_main(hw);
+> +	clkmain->irq = platform_get_irq(pdev, 0);
+> +	if (!clkmain->irq)
+> +		return 0;
 
+Is there any way to get the irq into this probe function without
+getting a clk pointer and then unwrapping it to get an irq
+value out of the clk_hw wrapper structure? That's a pretty
+convoluted design.
 
-On 1/14/2016 5:27 AM, Christoffer Dall wrote:
-> On Wed, Jan 13, 2016 at 07:03:04PM -0800, Mario Smarduch wrote:
->>
->>
->> On 1/12/2016 4:57 PM, Mario Smarduch wrote:
->>>
->>>
->>> On 1/12/2016 6:12 AM, Christoffer Dall wrote:
->>>> On Mon, Jan 11, 2016 at 03:39:21PM -0800, Mario Smarduch wrote:
->>>>>
->>>>>
->>>>> On 1/10/2016 8:32 AM, Christoffer Dall wrote:
->>>>>> Hi Mario,
->>>>>>
->>>>>> I spotted one more potential issue...
->>>>>>
->>>>>> On Sat, Dec 26, 2015 at 01:54:55PM -0800, Mario Smarduch wrote:
->>>>>>> Add helper functions to enable access to fp/smid on guest entry and save host
->>>>>>> fpexc on vcpu put, check if fp/simd registers are dirty and add new vcpu
->>>>>>> fields.
->>>>>>>
->>>>>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->>>>>>> ---
->>>>>>>  arch/arm/include/asm/kvm_emulate.h   | 42 ++++++++++++++++++++++++++++++++++++
->>>>>>>  arch/arm/include/asm/kvm_host.h      |  6 ++++++
->>>>>>>  arch/arm64/include/asm/kvm_emulate.h |  8 +++++++
->>>>>>>  3 files changed, 56 insertions(+)
->>>>>>>
->>>>>>> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
->>>>>>> index 3095df0..d4d9da1 100644
->>>>>>> --- a/arch/arm/include/asm/kvm_emulate.h
->>>>>>> +++ b/arch/arm/include/asm/kvm_emulate.h
->>>>>>> @@ -24,6 +24,8 @@
->>>>>>>  #include <asm/kvm_mmio.h>
->>>>>>>  #include <asm/kvm_arm.h>
->>>>>>>  #include <asm/cputype.h>
->>>>>>> +#include <asm/vfp.h>
->>>>>>> +#include "../vfp/vfpinstr.h"
->>>>>>>  
->>>>>>>  unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
->>>>>>>  unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
->>>>>>> @@ -255,4 +257,44 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
->>>>>>>  	}
->>>>>>>  }
->>>>>>>  
->>>>>>> +#ifdef CONFIG_VFPv3
->>>>>>> +/* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
->>>>>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
->>>>>>> +{
->>>>>>> +	u32 fpexc;
->>>>>>> +
->>>>>>> +	/* Save host fpexc, and enable guest access to fp unit */
->>>>>>> +	fpexc = fmrx(FPEXC);
->>>>>>> +	vcpu->arch.host_fpexc = fpexc;
->>>>>>> +	fpexc |= FPEXC_EN;
->>>>>>> +	fmxr(FPEXC, fpexc);
->>>>>>> +
->>>>>>> +	/* Configure HCPTR to trap on tracing and fp/simd access */
->>>>>>> +	vcpu->arch.hcptr = HCPTR_TTA | HCPTR_TCP(10)  | HCPTR_TCP(11);
->>>>>>> +}
->>>>>>> +
->>>>>>> +/* Called from vcpu_put - restore host fpexc */
->>>>>>> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu)
->>>>>>> +{
->>>>>>> +	fmxr(FPEXC, vcpu->arch.host_fpexc);
->>>>>>> +}
->>>>>>> +
->>>>>>> +/* If trap bits are reset then fp/simd registers are dirty */
->>>>>>> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
->>>>>>> +{
->>>>>>> +	return !(vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
->>>>>>> +}
->>>>>>> +#else
->>>>>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
->>>>>>> +{
->>>>>>> +	vcpu->arch.hcptr = HCPTR_TTA;
->>>>>>
->>>>>> Is it correct not to trap VFP registers when the host kernel does not
->>>>>> have CONFIG_VFPv3?  I think this is a change in functionality compared
->>>>>> to the current kernels is it not?
->>>>>
->>>>> With CPU_V7 VFPv3 gets selected, without it fp should be emulated,
->>>>> with exceptions taken in guest kernel. I don't see a reason why
->>>>> fp hcptr access should be enabled in that case.
->>>>>
->>>>
->>>> If you have to guests with CONFIG_VFPV3 but your host doesn't have
->>>> CONFIG_VFPV3, you will never context-switch the VFP registers between
->>>> the two VMs, and mayhem will ensue.
->>>>
->>>> Unless I'm missing something very obvious?
->>
->> Did more testing on this enabling OABI_COMPAT and selecting
->> NWFPE/FastFPE breaks the boot. So far can't find a way to boot host
->> without VFP/VFPv3 enabled on ARMv7. CPU_V7 defaults to VFPv3
->> selection. I'm wondering if !VFPv3 path should be removed from
->> the patches?
->>
-> I think this is related to your particular choice of userspace. 
+> +
+> +	init_waitqueue_head(&clkmain->wait);
+> +	irq_set_status_flags(clkmain->irq, IRQ_NOAUTOEN);
+> +	ret = devm_request_irq(&pdev->dev, clkmain->irq, clk_main_irq_handler,
+> +			       IRQF_TRIGGER_HIGH, __clk_get_name(hw->clk),
+> +			       clkmain);
+> +	if (ret)
+> +		clkmain->irq = 0;
+> +
+> +	return ret;
+> +}
+> +
 
-It appears like there are two soft float implementations.
-
-FastFPE - but that's missing arch/arm/fastfpe directory, the option
-can still be selected but nothing is built.
-
-And the Netwidner FPE arch/arm/nwfpe, that doesn't appear to be
-hooked into the kernel. The hook nwfpe_enter is not referenced
-anywhere.
-
-I could make this change but have no way to bring the host up to
-test it.
-
-- Mario
-
-> I think
-> it's fair to assume VFP is enabled for a KVM host, but I don't have
-> enough familiarity with this to be sure.
-> 
-> Marc, any thoughts?
-> 
-> -Christoffer
-> 
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
