@@ -1,190 +1,130 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 15 Jan 2016 17:39:55 +0000
-Subject: [Xen-devel] [PATCH v2 06/16] Xen: ARM: Add support for mapping
- platform device mmio
-In-Reply-To: <1452840929-19612-7-git-send-email-zhaoshenglong@huawei.com>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-7-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <alpine.DEB.2.02.1601151739470.16178@kaball.uk.xensource.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 15 Jan 2016 12:44:08 -0500
+Subject: [PATCH V12 3/7] dma: add Qualcomm Technologies HIDMA management
+ driver
+In-Reply-To: <56992C4E.6010606@arm.com>
+References: <1452523550-8920-1-git-send-email-okaya@codeaurora.org>
+ <1452523550-8920-4-git-send-email-okaya@codeaurora.org>
+ <20160115145629.GI3262@leverpostej> <56990CD4.6020405@arm.com>
+ <569912F3.9040507@codeaurora.org> <56992C4E.6010606@arm.com>
+Message-ID: <56992FE8.4000606@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Jan 2016, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>
+>> Sure, I'm ready to answer any questions. This is really a VFIO platform course. Not
+>> a HIDMA driver course. The approach is not different if you assign a platfom 
+>> SATA (AHCI) or SDHC driver to a guest machine.
 > 
-> Add a bus_notifier for platform bus device in order to map the device
-> mmio regions when DOM0 booting with ACPI.
+> I happen to have an idea of how VFIO works...
 > 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  drivers/xen/Makefile     |   1 +
->  drivers/xen/arm-device.c | 140 +++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 141 insertions(+)
->  create mode 100644 drivers/xen/arm-device.c
+
+OK. Good to know that we are speaking the same language.
+
+>>
+>> The summary is that:
+>> - IOMMU takes care of the mappings via VFIO driver.
+>> - Guest machine owns the HW. No hypervisor interaction.
 > 
-> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
-> index aa8a7f7..0c087b1 100644
-> --- a/drivers/xen/Makefile
-> +++ b/drivers/xen/Makefile
-> @@ -9,6 +9,7 @@ CFLAGS_features.o			:= $(nostackp)
->  
->  CFLAGS_efi.o				+= -fshort-wchar
->  
-> +dom0-$(CONFIG_ARM64) += arm-device.o
->  dom0-$(CONFIG_PCI) += pci.o
->  dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
->  dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
-> diff --git a/drivers/xen/arm-device.c b/drivers/xen/arm-device.c
-> new file mode 100644
-> index 0000000..7d902ea
-> --- /dev/null
-> +++ b/drivers/xen/arm-device.c
-> @@ -0,0 +1,140 @@
-> +/*
-> + * Copyright (c) 2015, Linaro Limited, Shannon Zhao
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/platform_device.h>
-> +#include <linux/acpi.h>
-> +#include <xen/xen.h>
-> +#include <xen/page.h>
-> +#include <xen/interface/memory.h>
-> +#include <asm/xen/hypervisor.h>
-> +#include <asm/xen/hypercall.h>
-> +
-> +static int xen_unmap_device_mmio(struct resource *resource, unsigned int count)
-> +{
-> +	unsigned int i, j, nr;
-> +	int rc = 0;
-> +	struct resource *r;
-> +	struct xen_remove_from_physmap xrp;
-> +
-> +	for (i = 0; i < count; i++) {
-> +		r = &resource[i];
-> +		nr = DIV_ROUND_UP(resource_size(r), XEN_PAGE_SIZE);
-> +		if ((resource_type(r) != IORESOURCE_MEM) || (nr == 0))
-> +			continue;
-> +
-> +		for (j = 0; j < nr; j++) {
-> +			xrp.domid = DOMID_SELF;
-> +			xrp.gpfn = XEN_PFN_DOWN(r->start) + j;
-> +			rc = HYPERVISOR_memory_op(XENMEM_remove_from_physmap,
-> +						  &xrp);
-> +			if (rc)
-> +				return rc;
-> +		}
-> +	}
-> +
-> +	return rc;
-> +}
-> +
-> +static int xen_map_device_mmio(struct resource *resource, unsigned int count)
-> +{
-> +	unsigned int i, j, nr;
-> +	int rc = 0;
-> +	struct resource *r;
-> +	xen_pfn_t *gpfns;
-> +	xen_ulong_t *idxs;
-> +	int *errs;
-> +	struct xen_add_to_physmap_range xatp;
-> +
-> +	for (i = 0; i < count; i++) {
-> +		r = &resource[i];
-> +		nr = DIV_ROUND_UP(resource_size(r), XEN_PAGE_SIZE);
-> +		if ((resource_type(r) != IORESOURCE_MEM) || (nr == 0))
-> +			continue;
-> +
-> +		gpfns = kzalloc(sizeof(xen_pfn_t) * nr, GFP_KERNEL);
-> +		idxs = kzalloc(sizeof(xen_ulong_t) * nr, GFP_KERNEL);
-> +		errs = kzalloc(sizeof(int) * nr, GFP_KERNEL);
-> +		if (!gpfns || !idxs || !errs) {
-> +			kfree(gpfns);
-> +			kfree(idxs);
+> Then it might be worth mentioning all of this
+> 
 
-kfree(errs)?
+Sure thing. I'm trying to locate where the right place would be.
+I'll target commit message and source code for now.
 
-Aside from this:
+>>
+>>>
+>>> - How do host and guest communicate?
+>> They don't.
+>>
+>>> - How is the integration performed in the hypervisor?
+>> Hypervisor has a bunch of channel resources. For each guest machine, the channel gets
+>> unbound from the hypervisor. Channels get bind to each VFIO platform device and then
+>> control is given to the guest machine.
+> 
+> And what does the hypervisor do with those in the meantime? Above, you
+> say "Guest machine owns the HW". 
 
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+The guest machine owns the channel HW which runs independent of the management HW.
+
+> So what is that hypervisor code used
+> for? Is that your reset driver?
+
+The HIDMA "management" driver which runs at the hypervisor owns the management HW. 
+Management driver serves two purposes.
+
+1. Common bus parameter configuration (could be called reset driver).
+2. Fine tuning the HW resources.
+
+Multiple HIDMA channels share common HW resources. The management driver is able to change 
+the priority (high/low) and weight (round-robin priority) of each HIDMA channel on the flight. 
+
+The system administrator will use a userspace application to allocate HW resources to each channel via
+the management driver.
+
+The management driver does some common configuration too for these parameters. 
+The management interface also has to be enabled before any channel can be enabled.
+
+- max-write-burst-bytes: Maximum write burst in bytes that HIDMA can 
+  occupy the bus for in a single transaction. A memcpy requested is 
+  fragmented to multiples of this amount. This parameter is used while
+  writing into destination memory. Setting this value incorrectly can
+  starve other peripherals in the system.
+- max-read-burst-bytes: Maximum read burst in bytes that HIDMA can
+  occupy the bus for in a single transaction. A memcpy request is
+  fragmented to multiples of this amount. This parameter is used while
+  reading the source memory. Setting this value incorrectly can starve
+  other peripherals in the system.
+- max-write-transactions: This value is how many times a write burst is 
+  applied back to back while writing to the destination before yielding 
+  the bus.
+- max-read-transactions: This value is how many times a read burst is
+  applied back to back while reading the source before a yielding the bus.
+- channel-reset-timeout-cycles: Channel reset timeout in cycles for this SOC.
+  Once a reset is applied to the HW, HW starts a timer for reset operation
+  to confirm. If reset is not completed within this time, HW reports reset
+  failure. 
+
+> 
+> You may want to drop the "hypervisor" designation, BTW, because this has
+> no real connection to virtualisation.
+> 
+
+Would you use host/guest relationship?
+
+>>
+>> Once the guest machine is shutdown, VFIO driver still owns the channel device. It can
+>> assign the device to another guest machine.
+>>
+>>> - Does the HYP side requires any context switch (and how is that done)?
+>> No communication is needed.
+>>
+>>> - What makes it safe?
+>> No communication is needed.
+>>
+>>>
+>>> Without any of this information (and pointer to the code to back it up),
+>>> I'm very reluctant to take any of this.
+>>
+>> Please let me know what exactly is not clear. 
+>>
+>> You don't write a virtualization driver for 8139too driver. The driver works whether it is running in the 
+>> guest machine or the hypervisor. 
+> 
+> Exactly. No hypervisor code needed whatsoever. So please get rid of this
+> hypervisor nonsense! ;-)
+> 
+
+I need the management driver for administrative purposes and common initialization. 
+I like the split SW design as it follows the HW design too.
+
+> Thanks,
+> 
+> 	M.
+> 
 
 
-> +			return -ENOMEM;
-> +		}
-> +
-> +		for (j = 0; j < nr; j++) {
-> +			gpfns[j] = XEN_PFN_DOWN(r->start) + j;
-> +			idxs[j] = XEN_PFN_DOWN(r->start) + j;
-> +		}
-> +
-> +		xatp.domid = DOMID_SELF;
-> +		xatp.size = nr;
-> +		xatp.space = XENMAPSPACE_dev_mmio;
-> +
-> +		set_xen_guest_handle(xatp.gpfns, gpfns);
-> +		set_xen_guest_handle(xatp.idxs, idxs);
-> +		set_xen_guest_handle(xatp.errs, errs);
-> +
-> +		rc = HYPERVISOR_memory_op(XENMEM_add_to_physmap_range, &xatp);
-> +		kfree(gpfns);
-> +		kfree(idxs);
-> +		kfree(errs);
-> +		if (rc)
-> +			return rc;
-> +	}
-> +
-> +	return rc;
-> +}
-> +
-> +static int xen_platform_notifier(struct notifier_block *nb,
-> +				 unsigned long action, void *data)
-> +{
-> +	struct platform_device *pdev = to_platform_device(data);
-> +	int r = 0;
-> +
-> +	if (pdev->num_resources == 0 || pdev->resource == NULL)
-> +		return NOTIFY_OK;
-> +
-> +	switch (action) {
-> +	case BUS_NOTIFY_ADD_DEVICE:
-> +		r = xen_map_device_mmio(pdev->resource, pdev->num_resources);
-> +		break;
-> +	case BUS_NOTIFY_DEL_DEVICE:
-> +		r = xen_unmap_device_mmio(pdev->resource, pdev->num_resources);
-> +		break;
-> +	default:
-> +		return NOTIFY_DONE;
-> +	}
-> +	if (r)
-> +		dev_err(&pdev->dev, "Platform: Failed to %s device %s MMIO!\n",
-> +			action == BUS_NOTIFY_ADD_DEVICE ? "map" :
-> +			(action == BUS_NOTIFY_DEL_DEVICE ? "unmap" : "?"),
-> +			pdev->name);
-> +
-> +	return NOTIFY_OK;
-> +}
-> +
-> +static struct notifier_block platform_device_nb = {
-> +	.notifier_call = xen_platform_notifier,
-> +};
-> +
-> +static int __init register_xen_platform_notifier(void)
-> +{
-> +	if (!xen_initial_domain() || acpi_disabled)
-> +		return 0;
-> +
-> +	return bus_register_notifier(&platform_bus_type, &platform_device_nb);
-> +}
-> +
-> +arch_initcall(register_xen_platform_notifier);
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
