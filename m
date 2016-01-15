@@ -1,49 +1,54 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Sat, 16 Jan 2016 00:00:39 +0200
-Subject: mvsdio not working on OpenRD
-In-Reply-To: <20160115192217.GA12145@jirafa.cyrius.com>
-References: <20160110042619.GA22738@jirafa.cyrius.com>
- <20160110153843.GA22229@lunn.ch>
- <20160115180339.GC18908@darkstar.musicnaut.iki.fi>
- <20160115192217.GA12145@jirafa.cyrius.com>
-Message-ID: <20160115220039.GD18908@darkstar.musicnaut.iki.fi>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Fri, 15 Jan 2016 14:01:47 -0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160115212912.GN3421@worktop>
+References: <20160113104516.GE25458@arm.com> <5696CF08.8080700@imgtec.com>
+ <20160114121449.GC15828@arm.com> <5697F6D2.60409@imgtec.com>
+ <20160114203430.GC3818@linux.vnet.ibm.com>
+ <56980C91.1010403@imgtec.com>
+ <20160114212913.GF3818@linux.vnet.ibm.com>
+ <20160115085554.GF3421@worktop>
+ <20160115173912.GU3818@linux.vnet.ibm.com>
+ <20160115212912.GN3421@worktop>
+Message-ID: <20160115220147.GD3818@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jan 15, 2016 at 10:29:12PM +0100, Peter Zijlstra wrote:
+> On Fri, Jan 15, 2016 at 09:39:12AM -0800, Paul E. McKenney wrote:
+> > Should we start putting litmus tests for the various examples
+> > somewhere, perhaps in a litmus-tests directory within each participating
+> > architecture?  I have a pile of powerpc-related litmus tests on my laptop,
+> > but they probably aren't doing all that much good there.
+> 
+> Yeah, or a version of them in C that we can 'compile'?
 
-On Fri, Jan 15, 2016 at 11:22:17AM -0800, Martin Michlmayr wrote:
-> * Aaro Koskinen <aaro.koskinen@iki.fi> [2016-01-15 20:03]:
-> > On Sun, Jan 10, 2016 at 04:38:43PM +0100, Andrew Lunn wrote:
-> > > If i remember correctly, the OpenRD has some odd muxing going on with
-> > > MMC and the second serial port. This fits the error message:
-> 
-> Andrew, your memory is good!  I looked at the old board file and
-> noticed there used to be a kw_openrd_init_uart1 kernel option to
-> choose.  The default was MMC (this was not a Debian choice, but one
-> from kernel.org), so I think that should become the default again.
-> 
-> See https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/diff/arch/arm/mach-kirkwood/openrd-setup.c?id=ba364fc752daeded072a5ef31e43b84cb1f9e5fd
-> 
-> Rick Thomas did some tests we came to the conclusion that MMC on DTB
-> doesn't work, even with your patch.  We established that the same
-> kernel (3.16) works with the board file but not with DTB.  I was about
-> to send an udpate when I saw Aaro's email.
-> 
-> I suggested we put in both of these patches.  I'll produce a test
-> kernel for Rick with Aaro's patch.
-> 
-> > In addition, the UART/SD selection GPIO needs to be set up. I sent a
-> > patch proposal for this:
-> > 	http://marc.info/?l=linux-arm-kernel&m=145262936504783&w=2
-> 
-> Thanks!
+That would be good as well.  I am guessing that architecture-specific
+litmus tests will also be needed, but you are right that
+architecture-independent versions are higher priority.
 
-BTW, the GPIO hogging binding used in the patch might not be supported
-by the old Debian 3.16 kernel. :-(
+> > commit 2cb4e83a1b5c89c8e39b8a64bd89269d05913e41
+> > Author: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> > Date:   Fri Jan 15 09:30:42 2016 -0800
+> > 
+> >     documentation: Distinguish between local and global transitivity
+> >     
+> >     The introduction of smp_load_acquire() and smp_store_release() had
+> >     the side effect of introducing a weaker notion of transitivity:
+> >     The transitivity of full smp_mb() barriers is global, but that
+> >     of smp_store_release()/smp_load_acquire() chains is local.  This
+> >     commit therefore introduces the notion of local transitivity and
+> >     gives an example.
+> >     
+> >     Reported-by: Peter Zijlstra <peterz@infradead.org>
+> >     Reported-by: Will Deacon <will.deacon@arm.com>
+> >     Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> 
+> I think it fails to mention smp_mb__after_release_acquire(), although I
+> suspect we didn't actually introduce the primitive yet, which raises the
+> point, do we want to?
 
-One workaround would be to setup the GPIO from userspace using sysfs,
-but that would need replug of the SD card (unbind/bind, or if the driver
-a module unload/reload, might work), but that's quite clumsy...
+Well, it is not in v4.4.  I believe that we need good use cases before
+we add it.
 
-A.
+							Thanx, Paul
