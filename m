@@ -1,189 +1,195 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Fri, 15 Jan 2016 19:18:37 +0000
-Subject: [PATCH 05/19] arm64: Convert hcalls to use HVC immediate value
+Subject: [PATCH 01/19] arm64: Fold proc-macros.S into assembler.h
 In-Reply-To: <cover.1452884156.git.geoff@infradead.org>
 References: <cover.1452884156.git.geoff@infradead.org>
-Message-ID: <38930b39f3366074034719a351f62086c9172ae2.1452884156.git.geoff@infradead.org>
+Message-ID: <8b5d0a08bff585caa278afc2dc16352e5b8f210b.1452884156.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The existing arm64 hcall implementations are limited in that they only allow
-for two distinct hcalls; with the x0 register either zero or not zero.  Also,
-the API of the hyp-stub exception vector routines and the KVM exception vector
-routines differ; hyp-stub uses a non-zero value in x0 to implement
-__hyp_set_vectors, whereas KVM uses it to implement kvm_call_hyp.
-
-To allow for additional hcalls to be defined and to make the arm64 hcall API
-more consistent across exception vector routines, change the hcall
-implementations to use the 16 bit immediate value of the HVC instruction to
-specify the hcall type.
-
-Define three new preprocessor macros HVC_CALL_HYP, HVC_GET_VECTORS, and
-HVC_SET_VECTORS to be used as hcall type specifiers and convert the
-existing __hyp_get_vectors(), __hyp_set_vectors() and kvm_call_hyp() routines
-to use these new macros when executing an HVC call.  Also, change the
-corresponding hyp-stub and KVM el1_sync exception vector routines to use these
-new macros.
+To allow the assembler macros defined in arch/arm64/mm/proc-macros.S to be used
+outside the mm code move the contents of proc-macros.S to asm/assembler.h.  Also,
+delete proc-macros.S, and fix up all references to proc-macros.S.
 
 Signed-off-by: Geoff Levand <geoff@infradead.org>
+Acked-by: Pavel Machek <pavel@ucw.cz>
 ---
- arch/arm64/include/asm/virt.h | 27 +++++++++++++++++++++++++++
- arch/arm64/kernel/hyp-stub.S  | 32 +++++++++++++++++++++-----------
- arch/arm64/kvm/hyp.S          | 16 +++++++++-------
- 3 files changed, 57 insertions(+), 18 deletions(-)
+ arch/arm64/include/asm/assembler.h | 48 +++++++++++++++++++++++++++-
+ arch/arm64/mm/cache.S              |  2 --
+ arch/arm64/mm/proc-macros.S        | 64 --------------------------------------
+ arch/arm64/mm/proc.S               |  3 --
+ 4 files changed, 47 insertions(+), 70 deletions(-)
+ delete mode 100644 arch/arm64/mm/proc-macros.S
 
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index 7a5df52..eb10368 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -18,6 +18,33 @@
- #ifndef __ASM__VIRT_H
- #define __ASM__VIRT_H
- 
-+/*
-+ * The arm64 hcall implementation uses the ISS field of the ESR_EL2 register to
-+ * specify the hcall type.  The exception handlers are allowed to use registers
-+ * x17 and x18 in their implementation.  Any routine issuing an hcall must not
-+ * expect these registers to be preserved.
-+ */
-+
-+/*
-+ * HVC_CALL_HYP - Execute a hyp routine.
-+ */
-+
-+#define HVC_CALL_HYP 0
-+
-+/*
-+ * HVC_GET_VECTORS - Return the value of the vbar_el2 register.
-+ */
-+
-+#define HVC_GET_VECTORS 1
-+
-+/*
-+ * HVC_SET_VECTORS - Set the value of the vbar_el2 register.
-+ *
-+ * @x0: Physical address of the new vector table.
-+ */
-+
-+#define HVC_SET_VECTORS 2
-+
- #define BOOT_CPU_MODE_EL1	(0xe11)
- #define BOOT_CPU_MODE_EL2	(0xe12)
- 
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index a272f33..017ab519 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -22,6 +22,7 @@
- #include <linux/irqchip/arm-gic-v3.h>
- 
- #include <asm/assembler.h>
-+#include <asm/kvm_arm.h>
- #include <asm/ptrace.h>
- #include <asm/virt.h>
- 
-@@ -53,14 +54,22 @@ ENDPROC(__hyp_stub_vectors)
- 	.align 11
- 
- el1_sync:
--	mrs	x1, esr_el2
--	lsr	x1, x1, #26
--	cmp	x1, #0x16
-+	mrs	x18, esr_el2
-+	lsr	x17, x18, #ESR_ELx_EC_SHIFT
-+	and	x18, x18, #ESR_ELx_ISS_MASK
-+
-+	cmp	x17, #ESR_ELx_EC_HVC64
- 	b.ne	2f				// Not an HVC trap
--	cbz	x0, 1f
--	msr	vbar_el2, x0			// Set vbar_el2
-+
-+	cmp	x18, #HVC_GET_VECTORS
-+	b.ne	1f
-+	mrs	x0, vbar_el2
- 	b	2f
--1:	mrs	x0, vbar_el2			// Return vbar_el2
-+
-+1:	cmp	x18, #HVC_SET_VECTORS
-+	b.ne	2f
-+	msr	vbar_el2, x0
-+
- 2:	eret
- ENDPROC(el1_sync)
- 
-@@ -100,11 +109,12 @@ ENDPROC(\label)
-  * initialisation entry point.
-  */
- 
--ENTRY(__hyp_get_vectors)
--	mov	x0, xzr
--	// fall through
- ENTRY(__hyp_set_vectors)
--	hvc	#0
-+	hvc	#HVC_SET_VECTORS
- 	ret
--ENDPROC(__hyp_get_vectors)
- ENDPROC(__hyp_set_vectors)
-+
-+ENTRY(__hyp_get_vectors)
-+	hvc	#HVC_GET_VECTORS
-+	ret
-+ENDPROC(__hyp_get_vectors)
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 86c2898..15b1ef9 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -29,6 +29,7 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_mmu.h>
- #include <asm/memory.h>
-+#include <asm/virt.h>
- 
- #define CPU_GP_REG_OFFSET(x)	(CPU_GP_REGS + x)
- #define CPU_XREG_OFFSET(x)	CPU_GP_REG_OFFSET(CPU_USER_PT_REGS + 8*x)
-@@ -936,12 +937,9 @@ __hyp_panic_str:
-  * in Hyp mode (see init_hyp_mode in arch/arm/kvm/arm.c).  Return values are
-  * passed in r0 and r1.
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 12eff92..21979a4 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -1,5 +1,5 @@
+ /*
+- * Based on arch/arm/include/asm/assembler.h
++ * Based on arch/arm/include/asm/assembler.h, arch/arm/mm/proc-macros.S
   *
-- * A function pointer with a value of 0 has a special meaning, and is
-- * used to implement __hyp_get_vectors in the same way as in
-- * arch/arm64/kernel/hyp_stub.S.
-  */
- ENTRY(kvm_call_hyp)
--	hvc	#0
-+	hvc	#HVC_CALL_HYP
- 	ret
- ENDPROC(kvm_call_hyp)
+  * Copyright (C) 1996-2000 Russell King
+  * Copyright (C) 2012 ARM Ltd.
+@@ -23,6 +23,8 @@
+ #ifndef __ASM_ASSEMBLER_H
+ #define __ASM_ASSEMBLER_H
  
-@@ -972,6 +970,7 @@ el1_sync:					// Guest trapped into EL2
++#include <asm/asm-offsets.h>
++#include <asm/pgtable-hwdef.h>
+ #include <asm/ptrace.h>
+ #include <asm/thread_info.h>
  
- 	mrs	x1, esr_el2
- 	lsr	x2, x1, #ESR_ELx_EC_SHIFT
-+	and	x0, x1, #ESR_ELx_ISS_MASK
+@@ -194,6 +196,50 @@ lr	.req	x30		// link register
+ 	.endm
  
- 	cmp	x2, #ESR_ELx_EC_HVC64
- 	b.ne	el1_trap
-@@ -980,15 +979,18 @@ el1_sync:					// Guest trapped into EL2
- 	cbnz	x3, el1_trap			// called HVC
- 
- 	/* Here, we're pretty sure the host called HVC. */
-+	mov	x18, x0
- 	pop	x2, x3
- 	pop	x0, x1
- 
--	/* Check for __hyp_get_vectors */
--	cbnz	x0, 1f
-+	cmp	x18, #HVC_GET_VECTORS
-+	b.ne	1f
- 	mrs	x0, vbar_el2
- 	b	2f
- 
--1:	push	lr, xzr
-+1:	/* Default to HVC_CALL_HYP. */
+ /*
++ * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
++ */
++	.macro	vma_vm_mm, rd, rn
++	ldr	\rd, [\rn, #VMA_VM_MM]
++	.endm
 +
-+	push	lr, xzr
++/*
++ * mmid - get context id from mm pointer (mm->context.id)
++ */
++	.macro	mmid, rd, rn
++	ldr	\rd, [\rn, #MM_CONTEXT_ID]
++	.endm
++
++/*
++ * dcache_line_size - get the minimum D-cache line size from the CTR register.
++ */
++	.macro	dcache_line_size, reg, tmp
++	mrs	\tmp, ctr_el0			// read CTR
++	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
++	mov	\reg, #4			// bytes per word
++	lsl	\reg, \reg, \tmp		// actual cache line size
++	.endm
++
++/*
++ * icache_line_size - get the minimum I-cache line size from the CTR register.
++ */
++	.macro	icache_line_size, reg, tmp
++	mrs	\tmp, ctr_el0			// read CTR
++	and	\tmp, \tmp, #0xf		// cache line size encoding
++	mov	\reg, #4			// bytes per word
++	lsl	\reg, \reg, \tmp		// actual cache line size
++	.endm
++
++/*
++ * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
++ */
++	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
++#ifndef CONFIG_ARM64_VA_BITS_48
++	ldr_l	\tmpreg, idmap_t0sz
++	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
++#endif
++	.endm
++
++/*
+  * Annotate a function as position independent, i.e., safe to be called before
+  * the kernel virtual mapping is activated.
+  */
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index cfa44a6..f49041d 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -24,8 +24,6 @@
+ #include <asm/cpufeature.h>
+ #include <asm/alternative.h>
  
- 	/*
- 	 * Compute the function address in EL2, and shuffle the parameters.
+-#include "proc-macros.S"
+-
+ /*
+  *	flush_icache_range(start,end)
+  *
+diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
+deleted file mode 100644
+index 4c4d93c..0000000
+--- a/arch/arm64/mm/proc-macros.S
++++ /dev/null
+@@ -1,64 +0,0 @@
+-/*
+- * Based on arch/arm/mm/proc-macros.S
+- *
+- * Copyright (C) 2012 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-
+-#include <asm/asm-offsets.h>
+-#include <asm/thread_info.h>
+-
+-/*
+- * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
+- */
+-	.macro	vma_vm_mm, rd, rn
+-	ldr	\rd, [\rn, #VMA_VM_MM]
+-	.endm
+-
+-/*
+- * mmid - get context id from mm pointer (mm->context.id)
+- */
+-	.macro	mmid, rd, rn
+-	ldr	\rd, [\rn, #MM_CONTEXT_ID]
+-	.endm
+-
+-/*
+- * dcache_line_size - get the minimum D-cache line size from the CTR register.
+- */
+-	.macro	dcache_line_size, reg, tmp
+-	mrs	\tmp, ctr_el0			// read CTR
+-	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
+-	mov	\reg, #4			// bytes per word
+-	lsl	\reg, \reg, \tmp		// actual cache line size
+-	.endm
+-
+-/*
+- * icache_line_size - get the minimum I-cache line size from the CTR register.
+- */
+-	.macro	icache_line_size, reg, tmp
+-	mrs	\tmp, ctr_el0			// read CTR
+-	and	\tmp, \tmp, #0xf		// cache line size encoding
+-	mov	\reg, #4			// bytes per word
+-	lsl	\reg, \reg, \tmp		// actual cache line size
+-	.endm
+-
+-/*
+- * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
+- */
+-	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
+-#ifndef CONFIG_ARM64_VA_BITS_48
+-	ldr_l	\tmpreg, idmap_t0sz
+-	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
+-#endif
+-	.endm
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index cacecc4..7ab3a90 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -23,11 +23,8 @@
+ #include <asm/assembler.h>
+ #include <asm/asm-offsets.h>
+ #include <asm/hwcap.h>
+-#include <asm/pgtable-hwdef.h>
+ #include <asm/pgtable.h>
+ 
+-#include "proc-macros.S"
+-
+ #ifdef CONFIG_ARM64_64K_PAGES
+ #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
+ #elif defined(CONFIG_ARM64_16K_PAGES)
 -- 
 2.5.0
