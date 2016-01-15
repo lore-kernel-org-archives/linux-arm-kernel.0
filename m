@@ -1,69 +1,64 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 15 Jan 2016 12:16:55 -0500
-Subject: [PATCH V12 3/7] dma: add Qualcomm Technologies HIDMA management
- driver
-In-Reply-To: <20160115152257.GK3262@leverpostej>
-References: <1452523550-8920-1-git-send-email-okaya@codeaurora.org>
- <1452523550-8920-4-git-send-email-okaya@codeaurora.org>
- <20160115145629.GI3262@leverpostej> <56990C40.4050407@codeaurora.org>
- <20160115152257.GK3262@leverpostej>
-Message-ID: <56992987.5080603@codeaurora.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 15 Jan 2016 17:21:18 +0000
+Subject: [PATCH v2 04/16] arm/xen: Use xen_xlate_map_ballooned_pages to
+ setup grant table
+In-Reply-To: <1452840929-19612-5-git-send-email-zhaoshenglong@huawei.com>
+References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452840929-19612-5-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <alpine.DEB.2.02.1601151717460.16178@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> This doesn't seem to tie into KVM or VFIO, and as far as I can tell
->>> there's no mechanism for associating channels with a particular virtual
->>> address space (i.e. no configuration of an external or internal IOMMU),
->>> nor pinning of guest pages to allow for DMA to occur safely.
->>
->> I'm using VFIO platform driver for this purpose. VFIO platform driver is 
->> capable of assigning any platform device to a guest machine with this driver. 
+On Fri, 15 Jan 2016, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> Typically VFIO-platform also comes with a corresponding reset driver.
-> You don't need one?
-
-The HIDMA channel driver resets the channel before using it. That's why, I never
-bothered with writing a reset driver on the hypervisor.
-
+> Use xen_xlate_map_ballooned_pages to setup grant table. Then it doesn't
+> rely on DT or ACPI to pass the start address and size of grant table.
 > 
->> You just unbind the HIDMA channel driver from the hypervisor and bind to vfio
->> driver using the very same approach you'd use with PCIe. 
->>
->> Of course, this all assumes the presence of an IOMMU driver on the system. VFIO
->> driver uses the IOMMU driver to create the mappings. 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+
+
+>  arch/arm/xen/enlighten.c | 13 ++++---------
+>  1 file changed, 4 insertions(+), 9 deletions(-)
 > 
-> No IOMMU was described in the DT binding. It sounds like you'd need an
-> optional (not present in the guest) iommus property per-channel
-
-You are right. I missed that part. I'll update the device-tree binding documentation.
-
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index afe6175..6d90a62 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -266,18 +266,10 @@ static int __init xen_guest_init(void)
+>  {
+>  	struct xen_add_to_physmap xatp;
+>  	struct shared_info *shared_info_page = NULL;
+> -	struct resource res;
+> -	phys_addr_t grant_frames;
+>  
+>  	if (!xen_domain())
+>  		return 0;
+>  
+> -	if (of_address_to_resource(xen_node, GRANT_TABLE_PHYSADDR, &res)) {
+> -		pr_err("Xen grant table base address not found\n");
+> -		return -ENODEV;
+> -	}
+> -	grant_frames = res.start;
+> -
+>  	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
+>  	if (!xen_events_irq) {
+>  		pr_err("Xen event channel interrupt not found\n");
+> @@ -312,7 +304,10 @@ static int __init xen_guest_init(void)
+>  	if (xen_vcpu_info == NULL)
+>  		return -ENOMEM;
+>  
+> -	if (gnttab_setup_auto_xlat_frames(grant_frames)) {
+> +	xen_auto_xlat_grant_frames.count = gnttab_max_grant_frames();
+> +	if (xen_xlate_map_ballooned_pages(&xen_auto_xlat_grant_frames.pfn,
+> +					  &xen_auto_xlat_grant_frames.vaddr,
+> +					  xen_auto_xlat_grant_frames.count)) {
+>  		free_percpu(xen_vcpu_info);
+>  		return -ENOMEM;
+>  	}
+> -- 
+> 2.0.4
 > 
->> The mechanism used here is not different from VFIO PCI from user perspective.
->>
->>>
->>> Given that, I'm at a loss as to how this would be used in a hypervisor
->>> context. What am I missing?
->>>
->>> Are there additional patches, or do you have some userspace that works
->>> with this in some limited configuration?
->>
->> No, these are the only patches. We have one patch for the QEMU but from kernel
->> perspective this is it. 
 > 
-> Do you have a link to that? Seeing it would help to ease my concerns.
-
-The QEMU driver has not been posted yet. As far as I know, it just discovers the memory
-resources on the platform object and creates mappings for the guest machine only. 
-
-Shanker Donthineni and Vikram Sethi will post the QEMU patch later.
-
-> 
-> Thanks,
-> Mark.
-> 
-
-
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
