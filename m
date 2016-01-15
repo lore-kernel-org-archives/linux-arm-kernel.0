@@ -1,190 +1,160 @@
-From: heiko.carstens@de.ibm.com (Heiko Carstens)
-Date: Fri, 15 Jan 2016 13:46:46 +0100
-Subject: [PATCH v6 20/21] all: s390: make compat wrappers the generic
- solution
-In-Reply-To: <1452792198-10718-21-git-send-email-ynorov@caviumnetworks.com>
-References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
- <1452792198-10718-21-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <20160115124646.GD4130@osiris>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 15 Jan 2016 13:46:58 +0100
+Subject: [PATCH] arm64: hide __efistub_ aliases from kallsyms
+In-Reply-To: <20160115124159.GF3262@leverpostej>
+References: <1452860937-4413-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160115124159.GF3262@leverpostej>
+Message-ID: <CAKv+Gu8mos798tm625kYWbFkAoCfeppsmQs=_QO2HpGQB64KYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 08:23:17PM +0300, Yury Norov wrote:
-> The problem that makes us to use wrappers is that some compat
-> architectures allows user code to access top halves of registers.
-> This is not a problem for syscalls that are already handled by compat
-> code, or for that who has types of the same size in kernel and
-> userspace. In case of lp64/ilp32 the problem is in pointer types, long,
-> unsigned long.
-> 
-> S390 folks already have the solution for it. In this patch,
-> it is turned to be general, as arm64/ilp32 needs it too.
-> 
-> Build-tested on s390.
+On 15 January 2016 at 13:41, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Jan 15, 2016 at 01:28:57PM +0100, Ard Biesheuvel wrote:
+>> Commit e8f3010f7326 ("arm64/efi: isolate EFI stub from the kernel
+>> proper") isolated the EFI stub code from the kernel proper by prefixing
+>> all of its symbols with __efistub_, and selectively allowing access to
+>> core kernel symbols from the stub by emitting __efistub_ aliases for
+>> functions and variables that the stub can access legally.
+>>
+>> As an unintended side effect, these aliases are emitted into the
+>> kallsyms symbol table, which means they may turn up in backtraces,
+>> e.g.,
+>>
+>>   ...
+>>   PC is at __efistub_memset+0x108/0x200
+>>   LR is at fixup_init+0x3c/0x48
+>>   ...
+>>   [<ffffff8008328608>] __efistub_memset+0x108/0x200
+>>   [<ffffff8008094dcc>] free_initmem+0x2c/0x40
+>>   [<ffffff8008645198>] kernel_init+0x20/0xe0
+>>   [<ffffff8008085cd0>] ret_from_fork+0x10/0x40
+>>
+>> The backtrace in question has nothing to do with the EFI stub, but
+>> simply returns one of the several aliases of memset() that have been
+>> recorded in the kallsyms table. This is undesirable, since it may
+>> suggest to people who are not aware of this that the issue they are
+>> seeing is somehow EFI related.
+>>
+>> So hide the __efistub_ aliases from kallsyms, by emitting them as
+>> absolute linker symbols explicitly. The distinction between those
+>> and section relative symbols is completely irrelevant to these
+>> definitions, and to the final link we are performing when these
+>> definitions are being taken into account (the distinction is only
+>> relevant to symbols defined inside a section definition when performing
+>> a partial link), and so the resulting values are identical to the
+>> original ones. Since absolute symbols are ignored by kallsyms, this
+>> will result in these values to be omitted from its symbol table.
+>>
+>> After this patch, the backtrace generated from the same address looks
+>> like this:
+>>   ...
+>>   PC is at __memset+0x108/0x200
+>>   LR is at fixup_init+0x3c/0x48
+>>   ...
+>>   [<ffffff8008328608>] __memset+0x108/0x200
+>>   [<ffffff8008094dcc>] free_initmem+0x2c/0x40
+>>   [<ffffff8008645198>] kernel_init+0x20/0xe0
+>>   [<ffffff8008085cd0>] ret_from_fork+0x10/0x40
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/kernel/image.h | 40 +++++++++++++++++++++++++---------------
+>>  1 file changed, 25 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+>> index ddd61e2d9e3e..ce6f02c56b3d 100644
+>> --- a/arch/arm64/kernel/image.h
+>> +++ b/arch/arm64/kernel/image.h
+>> @@ -81,6 +81,16 @@
+>>  #ifdef CONFIG_EFI
+>>
+>>  /*
+>> + * Prevent the symbol aliases below from being emitted into the kallsyms
+>> + * table, by forcing them to be absolute symbols (which are conveniently
+>> + * ignored by scripts/kallsyms) rather than section relative symbols.
+>> + * The distinction is only relevant for partial linking, and only for symbols
+>> + * that are defined within a section declaration (which is not the case for
+>> + * the definitions below) so the resulting values will be identical.
+>> + */
+>> +#define KALLSYMS_HIDE(sym)   ABSOLUTE(sym)
+>
+> From looking at the GNU LD manual recently, I discovered
+> PROVIDE_HIDDEN(sym), which sounds closer to what we want semantically,
+> even if ABSOLUTE(sym) acheives the same thing.
+>
+> If that works, that might be preferable.
+>
 
-If you want to make this generic then I think the footprint of the compat
-wrapper infrastructure should be as small as possible:
+No, it doesn't. PROVIDE_HIDDEN() turns it into a local symbol, but
+preserves the type, i.e.,
 
-> diff --git a/arch/s390/include/asm/compat_wrapper.h b/arch/s390/include/asm/compat_wrapper.h
-> new file mode 100644
-> index 0000000..d5a5c36
-> --- /dev/null
-> +++ b/arch/s390/include/asm/compat_wrapper.h
-> @@ -0,0 +1,25 @@
-> +#ifndef __ASM_COMPAT_WRAPPER
-> +#define __ASM_COMPAT_WRAPPER
-> +
-> +/*
-> + *  Compat system call wrappers.
-> + *
-> + *    Copyright IBM Corp. 2014
-> + */
-> +
-> +#define __SC_COMPAT_CAST(t, a)						\
-> +({									\
-> +	long __ReS = a;							\
-> +									\
-> +	BUILD_BUG_ON((sizeof(t) > 4) && !__TYPE_IS_L(t) &&		\
-> +		     !__TYPE_IS_UL(t) && !__TYPE_IS_PTR(t));		\
-> +	if (__TYPE_IS_L(t))						\
-> +		__ReS = (s32)a;						\
-> +	if (__TYPE_IS_UL(t))						\
-> +		__ReS = (u32)a;						\
-> +	if (__TYPE_IS_PTR(t))						\
-> +		__ReS = a & 0x7fffffff;					\
-> +	(t)__ReS;							\
-> +})
-> +
-> +#endif /* __ASM_COMPAT_WRAPPER */
+Before:
+ffffff8008080000 T __efistub__text
 
-This should go to arch/s390/include/asm/compat.h right below Al's
-__SC_DELOUSE. (no new header file please)
+With this patch
+ffffff8008080000 A __efistub__text
 
+With PROVIDE_HIDDEN
+ffffff8008080000 t __efistub__text
 
-> diff --git a/arch/s390/kernel/compat_linux.c b/arch/s390/kernel/compat_linux.c
-> index 437e611..22416a8 100644
-> --- a/arch/s390/kernel/compat_linux.c
-> +++ b/arch/s390/kernel/compat_linux.c
-> @@ -44,6 +44,7 @@
->  #include <linux/binfmts.h>
->  #include <linux/capability.h>
->  #include <linux/compat.h>
-> +#include <linux/compat_wrapper.h>
->  #include <linux/vfs.h>
->  #include <linux/ptrace.h>
->  #include <linux/fadvise.h>
-> @@ -86,6 +87,11 @@
->  #define SET_STAT_UID(stat, uid)		(stat).st_uid = high2lowuid(uid)
->  #define SET_STAT_GID(stat, gid)		(stat).st_gid = high2lowgid(gid)
-> 
-> +COMPAT_SYSCALL_WRAP3(s390_pci_mmio_write, const unsigned long,
-> +		mmio_addr, const void __user *, user_buffer, const size_t, length);
-> +COMPAT_SYSCALL_WRAP3(s390_pci_mmio_read, const unsigned long,
-> +		mmio_addr, void __user *, user_buffer, const size_t, length);
-> +
+I am not crazy about this change myself, but at least it keeps the
+ugliness confined to image.h in a well annotated manner, rather than
+in every backtrace that involves any of these functions.
 
-I'd really prefer if the existing common SYSCALL_DEFINE macros could be
-extended to also generate the compat wrappers, if needed.
+> Either way this looks sensible to me, so:
+>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>
 
-This probably means that you need another set of SYSCALL_DEFINE macros,
-e.g. something like SYSCALL_COMPAT, which is defined the same like
-SYSCALL_DEFINE, except that it also generates the compat_wrapper functions.
+Thanks,
+Ard.
 
-Since the list of system calls that need a wrapper is already present in
-s390's compat_wrapper.c file it's "only" a matter of writing a script that
-converts the required SYSCALL_DEFINEs to SYSYCALL_COMPATs.
-
-> diff --git a/include/linux/compat_wrapper.h b/include/linux/compat_wrapper.h
-> new file mode 100644
-> index 0000000..6f22732
-> --- /dev/null
-> +++ b/include/linux/compat_wrapper.h
-> @@ -0,0 +1,270 @@
-> +#ifndef __COMPAT_WRAPPER
-> +#define __COMPAT_WRAPPER
-> +
-> +#include <asm/compat_wrapper.h>
-> +
-> +#define COMPAT_SYSCALL_WRAP1(name, ...) \
-> +	COMPAT_SYSCALL_WRAPx(1, _##name, __VA_ARGS__)
-> +#define COMPAT_SYSCALL_WRAP2(name, ...) \
-> +	COMPAT_SYSCALL_WRAPx(2, _##name, __VA_ARGS__)
-> +#define COMPAT_SYSCALL_WRAP3(name, ...) \
-> +	COMPAT_SYSCALL_WRAPx(3, _##name, __VA_ARGS__)
-> +#define COMPAT_SYSCALL_WRAP4(name, ...) \
-> +	COMPAT_SYSCALL_WRAPx(4, _##name, __VA_ARGS__)
-> +#define COMPAT_SYSCALL_WRAP5(name, ...) \
-> +	COMPAT_SYSCALL_WRAPx(5, _##name, __VA_ARGS__)
-> +#define COMPAT_SYSCALL_WRAP6(name, ...) \
-> +	COMPAT_SYSCALL_WRAPx(6, _##name, __VA_ARGS__)
-> +
-> +#ifndef __SC_COMPAT_TYPE
-> +#define __SC_COMPAT_TYPE(t, a) \
-> +	__typeof(__builtin_choose_expr(sizeof(t) > 4, 0L, (t)0)) a
-> +#endif
-> +
-> +#ifndef __SC_COMPAT_CAST
-> +#define __SC_COMPAT_CAST(t, a)	((t)(long) ((t)(-1) < 0 ? (s32)(a) : (u32)(a)))
-> +#endif
-> +/*
-> + * The COMPAT_SYSCALL_WRAP macro generates system call wrappers to be used by
-> + * compat tasks. These wrappers will only be used for system calls where only
-> + * the system call arguments need sign or zero extension or zeroing of the upper
-> + * 33 bits of pointers.
-> + * Note: since the wrapper function will afterwards call a system call which
-> + * again performs zero and sign extension for all system call arguments with
-> + * a size of less than eight bytes, these compat wrappers only touch those
-> + * system call arguments with a size of eight bytes ((unsigned) long and
-> + * pointers). Zero and sign extension for e.g. int parameters will be done by
-> + * the regular system call wrappers.
-> + */
-> +#ifndef COMPAT_SYSCALL_WRAPx
-> +#define COMPAT_SYSCALL_WRAPx(x, name, ...)						\
-> +asmlinkage long sys##name(__MAP(x,__SC_DECL,__VA_ARGS__));				\
-> +asmlinkage long compat_sys##name(__MAP(x,__SC_DECL,__VA_ARGS__))			\
-> +		__attribute__((alias(__stringify(compat_SyS##name))));			\
-> +asmlinkage long notrace compat_SyS##name(__MAP(x,__SC_COMPAT_TYPE,__VA_ARGS__));	\
-> +asmlinkage long notrace compat_SyS##name(__MAP(x,__SC_COMPAT_TYPE,__VA_ARGS__))		\
-> +{											\
-> +	return sys##name(__MAP(x,__SC_COMPAT_CAST,__VA_ARGS__));			\
-> +}
-> +#endif
-
-All of this should go to include/linux/compat.h
-
-> +asmlinkage long compat_sys_creat(const char __user *pathname, umode_t mode);
-> +asmlinkage long compat_sys_link(const char __user *oldname,
-> +				const char __user *newname);
-> +asmlinkage long compat_sys_chdir(const char __user *filename);
-> +asmlinkage long compat_sys_mknod(const char __user *filename, umode_t mode,
-> +				unsigned dev);
-
-Are these really needed?
-
-> diff --git a/kernel/compat_wrapper.c b/kernel/compat_wrapper.c
-> new file mode 100644
-> index 0000000..4a99811
-> --- /dev/null
-> +++ b/kernel/compat_wrapper.c
-> @@ -0,0 +1,167 @@
-> +/*
-> + *  Compat system call wrappers.
-> + *
-> + *    Copyright IBM Corp. 2014
-> + */
-> +
-> +#include <linux/syscalls.h>
-> +#include <linux/compat.h>
-> +#include <linux/compat_wrapper.h>
-> +
-> +COMPAT_SYSCALL_WRAP2(creat, const char __user *, pathname, umode_t, mode);
-> +COMPAT_SYSCALL_WRAP2(link, const char __user *, oldname, const char __user *, newname);
-> +COMPAT_SYSCALL_WRAP1(unlink, const char __user *, pathname);
-> +COMPAT_SYSCALL_WRAP1(chdir, const char __user *, filename);
-> +COMPAT_SYSCALL_WRAP3(mknod, const char __user *, filename, umode_t, mode, unsigned, dev);
-> +COMPAT_SYSCALL_WRAP2(chmod, const char __user *, filename, umode_t, mode);
-
-With all the above changes this file wouldn't be necessary, which I think
-would be good.
-
-Just my thoughts...
+>> +
+>> +/*
+>>   * The EFI stub has its own symbol namespace prefixed by __efistub_, to
+>>   * isolate it from the kernel proper. The following symbols are legally
+>>   * accessed by the stub, so provide some aliases to make them accessible.
+>> @@ -89,25 +99,25 @@
+>>   * linked at. The routines below are all implemented in assembler in a
+>>   * position independent manner
+>>   */
+>> -__efistub_memcmp             = __pi_memcmp;
+>> -__efistub_memchr             = __pi_memchr;
+>> -__efistub_memcpy             = __pi_memcpy;
+>> -__efistub_memmove            = __pi_memmove;
+>> -__efistub_memset             = __pi_memset;
+>> -__efistub_strlen             = __pi_strlen;
+>> -__efistub_strcmp             = __pi_strcmp;
+>> -__efistub_strncmp            = __pi_strncmp;
+>> -__efistub___flush_dcache_area        = __pi___flush_dcache_area;
+>> +__efistub_memcmp             = KALLSYMS_HIDE(__pi_memcmp);
+>> +__efistub_memchr             = KALLSYMS_HIDE(__pi_memchr);
+>> +__efistub_memcpy             = KALLSYMS_HIDE(__pi_memcpy);
+>> +__efistub_memmove            = KALLSYMS_HIDE(__pi_memmove);
+>> +__efistub_memset             = KALLSYMS_HIDE(__pi_memset);
+>> +__efistub_strlen             = KALLSYMS_HIDE(__pi_strlen);
+>> +__efistub_strcmp             = KALLSYMS_HIDE(__pi_strcmp);
+>> +__efistub_strncmp            = KALLSYMS_HIDE(__pi_strncmp);
+>> +__efistub___flush_dcache_area        = KALLSYMS_HIDE(__pi___flush_dcache_area);
+>>
+>>  #ifdef CONFIG_KASAN
+>> -__efistub___memcpy           = __pi_memcpy;
+>> -__efistub___memmove          = __pi_memmove;
+>> -__efistub___memset           = __pi_memset;
+>> +__efistub___memcpy           = KALLSYMS_HIDE(__pi_memcpy);
+>> +__efistub___memmove          = KALLSYMS_HIDE(__pi_memmove);
+>> +__efistub___memset           = KALLSYMS_HIDE(__pi_memset);
+>>  #endif
+>>
+>> -__efistub__text                      = _text;
+>> -__efistub__end                       = _end;
+>> -__efistub__edata             = _edata;
+>> +__efistub__text                      = KALLSYMS_HIDE(_text);
+>> +__efistub__end                       = KALLSYMS_HIDE(_end);
+>> +__efistub__edata             = KALLSYMS_HIDE(_edata);
+>>
+>>  #endif
+>>
+>> --
+>> 2.5.0
+>>
