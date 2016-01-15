@@ -1,146 +1,126 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 15 Jan 2016 14:55:23 +0800
-Subject: [PATCH v2 10/16] ARM: XEN: Move xen_early_init() before efi_init()
+Date: Fri, 15 Jan 2016 14:55:27 +0800
+Subject: [PATCH v2 14/16] Xen: EFI: Parse DT parameters for Xen specific UEFI
 In-Reply-To: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1452840929-19612-11-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1452840929-19612-15-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Move xen_early_init() before efi_init(), then when calling efi_init()
-could initialize Xen specific UEFI.
-
-Check if it runs on Xen hypervisor through the flat dts.
+Add a new function to parse DT parameters for Xen specific UEFI just
+like the way for normal UEFI. Then it could reuse the existing codes.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm/xen/enlighten.c  | 56 ++++++++++++++++++++++++++++++++++-------------
- arch/arm64/kernel/setup.c |  2 +-
- 2 files changed, 42 insertions(+), 16 deletions(-)
+ drivers/firmware/efi/efi.c | 45 ++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 38 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 4e78c49..5d0fe68 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -19,6 +19,7 @@
- #include <linux/irqreturn.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_fdt.h>
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
- #include <linux/cpuidle.h>
-@@ -52,8 +53,6 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS] __initdata;
+diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+index 027ca21..2dbc2ac 100644
+--- a/drivers/firmware/efi/efi.c
++++ b/drivers/firmware/efi/efi.c
+@@ -24,6 +24,7 @@
+ #include <linux/of_fdt.h>
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
++#include <xen/xen.h>
  
- static __read_mostly unsigned int xen_events_irq;
+ struct efi __read_mostly efi = {
+ 	.mps			= EFI_INVALID_TABLE_ADDR,
+@@ -498,12 +499,14 @@ device_initcall(efi_load_efivars);
+ 		FIELD_SIZEOF(struct efi_fdt_params, field) \
+ 	}
  
--static __initdata struct device_node *xen_node;
--
- int xen_remap_domain_gfn_array(struct vm_area_struct *vma,
- 			       unsigned long addr,
- 			       xen_pfn_t *gfn, int nr,
-@@ -222,6 +221,33 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
- 	return IRQ_HANDLED;
- }
+-static __initdata struct {
++struct params {
+ 	const char name[32];
+ 	const char propname[32];
+ 	int offset;
+ 	int size;
+-} dt_params[] = {
++};
++
++static struct params fdt_params[] __initdata = {
+ 	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
+ 	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
+ 	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
+@@ -511,6 +514,14 @@ static __initdata struct {
+ 	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
+ };
  
-+static __initdata struct {
-+	const char *compat;
-+	const char *prefix;
-+	const char *version;
-+	bool found;
-+} xen_node = {"xen,xen", "xen,xen-", NULL, false};
++static struct params xen_fdt_params[] __initdata = {
++	UEFI_PARAM("System Table", "xen,uefi-system-table", system_table),
++	UEFI_PARAM("MemMap Address", "xen,uefi-mmap-start", mmap),
++	UEFI_PARAM("MemMap Size", "xen,uefi-mmap-size", mmap_size),
++	UEFI_PARAM("MemMap Desc. Size", "xen,uefi-mmap-desc-size", desc_size),
++	UEFI_PARAM("MemMap Desc. Version", "xen,uefi-mmap-desc-ver", desc_ver)
++};
 +
-+static int __init fdt_find_xen_node(unsigned long node, const char *uname,
-+				    int depth, void *data)
-+{
-+	const void *s = NULL;
-+	int len;
-+
-+	if (depth != 1 || strcmp(uname, "hypervisor") != 0)
-+		return 0;
-+
-+	if (of_flat_dt_is_compatible(node, xen_node.compat))
-+		xen_node.found = true;
-+
-+	s = of_get_flat_dt_prop(node, "compatible", &len);
-+	if (strlen(xen_node.prefix) + 3  < len &&
-+	    !strncmp(xen_node.prefix, s, strlen(xen_node.prefix)))
-+		xen_node.version = s + strlen(xen_node.prefix);
-+
-+	return 0;
-+}
-+
- /*
-  * see Documentation/devicetree/bindings/arm/xen.txt for the
-  * documentation of the Xen Device Tree format.
-@@ -229,26 +255,18 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
- #define GRANT_TABLE_PHYSADDR 0
- void __init xen_early_init(void)
+ struct param_info {
+ 	int found;
+ 	void *params;
+@@ -520,15 +531,28 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+ 				       int depth, void *data)
  {
--	int len;
--	const char *s = NULL;
--	const char *version = NULL;
--	const char *xen_prefix = "xen,xen-";
--
--	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
--	if (!xen_node) {
-+	of_scan_flat_dt(fdt_find_xen_node, NULL);
-+	if (!xen_node.found) {
- 		pr_debug("No Xen support\n");
- 		return;
- 	}
--	s = of_get_property(xen_node, "compatible", &len);
--	if (strlen(xen_prefix) + 3  < len &&
--			!strncmp(xen_prefix, s, strlen(xen_prefix)))
--		version = s + strlen(xen_prefix);
--	if (version == NULL) {
+ 	struct param_info *info = data;
++	struct params *dt_params;
++	unsigned int size;
+ 	const void *prop;
+ 	void *dest;
+ 	u64 val;
+ 	int i, len;
+ 
+-	if (depth != 1 || strcmp(uname, "chosen") != 0)
+-		return 0;
++	if (efi_enabled(EFI_PARAVIRT)) {
++		if (depth != 2 || strcmp(uname, "uefi") != 0)
++			return 0;
+ 
+-	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
++		dt_params = xen_fdt_params;
++		size = ARRAY_SIZE(xen_fdt_params);
++	} else {
++		if (depth != 1 || strcmp(uname, "chosen") != 0)
++			return 0;
 +
-+	if (xen_node.version == NULL) {
- 		pr_debug("Xen version not found\n");
- 		return;
- 	}
- 
--	pr_info("Xen %s support found\n", version);
-+	pr_info("Xen %s support found\n", xen_node.version);
- 
- 	xen_domain_type = XEN_HVM_DOMAIN;
- 
-@@ -296,6 +314,14 @@ static int __init xen_guest_init(void)
- 		}
- #endif
- 	} else {
-+		struct device_node *xen_node;
++		dt_params = fdt_params;
++		size = ARRAY_SIZE(fdt_params);
++	}
 +
-+		xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
-+		if (!xen_node) {
-+			pr_debug("No Xen support\n");
-+			return -ENODEV;
-+		}
++	for (i = 0; i < size; i++) {
+ 		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
+ 		if (!prop)
+ 			return 0;
+@@ -552,6 +576,7 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+ int __init efi_get_fdt_params(struct efi_fdt_params *params)
+ {
+ 	struct param_info info;
++	struct params *dt_params;
+ 	int ret;
+ 
+ 	pr_info("Getting EFI parameters from FDT:\n");
+@@ -559,12 +584,18 @@ int __init efi_get_fdt_params(struct efi_fdt_params *params)
+ 	info.found = 0;
+ 	info.params = params;
+ 
++	if (efi_enabled(EFI_PARAVIRT))
++		dt_params = xen_fdt_params;
++	else
++		dt_params = fdt_params;
 +
- 		xen_events_irq = irq_of_parse_and_map(xen_node, 0);
- 	}
+ 	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
+-	if (!info.found)
++	if (!info.found) {
+ 		pr_info("UEFI not found.\n");
+-	else if (!ret)
++	} else if (!ret) {
+ 		pr_err("Can't find '%s' in device tree!\n",
+ 		       dt_params[info.found].name);
++	}
  
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 8119479..a4a2878 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -313,6 +313,7 @@ void __init setup_arch(char **cmdline_p)
- 	 */
- 	local_async_enable();
- 
-+	xen_early_init();
- 	efi_init();
- 	arm64_memblock_init();
- 
-@@ -334,7 +335,6 @@ void __init setup_arch(char **cmdline_p)
- 	} else {
- 		psci_acpi_init();
- 	}
--	xen_early_init();
- 
- 	cpu_read_bootcpu_ops();
- 	smp_init_cpus();
+ 	return ret;
+ }
 -- 
 2.0.4
