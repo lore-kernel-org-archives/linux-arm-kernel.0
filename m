@@ -1,108 +1,150 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 15 Jan 2016 09:57:34 +0100
-Subject: [PATCH v2 1/2] regulator: Add coupled regulator
-In-Reply-To: <20160112143100.GA14628@rob-hp-laptop>
-References: <1452605842-9317-1-git-send-email-maxime.ripard@free-electrons.com>
- <1452605842-9317-2-git-send-email-maxime.ripard@free-electrons.com>
- <20160112143100.GA14628@rob-hp-laptop>
-Message-ID: <20160115085734.GG4581@lukather>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 15 Jan 2016 09:03:05 +0000
+Subject: [PATCH v6 1/6] arm/arm64: KVM: Introduce armv7 fp/simd vcpu fields
+ and helpers
+In-Reply-To: <5698531E.1090606@samsung.com>
+References: <1451166900-3711-1-git-send-email-m.smarduch@samsung.com>
+ <1451166900-3711-2-git-send-email-m.smarduch@samsung.com>
+ <20160110163204.GD30867@cbox> <56943D29.3000002@samsung.com>
+ <20160112141207.GF15554@cbox> <5695A0EB.5020609@samsung.com>
+ <56970FE8.4020805@samsung.com> <20160114132718.GA4329@cbox>
+ <5698531E.1090606@samsung.com>
+Message-ID: <5698B5C9.4030404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Tue, Jan 12, 2016 at 08:31:00AM -0600, Rob Herring wrote:
-> On Tue, Jan 12, 2016 at 02:37:21PM +0100, Maxime Ripard wrote:
-> > Some boards, in order to power devices that have a quite high power
-> > consumption, wire multiple regulators in parallel.
-> > 
-> > In such a case, the regulators need to be kept in sync, all of them being
-> > enabled or disabled in parallel.
-> > 
-> > This also requires to expose only the voltages that are common to all the
-> > regulators.
-> > 
-> > Eventually support for changing the voltage in parallel should be added
-> > too, possibly with delays between each other to avoid having a too brutal
-> > peak consumption.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  .../bindings/regulator/coupled-voltage.txt         |  18 ++
-> >  drivers/regulator/Kconfig                          |   8 +
-> >  drivers/regulator/Makefile                         |   1 +
-> >  drivers/regulator/coupled-voltage-regulator.c      | 299 +++++++++++++++++++++
-> >  4 files changed, 326 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/regulator/coupled-voltage.txt
-> >  create mode 100644 drivers/regulator/coupled-voltage-regulator.c
-> > 
-> > diff --git a/Documentation/devicetree/bindings/regulator/coupled-voltage.txt b/Documentation/devicetree/bindings/regulator/coupled-voltage.txt
-> > new file mode 100644
-> > index 000000000000..f5401aab52f2
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/regulator/coupled-voltage.txt
-> > @@ -0,0 +1,18 @@
-> > +Coupled voltage regulators
-> > +
-> > +Required properties:
-> > +- compatible		: Must be "coupled-voltage-regulator".
-> > +
-> > +Optional properties:
-> > +- vinX-supply		: Phandle to the regulators it aggregates
-> > +
-> > +Any property defined as part of the core regulator binding defined in
-> > +regulator.txt can also be used.
-> > +
-> > +Example:
-> > +	vcc_wifi: wifi_reg {
-> > +		compatible = "coupled-voltage-regulator";
-> > +		regulator-name = "vcc-wifi";
-> > +		vin0-supply = <&reg_ldo3>;
-> > +		vin1-supply = <&reg_ldo4>;
-> > +	};
+On 15/01/16 02:02, Mario Smarduch wrote:
 > 
-> Why not just make ?-supply a list of phandles? That would be simpler 
-> than a virtual regulator.
+> 
+> On 1/14/2016 5:27 AM, Christoffer Dall wrote:
+>> On Wed, Jan 13, 2016 at 07:03:04PM -0800, Mario Smarduch wrote:
+>>>
+>>>
+>>> On 1/12/2016 4:57 PM, Mario Smarduch wrote:
+>>>>
+>>>>
+>>>> On 1/12/2016 6:12 AM, Christoffer Dall wrote:
+>>>>> On Mon, Jan 11, 2016 at 03:39:21PM -0800, Mario Smarduch wrote:
+>>>>>>
+>>>>>>
+>>>>>> On 1/10/2016 8:32 AM, Christoffer Dall wrote:
+>>>>>>> Hi Mario,
+>>>>>>>
+>>>>>>> I spotted one more potential issue...
+>>>>>>>
+>>>>>>> On Sat, Dec 26, 2015 at 01:54:55PM -0800, Mario Smarduch wrote:
+>>>>>>>> Add helper functions to enable access to fp/smid on guest entry and save host
+>>>>>>>> fpexc on vcpu put, check if fp/simd registers are dirty and add new vcpu
+>>>>>>>> fields.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>>>>>>>> ---
+>>>>>>>>  arch/arm/include/asm/kvm_emulate.h   | 42 ++++++++++++++++++++++++++++++++++++
+>>>>>>>>  arch/arm/include/asm/kvm_host.h      |  6 ++++++
+>>>>>>>>  arch/arm64/include/asm/kvm_emulate.h |  8 +++++++
+>>>>>>>>  3 files changed, 56 insertions(+)
+>>>>>>>>
+>>>>>>>> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+>>>>>>>> index 3095df0..d4d9da1 100644
+>>>>>>>> --- a/arch/arm/include/asm/kvm_emulate.h
+>>>>>>>> +++ b/arch/arm/include/asm/kvm_emulate.h
+>>>>>>>> @@ -24,6 +24,8 @@
+>>>>>>>>  #include <asm/kvm_mmio.h>
+>>>>>>>>  #include <asm/kvm_arm.h>
+>>>>>>>>  #include <asm/cputype.h>
+>>>>>>>> +#include <asm/vfp.h>
+>>>>>>>> +#include "../vfp/vfpinstr.h"
+>>>>>>>>  
+>>>>>>>>  unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
+>>>>>>>>  unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
+>>>>>>>> @@ -255,4 +257,44 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+>>>>>>>>  	}
+>>>>>>>>  }
+>>>>>>>>  
+>>>>>>>> +#ifdef CONFIG_VFPv3
+>>>>>>>> +/* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
+>>>>>>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
+>>>>>>>> +{
+>>>>>>>> +	u32 fpexc;
+>>>>>>>> +
+>>>>>>>> +	/* Save host fpexc, and enable guest access to fp unit */
+>>>>>>>> +	fpexc = fmrx(FPEXC);
+>>>>>>>> +	vcpu->arch.host_fpexc = fpexc;
+>>>>>>>> +	fpexc |= FPEXC_EN;
+>>>>>>>> +	fmxr(FPEXC, fpexc);
+>>>>>>>> +
+>>>>>>>> +	/* Configure HCPTR to trap on tracing and fp/simd access */
+>>>>>>>> +	vcpu->arch.hcptr = HCPTR_TTA | HCPTR_TCP(10)  | HCPTR_TCP(11);
+>>>>>>>> +}
+>>>>>>>> +
+>>>>>>>> +/* Called from vcpu_put - restore host fpexc */
+>>>>>>>> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu)
+>>>>>>>> +{
+>>>>>>>> +	fmxr(FPEXC, vcpu->arch.host_fpexc);
+>>>>>>>> +}
+>>>>>>>> +
+>>>>>>>> +/* If trap bits are reset then fp/simd registers are dirty */
+>>>>>>>> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
+>>>>>>>> +{
+>>>>>>>> +	return !(vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
+>>>>>>>> +}
+>>>>>>>> +#else
+>>>>>>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
+>>>>>>>> +{
+>>>>>>>> +	vcpu->arch.hcptr = HCPTR_TTA;
+>>>>>>>
+>>>>>>> Is it correct not to trap VFP registers when the host kernel does not
+>>>>>>> have CONFIG_VFPv3?  I think this is a change in functionality compared
+>>>>>>> to the current kernels is it not?
+>>>>>>
+>>>>>> With CPU_V7 VFPv3 gets selected, without it fp should be emulated,
+>>>>>> with exceptions taken in guest kernel. I don't see a reason why
+>>>>>> fp hcptr access should be enabled in that case.
+>>>>>>
+>>>>>
+>>>>> If you have to guests with CONFIG_VFPV3 but your host doesn't have
+>>>>> CONFIG_VFPV3, you will never context-switch the VFP registers between
+>>>>> the two VMs, and mayhem will ensue.
+>>>>>
+>>>>> Unless I'm missing something very obvious?
+>>>
+>>> Did more testing on this enabling OABI_COMPAT and selecting
+>>> NWFPE/FastFPE breaks the boot. So far can't find a way to boot host
+>>> without VFP/VFPv3 enabled on ARMv7. CPU_V7 defaults to VFPv3
+>>> selection. I'm wondering if !VFPv3 path should be removed from
+>>> the patches?
+>>>
+>> I think this is related to your particular choice of userspace. 
+> 
+> It appears like there are two soft float implementations.
+> 
+> FastFPE - but that's missing arch/arm/fastfpe directory, the option
+> can still be selected but nothing is built.
+> 
+> And the Netwidner FPE arch/arm/nwfpe, that doesn't appear to be
+> hooked into the kernel. The hook nwfpe_enter is not referenced
+> anywhere.
 
-I'm not sure I get what you're saying. Do you want to remove that
-driver entirely, or just allow the -supply properties in the device
-tree to take a list?
+It is:
 
-In the former case, the rationale behind this driver is that the
-regulators powering a device also have to be kept in sync, both by
-enabling and disabling all of them at once, but also by all having
-them at the same voltages.
+arch/arm/nwfpe/entry.S: .globl  nwfpe_enter
+arch/arm/nwfpe/entry.S:nwfpe_enter:
+arch/arm/nwfpe/fpmodule.c:extern void nwfpe_enter(void);
+arch/arm/nwfpe/fpmodule.c:      kern_fp_enter = nwfpe_enter;
 
-We could push that code in the consumer drivers, but that has some
-significant drawbacks:
-  - That would duplicate that code in all the drivers, leading to the
-    usual drawbacks of code duplication, especially when it's not
-    really trivial to handle (or at least, when there's a few
-    gotchas).
-  - When you come to consider it from an hardware point of view, the
-    device usually have a single pin that powers it. It's the board
-    designer that chose to route that pin to multiple regulators, so
-    it's really the board that is wired that way, and putting that
-    code in the consumer drivers would be an abstraction leak imho.
-  - We might not even have a driver for these regulators, or at least
-    one that play by the rules. In our case, that's an out-of-tree
-    WiFi driver.
+> I could make this change but have no way to bring the host up to
+> test it.
 
-In the latter case, I remember Mark saying several times that he was
-not in favour of such a change, even recently:
-https://lkml.org/lkml/2015/10/14/238
+None of these are relevant - they are emulation for the FPA (Floating
+Point Accelerator). Most of the time, nobody uses this but instead a
+userspace softfloat implementation, which saves the trap to kernel space
+for emulation.
 
-Thanks!
-Maxime
+You can try Debian armel (as opposed to armhf, which mandates VFP) for
+example, which is a softfloat-based distribution.
 
+Thanks,
+
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160115/cf9595dd/attachment.sig>
+Jazz is not dead. It just smells funny...
