@@ -1,59 +1,76 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Fri, 15 Jan 2016 15:03:42 -0800
-Subject: [PATCH] staging: ion: make the pte default none PTE_RDONLY
-In-Reply-To: <1452825753-36364-1-git-send-email-puck.chen@hisilicon.com>
-References: <1452825753-36364-1-git-send-email-puck.chen@hisilicon.com>
-Message-ID: <56997ACE.80604@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 16 Jan 2016 00:03:37 +0100
+Subject: [PATCH v3 1/1] USB: core: let USB device know device node
+In-Reply-To: <Pine.LNX.4.44L0.1601151006330.1533-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1601151006330.1533-100000@iolanthe.rowland.org>
+Message-ID: <5216704.YbueADHOOR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(adding linux-arm and a few people)
+On Friday 15 January 2016 10:11:06 Alan Stern wrote:
+> On Fri, 15 Jan 2016, Arnd Bergmann wrote:
+> 
+> > On Friday 15 January 2016 17:17:27 Peter Chen wrote:
+> > > Although most of USB devices are hot-plug's, there are still some devices
+> > > are hard wired on the board, eg, for HSIC and SSIC interface USB devices.
+> > > If these kinds of USB devices are multiple functions, and they can supply
+> > > other interfaces like i2c, gpios for other devices, we may need to
+> > > describe these at device tree.
+> > > 
+> > > In this commit, it uses "reg" in dts as port number to match the port
+> > > number decided by USB core, if they are the same, then the device node
+> > > is for the device we are creating for USB core.
+> > > 
+> > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > 
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > 
+> > 
+> > Just one last question:
+> > 
+> > >  	dev->active_duration = -jiffies;
+> > >  #endif
+> > > -	if (root_hub)	/* Root hub always ok [and always wired] */
+> > > +	if (root_hub) {	/* Root hub always ok [and always wired] */
+> > >  		dev->authorized = 1;
+> > > -	else {
+> > > +		dev->of_node = bus->controller->of_node;
+> > 
+> > 
+> > You are adding the of_node of the controller to the root hub, which I
+> > guess means that we now have two 'struct device' instances with the
+> > same of_node. They have different bus_types, so I think that is ok,
+> > but I wonder if it would be better to leave out the of_node for the
+> > root hub to avoid the confusion. Can you think of a case where we
+> > actually want to add properties for the root hub that we can't do
+> > more easily in the host controller?
+> 
+> There may not be any such cases, but there's still a good reason for
+> setting the root hub's of_node pointer: to initialize the recursion
+> along the USB device tree.
+> 
+> This leaves the question of whether OF will always use the same node to
+> represent the host controller and the root hub.  In other words, if a
+> motherboard has a fixed device plugged into a fixed root-hub port, will
+> the DT description make that device a child of the host controller?  
+> Or will there be a node in between (to represent the root hub)?
 
-On 01/14/2016 06:42 PM, Chen Feng wrote:
-> The page is already alloc at ion_alloc function,
-> ion_mmap map the alloced pages to user-space.
->
-> The default prot can be PTE_RDONLY. Take a look at
-> here:
-> set_pte_at()
-> arch/arm64/include/asm:
-> 		if (pte_dirty(pte) && pte_write(pte))
-> 			pte_val(pte) &= ~PTE_RDONLY;
-> 		else
-> 			pte_val(pte) |= PTE_RDONLY;
->
-> So with the dirty bit,it can improve the efficiency
-> and donnot need to handle memory fault when use access.
->
-> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
-> Signed-off-by: Wei Dong <weidong2@hisilicon.com>
-> Reviewed-by: Zhuangluan Su <suzhuangluan@hisilicon.com>
-> ---
->   drivers/staging/android/ion/ion.c | 3 +++
->   1 file changed, 3 insertions(+)
->
-> diff --git a/drivers/staging/android/ion/ion.c b/drivers/staging/android/ion/ion.c
-> index e237e9f..dba5942 100644
-> --- a/drivers/staging/android/ion/ion.c
-> +++ b/drivers/staging/android/ion/ion.c
-> @@ -1026,6 +1026,9 @@ static int ion_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma)
->   	if (!(buffer->flags & ION_FLAG_CACHED))
->   		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
->
-> +	/*Default writeable*/
-> +	vma->vm_page_prot = pte_mkdirty(vma->vm_page_prot);
-> +
->   	mutex_lock(&buffer->lock);
->   	/* now map it to userspace */
->   	ret = buffer->heap->ops->map_user(buffer->heap, buffer, vma);
->
+Good question. I'm sure the answer is somewhere in this document
 
-The extra fault is unfortunate but I'm skeptical about just setting
-pte_mkdirty.
+http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
 
-Catalin/Will, do you have any thoughts? Right now it seems like any
-range mapped with remap_pfn_range will have this extra fault
-behavior. Is marking the range dirty the best solution?
+but unfortunately I don't understand USB addressing well enough
+to answer this. I think the key sentence is the definition of the
+"reg" property:
 
-Thanks,
-Laura
+| prop-encoded-array: one integer, encoded as with encode-int.
+| The "reg" property for a device node shall consist of the number of the
+| USB hub port or the USB host controller port to which this USB device
+| is attached. As specified in [2] section 11.11.2.1, port numbers range
+| from 1 to 255.
+
+Does the root hub have a port number relative to the host controller,
+or is it identical to the host controller from the addressing
+perspective?
+
+	Arnd
