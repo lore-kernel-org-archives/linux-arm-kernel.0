@@ -1,93 +1,21 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 14 Jan 2016 18:04:21 -0800
-Subject: [PATCH v3 09/13] ARM: at91: pm: find and remap the pmc
-In-Reply-To: <1449248628-3486-10-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Thu, 14 Jan 2016 18:04:39 -0800
+Subject: [PATCH v3 07/13] clk: at91: pmc: move pmc structures to C file
+In-Reply-To: <1449248628-3486-8-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1449248628-3486-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1449248628-3486-10-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20160115020421.GK22188@codeaurora.org>
+ <1449248628-3486-8-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20160115020439.GL22188@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 12/04, Alexandre Belloni wrote:
-> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-> index 5c2b60c5a2a1..38e93174031d 100644
-> --- a/arch/arm/mach-at91/pm.c
-> +++ b/arch/arm/mach-at91/pm.c
-> @@ -35,6 +35,8 @@
->  #include "generic.h"
->  #include "pm.h"
->  
-> +void __iomem *pmc;
+> pmc.c is now the only user of struct at91_pmc*, move their definition in
+> the C file.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
 
-static?
-
-> +
->  /*
->   * FIXME: this is needed to communicate between the pinctrl driver and
->   * the PM implementation in the machine. Possibly part of the PM
-> @@ -85,7 +87,7 @@ static int at91_pm_verify_clocks(void)
->  	unsigned long scsr;
->  	int i;
->  
-> -	scsr = at91_pmc_read(AT91_PMC_SCSR);
-> +	scsr = readl(pmc + AT91_PMC_SCSR);
->  
->  	/* USB must not be using PLLB */
->  	if ((scsr & at91_pm_data.uhp_udp_mask) != 0) {
-> @@ -99,8 +101,7 @@ static int at91_pm_verify_clocks(void)
->  
->  		if ((scsr & (AT91_PMC_PCK0 << i)) == 0)
->  			continue;
-> -
-> -		css = at91_pmc_read(AT91_PMC_PCKR(i)) & AT91_PMC_CSS;
-> +		css = readl(pmc + AT91_PMC_PCKR(i)) & AT91_PMC_CSS;
->  		if (css != AT91_PMC_CSS_SLOW) {
->  			pr_err("AT91: PM - Suspend-to-RAM with PCK%d src %d\n", i, css);
->  			return 0;
-> @@ -143,8 +144,8 @@ static void at91_pm_suspend(suspend_state_t state)
->  	flush_cache_all();
->  	outer_disable();
->  
-> -	at91_suspend_sram_fn(at91_pmc_base, at91_ramc_base[0],
-> -				at91_ramc_base[1], pm_data);
-> +	at91_suspend_sram_fn(pmc, at91_ramc_base[0],
-> +			     at91_ramc_base[1], pm_data);
->  
->  	outer_resume();
->  }
-> @@ -394,13 +395,33 @@ static void __init at91_pm_sram_init(void)
->  			&at91_pm_suspend_in_sram, at91_pm_suspend_in_sram_sz);
->  }
->  
-> +static const struct of_device_id atmel_pmc_ids[] = {
-
-__initconst?
-
-> +	{ .compatible = "atmel,at91rm9200-pmc"  },
-> +	{ .compatible = "atmel,at91sam9260-pmc" },
-> +	{ .compatible = "atmel,at91sam9g45-pmc" },
-> +	{ .compatible = "atmel,at91sam9n12-pmc" },
-> +	{ .compatible = "atmel,at91sam9x5-pmc" },
-> +	{ .compatible = "atmel,sama5d3-pmc" },
-> +	{ .compatible = "atmel,sama5d2-pmc" },
-> +	{ /* sentinel */ },
-> +};
-> +
->  static void __init at91_pm_init(void)
->  {
-> -	at91_pm_sram_init();
-> +	struct device_node *pmc_np;
->  
->  	if (at91_cpuidle_device.dev.platform_data)
->  		platform_device_register(&at91_cpuidle_device);
->  
-> +	pmc_np = of_find_matching_node(NULL, atmel_pmc_ids);
-> +	pmc = of_iomap(pmc_np, 0);
-> +	if (!pmc) {
-> +		pr_info("AT91: PM not supported, PMC not found\n");
-
-pr_err?
-
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
