@@ -1,74 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Jan 2016 11:52:54 +0100
-Subject: [PATCH] drm: omap dss: add missing includes
-Message-ID: <6010313.rYeAixWRHJ@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 15 Jan 2016 11:54:20 +0100
+Subject: [PATCH] clockevents: tcb_clksrc: stop disabling an already
+ disabled clock
+In-Reply-To: <1452854061-30370-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1452854061-30370-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5698CFDC.2090304@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omapdrm dss driver currently fails to build in some configurations when
-the pinctrl and seq_print declarations are not visible:
+Le 15/01/2016 11:34, Alexandre Belloni a ?crit :
+> clockevents_exchange_device is calling clockevents_shutdown() on the new
+> clockenvents device but it may have never been enabled in the first place.
+> This results in the tcb clock being disabled without being enabled first:
+> 
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:680 clk_disable+0x28/0x34()
+> Modules linked in:
+> CPU: 0 PID: 1 Comm: swapper Not tainted 4.4.0+ #6
+> Hardware name: Atmel AT91SAM9
+> [<c000f2b8>] (unwind_backtrace) from [<c000d01c>] (show_stack+0x10/0x14)
+> [<c000d01c>] (show_stack) from [<c00172f0>] (warn_slowpath_common+0x78/0xa0)
+> [<c00172f0>] (warn_slowpath_common) from [<c00173a8>] (warn_slowpath_null+0x18/0x20)
+> [<c00173a8>] (warn_slowpath_null) from [<c0361528>] (clk_disable+0x28/0x34)
+> [<c0361528>] (clk_disable) from [<c034d560>] (tc_shutdown+0x38/0x4c)
+> [<c034d560>] (tc_shutdown) from [<c0059ad4>] (clockevents_switch_state+0x38/0x6c)
+> [<c0059ad4>] (clockevents_switch_state) from [<c0059b18>] (clockevents_shutdown+0x10/0x24)
+> [<c0059b18>] (clockevents_shutdown) from [<c005a458>] (tick_check_new_device+0x84/0xac)
+> [<c005a458>] (tick_check_new_device) from [<c0059660>] (clockevents_register_device+0x7c/0x108)
+> [<c0059660>] (clockevents_register_device) from [<c06b5a68>] (tcb_clksrc_init+0x390/0x3e8)
+> [<c06b5a68>] (tcb_clksrc_init) from [<c00097cc>] (do_one_initcall+0x114/0x1d4)
+> [<c00097cc>] (do_one_initcall) from [<c069bd54>] (kernel_init_freeable+0xfc/0x1b8)
+> [<c069bd54>] (kernel_init_freeable) from [<c04c3818>] (kernel_init+0x8/0xe0)
+> [<c04c3818>] (kernel_init) from [<c000a410>] (ret_from_fork+0x14/0x24)
+> ---[ end trace 0000000000000001 ]---
+> 
+> Check what state we were in before trying to disable the clock.
+> 
+> Fixes: cf4541c101ea ("clockevents/drivers/tcb_clksrc: Migrate to new 'set-state' interface")
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-omapdrm/dss/dss.c:1268:2: error: implicit declaration of function 'pinctrl_pm_select_sleep_state' [-Werror=implicit-function-declaration]
-omapdrm/dss/dss.c:1277:2: error: implicit declaration of function 'pinctrl_pm_select_default_state' [-Werror=implicit-function-declaration]
-omapdrm/dss/hdmi_wp.c:26:2: error: implicit declaration of function 'seq_printf' [-Werror=implicit-function-declaration]
-omapdrm/dss/hdmi_pll.c:30:2: error: implicit declaration of function 'seq_printf' [-Werror=implicit-function-declaration]
-omapdrm/dss/hdmi_phy.c:34:2: error: implicit declaration of function 'seq_printf' [-Werror=implicit-function-declaration]
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-This adds the appropriate include statements.
+Thanks!
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 9960aa7cb58c ("drm/omap: move omapdss & displays under omapdrm")
----
-Found on ARM randconfig builds. I assume there are also configurations in which this is
-not needed because the headers get included through other headers, and I have not
-investigated exactly what options cause this as the fix seems obvious and harmless.
+> ---
+>  drivers/clocksource/tcb_clksrc.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+> index 6ee91401918e..4da2af9694a2 100644
+> --- a/drivers/clocksource/tcb_clksrc.c
+> +++ b/drivers/clocksource/tcb_clksrc.c
+> @@ -98,7 +98,8 @@ static int tc_shutdown(struct clock_event_device *d)
+>  
+>  	__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
+>  	__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
+> -	clk_disable(tcd->clk);
+> +	if (!clockevent_state_detached(d))
+> +		clk_disable(tcd->clk);
+>  
+>  	return 0;
+>  }
+> 
 
-diff --git a/drivers/gpu/drm/omapdrm/dss/dss.c b/drivers/gpu/drm/omapdrm/dss/dss.c
-index f95ff319e68e..839b1b6bdbe4 100644
---- a/drivers/gpu/drm/omapdrm/dss/dss.c
-+++ b/drivers/gpu/drm/omapdrm/dss/dss.c
-@@ -37,6 +37,7 @@
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
- #include <linux/of.h>
-+#include <linux/pinctrl/consumer.h>
- #include <linux/regulator/consumer.h>
- #include <linux/suspend.h>
- #include <linux/component.h>
-diff --git a/drivers/gpu/drm/omapdrm/dss/hdmi_phy.c b/drivers/gpu/drm/omapdrm/dss/hdmi_phy.c
-index 1f5d19c119ce..a872721a03a2 100644
---- a/drivers/gpu/drm/omapdrm/dss/hdmi_phy.c
-+++ b/drivers/gpu/drm/omapdrm/dss/hdmi_phy.c
-@@ -13,6 +13,8 @@
- #include <linux/io.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
-+#include <linux/seq_file.h>
-+
- #include <video/omapdss.h>
- 
- #include "dss.h"
-diff --git a/drivers/gpu/drm/omapdrm/dss/hdmi_pll.c b/drivers/gpu/drm/omapdrm/dss/hdmi_pll.c
-index 06e23a7c432c..f1015e8b8267 100644
---- a/drivers/gpu/drm/omapdrm/dss/hdmi_pll.c
-+++ b/drivers/gpu/drm/omapdrm/dss/hdmi_pll.c
-@@ -16,6 +16,7 @@
- #include <linux/io.h>
- #include <linux/platform_device.h>
- #include <linux/clk.h>
-+#include <linux/seq_file.h>
- 
- #include <video/omapdss.h>
- 
-diff --git a/drivers/gpu/drm/omapdrm/dss/hdmi_wp.c b/drivers/gpu/drm/omapdrm/dss/hdmi_wp.c
-index 7c544bc56fb5..753ac305d32a 100644
---- a/drivers/gpu/drm/omapdrm/dss/hdmi_wp.c
-+++ b/drivers/gpu/drm/omapdrm/dss/hdmi_wp.c
-@@ -14,6 +14,7 @@
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/platform_device.h>
-+#include <linux/seq_file.h>
- #include <video/omapdss.h>
- 
- #include "dss.h"
+
+-- 
+Nicolas Ferre
