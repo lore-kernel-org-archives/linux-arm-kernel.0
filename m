@@ -1,56 +1,84 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 15 Jan 2016 11:37:53 +0900
-Subject: [PATCH v3 00/14] r8a7793, gose: Add audio support to device tree
-Message-ID: <1452825487-15931-1-git-send-email-horms+renesas@verge.net.au>
+Date: Fri, 15 Jan 2016 11:37:54 +0900
+Subject: [PATCH v3 01/14] ARM: shmobile: r8a7793: add MSTP10 clocks to device
+ tree
+In-Reply-To: <1452825487-15931-1-git-send-email-horms+renesas@verge.net.au>
+References: <1452825487-15931-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1452825487-15931-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Instantiate MSTP10 clocks in r8a7793 device tree.
 
-this series adds support to r8a7793 and gose device trees for
-rcar sound: first in PIO mode then using DMA
+Based on similar work for the r8a7791 by Kuninori Morimoto.
 
-I have been unable to test if audio works (in PIO mode) as I
-do not have physical access to a gose board. I would appreciate
-some assistance there.
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7793.dtsi            | 36 +++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/r8a7793-clock.h |  2 ++
+ 2 files changed, 38 insertions(+)
 
-This work is based heavily on the work of others for the r8a7791 and
-koelsch as noted in the changelogs of individual patches.
-
-This series is based on renesas-devel-20160111-v4.4 and
-has no other dependencies that I am aware of.
-
-Changes between v2 and v3
-* Minor changelog tweaks
-
-Changes since v1 and v2:
-* Dropped RFC designation
-* Dropped i2c patches: they have been posted and partially merged separately
-* Dropped MIX/CTU support pending more work on that feature
-* Enable Audio DMAC peri peri via sound driver
-* Other changes noted in per-patch changelogs
-
-
-Simon Horman (14):
-  ARM: shmobile: r8a7793: add MSTP10 clocks to device tree
-  ARM: shmobile: r8a7793: add audio clock to device tree
-  ARM: shmobile: r8a7793: add m2 clock to device tree
-  ARM: shmobile: r8a7793: add R-Car sound support to device tree
-  ARM: shmobile: r8a7793: add DVC support to device tree
-  ARM: shmobile: r8a7793: add audio DMAC clocks to device tree
-  ARM: shmobile: r8a7793: add audio DMAC to device tree
-  ARM: shmobile: r8a7793: enable Audio DMAC peri peri via sound driver
-  ARM: shmobile: gose: Enable sound PIO support in device tree
-  ARM: shmobile: gose: enable sound DMA support in device tree
-  ARM: shmobile: gose: enable sound DMA support via BUSIF in device tree
-  ARM: shmobile: gose: enable sound DMA support via SRC in device tree
-  ARM: shmobile: gose: enable sound DMA support via DVC in device tree
-  ARM: shmobile: r8a7793: enable audio DMAC in device tree
-
- arch/arm/boot/dts/r8a7793-gose.dts        |  88 +++++++++
- arch/arm/boot/dts/r8a7793.dtsi            | 289 +++++++++++++++++++++++++++++-
- include/dt-bindings/clock/r8a7793-clock.h |   2 +
- 3 files changed, 376 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index 0ce7cc420c9d..221f5707a622 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -963,6 +963,42 @@
+ 				"qspi_mod", "i2c5", "i2c6", "i2c4",
+ 				"i2c3", "i2c2", "i2c1", "i2c0";
+ 		};
++		mstp10_clks: mstp10_clks at e6150998 {
++			compatible = "renesas,r8a7793-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0 0xe6150998 0 4>, <0 0xe61509a8 0 4>;
++			clocks = <&p_clk>,
++				<&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
++				<&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
++				<&p_clk>,
++				<&mstp10_clks R8A7793_CLK_SCU_ALL>, <&mstp10_clks R8A7793_CLK_SCU_ALL>,
++				<&mstp10_clks R8A7793_CLK_SCU_ALL>, <&mstp10_clks R8A7793_CLK_SCU_ALL>,
++				<&mstp10_clks R8A7793_CLK_SCU_ALL>, <&mstp10_clks R8A7793_CLK_SCU_ALL>,
++				<&mstp10_clks R8A7793_CLK_SCU_ALL>, <&mstp10_clks R8A7793_CLK_SCU_ALL>,
++				<&mstp10_clks R8A7793_CLK_SCU_ALL>, <&mstp10_clks R8A7793_CLK_SCU_ALL>,
++				<&mstp10_clks R8A7793_CLK_SCU_ALL>, <&mstp10_clks R8A7793_CLK_SCU_ALL>,
++				<&mstp10_clks R8A7793_CLK_SCU_ALL>, <&mstp10_clks R8A7793_CLK_SCU_ALL>;
++
++			#clock-cells = <1>;
++			clock-indices = <
++				R8A7793_CLK_SSI_ALL
++				R8A7793_CLK_SSI9 R8A7793_CLK_SSI8 R8A7793_CLK_SSI7 R8A7793_CLK_SSI6 R8A7793_CLK_SSI5
++				R8A7793_CLK_SSI4 R8A7793_CLK_SSI3 R8A7793_CLK_SSI2 R8A7793_CLK_SSI1 R8A7793_CLK_SSI0
++				R8A7793_CLK_SCU_ALL
++				R8A7793_CLK_SCU_DVC1 R8A7793_CLK_SCU_DVC0
++				R8A7793_CLK_SCU_CTU1_MIX1 R8A7793_CLK_SCU_CTU0_MIX0
++				R8A7793_CLK_SCU_SRC9 R8A7793_CLK_SCU_SRC8 R8A7793_CLK_SCU_SRC7 R8A7793_CLK_SCU_SRC6 R8A7793_CLK_SCU_SRC5
++				R8A7793_CLK_SCU_SRC4 R8A7793_CLK_SCU_SRC3 R8A7793_CLK_SCU_SRC2 R8A7793_CLK_SCU_SRC1 R8A7793_CLK_SCU_SRC0
++			>;
++			clock-output-names =
++				"ssi-all",
++				"ssi9", "ssi8", "ssi7", "ssi6", "ssi5",
++				"ssi4", "ssi3", "ssi2", "ssi1", "ssi0",
++				"scu-all",
++				"scu-dvc1", "scu-dvc0",
++				"scu-ctu1-mix1", "scu-ctu0-mix0",
++				"scu-src9", "scu-src8", "scu-src7", "scu-src6", "scu-src5",
++				"scu-src4", "scu-src3", "scu-src2", "scu-src1", "scu-src0";
++		};
+ 		mstp11_clks: mstp11_clks at e615099c {
+ 			compatible = "renesas,r8a7793-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe615099c 0 4>, <0 0xe61509ac 0 4>;
+diff --git a/include/dt-bindings/clock/r8a7793-clock.h b/include/dt-bindings/clock/r8a7793-clock.h
+index 1579e07f96a3..efcbc594fe82 100644
+--- a/include/dt-bindings/clock/r8a7793-clock.h
++++ b/include/dt-bindings/clock/r8a7793-clock.h
+@@ -145,6 +145,8 @@
+ #define R8A7793_CLK_SCU_ALL		17
+ #define R8A7793_CLK_SCU_DVC1		18
+ #define R8A7793_CLK_SCU_DVC0		19
++#define R8A7793_CLK_SCU_CTU1_MIX1	20
++#define R8A7793_CLK_SCU_CTU0_MIX0	21
+ #define R8A7793_CLK_SCU_SRC9		22
+ #define R8A7793_CLK_SCU_SRC8		23
+ #define R8A7793_CLK_SCU_SRC7		24
 -- 
 2.1.4
