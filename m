@@ -1,49 +1,44 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 15 Jan 2016 08:53:56 +0100
-Subject: [PATCH v3] i2c: imx: make bus recovery through pinctrl optional
-In-Reply-To: <1452842844-16256-1-git-send-email-leoyang.li@nxp.com>
-References: <1452842844-16256-1-git-send-email-leoyang.li@nxp.com>
-Message-ID: <20160115075356.GI24441@pengutronix.de>
+From: vw@iommu.org (Wan Zongshun)
+Date: Fri, 15 Jan 2016 15:53:41 +0800
+Subject: [PATCH] mtd: nuc900_nand: read correct SMISR register
+In-Reply-To: <4251392.DUmfQyrPag@wuerfel>
+References: <9019174.GYajdpGP8V@wuerfel> <20160114002900.GA54220@google.com>
+ <56976BA9.2040709@iommu.org> <4251392.DUmfQyrPag@wuerfel>
+Message-ID: <5698A585.7060007@iommu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On Fri, Jan 15, 2016 at 01:27:24AM -0600, Li Yang wrote:
-> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-> index a2b132c..1239bfa 100644
-> --- a/drivers/i2c/busses/i2c-imx.c
-> +++ b/drivers/i2c/busses/i2c-imx.c
-> @@ -1081,8 +1081,11 @@ static int i2c_imx_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> +	/* optional bus recovery feature through pinctrl */
->  	i2c_imx->pinctrl = devm_pinctrl_get(&pdev->dev);
-> -	if (IS_ERR(i2c_imx->pinctrl)) {
-> +	/* bailout on -ENOMEM or -EPROBE_DEFER, continue for other errors */
-> +	if (PTR_ERR(i2c_imx->pinctrl) == -ENOMEM ||
-> +			PTR_ERR(i2c_imx->pinctrl) == -EPROBE_DEFER) {
->  		ret = PTR_ERR(i2c_imx->pinctrl);
->  		goto clk_disable;
->  	}
-> @@ -1125,7 +1128,10 @@ static int i2c_imx_probe(struct platform_device *pdev)
->  			i2c_imx, IMX_I2C_I2CR);
->  	imx_i2c_write_reg(i2c_imx->hwdata->i2sr_clr_opcode, i2c_imx, IMX_I2C_I2SR);
->  
-> -	i2c_imx_init_recovery_info(i2c_imx, pdev);
-> +	if (IS_ERR_OR_NULL(i2c_imx->pinctrl))
+>>
+>> Actually, Nuvoton should still leverage this upstream w90x900 codes for
+>> their old and new arm chip BSP, but I am not sure their open source plan
+>> for the new chip now, I will check with Nuvoton for this topic, and give
+>> you feedback here, so please hold on its removal.
+>
+> Ok, sure. Thanks for the quick reply!
+>
+> I've had a look around at the current produce lineup, and it seems that
+> nuc900 (w90x900) is still marketed, and as you say is similar to the n329
+> series.
+>
+> There has been one attempt to do a modern port for n329 in 2014 but
+> it never got submitted. See http://comments.gmane.org/gmane.linux.kernel.kernelnewbies/49077
+> and https://github.com/mpthompson/linux/tree/n329
+>
+> The code looks rather nice, so it's a pity that the effort stalled,
+> but it should not be hard for anyone to start out with Mike's tree
+> and forward-port it to 4.5.
 
-I'd prefer to set i2c_imx->pinctrl to NULL if it's not used and then use
+I will try to get this board you mentioned and try to cowork Mike to 
+submit it into upstream.
 
-	if (!i2c_imx->pinctrl)
+After checking with Nuvoton people, and I will get another board and 
+help them update the latest kernel BSP and also submit new nuc970 chip 
+BSP into upstream.
 
-here. (Or maybe make i2c_imx_init_recovery_info aware of this situation
-to keep the caller simple?)
+spec:
+http://www.nuvoton.com/hq/products/microprocessors/arm9-mpus/nuc900-series/?__locale=en
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>
+> 	Arnd
+>
