@@ -1,224 +1,146 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 15 Jan 2016 14:27:43 +0800
-Subject: [PATCH v9 09/21] KVM: ARM64: Add access handler for event counter
- register
+Date: Fri, 15 Jan 2016 14:27:50 +0800
+Subject: [PATCH v9 16/21] KVM: ARM64: Add PMU overflow interrupt routing
 In-Reply-To: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1452839275-19368-10-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1452839275-19368-17-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-These kind of registers include PMEVCNTRn, PMCCNTR and PMXEVCNTR which
-is mapped to PMEVCNTRn.
+When calling perf_event_create_kernel_counter to create perf_event,
+assign a overflow handler. Then when the perf event overflows, set the
+corresponding bit of guest PMOVSSET register. If this counter is enabled
+and its interrupt is enabled as well, kick the vcpu to sync the
+interrupt.
 
-The access handler translates all aarch32 register offsets to aarch64
-ones and uses vcpu_sys_reg() to access their values to avoid taking care
-of big endian.
-
-When reading these registers, return the sum of register value and the
-value perf event counts.
+On VM entry, if there is counter overflowed, inject the interrupt with
+the level set to 1. Otherwise, inject the interrupt with the level set
+to 0.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/sys_regs.c | 129 ++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 125 insertions(+), 4 deletions(-)
+ arch/arm/kvm/arm.c    |  2 ++
+ include/kvm/arm_pmu.h |  2 ++
+ virt/kvm/arm/pmu.c    | 50 +++++++++++++++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 53 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 298ae94..6a50262 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -561,6 +561,48 @@ static bool access_pmu_evtyper(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	return true;
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index dda1959..f54264c 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -28,6 +28,7 @@
+ #include <linux/sched.h>
+ #include <linux/kvm.h>
+ #include <trace/events/kvm.h>
++#include <kvm/arm_pmu.h>
+ 
+ #define CREATE_TRACE_POINTS
+ #include "trace.h"
+@@ -577,6 +578,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 * non-preemptible context.
+ 		 */
+ 		preempt_disable();
++		kvm_pmu_flush_hwstate(vcpu);
+ 		kvm_timer_flush_hwstate(vcpu);
+ 		kvm_vgic_flush_hwstate(vcpu);
+ 
+diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+index 5bed00c..fbc42fd 100644
+--- a/include/kvm/arm_pmu.h
++++ b/include/kvm/arm_pmu.h
+@@ -41,6 +41,7 @@ u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu);
+ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
++void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+@@ -62,6 +63,7 @@ static inline u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
+ static inline void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+ static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+ static inline void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
++static inline void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val) {}
+ static inline void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val) {}
+ static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index d411f3f..644f2dc 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -21,6 +21,7 @@
+ #include <linux/perf_event.h>
+ #include <asm/kvm_emulate.h>
+ #include <kvm/arm_pmu.h>
++#include <kvm/arm_vgic.h>
+ 
+ /**
+  * kvm_pmu_get_counter_value - get PMU counter value
+@@ -162,6 +163,52 @@ void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val)
  }
  
-+static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
-+			      struct sys_reg_params *p,
-+			      const struct sys_reg_desc *r)
+ /**
++ * kvm_pmu_flush_hwstate - flush pmu state to cpu
++ * @vcpu: The vcpu pointer
++ *
++ * Inject virtual PMU IRQ if IRQ is pending for this cpu.
++ */
++void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu)
 +{
-+	u64 idx, reg, val;
++	struct kvm_pmu *pmu = &vcpu->arch.pmu;
++	u64 overflow;
 +
 +	if (!kvm_arm_pmu_v3_ready(vcpu))
-+		return trap_raz_wi(vcpu, p, r);
++		return;
 +
-+	if (r->CRn == 9 && r->CRm == 13) {
-+		if (r->Op2 == 2) {
-+			/* PMXEVCNTR_EL0 */
-+			idx = vcpu_sys_reg(vcpu, PMSELR_EL0)
-+			      & ARMV8_COUNTER_MASK;
-+			reg = PMEVCNTR0_EL0 + idx;
-+		} else if (r->Op2 == 0) {
-+			/* PMCCNTR_EL0 */
-+			idx = ARMV8_CYCLE_IDX;
-+			reg = PMCCNTR_EL0;
-+		} else {
-+			BUG();
-+		}
-+	} else if (r->CRn == 14 && (r->CRm & 12) == 8) {
-+		/* PMEVCNTRn_EL0 */
-+		idx = ((r->CRm & 3) << 3) | (r->Op2 & 7);
-+		reg = PMEVCNTR0_EL0 + idx;
-+	} else {
-+		BUG();
-+	}
++	if (!(vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E))
++		return;
 +
-+	if (!pmu_counter_idx_valid(vcpu, idx))
-+		return false;
-+
-+	val = kvm_pmu_get_counter_value(vcpu, idx);
-+	if (p->is_write)
-+		vcpu_sys_reg(vcpu, reg) += (s64)p->regval - val;
-+	else
-+		p->regval = val;
-+
-+	return true;
++	overflow = kvm_pmu_overflow_status(vcpu);
++	kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id, pmu->irq_num, !!overflow);
 +}
 +
- /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
- #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
- 	/* DBGBVRn_EL1 */						\
-@@ -576,6 +618,13 @@ static bool access_pmu_evtyper(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b111),	\
- 	  trap_wcr, reset_wcr, n, 0,  get_wcr, set_wcr }
- 
-+/* Macro to expand the PMEVCNTRn_EL0 register */
-+#define PMU_PMEVCNTR_EL0(n)						\
-+	/* PMEVCNTRn_EL0 */						\
-+	{ Op0(0b11), Op1(0b011), CRn(0b1110),				\
-+	  CRm((0b1000 | (((n) >> 3) & 0x3))), Op2(((n) & 0x7)),		\
-+	  access_pmu_evcntr, reset_unknown, (PMEVCNTR0_EL0 + n), }
++static inline struct kvm_vcpu *kvm_pmc_to_vcpu(struct kvm_pmc *pmc)
++{
++	struct kvm_pmu *pmu;
++	struct kvm_vcpu_arch *vcpu_arch;
 +
- /* Macro to expand the PMEVTYPERn_EL0 register */
- #define PMU_PMEVTYPER_EL0(n)						\
- 	/* PMEVTYPERn_EL0 */						\
-@@ -776,13 +825,13 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	  access_pmceid },
- 	/* PMCCNTR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
--	  trap_raz_wi },
-+	  access_pmu_evcntr, reset_unknown, PMCCNTR_EL0 },
- 	/* PMXEVTYPER_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b001),
- 	  access_pmu_evtyper },
- 	/* PMXEVCNTR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b010),
--	  trap_raz_wi },
-+	  access_pmu_evcntr },
- 	/* PMUSERENR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b000),
- 	  trap_raz_wi },
-@@ -797,6 +846,38 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b011),
- 	  NULL, reset_unknown, TPIDRRO_EL0 },
- 
-+	/* PMEVCNTRn_EL0 */
-+	PMU_PMEVCNTR_EL0(0),
-+	PMU_PMEVCNTR_EL0(1),
-+	PMU_PMEVCNTR_EL0(2),
-+	PMU_PMEVCNTR_EL0(3),
-+	PMU_PMEVCNTR_EL0(4),
-+	PMU_PMEVCNTR_EL0(5),
-+	PMU_PMEVCNTR_EL0(6),
-+	PMU_PMEVCNTR_EL0(7),
-+	PMU_PMEVCNTR_EL0(8),
-+	PMU_PMEVCNTR_EL0(9),
-+	PMU_PMEVCNTR_EL0(10),
-+	PMU_PMEVCNTR_EL0(11),
-+	PMU_PMEVCNTR_EL0(12),
-+	PMU_PMEVCNTR_EL0(13),
-+	PMU_PMEVCNTR_EL0(14),
-+	PMU_PMEVCNTR_EL0(15),
-+	PMU_PMEVCNTR_EL0(16),
-+	PMU_PMEVCNTR_EL0(17),
-+	PMU_PMEVCNTR_EL0(18),
-+	PMU_PMEVCNTR_EL0(19),
-+	PMU_PMEVCNTR_EL0(20),
-+	PMU_PMEVCNTR_EL0(21),
-+	PMU_PMEVCNTR_EL0(22),
-+	PMU_PMEVCNTR_EL0(23),
-+	PMU_PMEVCNTR_EL0(24),
-+	PMU_PMEVCNTR_EL0(25),
-+	PMU_PMEVCNTR_EL0(26),
-+	PMU_PMEVCNTR_EL0(27),
-+	PMU_PMEVCNTR_EL0(28),
-+	PMU_PMEVCNTR_EL0(29),
-+	PMU_PMEVCNTR_EL0(30),
- 	/* PMEVTYPERn_EL0 */
- 	PMU_PMEVTYPER_EL0(0),
- 	PMU_PMEVTYPER_EL0(1),
-@@ -1025,6 +1106,13 @@ static const struct sys_reg_desc cp14_64_regs[] = {
- 	{ Op1( 0), CRm( 2), .access = trap_raz_wi },
- };
- 
-+/* Macro to expand the PMEVCNTRn register */
-+#define PMU_PMEVCNTR(n)							\
-+	/* PMEVCNTRn */							\
-+	{ Op1(0), CRn(0b1110),						\
-+	  CRm((0b1000 | (((n) >> 3) & 0x3))), Op2(((n) & 0x7)),		\
-+	  access_pmu_evcntr }
++	pmc -= pmc->idx;
++	pmu = container_of(pmc, struct kvm_pmu, pmc[0]);
++	vcpu_arch = container_of(pmu, struct kvm_vcpu_arch, pmu);
++	return container_of(vcpu_arch, struct kvm_vcpu, arch);
++}
 +
- /* Macro to expand the PMEVTYPERn register */
- #define PMU_PMEVTYPER(n)						\
- 	/* PMEVTYPERn */						\
-@@ -1067,9 +1155,9 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmceid },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmceid },
--	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), access_pmu_evcntr },
- 	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), access_pmu_evtyper },
--	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_evcntr },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), trap_raz_wi },
-@@ -1084,6 +1172,38 @@ static const struct sys_reg_desc cp15_regs[] = {
++/**
++ * When perf event overflows, call kvm_pmu_overflow_set to set overflow status.
++ */
++static void kvm_pmu_perf_overflow(struct perf_event *perf_event,
++				  struct perf_sample_data *data,
++				  struct pt_regs *regs)
++{
++	struct kvm_pmc *pmc = perf_event->overflow_handler_context;
++	struct kvm_vcpu *vcpu = kvm_pmc_to_vcpu(pmc);
++	int idx = pmc->idx;
++
++	kvm_pmu_overflow_set(vcpu, BIT(idx));
++}
++
++/**
+  * kvm_pmu_software_increment - do software increment
+  * @vcpu: The vcpu pointer
+  * @val: the value guest writes to PMSWINC register
+@@ -279,7 +326,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+ 	/* The initial sample period (overflow count) of an event. */
+ 	attr.sample_period = (-counter) & pmc->bitmask;
  
- 	{ Op1( 0), CRn(13), CRm( 0), Op2( 1), access_vm_reg, NULL, c13_CID },
- 
-+	/* PMEVCNTRn */
-+	PMU_PMEVCNTR(0),
-+	PMU_PMEVCNTR(1),
-+	PMU_PMEVCNTR(2),
-+	PMU_PMEVCNTR(3),
-+	PMU_PMEVCNTR(4),
-+	PMU_PMEVCNTR(5),
-+	PMU_PMEVCNTR(6),
-+	PMU_PMEVCNTR(7),
-+	PMU_PMEVCNTR(8),
-+	PMU_PMEVCNTR(9),
-+	PMU_PMEVCNTR(10),
-+	PMU_PMEVCNTR(11),
-+	PMU_PMEVCNTR(12),
-+	PMU_PMEVCNTR(13),
-+	PMU_PMEVCNTR(14),
-+	PMU_PMEVCNTR(15),
-+	PMU_PMEVCNTR(16),
-+	PMU_PMEVCNTR(17),
-+	PMU_PMEVCNTR(18),
-+	PMU_PMEVCNTR(19),
-+	PMU_PMEVCNTR(20),
-+	PMU_PMEVCNTR(21),
-+	PMU_PMEVCNTR(22),
-+	PMU_PMEVCNTR(23),
-+	PMU_PMEVCNTR(24),
-+	PMU_PMEVCNTR(25),
-+	PMU_PMEVCNTR(26),
-+	PMU_PMEVCNTR(27),
-+	PMU_PMEVCNTR(28),
-+	PMU_PMEVCNTR(29),
-+	PMU_PMEVCNTR(30),
- 	/* PMEVTYPERn */
- 	PMU_PMEVTYPER(0),
- 	PMU_PMEVTYPER(1),
-@@ -1122,6 +1242,7 @@ static const struct sys_reg_desc cp15_regs[] = {
- 
- static const struct sys_reg_desc cp15_64_regs[] = {
- 	{ Op1( 0), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
-+	{ Op1( 0), CRn( 0), CRm( 9), Op2( 0), access_pmu_evcntr },
- 	{ Op1( 0), CRn( 0), CRm(12), Op2( 0), access_gic_sgi },
- 	{ Op1( 1), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR1 },
- };
+-	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
++	event = perf_event_create_kernel_counter(&attr, -1, current,
++						 kvm_pmu_perf_overflow, pmc);
+ 	if (IS_ERR(event)) {
+ 		pr_err_once("kvm: pmu event creation failed %ld\n",
+ 			    PTR_ERR(event));
 -- 
 2.0.4
