@@ -1,196 +1,182 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 15 Jan 2016 14:55:15 +0800
-Subject: [PATCH v2 02/16] xen/grant-table: Move xlated_setup_gnttab_pages to
- common place
+Date: Fri, 15 Jan 2016 14:55:19 +0800
+Subject: [PATCH v2 06/16] Xen: ARM: Add support for mapping platform device
+ mmio
 In-Reply-To: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1452840929-19612-3-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1452840929-19612-7-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Move xlated_setup_gnttab_pages to common place, so it can be reused by
-ARM to setup grant table.
-
-Rename it to xen_xlate_map_ballooned_pages.
+Add a bus_notifier for platform bus device in order to map the device
+mmio regions when DOM0 booting with ACPI.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/x86/xen/grant-table.c | 57 +++++--------------------------------------
- drivers/xen/xlate_mmu.c    | 61 ++++++++++++++++++++++++++++++++++++++++++++++
- include/xen/xen-ops.h      |  2 ++
- 3 files changed, 69 insertions(+), 51 deletions(-)
+ drivers/xen/Makefile     |   1 +
+ drivers/xen/arm-device.c | 140 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 141 insertions(+)
+ create mode 100644 drivers/xen/arm-device.c
 
-diff --git a/arch/x86/xen/grant-table.c b/arch/x86/xen/grant-table.c
-index e079500..de4144c 100644
---- a/arch/x86/xen/grant-table.c
-+++ b/arch/x86/xen/grant-table.c
-@@ -111,63 +111,18 @@ int arch_gnttab_init(unsigned long nr_shared)
- }
+diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+index aa8a7f7..0c087b1 100644
+--- a/drivers/xen/Makefile
++++ b/drivers/xen/Makefile
+@@ -9,6 +9,7 @@ CFLAGS_features.o			:= $(nostackp)
  
- #ifdef CONFIG_XEN_PVH
--#include <xen/balloon.h>
- #include <xen/events.h>
--#include <linux/slab.h>
--static int __init xlated_setup_gnttab_pages(void)
--{
--	struct page **pages;
--	xen_pfn_t *pfns;
--	void *vaddr;
--	int rc;
--	unsigned int i;
--	unsigned long nr_grant_frames = gnttab_max_grant_frames();
--
--	BUG_ON(nr_grant_frames == 0);
--	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
--	if (!pages)
--		return -ENOMEM;
--
--	pfns = kcalloc(nr_grant_frames, sizeof(pfns[0]), GFP_KERNEL);
--	if (!pfns) {
--		kfree(pages);
--		return -ENOMEM;
--	}
--	rc = alloc_xenballooned_pages(nr_grant_frames, pages);
--	if (rc) {
--		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
--			nr_grant_frames, rc);
--		kfree(pages);
--		kfree(pfns);
--		return rc;
--	}
--	for (i = 0; i < nr_grant_frames; i++)
--		pfns[i] = page_to_pfn(pages[i]);
--
--	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
--	if (!vaddr) {
--		pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
--			nr_grant_frames, rc);
--		free_xenballooned_pages(nr_grant_frames, pages);
--		kfree(pages);
--		kfree(pfns);
--		return -ENOMEM;
--	}
--	kfree(pages);
--
--	xen_auto_xlat_grant_frames.pfn = pfns;
--	xen_auto_xlat_grant_frames.count = nr_grant_frames;
--	xen_auto_xlat_grant_frames.vaddr = vaddr;
--
--	return 0;
--}
--
-+#include <xen/xen-ops.h>
- static int __init xen_pvh_gnttab_setup(void)
- {
- 	if (!xen_pvh_domain())
- 		return -ENODEV;
+ CFLAGS_efi.o				+= -fshort-wchar
  
--	return xlated_setup_gnttab_pages();
-+	xen_auto_xlat_grant_frames.count = gnttab_max_grant_frames();
-+
-+	return xen_xlate_map_ballooned_pages(&xen_auto_xlat_grant_frames.pfn,
-+					     &xen_auto_xlat_grant_frames.vaddr,
-+					     xen_auto_xlat_grant_frames.count);
- }
- /* Call it _before_ __gnttab_init as we need to initialize the
-  * xen_auto_xlat_grant_frames first. */
-diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
-index 5063c5e..9692656 100644
---- a/drivers/xen/xlate_mmu.c
-+++ b/drivers/xen/xlate_mmu.c
-@@ -29,6 +29,8 @@
-  */
- #include <linux/kernel.h>
- #include <linux/mm.h>
-+#include <linux/slab.h>
-+#include <linux/vmalloc.h>
- 
- #include <asm/xen/hypercall.h>
- #include <asm/xen/hypervisor.h>
-@@ -37,6 +39,7 @@
- #include <xen/page.h>
- #include <xen/interface/xen.h>
- #include <xen/interface/memory.h>
-+#include <xen/balloon.h>
- 
- typedef void (*xen_gfn_fn_t)(unsigned long gfn, void *data);
- 
-@@ -185,3 +188,61 @@ int xen_xlate_unmap_gfn_range(struct vm_area_struct *vma,
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(xen_xlate_unmap_gfn_range);
-+
-+/**
-+ * xen_xlate_map_ballooned_pages - map a new set of ballooned pages
-+ * @gfns: returns the array of corresponding GFNs
-+ * @virt: returns the virtual address of the mapped region
-+ * @nr_grant_frames: number of GFNs
-+ * @return 0 on success, error otherwise
++dom0-$(CONFIG_ARM64) += arm-device.o
+ dom0-$(CONFIG_PCI) += pci.o
+ dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
+ dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
+diff --git a/drivers/xen/arm-device.c b/drivers/xen/arm-device.c
+new file mode 100644
+index 0000000..7d902ea
+--- /dev/null
++++ b/drivers/xen/arm-device.c
+@@ -0,0 +1,140 @@
++/*
++ * Copyright (c) 2015, Linaro Limited, Shannon Zhao
 + *
-+ * This allocates a set of ballooned pages and maps them into the
-+ * kernel's address space.
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
-+					 unsigned long nr_grant_frames)
++
++#include <linux/platform_device.h>
++#include <linux/acpi.h>
++#include <xen/xen.h>
++#include <xen/page.h>
++#include <xen/interface/memory.h>
++#include <asm/xen/hypervisor.h>
++#include <asm/xen/hypercall.h>
++
++static int xen_unmap_device_mmio(struct resource *resource, unsigned int count)
 +{
-+	struct page **pages;
-+	xen_pfn_t *pfns;
-+	void *vaddr;
-+	int rc;
-+	unsigned int i;
++	unsigned int i, j, nr;
++	int rc = 0;
++	struct resource *r;
++	struct xen_remove_from_physmap xrp;
 +
-+	BUG_ON(nr_grant_frames == 0);
-+	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
-+	if (!pages)
-+		return -ENOMEM;
++	for (i = 0; i < count; i++) {
++		r = &resource[i];
++		nr = DIV_ROUND_UP(resource_size(r), XEN_PAGE_SIZE);
++		if ((resource_type(r) != IORESOURCE_MEM) || (nr == 0))
++			continue;
 +
-+	pfns = kcalloc(nr_grant_frames, sizeof(pfns[0]), GFP_KERNEL);
-+	if (!pfns) {
-+		kfree(pages);
-+		return -ENOMEM;
++		for (j = 0; j < nr; j++) {
++			xrp.domid = DOMID_SELF;
++			xrp.gpfn = XEN_PFN_DOWN(r->start) + j;
++			rc = HYPERVISOR_memory_op(XENMEM_remove_from_physmap,
++						  &xrp);
++			if (rc)
++				return rc;
++		}
 +	}
-+	rc = alloc_xenballooned_pages(nr_grant_frames, pages);
-+	if (rc) {
-+		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
-+			nr_grant_frames, rc);
-+		kfree(pages);
-+		kfree(pfns);
-+		return rc;
-+	}
-+	for (i = 0; i < nr_grant_frames; i++)
-+		pfns[i] = page_to_pfn(pages[i]);
 +
-+	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
-+	if (!vaddr) {
-+		pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
-+			nr_grant_frames, rc);
-+		free_xenballooned_pages(nr_grant_frames, pages);
-+		kfree(pages);
-+		kfree(pfns);
-+		return -ENOMEM;
-+	}
-+	kfree(pages);
-+
-+	*gfns = pfns;
-+	*virt = vaddr;
-+
-+	return 0;
++	return rc;
 +}
-+EXPORT_SYMBOL_GPL(xen_xlate_map_ballooned_pages);
-diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
-index e4e214a..42be31a 100644
---- a/include/xen/xen-ops.h
-+++ b/include/xen/xen-ops.h
-@@ -80,6 +80,8 @@ int xen_xlate_remap_gfn_array(struct vm_area_struct *vma,
- 			      struct page **pages);
- int xen_xlate_unmap_gfn_range(struct vm_area_struct *vma,
- 			      int nr, struct page **pages);
-+int xen_xlate_map_ballooned_pages(xen_pfn_t **pfns, void **vaddr,
-+				  unsigned long nr_grant_frames);
- 
- bool xen_running_on_version_or_later(unsigned int major, unsigned int minor);
- 
++
++static int xen_map_device_mmio(struct resource *resource, unsigned int count)
++{
++	unsigned int i, j, nr;
++	int rc = 0;
++	struct resource *r;
++	xen_pfn_t *gpfns;
++	xen_ulong_t *idxs;
++	int *errs;
++	struct xen_add_to_physmap_range xatp;
++
++	for (i = 0; i < count; i++) {
++		r = &resource[i];
++		nr = DIV_ROUND_UP(resource_size(r), XEN_PAGE_SIZE);
++		if ((resource_type(r) != IORESOURCE_MEM) || (nr == 0))
++			continue;
++
++		gpfns = kzalloc(sizeof(xen_pfn_t) * nr, GFP_KERNEL);
++		idxs = kzalloc(sizeof(xen_ulong_t) * nr, GFP_KERNEL);
++		errs = kzalloc(sizeof(int) * nr, GFP_KERNEL);
++		if (!gpfns || !idxs || !errs) {
++			kfree(gpfns);
++			kfree(idxs);
++			return -ENOMEM;
++		}
++
++		for (j = 0; j < nr; j++) {
++			gpfns[j] = XEN_PFN_DOWN(r->start) + j;
++			idxs[j] = XEN_PFN_DOWN(r->start) + j;
++		}
++
++		xatp.domid = DOMID_SELF;
++		xatp.size = nr;
++		xatp.space = XENMAPSPACE_dev_mmio;
++
++		set_xen_guest_handle(xatp.gpfns, gpfns);
++		set_xen_guest_handle(xatp.idxs, idxs);
++		set_xen_guest_handle(xatp.errs, errs);
++
++		rc = HYPERVISOR_memory_op(XENMEM_add_to_physmap_range, &xatp);
++		kfree(gpfns);
++		kfree(idxs);
++		kfree(errs);
++		if (rc)
++			return rc;
++	}
++
++	return rc;
++}
++
++static int xen_platform_notifier(struct notifier_block *nb,
++				 unsigned long action, void *data)
++{
++	struct platform_device *pdev = to_platform_device(data);
++	int r = 0;
++
++	if (pdev->num_resources == 0 || pdev->resource == NULL)
++		return NOTIFY_OK;
++
++	switch (action) {
++	case BUS_NOTIFY_ADD_DEVICE:
++		r = xen_map_device_mmio(pdev->resource, pdev->num_resources);
++		break;
++	case BUS_NOTIFY_DEL_DEVICE:
++		r = xen_unmap_device_mmio(pdev->resource, pdev->num_resources);
++		break;
++	default:
++		return NOTIFY_DONE;
++	}
++	if (r)
++		dev_err(&pdev->dev, "Platform: Failed to %s device %s MMIO!\n",
++			action == BUS_NOTIFY_ADD_DEVICE ? "map" :
++			(action == BUS_NOTIFY_DEL_DEVICE ? "unmap" : "?"),
++			pdev->name);
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block platform_device_nb = {
++	.notifier_call = xen_platform_notifier,
++};
++
++static int __init register_xen_platform_notifier(void)
++{
++	if (!xen_initial_domain() || acpi_disabled)
++		return 0;
++
++	return bus_register_notifier(&platform_bus_type, &platform_device_nb);
++}
++
++arch_initcall(register_xen_platform_notifier);
 -- 
 2.0.4
