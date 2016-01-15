@@ -1,67 +1,62 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 15 Jan 2016 18:08:51 +0000
-Subject: [PATCH V12 3/7] dma: add Qualcomm Technologies HIDMA management
- driver
-In-Reply-To: <56992FE8.4000606@codeaurora.org>
-References: <1452523550-8920-1-git-send-email-okaya@codeaurora.org>
- <1452523550-8920-4-git-send-email-okaya@codeaurora.org>
- <20160115145629.GI3262@leverpostej> <56990CD4.6020405@arm.com>
- <569912F3.9040507@codeaurora.org> <56992C4E.6010606@arm.com>
- <56992FE8.4000606@codeaurora.org>
-Message-ID: <569935B3.4090004@arm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 15 Jan 2016 12:31:30 -0600
+Subject: [PATCH v3] PCI: hosts: mark pcie/pci (msi) irq cascade handler
+ as IRQF_NO_THREAD
+In-Reply-To: <56973DEC.2000108@ti.com>
+References: <1449775100-30877-1-git-send-email-grygorii.strashko@ti.com>
+ <20160106221827.GD16231@localhost>
+ <20160113133904.GD29964@linutronix.de>
+ <20160113175016.GB28453@localhost> <56969BE3.6000804@ti.com>
+ <56973DEC.2000108@ti.com>
+Message-ID: <20160115183130.GB5296@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/01/16 17:44, Sinan Kaya wrote:
->>>
-
-[...]
-
->> You may want to drop the "hypervisor" designation, BTW, because this has
->> no real connection to virtualisation.
->>
+On Thu, Jan 14, 2016 at 11:49:24AM +0530, Kishon Vijay Abraham I wrote:
+> Hi,
 > 
-> Would you use host/guest relationship?
-
-Not even that. This is a host/user relationship, as VFIO is in no way
-virtualisation specific. It just gives you a way to make a device
-accessible to userspace. KVM is just a specialised instance of a more
-generic problem.
-
+> On Thursday 14 January 2016 12:18 AM, Grygorii Strashko wrote:
+> > On 01/13/2016 07:50 PM, Bjorn Helgaas wrote:
+> >> On Wed, Jan 13, 2016 at 02:39:04PM +0100, Sebastian Andrzej Siewior wrote:
+> >>> * Bjorn Helgaas | 2016-01-06 16:18:27 [-0600]:
+> >>>
+> >>>> Hi Bjorn,
+> >>>
+> >>>>> diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
+> >>>>> index 8c36880..0415192 100644
+> >>>>> --- a/drivers/pci/host/pci-dra7xx.c
+> >>>>> +++ b/drivers/pci/host/pci-dra7xx.c
+> >>>>> @@ -301,8 +301,19 @@ static int __init dra7xx_add_pcie_port(struct
+> >>>>> dra7xx_pcie *dra7xx,
+> >>>>>           return -EINVAL;
+> >>>>>       }
+> >>>>>
+> >>>>> +    /*
+> >>>>> +     * Mark dra7xx_pcie_msi IRQ as IRQF_NO_THREAD
+> >>>>> +     * On -RT and if kernel is booting with "threadirqs" cmd line parameter
+> >>>>> +     * the dra7xx_pcie_msi_irq_handler() will be forced threaded but,
+> >>>>> +     * in the same time, it's IRQ dispatcher and calls generic_handle_irq(),
+> >>>>> +     * which, in turn, will be resolved to handle_simple_irq() call.
+> >>>>> +     * The handle_simple_irq() expected to be called with IRQ disabled, as
+> >>>>> +     * result kernle will display warning:
+> >>>>> +     * "irq XXX handler YYY+0x0/0x14 enabled interrupts".
+> >>>>> +     */
+> >>>
+> >>> could you _please_ remove this coment? This kind of comment (if at all)
+> >>> should be part of the commit message (which is the case more or less).
+> >>
+> >> IIRC, Grygorii specifically wanted to keep this comment in dra7xx, but
+> > 
+> > True.
+> > 
+> >> I do agree that this level of detail is more appropriate for a changelog.
+> >>
+> >> If Grygorii and Kishon don't object, I can update the patch to remove it.
+> > 
+> > But no objections from my side. Thanks a lot.
 > 
->>>
->>> Once the guest machine is shutdown, VFIO driver still owns the channel device. It can
->>> assign the device to another guest machine.
->>>
->>>> - Does the HYP side requires any context switch (and how is that done)?
->>> No communication is needed.
->>>
->>>> - What makes it safe?
->>> No communication is needed.
->>>
->>>>
->>>> Without any of this information (and pointer to the code to back it up),
->>>> I'm very reluctant to take any of this.
->>>
->>> Please let me know what exactly is not clear. 
->>>
->>> You don't write a virtualization driver for 8139too driver. The driver works whether it is running in the 
->>> guest machine or the hypervisor. 
->>
->> Exactly. No hypervisor code needed whatsoever. So please get rid of this
->> hypervisor nonsense! ;-)
->>
-> 
-> I need the management driver for administrative purposes and common initialization. 
-> I like the split SW design as it follows the HW design too.
+> I don't have any objections.
 
-I have no problem with the split design (whatever floats your boat),
-more with the terminology which I find very confusing. It would be a lot
-better if you stuck with management (host) and client (user), or some
-other general terminology.
+OK, I dropped it, thanks guys!
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Bjorn
