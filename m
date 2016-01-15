@@ -1,129 +1,100 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 15 Jan 2016 20:07:27 +0000
-Subject: [PATCH 04/19] arm64: Cleanup SCTLR flags
-In-Reply-To: <701b44f00cdb8dbc7881c12508f55e993b9ce6dd.1452884156.git.geoff@infradead.org>
+Date: Fri, 15 Jan 2016 20:16:01 +0000
+Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
+In-Reply-To: <fb4506943bbaed8b0657ed367ebd57e4064d57ed.1452884156.git.geoff@infradead.org>
 References: <cover.1452884156.git.geoff@infradead.org>
- <701b44f00cdb8dbc7881c12508f55e993b9ce6dd.1452884156.git.geoff@infradead.org>
-Message-ID: <20160115200727.GQ3262@leverpostej>
+ <fb4506943bbaed8b0657ed367ebd57e4064d57ed.1452884156.git.geoff@infradead.org>
+Message-ID: <20160115201601.GR3262@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding Marc as this touches KVM code]
-
-On Fri, Jan 15, 2016 at 07:18:37PM +0000, Geoff Levand wrote:
-> We currently have macros defining flags for the arm64 sctlr registers in both
-> kvm_arm.h and sysreg.h.  To clean things up and simplify move the definitions
-> of the SCTLR_EL2 flags from kvm_arm.h to sysreg.h, rename any SCTLR_EL1 or
-> SCTLR_EL2 flags that are common to both registers to be SCTLR_ELx, with 'x'
-> indicating a common flag, and fixup all files to include the proper header or
-> to use the new macro names.
-
-I am certainly in favour of having consistently named and located macros
-for register fields.
-
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
->  arch/arm64/include/asm/kvm_arm.h | 11 -----------
->  arch/arm64/include/asm/sysreg.h  | 19 +++++++++++++++----
->  arch/arm64/kvm/hyp-init.S        |  6 +++---
->  3 files changed, 18 insertions(+), 18 deletions(-)
+On Fri, Jan 15, 2016 at 07:18:38PM +0000, Geoff Levand wrote:
+> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 > 
-> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> index 5e6857b..92ef6f6 100644
-> --- a/arch/arm64/include/asm/kvm_arm.h
-> +++ b/arch/arm64/include/asm/kvm_arm.h
-> @@ -83,17 +83,6 @@
->  #define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
+> This patch adds arch specific descriptions about kdump usage on arm64
+> to kdump.txt.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  Documentation/kdump/kdump.txt | 23 ++++++++++++++++++++++-
+>  1 file changed, 22 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
+> index bc4bd5a..36cf978 100644
+> --- a/Documentation/kdump/kdump.txt
+> +++ b/Documentation/kdump/kdump.txt
+> @@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
+>  a remote system.
 >  
+>  Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
+> -s390x and arm architectures.
+> +s390x, arm and arm64 architectures.
 >  
-> -/* Hyp System Control Register (SCTLR_EL2) bits */
-> -#define SCTLR_EL2_EE	(1 << 25)
-> -#define SCTLR_EL2_WXN	(1 << 19)
-> -#define SCTLR_EL2_I	(1 << 12)
-> -#define SCTLR_EL2_SA	(1 << 3)
-> -#define SCTLR_EL2_C	(1 << 2)
-> -#define SCTLR_EL2_A	(1 << 1)
-> -#define SCTLR_EL2_M	1
-> -#define SCTLR_EL2_FLAGS	(SCTLR_EL2_M | SCTLR_EL2_A | SCTLR_EL2_C |	\
-> -			 SCTLR_EL2_SA | SCTLR_EL2_I)
-
-SCTLR_EL2_FLAGS is a KVM-specific value (i.e. the SCTLR_EL2 flags which
-KVM wants to set), even if it consists solely of common fields.
-
-I believe it should stay here (with an include for <asm/sysreg.h>),
-perhaps with a KVM_ prefix to imply it's not as generic as one might
-assume it is.
-
-> -
->  /* TCR_EL2 Registers bits */
->  #define TCR_EL2_RES1	((1 << 31) | (1 << 23))
->  #define TCR_EL2_TBI	(1 << 20)
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index d48ab5b..109d46e 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -80,10 +80,21 @@
->  #define SET_PSTATE_PAN(x) __inst_arm(0xd5000000 | REG_PSTATE_PAN_IMM |\
->  				     (!!x)<<8 | 0x1f)
+>  When the system kernel boots, it reserves a small section of memory for
+>  the dump-capture kernel. This ensures that ongoing Direct Memory Access
+> @@ -249,6 +249,20 @@ Dump-capture kernel config options (Arch Dependent, arm)
 >  
-> -/* SCTLR_EL1 */
-> -#define SCTLR_EL1_CP15BEN	(0x1 << 5)
-> -#define SCTLR_EL1_SED		(0x1 << 8)
-> -#define SCTLR_EL1_SPAN		(0x1 << 23)
-> +/* Common SCTLR_ELx flags. */
-> +#define SCTLR_ELx_EE    (1 << 25)
-> +#define SCTLR_ELx_I	(1 << 12)
-> +#define SCTLR_ELx_SA	(1 << 3)
-> +#define SCTLR_ELx_C	(1 << 2)
-> +#define SCTLR_ELx_A	(1 << 1)
-> +#define SCTLR_ELx_M	1
-
-For consistency, (1 << 0) would be preferable.
-
+>      AUTO_ZRELADDR=y
+>  
+> +Dump-capture kernel config options (Arch Dependent, arm64)
+> +----------------------------------------------------------
 > +
-> +#define SCTLR_ELx_FLAGS	(SCTLR_ELx_M | SCTLR_ELx_A | SCTLR_ELx_C | \
-> +			 SCTLR_ELx_SA | SCTLR_ELx_I)
+> +1) The maximum memory size on the dump-capture kernel must be limited by
+> +   specifying:
 > +
-> +/* SCTLR_EL1 specific flags. */
-> +#define SCTLR_EL1_SPAN		(1 << 23)
-> +#define SCTLR_EL1_SED		(1 << 8)
-> +#define SCTLR_EL1_CP15BEN	(1 << 5)
->  
->  
->  /* id_aa64isar0 */
-> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-> index 178ba22..1d7e502 100644
-> --- a/arch/arm64/kvm/hyp-init.S
-> +++ b/arch/arm64/kvm/hyp-init.S
-> @@ -20,7 +20,7 @@
->  #include <asm/assembler.h>
->  #include <asm/kvm_arm.h>
->  #include <asm/kvm_mmu.h>
-> -#include <asm/pgtable-hwdef.h>
-> +#include <asm/sysreg.h>
->  
->  	.text
->  	.pushsection	.hyp.idmap.text, "ax"
-> @@ -105,8 +105,8 @@ __do_hyp_init:
->  	dsb	sy
->  
->  	mrs	x4, sctlr_el2
-> -	and	x4, x4, #SCTLR_EL2_EE	// preserve endianness of EL2
-> -	ldr	x5, =SCTLR_EL2_FLAGS
-> +	and	x4, x4, #SCTLR_ELx_EE	// preserve endianness of EL2
-> +	ldr	x5, =SCTLR_ELx_FLAGS
+> +   mem=X[MG]
+> +
+> +   where X should be less than or equal to the size in "crashkernel="
+> +   boot parameter. Kexec-tools will automatically add this.
 
-Marc, Christoffer, I note that in SCTLR_EL2_FLAGS we don't set the RES1
-bits of SCTLR_EL2 (not in head.S el2_setup). Should we perhaps be doing
-so so as to avoid any future surprises?
+
+This is extremely fragile, and will trivially fail when the kernel can
+be loaded anywhere (see [1]).
+
+We must explicitly describe the set of regions the crash kernel may use
+(i.e. we need base and size). NAK in the absence of that.
 
 Thanks,
 Mark.
 
->  	orr	x4, x4, x5
->  	msr	sctlr_el2, x4
->  	isb
+> +
+> +2) Currently, kvm will not be enabled on the dump-capture kernel even
+> +   if it is configured.
+> +
+>  Extended crashkernel syntax
+>  ===========================
+>  
+> @@ -312,6 +326,8 @@ Boot into System Kernel
+>     any space below the alignment point may be overwritten by the dump-capture kernel,
+>     which means it is possible that the vmcore is not that precise as expected.
+>  
+> +   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
+> +   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
+>  
+>  Load the Dump-capture Kernel
+>  ============================
+> @@ -334,6 +350,8 @@ For s390x:
+>  	- Use image or bzImage
+>  For arm:
+>  	- Use zImage
+> +For arm64:
+> +	- Use vmlinux or Image
+>  
+>  If you are using a uncompressed vmlinux image then use following command
+>  to load dump-capture kernel.
+> @@ -377,6 +395,9 @@ For s390x:
+>  For arm:
+>  	"1 maxcpus=1 reset_devices"
+>  
+> +For arm64:
+> +	"1 mem=X[MG] maxcpus=1 reset_devices"
+> +
+>  Notes on loading the dump-capture kernel:
+>  
+>  * By default, the ELF headers are stored in ELF64 format to support
 > -- 
 > 2.5.0
 > 
 > 
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/398527.html
