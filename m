@@ -1,90 +1,116 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 15 Jan 2016 16:20:47 +0200
-Subject: [4.4-rt2 PATCH] ARM: highmem: take into account FIX_KMAP_BEGIN in
- switch_kmaps()
-Message-ID: <1452867647-1410-1-git-send-email-grygorii.strashko@ti.com>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Fri, 15 Jan 2016 14:21:06 +0000
+Subject: [PATCH V4 7/7] clk: bcm2835: apply limits on dividers to MASH mode.
+In-Reply-To: <1452867667-2447-1-git-send-email-kernel@martin.sperl.org>
+References: <1452867667-2447-1-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1452867667-2447-8-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now the random crashes are observed on ARM TI am437x-idk-evm used with
--RT Kernel v4.4-rt2 and with Highmem enabled.
+From: Martin Sperl <kernel@martin.sperl.org>
 
-The reason of issue is that, newly introduced switch_kmaps() does not
-take into account FIX_KMAP_BEGIN, which was re-added by
-commit a5f4c561b3b1 ("ARM: 8415/1: early fixmap support for earlycon")
-(K4.3) for ARM and since that the value of FIX_KMAP_BEGIN
-is not 0 any more.
+There are several limits on the divider as well as effective frequency
+that apply when a fractional divider with higher order MASH is used.
 
-Hence update switch_kmaps() so it will take into FIX_KMAP_BEGIN while
-calculating fixmap idx. This patch also introduces fixmap_idx() to
-make code simpler and remove duplicated code.
+This patch applies all the information about limits that is available
+at this time and all of which has been tested empirically by
+Mathias Reichl using primarily the pcm clock.
 
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+The patch tries to use the "highest" order of MASH support and when it
+fails it reduces MASH order and retries the test - fall back all the way
+to integer divide if necessary, where "normal" clamping of limits
+happens.
+
+Note that http://www.aholme.co.uk/Frac2/Mash.htm
+contains a description of MASH, the author - allegedly - was
+working for Broadcom at that time.
+
+Suggested-by: Mathias Reichl <hias@horus.com>
+Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- arch/arm/mm/highmem.c | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+ drivers/clk/bcm/clk-bcm2835.c |   52 ++++++++++++++++++++++++++++++++---------
+ 1 file changed, 41 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-index deabc36..542692d 100644
---- a/arch/arm/mm/highmem.c
-+++ b/arch/arm/mm/highmem.c
-@@ -34,6 +34,11 @@ static inline pte_t get_fixmap_pte(unsigned long vaddr)
- 	return *ptep;
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index 545c21a..637f8ae 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -300,6 +300,7 @@
+
+ #define LOCK_TIMEOUT_NS		100000000
+ #define BCM2835_MAX_FB_RATE	1750000000u
++#define BCM2835_MASH_MAX_FREQ	25000000u
+
+ enum bcm2835_clock_mash_type {
+ 	MASH_NONE = 0,
+@@ -1489,7 +1490,9 @@ static divmash bcm2835_clock_choose_div(struct clk_hw *hw,
+ 	u64 temp = (u64)parent_rate << CM_DIV_FRAC_BITS;
+ 	enum bcm2835_clock_mash_type mash = MASH_NONE;
+ 	u64 rem;
+-	u32 div;
++	u32 div, divi, divf;
++	const u32 divi_max = BIT(data->int_bits) - 1;
++	const u32 divi_min = 2;
+
+ 	rem = do_div(temp, rate);
+ 	div = temp;
+@@ -1499,20 +1502,47 @@ static divmash bcm2835_clock_choose_div(struct clk_hw *hw,
+ 		div += unused_frac_mask + 1;
+ 	div &= ~unused_frac_mask;
+
+-	/* Clamp to the limits. */
++	divi = div >> CM_DIV_FRAC_BITS;
++	divf = div & GENMASK(CM_DIV_FRAC_BITS - 1, 0);
+
+-	/* divider must be >= 2 */
+-	div = max_t(u32, div, (2 << CM_DIV_FRAC_BITS));
++	/* select mash mode */
++	if (data->frac_bits && divf)
++		mash = data->mash ? data->mash : MASH_FRAC;
+
+-	/* clamp to max divider allowed - max is integer divider */
+-	div = min_t(u32, div, GENMASK(data->int_bits + CM_DIV_FRAC_BITS - 1,
+-				      CM_DIV_FRAC_BITS));
++	/*
++	 * handle possible limits for different mash levels with fall-tru
++	 * For offset values see page 105 table 6-32 in
++	 * BCM2835-ARM-Peripherials as well as the errata at:
++	 *   http://elinux.org/BCM2835_datasheet_errata#p105_table
++	 */
++	switch (mash) {
++	case MASH_3RD_ORDER:
++		if ((divi >= divi_min + 3) &&
++		    (divi + 4 <= divi_max) &&
++		    (parent_rate / (divi - 3) <= BCM2835_MASH_MAX_FREQ))
++			return divmash_calc(MASH_3RD_ORDER, div);
++		/* fall tru if not in bounds */
++	case MASH_2ND_ORDER:
++		if ((divi >= divi_min + 1) &&
++		    (divi + 2 <= divi_max) &&
++		    (parent_rate / (divi - 1) <= BCM2835_MASH_MAX_FREQ))
++			return divmash_calc(MASH_2ND_ORDER, div);
++		/* fall tru if not in bounds */
++	case MASH_FRAC:
++		if ((divi >= divi_min) &&
++		    (divi + 1 <= divi_max))
++			return divmash_calc(MASH_FRAC, div);
++		/* fall tru if not in bounds */
++	case MASH_NONE:
++	default:
++		break;
++	}
+
+-	/* set mash if necessary */
+-	if (data->frac_bits && (div & GENMASK(CM_DIV_FRAC_BITS - 1, 0)))
+-		mash = data->mash ? data->mash : MASH_FRAC;
++	/* we apply standard clamping based on divi alone */
++	divi = max(divi, divi_min);
++	divi = min(divi, divi_max);
+
+-	return divmash_calc(mash, div);
++	return divmash_calc(MASH_NONE, divi << CM_DIV_FRAC_BITS);
  }
- 
-+static unsigned int fixmap_idx(int type)
-+{
-+	return FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
-+}
-+
- void *kmap(struct page *page)
- {
- 	might_sleep();
-@@ -80,7 +85,7 @@ void *kmap_atomic(struct page *page)
- 
- 	type = kmap_atomic_idx_push();
- 
--	idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
-+	idx = fixmap_idx(type);
- 	vaddr = __fix_to_virt(idx);
- #ifdef CONFIG_DEBUG_HIGHMEM
- 	/*
-@@ -110,7 +115,7 @@ void __kunmap_atomic(void *kvaddr)
- 
- 	if (kvaddr >= (void *)FIXADDR_START) {
- 		type = kmap_atomic_idx();
--		idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
-+		idx = fixmap_idx(type);
- 
- 		if (cache_is_vivt())
- 			__cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
-@@ -146,7 +151,7 @@ void *kmap_atomic_pfn(unsigned long pfn)
- 		return page_address(page);
- 
- 	type = kmap_atomic_idx_push();
--	idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
-+	idx = fixmap_idx(type);
- 	vaddr = __fix_to_virt(idx);
- #ifdef CONFIG_DEBUG_HIGHMEM
- 	BUG_ON(!pte_none(get_fixmap_pte(vaddr)));
-@@ -167,7 +172,7 @@ void switch_kmaps(struct task_struct *prev_p, struct task_struct *next_p)
- 	 * Clear @prev's kmap_atomic mappings
- 	 */
- 	for (i = 0; i < prev_p->kmap_idx; i++) {
--		int idx = i + KM_TYPE_NR * smp_processor_id();
-+		int idx = fixmap_idx(i);
- 
- 		set_fixmap_pte(idx, __pte(0));
- 	}
-@@ -175,7 +180,7 @@ void switch_kmaps(struct task_struct *prev_p, struct task_struct *next_p)
- 	 * Restore @next_p's kmap_atomic mappings
- 	 */
- 	for (i = 0; i < next_p->kmap_idx; i++) {
--		int idx = i + KM_TYPE_NR * smp_processor_id();
-+		int idx = fixmap_idx(i);
- 
- 		if (!pte_none(next_p->kmap_pte[i]))
- 			set_fixmap_pte(idx, next_p->kmap_pte[i]);
--- 
-2.7.0
+
+ static long bcm2835_clock_rate_from_divisor(struct bcm2835_clock *clock,
+--
+1.7.10.4
