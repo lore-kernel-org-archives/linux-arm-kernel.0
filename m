@@ -1,149 +1,29 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Fri, 15 Jan 2016 16:05:55 +0300
-Subject: [PATCH v2] kernel: add kcov code coverage
-In-Reply-To: <CACT4Y+bHjfkrZ4jWZf+j6FKnj2GQv1t94Y9LJm4=WFyb8C0J8w@mail.gmail.com>
-References: <1452689318-107172-1-git-send-email-dvyukov@google.com>
- <CAPAsAGx_0pVjtKA2RwwpStRG2-L+5X6W14QbrQaMYhdg30EeAQ@mail.gmail.com>
- <CACT4Y+bHjfkrZ4jWZf+j6FKnj2GQv1t94Y9LJm4=WFyb8C0J8w@mail.gmail.com>
-Message-ID: <CAPAsAGzjX2OJ7SRt4gM1VqEEm5=xERUtfcEDi05o5bwOTdNhpQ@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 15 Jan 2016 14:06:31 +0100
+Subject: [PATCH 1/2] devicetree: bindings: Add vendor prefix for Tronsmart
+Message-ID: <1452863192-29231-1-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-01-14 17:30 GMT+03:00 Dmitry Vyukov <dvyukov@google.com>:
-> On Thu, Jan 14, 2016 at 11:50 AM, Andrey Ryabinin
-> <ryabinin.a.a@gmail.com> wrote:
->> 2016-01-13 15:48 GMT+03:00 Dmitry Vyukov <dvyukov@google.com>:
->>
->>> +       /* Read number of PCs collected. */
->>> +       n = __atomic_load_n(&cover[0], __ATOMIC_RELAXED);
->>> +       /* PCs are shorten to uint32_t, so we need to restore the upper part. */
->>> +       for (i = 0; i < n; i++)
->>> +               printf("0xffffffff%0lx\n", (unsigned long)cover[i + 1]);
->
-> Thanks for the review!
-> Mailed v3 with fixes.
-> Comments inline.
->
->> This works only for x86-64.
->> Probably there is no simple way to make this arch-independent with
->> 32-bit values.
->
-> We probably could add an ioctl that returns base of the stripped PCs.
+Tronsmart is a China based company building consumer electronic
+devices.
 
-You forgot about modules. With stripped PCs you'll start mixing
-kernel's and module's PC (if distance between module and kernel > 4G).
+Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
->>> diff --git a/include/linux/sched.h b/include/linux/sched.h
->>> index 61aa9bb..9e9e9f6 100644
->>> --- a/include/linux/sched.h
->>> +++ b/include/linux/sched.h
->>> @@ -1807,6 +1807,16 @@ struct task_struct {
->>>         /* bitmask and counter of trace recursion */
->>>         unsigned long trace_recursion;
->>>  #endif /* CONFIG_TRACING */
->>> +#ifdef CONFIG_KCOV
->>> +       /* Coverage collection mode enabled for this task (0 if disabled). */
->>> +       int             kcov_mode;
->>> +       /* Size of the kcov_area. */
->>> +       unsigned long   kcov_size;
->>
->> Could be just 'unsigned'
->
-> Done
->
->>> +       /* Buffer for coverage collection. */
->>> +       void            *kcov_area;
->>
->> So, these fields above are duplicates the same fields from kcov struct.
->> Consider embedding kcov struct (since it's relatively small) into task_struct.
->
-> It would be strange to copy spinlock and refcounter.  Also if
-> additional fields added to kcov struct, most likely they won't need to
-> be copied to task struct. Also I did not want to pull my headers into
-> sched.h.
-> How strong are you about this? I would leave it as is.
-
-Fine by me. It was just an idea to consider.
-
-
->>> diff --git a/kernel/kcov/kcov.c b/kernel/kcov/kcov.c
->>> +/* Entry point from instrumented code.
->>> + * This is called once per basic-block/edge.
->>> + */
->>> +void __sanitizer_cov_trace_pc(void)
->>> +{
->>> +       struct task_struct *t;
->>> +       enum kcov_mode mode;
->>> +
->>> +       t = current;
->>> +       /* We are interested in code coverage as a function of a syscall inputs,
->>> +        * so we ignore code executed in interrupts.
->>> +        */
->>> +       if (!t || in_interrupt())
->>> +               return;
->>> +       mode = READ_ONCE(t->kcov_mode);
->>> +       if (mode == kcov_mode_trace) {
->>> +               u32 *area;
->>> +               u32 pos;
->>> +
->>> +               /* There is some code that runs in interrupts but for which
->>> +                * in_interrupt() returns false (e.g. preempt_schedule_irq()).
->>> +                * READ_ONCE()/barrier() effectively provides load-acquire wrt
->>> +                * interrupts, there are paired barrier()/WRITE_ONCE() in
->>> +                * kcov_ioctl_locked().
->>> +                */
->>> +               barrier();
->>> +               area = t->kcov_area;
->>> +               /* The first u32 is number of subsequent PCs. */
->>> +               pos = READ_ONCE(area[0]) + 1;
->>> +               if (likely(pos < t->kcov_size)) {
->>> +                       area[pos] = (u32)_RET_IP_;
->>> +                       WRITE_ONCE(area[0], pos);
->>
->> Note that this works only for cache-coherent architectures.
->> For incoherent arches you'll need to flush_dcache_page() somewhere.
->> Perhaps it could be done on exit to userspace, since flushing here is
->> certainly an overkill.
->
-> I can say that I understand the problem. Does it have to do with the
-> fact that the buffer is shared between kernel and user-space?
-> Current code is OK from the plain multi-threading side, as user must
-> not read buffer concurrently with writing (that would not yield
-> anything useful).
-
-It's not about SMP.
-This problem is about virtually indexed aliasing D-caches and could be
-observed on uniprocessor system.
-You have 3 virtual addresses (user-space, linear mapping and vmalloc)
-mapped to the same physical page.
-With aliasing cache it's possible to have multiple cache-lines
-representing the same physical page.
-So the kernel might not see the update made by userspace and vise
-versa because kernel/userspace use different virtual addresses.
-
-And btw, flush_dcache_page()  would be a wrong choice, since kcov_area
-is a vmalloc address, not a linear address.
-So we need something that flushes vmalloc addresses.
-
-Alternatively we could simply mlock that memory and talk to user space
-via get/put_user(). No flush will be required.
-And we will avoid another potential problem - lack of vmalloc address
-space on 32-bits.
-
-> We could add an ioctl that does the flush. But I would prefer if it is
-> done when we port kcov to such an arch. Does arm64 require the flush?
->
-
-I think, it doesn't. AFAIK arm64 has non-aliasing D-cache.
-
-arm64/include/asm/cacheflush.h says:
-       Please note that the implementation assumes non-aliasing VIPT D-cache
-
-However, I wonder why it implements flush_dcache_page(). Per my
-understanding it is not need for non-aliasing caches.
-And Documentation/cachetlb.txt agrees with me:
-       void flush_dcache_page(struct page *page)
-          If D-cache aliasing is not an issue, this routine may
-          simply be defined as a nop on that architecture.
-
-Catalin, Will, could you please shed light on this?
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 55df1d4..f787742 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -231,6 +231,7 @@ toshiba	Toshiba Corporation
+ toumaz	Toumaz
+ tplink	TP-LINK Technologies Co., Ltd.
+ tronfy	Tronfy
++tronsmart	Tronsmart
+ truly	Truly Semiconductors Limited
+ upisemi	uPI Semiconductor Corp.
+ usi	Universal Scientific Industrial Co., Ltd.
+-- 
+2.6.2
