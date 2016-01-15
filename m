@@ -1,93 +1,68 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 15 Jan 2016 10:54:26 +0100
-Subject: [PATCH v3 07/21] arm64: move kernel image to base of vmalloc area
-In-Reply-To: <20160114185701.GA28181@leverpostej>
-References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
- <1452518355-4606-8-git-send-email-ard.biesheuvel@linaro.org>
- <20160112181336.GF4858@leverpostej>
- <CAKv+Gu-TS7w=AVBceGhsQkQzVCv+u7Gh6ojftwW1iaE+d0yrYw@mail.gmail.com>
- <20160113135109.GJ23370@leverpostej>
- <20160114185701.GA28181@leverpostej>
-Message-ID: <CAKv+Gu-mPcXBTpENRaM5qo0nV_z93ZKw=5o5xVLNMU7QfiRCHQ@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 15 Jan 2016 17:57:45 +0800
+Subject: [PATCH V3 19/21] pci, acpi: Support for ACPI based generic PCI
+ host controller init
+In-Reply-To: <1452691267-32240-20-git-send-email-tn@semihalf.com>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <1452691267-32240-20-git-send-email-tn@semihalf.com>
+Message-ID: <5698C299.2080702@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 January 2016 at 19:57, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Jan 13, 2016 at 01:51:10PM +0000, Mark Rutland wrote:
->> On Wed, Jan 13, 2016 at 09:39:41AM +0100, Ard Biesheuvel wrote:
->> > On 12 January 2016 at 19:14, Mark Rutland <mark.rutland@arm.com> wrote:
->> > > On Mon, Jan 11, 2016 at 02:19:00PM +0100, Ard Biesheuvel wrote:
->> > >>  void __init kasan_init(void)
->> > >>  {
->> > >> +     u64 kimg_shadow_start, kimg_shadow_end;
->> > >>       struct memblock_region *reg;
->> > >>
->> > >> +     kimg_shadow_start = round_down((u64)kasan_mem_to_shadow(_text),
->> > >> +                                    SWAPPER_BLOCK_SIZE);
->> > >> +     kimg_shadow_end = round_up((u64)kasan_mem_to_shadow(_end),
->> > >> +                                SWAPPER_BLOCK_SIZE);
->> > >
->> > > This rounding looks suspect to me, given it's applied to the shadow
->> > > addresses rather than the kimage addresses. That's roughly equivalent to
->> > > kasan_mem_to_shadow(round_up(_end, 8 * SWAPPER_BLOCK_SIZE).
->> > >
->> > > I don't think we need any rounding for the kimage addresses. The image
->> > > end is page-granular (and the fine-grained mapping will reflect that).
->> > > Any accesses between _end and roud_up(_end, SWAPPER_BLOCK_SIZE) would be
->> > > bugs (and would most likely fault) regardless of KASAN.
->> > >
->> > > Or am I just being thick here?
->> > >
->> >
->> > Well, the problem here is that vmemmap_populate() is used as a
->> > surrogate vmalloc() since that is not available yet, and
->> > vmemmap_populate() allocates in SWAPPER_BLOCK_SIZE granularity.
->
-> From a look at the git history, and a chat with Catalin, it sounds like
-> the SWAPPER_BLOCK_SIZE granularity is a historical artifact. It happened
-> to be easier to implement it that way at some point in the past, but
-> there's no reason the 4K/16K/64K cases can't all be handled by the same
-> code that would go down to PAGE_SIZE granularity, using sections if
-> possible.
->
-> I'll drop that on the TODO list.
->
+Hi Tomasz,
 
-OK
+On 2016/1/13 21:21, Tomasz Nowicki wrote:
+> Because of two patch series:
+> 1. Jiang Liu's common interface to support PCI host controller init
+> 2. MMCONFIG refactoring (part of this patch set)
+> now we can think about generic ACPI based PCI host controller init
+> implementation out of arch/ directory.
+>
+> These calls use information from MCFG table (PCI config space regions)
+> and _CRS method (IO/irq resources) to initialize PCI hostbridge.
+>
+> TBD: We are still not sure whether we should reassign resources
+> after PCI bus enumeration or trust firmware to do all that work for
+> us properly.
+>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> CC: Liviu Dudau <Liviu.Dudau@arm.com>
+> CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>   drivers/acpi/Kconfig    |   5 ++
+>   drivers/acpi/pci_root.c | 131 ++++++++++++++++++++++++++++++++++++++++++++++++
+>   2 files changed, 136 insertions(+)
+>
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index c3664be..e315061 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -335,6 +335,11 @@ config ACPI_PCI_SLOT
+>   	  i.e., segment/bus/device/function tuples, with physical slots in
+>   	  the system.  If you are unsure, say N.
+>
+> +config ACPI_PCI_HOST_GENERIC
+> +	bool "Generic ACPI PCI host controller"
+> +	help
+> +	  Say Y here if you want to support generic ACPI PCI host controller.
 
->> > If I remove the rounding, I get false positive kasan errors which I
->> > have not quite diagnosed yet, but are probably due to the fact that
->> > the rounding performed by vmemmap_populate() goes in the wrong
->> > direction.
->
-> As far as I can see, it implicitly rounds the base down and end up to
-> SWAPPER_BLOCK_SIZE granularity.
->
-> I can see that it might map too much memory, but I can't see why that
-> should trigger KASAN failures. Regardless of what was mapped KASAN
-> should stick to the region it cares about, and everything else should
-> stay out of that.
->
-> When do you see the failures, and are they in any way consistent?
->
-> Do you have an example to hand?
->
+Since x86 and IA64 will not use ACPI_PCI_HOST_GENERIC in this
+patch, it should be defined as
 
-For some reason, this issue has evaporated, i.e., I can no longer
-reproduce it on my WIP v4 branch.
-So I will remove the rounding.
+config ACPI_PCI_HOST_GENERIC
+	bool
 
-Thanks,
-Ard.
+and select for ARCHs, or will default y on x86 and IA64 too.
 
+Compiling the kernel on a IA64 machine, will send out the
+result when it's ready.
 
->> I'll also take a peek.
->
-> I haven't managed to trigger KASAN failures with the rounding removed.
-> I'm using 4K pages, and running under KVM tool (no EFI, so the memory
-> map is a contiguous block).
->
-> What does your memory map look like?
->
-> Thanks,
-> Mark.
+Thanks
+Hanjun
