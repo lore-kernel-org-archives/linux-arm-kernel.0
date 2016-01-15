@@ -1,165 +1,93 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 15 Jan 2016 10:39:01 +0100
-Subject: [PATCH v3 04/13] clk: at91: make IRQ optional and register them
- later
-In-Reply-To: <20160115020237.GJ22188@codeaurora.org>
-References: <1449248628-3486-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1449248628-3486-5-git-send-email-alexandre.belloni@free-electrons.com>
- <20160115020237.GJ22188@codeaurora.org>
-Message-ID: <20160115103901.1b987f53@bbrezillon>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 15 Jan 2016 10:54:26 +0100
+Subject: [PATCH v3 07/21] arm64: move kernel image to base of vmalloc area
+In-Reply-To: <20160114185701.GA28181@leverpostej>
+References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1452518355-4606-8-git-send-email-ard.biesheuvel@linaro.org>
+ <20160112181336.GF4858@leverpostej>
+ <CAKv+Gu-TS7w=AVBceGhsQkQzVCv+u7Gh6ojftwW1iaE+d0yrYw@mail.gmail.com>
+ <20160113135109.GJ23370@leverpostej>
+ <20160114185701.GA28181@leverpostej>
+Message-ID: <CAKv+Gu-mPcXBTpENRaM5qo0nV_z93ZKw=5o5xVLNMU7QfiRCHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On 14 January 2016 at 19:57, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, Jan 13, 2016 at 01:51:10PM +0000, Mark Rutland wrote:
+>> On Wed, Jan 13, 2016 at 09:39:41AM +0100, Ard Biesheuvel wrote:
+>> > On 12 January 2016 at 19:14, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > > On Mon, Jan 11, 2016 at 02:19:00PM +0100, Ard Biesheuvel wrote:
+>> > >>  void __init kasan_init(void)
+>> > >>  {
+>> > >> +     u64 kimg_shadow_start, kimg_shadow_end;
+>> > >>       struct memblock_region *reg;
+>> > >>
+>> > >> +     kimg_shadow_start = round_down((u64)kasan_mem_to_shadow(_text),
+>> > >> +                                    SWAPPER_BLOCK_SIZE);
+>> > >> +     kimg_shadow_end = round_up((u64)kasan_mem_to_shadow(_end),
+>> > >> +                                SWAPPER_BLOCK_SIZE);
+>> > >
+>> > > This rounding looks suspect to me, given it's applied to the shadow
+>> > > addresses rather than the kimage addresses. That's roughly equivalent to
+>> > > kasan_mem_to_shadow(round_up(_end, 8 * SWAPPER_BLOCK_SIZE).
+>> > >
+>> > > I don't think we need any rounding for the kimage addresses. The image
+>> > > end is page-granular (and the fine-grained mapping will reflect that).
+>> > > Any accesses between _end and roud_up(_end, SWAPPER_BLOCK_SIZE) would be
+>> > > bugs (and would most likely fault) regardless of KASAN.
+>> > >
+>> > > Or am I just being thick here?
+>> > >
+>> >
+>> > Well, the problem here is that vmemmap_populate() is used as a
+>> > surrogate vmalloc() since that is not available yet, and
+>> > vmemmap_populate() allocates in SWAPPER_BLOCK_SIZE granularity.
+>
+> From a look at the git history, and a chat with Catalin, it sounds like
+> the SWAPPER_BLOCK_SIZE granularity is a historical artifact. It happened
+> to be easier to implement it that way at some point in the past, but
+> there's no reason the 4K/16K/64K cases can't all be handled by the same
+> code that would go down to PAGE_SIZE granularity, using sections if
+> possible.
+>
+> I'll drop that on the TODO list.
+>
 
-On Thu, 14 Jan 2016 18:02:37 -0800
-Stephen Boyd <sboyd@codeaurora.org> wrote:
+OK
 
-> On 12/04, Alexandre Belloni wrote:
-> > @@ -686,3 +652,45 @@ static void __init of_at91sam9x5_clk_main_setup(struct device_node *np)
-> >  }
-> >  CLK_OF_DECLARE(at91sam9x5_clk_main, "atmel,at91sam9x5-clk-main",
-> >  	       of_at91sam9x5_clk_main_setup);
-> > +
-> > +static const struct of_device_id atmel_clk_main_dt_ids[] = {
-> > +	{ .compatible = "atmel,at91rm9200-clk-main-osc" },
-> > +	{ .compatible = "atmel,at91sam9x5-clk-main-rc-osc" },
-> > +	{ .compatible = "atmel,at91sam9x5-clk-main" },
-> > +	{ /* sentinel */ }
-> > +};
-> > +
-> > +static int __init atmel_clk_main_probe(struct platform_device *pdev)
-> > +{
-> > +	struct of_phandle_args clkspec = { .np = pdev->dev.of_node};
-> > +	struct clk_main *clkmain;
-> > +	struct clk_hw *hw;
-> > +	int ret;
-> > +
-> > +	hw = __clk_get_hw(of_clk_get_from_provider(&clkspec));
-> > +	if (!hw)
-> > +		return -ENODEV;
-> > +
-> > +	clkmain = to_clk_main(hw);
-> > +	clkmain->irq = platform_get_irq(pdev, 0);
-> > +	if (!clkmain->irq)
-> > +		return 0;
-> 
-> Is there any way to get the irq into this probe function without
-> getting a clk pointer and then unwrapping it to get an irq
-> value out of the clk_hw wrapper structure? That's a pretty
-> convoluted design.
+>> > If I remove the rounding, I get false positive kasan errors which I
+>> > have not quite diagnosed yet, but are probably due to the fact that
+>> > the rounding performed by vmemmap_populate() goes in the wrong
+>> > direction.
+>
+> As far as I can see, it implicitly rounds the base down and end up to
+> SWAPPER_BLOCK_SIZE granularity.
+>
+> I can see that it might map too much memory, but I can't see why that
+> should trigger KASAN failures. Regardless of what was mapped KASAN
+> should stick to the region it cares about, and everything else should
+> stay out of that.
+>
+> When do you see the failures, and are they in any way consistent?
+>
+> Do you have an example to hand?
+>
 
-Not sure I get what you're suggesting, but the only solution I see to
-avoid this "get main clk pointer dance" would be to have a global
-variable storing the clk_main instance (or a list of clk_main
-instances).
-The thing is, I'd like to avoid adding new global variables in this
-clk drivers as much as possible. Moreover, the core is already taking
-care of keeping the list of all registered clks, with their associated
-of_node, so, is there a real point in creating a duplicated association
-list in this driver too?
+For some reason, this issue has evaporated, i.e., I can no longer
+reproduce it on my WIP v4 branch.
+So I will remove the rounding.
 
-Maybe we could create an of_clk_hw_get_from_provider(), which would
-prevent the creation of this useless per-user clk instance (see the patch
-below).
+Thanks,
+Ard.
 
-> 
-> > +
-> > +	init_waitqueue_head(&clkmain->wait);
-> > +	irq_set_status_flags(clkmain->irq, IRQ_NOAUTOEN);
-> > +	ret = devm_request_irq(&pdev->dev, clkmain->irq, clk_main_irq_handler,
-> > +			       IRQF_TRIGGER_HIGH, __clk_get_name(hw->clk),
-> > +			       clkmain);
-> > +	if (ret)
-> > +		clkmain->irq = 0;
-> > +
 
-You should probably call clk_put() on the pointer returned by
-of_clk_get_from_provider(&clkspec).
-
-> > +	return ret;
-> > +}
-> > +
-> 
-
-Best Regards,
-
-Boris
-
---- >8 ---
->From a83670d29504e256bdc97c04f0dfd96a7d6842bf Mon Sep 17 00:00:00 2001
-From: Boris Brezillon <boris.brezillon@free-electrons.com>
-Date: Fri, 15 Jan 2016 10:36:23 +0100
-Subject: [PATCH] clk: add a function to retrieve a clk_hw instance from a
- clkspec definition
-
-of_clk_hw_get_from_provider() is providing a way to retrieve a clk_hw
-instance from a clkspec definition. Which is usefull in case a clk driver
-wants to get one of its own instance from a clkspec, without allocating a
-new per-user clk struct.
-
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/clk/clk.c            | 36 ++++++++++++++++++++++++++++++++++++
- include/linux/clk-provider.h |  1 +
- 2 files changed, 37 insertions(+)
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index f13c3f4..fbef1b7 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -3001,6 +3001,42 @@ void of_clk_del_provider(struct device_node *np)
- }
- EXPORT_SYMBOL_GPL(of_clk_del_provider);
- 
-+/**
-+ * of_clk_hw_get_from_provider() - Look for a clk_hw instance registered with
-+ *				   the given clkspec definition.
-+ * @clkspec: pointer to a clock specifier data structure
-+ *
-+ * This function looks up a struct clk_hw from the registered list of clock
-+ * providers, an input is a clock specifier data structure as returned
-+ * from the of_parse_phandle_with_args() function call.
-+ */
-+struct clk_hw *of_clk_hw_get_from_provider(struct of_phandle_args *clkspec)
-+{
-+	struct clk_hw *clk_hw = ERR_PTR(-EPROBE_DEFER);
-+	struct of_clk_provider *provider;
-+
-+	if (!clkspec)
-+		return ERR_PTR(-EINVAL);
-+
-+	/* Check if we have such a provider in our array */
-+	mutex_lock(&of_clk_mutex);
-+	list_for_each_entry(provider, &of_clk_providers, link) {
-+		struct clk *clk = ERR_PTR(-EPROBE_DEFER);
-+
-+		if (provider->node == clkspec->np)
-+			clk = provider->get(clkspec, provider->data);
-+
-+		if (!IS_ERR(clk)) {
-+			clk_hw = __clk_get_hw(clk);
-+			break;
-+		}
-+	}
-+	mutex_unlock(&of_clk_mutex);
-+
-+	return clk_hw;
-+}
-+EXPORT_SYMBOL_GPL(of_clk_hw_get_from_provider);
-+
- struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec,
- 				       const char *dev_id, const char *con_id)
- {
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index c56988a..bb62517 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -645,6 +645,7 @@ void devm_clk_unregister(struct device *dev, struct clk *clk);
- const char *__clk_get_name(const struct clk *clk);
- const char *clk_hw_get_name(const struct clk_hw *hw);
- struct clk_hw *__clk_get_hw(struct clk *clk);
-+struct clk_hw *of_clk_hw_get_from_provider(struct of_phandle_args *clkspec);
- unsigned int clk_hw_get_num_parents(const struct clk_hw *hw);
- struct clk_hw *clk_hw_get_parent(const struct clk_hw *hw);
- struct clk_hw *clk_hw_get_parent_by_index(const struct clk_hw *hw,
+>> I'll also take a peek.
+>
+> I haven't managed to trigger KASAN failures with the rounding removed.
+> I'm using 4K pages, and running under KVM tool (no EFI, so the memory
+> map is a contiguous block).
+>
+> What does your memory map look like?
+>
+> Thanks,
+> Mark.
