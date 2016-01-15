@@ -1,45 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Jan 2016 12:11:27 +0100
-Subject: [PATCH v3 1/1] USB: core: let USB device know device node
-In-Reply-To: <1452849447-25025-1-git-send-email-peter.chen@freescale.com>
-References: <1452849447-25025-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <22377526.4ksCBpoDgG@wuerfel>
+From: drjones@redhat.com (Andrew Jones)
+Date: Fri, 15 Jan 2016 12:16:03 +0100
+Subject: [PATCH v9 20/21] KVM: ARM: Introduce per-vcpu kvm device controls
+In-Reply-To: <1452839275-19368-21-git-send-email-zhaoshenglong@huawei.com>
+References: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452839275-19368-21-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20160115111603.GF3915@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 January 2016 17:17:27 Peter Chen wrote:
-> Although most of USB devices are hot-plug's, there are still some devices
-> are hard wired on the board, eg, for HSIC and SSIC interface USB devices.
-> If these kinds of USB devices are multiple functions, and they can supply
-> other interfaces like i2c, gpios for other devices, we may need to
-> describe these at device tree.
+On Fri, Jan 15, 2016 at 02:27:54PM +0800, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> In this commit, it uses "reg" in dts as port number to match the port
-> number decided by USB core, if they are the same, then the device node
-> is for the device we are creating for USB core.
+> In some cases it needs to get/set attributes specific to a vcpu and so
+> needs something else than ONE_REG.
 > 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> Let's copy the KVM_DEVICE approach, and define the respective ioctls
+> for the vcpu file descriptor.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+> CC: Peter Maydell <peter.maydell@linaro.org>
+> ---
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-
-Just one last question:
-
->  	dev->active_duration = -jiffies;
->  #endif
-> -	if (root_hub)	/* Root hub always ok [and always wired] */
-> +	if (root_hub) {	/* Root hub always ok [and always wired] */
->  		dev->authorized = 1;
-> -	else {
-> +		dev->of_node = bus->controller->of_node;
-
-
-You are adding the of_node of the controller to the root hub, which I
-guess means that we now have two 'struct device' instances with the
-same of_node. They have different bus_types, so I think that is ok,
-but I wonder if it would be better to leave out the of_node for the
-root hub to avoid the confusion. Can you think of a case where we
-actually want to add properties for the root hub that we can't do
-more easily in the host controller?
-
-	Arnd
+Reviewed-by: Andrew Jones <drjones@redhat.com>
