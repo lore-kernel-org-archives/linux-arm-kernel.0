@@ -1,17 +1,20 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 14 Jan 2016 18:04:53 -0800
-Subject: [PATCH v3 06/13] clk: at91: pmc: merge at91_pmc_init in
- atmel_pmc_probe
-In-Reply-To: <1449248628-3486-7-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Thu, 14 Jan 2016 18:05:02 -0800
+Subject: [PATCH v3 05/13] clk: at91: only disable available IRQs
+In-Reply-To: <1449248628-3486-6-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1449248628-3486-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1449248628-3486-7-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20160115020452.GM22188@codeaurora.org>
+ <1449248628-3486-6-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20160115020502.GN22188@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 12/04, Alexandre Belloni wrote:
-> at91_pmc_init() doesn't do much anymore, merge it in atmel_pmc_probe().
+> From: Boris Brezillon <boris.brezillon@free-electrons.com>
 > 
+> Only disable available IRQs in case writing to a reserved bit has a harmful
+> effect.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > ---
 
