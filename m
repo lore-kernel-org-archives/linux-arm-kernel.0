@@ -1,53 +1,203 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Jan 2016 09:33:26 +0100
-Subject: [Question] cacheline sharing problem on DMA for custom outer-cache
-In-Reply-To: <CAK7LNASC2kkgQvxetrRA=guvKTAnxGm3xeMbtV0hXgubR0tEwQ@mail.gmail.com>
-References: <CAK7LNASC2kkgQvxetrRA=guvKTAnxGm3xeMbtV0hXgubR0tEwQ@mail.gmail.com>
-Message-ID: <134552368.ft0oU8iHdY@wuerfel>
+From: wdc@rock-chips.com (David.Wu)
+Date: Fri, 15 Jan 2016 16:34:44 +0800
+Subject: [PATCH v3 2/4] i2c: rk3x: add ops to caculate i2c clocks
+In-Reply-To: <CAHp75VdR01_suo3nTWuuT2OEusy6z6KGSg29LKD8T3kY9eGMPA@mail.gmail.com>
+References: <1452774699-57455-1-git-send-email-david.wu@rock-chips.com>
+ <1452774699-57455-3-git-send-email-david.wu@rock-chips.com>
+ <CAHp75VdR01_suo3nTWuuT2OEusy6z6KGSg29LKD8T3kY9eGMPA@mail.gmail.com>
+Message-ID: <5698AF24.2030202@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 January 2016 11:36:30 Masahiro Yamada wrote:
-> 
-> When only L1-cache is enabled, it is OK.
-> 
-> 
-> If L2 is also enabled,
-> kmalloc() & dma_map_single() could be a cacheline sharing problem.
-> 
-> 
-> Is there any good solution?
 
-kmalloc uses ARCH_KMALLOC_MINALIGN alignment, so we need to tweak that
-in one form or another.
+Hi Andy,
 
+? 2016/1/14 21:19, Andy Shevchenko ??:
+> On Thu, Jan 14, 2016 at 2:31 PM, David Wu <david.wu@rock-chips.com> wrote:
+>> From: David Wu <wdc@rock-chips.com>
+>>
+>> I2c Controller of rk3x is updated for the rules to caculate clocks.
+>> So it need a new method to caculate i2c clock timing information
+>> for new version. The current method is defined as v0, and new is
+>> v1, next maybe v2......
+> Thanks for an update. My comments below.
+>
+>> --- a/drivers/i2c/busses/i2c-rk3x.c
+>> +++ b/drivers/i2c/busses/i2c-rk3x.c
+>> @@ -90,10 +95,27 @@ struct rk3x_i2c_soc_data {
+>>          int grf_offset;
+>>   };
+>>
+>> +/**
+>> + * struct rk3x_priv_i2c_timings - rk3x I2C timing information
+>> + * @div_low: Divider output for low
+>> + * @div_high: Divider output for high
+>> + */
+>> +struct rk3x_priv_i2c_timings {
+>> +       unsigned long div_low;
+>> +       unsigned long div_high;
+>> +};
+>> +
+>> +struct rk3x_i2c_ops {
+>> +       int (*calc_clock)(unsigned long,
+>> +                         struct i2c_timings *,
+>> +                         struct rk3x_priv_i2c_timings *);
+>> +};
+>> +
+>>   struct rk3x_i2c {
+>>          struct i2c_adapter adap;
+>>          struct device *dev;
+>>          struct rk3x_i2c_soc_data *soc_data;
+>> +       struct rk3x_i2c_ops ops;
+> Not much sense for now to have a struct for one member.
 
-The relevant definitions I see are
+Yes, it looks ok not to do change here.
 
-#define ARCH_KMALLOC_MINALIGN ARCH_DMA_MINALIGN
-#define ARCH_DMA_MINALIGN       L1_CACHE_BYTES
-#define L1_CACHE_SHIFT          CONFIG_ARM_L1_CACHE_SHIFT
-#define L1_CACHE_BYTES          (1 << L1_CACHE_SHIFT)
-
-I think you should check all other uses of L1_CACHE_SHIFT and L1_CACHE_BYTES.
-If this is the only one that needs to be adjusted, we can change the
-definition of ARCH_DMA_MINALIGN, otherwise we may have to add a platform
-specific option to CONFIG_ARM_L1_CACHE_SHIFT.
-
-I see a couple of suspicious uses of the L1 cache line size:
-
-drivers/net/ethernet/broadcom/cnic.c:   data->rx.cache_line_alignment_log_size = L1_CACHE_SHIFT;
-drivers/net/ethernet/qlogic/qede/qede.h:#define QEDE_RX_ALIGN_SHIFT             max(6, min(8, L1_CACHE_SHIFT))
-lib/dma-debug.c:#define CACHELINE_PER_PAGE_SHIFT (PAGE_SHIFT - L1_CACHE_SHIFT)
-drivers/net/ethernet/sfc/tx.c:#define EFX_PIOBUF_SIZE_DEF ALIGN(256, L1_CACHE_BYTES)
-drivers/net/wireless/ath/ath6kl/init.c:         skb_reserve(skb, reserved - L1_CACHE_BYTES);
-include/linux/iio/iio.h:#define IIO_ALIGN L1_CACHE_BYTES
-include/linux/mlx5/driver.h:    MLX5_DB_PER_PAGE = PAGE_SIZE / L1_CACHE_BYTES,
-
-Those need closer inspection, and I'm sure there are a couple more. Maybe
-they should use ARCH_DMA_MINALIGN instead of L1_CACHE_BYTES. There are also
-lots of instances that assume L1_CACHE_BYTES is the L1 line size, not L2,
-but they are typically only for performance optimization through prefetching,
-so having it set too big will only make it slower rather than incorrect.
-
-	Arnd
+>>          /* Hardware resources */
+>>          void __iomem *regs;
+>> @@ -102,6 +124,7 @@ struct rk3x_i2c {
+>>
+> What about
+>        /* I2C timing settings */
+>        struct i2c_timings t;
+>
+>        /* Divider settings */
+>        int (*calc_divs)(unsigned long,
+>                          struct i2c_timings *,
+>                          unsigned long *div_low,
+>                          unsigned long *div_high);
+>        unsigned long div_low;
+>        unsigned long div_high;
+> ?
+>
+> As far as I understand you still calculate divider values.
+>
+>>          /* Synchronization & notification */
+>>          spinlock_t lock;
+>> @@ -431,21 +454,20 @@ out:
+>>   }
+>>
+>>   /**
+>> - * Calculate divider values for desired SCL frequency
+>> + * Calculate timing clock info values for desired SCL frequency
+>>    *
+>>    * @clk_rate: I2C input clock rate
+>> - * @t_input: Known I2C timing information.
+>> - * @div_low: Divider output for low
+>> - * @div_high: Divider output for high
+> For now seems better to leave this prototype.
+>
+>> + * @t_input: Known I2C timing information
+>> + * @t_output: Caculated rk3x private timing information that would
+>> + * be written into regs
+>>    *
+>>    * Returns: 0 on success, -EINVAL if the goal SCL rate is too slow. In that case
+>>    * a best-effort divider value is returned in divs. If the target rate is
+>>    * too high, we silently use the highest possible rate.
+>>    */
+>> -static int rk3x_i2c_calc_divs(unsigned long clk_rate,
+>> -                             struct i2c_timings *t_input,
+>> -                             unsigned long *div_low,
+>> -                             unsigned long *div_high)
+>> +static int rk3x_i2c_v0_calc_clock(unsigned long clk_rate,
+>> +                                 struct i2c_timings *t_input,
+>> +                                 struct rk3x_priv_i2c_timings *t_output)
+>>   {
+>>          unsigned long spec_min_low_ns, spec_min_high_ns;
+>>          unsigned long spec_setup_start, spec_max_data_hold_ns;
+>
+>> @@ -583,25 +605,25 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate,
+>>
+>>                  /* Give low the "ideal" and give high whatever extra is left */
+>>                  extra_low_div = ideal_low_div - min_low_div;
+>> -               *div_low = ideal_low_div;
+>> -               *div_high = min_high_div + (extra_div - extra_low_div);
+>> +               t_output->div_low = ideal_low_div;
+>> +               t_output->div_high = min_high_div + (extra_div - extra_low_div);
+>>          }
+>>
+>>          /*
+>>           * Adjust to the fact that the hardware has an implicit "+1".
+>>           * NOTE: Above calculations always produce div_low > 0 and div_high > 0.
+>>           */
+>> -       *div_low = *div_low - 1;
+>> -       *div_high = *div_high - 1;
+>> +       t_output->div_low = t_output->div_low - 1;
+> -= 1
+>
+>> +       t_output->div_high = t_output->div_high - 1;
+> Ditto.
+>
+> But without change of prototype those no needed.
+>
+>>          /* Maximum divider supported by hw is 0xffff */
+>> -       if (*div_low > 0xffff) {
+>> -               *div_low = 0xffff;
+>> +       if (t_output->div_low > 0xffff) {
+>> +               t_output->div_low = 0xffff;
+>>                  ret = -EINVAL;
+>>          }
+>>
+>> -       if (*div_high > 0xffff) {
+>> -               *div_high = 0xffff;
+>> +       if (t_output->div_high > 0xffff) {
+>> +               t_output->div_high = 0xffff;
+>>                  ret = -EINVAL;
+>>          }
+>>
+>> @@ -610,19 +632,21 @@ static int rk3x_i2c_calc_divs(unsigned long clk_rate,
+>>
+>>   static void rk3x_i2c_adapt_div(struct rk3x_i2c *i2c, unsigned long clk_rate)
+>>   {
+>> -       unsigned long div_low, div_high;
+>>          u64 t_low_ns, t_high_ns;
+>>          int ret;
+>>
+>> -       ret = rk3x_i2c_calc_divs(clk_rate, &i2c->t, &div_low, &div_high);
+>> +       ret = i2c->ops.calc_clock(clk_rate, &i2c->t, &i2c->t_priv);
+>>          WARN_ONCE(ret != 0, "Could not reach SCL freq %u", i2c->t.bus_freq_hz);
+>>
+>>          clk_enable(i2c->clk);
+>> -       i2c_writel(i2c, (div_high << 16) | (div_low & 0xffff), REG_CLKDIV);
+>> +       i2c_writel(i2c, (i2c->t_priv.div_high << 16) |
+>> +                 (i2c->t_priv.div_low & 0xffff), REG_CLKDIV);
+>>          clk_disable(i2c->clk);
+>>
+>> -       t_low_ns = div_u64(((u64)div_low + 1) * 8 * 1000000000, clk_rate);
+>> -       t_high_ns = div_u64(((u64)div_high + 1) * 8 * 1000000000, clk_rate);
+>> +       t_low_ns = div_u64(((u64)i2c->t_priv.div_low + 1) * 8 * 1000000000,
+>> +                          clk_rate);
+>> +       t_high_ns = div_u64(((u64)i2c->t_priv.div_high + 1) * 8 * 1000000000,
+>> +                           clk_rate);
+>>          dev_dbg(i2c->dev,
+>>                  "CLK %lukhz, Req %uns, Act low %lluns high %lluns\n",
+>>                  clk_rate / 1000,
+>> @@ -652,12 +676,11 @@ static int rk3x_i2c_clk_notifier_cb(struct notifier_block *nb, unsigned long
+>>   {
+>>          struct clk_notifier_data *ndata = data;
+>>          struct rk3x_i2c *i2c = container_of(nb, struct rk3x_i2c, clk_rate_nb);
+>> -       unsigned long div_low, div_high;
+>>
+>>          switch (event) {
+>>          case PRE_RATE_CHANGE:
+>> -               if (rk3x_i2c_calc_divs(ndata->new_rate, &i2c->t,
+>> -                                      &div_low, &div_high) != 0)
+>> +               if (i2c->ops.calc_clock(ndata->new_rate, &i2c->t,
+>> +                                       &i2c->t_priv) != 0)
+>>                          return NOTIFY_STOP;
+>>
+>>                  /* scale up */
+>> @@ -861,6 +884,7 @@ static int rk3x_i2c_probe(struct platform_device *pdev)
+>>          u32 value;
+>>          int irq;
+>>          unsigned long clk_rate;
+>> +       unsigned int version;
+> No need to have a separate variable?
+>
+>> +       version = (readl(i2c->regs + REG_CON) & VERSION_MASK) >> VERSION_SHIFT;
+>> +       if (version == RK3X_I2C_V0)
+>> +               i2c->ops.calc_clock = rk3x_i2c_v0_calc_clock;
+> value = readl(i2c->regs + REG_CON);
+> if ((value & VERSION_MASK) >> VERSION_SHIFT) == RK3X_I2C_V0)
+>    i2c->ops.calc_clock = rk3x_i2c_v0_calc_clock;
+>
