@@ -1,62 +1,46 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 15 Jan 2016 12:31:30 -0600
-Subject: [PATCH v3] PCI: hosts: mark pcie/pci (msi) irq cascade handler
- as IRQF_NO_THREAD
-In-Reply-To: <56973DEC.2000108@ti.com>
-References: <1449775100-30877-1-git-send-email-grygorii.strashko@ti.com>
- <20160106221827.GD16231@localhost>
- <20160113133904.GD29964@linutronix.de>
- <20160113175016.GB28453@localhost> <56969BE3.6000804@ti.com>
- <56973DEC.2000108@ti.com>
-Message-ID: <20160115183130.GB5296@localhost>
+From: Leonid.Yegoshin@imgtec.com (Leonid Yegoshin)
+Date: Fri, 15 Jan 2016 10:54:32 -0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160115095756.GA2131@arm.com>
+References: <569565DA.2010903@imgtec.com> <20160113104516.GE25458@arm.com>
+ <56969F4B.7070001@imgtec.com>
+ <20160113204844.GV6357@twins.programming.kicks-ass.net>
+ <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
+ <56980145.5030901@imgtec.com> <20160114204827.GE3818@linux.vnet.ibm.com>
+ <56981212.7050301@imgtec.com> <20160114222046.GH3818@linux.vnet.ibm.com>
+ <20160115095756.GA2131@arm.com>
+Message-ID: <56994068.4050402@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 11:49:24AM +0530, Kishon Vijay Abraham I wrote:
-> Hi,
-> 
-> On Thursday 14 January 2016 12:18 AM, Grygorii Strashko wrote:
-> > On 01/13/2016 07:50 PM, Bjorn Helgaas wrote:
-> >> On Wed, Jan 13, 2016 at 02:39:04PM +0100, Sebastian Andrzej Siewior wrote:
-> >>> * Bjorn Helgaas | 2016-01-06 16:18:27 [-0600]:
-> >>>
-> >>>> Hi Bjorn,
-> >>>
-> >>>>> diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
-> >>>>> index 8c36880..0415192 100644
-> >>>>> --- a/drivers/pci/host/pci-dra7xx.c
-> >>>>> +++ b/drivers/pci/host/pci-dra7xx.c
-> >>>>> @@ -301,8 +301,19 @@ static int __init dra7xx_add_pcie_port(struct
-> >>>>> dra7xx_pcie *dra7xx,
-> >>>>>           return -EINVAL;
-> >>>>>       }
-> >>>>>
-> >>>>> +    /*
-> >>>>> +     * Mark dra7xx_pcie_msi IRQ as IRQF_NO_THREAD
-> >>>>> +     * On -RT and if kernel is booting with "threadirqs" cmd line parameter
-> >>>>> +     * the dra7xx_pcie_msi_irq_handler() will be forced threaded but,
-> >>>>> +     * in the same time, it's IRQ dispatcher and calls generic_handle_irq(),
-> >>>>> +     * which, in turn, will be resolved to handle_simple_irq() call.
-> >>>>> +     * The handle_simple_irq() expected to be called with IRQ disabled, as
-> >>>>> +     * result kernle will display warning:
-> >>>>> +     * "irq XXX handler YYY+0x0/0x14 enabled interrupts".
-> >>>>> +     */
-> >>>
-> >>> could you _please_ remove this coment? This kind of comment (if at all)
-> >>> should be part of the commit message (which is the case more or less).
-> >>
-> >> IIRC, Grygorii specifically wanted to keep this comment in dra7xx, but
-> > 
-> > True.
-> > 
-> >> I do agree that this level of detail is more appropriate for a changelog.
-> >>
-> >> If Grygorii and Kishon don't object, I can update the patch to remove it.
-> > 
-> > But no objections from my side. Thanks a lot.
-> 
-> I don't have any objections.
+On 01/15/2016 01:57 AM, Will Deacon wrote:
+> Paul,
+>
+>
+> I think you figured this out while I was sleeping, but just to confirm:
+>
+>   1. The MIPS64 ISA doc [1] talks about SYNC in a way that applies only
+>      to memory accesses appearing in *program-order* before the SYNC
+>
+>   2. We need WRC+sync+addr to work, which means that the SYNC in P1 must
+>      also capture the store in P0 as being "before" the barrier. Leonid
+>      reckons it works, but his explanation [2] focussed on the address
+>      dependency in P2 as to why this works. If that is the case (i.e.
+>      address dependency provides global transitivity), then WRC+addr+addr
+>      should also work (even though its not required).
 
-OK, I dropped it, thanks guys!
+No, it is not correct. There is one old design which provides access to 
+core (thread0 + thread1) write-buffers for threads load in advance of it 
+is visible to other cores. It means, that WRC+sync+addr passes because 
+of SYNC in write thread and register dependency inside other thread but 
+WRC+addr+addr may fail because other core may get a stale data.
 
-Bjorn
+>
+>   3. It seems that WRC+addr+addr doesn't work, so I'm still suspicious
+>      about WRC+sync+addr, because neither the architecture document or
+>      Leonid's explanation tell me that it should be forbidden.
+>
+> Will
+>
+> [1] https://imgtec.com/?do-download=4302
+> [2] http://lkml.kernel.org/r/569565DA.2010903 at imgtec.com (scroll to the end)
