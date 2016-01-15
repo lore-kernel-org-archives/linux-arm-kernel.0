@@ -1,137 +1,165 @@
-From: wdc@rock-chips.com (David.Wu)
-Date: Fri, 15 Jan 2016 17:39:13 +0800
-Subject: [PATCH v3 3/4] i2c: rk3x: new method to calculate i2c clocks
-In-Reply-To: <CAD=FV=UXMzEQiKcMa7VjDx+arcbRo1e-0HPHBnG8GP7k6uFt1g@mail.gmail.com>
-References: <1452774699-57455-1-git-send-email-david.wu@rock-chips.com>
- <1452774699-57455-4-git-send-email-david.wu@rock-chips.com>
- <CAD=FV=UXMzEQiKcMa7VjDx+arcbRo1e-0HPHBnG8GP7k6uFt1g@mail.gmail.com>
-Message-ID: <5698BE41.30005@rock-chips.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 15 Jan 2016 10:39:01 +0100
+Subject: [PATCH v3 04/13] clk: at91: make IRQ optional and register them
+ later
+In-Reply-To: <20160115020237.GJ22188@codeaurora.org>
+References: <1449248628-3486-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1449248628-3486-5-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160115020237.GJ22188@codeaurora.org>
+Message-ID: <20160115103901.1b987f53@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug?
+Hi Stephen,
 
-? 2016/1/15 0:12, Doug Anderson ??:
-> Hi,
->
-> On Thu, Jan 14, 2016 at 4:31 AM, David Wu <david.wu@rock-chips.com> wrote:
->> There was an timing issue about "repeated start" time at the I2C
->> controller of version0, controller appears to drop SDA at .875x (7/8)
->> programmed clk high. The rule(.875x) isn't enough to meet tSU;STA
->> requirements on 100k's Standard-mode. To resolve this issue,
->> data_upd_st, start_setup_cnt and stop_setup_cnt configs for I2C
->> timing information are added, new rules are designed to calculate
->> the timing information at new v1.
-> I'm curious: does new hardware behave differently and that's why you
-> need v1?
-Yes , i didn't describe clearly about difference between old and new.
-Old and new hardware behave the same except some timing rules.
+On Thu, 14 Jan 2016 18:02:37 -0800
+Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-v0 is the same with the v1 for tHigh and tLow :
-  tHigh = 8 * divh * pclk_cycle;
-  tLow = 8 * divl * pclk_cycle;
+> On 12/04, Alexandre Belloni wrote:
+> > @@ -686,3 +652,45 @@ static void __init of_at91sam9x5_clk_main_setup(struct device_node *np)
+> >  }
+> >  CLK_OF_DECLARE(at91sam9x5_clk_main, "atmel,at91sam9x5-clk-main",
+> >  	       of_at91sam9x5_clk_main_setup);
+> > +
+> > +static const struct of_device_id atmel_clk_main_dt_ids[] = {
+> > +	{ .compatible = "atmel,at91rm9200-clk-main-osc" },
+> > +	{ .compatible = "atmel,at91sam9x5-clk-main-rc-osc" },
+> > +	{ .compatible = "atmel,at91sam9x5-clk-main" },
+> > +	{ /* sentinel */ }
+> > +};
+> > +
+> > +static int __init atmel_clk_main_probe(struct platform_device *pdev)
+> > +{
+> > +	struct of_phandle_args clkspec = { .np = pdev->dev.of_node};
+> > +	struct clk_main *clkmain;
+> > +	struct clk_hw *hw;
+> > +	int ret;
+> > +
+> > +	hw = __clk_get_hw(of_clk_get_from_provider(&clkspec));
+> > +	if (!hw)
+> > +		return -ENODEV;
+> > +
+> > +	clkmain = to_clk_main(hw);
+> > +	clkmain->irq = platform_get_irq(pdev, 0);
+> > +	if (!clkmain->irq)
+> > +		return 0;
+> 
+> Is there any way to get the irq into this probe function without
+> getting a clk pointer and then unwrapping it to get an irq
+> value out of the clk_hw wrapper structure? That's a pretty
+> convoluted design.
 
-v0 rules' difference:
-     start setup? 7/8 * tHigh + 1 pclk cycle
-     start hold :    2 * ?7/8 * tHigh? - 1 pclk cycle
-     stop setup :   7/8 * tHigh + 1 pclk cycle
+Not sure I get what you're suggesting, but the only solution I see to
+avoid this "get main clk pointer dance" would be to have a global
+variable storing the clk_main instance (or a list of clk_main
+instances).
+The thing is, I'd like to avoid adding new global variables in this
+clk drivers as much as possible. Moreover, the core is already taking
+care of keeping the list of all registered clks, with their associated
+of_node, so, is there a real point in creating a duplicated association
+list in this driver too?
 
-     data setup:    1/2 tLow - 1 pclk cycle
-     data hold :    1/2  tLow + 1  pclk cycle
+Maybe we could create an of_clk_hw_get_from_provider(), which would
+prevent the creation of this useless per-user clk instance (see the patch
+below).
 
-For 100k's example:
-     spec_min_low_ns = 4700;
-     spec_min_high_ns = 4000;
-     spec_min_setup_start_ns = 4700;
+> 
+> > +
+> > +	init_waitqueue_head(&clkmain->wait);
+> > +	irq_set_status_flags(clkmain->irq, IRQ_NOAUTOEN);
+> > +	ret = devm_request_irq(&pdev->dev, clkmain->irq, clk_main_irq_handler,
+> > +			       IRQF_TRIGGER_HIGH, __clk_get_name(hw->clk),
+> > +			       clkmain);
+> > +	if (ret)
+> > +		clkmain->irq = 0;
+> > +
 
-We could calculate the timing info by the rules of v0, and ignore effect 
-of the pclk cycle here.
-     tSU;sta >=4700;
-     tHigh_min = tSU;sta * 8/7 >= 5372ns;
-     tHigh_min  = max(tHigh_min, spec_min_high_ns) = 5372ns;
+You should probably call clk_put() on the pointer returned by
+of_clk_get_from_provider(&clkspec).
 
-We get the final scl clk rate is 99k(1000000000 / (5372ns + 4700ns)),  
-it looks ok for the 100k
-Standard mode. But the timing point of repeat start and low time is very 
-critical, it is dangerous
-to some slave devices which are perhaps not so specified.
-So need to give some time margin for them, that would increase the cycle 
-time and reduce
-the clk rate, the final rate we get may be 97k or 96k.
+> > +	return ret;
+> > +}
+> > +
+> 
 
-In fact, we must think about scl rise time and scl fall time, and get 
-final clk may be 93k or less.
-After that, we get about 7 percent lost at clk rate, it would reduce the 
-efficiency of i2c transfer.
+Best Regards,
 
-In other words, we could say there is a timing issue about "repeat 
-start" time when we want
-accurate 100k's rate, it is short to meet I2C spec requirements.
-3.4M clk rate also has the same issue.
+Boris
 
-The start_setup count is added to fix this issue, tHigh is not need to 
-considered of "repeat start" time.
-After divs calculated, the count would be calculated to meet i2c spec.
-v1 rule:
-start setup? tHigh + 1 pclk cycle
-start hold:  [8h * (u + 1) - 1] * T;
-  tSU;sto = (8h * p + 1) * T;
----------------------------------------------------------------------------------------------------------------
+--- >8 ---
+>From a83670d29504e256bdc97c04f0dfd96a7d6842bf Mon Sep 17 00:00:00 2001
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
+Date: Fri, 15 Jan 2016 10:36:23 +0100
+Subject: [PATCH] clk: add a function to retrieve a clk_hw instance from a
+ clkspec definition
 
-The data_upd_st is added for the Data set-up time and Data hold time on 
-Highspeed mode.
-For 1.7M's example on v0:
-     tHD;DAT = 1/2 tLow?
-     tHD;DAT <= spec_max_data_hold_ns = 150ns
-     tLow <= 2 * tHD;DAT <= 300ns;
-     tLow >= spec_min_low_ns = 320ns;
-According to these, we could not get a value for tLow, need changes for 
-the rule: tHD;DAT = 1/2 tLow.
+of_clk_hw_get_from_provider() is providing a way to retrieve a clk_hw
+instance from a clkspec definition. Which is usefull in case a clk driver
+wants to get one of its own instance from a clkspec, without allocating a
+new per-user clk struct.
 
-Cut the tLow into eight euqal parts?the range of data_upd_st is 1 ~ 7.
-It seems that v1 rule could resolve the issue.
-v1 rule:
-     tHD;sda = n/8 * tLow;
-     tSU;sda = [(8 - n)/8 * tLow;
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/clk/clk.c            | 36 ++++++++++++++++++++++++++++++++++++
+ include/linux/clk-provider.h |  1 +
+ 2 files changed, 37 insertions(+)
 
-3.4M clk rate also has the same issue.
-
->   ...or does old and new hardware behave the same and you're
-> just introducing v1 so you don't mess with how old boards are working?
-The registers of counts added would not effect old boards.
-No matter what values of count was written in regs, that old i2c 
-controller didn't care,
-it worked by original timing rule.
-
-After picking this patch, pmic-rk818 and touchscreen-gt911 worked well 
-on the rk3368 sdk
-board which use old method.
-
->
-> >From the description it sounds as if the old code had problems as 100k too...
->
-> If the new controller is different, I'd probably reword like the
-> following (you'd have to re-wordwrap):
->
-> There was an timing issue about "repeated start" time at the I2C
-> controller of version0, controller appears to drop SDA at .875x (7/8)
-> programmed clk high. On version 1 of the controller, the rule(.875x)
-> isn't enough to meet tSU;STA
-> requirements on 100k's Standard-mode. To resolve this issue,
-> data_upd_st, start_setup_cnt and stop_setup_cnt configs for I2C
-> timing information are added, new rules are designed to calculate
-> the timing information at new v1.
-
-There was an timing issue about "repeated start" time at the I2C
-controller of version0, controller appears to drop SDA at .875x (7/8)
-programmed clk high. On version 1 of the controller, the rule(.875x)
-isn't enough to meet tSU;STA requirements on 100k's Standard-mode.
-
-To resolve this issue,data_upd_st, start_setup_cnt and stop_setup_cnt
-configs for I2C timing information are added, new rules are designed
-to calculate the timing information at new v1.
-
-> -Doug
->
->
->
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index f13c3f4..fbef1b7 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -3001,6 +3001,42 @@ void of_clk_del_provider(struct device_node *np)
+ }
+ EXPORT_SYMBOL_GPL(of_clk_del_provider);
+ 
++/**
++ * of_clk_hw_get_from_provider() - Look for a clk_hw instance registered with
++ *				   the given clkspec definition.
++ * @clkspec: pointer to a clock specifier data structure
++ *
++ * This function looks up a struct clk_hw from the registered list of clock
++ * providers, an input is a clock specifier data structure as returned
++ * from the of_parse_phandle_with_args() function call.
++ */
++struct clk_hw *of_clk_hw_get_from_provider(struct of_phandle_args *clkspec)
++{
++	struct clk_hw *clk_hw = ERR_PTR(-EPROBE_DEFER);
++	struct of_clk_provider *provider;
++
++	if (!clkspec)
++		return ERR_PTR(-EINVAL);
++
++	/* Check if we have such a provider in our array */
++	mutex_lock(&of_clk_mutex);
++	list_for_each_entry(provider, &of_clk_providers, link) {
++		struct clk *clk = ERR_PTR(-EPROBE_DEFER);
++
++		if (provider->node == clkspec->np)
++			clk = provider->get(clkspec, provider->data);
++
++		if (!IS_ERR(clk)) {
++			clk_hw = __clk_get_hw(clk);
++			break;
++		}
++	}
++	mutex_unlock(&of_clk_mutex);
++
++	return clk_hw;
++}
++EXPORT_SYMBOL_GPL(of_clk_hw_get_from_provider);
++
+ struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec,
+ 				       const char *dev_id, const char *con_id)
+ {
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index c56988a..bb62517 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -645,6 +645,7 @@ void devm_clk_unregister(struct device *dev, struct clk *clk);
+ const char *__clk_get_name(const struct clk *clk);
+ const char *clk_hw_get_name(const struct clk_hw *hw);
+ struct clk_hw *__clk_get_hw(struct clk *clk);
++struct clk_hw *of_clk_hw_get_from_provider(struct of_phandle_args *clkspec);
+ unsigned int clk_hw_get_num_parents(const struct clk_hw *hw);
+ struct clk_hw *clk_hw_get_parent(const struct clk_hw *hw);
+ struct clk_hw *clk_hw_get_parent_by_index(const struct clk_hw *hw,
