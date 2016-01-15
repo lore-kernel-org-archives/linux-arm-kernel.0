@@ -1,215 +1,214 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 15 Jan 2016 14:27:34 +0800
-Subject: [PATCH v9 00/21] KVM: ARM64: Add guest PMU support
-Message-ID: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
+Date: Fri, 15 Jan 2016 14:27:41 +0800
+Subject: [PATCH v9 07/21] KVM: ARM64: PMU: Add perf event map and introduce
+ perf event creating function
+In-Reply-To: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1452839275-19368-8-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-This patchset adds guest PMU support for KVM on ARM64. It takes
-trap-and-emulate approach. When guest wants to monitor one event, it
-will be trapped by KVM and KVM will call perf_event API to create a perf
-event and call relevant perf_event APIs to get the count value of event.
+When we use tools like perf on host, perf passes the event type and the
+id of this event type category to kernel, then kernel will map them to
+hardware event number and write this number to PMU PMEVTYPER<n>_EL0
+register. When getting the event number in KVM, directly use raw event
+type to create a perf_event for it.
 
-Use perf to test this patchset in guest. When using "perf list", it
-shows the list of the hardware events and hardware cache events perf
-supports. Then use "perf stat -e EVENT" to monitor some event. For
-example, use "perf stat -e cycles" to count cpu cycles and
-"perf stat -e cache-misses" to count cache misses.
-
-Below are the outputs of "perf stat -r 5 sleep 5" when running in host
-and guest.
-
-Host:
- Performance counter stats for 'sleep 5' (5 runs):
-
-          0.529248      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.65% )
-                 1      context-switches          #    0.002 M/sec
-                 0      cpu-migrations            #    0.000 K/sec
-                49      page-faults               #    0.092 M/sec                    ( +-  1.05% )
-           1104279      cycles                    #    2.087 GHz                      ( +-  1.65% )
-   <not supported>      stalled-cycles-frontend
-   <not supported>      stalled-cycles-backend
-            528112      instructions              #    0.48  insns per cycle          ( +-  1.12% )
-   <not supported>      branches
-              9579      branch-misses             #   18.099 M/sec                    ( +-  2.40% )
-
-       5.000851904 seconds time elapsed                                          ( +-  0.00% )
-
-Guest:
- Performance counter stats for 'sleep 5' (5 runs):
-
-          0.695412      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.26% )
-                 1      context-switches          #    0.001 M/sec
-                 0      cpu-migrations            #    0.000 K/sec
-                49      page-faults               #    0.070 M/sec                    ( +-  1.29% )
-           1430471      cycles                    #    2.057 GHz                      ( +-  1.25% )
-   <not supported>      stalled-cycles-frontend
-   <not supported>      stalled-cycles-backend
-            659173      instructions              #    0.46  insns per cycle          ( +-  2.64% )
-   <not supported>      branches
-             10893      branch-misses             #   15.664 M/sec                    ( +-  1.23% )
-
-       5.001277044 seconds time elapsed                                          ( +-  0.00% )
-
-Have a cycle counter read test like below in guest and host:
-
-static void test(void)
-{
-	unsigned long count, count1, count2;
-	count1 = read_cycles();
-	count++;
-	count2 = read_cycles();
-}
-
-Host:
-count1: 3046505444
-count2: 3046505575
-delta: 131
-
-Guest:
-count1: 5932773531
-count2: 5932773668
-delta: 137
-
-The gap between guest and host is very small. One reason for this I
-think is that it doesn't count the cycles in EL2 and host since we add
-exclude_hv = 1. So the cycles spent to store/restore registers which
-happens at EL2 are not included.
-
-This patchset can be fetched from [1] and the relevant QEMU version for
-test can be fetched from [2].
-
-The results of 'perf test' can be found from [3][4].
-The results of perf_event_tests test suite can be found from [5][6].
-
-Also, I have tested "perf top" in two VMs and host at the same time. It
-works well.
-
-Thanks,
-Shannon
-
-[1] https://git.linaro.org/people/shannon.zhao/linux-mainline.git  KVM_ARM64_PMU_v9
-[2] https://git.linaro.org/people/shannon.zhao/qemu.git  PMU
-[3] http://people.linaro.org/~shannon.zhao/PMU/perf-test-host.txt
-[4] http://people.linaro.org/~shannon.zhao/PMU/perf-test-guest.txt
-[5] http://people.linaro.org/~shannon.zhao/PMU/perf_event_tests-host.txt
-[6] http://people.linaro.org/~shannon.zhao/PMU/perf_event_tests-guest.txt
-
-Changes since v8:
-* Fix the wrong use of r->reg in register accessors for 32bit part
-* Rewrite the handle of PMUSERENR based on the new inject UND patch
-* Drop the inline attribute
-* Introduce SET/GET/HAS_DEVICE_ATTR for vcpu iotcl and set the PMU
-  overflow interrupt via this API
-* Use one feature bit for PMUv3
-
-Changes since v7:
-* Rebase on kvm-arm next
-* Fix the handler of PMUSERENR and add a helper to forward trap to guest
-  EL1
-* Fix some small bugs found by Marc
-
-Changes since v6:
-* Rebase on v4.4-rc5
-* Drop access_pmu_cp15_regs() so that it could use same handler for both
-  arch64 and arch32. And it could drop the definitions of CP15 register
-  offsets, also avoid same codes added twice
-* Use vcpu_sys_reg() when accessing PMU registers to avoid endian things
-* Add handler for PMUSERENR and some checkers for other registers
-* Add kvm_arm_pmu_get_attr()
-
-Changes since v5:
-* Rebase on new linux kernel mainline
-* Remove state duplications and drop PMOVSCLR, PMCNTENCLR, PMINTENCLR,
-  PMXEVCNTR, PMXEVTYPER
-* Add a helper to check if vPMU is already initialized
-* remove kvm_vcpu from kvm_pmc
-
-Changes since v4:
-* Rebase on new linux kernel mainline 
-* Drop the reset handler of CP15 registers
-* Fix a compile failure on arch ARM due to lack of asm/pmu.h
-* Refactor the interrupt injecting flow according to Marc's suggestion
-* Check the value of PMSELR register
-* Calculate the attr.disabled according to PMCR.E and PMCNTENSET/CLR
-* Fix some coding style
-* Document the vPMU irq range
-
-Changes since v3:
-* Rebase on new linux kernel mainline 
-* Use ARMV8_MAX_COUNTERS instead of 32
-* Reset PMCR.E to zero.
-* Trigger overflow for software increment.
-* Optimize PMU interrupt inject logic.
-* Add handler for E,C,P bits of PMCR
-* Fix the overflow bug found by perf_event_tests
-* Run 'perf test', 'perf top' and perf_event_tests test suite
-* Add exclude_hv = 1 configuration to not count in EL2
-
-Changes since v2:
-* Directly use perf raw event type to create perf_event in KVM
-* Add a helper vcpu_sysreg_write
-* remove unrelated header file
-
-Changes since v1:
-* Use switch...case for registers access handler instead of adding
-  alone handler for each register
-* Try to use the sys_regs to store the register value instead of adding
-  new variables in struct kvm_pmc
-* Fix the handle of cp15 regs
-* Create a new kvm device vPMU, then userspace could choose whether to
-  create PMU
-* Fix the handle of PMU overflow interrupt
-
-Shannon Zhao (21):
-  ARM64: Move PMU register related defines to asm/pmu.h
-  KVM: ARM64: Define PMU data structure for each vcpu
-  KVM: ARM64: Add offset defines for PMU registers
-  KVM: ARM64: Add access handler for PMCR register
-  KVM: ARM64: Add access handler for PMSELR register
-  KVM: ARM64: Add access handler for PMCEID0 and PMCEID1 register
-  KVM: ARM64: PMU: Add perf event map and introduce perf event creating
-    function
-  KVM: ARM64: Add access handler for event type register
-  KVM: ARM64: Add access handler for event counter register
-  KVM: ARM64: Add access handler for PMCNTENSET and PMCNTENCLR register
-  KVM: ARM64: Add access handler for PMINTENSET and PMINTENCLR register
-  KVM: ARM64: Add access handler for PMOVSSET and PMOVSCLR register
-  KVM: ARM64: Add access handler for PMSWINC register
-  KVM: ARM64: Add helper to handle PMCR register bits
-  KVM: ARM64: Add access handler for PMUSERENR register
-  KVM: ARM64: Add PMU overflow interrupt routing
-  KVM: ARM64: Reset PMU state when resetting vcpu
-  KVM: ARM64: Free perf event of PMU when destroying vcpu
-  KVM: ARM64: Add a new feature bit for PMUv3
-  KVM: ARM: Introduce per-vcpu kvm device controls
-  KVM: ARM64: Add a new vcpu device control group for PMUv3
-
- Documentation/virtual/kvm/api.txt          |  12 +-
- Documentation/virtual/kvm/devices/vcpu.txt |  32 ++
- arch/arm/include/asm/kvm_host.h            |  15 +
- arch/arm/kvm/arm.c                         |  61 +++
- arch/arm64/include/asm/kvm_host.h          |  25 +-
- arch/arm64/include/asm/pmu.h               |  81 ++++
- arch/arm64/include/uapi/asm/kvm.h          |   6 +
- arch/arm64/kernel/perf_event.c             |  36 +-
- arch/arm64/kvm/Kconfig                     |   7 +
- arch/arm64/kvm/Makefile                    |   1 +
- arch/arm64/kvm/guest.c                     |  51 +++
- arch/arm64/kvm/hyp/hyp.h                   |   1 +
- arch/arm64/kvm/hyp/switch.c                |   3 +
- arch/arm64/kvm/reset.c                     |   7 +
- arch/arm64/kvm/sys_regs.c                  | 570 +++++++++++++++++++++++++++--
- include/kvm/arm_pmu.h                      | 102 ++++++
- include/uapi/linux/kvm.h                   |   2 +
- virt/kvm/arm/pmu.c                         | 513 ++++++++++++++++++++++++++
- 18 files changed, 1456 insertions(+), 69 deletions(-)
- create mode 100644 Documentation/virtual/kvm/devices/vcpu.txt
- create mode 100644 arch/arm64/include/asm/pmu.h
- create mode 100644 include/kvm/arm_pmu.h
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/pmu.h |   3 ++
+ arch/arm64/kvm/Makefile      |   1 +
+ include/kvm/arm_pmu.h        |  10 ++++
+ virt/kvm/arm/pmu.c           | 122 +++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 136 insertions(+)
  create mode 100644 virt/kvm/arm/pmu.c
 
+diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
+index 4406184..2588f9c 100644
+--- a/arch/arm64/include/asm/pmu.h
++++ b/arch/arm64/include/asm/pmu.h
+@@ -21,6 +21,7 @@
+ 
+ #define ARMV8_MAX_COUNTERS      32
+ #define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
++#define ARMV8_CYCLE_IDX         (ARMV8_MAX_COUNTERS - 1)
+ 
+ /*
+  * Per-CPU PMCR: config reg
+@@ -31,6 +32,8 @@
+ #define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
+ #define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
+ #define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
++/* Determines which PMCCNTR_EL0 bit generates an overflow */
++#define ARMV8_PMCR_LC		(1 << 6)
+ #define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
+ #define	ARMV8_PMCR_N_MASK	0x1f
+ #define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index caee9ee..122cff4 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -26,3 +26,4 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2-emul.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
++kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
+diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+index 32fee2d..ee4b15c 100644
+--- a/include/kvm/arm_pmu.h
++++ b/include/kvm/arm_pmu.h
+@@ -36,11 +36,21 @@ struct kvm_pmu {
+ };
+ 
+ #define kvm_arm_pmu_v3_ready(v)		((v)->arch.pmu.ready)
++u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
++void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
++				    u64 select_idx);
+ #else
+ struct kvm_pmu {
+ };
+ 
+ #define kvm_arm_pmu_v3_ready(v)		(false)
++static inline u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu,
++					    u64 select_idx)
++{
++	return 0;
++}
++static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
++						  u64 data, u64 select_idx) {}
+ #endif
+ 
+ #endif
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+new file mode 100644
+index 0000000..673ec55
+--- /dev/null
++++ b/virt/kvm/arm/pmu.c
+@@ -0,0 +1,122 @@
++/*
++ * Copyright (C) 2015 Linaro Ltd.
++ * Author: Shannon Zhao <shannon.zhao@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/cpu.h>
++#include <linux/kvm.h>
++#include <linux/kvm_host.h>
++#include <linux/perf_event.h>
++#include <asm/kvm_emulate.h>
++#include <kvm/arm_pmu.h>
++
++/**
++ * kvm_pmu_get_counter_value - get PMU counter value
++ * @vcpu: The vcpu pointer
++ * @select_idx: The counter index
++ */
++u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
++{
++	u64 counter, reg, enabled, running;
++	struct kvm_pmu *pmu = &vcpu->arch.pmu;
++	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
++
++	reg = (select_idx == ARMV8_CYCLE_IDX)
++	      ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + select_idx;
++	counter = vcpu_sys_reg(vcpu, reg);
++
++	/* The real counter value is equal to the value of counter register plus
++	 * the value perf event counts.
++	 */
++	if (pmc->perf_event)
++		counter += perf_event_read_value(pmc->perf_event, &enabled,
++						 &running);
++
++	return counter & pmc->bitmask;
++}
++
++/**
++ * kvm_pmu_stop_counter - stop PMU counter
++ * @pmc: The PMU counter pointer
++ *
++ * If this counter has been configured to monitor some event, release it here.
++ */
++static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc)
++{
++	u64 counter, reg;
++
++	if (pmc->perf_event) {
++		counter = kvm_pmu_get_counter_value(vcpu, pmc->idx);
++		reg = (pmc->idx == ARMV8_CYCLE_IDX)
++		       ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + pmc->idx;
++		vcpu_sys_reg(vcpu, reg) = counter;
++		perf_event_disable(pmc->perf_event);
++		perf_event_release_kernel(pmc->perf_event);
++		pmc->perf_event = NULL;
++	}
++}
++
++static bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu, u64 select_idx)
++{
++	return (vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E) &&
++	       (vcpu_sys_reg(vcpu, PMCNTENSET_EL0) & BIT(select_idx));
++}
++
++/**
++ * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
++ * @vcpu: The vcpu pointer
++ * @data: The data guest writes to PMXEVTYPER_EL0
++ * @select_idx: The number of selected counter
++ *
++ * When OS accesses PMXEVTYPER_EL0, that means it wants to set a PMC to count an
++ * event with given hardware event number. Here we call perf_event API to
++ * emulate this action and create a kernel perf event for it.
++ */
++void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
++				    u64 select_idx)
++{
++	struct kvm_pmu *pmu = &vcpu->arch.pmu;
++	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
++	struct perf_event *event;
++	struct perf_event_attr attr;
++	u64 eventsel, counter;
++
++	kvm_pmu_stop_counter(vcpu, pmc);
++	eventsel = data & ARMV8_EVTYPE_EVENT;
++
++	memset(&attr, 0, sizeof(struct perf_event_attr));
++	attr.type = PERF_TYPE_RAW;
++	attr.size = sizeof(attr);
++	attr.pinned = 1;
++	attr.disabled = kvm_pmu_counter_is_enabled(vcpu, select_idx);
++	attr.exclude_user = data & ARMV8_EXCLUDE_EL0 ? 1 : 0;
++	attr.exclude_kernel = data & ARMV8_EXCLUDE_EL1 ? 1 : 0;
++	attr.exclude_hv = 1; /* Don't count EL2 events */
++	attr.exclude_host = 1; /* Don't count host events */
++	attr.config = eventsel;
++
++	counter = kvm_pmu_get_counter_value(vcpu, select_idx);
++	/* The initial sample period (overflow count) of an event. */
++	attr.sample_period = (-counter) & pmc->bitmask;
++
++	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
++	if (IS_ERR(event)) {
++		pr_err_once("kvm: pmu event creation failed %ld\n",
++			    PTR_ERR(event));
++		return;
++	}
++
++	pmc->perf_event = event;
++}
 -- 
 2.0.4
