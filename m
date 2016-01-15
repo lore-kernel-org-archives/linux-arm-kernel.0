@@ -1,20 +1,63 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 15 Jan 2016 11:44:04 +0100
-Subject: [PATCH v2 2/2] ARM: shmobile: r8a7791: use GIC_* defines
-In-Reply-To: <1452825856-16230-3-git-send-email-horms+renesas@verge.net.au>
-References: <1452825856-16230-1-git-send-email-horms+renesas@verge.net.au>
- <1452825856-16230-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWRSWMMR7G2e-A5E_CxX=KsN1Ztj7uQ1JJViCet1WoQoA@mail.gmail.com>
+Date: Fri, 15 Jan 2016 11:45:35 +0100
+Subject: [PATCH v3 14/14] ARM: shmobile: r8a7793: enable audio DMAC in
+ device tree
+In-Reply-To: <1452825487-15931-15-git-send-email-horms+renesas@verge.net.au>
+References: <1452825487-15931-1-git-send-email-horms+renesas@verge.net.au>
+ <1452825487-15931-15-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXHixAuiYayxmvOLLm39w4iTosVucRtN7ASuHGuY7p5-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 3:44 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Use GIC_* defines for GIC interrupt cells in r8a7791 device tree.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Hi Simon,
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On Fri, Jan 15, 2016 at 3:38 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> --- a/arch/arm/boot/dts/r8a7793.dtsi
+> +++ b/arch/arm/boot/dts/r8a7793.dtsi
+> @@ -1201,52 +1201,119 @@
+>                 status = "disabled";
+>
+>                 rcar_sound,dvc {
+> -                       dvc0: dvc at 0 { };
+> -                       dvc1: dvc at 1 { };
+> +                       dvc0: dvc at 0 {
+> +                               dmas = <&audma0 0xbc>;
+> +                               dma-names = "tx";
+> +                       };
+> +                       dvc1: dvc at 1 {
+> +                               dmas = <&audma0 0xbe>;
+> +                               dma-names = "tx";
+> +                       };
+>                 };
+> +
+>                 rcar_sound,src {
+> -                       src0: src at 0 { };
+> -                       src1: src at 1 { };
+> -                       src2: src at 2 { };
+> -                       src3: src at 3 { };
+> -                       src4: src at 4 { };
+> -                       src5: src at 5 { };
+> -                       src6: src at 6 { };
+> -                       src7: src at 7 { };
+> -                       src8: src at 8 { };
+> -                       src9: src at 9 { };
+> +                       src0: src at 0 {
+> +                               interrupts = <0 352 IRQ_TYPE_LEVEL_HIGH>;
+
+<GIC_SPI ...> (and more below)
+
+>                 rcar_sound,ssi {
+>                         ssi0: ssi at 0 {
+>                                 interrupts = <0 370 IRQ_TYPE_LEVEL_HIGH>;
+
+<GIC_SPI ...>
+
+Ah, you already let a few pass through before ;-)
+
+> +                               dmas = <&audma0 0x01>, <&audma1 0x02>, <&audma0 0x15>, <&audma1 0x16>;
+> +                               dma-names = "rx", "tx", "rxu", "txu";
+>                         };
 
 Gr{oetje,eeting}s,
 
