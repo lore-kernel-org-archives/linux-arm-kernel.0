@@ -1,47 +1,79 @@
-From: nouveau@karolherbst.de (Karol Herbst)
-Date: Fri, 15 Jan 2016 13:07:41 +0100 (CET)
-Subject: [PATCH] drm: nouveau: fix nouveau_debugfs_init prototype
-In-Reply-To: <CACvgo50aGCMBB3Qe3o5jyV7oZ62yiDRHcLAy4xu-Nnmb5S_DaQ@mail.gmail.com>
-References: <3968390.Pvmnq3v7oC@wuerfel>
- <1503925101.39877.1452693347204.JavaMail.open-xchange@www.ud-mail.de>
- <12563536.Vhe8JJPi2x@wuerfel>
- <CACvgo50aGCMBB3Qe3o5jyV7oZ62yiDRHcLAy4xu-Nnmb5S_DaQ@mail.gmail.com>
-Message-ID: <1213515825.56151.1452859661690.JavaMail.open-xchange@www.ud-mail.de>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Fri, 15 Jan 2016 12:12:31 +0000
+Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
+ hostbridge init based on ACPI
+In-Reply-To: <1452781481.28109.8.camel@redhat.com>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <20160114134440.GA8520@xora-haswell.xora.org.uk>
+ <1452780100.28109.3.camel@redhat.com>
+ <20160114141501.GC8520@xora-haswell.xora.org.uk>
+ <1452781481.28109.8.camel@redhat.com>
+Message-ID: <20160115121231.GD8520@xora-haswell.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Emil Velikov <emil.l.velikov@gmail.com> hat am 15. Januar 2016 um 12:06
-> geschrieben:
+On Thu, Jan 14, 2016 at 09:24:41AM -0500, Mark Salter wrote:
+> On Thu, 2016-01-14 at 14:15 +0000, Graeme Gregory wrote:
+> > On Thu, Jan 14, 2016 at 09:01:40AM -0500, Mark Salter wrote:
+> > > On Thu, 2016-01-14 at 13:44 +0000, Graeme Gregory wrote:
+> > > > On Wed, Jan 13, 2016 at 02:20:46PM +0100, Tomasz Nowicki wrote:
+> > > > > From the functionality point of view this series might be split into the
+> > > > > following logic parts:
+> > > > > 1. Make MMCONFIG code arch-agnostic which allows all architectures to collect
+> > > > > ???PCI config regions and used when necessary.
+> > > > > 2. Move non-arch specific bits to the core code.
+> > > > > 3. Use MMCONFIG code and implement generic ACPI based PCI host controller driver.
+> > > > > 4. Enable above driver on ARM64
+> > > > > 
+> > > > > Patches has been built on top of 4.4 and can be found here:
+> > > > > git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v3)
+> > > > > 
+> > > > > NOTE, this patch set depends on Matthew's patches:
+> > > > > http://www.spinics.net/lists/linux-pci/msg45950.html
+> > > > > https://github.com/Vality/linux/tree/pci-fixes
+> > > > > 
+> > > > > This has been tested on Cavium ThunderX server and QEMU.
+> > > > > Any help in reviewing and testing is very appreciated.
+> > > > 
+> > > > I have tested this on my AMD Overdrive so
+> > > > 
+> > > > Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
+> > > > 
+> > > > But to actually get my r8169 network card working I also need the
+> > > > following patch.
+> > > > 
+> > > > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> > > > index 2fbf840..40e24e2 100644
+> > > > --- a/drivers/pci/probe.c
+> > > > +++ b/drivers/pci/probe.c
+> > > > @@ -1717,7 +1717,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+> > > > ????????set_dev_node(&dev->dev, pcibus_to_node(bus));
+> > > > ????????dev->dev.dma_mask = &dev->dma_mask;
+> > > > ????????dev->dev.dma_parms = &dev->dma_parms;
+> > > > -???????dev->dev.coherent_dma_mask = 0xffffffffull;
+> > > > +???????dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
+> > > > ????????pci_dma_configure(dev);
+> > > > 
+> > > > ????????pci_set_dma_max_seg_size(dev, 65536);
+> > > > 
+> > > > I suspect we need to set coherent_dma_mask somewhere in the platform but I do
+> > > > not know where this should happen. Hopefully an ARM64 expert can help.
+> > > 
+> > > I've run into a number of cards which don't work on some arm64 machines where there are
+> > > no DMA address below 4G. For the realtek card you can use r8169.use_dac=1 on the cmdline
+> > > to get it to work.
+> > > 
+> > I need r8169.use_dac=1 and this patch to get card to work.
+> > 
 > 
-> On 13 January 2016 at 16:00, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 13 January 2016 14:55:47 Karol Herbst wrote:
-> >> > Arnd Bergmann <arnd@arndb.de> hat am 13. Januar 2016 um 14:48
-> >> > geschrieben:
-> >> >
-> >> > The new debugfs initialization code fails to build when CONFIG_DEBUG_FS
-> >> > is disabled:
-> >> >
-> >> > In file included from
-> >> > /git/arm-soc/drivers/gpu/drm/nouveau/nouveau_drm.c:57:0:
-> >> > drivers/gpu/drm/nouveau/nouveau_debugfs.h: In function
-> >> > 'nouveau_debugfs_init':
-> >> > drivers/gpu/drm/nouveau/nouveau_debugfs.h:37:29: error: parameter name
-> >> > omitted
-> >> > nouveau_debugfs_init(struct nouveau_drm *)
-> >> >
-> >> > This fixes the prototypes so we can build it again.
-> >> >
-> >>
-> >> thanks for this. I already send a patch to the nouveau ML here:
-> >> http://lists.freedesktop.org/archives/nouveau/2016-January/023779.html
-> >
-> > Ok, thanks
-> >
-> Fwiw Arnd's fix feels a lot better - it lacks typos, has a fixes tag,
-> comprehensive commit message etc. etc. :-)
+> Hmm. I didn't need a patch in the past but I don't think I've used that card with
+> this patch series. I will try that when I get a chance...
 > 
-> -Emil
 
-no worries, I am still learning after all
+>From my previous debugging on this issue I was getting an address bigger
+than 32bits. As r8169 is a whole range of chips are guess they are not
+all equal?
 
-Karol
+I can stick debug stuff in if someone tells me where to put them.
+
+Graeme
