@@ -1,41 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 15 Jan 2016 10:03:43 +0100
-Subject: [PATCH v3] i2c: imx: make bus recovery through pinctrl optional
-In-Reply-To: <CADRPPNT=+amxRcea=N7m96=wKgdbRmU8R5cBACvTn7XffKofzQ@mail.gmail.com>
-References: <1452842844-16256-1-git-send-email-leoyang.li@nxp.com>
- <20160115075356.GI24441@pengutronix.de>
- <CADRPPNT=+amxRcea=N7m96=wKgdbRmU8R5cBACvTn7XffKofzQ@mail.gmail.com>
-Message-ID: <20160115090343.GK24441@pengutronix.de>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 15 Jan 2016 10:13:48 +0100
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160115085554.GF3421@worktop>
+References: <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
+ <20160113104516.GE25458@arm.com> <5696CF08.8080700@imgtec.com>
+ <20160114121449.GC15828@arm.com> <5697F6D2.60409@imgtec.com>
+ <20160114203430.GC3818@linux.vnet.ibm.com>
+ <56980C91.1010403@imgtec.com>
+ <20160114212913.GF3818@linux.vnet.ibm.com>
+ <20160115085554.GF3421@worktop>
+Message-ID: <20160115091348.GA27936@worktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Li,
-
-On Fri, Jan 15, 2016 at 04:46:06PM +0800, Li Yang wrote:
-> On Fri, Jan 15, 2016 at 3:53 PM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> >> -     i2c_imx_init_recovery_info(i2c_imx, pdev);
-> >> +     if (IS_ERR_OR_NULL(i2c_imx->pinctrl))
-> >
-> > I'd prefer to set i2c_imx->pinctrl to NULL if it's not used and then use
-> >
-> >         if (!i2c_imx->pinctrl)
-> >
-> > here. (Or maybe make i2c_imx_init_recovery_info aware of this situation
-> > to keep the caller simple?)
+On Fri, Jan 15, 2016 at 09:55:54AM +0100, Peter Zijlstra wrote:
+> On Thu, Jan 14, 2016 at 01:29:13PM -0800, Paul E. McKenney wrote:
+> > So smp_mb() provides transitivity, as do pairs of smp_store_release()
+> > and smp_read_acquire(), 
 > 
-> Setting not used pointer to NULL might be a good coding practice
-> generally.  But in this case neither the driver nor gpio framework
-> checks if the pinctrl is NULL before accessing it.  We still need the
-> driver to make sure pinctrl is not used in this situation.  The
-> benefit of the proposed change seems to be pretty limited.  :)
+> But they provide different grades of transitivity, which is where all
+> the confusion lays.
+> 
+> smp_mb() is strongly/globally transitive, all CPUs will agree on the order.
+> 
+> Whereas the RCpc release+acquire is weakly so, only the two cpus
+> involved in the handover will agree on the order.
 
-At least it gets rid of IS_ERR_OR_NULL which is used wrongly more often
-than not.
+And the stuff we're confused about is how best to express the difference
+and guarantees of these two forms of transitivity and how exactly they
+interact.
 
-Best regards
-Uwe
+And smp_load_acquire()/smp_store_release() are RCpc because TSO archs
+and PPC. the atomic*_{acquire,release}() are RCpc because PPC and
+LOCK,UNLOCK are similarly RCpc because of PPC.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Now we'd like PPC to stick a SYNC in either LOCK or UNLOCK so at least
+the locks are RCsc again, but they resist for performance reasons but
+waver because they don't want to be the ones finding all the nasty bugs
+because they're the only one.
+
+Now the thing I worry about, and still have not had an answer to is if
+weakly ordered MIPS will end up being RCsc or RCpc for their locks if
+they get implemented with SYNC_ACQUIRE and SYNC_RELEASE instead of the
+current SYNC.
