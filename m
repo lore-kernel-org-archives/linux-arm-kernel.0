@@ -1,137 +1,78 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 15 Jan 2016 15:16:38 +0000
-Subject: [PATCH V12 2/7] dma: hidma: Add Device Tree support
-In-Reply-To: <1452523550-8920-3-git-send-email-okaya@codeaurora.org>
+Date: Fri, 15 Jan 2016 15:22:58 +0000
+Subject: [PATCH V12 3/7] dma: add Qualcomm Technologies HIDMA management
+ driver
+In-Reply-To: <56990C40.4050407@codeaurora.org>
 References: <1452523550-8920-1-git-send-email-okaya@codeaurora.org>
- <1452523550-8920-3-git-send-email-okaya@codeaurora.org>
-Message-ID: <20160115151637.GJ3262@leverpostej>
+ <1452523550-8920-4-git-send-email-okaya@codeaurora.org>
+ <20160115145629.GI3262@leverpostej>
+ <56990C40.4050407@codeaurora.org>
+Message-ID: <20160115152257.GK3262@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 09:45:42AM -0500, Sinan Kaya wrote:
-> Add documentation for the Qualcomm Technologies HIDMA driver.
-
-s/driver/binding/
-
-
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
->  .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    | 79 ++++++++++++++++++++++
->  1 file changed, 79 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+On Fri, Jan 15, 2016 at 10:12:00AM -0500, Sinan Kaya wrote:
+> Hi Mark,
 > 
-> diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-> new file mode 100644
-> index 0000000..0e6ed1f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-> @@ -0,0 +1,79 @@
-> +Qualcomm Technologies HIDMA Management interface
-> +
-> +Qualcomm Technologies HIDMA is a high speed DMA device. It only supports
-> +memcpy and memset capabilities. It has been designed for virtualized
-> +environments.
-> +
-> +Each HIDMA HW instance consists of multiple DMA channels. These channels
-> +share the same bandwidth. The bandwidth utilization can be parititioned
-> +among channels based on the priority and weight assignments.
-> +
-> +There are only two priority levels and 15 weigh assignments possible.
-> +
-> +Other parameters here determine how much of the system bus this HIDMA
-> +instance can use like maximum read/write request and and number of bytes to
-> +read/write in a single burst.
-> +
-> +Main node required properties:
-> +- compatible: "qcom,hidma-mgmt-1.0";
-> +- reg: Address range for DMA device
-> +- dma-channels: Number of channels supported by this DMA controller.
-> +- max-write-burst-bytes: Maximum write burst in bytes. A memcpy requested is
-> +  fragmented to multiples of this amount.
-> +- max-read-burst-bytes: Maximum read burst in bytes. A memcpy request is
-> +  fragmented to multiples of this amount.
-> +- max-write-transactions: Maximum write transactions to perform in a burst
-> +- max-read-transactions: Maximum read transactions to perform in a burst
+> On 1/15/2016 9:56 AM, Mark Rutland wrote:
+> > Hi,
+> > 
+> > [adding KVM people, given this is meant for virtualization]
+> > 
+> > On Mon, Jan 11, 2016 at 09:45:43AM -0500, Sinan Kaya wrote:
+> >> The Qualcomm Technologies HIDMA device has been designed to support
+> >> virtualization technology. The driver has been divided into two to follow
+> >> the hardware design.
+> >>
+> >> 1. HIDMA Management driver
+> >> 2. HIDMA Channel driver
+> >>
+> >> Each HIDMA HW consists of multiple channels. These channels share some set
+> >> of common parameters. These parameters are initialized by the management
+> >> driver during power up. Same management driver is used for monitoring the
+> >> execution of the channels. Management driver can change the performance
+> >> behavior dynamically such as bandwidth allocation and prioritization.
+> >>
+> >> The management driver is executed in hypervisor context and is the main
+> >> management entity for all channels provided by the device.
+> > 
+> > You mention repeatedly that this is designed for virtualization, but
+> > looking at the series as it stands today I can't see how this operates
+> > from the host side.
+> > 
+> > This doesn't seem to tie into KVM or VFIO, and as far as I can tell
+> > there's no mechanism for associating channels with a particular virtual
+> > address space (i.e. no configuration of an external or internal IOMMU),
+> > nor pinning of guest pages to allow for DMA to occur safely.
+> 
+> I'm using VFIO platform driver for this purpose. VFIO platform driver is 
+> capable of assigning any platform device to a guest machine with this driver. 
 
-Just to check, where do these max-* values come from?
+Typically VFIO-platform also comes with a corresponding reset driver.
+You don't need one?
 
-Are they some correctness requirement of the bus this is attached to?
+> You just unbind the HIDMA channel driver from the hypervisor and bind to vfio
+> driver using the very same approach you'd use with PCIe. 
+> 
+> Of course, this all assumes the presence of an IOMMU driver on the system. VFIO
+> driver uses the IOMMU driver to create the mappings. 
 
-Are they tuning values?
+No IOMMU was described in the DT binding. It sounds like you'd need an
+optional (not present in the guest) iommus property per-channel
 
-The latter doesn't really belong in the DT. Given they're writeable from
-the driver, it seems like that's what they are...
+> The mechanism used here is not different from VFIO PCI from user perspective.
+> 
+> > 
+> > Given that, I'm at a loss as to how this would be used in a hypervisor
+> > context. What am I missing?
+> > 
+> > Are there additional patches, or do you have some userspace that works
+> > with this in some limited configuration?
+> 
+> No, these are the only patches. We have one patch for the QEMU but from kernel
+> perspective this is it. 
 
-> +- channel-reset-timeout-cycles: Channel reset timeout in cycles for this SOC.
-
-I'm not sure what this means. Could you elaborate on this is?
-
-> +
-> +Sub-nodes:
-> +
-> +HIDMA has one or more DMA channels that are used to move data from one
-> +memory location to another.
-> +
-> +Each DMA channel is described as a sub-node under the management object.
-> +When a transfer channel is given to the guest operating system, only the channel
-> +object is created. The drivers have support for both flat and hierarchical
-> +configuration.
-
-Don't mention drivers here.
-
-All you need to state is that when the OS is not in control of the
-management interface (i.e. it's a guest), the channel nodes appear on
-their own, not under a management node.
-
-Other than the above questions, this looks ok to me.
+Do you have a link to that? Seeing it would help to ease my concerns.
 
 Thanks,
 Mark.
-
-> +
-> +Required properties:
-> +- compatible: must contain "qcom,hidma-1.0"
-> +- reg: Addresses for the transfer and event channel
-> +- interrupts: Should contain the event interrupt
-> +- desc-count: Number of asynchronous requests this channel can handle
-> +- channel-index: The HW event channel completions will be delivered.
-> +
-> +Example:
-> +
-> +Hypervisor OS configuration:
-> +
-> +	hidma-mgmt at f9984000 = {
-> +		compatible = "qcom,hidma-mgmt-1.0";
-> +		reg = <0xf9984000 0x15000>;
-> +		dma-channels = <6>;
-> +		max-write-burst-bytes = <1024>;
-> +		max-read-burst-bytes = <1024>;
-> +		max-write-transactions = <31>;
-> +		max-read-transactions = <31>;
-> +		channel-reset-timeout-cycles = <0x500>;
-> +
-> +		hidma_24: dma-controller at 0x5c050000 {
-> +			compatible = "qcom,hidma-1.0";
-> +			reg = <0 0x5c050000 0x0 0x1000>,
-> +			      <0 0x5c0b0000 0x0 0x1000>;
-> +			interrupts = <0 389 0>;
-> +			desc-count = <10>;
-> +			channel-index = <4>;
-> +		};
-> +	};
-> +
-> +Guest OS configuration:
-> +
-> +	hidma_24: dma-controller at 0x5c050000 {
-> +		compatible = "qcom,hidma-1.0";
-> +		reg = <0 0x5c050000 0x0 0x1000>,
-> +		      <0 0x5c0b0000 0x0 0x1000>;
-> +		interrupts = <0 389 0>;
-> +		desc-count = <10>;
-> +		channel-index = <4>;
-> +	};
-> -- 
-> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
-> 
