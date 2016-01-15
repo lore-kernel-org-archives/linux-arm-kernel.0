@@ -1,147 +1,98 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri, 15 Jan 2016 21:49:48 +0800
-Subject: [PATCH v3 1/9] ARM: dts: rockchip: add hdmi/vop device node for rk3036
+Date: Fri, 15 Jan 2016 21:49:50 +0800
+Subject: [PATCH v3 3/9] ASoC: rockchip: i2s: add support for grabbing output
+ clock to codec
 In-Reply-To: <1452865796-23527-1-git-send-email-wxt@rock-chips.com>
 References: <1452865796-23527-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1452865796-23527-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <1452865796-23527-4-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the needed display info for rk3036 SOCs.
+From: Sonny Rao <sonnyrao@chromium.org>
 
-The rk3036 support two overlay plane and one hwc plane,
-it support IOMMU, and its IOMMU same as rk3288's.
-Meanwhile, add the inno hdmi for HDMI display.
+We need to claim the clock which is driving the codec so that when we
+enable clock gating, we continue to clock the codec when needed.
+I make this an optional clock since there might be some applications
+where we don't need it but can still use the I2S block.
 
+Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+
 ---
 
-Changes in v3: None
+Changes in v3:
+- As the perious discuss on https://patchwork.kernel.org/patch/5427131/,
+  I think Mark likes do it in codec driver, I have to say I agree this
+  patch in here since that's the i2s block output. I don't know if the
+  Mark has changed his mind.
+- Add the suspend/resume handle the clock.
 
- arch/arm/boot/dts/rk3036-kylin.dts | 12 +++++++
- arch/arm/boot/dts/rk3036.dtsi      | 66 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 78 insertions(+)
+ sound/soc/rockchip/rockchip_i2s.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3036-kylin.dts b/arch/arm/boot/dts/rk3036-kylin.dts
-index b287625..30a9aca 100644
---- a/arch/arm/boot/dts/rk3036-kylin.dts
-+++ b/arch/arm/boot/dts/rk3036-kylin.dts
-@@ -88,6 +88,10 @@
- 	status = "okay";
- };
+diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+index 58ee645..5889bba 100644
+--- a/sound/soc/rockchip/rockchip_i2s.c
++++ b/sound/soc/rockchip/rockchip_i2s.c
+@@ -28,6 +28,7 @@ struct rk_i2s_dev {
  
-+&hdmi {
-+	status = "okay";
-+};
-+
- &i2c1 {
- 	clock-frequency = <400000>;
+ 	struct clk *hclk;
+ 	struct clk *mclk;
++	struct clk *oclk;
  
-@@ -320,6 +324,14 @@
- 	status = "okay";
- };
+ 	struct snd_dmaengine_dai_dma_data capture_dma_data;
+ 	struct snd_dmaengine_dai_dma_data playback_dma_data;
+@@ -47,6 +48,9 @@ static int i2s_runtime_suspend(struct device *dev)
+ {
+ 	struct rk_i2s_dev *i2s = dev_get_drvdata(dev);
  
-+&vop {
-+	status = "okay";
-+};
++	if (i2s->oclk)
++		clk_disable_unprepare(i2s->oclk);
 +
-+&vop_mmu {
-+	status = "okay";
-+};
-+
- &pinctrl {
- 	pmic {
- 		pmic_int: pmic-int {
-diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
-index ee457a2..0b128be 100644
---- a/arch/arm/boot/dts/rk3036.dtsi
-+++ b/arch/arm/boot/dts/rk3036.dtsi
-@@ -147,6 +147,42 @@
- 		};
- 	};
+ 	clk_disable_unprepare(i2s->mclk);
  
-+	vop: vop at 10118000 {
-+		compatible = "rockchip,rk3036-vop";
-+		reg = <0x10118000 0x19c>;
-+		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru ACLK_LCDC>, <&cru SCLK_LCDC>, <&cru HCLK_LCDC>;
-+		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
-+		resets = <&cru SRST_LCDC1_A>, <&cru SRST_LCDC1_H>, <&cru SRST_LCDC1_D>;
-+		reset-names = "axi", "ahb", "dclk";
-+		iommus = <&vop_mmu>;
-+
-+		status = "disabled";
-+
-+		vop_out: port {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			vop_out_hdmi: endpoint at 0 {
-+				reg = <1>;
-+				remote-endpoint = <&hdmi_in_vop>;
-+			};
-+		};
-+	};
-+
-+	display-subsystem {
-+		compatible = "rockchip,display-subsystem";
-+		ports = <&vop_out>;
-+	};
-+
-+	vop_mmu: iommu at 10118300 {
-+		compatible = "rockchip,iommu";
-+		reg = <0x10118300 0x100>;
-+		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "vop_mmu";
-+		#iommu-cells = <0>;
-+		status = "disabled";
-+	};
-+
- 	gic: interrupt-controller at 10139000 {
- 		compatible = "arm,gic-400";
- 		interrupt-controller;
-@@ -274,6 +310,27 @@
- 		status = "disabled";
- 	};
+ 	return 0;
+@@ -63,6 +67,14 @@ static int i2s_runtime_resume(struct device *dev)
+ 		return ret;
+ 	}
  
-+	hdmi: hdmi at 20034000 {
-+		compatible = "rockchip,rk3036-inno-hdmi";
-+		reg = <0x20034000 0x4000>;
-+		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru  PCLK_HDMI>;
-+		clock-names = "pclk";
-+		rockchip,grf = <&grf>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&hdmi_ctl>;
-+		status = "disabled";
++	if (i2s->oclk) {
++		ret = clk_prepare_enable(i2s->oclk);
++		if (ret) {
++			dev_err(i2s->dev, "oclk enable failed %d\n", ret);
++			return ret;
++		}
++	}
 +
-+		hdmi_in: port {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			hdmi_in_vop: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&vop_out_hdmi>;
-+			};
-+		};
-+	};
-+
- 	timer: timer at 20044000 {
- 		compatible = "rockchip,rk3036-timer", "rockchip,rk3288-timer";
- 		reg = <0x20044000 0x20>;
-@@ -588,6 +645,15 @@
- 			};
- 		};
+ 	return 0;
+ }
  
-+		hdmi {
-+			hdmi_ctl: hdmi-ctl {
-+				rockchip,pins = <1 8  RK_FUNC_1 &pcfg_pull_none>,
-+						<1 9  RK_FUNC_1 &pcfg_pull_none>,
-+						<1 10 RK_FUNC_1 &pcfg_pull_none>,
-+						<1 11 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
+@@ -480,6 +492,15 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
+ 		return PTR_ERR(i2s->mclk);
+ 	}
+ 
++	i2s->oclk = devm_clk_get(&pdev->dev, "i2s_clk_out");
++	if (IS_ERR(i2s->oclk)) {
++		dev_dbg(&pdev->dev, "Didn't find output clock\n");
++		i2s->oclk = NULL;
++	}
 +
- 		uart0 {
- 			uart0_xfer: uart0-xfer {
- 				rockchip,pins = <0 16 RK_FUNC_1 &pcfg_pull_default>,
++	if (i2s->oclk)
++		ret = clk_prepare_enable(i2s->oclk);
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	regs = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(regs))
+@@ -552,6 +573,9 @@ static int rockchip_i2s_remove(struct platform_device *pdev)
+ 	if (!pm_runtime_status_suspended(&pdev->dev))
+ 		i2s_runtime_suspend(&pdev->dev);
+ 
++	if (i2s->oclk)
++		clk_disable_unprepare(i2s->oclk);
++
+ 	clk_disable_unprepare(i2s->mclk);
+ 	clk_disable_unprepare(i2s->hclk);
+ 
 -- 
 1.9.1
