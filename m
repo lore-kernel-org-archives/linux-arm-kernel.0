@@ -1,50 +1,62 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 15 Jan 2016 16:17:49 +0200
-Subject: [4.1.2-rt1 PATCH] include/linux/pid.h: fix build error
-In-Reply-To: <1452867255-1121-1-git-send-email-grygorii.strashko@ti.com>
-References: <1452867255-1121-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <5698FF8D.2030708@ti.com>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Fri, 15 Jan 2016 14:20:59 +0000
+Subject: [PATCH V4 0/7] clk: bcm2835: add clocks and add MASH support
+Message-ID: <1452867667-2447-1-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry- ignore this e-mail pls
+From: Martin Sperl <kernel@martin.sperl.org>
 
-On 01/15/2016 04:14 PM, Grygorii Strashko wrote:
-> From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
->
-> This patch fixes build error:
->    CC      kernel/pid_namespace.o
-> In file included from kernel/pid_namespace.c:11:0:
-> include/linux/pid.h: In function 'get_pid':
-> include/linux/pid.h:78:3: error: implicit declaration of function 'atomic_inc' [-Werror=implicit-function-declaration]
->     atomic_inc(&pid->count);
->     ^
-> which happens when
->   CONFIG_PROVE_LOCKING=n
->   CONFIG_DEBUG_SPINLOCK=n
->   CONFIG_DEBUG_MUTEXES=n
->   CONFIG_DEBUG_LOCK_ALLOC=n
->
-> Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
-> ---
->   include/linux/pid.h | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/include/linux/pid.h b/include/linux/pid.h
-> index 23705a53..2cc64b7 100644
-> --- a/include/linux/pid.h
-> +++ b/include/linux/pid.h
-> @@ -2,6 +2,7 @@
->   #define _LINUX_PID_H
->
->   #include <linux/rcupdate.h>
-> +#include <linux/atomic.h>
->
->   enum pid_type
->   {
->
+The clk-bcm2835 driver right now relies on BCM2835_CLOCK_COUNT defined
+in include/dt-binding/clocks/bcm2835.h
+With every new clock introduced this value needs to increase,
+which is not what should happen for bindings.
 
+So we reorganize the driver so that it is no longer necessary
+to define BCM2835_CLOCK_COUNT.
 
--- 
-regards,
--grygorii
+Also the driver calculates fractional clock dividers correctly,
+but it does not enable the bit to enable support in the register.
+As a minimal extension we now can also define higher order MASH
+support when defining the clocks.
+
+There is also an issue when the clock divider is < 2 - in that
+case no clock-output is generate. The clamping code has been
+enhanced to handle this as well.
+
+Similarly there is also the clamping of the highest divider now
+limited to the highest possible integer divider instead of the
+highest possible fractional diviver.
+
+Finally we add all the 23 different HW clocks that have not been
+configured in the driver.
+
+Changelog:
+	V1 -> V2: split the asoc/sound patches from the clock patches
+	      	  enable frac/mash support
+	V2 -> V3: clamp clock divider to be >= 2
+		  clamp max clock divider to be integer (not fractional)
+		  added additional limit checks for divider selection
+		    allowing fallback to lower mash levels.
+		  use a newer probing mechanism based on a single array
+	V3 -> V4: fixed bad NULL pointer check in init
+	      	  fixed (mash) limit checks
+		  separated basic mash support from limits checks
+		  really tested with I2S device (unfortunately V3 was
+		  not well tested in this respect)
+
+Martin Sperl (7):
+  clk: bcm2835: the minimum clock divider is 2
+  clk: bcm2835: clamp clock divider to highest integer only
+  clk: bcm2835: remove use of BCM2835_CLOCK_COUNT in driver
+  clk: bcm2835: enable management of PCM clock
+  clk: bcm2835: add missing 22 HW-clocks.
+  clk: bcm2835: enable fractional and mash support
+  clk: bcm2835: apply limits on dividers to MASH mode.
+
+ drivers/clk/bcm/clk-bcm2835.c       |  583 ++++++++++++++++++++++++++++++-----
+ include/dt-bindings/clock/bcm2835.h |   25 +-
+ 2 files changed, 521 insertions(+), 87 deletions(-)
+
+--
+1.7.10.4
