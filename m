@@ -1,150 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 15 Jan 2016 09:03:05 +0000
-Subject: [PATCH v6 1/6] arm/arm64: KVM: Introduce armv7 fp/simd vcpu fields
- and helpers
-In-Reply-To: <5698531E.1090606@samsung.com>
-References: <1451166900-3711-1-git-send-email-m.smarduch@samsung.com>
- <1451166900-3711-2-git-send-email-m.smarduch@samsung.com>
- <20160110163204.GD30867@cbox> <56943D29.3000002@samsung.com>
- <20160112141207.GF15554@cbox> <5695A0EB.5020609@samsung.com>
- <56970FE8.4020805@samsung.com> <20160114132718.GA4329@cbox>
- <5698531E.1090606@samsung.com>
-Message-ID: <5698B5C9.4030404@arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 15 Jan 2016 10:03:43 +0100
+Subject: [PATCH v3] i2c: imx: make bus recovery through pinctrl optional
+In-Reply-To: <CADRPPNT=+amxRcea=N7m96=wKgdbRmU8R5cBACvTn7XffKofzQ@mail.gmail.com>
+References: <1452842844-16256-1-git-send-email-leoyang.li@nxp.com>
+ <20160115075356.GI24441@pengutronix.de>
+ <CADRPPNT=+amxRcea=N7m96=wKgdbRmU8R5cBACvTn7XffKofzQ@mail.gmail.com>
+Message-ID: <20160115090343.GK24441@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/01/16 02:02, Mario Smarduch wrote:
+Hello Li,
+
+On Fri, Jan 15, 2016 at 04:46:06PM +0800, Li Yang wrote:
+> On Fri, Jan 15, 2016 at 3:53 PM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> >> -     i2c_imx_init_recovery_info(i2c_imx, pdev);
+> >> +     if (IS_ERR_OR_NULL(i2c_imx->pinctrl))
+> >
+> > I'd prefer to set i2c_imx->pinctrl to NULL if it's not used and then use
+> >
+> >         if (!i2c_imx->pinctrl)
+> >
+> > here. (Or maybe make i2c_imx_init_recovery_info aware of this situation
+> > to keep the caller simple?)
 > 
-> 
-> On 1/14/2016 5:27 AM, Christoffer Dall wrote:
->> On Wed, Jan 13, 2016 at 07:03:04PM -0800, Mario Smarduch wrote:
->>>
->>>
->>> On 1/12/2016 4:57 PM, Mario Smarduch wrote:
->>>>
->>>>
->>>> On 1/12/2016 6:12 AM, Christoffer Dall wrote:
->>>>> On Mon, Jan 11, 2016 at 03:39:21PM -0800, Mario Smarduch wrote:
->>>>>>
->>>>>>
->>>>>> On 1/10/2016 8:32 AM, Christoffer Dall wrote:
->>>>>>> Hi Mario,
->>>>>>>
->>>>>>> I spotted one more potential issue...
->>>>>>>
->>>>>>> On Sat, Dec 26, 2015 at 01:54:55PM -0800, Mario Smarduch wrote:
->>>>>>>> Add helper functions to enable access to fp/smid on guest entry and save host
->>>>>>>> fpexc on vcpu put, check if fp/simd registers are dirty and add new vcpu
->>>>>>>> fields.
->>>>>>>>
->>>>>>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->>>>>>>> ---
->>>>>>>>  arch/arm/include/asm/kvm_emulate.h   | 42 ++++++++++++++++++++++++++++++++++++
->>>>>>>>  arch/arm/include/asm/kvm_host.h      |  6 ++++++
->>>>>>>>  arch/arm64/include/asm/kvm_emulate.h |  8 +++++++
->>>>>>>>  3 files changed, 56 insertions(+)
->>>>>>>>
->>>>>>>> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
->>>>>>>> index 3095df0..d4d9da1 100644
->>>>>>>> --- a/arch/arm/include/asm/kvm_emulate.h
->>>>>>>> +++ b/arch/arm/include/asm/kvm_emulate.h
->>>>>>>> @@ -24,6 +24,8 @@
->>>>>>>>  #include <asm/kvm_mmio.h>
->>>>>>>>  #include <asm/kvm_arm.h>
->>>>>>>>  #include <asm/cputype.h>
->>>>>>>> +#include <asm/vfp.h>
->>>>>>>> +#include "../vfp/vfpinstr.h"
->>>>>>>>  
->>>>>>>>  unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
->>>>>>>>  unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
->>>>>>>> @@ -255,4 +257,44 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
->>>>>>>>  	}
->>>>>>>>  }
->>>>>>>>  
->>>>>>>> +#ifdef CONFIG_VFPv3
->>>>>>>> +/* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
->>>>>>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
->>>>>>>> +{
->>>>>>>> +	u32 fpexc;
->>>>>>>> +
->>>>>>>> +	/* Save host fpexc, and enable guest access to fp unit */
->>>>>>>> +	fpexc = fmrx(FPEXC);
->>>>>>>> +	vcpu->arch.host_fpexc = fpexc;
->>>>>>>> +	fpexc |= FPEXC_EN;
->>>>>>>> +	fmxr(FPEXC, fpexc);
->>>>>>>> +
->>>>>>>> +	/* Configure HCPTR to trap on tracing and fp/simd access */
->>>>>>>> +	vcpu->arch.hcptr = HCPTR_TTA | HCPTR_TCP(10)  | HCPTR_TCP(11);
->>>>>>>> +}
->>>>>>>> +
->>>>>>>> +/* Called from vcpu_put - restore host fpexc */
->>>>>>>> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu)
->>>>>>>> +{
->>>>>>>> +	fmxr(FPEXC, vcpu->arch.host_fpexc);
->>>>>>>> +}
->>>>>>>> +
->>>>>>>> +/* If trap bits are reset then fp/simd registers are dirty */
->>>>>>>> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
->>>>>>>> +{
->>>>>>>> +	return !(vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
->>>>>>>> +}
->>>>>>>> +#else
->>>>>>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
->>>>>>>> +{
->>>>>>>> +	vcpu->arch.hcptr = HCPTR_TTA;
->>>>>>>
->>>>>>> Is it correct not to trap VFP registers when the host kernel does not
->>>>>>> have CONFIG_VFPv3?  I think this is a change in functionality compared
->>>>>>> to the current kernels is it not?
->>>>>>
->>>>>> With CPU_V7 VFPv3 gets selected, without it fp should be emulated,
->>>>>> with exceptions taken in guest kernel. I don't see a reason why
->>>>>> fp hcptr access should be enabled in that case.
->>>>>>
->>>>>
->>>>> If you have to guests with CONFIG_VFPV3 but your host doesn't have
->>>>> CONFIG_VFPV3, you will never context-switch the VFP registers between
->>>>> the two VMs, and mayhem will ensue.
->>>>>
->>>>> Unless I'm missing something very obvious?
->>>
->>> Did more testing on this enabling OABI_COMPAT and selecting
->>> NWFPE/FastFPE breaks the boot. So far can't find a way to boot host
->>> without VFP/VFPv3 enabled on ARMv7. CPU_V7 defaults to VFPv3
->>> selection. I'm wondering if !VFPv3 path should be removed from
->>> the patches?
->>>
->> I think this is related to your particular choice of userspace. 
-> 
-> It appears like there are two soft float implementations.
-> 
-> FastFPE - but that's missing arch/arm/fastfpe directory, the option
-> can still be selected but nothing is built.
-> 
-> And the Netwidner FPE arch/arm/nwfpe, that doesn't appear to be
-> hooked into the kernel. The hook nwfpe_enter is not referenced
-> anywhere.
+> Setting not used pointer to NULL might be a good coding practice
+> generally.  But in this case neither the driver nor gpio framework
+> checks if the pinctrl is NULL before accessing it.  We still need the
+> driver to make sure pinctrl is not used in this situation.  The
+> benefit of the proposed change seems to be pretty limited.  :)
 
-It is:
+At least it gets rid of IS_ERR_OR_NULL which is used wrongly more often
+than not.
 
-arch/arm/nwfpe/entry.S: .globl  nwfpe_enter
-arch/arm/nwfpe/entry.S:nwfpe_enter:
-arch/arm/nwfpe/fpmodule.c:extern void nwfpe_enter(void);
-arch/arm/nwfpe/fpmodule.c:      kern_fp_enter = nwfpe_enter;
+Best regards
+Uwe
 
-> I could make this change but have no way to bring the host up to
-> test it.
-
-None of these are relevant - they are emulation for the FPA (Floating
-Point Accelerator). Most of the time, nobody uses this but instead a
-userspace softfloat implementation, which saves the trap to kernel space
-for emulation.
-
-You can try Debian armel (as opposed to armhf, which mandates VFP) for
-example, which is a softfloat-based distribution.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
