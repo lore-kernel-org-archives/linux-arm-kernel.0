@@ -1,55 +1,135 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 15 Jan 2016 19:18:37 +0000
-Subject: [PATCH 09/19] Revert "arm64: remove dead code"
+Date: Fri, 15 Jan 2016 19:18:38 +0000
+Subject: [PATCH 14/19] arm64: kdump: reserve memory for crash dump kernel
 In-Reply-To: <cover.1452884156.git.geoff@infradead.org>
 References: <cover.1452884156.git.geoff@infradead.org>
-Message-ID: <81d9f2f035e6ae0e1a121f3eddeaef915d761e2d.1452884156.git.geoff@infradead.org>
+Message-ID: <89938a32f3761cbfba0c8773601db2e9e66bd77b.1452884156.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit b08d4640a3dca68670fc5af2fe9205b395a02388.
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Add back the setup_mm_for_reboot() needed for kexec.
+On primary kernel, the memory region used by crash dump kernel must be
+specified by "crashkernel=" boot parameter. reserve_crashkernel()
+will allocate and reserve the region for later use.
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
+User space tools will be able to find the region marked as "Crash kernel"
+in /proc/iomem.
+
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: Mark Salter <msalter@redhat.com>
+Signed-off-by: Pratyush Anand <panand@redhat.com>
 ---
- arch/arm64/include/asm/mmu.h |  1 +
- arch/arm64/mm/mmu.c          | 11 +++++++++++
- 2 files changed, 12 insertions(+)
+ arch/arm64/kernel/setup.c |  7 +++++-
+ arch/arm64/mm/init.c      | 57 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 63 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 990124a..6326d11 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -29,6 +29,7 @@ typedef struct {
- #define ASID(mm)	((mm)->context.id.counter & 0xffff)
- 
- extern void paging_init(void);
-+extern void setup_mm_for_reboot(void);
- extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
- extern void init_mem_pgprot(void);
- extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 873e363..afcf1ee 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -466,6 +466,17 @@ void __init paging_init(void)
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 8119479..293cee2 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -31,7 +31,6 @@
+ #include <linux/screen_info.h>
+ #include <linux/init.h>
+ #include <linux/kexec.h>
+-#include <linux/crash_dump.h>
+ #include <linux/root_dev.h>
+ #include <linux/cpu.h>
+ #include <linux/interrupt.h>
+@@ -221,6 +220,12 @@ static void __init request_standard_resources(void)
+ 		    kernel_data.end <= res->end)
+ 			request_resource(res, &kernel_data);
+ 	}
++
++#ifdef CONFIG_KEXEC_CORE
++	/* User space tools will find "Crash kernel" region in /proc/iomem. */
++	if (crashk_res.end)
++		insert_resource(&iomem_resource, &crashk_res);
++#endif
  }
  
- /*
-+ * Enable the identity mapping to allow the MMU disabling.
-+ */
-+void setup_mm_for_reboot(void)
-+{
-+	cpu_set_reserved_ttbr0();
-+	flush_tlb_all();
-+	cpu_set_idmap_tcr_t0sz();
-+	cpu_switch_mm(idmap_pg_dir, &init_mm);
-+}
-+
+ #ifdef CONFIG_BLK_DEV_INITRD
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 17bf39a..a8eae6b 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -34,6 +34,7 @@
+ #include <linux/dma-contiguous.h>
+ #include <linux/efi.h>
+ #include <linux/swiotlb.h>
++#include <linux/kexec.h>
+ 
+ #include <asm/fixmap.h>
+ #include <asm/memory.h>
+@@ -66,6 +67,58 @@ static int __init early_initrd(char *p)
+ early_param("initrd", early_initrd);
+ #endif
+ 
++#ifdef CONFIG_KEXEC_CORE
 +/*
-  * Check whether a kernel address is valid (derived from arch/x86/).
-  */
- int kern_addr_valid(unsigned long addr)
++ * reserve_crashkernel() - reserves memory for crash kernel
++ *
++ * This function reserves memory area given in "crashkernel=" kernel command
++ * line parameter. The memory reserved is used by dump capture kernel when
++ * primary kernel is crashing.
++ */
++static void __init reserve_crashkernel(void)
++{
++	unsigned long long crash_size = 0, crash_base = 0;
++	int ret;
++
++	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
++				&crash_size, &crash_base);
++	if (ret)
++		return;
++
++	if (crash_base == 0) {
++		crash_base = memblock_find_in_range(0,
++				MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, 1 << 21);
++		if (crash_base == 0) {
++			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
++				crash_size);
++			return;
++		}
++		memblock_reserve(crash_base, crash_size);
++
++	} else {
++		/* User specifies base address explicitly. */
++		if (!memblock_is_region_memory(crash_base, crash_size) ||
++			memblock_is_region_reserved(crash_base, crash_size)) {
++			pr_warn("crashkernel has wrong address or size\n");
++			return;
++		}
++
++		if (crash_base & ((1 << 21) - 1)) {
++			pr_warn("crashkernel base address is not 2MB aligned\n");
++			return;
++		}
++
++		memblock_reserve(crash_base, crash_size);
++	}
++
++	pr_info("Reserving %lldMB of memory@%lldMB for crashkernel\n",
++		crash_size >> 20, crash_base >> 20);
++
++	crashk_res.start = crash_base;
++	crashk_res.end = crash_base + crash_size - 1;
++}
++#endif /* CONFIG_KEXEC_CORE */
++
+ /*
+  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
+  * currently assumes that for memory starting above 4G, 32-bit devices will
+@@ -171,6 +224,10 @@ void __init arm64_memblock_init(void)
+ 		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
+ #endif
+ 
++#ifdef CONFIG_KEXEC_CORE
++	reserve_crashkernel();
++#endif
++
+ 	early_init_fdt_scan_reserved_mem();
+ 
+ 	/* 4GB maximum for 32-bit only capable devices */
 -- 
 2.5.0
