@@ -1,32 +1,131 @@
-From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Fri, 15 Jan 2016 22:04:03 +0800
-Subject: [PATCH v9 00/21] KVM: ARM64: Add guest PMU support
-In-Reply-To: <20160115134523.GH3915@hawk.localdomain>
-References: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
- <20160115134523.GH3915@hawk.localdomain>
-Message-ID: <5698FC53.2090907@linaro.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 15 Jan 2016 15:03:52 +0100
+Subject: [PATCH 2/2] arm64: dts: rockchip: Add basic support for orion-r68
+In-Reply-To: <CABxcv=m+hK3xS8_fYNns-xE5DaLHD0D_Yj8McjM72Y_5V=YmSw@mail.gmail.com>
+References: <1452863192-29231-1-git-send-email-matthias.bgg@gmail.com>
+ <1452863192-29231-2-git-send-email-matthias.bgg@gmail.com>
+ <CABxcv=m+hK3xS8_fYNns-xE5DaLHD0D_Yj8McjM72Y_5V=YmSw@mail.gmail.com>
+Message-ID: <2174023.jkjdoEECkq@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Javier,
+
+Am Freitag, 15. Januar 2016, 10:28:44 schrieb Javier Martinez Canillas:
+> This is not a complete review but I just wanted to comment on two
+> things that I noticed:
+
+same for me for now :-)
 
 
-On 2016/1/15 21:45, Andrew Jones wrote:
-> On Fri, Jan 15, 2016 at 02:27:34PM +0800, Shannon Zhao wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
-> ...
->> This patchset can be fetched from [1] and the relevant QEMU version for
->> test can be fetched from [2].
->>
-> ...
->> [1] https://git.linaro.org/people/shannon.zhao/linux-mainline.git  KVM_ARM64_PMU_v9
->> [2] https://git.linaro.org/people/shannon.zhao/qemu.git  PMU
->
-> I don't see corresponding qemu vcpu ioctl code for patch 21/21 in this
-> branch. Forget to push it?
->
-Sorry, I forget to commit the changes. Will update the branch tomorrow 
-since the codes are on my working computer.
+> On Fri, Jan 15, 2016 at 10:06 AM, Matthias Brugger
+> <matthias.bgg@gmail.com> wrote:
+> 
+> [snip]
+> 
+> > +       };
+> > +
+> > +       vcc_18: vcc18-regulator {
+> > +               compatible = "regulator-fixed";
+> > +               regulator-name = "vcc_18";
+> > +               regulator-min-microvolt = <1800000>;
+> > +               regulator-max-microvolt = <1800000>;
+> > +               regulator-always-on;
+> > +               regulator-boot-on;
+> > +               vin-supply = <&vcc_sys>;
+> > +       };
+> > +
+> > +       /* supplies both host and otg */
+> > +       vcc_host: vcc-host-regulator {
+> > +               compatible = "regulator-fixed";
+> > +               gpio = <&gpio0 4 GPIO_ACTIVE_LOW>;
+> > +               pinctrl-names = "default";
+> > +               pinctrl-0 = <&host_vbus_drv>;
+> > +               regulator-name = "vcc_host";
+> > +               regulator-always-on;
+> > +               regulator-boot-on;
+> > +               vin-supply = <&vcc_sys>;
+> > +       };
+> > +
+> > +       vccio_sd: vcc-io-sd-regulator {
+> > +               regulator-name= "vccio_sd";
+> > +               gpio = <&gpio0 9 GPIO_ACTIVE_LOW>;
+> > +               regulator-min-microvolt = <3300000>;
+> > +               regulator-max-microvolt = <3300000>;
+> > +       };
+> > +
+> > +       vcc_sd: vcc-sd-regulator {
+> > +               compatible = "regulator-fixed";
+> > +               regulator-name = "vcc_sd";
+> > +               gpio = <&gpio3 11 GPIO_ACTIVE_LOW>;
+> > +               regulator-min-microvolt = <3300000>;
+> > +               regulator-max-microvolt = <3300000>;
+> > +               regulator-always-on;
+> > +               regulator-boot-on;
+> > +               vin-supply = <&vcc_io>;
+> > +       };
+> > +
+> > +       vcc_io: vcc-io-regulator {
+> > +               compatible = "regulator-fixed";
+> > +               regulator-name = "vcc_io";
+> > +               regulator-min-microvolt = <3300000>;
+> > +               regulator-max-microvolt = <3300000>;
+> > +               regulator-always-on;
+> > +               regulator-boot-on;
+> > +               vin-supply = <&vcc_sys>;
+> > +       };
+> > +
+> > +       vcc_lan: vcc-lan-regulator {
+> > +               compatible = "regulator-fixed";
+> > +               regulator-name = "vcc_lan";
+> > +               regulator-min-microvolt = <3300000>;
+> > +               regulator-max-microvolt = <3300000>;
+> > +               regulator-always-on;
+> > +               regulator-boot-on;
+> > +               vin-supply = <&vcc_io>;
+> > +       };
+> > +
+> > +       vcc_sys: vcc-sys-regulator {
+> > +               compatible = "regulator-fixed";
+> > +               regulator-name = "vcc_sys";
+> > +               regulator-min-microvolt = <5000000>;
+> > +               regulator-max-microvolt = <5000000>;
+> > +               regulator-always-on;
+> > +               regulator-boot-on;
+> > +       };
+> > +
+> > +       vccio_wl: vccio-wl-regulator {
+> > +               compatible = "regulator-fixed";
+> > +               regulator-name = "vccio_wl";
+> > +               regulator-min-microvolt = <3300000>;
+> > +               regulator-max-microvolt = <3300000>;
+> > +               regulator-always-on;
+> > +               regulator-boot-on;
+> > +               vin-supply = <&vcc_io>;
+> > +       };
+> > +
+> > +       vdd_10: vdd-10-regulator {
+> > +               compatible = "regulator-fixed";
+> > +               regulator-name = "vdd_10";
+> > +               regulator-min-microvolt = <1000000>;
+> > +               regulator-max-microvolt = <1000000>;
+> > +               regulator-always-on;
+> > +               regulator-boot-on;
+> > +               vin-supply = <&vcc_sys>;
+> > +       };
+> > +};
+> 
+> There is only one regulator that is not marked as always-on. This will
+> prevent the regulator subsystem to disable unused regulators. Do you
+> really need all of them to be always-on?
 
-Thanks,
--- 
-Shannon
+I do believe the regulators should be more or less correct. Sadly there are 
+no real schematics for that specific device available, but the reference 
+design for rk3368-based tv-boxes uses a hirarchy of hard-wired individual 
+regulators without any ability to control for most of them [aka always on].
+
+And due to the r68 not sporting any different real pmic, I'd believe the 
+Orion will most likely also follow that scheme.
+
+
+Heiko
