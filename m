@@ -1,56 +1,74 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 15 Jan 2016 10:11:06 -0500 (EST)
-Subject: [PATCH v3 1/1] USB: core: let USB device know device node
-In-Reply-To: <22377526.4ksCBpoDgG@wuerfel>
-Message-ID: <Pine.LNX.4.44L0.1601151006330.1533-100000@iolanthe.rowland.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 15 Jan 2016 10:12:00 -0500
+Subject: [PATCH V12 3/7] dma: add Qualcomm Technologies HIDMA management
+ driver
+In-Reply-To: <20160115145629.GI3262@leverpostej>
+References: <1452523550-8920-1-git-send-email-okaya@codeaurora.org>
+ <1452523550-8920-4-git-send-email-okaya@codeaurora.org>
+ <20160115145629.GI3262@leverpostej>
+Message-ID: <56990C40.4050407@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Jan 2016, Arnd Bergmann wrote:
+Hi Mark,
 
-> On Friday 15 January 2016 17:17:27 Peter Chen wrote:
-> > Although most of USB devices are hot-plug's, there are still some devices
-> > are hard wired on the board, eg, for HSIC and SSIC interface USB devices.
-> > If these kinds of USB devices are multiple functions, and they can supply
-> > other interfaces like i2c, gpios for other devices, we may need to
-> > describe these at device tree.
-> > 
-> > In this commit, it uses "reg" in dts as port number to match the port
-> > number decided by USB core, if they are the same, then the device node
-> > is for the device we are creating for USB core.
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+On 1/15/2016 9:56 AM, Mark Rutland wrote:
+> Hi,
 > 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> [adding KVM people, given this is meant for virtualization]
 > 
+> On Mon, Jan 11, 2016 at 09:45:43AM -0500, Sinan Kaya wrote:
+>> The Qualcomm Technologies HIDMA device has been designed to support
+>> virtualization technology. The driver has been divided into two to follow
+>> the hardware design.
+>>
+>> 1. HIDMA Management driver
+>> 2. HIDMA Channel driver
+>>
+>> Each HIDMA HW consists of multiple channels. These channels share some set
+>> of common parameters. These parameters are initialized by the management
+>> driver during power up. Same management driver is used for monitoring the
+>> execution of the channels. Management driver can change the performance
+>> behavior dynamically such as bandwidth allocation and prioritization.
+>>
+>> The management driver is executed in hypervisor context and is the main
+>> management entity for all channels provided by the device.
 > 
-> Just one last question:
+> You mention repeatedly that this is designed for virtualization, but
+> looking at the series as it stands today I can't see how this operates
+> from the host side.
 > 
-> >  	dev->active_duration = -jiffies;
-> >  #endif
-> > -	if (root_hub)	/* Root hub always ok [and always wired] */
-> > +	if (root_hub) {	/* Root hub always ok [and always wired] */
-> >  		dev->authorized = 1;
-> > -	else {
-> > +		dev->of_node = bus->controller->of_node;
-> 
-> 
-> You are adding the of_node of the controller to the root hub, which I
-> guess means that we now have two 'struct device' instances with the
-> same of_node. They have different bus_types, so I think that is ok,
-> but I wonder if it would be better to leave out the of_node for the
-> root hub to avoid the confusion. Can you think of a case where we
-> actually want to add properties for the root hub that we can't do
-> more easily in the host controller?
+> This doesn't seem to tie into KVM or VFIO, and as far as I can tell
+> there's no mechanism for associating channels with a particular virtual
+> address space (i.e. no configuration of an external or internal IOMMU),
+> nor pinning of guest pages to allow for DMA to occur safely.
 
-There may not be any such cases, but there's still a good reason for
-setting the root hub's of_node pointer: to initialize the recursion
-along the USB device tree.
+I'm using VFIO platform driver for this purpose. VFIO platform driver is 
+capable of assigning any platform device to a guest machine with this driver. 
 
-This leaves the question of whether OF will always use the same node to
-represent the host controller and the root hub.  In other words, if a
-motherboard has a fixed device plugged into a fixed root-hub port, will
-the DT description make that device a child of the host controller?  
-Or will there be a node in between (to represent the root hub)?
+You just unbind the HIDMA channel driver from the hypervisor and bind to vfio
+driver using the very same approach you'd use with PCIe. 
 
-Alan Stern
+Of course, this all assumes the presence of an IOMMU driver on the system. VFIO
+driver uses the IOMMU driver to create the mappings. 
+
+The mechanism used here is not different from VFIO PCI from user perspective.
+
+> 
+> Given that, I'm at a loss as to how this would be used in a hypervisor
+> context. What am I missing?
+> 
+> Are there additional patches, or do you have some userspace that works
+> with this in some limited configuration?
+
+No, these are the only patches. We have one patch for the QEMU but from kernel
+perspective this is it. 
+
+I just rely on the platform VFIO driver to do the work. 
+
+> 
+> Thanks,
+> Mark.
+> 
+
+Sinan
