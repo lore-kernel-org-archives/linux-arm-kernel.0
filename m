@@ -1,44 +1,80 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Fri, 15 Jan 2016 13:48:04 -0800
-Subject: [PATCH v3 3/9] ASoC: rockchip: i2s: add support for grabbing
- output clock to codec
-In-Reply-To: <20160115174623.GZ6588@sirena.org.uk>
-References: <1452865796-23527-1-git-send-email-wxt@rock-chips.com>
- <1452865796-23527-4-git-send-email-wxt@rock-chips.com>
- <20160115174623.GZ6588@sirena.org.uk>
-Message-ID: <CAPz6YkWt-iXS6P4QBBoq3v3i7ZAGGu6=_9AHw4qgevEwDwbdTA@mail.gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Fri, 15 Jan 2016 13:58:53 -0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160115212714.GM3421@worktop>
+References: <5696CF08.8080700@imgtec.com> <20160114121449.GC15828@arm.com>
+ <5697F6D2.60409@imgtec.com>
+ <20160114203430.GC3818@linux.vnet.ibm.com>
+ <56980C91.1010403@imgtec.com>
+ <20160114212913.GF3818@linux.vnet.ibm.com>
+ <20160115085554.GF3421@worktop> <20160115091348.GA27936@worktop>
+ <20160115174612.GV3818@linux.vnet.ibm.com>
+ <20160115212714.GM3421@worktop>
+Message-ID: <20160115215853.GC3818@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 9:46 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, Jan 15, 2016 at 09:49:50PM +0800, Caesar Wang wrote:
->
->> We need to claim the clock which is driving the codec so that when we
->> enable clock gating, we continue to clock the codec when needed.
->> I make this an optional clock since there might be some applications
->> where we don't need it but can still use the I2S block.
->
->> - As the perious discuss on https://patchwork.kernel.org/patch/5427131/,
->>   I think Mark likes do it in codec driver, I have to say I agree this
->>   patch in here since that's the i2s block output. I don't know if the
->>   Mark has changed his mind.
->
-> If the I2S block is providing a clock to the CODEC then that's what the
-> software should do so that the CODEC can gate and ungate the clock as
-> required.  This patch has the I2S block using a clock, not providing
-> one.
+On Fri, Jan 15, 2016 at 10:27:14PM +0100, Peter Zijlstra wrote:
+> On Fri, Jan 15, 2016 at 09:46:12AM -0800, Paul E. McKenney wrote:
+> > On Fri, Jan 15, 2016 at 10:13:48AM +0100, Peter Zijlstra wrote:
+> 
+> > > And the stuff we're confused about is how best to express the difference
+> > > and guarantees of these two forms of transitivity and how exactly they
+> > > interact.
+> > 
+> > Hoping my memory-barrier.txt patch helps here...
+> 
+> Yes, that seems a good start. But yesterday you raised the 'fun' point
+> of two globally ordered sequences connected by a single local link.
 
->From my read of the clock diagram for RK3288  there is a single clock
-signal (labeled "clk_i2s0") that comes out of a fractional divider,
-and it is split such that one path gets sent to the I2S block and the
-second path is sent to a mux after which that signal is sent to an
-external pin that goes to the codec.
+The conclusion that I am slowly coming to is that litmus tests should
+not be thought of as linear chains, but rather as cycles.  If you think
+of it as a cycle, then it doesn't matter where the local link is, just
+how many of them and how they are connected.
 
-There are separate clock gates for the two paths: one for the I2S
-block and one after that mux before the external pin.
+But I will admit that there are some rather strange litmus tests that
+challenge this cycle-centric view, for example, the one shown below.
+It turns out that herd and ppcmem disagree on the outcome.  (The Power
+architects side with ppcmem.)
 
-I'm not sure if it's being modeled that way in the Linux code or not,
-but at least physically I don't think this clock signal actually goes
-through the I2S block before being sent to the codec.
+> And I think I'm still confused on LWSYNC (in the smp_wmb case) when one
+> of the stores looses a conflict, and if that scenario matters. If it
+> does, we should inspect the same case for other barriers.
 
-Does that help clarify?
+Indeed.  I am still working on how these should be described.  My
+current thought is to be quite conservative on what ordering is
+actually respected, however, the current task is formalizing how
+RCU plays with the rest of the memory model.
+
+							Thanx, Paul
+
+------------------------------------------------------------------------
+
+PPC Overlapping Group-B sets version 4
+""
+(* When the Group-B sets from two different barriers involve instructions in
+   the same thread, within that thread one set must contain the other.
+
+	P0	P1	P2
+	Rx=1	Wy=1	Wz=2
+	dep.	lwsync	lwsync
+	Ry=0	Wz=1	Wx=1
+	Rz=1
+
+	assert(!(z=2))
+
+   Forbidden by ppcmem, allowed by herd.
+*)
+{
+0:r1=x; 0:r2=y; 0:r3=z;
+1:r1=x; 1:r2=y; 1:r3=z; 1:r4=1;
+2:r1=x; 2:r2=y; 2:r3=z; 2:r4=1; 2:r5=2;
+}
+ P0		| P1		| P2		;
+ lwz r6,0(r1)	| stw r4,0(r2)	| stw r5,0(r3)	;
+ xor r7,r6,r6	| lwsync	| lwsync	;
+ lwzx r7,r7,r2	| stw r4,0(r3)	| stw r4,0(r1)	;
+ lwz r8,0(r3)	|		|		;
+
+exists
+(z=2 /\ 0:r6=1 /\ 0:r7=0 /\ 0:r8=1)
