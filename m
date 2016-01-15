@@ -1,61 +1,69 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 15 Jan 2016 17:08:46 +0000
-Subject: [Xen-devel] [PATCH v2 03/16] Xen: xlate: Use page_to_xen_pfn
- instead of page_to_pfn
-In-Reply-To: <1452840929-19612-4-git-send-email-zhaoshenglong@huawei.com>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-4-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <alpine.DEB.2.02.1601151558010.16178@kaball.uk.xensource.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 15 Jan 2016 12:16:55 -0500
+Subject: [PATCH V12 3/7] dma: add Qualcomm Technologies HIDMA management
+ driver
+In-Reply-To: <20160115152257.GK3262@leverpostej>
+References: <1452523550-8920-1-git-send-email-okaya@codeaurora.org>
+ <1452523550-8920-4-git-send-email-okaya@codeaurora.org>
+ <20160115145629.GI3262@leverpostej> <56990C40.4050407@codeaurora.org>
+ <20160115152257.GK3262@leverpostej>
+Message-ID: <56992987.5080603@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Jan 2016, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>> This doesn't seem to tie into KVM or VFIO, and as far as I can tell
+>>> there's no mechanism for associating channels with a particular virtual
+>>> address space (i.e. no configuration of an external or internal IOMMU),
+>>> nor pinning of guest pages to allow for DMA to occur safely.
+>>
+>> I'm using VFIO platform driver for this purpose. VFIO platform driver is 
+>> capable of assigning any platform device to a guest machine with this driver. 
 > 
-> Use page_to_xen_pfn in case of 64KB page.
+> Typically VFIO-platform also comes with a corresponding reset driver.
+> You don't need one?
+
+The HIDMA channel driver resets the channel before using it. That's why, I never
+bothered with writing a reset driver on the hypervisor.
+
 > 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  drivers/xen/xlate_mmu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>> You just unbind the HIDMA channel driver from the hypervisor and bind to vfio
+>> driver using the very same approach you'd use with PCIe. 
+>>
+>> Of course, this all assumes the presence of an IOMMU driver on the system. VFIO
+>> driver uses the IOMMU driver to create the mappings. 
 > 
-> diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
-> index 9692656..b9fcc2c 100644
-> --- a/drivers/xen/xlate_mmu.c
-> +++ b/drivers/xen/xlate_mmu.c
-> @@ -227,7 +227,7 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
->  		return rc;
->  	}
->  	for (i = 0; i < nr_grant_frames; i++)
-> -		pfns[i] = page_to_pfn(pages[i]);
-> +		pfns[i] = page_to_xen_pfn(pages[i]);
+> No IOMMU was described in the DT binding. It sounds like you'd need an
+> optional (not present in the guest) iommus property per-channel
 
-Shannon, thanks for the patch.
+You are right. I missed that part. I'll update the device-tree binding documentation.
 
-Keeping in mind that in the 64K case, kernel pages are 64K but xen pages
-are still 4K, I think you also need to allocate
-(nr_grant_frames/XEN_PFN_PER_PAGE) kernel pages (assuming that they are
-allocated contiguously): nr_grant_frames refers to 4K pages, while
-xen_xlate_map_ballooned_pages is allocating pages on a 64K granularity
-(sizeof(pages[0]) == 64K).
-
-Be careful that alloc_xenballooned_pages deals with 64K pages (because
-it deals with kernel pages), while xen_pfn_t is always 4K based (because
-it deals with Xen pfns).
-
-Please test it with and without CONFIG_ARM64_64K_PAGES. Thanks!
-
-
-
->  	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
->  	if (!vaddr) {
-> -- 
-> 2.0.4
 > 
+>> The mechanism used here is not different from VFIO PCI from user perspective.
+>>
+>>>
+>>> Given that, I'm at a loss as to how this would be used in a hypervisor
+>>> context. What am I missing?
+>>>
+>>> Are there additional patches, or do you have some userspace that works
+>>> with this in some limited configuration?
+>>
+>> No, these are the only patches. We have one patch for the QEMU but from kernel
+>> perspective this is it. 
 > 
+> Do you have a link to that? Seeing it would help to ease my concerns.
+
+The QEMU driver has not been posted yet. As far as I know, it just discovers the memory
+resources on the platform object and creates mappings for the guest machine only. 
+
+Shanker Donthineni and Vikram Sethi will post the QEMU patch later.
+
 > 
-> _______________________________________________
-> Xen-devel mailing list
-> Xen-devel at lists.xen.org
-> http://lists.xen.org/xen-devel
+> Thanks,
+> Mark.
 > 
+
+
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
