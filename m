@@ -1,45 +1,39 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 15 Jan 2016 10:13:48 +0100
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160115085554.GF3421@worktop>
-References: <20160112114111.GB15737@arm.com> <569565DA.2010903@imgtec.com>
- <20160113104516.GE25458@arm.com> <5696CF08.8080700@imgtec.com>
- <20160114121449.GC15828@arm.com> <5697F6D2.60409@imgtec.com>
- <20160114203430.GC3818@linux.vnet.ibm.com>
- <56980C91.1010403@imgtec.com>
- <20160114212913.GF3818@linux.vnet.ibm.com>
- <20160115085554.GF3421@worktop>
-Message-ID: <20160115091348.GA27936@worktop>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 Jan 2016 09:14:21 +0000
+Subject: [PATCH] mmc: host: omap_hsmmc: add a verbose print to enable
+ CONFIG_REGULATOR_PBIAS
+In-Reply-To: <20160114224025.GA26988@earth>
+References: <1452762920-2588-1-git-send-email-kishon@ti.com>
+ <20160114120706.GA12774@earth>
+ <20160114172549.GC5783@n2100.arm.linux.org.uk>
+ <20160114224025.GA26988@earth>
+Message-ID: <20160115091421.GD5783@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 09:55:54AM +0100, Peter Zijlstra wrote:
-> On Thu, Jan 14, 2016 at 01:29:13PM -0800, Paul E. McKenney wrote:
-> > So smp_mb() provides transitivity, as do pairs of smp_store_release()
-> > and smp_read_acquire(), 
+On Thu, Jan 14, 2016 at 11:40:25PM +0100, Sebastian Reichel wrote:
+> On Thu, Jan 14, 2016 at 05:25:49PM +0000, Russell King - ARM Linux wrote:
+> > There are very good reasons not to do this: that will result in
+> > configurations where MMC_OMAP_HS was set but without REGULATOR_PBIAS
+> > ending up with MMC_OMAP_HS being disabled.  That doesn't help the
+> > root problem, which is "why has the kernel boot regressed for my
+> > previous working configuration?"
+> > 
+> > The solution proposed here adds a message to the boot which points
+> > out fair and square what needs to be done to rectify the boot
+> > failure.  Adding a dependency just brings up the question "where
+> > has my MMC driver gone?"
 > 
-> But they provide different grades of transitivity, which is where all
-> the confusion lays.
-> 
-> smp_mb() is strongly/globally transitive, all CPUs will agree on the order.
-> 
-> Whereas the RCpc release+acquire is weakly so, only the two cpus
-> involved in the handover will agree on the order.
+> The best thing would be to have no regression. Just printing a
+> message means I have to build another kernel. But more importantly
+> the message may not be visible by the user - e.g. if the display has
+> not yet been initialized.
 
-And the stuff we're confused about is how best to express the difference
-and guarantees of these two forms of transitivity and how exactly they
-interact.
+I agree in principle, but that's not possible here (see Tony's mails
+on why the PBIAS stuff needs to be optional.)  I'd agree with changing
+the Kconfig if PBIAS were a hard and fast requirement, but it isn't.
 
-And smp_load_acquire()/smp_store_release() are RCpc because TSO archs
-and PPC. the atomic*_{acquire,release}() are RCpc because PPC and
-LOCK,UNLOCK are similarly RCpc because of PPC.
-
-Now we'd like PPC to stick a SYNC in either LOCK or UNLOCK so at least
-the locks are RCsc again, but they resist for performance reasons but
-waver because they don't want to be the ones finding all the nasty bugs
-because they're the only one.
-
-Now the thing I worry about, and still have not had an answer to is if
-weakly ordered MIPS will end up being RCsc or RCpc for their locks if
-they get implemented with SYNC_ACQUIRE and SYNC_RELEASE instead of the
-current SYNC.
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
