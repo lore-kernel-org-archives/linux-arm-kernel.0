@@ -1,49 +1,36 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 15 Jan 2016 11:23:07 +0000
-Subject: [PATCH v3 07/21] arm64: move kernel image to base of vmalloc area
-In-Reply-To: <CAKv+Gu-mPcXBTpENRaM5qo0nV_z93ZKw=5o5xVLNMU7QfiRCHQ@mail.gmail.com>
-References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
- <1452518355-4606-8-git-send-email-ard.biesheuvel@linaro.org>
- <20160112181336.GF4858@leverpostej>
- <CAKv+Gu-TS7w=AVBceGhsQkQzVCv+u7Gh6ojftwW1iaE+d0yrYw@mail.gmail.com>
- <20160113135109.GJ23370@leverpostej>
- <20160114185701.GA28181@leverpostej>
- <CAKv+Gu-mPcXBTpENRaM5qo0nV_z93ZKw=5o5xVLNMU7QfiRCHQ@mail.gmail.com>
-Message-ID: <20160115112306.GC3262@leverpostej>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 15 Jan 2016 12:24:16 +0100
+Subject: [PATCH] spi: fix counting in spi-loopback-test code
+In-Reply-To: <7416604.jejCLcpcOT@wuerfel>
+References: <7416604.jejCLcpcOT@wuerfel>
+Message-ID: <CAMuHMdUT500KRLsnxf_PzfU3sSxVACES-NZxENRcX+x_NxPeaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 10:54:26AM +0100, Ard Biesheuvel wrote:
-> On 14 January 2016 at 19:57, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Wed, Jan 13, 2016 at 01:51:10PM +0000, Mark Rutland wrote:
-> >> On Wed, Jan 13, 2016 at 09:39:41AM +0100, Ard Biesheuvel wrote:
-> >> > If I remove the rounding, I get false positive kasan errors which I
-> >> > have not quite diagnosed yet, but are probably due to the fact that
-> >> > the rounding performed by vmemmap_populate() goes in the wrong
-> >> > direction.
-> >
-> > As far as I can see, it implicitly rounds the base down and end up to
-> > SWAPPER_BLOCK_SIZE granularity.
-> >
-> > I can see that it might map too much memory, but I can't see why that
-> > should trigger KASAN failures. Regardless of what was mapped KASAN
-> > should stick to the region it cares about, and everything else should
-> > stay out of that.
-> >
-> > When do you see the failures, and are they in any way consistent?
-> >
-> > Do you have an example to hand?
-> >
-> 
-> For some reason, this issue has evaporated, i.e., I can no longer
-> reproduce it on my WIP v4 branch.
-> So I will remove the rounding.
+On Wed, Jan 13, 2016 at 9:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> These variables are always used uninitialized:
+>
+> drivers/spi/spi-loopback-test.c: In function 'spi_test_run_iter':
+> drivers/spi/spi-loopback-test.c:768:17: warning: 'rx_count' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> drivers/spi/spi-loopback-test.c:762:17: warning: 'tx_count' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>
+> Adding an explicit initialization seems to be the only
+> workable solution here, to make the code behave correctly
+> and build without warning.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 84e0c4e5e2c4 ("spi: add loopback test driver to allow for spi_master regression tests")
 
-Ok.
+Just noticed the same, so
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-I'll let you know if I stumble across anything that looks like a
-potential cause of the KASAN failures, and I'll try to give v4 a go at
-some point soon.
+Gr{oetje,eeting}s,
 
-Thanks,
-Mark.
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
