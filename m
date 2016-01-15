@@ -1,63 +1,56 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 14 Jan 2016 20:38:09 -0600
-Subject: [PATCH 14/14] ARM: dts: imx6: make audmux optional for i.MX6UL
- sound driver
-In-Reply-To: <1452619291-13625-15-git-send-email-LW@KARO-electronics.de>
-References: <1452619291-13625-6-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-7-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-8-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-9-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-10-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-11-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-12-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-13-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-14-git-send-email-LW@KARO-electronics.de>
- <1452619291-13625-15-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20160115023809.GA3284@rob-hp-laptop>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 15 Jan 2016 11:37:53 +0900
+Subject: [PATCH v3 00/14] r8a7793, gose: Add audio support to device tree
+Message-ID: <1452825487-15931-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 06:21:31PM +0100, Lothar Wa?mann wrote:
-> i.MX6UL does not have the audio multiplexer (AUDMUX) like the other
-> i.MX6 SoCs, but apart from that can use the same audio driver. Make
-> audmux optional for the imx-sgtl5000 driver, so it can be used on
-> i.MX6UL too. Furthermore i.MX6UL requires use of the SAI interface
-> rather than SSI. Change the DTS documentation accordingly.
-> 
-> The patch with the corresponding changes to the imx-sgtl5000 driver
-> will be sent separately.
-> 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> ---
->  .../bindings/sound/imx-audio-sgtl5000.txt          | 26 +++++++++++++++++++++-
->  1 file changed, 25 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/sound/imx-audio-sgtl5000.txt b/Documentation/devicetree/bindings/sound/imx-audio-sgtl5000.txt
-> index 2f89db8..fd46671 100644
-> --- a/Documentation/devicetree/bindings/sound/imx-audio-sgtl5000.txt
-> +++ b/Documentation/devicetree/bindings/sound/imx-audio-sgtl5000.txt
-> @@ -6,7 +6,7 @@ Required properties:
->  
->    - model		: The user-visible name of this sound complex
->  
-> -  - ssi-controller	: The phandle of the i.MX SSI controller
-> +  - ssi-controller	: The phandle of the i.MX SSI (or SAI) controller
->  
->    - audio-codec		: The phandle of the SGTL5000 audio codec
->  
-> @@ -39,6 +39,16 @@ Required properties:
->  Note: The AUDMUX port numbering should start at 1, which is consistent with
->  hardware manual.
->  
-> +Optional properties:
-> +  - fsl,no-audmux	: boolean
-> +    			  Required for i.MX6UL (and maybe other SoCs)
-> +    			  which don't have an AUDMUX, but still
-> +			  feature the same audio subsystem otherwise.
+Hi,
 
-It would have been better if this was a phandle to the audmux and lack 
-of the property meant no audmux. Too late for that I guess.
+this series adds support to r8a7793 and gose device trees for
+rcar sound: first in PIO mode then using DMA
 
-Acked-by: Rob Herring <robh@kernel.org>
+I have been unable to test if audio works (in PIO mode) as I
+do not have physical access to a gose board. I would appreciate
+some assistance there.
 
-Rob
+This work is based heavily on the work of others for the r8a7791 and
+koelsch as noted in the changelogs of individual patches.
+
+This series is based on renesas-devel-20160111-v4.4 and
+has no other dependencies that I am aware of.
+
+Changes between v2 and v3
+* Minor changelog tweaks
+
+Changes since v1 and v2:
+* Dropped RFC designation
+* Dropped i2c patches: they have been posted and partially merged separately
+* Dropped MIX/CTU support pending more work on that feature
+* Enable Audio DMAC peri peri via sound driver
+* Other changes noted in per-patch changelogs
+
+
+Simon Horman (14):
+  ARM: shmobile: r8a7793: add MSTP10 clocks to device tree
+  ARM: shmobile: r8a7793: add audio clock to device tree
+  ARM: shmobile: r8a7793: add m2 clock to device tree
+  ARM: shmobile: r8a7793: add R-Car sound support to device tree
+  ARM: shmobile: r8a7793: add DVC support to device tree
+  ARM: shmobile: r8a7793: add audio DMAC clocks to device tree
+  ARM: shmobile: r8a7793: add audio DMAC to device tree
+  ARM: shmobile: r8a7793: enable Audio DMAC peri peri via sound driver
+  ARM: shmobile: gose: Enable sound PIO support in device tree
+  ARM: shmobile: gose: enable sound DMA support in device tree
+  ARM: shmobile: gose: enable sound DMA support via BUSIF in device tree
+  ARM: shmobile: gose: enable sound DMA support via SRC in device tree
+  ARM: shmobile: gose: enable sound DMA support via DVC in device tree
+  ARM: shmobile: r8a7793: enable audio DMAC in device tree
+
+ arch/arm/boot/dts/r8a7793-gose.dts        |  88 +++++++++
+ arch/arm/boot/dts/r8a7793.dtsi            | 289 +++++++++++++++++++++++++++++-
+ include/dt-bindings/clock/r8a7793-clock.h |   2 +
+ 3 files changed, 376 insertions(+), 3 deletions(-)
+
+-- 
+2.1.4
