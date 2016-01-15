@@ -1,54 +1,50 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 15 Jan 2016 14:01:47 -0800
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160115212912.GN3421@worktop>
-References: <20160113104516.GE25458@arm.com> <5696CF08.8080700@imgtec.com>
- <20160114121449.GC15828@arm.com> <5697F6D2.60409@imgtec.com>
- <20160114203430.GC3818@linux.vnet.ibm.com>
- <56980C91.1010403@imgtec.com>
- <20160114212913.GF3818@linux.vnet.ibm.com>
- <20160115085554.GF3421@worktop>
- <20160115173912.GU3818@linux.vnet.ibm.com>
- <20160115212912.GN3421@worktop>
-Message-ID: <20160115220147.GD3818@linux.vnet.ibm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 15 Jan 2016 23:08:41 +0100
+Subject: [PATCH RFC 08/27] PM / Domains: Support IRQ safe PM domains
+In-Reply-To: <20160115165758.GC1651@linaro.org>
+References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
+ <1447799871-56374-9-git-send-email-lina.iyer@linaro.org>
+ <CAPDyKFoKpgURMYoepWH0TNK1=bFp4uyQCHUSnPiXmLxC7BNyRA@mail.gmail.com>
+ <20160114183316.GB1651@linaro.org>
+ <CAPDyKFpj0Gv=5hVwZWjmgmumHPriuYk+LLVBwjEeW9Jfj8p5Kw@mail.gmail.com>
+ <20160115165758.GC1651@linaro.org>
+Message-ID: <CAPDyKFo4qe8THwJQd1aNQwpbjV1phOGKz_gEuP-wRD6Dgtx0pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 10:29:12PM +0100, Peter Zijlstra wrote:
-> On Fri, Jan 15, 2016 at 09:39:12AM -0800, Paul E. McKenney wrote:
-> > Should we start putting litmus tests for the various examples
-> > somewhere, perhaps in a litmus-tests directory within each participating
-> > architecture?  I have a pile of powerpc-related litmus tests on my laptop,
-> > but they probably aren't doing all that much good there.
-> 
-> Yeah, or a version of them in C that we can 'compile'?
+[...]
 
-That would be good as well.  I am guessing that architecture-specific
-litmus tests will also be needed, but you are right that
-architecture-independent versions are higher priority.
+>> I think case 2 and case 3 should be okay to support, but I am really
+>> questioning case 1.
+>>
+> With you other patch, it does make sense to have 2 and 3 instead of 1
+> and 2.
 
-> > commit 2cb4e83a1b5c89c8e39b8a64bd89269d05913e41
-> > Author: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> > Date:   Fri Jan 15 09:30:42 2016 -0800
-> > 
-> >     documentation: Distinguish between local and global transitivity
-> >     
-> >     The introduction of smp_load_acquire() and smp_store_release() had
-> >     the side effect of introducing a weaker notion of transitivity:
-> >     The transitivity of full smp_mb() barriers is global, but that
-> >     of smp_store_release()/smp_load_acquire() chains is local.  This
-> >     commit therefore introduces the notion of local transitivity and
-> >     gives an example.
-> >     
-> >     Reported-by: Peter Zijlstra <peterz@infradead.org>
-> >     Reported-by: Will Deacon <will.deacon@arm.com>
-> >     Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> 
-> I think it fails to mention smp_mb__after_release_acquire(), although I
-> suspect we didn't actually introduce the primitive yet, which raises the
-> point, do we want to?
+Okay!
 
-Well, it is not in v4.4.  I believe that we need good use cases before
-we add it.
+> My only concern is as I view the SoC as a whole, there would be cases
+> where the parent domain could only be non-IRQ safe (turning off a big
+> regulator may require some sleep) and the subdomains are quicker and
+> faster IRQ-safe domains. Putting up this restriction, chops up the
 
-							Thanx, Paul
+Just because they are "quick" (don't sleep) doesn't mean they have to
+set the IRQ safe flag for the domain.
+
+Let's compare how pm_runtime_irq_safe() is used for devices in
+drivers. Lots of corresponding runtime PM callbacks don't sleep, but
+that don't mean that the driver calls pm_runtime_irq_safe().
+
+Drivers that are expecting to invoke pm_runtime_get_sync() (or other
+synchronous runtime PM API) from atomic context, requires the
+corresponding runtime PM callbacks to be IRQ safe. Only under these
+circumstances the pm_runtime_irq_safe() is used.
+
+> domain hierarchy. Imagine, if you could represent the whole power domain
+> organization in DT, but because of this restriction, we may not be able
+> to do that.
+
+You do have a point. Considering my comment above, do you still think
+this may become an issue?
+
+Kind regards
+Uffe
