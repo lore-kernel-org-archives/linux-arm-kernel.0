@@ -1,70 +1,53 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 15 Jan 2016 14:55:22 +0800
-Subject: [PATCH v2 09/16] arm/xen: Get event-channel irq through HVM_PARAM
- when booting with ACPI
+Date: Fri, 15 Jan 2016 14:55:24 +0800
+Subject: [PATCH v2 11/16] ARM64: ACPI: Check if it runs on Xen to enable or
+ disable ACPI
 In-Reply-To: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1452840929-19612-10-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1452840929-19612-12-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-When booting with ACPI, it could get the event-channel irq through
-HVM_PARAM_CALLBACK_IRQ.
+When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
+a /hypervisor node in DT. So check if it needs to enable ACPI.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm/xen/enlighten.c | 30 +++++++++++++++++++++++++++++-
- 1 file changed, 29 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/acpi.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 6d90a62..4e78c49 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -29,6 +29,7 @@
- #include <linux/time64.h>
- #include <linux/timekeeping.h>
- #include <linux/timekeeper_internal.h>
-+#include <linux/acpi.h>
- 
- #include <linux/mm.h>
- 
-@@ -270,7 +271,34 @@ static int __init xen_guest_init(void)
- 	if (!xen_domain())
- 		return 0;
- 
--	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
-+	if (!acpi_disabled) {
-+#ifdef CONFIG_ACPI
-+		struct xen_hvm_param a;
-+		int interrupt, trigger, polarity;
-+
-+		a.domid = DOMID_SELF;
-+		a.index = HVM_PARAM_CALLBACK_IRQ;
-+		xen_events_irq = 0;
-+		if (!HYPERVISOR_hvm_op(HVMOP_get_param, &a)) {
-+			if ((a.value >> 56) == 3) {
-+				interrupt = a.value & 0xff;
-+				trigger = ((a.value >> 8) & 0x1)
-+					  ? ACPI_EDGE_SENSITIVE
-+					  : ACPI_LEVEL_SENSITIVE;
-+				polarity = ((a.value >> 8) & 0x2)
-+					  ? ACPI_ACTIVE_LOW
-+					  : ACPI_ACTIVE_HIGH;
-+				xen_events_irq = acpi_register_gsi(NULL,
-+								   interrupt,
-+								   trigger,
-+								   polarity);
-+			}
-+		}
-+#endif
-+	} else {
-+		xen_events_irq = irq_of_parse_and_map(xen_node, 0);
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index d1ce8e2..4e92be0 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
+ {
+ 	/*
+ 	 * Return 1 as soon as we encounter a node at depth 1 that is
+-	 * not the /chosen node.
++	 * not the /chosen node, or /hypervisor node when running on Xen.
+ 	 */
+-	if (depth == 1 && (strcmp(uname, "chosen") != 0))
+-		return 1;
++	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
++		if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
++			return 1;
 +	}
 +
- 	if (!xen_events_irq) {
- 		pr_err("Xen event channel interrupt not found\n");
- 		return -ENODEV;
+ 	return 0;
+ }
+ 
+@@ -184,7 +187,8 @@ void __init acpi_boot_table_init(void)
+ 	/*
+ 	 * Enable ACPI instead of device tree unless
+ 	 * - ACPI has been disabled explicitly (acpi=off), or
+-	 * - the device tree is not empty (it has more than just a /chosen node)
++	 * - the device tree is not empty (it has more than just a /chosen node,
++	 *   and a /hypervisor node when running on Xen)
+ 	 *   and ACPI has not been force enabled (acpi=force)
+ 	 */
+ 	if (param_acpi_off ||
 -- 
 2.0.4
