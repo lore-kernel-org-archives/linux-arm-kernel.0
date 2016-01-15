@@ -1,66 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Jan 2016 23:23:34 +0000
-Subject: [PATCH] staging: ion: make the pte default none PTE_RDONLY
-In-Reply-To: <56997ACE.80604@redhat.com>
-References: <1452825753-36364-1-git-send-email-puck.chen@hisilicon.com>
- <56997ACE.80604@redhat.com>
-Message-ID: <20160115232334.GD19062@n2100.arm.linux.org.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sat, 16 Jan 2016 01:26:37 +0200
+Subject: [PATCH v2 3/3] iommu/io-pgtable: Avoid redundant TLB syncs
+In-Reply-To: <20160112182754.GC22186@arm.com>
+References: <cover.1450383740.git.robin.murphy@arm.com>
+ <eb7458ed51b800f035976e879530ab1e90d02858.1450383740.git.robin.murphy@arm.com>
+ <20160112182754.GC22186@arm.com>
+Message-ID: <1525049.idULaytocz@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 03:03:42PM -0800, Laura Abbott wrote:
-> (adding linux-arm and a few people)
-> 
-> On 01/14/2016 06:42 PM, Chen Feng wrote:
-> >The page is already alloc at ion_alloc function,
-> >ion_mmap map the alloced pages to user-space.
-> >
-> >The default prot can be PTE_RDONLY. Take a look at
-> >here:
-> >set_pte_at()
-> >arch/arm64/include/asm:
-> >		if (pte_dirty(pte) && pte_write(pte))
-> >			pte_val(pte) &= ~PTE_RDONLY;
-> >		else
-> >			pte_val(pte) |= PTE_RDONLY;
-> >
-> >So with the dirty bit,it can improve the efficiency
-> >and donnot need to handle memory fault when use access.
-> >
-> >Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
-> >Signed-off-by: Wei Dong <weidong2@hisilicon.com>
-> >Reviewed-by: Zhuangluan Su <suzhuangluan@hisilicon.com>
-> >---
-> >  drivers/staging/android/ion/ion.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> >
-> >diff --git a/drivers/staging/android/ion/ion.c b/drivers/staging/android/ion/ion.c
-> >index e237e9f..dba5942 100644
-> >--- a/drivers/staging/android/ion/ion.c
-> >+++ b/drivers/staging/android/ion/ion.c
-> >@@ -1026,6 +1026,9 @@ static int ion_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma)
-> >  	if (!(buffer->flags & ION_FLAG_CACHED))
-> >  		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-> >
-> >+	/*Default writeable*/
-> >+	vma->vm_page_prot = pte_mkdirty(vma->vm_page_prot);
-> >+
-> >  	mutex_lock(&buffer->lock);
-> >  	/* now map it to userspace */
-> >  	ret = buffer->heap->ops->map_user(buffer->heap, buffer, vma);
-> >
-> 
-> The extra fault is unfortunate but I'm skeptical about just setting
-> pte_mkdirty.
-> 
-> Catalin/Will, do you have any thoughts? Right now it seems like any
-> range mapped with remap_pfn_range will have this extra fault
-> behavior. Is marking the range dirty the best solution?
+Hi Robin,
 
-What happens if the mapping requested was read only - at the very
-least, I don't think this should be done unconditionally.
+Thank you for the patch.
+
+On Tuesday 12 January 2016 18:27:55 Will Deacon wrote:
+> On Thu, Dec 17, 2015 at 08:50:59PM +0000, Robin Murphy wrote:
+> > In certain unmapping situations it is quite possible to end up issuing
+> > back-to-back TLB synchronisations, which at best is a waste of time and
+> > effort, and at worst causes some hardware to get rather confused. Whilst
+> > the pagetable implementations, or the IOMMU drivers, or both, could keep
+> > track of things to avoid this happening, it seems to make the most sense
+> > to prevent code duplication and add some simple state tracking in the
+> > common interface between the two.
+> > 
+> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> > ---
+> > 
+> >  drivers/iommu/io-pgtable.h | 9 ++++++++-
+> >  1 file changed, 8 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+> > index 95c5565..d06219b 100644
+> > --- a/drivers/iommu/io-pgtable.h
+> > +++ b/drivers/iommu/io-pgtable.h
+> > @@ -132,12 +132,14 @@ void free_io_pgtable_ops(struct io_pgtable_ops
+> > *ops);
+> > 
+> >   * @fmt:    The page table format.
+> >   * @cookie: An opaque token provided by the IOMMU driver and passed back
+> >   to
+> >   *          any callback routines.
+> > 
+> > + * @sync_flag: Private flag for optimising out redundant syncs.
+> 
+> It makes sense to factor this out like you're proposing, but maybe we
+> can think of a better name? How about "tlb_sync_pending", to follow
+> "tlb_flush_pending" in the core code?
+
+With tlb_sync_pending,
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+
+Laurent Pinchart
