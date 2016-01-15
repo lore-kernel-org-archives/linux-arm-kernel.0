@@ -1,48 +1,67 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Fri, 15 Jan 2016 20:03:39 +0200
-Subject: mvsdio not working on OpenRD
-In-Reply-To: <20160110153843.GA22229@lunn.ch>
-References: <20160110042619.GA22738@jirafa.cyrius.com>
- <20160110153843.GA22229@lunn.ch>
-Message-ID: <20160115180339.GC18908@darkstar.musicnaut.iki.fi>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 15 Jan 2016 18:08:51 +0000
+Subject: [PATCH V12 3/7] dma: add Qualcomm Technologies HIDMA management
+ driver
+In-Reply-To: <56992FE8.4000606@codeaurora.org>
+References: <1452523550-8920-1-git-send-email-okaya@codeaurora.org>
+ <1452523550-8920-4-git-send-email-okaya@codeaurora.org>
+ <20160115145629.GI3262@leverpostej> <56990CD4.6020405@arm.com>
+ <569912F3.9040507@codeaurora.org> <56992C4E.6010606@arm.com>
+ <56992FE8.4000606@codeaurora.org>
+Message-ID: <569935B3.4090004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 15/01/16 17:44, Sinan Kaya wrote:
+>>>
 
-On Sun, Jan 10, 2016 at 04:38:43PM +0100, Andrew Lunn wrote:
-> If i remember correctly, the OpenRD has some odd muxing going on with
-> MMC and the second serial port. This fits the error message:
+[...]
+
+>> You may want to drop the "hypervisor" designation, BTW, because this has
+>> no real connection to virtualisation.
+>>
 > 
->                         pmx_uart1: pmx-uart1 {
->                                 marvell,pins = "mpp13", "mpp14";
->                                 marvell,function = "uart1";
->                         };
+> Would you use host/guest relationship?
+
+Not even that. This is a host/user relationship, as VFIO is in no way
+virtualisation specific. It just gives you a way to make a device
+accessible to userspace. KVM is just a specialised instance of a more
+generic problem.
+
 > 
-> and
+>>>
+>>> Once the guest machine is shutdown, VFIO driver still owns the channel device. It can
+>>> assign the device to another guest machine.
+>>>
+>>>> - Does the HYP side requires any context switch (and how is that done)?
+>>> No communication is needed.
+>>>
+>>>> - What makes it safe?
+>>> No communication is needed.
+>>>
+>>>>
+>>>> Without any of this information (and pointer to the code to back it up),
+>>>> I'm very reluctant to take any of this.
+>>>
+>>> Please let me know what exactly is not clear. 
+>>>
+>>> You don't write a virtualization driver for 8139too driver. The driver works whether it is running in the 
+>>> guest machine or the hypervisor. 
+>>
+>> Exactly. No hypervisor code needed whatsoever. So please get rid of this
+>> hypervisor nonsense! ;-)
+>>
 > 
->                         pmx_sdio: pmx-sdio {
->                                 marvell,pins = "mpp12", "mpp13", "mpp14",
->                                                "mpp15", "mpp16", "mpp17";
->                                 marvell,function = "sdio";
-> 			};
-> 
-> Either you can have MMC, or you can have the RS-232/RS485 on a DB9 or
-> you can have MMC. You cannot have both.
-> 
-> It seems like older Debian kernels has defaulted to MMC, so we should
-> probably disable the serial port.
+> I need the management driver for administrative purposes and common initialization. 
+> I like the split SW design as it follows the HW design too.
 
-In addition, the UART/SD selection GPIO needs to be set up. I sent a
-patch proposal for this:
+I have no problem with the split design (whatever floats your boat),
+more with the terminology which I find very confusing. It would be a lot
+better if you stuck with management (host) and client (user), or some
+other general terminology.
 
-	http://marc.info/?l=linux-arm-kernel&m=145262936504783&w=2
+Thanks,
 
-> Please can you try the following patch. If this works, i can add it to
-> mainline. The issue we might run into is that somebody else wants
-> serial not MMC....
-
-I use mainline kernel only, and I also think the default should be SD
-like it used to be with legacy boot...
-
-A.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
