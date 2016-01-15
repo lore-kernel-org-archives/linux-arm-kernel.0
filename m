@@ -1,163 +1,87 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 15 Jan 2016 12:31:22 -0300
-Subject: [PATCH 2/2] arm64: dts: rockchip: Add basic support for orion-r68
-In-Reply-To: <1804889.MQWMfNjko2@phil>
-References: <1452863192-29231-1-git-send-email-matthias.bgg@gmail.com>
- <2174023.jkjdoEECkq@phil>
- <CABxcv=nkry9PUg5pp+6jKjYb_G=iEfMa7+evZOrUkifDS8h5BA@mail.gmail.com>
- <1804889.MQWMfNjko2@phil>
-Message-ID: <CABxcv=nDs2jw0-zZK7jBmtLDEmvAPUNNMST0XBK75OyUGDXmRg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 15 Jan 2016 15:36:56 +0000
+Subject: [PATCH V12 3/7] dma: add Qualcomm Technologies HIDMA management
+ driver
+In-Reply-To: <56990CD4.6020405@arm.com>
+References: <1452523550-8920-1-git-send-email-okaya@codeaurora.org>
+ <1452523550-8920-4-git-send-email-okaya@codeaurora.org>
+ <20160115145629.GI3262@leverpostej> <56990CD4.6020405@arm.com>
+Message-ID: <20160115153656.GM3262@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Heiko,
+On Fri, Jan 15, 2016 at 03:14:28PM +0000, Marc Zyngier wrote:
+> On 15/01/16 14:56, Mark Rutland wrote:
+> > Hi,
+> > 
+> > [adding KVM people, given this is meant for virtualization]
+> > 
+> > On Mon, Jan 11, 2016 at 09:45:43AM -0500, Sinan Kaya wrote:
+> >> The Qualcomm Technologies HIDMA device has been designed to support
+> >> virtualization technology. The driver has been divided into two to follow
+> >> the hardware design.
+> >>
+> >> 1. HIDMA Management driver
+> >> 2. HIDMA Channel driver
+> >>
+> >> Each HIDMA HW consists of multiple channels. These channels share some set
+> >> of common parameters. These parameters are initialized by the management
+> >> driver during power up. Same management driver is used for monitoring the
+> >> execution of the channels. Management driver can change the performance
+> >> behavior dynamically such as bandwidth allocation and prioritization.
+> >>
+> >> The management driver is executed in hypervisor context and is the main
+> >> management entity for all channels provided by the device.
+> > 
+> > You mention repeatedly that this is designed for virtualization, but
+> > looking at the series as it stands today I can't see how this operates
+> > from the host side.
+> 
+> Nor the guest's, TBH. How do host and guest communicate, what is the
+> infrastructure, how is it meant to be used? A lot of questions, and no
+> answer whatsoever in this series.
 
-On Fri, Jan 15, 2016 at 11:26 AM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Am Freitag, 15. Januar 2016, 11:22:52 schrieb Javier Martinez Canillas:
->> Hello Heiko,
->>
->> On Fri, Jan 15, 2016 at 11:03 AM, Heiko Stuebner <heiko@sntech.de> wrote:
->> > Hi Javier,
->> >
->> > Am Freitag, 15. Januar 2016, 10:28:44 schrieb Javier Martinez Canillas:
->> >> This is not a complete review but I just wanted to comment on two
->> >
->> >> things that I noticed:
->> > same for me for now :-)
->> >
->> >> On Fri, Jan 15, 2016 at 10:06 AM, Matthias Brugger
->> >> <matthias.bgg@gmail.com> wrote:
->> >>
->> >> [snip]
->> >>
->> >> > +       };
->> >> > +
->> >> > +       vcc_18: vcc18-regulator {
->> >> > +               compatible = "regulator-fixed";
->> >> > +               regulator-name = "vcc_18";
->> >> > +               regulator-min-microvolt = <1800000>;
->> >> > +               regulator-max-microvolt = <1800000>;
->> >> > +               regulator-always-on;
->> >> > +               regulator-boot-on;
->> >> > +               vin-supply = <&vcc_sys>;
->> >> > +       };
->> >> > +
->> >> > +       /* supplies both host and otg */
->> >> > +       vcc_host: vcc-host-regulator {
->> >> > +               compatible = "regulator-fixed";
->> >> > +               gpio = <&gpio0 4 GPIO_ACTIVE_LOW>;
->> >> > +               pinctrl-names = "default";
->> >> > +               pinctrl-0 = <&host_vbus_drv>;
->> >> > +               regulator-name = "vcc_host";
->> >> > +               regulator-always-on;
->> >> > +               regulator-boot-on;
->> >> > +               vin-supply = <&vcc_sys>;
->> >> > +       };
->> >> > +
->> >> > +       vccio_sd: vcc-io-sd-regulator {
->> >> > +               regulator-name= "vccio_sd";
->> >> > +               gpio = <&gpio0 9 GPIO_ACTIVE_LOW>;
->> >> > +               regulator-min-microvolt = <3300000>;
->> >> > +               regulator-max-microvolt = <3300000>;
->
-> that seems to be missing essential regulator properties
-> like a compatible.
->
+I think the guest's PoV is fairly simple and understood. The DMA channel
+is pased in as with any passthrough of any other platform device.
 
-Oh right, I missed that when first reading the patch.
+No communication with the host is necessary -- an isolated channel is
+usable.
 
->> >> > +       };
->> >> > +
->> >> > +       vcc_sd: vcc-sd-regulator {
->> >> > +               compatible = "regulator-fixed";
->> >> > +               regulator-name = "vcc_sd";
->> >> > +               gpio = <&gpio3 11 GPIO_ACTIVE_LOW>;
->> >> > +               regulator-min-microvolt = <3300000>;
->> >> > +               regulator-max-microvolt = <3300000>;
->> >> > +               regulator-always-on;
->> >> > +               regulator-boot-on;
->> >> > +               vin-supply = <&vcc_io>;
->> >> > +       };
->> >> > +
->> >> > +       vcc_io: vcc-io-regulator {
->> >> > +               compatible = "regulator-fixed";
->> >> > +               regulator-name = "vcc_io";
->> >> > +               regulator-min-microvolt = <3300000>;
->> >> > +               regulator-max-microvolt = <3300000>;
->> >> > +               regulator-always-on;
->> >> > +               regulator-boot-on;
->> >> > +               vin-supply = <&vcc_sys>;
->> >> > +       };
->> >> > +
->> >> > +       vcc_lan: vcc-lan-regulator {
->> >> > +               compatible = "regulator-fixed";
->> >> > +               regulator-name = "vcc_lan";
->> >> > +               regulator-min-microvolt = <3300000>;
->> >> > +               regulator-max-microvolt = <3300000>;
->> >> > +               regulator-always-on;
->> >> > +               regulator-boot-on;
->> >> > +               vin-supply = <&vcc_io>;
->> >> > +       };
->> >> > +
->> >> > +       vcc_sys: vcc-sys-regulator {
->> >> > +               compatible = "regulator-fixed";
->> >> > +               regulator-name = "vcc_sys";
->> >> > +               regulator-min-microvolt = <5000000>;
->> >> > +               regulator-max-microvolt = <5000000>;
->> >> > +               regulator-always-on;
->> >> > +               regulator-boot-on;
->> >> > +       };
->> >> > +
->> >> > +       vccio_wl: vccio-wl-regulator {
->> >> > +               compatible = "regulator-fixed";
->> >> > +               regulator-name = "vccio_wl";
->> >> > +               regulator-min-microvolt = <3300000>;
->> >> > +               regulator-max-microvolt = <3300000>;
->> >> > +               regulator-always-on;
->> >> > +               regulator-boot-on;
->> >> > +               vin-supply = <&vcc_io>;
->> >> > +       };
->> >> > +
->> >> > +       vdd_10: vdd-10-regulator {
->> >> > +               compatible = "regulator-fixed";
->> >> > +               regulator-name = "vdd_10";
->> >> > +               regulator-min-microvolt = <1000000>;
->> >> > +               regulator-max-microvolt = <1000000>;
->> >> > +               regulator-always-on;
->> >> > +               regulator-boot-on;
->> >> > +               vin-supply = <&vcc_sys>;
->> >> > +       };
->> >> > +};
->> >>
->> >> There is only one regulator that is not marked as always-on. This will
->> >> prevent the regulator subsystem to disable unused regulators. Do you
->> >> really need all of them to be always-on?
->> >
->> > I do believe the regulators should be more or less correct. Sadly there
->> > are no real schematics for that specific device available, but the
->> > reference design for rk3368-based tv-boxes uses a hirarchy of
->> > hard-wired individual regulators without any ability to control for
->> > most of them [aka always on].
->> >
->> > And due to the r68 not sporting any different real pmic, I'd believe the
->> > Orion will most likely also follow that scheme.
->>
->> I see, thanks a lot for the clarification. But then in that case I
->> wonder what's the point of defining the gpio property in the fixed
->> regulator device nodes?
->
-> the ones with gpio properties actually can be turned off - here they are the
-> different supplies for usb and sd-card only, so leaf-regulators without
-> further children.
->
+The larger concern is isolation, given the lack of IOMMU, or anything
+obvious w.r.t. pinning of pages.
 
-Ok, sorry I misunderstood and thought you were referring to all
-regulators. I of course agree that regulators that can't be turned of
-should be marked as always-on. I just asked this to be revisit and
-only mark as always-on the ones that really should be.
+> > This doesn't seem to tie into KVM or VFIO, and as far as I can tell
+> > there's no mechanism for associating channels with a particular virtual
+> > address space (i.e. no configuration of an external or internal IOMMU),
+> > nor pinning of guest pages to allow for DMA to occur safely.
+> > 
+> > Given that, I'm at a loss as to how this would be used in a hypervisor
+> > context. What am I missing?
+> > 
+> > Are there additional patches, or do you have some userspace that works
+> > with this in some limited configuration?
+> 
+> Well, this looks so far like a code dumping exercise. I'd very much
+> appreciate a HIDMA101 crash course:
+> 
+> - How do host and guest communicate?
+> - How is the integration performed in the hypervisor?
+> - Does the HYP side requires any context switch (and how is that done)?
 
->
-> Heiko
+I don't believe this requires any context-switch -- it's the same as
+assigning any other platform device other than additional proeprties
+being controlled in the managament interface.
 
-Best regards,
-Javier
+> - What makes it safe?
+
+I'm concerned with how this is safe, and with the userspace interface.
+e.g. if the user wants to up the QoS for a VM, how to they find the
+right channel in sysfs  to alter?
+
+> Without any of this information (and pointer to the code to back it up),
+> I'm very reluctant to take any of this.
+
+Likewise.
+
+Thanks,
+Mark.
