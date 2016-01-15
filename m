@@ -1,48 +1,44 @@
 From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Fri, 15 Jan 2016 15:49:30 +0100
-Subject: [PATCH 0/5] crypto: atmel-sha: fix registration issue and other bugs
-Message-ID: <cover.1452867917.git.cyrille.pitchen@atmel.com>
+Date: Fri, 15 Jan 2016 15:49:31 +0100
+Subject: [PATCH 1/5] crypto: atmel-sha: fix crash when computing digest on
+ empty message
+In-Reply-To: <cover.1452867917.git.cyrille.pitchen@atmel.com>
+References: <cover.1452867917.git.cyrille.pitchen@atmel.com>
+Message-ID: <4396c236d6cc6dc89801ef6d179d10b901461654.1452867917.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This patch fixes a crash which occured during the computation of the
+digest of an empty message.
 
-This series of patches fixes many issues such as the algo registration failure
-or the broken support of context switches.
+Indeed, when processing an empty message, the atmel_sha_handle_queue()
+function was never called, hence the dd->req pointer remained
+uninitialized.
 
-This series was applied to linux-next and tested on a sama5d2 xplained
-ultra board. We now pass the tcrypt tests in the following modes:
--  2: sha1
--  6: sha256
-- 11: sha384
-- 12: sha512
-- 33: sha224
+Later, when the atmel_sha_final_req() function was called, it used
+to crash while using this uninitialized dd->req pointer.
 
-The context switch fix was tested with a userspace program using the cryptodev
-module. This single thread program computes the SHA256 hashes of many files
-by splitting then into fixed size chunks. The chunks of each file are
-processed by calling 'update' operations using a round robin algorithm.
+Hence this patch adds missing initializations of dd->req before calls of
+the atmel_sha_final_req() function.
 
-However, the .import() / .export() implementation was NOT tested!
-Nonetheless the last patch is needed to fix the registration issue, otherwise
-atmel_sha_probe() would still fail.
+This bug prevented us from passing the tcrypt test suite on SHA algo.
 
-Best regards,
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+---
+ drivers/crypto/atmel-sha.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Cyrille
-
-
-Cyrille Pitchen (5):
-  crypto: atmel-sha: fix crash when computing digest on empty message
-  crypto: atmel-sha: fix a race between the 'done' tasklet and the
-    crypto client
-  crypto: atmel-sha: add support of sama5d2x SoCs
-  crypto: atmel-sha: fix context switches
-  crypto: atmel-sha: fix algorihtm registration
-
- drivers/crypto/atmel-sha-regs.h |   4 +
- drivers/crypto/atmel-sha.c      | 186 +++++++++++++++++++++++++++++++++-------
- 2 files changed, 158 insertions(+), 32 deletions(-)
-
+diff --git a/drivers/crypto/atmel-sha.c b/drivers/crypto/atmel-sha.c
+index 20de861aa0ea..006b2aefba30 100644
+--- a/drivers/crypto/atmel-sha.c
++++ b/drivers/crypto/atmel-sha.c
+@@ -939,6 +939,7 @@ static int atmel_sha_final(struct ahash_request *req)
+ 		if (err)
+ 			goto err1;
+ 
++		dd->req = req;
+ 		dd->flags |= SHA_FLAGS_BUSY;
+ 		err = atmel_sha_final_req(dd);
+ 	} else {
 -- 
 1.8.2.2
