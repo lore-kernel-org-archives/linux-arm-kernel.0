@@ -1,26 +1,28 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 14 Jan 2016 21:17:35 -0600
-Subject: [PATCH v2 25/26] drm/panel: simple: Add timings for the Olimex
- LCD-OLinuXino-4.3TS
-In-Reply-To: <1452785109-6172-26-git-send-email-maxime.ripard@free-electrons.com>
-References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
- <1452785109-6172-26-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20160115031735.GA26011@rob-hp-laptop>
+From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
+Date: Thu, 14 Jan 2016 21:09:38 -0800
+Subject: [PATCH 2/2] arm64: bpf: add extra pass to handle faulty codegen
+In-Reply-To: <1452756802-16511-2-git-send-email-zlim.lnx@gmail.com>
+References: <1452756802-16511-1-git-send-email-zlim.lnx@gmail.com>
+ <1452756802-16511-2-git-send-email-zlim.lnx@gmail.com>
+Message-ID: <20160115050937.GB52169@ast-mbp.thefacebook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 04:25:08PM +0100, Maxime Ripard wrote:
-> Add support for the Olimex LCD-OLinuXino-4.3TS panel to the DRM simple
-> panel driver.
+On Wed, Jan 13, 2016 at 11:33:22PM -0800, Zi Shen Lim wrote:
+> Code generation functions in arch/arm64/kernel/insn.c previously
+> BUG_ON invalid parameters. Following change of that behavior, now we
+> need to handle the error case where AARCH64_BREAK_FAULT is returned.
 > 
-> It is a 480x272 panel connected through a 24-bits RGB interface.
+> Instead of error-handling on every emit() in JIT, we add a new
+> validation pass at the end of JIT compilation. There's no point in
+> running JITed code at run-time only to trap due to AARCH64_BREAK_FAULT.
+> Instead, we drop this failed JIT compilation and allow the system to
+> gracefully fallback on the BPF interpreter.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  .../display/panel/olimex,lcd-olinuxino-43-ts.txt   |  7 ++++++
+> Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+> Suggested-by: Alexei Starovoitov <ast@kernel.org>
 
-Acked-by: Rob Herring <robh@kernel.org>
-
->  drivers/gpu/drm/panel/panel-simple.c               | 26 ++++++++++++++++++++++
->  2 files changed, 33 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/panel/olimex,lcd-olinuxino-43-ts.txt
+Looks good to me.
+Acked-by: Alexei Starovoitov <ast@kernel.org>
+technically it's a bug fix, though the shift problem is already mitigated.
+Will, any comments?
