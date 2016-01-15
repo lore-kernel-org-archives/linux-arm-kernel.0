@@ -1,28 +1,49 @@
-From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
-Date: Thu, 14 Jan 2016 21:09:38 -0800
-Subject: [PATCH 2/2] arm64: bpf: add extra pass to handle faulty codegen
-In-Reply-To: <1452756802-16511-2-git-send-email-zlim.lnx@gmail.com>
-References: <1452756802-16511-1-git-send-email-zlim.lnx@gmail.com>
- <1452756802-16511-2-git-send-email-zlim.lnx@gmail.com>
-Message-ID: <20160115050937.GB52169@ast-mbp.thefacebook.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Fri, 15 Jan 2016 14:27:37 +0800
+Subject: [PATCH v9 03/21] KVM: ARM64: Add offset defines for PMU registers
+In-Reply-To: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1452839275-19368-4-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 11:33:22PM -0800, Zi Shen Lim wrote:
-> Code generation functions in arch/arm64/kernel/insn.c previously
-> BUG_ON invalid parameters. Following change of that behavior, now we
-> need to handle the error case where AARCH64_BREAK_FAULT is returned.
-> 
-> Instead of error-handling on every emit() in JIT, we add a new
-> validation pass at the end of JIT compilation. There's no point in
-> running JITed code at run-time only to trap due to AARCH64_BREAK_FAULT.
-> Instead, we drop this failed JIT compilation and allow the system to
-> gracefully fallback on the BPF interpreter.
-> 
-> Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
-> Suggested-by: Alexei Starovoitov <ast@kernel.org>
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Looks good to me.
-Acked-by: Alexei Starovoitov <ast@kernel.org>
-technically it's a bug fix, though the shift problem is already mitigated.
-Will, any comments?
+We are about to trap and emulate accesses to each PMU register
+individually. This adds the context offsets for the AArch64 PMU
+registers.
+
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/kvm_host.h | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 6f0241f..6bab7fb 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -115,6 +115,21 @@ enum vcpu_sysreg {
+ 	MDSCR_EL1,	/* Monitor Debug System Control Register */
+ 	MDCCINT_EL1,	/* Monitor Debug Comms Channel Interrupt Enable Reg */
+ 
++	/* Performance Monitors Registers */
++	PMCR_EL0,	/* Control Register */
++	PMOVSSET_EL0,	/* Overflow Flag Status Set Register */
++	PMSELR_EL0,	/* Event Counter Selection Register */
++	PMEVCNTR0_EL0,	/* Event Counter Register (0-30) */
++	PMEVCNTR30_EL0 = PMEVCNTR0_EL0 + 30,
++	PMCCNTR_EL0,	/* Cycle Counter Register */
++	PMEVTYPER0_EL0,	/* Event Type Register (0-30) */
++	PMEVTYPER30_EL0 = PMEVTYPER0_EL0 + 30,
++	PMCCFILTR_EL0,	/* Cycle Count Filter Register */
++	PMCNTENSET_EL0,	/* Count Enable Set Register */
++	PMINTENSET_EL1,	/* Interrupt Enable Set Register */
++	PMUSERENR_EL0,	/* User Enable Register */
++	PMSWINC_EL0,	/* Software Increment Register */
++
+ 	/* 32bit specific registers. Keep them at the end of the range */
+ 	DACR32_EL2,	/* Domain Access Control Register */
+ 	IFSR32_EL2,	/* Instruction Fault Status Register */
+-- 
+2.0.4
