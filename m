@@ -1,31 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Jan 2016 11:05:17 +0000
-Subject: [PATCH v2] reboot: Backup orderly_poweroff
-In-Reply-To: <20160115101312.GA23349@gmail.com>
-References: <1452688405-15087-1-git-send-email-j-keerthy@ti.com>
- <20160114090520.GA4351@gmail.com> <569767EC.2010704@ti.com>
- <20160114100913.GB15857@gmail.com> <56977BA7.702@ti.com>
- <20160114112354.GA17869@gmail.com>
- <20160114142227.GB5783@n2100.arm.linux.org.uk>
- <20160115101312.GA23349@gmail.com>
-Message-ID: <20160115110517.GE5783@n2100.arm.linux.org.uk>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Fri, 15 Jan 2016 13:06:52 +0200
+Subject: [PATCH] drm: nouveau: fix nouveau_debugfs_init prototype
+In-Reply-To: <12563536.Vhe8JJPi2x@wuerfel>
+References: <3968390.Pvmnq3v7oC@wuerfel>
+ <1503925101.39877.1452693347204.JavaMail.open-xchange@www.ud-mail.de>
+ <12563536.Vhe8JJPi2x@wuerfel>
+Message-ID: <CACvgo50aGCMBB3Qe3o5jyV7oZ62yiDRHcLAy4xu-Nnmb5S_DaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 11:13:12AM +0100, Ingo Molnar wrote:
-> FYI, you are making an unnecessarily obtuse argument by insisting on the 
-> architecture != platform triviality and you also injected an uncalled for 
-> patronizing tone into this discussion by pretending that I don't know that 
-> distinction. It's sad.
+On 13 January 2016 at 16:00, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 13 January 2016 14:55:47 Karol Herbst wrote:
+>> > Arnd Bergmann <arnd@arndb.de> hat am 13. Januar 2016 um 14:48 geschrieben:
+>> >
+>> > The new debugfs initialization code fails to build when CONFIG_DEBUG_FS
+>> > is disabled:
+>> >
+>> > In file included from /git/arm-soc/drivers/gpu/drm/nouveau/nouveau_drm.c:57:0:
+>> > drivers/gpu/drm/nouveau/nouveau_debugfs.h: In function 'nouveau_debugfs_init':
+>> > drivers/gpu/drm/nouveau/nouveau_debugfs.h:37:29: error: parameter name omitted
+>> >  nouveau_debugfs_init(struct nouveau_drm *)
+>> >
+>> > This fixes the prototypes so we can build it again.
+>> >
+>>
+>> thanks for this. I already send a patch to the nouveau ML here:
+>> http://lists.freedesktop.org/archives/nouveau/2016-January/023779.html
+>
+> Ok, thanks
+>
+Fwiw Arnd's fix feels a lot better - it lacks typos, has a fixes tag,
+comprehensive commit message etc. etc. :-)
 
-I was trying to be helpful, but your attitude seems to always one of
-finding some way to turn a reasonable discussion into an ad hominem
-attack.  You've just proven that you're totally impossible to work
-with.
-
-I won't make the mistake of replying to one of your messages again.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+-Emil
