@@ -1,68 +1,53 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 15 Jan 2016 17:57:45 +0800
-Subject: [PATCH V3 19/21] pci, acpi: Support for ACPI based generic PCI
- host controller init
-In-Reply-To: <1452691267-32240-20-git-send-email-tn@semihalf.com>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <1452691267-32240-20-git-send-email-tn@semihalf.com>
-Message-ID: <5698C299.2080702@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 15 Jan 2016 09:57:57 +0000
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160114222046.GH3818@linux.vnet.ibm.com>
+References: <569565DA.2010903@imgtec.com> <20160113104516.GE25458@arm.com>
+ <56969F4B.7070001@imgtec.com>
+ <20160113204844.GV6357@twins.programming.kicks-ass.net>
+ <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
+ <56980145.5030901@imgtec.com>
+ <20160114204827.GE3818@linux.vnet.ibm.com>
+ <56981212.7050301@imgtec.com>
+ <20160114222046.GH3818@linux.vnet.ibm.com>
+Message-ID: <20160115095756.GA2131@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Paul,
 
-On 2016/1/13 21:21, Tomasz Nowicki wrote:
-> Because of two patch series:
-> 1. Jiang Liu's common interface to support PCI host controller init
-> 2. MMCONFIG refactoring (part of this patch set)
-> now we can think about generic ACPI based PCI host controller init
-> implementation out of arch/ directory.
->
-> These calls use information from MCFG table (PCI config space regions)
-> and _CRS method (IO/irq resources) to initialize PCI hostbridge.
->
-> TBD: We are still not sure whether we should reassign resources
-> after PCI bus enumeration or trust firmware to do all that work for
-> us properly.
->
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> CC: Arnd Bergmann <arnd@arndb.de>
-> CC: Catalin Marinas <catalin.marinas@arm.com>
-> CC: Liviu Dudau <Liviu.Dudau@arm.com>
-> CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
-> CC: Will Deacon <will.deacon@arm.com>
-> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Tested-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->   drivers/acpi/Kconfig    |   5 ++
->   drivers/acpi/pci_root.c | 131 ++++++++++++++++++++++++++++++++++++++++++++++++
->   2 files changed, 136 insertions(+)
->
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index c3664be..e315061 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -335,6 +335,11 @@ config ACPI_PCI_SLOT
->   	  i.e., segment/bus/device/function tuples, with physical slots in
->   	  the system.  If you are unsure, say N.
->
-> +config ACPI_PCI_HOST_GENERIC
-> +	bool "Generic ACPI PCI host controller"
-> +	help
-> +	  Say Y here if you want to support generic ACPI PCI host controller.
+On Thu, Jan 14, 2016 at 02:20:46PM -0800, Paul E. McKenney wrote:
+> On Thu, Jan 14, 2016 at 01:24:34PM -0800, Leonid Yegoshin wrote:
+> > It is not so simple, I mean "local ordering for address and data
+> > dependencies". Local ordering is NOT enough. It happens that current
+> > MIPS R6 doesn't require in your example smp_read_barrier_depends()
+> > but in discussion it comes out that it may not. Because without
+> > smp_read_barrier_depends() your example can be a part of Will's
+> > WRC+addr+addr and we found some design which easily can bump into
+> > this test. And that design actually performs "local ordering for
+> > address and data dependencies" too.
+> 
+> As noted in another email in this thread, I do not believe that
+> WRC+addr+addr needs to be prohibited.  Sounds like Will and I need to
+> get our story straight, though.
 
-Since x86 and IA64 will not use ACPI_PCI_HOST_GENERIC in this
-patch, it should be defined as
+I think you figured this out while I was sleeping, but just to confirm:
 
-config ACPI_PCI_HOST_GENERIC
-	bool
+ 1. The MIPS64 ISA doc [1] talks about SYNC in a way that applies only
+    to memory accesses appearing in *program-order* before the SYNC
 
-and select for ARCHs, or will default y on x86 and IA64 too.
+ 2. We need WRC+sync+addr to work, which means that the SYNC in P1 must
+    also capture the store in P0 as being "before" the barrier. Leonid
+    reckons it works, but his explanation [2] focussed on the address
+    dependency in P2 as to why this works. If that is the case (i.e.
+    address dependency provides global transitivity), then WRC+addr+addr
+    should also work (even though its not required).
 
-Compiling the kernel on a IA64 machine, will send out the
-result when it's ready.
+ 3. It seems that WRC+addr+addr doesn't work, so I'm still suspicious
+    about WRC+sync+addr, because neither the architecture document or
+    Leonid's explanation tell me that it should be forbidden.
 
-Thanks
-Hanjun
+Will
+
+[1] https://imgtec.com/?do-download=4302
+[2] http://lkml.kernel.org/r/569565DA.2010903 at imgtec.com (scroll to the end)
