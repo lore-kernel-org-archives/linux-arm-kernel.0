@@ -1,57 +1,40 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 15 Jan 2016 14:55:17 +0800
-Subject: [PATCH v2 04/16] arm/xen: Use xen_xlate_map_ballooned_pages to setup
- grant table
+Date: Fri, 15 Jan 2016 14:55:21 +0800
+Subject: [PATCH v2 08/16] xen/hvm/params: Add a new delivery type for
+ event-channel in HVM_PARAM_CALLBACK_IRQ
 In-Reply-To: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1452840929-19612-5-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1452840929-19612-9-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Use xen_xlate_map_ballooned_pages to setup grant table. Then it doesn't
-rely on DT or ACPI to pass the start address and size of grant table.
+Add a new delivery type:
+val[63:56] == 3: val[15:8] is flag: val[7:0] is a PPI.
+To the flag, bit 0 stands the interrupt mode is edge(1) or level(0) and
+bit 1 stands the interrupt polarity is active low(1) or high(0).
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm/xen/enlighten.c | 13 ++++---------
- 1 file changed, 4 insertions(+), 9 deletions(-)
+ include/xen/interface/hvm/params.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index afe6175..6d90a62 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -266,18 +266,10 @@ static int __init xen_guest_init(void)
- {
- 	struct xen_add_to_physmap xatp;
- 	struct shared_info *shared_info_page = NULL;
--	struct resource res;
--	phys_addr_t grant_frames;
- 
- 	if (!xen_domain())
- 		return 0;
- 
--	if (of_address_to_resource(xen_node, GRANT_TABLE_PHYSADDR, &res)) {
--		pr_err("Xen grant table base address not found\n");
--		return -ENODEV;
--	}
--	grant_frames = res.start;
--
- 	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
- 	if (!xen_events_irq) {
- 		pr_err("Xen event channel interrupt not found\n");
-@@ -312,7 +304,10 @@ static int __init xen_guest_init(void)
- 	if (xen_vcpu_info == NULL)
- 		return -ENOMEM;
- 
--	if (gnttab_setup_auto_xlat_frames(grant_frames)) {
-+	xen_auto_xlat_grant_frames.count = gnttab_max_grant_frames();
-+	if (xen_xlate_map_ballooned_pages(&xen_auto_xlat_grant_frames.pfn,
-+					  &xen_auto_xlat_grant_frames.vaddr,
-+					  xen_auto_xlat_grant_frames.count)) {
- 		free_percpu(xen_vcpu_info);
- 		return -ENOMEM;
- 	}
+diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
+index a6c7991..550688a 100644
+--- a/include/xen/interface/hvm/params.h
++++ b/include/xen/interface/hvm/params.h
+@@ -34,6 +34,11 @@
+  *                  Domain = val[47:32], Bus  = val[31:16],
+  *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
+  * val[63:56] == 2: val[7:0] is a vector number.
++ * val[63:56] == 3: val[15:8] is flag of event-channel interrupt:
++ *                      bit 0: interrupt is edge(1) or level(0) triggered
++ *                      bit 1: interrupt is active low(1) or high(0)
++ *                  val[7:0] is PPI number used by event-channel.
++ *                  This is only used by ARM/ARM64.
+  * If val == 0 then CPU0 event-channel notifications are not delivered.
+  */
+ #define HVM_PARAM_CALLBACK_IRQ 0
 -- 
 2.0.4
