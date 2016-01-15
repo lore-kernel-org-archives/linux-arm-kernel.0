@@ -1,64 +1,52 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 15 Jan 2016 17:21:18 +0000
-Subject: [PATCH v2 04/16] arm/xen: Use xen_xlate_map_ballooned_pages to
- setup grant table
-In-Reply-To: <1452840929-19612-5-git-send-email-zhaoshenglong@huawei.com>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-5-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <alpine.DEB.2.02.1601151717460.16178@kaball.uk.xensource.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Fri, 15 Jan 2016 17:48:42 +0100
+Subject: [PATCH v2 0/2] Add a DRM display driver to the Allwinner H3
+Message-ID: <cover.1452876522.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Jan 2016, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Use xen_xlate_map_ballooned_pages to setup grant table. Then it doesn't
-> rely on DT or ACPI to pass the start address and size of grant table.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+The proposed DRM driver works on a Orange PI 2 with a kernel 4.4.0
+and the H3 patches found in Hans de Goede's GIT repository.
 
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+As there is no documentation about the HDMI of the H3,
+the associated encoder/connector driver has not been included
+in this patch series.
+For tests, it may be built as a out-of-tree driver from the tarball:
+	http://moinejf.free.fr/opi2/h3-hdmi.tar.gz
+and the DT files:
+	http://moinejf.free.fr/opi2/sun8i-h3.dtsi
+	http://moinejf.free.fr/opi2/sun8i-h3-orangepi-plus.dts
 
+Jean-Francois Moine (2):
+  clk: sunxi: Add sun6i/8i video support
+  drm: sunxi: Add a basic DRM driver for Allwinner DE2
 
->  arch/arm/xen/enlighten.c | 13 ++++---------
->  1 file changed, 4 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index afe6175..6d90a62 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -266,18 +266,10 @@ static int __init xen_guest_init(void)
->  {
->  	struct xen_add_to_physmap xatp;
->  	struct shared_info *shared_info_page = NULL;
-> -	struct resource res;
-> -	phys_addr_t grant_frames;
->  
->  	if (!xen_domain())
->  		return 0;
->  
-> -	if (of_address_to_resource(xen_node, GRANT_TABLE_PHYSADDR, &res)) {
-> -		pr_err("Xen grant table base address not found\n");
-> -		return -ENODEV;
-> -	}
-> -	grant_frames = res.start;
-> -
->  	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
->  	if (!xen_events_irq) {
->  		pr_err("Xen event channel interrupt not found\n");
-> @@ -312,7 +304,10 @@ static int __init xen_guest_init(void)
->  	if (xen_vcpu_info == NULL)
->  		return -ENOMEM;
->  
-> -	if (gnttab_setup_auto_xlat_frames(grant_frames)) {
-> +	xen_auto_xlat_grant_frames.count = gnttab_max_grant_frames();
-> +	if (xen_xlate_map_ballooned_pages(&xen_auto_xlat_grant_frames.pfn,
-> +					  &xen_auto_xlat_grant_frames.vaddr,
-> +					  xen_auto_xlat_grant_frames.count)) {
->  		free_percpu(xen_vcpu_info);
->  		return -ENOMEM;
->  	}
-> -- 
-> 2.0.4
-> 
-> 
+ Documentation/devicetree/bindings/clock/sunxi.txt  |   2 +
+ .../devicetree/bindings/display/sunxi.txt          |  81 ++++
+ drivers/clk/sunxi/clk-sun6i-display.c              | 106 +++++
+ drivers/clk/sunxi/clk-sun6i-pll3.c                 | 174 ++++++++
+ drivers/gpu/drm/Kconfig                            |   2 +
+ drivers/gpu/drm/Makefile                           |   1 +
+ drivers/gpu/drm/sunxi/Kconfig                      |  20 +
+ drivers/gpu/drm/sunxi/Makefile                     |   7 +
+ drivers/gpu/drm/sunxi/de2_crtc.c                   | 425 +++++++++++++++++++
+ drivers/gpu/drm/sunxi/de2_crtc.h                   |  43 ++
+ drivers/gpu/drm/sunxi/de2_de.c                     | 461 +++++++++++++++++++++
+ drivers/gpu/drm/sunxi/de2_drm.h                    |  55 +++
+ drivers/gpu/drm/sunxi/de2_drv.c                    | 376 +++++++++++++++++
+ drivers/gpu/drm/sunxi/de2_plane.c                  | 114 +++++
+ 14 files changed, 1867 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/sunxi.txt
+ create mode 100644 drivers/clk/sunxi/clk-sun6i-display.c
+ create mode 100644 drivers/clk/sunxi/clk-sun6i-pll3.c
+ create mode 100644 drivers/gpu/drm/sunxi/Kconfig
+ create mode 100644 drivers/gpu/drm/sunxi/Makefile
+ create mode 100644 drivers/gpu/drm/sunxi/de2_crtc.c
+ create mode 100644 drivers/gpu/drm/sunxi/de2_crtc.h
+ create mode 100644 drivers/gpu/drm/sunxi/de2_de.c
+ create mode 100644 drivers/gpu/drm/sunxi/de2_drm.h
+ create mode 100644 drivers/gpu/drm/sunxi/de2_drv.c
+ create mode 100644 drivers/gpu/drm/sunxi/de2_plane.c
+
+-- 
+2.7.0
