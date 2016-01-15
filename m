@@ -1,22 +1,28 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 15 Jan 2016 11:38:03 +0900
-Subject: [PATCH v3 10/14] ARM: shmobile: gose: enable sound DMA support in
- device tree
+Date: Fri, 15 Jan 2016 11:38:05 +0900
+Subject: [PATCH v3 12/14] ARM: shmobile: gose: enable sound DMA support via
+ SRC in device tree
 In-Reply-To: <1452825487-15931-1-git-send-email-horms+renesas@verge.net.au>
 References: <1452825487-15931-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1452825487-15931-11-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1452825487-15931-13-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable DMA transfer to/from SSI in r8a7793/gose device tree.
+Enable DMA transfer to/from SRC in r8a7793/gose device tree.
 
-     DMA
-[MEM] -> [SSI]
+     DMA      DMApp
+[MEM] -> [SRC] -> [SSIU] -> [SSI]
 
-     DMA
-[MEM] <- [SSI]
+     DMA      DMApp
+[MEM] <- [SRC] <- [SSIU] <- [SSI]
 
-Based on similar work for the r8a7791/koelsch by Kuninori Morimoto.
+Current sound driver is supporting
+SSI/SRC random connection.
+So, this patch is tring
+SSI0 -> SRC2
+SSI1 <- SRC3
+
+Based on similar work for the r8a7791/koeslch by Kuninori Morimoto.
 
 Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
@@ -26,21 +32,19 @@ Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index a90af303e21a..0ab0abb9f889 100644
+index 4a7048d676c8..ad20ddc5203d 100644
 --- a/arch/arm/boot/dts/r8a7793-gose.dts
 +++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -322,10 +322,10 @@
- };
+@@ -315,8 +315,8 @@
  
- &ssi0 {
--	pio-transfer;
-+	no-busif;
- };
- 
- &ssi1 {
--	pio-transfer;
-+	no-busif;
- 	shared-pin;
+ 	rcar_sound,dai {
+ 		dai0 {
+-			playback = <&ssi0>;
+-			capture  = <&ssi1>;
++			playback = <&ssi0 &src2>;
++			capture  = <&ssi1 &src3>;
+ 		};
+ 	};
  };
 -- 
 2.1.4
