@@ -1,131 +1,66 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 15 Jan 2016 14:27:53 +0800
-Subject: [PATCH v9 19/21] KVM: ARM64: Add a new feature bit for PMUv3
+Date: Fri, 15 Jan 2016 14:27:39 +0800
+Subject: [PATCH v9 05/21] KVM: ARM64: Add access handler for PMSELR register
 In-Reply-To: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1452839275-19368-20-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1452839275-19368-6-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-To support guest PMUv3, use one bit of the VCPU INIT feature array.
-Initialize the PMU when initialzing the vcpu with that bit and PMU
-overflow interrupt set.
+Since the reset value of PMSELR_EL0 is UNKNOWN, use reset_unknown for
+its reset handler. When reading PMSELR, return the PMSELR.SEL field to
+guest.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
-CC: Peter Maydell <peter.maydell@linaro.org>
----
- Documentation/virtual/kvm/api.txt | 2 ++
- arch/arm64/include/asm/kvm_host.h | 2 +-
- arch/arm64/include/uapi/asm/kvm.h | 1 +
- arch/arm64/kvm/reset.c            | 3 +++
- include/kvm/arm_pmu.h             | 2 ++
- include/uapi/linux/kvm.h          | 1 +
- virt/kvm/arm/pmu.c                | 9 +++++++++
- 7 files changed, 19 insertions(+), 1 deletion(-)
+ arch/arm64/kvm/sys_regs.c | 19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 053f613..e51fa04 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2577,6 +2577,8 @@ Possible features:
- 	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
- 	- KVM_ARM_VCPU_PSCI_0_2: Emulate PSCI v0.2 for the CPU.
- 	  Depends on KVM_CAP_ARM_PSCI_0_2.
-+	- KVM_ARM_VCPU_PMU_V3: Emulate PMUv3 for the CPU.
-+	  Depends on KVM_CAP_ARM_PMU_V3.
- 
- 
- 4.83 KVM_ARM_PREFERRED_TARGET
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 6bab7fb..cb220b7 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -40,7 +40,7 @@
- 
- #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
- 
--#define KVM_VCPU_MAX_FEATURES 3
-+#define KVM_VCPU_MAX_FEATURES 4
- 
- int __attribute_const__ kvm_target_cpu(void);
- int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 2d4ca4b..6aedbe3 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -94,6 +94,7 @@ struct kvm_regs {
- #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
- #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
- #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
-+#define KVM_ARM_VCPU_PMU_V3		3 /* Support guest PMUv3 */
- 
- struct kvm_vcpu_init {
- 	__u32 target;
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index dfbce78..cf4f28a 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -77,6 +77,9 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
- 	case KVM_CAP_GUEST_DEBUG_HW_WPS:
- 		r = get_num_wrps();
- 		break;
-+	case KVM_CAP_ARM_PMU_V3:
-+		r = kvm_arm_support_pmu_v3();
-+		break;
- 	case KVM_CAP_SET_GUEST_DEBUG:
- 		r = 1;
- 		break;
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index d90fc65..c35b11d 100644
---- a/include/kvm/arm_pmu.h
-+++ b/include/kvm/arm_pmu.h
-@@ -48,6 +48,7 @@ void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
- 				    u64 select_idx);
-+int kvm_arm_support_pmu_v3(void);
- #else
- struct kvm_pmu {
- };
-@@ -72,6 +73,7 @@ static inline void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
- 						  u64 data, u64 select_idx) {}
-+static inline int kvm_arm_support_pmu_v3(void) { return 0; }
- #endif
- 
- #endif
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 9da9051..dc16d30 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -850,6 +850,7 @@ struct kvm_ppc_smmu_info {
- #define KVM_CAP_IOEVENTFD_ANY_LENGTH 122
- #define KVM_CAP_HYPERV_SYNIC 123
- #define KVM_CAP_S390_RI 124
-+#define KVM_CAP_ARM_PMU_V3 125
- 
- #ifdef KVM_CAP_IRQ_ROUTING
- 
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 45d4d91..cb373d4 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -374,3 +374,12 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
- 
- 	pmc->perf_event = event;
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 97fea84..fc60041 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -477,6 +477,21 @@ static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	return true;
  }
-+
-+int kvm_arm_support_pmu_v3(void)
+ 
++static bool access_pmselr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			  const struct sys_reg_desc *r)
 +{
-+	/* Check if HW_PERF_EVENTS are supported by checking the number of
-+	 * hardware performance counters. This could ensure physical PMU and
-+	 * PERF_EVENT driver existing.
-+	 */
-+	return perf_num_counters();
++	if (!kvm_arm_pmu_v3_ready(vcpu))
++		return trap_raz_wi(vcpu, p, r);
++
++	if (p->is_write)
++		vcpu_sys_reg(vcpu, PMSELR_EL0) = p->regval;
++	else
++		/* return PMSELR.SEL field */
++		p->regval = vcpu_sys_reg(vcpu, PMSELR_EL0) & ARMV8_COUNTER_MASK;
++
++	return true;
 +}
++
+ /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+ #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+ 	/* DBGBVRn_EL1 */						\
+@@ -676,7 +691,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	  trap_raz_wi },
+ 	/* PMSELR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b101),
+-	  trap_raz_wi },
++	  access_pmselr, reset_unknown, PMSELR_EL0 },
+ 	/* PMCEID0_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b110),
+ 	  trap_raz_wi },
+@@ -927,7 +942,7 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
 -- 
 2.0.4
