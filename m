@@ -1,36 +1,70 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Fri, 15 Jan 2016 11:29:35 +0000
-Subject: [PATCH] arm-cci: simplify sysfs attr handling
-In-Reply-To: <20160115112054.GB3262@leverpostej>
-References: <1443523283-6248-1-git-send-email-mark.rutland@arm.com>
- <20151104111112.GA23860@leverpostej> <5698C9E2.7040405@arm.com>
- <20160115112054.GB3262@leverpostej>
-Message-ID: <5698D81F.3030305@arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 15 Jan 2016 13:35:33 +0200
+Subject: [4.4-rc6-rt1 PATCH 0/2] ARM: am437x: boot test report
+In-Reply-To: <20160114213048.GB19062@n2100.arm.linux.org.uk>
+References: <1451325611-21678-1-git-send-email-grygorii.strashko@ti.com>
+ <20160112171556.GB31009@linutronix.de> <569637ED.1030304@ti.com>
+ <5696B025.8020909@ti.com> <569800DD.7090102@ti.com>
+ <20160114213048.GB19062@n2100.arm.linux.org.uk>
+Message-ID: <5698D985.2050608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/01/16 11:20, Mark Rutland wrote:
-> On Fri, Jan 15, 2016 at 10:28:50AM +0000, Suzuki K. Poulose wrote:
->> On 04/11/15 11:11, Mark Rutland wrote:
->>> On Tue, Sep 29, 2015 at 11:41:23AM +0100, Mark Rutland wrote:
+Hi Russell,
 
->> fyi,
->>
->> This hasn't made into arm-soc tree yet.
->
-> Ok. We're in the middle of the merge window, so it's understandable if
-> this isn't picked up.
+On 01/14/2016 11:30 PM, Russell King - ARM Linux wrote:
+> On Thu, Jan 14, 2016 at 10:11:09PM +0200, Grygorii Strashko wrote:
+>> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+>> index deabc36..b9b4f9c 100644
+>> --- a/arch/arm/mm/highmem.c
+>> +++ b/arch/arm/mm/highmem.c
+>> @@ -167,7 +167,7 @@ void switch_kmaps(struct task_struct *prev_p, struct task_struct *next_p)
+>>           * Clear @prev's kmap_atomic mappings
+>>           */
+>>          for (i = 0; i < prev_p->kmap_idx; i++) {
+>> -               int idx = i + KM_TYPE_NR * smp_processor_id();
+>> +               int idx = FIX_KMAP_BEGIN + i + KM_TYPE_NR * smp_processor_id();
+>>   
+>>                  set_fixmap_pte(idx, __pte(0));
+>>          }
+>> @@ -175,7 +175,7 @@ void switch_kmaps(struct task_struct *prev_p, struct task_struct *next_p)
+>>           * Restore @next_p's kmap_atomic mappings
+>>           */
+>>          for (i = 0; i < next_p->kmap_idx; i++) {
+>> -               int idx = i + KM_TYPE_NR * smp_processor_id();
+>> +               int idx = FIX_KMAP_BEGIN + i + KM_TYPE_NR * smp_processor_id();
+>>   
+>>                  if (!pte_none(next_p->kmap_pte[i]))
+>>                          set_fixmap_pte(idx, next_p->kmap_pte[i]);
+> 
+> This looks like it introduces the 4th and 5th copies of the same
+> calcuation, so can I suggest that we do this to prevent this kind
+> of error?
+> 
+> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+> index d02f8187b1cc..61f0d5941116 100644
+> --- a/arch/arm/mm/highmem.c
+> +++ b/arch/arm/mm/highmem.c
+> @@ -34,6 +34,11 @@ static inline pte_t get_fixmap_pte(unsigned long vaddr)
+>   	return *ptep;
+>   }
+>   
+> +static unsigned int fixmap_idx(int type)
+> +{
+> +	return FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
+> +}
+> +
 
-I know, and I meant it didn't get picked up before the merge window. Also I
-don't expect the maintainers to do anything at the moment. Instead, wanted
-to know what the next steps should be.
 
->
-> Suzuki, would you be happy to pick this up as a prefix of your CCI patch
-> series for now?
+This looks very reasonable - I'll updated and re-send.
+Would you agree if I'll add your Signed-off-by: in final patch?
 
-And ^^ that was an option I was considering, but didn't mention it.
-I will pick this one up.
+Thanks for review.
 
-Cheers
-Suzuki
+
+[...]
+
+
+-- 
+regards,
+-grygorii
