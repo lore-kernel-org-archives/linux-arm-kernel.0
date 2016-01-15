@@ -1,130 +1,62 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 15 Jan 2016 12:44:08 -0500
-Subject: [PATCH V12 3/7] dma: add Qualcomm Technologies HIDMA management
- driver
-In-Reply-To: <56992C4E.6010606@arm.com>
-References: <1452523550-8920-1-git-send-email-okaya@codeaurora.org>
- <1452523550-8920-4-git-send-email-okaya@codeaurora.org>
- <20160115145629.GI3262@leverpostej> <56990CD4.6020405@arm.com>
- <569912F3.9040507@codeaurora.org> <56992C4E.6010606@arm.com>
-Message-ID: <56992FE8.4000606@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 15 Jan 2016 17:46:01 +0000
+Subject: [PATCH v4 1/1] ARM: perf: Set ARMv7 SDER SUNIDEN bit
+In-Reply-To: <20160114043626.GA45778@gandalf.middle.earth.net>
+References: <20140805144831.25462.18149.stgit@localhost>
+ <20140805144833.25462.46011.stgit@localhost>
+ <20140806104947.GD25953@arm.com> <53E22E0B.7080907@parkeon.com>
+ <20140807173316.GH31101@arm.com>
+ <20160106145500.GA92797@gandalf.middle.earth.net>
+ <20160112171109.GJ15737@arm.com>
+ <20160114043626.GA45778@gandalf.middle.earth.net>
+Message-ID: <20160115174601.GC1641@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>
->> Sure, I'm ready to answer any questions. This is really a VFIO platform course. Not
->> a HIDMA driver course. The approach is not different if you assign a platfom 
->> SATA (AHCI) or SDHC driver to a guest machine.
+On Wed, Jan 13, 2016 at 11:36:26PM -0500, George G. Davis wrote:
+> From: Martin Fuzzey <mfuzzey@parkeon.com>
 > 
-> I happen to have an idea of how VFIO works...
+> ARMv7 counters other than the CPU cycle counter only work if the Secure
+> Debug Enable Register (SDER) SUNIDEN bit is set.
 > 
-
-OK. Good to know that we are speaking the same language.
-
->>
->> The summary is that:
->> - IOMMU takes care of the mappings via VFIO driver.
->> - Guest machine owns the HW. No hypervisor interaction.
+> Since access to the SDER is only possible in secure state, it will
+> only be done if the device tree property "secure-reg-access" is set.
 > 
-> Then it might be worth mentioning all of this
+> Without this:
+> # perf stat -e cycles,instructions sleep 1
 > 
-
-Sure thing. I'm trying to locate where the right place would be.
-I'll target commit message and source code for now.
-
->>
->>>
->>> - How do host and guest communicate?
->> They don't.
->>
->>> - How is the integration performed in the hypervisor?
->> Hypervisor has a bunch of channel resources. For each guest machine, the channel gets
->> unbound from the hypervisor. Channels get bind to each VFIO platform device and then
->> control is given to the guest machine.
+>  Performance counter stats for 'sleep 1':
 > 
-> And what does the hypervisor do with those in the meantime? Above, you
-> say "Guest machine owns the HW". 
-
-The guest machine owns the channel HW which runs independent of the management HW.
-
-> So what is that hypervisor code used
-> for? Is that your reset driver?
-
-The HIDMA "management" driver which runs at the hypervisor owns the management HW. 
-Management driver serves two purposes.
-
-1. Common bus parameter configuration (could be called reset driver).
-2. Fine tuning the HW resources.
-
-Multiple HIDMA channels share common HW resources. The management driver is able to change 
-the priority (high/low) and weight (round-robin priority) of each HIDMA channel on the flight. 
-
-The system administrator will use a userspace application to allocate HW resources to each channel via
-the management driver.
-
-The management driver does some common configuration too for these parameters. 
-The management interface also has to be enabled before any channel can be enabled.
-
-- max-write-burst-bytes: Maximum write burst in bytes that HIDMA can 
-  occupy the bus for in a single transaction. A memcpy requested is 
-  fragmented to multiples of this amount. This parameter is used while
-  writing into destination memory. Setting this value incorrectly can
-  starve other peripherals in the system.
-- max-read-burst-bytes: Maximum read burst in bytes that HIDMA can
-  occupy the bus for in a single transaction. A memcpy request is
-  fragmented to multiples of this amount. This parameter is used while
-  reading the source memory. Setting this value incorrectly can starve
-  other peripherals in the system.
-- max-write-transactions: This value is how many times a write burst is 
-  applied back to back while writing to the destination before yielding 
-  the bus.
-- max-read-transactions: This value is how many times a read burst is
-  applied back to back while reading the source before a yielding the bus.
-- channel-reset-timeout-cycles: Channel reset timeout in cycles for this SOC.
-  Once a reset is applied to the HW, HW starts a timer for reset operation
-  to confirm. If reset is not completed within this time, HW reports reset
-  failure. 
-
+>           14606094 cycles                    #    0.000 GHz
+>                  0 instructions              #    0.00  insns per cycle
 > 
-> You may want to drop the "hypervisor" designation, BTW, because this has
-> no real connection to virtualisation.
+> After applying:
+> # perf stat -e cycles,instructions sleep 1
 > 
-
-Would you use host/guest relationship?
-
->>
->> Once the guest machine is shutdown, VFIO driver still owns the channel device. It can
->> assign the device to another guest machine.
->>
->>> - Does the HYP side requires any context switch (and how is that done)?
->> No communication is needed.
->>
->>> - What makes it safe?
->> No communication is needed.
->>
->>>
->>> Without any of this information (and pointer to the code to back it up),
->>> I'm very reluctant to take any of this.
->>
->> Please let me know what exactly is not clear. 
->>
->> You don't write a virtualization driver for 8139too driver. The driver works whether it is running in the 
->> guest machine or the hypervisor. 
+>  Performance counter stats for 'sleep 1':
 > 
-> Exactly. No hypervisor code needed whatsoever. So please get rid of this
-> hypervisor nonsense! ;-)
+>            5843809 cycles
+>            2566484 instructions              #    0.44  insns per cycle
 > 
-
-I need the management driver for administrative purposes and common initialization. 
-I like the split SW design as it follows the HW design too.
-
-> Thanks,
+>        1.020144000 seconds time elapsed
 > 
-> 	M.
+> Some platforms (eg i.MX53) may also need additional platform specific
+> setup.
 > 
+> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
+> Signed-off-by: Pooya Keshavarzi <Pooya.Keshavarzi@de.bosch.com>
+> Signed-off-by: George G. Davis <george_davis@mentor.com>
+> ---
+> Changes in v4:
+> - Reword commit message to clarify that this change is ARMv7 specific.
+> - Clarify that secure-reg-access property is only valid for ARMv7 CPUs
+>   and is not supported on anything else (in particular, the arm64
+>   port requires you to boot in non-secure mode).
+> - Convert on_each_cpu(armv7pmu_enable_secure_access, NULL, 1) call in
+>   armv7pmu_init() to in-lined code in ->reset callback, since that is
+>   called off the back of a CPU hotplug notifier when the PMU may need
+>   to be reinitialised.
 
+Thanks. I'll queue this for 4.6 along with Rob's ack.
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Will
