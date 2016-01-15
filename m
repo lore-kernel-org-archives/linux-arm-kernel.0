@@ -1,80 +1,92 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 15 Jan 2016 14:55:25 +0800
-Subject: [PATCH v2 12/16] ARM: Xen: Document UEFI support on Xen ARM virtual
- platforms
+Date: Fri, 15 Jan 2016 14:55:26 +0800
+Subject: [PATCH v2 13/16] ARM: XEN: Set EFI_PARAVIRT if Xen supports EFI
 In-Reply-To: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1452840929-19612-13-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1452840929-19612-14-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
-scan this to get the UEFI information.
+Check if there is "uefi" node in the DT. If so, set EFI_PARAVIRT flag.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/xen.txt | 42 +++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ arch/arm/xen/enlighten.c | 23 +++++++++++++++++++++++
+ arch/arm64/kernel/efi.c  |  5 +++++
+ 2 files changed, 28 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
-index 0f7b9c2..fbc17ae 100644
---- a/Documentation/devicetree/bindings/arm/xen.txt
-+++ b/Documentation/devicetree/bindings/arm/xen.txt
-@@ -15,6 +15,36 @@ the following properties:
- - interrupts: the interrupt used by Xen to inject event notifications.
-   A GIC node is also required.
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 5d0fe68..485e117 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -31,6 +31,7 @@
+ #include <linux/timekeeping.h>
+ #include <linux/timekeeper_internal.h>
+ #include <linux/acpi.h>
++#include <linux/efi.h>
  
-+To support UEFI on Xen ARM virtual platforms, Xen pupulates the FDT "uefi" node
-+under /hypervisor with following parameters:
-+
-+________________________________________________________________________________
-+Name                      | Size   | Description
-+================================================================================
-+xen,uefi-system-table     | 64-bit | Guest physical address of the UEFI System
-+			  |	   | Table.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-start       | 64-bit | Guest physical address of the UEFI memory
-+			  |	   | map.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
-+                          |        | pointed to in previous entry.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
-+                          |        | memory map.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
-+--------------------------------------------------------------------------------
-+
-+Below is the format of the mmap descriptor.
-+typedef struct {
-+	u32 type;
-+	u32 pad;
-+	u64 phys_addr;
-+	u64 virt_addr;
-+	u64 num_pages;
-+	u64 attribute;
-+} efi_memory_desc_t;
+ #include <linux/mm.h>
  
- Example (assuming #address-cells = <2> and #size-cells = <2>):
+@@ -248,6 +249,19 @@ static int __init fdt_find_xen_node(unsigned long node, const char *uname,
+ 	return 0;
+ }
  
-@@ -22,4 +52,16 @@ hypervisor {
- 	compatible = "xen,xen-4.3", "xen,xen";
- 	reg = <0 0xb0000000 0 0x20000>;
- 	interrupts = <1 15 0xf08>;
-+	uefi {
-+		xen,uefi-system-table = <0xXXXXXXXX>;
-+		xen,uefi-mmap-start = <0xXXXXXXXX>;
-+		xen,uefi-mmap-size = <0xXXXXXXXX>;
-+		xen,uefi-mmap-desc-size = <0xXXXXXXXX>;
-+		xen,uefi-mmap-desc-ver = <0xXXXXXXXX>;
-+        };
- };
++static int __init fdt_find_uefi_node(unsigned long node, const char *uname,
++				     int depth, void *data)
++{
++	bool *found = data;
 +
-+These "xen,uefi-*" parameters are similar to those in Documentation/arm/uefi.txt
-+which are used by normal UEFI. But to Xen ARM virtual platforms, it needs to
-+introduce a Xen specific UEFI and it doesn't want to mix with normal UEFI.
-+Therefore, it defines these parameters under /hypervisor node.
++	if (depth != 2 || strcmp(uname, "uefi") != 0)
++		return 0;
++
++	*found = true;
++
++	return 1;
++}
++
+ /*
+  * see Documentation/devicetree/bindings/arm/xen.txt for the
+  * documentation of the Xen Device Tree format.
+@@ -255,6 +269,8 @@ static int __init fdt_find_xen_node(unsigned long node, const char *uname,
+ #define GRANT_TABLE_PHYSADDR 0
+ void __init xen_early_init(void)
+ {
++	bool uefi_found = false;
++
+ 	of_scan_flat_dt(fdt_find_xen_node, NULL);
+ 	if (!xen_node.found) {
+ 		pr_debug("No Xen support\n");
+@@ -279,6 +295,13 @@ void __init xen_early_init(void)
+ 
+ 	if (!console_set_on_cmdline && !xen_initial_domain())
+ 		add_preferred_console("hvc", 0, NULL);
++
++	if (IS_ENABLED(CONFIG_XEN_EFI)) {
++		/* Check if Xen support UEFI */
++		of_scan_flat_dt(fdt_find_uefi_node, &uefi_found);
++		if (uefi_found)
++			set_bit(EFI_PARAVIRT, &efi.flags);
++	}
+ }
+ 
+ static int __init xen_guest_init(void)
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 4eeb171..16c6b72 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -288,6 +288,11 @@ static int __init arm64_enable_runtime_services(void)
+ 		return 0;
+ 	}
+ 
++	if (efi_enabled(EFI_PARAVIRT)) {
++		pr_info("EFI runtime services access via paravirt.\n");
++		return -1;
++	}
++
+ 	pr_info("Remapping and enabling EFI services.\n");
+ 
+ 	mapsize = memmap.map_end - memmap.map;
 -- 
 2.0.4
