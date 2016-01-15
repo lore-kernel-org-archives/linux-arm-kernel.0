@@ -1,69 +1,190 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 15 Jan 2016 17:32:06 +0000
-Subject: [PATCH V12 3/7] dma: add Qualcomm Technologies HIDMA management
- driver
-In-Reply-To: <56992987.5080603@codeaurora.org>
-References: <1452523550-8920-1-git-send-email-okaya@codeaurora.org>
- <1452523550-8920-4-git-send-email-okaya@codeaurora.org>
- <20160115145629.GI3262@leverpostej> <56990C40.4050407@codeaurora.org>
- <20160115152257.GK3262@leverpostej> <56992987.5080603@codeaurora.org>
-Message-ID: <56992D16.6070800@arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 15 Jan 2016 17:39:55 +0000
+Subject: [Xen-devel] [PATCH v2 06/16] Xen: ARM: Add support for mapping
+ platform device mmio
+In-Reply-To: <1452840929-19612-7-git-send-email-zhaoshenglong@huawei.com>
+References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452840929-19612-7-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <alpine.DEB.2.02.1601151739470.16178@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/01/16 17:16, Sinan Kaya wrote:
->>>> This doesn't seem to tie into KVM or VFIO, and as far as I can tell
->>>> there's no mechanism for associating channels with a particular virtual
->>>> address space (i.e. no configuration of an external or internal IOMMU),
->>>> nor pinning of guest pages to allow for DMA to occur safely.
->>>
->>> I'm using VFIO platform driver for this purpose. VFIO platform driver is 
->>> capable of assigning any platform device to a guest machine with this driver. 
->>
->> Typically VFIO-platform also comes with a corresponding reset driver.
->> You don't need one?
+On Fri, 15 Jan 2016, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> The HIDMA channel driver resets the channel before using it. That's why, I never
-> bothered with writing a reset driver on the hypervisor.
+> Add a bus_notifier for platform bus device in order to map the device
+> mmio regions when DOM0 booting with ACPI.
 > 
->>
->>> You just unbind the HIDMA channel driver from the hypervisor and bind to vfio
->>> driver using the very same approach you'd use with PCIe. 
->>>
->>> Of course, this all assumes the presence of an IOMMU driver on the system. VFIO
->>> driver uses the IOMMU driver to create the mappings. 
->>
->> No IOMMU was described in the DT binding. It sounds like you'd need an
->> optional (not present in the guest) iommus property per-channel
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  drivers/xen/Makefile     |   1 +
+>  drivers/xen/arm-device.c | 140 +++++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 141 insertions(+)
+>  create mode 100644 drivers/xen/arm-device.c
 > 
-> You are right. I missed that part. I'll update the device-tree binding documentation.
-> 
->>
->>> The mechanism used here is not different from VFIO PCI from user perspective.
->>>
->>>>
->>>> Given that, I'm at a loss as to how this would be used in a hypervisor
->>>> context. What am I missing?
->>>>
->>>> Are there additional patches, or do you have some userspace that works
->>>> with this in some limited configuration?
->>>
->>> No, these are the only patches. We have one patch for the QEMU but from kernel
->>> perspective this is it. 
->>
->> Do you have a link to that? Seeing it would help to ease my concerns.
-> 
-> The QEMU driver has not been posted yet. As far as I know, it just discovers the memory
-> resources on the platform object and creates mappings for the guest machine only. 
-> 
-> Shanker Donthineni and Vikram Sethi will post the QEMU patch later.
+> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+> index aa8a7f7..0c087b1 100644
+> --- a/drivers/xen/Makefile
+> +++ b/drivers/xen/Makefile
+> @@ -9,6 +9,7 @@ CFLAGS_features.o			:= $(nostackp)
+>  
+>  CFLAGS_efi.o				+= -fshort-wchar
+>  
+> +dom0-$(CONFIG_ARM64) += arm-device.o
+>  dom0-$(CONFIG_PCI) += pci.o
+>  dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
+>  dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
+> diff --git a/drivers/xen/arm-device.c b/drivers/xen/arm-device.c
+> new file mode 100644
+> index 0000000..7d902ea
+> --- /dev/null
+> +++ b/drivers/xen/arm-device.c
+> @@ -0,0 +1,140 @@
+> +/*
+> + * Copyright (c) 2015, Linaro Limited, Shannon Zhao
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/platform_device.h>
+> +#include <linux/acpi.h>
+> +#include <xen/xen.h>
+> +#include <xen/page.h>
+> +#include <xen/interface/memory.h>
+> +#include <asm/xen/hypervisor.h>
+> +#include <asm/xen/hypercall.h>
+> +
+> +static int xen_unmap_device_mmio(struct resource *resource, unsigned int count)
+> +{
+> +	unsigned int i, j, nr;
+> +	int rc = 0;
+> +	struct resource *r;
+> +	struct xen_remove_from_physmap xrp;
+> +
+> +	for (i = 0; i < count; i++) {
+> +		r = &resource[i];
+> +		nr = DIV_ROUND_UP(resource_size(r), XEN_PAGE_SIZE);
+> +		if ((resource_type(r) != IORESOURCE_MEM) || (nr == 0))
+> +			continue;
+> +
+> +		for (j = 0; j < nr; j++) {
+> +			xrp.domid = DOMID_SELF;
+> +			xrp.gpfn = XEN_PFN_DOWN(r->start) + j;
+> +			rc = HYPERVISOR_memory_op(XENMEM_remove_from_physmap,
+> +						  &xrp);
+> +			if (rc)
+> +				return rc;
+> +		}
+> +	}
+> +
+> +	return rc;
+> +}
+> +
+> +static int xen_map_device_mmio(struct resource *resource, unsigned int count)
+> +{
+> +	unsigned int i, j, nr;
+> +	int rc = 0;
+> +	struct resource *r;
+> +	xen_pfn_t *gpfns;
+> +	xen_ulong_t *idxs;
+> +	int *errs;
+> +	struct xen_add_to_physmap_range xatp;
+> +
+> +	for (i = 0; i < count; i++) {
+> +		r = &resource[i];
+> +		nr = DIV_ROUND_UP(resource_size(r), XEN_PAGE_SIZE);
+> +		if ((resource_type(r) != IORESOURCE_MEM) || (nr == 0))
+> +			continue;
+> +
+> +		gpfns = kzalloc(sizeof(xen_pfn_t) * nr, GFP_KERNEL);
+> +		idxs = kzalloc(sizeof(xen_ulong_t) * nr, GFP_KERNEL);
+> +		errs = kzalloc(sizeof(int) * nr, GFP_KERNEL);
+> +		if (!gpfns || !idxs || !errs) {
+> +			kfree(gpfns);
+> +			kfree(idxs);
 
-Then may I suggest you both synchronize your submissions? I'd really
-like to hear from the QEMU maintainers that they are satisfied with that
-side of the story as well.
+kfree(errs)?
 
-Thanks,
+Aside from this:
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+
+
+> +			return -ENOMEM;
+> +		}
+> +
+> +		for (j = 0; j < nr; j++) {
+> +			gpfns[j] = XEN_PFN_DOWN(r->start) + j;
+> +			idxs[j] = XEN_PFN_DOWN(r->start) + j;
+> +		}
+> +
+> +		xatp.domid = DOMID_SELF;
+> +		xatp.size = nr;
+> +		xatp.space = XENMAPSPACE_dev_mmio;
+> +
+> +		set_xen_guest_handle(xatp.gpfns, gpfns);
+> +		set_xen_guest_handle(xatp.idxs, idxs);
+> +		set_xen_guest_handle(xatp.errs, errs);
+> +
+> +		rc = HYPERVISOR_memory_op(XENMEM_add_to_physmap_range, &xatp);
+> +		kfree(gpfns);
+> +		kfree(idxs);
+> +		kfree(errs);
+> +		if (rc)
+> +			return rc;
+> +	}
+> +
+> +	return rc;
+> +}
+> +
+> +static int xen_platform_notifier(struct notifier_block *nb,
+> +				 unsigned long action, void *data)
+> +{
+> +	struct platform_device *pdev = to_platform_device(data);
+> +	int r = 0;
+> +
+> +	if (pdev->num_resources == 0 || pdev->resource == NULL)
+> +		return NOTIFY_OK;
+> +
+> +	switch (action) {
+> +	case BUS_NOTIFY_ADD_DEVICE:
+> +		r = xen_map_device_mmio(pdev->resource, pdev->num_resources);
+> +		break;
+> +	case BUS_NOTIFY_DEL_DEVICE:
+> +		r = xen_unmap_device_mmio(pdev->resource, pdev->num_resources);
+> +		break;
+> +	default:
+> +		return NOTIFY_DONE;
+> +	}
+> +	if (r)
+> +		dev_err(&pdev->dev, "Platform: Failed to %s device %s MMIO!\n",
+> +			action == BUS_NOTIFY_ADD_DEVICE ? "map" :
+> +			(action == BUS_NOTIFY_DEL_DEVICE ? "unmap" : "?"),
+> +			pdev->name);
+> +
+> +	return NOTIFY_OK;
+> +}
+> +
+> +static struct notifier_block platform_device_nb = {
+> +	.notifier_call = xen_platform_notifier,
+> +};
+> +
+> +static int __init register_xen_platform_notifier(void)
+> +{
+> +	if (!xen_initial_domain() || acpi_disabled)
+> +		return 0;
+> +
+> +	return bus_register_notifier(&platform_bus_type, &platform_device_nb);
+> +}
+> +
+> +arch_initcall(register_xen_platform_notifier);
