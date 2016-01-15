@@ -1,128 +1,80 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 15 Jan 2016 11:17:30 +0100
-Subject: [PATCH v2 13/26] drm/fb_cma_helper: Remove implicit call to
- disable_unused_functions
-In-Reply-To: <2014724.QmjXVju9UW@avalon>
-References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
- <1452785109-6172-14-git-send-email-maxime.ripard@free-electrons.com>
- <2014724.QmjXVju9UW@avalon>
-Message-ID: <20160115101730.GH19130@phenom.ffwll.local>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 15 Jan 2016 10:24:32 +0000
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160114225510.GJ3818@linux.vnet.ibm.com>
+References: <569565DA.2010903@imgtec.com> <20160113104516.GE25458@arm.com>
+ <5696CF08.8080700@imgtec.com> <20160114121449.GC15828@arm.com>
+ <5697F6D2.60409@imgtec.com>
+ <20160114203430.GC3818@linux.vnet.ibm.com>
+ <56980C91.1010403@imgtec.com>
+ <20160114212913.GF3818@linux.vnet.ibm.com>
+ <569814F2.50801@imgtec.com>
+ <20160114225510.GJ3818@linux.vnet.ibm.com>
+Message-ID: <20160115102431.GB2131@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 01:13:05AM +0200, Laurent Pinchart wrote:
-> Hi Maxime,
-> 
-> Thank you for the patch.
-> 
-> On Thursday 14 January 2016 16:24:56 Maxime Ripard wrote:
-> > The drm_fbdev_cma_init function always calls the
-> > drm_helper_disable_unused_functions. Since it's part of the usual probe
-> > process, all the drivers using that helper will end up having their encoder
-> > and CRTC disable functions called at probe if their device has not been
-> > reported as enabled.
+On Thu, Jan 14, 2016 at 02:55:10PM -0800, Paul E. McKenney wrote:
+> On Thu, Jan 14, 2016 at 01:36:50PM -0800, Leonid Yegoshin wrote:
+> > On 01/14/2016 01:29 PM, Paul E. McKenney wrote:
+> > >
+> > >>On 01/14/2016 12:34 PM, Paul E. McKenney wrote:
+> > >>>
+> > >>>The WRC+addr+addr is OK because data dependencies are not required to be
+> > >>>transitive, in other words, they are not required to flow from one CPU to
+> > >>>another without the help of an explicit memory barrier.
+> > >>I don't see any reliable way to fit WRC+addr+addr into "DATA
+> > >>DEPENDENCY BARRIERS" section recommendation to have data dependency
+> > >>barrier between read of a shared pointer/index and read the shared
+> > >>data based on that pointer. If you have this two reads, it doesn't
+> > >>matter the rest of scenario, you should put the dependency barrier
+> > >>in code anyway. If you don't do it in WRC+addr+addr scenario then
+> > >>after years it can be easily changed to different scenario which
+> > >>fits some of scenario in "DATA DEPENDENCY BARRIERS" section and
+> > >>fails.
+> > >The trick is that lockless_dereference() contains an
+> > >smp_read_barrier_depends():
+> > >
+> > >#define lockless_dereference(p) \
+> > >({ \
+> > >	typeof(p) _________p1 = READ_ONCE(p); \
+> > >	smp_read_barrier_depends(); /* Dependency order vs. p above. */ \
+> > >	(_________p1); \
+> > >})
+> > >
+> > >Or am I missing your point?
 > > 
-> > This could be fixed by reading out from the registers the current state of
-> > the device if it is enabled, but even that will not handle the case where
-> > the device is actually disabled.
-> > 
-> > Moreover, the drivers using the atomic modesetting expect that their enable
-> > and disable callback to be called when the device is already enabled or
-> > disabled (respectively).
-> > 
-> > We can however fix this issue by moving the call to
-> > drm_helper_disable_unused_functions out of drm_fbdev_cma_init and make the
-> > drivers needing it (all the drivers calling drm_fbdev_cma_init and not
-> > using the atomic modesetting) explicitly call it.
+> > WRC+addr+addr has no any barrier. lockless_dereference() has a
+> > barrier. I don't see a common points between this and that in your
+> > answer, sorry.
 > 
-> I'd rather add it to all drivers that call drm_fbdev_cma_init(). All the 
-> atomic ones must have special code to cope with it that could be rendered 
-> useless by the removal of the drm_helper_disable_unused_functions() call. That 
-> code should be removed too, and it would be easier to check drivers one by one 
-> and fixing them individually (outside of this patch series, unless you insist 
-> ;-)) when removing the explicit drm_helper_disable_unused_functions() call. 
+> Me, I am wondering what WRC+addr+addr has to do with anything at all.
 
-I had the same thought, but figured there's really no good reason ever to
-do this. I suspect most of that disable_unused_function stuff we have all
-over is supreme cargo-cult anyway ;-)
+See my earlier reply [1] (but also, your WRC Linux example looks more
+like a variant on WWC and I couldn't really follow it).
 
-> Other than that the patch looks fine to me.
+> <Going back through earlier email>
+> 
+> OK, so it looks like Will was asking not about WRC+addr+addr, but instead
+> about WRC+sync+addr.  This would drop an smp_mb() into cpu2() in my
+> earlier example, which needs to provide ordering.
+> 
+> I am guessing that the manual's "Older instructions which must be globally
+> performed when the SYNC instruction completes" provides the equivalent
+> of ARM/Power A-cumulativity, which can be thought of as transitivity
+> backwards in time. 
 
-So went ahead and applied to drm-misc.
--Daniel
+I couldn't make that leap. In particular, the manual's "Detailed
+Description" sections explicitly refer to program-order:
 
-> 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/gpu/drm/drm_fb_cma_helper.c | 3 ---
-> >  drivers/gpu/drm/imx/imx-drm-core.c  | 1 +
-> >  drivers/gpu/drm/sti/sti_drv.c       | 1 +
-> >  drivers/gpu/drm/tilcdc/tilcdc_drv.c | 1 +
-> >  4 files changed, 3 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/drm_fb_cma_helper.c
-> > b/drivers/gpu/drm/drm_fb_cma_helper.c index c19a62561183..daa98d881142
-> > 100644
-> > --- a/drivers/gpu/drm/drm_fb_cma_helper.c
-> > +++ b/drivers/gpu/drm/drm_fb_cma_helper.c
-> > @@ -348,9 +348,6 @@ struct drm_fbdev_cma *drm_fbdev_cma_init(struct
-> > drm_device *dev,
-> > 
-> >  	}
-> > 
-> > -	/* disable all the possible outputs/crtcs before entering KMS mode */
-> > -	drm_helper_disable_unused_functions(dev);
-> > -
-> >  	ret = drm_fb_helper_initial_config(helper, preferred_bpp);
-> >  	if (ret < 0) {
-> >  		dev_err(dev->dev, "Failed to set initial hw configuration.\n");
-> > diff --git a/drivers/gpu/drm/imx/imx-drm-core.c
-> > b/drivers/gpu/drm/imx/imx-drm-core.c index 7b990b4e96d2..e1db57791fc9
-> > 100644
-> > --- a/drivers/gpu/drm/imx/imx-drm-core.c
-> > +++ b/drivers/gpu/drm/imx/imx-drm-core.c
-> > @@ -312,6 +312,7 @@ static int imx_drm_driver_load(struct drm_device *drm,
-> > unsigned long flags) dev_warn(drm->dev, "Invalid legacyfb_depth. 
-> > Defaulting to 16bpp\n"); legacyfb_depth = 16;
-> >  	}
-> > +	drm_helper_disable_unused_functions(drm);
-> >  	imxdrm->fbhelper = drm_fbdev_cma_init(drm, legacyfb_depth,
-> >  				drm->mode_config.num_crtc, MAX_CRTC);
-> >  	if (IS_ERR(imxdrm->fbhelper)) {
-> > diff --git a/drivers/gpu/drm/sti/sti_drv.c b/drivers/gpu/drm/sti/sti_drv.c
-> > index 1469987949d8..506b5626f3ed 100644
-> > --- a/drivers/gpu/drm/sti/sti_drv.c
-> > +++ b/drivers/gpu/drm/sti/sti_drv.c
-> > @@ -160,6 +160,7 @@ static int sti_load(struct drm_device *dev, unsigned
-> > long flags)
-> > 
-> >  	drm_mode_config_reset(dev);
-> > 
-> > +	drm_helper_disable_unused_functions(dev);
-> >  	drm_fbdev_cma_init(dev, 32,
-> >  			   dev->mode_config.num_crtc,
-> >  			   dev->mode_config.num_connector);
-> > diff --git a/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-> > b/drivers/gpu/drm/tilcdc/tilcdc_drv.c index 876cad58b1f9..24be31d69701
-> > 100644
-> > --- a/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-> > +++ b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-> > @@ -294,6 +294,7 @@ static int tilcdc_load(struct drm_device *dev, unsigned
-> > long flags) break;
-> >  	}
-> > 
-> > +	drm_helper_disable_unused_functions(dev);
-> >  	priv->fbdev = drm_fbdev_cma_init(dev, bpp,
-> >  			dev->mode_config.num_crtc,
-> >  			dev->mode_config.num_connector);
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
+  Every synchronizable specified memory instruction (loads or stores or
+  both) that occurs in the instruction stream before the SYNC
+  instruction must reach a stage in the load/store datapath after which
+  no instruction re-ordering is possible before any synchronizable
+  specified memory instruction which occurs after the SYNC instruction
+  in the instruction stream reaches the same stage in the load/store
+  datapath.
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Will
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/399765.html
