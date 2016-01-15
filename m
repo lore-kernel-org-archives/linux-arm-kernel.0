@@ -1,57 +1,28 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 15 Jan 2016 11:34:21 +0100
-Subject: [PATCH] clockevents: tcb_clksrc: stop disabling an already disabled
- clock
-Message-ID: <1452854061-30370-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 15 Jan 2016 11:43:47 +0100
+Subject: [PATCH v2 1/2] ARM: shmobile: r8a7790: use GIC_* defines
+In-Reply-To: <1452825856-16230-2-git-send-email-horms+renesas@verge.net.au>
+References: <1452825856-16230-1-git-send-email-horms+renesas@verge.net.au>
+ <1452825856-16230-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVcHH4Sv5b5xweAgSMun3kEWgOiR32pzSuXVAkYwi=RcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clockevents_exchange_device is calling clockevents_shutdown() on the new
-clockenvents device but it may have never been enabled in the first place.
-This results in the tcb clock being disabled without being enabled first:
+On Fri, Jan 15, 2016 at 3:44 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Use GIC_* defines for GIC interrupt cells in r8a7791 device tree.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:680 clk_disable+0x28/0x34()
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper Not tainted 4.4.0+ #6
-Hardware name: Atmel AT91SAM9
-[<c000f2b8>] (unwind_backtrace) from [<c000d01c>] (show_stack+0x10/0x14)
-[<c000d01c>] (show_stack) from [<c00172f0>] (warn_slowpath_common+0x78/0xa0)
-[<c00172f0>] (warn_slowpath_common) from [<c00173a8>] (warn_slowpath_null+0x18/0x20)
-[<c00173a8>] (warn_slowpath_null) from [<c0361528>] (clk_disable+0x28/0x34)
-[<c0361528>] (clk_disable) from [<c034d560>] (tc_shutdown+0x38/0x4c)
-[<c034d560>] (tc_shutdown) from [<c0059ad4>] (clockevents_switch_state+0x38/0x6c)
-[<c0059ad4>] (clockevents_switch_state) from [<c0059b18>] (clockevents_shutdown+0x10/0x24)
-[<c0059b18>] (clockevents_shutdown) from [<c005a458>] (tick_check_new_device+0x84/0xac)
-[<c005a458>] (tick_check_new_device) from [<c0059660>] (clockevents_register_device+0x7c/0x108)
-[<c0059660>] (clockevents_register_device) from [<c06b5a68>] (tcb_clksrc_init+0x390/0x3e8)
-[<c06b5a68>] (tcb_clksrc_init) from [<c00097cc>] (do_one_initcall+0x114/0x1d4)
-[<c00097cc>] (do_one_initcall) from [<c069bd54>] (kernel_init_freeable+0xfc/0x1b8)
-[<c069bd54>] (kernel_init_freeable) from [<c04c3818>] (kernel_init+0x8/0xe0)
-[<c04c3818>] (kernel_init) from [<c000a410>] (ret_from_fork+0x14/0x24)
----[ end trace 0000000000000001 ]---
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Check what state we were in before trying to disable the clock.
+Gr{oetje,eeting}s,
 
-Fixes: cf4541c101ea ("clockevents/drivers/tcb_clksrc: Migrate to new 'set-state' interface")
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/clocksource/tcb_clksrc.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+                        Geert
 
-diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-index 6ee91401918e..4da2af9694a2 100644
---- a/drivers/clocksource/tcb_clksrc.c
-+++ b/drivers/clocksource/tcb_clksrc.c
-@@ -98,7 +98,8 @@ static int tc_shutdown(struct clock_event_device *d)
- 
- 	__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
- 	__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
--	clk_disable(tcd->clk);
-+	if (!clockevent_state_detached(d))
-+		clk_disable(tcd->clk);
- 
- 	return 0;
- }
--- 
-2.5.0
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
