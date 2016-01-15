@@ -1,22 +1,35 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 14 Jan 2016 18:08:23 -0800
-Subject: [PATCH v3 03/13] clk: at91: clk-main: factorize irq handling
-In-Reply-To: <1449248628-3486-4-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Thu, 14 Jan 2016 18:10:26 -0800
+Subject: [PATCH v3 02/13] clk: at91: make use of syscon/regmap internally
+In-Reply-To: <1449248628-3486-3-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1449248628-3486-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1449248628-3486-4-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20160115020823.GQ22188@codeaurora.org>
+ <1449248628-3486-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20160115021026.GR22188@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 12/04, Alexandre Belloni wrote:
-> The three different irq handlers are doing the same thing, factorize their
-> code in a generic irq handler.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
+> diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
+> index abc80949e1dd..0b9e0aeef346 100644
+> --- a/drivers/clk/at91/clk-generated.c
+> +++ b/drivers/clk/at91/clk-generated.c
+> @@ -17,9 +17,13 @@
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+>  #include <linux/io.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/regmap.h>
+>  
+>  #include "pmc.h"
+>  
+> +extern spinlock_t pmc_pcr_lock;
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+You can throw this extern into pmc.h?
 
+> +
+>  #define PERIPHERAL_MAX		64
+>  #define PERIPHERAL_ID_MIN	2
+>  
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 a Linux Foundation Collaborative Project
