@@ -1,19 +1,26 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 14 Jan 2016 21:15:43 -0600
-Subject: [PATCH v2 24/26] devicetree: Add olimex vendor prefix
-In-Reply-To: <1452785109-6172-25-git-send-email-maxime.ripard@free-electrons.com>
+Date: Thu, 14 Jan 2016 21:17:35 -0600
+Subject: [PATCH v2 25/26] drm/panel: simple: Add timings for the Olimex
+ LCD-OLinuXino-4.3TS
+In-Reply-To: <1452785109-6172-26-git-send-email-maxime.ripard@free-electrons.com>
 References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
- <1452785109-6172-25-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20160115031543.GA25640@rob-hp-laptop>
+ <1452785109-6172-26-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20160115031735.GA26011@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 04:25:07PM +0100, Maxime Ripard wrote:
-> Olimex is an open source hardware boards vendors based in Bulgaria.
+On Thu, Jan 14, 2016 at 04:25:08PM +0100, Maxime Ripard wrote:
+> Add support for the Olimex LCD-OLinuXino-4.3TS panel to the DRM simple
+> panel driver.
+> 
+> It is a 480x272 panel connected through a 24-bits RGB interface.
 > 
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+>  .../display/panel/olimex,lcd-olinuxino-43-ts.txt   |  7 ++++++
 
 Acked-by: Rob Herring <robh@kernel.org>
+
+>  drivers/gpu/drm/panel/panel-simple.c               | 26 ++++++++++++++++++++++
+>  2 files changed, 33 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/olimex,lcd-olinuxino-43-ts.txt
