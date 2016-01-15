@@ -1,46 +1,68 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 15 Jan 2016 13:41:38 -0600
-Subject: [PATCH v3 2/3] ARM: DRA7: add pdata-quirks to do reset of PCIe
-In-Reply-To: <20160115192224.GD3904@atomide.com>
-References: <1452780672-14339-1-git-send-email-kishon@ti.com>
- <1452780672-14339-3-git-send-email-kishon@ti.com> <56994640.3090704@ti.com>
- <20160115192224.GD3904@atomide.com>
-Message-ID: <56994B72.2@ti.com>
+From: steve.muckle@linaro.org (Steve Muckle)
+Date: Fri, 15 Jan 2016 11:50:31 -0800
+Subject: [RFC PATCH v2 0/4] CPUs capacity information for heterogeneous
+ systems
+In-Reply-To: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
+References: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
+Message-ID: <56994D87.6000709@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2016 01:22 PM, Tony Lindgren wrote:
-> * Suman Anna <s-anna@ti.com> [160115 11:20]:
->> On 01/14/2016 08:11 AM, Kishon Vijay Abraham I wrote:
->>> Create platform data for PCIe and populate it with function
->>> pointers to perform assert and deassert of PCIe reset lines.
->>> The PCIe driver can use the callbacks provided here to
->>> reset the PCIe.
->>> This will be removed once the reset contoller driver is
->>> available to reset PCIe.
-> ...
+On 01/08/2016 06:09 AM, Juri Lelli wrote:
+>  2. Dynamic profiling at boot (v2)
 > 
->>> +/**
->>> + * struct pci_dra7xx_platform_data - platform data specific to pci in dra7xx
->>> + * @reset_name: name of the reset line
->>> + * @assert_reset: callback for performing assert reset operation
->>> + * @deassert_reset: callback for performing deassert reset operation
->>> + */
->>> +struct pci_dra7xx_platform_data {
->>> +	const char *reset_name;
->>> +
->>> +	int (*assert_reset)(struct platform_device *pdev, const char *name);
->>> +	int (*deassert_reset)(struct platform_device *pdev, const char *name);
->>> +};
+>     pros: - does not require a standardized definition of capacity
+>           - cannot be incorrectly tuned (once benchmark is fixed)
+>           - does not require user/integrator work
 > 
-> I doubt this platform_data is dra7 specific. I believe it's
-> the same PCI controller that has been in the omap variants for
-> years?
+>     cons: - not easy to come up with a clean solution, as it seems interaction
+>             with several subsystems (e.g., cpufreq) is required
+>           - not easy to agree upon a single benchmark (that has to be both
+>             representative and simple enough to run at boot)
+>           - numbers might (and do) vary from boot to boot
 
-AFAIK, this only applies to DRA7. Sekhar/Kishon can confirm. I did take
-a quick look at OMAP3/4/5 TRMs, and didn't find any. Neither did a grep
-on current hwmod files other than DRA7. There's a DM81xx related PCI
-clock domain, but don't see any corresponding driver/device for the same.
+An important additional con that was mentioned earlier IIRC was the
+additional boot time required for the benchmark. Perhaps there could be
+a kernel command line argument to bypass the benchmark if it is known
+that predetermined values will be provided via sysfs later?
 
-regards
-Suman
+Though there may be another issue with that as mentioned below.
+
+>  3. sysfs (v1)
+> 
+>     pros: - clean and super easy to implement
+>           - values don't require to be physical properties, defining them is
+>             probably easier
+> 
+>     cons: - CPUs capacity have to be provided after boot (by some init script?)
+>           - API is modified, still some discussion/review is needed
+>           - values can still be incorrectly used for runtime tuning purposes
+
+Initializing the values via userspace init will cause more of the boot
+process to run with incorrect CPU capacity values. Boot times may be
+increased with tasks running on suboptimal CPUs. Such increases may also
+not be deterministic.
+
+Extending the kernel command line idea above, perhaps capacity values
+could be provided there as well, similar to the lpj parameter? That has
+scalability issues though if there's a huge highly heterogeneous platform...
+
+DT solves these issues and would be the perfect place for this - we are
+defining the compute capacity of a CPU which is a property of the
+hardware. However there are a couple things forcing us to compromise.
+One is that the amount and detail of information required to adequately
+capture the computational abilities of a CPU across all possible
+workloads seem onerous to collect and enumerate. The second is that even
+if we were willing to undertake that, CPU vendors probably won't be
+forthcoming with that information.
+
+Despite this DT still seems to me like the best way to go. At their
+heart these are properties of the hardware, even if we can't specify
+them as such per se because of the problems above. The capacity would
+have to be defined as a relative value among CPUs. And while it's true
+it may be abused for tuning purposes, that's true of any strategy.
+Certainly the sysfs strategy and even if only a dynamic option is
+provided, it is guaranteed to be hacked by platform vendors.
+
+thanks,
+Steve
