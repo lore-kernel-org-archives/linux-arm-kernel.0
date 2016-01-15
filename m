@@ -1,55 +1,49 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 15 Jan 2016 14:27:46 +0800
-Subject: [PATCH v9 12/21] KVM: ARM64: Add access handler for PMOVSSET and
- PMOVSCLR register
+Date: Fri, 15 Jan 2016 14:27:40 +0800
+Subject: [PATCH v9 06/21] KVM: ARM64: Add access handler for PMCEID0 and
+ PMCEID1 register
 In-Reply-To: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1452839275-19368-13-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1452839275-19368-7-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Since the reset value of PMOVSSET and PMOVSCLR is UNKNOWN, use
-reset_unknown for its reset handler. Add a handler to emulate writing
-PMOVSSET or PMOVSCLR register.
-
-When writing non-zero value to PMOVSSET, the counter and its interrupt
-is enabled, kick this vcpu to sync PMU interrupt.
+Add access handler which gets host value of PMCEID0 or PMCEID1 when
+guest access these registers. Writing action to PMCEID0 or PMCEID1 is
+UNDEFINED.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm64/kvm/sys_regs.c | 29 ++++++++++++++++++++++++++---
- include/kvm/arm_pmu.h     |  2 ++
- virt/kvm/arm/pmu.c        | 30 ++++++++++++++++++++++++++++++
- 3 files changed, 58 insertions(+), 3 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 29 +++++++++++++++++++++++++----
+ 1 file changed, 25 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 41d4bcd..60b24ea 100644
+index fc60041..06257e2 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -654,6 +654,28 @@ static bool access_pminten(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+@@ -492,6 +492,27 @@ static bool access_pmselr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
  	return true;
  }
  
-+static bool access_pmovs(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-+			 const struct sys_reg_desc *r)
++static bool access_pmceid(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			  const struct sys_reg_desc *r)
 +{
-+	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
++	u64 pmceid;
 +
 +	if (!kvm_arm_pmu_v3_ready(vcpu))
 +		return trap_raz_wi(vcpu, p, r);
 +
-+	if (p->is_write) {
-+		if (r->CRm & 0x2)
-+			/* accessing PMOVSSET_EL0 */
-+			kvm_pmu_overflow_set(vcpu, p->regval & mask);
-+		else
-+			/* accessing PMOVSCLR_EL0 */
-+			vcpu_sys_reg(vcpu, PMOVSSET_EL0) &= ~(p->regval & mask);
-+	} else {
-+		p->regval = vcpu_sys_reg(vcpu, PMOVSSET_EL0) & mask;
-+	}
++	if (p->is_write)
++		return false;
++
++	if (!(p->Op2 & 1))
++		asm volatile("mrs %0, pmceid0_el0\n" : "=r" (pmceid));
++	else
++		asm volatile("mrs %0, pmceid1_el0\n" : "=r" (pmceid));
++
++	p->regval = pmceid;
 +
 +	return true;
 +}
@@ -57,101 +51,29 @@ index 41d4bcd..60b24ea 100644
  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
  	/* DBGBVRn_EL1 */						\
-@@ -861,7 +883,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	  access_pmcnten, NULL, PMCNTENSET_EL0 },
- 	/* PMOVSCLR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b011),
+@@ -694,10 +715,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	  access_pmselr, reset_unknown, PMSELR_EL0 },
+ 	/* PMCEID0_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b110),
 -	  trap_raz_wi },
-+	  access_pmovs, NULL, PMOVSSET_EL0 },
- 	/* PMSWINC_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b100),
- 	  trap_raz_wi },
-@@ -888,7 +910,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	  trap_raz_wi },
- 	/* PMOVSSET_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b011),
++	  access_pmceid },
+ 	/* PMCEID1_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b111),
 -	  trap_raz_wi },
-+	  access_pmovs, reset_unknown, PMOVSSET_EL0 },
- 
- 	/* TPIDR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b010),
-@@ -1202,7 +1224,7 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmcr },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), access_pmcnten },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), access_pmcnten },
--	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), access_pmovs },
++	  access_pmceid },
+ 	/* PMCCNTR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
+ 	  trap_raz_wi },
+@@ -943,8 +964,8 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
  	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmceid },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmceid },
-@@ -1212,6 +1234,7 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), access_pminten },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), access_pminten },
-+	{ Op1( 0), CRn( 9), CRm(14), Op2( 3), access_pmovs },
- 
- 	{ Op1( 0), CRn(10), CRm( 2), Op2( 0), access_vm_reg, NULL, c10_PRRR },
- 	{ Op1( 0), CRn(10), CRm( 2), Op2( 1), access_vm_reg, NULL, c10_NMRR },
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index a7e5485..4f8409d 100644
---- a/include/kvm/arm_pmu.h
-+++ b/include/kvm/arm_pmu.h
-@@ -40,6 +40,7 @@ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
- u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu);
- void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
-+void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
- 				    u64 select_idx);
- #else
-@@ -58,6 +59,7 @@ static inline u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
- }
- static inline void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
-+static inline void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
- 						  u64 data, u64 select_idx) {}
- #endif
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 0873977..ee75fac 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -131,6 +131,36 @@ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val)
- 	}
- }
- 
-+static u64 kvm_pmu_overflow_status(struct kvm_vcpu *vcpu)
-+{
-+	u64 reg;
-+
-+	reg = vcpu_sys_reg(vcpu, PMOVSSET_EL0);
-+	reg &= vcpu_sys_reg(vcpu, PMCNTENSET_EL0);
-+	reg &= vcpu_sys_reg(vcpu, PMINTENSET_EL1);
-+	reg &= kvm_pmu_valid_counter_mask(vcpu);
-+
-+	return reg;
-+}
-+
-+/**
-+ * kvm_pmu_overflow_set - set PMU overflow interrupt
-+ * @vcpu: The vcpu pointer
-+ * @val: the value guest writes to PMOVSSET register
-+ */
-+void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val)
-+{
-+	u64 reg;
-+
-+	if (val == 0)
-+		return;
-+
-+	vcpu_sys_reg(vcpu, PMOVSSET_EL0) |= val;
-+	reg = kvm_pmu_overflow_status(vcpu);
-+	if (reg != 0)
-+		kvm_vcpu_kick(vcpu);
-+}
-+
- static bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu, u64 select_idx)
- {
- 	return (vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E) &&
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), trap_raz_wi },
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmceid },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmceid },
+ 	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), trap_raz_wi },
 -- 
 2.0.4
