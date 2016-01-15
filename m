@@ -1,77 +1,54 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Fri, 15 Jan 2016 08:38:50 +0000
-Subject: [PATCH v5 1/2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD
- driver
-In-Reply-To: <8737tzz33h.fsf@dell.be.48ers.dk>
-References: <1452747845-2962-1-git-send-email-wenyou.yang@atmel.com>
- <1452747845-2962-2-git-send-email-wenyou.yang@atmel.com>
- <87pox41dy9.fsf@dell.be.48ers.dk>
- <B256D81BAE5131468A838E5D7A243641D63ECA51@penmbx01>
- <8737tzz33h.fsf@dell.be.48ers.dk>
-Message-ID: <B256D81BAE5131468A838E5D7A243641D63F102C@penmbx01>
+From: leoli@freescale.com (Li Yang)
+Date: Fri, 15 Jan 2016 16:46:06 +0800
+Subject: [PATCH v3] i2c: imx: make bus recovery through pinctrl optional
+In-Reply-To: <20160115075356.GI24441@pengutronix.de>
+References: <1452842844-16256-1-git-send-email-leoyang.li@nxp.com>
+ <20160115075356.GI24441@pengutronix.de>
+Message-ID: <CADRPPNT=+amxRcea=N7m96=wKgdbRmU8R5cBACvTn7XffKofzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Fri, Jan 15, 2016 at 3:53 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> Hello,
+>
+> On Fri, Jan 15, 2016 at 01:27:24AM -0600, Li Yang wrote:
+>> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+>> index a2b132c..1239bfa 100644
+>> --- a/drivers/i2c/busses/i2c-imx.c
+>> +++ b/drivers/i2c/busses/i2c-imx.c
+>> @@ -1081,8 +1081,11 @@ static int i2c_imx_probe(struct platform_device *pdev)
+>>               return ret;
+>>       }
+>>
+>> +     /* optional bus recovery feature through pinctrl */
+>>       i2c_imx->pinctrl = devm_pinctrl_get(&pdev->dev);
+>> -     if (IS_ERR(i2c_imx->pinctrl)) {
+>> +     /* bailout on -ENOMEM or -EPROBE_DEFER, continue for other errors */
+>> +     if (PTR_ERR(i2c_imx->pinctrl) == -ENOMEM ||
+>> +                     PTR_ERR(i2c_imx->pinctrl) == -EPROBE_DEFER) {
+>>               ret = PTR_ERR(i2c_imx->pinctrl);
+>>               goto clk_disable;
+>>       }
+>> @@ -1125,7 +1128,10 @@ static int i2c_imx_probe(struct platform_device *pdev)
+>>                       i2c_imx, IMX_I2C_I2CR);
+>>       imx_i2c_write_reg(i2c_imx->hwdata->i2sr_clr_opcode, i2c_imx, IMX_I2C_I2SR);
+>>
+>> -     i2c_imx_init_recovery_info(i2c_imx, pdev);
+>> +     if (IS_ERR_OR_NULL(i2c_imx->pinctrl))
+>
+> I'd prefer to set i2c_imx->pinctrl to NULL if it's not used and then use
+>
+>         if (!i2c_imx->pinctrl)
+>
+> here. (Or maybe make i2c_imx_init_recovery_info aware of this situation
+> to keep the caller simple?)
 
-> -----Original Message-----
-> From: Peter Korsgaard [mailto:jacmet at gmail.com] On Behalf Of Peter Korsgaard
-> Sent: 2016?1?15? 15:58
-> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
-> Cc: Lee Jones <lee.jones@linaro.org>; Rob Herring <robh+dt@kernel.org>;
-> Pawel Moll <pawel.moll@arm.com>; Mark Rutland <mark.rutland@arm.com>; Ian
-> Campbell <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>;
-> devicetree at vger.kernel.org; Krzysztof Kozlowski <k.kozlowski@samsung.com>;
-> Ferre, Nicolas <Nicolas.FERRE@atmel.com>; linux-kernel at vger.kernel.org;
-> Javier Martinez Canillas <javier@dowhile0.org>; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v5 1/2] mfd: act8945a: add Active-semi ACT8945A PMIC
-> MFD driver
-> 
-> >>>>> "Yang," == Yang, Wenyou <Wenyou.Yang@atmel.com> writes:
-> 
-> Hi,
-> 
->  >> Why not make it a tristate instead? Having regulators as modules is perhaps
-> not a  >> very wise thing to do, but conceptually I don't see why this code couldn't
-> be a  >> module.
-> 
->  > Yes, you are right. it can be use a tristate.
-> 
-> Ok, good.
-> 
-> >> > +	act8945a = devm_kzalloc(&i2c->dev, sizeof(*act8945a),
-> >> > +GFP_KERNEL);
->  >> > +	if (!act8945a)
->  >> > +		return -ENOMEM;
->  >> > +
->  >>
->  >> What is the point of this structure (and the header file)? Can't the subdevices
-> just  >> do dev_get_regmap(dev->parent)? regulator_register() afaik already does
-> this by  >> default.
-> 
->  > Yes, I re-read regulator_register() code. It did do dev_get_regmap(dev-
-> >parent).
-> 
->  > I think this structure should be pointed by dev->parent, this structure is
-> necessary.
-> 
->  > Yes regulator driver should be simpler.
-> 
->  > Moreover, it is used by another sub device, charger. Which don't such code.
-> 
-> But the charger driver can just as well do:
-> 
-> dev_get_regmap(dev->parent);
-> 
-> instead of:
-> 
-> dev_get_drvdata(pdev->dev.parent)->regmap.
+Setting not used pointer to NULL might be a good coding practice
+generally.  But in this case neither the driver nor gpio framework
+checks if the pinctrl is NULL before accessing it.  We still need the
+driver to make sure pinctrl is not used in this situation.  The
+benefit of the proposed change seems to be pretty limited.  :)
 
-Understand. 
-
-Thank you!
-
-
-Best Regards,
-Wenyou Yang
+Regards,
+Leo
