@@ -1,43 +1,80 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 15 Jan 2016 10:59:36 +0100
-Subject: [PATCH v2 0/6] generic relative extable support
-In-Reply-To: <20160114075720.GB4073@osiris>
-References: <1452007180-27411-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu8WW7opaa2ck9kEP91BF=amBo=jejcjnKQB1DgLWvtK3w@mail.gmail.com>
- <20160114075720.GB4073@osiris>
-Message-ID: <CAKv+Gu_qJESX1iafST2M-dqP1nx2Y+bHt6TPXL2sb6ZoSq-yYw@mail.gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Fri, 15 Jan 2016 11:13:12 +0100
+Subject: [PATCH v2] reboot: Backup orderly_poweroff
+In-Reply-To: <20160114142227.GB5783@n2100.arm.linux.org.uk>
+References: <1452688405-15087-1-git-send-email-j-keerthy@ti.com>
+ <20160114090520.GA4351@gmail.com> <569767EC.2010704@ti.com>
+ <20160114100913.GB15857@gmail.com> <56977BA7.702@ti.com>
+ <20160114112354.GA17869@gmail.com>
+ <20160114142227.GB5783@n2100.arm.linux.org.uk>
+Message-ID: <20160115101312.GA23349@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 January 2016 at 08:57, Heiko Carstens <heiko.carstens@de.ibm.com> wrote:
-> On Mon, Jan 11, 2016 at 02:59:46PM +0100, Ard Biesheuvel wrote:
->> On 5 January 2016 at 16:19, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> > There are currently four architectures (x86, ia64, alpha and s390) whose
->> > user-access exception tables are relative to the table entry address rather
->> > than absolute. Each of these architectures has its own search_extable() and
->> > sort_extable() implementation, which are not only mostly identical to each
->> > other, but also deviate very little from the generic absolute implementations
->> > in lib/extable.c that they override.
->> >
->> > So before making arm64 the fifth architecture that reimplements this, let's
->> > refactor the existing code so that all of these architectures use common code
->> > for searching and sorting the relative extables. Archs may set
->> > ARCH_HAS_RELATIVE_EXTABLE to indicate that the table consists of a pair of
->> > relative ints, and may define swap_ex_entry_fixup() if the fixup member needs
->> > special treatment in the swapping step of the sorting routine (such as alpha).
->> >
->>
->> [...]
->>
->> Now that I have collected acks for all the patches, I think this is
->> good to go in.
->>
->> @Andrew: since this touches 5 different architectures, is this perhaps
->> something that could go in via your tree after -rc1?
->> (assuming that the s390 bugfix has been merged by then)
->
-> Your s390 bugfix has been merged.  See git commit id bcb7825a77f4 ("s390:
-> fix normalization bug in exception table sorting").
->
 
-Thanks for the head's up.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
+> On Thu, Jan 14, 2016 at 12:23:54PM +0100, Ingo Molnar wrote:
+> > * Keerthy <a0393675@ti.com> wrote:
+> > > I tried to simulate the issue.
+> > > 
+> > > In the probe function of drivers/thermal/ti-soc-thermal/ti-bandgap.c
+> > > ti_bandgap_probe i call
+> > > 
+> > > orderly_poweroff(true);
+> > > 
+> > > This is while driver probes are still on going. I observe that
+> > > ret = run_cmd(poweroff_cmd);
+> > > 
+> > > ret is a non-zero value and we enter the if condition:
+> > > 
+> > > Even after the
+> > > 
+> > > emergency_sync();
+> > > kernel_power_off();
+> > > 
+> > > calls
+> > > 
+> > > the console remained active in weird state.
+> > 
+> > Now _that_ is clearly an architecture bug that should not be papered over ...
+> 
+> No, it's not an architecture bug - it's a platform bug. [...]
+
+It's an 'architecture bug' in Linux kernel speak: all stuff that is traditionally 
+under arch/*. The 'arch' in that directory name derives from 'architecture'.
+
+kernel_power_off() is a traditionally architecture level (not core kernel level 
+and not driver level) code.
+
+> [...] The ARM architecture has no standard way to control CPU reset or system 
+> power, all that is up to the platform.
+
+... and platform code is typically part of arch/ as well.
+
+FYI, you are making an unnecessarily obtuse argument by insisting on the 
+architecture != platform triviality and you also injected an uncalled for 
+patronizing tone into this discussion by pretending that I don't know that 
+distinction. It's sad.
+
+> > If kernel_power_off() is called then the system should power off. No ifs and 
+> > whens.
+> 
+> There definitely are ifs and whens.  Only if the platform has support, and when 
+> that support works.
+
+And that is precisely what I meant: in a correctly working kernel, with correctly 
+working hardware, in a correctly working universe, the core kernel expects 
+kernel_power_off() to never 'fail'.
+
+As the name suggests.
+
+Yes, bugs in user-space, kernel-space, hardware and designed buggy hardware might 
+prevent a reboot - as usual.
+
+I.e. I NAK this patch from a core kernel perspective, we don't add such 
+workarounds without a lot more information about why it's the right thing to do.
+
+Thanks,
+
+	Ingo
