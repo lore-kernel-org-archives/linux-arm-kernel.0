@@ -1,29 +1,26 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 14 Jan 2016 21:03:04 -0600
-Subject: [PATCH v2 07/26] clk: sunxi: Add TCON channel1 clock
-In-Reply-To: <1452785109-6172-8-git-send-email-maxime.ripard@free-electrons.com>
+Date: Thu, 14 Jan 2016 21:04:00 -0600
+Subject: [PATCH v2 08/26] clk: sun5i: add DRAM gates
+In-Reply-To: <1452785109-6172-9-git-send-email-maxime.ripard@free-electrons.com>
 References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
- <1452785109-6172-8-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20160115030304.GA18853@rob-hp-laptop>
+ <1452785109-6172-9-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20160115030400.GA19274@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 04:24:50PM +0100, Maxime Ripard wrote:
-> The TCON is a controller generating the timings to output videos signals,
-> acting like both a CRTC and an encoder.
+On Thu, Jan 14, 2016 at 04:24:51PM +0100, Maxime Ripard wrote:
+> The Allwinner SoCs have a gate controller to gate the access to the DRAM
+> clock to the some devices that need to access the DRAM directly (mostly
+> display / image related IPs).
 > 
-> It has two channels depending on the output, each channel being driven by
-> its own clock (and own clock controller).
-> 
-> Add a driver for the channel 1 clock.
+> Use a simple gates driver to support the one found in the A13 / R8 SoCs.
 > 
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  Documentation/devicetree/bindings/clock/sunxi.txt |   1 +
+>  Documentation/devicetree/bindings/clock/sunxi.txt | 1 +
 
 Acked-by: Rob Herring <robh@kernel.org>
 
->  drivers/clk/sunxi/Makefile                        |   1 +
->  drivers/clk/sunxi/clk-sun4i-tcon-ch1.c            | 154 ++++++++++++++++++++++
->  3 files changed, 156 insertions(+)
->  create mode 100644 drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
+>  drivers/clk/sunxi/clk-simple-gates.c              | 2 ++
+>  2 files changed, 3 insertions(+)
