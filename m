@@ -1,118 +1,146 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 15 Jan 2016 14:55:29 +0800
-Subject: [PATCH v2 16/16] ARM64: XEN: Initialize Xen specific UEFI runtime
- services
+Date: Fri, 15 Jan 2016 14:55:23 +0800
+Subject: [PATCH v2 10/16] ARM: XEN: Move xen_early_init() before efi_init()
 In-Reply-To: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1452840929-19612-17-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1452840929-19612-11-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-When running on Xen hypervisor, runtime services are supported through
-hypercall. So call Xen specific function to initialize runtime services.
+Move xen_early_init() before efi_init(), then when calling efi_init()
+could initialize Xen specific UEFI.
+
+Check if it runs on Xen hypervisor through the flat dts.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm/xen/enlighten.c |  5 +++++
- arch/arm64/xen/Makefile  |  1 +
- arch/arm64/xen/efi.c     | 36 ++++++++++++++++++++++++++++++++++++
- drivers/xen/Kconfig      |  2 +-
- include/xen/xen-ops.h    |  1 +
- 5 files changed, 44 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/xen/efi.c
+ arch/arm/xen/enlighten.c  | 56 ++++++++++++++++++++++++++++++++++-------------
+ arch/arm64/kernel/setup.c |  2 +-
+ 2 files changed, 42 insertions(+), 16 deletions(-)
 
 diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 485e117..84f27ec 100644
+index 4e78c49..5d0fe68 100644
 --- a/arch/arm/xen/enlighten.c
 +++ b/arch/arm/xen/enlighten.c
-@@ -414,6 +414,11 @@ static int __init xen_guest_init(void)
- 	if (xen_initial_domain())
- 		pvclock_gtod_register_notifier(&xen_pvclock_gtod_notifier);
+@@ -19,6 +19,7 @@
+ #include <linux/irqreturn.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
++#include <linux/of_fdt.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_address.h>
+ #include <linux/cpuidle.h>
+@@ -52,8 +53,6 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS] __initdata;
  
-+	if (IS_ENABLED(CONFIG_XEN_EFI)) {
-+		if (efi_enabled(EFI_PARAVIRT))
-+			xen_efi_runtime_setup();
-+	}
-+
- 	return 0;
+ static __read_mostly unsigned int xen_events_irq;
+ 
+-static __initdata struct device_node *xen_node;
+-
+ int xen_remap_domain_gfn_array(struct vm_area_struct *vma,
+ 			       unsigned long addr,
+ 			       xen_pfn_t *gfn, int nr,
+@@ -222,6 +221,33 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
+ 	return IRQ_HANDLED;
  }
- early_initcall(xen_guest_init);
-diff --git a/arch/arm64/xen/Makefile b/arch/arm64/xen/Makefile
-index 74a8d87..62e6fe2 100644
---- a/arch/arm64/xen/Makefile
-+++ b/arch/arm64/xen/Makefile
-@@ -1,2 +1,3 @@
- xen-arm-y	+= $(addprefix ../../arm/xen/, enlighten.o grant-table.o p2m.o mm.o)
- obj-y		:= xen-arm.o hypercall.o
-+obj-$(CONFIG_XEN_EFI) += efi.o
-diff --git a/arch/arm64/xen/efi.c b/arch/arm64/xen/efi.c
-new file mode 100644
-index 0000000..33046b0
---- /dev/null
-+++ b/arch/arm64/xen/efi.c
-@@ -0,0 +1,36 @@
-+/*
-+ * Copyright (c) 2015, Linaro Limited, Shannon Zhao
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
+ 
++static __initdata struct {
++	const char *compat;
++	const char *prefix;
++	const char *version;
++	bool found;
++} xen_node = {"xen,xen", "xen,xen-", NULL, false};
 +
-+#include <linux/efi.h>
-+#include <xen/xen-ops.h>
-+
-+void __init xen_efi_runtime_setup(void)
++static int __init fdt_find_xen_node(unsigned long node, const char *uname,
++				    int depth, void *data)
 +{
-+	efi.get_time                 = xen_efi_get_time;
-+	efi.set_time                 = xen_efi_set_time;
-+	efi.get_wakeup_time          = xen_efi_get_wakeup_time;
-+	efi.set_wakeup_time          = xen_efi_set_wakeup_time;
-+	efi.get_variable             = xen_efi_get_variable;
-+	efi.get_next_variable        = xen_efi_get_next_variable;
-+	efi.set_variable             = xen_efi_set_variable;
-+	efi.query_variable_info      = xen_efi_query_variable_info;
-+	efi.update_capsule           = xen_efi_update_capsule;
-+	efi.query_capsule_caps       = xen_efi_query_capsule_caps;
-+	efi.get_next_high_mono_count = xen_efi_get_next_high_mono_count;
-+	efi.reset_system             = NULL;
++	const void *s = NULL;
++	int len;
++
++	if (depth != 1 || strcmp(uname, "hypervisor") != 0)
++		return 0;
++
++	if (of_flat_dt_is_compatible(node, xen_node.compat))
++		xen_node.found = true;
++
++	s = of_get_flat_dt_prop(node, "compatible", &len);
++	if (strlen(xen_node.prefix) + 3  < len &&
++	    !strncmp(xen_node.prefix, s, strlen(xen_node.prefix)))
++		xen_node.version = s + strlen(xen_node.prefix);
++
++	return 0;
 +}
-+EXPORT_SYMBOL_GPL(xen_efi_runtime_setup);
-diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
-index 73708ac..27d216a 100644
---- a/drivers/xen/Kconfig
-+++ b/drivers/xen/Kconfig
-@@ -268,7 +268,7 @@ config XEN_HAVE_PVMMU
++
+ /*
+  * see Documentation/devicetree/bindings/arm/xen.txt for the
+  * documentation of the Xen Device Tree format.
+@@ -229,26 +255,18 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
+ #define GRANT_TABLE_PHYSADDR 0
+ void __init xen_early_init(void)
+ {
+-	int len;
+-	const char *s = NULL;
+-	const char *version = NULL;
+-	const char *xen_prefix = "xen,xen-";
+-
+-	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
+-	if (!xen_node) {
++	of_scan_flat_dt(fdt_find_xen_node, NULL);
++	if (!xen_node.found) {
+ 		pr_debug("No Xen support\n");
+ 		return;
+ 	}
+-	s = of_get_property(xen_node, "compatible", &len);
+-	if (strlen(xen_prefix) + 3  < len &&
+-			!strncmp(xen_prefix, s, strlen(xen_prefix)))
+-		version = s + strlen(xen_prefix);
+-	if (version == NULL) {
++
++	if (xen_node.version == NULL) {
+ 		pr_debug("Xen version not found\n");
+ 		return;
+ 	}
  
- config XEN_EFI
- 	def_bool y
--	depends on X86_64 && EFI
-+	depends on (ARM64 || X86_64) && EFI
+-	pr_info("Xen %s support found\n", version);
++	pr_info("Xen %s support found\n", xen_node.version);
  
- config XEN_AUTO_XLATE
- 	def_bool y
-diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
-index c83a338..36ff8e4 100644
---- a/include/xen/xen-ops.h
-+++ b/include/xen/xen-ops.h
-@@ -107,6 +107,7 @@ efi_status_t xen_efi_update_capsule(efi_capsule_header_t **capsules,
- efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
- 					unsigned long count, u64 *max_size,
- 					int *reset_type);
-+void xen_efi_runtime_setup(void);
+ 	xen_domain_type = XEN_HVM_DOMAIN;
  
- #ifdef CONFIG_PREEMPT
+@@ -296,6 +314,14 @@ static int __init xen_guest_init(void)
+ 		}
+ #endif
+ 	} else {
++		struct device_node *xen_node;
++
++		xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
++		if (!xen_node) {
++			pr_debug("No Xen support\n");
++			return -ENODEV;
++		}
++
+ 		xen_events_irq = irq_of_parse_and_map(xen_node, 0);
+ 	}
  
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 8119479..a4a2878 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -313,6 +313,7 @@ void __init setup_arch(char **cmdline_p)
+ 	 */
+ 	local_async_enable();
+ 
++	xen_early_init();
+ 	efi_init();
+ 	arm64_memblock_init();
+ 
+@@ -334,7 +335,6 @@ void __init setup_arch(char **cmdline_p)
+ 	} else {
+ 		psci_acpi_init();
+ 	}
+-	xen_early_init();
+ 
+ 	cpu_read_bootcpu_ops();
+ 	smp_init_cpus();
 -- 
 2.0.4
