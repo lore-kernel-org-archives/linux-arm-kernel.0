@@ -1,41 +1,42 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 15 Jan 2016 11:37:56 +0900
-Subject: [PATCH v3 03/14] ARM: shmobile: r8a7793: add m2 clock to device tree
+Date: Fri, 15 Jan 2016 11:37:59 +0900
+Subject: [PATCH v3 06/14] ARM: shmobile: r8a7793: add audio DMAC clocks to
+ device tree
 In-Reply-To: <1452825487-15931-1-git-send-email-horms+renesas@verge.net.au>
 References: <1452825487-15931-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1452825487-15931-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1452825487-15931-7-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare m2 clock in r8a7793 device tree.
+Instantiate Audio DMA clocks in the r8a7791 device tree.
 
-Based on similar work for the r8a7791 by Laurent Pinchart.
+Based on similar work for the r8a7791 by Kuninori Morimoto.
 
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/r8a7793.dtsi | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index bf6be4a40e31..fa8a0d772d51 100644
+index 1a260676682f..4a58994ba124 100644
 --- a/arch/arm/boot/dts/r8a7793.dtsi
 +++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -817,6 +817,14 @@
- 			clock-mult = <1>;
- 			clock-output-names = "p";
+@@ -924,10 +924,11 @@
+ 		mstp5_clks: mstp5_clks at e6150144 {
+ 			compatible = "renesas,r8a7793-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
+-			clocks = <&extal_clk>;
++			clocks = <&hp_clk>, <&hp_clk>, <&extal_clk>;
+ 			#clock-cells = <1>;
+-			clock-indices = <R8A7793_CLK_THERMAL>;
+-			clock-output-names = "thermal";
++			clock-indices = <R8A7793_CLK_AUDIO_DMAC0 R8A7793_CLK_AUDIO_DMAC1
++					 R8A7793_CLK_THERMAL>;
++			clock-output-names = "audmac0", "audmac1", "thermal";
  		};
-+		m2_clk: m2_clk {
-+			compatible = "fixed-factor-clock";
-+			clocks = <&cpg_clocks R8A7793_CLK_PLL1>;
-+			#clock-cells = <0>;
-+			clock-div = <8>;
-+			clock-mult = <1>;
-+			clock-output-names = "m2";
-+		};
- 		rclk_clk: rclk_clk {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7793_CLK_PLL1>;
+ 		mstp7_clks: mstp7_clks at e615014c {
+ 			compatible = "renesas,r8a7793-mstp-clocks",
 -- 
 2.1.4
