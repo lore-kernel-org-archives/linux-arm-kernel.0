@@ -1,195 +1,103 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 15 Jan 2016 19:18:37 +0000
-Subject: [PATCH 01/19] arm64: Fold proc-macros.S into assembler.h
-In-Reply-To: <cover.1452884156.git.geoff@infradead.org>
-References: <cover.1452884156.git.geoff@infradead.org>
-Message-ID: <8b5d0a08bff585caa278afc2dc16352e5b8f210b.1452884156.git.geoff@infradead.org>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 15 Jan 2016 13:19:28 -0600
+Subject: [PATCH v3 2/3] ARM: DRA7: add pdata-quirks to do reset of PCIe
+In-Reply-To: <1452780672-14339-3-git-send-email-kishon@ti.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <1452780672-14339-3-git-send-email-kishon@ti.com>
+Message-ID: <56994640.3090704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow the assembler macros defined in arch/arm64/mm/proc-macros.S to be used
-outside the mm code move the contents of proc-macros.S to asm/assembler.h.  Also,
-delete proc-macros.S, and fix up all references to proc-macros.S.
+On 01/14/2016 08:11 AM, Kishon Vijay Abraham I wrote:
+> Create platform data for PCIe and populate it with function
+> pointers to perform assert and deassert of PCIe reset lines.
+> The PCIe driver can use the callbacks provided here to
+> reset the PCIe.
+> This will be removed once the reset contoller driver is
+> available to reset PCIe.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
-Acked-by: Pavel Machek <pavel@ucw.cz>
----
- arch/arm64/include/asm/assembler.h | 48 +++++++++++++++++++++++++++-
- arch/arm64/mm/cache.S              |  2 --
- arch/arm64/mm/proc-macros.S        | 64 --------------------------------------
- arch/arm64/mm/proc.S               |  3 --
- 4 files changed, 47 insertions(+), 70 deletions(-)
- delete mode 100644 arch/arm64/mm/proc-macros.S
+Thanks for the revised version, looks much better.
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 12eff92..21979a4 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -1,5 +1,5 @@
- /*
-- * Based on arch/arm/include/asm/assembler.h
-+ * Based on arch/arm/include/asm/assembler.h, arch/arm/mm/proc-macros.S
-  *
-  * Copyright (C) 1996-2000 Russell King
-  * Copyright (C) 2012 ARM Ltd.
-@@ -23,6 +23,8 @@
- #ifndef __ASM_ASSEMBLER_H
- #define __ASM_ASSEMBLER_H
- 
-+#include <asm/asm-offsets.h>
-+#include <asm/pgtable-hwdef.h>
- #include <asm/ptrace.h>
- #include <asm/thread_info.h>
- 
-@@ -194,6 +196,50 @@ lr	.req	x30		// link register
- 	.endm
- 
- /*
-+ * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
-+ */
-+	.macro	vma_vm_mm, rd, rn
-+	ldr	\rd, [\rn, #VMA_VM_MM]
-+	.endm
-+
-+/*
-+ * mmid - get context id from mm pointer (mm->context.id)
-+ */
-+	.macro	mmid, rd, rn
-+	ldr	\rd, [\rn, #MM_CONTEXT_ID]
-+	.endm
-+
-+/*
-+ * dcache_line_size - get the minimum D-cache line size from the CTR register.
-+ */
-+	.macro	dcache_line_size, reg, tmp
-+	mrs	\tmp, ctr_el0			// read CTR
-+	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
-+	mov	\reg, #4			// bytes per word
-+	lsl	\reg, \reg, \tmp		// actual cache line size
-+	.endm
-+
-+/*
-+ * icache_line_size - get the minimum I-cache line size from the CTR register.
-+ */
-+	.macro	icache_line_size, reg, tmp
-+	mrs	\tmp, ctr_el0			// read CTR
-+	and	\tmp, \tmp, #0xf		// cache line size encoding
-+	mov	\reg, #4			// bytes per word
-+	lsl	\reg, \reg, \tmp		// actual cache line size
-+	.endm
-+
-+/*
-+ * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
-+ */
-+	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
-+#ifndef CONFIG_ARM64_VA_BITS_48
-+	ldr_l	\tmpreg, idmap_t0sz
-+	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
-+#endif
-+	.endm
-+
-+/*
-  * Annotate a function as position independent, i.e., safe to be called before
-  * the kernel virtual mapping is activated.
-  */
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index cfa44a6..f49041d 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -24,8 +24,6 @@
- #include <asm/cpufeature.h>
- #include <asm/alternative.h>
- 
--#include "proc-macros.S"
--
- /*
-  *	flush_icache_range(start,end)
-  *
-diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
-deleted file mode 100644
-index 4c4d93c..0000000
---- a/arch/arm64/mm/proc-macros.S
-+++ /dev/null
-@@ -1,64 +0,0 @@
--/*
-- * Based on arch/arm/mm/proc-macros.S
-- *
-- * Copyright (C) 2012 ARM Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#include <asm/asm-offsets.h>
--#include <asm/thread_info.h>
--
--/*
-- * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
-- */
--	.macro	vma_vm_mm, rd, rn
--	ldr	\rd, [\rn, #VMA_VM_MM]
--	.endm
--
--/*
-- * mmid - get context id from mm pointer (mm->context.id)
-- */
--	.macro	mmid, rd, rn
--	ldr	\rd, [\rn, #MM_CONTEXT_ID]
--	.endm
--
--/*
-- * dcache_line_size - get the minimum D-cache line size from the CTR register.
-- */
--	.macro	dcache_line_size, reg, tmp
--	mrs	\tmp, ctr_el0			// read CTR
--	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
--	mov	\reg, #4			// bytes per word
--	lsl	\reg, \reg, \tmp		// actual cache line size
--	.endm
--
--/*
-- * icache_line_size - get the minimum I-cache line size from the CTR register.
-- */
--	.macro	icache_line_size, reg, tmp
--	mrs	\tmp, ctr_el0			// read CTR
--	and	\tmp, \tmp, #0xf		// cache line size encoding
--	mov	\reg, #4			// bytes per word
--	lsl	\reg, \reg, \tmp		// actual cache line size
--	.endm
--
--/*
-- * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
-- */
--	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
--#ifndef CONFIG_ARM64_VA_BITS_48
--	ldr_l	\tmpreg, idmap_t0sz
--	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
--#endif
--	.endm
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index cacecc4..7ab3a90 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -23,11 +23,8 @@
- #include <asm/assembler.h>
- #include <asm/asm-offsets.h>
- #include <asm/hwcap.h>
--#include <asm/pgtable-hwdef.h>
- #include <asm/pgtable.h>
- 
--#include "proc-macros.S"
--
- #ifdef CONFIG_ARM64_64K_PAGES
- #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
- #elif defined(CONFIG_ARM64_16K_PAGES)
--- 
-2.5.0
+Reviewed-by: Suman Anna <s-anna@ti.com>
+
+> ---
+>  arch/arm/mach-omap2/pdata-quirks.c       |   11 +++++++++++
+>  include/linux/platform_data/pci-dra7xx.h |   29 +++++++++++++++++++++++++++++
+>  2 files changed, 40 insertions(+)
+>  create mode 100644 include/linux/platform_data/pci-dra7xx.h
+> 
+> diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+> index 5814477..f5a65fe 100644
+> --- a/arch/arm/mach-omap2/pdata-quirks.c
+> +++ b/arch/arm/mach-omap2/pdata-quirks.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/platform_data/pinctrl-single.h>
+>  #include <linux/platform_data/iommu-omap.h>
+>  #include <linux/platform_data/wkup_m3.h>
+> +#include <linux/platform_data/pci-dra7xx.h>
+>  
+>  #include "common.h"
+>  #include "common-board-devices.h"
+> @@ -404,6 +405,14 @@ static void __init omap5_uevm_legacy_init(void)
+>  }
+>  #endif
+>  
+> +#ifdef CONFIG_SOC_DRA7XX
+> +static struct pci_dra7xx_platform_data dra7xx_pci_pdata = {
+> +	.reset_name = "pcie",
+> +	.assert_reset = omap_device_assert_hardreset,
+> +	.deassert_reset = omap_device_deassert_hardreset,
+> +};
+> +#endif
+> +
+>  static struct pcs_pdata pcs_pdata;
+>  
+>  void omap_pcs_legacy_init(int irq, void (*rearm)(void))
+> @@ -474,6 +483,8 @@ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+>  #endif
+>  #ifdef CONFIG_SOC_DRA7XX
+>  	OF_DEV_AUXDATA("ti,dra7-padconf", 0x4a003400, "4a003400.pinmux", &pcs_pdata),
+> +	OF_DEV_AUXDATA("ti,dra7-pcie", 0x51000000, "51000000.pcie", &dra7xx_pci_pdata),
+> +	OF_DEV_AUXDATA("ti,dra7-pcie", 0x51800000, "51800000.pcie", &dra7xx_pci_pdata),
+>  #endif
+>  #ifdef CONFIG_SOC_AM43XX
+>  	OF_DEV_AUXDATA("ti,am437-padconf", 0x44e10800, "44e10800.pinmux", &pcs_pdata),
+> diff --git a/include/linux/platform_data/pci-dra7xx.h b/include/linux/platform_data/pci-dra7xx.h
+> new file mode 100644
+> index 0000000..a3bab6b
+> --- /dev/null
+> +++ b/include/linux/platform_data/pci-dra7xx.h
+> @@ -0,0 +1,29 @@
+> +/*
+> + * pcie-dra7xx - Platform data for PCIe controller
+> + *
+> + * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * Authors: Kishon Vijay Abraham I <kishon@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __PCI_DRA7XX_H
+> +#define __PCI_DRA7XX_H
+> +
+> +/**
+> + * struct pci_dra7xx_platform_data - platform data specific to pci in dra7xx
+> + * @reset_name: name of the reset line
+> + * @assert_reset: callback for performing assert reset operation
+> + * @deassert_reset: callback for performing deassert reset operation
+> + */
+> +struct pci_dra7xx_platform_data {
+> +	const char *reset_name;
+> +
+> +	int (*assert_reset)(struct platform_device *pdev, const char *name);
+> +	int (*deassert_reset)(struct platform_device *pdev, const char *name);
+> +};
+> +
+> +#endif /* __PCI_DRA7XX_H */
+> 
