@@ -1,76 +1,122 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 15 Jan 2016 21:14:10 +0900
-Subject: [PATCH v3 14/14] ARM: shmobile: r8a7793: enable audio DMAC in
- device tree
-In-Reply-To: <CAMuHMdXHixAuiYayxmvOLLm39w4iTosVucRtN7ASuHGuY7p5-Q@mail.gmail.com>
-References: <1452825487-15931-1-git-send-email-horms+renesas@verge.net.au>
- <1452825487-15931-15-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdXHixAuiYayxmvOLLm39w4iTosVucRtN7ASuHGuY7p5-Q@mail.gmail.com>
-Message-ID: <20160115121405.GA4005@verge.net.au>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 15 Jan 2016 13:28:57 +0100
+Subject: [PATCH] arm64: hide __efistub_ aliases from kallsyms
+Message-ID: <1452860937-4413-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 11:45:35AM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Fri, Jan 15, 2016 at 3:38 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > --- a/arch/arm/boot/dts/r8a7793.dtsi
-> > +++ b/arch/arm/boot/dts/r8a7793.dtsi
-> > @@ -1201,52 +1201,119 @@
-> >                 status = "disabled";
-> >
-> >                 rcar_sound,dvc {
-> > -                       dvc0: dvc at 0 { };
-> > -                       dvc1: dvc at 1 { };
-> > +                       dvc0: dvc at 0 {
-> > +                               dmas = <&audma0 0xbc>;
-> > +                               dma-names = "tx";
-> > +                       };
-> > +                       dvc1: dvc at 1 {
-> > +                               dmas = <&audma0 0xbe>;
-> > +                               dma-names = "tx";
-> > +                       };
-> >                 };
-> > +
-> >                 rcar_sound,src {
-> > -                       src0: src at 0 { };
-> > -                       src1: src at 1 { };
-> > -                       src2: src at 2 { };
-> > -                       src3: src at 3 { };
-> > -                       src4: src at 4 { };
-> > -                       src5: src at 5 { };
-> > -                       src6: src at 6 { };
-> > -                       src7: src at 7 { };
-> > -                       src8: src at 8 { };
-> > -                       src9: src at 9 { };
-> > +                       src0: src at 0 {
-> > +                               interrupts = <0 352 IRQ_TYPE_LEVEL_HIGH>;
-> 
-> <GIC_SPI ...> (and more below)
-> 
-> >                 rcar_sound,ssi {
-> >                         ssi0: ssi at 0 {
-> >                                 interrupts = <0 370 IRQ_TYPE_LEVEL_HIGH>;
-> 
-> <GIC_SPI ...>
-> 
-> Ah, you already let a few pass through before ;-)
+Commit e8f3010f7326 ("arm64/efi: isolate EFI stub from the kernel
+proper") isolated the EFI stub code from the kernel proper by prefixing
+all of its symbols with __efistub_, and selectively allowing access to
+core kernel symbols from the stub by emitting __efistub_ aliases for
+functions and variables that the stub can access legally.
 
-Thanks, I'll fix this up.
+As an unintended side effect, these aliases are emitted into the
+kallsyms symbol table, which means they may turn up in backtraces,
+e.g.,
 
-> > +                               dmas = <&audma0 0x01>, <&audma1 0x02>, <&audma0 0x15>, <&audma1 0x16>;
-> > +                               dma-names = "rx", "tx", "rxu", "txu";
-> >                         };
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-> 
+  ...
+  PC is at __efistub_memset+0x108/0x200
+  LR is at fixup_init+0x3c/0x48
+  ...
+  [<ffffff8008328608>] __efistub_memset+0x108/0x200
+  [<ffffff8008094dcc>] free_initmem+0x2c/0x40
+  [<ffffff8008645198>] kernel_init+0x20/0xe0
+  [<ffffff8008085cd0>] ret_from_fork+0x10/0x40
+
+The backtrace in question has nothing to do with the EFI stub, but
+simply returns one of the several aliases of memset() that have been
+recorded in the kallsyms table. This is undesirable, since it may
+suggest to people who are not aware of this that the issue they are
+seeing is somehow EFI related.
+
+So hide the __efistub_ aliases from kallsyms, by emitting them as
+absolute linker symbols explicitly. The distinction between those
+and section relative symbols is completely irrelevant to these
+definitions, and to the final link we are performing when these
+definitions are being taken into account (the distinction is only
+relevant to symbols defined inside a section definition when performing
+a partial link), and so the resulting values are identical to the
+original ones. Since absolute symbols are ignored by kallsyms, this
+will result in these values to be omitted from its symbol table.
+
+After this patch, the backtrace generated from the same address looks
+like this:
+  ...
+  PC is at __memset+0x108/0x200
+  LR is at fixup_init+0x3c/0x48
+  ...
+  [<ffffff8008328608>] __memset+0x108/0x200
+  [<ffffff8008094dcc>] free_initmem+0x2c/0x40
+  [<ffffff8008645198>] kernel_init+0x20/0xe0
+  [<ffffff8008085cd0>] ret_from_fork+0x10/0x40
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/image.h | 40 +++++++++++++++++++++++++---------------
+ 1 file changed, 25 insertions(+), 15 deletions(-)
+
+diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+index ddd61e2d9e3e..ce6f02c56b3d 100644
+--- a/arch/arm64/kernel/image.h
++++ b/arch/arm64/kernel/image.h
+@@ -81,6 +81,16 @@
+ #ifdef CONFIG_EFI
+ 
+ /*
++ * Prevent the symbol aliases below from being emitted into the kallsyms
++ * table, by forcing them to be absolute symbols (which are conveniently
++ * ignored by scripts/kallsyms) rather than section relative symbols.
++ * The distinction is only relevant for partial linking, and only for symbols
++ * that are defined within a section declaration (which is not the case for
++ * the definitions below) so the resulting values will be identical.
++ */
++#define KALLSYMS_HIDE(sym)	ABSOLUTE(sym)
++
++/*
+  * The EFI stub has its own symbol namespace prefixed by __efistub_, to
+  * isolate it from the kernel proper. The following symbols are legally
+  * accessed by the stub, so provide some aliases to make them accessible.
+@@ -89,25 +99,25 @@
+  * linked at. The routines below are all implemented in assembler in a
+  * position independent manner
+  */
+-__efistub_memcmp		= __pi_memcmp;
+-__efistub_memchr		= __pi_memchr;
+-__efistub_memcpy		= __pi_memcpy;
+-__efistub_memmove		= __pi_memmove;
+-__efistub_memset		= __pi_memset;
+-__efistub_strlen		= __pi_strlen;
+-__efistub_strcmp		= __pi_strcmp;
+-__efistub_strncmp		= __pi_strncmp;
+-__efistub___flush_dcache_area	= __pi___flush_dcache_area;
++__efistub_memcmp		= KALLSYMS_HIDE(__pi_memcmp);
++__efistub_memchr		= KALLSYMS_HIDE(__pi_memchr);
++__efistub_memcpy		= KALLSYMS_HIDE(__pi_memcpy);
++__efistub_memmove		= KALLSYMS_HIDE(__pi_memmove);
++__efistub_memset		= KALLSYMS_HIDE(__pi_memset);
++__efistub_strlen		= KALLSYMS_HIDE(__pi_strlen);
++__efistub_strcmp		= KALLSYMS_HIDE(__pi_strcmp);
++__efistub_strncmp		= KALLSYMS_HIDE(__pi_strncmp);
++__efistub___flush_dcache_area	= KALLSYMS_HIDE(__pi___flush_dcache_area);
+ 
+ #ifdef CONFIG_KASAN
+-__efistub___memcpy		= __pi_memcpy;
+-__efistub___memmove		= __pi_memmove;
+-__efistub___memset		= __pi_memset;
++__efistub___memcpy		= KALLSYMS_HIDE(__pi_memcpy);
++__efistub___memmove		= KALLSYMS_HIDE(__pi_memmove);
++__efistub___memset		= KALLSYMS_HIDE(__pi_memset);
+ #endif
+ 
+-__efistub__text			= _text;
+-__efistub__end			= _end;
+-__efistub__edata		= _edata;
++__efistub__text			= KALLSYMS_HIDE(_text);
++__efistub__end			= KALLSYMS_HIDE(_end);
++__efistub__edata		= KALLSYMS_HIDE(_edata);
+ 
+ #endif
+ 
+-- 
+2.5.0
