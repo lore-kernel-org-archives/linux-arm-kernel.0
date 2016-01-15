@@ -1,32 +1,47 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Fri, 15 Jan 2016 19:54:14 +0800
-Subject: [PATCH] clk: rockchip: rk3036: enable the CLK_IGNORE_UNUSED flag for
- hclk_vio_bus
-Message-ID: <1452858854-841-1-git-send-email-ykk@rock-chips.com>
+From: nouveau@karolherbst.de (Karol Herbst)
+Date: Fri, 15 Jan 2016 13:07:41 +0100 (CET)
+Subject: [PATCH] drm: nouveau: fix nouveau_debugfs_init prototype
+In-Reply-To: <CACvgo50aGCMBB3Qe3o5jyV7oZ62yiDRHcLAy4xu-Nnmb5S_DaQ@mail.gmail.com>
+References: <3968390.Pvmnq3v7oC@wuerfel>
+ <1503925101.39877.1452693347204.JavaMail.open-xchange@www.ud-mail.de>
+ <12563536.Vhe8JJPi2x@wuerfel>
+ <CACvgo50aGCMBB3Qe3o5jyV7oZ62yiDRHcLAy4xu-Nnmb5S_DaQ@mail.gmail.com>
+Message-ID: <1213515825.56151.1452859661690.JavaMail.open-xchange@www.ud-mail.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HCLK_VIO_BUS is the noc bus controller clock for display module,
-due to it shouldn't belong to any driver, but we need it enabled,
-so just mark it as the CLK_IGNORE_UNUSED flag.
+> Emil Velikov <emil.l.velikov@gmail.com> hat am 15. Januar 2016 um 12:06
+> geschrieben:
+> 
+> On 13 January 2016 at 16:00, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 13 January 2016 14:55:47 Karol Herbst wrote:
+> >> > Arnd Bergmann <arnd@arndb.de> hat am 13. Januar 2016 um 14:48
+> >> > geschrieben:
+> >> >
+> >> > The new debugfs initialization code fails to build when CONFIG_DEBUG_FS
+> >> > is disabled:
+> >> >
+> >> > In file included from
+> >> > /git/arm-soc/drivers/gpu/drm/nouveau/nouveau_drm.c:57:0:
+> >> > drivers/gpu/drm/nouveau/nouveau_debugfs.h: In function
+> >> > 'nouveau_debugfs_init':
+> >> > drivers/gpu/drm/nouveau/nouveau_debugfs.h:37:29: error: parameter name
+> >> > omitted
+> >> > nouveau_debugfs_init(struct nouveau_drm *)
+> >> >
+> >> > This fixes the prototypes so we can build it again.
+> >> >
+> >>
+> >> thanks for this. I already send a patch to the nouveau ML here:
+> >> http://lists.freedesktop.org/archives/nouveau/2016-January/023779.html
+> >
+> > Ok, thanks
+> >
+> Fwiw Arnd's fix feels a lot better - it lacks typos, has a fixes tag,
+> comprehensive commit message etc. etc. :-)
+> 
+> -Emil
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
- drivers/clk/rockchip/clk-rk3036.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+no worries, I am still learning after all
 
-diff --git a/drivers/clk/rockchip/clk-rk3036.c b/drivers/clk/rockchip/clk-rk3036.c
-index 484de46..00fac21 100644
---- a/drivers/clk/rockchip/clk-rk3036.c
-+++ b/drivers/clk/rockchip/clk-rk3036.c
-@@ -379,7 +379,7 @@ static struct rockchip_clk_branch rk3036_clk_branches[] __initdata = {
- 	GATE(ACLK_VIO, "aclk_vio", "aclk_disp1_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(6), 13, GFLAGS),
- 	GATE(ACLK_LCDC, "aclk_lcdc", "aclk_disp1_pre", 0, RK2928_CLKGATE_CON(9), 6, GFLAGS),
- 
--	GATE(HCLK_VIO_BUS, "hclk_vio_bus", "hclk_disp_pre", 0, RK2928_CLKGATE_CON(6), 12, GFLAGS),
-+	GATE(HCLK_VIO_BUS, "hclk_vio_bus", "hclk_disp_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(6), 12, GFLAGS),
- 	GATE(HCLK_LCDC, "hclk_lcdc", "hclk_disp_pre", 0, RK2928_CLKGATE_CON(9), 5, GFLAGS),
- 
- 	/* hclk_video gates */
--- 
-1.9.1
+Karol
