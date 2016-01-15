@@ -1,68 +1,76 @@
-From: steve.muckle@linaro.org (Steve Muckle)
-Date: Fri, 15 Jan 2016 11:50:31 -0800
-Subject: [RFC PATCH v2 0/4] CPUs capacity information for heterogeneous
- systems
-In-Reply-To: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
-References: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
-Message-ID: <56994D87.6000709@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 15 Jan 2016 19:55:18 +0000
+Subject: [PATCH 09/19] Revert "arm64: remove dead code"
+In-Reply-To: <81d9f2f035e6ae0e1a121f3eddeaef915d761e2d.1452884156.git.geoff@infradead.org>
+References: <cover.1452884156.git.geoff@infradead.org>
+ <81d9f2f035e6ae0e1a121f3eddeaef915d761e2d.1452884156.git.geoff@infradead.org>
+Message-ID: <20160115195517.GP3262@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2016 06:09 AM, Juri Lelli wrote:
->  2. Dynamic profiling at boot (v2)
+Hi,
+
+On Fri, Jan 15, 2016 at 07:18:37PM +0000, Geoff Levand wrote:
+> This reverts commit b08d4640a3dca68670fc5af2fe9205b395a02388.
 > 
->     pros: - does not require a standardized definition of capacity
->           - cannot be incorrectly tuned (once benchmark is fixed)
->           - does not require user/integrator work
+> Add back the setup_mm_for_reboot() needed for kexec.
+
+My pagetable rework series [1,2] adds cpu_install_idmap() [3], which
+supersedes setup_mm_for_reboot, and differs only in name.
+
+I intend to rebase once v4.5-rc1 comes out. Unless there are substantial
+changes or new comments, I expect that to be on a stable branche shortly
+thereafter. When that happens, it should be possible to drop this patch.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/397095.html
+[2] https://git.kernel.org/cgit/linux/kernel/git/mark/linux.git/log/?h=arm64/pagetable-rework
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/397101.html
+
 > 
->     cons: - not easy to come up with a clean solution, as it seems interaction
->             with several subsystems (e.g., cpufreq) is required
->           - not easy to agree upon a single benchmark (that has to be both
->             representative and simple enough to run at boot)
->           - numbers might (and do) vary from boot to boot
-
-An important additional con that was mentioned earlier IIRC was the
-additional boot time required for the benchmark. Perhaps there could be
-a kernel command line argument to bypass the benchmark if it is known
-that predetermined values will be provided via sysfs later?
-
-Though there may be another issue with that as mentioned below.
-
->  3. sysfs (v1)
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+>  arch/arm64/include/asm/mmu.h |  1 +
+>  arch/arm64/mm/mmu.c          | 11 +++++++++++
+>  2 files changed, 12 insertions(+)
 > 
->     pros: - clean and super easy to implement
->           - values don't require to be physical properties, defining them is
->             probably easier
+> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+> index 990124a..6326d11 100644
+> --- a/arch/arm64/include/asm/mmu.h
+> +++ b/arch/arm64/include/asm/mmu.h
+> @@ -29,6 +29,7 @@ typedef struct {
+>  #define ASID(mm)	((mm)->context.id.counter & 0xffff)
+>  
+>  extern void paging_init(void);
+> +extern void setup_mm_for_reboot(void);
+>  extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
+>  extern void init_mem_pgprot(void);
+>  extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 873e363..afcf1ee 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -466,6 +466,17 @@ void __init paging_init(void)
+>  }
+>  
+>  /*
+> + * Enable the identity mapping to allow the MMU disabling.
+> + */
+> +void setup_mm_for_reboot(void)
+> +{
+> +	cpu_set_reserved_ttbr0();
+> +	flush_tlb_all();
+> +	cpu_set_idmap_tcr_t0sz();
+> +	cpu_switch_mm(idmap_pg_dir, &init_mm);
+> +}
+> +
+> +/*
+>   * Check whether a kernel address is valid (derived from arch/x86/).
+>   */
+>  int kern_addr_valid(unsigned long addr)
+> -- 
+> 2.5.0
 > 
->     cons: - CPUs capacity have to be provided after boot (by some init script?)
->           - API is modified, still some discussion/review is needed
->           - values can still be incorrectly used for runtime tuning purposes
-
-Initializing the values via userspace init will cause more of the boot
-process to run with incorrect CPU capacity values. Boot times may be
-increased with tasks running on suboptimal CPUs. Such increases may also
-not be deterministic.
-
-Extending the kernel command line idea above, perhaps capacity values
-could be provided there as well, similar to the lpj parameter? That has
-scalability issues though if there's a huge highly heterogeneous platform...
-
-DT solves these issues and would be the perfect place for this - we are
-defining the compute capacity of a CPU which is a property of the
-hardware. However there are a couple things forcing us to compromise.
-One is that the amount and detail of information required to adequately
-capture the computational abilities of a CPU across all possible
-workloads seem onerous to collect and enumerate. The second is that even
-if we were willing to undertake that, CPU vendors probably won't be
-forthcoming with that information.
-
-Despite this DT still seems to me like the best way to go. At their
-heart these are properties of the hardware, even if we can't specify
-them as such per se because of the problems above. The capacity would
-have to be defined as a relative value among CPUs. And while it's true
-it may be abused for tuning purposes, that's true of any strategy.
-Certainly the sysfs strategy and even if only a dynamic option is
-provided, it is guaranteed to be hacked by platform vendors.
-
-thanks,
-Steve
+> 
