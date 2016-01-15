@@ -1,17 +1,46 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 15 Jan 2016 14:40:31 -0500 (EST)
-Subject: [patch v3 net-next 0/2] dts: hisi: fixes no syscon fault when
- init mdio
-In-Reply-To: <1452668999-443-1-git-send-email-yankejian@huawei.com>
-References: <1452668999-443-1-git-send-email-yankejian@huawei.com>
-Message-ID: <20160115.144031.1566053238441157328.davem@davemloft.net>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 15 Jan 2016 13:41:38 -0600
+Subject: [PATCH v3 2/3] ARM: DRA7: add pdata-quirks to do reset of PCIe
+In-Reply-To: <20160115192224.GD3904@atomide.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <1452780672-14339-3-git-send-email-kishon@ti.com> <56994640.3090704@ti.com>
+ <20160115192224.GD3904@atomide.com>
+Message-ID: <56994B72.2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kejian Yan <yankejian@huawei.com>
-Date: Wed, 13 Jan 2016 15:09:57 +0800
+On 01/15/2016 01:22 PM, Tony Lindgren wrote:
+> * Suman Anna <s-anna@ti.com> [160115 11:20]:
+>> On 01/14/2016 08:11 AM, Kishon Vijay Abraham I wrote:
+>>> Create platform data for PCIe and populate it with function
+>>> pointers to perform assert and deassert of PCIe reset lines.
+>>> The PCIe driver can use the callbacks provided here to
+>>> reset the PCIe.
+>>> This will be removed once the reset contoller driver is
+>>> available to reset PCIe.
+> ...
+> 
+>>> +/**
+>>> + * struct pci_dra7xx_platform_data - platform data specific to pci in dra7xx
+>>> + * @reset_name: name of the reset line
+>>> + * @assert_reset: callback for performing assert reset operation
+>>> + * @deassert_reset: callback for performing deassert reset operation
+>>> + */
+>>> +struct pci_dra7xx_platform_data {
+>>> +	const char *reset_name;
+>>> +
+>>> +	int (*assert_reset)(struct platform_device *pdev, const char *name);
+>>> +	int (*deassert_reset)(struct platform_device *pdev, const char *name);
+>>> +};
+> 
+> I doubt this platform_data is dra7 specific. I believe it's
+> the same PCI controller that has been in the omap variants for
+> years?
 
-> This patchset fixes the bug that eth can't initial successful on hip05-D02
-> because the dts files doesn't match the source code.
+AFAIK, this only applies to DRA7. Sekhar/Kishon can confirm. I did take
+a quick look at OMAP3/4/5 TRMs, and didn't find any. Neither did a grep
+on current hwmod files other than DRA7. There's a DM81xx related PCI
+clock domain, but don't see any corresponding driver/device for the same.
 
-Series applied, thanks.
+regards
+Suman
