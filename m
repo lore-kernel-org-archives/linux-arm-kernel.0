@@ -1,92 +1,30 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 15 Jan 2016 14:32:20 -0600
-Subject: [PATCH] [v2] serial: amba-pl011: use cpu_relax when polling registers
-Message-ID: <1452889940-19594-1-git-send-email-timur@codeaurora.org>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 15 Jan 2016 22:27:14 +0100
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160115174612.GV3818@linux.vnet.ibm.com>
+References: <20160113104516.GE25458@arm.com> <5696CF08.8080700@imgtec.com>
+ <20160114121449.GC15828@arm.com> <5697F6D2.60409@imgtec.com>
+ <20160114203430.GC3818@linux.vnet.ibm.com>
+ <56980C91.1010403@imgtec.com>
+ <20160114212913.GF3818@linux.vnet.ibm.com>
+ <20160115085554.GF3421@worktop> <20160115091348.GA27936@worktop>
+ <20160115174612.GV3818@linux.vnet.ibm.com>
+Message-ID: <20160115212714.GM3421@worktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Busy loops that poll on a register should call cpu_relax().  On some
-architectures, it can lower CPU power consumption or yield to a
-hyperthreaded twin processor.  It also serves as a compiler barrier,
-so it can replace barrier() calls.
+On Fri, Jan 15, 2016 at 09:46:12AM -0800, Paul E. McKenney wrote:
+> On Fri, Jan 15, 2016 at 10:13:48AM +0100, Peter Zijlstra wrote:
 
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
+> > And the stuff we're confused about is how best to express the difference
+> > and guarantees of these two forms of transitivity and how exactly they
+> > interact.
+> 
+> Hoping my memory-barrier.txt patch helps here...
 
-v2: rebased to latest code
+Yes, that seems a good start. But yesterday you raised the 'fun' point
+of two globally ordered sequences connected by a single local link.
 
- drivers/tty/serial/amba-pl011.c | 17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index c0da0cc..69b5acd 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -1167,7 +1167,7 @@ static void pl011_dma_shutdown(struct uart_amba_port *uap)
- 
- 	/* Disable RX and TX DMA */
- 	while (pl011_read(uap, REG_FR) & UART01x_FR_BUSY)
--		barrier();
-+		cpu_relax();
- 
- 	spin_lock_irq(&uap->port.lock);
- 	uap->dmacr &= ~(UART011_DMAONERR | UART011_RXDMAE | UART011_TXDMAE);
-@@ -1611,7 +1611,7 @@ static void pl011_put_poll_char(struct uart_port *port,
- 	    container_of(port, struct uart_amba_port, port);
- 
- 	while (pl011_read(uap, REG_FR) & UART01x_FR_TXFF)
--		barrier();
-+		cpu_relax();
- 
- 	pl011_write(ch, uap, REG_DR);
- }
-@@ -2150,7 +2150,7 @@ static void pl011_console_putchar(struct uart_port *port, int ch)
- 	    container_of(port, struct uart_amba_port, port);
- 
- 	while (pl011_read(uap, REG_FR) & UART01x_FR_TXFF)
--		barrier();
-+		cpu_relax();
- 	pl011_write(ch, uap, REG_DR);
- }
- 
-@@ -2158,7 +2158,7 @@ static void
- pl011_console_write(struct console *co, const char *s, unsigned int count)
- {
- 	struct uart_amba_port *uap = amba_ports[co->index];
--	unsigned int status, old_cr = 0, new_cr;
-+	unsigned int old_cr = 0, new_cr;
- 	unsigned long flags;
- 	int locked = 1;
- 
-@@ -2188,9 +2188,8 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
- 	 *	Finally, wait for transmitter to become empty
- 	 *	and restore the TCR
- 	 */
--	do {
--		status = pl011_read(uap, REG_FR);
--	} while (status & UART01x_FR_BUSY);
-+	while (pl011_read(uap, REG_FR) & UART01x_FR_BUSY)
-+		cpu_relax();
- 	if (!uap->vendor->always_enabled)
- 		pl011_write(old_cr, uap, REG_CR);
- 
-@@ -2302,13 +2301,13 @@ static struct console amba_console = {
- static void pl011_putc(struct uart_port *port, int c)
- {
- 	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
--		;
-+		cpu_relax();
- 	if (port->iotype == UPIO_MEM32)
- 		writel(c, port->membase + UART01x_DR);
- 	else
- 		writeb(c, port->membase + UART01x_DR);
- 	while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
--		;
-+		cpu_relax();
- }
- 
- static void pl011_early_write(struct console *con, const char *s, unsigned n)
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+And I think I'm still confused on LWSYNC (in the smp_wmb case) when one
+of the stores looses a conflict, and if that scenario matters. If it
+does, we should inspect the same case for other barriers.
