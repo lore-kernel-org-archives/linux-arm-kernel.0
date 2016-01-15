@@ -1,60 +1,209 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 15 Jan 2016 16:50:12 +0100
-Subject: [PATCH v2 01/26] reset: Move DT cell size check to the core
-In-Reply-To: <1452785109-6172-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
- <1452785109-6172-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1452873012.6067.78.camel@pengutronix.de>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 15 Jan 2016 15:53:40 +0000
+Subject: [Xen-devel] [PATCH v2 02/16] xen/grant-table: Move
+ xlated_setup_gnttab_pages to common place
+In-Reply-To: <1452840929-19612-3-git-send-email-zhaoshenglong@huawei.com>
+References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452840929-19612-3-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <alpine.DEB.2.02.1601151553330.16178@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Fri, 15 Jan 2016, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Move xlated_setup_gnttab_pages to common place, so it can be reused by
+> ARM to setup grant table.
+> 
+> Rename it to xen_xlate_map_ballooned_pages.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 
-Am Donnerstag, den 14.01.2016, 16:24 +0100 schrieb Maxime Ripard:
-> The core currently doesn't check that the DT cell size matches what the
-> driver declares, which means that every xlate function needs to duplicate
-> that check.
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+
+
+>  arch/x86/xen/grant-table.c | 57 +++++--------------------------------------
+>  drivers/xen/xlate_mmu.c    | 61 ++++++++++++++++++++++++++++++++++++++++++++++
+>  include/xen/xen-ops.h      |  2 ++
+>  3 files changed, 69 insertions(+), 51 deletions(-)
 > 
-> Make sure that of_reset_control_get checks for this to avoid duplication
-> and errors.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/reset/core.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/reset/core.c b/drivers/reset/core.c
-> index 7955e00d04d4..d53b2b980bdd 100644
-> --- a/drivers/reset/core.c
-> +++ b/drivers/reset/core.c
-> @@ -46,9 +46,6 @@ struct reset_control {
->  static int of_reset_simple_xlate(struct reset_controller_dev *rcdev,
->  			  const struct of_phandle_args *reset_spec)
->  {
-> -	if (WARN_ON(reset_spec->args_count != rcdev->of_reset_n_cells))
-> -		return -EINVAL;
+> diff --git a/arch/x86/xen/grant-table.c b/arch/x86/xen/grant-table.c
+> index e079500..de4144c 100644
+> --- a/arch/x86/xen/grant-table.c
+> +++ b/arch/x86/xen/grant-table.c
+> @@ -111,63 +111,18 @@ int arch_gnttab_init(unsigned long nr_shared)
+>  }
+>  
+>  #ifdef CONFIG_XEN_PVH
+> -#include <xen/balloon.h>
+>  #include <xen/events.h>
+> -#include <linux/slab.h>
+> -static int __init xlated_setup_gnttab_pages(void)
+> -{
+> -	struct page **pages;
+> -	xen_pfn_t *pfns;
+> -	void *vaddr;
+> -	int rc;
+> -	unsigned int i;
+> -	unsigned long nr_grant_frames = gnttab_max_grant_frames();
 > -
->  	if (reset_spec->args[0] >= rcdev->nr_resets)
->  		return -EINVAL;
+> -	BUG_ON(nr_grant_frames == 0);
+> -	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
+> -	if (!pages)
+> -		return -ENOMEM;
+> -
+> -	pfns = kcalloc(nr_grant_frames, sizeof(pfns[0]), GFP_KERNEL);
+> -	if (!pfns) {
+> -		kfree(pages);
+> -		return -ENOMEM;
+> -	}
+> -	rc = alloc_xenballooned_pages(nr_grant_frames, pages);
+> -	if (rc) {
+> -		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
+> -			nr_grant_frames, rc);
+> -		kfree(pages);
+> -		kfree(pfns);
+> -		return rc;
+> -	}
+> -	for (i = 0; i < nr_grant_frames; i++)
+> -		pfns[i] = page_to_pfn(pages[i]);
+> -
+> -	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
+> -	if (!vaddr) {
+> -		pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
+> -			nr_grant_frames, rc);
+> -		free_xenballooned_pages(nr_grant_frames, pages);
+> -		kfree(pages);
+> -		kfree(pfns);
+> -		return -ENOMEM;
+> -	}
+> -	kfree(pages);
+> -
+> -	xen_auto_xlat_grant_frames.pfn = pfns;
+> -	xen_auto_xlat_grant_frames.count = nr_grant_frames;
+> -	xen_auto_xlat_grant_frames.vaddr = vaddr;
+> -
+> -	return 0;
+> -}
+> -
+> +#include <xen/xen-ops.h>
+>  static int __init xen_pvh_gnttab_setup(void)
+>  {
+>  	if (!xen_pvh_domain())
+>  		return -ENODEV;
 >  
-> @@ -182,6 +179,9 @@ struct reset_control *of_reset_control_get(struct device_node *node,
->  		return ERR_PTR(-EPROBE_DEFER);
->  	}
->  
-> +	if (WARN_ON(args.args_count != rcdev->of_reset_n_cells))
-> +		return ERR_PTR(-EINVAL);
+> -	return xlated_setup_gnttab_pages();
+> +	xen_auto_xlat_grant_frames.count = gnttab_max_grant_frames();
 > +
-
-Applied with this fix:
- 
--	if (WARN_ON(args.args_count != rcdev->of_reset_n_cells))
-+	if (WARN_ON(args.args_count != rcdev->of_reset_n_cells)) {
-+		mutex_unlock(&reset_controller_list_mutex);
- 		return ERR_PTR(-EINVAL);
-+	}
- 
-No further action needed if you agree, otherwise let me know and I'll
-back it out.
-
-best regards
-Philipp
+> +	return xen_xlate_map_ballooned_pages(&xen_auto_xlat_grant_frames.pfn,
+> +					     &xen_auto_xlat_grant_frames.vaddr,
+> +					     xen_auto_xlat_grant_frames.count);
+>  }
+>  /* Call it _before_ __gnttab_init as we need to initialize the
+>   * xen_auto_xlat_grant_frames first. */
+> diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
+> index 5063c5e..9692656 100644
+> --- a/drivers/xen/xlate_mmu.c
+> +++ b/drivers/xen/xlate_mmu.c
+> @@ -29,6 +29,8 @@
+>   */
+>  #include <linux/kernel.h>
+>  #include <linux/mm.h>
+> +#include <linux/slab.h>
+> +#include <linux/vmalloc.h>
+>  
+>  #include <asm/xen/hypercall.h>
+>  #include <asm/xen/hypervisor.h>
+> @@ -37,6 +39,7 @@
+>  #include <xen/page.h>
+>  #include <xen/interface/xen.h>
+>  #include <xen/interface/memory.h>
+> +#include <xen/balloon.h>
+>  
+>  typedef void (*xen_gfn_fn_t)(unsigned long gfn, void *data);
+>  
+> @@ -185,3 +188,61 @@ int xen_xlate_unmap_gfn_range(struct vm_area_struct *vma,
+>  	return 0;
+>  }
+>  EXPORT_SYMBOL_GPL(xen_xlate_unmap_gfn_range);
+> +
+> +/**
+> + * xen_xlate_map_ballooned_pages - map a new set of ballooned pages
+> + * @gfns: returns the array of corresponding GFNs
+> + * @virt: returns the virtual address of the mapped region
+> + * @nr_grant_frames: number of GFNs
+> + * @return 0 on success, error otherwise
+> + *
+> + * This allocates a set of ballooned pages and maps them into the
+> + * kernel's address space.
+> + */
+> +int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
+> +					 unsigned long nr_grant_frames)
+> +{
+> +	struct page **pages;
+> +	xen_pfn_t *pfns;
+> +	void *vaddr;
+> +	int rc;
+> +	unsigned int i;
+> +
+> +	BUG_ON(nr_grant_frames == 0);
+> +	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
+> +	if (!pages)
+> +		return -ENOMEM;
+> +
+> +	pfns = kcalloc(nr_grant_frames, sizeof(pfns[0]), GFP_KERNEL);
+> +	if (!pfns) {
+> +		kfree(pages);
+> +		return -ENOMEM;
+> +	}
+> +	rc = alloc_xenballooned_pages(nr_grant_frames, pages);
+> +	if (rc) {
+> +		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
+> +			nr_grant_frames, rc);
+> +		kfree(pages);
+> +		kfree(pfns);
+> +		return rc;
+> +	}
+> +	for (i = 0; i < nr_grant_frames; i++)
+> +		pfns[i] = page_to_pfn(pages[i]);
+> +
+> +	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
+> +	if (!vaddr) {
+> +		pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
+> +			nr_grant_frames, rc);
+> +		free_xenballooned_pages(nr_grant_frames, pages);
+> +		kfree(pages);
+> +		kfree(pfns);
+> +		return -ENOMEM;
+> +	}
+> +	kfree(pages);
+> +
+> +	*gfns = pfns;
+> +	*virt = vaddr;
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(xen_xlate_map_ballooned_pages);
+> diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
+> index e4e214a..42be31a 100644
+> --- a/include/xen/xen-ops.h
+> +++ b/include/xen/xen-ops.h
+> @@ -80,6 +80,8 @@ int xen_xlate_remap_gfn_array(struct vm_area_struct *vma,
+>  			      struct page **pages);
+>  int xen_xlate_unmap_gfn_range(struct vm_area_struct *vma,
+>  			      int nr, struct page **pages);
+> +int xen_xlate_map_ballooned_pages(xen_pfn_t **pfns, void **vaddr,
+> +				  unsigned long nr_grant_frames);
+>  
+>  bool xen_running_on_version_or_later(unsigned int major, unsigned int minor);
+>  
+> -- 
+> 2.0.4
+> 
+> 
+> 
+> _______________________________________________
+> Xen-devel mailing list
+> Xen-devel at lists.xen.org
+> http://lists.xen.org/xen-devel
+> 
