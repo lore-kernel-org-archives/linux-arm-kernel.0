@@ -1,44 +1,53 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 15 Jan 2016 09:30:18 +0100
-Subject: [PATCH] ARM: dts: at91: sama5d4_xplained: properly mux phy interrupt
-Message-ID: <1452846618-17854-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Jan 2016 09:33:26 +0100
+Subject: [Question] cacheline sharing problem on DMA for custom outer-cache
+In-Reply-To: <CAK7LNASC2kkgQvxetrRA=guvKTAnxGm3xeMbtV0hXgubR0tEwQ@mail.gmail.com>
+References: <CAK7LNASC2kkgQvxetrRA=guvKTAnxGm3xeMbtV0hXgubR0tEwQ@mail.gmail.com>
+Message-ID: <134552368.ft0oU8iHdY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No interrupt were received from the phy because PIOE 1 may not be properly
-muxed. It prevented proper link detection, especially since commit
-321beec5047a ("net: phy: Use interrupts when available in NOLINK state")
-disables polling.
+On Friday 15 January 2016 11:36:30 Masahiro Yamada wrote:
+> 
+> When only L1-cache is enabled, it is OK.
+> 
+> 
+> If L2 is also enabled,
+> kmalloc() & dma_map_single() could be a cacheline sharing problem.
+> 
+> 
+> Is there any good solution?
 
-Cc: <stable@vger.kernel.org> # 4.4
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/at91-sama5d4_xplained.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+kmalloc uses ARCH_KMALLOC_MINALIGN alignment, so we need to tweak that
+in one form or another.
 
-diff --git a/arch/arm/boot/dts/at91-sama5d4_xplained.dts b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-index 131614f28e75..8cf9999cb0cd 100644
---- a/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-@@ -86,6 +86,8 @@
- 			macb0: ethernet at f8020000 {
- 				phy-mode = "rmii";
- 				status = "okay";
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_macb0_rmii &pinctrl_macb0_phy_irq>;
- 
- 				phy0: ethernet-phy at 1 {
- 					interrupt-parent = <&pioE>;
-@@ -152,6 +154,10 @@
- 						atmel,pins =
- 							<AT91_PIOE 8 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
- 					};
-+					pinctrl_macb0_phy_irq: macb0_phy_irq_0 {
-+						atmel,pins =
-+							<AT91_PIOE 1 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
-+					};
- 				};
- 			};
- 		};
--- 
-2.5.0
+
+The relevant definitions I see are
+
+#define ARCH_KMALLOC_MINALIGN ARCH_DMA_MINALIGN
+#define ARCH_DMA_MINALIGN       L1_CACHE_BYTES
+#define L1_CACHE_SHIFT          CONFIG_ARM_L1_CACHE_SHIFT
+#define L1_CACHE_BYTES          (1 << L1_CACHE_SHIFT)
+
+I think you should check all other uses of L1_CACHE_SHIFT and L1_CACHE_BYTES.
+If this is the only one that needs to be adjusted, we can change the
+definition of ARCH_DMA_MINALIGN, otherwise we may have to add a platform
+specific option to CONFIG_ARM_L1_CACHE_SHIFT.
+
+I see a couple of suspicious uses of the L1 cache line size:
+
+drivers/net/ethernet/broadcom/cnic.c:   data->rx.cache_line_alignment_log_size = L1_CACHE_SHIFT;
+drivers/net/ethernet/qlogic/qede/qede.h:#define QEDE_RX_ALIGN_SHIFT             max(6, min(8, L1_CACHE_SHIFT))
+lib/dma-debug.c:#define CACHELINE_PER_PAGE_SHIFT (PAGE_SHIFT - L1_CACHE_SHIFT)
+drivers/net/ethernet/sfc/tx.c:#define EFX_PIOBUF_SIZE_DEF ALIGN(256, L1_CACHE_BYTES)
+drivers/net/wireless/ath/ath6kl/init.c:         skb_reserve(skb, reserved - L1_CACHE_BYTES);
+include/linux/iio/iio.h:#define IIO_ALIGN L1_CACHE_BYTES
+include/linux/mlx5/driver.h:    MLX5_DB_PER_PAGE = PAGE_SIZE / L1_CACHE_BYTES,
+
+Those need closer inspection, and I'm sure there are a couple more. Maybe
+they should use ARCH_DMA_MINALIGN instead of L1_CACHE_BYTES. There are also
+lots of instances that assume L1_CACHE_BYTES is the L1 line size, not L2,
+but they are typically only for performance optimization through prefetching,
+so having it set too big will only make it slower rather than incorrect.
+
+	Arnd
