@@ -1,127 +1,208 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 15 Jan 2016 19:18:37 +0000
-Subject: [PATCH 07/19] arm64: Add back cpu_reset routines
+Date: Fri, 15 Jan 2016 19:18:38 +0000
+Subject: [PATCH 16/19] arm64: kdump: add kdump support
 In-Reply-To: <cover.1452884156.git.geoff@infradead.org>
 References: <cover.1452884156.git.geoff@infradead.org>
-Message-ID: <843e345fe841045e4d586d86768351eff47ee8f1.1452884156.git.geoff@infradead.org>
+Message-ID: <c1faadcc74ca0670413396b36e2bdcc02b15bcd9.1452884156.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 68234df4ea7939f98431aa81113fbdce10c4a84b (arm64: kill flush_cache_all())
-removed the global arm64 routines cpu_reset() and cpu_soft_restart() needed by
-the arm64 kexec and kdump support.  Add simplified versions of those two
-routines back with some changes needed for kexec in the new files cpu_reset.S,
-and cpu_reset.h.
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-When a CPU is reset it needs to be put into the exception level it had
-when it entered the kernel. Update cpu_reset() to accept an argument
-which signals if the reset address needs to be entered at EL1 or EL2.
+On crash dump kernel, all the information about primary kernel's core
+image is available in elf core header specified by "elfcorehdr=" boot
+parameter. reserve_elfcorehdr() will set aside the region to avoid any
+corruption by crash dump kernel.
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
+Crash dump kernel will access the system memory of primary kernel via
+copy_oldmem_page(), which reads one page by ioremap'ing it since it does
+not reside in linear mapping on crash dump kernel.
+Please note that we should add "mem=X[MG]" boot parameter to limit the
+memory size and avoid the following assertion at ioremap():
+	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
+		return NULL;
+when accessing any pages beyond the usable memories of crash dump kernel.
+
+We also need our own elfcorehdr_read() here since the weak definition of
+elfcorehdr_read() utilizes copy_oldmem_page() and will hit the assertion
+above on arm64.
+
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/kernel/cpu-reset.S | 57 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/cpu-reset.h | 29 ++++++++++++++++++++++
- 2 files changed, 86 insertions(+)
- create mode 100644 arch/arm64/kernel/cpu-reset.S
- create mode 100644 arch/arm64/kernel/cpu-reset.h
+ arch/arm64/Kconfig             | 11 +++++++
+ arch/arm64/kernel/Makefile     |  1 +
+ arch/arm64/kernel/crash_dump.c | 71 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/init.c           | 32 +++++++++++++++++++
+ 4 files changed, 115 insertions(+)
+ create mode 100644 arch/arm64/kernel/crash_dump.c
 
-diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index b7d0078..31901d0 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -566,6 +566,17 @@ config KEXEC
+ 	  but it is independent of the system firmware.   And like a reboot
+ 	  you can start any kernel with it, not just Linux.
+ 
++config CRASH_DUMP
++	bool "Build kdump crash kernel"
++	help
++	  Generate crash dump after being started by kexec. This should
++	  be normally only set in special crash dump kernels which are
++	  loaded in the main kernel with kexec-tools into a specially
++	  reserved region and then later executed after a crash by
++	  kdump/kexec.
++
++	  For more details see Documentation/kdump/kdump.txt
++
+ config XEN_DOM0
+ 	def_bool y
+ 	depends on XEN
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index f68420d..a08b054 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -43,6 +43,7 @@ arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+ arm64-obj-$(CONFIG_ACPI)		+= acpi.o
+ arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
+ 					   cpu-reset.o
++arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
 new file mode 100644
-index 0000000..f8d00d5
+index 0000000..2dc54d1
 --- /dev/null
-+++ b/arch/arm64/kernel/cpu-reset.S
-@@ -0,0 +1,57 @@
++++ b/arch/arm64/kernel/crash_dump.c
+@@ -0,0 +1,71 @@
 +/*
-+ * CPU reset routines
++ * Routines for doing kexec-based kdump
 + *
-+ * Copyright (C) 2001 Deep Blue Solutions Ltd.
-+ * Copyright (C) 2012 ARM Ltd.
-+ * Copyright (C) 2015 Huawei Futurewei Technologies.
++ * Copyright (C) 2014 Linaro Limited
++ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
 +
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <asm/sysreg.h>
-+#include <asm/virt.h>
++#include <linux/crash_dump.h>
++#include <linux/errno.h>
++#include <linux/io.h>
++#include <linux/memblock.h>
++#include <linux/uaccess.h>
++#include <asm/memory.h>
 +
-+.text
-+.pushsection    .idmap.text, "ax"
-+
-+/*
-+ * __cpu_soft_restart(el2_switch, entry, arg0, arg1, arg2) - Helper for
-+ * cpu_soft_restart.
++/**
++ * copy_oldmem_page() - copy one page from old kernel memory
++ * @pfn: page frame number to be copied
++ * @buf: buffer where the copied page is placed
++ * @csize: number of bytes to copy
++ * @offset: offset in bytes into the page
++ * @userbuf: if set, @buf is in a user address space
 + *
-+ * @el2_switch: Flag to indicate a swich to EL2 is needed.
-+ * @entry: Location to jump to for soft reset.
-+ * arg0: First argument passed to @entry.
-+ * arg1: Second argument passed to @entry.
-+ * arg2: Third argument passed to @entry.
-+ *
-+ * Put the CPU into the same state as it would be if it had been reset, and
-+ * branch to what would be the reset vector. It must be executed with the
-+ * flat identity mapping.
++ * This function copies one page from old kernel memory into buffer pointed by
++ * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
++ * copied or negative error in case of failure.
 + */
-+ENTRY(__cpu_soft_restart)
-+	/* Clear sctlr_el1 flags. */
-+	mrs	x12, sctlr_el1
-+	ldr	x13, =SCTLR_ELx_FLAGS
-+	bic	x12, x12, x13
-+	msr	sctlr_el1, x12
-+	isb
-+
-+	cbz	x0, 1f				// el2_switch?
-+	mov	x0, x1				// entry
-+	mov	x1, x2				// arg0
-+	mov	x2, x3				// arg1
-+	mov	x3, x4				// arg2
-+	hvc	#HVC_CALL_FUNC			// no return
-+
-+1:	mov	x18, x1				// entry
-+	mov	x0, x2				// arg0
-+	mov	x1, x3				// arg1
-+	mov	x2, x4				// arg2
-+	ret	x18
-+ENDPROC(__cpu_soft_restart)
-+
-+.popsection
-diff --git a/arch/arm64/kernel/cpu-reset.h b/arch/arm64/kernel/cpu-reset.h
-new file mode 100644
-index 0000000..5a5ea0a
---- /dev/null
-+++ b/arch/arm64/kernel/cpu-reset.h
-@@ -0,0 +1,29 @@
-+/*
-+ * CPU reset routines
-+ *
-+ * Copyright (C) 2015 Huawei Futurewei Technologies.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef _ARM64_CPU_RESET_H
-+#define _ARM64_CPU_RESET_H
-+
-+#include <asm/virt.h>
-+
-+void __cpu_soft_restart(unsigned long el2_switch, unsigned long entry,
-+	unsigned long arg0, unsigned long arg1, unsigned long arg2);
-+
-+static inline void __noreturn cpu_soft_restart(unsigned long el2_switch,
-+	unsigned long entry, unsigned long arg0, unsigned long arg1,
-+	unsigned long arg2)
++ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
++			 size_t csize, unsigned long offset,
++			 int userbuf)
 +{
-+	typeof(__cpu_soft_restart) *restart;
-+	restart = (void *)virt_to_phys(__cpu_soft_restart);
-+	restart(el2_switch, entry, arg0, arg1, arg2);
-+	unreachable();
++	void *vaddr;
++
++	if (!csize)
++		return 0;
++
++	vaddr = ioremap_cache(__pfn_to_phys(pfn), PAGE_SIZE);
++	if (!vaddr)
++		return -ENOMEM;
++
++	if (userbuf) {
++		if (copy_to_user(buf, vaddr + offset, csize)) {
++			iounmap(vaddr);
++			return -EFAULT;
++		}
++	} else {
++		memcpy(buf, vaddr + offset, csize);
++	}
++
++	iounmap(vaddr);
++
++	return csize;
 +}
 +
-+#endif
++/**
++ * elfcorehdr_read - read from ELF core header
++ * @buf: buffer where the data is placed
++ * @csize: number of bytes to read
++ * @ppos: address in the memory
++ *
++ * This function reads @count bytes from elf core header which exists
++ * on crash dump kernel's memory.
++ */
++ssize_t elfcorehdr_read(char *buf, size_t count, u64 *ppos)
++{
++	memcpy(buf, phys_to_virt((phys_addr_t)*ppos), count);
++	return count;
++}
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index a8eae6b..7398a6b 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -35,6 +35,7 @@
+ #include <linux/efi.h>
+ #include <linux/swiotlb.h>
+ #include <linux/kexec.h>
++#include <linux/crash_dump.h>
+ 
+ #include <asm/fixmap.h>
+ #include <asm/memory.h>
+@@ -119,6 +120,36 @@ static void __init reserve_crashkernel(void)
+ }
+ #endif /* CONFIG_KEXEC_CORE */
+ 
++#ifdef CONFIG_CRASH_DUMP
++/*
++ * reserve_elfcorehdr() - reserves memory for elf core header
++ *
++ * This function reserves elf core header given in "elfcorehdr=" kernel
++ * command line parameter. This region contains all the information about
++ * primary kernel's core image and is used by a dump capture kernel to
++ * access the system memory on primary kernel.
++ */
++static void __init reserve_elfcorehdr(void)
++{
++	if (!elfcorehdr_size)
++		return;
++
++	if (memblock_is_region_reserved(elfcorehdr_addr, elfcorehdr_size)) {
++		pr_warn("elfcorehdr is overlapped\n");
++		return;
++	}
++
++	memblock_reserve(elfcorehdr_addr, elfcorehdr_size);
++
++	pr_info("Reserving %lldKB of memory at 0x%llx for elfcorehdr\n",
++		elfcorehdr_size >> 10, elfcorehdr_addr);
++}
++#else
++static void __init reserve_elfcorehdr(void)
++{
++	;
++}
++#endif /* CONFIG_CRASH_DUMP */
+ /*
+  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
+  * currently assumes that for memory starting above 4G, 32-bit devices will
+@@ -227,6 +258,7 @@ void __init arm64_memblock_init(void)
+ #ifdef CONFIG_KEXEC_CORE
+ 	reserve_crashkernel();
+ #endif
++	reserve_elfcorehdr();
+ 
+ 	early_init_fdt_scan_reserved_mem();
+ 
 -- 
 2.5.0
