@@ -1,86 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Jan 2016 14:12:17 +0000
-Subject: [PATCH v2] reboot: Backup orderly_poweroff
-In-Reply-To: <5698F420.2010500@ti.com>
-References: <1452688405-15087-1-git-send-email-j-keerthy@ti.com>
- <20160114090520.GA4351@gmail.com> <569767EC.2010704@ti.com>
- <20160114100913.GB15857@gmail.com> <56977BA7.702@ti.com>
- <20160114112354.GA17869@gmail.com>
- <20160114132527.575e0f20@lxorguk.ukuu.org.uk>
- <20160115101459.GB23349@gmail.com> <5698F420.2010500@ti.com>
-Message-ID: <20160115141217.GF5783@n2100.arm.linux.org.uk>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 15 Jan 2016 16:14:15 +0200
+Subject: [4.1.2-rt1 PATCH] include/linux/pid.h: fix build error
+Message-ID: <1452867255-1121-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 03:29:04PM +0200, Grygorii Strashko wrote:
-> Seems ARM doesn't have endless loop implemented in machine_power_off() - so,
-> not too much chances for Watchdog to fire.
-> void machine_power_off(void)
-> {
-> 	local_irq_disable();
-> 	smp_send_stop();
-> 
-> 	if (pm_power_off)
-> 		pm_power_off();
-> 
-> 	--- endless loop ?
-> 	--- or restart ?
-> }
-> [and even if it will be there - 20-30sec is usual timeout for Watchdog
-> and this enough time to burn the system in case of thermal emergency
-> poweroff :(]
+From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
 
-I covered this in my reply to Ingo yesterday.  The result is that a
-failed or unimplemented call drops through to do_exit(0) on behalf of
-the calling process, terminating that process.  However, as I said
-in that same email, I don't think you're getting anywhere near this
-code.
+This patch fixes build error:
+  CC      kernel/pid_namespace.o
+In file included from kernel/pid_namespace.c:11:0:
+include/linux/pid.h: In function 'get_pid':
+include/linux/pid.h:78:3: error: implicit declaration of function 'atomic_inc' [-Werror=implicit-function-declaration]
+   atomic_inc(&pid->count);
+   ^
+which happens when
+ CONFIG_PROVE_LOCKING=n
+ CONFIG_DEBUG_SPINLOCK=n
+ CONFIG_DEBUG_MUTEXES=n
+ CONFIG_DEBUG_LOCK_ALLOC=n
 
-> That's true - original log [1] has 
-> Nov 30 11:19:22 [    5.942769] thermal thermal_zone3: critical temperature reached(108 C),shutting down
-> [...]
-> Nov 30 11:19:24 [    7.387900] ahci 4a140000.sata: flags: 64bit ncq sntf stag pm led clo only pmp pio slum part ccc apst 
-> Nov 30 11:19:24 INIT: Switching to runlevel: 0
-> Nov 30 11:19:24 INIT: Sending processes the TERM signal
-> 
-> and there are no
-> [  220.004522] reboot: Power down
+Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+---
+ include/linux/pid.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-Right, so things are stuck in userspace, which means the system is still
-in an active runnable state.
-
-As I mentioned (again) in my email, the issue appears to be that the 'rc'
-script is stuck waiting on a FIFO.
-
-The init daemon is trying to do an orderly shutdown.  As part of that,
-it's executing the 'rc' script, which in systems I've seen, runs through
-a set of scripts in the /etc/rc?.d directory in order, which normally
-bring up or take down services and perform other sequenced actions.
-
-If this script hangs (as it seems to be doing) it won't get to running
-/sbin/poweroff or similar, and that means machine_power_off() won't be
-called.
-
-> In general, this kind of use case can be simulated using SysRq on any arch
-> - [3.290034] Freeing unused kernel memory: 492K (c0a67000 - c0ae2000)
->   INIT: version 2.88 booting
->   Starting udev
-> ^^ The issue most probably might happens when system in the process of
-> loading modules
-> So, once modules loading process is started - fire Sysrq "poweroff(o)"
-
-This suggests it could be a udev issue - but without knowing what's
-happening inside sysvinit's scripts, it's hard to know for certain.
-Adding some debug to the 'rc' script (make sure it works without
-rebooting or changing the run level, or have a way of restoring the
-file if it fails to boot) so that it's possible to see what it's doing
-may be a good idea - the simplest approach may be to just add
-
-set -x
-
-towards the top of the file - which will make it very noisy.
-
+diff --git a/include/linux/pid.h b/include/linux/pid.h
+index 23705a53..2cc64b7 100644
+--- a/include/linux/pid.h
++++ b/include/linux/pid.h
+@@ -2,6 +2,7 @@
+ #define _LINUX_PID_H
+ 
+ #include <linux/rcupdate.h>
++#include <linux/atomic.h>
+ 
+ enum pid_type
+ {
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.4.6
