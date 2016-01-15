@@ -1,53 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 15 Jan 2016 09:57:57 +0000
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160114222046.GH3818@linux.vnet.ibm.com>
-References: <569565DA.2010903@imgtec.com> <20160113104516.GE25458@arm.com>
- <56969F4B.7070001@imgtec.com>
- <20160113204844.GV6357@twins.programming.kicks-ass.net>
- <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
- <56980145.5030901@imgtec.com>
- <20160114204827.GE3818@linux.vnet.ibm.com>
- <56981212.7050301@imgtec.com>
- <20160114222046.GH3818@linux.vnet.ibm.com>
-Message-ID: <20160115095756.GA2131@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 15 Jan 2016 10:59:36 +0100
+Subject: [PATCH v2 0/6] generic relative extable support
+In-Reply-To: <20160114075720.GB4073@osiris>
+References: <1452007180-27411-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu8WW7opaa2ck9kEP91BF=amBo=jejcjnKQB1DgLWvtK3w@mail.gmail.com>
+ <20160114075720.GB4073@osiris>
+Message-ID: <CAKv+Gu_qJESX1iafST2M-dqP1nx2Y+bHt6TPXL2sb6ZoSq-yYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
+On 14 January 2016 at 08:57, Heiko Carstens <heiko.carstens@de.ibm.com> wrote:
+> On Mon, Jan 11, 2016 at 02:59:46PM +0100, Ard Biesheuvel wrote:
+>> On 5 January 2016 at 16:19, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> > There are currently four architectures (x86, ia64, alpha and s390) whose
+>> > user-access exception tables are relative to the table entry address rather
+>> > than absolute. Each of these architectures has its own search_extable() and
+>> > sort_extable() implementation, which are not only mostly identical to each
+>> > other, but also deviate very little from the generic absolute implementations
+>> > in lib/extable.c that they override.
+>> >
+>> > So before making arm64 the fifth architecture that reimplements this, let's
+>> > refactor the existing code so that all of these architectures use common code
+>> > for searching and sorting the relative extables. Archs may set
+>> > ARCH_HAS_RELATIVE_EXTABLE to indicate that the table consists of a pair of
+>> > relative ints, and may define swap_ex_entry_fixup() if the fixup member needs
+>> > special treatment in the swapping step of the sorting routine (such as alpha).
+>> >
+>>
+>> [...]
+>>
+>> Now that I have collected acks for all the patches, I think this is
+>> good to go in.
+>>
+>> @Andrew: since this touches 5 different architectures, is this perhaps
+>> something that could go in via your tree after -rc1?
+>> (assuming that the s390 bugfix has been merged by then)
+>
+> Your s390 bugfix has been merged.  See git commit id bcb7825a77f4 ("s390:
+> fix normalization bug in exception table sorting").
+>
 
-On Thu, Jan 14, 2016 at 02:20:46PM -0800, Paul E. McKenney wrote:
-> On Thu, Jan 14, 2016 at 01:24:34PM -0800, Leonid Yegoshin wrote:
-> > It is not so simple, I mean "local ordering for address and data
-> > dependencies". Local ordering is NOT enough. It happens that current
-> > MIPS R6 doesn't require in your example smp_read_barrier_depends()
-> > but in discussion it comes out that it may not. Because without
-> > smp_read_barrier_depends() your example can be a part of Will's
-> > WRC+addr+addr and we found some design which easily can bump into
-> > this test. And that design actually performs "local ordering for
-> > address and data dependencies" too.
-> 
-> As noted in another email in this thread, I do not believe that
-> WRC+addr+addr needs to be prohibited.  Sounds like Will and I need to
-> get our story straight, though.
-
-I think you figured this out while I was sleeping, but just to confirm:
-
- 1. The MIPS64 ISA doc [1] talks about SYNC in a way that applies only
-    to memory accesses appearing in *program-order* before the SYNC
-
- 2. We need WRC+sync+addr to work, which means that the SYNC in P1 must
-    also capture the store in P0 as being "before" the barrier. Leonid
-    reckons it works, but his explanation [2] focussed on the address
-    dependency in P2 as to why this works. If that is the case (i.e.
-    address dependency provides global transitivity), then WRC+addr+addr
-    should also work (even though its not required).
-
- 3. It seems that WRC+addr+addr doesn't work, so I'm still suspicious
-    about WRC+sync+addr, because neither the architecture document or
-    Leonid's explanation tell me that it should be forbidden.
-
-Will
-
-[1] https://imgtec.com/?do-download=4302
-[2] http://lkml.kernel.org/r/569565DA.2010903 at imgtec.com (scroll to the end)
+Thanks for the head's up.
