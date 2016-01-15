@@ -1,100 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 15 Jan 2016 20:16:01 +0000
-Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
-In-Reply-To: <fb4506943bbaed8b0657ed367ebd57e4064d57ed.1452884156.git.geoff@infradead.org>
-References: <cover.1452884156.git.geoff@infradead.org>
- <fb4506943bbaed8b0657ed367ebd57e4064d57ed.1452884156.git.geoff@infradead.org>
-Message-ID: <20160115201601.GR3262@leverpostej>
+From: john.stultz@linaro.org (John Stultz)
+Date: Fri, 15 Jan 2016 12:27:57 -0800
+Subject: [PATCH v2 2/4] power: reset: add reboot mode driver
+In-Reply-To: <1452598319-8324-1-git-send-email-andy.yan@rock-chips.com>
+References: <1452598029-8222-1-git-send-email-andy.yan@rock-chips.com>
+ <1452598319-8324-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <CALAqxLVNUG_cVbavXC34sNPv68jbMghti31+PrgQ7mpPngXh6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 07:18:38PM +0000, Geoff Levand wrote:
-> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> 
-> This patch adds arch specific descriptions about kdump usage on arm64
-> to kdump.txt.
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  Documentation/kdump/kdump.txt | 23 ++++++++++++++++++++++-
->  1 file changed, 22 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-> index bc4bd5a..36cf978 100644
-> --- a/Documentation/kdump/kdump.txt
-> +++ b/Documentation/kdump/kdump.txt
-> @@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
->  a remote system.
->  
->  Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
-> -s390x and arm architectures.
-> +s390x, arm and arm64 architectures.
->  
->  When the system kernel boots, it reserves a small section of memory for
->  the dump-capture kernel. This ensures that ongoing Direct Memory Access
-> @@ -249,6 +249,20 @@ Dump-capture kernel config options (Arch Dependent, arm)
->  
->      AUTO_ZRELADDR=y
->  
-> +Dump-capture kernel config options (Arch Dependent, arm64)
-> +----------------------------------------------------------
-> +
-> +1) The maximum memory size on the dump-capture kernel must be limited by
-> +   specifying:
-> +
-> +   mem=X[MG]
-> +
-> +   where X should be less than or equal to the size in "crashkernel="
-> +   boot parameter. Kexec-tools will automatically add this.
+On Tue, Jan 12, 2016 at 3:31 AM, Andy Yan <andy.yan@rock-chips.com> wrote:
+> This driver parse the reboot commands like "reboot loader"
+> and "reboot recovery" to get a boot mode described in the
+> device tree , then call the write interfae to store the boot
+> mode in some persistent storage  like special register or ram,
+> which can be read by the bootloader after system reboot, then
+> the bootloader can take different action according to the mode
+> stored.
+>
+> This is commonly used on Android based devices, which in order
+> to reboot the device into fastboot or recovery mode.
+>
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
 
-This is extremely fragile, and will trivially fail when the kernel can
-be loaded anywhere (see [1]).
+Hey Andy!
+  Thanks for keeping this work going! I've just successfully reworked
+my Nexus7 tree to use your implementation (using the syscon version,
+setting up a syscon for IMEM as Bjorn had requested earlier).
 
-We must explicitly describe the set of regions the crash kernel may use
-(i.e. we need base and size). NAK in the absence of that.
+All is working well so far!
 
-Thanks,
-Mark.
+The one thing I was working on supporting with my own version that
+seems to be missing here are for devices that use string based codes,
+rather then magic numbers.
 
-> +
-> +2) Currently, kvm will not be enabled on the dump-capture kernel even
-> +   if it is configured.
-> +
->  Extended crashkernel syntax
->  ===========================
->  
-> @@ -312,6 +326,8 @@ Boot into System Kernel
->     any space below the alignment point may be overwritten by the dump-capture kernel,
->     which means it is possible that the vmcore is not that precise as expected.
->  
-> +   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
-> +   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
->  
->  Load the Dump-capture Kernel
->  ============================
-> @@ -334,6 +350,8 @@ For s390x:
->  	- Use image or bzImage
->  For arm:
->  	- Use zImage
-> +For arm64:
-> +	- Use vmlinux or Image
->  
->  If you are using a uncompressed vmlinux image then use following command
->  to load dump-capture kernel.
-> @@ -377,6 +395,9 @@ For s390x:
->  For arm:
->  	"1 maxcpus=1 reset_devices"
->  
-> +For arm64:
-> +	"1 mem=X[MG] maxcpus=1 reset_devices"
-> +
->  Notes on loading the dump-capture kernel:
->  
->  * By default, the ELF headers are stored in ELF64 format to support
-> -- 
-> 2.5.0
-> 
-> 
+This was mostly a theoretical issue. I think the Galaxy Nexus used it,
+and when I was looking at some of the HTC devices, they support a text
+based reason along with the magic code, but at least in some
+implementations the text mode isn't used, so I suspect there its just
+for extra debugging.  So this may not be critical to solve until
+someone tries to add support for such a device.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/398527.html
+Anyway, I'm going to look at porting this to the HiKey board next
+(which just uses reserved ram, not syscon), so I'll try to do a an
+SRAM driver implementaiton to see how that goes.
+
+thanks!
+-john
