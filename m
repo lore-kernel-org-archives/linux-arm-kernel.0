@@ -1,10 +1,10 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 15 Jan 2016 11:43:47 +0100
-Subject: [PATCH v2 1/2] ARM: shmobile: r8a7790: use GIC_* defines
-In-Reply-To: <1452825856-16230-2-git-send-email-horms+renesas@verge.net.au>
+Date: Fri, 15 Jan 2016 11:44:04 +0100
+Subject: [PATCH v2 2/2] ARM: shmobile: r8a7791: use GIC_* defines
+In-Reply-To: <1452825856-16230-3-git-send-email-horms+renesas@verge.net.au>
 References: <1452825856-16230-1-git-send-email-horms+renesas@verge.net.au>
- <1452825856-16230-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVcHH4Sv5b5xweAgSMun3kEWgOiR32pzSuXVAkYwi=RcA@mail.gmail.com>
+ <1452825856-16230-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWRSWMMR7G2e-A5E_CxX=KsN1Ztj7uQ1JJViCet1WoQoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
