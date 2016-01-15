@@ -1,112 +1,82 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 15 Jan 2016 14:27:48 +0800
-Subject: [PATCH v9 14/21] KVM: ARM64: Add helper to handle PMCR register bits
+Date: Fri, 15 Jan 2016 14:27:45 +0800
+Subject: [PATCH v9 11/21] KVM: ARM64: Add access handler for PMINTENSET and
+ PMINTENCLR register
 In-Reply-To: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1452839275-19368-15-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1452839275-19368-12-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-According to ARMv8 spec, when writing 1 to PMCR.E, all counters are
-enabled by PMCNTENSET, while writing 0 to PMCR.E, all counters are
-disabled. When writing 1 to PMCR.P, reset all event counters, not
-including PMCCNTR, to zero. When writing 1 to PMCR.C, reset PMCCNTR to
-zero.
+Since the reset value of PMINTENSET and PMINTENCLR is UNKNOWN, use
+reset_unknown for its reset handler. Add a handler to emulate writing
+PMINTENSET or PMINTENCLR register.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/sys_regs.c |  1 +
- include/kvm/arm_pmu.h     |  2 ++
- virt/kvm/arm/pmu.c        | 42 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 45 insertions(+)
+ arch/arm64/kvm/sys_regs.c | 32 ++++++++++++++++++++++++++++----
+ 1 file changed, 28 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index f45c227..eefc60a 100644
+index d43a9a4..41d4bcd 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -467,6 +467,7 @@ static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 		val &= ~ARMV8_PMCR_MASK;
- 		val |= p->regval & ARMV8_PMCR_MASK;
- 		vcpu_sys_reg(vcpu, PMCR_EL0) = val;
-+		kvm_pmu_handle_pmcr(vcpu, val);
- 	} else {
- 		/* PMCR.P & PMCR.C are RAZ */
- 		val = vcpu_sys_reg(vcpu, PMCR_EL0)
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index caa706e..5bed00c 100644
---- a/include/kvm/arm_pmu.h
-+++ b/include/kvm/arm_pmu.h
-@@ -42,6 +42,7 @@ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val);
-+void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
- 				    u64 select_idx);
- #else
-@@ -62,6 +63,7 @@ static inline void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val) {}
-+static inline void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
- 						  u64 data, u64 select_idx) {}
- #endif
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 706c935..d411f3f 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -190,6 +190,48 @@ void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val)
- 	}
+@@ -630,6 +630,30 @@ static bool access_pmcnten(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	return true;
  }
  
-+/**
-+ * kvm_pmu_handle_pmcr - handle PMCR register
-+ * @vcpu: The vcpu pointer
-+ * @val: the value guest writes to PMCR register
-+ */
-+void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val)
++static bool access_pminten(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			   const struct sys_reg_desc *r)
 +{
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+	struct kvm_pmc *pmc;
-+	u64 mask;
-+	int i;
++	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
 +
-+	mask = kvm_pmu_valid_counter_mask(vcpu);
-+	if (val & ARMV8_PMCR_E) {
-+		kvm_pmu_enable_counter(vcpu,
-+				     vcpu_sys_reg(vcpu, PMCNTENSET_EL0) & mask);
++	if (!kvm_arm_pmu_v3_ready(vcpu))
++		return trap_raz_wi(vcpu, p, r);
++
++	if (p->is_write) {
++		if (r->Op2 & 0x1)
++			/* accessing PMINTENSET_EL1 */
++			vcpu_sys_reg(vcpu, PMINTENSET_EL1) |= (p->regval
++							       & mask);
++		else
++			/* accessing PMINTENCLR_EL1 */
++			vcpu_sys_reg(vcpu, PMINTENSET_EL1) &= ~(p->regval
++								& mask);
 +	} else {
-+		kvm_pmu_disable_counter(vcpu, mask);
++		p->regval = vcpu_sys_reg(vcpu, PMINTENSET_EL1) & mask;
 +	}
 +
-+	if (val & ARMV8_PMCR_C) {
-+		pmc = &pmu->pmc[ARMV8_CYCLE_IDX];
-+		if (pmc->perf_event)
-+			local64_set(&pmc->perf_event->count, 0);
-+		vcpu_sys_reg(vcpu, PMCCNTR_EL0) = 0;
-+	}
-+
-+	if (val & ARMV8_PMCR_P) {
-+		for (i = 0; i < ARMV8_CYCLE_IDX; i++) {
-+			pmc = &pmu->pmc[i];
-+			if (pmc->perf_event)
-+				local64_set(&pmc->perf_event->count, 0);
-+			vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + i) = 0;
-+		}
-+	}
-+
-+	if (val & ARMV8_PMCR_LC) {
-+		pmc = &pmu->pmc[ARMV8_CYCLE_IDX];
-+		pmc->bitmask = 0xffffffffffffffffUL;
-+	}
++	return true;
 +}
 +
- static bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu, u64 select_idx)
- {
- 	return (vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E) &&
+ /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+ #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+ 	/* DBGBVRn_EL1 */						\
+@@ -788,10 +812,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 
+ 	/* PMINTENSET_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b001),
+-	  trap_raz_wi },
++	  access_pminten, reset_unknown, PMINTENSET_EL1 },
+ 	/* PMINTENCLR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b010),
+-	  trap_raz_wi },
++	  access_pminten, NULL, PMINTENSET_EL1 },
+ 
+ 	/* MAIR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0010), Op2(0b000),
+@@ -1186,8 +1210,8 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), access_pmu_evtyper },
+ 	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_evcntr },
+ 	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
+-	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), trap_raz_wi },
+-	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), access_pminten },
++	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), access_pminten },
+ 
+ 	{ Op1( 0), CRn(10), CRm( 2), Op2( 0), access_vm_reg, NULL, c10_PRRR },
+ 	{ Op1( 0), CRn(10), CRm( 2), Op2( 1), access_vm_reg, NULL, c10_NMRR },
 -- 
 2.0.4
