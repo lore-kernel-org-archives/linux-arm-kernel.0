@@ -1,33 +1,34 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 15 Jan 2016 14:55:18 +0800
-Subject: [PATCH v2 05/16] xen: memory : Add new XENMAPSPACE type
- XENMAPSPACE_dev_mmio
+Date: Fri, 15 Jan 2016 14:55:16 +0800
+Subject: [PATCH v2 03/16] Xen: xlate: Use page_to_xen_pfn instead of
+ page_to_pfn
 In-Reply-To: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1452840929-19612-6-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1452840929-19612-4-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add a new type of Xen map space for Dom0 to map device's MMIO region.
+Use page_to_xen_pfn in case of 64KB page.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- include/xen/interface/memory.h | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/xen/xlate_mmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
-index 2ecfe4f..9aa8988 100644
---- a/include/xen/interface/memory.h
-+++ b/include/xen/interface/memory.h
-@@ -160,6 +160,7 @@ DEFINE_GUEST_HANDLE_STRUCT(xen_machphys_mapping_t);
- #define XENMAPSPACE_gmfn_foreign 4 /* GMFN from another dom,
- 				    * XENMEM_add_to_physmap_range only.
- 				    */
-+#define XENMAPSPACE_dev_mmio     5 /* device mmio region */
+diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
+index 9692656..b9fcc2c 100644
+--- a/drivers/xen/xlate_mmu.c
++++ b/drivers/xen/xlate_mmu.c
+@@ -227,7 +227,7 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
+ 		return rc;
+ 	}
+ 	for (i = 0; i < nr_grant_frames; i++)
+-		pfns[i] = page_to_pfn(pages[i]);
++		pfns[i] = page_to_xen_pfn(pages[i]);
  
- /*
-  * Sets the GPFN at which a particular page appears in the specified guest's
+ 	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
+ 	if (!vaddr) {
 -- 
 2.0.4
