@@ -1,214 +1,224 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 15 Jan 2016 14:27:41 +0800
-Subject: [PATCH v9 07/21] KVM: ARM64: PMU: Add perf event map and introduce
- perf event creating function
+Date: Fri, 15 Jan 2016 14:27:43 +0800
+Subject: [PATCH v9 09/21] KVM: ARM64: Add access handler for event counter
+ register
 In-Reply-To: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1452839275-19368-8-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1452839275-19368-10-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-When we use tools like perf on host, perf passes the event type and the
-id of this event type category to kernel, then kernel will map them to
-hardware event number and write this number to PMU PMEVTYPER<n>_EL0
-register. When getting the event number in KVM, directly use raw event
-type to create a perf_event for it.
+These kind of registers include PMEVCNTRn, PMCCNTR and PMXEVCNTR which
+is mapped to PMEVCNTRn.
+
+The access handler translates all aarch32 register offsets to aarch64
+ones and uses vcpu_sys_reg() to access their values to avoid taking care
+of big endian.
+
+When reading these registers, return the sum of register value and the
+value perf event counts.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/pmu.h |   3 ++
- arch/arm64/kvm/Makefile      |   1 +
- include/kvm/arm_pmu.h        |  10 ++++
- virt/kvm/arm/pmu.c           | 122 +++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 136 insertions(+)
- create mode 100644 virt/kvm/arm/pmu.c
+ arch/arm64/kvm/sys_regs.c | 129 ++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 125 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
-index 4406184..2588f9c 100644
---- a/arch/arm64/include/asm/pmu.h
-+++ b/arch/arm64/include/asm/pmu.h
-@@ -21,6 +21,7 @@
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 298ae94..6a50262 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -561,6 +561,48 @@ static bool access_pmu_evtyper(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	return true;
+ }
  
- #define ARMV8_MAX_COUNTERS      32
- #define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
-+#define ARMV8_CYCLE_IDX         (ARMV8_MAX_COUNTERS - 1)
- 
- /*
-  * Per-CPU PMCR: config reg
-@@ -31,6 +32,8 @@
- #define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
- #define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
- #define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
-+/* Determines which PMCCNTR_EL0 bit generates an overflow */
-+#define ARMV8_PMCR_LC		(1 << 6)
- #define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
- #define	ARMV8_PMCR_N_MASK	0x1f
- #define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index caee9ee..122cff4 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -26,3 +26,4 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2-emul.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
-+kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index 32fee2d..ee4b15c 100644
---- a/include/kvm/arm_pmu.h
-+++ b/include/kvm/arm_pmu.h
-@@ -36,11 +36,21 @@ struct kvm_pmu {
- };
- 
- #define kvm_arm_pmu_v3_ready(v)		((v)->arch.pmu.ready)
-+u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
-+void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
-+				    u64 select_idx);
- #else
- struct kvm_pmu {
- };
- 
- #define kvm_arm_pmu_v3_ready(v)		(false)
-+static inline u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu,
-+					    u64 select_idx)
++static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
++			      struct sys_reg_params *p,
++			      const struct sys_reg_desc *r)
 +{
-+	return 0;
-+}
-+static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
-+						  u64 data, u64 select_idx) {}
- #endif
- 
- #endif
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-new file mode 100644
-index 0000000..673ec55
---- /dev/null
-+++ b/virt/kvm/arm/pmu.c
-@@ -0,0 +1,122 @@
-+/*
-+ * Copyright (C) 2015 Linaro Ltd.
-+ * Author: Shannon Zhao <shannon.zhao@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
++	u64 idx, reg, val;
 +
-+#include <linux/cpu.h>
-+#include <linux/kvm.h>
-+#include <linux/kvm_host.h>
-+#include <linux/perf_event.h>
-+#include <asm/kvm_emulate.h>
-+#include <kvm/arm_pmu.h>
++	if (!kvm_arm_pmu_v3_ready(vcpu))
++		return trap_raz_wi(vcpu, p, r);
 +
-+/**
-+ * kvm_pmu_get_counter_value - get PMU counter value
-+ * @vcpu: The vcpu pointer
-+ * @select_idx: The counter index
-+ */
-+u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
-+{
-+	u64 counter, reg, enabled, running;
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
-+
-+	reg = (select_idx == ARMV8_CYCLE_IDX)
-+	      ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + select_idx;
-+	counter = vcpu_sys_reg(vcpu, reg);
-+
-+	/* The real counter value is equal to the value of counter register plus
-+	 * the value perf event counts.
-+	 */
-+	if (pmc->perf_event)
-+		counter += perf_event_read_value(pmc->perf_event, &enabled,
-+						 &running);
-+
-+	return counter & pmc->bitmask;
-+}
-+
-+/**
-+ * kvm_pmu_stop_counter - stop PMU counter
-+ * @pmc: The PMU counter pointer
-+ *
-+ * If this counter has been configured to monitor some event, release it here.
-+ */
-+static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc)
-+{
-+	u64 counter, reg;
-+
-+	if (pmc->perf_event) {
-+		counter = kvm_pmu_get_counter_value(vcpu, pmc->idx);
-+		reg = (pmc->idx == ARMV8_CYCLE_IDX)
-+		       ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + pmc->idx;
-+		vcpu_sys_reg(vcpu, reg) = counter;
-+		perf_event_disable(pmc->perf_event);
-+		perf_event_release_kernel(pmc->perf_event);
-+		pmc->perf_event = NULL;
-+	}
-+}
-+
-+static bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu, u64 select_idx)
-+{
-+	return (vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E) &&
-+	       (vcpu_sys_reg(vcpu, PMCNTENSET_EL0) & BIT(select_idx));
-+}
-+
-+/**
-+ * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
-+ * @vcpu: The vcpu pointer
-+ * @data: The data guest writes to PMXEVTYPER_EL0
-+ * @select_idx: The number of selected counter
-+ *
-+ * When OS accesses PMXEVTYPER_EL0, that means it wants to set a PMC to count an
-+ * event with given hardware event number. Here we call perf_event API to
-+ * emulate this action and create a kernel perf event for it.
-+ */
-+void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
-+				    u64 select_idx)
-+{
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
-+	struct perf_event *event;
-+	struct perf_event_attr attr;
-+	u64 eventsel, counter;
-+
-+	kvm_pmu_stop_counter(vcpu, pmc);
-+	eventsel = data & ARMV8_EVTYPE_EVENT;
-+
-+	memset(&attr, 0, sizeof(struct perf_event_attr));
-+	attr.type = PERF_TYPE_RAW;
-+	attr.size = sizeof(attr);
-+	attr.pinned = 1;
-+	attr.disabled = kvm_pmu_counter_is_enabled(vcpu, select_idx);
-+	attr.exclude_user = data & ARMV8_EXCLUDE_EL0 ? 1 : 0;
-+	attr.exclude_kernel = data & ARMV8_EXCLUDE_EL1 ? 1 : 0;
-+	attr.exclude_hv = 1; /* Don't count EL2 events */
-+	attr.exclude_host = 1; /* Don't count host events */
-+	attr.config = eventsel;
-+
-+	counter = kvm_pmu_get_counter_value(vcpu, select_idx);
-+	/* The initial sample period (overflow count) of an event. */
-+	attr.sample_period = (-counter) & pmc->bitmask;
-+
-+	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
-+	if (IS_ERR(event)) {
-+		pr_err_once("kvm: pmu event creation failed %ld\n",
-+			    PTR_ERR(event));
-+		return;
++	if (r->CRn == 9 && r->CRm == 13) {
++		if (r->Op2 == 2) {
++			/* PMXEVCNTR_EL0 */
++			idx = vcpu_sys_reg(vcpu, PMSELR_EL0)
++			      & ARMV8_COUNTER_MASK;
++			reg = PMEVCNTR0_EL0 + idx;
++		} else if (r->Op2 == 0) {
++			/* PMCCNTR_EL0 */
++			idx = ARMV8_CYCLE_IDX;
++			reg = PMCCNTR_EL0;
++		} else {
++			BUG();
++		}
++	} else if (r->CRn == 14 && (r->CRm & 12) == 8) {
++		/* PMEVCNTRn_EL0 */
++		idx = ((r->CRm & 3) << 3) | (r->Op2 & 7);
++		reg = PMEVCNTR0_EL0 + idx;
++	} else {
++		BUG();
 +	}
 +
-+	pmc->perf_event = event;
++	if (!pmu_counter_idx_valid(vcpu, idx))
++		return false;
++
++	val = kvm_pmu_get_counter_value(vcpu, idx);
++	if (p->is_write)
++		vcpu_sys_reg(vcpu, reg) += (s64)p->regval - val;
++	else
++		p->regval = val;
++
++	return true;
 +}
++
+ /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+ #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+ 	/* DBGBVRn_EL1 */						\
+@@ -576,6 +618,13 @@ static bool access_pmu_evtyper(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b111),	\
+ 	  trap_wcr, reset_wcr, n, 0,  get_wcr, set_wcr }
+ 
++/* Macro to expand the PMEVCNTRn_EL0 register */
++#define PMU_PMEVCNTR_EL0(n)						\
++	/* PMEVCNTRn_EL0 */						\
++	{ Op0(0b11), Op1(0b011), CRn(0b1110),				\
++	  CRm((0b1000 | (((n) >> 3) & 0x3))), Op2(((n) & 0x7)),		\
++	  access_pmu_evcntr, reset_unknown, (PMEVCNTR0_EL0 + n), }
++
+ /* Macro to expand the PMEVTYPERn_EL0 register */
+ #define PMU_PMEVTYPER_EL0(n)						\
+ 	/* PMEVTYPERn_EL0 */						\
+@@ -776,13 +825,13 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	  access_pmceid },
+ 	/* PMCCNTR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
+-	  trap_raz_wi },
++	  access_pmu_evcntr, reset_unknown, PMCCNTR_EL0 },
+ 	/* PMXEVTYPER_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b001),
+ 	  access_pmu_evtyper },
+ 	/* PMXEVCNTR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b010),
+-	  trap_raz_wi },
++	  access_pmu_evcntr },
+ 	/* PMUSERENR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b000),
+ 	  trap_raz_wi },
+@@ -797,6 +846,38 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b011),
+ 	  NULL, reset_unknown, TPIDRRO_EL0 },
+ 
++	/* PMEVCNTRn_EL0 */
++	PMU_PMEVCNTR_EL0(0),
++	PMU_PMEVCNTR_EL0(1),
++	PMU_PMEVCNTR_EL0(2),
++	PMU_PMEVCNTR_EL0(3),
++	PMU_PMEVCNTR_EL0(4),
++	PMU_PMEVCNTR_EL0(5),
++	PMU_PMEVCNTR_EL0(6),
++	PMU_PMEVCNTR_EL0(7),
++	PMU_PMEVCNTR_EL0(8),
++	PMU_PMEVCNTR_EL0(9),
++	PMU_PMEVCNTR_EL0(10),
++	PMU_PMEVCNTR_EL0(11),
++	PMU_PMEVCNTR_EL0(12),
++	PMU_PMEVCNTR_EL0(13),
++	PMU_PMEVCNTR_EL0(14),
++	PMU_PMEVCNTR_EL0(15),
++	PMU_PMEVCNTR_EL0(16),
++	PMU_PMEVCNTR_EL0(17),
++	PMU_PMEVCNTR_EL0(18),
++	PMU_PMEVCNTR_EL0(19),
++	PMU_PMEVCNTR_EL0(20),
++	PMU_PMEVCNTR_EL0(21),
++	PMU_PMEVCNTR_EL0(22),
++	PMU_PMEVCNTR_EL0(23),
++	PMU_PMEVCNTR_EL0(24),
++	PMU_PMEVCNTR_EL0(25),
++	PMU_PMEVCNTR_EL0(26),
++	PMU_PMEVCNTR_EL0(27),
++	PMU_PMEVCNTR_EL0(28),
++	PMU_PMEVCNTR_EL0(29),
++	PMU_PMEVCNTR_EL0(30),
+ 	/* PMEVTYPERn_EL0 */
+ 	PMU_PMEVTYPER_EL0(0),
+ 	PMU_PMEVTYPER_EL0(1),
+@@ -1025,6 +1106,13 @@ static const struct sys_reg_desc cp14_64_regs[] = {
+ 	{ Op1( 0), CRm( 2), .access = trap_raz_wi },
+ };
+ 
++/* Macro to expand the PMEVCNTRn register */
++#define PMU_PMEVCNTR(n)							\
++	/* PMEVCNTRn */							\
++	{ Op1(0), CRn(0b1110),						\
++	  CRm((0b1000 | (((n) >> 3) & 0x3))), Op2(((n) & 0x7)),		\
++	  access_pmu_evcntr }
++
+ /* Macro to expand the PMEVTYPERn register */
+ #define PMU_PMEVTYPER(n)						\
+ 	/* PMEVTYPERn */						\
+@@ -1067,9 +1155,9 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmceid },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmceid },
+-	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), access_pmu_evcntr },
+ 	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), access_pmu_evtyper },
+-	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_evcntr },
+ 	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), trap_raz_wi },
+@@ -1084,6 +1172,38 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 
+ 	{ Op1( 0), CRn(13), CRm( 0), Op2( 1), access_vm_reg, NULL, c13_CID },
+ 
++	/* PMEVCNTRn */
++	PMU_PMEVCNTR(0),
++	PMU_PMEVCNTR(1),
++	PMU_PMEVCNTR(2),
++	PMU_PMEVCNTR(3),
++	PMU_PMEVCNTR(4),
++	PMU_PMEVCNTR(5),
++	PMU_PMEVCNTR(6),
++	PMU_PMEVCNTR(7),
++	PMU_PMEVCNTR(8),
++	PMU_PMEVCNTR(9),
++	PMU_PMEVCNTR(10),
++	PMU_PMEVCNTR(11),
++	PMU_PMEVCNTR(12),
++	PMU_PMEVCNTR(13),
++	PMU_PMEVCNTR(14),
++	PMU_PMEVCNTR(15),
++	PMU_PMEVCNTR(16),
++	PMU_PMEVCNTR(17),
++	PMU_PMEVCNTR(18),
++	PMU_PMEVCNTR(19),
++	PMU_PMEVCNTR(20),
++	PMU_PMEVCNTR(21),
++	PMU_PMEVCNTR(22),
++	PMU_PMEVCNTR(23),
++	PMU_PMEVCNTR(24),
++	PMU_PMEVCNTR(25),
++	PMU_PMEVCNTR(26),
++	PMU_PMEVCNTR(27),
++	PMU_PMEVCNTR(28),
++	PMU_PMEVCNTR(29),
++	PMU_PMEVCNTR(30),
+ 	/* PMEVTYPERn */
+ 	PMU_PMEVTYPER(0),
+ 	PMU_PMEVTYPER(1),
+@@ -1122,6 +1242,7 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 
+ static const struct sys_reg_desc cp15_64_regs[] = {
+ 	{ Op1( 0), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
++	{ Op1( 0), CRn( 0), CRm( 9), Op2( 0), access_pmu_evcntr },
+ 	{ Op1( 0), CRn( 0), CRm(12), Op2( 0), access_gic_sgi },
+ 	{ Op1( 1), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR1 },
+ };
 -- 
 2.0.4
