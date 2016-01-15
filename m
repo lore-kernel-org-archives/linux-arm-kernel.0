@@ -1,49 +1,92 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Fri, 15 Jan 2016 12:27:57 -0800
-Subject: [PATCH v2 2/4] power: reset: add reboot mode driver
-In-Reply-To: <1452598319-8324-1-git-send-email-andy.yan@rock-chips.com>
-References: <1452598029-8222-1-git-send-email-andy.yan@rock-chips.com>
- <1452598319-8324-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <CALAqxLVNUG_cVbavXC34sNPv68jbMghti31+PrgQ7mpPngXh6g@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 15 Jan 2016 14:32:20 -0600
+Subject: [PATCH] [v2] serial: amba-pl011: use cpu_relax when polling registers
+Message-ID: <1452889940-19594-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 3:31 AM, Andy Yan <andy.yan@rock-chips.com> wrote:
-> This driver parse the reboot commands like "reboot loader"
-> and "reboot recovery" to get a boot mode described in the
-> device tree , then call the write interfae to store the boot
-> mode in some persistent storage  like special register or ram,
-> which can be read by the bootloader after system reboot, then
-> the bootloader can take different action according to the mode
-> stored.
->
-> This is commonly used on Android based devices, which in order
-> to reboot the device into fastboot or recovery mode.
->
-> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+Busy loops that poll on a register should call cpu_relax().  On some
+architectures, it can lower CPU power consumption or yield to a
+hyperthreaded twin processor.  It also serves as a compiler barrier,
+so it can replace barrier() calls.
 
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
 
-Hey Andy!
-  Thanks for keeping this work going! I've just successfully reworked
-my Nexus7 tree to use your implementation (using the syscon version,
-setting up a syscon for IMEM as Bjorn had requested earlier).
+v2: rebased to latest code
 
-All is working well so far!
+ drivers/tty/serial/amba-pl011.c | 17 ++++++++---------
+ 1 file changed, 8 insertions(+), 9 deletions(-)
 
-The one thing I was working on supporting with my own version that
-seems to be missing here are for devices that use string based codes,
-rather then magic numbers.
-
-This was mostly a theoretical issue. I think the Galaxy Nexus used it,
-and when I was looking at some of the HTC devices, they support a text
-based reason along with the magic code, but at least in some
-implementations the text mode isn't used, so I suspect there its just
-for extra debugging.  So this may not be critical to solve until
-someone tries to add support for such a device.
-
-Anyway, I'm going to look at porting this to the HiKey board next
-(which just uses reserved ram, not syscon), so I'll try to do a an
-SRAM driver implementaiton to see how that goes.
-
-thanks!
--john
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index c0da0cc..69b5acd 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1167,7 +1167,7 @@ static void pl011_dma_shutdown(struct uart_amba_port *uap)
+ 
+ 	/* Disable RX and TX DMA */
+ 	while (pl011_read(uap, REG_FR) & UART01x_FR_BUSY)
+-		barrier();
++		cpu_relax();
+ 
+ 	spin_lock_irq(&uap->port.lock);
+ 	uap->dmacr &= ~(UART011_DMAONERR | UART011_RXDMAE | UART011_TXDMAE);
+@@ -1611,7 +1611,7 @@ static void pl011_put_poll_char(struct uart_port *port,
+ 	    container_of(port, struct uart_amba_port, port);
+ 
+ 	while (pl011_read(uap, REG_FR) & UART01x_FR_TXFF)
+-		barrier();
++		cpu_relax();
+ 
+ 	pl011_write(ch, uap, REG_DR);
+ }
+@@ -2150,7 +2150,7 @@ static void pl011_console_putchar(struct uart_port *port, int ch)
+ 	    container_of(port, struct uart_amba_port, port);
+ 
+ 	while (pl011_read(uap, REG_FR) & UART01x_FR_TXFF)
+-		barrier();
++		cpu_relax();
+ 	pl011_write(ch, uap, REG_DR);
+ }
+ 
+@@ -2158,7 +2158,7 @@ static void
+ pl011_console_write(struct console *co, const char *s, unsigned int count)
+ {
+ 	struct uart_amba_port *uap = amba_ports[co->index];
+-	unsigned int status, old_cr = 0, new_cr;
++	unsigned int old_cr = 0, new_cr;
+ 	unsigned long flags;
+ 	int locked = 1;
+ 
+@@ -2188,9 +2188,8 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
+ 	 *	Finally, wait for transmitter to become empty
+ 	 *	and restore the TCR
+ 	 */
+-	do {
+-		status = pl011_read(uap, REG_FR);
+-	} while (status & UART01x_FR_BUSY);
++	while (pl011_read(uap, REG_FR) & UART01x_FR_BUSY)
++		cpu_relax();
+ 	if (!uap->vendor->always_enabled)
+ 		pl011_write(old_cr, uap, REG_CR);
+ 
+@@ -2302,13 +2301,13 @@ static struct console amba_console = {
+ static void pl011_putc(struct uart_port *port, int c)
+ {
+ 	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+-		;
++		cpu_relax();
+ 	if (port->iotype == UPIO_MEM32)
+ 		writel(c, port->membase + UART01x_DR);
+ 	else
+ 		writeb(c, port->membase + UART01x_DR);
+ 	while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
+-		;
++		cpu_relax();
+ }
+ 
+ static void pl011_early_write(struct console *con, const char *s, unsigned n)
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
