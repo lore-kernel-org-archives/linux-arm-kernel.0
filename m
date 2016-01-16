@@ -1,347 +1,90 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Sat, 16 Jan 2016 02:51:07 +0100
-Subject: [PATCH v3 2/2] ARM: dts: imx6: Add support for Toradex Ixora carrier
- board
-In-Reply-To: <1452909067-1998-1-git-send-email-marcel.ziswiler@toradex.com>
-References: <1452909067-1998-1-git-send-email-marcel.ziswiler@toradex.com>
-Message-ID: <1452909067-1998-3-git-send-email-marcel.ziswiler@toradex.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Fri, 15 Jan 2016 18:41:28 -0800
+Subject: [PATCH v3 2/3] Documentation: mailbox: Add APM X-Gene SLIMpro
+ mailbox dts documentation
+In-Reply-To: <20151110141502.GA14092@rob-hp-laptop>
+References: <1429863912.2927.43.camel@x220>
+ <cover.1447091625.git.dhdang@apm.com>
+ <6be192528afbcc604653a318994ee30fa05a0e05.1447091626.git.dhdang@apm.com>
+ <20151110141502.GA14092@rob-hp-laptop>
+Message-ID: <CADaLNDksp35VwKv+b2K53VXKUOxS=4uiOV=GM6PneCKM5xhasA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Petr ?tetiar <ynezz@true.cz>
+On Tue, Nov 10, 2015 at 6:15 AM, Rob Herring <robh@kernel.org> wrote:
+>
+> On Mon, Nov 09, 2015 at 10:05:44AM -0800, Duc Dang wrote:
+> > This adds the APM X-Gene SLIMpro mailbox device tree
+> > node documentation.
+> >
+> > [dhdang: rebase over 4.3-rc5]
+> > Signed-off-by: Feng Kan <fkan@apm.com>
+> > Signed-off-by: Duc Dang <dhdang@apm.com>
+> > ---
+> >  .../bindings/mailbox/xgene-slimpro-mailbox.txt     | 34 ++++++++++++++++++++++
+> >  1 file changed, 34 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
+> > new file mode 100644
+> > index 0000000..d02a3d8
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
+> > @@ -0,0 +1,34 @@
+> > +The APM X-Gene SLIMpro mailbox is used to communicate messages between
+> > +the ARM64 processors and the Cortex M3 (dubbed SLIMpro). It uses a simple
+> > +interrupt based door bell mechanism and can exchange simple messages using the
+> > +internal registers.
+> > +
+> > +There are total of 7 interrupts in this mailbox. Each used for an individual
+> > +door bell (or mailbox channel).
+> > +
+> > +Required properties:
+> > +- compatible:        Should be as "apm, xgene-slimpro-mbox".
+>                                           ^
+> remove the space
+>
+> > +
+> > +- reg:               Contain the mailbox register address range.
+>
+> s/Contain/Contains/
+>
+> > +
+> > +- interrupts:        7 interrupts must start from 0 to 6, interrupt 0 define the
+> > +             the interrupt for mailbox channel 0 and interrupt 1 for
+> > +             mailbox channel 1 and so likewise for the reminder.
+>
+> s/start/be/
 
-Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-Signed-off-by: Petr ?tetiar <ynezz@true.cz>
-Reviewed-by: Stefan Agner <stefan@agner.ch>
----
+Thanks, Rob.
 
-Changes in v3:
-- integrated review feedback from Petr
-- integrated review feedback from Stefan
-- fix comment concerning Apalis GPIO usage as GPIO7 is only used for PCIe switch reset on Apalis Evaluation board
-- move I2C DDC handling into carrier board DTS where it belongs
-- simplify RTC alias
+I will post an updated version shortly.
 
-Changes in v2:
-- clarify exact Apalis iMX6Q/D SoM type in cover letter
-- clarify exact Apalis iMX6Q/D module type and Ixora carrier board in model
-  node
-- got rid of obsolete mmc aliases
-- working SGTL5000 audio/sound integration
-- working STMPE811 touch screen controller integration
-- integrated review feedback from Lucas
-- left and even added some more comments as I don't see why putting any
-  explanatory comments in dts' should be such a bad thing to do
-- completely got rid of the memory node as that is something typically filled
-  in by the boot loader e.g. U-Boot
-- without the regulators simple-bus it no longer boots
-- even though we supposedly shipped a few hundred V1.0a modules drop DCE UART
-  support for now and simplify file layout
-- replaced obsolete no-1-8-v by mainline supported voltage-ranges = <3300 3300>
-  usdhc property and yes card detects are indeed active low (;-p)
-- integrated review feedback from Stefan
-- fixed Ethernet PHY reset & interrupt (requires Micrel PHY driver to be
-  enabled)
-- fixed HDMI DDC (requires GPIO-based bitbanging I2C to be enabled)
-- fixed SPDIF
-
- arch/arm/boot/dts/Makefile               |   1 +
- arch/arm/boot/dts/imx6q-apalis-ixora.dts | 275 +++++++++++++++++++++++++++++++
- 2 files changed, 276 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-apalis-ixora.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a4a6d70..0d5e11b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -317,6 +317,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6dl-udoo.dtb \
- 	imx6dl-wandboard.dtb \
- 	imx6dl-wandboard-revb1.dtb \
-+	imx6q-apalis-ixora.dtb \
- 	imx6q-apf6dev.dtb \
- 	imx6q-arm2.dtb \
- 	imx6q-cm-fx6.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora.dts b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-new file mode 100644
-index 0000000..28f3b34
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-@@ -0,0 +1,275 @@
-+/*
-+ * Copyright 2014-2016 Toradex AG
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include "imx6q.dtsi"
-+#include "imx6qdl-apalis.dtsi"
-+
-+/ {
-+	model = "Toradex Apalis iMX6Q/D Module on Ixora Carrier Board";
-+	compatible = "toradex,apalis_imx6q-ixora", "toradex,apalis_imx6q",
-+		     "fsl,imx6q";
-+
-+	aliases {
-+		i2c0 = &i2cddc;
-+		i2c1 = &i2c1;
-+		i2c2 = &i2c2;
-+		i2c3 = &i2c3;
-+	};
-+
-+	aliases {
-+		rtc0 = &rtc_i2c;
-+		rtc1 = &snvs_rtc;
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpio_keys>;
-+
-+		wakeup {
-+			label = "Wake-Up";
-+			gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_WAKEUP>;
-+			debounce-interval = <10>;
-+			gpio-key,wakeup;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_leds_ixora>;
-+
-+		led4-green {
-+			label = "LED_4_GREEN";
-+			gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led4-red {
-+			label = "LED_4_RED";
-+			gpios = <&gpio1 21 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led5-green {
-+			label = "LED_5_GREEN";
-+			gpios = <&gpio2 1 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led5-red {
-+			label = "LED_5_RED";
-+			gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	pwmleds {
-+		compatible = "pwm-leds";
-+		ledpwm1 {
-+			label = "PWM1";
-+			pwms = <&pwm1 0 50000>;
-+			max-brightness = <255>;
-+		};
-+
-+		ledpwm2 {
-+			label = "PWM2";
-+			pwms = <&pwm2 0 50000>;
-+			max-brightness = <255>;
-+		};
-+
-+		ledpwm3 {
-+			label = "PWM3";
-+			pwms = <&pwm3 0 50000>;
-+			max-brightness = <255>;
-+		};
-+	};
-+
-+	regulators {
-+		reg_usb_otg_vbus: usb_otg_vbus {
-+			status = "okay";
-+		};
-+
-+		reg_usb_host_vbus: usb_host_vbus {
-+			status = "okay";
-+		};
-+	};
-+};
-+
-+&backlight {
-+	brightness-levels = <0 127 191 223 239 247 251 255>;
-+	default-brightness-level = <1>;
-+	status = "okay";
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
-+&can2 {
-+	status = "okay";
-+};
-+
-+&hdmi {
-+	ddc-i2c-bus = <&i2cddc>;
-+	status = "okay";
-+};
-+
-+&i2cddc {
-+	status = "okay";
-+};
-+
-+/* GEN1_I2C: I2C1_SDA/SCL on MXM3 209/211 (e.g. RTC on carrier board) */
-+&i2c1 {
-+	status = "okay";
-+
-+	eeprom at 50 {
-+		compatible = "atmel,24c02";
-+		reg = <0x50>;
-+	};
-+
-+	/* M41T0M6 real time clock on carrier board */
-+	rtc_i2c: rtc at 68 {
-+		compatible = "st,m41t00";
-+		reg = <0x68>;
-+	};
-+};
-+
-+&ldb {
-+	status = "okay";
-+};
-+
-+&pcie {
-+	/* active-low meaning opposite of regular PERST# active-low polarity */
-+	reset-gpio = <&gpio1 28 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
-+&pwm1 {
-+	status = "okay";
-+};
-+
-+&pwm2 {
-+	status = "okay";
-+};
-+
-+&pwm3 {
-+	status = "okay";
-+};
-+
-+&pwm4 {
-+	status = "okay";
-+};
-+
-+&sata {
-+	status = "okay";
-+};
-+
-+&sound_spdif {
-+	status = "okay";
-+};
-+
-+&spdif {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&uart4 {
-+	status = "okay";
-+};
-+
-+&uart5 {
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	vbus-supply = <&reg_usb_host_vbus>;
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	status = "okay";
-+};
-+
-+/* SD1 */
-+&usdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_sd_cd>;
-+	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	/*
-+	 * Mux the Apalis GPIOs
-+	 * GPIO5, 6 used by optional fusion_F0710A kernel module
-+	 */
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_apalis_gpio1 &pinctrl_apalis_gpio2
-+		     &pinctrl_apalis_gpio3 &pinctrl_apalis_gpio4
-+		     &pinctrl_apalis_gpio5 &pinctrl_apalis_gpio6
-+		     &pinctrl_apalis_gpio7 &pinctrl_apalis_gpio8
-+		    >;
-+
-+	leds_ixora {
-+		pinctrl_leds_ixora: leds-ixora {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_DAT1__GPIO1_IO17 0x1b0b0
-+				MX6QDL_PAD_SD1_DAT3__GPIO1_IO21 0x1b0b0
-+				MX6QDL_PAD_NANDF_D1__GPIO2_IO01 0x1b0b0
-+				MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x1b0b0
-+			>;
-+		};
-+	};
-+};
--- 
-2.5.0
+Regards,
+Duc Dang.
+>
+> > +
+> > +- #mbox-cells:       only one to specify the mailbox channel number.
+> > +
+> > +Example:
+> > +
+> > +Mailbox Node:
+> > +             slimpro-mbox: slimpro-mbox at 10540000 {
+> > +                     compatible = "apm,xgene-slimpro-mbox";
+> > +                     reg = <0x0 0x10540000 0x0 0xa000>;
+> > +                     #mbox-cells = <1>;
+> > +                     interrupts =    <0x0 0x0 0x4>,
+> > +                                     <0x0 0x1 0x4>,
+> > +                                     <0x0 0x2 0x4>,
+> > +                                     <0x0 0x3 0x4>,
+> > +                                     <0x0 0x4 0x4>,
+> > +                                     <0x0 0x5 0x4>,
+> > +                                     <0x0 0x6 0x4>,
+> > +             };
+> > --
+> > 1.9.1
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
