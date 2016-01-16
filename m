@@ -1,162 +1,141 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Fri, 15 Jan 2016 17:21:23 -0800
-Subject: [PATCH v6 1/6] arm/arm64: KVM: Introduce armv7 fp/simd vcpu fields
- and helpers
-In-Reply-To: <5698B5C9.4030404@arm.com>
-References: <1451166900-3711-1-git-send-email-m.smarduch@samsung.com>
- <1451166900-3711-2-git-send-email-m.smarduch@samsung.com>
- <20160110163204.GD30867@cbox> <56943D29.3000002@samsung.com>
- <20160112141207.GF15554@cbox> <5695A0EB.5020609@samsung.com>
- <56970FE8.4020805@samsung.com> <20160114132718.GA4329@cbox>
- <5698531E.1090606@samsung.com> <5698B5C9.4030404@arm.com>
-Message-ID: <56999B13.6050103@samsung.com>
+From: naobsd@gmail.com (Naoki FUKAUMI)
+Date: Sat, 16 Jan 2016 10:22:40 +0900
+Subject: [PATCH 2/2] arm64: dts: rockchip: Add basic support for orion-r68
+In-Reply-To: <1452863192-29231-2-git-send-email-matthias.bgg@gmail.com>
+References: <1452863192-29231-1-git-send-email-matthias.bgg@gmail.com>
+ <1452863192-29231-2-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <CAFnsNoQ0Y11kQaTiQL-xEoTxAbZW4vzZDFrZC8ccS4egBx4NEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+this is not full review.
 
-On 1/15/2016 1:03 AM, Marc Zyngier wrote:
-> On 15/01/16 02:02, Mario Smarduch wrote:
->>
->>
->> On 1/14/2016 5:27 AM, Christoffer Dall wrote:
->>> On Wed, Jan 13, 2016 at 07:03:04PM -0800, Mario Smarduch wrote:
->>>>
->>>>
->>>> On 1/12/2016 4:57 PM, Mario Smarduch wrote:
->>>>>
->>>>>
->>>>> On 1/12/2016 6:12 AM, Christoffer Dall wrote:
->>>>>> On Mon, Jan 11, 2016 at 03:39:21PM -0800, Mario Smarduch wrote:
->>>>>>>
->>>>>>>
->>>>>>> On 1/10/2016 8:32 AM, Christoffer Dall wrote:
->>>>>>>> Hi Mario,
->>>>>>>>
->>>>>>>> I spotted one more potential issue...
->>>>>>>>
->>>>>>>> On Sat, Dec 26, 2015 at 01:54:55PM -0800, Mario Smarduch wrote:
->>>>>>>>> Add helper functions to enable access to fp/smid on guest entry and save host
->>>>>>>>> fpexc on vcpu put, check if fp/simd registers are dirty and add new vcpu
->>>>>>>>> fields.
->>>>>>>>>
->>>>>>>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->>>>>>>>> ---
->>>>>>>>>  arch/arm/include/asm/kvm_emulate.h   | 42 ++++++++++++++++++++++++++++++++++++
->>>>>>>>>  arch/arm/include/asm/kvm_host.h      |  6 ++++++
->>>>>>>>>  arch/arm64/include/asm/kvm_emulate.h |  8 +++++++
->>>>>>>>>  3 files changed, 56 insertions(+)
->>>>>>>>>
->>>>>>>>> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
->>>>>>>>> index 3095df0..d4d9da1 100644
->>>>>>>>> --- a/arch/arm/include/asm/kvm_emulate.h
->>>>>>>>> +++ b/arch/arm/include/asm/kvm_emulate.h
->>>>>>>>> @@ -24,6 +24,8 @@
->>>>>>>>>  #include <asm/kvm_mmio.h>
->>>>>>>>>  #include <asm/kvm_arm.h>
->>>>>>>>>  #include <asm/cputype.h>
->>>>>>>>> +#include <asm/vfp.h>
->>>>>>>>> +#include "../vfp/vfpinstr.h"
->>>>>>>>>  
->>>>>>>>>  unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
->>>>>>>>>  unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
->>>>>>>>> @@ -255,4 +257,44 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
->>>>>>>>>  	}
->>>>>>>>>  }
->>>>>>>>>  
->>>>>>>>> +#ifdef CONFIG_VFPv3
->>>>>>>>> +/* Called from vcpu_load - save fpexc and enable guest access to fp/simd unit */
->>>>>>>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
->>>>>>>>> +{
->>>>>>>>> +	u32 fpexc;
->>>>>>>>> +
->>>>>>>>> +	/* Save host fpexc, and enable guest access to fp unit */
->>>>>>>>> +	fpexc = fmrx(FPEXC);
->>>>>>>>> +	vcpu->arch.host_fpexc = fpexc;
->>>>>>>>> +	fpexc |= FPEXC_EN;
->>>>>>>>> +	fmxr(FPEXC, fpexc);
->>>>>>>>> +
->>>>>>>>> +	/* Configure HCPTR to trap on tracing and fp/simd access */
->>>>>>>>> +	vcpu->arch.hcptr = HCPTR_TTA | HCPTR_TCP(10)  | HCPTR_TCP(11);
->>>>>>>>> +}
->>>>>>>>> +
->>>>>>>>> +/* Called from vcpu_put - restore host fpexc */
->>>>>>>>> +static inline void vcpu_restore_host_fpexc(struct kvm_vcpu *vcpu)
->>>>>>>>> +{
->>>>>>>>> +	fmxr(FPEXC, vcpu->arch.host_fpexc);
->>>>>>>>> +}
->>>>>>>>> +
->>>>>>>>> +/* If trap bits are reset then fp/simd registers are dirty */
->>>>>>>>> +static inline bool vcpu_vfp_isdirty(struct kvm_vcpu *vcpu)
->>>>>>>>> +{
->>>>>>>>> +	return !(vcpu->arch.hcptr & (HCPTR_TCP(10) | HCPTR_TCP(11)));
->>>>>>>>> +}
->>>>>>>>> +#else
->>>>>>>>> +static inline void vcpu_trap_vfp_enable(struct kvm_vcpu *vcpu)
->>>>>>>>> +{
->>>>>>>>> +	vcpu->arch.hcptr = HCPTR_TTA;
->>>>>>>>
->>>>>>>> Is it correct not to trap VFP registers when the host kernel does not
->>>>>>>> have CONFIG_VFPv3?  I think this is a change in functionality compared
->>>>>>>> to the current kernels is it not?
->>>>>>>
->>>>>>> With CPU_V7 VFPv3 gets selected, without it fp should be emulated,
->>>>>>> with exceptions taken in guest kernel. I don't see a reason why
->>>>>>> fp hcptr access should be enabled in that case.
->>>>>>>
->>>>>>
->>>>>> If you have to guests with CONFIG_VFPV3 but your host doesn't have
->>>>>> CONFIG_VFPV3, you will never context-switch the VFP registers between
->>>>>> the two VMs, and mayhem will ensue.
->>>>>>
->>>>>> Unless I'm missing something very obvious?
->>>>
->>>> Did more testing on this enabling OABI_COMPAT and selecting
->>>> NWFPE/FastFPE breaks the boot. So far can't find a way to boot host
->>>> without VFP/VFPv3 enabled on ARMv7. CPU_V7 defaults to VFPv3
->>>> selection. I'm wondering if !VFPv3 path should be removed from
->>>> the patches?
->>>>
->>> I think this is related to your particular choice of userspace. 
->>
->> It appears like there are two soft float implementations.
->>
->> FastFPE - but that's missing arch/arm/fastfpe directory, the option
->> can still be selected but nothing is built.
->>
->> And the Netwidner FPE arch/arm/nwfpe, that doesn't appear to be
->> hooked into the kernel. The hook nwfpe_enter is not referenced
->> anywhere.
-> 
-> It is:
-> 
-> arch/arm/nwfpe/entry.S: .globl  nwfpe_enter
-> arch/arm/nwfpe/entry.S:nwfpe_enter:
-> arch/arm/nwfpe/fpmodule.c:extern void nwfpe_enter(void);
-> arch/arm/nwfpe/fpmodule.c:      kern_fp_enter = nwfpe_enter;
-> 
->> I could make this change but have no way to bring the host up to
->> test it.
-> 
-> None of these are relevant - they are emulation for the FPA (Floating
-> Point Accelerator). Most of the time, nobody uses this but instead a
-> userspace softfloat implementation, which saves the trap to kernel space
-> for emulation.
-> 
-> You can try Debian armel (as opposed to armhf, which mandates VFP) for
-> example, which is a softfloat-based distribution.
+On Fri, Jan 15, 2016 at 10:06 PM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
 
-I've been using armel debian but it appears some binaries have hard fp
-instructions (-mfloat-abi=hard,softfp). I have a simple rootfs now and
-it comes up cleanly on the host. I'll work on qemu now.
+> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+> index 8e985dd..fa97d93 100644
+> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
+> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+> @@ -72,3 +72,7 @@ Rockchip platforms device tree bindings
+>  - Rockchip R88 board:
+>      Required root node properties:
+>        - compatible = "rockchip,r88", "rockchip,rk3368";
+> +
+> +- Tronsmart Orion R68
+> +    Required root node properties:
+> +      - compatible = "tronsmart,orion-r68", "rockchip,rk3368";
 
-Thanks for pointing out FPA.
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3368-orion-r68.dts b/arch/arm64/boot/dts/rockchip/rk3368-orion-r68.dts
+> new file mode 100644
+> index 0000000..3f71d506
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/rockchip/rk3368-orion-r68.dts
+> @@ -0,0 +1,370 @@
+> +/*
+> + * Copyright (c) 2015 Matthias Brugger <mbrugger@suse.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "rk3368.dtsi"
+> +
+> +/ {
+> +       model = "Rockchip Orion R68";
+> +       compatible = "tronsmart,orion-r68", "rockchip,rk3368";
+> +
+> +       chosen {
+> +               stdout-path = "serial2:115200n8";
+> +       };
+> +
+> +       memory {
+> +               device_type = "memory";
+> +               reg = <0x0 0x0 0x0 0x40000000>;
+> +       };
 
-- Mario
+there are (at least) 4 models/revisions in Tronsmart Orion R68, Meta
+or Pro, 100M or 1000M ethernet. probably there are more variants from
+other vendors based on same board.
+I don't say all variants need to be supported here now, but it may
+need few more description.
 
+I have Orion R68 Meta 1000M version. there is a label on the board,
+"Netxeon RK68G V2.0 2G/16G/AP6335". it might be called
+"netxeon,rk68g-v2.0" or something like that.
 
-> 
-> Thanks,
-> 
-> 	M.
-> 
+> +       leds: gpio-leds {
+> +               compatible = "gpio-leds";
+> +
+> +               work {
+> +                       gpios = <&gpio3 29 GPIO_ACTIVE_HIGH>;
+> +                       label = "orion:purple:led";
+> +                       pinctrl-names = "default";
+> +                       pinctrl-0 = <&led_ctl>;
+> +                       default-state = "on";
+> +               };
+> +       };
+
+> +       leds {
+> +               stby_pwren: stby-pwren {
+> +                       rockchip,pins = <0 12 RK_FUNC_GPIO &pcfg_pull_none>;
+> +               };
+> +
+> +               led_ctl: led-ctl {
+> +                       rockchip,pins = <3 29 RK_FUNC_GPIO &pcfg_pull_none>;
+> +               };
+> +       };
+
+on my board, there is no "purple" LED, <&gpio3 29 GPIO_ACTIVE_HIGH> is
+red LED, <&gpio0 12 GPIO_ACTIVE_HIGH> is blue LED.
+
+did you already confirm all GPIO connection written in your dts?
+
+> +&uart2 {
+> +       status = "okay";
+> +};
+
+uart4 is working for me. (as a console)
+
+Regards,
+
+--
+FUKAUMI Naoki
