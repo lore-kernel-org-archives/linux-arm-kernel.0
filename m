@@ -1,65 +1,73 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sat, 16 Jan 2016 11:40:32 -0500 (EST)
-Subject: [PATCH v3 1/1] USB: core: let USB device know device node
-In-Reply-To: <5216704.YbueADHOOR@wuerfel>
-Message-ID: <Pine.LNX.4.44L0.1601161115050.11338-100000@netrider.rowland.org>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Sat, 16 Jan 2016 17:47:50 +0100
+Subject: [PATCH V2 2/3] ARM: bcm2835: I2S: use new register-range and
+ clock framework
+In-Reply-To: <569A6134.6070504@lategoodbye.de>
+References: <1452602149-5875-1-git-send-email-kernel@martin.sperl.org>
+ <1452602149-5875-3-git-send-email-kernel@martin.sperl.org>
+ <569A6134.6070504@lategoodbye.de>
+Message-ID: <25D01EDB-5DD2-4604-B42E-97BB1D186EBD@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 16 Jan 2016, Arnd Bergmann wrote:
 
-> > This leaves the question of whether OF will always use the same node to
-> > represent the host controller and the root hub.  In other words, if a
-> > motherboard has a fixed device plugged into a fixed root-hub port, will
-> > the DT description make that device a child of the host controller?  
-> > Or will there be a node in between (to represent the root hub)?
+> On 16.01.2016, at 16:26, Stefan Wahren <info@lategoodbye.de> wrote:
 > 
-> Good question. I'm sure the answer is somewhere in this document
+> Hi Martin,
 > 
-> http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
+> [add Mike and Remi]
 > 
-> but unfortunately I don't understand USB addressing well enough
-> to answer this. I think the key sentence is the definition of the
-> "reg" property:
+> Am 12.01.2016 um 13:35 schrieb kernel at martin.sperl.org:
+>> From: Martin Sperl <kernel@martin.sperl.org>
+>> 
+>> Since the move to the new clock framework with commit 94cb7f76caa0
+>> ("ARM: bcm2835: Switch to using the new clock driver support.")
+>> the bcm2835-i2s driver was no longer working.
+>> 
+>> This patch fixes the address ranges:
+>> * remove the PCM clock register range that is owned by the clockmanager
+>> * fix the length, which did not include the last register of this device
+>> 
+>> It also adds the required pcm-clock.
+>> 
+>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>> ---
+>>  arch/arm/boot/dts/bcm2835.dtsi |    5 ++---
 > 
-> | prop-encoded-array: one integer, encoded as with encode-int.
-> | The "reg" property for a device node shall consist of the number of the
-> | USB hub port or the USB host controller port to which this USB device
-> | is attached. As specified in [2] section 11.11.2.1, port numbers range
-> | from 1 to 255.
+> this won't apply, because the file has been renamed to bcm283x.dtsi.
+
+Well - this "rename? was and still is not merged upstream, so it is an
+unfortunate circumstance as I am going on vacation and can not create a
+new patchset until I return. So please take it as a template
+when applying it.
+
 > 
-> Does the root hub have a port number relative to the host controller,
-> or is it identical to the host controller from the addressing
-> perspective?
+>>  1 file changed, 2 insertions(+), 3 deletions(-)
+>> 
+>> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+>> index aef64de..83d9787 100644
+>> --- a/arch/arm/boot/dts/bcm2835.dtsi
+>> +++ b/arch/arm/boot/dts/bcm2835.dtsi
+>> @@ -120,9 +120,8 @@
+>> 
+>>  		i2s: i2s at 7e203000 {
+>>  			compatible = "brcm,bcm2835-i2s";
+>> -			reg = <0x7e203000 0x20>,
+>> -			      <0x7e101098 0x02>;
+>> -
+>> +			reg = <0x7e203000 0x24>;
+>> +			clocks = <&clocks BCM2835_CLOCK_PCM>;
+> 
+> After applying clk series ([PATCH V4 0/7] clk: bcm2835: add clocks and add MASH support) and this series the pcm clock is an orphan.
+> 
+> Do we need to add "assigned-clocks" to the i2s node just like for pwm [1]?
 
-The root hub does not have a port number relative to the host
-controller.  In a sense, the root hub is _part_ of the host controller;
-it represents the controller's connection to the USB bus (whereas the
-logical device we commonly associate with the host controller
-represents the controller's connection to the upstream PCI/whatever
-bus).
+In my experience it is not needed for PCM, as the clock is set by the
+bcm2835-i2s driver, so I left it out.
 
-You can also ask whether port numbers relative to the root hub are
-the same as the port numbers relative to the controller.  Under normal
-circumstances they are the same.  However, it is possible that they
-will be different for USB-3 host controllers (!).
+As I do not know how the orphan PWM clock would be used I can not comment
+if this is really needed with PWM or not - it would just set the default
+clock if it got referenced in the DT.
 
-This is because USB-3 uses two buses per controller: the legacy
-Low-Speed/Full-Speed/High-Speed bus compatible with USB-1.1 and USB-2
-devices, and the new SuperSpeed bus compatible with USB-3 devices.  
-Even though there's only the one controller, each bus has its own root
-hub and the ports for each root hub are numbered starting from 1.  
-Thus, for example, an xHCI controller with 6 LS/FS/HS ports and 3 SS
-ports would have a USB-2 root hub with ports 1-6 and a USB-3 root hub
-with ports 1-3.  However, xHCI treats the controller as a single entity
-and numbers all the ports sequentially; thus the controller would have
-ports 1-9.  (Even though the three SS ports would be the same physical
-objects as three of the LS/FS/HS ports -- USB-3 ports literally contain
-two independent sets of signal wires.)
-
-This isn't merely a convention in the specifications; the hardware
-actually uses both numbering schemes (although I don't know about USB-3
-controllers other than xHCI; they might be different).  Untangling this
-mess might be difficult.  I don't know how existing DT files handle it.
-
-Alan Stern
+Thanks,
+	Martin
