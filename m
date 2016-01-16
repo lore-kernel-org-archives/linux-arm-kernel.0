@@ -1,72 +1,37 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Sat, 16 Jan 2016 16:24:35 +0000
-Subject: [PATCH 1/4] ASoC: mxs-saif: fix clock prepare and enable
- unbalance issue
-In-Reply-To: <1342776027-31758-2-git-send-email-b29396@freescale.com> (Dong
- Aisheng's message of "Fri, 20 Jul 2012 17:20:24 +0800")
-References: <1342776027-31758-1-git-send-email-b29396@freescale.com>
- <1342776027-31758-2-git-send-email-b29396@freescale.com>
-Message-ID: <yw1xpox1truk.fsf@unicorn.mansr.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 17 Jan 2016 00:24:56 +0800
+Subject: [PATCH 2/3] ARM: dts: sun8i: Add watchdog device node for A83T
+In-Reply-To: <1452961497-10804-1-git-send-email-wens@csie.org>
+References: <1452961497-10804-1-git-send-email-wens@csie.org>
+Message-ID: <1452961497-10804-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dong Aisheng <b29396@freescale.com> writes:
+The A83T, like previous Allwinner SoCs, has a watchdog as part of its
+timer block. Add a device node for it.
 
-> From: Dong Aisheng <dong.aisheng@linaro.org>
->
-> Currently we directly call a clock_enable in trigger function without
-> a clk_prepare as pair first.
-> This will cause system hang immediately when run capture because
-> the clock was not prepared(playback does not hang because the clock was
-> prepared already by get_mclk before), a warning message in clock framework
-> may cause a deadlock to reclaim clock lock (see: pl011_console_write).
->
-> Here we prepare clock first in hw_param, then enable it in trigger
-> function to guarantee the balance.
->
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Liam Girdwood <lrg@ti.com>
-> Cc: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> ---
->  sound/soc/mxs/mxs-saif.c |   10 ++++++++++
->  1 files changed, 10 insertions(+), 0 deletions(-)
->
-> diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
-> index aba71bf..fdbb36a 100644
-> --- a/sound/soc/mxs/mxs-saif.c
-> +++ b/sound/soc/mxs/mxs-saif.c
-> @@ -394,9 +394,14 @@ static int mxs_saif_hw_params(struct snd_pcm_substream *substream,
->  			     struct snd_soc_dai *cpu_dai)
->  {
->  	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
-> +	struct mxs_saif *master_saif;
->  	u32 scr, stat;
->  	int ret;
->
-> +	master_saif = mxs_saif_get_master(saif);
-> +	if (!master_saif)
-> +		return -EINVAL;
-> +
->  	/* mclk should already be set */
->  	if (!saif->mclk && saif->mclk_in_use) {
->  		dev_err(cpu_dai->dev, "set mclk first\n");
-> @@ -420,6 +425,11 @@ static int mxs_saif_hw_params(struct snd_pcm_substream *substream,
->  		return ret;
->  	}
->
-> +	/* prepare clk in hw_param, enable in trigger */
-> +	clk_prepare(saif->clk);
-> +	if (saif != master_saif)
-> +		clk_prepare(master_saif->clk);
-> +
->  	scr = __raw_readl(saif->base + SAIF_CTRL);
->
->  	scr &= ~BM_SAIF_CTRL_WORD_LENGTH;
-> -- 
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-This is missing a matching clk_unprepare() call.
-
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index 08df5598df9c..8d27b6381257 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -182,6 +182,13 @@
+ 			clocks = <&osc24M>;
+ 		};
+ 
++		watchdog at 01c20ca0 {
++			compatible = "allwinner,sun6i-a31-wdt";
++			reg = <0x01c20ca0 0x20>;
++			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&osc24M>;
++		};
++
+ 		uart0: serial at 01c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
 -- 
-M?ns Rullg?rd
+2.7.0.rc3
