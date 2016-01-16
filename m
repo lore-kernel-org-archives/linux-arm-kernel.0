@@ -1,161 +1,72 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 17 Jan 2016 00:05:06 +0800
-Subject: [PATCH v2 06/26] clk: sunxi: Add PLL3 clock
-In-Reply-To: <1452785109-6172-7-git-send-email-maxime.ripard@free-electrons.com>
-References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
- <1452785109-6172-7-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64pj5Ga4-QaF7RpExUSyYntyMU2dQ87TPsm5WbNeAXMOQ@mail.gmail.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Sat, 16 Jan 2016 16:24:35 +0000
+Subject: [PATCH 1/4] ASoC: mxs-saif: fix clock prepare and enable
+ unbalance issue
+In-Reply-To: <1342776027-31758-2-git-send-email-b29396@freescale.com> (Dong
+ Aisheng's message of "Fri, 20 Jul 2012 17:20:24 +0800")
+References: <1342776027-31758-1-git-send-email-b29396@freescale.com>
+ <1342776027-31758-2-git-send-email-b29396@freescale.com>
+Message-ID: <yw1xpox1truk.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dong Aisheng <b29396@freescale.com> writes:
 
-On Thu, Jan 14, 2016 at 11:24 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The A10 SoCs and relatives have a PLL controller to drive the PLL3 and
-> PLL7, clocked from a 3MHz oscillator, that drives the display related
-> clocks (GPU, display engine, TCON, etc.)
+> From: Dong Aisheng <dong.aisheng@linaro.org>
 >
-> Add a driver for it.
+> Currently we directly call a clock_enable in trigger function without
+> a clk_prepare as pair first.
+> This will cause system hang immediately when run capture because
+> the clock was not prepared(playback does not hang because the clock was
+> prepared already by get_mclk before), a warning message in clock framework
+> may cause a deadlock to reclaim clock lock (see: pl011_console_write).
 >
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Here we prepare clock first in hw_param, then enable it in trigger
+> function to guarantee the balance.
+>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Liam Girdwood <lrg@ti.com>
+> Cc: Wolfram Sang <w.sang@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 > ---
->  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
->  drivers/clk/sunxi/Makefile                        |  1 +
->  drivers/clk/sunxi/clk-sun4i-pll3.c                | 90 +++++++++++++++++++++++
->  3 files changed, 92 insertions(+)
->  create mode 100644 drivers/clk/sunxi/clk-sun4i-pll3.c
+>  sound/soc/mxs/mxs-saif.c |   10 ++++++++++
+>  1 files changed, 10 insertions(+), 0 deletions(-)
 >
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index 5360554a7d3f..bb9fb78dcff8 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -10,6 +10,7 @@ Required properties:
->         "allwinner,sun4i-a10-pll1-clk" - for the main PLL clock and PLL4
->         "allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
->         "allwinner,sun8i-a23-pll1-clk" - for the main PLL clock on A23
-> +       "allwinner,sun4i-a10-pll3-clk" - for the video PLL clock on A10
->         "allwinner,sun9i-a80-pll4-clk" - for the peripheral PLLs on A80
->         "allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
->         "allwinner,sun4i-a10-pll6-clk" - for the PLL6 clock
-> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> index a991cd8ca509..40c32ffd912c 100644
-> --- a/drivers/clk/sunxi/Makefile
-> +++ b/drivers/clk/sunxi/Makefile
-> @@ -11,6 +11,7 @@ obj-y += clk-a20-gmac.o
->  obj-y += clk-mod0.o
->  obj-y += clk-simple-gates.o
->  obj-y += clk-sun4i-display.o
-> +obj-y += clk-sun4i-pll3.o
->  obj-y += clk-sun8i-mbus.o
->  obj-y += clk-sun9i-core.o
->  obj-y += clk-sun9i-mmc.o
-> diff --git a/drivers/clk/sunxi/clk-sun4i-pll3.c b/drivers/clk/sunxi/clk-sun4i-pll3.c
-> new file mode 100644
-> index 000000000000..6c9c2210b6b2
-> --- /dev/null
-> +++ b/drivers/clk/sunxi/clk-sun4i-pll3.c
-> @@ -0,0 +1,90 @@
-> +/*
-> + * Copyright 2015 Maxime Ripard
-> + *
-> + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/slab.h>
-> +#include <linux/spinlock.h>
-> +
-> +#define SUN4I_A10_PLL3_GATE_BIT        31
-> +#define SUN4I_A10_PLL3_DIV_WIDTH       7
-> +#define SUN4I_A10_PLL3_DIV_SHIFT       0
-> +
-> +static DEFINE_SPINLOCK(sun4i_a10_pll3_lock);
-> +
-> +static void __init sun4i_a10_pll3_setup(struct device_node *node)
-> +{
-> +       const char *clk_name = node->name, *parent;
-> +       struct clk_multiplier *mult;
-> +       struct clk_gate *gate;
-> +       void __iomem *reg;
-> +       struct clk *clk;
-> +       int ret;
-> +
-> +       of_property_read_string(node, "clock-output-names", &clk_name);
-> +       parent = of_clk_get_parent_name(node, 0);
-> +
-> +       reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-> +       if (IS_ERR(reg)) {
-> +               pr_err("%s: Could not map the clock registers\n", clk_name);
-> +               return;
-> +       }
-> +
-> +       gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-> +       if (!gate)
-> +               return;
-> +
-> +       gate->reg = reg;
-> +       gate->bit_idx = SUN4I_A10_PLL3_GATE_BIT;
-> +       gate->lock = &sun4i_a10_pll3_lock;
-> +
-> +       mult = kzalloc(sizeof(*mult), GFP_KERNEL);
-> +       if (!mult)
-> +               goto err_free_gate;
-> +
-> +       mult->reg = reg;
-> +       mult->shift = SUN4I_A10_PLL3_DIV_SHIFT;
-> +       mult->width = SUN4I_A10_PLL3_DIV_WIDTH;
-> +       mult->lock = &sun4i_a10_pll3_lock;
-> +
-> +       clk = clk_register_composite(NULL, clk_name,
-> +                                    &parent, 1,
-> +                                    NULL, NULL,
-> +                                    &mult->hw, &clk_multiplier_ops,
-> +                                    &gate->hw, &clk_gate_ops,
-> +                                    0);
-> +       if (IS_ERR(clk)) {
-> +               pr_err("%s: Couldn't register the clock\n", clk_name);
-> +               goto err_free_mult;
-> +       }
-> +
-> +       ret = of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +       if (WARN_ON(ret))
-
-Any particular reason for WARN_ON instead of pr_err like above?
-
-> +               goto err_clk_unregister;
-> +
-> +       return;
-> +
-> +err_clk_unregister:
-> +       clk_unregister_composite(clk);
-> +err_free_mult:
-> +       kfree(mult);
-> +err_free_gate:
-> +       kfree(gate);
-
-Clean up after of_io_request_and_map(), otherwise
-
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-
-Thanks!
-
-> +}
-> +
-> +CLK_OF_DECLARE(sun4i_a10_pll3, "allwinner,sun4i-a10-pll3-clk",
-> +              sun4i_a10_pll3_setup);
-> --
-> 2.6.4
+> diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
+> index aba71bf..fdbb36a 100644
+> --- a/sound/soc/mxs/mxs-saif.c
+> +++ b/sound/soc/mxs/mxs-saif.c
+> @@ -394,9 +394,14 @@ static int mxs_saif_hw_params(struct snd_pcm_substream *substream,
+>  			     struct snd_soc_dai *cpu_dai)
+>  {
+>  	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
+> +	struct mxs_saif *master_saif;
+>  	u32 scr, stat;
+>  	int ret;
 >
+> +	master_saif = mxs_saif_get_master(saif);
+> +	if (!master_saif)
+> +		return -EINVAL;
+> +
+>  	/* mclk should already be set */
+>  	if (!saif->mclk && saif->mclk_in_use) {
+>  		dev_err(cpu_dai->dev, "set mclk first\n");
+> @@ -420,6 +425,11 @@ static int mxs_saif_hw_params(struct snd_pcm_substream *substream,
+>  		return ret;
+>  	}
+>
+> +	/* prepare clk in hw_param, enable in trigger */
+> +	clk_prepare(saif->clk);
+> +	if (saif != master_saif)
+> +		clk_prepare(master_saif->clk);
+> +
+>  	scr = __raw_readl(saif->base + SAIF_CTRL);
+>
+>  	scr &= ~BM_SAIF_CTRL_WORD_LENGTH;
+> -- 
+
+This is missing a matching clk_unprepare() call.
+
+-- 
+M?ns Rullg?rd
