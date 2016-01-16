@@ -1,231 +1,65 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 17 Jan 2016 00:36:20 +0800
-Subject: [PATCH v2 07/26] clk: sunxi: Add TCON channel1 clock
-In-Reply-To: <1452785109-6172-8-git-send-email-maxime.ripard@free-electrons.com>
-References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
- <1452785109-6172-8-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v65_jsmiQ6DNCznFuQCcWxqs1N2fYJ-8OiUJ_BR+jf314w@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Sat, 16 Jan 2016 11:40:32 -0500 (EST)
+Subject: [PATCH v3 1/1] USB: core: let USB device know device node
+In-Reply-To: <5216704.YbueADHOOR@wuerfel>
+Message-ID: <Pine.LNX.4.44L0.1601161115050.11338-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, 16 Jan 2016, Arnd Bergmann wrote:
 
-On Thu, Jan 14, 2016 at 11:24 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The TCON is a controller generating the timings to output videos signals,
-> acting like both a CRTC and an encoder.
->
-> It has two channels depending on the output, each channel being driven by
-> its own clock (and own clock controller).
->
-> Add a driver for the channel 1 clock.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/clock/sunxi.txt |   1 +
->  drivers/clk/sunxi/Makefile                        |   1 +
->  drivers/clk/sunxi/clk-sun4i-tcon-ch1.c            | 154 ++++++++++++++++++++++
->  3 files changed, 156 insertions(+)
->  create mode 100644 drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
->
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index bb9fb78dcff8..fe34fc56e803 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -67,6 +67,7 @@ Required properties:
->         "allwinner,sun7i-a20-out-clk" - for the external output clocks
->         "allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
->         "allwinner,sun4i-a10-tcon-ch0-clk" - for the TCON channel 0 clock on the A10
-> +       "allwinner,sun4i-a10-tcon-ch1-clk" - for the TCON channel 1 clock on the A10
->         "allwinner,sun4i-a10-usb-clk" - for usb gates + resets on A10 / A20
->         "allwinner,sun5i-a13-usb-clk" - for usb gates + resets on A13
->         "allwinner,sun6i-a31-usb-clk" - for usb gates + resets on A31
-> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> index 40c32ffd912c..0a20873cd103 100644
-> --- a/drivers/clk/sunxi/Makefile
-> +++ b/drivers/clk/sunxi/Makefile
-> @@ -12,6 +12,7 @@ obj-y += clk-mod0.o
->  obj-y += clk-simple-gates.o
->  obj-y += clk-sun4i-display.o
->  obj-y += clk-sun4i-pll3.o
-> +obj-y += clk-sun4i-tcon-ch1.o
->  obj-y += clk-sun8i-mbus.o
->  obj-y += clk-sun9i-core.o
->  obj-y += clk-sun9i-mmc.o
-> diff --git a/drivers/clk/sunxi/clk-sun4i-tcon-ch1.c b/drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
-> new file mode 100644
-> index 000000000000..51ddc38821f7
-> --- /dev/null
-> +++ b/drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
-> @@ -0,0 +1,154 @@
-> +/*
-> + * Copyright 2015 Maxime Ripard
-> + *
-> + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/slab.h>
-> +#include <linux/spinlock.h>
-> +
-> +#define SUN4I_TCON_CH1_SCLK_NAME_LEN   32
-> +
-> +#define SUN4I_A10_TCON_CH1_SCLK2_PARENTS       4
-> +
-> +#define SUN4I_A10_TCON_CH1_SCLK2_GATE_BIT      31
-> +#define SUN4I_A10_TCON_CH1_SCLK2_MUX_MASK      3
-> +#define SUN4I_A10_TCON_CH1_SCLK2_MUX_SHIFT     24
-> +#define SUN4I_A10_TCON_CH1_SCLK2_DIV_WIDTH     4
-> +#define SUN4I_A10_TCON_CH1_SCLK2_DIV_SHIFT     0
-> +
-> +#define SUN4I_A10_TCON_CH1_SCLK1_GATE_BIT      15
-> +#define SUN4I_A10_TCON_CH1_SCLK1_DIV_WIDTH     1
-> +#define SUN4I_A10_TCON_CH1_SCLK1_DIV_SHIFT     11
-> +
-> +static DEFINE_SPINLOCK(sun4i_a10_tcon_ch1_lock);
-> +
-> +static void __init sun4i_a10_tcon_ch1_setup(struct device_node *node)
-> +{
-> +       const char *sclk2_parents[SUN4I_A10_TCON_CH1_SCLK2_PARENTS];
-> +       const char *sclk1_name = node->name;
-> +       const char *sclk2_name;
-> +       struct clk_divider *sclk1_div, *sclk2_div;
-> +       struct clk_gate *sclk1_gate, *sclk2_gate;
-> +       struct clk_mux *sclk2_mux;
-> +       struct clk *sclk1, *sclk2;
-> +       void __iomem *reg;
-> +       int i, ret;
-> +
-> +       of_property_read_string(node, "clock-output-names",
-> +                               &sclk1_name);
-> +
-> +       sclk2_name = kasprintf(GFP_KERNEL, "%s2", sclk1_name);
-> +       if (!sclk2_name)
-> +               return;
-> +
-> +       reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-> +       if (IS_ERR(reg)) {
-> +               pr_err("%s: Could not map the clock registers\n", sclk2_name);
-> +               return;
-> +       }
-> +
-> +       for (i = 0; i < SUN4I_A10_TCON_CH1_SCLK2_PARENTS; i++)
-> +               sclk2_parents[i] = of_clk_get_parent_name(node, i);
+> > This leaves the question of whether OF will always use the same node to
+> > represent the host controller and the root hub.  In other words, if a
+> > motherboard has a fixed device plugged into a fixed root-hub port, will
+> > the DT description make that device a child of the host controller?  
+> > Or will there be a node in between (to represent the root hub)?
+> 
+> Good question. I'm sure the answer is somewhere in this document
+> 
+> http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
+> 
+> but unfortunately I don't understand USB addressing well enough
+> to answer this. I think the key sentence is the definition of the
+> "reg" property:
+> 
+> | prop-encoded-array: one integer, encoded as with encode-int.
+> | The "reg" property for a device node shall consist of the number of the
+> | USB hub port or the USB host controller port to which this USB device
+> | is attached. As specified in [2] section 11.11.2.1, port numbers range
+> | from 1 to 255.
+> 
+> Does the root hub have a port number relative to the host controller,
+> or is it identical to the host controller from the addressing
+> perspective?
 
-of_clk_parent_fill?
+The root hub does not have a port number relative to the host
+controller.  In a sense, the root hub is _part_ of the host controller;
+it represents the controller's connection to the USB bus (whereas the
+logical device we commonly associate with the host controller
+represents the controller's connection to the upstream PCI/whatever
+bus).
 
-> +
-> +       sclk2_mux = kzalloc(sizeof(*sclk2_mux), GFP_KERNEL);
-> +       if (!sclk2_mux)
-> +               return;
-> +
-> +       sclk2_mux->reg = reg;
-> +       sclk2_mux->shift = SUN4I_A10_TCON_CH1_SCLK2_MUX_SHIFT;
-> +       sclk2_mux->mask = SUN4I_A10_TCON_CH1_SCLK2_MUX_MASK;
-> +       sclk2_mux->lock = &sun4i_a10_tcon_ch1_lock;
-> +
-> +       sclk2_gate = kzalloc(sizeof(*sclk2_gate), GFP_KERNEL);
-> +       if (!sclk2_gate)
-> +               goto free_sclk2_mux;
-> +
-> +       sclk2_gate->reg = reg;
-> +       sclk2_gate->bit_idx = SUN4I_A10_TCON_CH1_SCLK2_GATE_BIT;
-> +       sclk2_gate->lock = &sun4i_a10_tcon_ch1_lock;
-> +
-> +       sclk2_div = kzalloc(sizeof(*sclk2_div), GFP_KERNEL);
-> +       if (!sclk2_div)
-> +               goto free_sclk2_gate;
-> +
-> +       sclk2_div->reg = reg;
-> +       sclk2_div->shift = SUN4I_A10_TCON_CH1_SCLK2_DIV_SHIFT;
-> +       sclk2_div->width = SUN4I_A10_TCON_CH1_SCLK2_DIV_WIDTH;
-> +       sclk2_div->lock = &sun4i_a10_tcon_ch1_lock;
-> +
-> +       sclk2 = clk_register_composite(NULL, sclk2_name, sclk2_parents,
-> +                                      SUN4I_A10_TCON_CH1_SCLK2_PARENTS,
-> +                                      &sclk2_mux->hw, &clk_mux_ops,                                   &
+You can also ask whether port numbers relative to the root hub are
+the same as the port numbers relative to the controller.  Under normal
+circumstances they are the same.  However, it is possible that they
+will be different for USB-3 host controllers (!).
 
-> +                                      sclk2_div->hw, &clk_divider_ops,
+This is because USB-3 uses two buses per controller: the legacy
+Low-Speed/Full-Speed/High-Speed bus compatible with USB-1.1 and USB-2
+devices, and the new SuperSpeed bus compatible with USB-3 devices.  
+Even though there's only the one controller, each bus has its own root
+hub and the ports for each root hub are numbered starting from 1.  
+Thus, for example, an xHCI controller with 6 LS/FS/HS ports and 3 SS
+ports would have a USB-2 root hub with ports 1-6 and a USB-3 root hub
+with ports 1-3.  However, xHCI treats the controller as a single entity
+and numbers all the ports sequentially; thus the controller would have
+ports 1-9.  (Even though the three SS ports would be the same physical
+objects as three of the LS/FS/HS ports -- USB-3 ports literally contain
+two independent sets of signal wires.)
 
-Placement of the "&" is very weird.
+This isn't merely a convention in the specifications; the hardware
+actually uses both numbering schemes (although I don't know about USB-3
+controllers other than xHCI; they might be different).  Untangling this
+mess might be difficult.  I don't know how existing DT files handle it.
 
-> +                                      &sclk2_gate->hw, &clk_gate_ops,
-> +                                      0);
-> +       if (IS_ERR(sclk2)) {
-> +               pr_err("%s: Couldn't register the clock\n", sclk2_name);
-> +               goto free_sclk2_div;
-> +       }
-> +
-> +       sclk1_div = kzalloc(sizeof(*sclk1_div), GFP_KERNEL);
-> +       if (!sclk1_div)
-> +               goto free_sclk2;
-> +
-> +       sclk1_div->reg = reg;
-> +       sclk1_div->shift = SUN4I_A10_TCON_CH1_SCLK1_DIV_SHIFT;
-> +       sclk1_div->width = SUN4I_A10_TCON_CH1_SCLK1_DIV_WIDTH;
-> +       sclk1_div->lock = &sun4i_a10_tcon_ch1_lock;
-> +
-> +       sclk1_gate = kzalloc(sizeof(*sclk1_gate), GFP_KERNEL);
-> +       if (!sclk1_gate)
-> +               goto free_sclk1_mux;
-> +
-> +       sclk1_gate->reg = reg;
-> +       sclk1_gate->bit_idx = SUN4I_A10_TCON_CH1_SCLK1_GATE_BIT;
-> +       sclk1_gate->lock = &sun4i_a10_tcon_ch1_lock;
-> +
-> +       sclk1 = clk_register_composite(NULL, sclk1_name, &sclk2_name, 1,
-> +                                      NULL, NULL,
-> +                                      &sclk1_div->hw, &clk_divider_ops,
-> +                                      &sclk1_gate->hw, &clk_gate_ops,
-> +                                      0);
-> +       if (IS_ERR(sclk1)) {
-> +               pr_err("%s: Couldn't register the clock\n", sclk1_name);
-> +               goto free_sclk1_gate;
-> +       }
-> +
-> +       ret = of_clk_add_provider(node, of_clk_src_simple_get, sclk1);
-> +       if (WARN_ON(ret))
-> +               goto free_sclk1;
-> +
-> +       return;
-> +
-> +free_sclk1:
-> +       clk_unregister_composite(sclk1);
-> +free_sclk1_gate:
-> +       kfree(sclk1_gate);
-> +free_sclk1_mux:
-> +       kfree(sclk1_div);
-> +free_sclk2:
-> +       clk_unregister(sclk2);
-> +free_sclk2_div:
-> +       kfree(sclk2_div);
-> +free_sclk2_gate:
-> +       kfree(sclk2_gate);
-> +free_sclk2_mux:
-> +       kfree(sclk2_mux);
-
-Cleanup after of_io_request_and_map?
-
-
-Regards
-ChenYu
-
-> +}
-> +
-> +CLK_OF_DECLARE(sun4i_a10_tcon_ch1, "allwinner,sun4i-a10-tcon-ch1-clk",
-> +              sun4i_a10_tcon_ch1_setup);
-> --
-> 2.6.4
->
+Alan Stern
