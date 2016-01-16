@@ -1,65 +1,28 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 16 Jan 2016 11:38:30 +0000
-Subject: [PATCH v3 3/5] ARM: at91/dt: sama5d2: add adc device
-In-Reply-To: <1452785897-16270-4-git-send-email-ludovic.desroches@atmel.com>
-References: <1452785897-16270-1-git-send-email-ludovic.desroches@atmel.com>
- <1452785897-16270-4-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <569A2BB6.4070602@kernel.org>
+From: kvalo@codeaurora.org (Kalle Valo)
+Date: Sat, 16 Jan 2016 14:10:31 +0200
+Subject: [PATCH, RESEND] ssb: mark ssb_bus_register as __maybe_unused
+In-Reply-To: <4037550.DMaVTE01Aq@wuerfel> (Arnd Bergmann's message of "Fri, 15
+ Jan 2016 00:13 +0100")
+References: <8128014.DbbgBtKY3z@wuerfel>
+ <8760ywd5fe.fsf@kamboji.qca.qualcomm.com> <4037550.DMaVTE01Aq@wuerfel>
+Message-ID: <87bn8l7miw.fsf@kamboji.qca.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/01/16 15:38, Ludovic Desroches wrote:
-> Add the ADC device, and remove the adc_op_clk which is useless since the
-> adc sampling frequency is configured with sysfs.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-I've now applied the driver to the togreg branch of iio.git.
-Should get a pull request out to Greg in about 2 weeks time and it'll
-probably be in linux-next a week after that.  I'm assuming all the device
-tree changes will got through the at91 tree and arm-soc etc. 
-Shout if you want me to take them through IIO.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Thanks,
+> On Thursday 14 January 2016 08:46:29 Kalle Valo wrote:
+>> I can take it. For historical reasons ssb patches go through my
+>> wireless-drivers trees.
+>
+> I found this in my backlog, and I believe it still applies. Can you take
+> that one too?
 
-Jonathan
-> ---
->  arch/arm/boot/dts/sama5d2.dtsi | 18 ++++++++++++------
->  1 file changed, 12 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-> index 3f750f6..46dd430 100644
-> --- a/arch/arm/boot/dts/sama5d2.dtsi
-> +++ b/arch/arm/boot/dts/sama5d2.dtsi
-> @@ -88,12 +88,6 @@
->  			#clock-cells = <0>;
->  			clock-frequency = <0>;
->  		};
-> -
-> -		adc_op_clk: adc_op_clk{
-> -			compatible = "fixed-clock";
-> -			#clock-cells = <0>;
-> -			clock-frequency = <1000000>;
-> -		};
->  	};
->  
->  	ns_sram: sram at 00200000 {
-> @@ -1085,6 +1079,18 @@
->  				status = "disabled";
->  			};
->  
-> +			adc: adc at fc030000 {
-> +				compatible = "atmel,sama5d2-adc";
-> +				reg = <0xfc030000 0x100>;
-> +				interrupts = <40 IRQ_TYPE_LEVEL_HIGH 7>;
-> +				clocks = <&adc_clk>;
-> +				clock-names = "adc_clk";
-> +				atmel,min-sample-rate-hz = <200000>;
-> +				atmel,max-sample-rate-hz = <20000000>;
-> +				atmel,startup-time-ms = <4>;
-> +				status = "disabled";
-> +			};
-> +
->  			pioA: pinctrl at fc038000 {
->  				compatible = "atmel,sama5d2-pinctrl";
->  				reg = <0xfc038000 0x600>;
-> 
+I'm not sure what you mean here, I can take any ssb patch if it's ok for
+Michael or Rafal :)
+
+Just please submit the patch properly (with S-o-B line) and CC
+linux-wireless so that it goes to patchwork.
+
+-- 
+Kalle Valo
