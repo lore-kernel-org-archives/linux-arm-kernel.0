@@ -1,46 +1,55 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 16 Jan 2016 18:27:00 +0100
-Subject: ARM: mvebu_v5_defconfig: Enable sound module needed for OpenRD
-In-Reply-To: <20160111042540.GA31022@jirafa.cyrius.com>
-References: <20160111042540.GA31022@jirafa.cyrius.com>
-Message-ID: <20160116172700.GD9880@lunn.ch>
+From: clabbe.montjoie@gmail.com (Corentin LABBE)
+Date: Sat, 16 Jan 2016 21:32:45 +0100
+Subject: [RESEND PATCH 0/2] crypto: sunxi-ss: fix 64-bit compilation
+In-Reply-To: <1452252249-12040-1-git-send-email-andre.przywara@arm.com>
+References: <1452252249-12040-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <569AA8ED.7050404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 10, 2016 at 08:25:40PM -0800, Martin Michlmayr wrote:
-> OpenRD-Client requires the CS42L51 codec.
+Le 08/01/2016 12:24, Andre Przywara a ?crit :
+> (resending to add linux-crypto, patches unchanged)
 > 
-> Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
+> Hi,
+> 
+> these two patches provide a different approach to an issue I tried
+> to fix lately [1].
+> Instead of casting everything I now promote local types to size_t, so
+> that the min3() arguments naturally match in type.
+> As size_t is defined as "unsigned int" on 32-bit architectures
+> anyway, that actually does not change anything there, but instead
+> provides a clean approach to get it compiled for arm64.
+> 
+> I split this up because 1/2 seems much cleaner to me than 2/2, so we
+> can have a separate discussion/merge process on this.
+> 
+> Cheers,
+> Andre.
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/395689.html
+> 
+> Andre Przywara (2):
+>   crypto: sunxi-ss-cipher: promote variables to match types in min3()
+>     calls
+>   crypto: sunxi-ss-hash: promote variables to match types in min3()
+>     calls
+> 
+>  drivers/crypto/sunxi-ss/sun4i-ss-cipher.c | 20 ++++++++++----------
+>  drivers/crypto/sunxi-ss/sun4i-ss-hash.c   | 12 ++++++------
+>  drivers/crypto/sunxi-ss/sun4i-ss.h        |  2 +-
+>  3 files changed, 17 insertions(+), 17 deletions(-)
+> 
 
-Reviewd-by: Andrew Lunn <andrew@lunn.ch>
+Hello
 
-Thanks
-	Andrew
+Sorry for this late answer.
 
-> ---
->  arch/arm/configs/mvebu_v5_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
-> index 79e6260..25c788a 100644
-> --- a/arch/arm/configs/mvebu_v5_defconfig
-> +++ b/arch/arm/configs/mvebu_v5_defconfig
-> @@ -109,6 +109,7 @@ CONFIG_SND=y
->  CONFIG_SND_SOC=y
->  CONFIG_SND_KIRKWOOD_SOC=y
->  CONFIG_SND_SOC_ALC5623=y
-> +CONFIG_SND_SOC_CS42L51_I2C=y
->  CONFIG_SND_SIMPLE_CARD=y
->  CONFIG_REGULATOR=y
->  CONFIG_REGULATOR_FIXED_VOLTAGE=y
-> -- 
-> 2.1.4
-> 
-> -- 
-> Martin Michlmayr
-> http://www.cyrius.com/
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I am in trouble with those patch, so we have with Andre a long conversation about it.
+Basically, sun4i-ss will never be available on 64bits platform. (A64 will have a totally new crypto engine).
+So letting it to compile under 64bit arch is only useful when goal is to add COMPILE_TEST for it.
+But COMPILE_TEST cannot simply be added with those patch since some arches (x86/x86_64 at least) does not have writesl/readsl available.
+The conclusion is that it is simpler to block 64bit build for sun4i-ss.
+
+Regards
+
+LABBE Corentin
