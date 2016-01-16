@@ -1,37 +1,36 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 17 Jan 2016 00:24:56 +0800
-Subject: [PATCH 2/3] ARM: dts: sun8i: Add watchdog device node for A83T
-In-Reply-To: <1452961497-10804-1-git-send-email-wens@csie.org>
-References: <1452961497-10804-1-git-send-email-wens@csie.org>
-Message-ID: <1452961497-10804-3-git-send-email-wens@csie.org>
+Date: Sun, 17 Jan 2016 00:24:54 +0800
+Subject: [PATCH 0/3] ARM: dts: sun8i: Add timer/watchdog for A83T and
+ Cubietruck Plus
+Message-ID: <1452961497-10804-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A83T, like previous Allwinner SoCs, has a watchdog as part of its
-timer block. Add a device node for it.
+Hi Maxime,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a83t.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+This small series adds the timer/watchdog block for A83T, and also a new
+board, the A83T/H8 based Cubietruck Plus from Cubietech.
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 08df5598df9c..8d27b6381257 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -182,6 +182,13 @@
- 			clocks = <&osc24M>;
- 		};
- 
-+		watchdog at 01c20ca0 {
-+			compatible = "allwinner,sun6i-a31-wdt";
-+			reg = <0x01c20ca0 0x20>;
-+			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&osc24M>;
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
+Patch 1 from Vishnu adds the timer device node. This was picked from his
+github branch sunxi-a83-wip.
+
+Patch 2 adds the watchdog device node. We get watchdog and reboot support
+on the A83T.
+
+Patch 3 adds a basic DTS file for the Cubieteuck Plus.
+
+Chen-Yu Tsai (2):
+  ARM: dts: sun8i: Add watchdog device node for A83T
+  ARM: dts: sun8i: Add device tree for Cubietruck Plus
+
+Vishnu Patekar (1):
+  ARM: dts: sun8i: Enable timer node for A83T
+
+ arch/arm/boot/dts/Makefile                       |  1 +
+ arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts | 65 ++++++++++++++++++++++++
+ arch/arm/boot/dts/sun8i-a83t.dtsi                | 15 ++++++
+ 3 files changed, 81 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+
 -- 
 2.7.0.rc3
