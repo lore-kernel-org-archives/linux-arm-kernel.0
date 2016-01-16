@@ -1,68 +1,48 @@
 From: dhdang@apm.com (Duc Dang)
-Date: Fri, 15 Jan 2016 18:57:18 -0800
-Subject: [PATCH v4 2/3] Documentation: mailbox: Add APM X-Gene SLIMpro mailbox
- dts documentation
+Date: Fri, 15 Jan 2016 18:57:19 -0800
+Subject: [PATCH v4 3/3] arm64: dts: mailbox device tree node for APM X-Gene
+ platform.
 In-Reply-To: <cover.1452912126.git.dhdang@apm.com>
 References: <cover.1452912126.git.dhdang@apm.com>
-Message-ID: <efac1dfff3e6893516f527f47b82f889635122a7.1452912126.git.dhdang@apm.com>
+Message-ID: <54c827fc1e65689569232eb319ad17a0725c2411.1452912126.git.dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the APM X-Gene SLIMpro mailbox device tree
-node documentation.
+Mailbox device tree node for APM X-Gene platform.
 
 Signed-off-by: Feng Kan <fkan@apm.com>
 Signed-off-by: Duc Dang <dhdang@apm.com>
 ---
 Changes since v3:
         - Rebase over v4.4
-        - Change number of mailbox IRQs to 8
-	- Fix white spaces, typos.
 
- .../bindings/mailbox/xgene-slimpro-mailbox.txt     | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
+ arch/arm64/boot/dts/apm/apm-storm.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
-new file mode 100644
-index 0000000..91774d7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
-@@ -0,0 +1,35 @@
-+The APM X-Gene SLIMpro mailbox is used to communicate messages between
-+the ARM64 processors and the Cortex M3 (dubbed SLIMpro). It uses a simple
-+interrupt based door bell mechanism and can exchange simple messages using the
-+internal registers.
-+
-+There are total of 7 interrupts in this mailbox. Each used for an individual
-+door bell (or mailbox channel).
-+
-+Required properties:
-+- compatible:	Should be as "apm,xgene-slimpro-mbox".
-+
-+- reg:		Contains the mailbox register address range.
-+
-+- interrupts:	8 interrupts must be from 0 to 7, interrupt 0 define the
-+		the interrupt for mailbox channel 0 and interrupt 1 for
-+		mailbox channel 1 and so likewise for the reminder.
-+
-+- #mbox-cells:	only one to specify the mailbox channel number.
-+
-+Example:
-+
-+Mailbox Node:
-+		slimpro-mbox: slimpro-mbox at 10540000 {
+diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+index 6c5ed11..42f3fa0 100644
+--- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+@@ -642,6 +642,20 @@
+ 			msi-parent = <&msi>;
+ 		};
+ 
++		mailbox: slimpro-mbox at 10540000 {
 +			compatible = "apm,xgene-slimpro-mbox";
 +			reg = <0x0 0x10540000 0x0 0xa000>;
 +			#mbox-cells = <1>;
-+			interrupts =  	<0x0 0x0 0x4>,
++			interrupts =    <0x0 0x0 0x4>,
 +					<0x0 0x1 0x4>,
 +					<0x0 0x2 0x4>,
 +					<0x0 0x3 0x4>,
 +					<0x0 0x4 0x4>,
 +					<0x0 0x5 0x4>,
 +					<0x0 0x6 0x4>,
-+					<0x0 0x7 0x4>,
++					<0x0 0x7 0x4>;
 +		};
++
+ 		serial0: serial at 1c020000 {
+ 			status = "disabled";
+ 			device_type = "serial";
 -- 
 1.9.1
