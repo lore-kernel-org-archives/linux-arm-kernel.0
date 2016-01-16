@@ -1,38 +1,55 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Sat, 16 Jan 2016 15:23:29 +0100
-Subject: [PATCH v3] clk: shmobile: r8a7795: Add SDHI clocks
-Message-ID: <1452954209-5282-1-git-send-email-dirk.behme@gmail.com>
+From: zhongjiang@huawei.com (zhong jiang)
+Date: Sat, 16 Jan 2016 22:26:43 +0800
+Subject: [patch 112/178] arm64: fix add kasan bug
+In-Reply-To: <20160115103527.GC21998@e104818-lin.cambridge.arm.com>
+References: <56982daf.v++3ELUdiwhIHn5Z%akpm@linux-foundation.org>
+ <CAPAsAGxqdm_ftXMebmg_R89ZScaaFzRuqRGV=eeKMrDLtn3DvA@mail.gmail.com>
+ <20160115103527.GC21998@e104818-lin.cambridge.arm.com>
+Message-ID: <569A5323.6090007@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add R8A7795 SDHI clocks.
+On 2016/1/15 18:35, Catalin Marinas wrote:
+> On Fri, Jan 15, 2016 at 10:39:04AM +0300, Andrey Ryabinin wrote:
+>> 2016-01-15 2:22 GMT+03:00  <akpm@linux-foundation.org>:
+>>> From: zhong jiang <zhongjiang@huawei.com>
+>>> Subject: arm64: fix add kasan bug
+>>>
+>>> In general, each process have 16kb stack space to use, but stack need
+>>> extra space to store red_zone when kasan enable.  the patch fix above
+>>> question.
+>>>
+>>> Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+>>> Cc: Andrey Ryabinin <ryabinin.a.a@gmail.com>
+>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>> Cc: Xishi Qiu <qiuxishi@huawei.com>
+>>> Cc: Wang Long <long.wanglong@huawei.com>
+>>> Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+>>> ---
+>>>
+>>>  arch/arm64/include/asm/thread_info.h |   15 +++++++++++++--
+>>>  1 file changed, 13 insertions(+), 2 deletions(-)
+>>
+>> This has been nacked by Catalin:
+>> http://lkml.kernel.org/g/<20160108182744.GQ16432@e104818-lin.cambridge.arm.com>
+> 
+> As above, the patch doesn't make much sense for 4.5 where we have
+> separate IRQ stacks. Arguably, it could be included in 4.4 *if* there
+> was a regression but the patch author failed to reply.
+> 
+> Thanks.
+> 
 
-Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
----
-Changes in v3: Drop the DEF_FIXED as these clocks are not fixed. I'll
-have a look to
+I'm so sorry that I don't respond to this email in time, Because I thought
+it has been recognized without any discussion. and I am busy with other
+things during the time. at present, I have looked at all of the discussion,
+and I have some words want to say.
 
-https://git.kernel.org/cgit/linux/kernel/git/horms/renesas-bsp.git/commit/drivers/clk/shmobile/clk-rcar-gen3.c?h=v4.2/rcar-3.0.x&id=cd10385afc15cef6bfbaea4aa5da41193b24fe82
+when kasan enables, compiler need to insert an additional 32-byte redzon to
+a local variable in the front and behind. as a result, The actual usable stack
+space is less than half of the total. The main purpose of this patch is whether
+kasan enable or not, the actual usable stack space always satisfied the demand
+to avoid the risk of the stack overflow.
 
-and see how this could be ported.
-
- drivers/clk/shmobile/r8a7795-cpg-mssr.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/clk/shmobile/r8a7795-cpg-mssr.c b/drivers/clk/shmobile/r8a7795-cpg-mssr.c
-index 23e98fe..c66645f 100644
---- a/drivers/clk/shmobile/r8a7795-cpg-mssr.c
-+++ b/drivers/clk/shmobile/r8a7795-cpg-mssr.c
-@@ -120,6 +120,10 @@ static const struct mssr_mod_clk r8a7795_mod_clks[] __initconst = {
- 	DEF_MOD("sys-dmac1",		 218,	R8A7795_CLK_S3D1),
- 	DEF_MOD("sys-dmac0",		 219,	R8A7795_CLK_S3D1),
- 	DEF_MOD("scif2",		 310,	R8A7795_CLK_S3D4),
-+	DEF_MOD("sdif3",	       	 311,	R8A7795_CLK_SD3),
-+	DEF_MOD("sdif2",	       	 312,	R8A7795_CLK_SD2),
-+	DEF_MOD("sdif1",	      	 313,	R8A7795_CLK_SD1),
-+	DEF_MOD("sdif0",	     	 314,	R8A7795_CLK_SD0),
- 	DEF_MOD("pcie1",		 318,	R8A7795_CLK_S3D1),
- 	DEF_MOD("pcie0",		 319,	R8A7795_CLK_S3D1),
- 	DEF_MOD("intc-ap",		 408,	R8A7795_CLK_S3D1),
--- 
-2.7.0
+Thanks
+zhongjiang
