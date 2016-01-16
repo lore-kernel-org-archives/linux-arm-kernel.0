@@ -1,56 +1,95 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 15 Jan 2016 17:26:12 -0800
-Subject: [PATCH v3 04/13] clk: at91: make IRQ optional and register them
- later
-In-Reply-To: <20160115103901.1b987f53@bbrezillon>
-References: <1449248628-3486-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1449248628-3486-5-git-send-email-alexandre.belloni@free-electrons.com>
- <20160115020237.GJ22188@codeaurora.org>
- <20160115103901.1b987f53@bbrezillon>
-Message-ID: <20160116012612.GA20466@codeaurora.org>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Sat, 16 Jan 2016 02:51:05 +0100
+Subject: [PATCH v3 0/2] ARM: dts: imx6: Add support for Toradex Apalis iMX6Q/D
+ SoM/Ixora carrier board
+Message-ID: <1452909067-1998-1-git-send-email-marcel.ziswiler@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15, Boris Brezillon wrote:
-> Hi Stephen,
-> 
-> On Thu, 14 Jan 2016 18:02:37 -0800
-> Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > 
-> > Is there any way to get the irq into this probe function without
-> > getting a clk pointer and then unwrapping it to get an irq
-> > value out of the clk_hw wrapper structure? That's a pretty
-> > convoluted design.
-> 
-> Not sure I get what you're suggesting, but the only solution I see to
-> avoid this "get main clk pointer dance" would be to have a global
-> variable storing the clk_main instance (or a list of clk_main
-> instances).
-> The thing is, I'd like to avoid adding new global variables in this
-> clk drivers as much as possible. Moreover, the core is already taking
-> care of keeping the list of all registered clks, with their associated
-> of_node, so, is there a real point in creating a duplicated association
-> list in this driver too?
 
-Ok I have to admit I'm a little confused. I thought we were
-getting the irq from the clkmain structure so that we could
-request it here in the probe function. But we're really assigning
-the irq so that we can enable/disable/free it later on?
+This patch series adds support for Toradex Apalis iMX6Q/D SoM module [1] and
+Ixora carrier board [2].
 
-So my new question is if we can register the clocks at the same
-time as the "platform device" (really a clock) probes. The
-correct design was probably to have pmc be a big platform device
-and have it register clocks that it knows exist inside it based
-on the compatible string. And it would also know which irqs (or
-enforce some ordering of irqs) to assign to which clocks.
+Petr ?tetiar has simply taken content of DTSes from Toradex's Git tree [3],
+removed not mainlined stuff and fixed all errors returned by checkpatch script.
 
-It looks like we totally missed that though.... so now we have
-many DT nodes that are also platform devices. So if we can do it
-at the same time as irq requests then we're good and the clk_hw
-structure is in the same scope. If not, then we should probably
-just let of_clk_hw_get_from_provider() happen (and it needs to
-happen for other reasons anyway) and call it a day.
+Please note that RESET_MOCI# used as mini-PCIe PERST# is not directly
+GPIO1_IO28 but rather inverted (e.g. active-high and ored with RESETBMCU coming
+off the PMIC but that is not relevant in this context). As changing the
+reset-gpio polarity wasn't previously supported Petr ?tetiar's
+"PCI: imx6: Fix reset-gpio to work with active low GPIO" fix [4] is needed.
+
+1. https://www.toradex.com/computer-on-modules/apalis-arm-family/freescale-imx-6
+2. https://www.toradex.com/products/carrier-boards/ixora-carrier-board
+3. https://git.toradex.com/cgit/linux-toradex.git/log/?h=toradex_imx_3.14.28_1.0.0_ga
+4. https://patchwork.ozlabs.org/patch/552886/
+
+Changes in v3:
+- integrated review feedback from Petr
+- integrated review feedback from Stefan
+- move I2C DDC enablement and assignement handling into carrier board DTS where it belongs
+- move CAN nodes up a little to keep the alphabetical order
+- added an explanatory comment about PWR_I2C usage
+- integrated review feedback from Petr
+- integrated review feedback from Stefan
+- fix comment concerning Apalis GPIO usage as GPIO7 is only used for PCIe switch reset on Apalis Evaluation board
+- move I2C DDC handling into carrier board DTS where it belongs
+- simplify RTC alias
+
+Changes in v2:
+- clarify exact Apalis iMX6Q/D SoM type in cover letter
+- clarify exact Apalis iMX6Q/D module type and Ixora carrier board in model
+  node
+- got rid of obsolete mmc aliases
+- working SGTL5000 audio/sound integration
+- working STMPE811 touch screen controller integration
+- integrated review feedback from Lucas
+- left and even added some more comments as I don't see why putting any
+  explanatory comments in dts' should be such a bad thing to do
+- completely got rid of the memory node as that is something typically filled
+  in by the boot loader e.g. U-Boot
+- without the regulators simple-bus it no longer boots
+- even though we supposedly shipped a few hundred V1.0a modules drop DCE UART
+  support for now and simplify file layout
+- replaced obsolete no-1-8-v by mainline supported voltage-ranges = <3300 3300>
+  usdhc property and yes card detects are indeed active low (;-p)
+- integrated review feedback from Stefan
+- fixed Ethernet PHY reset & interrupt (requires Micrel PHY driver to be
+  enabled)
+- fixed HDMI DDC (requires GPIO-based bitbanging I2C to be enabled)
+- fixed SPDIF
+- clarify exact Apalis iMX6Q/D SoM type in cover letter
+- clarify exact Apalis iMX6Q/D module type and Ixora carrier board in model
+  node
+- got rid of obsolete mmc aliases
+- working SGTL5000 audio/sound integration
+- working STMPE811 touch screen controller integration
+- integrated review feedback from Lucas
+- left and even added some more comments as I don't see why putting any
+  explanatory comments in dts' should be such a bad thing to do
+- completely got rid of the memory node as that is something typically filled
+  in by the boot loader e.g. U-Boot
+- without the regulators simple-bus it no longer boots
+- even though we supposedly shipped a few hundred V1.0a modules drop DCE UART
+  support for now and simplify file layout
+- replaced obsolete no-1-8-v by mainline supported voltage-ranges = <3300 3300>
+  usdhc property and yes card detects are indeed active low (;-p)
+- integrated review feedback from Stefan
+- fixed Ethernet PHY reset & interrupt (requires Micrel PHY driver to be
+  enabled)
+- fixed HDMI DDC (requires GPIO-based bitbanging I2C to be enabled)
+- fixed SPDIF
+
+Petr ?tetiar (2):
+  ARM: dts: imx6: Add support for Toradex Apalis iMX6Q/D SoM
+  ARM: dts: imx6: Add support for Toradex Ixora carrier board
+
+ arch/arm/boot/dts/Makefile               |    1 +
+ arch/arm/boot/dts/imx6q-apalis-ixora.dts |  275 ++++++++
+ arch/arm/boot/dts/imx6qdl-apalis.dtsi    | 1012 ++++++++++++++++++++++++++++++
+ 3 files changed, 1288 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-apalis-ixora.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-apalis.dtsi
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.5.0
