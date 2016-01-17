@@ -1,38 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 17 Jan 2016 20:59:04 +0100
-Subject: [PATCH] ARM: sunxi: Add CPU regulator for cpufreq
-In-Reply-To: <CAGb2v67a7DATu-sesVPE9Aypn_n0-K++TjdpXmxRSMZRiyHJ7A@mail.gmail.com>
-References: <1452607153-8698-1-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v67a7DATu-sesVPE9Aypn_n0-K++TjdpXmxRSMZRiyHJ7A@mail.gmail.com>
-Message-ID: <20160117195904.GM4581@lukather>
+From: tbm@cyrius.com (Martin Michlmayr)
+Date: Sun, 17 Jan 2016 14:42:41 -0800
+Subject: mvsdio not working on OpenRD
+In-Reply-To: <20160110153843.GA22229@lunn.ch>
+References: <20160110042619.GA22738@jirafa.cyrius.com>
+ <20160110153843.GA22229@lunn.ch>
+Message-ID: <20160117224241.GD24567@jirafa.cyrius.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Andrew Lunn <andrew@lunn.ch> [2016-01-10 16:38]:
+> Please can you try the following patch. If this works, i can add it to
+> mainline. The issue we might run into is that somebody else wants
+> serial not MMC....
 
-On Tue, Jan 12, 2016 at 10:17:31PM +0800, Chen-Yu Tsai wrote:
-> On Tue, Jan 12, 2016 at 9:59 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The current DT doesn't have a phandle to the CPU regulator in the CPU node,
-> > which disables the CPU voltage scaling entirely.
+This works fine on the OpenRD-Base (together with Aaro's patch), as
+tested by Rick Thomas.
+
+Reported-by: Rick Thomas <rbthomas@pobox.com>
+Tested-by: Rick Thomas <rbthomas@pobox.com>
+Reviewed-by: Martin Michlmayr <tbm@cyrius.com>
+
+>        Andrew
 > 
-> Commit message doesn't say which chip (family).
-
-Even worse, which board :)
-
-I've fixed it and applied it.
-
-Thanks!
-Maxime
+> diff --git a/arch/arm/boot/dts/kirkwood-openrd-base.dts b/arch/arm/boot/dts/kirkwood-openrd-base.dts
+> index 8af58999606d..883bd416ba0b 100644
+> --- a/arch/arm/boot/dts/kirkwood-openrd-base.dts
+> +++ b/arch/arm/boot/dts/kirkwood-openrd-base.dts
+> @@ -18,11 +18,6 @@
+>  / {
+>         model = "OpenRD Base";
+>         compatible = "marvell,openrd-base", "marvell,openrd", "marvell,kirkwood-88f6281", "marvell,kirkwood";
+> -
+> -       ocp at f1000000 {
+> -               serial at 12100 {
+> -                       status = "okay";
+> -               };
+>         };
+>  };
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160117/babc3cc3/attachment-0001.sig>
+Martin Michlmayr
+http://www.cyrius.com/
