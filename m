@@ -1,35 +1,38 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 17 Jan 2016 20:37:17 +0100
-Subject: [PATCH v3 7/9] ARM: dts: rockchip: add the sdmmc for kylin board
-In-Reply-To: <1452865796-23527-8-git-send-email-wxt@rock-chips.com>
-References: <1452865796-23527-1-git-send-email-wxt@rock-chips.com>
- <1452865796-23527-8-git-send-email-wxt@rock-chips.com>
-Message-ID: <2230942.JkKsuulFEe@phil>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 17 Jan 2016 20:59:04 +0100
+Subject: [PATCH] ARM: sunxi: Add CPU regulator for cpufreq
+In-Reply-To: <CAGb2v67a7DATu-sesVPE9Aypn_n0-K++TjdpXmxRSMZRiyHJ7A@mail.gmail.com>
+References: <1452607153-8698-1-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v67a7DATu-sesVPE9Aypn_n0-K++TjdpXmxRSMZRiyHJ7A@mail.gmail.com>
+Message-ID: <20160117195904.GM4581@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 15. Januar 2016, 21:49:54 schrieb Caesar Wang:
-> Although We can add the sdmmc node, shouldn't enable it.
-> Since the sdmmc is reusing the same pin with uart2.
-> Unfortunately, the uart2 is used by the debug port, so that will cause
-> the debug information can't display on console if enabling the sdmmc.
-> 
-> As we have supported the sdmmc (sd card) on hardware for kylin board.
-> So, maybe we can have the sdmmc node in kylin dts, not to enable it.
-> 
-> Anyway, you only need add the okay status if someone want to enable the
-> sdmmc.
-> 
-> e.g.
-> if you use the adb to debug with android os.
-> You can add the
-> status = "okay" to enable the sdmmc for sd card working.
-> The defauly status is disabling it.
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Hi,
 
-applied to my dts32 branch for 4.6
+On Tue, Jan 12, 2016 at 10:17:31PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Jan 12, 2016 at 9:59 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The current DT doesn't have a phandle to the CPU regulator in the CPU node,
+> > which disables the CPU voltage scaling entirely.
+> 
+> Commit message doesn't say which chip (family).
 
+Even worse, which board :)
 
-Thanks
-Heiko
+I've fixed it and applied it.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160117/babc3cc3/attachment-0001.sig>
