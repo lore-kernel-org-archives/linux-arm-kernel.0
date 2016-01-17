@@ -1,79 +1,58 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Sun, 17 Jan 2016 14:58:39 +0200
-Subject: [linux-sunxi] [PATCH v2 16/26] drm: Add Allwinner A10 Display
- Engine support
-In-Reply-To: <1452957104.12419.12.camel@plaes.org>
-References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
- <1452785109-6172-17-git-send-email-maxime.ripard@free-electrons.com>
- <1452957104.12419.12.camel@plaes.org>
-Message-ID: <1453035519.13209.1.camel@plaes.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 17 Jan 2016 15:25:14 +0100
+Subject: [PATCH v12 0/18] Add Analogix Core Display Port Driver
+In-Reply-To: <2322926.s1viZ6tSS3@phil>
+References: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
+ <2322926.s1viZ6tSS3@phil>
+Message-ID: <1670568.VBNHbJuGkf@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2016-01-16 at 17:11 +0200, Priit Laes wrote:
-> On Thu, 2016-01-14 at 16:24 +0100, Maxime Ripard wrote:
-> > The Allwinner A10 and subsequent SoCs share the same display
-> > pipeline, with
-> > variations in the number of controllers (1 or 2), or the presence
-> > or not of
-> > some output (HDMI, TV, VGA) or not.
-[...]
-> > diff --git a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
-> > b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
-> > new file mode 100644
-> > index 000000000000..68072b8cddab
-> > --- /dev/null
-> > +++ b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
-> > @@ -0,0 +1,54 @@
-> > +/*
-> > + * Copyright (C) 2015 Free Electrons
-> > + * Copyright (C) 2015 NextThing Co
-> > + *
-> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > + * modify it under the terms of the GNU General Public License as
-> > + * published by the Free Software Foundation; either version 2 of
-> > + * the License, or (at your option) any later version.
-> > + */
-> > +
-> > +#include <drm/drm_fb_cma_helper.h>
-> > +#include <drm/drm_atomic_helper.h>
-> > +#include <drm/drmP.h>
-> > +
-> > +#include "sun4i_drv.h"
-> > +
-> > +static void sun4i_de_output_poll_changed(struct drm_device *drm)
-> > +{
-> > +	struct sun4i_drv *drv = drm->dev_private;
-> > +
-> > +	if (drv->fbdev)
-> > +		drm_fbdev_cma_hotplug_event(drv->fbdev);
-> > +}
-> > +
-> > +static const struct drm_mode_config_funcs
-> > sun4i_de_mode_config_funcs
-> > = {
-> > +	.output_poll_changed	=
-> > sun4i_de_output_poll_changed,
-> > +	.atomic_check		= drm_atomic_helper_check,
-> > +	.atomic_commit		= drm_atomic_helper_commit,
-> > +	.fb_create		= drm_fb_cma_create,
-> > +};
-> > +
-> > +struct drm_fbdev_cma *sun4i_framebuffer_init(struct drm_device
-> > *drm)
-> > +{
-> > +	drm_mode_config_reset(drm);
-> > +
-> > +	drm->mode_config.max_width = 8192;
-> > +	drm->mode_config.max_height = 8192;
->?
-> Shouldn't these be 1920 x 1080 as per A10 User manual?
+Hi Yakir,
 
-I was wrong here. 8192x8192 it is.
+Am Mittwoch, 13. Januar 2016, 15:59:51 schrieb Heiko Stuebner:
+> Am Mittwoch, 23. Dezember 2015, 20:25:38 schrieb Yakir Yang:
+> >    The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
+> > 
+> > share the same IP, so a lot of parts can be re-used. I split the common
+> > code into bridge directory, then rk3288 and exynos only need to keep
+> > some platform code. Cause I can't find the exact IP name of exynos dp
+> > controller, so I decide to name dp core driver with "analogix" which I
+> > find in rk3288 eDP TRM
+> 
+> could you rebase your patches on top of Dave's drm-next branch [0] please?
+> The exynos part got some const attributes for the *_func_ops structs and
+> drm_encoder_init got an additional parameter.
+> I'm still hoping that we can get this finally committed once 4.5-rc1 is
+> released in 1.5 weeks :-) .
+> 
+> I did try to merge things together [1], the system at least comes up and
+> detects the panel (EDID is read correctly and it turns the backlight on)
+> but I don't see any output on the display - hdmi works fine though and
+> X11 is claiming everything to be fine in both cases.
+> 
+> So I don't know yet if I made a mistake when putting this together or
+> there is an issue on the driver-side.
 
->
+I was able to debug this a bit more, and it seems the encoder_helper_funcs 
+don't like the prepare/commit callbacks and like enable better.
 
-P?ikest,
-Priit Laes :)
+So when I do something similar to Marks patch a8eef71d38da ("drm/rockchip: 
+dw_hdmi: use encoder enable function"), like in the attached patch (to be 
+folded into the original addition of those functions), I get display output 
+again.
+
+
+Heiko
+
+> [0] http://cgit.freedesktop.org/~airlied/linux/log/?h=drm-next
+> [1] https://github.com/mmind/linux-rockchip/tree/tmp/analogixdp_v12-veyron
+> I left out patch16, per your talk with Jingoo and me not seeing any AUX
+> CH errors without it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-analogix_dp-rockchip-use-.enable-instead-of-preprare.patch
+Type: text/x-patch
+Size: 1406 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160117/40b29442/attachment.bin>
