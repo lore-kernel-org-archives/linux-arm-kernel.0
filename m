@@ -1,62 +1,19 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sat, 16 Jan 2016 18:13:21 -0600
-Subject: [PATCH v4 2/3] Documentation: mailbox: Add APM X-Gene SLIMpro
- mailbox dts documentation
-In-Reply-To: <efac1dfff3e6893516f527f47b82f889635122a7.1452912126.git.dhdang@apm.com>
-References: <CABb+yY2zHycEmsVvp8OFwpJ1PZgrEPpV-oOe56wgFJ=EE0nTcg@mail.gmail.com>
- <cover.1452912126.git.dhdang@apm.com>
- <efac1dfff3e6893516f527f47b82f889635122a7.1452912126.git.dhdang@apm.com>
-Message-ID: <20160117001321.GA7791@rob-hp-laptop>
+Date: Sat, 16 Jan 2016 18:17:39 -0600
+Subject: [PATCH 1/2] devicetree: bindings: Add vendor prefix for Tronsmart
+In-Reply-To: <1452863192-29231-1-git-send-email-matthias.bgg@gmail.com>
+References: <1452863192-29231-1-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <20160117001739.GA11246@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 06:57:18PM -0800, Duc Dang wrote:
-> This adds the APM X-Gene SLIMpro mailbox device tree
-> node documentation.
+On Fri, Jan 15, 2016 at 02:06:31PM +0100, Matthias Brugger wrote:
+> Tronsmart is a China based company building consumer electronic
+> devices.
 > 
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> Signed-off-by: Duc Dang <dhdang@apm.com>
+> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
 > ---
-> Changes since v3:
->         - Rebase over v4.4
->         - Change number of mailbox IRQs to 8
-> 	- Fix white spaces, typos.
-> 
->  .../bindings/mailbox/xgene-slimpro-mailbox.txt     | 35 ++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
-> new file mode 100644
-> index 0000000..91774d7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
-> @@ -0,0 +1,35 @@
-> +The APM X-Gene SLIMpro mailbox is used to communicate messages between
-> +the ARM64 processors and the Cortex M3 (dubbed SLIMpro). It uses a simple
-> +interrupt based door bell mechanism and can exchange simple messages using the
-> +internal registers.
-> +
-> +There are total of 7 interrupts in this mailbox. Each used for an individual
-> +door bell (or mailbox channel).
-> +
-> +Required properties:
-> +- compatible:	Should be as "apm,xgene-slimpro-mbox".
-> +
-> +- reg:		Contains the mailbox register address range.
-> +
-> +- interrupts:	8 interrupts must be from 0 to 7, interrupt 0 define the
-> +		the interrupt for mailbox channel 0 and interrupt 1 for
-> +		mailbox channel 1 and so likewise for the reminder.
-> +
-> +- #mbox-cells:	only one to specify the mailbox channel number.
-> +
-> +Example:
-> +
-> +Mailbox Node:
-> +		slimpro-mbox: slimpro-mbox at 10540000 {
-
-Nit: just use mailbox@ or mbox@ (whatever others are using) for node 
-name. Otherwise:
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
