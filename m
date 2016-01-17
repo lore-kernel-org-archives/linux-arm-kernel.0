@@ -1,37 +1,79 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 17 Jan 2016 13:23:56 +0100
-Subject: [PATCH 3/3] ARM: dts: sun8i: Add device tree for Cubietruck Plus
-In-Reply-To: <1452961497-10804-4-git-send-email-wens@csie.org>
-References: <1452961497-10804-1-git-send-email-wens@csie.org>
- <1452961497-10804-4-git-send-email-wens@csie.org>
-Message-ID: <20160117122356.GK4581@lukather>
+From: plaes@plaes.org (Priit Laes)
+Date: Sun, 17 Jan 2016 14:58:39 +0200
+Subject: [linux-sunxi] [PATCH v2 16/26] drm: Add Allwinner A10 Display
+ Engine support
+In-Reply-To: <1452957104.12419.12.camel@plaes.org>
+References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1452785109-6172-17-git-send-email-maxime.ripard@free-electrons.com>
+ <1452957104.12419.12.camel@plaes.org>
+Message-ID: <1453035519.13209.1.camel@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 17, 2016 at 12:24:57AM +0800, Chen-Yu Tsai wrote:
-> Cubietruck Plus is a A83T/H8 based development board. The board has
-> standard DDR3 SDRAM, AXP818 PMIC/codec, SD/MMC, eMMC, USB 2.0 host
-> via HSIC USB Hub, USB OTG, SATA via USB bridge, gigabit ethernet,
-> WiFi, headphone out / mic in, and various GPIO headers.
-> 
-> The board also has an EEPROM on i2c0 which holds the MAC address.
+On Sat, 2016-01-16 at 17:11 +0200, Priit Laes wrote:
+> On Thu, 2016-01-14 at 16:24 +0100, Maxime Ripard wrote:
+> > The Allwinner A10 and subsequent SoCs share the same display
+> > pipeline, with
+> > variations in the number of controllers (1 or 2), or the presence
+> > or not of
+> > some output (HDMI, TV, VGA) or not.
+[...]
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+> > b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+> > new file mode 100644
+> > index 000000000000..68072b8cddab
+> > --- /dev/null
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+> > @@ -0,0 +1,54 @@
+> > +/*
+> > + * Copyright (C) 2015 Free Electrons
+> > + * Copyright (C) 2015 NextThing Co
+> > + *
+> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License as
+> > + * published by the Free Software Foundation; either version 2 of
+> > + * the License, or (at your option) any later version.
+> > + */
+> > +
+> > +#include <drm/drm_fb_cma_helper.h>
+> > +#include <drm/drm_atomic_helper.h>
+> > +#include <drm/drmP.h>
+> > +
+> > +#include "sun4i_drv.h"
+> > +
+> > +static void sun4i_de_output_poll_changed(struct drm_device *drm)
+> > +{
+> > +	struct sun4i_drv *drv = drm->dev_private;
+> > +
+> > +	if (drv->fbdev)
+> > +		drm_fbdev_cma_hotplug_event(drv->fbdev);
+> > +}
+> > +
+> > +static const struct drm_mode_config_funcs
+> > sun4i_de_mode_config_funcs
+> > = {
+> > +	.output_poll_changed	=
+> > sun4i_de_output_poll_changed,
+> > +	.atomic_check		= drm_atomic_helper_check,
+> > +	.atomic_commit		= drm_atomic_helper_commit,
+> > +	.fb_create		= drm_fb_cma_create,
+> > +};
+> > +
+> > +struct drm_fbdev_cma *sun4i_framebuffer_init(struct drm_device
+> > *drm)
+> > +{
+> > +	drm_mode_config_reset(drm);
+> > +
+> > +	drm->mode_config.max_width = 8192;
+> > +	drm->mode_config.max_height = 8192;
+>?
+> Shouldn't these be 1920 x 1080 as per A10 User manual?
 
-Time to use the nvmem framework then ;)
+I was wrong here. 8192x8192 it is.
 
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
 
-Applied, thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160117/be5f4bf3/attachment.sig>
+P?ikest,
+Priit Laes :)
