@@ -1,143 +1,44 @@
-From: eyalr@ti.com (Reizer, Eyal)
-Date: Sun, 17 Jan 2016 07:57:01 +0000
-Subject: [PATCH 1/3] ti-st: use device handles and add device tree binding
-In-Reply-To: <20151229183534.GM12450@rob-hp-laptop>
-References: <1450870253-8694-1-git-send-email-eyalr@ti.com>
- <8665E2433BC68541A24DFFCA87B70F5B23759A5B@DFRE01.ent.ti.com>
- <20151229183534.GM12450@rob-hp-laptop>
-Message-ID: <8665E2433BC68541A24DFFCA87B70F5B2376B680@DFRE01.ent.ti.com>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Sun, 17 Jan 2016 12:15:27 +0000
+Subject: [PATCH V3 0/4] serial: bcm2835: add bcm2835 auxiliar uart driver
+Message-ID: <1453032932-2512-1-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for the delayed response.
+From: Martin Sperl <kernel@martin.sperl.org>
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: Tuesday, December 29, 2015 8:36 PM
-> To: Reizer, Eyal
-> Cc: devicetree at vger.kernel.org; linux-omap at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; pawel.moll at arm.com; mark.rutland at arm.com;
-> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; tony at atomide.com;
-> linux at arm.linux.org.uk
-> Subject: Re: [PATCH 1/3] ti-st: use device handles and add device tree binding
-> 
-> On Wed, Dec 23, 2015 at 11:38:29AM +0000, Reizer, Eyal wrote:
-> > - Add support for getting the platform data which includes the uart
-> >   used and gpio pin used for enable from device tree.
-> >
-> > - Fix the implementation for using device handle for the uart and
-> >   gpiod for the enable pin, instead of device name (as string) used
-> >   for the uart and pio number which are both bad practice.
-> >
-> > Signed-off-by: Eyal Reizer <eyalr@ti.com>
-> > ---
-> >  Documentation/devicetree/bindings/misc/ti-st.txt |   42 ++++++
-> >  arch/arm/mach-omap2/pdata-quirks.c               |   16 ++-
-> >  drivers/misc/ti-st/st_kim.c                      |  159 ++++++++++++++++------
-> >  drivers/misc/ti-st/st_ll.c                       |   16 ++-
-> >  include/linux/ti_wilink_st.h                     |   13 +-
-> 
-> I'd suggest you look at commit c0bd1b9e58959c5 (Revert "ti-st: add device
-> tree support") first.
-> 
-> >  5 files changed, 190 insertions(+), 56 deletions(-)  create mode
-> > 100644 Documentation/devicetree/bindings/misc/ti-st.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/misc/ti-st.txt
-> > b/Documentation/devicetree/bindings/misc/ti-st.txt
-> > new file mode 100644
-> > index 0000000..4490da6
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/misc/ti-st.txt
-> > @@ -0,0 +1,42 @@
-> > +TI Wilink 6/7/8 (wl12xx/wl18xx) Shared transport driver
-> 
-> Bindings shouldn't be describing drivers...
-> 
+This patch series adds the bcm2835aux uart driver, which is created
+as a wrapper arround the 8250 driver (based on recommendations by
+Stephen Warren)
 
-OK, understood
+Also (as per request) the recommendation for naming conventions of nodes
+in the device-tree have been followed for both the primary uart as well
+as for the auxiliar uart: nodes should be called "serial at ...".
 
-> > +
-> > +TI?s Wireless Connectivity chips support Bluetooth (BT), WiFi, and
-> > +GPS technology cores in a single die.
-> > +
-> > +Such a multi-core combo chip will be interfaced to the application
-> > +processor using a single physical port (like UART).
-> > +
-> > +Shared Transport (ST) software enables BT and GPS protocols or
-> > +software components to interact with their respective cores over single
-> physical port.
-> > +ST uses logical channels, over physical transport, to communicate
-> > +with individual cores.
-> > +
-> > +Logical channels 1, 2, 3, and 4 are used for BT packets, channel 8
-> > +for FM, channel 9 for GPS and channels 30, 31, 32, and 33 are used
-> > +for Chip Power Management (PM).
-> 
-> All this is irrelevant for a binding.
-> 
+The device tree patches will not apply cleanly as:
+* the bcm-auxiliar clock device tree patch has not been applied to
+  upstream yet (but it is pending).
+* there is a rename of arch/arm/boot/dts/bcm2835.dtsi
+  scheduled, which is also not upstream yet.
 
-OK, understood
+I want to get this patch out before I go on vacation not waiting for
+it to appear. If necessary please modify the corresponding patches.
 
-> > +
-> > +This node provides properties for passing parameters to the ti shared
-> > +transport driver.
-> > +
-> > +Required properties:
-> > + - compatible: should be the following:
-> > +    * "kim" - ti-st parameters
-> 
-> Who is kim? Certainly not a description of a h/w block.
+Martin Sperl (4):
+  ARM: bcm2835: follow dt uart node-naming convention
+  dt/bindings: serial: bcm2835: add binding documentation for
+    bcm2835-aux-uart
+  serial: bcm2835: add driver for bcm2835-aux-uart
+  ARM: bcm2835: add bcm2835-aux-uart support to default DT
 
-Not sure about the origin of this name but according to the following link:
-http://processors.wiki.ti.com/index.php/Shared_Transport_Driver
-KIM is "Kernel Initialization Manager" that enables communication with BT and GPS cores.
+ .../bindings/serial/brcm,bcm2835-aux-uart.txt      |   18 +++
+ arch/arm/boot/dts/bcm2835.dtsi                     |    9 +-
+ drivers/tty/serial/8250/8250_bcm2835aux.c          |  146 ++++++++++++++++++++
+ drivers/tty/serial/8250/Kconfig                    |   24 ++++
+ drivers/tty/serial/8250/Makefile                   |    1 +
+ 5 files changed, 197 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/serial/brcm,bcm2835-aux-uart.txt
+ create mode 100644 drivers/tty/serial/8250/8250_bcm2835aux.c
 
-> 
-> > +
-> > +Optional properties:
-> > + - nshutdown-gpios : specifies attributes for gpio ping used for enabling
-> > +	the bluetooth,gps and FM sub systems
-> > + - serial-device : the phandle for the phisical uart used for interacting
-> > + 	with the wilink device
-> 
-> There have been multiple discussions on serial slave devices recently.
-> I'm not going to accept any device binding without a common uart slave
-> device binding first.
-> 
-
-Perhaps I am reading it wrong but I think this is a different discussion.
-The shared transport driver is already in the kernel for pretty long time. 
-AFAIK the original author is not around to maintain it.
-Currently it is useless  as no bindings exist for it and all customers I have seen using ti_st that upgrade 
-to newer kernels have broken support and have to manually patch the kernel for adding bindings for it.
-
-Having a new uart slave device that may provide similar functionality is a different discussion as it would 
-require a total different implementation.
-But what do we do now with the implementation that is already there. 
-Don't we want it to work and at least have working bindings for it?
-
-> > + - flow_cntrl : Indicates if uart flow control is used
-> > + - flow_cntrl : uart baud rate in BPS
-> 
-> Typo here, but these should be part of a common serial slave binding.
-> 
-> Don't use '_' in property names.
-> 
-
-Will fix this
-
-> > +
-> > +Example:
-> > +
-> > +kim {
-> > +	compatible = "kim";
-> > +	nshutdown-gpios = <&gpio3 21 GPIO_ACTIVE_HIGH>;
-> > +	serial-device = <&uart1>;
-> > +	flow_cntrl = <1>;
-> > +	flow_cntrl = <3000000>;
-> > +};
-> > +
-
-Best Regards,
-Eyal
+--
+1.7.10.4
