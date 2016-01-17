@@ -1,31 +1,21 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 17 Jan 2016 19:56:31 +0100 (CET)
-Subject: [PATCH 1/2] usb: chipidea: add CI_HDRC_TURN_VBUS_EARLY_ON for
- imx23
-In-Reply-To: <1451407269-14905-1-git-send-email-stefan.wahren@i2se.com>
-References: <1451407269-14905-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <245634301.105525.a366f7cd-6533-4e6a-9506-5cc94a8288bd.open-xchange@email.1und1.de>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 17 Jan 2016 20:14:07 +0100
+Subject: [PATCH] clk: rockchip: rk3036: enable the CLK_IGNORE_UNUSED flag
+ for hclk_vio_bus
+In-Reply-To: <1452858854-841-1-git-send-email-ykk@rock-chips.com>
+References: <1452858854-841-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1816378.OnNVlMiORS@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Am Freitag, 15. Januar 2016, 19:54:14 schrieb Yakir Yang:
+> HCLK_VIO_BUS is the noc bus controller clock for display module,
+> due to it shouldn't belong to any driver, but we need it enabled,
+> so just mark it as the CLK_IGNORE_UNUSED flag.
+> 
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 
-> Stefan Wahren <stefan.wahren@i2se.com> hat am 29. Dezember 2015 um 17:41
-> geschrieben:
->
->
-> Until now the imx23 uses the imx27 platform flag. But the
-> imx23 needs the flag CI_HDRC_TURN_VBUS_EARLY_ON, too. So
-> fix this by adding a separate platform flag.
->
-> Suggested-by: Peter Chen <peter.chen@nxp.com>
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> ---
-> drivers/usb/chipidea/ci_hdrc_imx.c | 6 ++++++
-> 1 file changed, 6 insertions(+)
->
+applied to my clk-branch for 4.6
 
-is the series okay?
-
-Regards
-Stefan
+Thanks
+Heiko
