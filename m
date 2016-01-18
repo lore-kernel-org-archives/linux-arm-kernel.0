@@ -1,46 +1,45 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Mon, 18 Jan 2016 15:13:09 +0800
-Subject: [PATCH v3 1/1] USB: core: let USB device know device node
-In-Reply-To: <Pine.LNX.4.44L0.1601151220020.1533-100000@iolanthe.rowland.org>
-References: <1452877630.6067.97.camel@pengutronix.de>
- <Pine.LNX.4.44L0.1601151220020.1533-100000@iolanthe.rowland.org>
-Message-ID: <20160118071309.GC8150@shlinux2>
+From: jonathan@jonmasters.org (Jon Masters)
+Date: Mon, 18 Jan 2016 01:23:50 -0600
+Subject: [RFC] arm64: failed when run the command: timedatectl set-timezone
+ Asia/Shanghai
+In-Reply-To: <20160113110900.GA23370@leverpostej>
+References: <56946932.70601@huawei.com> <569473B2.3030909@huawei.com>
+ <CAPvkgC3HkZ5nP4qxDO+LRCeK5dd29zEpz9ZeK7J_mrCWXrszGA@mail.gmail.com>
+ <5695A57B.1060905@huawei.com> <20160113110900.GA23370@leverpostej>
+Message-ID: <569C9306.7090904@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 12:30:41PM -0500, Alan Stern wrote:
-> On Fri, 15 Jan 2016, Philipp Zabel wrote:
-> 
-> > > +- reg: the port number which this device is connecting to.
-> > 
-> > Should it be noted here that the port number range is 1-255?
-> 
-> Actually the range is 1 - 31 (defined by USB_MAXCHILDREN set in 
-> include/uapi/linux/usb/ch11.h).
-> 
-> > > @@ -502,11 +503,14 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
-> > >  	dev->connect_time = jiffies;
-> > >  	dev->active_duration = -jiffies;
-> > >  #endif
-> > > -	if (root_hub)	/* Root hub always ok [and always wired] */
-> > > +	if (root_hub) {	/* Root hub always ok [and always wired] */
-> > >  		dev->authorized = 1;
-> > > -	else {
-> > > +		dev->of_node = bus->controller->of_node;
-> > 
-> > Why can't the root_hub reuse dev->dev.of_node?
-> 
-> Indeed, there's no need to add an .of_node field to struct usb_device, 
-> since the embedded struct device already contains an .of_node field.
-> 
+Hi Mark, Xishi,
 
-No, the usb_device needs the .of_node field.
+On 1/13/16, 5:09 AM, Mark Rutland wrote:
+> On Wed, Jan 13, 2016 at 09:16:43AM +0800, Xishi Qiu wrote:
+>> On 2016/1/12 18:59, Steve Capper wrote:
+>>
+>>> On 12 January 2016 at 03:32, Xishi Qiu <qiuxishi@huawei.com> wrote:
+>>>> On 2016/1/12 10:47, Xishi Qiu wrote:
+>>>>
+>>>>> Failed when run the command: timedatectl set-timezone Asia/Shanghai
+>>>>> But CONFIG_PGTABLE_LEVELS=3 is OK, and CONFIG_PGTABLE_LEVELS=4 is failed.
+>>>>> The kernel is v4.1, and this command need the lib polikit.
+>>>>>
+>>>>> Is this the bug of kernel?
 
-The devices belong to platform bus contains device node.
-The devices (usb device) belong to USB bus which are created
-dynamically do not contain device node.
+As noted by others, this is a problem with interpretation by certain 
+userspace (probably not restricted to mozjs) applications of their 
+ability to use the high order bits of a VA. It's actually been flagged a 
+few times by others in both RHEL(SA) and Fedora as well, but I've 
+pointed out (at least in the former) that we're not building with a 
+48-bit VA currently so it won't be as visible for the moment. That means 
+if you're consuming a Cent7 kernel from Jim/etc. it'll probably not fall 
+over out of the box (copying him so he knows about this - it's been 
+coming up a bit over the past few days in some other conversation).
 
--- 
+This definitely needs fixing in upstream polkit builds, and a general 
+education exercise needs to be initiated so that people don't get this 
+wrong in future (but it's guaranteed that they will). FWIW my personal 
+opinion is that tagged pointers are dangerous and should never have 
+happened (because you can't trust people/there will be code out there 
+for years that will have broken assumptions and never be fixed).
 
-Best Regards,
-Peter Chen
+Jon.
