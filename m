@@ -1,73 +1,229 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 18 Jan 2016 09:28:20 +0000
-Subject: [PATCH] help guest boot up on AArch64 host with GICv2
-In-Reply-To: <56995068.9050207@ezchip.com>
-References: <56995068.9050207@ezchip.com>
-Message-ID: <569CB034.1060307@arm.com>
+From: liudongdong3@huawei.com (liudongdong (C))
+Date: Mon, 18 Jan 2016 17:25:18 +0800
+Subject: [PATCH V3 19/21] pci, acpi: Support for ACPI based generic PCI
+ host controller init
+In-Reply-To: <1452691267-32240-20-git-send-email-tn@semihalf.com>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <1452691267-32240-20-git-send-email-tn@semihalf.com>
+Message-ID: <569CAF7E.9040000@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+Hi Tomasz,
 
-On 15/01/16 20:02, Chris Metcalf wrote:
-> We are using GICv2 compatibility mode in the Fast Models/Foundation 
-> Models simulations we are running because the boot code (ATF/UEFI) 
-> doesn't support GICv3 in our system at the moment.
-> 
-> However, starting with kernel 4.2, the guest couldn't boot up because it 
-> wasn't getting timer interrupts.  I tracked this down to a kernel commit 
-> that switched to using the "alternatives" mechanism -- rather than 
-> seeing either a GICv2 or GICv3 and configuring appropriately, the KVM 
-> code just configured the code that saves/restores the vgic state based 
-> on the presence of the system register interface to the GIC CPU 
-> interface.  See the attached patch for a fix that manages this 
-> differently and allows me to boot up the guest in this configuration.
-> 
-> However, even assuming this patch can be taken into an upstream tree, I 
-> still have a couple of additional problems:
-> 
-> - I can boot up with the Foundation Models using this change, but not 
-> with the Fast Models (again, using a v3 GIC but in v2 compatibility mode 
-> in the device tree).  The Fast Models dts looks like it has the same 
-> configuration for the GIC and the timers so I'm not sure what's going on 
-> here.  Any suggestions appreciated.
-> 
-> - Without this change, I could only boot kernels up to 4.1.  With the 
-> change, I can boot kernels up to 4.3.  But 4.4 won't boot for me either; 
-> I haven't bisected it down yet.  So any suggestions on what might be 
-> going wrong here would also be appreciated.
-> 
-> We are planning to eventually use GICv3 mode in our software stack but 
-> for the time being I assume it is interesting to resolve issues with GIC 
-> v2 compatibility mode on GIC v3.
-> 
+? 2016/1/13 21:21, Tomasz Nowicki ??:
+> Because of two patch series:
+> 1. Jiang Liu's common interface to support PCI host controller init
+> 2. MMCONFIG refactoring (part of this patch set)
+> now we can think about generic ACPI based PCI host controller init
+> implementation out of arch/ directory.
+>
+> These calls use information from MCFG table (PCI config space regions)
+> and _CRS method (IO/irq resources) to initialize PCI hostbridge.
+>
+> TBD: We are still not sure whether we should reassign resources
+> after PCI bus enumeration or trust firmware to do all that work for
+> us properly.
+>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> CC: Liviu Dudau <Liviu.Dudau@arm.com>
+> CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>   drivers/acpi/Kconfig    |   5 ++
+>   drivers/acpi/pci_root.c | 131 ++++++++++++++++++++++++++++++++++++++++++++++++
+>   2 files changed, 136 insertions(+)
+>
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index c3664be..e315061 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -335,6 +335,11 @@ config ACPI_PCI_SLOT
+>   	  i.e., segment/bus/device/function tuples, with physical slots in
+>   	  the system.  If you are unsure, say N.
+>
+> +config ACPI_PCI_HOST_GENERIC
+> +	bool "Generic ACPI PCI host controller"
+> +	help
+> +	  Say Y here if you want to support generic ACPI PCI host controller.
+> +
+>   config X86_PM_TIMER
+>   	bool "Power Management Timer Support" if EXPERT
+>   	depends on X86
+> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+> index a65c8c2..d483e2a 100644
+> --- a/drivers/acpi/pci_root.c
+> +++ b/drivers/acpi/pci_root.c
+> @@ -24,6 +24,7 @@
+>   #include <linux/init.h>
+>   #include <linux/types.h>
+>   #include <linux/mutex.h>
+> +#include <linux/of_address.h>
+>   #include <linux/pm.h>
+>   #include <linux/pm_runtime.h>
+>   #include <linux/pci.h>
+> @@ -514,6 +515,136 @@ static void negotiate_os_control(struct acpi_pci_root *root, int *no_aspm)
+>   	}
+>   }
+>
+> +#ifdef CONFIG_ACPI_PCI_HOST_GENERIC
+> +static int pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
+> +{
+> +	if (pci_dev_msi_enabled(dev))
+> +		return 0;
+> +
+> +	acpi_pci_irq_enable(dev);
+> +	return dev->irq;
+> +}
+> +
+> +static void pci_mcfg_release_info(struct acpi_pci_root_info *ci)
+> +{
+> +	pci_mmcfg_teardown_map(ci);
+> +	kfree(ci);
+> +}
+> +
+> +static int pci_acpi_root_prepare_resources(struct acpi_pci_root_info *ci)
+> +{
+> +	struct list_head *list = &ci->resources;
+> +	struct acpi_device *device = ci->bridge;
+> +	struct resource_entry *entry, *tmp;
+> +	unsigned long flags;
+> +	int ret;
+> +
+> +	flags = IORESOURCE_IO | IORESOURCE_MEM;
+> +	ret = acpi_dev_get_resources(device, list,
+> +				     acpi_dev_filter_resource_type_cb,
+> +				     (void *)flags);
+> +	if (ret < 0) {
+> +		dev_warn(&device->dev,
+> +			 "failed to parse _CRS method, error code %d\n", ret);
+> +		return ret;
+> +	} else if (ret == 0)
+> +		dev_dbg(&device->dev,
+> +			"no IO and memory resources present in _CRS\n");
+> +
+> +	resource_list_for_each_entry_safe(entry, tmp, &ci->resources) {
+> +		resource_size_t cpu_addr, length;
+> +		struct resource *res = entry->res;
+> +
+> +		if (entry->res->flags & IORESOURCE_DISABLED)
+> +			resource_list_destroy_entry(entry);
+> +		else
+> +			res->name = ci->name;
+> +
+> +		/* PCI -> CPU space translation */
+> +		cpu_addr = res->start + entry->offset;
+> +		length = res->end - res->start + 1;
 
-I'm afraid that this is the wrong approach. Whilst 4.2 was a bit too
-eager to use GICv3 (only checking the CPU capability and ignoring the
-actual state of the EL2/EL3 SRE bits), the fact that 4.4 doesn't boot is
-probably the sign of a broken firmware that enables the system register
-interface at EL3, letting the rest of the software stack to use GICv3 in
-native mode, and yet providing a GICv2 DT.
+I see here is different from V2 patch,
+in V2 patch,  0x0000022004000000 is cpu addr.
+but in V3 patch, 0x0000022004000000 is pci addr.
+which one is right ?
 
-This combination is unpredictable, and is likely to  cause issues on
-some HW implementations.
+0x0000022004000000  is the value of AddressMinimum.
+AddressMinimum evaluates to a 64-bit integer that specifies the lowest possible base address of the Memory range
+QWordMemory ( // 64-bit BAR Windows
+	ResourceProducer, PosDecode,
+	MinFixed, MaxFixed,
+	Cacheable, ReadWrite,
+	0x000000000000000, // Granularity
+	0x0000022004000000, // Min Base Address
+	0x000002200fffffff, // Max Base Address
+	0x0000021ff9000000, // Translate
+	0x000000000c000000 // Length
+)
 
-Could you please point me to the firmware you're using?
-
-Also, please check the following patches:
-
-6d32ab2 arm64: Update booting requirements for GICv3 in GICv2 mode
-76e52dd irqchip/gic: Warn if GICv3 system registers are enabled
-963fcd4 arm64: cpufeatures: Check ICC_EL1_SRE.SRE before enabling
-ARM64_HAS_SYSREG_GIC_CPUIF
-7cabd00 irqchip/gic-v3: Make gic_enable_sre an inline function
-d271976 arm64: el2_setup: Make sure ICC_SRE_EL2.SRE sticks before using
-GICv3 sysregs
-
-Can you point me to the one that prevents you from booting?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks
+Dongdong
+> +
+> +		if (res->flags & IORESOURCE_MEM) {
+> +			res->start = cpu_addr;
+> +			res->end = cpu_addr + length - 1;
+> +		} else if (res->flags & IORESOURCE_IO) {
+> +			resource_size_t pci_addr = res->start;
+> +			unsigned long port;
+> +
+> +			if (pci_register_io_range(cpu_addr, length)) {
+> +				resource_list_destroy_entry(entry);
+> +				continue;
+> +			}
+> +
+> +			port = pci_address_to_pio(cpu_addr);
+> +			if (port == (unsigned long)-1) {
+> +				resource_list_destroy_entry(entry);
+> +				continue;
+> +			}
+> +
+> +			res->start = port;
+> +			res->end = port + length - 1;
+> +			entry->offset = port - pci_addr;
+> +
+> +			if (pci_remap_iospace(res, cpu_addr) < 0)
+> +				resource_list_destroy_entry(entry);
+> +		}
+> +	}
+> +	return ret;
+> +}
+> +
+> +static struct acpi_pci_root_ops acpi_pci_root_ops = {
+> +	.init_info = pci_mmcfg_setup_map,
+> +	.release_info = pci_mcfg_release_info,
+> +	.prepare_resources = pci_acpi_root_prepare_resources,
+> +};
+> +
+> +/* Root bridge scanning */
+> +struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+> +{
+> +	int node = acpi_get_node(root->device->handle);
+> +	int domain = root->segment;
+> +	int busnum = root->secondary.start;
+> +	struct acpi_pci_root_info *info;
+> +	struct pci_host_bridge *bridge;
+> +	struct pci_bus *bus, *child;
+> +
+> +	if (domain && !pci_domains_supported) {
+> +		pr_warn("PCI %04x:%02x: multiple domains not supported.\n",
+> +			domain, busnum);
+> +		return NULL;
+> +	}
+> +
+> +	info = kzalloc_node(sizeof(*info), GFP_KERNEL, node);
+> +	if (!info) {
+> +		dev_err(&root->device->dev,
+> +			"pci_bus %04x:%02x: ignored (out of memory)\n",
+> +			domain, busnum);
+> +		return NULL;
+> +	}
+> +
+> +	acpi_pci_root_ops.pci_ops = pci_mcfg_get_ops(root);
+> +	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, info, root);
+> +	if (!bus)
+> +		return NULL;
+> +
+> +	bridge = pci_find_host_bridge(bus);
+> +	bridge->map_irq = pcibios_map_irq;
+> +
+> +	pci_bus_size_bridges(bus);
+> +	pci_bus_assign_resources(bus);
+> +
+> +	/*
+> +	 * After the PCI-E bus has been walked and all devices discovered,
+> +	 * configure any settings of the fabric that might be necessary.
+> +	 */
+> +	list_for_each_entry(child, &bus->children, node)
+> +		pcie_bus_configure_settings(child);
+> +
+> +	return bus;
+> +}
+> +#endif /* CONFIG_ARCH_PCI_HOST_GENERIC_ACPI */
+> +
+>   static int acpi_pci_root_add(struct acpi_device *device,
+>   			     const struct acpi_device_id *not_used)
+>   {
+>
