@@ -1,22 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Jan 2016 09:59:19 +0000
-Subject: [PATCH] ARM: debug-ll: fix BCM63xx entry for multiplatform
-In-Reply-To: <5641204.G6RtGs3Kji@wuerfel>
-References: <5641204.G6RtGs3Kji@wuerfel>
-Message-ID: <20160118095919.GE19062@n2100.arm.linux.org.uk>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Mon, 18 Jan 2016 10:57:41 +0100
+Subject: [PATCH V3 19/21] pci, acpi: Support for ACPI based generic PCI
+ host controller init
+In-Reply-To: <5698C299.2080702@linaro.org>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <1452691267-32240-20-git-send-email-tn@semihalf.com>
+ <5698C299.2080702@linaro.org>
+Message-ID: <569CB715.7040306@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 18, 2016 at 10:51:00AM +0100, Arnd Bergmann wrote:
-> During my randconfig build testing, I found that a kernel with
-> DEBUG_AT91_UART and ARCH_BCM_63XX fails to build:
-> 
-> arch/arm/include/debug/at91.S:18:0: error: "CONFIG_DEBUG_UART_VIRT" redefined [-Werror]
+On 15.01.2016 10:57, Hanjun Guo wrote:
+> Hi Tomasz,
+>
+> On 2016/1/13 21:21, Tomasz Nowicki wrote:
+>> Because of two patch series:
+>> 1. Jiang Liu's common interface to support PCI host controller init
+>> 2. MMCONFIG refactoring (part of this patch set)
+>> now we can think about generic ACPI based PCI host controller init
+>> implementation out of arch/ directory.
+>>
+>> These calls use information from MCFG table (PCI config space regions)
+>> and _CRS method (IO/irq resources) to initialize PCI hostbridge.
+>>
+>> TBD: We are still not sure whether we should reassign resources
+>> after PCI bus enumeration or trust firmware to do all that work for
+>> us properly.
+>>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> CC: Arnd Bergmann <arnd@arndb.de>
+>> CC: Catalin Marinas <catalin.marinas@arm.com>
+>> CC: Liviu Dudau <Liviu.Dudau@arm.com>
+>> CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+>> CC: Will Deacon <will.deacon@arm.com>
+>> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+>> ---
+>>   drivers/acpi/Kconfig    |   5 ++
+>>   drivers/acpi/pci_root.c | 131
+>> ++++++++++++++++++++++++++++++++++++++++++++++++
+>>   2 files changed, 136 insertions(+)
+>>
+>> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+>> index c3664be..e315061 100644
+>> --- a/drivers/acpi/Kconfig
+>> +++ b/drivers/acpi/Kconfig
+>> @@ -335,6 +335,11 @@ config ACPI_PCI_SLOT
+>>         i.e., segment/bus/device/function tuples, with physical slots in
+>>         the system.  If you are unsure, say N.
+>>
+>> +config ACPI_PCI_HOST_GENERIC
+>> +    bool "Generic ACPI PCI host controller"
+>> +    help
+>> +      Say Y here if you want to support generic ACPI PCI host
+>> controller.
+>
+> Since x86 and IA64 will not use ACPI_PCI_HOST_GENERIC in this
+> patch, it should be defined as
+>
+> config ACPI_PCI_HOST_GENERIC
+>      bool
+>
+> and select for ARCHs, or will default y on x86 and IA64 too.
 
-Why do we have files defining CONFIG_* symbols?  This is the real error
-here - no source file should be defining this.
+Right, I will fix that in v4.
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>
+> Compiling the kernel on a IA64 machine, will send out the
+> result when it's ready.
+>
+
+Thanks,
+Tomasz
