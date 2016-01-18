@@ -1,21 +1,28 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 18 Jan 2016 10:34:33 +0900
-Subject: [PATCH v2 2/2] ARM: shmobile: r8a7791: use GIC_* defines
-In-Reply-To: <CAMuHMdWRSWMMR7G2e-A5E_CxX=KsN1Ztj7uQ1JJViCet1WoQoA@mail.gmail.com>
-References: <1452825856-16230-1-git-send-email-horms+renesas@verge.net.au>
- <1452825856-16230-3-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdWRSWMMR7G2e-A5E_CxX=KsN1Ztj7uQ1JJViCet1WoQoA@mail.gmail.com>
-Message-ID: <20160118013432.GB1905@verge.net.au>
+From: incoming@interfax.net (Interfax)
+Date: Mon, 18 Jan 2016 01:37:44 +0000
+Subject: You have received a new fax, document 000320594
+Message-ID: <e1af75d2189dceac56d289434d975b72@interfax.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 11:44:04AM +0100, Geert Uytterhoeven wrote:
-> On Fri, Jan 15, 2016 at 3:44 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Use GIC_* defines for GIC interrupt cells in r8a7791 device tree.
-> >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+You have received a new fax.
 
-Thanks, I have queued this up.
+Scanned fax document is attached to this email.
+
+From:                  Sam Kuhn
+Scan time:             39 seconds
+Scanned:               Sun, 17 Jan 2016 20:00:42 +0300
+Fax name:              task-000320594.doc
+File size:             232 Kb
+Pages:                 7
+Resolution:            500 DPI
+
+Thanks for using Interfax service!
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: task-000320594.zip
+Type: application/zip
+Size: 1476 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160118/e4bac2bb/attachment.zip>
