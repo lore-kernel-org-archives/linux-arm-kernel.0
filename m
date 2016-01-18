@@ -1,60 +1,88 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Mon, 18 Jan 2016 15:01:02 +0000
-Subject: [RFC PATCH v2 0/4] CPUs capacity information for heterogeneous
- systems
-In-Reply-To: <20160115180107.GC6588@sirena.org.uk>
-References: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
- <20160115180107.GC6588@sirena.org.uk>
-Message-ID: <20160118150102.GC7159@e106622-lin>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 18 Jan 2016 15:05:56 +0000
+Subject: [PATCH] arm64: allow vmalloc regions to be set with set_memory_*
+In-Reply-To: <1453125665-26627-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1453125665-26627-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160118150556.GO21067@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Mon, Jan 18, 2016 at 03:01:05PM +0100, Ard Biesheuvel wrote:
+> The range of set_memory_* is currently restricted to the module address
+> range because of difficulties in breaking down larger block sizes.
+> vmalloc maps PAGE_SIZE pages so it is safe to use as well. Update the
+> function ranges and add a comment explaining why the range is restricted
+> the way it is.
+> 
+> Suggested-by: Laura Abbott <labbott@fedoraproject.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-On 15/01/16 18:01, Mark Brown wrote:
-> On Fri, Jan 08, 2016 at 02:09:28PM +0000, Juri Lelli wrote:
-> 
-> > Second version of this RFC proposes an alternative solution (w.r.t. v1) to the
-> > problem of how do we init CPUs original capacity: we run a bogus benchmark (for
-> > this RFC I simple stole int_sqrt from lib/ and I run that in a loop to perform
-> > some integer computation, I'm sure there are better benchmarks around) on the
-> > first cpu of each frequency domain (assuming no u-arch differences inside
-> > domains), measure time to complete a fixed number of iterations and then
-> > normalize results to SCHED_CAPACITY_SCALE (1024). I didn't spend much time in
-> > polishing this up or thinking about a better benchmark, as this is an RFC and
-> > I'd like discussion happening before we make this solution better
-> > working/looking. However, surprisingly, results are not that bad already:
-> 
-> This approach looks good to me - certainly vastly preferable to putting
-> the numbers into DT.
-> 
-> >  2. Dynamic profiling at boot (v2)
-> > 
-> >     pros: - does not require a standardized definition of capacity
-> >           - cannot be incorrectly tuned (once benchmark is fixed)
-> >           - does not require user/integrator work
-> 
-> >     cons: - not easy to come up with a clean solution, as it seems interaction
-> >             with several subsystems (e.g., cpufreq) is required
-> 
-> This actually seems to be pretty clean.
-> 
+Previously we allowed set_memory_* calls on any range in the modules
+area (even if that covered multiple VMAs). However, I believe that given
+the way vmap area is allocated, no caller can rely on mappings being
+adjacent, and thus such calls would be erroneous.
 
-Oh, maybe I was overly critic of my code then. :)
+Given that, this looks good to me (with one minor nit below). FWIW:
 
-> >           - not easy to agree upon a single benchmark (that has to be both
-> >             representative and simple enough to run at boot)
-> >           - numbers might (and do) vary from boot to boot
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+> ---
+>  arch/arm64/mm/pageattr.c | 23 +++++++++++++++++++----
+>  1 file changed, 19 insertions(+), 4 deletions(-)
 > 
-> This does come back to the question of how accurate the numbers need to
-> be - is "good enough" fine?
+> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+> index 3571c7309c5e..1360a02d88b7 100644
+> --- a/arch/arm64/mm/pageattr.c
+> +++ b/arch/arm64/mm/pageattr.c
+> @@ -13,6 +13,7 @@
+>  #include <linux/kernel.h>
+>  #include <linux/mm.h>
+>  #include <linux/module.h>
+> +#include <linux/vmalloc.h>
+>  #include <linux/sched.h>
 
-Here we probably also have to account for the fact that numbers might
-actually change from boot to boot. They might be good enough in average,
-but you might have cases in which, for some reason, they turn out to be
-far from usual values. Not that I see that happening much on my boxes,
-but I guess it can happen.
+Nit: please keep alphabetical order here.
 
-Best,
+Mark.
 
-- Juri
+>  
+>  #include <asm/pgtable.h>
+> @@ -44,6 +45,7 @@ static int change_memory_common(unsigned long addr, int numpages,
+>  	unsigned long end = start + size;
+>  	int ret;
+>  	struct page_change_data data;
+> +	struct vm_struct *area;
+>  
+>  	if (!PAGE_ALIGNED(addr)) {
+>  		start &= PAGE_MASK;
+> @@ -51,10 +53,23 @@ static int change_memory_common(unsigned long addr, int numpages,
+>  		WARN_ON_ONCE(1);
+>  	}
+>  
+> -	if (start < MODULES_VADDR || start >= MODULES_END)
+> -		return -EINVAL;
+> -
+> -	if (end < MODULES_VADDR || end >= MODULES_END)
+> +	/*
+> +	 * Kernel VA mappings are always live, and splitting live section
+> +	 * mappings into page mappings may cause TLB conflicts. This means
+> +	 * we have to ensure that changing the permission bits of the range
+> +	 * we are operating on does not result in such splitting.
+> +	 *
+> +	 * Let's restrict ourselves to mappings created by vmalloc (or vmap).
+> +	 * Those are guaranteed to consist entirely of page mappings, and
+> +	 * splitting is never needed.
+> +	 *
+> +	 * So check whether the [addr, addr + size) interval is entirely
+> +	 * covered by precisely one VM area that has the VM_ALLOC flag set.
+> +	 */
+> +	area = find_vm_area((void *)addr);
+> +	if (!area ||
+> +	    end > (unsigned long)area->addr + area->size ||
+> +	    !(area->flags & VM_ALLOC))
+>  		return -EINVAL;
+>  
+>  	data.set_mask = set_mask;
+> -- 
+> 2.5.0
+> 
