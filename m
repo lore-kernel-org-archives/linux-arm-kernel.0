@@ -1,43 +1,54 @@
 From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 18 Jan 2016 09:41:41 -0800
-Subject: [PATCH 3/4] Input: rotary_encoder - use input_set_capability()
+Date: Mon, 18 Jan 2016 09:41:39 -0800
+Subject: [PATCH 1/4] Input: rotary_encoder - mark PM methods as __maybe_unused
 In-Reply-To: <1453138902-11657-1-git-send-email-dmitry.torokhov@gmail.com>
 References: <1453138902-11657-1-git-send-email-dmitry.torokhov@gmail.com>
-Message-ID: <1453138902-11657-4-git-send-email-dmitry.torokhov@gmail.com>
+Message-ID: <1453138902-11657-2-git-send-email-dmitry.torokhov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of manipulating capability bits directly let's use appropriate
-helpers. Also there is no need to explicitly set EV_ABS when calling
-input_set_abs_params().
+Instead of guarding PM methods with #ifdef let's mark them as
+__maybe_unused as it allows for better compile coverage.
 
 Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 ---
- drivers/input/misc/rotary_encoder.c | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+ drivers/input/misc/rotary_encoder.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/input/misc/rotary_encoder.c b/drivers/input/misc/rotary_encoder.c
-index e913bfb64..1882e65 100644
+index 7828bd1..b9a86ca 100644
 --- a/drivers/input/misc/rotary_encoder.c
 +++ b/drivers/input/misc/rotary_encoder.c
-@@ -318,14 +318,10 @@ static int rotary_encoder_probe(struct platform_device *pdev)
- 	input->id.bustype = BUS_HOST;
- 	input->dev.parent = dev;
+@@ -381,8 +381,7 @@ static int rotary_encoder_probe(struct platform_device *pdev)
+ 	return 0;
+ }
  
--	if (pdata->relative_axis) {
--		input->evbit[0] = BIT_MASK(EV_REL);
--		input->relbit[0] = BIT_MASK(pdata->axis);
--	} else {
--		input->evbit[0] = BIT_MASK(EV_ABS);
--		input_set_abs_params(encoder->input,
--				     pdata->axis, 0, pdata->steps, 0, 1);
--	}
-+	if (pdata->relative_axis)
-+		input_set_capability(input, EV_REL, pdata->axis);
-+	else
-+		input_set_abs_params(input, pdata->axis, 0, pdata->steps, 0, 1);
+-#ifdef CONFIG_PM_SLEEP
+-static int rotary_encoder_suspend(struct device *dev)
++static int __maybe_unused rotary_encoder_suspend(struct device *dev)
+ {
+ 	struct rotary_encoder *encoder = dev_get_drvdata(dev);
  
- 	switch (pdata->steps_per_period) {
- 	case 4:
+@@ -394,7 +393,7 @@ static int rotary_encoder_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int rotary_encoder_resume(struct device *dev)
++static int __maybe_unused rotary_encoder_resume(struct device *dev)
+ {
+ 	struct rotary_encoder *encoder = dev_get_drvdata(dev);
+ 
+@@ -405,10 +404,9 @@ static int rotary_encoder_resume(struct device *dev)
+ 
+ 	return 0;
+ }
+-#endif
+ 
+ static SIMPLE_DEV_PM_OPS(rotary_encoder_pm_ops,
+-		 rotary_encoder_suspend, rotary_encoder_resume);
++			 rotary_encoder_suspend, rotary_encoder_resume);
+ 
+ static struct platform_driver rotary_encoder_driver = {
+ 	.probe		= rotary_encoder_probe,
 -- 
 2.6.0.rc2.230.g3dd15c0
