@@ -1,105 +1,96 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 Jan 2016 10:51:15 +0000
-Subject: [PATCH v2 12/16] ARM: Xen: Document UEFI support on Xen ARM
- virtual platforms
-In-Reply-To: <1452840929-19612-13-git-send-email-zhaoshenglong@huawei.com>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-13-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <20160118105115.GD21067@leverpostej>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 18 Jan 2016 19:54:08 +0900
+Subject: [PATCH v7 0/4] ARM: SoC: add a new platform,
+ UniPhier (arch/arm/mach-uniphier)
+In-Reply-To: <2230140.n6kW8LSSaP@wuerfel>
+References: <1431058034-5508-1-git-send-email-yamada.masahiro@socionext.com>
+ <2101307.fSn8Z2ZyBq@wuerfel>
+ <CAK7LNASyJmyUcKNecdhWjXbd615=9XcMxeLxC7y_z+psO03BbQ@mail.gmail.com>
+ <2230140.n6kW8LSSaP@wuerfel>
+Message-ID: <CAK7LNAQkfSqYs7jJ6Zn0HS6FBRcXbonmNZ0eV_QS0mYeS8adbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 02:55:25PM +0800, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
-> scan this to get the UEFI information.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  Documentation/devicetree/bindings/arm/xen.txt | 42 +++++++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
-> index 0f7b9c2..fbc17ae 100644
-> --- a/Documentation/devicetree/bindings/arm/xen.txt
-> +++ b/Documentation/devicetree/bindings/arm/xen.txt
-> @@ -15,6 +15,36 @@ the following properties:
->  - interrupts: the interrupt used by Xen to inject event notifications.
->    A GIC node is also required.
->  
-> +To support UEFI on Xen ARM virtual platforms, Xen pupulates the FDT "uefi" node
-> +under /hypervisor with following parameters:
+Hi Arnd,
 
-s/pupulates/populates/
 
-> +
-> +________________________________________________________________________________
-> +Name                      | Size   | Description
-> +================================================================================
-> +xen,uefi-system-table     | 64-bit | Guest physical address of the UEFI System
-> +			  |	   | Table.
-> +--------------------------------------------------------------------------------
-> +xen,uefi-mmap-start       | 64-bit | Guest physical address of the UEFI memory
-> +			  |	   | map.
-> +--------------------------------------------------------------------------------
-> +xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
-> +                          |        | pointed to in previous entry.
-> +--------------------------------------------------------------------------------
-> +xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
-> +                          |        | memory map.
-> +--------------------------------------------------------------------------------
-> +xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
-> +--------------------------------------------------------------------------------
-> +
-> +Below is the format of the mmap descriptor.
-> +typedef struct {
-> +	u32 type;
-> +	u32 pad;
-> +	u64 phys_addr;
-> +	u64 virt_addr;
-> +	u64 num_pages;
-> +	u64 attribute;
-> +} efi_memory_desc_t;
+2015-05-13 16:48 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 13 May 2015 16:00:21 Masahiro Yamada wrote:
+>> 2015-05-13 0:00 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+>> > On Friday 08 May 2015 13:07:10 Masahiro Yamada wrote:
+>> > Welcome as our latest new maintainer. In the future, please send
+>> > any follow-up patches for the architecture specific code to
+>> > arm at kernel.org in addition to the normal recipients, once you
+>> > consider them ready to be applied.
+>>
+>>
+>> Please teach me a little more because I am not experienced enough
+>> in this community.
+>>
+>>
+>> I checked MAINTAINERS, but I could not find arm at kernel.org.
+>> Is it documented somewhere?
+>>
+>> I found ARM SUB-ARCHITECTURES entry in that file, but it does not mention
+>> the responsible individuals.
+>> (I assume, you and Olof are the ones.)
+>>
+>
+> We normally only take patches from subarch maintainers that know who
+> we are and how it works, but we don't want to be Cc'd on every single
+> patch, so we don't have an entry in MAINTAINERS directly.
+>
+>> I have one more question.
+>>
+>> Are you receiving pull requests from each sub-arch maintainer?
+>> Or should every patch be submitted to arm at kernel.org and
+>> applied by you (or other ARM-SoC maintainers)?
+>>
+>> I have not earned enough reputations in this ML, so I know
+>> it is too early for me to handle pull-reqs.
+>>
+>> I understand the general development process of Linux, but
+>> the maintainership of the ARM-SoC subsystem looks more hierarchized, so
+>> I just want to know its development process correctly.
+>
+> No worries, if you are unsure you can always ask us on the mailing
+> list or on the #armlinux channel on irc.freenode.net.
+>
+> If you have more than a few patches at once, we'd always appreciate
+> a pull request, for a couple of patches, emails to arm at kernel.org plus
+> linux-arm-kernel are fine as well.
+>
+> When you do pull requests, please split them up according to larger
+> topics, e.g. send dts changes separately from code changes, and
+> separate bug fixes, cleanups and new feature support.
+>
+> Often when you add a new driver, that will require sending the driver
+> code to a subsystem maintainer, and the dts changes to us. If everything
+> goes well, your DT bindings are both forward and backward compatible,
+> so they can get merged independently. If you ever have interdependencies
+> between them, talk to us first so we can find a solution.
+>
+> For sending pull requests, it would be good to have a gpg key that
+> is signed by other well-known kernel developers. If you have such
+> a key, you can also request a kernel.org account to host a git tree
+> there, or you can host a git tree somewhere on your company's domain.
+> A public hosting service like github is not as good for us, but we
+> can deal with it when you are still ramping up your infrastructure.
+> Let me know if you need help finding kernel developers to sign your key.
+>
+>         Arnd
 
-I don't think we should describe this here, as it duplicates the UEFI
-spec, and is techincally incorrect the above is only guaranteed to be
-the prefix of each memory descriptor -- that's why the
-uefi-mmap-desc-size property exists.
 
-We don't do this in Documentation/arm/uefi.txt, and I don't see why we
-should do so here.
+About 7 months have passed since I became a sub-arch maintainer (ARM/UniPhier),
+and I am hoping now I deserve to have the gpg key thing you mentioned.
 
-Does Xen handle arbitrary size memory map descriptors? I'm not sure what
-new information might be passed in future additions to the descriptor
-format, and I'm not sure what should happen in the Dom0 case.
+Could you help me get a key and a kernel.org account to host a git tree?
 
->  Example (assuming #address-cells = <2> and #size-cells = <2>):
->  
-> @@ -22,4 +52,16 @@ hypervisor {
->  	compatible = "xen,xen-4.3", "xen,xen";
->  	reg = <0 0xb0000000 0 0x20000>;
->  	interrupts = <1 15 0xf08>;
-> +	uefi {
-> +		xen,uefi-system-table = <0xXXXXXXXX>;
-> +		xen,uefi-mmap-start = <0xXXXXXXXX>;
-> +		xen,uefi-mmap-size = <0xXXXXXXXX>;
-> +		xen,uefi-mmap-desc-size = <0xXXXXXXXX>;
-> +		xen,uefi-mmap-desc-ver = <0xXXXXXXXX>;
-> +        };
->  };
-> +
-> +These "xen,uefi-*" parameters are similar to those in Documentation/arm/uefi.txt
-> +which are used by normal UEFI. But to Xen ARM virtual platforms, it needs to
-> +introduce a Xen specific UEFI and it doesn't want to mix with normal UEFI.
-> +Therefore, it defines these parameters under /hypervisor node.
+It would make it easier to get SoC-specific things in
+without loading you and Olof.
 
-Could we please describe what that actual difference is?
 
-I know that the OS must handle a system table differently under Xen, but
-this doesn't describe what it should do.
 
-I assume that the OS can handle the memory map in an identical fashion
-to when it is native. Is that true?
-
-Mark.
+-- 
+Best Regards
+Masahiro Yamada
