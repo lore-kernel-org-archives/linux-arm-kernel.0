@@ -1,56 +1,71 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Mon, 18 Jan 2016 10:26:29 +0200
-Subject: [PATCH, RESEND] ssb: mark ssb_bus_register as __maybe_unused
-In-Reply-To: <CACna6ryvDFHqwJ3ExURcyFT2ZaT9fS9v36wCnJfze5BLnE88og@mail.gmail.com>
- (=?utf-8?Q?=22Rafa=C5=82_Mi=C5=82ecki=22's?= message of "Sat, 16 Jan 2016
- 15:44:23 +0100")
-References: <8128014.DbbgBtKY3z@wuerfel>
- <8760ywd5fe.fsf@kamboji.qca.qualcomm.com> <4037550.DMaVTE01Aq@wuerfel>
- <87bn8l7miw.fsf@kamboji.qca.qualcomm.com>
- <CACna6ryvDFHqwJ3ExURcyFT2ZaT9fS9v36wCnJfze5BLnE88og@mail.gmail.com>
-Message-ID: <87y4bn5m4q.fsf@kamboji.qca.qualcomm.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Mon, 18 Jan 2016 09:27:47 +0100
+Subject: [RESEND PATCH v2] ARM: debug: add support for Palmchip BK-310x UART
+Message-ID: <569CA203.6050001@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rafa? Mi?ecki <zajec5@gmail.com> writes:
+From: Mans Rullgard <mans@mansr.com>
 
-> On 16 January 2016 at 13:10, Kalle Valo <kvalo@codeaurora.org> wrote:
->> Arnd Bergmann <arnd@arndb.de> writes:
->>
->>> On Thursday 14 January 2016 08:46:29 Kalle Valo wrote:
->>>> I can take it. For historical reasons ssb patches go through my
->>>> wireless-drivers trees.
->>>
->>> I found this in my backlog, and I believe it still applies. Can you take
->>> that one too?
->>
->> I'm not sure what you mean here, I can take any ssb patch if it's ok for
->> Michael or Rafal :)
->>
->> Just please submit the patch properly (with S-o-B line) and CC
->> linux-wireless so that it goes to patchwork.
->
-> It was already sent once and Acked by Michael:
-> https://patchwork.kernel.org/patch/7543191/
->
-> The problem was not cc-ing linux-wireless so it wasn't picked by the
-> linux-wireless patchwork.
+Some SoCs use a Palmchip BK-310x UART which is mostly 16550 compatible
+but with a different register layout. While this UART has previously
+only been supported in MIPS based chips (Alchemy, Ralink), the ARM based
+SMP87xx series from Sigma Designs also uses it.
 
-Ah, that's why I missed it. I only follow patchwork, I basically ignore
-patches which are sent via email. Arnd, can you please resend the patch
-and CC linux-wireless? Sorry for the trouble.
+This patch allows the debug console to work with this type of UART.
 
-To avoid this in the future I think we should replace netdev with
-linux-wireless in the MAINTAINERS entry:
+Signed-off-by: Mans Rullgard <mans@mansr.com>
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
+Peter, this is the patch I've been using on Tango for earlyprintk support.
+arm-soc, this is just the Nov 8 patch with my Signed-off-by tag.
+---
+ arch/arm/Kconfig.debug            |  9 +++++++++
+ arch/arm/include/debug/palmchip.S | 11 +++++++++++
+ 2 files changed, 20 insertions(+)
+ create mode 100644 arch/arm/include/debug/palmchip.S
 
-SONICS SILICON BACKPLANE DRIVER (SSB)
-M:      Michael Buesch <m@bues.ch>
-L:      netdev at vger.kernel.org
-S:      Maintained
-F:      drivers/ssb/
-F:      include/linux/ssb/
-
-Are people ok with that? Patches welcome :)
-
--- 
-Kalle Valo
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 259c0ca9c99a..708aa9150c00 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1304,6 +1304,7 @@ config DEBUG_SIRFSOC_UART
+ config DEBUG_LL_INCLUDE
+ 	string
+ 	default "debug/sa1100.S" if DEBUG_SA1100
++	default "debug/palmchip.S" if DEBUG_UART_8250_PALMCHIP
+ 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
+ 	default "debug/at91.S" if DEBUG_AT91_UART
+ 	default "debug/asm9260.S" if DEBUG_ASM9260_UART
+@@ -1588,6 +1589,14 @@ config DEBUG_UART_8250_WORD
+ 		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2 || \
+ 		DEBUG_BRCMSTB_UART
+ 
++config DEBUG_UART_8250_PALMCHIP
++	bool "8250 UART is Palmchip BK-310x"
++	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
++	help
++	  Palmchip provides a UART implementation compatible with 16550
++	  except for having a different register layout.  Say Y here if
++	  the debug UART is of this type.
++
+ config DEBUG_UART_8250_FLOW_CONTROL
+ 	bool "Enable flow control for 8250 UART"
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
+diff --git a/arch/arm/include/debug/palmchip.S b/arch/arm/include/debug/palmchip.S
+new file mode 100644
+index 000000000000..6824b2d1c38e
+--- /dev/null
++++ b/arch/arm/include/debug/palmchip.S
+@@ -0,0 +1,11 @@
++#include <linux/serial_reg.h>
++
++#undef UART_TX
++#undef UART_LSR
++#undef UART_MSR
++
++#define UART_TX 1
++#define UART_LSR 7
++#define UART_MSR 8
++
++#include <debug/8250.S>
