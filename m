@@ -1,43 +1,21 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Mon, 18 Jan 2016 01:31:58 +0000
-Subject: [PATCH 2/2] regulator: add documentation for ACT8945A's
- regulator DT bindings
-In-Reply-To: <20160115175905.GB6588@sirena.org.uk>
-References: <1452218938-10621-1-git-send-email-wenyou.yang@atmel.com>
- <1452218938-10621-3-git-send-email-wenyou.yang@atmel.com>
- <20160115175905.GB6588@sirena.org.uk>
-Message-ID: <B256D81BAE5131468A838E5D7A243641D63F1B1E@penmbx01>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 18 Jan 2016 10:34:23 +0900
+Subject: [PATCH v2 1/2] ARM: shmobile: r8a7790: use GIC_* defines
+In-Reply-To: <CAMuHMdVcHH4Sv5b5xweAgSMun3kEWgOiR32pzSuXVAkYwi=RcA@mail.gmail.com>
+References: <1452825856-16230-1-git-send-email-horms+renesas@verge.net.au>
+ <1452825856-16230-2-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdVcHH4Sv5b5xweAgSMun3kEWgOiR32pzSuXVAkYwi=RcA@mail.gmail.com>
+Message-ID: <20160118013422.GA1905@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-> -----Original Message-----
-> From: Mark Brown [mailto:broonie at kernel.org]
-> Sent: 2016?1?16? 1:59
-> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
-> Cc: Liam Girdwood <lgirdwood@gmail.com>; Rob Herring <robh+dt@kernel.org>;
-> Pawel Moll <pawel.moll@arm.com>; Mark Rutland <mark.rutland@arm.com>; Ian
-> Campbell <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>;
-> Ferre, Nicolas <Nicolas.FERRE@atmel.com>; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> devicetree at vger.kernel.org
-> Subject: Re: [PATCH 2/2] regulator: add documentation for ACT8945A's regulator
-> DT bindings
+On Fri, Jan 15, 2016 at 11:43:47AM +0100, Geert Uytterhoeven wrote:
+> On Fri, Jan 15, 2016 at 3:44 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Use GIC_* defines for GIC interrupt cells in r8a7791 device tree.
+> >
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> On Fri, Jan 08, 2016 at 10:08:58AM +0800, Wenyou Yang wrote:
-> 
-> > +Optional properties:
-> > +- active-semi,vsel-high: Indicates if the VSEL pin is set to logic-high.
-> > +  If this property is missing, assume the VSEL pin is set to logic-low.
-> 
-> Wouldn't such a pin normally be connected to a GPIO for runtime control
-> - why is it expected to be tied statically all the time?
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-On the reference board, it is connected to the VSYS_5V statically.
-
-Yes, it should be connected to a GPIO, it should be controllable at the necessary time.
-
-
-Best Regards,
-Wenyou Yang 
+Thanks, I have queued this up.
