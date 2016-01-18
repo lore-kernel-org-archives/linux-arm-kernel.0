@@ -1,37 +1,53 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Mon, 18 Jan 2016 09:49:56 -0800
-Subject: [PATCH v9 4/6] arm64, dt, thunderx: Add initial dts for Cavium
- Thunderx in 2 node topology.
-In-Reply-To: <1453134965-6125-5-git-send-email-gkulkarni@caviumnetworks.com>
-References: <1453134965-6125-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1453134965-6125-5-git-send-email-gkulkarni@caviumnetworks.com>
-Message-ID: <569D25C4.3060806@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 18 Jan 2016 18:27:48 +0000
+Subject: [PATCH v2 16/16] ARM64: XEN: Initialize Xen specific UEFI
+ runtime services
+In-Reply-To: <alpine.DEB.2.02.1601181736090.9400@kaball.uk.xensource.com>
+References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452840929-19612-17-git-send-email-zhaoshenglong@huawei.com>
+ <20160118110854.GG21067@leverpostej>
+ <alpine.DEB.2.02.1601181736090.9400@kaball.uk.xensource.com>
+Message-ID: <20160118182747.GR21067@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2016 08:36 AM, Ganapatrao Kulkarni wrote:
-> Adding dt file for Cavium's Thunderx dual socket platform.
->
-> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> ---
->   arch/arm64/boot/dts/cavium/Makefile             |   2 +-
->   arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts  |  83 +++
->   arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi | 806 ++++++++++++++++++++++++
->   3 files changed, 890 insertions(+), 1 deletion(-)
->   create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts
->   create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi
->
+On Mon, Jan 18, 2016 at 05:45:24PM +0000, Stefano Stabellini wrote:
+> On Mon, 18 Jan 2016, Mark Rutland wrote:
+> > On Fri, Jan 15, 2016 at 02:55:29PM +0800, Shannon Zhao wrote:
+> > > +void __init xen_efi_runtime_setup(void)
+> > > +{
+> > > +	efi.get_time                 = xen_efi_get_time;
+> > > +	efi.set_time                 = xen_efi_set_time;
+> > > +	efi.get_wakeup_time          = xen_efi_get_wakeup_time;
+> > > +	efi.set_wakeup_time          = xen_efi_set_wakeup_time;
+> > > +	efi.get_variable             = xen_efi_get_variable;
+> > > +	efi.get_next_variable        = xen_efi_get_next_variable;
+> > > +	efi.set_variable             = xen_efi_set_variable;
+> > > +	efi.query_variable_info      = xen_efi_query_variable_info;
+> > > +	efi.update_capsule           = xen_efi_update_capsule;
+> > > +	efi.query_capsule_caps       = xen_efi_query_capsule_caps;
+> > > +	efi.get_next_high_mono_count = xen_efi_get_next_high_mono_count;
+> > > +	efi.reset_system             = NULL;
+> > > +}
+> > 
+> > How do capsules work in the absence of an EFI system reset?
+> 
+> Actually I don't think that capsules are available in Xen on ARM64 yet,
+> see "TODO - disabled until implemented on ARM" in
+> xen/common/efi/runtime.c.
+> 
+> FYI system reset is available, but it is provided via a different
+> mechanism (HYPERVISOR_sched_op(xen_restart...)
 
-These files are useless, they don't contain device nodes for anything 
-other than the UARTs.  There is no existing system that has only UARTs 
-and no other devices, so these files cannot be (and can never be) used 
-anywhere.
+Will that trigger Xen to do the right thing to trigger capsule updates
+when implemented in Xen? Or do we need a xen_efi_reset_system?
 
-Since the boot firmware in all real, and emulated, systems is supplying 
-correct DTBs, we should consider not merging these files, and removing 
-the likewise useless thunder-88xx.dts  thunder-88xx.dtsi
+Does that override PSCI?
 
-David Daney
+In machine_restart we try efi_reboot first specifically to allow for
+capsule updates. Similarly drivers/firmware/efi/reboot.c registers
+efi_power_off late in order to override anything else, though that's
+best-effort at present.
 
-
-[...]
+Thanks,
+Mark.
