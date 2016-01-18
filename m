@@ -1,53 +1,33 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 18 Jan 2016 21:30:13 +0100
-Subject: Fix preempt-rt on AT91
-In-Reply-To: <20160118192308.GR3367@piout.net>
-References: <1452997394-8554-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20160118174259.GC12309@linutronix.de> <20160118192308.GR3367@piout.net>
-Message-ID: <569D4B55.10103@linutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Jan 2016 21:50:26 +0100
+Subject: [PATCH] mm: avoid uninitialized variable in tracepoint
+Message-ID: <4117363.Ys1FTDH7Wz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2016 08:23 PM, Alexandre Belloni wrote:
-> Hi,
-Hi,
+A newly added tracepoint in the hugepage code uses a variable in the
+error handling that is not initialized at that point:
 
->>> I'd say that the proper solution would still be to implement the virtual
->>> irqchip because this would still hit people not wanting to use the TCB as
->>> their clock source.
->>
->> why wouldn't people not want that?
-> 
-> Because they may be using the TCBs for something else: PWM, frequency
-> measure, quadrature decoder...
+include/trace/events/huge_memory.h:81:230: error: 'isolated' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 
-Oh okay.
+The result is relatively harmless, as the trace data will in rare
+cases contain incorrect data.
 
->> For a virtual irqchip you would need a mask/unmask register in order to
->> individual disable/enable the irq and you need something to figure out
->> which one of the three is active. You don't have all those things, do
->> you?
->>
-> 
-> The proposed solution was software only. It mainly consisted in a simple
-> irq demuxer.
+This works around the problem by adding an explicit initialization.
 
-Well, if it works properly and does not lead to any new bugs or
-anything else then nobody will mind I guess.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 7d2eba0557c1 ("mm: add tracepoint for scanning pages")
 
->> All in all, care to forwarded the working pieces from -RT patch set
->> upstream? I problem I have here is mostly that I can't the patches on
->> actual hardware. Disabling the PIT and running on the other clocksource
->> isn't that -RT specific after all :)
-> 
-> I'd say that the only remaining part is the IRQ freeing/requesting but
-> as I said, this can't land in mainline as is. I still plan to work on
-> that later.
-> I'd say that most people running linux on at91 are already using the tcb
-> as the clocksource, this is already available in the mainline and is the
-> default unless the TCBs are used for something else.
-
-Wasn't there one of the patches to increase the frequency of the TCB
-clocksource from the default to something higher?
-
-Sebastian
+diff --git a/mm/huge_memory.c b/mm/huge_memory.c
+index b2db98136af9..bb3b763b1829 100644
+--- a/mm/huge_memory.c
++++ b/mm/huge_memory.c
+@@ -2320,7 +2320,7 @@ static void collapse_huge_page(struct mm_struct *mm,
+ 	pgtable_t pgtable;
+ 	struct page *new_page;
+ 	spinlock_t *pmd_ptl, *pte_ptl;
+-	int isolated, result = 0;
++	int isolated = 0, result = 0;
+ 	unsigned long hstart, hend;
+ 	struct mem_cgroup *memcg;
+ 	unsigned long mmun_start;	/* For mmu_notifiers */
