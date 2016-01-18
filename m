@@ -1,69 +1,91 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 18 Jan 2016 15:01:05 +0100
-Subject: [PATCH] arm64: allow vmalloc regions to be set with set_memory_*
-Message-ID: <1453125665-26627-1-git-send-email-ard.biesheuvel@linaro.org>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Mon, 18 Jan 2016 14:04:05 +0000
+Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
+ hostbridge init based on ACPI
+In-Reply-To: <20160115121231.GD8520@xora-haswell.xora.org.uk>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <20160114134440.GA8520@xora-haswell.xora.org.uk>
+ <1452780100.28109.3.camel@redhat.com>
+ <20160114141501.GC8520@xora-haswell.xora.org.uk>
+ <1452781481.28109.8.camel@redhat.com>
+ <20160115121231.GD8520@xora-haswell.xora.org.uk>
+Message-ID: <20160118140405.GC11384@xora-haswell.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The range of set_memory_* is currently restricted to the module address
-range because of difficulties in breaking down larger block sizes.
-vmalloc maps PAGE_SIZE pages so it is safe to use as well. Update the
-function ranges and add a comment explaining why the range is restricted
-the way it is.
+On Fri, Jan 15, 2016 at 12:12:31PM +0000, Graeme Gregory wrote:
+> On Thu, Jan 14, 2016 at 09:24:41AM -0500, Mark Salter wrote:
+> > On Thu, 2016-01-14 at 14:15 +0000, Graeme Gregory wrote:
+> > > On Thu, Jan 14, 2016 at 09:01:40AM -0500, Mark Salter wrote:
+> > > > On Thu, 2016-01-14 at 13:44 +0000, Graeme Gregory wrote:
+> > > > > On Wed, Jan 13, 2016 at 02:20:46PM +0100, Tomasz Nowicki wrote:
+> > > > > > From the functionality point of view this series might be split into the
+> > > > > > following logic parts:
+> > > > > > 1. Make MMCONFIG code arch-agnostic which allows all architectures to collect
+> > > > > > ???PCI config regions and used when necessary.
+> > > > > > 2. Move non-arch specific bits to the core code.
+> > > > > > 3. Use MMCONFIG code and implement generic ACPI based PCI host controller driver.
+> > > > > > 4. Enable above driver on ARM64
+> > > > > > 
+> > > > > > Patches has been built on top of 4.4 and can be found here:
+> > > > > > git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v3)
+> > > > > > 
+> > > > > > NOTE, this patch set depends on Matthew's patches:
+> > > > > > http://www.spinics.net/lists/linux-pci/msg45950.html
+> > > > > > https://github.com/Vality/linux/tree/pci-fixes
+> > > > > > 
+> > > > > > This has been tested on Cavium ThunderX server and QEMU.
+> > > > > > Any help in reviewing and testing is very appreciated.
+> > > > > 
+> > > > > I have tested this on my AMD Overdrive so
+> > > > > 
+> > > > > Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
+> > > > > 
+> > > > > But to actually get my r8169 network card working I also need the
+> > > > > following patch.
+> > > > > 
+> > > > > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> > > > > index 2fbf840..40e24e2 100644
+> > > > > --- a/drivers/pci/probe.c
+> > > > > +++ b/drivers/pci/probe.c
+> > > > > @@ -1717,7 +1717,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+> > > > > ????????set_dev_node(&dev->dev, pcibus_to_node(bus));
+> > > > > ????????dev->dev.dma_mask = &dev->dma_mask;
+> > > > > ????????dev->dev.dma_parms = &dev->dma_parms;
+> > > > > -???????dev->dev.coherent_dma_mask = 0xffffffffull;
+> > > > > +???????dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
+> > > > > ????????pci_dma_configure(dev);
+> > > > > 
+> > > > > ????????pci_set_dma_max_seg_size(dev, 65536);
+> > > > > 
+> > > > > I suspect we need to set coherent_dma_mask somewhere in the platform but I do
+> > > > > not know where this should happen. Hopefully an ARM64 expert can help.
+> > > > 
+> > > > I've run into a number of cards which don't work on some arm64 machines where there are
+> > > > no DMA address below 4G. For the realtek card you can use r8169.use_dac=1 on the cmdline
+> > > > to get it to work.
+> > > > 
+> > > I need r8169.use_dac=1 and this patch to get card to work.
+> > > 
+> > 
+> > Hmm. I didn't need a patch in the past but I don't think I've used that card with
+> > this patch series. I will try that when I get a chance...
+> > 
+> 
+> From my previous debugging on this issue I was getting an address bigger
+> than 32bits. As r8169 is a whole range of chips are guess they are not
+> all equal?
+> 
+> I can stick debug stuff in if someone tells me where to put them.
+> 
 
-Suggested-by: Laura Abbott <labbott@fedoraproject.org>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/mm/pageattr.c | 23 +++++++++++++++++++----
- 1 file changed, 19 insertions(+), 4 deletions(-)
+After some private debugging with Mark it turned out that the difference
+between our configurations was I did not have.
 
-diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-index 3571c7309c5e..1360a02d88b7 100644
---- a/arch/arm64/mm/pageattr.c
-+++ b/arch/arm64/mm/pageattr.c
-@@ -13,6 +13,7 @@
- #include <linux/kernel.h>
- #include <linux/mm.h>
- #include <linux/module.h>
-+#include <linux/vmalloc.h>
- #include <linux/sched.h>
- 
- #include <asm/pgtable.h>
-@@ -44,6 +45,7 @@ static int change_memory_common(unsigned long addr, int numpages,
- 	unsigned long end = start + size;
- 	int ret;
- 	struct page_change_data data;
-+	struct vm_struct *area;
- 
- 	if (!PAGE_ALIGNED(addr)) {
- 		start &= PAGE_MASK;
-@@ -51,10 +53,23 @@ static int change_memory_common(unsigned long addr, int numpages,
- 		WARN_ON_ONCE(1);
- 	}
- 
--	if (start < MODULES_VADDR || start >= MODULES_END)
--		return -EINVAL;
--
--	if (end < MODULES_VADDR || end >= MODULES_END)
-+	/*
-+	 * Kernel VA mappings are always live, and splitting live section
-+	 * mappings into page mappings may cause TLB conflicts. This means
-+	 * we have to ensure that changing the permission bits of the range
-+	 * we are operating on does not result in such splitting.
-+	 *
-+	 * Let's restrict ourselves to mappings created by vmalloc (or vmap).
-+	 * Those are guaranteed to consist entirely of page mappings, and
-+	 * splitting is never needed.
-+	 *
-+	 * So check whether the [addr, addr + size) interval is entirely
-+	 * covered by precisely one VM area that has the VM_ALLOC flag set.
-+	 */
-+	area = find_vm_area((void *)addr);
-+	if (!area ||
-+	    end > (unsigned long)area->addr + area->size ||
-+	    !(area->flags & VM_ALLOC))
- 		return -EINVAL;
- 
- 	data.set_mask = set_mask;
--- 
-2.5.0
+CONFIG_DMA_CMA=y
+
+With this enabled then the card works without coherent mask hack.
+
+Thanks
+
+Graeme
