@@ -1,31 +1,37 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 18 Jan 2016 10:48:36 +0900
-Subject: [PATCH 3/3] ARM: shmobile: defconfig: Do not enable
- CONFIG_CPU_BPREDICT_DISABLE
-In-Reply-To: <1452537674-20006-4-git-send-email-geert+renesas@glider.be>
-References: <1452537674-20006-1-git-send-email-geert+renesas@glider.be>
- <1452537674-20006-4-git-send-email-geert+renesas@glider.be>
-Message-ID: <20160118014836.GF1905@verge.net.au>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Mon, 18 Jan 2016 10:07:14 +0800
+Subject: [PATCH 1/2] usb: chipidea: add CI_HDRC_TURN_VBUS_EARLY_ON for
+ imx23
+In-Reply-To: <245634301.105525.a366f7cd-6533-4e6a-9506-5cc94a8288bd.open-xchange@email.1und1.de>
+References: <1451407269-14905-1-git-send-email-stefan.wahren@i2se.com>
+ <245634301.105525.a366f7cd-6533-4e6a-9506-5cc94a8288bd.open-xchange@email.1und1.de>
+Message-ID: <20160118020713.GA8150@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 07:41:14PM +0100, Geert Uytterhoeven wrote:
-> Do not disable branch prediction, as this has a big performance impact.
+On Sun, Jan 17, 2016 at 07:56:31PM +0100, Stefan Wahren wrote:
+> Hi Peter,
 > 
-> After re-enabling branch prediction, __loop_delay() runs 16 (Cortex A15)
-> or 11 (Cortex A9) times faster than before.
+> > Stefan Wahren <stefan.wahren@i2se.com> hat am 29. Dezember 2015 um 17:41
+> > geschrieben:
+> >
+> >
+> > Until now the imx23 uses the imx27 platform flag. But the
+> > imx23 needs the flag CI_HDRC_TURN_VBUS_EARLY_ON, too. So
+> > fix this by adding a separate platform flag.
+> >
+> > Suggested-by: Peter Chen <peter.chen@nxp.com>
+> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > ---
+> > drivers/usb/chipidea/ci_hdrc_imx.c | 6 ++++++
+> > 1 file changed, 6 insertions(+)
+> >
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> This used to be enabled in:
-> 
->   - ag5evm_defconfig (sh73a0)
->   - ape6evm_defconfig (r8a73a4)
->   - armadillo800eva_defconfig (r8a7740)
->   - koelsch_defconfig (r8a7791)
->   - kota2_defconfig (sh73a0)
-> 
-> Was there ever a good reason for that?
+> is the series okay?
 
-If that was a concious decision then I believe it was made before my time.
-I'm going ahead and queuing up this change for v4.6.
+Yes, it is ok, already at my patch queue
+
+-- 
+
+Best Regards,
+Peter Chen
