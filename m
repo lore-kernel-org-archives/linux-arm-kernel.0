@@ -1,76 +1,136 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 18 Jan 2016 10:00:48 -0700
-Subject: [PATCH RFC 08/27] PM / Domains: Support IRQ safe PM domains
-In-Reply-To: <20160118165818.GD1651@linaro.org>
-References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
- <1447799871-56374-9-git-send-email-lina.iyer@linaro.org>
- <CAPDyKFoKpgURMYoepWH0TNK1=bFp4uyQCHUSnPiXmLxC7BNyRA@mail.gmail.com>
- <20160114183316.GB1651@linaro.org>
- <CAPDyKFpj0Gv=5hVwZWjmgmumHPriuYk+LLVBwjEeW9Jfj8p5Kw@mail.gmail.com>
- <20160115165758.GC1651@linaro.org>
- <CAPDyKFo4qe8THwJQd1aNQwpbjV1phOGKz_gEuP-wRD6Dgtx0pg@mail.gmail.com>
- <20160118165818.GD1651@linaro.org>
-Message-ID: <20160118170048.GE1651@linaro.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 18 Jan 2016 17:03:19 +0000
+Subject: [Xen-devel] [PATCH v2 16/16] ARM64: XEN: Initialize Xen specific
+ UEFI runtime services
+In-Reply-To: <1452840929-19612-17-git-send-email-zhaoshenglong@huawei.com>
+References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452840929-19612-17-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <alpine.DEB.2.02.1601181634070.9400@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 18 2016 at 09:58 -0700, Lina Iyer wrote:
->On Fri, Jan 15 2016 at 15:08 -0700, Ulf Hansson wrote:
->>[...]
->>
->>>>I think case 2 and case 3 should be okay to support, but I am really
->>>>questioning case 1.
->>>>
->>>With you other patch, it does make sense to have 2 and 3 instead of 1
->>>and 2.
->>
->>Okay!
->>
->>>My only concern is as I view the SoC as a whole, there would be cases
->>>where the parent domain could only be non-IRQ safe (turning off a big
->>>regulator may require some sleep) and the subdomains are quicker and
->>>faster IRQ-safe domains. Putting up this restriction, chops up the
->>
->>Just because they are "quick" (don't sleep) doesn't mean they have to
->>set the IRQ safe flag for the domain.
->>
->>Let's compare how pm_runtime_irq_safe() is used for devices in
->>drivers. Lots of corresponding runtime PM callbacks don't sleep, but
->>that don't mean that the driver calls pm_runtime_irq_safe().
->>
->>Drivers that are expecting to invoke pm_runtime_get_sync() (or other
->>synchronous runtime PM API) from atomic context, requires the
->>corresponding runtime PM callbacks to be IRQ safe. Only under these
->>circumstances the pm_runtime_irq_safe() is used.
->>
->I agree.
->
->The limitation and the interpretation could completely be s/w. There is
->nothing preventing that in hardware. So we could have a processor
->subsystem domain that can collapse faster and even during cpuidle. We
->would define that domain IRQ-safe because of its need to collapse and
->resume when IRQs are disabled, but its parent may not have that
->restriction, in fact, the parent could have another child that could
->only operate as non-IRQ safe.
->
->By imposing the limitation that parents of IRQ-safe domains cannot be 
->non-IRQ-safe, we have to chop off that relationship, because of 
->another
->non-IRQ-safe sibling.
->
->>>domain hierarchy. Imagine, if you could represent the whole power domain
->>>organization in DT, but because of this restriction, we may not be able
->>>to do that.
->>
->>You do have a point. Considering my comment above, do you still think
->>this may become an issue?
->>
->Yes. Pls see my example below.
->
-Sorry above ;)
+On Fri, 15 Jan 2016, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> When running on Xen hypervisor, runtime services are supported through
+> hypercall. So call Xen specific function to initialize runtime services.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 
->That said, I probably won't encounter this limitation in my current
->series, but its not hard to foresee this corner case.
->
->Thanks,
->Lina
+Thanks Shannon, much much better!  Just a couple of questions.
+
+
+>  arch/arm/xen/enlighten.c |  5 +++++
+>  arch/arm64/xen/Makefile  |  1 +
+>  arch/arm64/xen/efi.c     | 36 ++++++++++++++++++++++++++++++++++++
+>  drivers/xen/Kconfig      |  2 +-
+>  include/xen/xen-ops.h    |  1 +
+>  5 files changed, 44 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm64/xen/efi.c
+> 
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index 485e117..84f27ec 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -414,6 +414,11 @@ static int __init xen_guest_init(void)
+>  	if (xen_initial_domain())
+>  		pvclock_gtod_register_notifier(&xen_pvclock_gtod_notifier);
+>  
+> +	if (IS_ENABLED(CONFIG_XEN_EFI)) {
+> +		if (efi_enabled(EFI_PARAVIRT))
+> +			xen_efi_runtime_setup();
+> +	}
+> +
+>  	return 0;
+>  }
+>  early_initcall(xen_guest_init);
+> diff --git a/arch/arm64/xen/Makefile b/arch/arm64/xen/Makefile
+> index 74a8d87..62e6fe2 100644
+> --- a/arch/arm64/xen/Makefile
+> +++ b/arch/arm64/xen/Makefile
+> @@ -1,2 +1,3 @@
+>  xen-arm-y	+= $(addprefix ../../arm/xen/, enlighten.o grant-table.o p2m.o mm.o)
+>  obj-y		:= xen-arm.o hypercall.o
+> +obj-$(CONFIG_XEN_EFI) += efi.o
+> diff --git a/arch/arm64/xen/efi.c b/arch/arm64/xen/efi.c
+> new file mode 100644
+> index 0000000..33046b0
+> --- /dev/null
+> +++ b/arch/arm64/xen/efi.c
+> @@ -0,0 +1,36 @@
+> +/*
+> + * Copyright (c) 2015, Linaro Limited, Shannon Zhao
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/efi.h>
+> +#include <xen/xen-ops.h>
+> +
+> +void __init xen_efi_runtime_setup(void)
+> +{
+> +	efi.get_time                 = xen_efi_get_time;
+> +	efi.set_time                 = xen_efi_set_time;
+> +	efi.get_wakeup_time          = xen_efi_get_wakeup_time;
+> +	efi.set_wakeup_time          = xen_efi_set_wakeup_time;
+> +	efi.get_variable             = xen_efi_get_variable;
+> +	efi.get_next_variable        = xen_efi_get_next_variable;
+> +	efi.set_variable             = xen_efi_set_variable;
+> +	efi.query_variable_info      = xen_efi_query_variable_info;
+> +	efi.update_capsule           = xen_efi_update_capsule;
+> +	efi.query_capsule_caps       = xen_efi_query_capsule_caps;
+> +	efi.get_next_high_mono_count = xen_efi_get_next_high_mono_count;
+> +	efi.reset_system             = NULL;
+> +}
+> +EXPORT_SYMBOL_GPL(xen_efi_runtime_setup);
+
+This looks very similar to struct efi efi_xen previously in
+drivers/xen/efi.c.  Maybe it makes sense to leave struct efi efi_xen in
+drivers/xen/efi.c, export it in include/xen/xen-ops.h, then here just:
+
+  efi = efi_xen;
+
+Would that improve code readability?
+
+
+Correct me if I am wrong, but on ARM64 (differently from x86) it is not
+necessary to set efi.systab because it is not used, right? If so, it
+would be best to add a comment here to remember.
+
+
+> diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
+> index 73708ac..27d216a 100644
+> --- a/drivers/xen/Kconfig
+> +++ b/drivers/xen/Kconfig
+> @@ -268,7 +268,7 @@ config XEN_HAVE_PVMMU
+>  
+>  config XEN_EFI
+>  	def_bool y
+> -	depends on X86_64 && EFI
+> +	depends on (ARM64 || X86_64) && EFI
+>  
+>  config XEN_AUTO_XLATE
+>  	def_bool y
+> diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
+> index c83a338..36ff8e4 100644
+> --- a/include/xen/xen-ops.h
+> +++ b/include/xen/xen-ops.h
+> @@ -107,6 +107,7 @@ efi_status_t xen_efi_update_capsule(efi_capsule_header_t **capsules,
+>  efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
+>  					unsigned long count, u64 *max_size,
+>  					int *reset_type);
+> +void xen_efi_runtime_setup(void);
+
+xen_efi_runtime_setup is not defined on x86, but this header is not arch
+specific.
