@@ -1,44 +1,112 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 18 Jan 2016 11:14:44 +0100
-Subject: [PATCH] dmaengine: at_xdmac: fix resume for cyclic transfers
-Message-ID: <1453112084-4879-1-git-send-email-ludovic.desroches@atmel.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Mon, 18 Jan 2016 11:15:11 +0100
+Subject: [RESEND PATCH 0/2] crypto: sunxi-ss: fix 64-bit compilation
+In-Reply-To: <569CB813.5050607@arm.com>
+References: <1452252249-12040-1-git-send-email-andre.przywara@arm.com>
+ <569AA8ED.7050404@gmail.com> <569CB813.5050607@arm.com>
+Message-ID: <20160118101511.GD12644@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Songjun Wu <songjun.wu@atmel.com>
+On Mon, Jan 18, 2016 at 10:01:55AM +0000, Andre Przywara wrote:
+> Hi Corentin,
+> 
+> (CC:ing Boris for the x86 parts)
+> 
+> thanks for looking at this and your answer.
+> 
+> On 16/01/16 20:32, Corentin LABBE wrote:
+> > Le 08/01/2016 12:24, Andre Przywara a ?crit :
+> >> (resending to add linux-crypto, patches unchanged)
+> >>
+> >> Hi,
+> >>
+> >> these two patches provide a different approach to an issue I tried
+> >> to fix lately [1].
+> >> Instead of casting everything I now promote local types to size_t, so
+> >> that the min3() arguments naturally match in type.
+> >> As size_t is defined as "unsigned int" on 32-bit architectures
+> >> anyway, that actually does not change anything there, but instead
+> >> provides a clean approach to get it compiled for arm64.
+> >>
+> >> I split this up because 1/2 seems much cleaner to me than 2/2, so we
+> >> can have a separate discussion/merge process on this.
+> >>
+> >> Cheers,
+> >> Andre.
+> >>
+> >> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/395689.html
+> >>
+> >> Andre Przywara (2):
+> >>   crypto: sunxi-ss-cipher: promote variables to match types in min3()
+> >>     calls
+> >>   crypto: sunxi-ss-hash: promote variables to match types in min3()
+> >>     calls
+> >>
+> >>  drivers/crypto/sunxi-ss/sun4i-ss-cipher.c | 20 ++++++++++----------
+> >>  drivers/crypto/sunxi-ss/sun4i-ss-hash.c   | 12 ++++++------
+> >>  drivers/crypto/sunxi-ss/sun4i-ss.h        |  2 +-
+> >>  3 files changed, 17 insertions(+), 17 deletions(-)
+> >>
+> > 
+> > Hello
+> > 
+> > Sorry for this late answer.
+> > 
+> > I am in trouble with those patch, so we have with Andre a long conversation about it.
+> > Basically, sun4i-ss will never be available on 64bits platform. (A64 will have a totally new crypto engine).
+> > So letting it to compile under 64bit arch is only useful when goal is to add COMPILE_TEST for it.
+> 
+> OK, but actually I don't see the strict requirement for having
+> COMPILE_TEST here. Usually those warnings point to portability issues in
+> the code and should be fixed, regardless of it being usable for a
+> particular architecture or not. Since it got enabled with ARCH_SUNXI on
+> arm64 without further ado, I took this as a sufficient reason to fix
+> those issues.
+> 
+> But I see your point in it being useless outside of arm(32) (unless
+> Allwinner comes up with a ARMv8 SoC using the "old" crypto engine ;-)
+> 
+> > But COMPILE_TEST cannot simply be added with those patch since some arches (x86/x86_64 at least) does not have writesl/readsl available.
+> 
+> So for the records (and interested x86 readers):
+> The sunxi-ss driver uses writesl/readsl, which _are_ defined in
+> include/asm-generic/io.h. But x86 does not include this header (probably
+> for historic reasons). So I added the #include in
+> arch/x86/include/asm/io.h, this required to dummy define a lot of
+> implemented functions, like:
+> #define readb readb
+> basically for all MMIO and IO port accessors. After that it worked, I
+> could use COMPILE_TEST on the driver and found the same issues as with
+> arm64 (which were fixed by my patch).
+> 
+> Now adding a number of hideous #defines to a core header in an unrelated
+> architecture to enable COMPILE_TEST for a single driver seems a bit of a
+> stretch to me, so I refrain from sending this out - unless people ask
+> for it.
+> 
+> Boris, do you recall any discussions about asm-generic/io.h on x86 in
+> the past?
 
-When having cyclic transfers, the channel was paused when performing
-suspend but was not correctly resumed.
+Bah, I don't remember what I did last week. :-)
 
-Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Fixes: e1f7c9eee707 ("dmaengine: at_xdmac: creation of the atmel
-eXtended DMA Controller driver")
-Cc: <stable@vger.kernel.org> # 4.1 and later
----
- drivers/dma/at_xdmac.c | 3 +++
- 1 file changed, 3 insertions(+)
+Let's CC tip people. I'm leaving in the rest of the mail for reference.
 
-diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index 39f5966..64f5d1b 100644
---- a/drivers/dma/at_xdmac.c
-+++ b/drivers/dma/at_xdmac.c
-@@ -1700,6 +1700,7 @@ static int at_xdmac_device_terminate_all(struct dma_chan *chan)
- 	list_for_each_entry_safe(desc, _desc, &atchan->xfers_list, xfer_node)
- 		at_xdmac_remove_xfer(atchan, desc);
- 
-+	clear_bit(AT_XDMAC_CHAN_IS_PAUSED, &atchan->status);
- 	clear_bit(AT_XDMAC_CHAN_IS_CYCLIC, &atchan->status);
- 	spin_unlock_irqrestore(&atchan->lock, flags);
- 
-@@ -1832,6 +1833,8 @@ static int atmel_xdmac_resume(struct device *dev)
- 		atchan = to_at_xdmac_chan(chan);
- 		at_xdmac_chan_write(atchan, AT_XDMAC_CC, atchan->save_cc);
- 		if (at_xdmac_chan_is_cyclic(atchan)) {
-+			if (at_xdmac_chan_is_paused(atchan))
-+				at_xdmac_device_resume(chan);
- 			at_xdmac_chan_write(atchan, AT_XDMAC_CNDA, atchan->save_cnda);
- 			at_xdmac_chan_write(atchan, AT_XDMAC_CNDC, atchan->save_cndc);
- 			at_xdmac_chan_write(atchan, AT_XDMAC_CIE, atchan->save_cim);
+> > The conclusion is that it is simpler to block 64bit build for sun4i-ss.
+> 
+> OK, I am fine with just adding "&& !64BIT" to the Kconfig entry.
+> Actually that was my first impulse on finding this issue, but then I
+> felt it a bit cowardly to paper over the problem instead of fixing it.
+> 
+> So if no-one disagrees, I will include the !64bit dependency in the A64
+> enablement series I plan to send out later this week.
+> 
+> Cheers,
+> Andre.
+> 
+
 -- 
-2.5.0
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
