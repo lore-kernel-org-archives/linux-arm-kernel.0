@@ -1,60 +1,24 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Mon, 18 Jan 2016 09:41:03 -0800
-Subject: [PATCH v9 5/6] PCI: generic: Make pci-host-generic driver numa
- aware
-In-Reply-To: <1453134965-6125-6-git-send-email-gkulkarni@caviumnetworks.com>
-References: <1453134965-6125-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1453134965-6125-6-git-send-email-gkulkarni@caviumnetworks.com>
-Message-ID: <569D23AF.9050503@gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 18 Jan 2016 09:41:38 -0800
+Subject: [PATCH 0/4] rotary-encoder: use generic device properties
+Message-ID: <1453138902-11657-1-git-send-email-dmitry.torokhov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2016 08:36 AM, Ganapatrao Kulkarni wrote:
-> update numa_node of device associated with pci bus.
-> moved down devm_kzalloc to allocate from node memory.
->
-> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> ---
->   drivers/pci/host/pci-host-generic.c | 9 ++++++---
->   1 file changed, 6 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> index 5434c90..0e1ce06 100644
-> --- a/drivers/pci/host/pci-host-generic.c
-> +++ b/drivers/pci/host/pci-host-generic.c
-> @@ -215,11 +215,9 @@ static int gen_pci_probe(struct platform_device *pdev)
->   	const struct of_device_id *of_id;
->   	struct device *dev = &pdev->dev;
->   	struct device_node *np = dev->of_node;
-> -	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-> +	struct gen_pci *pci;
->   	struct pci_bus *bus, *child;
->
-> -	if (!pci)
-> -		return -ENOMEM;
->
->   	type = of_get_property(np, "device_type", NULL);
->   	if (!type || strcmp(type, "pci")) {
-> @@ -230,6 +228,11 @@ static int gen_pci_probe(struct platform_device *pdev)
->   	of_pci_check_probe_only();
->
->   	of_id = of_match_node(gen_pci_of_match, np);
-> +	set_dev_node(dev, of_node_to_nid(np));
+Hi,
 
-This shouldn't be done in individual platform_drivers, but instead in 
-the device probing code.
+This series tries to move the driver away from legacy platform data towards
+using platform-independent way of retrieving both configuration parameters and
+GPIOs (device_property_read_* and gpiod APIs).
 
-There is code that does this in drivers/of/platform.c and 
-drivers/of/device.c  Is that not being called for the pci-host-gweneric 
-devices?  If not, we should figure out why, and perhaps attempt to fix 
-it rather than doing it here.
+This is based on top of 2 Timo's patches converting the driver to use devm* API
+and threaded IRQs. I uploaded all changes into 'rotary-encoder' branch of my
+tree.
 
+I do not have hard ware so please give it a spin, especially on raumfield as it
+uses branch new way of passing platform parameters to the driver.
 
-> +	pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-> +	if (!pci)
-> +		return -ENOMEM;
-> +
->   	pci->cfg.ops = (struct gen_pci_cfg_bus_ops *)of_id->data;
->   	pci->host.dev.parent = dev;
->   	INIT_LIST_HEAD(&pci->host.windows);
->
+Thanks.
+
+-- 
+Dmitry
