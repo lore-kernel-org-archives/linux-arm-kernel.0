@@ -1,58 +1,44 @@
-From: andrew.cooper3@citrix.com (Andrew Cooper)
-Date: Mon, 18 Jan 2016 12:42:31 +0000
-Subject: [Xen-devel] [PATCH v2 08/16] xen/hvm/params: Add a new delivery
- type for event-channel in HVM_PARAM_CALLBACK_IRQ
-In-Reply-To: <alpine.DEB.2.02.1601181205110.16178@kaball.uk.xensource.com>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-9-git-send-email-zhaoshenglong@huawei.com>
- <alpine.DEB.2.02.1601181205110.16178@kaball.uk.xensource.com>
-Message-ID: <569CDDB7.9030103@citrix.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Mon, 18 Jan 2016 13:41:51 +0100
+Subject: [PATCH V3 20/21] pci, acpi: Match PCI config space accessors
+ against platfrom specific quirks.
+In-Reply-To: <1452785776.28109.22.camel@redhat.com>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <1452691267-32240-21-git-send-email-tn@semihalf.com>
+ <1452785776.28109.22.camel@redhat.com>
+Message-ID: <569CDD8F.807@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/16 12:38, Stefano Stabellini wrote:
-> On Fri, 15 Jan 2016, Shannon Zhao wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
->>
->> Add a new delivery type:
->> val[63:56] == 3: val[15:8] is flag: val[7:0] is a PPI.
->> To the flag, bit 0 stands the interrupt mode is edge(1) or level(0) and
->> bit 1 stands the interrupt polarity is active low(1) or high(0).
->>
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> ---
->>  include/xen/interface/hvm/params.h | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
->> index a6c7991..550688a 100644
->> --- a/include/xen/interface/hvm/params.h
->> +++ b/include/xen/interface/hvm/params.h
->> @@ -34,6 +34,11 @@
->>   *                  Domain = val[47:32], Bus  = val[31:16],
->>   *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
->>   * val[63:56] == 2: val[7:0] is a vector number.
->> + * val[63:56] == 3: val[15:8] is flag of event-channel interrupt:
->> + *                      bit 0: interrupt is edge(1) or level(0) triggered
->> + *                      bit 1: interrupt is active low(1) or high(0)
->> + *                  val[7:0] is PPI number used by event-channel.
->> + *                  This is only used by ARM/ARM64.
->>   * If val == 0 then CPU0 event-channel notifications are not delivered.
->>   */
->>  #define HVM_PARAM_CALLBACK_IRQ 0
-> Andrew, I think that this patch is correct. Looking back at your
-> previous comment (http://marc.info/?l=devicetree&m=144804014214262&w=2),
-> is it possible that you were confused by enum callback_via_type, which
-> is internal to Xen and offset'ed by 1 compared to the described values
-> in xen/include/public/hvm/params.h?
+On 14.01.2016 16:36, Mark Salter wrote:
+>> +extern struct pci_mcfg_fixup __start_acpi_mcfg_fixups[];
+>> >+extern struct pci_mcfg_fixup __end_acpi_mcfg_fixups[];
+>> >+
+>> >+static struct pci_ops *pci_mcfg_check_quirks(struct acpi_pci_root *root)
+>> >+{
+>> >+	struct pci_mcfg_fixup *f;
+>> >+	int bus_num = root->secondary.start;
+>> >+	int domain = root->segment;
+>> >+
+>> >+	/*
+>> >+	 * First match against PCI topology <domain:bus> then use DMI or
+>> >+	 * custom match handler.
+>> >+	 */
+>> >+	for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
+>> >+		if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
+>> >+		    (f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
+>> >+		    (f->system ? dmi_check_system(f->system) : 0 ||
+>> >+		     f->match ? f->match(f, root) : 0))
+>> >+			return f->ops;
+> I think this would be better as:
 >
-> If not, and indeed somebody introduced one more field but failed to
-> document it, then I suggest she sends a patch to fix the issue as soon
-> as possible.
+> 		    (f->system ? dmi_check_system(f->system) : 1 &&
+> 		     f->match ? f->match(f, root) : 1))
+> 			return f->ops;
+>
+> Otherwise, one has to call dmi_check_system() from f->match() if
+> access to root is needed.
 
-I was indeed confused - the ABI is utterly mad.
+Makes a lot of sense to me, I will modify as you suggested.
 
-However, this change does need rebasing over c/s ca5c54b, which was the
-result of the original discussion.
-
-~Andrew
+Tomasz
