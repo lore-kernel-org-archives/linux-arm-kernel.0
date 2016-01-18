@@ -1,356 +1,66 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 18 Jan 2016 09:41:42 -0800
-Subject: [PATCH 4/4] Input: rotary_encoder - move away from platform data
- structure
-In-Reply-To: <1453138902-11657-1-git-send-email-dmitry.torokhov@gmail.com>
-References: <1453138902-11657-1-git-send-email-dmitry.torokhov@gmail.com>
-Message-ID: <1453138902-11657-5-git-send-email-dmitry.torokhov@gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Mon, 18 Jan 2016 18:42:59 +0100
+Subject: Fix preempt-rt on AT91
+In-Reply-To: <1452997394-8554-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1452997394-8554-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20160118174259.GC12309@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop support for platform data passed via a C-structure and switch to
-device properties instead, which should make the driver compatible with all
-platforms: OF, ACPI and static boards. Static boards should use property
-sets to communicate device parameters to the driver.
+* Alexandre Belloni | 2016-01-17 03:23:13 [+0100]:
 
-Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
----
- arch/arm/mach-pxa/raumfeld.c        |  29 +++++--
- drivers/input/misc/rotary_encoder.c | 147 ++++++++++++++----------------------
- include/linux/rotary_encoder.h      |  13 ----
- 3 files changed, 76 insertions(+), 113 deletions(-)
- delete mode 100644 include/linux/rotary_encoder.h
+>Hi Sebastian, Thomas,
+>
+Hi Alexandre,
 
-diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-index d156f79..c559114 100644
---- a/arch/arm/mach-pxa/raumfeld.c
-+++ b/arch/arm/mach-pxa/raumfeld.c
-@@ -18,13 +18,13 @@
- 
- #include <linux/init.h>
- #include <linux/kernel.h>
-+#include <linux/property.h>
- #include <linux/platform_device.h>
- #include <linux/interrupt.h>
- #include <linux/gpio.h>
- #include <linux/gpio/machine.h>
- #include <linux/smsc911x.h>
- #include <linux/input.h>
--#include <linux/rotary_encoder.h>
- #include <linux/gpio_keys.h>
- #include <linux/input/eeti_ts.h>
- #include <linux/leds.h>
-@@ -378,18 +378,27 @@ static struct gpiod_lookup_table raumfeld_rotary_gpios_table = {
- 	},
- };
- 
--static struct rotary_encoder_platform_data raumfeld_rotary_encoder_info = {
--	.steps		= 24,
--	.axis		= REL_X,
--	.relative_axis	= 1,
-+static u32 raumfeld_rotary_encoder_steps = 24;
-+static u32 raumfeld_rotary_encoder_axis = REL_X;
-+static u32 raumfeld_rotary_encoder_relative_axis = 1;
-+
-+static struct property_entry raumfeld_rotary_properties[] = {
-+	{ "rotary-encoder,steps-per-period",
-+		DEV_PROP_U32, 1, &raumfeld_rotary_encoder_steps, },
-+	{ "linux,axis",
-+		DEV_PROP_U32, 1, &raumfeld_rotary_encoder_axis, },
-+	{ "rotary-encoder,relative_axis", 1, },
-+		DEV_PROP_U32, 1, &raumfeld_rotary_encoder_relative_axis, },
-+	{ NULL }
-+};
-+
-+static struct property_entry raumfeld_rotary_property_set = {
-+	.properties = raumfeld_rotary_properties,
- };
- 
- static struct platform_device rotary_encoder_device = {
- 	.name		= "rotary-encoder",
- 	.id		= 0,
--	.dev		= {
--		.platform_data = &raumfeld_rotary_encoder_info,
--	}
- };
- 
- /**
-@@ -1061,6 +1070,8 @@ static void __init raumfeld_controller_init(void)
- 	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_controller_pin_config));
- 
- 	gpiod_add_lookup_table(&raumfeld_rotary_gpios_table);
-+	device_add_property_set(&rotary_encoder_device.dev,
-+				&raumfeld_rotary_property_set);
- 	platform_device_register(&rotary_encoder_device);
- 
- 	spi_register_board_info(ARRAY_AND_SIZE(controller_spi_devices));
-@@ -1099,6 +1110,8 @@ static void __init raumfeld_speaker_init(void)
- 	platform_device_register(&smc91x_device);
- 
- 	gpiod_add_lookup_table(&raumfeld_rotary_gpios_table);
-+	device_add_property_set(&rotary_encoder_device.dev,
-+				&raumfeld_rotary_property_set);
- 	platform_device_register(&rotary_encoder_device);
- 
- 	raumfeld_audio_init();
-diff --git a/drivers/input/misc/rotary_encoder.c b/drivers/input/misc/rotary_encoder.c
-index 1882e65..309612a 100644
---- a/drivers/input/misc/rotary_encoder.c
-+++ b/drivers/input/misc/rotary_encoder.c
-@@ -21,20 +21,23 @@
- #include <linux/device.h>
- #include <linux/platform_device.h>
- #include <linux/gpio/consumer.h>
--#include <linux/rotary_encoder.h>
- #include <linux/slab.h>
- #include <linux/of.h>
--#include <linux/of_platform.h>
- #include <linux/pm.h>
-+#include <linux/property.h>
- 
- #define DRV_NAME "rotary-encoder"
- 
- struct rotary_encoder {
- 	struct input_dev *input;
--	const struct rotary_encoder_platform_data *pdata;
-+
- 	struct mutex access_mutex;
- 
--	unsigned int axis;
-+	u32 steps;
-+	u32 axis;
-+	bool relative_axis;
-+	bool rollover;
-+
- 	unsigned int pos;
- 
- 	struct gpio_desc *gpio_a;
-@@ -59,31 +62,29 @@ static int rotary_encoder_get_state(struct rotary_encoder *encoder)
- 
- static void rotary_encoder_report_event(struct rotary_encoder *encoder)
- {
--	const struct rotary_encoder_platform_data *pdata = encoder->pdata;
--
--	if (pdata->relative_axis) {
-+	if (encoder->relative_axis) {
- 		input_report_rel(encoder->input,
--				 pdata->axis, encoder->dir ? -1 : 1);
-+				 encoder->axis, encoder->dir ? -1 : 1);
- 	} else {
- 		unsigned int pos = encoder->pos;
- 
- 		if (encoder->dir) {
- 			/* turning counter-clockwise */
--			if (pdata->rollover)
--				pos += pdata->steps;
-+			if (encoder->rollover)
-+				pos += encoder->steps;
- 			if (pos)
- 				pos--;
- 		} else {
- 			/* turning clockwise */
--			if (pdata->rollover || pos < pdata->steps)
-+			if (encoder->rollover || pos < encoder->steps)
- 				pos++;
- 		}
- 
--		if (pdata->rollover)
--			pos %= pdata->steps;
-+		if (encoder->rollover)
-+			pos %= encoder->steps;
- 
- 		encoder->pos = pos;
--		input_report_abs(encoder->input, pdata->axis, encoder->pos);
-+		input_report_abs(encoder->input, encoder->axis, encoder->pos);
- 	}
- 
- 	input_sync(encoder->input);
-@@ -204,91 +205,43 @@ out:
- 	return IRQ_HANDLED;
- }
- 
--#ifdef CONFIG_OF
--static const struct of_device_id rotary_encoder_of_match[] = {
--	{ .compatible = "rotary-encoder", },
--	{ },
--};
--MODULE_DEVICE_TABLE(of, rotary_encoder_of_match);
--
--static struct rotary_encoder_platform_data *rotary_encoder_parse_dt(struct device *dev)
--{
--	const struct of_device_id *of_id =
--				of_match_device(rotary_encoder_of_match, dev);
--	struct device_node *np = dev->of_node;
--	struct rotary_encoder_platform_data *pdata;
--	enum of_gpio_flags flags;
--	int error;
--
--	if (!of_id || !np)
--		return NULL;
--
--	pdata = devm_kzalloc(dev, sizeof(struct rotary_encoder_platform_data),
--			     GFP_KERNEL);
--	if (!pdata)
--		return ERR_PTR(-ENOMEM);
--
--	of_property_read_u32(np, "rotary-encoder,steps", &pdata->steps);
--	of_property_read_u32(np, "linux,axis", &pdata->axis);
--
--	pdata->relative_axis =
--		of_property_read_bool(np, "rotary-encoder,relative-axis");
--	pdata->rollover = of_property_read_bool(np, "rotary-encoder,rollover");
--
--	error = of_property_read_u32(np, "rotary-encoder,steps-per-period",
--				     &pdata->steps_per_period);
--	if (error) {
--		/*
--		 * The 'half-period' property has been deprecated, you must use
--		 * 'steps-per-period' and set an appropriate value, but we still
--		 * need to parse it to maintain compatibility.
--		 */
--		if (of_property_read_bool(np, "rotary-encoder,half-period")) {
--			pdata->steps_per_period = 2;
--		} else {
--			/* Fallback to one step per period behavior */
--			pdata->steps_per_period = 1;
--		}
--	}
--
--	pdata->wakeup_source = of_property_read_bool(np, "wakeup-source");
--
--	return pdata;
--}
--#else
--static inline struct rotary_encoder_platform_data *
--rotary_encoder_parse_dt(struct device *dev)
--{
--	return NULL;
--}
--#endif
--
- static int rotary_encoder_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
--	const struct rotary_encoder_platform_data *pdata = dev_get_platdata(dev);
- 	struct rotary_encoder *encoder;
- 	struct input_dev *input;
- 	irq_handler_t handler;
-+	u32 steps_per_period;
- 	int err;
- 
--	if (!pdata) {
--		pdata = rotary_encoder_parse_dt(dev);
--		if (IS_ERR(pdata))
--			return PTR_ERR(pdata);
--
--		if (!pdata) {
--			dev_err(dev, "missing platform data\n");
--			return -EINVAL;
--		}
--	}
--
- 	encoder = devm_kzalloc(dev, sizeof(struct rotary_encoder), GFP_KERNEL);
- 	if (!encoder)
- 		return -ENOMEM;
- 
- 	mutex_init(&encoder->access_mutex);
--	encoder->pdata = pdata;
-+
-+	device_property_read_u32(dev, "rotary-encoder,steps", &encoder->steps);
-+
-+	err = device_property_read_u32(dev, "rotary-encoder,steps-per-period",
-+				       &steps_per_period);
-+	if (err) {
-+		/*
-+		 * The 'half-period' property has been deprecated, you must
-+		 * use 'steps-per-period' and set an appropriate value, but
-+		 * we still need to parse it to maintain compatibility. If
-+		 * neither property is present we fall back to the one step
-+		 * per period behavior.
-+		 */
-+		steps_per_period = device_property_read_bool(dev,
-+					"rotary-encoder,half-period") ? 2 : 1;
-+	}
-+
-+	encoder->rollover =
-+		device_property_read_bool(dev, "rotary-encoder,rollover");
-+
-+	device_property_read_u32(dev, "linux,axis", &encoder->axis);
-+	encoder->relative_axis =
-+		device_property_read_bool(dev, "rotary-encoder,relative-axis");
- 
- 	encoder->gpio_a = devm_gpiod_get_index(dev, NULL, 0, GPIOD_IN);
- 	if (IS_ERR(encoder->gpio_a)) {
-@@ -318,12 +271,13 @@ static int rotary_encoder_probe(struct platform_device *pdev)
- 	input->id.bustype = BUS_HOST;
- 	input->dev.parent = dev;
- 
--	if (pdata->relative_axis)
--		input_set_capability(input, EV_REL, pdata->axis);
-+	if (encoder->relative_axis)
-+		input_set_capability(input, EV_REL, encoder->axis);
- 	else
--		input_set_abs_params(input, pdata->axis, 0, pdata->steps, 0, 1);
-+		input_set_abs_params(input,
-+				     encoder->axis, 0, encoder->steps, 0, 1);
- 
--	switch (pdata->steps_per_period) {
-+	switch (steps_per_period) {
- 	case 4:
- 		handler = &rotary_encoder_quarter_period_irq;
- 		encoder->last_stable = rotary_encoder_get_state(encoder);
-@@ -337,7 +291,7 @@ static int rotary_encoder_probe(struct platform_device *pdev)
- 		break;
- 	default:
- 		dev_err(dev, "'%d' is not a valid steps-per-period value\n",
--			pdata->steps_per_period);
-+			steps_per_period);
- 		return -EINVAL;
- 	}
- 
-@@ -363,7 +317,8 @@ static int rotary_encoder_probe(struct platform_device *pdev)
- 		return err;
- 	}
- 
--	device_init_wakeup(&pdev->dev, pdata->wakeup_source);
-+	device_init_wakeup(dev,
-+			   device_property_read_bool(dev, "wakeup-source"));
- 
- 	platform_set_drvdata(pdev, encoder);
- 
-@@ -397,6 +352,14 @@ static int __maybe_unused rotary_encoder_resume(struct device *dev)
- static SIMPLE_DEV_PM_OPS(rotary_encoder_pm_ops,
- 			 rotary_encoder_suspend, rotary_encoder_resume);
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id rotary_encoder_of_match[] = {
-+	{ .compatible = "rotary-encoder", },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, rotary_encoder_of_match);
-+#endif
-+
- static struct platform_driver rotary_encoder_driver = {
- 	.probe		= rotary_encoder_probe,
- 	.driver		= {
-diff --git a/include/linux/rotary_encoder.h b/include/linux/rotary_encoder.h
-deleted file mode 100644
-index 4536c81..0000000
---- a/include/linux/rotary_encoder.h
-+++ /dev/null
-@@ -1,13 +0,0 @@
--#ifndef __ROTARY_ENCODER_H__
--#define __ROTARY_ENCODER_H__
--
--struct rotary_encoder_platform_data {
--	unsigned int steps;
--	unsigned int axis;
--	unsigned int steps_per_period;
--	bool relative_axis;
--	bool rollover;
--	bool wakeup_source;
--};
--
--#endif /* __ROTARY_ENCODER_H__ */
--- 
-2.6.0.rc2.230.g3dd15c0
+> 1/ After apply the preempt-rt patch, the kernel doesn't build anymore,
+> arm-at91-pit-remove-irq-handler-when-clock-is-unused.patch is not correct
+> anymore. Can you squash the following patch to solve this build issue?
+
+I folded most of the changes and should be part of -rt3.
+
+> 2/ This approach actually has more issues, in particular, request_irq() must
+> not be calls from interrupt disabled context. That only works because
+> might_sleep() is not active during early boot.
+> For more information, see the following discussion:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/357607.html
+>
+> However, we can't remove those patches now because else we would suffer from
+> another issue:
+> The timer interrupt is shared with other devices, in particular the debug tty,
+> the rtc dans the pmc. When using preempt-rt, those interrupts become threaded
+> interrupts. But, the pit interrupt is requested with IRQF_TIMER and so has
+> IRQF_NO_THREAD. If the pit interrupt is not freed at early boot, all the other
+> devices will fail requesting their interrupt, for example:
+>
+>genirq: Flags mismatch irq 16. 00042080 (ttyS0) vs. 00015280 (at91_tick)
+>atmel_usart ffffee00.serial: atmel_startup - Can't get irq
+
+I assumed the pit is just temporary here for the bootstap. The pit irq is
+removed and the system switches to the TCB clocksource which runs at a
+higher rate.
+
+> I'd say that the proper solution would still be to implement the virtual
+> irqchip because this would still hit people not wanting to use the TCB as
+> their clock source.
+
+why wouldn't people not want that?
+For a virtual irqchip you would need a mask/unmask register in order to
+individual disable/enable the irq and you need something to figure out
+which one of the three is active. You don't have all those things, do
+you?
+
+> 3/ Finally, the kernel will crash when initializing the PMC driver. This is
+> solved by this series that will hopefully land in the mainline:
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390954.html
+
+This is new, isn't it? So the series in currently in v3 and people seem
+happy with it. Please poke me once with the commit ids once it is merged
+on its way upstream and I will try cherry-pick them from next or so.
+
+All in all, care to forwarded the working pieces from -RT patch set
+upstream? I problem I have here is mostly that I can't the patches on
+actual hardware. Disabling the PIT and running on the other clocksource
+isn't that -RT specific after all :)
+
+Sebastian
