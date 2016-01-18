@@ -1,97 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Jan 2016 10:51 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Jan 2016 09:59:19 +0000
 Subject: [PATCH] ARM: debug-ll: fix BCM63xx entry for multiplatform
-Message-ID: <5641204.G6RtGs3Kji@wuerfel>
+In-Reply-To: <5641204.G6RtGs3Kji@wuerfel>
+References: <5641204.G6RtGs3Kji@wuerfel>
+Message-ID: <20160118095919.GE19062@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During my randconfig build testing, I found that a kernel with
-DEBUG_AT91_UART and ARCH_BCM_63XX fails to build:
+On Mon, Jan 18, 2016 at 10:51:00AM +0100, Arnd Bergmann wrote:
+> During my randconfig build testing, I found that a kernel with
+> DEBUG_AT91_UART and ARCH_BCM_63XX fails to build:
+> 
+> arch/arm/include/debug/at91.S:18:0: error: "CONFIG_DEBUG_UART_VIRT" redefined [-Werror]
 
-arch/arm/include/debug/at91.S:18:0: error: "CONFIG_DEBUG_UART_VIRT" redefined [-Werror]
+Why do we have files defining CONFIG_* symbols?  This is the real error
+here - no source file should be defining this.
 
-It turns out that the DEBUG_UART_BCM63XX option is enabled whenever
-the ARCH_BCM_63XX is, and that breaks multiplatform kernels because
-we then end up using the UART address from BCM63XX rather than the
-one we actually configured (if any).
-
-This changes the BCM63XX options to only have one Kconfig option,
-and only enable that if the user explicitly turns it on.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: b51312bebfa4 ("ARM: BCM63XX: add low-level UART debug support")
-Cc: stable at vger.kernel.org
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index c57cbb7e8179..4a2c6a3bc90a 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -153,10 +153,10 @@ choice
- 		  mobile SoCs in the Kona family of chips (e.g. bcm28155,
- 		  bcm11351, etc...)
- 
--	config DEBUG_BCM63XX
-+	config DEBUG_BCM63XX_UART
- 		bool "Kernel low-level debugging on BCM63XX UART"
- 		depends on ARCH_BCM_63XX
--		select DEBUG_UART_BCM63XX
-+		help		  
- 
- 	config DEBUG_BERLIN_UART
- 		bool "Marvell Berlin SoC Debug UART"
-@@ -1414,7 +1414,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/vf.S" if DEBUG_VF_UART
- 	default "debug/vt8500.S" if DEBUG_VT8500_UART0
- 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
--	default "debug/bcm63xx.S" if DEBUG_UART_BCM63XX
-+	default "debug/bcm63xx.S" if DEBUG_BCM63XX_UART
- 	default "debug/digicolor.S" if DEBUG_DIGICOLOR_UA0
- 	default "mach/debug-macro.S"
- 
-@@ -1428,10 +1428,6 @@ config DEBUG_UART_8250
- 		ARCH_IOP13XX || ARCH_IOP32X || ARCH_IOP33X || ARCH_IXP4XX || \
- 		ARCH_RPC
- 
--# Compatibility options for BCM63xx
--config DEBUG_UART_BCM63XX
--	def_bool ARCH_BCM_63XX
--
- config DEBUG_UART_PHYS
- 	hex "Physical base address of debug UART"
- 	default 0x00100a00 if DEBUG_NETX_UART
-@@ -1529,7 +1525,7 @@ config DEBUG_UART_PHYS
- 	default 0xfffb0000 if DEBUG_OMAP1UART1 || DEBUG_OMAP7XXUART1
- 	default 0xfffb0800 if DEBUG_OMAP1UART2 || DEBUG_OMAP7XXUART2
- 	default 0xfffb9800 if DEBUG_OMAP1UART3 || DEBUG_OMAP7XXUART3
--	default 0xfffe8600 if DEBUG_UART_BCM63XX
-+	default 0xfffe8600 if DEBUG_BCM63XX_UART
- 	default 0xfffff700 if ARCH_IOP33X
- 	default 0
- 	depends on ARCH_EP93XX || \
-@@ -1543,7 +1539,7 @@ config DEBUG_UART_PHYS
- 		DEBUG_RMOBILE_SCIFA0 || DEBUG_RMOBILE_SCIFA1 || \
- 		DEBUG_RMOBILE_SCIFA4 || DEBUG_S3C24XX_UART || \
- 		DEBUG_S3C64XX_UART || \
--		DEBUG_UART_BCM63XX || DEBUG_ASM9260_UART || \
-+		DEBUG_BCM63XX_UART || DEBUG_ASM9260_UART || \
- 		DEBUG_SIRFSOC_UART || DEBUG_DIGICOLOR_UA0 || \
- 		DEBUG_AT91_UART
- 
-@@ -1589,7 +1585,7 @@ config DEBUG_UART_VIRT
- 	default 0xfb10c000 if DEBUG_REALVIEW_PB1176_PORT
- 	default 0xfc40ab00 if DEBUG_BRCMSTB_UART
- 	default 0xfc705000 if DEBUG_ZTE_ZX
--	default 0xfcfe8600 if DEBUG_UART_BCM63XX
-+	default 0xfcfe8600 if DEBUG_BCM63XX_UART
- 	default 0xfd000000 if DEBUG_SPEAR3XX || DEBUG_SPEAR13XX
- 	default 0xfd883000 if DEBUG_ALPINE_UART0
- 	default 0xfe017000 if DEBUG_MMP_UART2
-@@ -1637,7 +1633,7 @@ config DEBUG_UART_VIRT
- 		DEBUG_NETX_UART || \
- 		DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART || \
- 		DEBUG_S3C64XX_UART || \
--		DEBUG_UART_BCM63XX || DEBUG_ASM9260_UART || \
-+		DEBUG_BCM63XX_UART || DEBUG_ASM9260_UART || \
- 		DEBUG_SIRFSOC_UART || DEBUG_DIGICOLOR_UA0
- 
- config DEBUG_UART_8250_SHIFT
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
