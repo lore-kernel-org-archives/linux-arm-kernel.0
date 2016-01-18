@@ -1,79 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 Jan 2016 14:13:52 +0000
-Subject: [PATCH v2] kernel: add kcov code coverage
-In-Reply-To: <CACT4Y+YvL_L9a2dBfoXQ0AKpKmnypfObtt7k97j_i2Qiu=wnQg@mail.gmail.com>
-References: <1452689318-107172-1-git-send-email-dvyukov@google.com>
- <CAPAsAGx_0pVjtKA2RwwpStRG2-L+5X6W14QbrQaMYhdg30EeAQ@mail.gmail.com>
- <CACT4Y+bHjfkrZ4jWZf+j6FKnj2GQv1t94Y9LJm4=WFyb8C0J8w@mail.gmail.com>
- <CAPAsAGzjX2OJ7SRt4gM1VqEEm5=xERUtfcEDi05o5bwOTdNhpQ@mail.gmail.com>
- <CACT4Y+YvL_L9a2dBfoXQ0AKpKmnypfObtt7k97j_i2Qiu=wnQg@mail.gmail.com>
-Message-ID: <20160118141352.GM21067@leverpostej>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 18 Jan 2016 14:28:48 +0000
+Subject: [PATCH 0/3] clk: Add support for critical clocks
+Message-ID: <1453127331-20616-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 03:07:59PM +0100, Dmitry Vyukov wrote:
-> On Fri, Jan 15, 2016 at 2:05 PM, Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
-> > 2016-01-14 17:30 GMT+03:00 Dmitry Vyukov <dvyukov@google.com>:
-> >> On Thu, Jan 14, 2016 at 11:50 AM, Andrey Ryabinin
-> >> <ryabinin.a.a@gmail.com> wrote:
-> >>> 2016-01-13 15:48 GMT+03:00 Dmitry Vyukov <dvyukov@google.com>:
-> >>>
-> >>>> +       /* Read number of PCs collected. */
-> >>>> +       n = __atomic_load_n(&cover[0], __ATOMIC_RELAXED);
-> >>>> +       /* PCs are shorten to uint32_t, so we need to restore the upper part. */
-> >>>> +       for (i = 0; i < n; i++)
-> >>>> +               printf("0xffffffff%0lx\n", (unsigned long)cover[i + 1]);
-> >>
-> >> Thanks for the review!
-> >> Mailed v3 with fixes.
-> >> Comments inline.
-> >>
-> >>> This works only for x86-64.
-> >>> Probably there is no simple way to make this arch-independent with
-> >>> 32-bit values.
-> >>
-> >> We probably could add an ioctl that returns base of the stripped PCs.
-> >
-> > You forgot about modules. With stripped PCs you'll start mixing
-> > kernel's and module's PC (if distance between module and kernel > 4G).
-> 
-> It's just that on x86 text and modules are within 4GB.
-> 
-> I've checked that on arm64 it also seems to be the case:
-> 
->  48  * The module space lives between the addresses given by TASK_SIZE
->  49  * and PAGE_OFFSET - it must be within 128MB of the kernel text.
->  50  */
->  54 #define MODULES_END             (PAGE_OFFSET)
->  55 #define MODULES_VADDR           (MODULES_END - SZ_64M)
+Some platforms contain clocks which if gated, will cause undefined or
+catastrophic behaviours.  As such they are not to be turned off, ever.
+Many of these such clocks do not have devices, thus device drivers
+where clocks may be enabled and references taken to ensure they stay
+enabled do not exist.  Therefore, we must handle these such cases in
+the core.
 
-This won't necessarily remain true. With kASLR [1,2] the modules and
-kernel might be located anywhere in the vmalloc area, independently.
-Using PLTs removes the +/-128MB restriction, so they may be placed
-anywhere in the vmalloc area.
+This patchset defines an CLK_IS_CRITICAL flag which the core can use
+to identify critical clocks and subsequently refuse to gate them.
+Once a clock has been recognised as critical, we take extra
+references to ensure the continued functionality of the clock
+whatever else happens.
 
-On my defconfig kernel (4KiB, 39-bit VA) today, that area is ~246GiB wide:
+Mike,
 
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     vmalloc : 0xffffff8000000000 - 0xffffffbdbfff0000   (   246 GB)
-[    0.000000]     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
-[    0.000000]               0xffffffbdc2000000 - 0xffffffbde8000000   (   608 MB actual)
-[    0.000000]     fixed   : 0xffffffbffa7fd000 - 0xffffffbffac00000   (  4108 KB)
-[    0.000000]     PCI I/O : 0xffffffbffae00000 - 0xffffffbffbe00000   (    16 MB)
-[    0.000000]     modules : 0xffffffbffc000000 - 0xffffffc000000000   (    64 MB)
-[    0.000000]     memory  : 0xffffffc000000000 - 0xffffffc980000000   ( 38912 MB)
-[    0.000000]       .init : 0xffffffc000a00000 - 0xffffffc000a9c000   (   624 KB)
-[    0.000000]       .text : 0xffffffc000080000 - 0xffffffc000a00000   (  9728 KB)
-[    0.000000]       .data : 0xffffffc000a9c000 - 0xffffffc000b17a00   (   495 KB)
+It's been 17 weeks since our meeting in San Francisco and I'm keen to
+move this forward.  As per our meeting, the plan is to separate our
+two requirements, as users who require both critical clocks AND the
+hand-off feature do not currently exist.  If you'd like to continue
+enablement of the hand-off functionality you were interested in, I'll
+continue on with critical clocks, as we still need this for our
+platform.
 
-Kernels can be built with a 48-bit VA (and potentially larger in future
-with ARMv8.2-A or later [3]). The vmalloc area (and hence the maximum
-distances between modules and kernel) will increase grow with the VA
-range.
+I'm hoping this isn't the wrong approach, but if it is, let me know
+how it can be improved and I'll re-roll.
 
-Thanks,
-Mark.
+Kind regards,
+Lee
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/398527.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/398534.html
-[3] https://community.arm.com/groups/processors/blog/2016/01/05/armv8-a-architecture-evolution
+Lee Jones (3):
+  clk: Allow clocks to be marked as CRITICAL
+  clk: WARN_ON about to disable a critical clock
+  clk: Provide OF helper to mark clocks as CRITICAL
+
+ drivers/clk/clk.c            | 13 ++++++++++++-
+ include/linux/clk-provider.h | 23 +++++++++++++++++++++++
+ 2 files changed, 35 insertions(+), 1 deletion(-)
+
+-- 
+1.9.1
