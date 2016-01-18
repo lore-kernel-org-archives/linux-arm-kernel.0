@@ -1,81 +1,47 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 18 Jan 2016 14:38:27 +0000
-Subject: [Xen-devel] [PATCH v2 09/16] arm/xen: Get event-channel irq
- through HVM_PARAM when booting with ACPI
-In-Reply-To: <1452840929-19612-10-git-send-email-zhaoshenglong@huawei.com>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-10-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <alpine.DEB.2.02.1601181351400.16178@kaball.uk.xensource.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Mon, 18 Jan 2016 22:42:03 +0800
+Subject: [PATCH v4 0/1] Introduce Innosilicon HDMI driver on Rockchip platforms
+Message-ID: <1453128123-29155-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Jan 2016, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> When booting with ACPI, it could get the event-channel irq through
-> HVM_PARAM_CALLBACK_IRQ.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm/xen/enlighten.c | 30 +++++++++++++++++++++++++++++-
->  1 file changed, 29 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index 6d90a62..4e78c49 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -29,6 +29,7 @@
->  #include <linux/time64.h>
->  #include <linux/timekeeping.h>
->  #include <linux/timekeeper_internal.h>
-> +#include <linux/acpi.h>
->  
->  #include <linux/mm.h>
->  
-> @@ -270,7 +271,34 @@ static int __init xen_guest_init(void)
->  	if (!xen_domain())
->  		return 0;
->  
-> -	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
-> +	if (!acpi_disabled) {
-> +#ifdef CONFIG_ACPI
 
-I think it would be best to move the acpi specific and DT specific
-initializations out of xen_guest_init. Then at the beginning of
-xen_guest_init, call only the one that applies.  The acpi init function
-could be ifdef'ed CONFIG_ACPI. Making sure that acpi_disabled is 1 when
-!CONFIG_ACPI, we could even avoid all ifdef's from xen_guest_init.
-
-The rest is good, thanks.
+Here are a brief introduction to Innosilicon HDMI IP:
+ - Support HDMI 1.4a, HDCP 1.2 and DVI 1.0 standard compliant transmitter
+ - Support HDMI1.4 a/b 3D function defined in HDMI 1.4 a/b spec
+ - Digital video interface supports a pixel size of 24, 30, 36, 48bits color
+   depth in RGB
+ - S/PDIF output supports PCM, Dolby Digital, DTS digital audio transmission
+   (32-192kHz Fs) using IEC60958 and IEC 61937
+ - The EDID and CEC function are also supported by Innosilicon HDMI Transmitter
+   Controlle
 
 
-> +		struct xen_hvm_param a;
-> +		int interrupt, trigger, polarity;
-> +
-> +		a.domid = DOMID_SELF;
-> +		a.index = HVM_PARAM_CALLBACK_IRQ;
-> +		xen_events_irq = 0;
-> +		if (!HYPERVISOR_hvm_op(HVMOP_get_param, &a)) {
-> +			if ((a.value >> 56) == 3) {
-> +				interrupt = a.value & 0xff;
-> +				trigger = ((a.value >> 8) & 0x1)
-> +					  ? ACPI_EDGE_SENSITIVE
-> +					  : ACPI_LEVEL_SENSITIVE;
-> +				polarity = ((a.value >> 8) & 0x2)
-> +					  ? ACPI_ACTIVE_LOW
-> +					  : ACPI_ACTIVE_HIGH;
-> +				xen_events_irq = acpi_register_gsi(NULL,
-> +								   interrupt,
-> +								   trigger,
-> +								   polarity);
-> +			}
-> +		}
-> +
-> +#endif
-> +	} else {
-> +		xen_events_irq = irq_of_parse_and_map(xen_node, 0);
-> +	}
-> +
->  	if (!xen_events_irq) {
->  		pr_err("Xen event channel interrupt not found\n");
->  		return -ENODEV;
+Changes in v4:
+- Modify the commit title "drm/rockchip: hdmi: ..." (Mark)
+- Correct the "DKMS" to "DPMS" (Mark)
+- Fix over 80 characters problems (Mark)
+- Remove encoder .prepare/.commit helper functions, and move the vop mode
+  configure function into encoder .enable helper functions. (Mark)
+
+Changes in v3:
+- Use encoder enable/disable function, and remove the encoder DPMS function
+- Keep HDMI PLL power on in standby mode
+
+Changes in v2:
+- Using DRM atomic helper functions for connector init (Mark)
+- Remove "hdmi->connector.encoder = encoder;" (Mark)
+
+Yakir Yang (1):
+  drm/rockchip: hdmi: add Innosilicon HDMI support
+
+ drivers/gpu/drm/rockchip/Kconfig     |   8 +
+ drivers/gpu/drm/rockchip/Makefile    |   1 +
+ drivers/gpu/drm/rockchip/inno_hdmi.c | 992 +++++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/rockchip/inno_hdmi.h | 364 +++++++++++++
+ 4 files changed, 1365 insertions(+)
+ create mode 100644 drivers/gpu/drm/rockchip/inno_hdmi.c
+ create mode 100644 drivers/gpu/drm/rockchip/inno_hdmi.h
+
+-- 
+1.9.1
