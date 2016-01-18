@@ -1,99 +1,110 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 Jan 2016 11:29:33 +0000
-Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
-In-Reply-To: <569CBDBC.5050500@linaro.org>
-References: <cover.1452884156.git.geoff@infradead.org>
- <fb4506943bbaed8b0657ed367ebd57e4064d57ed.1452884156.git.geoff@infradead.org>
- <20160115201601.GR3262@leverpostej> <569CBDBC.5050500@linaro.org>
-Message-ID: <20160118112933.GH21067@leverpostej>
+From: yankejian@huawei.com (Yankejian (Hackim Yim))
+Date: Mon, 18 Jan 2016 19:35:38 +0800
+Subject: [PATCH v2 next-next] net: hns: enet specifies a reference to dsaf
+In-Reply-To: <1452764635.2521.28.camel@linux.intel.com>
+References: <1452654880-28980-1-git-send-email-yankejian@huawei.com>
+ <56970F48.9060504@huawei.com> <1452764635.2521.28.camel@linux.intel.com>
+Message-ID: <569CCE0A.5010005@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 18, 2016 at 07:26:04PM +0900, AKASHI Takahiro wrote:
-> On 01/16/2016 05:16 AM, Mark Rutland wrote:
-> >On Fri, Jan 15, 2016 at 07:18:38PM +0000, Geoff Levand wrote:
-> >>From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> >>
-> >>This patch adds arch specific descriptions about kdump usage on arm64
-> >>to kdump.txt.
-> >>
-> >>Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> >>---
-> >>  Documentation/kdump/kdump.txt | 23 ++++++++++++++++++++++-
-> >>  1 file changed, 22 insertions(+), 1 deletion(-)
-> >>
-> >>diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-> >>index bc4bd5a..36cf978 100644
-> >>--- a/Documentation/kdump/kdump.txt
-> >>+++ b/Documentation/kdump/kdump.txt
-> >>@@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
-> >>  a remote system.
-> >>
-> >>  Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
-> >>-s390x and arm architectures.
-> >>+s390x, arm and arm64 architectures.
-> >>
-> >>  When the system kernel boots, it reserves a small section of memory for
-> >>  the dump-capture kernel. This ensures that ongoing Direct Memory Access
-> >>@@ -249,6 +249,20 @@ Dump-capture kernel config options (Arch Dependent, arm)
-> >>
-> >>      AUTO_ZRELADDR=y
-> >>
-> >>+Dump-capture kernel config options (Arch Dependent, arm64)
-> >>+----------------------------------------------------------
-> >>+
-> >>+1) The maximum memory size on the dump-capture kernel must be limited by
-> >>+   specifying:
-> >>+
-> >>+   mem=X[MG]
-> >>+
-> >>+   where X should be less than or equal to the size in "crashkernel="
-> >>+   boot parameter. Kexec-tools will automatically add this.
-> >
-> >
-> >This is extremely fragile, and will trivially fail when the kernel can
-> >be loaded anywhere (see [1]).
-> 
-> As I said before, this restriction also exists on arm, but I understand
-> that recent Ard's patches break it.
-> 
-> >We must explicitly describe the set of regions the crash kernel may use
-> >(i.e. we need base and size). NAK in the absence of that.
-> 
-> There seem to exist several approaches:
-> (a) use a device-tree property, "linux,usable-memory", in addition to "reg"
 
-I'm not opposed to the idea of a DT property, though I think that should
-live under /chosen.
 
-I see that "linux,usable-memory" exists already, though I'm confused as
-to exactly what it is for as there is no documentation (neither in the
-kernel nor in ePAPR). It's also painful to alter multiple memory nodes
-to use that, and I can see that going wrong.
+On 2016/1/14 17:43, Andy Shevchenko wrote:
+> On Thu, 2016-01-14 at 11:00 +0800, Yisen Zhuang wrote:
+>> ? 2016/1/13 11:14, Kejian Yan ??:
+>>> This patch replace the assoication between dsaf and enet from
+>>> string
+>>> matching to object reference. It requires the DTS to be updated
+>>> within
+>>> BIOS. Thanks god it can be done for all released boards.
+>>>
+>> Hi kejian,
+>>
+>> This patch is fine to me.
+> There are few thing below.
+>
+>>  
+>>> --- a/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
+>>> +++ b/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
+>>> @@ -847,6 +847,7 @@ static struct hnae_ae_ops hns_dsaf_ops = {
+>>>  int hns_dsaf_ae_init(struct dsaf_device *dsaf_dev)
+>>>  {
+>>>  	struct hnae_ae_dev *ae_dev = &dsaf_dev->ae_dev;
+>>> +	static atomic_t id = ATOMIC_INIT(-1);
+>>>  
+>>>  	switch (dsaf_dev->dsaf_ver) {
+>>>  	case AE_VERSION_1:
+>>> @@ -858,6 +859,9 @@ int hns_dsaf_ae_init(struct dsaf_device
+>>> *dsaf_dev)
+>>>  	default:
+>>>  		break;
+>>>  	}
+>>> +
+>>> +	snprintf(ae_dev->name, AE_NAME_SIZE, "%s%d",
+>>> DSAF_DEVICE_NAME,
+>>> +		 (int)atomic_inc_return(&id));
+> If you bind/unbind device enough times you may get an overflow and end
+> up with name of existing device (if you have 1+ of them in the system).
+>
+> To avoid such situation better to use IDA/IDR framework.
 
->     under "memory" node
-> (b) use a kernel's early parameter, "memmap=nn[@#$]ss"
+thanks
 
-I'm not too keen on this, as I think it's fragile, and logically
-somewhat distinct from what mem= is for (a best effort testing tool).
+Best Regards
+Kejian Yan
 
-> Power PC takes (a), while this does not work on efi-started kernel
-> because dtb has no "memory" nodes under efi.
+>>>  
+>>> --- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+>>> +++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+>>> @@ -1802,7 +1802,7 @@ static int hns_nic_try_get_ae(struct
+>>> net_device *ndev)
+>>>  	int ret;
+>>>  
+>>>  	h = hnae_get_handle(&priv->netdev->dev,
+>>> -			    priv->ae_name, priv->port_id, NULL);
+>>> +			    priv->ae_node, priv->port_id, NULL);
+>>>  	if (IS_ERR_OR_NULL(h)) {
+>>>  		ret = PTR_ERR(h);
+>>>  		dev_dbg(priv->dev, "has not handle, register
+>>> notifier!\n");
+>>> @@ -1880,9 +1880,12 @@ static int hns_nic_dev_probe(struct
+>>> platform_device *pdev)
+>>>  	else
+>>>  		priv->enet_ver = AE_VERSION_2;
+>>>  
+>>> -	ret = of_property_read_string(node, "ae-name", &priv-
+>>>> ae_name);
+>>> -	if (ret)
+>>> -		goto out_read_string_fail;
+> (1)
+>
+>>> +	priv->ae_node = (void *)of_parse_phandle(node, "ae-
+>>> handle", 0);
+>>> +	if (IS_ERR_OR_NULL(priv->ae_node)) {
+>>> +		ret = PTR_ERR(priv->ae_node);
+>>> +		dev_err(dev, "not find ae-handle\n");
+>>> +		goto out_read_handle_fai;
+> (2)
+>
+>>> +	}
+>>>  
+>>>  	ret = of_property_read_u32(node, "port-id", &priv-
+>>>> port_id);
+>>>  	if (ret)
+>>> @@ -1945,6 +1948,8 @@ static int hns_nic_dev_probe(struct
+>>> platform_device *pdev)
+>>>  
+>>>  out_notify_fail:
+>>>  	(void)cancel_work_sync(&priv->service_task);
+>>> +out_read_handle_fai:
+>>> +
+> Redundant line
+>
+>>>  out_read_string_fail:
+> Leftover? (see (1) and (2) )
 
-A property under /chosen would work for EFI too.
+thanks.
 
-> X86 takes (b). If we take this, we will need to overwrite a weak
-> early_init_dt_add_memory().
-> (I thought that this approach was not smart as we have three different
-> ways to specify memory regions, dtb, efi and this kernel parameter.)
-
-I'm not sure that's a big problem. We may be able to make this generic,
-also.
-
-We don't necessarily need a weak add memory function if we can guarantee
-nothing gets memblock_alloc'd before we carve it out.
-
-Something like the nomap stuff Ard put together might be useful here.
-
-Thanks,
-Mark.
+Best Regards
+Kejian Yan
