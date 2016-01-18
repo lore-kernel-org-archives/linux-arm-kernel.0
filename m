@@ -1,108 +1,79 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 18 Jan 2016 09:04:30 -0500
-Subject: [PATCH V12 2/7] dma: hidma: Add Device Tree support
-In-Reply-To: <20160118114931.GJ21067@leverpostej>
-References: <1452523550-8920-1-git-send-email-okaya@codeaurora.org>
- <1452523550-8920-3-git-send-email-okaya@codeaurora.org>
- <20160115151637.GJ3262@leverpostej> <5699232E.60809@codeaurora.org>
- <20160118114931.GJ21067@leverpostej>
-Message-ID: <569CF0EE.7010706@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 18 Jan 2016 14:13:52 +0000
+Subject: [PATCH v2] kernel: add kcov code coverage
+In-Reply-To: <CACT4Y+YvL_L9a2dBfoXQ0AKpKmnypfObtt7k97j_i2Qiu=wnQg@mail.gmail.com>
+References: <1452689318-107172-1-git-send-email-dvyukov@google.com>
+ <CAPAsAGx_0pVjtKA2RwwpStRG2-L+5X6W14QbrQaMYhdg30EeAQ@mail.gmail.com>
+ <CACT4Y+bHjfkrZ4jWZf+j6FKnj2GQv1t94Y9LJm4=WFyb8C0J8w@mail.gmail.com>
+ <CAPAsAGzjX2OJ7SRt4gM1VqEEm5=xERUtfcEDi05o5bwOTdNhpQ@mail.gmail.com>
+ <CACT4Y+YvL_L9a2dBfoXQ0AKpKmnypfObtt7k97j_i2Qiu=wnQg@mail.gmail.com>
+Message-ID: <20160118141352.GM21067@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/18/2016 6:49 AM, Mark Rutland wrote:
->>>> +Main node required properties:
->>>> +- compatible: "qcom,hidma-mgmt-1.0";
->>>> +- reg: Address range for DMA device
->>>> +- dma-channels: Number of channels supported by this DMA controller.
->>>> +- max-write-burst-bytes: Maximum write burst in bytes. A memcpy requested is
->>>> +  fragmented to multiples of this amount.
->>>> +- max-read-burst-bytes: Maximum read burst in bytes. A memcpy request is
->>>> +  fragmented to multiples of this amount.
->>>> +- max-write-transactions: Maximum write transactions to perform in a burst
->>>> +- max-read-transactions: Maximum read transactions to perform in a burst
->>>
->>> Just to check, where do these max-* values come from?
->> These are HW bus parameters like the burst count and 
->> size of each burst. These values change based on the SoC this IP is in use.
->>
->>>
->>> Are they some correctness requirement of the bus this is attached to?
->> You can starve other peripherals if you use incorrect values as the bus is 
->> shared with other peripherals. Yes, correctness is required.
+On Fri, Jan 15, 2016 at 03:07:59PM +0100, Dmitry Vyukov wrote:
+> On Fri, Jan 15, 2016 at 2:05 PM, Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
+> > 2016-01-14 17:30 GMT+03:00 Dmitry Vyukov <dvyukov@google.com>:
+> >> On Thu, Jan 14, 2016 at 11:50 AM, Andrey Ryabinin
+> >> <ryabinin.a.a@gmail.com> wrote:
+> >>> 2016-01-13 15:48 GMT+03:00 Dmitry Vyukov <dvyukov@google.com>:
+> >>>
+> >>>> +       /* Read number of PCs collected. */
+> >>>> +       n = __atomic_load_n(&cover[0], __ATOMIC_RELAXED);
+> >>>> +       /* PCs are shorten to uint32_t, so we need to restore the upper part. */
+> >>>> +       for (i = 0; i < n; i++)
+> >>>> +               printf("0xffffffff%0lx\n", (unsigned long)cover[i + 1]);
+> >>
+> >> Thanks for the review!
+> >> Mailed v3 with fixes.
+> >> Comments inline.
+> >>
+> >>> This works only for x86-64.
+> >>> Probably there is no simple way to make this arch-independent with
+> >>> 32-bit values.
+> >>
+> >> We probably could add an ioctl that returns base of the stripped PCs.
+> >
+> > You forgot about modules. With stripped PCs you'll start mixing
+> > kernel's and module's PC (if distance between module and kernel > 4G).
 > 
-> Is that a property of the system known statically, or one determined by
-> testing the system under particular workloads? It feels like the latter
-> (though I appreciate that not starving other masters is certainly a
-> correctness property regardless of how this is derived).
+> It's just that on x86 text and modules are within 4GB.
 > 
-
-It is known statically and is determined through simulations according to the SoC design.
-It is later verified on chip. Once verified, these values never change. 
-Values change from one SoC to another. 
-
-> I'd have expected the bus this is plugged into to have appropriate QoS
-> settings pre-configured so as to avoid starvation, though it sounds like
-> that's not possible here?
-
-There are some very safe values but they are not correct until validated on the chip.
-
+> I've checked that on arm64 it also seems to be the case:
 > 
->>> Are they tuning values?
->> Correct value is necessary for functioning. I'd consider weight and priority
->> as the only tuning parameters. 
->>
->>>
->>> The latter doesn't really belong in the DT. Given they're writeable from
->>> the driver, it seems like that's what they are...
->>
->> Good catch. Those should have been read-only. I wanted to be able to export these
->> information to the userspace app. I'll fix the sysfs to make them read-only.
->>
->>>
->>>> +- channel-reset-timeout-cycles: Channel reset timeout in cycles for this SOC.
->>>
->>> I'm not sure what this means. Could you elaborate on this is?
->> After each reset command, HW starts a timer. This is the time HW waits before it declares
->> reset failed.
-> 
-> Is that a reset command sent to the HIDMA by the OS, or a reset command
-> from the HIDMA to something else?
+>  48  * The module space lives between the addresses given by TASK_SIZE
+>  49  * and PAGE_OFFSET - it must be within 128MB of the kernel text.
+>  50  */
+>  54 #define MODULES_END             (PAGE_OFFSET)
+>  55 #define MODULES_VADDR           (MODULES_END - SZ_64M)
 
-First one. 
+This won't necessarily remain true. With kASLR [1,2] the modules and
+kernel might be located anywhere in the vmalloc area, independently.
+Using PLTs removes the +/-128MB restriction, so they may be placed
+anywhere in the vmalloc area.
 
-As I said on another email, The HIDMA channel driver resets the transfer and event channels 
-before using them. The reset command is intended for the HIDMA HW itself.
+On my defconfig kernel (4KiB, 39-bit VA) today, that area is ~246GiB wide:
 
-> 
-> What does it do when it declares a reset as failed?
-> 
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     vmalloc : 0xffffff8000000000 - 0xffffffbdbfff0000   (   246 GB)
+[    0.000000]     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
+[    0.000000]               0xffffffbdc2000000 - 0xffffffbde8000000   (   608 MB actual)
+[    0.000000]     fixed   : 0xffffffbffa7fd000 - 0xffffffbffac00000   (  4108 KB)
+[    0.000000]     PCI I/O : 0xffffffbffae00000 - 0xffffffbffbe00000   (    16 MB)
+[    0.000000]     modules : 0xffffffbffc000000 - 0xffffffc000000000   (    64 MB)
+[    0.000000]     memory  : 0xffffffc000000000 - 0xffffffc980000000   ( 38912 MB)
+[    0.000000]       .init : 0xffffffc000a00000 - 0xffffffc000a9c000   (   624 KB)
+[    0.000000]       .text : 0xffffffc000080000 - 0xffffffc000a00000   (  9728 KB)
+[    0.000000]       .data : 0xffffffc000a9c000 - 0xffffffc000b17a00   (   495 KB)
 
-The channel probe will fail with reset failed message.
+Kernels can be built with a 48-bit VA (and potentially larger in future
+with ARMv8.2-A or later [3]). The vmalloc area (and hence the maximum
+distances between modules and kernel) will increase grow with the VA
+range.
 
-> How can the OS make use of this information? It has no idea of the
-> clocks input to the HIDMA, so it has no idea how long a cycle is.
-> 
-This is a HW parameter. The OS doesn't use timers or any other facility to time correctness. 
+Thanks,
+Mark.
 
-The HIDMA channel driver issues a reset and then waits for confirmation while polling a status
-register. If no confirmation is received, then the HW is assumed broken or incorrectly configured.
-The HW channel is removed from the OS access.
-
-> Is this programmed by the OS?
-The HIDMA management driver programs this value to the HW. It is not consumed by the OS directly.
-
-> 
-> Is the particular duration in cycles a requirement of some other agent?
-It is a requirement of the HW. Not the OS.
-
-> 
-> Thanks,
-> Mark.
-> 
-
-
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/398527.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/398534.html
+[3] https://community.arm.com/groups/processors/blog/2016/01/05/armv8-a-architecture-evolution
