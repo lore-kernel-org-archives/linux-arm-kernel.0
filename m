@@ -1,44 +1,134 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Jan 2016 14:28:03 +0900
-Subject: [PATCH v4 08/14] ARM: dts: r8a7793: enable Audio DMAC peri peri via
- sound driver
+Date: Mon, 18 Jan 2016 14:28:04 +0900
+Subject: [PATCH v4 09/14] ARM: dts: gose: Enable sound PIO support in device
+ tree
 In-Reply-To: <1453094889-25204-1-git-send-email-horms+renesas@verge.net.au>
 References: <1453094889-25204-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1453094889-25204-9-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1453094889-25204-10-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Audio DMAC peri peri is no longer DMAEngine. it is supported by
-sound driver. this patch enable it.
+Enable sound PIO support in the r8a7793/gose device tree.
 
-Base on work for the r8a7791 by Kuninori Morimoto.
+Based on similar work for the r8a7791/koelsch by Kuninori Morimoto.
 
 Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
 ---
-v2
-* New patch
----
- arch/arm/boot/dts/r8a7793.dtsi | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7793-gose.dts | 76 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 76 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index 0766400caaf6..b95aa1ced90d 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -1172,8 +1172,9 @@
- 		reg =	<0 0xec500000 0 0x1000>, /* SCU */
- 			<0 0xec5a0000 0 0x100>,  /* ADG */
- 			<0 0xec540000 0 0x1000>, /* SSIU */
--			<0 0xec541000 0 0x280>;  /* SSI */
--		reg-names = "scu", "adg", "ssiu", "ssi";
-+			<0 0xec541000 0 0x280>,  /* SSI */
-+			<0 0xec740000 0 0x200>;  /* Audio DMAC peri peri*/
-+		reg-names = "scu", "adg", "ssiu", "ssi", "audmapp";
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index 987ed03b1e02..a90af303e21a 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -8,6 +8,17 @@
+  * kind, whether express or implied.
+  */
  
- 		clocks = <&mstp10_clks R8A7793_CLK_SSI_ALL>,
- 			<&mstp10_clks R8A7793_CLK_SSI9>, <&mstp10_clks R8A7793_CLK_SSI8>,
++/*
++ * SSI-AK4643
++ *
++ * SW1: 1: AK4643
++ *      2: CN22
++ *      3: ADV7511
++ *
++ * This command is required when Playback/Capture
++ *
++ *	amixer set "LINEOUT Mixer DACL" on
++ */
+ /dts-v1/;
+ #include "r8a7793.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
+@@ -129,6 +140,30 @@
+ 			label = "LED8";
+ 		};
+ 	};
++
++	audio_clock: clock {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <11289600>;
++		clock-output-names = "audio_clock";
++	};
++
++	rsnd_ak4643: sound {
++		compatible = "simple-audio-card";
++
++		simple-audio-card,format = "left_j";
++		simple-audio-card,bitclock-master = <&sndcodec>;
++		simple-audio-card,frame-master = <&sndcodec>;
++
++		sndcpu: simple-audio-card,cpu {
++			sound-dai = <&rcar_sound>;
++		};
++
++		sndcodec: simple-audio-card,codec {
++			sound-dai = <&ak4643>;
++			clocks = <&audio_clock>;
++		};
++	};
+ };
+ 
+ &extal_clk {
+@@ -165,6 +200,16 @@
+ 		renesas,groups = "qspi_ctrl", "qspi_data4";
+ 		renesas,function = "qspi";
+ 	};
++
++	sound_pins: sound {
++		renesas,groups = "ssi0129_ctrl", "ssi0_data", "ssi1_data";
++		renesas,function = "ssi";
++	};
++
++	sound_clk_pins: sound_clk {
++		renesas,groups = "audio_clk_a";
++		renesas,function = "audio_clk";
++	};
+ };
+ 
+ &ether {
+@@ -247,9 +292,40 @@
+ 	status = "okay";
+ 	clock-frequency = <100000>;
+ 
++	ak4643: codec at 12 {
++		compatible = "asahi-kasei,ak4643";
++		#sound-dai-cells = <0>;
++		reg = <0x12>;
++	};
+ 	eeprom at 50 {
+ 		compatible = "renesas,r1ex24002", "atmel,24c02";
+ 		reg = <0x50>;
+ 		pagesize = <16>;
+ 	};
+ };
++
++&rcar_sound {
++	pinctrl-0 = <&sound_pins &sound_clk_pins>;
++	pinctrl-names = "default";
++
++	/* Single DAI */
++	#sound-dai-cells = <0>;
++
++	status = "okay";
++
++	rcar_sound,dai {
++		dai0 {
++			playback = <&ssi0>;
++			capture  = <&ssi1>;
++		};
++	};
++};
++
++&ssi0 {
++	pio-transfer;
++};
++
++&ssi1 {
++	pio-transfer;
++	shared-pin;
++};
 -- 
 2.1.4
