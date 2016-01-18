@@ -1,77 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 18 Jan 2016 11:18:27 +0100
-Subject: [PATCH RFC 0/2] Add a display driver to the Allwinner H3
-In-Reply-To: <20160108181306.4a5a7370f0e3f3daa7c9e285@free.fr>
-References: <cover.1452021349.git.moinejf@free.fr>
- <20160106212046.GD9631@lukather>
- <20160108181306.4a5a7370f0e3f3daa7c9e285@free.fr>
-Message-ID: <20160118101827.GO4581@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Jan 2016 11:24:47 +0100
+Subject: [PATCH v3 1/1] USB: core: let USB device know device node
+In-Reply-To: <Pine.LNX.4.44L0.1601161115050.11338-100000@netrider.rowland.org>
+References: <Pine.LNX.4.44L0.1601161115050.11338-100000@netrider.rowland.org>
+Message-ID: <4938288.BbhleXAYOc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Jan 08, 2016 at 06:13:06PM +0100, Jean-Francois Moine wrote:
-> On Wed, 6 Jan 2016 22:20:46 +0100
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On Saturday 16 January 2016 11:40:32 Alan Stern wrote:
+> On Sat, 16 Jan 2016, Arnd Bergmann wrote:
 > 
-> > > As there is no documentation about the DE2 nor about the HDMI which
-> > > are found in the H3, this driver has been built from Allwiiner's
-> > > sources.
+> > > This leaves the question of whether OF will always use the same node to
+> > > represent the host controller and the root hub.  In other words, if a
+> > > motherboard has a fixed device plugged into a fixed root-hub port, will
+> > > the DT description make that device a child of the host controller?  
+> > > Or will there be a node in between (to represent the root hub)?
 > > 
-> > That's unfortunate :/
+> > Good question. I'm sure the answer is somewhere in this document
 > > 
-> > Have you checked in the A64 BSP if there was some useful information?
-> 
-> Same as the H3: no more information about the display system.
-
-Too bad...
-
-> > > So, there may be license problems, especially for the file
-> > > de2_hdmi_h3.c which contains a lot of magic values.
+> > http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
 > > 
-> > I guess it's the biggest issue with your code right now. What licenses
-> > issues are we talking about here?
+> > but unfortunately I don't understand USB addressing well enough
+> > to answer this. I think the key sentence is the definition of the
+> > "reg" property:
+> > 
+> > | prop-encoded-array: one integer, encoded as with encode-int.
+> > | The "reg" property for a device node shall consist of the number of the
+> > | USB hub port or the USB host controller port to which this USB device
+> > | is attached. As specified in [2] section 11.11.2.1, port numbers range
+> > | from 1 to 255.
+> > 
+> > Does the root hub have a port number relative to the host controller,
+> > or is it identical to the host controller from the addressing
+> > perspective?
 > 
-> The documentation about the H3, as the other Allwinner documentations,
-> starts with:
+> The root hub does not have a port number relative to the host
+> controller.  In a sense, the root hub is _part_ of the host controller;
+> it represents the controller's connection to the USB bus (whereas the
+> logical device we commonly associate with the host controller
+> represents the controller's connection to the upstream PCI/whatever
+> bus).
 > 
-> 	This documentation is the original work and copyrighted
-> 	property of Allwinner Technology ("Allwinner"). Reproduction in
-> 	whole or in part must obtain the written approval of Allwinner
-> 	and give clear acknowledgement to the copyright owner.
-
-I'm not sure this one is an issue. This datasheet is available
-publicly, and it's common to have a datasheet with restrictions (or
-even an NDA).
-
-> Then, the DE2 sources contain only:
+> You can also ask whether port numbers relative to the root hub are
+> the same as the port numbers relative to the controller.  Under normal
+> circumstances they are the same.  However, it is possible that they
+> will be different for USB-3 host controllers (!).
 > 
-> 	All Winner Tech, All Right Reserved. 2014-2015 Copyright (c)
+> This is because USB-3 uses two buses per controller: the legacy
+> Low-Speed/Full-Speed/High-Speed bus compatible with USB-1.1 and USB-2
+> devices, and the new SuperSpeed bus compatible with USB-3 devices.  
+> Even though there's only the one controller, each bus has its own root
+> hub and the ports for each root hub are numbered starting from 1.  
+> Thus, for example, an xHCI controller with 6 LS/FS/HS ports and 3 SS
+> ports would have a USB-2 root hub with ports 1-6 and a USB-3 root hub
+> with ports 1-3.  However, xHCI treats the controller as a single entity
+> and numbers all the ports sequentially; thus the controller would have
+> ports 1-9.  (Even though the three SS ports would be the same physical
+> objects as three of the LS/FS/HS ports -- USB-3 ports literally contain
+> two independent sets of signal wires.)
 > 
-> Eventually, there is no copyright/author/history in the HDMI sources.
+> This isn't merely a convention in the specifications; the hardware
+> actually uses both numbering schemes (although I don't know about USB-3
+> controllers other than xHCI; they might be different).  Untangling this
+> mess might be difficult.  I don't know how existing DT files handle it.
 
-That one is nasty though :/
+Existing DTS files never list USB devices, and the specification has
+been largely unused even on real OF since it was written an eternity
+ago (way before USB3).
 
-It seems to be a GPL violation though, so we have two solutions:
+I think the sanest interpretation is if we assume the addressing in
+DT uses the single number space (port 1-9 in your example), so we
+don't need to add in the root port as an extra device node that would
+complicate matters.
 
-A) have a clean room implementation
-B) Ask allwinner to comply with the license
-
-The former doesn't look likely to happen soon... Can you open an issue
-on this on their linux github repo?
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160118/ca88bf83/attachment.sig>
+	Arnd
