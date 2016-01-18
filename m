@@ -1,136 +1,154 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 18 Jan 2016 17:03:19 +0000
-Subject: [Xen-devel] [PATCH v2 16/16] ARM64: XEN: Initialize Xen specific
- UEFI runtime services
-In-Reply-To: <1452840929-19612-17-git-send-email-zhaoshenglong@huawei.com>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-17-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <alpine.DEB.2.02.1601181634070.9400@kaball.uk.xensource.com>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Mon, 18 Jan 2016 17:08:54 +0000
+Subject: [RFC PATCH v2 0/4] CPUs capacity information for heterogeneous
+ systems
+In-Reply-To: <CAKfTPtDJBAXUz=_-QQSkrqwAvmUJd1bUJ-VfSaNER-0NzWpunA@mail.gmail.com>
+References: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
+ <56994D87.6000709@linaro.org> <20160118151316.GD7159@e106622-lin>
+ <CAKfTPtBFR4cowT-j4qVxfUvh6NDNmi6R=J7z9kywi6bONU3Pow@mail.gmail.com>
+ <20160118163014.GA10332@e106622-lin>
+ <CAKfTPtDJBAXUz=_-QQSkrqwAvmUJd1bUJ-VfSaNER-0NzWpunA@mail.gmail.com>
+Message-ID: <20160118170854.GB10332@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Jan 2016, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On 18/01/16 17:42, Vincent Guittot wrote:
+> On 18 January 2016 at 17:30, Juri Lelli <juri.lelli@arm.com> wrote:
+> > Hi Vincent,
+> >
+> > On 18/01/16 17:13, Vincent Guittot wrote:
+> >> On 18 January 2016 at 16:13, Juri Lelli <juri.lelli@arm.com> wrote:
+> >> > Hi Steve,
+> >> >
+> >> > On 15/01/16 11:50, Steve Muckle wrote:
+> >> >> On 01/08/2016 06:09 AM, Juri Lelli wrote:
+> >> >> >  2. Dynamic profiling at boot (v2)
+> >> >> >
+> >> >> >     pros: - does not require a standardized definition of capacity
+> >> >> >           - cannot be incorrectly tuned (once benchmark is fixed)
+> >> >> >           - does not require user/integrator work
+> >> >> >
+> >> >> >     cons: - not easy to come up with a clean solution, as it seems interaction
+> >> >> >             with several subsystems (e.g., cpufreq) is required
+> >> >> >           - not easy to agree upon a single benchmark (that has to be both
+> >> >> >             representative and simple enough to run at boot)
+> >> >> >           - numbers might (and do) vary from boot to boot
+> >> >>
+> >> >> An important additional con that was mentioned earlier IIRC was the
+> >> >> additional boot time required for the benchmark.
+> >> >
+> >> > Right. I forgot about that.
+> >> >
+> >> >> Perhaps there could be
+> >> >> a kernel command line argument to bypass the benchmark if it is known
+> >> >> that predetermined values will be provided via sysfs later?
+> >> >>
+> >> >
+> >> > This might work, yes.
+> >>
+> >> Instead of command line, I prefer to use DT.
+> >>
+> >> Can't we use something similar to what is currently done in arm arch
+> >> for the early stage of the boot ? We don't have to provide performance
+> >> value for which it's difficult to find a consensus on how to define it
+> >> and which benchmark should be used. We use the micro arch and the
+> >> frequency of the core to define a relative capacity. This give us a
+> >> relatively good idea of the capacity of each core.
+> >
+> > I'm not sure I understand what you are proposing. arm arch is currently
+> > based on having static hardcoded data (efficiency values). But, this has
+> > already been NACKed for arm64 during last review of this RFC.
+> >
+> > Are you proposing something different?
 > 
-> When running on Xen hypervisor, runtime services are supported through
-> hypercall. So call Xen specific function to initialize runtime services.
+> No, i'm proposing to use it at boot time until the dynamic profiling
+> gives better value.
+> We don't have to set any new properties.
+> IIRC, It was nacked because it was of static hardcoded value that was
+> not always reflecting the best accurate capacity of a system. IMHO,
+> it's not that far from reality so can't this be used as an
+> intermediate step while waiting for dynamic profiling ?
+
+It seems to me that we will only make things more complicated than
+needed, without gaining much. Either we will have these values until the
+profile happens (do we really think we will speed up pre-profile boot
+time much?) or we will have them as defaults, and every concern that
+brought this approach to be nacked will apply.
+
+Thanks,
+
+- Juri
+
+> >
+> > Thanks,
+> >
+> > - Juri
+> >
+> >> Then, the dynamic profiling can update it with a more accurate value
+> >> during the boot.
+> >>
+> >> >
+> >> >> Though there may be another issue with that as mentioned below.
+> >> >>
+> >> >> >  3. sysfs (v1)
+> >> >> >
+> >> >> >     pros: - clean and super easy to implement
+> >> >> >           - values don't require to be physical properties, defining them is
+> >> >> >             probably easier
+> >> >> >
+> >> >> >     cons: - CPUs capacity have to be provided after boot (by some init script?)
+> >> >> >           - API is modified, still some discussion/review is needed
+> >> >> >           - values can still be incorrectly used for runtime tuning purposes
+> >> >>
+> >> >> Initializing the values via userspace init will cause more of the boot
+> >> >> process to run with incorrect CPU capacity values. Boot times may be
+> >> >> increased with tasks running on suboptimal CPUs. Such increases may also
+> >> >> not be deterministic.
+> >> >>
+> >> >> Extending the kernel command line idea above, perhaps capacity values
+> >> >> could be provided there as well, similar to the lpj parameter? That has
+> >> >> scalability issues though if there's a huge highly heterogeneous platform...
+> >> >>
+> >> >
+> >> > Yeah, adding such option is not difficult, but I'm also a bit concerned
+> >> > about the scalability of such a thing.
+> >> >
+> >> >> DT solves these issues and would be the perfect place for this - we are
+> >> >> defining the compute capacity of a CPU which is a property of the
+> >> >> hardware. However there are a couple things forcing us to compromise.
+> >> >> One is that the amount and detail of information required to adequately
+> >> >> capture the computational abilities of a CPU across all possible
+> >> >> workloads seem onerous to collect and enumerate. The second is that even
+> >> >> if we were willing to undertake that, CPU vendors probably won't be
+> >> >> forthcoming with that information.
+> >> >>
+> >> >
+> >> > You mean because they won't publish performance data of their hw?
+> >> >
+> >> > But we already use per platform normalized values (as you are proposing
+> >> > below). So that a platform to platform comparison doesn't make sense.
+> >> >
+> >> >> Despite this DT still seems to me like the best way to go. At their
+> >> >> heart these are properties of the hardware, even if we can't specify
+> >> >> them as such per se because of the problems above. The capacity would
+> >> >> have to be defined as a relative value among CPUs. And while it's true
+> >> >> it may be abused for tuning purposes, that's true of any strategy.
+> >> >> Certainly the sysfs strategy and even if only a dynamic option is
+> >> >> provided, it is guaranteed to be hacked by platform vendors.
+> >> >
+> >> > I also like the DT approach and consider the sysfs option as something
+> >> > that can go together with any solution we want to adopt.
+> >>
+> >> I'm not sure that we should consider sysfs as an option because of all
+> >> the concerned that as already been put forward.
+> >> I would prefer a debugfs if we have play with these capacity values in
+> >> order to test their accuracy.
+> >>
+> >> Regards,
+> >> Vincent
+> >> >
+> >> > Best,
+> >> >
+> >> > - Juri
+> >>
 > 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-
-Thanks Shannon, much much better!  Just a couple of questions.
-
-
->  arch/arm/xen/enlighten.c |  5 +++++
->  arch/arm64/xen/Makefile  |  1 +
->  arch/arm64/xen/efi.c     | 36 ++++++++++++++++++++++++++++++++++++
->  drivers/xen/Kconfig      |  2 +-
->  include/xen/xen-ops.h    |  1 +
->  5 files changed, 44 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm64/xen/efi.c
-> 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index 485e117..84f27ec 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -414,6 +414,11 @@ static int __init xen_guest_init(void)
->  	if (xen_initial_domain())
->  		pvclock_gtod_register_notifier(&xen_pvclock_gtod_notifier);
->  
-> +	if (IS_ENABLED(CONFIG_XEN_EFI)) {
-> +		if (efi_enabled(EFI_PARAVIRT))
-> +			xen_efi_runtime_setup();
-> +	}
-> +
->  	return 0;
->  }
->  early_initcall(xen_guest_init);
-> diff --git a/arch/arm64/xen/Makefile b/arch/arm64/xen/Makefile
-> index 74a8d87..62e6fe2 100644
-> --- a/arch/arm64/xen/Makefile
-> +++ b/arch/arm64/xen/Makefile
-> @@ -1,2 +1,3 @@
->  xen-arm-y	+= $(addprefix ../../arm/xen/, enlighten.o grant-table.o p2m.o mm.o)
->  obj-y		:= xen-arm.o hypercall.o
-> +obj-$(CONFIG_XEN_EFI) += efi.o
-> diff --git a/arch/arm64/xen/efi.c b/arch/arm64/xen/efi.c
-> new file mode 100644
-> index 0000000..33046b0
-> --- /dev/null
-> +++ b/arch/arm64/xen/efi.c
-> @@ -0,0 +1,36 @@
-> +/*
-> + * Copyright (c) 2015, Linaro Limited, Shannon Zhao
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along
-> + * with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/efi.h>
-> +#include <xen/xen-ops.h>
-> +
-> +void __init xen_efi_runtime_setup(void)
-> +{
-> +	efi.get_time                 = xen_efi_get_time;
-> +	efi.set_time                 = xen_efi_set_time;
-> +	efi.get_wakeup_time          = xen_efi_get_wakeup_time;
-> +	efi.set_wakeup_time          = xen_efi_set_wakeup_time;
-> +	efi.get_variable             = xen_efi_get_variable;
-> +	efi.get_next_variable        = xen_efi_get_next_variable;
-> +	efi.set_variable             = xen_efi_set_variable;
-> +	efi.query_variable_info      = xen_efi_query_variable_info;
-> +	efi.update_capsule           = xen_efi_update_capsule;
-> +	efi.query_capsule_caps       = xen_efi_query_capsule_caps;
-> +	efi.get_next_high_mono_count = xen_efi_get_next_high_mono_count;
-> +	efi.reset_system             = NULL;
-> +}
-> +EXPORT_SYMBOL_GPL(xen_efi_runtime_setup);
-
-This looks very similar to struct efi efi_xen previously in
-drivers/xen/efi.c.  Maybe it makes sense to leave struct efi efi_xen in
-drivers/xen/efi.c, export it in include/xen/xen-ops.h, then here just:
-
-  efi = efi_xen;
-
-Would that improve code readability?
-
-
-Correct me if I am wrong, but on ARM64 (differently from x86) it is not
-necessary to set efi.systab because it is not used, right? If so, it
-would be best to add a comment here to remember.
-
-
-> diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
-> index 73708ac..27d216a 100644
-> --- a/drivers/xen/Kconfig
-> +++ b/drivers/xen/Kconfig
-> @@ -268,7 +268,7 @@ config XEN_HAVE_PVMMU
->  
->  config XEN_EFI
->  	def_bool y
-> -	depends on X86_64 && EFI
-> +	depends on (ARM64 || X86_64) && EFI
->  
->  config XEN_AUTO_XLATE
->  	def_bool y
-> diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
-> index c83a338..36ff8e4 100644
-> --- a/include/xen/xen-ops.h
-> +++ b/include/xen/xen-ops.h
-> @@ -107,6 +107,7 @@ efi_status_t xen_efi_update_capsule(efi_capsule_header_t **capsules,
->  efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
->  					unsigned long count, u64 *max_size,
->  					int *reset_type);
-> +void xen_efi_runtime_setup(void);
-
-xen_efi_runtime_setup is not defined on x86, but this header is not arch
-specific.
