@@ -1,109 +1,125 @@
 From: rainyfeeling@gmail.com (Josh Wu)
-Date: Mon, 18 Jan 2016 20:52:21 +0800
-Subject: [PATCH 10/13] atmel-isi: reuse start_dma() function in isi interrupt
- handler
+Date: Mon, 18 Jan 2016 20:52:24 +0800
+Subject: [PATCH 12/13] atmel-isi: use union for the fbd (frame buffer
+ descriptor)
 In-Reply-To: <1453121545-27528-1-git-send-email-rainyfeeling@gmail.com>
 References: <1453119709-20940-1-git-send-email-rainyfeeling@gmail.com>
  <1453121545-27528-1-git-send-email-rainyfeeling@gmail.com>
-Message-ID: <1453121545-27528-5-git-send-email-rainyfeeling@gmail.com>
+Message-ID: <1453121545-27528-8-git-send-email-rainyfeeling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reuse start_dma() in interrupt handler function to avoid duplication.
-Also we need to move start_dma() function up in the file.
+From: Josh Wu <josh.wu@atmel.com>
+
+This way, we can easy to add other type of fbd for new hardware.
 
 Signed-off-by: Josh Wu <rainyfeeling@gmail.com>
 ---
 
- drivers/media/platform/soc_camera/atmel-isi.c | 62 +++++++++++----------------
- 1 file changed, 25 insertions(+), 37 deletions(-)
+ drivers/media/platform/soc_camera/atmel-isi.c | 33 ++++++++++++++++++---------
+ 1 file changed, 22 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-index 0e42171..c1a8698 100644
+index 7d2e952..b4c1f38 100644
 --- a/drivers/media/platform/soc_camera/atmel-isi.c
 +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-@@ -259,6 +259,30 @@ static void start_isi(struct atmel_isi *isi)
- 	isi_writel(isi, ISI_CTRL, ctrl);
+@@ -37,7 +37,7 @@
+ #define FRAME_INTERVAL_MILLI_SEC	(1000 / MIN_FRAME_RATE)
+ 
+ /* Frame buffer descriptor */
+-struct fbd {
++struct fbd_isi_v2 {
+ 	/* Physical address of the frame buffer */
+ 	u32 fb_address;
+ 	/* DMA Control Register(only in HISI2) */
+@@ -46,9 +46,13 @@ struct fbd {
+ 	u32 next_fbd_address;
+ };
+ 
++union fbd {
++	struct fbd_isi_v2 fbd_isi;
++};
++
+ struct isi_dma_desc {
+ 	struct list_head list;
+-	struct fbd *p_fbd;
++	union fbd *p_fbd;
+ 	dma_addr_t fbd_phys;
+ };
+ 
+@@ -69,7 +73,7 @@ struct atmel_isi {
+ 	struct vb2_alloc_ctx		*alloc_ctx;
+ 
+ 	/* Allocate descriptors for dma buffer use */
+-	struct fbd			*p_fb_descriptors;
++	union fbd			*p_fb_descriptors;
+ 	dma_addr_t			fb_descriptors_phys;
+ 	struct				list_head dma_desc_head;
+ 	struct isi_dma_desc		dma_desc[MAX_BUFFER_NUM];
+@@ -396,6 +400,16 @@ static int buffer_init(struct vb2_buffer *vb)
+ 	return 0;
  }
  
-+static void start_dma(struct atmel_isi *isi, struct frame_buffer *buffer)
++static void isi_hw_init_dma_desc(union fbd *p_fdb, u32 fb_addr,
++				 u32 next_fbd_addr)
 +{
-+	/* Check if already in a frame */
-+	if (!isi->enable_preview_path) {
-+		if (isi_readl(isi, ISI_STATUS) & ISI_CTRL_CDC) {
-+			dev_err(isi->soc_host.icd->parent, "Already in frame handling.\n");
-+			return;
-+		}
++	struct fbd_isi_v2 *p = &(p_fdb->fbd_isi);
 +
-+		isi_writel(isi, ISI_DMA_C_DSCR,
-+				(u32)buffer->p_dma_desc->fbd_phys);
-+		isi_writel(isi, ISI_DMA_C_CTRL,
-+				ISI_DMA_CTRL_FETCH | ISI_DMA_CTRL_DONE);
-+		isi_writel(isi, ISI_DMA_CHER, ISI_DMA_CHSR_C_CH);
-+	} else {
-+		isi_writel(isi, ISI_DMA_P_DSCR,
-+				(u32)buffer->p_dma_desc->fbd_phys);
-+		isi_writel(isi, ISI_DMA_P_CTRL,
-+				ISI_DMA_CTRL_FETCH | ISI_DMA_CTRL_DONE);
-+		isi_writel(isi, ISI_DMA_CHER, ISI_DMA_CHSR_P_CH);
-+	}
-+
++	p->fb_address = fb_addr;
++	p->next_fbd_address = next_fbd_addr;
++	p->dma_ctrl = ISI_DMA_CTRL_WB;
 +}
 +
- static irqreturn_t atmel_isi_handle_streaming(struct atmel_isi *isi)
- {
- 	if (isi->active) {
-@@ -277,19 +301,7 @@ static irqreturn_t atmel_isi_handle_streaming(struct atmel_isi *isi)
- 		/* start next dma frame. */
- 		isi->active = list_entry(isi->video_buffer_list.next,
- 					struct frame_buffer, list);
--		if (!isi->enable_preview_path) {
--			isi_writel(isi, ISI_DMA_C_DSCR,
--				(u32)isi->active->p_dma_desc->fbd_phys);
--			isi_writel(isi, ISI_DMA_C_CTRL,
--				ISI_DMA_CTRL_FETCH | ISI_DMA_CTRL_DONE);
--			isi_writel(isi, ISI_DMA_CHER, ISI_DMA_CHSR_C_CH);
--		} else {
--			isi_writel(isi, ISI_DMA_P_DSCR,
--				(u32)isi->active->p_dma_desc->fbd_phys);
--			isi_writel(isi, ISI_DMA_P_CTRL,
--				ISI_DMA_CTRL_FETCH | ISI_DMA_CTRL_DONE);
--			isi_writel(isi, ISI_DMA_CHER, ISI_DMA_CHSR_P_CH);
--		}
-+		start_dma(isi, isi->active);
- 	}
- 	return IRQ_HANDLED;
- }
-@@ -415,30 +427,6 @@ static void buffer_cleanup(struct vb2_buffer *vb)
- 		list_add(&buf->p_dma_desc->list, &isi->dma_desc_head);
- }
- 
--static void start_dma(struct atmel_isi *isi, struct frame_buffer *buffer)
--{
--	/* Check if already in a frame */
--	if (!isi->enable_preview_path) {
--		if (isi_readl(isi, ISI_STATUS) & ISI_CTRL_CDC) {
--			dev_err(isi->soc_host.icd->parent, "Already in frame handling.\n");
--			return;
--		}
--
--		isi_writel(isi, ISI_DMA_C_DSCR,
--				(u32)buffer->p_dma_desc->fbd_phys);
--		isi_writel(isi, ISI_DMA_C_CTRL,
--				ISI_DMA_CTRL_FETCH | ISI_DMA_CTRL_DONE);
--		isi_writel(isi, ISI_DMA_CHER, ISI_DMA_CHSR_C_CH);
--	} else {
--		isi_writel(isi, ISI_DMA_P_DSCR,
--				(u32)buffer->p_dma_desc->fbd_phys);
--		isi_writel(isi, ISI_DMA_P_CTRL,
--				ISI_DMA_CTRL_FETCH | ISI_DMA_CTRL_DONE);
--		isi_writel(isi, ISI_DMA_CHER, ISI_DMA_CHSR_P_CH);
--	}
--
--}
--
- static void buffer_queue(struct vb2_buffer *vb)
+ static int buffer_prepare(struct vb2_buffer *vb)
  {
  	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
+@@ -428,10 +442,7 @@ static int buffer_prepare(struct vb2_buffer *vb)
+ 			list_del_init(&desc->list);
+ 
+ 			/* Initialize the dma descriptor */
+-			desc->p_fbd->fb_address =
+-					vb2_dma_contig_plane_dma_addr(vb, 0);
+-			desc->p_fbd->next_fbd_address = 0;
+-			desc->p_fbd->dma_ctrl = ISI_DMA_CTRL_WB;
++			isi_hw_init_dma_desc(desc->p_fbd, vb2_dma_contig_plane_dma_addr(vb, 0), 0);
+ 
+ 			buf->p_dma_desc = desc;
+ 		}
+@@ -923,7 +934,7 @@ static int atmel_isi_remove(struct platform_device *pdev)
+ 	soc_camera_host_unregister(soc_host);
+ 	vb2_dma_contig_cleanup_ctx(isi->alloc_ctx);
+ 	dma_free_coherent(&pdev->dev,
+-			sizeof(struct fbd) * MAX_BUFFER_NUM,
++			sizeof(union fbd) * MAX_BUFFER_NUM,
+ 			isi->p_fb_descriptors,
+ 			isi->fb_descriptors_phys);
+ 	pm_runtime_disable(&pdev->dev);
+@@ -1010,7 +1021,7 @@ static int atmel_isi_probe(struct platform_device *pdev)
+ 	INIT_LIST_HEAD(&isi->dma_desc_head);
+ 
+ 	isi->p_fb_descriptors = dma_alloc_coherent(&pdev->dev,
+-				sizeof(struct fbd) * MAX_BUFFER_NUM,
++				sizeof(union fbd) * MAX_BUFFER_NUM,
+ 				&isi->fb_descriptors_phys,
+ 				GFP_KERNEL);
+ 	if (!isi->p_fb_descriptors) {
+@@ -1021,7 +1032,7 @@ static int atmel_isi_probe(struct platform_device *pdev)
+ 	for (i = 0; i < MAX_BUFFER_NUM; i++) {
+ 		isi->dma_desc[i].p_fbd = isi->p_fb_descriptors + i;
+ 		isi->dma_desc[i].fbd_phys = isi->fb_descriptors_phys +
+-					i * sizeof(struct fbd);
++					i * sizeof(union fbd);
+ 		list_add(&isi->dma_desc[i].list, &isi->dma_desc_head);
+ 	}
+ 
+@@ -1080,7 +1091,7 @@ err_ioremap:
+ 	vb2_dma_contig_cleanup_ctx(isi->alloc_ctx);
+ err_alloc_ctx:
+ 	dma_free_coherent(&pdev->dev,
+-			sizeof(struct fbd) * MAX_BUFFER_NUM,
++			sizeof(union fbd) * MAX_BUFFER_NUM,
+ 			isi->p_fb_descriptors,
+ 			isi->fb_descriptors_phys);
+ 
 -- 
 1.9.1
