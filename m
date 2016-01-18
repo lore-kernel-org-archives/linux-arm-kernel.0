@@ -1,57 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 18 Jan 2016 12:24:48 +0000
-Subject: [PATCH] arm64: fix off-by-one in compat syscall table for
- syscalls over 382
-In-Reply-To: <1450804573-322-1-git-send-email-will.deacon@arm.com>
-References: <1450804573-322-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20160118122447.GE3693@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Jan 2016 12:32:26 +0000
+Subject: [Question] cacheline sharing problem on DMA for custom outer-cache
+In-Reply-To: <CAK7LNAQBJbjx4koGjkKHo1Xe9NKC-dCj_0TP6AiT=3eaPTYdoQ@mail.gmail.com>
+References: <CAK7LNASC2kkgQvxetrRA=guvKTAnxGm3xeMbtV0hXgubR0tEwQ@mail.gmail.com>
+ <134552368.ft0oU8iHdY@wuerfel>
+ <CAK7LNAQBJbjx4koGjkKHo1Xe9NKC-dCj_0TP6AiT=3eaPTYdoQ@mail.gmail.com>
+Message-ID: <20160118123226.GF19062@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg, Sasha,
+On Mon, Jan 18, 2016 at 09:05:15PM +0900, Masahiro Yamada wrote:
+> L1_CACHE_BYTES is not a configuration.  It is a hardware property.
+> 
+> Actually, Tegra is the only hardware that has L1 cache with 64byte line-size.
 
-Is there anything else I need to do to get this queued in the 3.17.y
-and 3.18.y stable trees? There's no corresponding upstream commit since
-the issue was fixed by accident in 3.19+ as a result of something else.
+We have a load of paltforms which select ARM_L1_CACHE_SHIFT_6, plus
+Cortex-A8 and Cortex-A15 both have 64-byte L1 line size.
 
-Will
+It's all in the git history, please research.
 
-On Tue, Dec 22, 2015 at 05:16:12PM +0000, Will Deacon wrote:
-> [fix targetting -stable only, no upstream commit required]
-> 
-> In the bad old days, our compat syscall table was a linear array
-> defined in assembly code using a series of .quad directives generated
-> from a preprocessed header file.
-> 
-> When I added compat support for memfd_create and getrandom in commit
-> a97a42c47608 ("arm64: compat: wire up memfd_create and getrandom
-> syscalls for aarch32"), I forgot to pad the gap where seccomp was due
-> to go, and so the new syscalls actually ended up being off-by-one in the
-> table for v3.17 and v3.18 (in 3.19 seccomp was added and in v4.0 we
-> moved the table construction into C).
-> 
-> This patch is intended for -stable trees based on v3.17 or v3.18.
-> 
-> Cc: <stable@vger.kernel.org> # 3.17 and 3.18 only
-> Fixes: a97a42c47608 ("arm64: compat: wire up memfd_create and getrandom syscalls for aarch32")
-> Reported-by: Edmund Grimley-Evans <Edmund.Grimley-Evans@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/unistd32.h | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
-> index 9dfdac4a74a1..fbe1ab059bbb 100644
-> --- a/arch/arm64/include/asm/unistd32.h
-> +++ b/arch/arm64/include/asm/unistd32.h
-> @@ -788,6 +788,7 @@ __SYSCALL(__NR_sched_getattr, sys_sched_getattr)
->  #define __NR_renameat2 382
->  __SYSCALL(__NR_renameat2, sys_renameat2)
->  			/* 383 for seccomp */
-> +__SYSCALL(383, sys_ni_syscall)
->  #define __NR_getrandom 384
->  __SYSCALL(__NR_getrandom, sys_getrandom)
->  #define __NR_memfd_create 385
-> -- 
-> 2.1.4
-> 
+$ git log -p -- arch/arm/Kconfig arch/arm/mm/Kconfig
+
+and search for "ARM_L1_CACHE_SHIFT_6".
+
+> The other SoCs in multi_v7_defconfig run software configured for
+> 64byte line-size on CPUs with 32byte line-size.  Weird.
+
+Nothing weird here.  A kernel configured for a 64 byte cache line size
+can be run on a system with a 32 byte cache line size, but not vice
+versa.
+
+> And, deciding the DMA aligment only with L1 line-size does not seem nice.
+> I admit the outer-cache on my SoC is odd, though.
+
+Currently, the L1 defines the biggest restriction on DMA cache line
+alignment that we have.  However, you should be wary of changing
+only the DMA cache alignment - I think you'll find a lot of things
+assume that aligning to L1_CACHE_BYTES will be DMA safe.
+
+> If we could parse "line-size" DT-property in the early stage
+> and change the DMA alignment run-time, it would avoid degrading
+> performance on other SoCs.
+
+You can't realign data structures in the kernel image at runtime.
+
+L1_CACHE_BYTES is used as a constant in several places for this
+purpose.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
