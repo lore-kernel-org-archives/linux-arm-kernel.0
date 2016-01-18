@@ -1,59 +1,105 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Mon, 18 Jan 2016 18:48:38 +0800
-Subject: [PATCH v12 0/18] Add Analogix Core Display Port Driver
-In-Reply-To: <1670568.VBNHbJuGkf@phil>
-References: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
- <2322926.s1viZ6tSS3@phil> <1670568.VBNHbJuGkf@phil>
-Message-ID: <569CC306.8030207@rock-chips.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 18 Jan 2016 10:51:15 +0000
+Subject: [PATCH v2 12/16] ARM: Xen: Document UEFI support on Xen ARM
+ virtual platforms
+In-Reply-To: <1452840929-19612-13-git-send-email-zhaoshenglong@huawei.com>
+References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452840929-19612-13-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20160118105115.GD21067@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Fri, Jan 15, 2016 at 02:55:25PM +0800, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
+> scan this to get the UEFI information.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/arm/xen.txt | 42 +++++++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
+> index 0f7b9c2..fbc17ae 100644
+> --- a/Documentation/devicetree/bindings/arm/xen.txt
+> +++ b/Documentation/devicetree/bindings/arm/xen.txt
+> @@ -15,6 +15,36 @@ the following properties:
+>  - interrupts: the interrupt used by Xen to inject event notifications.
+>    A GIC node is also required.
+>  
+> +To support UEFI on Xen ARM virtual platforms, Xen pupulates the FDT "uefi" node
+> +under /hypervisor with following parameters:
 
-Sorry for the delay reply ;)
+s/pupulates/populates/
 
-On 01/17/2016 10:25 PM, Heiko Stuebner wrote:
-> Hi Yakir,
->
-> Am Mittwoch, 13. Januar 2016, 15:59:51 schrieb Heiko Stuebner:
->> Am Mittwoch, 23. Dezember 2015, 20:25:38 schrieb Yakir Yang:
->>>     The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
->>>
->>> share the same IP, so a lot of parts can be re-used. I split the common
->>> code into bridge directory, then rk3288 and exynos only need to keep
->>> some platform code. Cause I can't find the exact IP name of exynos dp
->>> controller, so I decide to name dp core driver with "analogix" which I
->>> find in rk3288 eDP TRM
->> could you rebase your patches on top of Dave's drm-next branch [0] please?
->> The exynos part got some const attributes for the *_func_ops structs and
->> drm_encoder_init got an additional parameter.
-Sure
->> I'm still hoping that we can get this finally committed once 4.5-rc1 is
->> released in 1.5 weeks :-) .
->>
->> I did try to merge things together [1], the system at least comes up and
->> detects the panel (EDID is read correctly and it turns the backlight on)
->> but I don't see any output on the display - hdmi works fine though and
->> X11 is claiming everything to be fine in both cases.
-Hmmm.... I would double check in my side.
->> So I don't know yet if I made a mistake when putting this together or
->> there is an issue on the driver-side.
-> I was able to debug this a bit more, and it seems the encoder_helper_funcs
-> don't like the prepare/commit callbacks and like enable better.
-Ah..... Yep, Atomic helper seems wouldn't call the prepaer/commit, 
-instead we can use the enbale/disable helper functions.
-> So when I do something similar to Marks patch a8eef71d38da ("drm/rockchip:
-> dw_hdmi: use encoder enable function"), like in the attached patch (to be
-> folded into the original addition of those functions), I get display output
-> again.
+> +
+> +________________________________________________________________________________
+> +Name                      | Size   | Description
+> +================================================================================
+> +xen,uefi-system-table     | 64-bit | Guest physical address of the UEFI System
+> +			  |	   | Table.
+> +--------------------------------------------------------------------------------
+> +xen,uefi-mmap-start       | 64-bit | Guest physical address of the UEFI memory
+> +			  |	   | map.
+> +--------------------------------------------------------------------------------
+> +xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
+> +                          |        | pointed to in previous entry.
+> +--------------------------------------------------------------------------------
+> +xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
+> +                          |        | memory map.
+> +--------------------------------------------------------------------------------
+> +xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
+> +--------------------------------------------------------------------------------
+> +
+> +Below is the format of the mmap descriptor.
+> +typedef struct {
+> +	u32 type;
+> +	u32 pad;
+> +	u64 phys_addr;
+> +	u64 virt_addr;
+> +	u64 num_pages;
+> +	u64 attribute;
+> +} efi_memory_desc_t;
 
-Thanks for your patient debug, I would send the new version out soon  ;)
+I don't think we should describe this here, as it duplicates the UEFI
+spec, and is techincally incorrect the above is only guaranteed to be
+the prefix of each memory descriptor -- that's why the
+uefi-mmap-desc-size property exists.
 
-- Yakir
->
-> Heiko
->
->> [0] http://cgit.freedesktop.org/~airlied/linux/log/?h=drm-next
->> [1] https://github.com/mmind/linux-rockchip/tree/tmp/analogixdp_v12-veyron
->> I left out patch16, per your talk with Jingoo and me not seeing any AUX
->> CH errors without it.
+We don't do this in Documentation/arm/uefi.txt, and I don't see why we
+should do so here.
+
+Does Xen handle arbitrary size memory map descriptors? I'm not sure what
+new information might be passed in future additions to the descriptor
+format, and I'm not sure what should happen in the Dom0 case.
+
+>  Example (assuming #address-cells = <2> and #size-cells = <2>):
+>  
+> @@ -22,4 +52,16 @@ hypervisor {
+>  	compatible = "xen,xen-4.3", "xen,xen";
+>  	reg = <0 0xb0000000 0 0x20000>;
+>  	interrupts = <1 15 0xf08>;
+> +	uefi {
+> +		xen,uefi-system-table = <0xXXXXXXXX>;
+> +		xen,uefi-mmap-start = <0xXXXXXXXX>;
+> +		xen,uefi-mmap-size = <0xXXXXXXXX>;
+> +		xen,uefi-mmap-desc-size = <0xXXXXXXXX>;
+> +		xen,uefi-mmap-desc-ver = <0xXXXXXXXX>;
+> +        };
+>  };
+> +
+> +These "xen,uefi-*" parameters are similar to those in Documentation/arm/uefi.txt
+> +which are used by normal UEFI. But to Xen ARM virtual platforms, it needs to
+> +introduce a Xen specific UEFI and it doesn't want to mix with normal UEFI.
+> +Therefore, it defines these parameters under /hypervisor node.
+
+Could we please describe what that actual difference is?
+
+I know that the OS must handle a system table differently under Xen, but
+this doesn't describe what it should do.
+
+I assume that the OS can handle the memory map in an identical fashion
+to when it is native. Is that true?
+
+Mark.
