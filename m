@@ -1,128 +1,81 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 18 Jan 2016 09:09:29 +0100
-Subject: [PATCH] MAINTAINERS: Update mailing list for Renesas SoC
- Development
-In-Reply-To: <1453079073-30937-1-git-send-email-horms+renesas@verge.net.au>
-References: <1453079073-30937-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXF8QnKsLOYFnT7Rje5G9_7Xr0NesO2SKEkWSivKQYkbA@mail.gmail.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Mon, 18 Jan 2016 16:15:10 +0800
+Subject: [PATCH v3 1/1] USB: core: let USB device know device node
+In-Reply-To: <Pine.LNX.4.44L0.1601161115050.11338-100000@netrider.rowland.org>
+References: <5216704.YbueADHOOR@wuerfel>
+ <Pine.LNX.4.44L0.1601161115050.11338-100000@netrider.rowland.org>
+Message-ID: <20160118081510.GF8150@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC linux-arm-kernel
+On Sat, Jan 16, 2016 at 11:40:32AM -0500, Alan Stern wrote:
+> On Sat, 16 Jan 2016, Arnd Bergmann wrote:
+> 
+> > > This leaves the question of whether OF will always use the same node to
+> > > represent the host controller and the root hub.  In other words, if a
+> > > motherboard has a fixed device plugged into a fixed root-hub port, will
+> > > the DT description make that device a child of the host controller?  
+> > > Or will there be a node in between (to represent the root hub)?
+> > 
+> > Good question. I'm sure the answer is somewhere in this document
+> > 
+> > http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
+> > 
+> > but unfortunately I don't understand USB addressing well enough
+> > to answer this. I think the key sentence is the definition of the
+> > "reg" property:
+> > 
+> > | prop-encoded-array: one integer, encoded as with encode-int.
+> > | The "reg" property for a device node shall consist of the number of the
+> > | USB hub port or the USB host controller port to which this USB device
+> > | is attached. As specified in [2] section 11.11.2.1, port numbers range
+> > | from 1 to 255.
+> > 
+> > Does the root hub have a port number relative to the host controller,
+> > or is it identical to the host controller from the addressing
+> > perspective?
+> 
+> The root hub does not have a port number relative to the host
+> controller.  In a sense, the root hub is _part_ of the host controller;
+> it represents the controller's connection to the USB bus (whereas the
+> logical device we commonly associate with the host controller
+> represents the controller's connection to the upstream PCI/whatever
+> bus).
+> 
+> You can also ask whether port numbers relative to the root hub are
+> the same as the port numbers relative to the controller.  Under normal
+> circumstances they are the same.  However, it is possible that they
+> will be different for USB-3 host controllers (!).
+> 
+> This is because USB-3 uses two buses per controller: the legacy
+> Low-Speed/Full-Speed/High-Speed bus compatible with USB-1.1 and USB-2
+> devices, and the new SuperSpeed bus compatible with USB-3 devices.  
+> Even though there's only the one controller, each bus has its own root
+> hub and the ports for each root hub are numbered starting from 1.  
+> Thus, for example, an xHCI controller with 6 LS/FS/HS ports and 3 SS
+> ports would have a USB-2 root hub with ports 1-6 and a USB-3 root hub
+> with ports 1-3.  However, xHCI treats the controller as a single entity
+> and numbers all the ports sequentially; thus the controller would have
+> ports 1-9.  (Even though the three SS ports would be the same physical
+> objects as three of the LS/FS/HS ports -- USB-3 ports literally contain
+> two independent sets of signal wires.)
 
-On Mon, Jan 18, 2016 at 2:04 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Update the mailing list used for development of support for
-> Renesas SoCs and related drivers.
->
-> Up until now the linux-sh mailing list has been used, however,
-> Renesas SoCs are now much wider than the SH architecture and there
-> is some desire from some for the linux-sh list to refocus on
-> discussion of the work on the SH architecture.
->
-> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Sorry, I have not USB-3 platform now.
+I have several questions:
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+- For USB-3, how many times hub_configure() will be called for root hub?
+One or two?
 
-> ---
-> * This patch applies on top of Linus's tree where currently the head commit
->   is 984065055e6e ("Merge branch 'drm-next' of
->   git://people.freedesktop.org/~airlied/linux")
->
->   This has been used as a base instead of v4.4 so that it is based on the
->   following two commits which affect it:
->   - 1a4ca6dd3dc8 ("MAINTAINERS: Add co-maintainer for Renesas Pin Controllers")
->   - 3e46c3973cba ("MAINTAINERS: add Renesas usb2 phy driver")
+- Which the value of hub->descriptor->bNbrPorts for root hub?
 
-I assume you'll send an update for the "ARM/RENESAS ARM64 ARCHITECTURE"
-section as soon as that has landed in mainline?
+> 
+> This isn't merely a convention in the specifications; the hardware
+> actually uses both numbering schemes (although I don't know about USB-3
+> controllers other than xHCI; they might be different).  Untangling this
+> mess might be difficult.  I don't know how existing DT files handle it.
+> 
 
-> ---
->  MAINTAINERS | 16 ++++++++--------
->  1 file changed, 8 insertions(+), 8 deletions(-)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 1d23f701489c..52a6ba79fa3f 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1531,9 +1531,9 @@ F:        drivers/media/platform/s5p-jpeg/
->  ARM/SHMOBILE ARM ARCHITECTURE
->  M:     Simon Horman <horms@verge.net.au>
->  M:     Magnus Damm <magnus.damm@gmail.com>
-> -L:     linux-sh at vger.kernel.org
-> +L:     linux-renesas-soc at vger.kernel.org
->  W:     http://oss.renesas.com
-> -Q:     http://patchwork.kernel.org/project/linux-sh/list/
-> +Q:     http://patchwork.kernel.org/project/linux-renesas-soc/list/
->  T:     git git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git next
->  S:     Supported
->  F:     arch/arm/boot/dts/emev2*
-> @@ -3745,7 +3745,7 @@ F:        Documentation/devicetree/bindings/display/tegra/nvidia,tegra20-host1x.txt
->  DRM DRIVERS FOR RENESAS
->  M:     Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->  L:     dri-devel at lists.freedesktop.org
-> -L:     linux-sh at vger.kernel.org
-> +L:     linux-renesas-soc at vger.kernel.org
->  T:     git git://people.freedesktop.org/~airlied/linux
->  S:     Supported
->  F:     drivers/gpu/drm/rcar-du/
-> @@ -6858,7 +6858,7 @@ F:        drivers/iio/potentiometer/mcp4531.c
->  MEDIA DRIVERS FOR RENESAS - VSP1
->  M:     Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->  L:     linux-media at vger.kernel.org
-> -L:     linux-sh at vger.kernel.org
-> +L:     linux-renesas-soc at vger.kernel.org
->  T:     git git://linuxtv.org/media_tree.git
->  S:     Supported
->  F:     Documentation/devicetree/bindings/media/renesas,vsp1.txt
-> @@ -8235,7 +8235,7 @@ F:        drivers/pci/host/pci-dra7xx.c
->  PCI DRIVER FOR RENESAS R-CAR
->  M:     Simon Horman <horms@verge.net.au>
->  L:     linux-pci at vger.kernel.org
-> -L:     linux-sh at vger.kernel.org
-> +L:     linux-renesas-soc at vger.kernel.org
->  S:     Maintained
->  F:     drivers/pci/host/*rcar*
->
-> @@ -8413,7 +8413,7 @@ F:        drivers/pinctrl/intel/
->  PIN CONTROLLER - RENESAS
->  M:     Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->  M:     Geert Uytterhoeven <geert+renesas@glider.be>
-> -L:     linux-sh at vger.kernel.org
-> +L:     linux-renesas-soc at vger.kernel.org
->  S:     Maintained
->  F:     drivers/pinctrl/sh-pfc/
->
-> @@ -9019,13 +9019,13 @@ F:      include/linux/rpmsg.h
->  RENESAS ETHERNET DRIVERS
->  R:     Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->  L:     netdev at vger.kernel.org
-> -L:     linux-sh at vger.kernel.org
-> +L:     linux-renesas-soc at vger.kernel.org
->  F:     drivers/net/ethernet/renesas/
->  F:     include/linux/sh_eth.h
->
->  RENESAS USB2 PHY DRIVER
->  M:     Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> -L:     linux-sh at vger.kernel.org
-> +L:     linux-renesas-soc at vger.kernel.org
->  S:     Maintained
->  F:     drivers/phy/phy-rcar-gen3-usb2.c
->
-> --
-> 2.1.4
+-- 
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best Regards,
+Peter Chen
