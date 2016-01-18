@@ -1,32 +1,114 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Mon, 18 Jan 2016 16:57:52 +0100
-Subject: [RFC PATCH v2] irqchip: Add support for Tango interrupt controller
-In-Reply-To: <569CE0F2.1060507@sigmadesigns.com>
-References: <569CE0F2.1060507@sigmadesigns.com>
-Message-ID: <569D0B80.1010908@sigmadesigns.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 18 Jan 2016 17:13:11 +0100
+Subject: [RFC PATCH v2 0/4] CPUs capacity information for heterogeneous
+ systems
+In-Reply-To: <20160118151316.GD7159@e106622-lin>
+References: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
+ <56994D87.6000709@linaro.org> <20160118151316.GD7159@e106622-lin>
+Message-ID: <CAKfTPtBFR4cowT-j4qVxfUvh6NDNmi6R=J7z9kywi6bONU3Pow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/2016 13:56, Marc Gonzalez wrote:
+On 18 January 2016 at 16:13, Juri Lelli <juri.lelli@arm.com> wrote:
+> Hi Steve,
+>
+> On 15/01/16 11:50, Steve Muckle wrote:
+>> On 01/08/2016 06:09 AM, Juri Lelli wrote:
+>> >  2. Dynamic profiling at boot (v2)
+>> >
+>> >     pros: - does not require a standardized definition of capacity
+>> >           - cannot be incorrectly tuned (once benchmark is fixed)
+>> >           - does not require user/integrator work
+>> >
+>> >     cons: - not easy to come up with a clean solution, as it seems interaction
+>> >             with several subsystems (e.g., cpufreq) is required
+>> >           - not easy to agree upon a single benchmark (that has to be both
+>> >             representative and simple enough to run at boot)
+>> >           - numbers might (and do) vary from boot to boot
+>>
+>> An important additional con that was mentioned earlier IIRC was the
+>> additional boot time required for the benchmark.
+>
+> Right. I forgot about that.
+>
+>> Perhaps there could be
+>> a kernel command line argument to bypass the benchmark if it is known
+>> that predetermined values will be provided via sysfs later?
+>>
+>
+> This might work, yes.
 
-> For the arch/arm/mach-tango port, I'm using this driver written
-> by Mans. Version 1 of the patch was submitted two months ago:
-> http://thread.gmane.org/gmane.linux.kernel/2089471
-> 
-> I've tried to address Marc Zyngier's remarks.
+Instead of command line, I prefer to use DT.
 
-And my patch is incomplete, v3 coming right up.
+Can't we use something similar to what is currently done in arm arch
+for the early stage of the boot ? We don't have to provide performance
+value for which it's difficult to find a consensus on how to define it
+and which benchmark should be used. We use the micro arch and the
+frequency of the core to define a relative capacity. This give us a
+relatively good idea of the capacity of each core.
+Then, the dynamic profiling can update it with a more accurate value
+during the boot.
 
-drivers/irqchip/irq-tango.c: In function 'tangox_irq_init':
-drivers/irqchip/irq-tango.c:183:6: warning: unused variable 'i' [-Wunused-variable]
-  int i;
-      ^
-drivers/irqchip/irq-tango.c: In function 'tangox_of_irq_init':
-drivers/irqchip/irq-tango.c:200:6: warning: 'name' may be used uninitialized in this function [-Wmaybe-uninitialized]
-  err = irq_alloc_domain_generic_chips(dom, 32, 2, name, handle_level_irq,
-      ^
-drivers/irqchip/irq-tango.c:179:14: note: 'name' was declared here
-  const char *name;
-              ^
+>
+>> Though there may be another issue with that as mentioned below.
+>>
+>> >  3. sysfs (v1)
+>> >
+>> >     pros: - clean and super easy to implement
+>> >           - values don't require to be physical properties, defining them is
+>> >             probably easier
+>> >
+>> >     cons: - CPUs capacity have to be provided after boot (by some init script?)
+>> >           - API is modified, still some discussion/review is needed
+>> >           - values can still be incorrectly used for runtime tuning purposes
+>>
+>> Initializing the values via userspace init will cause more of the boot
+>> process to run with incorrect CPU capacity values. Boot times may be
+>> increased with tasks running on suboptimal CPUs. Such increases may also
+>> not be deterministic.
+>>
+>> Extending the kernel command line idea above, perhaps capacity values
+>> could be provided there as well, similar to the lpj parameter? That has
+>> scalability issues though if there's a huge highly heterogeneous platform...
+>>
+>
+> Yeah, adding such option is not difficult, but I'm also a bit concerned
+> about the scalability of such a thing.
+>
+>> DT solves these issues and would be the perfect place for this - we are
+>> defining the compute capacity of a CPU which is a property of the
+>> hardware. However there are a couple things forcing us to compromise.
+>> One is that the amount and detail of information required to adequately
+>> capture the computational abilities of a CPU across all possible
+>> workloads seem onerous to collect and enumerate. The second is that even
+>> if we were willing to undertake that, CPU vendors probably won't be
+>> forthcoming with that information.
+>>
+>
+> You mean because they won't publish performance data of their hw?
+>
+> But we already use per platform normalized values (as you are proposing
+> below). So that a platform to platform comparison doesn't make sense.
+>
+>> Despite this DT still seems to me like the best way to go. At their
+>> heart these are properties of the hardware, even if we can't specify
+>> them as such per se because of the problems above. The capacity would
+>> have to be defined as a relative value among CPUs. And while it's true
+>> it may be abused for tuning purposes, that's true of any strategy.
+>> Certainly the sysfs strategy and even if only a dynamic option is
+>> provided, it is guaranteed to be hacked by platform vendors.
+>
+> I also like the DT approach and consider the sysfs option as something
+> that can go together with any solution we want to adopt.
 
-Regards.
+I'm not sure that we should consider sysfs as an option because of all
+the concerned that as already been put forward.
+I would prefer a debugfs if we have play with these capacity values in
+order to test their accuracy.
+
+Regards,
+Vincent
+>
+> Best,
+>
+> - Juri
