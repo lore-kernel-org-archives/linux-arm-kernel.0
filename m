@@ -1,58 +1,67 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 Jan 2016 11:39:36 +0000
-Subject: [PATCH V12 2/7] dma: hidma: Add Device Tree support
-In-Reply-To: <569926CF.6030205@codeaurora.org>
-References: <1452523550-8920-1-git-send-email-okaya@codeaurora.org>
- <1452523550-8920-3-git-send-email-okaya@codeaurora.org>
- <20160115151637.GJ3262@leverpostej>
- <20160115153054.GL3262@leverpostej>
- <569926CF.6030205@codeaurora.org>
-Message-ID: <20160118113935.GI21067@leverpostej>
+From: wangnan0@huawei.com (Wangnan (F))
+Date: Mon, 18 Jan 2016 19:39:06 +0800
+Subject: [PATCH v2] arm64: Store breakpoint single step state into pstate
+In-Reply-To: <20160112170650.GI15737@arm.com>
+References: <1450860731-194418-1-git-send-email-wangnan0@huawei.com>
+ <1450921362-198371-1-git-send-email-wangnan0@huawei.com>
+ <20160104165535.GI1616@arm.com> <568B4F47.5080307@huawei.com>
+ <20160112170650.GI15737@arm.com>
+Message-ID: <569CCEDA.6040103@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 12:05:19PM -0500, Sinan Kaya wrote:
-> On 1/15/2016 10:30 AM, Mark Rutland wrote:
-> > Further to my reply below, I'm generally uncomfortable with some
-> > properties (max-* need a better description if they are a HW
-> > requirement, and probably should not be present otherwise). 
-> 
-> I'll add more description. 
-> 
-> > I'm also
-> > concerned that information necessary for the advertised use-case of the
-> > device (e.g. IOMMUs) is missing [1], and we're missing parts of the
-> > story necessary to review this for correctness.
-> 
-> OK. Let me work on this. I tried to capture as much documentation as possible
-> into the series before. One reviewer said I should add it. Another reviewer said I should 
-> remove it. 
-> 
-> Where would be the best place to document the use case? 
-> - In the source file?
-> - In the commit message?
-> - In the device-tree documentation?
 
-Mostly the cover letter, but to varying degrees some information should
-appear in the commit messages, documentation, and code.
 
-The cover letter should give a high-level overview sufficient to get
-reviewing (e.g. that should point out we expect isolation by IOMMUs).
-There should also be pointers to related components (i.e. the QEMU
-driver intended to communicate with this).
+On 2016/1/13 1:06, Will Deacon wrote:
+> On Tue, Jan 05, 2016 at 01:06:15PM +0800, Wangnan (F) wrote:
+>> On 2016/1/5 0:55, Will Deacon wrote:
+>>> The problem seems to be that we take the debug exception before the
+>>> breakpointed instruction has been executed and call perf_bp_event at
+>>> that moment, so when we single-step the faulting instruction we actually
+>>> step into the SIGIO handler and end up getting stuck.
+>>>
+>>> Your fix doesn't really address this afaict, in that you don't (can't?)
+>>> handle:
+>>>
+>>>    * A longjmp out of a signal handler
+>>>    * A watchpoint and a breakpoint that fire on the same instruction
+>>>    * User-controlled single-step from a signal handler that enables a
+>>>      breakpoint explicitly
+>>>    * Nested signals
+>> Please have a look at [1], which I improve test__bp_signal() to
+>> check bullet 2 and 4 you mentioned above. Seems my fix is correct.
+>>
+>> [1] http://lkml.kernel.org/g/1451969880-14877-1-git-send-email-wangnan0 at huawei.com
+> I'm still really uneasy about this change. Pairing up the signal delivery
+> with the sigreturn to keep track of the debug state is extremely fragile
+> and I'm not keen on adding this logic there. I also think we need to
+> track the address that the breakpoint is originally taken on so that we
+> can only perform the extra sigreturn work if we're returning to the same
+> instruction. Furthermore, I wouldn't want to do this for signals other
+> than those generated directly by a breakpoint.
+>
+> An alternative would be to postpone the signal delivery until after the
+> stepping has been taken care of, but that's a change in ABI and I worry
+> we'll break somebody relying on the current behaviour.
+>
+> What exactly does x86 do? I couldn't figure it out from the code.
 
-Things subject to change should go in the cover letter, as it's not
-permanent.
+Actually x86 does similar thing as what this patch does.
 
-If something strongly influences the design in a way that's non-obvious,
-then that will probably remain non-obvious. For that, there should
-certainly be something in the commit message. If it's something that
-will be hit in general usage of the binding (or forms part of the
-contract of the binding), that should be described in the binding
-documentation.
+RF bit in x86_64's eflags prohibit debug exception raises. It is set by
+x86_64's debug handler to avoid recursion. x86_64 need setting this bit
+in breakpoint handler because it needs to jump back to original
+instruction and single-step on it, similar to ARM64.
 
-If there's some caveat other developers need to be aware of, drop a
-comment in the code.
+The RF bit in eflags records a state that the process shouldn't generate
+debug exception. It is part of the state of a process, and should be saved
+and cleared if transfers to signal handler.
 
-Thanks,
-Mark.
+This patch does the same thing: create two bits in pstate to indicate
+the states that 'a process should not raises watchpoint/breakpoint 
+exceptions',
+maintains them in kernel, cleans them for signal handler and save them 
+in signal
+frame.
+
+Thank you.
