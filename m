@@ -1,125 +1,91 @@
 From: rainyfeeling@gmail.com (Josh Wu)
-Date: Mon, 18 Jan 2016 20:52:24 +0800
-Subject: [PATCH 12/13] atmel-isi: use union for the fbd (frame buffer
- descriptor)
+Date: Mon, 18 Jan 2016 20:52:22 +0800
+Subject: [PATCH 11/13] atmel-isi: add hw_uninitialize() in stop_streaming()
 In-Reply-To: <1453121545-27528-1-git-send-email-rainyfeeling@gmail.com>
 References: <1453119709-20940-1-git-send-email-rainyfeeling@gmail.com>
  <1453121545-27528-1-git-send-email-rainyfeeling@gmail.com>
-Message-ID: <1453121545-27528-8-git-send-email-rainyfeeling@gmail.com>
+Message-ID: <1453121545-27528-6-git-send-email-rainyfeeling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Josh Wu <josh.wu@atmel.com>
-
-This way, we can easy to add other type of fbd for new hardware.
+add new function: hw_uninitialize() and call it when stop_streaming().
 
 Signed-off-by: Josh Wu <rainyfeeling@gmail.com>
 ---
 
- drivers/media/platform/soc_camera/atmel-isi.c | 33 ++++++++++++++++++---------
- 1 file changed, 22 insertions(+), 11 deletions(-)
+ drivers/media/platform/soc_camera/atmel-isi.c | 46 +++++++++++++++------------
+ 1 file changed, 26 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-index 7d2e952..b4c1f38 100644
+index c1a8698..7d2e952 100644
 --- a/drivers/media/platform/soc_camera/atmel-isi.c
 +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-@@ -37,7 +37,7 @@
- #define FRAME_INTERVAL_MILLI_SEC	(1000 / MIN_FRAME_RATE)
- 
- /* Frame buffer descriptor */
--struct fbd {
-+struct fbd_isi_v2 {
- 	/* Physical address of the frame buffer */
- 	u32 fb_address;
- 	/* DMA Control Register(only in HISI2) */
-@@ -46,9 +46,13 @@ struct fbd {
- 	u32 next_fbd_address;
- };
- 
-+union fbd {
-+	struct fbd_isi_v2 fbd_isi;
-+};
-+
- struct isi_dma_desc {
- 	struct list_head list;
--	struct fbd *p_fbd;
-+	union fbd *p_fbd;
- 	dma_addr_t fbd_phys;
- };
- 
-@@ -69,7 +73,7 @@ struct atmel_isi {
- 	struct vb2_alloc_ctx		*alloc_ctx;
- 
- 	/* Allocate descriptors for dma buffer use */
--	struct fbd			*p_fb_descriptors;
-+	union fbd			*p_fb_descriptors;
- 	dma_addr_t			fb_descriptors_phys;
- 	struct				list_head dma_desc_head;
- 	struct isi_dma_desc		dma_desc[MAX_BUFFER_NUM];
-@@ -396,6 +400,16 @@ static int buffer_init(struct vb2_buffer *vb)
+@@ -245,6 +245,31 @@ static int isi_hw_initialize(struct atmel_isi *isi)
  	return 0;
  }
  
-+static void isi_hw_init_dma_desc(union fbd *p_fdb, u32 fb_addr,
-+				 u32 next_fbd_addr)
++static void isi_hw_uninitialize(struct atmel_isi *isi)
 +{
-+	struct fbd_isi_v2 *p = &(p_fdb->fbd_isi);
++	int ret;
 +
-+	p->fb_address = fb_addr;
-+	p->next_fbd_address = next_fbd_addr;
-+	p->dma_ctrl = ISI_DMA_CTRL_WB;
++	if (!isi->enable_preview_path) {
++		/* Wait until the end of the current frame. */
++		ret = isi_hw_wait_status(isi, ISI_CTRL_CDC,
++					 FRAME_INTERVAL_MILLI_SEC);
++		if (ret)
++			dev_err(isi->soc_host.icd->parent, "Timeout waiting for finishing codec request\n");
++	}
++
++	/* Disable interrupts */
++	isi_writel(isi, ISI_INTDIS,
++			ISI_SR_CXFR_DONE | ISI_SR_PXFR_DONE);
++
++	/* Disable ISI and wait for it is done */
++	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
++
++	/* Check Reset status */
++	ret  = isi_hw_wait_status(isi, ISI_CTRL_DIS, 500);
++	if (ret)
++		dev_err(isi->soc_host.icd->parent, "Disable ISI timed out\n");
 +}
 +
- static int buffer_prepare(struct vb2_buffer *vb)
+ static void start_isi(struct atmel_isi *isi)
  {
- 	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
-@@ -428,10 +442,7 @@ static int buffer_prepare(struct vb2_buffer *vb)
- 			list_del_init(&desc->list);
+ 	u32 ctrl;
+@@ -484,7 +509,6 @@ static void stop_streaming(struct vb2_queue *vq)
+ 	struct soc_camera_host *ici = to_soc_camera_host(icd->parent);
+ 	struct atmel_isi *isi = ici->priv;
+ 	struct frame_buffer *buf, *node;
+-	int ret = 0;
  
- 			/* Initialize the dma descriptor */
--			desc->p_fbd->fb_address =
--					vb2_dma_contig_plane_dma_addr(vb, 0);
--			desc->p_fbd->next_fbd_address = 0;
--			desc->p_fbd->dma_ctrl = ISI_DMA_CTRL_WB;
-+			isi_hw_init_dma_desc(desc->p_fbd, vb2_dma_contig_plane_dma_addr(vb, 0), 0);
- 
- 			buf->p_dma_desc = desc;
- 		}
-@@ -923,7 +934,7 @@ static int atmel_isi_remove(struct platform_device *pdev)
- 	soc_camera_host_unregister(soc_host);
- 	vb2_dma_contig_cleanup_ctx(isi->alloc_ctx);
- 	dma_free_coherent(&pdev->dev,
--			sizeof(struct fbd) * MAX_BUFFER_NUM,
-+			sizeof(union fbd) * MAX_BUFFER_NUM,
- 			isi->p_fb_descriptors,
- 			isi->fb_descriptors_phys);
- 	pm_runtime_disable(&pdev->dev);
-@@ -1010,7 +1021,7 @@ static int atmel_isi_probe(struct platform_device *pdev)
- 	INIT_LIST_HEAD(&isi->dma_desc_head);
- 
- 	isi->p_fb_descriptors = dma_alloc_coherent(&pdev->dev,
--				sizeof(struct fbd) * MAX_BUFFER_NUM,
-+				sizeof(union fbd) * MAX_BUFFER_NUM,
- 				&isi->fb_descriptors_phys,
- 				GFP_KERNEL);
- 	if (!isi->p_fb_descriptors) {
-@@ -1021,7 +1032,7 @@ static int atmel_isi_probe(struct platform_device *pdev)
- 	for (i = 0; i < MAX_BUFFER_NUM; i++) {
- 		isi->dma_desc[i].p_fbd = isi->p_fb_descriptors + i;
- 		isi->dma_desc[i].fbd_phys = isi->fb_descriptors_phys +
--					i * sizeof(struct fbd);
-+					i * sizeof(union fbd);
- 		list_add(&isi->dma_desc[i].list, &isi->dma_desc_head);
+ 	spin_lock_irq(&isi->lock);
+ 	isi->active = NULL;
+@@ -495,25 +519,7 @@ static void stop_streaming(struct vb2_queue *vq)
  	}
+ 	spin_unlock_irq(&isi->lock);
  
-@@ -1080,7 +1091,7 @@ err_ioremap:
- 	vb2_dma_contig_cleanup_ctx(isi->alloc_ctx);
- err_alloc_ctx:
- 	dma_free_coherent(&pdev->dev,
--			sizeof(struct fbd) * MAX_BUFFER_NUM,
-+			sizeof(union fbd) * MAX_BUFFER_NUM,
- 			isi->p_fb_descriptors,
- 			isi->fb_descriptors_phys);
+-	if (!isi->enable_preview_path) {
+-		/* Wait until the end of the current frame. */
+-		ret = isi_hw_wait_status(isi, ISI_CTRL_CDC,
+-					 FRAME_INTERVAL_MILLI_SEC);
+-		if (ret)
+-			dev_err(icd->parent, "Timeout waiting for finishing codec request\n");
+-	}
+-
+-	/* Disable interrupts */
+-	isi_writel(isi, ISI_INTDIS,
+-			ISI_SR_CXFR_DONE | ISI_SR_PXFR_DONE);
+-
+-	/* Disable ISI and wait for it is done */
+-	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+-
+-	/* Check Reset status */
+-	ret  = isi_hw_wait_status(isi, ISI_CTRL_DIS, 500);
+-	if (ret)
+-		dev_err(icd->parent, "Disable ISI timed out\n");
++	isi_hw_uninitialize(isi);
  
+ 	pm_runtime_put(ici->v4l2_dev.dev);
+ }
 -- 
 1.9.1
