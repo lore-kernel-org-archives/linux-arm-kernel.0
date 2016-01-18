@@ -1,40 +1,60 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 18 Jan 2016 14:28:50 +0000
-Subject: [PATCH 2/3] clk: WARN_ON about to disable a critical clock
+Date: Mon, 18 Jan 2016 14:28:51 +0000
+Subject: [PATCH 3/3] clk: Provide OF helper to mark clocks as CRITICAL
 In-Reply-To: <1453127331-20616-1-git-send-email-lee.jones@linaro.org>
 References: <1453127331-20616-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1453127331-20616-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1453127331-20616-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This call matches clocks which have been marked as critical in DT
+and sets the appropriate flag.  These flags can then be used to
+mark the clock core flags appropriately prior to registration.
+
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/clk/clk.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ include/linux/clk-provider.h | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 835cb85..178b364 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -575,6 +575,9 @@ static void clk_core_unprepare(struct clk_core *core)
- 	if (WARN_ON(core->prepare_count == 0))
- 		return;
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index ffa0b2e..6f178b7 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -707,6 +707,23 @@ const char *of_clk_get_parent_name(struct device_node *np, int index);
  
-+	if (WARN_ON(core->prepare_count == 1 && core->flags & CLK_IS_CRITICAL))
-+		return;
+ void of_clk_init(const struct of_device_id *matches);
+ 
++static inline int of_clk_mark_if_critical(struct device_node *np,
++					  int index, unsigned long *flags)
++{
++	struct property *prop;
++	const __be32 *cur;
++	uint32_t idx;
 +
- 	if (--core->prepare_count > 0)
- 		return;
- 
-@@ -680,6 +683,9 @@ static void clk_core_disable(struct clk_core *core)
- 	if (WARN_ON(core->enable_count == 0))
- 		return;
- 
-+	if (WARN_ON(core->enable_count == 1 && core->flags & CLK_IS_CRITICAL))
-+		return;
++	if (!np || !flags)
++		return -EINVAL;
 +
- 	if (--core->enable_count > 0)
- 		return;
++	of_property_for_each_u32(np, "critical-clock", prop, cur, idx)
++		if (index == idx)
++			*flags |= CLK_IS_CRITICAL;
++
++	return 0;
++}
++
+ #else /* !CONFIG_OF */
  
+ static inline int of_clk_add_provider(struct device_node *np,
+@@ -742,6 +759,11 @@ static inline const char *of_clk_get_parent_name(struct device_node *np,
+ {
+ 	return NULL;
+ }
++static inline int of_clk_mark_if_critical(struct device_node *np, int index,
++					  unsigned long *flags)
++{
++	return 0;
++}
+ #define of_clk_init(matches) \
+ 	{ while (0); }
+ #endif /* CONFIG_OF */
 -- 
 1.9.1
