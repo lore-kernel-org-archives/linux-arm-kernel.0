@@ -1,76 +1,100 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 18 Jan 2016 10:57:41 +0100
-Subject: [PATCH V3 19/21] pci, acpi: Support for ACPI based generic PCI
- host controller init
-In-Reply-To: <5698C299.2080702@linaro.org>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <1452691267-32240-20-git-send-email-tn@semihalf.com>
- <5698C299.2080702@linaro.org>
-Message-ID: <569CB715.7040306@semihalf.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 18 Jan 2016 10:01:55 +0000
+Subject: [RESEND PATCH 0/2] crypto: sunxi-ss: fix 64-bit compilation
+In-Reply-To: <569AA8ED.7050404@gmail.com>
+References: <1452252249-12040-1-git-send-email-andre.przywara@arm.com>
+ <569AA8ED.7050404@gmail.com>
+Message-ID: <569CB813.5050607@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.01.2016 10:57, Hanjun Guo wrote:
-> Hi Tomasz,
->
-> On 2016/1/13 21:21, Tomasz Nowicki wrote:
->> Because of two patch series:
->> 1. Jiang Liu's common interface to support PCI host controller init
->> 2. MMCONFIG refactoring (part of this patch set)
->> now we can think about generic ACPI based PCI host controller init
->> implementation out of arch/ directory.
->>
->> These calls use information from MCFG table (PCI config space regions)
->> and _CRS method (IO/irq resources) to initialize PCI hostbridge.
->>
->> TBD: We are still not sure whether we should reassign resources
->> after PCI bus enumeration or trust firmware to do all that work for
->> us properly.
->>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> CC: Arnd Bergmann <arnd@arndb.de>
->> CC: Catalin Marinas <catalin.marinas@arm.com>
->> CC: Liviu Dudau <Liviu.Dudau@arm.com>
->> CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
->> CC: Will Deacon <will.deacon@arm.com>
->> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> Tested-by: Jeremy Linton <jeremy.linton@arm.com>
->> ---
->>   drivers/acpi/Kconfig    |   5 ++
->>   drivers/acpi/pci_root.c | 131
->> ++++++++++++++++++++++++++++++++++++++++++++++++
->>   2 files changed, 136 insertions(+)
->>
->> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
->> index c3664be..e315061 100644
->> --- a/drivers/acpi/Kconfig
->> +++ b/drivers/acpi/Kconfig
->> @@ -335,6 +335,11 @@ config ACPI_PCI_SLOT
->>         i.e., segment/bus/device/function tuples, with physical slots in
->>         the system.  If you are unsure, say N.
->>
->> +config ACPI_PCI_HOST_GENERIC
->> +    bool "Generic ACPI PCI host controller"
->> +    help
->> +      Say Y here if you want to support generic ACPI PCI host
->> controller.
->
-> Since x86 and IA64 will not use ACPI_PCI_HOST_GENERIC in this
-> patch, it should be defined as
->
-> config ACPI_PCI_HOST_GENERIC
->      bool
->
-> and select for ARCHs, or will default y on x86 and IA64 too.
+Hi Corentin,
 
-Right, I will fix that in v4.
+(CC:ing Boris for the x86 parts)
 
->
-> Compiling the kernel on a IA64 machine, will send out the
-> result when it's ready.
->
+thanks for looking at this and your answer.
 
-Thanks,
-Tomasz
+On 16/01/16 20:32, Corentin LABBE wrote:
+> Le 08/01/2016 12:24, Andre Przywara a ?crit :
+>> (resending to add linux-crypto, patches unchanged)
+>>
+>> Hi,
+>>
+>> these two patches provide a different approach to an issue I tried
+>> to fix lately [1].
+>> Instead of casting everything I now promote local types to size_t, so
+>> that the min3() arguments naturally match in type.
+>> As size_t is defined as "unsigned int" on 32-bit architectures
+>> anyway, that actually does not change anything there, but instead
+>> provides a clean approach to get it compiled for arm64.
+>>
+>> I split this up because 1/2 seems much cleaner to me than 2/2, so we
+>> can have a separate discussion/merge process on this.
+>>
+>> Cheers,
+>> Andre.
+>>
+>> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/395689.html
+>>
+>> Andre Przywara (2):
+>>   crypto: sunxi-ss-cipher: promote variables to match types in min3()
+>>     calls
+>>   crypto: sunxi-ss-hash: promote variables to match types in min3()
+>>     calls
+>>
+>>  drivers/crypto/sunxi-ss/sun4i-ss-cipher.c | 20 ++++++++++----------
+>>  drivers/crypto/sunxi-ss/sun4i-ss-hash.c   | 12 ++++++------
+>>  drivers/crypto/sunxi-ss/sun4i-ss.h        |  2 +-
+>>  3 files changed, 17 insertions(+), 17 deletions(-)
+>>
+> 
+> Hello
+> 
+> Sorry for this late answer.
+> 
+> I am in trouble with those patch, so we have with Andre a long conversation about it.
+> Basically, sun4i-ss will never be available on 64bits platform. (A64 will have a totally new crypto engine).
+> So letting it to compile under 64bit arch is only useful when goal is to add COMPILE_TEST for it.
+
+OK, but actually I don't see the strict requirement for having
+COMPILE_TEST here. Usually those warnings point to portability issues in
+the code and should be fixed, regardless of it being usable for a
+particular architecture or not. Since it got enabled with ARCH_SUNXI on
+arm64 without further ado, I took this as a sufficient reason to fix
+those issues.
+
+But I see your point in it being useless outside of arm(32) (unless
+Allwinner comes up with a ARMv8 SoC using the "old" crypto engine ;-)
+
+> But COMPILE_TEST cannot simply be added with those patch since some arches (x86/x86_64 at least) does not have writesl/readsl available.
+
+So for the records (and interested x86 readers):
+The sunxi-ss driver uses writesl/readsl, which _are_ defined in
+include/asm-generic/io.h. But x86 does not include this header (probably
+for historic reasons). So I added the #include in
+arch/x86/include/asm/io.h, this required to dummy define a lot of
+implemented functions, like:
+#define readb readb
+basically for all MMIO and IO port accessors. After that it worked, I
+could use COMPILE_TEST on the driver and found the same issues as with
+arm64 (which were fixed by my patch).
+
+Now adding a number of hideous #defines to a core header in an unrelated
+architecture to enable COMPILE_TEST for a single driver seems a bit of a
+stretch to me, so I refrain from sending this out - unless people ask
+for it.
+
+Boris, do you recall any discussions about asm-generic/io.h on x86 in
+the past?
+
+> The conclusion is that it is simpler to block 64bit build for sun4i-ss.
+
+OK, I am fine with just adding "&& !64BIT" to the Kconfig entry.
+Actually that was my first impulse on finding this issue, but then I
+felt it a bit cowardly to paper over the problem instead of fixing it.
+
+So if no-one disagrees, I will include the !64bit dependency in the A64
+enablement series I plan to send out later this week.
+
+Cheers,
+Andre.
