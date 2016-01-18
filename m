@@ -1,51 +1,60 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Mon, 18 Jan 2016 09:41:17 -0800
-Subject: [PATCH] ARM: debug-ll: fix BCM63xx entry for multiplatform
-In-Reply-To: <5641204.G6RtGs3Kji@wuerfel>
-References: <5641204.G6RtGs3Kji@wuerfel>
-Message-ID: <569D23BD.9050506@infradead.org>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Mon, 18 Jan 2016 09:41:03 -0800
+Subject: [PATCH v9 5/6] PCI: generic: Make pci-host-generic driver numa
+ aware
+In-Reply-To: <1453134965-6125-6-git-send-email-gkulkarni@caviumnetworks.com>
+References: <1453134965-6125-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1453134965-6125-6-git-send-email-gkulkarni@caviumnetworks.com>
+Message-ID: <569D23AF.9050503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/16 01:51, Arnd Bergmann wrote:
-> During my randconfig build testing, I found that a kernel with
-> DEBUG_AT91_UART and ARCH_BCM_63XX fails to build:
-> 
-> arch/arm/include/debug/at91.S:18:0: error: "CONFIG_DEBUG_UART_VIRT" redefined [-Werror]
-> 
-> It turns out that the DEBUG_UART_BCM63XX option is enabled whenever
-> the ARCH_BCM_63XX is, and that breaks multiplatform kernels because
-> we then end up using the UART address from BCM63XX rather than the
-> one we actually configured (if any).
-> 
-> This changes the BCM63XX options to only have one Kconfig option,
-> and only enable that if the user explicitly turns it on.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: b51312bebfa4 ("ARM: BCM63XX: add low-level UART debug support")
-> Cc: stable at vger.kernel.org
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index c57cbb7e8179..4a2c6a3bc90a 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -153,10 +153,10 @@ choice
->  		  mobile SoCs in the Kona family of chips (e.g. bcm28155,
->  		  bcm11351, etc...)
->  
-> -	config DEBUG_BCM63XX
-> +	config DEBUG_BCM63XX_UART
->  		bool "Kernel low-level debugging on BCM63XX UART"
->  		depends on ARCH_BCM_63XX
-> -		select DEBUG_UART_BCM63XX
-> +		help		  
+On 01/18/2016 08:36 AM, Ganapatrao Kulkarni wrote:
+> update numa_node of device associated with pci bus.
+> moved down devm_kzalloc to allocate from node memory.
+>
+> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> ---
+>   drivers/pci/host/pci-host-generic.c | 9 ++++++---
+>   1 file changed, 6 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index 5434c90..0e1ce06 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -215,11 +215,9 @@ static int gen_pci_probe(struct platform_device *pdev)
+>   	const struct of_device_id *of_id;
+>   	struct device *dev = &pdev->dev;
+>   	struct device_node *np = dev->of_node;
+> -	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> +	struct gen_pci *pci;
+>   	struct pci_bus *bus, *child;
+>
+> -	if (!pci)
+> -		return -ENOMEM;
+>
+>   	type = of_get_property(np, "device_type", NULL);
+>   	if (!type || strcmp(type, "pci")) {
+> @@ -230,6 +228,11 @@ static int gen_pci_probe(struct platform_device *pdev)
+>   	of_pci_check_probe_only();
+>
+>   	of_id = of_match_node(gen_pci_of_match, np);
+> +	set_dev_node(dev, of_node_to_nid(np));
 
-What's with the empty help message (and lots of trailing whitespace)?
+This shouldn't be done in individual platform_drivers, but instead in 
+the device probing code.
 
->  
->  	config DEBUG_BERLIN_UART
->  		bool "Marvell Berlin SoC Debug UART"
+There is code that does this in drivers/of/platform.c and 
+drivers/of/device.c  Is that not being called for the pci-host-gweneric 
+devices?  If not, we should figure out why, and perhaps attempt to fix 
+it rather than doing it here.
 
 
--- 
-~Randy
+> +	pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> +	if (!pci)
+> +		return -ENOMEM;
+> +
+>   	pci->cfg.ops = (struct gen_pci_cfg_bus_ops *)of_id->data;
+>   	pci->host.dev.parent = dev;
+>   	INIT_LIST_HEAD(&pci->host.windows);
+>
