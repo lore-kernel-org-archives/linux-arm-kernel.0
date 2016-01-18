@@ -1,114 +1,28 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Mon, 18 Jan 2016 13:08:51 +0800
-Subject: [Xen-devel] [PATCH v2 03/16] Xen: xlate: Use page_to_xen_pfn
- instead of page_to_pfn
-In-Reply-To: <alpine.DEB.2.02.1601151558010.16178@kaball.uk.xensource.com>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-4-git-send-email-zhaoshenglong@huawei.com>
- <alpine.DEB.2.02.1601151558010.16178@kaball.uk.xensource.com>
-Message-ID: <569C7363.80106@huawei.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 18 Jan 2016 14:18:42 +0900
+Subject: [PATCH 0/2] ARM: shmobile: r8a779[34]: use GIC_* defines
+Message-ID: <1453094324-22404-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+this short series uses GIC_* defines in the r8a779[34] device trees as
+appropriate.
 
-On 2016/1/16 1:08, Stefano Stabellini wrote:
-> On Fri, 15 Jan 2016, Shannon Zhao wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
->>
->> Use page_to_xen_pfn in case of 64KB page.
->>
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> ---
->>  drivers/xen/xlate_mmu.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
->> index 9692656..b9fcc2c 100644
->> --- a/drivers/xen/xlate_mmu.c
->> +++ b/drivers/xen/xlate_mmu.c
->> @@ -227,7 +227,7 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
->>  		return rc;
->>  	}
->>  	for (i = 0; i < nr_grant_frames; i++)
->> -		pfns[i] = page_to_pfn(pages[i]);
->> +		pfns[i] = page_to_xen_pfn(pages[i]);
-> 
-> Shannon, thanks for the patch.
-> 
-> Keeping in mind that in the 64K case, kernel pages are 64K but xen pages
-> are still 4K, I think you also need to allocate
-> (nr_grant_frames/XEN_PFN_PER_PAGE) kernel pages (assuming that they are
-> allocated contiguously): nr_grant_frames refers to 4K pages, while
-> xen_xlate_map_ballooned_pages is allocating pages on a 64K granularity
-> (sizeof(pages[0]) == 64K).
-> 
-> Be careful that alloc_xenballooned_pages deals with 64K pages (because
-> it deals with kernel pages), while xen_pfn_t is always 4K based (because
-> it deals with Xen pfns).
-> 
-> Please test it with and without CONFIG_ARM64_64K_PAGES. Thanks!
-> 
-Stefano, thanks for your explanation. How about below patch?
+This is a follow-up for similar work for the rua779[01] SoCs.
+I plan to post follow up patches to update the device trees for
+other Renesas SoCs depending on the success of this series.
 
-diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
-index 9692656..e1f7c95 100644
---- a/drivers/xen/xlate_mmu.c
-+++ b/drivers/xen/xlate_mmu.c
-@@ -207,9 +207,12 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t
-**gfns, void **virt,
-        void *vaddr;
-        int rc;
-        unsigned int i;
-+       unsigned long nr_pages;
-+       xen_pfn_t xen_pfn = 0;
+Based on renesas-devel-20160111-v4.4
 
-        BUG_ON(nr_grant_frames == 0);
--       pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
-+       nr_pages = DIV_ROUND_UP(nr_grant_frames, XEN_PFN_PER_PAGE);
-+       pages = kcalloc(nr_pages, sizeof(pages[0]), GFP_KERNEL);
-        if (!pages)
-                return -ENOMEM;
+Simon Horman (2):
+  ARM: dts: r8a7793: use GIC_*defines
+  ARM: dts: r8a7794: use GIC_*defines
 
-@@ -218,22 +221,25 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t
-**gfns, void **virt,
-                kfree(pages);
-                return -ENOMEM;
-        }
--       rc = alloc_xenballooned_pages(nr_grant_frames, pages);
-+       rc = alloc_xenballooned_pages(nr_pages, pages);
-        if (rc) {
--               pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n",
-__func__,
--                       nr_grant_frames, rc);
-+               pr_warn("%s Couldn't balloon alloc %ld pages rc:%d\n",
-__func__,
-+                       nr_pages, rc);
-                kfree(pages);
-                kfree(pfns);
-                return rc;
-        }
--       for (i = 0; i < nr_grant_frames; i++)
--               pfns[i] = page_to_pfn(pages[i]);
-+       for (i = 0; i < nr_grant_frames; i++) {
-+               if ((i % XEN_PFN_PER_PAGE) == 0)
-+                       xen_pfn = page_to_xen_pfn(pages[i /
-XEN_PFN_PER_PAGE]);
-+               pfns[i] = xen_pfn++;
-+       }
-
--       vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
-+       vaddr = vmap(pages, nr_pages, 0, PAGE_KERNEL);
-        if (!vaddr) {
--               pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
--                       nr_grant_frames, rc);
--               free_xenballooned_pages(nr_grant_frames, pages);
-+               pr_warn("%s Couldn't map %ld pages rc:%d\n", __func__,
-+                       nr_pages, rc);
-+               free_xenballooned_pages(nr_pages, pages);
-                kfree(pages);
-                kfree(pfns);
-                return -ENOMEM;
+ arch/arm/boot/dts/r8a7793.dtsi | 216 ++++++++++++++++++++--------------------
+ arch/arm/boot/dts/r8a7794.dtsi | 220 ++++++++++++++++++++---------------------
+ 2 files changed, 218 insertions(+), 218 deletions(-)
 
 -- 
-Shannon
+2.1.4
