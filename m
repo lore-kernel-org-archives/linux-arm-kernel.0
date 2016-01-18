@@ -1,30 +1,32 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 18 Jan 2016 23:24:57 +0800
-Subject: lib: sw842: select crc32
-In-Reply-To: <4168537.6I1FVkp3DA@wuerfel>
-References: <4168537.6I1FVkp3DA@wuerfel>
-Message-ID: <20160118152457.GD717@gondor.apana.org.au>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Mon, 18 Jan 2016 16:38:31 +0100
+Subject: [PATCH] pinctrl: st: activate strict mux mode
+Message-ID: <1453131511-5590-1-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 11:24:02PM +0100, Arnd Bergmann wrote:
-> The sw842 library code was merged in linux-4.1 and causes a very rare randconfig
-> failure when CONFIG_CRC32 is not set:
->     
->     lib/built-in.o: In function `sw842_compress':
->     oid_registry.c:(.text+0x12ddc): undefined reference to `crc32_be'
->     lib/built-in.o: In function `sw842_decompress':
->     oid_registry.c:(.text+0x137e4): undefined reference to `crc32_be'
-> 
-> This adds an explict 'select CRC32' statement, similar to what the other users
-> of the crc32 code have. In practice, CRC32 is always enabled anyway because
-> over 100 other symbols select it.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 2da572c959dd ("lib: add software 842 compression/decompression")
+From: Patrice Chotard <patrice.chotard@st.com>
 
-Patch applied.  Thanks!
+This activates strict mode muxing for the ST pin controllers,
+as these do not allow GPIO and functions to use the same pin
+simultaneously.
+
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+---
+ drivers/pinctrl/pinctrl-st.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+index b58d3f2..00e179b 100644
+--- a/drivers/pinctrl/pinctrl-st.c
++++ b/drivers/pinctrl/pinctrl-st.c
+@@ -988,6 +988,7 @@ static struct pinmux_ops st_pmxops = {
+ 	.get_function_groups	= st_pmx_get_groups,
+ 	.set_mux		= st_pmx_set_mux,
+ 	.gpio_set_direction	= st_pmx_set_gpio_direction,
++	.strict			= true,
+ };
+ 
+ /* Pinconf  */
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+1.9.1
