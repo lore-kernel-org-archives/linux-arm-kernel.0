@@ -1,35 +1,86 @@
-From: steve.muckle@linaro.org (Steve Muckle)
-Date: Mon, 18 Jan 2016 11:25:41 -0800
-Subject: [RFC PATCH v2 0/4] CPUs capacity information for heterogeneous
- systems
-In-Reply-To: <20160118151316.GD7159@e106622-lin>
-References: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
- <56994D87.6000709@linaro.org> <20160118151316.GD7159@e106622-lin>
-Message-ID: <569D3C35.5070703@linaro.org>
+From: dvyukov@google.com (Dmitry Vyukov)
+Date: Mon, 18 Jan 2016 20:31:10 +0100
+Subject: [PATCH v2] kernel: add kcov code coverage
+In-Reply-To: <CAPAsAGxpntZ-H+SEc3BNfOdS5Ciqn+esXmypD0e3h4oucxdoJw@mail.gmail.com>
+References: <1452689318-107172-1-git-send-email-dvyukov@google.com>
+ <CAPAsAGx_0pVjtKA2RwwpStRG2-L+5X6W14QbrQaMYhdg30EeAQ@mail.gmail.com>
+ <CACT4Y+bHjfkrZ4jWZf+j6FKnj2GQv1t94Y9LJm4=WFyb8C0J8w@mail.gmail.com>
+ <CAPAsAGzjX2OJ7SRt4gM1VqEEm5=xERUtfcEDi05o5bwOTdNhpQ@mail.gmail.com>
+ <CACT4Y+YvL_L9a2dBfoXQ0AKpKmnypfObtt7k97j_i2Qiu=wnQg@mail.gmail.com>
+ <CAPAsAGxpntZ-H+SEc3BNfOdS5Ciqn+esXmypD0e3h4oucxdoJw@mail.gmail.com>
+Message-ID: <CACT4Y+Y+QgNWub4uRZodCz4QTQm6SA-AkuWS+0XvK28YWNvd6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2016 07:13 AM, Juri Lelli wrote:
->> DT solves these issues and would be the perfect place for this - we are
->> > defining the compute capacity of a CPU which is a property of the
->> > hardware. However there are a couple things forcing us to compromise.
->> > One is that the amount and detail of information required to adequately
->> > capture the computational abilities of a CPU across all possible
->> > workloads seem onerous to collect and enumerate. The second is that even
->> > if we were willing to undertake that, CPU vendors probably won't be
->> > forthcoming with that information.
->> > 
+On Mon, Jan 18, 2016 at 2:34 PM, Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
+> 2016-01-15 17:07 GMT+03:00 Dmitry Vyukov <dvyukov@google.com>:
+>>>>> Note that this works only for cache-coherent architectures.
+>>>>> For incoherent arches you'll need to flush_dcache_page() somewhere.
+>>>>> Perhaps it could be done on exit to userspace, since flushing here is
+>>>>> certainly an overkill.
+>>>>
+>>>> I can say that I understand the problem. Does it have to do with the
+>>>> fact that the buffer is shared between kernel and user-space?
+>>>> Current code is OK from the plain multi-threading side, as user must
+>>>> not read buffer concurrently with writing (that would not yield
+>>>> anything useful).
+>>>
+>>> It's not about SMP.
+>>> This problem is about virtually indexed aliasing D-caches and could be
+>>> observed on uniprocessor system.
+>>> You have 3 virtual addresses (user-space, linear mapping and vmalloc)
+>>> mapped to the same physical page.
+>>> With aliasing cache it's possible to have multiple cache-lines
+>>> representing the same physical page.
+>>> So the kernel might not see the update made by userspace and vise
+>>> versa because kernel/userspace use different virtual addresses.
+>>>
+>>> And btw, flush_dcache_page()  would be a wrong choice, since kcov_area
+>>> is a vmalloc address, not a linear address.
+>>> So we need something that flushes vmalloc addresses.
+>>>
+>>> Alternatively we could simply mlock that memory and talk to user space
+>>> via get/put_user(). No flush will be required.
+>>> And we will avoid another potential problem - lack of vmalloc address
+>>> space on 32-bits.
+>>
+>> Do you mean that user-space allocates a buffer and passes this buffer
+>> to ioctl(KCOV_INIT); kernel locks this range and then directly writes
+>> to it?
+>>
 >
-> You mean because they won't publish performance data of their hw?
+> It's one of the ways of doing this. Another possible way is to
+> allocate, mmap and pin pages in kcov_mmap().
 
-More specific things like IPC and other architectural details that could
-comprise a precise physical definition of a CPU that would meet the
-ideal goals of a device tree definition.
 
-> But we already use per platform normalized values (as you are proposing
-> below). So that a platform to platform comparison doesn't make sense.
+Which means that we can hide it under the same interface, right?
+I preallocate all pages in kcov_mmap() in v4 as suggested by Kirill.
+If we can hide it under the current interface, then I would prefer to
+do locking later in subsequent patches (probably the ones that port
+kcov to an arch that require flush).
 
-Yeah I'm just advocating for that strategy here.
 
-cheers,
-Steve
+
+>> I afraid it becomes prohibitively expensive with put_user/get_user:
+>> https://gist.githubusercontent.com/dvyukov/568f2e4a61afc910f880/raw/540cc071f1d561b9a3f9e50183d681be265af8c3/gistfile1.txt
+>>
+>
+> Right, but it should be better with __get_user/__put_user.
+>
+>> Also, won't it require the same flush since the region is mmaped into
+>> several processes (and process that reads is not the one that setups
+>> the region)?
+>
+> But it's only child process that could inherit kcov mapping from
+> parent, so it's be the same physical->virtual mapping as in parent.
+
+ack
+
+>> Size of coverage buffer that I currently use is 64K. I hope it is not
+>> a problem for 32-bit archs.
+>>
+>
+> 64K - per process. It's hard to whether this is a real problem or not,
+> since it depends
+> on how many processes collect coverage, size of vmalloc and vmalloc's
+> utilization by the rest of the kernel.
