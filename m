@@ -1,229 +1,95 @@
-From: liudongdong3@huawei.com (liudongdong (C))
-Date: Mon, 18 Jan 2016 17:25:18 +0800
-Subject: [PATCH V3 19/21] pci, acpi: Support for ACPI based generic PCI
- host controller init
-In-Reply-To: <1452691267-32240-20-git-send-email-tn@semihalf.com>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <1452691267-32240-20-git-send-email-tn@semihalf.com>
-Message-ID: <569CAF7E.9040000@huawei.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 18 Jan 2016 10:40:49 +0100
+Subject: [PATCH v3 4/8] dt-bindings: Add a binding for Mediatek Video
+ Encoder
+In-Reply-To: <1451902316-55931-5-git-send-email-tiffany.lin@mediatek.com>
+References: <1451902316-55931-1-git-send-email-tiffany.lin@mediatek.com>
+ <1451902316-55931-5-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <569CB321.10206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
 
-? 2016/1/13 21:21, Tomasz Nowicki ??:
-> Because of two patch series:
-> 1. Jiang Liu's common interface to support PCI host controller init
-> 2. MMCONFIG refactoring (part of this patch set)
-> now we can think about generic ACPI based PCI host controller init
-> implementation out of arch/ directory.
+
+On 04/01/16 11:11, Tiffany Lin wrote:
+> Add a DT binding documentation of Video Encoder for the
+> MT8173 SoC from Mediatek.
 >
-> These calls use information from MCFG table (PCI config space regions)
-> and _CRS method (IO/irq resources) to initialize PCI hostbridge.
->
-> TBD: We are still not sure whether we should reassign resources
-> after PCI bus enumeration or trust firmware to do all that work for
-> us properly.
->
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> CC: Arnd Bergmann <arnd@arndb.de>
-> CC: Catalin Marinas <catalin.marinas@arm.com>
-> CC: Liviu Dudau <Liviu.Dudau@arm.com>
-> CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
-> CC: Will Deacon <will.deacon@arm.com>
-> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
 > ---
->   drivers/acpi/Kconfig    |   5 ++
->   drivers/acpi/pci_root.c | 131 ++++++++++++++++++++++++++++++++++++++++++++++++
->   2 files changed, 136 insertions(+)
+>   .../devicetree/bindings/media/mediatek-vcodec.txt  |   58 ++++++++++++++++++++
+>   1 file changed, 58 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/media/mediatek-vcodec.txt
 >
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index c3664be..e315061 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -335,6 +335,11 @@ config ACPI_PCI_SLOT
->   	  i.e., segment/bus/device/function tuples, with physical slots in
->   	  the system.  If you are unsure, say N.
->
-> +config ACPI_PCI_HOST_GENERIC
-> +	bool "Generic ACPI PCI host controller"
-> +	help
-> +	  Say Y here if you want to support generic ACPI PCI host controller.
+> diff --git a/Documentation/devicetree/bindings/media/mediatek-vcodec.txt b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
+> new file mode 100644
+> index 0000000..5cc35ae
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
+> @@ -0,0 +1,58 @@
+> +Mediatek Video Codec
 > +
->   config X86_PM_TIMER
->   	bool "Power Management Timer Support" if EXPERT
->   	depends on X86
-> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-> index a65c8c2..d483e2a 100644
-> --- a/drivers/acpi/pci_root.c
-> +++ b/drivers/acpi/pci_root.c
-> @@ -24,6 +24,7 @@
->   #include <linux/init.h>
->   #include <linux/types.h>
->   #include <linux/mutex.h>
-> +#include <linux/of_address.h>
->   #include <linux/pm.h>
->   #include <linux/pm_runtime.h>
->   #include <linux/pci.h>
-> @@ -514,6 +515,136 @@ static void negotiate_os_control(struct acpi_pci_root *root, int *no_aspm)
->   	}
->   }
->
-> +#ifdef CONFIG_ACPI_PCI_HOST_GENERIC
-> +static int pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
-> +{
-> +	if (pci_dev_msi_enabled(dev))
-> +		return 0;
+> +Mediatek Video Codec is the video codec hw present in Mediatek SoCs which
+> +supports high resolution encoding functionalities.
 > +
-> +	acpi_pci_irq_enable(dev);
-> +	return dev->irq;
-> +}
-> +
-> +static void pci_mcfg_release_info(struct acpi_pci_root_info *ci)
-> +{
-> +	pci_mmcfg_teardown_map(ci);
-> +	kfree(ci);
-> +}
-> +
-> +static int pci_acpi_root_prepare_resources(struct acpi_pci_root_info *ci)
-> +{
-> +	struct list_head *list = &ci->resources;
-> +	struct acpi_device *device = ci->bridge;
-> +	struct resource_entry *entry, *tmp;
-> +	unsigned long flags;
-> +	int ret;
-> +
-> +	flags = IORESOURCE_IO | IORESOURCE_MEM;
-> +	ret = acpi_dev_get_resources(device, list,
-> +				     acpi_dev_filter_resource_type_cb,
-> +				     (void *)flags);
-> +	if (ret < 0) {
-> +		dev_warn(&device->dev,
-> +			 "failed to parse _CRS method, error code %d\n", ret);
-> +		return ret;
-> +	} else if (ret == 0)
-> +		dev_dbg(&device->dev,
-> +			"no IO and memory resources present in _CRS\n");
-> +
-> +	resource_list_for_each_entry_safe(entry, tmp, &ci->resources) {
-> +		resource_size_t cpu_addr, length;
-> +		struct resource *res = entry->res;
-> +
-> +		if (entry->res->flags & IORESOURCE_DISABLED)
-> +			resource_list_destroy_entry(entry);
-> +		else
-> +			res->name = ci->name;
-> +
-> +		/* PCI -> CPU space translation */
-> +		cpu_addr = res->start + entry->offset;
-> +		length = res->end - res->start + 1;
+> +Required properties:
+> +- compatible : "mediatek,mt8173-vcodec-enc" for encoder
+> +- reg : Physical base address of the video codec registers and length of
+> +  memory mapped region.
+> +- interrupts : interrupt number to the cpu.
+> +- mediatek,larb : must contain the local arbiters in the current Socs.
+> +- clocks : list of clock specifiers, corresponding to entries in
+> +  the clock-names property;
+> +- clock-names: must contain "vencpll", "venc_lt_sel", "vcodecpll_370p5_ck"
+> +- iommus : list of iommus specifiers should be enabled for hw encode.
+> +  There are 2 cells needed to enable/disable iommu.
+> +  The first one is local arbiter index(larbid), and the other is port
+> +  index(portid) within local arbiter. Specifies the larbid and portid
+> +  as defined in dt-binding/memory/mt8173-larb-port.h.
 
-I see here is different from V2 patch,
-in V2 patch,  0x0000022004000000 is cpu addr.
-but in V3 patch, 0x0000022004000000 is pci addr.
-which one is right ?
+iommus have only one cell, as in the example below. Please fix the 
+binding description accordingly.
 
-0x0000022004000000  is the value of AddressMinimum.
-AddressMinimum evaluates to a 64-bit integer that specifies the lowest possible base address of the Memory range
-QWordMemory ( // 64-bit BAR Windows
-	ResourceProducer, PosDecode,
-	MinFixed, MaxFixed,
-	Cacheable, ReadWrite,
-	0x000000000000000, // Granularity
-	0x0000022004000000, // Min Base Address
-	0x000002200fffffff, // Max Base Address
-	0x0000021ff9000000, // Translate
-	0x000000000c000000 // Length
-)
+Regards,
+Matthias
 
-Thanks
-Dongdong
+> +- mediatek,vpu : the node of video processor unit
 > +
-> +		if (res->flags & IORESOURCE_MEM) {
-> +			res->start = cpu_addr;
-> +			res->end = cpu_addr + length - 1;
-> +		} else if (res->flags & IORESOURCE_IO) {
-> +			resource_size_t pci_addr = res->start;
-> +			unsigned long port;
-> +
-> +			if (pci_register_io_range(cpu_addr, length)) {
-> +				resource_list_destroy_entry(entry);
-> +				continue;
-> +			}
-> +
-> +			port = pci_address_to_pio(cpu_addr);
-> +			if (port == (unsigned long)-1) {
-> +				resource_list_destroy_entry(entry);
-> +				continue;
-> +			}
-> +
-> +			res->start = port;
-> +			res->end = port + length - 1;
-> +			entry->offset = port - pci_addr;
-> +
-> +			if (pci_remap_iospace(res, cpu_addr) < 0)
-> +				resource_list_destroy_entry(entry);
-> +		}
-> +	}
-> +	return ret;
-> +}
-> +
-> +static struct acpi_pci_root_ops acpi_pci_root_ops = {
-> +	.init_info = pci_mmcfg_setup_map,
-> +	.release_info = pci_mcfg_release_info,
-> +	.prepare_resources = pci_acpi_root_prepare_resources,
-> +};
-> +
-> +/* Root bridge scanning */
-> +struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
-> +{
-> +	int node = acpi_get_node(root->device->handle);
-> +	int domain = root->segment;
-> +	int busnum = root->secondary.start;
-> +	struct acpi_pci_root_info *info;
-> +	struct pci_host_bridge *bridge;
-> +	struct pci_bus *bus, *child;
-> +
-> +	if (domain && !pci_domains_supported) {
-> +		pr_warn("PCI %04x:%02x: multiple domains not supported.\n",
-> +			domain, busnum);
-> +		return NULL;
-> +	}
-> +
-> +	info = kzalloc_node(sizeof(*info), GFP_KERNEL, node);
-> +	if (!info) {
-> +		dev_err(&root->device->dev,
-> +			"pci_bus %04x:%02x: ignored (out of memory)\n",
-> +			domain, busnum);
-> +		return NULL;
-> +	}
-> +
-> +	acpi_pci_root_ops.pci_ops = pci_mcfg_get_ops(root);
-> +	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, info, root);
-> +	if (!bus)
-> +		return NULL;
-> +
-> +	bridge = pci_find_host_bridge(bus);
-> +	bridge->map_irq = pcibios_map_irq;
-> +
-> +	pci_bus_size_bridges(bus);
-> +	pci_bus_assign_resources(bus);
-> +
-> +	/*
-> +	 * After the PCI-E bus has been walked and all devices discovered,
-> +	 * configure any settings of the fabric that might be necessary.
-> +	 */
-> +	list_for_each_entry(child, &bus->children, node)
-> +		pcie_bus_configure_settings(child);
-> +
-> +	return bus;
-> +}
-> +#endif /* CONFIG_ARCH_PCI_HOST_GENERIC_ACPI */
-> +
->   static int acpi_pci_root_add(struct acpi_device *device,
->   			     const struct acpi_device_id *not_used)
->   {
+> +Example:
+> +vcodec_enc: vcodec at 0x18002000 {
+> +    compatible = "mediatek,mt8173-vcodec-enc";
+> +    reg = <0 0x18002000 0 0x1000>,    /*VENC_SYS*/
+> +          <0 0x19002000 0 0x1000>;    /*VENC_LT_SYS*/
+> +    interrupts = <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>,
+> +           <GIC_SPI 202 IRQ_TYPE_LEVEL_LOW>;
+> +    mediatek,larb = <&larb3>,
+> +		    <&larb5>;
+> +    iommus = <&iommu M4U_PORT_VENC_RCPU>,
+> +             <&iommu M4U_PORT_VENC_REC>,
+> +             <&iommu M4U_PORT_VENC_BSDMA>,
+> +             <&iommu M4U_PORT_VENC_SV_COMV>,
+> +             <&iommu M4U_PORT_VENC_RD_COMV>,
+> +             <&iommu M4U_PORT_VENC_CUR_LUMA>,
+> +             <&iommu M4U_PORT_VENC_CUR_CHROMA>,
+> +             <&iommu M4U_PORT_VENC_REF_LUMA>,
+> +             <&iommu M4U_PORT_VENC_REF_CHROMA>,
+> +             <&iommu M4U_PORT_VENC_NBM_RDMA>,
+> +             <&iommu M4U_PORT_VENC_NBM_WDMA>,
+> +             <&iommu M4U_PORT_VENC_RCPU_SET2>,
+> +             <&iommu M4U_PORT_VENC_REC_FRM_SET2>,
+> +             <&iommu M4U_PORT_VENC_BSDMA_SET2>,
+> +             <&iommu M4U_PORT_VENC_SV_COMA_SET2>,
+> +             <&iommu M4U_PORT_VENC_RD_COMA_SET2>,
+> +             <&iommu M4U_PORT_VENC_CUR_LUMA_SET2>,
+> +             <&iommu M4U_PORT_VENC_CUR_CHROMA_SET2>,
+> +             <&iommu M4U_PORT_VENC_REF_LUMA_SET2>,
+> +             <&iommu M4U_PORT_VENC_REC_CHROMA_SET2>;
+> +    mediatek,vpu = <&vpu>;
+> +    clocks = <&apmixedsys CLK_APMIXED_VENCPLL>,
+> +             <&topckgen CLK_TOP_VENC_LT_SEL>,
+> +             <&topckgen CLK_TOP_VCODECPLL_370P5>;
+> +    clock-names = "vencpll",
+> +                  "venc_lt_sel",
+> +                  "vcodecpll_370p5_ck";
+> +  };
 >
