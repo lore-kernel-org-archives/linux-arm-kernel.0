@@ -1,65 +1,121 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 18 Jan 2016 18:25:22 +0100
-Subject: [PATCH 4.4-rt2] fix
- arm-at91-pit-remove-irq-handler-when-clock-is-unused.patch
-In-Reply-To: <1452997394-8554-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1452997394-8554-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1452997394-8554-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20160118172522.GB12309@linutronix.de>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 18 Jan 2016 17:34:38 +0000
+Subject: [PATCH v2 12/16] ARM: Xen: Document UEFI support on Xen ARM
+ virtual platforms
+In-Reply-To: <20160118105115.GD21067@leverpostej>
+References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452840929-19612-13-git-send-email-zhaoshenglong@huawei.com>
+ <20160118105115.GD21067@leverpostej>
+Message-ID: <alpine.DEB.2.02.1601181710270.9400@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alexandre Belloni | 2016-01-17 03:23:14 [+0100]:
-
->index 80d74c4adcbe..43b50634d640 100644
->--- a/drivers/clocksource/timer-atmel-pit.c
->+++ b/drivers/clocksource/timer-atmel-pit.c
->@@ -96,11 +96,44 @@ static int pit_clkevt_shutdown(struct clock_event_device *dev)
+On Mon, 18 Jan 2016, Mark Rutland wrote:
+> On Fri, Jan 15, 2016 at 02:55:25PM +0800, Shannon Zhao wrote:
+> > From: Shannon Zhao <shannon.zhao@linaro.org>
+> > 
+> > Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
+> > scan this to get the UEFI information.
+> > 
+> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> > ---
+> >  Documentation/devicetree/bindings/arm/xen.txt | 42 +++++++++++++++++++++++++++
+> >  1 file changed, 42 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
+> > index 0f7b9c2..fbc17ae 100644
+> > --- a/Documentation/devicetree/bindings/arm/xen.txt
+> > +++ b/Documentation/devicetree/bindings/arm/xen.txt
+> > @@ -15,6 +15,36 @@ the following properties:
+> >  - interrupts: the interrupt used by Xen to inject event notifications.
+> >    A GIC node is also required.
+> >  
+> > +To support UEFI on Xen ARM virtual platforms, Xen pupulates the FDT "uefi" node
+> > +under /hypervisor with following parameters:
 > 
-> 	/* disable irq, leaving the clocksource active */
-> 	pit_write(data->base, AT91_PIT_MR, (data->cycle - 1) | AT91_PIT_PITEN);
->-	free_irq(atmel_pit_irq, data);
->+	if (!clockevent_state_detached(dev))
->+		free_irq(data->irq, data);
-
-I did it in the meantime without clockevent_state_detached(). From what
-it looks, it first sets the state and then invokes
-pit_clkevt_shutdown(). Any particular reason for this?
-
-> 	return 0;
-> }
+> s/pupulates/populates/
 > 
-> /*
->+ * IRQ handler for the timer.
->+ */
->+static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
+> > +
+> > +________________________________________________________________________________
+> > +Name                      | Size   | Description
+> > +================================================================================
+> > +xen,uefi-system-table     | 64-bit | Guest physical address of the UEFI System
+> > +			  |	   | Table.
+> > +--------------------------------------------------------------------------------
+> > +xen,uefi-mmap-start       | 64-bit | Guest physical address of the UEFI memory
+> > +			  |	   | map.
+> > +--------------------------------------------------------------------------------
+> > +xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
+> > +                          |        | pointed to in previous entry.
+> > +--------------------------------------------------------------------------------
+> > +xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
+> > +                          |        | memory map.
+> > +--------------------------------------------------------------------------------
+> > +xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
+> > +--------------------------------------------------------------------------------
+> > +
+> > +Below is the format of the mmap descriptor.
+> > +typedef struct {
+> > +	u32 type;
+> > +	u32 pad;
+> > +	u64 phys_addr;
+> > +	u64 virt_addr;
+> > +	u64 num_pages;
+> > +	u64 attribute;
+> > +} efi_memory_desc_t;
+> 
+> I don't think we should describe this here, as it duplicates the UEFI
+> spec, and is techincally incorrect the above is only guaranteed to be
+> the prefix of each memory descriptor -- that's why the
+> uefi-mmap-desc-size property exists.
+> 
+> We don't do this in Documentation/arm/uefi.txt, and I don't see why we
+> should do so here.
+> 
+> Does Xen handle arbitrary size memory map descriptors? I'm not sure what
+> new information might be passed in future additions to the descriptor
+> format, and I'm not sure what should happen in the Dom0 case.
 
-this is just here to avoid to forward declaration.
-?
->diff --git a/drivers/clocksource/timer-atmel-st.c b/drivers/clocksource/timer-atmel-st.c
->index ea37afc26e1b..11ce404d0791 100644
->--- a/drivers/clocksource/timer-atmel-st.c
->+++ b/drivers/clocksource/timer-atmel-st.c
->@@ -229,15 +229,15 @@ static void __init atmel_st_timer_init(struct device_node *node)
-> 	regmap_read(regmap_st, AT91_ST_SR, &val);
-> 
-> 	/* Get the interrupts property */
->-	irq  = irq_of_parse_and_map(node, 0);
->-	if (!irq)
->+	atmel_st_irq  = irq_of_parse_and_map(node, 0);
->+	if (!atmel_st_irq)
-> 		panic(pr_fmt("Unable to get IRQ from DT\n"));
-> 
-> 	sclk = of_clk_get(node, 0);
-> 	if (IS_ERR(sclk))
-> 		panic(pr_fmt("Unable to get slow clock\n"));
-> 
->-	clk_prepare_enable(sclk);
->+	ret = clk_prepare_enable(sclk);
-this piece applies to upstream v4.4.
+Xen passes to Dom0 the memory map in the same format as the native
+memory map.
 
-> 	if (ret)
-> 		panic(pr_fmt("Could not enable slow clock\n"));
-> 
 
-Sebastian
+> >  Example (assuming #address-cells = <2> and #size-cells = <2>):
+> >  
+> > @@ -22,4 +52,16 @@ hypervisor {
+> >  	compatible = "xen,xen-4.3", "xen,xen";
+> >  	reg = <0 0xb0000000 0 0x20000>;
+> >  	interrupts = <1 15 0xf08>;
+> > +	uefi {
+> > +		xen,uefi-system-table = <0xXXXXXXXX>;
+> > +		xen,uefi-mmap-start = <0xXXXXXXXX>;
+> > +		xen,uefi-mmap-size = <0xXXXXXXXX>;
+> > +		xen,uefi-mmap-desc-size = <0xXXXXXXXX>;
+> > +		xen,uefi-mmap-desc-ver = <0xXXXXXXXX>;
+> > +        };
+> >  };
+> > +
+> > +These "xen,uefi-*" parameters are similar to those in Documentation/arm/uefi.txt
+> > +which are used by normal UEFI. But to Xen ARM virtual platforms, it needs to
+> > +introduce a Xen specific UEFI and it doesn't want to mix with normal UEFI.
+> > +Therefore, it defines these parameters under /hypervisor node.
+> 
+> Could we please describe what that actual difference is?
+> 
+> I know that the OS must handle a system table differently under Xen, but
+> this doesn't describe what it should do.
+
+For a reference, the hypercall interface is described in not so many words here:
+
+include/xen/interface/platform.h
+http://xenbits.xen.org/gitweb/?p=xen.git;a=blob_plain;f=xen/include/public/platform.h;hb=HEAD
+
+However it is clear that platform.h also contains some x86 specific
+calls, for example xenpf_set_processor_pminfo. It might be a good idea
+to list the calls that are available on ARM64.
+
+
+> I assume that the OS can handle the memory map in an identical fashion
+> to when it is native. Is that true?
+ 
+Yes, I think that's true.
