@@ -1,83 +1,128 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 18 Jan 2016 09:09:31 +0100
-Subject: [PATCH v3 3/5] ARM: at91/dt: sama5d2: add adc device
-In-Reply-To: <20160118075931.GC10663@odux.rfo.atmel.com>
-References: <1452785897-16270-1-git-send-email-ludovic.desroches@atmel.com>
- <1452785897-16270-4-git-send-email-ludovic.desroches@atmel.com>
- <569A2BB6.4070602@kernel.org> <20160118075931.GC10663@odux.rfo.atmel.com>
-Message-ID: <569C9DBB.6060808@atmel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 18 Jan 2016 09:09:29 +0100
+Subject: [PATCH] MAINTAINERS: Update mailing list for Renesas SoC
+ Development
+In-Reply-To: <1453079073-30937-1-git-send-email-horms+renesas@verge.net.au>
+References: <1453079073-30937-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXF8QnKsLOYFnT7Rje5G9_7Xr0NesO2SKEkWSivKQYkbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 18/01/2016 08:59, Ludovic Desroches a ?crit :
-> On Sat, Jan 16, 2016 at 11:38:30AM +0000, Jonathan Cameron wrote:
->> On 14/01/16 15:38, Ludovic Desroches wrote:
->>> Add the ADC device, and remove the adc_op_clk which is useless since the
->>> adc sampling frequency is configured with sysfs.
->>>
->>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->> I've now applied the driver to the togreg branch of iio.git.
->> Should get a pull request out to Greg in about 2 weeks time and it'll
->> probably be in linux-next a week after that.  I'm assuming all the device
->> tree changes will got through the at91 tree and arm-soc etc. 
->> Shout if you want me to take them through IIO.
->>
-> 
-> Ok, I think Nicolas would take this patch.
+CC linux-arm-kernel
 
-Sure, we'll take them through AT91 then arm-soc trees.
+On Mon, Jan 18, 2016 at 2:04 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Update the mailing list used for development of support for
+> Renesas SoCs and related drivers.
+>
+> Up until now the linux-sh mailing list has been used, however,
+> Renesas SoCs are now much wider than the SH architecture and there
+> is some desire from some for the linux-sh list to refocus on
+> discussion of the work on the SH architecture.
+>
+> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Thanks, bye.
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
+> ---
+> * This patch applies on top of Linus's tree where currently the head commit
+>   is 984065055e6e ("Merge branch 'drm-next' of
+>   git://people.freedesktop.org/~airlied/linux")
+>
+>   This has been used as a base instead of v4.4 so that it is based on the
+>   following two commits which affect it:
+>   - 1a4ca6dd3dc8 ("MAINTAINERS: Add co-maintainer for Renesas Pin Controllers")
+>   - 3e46c3973cba ("MAINTAINERS: add Renesas usb2 phy driver")
 
->>> ---
->>>  arch/arm/boot/dts/sama5d2.dtsi | 18 ++++++++++++------
->>>  1 file changed, 12 insertions(+), 6 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
->>> index 3f750f6..46dd430 100644
->>> --- a/arch/arm/boot/dts/sama5d2.dtsi
->>> +++ b/arch/arm/boot/dts/sama5d2.dtsi
->>> @@ -88,12 +88,6 @@
->>>  			#clock-cells = <0>;
->>>  			clock-frequency = <0>;
->>>  		};
->>> -
->>> -		adc_op_clk: adc_op_clk{
->>> -			compatible = "fixed-clock";
->>> -			#clock-cells = <0>;
->>> -			clock-frequency = <1000000>;
->>> -		};
->>>  	};
->>>  
->>>  	ns_sram: sram at 00200000 {
->>> @@ -1085,6 +1079,18 @@
->>>  				status = "disabled";
->>>  			};
->>>  
->>> +			adc: adc at fc030000 {
->>> +				compatible = "atmel,sama5d2-adc";
->>> +				reg = <0xfc030000 0x100>;
->>> +				interrupts = <40 IRQ_TYPE_LEVEL_HIGH 7>;
->>> +				clocks = <&adc_clk>;
->>> +				clock-names = "adc_clk";
->>> +				atmel,min-sample-rate-hz = <200000>;
->>> +				atmel,max-sample-rate-hz = <20000000>;
->>> +				atmel,startup-time-ms = <4>;
->>> +				status = "disabled";
->>> +			};
->>> +
->>>  			pioA: pinctrl at fc038000 {
->>>  				compatible = "atmel,sama5d2-pinctrl";
->>>  				reg = <0xfc038000 0x600>;
->>>
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+I assume you'll send an update for the "ARM/RENESAS ARM64 ARCHITECTURE"
+section as soon as that has landed in mainline?
 
+> ---
+>  MAINTAINERS | 16 ++++++++--------
+>  1 file changed, 8 insertions(+), 8 deletions(-)
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 1d23f701489c..52a6ba79fa3f 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1531,9 +1531,9 @@ F:        drivers/media/platform/s5p-jpeg/
+>  ARM/SHMOBILE ARM ARCHITECTURE
+>  M:     Simon Horman <horms@verge.net.au>
+>  M:     Magnus Damm <magnus.damm@gmail.com>
+> -L:     linux-sh at vger.kernel.org
+> +L:     linux-renesas-soc at vger.kernel.org
+>  W:     http://oss.renesas.com
+> -Q:     http://patchwork.kernel.org/project/linux-sh/list/
+> +Q:     http://patchwork.kernel.org/project/linux-renesas-soc/list/
+>  T:     git git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git next
+>  S:     Supported
+>  F:     arch/arm/boot/dts/emev2*
+> @@ -3745,7 +3745,7 @@ F:        Documentation/devicetree/bindings/display/tegra/nvidia,tegra20-host1x.txt
+>  DRM DRIVERS FOR RENESAS
+>  M:     Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>  L:     dri-devel at lists.freedesktop.org
+> -L:     linux-sh at vger.kernel.org
+> +L:     linux-renesas-soc at vger.kernel.org
+>  T:     git git://people.freedesktop.org/~airlied/linux
+>  S:     Supported
+>  F:     drivers/gpu/drm/rcar-du/
+> @@ -6858,7 +6858,7 @@ F:        drivers/iio/potentiometer/mcp4531.c
+>  MEDIA DRIVERS FOR RENESAS - VSP1
+>  M:     Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>  L:     linux-media at vger.kernel.org
+> -L:     linux-sh at vger.kernel.org
+> +L:     linux-renesas-soc at vger.kernel.org
+>  T:     git git://linuxtv.org/media_tree.git
+>  S:     Supported
+>  F:     Documentation/devicetree/bindings/media/renesas,vsp1.txt
+> @@ -8235,7 +8235,7 @@ F:        drivers/pci/host/pci-dra7xx.c
+>  PCI DRIVER FOR RENESAS R-CAR
+>  M:     Simon Horman <horms@verge.net.au>
+>  L:     linux-pci at vger.kernel.org
+> -L:     linux-sh at vger.kernel.org
+> +L:     linux-renesas-soc at vger.kernel.org
+>  S:     Maintained
+>  F:     drivers/pci/host/*rcar*
+>
+> @@ -8413,7 +8413,7 @@ F:        drivers/pinctrl/intel/
+>  PIN CONTROLLER - RENESAS
+>  M:     Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>  M:     Geert Uytterhoeven <geert+renesas@glider.be>
+> -L:     linux-sh at vger.kernel.org
+> +L:     linux-renesas-soc at vger.kernel.org
+>  S:     Maintained
+>  F:     drivers/pinctrl/sh-pfc/
+>
+> @@ -9019,13 +9019,13 @@ F:      include/linux/rpmsg.h
+>  RENESAS ETHERNET DRIVERS
+>  R:     Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>  L:     netdev at vger.kernel.org
+> -L:     linux-sh at vger.kernel.org
+> +L:     linux-renesas-soc at vger.kernel.org
+>  F:     drivers/net/ethernet/renesas/
+>  F:     include/linux/sh_eth.h
+>
+>  RENESAS USB2 PHY DRIVER
+>  M:     Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> -L:     linux-sh at vger.kernel.org
+> +L:     linux-renesas-soc at vger.kernel.org
+>  S:     Maintained
+>  F:     drivers/phy/phy-rcar-gen3-usb2.c
+>
+> --
+> 2.1.4
 
--- 
-Nicolas Ferre
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
