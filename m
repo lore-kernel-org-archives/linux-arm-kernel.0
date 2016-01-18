@@ -1,71 +1,73 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 18 Jan 2016 14:42:55 +0530
-Subject: [PATCH v3 2/3] ARM: DRA7: add pdata-quirks to do reset of PCIe
-In-Reply-To: <56994B72.2@ti.com>
-References: <1452780672-14339-1-git-send-email-kishon@ti.com>
- <1452780672-14339-3-git-send-email-kishon@ti.com> <56994640.3090704@ti.com>
- <20160115192224.GD3904@atomide.com> <56994B72.2@ti.com>
-Message-ID: <569CAC97.3030703@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 18 Jan 2016 09:28:20 +0000
+Subject: [PATCH] help guest boot up on AArch64 host with GICv2
+In-Reply-To: <56995068.9050207@ezchip.com>
+References: <56995068.9050207@ezchip.com>
+Message-ID: <569CB034.1060307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 16 January 2016 01:11 AM, Suman Anna wrote:
-> On 01/15/2016 01:22 PM, Tony Lindgren wrote:
->> * Suman Anna <s-anna@ti.com> [160115 11:20]:
->>> On 01/14/2016 08:11 AM, Kishon Vijay Abraham I wrote:
->>>> Create platform data for PCIe and populate it with function
->>>> pointers to perform assert and deassert of PCIe reset lines.
->>>> The PCIe driver can use the callbacks provided here to
->>>> reset the PCIe.
->>>> This will be removed once the reset contoller driver is
->>>> available to reset PCIe.
->> ...
->>
->>>> +/**
->>>> + * struct pci_dra7xx_platform_data - platform data specific to pci in dra7xx
->>>> + * @reset_name: name of the reset line
->>>> + * @assert_reset: callback for performing assert reset operation
->>>> + * @deassert_reset: callback for performing deassert reset operation
->>>> + */
->>>> +struct pci_dra7xx_platform_data {
->>>> +	const char *reset_name;
->>>> +
->>>> +	int (*assert_reset)(struct platform_device *pdev, const char *name);
->>>> +	int (*deassert_reset)(struct platform_device *pdev, const char *name);
->>>> +};
->>
->> I doubt this platform_data is dra7 specific. I believe it's
->> the same PCI controller that has been in the omap variants for
->> years?
+Hi Chris,
+
+On 15/01/16 20:02, Chris Metcalf wrote:
+> We are using GICv2 compatibility mode in the Fast Models/Foundation 
+> Models simulations we are running because the boot code (ATF/UEFI) 
+> doesn't support GICv3 in our system at the moment.
 > 
-> AFAIK, this only applies to DRA7. Sekhar/Kishon can confirm. I did take
-> a quick look at OMAP3/4/5 TRMs, and didn't find any. Neither did a grep
-> on current hwmod files other than DRA7. There's a DM81xx related PCI
-> clock domain, but don't see any corresponding driver/device for the same.
+> However, starting with kernel 4.2, the guest couldn't boot up because it 
+> wasn't getting timer interrupts.  I tracked this down to a kernel commit 
+> that switched to using the "alternatives" mechanism -- rather than 
+> seeing either a GICv2 or GICv3 and configuring appropriately, the KVM 
+> code just configured the code that saves/restores the vgic state based 
+> on the presence of the system register interface to the GIC CPU 
+> interface.  See the attached patch for a fix that manages this 
+> differently and allows me to boot up the guest in this configuration.
+> 
+> However, even assuming this patch can be taken into an upstream tree, I 
+> still have a couple of additional problems:
+> 
+> - I can boot up with the Foundation Models using this change, but not 
+> with the Fast Models (again, using a v3 GIC but in v2 compatibility mode 
+> in the device tree).  The Fast Models dts looks like it has the same 
+> configuration for the GIC and the timers so I'm not sure what's going on 
+> here.  Any suggestions appreciated.
+> 
+> - Without this change, I could only boot kernels up to 4.1.  With the 
+> change, I can boot kernels up to 4.3.  But 4.4 won't boot for me either; 
+> I haven't bisected it down yet.  So any suggestions on what might be 
+> going wrong here would also be appreciated.
+> 
+> We are planning to eventually use GICv3 mode in our software stack but 
+> for the time being I assume it is interesting to resolve issues with GIC 
+> v2 compatibility mode on GIC v3.
+> 
 
-Like Suman, I do not know of any TI SoC that came off the OMAP mobile
-business that has PCIe.
+I'm afraid that this is the wrong approach. Whilst 4.2 was a bit too
+eager to use GICv3 (only checking the CPU capability and ignoring the
+actual state of the EL2/EL3 SRE bits), the fact that 4.4 doesn't boot is
+probably the sign of a broken firmware that enables the system register
+interface at EL3, letting the rest of the software stack to use GICv3 in
+native mode, and yet providing a GICv2 DT.
 
-DM81xx has a PCIe (but no mainline driver). Both DM81xx and DRA7x use a
-designware core. But, the glue layer (which is the subject of interest
-here), is completely different. I looked at the DM81xx driver in TI
-kernel[1] to confirm this.
+This combination is unpredictable, and is likely to  cause issues on
+some HW implementations.
 
-I remember talking to Kishon about similarities between the DM81xx and
-DRA7x PCIe subsystem and remember that he too mentioned that they are
-quite different.
+Could you please point me to the firmware you're using?
 
-For an IP like PCIeSS, its quite difficult to come-up with unique names
-without using the name of the platform they first appeared in. Anyway,
-the driver is already called "pci-dra7xx", so I guess there is no harm
-in having that name in platform data as well. That in itself should not
-preclude its use on other platforms later (although I agree having a
-generic name would be ideal).
+Also, please check the following patches:
+
+6d32ab2 arm64: Update booting requirements for GICv3 in GICv2 mode
+76e52dd irqchip/gic: Warn if GICv3 system registers are enabled
+963fcd4 arm64: cpufeatures: Check ICC_EL1_SRE.SRE before enabling
+ARM64_HAS_SYSREG_GIC_CPUIF
+7cabd00 irqchip/gic-v3: Make gic_enable_sre an inline function
+d271976 arm64: el2_setup: Make sure ICC_SRE_EL2.SRE sticks before using
+GICv3 sysregs
+
+Can you point me to the one that prevents you from booting?
 
 Thanks,
-Sekhar
 
-PS: Kishon is out-of-office till the end of the month
-
-[1]
-http://arago-project.org/git/projects/?p=linux-omap3.git;a=blob;f=arch/arm/mach-omap2/pcie-ti81xx.c;h=05ae4f1df85a35e91a770435c50777a31de4f1ca;hb=4f1fb3bea4cc381c76e8e439f8af393c1a698dfc#l70
+	M.
+-- 
+Jazz is not dead. It just smells funny...
