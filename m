@@ -1,45 +1,162 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Jan 2016 14:28:06 +0900
-Subject: [PATCH v4 11/14] ARM: dts: gose: enable sound DMA support via BUSIF
- in device tree
+Date: Mon, 18 Jan 2016 14:28:09 +0900
+Subject: [PATCH v4 14/14] ARM: dts: r8a7793: enable audio DMAC in device tree
 In-Reply-To: <1453094889-25204-1-git-send-email-horms+renesas@verge.net.au>
 References: <1453094889-25204-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1453094889-25204-12-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1453094889-25204-15-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable DMA transfer to/from SSIU in gose/r8a7791 device tree.
+Enable audio DMAC (= rcar-dmac) in r8a7793 device tree.
 
-     DMA
-[MEM] -> [SSIU] -> [SSI]
-
-     DMA
-[MEM] <- [SSIU] <- [SSI]
-
-Based on similar work for the r8a7791/koelsch by Kuninori Morimoto.
+Based on similar work for the r8a7791 by Kuninori Morimoto.
 
 Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7793-gose.dts | 5 -----
- 1 file changed, 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index 0ab0abb9f889..4a7048d676c8 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -321,11 +321,6 @@
- 	};
- };
+---
+v4
+* Use GIC_SPI in interrupts properties
+---
+ arch/arm/boot/dts/r8a7793.dtsi | 91 ++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 79 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index b95aa1ced90d..bcaf281ca9e5 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -1201,52 +1201,119 @@
+ 		status = "disabled";
  
--&ssi0 {
--	no-busif;
--};
--
- &ssi1 {
--	no-busif;
- 	shared-pin;
- };
+ 		rcar_sound,dvc {
+-			dvc0: dvc at 0 { };
+-			dvc1: dvc at 1 { };
++			dvc0: dvc at 0 {
++				dmas = <&audma0 0xbc>;
++				dma-names = "tx";
++			};
++			dvc1: dvc at 1 {
++				dmas = <&audma0 0xbe>;
++				dma-names = "tx";
++			};
+ 		};
++
+ 		rcar_sound,src {
+-			src0: src at 0 { };
+-			src1: src at 1 { };
+-			src2: src at 2 { };
+-			src3: src at 3 { };
+-			src4: src at 4 { };
+-			src5: src at 5 { };
+-			src6: src at 6 { };
+-			src7: src at 7 { };
+-			src8: src at 8 { };
+-			src9: src at 9 { };
++			src0: src at 0 {
++				interrupts = <GIC_SPI 352 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x85>, <&audma1 0x9a>;
++				dma-names = "rx", "tx";
++			};
++			src1: src at 1 {
++				interrupts = <GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x87>, <&audma1 0x9c>;
++				dma-names = "rx", "tx";
++			};
++			src2: src at 2 {
++				interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x89>, <&audma1 0x9e>;
++				dma-names = "rx", "tx";
++			};
++			src3: src at 3 {
++				interrupts = <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x8b>, <&audma1 0xa0>;
++				dma-names = "rx", "tx";
++			};
++			src4: src at 4 {
++				interrupts = <GIC_SPI 356 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x8d>, <&audma1 0xb0>;
++				dma-names = "rx", "tx";
++			};
++			src5: src at 5 {
++				interrupts = <GIC_SPI 357 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x8f>, <&audma1 0xb2>;
++				dma-names = "rx", "tx";
++			};
++			src6: src at 6 {
++				interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x91>, <&audma1 0xb4>;
++				dma-names = "rx", "tx";
++			};
++			src7: src at 7 {
++				interrupts = <GIC_SPI 359 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x93>, <&audma1 0xb6>;
++				dma-names = "rx", "tx";
++			};
++			src8: src at 8 {
++				interrupts = <GIC_SPI 360 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x95>, <&audma1 0xb8>;
++				dma-names = "rx", "tx";
++			};
++			src9: src at 9 {
++				interrupts = <GIC_SPI 361 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x97>, <&audma1 0xba>;
++				dma-names = "rx", "tx";
++			};
+ 		};
+ 
+ 		rcar_sound,ssi {
+ 			ssi0: ssi at 0 {
+ 				interrupts = <GIC_SPI 370 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x01>, <&audma1 0x02>, <&audma0 0x15>, <&audma1 0x16>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 			ssi1: ssi at 1 {
+ 				 interrupts = <GIC_SPI 371 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x03>, <&audma1 0x04>, <&audma0 0x49>, <&audma1 0x4a>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 			ssi2: ssi at 2 {
+ 				interrupts = <GIC_SPI 372 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x05>, <&audma1 0x06>, <&audma0 0x63>, <&audma1 0x64>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 			ssi3: ssi at 3 {
+ 				interrupts = <GIC_SPI 373 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x07>, <&audma1 0x08>, <&audma0 0x6f>, <&audma1 0x70>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 			ssi4: ssi at 4 {
+ 				interrupts = <GIC_SPI 374 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x09>, <&audma1 0x0a>, <&audma0 0x71>, <&audma1 0x72>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 			ssi5: ssi at 5 {
+ 				interrupts = <GIC_SPI 375 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x0b>, <&audma1 0x0c>, <&audma0 0x73>, <&audma1 0x74>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 			ssi6: ssi at 6 {
+ 				interrupts = <GIC_SPI 376 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x0d>, <&audma1 0x0e>, <&audma0 0x75>, <&audma1 0x76>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 			ssi7: ssi at 7 {
+ 				interrupts = <GIC_SPI 377 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x0f>, <&audma1 0x10>, <&audma0 0x79>, <&audma1 0x7a>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 			ssi8: ssi at 8 {
+ 				interrupts = <GIC_SPI 378 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x11>, <&audma1 0x12>, <&audma0 0x7b>, <&audma1 0x7c>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 			ssi9: ssi at 9 {
+ 				interrupts = <GIC_SPI 379 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&audma0 0x13>, <&audma1 0x14>, <&audma0 0x7d>, <&audma1 0x7e>;
++				dma-names = "rx", "tx", "rxu", "txu";
+ 			};
+ 		};
+ 	};
 -- 
 2.1.4
