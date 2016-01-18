@@ -1,124 +1,106 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 18 Jan 2016 19:26:04 +0900
-Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
-In-Reply-To: <20160115201601.GR3262@leverpostej>
-References: <cover.1452884156.git.geoff@infradead.org>
- <fb4506943bbaed8b0657ed367ebd57e4064d57ed.1452884156.git.geoff@infradead.org>
- <20160115201601.GR3262@leverpostej>
-Message-ID: <569CBDBC.5050500@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 18 Jan 2016 10:32:17 +0000
+Subject: [PATCH v2 01/16] Xen: ACPI: Hide UART used by Xen
+In-Reply-To: <1452840929-19612-2-git-send-email-zhaoshenglong@huawei.com>
+References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452840929-19612-2-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20160118103216.GB21067@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2016 05:16 AM, Mark Rutland wrote:
-> On Fri, Jan 15, 2016 at 07:18:38PM +0000, Geoff Levand wrote:
->> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
->>
->> This patch adds arch specific descriptions about kdump usage on arm64
->> to kdump.txt.
->>
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> ---
->>   Documentation/kdump/kdump.txt | 23 ++++++++++++++++++++++-
->>   1 file changed, 22 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
->> index bc4bd5a..36cf978 100644
->> --- a/Documentation/kdump/kdump.txt
->> +++ b/Documentation/kdump/kdump.txt
->> @@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
->>   a remote system.
->>
->>   Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
->> -s390x and arm architectures.
->> +s390x, arm and arm64 architectures.
->>
->>   When the system kernel boots, it reserves a small section of memory for
->>   the dump-capture kernel. This ensures that ongoing Direct Memory Access
->> @@ -249,6 +249,20 @@ Dump-capture kernel config options (Arch Dependent, arm)
->>
->>       AUTO_ZRELADDR=y
->>
->> +Dump-capture kernel config options (Arch Dependent, arm64)
->> +----------------------------------------------------------
->> +
->> +1) The maximum memory size on the dump-capture kernel must be limited by
->> +   specifying:
->> +
->> +   mem=X[MG]
->> +
->> +   where X should be less than or equal to the size in "crashkernel="
->> +   boot parameter. Kexec-tools will automatically add this.
->
->
-> This is extremely fragile, and will trivially fail when the kernel can
-> be loaded anywhere (see [1]).
+On Fri, Jan 15, 2016 at 02:55:14PM +0800, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> ACPI 6.0 introduces a new table STAO to list the devices which are used
+> by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
+> UART is used by Xen. So here it hides UART from Dom0.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+> CC: "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI)
+> CC: Len Brown <lenb@kernel.org> (supporter:ACPI)
+> CC: linux-acpi at vger.kernel.org (open list:ACPI)
+> ---
+>  drivers/acpi/bus.c | 30 ++++++++++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
+> 
+> diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
+> index a212cef..d7a559f 100644
+> --- a/drivers/acpi/bus.c
+> +++ b/drivers/acpi/bus.c
+> @@ -46,6 +46,7 @@ ACPI_MODULE_NAME("bus");
+>  struct acpi_device *acpi_root;
+>  struct proc_dir_entry *acpi_root_dir;
+>  EXPORT_SYMBOL(acpi_root_dir);
+> +static u64 spcr_uart_addr;
+>  
+>  #ifdef CONFIG_X86
+>  #ifdef CONFIG_ACPI_CUSTOM_DSDT
+> @@ -93,6 +94,17 @@ acpi_status acpi_bus_get_status_handle(acpi_handle handle,
+>  {
+>  	acpi_status status;
+>  
+> +	if (spcr_uart_addr != 0xffffffffffffffff) {
 
-As I said before, this restriction also exists on arm, but I understand
-that recent Ard's patches break it.
+The SPCR spec says that the Base Address fields being zero means that
+console redirection is disabled (though I'm not clear on whether or not
+that requires the whole acpi_generic_address to be zero).
 
-> We must explicitly describe the set of regions the crash kernel may use
-> (i.e. we need base and size). NAK in the absence of that.
+Can we not use that here?
 
-There seem to exist several approaches:
-(a) use a device-tree property, "linux,usable-memory", in addition to "reg"
-     under "memory" node
-(b) use a kernel's early parameter, "memmap=nn[@#$]ss"
+Mark.
 
-Power PC takes (a), while this does not work on efi-started kernel
-because dtb has no "memory" nodes under efi.
-X86 takes (b). If we take this, we will need to overwrite a weak
-early_init_dt_add_memory().
-(I thought that this approach was not smart as we have three different
-ways to specify memory regions, dtb, efi and this kernel parameter.)
-
-Do you have any other ideas?
-
-Thanks,
--Takahiro AKASHI
-
-
-> Thanks,
-> Mark.
->
->> +
->> +2) Currently, kvm will not be enabled on the dump-capture kernel even
->> +   if it is configured.
->> +
->>   Extended crashkernel syntax
->>   ===========================
->>
->> @@ -312,6 +326,8 @@ Boot into System Kernel
->>      any space below the alignment point may be overwritten by the dump-capture kernel,
->>      which means it is possible that the vmcore is not that precise as expected.
->>
->> +   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
->> +   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
->>
->>   Load the Dump-capture Kernel
->>   ============================
->> @@ -334,6 +350,8 @@ For s390x:
->>   	- Use image or bzImage
->>   For arm:
->>   	- Use zImage
->> +For arm64:
->> +	- Use vmlinux or Image
->>
->>   If you are using a uncompressed vmlinux image then use following command
->>   to load dump-capture kernel.
->> @@ -377,6 +395,9 @@ For s390x:
->>   For arm:
->>   	"1 maxcpus=1 reset_devices"
->>
->> +For arm64:
->> +	"1 mem=X[MG] maxcpus=1 reset_devices"
->> +
->>   Notes on loading the dump-capture kernel:
->>
->>   * By default, the ELF headers are stored in ELF64 format to support
->> --
->> 2.5.0
->>
->>
->
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/398527.html
->
+> +		u64 addr;
+> +
+> +		status = acpi_evaluate_integer(handle, METHOD_NAME__ADR, NULL,
+> +					       &addr);
+> +		if (ACPI_SUCCESS(status) && (addr == spcr_uart_addr)) {
+> +			*sta = 0;
+> +			return AE_OK;
+> +		}
+> +	}
+> +
+>  	status = acpi_evaluate_integer(handle, "_STA", NULL, sta);
+>  	if (ACPI_SUCCESS(status))
+>  		return AE_OK;
+> @@ -1069,6 +1081,8 @@ EXPORT_SYMBOL_GPL(acpi_kobj);
+>  static int __init acpi_init(void)
+>  {
+>  	int result;
+> +	acpi_status status;
+> +	struct acpi_table_stao *stao_ptr;
+>  
+>  	if (acpi_disabled) {
+>  		printk(KERN_INFO PREFIX "Interpreter disabled.\n");
+> @@ -1081,6 +1095,22 @@ static int __init acpi_init(void)
+>  		acpi_kobj = NULL;
+>  	}
+>  
+> +	/* If there is STAO table, check whether it needs to ignore the UART
+> +	 * device in SPCR table.
+> +	 */
+> +	spcr_uart_addr = 0xffffffffffffffff;
+> +	status = acpi_get_table(ACPI_SIG_STAO, 0,
+> +				(struct acpi_table_header **)&stao_ptr);
+> +	if (ACPI_SUCCESS(status)) {
+> +		if (stao_ptr->ignore_uart) {
+> +			struct acpi_table_spcr *spcr_ptr;
+> +
+> +			acpi_get_table(ACPI_SIG_SPCR, 0,
+> +				       (struct acpi_table_header **)&spcr_ptr);
+> +			spcr_uart_addr = spcr_ptr->serial_port.address;
+> +		}
+> +	}
+> +
+>  	init_acpi_device_notify();
+>  	result = acpi_bus_init();
+>  	if (result) {
+> -- 
+> 2.0.4
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
