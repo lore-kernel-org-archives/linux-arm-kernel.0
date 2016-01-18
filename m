@@ -1,45 +1,56 @@
-From: leoli@freescale.com (Li Yang)
-Date: Mon, 18 Jan 2016 16:22:51 +0800
-Subject: [PATCH v3] i2c: imx: make bus recovery through pinctrl optional
-In-Reply-To: <20160115090343.GK24441@pengutronix.de>
-References: <1452842844-16256-1-git-send-email-leoyang.li@nxp.com>
- <20160115075356.GI24441@pengutronix.de>
- <CADRPPNT=+amxRcea=N7m96=wKgdbRmU8R5cBACvTn7XffKofzQ@mail.gmail.com>
- <20160115090343.GK24441@pengutronix.de>
-Message-ID: <CADRPPNR2YDj43XjJUQszEUkKDj256L6p=N2QYteFG8uAfBYdMw@mail.gmail.com>
+From: kvalo@codeaurora.org (Kalle Valo)
+Date: Mon, 18 Jan 2016 10:26:29 +0200
+Subject: [PATCH, RESEND] ssb: mark ssb_bus_register as __maybe_unused
+In-Reply-To: <CACna6ryvDFHqwJ3ExURcyFT2ZaT9fS9v36wCnJfze5BLnE88og@mail.gmail.com>
+ (=?utf-8?Q?=22Rafa=C5=82_Mi=C5=82ecki=22's?= message of "Sat, 16 Jan 2016
+ 15:44:23 +0100")
+References: <8128014.DbbgBtKY3z@wuerfel>
+ <8760ywd5fe.fsf@kamboji.qca.qualcomm.com> <4037550.DMaVTE01Aq@wuerfel>
+ <87bn8l7miw.fsf@kamboji.qca.qualcomm.com>
+ <CACna6ryvDFHqwJ3ExURcyFT2ZaT9fS9v36wCnJfze5BLnE88og@mail.gmail.com>
+Message-ID: <87y4bn5m4q.fsf@kamboji.qca.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 5:03 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> Hello Li,
->
-> On Fri, Jan 15, 2016 at 04:46:06PM +0800, Li Yang wrote:
->> On Fri, Jan 15, 2016 at 3:53 PM, Uwe Kleine-K?nig
->> <u.kleine-koenig@pengutronix.de> wrote:
->> >> -     i2c_imx_init_recovery_info(i2c_imx, pdev);
->> >> +     if (IS_ERR_OR_NULL(i2c_imx->pinctrl))
->> >
->> > I'd prefer to set i2c_imx->pinctrl to NULL if it's not used and then use
->> >
->> >         if (!i2c_imx->pinctrl)
->> >
->> > here. (Or maybe make i2c_imx_init_recovery_info aware of this situation
->> > to keep the caller simple?)
+Rafa? Mi?ecki <zajec5@gmail.com> writes:
+
+> On 16 January 2016 at 13:10, Kalle Valo <kvalo@codeaurora.org> wrote:
+>> Arnd Bergmann <arnd@arndb.de> writes:
 >>
->> Setting not used pointer to NULL might be a good coding practice
->> generally.  But in this case neither the driver nor gpio framework
->> checks if the pinctrl is NULL before accessing it.  We still need the
->> driver to make sure pinctrl is not used in this situation.  The
->> benefit of the proposed change seems to be pretty limited.  :)
+>>> On Thursday 14 January 2016 08:46:29 Kalle Valo wrote:
+>>>> I can take it. For historical reasons ssb patches go through my
+>>>> wireless-drivers trees.
+>>>
+>>> I found this in my backlog, and I believe it still applies. Can you take
+>>> that one too?
+>>
+>> I'm not sure what you mean here, I can take any ssb patch if it's ok for
+>> Michael or Rafal :)
+>>
+>> Just please submit the patch properly (with S-o-B line) and CC
+>> linux-wireless so that it goes to patchwork.
 >
-> At least it gets rid of IS_ERR_OR_NULL which is used wrongly more often
-> than not.
+> It was already sent once and Acked by Michael:
+> https://patchwork.kernel.org/patch/7543191/
+>
+> The problem was not cc-ing linux-wireless so it wasn't picked by the
+> linux-wireless patchwork.
 
-It's true that this API is not used a lot.  Are you suggesting that it
-is poorly designed and probably should be removed?  But I still don't
-quite get the point why it tends to be wrongly used.  Do you consider
-the use in this patch a wrongly used case?
+Ah, that's why I missed it. I only follow patchwork, I basically ignore
+patches which are sent via email. Arnd, can you please resend the patch
+and CC linux-wireless? Sorry for the trouble.
 
-Regards,
-Leo
+To avoid this in the future I think we should replace netdev with
+linux-wireless in the MAINTAINERS entry:
+
+SONICS SILICON BACKPLANE DRIVER (SSB)
+M:      Michael Buesch <m@bues.ch>
+L:      netdev at vger.kernel.org
+S:      Maintained
+F:      drivers/ssb/
+F:      include/linux/ssb/
+
+Are people ok with that? Patches welcome :)
+
+-- 
+Kalle Valo
