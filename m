@@ -1,209 +1,165 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Jan 2016 17:15:14 +0000
-Subject: [PATCH v4] drm/rockchip: hdmi: add Innosilicon HDMI support
-In-Reply-To: <1453128140-29208-1-git-send-email-ykk@rock-chips.com>
-References: <1453128123-29155-1-git-send-email-ykk@rock-chips.com>
- <1453128140-29208-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <20160118171514.GG19062@n2100.arm.linux.org.uk>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 18 Jan 2016 18:23:12 +0100
+Subject: [RFC PATCH v2 0/4] CPUs capacity information for heterogeneous
+ systems
+In-Reply-To: <20160118170854.GB10332@e106622-lin>
+References: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
+ <56994D87.6000709@linaro.org> <20160118151316.GD7159@e106622-lin>
+ <CAKfTPtBFR4cowT-j4qVxfUvh6NDNmi6R=J7z9kywi6bONU3Pow@mail.gmail.com>
+ <20160118163014.GA10332@e106622-lin>
+ <CAKfTPtDJBAXUz=_-QQSkrqwAvmUJd1bUJ-VfSaNER-0NzWpunA@mail.gmail.com>
+ <20160118170854.GB10332@e106622-lin>
+Message-ID: <CAKfTPtCG-j3LJvR7Wf-d7ccHKUE7ZWqJaDy=Hm3ZxCzyjeDsug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 18 January 2016 at 18:08, Juri Lelli <juri.lelli@arm.com> wrote:
+> On 18/01/16 17:42, Vincent Guittot wrote:
+>> On 18 January 2016 at 17:30, Juri Lelli <juri.lelli@arm.com> wrote:
+>> > Hi Vincent,
+>> >
+>> > On 18/01/16 17:13, Vincent Guittot wrote:
+>> >> On 18 January 2016 at 16:13, Juri Lelli <juri.lelli@arm.com> wrote:
+>> >> > Hi Steve,
+>> >> >
+>> >> > On 15/01/16 11:50, Steve Muckle wrote:
+>> >> >> On 01/08/2016 06:09 AM, Juri Lelli wrote:
+>> >> >> >  2. Dynamic profiling at boot (v2)
+>> >> >> >
+>> >> >> >     pros: - does not require a standardized definition of capacity
+>> >> >> >           - cannot be incorrectly tuned (once benchmark is fixed)
+>> >> >> >           - does not require user/integrator work
+>> >> >> >
+>> >> >> >     cons: - not easy to come up with a clean solution, as it seems interaction
+>> >> >> >             with several subsystems (e.g., cpufreq) is required
+>> >> >> >           - not easy to agree upon a single benchmark (that has to be both
+>> >> >> >             representative and simple enough to run at boot)
+>> >> >> >           - numbers might (and do) vary from boot to boot
+>> >> >>
+>> >> >> An important additional con that was mentioned earlier IIRC was the
+>> >> >> additional boot time required for the benchmark.
+>> >> >
+>> >> > Right. I forgot about that.
+>> >> >
+>> >> >> Perhaps there could be
+>> >> >> a kernel command line argument to bypass the benchmark if it is known
+>> >> >> that predetermined values will be provided via sysfs later?
+>> >> >>
+>> >> >
+>> >> > This might work, yes.
+>> >>
+>> >> Instead of command line, I prefer to use DT.
+>> >>
+>> >> Can't we use something similar to what is currently done in arm arch
+>> >> for the early stage of the boot ? We don't have to provide performance
+>> >> value for which it's difficult to find a consensus on how to define it
+>> >> and which benchmark should be used. We use the micro arch and the
+>> >> frequency of the core to define a relative capacity. This give us a
+>> >> relatively good idea of the capacity of each core.
+>> >
+>> > I'm not sure I understand what you are proposing. arm arch is currently
+>> > based on having static hardcoded data (efficiency values). But, this has
+>> > already been NACKed for arm64 during last review of this RFC.
+>> >
+>> > Are you proposing something different?
+>>
+>> No, i'm proposing to use it at boot time until the dynamic profiling
+>> gives better value.
+>> We don't have to set any new properties.
+>> IIRC, It was nacked because it was of static hardcoded value that was
+>> not always reflecting the best accurate capacity of a system. IMHO,
+>> it's not that far from reality so can't this be used as an
+>> intermediate step while waiting for dynamic profiling ?
+>
+> It seems to me that we will only make things more complicated than
+> needed, without gaining much. Either we will have these values until the
 
-Some comments below...
+Not sure that this will complicate thing as it doesn't need any
+specific inputs from DT as it uses properties already available.
+Now, if we consider that the potential impact on the boot time of
+using default value is not a issue, i agree that it doesn't worth
+adding this step
 
-On Mon, Jan 18, 2016 at 10:42:20PM +0800, Yakir Yang wrote:
-> +static int inno_hdmi_config_video_avi(struct inno_hdmi *hdmi)
-> +{
-> +	char info[HDMI_SIZE_AVI_INFOFRAME] = {0};
-> +	int avi_color_mode;
-> +	int i;
-> +
-> +	hdmi_writeb(hdmi, HDMI_CONTROL_PACKET_BUF_INDEX, INFOFRAME_AVI);
-> +
-> +	info[0] = 0x82;
-> +	info[1] = 0x02;
-> +	info[2] = 0x0D;
-> +	info[3] = info[0] + info[1] + info[2];
-> +
-> +	if (hdmi->hdmi_data.enc_out_format == HDMI_COLORSPACE_RGB)
-> +		avi_color_mode = AVI_COLOR_MODE_RGB;
-> +	else if (hdmi->hdmi_data.enc_out_format == HDMI_COLORSPACE_YUV444)
-> +		avi_color_mode = AVI_COLOR_MODE_YCBCR444;
-> +	else if (hdmi->hdmi_data.enc_out_format == HDMI_COLORSPACE_YUV422)
-> +		avi_color_mode = AVI_COLOR_MODE_YCBCR422;
-> +	else
-> +		avi_color_mode = AVI_COLOR_MODE_RGB;
-> +
-> +	info[4] = (avi_color_mode << 5);
-> +	info[5] = (AVI_COLORIMETRY_NO_DATA << 6) |
-> +		  (AVI_CODED_FRAME_ASPECT_NO_DATA << 4) |
-> +		  ACTIVE_ASPECT_RATE_SAME_AS_CODED_FRAME;
-> +
-> +	info[6] = 0;
-> +	info[7] = hdmi->hdmi_data.vic;
-> +
-> +	if (hdmi->hdmi_data.vic == 6 || hdmi->hdmi_data.vic == 7 ||
-> +	    hdmi->hdmi_data.vic == 21 || hdmi->hdmi_data.vic == 22)
-> +		info[8] = 1;
-> +	else
-> +		info[8] = 0;
-> +
-> +	/* Calculate avi info frame checKsum */
-> +	for (i = 4; i < HDMI_SIZE_AVI_INFOFRAME; i++)
-> +		info[3] += info[i];
-> +	info[3] = 0x100 - info[3];
-> +
-> +	for (i = 0; i < HDMI_SIZE_AVI_INFOFRAME; i++)
-> +		hdmi_writeb(hdmi, HDMI_CONTROL_PACKET_ADDR + i, info[i]);
-> +
-> +	return 0;
+Vincent
 
-Is there a reason why the helpers in drivers/video/hdmi.c can't be used
-to generate this?
-
-hdmi_avi_infoframe_init / hdmi_avi_infoframe_pack and
-drm_hdmi_avi_infoframe_from_display_mode ?
-
-> +}
-> +
-> +static int inno_hdmi_config_video_vsi(struct inno_hdmi *hdmi)
-> +{
-> +	char info[HDMI_SIZE_VSI_INFOFRAME] = {0};
-> +	int i;
-> +
-> +	hdmi_modb(hdmi, HDMI_PACKET_SEND_AUTO, m_PACKET_VSI_EN,
-> +		  v_PACKET_VSI_EN(0));
-> +
-> +	hdmi_writeb(hdmi, HDMI_CONTROL_PACKET_BUF_INDEX, INFOFRAME_VSI);
-> +
-> +	/* Header Bytes */
-> +	info[0] = 0x81;
-> +	info[1] = 0x01;
-> +
-> +	/* PB1 - PB3 contain the 24bit IEEE Registration Identifier */
-> +	info[4] = 0x03;
-> +	info[5] = 0x0c;
-> +	info[6] = 0x00;
-> +
-> +	/* PB4 - HDMI_Video_Format into bits 7:5 */
-> +	info[7] = 0;
-> +
-> +	/*
-> +	 * PB5 - Depending on the video format, this byte will contain
-> +	 * either the HDMI_VIC code in buts 7:0, OR the 3D_Structure in
-> +	 * bits 7:4.
-> +	 */
-> +	info[2] = 0x06 - 2;
-> +	info[8] = 0;
-> +	info[9] = 0;
-> +
-> +	info[3] = info[0] + info[1] + info[2];
-> +
-> +	/* Calculate info frame checKsum */
-> +	for (i = 4; i < HDMI_SIZE_VSI_INFOFRAME; i++)
-> +		info[3] += info[i];
-> +	info[3] = 0x100 - info[3];
-> +
-> +	for (i = 0; i < HDMI_SIZE_VSI_INFOFRAME; i++)
-> +		hdmi_writeb(hdmi, HDMI_CONTROL_PACKET_ADDR + i, info[i]);
-> +
-> +	hdmi_modb(hdmi, HDMI_PACKET_SEND_AUTO, m_PACKET_VSI_EN,
-> +		  v_PACKET_VSI_EN(1));
-> +
-> +	return 0;
-
-hdmi_vendor_infoframe_init / hdmi_vendor_infoframe_pack?
-
-You can probably use the same function to upload the control packet
-too - something like:
-
-static int inno_hdmi_upload_frame(struct inno_hdmi *hdmi, int setup_rc,
-	union hdmi_infoframe *frame, u32 mask, u32 disable, u32 enable)
-{
-	if (mask)
-		hdmi_modb(hdmi, HDMI_PACKET_SEND_AUTO, mask, disable);
-
-	if (setup_rc >= 0) {
-		u8 packed_frame[YOUR_MAXIMUM_INFO_FRAME_SIZE];
-		ssize_t rc, i;
-
-		rc = hdmi_infoframe_pack(frame, packed_frame,
-					 sizeof(packed_frame));
-		if (rc < 0)
-			return rc;
-
-		for (i = 0; i < rc; i++)
-			hdmi_writeb(hdmi, HDMI_CONTROL_PACKET_ADDR + i, buf[i]);
-
-		if (mask)
-			hdmi_modb(hdmi, HDMI_PACKET_SEND_AUTO, mask, enable);
-	}
-
-	return setup_rc;
-}
-
-static int inno_hdmi_config_video_vsi(struct inno_hdmi *hdmi)
-{
-	union hdmi_infoframe frame;
-
-	rc = drm_hdmi_vendor_infoframe_from_display_mode(&frame.vendor.hdmi,
-							 the_drm_display_mode);
-
-	return inno_hdmi_upload_frame(hdmi, rc, &frame, m_PACKET_VSI_EN,
-				      v_PACKET_VSI_EN(0), v_PACKET_VSI_EN(1));
-}
-
-> +static int inno_hdmi_i2c_wait(struct inno_hdmi *hdmi)
-> +{
-> +	struct inno_hdmi_i2c *i2c = hdmi->i2c;
-> +	int stat;
-> +
-> +	stat = wait_for_completion_timeout(&i2c->cmp, HZ / 10);
-> +	if (!stat) {
-> +		stat = wait_for_completion_timeout(&i2c->cmp, HZ / 10);
-> +		if (!stat)
-> +			return -EAGAIN;
-
-What's the reason for this double wait_for_completion?  This probably
-needs a comment, otherwise it looks like some weird cut-n-paste error.
-
-> +static int inno_hdmi_i2c_write(struct inno_hdmi *hdmi, struct i2c_msg *msgs)
-> +{
-> +	struct inno_hdmi_i2c *i2c = hdmi->i2c;
-
-You seem to have a local i2c pointer...
-
-> +
-> +	/*
-> +	 * The DDC module only support read EDID message, so
-> +	 * we assume that each word write to this i2c adapter
-> +	 * should be the offset of EDID word address.
-> +	 */
-> +	if ((msgs->len != 1) ||
-> +	    ((msgs->addr != DDC_ADDR) && (msgs->addr != DDC_SEGMENT_ADDR)))
-> +		return -EINVAL;
-> +
-> +	reinit_completion(&i2c->cmp);
-> +
-> +	if (msgs->addr == DDC_SEGMENT_ADDR)
-> +		hdmi->i2c->segment_addr = msgs->buf[0];
-> +	if (msgs->addr == DDC_ADDR)
-> +		hdmi->i2c->ddc_addr = msgs->buf[0];
-> +
-> +	/* Set edid fifo first addr */
-> +	hdmi_writeb(hdmi, HDMI_EDID_FIFO_OFFSET, 0x00);
-> +
-> +	/* Set edid word address 0x00/0x80 */
-> +	hdmi_writeb(hdmi, HDMI_EDID_WORD_ADDR, hdmi->i2c->ddc_addr);
-> +
-> +	/* Set edid segment pointer */
-> +	hdmi_writeb(hdmi, HDMI_EDID_SEGMENT_POINTER, hdmi->i2c->segment_addr);
-
-but then you don't use it in the four locations above.
-
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> profile happens (do we really think we will speed up pre-profile boot
+> time much?) or we will have them as defaults, and every concern that
+> brought this approach to be nacked will apply.
+>
+> Thanks,
+>
+> - Juri
+>
+>> >
+>> > Thanks,
+>> >
+>> > - Juri
+>> >
+>> >> Then, the dynamic profiling can update it with a more accurate value
+>> >> during the boot.
+>> >>
+>> >> >
+>> >> >> Though there may be another issue with that as mentioned below.
+>> >> >>
+>> >> >> >  3. sysfs (v1)
+>> >> >> >
+>> >> >> >     pros: - clean and super easy to implement
+>> >> >> >           - values don't require to be physical properties, defining them is
+>> >> >> >             probably easier
+>> >> >> >
+>> >> >> >     cons: - CPUs capacity have to be provided after boot (by some init script?)
+>> >> >> >           - API is modified, still some discussion/review is needed
+>> >> >> >           - values can still be incorrectly used for runtime tuning purposes
+>> >> >>
+>> >> >> Initializing the values via userspace init will cause more of the boot
+>> >> >> process to run with incorrect CPU capacity values. Boot times may be
+>> >> >> increased with tasks running on suboptimal CPUs. Such increases may also
+>> >> >> not be deterministic.
+>> >> >>
+>> >> >> Extending the kernel command line idea above, perhaps capacity values
+>> >> >> could be provided there as well, similar to the lpj parameter? That has
+>> >> >> scalability issues though if there's a huge highly heterogeneous platform...
+>> >> >>
+>> >> >
+>> >> > Yeah, adding such option is not difficult, but I'm also a bit concerned
+>> >> > about the scalability of such a thing.
+>> >> >
+>> >> >> DT solves these issues and would be the perfect place for this - we are
+>> >> >> defining the compute capacity of a CPU which is a property of the
+>> >> >> hardware. However there are a couple things forcing us to compromise.
+>> >> >> One is that the amount and detail of information required to adequately
+>> >> >> capture the computational abilities of a CPU across all possible
+>> >> >> workloads seem onerous to collect and enumerate. The second is that even
+>> >> >> if we were willing to undertake that, CPU vendors probably won't be
+>> >> >> forthcoming with that information.
+>> >> >>
+>> >> >
+>> >> > You mean because they won't publish performance data of their hw?
+>> >> >
+>> >> > But we already use per platform normalized values (as you are proposing
+>> >> > below). So that a platform to platform comparison doesn't make sense.
+>> >> >
+>> >> >> Despite this DT still seems to me like the best way to go. At their
+>> >> >> heart these are properties of the hardware, even if we can't specify
+>> >> >> them as such per se because of the problems above. The capacity would
+>> >> >> have to be defined as a relative value among CPUs. And while it's true
+>> >> >> it may be abused for tuning purposes, that's true of any strategy.
+>> >> >> Certainly the sysfs strategy and even if only a dynamic option is
+>> >> >> provided, it is guaranteed to be hacked by platform vendors.
+>> >> >
+>> >> > I also like the DT approach and consider the sysfs option as something
+>> >> > that can go together with any solution we want to adopt.
+>> >>
+>> >> I'm not sure that we should consider sysfs as an option because of all
+>> >> the concerned that as already been put forward.
+>> >> I would prefer a debugfs if we have play with these capacity values in
+>> >> order to test their accuracy.
+>> >>
+>> >> Regards,
+>> >> Vincent
+>> >> >
+>> >> > Best,
+>> >> >
+>> >> > - Juri
+>> >>
+>>
