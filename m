@@ -1,35 +1,43 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 18 Jan 2016 17:20:43 +0900
-Subject: [PATCH v4 2/2] power: add documentation for ACT8945A's charger DT
- bindings
-In-Reply-To: <1452659289-30837-3-git-send-email-wenyou.yang@atmel.com>
-References: <1452659289-30837-1-git-send-email-wenyou.yang@atmel.com>
- <1452659289-30837-3-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <569CA05B.3010107@samsung.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Mon, 18 Jan 2016 16:19:29 +0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160114204827.GE3818@linux.vnet.ibm.com>
+Message-ID: <20160118081929.GA30420@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.01.2016 13:28, Wenyou Yang wrote:
-> This patch adds documentation for the DT bindings of the charger
-> subdevice of ACT8945A MFD.
+Paul E. McKenney <paulmck@linux.vnet.ibm.com> wrote:
+>
+> You could use SYNC_ACQUIRE() to implement read_barrier_depends() and
+> smp_read_barrier_depends(), but SYNC_RMB probably does not suffice.
+> The reason for this is that smp_read_barrier_depends() must order the
+> pointer load against any subsequent read or write through a dereference
+> of that pointer.  For example:
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
+>        p = READ_ONCE(gp);
+>        smp_rmb();
+>        r1 = p->a; /* ordered by smp_rmb(). */
+>        p->b = 42; /* NOT ordered by smp_rmb(), BUG!!! */
+>        r2 = x; /* ordered by smp_rmb(), but doesn't need to be. */
 > 
-> Changes in v4:
->  - change the properties with more legible name, clearer description.
+> In contrast:
 > 
-> Changes in v3: None
-> Changes in v2: None
+>        p = READ_ONCE(gp);
+>        smp_read_barrier_depends();
+>        r1 = p->a; /* ordered by smp_read_barrier_depends(). */
+>        p->b = 42; /* ordered by smp_read_barrier_depends(). */
+>        r2 = x; /* not ordered by smp_read_barrier_depends(), which is OK. */
 > 
->  .../devicetree/bindings/power/act8945a-charger.txt |   33 ++++++++++++++++++++
->  1 file changed, 33 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power/act8945a-charger.txt
+> Again, if your hardware maintains local ordering for address
+> and data dependencies, you can have read_barrier_depends() and
+> smp_read_barrier_depends() be no-ops like they are for most
+> architectures.
 > 
+> Does that help?
 
-Okay for me:
-
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
+This is crazy! smp_rmb started out being strictly stronger than
+smp_read_barrier_depends, when did this stop being the case?
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
