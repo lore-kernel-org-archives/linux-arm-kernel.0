@@ -1,132 +1,34 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Mon, 18 Jan 2016 14:28:55 +0800
-Subject: [PATCH v2 1/3] iommu/io-pgtable: Add ARMv7 short descriptor
- support
-In-Reply-To: <56990CAC.5020606@arm.com>
-References: <cover.1450383740.git.robin.murphy@arm.com>
- <ddfe960ef1da22e5264811bfcafeb412fa976f4a.1450383740.git.robin.murphy@arm.com>
- <1452776704.15636.59.camel@mhfsdcap03> <56990CAC.5020606@arm.com>
-Message-ID: <1453098535.10156.21.camel@mhfsdcap03>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Mon, 18 Jan 2016 12:17:19 +0530
+Subject: [PATCH v2 0/4] ACPI based NUMA support for ARM64
+In-Reply-To: <569B2308.80501@jonmasters.org>
+References: <1447784733-10419-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <569B2308.80501@jonmasters.org>
+Message-ID: <CAFpQJXWozH1xQgcW7w+VmzrEGdPfr=u+P3Y6WPH-6X3i=P0q4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-01-15 at 15:13 +0000, Robin Murphy wrote:
-> On 14/01/16 13:05, Yong Wu wrote:
-> > On Thu, 2015-12-17 at 20:50 +0000, Robin Murphy wrote:
-> >> Add a nearly-complete ARMv7 short descriptor implementation, omitting
-> >> only a few legacy and CPU-centric aspects which shouldn't be necessary
-> >> for IOMMU API use anyway.
+Hi Jon,
 
-[...]
-
-> >> +static int arm_v7s_split_blk_unmap(struct arm_v7s_io_pgtable *data,
-> >> +				   unsigned long iova, size_t size,
-> >> +				   arm_v7s_iopte *ptep)
-> >> +{
-> >> +	unsigned long blk_start, blk_end, blk_size;
-> >> +	phys_addr_t blk_paddr;
-> >> +	arm_v7s_iopte table = 0;
-> >> +	struct io_pgtable_cfg *cfg = &data->iop.cfg;
-> >> +	int prot = arm_v7s_pte_to_prot(*ptep, 1);
-> >> +
-> >> +	blk_size = ARM_V7S_BLOCK_SIZE(1);
-> >> +	blk_start = iova & ARM_V7S_LVL_MASK(1);
-> >> +	blk_end = blk_start + ARM_V7S_BLOCK_SIZE(1);
-> >> +	blk_paddr = *ptep & ARM_V7S_LVL_MASK(1);
-> >> +
-> >> +	for (; blk_start < blk_end; blk_start += size, blk_paddr += size) {
-> >> +		arm_v7s_iopte *tablep;
-> >> +
-> >> +		/* Unmap! */
-> >> +		if (blk_start == iova)
-> >> +			continue;
-> >> +
-> >> +		/* __arm_v7s_map expects a pointer to the start of the table */
-> >> +		tablep = &table - ARM_V7S_LVL_IDX(blk_start, 1);
-> >
-> >     The "table" seems not be initialized here. (LPAE too.) maybe I don't
-> > get it here.
-> 
-> It took me about 2 hours of staring at the original code to fully get my 
-> head round it, too ;) The comment would perhaps be better worded as 
-> "__arm_v7s_map expects a pointer to the start of *a* table". What we're 
-> doing is building up the whole level 2 table (with the relevant pages 
-> mapped) in advance _before_ touching the live level 1 table. Since 
-> __arm_v7s_map() is going to take the table pointer we pass and write an 
-> entry for the new level 2 table at the relevant index, we construct 
-> _just that entry_ ("arm_v7s_iopte table = 0;") and fake up a 
-> corresponding 'level 1 table pointer' - chances are that tablep itself 
-> is dangling way off the bottom of the stack somewhere, but the only 
-> entry in that 'table' that's going to be dereferenced is the one backed 
-> by the local variable.
-
-Thanks for this comment, I get it.
-
-It works well but I still don't think "tablep" is safe here. Currently
-it must rely on "ptep += ARM_V7S_LVL_IDX(iova, lvl)" in the
-__arm_v7s_map. this may be danger if __arm_v7s_map is changed in the
-further. and at least it is not readable, 2 hours is needed even though
-it's you;).
-
-And the lvl is always 1 in the __arm_v7s_map below, so "tablep" is
-expected to be the start of the lvl1 table rather than *a* start of the
-table.
-
-> 
-> >     If we would like to get the start of the table, maybe :
-> >
-> >     tablep = ptep - ARM_V7S_LVL_IDX(blk_start, 1);
-> >
-> >      Even though we change "tablep" here, it will also fail in the
-> > __arm_v7s_map since there is a value in current ptep(the pa of the
-> > section), then it will call iopte_deref instread of creating a new
-> > pgtable in the __arm_v7s_map below, then it will abort.
-> >
-> > so maybe we need unmap the ptep before this "for" loop.
-> > __arm_v7s_set_pte(ptep, 0, 1, cfg);
-> >
-> >> +		if (__arm_v7s_map(data, blk_start, blk_paddr, size, prot, 1,
-> >> +				  tablep) < 0) {
-> >> +			if (table) {
-> >> +				/* Free the table we allocated */
-> >> +				tablep = iopte_deref(table, 1);
-> >> +				__arm_v7s_free_table(tablep, 2, data);
-> >
-> > Following Will's quesion before, do we need flush tlb here?
-> 
-> No; this is just cleaning up the uncommitted preparatory work if map 
-> failure left a partially-created next-level table - in fact, now that I 
-> look at it, with only two levels the only way that can happen is if we 
-> allocate a new empty table but find nonzero entries when installing the 
-> PTEs, and that suggests a level of system corruption I'm not sure it's 
-> even worth trying to handle.
-> 
-> Anyway, from the IOMMU's perspective, at this point it knows nothing 
-> about the new table and the section mapping is still live...
-> 
-> >> +			}
-> >> +			return 0; /* Bytes unmapped */
-> >> +		}
-> >> +	}
-> >> +
-> >> +	__arm_v7s_set_pte(ptep, table, 1, cfg);
-> >
-> >      Is this in order to update the lvl2 pgtable base address? why it's
-> > not updated in __arm_v7s_map which create a lvl2 pgtable?
-> 
-> ...until here, when we drop the table entry over the top of the section 
-> entry and TLBI the section, for an atomic valid->valid transition.
-> 
-> >> +	iova &= ~(blk_size - 1);
-> >> +	cfg->tlb->tlb_add_flush(iova, blk_size, blk_size, true, data->iop.cookie);
-> >> +	return size;
-> >> +}
-> >> +
-> >
-> > All the others looks good for me. Thanks.
-> 
-> Cool, thanks. I'll send out a proper v3 once everyone's finished with 
-> merge window stuff, but below is the local diff I now have.
-> 
-> Robin.
-> 
+On Sun, Jan 17, 2016 at 10:43 AM, Jon Masters <jonathan@jonmasters.org> wrote:
+> On 11/17/15, 1:25 PM, Ganapatrao Kulkarni wrote:
+>>
+>>   -v2 rebased on arm64-numa v7 patches.
+>>   http://www.spinics.net/lists/arm-kernel/msg460813.html
+>>
+>>   -v1 initial patches from Hanjun Guo
+>
+>
+> Hi Ganapatrao,
+>
+> Can I confirm that you intend to post an updated version of this patch
+> series once the merge window is closed? We have a dependency upon this
+> patch series being upstream and need to do a little planning :)
+We are working on numa-dt-v9 and numa-acpi-v3 patch series.
+we will be submitting once merge window is closed.
+thanks for your email.
+>
+> Jon.
+>
+thanks
+Ganapat
