@@ -1,46 +1,196 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Jan 2016 20:39:56 +0100
-Subject: [PATCH, RESEND^2] ssb: mark ssb_bus_register as __maybe_unused
-In-Reply-To: <8760ywd5fe.fsf@kamboji.qca.qualcomm.com>
-References: <8128014.DbbgBtKY3z@wuerfel>
- <8760ywd5fe.fsf@kamboji.qca.qualcomm.com>
-Message-ID: <6063400.39vor3soEb@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 18 Jan 2016 20:41:00 +0100
+Subject: [linux-sunxi][PATCH v3 3/5] ARM: dts: sun7i: Add Itead Ibox
+ support
+In-Reply-To: <1452766555-16409-4-git-send-email-codekipper@gmail.com>
+References: <1452766555-16409-1-git-send-email-codekipper@gmail.com>
+ <1452766555-16409-4-git-send-email-codekipper@gmail.com>
+Message-ID: <20160118194100.GR4581@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SoC variant of the ssb code is now optional like the other
-ones, which means we can build the framwork without any
-front-end, but that results in a warning:
+Hi,
 
-drivers/ssb/main.c:616:12: warning: 'ssb_bus_register' defined but not used [-Wunused-function]
+On Thu, Jan 14, 2016 at 11:15:53AM +0100, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+> 
+> The Itead Ibox is a multi board device based on the Allwinner A20 SoC.
+> It contains the A20 Itead Core module and a base board for the external
+> interfaces.
+> 
+> The core module comes with 4GB NAND and 1GB DDR RAM.
+> 
+> The base board to which the core board is connected provides 3 USB 2.0 Host
+> ports, 1 USB 2.0 OTG, 1 uSD slot, 10/100 Ethernet port, HDMI, IR receiver,
+> SPDIF and a 32-pin GPIO header. This header expands the features of core
+> board by exposing the VGA pins, audio In/Out pins, SATA, SPI, I2C, UARTS,
+> USB-OTG and power.
+> 
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> ---
+>  arch/arm/boot/dts/Makefile                 |   1 +
+>  arch/arm/boot/dts/sun7i-a20-itead-ibox.dts | 124 +++++++++++++++++++++++++++++
+>  2 files changed, 125 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index da910b2..5c5e8f4 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -638,6 +638,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+>  	sun7i-a20-cubieboard2.dtb \
+>  	sun7i-a20-cubietruck.dtb \
+>  	sun7i-a20-hummingbird.dtb \
+> +	sun7i-a20-itead-ibox.dtb \
+>  	sun7i-a20-i12-tvbox.dtb \
+>  	sun7i-a20-icnova-swac.dtb \
+>  	sun7i-a20-m3.dtb \
+> diff --git a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+> new file mode 100644
+> index 0000000..66b8dec
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+> @@ -0,0 +1,124 @@
+> +/*
+> + * Copyright 2015 - Marcus Cooper <codekipper@gmail.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "sun7i-a20-itead-core.dtsi"
+> +
+> +/ {
+> +	model = "Itead Ibox A20";
+> +	compatible = "itead,itead_ibox_a20", "allwinner,sun7i-a20";
 
-This annotates the ssb_bus_register function as __maybe_unused to
-shut up the warning. A configuration like this will not work on
-any hardware of course, but we still want this to silently build
-without warnings if the configuration is allowed in the first
-place.
+Compatibles are using a dash (-) as a delimiter, not an underscore (_)
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 845da6e58e19 ("ssb: add Kconfig entry for compiling SoC related code")
-Acked-by: Michael Buesch <m@bues.ch>
----
-Resent to linux-wireless as requested
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&led_pins_itead_core>;
+> +
+> +		green {
+> +			label = "itead_core:green:usr";
+> +			gpios = <&pio 7 20 GPIO_ACTIVE_HIGH>;
+> +			default-state = "on";
+> +		};
+> +
+> +		blue {
+> +			label = "itead_core:blue:usr";
+> +			gpios = <&pio 7 21 GPIO_ACTIVE_HIGH>;
+> +			default-state = "on";
+> +		};
+> +	};
+> +};
+> +
+> +&ahci {
+> +	target-supply = <&reg_ahci_5v>;
+> +	status = "okay";
+> +};
+> +
+> +&codec {
+> +	status = "okay";
+> +};
+> +
+> +&gmac {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&gmac_pins_mii_a>;
+> +	phy = <&phy1>;
+> +	phy-mode = "mii";
+> +	status = "okay";
+> +
+> +	phy1: ethernet-phy at 1 {
+> +		reg = <1>;
+> +	};
+> +};
+> +
+> +&ir0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&ir0_rx_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&mmc0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	bus-width = <4>;
+> +	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
+> +	cd-inverted;
+> +	status = "okay";
+> +};
+> +
+> +&pio {
+> +	led_pins_itead_core: led_pins at 0 {
+> +		allwinner,pins = "PH20","PH21";
+> +		allwinner,function = "gpio_out";
+> +		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +};
+> +
+> +&reg_ahci_5v {
+> +	status = "okay";
+> +};
+> +
+> +&spi0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&spi0_pins_a>,
+> +		    <&spi0_cs0_pins_a>;
+> +	status = "okay";
 
-diff --git a/drivers/ssb/main.c b/drivers/ssb/main.c
-index cde5ff7529eb..d1a750760cf3 100644
---- a/drivers/ssb/main.c
-+++ b/drivers/ssb/main.c
-@@ -613,9 +613,10 @@ out:
- 	return err;
- }
- 
--static int ssb_bus_register(struct ssb_bus *bus,
--			    ssb_invariants_func_t get_invariants,
--			    unsigned long baseaddr)
-+static int __maybe_unused
-+ssb_bus_register(struct ssb_bus *bus,
-+		 ssb_invariants_func_t get_invariants,
-+		 unsigned long baseaddr)
- {
- 	int err;
- 
+What device is connected to that bus?
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160118/e234b21d/attachment.sig>
