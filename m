@@ -1,79 +1,57 @@
-From: rainyfeeling@gmail.com (Josh Wu)
-Date: Mon, 18 Jan 2016 20:21:41 +0800
-Subject: [PATCH 05/13] atmel-isi: add a function: isi_hw_wait_status() to
- check ISI_SR status
-In-Reply-To: <1453119709-20940-1-git-send-email-rainyfeeling@gmail.com>
-References: <1453119709-20940-1-git-send-email-rainyfeeling@gmail.com>
-Message-ID: <1453119709-20940-6-git-send-email-rainyfeeling@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 18 Jan 2016 12:24:48 +0000
+Subject: [PATCH] arm64: fix off-by-one in compat syscall table for
+ syscalls over 382
+In-Reply-To: <1450804573-322-1-git-send-email-will.deacon@arm.com>
+References: <1450804573-322-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20160118122447.GE3693@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Josh Wu <josh.wu@atmel.com>
+Greg, Sasha,
 
-Extract the code that check ISI_SR flag into a function:
-isi_hw_wait_status().
+Is there anything else I need to do to get this queued in the 3.17.y
+and 3.18.y stable trees? There's no corresponding upstream commit since
+the issue was fixed by accident in 3.19+ as a result of something else.
 
-In this patch, we use isi_hw_wait_status() to check CDC pending status.
+Will
 
-Signed-off-by: Josh Wu <rainyfeeling@gmail.com>
----
-
- drivers/media/platform/soc_camera/atmel-isi.c | 28 ++++++++++++++++++---------
- 1 file changed, 19 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-index 4bd8258..f0508ea 100644
---- a/drivers/media/platform/soc_camera/atmel-isi.c
-+++ b/drivers/media/platform/soc_camera/atmel-isi.c
-@@ -190,6 +190,21 @@ static void configure_geometry(struct atmel_isi *isi, u32 width,
- 	return;
- }
- 
-+static int isi_hw_wait_status(struct atmel_isi *isi, int status_flag,
-+			       int wait_ms)
-+{
-+	unsigned long timeout = jiffies + wait_ms * HZ;
-+
-+	while ((isi_readl(isi, ISI_STATUS) & status_flag) &&
-+			time_before(jiffies, timeout))
-+		msleep(1);
-+
-+	if (time_after(jiffies, timeout))
-+		return -ETIMEDOUT;
-+
-+	return 0;
-+}
-+
- static void isi_hw_initialize(struct atmel_isi *isi)
- {
- 	u32 common_flags = isi->bus_param;
-@@ -511,7 +526,6 @@ static void stop_streaming(struct vb2_queue *vq)
- 	struct atmel_isi *isi = ici->priv;
- 	struct frame_buffer *buf, *node;
- 	int ret = 0;
--	unsigned long timeout;
- 
- 	spin_lock_irq(&isi->lock);
- 	isi->active = NULL;
-@@ -523,15 +537,11 @@ static void stop_streaming(struct vb2_queue *vq)
- 	spin_unlock_irq(&isi->lock);
- 
- 	if (!isi->enable_preview_path) {
--		timeout = jiffies + FRAME_INTERVAL_MILLI_SEC * HZ;
- 		/* Wait until the end of the current frame. */
--		while ((isi_readl(isi, ISI_STATUS) & ISI_CTRL_CDC) &&
--				time_before(jiffies, timeout))
--			msleep(1);
--
--		if (time_after(jiffies, timeout))
--			dev_err(icd->parent,
--				"Timeout waiting for finishing codec request\n");
-+		ret = isi_hw_wait_status(isi, ISI_CTRL_CDC,
-+					 FRAME_INTERVAL_MILLI_SEC);
-+		if (ret)
-+			dev_err(icd->parent, "Timeout waiting for finishing codec request\n");
- 	}
- 
- 	/* Disable interrupts */
--- 
-1.9.1
+On Tue, Dec 22, 2015 at 05:16:12PM +0000, Will Deacon wrote:
+> [fix targetting -stable only, no upstream commit required]
+> 
+> In the bad old days, our compat syscall table was a linear array
+> defined in assembly code using a series of .quad directives generated
+> from a preprocessed header file.
+> 
+> When I added compat support for memfd_create and getrandom in commit
+> a97a42c47608 ("arm64: compat: wire up memfd_create and getrandom
+> syscalls for aarch32"), I forgot to pad the gap where seccomp was due
+> to go, and so the new syscalls actually ended up being off-by-one in the
+> table for v3.17 and v3.18 (in 3.19 seccomp was added and in v4.0 we
+> moved the table construction into C).
+> 
+> This patch is intended for -stable trees based on v3.17 or v3.18.
+> 
+> Cc: <stable@vger.kernel.org> # 3.17 and 3.18 only
+> Fixes: a97a42c47608 ("arm64: compat: wire up memfd_create and getrandom syscalls for aarch32")
+> Reported-by: Edmund Grimley-Evans <Edmund.Grimley-Evans@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/unistd32.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
+> index 9dfdac4a74a1..fbe1ab059bbb 100644
+> --- a/arch/arm64/include/asm/unistd32.h
+> +++ b/arch/arm64/include/asm/unistd32.h
+> @@ -788,6 +788,7 @@ __SYSCALL(__NR_sched_getattr, sys_sched_getattr)
+>  #define __NR_renameat2 382
+>  __SYSCALL(__NR_renameat2, sys_renameat2)
+>  			/* 383 for seccomp */
+> +__SYSCALL(383, sys_ni_syscall)
+>  #define __NR_getrandom 384
+>  __SYSCALL(__NR_getrandom, sys_getrandom)
+>  #define __NR_memfd_create 385
+> -- 
+> 2.1.4
+> 
