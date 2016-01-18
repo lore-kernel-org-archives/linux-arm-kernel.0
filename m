@@ -1,27 +1,92 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 17 Jan 2016 19:15:45 -0500 (EST)
-Subject: [PATCH 2/2] arm64: bpf: add extra pass to handle faulty codegen
-In-Reply-To: <1452756802-16511-2-git-send-email-zlim.lnx@gmail.com>
-References: <1452756802-16511-1-git-send-email-zlim.lnx@gmail.com>
- <1452756802-16511-2-git-send-email-zlim.lnx@gmail.com>
-Message-ID: <20160117.191545.670534349073994378.davem@davemloft.net>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Mon, 18 Jan 2016 09:11:58 +0800
+Subject: [PATCH v3 8/9] ARM: dts: rockchip: add reboot-mode node for
+ rk3036 SoCs
+In-Reply-To: <3866840.JFJvXxmQit@phil>
+References: <1452865796-23527-1-git-send-email-wxt@rock-chips.com>
+ <1452865796-23527-9-git-send-email-wxt@rock-chips.com>
+ <3866840.JFJvXxmQit@phil>
+Message-ID: <569C3BDE.1040108@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zi Shen Lim <zlim.lnx@gmail.com>
-Date: Wed, 13 Jan 2016 23:33:22 -0800
+Hi Heiko, Caesar:
 
-> Code generation functions in arch/arm64/kernel/insn.c previously
-> BUG_ON invalid parameters. Following change of that behavior, now we
-> need to handle the error case where AARCH64_BREAK_FAULT is returned.
-> 
-> Instead of error-handling on every emit() in JIT, we add a new
-> validation pass at the end of JIT compilation. There's no point in
-> running JITed code at run-time only to trap due to AARCH64_BREAK_FAULT.
-> Instead, we drop this failed JIT compilation and allow the system to
-> gracefully fallback on the BPF interpreter.
-> 
-> Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
-> Suggested-by: Alexei Starovoitov <ast@kernel.org>
+On 2016?01?18? 03:18, Heiko Stuebner wrote:
+> Hi Caesar, Andy,
+>
+> Am Freitag, 15. Januar 2016, 21:49:55 schrieb Caesar Wang:
+>> Add reboot mode driver DT node for rk3036 platform.
+>> This patch adds the needed reboot mode node for rk3036.
+>>
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> this obviously depends on Andy's reboot series.
+>
+> Andy, could you include this patch into further submissions of your series
+> please? That way it won't keep floating unconnected on the lists :-)
+>
+>
+> Thanks
+> Heiko
+>
 
-Applied.
+
+     Okay, I will add it in my next series.
+>> ---
+>>
+>> Changes in v3: None
+>>
+>>   arch/arm/boot/dts/rk3036.dtsi | 28 +++++++++++++++++++++++++++-
+>>   1 file changed, 27 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+>> index cf0968c..f5ecfff 100644
+>> --- a/arch/arm/boot/dts/rk3036.dtsi
+>> +++ b/arch/arm/boot/dts/rk3036.dtsi
+>> @@ -43,6 +43,7 @@
+>>   #include <dt-bindings/interrupt-controller/arm-gic.h>
+>>   #include <dt-bindings/pinctrl/rockchip.h>
+>>   #include <dt-bindings/clock/rk3036-cru.h>
+>> +#include <dt-bindings/soc/rockchip_boot-mode.h>
+>>   #include "skeleton.dtsi"
+>>
+>>   / {
+>> @@ -297,8 +298,33 @@
+>>   	};
+>>
+>>   	grf: syscon at 20008000 {
+>> -		compatible = "rockchip,rk3036-grf", "syscon";
+>> +		compatible = "rockchip,rk3036-grf", "syscon", "simple-mfd";
+>>   		reg = <0x20008000 0x1000>;
+>> +
+>> +		reboot-mode {
+>> +			compatible = "syscon-reboot-mode";
+>> +			offset = <0x1d8>;
+>> +
+>> +			normal {
+>> +				linux,mode = "normal";
+>> +				loader,magic = <BOOT_NORMAL>;
+>> +			};
+>> +
+>> +			loader {
+>> +				linux,mode = "loader";
+>> +				loader,magic = <BOOT_LOADER>;
+>> +			};
+>> +
+>> +			recovery {
+>> +				linux,mode = "recovery";
+>> +				loader,magic = <BOOT_RECOVERY>;
+>> +			};
+>> +
+>> +			fastboot {
+>> +				linux,mode = "fastboot";
+>> +				loader,magic = <BOOT_FASTBOOT>;
+>> +			};
+>> +		};
+>>   	};
+>>
+>>   	acodec: acodec-ana at 20030000 {
+>
+>
+>
+>
