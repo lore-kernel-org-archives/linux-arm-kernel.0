@@ -1,91 +1,108 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Mon, 18 Jan 2016 14:04:05 +0000
-Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <20160115121231.GD8520@xora-haswell.xora.org.uk>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <20160114134440.GA8520@xora-haswell.xora.org.uk>
- <1452780100.28109.3.camel@redhat.com>
- <20160114141501.GC8520@xora-haswell.xora.org.uk>
- <1452781481.28109.8.camel@redhat.com>
- <20160115121231.GD8520@xora-haswell.xora.org.uk>
-Message-ID: <20160118140405.GC11384@xora-haswell.xora.org.uk>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 18 Jan 2016 09:04:30 -0500
+Subject: [PATCH V12 2/7] dma: hidma: Add Device Tree support
+In-Reply-To: <20160118114931.GJ21067@leverpostej>
+References: <1452523550-8920-1-git-send-email-okaya@codeaurora.org>
+ <1452523550-8920-3-git-send-email-okaya@codeaurora.org>
+ <20160115151637.GJ3262@leverpostej> <5699232E.60809@codeaurora.org>
+ <20160118114931.GJ21067@leverpostej>
+Message-ID: <569CF0EE.7010706@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 12:12:31PM +0000, Graeme Gregory wrote:
-> On Thu, Jan 14, 2016 at 09:24:41AM -0500, Mark Salter wrote:
-> > On Thu, 2016-01-14 at 14:15 +0000, Graeme Gregory wrote:
-> > > On Thu, Jan 14, 2016 at 09:01:40AM -0500, Mark Salter wrote:
-> > > > On Thu, 2016-01-14 at 13:44 +0000, Graeme Gregory wrote:
-> > > > > On Wed, Jan 13, 2016 at 02:20:46PM +0100, Tomasz Nowicki wrote:
-> > > > > > From the functionality point of view this series might be split into the
-> > > > > > following logic parts:
-> > > > > > 1. Make MMCONFIG code arch-agnostic which allows all architectures to collect
-> > > > > > ???PCI config regions and used when necessary.
-> > > > > > 2. Move non-arch specific bits to the core code.
-> > > > > > 3. Use MMCONFIG code and implement generic ACPI based PCI host controller driver.
-> > > > > > 4. Enable above driver on ARM64
-> > > > > > 
-> > > > > > Patches has been built on top of 4.4 and can be found here:
-> > > > > > git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v3)
-> > > > > > 
-> > > > > > NOTE, this patch set depends on Matthew's patches:
-> > > > > > http://www.spinics.net/lists/linux-pci/msg45950.html
-> > > > > > https://github.com/Vality/linux/tree/pci-fixes
-> > > > > > 
-> > > > > > This has been tested on Cavium ThunderX server and QEMU.
-> > > > > > Any help in reviewing and testing is very appreciated.
-> > > > > 
-> > > > > I have tested this on my AMD Overdrive so
-> > > > > 
-> > > > > Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
-> > > > > 
-> > > > > But to actually get my r8169 network card working I also need the
-> > > > > following patch.
-> > > > > 
-> > > > > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> > > > > index 2fbf840..40e24e2 100644
-> > > > > --- a/drivers/pci/probe.c
-> > > > > +++ b/drivers/pci/probe.c
-> > > > > @@ -1717,7 +1717,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
-> > > > > ????????set_dev_node(&dev->dev, pcibus_to_node(bus));
-> > > > > ????????dev->dev.dma_mask = &dev->dma_mask;
-> > > > > ????????dev->dev.dma_parms = &dev->dma_parms;
-> > > > > -???????dev->dev.coherent_dma_mask = 0xffffffffull;
-> > > > > +???????dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
-> > > > > ????????pci_dma_configure(dev);
-> > > > > 
-> > > > > ????????pci_set_dma_max_seg_size(dev, 65536);
-> > > > > 
-> > > > > I suspect we need to set coherent_dma_mask somewhere in the platform but I do
-> > > > > not know where this should happen. Hopefully an ARM64 expert can help.
-> > > > 
-> > > > I've run into a number of cards which don't work on some arm64 machines where there are
-> > > > no DMA address below 4G. For the realtek card you can use r8169.use_dac=1 on the cmdline
-> > > > to get it to work.
-> > > > 
-> > > I need r8169.use_dac=1 and this patch to get card to work.
-> > > 
-> > 
-> > Hmm. I didn't need a patch in the past but I don't think I've used that card with
-> > this patch series. I will try that when I get a chance...
-> > 
+On 1/18/2016 6:49 AM, Mark Rutland wrote:
+>>>> +Main node required properties:
+>>>> +- compatible: "qcom,hidma-mgmt-1.0";
+>>>> +- reg: Address range for DMA device
+>>>> +- dma-channels: Number of channels supported by this DMA controller.
+>>>> +- max-write-burst-bytes: Maximum write burst in bytes. A memcpy requested is
+>>>> +  fragmented to multiples of this amount.
+>>>> +- max-read-burst-bytes: Maximum read burst in bytes. A memcpy request is
+>>>> +  fragmented to multiples of this amount.
+>>>> +- max-write-transactions: Maximum write transactions to perform in a burst
+>>>> +- max-read-transactions: Maximum read transactions to perform in a burst
+>>>
+>>> Just to check, where do these max-* values come from?
+>> These are HW bus parameters like the burst count and 
+>> size of each burst. These values change based on the SoC this IP is in use.
+>>
+>>>
+>>> Are they some correctness requirement of the bus this is attached to?
+>> You can starve other peripherals if you use incorrect values as the bus is 
+>> shared with other peripherals. Yes, correctness is required.
 > 
-> From my previous debugging on this issue I was getting an address bigger
-> than 32bits. As r8169 is a whole range of chips are guess they are not
-> all equal?
-> 
-> I can stick debug stuff in if someone tells me where to put them.
+> Is that a property of the system known statically, or one determined by
+> testing the system under particular workloads? It feels like the latter
+> (though I appreciate that not starving other masters is certainly a
+> correctness property regardless of how this is derived).
 > 
 
-After some private debugging with Mark it turned out that the difference
-between our configurations was I did not have.
+It is known statically and is determined through simulations according to the SoC design.
+It is later verified on chip. Once verified, these values never change. 
+Values change from one SoC to another. 
 
-CONFIG_DMA_CMA=y
+> I'd have expected the bus this is plugged into to have appropriate QoS
+> settings pre-configured so as to avoid starvation, though it sounds like
+> that's not possible here?
 
-With this enabled then the card works without coherent mask hack.
+There are some very safe values but they are not correct until validated on the chip.
 
-Thanks
+> 
+>>> Are they tuning values?
+>> Correct value is necessary for functioning. I'd consider weight and priority
+>> as the only tuning parameters. 
+>>
+>>>
+>>> The latter doesn't really belong in the DT. Given they're writeable from
+>>> the driver, it seems like that's what they are...
+>>
+>> Good catch. Those should have been read-only. I wanted to be able to export these
+>> information to the userspace app. I'll fix the sysfs to make them read-only.
+>>
+>>>
+>>>> +- channel-reset-timeout-cycles: Channel reset timeout in cycles for this SOC.
+>>>
+>>> I'm not sure what this means. Could you elaborate on this is?
+>> After each reset command, HW starts a timer. This is the time HW waits before it declares
+>> reset failed.
+> 
+> Is that a reset command sent to the HIDMA by the OS, or a reset command
+> from the HIDMA to something else?
 
-Graeme
+First one. 
+
+As I said on another email, The HIDMA channel driver resets the transfer and event channels 
+before using them. The reset command is intended for the HIDMA HW itself.
+
+> 
+> What does it do when it declares a reset as failed?
+> 
+
+The channel probe will fail with reset failed message.
+
+> How can the OS make use of this information? It has no idea of the
+> clocks input to the HIDMA, so it has no idea how long a cycle is.
+> 
+This is a HW parameter. The OS doesn't use timers or any other facility to time correctness. 
+
+The HIDMA channel driver issues a reset and then waits for confirmation while polling a status
+register. If no confirmation is received, then the HW is assumed broken or incorrectly configured.
+The HW channel is removed from the OS access.
+
+> Is this programmed by the OS?
+The HIDMA management driver programs this value to the HW. It is not consumed by the OS directly.
+
+> 
+> Is the particular duration in cycles a requirement of some other agent?
+It is a requirement of the HW. Not the OS.
+
+> 
+> Thanks,
+> Mark.
+> 
+
+
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
