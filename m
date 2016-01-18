@@ -1,101 +1,86 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 Jan 2016 11:56:40 +0000
-Subject: [PATCH] arm64: Allow vmalloc regions to be set with set_memory_*
-In-Reply-To: <CAKv+Gu-73QKAsFQCa=yO5+=DihLXp_AKYyY6QRTVM4nuDH=-8g@mail.gmail.com>
-References: <1452635187-8057-1-git-send-email-labbott@fedoraproject.org>
- <CAKv+Gu_A1C9hXgqrYDekoy1YHaRXi_mUF-kYx-TqsOBkWMVjmQ@mail.gmail.com>
- <CAKv+Gu-73QKAsFQCa=yO5+=DihLXp_AKYyY6QRTVM4nuDH=-8g@mail.gmail.com>
-Message-ID: <20160118115640.GK21067@leverpostej>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 18 Jan 2016 11:58:48 +0000
+Subject: [Xen-devel] [PATCH v2 07/16] Xen: ARM: Add support for mapping
+ AMBA device mmio
+In-Reply-To: <1452840929-19612-8-git-send-email-zhaoshenglong@huawei.com>
+References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452840929-19612-8-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <alpine.DEB.2.02.1601181158210.16178@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 05:10:31PM +0100, Ard Biesheuvel wrote:
-> On 13 January 2016 at 15:03, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > On 12 January 2016 at 22:46, Laura Abbott <labbott@fedoraproject.org> wrote:
-> >>
-> >> The range of set_memory_* is currently restricted to the module address
-> >> range because of difficulties in breaking down larger block sizes.
-> >> vmalloc maps PAGE_SIZE pages so it is safe to use as well. Update the
-> >> function ranges and add a comment explaining why the range is restricted
-> >> the way it is.
-> >>
-> >> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
-> >> ---
-> >> This should let the protections for the eBPF work as expected, I don't
-> >> know if there is some sort of self test for thatL.
-> >
-> >
-> > This is going to conflict with my KASLR implementation, since it puts
-> > the kernel image right in the middle of the vmalloc area, and the
-> > kernel is obviously mapped with block mappings. In fact, I am
-> > proposing enabling huge-vmap for arm64 as well, since it seems an
-> > improvement generally, but also specifically allows me to unmap the
-> > __init section using the generic vunmap code (remove_vm_area). But in
-> > general, I think the assumption that the whole vmalloc area is mapped
-> > using pages is not tenable.
-> >
-> > AFAICT, vmalloc still use pages exclusively even with huge-vmap (but
-> > ioremap does not). So perhaps it would make sense to check for the
-> > VM_ALLOC bit in the VMA flags (which I will not set for the kernel
-> > regions either)
-> >
+On Fri, 15 Jan 2016, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> Something along these lines, perhaps?
+> Add a bus_notifier for AMBA bus device in order to map the device
+> mmio regions when DOM0 booting with ACPI.
 > 
-> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-> index 3571c7309c5e..bda0a776c58e 100644
-> --- a/arch/arm64/mm/pageattr.c
-> +++ b/arch/arm64/mm/pageattr.c
-> @@ -13,6 +13,7 @@
->  #include <linux/kernel.h>
->  #include <linux/mm.h>
->  #include <linux/module.h>
-> +#include <linux/vmalloc.h>
->  #include <linux/sched.h>
-> 
->  #include <asm/pgtable.h>
-> @@ -44,6 +45,7 @@ static int change_memory_common(unsigned long addr
->         unsigned long end = start + size;
->         int ret;
->         struct page_change_data data;
-> +       struct vm_struct *area;
-> 
->         if (!PAGE_ALIGNED(addr)) {
->                 start &= PAGE_MASK;
-> @@ -51,10 +53,14 @@ static int change_memory_common(unsigned long addr,
->                 WARN_ON_ONCE(1);
->         }
-> 
-> -       if (start < MODULES_VADDR || start >= MODULES_END)
-> -               return -EINVAL;
-> -
-> -       if (end < MODULES_VADDR || end >= MODULES_END)
-> +       /*
-> +        * Check whether the [addr, addr + size) interval is entirely
-> +        * covered by precisely one VM area that has the VM_ALLOC flag set
-> +        */
-> +       area = find_vm_area((void *)addr);
-> +       if (!area ||
-> +           end > (unsigned long)area->addr + area->size ||
-> +           !(area->flags & VM_ALLOC))
->                 return -EINVAL;
-> 
->         data.set_mask = set_mask;
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 
-Neat. That fixes the fencepost bug too.
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-Looks good to me, though as Laura suggested we should have a comment as
-to why we limit changes to such regions. Fancy taking her wording below
-and spinning this as a patch?
 
-> >> +       /*
-> >> +        * This check explicitly excludes most kernel memory. Most kernel
-> >> +        * memory is mapped with a larger page size and breaking down the
-> >> +        * larger page size without causing TLB conflicts is very difficult.
-> >> +        *
-> >> +        * If you need to call set_memory_* on a range, the recommendation is
-> >> +        * to use vmalloc since that range is mapped with pages.
-> >> +        */
-
-Thanks,
-Mark.
+>  drivers/xen/arm-device.c | 43 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+> 
+> diff --git a/drivers/xen/arm-device.c b/drivers/xen/arm-device.c
+> index 7d902ea..9978f8d 100644
+> --- a/drivers/xen/arm-device.c
+> +++ b/drivers/xen/arm-device.c
+> @@ -138,3 +138,46 @@ static int __init register_xen_platform_notifier(void)
+>  }
+>  
+>  arch_initcall(register_xen_platform_notifier);
+> +
+> +#ifdef CONFIG_ARM_AMBA
+> +#include <linux/amba/bus.h>
+> +
+> +static int xen_amba_notifier(struct notifier_block *nb,
+> +			     unsigned long action, void *data)
+> +{
+> +	struct amba_device *adev = to_amba_device(data);
+> +	int r = 0;
+> +
+> +	switch (action) {
+> +	case BUS_NOTIFY_ADD_DEVICE:
+> +		r = xen_map_device_mmio(&adev->res, 1);
+> +		break;
+> +	case BUS_NOTIFY_DEL_DEVICE:
+> +		r = xen_unmap_device_mmio(&adev->res, 1);
+> +		break;
+> +	default:
+> +		return NOTIFY_DONE;
+> +	}
+> +	if (r)
+> +		dev_err(&adev->dev, "AMBA: Failed to %s device %s MMIO!\n",
+> +			action == BUS_NOTIFY_ADD_DEVICE ? "map" :
+> +			(action == BUS_NOTIFY_DEL_DEVICE ? "unmap" : "?"),
+> +			adev->dev.init_name);
+> +
+> +	return NOTIFY_OK;
+> +}
+> +
+> +static struct notifier_block amba_device_nb = {
+> +	.notifier_call = xen_amba_notifier,
+> +};
+> +
+> +static int __init register_xen_amba_notifier(void)
+> +{
+> +	if (!xen_initial_domain() || acpi_disabled)
+> +		return 0;
+> +
+> +	return bus_register_notifier(&amba_bustype, &amba_device_nb);
+> +}
+> +
+> +arch_initcall(register_xen_amba_notifier);
+> +#endif
+> -- 
+> 2.0.4
+> 
+> 
+> 
+> _______________________________________________
+> Xen-devel mailing list
+> Xen-devel at lists.xen.org
+> http://lists.xen.org/xen-devel
+> 
