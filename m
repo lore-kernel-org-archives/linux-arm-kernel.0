@@ -1,60 +1,127 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Tue, 19 Jan 2016 23:56:47 +0900
-Subject: [PATCH 1/2] ARM: dts: kirkwood: split lswxl into linkstation
- lswsxl and lswxl
-In-Reply-To: <20160119144846.GI6554@lunn.ch>
-References: <1453211342-25214-1-git-send-email-rogershimizu@gmail.com>
- <1453211342-25214-2-git-send-email-rogershimizu@gmail.com>
- <20160119140507.GG6554@lunn.ch>
- <CAEQ9gE=saHf0TZ5aBDYC0cCMCXgHOSON8-oPwmVXuU-h4XPbFA@mail.gmail.com>
- <20160119144846.GI6554@lunn.ch>
-Message-ID: <CAEQ9gEmEoBuBCEYjW50zJ5+1woq-V+B-JbxhA-dkAYvVDxhBvg@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 19 Jan 2016 14:59:39 +0000
+Subject: [Xen-devel] [PATCH v2 03/16] Xen: xlate: Use page_to_xen_pfn
+ instead of page_to_pfn
+In-Reply-To: <569C7363.80106@huawei.com>
+References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452840929-19612-4-git-send-email-zhaoshenglong@huawei.com>
+ <alpine.DEB.2.02.1601151558010.16178@kaball.uk.xensource.com>
+ <569C7363.80106@huawei.com>
+Message-ID: <alpine.DEB.2.02.1601191456370.9400@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2016 at 11:48 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Tue, Jan 19, 2016 at 11:15:35PM +0900, Roger Shimizu wrote:
->> On Tue, Jan 19, 2016 at 11:05 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->> > On Tue, Jan 19, 2016 at 10:49:01PM +0900, Roger Shimizu wrote:
->> >> With a few gpio/led-pin changes, including fix for the issue mentioned
->> >> in Debian BTS #810894.
->> >
->> > Hi Roger
->> >
->> > This fix should be a separate patch. We can then get it applied to
->> > stable, so it makes its way back to older kernels.
->>
->> Dear Andrew,
->>
->> So this patchset would be reviewed or not?
->
-> I will review it and give comments, but won't accept it.
+On Mon, 18 Jan 2016, Shannon Zhao wrote:
+> On 2016/1/16 1:08, Stefano Stabellini wrote:
+> > On Fri, 15 Jan 2016, Shannon Zhao wrote:
+> >> From: Shannon Zhao <shannon.zhao@linaro.org>
+> >>
+> >> Use page_to_xen_pfn in case of 64KB page.
+> >>
+> >> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> >> ---
+> >>  drivers/xen/xlate_mmu.c | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
+> >> index 9692656..b9fcc2c 100644
+> >> --- a/drivers/xen/xlate_mmu.c
+> >> +++ b/drivers/xen/xlate_mmu.c
+> >> @@ -227,7 +227,7 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
+> >>  		return rc;
+> >>  	}
+> >>  	for (i = 0; i < nr_grant_frames; i++)
+> >> -		pfns[i] = page_to_pfn(pages[i]);
+> >> +		pfns[i] = page_to_xen_pfn(pages[i]);
+> > 
+> > Shannon, thanks for the patch.
+> > 
+> > Keeping in mind that in the 64K case, kernel pages are 64K but xen pages
+> > are still 4K, I think you also need to allocate
+> > (nr_grant_frames/XEN_PFN_PER_PAGE) kernel pages (assuming that they are
+> > allocated contiguously): nr_grant_frames refers to 4K pages, while
+> > xen_xlate_map_ballooned_pages is allocating pages on a 64K granularity
+> > (sizeof(pages[0]) == 64K).
+> > 
+> > Be careful that alloc_xenballooned_pages deals with 64K pages (because
+> > it deals with kernel pages), while xen_pfn_t is always 4K based (because
+> > it deals with Xen pfns).
+> > 
+> > Please test it with and without CONFIG_ARM64_64K_PAGES. Thanks!
+> > 
+> Stefano, thanks for your explanation. How about below patch?
 
-Please do.
-I'll modify accordingly and include it in v2 patchset.
+Good work, it looks like you covered all bases, I think it should work,
+but I haven't tested it myself. Just one note below.
 
->> Or I have to create another patchset including both fix for
->> "kirkwood-lswxl.dts" and the dts split?
->
-> Yes please. And the fix patch should come first, and have a fixes:
-> tag.
->
-> As a general rule of thumb, it is better to have lots of small, easy
-> to review patches, than an couple of big patch. So i would probably
-> have:
->
-> 1) Fix
-> 2) License change.
-> 3) Split patch LS-WXL/WSXL
-> 4) Split patch LS-WVL/VL
->
-> The license change needs a different sort of review to the other
-> patches, so having it as a separate patch helps with the review
-> process.
 
-Thanks for your clarify!
-Now I understand how to proceed.
-Will send out my v2 patchset within this week.
+> diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
+> index 9692656..e1f7c95 100644
+> --- a/drivers/xen/xlate_mmu.c
+> +++ b/drivers/xen/xlate_mmu.c
+> @@ -207,9 +207,12 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t
+> **gfns, void **virt,
+>         void *vaddr;
+>         int rc;
+>         unsigned int i;
+> +       unsigned long nr_pages;
+> +       xen_pfn_t xen_pfn = 0;
+> 
+>         BUG_ON(nr_grant_frames == 0);
+> -       pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
+> +       nr_pages = DIV_ROUND_UP(nr_grant_frames, XEN_PFN_PER_PAGE);
+> +       pages = kcalloc(nr_pages, sizeof(pages[0]), GFP_KERNEL);
+>         if (!pages)
+>                 return -ENOMEM;
+> 
+> @@ -218,22 +221,25 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t
+> **gfns, void **virt,
+>                 kfree(pages);
+>                 return -ENOMEM;
+>         }
+> -       rc = alloc_xenballooned_pages(nr_grant_frames, pages);
+> +       rc = alloc_xenballooned_pages(nr_pages, pages);
+>         if (rc) {
+> -               pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n",
+> __func__,
+> -                       nr_grant_frames, rc);
+> +               pr_warn("%s Couldn't balloon alloc %ld pages rc:%d\n",
+> __func__,
+> +                       nr_pages, rc);
+>                 kfree(pages);
+>                 kfree(pfns);
+>                 return rc;
+>         }
+> -       for (i = 0; i < nr_grant_frames; i++)
+> -               pfns[i] = page_to_pfn(pages[i]);
+> +       for (i = 0; i < nr_grant_frames; i++) {
+> +               if ((i % XEN_PFN_PER_PAGE) == 0)
+> +                       xen_pfn = page_to_xen_pfn(pages[i /
+> XEN_PFN_PER_PAGE]);
+> +               pfns[i] = xen_pfn++;
+> +       }
 
-Cheers,
-Roger
+We might want to:
+
+  pfns[i] = pfn_to_gfn(xen_pfn++);
+
+for consistency, even though for autotranslate guests pfn_to_gfn always
+returns pfn.
+
+
+> -       vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
+> +       vaddr = vmap(pages, nr_pages, 0, PAGE_KERNEL);
+>         if (!vaddr) {
+> -               pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
+> -                       nr_grant_frames, rc);
+> -               free_xenballooned_pages(nr_grant_frames, pages);
+> +               pr_warn("%s Couldn't map %ld pages rc:%d\n", __func__,
+> +                       nr_pages, rc);
+> +               free_xenballooned_pages(nr_pages, pages);
+>                 kfree(pages);
+>                 kfree(pfns);
+>                 return -ENOMEM;
+> 
+> -- 
+> Shannon
+> 
