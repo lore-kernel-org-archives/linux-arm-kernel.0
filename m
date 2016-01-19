@@ -1,46 +1,26 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 19 Jan 2016 09:18:16 +0900
-Subject: [PATCH] MAINTAINERS: Update mailing list for Renesas SoC
- Development
-In-Reply-To: <CAMuHMdXF8QnKsLOYFnT7Rje5G9_7Xr0NesO2SKEkWSivKQYkbA@mail.gmail.com>
-References: <1453079073-30937-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdXF8QnKsLOYFnT7Rje5G9_7Xr0NesO2SKEkWSivKQYkbA@mail.gmail.com>
-Message-ID: <20160119001815.GA14224@verge.net.au>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 18 Jan 2016 16:27:51 -0800
+Subject: [PATCH LINUX v5 0/8] tty: xuartps: Fix lock ups
+In-Reply-To: <5691F7C6.5050107@hurleysoftware.com>
+References: <1451126636-13699-1-git-send-email-soren.brinkmann@xilinx.com>
+ <5691F7C6.5050107@hurleysoftware.com>
+Message-ID: <20160119002751.GD6491@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 18, 2016 at 09:09:29AM +0100, Geert Uytterhoeven wrote:
-> CC linux-arm-kernel
+On Sat, 2016-01-09 at 10:18PM -0800, Peter Hurley wrote:
+> On 12/26/2015 02:43 AM, Soren Brinkmann wrote:
+> > Hi,
+> > 
+> > as requested by Peter, this is the first part of my series which has the
+> > patches reviewed by Peter. I'll submit the second part separately. There
+> > are no new changes within the patches.
 > 
-> On Mon, Jan 18, 2016 at 2:04 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Update the mailing list used for development of support for
-> > Renesas SoCs and related drivers.
-> >
-> > Up until now the linux-sh mailing list has been used, however,
-> > Renesas SoCs are now much wider than the SH architecture and there
-> > is some desire from some for the linux-sh list to refocus on
-> > discussion of the work on the SH architecture.
-> >
-> > Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> > Cc: Magnus Damm <magnus.damm@gmail.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> > ---
-> > * This patch applies on top of Linus's tree where currently the head commit
-> >   is 984065055e6e ("Merge branch 'drm-next' of
-> >   git://people.freedesktop.org/~airlied/linux")
-> >
-> >   This has been used as a base instead of v4.4 so that it is based on the
-> >   following two commits which affect it:
-> >   - 1a4ca6dd3dc8 ("MAINTAINERS: Add co-maintainer for Renesas Pin Controllers")
-> >   - 3e46c3973cba ("MAINTAINERS: add Renesas usb2 phy driver")
-> 
-> I assume you'll send an update for the "ARM/RENESAS ARM64 ARCHITECTURE"
-> section as soon as that has landed in mainline?
+> Thanks. Looks good.
 
-Yes, that is my plan.
+Thanks, Peter.
+
+Greg, would you pick these up please? Or is anything missing?
+
+	Thanks,
+	S?ren
