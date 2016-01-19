@@ -1,246 +1,192 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Tue, 19 Jan 2016 18:00:43 +0800
-Subject: [PATCH v12.1 05/17] dt-bindings: add document for analogix display
- port driver
-In-Reply-To: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
-References: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1453197643-13130-1-git-send-email-ykk@rock-chips.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue, 19 Jan 2016 15:32:41 +0530
+Subject: [PATCH V7 1/6] i2c: qup: Change qup_wait_writeready function to use
+ for all timeouts
+In-Reply-To: <1453197766-18976-1-git-send-email-sricharan@codeaurora.org>
+References: <1453197766-18976-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1453197766-18976-2-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Analogix dp driver is split from exynos dp driver, so we just
-make an copy of exynos_dp.txt, and then simplify exynos_dp.txt
+qup_wait_writeready waits only on a output fifo empty event.
+Change the same function to accept the event and data length
+to wait as parameters. This way the same function can be used for
+timeouts in other places as well.
 
-Beside update some exynos dtsi file with the latest change
-according to the devicetree binding documents.
-
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+Reviewed-by: Andy Gross <andy.gross@linaro.org>
+Tested-by: Archit Taneja <architt@codeaurora.org>
+Tested-by: Telkar Nagender <ntelkar@codeaurora.org>
 ---
-There is no new changes in v12.1, but just rebase the whole patches on
-top of Dave's drm-next branch [0] (Heiko)
+ drivers/i2c/busses/i2c-qup.c | 67 +++++++++++++++++++++++++++++++-------------
+ 1 file changed, 48 insertions(+), 19 deletions(-)
 
-Changes in v12.1: None
-Changes in v12: None
-Changes in v11: None
-Changes in v10:
-- Add the ack from Rob Herring
-
-Changes in v9: None
-Changes in v8:
-- Correct the right document path of display-timing.txt (Heiko)
-- Correct the misspell of 'from' to 'frm'. (Heiko)
-
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4:
-- Split all DTS changes, and provide backward compatibility. Mark old
-  properties as deprecated but still support them. (Krzysztof)
-- Update "analogix,hpd-gpio" to "hpd-gpios" prop name. (Rob)
-- Deprecated some properties which could parsed from Edid/Mode/DPCD. (Thierry)
-    "analogix,color-space" & "analogix,color-depth"   &
-    "analogix,link-rate"   & "analogix,lane-count"    &
-    "analogix,ycbcr-coeff" & "analogix,dynamic-range" &
-    "vsync-active-high"    & "hsync-active-high"      & "interlaces"
-
-Changes in v3:
-- Add devicetree binding documents. (Heiko)
-- Remove sync pol & colorimetry properies from the new analogix dp driver
-  devicetree binding. (Thierry)
-- Update the exist exynos dtsi file with the latest DP DT properies.
-
-Changes in v2: None
-
- .../bindings/display/bridge/analogix_dp.txt        | 50 ++++++++++++
- .../bindings/display/exynos/exynos_dp.txt          | 92 ++++++----------------
- 2 files changed, 76 insertions(+), 66 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-
-diff --git a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-new file mode 100644
-index 0000000..7659a7a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-@@ -0,0 +1,50 @@
-+Analogix Display Port bridge bindings
-+
-+Required properties for dp-controller:
-+	-compatible:
-+		platform specific such as:
-+		 * "samsung,exynos5-dp"
-+		 * "rockchip,rk3288-dp"
-+	-reg:
-+		physical base address of the controller and length
-+		of memory mapped region.
-+	-interrupts:
-+		interrupt combiner values.
-+	-clocks:
-+		from common clock binding: handle to dp clock.
-+	-clock-names:
-+		from common clock binding: Shall be "dp".
-+	-interrupt-parent:
-+		phandle to Interrupt combiner node.
-+	-phys:
-+		from general PHY binding: the phandle for the PHY device.
-+	-phy-names:
-+		from general PHY binding: Should be "dp".
-+
-+Optional properties for dp-controller:
-+	-hpd-gpios:
-+		Hotplug detect GPIO.
-+		Indicates which GPIO should be used for hotplug detection
-+	-port@[X]: SoC specific port nodes with endpoint definitions as defined
-+		in Documentation/devicetree/bindings/media/video-interfaces.txt,
-+		please refer to the SoC specific binding document:
-+		* Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-+		* Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
-+
-+
-+[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
-+-------------------------------------------------------------------------------
-+
-+Example:
-+
-+	dp-controller {
-+		compatible = "samsung,exynos5-dp";
-+		reg = <0x145b0000 0x10000>;
-+		interrupts = <10 3>;
-+		interrupt-parent = <&combiner>;
-+		clocks = <&clock 342>;
-+		clock-names = "dp";
-+
-+		phys = <&dp_phy>;
-+		phy-names = "dp";
-+	};
-diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-index fe4a7a2..4fa8aca 100644
---- a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-+++ b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-@@ -1,20 +1,3 @@
--Device-Tree bindings for Samsung Exynos Embedded DisplayPort Transmitter(eDP)
--
--DisplayPort is industry standard to accommodate the growing board adoption
--of digital display technology within the PC and CE industries.
--It consolidates the internal and external connection methods to reduce device
--complexity and cost. It also supports necessary features for important cross
--industry applications and provides performance scalability to enable the next
--generation of displays that feature higher color depths, refresh rates, and
--display resolutions.
--
--eDP (embedded display port) device is compliant with Embedded DisplayPort
--standard as follows,
--- DisplayPort standard 1.1a for Exynos5250 and Exynos5260.
--- DisplayPort standard 1.3 for Exynos5422s and Exynos5800.
--
--eDP resides between FIMD and panel or FIMD and bridge such as LVDS.
--
- The Exynos display port interface should be configured based on
- the type of panel connected to it.
+diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+index fdcbdab..81ed120 100644
+--- a/drivers/i2c/busses/i2c-qup.c
++++ b/drivers/i2c/busses/i2c-qup.c
+@@ -98,6 +98,9 @@
+ #define QUP_STATUS_ERROR_FLAGS		0x7c
  
-@@ -48,26 +31,6 @@ Required properties for dp-controller:
- 		from general PHY binding: the phandle for the PHY device.
- 	-phy-names:
- 		from general PHY binding: Should be "dp".
--	-samsung,color-space:
--		input video data format.
--			COLOR_RGB = 0, COLOR_YCBCR422 = 1, COLOR_YCBCR444 = 2
--	-samsung,dynamic-range:
--		dynamic range for input video data.
--			VESA = 0, CEA = 1
--	-samsung,ycbcr-coeff:
--		YCbCr co-efficients for input video.
--			COLOR_YCBCR601 = 0, COLOR_YCBCR709 = 1
--	-samsung,color-depth:
--		number of bits per colour component.
--			COLOR_6 = 0, COLOR_8 = 1, COLOR_10 = 2, COLOR_12 = 3
--	-samsung,link-rate:
--		link rate supported by the panel.
--			LINK_RATE_1_62GBPS = 0x6, LINK_RATE_2_70GBPS = 0x0A
--	-samsung,lane-count:
--		number of lanes supported by the panel.
--			LANE_COUNT1 = 1, LANE_COUNT2 = 2, LANE_COUNT4 = 4
--	- display-timings: timings for the connected panel as described by
--		Documentation/devicetree/bindings/display/display-timing.txt
+ #define QUP_READ_LIMIT			256
++#define SET_BIT				0x1
++#define RESET_BIT			0x0
++#define ONE_BYTE			0x1
  
- Optional properties for dp-controller:
- 	-interlaced:
-@@ -83,17 +46,30 @@ Optional properties for dp-controller:
- 		Hotplug detect GPIO.
- 			Indicates which GPIO should be used for hotplug
- 			detection
--Video interfaces:
--  Device node can contain video interface port nodes according to [1].
--  The following are properties specific to those nodes:
--
--  endpoint node connected to bridge or panel node:
--   - remote-endpoint: specifies the endpoint in panel or bridge node.
--		      This node is required in all kinds of exynos dp
--		      to represent the connection between dp and bridge
--		      or dp and panel.
--
--[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
-+	-video interfaces: Device node can contain video interface port
-+			nodes according to [1].
-+	- display-timings: timings for the connected panel as described by
-+		Documentation/devicetree/bindings/display/panel/display-timing.txt
+ struct qup_i2c_dev {
+ 	struct device		*dev;
+@@ -221,26 +224,42 @@ static int qup_i2c_change_state(struct qup_i2c_dev *qup, u32 state)
+ 	return 0;
+ }
+ 
+-static int qup_i2c_wait_writeready(struct qup_i2c_dev *qup)
++/**
++ * qup_i2c_wait_ready - wait for a give number of bytes in tx/rx path
++ * @qup: The qup_i2c_dev device
++ * @op: The bit/event to wait on
++ * @val: value of the bit to wait on, 0 or 1
++ * @len: The length the bytes to be transferred
++ */
++static int qup_i2c_wait_ready(struct qup_i2c_dev *qup, int op, bool val,
++			      int len)
+ {
+ 	unsigned long timeout;
+ 	u32 opflags;
+ 	u32 status;
++	u32 shift = __ffs(op);
+ 
+-	timeout = jiffies + HZ;
++	len *= qup->one_byte_t;
++	/* timeout after a wait of twice the max time */
++	timeout = jiffies + len * 4;
+ 
+ 	for (;;) {
+ 		opflags = readl(qup->base + QUP_OPERATIONAL);
+ 		status = readl(qup->base + QUP_I2C_STATUS);
+ 
+-		if (!(opflags & QUP_OUT_NOT_EMPTY) &&
+-		    !(status & I2C_STATUS_BUS_ACTIVE))
+-			return 0;
++		if (((opflags & op) >> shift) == val) {
++			if (op == QUP_OUT_NOT_EMPTY) {
++				if (!(status & I2C_STATUS_BUS_ACTIVE))
++					return 0;
++			} else {
++				return 0;
++			}
++		}
+ 
+ 		if (time_after(jiffies, timeout))
+ 			return -ETIMEDOUT;
+ 
+-		usleep_range(qup->one_byte_t, qup->one_byte_t * 2);
++		usleep_range(len, len * 2);
+ 	}
+ }
+ 
+@@ -261,13 +280,13 @@ static void qup_i2c_set_write_mode(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+ 	}
+ }
+ 
+-static void qup_i2c_issue_write(struct qup_i2c_dev *qup, struct i2c_msg *msg)
++static int qup_i2c_issue_write(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+ {
+ 	u32 addr = msg->addr << 1;
+ 	u32 qup_tag;
+-	u32 opflags;
+ 	int idx;
+ 	u32 val;
++	int ret = 0;
+ 
+ 	if (qup->pos == 0) {
+ 		val = QUP_TAG_START | addr;
+@@ -279,9 +298,10 @@ static void qup_i2c_issue_write(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+ 
+ 	while (qup->pos < msg->len) {
+ 		/* Check that there's space in the FIFO for our pair */
+-		opflags = readl(qup->base + QUP_OPERATIONAL);
+-		if (opflags & QUP_OUT_FULL)
+-			break;
++		ret = qup_i2c_wait_ready(qup, QUP_OUT_FULL, RESET_BIT,
++					 4 * ONE_BYTE);
++		if (ret)
++			return ret;
+ 
+ 		if (qup->pos == msg->len - 1)
+ 			qup_tag = QUP_TAG_STOP;
+@@ -300,6 +320,8 @@ static void qup_i2c_issue_write(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+ 		qup->pos++;
+ 		idx++;
+ 	}
 +
-+For the below properties, please refer to Analogix DP binding document:
-+ * Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-+	-phys (required)
-+	-phy-names (required)
-+	-hpd-gpios (optional)
++	return ret;
+ }
+ 
+ static int qup_i2c_write_one(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+@@ -325,7 +347,9 @@ static int qup_i2c_write_one(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+ 		if (ret)
+ 			goto err;
+ 
+-		qup_i2c_issue_write(qup, msg);
++		ret = qup_i2c_issue_write(qup, msg);
++		if (ret)
++			goto err;
+ 
+ 		ret = qup_i2c_change_state(qup, QUP_RUN_STATE);
+ 		if (ret)
+@@ -347,7 +371,7 @@ static int qup_i2c_write_one(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+ 	} while (qup->pos < msg->len);
+ 
+ 	/* Wait for the outstanding data in the fifo to drain */
+-	ret = qup_i2c_wait_writeready(qup);
++	ret = qup_i2c_wait_ready(qup, QUP_OUT_NOT_EMPTY, RESET_BIT, ONE_BYTE);
+ 
+ err:
+ 	disable_irq(qup->irq);
+@@ -384,18 +408,19 @@ static void qup_i2c_issue_read(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+ }
+ 
+ 
+-static void qup_i2c_read_fifo(struct qup_i2c_dev *qup, struct i2c_msg *msg)
++static int qup_i2c_read_fifo(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+ {
+-	u32 opflags;
+ 	u32 val = 0;
+ 	int idx;
++	int ret = 0;
+ 
+ 	for (idx = 0; qup->pos < msg->len; idx++) {
+ 		if ((idx & 1) == 0) {
+ 			/* Check that FIFO have data */
+-			opflags = readl(qup->base + QUP_OPERATIONAL);
+-			if (!(opflags & QUP_IN_NOT_EMPTY))
+-				break;
++			ret = qup_i2c_wait_ready(qup, QUP_IN_NOT_EMPTY,
++						 SET_BIT, 4 * ONE_BYTE);
++			if (ret)
++				return ret;
+ 
+ 			/* Reading 2 words at time */
+ 			val = readl(qup->base + QUP_IN_FIFO_BASE);
+@@ -405,6 +430,8 @@ static void qup_i2c_read_fifo(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+ 			msg->buf[qup->pos++] = val >> QUP_MSW_SHIFT;
+ 		}
+ 	}
 +
-+Deprecated properties for DisplayPort:
-+-interlaced:            deprecated prop that can parsed from drm_display_mode.
-+-vsync-active-high:     deprecated prop that can parsed from drm_display_mode.
-+-hsync-active-high:     deprecated prop that can parsed from drm_display_mode.
-+-samsung,ycbcr-coeff:   deprecated prop that can parsed from drm_display_mode.
-+-samsung,dynamic-range: deprecated prop that can parsed from drm_display_mode.
-+-samsung,color-space:   deprecated prop that can parsed from drm_display_info.
-+-samsung,color-depth:   deprecated prop that can parsed from drm_display_info.
-+-samsung,link-rate:     deprecated prop that can reading from monitor by dpcd method.
-+-samsung,lane-count:    deprecated prop that can reading from monitor by dpcd method.
-+-samsung,hpd-gpio:      deprecated name for hpd-gpios.
-+
-+-------------------------------------------------------------------------------
++	return ret;
+ }
  
- Example:
+ static int qup_i2c_read_one(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+@@ -450,7 +477,9 @@ static int qup_i2c_read_one(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+ 			goto err;
+ 		}
  
-@@ -112,13 +88,6 @@ SOC specific portion:
+-		qup_i2c_read_fifo(qup, msg);
++		ret = qup_i2c_read_fifo(qup, msg);
++		if (ret)
++			goto err;
+ 	} while (qup->pos < msg->len);
  
- Board Specific portion:
- 	dp-controller {
--		samsung,color-space = <0>;
--		samsung,dynamic-range = <0>;
--		samsung,ycbcr-coeff = <0>;
--		samsung,color-depth = <1>;
--		samsung,link-rate = <0x0a>;
--		samsung,lane-count = <4>;
--
- 		display-timings {
- 			native-mode = <&lcd_timing>;
- 			lcd_timing: 1366x768 {
-@@ -135,18 +104,9 @@ Board Specific portion:
- 		};
- 
- 		ports {
--			port {
-+			port at 0 {
- 				dp_out: endpoint {
--					remote-endpoint = <&dp_in>;
--				};
--			};
--		};
--
--		panel {
--			...
--			port {
--				dp_in: endpoint {
--					remote-endpoint = <&dp_out>;
-+					remote-endpoint = <&bridge_in>;
- 				};
- 			};
- 		};
+ err:
 -- 
-1.9.1
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
