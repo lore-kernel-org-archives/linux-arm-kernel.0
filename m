@@ -1,58 +1,42 @@
-From: rientjes@google.com (David Rientjes)
-Date: Tue, 19 Jan 2016 14:17:03 -0800 (PST)
-Subject: [PATCH] mm: avoid uninitialized variable in tracepoint
-In-Reply-To: <20160118230324.GF14531@node.shutemov.name>
-References: <4117363.Ys1FTDH7Wz@wuerfel>
- <20160118230324.GF14531@node.shutemov.name>
-Message-ID: <alpine.DEB.2.10.1601191415480.7346@chino.kir.corp.google.com>
+From: Michael.Wang@alliedtelesis.co.nz (Michael Wang)
+Date: Tue, 19 Jan 2016 22:33:46 +0000
+Subject: mtd: pxa3xx_nand: issue with command time out
+In-Reply-To: <87wpr6d21b.fsf@belgarion.home>
+References: <5695CEF0.1080100@alliedtelesis.co.nz>
+ <87a8o9ex9r.fsf@belgarion.home> <569827BC.10601@alliedtelesis.co.nz>
+ <874meddqu5.fsf@belgarion.home> <569C4ABD.6080803@alliedtelesis.co.nz>
+ <87wpr6d21b.fsf@belgarion.home>
+Message-ID: <569EB9CA.9080201@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Jan 2016, Kirill A. Shutemov wrote:
+On 01/19/2016 10:13 AM, Robert Jarzmik wrote:
+>  From this analysis I think you have something broken in your platform, a driver
+> taking a lock and blocking the scheduling or something like that. Your timeouts
+> seem to come from there.
+>
+> If you want to add 2 prinks to validate the theory (and remove my debug logs
+> which change the realtime behavior) :
+>   - put one just before the "ret = IRQ_WAKE_THREAD";
+>   - put the other on the first line of pxa3xx_nand_irq_thread()
+>   - and calculate the difference.
+Hi Robert,
 
-> > A newly added tracepoint in the hugepage code uses a variable in the
-> > error handling that is not initialized at that point:
-> > 
-> > include/trace/events/huge_memory.h:81:230: error: 'isolated' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> > 
-> > The result is relatively harmless, as the trace data will in rare
-> > cases contain incorrect data.
-> > 
-> > This works around the problem by adding an explicit initialization.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: 7d2eba0557c1 ("mm: add tracepoint for scanning pages")
-> 
-> There's the same patch in mm tree, but it got lost on the way to Linus'
-> tree:
-> 
-> https://ozlabs.org/~akpm/mmots/broken-out/mm-make-optimistic-check-for-swapin-readahead-fix.patch
-> 
-> Andrew?
-> 
+Thank you very much for your help.
 
-Looks like the patch got the wrong title, 
-mm-make-optimistic-check-for-swapin-readahead-fix.patch, since the subject 
-is "khugepaged: avoid usage of uninitialized variable 'isolated'".
+I have added the 2 printks, and I think you are right that there is 
+something
+blocking the scheduling.
 
-Anyway, feel free to add
+[  146.372745] pxa3xx_nand_irq:700 IRQ_WAKE_THREAD status=2
+[  146.378106] pxa3xx_nand_irq_thread:643
+[  146.411117] pxa3xx_nand_irq:700 IRQ_WAKE_THREAD status=2
+[  146.537124] pxa3xx_nand_irq_thread:643
+       => irq thread was scheduled in 0.126 ms
+[  146.541245] pxa3xx_nand_irq:700 IRQ_WAKE_THREAD status=2
+[  146.546603] pxa3xx_nand_irq_thread:643
 
-Acked-by: David Rientjes <rientjes@google.com>
+I will continue to investigate the cause of this delay.
 
-to either patch.
-
-> > 
-> > diff --git a/mm/huge_memory.c b/mm/huge_memory.c
-> > index b2db98136af9..bb3b763b1829 100644
-> > --- a/mm/huge_memory.c
-> > +++ b/mm/huge_memory.c
-> > @@ -2320,7 +2320,7 @@ static void collapse_huge_page(struct mm_struct *mm,
-> >  	pgtable_t pgtable;
-> >  	struct page *new_page;
-> >  	spinlock_t *pmd_ptl, *pte_ptl;
-> > -	int isolated, result = 0;
-> > +	int isolated = 0, result = 0;
-> >  	unsigned long hstart, hend;
-> >  	struct mem_cgroup *memcg;
-> >  	unsigned long mmun_start;	/* For mmu_notifiers */
-> > 
+Thanks,
+Michael
