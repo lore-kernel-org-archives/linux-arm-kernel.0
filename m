@@ -1,37 +1,29 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 19 Jan 2016 09:49:07 +0100
-Subject: [PATCH RFC 0/2] Add a display driver to the Allwinner H3
-In-Reply-To: <20160118101827.GO4581@lukather>
-References: <cover.1452021349.git.moinejf@free.fr>
- <20160106212046.GD9631@lukather>
- <20160108181306.4a5a7370f0e3f3daa7c9e285@free.fr>
- <20160118101827.GO4581@lukather>
-Message-ID: <20160119094907.2cc56f1ac6b120472df29aa1@free.fr>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 19 Jan 2016 09:49:49 +0100
+Subject: [PATCH] clocksource: atmel-st: use return value from
+ clk_prepare_enable()
+In-Reply-To: <1453145698-23661-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1453145698-23661-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <569DF8AD.5040704@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Jan 2016 11:18:27 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On 01/18/2016 08:34 PM, Alexandre Belloni wrote:
+> ret is used to detect an error but it was not properly updated after
+> calling clk_prepare_enable() thus it made it impossible to detect an error
+> when enabling the slow clock.
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
 
-> > Then, the DE2 sources contain only:
-> > 
-> > 	All Winner Tech, All Right Reserved. 2014-2015 Copyright (c)
-> > 
-> > Eventually, there is no copyright/author/history in the HDMI sources.
-> 
-> That one is nasty though :/
-> 
-> It seems to be a GPL violation though, so we have two solutions:
-> 
-> A) have a clean room implementation
-> B) Ask allwinner to comply with the license
-> 
-> The former doesn't look likely to happen soon... Can you open an issue
-> on this on their linux github repo?
+Applied thanks !
 
-Do you really think that I could have more luck than people of the
-linux-sunxi or pine64 teams?
+   -- Daniel
+
 
 -- 
-A galon		|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
