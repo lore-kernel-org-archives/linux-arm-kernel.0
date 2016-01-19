@@ -1,73 +1,42 @@
-From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Tue, 19 Jan 2016 21:46:00 +0800
-Subject: [Xen-devel] [PATCH v2 14/16] Xen: EFI: Parse DT parameters for
- Xen specific UEFI
-In-Reply-To: <20160119134318.GB26545@leverpostej>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-15-git-send-email-zhaoshenglong@huawei.com>
- <alpine.DEB.2.02.1601181533010.16178@kaball.uk.xensource.com>
- <569E37C9.6040700@linaro.org> <20160119134318.GB26545@leverpostej>
-Message-ID: <569E3E18.2040003@linaro.org>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Tue, 19 Jan 2016 22:49:00 +0900
+Subject: [PATCH 0/2] ARM: dts: kirkwood: split lswxl and lswvl with fixes
+Message-ID: <1453211342-25214-1-git-send-email-rogershimizu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In order to support more buffalo linkstation devices in convenient way,
+I split current 2 dts files into a few comoon dtsi files and device specific
+dts files.
 
+And I also fixed a few gpio/led pin, including fix for the issue mentioned
+in Debian BTS #810894.
 
-On 2016/1/19 21:43, Mark Rutland wrote:
-> On Tue, Jan 19, 2016 at 09:19:05PM +0800, Shannon Zhao wrote:
->>
->>
->> On 2016/1/18 23:41, Stefano Stabellini wrote:
->>> CC'ing Matt Fleming
->>>
->>> On Fri, 15 Jan 2016, Shannon Zhao wrote:
->>>> From: Shannon Zhao <shannon.zhao@linaro.org>
->>>> @@ -520,15 +531,28 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
->>>>   				       int depth, void *data)
->>>>   {
->>>>   	struct param_info *info = data;
->>>> +	struct params *dt_params;
->>>> +	unsigned int size;
->>>>   	const void *prop;
->>>>   	void *dest;
->>>>   	u64 val;
->>>>   	int i, len;
->>>>
->>>> -	if (depth != 1 || strcmp(uname, "chosen") != 0)
->>>> -		return 0;
->>>> +	if (efi_enabled(EFI_PARAVIRT)) {
->>>> +		if (depth != 2 || strcmp(uname, "uefi") != 0)
->>>
->>> You are already introducing this check in the previous patch when
->>> setting EFI_PARAVIRT, why do this again now?  But if we need to do this
->>> check again, then, like Mark suggested, it should be done against the
->>> full path.
->>>
->> This check just wants to confirm that the current node is the "uefi"
->> node and we can parse it with xen_fdt_params now.
->
-> There is no single "uefi" node as many nodes can share that name. There
-> is at most a single, /hypervisor/uefi node, as that is qualified by a
-> full path.
->
-Sure, I will check it by full path.
+Roger Shimizu (2):
+  ARM: dts: kirkwood: split lswxl into linkstation lswsxl and lswxl
+  ARM: dts: kirkwood: split lswvl into linkstation lsvl and lswvl
 
-> Checking the leaf node name, as above, is insufficient. For example, the
-> below will be accepted:
->
-> * /chosen/uefi
-> * /foo/uefi
-> * /not-a-hypervisor/uefi
->
-> Any of these could exist in addition to a /hypervisor/uefi node, and
-> could appear ealier or later in the DTB.
->
-> There may be reasons to add such nodes in future, and regardless we
-> should not read properties from an invalid/wrong node.
->
-> Thanks,
-> Mark.
->
+ .../devicetree/bindings/arm/marvell,kirkwood.txt   |   6 +-
+ arch/arm/boot/dts/Makefile                         |   6 +-
+ arch/arm/boot/dts/kirkwood-linkstation-6282.dtsi   | 190 +++++++++++++
+ .../boot/dts/kirkwood-linkstation-duo-6281.dtsi    | 185 +++++++++++++
+ arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts    |  57 ++++
+ arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts  |  57 ++++
+ arch/arm/boot/dts/kirkwood-linkstation-lswvl.dts   | 112 ++++++++
+ arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts   | 113 ++++++++
+ arch/arm/boot/dts/kirkwood-linkstation.dtsi        | 202 ++++++++++++++
+ arch/arm/boot/dts/kirkwood-lswvl.dts               | 301 ---------------------
+ arch/arm/boot/dts/kirkwood-lswxl.dts               | 301 ---------------------
+ 11 files changed, 924 insertions(+), 606 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-6282.dtsi
+ create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi
+ create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lswvl.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-linkstation.dtsi
+ delete mode 100644 arch/arm/boot/dts/kirkwood-lswvl.dts
+ delete mode 100644 arch/arm/boot/dts/kirkwood-lswxl.dts
 
 -- 
-Shannon
+2.1.4
