@@ -1,59 +1,38 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Tue, 19 Jan 2016 21:58:19 +0100
-Subject: USB Ethernet gadget on Nokia n900
-In-Reply-To: <20150707114658.GT10705@atomide.com>
-References: <20141019090107.GA19132@amd> <20150707074626.GB12087@pali>
- <20150707114658.GT10705@atomide.com>
-Message-ID: <201601192158.19810@pali>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 19 Jan 2016 21:10:49 +0000
+Subject: [RFC PATCH v2 0/4] CPUs capacity information for heterogeneous
+ systems
+In-Reply-To: <569E92FF.4000006@linaro.org>
+References: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
+ <56994D87.6000709@linaro.org> <20160118151316.GD7159@e106622-lin>
+ <CAKfTPtBFR4cowT-j4qVxfUvh6NDNmi6R=J7z9kywi6bONU3Pow@mail.gmail.com>
+ <20160118163014.GA10332@e106622-lin>
+ <CAKfTPtDJBAXUz=_-QQSkrqwAvmUJd1bUJ-VfSaNER-0NzWpunA@mail.gmail.com>
+ <20160119105941.GA28845@e104818-lin.cambridge.arm.com>
+ <20160119112323.GB8573@e106622-lin>
+ <20160119142933.GF8573@e106622-lin> <569E92FF.4000006@linaro.org>
+Message-ID: <20160119211049.GX6588@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 July 2015 13:46:59 Tony Lindgren wrote:
-> * Pali Roh?r <pali.rohar@gmail.com> [150707 00:48]:
-> > On Monday 06 July 2015 06:53:18 Tony Lindgren wrote:
-> > > * Pali Roh?r <pali.rohar@gmail.com> [150706 06:27]:
-> > > > On Tuesday 28 October 2014 23:26:41 Tony Lindgren wrote:
-> > > > > * Pavel Machek <pavel@ucw.cz> [141028 15:22]:
-> > > > > > On Tue 2014-10-28 23:04:50, Pavel Machek wrote:
-> > > > > > > Networking now works against 3.17-based kernel. Thanks!
-> > > > > > 
-> > > > > > It works on 3.18-rc1 kernel, too. (I had to hand-modify
-> > > > > > patch to apply to 3.17, no changes needed for 3.18-rc1.)
-> > > > > > 
-> > > > > > Tested-by: Pavel Machek <pavel@ucw.cz>
-> > > > > 
-> > > > > Whatever we decice to do to fix this regression, it should
-> > > > > probably be backported to at least v3.16 stable for distro
-> > > > > use, maybe earlier too. I'd assume this is broken on
-> > > > > multiple platforms currently.
-> > > > 
-> > > > it looks like this patch was not included into any kernel
-> > > > version... I'm still using it on top of 4.x kernels. Are you
-> > > > going to send this patch into upstream? Or do you have another
-> > > > fix for this problem?
-> > > 
-> > > I think Felipe mentioned a better built-in gether fix that's been
-> > > reviewed on linux-usb list.
-> > 
-> > Do you have link to that email thread? Or was Felipe's fix already
-> > merged into mainline kernel?
-> 
-> Sorry I don't have a link, maybe Felipe can point you to the right
-> patch.
-> 
-> Regards,
-> 
-> Tony
+On Tue, Jan 19, 2016 at 11:48:15AM -0800, Steve Muckle wrote:
+> On 01/19/2016 06:29 AM, Juri Lelli wrote:
 
-Felipe, ping
+> > I'm generally seeing ~1sec increase in boot time for 1 and practically
+> > no difference for 2 (even after having added patches that provide
+> > runtime performance improvements).
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+> One second is considerable IMO. Aside from the general desire to have
+> shorter boot times on any platform there are environments like
+> automotive where boot time is critical.
+
+Yeah, definitely.  Is this actually blocking boot and if so can we
+arrange to do this in parallel with other activity (with likely knock on
+effects on reproducibility...)?
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160119/fb4765e9/attachment.sig>
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160119/97a243b4/attachment.sig>
