@@ -1,26 +1,41 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 18 Jan 2016 16:27:51 -0800
-Subject: [PATCH LINUX v5 0/8] tty: xuartps: Fix lock ups
-In-Reply-To: <5691F7C6.5050107@hurleysoftware.com>
-References: <1451126636-13699-1-git-send-email-soren.brinkmann@xilinx.com>
- <5691F7C6.5050107@hurleysoftware.com>
-Message-ID: <20160119002751.GD6491@xsjsorenbubuntu>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 19 Jan 2016 02:02:11 +0100
+Subject: Fix preempt-rt on AT91
+In-Reply-To: <569D4B55.10103@linutronix.de>
+References: <1452997394-8554-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160118174259.GC12309@linutronix.de>
+ <20160118192308.GR3367@piout.net> <569D4B55.10103@linutronix.de>
+Message-ID: <20160119010211.GU3367@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2016-01-09 at 10:18PM -0800, Peter Hurley wrote:
-> On 12/26/2015 02:43 AM, Soren Brinkmann wrote:
-> > Hi,
-> > 
-> > as requested by Peter, this is the first part of my series which has the
-> > patches reviewed by Peter. I'll submit the second part separately. There
-> > are no new changes within the patches.
+On 18/01/2016 at 21:30:13 +0100, Sebastian Andrzej Siewior wrote :
+> Well, if it works properly and does not lead to any new bugs or
+> anything else then nobody will mind I guess.
 > 
-> Thanks. Looks good.
 
-Thanks, Peter.
+Yeah, the DT guys were not happy about the patch set, I'll try to work
+around using DT ;)
 
-Greg, would you pick these up please? Or is anything missing?
+> >> All in all, care to forwarded the working pieces from -RT patch set
+> >> upstream? I problem I have here is mostly that I can't the patches on
+> >> actual hardware. Disabling the PIT and running on the other clocksource
+> >> isn't that -RT specific after all :)
+> > 
+> > I'd say that the only remaining part is the IRQ freeing/requesting but
+> > as I said, this can't land in mainline as is. I still plan to work on
+> > that later.
+> > I'd say that most people running linux on at91 are already using the tcb
+> > as the clocksource, this is already available in the mainline and is the
+> > default unless the TCBs are used for something else.
+> 
+> Wasn't there one of the patches to increase the frequency of the TCB
+> clocksource from the default to something higher?
+> 
 
-	Thanks,
-	S?ren
+Indeed, it may be worth mainlining that one.
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
