@@ -1,164 +1,467 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Tue, 19 Jan 2016 13:55:43 +0100
-Subject: [PATCH v4] kernel: add kcov code coverage
-In-Reply-To: <20160118225550.GE14531@node.shutemov.name>
-References: <1453145117-92868-1-git-send-email-dvyukov@google.com>
- <20160118225550.GE14531@node.shutemov.name>
-Message-ID: <CACT4Y+ZUKJOmATAASxM1qnbn=_0M9TAtTQYO0ecMtursLYvdww@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 19 Jan 2016 14:01:46 +0100
+Subject: [RFC PATCH 3/3] mmc: pwrseq: convert to proper platform device
+In-Reply-To: <1453201155-2598-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1453201052-2347-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1453201155-2598-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <CAPDyKFpsQwmdXxSaAx=KkL4q3anrRDsvnOd3_4f0rTzjDJes4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 18, 2016 at 11:55 PM, Kirill A. Shutemov
-<kirill@shutemov.name> wrote:
-> On Mon, Jan 18, 2016 at 08:25:16PM +0100, Dmitry Vyukov wrote:
->> +enum kcov_mode {
->> +     /*
->> +      * Tracing coverage collection mode.
->> +      * Covered PCs are collected in a per-task buffer.
->> +      */
->> +     kcov_mode_trace = 1,
+On 19 January 2016 at 11:59, Srinivas Kandagatla
+<srinivas.kandagatla@linaro.org> wrote:
+> simple-pwrseq and emmc-pwrseq drivers rely on platform_device
+> structure from of_find_device_by_node(), this works mostly. But, as there
+> is no driver associated with this devices, cases like default/init pinctrl
+> setup would never be performed by pwrseq. This becomes problem when the
+> gpios used in pwrseq require pinctrl setup.
 >
-> We usually use upper case for items in enum.
-
-Done in v5
-
->> +};
->> +
->> +/*
->> + * kcov descriptor (one per opened debugfs file).
->> + * State transitions of the descriptor:
->> + *  - initial state after open()
->> + *  - then there must be a single ioctl(KCOV_INIT_TRACE) call
->> + *  - then, mmap() call (several calls are allowed but not useful)
->> + *  - then, repeated enable/disable for a task (only one task a time allowed)
->> + */
->> +struct kcov {
->> +     /*
->> +      * Reference counter. We keep one for:
->> +      *  - opened file descriptor
->> +      *  - mmapped region (including copies after fork)
+> Currently most of the common pinctrl setup is done in
+> drivers/base/pinctrl.c by pinctrl_bind_pins().
 >
-> Outdated.
+> There are two ways to slove this issue on either convert pwrseq drivers
+> to a proper platform drivers or copy the exact code from
+> pcintrl_bind_pins(). I prefer converting pwrseq to proper drivers so that
+> other cases like setting up clks/parents from dt would also be possible.
 
-Removed in v5
+Overall I like the approach, thanks for posting this!
 
->> +      *  - task with enabled coverage (we can't unwire it from another task)
->> +      */
->> +     atomic_t                rc;
->> +     /* The lock protects mode, size, area and t. */
->> +     spinlock_t              lock;
->> +     enum kcov_mode          mode;
->> +     unsigned                size;
->> +     void                    *area;
->> +     struct task_struct      *t;
->> +};
+I have browsed through the patch, it looks okay, besides one issue...
+
+There is a possibility that the pwrseq drivers haven't been probed
+before mmc_pwrseq_alloc() gets called. This leads to that the
+pwrseq_list may be empty, which means that we would silently fail to
+find a corresponding pwrseq type even if the device node would say
+there should be one.
+
+Perhaps you should do a pre-validation of the device node in
+mmc_pwrseq_alloc(), to see if there is a pwrseq handle. If so, but no
+corresponding pwrseq method registerd (because the driver hasn?t been
+probed yet), you could return -EPROBE_DEFER. Or perhaps there are
+other alternatives to solved this issue!?
+
+Kind regards
+Uffe
+
 >
-> ...l
->> +static int kcov_mmap(struct file *filep, struct vm_area_struct *vma)
->> +{
->> +     int res = 0;
->> +     void *area;
->> +     struct kcov *kcov = vma->vm_file->private_data;
->> +     unsigned long size, off;
->> +     struct page *page;
->> +
->> +     area = vmalloc_user(vma->vm_end - vma->vm_start);
->> +     if (!area)
->> +             return -ENOMEM;
->> +
->> +     spin_lock(&kcov->lock);
->> +     size = kcov->size * sizeof(u32);
->> +     if (kcov->mode == 0 || vma->vm_pgoff != 0 ||
->> +         vma->vm_end - vma->vm_start != size) {
->> +             res = -EINVAL;
->> +             goto exit;
->> +     }
->> +     if (!kcov->area) {
->> +             kcov->area = area;
->> +             vma->vm_flags |= VM_DONTEXPAND;
->> +             spin_unlock(&kcov->lock);
->> +             for (off = 0; off < size; off += PAGE_SIZE) {
->> +                     page = vmalloc_to_page(kcov->area + off);
->> +                     vm_insert_page(vma, vma->vm_start + off, page);
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  drivers/mmc/core/pwrseq.c        | 99 ++++++++++++++++++++--------------------
+>  drivers/mmc/core/pwrseq.h        | 13 ++++--
+>  drivers/mmc/core/pwrseq_emmc.c   | 65 ++++++++++++++++----------
+>  drivers/mmc/core/pwrseq_simple.c | 71 ++++++++++++++++++----------
+>  4 files changed, 145 insertions(+), 103 deletions(-)
 >
-> At least WARN_ONCE() for non-zero return code, meaning something is
-> horribly wrong.
-
-Done in v5
-
->> +             }
->> +             return 0;
->> +     }
->> +exit:
->> +     spin_unlock(&kcov->lock);
->> +     vfree(area);
->> +     return res;
->> +}
+> diff --git a/drivers/mmc/core/pwrseq.c b/drivers/mmc/core/pwrseq.c
+> index 4c1d175..669608e 100644
+> --- a/drivers/mmc/core/pwrseq.c
+> +++ b/drivers/mmc/core/pwrseq.c
+> @@ -8,50 +8,30 @@
+>   *  MMC power sequence management
+>   */
+>  #include <linux/kernel.h>
+> -#include <linux/platform_device.h>
+>  #include <linux/err.h>
+>  #include <linux/of.h>
+> -#include <linux/of_platform.h>
 >
-> ....
+>  #include <linux/mmc/host.h>
 >
->> +static long kcov_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
->> +{
->> +     struct kcov *kcov = filep->private_data;
->> +     struct task_struct *t;
->> +     struct kcov_init_trace init;
->> +
->> +     switch (cmd) {
->> +     case KCOV_INIT_TRACE:
->> +             if (copy_from_user(&init, (void __user *)arg, sizeof(init)))
->> +                     return -EFAULT;
->> +             /*
->> +              * Size must be at least 2 to hold current position and one PC.
->> +              */
->> +             if (init.flags != 0 || init.size < 2 || init.size > INT_MAX)
->> +                     return -EINVAL;
->> +             /*
->> +              * Enable kcov in trace mode and setup buffer size.
->> +              * Must happen before anything else.
->> +              */
->> +             spin_lock(&kcov->lock);
->> +             if (kcov->mode != 0) {
->> +                     spin_unlock(&kcov->lock);
->> +                     return -EBUSY;
->> +             }
->> +             kcov->mode = kcov_mode_trace;
->> +             kcov->size = init.size;
->> +             init.version = 1;
->> +             init.pc_size = sizeof(u32);
->> +             init.pc_base = ((1ull << 32) - 1) << 32;
->> +             spin_unlock(&kcov->lock);
->> +             if (copy_to_user((void __user *)arg, &init, sizeof(init)))
->> +                     return -EFAULT;
->> +             return 0;
->> +     case KCOV_ENABLE:
+>  #include "pwrseq.h"
 >
-> Looks like you've ignored my comment on arg validation for enable/disable.
-> Why?
-
-Sorry. Not intentional. Just missed it. Done in v5.
-
->> +static int __init kcov_init(void)
->> +{
->> +     if (!debugfs_create_file("kcov", 0666, NULL, NULL, &kcov_fops)) {
+> -struct mmc_pwrseq_match {
+> -       const char *compatible;
+> -       struct mmc_pwrseq *(*alloc)(struct mmc_host *host, struct device *dev);
+> -};
+> -
+> -static struct mmc_pwrseq_match pwrseq_match[] = {
+> -       {
+> -               .compatible = "mmc-pwrseq-simple",
+> -               .alloc = mmc_pwrseq_simple_alloc,
+> -       }, {
+> -               .compatible = "mmc-pwrseq-emmc",
+> -               .alloc = mmc_pwrseq_emmc_alloc,
+> -       },
+> -};
+> -
+> -static struct mmc_pwrseq_match *mmc_pwrseq_find(struct device_node *np)
+> +static DEFINE_MUTEX(pwrseq_list_mutex);
+> +static LIST_HEAD(pwrseq_list);
+> +
+> +static struct mmc_pwrseq *of_find_mmc_pwrseq(struct device_node *np)
+>  {
+> -       struct mmc_pwrseq_match *match = ERR_PTR(-ENODEV);
+> -       int i;
+> +       struct mmc_pwrseq *p;
 >
-> Why 0666? May be 0600?.
-
-The idea is that it can be useful to fuzz-test under a normal user as well.
-This file is also guarded by debugfs mount permissions. Usually it is mounted
-as 0700, so normal users can't get access to it.
-However if one wants to fuzz-test under a normal user, he could mount
-debugfs as 0777 and get access to this file.
-
-I am not very strong about this, though. If you say, I will change it to 0600.
-I open this file as root at the moment. And we can change it back
-if/when we better understand a potential use case.
-
-
->> +             pr_err("init failed\n");
+> -       for (i = 0; i < ARRAY_SIZE(pwrseq_match); i++) {
+> -               if (of_device_is_compatible(np, pwrseq_match[i].compatible)) {
+> -                       match = &pwrseq_match[i];
+> -                       break;
+> -               }
+> -       }
+> +       list_for_each_entry(p, &pwrseq_list, list)
+> +               if (p->dev->of_node == np)
+> +                       return p;
 >
-> Again, you've ignored the comment.
-
-Sorry. Not intentional. Just missed it. Done in v5.
-
-
-Thanks for review again!
+> -       return match;
+> +       return NULL;
+>  }
+>
+>  int mmc_pwrseq_alloc(struct mmc_host *host)
+>  {
+> -       struct platform_device *pdev;
+>         struct device_node *np;
+> -       struct mmc_pwrseq_match *match;
+>         struct mmc_pwrseq *pwrseq;
+>         int ret = 0;
+>
+> @@ -59,25 +39,18 @@ int mmc_pwrseq_alloc(struct mmc_host *host)
+>         if (!np)
+>                 return 0;
+>
+> -       pdev = of_find_device_by_node(np);
+> -       if (!pdev) {
+> -               ret = -ENODEV;
+> -               goto err;
+> -       }
+> +       pwrseq = of_find_mmc_pwrseq(np);
+>
+> -       match = mmc_pwrseq_find(np);
+> -       if (IS_ERR(match)) {
+> -               ret = PTR_ERR(match);
+> -               goto err;
+> -       }
+> +       if (pwrseq && pwrseq->ops && pwrseq->ops->alloc) {
+> +               host->pwrseq = pwrseq;
+> +               ret = pwrseq->ops->alloc(host);
+> +               if (IS_ERR_VALUE(ret)) {
+> +                       host->pwrseq = NULL;
+> +                       goto err;
+> +               }
+>
+> -       pwrseq = match->alloc(host, &pdev->dev);
+> -       if (IS_ERR(pwrseq)) {
+> -               ret = PTR_ERR(pwrseq);
+> -               goto err;
+>         }
+>
+> -       host->pwrseq = pwrseq;
+>         dev_info(host->parent, "allocated mmc-pwrseq\n");
+>
+>  err:
+> @@ -89,7 +62,7 @@ void mmc_pwrseq_pre_power_on(struct mmc_host *host)
+>  {
+>         struct mmc_pwrseq *pwrseq = host->pwrseq;
+>
+> -       if (pwrseq && pwrseq->ops && pwrseq->ops->pre_power_on)
+> +       if (pwrseq && pwrseq->ops->pre_power_on)
+>                 pwrseq->ops->pre_power_on(host);
+>  }
+>
+> @@ -97,7 +70,7 @@ void mmc_pwrseq_post_power_on(struct mmc_host *host)
+>  {
+>         struct mmc_pwrseq *pwrseq = host->pwrseq;
+>
+> -       if (pwrseq && pwrseq->ops && pwrseq->ops->post_power_on)
+> +       if (pwrseq && pwrseq->ops->post_power_on)
+>                 pwrseq->ops->post_power_on(host);
+>  }
+>
+> @@ -105,7 +78,7 @@ void mmc_pwrseq_power_off(struct mmc_host *host)
+>  {
+>         struct mmc_pwrseq *pwrseq = host->pwrseq;
+>
+> -       if (pwrseq && pwrseq->ops && pwrseq->ops->power_off)
+> +       if (pwrseq && pwrseq->ops->power_off)
+>                 pwrseq->ops->power_off(host);
+>  }
+>
+> @@ -113,8 +86,34 @@ void mmc_pwrseq_free(struct mmc_host *host)
+>  {
+>         struct mmc_pwrseq *pwrseq = host->pwrseq;
+>
+> -       if (pwrseq && pwrseq->ops && pwrseq->ops->free)
+> -               pwrseq->ops->free(host);
+> +       if (pwrseq) {
+> +               if (pwrseq->ops->free)
+> +                       pwrseq->ops->free(host);
+> +
+> +               host->pwrseq = NULL;
+> +       }
+>
+> -       host->pwrseq = NULL;
+>  }
+> +
+> +int mmc_pwrseq_register(struct mmc_pwrseq *pwrseq)
+> +{
+> +       if (!pwrseq || !pwrseq->ops || !pwrseq->dev)
+> +               return -EINVAL;
+> +
+> +       mutex_lock(&pwrseq_list_mutex);
+> +       list_add(&pwrseq->list, &pwrseq_list);
+> +       mutex_unlock(&pwrseq_list_mutex);
+> +
+> +       return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(mmc_pwrseq_register);
+> +
+> +void mmc_pwrseq_unregister(struct mmc_pwrseq *pwrseq)
+> +{
+> +       if (pwrseq) {
+> +               mutex_lock(&pwrseq_list_mutex);
+> +               list_del(&pwrseq->list);
+> +               mutex_unlock(&pwrseq_list_mutex);
+> +       }
+> +}
+> +EXPORT_SYMBOL_GPL(mmc_pwrseq_unregister);
+> diff --git a/drivers/mmc/core/pwrseq.h b/drivers/mmc/core/pwrseq.h
+> index 096da48..08a7d2d 100644
+> --- a/drivers/mmc/core/pwrseq.h
+> +++ b/drivers/mmc/core/pwrseq.h
+> @@ -8,7 +8,10 @@
+>  #ifndef _MMC_CORE_PWRSEQ_H
+>  #define _MMC_CORE_PWRSEQ_H
+>
+> +#include <linux/mmc/host.h>
+> +
+>  struct mmc_pwrseq_ops {
+> +       int (*alloc)(struct mmc_host *host);
+>         void (*pre_power_on)(struct mmc_host *host);
+>         void (*post_power_on)(struct mmc_host *host);
+>         void (*power_off)(struct mmc_host *host);
+> @@ -17,21 +20,21 @@ struct mmc_pwrseq_ops {
+>
+>  struct mmc_pwrseq {
+>         struct mmc_pwrseq_ops *ops;
+> +       struct device *dev;
+> +       struct list_head list;
+>  };
+>
+>  #ifdef CONFIG_OF
+>
+> +int mmc_pwrseq_register(struct mmc_pwrseq *pwrseq);
+> +void mmc_pwrseq_unregister(struct mmc_pwrseq *pwrseq);
+> +
+>  int mmc_pwrseq_alloc(struct mmc_host *host);
+>  void mmc_pwrseq_pre_power_on(struct mmc_host *host);
+>  void mmc_pwrseq_post_power_on(struct mmc_host *host);
+>  void mmc_pwrseq_power_off(struct mmc_host *host);
+>  void mmc_pwrseq_free(struct mmc_host *host);
+>
+> -struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
+> -                                          struct device *dev);
+> -struct mmc_pwrseq *mmc_pwrseq_emmc_alloc(struct mmc_host *host,
+> -                                        struct device *dev);
+> -
+>  #else
+>
+>  static inline int mmc_pwrseq_alloc(struct mmc_host *host) { return 0; }
+> diff --git a/drivers/mmc/core/pwrseq_emmc.c b/drivers/mmc/core/pwrseq_emmc.c
+> index 7978fb7..75f7423 100644
+> --- a/drivers/mmc/core/pwrseq_emmc.c
+> +++ b/drivers/mmc/core/pwrseq_emmc.c
+> @@ -9,6 +9,7 @@
+>   */
+>  #include <linux/delay.h>
+>  #include <linux/kernel.h>
+> +#include <linux/platform_device.h>
+>  #include <linux/slab.h>
+>  #include <linux/device.h>
+>  #include <linux/err.h>
+> @@ -48,14 +49,8 @@ static void mmc_pwrseq_emmc_free(struct mmc_host *host)
+>
+>         unregister_restart_handler(&pwrseq->reset_nb);
+>         gpiod_put(pwrseq->reset_gpio);
+> -       kfree(pwrseq);
+>  }
+>
+> -static struct mmc_pwrseq_ops mmc_pwrseq_emmc_ops = {
+> -       .post_power_on = mmc_pwrseq_emmc_reset,
+> -       .free = mmc_pwrseq_emmc_free,
+> -};
+> -
+>  static int mmc_pwrseq_emmc_reset_nb(struct notifier_block *this,
+>                                     unsigned long mode, void *cmd)
+>  {
+> @@ -66,21 +61,14 @@ static int mmc_pwrseq_emmc_reset_nb(struct notifier_block *this,
+>         return NOTIFY_DONE;
+>  }
+>
+> -struct mmc_pwrseq *mmc_pwrseq_emmc_alloc(struct mmc_host *host,
+> -                                        struct device *dev)
+> +static int mmc_pwrseq_emmc_alloc(struct mmc_host *host)
+>  {
+> -       struct mmc_pwrseq_emmc *pwrseq;
+> -       int ret = 0;
+> -
+> -       pwrseq = kzalloc(sizeof(struct mmc_pwrseq_emmc), GFP_KERNEL);
+> -       if (!pwrseq)
+> -               return ERR_PTR(-ENOMEM);
+> +       struct mmc_pwrseq_emmc *pwrseq =  to_pwrseq_emmc(host->pwrseq);
+>
+> -       pwrseq->reset_gpio = gpiod_get(dev, "reset", GPIOD_OUT_LOW);
+> -       if (IS_ERR(pwrseq->reset_gpio)) {
+> -               ret = PTR_ERR(pwrseq->reset_gpio);
+> -               goto free;
+> -       }
+> +       pwrseq->reset_gpio = gpiod_get(host->pwrseq->dev,
+> +                                       "reset", GPIOD_OUT_LOW);
+> +       if (IS_ERR(pwrseq->reset_gpio))
+> +               return PTR_ERR(pwrseq->reset_gpio);
+>
+>         /*
+>          * register reset handler to ensure emmc reset also from
+> @@ -91,10 +79,41 @@ struct mmc_pwrseq *mmc_pwrseq_emmc_alloc(struct mmc_host *host,
+>         pwrseq->reset_nb.priority = 255;
+>         register_restart_handler(&pwrseq->reset_nb);
+>
+> +       return 0;
+> +}
+> +
+> +static struct mmc_pwrseq_ops mmc_pwrseq_emmc_ops = {
+> +       .alloc = mmc_pwrseq_emmc_alloc,
+> +       .post_power_on = mmc_pwrseq_emmc_reset,
+> +       .free = mmc_pwrseq_emmc_free,
+> +};
+> +
+> +static int mmc_pwrseq_emmc_probe(struct platform_device *pdev)
+> +{
+> +       struct mmc_pwrseq_emmc *pwrseq;
+> +       struct device *dev = &pdev->dev;
+> +
+> +       pwrseq = devm_kzalloc(dev, sizeof(*pwrseq), GFP_KERNEL);
+> +       if (!pwrseq)
+> +               return -ENOMEM;
+> +
+>         pwrseq->pwrseq.ops = &mmc_pwrseq_emmc_ops;
+> +       pwrseq->pwrseq.dev = dev;
+>
+> -       return &pwrseq->pwrseq;
+> -free:
+> -       kfree(pwrseq);
+> -       return ERR_PTR(ret);
+> +       return mmc_pwrseq_register(&pwrseq->pwrseq);
+>  }
+> +
+> +static const struct of_device_id mmc_pwrseq_emmc_of_match[] = {
+> +       { .compatible = "mmc-pwrseq-emmc",},
+> +       {/* sentinel */},
+> +};
+> +
+> +static struct platform_driver mmc_pwrseq_emmc_driver = {
+> +       .probe = mmc_pwrseq_emmc_probe,
+> +       .driver = {
+> +               .name = "pwrseq_emmc",
+> +               .of_match_table = mmc_pwrseq_emmc_of_match,
+> +       },
+> +};
+> +
+> +builtin_platform_driver(mmc_pwrseq_emmc_driver);
+> diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
+> index c091f98..b04cc2d 100644
+> --- a/drivers/mmc/core/pwrseq_simple.c
+> +++ b/drivers/mmc/core/pwrseq_simple.c
+> @@ -9,6 +9,7 @@
+>   */
+>  #include <linux/clk.h>
+>  #include <linux/kernel.h>
+> +#include <linux/platform_device.h>
+>  #include <linux/slab.h>
+>  #include <linux/device.h>
+>  #include <linux/err.h>
+> @@ -82,46 +83,66 @@ static void mmc_pwrseq_simple_free(struct mmc_host *host)
+>         if (!IS_ERR(pwrseq->ext_clk))
+>                 clk_put(pwrseq->ext_clk);
+>
+> -       kfree(pwrseq);
+>  }
+>
+> -static struct mmc_pwrseq_ops mmc_pwrseq_simple_ops = {
+> -       .pre_power_on = mmc_pwrseq_simple_pre_power_on,
+> -       .post_power_on = mmc_pwrseq_simple_post_power_on,
+> -       .power_off = mmc_pwrseq_simple_power_off,
+> -       .free = mmc_pwrseq_simple_free,
+> -};
+> -
+> -struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
+> -                                          struct device *dev)
+> +int mmc_pwrseq_simple_alloc(struct mmc_host *host)
+>  {
+> -       struct mmc_pwrseq_simple *pwrseq;
+> +       struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
+> +       struct device *dev = host->pwrseq->dev;
+>         int ret = 0;
+>
+> -       pwrseq = kzalloc(sizeof(*pwrseq), GFP_KERNEL);
+> -       if (!pwrseq)
+> -               return ERR_PTR(-ENOMEM);
+> -
+>         pwrseq->ext_clk = clk_get(dev, "ext_clock");
+>         if (IS_ERR(pwrseq->ext_clk) &&
+>             PTR_ERR(pwrseq->ext_clk) != -ENOENT) {
+> -               ret = PTR_ERR(pwrseq->ext_clk);
+> -               goto free;
+> +               return PTR_ERR(pwrseq->ext_clk);
+> +
+>         }
+>
+>         pwrseq->reset_gpios = gpiod_get_array(dev, "reset", GPIOD_OUT_HIGH);
+>         if (IS_ERR(pwrseq->reset_gpios)) {
+>                 ret = PTR_ERR(pwrseq->reset_gpios);
+> -               goto clk_put;
+> +               clk_put(pwrseq->ext_clk);
+> +               return ret;
+>         }
+>
+> +       return 0;
+> +}
+> +
+> +static struct mmc_pwrseq_ops mmc_pwrseq_simple_ops = {
+> +       .alloc = mmc_pwrseq_simple_alloc,
+> +       .pre_power_on = mmc_pwrseq_simple_pre_power_on,
+> +       .post_power_on = mmc_pwrseq_simple_post_power_on,
+> +       .power_off = mmc_pwrseq_simple_power_off,
+> +       .free = mmc_pwrseq_simple_free,
+> +};
+> +
+> +static const struct of_device_id mmc_pwrseq_simple_of_match[] = {
+> +       { .compatible = "mmc-pwrseq-simple",},
+> +       {/* sentinel */},
+> +};
+> +
+> +static int mmc_pwrseq_simple_probe(struct platform_device *pdev)
+> +{
+> +       struct mmc_pwrseq_simple *pwrseq;
+> +       struct device *dev = &pdev->dev;
+> +
+> +       pwrseq = devm_kzalloc(dev, sizeof(*pwrseq), GFP_KERNEL);
+> +       if (!pwrseq)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       pwrseq->pwrseq.dev = dev;
+>         pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
+>
+> -       return &pwrseq->pwrseq;
+> -clk_put:
+> -       if (!IS_ERR(pwrseq->ext_clk))
+> -               clk_put(pwrseq->ext_clk);
+> -free:
+> -       kfree(pwrseq);
+> -       return ERR_PTR(ret);
+> +       return mmc_pwrseq_register(&pwrseq->pwrseq);
+>  }
+> +
+> +
+> +static struct platform_driver mmc_pwrseq_simple_driver = {
+> +       .probe = mmc_pwrseq_simple_probe,
+> +       .driver = {
+> +               .name = "pwrseq_simple",
+> +               .of_match_table = mmc_pwrseq_simple_of_match,
+> +       },
+> +};
+> +
+> +builtin_platform_driver(mmc_pwrseq_simple_driver);
+> --
+> 1.9.1
+>
