@@ -1,208 +1,131 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Tue, 19 Jan 2016 14:51:33 +0000
-Subject: [RFC 2/9] clk: bcm2835: add support for parent selection in DT
+Date: Tue, 19 Jan 2016 14:51:34 +0000
+Subject: [RFC 3/9] clk: bcm2835: add ability to control mash level via
+ device-tree
 In-Reply-To: <1453215100-2382-1-git-send-email-kernel@martin.sperl.org>
 References: <1453215100-2382-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1453215100-2382-3-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1453215100-2382-4-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-Allow for a per clock custom selection of clocks in the device tree.
-
-Basic setup in dt looks like this:
-  clock at BCM2835_CLOCK_PCM {
-    reg = <BCM2835_CLOCK_PCM>;
-    parent-clock-names = "xosc", "plld_per", "plla_per", "pll_aux_per";
-  };
-
-Special care had to be taken when only a single clock is assigned,
-as then set_parent_rate is not called - so the register has to get
-set up immediately.
-
-To allow for custom order of the clocks (giving preference)
-an additional mapping between IDs is required when handling
-get/set parent.
-
-The default parent clocks are assumed to be all available clocks
-against which the "selected" parents are checked.
+Control maximum mash levels that can get used via the device tree.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- drivers/clk/bcm/clk-bcm2835.c |  124 +++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 119 insertions(+), 5 deletions(-)
+ drivers/clk/bcm/clk-bcm2835.c       |   39 +++++++++++++++++++++++++++--------
+ include/dt-bindings/clock/bcm2835.h |    9 ++++++++
+ 2 files changed, 39 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 1c714d0..8fccbd3 100644
+index 8fccbd3..48c1ad0 100644
 --- a/drivers/clk/bcm/clk-bcm2835.c
 +++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -702,6 +702,7 @@ struct bcm2835_clock_data {
+@@ -303,10 +303,10 @@
+ #define BCM2835_MASH_MAX_FREQ	25000000u
  
- 	const char *const *parents;
- 	int num_mux_parents;
-+	u8 *parents_idx;
+ enum bcm2835_clock_mash_type {
+-	MASH_NONE = 0,
+-	MASH_FRAC = 1,
+-	MASH_2ND_ORDER = 2,
+-	MASH_3RD_ORDER = 3
++	MASH_NONE = BCM2835_MASH_NONE,
++	MASH_FRAC = BCM2835_MASH_FRAC,
++	MASH_ORDER_2 = BCM2835_MASH_ORDER_2,
++	MASH_ORDER_3 = BCM2835_MASH_ORDER_3
+ };
  
- 	u32 ctl_reg;
- 	u32 div_reg;
-@@ -1706,15 +1707,30 @@ static int bcm2835_clock_determine_rate(struct clk_hw *hw,
- 	return 0;
- }
+ /*
+@@ -713,6 +713,7 @@ struct bcm2835_clock_data {
+ 	u32 frac_bits;
+ 	/* the mash value to use - see CM_MASH */
+ 	enum bcm2835_clock_mash_type mash;
++	bool mash_forced;
  
-+static int _bcm2835_clk_set_parent(struct bcm2835_cprman *cprman,
-+				   const struct bcm2835_clock_data *data,
-+				   u8 index)
-+{
-+	u8 src;
-+
-+	/* map the index if we got a map */
-+	if (data->parents_idx)
-+		index = data->parents_idx[index];
-+
-+	/* calc the source */
-+	src = (index << CM_SRC_SHIFT) & CM_SRC_MASK;
-+
-+	cprman_write(cprman, data->ctl_reg, src);
-+	return 0;
-+}
-+
- static int bcm2835_clock_set_parent(struct clk_hw *hw, u8 index)
- {
- 	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
- 	struct bcm2835_cprman *cprman = clock->cprman;
- 	const struct bcm2835_clock_data *data = clock->data;
--	u8 src = (index << CM_SRC_SHIFT) & CM_SRC_MASK;
+ 	bool is_vpu_clock;
+ };
+@@ -1508,7 +1509,7 @@ static divmash bcm2835_clock_choose_div(struct clk_hw *hw,
  
--	cprman_write(cprman, data->ctl_reg, src);
--	return 0;
-+	return _bcm2835_clk_set_parent(cprman, data, index);
- }
+ 	/* select mash mode */
+ 	if (data->frac_bits && divf)
+-		mash = data->mash ? data->mash : MASH_FRAC;
++		mash = data->mash_forced ? data->mash : MASH_FRAC;
  
- static u8 bcm2835_clock_get_parent(struct clk_hw *hw)
-@@ -1723,10 +1739,23 @@ static u8 bcm2835_clock_get_parent(struct clk_hw *hw)
- 	struct bcm2835_cprman *cprman = clock->cprman;
- 	const struct bcm2835_clock_data *data = clock->data;
- 	u32 src = cprman_read(cprman, data->ctl_reg);
-+	int i;
+ 	/*
+ 	 * handle possible limits for different mash levels with fall-tru
+@@ -1517,17 +1518,17 @@ static divmash bcm2835_clock_choose_div(struct clk_hw *hw,
+ 	 *   http://elinux.org/BCM2835_datasheet_errata#p105_table
+ 	 */
+ 	switch (mash) {
+-	case MASH_3RD_ORDER:
++	case MASH_ORDER_3:
+ 		if ((divi >= divi_min + 3) &&
+ 		    (divi + 4 <= divi_max) &&
+ 		    (parent_rate / (divi - 3) <= BCM2835_MASH_MAX_FREQ))
+-			return divmash_calc(MASH_3RD_ORDER, div);
++			return divmash_calc(MASH_ORDER_3, div);
+ 		/* fall tru if not in bounds */
+-	case MASH_2ND_ORDER:
++	case MASH_ORDER_2:
+ 		if ((divi >= divi_min + 1) &&
+ 		    (divi + 2 <= divi_max) &&
+ 		    (parent_rate / (divi - 1) <= BCM2835_MASH_MAX_FREQ))
+-			return divmash_calc(MASH_2ND_ORDER, div);
++			return divmash_calc(MASH_ORDER_2, div);
+ 		/* fall tru if not in bounds */
+ 	case MASH_FRAC:
+ 		if ((divi >= divi_min) &&
+@@ -1993,6 +1994,8 @@ static const struct bcm2835_clock_data *bcm2835_register_clock_of(
+ 	struct device *dev = cprman->dev;
+ 	struct device_node *nc;
+ 	struct bcm2835_clock_data *data;
++	int err;
++	u32 value;
  
--	return (src & CM_SRC_MASK) >> CM_SRC_SHIFT;
--}
-+	/* translate src to default index */
-+	src = (src & CM_SRC_MASK) >> CM_SRC_SHIFT;
-+
-+	/* without overrides overrides return the value */
-+	if (!data->parents_idx)
-+		return src;
+ 	/* find the corresponding dt-node */
+ 	nc = bcm2835_find_dt_node(cprman, id);
+@@ -2008,6 +2011,24 @@ static const struct bcm2835_clock_data *bcm2835_register_clock_of(
+ 	/* apply overrides */
+ 	bcm2835_register_clock_of_parents(cprman, data, nc);
  
-+	/* otherwise iterate over fields to find it */
-+	for (i = 0; i < data->num_mux_parents ; i++)
-+		if (data->parents_idx[i] == src)
-+			return i;
-+
-+	/* if not found */
-+	return -EINVAL;
-+}
- 
- static const struct clk_ops bcm2835_clock_clk_ops = {
- 	.is_prepared = bcm2835_clock_is_on,
-@@ -1874,6 +1903,88 @@ bcm2835_register_pll_divider(struct bcm2835_cprman *cprman,
- 	return clk;
- }
- 
-+static void bcm2835_register_clock_of_parents(
-+	struct bcm2835_cprman *cprman,
-+	struct bcm2835_clock_data *data,
-+	struct device_node *nc)
-+{
-+	struct device *dev = cprman->dev;
-+	u8 *parents_idx;
-+	const char **parents;
-+	const char *name;
-+	int err, names, i, j;
-+
-+	/* check number of strings */
-+	names = of_property_count_strings(nc, "parent-clock-names");
-+	if (names < 0)
-+		return;
-+	if (names > data->num_mux_parents) {
-+		dev_err(dev,
-+			"%s: dt-property parent-clock-names has more entries (%d) than available parent clocks (%d)\n",
-+			of_node_full_name(nc), names, data->num_mux_parents);
-+		return;
-+	}
-+
-+	/* allocate parents */
-+	parents = devm_kzalloc(dev, sizeof(*parents) * names, GFP_KERNEL);
-+	if (!parents)
-+		return;
-+
-+	/* allocate parents index */
-+	parents_idx = devm_kzalloc(dev, sizeof(*parents_idx) * names,
-+				   GFP_KERNEL);
-+	if (!parents_idx) {
-+		devm_kfree(dev, parents);
-+		return;
-+	}
-+
-+	/* and check the parents against list of allowed parents */
-+	for (i = 0; i < names; i++) {
-+		/* get the string */
-+		err = of_property_read_string_index(nc, "parent-clock-names",
-+						    i, &name);
-+		if (err) {
-+			devm_kfree(dev, parents_idx);
-+			devm_kfree(dev, parents);
-+			dev_err(dev,
-+				"%s: could not get parent-clock-names[%d] - %d\n",
-+				of_node_full_name(nc), i, err);
-+			return;
-+		}
-+		/* check against available parents - the default list */
-+		for (j = 0; j < data->num_mux_parents; j++) {
-+			if (strcmp(data->parents[j],  name) == 0) {
-+				parents[i] = data->parents[j];
-+				parents_idx[i] = j;
-+				break;
-+			}
-+		}
-+		/* if there was no match */
-+		if (!parents[i]) {
-+			devm_kfree(dev, parents_idx);
-+			devm_kfree(dev, parents);
-+			dev_err(dev,
-+				"%s: could not find %s in list of allowed parent clocks\n",
-+				of_node_full_name(nc), name);
-+			return;
++	/* check for mash */
++	err = of_property_read_u32(nc, "brcm,mash-max-order", &value);
++	if (!err) {
++		switch (value) {
++		case MASH_NONE:
++		case MASH_FRAC:
++		case MASH_ORDER_2:
++		case MASH_ORDER_3:
++			data->mash = value;
++			data->mash_forced = 1;
++			break;
++		default:
++			dev_err(dev, "clock %s: undefined mash type: %d\n",
++				data->name, value);
++			break;
 +		}
 +	}
-+
-+	/* finally assign it */
-+	data->num_mux_parents = names;
-+	data->parents = parents;
-+	data->parents_idx = parents_idx;
-+
-+	/*
-+	 * if there is only one parent, then use that one immediately,
-+	 * as with only one parent clock_set_parent does not get called
-+	 * and it is assumed that everything is set up, so
-+	 * we need to do that before anything else...
-+	 */
-+	if (names == 1)
-+		_bcm2835_clk_set_parent(cprman, data, 0);
-+}
-+
- static const struct bcm2835_clock_data *bcm2835_register_clock_of(
- 	struct bcm2835_cprman *cprman,
- 	const struct bcm2835_clock_data *data_orig,
-@@ -1894,6 +2005,9 @@ static const struct bcm2835_clock_data *bcm2835_register_clock_of(
- 		return data_orig;
- 	memcpy(data, data_orig, sizeof(*data));
- 
-+	/* apply overrides */
-+	bcm2835_register_clock_of_parents(cprman, data, nc);
 +
  	/* and return the result */
  	return data;
  }
+diff --git a/include/dt-bindings/clock/bcm2835.h b/include/dt-bindings/clock/bcm2835.h
+index d29f181..eb73380 100644
+--- a/include/dt-bindings/clock/bcm2835.h
++++ b/include/dt-bindings/clock/bcm2835.h
+@@ -67,3 +67,12 @@
+ #define BCM2835_CLOCK_TD0		51
+ #define BCM2835_CLOCK_TD1		52
+ #define BCM2835_CLOCK_TEC		53
++
++/* the mash divider options */
++#define BCM2835_MASH_NONE		0
++#define BCM2835_MASH_ORDER_1		1
++#define BCM2835_MASH_ORDER_2		2
++#define BCM2835_MASH_ORDER_3		3
++
++#define BCM2835_MASH_INTEGER		BCM2835_MASH_NONE
++#define BCM2835_MASH_FRAC		BCM2835_MASH_ORDER_1
 -- 
 1.7.10.4
