@@ -1,71 +1,109 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 19 Jan 2016 12:03:59 +0000
-Subject: [PATCH v2 16/16] ARM64: XEN: Initialize Xen specific UEFI runtime
- services
-In-Reply-To: <20160118182747.GR21067@leverpostej>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-17-git-send-email-zhaoshenglong@huawei.com>
- <20160118110854.GG21067@leverpostej>
- <alpine.DEB.2.02.1601181736090.9400@kaball.uk.xensource.com>
- <20160118182747.GR21067@leverpostej>
-Message-ID: <alpine.DEB.2.02.1601191143590.9400@kaball.uk.xensource.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 19 Jan 2016 12:05:02 +0000
+Subject: [PATCH] [v2] serial: amba-pl011: use cpu_relax when polling
+ registers
+In-Reply-To: <1452889940-19594-1-git-send-email-timur@codeaurora.org>
+References: <1452889940-19594-1-git-send-email-timur@codeaurora.org>
+Message-ID: <20160119120501.GD4436@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Jan 2016, Mark Rutland wrote:
-> On Mon, Jan 18, 2016 at 05:45:24PM +0000, Stefano Stabellini wrote:
-> > On Mon, 18 Jan 2016, Mark Rutland wrote:
-> > > On Fri, Jan 15, 2016 at 02:55:29PM +0800, Shannon Zhao wrote:
-> > > > +void __init xen_efi_runtime_setup(void)
-> > > > +{
-> > > > +	efi.get_time                 = xen_efi_get_time;
-> > > > +	efi.set_time                 = xen_efi_set_time;
-> > > > +	efi.get_wakeup_time          = xen_efi_get_wakeup_time;
-> > > > +	efi.set_wakeup_time          = xen_efi_set_wakeup_time;
-> > > > +	efi.get_variable             = xen_efi_get_variable;
-> > > > +	efi.get_next_variable        = xen_efi_get_next_variable;
-> > > > +	efi.set_variable             = xen_efi_set_variable;
-> > > > +	efi.query_variable_info      = xen_efi_query_variable_info;
-> > > > +	efi.update_capsule           = xen_efi_update_capsule;
-> > > > +	efi.query_capsule_caps       = xen_efi_query_capsule_caps;
-> > > > +	efi.get_next_high_mono_count = xen_efi_get_next_high_mono_count;
-> > > > +	efi.reset_system             = NULL;
-> > > > +}
-> > > 
-> > > How do capsules work in the absence of an EFI system reset?
-> > 
-> > Actually I don't think that capsules are available in Xen on ARM64 yet,
-> > see "TODO - disabled until implemented on ARM" in
-> > xen/common/efi/runtime.c.
-> > 
-> > FYI system reset is available, but it is provided via a different
-> > mechanism (HYPERVISOR_sched_op(xen_restart...)
+On Fri, Jan 15, 2016 at 02:32:20PM -0600, Timur Tabi wrote:
+> Busy loops that poll on a register should call cpu_relax().  On some
+> architectures, it can lower CPU power consumption or yield to a
+> hyperthreaded twin processor.  It also serves as a compiler barrier,
+> so it can replace barrier() calls.
+
+I remember noticing this before, but didn't write any patch for it at
+the time...  cpu_relax() is indeed the write thing to do in such polling
+loops.
+
+> Signed-off-by: Timur Tabi <timur@codeaurora.org>
+
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
+> ---
 > 
-> Will that trigger Xen to do the right thing to trigger capsule updates
-> when implemented in Xen? Or do we need a xen_efi_reset_system?
-
-On ARM, to reboot the hardware, Xen calls the native PSCI system_reset
-method. On x86, Xen calls efi_reset_system on EFI systems, and has
-several fall backs if that doesn't work as expected (see
-xen/arch/x86/shutdown.c:machine_restart).
-
-But on a second look it doesn't look like that the capsule hypercalls
-are implemented correctly even on x86 (there is an "XXX fall through for
-now" comment in the code). I guess they are not available on Xen at all
-unfortunately.
-
-
-> Does that override PSCI?
-
-It does not, HYPERVISOR_sched_op(xen_restart,) is in addition to it. It
-ends up calling the same function within Xen as PSCI system_reset.
-
-
-> In machine_restart we try efi_reboot first specifically to allow for
-> capsule updates. Similarly drivers/firmware/efi/reboot.c registers
-> efi_power_off late in order to override anything else, though that's
-> best-effort at present.
-
-That's very interesting. I think that Xen on ARM should follow what
-Linux does and what Xen already does on x86 and try efi_reset_system
-first on efi systems.
+> v2: rebased to latest code
+> 
+>  drivers/tty/serial/amba-pl011.c | 17 ++++++++---------
+>  1 file changed, 8 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index c0da0cc..69b5acd 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -1167,7 +1167,7 @@ static void pl011_dma_shutdown(struct uart_amba_port *uap)
+>  
+>  	/* Disable RX and TX DMA */
+>  	while (pl011_read(uap, REG_FR) & UART01x_FR_BUSY)
+> -		barrier();
+> +		cpu_relax();
+>  
+>  	spin_lock_irq(&uap->port.lock);
+>  	uap->dmacr &= ~(UART011_DMAONERR | UART011_RXDMAE | UART011_TXDMAE);
+> @@ -1611,7 +1611,7 @@ static void pl011_put_poll_char(struct uart_port *port,
+>  	    container_of(port, struct uart_amba_port, port);
+>  
+>  	while (pl011_read(uap, REG_FR) & UART01x_FR_TXFF)
+> -		barrier();
+> +		cpu_relax();
+>  
+>  	pl011_write(ch, uap, REG_DR);
+>  }
+> @@ -2150,7 +2150,7 @@ static void pl011_console_putchar(struct uart_port *port, int ch)
+>  	    container_of(port, struct uart_amba_port, port);
+>  
+>  	while (pl011_read(uap, REG_FR) & UART01x_FR_TXFF)
+> -		barrier();
+> +		cpu_relax();
+>  	pl011_write(ch, uap, REG_DR);
+>  }
+>  
+> @@ -2158,7 +2158,7 @@ static void
+>  pl011_console_write(struct console *co, const char *s, unsigned int count)
+>  {
+>  	struct uart_amba_port *uap = amba_ports[co->index];
+> -	unsigned int status, old_cr = 0, new_cr;
+> +	unsigned int old_cr = 0, new_cr;
+>  	unsigned long flags;
+>  	int locked = 1;
+>  
+> @@ -2188,9 +2188,8 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
+>  	 *	Finally, wait for transmitter to become empty
+>  	 *	and restore the TCR
+>  	 */
+> -	do {
+> -		status = pl011_read(uap, REG_FR);
+> -	} while (status & UART01x_FR_BUSY);
+> +	while (pl011_read(uap, REG_FR) & UART01x_FR_BUSY)
+> +		cpu_relax();
+>  	if (!uap->vendor->always_enabled)
+>  		pl011_write(old_cr, uap, REG_CR);
+>  
+> @@ -2302,13 +2301,13 @@ static struct console amba_console = {
+>  static void pl011_putc(struct uart_port *port, int c)
+>  {
+>  	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+> -		;
+> +		cpu_relax();
+>  	if (port->iotype == UPIO_MEM32)
+>  		writel(c, port->membase + UART01x_DR);
+>  	else
+>  		writeb(c, port->membase + UART01x_DR);
+>  	while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
+> -		;
+> +		cpu_relax();
+>  }
+>  
+>  static void pl011_early_write(struct console *con, const char *s, unsigned n)
+> -- 
+> Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project.
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
