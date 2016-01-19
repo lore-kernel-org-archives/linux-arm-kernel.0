@@ -1,30 +1,163 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue, 19 Jan 2016 15:32:46 +0530
-Subject: [PATCH V7 6/6] dts: msm8974: Add dma channels for blsp2_i2c1 node
-In-Reply-To: <1453197766-18976-1-git-send-email-sricharan@codeaurora.org>
-References: <1453197766-18976-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1453197766-18976-7-git-send-email-sricharan@codeaurora.org>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Tue, 19 Jan 2016 18:02:48 +0800
+Subject: [PATCH v12.1 06/17] ARM: dts: exynos/dp: remove some properties that
+ deprecated by analogix_dp driver
+In-Reply-To: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
+References: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1453197768-13253-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-Reviewed-by: Andy Gross <andy.gross@linaro.org>
----
- arch/arm/boot/dts/qcom-msm8974.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+After exynos_dp have been split the common IP code into analogix_dp driver,
+the analogix_dp driver have deprecated some Samsung platform properties which
+could be dynamically parsed from EDID/MODE/DPCD message, so this is an update
+for Exynos DTS file for dp-controller.
 
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index 7786408..bd1be53 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -328,6 +328,8 @@
- 			clock-names = "core", "iface";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+			dmas = <&blsp2_dma 20>, <&blsp2_dma 21>;
-+			dma-names = "tx", "rx";
- 		};
+Beside the backward compatibility is fully preserved, so there are no
+bisectability break that make this change in a separate patch.
+
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
+There is no new changes in v12.1, but just rebase the whole patches on
+top of Dave's drm-next branch [0] (Heiko)
+
+Changes in v12.1: None
+Changes in v12: None
+Changes in v11: None
+Changes in v10: None
+Changes in v9: None
+Changes in v8: None
+Changes in v7: None
+Changes in v6:
+- Fix Peach Pit hpd property name error:
+-       hpd-gpio = <&gpx2 6 0>;
++       hpd-gpios = <&gpx2 6 0>;
+
+Changes in v5:
+- Correct the misspell in commit message. (Krzysztof)
+
+Changes in v4:
+- Separate all DTS changes to a separate patch. (Krzysztof)
+
+Changes in v3: None
+Changes in v2: None
+
+ arch/arm/boot/dts/exynos5250-arndale.dts      | 2 --
+ arch/arm/boot/dts/exynos5250-smdk5250.dts     | 2 --
+ arch/arm/boot/dts/exynos5250-snow-common.dtsi | 4 +---
+ arch/arm/boot/dts/exynos5250-spring.dts       | 4 +---
+ arch/arm/boot/dts/exynos5420-peach-pit.dts    | 4 +---
+ arch/arm/boot/dts/exynos5420-smdk5420.dts     | 2 --
+ arch/arm/boot/dts/exynos5800-peach-pi.dts     | 2 --
+ 7 files changed, 3 insertions(+), 17 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+index c000532..b1790cf 100644
+--- a/arch/arm/boot/dts/exynos5250-arndale.dts
++++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+@@ -124,8 +124,6 @@
+ &dp {
+ 	status = "okay";
+ 	samsung,color-space = <0>;
+-	samsung,dynamic-range = <0>;
+-	samsung,ycbcr-coeff = <0>;
+ 	samsung,color-depth = <1>;
+ 	samsung,link-rate = <0x0a>;
+ 	samsung,lane-count = <4>;
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index 0f5dcd4..f30c2db 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -80,8 +80,6 @@
  
- 		spmi_bus: spmi at fc4cf000 {
+ &dp {
+ 	samsung,color-space = <0>;
+-	samsung,dynamic-range = <0>;
+-	samsung,ycbcr-coeff = <0>;
+ 	samsung,color-depth = <1>;
+ 	samsung,link-rate = <0x0a>;
+ 	samsung,lane-count = <4>;
+diff --git a/arch/arm/boot/dts/exynos5250-snow-common.dtsi b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+index 0a7f408..ee94110 100644
+--- a/arch/arm/boot/dts/exynos5250-snow-common.dtsi
++++ b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+@@ -236,12 +236,10 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&dp_hpd>;
+ 	samsung,color-space = <0>;
+-	samsung,dynamic-range = <0>;
+-	samsung,ycbcr-coeff = <0>;
+ 	samsung,color-depth = <1>;
+ 	samsung,link-rate = <0x0a>;
+ 	samsung,lane-count = <2>;
+-	samsung,hpd-gpio = <&gpx0 7 GPIO_ACTIVE_HIGH>;
++	hpd-gpios = <&gpx0 7 GPIO_ACTIVE_HIGH>;
+ 
+ 	ports {
+ 		port at 0 {
+diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
+index c1edd6d..91881d7 100644
+--- a/arch/arm/boot/dts/exynos5250-spring.dts
++++ b/arch/arm/boot/dts/exynos5250-spring.dts
+@@ -74,12 +74,10 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&dp_hpd_gpio>;
+ 	samsung,color-space = <0>;
+-	samsung,dynamic-range = <0>;
+-	samsung,ycbcr-coeff = <0>;
+ 	samsung,color-depth = <1>;
+ 	samsung,link-rate = <0x0a>;
+ 	samsung,lane-count = <1>;
+-	samsung,hpd-gpio = <&gpc3 0 GPIO_ACTIVE_HIGH>;
++	hpd-gpios = <&gpc3 0 GPIO_ACTIVE_HIGH>;
+ };
+ 
+ &ehci {
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index 72ba6f0..8baf40a 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -148,12 +148,10 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&dp_hpd_gpio>;
+ 	samsung,color-space = <0>;
+-	samsung,dynamic-range = <0>;
+-	samsung,ycbcr-coeff = <0>;
+ 	samsung,color-depth = <1>;
+ 	samsung,link-rate = <0x06>;
+ 	samsung,lane-count = <2>;
+-	samsung,hpd-gpio = <&gpx2 6 GPIO_ACTIVE_HIGH>;
++	hpd-gpios = <&gpx2 6 GPIO_ACTIVE_HIGH>;
+ 
+ 	ports {
+ 		port at 0 {
+diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+index ac35aef..f67344f 100644
+--- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
++++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+@@ -93,8 +93,6 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&dp_hpd>;
+ 	samsung,color-space = <0>;
+-	samsung,dynamic-range = <0>;
+-	samsung,ycbcr-coeff = <0>;
+ 	samsung,color-depth = <1>;
+ 	samsung,link-rate = <0x0a>;
+ 	samsung,lane-count = <4>;
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index 1cc2e95..fc232be 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -148,8 +148,6 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&dp_hpd_gpio>;
+ 	samsung,color-space = <0>;
+-	samsung,dynamic-range = <0>;
+-	samsung,ycbcr-coeff = <0>;
+ 	samsung,color-depth = <1>;
+ 	samsung,link-rate = <0x0a>;
+ 	samsung,lane-count = <2>;
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+1.9.1
