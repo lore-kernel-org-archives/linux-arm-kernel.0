@@ -1,34 +1,36 @@
-From: lakshmi.sai.krishna.potthuri@xilinx.com (P L Sai Krishna)
-Date: Tue, 19 Jan 2016 19:47:34 +0530
-Subject: [LINUX PATCH 4/5] Documentation: mmc: Updated the binding doc for
- Arasan SDHCI.
-In-Reply-To: <1453213055-35563-1-git-send-email-lakshmis@xilinx.com>
-References: <1453213055-35563-1-git-send-email-lakshmis@xilinx.com>
-Message-ID: <1453213055-35563-4-git-send-email-lakshmis@xilinx.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Jan 2016 14:18:29 +0000
+Subject: [PATCHv2 01/18] asm-generic: make __set_fixmap_offset a static
+ inline
+In-Reply-To: <5123400.xZnN6QSGxK@wuerfel>
+References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
+ <1451930211-22460-2-git-send-email-mark.rutland@arm.com>
+ <20160119115539.GE25024@leverpostej> <5123400.xZnN6QSGxK@wuerfel>
+Message-ID: <20160119141829.GE26545@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds broken-mmc-highspeed property to the binding
-doc for Arasan SDHCI.
+On Tue, Jan 19, 2016 at 03:11:09PM +0100, Arnd Bergmann wrote:
+> On Tuesday 19 January 2016 11:55:40 Mark Rutland wrote:
+> > Hi Arnd,
+> > 
+> > Sorry to poke during the merge window.
+> > 
+> > Are you happy with the below patch, and if so, would you be happy for
+> > this to go via the arm64 tree?
+> > 
+> > If possible, I'd like to be able to place the series on a stable branch
+> > come -rc1, so that can be used as the base for other work (e.g. [1]),
+> > and so that we can get it into -next.
+> > 
+> > Everything else has the appropriate acks collected.
+> > 
+> > 
+> 
+> Yes, please merge it through arm64
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Signed-off-by: P L Sai Krishna <lakshmis@xilinx.com>
----
- Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Cheers!
 
-diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-index 2088d9f..5884832 100644
---- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-+++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-@@ -20,7 +20,8 @@ Required Properties:
- Optional Properties:
-   - broken-tuning: Indicates tuning broken in Silicon 1.0 of
- 			  Zynq Ultrascale+ MPSoC.
--
-+  - broken-mmc-highspeed: Indicates to force
-+				the controller to use in standard speed.
- Example:
- 	sdhci at e0100000 {
- 		compatible = "arasan,sdhci-8.9a";
--- 
-2.1.2
+Mark.
