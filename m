@@ -1,109 +1,103 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Jan 2016 14:05:26 +0000
-Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
-In-Reply-To: <20160119135233.GB2986@dhcp-128-65.nay.redhat.com>
-References: <cover.1452884156.git.geoff@infradead.org>
- <fb4506943bbaed8b0657ed367ebd57e4064d57ed.1452884156.git.geoff@infradead.org>
- <20160115201601.GR3262@leverpostej> <569CBDBC.5050500@linaro.org>
- <20160119014332.GB2919@dhcp-128-65.nay.redhat.com>
- <20160119121721.GG25024@leverpostej>
- <20160119135233.GB2986@dhcp-128-65.nay.redhat.com>
-Message-ID: <20160119140526.GD26545@leverpostej>
+From: dvyukov@google.com (Dmitry Vyukov)
+Date: Tue, 19 Jan 2016 15:06:10 +0100
+Subject: [PATCH v5] kernel: add kcov code coverage
+In-Reply-To: <1453207342-46254-1-git-send-email-dvyukov@google.com>
+References: <1453207342-46254-1-git-send-email-dvyukov@google.com>
+Message-ID: <CACT4Y+YeM+_12e9WzG3306QPEDspNiHFmCBO4yjW_B-jzPrzdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2016 at 09:52:33PM +0800, Dave Young wrote:
-> On 01/19/16 at 12:17pm, Mark Rutland wrote:
-> > On Tue, Jan 19, 2016 at 09:43:32AM +0800, Dave Young wrote:
-> > > On 01/18/16 at 07:26pm, AKASHI Takahiro wrote:
-> > > > On 01/16/2016 05:16 AM, Mark Rutland wrote:
-> > > > >On Fri, Jan 15, 2016 at 07:18:38PM +0000, Geoff Levand wrote:
-> > > > >>From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > > > >>
-> > > > >>This patch adds arch specific descriptions about kdump usage on arm64
-> > > > >>to kdump.txt.
-> > > > >>
-> > > > >>Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > > > >>---
-> > > > >>  Documentation/kdump/kdump.txt | 23 ++++++++++++++++++++++-
-> > > > >>  1 file changed, 22 insertions(+), 1 deletion(-)
-> > > > >>
-> > > > >>diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-> > > > >>index bc4bd5a..36cf978 100644
-> > > > >>--- a/Documentation/kdump/kdump.txt
-> > > > >>+++ b/Documentation/kdump/kdump.txt
-> > > > >>@@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
-> > > > >>  a remote system.
-> > > > >>
-> > > > >>  Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
-> > > > >>-s390x and arm architectures.
-> > > > >>+s390x, arm and arm64 architectures.
-> > > > >>
-> > > > >>  When the system kernel boots, it reserves a small section of memory for
-> > > > >>  the dump-capture kernel. This ensures that ongoing Direct Memory Access
-> > > > >>@@ -249,6 +249,20 @@ Dump-capture kernel config options (Arch Dependent, arm)
-> > > > >>
-> > > > >>      AUTO_ZRELADDR=y
-> > > > >>
-> > > > >>+Dump-capture kernel config options (Arch Dependent, arm64)
-> > > > >>+----------------------------------------------------------
-> > > > >>+
-> > > > >>+1) The maximum memory size on the dump-capture kernel must be limited by
-> > > > >>+   specifying:
-> > > > >>+
-> > > > >>+   mem=X[MG]
-> > > > >>+
-> > > > >>+   where X should be less than or equal to the size in "crashkernel="
-> > > > >>+   boot parameter. Kexec-tools will automatically add this.
-> > > > >
-> > > > >
-> > > > >This is extremely fragile, and will trivially fail when the kernel can
-> > > > >be loaded anywhere (see [1]).
-> > > > 
-> > > > As I said before, this restriction also exists on arm, but I understand
-> > > > that recent Ard's patches break it.
-> > > > 
-> > > > >We must explicitly describe the set of regions the crash kernel may use
-> > > > >(i.e. we need base and size). NAK in the absence of that.
-> > > > 
-> > > > There seem to exist several approaches:
-> > > > (a) use a device-tree property, "linux,usable-memory", in addition to "reg"
-> > > >     under "memory" node
-> > > > (b) use a kernel's early parameter, "memmap=nn[@#$]ss"
-> > > > 
-> > > > Power PC takes (a), while this does not work on efi-started kernel
-> > > > because dtb has no "memory" nodes under efi.
-> > > > X86 takes (b). If we take this, we will need to overwrite a weak
-> > > > early_init_dt_add_memory().
-> > > 
-> > > X86 takes another way in latest kexec-tools and kexec_file_load, that is
-> > > recreating E820 table and pass it to kexec/kdump kernel, if the entries
-> > > are over E820 limitation then turn to use setup_data list for remain
-> > > entries.
-> > 
-> > This would imply modifying the EFI memory map or the memory nodes, which
-> > I'm not keen on.
-> > 
-> > I would prefer that they are left _pristine_, and we describe the
-> > restriction on the kdump kernel with additional properties under
-> > /chosen.
-> > 
-> > That leaves us with more useful information about the environment of the
-> > first kernel, is simpler for userspace (it's resilient to updates to the
-> > UEFI memory map spec, for example), and is simple for the crash kernel.
-> 
-> In theory kexec as boot loader should prepare correct efi memmap and pass
-> to kernel, but as you said yes it will increase complexity. We need banlance
-> them.
+On Tue, Jan 19, 2016 at 1:42 PM, Dmitry Vyukov <dvyukov@google.com> wrote:
+> kcov provides code coverage collection for coverage-guided fuzzing
+> (randomized testing). Coverage-guided fuzzing is a testing technique
+> that uses coverage feedback to determine new interesting inputs to a
+> system. A notable user-space example is AFL
+> (http://lcamtuf.coredump.cx/afl/). However, this technique is not
+> widely used for kernel testing due to missing compiler and kernel
+> support.
+>
+> kcov does not aim to collect as much coverage as possible. It aims
+> to collect more or less stable coverage that is function of syscall
+> inputs. To achieve this goal it does not collect coverage in
+> soft/hard interrupts and instrumentation of some inherently
+> non-deterministic or non-interesting parts of kernel is disbled
+> (e.g. scheduler, locking).
+>
+> Currently there is a single coverage collection mode (tracing),
+> but the API anticipates additional collection modes.
+> Initially I also implemented a second mode which exposes
+> coverage in a fixed-size hash table of counters (what Quentin
+> used in his original patch). I've dropped the second mode for
+> simplicity.
+>
+> This patch adds the necessary support on kernel side.
+> The complimentary compiler support was added in gcc revision 231296.
+>
+> We've used this support to build syzkaller system call fuzzer,
+> which has found 90 kernel bugs in just 2 months:
+> https://github.com/google/syzkaller/wiki/Found-Bugs
+> We've also found 30+ bugs in our internal systems with syzkaller.
+> Another (yet unexplored) direction where kcov coverage would greatly
+> help is more traditional "blob mutation". For example, mounting
+> a random blob as a filesystem, or receiving a random blob over wire.
+>
+> Why not gcov. Typical fuzzing loop looks as follows: (1) reset
+> coverage, (2) execute a bit of code, (3) collect coverage, repeat.
+> A typical coverage can be just a dozen of basic blocks (e.g. an
+> invalid input). In such context gcov becomes prohibitively expensive
+> as reset/collect coverage steps depend on total number of basic
+> blocks/edges in program (in case of kernel it is about 2M). Cost of
+> kcov depends only on number of executed basic blocks/edges. On top of
+> that, kernel requires per-thread coverage because there are
+> always background threads and unrelated processes that also produce
+> coverage. With inlined gcov instrumentation per-thread coverage is not
+> possible.
+>
+> kcov exposes kernel PCs and control flow to user-space which
+> is insecure. But debugfs should not be mapped as user accessible.
+>
+> Based on a patch by Quentin Casasnovas.
+> Signed-off-by: Dmitry Vyukov <dvyukov@google.com>
+> Reviewed-by: Kees Cook <keescook@chromium.org>
+> ---
+> Anticipating reasonable questions regarding usage of this feature.
+> Quentin Casasnovas and Vegard Nossum also plan to use kcov for
+> coverage-guided fuzzing. Currently they use a custom kernel patch
+> for their fuzzer and found several dozens of bugs.
+> There is also interest from Intel 0-DAY kernel test infrastructure.
+>
+> Based on commit a200dcb34693084e56496960d855afdeaaf9578f.
+>
+> v2: - added note to commit desciption that kcov is insecure,
+>       but debugfs should not be mapped as user accessible.
+>     - make CONFIG_KCOV depend on CONFIG_ARCH_HAS_KCOV
+>       instead of conditional inclusion with if/endif
+>       (as per Kees comments).
+>
+> v3: - disabled instrumentation of lib/hweight.c
+>     - changed task_struct.kcov_size type to unsigned
+>     - moved kcov.c from kernel/kcov/ to kernel/
+>     - fixed multi-line comment formatting
+>     - changed BUG_ONs to WARN_ONs
+>     - added kcov_get() helper
+>
+> v4: - pre-populate mapping with pages in kcov_mmap()
+>     - don't get kcov references on vma open/copy,
+>       vma holds a reference to the file which is enough
+>     - extend KCOV_INIT_TRACE to support both compressed
+>       4-byte PCs and full 8-byte PCs (it now accepts a struct)
+>     - update example in Documentation/kcov.txt
+>
+> v5: - export only unsigned long PCs (no compression to 4 bytes)
+>     - remove KCOV dependency on !RANDOMIZE_BASE
 
-I'd argue that the "correct efi memmap" is what we were given by the
-firmware initially -- none of that information is any less true.
 
-For kdump all we need to ensure is that the kdump kernel only uses the
-memory that was specially reserved for it by the first kernel. The
-simplest way of doing that is to tell the kdump kernel which specific
-region(s) of memory were reserved for it, leaving the EFI memory map
-alone.
-
-Thanks,
-Mark.
+I've made some measurements. Currently I have ~30MB of coverage data.
+Let's say it will grow 2x over time, that's 60MB. I also use a GC
+language so it actually consumes 2x = 120MB. If PCs are doubled,
+that's 240MB. I think I can live with this. Or I can somehow compress
+PCs to 4 bytes in user-space.
+So changed kcov to expose only unsigned-long-sized PCs as is. This
+makes the interface much cleaner. And also removes all potential
+issues wrt other archs and KASLR (user-space can canonicalize PCs
+using /proc/modules and kaslr base for text).
