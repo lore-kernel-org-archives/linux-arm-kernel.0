@@ -1,64 +1,60 @@
-From: Lada.Trimasova@synopsys.com (Lada Trimasova)
-Date: Tue, 19 Jan 2016 14:53:57 +0000
-Subject: [PATCH] Fixing io-pgtable-arm build failure
-In-Reply-To: <1452696481-2030-1-git-send-email-ltrimas@synopsys.com>
-References: <1452696481-2030-1-git-send-email-ltrimas@synopsys.com>
-Message-ID: <1453215237.7041.10.camel@synopsys.com>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Tue, 19 Jan 2016 23:56:47 +0900
+Subject: [PATCH 1/2] ARM: dts: kirkwood: split lswxl into linkstation
+ lswsxl and lswxl
+In-Reply-To: <20160119144846.GI6554@lunn.ch>
+References: <1453211342-25214-1-git-send-email-rogershimizu@gmail.com>
+ <1453211342-25214-2-git-send-email-rogershimizu@gmail.com>
+ <20160119140507.GG6554@lunn.ch>
+ <CAEQ9gE=saHf0TZ5aBDYC0cCMCXgHOSON8-oPwmVXuU-h4XPbFA@mail.gmail.com>
+ <20160119144846.GI6554@lunn.ch>
+Message-ID: <CAEQ9gEmEoBuBCEYjW50zJ5+1woq-V+B-JbxhA-dkAYvVDxhBvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Tue, Jan 19, 2016 at 11:48 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Tue, Jan 19, 2016 at 11:15:35PM +0900, Roger Shimizu wrote:
+>> On Tue, Jan 19, 2016 at 11:05 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> > On Tue, Jan 19, 2016 at 10:49:01PM +0900, Roger Shimizu wrote:
+>> >> With a few gpio/led-pin changes, including fix for the issue mentioned
+>> >> in Debian BTS #810894.
+>> >
+>> > Hi Roger
+>> >
+>> > This fix should be a separate patch. We can then get it applied to
+>> > stable, so it makes its way back to older kernels.
+>>
+>> Dear Andrew,
+>>
+>> So this patchset would be reviewed or not?
+>
+> I will review it and give comments, but won't accept it.
 
-On Wed, 2016-01-13 at 17:48 +0300, Lada Trimasova wrote:
+Please do.
+I'll modify accordingly and include it in v2 patchset.
 
-Trying to build kernel for ARC with both options
-CONFIG_COMPILE_TEST and CONFIG_IOMMU_IO_PGTABLE_LPAE enabled
-(which happened really in "allyesconfig") I'm seeing this:
----------------->8----------------
-$ make ARCH=arc
-...sic...
-CC drivers/iommu/io-pgtable-arm.o
-linux/drivers/iommu/io-pgtable-arm.c: In
-function ?__arm_lpae_alloc_pages?:
-linux/drivers/iommu/io-pgtable-arm.c:221:3:
-error: implicit declaration of function ?dma_map_single?
-[-Werror=implicit-function-declaration]
-dma = dma_map_single(dev, pages, size, DMA_TO_DEVICE);
-^
-linux/drivers/iommu/io-pgtable-arm.c:221:42:
-error: ?DMA_TO_DEVICE? undeclared (first use in this function)
-dma = dma_map_single(dev, pages, size, DMA_TO_DEVICE);
-^
----------------->8----------------
-and so on.
+>> Or I have to create another patchset including both fix for
+>> "kirkwood-lswxl.dts" and the dts split?
+>
+> Yes please. And the fix patch should come first, and have a fixes:
+> tag.
+>
+> As a general rule of thumb, it is better to have lots of small, easy
+> to review patches, than an couple of big patch. So i would probably
+> have:
+>
+> 1) Fix
+> 2) License change.
+> 3) Split patch LS-WXL/WSXL
+> 4) Split patch LS-WVL/VL
+>
+> The license change needs a different sort of review to the other
+> patches, so having it as a separate patch helps with the review
+> process.
 
-IOMMU_IO_PGTABLE_LPAE depends on DMA API.
-So io-pgtable-arm.c should include linux/dma-mapping.h.
+Thanks for your clarify!
+Now I understand how to proceed.
+Will send out my v2 patchset within this week.
 
-Signed-off-by: Lada Trimasova <ltrimas at synopsys.com<mailto:ltrimas@synopsys.com>>
-Cc: Alexey Brodkin <abrodkin at synopsys.com<mailto:abrodkin@synopsys.com>>
-Cc: Vineet Gupta <vgupta at synopsys.com<mailto:vgupta@synopsys.com>>
-Cc: Will Deacon <will.deacon at arm.com<mailto:will.deacon@arm.com>>
-Cc: Joerg Roedel <joro at 8bytes.org<mailto:joro@8bytes.org>>
----
- drivers/iommu/io-pgtable-arm.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 7df9777..0b1aca0 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -25,6 +25,7 @@
- #include <linux/sizes.h>
- #include <linux/slab.h>
- #include <linux/types.h>
-+#include <linux/dma-mapping.h>
-
- #include <asm/barrier.h>
-
-
-
-Please treat this as a polite reminder to review that patch sometime soon.
-
-Regards,
-Lada Trimasova.
+Cheers,
+Roger
