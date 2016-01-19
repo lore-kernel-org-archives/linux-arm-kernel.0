@@ -1,27 +1,28 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 19 Jan 2016 22:50:35 +0100
-Subject: [PATCH 0/2] Add support for wireless on Radxa Rock2
-In-Reply-To: <1452344058-27434-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1452344058-27434-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <2280130.ybTTBxI3rJ@phil>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 19 Jan 2016 13:57:45 -0800
+Subject: [PATCH 3/5] ARM: OMAP2+: Fix save_secure_ram_context for rodata
+In-Reply-To: <569E845F.7080001@cogentembedded.com>
+References: <1453225734-16993-1-git-send-email-tony@atomide.com>
+ <1453225734-16993-4-git-send-email-tony@atomide.com>
+ <569E845F.7080001@cogentembedded.com>
+Message-ID: <20160119215745.GF19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, 9. Januar 2016, 13:54:16 schrieb Sjoerd Simons:
-> First patch improved the modelling of the power supplies on the Rock2
-> some a bit and adds the iodomain setup needed for wireless to work.
-> Second patch adds the actual updates for the wireless setup on the rock2
-> square board.
+* Sergei Shtylyov <sergei.shtylyov@cogentembedded.com> [160119 10:46]:
+> >--- a/arch/arm/mach-omap2/sleep34xx.S
+> >+++ b/arch/arm/mach-omap2/sleep34xx.S
+> >@@ -93,8 +93,12 @@ ENTRY(enable_omap3630_toggle_l2_on_restore)
+> >  	ldmfd	sp!, {pc}	@ restore regs and return
+> >  ENDPROC(enable_omap3630_toggle_l2_on_restore)
+> >
+> >-	.text
+> >-/* Function to call rom code to save secure ram context */
+> >+/*
+> >+ * Function to call rom code to save secure ram context, This gets
 > 
-> With current kernels the probing of the wifi card is unfortunately not
-> reliable as the 32k clock is provided by the external RTC module, this
-> is fixed by a patch from Heiko still in RFC state[0] to properly defer
-> things as needed. Also things only work if the io domains get
-> initialized before the sdio bus is probed as their is no explicit
-> dependency, fixing that is for a later patchset.
+>    s/,/./?
 
-applied both to my dts32 branch for 4.6
+Will fix thanks.
 
-
-Thaks
-Heiko
+Tony
