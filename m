@@ -1,31 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Jan 2016 15:11:09 +0100
-Subject: [PATCHv2 01/18] asm-generic: make __set_fixmap_offset a static
- inline
-In-Reply-To: <20160119115539.GE25024@leverpostej>
-References: <1451930211-22460-1-git-send-email-mark.rutland@arm.com>
- <1451930211-22460-2-git-send-email-mark.rutland@arm.com>
- <20160119115539.GE25024@leverpostej>
-Message-ID: <5123400.xZnN6QSGxK@wuerfel>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 19 Jan 2016 14:11:39 +0000
+Subject: [PATCH v2 12/16] ARM: Xen: Document UEFI support on Xen ARM
+ virtual platforms
+In-Reply-To: <569E3D9F.6050808@linaro.org>
+References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452840929-19612-13-git-send-email-zhaoshenglong@huawei.com>
+ <20160118105115.GD21067@leverpostej>
+ <alpine.DEB.2.02.1601181710270.9400@kaball.uk.xensource.com>
+ <569E0F15.8090001@huawei.com> <20160119104747.GB25024@leverpostej>
+ <alpine.DEB.2.02.1601191217190.9400@kaball.uk.xensource.com>
+ <20160119131348.GJ25024@leverpostej> <569E3D9F.6050808@linaro.org>
+Message-ID: <alpine.DEB.2.02.1601191408420.9400@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 January 2016 11:55:40 Mark Rutland wrote:
-> Hi Arnd,
+On Tue, 19 Jan 2016, Shannon Zhao wrote:
+> On 2016/1/19 21:13, Mark Rutland wrote:
+> > On Tue, Jan 19, 2016 at 12:23:17PM +0000, Stefano Stabellini wrote:
+> > > >On Tue, 19 Jan 2016, Mark Rutland wrote:
+> > > > > >On Tue, Jan 19, 2016 at 06:25:25PM +0800, Shannon Zhao wrote:
+> > > > > > > > > > >>We don't do this in Documentation/arm/uefi.txt, and I
+> > > > > > > don't see why we
+> > > > > > > > > > >>should do so here.
+> > > > > > > > > > >>
+> > > > > > > > > > >>Does Xen handle arbitrary size memory map descriptors? I'm
+> > > > > > > not sure what
+> > > > > > > > > > >>new information might be passed in future additions to the
+> > > > > > > descriptor
+> > > > > > > > > > >>format, and I'm not sure what should happen in the Dom0
+> > > > > > > case.
+> > > > > > > > > >
+> > > > > > > > > >Xen passes to Dom0 the memory map in the same format as the
+> > > > > > native
+> > > > > > > > > >memory map.
+> > > > > >
+> > > > > >Does Xen parse or modify the EFI memory map in any way?
+> > > >
+> > > >Xen:
+> > > >- calls EFI_BOOT_SERVICES.GetMemoryMap()
+> > > >- takes note of the memory regions for its own usage
+> > > >- create the fdt notes, including efi-mmap-start, with a pointer to it
+> > > >
+> > > >
+> > > > > >Does it pass the raw values returned by
+> > > > EFI_BOOT_SERVICES.GetMemoryMap()
+> > > > > >through to the xen,uefi-* properties, or does is make any static
+> > > > > >assumptions about what the values will be?
+> > > >
+> > > >It just passes the raw values.
+> > I take it that means that any memory carved out for Xen itself is
+> > described/discovered via a separate mechanism? How does that work
 > 
-> Sorry to poke during the merge window.
+> For Xen hypervisor booting on UEFI, it get the EFI memory map through the
+> similar way like Linux, e.g. call EFI_BOOT_SERVICES.GetMemoryMap().
+> For Dom0, Xen will create a new EFI memory map for Dom0.
 > 
-> Are you happy with the below patch, and if so, would you be happy for
-> this to go via the arm64 tree?
-> 
-> If possible, I'd like to be able to place the series on a stable branch
-> come -rc1, so that can be used as the base for other work (e.g. [1]),
-> and so that we can get it into -next.
-> 
-> Everything else has the appropriate acks collected.
-> 
-> 
+> See [PATCH v3 52/62] arm/acpi: Prepare EFI memory descriptor for Dom0
+> http://lists.xen.org/archives/html/xen-devel/2015-11/msg01884.html
 
-Yes, please merge it through arm64
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Ah! That patch is not upstream yet, that's why I thought that something
+was off. Listen to Shannon, don't listen to me :-)
