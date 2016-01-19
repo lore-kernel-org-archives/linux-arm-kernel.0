@@ -1,36 +1,71 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 19 Jan 2016 17:50:38 +0000
-Subject: [RFC PATCH v2 0/4] CPUs capacity information for heterogeneous
- systems
-In-Reply-To: <20160119150551.GI6344@twins.programming.kicks-ass.net>
-References: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
- <20160119150551.GI6344@twins.programming.kicks-ass.net>
-Message-ID: <20160119175038.GS6588@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 Jan 2016 17:57:58 +0000
+Subject: [LINUX PATCH 1/5] mmc: Workaround for the issue in auto tuning
+ mode.
+In-Reply-To: <1453213055-35563-1-git-send-email-lakshmis@xilinx.com>
+References: <1453213055-35563-1-git-send-email-lakshmis@xilinx.com>
+Message-ID: <20160119175757.GR19062@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2016 at 04:05:51PM +0100, Peter Zijlstra wrote:
-> On Fri, Jan 08, 2016 at 02:09:28PM +0000, Juri Lelli wrote:
+On Tue, Jan 19, 2016 at 07:47:31PM +0530, P L Sai Krishna wrote:
+> +void arasan_tune_sdclk(struct sdhci_host *host)
 
-> >     cons: - not easy to come up with a clean solution, as it seems interaction
-> >             with several subsystems (e.g., cpufreq) is required
-> >           - not easy to agree upon a single benchmark (that has to be both
-> >             representative and simple enough to run at boot)
-> >           - numbers might (and do) vary from boot to boot
+static?
 
-> This last point is a total pain for benchmarking, it means nothing is
-> every reproducible.
+> +{
+> +	unsigned int clock;
+> +
+> +	clock = host->clock;
 
-> Therefore, I would always augment the above (2) with the below (3), such
-> that you can overwrite the results with a known stable set of numbers:
+Maybe combine the above two lines:
 
-The suggestion when the previous version was being discussed was that
-there are supposed to be some other knobs one uses for tuning and one
-was never supposed to use these numbers.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160119/2f579d28/attachment.sig>
+	unsigned int clock = host->clock;
+
+?
+
+> +
+> +	/*
+> +	 * As per controller erratum, program the SDCLK Frequency
+> +	 * Select of clock control register with a value, say
+> +	 * clock/2. Wait for the Internal clock stable and program
+> +	 * the desired frequency.
+> +	 */
+> +	host->ops->set_clock(host, clock/2);
+
+The comment above says "wait for the internal clock stable" - I see
+no wait in here.  Does the code actually conform with the comment?
+
+Please also use "clock / 2" as per coding style, thanks
+
+> +
+> +	host->ops->set_clock(host, host->clock);
+
+Maybe replace host->clock with clock?
+
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index d622435..8b064cd 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -2043,6 +2043,11 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+>  		err = -EIO;
+>  	}
+>  
+> +	if ((host->quirks2 & SDHCI_QUIRK2_BROKEN_TUNING) &&
+> +		(tuning_loop_counter >= 0) && (ctrl & SDHCI_CTRL_TUNED_CLK)) {
+> +		host->ops->tune_clk(host);
+> +	}
+
+Do we need this "SDHCI_QUIRK2_BROKEN_TUNING" quirk at all?  What's wrong
+with:
+
+	if (host->ops->tune_clk && tuning_loop_counter >= 0 &&
+	    ctrl & SDHCI_CTRL_TUNED_CLK)
+		host->ops->tune_clk(host);
+
+here?
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
