@@ -1,99 +1,41 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Tue, 19 Jan 2016 11:23:23 +0000
-Subject: [RFC PATCH v2 0/4] CPUs capacity information for heterogeneous
- systems
-In-Reply-To: <20160119105941.GA28845@e104818-lin.cambridge.arm.com>
-References: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
- <56994D87.6000709@linaro.org> <20160118151316.GD7159@e106622-lin>
- <CAKfTPtBFR4cowT-j4qVxfUvh6NDNmi6R=J7z9kywi6bONU3Pow@mail.gmail.com>
- <20160118163014.GA10332@e106622-lin>
- <CAKfTPtDJBAXUz=_-QQSkrqwAvmUJd1bUJ-VfSaNER-0NzWpunA@mail.gmail.com>
- <20160119105941.GA28845@e104818-lin.cambridge.arm.com>
-Message-ID: <20160119112323.GB8573@e106622-lin>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Jan 2016 12:33:28 +0100
+Subject: [PATCH v3 1/1] USB: core: let USB device know device node
+In-Reply-To: <20160119030859.GB24548@shlinux2>
+References: <20160118081510.GF8150@shlinux2>
+ <Pine.LNX.4.44L0.1601181139150.25155-100000@netrider.rowland.org>
+ <20160119030859.GB24548@shlinux2>
+Message-ID: <4405270.vcz87Q878u@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-On 19/01/16 10:59, Catalin Marinas wrote:
-> On Mon, Jan 18, 2016 at 05:42:58PM +0100, Vincent Guittot wrote:
-> > On 18 January 2016 at 17:30, Juri Lelli <juri.lelli@arm.com> wrote:
-> > > On 18/01/16 17:13, Vincent Guittot wrote:
-> > >> On 18 January 2016 at 16:13, Juri Lelli <juri.lelli@arm.com> wrote:
-> > >> > On 15/01/16 11:50, Steve Muckle wrote:
-> > >> >> On 01/08/2016 06:09 AM, Juri Lelli wrote:
-> > >> >> >  2. Dynamic profiling at boot (v2)
-> > >> >> >
-> > >> >> >     pros: - does not require a standardized definition of capacity
-> > >> >> >           - cannot be incorrectly tuned (once benchmark is fixed)
-> > >> >> >           - does not require user/integrator work
-> > >> >> >
-> > >> >> >     cons: - not easy to come up with a clean solution, as it seems interaction
-> > >> >> >             with several subsystems (e.g., cpufreq) is required
-> > >> >> >           - not easy to agree upon a single benchmark (that has to be both
-> > >> >> >             representative and simple enough to run at boot)
-> > >> >> >           - numbers might (and do) vary from boot to boot
-> > >> >>
-> > >> >> An important additional con that was mentioned earlier IIRC was the
-> > >> >> additional boot time required for the benchmark.
-> > >> >
-> > >> > Right. I forgot about that.
-> > >> >
-> > >> >> Perhaps there could be
-> > >> >> a kernel command line argument to bypass the benchmark if it is known
-> > >> >> that predetermined values will be provided via sysfs later?
-> > >> >>
-> > >> >
-> > >> > This might work, yes.
-> > >>
-> > >> Instead of command line, I prefer to use DT.
+On Tuesday 19 January 2016 11:08:59 Peter Chen wrote:
 > 
-> I fully agree. Command line doesn't scale with multiple CPUs, at most an
-> option to bypass the benchmark (though we could just skip it when the DT
-> values are present).
+> I am afraid I have no USB 3.0 PC running Linux.
 > 
-> > >> Can't we use something similar to what is currently done in arm arch
-> > >> for the early stage of the boot ? We don't have to provide performance
-> > >> value for which it's difficult to find a consensus on how to define it
-> > >> and which benchmark should be used. We use the micro arch and the
-> > >> frequency of the core to define a relative capacity. This give us a
-> > >> relatively good idea of the capacity of each core.
-> > >
-> > > I'm not sure I understand what you are proposing. arm arch is currently
-> > > based on having static hardcoded data (efficiency values). But, this has
-> > > already been NACKed for arm64 during last review of this RFC.
-> > >
-> > > Are you proposing something different?
+> > > - Which the value of hub->descriptor->bNbrPorts for root hub?
 > > 
-> > No, i'm proposing to use it at boot time until the dynamic profiling
-> > gives better value.
-> > We don't have to set any new properties.
-> > IIRC, It was nacked because it was of static hardcoded value that was
-> > not always reflecting the best accurate capacity of a system. IMHO,
-> > it's not that far from reality so can't this be used as an
-> > intermediate step while waiting for dynamic profiling ?
+> > In the example above, the legacy root hub would have bNbrPorts set to 6 
+> > and the SS root hub would have bNbrPorts set to 3.
+> > 
 > 
-> My nack for hard-coded values still stands since this is not just about
-> the microarchitecture (MIDR) but how the CPUs are integrated with the
-> SoC, additional caches, memory latency, maximum clock frequency (or you
-> rely on DT again to get this information and scale the initial CPU
-> capacity/efficiency accordingly). MIDR does not capture SoC details.
-> 
-> Two questions:
-> 
-> 1. How is the boot time affected by the benchmark?
-> 2. How is the boot time affected by considering all the CPUs the same?
-> 
-> My preference is for DT and sysfs (especially useful for
-> development/tuning) but I'm not opposed to a boot-time benchmark if
-> people insist on it. If the answer to point 2 is "insignificant", we
-> could as well defer the capacity setting to user space (sysfs).
-> 
+> Ok, so the maximum physical port number is 6 as well as bNbrports value.
+> The "reg" value at dts should be from 1 to 6. "reg" stands for physical
+> port number for individual physical port, eg if "reg" equals to 1, it
+> stands for the device connects at port 1, no matter the device is HS or
+> SS, it can use the node whose "reg" is 1.
 
-Given that we are not targeting boot time with this, but rather better
-performance afterwards, I don't expect significant differences; but,
-I'll get numbers :).
+As I understand it, you could have two devices that are both
+connected to port '1', when one is using HS and the other is using
+SS. This means that we can't use the same 'reg' value for both, and
+we have to define a particular way to disambiguate them.
 
-Thanks,
+As Alan says, there is an established ordering that just sorts the
+ports form 1 to 9 in the example, and that would be the most
+straightforward to use here.
 
-- Juri
+Alternatively, you could use one of the high bits of the 'reg' value
+to indicate which root hub is used. I'm sure that would work as
+well, but be less obvious.
+
+	Arnd
