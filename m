@@ -1,118 +1,67 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 19 Jan 2016 14:11:21 +0100
-Subject: [PATCH V3 08/10] irqchip, gicv3, its: Probe ITS in the ACPI way.
-In-Reply-To: <1453209083-3358-1-git-send-email-tn@semihalf.com>
-References: <1453209083-3358-1-git-send-email-tn@semihalf.com>
-Message-ID: <1453209083-3358-9-git-send-email-tn@semihalf.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Jan 2016 13:13:49 +0000
+Subject: [PATCH v2 12/16] ARM: Xen: Document UEFI support on Xen ARM
+ virtual platforms
+In-Reply-To: <alpine.DEB.2.02.1601191217190.9400@kaball.uk.xensource.com>
+References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452840929-19612-13-git-send-email-zhaoshenglong@huawei.com>
+ <20160118105115.GD21067@leverpostej>
+ <alpine.DEB.2.02.1601181710270.9400@kaball.uk.xensource.com>
+ <569E0F15.8090001@huawei.com> <20160119104747.GB25024@leverpostej>
+ <alpine.DEB.2.02.1601191217190.9400@kaball.uk.xensource.com>
+Message-ID: <20160119131348.GJ25024@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we prepared ITS for being initialized different that via DT,
-it is now possible to parse MADT and pass mandatory info to
-firmware-agnostic ITS init call.
+On Tue, Jan 19, 2016 at 12:23:17PM +0000, Stefano Stabellini wrote:
+> On Tue, 19 Jan 2016, Mark Rutland wrote:
+> > On Tue, Jan 19, 2016 at 06:25:25PM +0800, Shannon Zhao wrote:
+> > > >> We don't do this in Documentation/arm/uefi.txt, and I don't see why we
+> > > >> should do so here.
+> > > >>
+> > > >> Does Xen handle arbitrary size memory map descriptors? I'm not sure what
+> > > >> new information might be passed in future additions to the descriptor
+> > > >> format, and I'm not sure what should happen in the Dom0 case.
+> > > > 
+> > > > Xen passes to Dom0 the memory map in the same format as the native
+> > > > memory map.
+> > 
+> > Does Xen parse or modify the EFI memory map in any way?
+> 
+> Xen:
+> - calls EFI_BOOT_SERVICES.GetMemoryMap()
+> - takes note of the memory regions for its own usage
+> - create the fdt notes, including efi-mmap-start, with a pointer to it
+> 
+> 
+> > Does it pass the raw values returned by EFI_BOOT_SERVICES.GetMemoryMap()
+> > through to the xen,uefi-* properties, or does is make any static
+> > assumptions about what the values will be?
+> 
+> It just passes the raw values.
 
-Note that we are using here IORT lib to keep track of allocated
-domain handler which will be used to build PCI MSI domain on top
-in the later patches.
+I take it that means that any memory carved out for Xen itself is
+described/discovered via a separate mechanism? How does that work?
 
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/irqchip/irq-gic-v3-its.c | 57 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 56 insertions(+), 1 deletion(-)
+> > I'm trying to get a feeling for what the behaviour will be if/when a
+> > version of the EFI spec expands the memory map format.
+> 
+> Linux is likely to get the memory map in the same format as it's
+> provided on native.
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index fecb7a6..42f378a 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -15,10 +15,13 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/acpi.h>
- #include <linux/bitmap.h>
- #include <linux/cpu.h>
- #include <linux/delay.h>
- #include <linux/interrupt.h>
-+#include <linux/irqdomain.h>
-+#include <linux/iort.h>
- #include <linux/log2.h>
- #include <linux/mm.h>
- #include <linux/msi.h>
-@@ -1272,6 +1275,11 @@ static int its_irq_gic_domain_alloc(struct irq_domain *domain,
- 		fwspec.param[0] = GIC_IRQ_TYPE_LPI;
- 		fwspec.param[1] = hwirq;
- 		fwspec.param[2] = IRQ_TYPE_EDGE_RISING;
-+	} else if (is_fwnode_irqchip(domain->parent->fwnode)) {
-+		fwspec.fwnode = domain->parent->fwnode;
-+		fwspec.param_count = 2;
-+		fwspec.param[0] = hwirq;
-+		fwspec.param[1] = IRQ_TYPE_EDGE_RISING;
- 	} else {
- 		return -EINVAL;
- 	}
-@@ -1594,6 +1602,52 @@ int its_cpu_init(void)
- 	return 0;
- }
- 
-+#ifdef CONFIG_ACPI
-+
-+#define ACPI_GICV3_ITS_MEM_SIZE (2 * SZ_64K)
-+
-+static struct irq_domain *its_parent __initdata;
-+
-+static int __init
-+gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
-+			const unsigned long end)
-+{
-+	struct acpi_madt_generic_translator *its_entry;
-+	struct fwnode_handle *domain_handle;
-+	int err;
-+
-+	its_entry = (struct acpi_madt_generic_translator *)header;
-+	domain_handle = irq_domain_alloc_fwnode((void *)its_entry->base_address);
-+	if (!domain_handle) {
-+		pr_err("Unable to allocate GICv2m domain token\n");
-+		return -ENOMEM;
-+	}
-+
-+	/* ITS works as msi controller in ACPI case */
-+	err = its_probe_one(its_entry->base_address, ACPI_GICV3_ITS_MEM_SIZE,
-+			    its_parent, true, domain_handle);
-+	if (err) {
-+		irq_domain_free_fwnode(domain_handle);
-+		return err;
-+	}
-+	iort_register_domain_token(its_entry->translation_id, domain_handle);
-+	return 0;
-+}
-+
-+void __init its_acpi_probe(struct irq_domain *parent_domain)
-+{
-+	int count;
-+
-+	its_parent = parent_domain;
-+	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
-+				      gic_acpi_parse_madt_its, 0);
-+	if (count <= 0)
-+		pr_info("No valid GIC ITS entries exist\n");
-+}
-+#else
-+static inline void __init its_acpi_probe(struct irq_domain *parent_domain) { }
-+#endif
-+
- static struct of_device_id its_device_id[] = {
- 	{	.compatible	= "arm,gic-v3-its",	},
- 	{},
-@@ -1610,7 +1664,8 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
- 		     np = of_find_matching_node(np, its_device_id)) {
- 			its_of_probe(np, parent_domain);
- 		}
--	}
-+	} else
-+		its_acpi_probe(parent_domain);
- 
- 	if (list_empty(&its_nodes)) {
- 		pr_warn("ITS: No ITS available, not enabling LPIs\n");
--- 
-1.9.1
+Ok.
+
+The only fragility I forsee there would be if some extended memory
+descriptor format defined things the kernel understood but Xen did not.
+
+Given that would require an update to the kernel, at that point code is
+added for that we can figure out how to determine whether Xen handled
+any of said information, and whether any further negotiation with Xen is
+necessary. I assume Xen exposes some feature probing mechanism to guests
+that can cater for that if necessary.
+
+Ard, Leif, I trust you two can keep an eye out for anything of that
+sort on the UEFI side. :)
+
+Thanks,
+Mark.
