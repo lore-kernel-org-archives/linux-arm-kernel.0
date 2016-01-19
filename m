@@ -1,483 +1,977 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 19 Jan 2016 14:05:09 +0000
-Subject: [RFC PATCH 3/3] mmc: pwrseq: convert to proper platform device
-In-Reply-To: <CAPDyKFpsQwmdXxSaAx=KkL4q3anrRDsvnOd3_4f0rTzjDJes4g@mail.gmail.com>
-References: <1453201052-2347-1-git-send-email-srinivas.kandagatla@linaro.org>	<1453201155-2598-1-git-send-email-srinivas.kandagatla@linaro.org>
- <CAPDyKFpsQwmdXxSaAx=KkL4q3anrRDsvnOd3_4f0rTzjDJes4g@mail.gmail.com>
-Message-ID: <569E4295.8070605@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 19 Jan 2016 15:05:07 +0100
+Subject: [PATCH 1/2] ARM: dts: kirkwood: split lswxl into linkstation
+ lswsxl and lswxl
+In-Reply-To: <1453211342-25214-2-git-send-email-rogershimizu@gmail.com>
+References: <1453211342-25214-1-git-send-email-rogershimizu@gmail.com>
+ <1453211342-25214-2-git-send-email-rogershimizu@gmail.com>
+Message-ID: <20160119140507.GG6554@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jan 19, 2016 at 10:49:01PM +0900, Roger Shimizu wrote:
+> LS-WXL/WSXL are both kirkwood-6281 based 2-Bay NAS devices, which share
+> many MPP pins. However they are slightly different:
+>   - There're two red LED indicator on LS-WXL to show when HDD fails,
+>     but there's no such on LS-WSXL.
+>   - There's 4-level speed adjustable FAN on LS-WXL, but not LS-WSXL.
+> 
+> So after the split, common part goes into .dtsi file:
+>   - kirkwood-linkstation.dtsi
+>   - kirkwood-linkstation-duo-6281.dtsi
+> while all rest part goes into device specific .dts file:
+>   - kirkwood-linkstation-lswsxl.dts
+>   - kirkwood-linkstation-lswxl.dts
+> 
+> With a few gpio/led-pin changes, including fix for the issue mentioned
+> in Debian BTS #810894.
 
+Hi Roger
 
-On 19/01/16 13:01, Ulf Hansson wrote:
-> On 19 January 2016 at 11:59, Srinivas Kandagatla
-> <srinivas.kandagatla@linaro.org> wrote:
->> simple-pwrseq and emmc-pwrseq drivers rely on platform_device
->> structure from of_find_device_by_node(), this works mostly. But, as there
->> is no driver associated with this devices, cases like default/init pinctrl
->> setup would never be performed by pwrseq. This becomes problem when the
->> gpios used in pwrseq require pinctrl setup.
->>
->> Currently most of the common pinctrl setup is done in
->> drivers/base/pinctrl.c by pinctrl_bind_pins().
->>
->> There are two ways to slove this issue on either convert pwrseq drivers
->> to a proper platform drivers or copy the exact code from
->> pcintrl_bind_pins(). I prefer converting pwrseq to proper drivers so that
->> other cases like setting up clks/parents from dt would also be possible.
->
-> Overall I like the approach, thanks for posting this!
->
-> I have browsed through the patch, it looks okay, besides one issue...
->
-> There is a possibility that the pwrseq drivers haven't been probed
-> before mmc_pwrseq_alloc() gets called. This leads to that the
-> pwrseq_list may be empty, which means that we would silently fail to
-> find a corresponding pwrseq type even if the device node would say
-> there should be one.
->
-> Perhaps you should do a pre-validation of the device node in
-> mmc_pwrseq_alloc(), to see if there is a pwrseq handle. If so, but no
-> corresponding pwrseq method registerd (because the driver hasn?t been
-> probed yet), you could return -EPROBE_DEFER. Or perhaps there are
-> other alternatives to solved this issue!?
-That's a good point.
+This fix should be a separate patch. We can then get it applied to
+stable, so it makes its way back to older kernels.
 
-Doing EPROBE_DEFER sounds more correct to me, we could return this error 
-in cases where the phandle for "mmc-pwrseq" exists and unable to find 
-the pwrseq in the list.
+	Andrew
 
-This would go well with mmc_of_parse() return types.
-
-Will spin v2 with this fix.
-
-thanks,
-srini
-
->
-> Kind regards
-> Uffe
->
->>
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->>   drivers/mmc/core/pwrseq.c        | 99 ++++++++++++++++++++--------------------
->>   drivers/mmc/core/pwrseq.h        | 13 ++++--
->>   drivers/mmc/core/pwrseq_emmc.c   | 65 ++++++++++++++++----------
->>   drivers/mmc/core/pwrseq_simple.c | 71 ++++++++++++++++++----------
->>   4 files changed, 145 insertions(+), 103 deletions(-)
->>
->> diff --git a/drivers/mmc/core/pwrseq.c b/drivers/mmc/core/pwrseq.c
->> index 4c1d175..669608e 100644
->> --- a/drivers/mmc/core/pwrseq.c
->> +++ b/drivers/mmc/core/pwrseq.c
->> @@ -8,50 +8,30 @@
->>    *  MMC power sequence management
->>    */
->>   #include <linux/kernel.h>
->> -#include <linux/platform_device.h>
->>   #include <linux/err.h>
->>   #include <linux/of.h>
->> -#include <linux/of_platform.h>
->>
->>   #include <linux/mmc/host.h>
->>
->>   #include "pwrseq.h"
->>
->> -struct mmc_pwrseq_match {
->> -       const char *compatible;
->> -       struct mmc_pwrseq *(*alloc)(struct mmc_host *host, struct device *dev);
->> -};
->> -
->> -static struct mmc_pwrseq_match pwrseq_match[] = {
->> -       {
->> -               .compatible = "mmc-pwrseq-simple",
->> -               .alloc = mmc_pwrseq_simple_alloc,
->> -       }, {
->> -               .compatible = "mmc-pwrseq-emmc",
->> -               .alloc = mmc_pwrseq_emmc_alloc,
->> -       },
->> -};
->> -
->> -static struct mmc_pwrseq_match *mmc_pwrseq_find(struct device_node *np)
->> +static DEFINE_MUTEX(pwrseq_list_mutex);
->> +static LIST_HEAD(pwrseq_list);
->> +
->> +static struct mmc_pwrseq *of_find_mmc_pwrseq(struct device_node *np)
->>   {
->> -       struct mmc_pwrseq_match *match = ERR_PTR(-ENODEV);
->> -       int i;
->> +       struct mmc_pwrseq *p;
->>
->> -       for (i = 0; i < ARRAY_SIZE(pwrseq_match); i++) {
->> -               if (of_device_is_compatible(np, pwrseq_match[i].compatible)) {
->> -                       match = &pwrseq_match[i];
->> -                       break;
->> -               }
->> -       }
->> +       list_for_each_entry(p, &pwrseq_list, list)
->> +               if (p->dev->of_node == np)
->> +                       return p;
->>
->> -       return match;
->> +       return NULL;
->>   }
->>
->>   int mmc_pwrseq_alloc(struct mmc_host *host)
->>   {
->> -       struct platform_device *pdev;
->>          struct device_node *np;
->> -       struct mmc_pwrseq_match *match;
->>          struct mmc_pwrseq *pwrseq;
->>          int ret = 0;
->>
->> @@ -59,25 +39,18 @@ int mmc_pwrseq_alloc(struct mmc_host *host)
->>          if (!np)
->>                  return 0;
->>
->> -       pdev = of_find_device_by_node(np);
->> -       if (!pdev) {
->> -               ret = -ENODEV;
->> -               goto err;
->> -       }
->> +       pwrseq = of_find_mmc_pwrseq(np);
->>
->> -       match = mmc_pwrseq_find(np);
->> -       if (IS_ERR(match)) {
->> -               ret = PTR_ERR(match);
->> -               goto err;
->> -       }
->> +       if (pwrseq && pwrseq->ops && pwrseq->ops->alloc) {
->> +               host->pwrseq = pwrseq;
->> +               ret = pwrseq->ops->alloc(host);
->> +               if (IS_ERR_VALUE(ret)) {
->> +                       host->pwrseq = NULL;
->> +                       goto err;
->> +               }
->>
->> -       pwrseq = match->alloc(host, &pdev->dev);
->> -       if (IS_ERR(pwrseq)) {
->> -               ret = PTR_ERR(pwrseq);
->> -               goto err;
->>          }
->>
->> -       host->pwrseq = pwrseq;
->>          dev_info(host->parent, "allocated mmc-pwrseq\n");
->>
->>   err:
->> @@ -89,7 +62,7 @@ void mmc_pwrseq_pre_power_on(struct mmc_host *host)
->>   {
->>          struct mmc_pwrseq *pwrseq = host->pwrseq;
->>
->> -       if (pwrseq && pwrseq->ops && pwrseq->ops->pre_power_on)
->> +       if (pwrseq && pwrseq->ops->pre_power_on)
->>                  pwrseq->ops->pre_power_on(host);
->>   }
->>
->> @@ -97,7 +70,7 @@ void mmc_pwrseq_post_power_on(struct mmc_host *host)
->>   {
->>          struct mmc_pwrseq *pwrseq = host->pwrseq;
->>
->> -       if (pwrseq && pwrseq->ops && pwrseq->ops->post_power_on)
->> +       if (pwrseq && pwrseq->ops->post_power_on)
->>                  pwrseq->ops->post_power_on(host);
->>   }
->>
->> @@ -105,7 +78,7 @@ void mmc_pwrseq_power_off(struct mmc_host *host)
->>   {
->>          struct mmc_pwrseq *pwrseq = host->pwrseq;
->>
->> -       if (pwrseq && pwrseq->ops && pwrseq->ops->power_off)
->> +       if (pwrseq && pwrseq->ops->power_off)
->>                  pwrseq->ops->power_off(host);
->>   }
->>
->> @@ -113,8 +86,34 @@ void mmc_pwrseq_free(struct mmc_host *host)
->>   {
->>          struct mmc_pwrseq *pwrseq = host->pwrseq;
->>
->> -       if (pwrseq && pwrseq->ops && pwrseq->ops->free)
->> -               pwrseq->ops->free(host);
->> +       if (pwrseq) {
->> +               if (pwrseq->ops->free)
->> +                       pwrseq->ops->free(host);
->> +
->> +               host->pwrseq = NULL;
->> +       }
->>
->> -       host->pwrseq = NULL;
->>   }
->> +
->> +int mmc_pwrseq_register(struct mmc_pwrseq *pwrseq)
->> +{
->> +       if (!pwrseq || !pwrseq->ops || !pwrseq->dev)
->> +               return -EINVAL;
->> +
->> +       mutex_lock(&pwrseq_list_mutex);
->> +       list_add(&pwrseq->list, &pwrseq_list);
->> +       mutex_unlock(&pwrseq_list_mutex);
->> +
->> +       return 0;
->> +}
->> +EXPORT_SYMBOL_GPL(mmc_pwrseq_register);
->> +
->> +void mmc_pwrseq_unregister(struct mmc_pwrseq *pwrseq)
->> +{
->> +       if (pwrseq) {
->> +               mutex_lock(&pwrseq_list_mutex);
->> +               list_del(&pwrseq->list);
->> +               mutex_unlock(&pwrseq_list_mutex);
->> +       }
->> +}
->> +EXPORT_SYMBOL_GPL(mmc_pwrseq_unregister);
->> diff --git a/drivers/mmc/core/pwrseq.h b/drivers/mmc/core/pwrseq.h
->> index 096da48..08a7d2d 100644
->> --- a/drivers/mmc/core/pwrseq.h
->> +++ b/drivers/mmc/core/pwrseq.h
->> @@ -8,7 +8,10 @@
->>   #ifndef _MMC_CORE_PWRSEQ_H
->>   #define _MMC_CORE_PWRSEQ_H
->>
->> +#include <linux/mmc/host.h>
->> +
->>   struct mmc_pwrseq_ops {
->> +       int (*alloc)(struct mmc_host *host);
->>          void (*pre_power_on)(struct mmc_host *host);
->>          void (*post_power_on)(struct mmc_host *host);
->>          void (*power_off)(struct mmc_host *host);
->> @@ -17,21 +20,21 @@ struct mmc_pwrseq_ops {
->>
->>   struct mmc_pwrseq {
->>          struct mmc_pwrseq_ops *ops;
->> +       struct device *dev;
->> +       struct list_head list;
->>   };
->>
->>   #ifdef CONFIG_OF
->>
->> +int mmc_pwrseq_register(struct mmc_pwrseq *pwrseq);
->> +void mmc_pwrseq_unregister(struct mmc_pwrseq *pwrseq);
->> +
->>   int mmc_pwrseq_alloc(struct mmc_host *host);
->>   void mmc_pwrseq_pre_power_on(struct mmc_host *host);
->>   void mmc_pwrseq_post_power_on(struct mmc_host *host);
->>   void mmc_pwrseq_power_off(struct mmc_host *host);
->>   void mmc_pwrseq_free(struct mmc_host *host);
->>
->> -struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
->> -                                          struct device *dev);
->> -struct mmc_pwrseq *mmc_pwrseq_emmc_alloc(struct mmc_host *host,
->> -                                        struct device *dev);
->> -
->>   #else
->>
->>   static inline int mmc_pwrseq_alloc(struct mmc_host *host) { return 0; }
->> diff --git a/drivers/mmc/core/pwrseq_emmc.c b/drivers/mmc/core/pwrseq_emmc.c
->> index 7978fb7..75f7423 100644
->> --- a/drivers/mmc/core/pwrseq_emmc.c
->> +++ b/drivers/mmc/core/pwrseq_emmc.c
->> @@ -9,6 +9,7 @@
->>    */
->>   #include <linux/delay.h>
->>   #include <linux/kernel.h>
->> +#include <linux/platform_device.h>
->>   #include <linux/slab.h>
->>   #include <linux/device.h>
->>   #include <linux/err.h>
->> @@ -48,14 +49,8 @@ static void mmc_pwrseq_emmc_free(struct mmc_host *host)
->>
->>          unregister_restart_handler(&pwrseq->reset_nb);
->>          gpiod_put(pwrseq->reset_gpio);
->> -       kfree(pwrseq);
->>   }
->>
->> -static struct mmc_pwrseq_ops mmc_pwrseq_emmc_ops = {
->> -       .post_power_on = mmc_pwrseq_emmc_reset,
->> -       .free = mmc_pwrseq_emmc_free,
->> -};
->> -
->>   static int mmc_pwrseq_emmc_reset_nb(struct notifier_block *this,
->>                                      unsigned long mode, void *cmd)
->>   {
->> @@ -66,21 +61,14 @@ static int mmc_pwrseq_emmc_reset_nb(struct notifier_block *this,
->>          return NOTIFY_DONE;
->>   }
->>
->> -struct mmc_pwrseq *mmc_pwrseq_emmc_alloc(struct mmc_host *host,
->> -                                        struct device *dev)
->> +static int mmc_pwrseq_emmc_alloc(struct mmc_host *host)
->>   {
->> -       struct mmc_pwrseq_emmc *pwrseq;
->> -       int ret = 0;
->> -
->> -       pwrseq = kzalloc(sizeof(struct mmc_pwrseq_emmc), GFP_KERNEL);
->> -       if (!pwrseq)
->> -               return ERR_PTR(-ENOMEM);
->> +       struct mmc_pwrseq_emmc *pwrseq =  to_pwrseq_emmc(host->pwrseq);
->>
->> -       pwrseq->reset_gpio = gpiod_get(dev, "reset", GPIOD_OUT_LOW);
->> -       if (IS_ERR(pwrseq->reset_gpio)) {
->> -               ret = PTR_ERR(pwrseq->reset_gpio);
->> -               goto free;
->> -       }
->> +       pwrseq->reset_gpio = gpiod_get(host->pwrseq->dev,
->> +                                       "reset", GPIOD_OUT_LOW);
->> +       if (IS_ERR(pwrseq->reset_gpio))
->> +               return PTR_ERR(pwrseq->reset_gpio);
->>
->>          /*
->>           * register reset handler to ensure emmc reset also from
->> @@ -91,10 +79,41 @@ struct mmc_pwrseq *mmc_pwrseq_emmc_alloc(struct mmc_host *host,
->>          pwrseq->reset_nb.priority = 255;
->>          register_restart_handler(&pwrseq->reset_nb);
->>
->> +       return 0;
->> +}
->> +
->> +static struct mmc_pwrseq_ops mmc_pwrseq_emmc_ops = {
->> +       .alloc = mmc_pwrseq_emmc_alloc,
->> +       .post_power_on = mmc_pwrseq_emmc_reset,
->> +       .free = mmc_pwrseq_emmc_free,
->> +};
->> +
->> +static int mmc_pwrseq_emmc_probe(struct platform_device *pdev)
->> +{
->> +       struct mmc_pwrseq_emmc *pwrseq;
->> +       struct device *dev = &pdev->dev;
->> +
->> +       pwrseq = devm_kzalloc(dev, sizeof(*pwrseq), GFP_KERNEL);
->> +       if (!pwrseq)
->> +               return -ENOMEM;
->> +
->>          pwrseq->pwrseq.ops = &mmc_pwrseq_emmc_ops;
->> +       pwrseq->pwrseq.dev = dev;
->>
->> -       return &pwrseq->pwrseq;
->> -free:
->> -       kfree(pwrseq);
->> -       return ERR_PTR(ret);
->> +       return mmc_pwrseq_register(&pwrseq->pwrseq);
->>   }
->> +
->> +static const struct of_device_id mmc_pwrseq_emmc_of_match[] = {
->> +       { .compatible = "mmc-pwrseq-emmc",},
->> +       {/* sentinel */},
->> +};
->> +
->> +static struct platform_driver mmc_pwrseq_emmc_driver = {
->> +       .probe = mmc_pwrseq_emmc_probe,
->> +       .driver = {
->> +               .name = "pwrseq_emmc",
->> +               .of_match_table = mmc_pwrseq_emmc_of_match,
->> +       },
->> +};
->> +
->> +builtin_platform_driver(mmc_pwrseq_emmc_driver);
->> diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
->> index c091f98..b04cc2d 100644
->> --- a/drivers/mmc/core/pwrseq_simple.c
->> +++ b/drivers/mmc/core/pwrseq_simple.c
->> @@ -9,6 +9,7 @@
->>    */
->>   #include <linux/clk.h>
->>   #include <linux/kernel.h>
->> +#include <linux/platform_device.h>
->>   #include <linux/slab.h>
->>   #include <linux/device.h>
->>   #include <linux/err.h>
->> @@ -82,46 +83,66 @@ static void mmc_pwrseq_simple_free(struct mmc_host *host)
->>          if (!IS_ERR(pwrseq->ext_clk))
->>                  clk_put(pwrseq->ext_clk);
->>
->> -       kfree(pwrseq);
->>   }
->>
->> -static struct mmc_pwrseq_ops mmc_pwrseq_simple_ops = {
->> -       .pre_power_on = mmc_pwrseq_simple_pre_power_on,
->> -       .post_power_on = mmc_pwrseq_simple_post_power_on,
->> -       .power_off = mmc_pwrseq_simple_power_off,
->> -       .free = mmc_pwrseq_simple_free,
->> -};
->> -
->> -struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
->> -                                          struct device *dev)
->> +int mmc_pwrseq_simple_alloc(struct mmc_host *host)
->>   {
->> -       struct mmc_pwrseq_simple *pwrseq;
->> +       struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
->> +       struct device *dev = host->pwrseq->dev;
->>          int ret = 0;
->>
->> -       pwrseq = kzalloc(sizeof(*pwrseq), GFP_KERNEL);
->> -       if (!pwrseq)
->> -               return ERR_PTR(-ENOMEM);
->> -
->>          pwrseq->ext_clk = clk_get(dev, "ext_clock");
->>          if (IS_ERR(pwrseq->ext_clk) &&
->>              PTR_ERR(pwrseq->ext_clk) != -ENOENT) {
->> -               ret = PTR_ERR(pwrseq->ext_clk);
->> -               goto free;
->> +               return PTR_ERR(pwrseq->ext_clk);
->> +
->>          }
->>
->>          pwrseq->reset_gpios = gpiod_get_array(dev, "reset", GPIOD_OUT_HIGH);
->>          if (IS_ERR(pwrseq->reset_gpios)) {
->>                  ret = PTR_ERR(pwrseq->reset_gpios);
->> -               goto clk_put;
->> +               clk_put(pwrseq->ext_clk);
->> +               return ret;
->>          }
->>
->> +       return 0;
->> +}
->> +
->> +static struct mmc_pwrseq_ops mmc_pwrseq_simple_ops = {
->> +       .alloc = mmc_pwrseq_simple_alloc,
->> +       .pre_power_on = mmc_pwrseq_simple_pre_power_on,
->> +       .post_power_on = mmc_pwrseq_simple_post_power_on,
->> +       .power_off = mmc_pwrseq_simple_power_off,
->> +       .free = mmc_pwrseq_simple_free,
->> +};
->> +
->> +static const struct of_device_id mmc_pwrseq_simple_of_match[] = {
->> +       { .compatible = "mmc-pwrseq-simple",},
->> +       {/* sentinel */},
->> +};
->> +
->> +static int mmc_pwrseq_simple_probe(struct platform_device *pdev)
->> +{
->> +       struct mmc_pwrseq_simple *pwrseq;
->> +       struct device *dev = &pdev->dev;
->> +
->> +       pwrseq = devm_kzalloc(dev, sizeof(*pwrseq), GFP_KERNEL);
->> +       if (!pwrseq)
->> +               return ERR_PTR(-ENOMEM);
->> +
->> +       pwrseq->pwrseq.dev = dev;
->>          pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
->>
->> -       return &pwrseq->pwrseq;
->> -clk_put:
->> -       if (!IS_ERR(pwrseq->ext_clk))
->> -               clk_put(pwrseq->ext_clk);
->> -free:
->> -       kfree(pwrseq);
->> -       return ERR_PTR(ret);
->> +       return mmc_pwrseq_register(&pwrseq->pwrseq);
->>   }
->> +
->> +
->> +static struct platform_driver mmc_pwrseq_simple_driver = {
->> +       .probe = mmc_pwrseq_simple_probe,
->> +       .driver = {
->> +               .name = "pwrseq_simple",
->> +               .of_match_table = mmc_pwrseq_simple_of_match,
->> +       },
->> +};
->> +
->> +builtin_platform_driver(mmc_pwrseq_simple_driver);
->> --
->> 1.9.1
->>
+> 
+> License all newly created files under GPLv2/X11.
+> 
+> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
+> ---
+>  .../devicetree/bindings/arm/marvell,kirkwood.txt   |   3 +-
+>  arch/arm/boot/dts/Makefile                         |   4 +-
+>  .../boot/dts/kirkwood-linkstation-duo-6281.dtsi    | 185 +++++++++++++
+>  arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts  |  57 ++++
+>  arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts   | 113 ++++++++
+>  arch/arm/boot/dts/kirkwood-linkstation.dtsi        | 202 ++++++++++++++
+>  arch/arm/boot/dts/kirkwood-lswxl.dts               | 301 ---------------------
+>  7 files changed, 561 insertions(+), 304 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi
+>  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts
+>  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts
+>  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation.dtsi
+>  delete mode 100644 arch/arm/boot/dts/kirkwood-lswxl.dts
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+> index 5171ad8..c7f8e3e 100644
+> --- a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+> +++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+> @@ -19,9 +19,10 @@ SoC. Currently known SoC compatibles are:
+>  And in addition, the compatible shall be extended with the specific
+>  board. Currently known boards are:
+>  
+> +"buffalo,linkstation-lswsxl"
+> +"buffalo,linkstation-lswxl"
+>  "buffalo,lschlv2"
+>  "buffalo,lswvl"
+> -"buffalo,lswxl"
+>  "buffalo,lsxhl"
+>  "buffalo,lsxl"
+>  "dlink,dns-320"
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 30bbc37..6dff6af 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -183,9 +183,9 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
+>  	kirkwood-is2.dtb \
+>  	kirkwood-km_kirkwood.dtb \
+>  	kirkwood-laplug.dtb \
+> +	kirkwood-linkstation-lswsxl.dtb \
+> +	kirkwood-linkstation-lswxl.dtb \
+>  	kirkwood-lschlv2.dtb \
+> -	kirkwood-lswvl.dtb \
+> -	kirkwood-lswxl.dtb \
+>  	kirkwood-lsxhl.dtb \
+>  	kirkwood-mplcec4.dtb \
+>  	kirkwood-mv88f6281gtw-ge.dtb \
+> diff --git a/arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi b/arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi
+> new file mode 100644
+> index 0000000..d83ae8e
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi
+> @@ -0,0 +1,185 @@
+> +/*
+> + * Device Tree common file for kirkwood-6281 based 2-Bay Buffalo Linkstation
+> + *
+> + * Copyright (C) 2015, 2016
+> + * Roger Shimizu <rogershimizu@gmail.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +#include "kirkwood.dtsi"
+> +#include "kirkwood-6281.dtsi"
+> +#include "kirkwood-linkstation.dtsi"
+> +
+> +/ {
+> +	ocp at f1000000 {
+> +		pinctrl: pin-controller at 10000 {
+> +			pmx_power_hdd0: pmx-power-hdd0 {
+> +				marvell,pins = "mpp28";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_power_hdd1: pmx-power-hdd1 {
+> +				marvell,pins = "mpp29";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_usb_vbus: pmx-usb-vbus {
+> +				marvell,pins = "mpp37";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_alarm: pmx-led-alarm {
+> +				marvell,pins = "mpp49";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_function_red: pmx-led-function-red {
+> +				marvell,pins = "mpp34";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_function_blue: pmx-led-function-blue {
+> +				marvell,pins = "mpp36";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_info: pmx-led-info {
+> +				marvell,pins = "mpp38";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_power: pmx-led-power {
+> +				marvell,pins = "mpp39";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_button_function: pmx-button-function {
+> +				marvell,pins = "mpp41";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_power_switch: pmx-power-switch {
+> +				marvell,pins = "mpp42";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_power_auto_switch: pmx-power-auto-switch {
+> +				marvell,pins = "mpp43";
+> +				marvell,function = "gpio";
+> +			};
+> +		};
+> +
+> +		sata at 80000 {
+> +			nr-ports = <2>;
+> +		};
+> +	};
+> +
+> +	gpio_keys {
+> +		function-button {
+> +			gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
+> +		};
+> +
+> +		power-on-switch {
+> +			gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
+> +		};
+> +
+> +		power-auto-switch {
+> +			gpios = <&gpio1 11 GPIO_ACTIVE_LOW>;
+> +		};
+> +	};
+> +
+> +	gpio_leds {
+> +		red-alarm-led {
+> +			label = "red:alarm";
+> +			gpios = <&gpio1 17 GPIO_ACTIVE_LOW>;
+> +		};
+> +
+> +		red-function-led {
+> +			label = "red:function";
+> +			gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		amber-info-led {
+> +			label = "amber:info";
+> +			gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
+> +		};
+> +
+> +		blue-function-led {
+> +			label = "blue:function";
+> +			gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
+> +		};
+> +
+> +		blue-power-led {
+> +			label = "blue:power";
+> +			gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
+> +		};
+> +	};
+> +
+> +	regulators {
+> +		pinctrl-0 = <&pmx_power_hdd0 &pmx_power_hdd1 &pmx_usb_vbus>;
+> +
+> +		usb_power: regulator at 1 {
+> +			gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		hdd_power0: regulator at 2 {
+> +			gpio = <&gpio0 28 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		hdd_power1: regulator at 3 {
+> +			compatible = "regulator-fixed";
+> +			reg = <3>;
+> +			regulator-name = "HDD1 Power";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			enable-active-high;
+> +			regulator-always-on;
+> +			regulator-boot-on;
+> +			gpio = <&gpio0 29 GPIO_ACTIVE_HIGH>;
+> +		};
+> +	};
+> +};
+> +
+> +&mdio {
+> +	status = "okay";
+> +
+> +	ethphy1: ethernet-phy at 8 {
+> +		device_type = "ethernet-phy";
+> +		reg = <8>;
+> +	};
+> +};
+> +
+> +&eth1 {
+> +	status = "okay";
+> +
+> +	ethernet1-port at 0 {
+> +		phy-handle = <&ethphy1>;
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts b/arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts
+> new file mode 100644
+> index 0000000..4b64501
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts
+> @@ -0,0 +1,57 @@
+> +/*
+> + * Device Tree file for Buffalo Linkstation LS-WSXL
+> + *
+> + * Copyright (C) 2015, 2016
+> + * Roger Shimizu <rogershimizu@gmail.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "kirkwood-linkstation-duo-6281.dtsi"
+> +
+> +/ {
+> +	model = "Buffalo Linkstation LS-WSXL";
+> +	compatible = "buffalo,lswsxl", "marvell,kirkwood-88f6281", "marvell,kirkwood";
+> +
+> +	memory { /* 128 MB */
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x8000000>;
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts b/arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts
+> new file mode 100644
+> index 0000000..027f622
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts
+> @@ -0,0 +1,113 @@
+> +/*
+> + * Device Tree file for Buffalo Linkstation LS-WXL
+> + *
+> + * Copyright (C) 2015, 2016
+> + * Roger Shimizu <rogershimizu@gmail.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "kirkwood-linkstation-duo-6281.dtsi"
+> +
+> +/ {
+> +	model = "Buffalo Linkstation LS-WXL";
+> +	compatible = "buffalo,lswxl", "marvell,kirkwood-88f6281", "marvell,kirkwood";
+> +
+> +	memory { /* 128 MB */
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x8000000>;
+> +	};
+> +
+> +	ocp at f1000000 {
+> +		pinctrl: pin-controller at 10000 {
+> +			pmx_led_hdderr0: pmx-led-hdderr0 {
+> +				marvell,pins = "mpp8";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_hdderr1: pmx-led-hdderr1 {
+> +				marvell,pins = "mpp46";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_fan_lock: pmx-fan-lock {
+> +				marvell,pins = "mpp40";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_fan_high: pmx-fan-high {
+> +				marvell,pins = "mpp47";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_fan_low: pmx-fan-low {
+> +				marvell,pins = "mpp48";
+> +				marvell,function = "gpio";
+> +			};
+> +		};
+> +	};
+> +
+> +	gpio_leds {
+> +		pinctrl-0 = <&pmx_led_function_red &pmx_led_alarm
+> +			     &pmx_led_info &pmx_led_power
+> +			     &pmx_led_function_blue
+> +			     &pmx_led_hdderr0
+> +			     &pmx_led_hdderr1>;
+> +
+> +		red-hdderr0-led {
+> +			label = "red:hdderr0";
+> +			gpios = <&gpio0 8 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		red-hdderr1-led {
+> +			label = "red:hdderr1";
+> +			gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
+> +		};
+> +	};
+> +
+> +	gpio_fan {
+> +		compatible = "gpio-fan";
+> +		pinctrl-0 = <&pmx_fan_low &pmx_fan_high &pmx_fan_lock>;
+> +		pinctrl-names = "default";
+> +		gpios = <&gpio1 16 GPIO_ACTIVE_LOW
+> +			 &gpio1 15 GPIO_ACTIVE_LOW>;
+> +
+> +		gpio-fan,speed-map = <0 3
+> +				1500 2
+> +				3250 1
+> +				5000 0>;
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/kirkwood-linkstation.dtsi b/arch/arm/boot/dts/kirkwood-linkstation.dtsi
+> new file mode 100644
+> index 0000000..69061b6
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/kirkwood-linkstation.dtsi
+> @@ -0,0 +1,202 @@
+> +/*
+> + * Device Tree common file for kirkwood based Buffalo Linkstation
+> + *
+> + * Copyright (C) 2015, 2016
+> + * Roger Shimizu <rogershimizu@gmail.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/ {
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200n8 earlyprintk";
+> +		stdout-path = &uart0;
+> +	};
+> +
+> +	mbus {
+> +		pcie-controller {
+> +			status = "okay";
+> +			pcie at 1,0 {
+> +				status = "okay";
+> +			};
+> +		};
+> +	};
+> +
+> +	ocp at f1000000 {
+> +		pinctrl: pin-controller at 10000 {
+> +			pmx_power_hdd0: pmx-power-hdd0 {
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_usb_vbus: pmx-usb-vbus {
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_alarm: pmx-led-alarm {
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_function_red: pmx-led-function-red {
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_function_blue: pmx-led-function-blue {
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_info: pmx-led-info {
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_power: pmx-led-power {
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_button_function: pmx-button-function {
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_power_switch: pmx-power-switch {
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_power_auto_switch: pmx-power-auto-switch {
+> +				marvell,function = "gpio";
+> +			};
+> +		};
+> +
+> +		serial at 12000 {
+> +			status = "okay";
+> +		};
+> +
+> +		sata at 80000 {
+> +			status = "okay";
+> +			nr-ports = <1>;
+> +		};
+> +
+> +		spi at 10600 {
+> +			status = "okay";
+> +
+> +			m25p40 at 0 {
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				compatible = "st,m25p40", "jedec,spi-nor";
+> +				reg = <0>;
+> +				spi-max-frequency = <25000000>;
+> +				mode = <0>;
+> +
+> +				partition at 0 {
+> +					reg = <0x0 0x60000>;
+> +					label = "uboot";
+> +					read-only;
+> +				};
+> +
+> +				partition at 60000 {
+> +					reg = <0x60000 0x10000>;
+> +					label = "dtb";
+> +					read-only;
+> +				};
+> +
+> +				partition at 70000 {
+> +					reg = <0x70000 0x10000>;
+> +					label = "uboot_env";
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-0 = <&pmx_button_function &pmx_power_switch
+> +			     &pmx_power_auto_switch>;
+> +		pinctrl-names = "default";
+> +
+> +		function-button {
+> +			label = "Function Button";
+> +			linux,code = <KEY_OPTION>;
+> +		};
+> +
+> +		power-on-switch {
+> +			label = "Power-on Switch";
+> +			linux,code = <KEY_RESERVED>;
+> +			linux,input-type = <5>;
+> +		};
+> +
+> +		power-auto-switch {
+> +			label = "Power-auto Switch";
+> +			linux,code = <KEY_ESC>;
+> +			linux,input-type = <5>;
+> +		};
+> +	};
+> +
+> +	gpio_leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-0 = <&pmx_led_function_red &pmx_led_alarm
+> +			     &pmx_led_info &pmx_led_power
+> +			     &pmx_led_function_blue>;
+> +		pinctrl-names = "default";
+> +	};
+> +
+> +	restart_poweroff {
+> +		compatible = "restart-poweroff";
+> +	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-0 = <&pmx_power_hdd0 &pmx_usb_vbus>;
+> +		pinctrl-names = "default";
+> +
+> +		usb_power: regulator at 1 {
+> +			compatible = "regulator-fixed";
+> +			reg = <1>;
+> +			regulator-name = "USB Power";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			enable-active-high;
+> +			regulator-always-on;
+> +			regulator-boot-on;
+> +		};
+> +
+> +		hdd_power0: regulator at 2 {
+> +			compatible = "regulator-fixed";
+> +			reg = <2>;
+> +			regulator-name = "HDD0 Power";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			enable-active-high;
+> +			regulator-always-on;
+> +			regulator-boot-on;
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/kirkwood-lswxl.dts b/arch/arm/boot/dts/kirkwood-lswxl.dts
+> deleted file mode 100644
+> index f5db16a..0000000
+> --- a/arch/arm/boot/dts/kirkwood-lswxl.dts
+> +++ /dev/null
+> @@ -1,301 +0,0 @@
+> -/*
+> - * Device Tree file for Buffalo Linkstation LS-WXL/WSXL
+> - *
+> - * Copyright (C) 2015, rogershimizu at gmail.com
+> - *
+> - * This program is free software; you can redistribute it and/or
+> - * modify it under the terms of the GNU General Public License
+> - * as published by the Free Software Foundation; either version
+> - * 2 of the License, or (at your option) any later version.
+> - */
+> -
+> -/dts-v1/;
+> -
+> -#include "kirkwood.dtsi"
+> -#include "kirkwood-6281.dtsi"
+> -
+> -/ {
+> -	model = "Buffalo Linkstation LS-WXL/WSXL";
+> -	compatible = "buffalo,lswxl", "marvell,kirkwood-88f6281", "marvell,kirkwood";
+> -
+> -	memory { /* 128 MB */
+> -		device_type = "memory";
+> -		reg = <0x00000000 0x8000000>;
+> -	};
+> -
+> -	chosen {
+> -		bootargs = "console=ttyS0,115200n8 earlyprintk";
+> -		stdout-path = &uart0;
+> -	};
+> -
+> -	mbus {
+> -		pcie-controller {
+> -			status = "okay";
+> -			pcie at 1,0 {
+> -				status = "okay";
+> -			};
+> -		};
+> -	};
+> -
+> -	ocp at f1000000 {
+> -		pinctrl: pin-controller at 10000 {
+> -			pmx_power_hdd0: pmx-power-hdd0 {
+> -				marvell,pins = "mpp28";
+> -				marvell,function = "gpio";
+> -			};
+> -			pmx_power_hdd1: pmx-power-hdd1 {
+> -				marvell,pins = "mpp29";
+> -				marvell,function = "gpio";
+> -			};
+> -			pmx_usb_vbus: pmx-usb-vbus {
+> -				marvell,pins = "mpp37";
+> -				marvell,function = "gpio";
+> -			};
+> -			pmx_fan_high: pmx-fan-high {
+> -				marvell,pins = "mpp47";
+> -				marvell,function = "gpio";
+> -			};
+> -			pmx_fan_low: pmx-fan-low {
+> -				marvell,pins = "mpp48";
+> -				marvell,function = "gpio";
+> -			};
+> -			pmx_led_hdderr0: pmx-led-hdderr0 {
+> -				marvell,pins = "mpp8";
+> -				marvell,function = "gpio";
+> -			};
+> -			pmx_led_hdderr1: pmx-led-hdderr1 {
+> -				marvell,pins = "mpp46";
+> -				marvell,function = "gpio";
+> -			};
+> -			pmx_led_alarm: pmx-led-alarm {
+> -				marvell,pins = "mpp49";
+> -				marvell,function = "gpio";
+> -			};
+> -			pmx_led_function_red: pmx-led-function-red {
+> -				marvell,pins = "mpp34";
+> -				marvell,function = "gpio";
+> -			};
+> -			pmx_led_function_blue: pmx-led-function-blue {
+> -				marvell,pins = "mpp36";
+> -				marvell,function = "gpio";
+> -			};
+> -			pmx_led_info: pmx-led-info {
+> -				marvell,pins = "mpp38";
+> -				marvell,function = "gpio";
+> -			};
+> -			pmx_led_power: pmx-led-power {
+> -				marvell,pins = "mpp39";
+> -				marvell,function = "gpio";
+> -			};
+> -			pmx_fan_lock: pmx-fan-lock {
+> -				marvell,pins = "mpp40";
+> -				marvell,function = "gpio";
+> -			};
+> -			pmx_button_function: pmx-button-function {
+> -				marvell,pins = "mpp41";
+> -				marvell,function = "gpio";
+> -			};
+> -			pmx_power_switch: pmx-power-switch {
+> -				marvell,pins = "mpp42";
+> -				marvell,function = "gpio";
+> -			};
+> -			pmx_power_auto_switch: pmx-power-auto-switch {
+> -				marvell,pins = "mpp43";
+> -				marvell,function = "gpio";
+> -			};
+> -		};
+> -
+> -		serial at 12000 {
+> -			status = "okay";
+> -		};
+> -
+> -		sata at 80000 {
+> -			status = "okay";
+> -			nr-ports = <2>;
+> -		};
+> -
+> -		spi at 10600 {
+> -			status = "okay";
+> -
+> -			m25p40 at 0 {
+> -				#address-cells = <1>;
+> -				#size-cells = <1>;
+> -				compatible = "st,m25p40", "jedec,spi-nor";
+> -				reg = <0>;
+> -				spi-max-frequency = <25000000>;
+> -				mode = <0>;
+> -
+> -				partition at 0 {
+> -					reg = <0x0 0x60000>;
+> -					label = "uboot";
+> -					read-only;
+> -				};
+> -
+> -				partition at 60000 {
+> -					reg = <0x60000 0x10000>;
+> -					label = "dtb";
+> -					read-only;
+> -				};
+> -
+> -				partition at 70000 {
+> -					reg = <0x70000 0x10000>;
+> -					label = "uboot_env";
+> -				};
+> -			};
+> -		};
+> -	};
+> -
+> -	gpio_keys {
+> -		compatible = "gpio-keys";
+> -		#address-cells = <1>;
+> -		#size-cells = <0>;
+> -		pinctrl-0 = <&pmx_button_function &pmx_power_switch
+> -			     &pmx_power_auto_switch>;
+> -		pinctrl-names = "default";
+> -
+> -		button at 1 {
+> -			label = "Function Button";
+> -			linux,code = <KEY_OPTION>;
+> -			gpios = <&gpio1 41 GPIO_ACTIVE_LOW>;
+> -		};
+> -
+> -		button at 2 {
+> -			label = "Power-on Switch";
+> -			linux,code = <KEY_RESERVED>;
+> -			linux,input-type = <5>;
+> -			gpios = <&gpio1 42 GPIO_ACTIVE_LOW>;
+> -		};
+> -
+> -		button at 3 {
+> -			label = "Power-auto Switch";
+> -			linux,code = <KEY_ESC>;
+> -			linux,input-type = <5>;
+> -			gpios = <&gpio1 43 GPIO_ACTIVE_LOW>;
+> -		};
+> -	};
+> -
+> -	gpio_leds {
+> -		compatible = "gpio-leds";
+> -		pinctrl-0 = <&pmx_led_function_red &pmx_led_alarm
+> -			     &pmx_led_info &pmx_led_power
+> -			     &pmx_led_function_blue
+> -			     &pmx_led_hdderr0
+> -			     &pmx_led_hdderr1>;
+> -		pinctrl-names = "default";
+> -
+> -		led at 1 {
+> -			label = "lswxl:blue:func";
+> -			gpios = <&gpio1 36 GPIO_ACTIVE_LOW>;
+> -		};
+> -
+> -		led at 2 {
+> -			label = "lswxl:red:alarm";
+> -			gpios = <&gpio1 49 GPIO_ACTIVE_LOW>;
+> -		};
+> -
+> -		led at 3 {
+> -			label = "lswxl:amber:info";
+> -			gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
+> -		};
+> -
+> -		led at 4 {
+> -			label = "lswxl:blue:power";
+> -			gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
+> -		};
+> -
+> -		led at 5 {
+> -			label = "lswxl:red:func";
+> -			gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
+> -			default-state = "keep";
+> -		};
+> -
+> -		led at 6 {
+> -			label = "lswxl:red:hdderr0";
+> -			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
+> -		};
+> -
+> -		led at 7 {
+> -			label = "lswxl:red:hdderr1";
+> -			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
+> -		};
+> -	};
+> -
+> -	gpio_fan {
+> -		compatible = "gpio-fan";
+> -		pinctrl-0 = <&pmx_fan_low &pmx_fan_high &pmx_fan_lock>;
+> -		pinctrl-names = "default";
+> -
+> -		gpios = <&gpio0 47 GPIO_ACTIVE_LOW
+> -			 &gpio0 48 GPIO_ACTIVE_LOW>;
+> -
+> -		gpio-fan,speed-map = <0 3
+> -				1500 2
+> -				3250 1
+> -				5000 0>;
+> -
+> -		alarm-gpios = <&gpio1 49 GPIO_ACTIVE_HIGH>;
+> -	};
+> -
+> -	restart_poweroff {
+> -		compatible = "restart-poweroff";
+> -	};
+> -
+> -	regulators {
+> -		compatible = "simple-bus";
+> -		#address-cells = <1>;
+> -		#size-cells = <0>;
+> -		pinctrl-0 = <&pmx_power_hdd0 &pmx_power_hdd1 &pmx_usb_vbus>;
+> -		pinctrl-names = "default";
+> -
+> -		usb_power: regulator at 1 {
+> -			compatible = "regulator-fixed";
+> -			reg = <1>;
+> -			regulator-name = "USB Power";
+> -			regulator-min-microvolt = <5000000>;
+> -			regulator-max-microvolt = <5000000>;
+> -			enable-active-high;
+> -			regulator-always-on;
+> -			regulator-boot-on;
+> -			gpio = <&gpio0 37 GPIO_ACTIVE_HIGH>;
+> -		};
+> -		hdd_power0: regulator at 2 {
+> -			compatible = "regulator-fixed";
+> -			reg = <2>;
+> -			regulator-name = "HDD0 Power";
+> -			regulator-min-microvolt = <5000000>;
+> -			regulator-max-microvolt = <5000000>;
+> -			enable-active-high;
+> -			regulator-always-on;
+> -			regulator-boot-on;
+> -			gpio = <&gpio0 28 GPIO_ACTIVE_HIGH>;
+> -		};
+> -		hdd_power1: regulator at 3 {
+> -			compatible = "regulator-fixed";
+> -			reg = <3>;
+> -			regulator-name = "HDD1 Power";
+> -			regulator-min-microvolt = <5000000>;
+> -			regulator-max-microvolt = <5000000>;
+> -			enable-active-high;
+> -			regulator-always-on;
+> -			regulator-boot-on;
+> -			gpio = <&gpio0 29 GPIO_ACTIVE_HIGH>;
+> -		};
+> -	};
+> -};
+> -
+> -&mdio {
+> -	status = "okay";
+> -
+> -	ethphy1: ethernet-phy at 8 {
+> -		device_type = "ethernet-phy";
+> -		reg = <8>;
+> -	};
+> -};
+> -
+> -&eth1 {
+> -	status = "okay";
+> -
+> -	ethernet1-port at 0 {
+> -		phy-handle = <&ethphy1>;
+> -	};
+> -};
+> -- 
+> 2.1.4
+> 
