@@ -1,148 +1,208 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Tue, 19 Jan 2016 14:51:32 +0000
-Subject: [RFC 1/9] clk: bcm2835: add basic device tree support for per clock
- settings
+Date: Tue, 19 Jan 2016 14:51:33 +0000
+Subject: [RFC 2/9] clk: bcm2835: add support for parent selection in DT
 In-Reply-To: <1453215100-2382-1-git-send-email-kernel@martin.sperl.org>
 References: <1453215100-2382-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1453215100-2382-2-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1453215100-2382-3-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-Add basic device tree support for per clock settings taken from the
-device tree.
+Allow for a per clock custom selection of clocks in the device tree.
+
+Basic setup in dt looks like this:
+  clock at BCM2835_CLOCK_PCM {
+    reg = <BCM2835_CLOCK_PCM>;
+    parent-clock-names = "xosc", "plld_per", "plla_per", "pll_aux_per";
+  };
+
+Special care had to be taken when only a single clock is assigned,
+as then set_parent_rate is not called - so the register has to get
+set up immediately.
+
+To allow for custom order of the clocks (giving preference)
+an additional mapping between IDs is required when handling
+get/set parent.
+
+The default parent clocks are assumed to be all available clocks
+against which the "selected" parents are checked.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- drivers/clk/bcm/clk-bcm2835.c |   72 +++++++++++++++++++++++++++++++++++++----
- 1 file changed, 66 insertions(+), 6 deletions(-)
+ drivers/clk/bcm/clk-bcm2835.c |  124 +++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 119 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 637f8ae..1c714d0 100644
+index 1c714d0..8fccbd3 100644
 --- a/drivers/clk/bcm/clk-bcm2835.c
 +++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -1757,8 +1757,38 @@ static const struct clk_ops bcm2835_vpu_clock_clk_ops = {
- 	.get_parent = bcm2835_clock_get_parent,
- };
+@@ -702,6 +702,7 @@ struct bcm2835_clock_data {
  
-+static struct device_node *bcm2835_find_dt_node(
-+	struct bcm2835_cprman *cprman, int id)
+ 	const char *const *parents;
+ 	int num_mux_parents;
++	u8 *parents_idx;
+ 
+ 	u32 ctl_reg;
+ 	u32 div_reg;
+@@ -1706,15 +1707,30 @@ static int bcm2835_clock_determine_rate(struct clk_hw *hw,
+ 	return 0;
+ }
+ 
++static int _bcm2835_clk_set_parent(struct bcm2835_cprman *cprman,
++				   const struct bcm2835_clock_data *data,
++				   u8 index)
 +{
-+	struct device *dev = cprman->dev;
-+	struct device_node *nc, *ncp = dev->of_node;
-+	u32 value;
-+	int err;
++	u8 src;
 +
-+	/* if no dt, then use the constant version */
-+	if (!ncp)
-+		return NULL;
++	/* map the index if we got a map */
++	if (data->parents_idx)
++		index = data->parents_idx[index];
 +
-+	/* try to find the devicetree with the id */
-+	for_each_available_child_of_node(ncp, nc) {
-+		/* get reg value */
-+		err = of_property_read_u32(nc, "reg", &value);
-+		if (err) {
-+			dev_err(dev, "%s has no valid 'reg' property (%d)\n",
-+				nc->full_name, err);
-+		} else {
-+			if (value == id)
-+				return nc;
-+		}
-+	}
++	/* calc the source */
++	src = (index << CM_SRC_SHIFT) & CM_SRC_MASK;
 +
-+	/* not found */
-+	return NULL;
++	cprman_write(cprman, data->ctl_reg, src);
++	return 0;
 +}
 +
- static struct clk *bcm2835_register_pll(struct bcm2835_cprman *cprman,
--					const struct bcm2835_pll_data *data)
-+					const struct bcm2835_pll_data *data,
-+					size_t id)
+ static int bcm2835_clock_set_parent(struct clk_hw *hw, u8 index)
  {
- 	struct bcm2835_pll *pll;
- 	struct clk_init_data init;
-@@ -1785,7 +1815,8 @@ static struct clk *bcm2835_register_pll(struct bcm2835_cprman *cprman,
+ 	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
+ 	struct bcm2835_cprman *cprman = clock->cprman;
+ 	const struct bcm2835_clock_data *data = clock->data;
+-	u8 src = (index << CM_SRC_SHIFT) & CM_SRC_MASK;
  
- static struct clk *
- bcm2835_register_pll_divider(struct bcm2835_cprman *cprman,
--			     const struct bcm2835_pll_divider_data *data)
-+			     const struct bcm2835_pll_divider_data *data,
-+			     size_t id)
- {
- 	struct bcm2835_pll_divider *divider;
- 	struct clk_init_data init;
-@@ -1843,14 +1874,42 @@ bcm2835_register_pll_divider(struct bcm2835_cprman *cprman,
+-	cprman_write(cprman, data->ctl_reg, src);
+-	return 0;
++	return _bcm2835_clk_set_parent(cprman, data, index);
+ }
+ 
+ static u8 bcm2835_clock_get_parent(struct clk_hw *hw)
+@@ -1723,10 +1739,23 @@ static u8 bcm2835_clock_get_parent(struct clk_hw *hw)
+ 	struct bcm2835_cprman *cprman = clock->cprman;
+ 	const struct bcm2835_clock_data *data = clock->data;
+ 	u32 src = cprman_read(cprman, data->ctl_reg);
++	int i;
+ 
+-	return (src & CM_SRC_MASK) >> CM_SRC_SHIFT;
+-}
++	/* translate src to default index */
++	src = (src & CM_SRC_MASK) >> CM_SRC_SHIFT;
++
++	/* without overrides overrides return the value */
++	if (!data->parents_idx)
++		return src;
+ 
++	/* otherwise iterate over fields to find it */
++	for (i = 0; i < data->num_mux_parents ; i++)
++		if (data->parents_idx[i] == src)
++			return i;
++
++	/* if not found */
++	return -EINVAL;
++}
+ 
+ static const struct clk_ops bcm2835_clock_clk_ops = {
+ 	.is_prepared = bcm2835_clock_is_on,
+@@ -1874,6 +1903,88 @@ bcm2835_register_pll_divider(struct bcm2835_cprman *cprman,
  	return clk;
  }
  
-+static const struct bcm2835_clock_data *bcm2835_register_clock_of(
++static void bcm2835_register_clock_of_parents(
 +	struct bcm2835_cprman *cprman,
-+	const struct bcm2835_clock_data *data_orig,
-+	size_t id)
++	struct bcm2835_clock_data *data,
++	struct device_node *nc)
 +{
 +	struct device *dev = cprman->dev;
-+	struct device_node *nc;
-+	struct bcm2835_clock_data *data;
++	u8 *parents_idx;
++	const char **parents;
++	const char *name;
++	int err, names, i, j;
 +
-+	/* find the corresponding dt-node */
-+	nc = bcm2835_find_dt_node(cprman, id);
-+	if (!nc)
-+		return data_orig;
++	/* check number of strings */
++	names = of_property_count_strings(nc, "parent-clock-names");
++	if (names < 0)
++		return;
++	if (names > data->num_mux_parents) {
++		dev_err(dev,
++			"%s: dt-property parent-clock-names has more entries (%d) than available parent clocks (%d)\n",
++			of_node_full_name(nc), names, data->num_mux_parents);
++		return;
++	}
 +
-+	/* create a copy of data */
-+	data = devm_kmalloc(dev, sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return data_orig;
-+	memcpy(data, data_orig, sizeof(*data));
++	/* allocate parents */
++	parents = devm_kzalloc(dev, sizeof(*parents) * names, GFP_KERNEL);
++	if (!parents)
++		return;
 +
-+	/* and return the result */
-+	return data;
++	/* allocate parents index */
++	parents_idx = devm_kzalloc(dev, sizeof(*parents_idx) * names,
++				   GFP_KERNEL);
++	if (!parents_idx) {
++		devm_kfree(dev, parents);
++		return;
++	}
++
++	/* and check the parents against list of allowed parents */
++	for (i = 0; i < names; i++) {
++		/* get the string */
++		err = of_property_read_string_index(nc, "parent-clock-names",
++						    i, &name);
++		if (err) {
++			devm_kfree(dev, parents_idx);
++			devm_kfree(dev, parents);
++			dev_err(dev,
++				"%s: could not get parent-clock-names[%d] - %d\n",
++				of_node_full_name(nc), i, err);
++			return;
++		}
++		/* check against available parents - the default list */
++		for (j = 0; j < data->num_mux_parents; j++) {
++			if (strcmp(data->parents[j],  name) == 0) {
++				parents[i] = data->parents[j];
++				parents_idx[i] = j;
++				break;
++			}
++		}
++		/* if there was no match */
++		if (!parents[i]) {
++			devm_kfree(dev, parents_idx);
++			devm_kfree(dev, parents);
++			dev_err(dev,
++				"%s: could not find %s in list of allowed parent clocks\n",
++				of_node_full_name(nc), name);
++			return;
++		}
++	}
++
++	/* finally assign it */
++	data->num_mux_parents = names;
++	data->parents = parents;
++	data->parents_idx = parents_idx;
++
++	/*
++	 * if there is only one parent, then use that one immediately,
++	 * as with only one parent clock_set_parent does not get called
++	 * and it is assumed that everything is set up, so
++	 * we need to do that before anything else...
++	 */
++	if (names == 1)
++		_bcm2835_clk_set_parent(cprman, data, 0);
 +}
 +
- static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
--					  const struct bcm2835_clock_data *data)
-+					  const struct bcm2835_clock_data *data,
-+					  size_t id)
- {
- 	struct bcm2835_clock *clock;
- 	struct clk_init_data init;
- 	const char *parents[1 << CM_SRC_BITS];
- 	size_t i;
+ static const struct bcm2835_clock_data *bcm2835_register_clock_of(
+ 	struct bcm2835_cprman *cprman,
+ 	const struct bcm2835_clock_data *data_orig,
+@@ -1894,6 +2005,9 @@ static const struct bcm2835_clock_data *bcm2835_register_clock_of(
+ 		return data_orig;
+ 	memcpy(data, data_orig, sizeof(*data));
  
-+	/* update default values from the device_tree */
-+	data = bcm2835_register_clock_of(cprman, data, id);
++	/* apply overrides */
++	bcm2835_register_clock_of_parents(cprman, data, nc);
 +
- 	/*
- 	 * Replace our "xosc" references with the oscillator's
- 	 * actual name.
-@@ -1887,7 +1946,8 @@ static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
+ 	/* and return the result */
+ 	return data;
  }
- 
- static struct clk *bcm2835_register_gate(struct bcm2835_cprman *cprman,
--					 const struct bcm2835_gate_data *data)
-+					 const struct bcm2835_gate_data *data,
-+					 size_t id)
- {
- 	return clk_register_gate(cprman->dev, data->name, data->parent,
- 				 CLK_IGNORE_UNUSED | CLK_SET_RATE_GATE,
-@@ -1896,7 +1956,7 @@ static struct clk *bcm2835_register_gate(struct bcm2835_cprman *cprman,
- }
- 
- typedef struct clk *(*bcm2835_clk_register)(struct bcm2835_cprman *cprman,
--					    const void *data);
-+					    const void *data, size_t id);
- struct bcm2835_clk_desc {
- 	bcm2835_clk_register clk_register;
- 	const void *data;
-@@ -2007,7 +2067,7 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
- 	for (i = 0; i < asize; i++) {
- 		desc = &clk_desc_array[i];
- 		if (desc->clk_register && desc->data)
--			clks[i] = desc->clk_register(cprman, desc->data);
-+			clks[i] = desc->clk_register(cprman, desc->data, i);
- 	}
- 
- 	return of_clk_add_provider(dev->of_node, of_clk_src_onecell_get,
 -- 
 1.7.10.4
