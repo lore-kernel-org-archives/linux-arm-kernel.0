@@ -1,54 +1,53 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 19 Jan 2016 21:45:51 +0300
-Subject: [PATCH 3/5] ARM: OMAP2+: Fix save_secure_ram_context for rodata
-In-Reply-To: <1453225734-16993-4-git-send-email-tony@atomide.com>
-References: <1453225734-16993-1-git-send-email-tony@atomide.com>
- <1453225734-16993-4-git-send-email-tony@atomide.com>
-Message-ID: <569E845F.7080001@cogentembedded.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 19 Jan 2016 20:03:01 +0100
+Subject: [LINUX PATCH 2/5] Documentation: mmc: Updated the binding doc for
+ Arasan SDHCI.
+In-Reply-To: <20160119171940.GA7207@rob-hp-laptop>
+References: <1453213055-35563-1-git-send-email-lakshmis@xilinx.com>
+ <1453213055-35563-2-git-send-email-lakshmis@xilinx.com>
+ <20160119171940.GA7207@rob-hp-laptop>
+Message-ID: <569E8865.1030504@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 19.1.2016 18:19, Rob Herring wrote:
+> On Tue, Jan 19, 2016 at 07:47:32PM +0530, P L Sai Krishna wrote:
+>> This patch adds broken-tuning property to the binding
+>> doc for Arasan SDHCI.
+>>
+>> Signed-off-by: P L Sai Krishna <lakshmis@xilinx.com>
+>> ---
+>>  Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+>> index da541c3..2088d9f 100644
+>> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+>> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+>> @@ -17,6 +17,10 @@ Required Properties:
+>>    - interrupt-parent: Phandle for the interrupt controller that services
+>>  		      interrupts for this device.
+>>  
+>> +Optional Properties:
+>> +  - broken-tuning: Indicates tuning broken in Silicon 1.0 of
+>> +			  Zynq Ultrascale+ MPSoC.
+>> +
+> 
+> Make this a standard property.
+> 
+> Or use the compatible string to determine this. Si errata is exactly 
+> what they are for.
 
-On 01/19/2016 08:48 PM, Tony Lindgren wrote:
+I still think that having interface for runtime Silicon version
+detection in generic way is much better than using compatible strings
+for certain silicon version.
+The same board revisions can have different silicon versions.
 
-> We don't want to write to .text and we can move save_secure_ram_context
-> into .data as it all gets copied into SRAM anyways.
->
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Laura Abbott <labbott@redhat.com>
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Nishanth Menon <menon.nishanth@gmail.com>
-> Cc: Richard Woodruff <r-woodruff2@ti.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->   arch/arm/mach-omap2/sleep34xx.S | 10 ++++++++--
->   1 file changed, 8 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
-> index f7c7bf8..042e4fb 100644
-> --- a/arch/arm/mach-omap2/sleep34xx.S
-> +++ b/arch/arm/mach-omap2/sleep34xx.S
-> @@ -93,8 +93,12 @@ ENTRY(enable_omap3630_toggle_l2_on_restore)
->   	ldmfd	sp!, {pc}	@ restore regs and return
->   ENDPROC(enable_omap3630_toggle_l2_on_restore)
->
-> -	.text
-> -/* Function to call rom code to save secure ram context */
-> +/*
-> + * Function to call rom code to save secure ram context, This gets
+Asking secure monitor for this information and based on that setup
+quirks for this case would be preferred solution.
+I want to spend some time to share information about silicon via soc bus
+to user space and there should be similar way for sharing this
+information inside the kernel.
 
-    s/,/./?
-
-> + * relocated to SRAM, so it can be all in .data section. Otherwise
-> + * we need to initialize api_params separately.
-> + */
-> +	.data
->   	.align	3
->   ENTRY(save_secure_ram_context)
->   	stmfd	sp!, {r4 - r11, lr}	@ save registers on stack
-[...]
-
-MBR, Sergei
+Thanks,
+Michal
