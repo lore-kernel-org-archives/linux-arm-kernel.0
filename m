@@ -1,150 +1,195 @@
-From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Tue, 19 Jan 2016 21:12:52 +0800
-Subject: [Xen-devel] [PATCH v2 16/16] ARM64: XEN: Initialize Xen specific
- UEFI runtime services
-In-Reply-To: <alpine.DEB.2.02.1601181634070.9400@kaball.uk.xensource.com>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-17-git-send-email-zhaoshenglong@huawei.com>
- <alpine.DEB.2.02.1601181634070.9400@kaball.uk.xensource.com>
-Message-ID: <569E3654.90100@linaro.org>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 19 Jan 2016 14:11:15 +0100
+Subject: [PATCH V3 02/10] irqchip / GICv3: Add ACPI support for GICv3+
+ initialization
+In-Reply-To: <1453209083-3358-1-git-send-email-tn@semihalf.com>
+References: <1453209083-3358-1-git-send-email-tn@semihalf.com>
+Message-ID: <1453209083-3358-3-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+With the refator of gic_of_init(), GICv3/4 can be initialized
+by gic_init_bases() with gic distributor base address and gic
+redistributor region(s).
 
+So get the redistributor region base addresses from MADT GIC
+redistributor subtable, and the distributor base address from
+GICD subtable to init GICv3 irqchip in ACPI way.
 
-On 2016/1/19 1:03, Stefano Stabellini wrote:
-> On Fri, 15 Jan 2016, Shannon Zhao wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
->>
->> When running on Xen hypervisor, runtime services are supported through
->> hypercall. So call Xen specific function to initialize runtime services.
->>
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->
-> Thanks Shannon, much much better!  Just a couple of questions.
->
->
->>   arch/arm/xen/enlighten.c |  5 +++++
->>   arch/arm64/xen/Makefile  |  1 +
->>   arch/arm64/xen/efi.c     | 36 ++++++++++++++++++++++++++++++++++++
->>   drivers/xen/Kconfig      |  2 +-
->>   include/xen/xen-ops.h    |  1 +
->>   5 files changed, 44 insertions(+), 1 deletion(-)
->>   create mode 100644 arch/arm64/xen/efi.c
->>
->> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
->> index 485e117..84f27ec 100644
->> --- a/arch/arm/xen/enlighten.c
->> +++ b/arch/arm/xen/enlighten.c
->> @@ -414,6 +414,11 @@ static int __init xen_guest_init(void)
->>   	if (xen_initial_domain())
->>   		pvclock_gtod_register_notifier(&xen_pvclock_gtod_notifier);
->>
->> +	if (IS_ENABLED(CONFIG_XEN_EFI)) {
->> +		if (efi_enabled(EFI_PARAVIRT))
->> +			xen_efi_runtime_setup();
->> +	}
->> +
->>   	return 0;
->>   }
->>   early_initcall(xen_guest_init);
->> diff --git a/arch/arm64/xen/Makefile b/arch/arm64/xen/Makefile
->> index 74a8d87..62e6fe2 100644
->> --- a/arch/arm64/xen/Makefile
->> +++ b/arch/arm64/xen/Makefile
->> @@ -1,2 +1,3 @@
->>   xen-arm-y	+= $(addprefix ../../arm/xen/, enlighten.o grant-table.o p2m.o mm.o)
->>   obj-y		:= xen-arm.o hypercall.o
->> +obj-$(CONFIG_XEN_EFI) += efi.o
->> diff --git a/arch/arm64/xen/efi.c b/arch/arm64/xen/efi.c
->> new file mode 100644
->> index 0000000..33046b0
->> --- /dev/null
->> +++ b/arch/arm64/xen/efi.c
->> @@ -0,0 +1,36 @@
->> +/*
->> + * Copyright (c) 2015, Linaro Limited, Shannon Zhao
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along
->> + * with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <linux/efi.h>
->> +#include <xen/xen-ops.h>
->> +
->> +void __init xen_efi_runtime_setup(void)
->> +{
->> +	efi.get_time                 = xen_efi_get_time;
->> +	efi.set_time                 = xen_efi_set_time;
->> +	efi.get_wakeup_time          = xen_efi_get_wakeup_time;
->> +	efi.set_wakeup_time          = xen_efi_set_wakeup_time;
->> +	efi.get_variable             = xen_efi_get_variable;
->> +	efi.get_next_variable        = xen_efi_get_next_variable;
->> +	efi.set_variable             = xen_efi_set_variable;
->> +	efi.query_variable_info      = xen_efi_query_variable_info;
->> +	efi.update_capsule           = xen_efi_update_capsule;
->> +	efi.query_capsule_caps       = xen_efi_query_capsule_caps;
->> +	efi.get_next_high_mono_count = xen_efi_get_next_high_mono_count;
->> +	efi.reset_system             = NULL;
->> +}
->> +EXPORT_SYMBOL_GPL(xen_efi_runtime_setup);
->
-> This looks very similar to struct efi efi_xen previously in
-> drivers/xen/efi.c.  Maybe it makes sense to leave struct efi efi_xen in
-> drivers/xen/efi.c, export it in include/xen/xen-ops.h, then here just:
->
->    efi = efi_xen;
->
-> Would that improve code readability?
->
-Ok.
->
-> Correct me if I am wrong, but on ARM64 (differently from x86) it is not
-> necessary to set efi.systab because it is not used, right? If so, it
-> would be best to add a comment here to remember.
->
-Not set efi.systab here because it gets the system table through fdt and 
-set efi.systab there. See uefi_init() in arch/arm64/kernel.efi.c
+Note: GIC redistributor base address may also be provided in
+GICC structures on systems supporting GICv3 and above if the GIC
+Redistributors are not in the always-on power domain, this
+patch didn't implement such feature yet.
+Also, ACPI ITS initialization will be added in the following patches.
 
-	efi.systab = early_memremap(efi_system_table,
-				    sizeof(efi_system_table_t));
->
->> diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
->> index 73708ac..27d216a 100644
->> --- a/drivers/xen/Kconfig
->> +++ b/drivers/xen/Kconfig
->> @@ -268,7 +268,7 @@ config XEN_HAVE_PVMMU
->>
->>   config XEN_EFI
->>   	def_bool y
->> -	depends on X86_64 && EFI
->> +	depends on (ARM64 || X86_64) && EFI
->>
->>   config XEN_AUTO_XLATE
->>   	def_bool y
->> diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
->> index c83a338..36ff8e4 100644
->> --- a/include/xen/xen-ops.h
->> +++ b/include/xen/xen-ops.h
->> @@ -107,6 +107,7 @@ efi_status_t xen_efi_update_capsule(efi_capsule_header_t **capsules,
->>   efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
->>   					unsigned long count, u64 *max_size,
->>   					int *reset_type);
->> +void xen_efi_runtime_setup(void);
->
-> xen_efi_runtime_setup is not defined on x86, but this header is not arch
-> specific.
->
+Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ drivers/irqchip/irq-gic-v3.c | 137 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 137 insertions(+)
 
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 31205c7..2cada42 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -15,10 +15,12 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/acpi.h>
+ #include <linux/cpu.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/delay.h>
+ #include <linux/interrupt.h>
++#include <linux/irqdomain.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+@@ -764,6 +766,15 @@ static int gic_irq_domain_translate(struct irq_domain *d,
+ 		return 0;
+ 	}
+ 
++	if (is_fwnode_irqchip(fwspec->fwnode)) {
++		if(fwspec->param_count != 2)
++			return -EINVAL;
++
++		*hwirq = fwspec->param[0];
++		*type = fwspec->param[1];
++		return 0;
++	}
++
+ 	return -EINVAL;
+ }
+ 
+@@ -951,3 +962,129 @@ out_unmap_dist:
+ }
+ 
+ IRQCHIP_DECLARE(gic_v3, "arm,gic-v3", gic_of_init);
++
++#ifdef CONFIG_ACPI
++static struct redist_region *redist_regs __initdata;
++static u32 nr_redist_regions __initdata;
++
++static int __init
++gic_acpi_parse_madt_redist(struct acpi_subtable_header *header,
++			   const unsigned long end)
++{
++	struct acpi_madt_generic_redistributor *redist =
++			(struct acpi_madt_generic_redistributor *)header;
++	void __iomem *redist_base;
++	static int count = 0;
++
++	redist_base = ioremap(redist->base_address, redist->length);
++	if (!redist_base) {
++		pr_err("Couldn't map GICR region @%llx\n", redist->base_address);
++		return -ENOMEM;
++	}
++
++	redist_regs[count].phys_base = redist->base_address;
++	redist_regs[count].redist_base = redist_base;
++	count++;
++	return 0;
++}
++
++static int __init gic_acpi_match_gicr(struct acpi_subtable_header *header,
++				  const unsigned long end)
++{
++	/* Subtable presence means that redist exists, that's it */
++	return 0;
++}
++
++static bool __init acpi_validate_gic_table(struct acpi_subtable_header *header,
++					   struct acpi_probe_entry *ape)
++{
++	struct acpi_madt_generic_distributor *dist;
++	int count;
++
++	dist = (struct acpi_madt_generic_distributor *)header;
++	if (dist->version != ape->driver_data)
++		return false;
++
++	/* We need to do that exercise anyway, the sooner the better */
++	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
++				      gic_acpi_match_gicr, 0);
++	if (count <= 0)
++		return false;
++
++	nr_redist_regions = count;
++	return true;
++}
++
++#define ACPI_GICV3_DIST_MEM_SIZE (SZ_64K)
++
++static int __init
++gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
++{
++	struct acpi_madt_generic_distributor *dist;
++	struct fwnode_handle *domain_handle;
++	void __iomem *dist_base;
++	int i, err, count;
++
++	/* Get distributor base address */
++	dist = (struct acpi_madt_generic_distributor *)header;
++	dist_base = ioremap(dist->base_address, ACPI_GICV3_DIST_MEM_SIZE);
++	if (!dist_base) {
++		pr_err("Unable to map GICD registers\n");
++		return -ENOMEM;
++	}
++
++	err = gic_validate_dist_version(dist_base);
++	if (err) {
++		pr_err("No distributor detected at @%p, giving up", dist_base);
++		goto out_dist_unmap;
++	}
++
++	redist_regs = kzalloc(sizeof(*redist_regs) * nr_redist_regions,
++			      GFP_KERNEL);
++	if (!redist_regs) {
++		err = -ENOMEM;
++		goto out_dist_unmap;
++	}
++
++	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
++				      gic_acpi_parse_madt_redist, 0);
++	if (count <= 0) {
++		err = -ENODEV;
++		goto out_redist_unmap;
++	}
++
++	domain_handle = irq_domain_alloc_fwnode(dist_base);
++	if (!domain_handle) {
++		err = -ENOMEM;
++		goto out_redist_unmap;
++	}
++
++	err = gic_init_bases(dist_base, redist_regs, nr_redist_regions, 0,
++			     domain_handle);
++	if (err)
++		goto out_fwhandle_free;
++
++	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, domain_handle);
++	return 0;
++
++out_fwhandle_free:
++	irq_domain_free_fwnode(domain_handle);
++out_redist_unmap:
++	for (i = 0; i < nr_redist_regions; i++)
++		if (redist_regs[i].redist_base)
++			iounmap(redist_regs[i].redist_base);
++	kfree(redist_regs);
++out_dist_unmap:
++	iounmap(dist_base);
++	return err;
++}
++IRQCHIP_ACPI_DECLARE(gic_v3, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
++		     acpi_validate_gic_table, ACPI_MADT_GIC_VERSION_V3,
++		     gic_acpi_init);
++IRQCHIP_ACPI_DECLARE(gic_v4, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
++		     acpi_validate_gic_table, ACPI_MADT_GIC_VERSION_V4,
++		     gic_acpi_init);
++IRQCHIP_ACPI_DECLARE(gic_v3_or_v4, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
++		     acpi_validate_gic_table, ACPI_MADT_GIC_VERSION_NONE,
++		     gic_acpi_init);
++#endif
 -- 
-Shannon
+1.9.1
