@@ -1,195 +1,75 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Tue, 19 Jan 2016 18:06:57 +0800
-Subject: [PATCH v12.1 13/17] drm: bridge: analogix/dp: try force hpd after
- plug in lookup failed
-In-Reply-To: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
-References: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1453198017-13461-1-git-send-email-ykk@rock-chips.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Tue, 19 Jan 2016 15:44:03 +0530
+Subject: [PATCH V7 0/6] i2c: qup: Add support for v2 tags and bam dma
+In-Reply-To: <1453197766-18976-1-git-send-email-sricharan@codeaurora.org>
+References: <1453197766-18976-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <000101d152a2$23bb1da0$6b3158e0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some edp screen do not have hpd signal, so we can't just return
-failed when hpd plug in detect failed.
+Hi wolfram,
 
-This is an hardware property, so we need add a devicetree property
-"analogix,need-force-hpd" to indicate this sutiation.
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Sricharan R
+> Sent: Tuesday, January 19, 2016 3:33 PM
+> To: wsa at the-dreams.de
+> Cc: devicetree at vger.kernel.org; architt at codeaurora.org; linux-arm-
+> msm at vger.kernel.org; ntelkar at codeaurora.org; galak at codeaurora.org;
+> linux-kernel at vger.kernel.org; andy.gross at linaro.org; linux-
+> i2c at vger.kernel.org; iivanov at mm-sol.com; agross at codeaurora.org;
+> dmaengine at vger.kernel.org; sricharan at codeaurora.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: [PATCH V7 0/6] i2c: qup: Add support for v2 tags and bam dma
+> 
+> i2c: qup: Add support for v2 tags and bam dma
+> 
+> QUP from version 2.1.1 onwards, supports a new format of i2c command
+> tags.
+> Tag codes instructs the controller to perform a operation like read/write.
+> This new tagging version is required for adding bam dma capabilities.
+> V2 tags supports transfer of more than 256 bytes in a single i2c
+transaction.
+> Also adding bam dma support facilitates transferring each i2c_msg in
+> i2c_msgs without a 'stop' bit in between which is required for some of the
+> clients.
+> 
+> Tested this series on apq8074 dragon board eeprom client on i2c bus1
+> 
+> [V7] Added tested-by tags and fixed a small comment
+> 
+> [V6] Added review tags and fixed a checkpatch warning in patch 4/6.
+> 
+> [V5] Addressed few more comments from Ivan T. Ivanov.
+>      Squashed patch 2 and 3 as no point in having only few lines of
+>      common code between v1 and v2 tags for increased complexity.
+>      Couple of non functional review comments fixes in patch 3, 4.
+>      Added a change in patch 4 to have proper transfer completion in
+>      a corner case. patch 5, 6 unchanged.
+> 
+> [V4] Added a patch to factor out some common code.
+>      Removed support for freq > 400KHZ as per comments.
+>      Addressed comments from Ivan T. Ivanov to keep the code for
+>      V2 support in a separate path.
+>      Changed the authorship of V2 tags support patch.
+> 
+> [V3] Added support to coalesce each i2c_msg in i2c_msgs for fifo and
+>      block mode in Patch 2. Also addressed further code comments.
+> 
+>      http://comments.gmane.org/gmane.linux.drivers.i2c/22497
+> 
+> [V2] Addressed comments from Ivan T. Ivanov, Andy Gross [v1] Initial
+> Version
+> 
+> Sricharan R (6):
+>   i2c: qup: Change qup_wait_writeready function to use for all timeouts
+>   i2c: qup: Add V2 tags support
+>   i2c: qup: Transfer each i2c_msg in i2c_msgs without a stop bit
+>   i2c: qup: Add bam dma capabilities
+>   dts: msm8974: Add blsp2_bam dma node
+>   dts: msm8974: Add dma channels for blsp2_i2c1 node
+> 
+ Wolfram,  Does the first 4 patches looks good to be picked up  ?
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
----
-There is no new changes in v12.1, but just rebase the whole patches on
-top of Dave's drm-next branch [0] (Heiko)
-
-Changes in v12.1: None
-Changes in v12: None
-Changes in v11:
-- Rename the "analogix,need-force-hpd" to common 'force-hpd' (Rob)
-- Add the ack from Rob Herring
-
-Changes in v10: None
-Changes in v9: None
-Changes in v8: None
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
-- Add "analogix,need-force-hpd" to indicate whether driver need foce
-  hpd when hpd detect failed.
-
-Changes in v2: None
-
- .../bindings/display/bridge/analogix_dp.txt        |  4 ++-
- .../bindings/display/exynos/exynos_dp.txt          |  1 +
- .../display/rockchip/analogix_dp-rockchip.txt      |  1 +
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 35 ++++++++++++++++++----
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  2 ++
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  |  9 ++++++
- 6 files changed, 46 insertions(+), 6 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-index 7659a7a..4f2ba8c 100644
---- a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-+++ b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-@@ -22,6 +22,9 @@ Required properties for dp-controller:
- 		from general PHY binding: Should be "dp".
- 
- Optional properties for dp-controller:
-+	-force-hpd:
-+		Indicate driver need force hpd when hpd detect failed, this
-+		is used for some eDP screen which don't have hpd signal.
- 	-hpd-gpios:
- 		Hotplug detect GPIO.
- 		Indicates which GPIO should be used for hotplug detection
-@@ -31,7 +34,6 @@ Optional properties for dp-controller:
- 		* Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
- 		* Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
- 
--
- [1]: Documentation/devicetree/bindings/media/video-interfaces.txt
- -------------------------------------------------------------------------------
- 
-diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-index 4fa8aca..ade5d8e 100644
---- a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-+++ b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-@@ -56,6 +56,7 @@ For the below properties, please refer to Analogix DP binding document:
- 	-phys (required)
- 	-phy-names (required)
- 	-hpd-gpios (optional)
-+	 force-hpd (optional)
- 
- Deprecated properties for DisplayPort:
- -interlaced:            deprecated prop that can parsed from drm_display_mode.
-diff --git a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
-index 04d99e3..e832ff9 100644
---- a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
-+++ b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
-@@ -32,6 +32,7 @@ For the below properties, please refer to Analogix DP binding document:
- - phys (required)
- - phy-names (required)
- - hpd-gpios (optional)
-+- force-hpd (optional)
- -------------------------------------------------------------------------------
- 
- Example:
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index a62e8d0..13986b7 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -62,15 +62,38 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
- {
- 	int timeout_loop = 0;
- 
--	while (analogix_dp_get_plug_in_status(dp) != 0) {
-+	while (timeout_loop < DP_TIMEOUT_LOOP_COUNT) {
-+		if (analogix_dp_get_plug_in_status(dp) == 0)
-+			return 0;
-+
- 		timeout_loop++;
--		if (timeout_loop > DP_TIMEOUT_LOOP_COUNT) {
--			dev_err(dp->dev, "failed to get hpd plug status\n");
--			return -ETIMEDOUT;
--		}
- 		usleep_range(10, 11);
- 	}
- 
-+	/*
-+	 * Some edp screen do not have hpd signal, so we can't just
-+	 * return failed when hpd plug in detect failed, DT property
-+	 * "force-hpd" would indicate whether driver need this.
-+	 */
-+	if (!dp->force_hpd)
-+		return -ETIMEDOUT;
-+
-+	/*
-+	 * The eDP TRM indicate that if HPD_STATUS(RO) is 0, AUX CH
-+	 * will not work, so we need to give a force hpd action to
-+	 * set HPD_STATUS manually.
-+	 */
-+	dev_dbg(dp->dev, "failed to get hpd plug status, try to force hpd\n");
-+
-+	analogix_dp_force_hpd(dp);
-+
-+	if (analogix_dp_get_plug_in_status(dp) != 0) {
-+		dev_err(dp->dev, "failed to get hpd plug in status\n");
-+		return -EINVAL;
-+	}
-+
-+	dev_dbg(dp->dev, "success to get plug in status after force hpd\n");
-+
- 	return 0;
- }
- 
-@@ -1291,6 +1314,8 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
- 	if (IS_ERR(dp->reg_base))
- 		return PTR_ERR(dp->reg_base);
- 
-+	dp->force_hpd = of_property_read_bool(dev->of_node, "force-hpd");
-+
- 	dp->hpd_gpio = of_get_named_gpio(dev->of_node, "hpd-gpios", 0);
- 	if (!gpio_is_valid(dp->hpd_gpio))
- 		dp->hpd_gpio = of_get_named_gpio(dev->of_node,
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-index 6cc53d4..a8cba64 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-@@ -154,6 +154,7 @@ struct analogix_dp_device {
- 	struct phy		*phy;
- 	int			dpms_mode;
- 	int			hpd_gpio;
-+	bool                    force_hpd;
- 
- 	struct analogix_dp_plat_data *plat_data;
- };
-@@ -174,6 +175,7 @@ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
- 				       bool enable);
- void analogix_dp_init_analog_func(struct analogix_dp_device *dp);
- void analogix_dp_init_hpd(struct analogix_dp_device *dp);
-+void analogix_dp_force_hpd(struct analogix_dp_device *dp);
- enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp);
- void analogix_dp_clear_hotplug_interrupts(struct analogix_dp_device *dp);
- void analogix_dp_reset_aux(struct analogix_dp_device *dp);
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-index 1e24b37..cba3ffd 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-@@ -365,6 +365,15 @@ void analogix_dp_init_hpd(struct analogix_dp_device *dp)
- 	writel(reg, dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
- }
- 
-+void analogix_dp_force_hpd(struct analogix_dp_device *dp)
-+{
-+	u32 reg;
-+
-+	reg = readl(dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
-+	reg = (F_HPD | HPD_CTRL);
-+	writel(reg, dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
-+}
-+
- enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp)
- {
- 	u32 reg;
--- 
-1.9.1
+Regards,
+ Sricharan
