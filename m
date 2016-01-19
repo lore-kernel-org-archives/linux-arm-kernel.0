@@ -1,59 +1,42 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Tue, 19 Jan 2016 16:38:20 +0800
-Subject: [PATCH v2 2/4] power: reset: add reboot mode driver
-In-Reply-To: <CALAqxLVNUG_cVbavXC34sNPv68jbMghti31+PrgQ7mpPngXh6g@mail.gmail.com>
-References: <1452598029-8222-1-git-send-email-andy.yan@rock-chips.com>
- <1452598319-8324-1-git-send-email-andy.yan@rock-chips.com>
- <CALAqxLVNUG_cVbavXC34sNPv68jbMghti31+PrgQ7mpPngXh6g@mail.gmail.com>
-Message-ID: <569DF5FC.1080402@rock-chips.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 19 Jan 2016 09:42:54 +0100
+Subject: [PATCH] ARM: dts: at91: at91sam9n12ek: fix panel compatible string
+In-Reply-To: <1453167059-31247-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1453167059-31247-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <569DF70E.4070205@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John:
+Le 19/01/2016 02:30, Alexandre Belloni a ?crit :
+> Properly use qiaodian as the vendor prefix for the panel
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-On 2016?01?16? 04:27, John Stultz wrote:
-> On Tue, Jan 12, 2016 at 3:31 AM, Andy Yan <andy.yan@rock-chips.com> wrote:
->> This driver parse the reboot commands like "reboot loader"
->> and "reboot recovery" to get a boot mode described in the
->> device tree , then call the write interfae to store the boot
->> mode in some persistent storage  like special register or ram,
->> which can be read by the bootloader after system reboot, then
->> the bootloader can take different action according to the mode
->> stored.
->>
->> This is commonly used on Android based devices, which in order
->> to reboot the device into fastboot or recovery mode.
->>
->> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
->
-> Hey Andy!
->    Thanks for keeping this work going! I've just successfully reworked
-> my Nexus7 tree to use your implementation (using the syscon version,
-> setting up a syscon for IMEM as Bjorn had requested earlier).
->
-> All is working well so far!
->
-> The one thing I was working on supporting with my own version that
-> seems to be missing here are for devices that use string based codes,
-> rather then magic numbers.
->
-> This was mostly a theoretical issue. I think the Galaxy Nexus used it,
-> and when I was looking at some of the HTC devices, they support a text
-> based reason along with the magic code, but at least in some
-> implementations the text mode isn't used, so I suspect there its just
-> for extra debugging.  So this may not be critical to solve until
-> someone tries to add support for such a device.
->
-> Anyway, I'm going to look at porting this to the HiKey board next
-> (which just uses reserved ram, not syscon), so I'll try to do a an
-> SRAM driver implementaiton to see how that goes.
->
-> thanks!
-> -john
->
->
->
->
+Yes, this one needs to go in "fixes" for 4.5...
 
-  Very glad to hear news from you. And welcome your SRAM based driver 
-implementation.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Thanks, bye.
+
+> ---
+>  arch/arm/boot/dts/at91sam9n12ek.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
+> index ca4ddf86817a..626c67d66626 100644
+> --- a/arch/arm/boot/dts/at91sam9n12ek.dts
+> +++ b/arch/arm/boot/dts/at91sam9n12ek.dts
+> @@ -215,7 +215,7 @@
+>  	};
+>  
+>  	panel: panel {
+> -		compatible = "qd,qd43003c0-40", "simple-panel";
+> +		compatible = "qiaodian,qd43003c0-40", "simple-panel";
+>  		backlight = <&backlight>;
+>  		power-supply = <&panel_reg>;
+>  		#address-cells = <1>;
+> 
+
+
+-- 
+Nicolas Ferre
