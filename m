@@ -1,30 +1,63 @@
-From: holgerschurig@gmail.com (Holger Schurig)
-Date: Tue, 19 Jan 2016 17:05:04 +0100
-Subject: [LINUX PATCH 5/5] mmc: host: Update the quirks for this
- controller.
-In-Reply-To: <1453213055-35563-5-git-send-email-lakshmis@xilinx.com> (P. L.
- Sai Krishna's message of "Tue, 19 Jan 2016 19:47:35 +0530")
-References: <1453213055-35563-1-git-send-email-lakshmis@xilinx.com>
- <1453213055-35563-5-git-send-email-lakshmis@xilinx.com>
-Message-ID: <87fuxt4ksv.fsf@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 19 Jan 2016 16:20:18 +0000
+Subject: [PATCH] arm64: KVM: Obey RES0/1 reserved bits when setting CPTR_EL2
+Message-ID: <1453220418-24744-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Some bits in CPTR are defined as RES1 in the architecture.  Setting
+these bits to zero may unintentionally enable future architecture
+extensions, allowing guests to use them without supervision by the host.
 
-Don't write "of this controller" into subject, write "of sdhci-arasan"
-or something like it.
+This would be bad: for forwards compatibility, this patch makes
+sure the affected bits are always written with 1, not 0.
 
-Otherwise people will have to look into your patch description ...
+This patch only addresses CPTR_EL2.  Initialisation of other system
+registers may still need review.
 
-> This patch adds SDHCI_QUIRK2_STOP_WITH_TC quirk to remove
-> the following error message.
-> "mmc0: Got data interrupt 0x00000002 even though no data
-> operation was in progress"
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ arch/arm64/include/asm/kvm_arm.h |    1 +
+ arch/arm64/kvm/hyp/switch.c      |    8 ++++++--
+ 2 files changed, 7 insertions(+), 2 deletions(-)
 
-But wait, it's not there, too. So people have to look into the patch
-itself. :-(
-
-
-
-Holger
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 738a95f..7d858fe 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -182,6 +182,7 @@
+ #define CPTR_EL2_TCPAC	(1 << 31)
+ #define CPTR_EL2_TTA	(1 << 20)
+ #define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
++#define CPTR_EL2_DEFAULT	0x000033ff
+ 
+ /* Hyp Debug Configuration Register bits */
+ #define MDCR_EL2_TDRA		(1 << 11)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index ca8f5a5..63aa74a 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -36,7 +36,11 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ 	write_sysreg(val, hcr_el2);
+ 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+ 	write_sysreg(1 << 15, hstr_el2);
+-	write_sysreg(CPTR_EL2_TTA | CPTR_EL2_TFP, cptr_el2);
++
++	val = CPTR_EL2_DEFAULT;
++	val |= CPTR_EL2_TTA | CPTR_EL2_TFP;
++	write_sysreg(val, cptr_el2);
++
+ 	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
+ }
+ 
+@@ -45,7 +49,7 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+ 	write_sysreg(HCR_RW, hcr_el2);
+ 	write_sysreg(0, hstr_el2);
+ 	write_sysreg(read_sysreg(mdcr_el2) & MDCR_EL2_HPMN_MASK, mdcr_el2);
+-	write_sysreg(0, cptr_el2);
++	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
+ }
+ 
+ static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
+-- 
+1.7.10.4
