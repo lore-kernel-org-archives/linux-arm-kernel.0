@@ -1,51 +1,42 @@
-From: nbd@openwrt.org (Felix Fietkau)
-Date: Tue, 19 Jan 2016 16:38:02 +0100
-Subject: CONFIG_CPU_SW_DOMAIN_PAN breakage on ARM11 MPCore
-In-Reply-To: <12866783.yJ1maoGsrz@wuerfel>
-References: <569D71F3.7000408@openwrt.org>
- <20160119093845.GJ19062@n2100.arm.linux.org.uk>
- <569E0796.9000302@openwrt.org> <12866783.yJ1maoGsrz@wuerfel>
-Message-ID: <569E585A.9070009@openwrt.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 19 Jan 2016 16:38:16 +0100
+Subject: [linux-sunxi] [PATCH v2 16/26] drm: Add Allwinner A10 Display
+ Engine support
+In-Reply-To: <1452957104.12419.12.camel@plaes.org>
+References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1452785109-6172-17-git-send-email-maxime.ripard@free-electrons.com>
+ <1452957104.12419.12.camel@plaes.org>
+Message-ID: <20160119153816.GV4581@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-01-19 16:27, Arnd Bergmann wrote:
-> On Tuesday 19 January 2016 10:53:26 Felix Fietkau wrote:
->> root at OpenWrt:~# cat /proc/cpuinfo 
->> processor       : 0
->> model name      : ARMv6-compatible processor rev 4 (v6l)
->> BogoMIPS        : 238.38
->> Features        : half thumb fastmult vfp edsp java tls 
->> CPU implementer : 0x41
->> CPU architecture: 7
->> CPU variant     : 0x0
->> CPU part        : 0xb02
->> CPU revision    : 4
->> 
->> processor       : 1
->> model name      : ARMv6-compatible processor rev 4 (v6l)
->> BogoMIPS        : 239.61
->> Features        : half thumb fastmult vfp edsp java tls 
->> CPU implementer : 0x41
->> CPU architecture: 7
->> CPU variant     : 0x0
->> CPU part        : 0xb02
->> CPU revision    : 4
+Hi,
+
+On Sat, Jan 16, 2016 at 05:11:44PM +0200, Priit Laes wrote:
+> > +struct drm_fbdev_cma *sun4i_framebuffer_init(struct drm_device *drm)
+> > +{
+> > +	drm_mode_config_reset(drm);
+> > +
+> > +	drm->mode_config.max_width = 8192;
+> > +	drm->mode_config.max_height = 8192;
 > 
-> I guess this means you run with the SMP patches from OpenWRT,
-> while upstream only supports uniprocessor mode and presumably doesn't
-> have this problem, right?
-I tested without SMP and ran into the same user space hangs/crashes.
+> Shouldn't these be 1920 x 1080 as per A10 User manual?
 
-> I see that Oxnas (supported in OpenWRT but not upstream) has the
-> slightly newer ARM11mpcore variant 0 / revision 5 ID. Is it easy for
-> you to test if this has the same problem?
-I already spoke to Daniel (who maintains that target), and it is equally
-affected.
+1080p is what the SoC can output. However, to create its output, it
+uses a combination of planes of 8192x8192, that you'll obviously have
+to crop. This is the size of the plane that we are exposing here, not
+what we can output (which is listed in the various connectors).
 
-> Interestingly, the documentation at http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0360f/I65012.html
-> lists variant:0/revision:4 as the reported values for both r2p0 and r1p0
-> and it does not list any core having variant:0/revision:5. 
-Heh, interesting.
+Maxime
 
-- Felix
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160119/e2a63c5c/attachment.sig>
