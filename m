@@ -1,100 +1,45 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Tue, 19 Jan 2016 16:31:27 +0800
-Subject: [PATCH v2 1/4] dt-bindings: power: reset: add document for
- reboot-mode driver
-In-Reply-To: <CALAqxLUxh3=LhoHxqiRm_5L4G6m1Vctp=aUg+9_uAtLkFwW9bw@mail.gmail.com>
-References: <1452598029-8222-1-git-send-email-andy.yan@rock-chips.com>
- <1452598189-8272-1-git-send-email-andy.yan@rock-chips.com>
- <CALAqxLUxh3=LhoHxqiRm_5L4G6m1Vctp=aUg+9_uAtLkFwW9bw@mail.gmail.com>
-Message-ID: <569DF45F.3050908@rock-chips.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 19 Jan 2016 09:33:39 +0100
+Subject: [PATCH] clocksource: atmel-st: use return value from
+ clk_prepare_enable()
+In-Reply-To: <1453145698-23661-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1453145698-23661-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <569DF4E3.2000302@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John:
+Le 18/01/2016 20:34, Alexandre Belloni a ?crit :
+> ret is used to detect an error but it was not properly updated after
+> calling clk_prepare_enable() thus it made it impossible to detect an error
+> when enabling the slow clock.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  drivers/clocksource/timer-atmel-st.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clocksource/timer-atmel-st.c b/drivers/clocksource/timer-atmel-st.c
+> index 29d21d68df5a..c69070c6ad91 100644
+> --- a/drivers/clocksource/timer-atmel-st.c
+> +++ b/drivers/clocksource/timer-atmel-st.c
+> @@ -225,7 +225,7 @@ static void __init atmel_st_timer_init(struct device_node *node)
+>  	if (IS_ERR(sclk))
+>  		panic(pr_fmt("Unable to get slow clock\n"));
+>  
+> -	clk_prepare_enable(sclk);
+> +	ret = clk_prepare_enable(sclk);
 
-On 2016?01?16? 06:41, John Stultz wrote:
-> On Tue, Jan 12, 2016 at 3:29 AM, Andy Yan <andy.yan@rock-chips.com> wrote:
->> add device tree binding document for reboot-mode driver
->>
->> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
->>
->> ---
->>
->> Changes in v2: None
->> Changes in v1: None
->>
->>   .../bindings/power/reset/reboot-mode.txt           | 41 +++++++++++++++++
->>   .../bindings/power/reset/syscon-reboot-mode.txt    | 52 ++++++++++++++++++++++
->>   2 files changed, 93 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/power/reset/reboot-mode.txt
->>   create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
->>
->> diff --git a/Documentation/devicetree/bindings/power/reset/reboot-mode.txt b/Documentation/devicetree/bindings/power/reset/reboot-mode.txt
->> new file mode 100644
->> index 0000000..81d9f66
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/power/reset/reboot-mode.txt
->> @@ -0,0 +1,41 @@
->> +Generic reboot mode core map driver
->> +
->> +This driver get reboot mode arguments and call the write
->> +interface to stores the magic value in special register
->> +or ram . Then the bootloader can read it and take different
->> +action according to the argument stored.
->> +
->> +Required properties:
->> +- compatible: only support "syscon-reboot-mode" now.
->> +
->> +Each mode is represented as a sub-node of reboot_mode:
->> +
->> +Subnode required properties:
->> +- linux,mode: reboot mode command,such as "loader", "recovery", "fastboot".
->> +- loader,magic: magic number for the mode, this is vendor specific.
->> +
->> +Example:
->> +       reboot_mode {
->> +               compatible = "syscon-reboot-mode";
->> +               offset = <0x40>;
->> +
->> +               loader {
->> +                       linux,mode = "loader";
->> +                       loader,magic = <BOOT_LOADER>;
->> +               };
->> +
->> +               maskrom {
->> +                       linux,mode = "maskrom";
->> +                       loader,magic = <BOOT_MASKROM>;
->> +               };
->> +
->> +               recovery {
->> +                       linux,mode = "recovery";
->> +                       loader,magic = <BOOT_RECOVERY>;
->> +               };
->> +
->> +               fastboot {
->> +                       linux,mode = "fastboot";
->> +                       loader,magic = <BOOT_FASTBOOT>;
->> +               };
->> +        };
->
-> So one minor thought here. While the commands are somewhat vendor
-> specific, would it be a good idea for the example commands to match
-> the common commands on Android devices?  For example, usually
-> "bootloader" is what gets you into fastboot mode on nexus devices.
->
-> thanks
-> -john
->
->
->
->
+Yes, sure...
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-   When I run the "adb help" , I got the following message:
-   adb reboot [bootloader|recovery] - reboots the device, optionally 
-into the bootloader or recovery program
-   adb reboot-bootloader        - reboots the device into the bootloader
+Thanks!
 
-   It  only says "adb reboot-bootloader" will reboot the device into 
-bootloader, not specific to fastboot.
 
-   I add @Simon from Google here, maybe he can give some suggestions.
+>  	if (ret)
+>  		panic(pr_fmt("Could not enable slow clock\n"));
+>  
+> 
+
+
+-- 
+Nicolas Ferre
