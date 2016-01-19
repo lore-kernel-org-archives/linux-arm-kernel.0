@@ -1,30 +1,33 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Tue, 19 Jan 2016 15:04:47 +0200
-Subject: ssb: Set linux-wireless as MAINTAINERS list
-In-Reply-To: <CACna6ry2jSJpov1Mcvk=NF+GKrZVSHKjOsinpEQh7_BQAx34wQ@mail.gmail.com>
- (=?utf-8?Q?=22Rafa=C5=82_Mi=C5=82ecki=22's?= message of "Mon, 18 Jan 2016
- 20:09:52 +0100")
-References: <8128014.DbbgBtKY3z@wuerfel>
- <8760ywd5fe.fsf@kamboji.qca.qualcomm.com> <4037550.DMaVTE01Aq@wuerfel>
- <87bn8l7miw.fsf@kamboji.qca.qualcomm.com>
- <CACna6ryvDFHqwJ3ExURcyFT2ZaT9fS9v36wCnJfze5BLnE88og@mail.gmail.com>
- <87y4bn5m4q.fsf@kamboji.qca.qualcomm.com>
- <20160118175303.19164539@wiggum>
- <CACna6ry2jSJpov1Mcvk=NF+GKrZVSHKjOsinpEQh7_BQAx34wQ@mail.gmail.com>
-Message-ID: <8737tt67ps.fsf@kamboji.qca.qualcomm.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Tue, 19 Jan 2016 15:05:43 +0200
+Subject: [PATCH v4] kernel: add kcov code coverage
+In-Reply-To: <CACT4Y+ZUKJOmATAASxM1qnbn=_0M9TAtTQYO0ecMtursLYvdww@mail.gmail.com>
+References: <1453145117-92868-1-git-send-email-dvyukov@google.com>
+ <20160118225550.GE14531@node.shutemov.name>
+ <CACT4Y+ZUKJOmATAASxM1qnbn=_0M9TAtTQYO0ecMtursLYvdww@mail.gmail.com>
+Message-ID: <20160119130543.GB20984@node.shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rafa? Mi?ecki <zajec5@gmail.com> writes:
+On Tue, Jan 19, 2016 at 01:55:43PM +0100, Dmitry Vyukov wrote:
+> >> +static int __init kcov_init(void)
+> >> +{
+> >> +     if (!debugfs_create_file("kcov", 0666, NULL, NULL, &kcov_fops)) {
+> >
+> > Why 0666? May be 0600?.
+> 
+> The idea is that it can be useful to fuzz-test under a normal user as well.
+> This file is also guarded by debugfs mount permissions. Usually it is mounted
+> as 0700, so normal users can't get access to it.
+> However if one wants to fuzz-test under a normal user, he could mount
+> debugfs as 0777 and get access to this file.
+> 
+> I am not very strong about this, though. If you say, I will change it to 0600.
+> I open this file as root at the moment. And we can change it back
+> if/when we better understand a potential use case.
 
-> On 18 January 2016 at 17:53, Michael B?sch <m@bues.ch> wrote:
->
->> ssb patches go through the linux-wireless tree. Set the list to
->> linux-wireless, so linux-wireless patchwork can catch the patches.
->
-> Thanks Michael
-
-Thanks from me also. I'm planning to send this to 4.5.
+I think it's safer to make it 0600. It's up to system administrator to
+change permissions, if he wants give this capability to mortals.
 
 -- 
-Kalle Valo
+ Kirill A. Shutemov
