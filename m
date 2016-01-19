@@ -1,44 +1,108 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Jan 2016 10:32:25 +0000
-Subject: [PATCH] arm64: dts: Add PSCI function IDs for cpu-{on,off} on
- exynos7
-In-Reply-To: <1453198884-28723-1-git-send-email-alim.akhtar@samsung.com>
-References: <1453198884-28723-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <20160119103224.GA25024@leverpostej>
+From: a0393675@ti.com (Keerthy)
+Date: Tue, 19 Jan 2016 16:02:30 +0530
+Subject: [PATCH v2] reboot: Backup orderly_poweroff
+In-Reply-To: <20160119090623.GA29678@gmail.com>
+References: <1452688405-15087-1-git-send-email-j-keerthy@ti.com>
+ <20160114090520.GA4351@gmail.com> <569767EC.2010704@ti.com>
+ <20160114100913.GB15857@gmail.com> <56977BA7.702@ti.com>
+ <20160114112354.GA17869@gmail.com>
+ <20160114132527.575e0f20@lxorguk.ukuu.org.uk>
+ <20160115101459.GB23349@gmail.com> <5698F420.2010500@ti.com>
+ <20160119090623.GA29678@gmail.com>
+Message-ID: <569E10BE.2020809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2016 at 03:51:24PM +0530, Alim Akhtar wrote:
-> This patch adds cpu-{on,off} function IDs as per PSCI specification,
-> with this we can boot multiple CPUs and can use cpu hotplug on
-> exynos7 platform.
-> 
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> ---
->  arch/arm64/boot/dts/exynos/exynos7.dtsi |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> index f9c5a549c2c0..1a2bb3b453e5 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> @@ -65,6 +65,8 @@
->  	psci {
->  		compatible = "arm,psci-0.2";
->  		method = "smc";
-> +		cpu_on = <0xC4000003>;
-> +		cpu_off = <0x84000002>;
->  	};
+Hi Ingo,
 
-There is no need for this patch.
+On Tuesday 19 January 2016 02:36 PM, Ingo Molnar wrote:
+>
+> * Grygorii Strashko <grygorii.strashko@ti.com> wrote:
+>
+>> On 01/15/2016 12:14 PM, Ingo Molnar wrote:
+>>>
+>>> * One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> wrote:
+>>>
+>>>>> If kernel_power_off() is called then the system should power off. No ifs and
+>>>>> whens.
+>>>>
+>>>> Even if it doesn't the watchdog should kill it.
+>>>>
+>>>> That is broken on some platforms on the watchdog side as the
+>>>> watchdog shuts down during our power off callbacks - because the system
+>>>> firmware is too stupid to reset the watchdog as it powers back up (so
+>>>> keeps rebooting).
+>>>>
+>>>> If you watchdog and firmware function properly you shouldn't even have to
+>>>> care if you crash during the kernel power off.
+>>>
+>>> That's a good point as well - if the system is 'stuck' for some notion of stuck,
+>>> then watchdog drivers can help.
+>>>
+>>
+>> Seems ARM doesn't have endless loop implemented in machine_power_off() - so,
+>> not too much chances for Watchdog to fire.
+>> void machine_power_off(void)
+>> {
+>> 	local_irq_disable();
+>> 	smp_send_stop();
+>>
+>> 	if (pm_power_off)
+>> 		pm_power_off();
+>>
+>> 	--- endless loop ?
+>> 	--- or restart ?
+>> }
+>> [and even if it will be there - 20-30sec is usual timeout for Watchdog and this
+>> enough time to burn the system in case of thermal emergency poweroff :(]
+>>
+>>> Here it's unclear whether user-space even called the sys_reboot() system call.
+>>>
+>>
+>> That's true - original log [1] has
+>> Nov 30 11:19:22 [    5.942769] thermal thermal_zone3: critical temperature reached(108 C),shutting down
+>> [...]
+>> Nov 30 11:19:24 [    7.387900] ahci 4a140000.sata: flags: 64bit ncq sntf stag pm led clo only pmp pio slum part ccc apst
+>> Nov 30 11:19:24 INIT: Switching to runlevel: 0
+>> Nov 30 11:19:24 INIT: Sending processes the TERM signal
+>>
+>> and there are no
+>> [  220.004522] reboot: Power down
+>>
+>>
+>> Also, It's not the first time this part of code is discussed (thermal emergency poweroff) [2],
+>> so the good question, as for me, is it really required and safe to use orderly_poweroff() in
+>> case of thermal emergency poweroff ([3] as example)?
+>>
+>> In general, this kind of use case can be simulated using SysRq on any arch
+>> - [3.290034] Freeing unused kernel memory: 492K (c0a67000 - c0ae2000)
+>>    INIT: version 2.88 booting
+>>    Starting udev
+>> ^^ The issue most probably might happens when system in the process of loading modules
+>> So, once modules loading process is started - fire Sysrq "poweroff(o)"
+>
+> So I'd say emergency poweroff should be named accordingly - and the
+> orderly_poweroff() name suggest anything but an emergency, right?
+>
+> So I'd be fine with the following:
+>
+>   - introduce a poweroff_emergency() core kernel function call
+>
+>   - use it in drivers where it's justified
+>
+>   - poweroff_emergency() has a configurable timeout value. If the timeout value is
+>     set to 0 then it powers the system off immediately.
+>
+> Functionally it would be mostly equivalent to your current patch (except the '0'
+> immediate poweroff functionality).
 
-The "arm,psci-0.2" compatible string implicitly tells the kernel that
-the full set of mandatory PSCI 0.2 functions are present, with the IDs
-mandated by PSCI 0.2. That includes CPU_ON and CPU_OFF amongst others.
+Thanks for the suggestion. I will work on this and get back.
 
-The only reason to provide IDs is to function on kernels without PSCI
-0.2 support. Given the compatible string hasn't been updated for that,
-this is insufficient for that case.
+Best Regards,
+Keerthy
 
-Thanks,
-Mark.
+>
+> Thanks,
+>
+> 	Ingo
+>
