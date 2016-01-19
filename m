@@ -1,39 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Jan 2016 09:38:45 +0000
-Subject: CONFIG_CPU_SW_DOMAIN_PAN breakage on ARM11 MPCore
-In-Reply-To: <569D71F3.7000408@openwrt.org>
-References: <569D71F3.7000408@openwrt.org>
-Message-ID: <20160119093845.GJ19062@n2100.arm.linux.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 19 Jan 2016 09:41:50 +0000
+Subject: [PATCH v9 5/6] PCI: generic: Make pci-host-generic driver numa
+ aware
+In-Reply-To: <CAFpQJXXESn1EA5kotVOH2oLbRUSpOLf6+MeWG1pY_GhUP+4vVQ@mail.gmail.com>
+References: <1453134965-6125-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1453134965-6125-6-git-send-email-gkulkarni@caviumnetworks.com>
+ <569D23AF.9050503@gmail.com>
+ <CAFpQJXXESn1EA5kotVOH2oLbRUSpOLf6+MeWG1pY_GhUP+4vVQ@mail.gmail.com>
+Message-ID: <20160119094150.GA4991@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2016 at 12:14:59AM +0100, Felix Fietkau wrote:
-> I just wasted a few hours debugging user space hangs after updating my
-> CNS3xxx device to Linux 4.4 - until I found this:
-> http://www.spinics.net/lists/arm-kernel/msg450888.html
+On Tue, Jan 19, 2016 at 11:28:56AM +0530, Ganapatrao Kulkarni wrote:
+> On Mon, Jan 18, 2016 at 11:11 PM, David Daney <ddaney.cavm@gmail.com> wrote:
+> > On 01/18/2016 08:36 AM, Ganapatrao Kulkarni wrote:
+> >>
+> >> update numa_node of device associated with pci bus.
+> >> moved down devm_kzalloc to allocate from node memory.
+> >>
+> >> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> >> ---
+> >>   drivers/pci/host/pci-host-generic.c | 9 ++++++---
+> >>   1 file changed, 6 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/drivers/pci/host/pci-host-generic.c
+> >> b/drivers/pci/host/pci-host-generic.c
+> >> index 5434c90..0e1ce06 100644
+> >> --- a/drivers/pci/host/pci-host-generic.c
+> >> +++ b/drivers/pci/host/pci-host-generic.c
+> >> @@ -215,11 +215,9 @@ static int gen_pci_probe(struct platform_device
+> >> *pdev)
+> >>         const struct of_device_id *of_id;
+> >>         struct device *dev = &pdev->dev;
+> >>         struct device_node *np = dev->of_node;
+> >> -       struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> >> +       struct gen_pci *pci;
+> >>         struct pci_bus *bus, *child;
+> >>
+> >> -       if (!pci)
+> >> -               return -ENOMEM;
+> >>
+> >>         type = of_get_property(np, "device_type", NULL);
+> >>         if (!type || strcmp(type, "pci")) {
+> >> @@ -230,6 +228,11 @@ static int gen_pci_probe(struct platform_device
+> >> *pdev)
+> >>         of_pci_check_probe_only();
+> >>
+> >>         of_id = of_match_node(gen_pci_of_match, np);
+> >> +       set_dev_node(dev, of_node_to_nid(np));
+> >
+> >
+> > This shouldn't be done in individual platform_drivers, but instead in the
+> > device probing code.
+> >
+> > There is code that does this in drivers/of/platform.c and
+> > drivers/of/device.c  Is that not being called for the pci-host-gweneric
+> > devices?  If not, we should figure out why, and perhaps attempt to fix it
+> > rather than doing it here.
+> is it more appropriate to call of_platform_device_create ?
 
-Sorry about that.  What you've found is an investigatory patch, not
-a fix for it.
+That's already done to create the platform device by OF core when
+populating devices from DT, what David suggested is that you should
+add set_dev_node() to core OF code instead of adding it specifically
+to the PCI host generic code.
 
-> I haven't seen any follow-up patches since that discussion in October,
-> and this patch resolves the issue in my test.
-
-If you read the remainder of the thread, you'll notice that there was
-discussion about the problem and that isn't a proper fix.
-
-> Could you guys please get this merged and pushed to stable to avoid
-> wasting other people's time as well?
-
-No one understands what's going on with ARM11 MPcore (not even ARM Ltd
-people).  We certainly do not want to add the expense of writing to
-the DACR each and every time we want to do a TLB flush, and as Will
-said at the end of the thread, it should be predicated on ARM11 MPcore.
-We don't know which revisions of ARM11 MPcore are affected.
-
-Please can you provide your boot messages so we can see what revision
-11MPcore you have in your device.  Thanks.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Lorenzo
