@@ -1,136 +1,48 @@
-From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Tue, 19 Jan 2016 23:10:12 +0800
-Subject: [Xen-devel] [PATCH v2 03/16] Xen: xlate: Use page_to_xen_pfn
- instead of page_to_pfn
-In-Reply-To: <alpine.DEB.2.02.1601191456370.9400@kaball.uk.xensource.com>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-4-git-send-email-zhaoshenglong@huawei.com>
- <alpine.DEB.2.02.1601151558010.16178@kaball.uk.xensource.com>
- <569C7363.80106@huawei.com>
- <alpine.DEB.2.02.1601191456370.9400@kaball.uk.xensource.com>
-Message-ID: <569E51D4.9020209@linaro.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 19 Jan 2016 10:12:56 -0500 (EST)
+Subject: [PATCH v3 1/1] USB: core: let USB device know device node
+In-Reply-To: <4405270.vcz87Q878u@wuerfel>
+Message-ID: <Pine.LNX.4.44L0.1601191009190.1727-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 19 Jan 2016, Arnd Bergmann wrote:
 
+> On Tuesday 19 January 2016 11:08:59 Peter Chen wrote:
+> > 
+> > I am afraid I have no USB 3.0 PC running Linux.
+> > 
+> > > > - Which the value of hub->descriptor->bNbrPorts for root hub?
+> > > 
+> > > In the example above, the legacy root hub would have bNbrPorts set to 6 
+> > > and the SS root hub would have bNbrPorts set to 3.
+> > > 
+> > 
+> > Ok, so the maximum physical port number is 6 as well as bNbrports value.
+> > The "reg" value at dts should be from 1 to 6. "reg" stands for physical
+> > port number for individual physical port, eg if "reg" equals to 1, it
+> > stands for the device connects at port 1, no matter the device is HS or
+> > SS, it can use the node whose "reg" is 1.
+> 
+> As I understand it, you could have two devices that are both
+> connected to port '1', when one is using HS and the other is using
+> SS. This means that we can't use the same 'reg' value for both, and
+> we have to define a particular way to disambiguate them.
+> 
+> As Alan says, there is an established ordering that just sorts the
+> ports form 1 to 9 in the example, and that would be the most
+> straightforward to use here.
 
-On 2016/1/19 22:59, Stefano Stabellini wrote:
-> On Mon, 18 Jan 2016, Shannon Zhao wrote:
->> On 2016/1/16 1:08, Stefano Stabellini wrote:
->>> On Fri, 15 Jan 2016, Shannon Zhao wrote:
->>>> From: Shannon Zhao <shannon.zhao@linaro.org>
->>>>
->>>> Use page_to_xen_pfn in case of 64KB page.
->>>>
->>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->>>> ---
->>>>   drivers/xen/xlate_mmu.c | 2 +-
->>>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
->>>> index 9692656..b9fcc2c 100644
->>>> --- a/drivers/xen/xlate_mmu.c
->>>> +++ b/drivers/xen/xlate_mmu.c
->>>> @@ -227,7 +227,7 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
->>>>   		return rc;
->>>>   	}
->>>>   	for (i = 0; i < nr_grant_frames; i++)
->>>> -		pfns[i] = page_to_pfn(pages[i]);
->>>> +		pfns[i] = page_to_xen_pfn(pages[i]);
->>>
->>> Shannon, thanks for the patch.
->>>
->>> Keeping in mind that in the 64K case, kernel pages are 64K but xen pages
->>> are still 4K, I think you also need to allocate
->>> (nr_grant_frames/XEN_PFN_PER_PAGE) kernel pages (assuming that they are
->>> allocated contiguously): nr_grant_frames refers to 4K pages, while
->>> xen_xlate_map_ballooned_pages is allocating pages on a 64K granularity
->>> (sizeof(pages[0]) == 64K).
->>>
->>> Be careful that alloc_xenballooned_pages deals with 64K pages (because
->>> it deals with kernel pages), while xen_pfn_t is always 4K based (because
->>> it deals with Xen pfns).
->>>
->>> Please test it with and without CONFIG_ARM64_64K_PAGES. Thanks!
->>>
->> Stefano, thanks for your explanation. How about below patch?
->
-> Good work, it looks like you covered all bases, I think it should work,
-> but I haven't tested it myself. Just one note below.
->
->
->> diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
->> index 9692656..e1f7c95 100644
->> --- a/drivers/xen/xlate_mmu.c
->> +++ b/drivers/xen/xlate_mmu.c
->> @@ -207,9 +207,12 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t
->> **gfns, void **virt,
->>          void *vaddr;
->>          int rc;
->>          unsigned int i;
->> +       unsigned long nr_pages;
->> +       xen_pfn_t xen_pfn = 0;
->>
->>          BUG_ON(nr_grant_frames == 0);
->> -       pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
->> +       nr_pages = DIV_ROUND_UP(nr_grant_frames, XEN_PFN_PER_PAGE);
->> +       pages = kcalloc(nr_pages, sizeof(pages[0]), GFP_KERNEL);
->>          if (!pages)
->>                  return -ENOMEM;
->>
->> @@ -218,22 +221,25 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t
->> **gfns, void **virt,
->>                  kfree(pages);
->>                  return -ENOMEM;
->>          }
->> -       rc = alloc_xenballooned_pages(nr_grant_frames, pages);
->> +       rc = alloc_xenballooned_pages(nr_pages, pages);
->>          if (rc) {
->> -               pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n",
->> __func__,
->> -                       nr_grant_frames, rc);
->> +               pr_warn("%s Couldn't balloon alloc %ld pages rc:%d\n",
->> __func__,
->> +                       nr_pages, rc);
->>                  kfree(pages);
->>                  kfree(pfns);
->>                  return rc;
->>          }
->> -       for (i = 0; i < nr_grant_frames; i++)
->> -               pfns[i] = page_to_pfn(pages[i]);
->> +       for (i = 0; i < nr_grant_frames; i++) {
->> +               if ((i % XEN_PFN_PER_PAGE) == 0)
->> +                       xen_pfn = page_to_xen_pfn(pages[i /
->> XEN_PFN_PER_PAGE]);
->> +               pfns[i] = xen_pfn++;
->> +       }
->
-> We might want to:
->
->    pfns[i] = pfn_to_gfn(xen_pfn++);
->
-> for consistency, even though for autotranslate guests pfn_to_gfn always
-> returns pfn.
->
-Ok, will add. Thanks.
+There is even a documented callback (find_raw_port_number) in the
+hc_driver structure for converting between the numbering schemes.  I
+don't know if all the existing USB-3 host controller drivers implement
+that callback, but they should.
 
->
->> -       vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
->> +       vaddr = vmap(pages, nr_pages, 0, PAGE_KERNEL);
->>          if (!vaddr) {
->> -               pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
->> -                       nr_grant_frames, rc);
->> -               free_xenballooned_pages(nr_grant_frames, pages);
->> +               pr_warn("%s Couldn't map %ld pages rc:%d\n", __func__,
->> +                       nr_pages, rc);
->> +               free_xenballooned_pages(nr_pages, pages);
->>                  kfree(pages);
->>                  kfree(pfns);
->>                  return -ENOMEM;
->>
->> --
->> Shannon
->>
+> Alternatively, you could use one of the high bits of the 'reg' value
+> to indicate which root hub is used. I'm sure that would work as
+> well, but be less obvious.
 
--- 
-Shannon
+It's probably best to stick with the same numbering that the hardware 
+uses.
+
+Alan Stern
