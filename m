@@ -1,72 +1,195 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Tue, 19 Jan 2016 14:51:39 +0000
-Subject: [RFC 8/9] dt-bindings: bcm2835: document optional per clock dt-nodes
+Date: Tue, 19 Jan 2016 14:51:40 +0000
+Subject: [RFC 9/9] clk: bcm2835: expose raw clock-registers via debugfs
 In-Reply-To: <1453215100-2382-1-git-send-email-kernel@martin.sperl.org>
 References: <1453215100-2382-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1453215100-2382-9-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1453215100-2382-10-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-Document how to modify per clock default behaviour
-via the device-tree.
+For debugging purposes under some circumstance
+it helps to be able to see the actual clock registers.
+
+E.g: when looking at the clock divider it is helpful to
+see what the actual clock divider is.
+
+This patch exposes all the clock registers specific to each
+clock/pll/pll-divider via debugfs.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- .../bindings/clock/brcm,bcm2835-cprman.txt         |   33 ++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ drivers/clk/bcm/clk-bcm2835.c |  101 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 101 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/brcm,bcm2835-cprman.txt b/Documentation/devicetree/bindings/clock/brcm,bcm2835-cprman.txt
-index e56a1df..794c4ac 100644
---- a/Documentation/devicetree/bindings/clock/brcm,bcm2835-cprman.txt
-+++ b/Documentation/devicetree/bindings/clock/brcm,bcm2835-cprman.txt
-@@ -17,6 +17,26 @@ Required properties:
- 		  found in include/dt-bindings/clock/bcm2835.h
- - reg:		Specifies base physical address and size of the registers
- - clocks:	The external oscillator clock phandle
-+- #address-cells number of cells required to define a clock
-+- #size-cells    Should be 0
-+
-+Subnodes:
-+
-+It is possible to apply optional settings per clock to modify clock
-+selection behaviour.
-+For each clock there may be a subnode that may contain the following:
-+
-+Required properties:
-+- reg                 -  clock id
-+
-+Optional properties:
-+- parent-clock-names  - list of parrent-clock names
-+  		        this list is validated againt the default list
-+		        of parent clocks and is used in this order.
-+- brcm,clock-selector - the clock selector to use
-+- brcm,mash-max-order - the maximum order of the fractional divider
-+- brcm,min-fract-div  - the minimum divider required when using
-+  		      	the fractional divider
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index c381cb1..29abae6 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -40,6 +40,7 @@
+ #include <linux/clk-provider.h>
+ #include <linux/clkdev.h>
+ #include <linux/clk/bcm2835.h>
++#include <linux/debugfs.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
+@@ -379,6 +380,27 @@ static inline u32 cprman_read(struct bcm2835_cprman *cprman, u32 reg)
+ 	return readl(cprman->regs + reg);
+ }
  
- Example:
- 
-@@ -33,6 +53,19 @@ Example:
- 		#clock-cells = <1>;
- 		reg = <0x7e101000 0x2000>;
- 		clocks = <&clk_osc>;
++static int bcm2835_debugfs_regset(struct bcm2835_cprman *cprman, u32 base,
++				  struct debugfs_reg32 *regs, size_t nregs,
++				  struct dentry *dentry)
++{
++	struct dentry *regdump;
++	struct debugfs_regset32 *regset;
 +
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++	regset = devm_kzalloc(cprman->dev, sizeof(*regset), GFP_KERNEL);
++	if (!regset)
++		return -ENOMEM;
 +
-+		/* custom settings for the PCM clock */
-+		clock at BCM2835_CLOCK_PCM {
-+			 reg = <BCM2835_CLOCK_PCM>;
-+			 parent-clock-names = "xosc", "plld_per";
-+			 brcm,clock-selector =
-+				  <BCM2835_CHOOSE_CLOCK_INTEGER_THEN_FRAC>;
-+			 brcm,mash-max-order = <BCM2835_MASH_ORDER_3>;
-+			 brcm,min-fract-div = <20>;
-+		};
- 	};
++	regset->regs = regs;
++	regset->nregs = nregs;
++	regset->base = cprman->regs + base;
++
++	regdump = debugfs_create_regset32("regdump", S_IRUGO, dentry,
++					  regset);
++
++	return regdump ? 0 : -ENOMEM;
++}
++
+ /*
+  * These are fixed clocks. They're probably not all root clocks and it may
+  * be possible to turn them on and off but until this is mapped out better
+@@ -1360,6 +1382,36 @@ static int bcm2835_pll_set_rate(struct clk_hw *hw,
+ 	return 0;
+ }
  
- 	i2c0: i2c at 7e205000 {
++static int bcm2835_pll_debug_init(struct clk_hw *hw,
++				  struct dentry *dentry)
++{
++	struct bcm2835_pll *pll = container_of(hw, struct bcm2835_pll, hw);
++	struct bcm2835_cprman *cprman = pll->cprman;
++	const struct bcm2835_pll_data *data = pll->data;
++	struct debugfs_reg32 *regs;
++
++	regs = devm_kzalloc(cprman->dev, 7 * sizeof(*regs), GFP_KERNEL);
++	if (!regs)
++		return -ENOMEM;
++
++	regs[0].name = "cm_ctrl";
++	regs[0].offset = data->cm_ctrl_reg;
++	regs[1].name = "a2w_ctrl";
++	regs[1].offset = data->a2w_ctrl_reg;
++	regs[2].name = "frac";
++	regs[2].offset = data->frac_reg;
++	regs[3].name = "ana0";
++	regs[3].offset = data->ana_reg_base + 0 * 4;
++	regs[4].name = "ana1";
++	regs[4].offset = data->ana_reg_base + 1 * 4;
++	regs[5].name = "ana2";
++	regs[5].offset = data->ana_reg_base + 2 * 4;
++	regs[6].name = "ana3";
++	regs[6].offset = data->ana_reg_base + 3 * 4;
++
++	return bcm2835_debugfs_regset(cprman, 0, regs, 7, dentry);
++}
++
+ static const struct clk_ops bcm2835_pll_clk_ops = {
+ 	.is_prepared = bcm2835_pll_is_on,
+ 	.prepare = bcm2835_pll_on,
+@@ -1367,6 +1419,7 @@ static const struct clk_ops bcm2835_pll_clk_ops = {
+ 	.recalc_rate = bcm2835_pll_get_rate,
+ 	.set_rate = bcm2835_pll_set_rate,
+ 	.round_rate = bcm2835_pll_round_rate,
++	.debug_init = bcm2835_pll_debug_init,
+ };
+ 
+ struct bcm2835_pll_divider {
+@@ -1461,6 +1514,26 @@ static int bcm2835_pll_divider_set_rate(struct clk_hw *hw,
+ 	return 0;
+ }
+ 
++static int bcm2835_pll_divider_debug_init(struct clk_hw *hw,
++					  struct dentry *dentry)
++{
++	struct bcm2835_pll_divider *divider = bcm2835_pll_divider_from_hw(hw);
++	struct bcm2835_cprman *cprman = divider->cprman;
++	const struct bcm2835_pll_divider_data *data = divider->data;
++	struct debugfs_reg32 *regs;
++
++	regs = devm_kzalloc(cprman->dev, 7 * sizeof(*regs), GFP_KERNEL);
++	if (!regs)
++		return -ENOMEM;
++
++	regs[0].name = "cm";
++	regs[0].offset = data->cm_reg;
++	regs[1].name = "a2w";
++	regs[1].offset = data->a2w_reg;
++
++	return bcm2835_debugfs_regset(cprman, 0, regs, 2, dentry);
++}
++
+ static const struct clk_ops bcm2835_pll_divider_clk_ops = {
+ 	.is_prepared = bcm2835_pll_divider_is_on,
+ 	.prepare = bcm2835_pll_divider_on,
+@@ -1468,6 +1541,7 @@ static const struct clk_ops bcm2835_pll_divider_clk_ops = {
+ 	.recalc_rate = bcm2835_pll_divider_get_rate,
+ 	.set_rate = bcm2835_pll_divider_set_rate,
+ 	.round_rate = bcm2835_pll_divider_round_rate,
++	.debug_init = bcm2835_pll_divider_debug_init,
+ };
+ 
+ /*
+@@ -1854,6 +1928,31 @@ static u8 bcm2835_clock_get_parent(struct clk_hw *hw)
+ 	return -EINVAL;
+ }
+ 
++static struct debugfs_reg32 bcm2835_debugfs_clock_reg32[] = {
++	{
++		.name = "ctl",
++		.offset = 0,
++	},
++	{
++		.name = "div",
++		.offset = 4,
++	},
++};
++
++static int bcm2835_clock_debug_init(struct clk_hw *hw,
++				    struct dentry *dentry)
++{
++	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
++	struct bcm2835_cprman *cprman = clock->cprman;
++	const struct bcm2835_clock_data *data = clock->data;
++
++	return bcm2835_debugfs_regset(
++		cprman, data->ctl_reg,
++		bcm2835_debugfs_clock_reg32,
++		ARRAY_SIZE(bcm2835_debugfs_clock_reg32),
++		dentry);
++}
++
+ static const struct clk_ops bcm2835_clock_clk_ops = {
+ 	.is_prepared = bcm2835_clock_is_on,
+ 	.prepare = bcm2835_clock_on,
+@@ -1863,6 +1962,7 @@ static const struct clk_ops bcm2835_clock_clk_ops = {
+ 	.determine_rate = bcm2835_clock_determine_rate,
+ 	.set_parent = bcm2835_clock_set_parent,
+ 	.get_parent = bcm2835_clock_get_parent,
++	.debug_init = bcm2835_clock_debug_init,
+ };
+ 
+ static int bcm2835_vpu_clock_is_on(struct clk_hw *hw)
+@@ -1881,6 +1981,7 @@ static const struct clk_ops bcm2835_vpu_clock_clk_ops = {
+ 	.determine_rate = bcm2835_clock_determine_rate,
+ 	.set_parent = bcm2835_clock_set_parent,
+ 	.get_parent = bcm2835_clock_get_parent,
++	.debug_init = bcm2835_clock_debug_init,
+ };
+ 
+ static struct device_node *bcm2835_find_dt_node(
 -- 
 1.7.10.4
