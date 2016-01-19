@@ -1,54 +1,52 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 20 Jan 2016 02:26:15 +0800
-Subject: [PATCH V3 10/10] acpi, gicv3, its: Use MADT ITS subtable to do
- PCI/MSI domain initialization.
-In-Reply-To: <1453209083-3358-11-git-send-email-tn@semihalf.com>
-Message-ID: <201601200231.5eyNsiQb%fengguang.wu@intel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 19 Jan 2016 10:40:46 -0800
+Subject: [PATCH 2/5] ARM: OMAP2+: Fix l2dis_3630 for rodata
+In-Reply-To: <alpine.LFD.2.20.1601191305370.7882@knanqh.ubzr>
+References: <1453225734-16993-1-git-send-email-tony@atomide.com>
+ <1453225734-16993-3-git-send-email-tony@atomide.com>
+ <alpine.LFD.2.20.1601191305370.7882@knanqh.ubzr>
+Message-ID: <20160119184046.GD19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+* Nicolas Pitre <nicolas.pitre@linaro.org> [160119 10:10]:
+> On Tue, 19 Jan 2016, Tony Lindgren wrote:
+> > --- a/arch/arm/mach-omap2/sleep34xx.S
+> > +++ b/arch/arm/mach-omap2/sleep34xx.S
+> > @@ -86,7 +86,9 @@ ENTRY(enable_omap3630_toggle_l2_on_restore)
+> >  	stmfd	sp!, {lr}	@ save registers on stack
+> >  	/* Setup so that we will disable and enable l2 */
+> >  	mov	r1, #0x1
+> > -	adrl	r2, l2dis_3630	@ may be too distant for plain adr
+> > +	adrl	r3, l2dis_3630_offset	@ may be too distant for plain adr
+> > +	ldr	r2, [r3]
+> > +	add	r2, r2, r3
+> >  	str	r1, [r2]
+> 
+> You could combine the add with the following str:
 
-[auto build test ERROR on v4.4-rc8]
-[cannot apply to tip/irq/core next-20160119]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+OK.
 
-url:    https://github.com/0day-ci/linux/commits/Tomasz-Nowicki/Introduce-ACPI-world-to-GICv3-ITS-irqchip/20160119-211652
-config: arm64-allmodconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+> 	str	r1, [r2, r3]
+> 
+> >  	ldmfd	sp!, {pc}	@ restore regs and return
+> >  ENDPROC(enable_omap3630_toggle_l2_on_restore)
+> > @@ -415,7 +417,9 @@ ENTRY(omap3_restore)
+> >  	cmp	r2, #0x0	@ Check if target power state was OFF or RET
+> >  	bne	logic_l1_restore
+> >  
+> > -	ldr	r0, l2dis_3630
+> > +	adr	r1, l2dis_3630_offset
+> > +	ldr	r0, [r1]
+> > +	add	r0, r0, r1
+> >  	cmp	r0, #0x1	@ should we disable L2 on 3630?
+> 
+> This looks wrong. You're testing the first bit of the address for 
+> l2dis_3630 rather than its content.
 
-All errors (new ones prefixed by >>):
+Ugh yup a ldr missing missing there. Will check the whole series
+and repost. Thanks for checking!
 
-   drivers/irqchip/irq-gic-v3-its-pci-msi.c: In function 'its_pci_msi_parse_madt':
->> drivers/irqchip/irq-gic-v3-its-pci-msi.c:168:2: error: implicit declaration of function 'pci_msi_register_fwnode_provider' [-Werror=implicit-function-declaration]
-     pci_msi_register_fwnode_provider(&iort_find_pci_domain_token);
-     ^
-   cc1: some warnings being treated as errors
+Regards,
 
-vim +/pci_msi_register_fwnode_provider +168 drivers/irqchip/irq-gic-v3-its-pci-msi.c
-
-   162			return 0;
-   163		}
-   164	
-   165		if (its_pci_msi_init_one(domain_handle))
-   166			return 0;
-   167	
- > 168		pci_msi_register_fwnode_provider(&iort_find_pci_domain_token);
-   169		pr_info("PCI/MSI: ITS at 0x%lx domain created\n",
-   170			(long)its_entry->base_address);
-   171		return 0;
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 46675 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160120/7b83b434/attachment-0001.obj>
+Tony
