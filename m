@@ -1,97 +1,39 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 19 Jan 2016 10:06:23 +0100
-Subject: [PATCH v2] reboot: Backup orderly_poweroff
-In-Reply-To: <5698F420.2010500@ti.com>
-References: <1452688405-15087-1-git-send-email-j-keerthy@ti.com>
- <20160114090520.GA4351@gmail.com> <569767EC.2010704@ti.com>
- <20160114100913.GB15857@gmail.com> <56977BA7.702@ti.com>
- <20160114112354.GA17869@gmail.com>
- <20160114132527.575e0f20@lxorguk.ukuu.org.uk>
- <20160115101459.GB23349@gmail.com> <5698F420.2010500@ti.com>
-Message-ID: <20160119090623.GA29678@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 Jan 2016 09:38:45 +0000
+Subject: CONFIG_CPU_SW_DOMAIN_PAN breakage on ARM11 MPCore
+In-Reply-To: <569D71F3.7000408@openwrt.org>
+References: <569D71F3.7000408@openwrt.org>
+Message-ID: <20160119093845.GJ19062@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jan 19, 2016 at 12:14:59AM +0100, Felix Fietkau wrote:
+> I just wasted a few hours debugging user space hangs after updating my
+> CNS3xxx device to Linux 4.4 - until I found this:
+> http://www.spinics.net/lists/arm-kernel/msg450888.html
 
-* Grygorii Strashko <grygorii.strashko@ti.com> wrote:
+Sorry about that.  What you've found is an investigatory patch, not
+a fix for it.
 
-> On 01/15/2016 12:14 PM, Ingo Molnar wrote:
-> > 
-> > * One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> wrote:
-> > 
-> >>> If kernel_power_off() is called then the system should power off. No ifs and
-> >>> whens.
-> >>
-> >> Even if it doesn't the watchdog should kill it.
-> >>
-> >> That is broken on some platforms on the watchdog side as the
-> >> watchdog shuts down during our power off callbacks - because the system
-> >> firmware is too stupid to reset the watchdog as it powers back up (so
-> >> keeps rebooting).
-> >>
-> >> If you watchdog and firmware function properly you shouldn't even have to
-> >> care if you crash during the kernel power off.
-> > 
-> > That's a good point as well - if the system is 'stuck' for some notion of stuck,
-> > then watchdog drivers can help.
-> > 
-> 
-> Seems ARM doesn't have endless loop implemented in machine_power_off() - so,
-> not too much chances for Watchdog to fire.
-> void machine_power_off(void)
-> {
-> 	local_irq_disable();
-> 	smp_send_stop();
-> 
-> 	if (pm_power_off)
-> 		pm_power_off();
-> 
-> 	--- endless loop ?
-> 	--- or restart ?
-> }
-> [and even if it will be there - 20-30sec is usual timeout for Watchdog and this
-> enough time to burn the system in case of thermal emergency poweroff :(]
-> 
-> > Here it's unclear whether user-space even called the sys_reboot() system call.
-> > 
-> 
-> That's true - original log [1] has 
-> Nov 30 11:19:22 [    5.942769] thermal thermal_zone3: critical temperature reached(108 C),shutting down
-> [...]
-> Nov 30 11:19:24 [    7.387900] ahci 4a140000.sata: flags: 64bit ncq sntf stag pm led clo only pmp pio slum part ccc apst 
-> Nov 30 11:19:24 INIT: Switching to runlevel: 0
-> Nov 30 11:19:24 INIT: Sending processes the TERM signal
-> 
-> and there are no
-> [  220.004522] reboot: Power down
-> 
-> 
-> Also, It's not the first time this part of code is discussed (thermal emergency poweroff) [2],
-> so the good question, as for me, is it really required and safe to use orderly_poweroff() in
-> case of thermal emergency poweroff ([3] as example)?
-> 
-> In general, this kind of use case can be simulated using SysRq on any arch
-> - [3.290034] Freeing unused kernel memory: 492K (c0a67000 - c0ae2000)
->   INIT: version 2.88 booting
->   Starting udev
-> ^^ The issue most probably might happens when system in the process of loading modules
-> So, once modules loading process is started - fire Sysrq "poweroff(o)"
+> I haven't seen any follow-up patches since that discussion in October,
+> and this patch resolves the issue in my test.
 
-So I'd say emergency poweroff should be named accordingly - and the 
-orderly_poweroff() name suggest anything but an emergency, right?
+If you read the remainder of the thread, you'll notice that there was
+discussion about the problem and that isn't a proper fix.
 
-So I'd be fine with the following:
+> Could you guys please get this merged and pushed to stable to avoid
+> wasting other people's time as well?
 
- - introduce a poweroff_emergency() core kernel function call
+No one understands what's going on with ARM11 MPcore (not even ARM Ltd
+people).  We certainly do not want to add the expense of writing to
+the DACR each and every time we want to do a TLB flush, and as Will
+said at the end of the thread, it should be predicated on ARM11 MPcore.
+We don't know which revisions of ARM11 MPcore are affected.
 
- - use it in drivers where it's justified
+Please can you provide your boot messages so we can see what revision
+11MPcore you have in your device.  Thanks.
 
- - poweroff_emergency() has a configurable timeout value. If the timeout value is
-   set to 0 then it powers the system off immediately.
-
-Functionally it would be mostly equivalent to your current patch (except the '0' 
-immediate poweroff functionality).
-
-Thanks,
-
-	Ingo
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
