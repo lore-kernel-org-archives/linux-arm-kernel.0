@@ -1,39 +1,24 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 19 Jan 2016 11:19:40 -0600
-Subject: [LINUX PATCH 2/5] Documentation: mmc: Updated the binding doc
- for Arasan SDHCI.
-In-Reply-To: <1453213055-35563-2-git-send-email-lakshmis@xilinx.com>
-References: <1453213055-35563-1-git-send-email-lakshmis@xilinx.com>
- <1453213055-35563-2-git-send-email-lakshmis@xilinx.com>
-Message-ID: <20160119171940.GA7207@rob-hp-laptop>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 19 Jan 2016 12:26:50 -0500
+Subject: [PATCH v2] drivers: ata: wake port before DMA stop for ALPM
+In-Reply-To: <569D7A7B.8090603@broadcom.com>
+References: <1452547346-31735-1-git-send-email-dpetigara@broadcom.com>
+ <569D7A7B.8090603@broadcom.com>
+Message-ID: <20160119172650.GR3520@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2016 at 07:47:32PM +0530, P L Sai Krishna wrote:
-> This patch adds broken-tuning property to the binding
-> doc for Arasan SDHCI.
+On Mon, Jan 18, 2016 at 03:51:23PM -0800, Danesh Petigara wrote:
+> Hi Tejun,
 > 
-> Signed-off-by: P L Sai Krishna <lakshmis@xilinx.com>
-> ---
->  Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> index da541c3..2088d9f 100644
-> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> @@ -17,6 +17,10 @@ Required Properties:
->    - interrupt-parent: Phandle for the interrupt controller that services
->  		      interrupts for this device.
->  
-> +Optional Properties:
-> +  - broken-tuning: Indicates tuning broken in Silicon 1.0 of
-> +			  Zynq Ultrascale+ MPSoC.
-> +
+> I was wondering if you had an opportunity to review this patch? Any
+> chance of this going into v4.5 along with the other patches, or would
+> you like to defer it to v4.6? I am fine either way.
 
-Make this a standard property.
+Looks fine to me.  I'll route it through for-4.5-fixes once -rc1 is
+cut.
 
-Or use the compatible string to determine this. Si errata is exactly 
-what they are for.
+Thanks.
 
-Rob
+-- 
+tejun
