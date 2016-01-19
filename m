@@ -1,89 +1,104 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 19 Jan 2016 10:59:42 +0000
-Subject: [RFC PATCH v2 0/4] CPUs capacity information for heterogeneous
- systems
-In-Reply-To: <CAKfTPtDJBAXUz=_-QQSkrqwAvmUJd1bUJ-VfSaNER-0NzWpunA@mail.gmail.com>
-References: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
- <56994D87.6000709@linaro.org> <20160118151316.GD7159@e106622-lin>
- <CAKfTPtBFR4cowT-j4qVxfUvh6NDNmi6R=J7z9kywi6bONU3Pow@mail.gmail.com>
- <20160118163014.GA10332@e106622-lin>
- <CAKfTPtDJBAXUz=_-QQSkrqwAvmUJd1bUJ-VfSaNER-0NzWpunA@mail.gmail.com>
-Message-ID: <20160119105941.GA28845@e104818-lin.cambridge.arm.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 19 Jan 2016 12:03:34 +0100
+Subject: [PATCH v2 1/3] drm/atomic-helper: Export framebuffer_changed()
+In-Reply-To: <f89bf1d5b69d52656f7125b7c240ddd525f27930.1453200263.git.john@metanate.com>
+References: <cover.1452782114.git.john@metanate.com>
+ <cover.1453200263.git.john@metanate.com>
+ <f89bf1d5b69d52656f7125b7c240ddd525f27930.1453200263.git.john@metanate.com>
+Message-ID: <20160119110334.GA19130@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 18, 2016 at 05:42:58PM +0100, Vincent Guittot wrote:
-> On 18 January 2016 at 17:30, Juri Lelli <juri.lelli@arm.com> wrote:
-> > On 18/01/16 17:13, Vincent Guittot wrote:
-> >> On 18 January 2016 at 16:13, Juri Lelli <juri.lelli@arm.com> wrote:
-> >> > On 15/01/16 11:50, Steve Muckle wrote:
-> >> >> On 01/08/2016 06:09 AM, Juri Lelli wrote:
-> >> >> >  2. Dynamic profiling at boot (v2)
-> >> >> >
-> >> >> >     pros: - does not require a standardized definition of capacity
-> >> >> >           - cannot be incorrectly tuned (once benchmark is fixed)
-> >> >> >           - does not require user/integrator work
-> >> >> >
-> >> >> >     cons: - not easy to come up with a clean solution, as it seems interaction
-> >> >> >             with several subsystems (e.g., cpufreq) is required
-> >> >> >           - not easy to agree upon a single benchmark (that has to be both
-> >> >> >             representative and simple enough to run at boot)
-> >> >> >           - numbers might (and do) vary from boot to boot
-> >> >>
-> >> >> An important additional con that was mentioned earlier IIRC was the
-> >> >> additional boot time required for the benchmark.
-> >> >
-> >> > Right. I forgot about that.
-> >> >
-> >> >> Perhaps there could be
-> >> >> a kernel command line argument to bypass the benchmark if it is known
-> >> >> that predetermined values will be provided via sysfs later?
-> >> >>
-> >> >
-> >> > This might work, yes.
-> >>
-> >> Instead of command line, I prefer to use DT.
-
-I fully agree. Command line doesn't scale with multiple CPUs, at most an
-option to bypass the benchmark (though we could just skip it when the DT
-values are present).
-
-> >> Can't we use something similar to what is currently done in arm arch
-> >> for the early stage of the boot ? We don't have to provide performance
-> >> value for which it's difficult to find a consensus on how to define it
-> >> and which benchmark should be used. We use the micro arch and the
-> >> frequency of the core to define a relative capacity. This give us a
-> >> relatively good idea of the capacity of each core.
-> >
-> > I'm not sure I understand what you are proposing. arm arch is currently
-> > based on having static hardcoded data (efficiency values). But, this has
-> > already been NACKed for arm64 during last review of this RFC.
-> >
-> > Are you proposing something different?
+On Tue, Jan 19, 2016 at 10:46:58AM +0000, John Keeping wrote:
+> The Rockchip driver cannot use drm_atomic_helper_wait_for_vblanks()
+> because it has hardware counters for neither vblanks nor scanlines.
 > 
-> No, i'm proposing to use it at boot time until the dynamic profiling
-> gives better value.
-> We don't have to set any new properties.
-> IIRC, It was nacked because it was of static hardcoded value that was
-> not always reflecting the best accurate capacity of a system. IMHO,
-> it's not that far from reality so can't this be used as an
-> intermediate step while waiting for dynamic profiling ?
+> In order to simplify re-implementing the functionality for this driver,
+> export the framebuffer_changed() helper so it can be reused.
+> 
+> Signed-off-by: John Keeping <john@metanate.com>
+> Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 
-My nack for hard-coded values still stands since this is not just about
-the microarchitecture (MIDR) but how the CPUs are integrated with the
-SoC, additional caches, memory latency, maximum clock frequency (or you
-rely on DT again to get this information and scale the initial CPU
-capacity/efficiency accordingly). MIDR does not capture SoC details.
+Also ack for merging through rockchip git trees. I discussed this with
+Dave Airlie, he's ok with that.
+-Daniel
 
-Two questions:
-
-1. How is the boot time affected by the benchmark?
-2. How is the boot time affected by considering all the CPUs the same?
-
-My preference is for DT and sysfs (especially useful for
-development/tuning) but I'm not opposed to a boot-time benchmark if
-people insist on it. If the answer to point 2 is "insignificant", we
-could as well defer the capacity setting to user space (sysfs).
+> ---
+> Unchanged since v1.
+> 
+>  drivers/gpu/drm/drm_atomic_helper.c | 24 ++++++++++++++++++++----
+>  include/drm/drm_atomic_helper.h     |  4 ++++
+>  2 files changed, 24 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/drm_atomic_helper.c b/drivers/gpu/drm/drm_atomic_helper.c
+> index 268d37f..7449293 100644
+> --- a/drivers/gpu/drm/drm_atomic_helper.c
+> +++ b/drivers/gpu/drm/drm_atomic_helper.c
+> @@ -948,9 +948,23 @@ static void wait_for_fences(struct drm_device *dev,
+>  	}
+>  }
+>  
+> -static bool framebuffer_changed(struct drm_device *dev,
+> -				struct drm_atomic_state *old_state,
+> -				struct drm_crtc *crtc)
+> +/**
+> + * drm_atomic_helper_framebuffer_changed - check if framebuffer has changed
+> + * @dev: DRM device
+> + * @old_state: atomic state object with old state structures
+> + * @crtc: DRM crtc
+> + *
+> + * Checks whether the framebuffer used for this CRTC changes as a result of
+> + * the atomic update.  This is useful for drivers which cannot use
+> + * drm_atomic_helper_wait_for_vblanks() and need to reimplement its
+> + * functionality.
+> + *
+> + * Returns:
+> + * true if the framebuffer changed.
+> + */
+> +bool drm_atomic_helper_framebuffer_changed(struct drm_device *dev,
+> +					   struct drm_atomic_state *old_state,
+> +					   struct drm_crtc *crtc)
+>  {
+>  	struct drm_plane *plane;
+>  	struct drm_plane_state *old_plane_state;
+> @@ -967,6 +981,7 @@ static bool framebuffer_changed(struct drm_device *dev,
+>  
+>  	return false;
+>  }
+> +EXPORT_SYMBOL(drm_atomic_helper_framebuffer_changed);
+>  
+>  /**
+>   * drm_atomic_helper_wait_for_vblanks - wait for vblank on crtcs
+> @@ -1001,7 +1016,8 @@ drm_atomic_helper_wait_for_vblanks(struct drm_device *dev,
+>  		if (old_state->legacy_cursor_update)
+>  			continue;
+>  
+> -		if (!framebuffer_changed(dev, old_state, crtc))
+> +		if (!drm_atomic_helper_framebuffer_changed(dev,
+> +				old_state, crtc))
+>  			continue;
+>  
+>  		ret = drm_crtc_vblank_get(crtc);
+> diff --git a/include/drm/drm_atomic_helper.h b/include/drm/drm_atomic_helper.h
+> index a286cce..74fce78 100644
+> --- a/include/drm/drm_atomic_helper.h
+> +++ b/include/drm/drm_atomic_helper.h
+> @@ -42,6 +42,10 @@ int drm_atomic_helper_commit(struct drm_device *dev,
+>  			     struct drm_atomic_state *state,
+>  			     bool async);
+>  
+> +bool drm_atomic_helper_framebuffer_changed(struct drm_device *dev,
+> +					   struct drm_atomic_state *old_state,
+> +					   struct drm_crtc *crtc);
+> +
+>  void drm_atomic_helper_wait_for_vblanks(struct drm_device *dev,
+>  					struct drm_atomic_state *old_state);
+>  
+> -- 
+> 2.7.0.226.gfe986fe
+> 
 
 -- 
-Catalin
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
