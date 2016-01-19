@@ -1,108 +1,24 @@
-From: a0393675@ti.com (Keerthy)
-Date: Tue, 19 Jan 2016 16:02:30 +0530
-Subject: [PATCH v2] reboot: Backup orderly_poweroff
-In-Reply-To: <20160119090623.GA29678@gmail.com>
-References: <1452688405-15087-1-git-send-email-j-keerthy@ti.com>
- <20160114090520.GA4351@gmail.com> <569767EC.2010704@ti.com>
- <20160114100913.GB15857@gmail.com> <56977BA7.702@ti.com>
- <20160114112354.GA17869@gmail.com>
- <20160114132527.575e0f20@lxorguk.ukuu.org.uk>
- <20160115101459.GB23349@gmail.com> <5698F420.2010500@ti.com>
- <20160119090623.GA29678@gmail.com>
-Message-ID: <569E10BE.2020809@ti.com>
+From: john@metanate.com (John Keeping)
+Date: Tue, 19 Jan 2016 10:46:57 +0000
+Subject: [PATCH v2 0/3] drm/rockchip: fix cursor performance with atomic
+In-Reply-To: <cover.1452782114.git.john@metanate.com>
+References: <cover.1452782114.git.john@metanate.com>
+Message-ID: <cover.1453200263.git.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ingo,
+The first two patches are unchanged since v1 but the comment in the
+third has been expanded following Thierry's comments.
 
-On Tuesday 19 January 2016 02:36 PM, Ingo Molnar wrote:
->
-> * Grygorii Strashko <grygorii.strashko@ti.com> wrote:
->
->> On 01/15/2016 12:14 PM, Ingo Molnar wrote:
->>>
->>> * One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> wrote:
->>>
->>>>> If kernel_power_off() is called then the system should power off. No ifs and
->>>>> whens.
->>>>
->>>> Even if it doesn't the watchdog should kill it.
->>>>
->>>> That is broken on some platforms on the watchdog side as the
->>>> watchdog shuts down during our power off callbacks - because the system
->>>> firmware is too stupid to reset the watchdog as it powers back up (so
->>>> keeps rebooting).
->>>>
->>>> If you watchdog and firmware function properly you shouldn't even have to
->>>> care if you crash during the kernel power off.
->>>
->>> That's a good point as well - if the system is 'stuck' for some notion of stuck,
->>> then watchdog drivers can help.
->>>
->>
->> Seems ARM doesn't have endless loop implemented in machine_power_off() - so,
->> not too much chances for Watchdog to fire.
->> void machine_power_off(void)
->> {
->> 	local_irq_disable();
->> 	smp_send_stop();
->>
->> 	if (pm_power_off)
->> 		pm_power_off();
->>
->> 	--- endless loop ?
->> 	--- or restart ?
->> }
->> [and even if it will be there - 20-30sec is usual timeout for Watchdog and this
->> enough time to burn the system in case of thermal emergency poweroff :(]
->>
->>> Here it's unclear whether user-space even called the sys_reboot() system call.
->>>
->>
->> That's true - original log [1] has
->> Nov 30 11:19:22 [    5.942769] thermal thermal_zone3: critical temperature reached(108 C),shutting down
->> [...]
->> Nov 30 11:19:24 [    7.387900] ahci 4a140000.sata: flags: 64bit ncq sntf stag pm led clo only pmp pio slum part ccc apst
->> Nov 30 11:19:24 INIT: Switching to runlevel: 0
->> Nov 30 11:19:24 INIT: Sending processes the TERM signal
->>
->> and there are no
->> [  220.004522] reboot: Power down
->>
->>
->> Also, It's not the first time this part of code is discussed (thermal emergency poweroff) [2],
->> so the good question, as for me, is it really required and safe to use orderly_poweroff() in
->> case of thermal emergency poweroff ([3] as example)?
->>
->> In general, this kind of use case can be simulated using SysRq on any arch
->> - [3.290034] Freeing unused kernel memory: 492K (c0a67000 - c0ae2000)
->>    INIT: version 2.88 booting
->>    Starting udev
->> ^^ The issue most probably might happens when system in the process of loading modules
->> So, once modules loading process is started - fire Sysrq "poweroff(o)"
->
-> So I'd say emergency poweroff should be named accordingly - and the
-> orderly_poweroff() name suggest anything but an emergency, right?
->
-> So I'd be fine with the following:
->
->   - introduce a poweroff_emergency() core kernel function call
->
->   - use it in drivers where it's justified
->
->   - poweroff_emergency() has a configurable timeout value. If the timeout value is
->     set to 0 then it powers the system off immediately.
->
-> Functionally it would be mostly equivalent to your current patch (except the '0'
-> immediate poweroff functionality).
+John Keeping (3):
+  drm/atomic-helper: Export framebuffer_changed()
+  drm/rockchip: don't wait for vblank if fb hasn't changed
+  drm/rockchip: explain why we can't wait_for_vblanks
 
-Thanks for the suggestion. I will work on this and get back.
+ drivers/gpu/drm/drm_atomic_helper.c        | 24 ++++++++++++++++++++----
+ drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 23 +++++++++++++++++++++--
+ include/drm/drm_atomic_helper.h            |  4 ++++
+ 3 files changed, 45 insertions(+), 6 deletions(-)
 
-Best Regards,
-Keerthy
-
->
-> Thanks,
->
-> 	Ingo
->
+-- 
+2.7.0.226.gfe986fe
