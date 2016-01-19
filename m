@@ -1,86 +1,30 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 19 Jan 2016 16:02:24 +0000
-Subject: [PATCH V3 11/21] pci, acpi: Move ACPI host bridge device
- companion assignment to core code.
-In-Reply-To: <1452691267-32240-12-git-send-email-tn@semihalf.com>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <1452691267-32240-12-git-send-email-tn@semihalf.com>
-Message-ID: <20160119160224.GD5276@red-moon>
+From: holgerschurig@gmail.com (Holger Schurig)
+Date: Tue, 19 Jan 2016 17:05:04 +0100
+Subject: [LINUX PATCH 5/5] mmc: host: Update the quirks for this
+ controller.
+In-Reply-To: <1453213055-35563-5-git-send-email-lakshmis@xilinx.com> (P. L.
+ Sai Krishna's message of "Tue, 19 Jan 2016 19:47:35 +0530")
+References: <1453213055-35563-1-git-send-email-lakshmis@xilinx.com>
+ <1453213055-35563-5-git-send-email-lakshmis@xilinx.com>
+Message-ID: <87fuxt4ksv.fsf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 02:20:57PM +0100, Tomasz Nowicki wrote:
-> Currently we have two platforms (x86 & ia64) capable of PCI ACPI host
-> bridge initialization. They both use sysdata pill to pass down parent
+Hi,
 
-pill ?
+Don't write "of this controller" into subject, write "of sdhci-arasan"
+or something like it.
 
-> device reference and both relay on NULL parent in pci_create_root_bus()
+Otherwise people will have to look into your patch description ...
 
-s/relay/rely
+> This patch adds SDHCI_QUIRK2_STOP_WITH_TC quirk to remove
+> the following error message.
+> "mmc0: Got data interrupt 0x00000002 even though no data
+> operation was in progress"
 
-> to validate sysdata content.
-> 
-> It looks hacky and prevent us from getting some frimware specific
+But wait, it's not there, too. So people have to look into the patch
+itself. :-(
 
-"prevents us from getting some firmware..."
 
-> info for PCI host controller e.g. bus domain number.
-> However, it seems we can overcome that blocker by passing down parent
 
-It does not seem, either this patch overcomes the issue and it is
-accepted, or it does not and it is discarded.
-
-> device via pci_create_root_bus parameter (as the ACPI device type)
-
-I do not understand what you mean by "as the ACPI device type".
-
-> and using ACPI_COMPANION_SET in core code for ACPI boot method.
-> ACPI_COMPANION_SET is safe to run for all cases DT, ACPI and DT&ACPI.
-> 
-> Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> ---
->  drivers/acpi/pci_root.c | 5 ++++-
->  drivers/pci/probe.c     | 2 ++
->  2 files changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-> index ae3fe4e..a65c8c2 100644
-> --- a/drivers/acpi/pci_root.c
-> +++ b/drivers/acpi/pci_root.c
-> @@ -846,7 +846,10 @@ struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
->  
->  	pci_acpi_root_add_resources(info);
->  	pci_add_resource(&info->resources, &root->secondary);
-> -	bus = pci_create_root_bus(NULL, busnum, ops->pci_ops,
-> +
-> +	/* Root bridge device needs to be sure of parent ACPI type */
-> +	ACPI_COMPANION_SET(&device->dev, device);
-
-I do not understand why the code above is needed, can you elaborate
-please ?
-
-Thanks,
-Lorenzo
-
-> +	bus = pci_create_root_bus(&device->dev, busnum, ops->pci_ops,
->  				  sysdata, &info->resources);
->  	if (!bus)
->  		goto out_release_info;
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 553a029..cad836f 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -2107,6 +2107,8 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
->  	bridge->dev.parent = parent;
->  	bridge->dev.release = pci_release_host_bridge_dev;
->  	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
-> +	ACPI_COMPANION_SET(&bridge->dev,
-> +			   parent ? to_acpi_device_node(parent->fwnode) : NULL);
->  	error = pcibios_root_bridge_prepare(bridge);
->  	if (error) {
->  		kfree(bridge);
-> -- 
-> 1.9.1
-> 
+Holger
