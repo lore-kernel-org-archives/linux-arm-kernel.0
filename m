@@ -1,68 +1,46 @@
 From: john@metanate.com (John Keeping)
-Date: Tue, 19 Jan 2016 10:46:59 +0000
-Subject: [PATCH v2 2/3] drm/rockchip: don't wait for vblank if fb hasn't
- changed
+Date: Tue, 19 Jan 2016 10:47:00 +0000
+Subject: [PATCH v2 3/3] drm/rockchip: explain why we can't wait_for_vblanks
 In-Reply-To: <cover.1453200263.git.john@metanate.com>
 References: <cover.1453200263.git.john@metanate.com>
-Message-ID: <6865056b134065bcc8fff798314945e2ba5318cf.1453200263.git.john@metanate.com>
+Message-ID: <921a9f91937bebfeef7d7f563339fe6e4bf63f67.1453200263.git.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As commented in drm_atomic_helper_wait_for_vblanks(), userspace relies
-on cursor ioctls being unsynced.  Converting the rockchip driver to
-atomic has significantly impacted cursor performance by making every
-cursor update wait for vblank.
-
-By skipping the vblank sync when the framebuffer has not changed (as is
-done in drm_atomic_helper_wait_for_vblanks()) we can avoid this for the
-common case of moving the cursor and only need to delay the cursor ioctl
-when the cursor icon changes.
-
-We cannot add the check on legacy_cursor_update since that results in
-the cursor bo being unreferenced while the hardware may still be reading
-it.  Fully supporting unsynced cursor updates is left for the future
-when the atomic helper framework supports async updates.
-
 Signed-off-by: John Keeping <john@metanate.com>
-Tested-by: Heiko Stuebner <heiko@sntech.de>
 ---
-Unchanged since v1.
+v2:
+  - Add more detail of the particular race that could happen if we used
+    drm_atomic_helper_wait_for_vblanks().
 
- drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
 diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-index f784488..679d23a 100644
+index 679d23a..cf0b7bd 100644
 --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
 +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-@@ -178,7 +178,7 @@ static void rockchip_crtc_wait_for_update(struct drm_crtc *crtc)
+@@ -177,6 +177,21 @@ static void rockchip_crtc_wait_for_update(struct drm_crtc *crtc)
+ 		crtc_funcs->wait_for_update(crtc);
  }
  
++/*
++ * We can't use drm_atomic_helper_wait_for_vblanks() because rk3288 and rk3066
++ * have hardware counters for neither vblanks nor scanlines, which results in
++ * a race where:
++ *				| <-- HW vsync irq and reg take effect
++ *	       plane_commit --> |
++ *	get_vblank and wait --> |
++ *				| <-- handle_vblank, vblank->count + 1
++ *		 cleanup_fb --> |
++ *		iommu crash --> |
++ *				| <-- HW vsync irq and reg take effect
++ *
++ * This function is equivalent but uses rockchip_crtc_wait_for_update() instead
++ * of waiting for vblank_count to change.
++ */
  static void
--rockchip_atomic_wait_for_complete(struct drm_atomic_state *old_state)
-+rockchip_atomic_wait_for_complete(struct drm_device *dev, struct drm_atomic_state *old_state)
+ rockchip_atomic_wait_for_complete(struct drm_device *dev, struct drm_atomic_state *old_state)
  {
- 	struct drm_crtc_state *old_crtc_state;
- 	struct drm_crtc *crtc;
-@@ -194,6 +194,10 @@ rockchip_atomic_wait_for_complete(struct drm_atomic_state *old_state)
- 		if (!crtc->state->active)
- 			continue;
- 
-+		if (!drm_atomic_helper_framebuffer_changed(dev,
-+				old_state, crtc))
-+			continue;
-+
- 		ret = drm_crtc_vblank_get(crtc);
- 		if (ret != 0)
- 			continue;
-@@ -241,7 +245,7 @@ rockchip_atomic_commit_complete(struct rockchip_atomic_commit *commit)
- 
- 	drm_atomic_helper_commit_planes(dev, state, true);
- 
--	rockchip_atomic_wait_for_complete(state);
-+	rockchip_atomic_wait_for_complete(dev, state);
- 
- 	drm_atomic_helper_cleanup_planes(dev, state);
- 
 -- 
 2.7.0.226.gfe986fe
