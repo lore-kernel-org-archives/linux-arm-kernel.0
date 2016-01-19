@@ -1,80 +1,97 @@
-From: liudongdong3@huawei.com (liudongdong (C))
-Date: Tue, 19 Jan 2016 16:52:25 +0800
-Subject: [PATCH V3 20/21] pci, acpi: Match PCI config space accessors
- against platfrom specific quirks.
-In-Reply-To: <569DEBE9.5090909@semihalf.com>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <1452691267-32240-21-git-send-email-tn@semihalf.com>
- <1452785776.28109.22.camel@redhat.com> <569CDD8F.807@semihalf.com>
- <569D9634.3040304@huawei.com> <569DEBE9.5090909@semihalf.com>
-Message-ID: <569DF949.5080208@huawei.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 19 Jan 2016 10:06:23 +0100
+Subject: [PATCH v2] reboot: Backup orderly_poweroff
+In-Reply-To: <5698F420.2010500@ti.com>
+References: <1452688405-15087-1-git-send-email-j-keerthy@ti.com>
+ <20160114090520.GA4351@gmail.com> <569767EC.2010704@ti.com>
+ <20160114100913.GB15857@gmail.com> <56977BA7.702@ti.com>
+ <20160114112354.GA17869@gmail.com>
+ <20160114132527.575e0f20@lxorguk.ukuu.org.uk>
+ <20160115101459.GB23349@gmail.com> <5698F420.2010500@ti.com>
+Message-ID: <20160119090623.GA29678@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+* Grygorii Strashko <grygorii.strashko@ti.com> wrote:
 
-? 2016/1/19 15:55, Tomasz Nowicki ??:
-> On 19.01.2016 02:49, liudongdong (C) wrote:
->> Hi Tomasz, Mark
->>
->> ? 2016/1/18 20:41, Tomasz Nowicki ??:
->>> On 14.01.2016 16:36, Mark Salter wrote:
->>>>> +extern struct pci_mcfg_fixup __start_acpi_mcfg_fixups[];
->>>>> >+extern struct pci_mcfg_fixup __end_acpi_mcfg_fixups[];
->>>>> >+
->>>>> >+static struct pci_ops *pci_mcfg_check_quirks(struct acpi_pci_root
->>>>> *root)
->>>>> >+{
->>>>> >+    struct pci_mcfg_fixup *f;
->>>>> >+    int bus_num = root->secondary.start;
->>>>> >+    int domain = root->segment;
->>>>> >+
->>>>> >+    /*
->>>>> >+     * First match against PCI topology <domain:bus> then use DMI or
->>>>> >+     * custom match handler.
->>>>> >+     */
->>>>> >+    for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups;
->>>>> f++) {
->>>>> >+        if ((f->domain == domain || f->domain ==
->>>>> PCI_MCFG_DOMAIN_ANY) &&
->>>>> >+            (f->bus_num == bus_num || f->bus_num ==
->>>>> PCI_MCFG_BUS_ANY) &&
->>>>> >+            (f->system ? dmi_check_system(f->system) : 0 ||
->>>>> >+             f->match ? f->match(f, root) : 0))
->>>>> >+            return f->ops;
->>>> I think this would be better as:
->>>>
->>>>             (f->system ? dmi_check_system(f->system) : 1 &&
->>>>              f->match ? f->match(f, root) : 1))
->>>>             return f->ops;
->>>>
->>>> Otherwise, one has to call dmi_check_system() from f->match() if
->>>> access to root is needed.
->>>
->>
->> Non-DMI, we need not to call dmi_check_system() from f->match(),
->> we can use _HID to decide to hook the pci_ops or not.
->
-> Sorry, but I dont understand your point. Can you elaborate?
->
-> With Mark modification, you can use the following cases to identify platform:
-> 1. DMI only
-> 2. f->match() only (_HID can be used there)
-> 3. DMI and f->match()
->
-> DMI used to be very convenient way to recognise platform, sometimes it is not enough, hence f->match() alternative.
->
+> On 01/15/2016 12:14 PM, Ingo Molnar wrote:
+> > 
+> > * One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> wrote:
+> > 
+> >>> If kernel_power_off() is called then the system should power off. No ifs and
+> >>> whens.
+> >>
+> >> Even if it doesn't the watchdog should kill it.
+> >>
+> >> That is broken on some platforms on the watchdog side as the
+> >> watchdog shuts down during our power off callbacks - because the system
+> >> firmware is too stupid to reset the watchdog as it powers back up (so
+> >> keeps rebooting).
+> >>
+> >> If you watchdog and firmware function properly you shouldn't even have to
+> >> care if you crash during the kernel power off.
+> > 
+> > That's a good point as well - if the system is 'stuck' for some notion of stuck,
+> > then watchdog drivers can help.
+> > 
+> 
+> Seems ARM doesn't have endless loop implemented in machine_power_off() - so,
+> not too much chances for Watchdog to fire.
+> void machine_power_off(void)
+> {
+> 	local_irq_disable();
+> 	smp_send_stop();
+> 
+> 	if (pm_power_off)
+> 		pm_power_off();
+> 
+> 	--- endless loop ?
+> 	--- or restart ?
+> }
+> [and even if it will be there - 20-30sec is usual timeout for Watchdog and this
+> enough time to burn the system in case of thermal emergency poweroff :(]
+> 
+> > Here it's unclear whether user-space even called the sys_reboot() system call.
+> > 
+> 
+> That's true - original log [1] has 
+> Nov 30 11:19:22 [    5.942769] thermal thermal_zone3: critical temperature reached(108 C),shutting down
+> [...]
+> Nov 30 11:19:24 [    7.387900] ahci 4a140000.sata: flags: 64bit ncq sntf stag pm led clo only pmp pio slum part ccc apst 
+> Nov 30 11:19:24 INIT: Switching to runlevel: 0
+> Nov 30 11:19:24 INIT: Sending processes the TERM signal
+> 
+> and there are no
+> [  220.004522] reboot: Power down
+> 
+> 
+> Also, It's not the first time this part of code is discussed (thermal emergency poweroff) [2],
+> so the good question, as for me, is it really required and safe to use orderly_poweroff() in
+> case of thermal emergency poweroff ([3] as example)?
+> 
+> In general, this kind of use case can be simulated using SysRq on any arch
+> - [3.290034] Freeing unused kernel memory: 492K (c0a67000 - c0ae2000)
+>   INIT: version 2.88 booting
+>   Starting udev
+> ^^ The issue most probably might happens when system in the process of loading modules
+> So, once modules loading process is started - fire Sysrq "poweroff(o)"
 
-Yes, you are right,  I was wrong.
-In my case, I can use the second point.
-2. f->match() only (_HID can be used there)
+So I'd say emergency poweroff should be named accordingly - and the 
+orderly_poweroff() name suggest anything but an emergency, right?
 
-Thanks
-Dongdong
+So I'd be fine with the following:
 
-> Tomasz
->
->
->
-> .
->
+ - introduce a poweroff_emergency() core kernel function call
+
+ - use it in drivers where it's justified
+
+ - poweroff_emergency() has a configurable timeout value. If the timeout value is
+   set to 0 then it powers the system off immediately.
+
+Functionally it would be mostly equivalent to your current patch (except the '0' 
+immediate poweroff functionality).
+
+Thanks,
+
+	Ingo
