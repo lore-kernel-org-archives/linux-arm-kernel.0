@@ -1,497 +1,195 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Tue, 19 Jan 2016 18:04:53 +0800
-Subject: [PATCH v12.1 07/17] drm: rockchip: dp: add rockchip platform dp driver
+Date: Tue, 19 Jan 2016 18:06:57 +0800
+Subject: [PATCH v12.1 13/17] drm: bridge: analogix/dp: try force hpd after
+ plug in lookup failed
 In-Reply-To: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
 References: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1453197893-13413-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1453198017-13461-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rockchip have three clocks for dp controller, we leave pclk_edp
-to analogix_dp driver control, and keep the sclk_edp_24m and
-sclk_edp in platform driver.
+Some edp screen do not have hpd signal, so we can't just return
+failed when hpd plug in detect failed.
+
+This is an hardware property, so we need add a devicetree property
+"analogix,need-force-hpd" to indicate this sutiation.
 
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+Acked-by: Rob Herring <robh@kernel.org>
 Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
-Rebase the whole patches on top of Dave's drm-next branch [0] (Heiko)
+There is no new changes in v12.1, but just rebase the whole patches on
+top of Dave's drm-next branch [0] (Heiko)
 
-Changes in v12.1:
-- Use .enable instead of preprare/commit in encoder_helper_funcs (Heiko)
-
+Changes in v12.1: None
 Changes in v12: None
-Changes in v11: None
-Changes in v10:
-- Correct the ROCKCHIP_ANALOGIX_DP indentation in Kconfig to tabs here (Heiko)
+Changes in v11:
+- Rename the "analogix,need-force-hpd" to common 'force-hpd' (Rob)
+- Add the ack from Rob Herring
 
+Changes in v10: None
 Changes in v9: None
 Changes in v8: None
 Changes in v7: None
 Changes in v6: None
-Changes in v5:
-- Remove the empty line at the end of document, and correct the endpoint
-  numbers in the example DT node, and remove the regulator iomux setting
-  in driver code while using the pinctl in devicetree instead. (Heiko)
-- Add device type declared, cause the previous "platform device type
-  support (v4 11/16)" already merge into (v5 02/14).
-- Implement connector registration code. (Thierry)
-
-Changes in v4:
-- Remove some deprecated DT properties in rockchip dp document.
-
+Changes in v5: None
+Changes in v4: None
 Changes in v3:
-- Leave "sclk_edp_24m" to rockchip dp phy driver which name to "24m",
-  and leave "sclk_edp" to analogix dp core driver which name to "dp",
-  and leave "pclk_edp" to rockchip dp platform driver which name to
-  "pclk". (Thierry & Heiko)
-- Add devicetree binding document. (Heiko)
-- Remove "rockchip,panel" DT property, take use of remote point to get panel
-  node. (Heiko)
-- Add the new function point dp_platdata->get_modes() init.
+- Add "analogix,need-force-hpd" to indicate whether driver need foce
+  hpd when hpd detect failed.
 
-Changes in v2:
-- Get panel node with remote-endpoint method, and create devicetree binding
-  for driver. (Heiko)
-- Remove the clock enable/disbale with "sclk_edp" & "sclk_edp_24m",
-  leave those clock to rockchip dp phy driver.
+Changes in v2: None
 
- drivers/gpu/drm/rockchip/Kconfig                |   9 +
- drivers/gpu/drm/rockchip/Makefile               |   1 +
- drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 384 ++++++++++++++++++++++++
- include/drm/bridge/analogix_dp.h                |   1 +
- 4 files changed, 395 insertions(+)
- create mode 100644 drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+ .../bindings/display/bridge/analogix_dp.txt        |  4 ++-
+ .../bindings/display/exynos/exynos_dp.txt          |  1 +
+ .../display/rockchip/analogix_dp-rockchip.txt      |  1 +
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 35 ++++++++++++++++++----
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  2 ++
+ drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  |  9 ++++++
+ 6 files changed, 46 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
-index 8573985..9fe4e32 100644
---- a/drivers/gpu/drm/rockchip/Kconfig
-+++ b/drivers/gpu/drm/rockchip/Kconfig
-@@ -35,3 +35,12 @@ config ROCKCHIP_DW_MIPI_DSI
- 	 for the Synopsys DesignWare HDMI driver. If you want to
- 	 enable MIPI DSI on RK3288 based SoC, you should selet this
- 	 option.
-+
-+config ROCKCHIP_ANALOGIX_DP
-+	tristate "Rockchip specific extensions for Analogix DP driver"
-+	depends on DRM_ROCKCHIP
-+	select DRM_ANALOGIX_DP
-+	help
-+	  This selects support for Rockchip SoC specific extensions
-+	  for the Analogix Core DP driver. If you want to enable DP
-+	  on RK3288 based SoC, you should selet this option.
-diff --git a/drivers/gpu/drm/rockchip/Makefile b/drivers/gpu/drm/rockchip/Makefile
-index d1dc0f7..40d4c94 100644
---- a/drivers/gpu/drm/rockchip/Makefile
-+++ b/drivers/gpu/drm/rockchip/Makefile
-@@ -7,6 +7,7 @@ rockchipdrm-y := rockchip_drm_drv.o rockchip_drm_fb.o rockchip_drm_fbdev.o \
+diff --git a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
+index 7659a7a..4f2ba8c 100644
+--- a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
++++ b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
+@@ -22,6 +22,9 @@ Required properties for dp-controller:
+ 		from general PHY binding: Should be "dp".
  
- obj-$(CONFIG_ROCKCHIP_DW_HDMI) += dw_hdmi-rockchip.o
- obj-$(CONFIG_ROCKCHIP_DW_MIPI_DSI) += dw-mipi-dsi.o
-+obj-$(CONFIG_ROCKCHIP_ANALOGIX_DP) += analogix_dp-rockchip.o
+ Optional properties for dp-controller:
++	-force-hpd:
++		Indicate driver need force hpd when hpd detect failed, this
++		is used for some eDP screen which don't have hpd signal.
+ 	-hpd-gpios:
+ 		Hotplug detect GPIO.
+ 		Indicates which GPIO should be used for hotplug detection
+@@ -31,7 +34,6 @@ Optional properties for dp-controller:
+ 		* Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+ 		* Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
  
- obj-$(CONFIG_DRM_ROCKCHIP) += rockchipdrm.o rockchip_drm_vop.o \
- 				rockchip_vop_reg.o
-diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-new file mode 100644
-index 0000000..acedc98
---- /dev/null
-+++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-@@ -0,0 +1,384 @@
-+/*
-+ * Rockchip SoC DP (Display Port) interface driver.
-+ *
-+ * Copyright (C) Fuzhou Rockchip Electronics Co., Ltd.
-+ * Author: Andy Yan <andy.yan@rock-chips.com>
-+ *         Yakir Yang <ykk@rock-chips.com>
-+ *         Jeff Chen <jeff.chen@rock-chips.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License as published by the
-+ * Free Software Foundation; either version 2 of the License, or (at your
-+ * option) any later version.
-+ */
+-
+ [1]: Documentation/devicetree/bindings/media/video-interfaces.txt
+ -------------------------------------------------------------------------------
+ 
+diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+index 4fa8aca..ade5d8e 100644
+--- a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
++++ b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+@@ -56,6 +56,7 @@ For the below properties, please refer to Analogix DP binding document:
+ 	-phys (required)
+ 	-phy-names (required)
+ 	-hpd-gpios (optional)
++	 force-hpd (optional)
+ 
+ Deprecated properties for DisplayPort:
+ -interlaced:            deprecated prop that can parsed from drm_display_mode.
+diff --git a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+index 04d99e3..e832ff9 100644
+--- a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
++++ b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+@@ -32,6 +32,7 @@ For the below properties, please refer to Analogix DP binding document:
+ - phys (required)
+ - phy-names (required)
+ - hpd-gpios (optional)
++- force-hpd (optional)
+ -------------------------------------------------------------------------------
+ 
+ Example:
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index a62e8d0..13986b7 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -62,15 +62,38 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
+ {
+ 	int timeout_loop = 0;
+ 
+-	while (analogix_dp_get_plug_in_status(dp) != 0) {
++	while (timeout_loop < DP_TIMEOUT_LOOP_COUNT) {
++		if (analogix_dp_get_plug_in_status(dp) == 0)
++			return 0;
 +
-+#include <linux/component.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/of_graph.h>
-+#include <linux/regmap.h>
-+#include <linux/reset.h>
-+#include <linux/clk.h>
-+
-+#include <drm/drmP.h>
-+#include <drm/drm_crtc_helper.h>
-+#include <drm/drm_dp_helper.h>
-+#include <drm/drm_of.h>
-+#include <drm/drm_panel.h>
-+
-+#include <video/of_videomode.h>
-+#include <video/videomode.h>
-+
-+#include <drm/bridge/analogix_dp.h>
-+
-+#include "rockchip_drm_drv.h"
-+#include "rockchip_drm_vop.h"
-+
-+#define to_dp(nm)	container_of(nm, struct rockchip_dp_device, nm)
-+
-+/* dp grf register offset */
-+#define GRF_SOC_CON6                            0x025c
-+#define GRF_EDP_LCD_SEL_MASK                    BIT(5)
-+#define GRF_EDP_SEL_VOP_LIT                     BIT(5)
-+#define GRF_EDP_SEL_VOP_BIG                     0
-+
-+struct rockchip_dp_device {
-+	struct drm_device        *drm_dev;
-+	struct device            *dev;
-+	struct drm_encoder       encoder;
-+	struct drm_display_mode  mode;
-+
-+	struct clk               *pclk;
-+	struct regmap            *grf;
-+	struct reset_control     *rst;
-+
-+	struct analogix_dp_plat_data plat_data;
-+};
-+
-+static int rockchip_dp_pre_init(struct rockchip_dp_device *dp)
-+{
-+	reset_control_assert(dp->rst);
-+	usleep_range(10, 20);
-+	reset_control_deassert(dp->rst);
-+
-+	return 0;
-+}
-+
-+static int rockchip_dp_poweron(struct analogix_dp_plat_data *plat_data)
-+{
-+	struct rockchip_dp_device *dp = to_dp(plat_data);
-+	int ret;
-+
-+	ret = clk_prepare_enable(dp->pclk);
-+	if (ret < 0) {
-+		dev_err(dp->dev, "failed to enable pclk %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = rockchip_dp_pre_init(dp);
-+	if (ret < 0) {
-+		dev_err(dp->dev, "failed to dp pre init %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int rockchip_dp_powerdown(struct analogix_dp_plat_data *plat_data)
-+{
-+	struct rockchip_dp_device *dp = to_dp(plat_data);
-+
-+	clk_disable_unprepare(dp->pclk);
-+
-+	return 0;
-+}
-+
-+static bool
-+rockchip_dp_drm_encoder_mode_fixup(struct drm_encoder *encoder,
-+				   const struct drm_display_mode *mode,
-+				   struct drm_display_mode *adjusted_mode)
-+{
-+	/* do nothing */
-+	return true;
-+}
-+
-+static void rockchip_dp_drm_encoder_mode_set(struct drm_encoder *encoder,
-+					     struct drm_display_mode *mode,
-+					     struct drm_display_mode *adjusted)
-+{
-+	/* do nothing */
-+}
-+
-+static void rockchip_dp_drm_encoder_enable(struct drm_encoder *encoder)
-+{
-+	struct rockchip_dp_device *dp = to_dp(encoder);
-+	int ret;
-+	u32 val;
+ 		timeout_loop++;
+-		if (timeout_loop > DP_TIMEOUT_LOOP_COUNT) {
+-			dev_err(dp->dev, "failed to get hpd plug status\n");
+-			return -ETIMEDOUT;
+-		}
+ 		usleep_range(10, 11);
+ 	}
+ 
++	/*
++	 * Some edp screen do not have hpd signal, so we can't just
++	 * return failed when hpd plug in detect failed, DT property
++	 * "force-hpd" would indicate whether driver need this.
++	 */
++	if (!dp->force_hpd)
++		return -ETIMEDOUT;
 +
 +	/*
-+	 * FIXME(Yakir): driver should configure the CRTC output video
-+	 * mode with the display information which indicated the monitor
-+	 * support colorimetry.
-+	 *
-+	 * But don't know why the CRTC driver seems could only output the
-+	 * RGBaaa rightly. For example, if connect the "innolux,n116bge"
-+	 * eDP screen, EDID would indicated that screen only accepted the
-+	 * 6bpc mode. But if I configure CRTC to RGB666 output, then eDP
-+	 * screen would show a blue picture (RGB888 show a green picture).
-+	 * But if I configure CTRC to RGBaaa, and eDP driver still keep
-+	 * RGB666 input video mode, then screen would works prefect.
++	 * The eDP TRM indicate that if HPD_STATUS(RO) is 0, AUX CH
++	 * will not work, so we need to give a force hpd action to
++	 * set HPD_STATUS manually.
 +	 */
-+	ret = rockchip_drm_crtc_mode_config(encoder->crtc,
-+					    DRM_MODE_CONNECTOR_eDP,
-+					    ROCKCHIP_OUT_MODE_AAAA);
-+	if (ret < 0) {
-+		dev_err(dp->dev, "Could not set crtc mode config (%d)\n", ret);
-+		return;
-+	}
++	dev_dbg(dp->dev, "failed to get hpd plug status, try to force hpd\n");
 +
-+	ret = rockchip_drm_encoder_get_mux_id(dp->dev->of_node, encoder);
-+	if (ret < 0)
-+		return;
++	analogix_dp_force_hpd(dp);
 +
-+	if (ret)
-+		val = GRF_EDP_SEL_VOP_LIT | (GRF_EDP_LCD_SEL_MASK << 16);
-+	else
-+		val = GRF_EDP_SEL_VOP_BIG | (GRF_EDP_LCD_SEL_MASK << 16);
-+
-+	dev_dbg(dp->dev, "vop %s output to dp\n", (ret) ? "LIT" : "BIG");
-+
-+	ret = regmap_write(dp->grf, GRF_SOC_CON6, val);
-+	if (ret != 0) {
-+		dev_err(dp->dev, "Could not write to GRF: %d\n", ret);
-+		return;
-+	}
-+}
-+
-+static void rockchip_dp_drm_encoder_nop(struct drm_encoder *encoder)
-+{
-+	/* do nothing */
-+}
-+
-+static struct drm_encoder_helper_funcs rockchip_dp_encoder_helper_funcs = {
-+	.mode_fixup = rockchip_dp_drm_encoder_mode_fixup,
-+	.mode_set = rockchip_dp_drm_encoder_mode_set,
-+	.enable = rockchip_dp_drm_encoder_enable,
-+	.disable = rockchip_dp_drm_encoder_nop,
-+};
-+
-+static void rockchip_dp_drm_encoder_destroy(struct drm_encoder *encoder)
-+{
-+	drm_encoder_cleanup(encoder);
-+}
-+
-+static struct drm_encoder_funcs rockchip_dp_encoder_funcs = {
-+	.destroy = rockchip_dp_drm_encoder_destroy,
-+};
-+
-+static int rockchip_dp_init(struct rockchip_dp_device *dp)
-+{
-+	struct device *dev = dp->dev;
-+	struct device_node *np = dev->of_node;
-+	int ret;
-+
-+	dp->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
-+	if (IS_ERR(dp->grf)) {
-+		dev_err(dev, "failed to get rockchip,grf property\n");
-+		return PTR_ERR(dp->grf);
-+	}
-+
-+	dp->pclk = devm_clk_get(dev, "pclk");
-+	if (IS_ERR(dp->pclk)) {
-+		dev_err(dev, "failed to get pclk property\n");
-+		return PTR_ERR(dp->pclk);
-+	}
-+
-+	dp->rst = devm_reset_control_get(dev, "dp");
-+	if (IS_ERR(dp->rst)) {
-+		dev_err(dev, "failed to get dp reset control\n");
-+		return PTR_ERR(dp->rst);
-+	}
-+
-+	ret = clk_prepare_enable(dp->pclk);
-+	if (ret < 0) {
-+		dev_err(dp->dev, "failed to enable pclk %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = rockchip_dp_pre_init(dp);
-+	if (ret < 0) {
-+		dev_err(dp->dev, "failed to pre init %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int rockchip_dp_drm_create_encoder(struct rockchip_dp_device *dp)
-+{
-+	struct drm_encoder *encoder = &dp->encoder;
-+	struct drm_device *drm_dev = dp->drm_dev;
-+	struct device *dev = dp->dev;
-+	int ret;
-+
-+	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm_dev,
-+							     dev->of_node);
-+	DRM_DEBUG_KMS("possible_crtcs = 0x%x\n", encoder->possible_crtcs);
-+
-+	ret = drm_encoder_init(drm_dev, encoder, &rockchip_dp_encoder_funcs,
-+			       DRM_MODE_ENCODER_TMDS);
-+	if (ret) {
-+		DRM_ERROR("failed to initialize encoder with drm\n");
-+		return ret;
-+	}
-+
-+	drm_encoder_helper_add(encoder, &rockchip_dp_encoder_helper_funcs);
-+
-+	return 0;
-+}
-+
-+static int rockchip_dp_bind(struct device *dev, struct device *master,
-+			    void *data)
-+{
-+	struct rockchip_dp_device *dp = dev_get_drvdata(dev);
-+	struct drm_device *drm_dev = data;
-+	int ret;
-+
-+	/*
-+	 * Just like the probe function said, we don't need the
-+	 * device drvrate anymore, we should leave the charge to
-+	 * analogix dp driver, set the device drvdata to NULL.
-+	 */
-+	dev_set_drvdata(dev, NULL);
-+
-+	ret = rockchip_dp_init(dp);
-+	if (ret < 0)
-+		return ret;
-+
-+	dp->drm_dev = drm_dev;
-+
-+	ret = rockchip_dp_drm_create_encoder(dp);
-+	if (ret) {
-+		DRM_ERROR("failed to create drm encoder\n");
-+		return ret;
-+	}
-+
-+	dp->plat_data.encoder = &dp->encoder;
-+
-+	dp->plat_data.dev_type = RK3288_DP;
-+	dp->plat_data.power_on = rockchip_dp_poweron;
-+	dp->plat_data.power_off = rockchip_dp_powerdown;
-+
-+	return analogix_dp_bind(dev, dp->drm_dev, &dp->plat_data);
-+}
-+
-+static void rockchip_dp_unbind(struct device *dev, struct device *master,
-+			       void *data)
-+{
-+	return analogix_dp_unbind(dev, master, data);
-+}
-+
-+static const struct component_ops rockchip_dp_component_ops = {
-+	.bind = rockchip_dp_bind,
-+	.unbind = rockchip_dp_unbind,
-+};
-+
-+static int rockchip_dp_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *panel_node, *port, *endpoint;
-+	struct rockchip_dp_device *dp;
-+	struct drm_panel *panel;
-+
-+	port = of_graph_get_port_by_id(dev->of_node, 1);
-+	if (!port) {
-+		dev_err(dev, "can't find output port\n");
++	if (analogix_dp_get_plug_in_status(dp) != 0) {
++		dev_err(dp->dev, "failed to get hpd plug in status\n");
 +		return -EINVAL;
 +	}
 +
-+	endpoint = of_get_child_by_name(port, "endpoint");
-+	of_node_put(port);
-+	if (!endpoint) {
-+		dev_err(dev, "no output endpoint found\n");
-+		return -EINVAL;
-+	}
++	dev_dbg(dp->dev, "success to get plug in status after force hpd\n");
 +
-+	panel_node = of_graph_get_remote_port_parent(endpoint);
-+	of_node_put(endpoint);
-+	if (!panel_node) {
-+		dev_err(dev, "no output node found\n");
-+		return -EINVAL;
-+	}
-+
-+	panel = of_drm_find_panel(panel_node);
-+	if (!panel) {
-+		DRM_ERROR("failed to find panel\n");
-+		of_node_put(panel_node);
-+		return -EPROBE_DEFER;
-+	}
-+
-+	of_node_put(panel_node);
-+
-+	dp = devm_kzalloc(dev, sizeof(*dp), GFP_KERNEL);
-+	if (!dp)
-+		return -ENOMEM;
-+
-+	dp->dev = dev;
-+
-+	dp->plat_data.panel = panel;
-+
-+	/*
-+	 * We just use the drvdata until driver run into component
-+	 * add function, and then we would set drvdata to null, so
-+	 * that analogix dp driver could take charge of the drvdata.
-+	 */
-+	platform_set_drvdata(pdev, dp);
-+
-+	return component_add(dev, &rockchip_dp_component_ops);
-+}
-+
-+static int rockchip_dp_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &rockchip_dp_component_ops);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM_SLEEP
-+static int rockchip_dp_suspend(struct device *dev)
-+{
-+	return analogix_dp_suspend(dev);
-+}
-+
-+static int rockchip_dp_resume(struct device *dev)
-+{
-+	return analogix_dp_resume(dev);
-+}
-+#endif
-+
-+static const struct dev_pm_ops rockchip_dp_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(rockchip_dp_suspend, rockchip_dp_resume)
-+};
-+
-+static const struct of_device_id rockchip_dp_dt_ids[] = {
-+	{.compatible = "rockchip,rk3288-dp",},
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, rockchip_dp_dt_ids);
-+
-+static struct platform_driver rockchip_dp_driver = {
-+	.probe = rockchip_dp_probe,
-+	.remove = rockchip_dp_remove,
-+	.driver = {
-+		   .name = "rockchip-dp",
-+		   .owner = THIS_MODULE,
-+		   .pm = &rockchip_dp_pm_ops,
-+		   .of_match_table = of_match_ptr(rockchip_dp_dt_ids),
-+	},
-+};
-+
-+module_platform_driver(rockchip_dp_driver);
-+
-+MODULE_AUTHOR("Yakir Yang <ykk@rock-chips.com>");
-+MODULE_AUTHOR("Jeff chen <jeff.chen@rock-chips.com>");
-+MODULE_DESCRIPTION("Rockchip Specific Analogix-DP Driver Extension");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/drm/bridge/analogix_dp.h b/include/drm/bridge/analogix_dp.h
-index d1188db..25afb31 100644
---- a/include/drm/bridge/analogix_dp.h
-+++ b/include/drm/bridge/analogix_dp.h
-@@ -15,6 +15,7 @@
+ 	return 0;
+ }
  
- enum analogix_dp_devtype {
- 	EXYNOS_DP,
-+	RK3288_DP,
+@@ -1291,6 +1314,8 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
+ 	if (IS_ERR(dp->reg_base))
+ 		return PTR_ERR(dp->reg_base);
+ 
++	dp->force_hpd = of_property_read_bool(dev->of_node, "force-hpd");
++
+ 	dp->hpd_gpio = of_get_named_gpio(dev->of_node, "hpd-gpios", 0);
+ 	if (!gpio_is_valid(dp->hpd_gpio))
+ 		dp->hpd_gpio = of_get_named_gpio(dev->of_node,
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+index 6cc53d4..a8cba64 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+@@ -154,6 +154,7 @@ struct analogix_dp_device {
+ 	struct phy		*phy;
+ 	int			dpms_mode;
+ 	int			hpd_gpio;
++	bool                    force_hpd;
+ 
+ 	struct analogix_dp_plat_data *plat_data;
  };
+@@ -174,6 +175,7 @@ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
+ 				       bool enable);
+ void analogix_dp_init_analog_func(struct analogix_dp_device *dp);
+ void analogix_dp_init_hpd(struct analogix_dp_device *dp);
++void analogix_dp_force_hpd(struct analogix_dp_device *dp);
+ enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp);
+ void analogix_dp_clear_hotplug_interrupts(struct analogix_dp_device *dp);
+ void analogix_dp_reset_aux(struct analogix_dp_device *dp);
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+index 1e24b37..cba3ffd 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+@@ -365,6 +365,15 @@ void analogix_dp_init_hpd(struct analogix_dp_device *dp)
+ 	writel(reg, dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
+ }
  
- struct analogix_dp_plat_data {
++void analogix_dp_force_hpd(struct analogix_dp_device *dp)
++{
++	u32 reg;
++
++	reg = readl(dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
++	reg = (F_HPD | HPD_CTRL);
++	writel(reg, dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
++}
++
+ enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp)
+ {
+ 	u32 reg;
 -- 
 1.9.1
