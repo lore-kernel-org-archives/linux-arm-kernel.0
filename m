@@ -1,42 +1,78 @@
-From: Michael.Wang@alliedtelesis.co.nz (Michael Wang)
-Date: Tue, 19 Jan 2016 22:33:46 +0000
-Subject: mtd: pxa3xx_nand: issue with command time out
-In-Reply-To: <87wpr6d21b.fsf@belgarion.home>
-References: <5695CEF0.1080100@alliedtelesis.co.nz>
- <87a8o9ex9r.fsf@belgarion.home> <569827BC.10601@alliedtelesis.co.nz>
- <874meddqu5.fsf@belgarion.home> <569C4ABD.6080803@alliedtelesis.co.nz>
- <87wpr6d21b.fsf@belgarion.home>
-Message-ID: <569EB9CA.9080201@alliedtelesis.co.nz>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 19 Jan 2016 18:37:36 -0500
+Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
+ hostbridge init based on ACPI
+In-Reply-To: <20160119204015.GS19062@n2100.arm.linux.org.uk>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <20160114134440.GA8520@xora-haswell.xora.org.uk>
+ <1452780100.28109.3.camel@redhat.com>
+ <20160114141501.GC8520@xora-haswell.xora.org.uk>
+ <1452781481.28109.8.camel@redhat.com>
+ <20160115121231.GD8520@xora-haswell.xora.org.uk>
+ <20160118140405.GC11384@xora-haswell.xora.org.uk>
+ <20160119202513.GC6510@localhost>
+ <20160119204015.GS19062@n2100.arm.linux.org.uk>
+Message-ID: <1453246656.28109.81.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/2016 10:13 AM, Robert Jarzmik wrote:
->  From this analysis I think you have something broken in your platform, a driver
-> taking a lock and blocking the scheduling or something like that. Your timeouts
-> seem to come from there.
->
-> If you want to add 2 prinks to validate the theory (and remove my debug logs
-> which change the realtime behavior) :
->   - put one just before the "ret = IRQ_WAKE_THREAD";
->   - put the other on the first line of pxa3xx_nand_irq_thread()
->   - and calculate the difference.
-Hi Robert,
+On Tue, 2016-01-19 at 20:40 +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 19, 2016 at 02:25:13PM -0600, Bjorn Helgaas wrote:
+> > On Mon, Jan 18, 2016 at 02:04:05PM +0000, Graeme Gregory wrote:
+> > > After some private debugging with Mark it turned out that the difference
+> > > between our configurations was I did not have.
+> > > 
+> > > CONFIG_DMA_CMA=y
+> > > 
+> > > With this enabled then the card works without coherent mask hack.
+> > 
+> > I didn't follow the whole discussion here, but is this a case where
+> > the driver could fail more gracefully than it did???Can we do anything
+> > to make this easier for the next person who trips over the same problem?
+> 
+> I've not followed the discussion at all, but reading what was in the
+> quoted parts of the mail makes me somewhat suspicious.
+> 
+> The way PCI drivers (or in fact any driver) are supposed to work is:
+> 
+> - the bus code sets up a default mask (32-bit DMA in the case of PCI)
+> - the driver calls dma_set_mask() or similar function with the mask
+> ? the _driver_ wants to use.??Arch DMA code decides whether the mask
+> ? can be supported, and if it can, it re-sets the DMA mask.??If the
+> ? mask can't be supported, it returns an error.
+> 
+> The driver is doing things correctly:
+> 
+> ????????if ((sizeof(dma_addr_t) > 4) &&
+> ????????????!pci_set_dma_mask(pdev, DMA_BIT_MASK(64)) && use_dac) {
+> ????????????????tp->cp_cmd |= PCIDAC;
+> ????????????????dev->features |= NETIF_F_HIGHDMA;
+> ????????} else {
+> ????????????????rc = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
+> 
+> which says: if the size of a DMA address supports 64-bit, and we can
+> set a 64-bit DMA address mask (iow, the platform allows it), and
+> we're permitted to use DAC, use DAC, otherwise try to set a 32-bit
+> DMA mask.
+> 
+> It shouldn't matter one bit what the mask is before that point.
+> 
+> However, what the driver fails to do is to deal with the coherent
+> mask - it appears to be missing a call to pci_set_consistent_dma_mask().
+> That may be where the issue is.
 
-Thank you very much for your help.
+It is.
 
-I have added the 2 printks, and I think you are right that there is 
-something
-blocking the scheduling.
+The driver works with devicetree because of_dma_configure() sets up dma
+and coherent mask for PCI devices based on root bridge info in the DT.
+So the driver gets by without setting coherent mask explicitly. In the
+ACPI case, the coherent mask doesn't get set because there isn't DMA
+info in the ACPI tables (I think IORT table/IOMMU support will add this
+in the future). Using CONFIG_DMA_CMA avoids the issue by allowing CMA
+memory to be used for DMA while avoiding a check against coherent mask.
 
-[  146.372745] pxa3xx_nand_irq:700 IRQ_WAKE_THREAD status=2
-[  146.378106] pxa3xx_nand_irq_thread:643
-[  146.411117] pxa3xx_nand_irq:700 IRQ_WAKE_THREAD status=2
-[  146.537124] pxa3xx_nand_irq_thread:643
-       => irq thread was scheduled in 0.126 ms
-[  146.541245] pxa3xx_nand_irq:700 IRQ_WAKE_THREAD status=2
-[  146.546603] pxa3xx_nand_irq_thread:643
-
-I will continue to investigate the cause of this delay.
-
-Thanks,
-Michael
+> 
+> It may be worth doing what I did with the DMA API, and introducing
+> pci_set_mask_and_coherent() which sets both masks together - which
+> will probably allow some PCI driver code to be simplified.
+> 
