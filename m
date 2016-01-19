@@ -1,53 +1,91 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 20 Jan 2016 02:04:02 +0800
-Subject: [PATCH V3 08/10] irqchip, gicv3, its: Probe ITS in the ACPI way.
-In-Reply-To: <1453209083-3358-9-git-send-email-tn@semihalf.com>
-Message-ID: <201601200217.VECZlkZ7%fengguang.wu@intel.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 19 Jan 2016 13:10:09 -0500 (EST)
+Subject: [PATCH 2/5] ARM: OMAP2+: Fix l2dis_3630 for rodata
+In-Reply-To: <1453225734-16993-3-git-send-email-tony@atomide.com>
+References: <1453225734-16993-1-git-send-email-tony@atomide.com>
+ <1453225734-16993-3-git-send-email-tony@atomide.com>
+Message-ID: <alpine.LFD.2.20.1601191305370.7882@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Tue, 19 Jan 2016, Tony Lindgren wrote:
 
-[auto build test ERROR on v4.4-rc8]
-[cannot apply to tip/irq/core next-20160119]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+> We don't want to write to .text section. Let's move l2dis_3630
+> to .data and access it via a pointer.
+> 
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Laura Abbott <labbott@redhat.com>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Nishanth Menon <menon.nishanth@gmail.com>
+> Cc: Richard Woodruff <r-woodruff2@ti.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/sleep34xx.S | 16 +++++++++++++---
+>  1 file changed, 13 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
+> index 787cfda..f7c7bf8 100644
+> --- a/arch/arm/mach-omap2/sleep34xx.S
+> +++ b/arch/arm/mach-omap2/sleep34xx.S
+> @@ -86,7 +86,9 @@ ENTRY(enable_omap3630_toggle_l2_on_restore)
+>  	stmfd	sp!, {lr}	@ save registers on stack
+>  	/* Setup so that we will disable and enable l2 */
+>  	mov	r1, #0x1
+> -	adrl	r2, l2dis_3630	@ may be too distant for plain adr
+> +	adrl	r3, l2dis_3630_offset	@ may be too distant for plain adr
+> +	ldr	r2, [r3]
+> +	add	r2, r2, r3
+>  	str	r1, [r2]
 
-url:    https://github.com/0day-ci/linux/commits/Tomasz-Nowicki/Introduce-ACPI-world-to-GICv3-ITS-irqchip/20160119-211652
-config: arm64-allmodconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+You could combine the add with the following str:
 
-All errors (new ones prefixed by >>):
+	str	r1, [r2, r3]
 
-   drivers/irqchip/irq-gic-v3-its.c: In function 'its_irq_gic_domain_alloc':
->> drivers/irqchip/irq-gic-v3-its.c:1278:2: error: implicit declaration of function 'is_fwnode_irqchip' [-Werror=implicit-function-declaration]
-     } else if (is_fwnode_irqchip(domain->parent->fwnode)) {
-     ^
-   cc1: some warnings being treated as errors
+>  	ldmfd	sp!, {pc}	@ restore regs and return
+>  ENDPROC(enable_omap3630_toggle_l2_on_restore)
+> @@ -415,7 +417,9 @@ ENTRY(omap3_restore)
+>  	cmp	r2, #0x0	@ Check if target power state was OFF or RET
+>  	bne	logic_l1_restore
+>  
+> -	ldr	r0, l2dis_3630
+> +	adr	r1, l2dis_3630_offset
+> +	ldr	r0, [r1]
+> +	add	r0, r0, r1
+>  	cmp	r0, #0x1	@ should we disable L2 on 3630?
 
-vim +/is_fwnode_irqchip +1278 drivers/irqchip/irq-gic-v3-its.c
+This looks wrong. You're testing the first bit of the address for 
+l2dis_3630 rather than its content.
 
-  1272		if (irq_domain_get_of_node(domain->parent)) {
-  1273			fwspec.fwnode = domain->parent->fwnode;
-  1274			fwspec.param_count = 3;
-  1275			fwspec.param[0] = GIC_IRQ_TYPE_LPI;
-  1276			fwspec.param[1] = hwirq;
-  1277			fwspec.param[2] = IRQ_TYPE_EDGE_RISING;
-> 1278		} else if (is_fwnode_irqchip(domain->parent->fwnode)) {
-  1279			fwspec.fwnode = domain->parent->fwnode;
-  1280			fwspec.param_count = 2;
-  1281			fwspec.param[0] = hwirq;
+>  	bne	skipl2dis
+>  	mrc	p15, 0, r0, c1, c0, 1
+> @@ -484,7 +488,9 @@ l2_inv_gp:
+>  	mov	r12, #0x2
+>  	smc	#0			@ Call SMI monitor (smieq)
+>  logic_l1_restore:
+> -	ldr	r1, l2dis_3630
+> +	adr	r0, l2dis_3630_offset
+> +	ldr	r1, [r0]
+> +	add	r1, r1, r0
+>  	cmp	r1, #0x1		@ Test if L2 re-enable needed on 3630
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 46675 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160120/3b84bc2b/attachment-0001.obj>
+Ditto here.
+
+>  	bne	skipl2reen
+>  	mrc	p15, 0, r1, c1, c0, 1
+> @@ -513,6 +519,10 @@ control_stat:
+>  	.word	CONTROL_STAT
+>  control_mem_rta:
+>  	.word	CONTROL_MEM_RTA_CTRL
+> +l2dis_3630_offset:
+> +	.long	l2dis_3630 - .
+> +
+> +	.data
+>  l2dis_3630:
+>  	.word	0
+>  
+> -- 
+> 2.7.0.rc3
+> 
+> 
