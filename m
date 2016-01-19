@@ -1,71 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Jan 2016 17:57:58 +0000
-Subject: [LINUX PATCH 1/5] mmc: Workaround for the issue in auto tuning
- mode.
-In-Reply-To: <1453213055-35563-1-git-send-email-lakshmis@xilinx.com>
-References: <1453213055-35563-1-git-send-email-lakshmis@xilinx.com>
-Message-ID: <20160119175757.GR19062@n2100.arm.linux.org.uk>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 20 Jan 2016 02:04:02 +0800
+Subject: [PATCH V3 08/10] irqchip, gicv3, its: Probe ITS in the ACPI way.
+In-Reply-To: <1453209083-3358-9-git-send-email-tn@semihalf.com>
+Message-ID: <201601200217.VECZlkZ7%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2016 at 07:47:31PM +0530, P L Sai Krishna wrote:
-> +void arasan_tune_sdclk(struct sdhci_host *host)
+Hi Tomasz,
 
-static?
+[auto build test ERROR on v4.4-rc8]
+[cannot apply to tip/irq/core next-20160119]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-> +{
-> +	unsigned int clock;
-> +
-> +	clock = host->clock;
+url:    https://github.com/0day-ci/linux/commits/Tomasz-Nowicki/Introduce-ACPI-world-to-GICv3-ITS-irqchip/20160119-211652
+config: arm64-allmodconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-Maybe combine the above two lines:
+All errors (new ones prefixed by >>):
 
-	unsigned int clock = host->clock;
+   drivers/irqchip/irq-gic-v3-its.c: In function 'its_irq_gic_domain_alloc':
+>> drivers/irqchip/irq-gic-v3-its.c:1278:2: error: implicit declaration of function 'is_fwnode_irqchip' [-Werror=implicit-function-declaration]
+     } else if (is_fwnode_irqchip(domain->parent->fwnode)) {
+     ^
+   cc1: some warnings being treated as errors
 
-?
+vim +/is_fwnode_irqchip +1278 drivers/irqchip/irq-gic-v3-its.c
 
-> +
-> +	/*
-> +	 * As per controller erratum, program the SDCLK Frequency
-> +	 * Select of clock control register with a value, say
-> +	 * clock/2. Wait for the Internal clock stable and program
-> +	 * the desired frequency.
-> +	 */
-> +	host->ops->set_clock(host, clock/2);
+  1272		if (irq_domain_get_of_node(domain->parent)) {
+  1273			fwspec.fwnode = domain->parent->fwnode;
+  1274			fwspec.param_count = 3;
+  1275			fwspec.param[0] = GIC_IRQ_TYPE_LPI;
+  1276			fwspec.param[1] = hwirq;
+  1277			fwspec.param[2] = IRQ_TYPE_EDGE_RISING;
+> 1278		} else if (is_fwnode_irqchip(domain->parent->fwnode)) {
+  1279			fwspec.fwnode = domain->parent->fwnode;
+  1280			fwspec.param_count = 2;
+  1281			fwspec.param[0] = hwirq;
 
-The comment above says "wait for the internal clock stable" - I see
-no wait in here.  Does the code actually conform with the comment?
-
-Please also use "clock / 2" as per coding style, thanks
-
-> +
-> +	host->ops->set_clock(host, host->clock);
-
-Maybe replace host->clock with clock?
-
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index d622435..8b064cd 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -2043,6 +2043,11 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
->  		err = -EIO;
->  	}
->  
-> +	if ((host->quirks2 & SDHCI_QUIRK2_BROKEN_TUNING) &&
-> +		(tuning_loop_counter >= 0) && (ctrl & SDHCI_CTRL_TUNED_CLK)) {
-> +		host->ops->tune_clk(host);
-> +	}
-
-Do we need this "SDHCI_QUIRK2_BROKEN_TUNING" quirk at all?  What's wrong
-with:
-
-	if (host->ops->tune_clk && tuning_loop_counter >= 0 &&
-	    ctrl & SDHCI_CTRL_TUNED_CLK)
-		host->ops->tune_clk(host);
-
-here?
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 46675 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160120/3b84bc2b/attachment-0001.obj>
