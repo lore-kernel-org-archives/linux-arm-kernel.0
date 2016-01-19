@@ -1,33 +1,57 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Tue, 19 Jan 2016 15:05:43 +0200
-Subject: [PATCH v4] kernel: add kcov code coverage
-In-Reply-To: <CACT4Y+ZUKJOmATAASxM1qnbn=_0M9TAtTQYO0ecMtursLYvdww@mail.gmail.com>
-References: <1453145117-92868-1-git-send-email-dvyukov@google.com>
- <20160118225550.GE14531@node.shutemov.name>
- <CACT4Y+ZUKJOmATAASxM1qnbn=_0M9TAtTQYO0ecMtursLYvdww@mail.gmail.com>
-Message-ID: <20160119130543.GB20984@node.shutemov.name>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 19 Jan 2016 14:11:13 +0100
+Subject: [PATCH V3 00/10] Introduce ACPI world to GICv3 & ITS irqchip
+Message-ID: <1453209083-3358-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2016 at 01:55:43PM +0100, Dmitry Vyukov wrote:
-> >> +static int __init kcov_init(void)
-> >> +{
-> >> +     if (!debugfs_create_file("kcov", 0666, NULL, NULL, &kcov_fops)) {
-> >
-> > Why 0666? May be 0600?.
-> 
-> The idea is that it can be useful to fuzz-test under a normal user as well.
-> This file is also guarded by debugfs mount permissions. Usually it is mounted
-> as 0700, so normal users can't get access to it.
-> However if one wants to fuzz-test under a normal user, he could mount
-> debugfs as 0777 and get access to this file.
-> 
-> I am not very strong about this, though. If you say, I will change it to 0600.
-> I open this file as root at the moment. And we can change it back
-> if/when we better understand a potential use case.
+Patches base on Suravee's ACPI GICv2m support:
+https://lkml.org/lkml/2015/12/10/475
 
-I think it's safer to make it 0600. It's up to system administrator to
-change permissions, if he wants give this capability to mortals.
+The following git branch contains submitted patches along with
+the useful patches from the test point of view (mainly ACPI ARM64 PCI support).
+https://github.com/semihalf-nowicki-tomasz/linux.git (gicv3-its-acpi-v3)
+
+Series has been tested on Cavium ThunderX server.
+
+v2 -> v3
+- rebased on top of 4.4
+- fixes and improvements for redistributor init via GICC structures
+- fixes as per kbuild reports
+
+v1 -> v2
+- rebased on top of 4.4-rc4
+- use pci_msi_domain_get_msi_rid for requester ID to device ID translation
+
+Hanjun Guo (1):
+  irqchip / GICv3: remove gic root node in ITS
+
+Tomasz Nowicki (9):
+  irqchip / GICv3: Refactor gic_of_init() for GICv3 driver
+  irqchip / GICv3: Add ACPI support for GICv3+ initialization
+  irqchip,GICv3,ACPI: Add redistributor support via GICC structures.
+  irqchip, gicv3, its: Mark its_init() and its children as __init
+  irqchip, GICv3, ITS: Refator ITS dt init code to prepare for ACPI.
+  ARM64, ACPI, PCI: I/O Remapping Table (IORT) initial support.
+  irqchip, gicv3, its: Probe ITS in the ACPI way.
+  acpi, gicv3, msi: Factor out code that might be reused for ACPI
+    equivalent.
+  acpi, gicv3, its: Use MADT ITS subtable to do PCI/MSI domain
+    initialization.
+
+ drivers/acpi/Kconfig                     |   3 +
+ drivers/acpi/Makefile                    |   1 +
+ drivers/acpi/iort.c                      | 326 +++++++++++++++++++++++++++++
+ drivers/irqchip/Kconfig                  |   1 +
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c |  85 ++++++--
+ drivers/irqchip/irq-gic-v3-its.c         | 143 +++++++++----
+ drivers/irqchip/irq-gic-v3.c             | 344 ++++++++++++++++++++++++++-----
+ drivers/pci/msi.c                        |   3 +
+ include/linux/iort.h                     |  38 ++++
+ include/linux/irqchip/arm-gic-v3.h       |   2 +-
+ 10 files changed, 845 insertions(+), 101 deletions(-)
+ create mode 100644 drivers/acpi/iort.c
+ create mode 100644 include/linux/iort.h
 
 -- 
- Kirill A. Shutemov
+1.9.1
