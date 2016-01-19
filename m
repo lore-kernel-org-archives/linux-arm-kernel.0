@@ -1,62 +1,30 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 19 Jan 2016 14:11:39 +0000
-Subject: [PATCH v2 12/16] ARM: Xen: Document UEFI support on Xen ARM
- virtual platforms
-In-Reply-To: <569E3D9F.6050808@linaro.org>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-13-git-send-email-zhaoshenglong@huawei.com>
- <20160118105115.GD21067@leverpostej>
- <alpine.DEB.2.02.1601181710270.9400@kaball.uk.xensource.com>
- <569E0F15.8090001@huawei.com> <20160119104747.GB25024@leverpostej>
- <alpine.DEB.2.02.1601191217190.9400@kaball.uk.xensource.com>
- <20160119131348.GJ25024@leverpostej> <569E3D9F.6050808@linaro.org>
-Message-ID: <alpine.DEB.2.02.1601191408420.9400@kaball.uk.xensource.com>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Tue, 19 Jan 2016 23:15:35 +0900
+Subject: [PATCH 1/2] ARM: dts: kirkwood: split lswxl into linkstation
+ lswsxl and lswxl
+In-Reply-To: <20160119140507.GG6554@lunn.ch>
+References: <1453211342-25214-1-git-send-email-rogershimizu@gmail.com>
+ <1453211342-25214-2-git-send-email-rogershimizu@gmail.com>
+ <20160119140507.GG6554@lunn.ch>
+Message-ID: <CAEQ9gE=saHf0TZ5aBDYC0cCMCXgHOSON8-oPwmVXuU-h4XPbFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Jan 2016, Shannon Zhao wrote:
-> On 2016/1/19 21:13, Mark Rutland wrote:
-> > On Tue, Jan 19, 2016 at 12:23:17PM +0000, Stefano Stabellini wrote:
-> > > >On Tue, 19 Jan 2016, Mark Rutland wrote:
-> > > > > >On Tue, Jan 19, 2016 at 06:25:25PM +0800, Shannon Zhao wrote:
-> > > > > > > > > > >>We don't do this in Documentation/arm/uefi.txt, and I
-> > > > > > > don't see why we
-> > > > > > > > > > >>should do so here.
-> > > > > > > > > > >>
-> > > > > > > > > > >>Does Xen handle arbitrary size memory map descriptors? I'm
-> > > > > > > not sure what
-> > > > > > > > > > >>new information might be passed in future additions to the
-> > > > > > > descriptor
-> > > > > > > > > > >>format, and I'm not sure what should happen in the Dom0
-> > > > > > > case.
-> > > > > > > > > >
-> > > > > > > > > >Xen passes to Dom0 the memory map in the same format as the
-> > > > > > native
-> > > > > > > > > >memory map.
-> > > > > >
-> > > > > >Does Xen parse or modify the EFI memory map in any way?
-> > > >
-> > > >Xen:
-> > > >- calls EFI_BOOT_SERVICES.GetMemoryMap()
-> > > >- takes note of the memory regions for its own usage
-> > > >- create the fdt notes, including efi-mmap-start, with a pointer to it
-> > > >
-> > > >
-> > > > > >Does it pass the raw values returned by
-> > > > EFI_BOOT_SERVICES.GetMemoryMap()
-> > > > > >through to the xen,uefi-* properties, or does is make any static
-> > > > > >assumptions about what the values will be?
-> > > >
-> > > >It just passes the raw values.
-> > I take it that means that any memory carved out for Xen itself is
-> > described/discovered via a separate mechanism? How does that work
-> 
-> For Xen hypervisor booting on UEFI, it get the EFI memory map through the
-> similar way like Linux, e.g. call EFI_BOOT_SERVICES.GetMemoryMap().
-> For Dom0, Xen will create a new EFI memory map for Dom0.
-> 
-> See [PATCH v3 52/62] arm/acpi: Prepare EFI memory descriptor for Dom0
-> http://lists.xen.org/archives/html/xen-devel/2015-11/msg01884.html
+On Tue, Jan 19, 2016 at 11:05 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Tue, Jan 19, 2016 at 10:49:01PM +0900, Roger Shimizu wrote:
+>> With a few gpio/led-pin changes, including fix for the issue mentioned
+>> in Debian BTS #810894.
+>
+> Hi Roger
+>
+> This fix should be a separate patch. We can then get it applied to
+> stable, so it makes its way back to older kernels.
 
-Ah! That patch is not upstream yet, that's why I thought that something
-was off. Listen to Shannon, don't listen to me :-)
+Dear Andrew,
+
+So this patchset would be reviewed or not?
+Or I have to create another patchset including both fix for
+"kirkwood-lswxl.dts" and the dts split?
+
+Cheers,
+Roger
