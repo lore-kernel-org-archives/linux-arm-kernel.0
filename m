@@ -1,85 +1,157 @@
-From: wpdster@gmail.com (Patrick Doyle)
-Date: Tue, 19 Jan 2016 09:19:45 -0500
-Subject: How to get better precision out of getrusage on the ARM?
-In-Reply-To: <20160119001618.GT3367@piout.net>
-References: <CAF_dkJBjs1b+73ggvJyXwab6YL94HGT2jrqbcfaLxoETtQsD9Q@mail.gmail.com>
- <20151222144907.GK8644@n2100.arm.linux.org.uk>
- <CAF_dkJDFXSEgH+kO=k=Yj0_VDnFYgPtkoYznLUWZnq4=QTNDDg@mail.gmail.com>
- <20151222151314.GM8644@n2100.arm.linux.org.uk>
- <CAF_dkJAUyD3GRAETZUQG2yJTmOR95XKVguohBpBjUaM9JMaQyg@mail.gmail.com>
- <CAF_dkJBrfd=YUnG=ja2KE_z2DM8NQTLGiWVyvW6mrPYP4i+sFA@mail.gmail.com>
- <CAF_dkJBM3qbs3GB8jdgonus7dgVSyn-7QtogtqmMQWzR2BK+OQ@mail.gmail.com>
- <20160119001618.GT3367@piout.net>
-Message-ID: <CAF_dkJD_mJuGkDF0gg2W50-Kz2QkjTKvxkdHUL1vf+nst4nnyw@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 19 Jan 2016 14:24:53 +0000
+Subject: [Xen-devel] [PATCH v2 16/16] ARM64: XEN: Initialize Xen specific
+ UEFI runtime services
+In-Reply-To: <569E3654.90100@linaro.org>
+References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452840929-19612-17-git-send-email-zhaoshenglong@huawei.com>
+ <alpine.DEB.2.02.1601181634070.9400@kaball.uk.xensource.com>
+ <569E3654.90100@linaro.org>
+Message-ID: <alpine.DEB.2.02.1601191424270.9400@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Alexandre,
-I missed that patch.  I'll have to take a look at that.  Thank you.
+On Tue, 19 Jan 2016, Shannon Zhao wrote:
+> On 2016/1/19 1:03, Stefano Stabellini wrote:
+> > On Fri, 15 Jan 2016, Shannon Zhao wrote:
+> > > From: Shannon Zhao <shannon.zhao@linaro.org>
+> > > 
+> > > When running on Xen hypervisor, runtime services are supported through
+> > > hypercall. So call Xen specific function to initialize runtime services.
+> > > 
+> > > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> > 
+> > Thanks Shannon, much much better!  Just a couple of questions.
+> > 
+> > 
+> > >   arch/arm/xen/enlighten.c |  5 +++++
+> > >   arch/arm64/xen/Makefile  |  1 +
+> > >   arch/arm64/xen/efi.c     | 36 ++++++++++++++++++++++++++++++++++++
+> > >   drivers/xen/Kconfig      |  2 +-
+> > >   include/xen/xen-ops.h    |  1 +
+> > >   5 files changed, 44 insertions(+), 1 deletion(-)
+> > >   create mode 100644 arch/arm64/xen/efi.c
+> > > 
+> > > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > > index 485e117..84f27ec 100644
+> > > --- a/arch/arm/xen/enlighten.c
+> > > +++ b/arch/arm/xen/enlighten.c
+> > > @@ -414,6 +414,11 @@ static int __init xen_guest_init(void)
+> > >   	if (xen_initial_domain())
+> > >   		pvclock_gtod_register_notifier(&xen_pvclock_gtod_notifier);
+> > > 
+> > > +	if (IS_ENABLED(CONFIG_XEN_EFI)) {
+> > > +		if (efi_enabled(EFI_PARAVIRT))
+> > > +			xen_efi_runtime_setup();
+> > > +	}
+> > > +
+> > >   	return 0;
+> > >   }
+> > >   early_initcall(xen_guest_init);
+> > > diff --git a/arch/arm64/xen/Makefile b/arch/arm64/xen/Makefile
+> > > index 74a8d87..62e6fe2 100644
+> > > --- a/arch/arm64/xen/Makefile
+> > > +++ b/arch/arm64/xen/Makefile
+> > > @@ -1,2 +1,3 @@
+> > >   xen-arm-y	+= $(addprefix ../../arm/xen/, enlighten.o grant-table.o p2m.o
+> > > mm.o)
+> > >   obj-y		:= xen-arm.o hypercall.o
+> > > +obj-$(CONFIG_XEN_EFI) += efi.o
+> > > diff --git a/arch/arm64/xen/efi.c b/arch/arm64/xen/efi.c
+> > > new file mode 100644
+> > > index 0000000..33046b0
+> > > --- /dev/null
+> > > +++ b/arch/arm64/xen/efi.c
+> > > @@ -0,0 +1,36 @@
+> > > +/*
+> > > + * Copyright (c) 2015, Linaro Limited, Shannon Zhao
+> > > + *
+> > > + * This program is free software; you can redistribute it and/or modify
+> > > + * it under the terms of the GNU General Public License as published by
+> > > + * the Free Software Foundation; either version 2 of the License, or
+> > > + * (at your option) any later version.
+> > > + *
+> > > + * This program is distributed in the hope that it will be useful,
+> > > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > > + * GNU General Public License for more details.
+> > > + *
+> > > + * You should have received a copy of the GNU General Public License
+> > > along
+> > > + * with this program.  If not, see <http://www.gnu.org/licenses/>.
+> > > + */
+> > > +
+> > > +#include <linux/efi.h>
+> > > +#include <xen/xen-ops.h>
+> > > +
+> > > +void __init xen_efi_runtime_setup(void)
+> > > +{
+> > > +	efi.get_time                 = xen_efi_get_time;
+> > > +	efi.set_time                 = xen_efi_set_time;
+> > > +	efi.get_wakeup_time          = xen_efi_get_wakeup_time;
+> > > +	efi.set_wakeup_time          = xen_efi_set_wakeup_time;
+> > > +	efi.get_variable             = xen_efi_get_variable;
+> > > +	efi.get_next_variable        = xen_efi_get_next_variable;
+> > > +	efi.set_variable             = xen_efi_set_variable;
+> > > +	efi.query_variable_info      = xen_efi_query_variable_info;
+> > > +	efi.update_capsule           = xen_efi_update_capsule;
+> > > +	efi.query_capsule_caps       = xen_efi_query_capsule_caps;
+> > > +	efi.get_next_high_mono_count = xen_efi_get_next_high_mono_count;
+> > > +	efi.reset_system             = NULL;
+> > > +}
+> > > +EXPORT_SYMBOL_GPL(xen_efi_runtime_setup);
+> > 
+> > This looks very similar to struct efi efi_xen previously in
+> > drivers/xen/efi.c.  Maybe it makes sense to leave struct efi efi_xen in
+> > drivers/xen/efi.c, export it in include/xen/xen-ops.h, then here just:
+> > 
+> >    efi = efi_xen;
+> > 
+> > Would that improve code readability?
+> > 
+> Ok.
+> > 
+> > Correct me if I am wrong, but on ARM64 (differently from x86) it is not
+> > necessary to set efi.systab because it is not used, right? If so, it
+> > would be best to add a comment here to remember.
+> > 
+> Not set efi.systab here because it gets the system table through fdt and set
+> efi.systab there. See uefi_init() in arch/arm64/kernel.efi.c
+> 
+> 	efi.systab = early_memremap(efi_system_table,
+> 				    sizeof(efi_system_table_t));
 
-Regardless, it seems that I need to modify tcb_clksrc.c to register
-itself through CLOCKSOURCE_OF_DECLARE(), set the appropriate kernel
-configuration options, and use clock_gettime(CLOCK_THREAD_CPUTIME_ID)
-in order to get better than 1 tick resolution out of clock_gettime for
-my threads.  Unfortunately, the tcb_clksrc.c modifications appear to
-be incompatible with the design intent of atmel_tclib.c.  I am waiting
-for the opportunity to talk to Atmel about this.  (I need to ping my
-local FAE about this again).  I also need to turn up the heat on this
-back burner'ed task.  (I got some numbers, none of us are happy with
-them, and I need to see what I can do to get better numbers, when I
-can make the time to do so.)
-
---wpd
+I see now. Then it might be still good to add a comment about that.
 
 
-On Mon, Jan 18, 2016 at 7:16 PM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> Hi Patrick,
->
-> I was wondering whether you had the chance to test this patch from the
-> RT tree:
-> http://git.kernel.org/cgit/linux/kernel/git/rt/linux-rt-devel.git/commit/?h=v4.4-rt2&id=57142bdff523a67657d0b2603eaa91df58b88bd8
->
-> when trying your sched_clock experiment?
->
-> On 30/12/2015 at 10:00:46 -0500, Patrick Doyle wrote :
->> Continuing on...
->> I now have a CLOCKSOURCE_OF_DECLARED()'ed 10 MHz clock source running
->> on my ARM processor (Atmel SAMA5D2 Xplained board).  It registers
->> itself through sched_clock_register() to provide a high resolution
->> sched clock.  Once I turned on "Full dynticks CPU time accounting"
->> (CONFIG_VIRT_CPU_ACCOUNTING_GEN), I was able to get better than jiffy
->> resolution from my calls to getrusage(RUSAGE_THREAD,..).  But things
->> still aren't quite right.  I am using getrusage() to provide some
->> runtime profile information to an existing application (that was
->> ported to run on Linux instead of a custom RTOS).  I have code that
->> looks like:
->>
->> tick()
->> // commented out code that used to do something
->> tock()
->>
->> where tick() & tock() are my profile "start" and "stop" points that
->> call getrusage() to record and and accumulate time spent between calls
->> to tick() & tock().  Most of the time, I get a delta of 0 between the
->> two calls, which I expect.  But occasionally, I get a delta ranging
->> between 800us and 1000us, which I don't understand at all.  It seems
->> like my thread is being "charged" for time spent doing something else.
->> Perhaps an interrupt occurred and its time got charged to my thread;
->> perhaps a higher priority thread ran for 1ms, I don't know (yet).
->>
->> Does anybody have any suggestions as to where I might look, or as to
->> what kernel CONFIG options might make the most sense for an
->> application such as this?
->>
->> --wpd
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> --
-> Alexandre Belloni, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+> > > diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
+> > > index 73708ac..27d216a 100644
+> > > --- a/drivers/xen/Kconfig
+> > > +++ b/drivers/xen/Kconfig
+> > > @@ -268,7 +268,7 @@ config XEN_HAVE_PVMMU
+> > > 
+> > >   config XEN_EFI
+> > >   	def_bool y
+> > > -	depends on X86_64 && EFI
+> > > +	depends on (ARM64 || X86_64) && EFI
+> > > 
+> > >   config XEN_AUTO_XLATE
+> > >   	def_bool y
+> > > diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
+> > > index c83a338..36ff8e4 100644
+> > > --- a/include/xen/xen-ops.h
+> > > +++ b/include/xen/xen-ops.h
+> > > @@ -107,6 +107,7 @@ efi_status_t
+> > > xen_efi_update_capsule(efi_capsule_header_t **capsules,
+> > >   efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
+> > >   					unsigned long count, u64 *max_size,
+> > >   					int *reset_type);
+> > > +void xen_efi_runtime_setup(void);
+> > 
+> > xen_efi_runtime_setup is not defined on x86, but this header is not arch
+> > specific.
+> > 
+> 
+> -- 
+> Shannon
+> 
