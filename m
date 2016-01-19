@@ -1,35 +1,84 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Tue, 19 Jan 2016 15:03:45 +0200
-Subject: [PATCH, RESEND^2] ssb: mark ssb_bus_register as __maybe_unused
-In-Reply-To: <6063400.39vor3soEb@wuerfel> (Arnd Bergmann's message of "Mon, 18
- Jan 2016 20:39:56 +0100")
-References: <8128014.DbbgBtKY3z@wuerfel>
- <8760ywd5fe.fsf@kamboji.qca.qualcomm.com> <6063400.39vor3soEb@wuerfel>
-Message-ID: <877fj567ri.fsf@kamboji.qca.qualcomm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Jan 2016 13:03:42 +0000
+Subject: [PATCH v2 16/16] ARM64: XEN: Initialize Xen specific UEFI
+ runtime services
+In-Reply-To: <alpine.DEB.2.02.1601191143590.9400@kaball.uk.xensource.com>
+References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452840929-19612-17-git-send-email-zhaoshenglong@huawei.com>
+ <20160118110854.GG21067@leverpostej>
+ <alpine.DEB.2.02.1601181736090.9400@kaball.uk.xensource.com>
+ <20160118182747.GR21067@leverpostej>
+ <alpine.DEB.2.02.1601191143590.9400@kaball.uk.xensource.com>
+Message-ID: <20160119130341.GI25024@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Tue, Jan 19, 2016 at 12:03:59PM +0000, Stefano Stabellini wrote:
+> On Mon, 18 Jan 2016, Mark Rutland wrote:
+> > On Mon, Jan 18, 2016 at 05:45:24PM +0000, Stefano Stabellini wrote:
+> > > On Mon, 18 Jan 2016, Mark Rutland wrote:
+> > > > On Fri, Jan 15, 2016 at 02:55:29PM +0800, Shannon Zhao wrote:
+> > > > > +void __init xen_efi_runtime_setup(void)
+> > > > > +{
+> > > > > +	efi.get_time                 = xen_efi_get_time;
+> > > > > +	efi.set_time                 = xen_efi_set_time;
+> > > > > +	efi.get_wakeup_time          = xen_efi_get_wakeup_time;
+> > > > > +	efi.set_wakeup_time          = xen_efi_set_wakeup_time;
+> > > > > +	efi.get_variable             = xen_efi_get_variable;
+> > > > > +	efi.get_next_variable        = xen_efi_get_next_variable;
+> > > > > +	efi.set_variable             = xen_efi_set_variable;
+> > > > > +	efi.query_variable_info      = xen_efi_query_variable_info;
+> > > > > +	efi.update_capsule           = xen_efi_update_capsule;
+> > > > > +	efi.query_capsule_caps       = xen_efi_query_capsule_caps;
+> > > > > +	efi.get_next_high_mono_count = xen_efi_get_next_high_mono_count;
+> > > > > +	efi.reset_system             = NULL;
+> > > > > +}
+> > > > 
+> > > > How do capsules work in the absence of an EFI system reset?
+> > > 
+> > > Actually I don't think that capsules are available in Xen on ARM64 yet,
+> > > see "TODO - disabled until implemented on ARM" in
+> > > xen/common/efi/runtime.c.
+> > > 
+> > > FYI system reset is available, but it is provided via a different
+> > > mechanism (HYPERVISOR_sched_op(xen_restart...)
+> > 
+> > Will that trigger Xen to do the right thing to trigger capsule updates
+> > when implemented in Xen? Or do we need a xen_efi_reset_system?
+> 
+> On ARM, to reboot the hardware, Xen calls the native PSCI system_reset
+> method. On x86, Xen calls efi_reset_system on EFI systems, and has
+> several fall backs if that doesn't work as expected (see
+> xen/arch/x86/shutdown.c:machine_restart).
+> 
+> But on a second look it doesn't look like that the capsule hypercalls
+> are implemented correctly even on x86 (there is an "XXX fall through for
+> now" comment in the code). I guess they are not available on Xen at all
+> unfortunately.
 
-> The SoC variant of the ssb code is now optional like the other
-> ones, which means we can build the framwork without any
-> front-end, but that results in a warning:
->
-> drivers/ssb/main.c:616:12: warning: 'ssb_bus_register' defined but not used [-Wunused-function]
->
-> This annotates the ssb_bus_register function as __maybe_unused to
-> shut up the warning. A configuration like this will not work on
-> any hardware of course, but we still want this to silently build
-> without warnings if the configuration is allowed in the first
-> place.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 845da6e58e19 ("ssb: add Kconfig entry for compiling SoC related code")
-> Acked-by: Michael Buesch <m@bues.ch>
-> ---
-> Resent to linux-wireless as requested
+That is incredibly unfortunate. It effectively renders the firmware
+non-updateable when using Xen.
 
-Thanks, and sorry for the hassle. I'm planning to push this to 4.5.
+> > Does that override PSCI?
+> 
+> It does not, HYPERVISOR_sched_op(xen_restart,) is in addition to it. It
+> ends up calling the same function within Xen as PSCI system_reset.
 
--- 
-Kalle Valo
+I meant within Dom0.
+
+Presumably Dom0 calls HYPERVISOR_sched_op(xen_restart,), and doesn't
+ever call PSCI SYSTEM_RESET?
+
+> > In machine_restart we try efi_reboot first specifically to allow for
+> > capsule updates. Similarly drivers/firmware/efi/reboot.c registers
+> > efi_power_off late in order to override anything else, though that's
+> > best-effort at present.
+> 
+> That's very interesting. I think that Xen on ARM should follow what
+> Linux does and what Xen already does on x86 and try efi_reset_system
+> first on efi systems.
+
+I would agree.
+
+Thanks,
+Mark.
