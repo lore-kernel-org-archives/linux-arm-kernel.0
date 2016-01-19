@@ -1,64 +1,46 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 19 Jan 2016 01:16:18 +0100
-Subject: How to get better precision out of getrusage on the ARM?
-In-Reply-To: <CAF_dkJBM3qbs3GB8jdgonus7dgVSyn-7QtogtqmMQWzR2BK+OQ@mail.gmail.com>
-References: <CAF_dkJBjs1b+73ggvJyXwab6YL94HGT2jrqbcfaLxoETtQsD9Q@mail.gmail.com>
- <20151222144907.GK8644@n2100.arm.linux.org.uk>
- <CAF_dkJDFXSEgH+kO=k=Yj0_VDnFYgPtkoYznLUWZnq4=QTNDDg@mail.gmail.com>
- <20151222151314.GM8644@n2100.arm.linux.org.uk>
- <CAF_dkJAUyD3GRAETZUQG2yJTmOR95XKVguohBpBjUaM9JMaQyg@mail.gmail.com>
- <CAF_dkJBrfd=YUnG=ja2KE_z2DM8NQTLGiWVyvW6mrPYP4i+sFA@mail.gmail.com>
- <CAF_dkJBM3qbs3GB8jdgonus7dgVSyn-7QtogtqmMQWzR2BK+OQ@mail.gmail.com>
-Message-ID: <20160119001618.GT3367@piout.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 19 Jan 2016 09:18:16 +0900
+Subject: [PATCH] MAINTAINERS: Update mailing list for Renesas SoC
+ Development
+In-Reply-To: <CAMuHMdXF8QnKsLOYFnT7Rje5G9_7Xr0NesO2SKEkWSivKQYkbA@mail.gmail.com>
+References: <1453079073-30937-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdXF8QnKsLOYFnT7Rje5G9_7Xr0NesO2SKEkWSivKQYkbA@mail.gmail.com>
+Message-ID: <20160119001815.GA14224@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Patrick,
+On Mon, Jan 18, 2016 at 09:09:29AM +0100, Geert Uytterhoeven wrote:
+> CC linux-arm-kernel
+> 
+> On Mon, Jan 18, 2016 at 2:04 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Update the mailing list used for development of support for
+> > Renesas SoCs and related drivers.
+> >
+> > Up until now the linux-sh mailing list has been used, however,
+> > Renesas SoCs are now much wider than the SH architecture and there
+> > is some desire from some for the linux-sh list to refocus on
+> > discussion of the work on the SH architecture.
+> >
+> > Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Cc: Magnus Damm <magnus.damm@gmail.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> > ---
+> > * This patch applies on top of Linus's tree where currently the head commit
+> >   is 984065055e6e ("Merge branch 'drm-next' of
+> >   git://people.freedesktop.org/~airlied/linux")
+> >
+> >   This has been used as a base instead of v4.4 so that it is based on the
+> >   following two commits which affect it:
+> >   - 1a4ca6dd3dc8 ("MAINTAINERS: Add co-maintainer for Renesas Pin Controllers")
+> >   - 3e46c3973cba ("MAINTAINERS: add Renesas usb2 phy driver")
+> 
+> I assume you'll send an update for the "ARM/RENESAS ARM64 ARCHITECTURE"
+> section as soon as that has landed in mainline?
 
-I was wondering whether you had the chance to test this patch from the
-RT tree:
-http://git.kernel.org/cgit/linux/kernel/git/rt/linux-rt-devel.git/commit/?h=v4.4-rt2&id=57142bdff523a67657d0b2603eaa91df58b88bd8
-
-when trying your sched_clock experiment?
-
-On 30/12/2015 at 10:00:46 -0500, Patrick Doyle wrote :
-> Continuing on...
-> I now have a CLOCKSOURCE_OF_DECLARED()'ed 10 MHz clock source running
-> on my ARM processor (Atmel SAMA5D2 Xplained board).  It registers
-> itself through sched_clock_register() to provide a high resolution
-> sched clock.  Once I turned on "Full dynticks CPU time accounting"
-> (CONFIG_VIRT_CPU_ACCOUNTING_GEN), I was able to get better than jiffy
-> resolution from my calls to getrusage(RUSAGE_THREAD,..).  But things
-> still aren't quite right.  I am using getrusage() to provide some
-> runtime profile information to an existing application (that was
-> ported to run on Linux instead of a custom RTOS).  I have code that
-> looks like:
-> 
-> tick()
-> // commented out code that used to do something
-> tock()
-> 
-> where tick() & tock() are my profile "start" and "stop" points that
-> call getrusage() to record and and accumulate time spent between calls
-> to tick() & tock().  Most of the time, I get a delta of 0 between the
-> two calls, which I expect.  But occasionally, I get a delta ranging
-> between 800us and 1000us, which I don't understand at all.  It seems
-> like my thread is being "charged" for time spent doing something else.
-> Perhaps an interrupt occurred and its time got charged to my thread;
-> perhaps a higher priority thread ran for 1ms, I don't know (yet).
-> 
-> Does anybody have any suggestions as to where I might look, or as to
-> what kernel CONFIG options might make the most sense for an
-> application such as this?
-> 
-> --wpd
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Yes, that is my plan.
