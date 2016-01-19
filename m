@@ -1,93 +1,78 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 19 Jan 2016 16:21:23 +0800
-Subject: [Xen-devel] [PATCH v2 09/16] arm/xen: Get event-channel irq
- through HVM_PARAM when booting with ACPI
-In-Reply-To: <alpine.DEB.2.02.1601181351400.16178@kaball.uk.xensource.com>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-10-git-send-email-zhaoshenglong@huawei.com>
- <alpine.DEB.2.02.1601181351400.16178@kaball.uk.xensource.com>
-Message-ID: <569DF203.8030104@huawei.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 19 Jan 2016 17:25:28 +0900
+Subject: [Question] cacheline sharing problem on DMA for custom outer-cache
+In-Reply-To: <20160118123226.GF19062@n2100.arm.linux.org.uk>
+References: <CAK7LNASC2kkgQvxetrRA=guvKTAnxGm3xeMbtV0hXgubR0tEwQ@mail.gmail.com>
+ <134552368.ft0oU8iHdY@wuerfel>
+ <CAK7LNAQBJbjx4koGjkKHo1Xe9NKC-dCj_0TP6AiT=3eaPTYdoQ@mail.gmail.com>
+ <20160118123226.GF19062@n2100.arm.linux.org.uk>
+Message-ID: <CAK7LNATAgV5OQf3ZQrH-jsqTJ5P-iFA1RJ+4bOr5-myBYs1few@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Russell,
 
 
-On 2016/1/18 22:38, Stefano Stabellini wrote:
-> On Fri, 15 Jan 2016, Shannon Zhao wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
+2016-01-18 21:32 GMT+09:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Mon, Jan 18, 2016 at 09:05:15PM +0900, Masahiro Yamada wrote:
+>> L1_CACHE_BYTES is not a configuration.  It is a hardware property.
 >>
->> When booting with ACPI, it could get the event-channel irq through
->> HVM_PARAM_CALLBACK_IRQ.
->>
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> ---
->>  arch/arm/xen/enlighten.c | 30 +++++++++++++++++++++++++++++-
->>  1 file changed, 29 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
->> index 6d90a62..4e78c49 100644
->> --- a/arch/arm/xen/enlighten.c
->> +++ b/arch/arm/xen/enlighten.c
->> @@ -29,6 +29,7 @@
->>  #include <linux/time64.h>
->>  #include <linux/timekeeping.h>
->>  #include <linux/timekeeper_internal.h>
->> +#include <linux/acpi.h>
->>  
->>  #include <linux/mm.h>
->>  
->> @@ -270,7 +271,34 @@ static int __init xen_guest_init(void)
->>  	if (!xen_domain())
->>  		return 0;
->>  
->> -	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
->> +	if (!acpi_disabled) {
->> +#ifdef CONFIG_ACPI
-> 
-> I think it would be best to move the acpi specific and DT specific
-> initializations out of xen_guest_init. Then at the beginning of
-> xen_guest_init, call only the one that applies.  The acpi init function
-> could be ifdef'ed CONFIG_ACPI. Making sure that acpi_disabled is 1 when
-> !CONFIG_ACPI, we could even avoid all ifdef's from xen_guest_init.
-> 
-Sure, will fix. Thanks.
+>> Actually, Tegra is the only hardware that has L1 cache with 64byte line-size.
+>
+> We have a load of paltforms which select ARM_L1_CACHE_SHIFT_6, plus
+> Cortex-A8 and Cortex-A15 both have 64-byte L1 line size.
+>
+> It's all in the git history, please research.
+>
+> $ git log -p -- arch/arm/Kconfig arch/arm/mm/Kconfig
+>
+> and search for "ARM_L1_CACHE_SHIFT_6".
 
-> The rest is good, thanks.
-> 
-> 
->> +		struct xen_hvm_param a;
->> +		int interrupt, trigger, polarity;
->> +
->> +		a.domid = DOMID_SELF;
->> +		a.index = HVM_PARAM_CALLBACK_IRQ;
->> +		xen_events_irq = 0;
->> +		if (!HYPERVISOR_hvm_op(HVMOP_get_param, &a)) {
->> +			if ((a.value >> 56) == 3) {
->> +				interrupt = a.value & 0xff;
->> +				trigger = ((a.value >> 8) & 0x1)
->> +					  ? ACPI_EDGE_SENSITIVE
->> +					  : ACPI_LEVEL_SENSITIVE;
->> +				polarity = ((a.value >> 8) & 0x2)
->> +					  ? ACPI_ACTIVE_LOW
->> +					  : ACPI_ACTIVE_HIGH;
->> +				xen_events_irq = acpi_register_gsi(NULL,
->> +								   interrupt,
->> +								   trigger,
->> +								   polarity);
->> +			}
->> +		}
->> +
->> +#endif
->> +	} else {
->> +		xen_events_irq = irq_of_parse_and_map(xen_node, 0);
->> +	}
->> +
->>  	if (!xen_events_irq) {
->>  		pr_err("Xen event channel interrupt not found\n");
->>  		return -ENODEV;
-> 
-> .
-> 
+Ah, I missed that.
+Thanks for clarifying this.
+
+
+
+>> The other SoCs in multi_v7_defconfig run software configured for
+>> 64byte line-size on CPUs with 32byte line-size.  Weird.
+>
+> Nothing weird here.  A kernel configured for a 64 byte cache line size
+> can be run on a system with a 32 byte cache line size, but not vice
+> versa.
+>
+>> And, deciding the DMA aligment only with L1 line-size does not seem nice.
+>> I admit the outer-cache on my SoC is odd, though.
+>
+> Currently, the L1 defines the biggest restriction on DMA cache line
+> alignment that we have.  However, you should be wary of changing
+> only the DMA cache alignment - I think you'll find a lot of things
+> assume that aligning to L1_CACHE_BYTES will be DMA safe.
+>
+>> If we could parse "line-size" DT-property in the early stage
+>> and change the DMA alignment run-time, it would avoid degrading
+>> performance on other SoCs.
+>
+> You can't realign data structures in the kernel image at runtime.
+>
+> L1_CACHE_BYTES is used as a constant in several places for this
+> purpose.
+
+OK, I understand that it is difficult to change the definition of this macro.
+
+
+
+If I submitted something like follows, would it be accepted?
+
+
+ config ARM_L1_CACHE_SHIFT
+         int
++        default 7 if CACHE_UNIPHIER
+         default 6 if ARM_L1_CACHE_SHIFT_6
+         default 5
+
+
+
 
 -- 
-Shannon
+Best Regards
+Masahiro Yamada
