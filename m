@@ -1,156 +1,101 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Jan 2016 10:47:48 +0000
-Subject: [PATCH v2 12/16] ARM: Xen: Document UEFI support on Xen ARM
- virtual platforms
-In-Reply-To: <569E0F15.8090001@huawei.com>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-13-git-send-email-zhaoshenglong@huawei.com>
- <20160118105115.GD21067@leverpostej>
- <alpine.DEB.2.02.1601181710270.9400@kaball.uk.xensource.com>
- <569E0F15.8090001@huawei.com>
-Message-ID: <20160119104747.GB25024@leverpostej>
+From: zhongkaihua@huawei.com (Zhong Kaihua)
+Date: Tue, 19 Jan 2016 18:51:21 +0800
+Subject: [PATCH V3 3/3] arm64: dts: add Hi6220 spi configuration nodes
+In-Reply-To: <1453200681-26406-1-git-send-email-zhongkaihua@huawei.com>
+References: <1453200681-26406-1-git-send-email-zhongkaihua@huawei.com>
+Message-ID: <1453200681-26406-3-git-send-email-zhongkaihua@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2016 at 06:25:25PM +0800, Shannon Zhao wrote:
-> 
-> 
-> On 2016/1/19 1:34, Stefano Stabellini wrote:
-> > On Mon, 18 Jan 2016, Mark Rutland wrote:
-> >> On Fri, Jan 15, 2016 at 02:55:25PM +0800, Shannon Zhao wrote:
-> >>> From: Shannon Zhao <shannon.zhao@linaro.org>
-> >>>
-> >>> Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
-> >>> scan this to get the UEFI information.
-> >>>
-> >>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> >>> ---
-> >>>  Documentation/devicetree/bindings/arm/xen.txt | 42 +++++++++++++++++++++++++++
-> >>>  1 file changed, 42 insertions(+)
-> >>>
-> >>> diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
-> >>> index 0f7b9c2..fbc17ae 100644
-> >>> --- a/Documentation/devicetree/bindings/arm/xen.txt
-> >>> +++ b/Documentation/devicetree/bindings/arm/xen.txt
-> >>> @@ -15,6 +15,36 @@ the following properties:
-> >>>  - interrupts: the interrupt used by Xen to inject event notifications.
-> >>>    A GIC node is also required.
-> >>>  
-> >>> +To support UEFI on Xen ARM virtual platforms, Xen pupulates the FDT "uefi" node
-> >>> +under /hypervisor with following parameters:
-> >>
-> >> s/pupulates/populates/
-> >>
-> >>> +
-> >>> +________________________________________________________________________________
-> >>> +Name                      | Size   | Description
-> >>> +================================================================================
-> >>> +xen,uefi-system-table     | 64-bit | Guest physical address of the UEFI System
-> >>> +			  |	   | Table.
-> >>> +--------------------------------------------------------------------------------
-> >>> +xen,uefi-mmap-start       | 64-bit | Guest physical address of the UEFI memory
-> >>> +			  |	   | map.
-> >>> +--------------------------------------------------------------------------------
-> >>> +xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
-> >>> +                          |        | pointed to in previous entry.
-> >>> +--------------------------------------------------------------------------------
-> >>> +xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
-> >>> +                          |        | memory map.
-> >>> +--------------------------------------------------------------------------------
-> >>> +xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
-> >>> +--------------------------------------------------------------------------------
-> >>> +
-> >>> +Below is the format of the mmap descriptor.
-> >>> +typedef struct {
-> >>> +	u32 type;
-> >>> +	u32 pad;
-> >>> +	u64 phys_addr;
-> >>> +	u64 virt_addr;
-> >>> +	u64 num_pages;
-> >>> +	u64 attribute;
-> >>> +} efi_memory_desc_t;
-> >>
-> >> I don't think we should describe this here, as it duplicates the UEFI
-> >> spec, and is techincally incorrect the above is only guaranteed to be
-> >> the prefix of each memory descriptor -- that's why the
-> >> uefi-mmap-desc-size property exists.
-> >>
-> Oh, this format is suggested to describe here at previous patch set.
+arm64: dts: add Hi6220 spi configuration nodes
 
-We can describe it by referring to the definition in the UEFI
-specification (i.e. state the properties represent the return values of
-EFI_BOOT_SERVICES.GetMemoryMap()).
+Signed-off-by: Zhong Kaihua <zhongkaihua@huawei.com>
+---
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts   |  1 +
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi        | 20 ++++++++++++++++++++
+ arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi | 21 +++++++++++++++++++++
+ 3 files changed, 42 insertions(+)
 
-If that's necessary at all, fix that in the usual
-Documentation/arm/uefi.txt, and state here that the format and meaning
-of each property here follows its unprefixed cousin, with the caveat
-that Xen-specific assumptions also apply (e.g. runtime services must be
-indirected via hypercalls).
-
-Anything else is redundant and risks being wrong.
-
-> >> We don't do this in Documentation/arm/uefi.txt, and I don't see why we
-> >> should do so here.
-> >>
-> >> Does Xen handle arbitrary size memory map descriptors? I'm not sure what
-> >> new information might be passed in future additions to the descriptor
-> >> format, and I'm not sure what should happen in the Dom0 case.
-> > 
-> > Xen passes to Dom0 the memory map in the same format as the native
-> > memory map.
-
-Does Xen parse or modify the EFI memory map in any way?
-
-Does it pass the raw values returned by EFI_BOOT_SERVICES.GetMemoryMap()
-through to the xen,uefi-* properties, or does is make any static
-assumptions about what the values will be?
-
-I'm trying to get a feeling for what the behaviour will be if/when a
-version of the EFI spec expands the memory map format.
-
-> >>>  Example (assuming #address-cells = <2> and #size-cells = <2>):
-> >>>  
-> >>> @@ -22,4 +52,16 @@ hypervisor {
-> >>>  	compatible = "xen,xen-4.3", "xen,xen";
-> >>>  	reg = <0 0xb0000000 0 0x20000>;
-> >>>  	interrupts = <1 15 0xf08>;
-> >>> +	uefi {
-> >>> +		xen,uefi-system-table = <0xXXXXXXXX>;
-> >>> +		xen,uefi-mmap-start = <0xXXXXXXXX>;
-> >>> +		xen,uefi-mmap-size = <0xXXXXXXXX>;
-> >>> +		xen,uefi-mmap-desc-size = <0xXXXXXXXX>;
-> >>> +		xen,uefi-mmap-desc-ver = <0xXXXXXXXX>;
-> >>> +        };
-> >>>  };
-> >>> +
-> >>> +These "xen,uefi-*" parameters are similar to those in Documentation/arm/uefi.txt
-> >>> +which are used by normal UEFI. But to Xen ARM virtual platforms, it needs to
-> >>> +introduce a Xen specific UEFI and it doesn't want to mix with normal UEFI.
-> >>> +Therefore, it defines these parameters under /hypervisor node.
-> >>
-> >> Could we please describe what that actual difference is?
-> >>
-> >> I know that the OS must handle a system table differently under Xen, but
-> >> this doesn't describe what it should do.
-> > 
-> > For a reference, the hypercall interface is described in not so many words here:
-> > 
-> > include/xen/interface/platform.h
-> > http://xenbits.xen.org/gitweb/?p=xen.git;a=blob_plain;f=xen/include/public/platform.h;hb=HEAD
-> > 
-> > However it is clear that platform.h also contains some x86 specific
-> > calls, for example xenpf_set_processor_pminfo. It might be a good idea
-> > to list the calls that are available on ARM64.
-> > 
-> As Stefano said, I think the difference is that for Xen Dom0 the runtime
-> services are worked through hypercalls not the RuntimeServices under the
-> system table.
-
-So just state that Xen-specific hypercalls are required for Dom0 to make
-use of the runtime services.
-
-That makes it clear what the major diffence is between the native case
-and the Dom0 case, even if it's light on detail.
-
-Thanks,
-Mark.
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+index 4fb0bdc..2313ae0 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+@@ -23,6 +23,7 @@
+ 		serial1 = &uart1; /* BT UART */
+ 		serial2 = &uart2; /* LS Expansion UART0 */
+ 		serial3 = &uart3; /* LS Expansion UART1 */
++		spi0 = &spi_0;
+ 	};
+ 
+ 	chosen {
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index c1ae42b..facc0f0 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -489,5 +489,25 @@
+ 			clock-names = "apb_pclk";
+ 			status = "ok";
+ 		};
++
++		spi_0: spi at f7106000 {
++			compatible = "arm,pl022", "arm,primecell";
++			reg = <0x0 0xf7106000 0x0 0x1000>;
++			interrupts = <0 50 4>;
++			bus-id = <0>;
++			enable-dma = <0>;
++			/*dmas = <&dma0 12 &dma0 13>;*/
++			/*dma-names = "rx", "tx";*/
++
++			clocks = <&sys_ctrl HI6220_SPI_CLK>;
++			clock-names = "apb_pclk";
++			pinctrl-names = "default";
++			pinctrl-0 = <&spi0_pmx_func &spi0_cfg_func>;
++			num-cs = <1>;
++			cs-gpios = <&gpio6 2 0>;
++
++			status = "ok";
++		};
++
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi b/arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi
+index 28806df..0916e84 100644
+--- a/arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi
+@@ -221,6 +221,15 @@
+ 					0xfc   MUX_M0	/* I2C2_SDA     (IOMG063) */
+ 				>;
+ 			};
++
++			spi0_pmx_func: spi0_pmx_func {
++				pinctrl-single,pins = <
++					0x1a0  MUX_M1   /* SPI0_DI      (IOMG104) */
++					0x1a4  MUX_M1	/* SPI0_DO	(IOMG105) */
++					0x1a8  MUX_M1	/* SPI0_CS_N	(IOMG106) */
++					0x1ac  MUX_M1	/* SPI0_CLK	(IOMG107) */
++				>;
++			};
+ 		};
+ 
+ 		pmx1: pinmux at f7010800 {
+@@ -625,6 +634,18 @@
+ 				pinctrl-single,bias-pullup    = <PULL_DIS  PULL_UP   PULL_DIS  PULL_UP>;
+ 				pinctrl-single,drive-strength = <DRIVE1_02MA DRIVE_MASK>;
+ 			};
++
++			spi0_cfg_func: spi0_cfg_func {
++				pinctrl-single,pins = <
++					0x1b0  0x0	/* SPI0_DI	(IOCFG108) */
++					0x1b4  0x0	/* SPI0_DO	(IOCFG109) */
++					0x1b8  0x0	/* SPI0_CS_N	(IOCFG110) */
++					0x1bc  0x0	/* SPI0_CLK	(IOCFG111) */
++				>;
++				pinctrl-single,bias-pulldown  = <PULL_DIS  PULL_DOWN PULL_DIS PULL_DOWN>;
++				pinctrl-single,bias-pullup    = <PULL_DIS  PULL_UP   PULL_DIS PULL_UP>;
++				pinctrl-single,drive-strength = <DRIVE1_02MA DRIVE_MASK>;
++			};
+ 		};
+ 
+ 		pmx2: pinmux at f8001800 {
+-- 
+1.9.1
