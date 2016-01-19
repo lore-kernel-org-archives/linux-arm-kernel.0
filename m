@@ -1,89 +1,94 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Tue, 19 Jan 2016 09:50:59 +0800
-Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
-In-Reply-To: <20160119014332.GB2919@dhcp-128-65.nay.redhat.com>
-References: <cover.1452884156.git.geoff@infradead.org>
- <fb4506943bbaed8b0657ed367ebd57e4064d57ed.1452884156.git.geoff@infradead.org>
- <20160115201601.GR3262@leverpostej> <569CBDBC.5050500@linaro.org>
- <20160119014332.GB2919@dhcp-128-65.nay.redhat.com>
-Message-ID: <20160119015059.GA3297@dhcp-128-65.nay.redhat.com>
+From: liudongdong3@huawei.com (liudongdong (C))
+Date: Tue, 19 Jan 2016 09:49:40 +0800
+Subject: [PATCH V3 20/21] pci, acpi: Match PCI config space accessors
+ against platfrom specific quirks.
+In-Reply-To: <569CDD8F.807@semihalf.com>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <1452691267-32240-21-git-send-email-tn@semihalf.com>
+ <1452785776.28109.22.camel@redhat.com> <569CDD8F.807@semihalf.com>
+Message-ID: <569D9634.3040304@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/16 at 09:43am, Dave Young wrote:
-> On 01/18/16 at 07:26pm, AKASHI Takahiro wrote:
-> > On 01/16/2016 05:16 AM, Mark Rutland wrote:
-> > >On Fri, Jan 15, 2016 at 07:18:38PM +0000, Geoff Levand wrote:
-> > >>From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > >>
-> > >>This patch adds arch specific descriptions about kdump usage on arm64
-> > >>to kdump.txt.
-> > >>
-> > >>Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > >>---
-> > >>  Documentation/kdump/kdump.txt | 23 ++++++++++++++++++++++-
-> > >>  1 file changed, 22 insertions(+), 1 deletion(-)
-> > >>
-> > >>diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-> > >>index bc4bd5a..36cf978 100644
-> > >>--- a/Documentation/kdump/kdump.txt
-> > >>+++ b/Documentation/kdump/kdump.txt
-> > >>@@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
-> > >>  a remote system.
-> > >>
-> > >>  Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
-> > >>-s390x and arm architectures.
-> > >>+s390x, arm and arm64 architectures.
-> > >>
-> > >>  When the system kernel boots, it reserves a small section of memory for
-> > >>  the dump-capture kernel. This ensures that ongoing Direct Memory Access
-> > >>@@ -249,6 +249,20 @@ Dump-capture kernel config options (Arch Dependent, arm)
-> > >>
-> > >>      AUTO_ZRELADDR=y
-> > >>
-> > >>+Dump-capture kernel config options (Arch Dependent, arm64)
-> > >>+----------------------------------------------------------
-> > >>+
-> > >>+1) The maximum memory size on the dump-capture kernel must be limited by
-> > >>+   specifying:
-> > >>+
-> > >>+   mem=X[MG]
-> > >>+
-> > >>+   where X should be less than or equal to the size in "crashkernel="
-> > >>+   boot parameter. Kexec-tools will automatically add this.
-> > >
-> > >
-> > >This is extremely fragile, and will trivially fail when the kernel can
-> > >be loaded anywhere (see [1]).
-> > 
-> > As I said before, this restriction also exists on arm, but I understand
-> > that recent Ard's patches break it.
-> > 
-> > >We must explicitly describe the set of regions the crash kernel may use
-> > >(i.e. we need base and size). NAK in the absence of that.
-> > 
-> > There seem to exist several approaches:
-> > (a) use a device-tree property, "linux,usable-memory", in addition to "reg"
-> >     under "memory" node
-> > (b) use a kernel's early parameter, "memmap=nn[@#$]ss"
-> > 
-> > Power PC takes (a), while this does not work on efi-started kernel
-> > because dtb has no "memory" nodes under efi.
-> > X86 takes (b). If we take this, we will need to overwrite a weak
-> > early_init_dt_add_memory().
-> 
-> X86 takes another way in latest kexec-tools and kexec_file_load, that is
-> recreating E820 table and pass it to kexec/kdump kernel, if the entries
-> are over E820 limitation then turn to use setup_data list for remain
-> entries.
+Hi Tomasz, Mark
 
-One reason about the changing is kernel cmdline space is limited. We need
-to pass not only usable memory ranges, also reserved and other different
-memory ranges, cmdline array size is not enough sometimes.
+? 2016/1/18 20:41, Tomasz Nowicki ??:
+> On 14.01.2016 16:36, Mark Salter wrote:
+>>> +extern struct pci_mcfg_fixup __start_acpi_mcfg_fixups[];
+>>> >+extern struct pci_mcfg_fixup __end_acpi_mcfg_fixups[];
+>>> >+
+>>> >+static struct pci_ops *pci_mcfg_check_quirks(struct acpi_pci_root *root)
+>>> >+{
+>>> >+    struct pci_mcfg_fixup *f;
+>>> >+    int bus_num = root->secondary.start;
+>>> >+    int domain = root->segment;
+>>> >+
+>>> >+    /*
+>>> >+     * First match against PCI topology <domain:bus> then use DMI or
+>>> >+     * custom match handler.
+>>> >+     */
+>>> >+    for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
+>>> >+        if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
+>>> >+            (f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
+>>> >+            (f->system ? dmi_check_system(f->system) : 0 ||
+>>> >+             f->match ? f->match(f, root) : 0))
+>>> >+            return f->ops;
+>> I think this would be better as:
+>>
+>>             (f->system ? dmi_check_system(f->system) : 1 &&
+>>              f->match ? f->match(f, root) : 1))
+>>             return f->ops;
+>>
+>> Otherwise, one has to call dmi_check_system() from f->match() if
+>> access to root is needed.
+>
 
-> 
-> I think it is X86 specific. Personally I think device tree property is
-> better.
-> 
-> Thanks
-> Dave
+Non-DMI, we need not to call dmi_check_system() from f->match(),
+we can use _HID to decide to hook the pci_ops or not.
+
+Device (PCI1)
+{
+         Name (_HID, "HISI0080") // PCI Express Root Bridge
+         Name (_CID, "PNP0A03") // Compatible PCI Root Bridge
+	...
+}
+
+static const struct acpi_device_id hisi_pcie_ids[] = {
+     {"HISI0080", 0},
+     {"", 0},
+};
+
+static int hisi_pcie_match(struct pci_mcfg_fixup *fixup, struct acpi_pci_root *root)
+{
+     int ret;
+     struct acpi_device *device;
+
+     device = root->device;
+     ret = acpi_match_device_ids(device, hisi_pcie_ids);
+     if (ret)
+         return 0;
+     ......
+     return 1;
+}
+
+static struct pci_ops hisi_ecam_pci_ops = {
+     .map_bus = pci_mcfg_dev_base,
+     .read = hisi_pci_read,
+     .write = hisi_pci_write,
+};
+
+DECLARE_ACPI_MCFG_FIXUP(NULL, hisi_pcie_match, &hisi_ecam_pci_ops,
+     PCI_MCFG_DOMAIN_ANY, PCI_MCFG_BUS_ANY);
+
+Thanks
+Dongdong
+> Makes a lot of sense to me, I will modify as you suggested.
+>
+> Tomasz
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> .
+>
