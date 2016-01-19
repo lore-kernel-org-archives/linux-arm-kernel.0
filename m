@@ -1,69 +1,36 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 19 Jan 2016 12:20:46 -0600
-Subject: [PATCH v5 1/6] clk: hisilicon: add CRG driver for hi3519 soc
-In-Reply-To: <5698A650.5010600@huawei.com>
-References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
- <1452219400-32478-2-git-send-email-xuejiancheng@huawei.com>
- <20160112221211.GB22188@codeaurora.org> <5695BE65.3070409@huawei.com>
- <20160113185707.1168.85601@quark.deferred.io> <56979F9F.5080201@huawei.com>
- <5698A650.5010600@huawei.com>
-Message-ID: <CAL_JsqJPcPgS=cKNqv9j5Ch3ZHbUmci1LRedBWV1gV=5kCz68Q@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 19 Jan 2016 12:23:17 -0600
+Subject: [PATCH v6 1/6] clk: hisilicon: add CRG driver for hi3519 soc
+In-Reply-To: <1453171111-21921-2-git-send-email-xuejiancheng@huawei.com>
+References: <1453171111-21921-1-git-send-email-xuejiancheng@huawei.com>
+ <1453171111-21921-2-git-send-email-xuejiancheng@huawei.com>
+Message-ID: <20160119182317.GA3681@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 1:57 AM, xuejiancheng <xuejiancheng@huawei.com> wrote:
->
-> On 2016/1/14 21:16, xuejiancheng wrote:
->> Hi Mike,
->>
->> On 2016/1/14 2:57, Michael Turquette wrote:
->>> Quoting xuejiancheng (2016-01-12 19:03:01)
->>>> Hi Stephen,
->>>>    Thank you very much for your reply.
->>>>
->>>> On 2016/1/13 6:12, Stephen Boyd wrote:
->>>>> On 01/08, Jiancheng Xue wrote:
->>>>>> diff --git a/drivers/clk/hisilicon/Kconfig b/drivers/clk/hisilicon/Kconfig
->>>>>> index e434854..b6baebf 100644
->>>>>> --- a/drivers/clk/hisilicon/Kconfig
->>>>>> +++ b/drivers/clk/hisilicon/Kconfig
->>>>>> @@ -1,3 +1,10 @@
->>>>>> +config COMMON_CLK_HI3519
->>>>>> +    tristate "Clock Driver for Hi3519"
->>>>>
->>>>> It looks like this has to be bool. Otherwise it needs to be a
->>>>> platform driver and the hisilicon APIs need to be exported and
->>>>> lose their __init markings.
->>>>>
->>>> Yes,it's a problem. I will fix it in next version. Thank you.
->>>
->>> The best solution would be to make this clock driver a real platform
->>> driver.
->>>
->> Now the work clock of the clocksource timer-sp804 is provided by this driver. So
->> it need to be registered early by CLK_OF_DECLARE. If the timer clock is treated
->> as a fixed-clock provider, this driver can be implemented as a platform driver.
->> Then the crg device must be registered before other clock consumer devices.Accordingly
->> the crg device node must be written above all other clock consumer devices node in dts files.
->> I think it is also a dependence.
->>
->> Can you help me understand why it is better to make this driver a platform driver?
->> Thank you very much!
->>
-> arch_initcall(customize_machine)
-> -->of_platform_populate
->    -->of_platform_bus_create
->      -->of_amba_device_create
->         -->amba_device_add
->            -->amba_get_enable_pclk
-> The call sequence above shows that the clock of the amba device must be registered before
-> amba_device_add. The clock of "arm,pl011" uart is registered in the probe function of the
-> platform driver "hi3519-crg". So the platform device "hi3519-crg" must be created before
-> the amba device "arm,pl011" uart.
+On Tue, Jan 19, 2016 at 10:38:26AM +0800, Jiancheng Xue wrote:
+> The CRG(Clock and Reset Generator) block provides clock
+> and reset signals for other modules in hi3519 soc.
+> 
+> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+> ---
+>  .../devicetree/bindings/clock/hi3519-crg.txt       |  46 +++++++
 
-It is a problem, but Tomeu had a fix to support deferred probes here.
-That was part of the on-demand probing series, but maybe it needs to
-be applied separately if we are moving clock drivers to platform
-drivers.
+I already acked this. Please add ack's when posting new versions.
 
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
+
+>  drivers/clk/hisilicon/Kconfig                      |   7 ++
+>  drivers/clk/hisilicon/Makefile                     |   2 +
+>  drivers/clk/hisilicon/clk-hi3519.c                 | 132 +++++++++++++++++++++
+>  drivers/clk/hisilicon/clk.c                        |  23 ++--
+>  drivers/clk/hisilicon/clk.h                        |  14 +--
+>  drivers/clk/hisilicon/reset.c                      | 130 ++++++++++++++++++++
+>  drivers/clk/hisilicon/reset.h                      |  32 +++++
+>  include/dt-bindings/clock/hi3519-clock.h           |  40 +++++++
+>  9 files changed, 411 insertions(+), 15 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/hi3519-crg.txt
+>  create mode 100644 drivers/clk/hisilicon/clk-hi3519.c
+>  create mode 100644 drivers/clk/hisilicon/reset.c
+>  create mode 100644 drivers/clk/hisilicon/reset.h
+>  create mode 100644 include/dt-bindings/clock/hi3519-clock.h
