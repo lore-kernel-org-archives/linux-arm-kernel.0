@@ -1,26 +1,52 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 19 Jan 2016 12:13:49 -0600
-Subject: [PATCH v6 5/6] ARM: dt-bindings: add device tree bindings for
- Hi3519 sysctrl
-In-Reply-To: <1453171111-21921-6-git-send-email-xuejiancheng@huawei.com>
-References: <1453171111-21921-1-git-send-email-xuejiancheng@huawei.com>
- <1453171111-21921-6-git-send-email-xuejiancheng@huawei.com>
-Message-ID: <20160119181349.GA9747@rob-hp-laptop>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 19 Jan 2016 10:15:45 -0800
+Subject: [PATCH 0/4] nvmem: new drivers for v4.5
+In-Reply-To: <20160111183018.GA10243@kroah.com>
+References: <1449485763-391-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <5693AC68.6040802@linaro.org> <20160111183018.GA10243@kroah.com>
+Message-ID: <CAGS+omDHYeDCaHJC8Q3i4utTUJt40FPyq6S_maQ7scG_2oDmsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2016 at 10:38:30AM +0800, Jiancheng Xue wrote:
-> Add device tree bindings for Hi3519 system controller.
-> 
-> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
-> ---
->  .../devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt   | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt
+Hi Greg,
 
-Sorry to keep telling you different places, but I'd rather try to 
-collect these in a common location (perhaps bindings/sysctrl). 
-Leaving it here is fine for now. If you respin the series then please 
-move it. Either way:
+On Mon, Jan 11, 2016 at 10:30 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
+>
+> On Mon, Jan 11, 2016 at 01:21:44PM +0000, Srinivas Kandagatla wrote:
+> >
+> >
+> > On 07/12/15 10:56, Srinivas Kandagatla wrote:
+> > >Hi Greg,
+> > >
+> > >Here are 2 new nvmem drivers which are in the mailing list for long time
+> > >and are good to go for some testing and find its way to v4.5-rc*.
+> > >
+> > >Could you please take these patches via char-misc tree.
+> > Hi Greg,
+> >
+> > I have not seen these patches or https://lkml.org/lkml/2015/12/14/169 appear
+> > in your char-misc tree/linux-next.
+> >
+> > Just wanted to know whats your plan on these patches?
+>
+> To wait until after 4.5-rc1 is out, sorry, my patch backlog got huge
+> during Nov/Dec due to other external issues, I'll be digging out from
+> them after 4.5-rc1 is out.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Soon after 4.5-rc1 sounds great.
+
+FYI, to add some context, the Mediatek nvmem driver is actually
+blocking several other drivers that we would also like to see land in
+v4.5:  Mediatek thermal, Mediatek cpufreq_thermal, and Mediatek
+devfreq_thermal.
+
+So, the sooner nvmem lands, the earlier we can start staging/pushing
+through the rest.
+
+Thanks,
+-Dan
+
+>
+> thanks,
+>
+> greg k-h
