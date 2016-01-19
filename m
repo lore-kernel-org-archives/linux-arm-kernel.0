@@ -1,95 +1,71 @@
-From: tomeu@tomeuvizoso.net (Tomeu Vizoso)
-Date: Tue, 19 Jan 2016 13:02:34 +0100
-Subject: [PATCH 0/5] clk: rockchip: add full support for HDMI clock on
- rk3288
-In-Reply-To: <CAD=FV=Vzec3Qm-kc6zZ4VxSREoZbzVkWbzp-noHYdcEVrLYYSw@mail.gmail.com>
-References: <1415087559-19444-1-git-send-email-kever.yang@rock-chips.com>
- <48806799.thBSifdUp8@diego> <54647142.4080800@rock-chips.com>
- <CAD=FV=Vzec3Qm-kc6zZ4VxSREoZbzVkWbzp-noHYdcEVrLYYSw@mail.gmail.com>
-Message-ID: <CAAObsKChYN5nmcm5OWnAzNRGDi_QGSoKvN+0FizhjeT-3mmeXQ@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 19 Jan 2016 12:03:59 +0000
+Subject: [PATCH v2 16/16] ARM64: XEN: Initialize Xen specific UEFI runtime
+ services
+In-Reply-To: <20160118182747.GR21067@leverpostej>
+References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452840929-19612-17-git-send-email-zhaoshenglong@huawei.com>
+ <20160118110854.GG21067@leverpostej>
+ <alpine.DEB.2.02.1601181736090.9400@kaball.uk.xensource.com>
+ <20160118182747.GR21067@leverpostej>
+Message-ID: <alpine.DEB.2.02.1601191143590.9400@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 November 2014 at 23:59, Doug Anderson <dianders@chromium.org> wrote:
-> Hi,
->
-> On Thu, Nov 13, 2014 at 12:52 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
->> Hi Heiko,
->>
->> On 11/07/2014 05:06 AM, Heiko St?bner wrote:
->>>
->>> Hi Kever,
->>>
->>> Am Dienstag, 4. November 2014, 15:52:34 schrieb Kever Yang:
->>>>
->>>> we are going to make a clock usage solution for rk3288:
->>>> 1. CPLL and GPLL always not change after assign init;
->>>> 2. NPLL default as 500MHz, may used for most scene;
->>>> 3. NPLL may be changed by VOP(HDMI) clock for some special
->>>>     frequency requirement.
->>>>
->>>>      I test it with rk3288 evb on top of Heiko's clk-for-next
->>>
->>> In general I'm not really sure if allowing one component to arbitarily
->>> change
->>> a shared clock wouldn't result in trouble.
->>>
->>> At the moment only dclk_vop0 is included in your series, while the hdmi
->>> controller can connect to both vop0 and vop1.
->>> And as Doug mentioned the gpu also has the npll as one possible source.
->>
->> I think the problem GPU HANGs with 480MHz clock from usbphy has
->> been fixed with my patch to gerrit:
->> https://chromium-review.googlesource.com/#/c/229554/
->>>
->>>
->>> Looking through the clock-tree there are a lot more components possibly
->>> using
->>> (or wanting to use) the npll: of course the VOPs, the edp, hdmi, isp,
->>> hevc,
->>> gpu, tsp uart0 and gmac. So I'm slightly uncomfortable with somehow
->>> reserving
->>> the npll for VOP0 alone.
->>
->> It's true that I customized the usage of npll for VOP0 when we need some
->> very special frequency, but it doesn't means other modules can't use the
->> npll, it will always decided by clock core for module clocks that which
->> parent
->> is the best.
->
-> We will just need to be very careful.  As I've mentioned in the past
-> we'll need to think about what happens to other clocks that happen to
-> be parented by NPLL whenever we change it.
->
-> So if we do this:
->
-> 1. NPLL happens to be 500MHz.
-> 2. We set GPU to be 500MHz and it picks NPLL.
-> 3. We change NPLL to a different speed (like 600MHz).
->
-> ...I believe in this scenario the GPU would start running at 600MHz
-> immediately.  We'd need to add special code to watch out for this and
-> pick an alternate clock for the GPU (like the USB 480) before the NPLL
-> change.  If NPLL later changes back to 500MHz and the GPU still wanted
-> 500MHz, we'd have to decide what to do.
->
-> The summary is: it's pretty complicated
+On Mon, 18 Jan 2016, Mark Rutland wrote:
+> On Mon, Jan 18, 2016 at 05:45:24PM +0000, Stefano Stabellini wrote:
+> > On Mon, 18 Jan 2016, Mark Rutland wrote:
+> > > On Fri, Jan 15, 2016 at 02:55:29PM +0800, Shannon Zhao wrote:
+> > > > +void __init xen_efi_runtime_setup(void)
+> > > > +{
+> > > > +	efi.get_time                 = xen_efi_get_time;
+> > > > +	efi.set_time                 = xen_efi_set_time;
+> > > > +	efi.get_wakeup_time          = xen_efi_get_wakeup_time;
+> > > > +	efi.set_wakeup_time          = xen_efi_set_wakeup_time;
+> > > > +	efi.get_variable             = xen_efi_get_variable;
+> > > > +	efi.get_next_variable        = xen_efi_get_next_variable;
+> > > > +	efi.set_variable             = xen_efi_set_variable;
+> > > > +	efi.query_variable_info      = xen_efi_query_variable_info;
+> > > > +	efi.update_capsule           = xen_efi_update_capsule;
+> > > > +	efi.query_capsule_caps       = xen_efi_query_capsule_caps;
+> > > > +	efi.get_next_high_mono_count = xen_efi_get_next_high_mono_count;
+> > > > +	efi.reset_system             = NULL;
+> > > > +}
+> > > 
+> > > How do capsules work in the absence of an EFI system reset?
+> > 
+> > Actually I don't think that capsules are available in Xen on ARM64 yet,
+> > see "TODO - disabled until implemented on ARM" in
+> > xen/common/efi/runtime.c.
+> > 
+> > FYI system reset is available, but it is provided via a different
+> > mechanism (HYPERVISOR_sched_op(xen_restart...)
+> 
+> Will that trigger Xen to do the right thing to trigger capsule updates
+> when implemented in Xen? Or do we need a xen_efi_reset_system?
 
-Hello,
+On ARM, to reboot the hardware, Xen calls the native PSCI system_reset
+method. On x86, Xen calls efi_reset_system on EFI systems, and has
+several fall backs if that doesn't work as expected (see
+xen/arch/x86/shutdown.c:machine_restart).
 
-I have heard that this is still an issue in RK3288 support in mainline
-so have given a look and wonder if you have considered having the
-consumers of a shared clock (which could be a child clock) use
-PRE_RATE_CHANGE notifications to adapt to changes in a parent's rate,
-or to abort them if that's not possible.
+But on a second look it doesn't look like that the capsule hypercalls
+are implemented correctly even on x86 (there is an "XXX fall through for
+now" comment in the code). I guess they are not available on Xen at all
+unfortunately.
 
-Alternatively, a consumer can set min and max constraints if it
-doesn't want for others to mess with its provider, and let the other
-consumer deal with failed rate changes (probably by choosing another
-provider).
 
-Have I missed any problems with that?
+> Does that override PSCI?
 
-Thanks,
+It does not, HYPERVISOR_sched_op(xen_restart,) is in addition to it. It
+ends up calling the same function within Xen as PSCI system_reset.
 
-Tomeu
+
+> In machine_restart we try efi_reboot first specifically to allow for
+> capsule updates. Similarly drivers/firmware/efi/reboot.c registers
+> efi_power_off late in order to override anything else, though that's
+> best-effort at present.
+
+That's very interesting. I think that Xen on ARM should follow what
+Linux does and what Xen already does on x86 and try efi_reset_system
+first on efi systems.
