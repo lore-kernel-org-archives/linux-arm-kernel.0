@@ -1,39 +1,29 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 19 Jan 2016 02:02:11 +0100
-Subject: Fix preempt-rt on AT91
-In-Reply-To: <569D4B55.10103@linutronix.de>
+Date: Tue, 19 Jan 2016 02:22:47 +0100
+Subject: [PATCH 4.4-rt2] fix
+ arm-at91-pit-remove-irq-handler-when-clock-is-unused.patch
+In-Reply-To: <569D49FC.2050500@linutronix.de>
 References: <1452997394-8554-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20160118174259.GC12309@linutronix.de>
- <20160118192308.GR3367@piout.net> <569D4B55.10103@linutronix.de>
-Message-ID: <20160119010211.GU3367@piout.net>
+ <1452997394-8554-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160118172522.GB12309@linutronix.de>
+ <20160118184247.GQ3367@piout.net> <569D49FC.2050500@linutronix.de>
+Message-ID: <20160119012247.GV3367@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/2016 at 21:30:13 +0100, Sebastian Andrzej Siewior wrote :
-> Well, if it works properly and does not lead to any new bugs or
-> anything else then nobody will mind I guess.
-> 
-
-Yeah, the DT guys were not happy about the patch set, I'll try to work
-around using DT ;)
-
-> >> All in all, care to forwarded the working pieces from -RT patch set
-> >> upstream? I problem I have here is mostly that I can't the patches on
-> >> actual hardware. Disabling the PIT and running on the other clocksource
-> >> isn't that -RT specific after all :)
+On 18/01/2016 at 21:24:28 +0100, Sebastian Andrzej Siewior wrote :
 > > 
-> > I'd say that the only remaining part is the IRQ freeing/requesting but
-> > as I said, this can't land in mainline as is. I still plan to work on
-> > that later.
-> > I'd say that most people running linux on at91 are already using the tcb
-> > as the clocksource, this is already available in the mainline and is the
-> > default unless the TCBs are used for something else.
+> > My understanding is that clockevents_exchange_device() changes the state
+> > from detached to shutdown and so at that point the IRQ has never been
+> > requested.
 > 
-> Wasn't there one of the patches to increase the frequency of the TCB
-> clocksource from the default to something higher?
+> I see. So we get shutdown called twice while set_periodic was only
+> called once. In that case I would suggest to have internal bookkeeping
+> instead of relying on current core's behavior when it is time free the
+> irq.
 > 
 
-Indeed, it may be worth mainlining that one.
+Ok, I can do that. What should I base my patch on?
 
 -- 
 Alexandre Belloni, Free Electrons
