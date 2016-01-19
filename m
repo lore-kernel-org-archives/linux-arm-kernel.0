@@ -1,180 +1,59 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 19 Jan 2016 16:36:32 +0800
-Subject: [Xen-devel] [PATCH v2 10/16] ARM: XEN: Move xen_early_init()
- before efi_init()
-In-Reply-To: <alpine.DEB.2.02.1601181445210.16178@kaball.uk.xensource.com>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-11-git-send-email-zhaoshenglong@huawei.com>
- <alpine.DEB.2.02.1601181445210.16178@kaball.uk.xensource.com>
-Message-ID: <569DF590.6030105@huawei.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Tue, 19 Jan 2016 16:38:20 +0800
+Subject: [PATCH v2 2/4] power: reset: add reboot mode driver
+In-Reply-To: <CALAqxLVNUG_cVbavXC34sNPv68jbMghti31+PrgQ7mpPngXh6g@mail.gmail.com>
+References: <1452598029-8222-1-git-send-email-andy.yan@rock-chips.com>
+ <1452598319-8324-1-git-send-email-andy.yan@rock-chips.com>
+ <CALAqxLVNUG_cVbavXC34sNPv68jbMghti31+PrgQ7mpPngXh6g@mail.gmail.com>
+Message-ID: <569DF5FC.1080402@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi John:
 
+On 2016?01?16? 04:27, John Stultz wrote:
+> On Tue, Jan 12, 2016 at 3:31 AM, Andy Yan <andy.yan@rock-chips.com> wrote:
+>> This driver parse the reboot commands like "reboot loader"
+>> and "reboot recovery" to get a boot mode described in the
+>> device tree , then call the write interfae to store the boot
+>> mode in some persistent storage  like special register or ram,
+>> which can be read by the bootloader after system reboot, then
+>> the bootloader can take different action according to the mode
+>> stored.
+>>
+>> This is commonly used on Android based devices, which in order
+>> to reboot the device into fastboot or recovery mode.
+>>
+>> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+>
+> Hey Andy!
+>    Thanks for keeping this work going! I've just successfully reworked
+> my Nexus7 tree to use your implementation (using the syscon version,
+> setting up a syscon for IMEM as Bjorn had requested earlier).
+>
+> All is working well so far!
+>
+> The one thing I was working on supporting with my own version that
+> seems to be missing here are for devices that use string based codes,
+> rather then magic numbers.
+>
+> This was mostly a theoretical issue. I think the Galaxy Nexus used it,
+> and when I was looking at some of the HTC devices, they support a text
+> based reason along with the magic code, but at least in some
+> implementations the text mode isn't used, so I suspect there its just
+> for extra debugging.  So this may not be critical to solve until
+> someone tries to add support for such a device.
+>
+> Anyway, I'm going to look at porting this to the HiKey board next
+> (which just uses reserved ram, not syscon), so I'll try to do a an
+> SRAM driver implementaiton to see how that goes.
+>
+> thanks!
+> -john
+>
+>
+>
+>
 
-On 2016/1/18 22:59, Stefano Stabellini wrote:
-> On Fri, 15 Jan 2016, Shannon Zhao wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
->>
->> Move xen_early_init() before efi_init(), then when calling efi_init()
->> could initialize Xen specific UEFI.
->>
->> Check if it runs on Xen hypervisor through the flat dts.
->>
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> ---
->>  arch/arm/xen/enlighten.c  | 56 ++++++++++++++++++++++++++++++++++-------------
->>  arch/arm64/kernel/setup.c |  2 +-
->>  2 files changed, 42 insertions(+), 16 deletions(-)
->>
->> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
->> index 4e78c49..5d0fe68 100644
->> --- a/arch/arm/xen/enlighten.c
->> +++ b/arch/arm/xen/enlighten.c
->> @@ -19,6 +19,7 @@
->>  #include <linux/irqreturn.h>
->>  #include <linux/module.h>
->>  #include <linux/of.h>
->> +#include <linux/of_fdt.h>
->>  #include <linux/of_irq.h>
->>  #include <linux/of_address.h>
->>  #include <linux/cpuidle.h>
->> @@ -52,8 +53,6 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS] __initdata;
->>  
->>  static __read_mostly unsigned int xen_events_irq;
->>  
->> -static __initdata struct device_node *xen_node;
->> -
->>  int xen_remap_domain_gfn_array(struct vm_area_struct *vma,
->>  			       unsigned long addr,
->>  			       xen_pfn_t *gfn, int nr,
->> @@ -222,6 +221,33 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
->>  	return IRQ_HANDLED;
->>  }
->>  
->> +static __initdata struct {
->> +	const char *compat;
->> +	const char *prefix;
->> +	const char *version;
->> +	bool found;
->> +} xen_node = {"xen,xen", "xen,xen-", NULL, false};
->> +
->> +static int __init fdt_find_xen_node(unsigned long node, const char *uname,
->> +				    int depth, void *data)
->> +{
->> +	const void *s = NULL;
->> +	int len;
->> +
->> +	if (depth != 1 || strcmp(uname, "hypervisor") != 0)
->> +		return 0;
->> +
->> +	if (of_flat_dt_is_compatible(node, xen_node.compat))
->> +		xen_node.found = true;
->> +
->> +	s = of_get_flat_dt_prop(node, "compatible", &len);
->> +	if (strlen(xen_node.prefix) + 3  < len &&
->> +	    !strncmp(xen_node.prefix, s, strlen(xen_node.prefix)))
->> +		xen_node.version = s + strlen(xen_node.prefix);
->> +
->> +	return 0;
->> +}
->> +
->>  /*
->>   * see Documentation/devicetree/bindings/arm/xen.txt for the
->>   * documentation of the Xen Device Tree format.
->> @@ -229,26 +255,18 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
->>  #define GRANT_TABLE_PHYSADDR 0
->>  void __init xen_early_init(void)
->>  {
->> -	int len;
->> -	const char *s = NULL;
->> -	const char *version = NULL;
->> -	const char *xen_prefix = "xen,xen-";
->> -
->> -	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
->> -	if (!xen_node) {
->> +	of_scan_flat_dt(fdt_find_xen_node, NULL);
->> +	if (!xen_node.found) {
->>  		pr_debug("No Xen support\n");
->>  		return;
->>  	}
->> -	s = of_get_property(xen_node, "compatible", &len);
->> -	if (strlen(xen_prefix) + 3  < len &&
->> -			!strncmp(xen_prefix, s, strlen(xen_prefix)))
->> -		version = s + strlen(xen_prefix);
->> -	if (version == NULL) {
->> +
->> +	if (xen_node.version == NULL) {
->>  		pr_debug("Xen version not found\n");
->>  		return;
->>  	}
-> 
-> This is going to access data within the fdt, after it has been
-> unflattened (by the unflatten_device_tree call). Is that allowed?
-> 
-> If that's not allowed, then you could copy the version string to
-> xen_node.version, rather than just copying the pointer. Otherwise you
-> could move the version check entirely within fdt_find_xen_node and
-> remove the version field from xen_node.
-> 
-A little confused. Since here we move xen_early_init before efi_init and
-before unflatten_device_tree as well, at this moment in xen_early_init
-the fdt is flattened. The xen_node.version is only set in
-fdt_find_xen_node and accessed in xen_early_init.
-
-> 
->> -	pr_info("Xen %s support found\n", version);
->> +	pr_info("Xen %s support found\n", xen_node.version);
->>  
->>  	xen_domain_type = XEN_HVM_DOMAIN;
->>  
->> @@ -296,6 +314,14 @@ static int __init xen_guest_init(void)
->>  		}
->>  #endif
->>  	} else {
->> +		struct device_node *xen_node;
->> +
->> +		xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
->> +		if (!xen_node) {
->> +			pr_debug("No Xen support\n");
->> +			return -ENODEV;
->> +		}
-> 
-> It makes sense to move this into a DT specific init function called from
-> xen_guest_init. Also, given that at this point we know that a Xen node
-> should be present, it makes sense to return EFAULT on error, instead of
-> ENODEV. The error message could be changed to something like: "Xen
-> support was detected before, but it has disappeared" and should be
-> pr_err.
-> 
-OK, thanks.
-> 
->>  		xen_events_irq = irq_of_parse_and_map(xen_node, 0);
->>  	}
->>  
->> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->> index 8119479..a4a2878 100644
->> --- a/arch/arm64/kernel/setup.c
->> +++ b/arch/arm64/kernel/setup.c
->> @@ -313,6 +313,7 @@ void __init setup_arch(char **cmdline_p)
->>  	 */
->>  	local_async_enable();
->>  
->> +	xen_early_init();
->>  	efi_init();
->>  	arm64_memblock_init();
->>  
->> @@ -334,7 +335,6 @@ void __init setup_arch(char **cmdline_p)
->>  	} else {
->>  		psci_acpi_init();
->>  	}
->> -	xen_early_init();
->>  
->>  	cpu_read_bootcpu_ops();
->>  	smp_init_cpus();
-> 
-> .
-> 
-
--- 
-Shannon
+  Very glad to hear news from you. And welcome your SRAM based driver 
+implementation.
