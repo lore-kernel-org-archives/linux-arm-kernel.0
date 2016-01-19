@@ -1,57 +1,191 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 19 Jan 2016 14:11:13 +0100
-Subject: [PATCH V3 00/10] Introduce ACPI world to GICv3 & ITS irqchip
-Message-ID: <1453209083-3358-1-git-send-email-tn@semihalf.com>
+Date: Tue, 19 Jan 2016 14:11:14 +0100
+Subject: [PATCH V3 01/10] irqchip / GICv3: Refactor gic_of_init() for GICv3
+ driver
+In-Reply-To: <1453209083-3358-1-git-send-email-tn@semihalf.com>
+References: <1453209083-3358-1-git-send-email-tn@semihalf.com>
+Message-ID: <1453209083-3358-2-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patches base on Suravee's ACPI GICv2m support:
-https://lkml.org/lkml/2015/12/10/475
+Isolate hardware abstraction (FDT) code to gic_of_init().
+Rest of the logic goes to gic_init_bases() and expects well
+defined data to initialize GIC properly. The same solution
+is used for GICv2 driver.
 
-The following git branch contains submitted patches along with
-the useful patches from the test point of view (mainly ACPI ARM64 PCI support).
-https://github.com/semihalf-nowicki-tomasz/linux.git (gicv3-its-acpi-v3)
+This is needed for ACPI initialization later.
 
-Series has been tested on Cavium ThunderX server.
+Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ drivers/irqchip/irq-gic-v3.c | 130 ++++++++++++++++++++++++++-----------------
+ 1 file changed, 78 insertions(+), 52 deletions(-)
 
-v2 -> v3
-- rebased on top of 4.4
-- fixes and improvements for redistributor init via GICC structures
-- fixes as per kbuild reports
-
-v1 -> v2
-- rebased on top of 4.4-rc4
-- use pci_msi_domain_get_msi_rid for requester ID to device ID translation
-
-Hanjun Guo (1):
-  irqchip / GICv3: remove gic root node in ITS
-
-Tomasz Nowicki (9):
-  irqchip / GICv3: Refactor gic_of_init() for GICv3 driver
-  irqchip / GICv3: Add ACPI support for GICv3+ initialization
-  irqchip,GICv3,ACPI: Add redistributor support via GICC structures.
-  irqchip, gicv3, its: Mark its_init() and its children as __init
-  irqchip, GICv3, ITS: Refator ITS dt init code to prepare for ACPI.
-  ARM64, ACPI, PCI: I/O Remapping Table (IORT) initial support.
-  irqchip, gicv3, its: Probe ITS in the ACPI way.
-  acpi, gicv3, msi: Factor out code that might be reused for ACPI
-    equivalent.
-  acpi, gicv3, its: Use MADT ITS subtable to do PCI/MSI domain
-    initialization.
-
- drivers/acpi/Kconfig                     |   3 +
- drivers/acpi/Makefile                    |   1 +
- drivers/acpi/iort.c                      | 326 +++++++++++++++++++++++++++++
- drivers/irqchip/Kconfig                  |   1 +
- drivers/irqchip/irq-gic-v3-its-pci-msi.c |  85 ++++++--
- drivers/irqchip/irq-gic-v3-its.c         | 143 +++++++++----
- drivers/irqchip/irq-gic-v3.c             | 344 ++++++++++++++++++++++++++-----
- drivers/pci/msi.c                        |   3 +
- include/linux/iort.h                     |  38 ++++
- include/linux/irqchip/arm-gic-v3.h       |   2 +-
- 10 files changed, 845 insertions(+), 101 deletions(-)
- create mode 100644 drivers/acpi/iort.c
- create mode 100644 include/linux/iort.h
-
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index d7be6dd..31205c7 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -811,59 +811,16 @@ static void gicv3_enable_quirks(void)
+ #endif
+ }
+ 
+-static int __init gic_of_init(struct device_node *node, struct device_node *parent)
++static int __init gic_init_bases(void __iomem *dist_base,
++				 struct redist_region *rdist_regs,
++				 u32 nr_redist_regions,
++				 u64 redist_stride,
++				 struct fwnode_handle *handle)
+ {
+-	void __iomem *dist_base;
+-	struct redist_region *rdist_regs;
+-	u64 redist_stride;
+-	u32 nr_redist_regions;
++	struct device_node *node;
+ 	u32 typer;
+-	u32 reg;
+ 	int gic_irqs;
+ 	int err;
+-	int i;
+-
+-	dist_base = of_iomap(node, 0);
+-	if (!dist_base) {
+-		pr_err("%s: unable to map gic dist registers\n",
+-			node->full_name);
+-		return -ENXIO;
+-	}
+-
+-	reg = readl_relaxed(dist_base + GICD_PIDR2) & GIC_PIDR2_ARCH_MASK;
+-	if (reg != GIC_PIDR2_ARCH_GICv3 && reg != GIC_PIDR2_ARCH_GICv4) {
+-		pr_err("%s: no distributor detected, giving up\n",
+-			node->full_name);
+-		err = -ENODEV;
+-		goto out_unmap_dist;
+-	}
+-
+-	if (of_property_read_u32(node, "#redistributor-regions", &nr_redist_regions))
+-		nr_redist_regions = 1;
+-
+-	rdist_regs = kzalloc(sizeof(*rdist_regs) * nr_redist_regions, GFP_KERNEL);
+-	if (!rdist_regs) {
+-		err = -ENOMEM;
+-		goto out_unmap_dist;
+-	}
+-
+-	for (i = 0; i < nr_redist_regions; i++) {
+-		struct resource res;
+-		int ret;
+-
+-		ret = of_address_to_resource(node, 1 + i, &res);
+-		rdist_regs[i].redist_base = of_iomap(node, 1 + i);
+-		if (ret || !rdist_regs[i].redist_base) {
+-			pr_err("%s: couldn't map region %d\n",
+-			       node->full_name, i);
+-			err = -ENODEV;
+-			goto out_unmap_rdist;
+-		}
+-		rdist_regs[i].phys_base = res.start;
+-	}
+-
+-	if (of_property_read_u64(node, "redistributor-stride", &redist_stride))
+-		redist_stride = 0;
+ 
+ 	if (!is_hyp_mode_available())
+ 		static_key_slow_dec(&supports_deactivate);
+@@ -889,8 +846,8 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+ 		gic_irqs = 1020;
+ 	gic_data.irq_nr = gic_irqs;
+ 
+-	gic_data.domain = irq_domain_add_tree(node, &gic_irq_domain_ops,
+-					      &gic_data);
++	gic_data.domain = irq_domain_create_tree(handle, &gic_irq_domain_ops,
++						 &gic_data);
+ 	gic_data.rdists.rdist = alloc_percpu(typeof(*gic_data.rdists.rdist));
+ 
+ 	if (WARN_ON(!gic_data.domain) || WARN_ON(!gic_data.rdists.rdist)) {
+@@ -900,7 +857,9 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+ 
+ 	set_handle_irq(gic_handle_irq);
+ 
+-	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
++	node = to_of_node(handle);
++	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis() &&
++	    node) /* Temp hack to prevent ITS init for ACPI */
+ 		its_init(node, &gic_data.rdists, gic_data.domain);
+ 
+ 	gic_smp_init();
+@@ -914,6 +873,73 @@ out_free:
+ 	if (gic_data.domain)
+ 		irq_domain_remove(gic_data.domain);
+ 	free_percpu(gic_data.rdists.rdist);
++	return err;
++}
++
++static int __init gic_validate_dist_version(void __iomem *dist_base)
++{
++	u32 reg = readl_relaxed(dist_base + GICD_PIDR2) & GIC_PIDR2_ARCH_MASK;
++
++	if (reg != GIC_PIDR2_ARCH_GICv3 && reg != GIC_PIDR2_ARCH_GICv4)
++		return -ENODEV;
++
++	return 0;
++}
++
++static int __init gic_of_init(struct device_node *node, struct device_node *parent)
++{
++	void __iomem *dist_base;
++	struct redist_region *rdist_regs;
++	u64 redist_stride;
++	u32 nr_redist_regions;
++	int err, i;
++
++	dist_base = of_iomap(node, 0);
++	if (!dist_base) {
++		pr_err("%s: unable to map gic dist registers\n",
++			node->full_name);
++		return -ENXIO;
++	}
++
++	err = gic_validate_dist_version(dist_base);
++	if (err) {
++		pr_err("%s: no distributor detected, giving up\n",
++			node->full_name);
++		goto out_unmap_dist;
++	}
++
++	if (of_property_read_u32(node, "#redistributor-regions", &nr_redist_regions))
++		nr_redist_regions = 1;
++
++	rdist_regs = kzalloc(sizeof(*rdist_regs) * nr_redist_regions, GFP_KERNEL);
++	if (!rdist_regs) {
++		err = -ENOMEM;
++		goto out_unmap_dist;
++	}
++
++	for (i = 0; i < nr_redist_regions; i++) {
++		struct resource res;
++		int ret;
++
++		ret = of_address_to_resource(node, 1 + i, &res);
++		rdist_regs[i].redist_base = of_iomap(node, 1 + i);
++		if (ret || !rdist_regs[i].redist_base) {
++			pr_err("%s: couldn't map region %d\n",
++			       node->full_name, i);
++			err = -ENODEV;
++			goto out_unmap_rdist;
++		}
++		rdist_regs[i].phys_base = res.start;
++	}
++
++	if (of_property_read_u64(node, "redistributor-stride", &redist_stride))
++		redist_stride = 0;
++
++	err = gic_init_bases(dist_base, rdist_regs, nr_redist_regions,
++			     redist_stride, &node->fwnode);
++	if (!err)
++		return 0;
++
+ out_unmap_rdist:
+ 	for (i = 0; i < nr_redist_regions; i++)
+ 		if (rdist_regs[i].redist_base)
 -- 
 1.9.1
