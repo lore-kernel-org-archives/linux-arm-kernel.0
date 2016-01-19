@@ -1,49 +1,68 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 19 Jan 2016 08:29:17 +0100
-Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
-In-Reply-To: <20160104141940.GI13058@pengutronix.de>
-References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
- <1448883753-19068-3-git-send-email-s.hauer@pengutronix.de>
- <20151217193332.GB7999@localhost.localdomain>
- <20160104141940.GI13058@pengutronix.de>
-Message-ID: <20160119072917.GA13237@pengutronix.de>
+From: ntelkar@codeaurora.org (ntelkar at codeaurora.org)
+Date: Tue, 19 Jan 2016 07:48:49 -0000
+Subject: [PATCH V6 0/6] i2c: qup: Add support for v2 tags and bam dma
+In-Reply-To: <1452588233-1803-1-git-send-email-sricharan@codeaurora.org>
+References: <1452588233-1803-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <e45ba8b5efc13a4eda4b5c1b2282facc.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eduardo,
+Added SMB support on top of these patches and tested  i2c with ipmitool.
+It works as expected.
+Tested-by: ntelkar at codeaurora.org
 
-On Mon, Jan 04, 2016 at 03:19:40PM +0100, Sascha Hauer wrote:
-> Hi Eduardo,
-> 
-> > 
-> > That should remove the policy of computing the maximum from this driver.
-> > Please have a look on the work being done [1] to add grouping and
-> > aggregation of thermal zones. With that in place, you should be a matter
-> > of configuring the grouping and selecting max as the aggregation function,
-> > from the thermal core, instead in the driver. Which should give the
-> > system engineer, more flexibility to compose whatever policy based on
-> > the exposed sensors.
-> 
-> I think the aggregation of thermal zones is quite useful when it comes
-> to putting different chips together to a system. I am not so sure how
-> useful it is to expose different thermal zones of a single SoC to the
-> device tree.
-> Currently the only control knob we have is the CPU frequency. When any
-> of the sensors on the SoC gets too hot then the only thing we can do is
-> to decrease the CPU frequency. This does not leave much space for
-> configuration in the device tree.
-> What I need to be able is to attach multiple sensors to one thermal
-> zone. The aggregation patch series only partly solves that and I think
-> is inconsistent, but I commented on the series directly.
-
-Any input on this? I really like to get this driver upstream as it is
-currently blocking other Mediatek drivers.
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> i2c: qup: Add support for v2 tags and bam dma
+>
+> QUP from version 2.1.1 onwards, supports a new format of i2c command tags.
+> Tag codes instructs the controller to perform a operation like read/write.
+> This new tagging version supports and is required for adding bam dma
+> capabilities. V2 tags supports transfer of more than 256 bytes in a single
+> i2c
+> transaction. Also adding bam dma support facilitates transferring each
+> i2c_msg
+> in i2c_msgs without a 'stop' bit in between which is required for some of
+> the clients.
+>
+> Tested this series on apq8074 dragon board eeprom client on i2c bus1
+>
+> [V6] Added review tags and fixed a checkpatch warning in patch 4/6.
+>
+> [V5] Addressed few more comments from Ivan T. Ivanov.
+>      Squashed patch 2 and 3 as no point in having only few lines of
+>      common code between v1 and v2 tags for increased complexity.
+>      Couple of non functional review comments fixes in patch 3, 4.
+>      Added a change in patch 4 to have proper transfer completion in
+>      a corner case. patch 5, 6 unchanged.
+>
+> [V4] Added a patch to factor out some common code.
+>      Removed support for freq > 400KHZ as per comments.
+>      Addressed comments from Ivan T. Ivanov to keep the code for
+>      V2 support in a separate path.
+>      Changed the authorship of V2 tags support patch.
+>
+> [V3] Added support to coalesce each i2c_msg in i2c_msgs for fifo and
+>      block mode in Patch 2. Also addressed further code comments.
+>
+>      http://comments.gmane.org/gmane.linux.drivers.i2c/22497
+>
+> [V2] Addressed comments from Ivan T. Ivanov, Andy Gross [v1] Initial
+> Version
+>
+> Sricharan R (6):
+>   i2c: qup: Change qup_wait_writeready function to use for all timeouts
+>   i2c: qup: Add V2 tags support
+>   i2c: qup: Transfer each i2c_msg in i2c_msgs without a stop bit
+>   i2c: qup: Add bam dma capabilities
+>   dts: msm8974: Add blsp2_bam dma node
+>   dts: msm8974: Add dma channels for blsp2_i2c1 node
+>
+>  arch/arm/boot/dts/qcom-msm8974.dtsi |  14 +-
+>  drivers/i2c/busses/i2c-qup.c        | 922
+> ++++++++++++++++++++++++++++++++++--
+>  2 files changed, 887 insertions(+), 49 deletions(-)
+>
+> --
+> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+> of Code Aurora Forum, hosted by The Linux Foundation
+>
+>
