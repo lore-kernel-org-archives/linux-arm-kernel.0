@@ -1,153 +1,64 @@
-From: dpetigara@broadcom.com (Danesh Petigara)
-Date: Mon, 18 Jan 2016 15:51:23 -0800
-Subject: [PATCH v2] drivers: ata: wake port before DMA stop for ALPM
-In-Reply-To: <1452547346-31735-1-git-send-email-dpetigara@broadcom.com>
-References: <1452547346-31735-1-git-send-email-dpetigara@broadcom.com>
-Message-ID: <569D7A7B.8090603@broadcom.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 19 Jan 2016 01:16:18 +0100
+Subject: How to get better precision out of getrusage on the ARM?
+In-Reply-To: <CAF_dkJBM3qbs3GB8jdgonus7dgVSyn-7QtogtqmMQWzR2BK+OQ@mail.gmail.com>
+References: <CAF_dkJBjs1b+73ggvJyXwab6YL94HGT2jrqbcfaLxoETtQsD9Q@mail.gmail.com>
+ <20151222144907.GK8644@n2100.arm.linux.org.uk>
+ <CAF_dkJDFXSEgH+kO=k=Yj0_VDnFYgPtkoYznLUWZnq4=QTNDDg@mail.gmail.com>
+ <20151222151314.GM8644@n2100.arm.linux.org.uk>
+ <CAF_dkJAUyD3GRAETZUQG2yJTmOR95XKVguohBpBjUaM9JMaQyg@mail.gmail.com>
+ <CAF_dkJBrfd=YUnG=ja2KE_z2DM8NQTLGiWVyvW6mrPYP4i+sFA@mail.gmail.com>
+ <CAF_dkJBM3qbs3GB8jdgonus7dgVSyn-7QtogtqmMQWzR2BK+OQ@mail.gmail.com>
+Message-ID: <20160119001618.GT3367@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tejun,
+Hi Patrick,
 
-I was wondering if you had an opportunity to review this patch? Any
-chance of this going into v4.5 along with the other patches, or would
-you like to defer it to v4.6? I am fine either way.
+I was wondering whether you had the chance to test this patch from the
+RT tree:
+http://git.kernel.org/cgit/linux/kernel/git/rt/linux-rt-devel.git/commit/?h=v4.4-rt2&id=57142bdff523a67657d0b2603eaa91df58b88bd8
 
-Thanks,
-Danesh
+when trying your sched_clock experiment?
 
-On 1/11/2016 1:22 PM, Danesh Petigara wrote:
-> The AHCI driver code stops and starts port DMA engines at will
-> without considering the power state of the particular port. The
-> AHCI specification isn't very clear on how to handle this scenario,
-> leaving implementation open to interpretation.
+On 30/12/2015 at 10:00:46 -0500, Patrick Doyle wrote :
+> Continuing on...
+> I now have a CLOCKSOURCE_OF_DECLARED()'ed 10 MHz clock source running
+> on my ARM processor (Atmel SAMA5D2 Xplained board).  It registers
+> itself through sched_clock_register() to provide a high resolution
+> sched clock.  Once I turned on "Full dynticks CPU time accounting"
+> (CONFIG_VIRT_CPU_ACCOUNTING_GEN), I was able to get better than jiffy
+> resolution from my calls to getrusage(RUSAGE_THREAD,..).  But things
+> still aren't quite right.  I am using getrusage() to provide some
+> runtime profile information to an existing application (that was
+> ported to run on Linux instead of a custom RTOS).  I have code that
+> looks like:
 > 
-> Broadcom's STB SATA host controller is unable to handle port DMA
-> controller restarts when the port in question is in low power mode.
-> When a port enters partial or slumber mode, its PHY is powered down.
-> When a controller restart is requested, the controller's internal
-> state machine expects the PHY to be brought back up by software which
-> never happens in this case, resulting in failures.
+> tick()
+> // commented out code that used to do something
+> tock()
 > 
-> To avoid this situation, logic is added to manually wake up the port
-> just before its DMA engine is stopped, if the port happens to be in
-> a low power state. HBA initiated power management ensures that the port
-> eventually returns to its configured low power state, when the link is
-> idle (as per the conditions listed in the spec). A new host flag is also
-> added to ensure this logic is only exercised for hosts with the above
-> limitation.
+> where tick() & tock() are my profile "start" and "stop" points that
+> call getrusage() to record and and accumulate time spent between calls
+> to tick() & tock().  Most of the time, I get a delta of 0 between the
+> two calls, which I expect.  But occasionally, I get a delta ranging
+> between 800us and 1000us, which I don't understand at all.  It seems
+> like my thread is being "charged" for time spent doing something else.
+> Perhaps an interrupt occurred and its time got charged to my thread;
+> perhaps a higher priority thread ran for 1ms, I don't know (yet).
 > 
-> Signed-off-by: Danesh Petigara <dpetigara@broadcom.com>
-> Reviewed-by: Markus Mayer <mmayer@broadcom.com>
-> ---
-> This patch is against ata/for-next branch.
+> Does anybody have any suggestions as to where I might look, or as to
+> what kernel CONFIG options might make the most sense for an
+> application such as this?
 > 
-> Changes since v1 (https://lkml.org/lkml/2016/1/7/778)
-> - Moved wakeup flag to AHCI_HFLAG_* space
-> - Called an updated ahci_set_lpm from ahci_stop_engine to wakeup link
-> - Made minor changes to commit message
+> --wpd
 > 
->  drivers/ata/ahci.h         |  1 +
->  drivers/ata/ahci_brcmstb.c |  1 +
->  drivers/ata/libahci.c      | 27 ++++++++++++++++++++++++++-
->  include/linux/libata.h     |  1 +
->  4 files changed, 29 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
-> index a4faa43..a44c75d 100644
-> --- a/drivers/ata/ahci.h
-> +++ b/drivers/ata/ahci.h
-> @@ -250,6 +250,7 @@ enum {
->  	AHCI_HFLAG_MULTI_MSI		= 0,
->  	AHCI_HFLAG_MULTI_MSIX		= 0,
->  #endif
-> +	AHCI_HFLAG_WAKE_BEFORE_STOP	= (1 << 22), /* wake before DMA stop */
->  
->  	/* ap->flags bits */
->  
-> diff --git a/drivers/ata/ahci_brcmstb.c b/drivers/ata/ahci_brcmstb.c
-> index b36cae2..e87bcec 100644
-> --- a/drivers/ata/ahci_brcmstb.c
-> +++ b/drivers/ata/ahci_brcmstb.c
-> @@ -317,6 +317,7 @@ static int brcm_ahci_probe(struct platform_device *pdev)
->  	if (IS_ERR(hpriv))
->  		return PTR_ERR(hpriv);
->  	hpriv->plat_data = priv;
-> +	hpriv->flags = AHCI_HFLAG_WAKE_BEFORE_STOP;
->  
->  	brcm_sata_alpm_init(hpriv);
->  
-> diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
-> index eda3cf2..dee56d0 100644
-> --- a/drivers/ata/libahci.c
-> +++ b/drivers/ata/libahci.c
-> @@ -593,8 +593,26 @@ EXPORT_SYMBOL_GPL(ahci_start_engine);
->  int ahci_stop_engine(struct ata_port *ap)
->  {
->  	void __iomem *port_mmio = ahci_port_base(ap);
-> +	struct ahci_host_priv *hpriv = ap->host->private_data;
->  	u32 tmp;
->  
-> +	/*
-> +	 * On some controllers, stopping a port's DMA engine
-> +	 * while the port is in ALPM state (partial or slumber)
-> +	 * results in failures on subsequent DMA engine starts.
-> +	 * For those controllers, put the port back in active
-> +	 * state before stopping it's DMA engine.
-> +	 */
-> +	if ((hpriv->flags & AHCI_HFLAG_WAKE_BEFORE_STOP) &&
-> +	    (ap->link.lpm_policy > ATA_LPM_MAX_POWER)) {
-> +		if (ahci_set_lpm(&ap->link,
-> +			ATA_LPM_MAX_POWER, ATA_LPM_WAKE_ONLY)) {
-> +			dev_err(ap->host->dev,
-> +				"failed to wake up port\n");
-> +			return -EIO;
-> +		}
-> +	}
-> +
->  	tmp = readl(port_mmio + PORT_CMD);
->  
->  	/* check if the HBA is idle */
-> @@ -689,6 +707,9 @@ static int ahci_set_lpm(struct ata_link *link, enum ata_lpm_policy policy,
->  	void __iomem *port_mmio = ahci_port_base(ap);
->  
->  	if (policy != ATA_LPM_MAX_POWER) {
-> +		/* Wakeup flag only applies to the max power policy */
-> +		hints &= ~ATA_LPM_WAKE_ONLY;
-> +
->  		/*
->  		 * Disable interrupts on Phy Ready. This keeps us from
->  		 * getting woken up due to spurious phy ready
-> @@ -704,7 +725,8 @@ static int ahci_set_lpm(struct ata_link *link, enum ata_lpm_policy policy,
->  		u32 cmd = readl(port_mmio + PORT_CMD);
->  
->  		if (policy == ATA_LPM_MAX_POWER || !(hints & ATA_LPM_HIPM)) {
-> -			cmd &= ~(PORT_CMD_ASP | PORT_CMD_ALPE);
-> +			if (!(hints & ATA_LPM_WAKE_ONLY))
-> +				cmd &= ~(PORT_CMD_ASP | PORT_CMD_ALPE);
->  			cmd |= PORT_CMD_ICC_ACTIVE;
->  
->  			writel(cmd, port_mmio + PORT_CMD);
-> @@ -712,6 +734,9 @@ static int ahci_set_lpm(struct ata_link *link, enum ata_lpm_policy policy,
->  
->  			/* wait 10ms to be sure we've come out of LPM state */
->  			ata_msleep(ap, 10);
-> +
-> +			if (hints & ATA_LPM_WAKE_ONLY)
-> +				return 0;
->  		} else {
->  			cmd |= PORT_CMD_ALPE;
->  			if (policy == ATA_LPM_MIN_POWER)
-> diff --git a/include/linux/libata.h b/include/linux/libata.h
-> index 088ed92..f33640e 100644
-> --- a/include/linux/libata.h
-> +++ b/include/linux/libata.h
-> @@ -525,6 +525,7 @@ enum ata_lpm_policy {
->  enum ata_lpm_hints {
->  	ATA_LPM_EMPTY		= (1 << 0), /* port empty/probing */
->  	ATA_LPM_HIPM		= (1 << 1), /* may use HIPM */
-> +	ATA_LPM_WAKE_ONLY	= (1 << 2), /* only wake up link */
->  };
->  
->  /* forward declarations */
-> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
