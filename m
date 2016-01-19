@@ -1,53 +1,40 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Tue, 19 Jan 2016 10:55:00 +0800
-Subject: [PATCH 3/3] iommu/dma: Avoid unlikely high-order allocations
-In-Reply-To: <CAD=FV=WqJHjb3zoZn=8OPO2iKH1k1sMvXkVBkyM6pAyvo6PgDQ@mail.gmail.com>
-References: <9a84191ed813c23db7901f8c73f514d081495bdf.1450457730.git.robin.murphy@arm.com>
- <8014a146e90282b8cbc5868cee0d01776670d9a6.1450457730.git.robin.murphy@arm.com>
- <CAD=FV=WqJHjb3zoZn=8OPO2iKH1k1sMvXkVBkyM6pAyvo6PgDQ@mail.gmail.com>
-Message-ID: <1453172100.17894.9.camel@mhfsdcap03>
+From: xuejiancheng@huawei.com (Jiancheng Xue)
+Date: Tue, 19 Jan 2016 10:38:30 +0800
+Subject: [PATCH v6 5/6] ARM: dt-bindings: add device tree bindings for Hi3519
+ sysctrl
+In-Reply-To: <1453171111-21921-1-git-send-email-xuejiancheng@huawei.com>
+References: <1453171111-21921-1-git-send-email-xuejiancheng@huawei.com>
+Message-ID: <1453171111-21921-6-git-send-email-xuejiancheng@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-12-18 at 14:35 -0800, Doug Anderson wrote:
-> Robin,
-> 
-> On Fri, Dec 18, 2015 at 9:01 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> > Doug reports that the equivalent page allocator on 32-bit ARM exhibits
-> > particularly pathalogical behaviour under memory pressure when
-> > fragmentation is high, where allocating a 4MB buffer takes tens of
-> > seconds and the number of calls to alloc_pages() is over 9000![1]
-> >
-> > We can drastically improve that situation without losing the other
-> > benefits of high-order allocations when they would succeed, by assuming
-> > memory pressure is relatively constant over the course of an allocation,
-> > and not retrying allocations at orders we know to have failed before.
-> > This way, the best-case behaviour remains unchanged, and in the worst
-> > case we should see at most a dozen or so (MAX_ORDER - 1) failed attempts
-> > before falling back to single pages for the remainder of the buffer.
-> >
-> > [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/394660.html
-> >
-> > Reported-by: Douglas Anderson <dianders@chromium.org>
-> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> > ---
-> >  drivers/iommu/dma-iommu.c | 6 ++++--
-> >  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> Presumably it makes sense to update this based on v2 of my patch to
-> the original code?  AKA: <https://patchwork.kernel.org/patch/7888851/>
-> ?
+Add device tree bindings for Hi3519 system controller.
 
-Hi Robin,
+Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+---
+ .../devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt   | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt
 
-    Thanks very much for this patch.
-
-    And Douglas has sent his v2 which improve the flow of alloc_pages.
-Do you have any plan to update this patch according to this v2, or any
-concern about it?
-
-
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt b/Documentation/devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt
+new file mode 100644
+index 0000000..115c5be
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt
+@@ -0,0 +1,14 @@
++* Hisilicon Hi3519 System Controller Block
++
++This bindings use the following binding:
++Documentation/devicetree/bindings/mfd/syscon.txt
++
++Required properties:
++- compatible: "hisilicon,hi3519-sysctrl".
++- reg: the register region of this block
++
++Examples:
++sysctrl: system-controller at 12010000 {
++	compatible = "hisilicon,hi3519-sysctrl", "syscon";
++	reg = <0x12010000 0x1000>;
++};
+-- 
+1.9.1
