@@ -1,109 +1,21 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 19 Jan 2016 12:05:02 +0000
-Subject: [PATCH] [v2] serial: amba-pl011: use cpu_relax when polling
- registers
-In-Reply-To: <1452889940-19594-1-git-send-email-timur@codeaurora.org>
-References: <1452889940-19594-1-git-send-email-timur@codeaurora.org>
-Message-ID: <20160119120501.GD4436@e103592.cambridge.arm.com>
+From: paweljarosz3691@gmail.com (=?UTF-8?q?Pawe=C5=82=20Jarosz?=)
+Date: Tue, 19 Jan 2016 13:09:18 +0100
+Subject: [PATCH 0/3] Add rk3066 tsadc device tree bindings
+Message-ID: <1453205361-27267-1-git-send-email-paweljarosz3691@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 02:32:20PM -0600, Timur Tabi wrote:
-> Busy loops that poll on a register should call cpu_relax().  On some
-> architectures, it can lower CPU power consumption or yield to a
-> hyperthreaded twin processor.  It also serves as a compiler barrier,
-> so it can replace barrier() calls.
+This patchset adds devicetree bindings for rockchip rk3066 tsadc with needed dependencies.
 
-I remember noticing this before, but didn't write any patch for it at
-the time...  cpu_relax() is indeed the write thing to do in such polling
-loops.
+Pawe? Jarosz (3):
+  clk: rockchip: Add new id for rk3066 tsadc clock
+  clk: rockchip: add tsadc clock on rk3066
+  ARM: dts: rockchip: add tsadc node
 
-> Signed-off-by: Timur Tabi <timur@codeaurora.org>
+ arch/arm/boot/dts/rk3066a.dtsi                | 11 +++++++++++
+ drivers/clk/rockchip/clk-rk3188.c             |  2 +-
+ include/dt-bindings/clock/rk3188-cru-common.h |  1 +
+ 3 files changed, 13 insertions(+), 1 deletion(-)
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-
-> ---
-> 
-> v2: rebased to latest code
-> 
->  drivers/tty/serial/amba-pl011.c | 17 ++++++++---------
->  1 file changed, 8 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index c0da0cc..69b5acd 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -1167,7 +1167,7 @@ static void pl011_dma_shutdown(struct uart_amba_port *uap)
->  
->  	/* Disable RX and TX DMA */
->  	while (pl011_read(uap, REG_FR) & UART01x_FR_BUSY)
-> -		barrier();
-> +		cpu_relax();
->  
->  	spin_lock_irq(&uap->port.lock);
->  	uap->dmacr &= ~(UART011_DMAONERR | UART011_RXDMAE | UART011_TXDMAE);
-> @@ -1611,7 +1611,7 @@ static void pl011_put_poll_char(struct uart_port *port,
->  	    container_of(port, struct uart_amba_port, port);
->  
->  	while (pl011_read(uap, REG_FR) & UART01x_FR_TXFF)
-> -		barrier();
-> +		cpu_relax();
->  
->  	pl011_write(ch, uap, REG_DR);
->  }
-> @@ -2150,7 +2150,7 @@ static void pl011_console_putchar(struct uart_port *port, int ch)
->  	    container_of(port, struct uart_amba_port, port);
->  
->  	while (pl011_read(uap, REG_FR) & UART01x_FR_TXFF)
-> -		barrier();
-> +		cpu_relax();
->  	pl011_write(ch, uap, REG_DR);
->  }
->  
-> @@ -2158,7 +2158,7 @@ static void
->  pl011_console_write(struct console *co, const char *s, unsigned int count)
->  {
->  	struct uart_amba_port *uap = amba_ports[co->index];
-> -	unsigned int status, old_cr = 0, new_cr;
-> +	unsigned int old_cr = 0, new_cr;
->  	unsigned long flags;
->  	int locked = 1;
->  
-> @@ -2188,9 +2188,8 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
->  	 *	Finally, wait for transmitter to become empty
->  	 *	and restore the TCR
->  	 */
-> -	do {
-> -		status = pl011_read(uap, REG_FR);
-> -	} while (status & UART01x_FR_BUSY);
-> +	while (pl011_read(uap, REG_FR) & UART01x_FR_BUSY)
-> +		cpu_relax();
->  	if (!uap->vendor->always_enabled)
->  		pl011_write(old_cr, uap, REG_CR);
->  
-> @@ -2302,13 +2301,13 @@ static struct console amba_console = {
->  static void pl011_putc(struct uart_port *port, int c)
->  {
->  	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
-> -		;
-> +		cpu_relax();
->  	if (port->iotype == UPIO_MEM32)
->  		writel(c, port->membase + UART01x_DR);
->  	else
->  		writeb(c, port->membase + UART01x_DR);
->  	while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
-> -		;
-> +		cpu_relax();
->  }
->  
->  static void pl011_early_write(struct console *con, const char *s, unsigned n)
-> -- 
-> Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project.
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+1.9.1
