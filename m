@@ -1,63 +1,59 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 19 Jan 2016 16:20:18 +0000
-Subject: [PATCH] arm64: KVM: Obey RES0/1 reserved bits when setting CPTR_EL2
-Message-ID: <1453220418-24744-1-git-send-email-Dave.Martin@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 Jan 2016 16:23:28 +0000
+Subject: CONFIG_CPU_SW_DOMAIN_PAN breakage on ARM11 MPCore
+In-Reply-To: <12866783.yJ1maoGsrz@wuerfel>
+References: <569D71F3.7000408@openwrt.org>
+ <20160119093845.GJ19062@n2100.arm.linux.org.uk>
+ <569E0796.9000302@openwrt.org> <12866783.yJ1maoGsrz@wuerfel>
+Message-ID: <20160119162328.GM19062@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some bits in CPTR are defined as RES1 in the architecture.  Setting
-these bits to zero may unintentionally enable future architecture
-extensions, allowing guests to use them without supervision by the host.
+On Tue, Jan 19, 2016 at 04:27:49PM +0100, Arnd Bergmann wrote:
+> I guess this means you run with the SMP patches from OpenWRT,
+> while upstream only supports uniprocessor mode and presumably doesn't
+> have this problem, right?
 
-This would be bad: for forwards compatibility, this patch makes
-sure the affected bits are always written with 1, not 0.
+It's not got much to do with SMP vs UP mode - it seems to be a CPU
+core bug, though really we have no real idea what's going on here
+as Will was unable to easily get hold of the information within
+ARM Ltd to properly diagnose this (it's been "archived", and which
+is why it remains unfixed - we've a deficit of information.)
 
-This patch only addresses CPTR_EL2.  Initialisation of other system
-registers may still need review.
+However, the SMP vs UP mode thing does have an effect on the fix
+too - if we have MPcore systems operating in UP mode, we're going
+to need a much more complex and hideous fix - we're likely going
+to need to out-of-line _all_ the TLB flushing which is going to
+be nasty for the vast majority not affected by this. :(
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/include/asm/kvm_arm.h |    1 +
- arch/arm64/kvm/hyp/switch.c      |    8 ++++++--
- 2 files changed, 7 insertions(+), 2 deletions(-)
+> I see that Oxnas (supported in OpenWRT but not upstream) has the
+> slightly newer ARM11mpcore variant 0 / revision 5 ID. Is it easy for
+> you to test if this has the same problem?
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 738a95f..7d858fe 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -182,6 +182,7 @@
- #define CPTR_EL2_TCPAC	(1 << 31)
- #define CPTR_EL2_TTA	(1 << 20)
- #define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
-+#define CPTR_EL2_DEFAULT	0x000033ff
- 
- /* Hyp Debug Configuration Register bits */
- #define MDCR_EL2_TDRA		(1 << 11)
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index ca8f5a5..63aa74a 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -36,7 +36,11 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
- 	write_sysreg(val, hcr_el2);
- 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
- 	write_sysreg(1 << 15, hstr_el2);
--	write_sysreg(CPTR_EL2_TTA | CPTR_EL2_TFP, cptr_el2);
-+
-+	val = CPTR_EL2_DEFAULT;
-+	val |= CPTR_EL2_TTA | CPTR_EL2_TFP;
-+	write_sysreg(val, cptr_el2);
-+
- 	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
- }
- 
-@@ -45,7 +49,7 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
- 	write_sysreg(HCR_RW, hcr_el2);
- 	write_sysreg(0, hstr_el2);
- 	write_sysreg(read_sysreg(mdcr_el2) & MDCR_EL2_HPMN_MASK, mdcr_el2);
--	write_sysreg(0, cptr_el2);
-+	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
- }
- 
- static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
+LinusW's failing case is a MPcore with a MIDR of 0x410fb020 (r0p0).
+Felix's case is 0x410fb024.  Even if we had implemented a work-around
+for Linus' case, without any further information, we'd have assumed
+that only r0p0 is affected, which would not have caught Felix's case.
+
+> Interestingly, the documentation at
+> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0360f/I65012.html
+> lists variant:0/revision:4 as the reported values for both r2p0 and r1p0
+> and it does not list any core having variant:0/revision:5. 
+
+I wouldn't read too much into that - I suspect the r2p0 document
+wasn't updated properly.  That's why I prefer to go by a definitive
+list of variant/revisions to rNpN when listed, or by discovering
+what's actually out in the field compared to what it should contain.
+
+It is equally possible that r2p0 and r1p0 do indeed share the same
+variant/revision and someone forgot to change the hardware.
+
+Does it make much difference though - we now know that variant 0/
+revision 0 and variant 0/revision 4 are both affected, but we still
+don't know whether variant 0/revision 5 is, or whether all 11MPcores
+are affected.
+
 -- 
-1.7.10.4
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
