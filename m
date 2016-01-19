@@ -1,145 +1,73 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Tue, 19 Jan 2016 21:45:53 +0800
-Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
-In-Reply-To: <20160119125114.GH25024@leverpostej>
-References: <cover.1452884156.git.geoff@infradead.org>
- <fb4506943bbaed8b0657ed367ebd57e4064d57ed.1452884156.git.geoff@infradead.org>
- <20160115201601.GR3262@leverpostej> <569CBDBC.5050500@linaro.org>
- <20160119014332.GB2919@dhcp-128-65.nay.redhat.com>
- <569DCB30.9010501@linaro.org>
- <20160119122848.GA2904@dhcp-128-65.nay.redhat.com>
- <20160119125114.GH25024@leverpostej>
-Message-ID: <20160119134553.GA2986@dhcp-128-65.nay.redhat.com>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Tue, 19 Jan 2016 21:46:00 +0800
+Subject: [Xen-devel] [PATCH v2 14/16] Xen: EFI: Parse DT parameters for
+ Xen specific UEFI
+In-Reply-To: <20160119134318.GB26545@leverpostej>
+References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452840929-19612-15-git-send-email-zhaoshenglong@huawei.com>
+ <alpine.DEB.2.02.1601181533010.16178@kaball.uk.xensource.com>
+ <569E37C9.6040700@linaro.org> <20160119134318.GB26545@leverpostej>
+Message-ID: <569E3E18.2040003@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/16 at 12:51pm, Mark Rutland wrote:
-> On Tue, Jan 19, 2016 at 08:28:48PM +0800, Dave Young wrote:
-> > On 01/19/16 at 02:35pm, AKASHI Takahiro wrote:
-> > > On 01/19/2016 10:43 AM, Dave Young wrote:
-> > > >On 01/18/16 at 07:26pm, AKASHI Takahiro wrote:
-> > > >>On 01/16/2016 05:16 AM, Mark Rutland wrote:
-> > > >>>On Fri, Jan 15, 2016 at 07:18:38PM +0000, Geoff Levand wrote:
-> > > >>>>From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > > >>>>
-> > > >>>>This patch adds arch specific descriptions about kdump usage on arm64
-> > > >>>>to kdump.txt.
-> > > >>>>
-> > > >>>>Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > > >>>>---
-> > > >>>>  Documentation/kdump/kdump.txt | 23 ++++++++++++++++++++++-
-> > > >>>>  1 file changed, 22 insertions(+), 1 deletion(-)
-> > > >>>>
-> > > >>>>diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-> > > >>>>index bc4bd5a..36cf978 100644
-> > > >>>>--- a/Documentation/kdump/kdump.txt
-> > > >>>>+++ b/Documentation/kdump/kdump.txt
-> > > >>>>@@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
-> > > >>>>  a remote system.
-> > > >>>>
-> > > >>>>  Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
-> > > >>>>-s390x and arm architectures.
-> > > >>>>+s390x, arm and arm64 architectures.
-> > > >>>>
-> > > >>>>  When the system kernel boots, it reserves a small section of memory for
-> > > >>>>  the dump-capture kernel. This ensures that ongoing Direct Memory Access
-> > > >>>>@@ -249,6 +249,20 @@ Dump-capture kernel config options (Arch Dependent, arm)
-> > > >>>>
-> > > >>>>      AUTO_ZRELADDR=y
-> > > >>>>
-> > > >>>>+Dump-capture kernel config options (Arch Dependent, arm64)
-> > > >>>>+----------------------------------------------------------
-> > > >>>>+
-> > > >>>>+1) The maximum memory size on the dump-capture kernel must be limited by
-> > > >>>>+   specifying:
-> > > >>>>+
-> > > >>>>+   mem=X[MG]
-> > > >>>>+
-> > > >>>>+   where X should be less than or equal to the size in "crashkernel="
-> > > >>>>+   boot parameter. Kexec-tools will automatically add this.
-> > > >>>
-> > > >>>
-> > > >>>This is extremely fragile, and will trivially fail when the kernel can
-> > > >>>be loaded anywhere (see [1]).
-> > > >>
-> > > >>As I said before, this restriction also exists on arm, but I understand
-> > > >>that recent Ard's patches break it.
-> > > >>
-> > > >>>We must explicitly describe the set of regions the crash kernel may use
-> > > >>>(i.e. we need base and size). NAK in the absence of that.
-> > > >>
-> > > >>There seem to exist several approaches:
-> > > >>(a) use a device-tree property, "linux,usable-memory", in addition to "reg"
-> > > >>     under "memory" node
-> > > >>(b) use a kernel's early parameter, "memmap=nn[@#$]ss"
-> > > >>
-> > > >>Power PC takes (a), while this does not work on efi-started kernel
-> > > >>because dtb has no "memory" nodes under efi.
-> > > >>X86 takes (b). If we take this, we will need to overwrite a weak
-> > > >>early_init_dt_add_memory().
-> > > >
-> > > >X86 takes another way in latest kexec-tools and kexec_file_load, that is
-> > > >recreating E820 table and pass it to kexec/kdump kernel, if the entries
-> > > >are over E820 limitation then turn to use setup_data list for remain
-> > > >entries.
-> > > 
-> > > Thanks. I will visit x86 code again.
-> > > 
-> > > >I think it is X86 specific. Personally I think device tree property is
-> > > >better.
-> > > 
-> > > Do you think so?
-> > 
-> > I'm not sure it is the best way. For X86 we run into problem with
-> > memmap= design, one example is pci domain X (X>1) need the pci memory
-> > ranges being passed to kdump kernel. When we passed reserved ranges in /proc/iomem
-> > to 2nd kernel we find that cmdline[] array is not big enough.
-> 
-> I'm not sure how PCI ranges relate to the memory map used for normal
-> memory (i.e. RAM), though I'm probably missing some caveat with the way
-> ACPI and UEFI describe PCI. Why does memmap= affect PCI memory?
 
-Here is the old patch which was rejected in kexec-tools:
-http://lists.infradead.org/pipermail/kexec/2013-February/007924.html
 
-> 
-> If the kernel got the rest of its system topology from DT, the PCI
-> regions would be described there.
+On 2016/1/19 21:43, Mark Rutland wrote:
+> On Tue, Jan 19, 2016 at 09:19:05PM +0800, Shannon Zhao wrote:
+>>
+>>
+>> On 2016/1/18 23:41, Stefano Stabellini wrote:
+>>> CC'ing Matt Fleming
+>>>
+>>> On Fri, 15 Jan 2016, Shannon Zhao wrote:
+>>>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>>> @@ -520,15 +531,28 @@ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+>>>>   				       int depth, void *data)
+>>>>   {
+>>>>   	struct param_info *info = data;
+>>>> +	struct params *dt_params;
+>>>> +	unsigned int size;
+>>>>   	const void *prop;
+>>>>   	void *dest;
+>>>>   	u64 val;
+>>>>   	int i, len;
+>>>>
+>>>> -	if (depth != 1 || strcmp(uname, "chosen") != 0)
+>>>> -		return 0;
+>>>> +	if (efi_enabled(EFI_PARAVIRT)) {
+>>>> +		if (depth != 2 || strcmp(uname, "uefi") != 0)
+>>>
+>>> You are already introducing this check in the previous patch when
+>>> setting EFI_PARAVIRT, why do this again now?  But if we need to do this
+>>> check again, then, like Mark suggested, it should be done against the
+>>> full path.
+>>>
+>> This check just wants to confirm that the current node is the "uefi"
+>> node and we can parse it with xen_fdt_params now.
+>
+> There is no single "uefi" node as many nodes can share that name. There
+> is at most a single, /hypervisor/uefi node, as that is qualified by a
+> full path.
+>
+Sure, I will check it by full path.
 
-Yes, if kdump kernel use same DT as 1st kernel.
-
-> 
-> > Do you think for arm64 only usable memory is necessary to let kdump kernel
-> > know? I'm curious about how arm64 kernel get all memory layout from boot loader,
-> > via UEFI memmap?
-> 
-> When booted via EFI, we use the EFI memory map. The EFI stub handles
-> acquring the relevant information and passing that to the first kernel
-> in the DTB (see Documentation/arm/uefi.txt).
-
-Ok, thanks for the pointer. So in dt we are just have uefi memmap infomation
-instead of memory nodes details.. 
-
-> 
-> A kexec'd kernel should simply inherit that. So long as the DTB and/or
-> UEFI tables in memory are the same, it would be the same as a cold boot.
-
-For kexec all memory ranges are same, for kdump we need use original reserved
-range with crashkernel= as usable memory and all other orignal usable ranges
-are not usable anymore. 
-
-Is it possible to modify uefi memmap for kdump case?
-
-> 
-> In the !EFI case, we use the memory nodes in the DTB. Only in this case
-> could usable-memory properties in memory nodes make sense. I'd prefer a
-> uniform property under /chosen for both cases.
-
-We stil use same DTB, need to modify the DT and update the usable and unusable
-nodes for kdump?
-
+> Checking the leaf node name, as above, is insufficient. For example, the
+> below will be accepted:
+>
+> * /chosen/uefi
+> * /foo/uefi
+> * /not-a-hypervisor/uefi
+>
+> Any of these could exist in addition to a /hypervisor/uefi node, and
+> could appear ealier or later in the DTB.
+>
+> There may be reasons to add such nodes in future, and regardless we
+> should not read properties from an invalid/wrong node.
+>
 > Thanks,
 > Mark.
+>
 
-Thanks
-Dave
+-- 
+Shannon
