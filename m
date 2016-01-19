@@ -1,50 +1,95 @@
-From: steve.muckle@linaro.org (Steve Muckle)
-Date: Tue, 19 Jan 2016 11:48:15 -0800
-Subject: [RFC PATCH v2 0/4] CPUs capacity information for heterogeneous
- systems
-In-Reply-To: <20160119142933.GF8573@e106622-lin>
-References: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
- <56994D87.6000709@linaro.org> <20160118151316.GD7159@e106622-lin>
- <CAKfTPtBFR4cowT-j4qVxfUvh6NDNmi6R=J7z9kywi6bONU3Pow@mail.gmail.com>
- <20160118163014.GA10332@e106622-lin>
- <CAKfTPtDJBAXUz=_-QQSkrqwAvmUJd1bUJ-VfSaNER-0NzWpunA@mail.gmail.com>
- <20160119105941.GA28845@e104818-lin.cambridge.arm.com>
- <20160119112323.GB8573@e106622-lin> <20160119142933.GF8573@e106622-lin>
-Message-ID: <569E92FF.4000006@linaro.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 19 Jan 2016 14:25:13 -0600
+Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
+ hostbridge init based on ACPI
+In-Reply-To: <20160118140405.GC11384@xora-haswell.xora.org.uk>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <20160114134440.GA8520@xora-haswell.xora.org.uk>
+ <1452780100.28109.3.camel@redhat.com>
+ <20160114141501.GC8520@xora-haswell.xora.org.uk>
+ <1452781481.28109.8.camel@redhat.com>
+ <20160115121231.GD8520@xora-haswell.xora.org.uk>
+ <20160118140405.GC11384@xora-haswell.xora.org.uk>
+Message-ID: <20160119202513.GC6510@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/2016 06:29 AM, Juri Lelli wrote:
->>> Two questions:
->>> > > 
->>> > > 1. How is the boot time affected by the benchmark?
->>> > > 2. How is the boot time affected by considering all the CPUs the same?
->>> > > 
->>> > > My preference is for DT and sysfs (especially useful for
->>> > > development/tuning) but I'm not opposed to a boot-time benchmark if
->>> > > people insist on it. If the answer to point 2 is "insignificant", we
->>> > > could as well defer the capacity setting to user space (sysfs).
->>> > > 
->> > 
->> > Given that we are not targeting boot time with this, but rather better
->> > performance afterwards, I don't expect significant differences; but,
->> > I'll get numbers :).
->> > 
-> I've got some boot time numbers on TC2 and Juno based on timestamps.
-> They are of course not accurate and maybe not so representative of
-> products, but I guess still ballpark right.
+On Mon, Jan 18, 2016 at 02:04:05PM +0000, Graeme Gregory wrote:
+> On Fri, Jan 15, 2016 at 12:12:31PM +0000, Graeme Gregory wrote:
+> > On Thu, Jan 14, 2016 at 09:24:41AM -0500, Mark Salter wrote:
+> > > On Thu, 2016-01-14 at 14:15 +0000, Graeme Gregory wrote:
+> > > > On Thu, Jan 14, 2016 at 09:01:40AM -0500, Mark Salter wrote:
+> > > > > On Thu, 2016-01-14 at 13:44 +0000, Graeme Gregory wrote:
+> > > > > > On Wed, Jan 13, 2016 at 02:20:46PM +0100, Tomasz Nowicki wrote:
+> > > > > > > From the functionality point of view this series might be split into the
+> > > > > > > following logic parts:
+> > > > > > > 1. Make MMCONFIG code arch-agnostic which allows all architectures to collect
+> > > > > > > ???PCI config regions and used when necessary.
+> > > > > > > 2. Move non-arch specific bits to the core code.
+> > > > > > > 3. Use MMCONFIG code and implement generic ACPI based PCI host controller driver.
+> > > > > > > 4. Enable above driver on ARM64
+> > > > > > > 
+> > > > > > > Patches has been built on top of 4.4 and can be found here:
+> > > > > > > git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v3)
+> > > > > > > 
+> > > > > > > NOTE, this patch set depends on Matthew's patches:
+> > > > > > > http://www.spinics.net/lists/linux-pci/msg45950.html
+> > > > > > > https://github.com/Vality/linux/tree/pci-fixes
+> > > > > > > 
+> > > > > > > This has been tested on Cavium ThunderX server and QEMU.
+> > > > > > > Any help in reviewing and testing is very appreciated.
+> > > > > > 
+> > > > > > I have tested this on my AMD Overdrive so
+> > > > > > 
+> > > > > > Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
+> > > > > > 
+> > > > > > But to actually get my r8169 network card working I also need the
+> > > > > > following patch.
+> > > > > > 
+> > > > > > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> > > > > > index 2fbf840..40e24e2 100644
+> > > > > > --- a/drivers/pci/probe.c
+> > > > > > +++ b/drivers/pci/probe.c
+> > > > > > @@ -1717,7 +1717,7 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+> > > > > > ????????set_dev_node(&dev->dev, pcibus_to_node(bus));
+> > > > > > ????????dev->dev.dma_mask = &dev->dma_mask;
+> > > > > > ????????dev->dev.dma_parms = &dev->dma_parms;
+> > > > > > -???????dev->dev.coherent_dma_mask = 0xffffffffull;
+> > > > > > +???????dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
+> > > > > > ????????pci_dma_configure(dev);
+> > > > > > 
+> > > > > > ????????pci_set_dma_max_seg_size(dev, 65536);
+> > > > > > 
+> > > > > > I suspect we need to set coherent_dma_mask somewhere in the platform but I do
+> > > > > > not know where this should happen. Hopefully an ARM64 expert can help.
+> > > > > 
+> > > > > I've run into a number of cards which don't work on some arm64 machines where there are
+> > > > > no DMA address below 4G. For the realtek card you can use r8169.use_dac=1 on the cmdline
+> > > > > to get it to work.
+> > > > > 
+> > > > I need r8169.use_dac=1 and this patch to get card to work.
+> > > > 
+> > > 
+> > > Hmm. I didn't need a patch in the past but I don't think I've used that card with
+> > > this patch series. I will try that when I get a chance...
+> > > 
+> > 
+> > From my previous debugging on this issue I was getting an address bigger
+> > than 32bits. As r8169 is a whole range of chips are guess they are not
+> > all equal?
+> > 
+> > I can stick debug stuff in if someone tells me where to put them.
+> > 
 > 
-> I'm generally seeing ~1sec increase in boot time for 1 and practically
-> no difference for 2 (even after having added patches that provide
-> runtime performance improvements).
+> After some private debugging with Mark it turned out that the difference
+> between our configurations was I did not have.
+> 
+> CONFIG_DMA_CMA=y
+> 
+> With this enabled then the card works without coherent mask hack.
 
-One second is considerable IMO. Aside from the general desire to have
-shorter boot times on any platform there are environments like
-automotive where boot time is critical.
+I didn't follow the whole discussion here, but is this a case where
+the driver could fail more gracefully than it did?  Can we do anything
+to make this easier for the next person who trips over the same problem?
 
-How are the CPUs numbered on TC2 and Juno? When all CPUs are considered
-the same, is work running on the big CPUs because of the way they are
-numbered?
-
-thanks,
-Steve
+Bjorn
