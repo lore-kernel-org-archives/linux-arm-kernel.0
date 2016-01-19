@@ -1,58 +1,93 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 19 Jan 2016 09:09:01 +0100
-Subject: [PATCH RFC 1/2] clk: sunxi: Add sun8i display support
-In-Reply-To: <20160118190904.GP4581@lukather>
-References: <cover.1452021349.git.moinejf@free.fr>
- <9cc33c3701844a07c43ee6c0c1072be4e2073cc1.1452021349.git.moinejf@free.fr>
- <20160118190904.GP4581@lukather>
-Message-ID: <20160119090901.17c64bc4afb7095bb8bd291c@free.fr>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Tue, 19 Jan 2016 16:21:23 +0800
+Subject: [Xen-devel] [PATCH v2 09/16] arm/xen: Get event-channel irq
+ through HVM_PARAM when booting with ACPI
+In-Reply-To: <alpine.DEB.2.02.1601181351400.16178@kaball.uk.xensource.com>
+References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452840929-19612-10-git-send-email-zhaoshenglong@huawei.com>
+ <alpine.DEB.2.02.1601181351400.16178@kaball.uk.xensource.com>
+Message-ID: <569DF203.8030104@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Jan 2016 20:09:04 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-> > +static const struct clk_ops clk_sun8i_pll3_fact_ops = {
-> > +	.recalc_rate = sun8i_pll3_recalc_rate,
-> > +	.round_rate = sun8i_pll3_round_rate,
-> > +	.set_rate = sun8i_pll3_set_rate,
-> > +};
+
+On 2016/1/18 22:38, Stefano Stabellini wrote:
+> On Fri, 15 Jan 2016, Shannon Zhao wrote:
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>
+>> When booting with ACPI, it could get the event-channel irq through
+>> HVM_PARAM_CALLBACK_IRQ.
+>>
+>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> ---
+>>  arch/arm/xen/enlighten.c | 30 +++++++++++++++++++++++++++++-
+>>  1 file changed, 29 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+>> index 6d90a62..4e78c49 100644
+>> --- a/arch/arm/xen/enlighten.c
+>> +++ b/arch/arm/xen/enlighten.c
+>> @@ -29,6 +29,7 @@
+>>  #include <linux/time64.h>
+>>  #include <linux/timekeeping.h>
+>>  #include <linux/timekeeper_internal.h>
+>> +#include <linux/acpi.h>
+>>  
+>>  #include <linux/mm.h>
+>>  
+>> @@ -270,7 +271,34 @@ static int __init xen_guest_init(void)
+>>  	if (!xen_domain())
+>>  		return 0;
+>>  
+>> -	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
+>> +	if (!acpi_disabled) {
+>> +#ifdef CONFIG_ACPI
 > 
-> We have the clk-factors stuff to handle this easily, could you use
-> that instead ?
-
-No, the sun6i/8i pll3 offers direct 297MHz and 270MHz.
-
-> As part of my DRM patches, I've added a clk-display clock that can
-> handle that easily.
+> I think it would be best to move the acpi specific and DT specific
+> initializations out of xen_guest_init. Then at the beginning of
+> xen_guest_init, call only the one that applies.  The acpi init function
+> could be ifdef'ed CONFIG_ACPI. Making sure that acpi_disabled is 1 when
+> !CONFIG_ACPI, we could even avoid all ifdef's from xen_guest_init.
 > 
-> And actually, as part of bringing up the display engine on the A33, I
-> already did it:
-> https://github.com/mripard/linux/commit/92b6843b5ee5b70cb2be3638df31d3eca28a4dba
-> https://github.com/mripard/linux/commit/81e8ea74be5e72124eb584432bb79ff75f90d9ed
+Sure, will fix. Thanks.
 
-I don't remember any patch request from yours in the Linux
-mailing-lists about these developments.
-
-Otherwise, about this old RFC, Chen-Yu Tsai replied:
-
-> > Add the clock types which are used by the sun8i family for video.
+> The rest is good, thanks.
 > 
-> These clocks first appeared in the A31.
 > 
-> > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> > ---
-> >  drivers/clk/sunxi/Makefile            |   1 +
-> >  drivers/clk/sunxi/clk-sun8i-display.c | 247 ++++++++++++++++++++++++++++++++++
+>> +		struct xen_hvm_param a;
+>> +		int interrupt, trigger, polarity;
+>> +
+>> +		a.domid = DOMID_SELF;
+>> +		a.index = HVM_PARAM_CALLBACK_IRQ;
+>> +		xen_events_irq = 0;
+>> +		if (!HYPERVISOR_hvm_op(HVMOP_get_param, &a)) {
+>> +			if ((a.value >> 56) == 3) {
+>> +				interrupt = a.value & 0xff;
+>> +				trigger = ((a.value >> 8) & 0x1)
+>> +					  ? ACPI_EDGE_SENSITIVE
+>> +					  : ACPI_LEVEL_SENSITIVE;
+>> +				polarity = ((a.value >> 8) & 0x2)
+>> +					  ? ACPI_ACTIVE_LOW
+>> +					  : ACPI_ACTIVE_HIGH;
+>> +				xen_events_irq = acpi_register_gsi(NULL,
+>> +								   interrupt,
+>> +								   trigger,
+>> +								   polarity);
+>> +			}
+>> +		}
+>> +
+>> +#endif
+>> +	} else {
+>> +		xen_events_irq = irq_of_parse_and_map(xen_node, 0);
+>> +	}
+>> +
+>>  	if (!xen_events_irq) {
+>>  		pr_err("Xen event channel interrupt not found\n");
+>>  		return -ENODEV;
 > 
-> Please split this into 2 patches, and 2 files: one for PLL3, named
-> clk-sun6i-pll3.c, and one for the display mod clocks, named
-> clk-sun6i-display.c
-
-My new patch series about the H3 display was sent 4 days ago
-(but not sure it reached the list linux-clk at vger.kernel.org
-because of some non-ASCII characters).
+> .
+> 
 
 -- 
-A galon		|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Shannon
