@@ -1,80 +1,50 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 19 Jan 2016 20:26:04 +0100
-Subject: [PATCH v7 5/5] ARM: dts: rockchip: add support mipi panel
- tv080wum-nl0
-In-Reply-To: <1452053038-32098-6-git-send-email-zyw@rock-chips.com>
-References: <1452053038-32098-1-git-send-email-zyw@rock-chips.com>
- <1452053038-32098-6-git-send-email-zyw@rock-chips.com>
-Message-ID: <1649978.zzK0Pex4sR@phil>
+From: steve.muckle@linaro.org (Steve Muckle)
+Date: Tue, 19 Jan 2016 11:48:15 -0800
+Subject: [RFC PATCH v2 0/4] CPUs capacity information for heterogeneous
+ systems
+In-Reply-To: <20160119142933.GF8573@e106622-lin>
+References: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
+ <56994D87.6000709@linaro.org> <20160118151316.GD7159@e106622-lin>
+ <CAKfTPtBFR4cowT-j4qVxfUvh6NDNmi6R=J7z9kywi6bONU3Pow@mail.gmail.com>
+ <20160118163014.GA10332@e106622-lin>
+ <CAKfTPtDJBAXUz=_-QQSkrqwAvmUJd1bUJ-VfSaNER-0NzWpunA@mail.gmail.com>
+ <20160119105941.GA28845@e104818-lin.cambridge.arm.com>
+ <20160119112323.GB8573@e106622-lin> <20160119142933.GF8573@e106622-lin>
+Message-ID: <569E92FF.4000006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
-
-Am Mittwoch, 6. Januar 2016, 12:03:57 schrieb Chris Zhong:
-> This tv080wum-nl0 panel is a mipi panel, it can use in MIPI_TX socket
-> of rk3288 evb board.
+On 01/19/2016 06:29 AM, Juri Lelli wrote:
+>>> Two questions:
+>>> > > 
+>>> > > 1. How is the boot time affected by the benchmark?
+>>> > > 2. How is the boot time affected by considering all the CPUs the same?
+>>> > > 
+>>> > > My preference is for DT and sysfs (especially useful for
+>>> > > development/tuning) but I'm not opposed to a boot-time benchmark if
+>>> > > people insist on it. If the answer to point 2 is "insignificant", we
+>>> > > could as well defer the capacity setting to user space (sysfs).
+>>> > > 
+>> > 
+>> > Given that we are not targeting boot time with this, but rather better
+>> > performance afterwards, I don't expect significant differences; but,
+>> > I'll get numbers :).
+>> > 
+> I've got some boot time numbers on TC2 and Juno based on timestamps.
+> They are of course not accurate and maybe not so representative of
+> products, but I guess still ballpark right.
 > 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> I'm generally seeing ~1sec increase in boot time for 1 and practically
+> no difference for 2 (even after having added patches that provide
+> runtime performance improvements).
 
-[...]
+One second is considerable IMO. Aside from the general desire to have
+shorter boot times on any platform there are environments like
+automotive where boot time is critical.
 
-> diff --git a/arch/arm/boot/dts/rk3288-evb-act8846.dts
-> b/arch/arm/boot/dts/rk3288-evb-act8846.dts index e662147..7d5475b 100644
-> --- a/arch/arm/boot/dts/rk3288-evb-act8846.dts
-> +++ b/arch/arm/boot/dts/rk3288-evb-act8846.dts
-> @@ -50,6 +50,8 @@
->  		gpio = <&gpio7 3 GPIO_ACTIVE_HIGH>;
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&lcd_en>;
-> +		regulator-always-on;
-> +		regulator-boot-on;
+How are the CPUs numbered on TC2 and Juno? When all CPUs are considered
+the same, is work running on the big CPUs because of the way they are
+numbered?
 
-Is this only needed for the panel itself and can you try to get the panel 
-supplies set up correctly instead in that case please?
-
-
->  		regulator-name = "vcc_lcd";
->  		vin-supply = <&vcc_io>;
->  	};
-> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi
-> b/arch/arm/boot/dts/rk3288-evb.dtsi index 4faabdb..0c91858 100644
-> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
-> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-> @@ -47,7 +47,7 @@
->  		reg = <0x0 0x80000000>;
->  	};
-> 
-> -	backlight {
-> +	backlight: backlight {
->  		compatible = "pwm-backlight";
->  		brightness-levels = <
->  			  0   1   2   3   4   5   6   7
-> @@ -183,6 +183,16 @@
->  	status = "okay";
->  };
-> 
-> +&mipi_dsi {
-> +	status = "okay";
-> +	panel {
-> +		compatible ="boe,tv080wum-nl0";
-> +		reg = <0>;
-> +		backlight = <&backlight>;
-> +		status = "okay";
-
-in the evb-schematics I see, vcc_lcd as supply for the panel.
-
-So I'd think the panel node here should have a
-	power-supply = <&vcc_lcd>;
-instead of having the always-on above?
-
-
-Thanks
-Heiko
-
-> +	};
-> +};
-> +
->  &sdmmc {
->  	bus-width = <4>;
->  	cap-mmc-highspeed;
+thanks,
+Steve
