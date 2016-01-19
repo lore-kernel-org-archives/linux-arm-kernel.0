@@ -1,443 +1,89 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 19 Jan 2016 10:59:15 +0000
-Subject: [RFC PATCH 3/3] mmc: pwrseq: convert to proper platform device
-In-Reply-To: <1453201052-2347-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1453201052-2347-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1453201155-2598-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 19 Jan 2016 10:59:42 +0000
+Subject: [RFC PATCH v2 0/4] CPUs capacity information for heterogeneous
+ systems
+In-Reply-To: <CAKfTPtDJBAXUz=_-QQSkrqwAvmUJd1bUJ-VfSaNER-0NzWpunA@mail.gmail.com>
+References: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
+ <56994D87.6000709@linaro.org> <20160118151316.GD7159@e106622-lin>
+ <CAKfTPtBFR4cowT-j4qVxfUvh6NDNmi6R=J7z9kywi6bONU3Pow@mail.gmail.com>
+ <20160118163014.GA10332@e106622-lin>
+ <CAKfTPtDJBAXUz=_-QQSkrqwAvmUJd1bUJ-VfSaNER-0NzWpunA@mail.gmail.com>
+Message-ID: <20160119105941.GA28845@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-simple-pwrseq and emmc-pwrseq drivers rely on platform_device
-structure from of_find_device_by_node(), this works mostly. But, as there
-is no driver associated with this devices, cases like default/init pinctrl
-setup would never be performed by pwrseq. This becomes problem when the
-gpios used in pwrseq require pinctrl setup.
+On Mon, Jan 18, 2016 at 05:42:58PM +0100, Vincent Guittot wrote:
+> On 18 January 2016 at 17:30, Juri Lelli <juri.lelli@arm.com> wrote:
+> > On 18/01/16 17:13, Vincent Guittot wrote:
+> >> On 18 January 2016 at 16:13, Juri Lelli <juri.lelli@arm.com> wrote:
+> >> > On 15/01/16 11:50, Steve Muckle wrote:
+> >> >> On 01/08/2016 06:09 AM, Juri Lelli wrote:
+> >> >> >  2. Dynamic profiling at boot (v2)
+> >> >> >
+> >> >> >     pros: - does not require a standardized definition of capacity
+> >> >> >           - cannot be incorrectly tuned (once benchmark is fixed)
+> >> >> >           - does not require user/integrator work
+> >> >> >
+> >> >> >     cons: - not easy to come up with a clean solution, as it seems interaction
+> >> >> >             with several subsystems (e.g., cpufreq) is required
+> >> >> >           - not easy to agree upon a single benchmark (that has to be both
+> >> >> >             representative and simple enough to run at boot)
+> >> >> >           - numbers might (and do) vary from boot to boot
+> >> >>
+> >> >> An important additional con that was mentioned earlier IIRC was the
+> >> >> additional boot time required for the benchmark.
+> >> >
+> >> > Right. I forgot about that.
+> >> >
+> >> >> Perhaps there could be
+> >> >> a kernel command line argument to bypass the benchmark if it is known
+> >> >> that predetermined values will be provided via sysfs later?
+> >> >>
+> >> >
+> >> > This might work, yes.
+> >>
+> >> Instead of command line, I prefer to use DT.
 
-Currently most of the common pinctrl setup is done in
-drivers/base/pinctrl.c by pinctrl_bind_pins().
+I fully agree. Command line doesn't scale with multiple CPUs, at most an
+option to bypass the benchmark (though we could just skip it when the DT
+values are present).
 
-There are two ways to slove this issue on either convert pwrseq drivers
-to a proper platform drivers or copy the exact code from
-pcintrl_bind_pins(). I prefer converting pwrseq to proper drivers so that
-other cases like setting up clks/parents from dt would also be possible.
+> >> Can't we use something similar to what is currently done in arm arch
+> >> for the early stage of the boot ? We don't have to provide performance
+> >> value for which it's difficult to find a consensus on how to define it
+> >> and which benchmark should be used. We use the micro arch and the
+> >> frequency of the core to define a relative capacity. This give us a
+> >> relatively good idea of the capacity of each core.
+> >
+> > I'm not sure I understand what you are proposing. arm arch is currently
+> > based on having static hardcoded data (efficiency values). But, this has
+> > already been NACKed for arm64 during last review of this RFC.
+> >
+> > Are you proposing something different?
+> 
+> No, i'm proposing to use it at boot time until the dynamic profiling
+> gives better value.
+> We don't have to set any new properties.
+> IIRC, It was nacked because it was of static hardcoded value that was
+> not always reflecting the best accurate capacity of a system. IMHO,
+> it's not that far from reality so can't this be used as an
+> intermediate step while waiting for dynamic profiling ?
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/mmc/core/pwrseq.c        | 99 ++++++++++++++++++++--------------------
- drivers/mmc/core/pwrseq.h        | 13 ++++--
- drivers/mmc/core/pwrseq_emmc.c   | 65 ++++++++++++++++----------
- drivers/mmc/core/pwrseq_simple.c | 71 ++++++++++++++++++----------
- 4 files changed, 145 insertions(+), 103 deletions(-)
+My nack for hard-coded values still stands since this is not just about
+the microarchitecture (MIDR) but how the CPUs are integrated with the
+SoC, additional caches, memory latency, maximum clock frequency (or you
+rely on DT again to get this information and scale the initial CPU
+capacity/efficiency accordingly). MIDR does not capture SoC details.
 
-diff --git a/drivers/mmc/core/pwrseq.c b/drivers/mmc/core/pwrseq.c
-index 4c1d175..669608e 100644
---- a/drivers/mmc/core/pwrseq.c
-+++ b/drivers/mmc/core/pwrseq.c
-@@ -8,50 +8,30 @@
-  *  MMC power sequence management
-  */
- #include <linux/kernel.h>
--#include <linux/platform_device.h>
- #include <linux/err.h>
- #include <linux/of.h>
--#include <linux/of_platform.h>
- 
- #include <linux/mmc/host.h>
- 
- #include "pwrseq.h"
- 
--struct mmc_pwrseq_match {
--	const char *compatible;
--	struct mmc_pwrseq *(*alloc)(struct mmc_host *host, struct device *dev);
--};
--
--static struct mmc_pwrseq_match pwrseq_match[] = {
--	{
--		.compatible = "mmc-pwrseq-simple",
--		.alloc = mmc_pwrseq_simple_alloc,
--	}, {
--		.compatible = "mmc-pwrseq-emmc",
--		.alloc = mmc_pwrseq_emmc_alloc,
--	},
--};
--
--static struct mmc_pwrseq_match *mmc_pwrseq_find(struct device_node *np)
-+static DEFINE_MUTEX(pwrseq_list_mutex);
-+static LIST_HEAD(pwrseq_list);
-+
-+static struct mmc_pwrseq *of_find_mmc_pwrseq(struct device_node *np)
- {
--	struct mmc_pwrseq_match *match = ERR_PTR(-ENODEV);
--	int i;
-+	struct mmc_pwrseq *p;
- 
--	for (i = 0; i < ARRAY_SIZE(pwrseq_match); i++) {
--		if (of_device_is_compatible(np,	pwrseq_match[i].compatible)) {
--			match = &pwrseq_match[i];
--			break;
--		}
--	}
-+	list_for_each_entry(p, &pwrseq_list, list)
-+		if (p->dev->of_node == np)
-+			return p;
- 
--	return match;
-+	return NULL;
- }
- 
- int mmc_pwrseq_alloc(struct mmc_host *host)
- {
--	struct platform_device *pdev;
- 	struct device_node *np;
--	struct mmc_pwrseq_match *match;
- 	struct mmc_pwrseq *pwrseq;
- 	int ret = 0;
- 
-@@ -59,25 +39,18 @@ int mmc_pwrseq_alloc(struct mmc_host *host)
- 	if (!np)
- 		return 0;
- 
--	pdev = of_find_device_by_node(np);
--	if (!pdev) {
--		ret = -ENODEV;
--		goto err;
--	}
-+	pwrseq = of_find_mmc_pwrseq(np);
- 
--	match = mmc_pwrseq_find(np);
--	if (IS_ERR(match)) {
--		ret = PTR_ERR(match);
--		goto err;
--	}
-+	if (pwrseq && pwrseq->ops && pwrseq->ops->alloc) {
-+		host->pwrseq = pwrseq;
-+		ret = pwrseq->ops->alloc(host);
-+		if (IS_ERR_VALUE(ret)) {
-+			host->pwrseq = NULL;
-+			goto err;
-+		}
- 
--	pwrseq = match->alloc(host, &pdev->dev);
--	if (IS_ERR(pwrseq)) {
--		ret = PTR_ERR(pwrseq);
--		goto err;
- 	}
- 
--	host->pwrseq = pwrseq;
- 	dev_info(host->parent, "allocated mmc-pwrseq\n");
- 
- err:
-@@ -89,7 +62,7 @@ void mmc_pwrseq_pre_power_on(struct mmc_host *host)
- {
- 	struct mmc_pwrseq *pwrseq = host->pwrseq;
- 
--	if (pwrseq && pwrseq->ops && pwrseq->ops->pre_power_on)
-+	if (pwrseq && pwrseq->ops->pre_power_on)
- 		pwrseq->ops->pre_power_on(host);
- }
- 
-@@ -97,7 +70,7 @@ void mmc_pwrseq_post_power_on(struct mmc_host *host)
- {
- 	struct mmc_pwrseq *pwrseq = host->pwrseq;
- 
--	if (pwrseq && pwrseq->ops && pwrseq->ops->post_power_on)
-+	if (pwrseq && pwrseq->ops->post_power_on)
- 		pwrseq->ops->post_power_on(host);
- }
- 
-@@ -105,7 +78,7 @@ void mmc_pwrseq_power_off(struct mmc_host *host)
- {
- 	struct mmc_pwrseq *pwrseq = host->pwrseq;
- 
--	if (pwrseq && pwrseq->ops && pwrseq->ops->power_off)
-+	if (pwrseq && pwrseq->ops->power_off)
- 		pwrseq->ops->power_off(host);
- }
- 
-@@ -113,8 +86,34 @@ void mmc_pwrseq_free(struct mmc_host *host)
- {
- 	struct mmc_pwrseq *pwrseq = host->pwrseq;
- 
--	if (pwrseq && pwrseq->ops && pwrseq->ops->free)
--		pwrseq->ops->free(host);
-+	if (pwrseq) {
-+		if (pwrseq->ops->free)
-+			pwrseq->ops->free(host);
-+
-+		host->pwrseq = NULL;
-+	}
- 
--	host->pwrseq = NULL;
- }
-+
-+int mmc_pwrseq_register(struct mmc_pwrseq *pwrseq)
-+{
-+	if (!pwrseq || !pwrseq->ops || !pwrseq->dev)
-+		return -EINVAL;
-+
-+	mutex_lock(&pwrseq_list_mutex);
-+	list_add(&pwrseq->list, &pwrseq_list);
-+	mutex_unlock(&pwrseq_list_mutex);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(mmc_pwrseq_register);
-+
-+void mmc_pwrseq_unregister(struct mmc_pwrseq *pwrseq)
-+{
-+	if (pwrseq) {
-+		mutex_lock(&pwrseq_list_mutex);
-+		list_del(&pwrseq->list);
-+		mutex_unlock(&pwrseq_list_mutex);
-+	}
-+}
-+EXPORT_SYMBOL_GPL(mmc_pwrseq_unregister);
-diff --git a/drivers/mmc/core/pwrseq.h b/drivers/mmc/core/pwrseq.h
-index 096da48..08a7d2d 100644
---- a/drivers/mmc/core/pwrseq.h
-+++ b/drivers/mmc/core/pwrseq.h
-@@ -8,7 +8,10 @@
- #ifndef _MMC_CORE_PWRSEQ_H
- #define _MMC_CORE_PWRSEQ_H
- 
-+#include <linux/mmc/host.h>
-+
- struct mmc_pwrseq_ops {
-+	int (*alloc)(struct mmc_host *host);
- 	void (*pre_power_on)(struct mmc_host *host);
- 	void (*post_power_on)(struct mmc_host *host);
- 	void (*power_off)(struct mmc_host *host);
-@@ -17,21 +20,21 @@ struct mmc_pwrseq_ops {
- 
- struct mmc_pwrseq {
- 	struct mmc_pwrseq_ops *ops;
-+	struct device *dev;
-+	struct list_head list;
- };
- 
- #ifdef CONFIG_OF
- 
-+int mmc_pwrseq_register(struct mmc_pwrseq *pwrseq);
-+void mmc_pwrseq_unregister(struct mmc_pwrseq *pwrseq);
-+
- int mmc_pwrseq_alloc(struct mmc_host *host);
- void mmc_pwrseq_pre_power_on(struct mmc_host *host);
- void mmc_pwrseq_post_power_on(struct mmc_host *host);
- void mmc_pwrseq_power_off(struct mmc_host *host);
- void mmc_pwrseq_free(struct mmc_host *host);
- 
--struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
--					   struct device *dev);
--struct mmc_pwrseq *mmc_pwrseq_emmc_alloc(struct mmc_host *host,
--					 struct device *dev);
--
- #else
- 
- static inline int mmc_pwrseq_alloc(struct mmc_host *host) { return 0; }
-diff --git a/drivers/mmc/core/pwrseq_emmc.c b/drivers/mmc/core/pwrseq_emmc.c
-index 7978fb7..75f7423 100644
---- a/drivers/mmc/core/pwrseq_emmc.c
-+++ b/drivers/mmc/core/pwrseq_emmc.c
-@@ -9,6 +9,7 @@
-  */
- #include <linux/delay.h>
- #include <linux/kernel.h>
-+#include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/device.h>
- #include <linux/err.h>
-@@ -48,14 +49,8 @@ static void mmc_pwrseq_emmc_free(struct mmc_host *host)
- 
- 	unregister_restart_handler(&pwrseq->reset_nb);
- 	gpiod_put(pwrseq->reset_gpio);
--	kfree(pwrseq);
- }
- 
--static struct mmc_pwrseq_ops mmc_pwrseq_emmc_ops = {
--	.post_power_on = mmc_pwrseq_emmc_reset,
--	.free = mmc_pwrseq_emmc_free,
--};
--
- static int mmc_pwrseq_emmc_reset_nb(struct notifier_block *this,
- 				    unsigned long mode, void *cmd)
- {
-@@ -66,21 +61,14 @@ static int mmc_pwrseq_emmc_reset_nb(struct notifier_block *this,
- 	return NOTIFY_DONE;
- }
- 
--struct mmc_pwrseq *mmc_pwrseq_emmc_alloc(struct mmc_host *host,
--					 struct device *dev)
-+static int mmc_pwrseq_emmc_alloc(struct mmc_host *host)
- {
--	struct mmc_pwrseq_emmc *pwrseq;
--	int ret = 0;
--
--	pwrseq = kzalloc(sizeof(struct mmc_pwrseq_emmc), GFP_KERNEL);
--	if (!pwrseq)
--		return ERR_PTR(-ENOMEM);
-+	struct mmc_pwrseq_emmc *pwrseq =  to_pwrseq_emmc(host->pwrseq);
- 
--	pwrseq->reset_gpio = gpiod_get(dev, "reset", GPIOD_OUT_LOW);
--	if (IS_ERR(pwrseq->reset_gpio)) {
--		ret = PTR_ERR(pwrseq->reset_gpio);
--		goto free;
--	}
-+	pwrseq->reset_gpio = gpiod_get(host->pwrseq->dev,
-+					"reset", GPIOD_OUT_LOW);
-+	if (IS_ERR(pwrseq->reset_gpio))
-+		return PTR_ERR(pwrseq->reset_gpio);
- 
- 	/*
- 	 * register reset handler to ensure emmc reset also from
-@@ -91,10 +79,41 @@ struct mmc_pwrseq *mmc_pwrseq_emmc_alloc(struct mmc_host *host,
- 	pwrseq->reset_nb.priority = 255;
- 	register_restart_handler(&pwrseq->reset_nb);
- 
-+	return 0;
-+}
-+
-+static struct mmc_pwrseq_ops mmc_pwrseq_emmc_ops = {
-+	.alloc = mmc_pwrseq_emmc_alloc,
-+	.post_power_on = mmc_pwrseq_emmc_reset,
-+	.free = mmc_pwrseq_emmc_free,
-+};
-+
-+static int mmc_pwrseq_emmc_probe(struct platform_device *pdev)
-+{
-+	struct mmc_pwrseq_emmc *pwrseq;
-+	struct device *dev = &pdev->dev;
-+
-+	pwrseq = devm_kzalloc(dev, sizeof(*pwrseq), GFP_KERNEL);
-+	if (!pwrseq)
-+		return -ENOMEM;
-+
- 	pwrseq->pwrseq.ops = &mmc_pwrseq_emmc_ops;
-+	pwrseq->pwrseq.dev = dev;
- 
--	return &pwrseq->pwrseq;
--free:
--	kfree(pwrseq);
--	return ERR_PTR(ret);
-+	return mmc_pwrseq_register(&pwrseq->pwrseq);
- }
-+
-+static const struct of_device_id mmc_pwrseq_emmc_of_match[] = {
-+	{ .compatible = "mmc-pwrseq-emmc",},
-+	{/* sentinel */},
-+};
-+
-+static struct platform_driver mmc_pwrseq_emmc_driver = {
-+	.probe = mmc_pwrseq_emmc_probe,
-+	.driver = {
-+		.name = "pwrseq_emmc",
-+		.of_match_table = mmc_pwrseq_emmc_of_match,
-+	},
-+};
-+
-+builtin_platform_driver(mmc_pwrseq_emmc_driver);
-diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
-index c091f98..b04cc2d 100644
---- a/drivers/mmc/core/pwrseq_simple.c
-+++ b/drivers/mmc/core/pwrseq_simple.c
-@@ -9,6 +9,7 @@
-  */
- #include <linux/clk.h>
- #include <linux/kernel.h>
-+#include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/device.h>
- #include <linux/err.h>
-@@ -82,46 +83,66 @@ static void mmc_pwrseq_simple_free(struct mmc_host *host)
- 	if (!IS_ERR(pwrseq->ext_clk))
- 		clk_put(pwrseq->ext_clk);
- 
--	kfree(pwrseq);
- }
- 
--static struct mmc_pwrseq_ops mmc_pwrseq_simple_ops = {
--	.pre_power_on = mmc_pwrseq_simple_pre_power_on,
--	.post_power_on = mmc_pwrseq_simple_post_power_on,
--	.power_off = mmc_pwrseq_simple_power_off,
--	.free = mmc_pwrseq_simple_free,
--};
--
--struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
--					   struct device *dev)
-+int mmc_pwrseq_simple_alloc(struct mmc_host *host)
- {
--	struct mmc_pwrseq_simple *pwrseq;
-+	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
-+	struct device *dev = host->pwrseq->dev;
- 	int ret = 0;
- 
--	pwrseq = kzalloc(sizeof(*pwrseq), GFP_KERNEL);
--	if (!pwrseq)
--		return ERR_PTR(-ENOMEM);
--
- 	pwrseq->ext_clk = clk_get(dev, "ext_clock");
- 	if (IS_ERR(pwrseq->ext_clk) &&
- 	    PTR_ERR(pwrseq->ext_clk) != -ENOENT) {
--		ret = PTR_ERR(pwrseq->ext_clk);
--		goto free;
-+		return PTR_ERR(pwrseq->ext_clk);
-+
- 	}
- 
- 	pwrseq->reset_gpios = gpiod_get_array(dev, "reset", GPIOD_OUT_HIGH);
- 	if (IS_ERR(pwrseq->reset_gpios)) {
- 		ret = PTR_ERR(pwrseq->reset_gpios);
--		goto clk_put;
-+		clk_put(pwrseq->ext_clk);
-+		return ret;
- 	}
- 
-+	return 0;
-+}
-+
-+static struct mmc_pwrseq_ops mmc_pwrseq_simple_ops = {
-+	.alloc = mmc_pwrseq_simple_alloc,
-+	.pre_power_on = mmc_pwrseq_simple_pre_power_on,
-+	.post_power_on = mmc_pwrseq_simple_post_power_on,
-+	.power_off = mmc_pwrseq_simple_power_off,
-+	.free = mmc_pwrseq_simple_free,
-+};
-+
-+static const struct of_device_id mmc_pwrseq_simple_of_match[] = {
-+	{ .compatible = "mmc-pwrseq-simple",},
-+	{/* sentinel */},
-+};
-+
-+static int mmc_pwrseq_simple_probe(struct platform_device *pdev)
-+{
-+	struct mmc_pwrseq_simple *pwrseq;
-+	struct device *dev = &pdev->dev;
-+
-+	pwrseq = devm_kzalloc(dev, sizeof(*pwrseq), GFP_KERNEL);
-+	if (!pwrseq)
-+		return ERR_PTR(-ENOMEM);
-+
-+	pwrseq->pwrseq.dev = dev;
- 	pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
- 
--	return &pwrseq->pwrseq;
--clk_put:
--	if (!IS_ERR(pwrseq->ext_clk))
--		clk_put(pwrseq->ext_clk);
--free:
--	kfree(pwrseq);
--	return ERR_PTR(ret);
-+	return mmc_pwrseq_register(&pwrseq->pwrseq);
- }
-+
-+
-+static struct platform_driver mmc_pwrseq_simple_driver = {
-+	.probe = mmc_pwrseq_simple_probe,
-+	.driver = {
-+		.name = "pwrseq_simple",
-+		.of_match_table = mmc_pwrseq_simple_of_match,
-+	},
-+};
-+
-+builtin_platform_driver(mmc_pwrseq_simple_driver);
+Two questions:
+
+1. How is the boot time affected by the benchmark?
+2. How is the boot time affected by considering all the CPUs the same?
+
+My preference is for DT and sysfs (especially useful for
+development/tuning) but I'm not opposed to a boot-time benchmark if
+people insist on it. If the answer to point 2 is "insignificant", we
+could as well defer the capacity setting to user space (sysfs).
+
 -- 
-1.9.1
+Catalin
