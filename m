@@ -1,79 +1,53 @@
-From: xuejiancheng@huawei.com (Jiancheng Xue)
-Date: Tue, 19 Jan 2016 10:38:25 +0800
-Subject: [PATCH v6 0/6] ARM: hisi: Add initial support including clock driver
- for Hi3519 soc.
-Message-ID: <1453171111-21921-1-git-send-email-xuejiancheng@huawei.com>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Tue, 19 Jan 2016 10:55:00 +0800
+Subject: [PATCH 3/3] iommu/dma: Avoid unlikely high-order allocations
+In-Reply-To: <CAD=FV=WqJHjb3zoZn=8OPO2iKH1k1sMvXkVBkyM6pAyvo6PgDQ@mail.gmail.com>
+References: <9a84191ed813c23db7901f8c73f514d081495bdf.1450457730.git.robin.murphy@arm.com>
+ <8014a146e90282b8cbc5868cee0d01776670d9a6.1450457730.git.robin.murphy@arm.com>
+ <CAD=FV=WqJHjb3zoZn=8OPO2iKH1k1sMvXkVBkyM6pAyvo6PgDQ@mail.gmail.com>
+Message-ID: <1453172100.17894.9.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, 2015-12-18 at 14:35 -0800, Doug Anderson wrote:
+> Robin,
+> 
+> On Fri, Dec 18, 2015 at 9:01 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+> > Doug reports that the equivalent page allocator on 32-bit ARM exhibits
+> > particularly pathalogical behaviour under memory pressure when
+> > fragmentation is high, where allocating a 4MB buffer takes tens of
+> > seconds and the number of calls to alloc_pages() is over 9000![1]
+> >
+> > We can drastically improve that situation without losing the other
+> > benefits of high-order allocations when they would succeed, by assuming
+> > memory pressure is relatively constant over the course of an allocation,
+> > and not retrying allocations at orders we know to have failed before.
+> > This way, the best-case behaviour remains unchanged, and in the worst
+> > case we should see at most a dozen or so (MAX_ORDER - 1) failed attempts
+> > before falling back to single pages for the remainder of the buffer.
+> >
+> > [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/394660.html
+> >
+> > Reported-by: Douglas Anderson <dianders@chromium.org>
+> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> > ---
+> >  drivers/iommu/dma-iommu.c | 6 ++++--
+> >  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> Presumably it makes sense to update this based on v2 of my patch to
+> the original code?  AKA: <https://patchwork.kernel.org/patch/7888851/>
+> ?
 
-Hi3519 soc is mainly used for ip camera and sport DV solutions. This patchset adds initial support
-for Hi3519 soc. It includes clock driver, arch configuration, debug uart configuration and device tree.
-It has been tested on hi3519 reference board.
+Hi Robin,
 
-Any comments will be appreciated!
+    Thanks very much for this patch.
 
-Thanks!
+    And Douglas has sent his v2 which improve the flow of alloc_pages.
+Do you have any plan to update this patch according to this v2, or any
+concern about it?
 
-Change Log
-----------
-v6:
--Change clock driver to a real platform driver
 
-v5:
--Adjust clock and reset controller driver code
-
-v4:
--Rebase to v4.4-rc7
--Divide patches according to Rob's comments
--Add spi nodes in hi3519-demb.dts
-
-v3:
--Rebase to v4.4-rc4
--Adjust according to Arnd's comments
--Remove ARCH_HI3519, using ARCH_HISI directly
-
-v2:
--Rebase to v4.4-rc3
--Put dt-binding doc and header file in a separate patch.
--Delete unused clocks definitions.
--Adjust the ARCH_xxx order in Kconfig file
--Rename ARCH_HI3xxx to ARCH_36xx
-
-Jiancheng Xue (6):
-  clk: hisilicon: add CRG driver for hi3519 soc
-  ARM: hisi: add compatible string for Hi3519 soc
-  ARM: config: hisi: enable CONFIG_RESET_CONTROLLER
-  ARM: debug: add hi3519 debug uart
-  ARM: dt-bindings: add device tree bindings for Hi3519 sysctrl
-  ARM: dts: add dts files for Hi3519
-
- .../bindings/arm/hisilicon/hi3519-sysctrl.txt      |  14 ++
- .../devicetree/bindings/clock/hi3519-crg.txt       |  46 +++++
- arch/arm/Kconfig.debug                             |  10 ++
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/hi3519-demb.dts                  |  42 +++++
- arch/arm/boot/dts/hi3519.dtsi                      | 187 +++++++++++++++++++++
- arch/arm/configs/hisi_defconfig                    |   1 +
- arch/arm/mach-hisi/hisilicon.c                     |  23 +--
- drivers/clk/hisilicon/Kconfig                      |   7 +
- drivers/clk/hisilicon/Makefile                     |   2 +
- drivers/clk/hisilicon/clk-hi3519.c                 | 132 +++++++++++++++
- drivers/clk/hisilicon/clk.c                        |  23 ++-
- drivers/clk/hisilicon/clk.h                        |  14 +-
- drivers/clk/hisilicon/reset.c                      | 130 ++++++++++++++
- drivers/clk/hisilicon/reset.h                      |  32 ++++
- include/dt-bindings/clock/hi3519-clock.h           |  40 +++++
- 16 files changed, 671 insertions(+), 34 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hi3519-sysctrl.txt
- create mode 100644 Documentation/devicetree/bindings/clock/hi3519-crg.txt
- create mode 100644 arch/arm/boot/dts/hi3519-demb.dts
- create mode 100644 arch/arm/boot/dts/hi3519.dtsi
- create mode 100644 drivers/clk/hisilicon/clk-hi3519.c
- create mode 100644 drivers/clk/hisilicon/reset.c
- create mode 100644 drivers/clk/hisilicon/reset.h
- create mode 100644 include/dt-bindings/clock/hi3519-clock.h
-
--- 
-1.9.1
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
