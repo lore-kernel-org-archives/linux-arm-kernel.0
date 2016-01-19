@@ -1,977 +1,109 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 19 Jan 2016 15:05:07 +0100
-Subject: [PATCH 1/2] ARM: dts: kirkwood: split lswxl into linkstation
- lswsxl and lswxl
-In-Reply-To: <1453211342-25214-2-git-send-email-rogershimizu@gmail.com>
-References: <1453211342-25214-1-git-send-email-rogershimizu@gmail.com>
- <1453211342-25214-2-git-send-email-rogershimizu@gmail.com>
-Message-ID: <20160119140507.GG6554@lunn.ch>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Jan 2016 14:05:26 +0000
+Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
+In-Reply-To: <20160119135233.GB2986@dhcp-128-65.nay.redhat.com>
+References: <cover.1452884156.git.geoff@infradead.org>
+ <fb4506943bbaed8b0657ed367ebd57e4064d57ed.1452884156.git.geoff@infradead.org>
+ <20160115201601.GR3262@leverpostej> <569CBDBC.5050500@linaro.org>
+ <20160119014332.GB2919@dhcp-128-65.nay.redhat.com>
+ <20160119121721.GG25024@leverpostej>
+ <20160119135233.GB2986@dhcp-128-65.nay.redhat.com>
+Message-ID: <20160119140526.GD26545@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2016 at 10:49:01PM +0900, Roger Shimizu wrote:
-> LS-WXL/WSXL are both kirkwood-6281 based 2-Bay NAS devices, which share
-> many MPP pins. However they are slightly different:
->   - There're two red LED indicator on LS-WXL to show when HDD fails,
->     but there's no such on LS-WSXL.
->   - There's 4-level speed adjustable FAN on LS-WXL, but not LS-WSXL.
+On Tue, Jan 19, 2016 at 09:52:33PM +0800, Dave Young wrote:
+> On 01/19/16 at 12:17pm, Mark Rutland wrote:
+> > On Tue, Jan 19, 2016 at 09:43:32AM +0800, Dave Young wrote:
+> > > On 01/18/16 at 07:26pm, AKASHI Takahiro wrote:
+> > > > On 01/16/2016 05:16 AM, Mark Rutland wrote:
+> > > > >On Fri, Jan 15, 2016 at 07:18:38PM +0000, Geoff Levand wrote:
+> > > > >>From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > > > >>
+> > > > >>This patch adds arch specific descriptions about kdump usage on arm64
+> > > > >>to kdump.txt.
+> > > > >>
+> > > > >>Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > > > >>---
+> > > > >>  Documentation/kdump/kdump.txt | 23 ++++++++++++++++++++++-
+> > > > >>  1 file changed, 22 insertions(+), 1 deletion(-)
+> > > > >>
+> > > > >>diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
+> > > > >>index bc4bd5a..36cf978 100644
+> > > > >>--- a/Documentation/kdump/kdump.txt
+> > > > >>+++ b/Documentation/kdump/kdump.txt
+> > > > >>@@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
+> > > > >>  a remote system.
+> > > > >>
+> > > > >>  Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
+> > > > >>-s390x and arm architectures.
+> > > > >>+s390x, arm and arm64 architectures.
+> > > > >>
+> > > > >>  When the system kernel boots, it reserves a small section of memory for
+> > > > >>  the dump-capture kernel. This ensures that ongoing Direct Memory Access
+> > > > >>@@ -249,6 +249,20 @@ Dump-capture kernel config options (Arch Dependent, arm)
+> > > > >>
+> > > > >>      AUTO_ZRELADDR=y
+> > > > >>
+> > > > >>+Dump-capture kernel config options (Arch Dependent, arm64)
+> > > > >>+----------------------------------------------------------
+> > > > >>+
+> > > > >>+1) The maximum memory size on the dump-capture kernel must be limited by
+> > > > >>+   specifying:
+> > > > >>+
+> > > > >>+   mem=X[MG]
+> > > > >>+
+> > > > >>+   where X should be less than or equal to the size in "crashkernel="
+> > > > >>+   boot parameter. Kexec-tools will automatically add this.
+> > > > >
+> > > > >
+> > > > >This is extremely fragile, and will trivially fail when the kernel can
+> > > > >be loaded anywhere (see [1]).
+> > > > 
+> > > > As I said before, this restriction also exists on arm, but I understand
+> > > > that recent Ard's patches break it.
+> > > > 
+> > > > >We must explicitly describe the set of regions the crash kernel may use
+> > > > >(i.e. we need base and size). NAK in the absence of that.
+> > > > 
+> > > > There seem to exist several approaches:
+> > > > (a) use a device-tree property, "linux,usable-memory", in addition to "reg"
+> > > >     under "memory" node
+> > > > (b) use a kernel's early parameter, "memmap=nn[@#$]ss"
+> > > > 
+> > > > Power PC takes (a), while this does not work on efi-started kernel
+> > > > because dtb has no "memory" nodes under efi.
+> > > > X86 takes (b). If we take this, we will need to overwrite a weak
+> > > > early_init_dt_add_memory().
+> > > 
+> > > X86 takes another way in latest kexec-tools and kexec_file_load, that is
+> > > recreating E820 table and pass it to kexec/kdump kernel, if the entries
+> > > are over E820 limitation then turn to use setup_data list for remain
+> > > entries.
+> > 
+> > This would imply modifying the EFI memory map or the memory nodes, which
+> > I'm not keen on.
+> > 
+> > I would prefer that they are left _pristine_, and we describe the
+> > restriction on the kdump kernel with additional properties under
+> > /chosen.
+> > 
+> > That leaves us with more useful information about the environment of the
+> > first kernel, is simpler for userspace (it's resilient to updates to the
+> > UEFI memory map spec, for example), and is simple for the crash kernel.
 > 
-> So after the split, common part goes into .dtsi file:
->   - kirkwood-linkstation.dtsi
->   - kirkwood-linkstation-duo-6281.dtsi
-> while all rest part goes into device specific .dts file:
->   - kirkwood-linkstation-lswsxl.dts
->   - kirkwood-linkstation-lswxl.dts
-> 
-> With a few gpio/led-pin changes, including fix for the issue mentioned
-> in Debian BTS #810894.
+> In theory kexec as boot loader should prepare correct efi memmap and pass
+> to kernel, but as you said yes it will increase complexity. We need banlance
+> them.
 
-Hi Roger
+I'd argue that the "correct efi memmap" is what we were given by the
+firmware initially -- none of that information is any less true.
 
-This fix should be a separate patch. We can then get it applied to
-stable, so it makes its way back to older kernels.
+For kdump all we need to ensure is that the kdump kernel only uses the
+memory that was specially reserved for it by the first kernel. The
+simplest way of doing that is to tell the kdump kernel which specific
+region(s) of memory were reserved for it, leaving the EFI memory map
+alone.
 
-	Andrew
-
-> 
-> License all newly created files under GPLv2/X11.
-> 
-> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
-> ---
->  .../devicetree/bindings/arm/marvell,kirkwood.txt   |   3 +-
->  arch/arm/boot/dts/Makefile                         |   4 +-
->  .../boot/dts/kirkwood-linkstation-duo-6281.dtsi    | 185 +++++++++++++
->  arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts  |  57 ++++
->  arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts   | 113 ++++++++
->  arch/arm/boot/dts/kirkwood-linkstation.dtsi        | 202 ++++++++++++++
->  arch/arm/boot/dts/kirkwood-lswxl.dts               | 301 ---------------------
->  7 files changed, 561 insertions(+), 304 deletions(-)
->  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi
->  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation.dtsi
->  delete mode 100644 arch/arm/boot/dts/kirkwood-lswxl.dts
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-> index 5171ad8..c7f8e3e 100644
-> --- a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-> +++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-> @@ -19,9 +19,10 @@ SoC. Currently known SoC compatibles are:
->  And in addition, the compatible shall be extended with the specific
->  board. Currently known boards are:
->  
-> +"buffalo,linkstation-lswsxl"
-> +"buffalo,linkstation-lswxl"
->  "buffalo,lschlv2"
->  "buffalo,lswvl"
-> -"buffalo,lswxl"
->  "buffalo,lsxhl"
->  "buffalo,lsxl"
->  "dlink,dns-320"
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 30bbc37..6dff6af 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -183,9 +183,9 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
->  	kirkwood-is2.dtb \
->  	kirkwood-km_kirkwood.dtb \
->  	kirkwood-laplug.dtb \
-> +	kirkwood-linkstation-lswsxl.dtb \
-> +	kirkwood-linkstation-lswxl.dtb \
->  	kirkwood-lschlv2.dtb \
-> -	kirkwood-lswvl.dtb \
-> -	kirkwood-lswxl.dtb \
->  	kirkwood-lsxhl.dtb \
->  	kirkwood-mplcec4.dtb \
->  	kirkwood-mv88f6281gtw-ge.dtb \
-> diff --git a/arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi b/arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi
-> new file mode 100644
-> index 0000000..d83ae8e
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi
-> @@ -0,0 +1,185 @@
-> +/*
-> + * Device Tree common file for kirkwood-6281 based 2-Bay Buffalo Linkstation
-> + *
-> + * Copyright (C) 2015, 2016
-> + * Roger Shimizu <rogershimizu@gmail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +#include "kirkwood.dtsi"
-> +#include "kirkwood-6281.dtsi"
-> +#include "kirkwood-linkstation.dtsi"
-> +
-> +/ {
-> +	ocp at f1000000 {
-> +		pinctrl: pin-controller at 10000 {
-> +			pmx_power_hdd0: pmx-power-hdd0 {
-> +				marvell,pins = "mpp28";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_power_hdd1: pmx-power-hdd1 {
-> +				marvell,pins = "mpp29";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_usb_vbus: pmx-usb-vbus {
-> +				marvell,pins = "mpp37";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_alarm: pmx-led-alarm {
-> +				marvell,pins = "mpp49";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_function_red: pmx-led-function-red {
-> +				marvell,pins = "mpp34";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_function_blue: pmx-led-function-blue {
-> +				marvell,pins = "mpp36";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_info: pmx-led-info {
-> +				marvell,pins = "mpp38";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_power: pmx-led-power {
-> +				marvell,pins = "mpp39";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_button_function: pmx-button-function {
-> +				marvell,pins = "mpp41";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_power_switch: pmx-power-switch {
-> +				marvell,pins = "mpp42";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_power_auto_switch: pmx-power-auto-switch {
-> +				marvell,pins = "mpp43";
-> +				marvell,function = "gpio";
-> +			};
-> +		};
-> +
-> +		sata at 80000 {
-> +			nr-ports = <2>;
-> +		};
-> +	};
-> +
-> +	gpio_keys {
-> +		function-button {
-> +			gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		power-on-switch {
-> +			gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		power-auto-switch {
-> +			gpios = <&gpio1 11 GPIO_ACTIVE_LOW>;
-> +		};
-> +	};
-> +
-> +	gpio_leds {
-> +		red-alarm-led {
-> +			label = "red:alarm";
-> +			gpios = <&gpio1 17 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		red-function-led {
-> +			label = "red:function";
-> +			gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
-> +		};
-> +
-> +		amber-info-led {
-> +			label = "amber:info";
-> +			gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		blue-function-led {
-> +			label = "blue:function";
-> +			gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		blue-power-led {
-> +			label = "blue:power";
-> +			gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
-> +		};
-> +	};
-> +
-> +	regulators {
-> +		pinctrl-0 = <&pmx_power_hdd0 &pmx_power_hdd1 &pmx_usb_vbus>;
-> +
-> +		usb_power: regulator at 1 {
-> +			gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
-> +		};
-> +
-> +		hdd_power0: regulator at 2 {
-> +			gpio = <&gpio0 28 GPIO_ACTIVE_HIGH>;
-> +		};
-> +
-> +		hdd_power1: regulator at 3 {
-> +			compatible = "regulator-fixed";
-> +			reg = <3>;
-> +			regulator-name = "HDD1 Power";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			enable-active-high;
-> +			regulator-always-on;
-> +			regulator-boot-on;
-> +			gpio = <&gpio0 29 GPIO_ACTIVE_HIGH>;
-> +		};
-> +	};
-> +};
-> +
-> +&mdio {
-> +	status = "okay";
-> +
-> +	ethphy1: ethernet-phy at 8 {
-> +		device_type = "ethernet-phy";
-> +		reg = <8>;
-> +	};
-> +};
-> +
-> +&eth1 {
-> +	status = "okay";
-> +
-> +	ethernet1-port at 0 {
-> +		phy-handle = <&ethphy1>;
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts b/arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts
-> new file mode 100644
-> index 0000000..4b64501
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts
-> @@ -0,0 +1,57 @@
-> +/*
-> + * Device Tree file for Buffalo Linkstation LS-WSXL
-> + *
-> + * Copyright (C) 2015, 2016
-> + * Roger Shimizu <rogershimizu@gmail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "kirkwood-linkstation-duo-6281.dtsi"
-> +
-> +/ {
-> +	model = "Buffalo Linkstation LS-WSXL";
-> +	compatible = "buffalo,lswsxl", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-> +
-> +	memory { /* 128 MB */
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x8000000>;
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts b/arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts
-> new file mode 100644
-> index 0000000..027f622
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts
-> @@ -0,0 +1,113 @@
-> +/*
-> + * Device Tree file for Buffalo Linkstation LS-WXL
-> + *
-> + * Copyright (C) 2015, 2016
-> + * Roger Shimizu <rogershimizu@gmail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "kirkwood-linkstation-duo-6281.dtsi"
-> +
-> +/ {
-> +	model = "Buffalo Linkstation LS-WXL";
-> +	compatible = "buffalo,lswxl", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-> +
-> +	memory { /* 128 MB */
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x8000000>;
-> +	};
-> +
-> +	ocp at f1000000 {
-> +		pinctrl: pin-controller at 10000 {
-> +			pmx_led_hdderr0: pmx-led-hdderr0 {
-> +				marvell,pins = "mpp8";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_hdderr1: pmx-led-hdderr1 {
-> +				marvell,pins = "mpp46";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_fan_lock: pmx-fan-lock {
-> +				marvell,pins = "mpp40";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_fan_high: pmx-fan-high {
-> +				marvell,pins = "mpp47";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_fan_low: pmx-fan-low {
-> +				marvell,pins = "mpp48";
-> +				marvell,function = "gpio";
-> +			};
-> +		};
-> +	};
-> +
-> +	gpio_leds {
-> +		pinctrl-0 = <&pmx_led_function_red &pmx_led_alarm
-> +			     &pmx_led_info &pmx_led_power
-> +			     &pmx_led_function_blue
-> +			     &pmx_led_hdderr0
-> +			     &pmx_led_hdderr1>;
-> +
-> +		red-hdderr0-led {
-> +			label = "red:hdderr0";
-> +			gpios = <&gpio0 8 GPIO_ACTIVE_HIGH>;
-> +		};
-> +
-> +		red-hdderr1-led {
-> +			label = "red:hdderr1";
-> +			gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
-> +		};
-> +	};
-> +
-> +	gpio_fan {
-> +		compatible = "gpio-fan";
-> +		pinctrl-0 = <&pmx_fan_low &pmx_fan_high &pmx_fan_lock>;
-> +		pinctrl-names = "default";
-> +		gpios = <&gpio1 16 GPIO_ACTIVE_LOW
-> +			 &gpio1 15 GPIO_ACTIVE_LOW>;
-> +
-> +		gpio-fan,speed-map = <0 3
-> +				1500 2
-> +				3250 1
-> +				5000 0>;
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/kirkwood-linkstation.dtsi b/arch/arm/boot/dts/kirkwood-linkstation.dtsi
-> new file mode 100644
-> index 0000000..69061b6
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-linkstation.dtsi
-> @@ -0,0 +1,202 @@
-> +/*
-> + * Device Tree common file for kirkwood based Buffalo Linkstation
-> + *
-> + * Copyright (C) 2015, 2016
-> + * Roger Shimizu <rogershimizu@gmail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/ {
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200n8 earlyprintk";
-> +		stdout-path = &uart0;
-> +	};
-> +
-> +	mbus {
-> +		pcie-controller {
-> +			status = "okay";
-> +			pcie at 1,0 {
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-> +
-> +	ocp at f1000000 {
-> +		pinctrl: pin-controller at 10000 {
-> +			pmx_power_hdd0: pmx-power-hdd0 {
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_usb_vbus: pmx-usb-vbus {
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_alarm: pmx-led-alarm {
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_function_red: pmx-led-function-red {
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_function_blue: pmx-led-function-blue {
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_info: pmx-led-info {
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_power: pmx-led-power {
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_button_function: pmx-button-function {
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_power_switch: pmx-power-switch {
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_power_auto_switch: pmx-power-auto-switch {
-> +				marvell,function = "gpio";
-> +			};
-> +		};
-> +
-> +		serial at 12000 {
-> +			status = "okay";
-> +		};
-> +
-> +		sata at 80000 {
-> +			status = "okay";
-> +			nr-ports = <1>;
-> +		};
-> +
-> +		spi at 10600 {
-> +			status = "okay";
-> +
-> +			m25p40 at 0 {
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				compatible = "st,m25p40", "jedec,spi-nor";
-> +				reg = <0>;
-> +				spi-max-frequency = <25000000>;
-> +				mode = <0>;
-> +
-> +				partition at 0 {
-> +					reg = <0x0 0x60000>;
-> +					label = "uboot";
-> +					read-only;
-> +				};
-> +
-> +				partition at 60000 {
-> +					reg = <0x60000 0x10000>;
-> +					label = "dtb";
-> +					read-only;
-> +				};
-> +
-> +				partition at 70000 {
-> +					reg = <0x70000 0x10000>;
-> +					label = "uboot_env";
-> +				};
-> +			};
-> +		};
-> +	};
-> +
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-0 = <&pmx_button_function &pmx_power_switch
-> +			     &pmx_power_auto_switch>;
-> +		pinctrl-names = "default";
-> +
-> +		function-button {
-> +			label = "Function Button";
-> +			linux,code = <KEY_OPTION>;
-> +		};
-> +
-> +		power-on-switch {
-> +			label = "Power-on Switch";
-> +			linux,code = <KEY_RESERVED>;
-> +			linux,input-type = <5>;
-> +		};
-> +
-> +		power-auto-switch {
-> +			label = "Power-auto Switch";
-> +			linux,code = <KEY_ESC>;
-> +			linux,input-type = <5>;
-> +		};
-> +	};
-> +
-> +	gpio_leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-0 = <&pmx_led_function_red &pmx_led_alarm
-> +			     &pmx_led_info &pmx_led_power
-> +			     &pmx_led_function_blue>;
-> +		pinctrl-names = "default";
-> +	};
-> +
-> +	restart_poweroff {
-> +		compatible = "restart-poweroff";
-> +	};
-> +
-> +	regulators {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-0 = <&pmx_power_hdd0 &pmx_usb_vbus>;
-> +		pinctrl-names = "default";
-> +
-> +		usb_power: regulator at 1 {
-> +			compatible = "regulator-fixed";
-> +			reg = <1>;
-> +			regulator-name = "USB Power";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			enable-active-high;
-> +			regulator-always-on;
-> +			regulator-boot-on;
-> +		};
-> +
-> +		hdd_power0: regulator at 2 {
-> +			compatible = "regulator-fixed";
-> +			reg = <2>;
-> +			regulator-name = "HDD0 Power";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			enable-active-high;
-> +			regulator-always-on;
-> +			regulator-boot-on;
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/kirkwood-lswxl.dts b/arch/arm/boot/dts/kirkwood-lswxl.dts
-> deleted file mode 100644
-> index f5db16a..0000000
-> --- a/arch/arm/boot/dts/kirkwood-lswxl.dts
-> +++ /dev/null
-> @@ -1,301 +0,0 @@
-> -/*
-> - * Device Tree file for Buffalo Linkstation LS-WXL/WSXL
-> - *
-> - * Copyright (C) 2015, rogershimizu at gmail.com
-> - *
-> - * This program is free software; you can redistribute it and/or
-> - * modify it under the terms of the GNU General Public License
-> - * as published by the Free Software Foundation; either version
-> - * 2 of the License, or (at your option) any later version.
-> - */
-> -
-> -/dts-v1/;
-> -
-> -#include "kirkwood.dtsi"
-> -#include "kirkwood-6281.dtsi"
-> -
-> -/ {
-> -	model = "Buffalo Linkstation LS-WXL/WSXL";
-> -	compatible = "buffalo,lswxl", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-> -
-> -	memory { /* 128 MB */
-> -		device_type = "memory";
-> -		reg = <0x00000000 0x8000000>;
-> -	};
-> -
-> -	chosen {
-> -		bootargs = "console=ttyS0,115200n8 earlyprintk";
-> -		stdout-path = &uart0;
-> -	};
-> -
-> -	mbus {
-> -		pcie-controller {
-> -			status = "okay";
-> -			pcie at 1,0 {
-> -				status = "okay";
-> -			};
-> -		};
-> -	};
-> -
-> -	ocp at f1000000 {
-> -		pinctrl: pin-controller at 10000 {
-> -			pmx_power_hdd0: pmx-power-hdd0 {
-> -				marvell,pins = "mpp28";
-> -				marvell,function = "gpio";
-> -			};
-> -			pmx_power_hdd1: pmx-power-hdd1 {
-> -				marvell,pins = "mpp29";
-> -				marvell,function = "gpio";
-> -			};
-> -			pmx_usb_vbus: pmx-usb-vbus {
-> -				marvell,pins = "mpp37";
-> -				marvell,function = "gpio";
-> -			};
-> -			pmx_fan_high: pmx-fan-high {
-> -				marvell,pins = "mpp47";
-> -				marvell,function = "gpio";
-> -			};
-> -			pmx_fan_low: pmx-fan-low {
-> -				marvell,pins = "mpp48";
-> -				marvell,function = "gpio";
-> -			};
-> -			pmx_led_hdderr0: pmx-led-hdderr0 {
-> -				marvell,pins = "mpp8";
-> -				marvell,function = "gpio";
-> -			};
-> -			pmx_led_hdderr1: pmx-led-hdderr1 {
-> -				marvell,pins = "mpp46";
-> -				marvell,function = "gpio";
-> -			};
-> -			pmx_led_alarm: pmx-led-alarm {
-> -				marvell,pins = "mpp49";
-> -				marvell,function = "gpio";
-> -			};
-> -			pmx_led_function_red: pmx-led-function-red {
-> -				marvell,pins = "mpp34";
-> -				marvell,function = "gpio";
-> -			};
-> -			pmx_led_function_blue: pmx-led-function-blue {
-> -				marvell,pins = "mpp36";
-> -				marvell,function = "gpio";
-> -			};
-> -			pmx_led_info: pmx-led-info {
-> -				marvell,pins = "mpp38";
-> -				marvell,function = "gpio";
-> -			};
-> -			pmx_led_power: pmx-led-power {
-> -				marvell,pins = "mpp39";
-> -				marvell,function = "gpio";
-> -			};
-> -			pmx_fan_lock: pmx-fan-lock {
-> -				marvell,pins = "mpp40";
-> -				marvell,function = "gpio";
-> -			};
-> -			pmx_button_function: pmx-button-function {
-> -				marvell,pins = "mpp41";
-> -				marvell,function = "gpio";
-> -			};
-> -			pmx_power_switch: pmx-power-switch {
-> -				marvell,pins = "mpp42";
-> -				marvell,function = "gpio";
-> -			};
-> -			pmx_power_auto_switch: pmx-power-auto-switch {
-> -				marvell,pins = "mpp43";
-> -				marvell,function = "gpio";
-> -			};
-> -		};
-> -
-> -		serial at 12000 {
-> -			status = "okay";
-> -		};
-> -
-> -		sata at 80000 {
-> -			status = "okay";
-> -			nr-ports = <2>;
-> -		};
-> -
-> -		spi at 10600 {
-> -			status = "okay";
-> -
-> -			m25p40 at 0 {
-> -				#address-cells = <1>;
-> -				#size-cells = <1>;
-> -				compatible = "st,m25p40", "jedec,spi-nor";
-> -				reg = <0>;
-> -				spi-max-frequency = <25000000>;
-> -				mode = <0>;
-> -
-> -				partition at 0 {
-> -					reg = <0x0 0x60000>;
-> -					label = "uboot";
-> -					read-only;
-> -				};
-> -
-> -				partition at 60000 {
-> -					reg = <0x60000 0x10000>;
-> -					label = "dtb";
-> -					read-only;
-> -				};
-> -
-> -				partition at 70000 {
-> -					reg = <0x70000 0x10000>;
-> -					label = "uboot_env";
-> -				};
-> -			};
-> -		};
-> -	};
-> -
-> -	gpio_keys {
-> -		compatible = "gpio-keys";
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
-> -		pinctrl-0 = <&pmx_button_function &pmx_power_switch
-> -			     &pmx_power_auto_switch>;
-> -		pinctrl-names = "default";
-> -
-> -		button at 1 {
-> -			label = "Function Button";
-> -			linux,code = <KEY_OPTION>;
-> -			gpios = <&gpio1 41 GPIO_ACTIVE_LOW>;
-> -		};
-> -
-> -		button at 2 {
-> -			label = "Power-on Switch";
-> -			linux,code = <KEY_RESERVED>;
-> -			linux,input-type = <5>;
-> -			gpios = <&gpio1 42 GPIO_ACTIVE_LOW>;
-> -		};
-> -
-> -		button at 3 {
-> -			label = "Power-auto Switch";
-> -			linux,code = <KEY_ESC>;
-> -			linux,input-type = <5>;
-> -			gpios = <&gpio1 43 GPIO_ACTIVE_LOW>;
-> -		};
-> -	};
-> -
-> -	gpio_leds {
-> -		compatible = "gpio-leds";
-> -		pinctrl-0 = <&pmx_led_function_red &pmx_led_alarm
-> -			     &pmx_led_info &pmx_led_power
-> -			     &pmx_led_function_blue
-> -			     &pmx_led_hdderr0
-> -			     &pmx_led_hdderr1>;
-> -		pinctrl-names = "default";
-> -
-> -		led at 1 {
-> -			label = "lswxl:blue:func";
-> -			gpios = <&gpio1 36 GPIO_ACTIVE_LOW>;
-> -		};
-> -
-> -		led at 2 {
-> -			label = "lswxl:red:alarm";
-> -			gpios = <&gpio1 49 GPIO_ACTIVE_LOW>;
-> -		};
-> -
-> -		led at 3 {
-> -			label = "lswxl:amber:info";
-> -			gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
-> -		};
-> -
-> -		led at 4 {
-> -			label = "lswxl:blue:power";
-> -			gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
-> -		};
-> -
-> -		led at 5 {
-> -			label = "lswxl:red:func";
-> -			gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
-> -			default-state = "keep";
-> -		};
-> -
-> -		led at 6 {
-> -			label = "lswxl:red:hdderr0";
-> -			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
-> -		};
-> -
-> -		led at 7 {
-> -			label = "lswxl:red:hdderr1";
-> -			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
-> -		};
-> -	};
-> -
-> -	gpio_fan {
-> -		compatible = "gpio-fan";
-> -		pinctrl-0 = <&pmx_fan_low &pmx_fan_high &pmx_fan_lock>;
-> -		pinctrl-names = "default";
-> -
-> -		gpios = <&gpio0 47 GPIO_ACTIVE_LOW
-> -			 &gpio0 48 GPIO_ACTIVE_LOW>;
-> -
-> -		gpio-fan,speed-map = <0 3
-> -				1500 2
-> -				3250 1
-> -				5000 0>;
-> -
-> -		alarm-gpios = <&gpio1 49 GPIO_ACTIVE_HIGH>;
-> -	};
-> -
-> -	restart_poweroff {
-> -		compatible = "restart-poweroff";
-> -	};
-> -
-> -	regulators {
-> -		compatible = "simple-bus";
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
-> -		pinctrl-0 = <&pmx_power_hdd0 &pmx_power_hdd1 &pmx_usb_vbus>;
-> -		pinctrl-names = "default";
-> -
-> -		usb_power: regulator at 1 {
-> -			compatible = "regulator-fixed";
-> -			reg = <1>;
-> -			regulator-name = "USB Power";
-> -			regulator-min-microvolt = <5000000>;
-> -			regulator-max-microvolt = <5000000>;
-> -			enable-active-high;
-> -			regulator-always-on;
-> -			regulator-boot-on;
-> -			gpio = <&gpio0 37 GPIO_ACTIVE_HIGH>;
-> -		};
-> -		hdd_power0: regulator at 2 {
-> -			compatible = "regulator-fixed";
-> -			reg = <2>;
-> -			regulator-name = "HDD0 Power";
-> -			regulator-min-microvolt = <5000000>;
-> -			regulator-max-microvolt = <5000000>;
-> -			enable-active-high;
-> -			regulator-always-on;
-> -			regulator-boot-on;
-> -			gpio = <&gpio0 28 GPIO_ACTIVE_HIGH>;
-> -		};
-> -		hdd_power1: regulator at 3 {
-> -			compatible = "regulator-fixed";
-> -			reg = <3>;
-> -			regulator-name = "HDD1 Power";
-> -			regulator-min-microvolt = <5000000>;
-> -			regulator-max-microvolt = <5000000>;
-> -			enable-active-high;
-> -			regulator-always-on;
-> -			regulator-boot-on;
-> -			gpio = <&gpio0 29 GPIO_ACTIVE_HIGH>;
-> -		};
-> -	};
-> -};
-> -
-> -&mdio {
-> -	status = "okay";
-> -
-> -	ethphy1: ethernet-phy at 8 {
-> -		device_type = "ethernet-phy";
-> -		reg = <8>;
-> -	};
-> -};
-> -
-> -&eth1 {
-> -	status = "okay";
-> -
-> -	ethernet1-port at 0 {
-> -		phy-handle = <&ethphy1>;
-> -	};
-> -};
-> -- 
-> 2.1.4
-> 
+Thanks,
+Mark.
