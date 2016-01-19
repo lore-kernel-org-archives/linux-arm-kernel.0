@@ -1,127 +1,53 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 19 Jan 2016 14:59:39 +0000
-Subject: [Xen-devel] [PATCH v2 03/16] Xen: xlate: Use page_to_xen_pfn
- instead of page_to_pfn
-In-Reply-To: <569C7363.80106@huawei.com>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-4-git-send-email-zhaoshenglong@huawei.com>
- <alpine.DEB.2.02.1601151558010.16178@kaball.uk.xensource.com>
- <569C7363.80106@huawei.com>
-Message-ID: <alpine.DEB.2.02.1601191456370.9400@kaball.uk.xensource.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 19 Jan 2016 23:01:46 +0800
+Subject: [LINUX PATCH 1/5] mmc: Workaround for the issue in auto tuning
+ mode.
+In-Reply-To: <1453213055-35563-1-git-send-email-lakshmis@xilinx.com>
+References: <1453213055-35563-1-git-send-email-lakshmis@xilinx.com>
+Message-ID: <CAGb2v655SF-CUbZKKTif0toHqJ61Z4P4_QzQacfQL9EN0Y0zZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Jan 2016, Shannon Zhao wrote:
-> On 2016/1/16 1:08, Stefano Stabellini wrote:
-> > On Fri, 15 Jan 2016, Shannon Zhao wrote:
-> >> From: Shannon Zhao <shannon.zhao@linaro.org>
-> >>
-> >> Use page_to_xen_pfn in case of 64KB page.
-> >>
-> >> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> >> ---
-> >>  drivers/xen/xlate_mmu.c | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
-> >> index 9692656..b9fcc2c 100644
-> >> --- a/drivers/xen/xlate_mmu.c
-> >> +++ b/drivers/xen/xlate_mmu.c
-> >> @@ -227,7 +227,7 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
-> >>  		return rc;
-> >>  	}
-> >>  	for (i = 0; i < nr_grant_frames; i++)
-> >> -		pfns[i] = page_to_pfn(pages[i]);
-> >> +		pfns[i] = page_to_xen_pfn(pages[i]);
-> > 
-> > Shannon, thanks for the patch.
-> > 
-> > Keeping in mind that in the 64K case, kernel pages are 64K but xen pages
-> > are still 4K, I think you also need to allocate
-> > (nr_grant_frames/XEN_PFN_PER_PAGE) kernel pages (assuming that they are
-> > allocated contiguously): nr_grant_frames refers to 4K pages, while
-> > xen_xlate_map_ballooned_pages is allocating pages on a 64K granularity
-> > (sizeof(pages[0]) == 64K).
-> > 
-> > Be careful that alloc_xenballooned_pages deals with 64K pages (because
-> > it deals with kernel pages), while xen_pfn_t is always 4K based (because
-> > it deals with Xen pfns).
-> > 
-> > Please test it with and without CONFIG_ARM64_64K_PAGES. Thanks!
-> > 
-> Stefano, thanks for your explanation. How about below patch?
+Hi,
 
-Good work, it looks like you covered all bases, I think it should work,
-but I haven't tested it myself. Just one note below.
+On Tue, Jan 19, 2016 at 10:17 PM, P L Sai Krishna
+<lakshmi.sai.krishna.potthuri@xilinx.com> wrote:
+> During the auto tuning mode of SDR104, a couple of transactions
+> on rx_tap_value which are not incremental or decremental by 1.
+> Since the DLL supports only increment/decrement by 1 during
+> dynamic change, observed unexpected delays during both these
+> transactions.
+> The first transaction occurs when the tap value
+> reached 0x1F, it will reset to 0x0 and go till 0x7. This
+> transaction can be avoided by changing the corecfg_dis1p5xtuningcnt
+> to 1'b1 which is currently tied to 1'b0 in the RTL.
+> The second transaction occurs after the tuning is completed.
+> Once the tuning is done, the tuning fsm in the host controller
+> calculates the average pattern match and will write the value
+> on the rx tap value. Therefore observed a transaction from 0x7 to
+> the final value which need not be a increment/decrement value.
+> Because of this issue DLL tuning will not be accurate and SDR50,
+> SDR104 & HS200 modes may not work.
+>
+> This patch adds workaround to change the SD clock after
+> tuning done to provide accurate DLL tuning for SDR50,
+> SD104 & HS200 modes.
+>
+> After receiving the tuning done, program "SDCLK Frequency Select"
+> of clock control register with a value different from the desired
+> value. Wait for the "Internal Clock Stable" bit of the clock
+> control register and program the desired frequency.
 
+Does this series apply to any non-Arasan or non-sdhci mmc hosts?
+The subject does not indicate a specific platform.
 
-> diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
-> index 9692656..e1f7c95 100644
-> --- a/drivers/xen/xlate_mmu.c
-> +++ b/drivers/xen/xlate_mmu.c
-> @@ -207,9 +207,12 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t
-> **gfns, void **virt,
->         void *vaddr;
->         int rc;
->         unsigned int i;
-> +       unsigned long nr_pages;
-> +       xen_pfn_t xen_pfn = 0;
-> 
->         BUG_ON(nr_grant_frames == 0);
-> -       pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
-> +       nr_pages = DIV_ROUND_UP(nr_grant_frames, XEN_PFN_PER_PAGE);
-> +       pages = kcalloc(nr_pages, sizeof(pages[0]), GFP_KERNEL);
->         if (!pages)
->                 return -ENOMEM;
-> 
-> @@ -218,22 +221,25 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t
-> **gfns, void **virt,
->                 kfree(pages);
->                 return -ENOMEM;
->         }
-> -       rc = alloc_xenballooned_pages(nr_grant_frames, pages);
-> +       rc = alloc_xenballooned_pages(nr_pages, pages);
->         if (rc) {
-> -               pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n",
-> __func__,
-> -                       nr_grant_frames, rc);
-> +               pr_warn("%s Couldn't balloon alloc %ld pages rc:%d\n",
-> __func__,
-> +                       nr_pages, rc);
->                 kfree(pages);
->                 kfree(pfns);
->                 return rc;
->         }
-> -       for (i = 0; i < nr_grant_frames; i++)
-> -               pfns[i] = page_to_pfn(pages[i]);
-> +       for (i = 0; i < nr_grant_frames; i++) {
-> +               if ((i % XEN_PFN_PER_PAGE) == 0)
-> +                       xen_pfn = page_to_xen_pfn(pages[i /
-> XEN_PFN_PER_PAGE]);
-> +               pfns[i] = xen_pfn++;
-> +       }
+Thanks
+ChenYu
 
-We might want to:
-
-  pfns[i] = pfn_to_gfn(xen_pfn++);
-
-for consistency, even though for autotranslate guests pfn_to_gfn always
-returns pfn.
-
-
-> -       vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
-> +       vaddr = vmap(pages, nr_pages, 0, PAGE_KERNEL);
->         if (!vaddr) {
-> -               pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
-> -                       nr_grant_frames, rc);
-> -               free_xenballooned_pages(nr_grant_frames, pages);
-> +               pr_warn("%s Couldn't map %ld pages rc:%d\n", __func__,
-> +                       nr_pages, rc);
-> +               free_xenballooned_pages(nr_pages, pages);
->                 kfree(pages);
->                 kfree(pfns);
->                 return -ENOMEM;
-> 
-> -- 
-> Shannon
-> 
+> Signed-off-by: P L Sai Krishna <lakshmis@xilinx.com>
+> ---
+>  drivers/mmc/host/sdhci-of-arasan.c | 18 ++++++++++++++++++
+>  drivers/mmc/host/sdhci-pltfm.c     |  3 +++
+>  drivers/mmc/host/sdhci.c           |  5 +++++
+>  drivers/mmc/host/sdhci.h           |  4 ++++
+>  4 files changed, 30 insertions(+)
