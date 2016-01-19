@@ -1,81 +1,38 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Tue, 19 Jan 2016 18:02:13 +0530
-Subject: [PATCH v9 5/6] PCI: generic: Make pci-host-generic driver numa
- aware
-In-Reply-To: <20160119094150.GA4991@red-moon>
-References: <1453134965-6125-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1453134965-6125-6-git-send-email-gkulkarni@caviumnetworks.com>
- <569D23AF.9050503@gmail.com>
- <CAFpQJXXESn1EA5kotVOH2oLbRUSpOLf6+MeWG1pY_GhUP+4vVQ@mail.gmail.com>
- <20160119094150.GA4991@red-moon>
-Message-ID: <CAFpQJXV_5mryP5ZT5ezE7N9Csj97g7029D_9Fj_fNJ8+5n6O2w@mail.gmail.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Tue, 19 Jan 2016 20:32:30 +0800
+Subject: [PATCH 00/19] arm64 kexec kernel patches v13
+In-Reply-To: <cover.1452884156.git.geoff@infradead.org>
+References: <cover.1452884156.git.geoff@infradead.org>
+Message-ID: <20160119123230.GB2904@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2016 at 3:11 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Tue, Jan 19, 2016 at 11:28:56AM +0530, Ganapatrao Kulkarni wrote:
->> On Mon, Jan 18, 2016 at 11:11 PM, David Daney <ddaney.cavm@gmail.com> wrote:
->> > On 01/18/2016 08:36 AM, Ganapatrao Kulkarni wrote:
->> >>
->> >> update numa_node of device associated with pci bus.
->> >> moved down devm_kzalloc to allocate from node memory.
->> >>
->> >> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
->> >> ---
->> >>   drivers/pci/host/pci-host-generic.c | 9 ++++++---
->> >>   1 file changed, 6 insertions(+), 3 deletions(-)
->> >>
->> >> diff --git a/drivers/pci/host/pci-host-generic.c
->> >> b/drivers/pci/host/pci-host-generic.c
->> >> index 5434c90..0e1ce06 100644
->> >> --- a/drivers/pci/host/pci-host-generic.c
->> >> +++ b/drivers/pci/host/pci-host-generic.c
->> >> @@ -215,11 +215,9 @@ static int gen_pci_probe(struct platform_device
->> >> *pdev)
->> >>         const struct of_device_id *of_id;
->> >>         struct device *dev = &pdev->dev;
->> >>         struct device_node *np = dev->of_node;
->> >> -       struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
->> >> +       struct gen_pci *pci;
->> >>         struct pci_bus *bus, *child;
->> >>
->> >> -       if (!pci)
->> >> -               return -ENOMEM;
->> >>
->> >>         type = of_get_property(np, "device_type", NULL);
->> >>         if (!type || strcmp(type, "pci")) {
->> >> @@ -230,6 +228,11 @@ static int gen_pci_probe(struct platform_device
->> >> *pdev)
->> >>         of_pci_check_probe_only();
->> >>
->> >>         of_id = of_match_node(gen_pci_of_match, np);
->> >> +       set_dev_node(dev, of_node_to_nid(np));
->> >
->> >
->> > This shouldn't be done in individual platform_drivers, but instead in the
->> > device probing code.
->> >
->> > There is code that does this in drivers/of/platform.c and
->> > drivers/of/device.c  Is that not being called for the pci-host-gweneric
->> > devices?  If not, we should figure out why, and perhaps attempt to fix it
->> > rather than doing it here.
->> is it more appropriate to call of_platform_device_create ?
->
-> That's already done to create the platform device by OF core when
-> populating devices from DT, what David suggested is that you should
-> add set_dev_node() to core OF code instead of adding it specifically
-> to the PCI host generic code.
-This patch was worked on 4.2(inherited to 4.4) to have correct
-numa_node populated on sysfs.
-however, on 4.4, OF  is fixed to set numa_node(fixed by
-56f2de81e020c537f7e35550d13840143cb765cd)
+On 01/15/16 at 07:18pm, Geoff Levand wrote:
+> This series adds the core support for kexec re-boot and kdump on ARM64.  This
+> version of the series combines Takahiro's kdump patches with my kexec patches.
+> Please consider all patches for inclusion.
+> 
+> I just tested all the endian combinations of kexec LE->LE, LE->BE, BE->BE,
+> BE->LE, and both LE an BE kdump, and all work as expected.
+> 
+> To load a second stage kernel and execute a kexec re-boot or to work with kdump
+> on ARM64 systems a series of patches to kexec-tools [2], which have not yet been
+> merged upstream, are needed.
+> 
+> To examine vmcore (/proc/vmcore), you should use
+>   - gdb v7.7 or later
+>   - crash v7.1.1 or later
+> 
+> [1]  https://git.kernel.org/cgit/linux/kernel/git/geoff/linux-kexec.git
+> [2]  https://git.kernel.org/cgit/linux/kernel/git/geoff/kexec-tools.git
+> 
 
-This patch (patch #5) is not required and will be dropped.
-thanks for your comments.
+Geoff, another question about kexec-tools part is, can the kexec-tools code
+been written in kernel? We have the infrastructure for kexec_file_load.
 
+In the future if we have to support loading a signed kernel then we still
+need to do that, but we may have to support both the kexec-tools and the
+in kernel loader for compatibility purpose. It will be hard to maintain.
 
->
-> Lorenzo
-thanks
-Ganapat
+Thanks
+Dave
