@@ -1,68 +1,30 @@
-From: ntelkar@codeaurora.org (ntelkar at codeaurora.org)
-Date: Tue, 19 Jan 2016 07:48:49 -0000
-Subject: [PATCH V6 0/6] i2c: qup: Add support for v2 tags and bam dma
-In-Reply-To: <1452588233-1803-1-git-send-email-sricharan@codeaurora.org>
-References: <1452588233-1803-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <e45ba8b5efc13a4eda4b5c1b2282facc.squirrel@www.codeaurora.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 19 Jan 2016 07:53:46 +0000
+Subject: [PATCH 1/3] clk: Allow clocks to be marked as CRITICAL
+In-Reply-To: <CAMuHMdWoj=MT+-Tb+o6ocy2WKsZ42-ZUmN-Oe4ogNssgToFngw@mail.gmail.com>
+References: <1453127331-20616-1-git-send-email-lee.jones@linaro.org>
+ <1453127331-20616-2-git-send-email-lee.jones@linaro.org>
+ <CAMuHMdWoj=MT+-Tb+o6ocy2WKsZ42-ZUmN-Oe4ogNssgToFngw@mail.gmail.com>
+Message-ID: <20160119075346.GA29000@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added SMB support on top of these patches and tested  i2c with ipmitool.
-It works as expected.
-Tested-by: ntelkar at codeaurora.org
+On Mon, 18 Jan 2016, Geert Uytterhoeven wrote:
+> On Mon, Jan 18, 2016 at 3:28 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > --- a/include/linux/clk-provider.h
+> > +++ b/include/linux/clk-provider.h
+> > @@ -31,6 +31,7 @@
+> >  #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
+> >  #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
+> >  #define CLK_RECALC_NEW_RATES   BIT(9) /* recalc rates after notifications */
+> > +#define CLK_IS_CRITICAL                BIT(10) /* do not gate, ever */
+> 
+> 10 is already taken, even upstream. Please rebase ;-)
 
-> i2c: qup: Add support for v2 tags and bam dma
->
-> QUP from version 2.1.1 onwards, supports a new format of i2c command tags.
-> Tag codes instructs the controller to perform a operation like read/write.
-> This new tagging version supports and is required for adding bam dma
-> capabilities. V2 tags supports transfer of more than 256 bytes in a single
-> i2c
-> transaction. Also adding bam dma support facilitates transferring each
-> i2c_msg
-> in i2c_msgs without a 'stop' bit in between which is required for some of
-> the clients.
->
-> Tested this series on apq8074 dragon board eeprom client on i2c bus1
->
-> [V6] Added review tags and fixed a checkpatch warning in patch 4/6.
->
-> [V5] Addressed few more comments from Ivan T. Ivanov.
->      Squashed patch 2 and 3 as no point in having only few lines of
->      common code between v1 and v2 tags for increased complexity.
->      Couple of non functional review comments fixes in patch 3, 4.
->      Added a change in patch 4 to have proper transfer completion in
->      a corner case. patch 5, 6 unchanged.
->
-> [V4] Added a patch to factor out some common code.
->      Removed support for freq > 400KHZ as per comments.
->      Addressed comments from Ivan T. Ivanov to keep the code for
->      V2 support in a separate path.
->      Changed the authorship of V2 tags support patch.
->
-> [V3] Added support to coalesce each i2c_msg in i2c_msgs for fifo and
->      block mode in Patch 2. Also addressed further code comments.
->
->      http://comments.gmane.org/gmane.linux.drivers.i2c/22497
->
-> [V2] Addressed comments from Ivan T. Ivanov, Andy Gross [v1] Initial
-> Version
->
-> Sricharan R (6):
->   i2c: qup: Change qup_wait_writeready function to use for all timeouts
->   i2c: qup: Add V2 tags support
->   i2c: qup: Transfer each i2c_msg in i2c_msgs without a stop bit
->   i2c: qup: Add bam dma capabilities
->   dts: msm8974: Add blsp2_bam dma node
->   dts: msm8974: Add dma channels for blsp2_i2c1 node
->
->  arch/arm/boot/dts/qcom-msm8974.dtsi |  14 +-
->  drivers/i2c/busses/i2c-qup.c        | 922
-> ++++++++++++++++++++++++++++++++++--
->  2 files changed, 887 insertions(+), 49 deletions(-)
->
-> --
-> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-> of Code Aurora Forum, hosted by The Linux Foundation
->
->
+Thanks for the heads-up.  Will pull Heiko's patch in and rebase.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
