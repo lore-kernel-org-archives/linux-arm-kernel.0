@@ -1,66 +1,104 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 19 Jan 2016 08:55:21 +0100
-Subject: [PATCH V3 20/21] pci, acpi: Match PCI config space accessors
- against platfrom specific quirks.
-In-Reply-To: <569D9634.3040304@huawei.com>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <1452691267-32240-21-git-send-email-tn@semihalf.com>
- <1452785776.28109.22.camel@redhat.com> <569CDD8F.807@semihalf.com>
- <569D9634.3040304@huawei.com>
-Message-ID: <569DEBE9.5090909@semihalf.com>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Tue, 19 Jan 2016 16:03:36 +0800
+Subject: [PATCH v3 4/8] dt-bindings: Add a binding for Mediatek Video
+ Encoder
+In-Reply-To: <569CB321.10206@gmail.com>
+References: <1451902316-55931-1-git-send-email-tiffany.lin@mediatek.com>
+ <1451902316-55931-5-git-send-email-tiffany.lin@mediatek.com>
+ <569CB321.10206@gmail.com>
+Message-ID: <1453190616.1088.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.01.2016 02:49, liudongdong (C) wrote:
-> Hi Tomasz, Mark
->
-> ? 2016/1/18 20:41, Tomasz Nowicki ??:
->> On 14.01.2016 16:36, Mark Salter wrote:
->>>> +extern struct pci_mcfg_fixup __start_acpi_mcfg_fixups[];
->>>> >+extern struct pci_mcfg_fixup __end_acpi_mcfg_fixups[];
->>>> >+
->>>> >+static struct pci_ops *pci_mcfg_check_quirks(struct acpi_pci_root
->>>> *root)
->>>> >+{
->>>> >+    struct pci_mcfg_fixup *f;
->>>> >+    int bus_num = root->secondary.start;
->>>> >+    int domain = root->segment;
->>>> >+
->>>> >+    /*
->>>> >+     * First match against PCI topology <domain:bus> then use DMI or
->>>> >+     * custom match handler.
->>>> >+     */
->>>> >+    for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups;
->>>> f++) {
->>>> >+        if ((f->domain == domain || f->domain ==
->>>> PCI_MCFG_DOMAIN_ANY) &&
->>>> >+            (f->bus_num == bus_num || f->bus_num ==
->>>> PCI_MCFG_BUS_ANY) &&
->>>> >+            (f->system ? dmi_check_system(f->system) : 0 ||
->>>> >+             f->match ? f->match(f, root) : 0))
->>>> >+            return f->ops;
->>> I think this would be better as:
->>>
->>>             (f->system ? dmi_check_system(f->system) : 1 &&
->>>              f->match ? f->match(f, root) : 1))
->>>             return f->ops;
->>>
->>> Otherwise, one has to call dmi_check_system() from f->match() if
->>> access to root is needed.
->>
->
-> Non-DMI, we need not to call dmi_check_system() from f->match(),
-> we can use _HID to decide to hook the pci_ops or not.
+Hi Matthias,
 
-Sorry, but I dont understand your point. Can you elaborate?
+On Mon, 2016-01-18 at 10:40 +0100, Matthias Brugger wrote:
+> 
+> On 04/01/16 11:11, Tiffany Lin wrote:
+> > Add a DT binding documentation of Video Encoder for the
+> > MT8173 SoC from Mediatek.
+> >
+> > Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+> > ---
+> >   .../devicetree/bindings/media/mediatek-vcodec.txt  |   58 ++++++++++++++++++++
+> >   1 file changed, 58 insertions(+)
+> >   create mode 100644 Documentation/devicetree/bindings/media/mediatek-vcodec.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/media/mediatek-vcodec.txt b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
+> > new file mode 100644
+> > index 0000000..5cc35ae
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
+> > @@ -0,0 +1,58 @@
+> > +Mediatek Video Codec
+> > +
+> > +Mediatek Video Codec is the video codec hw present in Mediatek SoCs which
+> > +supports high resolution encoding functionalities.
+> > +
+> > +Required properties:
+> > +- compatible : "mediatek,mt8173-vcodec-enc" for encoder
+> > +- reg : Physical base address of the video codec registers and length of
+> > +  memory mapped region.
+> > +- interrupts : interrupt number to the cpu.
+> > +- mediatek,larb : must contain the local arbiters in the current Socs.
+> > +- clocks : list of clock specifiers, corresponding to entries in
+> > +  the clock-names property;
+> > +- clock-names: must contain "vencpll", "venc_lt_sel", "vcodecpll_370p5_ck"
+> > +- iommus : list of iommus specifiers should be enabled for hw encode.
+> > +  There are 2 cells needed to enable/disable iommu.
+> > +  The first one is local arbiter index(larbid), and the other is port
+> > +  index(portid) within local arbiter. Specifies the larbid and portid
+> > +  as defined in dt-binding/memory/mt8173-larb-port.h.
+> 
+> iommus have only one cell, as in the example below. Please fix the 
+> binding description accordingly.
+> 
+I will fix this in next version.
 
-With Mark modification, you can use the following cases to identify 
-platform:
-1. DMI only
-2. f->match() only (_HID can be used there)
-3. DMI and f->match()
 
-DMI used to be very convenient way to recognise platform, sometimes it 
-is not enough, hence f->match() alternative.
+best regards,
+Tiffany
 
-Tomasz
+> Regards,
+> Matthias
+> 
+> > +- mediatek,vpu : the node of video processor unit
+> > +
+> > +Example:
+> > +vcodec_enc: vcodec at 0x18002000 {
+> > +    compatible = "mediatek,mt8173-vcodec-enc";
+> > +    reg = <0 0x18002000 0 0x1000>,    /*VENC_SYS*/
+> > +          <0 0x19002000 0 0x1000>;    /*VENC_LT_SYS*/
+> > +    interrupts = <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>,
+> > +           <GIC_SPI 202 IRQ_TYPE_LEVEL_LOW>;
+> > +    mediatek,larb = <&larb3>,
+> > +		    <&larb5>;
+> > +    iommus = <&iommu M4U_PORT_VENC_RCPU>,
+> > +             <&iommu M4U_PORT_VENC_REC>,
+> > +             <&iommu M4U_PORT_VENC_BSDMA>,
+> > +             <&iommu M4U_PORT_VENC_SV_COMV>,
+> > +             <&iommu M4U_PORT_VENC_RD_COMV>,
+> > +             <&iommu M4U_PORT_VENC_CUR_LUMA>,
+> > +             <&iommu M4U_PORT_VENC_CUR_CHROMA>,
+> > +             <&iommu M4U_PORT_VENC_REF_LUMA>,
+> > +             <&iommu M4U_PORT_VENC_REF_CHROMA>,
+> > +             <&iommu M4U_PORT_VENC_NBM_RDMA>,
+> > +             <&iommu M4U_PORT_VENC_NBM_WDMA>,
+> > +             <&iommu M4U_PORT_VENC_RCPU_SET2>,
+> > +             <&iommu M4U_PORT_VENC_REC_FRM_SET2>,
+> > +             <&iommu M4U_PORT_VENC_BSDMA_SET2>,
+> > +             <&iommu M4U_PORT_VENC_SV_COMA_SET2>,
+> > +             <&iommu M4U_PORT_VENC_RD_COMA_SET2>,
+> > +             <&iommu M4U_PORT_VENC_CUR_LUMA_SET2>,
+> > +             <&iommu M4U_PORT_VENC_CUR_CHROMA_SET2>,
+> > +             <&iommu M4U_PORT_VENC_REF_LUMA_SET2>,
+> > +             <&iommu M4U_PORT_VENC_REC_CHROMA_SET2>;
+> > +    mediatek,vpu = <&vpu>;
+> > +    clocks = <&apmixedsys CLK_APMIXED_VENCPLL>,
+> > +             <&topckgen CLK_TOP_VENC_LT_SEL>,
+> > +             <&topckgen CLK_TOP_VCODECPLL_370P5>;
+> > +    clock-names = "vencpll",
+> > +                  "venc_lt_sel",
+> > +                  "vcodecpll_370p5_ck";
+> > +  };
+> >
