@@ -1,69 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Jan 2016 20:40:15 +0000
-Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <20160119202513.GC6510@localhost>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <20160114134440.GA8520@xora-haswell.xora.org.uk>
- <1452780100.28109.3.camel@redhat.com>
- <20160114141501.GC8520@xora-haswell.xora.org.uk>
- <1452781481.28109.8.camel@redhat.com>
- <20160115121231.GD8520@xora-haswell.xora.org.uk>
- <20160118140405.GC11384@xora-haswell.xora.org.uk>
- <20160119202513.GC6510@localhost>
-Message-ID: <20160119204015.GS19062@n2100.arm.linux.org.uk>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Tue, 19 Jan 2016 21:58:19 +0100
+Subject: USB Ethernet gadget on Nokia n900
+In-Reply-To: <20150707114658.GT10705@atomide.com>
+References: <20141019090107.GA19132@amd> <20150707074626.GB12087@pali>
+ <20150707114658.GT10705@atomide.com>
+Message-ID: <201601192158.19810@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2016 at 02:25:13PM -0600, Bjorn Helgaas wrote:
-> On Mon, Jan 18, 2016 at 02:04:05PM +0000, Graeme Gregory wrote:
-> > After some private debugging with Mark it turned out that the difference
-> > between our configurations was I did not have.
+On Tuesday 07 July 2015 13:46:59 Tony Lindgren wrote:
+> * Pali Roh?r <pali.rohar@gmail.com> [150707 00:48]:
+> > On Monday 06 July 2015 06:53:18 Tony Lindgren wrote:
+> > > * Pali Roh?r <pali.rohar@gmail.com> [150706 06:27]:
+> > > > On Tuesday 28 October 2014 23:26:41 Tony Lindgren wrote:
+> > > > > * Pavel Machek <pavel@ucw.cz> [141028 15:22]:
+> > > > > > On Tue 2014-10-28 23:04:50, Pavel Machek wrote:
+> > > > > > > Networking now works against 3.17-based kernel. Thanks!
+> > > > > > 
+> > > > > > It works on 3.18-rc1 kernel, too. (I had to hand-modify
+> > > > > > patch to apply to 3.17, no changes needed for 3.18-rc1.)
+> > > > > > 
+> > > > > > Tested-by: Pavel Machek <pavel@ucw.cz>
+> > > > > 
+> > > > > Whatever we decice to do to fix this regression, it should
+> > > > > probably be backported to at least v3.16 stable for distro
+> > > > > use, maybe earlier too. I'd assume this is broken on
+> > > > > multiple platforms currently.
+> > > > 
+> > > > it looks like this patch was not included into any kernel
+> > > > version... I'm still using it on top of 4.x kernels. Are you
+> > > > going to send this patch into upstream? Or do you have another
+> > > > fix for this problem?
+> > > 
+> > > I think Felipe mentioned a better built-in gether fix that's been
+> > > reviewed on linux-usb list.
 > > 
-> > CONFIG_DMA_CMA=y
-> > 
-> > With this enabled then the card works without coherent mask hack.
+> > Do you have link to that email thread? Or was Felipe's fix already
+> > merged into mainline kernel?
 > 
-> I didn't follow the whole discussion here, but is this a case where
-> the driver could fail more gracefully than it did?  Can we do anything
-> to make this easier for the next person who trips over the same problem?
+> Sorry I don't have a link, maybe Felipe can point you to the right
+> patch.
+> 
+> Regards,
+> 
+> Tony
 
-I've not followed the discussion at all, but reading what was in the
-quoted parts of the mail makes me somewhat suspicious.
-
-The way PCI drivers (or in fact any driver) are supposed to work is:
-
-- the bus code sets up a default mask (32-bit DMA in the case of PCI)
-- the driver calls dma_set_mask() or similar function with the mask
-  the _driver_ wants to use.  Arch DMA code decides whether the mask
-  can be supported, and if it can, it re-sets the DMA mask.  If the
-  mask can't be supported, it returns an error.
-
-The driver is doing things correctly:
-
-        if ((sizeof(dma_addr_t) > 4) &&
-            !pci_set_dma_mask(pdev, DMA_BIT_MASK(64)) && use_dac) {
-                tp->cp_cmd |= PCIDAC;
-                dev->features |= NETIF_F_HIGHDMA;
-        } else {
-                rc = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
-
-which says: if the size of a DMA address supports 64-bit, and we can
-set a 64-bit DMA address mask (iow, the platform allows it), and
-we're permitted to use DAC, use DAC, otherwise try to set a 32-bit
-DMA mask.
-
-It shouldn't matter one bit what the mask is before that point.
-
-However, what the driver fails to do is to deal with the coherent
-mask - it appears to be missing a call to pci_set_consistent_dma_mask().
-That may be where the issue is.
-
-It may be worth doing what I did with the DMA API, and introducing
-pci_set_mask_and_coherent() which sets both masks together - which
-will probably allow some PCI driver code to be simplified.
+Felipe, ping
 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160119/fb4765e9/attachment.sig>
