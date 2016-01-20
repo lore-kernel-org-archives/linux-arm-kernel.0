@@ -1,45 +1,41 @@
-From: lho@apm.com (Loc Ho)
-Date: Wed, 20 Jan 2016 15:14:07 -0800
-Subject: [PATCH v2 1/3] Documentation: Update the APM X-Gene SoC EDAC DTS
- binding for missing RB
-In-Reply-To: <20160120183543.GK23186@pd.tnic>
-References: <1453250812-15097-1-git-send-email-lho@apm.com>
- <1453250812-15097-2-git-send-email-lho@apm.com>
- <20160120183543.GK23186@pd.tnic>
-Message-ID: <CAPw-ZT=ThVjyTtOrs3GSukrsvasbokk1p3XT24sZxXBP5MS0PQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 21 Jan 2016 00:14:25 +0100
+Subject: [patch] drm: rockchip: signedness bug in
+ dw_mipi_dsi_get_lane_bps()
+In-Reply-To: <20160120095352.GA19898@mwanda>
+References: <20160120095352.GA19898@mwanda>
+Message-ID: <181674264.ynnWZU1Yz8@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Dan,
 
-On Wed, Jan 20, 2016 at 10:35 AM, Borislav Petkov <bp@alien8.de> wrote:
-> On Tue, Jan 19, 2016 at 05:46:50PM -0700, Loc Ho wrote:
->>  This patch updates the APM X-Gene SoC EDAC documentation binding to
->>  reference the missing register bus for the the SoC EDAC.
->>
->>  Signed-off-by: Loc Ho <lho@apm.com>
->>  ---
->>   .../devicetree/bindings/edac/apm-xgene-edac.txt    |   12 ++++++++++++
->>   1 files changed, 12 insertions(+), 0 deletions(-)
->>
->>  diff --git a/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
->>  index 78e2a31..17b29af 100644
->>  --- a/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
->>  +++ b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
->>  @@ -20,6 +20,12 @@ Required properties:
->>   - interrupts            : Interrupt-specifier for MCU, PMD, L3, or SoC error
->>                         IRQ(s).
->>
->>  +Optional property:
->>  +- regmap-rb         : Regmap of the register bus resource. This properity
->>  +                      is optional only for compatibility. If the RB
->>  +                      erorr conditions are not cleared, it will
->
-> s/erorr/error/
->
-> Please integrate a spellchecker into your patch creation workflow.
+Am Mittwoch, 20. Januar 2016, 12:53:52 schrieb Dan Carpenter:
+> "bpp" needs to be signed for the error handling to work.
+> 
+> Fixes: 84e05408fcfe ('drm: rockchip: Support Synopsys DW MIPI DSI')
+> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 
-I will integrate aspell into the patch creation workflow and shoot for
-an update version sometime this Friday.
+There's also "drm/rockchip/dsi: fix handling mipi_dsi_pixel_format_to_bpp 
+result" from Andrzej Hajda from january the 14th doing the same change.
 
--Loc
+
+Heiko
+
+> 
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c index 7bfe243..c35e5af 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -461,7 +461,8 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi
+> *dsi)
+> 
+>  static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi)
+>  {
+> -	unsigned int bpp, i, pre;
+> +	int bpp;
+> +	unsigned int i, pre;
+>  	unsigned long mpclk, pllref, tmp;
+>  	unsigned int m = 1, n = 1, target_mbps = 1000;
+>  	unsigned int max_mbps = dptdin_map[ARRAY_SIZE(dptdin_map) - 
+1].max_mbps;
