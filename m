@@ -1,97 +1,49 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 20 Jan 2016 12:03:03 +0100
-Subject: [PATCH 3/4] net: mvneta: mmc: get optional axi clk
-In-Reply-To: <20160120174223.53ccc36b@xhacker>
-References: <1453277183-5412-1-git-send-email-jszhang@marvell.com>
- <1453277183-5412-4-git-send-email-jszhang@marvell.com>
- <1525e5fba70.2764.107cef0f820c2f5d7b7f41463071c310@gmail.com>
- <20160120174223.53ccc36b@xhacker>
-Message-ID: <569F6967.9040302@gmail.com>
+From: nab@linux-iscsi.org (Nicholas A. Bellinger)
+Date: Wed, 20 Jan 2016 03:04:36 -0800
+Subject: [PATCH] scsi: qla2xxxx: avoid type mismatch in comparison
+In-Reply-To: <1603472.f34vvTrhuN@wuerfel>
+References: <1603472.f34vvTrhuN@wuerfel>
+Message-ID: <1453287876.27508.137.camel@haakon3.risingtidesystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2016 10:42 AM, Jisheng Zhang wrote:
-> On Wed, 20 Jan 2016 10:31:18 +0100 Sebastian Hesselbarth  wrote:
->
->> On January 20, 2016 9:15:22 AM Jisheng Zhang wrote:
->>
->>> Some platforms may provide more than one clk for the mvneta IP, for
->>> example Marvell BG4CT provides "core" clk for the mac core, and
->>> "axi" clk for the AXI bus logic. Obviously this "axi" clk also need to
->>> be enabled. This patch adds this optional "axi" clk support.
->>
->> Jisheng,
->>
->> although I do not expect mvneta to appear on a non-AXI bus
->> anytime soon, how about naming the clock "bus" instead?
->
-> Good question. IIRC, this IP expects AXI bus, but I'll check with HW people.
+On Wed, 2016-01-20 at 11:47 +0100, Arnd Bergmann wrote:
+> A recent bug fix added code that does
+> 
+>         bool logged_out = (status & 0xFFFF);
+>         if (logged_out == CTIO_PORT_LOGGED_OUT)
+> 		...
+> 
+> This looks wrong because we are comparing a boolean with an
+> integer constant, ang gcc warns about it accordingly:
+> 
+> drivers/scsi/qla2xxx/qla_target.c: In function 'qlt_do_ctio_completion':
+> drivers/scsi/qla2xxx/qla_target.c:3587:20: warning: comparison of constant '41' with boolean expression is always false [-Wbool-compare]
+>         (logged_out == CTIO_PORT_LOGGED_OUT) ?
+> 
+> The correct fix is presumably to make that variable an 'int'.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 71cdc0796465 ("qla2xxx: Delete session if initiator is gone from FW")
+> ---
+> The patch introducing this is currenly in linux-next through the target-updates/for-next
+> branch.
+> 
+> diff --git a/drivers/scsi/qla2xxx/qla_target.c b/drivers/scsi/qla2xxx/qla_target.c
+> index c7ab9e69c881..8075a4cdb45c 100644
+> --- a/drivers/scsi/qla2xxx/qla_target.c
+> +++ b/drivers/scsi/qla2xxx/qla_target.c
+> @@ -3580,7 +3580,7 @@ static void qlt_do_ctio_completion(struct scsi_qla_host *vha, uint32_t handle,
+>  		case CTIO_PORT_LOGGED_OUT:
+>  		case CTIO_PORT_UNAVAILABLE:
+>  		{
+> -			bool logged_out = (status & 0xFFFF);
+> +			int logged_out = (status & 0xFFFF);
+>  			ql_dbg(ql_dbg_tgt_mgt, vha, 0xf059,
+>  			    "qla_target(%d): CTIO with %s status %x "
+>  			    "received (state %x, se_cmd %p)\n", vha->vp_idx,
+> 
 
-Actually, I am quite sure the current IP requires AXI. But my comment
-was more about to make the binding a little bit more flexible to
-_future_ variants/SoCs we may stumble upon.
+Applied to target-pending/for-next.
 
-Naming the clock "bus" or "dma" will work for the current _and_ future
-IPs, while "axi" may not.
-
-Sebastian
-
->>
->> If you know the clock is only required for bus master DMA but
->> not for register access, "dma" would be an even better name.
->>
->> Sebastian
->>
->>
->>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
->>> ---
->>>   drivers/net/ethernet/marvell/mvneta.c | 8 ++++++++
->>>   1 file changed, 8 insertions(+)
->>>
->>> diff --git a/drivers/net/ethernet/marvell/mvneta.c
->>> b/drivers/net/ethernet/marvell/mvneta.c
->>> index aca0a73..6bb709a 100644
->>> --- a/drivers/net/ethernet/marvell/mvneta.c
->>> +++ b/drivers/net/ethernet/marvell/mvneta.c
->>> @@ -373,6 +373,8 @@ struct mvneta_port {
->>>
->>>   	/* Core clock */
->>>   	struct clk *clk;
->>> +	/* AXI clock */
->>> +	struct clk *clk_axi;
->>>   	u8 mcast_count[256];
->>>   	u16 tx_ring_size;
->>>   	u16 rx_ring_size;
->>> @@ -3615,6 +3617,10 @@ static int mvneta_probe(struct platform_device *pdev)
->>>
->>>   	clk_prepare_enable(pp->clk);
->>>
->>> +	pp->clk_axi = devm_clk_get(&pdev->dev, "axi");
->>> +	if (!IS_ERR(pp->clk_axi))
->>> +		clk_prepare_enable(pp->clk_axi);
->>> +
->>>   	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>>   	pp->base = devm_ioremap_resource(&pdev->dev, res);
->>>   	if (IS_ERR(pp->base)) {
->>> @@ -3727,6 +3733,7 @@ err_free_ports:
->>>   	free_percpu(pp->ports);
->>>   err_clk:
->>>   	clk_disable_unprepare(pp->clk);
->>> +	clk_disable_unprepare(pp->clk_axi);
->>>   err_put_phy_node:
->>>   	of_node_put(phy_node);
->>>   err_free_irq:
->>> @@ -3744,6 +3751,7 @@ static int mvneta_remove(struct platform_device *pdev)
->>>
->>>   	unregister_netdev(dev);
->>>   	clk_disable_unprepare(pp->clk);
->>> +	clk_disable_unprepare(pp->clk_axi);
->>>   	free_percpu(pp->ports);
->>>   	free_percpu(pp->stats);
->>>   	irq_dispose_mapping(dev->irq);
->>> --
->>> 2.7.0.rc3
->>>
->>
->>
->
+Thanks Arnd.
