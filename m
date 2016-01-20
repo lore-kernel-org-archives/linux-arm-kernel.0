@@ -1,46 +1,77 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 20 Jan 2016 17:29:21 +0800
-Subject: [PATCH v4 3/4] soc: mediatek: Add MT2701 power dt-bindings
-In-Reply-To: <1453270097-53853-4-git-send-email-jamesjj.liao@mediatek.com>
-References: <1453270097-53853-1-git-send-email-jamesjj.liao@mediatek.com>
- <1453270097-53853-4-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1453282161.16515.9.camel@mtksdaap41>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 20 Jan 2016 10:31:18 +0100
+Subject: [PATCH 3/4] net: mvneta: mmc: get optional axi clk
+In-Reply-To: <1453277183-5412-4-git-send-email-jszhang@marvell.com>
+References: <1453277183-5412-1-git-send-email-jszhang@marvell.com>
+ <1453277183-5412-4-git-send-email-jszhang@marvell.com>
+Message-ID: <1525e5fba70.2764.107cef0f820c2f5d7b7f41463071c310@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-01-20 at 14:08 +0800, James Liao wrote:
-> From: Shunli Wang <shunli.wang@mediatek.com>
-> 
-> Add power dt-bindings for MT2701.
-> 
-> Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+On January 20, 2016 9:15:22 AM Jisheng Zhang <jszhang@marvell.com> wrote:
+
+> Some platforms may provide more than one clk for the mvneta IP, for
+> example Marvell BG4CT provides "core" clk for the mac core, and
+> "axi" clk for the AXI bus logic. Obviously this "axi" clk also need to
+> be enabled. This patch adds this optional "axi" clk support.
+
+Jisheng,
+
+although I do not expect mvneta to appear on a non-AXI bus
+anytime soon, how about naming the clock "bus" instead?
+
+If you know the clock is only required for bus master DMA but
+not for register access, "dma" would be an even better name.
+
+Sebastian
+
+
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 > ---
->  .../devicetree/bindings/soc/mediatek/scpsys.txt    |  6 +++--
->  include/dt-bindings/power/mt2701-power.h           | 27 ++++++++++++++++++++++
->  2 files changed, 31 insertions(+), 2 deletions(-)
->  create mode 100644 include/dt-bindings/power/mt2701-power.h
-> 
-> diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> index a6c8afc..807d87f 100644
-> --- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> +++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> @@ -9,10 +9,12 @@ domain control.
->  
->  The driver implements the Generic PM domain bindings described in
->  power/power_domain.txt. It provides the power domains defined in
-> -include/dt-bindings/power/mt8173-power.h.
-> +include/dt-bindings/power/mt8173-power.h and mt2701-power.h.
->  
->  Required properties:
-> -- compatible: Must be "mediatek,mt8173-scpsys"
-> +- compatible: Should be:
-> +	- "mediatek,mt8173-scpsys"
-> +	- "mediatek,mt2701-scpsys"
->  - #power-domain-cells: Must be 1
->  - reg: Address range of the SCPSYS unit
->  - infracfg: must contain a phandle to the infracfg controller
-
-Please sort the list.
-
-Joe.C
+>  drivers/net/ethernet/marvell/mvneta.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c 
+> b/drivers/net/ethernet/marvell/mvneta.c
+> index aca0a73..6bb709a 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -373,6 +373,8 @@ struct mvneta_port {
+>
+>  	/* Core clock */
+>  	struct clk *clk;
+> +	/* AXI clock */
+> +	struct clk *clk_axi;
+>  	u8 mcast_count[256];
+>  	u16 tx_ring_size;
+>  	u16 rx_ring_size;
+> @@ -3615,6 +3617,10 @@ static int mvneta_probe(struct platform_device *pdev)
+>
+>  	clk_prepare_enable(pp->clk);
+>
+> +	pp->clk_axi = devm_clk_get(&pdev->dev, "axi");
+> +	if (!IS_ERR(pp->clk_axi))
+> +		clk_prepare_enable(pp->clk_axi);
+> +
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	pp->base = devm_ioremap_resource(&pdev->dev, res);
+>  	if (IS_ERR(pp->base)) {
+> @@ -3727,6 +3733,7 @@ err_free_ports:
+>  	free_percpu(pp->ports);
+>  err_clk:
+>  	clk_disable_unprepare(pp->clk);
+> +	clk_disable_unprepare(pp->clk_axi);
+>  err_put_phy_node:
+>  	of_node_put(phy_node);
+>  err_free_irq:
+> @@ -3744,6 +3751,7 @@ static int mvneta_remove(struct platform_device *pdev)
+>
+>  	unregister_netdev(dev);
+>  	clk_disable_unprepare(pp->clk);
+> +	clk_disable_unprepare(pp->clk_axi);
+>  	free_percpu(pp->ports);
+>  	free_percpu(pp->stats);
+>  	irq_dispose_mapping(dev->irq);
+> --
+> 2.7.0.rc3
+>
