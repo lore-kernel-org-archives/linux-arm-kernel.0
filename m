@@ -1,120 +1,61 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 20 Jan 2016 13:53:44 -0600
-Subject: [PATCH v2 1/4] dt-bindings: power: reset: add document for
- reboot-mode driver
-In-Reply-To: <CALAqxLVvJqL60nKfrDiZ+p-1ujxuG72iUN3DCvEE3WJ9bpnGLA@mail.gmail.com>
-References: <1452598029-8222-1-git-send-email-andy.yan@rock-chips.com>
- <1452598189-8272-1-git-send-email-andy.yan@rock-chips.com>
- <20160120182840.GA15741@rob-hp-laptop>
- <CALAqxLVvJqL60nKfrDiZ+p-1ujxuG72iUN3DCvEE3WJ9bpnGLA@mail.gmail.com>
-Message-ID: <CAL_Jsq+suCyqSi+cJiVLuA0aZKSciAaeUKW9A5Y_X_3wyW60Ug@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 20 Jan 2016 19:57:22 +0000
+Subject: CONFIG_CPU_SW_DOMAIN_PAN breakage on ARM11 MPCore
+In-Reply-To: <20160119162328.GM19062@n2100.arm.linux.org.uk>
+References: <569D71F3.7000408@openwrt.org>
+ <20160119093845.GJ19062@n2100.arm.linux.org.uk>
+ <569E0796.9000302@openwrt.org> <12866783.yJ1maoGsrz@wuerfel>
+ <20160119162328.GM19062@n2100.arm.linux.org.uk>
+Message-ID: <20160120195722.GU19062@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 20, 2016 at 12:47 PM, John Stultz <john.stultz@linaro.org> wrote:
-> On Wed, Jan 20, 2016 at 10:28 AM, Rob Herring <robh@kernel.org> wrote:
->> On Tue, Jan 12, 2016 at 07:29:49PM +0800, Andy Yan wrote:
->>> add device tree binding document for reboot-mode driver
->>>
->>> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
->>>
->>> ---
->>>
->>> Changes in v2: None
->>> Changes in v1: None
->>>
->>>  .../bindings/power/reset/reboot-mode.txt           | 41 +++++++++++++++++
->>>  .../bindings/power/reset/syscon-reboot-mode.txt    | 52 ++++++++++++++++++++++
->>>  2 files changed, 93 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/power/reset/reboot-mode.txt
->>>  create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/power/reset/reboot-mode.txt b/Documentation/devicetree/bindings/power/reset/reboot-mode.txt
->>> new file mode 100644
->>> index 0000000..81d9f66
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/power/reset/reboot-mode.txt
->>> @@ -0,0 +1,41 @@
->>> +Generic reboot mode core map driver
->>> +
->>> +This driver get reboot mode arguments and call the write
->>> +interface to stores the magic value in special register
->>> +or ram . Then the bootloader can read it and take different
->>> +action according to the argument stored.
->>> +
->>> +Required properties:
->>> +- compatible: only support "syscon-reboot-mode" now.
->>> +
->>> +Each mode is represented as a sub-node of reboot_mode:
->>> +
->>> +Subnode required properties:
->>> +- linux,mode: reboot mode command,such as "loader", "recovery", "fastboot".
->>> +- loader,magic: magic number for the mode, this is vendor specific.
->>> +
->>> +Example:
->>> +     reboot_mode {
->>
->> reboot-mode instead please.
->>
->>> +             compatible = "syscon-reboot-mode";
->>> +             offset = <0x40>;
->>
->> This doc by itself is a little confusing. For example, is a child of the
->> syscon node? I would remove offset (and perhaps compatible) from this
->> example.
->>
->>> +
->>> +             loader {
->>> +                     linux,mode = "loader";
->>> +                     loader,magic = <BOOT_LOADER>;
->>> +             };
->>
->> Sorry, my previous suggestion was not clear. I'm suggesting get rid of
->> the subnodes and just do properties like this:
->>
->> loader = <BOOT_LOADER>;
->> maskrom = <BOOT_MASKROM>;
->>
->> That's the same amount of information unless node names and linux,mode
->> values are going to diverge. Do they need to? I can't see a reason.
->
->
-> It seems like devices already have a number of various different
-> vendor specific commands.  So this sort of flexibility helps us adapt
-> the driver to different hardware/system environments (which may use
-> different conventions then what Android commonly uses).
->
-> Unless I'm misunderstanding you and you're instead suggesting we can
-> dynamically parse the command mode from the node name?
+On Tue, Jan 19, 2016 at 04:23:28PM +0000, Russell King - ARM Linux wrote:
+> However, the SMP vs UP mode thing does have an effect on the fix
+> too - if we have MPcore systems operating in UP mode, we're going
+> to need a much more complex and hideous fix - we're likely going
+> to need to out-of-line _all_ the TLB flushing which is going to
+> be nasty for the vast majority not affected by this. :(
 
-Yes, except it would be the property name. The driver could either
-iterate over the properties of the reboot-mode node or lookup the
-property when it has the reboot reason string. We generally like to
-parse everything up front at probe, but the latter would be somewhat
-easier to implement. Perhaps we would want to prefix nodes with
-"mode-" or something.
+Having thought about this some more, I'm coming to the conclusion that
+the only sane solution here is to change the help text for SW_PAN such
+that if you want to run a kernel on ARM11 MPcore, you must disable
+SW_PAN.
 
-Vendors can certainly still add their own (e.g.
-vendor,halt-and-catch-fire = <0xdead>).
+Unless that approach is taken, we're into a rewrite the ARM TLB flushing
+(as mentioned above) and I really don't want to do that just for the
+sake of one relatively rare early SMP CPU.
 
-The question here really is will we ever need additional data for each
-mode (in the DT) besides "magic". We can do some amount of extending
-the property like allowing more that single 32-bit value. We can't mix
-strings and integers though. If we don't need that, then lets go with
-the more concise approach. This isn't really an evolving area.
-Selecting boot mode/device has existed for a long time on PCs (it is
-fixed list in the IPMI spec for example). So I can't imagine that we'd
-have to extend this, but I'd like to hear thoughts on it. You had
-mentioned the Galaxy Nexus having a value and a string, but I'd find
-it surprising if the bootloader actually uses the string.
+For those who think we can simply apply my patch, consider the CNS3xxx
+situation, which is not a SMP system in mainline kernels, but uses ARM11
+MPcore CPUs (and thus fails when SMP is disabled, even with my patch.)
 
-> That said, I agree we should try to push vendors to using the same
-> conventions when they are providing the same functionality. But I'm
-> not sure we should enforce that by making vendors introduce a new dt
-> binding for every new reboot command they want to implement.
+So I'm going to suggest that this option's help text is changed to:
 
-Either way they need to document it. It's either a new linux,mode
-value or a new property name. Vendors are free to add whatever they
-want, but for upstream it has to go thru review.
+config CPU_SW_DOMAIN_PAN
+	bool "Enable use of CPU domains to implement privileged no-access"
+	depends on MMU && !ARM_LPAE
+	default y
+	help
+	  Increase kernel security by ensuring that normal kernel accesses
+	  are unable to access userspace addresses.  This can help prevent
+	  use-after-free bugs becoming an exploitable privilege escalation
+	  by ensuring that magic values (such as LIST_POISON) will always
+	  fault when dereferenced.
 
-Rob
+	  Note: This option is incompatible with ARM11 MPcore and must not
+	  be used with kernels which are to run on this CPU, whether in SMP
+	  or UP mode.
+
+	  CPUs with low-vector mappings use a best-efforts implementation.
+	  Their lower 1MB needs to remain accessible for the vectors, but
+	  the remainder of userspace will become appropriately inaccessible.
+
+Unfortunately, that's still going to lead to people hitting this, and
+possibly wasting a long time debugging it needlessly - but I don't
+have any better solution for this.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
