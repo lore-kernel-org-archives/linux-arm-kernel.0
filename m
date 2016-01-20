@@ -1,68 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Jan 2016 11:31:49 +0100
-Subject: [PATCH] xen: allocate gntdev_copy_batch dynamically
-Message-ID: <4664421.nvl14CijWp@wuerfel>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Wed, 20 Jan 2016 02:32:27 -0800
+Subject: [PATCH] soc: mediatek: PMIC wrap: clear the STAUPD_TRIG bit of
+ WDT_SRC_EN
+In-Reply-To: <1453265564-16379-1-git-send-email-henryc.chen@mediatek.com>
+References: <1453265564-16379-1-git-send-email-henryc.chen@mediatek.com>
+Message-ID: <CAGS+omCFOUgTHxeUn0snrkBjvcR1bSOAAmkBHppF8nM37P1vrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct gntdev_copy_batch is arguably too large to fit on the kernel stack,
-and we get a warning about the stack usage in gntdev_ioctl_grant_copy:
+On Tue, Jan 19, 2016 at 8:52 PM, Henry Chen <henryc.chen@mediatek.com> wrote:
+> Since STAUPD interrupts aren't handled on mt8173, disable watchdog timeout
+> monitor of STAUPD to avoid WDT_INT triggered by STAUPD.
+>
+> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
 
-drivers/xen/gntdev.c:949:1: error: the frame size of 1240 bytes is larger than 1024 bytes
+> ---
+>  drivers/soc/mediatek/mtk-pmic-wrap.c | 19 +++++++++++++++++--
+>  1 file changed, 17 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> index af919b1..998f561 100644
+> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> @@ -60,6 +60,15 @@
+>  #define PWRAP_MAN_CMD_OP_OUTD          (0x9 << 8)
+>  #define PWRAP_MAN_CMD_OP_OUTQ          (0xa << 8)
+>
+> +/* macro for Watch Dog Timer Source */
+> +#define PWRAP_WDT_SRC_EN_STAUPD_TRIG           (1 << 25)
+> +#define PWRAP_WDT_SRC_EN_HARB_STAUPD_DLE       (1 << 20)
+> +#define PWRAP_WDT_SRC_EN_HARB_STAUPD_ALE       (1 << 6)
+> +#define PWRAP_WDT_SRC_MASK_ALL                 0xffffffff
+> +#define PWRAP_WDT_SRC_MASK_NO_STAUPD   ~(PWRAP_WDT_SRC_EN_STAUPD_TRIG | \
+> +                                         PWRAP_WDT_SRC_EN_HARB_STAUPD_DLE | \
+> +                                         PWRAP_WDT_SRC_EN_HARB_STAUPD_ALE)
+> +
+>  /* macro for slave device wrapper registers */
+>  #define PWRAP_DEW_BASE                 0xbc00
+>  #define PWRAP_DEW_EVENT_OUT_EN         (PWRAP_DEW_BASE + 0x0)
+> @@ -830,7 +839,7 @@ MODULE_DEVICE_TABLE(of, of_pwrap_match_tbl);
+>
+>  static int pwrap_probe(struct platform_device *pdev)
+>  {
+> -       int ret, irq;
+> +       int ret, irq, wdt_src;
+>         struct pmic_wrapper *wrp;
+>         struct device_node *np = pdev->dev.of_node;
+>         const struct of_device_id *of_id =
+> @@ -920,7 +929,13 @@ static int pwrap_probe(struct platform_device *pdev)
+>
+>         /* Initialize watchdog, may not be done by the bootloader */
+>         pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
+> -       pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
+> +       /*
+> +        * Since STAUPD was not used on mt8173 platform,
+> +        * so STAUPD of WDT_SRC which should be turned off
+> +        */
 
-This changes the code to us a dynamic allocation instead.
+It is a little awkward that "!pwrap_is_mt8135(wrp)" means mt8173.  Is
+this always true?
+Why aren't we clearing STAUPD for mt8135 too?
+I assume it is because mt8135 does not define this bit?
+What about other devices that are not mt8135 or mt8173?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: a4cdb556cae0 ("xen/gntdev: add ioctl for grant copy")
----
-This is a regression against v4.4, found with ARM randconfig testing.
+Perhaps change the comment to:
+"This driver does not use STAUPD, so clear this WDT SRC for all
+devices for which it exists to avoid unhandled interrupts"
 
-diff --git a/drivers/xen/gntdev.c b/drivers/xen/gntdev.c
-index dc495383ad73..cc753b3a7154 100644
---- a/drivers/xen/gntdev.c
-+++ b/drivers/xen/gntdev.c
-@@ -915,15 +915,16 @@ static int gntdev_grant_copy_seg(struct gntdev_copy_batch *batch,
- static long gntdev_ioctl_grant_copy(struct gntdev_priv *priv, void __user *u)
- {
- 	struct ioctl_gntdev_grant_copy copy;
--	struct gntdev_copy_batch batch;
-+	struct gntdev_copy_batch *batch;
- 	unsigned int i;
- 	int ret = 0;
- 
- 	if (copy_from_user(&copy, u, sizeof(copy)))
- 		return -EFAULT;
- 
--	batch.nr_ops = 0;
--	batch.nr_pages = 0;
-+	batch = kzalloc(sizeof(*batch), GFP_KERNEL);
-+	if (!batch)
-+		return -ENOMEM;
- 
- 	for (i = 0; i < copy.count; i++) {
- 		struct gntdev_grant_copy_segment seg;
-@@ -933,18 +934,20 @@ static long gntdev_ioctl_grant_copy(struct gntdev_priv *priv, void __user *u)
- 			goto out;
- 		}
- 
--		ret = gntdev_grant_copy_seg(&batch, &seg, &copy.segments[i].status);
-+		ret = gntdev_grant_copy_seg(batch, &seg, &copy.segments[i].status);
- 		if (ret < 0)
- 			goto out;
- 
- 		cond_resched();
- 	}
--	if (batch.nr_ops)
--		ret = gntdev_copy(&batch);
-+	if (batch->nr_ops)
-+		ret = gntdev_copy(batch);
-+	kfree(batch);
- 	return ret;
- 
-   out:
--	gntdev_put_pages(&batch);
-+	gntdev_put_pages(batch);
-+	kfree(batch);
- 	return ret;
- }
- 
+Other than that, this patch is:
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+
+> +       wdt_src = pwrap_is_mt8135(wrp) ?
+> +                       PWRAP_WDT_SRC_MASK_ALL : PWRAP_WDT_SRC_MASK_NO_STAUPD;
+> +       pwrap_writel(wrp, wdt_src, PWRAP_WDT_SRC_EN);
+>         pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
+>         pwrap_writel(wrp, ~((1 << 31) | (1 << 1)), PWRAP_INT_EN);
+>
+> --
+> 1.8.1.1.dirty
+>
