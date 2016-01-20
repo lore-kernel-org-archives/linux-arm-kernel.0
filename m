@@ -1,83 +1,38 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 20 Jan 2016 18:21:43 +0100
-Subject: [PATCH v2 6/7] ARM: dts: kirkwood: split lswxl dts to linkstation
- lswsxl and lswxl
-In-Reply-To: <1453304038-28345-7-git-send-email-rogershimizu@gmail.com>
-References: <1453211342-25214-1-git-send-email-rogershimizu@gmail.com>
- <1453304038-28345-1-git-send-email-rogershimizu@gmail.com>
- <1453304038-28345-7-git-send-email-rogershimizu@gmail.com>
-Message-ID: <569FC227.2040300@gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 20 Jan 2016 19:25:19 +0200
+Subject: [PATCH v6 1/2] ACPI: introduce a function to find the first
+ physical device
+In-Reply-To: <569FBD1A.5050609@linaro.org>
+References: <1453300171-25473-1-git-send-email-aleksey.makarov@linaro.org>
+ <1453300171-25473-2-git-send-email-aleksey.makarov@linaro.org>
+ <CAHp75VcdtU6izThE+Z2ODnYoXk-uhweXzUtFwSze_jJHw3+38g@mail.gmail.com>
+ <569FBD1A.5050609@linaro.org>
+Message-ID: <CAHp75Vdedr9L_VPpbyKbDpqzheaovOh9bni_P5xyWH9djYFjoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2016 04:33 PM, Roger Shimizu wrote:
-> LS-WXL/WSXL are both kirkwood-6281 based 2-Bay NAS devices, which share
-> many MPP pins. However they are slightly different:
->    - There're two red LED indicator on LS-WXL to show when HDD fails,
->      but there's no such on LS-WSXL.
->    - There's 4-level speed adjustable FAN on LS-WXL, but not LS-WSXL.
->
-> So after the split, common part goes into .dtsi file:
->    - kirkwood-linkstation.dtsi
->    - kirkwood-linkstation-duo-6281.dtsi
-> while all rest part goes into device specific .dts file:
->    - kirkwood-linkstation-lswsxl.dts
->    - kirkwood-linkstation-lswxl.dts
->
-> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
-> ---
-[...]
-> diff --git a/arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi b/arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi
-> new file mode 100644
-> index 000000000000..47b8f185839d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi
-> @@ -0,0 +1,185 @@
-[...]
-> +/ {
-> +	ocp at f1000000 {
-> +		pinctrl: pin-controller at 10000 {
+On Wed, Jan 20, 2016 at 7:00 PM, Aleksey Makarov
+<aleksey.makarov@linaro.org> wrote:
+> On 20.01.2016 21:12, Andy Shevchenko wrote:
+>>
+>> On Wed, Jan 20, 2016 at 4:29 PM, Aleksey Makarov
+>> <aleksey.makarov@linaro.org> wrote:
+>>>
+>>> Factor out the code that finds the first physical device
+>>> of a given ACPI device.  It is used in several places.
+>>>
+>>> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 
-Roger,
+For all your comments, I have to withdraw my tag. You may return it
+back if Rafael and / or Mika will be okay with these changes.
+Sorry for inconvenience.
 
-nice series! Mind to send another patch moving pinctrl stuff
-and sata below to node references for both boards?
+>>> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+>>
+>>
+>> Hmm? Sorry, didn't notice one style issue and there is one is matter
+>> of taste below.
 
-Kirkwood has &pinctrl and &sata labels, it helps to keep the bus
-structure out of the board files. &mdio is an example for that.
-
-I might be easier not to squash that into this series but
-send another one later.
-
-Sebastian
-
-> +			pmx_power_hdd0: pmx-power-hdd0 {
-> +				marvell,pins = "mpp28";
-> +				marvell,function = "gpio";
-> +			};
-[...]
-> +		};
-> +
-> +		sata at 80000 {
-> +			nr-ports = <2>;
-> +		};
-> +	};
-[...]
-> +};
-> +
-> +&mdio {
-> +	status = "okay";
-> +
-> +	ethphy1: ethernet-phy at 8 {
-> +		device_type = "ethernet-phy";
-> +		reg = <8>;
-> +	};
-> +};
-> +
-> +&eth1 {
-> +	status = "okay";
-> +
-> +	ethernet1-port at 0 {
-> +		phy-handle = <&ethphy1>;
-> +	};
-> +};
+-- 
+With Best Regards,
+Andy Shevchenko
