@@ -1,148 +1,140 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 20 Jan 2016 12:12:04 +0900
-Subject: [RFC] arm64: ftrace with regs for livepatch support
-In-Reply-To: <569EE216.6030000@huawei.com>
-References: <564F0846.5000001@linaro.org> <567E5DA7.70904@huawei.com>
- <569DF394.4000105@linaro.org> <569EE216.6030000@huawei.com>
-Message-ID: <569EFB04.6070807@linaro.org>
+From: beanhuo@micron.com (=?utf-8?B?QmVhbiBIdW8g6ZyN5paM5paMIChiZWFuaHVvKQ==?=)
+Date: Wed, 20 Jan 2016 03:41:04 +0000
+Subject: [PATCH linux-next 0/5] mtd: spi-nor: add driver for Atmel QSPI
+ controller
+In-Reply-To: <20151218002901.GE10460@google.com>
+References: <cover.1449494420.git.cyrille.pitchen@atmel.com>
+ <20151207193441.GO120110@google.com>
+ <A765B125120D1346A63912DDE6D8B6310BF53437@NTXXIAMBX02.xacn.micron.com>
+ <20151218002901.GE10460@google.com>
+Message-ID: <A765B125120D1346A63912DDE6D8B6310BF57A4B@NTXXIAMBX02.xacn.micron.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Li,
+Hi, Brian
+Sorry for response this too later. Please see my comment below:
+ 
+> Hi Bean,
+> 
+> On Tue, Dec 08, 2015 at 06:21:00AM +0000, Bean Huo ??? wrote:
+> > > -----Original Message-----
+> > > From: Brian Norris [mailto:computersforpeace at gmail.com]
+> > >
+> > > I'll admit I'm a little fuzzy on the differences between dual and
+> > > quad modes on various flash manufacturers. Can you help clear it up for
+> me?
+> >
+> > For Micron SPI NOR spi quad mode, means that Qaud I/O prototocol, it
+> > follows I/O Bus width is command-address-Data 4-4-4, at this time,
+> > DQ0,DQ1,DQ2,DQ3 are all used to transfer address/command/data. For
+> > this maybe not the same between different flash manufactures. For
+> > example, for Spansion Qspi NOR, its all instructions are transferred
+> > from host to memory as a single bit serial sequence on the DQ0 signal, even
+> under Quad mode.  Dual mode the same as Qaud mode scenario.
+> >
+> > for SPI NOR 1-1-4, means command and address are transferred on the
+> > DQ0, but for data, being transferred on DQ0,DQ1,DQ2,DQ3.For this, it
+> > is the same between different flash manufacturers. Of course, at this
+> > moment, SPI NOR should work under extended I/O mode.
+> 
+> OK, so to make these statements *much* shorter:
+> 
+>  * Micron "Quad Mode" means putting the flash in a 4/4/4 mode
+	Yes.
+>  * Spansion (and all others?) are using 1/1/4 modes
+	Per my experience, Spansion are using 1/4/4 in quad mode,
+	But Macronix is the same with Micron, also putting flash into 4/4/4 mode.
 
-On 01/20/2016 10:25 AM, Li Bin wrote:
-> Hi Takahiro,
-> Thanks for your reply firstly.
->
-> on 2016/1/19 16:28, AKASHI Takahiro wrote:
->>>> 1) instruction sequence
->>>> Unlike x86, we have to preserve link register(x30) explicitly on arm64 since
->>>> a ftrace help function will be invoked before a function prologue. so we
->>>> need a few, not one, instructions here. Two possible ways:
->>>>
->>>>    (a) stp x29, x30, [sp, #-16]!
->>>>        mov x29, sp
->>>>        bl <mcount>
->>>>        ldp x29, x30, [sp], #16
->>>>        <function prologue>
->>>>        ...
->>>>
->>>>    (b) mov x9, x30
->>>>        bl <mcount>
->>>>        mov x30, x9
->>>>        <function prologue>
->>>>        ...
->>>>
->>>> (a) complies with a normal calling convention.
->>>> (b) is Li Bin's idea in his old patch. While (b) can save some memory
->>>> accesses by using a scratch register(x9 in this example), we have no way
->>>> to recover an actual value for this register.
->>>>
->>>>         Q#1. Which approach should we take here?
->>>>
->>>>
->>>> 2) replacing an instruction sequence
->>>>      (This issue is orthogonal to Q#1.)
->>>>
->>>> Replacing can happen anytime, so we have to do it (without any locking) in
->>>> such a safe way that any task either calls a helper or doesn't call it, but
->>>> never runs in any intermediate state.
->>>>
->>>> Again here, two possible ways:
->>>>
->>>>     (a) initialize the code in the shape of (A') at boot time,
->>>>               (B) -> (B') -> (A')
->>>>         then switching to (A) or (A')
->>>>     (b) take a few steps each time. For example,
->>>>         to enable tracing,
->>>>               (B) -> (B') -> (A') -> (A)
->>>>         to disable tracing,
->>>>               (A) -> (A') -> (B') -> (A)
->>>>         Obviously, we need cache flushing/invalidation and barriers between.
->>>>
->>>>       (A)                                (A')
->>>>           stp x29, x30, [sp, #-16]!           b 1f
->>>>           mov x29, sp                         mov x29, sp
->>>>           bl <_mcount>                        bl <_mcount>
->>>>           ldp x29, x30, [sp], #16             ld x29, x30, [sp], #16
->>>>                                            1:
->>>>           <function prologue>
->>>>           <function body>
->>>>           ...
->>>>
->>>>       (B)                                (B')
->>>>           nop                                 b 1f
->>>>           nop                                 nop
->>>>           nop                                 nop
->>>>           nop                                 nop
->>>>                                            1:
->>>>           <function prologue>
->>>>           <function body>
->>>>           ...
->>>>
->>>
->>> Hi takahiro,
->>> This method can not guarantee the correctness of replacing the multi instrucions
->>> from  (A') to (B') or from (B') to (A'), even if under kstop_machine especially for
->>> preemptable kernel or NMI context (which will be supported on arm64 in future).
->>> Right?
->>
->> You seem to be right.
->> I thought that we could use aarch64_insn_patch_text() here, but
->> it doesn't ensure any atomicity of replacement.
->> Switching from (A') to (A) or (A) to (A') can be used instead,
->> but the performance penalty will not be acceptable.
->>
->> Why does your livepatch with -mfentry work?
->>
->
-> For my method with -mfentry, the instruction replacement for converting
-> nops to ftrace calls or back is as following,
->
->      (A)    mov x9, x30                     (A')  mov x9, x30
->              nop           <-------------->     bl <__fentry__>
->              mov x30, x9                            mov x30, x9
->              <function prologue>            <function prologue>
->
-> so it is compatible with the current recordmcount and ftrace logic, and the
-> only effect is that introducing two extra low cost mov instruction.
+> 
+> Correct?
+> 
+> > > I think some of the comments on patch 2 help too, but I'll just
+> > > comment here for now.
+> > > It looks like the current driver has problems regarding the non
+> > > 1-x-y modes (e.g., 4-4-4), right? But I see that spi-nor.c never
+> > > tries to send a 4_4_4 command; it only sets read_opcode to
+> > > SPINOR_OP_READ_1_1_{1,2,4}. So is this an oversight in patches like
+> Bean's patch?
+> >
+> > For SPINOR_OP_READ_1_1_{1,2,4} commands, Spi NOR actually works
+> under
+> > Extended I/O mode, not Quad mode. They just push Spi NOR output data
+> > by Quad mode, Command and address still following extended I/O mode.
+> 
+> The naming is confusing enough here... so in your words, "extended"
+> means 1/1/{1,2,4} (i.e., command, and maybe address, use 1 line, but data
+> goes on 4)? And "quad" means 4/4/4?
 
-Last night I thought this issue and reached almost the same conclusion :)
-The only other way would be to forcedly suppress gcc's instruction
-scheduling in a function prologue and generate an always-the-same prologue.
-But this will be unlikely.
-(requiring pt_regs for livepatch is just too much.)
+Extended mode :
+means it is the standard spi interface, command and 
+Address use 1 line, and how many lines being used by data, it depends on
+Specified command, for example, fast read command, uses 4 lines.
 
-Other than a performance impact (I'm still not sure about it),
-we might have a problem *with -fprolog-add=N* when the kernel sets up this
-multiple-instructions sequence in each traceable function at boot time because
-we have no way to do so transparently. I will check the ftrace code.
 
-Thanks,
--Takahiro AKASHI
+> > For 4-4-4 I/O protocol, SPI NOR should change to Quad mode(just as my
+> > patch), of course, SPI controller should support this. for Micron Qspi
+> > NOR, under quad mode, all commands/address/data are transferred on
+> > DQ0,DQ1,DQ2,DQ3 signals. No matter what kind of command.
+> 
+> OK, so I think your patch is broken:
+> 
+> > >     commit 548cd3ab54da ("mtd: spi-nor: Add quad I/O support for
+> Micron
+> > >     SPI NOR")
+> 
+> How did you test this? Specifically, this can't possibly have worked with a
+> regular drivers/spi/ controllers, since:
+> 
+>  (a) you're enabling 4/4/4 (i.e., "Quad mode") on the flash but
+>  (b) m25p80_read() only sets .rx_bits for the data; i.e., it's using
+>  1/1/4 (i.e., "Extended mode")
 
-> Thanks,
-> Li Bin
->
->> -Takahiro AKASHI
->>
->>> Thanks,
->>> Li Bin
->>>
->>>> (a) is much simpler, but (b) has less performance penalty(?) when tracing
->>>> is disabled. I'm afraid that I might simplify the issue too much.
->>>>
->>>>          Q#2. Which one is more preferable?
->>>>
->>>>
->>>> [1] https://gcc.gnu.org/ml/gcc/2015-05/msg00267.html, and
->>>>       https://gcc.gnu.org/ml/gcc/2015-10/msg00090.html
->>>>
->>>>
->>>> Thanks,
->>>> -Takahiro AKASHI
->>>>
->>>> .
->>>>
->
->
+> I'm tempted to essentially revert that, as it looks essentially untested. It
+> would be nice to have a cleaner baseline before trying to extend it with
+> Cyrille's work.
+
+Definitely ,for my patch , it is tested and verified OK. But I add a hoot function in m25p80.c
+To put spi controller into quad mode as long as spi nor switch into quad mode.
+For this hook function patch is an independent patch with my patch, I did not submit.
+Because if we don't use m25p80.c driver, use new spi structure(such as : driver/mtd/spi-nor/fsl_quadspi.c)
+spi controller driver, This hook function patch is not necessary.
+
+> Cyrille, what do you think? Is my analysis at all correct here? (Sorry if this is
+> addressed elsewhere; there's a lot of text in this conversation, but I'm getting
+> hung up very early.) And if so, does it hurt to just drop Micron "Quad mode"
+> (4/4/4)?
+> (AIUI, this won't exactly be a panacea, since you mention bootloaders that
+> start us off in quad mode, so we can't use single I/O 0x9f READ
+> ID.)
+> 
+> > > Why would we even need to enable quad modes like that, if we're not
+> > > going to send the 4-4-4 opcodes?
+> > I think, in order to high speed SPI NOR, after enable quad mode,
+> > SPINOR_OP_READ_1_1_{1,2,4} commands don't need any more, normal
+> read
+> > command (0x03) Can implement as them.
+> 
+> OK. That's odd, but I guess it doesn't matter much. It just makes it a little less
+> obvious what's going on.
+> 
+> > > My next question (if my understanding is roughly correct) is, do we
+> > > need the
+> > > 4-4-4 modes, and what risks come with them? I understand we can
+> > > shorten the command and address phases, but does that alone yield
+> > > much performance benefit? And I think the risk is that a given
+> > > system might not be prepared for the flash to be in a 4-4-4 mode, if
+> > > the boot code tries to use 1-x-y commands.
+> >
+> > As far as my current experience and knowledge, this still need to be
+> > enabled, especially for fast boot, and some IOT devices to store info into
+> SPI NOR.
+> 
+> Do you have any data to about the speed? And you haven't addressed the
+> risks. There are definitely risks. Cyrille looks like he's trying to address the
+> risks (e.g., use volatile modes whenever possible), but it doesn't seem that
+> you are.
+> > For this patches, my current concern is that host side how to get
+> > different I/O protocol changes, and distinguish between different flash
+> manufacturers I/O mode.
+> 
+> Brian
