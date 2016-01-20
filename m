@@ -1,58 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Jan 2016 11:33:37 +0100
-Subject: [PATCH] drm: exynos: make PM functions as __maybe_unused
-Message-ID: <12427702.1DA55iFFLW@wuerfel>
+Date: Wed, 20 Jan 2016 11:40:03 +0100
+Subject: [PATCH] serial: amba-pl011: mark vendor_zte as __maybe_unused
+Message-ID: <1973012.CU51qOk9Kt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added runtime-pm support for exynos-drm encloses the
-pm functions in an #ifdef, but not the functions that are called
-from them and nowhere else, which produces warnings:
+The pl011 driver has gone back and forth on the definition of the
+ZTE specific variation of the hardware definitions, but the
+current state is that the vendor definition is left in place
+yet unused:
 
-drm/exynos/exynos_drm_dsi.c:733:13: warning: 'exynos_dsi_disable_clock' defined but not used [-Wunused-function]
- static void exynos_dsi_disable_clock(struct exynos_dsi *dsi)
-             ^
-drm/exynos/exynos_drm_dsi.c:1291:13: warning: 'exynos_dsi_disable_irq' defined but not used [-Wunused-function]
- static void exynos_dsi_disable_irq(struct exynos_dsi *dsi)
-             ^
+drivers/tty/serial/amba-pl011.c:190:27: warning: 'vendor_zte' defined but not used [-Wunused-variable]
 
-This removes the #ifdef and instead marks the functions as
-__maybe_unused, so gcc can silently discard them and all called
-functions when CONFIG_PM is disabled.
+I don't know what the plan forward is to get this code to work,
+but the current behavior is a bit annoying as we get a warning
+whenever we build this driver.
+
+This patch does not help us to make it work, but at least
+shuts up the warning.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: ba6e47795d83 ("drm/exynos: dsi: add runtime pm support")
----
-This is a regression against 4.4, found on ARM randconfig testing
+Fixes: 7ec758718920 ("tty: amba-pl011: add support for ZTE UART (EXPERIMENTAL)")
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-index d84a498ef099..e977a81af2e6 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-@@ -1906,8 +1906,7 @@ static int exynos_dsi_remove(struct platform_device *pdev)
- 	return 0;
- }
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index c0da0ccbbcf5..4cdfe8f806df 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -187,7 +187,7 @@ static const u16 pl011_zte_offsets[REG_ARRAY_SIZE] = {
+ 	[REG_DMACR] = ZX_UART011_DMACR,
+ };
  
--#ifdef CONFIG_PM
--static int exynos_dsi_suspend(struct device *dev)
-+static int __maybe_unused exynos_dsi_suspend(struct device *dev)
- {
- 	struct drm_encoder *encoder = dev_get_drvdata(dev);
- 	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
-@@ -1938,7 +1937,7 @@ static int exynos_dsi_suspend(struct device *dev)
- 	return 0;
- }
- 
--static int exynos_dsi_resume(struct device *dev)
-+static int __maybe_unused exynos_dsi_resume(struct device *dev)
- {
- 	struct drm_encoder *encoder = dev_get_drvdata(dev);
- 	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
-@@ -1972,7 +1971,6 @@ err_clk:
- 
- 	return ret;
- }
--#endif
- 
- static const struct dev_pm_ops exynos_dsi_pm_ops = {
- 	SET_RUNTIME_PM_OPS(exynos_dsi_suspend, exynos_dsi_resume, NULL)
+-static struct vendor_data vendor_zte = {
++static struct vendor_data vendor_zte __maybe_unused = {
+ 	.reg_offset		= pl011_zte_offsets,
+ 	.access_32b		= true,
+ 	.ifls			= UART011_IFLS_RX4_8|UART011_IFLS_TX4_8,
