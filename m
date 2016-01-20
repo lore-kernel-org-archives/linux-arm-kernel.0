@@ -1,76 +1,88 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 20 Jan 2016 19:34:06 +0800
-Subject: [alsa-devel] [PATCH v2] ASoC: avoid unused variable warning for
- rt5659_acpi_match
-In-Reply-To: <1477393.QDzvbob2TI@wuerfel>
-Message-ID: <201601201952.vmgArdQg%fengguang.wu@intel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 20 Jan 2016 12:36:32 +0100
+Subject: [PATCH] mmc: pwrseq_simple: Make reset-gpios optional to match doc
+In-Reply-To: <20160108090726.13066.66125.stgit@localhost>
+References: <20160108090726.13066.66125.stgit@localhost>
+Message-ID: <CAPDyKFpgCDHp1atgnZL6GtU9VwiJr0RR-4vW+m=uWHwnN3pz3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
++Tony, Javier, linux-omap
 
-[auto build test ERROR on asoc/for-next]
-[also build test ERROR on next-20160120]
-[cannot apply to v4.4]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+On 8 January 2016 at 10:07, Martin Fuzzey <mfuzzey@parkeon.com> wrote:
+> The DT binding doc says reset-gpios is an optional property but the code
+> currently bails out if it is omitted.
+>
+> Make the code match the documentation.
 
-url:    https://github.com/0day-ci/linux/commits/Arnd-Bergmann/ASoC-avoid-unused-variable-warning-for-rt5659_acpi_match/20160120-190911
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-next
-config: i386-allmodconfig (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+As Tony pointed out, this is actually a regression. Can you please
+update the change-log according to that.
 
-All error/warnings (new ones prefixed by >>):
+>
+> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
 
->> sound/soc/codecs/rt5659.c:4196:1: error: expected ',' or ';' before 'static'
-    static struct acpi_device_id rt5659_acpi_match[] = {
-    ^
-   In file included from sound/soc/codecs/rt5659.c:12:0:
->> sound/soc/codecs/rt5659.c:4201:27: error: 'rt5659_acpi_match' undeclared here (not in a function)
-    MODULE_DEVICE_TABLE(acpi, rt5659_acpi_match);
-                              ^
-   include/linux/module.h:223:21: note: in definition of macro 'MODULE_DEVICE_TABLE'
-    extern const typeof(name) __mod_##type##__##name##_device_table  \
-                        ^
->> include/linux/module.h:223:27: error: '__mod_acpi__rt5659_acpi_match_device_table' aliased to undefined symbol 'rt5659_acpi_match'
-    extern const typeof(name) __mod_##type##__##name##_device_table  \
-                              ^
->> sound/soc/codecs/rt5659.c:4201:1: note: in expansion of macro 'MODULE_DEVICE_TABLE'
-    MODULE_DEVICE_TABLE(acpi, rt5659_acpi_match);
-    ^
+Please add a fixes tag:
+Fixes: ce037275861e ("mmc: pwrseq_simple: use GPIO descriptors array API")
 
-vim +4196 sound/soc/codecs/rt5659.c
+> ---
+>  drivers/mmc/core/pwrseq_simple.c |   21 +++++++++++++--------
+>  1 file changed, 13 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
+> index d10538b..4d2962b 100644
+> --- a/drivers/mmc/core/pwrseq_simple.c
+> +++ b/drivers/mmc/core/pwrseq_simple.c
+> @@ -29,15 +29,18 @@ struct mmc_pwrseq_simple {
+>  static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
+>                                               int value)
+>  {
+> -       int i;
+>         struct gpio_descs *reset_gpios = pwrseq->reset_gpios;
+> -       int values[reset_gpios->ndescs];
+>
+> -       for (i = 0; i < reset_gpios->ndescs; i++)
+> -               values[i] = value;
+> +       if (!IS_ERR(reset_gpios)) {
+> +               int i;
+> +               int values[reset_gpios->ndescs];
+>
+> -       gpiod_set_array_value_cansleep(reset_gpios->ndescs, reset_gpios->desc,
+> -                                      values);
+> +               for (i = 0; i < reset_gpios->ndescs; i++)
+> +                       values[i] = value;
+> +
+> +               gpiod_set_array_value_cansleep(
+> +                       reset_gpios->ndescs, reset_gpios->desc, values);
+> +       }
+>  }
+>
+>  static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
+> @@ -79,7 +82,8 @@ static void mmc_pwrseq_simple_free(struct mmc_host *host)
+>         struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
+>                                         struct mmc_pwrseq_simple, pwrseq);
+>
+> -       gpiod_put_array(pwrseq->reset_gpios);
+> +       if (!IS_ERR(pwrseq->reset_gpios))
+> +               gpiod_put_array(pwrseq->reset_gpios);
+>
+>         if (!IS_ERR(pwrseq->ext_clk))
+>                 clk_put(pwrseq->ext_clk);
+> @@ -112,7 +116,8 @@ struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
+>         }
+>
+>         pwrseq->reset_gpios = gpiod_get_array(dev, "reset", GPIOD_OUT_HIGH);
+> -       if (IS_ERR(pwrseq->reset_gpios)) {
+> +       if (IS_ERR(pwrseq->reset_gpios) &&
+> +           PTR_ERR(pwrseq->reset_gpios) != -ENOENT) {
 
-d3cb2de2 Bard Liao     2015-11-09  4190  	{ },
-d3cb2de2 Bard Liao     2015-11-09  4191  };
-51bb9d21 Arnd Bergmann 2016-01-20  4192  MODULE_DEVICE_TABLE(of, rt5659_of_match)
-51bb9d21 Arnd Bergmann 2016-01-20  4193  #endif
-d3cb2de2 Bard Liao     2015-11-09  4194  
-51bb9d21 Arnd Bergmann 2016-01-20  4195  #ifdef CONFIG_ACPI
-d3cb2de2 Bard Liao     2015-11-09 @4196  static struct acpi_device_id rt5659_acpi_match[] = {
-51bb9d21 Arnd Bergmann 2016-01-20  4197  	{ "10EC5658", 0, },
-51bb9d21 Arnd Bergmann 2016-01-20  4198  	{ "10EC5659", 0, },
-d3cb2de2 Bard Liao     2015-11-09  4199  	{ },
-d3cb2de2 Bard Liao     2015-11-09  4200  };
-d3cb2de2 Bard Liao     2015-11-09 @4201  MODULE_DEVICE_TABLE(acpi, rt5659_acpi_match);
-51bb9d21 Arnd Bergmann 2016-01-20  4202  #endif
-d3cb2de2 Bard Liao     2015-11-09  4203  
-d3cb2de2 Bard Liao     2015-11-09  4204  struct i2c_driver rt5659_i2c_driver = {
+You need to check also for != -ENOSYS, as otherwise when
+CONFIG_GPIOLIB is unset we will treat that as an error.
+This is also what the original code did.
 
-:::::: The code at line 4196 was first introduced by commit
-:::::: d3cb2de2479bbbde29391393d68f2e313e1f0504 ASoC: rt5659: add rt5659 codec driver
+>                 ret = PTR_ERR(pwrseq->reset_gpios);
+>                 goto clk_put;
+>         }
+>
 
-:::::: TO: Bard Liao <bardliao@realtek.com>
-:::::: CC: Mark Brown <broonie@kernel.org>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 52676 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160120/a7f57720/attachment-0001.obj>
+Kind regards
+Uffe
