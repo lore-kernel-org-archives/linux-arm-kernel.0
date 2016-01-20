@@ -1,132 +1,51 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Wed, 20 Jan 2016 20:50:26 +0800
-Subject: [PATCH v3 1/1] USB: core: let USB device know device node
-In-Reply-To: <2538302.jXP5WXojXY@wuerfel>
-References: <4405270.vcz87Q878u@wuerfel>
- <Pine.LNX.4.44L0.1601191009190.1727-100000@iolanthe.rowland.org>
- <20160120034839.GA16222@shlinux2> <2538302.jXP5WXojXY@wuerfel>
-Message-ID: <20160120125026.GA16519@shlinux2>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 20 Jan 2016 20:53:08 +0800
+Subject: [PATCH v1 3/3] mmc: pwrseq: convert to proper platform device
+In-Reply-To: <1453286796-9746-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <201601202021.zTCtxQVb%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 20, 2016 at 10:07:13AM +0100, Arnd Bergmann wrote:
-> On Wednesday 20 January 2016 11:48:39 Peter Chen wrote:
-> > > 
-> > > > Alternatively, you could use one of the high bits of the 'reg' value
-> > > > to indicate which root hub is used. I'm sure that would work as
-> > > > well, but be less obvious.
-> > > 
-> > > It's probably best to stick with the same numbering that the hardware 
-> > > uses.
-> > 
-> > Seems we are talking about root hub, not the device in the
-> > root hub. So for multiple ports controller, we have to own node for 
-> > root hub. Assume your example, there is a genesys HUB at physical
-> > port 1, I suggest a dts node description like below, please correct
-> > me if anything wrong.
-> > 
-> > &usb1 {
-> >         roothub_1: nxp at 1 {
-> >                 compatible = "usb15a2,007d";
-> >                 reg = <0x01>;
-> > 
-> >                 hub: genesys at 1 {
-> >                         compatible = "usb05e3,0608";
-> >                         reg = <0x01>;
-> >                 };
-> >         };
-> > 
-> >         roothub_2: nxp at 2 {
-> >                 compatible = "usb15a2,007d";
-> >                 reg = <0x02>;
-> >         };
-> > 
-> >         ...
-> > 
-> >         roothub_7: nxp at 7 {
-> >                 compatible = "usb15a2,007d";
-> >                 reg = <0x07>;
-> > 
-> >                 hub: genesys at 1 {
-> >                         compatible = "usb05e3,0608";
-> >                         reg = <0x01>;
-> >                 };
-> >         };
-> > 
-> >         ...
-> > 
-> >         roothub_9: nxp at 9 {
-> >                 compatible = "usb15a2,007d";
-> >                 reg = <0x09>;
-> >         };
-> > };
-> 
-> This looks wrong to me: if I understand it right, you are now modeling
-> each port of the root hub as a separate hub, so you end up with
-> a total of 11 hub nodes when there should only be one or two.
-> 
+Hi Srinivas,
 
-How about below from both driver and device tree view:
+[auto build test ERROR on ulf.hansson-mmc/next]
+[also build test ERROR on next-20160120]
+[cannot apply to v4.4]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-1. From the USB driver view
+url:    https://github.com/0day-ci/linux/commits/Srinivas-Kandagatla/mmc-pwrseq-convert-to-proper-driver/20160120-185020
+base:   https://git.linaro.org/people/ulf.hansson/mmc next
+config: openrisc-allmodconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=openrisc 
 
-			USB Controller
-				|
-				|
-	   ---------------------|----------------
-		|				|	
-	    root hub(HS)		root hub(SS, optional)
-		|				|
-	---------------------		-------------------------	
-	|	|	... |		|	  |         |
-      port 1	port 2	   port 6	port 1	port 2	  port 3
-	|				|
-     genesys hub (if HS)	      genesys hub (if SS)	
+All error/warnings (new ones prefixed by >>):
 
-2. dts node:
+>> drivers/mmc/core/pwrseq_emmc.c:120:1: warning: data definition has no type or storage class
+>> drivers/mmc/core/pwrseq_emmc.c:120:1: error: type defaults to 'int' in declaration of 'device_initcall'
+   drivers/mmc/core/pwrseq_emmc.c:120:1: warning: parameter names (without types) in function declaration
+   drivers/mmc/core/pwrseq_emmc.c:120:1: warning: 'mmc_pwrseq_emmc_driver_init' defined but not used
 
-&usb1 {
-        port_1: nxp at 1 {
-                compatible = "usb15a2,007d";
-                reg = <0x01>;
+vim +120 drivers/mmc/core/pwrseq_emmc.c
 
-                hub: genesys at 1 {
-                        compatible = "usb05e3,0608";
-                        reg = <0x01>;
-                };
-        };
+   114		.driver = {
+   115			.name = "pwrseq_emmc",
+   116			.of_match_table = mmc_pwrseq_emmc_of_match,
+   117		},
+   118	};
+   119	
+ > 120	builtin_platform_driver(mmc_pwrseq_emmc_driver);
 
-        port_2: nxp at 2 {
-                compatible = "usb15a2,007d";
-                reg = <0x02>;
-        };
-
-        ...
-
-        port_7: nxp at 7 {
-                compatible = "usb15a2,007d";
-                reg = <0x07>;
-
-                hub: genesys at 1 {
-                        compatible = "usb05e3,0608";
-                        reg = <0x01>;
-                };
-        };
-
-        ...
-
-        port_9: nxp at 9 {
-                compatible = "usb15a2,007d";
-                reg = <0x09>;
-        };
-};
-
-- If the above are ok, is it ok we add two nodes for the same device
-in case the speed negotiation is different at some situations?
-- Usually, it should be ok we only add nodes at device tree which
-the hard wired device on it, like port_1 and port 7 at above, right?
-
--- 
-
-Best Regards,
-Peter Chen
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 36494 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160120/886d81bb/attachment-0001.obj>
