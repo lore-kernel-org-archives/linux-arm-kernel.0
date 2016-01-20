@@ -1,92 +1,76 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 20 Jan 2016 14:40:08 +0100
-Subject: [PATCH V3 11/21] pci, acpi: Move ACPI host bridge device
- companion assignment to core code.
-In-Reply-To: <20160120123849.GA13437@red-moon>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <1452691267-32240-12-git-send-email-tn@semihalf.com>
- <20160119160224.GD5276@red-moon> <569F6D67.5000000@semihalf.com>
- <20160120123849.GA13437@red-moon>
-Message-ID: <569F8E38.5030101@semihalf.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 20 Jan 2016 14:01:44 +0000
+Subject: [PATCH 03/19] arm64: Add new asm macro copy_page
+In-Reply-To: <f7dcd4d1b5a9b77eaef50f22f4040a26c6b40487.1452884156.git.geoff@infradead.org>
+References: <cover.1452884156.git.geoff@infradead.org>
+ <f7dcd4d1b5a9b77eaef50f22f4040a26c6b40487.1452884156.git.geoff@infradead.org>
+Message-ID: <569F9348.2000100@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.01.2016 13:38, Lorenzo Pieralisi wrote:
-> On Wed, Jan 20, 2016 at 12:20:07PM +0100, Tomasz Nowicki wrote:
->> On 19.01.2016 17:02, Lorenzo Pieralisi wrote:
->>> On Wed, Jan 13, 2016 at 02:20:57PM +0100, Tomasz Nowicki wrote:
->> [...]
->>>> device via pci_create_root_bus parameter (as the ACPI device type)
->>>
->>> I do not understand what you mean by "as the ACPI device type".
->>
->> See below.
->>
->>>
->>>> and using ACPI_COMPANION_SET in core code for ACPI boot method.
->>>> ACPI_COMPANION_SET is safe to run for all cases DT, ACPI and DT&ACPI.
->>>>
->>>> Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->>>> ---
->>>>   drivers/acpi/pci_root.c | 5 ++++-
->>>>   drivers/pci/probe.c     | 2 ++
->>>>   2 files changed, 6 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
->>>> index ae3fe4e..a65c8c2 100644
->>>> --- a/drivers/acpi/pci_root.c
->>>> +++ b/drivers/acpi/pci_root.c
->>>> @@ -846,7 +846,10 @@ struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
->>>>
->>>>   	pci_acpi_root_add_resources(info);
->>>>   	pci_add_resource(&info->resources, &root->secondary);
->>>> -	bus = pci_create_root_bus(NULL, busnum, ops->pci_ops,
->>>> +
->>>> +	/* Root bridge device needs to be sure of parent ACPI type */
->>>> +	ACPI_COMPANION_SET(&device->dev, device);
->>>
->>> I do not understand why the code above is needed, can you elaborate
->>> please ?
->>>
->>
->> This makes sure that device->dev can be identified as ACPI device,
->> so we can use to_acpi_device_node() and assign companion safely
->> below.
->
-> I do not follow. If you refer to the fwnode handle type, that is
-> already set by ACPI core code (before acpi_pci_root_add() is called,
-> in acpi_init_device_object()).
+Hi Geoff,
 
-acpi_init_device_object() sets ACPI fwnode handle type only for 
-"device", but not for "device->dev" which is what is passed as an 
-argument to pci_create_root_bus().
+On 15/01/16 19:18, Geoff Levand wrote:
 
-Without ACPI_COMPANION_SET(&device->dev, device) here, no one can be 
-sure if we have ACPI device in pci_create_root_bus().
+Can I donate a commit message:
 
->
-> Did you add the code above to solve a real issue you encountered ?
-Yes. You can try to run series with this patch:
+Kexec and hibernate need to copy pages of memory, but may not have all
+of the kernel mapped, and are unable to call copy_page().
 
-diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-index 88c9d20..1b74bf6 100644
---- a/drivers/acpi/pci_root.c
-+++ b/drivers/acpi/pci_root.c
-@@ -967,7 +967,11 @@ struct pci_bus *acpi_pci_root_create(struct 
-acpi_pci_root *root,
-         pci_add_resource(&info->resources, &root->secondary);
+Convert copy_page() to a macro, so that it can be inlined in these
+situations.
 
--        /* Root bridge device needs to be sure of parent ACPI type */
--       ACPI_COMPANION_SET(&device->dev, device);
-+       if (to_acpi_device_node(device->dev.fwnode) == NULL)
-+               pr_err("NON-ACPI TYPE\n");
-+       else
-+               pr_err("ACPI TYPE\n");
-+
-         bus = pci_create_root_bus(&device->dev, busnum, ops->pci_ops,
-                                   sysdata, &info->resources);
 
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+>  arch/arm64/include/asm/assembler.h | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+> index 21979a4..c47a623 100644
+> --- a/arch/arm64/include/asm/assembler.h
+> +++ b/arch/arm64/include/asm/assembler.h
+> @@ -24,6 +24,7 @@
+>  #define __ASM_ASSEMBLER_H
+>  
+>  #include <asm/asm-offsets.h>
+> +#include <asm/page.h>
+>  #include <asm/pgtable-hwdef.h>
+>  #include <asm/ptrace.h>
+>  #include <asm/thread_info.h>
+> @@ -240,6 +241,24 @@ lr	.req	x30		// link register
+>  	.endm
+>  
+>  /*
+> + * copy_page - copy src to dest using temp registers t1-t8
+> + */
+> +	.macro copy_page dest:req src:req t1:req t2:req t3:req t4:req t5:req t6:req t7:req t8:req
+> +1:	ldp	\t1, \t2, [\src]
+
+Using '1' as a label here means callers can't jump back over it using
+the same label. The convention with USER() and alternatives is to use
+unlikely values like '9999'.
+
+
+> +	ldp	\t3, \t4, [\src, #16]
+> +	ldp	\t5, \t6, [\src, #32]
+> +	ldp	\t7, \t8, [\src, #48]
+> +	add	\src, \src, #64
+> +	stnp	\t1, \t2, [\dest]
+> +	stnp	\t3, \t4, [\dest, #16]
+> +	stnp	\t5, \t6, [\dest, #32]
+> +	stnp	\t7, \t8, [\dest, #48]
+> +	add	\dest, \dest, #64
+> +	tst	\src, #(PAGE_SIZE - 1)
+> +	b.ne	1b
+> +	.endm
+
+It may be worth updating lib/copy_page.S to use this macro.
+
+
+I will fix the code in hibernate to use this!
 
 Thanks,
-Tomasz
+
+
+James
