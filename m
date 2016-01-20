@@ -1,77 +1,104 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 20 Jan 2016 12:02:58 +0000
-Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
-In-Reply-To: <569F1A33.4000208@linaro.org>
-References: <fb4506943bbaed8b0657ed367ebd57e4064d57ed.1452884156.git.geoff@infradead.org>
- <20160115201601.GR3262@leverpostej> <569CBDBC.5050500@linaro.org>
- <20160119014332.GB2919@dhcp-128-65.nay.redhat.com>
- <569DCB30.9010501@linaro.org>
- <20160119122848.GA2904@dhcp-128-65.nay.redhat.com>
- <20160119125114.GH25024@leverpostej>
- <20160119134553.GA2986@dhcp-128-65.nay.redhat.com>
- <20160119140139.GC26545@leverpostej> <569F1A33.4000208@linaro.org>
-Message-ID: <20160120120257.GD25829@leverpostej>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 20 Jan 2016 15:17:36 +0300
+Subject: [PATCH v6 20/21] all: s390: make compat wrappers the generic
+ solution
+In-Reply-To: <20160120081643.GB3395@osiris>
+References: <20160115124646.GD4130@osiris> <20160119175223.GA6603@yury-N73SV>
+ <20160120081643.GB3395@osiris>
+Message-ID: <20160120121736.GA22029@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 20, 2016 at 02:25:07PM +0900, AKASHI Takahiro wrote:
-> On 01/19/2016 11:01 PM, Mark Rutland wrote:
-> >For NUMA topology in !ACPI kernels, we might need to also retain and
-> >parse memory nodes, but only for toplogy information. The kernel would
-> >still only use memory as described by the EFI memory map.
-> >
-> >There's a horrible edge case I've spotted if performing a chain of
-> >cross-endian kexecs: LE -> BE -> LE, as the BE kernel would have to
-> >respect the EFI memory map so as to avoid corrupting it for the
-> >subsequent LE kernel. Other than this I believe everything should just
-> >work.
+On Wed, Jan 20, 2016 at 09:16:44AM +0100, Heiko Carstens wrote:
+> > +#ifndef __ARCH_WANT_COMPAT_SYS_GETDENTS64
+> > +SYSCALL_DEFINE_WRAP3(getdents64, unsigned int, fd,
+> > +		struct linux_dirent64 __user *, dirent, unsigned int, count)
+> > +#else
+> >  SYSCALL_DEFINE3(getdents64, unsigned int, fd,
+> >  		struct linux_dirent64 __user *, dirent, unsigned int, count)
+> > +#endif
+> >  {
+> >  	struct fd f;
+> >  	struct linux_dirent64 __user * lastdirent;
 > 
-> BE kernel doesn't support UEFI yet and cannot access UEFI memmap table. So,
-> for LE -> BE, we don't use a dtb generated from /sys/firmware/fdt (or /proc/device-tree)
-> (as in the case of LE -> LE) and require users to provide a dtb file explicitly.
+> This is a non-obvious change at first glance. I think it would make sense
+> to split this patch into at least three or four separate patches:
+> - one which introduces the infrastructure
+> - one which converts the non-obvious syscalls like this one
+> - one which converts the rest
+> - one which enables the architectures
 
-As I mentioned above, the problem exists when memory nodes also exist
-(for describing NUMA topology). In that case the BE kernel would try to
-use the information from the memory nodes.
+Agree. This one became too big and non-trivial...
+I'll prepare patchset this week. I also think, it's better
+to send it separately, like we did with 32/64bit off_t:
+https://lkml.org/lkml/2015/12/26/71
 
-> For BE -> LE, BE kernel doesn't know wther UEFI memmap table is available or not
-> and so use the same (explicitly-provided) dtb (as LE -> LE in !UEFI)
-
-See above. The problem I imagine is:
-
-LE kernel - uses EFI mmap, takes NUMA information from DT memory nodes
-
-    v       kexec
-
-BE kernel - uses DT memory nodes
-          - clobbers EFI runtime regions as it sees them as available
-
-    v       kexec
-
-LE kernel - uses EFI mmap, takes NUMA information from DT memory nodes
-          - tries to call EFI runtime services, and explodes.
-
-> >>>A kexec'd kernel should simply inherit that. So long as the DTB and/or
-> >>>UEFI tables in memory are the same, it would be the same as a cold boot.
-> >>
-> >>For kexec all memory ranges are same, for kdump we need use original reserved
-> >>range with crashkernel= as usable memory and all other orignal usable ranges
-> >>are not usable anymore.
-> >
-> >Sure. This is what I believe we should expose with an additional
-> >property under /chosen, while keeping everything else pristine.
-> >
-> >The crash kernel can then limit itself to that region, while it would
-> >have the information of the full memory map (which it could log and/or
-> >use to drive other dumping).
 > 
-> FYI,
-> all the original usable memory regions used by the 1st kernel are also
-> described in an ELF core header specified by "elfcorehdr=" parameter to
-> the crash dump kernel.
+> > diff --git a/include/linux/compat.h b/include/linux/compat.h
+> > index a76c917..293864c 100644
+> > --- a/include/linux/compat.h
+> > +++ b/include/linux/compat.h
+> > @@ -55,6 +55,52 @@
+> >  	}								\
+> >  	static inline long C_SYSC##name(__MAP(x,__SC_DECL,__VA_ARGS__))
+> > 
+> > +#define SYSCALL_DEFINE_WRAP1(name, ...) SYSCALL_DEFINE_WRAPx(1, _##name, __VA_ARGS__)
+> > +#define SYSCALL_DEFINE_WRAP2(name, ...) SYSCALL_DEFINE_WRAPx(2, _##name, __VA_ARGS__)
+> > +#define SYSCALL_DEFINE_WRAP3(name, ...) SYSCALL_DEFINE_WRAPx(3, _##name, __VA_ARGS__)
+> > +#define SYSCALL_DEFINE_WRAP4(name, ...) SYSCALL_DEFINE_WRAPx(4, _##name, __VA_ARGS__)
+> > +#define SYSCALL_DEFINE_WRAP5(name, ...) SYSCALL_DEFINE_WRAPx(5, _##name, __VA_ARGS__)
+> > +#define SYSCALL_DEFINE_WRAP6(name, ...) SYSCALL_DEFINE_WRAPx(6, _##name, __VA_ARGS__)
+> > +
+> > +#ifndef __SC_COMPAT_TYPE
+> > +#define __SC_COMPAT_TYPE(t, a) \
+> > +	__typeof(__builtin_choose_expr(sizeof(t) > 4, 0L, (t)0)) a
+> > +#endif
+> > +
+> > +#ifndef __SC_COMPAT_CAST
+> > +#define __SC_COMPAT_CAST(t, a)	((t) ((t)(-1) < 0 ? (s64)(s32)(a) : (u64)(u32)(a)))
+> > +#endif
+> 
+> You might consider adding a BUILD_BUG_ON() here, like within the s390 variant.
+> 
+> Personally I don't like the SYSCALL_DEFINE_WRAPx names too much. But that
+> can be changed easily if somebody comes up with a better name for it.
 
-That only describes what the first kernel parsed and thus believed, not
-exactly what the firmware described.
+Neither me... Maybe SYSCALL_DEFINE_WRAPPEDx?
 
-Thanks,
-Mark.
+> 
+> > +#define SYSCALL_DEFINE_WRAPx(x, name, ...)						\
+> > +asmlinkage long sys##name(__MAP(x,__SC_DECL,__VA_ARGS__));				\
+> > +asmlinkage long compat_sys##name(__MAP(x,__SC_DECL,__VA_ARGS__))			\
+> > +		__attribute__((alias(__stringify(compat_SyS##name))));			\
+> > +asmlinkage long notrace compat_SyS##name(__MAP(x,__SC_COMPAT_TYPE,__VA_ARGS__));	\
+> > +asmlinkage long notrace compat_SyS##name(__MAP(x,__SC_COMPAT_TYPE,__VA_ARGS__))		\
+> > +{											\
+> > +	return sys##name(__MAP(x,__SC_COMPAT_CAST,__VA_ARGS__));			\
+> > +}											\
+> > +SYSCALL_DEFINEx(x, name, __VA_ARGS__)
+> 
+> Given that the system call functions might be inlined, I think it would
+> make sense to remove the "notrace" attribute. Otherwise we would end up
+> with lots of untraceable (and unpatchable) functions. I didn't care back
+> then for the small compat wrappers...
+
+Ok
+
+> 
+> > diff --git a/kernel/sys_ni.c b/kernel/sys_ni.c
+> > index 0623787..ab14c3f 100644
+> > --- a/kernel/sys_ni.c
+> > +++ b/kernel/sys_ni.c
+> > @@ -17,27 +17,41 @@ asmlinkage long sys_ni_syscall(void)
+> >  }
+> > 
+> >  cond_syscall(sys_quotactl);
+> > +cond_syscall(compat_sys_quotactl);
+> 
+> It might make sense to add a define which adds both variants.
+> 
+> Btw. for future versions please add linux-arch to cc.
+
+Ok.
+
+Yury.
