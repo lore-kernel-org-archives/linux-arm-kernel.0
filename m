@@ -1,53 +1,49 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 20 Jan 2016 15:41:56 +0100
-Subject: [PATCH V3 11/21] pci, acpi: Move ACPI host bridge device
- companion assignment to core code.
-In-Reply-To: <20160120142243.GB13437@red-moon>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <1452691267-32240-12-git-send-email-tn@semihalf.com>
- <20160119160224.GD5276@red-moon> <569F6D67.5000000@semihalf.com>
- <20160120123849.GA13437@red-moon> <569F8E38.5030101@semihalf.com>
- <20160120142243.GB13437@red-moon>
-Message-ID: <569F9CB4.2010905@semihalf.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 20 Jan 2016 14:46:34 +0000
+Subject: [PATCH] iommu/arm-smmu: add a shortcut when the @dev_node is NULL
+In-Reply-To: <20160120133401.GA3487@localhost.localdomain>
+References: <1452564905-2662-1-git-send-email-shijie.huang@arm.com>
+ <20160120120225.GD18805@8bytes.org>
+ <20160120133401.GA3487@localhost.localdomain>
+Message-ID: <569F9DCA.3030808@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.01.2016 15:22, Lorenzo Pieralisi wrote:
-> On Wed, Jan 20, 2016 at 02:40:08PM +0100, Tomasz Nowicki wrote:
->
-> [...]
->
->>>>>> +	/* Root bridge device needs to be sure of parent ACPI type */
->>>>>> +	ACPI_COMPANION_SET(&device->dev, device);
->>>>>
->>>>> I do not understand why the code above is needed, can you elaborate
->>>>> please ?
->>>>>
->>>>
->>>> This makes sure that device->dev can be identified as ACPI device,
->>>> so we can use to_acpi_device_node() and assign companion safely
->>>> below.
->>>
->>> I do not follow. If you refer to the fwnode handle type, that is
->>> already set by ACPI core code (before acpi_pci_root_add() is called,
->>> in acpi_init_device_object()).
+On 20/01/16 13:34, Huang Shijie wrote:
+> On Wed, Jan 20, 2016 at 01:02:25PM +0100, Joerg Roedel wrote:
+>> On Tue, Jan 12, 2016 at 10:15:05AM +0800, Huang Shijie wrote:
+>>> This patch adds a shortcut for the code when the @device_node is NULL.
+>>> In my juno-r1 board, the boot time can be faster by 0.004014s.
 >>
->> acpi_init_device_object() sets ACPI fwnode handle type only for
->> "device", but not for "device->dev" which is what is passed as an
->> argument to pci_create_root_bus().
->>
->> Without ACPI_COMPANION_SET(&device->dev, device) here, no one can be
->> sure if we have ACPI device in pci_create_root_bus().
+>> How have you made sure this number is reliable and not just noise in the
+>> boot process?
+> In the boot process, there are 5 or more modules whose @dev_node are
+> NULL. Without the patch, the kernel will waste some cycles to do the
+> meaningless calculations for all these modules.
+
+With a quick counting hack, booting 4.4 on my r1 indeed shows 5 calls 
+where dev_node is null. Plus 68 calls in which we waste cycles doing 
+meaningless calculations when dev_node is non-null. The fundamental 
+issue at hand is that the "platform bus" is a rubbish abstraction.
+
+> In theory, it is not noise.
+> If you have interest, I can send you the kernel boot logs. :)
 >
-> Ok, got it. The question is whether this should be done in ACPI
-> core instead (is there a reason why it should *not* be done ?), but I
-> now understand your point.
+> Of course, the 0.004014s maybe not accurate enough, it is just an
+> approximate number.
+
+A mean and standard deviation of at least, say, 5 runs each with and 
+without the patch would be considerably more meaningful (even if still 
+far from statistically significant).
+
+Robin.
+
 >
-
-I am not able to answer that question, but I see lots of changes in this 
-area made by Rafael.
-
-Rafael, can you please shed some light on this?
-
-Thanks,
-Tomasz
+> Thanks
+> Huang Shijie
+>
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+>
