@@ -1,27 +1,92 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Wed, 20 Jan 2016 21:34:03 +0800
-Subject: [PATCH] iommu/arm-smmu: add a shortcut when the @dev_node is NULL
-In-Reply-To: <20160120120225.GD18805@8bytes.org>
-References: <1452564905-2662-1-git-send-email-shijie.huang@arm.com>
- <20160120120225.GD18805@8bytes.org>
-Message-ID: <20160120133401.GA3487@localhost.localdomain>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 20 Jan 2016 14:40:08 +0100
+Subject: [PATCH V3 11/21] pci, acpi: Move ACPI host bridge device
+ companion assignment to core code.
+In-Reply-To: <20160120123849.GA13437@red-moon>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <1452691267-32240-12-git-send-email-tn@semihalf.com>
+ <20160119160224.GD5276@red-moon> <569F6D67.5000000@semihalf.com>
+ <20160120123849.GA13437@red-moon>
+Message-ID: <569F8E38.5030101@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 20, 2016 at 01:02:25PM +0100, Joerg Roedel wrote:
-> On Tue, Jan 12, 2016 at 10:15:05AM +0800, Huang Shijie wrote:
-> > This patch adds a shortcut for the code when the @device_node is NULL.
-> > In my juno-r1 board, the boot time can be faster by 0.004014s.
-> 
-> How have you made sure this number is reliable and not just noise in the
-> boot process?
-In the boot process, there are 5 or more modules whose @dev_node are
-NULL. Without the patch, the kernel will waste some cycles to do the
-meaningless calculations for all these modules. In theory, it is not noise.
-If you have interest, I can send you the kernel boot logs. :)
+On 20.01.2016 13:38, Lorenzo Pieralisi wrote:
+> On Wed, Jan 20, 2016 at 12:20:07PM +0100, Tomasz Nowicki wrote:
+>> On 19.01.2016 17:02, Lorenzo Pieralisi wrote:
+>>> On Wed, Jan 13, 2016 at 02:20:57PM +0100, Tomasz Nowicki wrote:
+>> [...]
+>>>> device via pci_create_root_bus parameter (as the ACPI device type)
+>>>
+>>> I do not understand what you mean by "as the ACPI device type".
+>>
+>> See below.
+>>
+>>>
+>>>> and using ACPI_COMPANION_SET in core code for ACPI boot method.
+>>>> ACPI_COMPANION_SET is safe to run for all cases DT, ACPI and DT&ACPI.
+>>>>
+>>>> Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>>>> ---
+>>>>   drivers/acpi/pci_root.c | 5 ++++-
+>>>>   drivers/pci/probe.c     | 2 ++
+>>>>   2 files changed, 6 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+>>>> index ae3fe4e..a65c8c2 100644
+>>>> --- a/drivers/acpi/pci_root.c
+>>>> +++ b/drivers/acpi/pci_root.c
+>>>> @@ -846,7 +846,10 @@ struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
+>>>>
+>>>>   	pci_acpi_root_add_resources(info);
+>>>>   	pci_add_resource(&info->resources, &root->secondary);
+>>>> -	bus = pci_create_root_bus(NULL, busnum, ops->pci_ops,
+>>>> +
+>>>> +	/* Root bridge device needs to be sure of parent ACPI type */
+>>>> +	ACPI_COMPANION_SET(&device->dev, device);
+>>>
+>>> I do not understand why the code above is needed, can you elaborate
+>>> please ?
+>>>
+>>
+>> This makes sure that device->dev can be identified as ACPI device,
+>> so we can use to_acpi_device_node() and assign companion safely
+>> below.
+>
+> I do not follow. If you refer to the fwnode handle type, that is
+> already set by ACPI core code (before acpi_pci_root_add() is called,
+> in acpi_init_device_object()).
 
-Of course, the 0.004014s maybe not accurate enough, it is just an
-approximate number.
+acpi_init_device_object() sets ACPI fwnode handle type only for 
+"device", but not for "device->dev" which is what is passed as an 
+argument to pci_create_root_bus().
 
-Thanks
-Huang Shijie
+Without ACPI_COMPANION_SET(&device->dev, device) here, no one can be 
+sure if we have ACPI device in pci_create_root_bus().
+
+>
+> Did you add the code above to solve a real issue you encountered ?
+Yes. You can try to run series with this patch:
+
+diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+index 88c9d20..1b74bf6 100644
+--- a/drivers/acpi/pci_root.c
++++ b/drivers/acpi/pci_root.c
+@@ -967,7 +967,11 @@ struct pci_bus *acpi_pci_root_create(struct 
+acpi_pci_root *root,
+         pci_add_resource(&info->resources, &root->secondary);
+
+-        /* Root bridge device needs to be sure of parent ACPI type */
+-       ACPI_COMPANION_SET(&device->dev, device);
++       if (to_acpi_device_node(device->dev.fwnode) == NULL)
++               pr_err("NON-ACPI TYPE\n");
++       else
++               pr_err("ACPI TYPE\n");
++
+         bus = pci_create_root_bus(&device->dev, busnum, ops->pci_ops,
+                                   sysdata, &info->resources);
+
+
+Thanks,
+Tomasz
