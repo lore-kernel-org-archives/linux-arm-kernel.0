@@ -1,83 +1,36 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 20 Jan 2016 17:14:04 +0800
-Subject: [PATCH v4 1/4] soc: mediatek: Refine scpsys to support multiple
- platform
-In-Reply-To: <1453270097-53853-2-git-send-email-jamesjj.liao@mediatek.com>
-References: <1453270097-53853-1-git-send-email-jamesjj.liao@mediatek.com>
- <1453270097-53853-2-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1453281244.16515.3.camel@mtksdaap41>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 20 Jan 2016 17:20:18 +0800
+Subject: [PATCH v2 0/4] net: mvneta: support more than one clk
+Message-ID: <1453281622-7829-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-01-20 at 14:08 +0800, James Liao wrote:
-> Refine scpsys driver common code to support multiple SoC / platform.
-> 
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-<...>
-> diff --git a/drivers/soc/mediatek/mtk-scpsys.h b/drivers/soc/mediatek/mtk-scpsys.h
-> new file mode 100644
-> index 0000000..e435bc3
-> --- /dev/null
-> +++ b/drivers/soc/mediatek/mtk-scpsys.h
-> @@ -0,0 +1,55 @@
-> +#ifndef __DRV_SOC_MTK_H
-> +#define __DRV_SOC_MTK_H
-> +
-> +enum clk_id {
-> +	CLK_NONE,
-> +	CLK_MM,
-> +	CLK_MFG,
-> +	CLK_VENC,
-> +	CLK_VENC_LT,
-> +	CLK_MAX,
-> +};
-> +
-> +#define MAX_CLKS	2
-> +
-> +struct scp_domain_data {
-> +	const char *name;
-> +	u32 sta_mask;
-> +	int ctl_offs;
-> +	u32 sram_pdn_bits;
-> +	u32 sram_pdn_ack_bits;
-> +	u32 bus_prot_mask;
-> +	enum clk_id clk_id[MAX_CLKS];
-> +	bool active_wakeup;
-> +};
-> +
-> +struct scp;
-> +
-> +struct scp_domain {
-> +	struct generic_pm_domain genpd;
-> +	struct scp *scp;
-> +	struct clk *clk[MAX_CLKS];
-> +	u32 sta_mask;
-> +	void __iomem *ctl_addr;
-> +	u32 sram_pdn_bits;
-> +	u32 sram_pdn_ack_bits;
-> +	u32 bus_prot_mask;
-> +	bool active_wakeup;
-> +	struct regulator *supply;
-> +};
-> +
-> +struct scp {
-> +	struct scp_domain *domains;
-> +	struct genpd_onecell_data pd_data;
-> +	struct device *dev;
-> +	void __iomem *base;
-> +	struct regmap *infracfg;
-> +};
-> +
-> +struct scp *init_scp(struct platform_device *pdev,
-> +			const struct scp_domain_data *scp_domain_data, int num);
-> +
-> +void mtk_register_power_domains(struct platform_device *pdev,
-> +				struct scp *scp, int num);
-> +
-> +#endif /* __DRV_SOC_MTK_H */
+Some platforms may provide more than one clk for the mvneta IP, for
+example Marvell BG4CT provides "core" clk for the mac core, and "axi"
+clk for the AXI bus logic.
 
-After merge, only mtk-scpsys.c will use this file. I think it make sense
-to just include them in mtk-scpsys.c. Also init_scp and
-mtk_register_power_domains can be static now.
+This series tries to addess the "more than one clk" issue. Note: to
+support BG4CT, we have lots of refactor work to do, eg. BG4CT doesn't
+have mbus concept etc.
 
-Joe.C
+Since v1:
+ - Add Thomas Acks to patch1 and patch2.
+ - make sure the headers are really sorted (some headers are still
+   unsorted in v1).
+ - disable axi clk before disabling core clk, Thank Thomas.
+ - update dt binding as Thomas suggested.
+
+
+Jisheng Zhang (4):
+  net: mvneta: sort the headers in alphabetic order
+  net: mvneta: Try to get named core clock first
+  net: mvneta: get optional axi clk
+  net: mvneta: update clocks property and document additional
+    clock-names
+
+ .../bindings/net/marvell-armada-370-neta.txt       |  7 +++-
+ drivers/net/ethernet/marvell/mvneta.c              | 38 ++++++++++++++--------
+ 2 files changed, 30 insertions(+), 15 deletions(-)
+
+-- 
+2.7.0.rc3
