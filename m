@@ -1,51 +1,45 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 20 Jan 2016 14:16:56 -0800
-Subject: [PATCH v2] clk-divider: make sure read-only dividers do not
- write to their register
-In-Reply-To: <3578615.iBrKplh45Q@phil>
-References: <8710207.gKyLbM2bKY@phil>
- <3578615.iBrKplh45Q@phil>
-Message-ID: <20160120221604.GC12841@codeaurora.org>
+From: jeffrey.t.kirsher@intel.com (Jeff Kirsher)
+Date: Wed, 20 Jan 2016 14:17:25 -0800
+Subject: [PATCH] net: i40e: avoid unused function warnings
+In-Reply-To: <2806620.EpZqDlZTO3@wuerfel>
+References: <2806620.EpZqDlZTO3@wuerfel>
+Message-ID: <1453328245.2958.28.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20, Heiko Stuebner wrote:
-> Commit e6d5e7d90be9 ("clk-divider: Fix READ_ONLY when divider > 1") removed
-> the special ops struct for read-only clocks and instead opted to handle
-> them regularly.
+On Wed, 2016-01-20 at 11:42 +0100, Arnd Bergmann wrote:
+> The addition of the geneve tunnel offload code left a couple
+> of functions unconditionally defined but empty whenever CONFIG_VXLAN
+> and CONFIG_GENEVE are disabled. gcc warns about this:
 > 
-> On the rk3368 this results in breakage as aclkm now gets set a value.
-> While it is the same divider value, the A53 core still doesn't like it,
-> which can result in the cpu ending up in a hang.
-> The reason being that "ACLKENMasserts one clock cycle before the rising
-> edge of ACLKM" and the clock should only be touched when STANDBYWFIL2
-> is asserted.
+> i40e_main.c:7049:13: warning: 'i40e_sync_udp_filters_subtask' defined
+> but not used [-Wunused-function]
+> i40e_main.c:8516:13: warning: 'i40e_add_vxlan_port' defined but not
+> used [-Wunused-function]
+> i40e_main.c:8561:13: warning: 'i40e_del_vxlan_port' defined but not
+> used [-Wunused-function]
+> i40e_main.c:8596:13: warning: 'i40e_add_geneve_port' defined but not
+> used [-Wunused-function]
+> i40e_main.c:8643:13: warning: 'i40e_del_geneve_port' defined but not
+> used [-Wunused-function]
 > 
-> So make sure read-only clocks don't touch the clock-register at all
-> even if only writing the same value, as even writing the same value
-> may not be safe in all cases.
+> This moves the #ifdef statements to the outside of the affected
+> functions, which avoids the warnings.
 > 
-> Fixes: e6d5e7d90be9 ("clk-divider: Fix READ_ONLY when divider > 1")
-> Reported-by: Zhang Qing <zhangqing@rock-chips.com>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Reviewed-by: James Hogan <james.hogan@imgtec.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 6a899024058d ("i40e: geneve tunnel offload support")
 > ---
+> This is a harmless regression against v4.4, found on ARM randconfig
+> builds
 
-Hmph, the same patch[1] has been sitting in my inbox for months
-now but I never got a response to my last question and then
-forgot about it. I'll repeat the question here and hopefully we
-can finish the discussion.
+Thanks Arnd, I already have a patch from Eric Dumazet and Alex Duyck to
+resolve this issue.
 
-Maybe it would make more sense to have different ops for read
-only dividers? The clk_set_rate op would be empty, while we would
-have proper recalc_rate and round_rate ops. We can't just flat
-out revert commit e6d5e7d90be9 (clk-divider: Fix READ_ONLY when
-divider > 1, 2014-11-14) because that will introduce the problem
-that it was fixing, but as long as we implement round_rate in
-addition to recalc_rate it should work.
-
-[1] http://lkml.kernel.org/r/1428392806-14538-1-git-send-email-jy0922.shim at samsung.com
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Dave- I plan on pushing the fix later today to net.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160120/2a220f92/attachment-0001.sig>
