@@ -1,114 +1,80 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 20 Jan 2016 23:25:03 +0100
-Subject: [PATCH v7 5/5] ARM: dts: rockchip: add support mipi panel
- tv080wum-nl0
-In-Reply-To: <569EDE2F.6060400@rock-chips.com>
-References: <1452053038-32098-1-git-send-email-zyw@rock-chips.com>
- <1649978.zzK0Pex4sR@phil> <569EDE2F.6060400@rock-chips.com>
-Message-ID: <4804270.fNNME6HN13@phil>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 Jan 2016 23:28:34 +0100
+Subject: [PATCH] net: i40e: avoid unused function warnings
+In-Reply-To: <1453328245.2958.28.camel@intel.com>
+References: <2806620.EpZqDlZTO3@wuerfel> <1453328245.2958.28.camel@intel.com>
+Message-ID: <8814508.SjLecHrQqA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 20. Januar 2016, 09:09:03 schrieb Chris Zhong:
-> Hi Heiko
+On Wednesday 20 January 2016 14:17:25 Jeff Kirsher wrote:
+> On Wed, 2016-01-20 at 11:42 +0100, Arnd Bergmann wrote:
+> > The addition of the geneve tunnel offload code left a couple
+> > of functions unconditionally defined but empty whenever CONFIG_VXLAN
+> > and CONFIG_GENEVE are disabled. gcc warns about this:
+> > 
+> > i40e_main.c:7049:13: warning: 'i40e_sync_udp_filters_subtask' defined
+> > but not used [-Wunused-function]
+> > i40e_main.c:8516:13: warning: 'i40e_add_vxlan_port' defined but not
+> > used [-Wunused-function]
+> > i40e_main.c:8561:13: warning: 'i40e_del_vxlan_port' defined but not
+> > used [-Wunused-function]
+> > i40e_main.c:8596:13: warning: 'i40e_add_geneve_port' defined but not
+> > used [-Wunused-function]
+> > i40e_main.c:8643:13: warning: 'i40e_del_geneve_port' defined but not
+> > used [-Wunused-function]
+> > 
+> > This moves the #ifdef statements to the outside of the affected
+> > functions, which avoids the warnings.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Fixes: 6a899024058d ("i40e: geneve tunnel offload support")
+> > ---
+> > This is a harmless regression against v4.4, found on ARM randconfig
+> > builds
 > 
-> On 01/20/2016 03:26 AM, Heiko Stuebner wrote:
-> > Hi Chris,
-> > 
-> > Am Mittwoch, 6. Januar 2016, 12:03:57 schrieb Chris Zhong:
-> >> This tv080wum-nl0 panel is a mipi panel, it can use in MIPI_TX socket
-> >> of rk3288 evb board.
-> >> 
-> >> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> > 
-> > [...]
-> > 
-> >> diff --git a/arch/arm/boot/dts/rk3288-evb-act8846.dts
-> >> b/arch/arm/boot/dts/rk3288-evb-act8846.dts index e662147..7d5475b
-> >> 100644
-> >> --- a/arch/arm/boot/dts/rk3288-evb-act8846.dts
-> >> +++ b/arch/arm/boot/dts/rk3288-evb-act8846.dts
-> >> @@ -50,6 +50,8 @@
-> >> 
-> >>   		gpio = <&gpio7 3 GPIO_ACTIVE_HIGH>;
-> >>   		pinctrl-names = "default";
-> >>   		pinctrl-0 = <&lcd_en>;
-> >> 
-> >> +		regulator-always-on;
-> >> +		regulator-boot-on;
-> > 
-> > Is this only needed for the panel itself and can you try to get the
-> > panel
-> > supplies set up correctly instead in that case please?
+> Thanks Arnd, I already have a patch from Eric Dumazet and Alex Duyck to
+> resolve this issue.
 > 
-> It is not only for panel, LCDC_VDD need this supply too.
-> And rk3288-evb-rk808.dts has set this regulator to always on, so I do
-> the same thing in here.
+> Dave- I plan on pushing the fix later today to net.
 
-ok, so we keep the regulator-always-on for now, but could probably still add 
-the supply to the panel as well? That way once vcc_lcd handling is complete 
-in the future, we don't get surprises :-)
+Ok, thanks.
 
-I guess I can add that power-supply property myself when applying.
+FWIW, I have another patch for this driver that I did not yet submit
+because it's not a regression and I haven't written a proper changelog
+for it (it's in a set of 15 patches for netdev that fix harmless warnings).
 
+Do you have one for the warning below as well? I could not come up
+with a better way than adding a bogus initialization, but maybe
+there is one.
 
-Heiko
+	Arnd
 
-> 
-> >>   		regulator-name = "vcc_lcd";
-> >>   		vin-supply = <&vcc_io>;
-> >>   	
-> >>   	};
-> >> 
-> >> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi
-> >> b/arch/arm/boot/dts/rk3288-evb.dtsi index 4faabdb..0c91858 100644
-> >> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
-> >> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-> >> @@ -47,7 +47,7 @@
-> >> 
-> >>   		reg = <0x0 0x80000000>;
-> >>   	
-> >>   	};
-> >> 
-> >> -	backlight {
-> >> +	backlight: backlight {
-> >> 
-> >>   		compatible = "pwm-backlight";
-> >>   		brightness-levels = <
-> >>   		
-> >>   			  0   1   2   3   4   5   6   7
-> >> 
-> >> @@ -183,6 +183,16 @@
-> >> 
-> >>   	status = "okay";
-> >>   
-> >>   };
-> >> 
-> >> +&mipi_dsi {
-> >> +	status = "okay";
-> >> +	panel {
-> >> +		compatible ="boe,tv080wum-nl0";
-> >> +		reg = <0>;
-> >> +		backlight = <&backlight>;
-> >> +		status = "okay";
-> > 
-> > in the evb-schematics I see, vcc_lcd as supply for the panel.
-> > 
-> > So I'd think the panel node here should have a
-> > 
-> > 	power-supply = <&vcc_lcd>;
-> > 
-> > instead of having the always-on above?
-> > 
-> > 
-> > Thanks
-> > Heiko
-> > 
-> >> +	};
-> >> +};
-> >> +
-> >> 
-> >>   &sdmmc {
-> >>   
-> >>   	bus-width = <4>;
-> >>   	cap-mmc-highspeed;
+>From d89be3f0f932a71dfb5480ee396db514879097c4 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 15 Jan 2016 17:31:07 +0100
+Subject: [PATCH] net: i40e: shut up uninitialized variable warnings
+
+intel/i40e/i40e_txrx.c: In function 'i40e_xmit_frame_ring':
+intel/i40e/i40e_txrx.c:2367:20: error: 'oiph' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+intel/i40e/i40e_txrx.c:2317:16: note: 'oiph' was declared here
+intel/i40e/i40e_txrx.c:2367:17: error: 'oudph' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+intel/i40e/i40e_txrx.c:2316:17: note: 'oudph' was declared here
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/net/ethernet/intel/i40e/i40e_txrx.c b/drivers/net/ethernet/intel/i40e/i40e_txrx.c
+index 720516b0e8ee..47bd8b3145a7 100644
+--- a/drivers/net/ethernet/intel/i40e/i40e_txrx.c
++++ b/drivers/net/ethernet/intel/i40e/i40e_txrx.c
+@@ -2313,8 +2313,8 @@ static void i40e_tx_enable_csum(struct sk_buff *skb, u32 *tx_flags,
+ 	struct iphdr *this_ip_hdr;
+ 	u32 network_hdr_len;
+ 	u8 l4_hdr = 0;
+-	struct udphdr *oudph;
+-	struct iphdr *oiph;
++	struct udphdr *oudph = NULL;
++	struct iphdr *oiph = NULL;
+ 	u32 l4_tunnel = 0;
+ 
+ 	if (skb->encapsulation) {
