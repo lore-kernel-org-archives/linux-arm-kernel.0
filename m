@@ -1,34 +1,88 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Wed, 20 Jan 2016 11:36:10 +0200
-Subject: [PATCH v2 next-next] net: hns: enet specifies a reference to dsaf
-In-Reply-To: <569F2DEC.9040209@huawei.com>
-References: <1452654880-28980-1-git-send-email-yankejian@huawei.com>
- <56970F48.9060504@huawei.com> <1452764635.2521.28.camel@linux.intel.com>
- <569F2DEC.9040209@huawei.com>
-Message-ID: <1453282570.2521.130.camel@linux.intel.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 20 Jan 2016 17:42:23 +0800
+Subject: [PATCH 3/4] net: mvneta: mmc: get optional axi clk
+In-Reply-To: <1525e5fba70.2764.107cef0f820c2f5d7b7f41463071c310@gmail.com>
+References: <1453277183-5412-1-git-send-email-jszhang@marvell.com>
+ <1453277183-5412-4-git-send-email-jszhang@marvell.com>
+ <1525e5fba70.2764.107cef0f820c2f5d7b7f41463071c310@gmail.com>
+Message-ID: <20160120174223.53ccc36b@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-01-20 at 14:49 +0800, Yankejian (Hackim Yim) wrote:
-> > > +
-> > > > > > +	snprintf(ae_dev->name, AE_NAME_SIZE, "%s%d",
-> > > > > > DSAF_DEVICE_NAME,
-> > > > > > +		?(int)atomic_inc_return(&id));
-> > If you bind/unbind device enough times you may get an overflow and
-> > end
-> > up with name of existing device (if you have 1+ of them in the
-> > system).
-> > 
-> > To avoid such situation better to use IDA/IDR framework.
-> > 
-> Hi, Andy
-> Thanks again for your suggestion.
-> It seems that using IDA/IDR framework is better, but all of the
-> functions must be serialized by lock.
+On Wed, 20 Jan 2016 10:31:18 +0100 Sebastian Hesselbarth  wrote:
 
-AFAIR it's designed in a way you don't need to do any additional
-locking or synchronization.
+> On January 20, 2016 9:15:22 AM Jisheng Zhang wrote:
+> 
+> > Some platforms may provide more than one clk for the mvneta IP, for
+> > example Marvell BG4CT provides "core" clk for the mac core, and
+> > "axi" clk for the AXI bus logic. Obviously this "axi" clk also need to
+> > be enabled. This patch adds this optional "axi" clk support.  
+> 
+> Jisheng,
+> 
+> although I do not expect mvneta to appear on a non-AXI bus
+> anytime soon, how about naming the clock "bus" instead?
 
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+Good question. IIRC, this IP expects AXI bus, but I'll check with HW people.
+
+Thanks a lot,
+Jisheng
+
+> 
+> If you know the clock is only required for bus master DMA but
+> not for register access, "dma" would be an even better name.
+> 
+> Sebastian
+> 
+> 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  drivers/net/ethernet/marvell/mvneta.c | 8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> >
+> > diff --git a/drivers/net/ethernet/marvell/mvneta.c 
+> > b/drivers/net/ethernet/marvell/mvneta.c
+> > index aca0a73..6bb709a 100644
+> > --- a/drivers/net/ethernet/marvell/mvneta.c
+> > +++ b/drivers/net/ethernet/marvell/mvneta.c
+> > @@ -373,6 +373,8 @@ struct mvneta_port {
+> >
+> >  	/* Core clock */
+> >  	struct clk *clk;
+> > +	/* AXI clock */
+> > +	struct clk *clk_axi;
+> >  	u8 mcast_count[256];
+> >  	u16 tx_ring_size;
+> >  	u16 rx_ring_size;
+> > @@ -3615,6 +3617,10 @@ static int mvneta_probe(struct platform_device *pdev)
+> >
+> >  	clk_prepare_enable(pp->clk);
+> >
+> > +	pp->clk_axi = devm_clk_get(&pdev->dev, "axi");
+> > +	if (!IS_ERR(pp->clk_axi))
+> > +		clk_prepare_enable(pp->clk_axi);
+> > +
+> >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >  	pp->base = devm_ioremap_resource(&pdev->dev, res);
+> >  	if (IS_ERR(pp->base)) {
+> > @@ -3727,6 +3733,7 @@ err_free_ports:
+> >  	free_percpu(pp->ports);
+> >  err_clk:
+> >  	clk_disable_unprepare(pp->clk);
+> > +	clk_disable_unprepare(pp->clk_axi);
+> >  err_put_phy_node:
+> >  	of_node_put(phy_node);
+> >  err_free_irq:
+> > @@ -3744,6 +3751,7 @@ static int mvneta_remove(struct platform_device *pdev)
+> >
+> >  	unregister_netdev(dev);
+> >  	clk_disable_unprepare(pp->clk);
+> > +	clk_disable_unprepare(pp->clk_axi);
+> >  	free_percpu(pp->ports);
+> >  	free_percpu(pp->stats);
+> >  	irq_dispose_mapping(dev->irq);
+> > --
+> > 2.7.0.rc3
+> >  
+> 
+> 
