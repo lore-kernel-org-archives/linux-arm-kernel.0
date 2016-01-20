@@ -1,77 +1,81 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 20 Jan 2016 14:33:49 +0800
-Subject: [Xen-devel] [PATCH v2 08/16] xen/hvm/params: Add a new delivery
- type for event-channel in HVM_PARAM_CALLBACK_IRQ
-In-Reply-To: <569CE00C.5050406@citrix.com>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-9-git-send-email-zhaoshenglong@huawei.com>
- <alpine.DEB.2.02.1601181205110.16178@kaball.uk.xensource.com>
- <569CDDB7.9030103@citrix.com>
- <alpine.DEB.2.02.1601181244300.16178@kaball.uk.xensource.com>
- <569CE00C.5050406@citrix.com>
-Message-ID: <569F2A4D.9070006@huawei.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 20 Jan 2016 07:38:13 +0100
+Subject: [PATCH v5 1/6] clk: hisilicon: add CRG driver for hi3519 soc
+In-Reply-To: <CAL_JsqJPcPgS=cKNqv9j5Ch3ZHbUmci1LRedBWV1gV=5kCz68Q@mail.gmail.com>
+References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
+ <1452219400-32478-2-git-send-email-xuejiancheng@huawei.com>
+ <20160112221211.GB22188@codeaurora.org> <5695BE65.3070409@huawei.com>
+ <20160113185707.1168.85601@quark.deferred.io> <56979F9F.5080201@huawei.com>
+ <5698A650.5010600@huawei.com>
+ <CAL_JsqJPcPgS=cKNqv9j5Ch3ZHbUmci1LRedBWV1gV=5kCz68Q@mail.gmail.com>
+Message-ID: <CAAObsKBbUaGi-ZWg+Y-OCq=xVOgBJroMTVsqP2JpVHPQWcM4=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 19 January 2016 at 19:20, Rob Herring <robh+dt@kernel.org> wrote:
+> On Fri, Jan 15, 2016 at 1:57 AM, xuejiancheng <xuejiancheng@huawei.com> wrote:
+>>
+>> On 2016/1/14 21:16, xuejiancheng wrote:
+>>> Hi Mike,
+>>>
+>>> On 2016/1/14 2:57, Michael Turquette wrote:
+>>>> Quoting xuejiancheng (2016-01-12 19:03:01)
+>>>>> Hi Stephen,
+>>>>>    Thank you very much for your reply.
+>>>>>
+>>>>> On 2016/1/13 6:12, Stephen Boyd wrote:
+>>>>>> On 01/08, Jiancheng Xue wrote:
+>>>>>>> diff --git a/drivers/clk/hisilicon/Kconfig b/drivers/clk/hisilicon/Kconfig
+>>>>>>> index e434854..b6baebf 100644
+>>>>>>> --- a/drivers/clk/hisilicon/Kconfig
+>>>>>>> +++ b/drivers/clk/hisilicon/Kconfig
+>>>>>>> @@ -1,3 +1,10 @@
+>>>>>>> +config COMMON_CLK_HI3519
+>>>>>>> +    tristate "Clock Driver for Hi3519"
+>>>>>>
+>>>>>> It looks like this has to be bool. Otherwise it needs to be a
+>>>>>> platform driver and the hisilicon APIs need to be exported and
+>>>>>> lose their __init markings.
+>>>>>>
+>>>>> Yes,it's a problem. I will fix it in next version. Thank you.
+>>>>
+>>>> The best solution would be to make this clock driver a real platform
+>>>> driver.
+>>>>
+>>> Now the work clock of the clocksource timer-sp804 is provided by this driver. So
+>>> it need to be registered early by CLK_OF_DECLARE. If the timer clock is treated
+>>> as a fixed-clock provider, this driver can be implemented as a platform driver.
+>>> Then the crg device must be registered before other clock consumer devices.Accordingly
+>>> the crg device node must be written above all other clock consumer devices node in dts files.
+>>> I think it is also a dependence.
+>>>
+>>> Can you help me understand why it is better to make this driver a platform driver?
+>>> Thank you very much!
+>>>
+>> arch_initcall(customize_machine)
+>> -->of_platform_populate
+>>    -->of_platform_bus_create
+>>      -->of_amba_device_create
+>>         -->amba_device_add
+>>            -->amba_get_enable_pclk
+>> The call sequence above shows that the clock of the amba device must be registered before
+>> amba_device_add. The clock of "arm,pl011" uart is registered in the probe function of the
+>> platform driver "hi3519-crg". So the platform device "hi3519-crg" must be created before
+>> the amba device "arm,pl011" uart.
+>
+> It is a problem, but Tomeu had a fix to support deferred probes here.
+> That was part of the on-demand probing series, but maybe it needs to
+> be applied separately if we are moving clock drivers to platform
+> drivers.
 
+Hi,
 
-On 2016/1/18 20:52, Andrew Cooper wrote:
-> On 18/01/16 12:46, Stefano Stabellini wrote:
->> > On Mon, 18 Jan 2016, Andrew Cooper wrote:
->>> >> On 18/01/16 12:38, Stefano Stabellini wrote:
->>>> >>> On Fri, 15 Jan 2016, Shannon Zhao wrote:
->>>>> >>>> From: Shannon Zhao <shannon.zhao@linaro.org>
->>>>> >>>>
->>>>> >>>> Add a new delivery type:
->>>>> >>>> val[63:56] == 3: val[15:8] is flag: val[7:0] is a PPI.
->>>>> >>>> To the flag, bit 0 stands the interrupt mode is edge(1) or level(0) and
->>>>> >>>> bit 1 stands the interrupt polarity is active low(1) or high(0).
->>>>> >>>>
->>>>> >>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->>>>> >>>> ---
->>>>> >>>>  include/xen/interface/hvm/params.h | 5 +++++
->>>>> >>>>  1 file changed, 5 insertions(+)
->>>>> >>>>
->>>>> >>>> diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
->>>>> >>>> index a6c7991..550688a 100644
->>>>> >>>> --- a/include/xen/interface/hvm/params.h
->>>>> >>>> +++ b/include/xen/interface/hvm/params.h
->>>>> >>>> @@ -34,6 +34,11 @@
->>>>> >>>>   *                  Domain = val[47:32], Bus  = val[31:16],
->>>>> >>>>   *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
->>>>> >>>>   * val[63:56] == 2: val[7:0] is a vector number.
->>>>> >>>> + * val[63:56] == 3: val[15:8] is flag of event-channel interrupt:
->>>>> >>>> + *                      bit 0: interrupt is edge(1) or level(0) triggered
->>>>> >>>> + *                      bit 1: interrupt is active low(1) or high(0)
->>>>> >>>> + *                  val[7:0] is PPI number used by event-channel.
->>>>> >>>> + *                  This is only used by ARM/ARM64.
->>>>> >>>>   * If val == 0 then CPU0 event-channel notifications are not delivered.
->>>>> >>>>   */
->>>>> >>>>  #define HVM_PARAM_CALLBACK_IRQ 0
->>>> >>> Andrew, I think that this patch is correct. Looking back at your
->>>> >>> previous comment (http://marc.info/?l=devicetree&m=144804014214262&w=2),
->>>> >>> is it possible that you were confused by enum callback_via_type, which
->>>> >>> is internal to Xen and offset'ed by 1 compared to the described values
->>>> >>> in xen/include/public/hvm/params.h?
->>>> >>>
->>>> >>> If not, and indeed somebody introduced one more field but failed to
->>>> >>> document it, then I suggest she sends a patch to fix the issue as soon
->>>> >>> as possible.
->>> >> I was indeed confused - the ABI is utterly mad.
->> > All right. In that case, Shannon, you can add my
->> >
->> > Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->> >
->> >
->>> >> However, this change does need rebasing over c/s ca5c54b, which was the
->>> >> result of the original discussion.
->> > c/s ca5c54b is for Xen, while this is a Linux patch (Linux has its own
->> > set of Xen headers).
-> All ABI changes need to happen in the Xen public headers first.  This
-> patch cannot be accepted yet.
-So you mean it should port c/s ca5c54b to Linux first? Then add this
-change based on that?
+Marek Szyprowski has kindly taken those two patches as part of a series of him:
+
+http://lkml.kernel.org/g/1450868368-5650-1-git-send-email-m.szyprowski at samsung.com
+
+I think it would be great if you could test them and report.
 
 Thanks,
--- 
-Shannon
+
+Tomeu
