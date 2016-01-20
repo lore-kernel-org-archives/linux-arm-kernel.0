@@ -1,42 +1,86 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 20 Jan 2016 16:06:23 +0800
-Subject: [PATCH 4/4] net: mvneta: update clocks property and document
- additional clock-names
-In-Reply-To: <1453277183-5412-1-git-send-email-jszhang@marvell.com>
-References: <1453277183-5412-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1453277183-5412-5-git-send-email-jszhang@marvell.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Wed, 20 Jan 2016 00:13:37 -0800
+Subject: iProc bus scanning regression (after "PCI: iproc: Add PAXC
+ interface support")
+In-Reply-To: <CACna6rzMK4Htci8AucHVi1TNjBkxdQiy60MWJ234J8=4B_vteA@mail.gmail.com>
+References: <CACna6rx2t7Zg_xSVvYqZTW2dYEgRugaorV58Zy1YZ4Wy=+L4fQ@mail.gmail.com>
+ <CACna6rzMK4Htci8AucHVi1TNjBkxdQiy60MWJ234J8=4B_vteA@mail.gmail.com>
+Message-ID: <569F41B1.6000005@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that mvneta driver allows to have more than one clock defined,
-update the clocks property and document the clock-names property.
+Hi Rafal,
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+On 1/19/2016 11:02 PM, Rafa? Mi?ecki wrote:
+> On 20 January 2016 at 07:53, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+>> In OpenWrt trunk code we use iProc driver for PCIe controllers on bcma
+>> bus (PCIE_IPROC_BCMA). Right now we use 4.1 kernel but we backported
+>> all iProc changes. Unfortunately backporting set queued for 4.5 broke
+>> bus scanning on some routers.
+>>
+>> Most BCM4708 / BCM4709 chipsets have 3 PCIe controllers. All known
+>> routers use only first 2 of them. Even if router has 3 PCIe cards, the
+>> last two cards are connected to the 2nd PCIe controller.
+>>
+>> So that PAXC patch broke support for routers with 3 cards, 2 of them
+>> at the 2nd controller. It doesn't affect routers with just 2 cards.
+>> This problem was tracked down in:
+>> https://dev.openwrt.org/ticket/21393
+>>
+>> I'm attaching two OpenWrt boot logs.
+>> 1) r48381
+>> It contains all backported iProc changes. The log looks "nice", but
+>> only one card (0000:01:00.0) was detected.
+>> 2) r48382
+>> It contains "Revert "PCI: iproc: Add PAXC interface support"" patch.
+>> It contains many "[Firmware Bug]: reg 0x??: invalid BAR (can't size)"
+>> messages but there are all 3 cards detected: 0000:01:00.0,
+>> 0001:03:00.0 and 0001:04:00.0 (see brcmfmac messages).
+>>
+>> Can you take a look at this problem, please?
+>
+> linux-arm-kernel@ stopped my e-mail due to its size. Sending
+> compressed attachments.
+>
 
-diff --git a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
-index aeea50c..f85b93b 100644
---- a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
-+++ b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
-@@ -6,12 +6,16 @@ Required properties:
- - interrupts: interrupt for the device
- - phy: See ethernet.txt file in the same directory.
- - phy-mode: See ethernet.txt file in the same directory
--- clocks: a pointer to the reference clock for this device.
-+- clocks: Array of clocks required for this device; requires at least one
-+  for CORE clock.
- 
- Optional properties:
- - tx-csum-limit: maximum mtu supported by port that allow TX checksum.
-   Value is presented in bytes. If not used, by default 1600B is set for
-   "marvell,armada-370-neta" and 9800B for others.
-+- clock-names: Array of names corresponding to clocks property; shall be
-+  "core" for CORE clock and "axi" for optional AXI clock.
-+
- 
- Example:
- 
--- 
-2.7.0.rc3
+I'm a bit confused by these logs that you provided. Based on the log, 
+there seems to be 3 PCIe root complexes populated on the platform, 
+domain 0000:00:00.0, 0001:00:00:0, 0002:00:00:0 are the 3 root 
+complexes. Root complex 0002 seems to have nothing connected since it 
+does not detect any EP.
+
+Is the first card installed on root complex 0 (domain 0000), but the 
+second card and 3rd card are both installed on root complex 1 (domain 
+0001) on different slots or something?
+
+I suspect a potential issue is in this function:
+
+173 static inline bool iproc_pcie_device_is_valid(struct iproc_pcie *pcie,
+174                                               unsigned int slot,
+175                                               unsigned int fn)
+176 {
+177         if (slot > 0)
+178                 return false;
+179
+180         /* PAXC can only support limited number of functions */
+181         if (pcie->type == IPROC_PCIE_PAXC && fn >= MAX_NUM_PAXC_PF)
+182                 return false;
+183
+184         return true;
+185 }
+
+Compared to the original code, it's different. Can you try passing bus 
+number into the function as another argument and do the following check 
+on line 177:
+
+if (busnum == 0 && slot > 0)
+     return false;
+
+instead of
+
+if (slot > 0)
+     return false;
+
+Thanks,
+
+Ray
