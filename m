@@ -1,58 +1,102 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Wed, 20 Jan 2016 14:09:20 +0100
-Subject: [PATCH 2/4] ARM: dts: imx53: fix LVDS data-mapping and data-width
+Date: Wed, 20 Jan 2016 14:09:19 +0100
+Subject: [PATCH 1/4] ARM: dts: imx53: add ethernet PHY supply regulator
 In-Reply-To: <1453295362-18798-1-git-send-email-LW@KARO-electronics.de>
 References: <1453295362-18798-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1453295362-18798-3-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1453295362-18798-2-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx53-tx53-x13x.dts | 18 ++++++++++--------
- 1 file changed, 10 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/imx53-tx53.dtsi | 40 ++++++++++++++++++++++++++++++---------
+ 1 file changed, 31 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx53-tx53-x13x.dts b/arch/arm/boot/dts/imx53-tx53-x13x.dts
-index 6480471..6d0b526 100644
---- a/arch/arm/boot/dts/imx53-tx53-x13x.dts
-+++ b/arch/arm/boot/dts/imx53-tx53-x13x.dts
-@@ -183,13 +183,14 @@
+diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
+index d3e50b2..8f08389 100644
+--- a/arch/arm/boot/dts/imx53-tx53.dtsi
++++ b/arch/arm/boot/dts/imx53-tx53.dtsi
+@@ -87,9 +87,20 @@
+ 			regulator-max-microvolt = <3300000>;
+ 		};
+ 
+-		reg_can_xcvr: regulator at 2 {
++		reg_3v3_etn: regulator at 2 {
+ 			compatible = "regulator-fixed";
+ 			reg = <2>;
++			regulator-name = "ETN 3V3";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_etn_phy>;
++			gpio = <&gpio3 20 GPIO_ACTIVE_HIGH>;
++		};
++
++		reg_can_xcvr: regulator at 3 {
++			compatible = "regulator-fixed";
++			reg = <3>;
+ 			regulator-name = "CAN XCVR";
+ 			regulator-min-microvolt = <3300000>;
+ 			regulator-max-microvolt = <3300000>;
+@@ -98,9 +109,9 @@
+ 			gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
+ 		};
+ 
+-		reg_usbh1_vbus: regulator at 3 {
++		reg_usbh1_vbus: regulator at 4 {
+ 			compatible = "regulator-fixed";
+-			reg = <3>;
++			reg = <4>;
+ 			regulator-name = "usbh1_vbus";
+ 			regulator-min-microvolt = <5000000>;
+ 			regulator-max-microvolt = <5000000>;
+@@ -110,9 +121,9 @@
+ 			enable-active-high;
+ 		};
+ 
+-		reg_usbotg_vbus: regulator at 4 {
++		reg_usbotg_vbus: regulator at 5 {
+ 			compatible = "regulator-fixed";
+-			reg = <4>;
++			reg = <5>;
+ 			regulator-name = "usbotg_vbus";
+ 			regulator-min-microvolt = <5000000>;
+ 			regulator-max-microvolt = <5000000>;
+@@ -204,13 +215,20 @@
+ 	phy-mode = "rmii";
+ 	phy-reset-gpios = <&gpio7 6 GPIO_ACTIVE_HIGH>;
+ 	phy-handle = <&phy0>;
++	phy-supply = <&reg_3v3_etn>;
+ 	mac-address = [000000000000]; /* placeholder; will be overwritten by bootloader */
  	status = "okay";
  
- 	lvds0: lvds-channel at 0 {
--		fsl,data-mapping = "jeida";
--		fsl,data-width = <24>;
-+		fsl,data-mapping = "spwg";
-+		fsl,data-width = <18>;
- 		status = "okay";
- 
- 		display-timings {
--			native-mode = <&lvds_timing0>;
--			lvds_timing0: hsd100pxn1 {
-+			native-mode = <&lvds0_timing0>;
+-	phy0: ethernet-phy at 0 {
+-		interrupt-parent = <&gpio2>;
+-		interrupts = <4>;
+-		device_type = "ethernet-phy";
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+			lvds0_timing0: hsd100pxn1 {
- 				clock-frequency = <65000000>;
- 				hactive = <1024>;
- 				vactive = <768>;
-@@ -208,13 +209,14 @@
++		phy0: ethernet-phy at 0 {
++			compatible = "ethernet-phy-id0007.c0f1", "ethernet-phy-ieee802.3-c22";
++			reg = <0>;
++			interrupt-parent = <&gpio2>;
++			interrupts = <4>;
++		};
  	};
+ };
  
- 	lvds1: lvds-channel at 1 {
--		fsl,data-mapping = "jeida";
--		fsl,data-width = <24>;
-+		fsl,data-mapping = "spwg";
-+		fsl,data-width = <18>;
- 		status = "okay";
+@@ -309,6 +327,10 @@
+ 			fsl,pins = <MX53_PAD_DISP0_DAT0__GPIO4_21 0xe0>; /* Flexcan XCVR enable */
+ 		};
  
- 		display-timings {
--			native-mode = <&lvds_timing1>;
--			lvds_timing1: hsd100pxn1 {
-+			native-mode = <&lvds1_timing0>;
++		pinctrl_etn_phy: etn-phygrp {
++			fsl,pins = <MX53_PAD_EIM_D20__GPIO3_20 0xe0>; /* ETN PHY Power enable */
++		};
 +
-+			lvds1_timing0: hsd100pxn1 {
- 				clock-frequency = <65000000>;
- 				hactive = <1024>;
- 				vactive = <768>;
+ 		pinctrl_ds1339: ds1339grp {
+ 			fsl,pins = <MX53_PAD_DI0_PIN4__GPIO4_20 0xe0>;
+ 		};
 -- 
 2.1.4
