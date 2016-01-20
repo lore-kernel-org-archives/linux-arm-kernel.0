@@ -1,45 +1,53 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 20 Jan 2016 15:42:54 +0100
-Subject: [PATCH] clk-divider: make sure read-only dividers do not write to
- their register
-Message-ID: <8710207.gKyLbM2bKY@phil>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 20 Jan 2016 15:41:56 +0100
+Subject: [PATCH V3 11/21] pci, acpi: Move ACPI host bridge device
+ companion assignment to core code.
+In-Reply-To: <20160120142243.GB13437@red-moon>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <1452691267-32240-12-git-send-email-tn@semihalf.com>
+ <20160119160224.GD5276@red-moon> <569F6D67.5000000@semihalf.com>
+ <20160120123849.GA13437@red-moon> <569F8E38.5030101@semihalf.com>
+ <20160120142243.GB13437@red-moon>
+Message-ID: <569F9CB4.2010905@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit e6d5e7d90be9 ("clk-divider: Fix READ_ONLY when divider > 1") removed
-the special ops struct for read-only clocks and instead opted to handle
-them regularly.
+On 20.01.2016 15:22, Lorenzo Pieralisi wrote:
+> On Wed, Jan 20, 2016 at 02:40:08PM +0100, Tomasz Nowicki wrote:
+>
+> [...]
+>
+>>>>>> +	/* Root bridge device needs to be sure of parent ACPI type */
+>>>>>> +	ACPI_COMPANION_SET(&device->dev, device);
+>>>>>
+>>>>> I do not understand why the code above is needed, can you elaborate
+>>>>> please ?
+>>>>>
+>>>>
+>>>> This makes sure that device->dev can be identified as ACPI device,
+>>>> so we can use to_acpi_device_node() and assign companion safely
+>>>> below.
+>>>
+>>> I do not follow. If you refer to the fwnode handle type, that is
+>>> already set by ACPI core code (before acpi_pci_root_add() is called,
+>>> in acpi_init_device_object()).
+>>
+>> acpi_init_device_object() sets ACPI fwnode handle type only for
+>> "device", but not for "device->dev" which is what is passed as an
+>> argument to pci_create_root_bus().
+>>
+>> Without ACPI_COMPANION_SET(&device->dev, device) here, no one can be
+>> sure if we have ACPI device in pci_create_root_bus().
+>
+> Ok, got it. The question is whether this should be done in ACPI
+> core instead (is there a reason why it should *not* be done ?), but I
+> now understand your point.
+>
 
-On the rk3368 this results in breakage as aclkm now gets set a value.
-While it is the same divider, the A53 core still doesn't like it.
-The reason being that "ACLKENMasserts one clock cycle before the rising
-edge of ACLKM" and the clock should only be touched when STANDBYWFIL2
-is asserted.
+I am not able to answer that question, but I see lots of changes in this 
+area made by Rafael.
 
-So make sure, read-only clocks don't touch the clock-register at all
-even if only writing the same value.
+Rafael, can you please shed some light on this?
 
-Fixes: e6d5e7d90be9 ("clk-divider: Fix READ_ONLY when divider > 1")
-Reported-by: Zhang Qing <zhangqing@rock-chips.com>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/clk/clk-divider.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index ded3ff4..6dfe261 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -391,6 +391,10 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
- 	unsigned long flags = 0;
- 	u32 val;
- 
-+	/* don't do writes in read-only case */
-+	if (divider->flags & CLK_DIVIDER_READ_ONLY)
-+		return 0;
-+
- 	value = divider_get_val(rate, parent_rate, divider->table,
- 				divider->width, divider->flags);
- 
--- 
-2.6.4
+Thanks,
+Tomasz
