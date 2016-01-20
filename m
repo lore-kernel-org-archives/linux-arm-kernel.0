@@ -1,145 +1,50 @@
 From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Thu, 21 Jan 2016 00:33:52 +0900
-Subject: [PATCH v2 1/7] ARM: dts: kirkwood: gpio pin fixes for linkstation
+Date: Thu, 21 Jan 2016 00:33:54 +0900
+Subject: [PATCH v2 3/7] ARM: dts: kirkwood: gpio-leds fixes for linkstation
  ls-wxl/wsxl
 In-Reply-To: <1453304038-28345-1-git-send-email-rogershimizu@gmail.com>
 References: <1453211342-25214-1-git-send-email-rogershimizu@gmail.com>
  <1453304038-28345-1-git-send-email-rogershimizu@gmail.com>
-Message-ID: <1453304038-28345-2-git-send-email-rogershimizu@gmail.com>
+Message-ID: <1453304038-28345-4-git-send-email-rogershimizu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For kirkwood, gpio pins starts from 32 are in the 2nd bank, so it should be
-converted to "gpio1 <pin minus 32>" in dts file.
-e.g. gpio 40 should be "gpio1 8"
-
-Besides, a few other pin fixes for ls-wxl/wsxl, to match with mpp pin
-definition:
-  - gpio-leds: "lswxl:blue:power" pin
+Make all leds initially to "off" state except power indicator, so pins below
+change from active_low to active_high:
   - gpio-leds: "lswxl:red:func" pin
-  - gpio-leds: "lswxl:red:hdderr0" pin
-  - gpio-leds: "lswxl:red:hdderr1" pin
-  - gpio-fan:  low/high/alarm pin
-
-The pin/bank issue was found when discussing Debian Bug #810894
-  [https://bugs.debian.org/810894#47]
+  - gpio-leds: "lswxl:red:hdderr{0,1}" pin
 
 Fixes: e54e4b1b622e ("ARM: dts: add buffalo linkstation ls-wxl/wsxl")
-Reported-by: Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>
 Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
 ---
- arch/arm/boot/dts/kirkwood-lswxl.dts | 29 +++++++++++++++--------------
- 1 file changed, 15 insertions(+), 14 deletions(-)
+ arch/arm/boot/dts/kirkwood-lswxl.dts | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/boot/dts/kirkwood-lswxl.dts b/arch/arm/boot/dts/kirkwood-lswxl.dts
-index f5db16a08597..0e93f6d19259 100644
+index 0e93f6d19259..f4700a60065b 100644
 --- a/arch/arm/boot/dts/kirkwood-lswxl.dts
 +++ b/arch/arm/boot/dts/kirkwood-lswxl.dts
-@@ -1,7 +1,8 @@
- /*
-  * Device Tree file for Buffalo Linkstation LS-WXL/WSXL
-  *
-- * Copyright (C) 2015, rogershimizu at gmail.com
-+ * Copyright (C) 2015, 2016
-+ * Roger Shimizu <rogershimizu@gmail.com>
-  *
-  * This program is free software; you can redistribute it and/or
-  * modify it under the terms of the GNU General Public License
-@@ -156,21 +157,21 @@
- 		button at 1 {
- 			label = "Function Button";
- 			linux,code = <KEY_OPTION>;
--			gpios = <&gpio1 41 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
- 		};
- 
- 		button at 2 {
- 			label = "Power-on Switch";
- 			linux,code = <KEY_RESERVED>;
- 			linux,input-type = <5>;
--			gpios = <&gpio1 42 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
- 		};
- 
- 		button at 3 {
- 			label = "Power-auto Switch";
- 			linux,code = <KEY_ESC>;
- 			linux,input-type = <5>;
--			gpios = <&gpio1 43 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio1 11 GPIO_ACTIVE_LOW>;
- 		};
- 	};
- 
-@@ -185,12 +186,12 @@
- 
- 		led at 1 {
- 			label = "lswxl:blue:func";
--			gpios = <&gpio1 36 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
- 		};
- 
- 		led at 2 {
- 			label = "lswxl:red:alarm";
--			gpios = <&gpio1 49 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio1 17 GPIO_ACTIVE_LOW>;
- 		};
- 
- 		led at 3 {
-@@ -200,23 +201,23 @@
- 
- 		led at 4 {
- 			label = "lswxl:blue:power";
--			gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
- 		};
+@@ -206,18 +206,17 @@
  
  		led at 5 {
  			label = "lswxl:red:func";
--			gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
- 			default-state = "keep";
+-			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
+-			default-state = "keep";
++			gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
  		};
  
  		led at 6 {
  			label = "lswxl:red:hdderr0";
--			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
+-			gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
++			gpios = <&gpio0 8 GPIO_ACTIVE_HIGH>;
  		};
  
  		led at 7 {
  			label = "lswxl:red:hdderr1";
--			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
+-			gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
++			gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
  		};
  	};
  
-@@ -225,15 +226,15 @@
- 		pinctrl-0 = <&pmx_fan_low &pmx_fan_high &pmx_fan_lock>;
- 		pinctrl-names = "default";
- 
--		gpios = <&gpio0 47 GPIO_ACTIVE_LOW
--			 &gpio0 48 GPIO_ACTIVE_LOW>;
-+		gpios = <&gpio1 16 GPIO_ACTIVE_LOW
-+			 &gpio1 15 GPIO_ACTIVE_LOW>;
- 
- 		gpio-fan,speed-map = <0 3
- 				1500 2
- 				3250 1
- 				5000 0>;
- 
--		alarm-gpios = <&gpio1 49 GPIO_ACTIVE_HIGH>;
-+		alarm-gpios = <&gpio1 8 GPIO_ACTIVE_HIGH>;
- 	};
- 
- 	restart_poweroff {
-@@ -256,7 +257,7 @@
- 			enable-active-high;
- 			regulator-always-on;
- 			regulator-boot-on;
--			gpio = <&gpio0 37 GPIO_ACTIVE_HIGH>;
-+			gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
- 		};
- 		hdd_power0: regulator at 2 {
- 			compatible = "regulator-fixed";
 -- 
 2.1.4
