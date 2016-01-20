@@ -1,69 +1,58 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Wed, 20 Jan 2016 07:12:40 +0000
-Subject: [PATCH 1/2] regulator: act8945a: add regulator driver for ACT8945A
-In-Reply-To: <20160115175757.GA6588@sirena.org.uk>
-References: <1452218938-10621-1-git-send-email-wenyou.yang@atmel.com>
- <1452218938-10621-2-git-send-email-wenyou.yang@atmel.com>
- <20160115175757.GA6588@sirena.org.uk>
-Message-ID: <B256D81BAE5131468A838E5D7A243641D63F61A7@penmbx01>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Wed, 20 Jan 2016 15:19:41 +0800
+Subject: [PATCH v6 0/2] power: act8945a: add charger driver for the sub-device
+ of ACT8945A MFD
+Message-ID: <1453274383-24835-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+The ACT8945A is a Multi Function Device with the following subdevices:
+ - Regulator
+ - Charger
 
-Thank you for your review.
+This patch set is to add regulator driver for ACT8945A.
+It is based on the patch set:
+	http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/400534.html
 
-> -----Original Message-----
-> From: Mark Brown [mailto:broonie at kernel.org]
-> Sent: 2016?1?16? 1:58
-> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
-> Cc: Liam Girdwood <lgirdwood@gmail.com>; Rob Herring <robh+dt@kernel.org>;
-> Pawel Moll <pawel.moll@arm.com>; Mark Rutland <mark.rutland@arm.com>; Ian
-> Campbell <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>;
-> Ferre, Nicolas <Nicolas.FERRE@atmel.com>; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> devicetree at vger.kernel.org
-> Subject: Re: [PATCH 1/2] regulator: act8945a: add regulator driver for ACT8945A
-> 
-> On Fri, Jan 08, 2016 at 10:08:57AM +0800, Wenyou Yang wrote:
-> 
-> > +	np = of_get_child_by_name(pdev->dev.of_node, "regulators");
-> > +	if (!np) {
-> > +		dev_err(&pdev->dev, "regulator node not found\n");
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	matches = act8945a_matches;
-> > +	num_matches = ARRAY_SIZE(act8945a_matches);
-> > +
-> > +	ret = of_regulator_match(&pdev->dev, np, matches, num_matches);
-> 
-> Don't open code this, use the core regulators_node and of_match implementation
-> instead.
+Changes in v6:
+ - change the type value to unsigned int.
 
-Good. In the next version, I use the code implementation, and remove the redundant code.
+Changes in v5:
+ - remove spare spaces after #define.
+ - add OF match table.
+ - collect Reviewed-by from Krzysztof.
 
-Thank you for your advice.
+Changes in v4:
+ - use spaces after #define, not tabs.
+ - use BIT(n) macros to substitute (0x01 << x).
+ - change dt properties with more legible name.
+ - change the properties with more legible name, clearer description.
 
-> 
-> > +		dev_info(act8945a_dev->dev, "%s regulator registered\n",
-> > +			desc->name);
-> 
-> This is just noise, please remove it - let the core handle notifying users.
+Changes in v3:
+ - update the file header with short version license and author line.
+ - remove unused member of struct act8945a_charger, dev.
+ - action due to removing the member of stuct act8945a_dev, dev.
+ - remove the unnecessary print out.
+ - remove the unnecessary act8945a_charger_remove().
+ - fix align of the code-style.
 
-It is fixed in version 2.
+Changes in v2:
+ 1./ Substitute of_property_read_bool() for of_get_property().
+ 2./ Substitute devm_power_supply_register() for power_supply_register().
+ 3./ Use module_platform_driver(), instead of subsys_initcall().
+ 4./ Substitute MODULE_LICENSE("GPL") for MODULE_LICENSE("GPL v2").
 
-> 
-> > +static int __init act8945a_pmic_init(void) {
-> > +	return platform_driver_register(&act8945a_pmic_driver);
-> > +}
-> > +subsys_initcall(act8945a_pmic_init);
-> 
-> Please use module_platform_driver() unless there is a strong reason to do
-> otherwise.
+Wenyou Yang (2):
+  power: act8945a: add charger driver for ACT8945A
+  power: add documentation for ACT8945A's charger DT bindings
 
-It is fixed in version 2 too.
+ .../devicetree/bindings/power/act8945a-charger.txt |   33 ++
+ drivers/power/Kconfig                              |    7 +
+ drivers/power/Makefile                             |    1 +
+ drivers/power/act8945a_charger.c                   |  375 ++++++++++++++++++++
+ 4 files changed, 416 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power/act8945a-charger.txt
+ create mode 100644 drivers/power/act8945a_charger.c
 
-
-Best Regards,
-Wenyou Yang
+-- 
+1.7.9.5
