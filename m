@@ -1,40 +1,50 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Wed, 20 Jan 2016 10:32:45 -0600
-Subject: [PATCH 2/2] ARM: dts: am33xx: add support for Ka-Ro electronics
- TX48-7020 module
-In-Reply-To: <1453292992-1788-3-git-send-email-LW@KARO-electronics.de>
-References: <1453292992-1788-1-git-send-email-LW@KARO-electronics.de>
- <1453292992-1788-3-git-send-email-LW@KARO-electronics.de>
-Message-ID: <CAOCHtYhHiQmueqdxcvA48iC64eqq+Ey2gKNuwZjxaMYKeWPB-Q@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 20 Jan 2016 10:35:02 -0600
+Subject: [PATCH v4 3/4] soc: mediatek: Add MT2701 power dt-bindings
+In-Reply-To: <1453282161.16515.9.camel@mtksdaap41>
+References: <1453270097-53853-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1453270097-53853-4-git-send-email-jamesjj.liao@mediatek.com>
+ <1453282161.16515.9.camel@mtksdaap41>
+Message-ID: <20160120163502.GA22147@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +
-> +&am33xx_pinmux {
-> +       cpsw_default: cpsw_default {
-> +               pinctrl-single,pins = <
-> +                       /* Slave 1 */
-> +                       0x10c (PIN_INPUT_PULLDOWN | MUX_MODE1)  /* mii1_crs.rmii1_crs_dv */
-> +                       0x110 (PIN_INPUT_PULLDOWN | MUX_MODE1)  /* mii1_rxerr.rmii1_rxerr */
-> +                       0x114 (PIN_OUTPUT_PULLDOWN | MUX_MODE1) /* mii1_txen.rmii1_txen */
-> +                       0x124 (PIN_OUTPUT_PULLDOWN | MUX_MODE1) /* mii1_txd1.rmii1_txd1 */
-> +                       0x128 (PIN_OUTPUT_PULLDOWN | MUX_MODE1) /* mii1_txd0.rmii1_txd0 */
-> +                       0x13c (PIN_INPUT_PULLDOWN | MUX_MODE1)  /* mii1_rxd1.rmii1_rxd1 */
-> +                       0x140 (PIN_INPUT_PULLDOWN | MUX_MODE1)  /* mii1_rxd0.rmii1_rxd0 */
-> +                       0x144 (PIN_INPUT | SLEWCTRL_FAST | MUX_MODE0)   /* rmii1_ref_clk.rmii1_refclk */
-> +                       0x1e4 (PIN_INPUT_PULLUP | MUX_MODE7)    /* emu0.gpio3_7 */
-> +                       0x1e8 (PIN_OUTPUT_PULLDOWN | MUX_MODE7) /* emu1.gpio3_8 */
+On Wed, Jan 20, 2016 at 05:29:21PM +0800, Yingjoe Chen wrote:
+> On Wed, 2016-01-20 at 14:08 +0800, James Liao wrote:
+> > From: Shunli Wang <shunli.wang@mediatek.com>
+> > 
+> > Add power dt-bindings for MT2701.
+> > 
+> > Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/soc/mediatek/scpsys.txt    |  6 +++--
+> >  include/dt-bindings/power/mt2701-power.h           | 27 ++++++++++++++++++++++
+> >  2 files changed, 31 insertions(+), 2 deletions(-)
+> >  create mode 100644 include/dt-bindings/power/mt2701-power.h
+> > 
+> > diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+> > index a6c8afc..807d87f 100644
+> > --- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+> > +++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+> > @@ -9,10 +9,12 @@ domain control.
+> >  
+> >  The driver implements the Generic PM domain bindings described in
+> >  power/power_domain.txt. It provides the power domains defined in
+> > -include/dt-bindings/power/mt8173-power.h.
+> > +include/dt-bindings/power/mt8173-power.h and mt2701-power.h.
+> >  
+> >  Required properties:
+> > -- compatible: Must be "mediatek,mt8173-scpsys"
+> > +- compatible: Should be:
+> > +	- "mediatek,mt8173-scpsys"
+> > +	- "mediatek,mt2701-scpsys"
+> >  - #power-domain-cells: Must be 1
+> >  - reg: Address range of the SCPSYS unit
+> >  - infracfg: must contain a phandle to the infracfg controller
+> 
+> Please sort the list.
 
-please go thru and convert these all to use the AM33XX_IOPAD macro..
+And s/Should be/Should be one of/
 
-All the boards have been converted for the 4.5.0-rc0 merge..
-
-example:
-
-https://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/commit/?h=for-next&id=df10eadfce3510c2814e95d9f3d2d5d2c64eb26b
-
-Regards,
-
--- 
-Robert Nelson
-https://rcn-ee.com/
+Rob
