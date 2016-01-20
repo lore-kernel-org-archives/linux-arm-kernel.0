@@ -1,55 +1,129 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 20 Jan 2016 14:12:55 +0000
-Subject: [PATCH v1 3/3] mmc: pwrseq: convert to proper platform device
-In-Reply-To: <201601202021.zTCtxQVb%fengguang.wu@intel.com>
-References: <201601202021.zTCtxQVb%fengguang.wu@intel.com>
-Message-ID: <569F95E7.4080305@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 20 Jan 2016 08:18:06 -0600
+Subject: [PATCH v9 2/6] Documentation, dt, arm64/arm: dt bindings for numa.
+In-Reply-To: <1453134965-6125-3-git-send-email-gkulkarni@caviumnetworks.com>
+References: <1453134965-6125-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1453134965-6125-3-git-send-email-gkulkarni@caviumnetworks.com>
+Message-ID: <20160120141806.GA8434@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
-Just realized that this patch is totally broken when mmc support is 
-built as module. I will fix it and resend after v4.5-rc1
-
-Thanks for kbuild test robot :-)
-
---srini
-
-On 20/01/16 12:53, kbuild test robot wrote:
-> Hi Srinivas,
->
-> [auto build test ERROR on ulf.hansson-mmc/next]
-> [also build test ERROR on next-20160120]
-> [cannot apply to v4.4]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
->
-> url:    https://github.com/0day-ci/linux/commits/Srinivas-Kandagatla/mmc-pwrseq-convert-to-proper-driver/20160120-185020
-> base:   https://git.linaro.org/people/ulf.hansson/mmc next
-> config: openrisc-allmodconfig (attached as .config)
-> reproduce:
->          wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->          chmod +x ~/bin/make.cross
->          # save the attached .config to linux build tree
->          make.cross ARCH=openrisc
->
-> All error/warnings (new ones prefixed by >>):
->
->>> drivers/mmc/core/pwrseq_emmc.c:120:1: warning: data definition has no type or storage class
->>> drivers/mmc/core/pwrseq_emmc.c:120:1: error: type defaults to 'int' in declaration of 'device_initcall'
->     drivers/mmc/core/pwrseq_emmc.c:120:1: warning: parameter names (without types) in function declaration
->     drivers/mmc/core/pwrseq_emmc.c:120:1: warning: 'mmc_pwrseq_emmc_driver_init' defined but not used
->
-> vim +120 drivers/mmc/core/pwrseq_emmc.c
->
->     114		.driver = {
->     115			.name = "pwrseq_emmc",
->     116			.of_match_table = mmc_pwrseq_emmc_of_match,
->     117		},
->     118	};
->     119	
->   > 120	builtin_platform_driver(mmc_pwrseq_emmc_driver);
->
+On Mon, Jan 18, 2016 at 10:06:01PM +0530, Ganapatrao Kulkarni wrote:
+> DT bindings for numa mapping of memory, cores and IOs.
+> 
+> Reviewed-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
 > ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
->
+>  Documentation/devicetree/bindings/arm/numa.txt | 272 +++++++++++++++++++++++++
+>  1 file changed, 272 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
+
+This is looks okay to me, but some cosmetic things on the example.
+
+> +==============================================================================
+> +4 - Example dts
+> +==============================================================================
+> +
+> +2 sockets system consists of 2 boards connected through ccn bus and
+> +each board having one socket/soc of 8 cpus, memory and pci bus.
+> +
+> +	memory at 00c00000 {
+
+Drop the leading 0s on unit addresses.
+
+> +		device_type = "memory";
+> +		reg = <0x0 0x00c00000 0x0 0x80000000>;
+> +		/* node 0 */
+> +		numa-node-id = <0>;
+> +	};
+> +
+> +	memory at 10000000000 {
+> +		device_type = "memory";
+> +		reg = <0x100 0x00000000 0x0 0x80000000>;
+> +		/* node 1 */
+> +		numa-node-id = <1>;
+> +	};
+> +
+> +	cpus {
+> +		#address-cells = <2>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 000 {
+
+Same here (leaving one of course).
+
+> +			device_type = "cpu";
+> +			compatible =  "arm,armv8";
+> +			reg = <0x0 0x000>;
+> +			enable-method = "psci";
+> +			/* node 0 */
+> +			numa-node-id = <0>;
+> +		};
+> +		cpu at 001 {
+
+and so on...
+
+> +			device_type = "cpu";
+> +			compatible =  "arm,armv8";
+> +			reg = <0x0 0x001>;
+
+Either all leading 0s or none.
+
+> +			reg = <0x0 0x008>;
+> +			enable-method = "psci";
+> +			/* node 1 */
+
+Kind of a pointless comment.
+
+Wouldn't each cluster of cpus for a given numa node be in a different 
+cpu affinity? Certainly not required by the architecture, but the common 
+case at least.
+
+> +			numa-node-id = <1>;
+> +		};
+
+[...]
+
+> +	pcie0: pcie0 at 0x8480,00000000 {
+
+Drop the 0x and the comma.
+
+> +		compatible = "arm,armv8";
+> +		device_type = "pci";
+> +		bus-range = <0 255>;
+> +		#size-cells = <2>;
+> +		#address-cells = <3>;
+> +		reg = <0x8480 0x00000000 0 0x10000000>;  /* Configuration space */
+> +		ranges = <0x03000000 0x8010 0x00000000 0x8010 0x00000000 0x70 0x00000000>;
+> +		/* node 0 */
+> +		numa-node-id = <0>;
+> +        };
+> +
+> +	pcie1: pcie1 at 0x9480,00000000 {
+
+ditto
+
+> +		compatible = "arm,armv8";
+> +		device_type = "pci";
+> +		bus-range = <0 255>;
+> +		#size-cells = <2>;
+> +		#address-cells = <3>;
+> +		reg = <0x9480 0x00000000 0 0x10000000>;  /* Configuration space */
+> +		ranges = <0x03000000 0x9010 0x00000000 0x9010 0x00000000 0x70 0x00000000>;
+> +		/* node 1 */
+> +		numa-node-id = <1>;
+> +        };
+> +
+> +	distance-map {
+> +		compatible = "numa-distance-map-v1";
+> +		distance-matrix = <0 0 10>,
+> +				  <0 1 20>,
+> +				  <1 1 10>;
+> +	};
+> -- 
+> 1.8.1.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
