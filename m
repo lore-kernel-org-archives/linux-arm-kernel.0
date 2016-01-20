@@ -1,80 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Jan 2016 23:28:34 +0100
-Subject: [PATCH] net: i40e: avoid unused function warnings
-In-Reply-To: <1453328245.2958.28.camel@intel.com>
-References: <2806620.EpZqDlZTO3@wuerfel> <1453328245.2958.28.camel@intel.com>
-Message-ID: <8814508.SjLecHrQqA@wuerfel>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 20 Jan 2016 23:29:56 +0100
+Subject: [PATCH v2] clk-divider: make sure read-only dividers do not write
+ to their register
+In-Reply-To: <20160120221604.GC12841@codeaurora.org>
+References: <8710207.gKyLbM2bKY@phil> <3578615.iBrKplh45Q@phil>
+ <20160120221604.GC12841@codeaurora.org>
+Message-ID: <2694181.qDMgtzpC9k@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 January 2016 14:17:25 Jeff Kirsher wrote:
-> On Wed, 2016-01-20 at 11:42 +0100, Arnd Bergmann wrote:
-> > The addition of the geneve tunnel offload code left a couple
-> > of functions unconditionally defined but empty whenever CONFIG_VXLAN
-> > and CONFIG_GENEVE are disabled. gcc warns about this:
+Am Mittwoch, 20. Januar 2016, 14:16:56 schrieb Stephen Boyd:
+> On 01/20, Heiko Stuebner wrote:
+> > Commit e6d5e7d90be9 ("clk-divider: Fix READ_ONLY when divider > 1")
+> > removed the special ops struct for read-only clocks and instead opted
+> > to handle them regularly.
 > > 
-> > i40e_main.c:7049:13: warning: 'i40e_sync_udp_filters_subtask' defined
-> > but not used [-Wunused-function]
-> > i40e_main.c:8516:13: warning: 'i40e_add_vxlan_port' defined but not
-> > used [-Wunused-function]
-> > i40e_main.c:8561:13: warning: 'i40e_del_vxlan_port' defined but not
-> > used [-Wunused-function]
-> > i40e_main.c:8596:13: warning: 'i40e_add_geneve_port' defined but not
-> > used [-Wunused-function]
-> > i40e_main.c:8643:13: warning: 'i40e_del_geneve_port' defined but not
-> > used [-Wunused-function]
+> > On the rk3368 this results in breakage as aclkm now gets set a value.
+> > While it is the same divider value, the A53 core still doesn't like it,
+> > which can result in the cpu ending up in a hang.
+> > The reason being that "ACLKENMasserts one clock cycle before the rising
+> > edge of ACLKM" and the clock should only be touched when STANDBYWFIL2
+> > is asserted.
 > > 
-> > This moves the #ifdef statements to the outside of the affected
-> > functions, which avoids the warnings.
+> > So make sure read-only clocks don't touch the clock-register at all
+> > even if only writing the same value, as even writing the same value
+> > may not be safe in all cases.
 > > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: 6a899024058d ("i40e: geneve tunnel offload support")
+> > Fixes: e6d5e7d90be9 ("clk-divider: Fix READ_ONLY when divider > 1")
+> > Reported-by: Zhang Qing <zhangqing@rock-chips.com>
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > Reviewed-by: James Hogan <james.hogan@imgtec.com>
 > > ---
-> > This is a harmless regression against v4.4, found on ARM randconfig
-> > builds
 > 
-> Thanks Arnd, I already have a patch from Eric Dumazet and Alex Duyck to
-> resolve this issue.
+> Hmph, the same patch[1] has been sitting in my inbox for months
+> now but I never got a response to my last question and then
+> forgot about it. I'll repeat the question here and hopefully we
+> can finish the discussion.
 > 
-> Dave- I plan on pushing the fix later today to net.
+> Maybe it would make more sense to have different ops for read
+> only dividers? The clk_set_rate op would be empty, while we would
+> have proper recalc_rate and round_rate ops. We can't just flat
+> out revert commit e6d5e7d90be9 (clk-divider: Fix READ_ONLY when
+> divider > 1, 2014-11-14) because that will introduce the problem
+> that it was fixing, but as long as we implement round_rate in
+> addition to recalc_rate it should work.
+> 
+> [1]
+> http://lkml.kernel.org/r/1428392806-14538-1-git-send-email-jy0922.shim at sa
+> msung.com
 
-Ok, thanks.
+Sorry for the second submission then. That really is from quite a while ago. 
+Reintroducing a secondary ops-struct with a round-rate sounds fine for my 
+side - I'll give that a shot tomorrow.
 
-FWIW, I have another patch for this driver that I did not yet submit
-because it's not a regression and I haven't written a proper changelog
-for it (it's in a set of 15 patches for netdev that fix harmless warnings).
 
-Do you have one for the warning below as well? I could not come up
-with a better way than adding a bogus initialization, but maybe
-there is one.
-
-	Arnd
-
->From d89be3f0f932a71dfb5480ee396db514879097c4 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 15 Jan 2016 17:31:07 +0100
-Subject: [PATCH] net: i40e: shut up uninitialized variable warnings
-
-intel/i40e/i40e_txrx.c: In function 'i40e_xmit_frame_ring':
-intel/i40e/i40e_txrx.c:2367:20: error: 'oiph' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-intel/i40e/i40e_txrx.c:2317:16: note: 'oiph' was declared here
-intel/i40e/i40e_txrx.c:2367:17: error: 'oudph' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-intel/i40e/i40e_txrx.c:2316:17: note: 'oudph' was declared here
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/net/ethernet/intel/i40e/i40e_txrx.c b/drivers/net/ethernet/intel/i40e/i40e_txrx.c
-index 720516b0e8ee..47bd8b3145a7 100644
---- a/drivers/net/ethernet/intel/i40e/i40e_txrx.c
-+++ b/drivers/net/ethernet/intel/i40e/i40e_txrx.c
-@@ -2313,8 +2313,8 @@ static void i40e_tx_enable_csum(struct sk_buff *skb, u32 *tx_flags,
- 	struct iphdr *this_ip_hdr;
- 	u32 network_hdr_len;
- 	u8 l4_hdr = 0;
--	struct udphdr *oudph;
--	struct iphdr *oiph;
-+	struct udphdr *oudph = NULL;
-+	struct iphdr *oiph = NULL;
- 	u32 l4_tunnel = 0;
- 
- 	if (skb->encapsulation) {
+Heiko
