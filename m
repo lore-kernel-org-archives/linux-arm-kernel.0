@@ -1,43 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 19 Jan 2016 18:34:34 -0800
-Subject: [PATCH] mmc: pwrseq_simple: Make reset-gpios optional to match doc
-In-Reply-To: <CABxcv=mYRG0rikgtY-fPj_BFhY8hgn_LYjcxEeY14rZD-BHpfg@mail.gmail.com>
-References: <20160108090726.13066.66125.stgit@localhost>
- <CABxcv=mYRG0rikgtY-fPj_BFhY8hgn_LYjcxEeY14rZD-BHpfg@mail.gmail.com>
-Message-ID: <20160120023433.GG19432@atomide.com>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Wed, 20 Jan 2016 10:38:13 +0800
+Subject: A problem about SPI Interrupt Configuration
+Message-ID: <569EF315.2060203@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, Marc
 
-* Javier Martinez Canillas <javier@dowhile0.org> [160108 08:42]:
-> On Fri, Jan 8, 2016 at 6:07 AM, Martin Fuzzey <mfuzzey@parkeon.com> wrote:
-> > The DT binding doc says reset-gpios is an optional property but the code
-> > currently bails out if it is omitted.
-> >
-> > Make the code match the documentation.
-...
-> Tony already posted a fix for this before [0] but got some feedback so
-> is likely to post a v2 soon.
+I got some error messages "RWP timeout, gone fishing".
 
-Hmm I think my patch would end up looking pretty much like Martin's
-patch after fixing the comments. Based on what I understood, Ulf
-wants to keep pwrseq_simple, well, simple as discussed in [0].
+The case is :
 
-It also seems Ulf also wants to leave out the allocation, and does
-want to add any deeper knowledge of the state of the GPIOs in
-pwrse-simple. Instead, we can do device specific pwrseq for things
-like Marvell 8787 and so on.
+			CPU0												CPU1
+													acquire desc->lock in __setup_irq()
+															enable irq in __setup_irq()
+read iar in gic_handle_irq()
+waiting for desc->lock in handle_fasteoi_irq()
+												call gic_set_affinity() from setup_affinity()
+												waiting for the irq deactive in gic_do_wait_for_rwp()
 
-Ulf may have more comments, but $subject patch fixes the issue
-I'm seeing with wl12xx on omap5 devices:
 
-Tested-by: Tony Lindgren <tony@atomide.com>
+The hardware will not clear GICD_CTLR.RWP until the interrupt is not
+active. The interrupt is keeping active while it's waiting for
+desc->lock on cpu0. But the lock is hold by cpu1 while it's waiting for
+the interrupt is not active. It causes a deadlock here in 1s.
 
-Probably should be tagged Cc: stable # v4.4 when applied.
 
-Regards,
+And the GICv3 SPEC says:
 
-Tony
+4.5.5 SPI Interrupt Configuration
+To configure an SPI interrupt, to ensure that interrupts are never 
+distributed using partially updated configuration
+information, software must:
+o Ensure the interrupt is not active
+o Ensure that the interrupt is disabled
+o This might be done either by writing to GICD_CTLR to clear the enables 
+for a group, or
+o By writing to GICD_ICENABLERn to clear the Enable bit of the interrupt 
+(see section 5.3.11).
+o In both cases, software must poll GICD_CTLR.RWP to ensure the effects 
+are visible (see section
+5.3.20).
+o Program the routing (if appropriate), priority and group
+o Enable the interrupt (if required)
 
-> [0]: http://www.spinics.net/lists/linux-mmc/msg34398.html
+Because it says "Ensure the interrupt is not active", so I can not tell
+it is a hardware or software problem.
+
+Can you please give some advice?
+
+Thanks,
+Yang
