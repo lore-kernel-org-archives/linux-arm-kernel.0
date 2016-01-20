@@ -1,27 +1,70 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 20 Jan 2016 10:45:55 +0000
-Subject: [PATCH] ASoC: avoid unused variable warning for rt5659_acpi_match
-In-Reply-To: <2238845.aZnycJVYKR@wuerfel>
-References: <2238845.aZnycJVYKR@wuerfel>
-Message-ID: <20160120104555.GY6588@sirena.org.uk>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 20 Jan 2016 10:46:10 +0000
+Subject: [PATCH v1 1/3] mmc: pwrseq_simple: add to_pwrseq_simple() macro
+In-Reply-To: <1453286730-9616-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1453286730-9616-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1453286770-9660-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 20, 2016 at 11:43:48AM +0100, Arnd Bergmann wrote:
-> The newly added rt5659 codec driver unconditionally defines an
-> ACPI device match table but then uses ACPI_PTR() to remove the
-> only reference to it, so we get a harmless build warning:
+This patch adds to_pwrseq_simple() macro to make the code more readable.
 
-> sound/soc/codecs/rt5659.c:4200:30: warning: 'rt5659_acpi_match' defined but not used [-Wunused-variable]
->  static struct acpi_device_id rt5659_acpi_match[] = {
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ drivers/mmc/core/pwrseq_simple.c | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
 
-> This removes the ACPI_PTR() to avoid the warning.
-
-Why is this a better fix than conditionally defining the table?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160120/ce9df5db/attachment.sig>
+diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
+index 2b16263..3e07533 100644
+--- a/drivers/mmc/core/pwrseq_simple.c
++++ b/drivers/mmc/core/pwrseq_simple.c
+@@ -26,6 +26,8 @@ struct mmc_pwrseq_simple {
+ 	struct gpio_descs *reset_gpios;
+ };
+ 
++#define to_pwrseq_simple(p) container_of(p, struct mmc_pwrseq_simple, pwrseq)
++
+ static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
+ 					      int value)
+ {
+@@ -42,8 +44,7 @@ static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
+ 
+ static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
+ {
+-	struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
+-					struct mmc_pwrseq_simple, pwrseq);
++	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
+ 
+ 	if (!IS_ERR(pwrseq->ext_clk) && !pwrseq->clk_enabled) {
+ 		clk_prepare_enable(pwrseq->ext_clk);
+@@ -55,16 +56,14 @@ static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
+ 
+ static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
+ {
+-	struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
+-					struct mmc_pwrseq_simple, pwrseq);
++	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
+ 
+ 	mmc_pwrseq_simple_set_gpios_value(pwrseq, 0);
+ }
+ 
+ static void mmc_pwrseq_simple_power_off(struct mmc_host *host)
+ {
+-	struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
+-					struct mmc_pwrseq_simple, pwrseq);
++	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
+ 
+ 	mmc_pwrseq_simple_set_gpios_value(pwrseq, 1);
+ 
+@@ -76,8 +75,7 @@ static void mmc_pwrseq_simple_power_off(struct mmc_host *host)
+ 
+ static void mmc_pwrseq_simple_free(struct mmc_host *host)
+ {
+-	struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
+-					struct mmc_pwrseq_simple, pwrseq);
++	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
+ 
+ 	gpiod_put_array(pwrseq->reset_gpios);
+ 
+-- 
+1.9.1
