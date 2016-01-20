@@ -1,121 +1,123 @@
 From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Thu, 21 Jan 2016 00:33:53 +0900
-Subject: [PATCH v2 2/7] ARM: dts: kirkwood: gpio pin fixes for linkstation
- ls-wvl/vl
+Date: Thu, 21 Jan 2016 00:33:56 +0900
+Subject: [PATCH v2 5/7] ARM: dts: kirkwood: relicense dts of ls-wvl/vl and
+ ls-wxl/wsxl under GPLv2/X11
 In-Reply-To: <1453304038-28345-1-git-send-email-rogershimizu@gmail.com>
 References: <1453211342-25214-1-git-send-email-rogershimizu@gmail.com>
  <1453304038-28345-1-git-send-email-rogershimizu@gmail.com>
-Message-ID: <1453304038-28345-3-git-send-email-rogershimizu@gmail.com>
+Message-ID: <1453304038-28345-6-git-send-email-rogershimizu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For kirkwood, gpio pins starts from 32 are in the 2nd bank, so it should be
-converted to "gpio1 <pin minus 32>" in dts file.
-e.g. gpio 40 should be "gpio1 8"
-
-The pin/bank issue was found when discussing Debian Bug #810894
-  [https://bugs.debian.org/810894#47]
-
-Fixes: c43379e150aa ("ARM: dts: add buffalo linkstation ls-wvl/vl")
-Reported-by: Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>
 Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
 ---
- arch/arm/boot/dts/kirkwood-lswvl.dts | 25 +++++++++++++------------
- 1 file changed, 13 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/kirkwood-lswvl.dts | 41 ++++++++++++++++++++++++++++++++----
+ arch/arm/boot/dts/kirkwood-lswxl.dts | 41 ++++++++++++++++++++++++++++++++----
+ 2 files changed, 74 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/boot/dts/kirkwood-lswvl.dts b/arch/arm/boot/dts/kirkwood-lswvl.dts
-index 09eed3cea0af..28fd9abd7a57 100644
+index 20b6b0c8b3ec..59ac94cc93e9 100644
 --- a/arch/arm/boot/dts/kirkwood-lswvl.dts
 +++ b/arch/arm/boot/dts/kirkwood-lswvl.dts
-@@ -1,7 +1,8 @@
- /*
-  * Device Tree file for Buffalo Linkstation LS-WVL/VL
+@@ -4,10 +4,43 @@
+  * Copyright (C) 2015, 2016
+  * Roger Shimizu <rogershimizu@gmail.com>
   *
-- * Copyright (C) 2015, rogershimizu at gmail.com
-+ * Copyright (C) 2015, 2016
-+ * Roger Shimizu <rogershimizu@gmail.com>
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version
+- * 2 of the License, or (at your option) any later version.
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+ 
+ /dts-v1/;
+diff --git a/arch/arm/boot/dts/kirkwood-lswxl.dts b/arch/arm/boot/dts/kirkwood-lswxl.dts
+index f4700a60065b..5bc0b597c9c2 100644
+--- a/arch/arm/boot/dts/kirkwood-lswxl.dts
++++ b/arch/arm/boot/dts/kirkwood-lswxl.dts
+@@ -4,10 +4,43 @@
+  * Copyright (C) 2015, 2016
+  * Roger Shimizu <rogershimizu@gmail.com>
   *
-  * This program is free software; you can redistribute it and/or
-  * modify it under the terms of the GNU General Public License
-@@ -156,21 +157,21 @@
- 		button at 1 {
- 			label = "Function Button";
- 			linux,code = <KEY_OPTION>;
--			gpios = <&gpio0 45 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
- 		};
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version
+- * 2 of the License, or (at your option) any later version.
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
+  */
  
- 		button at 2 {
- 			label = "Power-on Switch";
- 			linux,code = <KEY_RESERVED>;
- 			linux,input-type = <5>;
--			gpios = <&gpio0 46 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
- 		};
- 
- 		button at 3 {
- 			label = "Power-auto Switch";
- 			linux,code = <KEY_ESC>;
- 			linux,input-type = <5>;
--			gpios = <&gpio0 47 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
- 		};
- 	};
- 
-@@ -185,38 +186,38 @@
- 
- 		led at 1 {
- 			label = "lswvl:red:alarm";
--			gpios = <&gpio0 36 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
- 		};
- 
- 		led at 2 {
- 			label = "lswvl:red:func";
--			gpios = <&gpio0 37 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
- 		};
- 
- 		led at 3 {
- 			label = "lswvl:amber:info";
--			gpios = <&gpio0 38 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
- 		};
- 
- 		led at 4 {
- 			label = "lswvl:blue:func";
--			gpios = <&gpio0 39 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
- 		};
- 
- 		led at 5 {
- 			label = "lswvl:blue:power";
--			gpios = <&gpio0 40 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
- 			default-state = "keep";
- 		};
- 
- 		led at 6 {
- 			label = "lswvl:red:hdderr0";
--			gpios = <&gpio0 34 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
- 		};
- 
- 		led at 7 {
- 			label = "lswvl:red:hdderr1";
--			gpios = <&gpio0 35 GPIO_ACTIVE_LOW>;
-+			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
- 		};
- 	};
- 
-@@ -233,7 +234,7 @@
- 				3250 1
- 				5000 0>;
- 
--		alarm-gpios = <&gpio0 43 GPIO_ACTIVE_HIGH>;
-+		alarm-gpios = <&gpio1 11 GPIO_ACTIVE_HIGH>;
- 	};
- 
- 	restart_poweroff {
+ /dts-v1/;
 -- 
 2.1.4
