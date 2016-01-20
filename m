@@ -1,19 +1,28 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Tue, 19 Jan 2016 16:15:00 -0800
-Subject: [PATCH 00/19] arm64 kexec kernel patches v13
-In-Reply-To: <20160119123230.GB2904@dhcp-128-65.nay.redhat.com>
-References: <cover.1452884156.git.geoff@infradead.org>
- <20160119123230.GB2904@dhcp-128-65.nay.redhat.com>
-Message-ID: <1453248900.21755.8.camel@infradead.org>
+From: lho@apm.com (Loc Ho)
+Date: Tue, 19 Jan 2016 17:46:49 -0700
+Subject: [PATCH v2 0/3] edac: xgene: Add missing SoC register bus error
+ handling and fix CE promotes to UE
+Message-ID: <1453250812-15097-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-01-19 at 20:32 +0800, Dave Young wrote:
-> Geoff, another question about kexec-tools part is, can the kexec
-> -tools code
-> been written in kernel? We have the infrastructure for kexec_file_load.
+Add missing register bus error handling for SoC and fix an checking
+condition for CE error promotes to UE. DT binding and documentation are
+also updated.
 
-I see no technical reason why the arm64 kernel cannot support
-kexec_file_load.
+v2:
+* Make the register bus resource optional
+* Update DT binding accordinlgy
 
--Geoff
+---
+Loc Ho (3):
+  Documentation: Update the APM X-Gene SoC EDAC DTS binding for missing
+    RB
+  edac: xgene: Add missing SoC register bus error handling and fix CE
+    promotes to UE
+  arm64: Update the APM X-Gene EDAC node with the RB register resource
+
+ .../devicetree/bindings/edac/apm-xgene-edac.txt    |   12 ++++
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |    6 ++
+ drivers/edac/xgene_edac.c                          |   70 +++++++++++++++++++-
+ 3 files changed, 87 insertions(+), 1 deletions(-)
