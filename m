@@ -1,62 +1,105 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 20 Jan 2016 19:29:47 +0200
-Subject: [PATCH 1/2] regulator: ltc3589: make IRQ optional
-In-Reply-To: <1453292992-1788-2-git-send-email-LW@KARO-electronics.de>
-References: <1453292992-1788-1-git-send-email-LW@KARO-electronics.de>
- <1453292992-1788-2-git-send-email-LW@KARO-electronics.de>
-Message-ID: <569FC40B.5030902@ti.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Wed, 20 Jan 2016 09:55:06 -0800
+Subject: iProc bus scanning regression (after "PCI: iproc: Add PAXC
+ interface support")
+In-Reply-To: <CACna6rxyMoarw=Yq93gijXeXx5bm35hzAs-+9w3SaXg7e1thtQ@mail.gmail.com>
+References: <CACna6rx2t7Zg_xSVvYqZTW2dYEgRugaorV58Zy1YZ4Wy=+L4fQ@mail.gmail.com>
+ <CACna6rzMK4Htci8AucHVi1TNjBkxdQiy60MWJ234J8=4B_vteA@mail.gmail.com>
+ <569F41B1.6000005@broadcom.com>
+ <CACna6rxyMoarw=Yq93gijXeXx5bm35hzAs-+9w3SaXg7e1thtQ@mail.gmail.com>
+Message-ID: <569FC9FA.4090607@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2016 02:29 PM, Lothar Wa?mann wrote:
-> On the AM335x SoC rev. <= 1.0 the "Input Function of the EXTINTn
-> Terminal is Inverted", for which the only remedy is to "Use an active
-> high interrupt source or use an external inverter to change the
-> polarity of any active low interrupt source."
-> 
-> This pin is used as IRQ pin for the LTC3589 PMIC on the Ka-Ro
-> electronics TX48 module. Make the IRQ optional in the driver and use a
-> polling routine instead if no IRQ is specified in DT.
-> Otherwise the driver will continuously generate interrupts and make
-> the system unusable.
-> 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> ---
->   drivers/regulator/ltc3589.c | 49 +++++++++++++++++++++++++++++++++++++++++----
->   1 file changed, 45 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/regulator/ltc3589.c b/drivers/regulator/ltc3589.c
+Hi Rafal,
 
-[...]
+On 1/20/2016 8:43 AM, Rafa? Mi?ecki wrote:
+> On 20 January 2016 at 09:13, Ray Jui <rjui@broadcom.com> wrote:
+>> On 1/19/2016 11:02 PM, Rafa? Mi?ecki wrote:
+>>>
+>>> On 20 January 2016 at 07:53, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+>>>>
+>>>> In OpenWrt trunk code we use iProc driver for PCIe controllers on bcma
+>>>> bus (PCIE_IPROC_BCMA). Right now we use 4.1 kernel but we backported
+>>>> all iProc changes. Unfortunately backporting set queued for 4.5 broke
+>>>> bus scanning on some routers.
+>>>>
+>>>> Most BCM4708 / BCM4709 chipsets have 3 PCIe controllers. All known
+>>>> routers use only first 2 of them. Even if router has 3 PCIe cards, the
+>>>> last two cards are connected to the 2nd PCIe controller.
+>>>>
+>>>> So that PAXC patch broke support for routers with 3 cards, 2 of them
+>>>> at the 2nd controller. It doesn't affect routers with just 2 cards.
+>>>> This problem was tracked down in:
+>>>> https://dev.openwrt.org/ticket/21393
+>>>>
+>>>> I'm attaching two OpenWrt boot logs.
+>>>> 1) r48381
+>>>> It contains all backported iProc changes. The log looks "nice", but
+>>>> only one card (0000:01:00.0) was detected.
+>>>> 2) r48382
+>>>> It contains "Revert "PCI: iproc: Add PAXC interface support"" patch.
+>>>> It contains many "[Firmware Bug]: reg 0x??: invalid BAR (can't size)"
+>>>> messages but there are all 3 cards detected: 0000:01:00.0,
+>>>> 0001:03:00.0 and 0001:04:00.0 (see brcmfmac messages).
+>>>>
+>>>> Can you take a look at this problem, please?
+>>>
+>>>
+>>> linux-arm-kernel@ stopped my e-mail due to its size. Sending
+>>> compressed attachments.
+>>>
+>>
+>> I'm a bit confused by these logs that you provided. Based on the log, there
+>> seems to be 3 PCIe root complexes populated on the platform, domain
+>> 0000:00:00.0, 0001:00:00:0, 0002:00:00:0 are the 3 root complexes. Root
+>> complex 0002 seems to have nothing connected since it does not detect any
+>> EP.
+>>
+>> Is the first card installed on root complex 0 (domain 0000), but the second
+>> card and 3rd card are both installed on root complex 1 (domain 0001) on
+>> different slots or something?
+>>
+>> I suspect a potential issue is in this function:
+>>
+>> 173 static inline bool iproc_pcie_device_is_valid(struct iproc_pcie *pcie,
+>> 174                                               unsigned int slot,
+>> 175                                               unsigned int fn)
+>> 176 {
+>> 177         if (slot > 0)
+>> 178                 return false;
+>> 179
+>> 180         /* PAXC can only support limited number of functions */
+>> 181         if (pcie->type == IPROC_PCIE_PAXC && fn >= MAX_NUM_PAXC_PF)
+>> 182                 return false;
+>> 183
+>> 184         return true;
+>> 185 }
+>>
+>> Compared to the original code, it's different. Can you try passing bus
+>> number into the function as another argument and do the following check on
+>> line 177:
+>>
+>> if (busnum == 0 && slot > 0)
+>>      return false;
+>>
+>> instead of
+>>
+>> if (slot > 0)
+>>      return false;
+>
+> This did work, thanks! I can see again all these scary
+> [Firmware Bug]: reg 0x??: invalid BAR (can't size)
+> messages but also all 3 cards were detected!
+>
+> Will you submit a patch for this, please?
+>
 
->   }
-> @@ -519,6 +539,16 @@ static int ltc3589_probe(struct i2c_client *client,
->   			return ret;
->   		}
->   	}
-> +	if (client->irq <= 0) {
-> +		dev_warn(dev,
-> +			"No interrupt configured; poll for thermal shutdown and undervoltage events\n");
-> +
-> +		INIT_DELAYED_WORK(&ltc3589->poll_timer, ltc3589_poll_func);
-> +		schedule_delayed_work(&ltc3589->poll_timer,
-> +				msecs_to_jiffies(POLL_PERIOD));
-> +
-> +		return 0;
-> +	}
->   
->   	ret = devm_request_threaded_irq(dev, client->irq, NULL, ltc3589_isr,
->   					IRQF_TRIGGER_LOW | IRQF_ONESHOT,
-					^^^^^^^^^^^^^^^^
+Thanks for helping to test.
 
-I assume you have issue with IRQ because of the above hard-coded flag.
-if yes - Over all approach for such kind of issues - do not hard-code IRQ triggering 
-flags in code in case of DT boot. DT core will configure it properly.
+Let me run a few tests on my platforms today and after that I'll submit 
+a fix.
 
+Thanks,
 
-
-[...]
-
--- 
-regards,
--grygorii
+Ray
