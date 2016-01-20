@@ -1,81 +1,72 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 20 Jan 2016 15:04:33 +0000
-Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
-In-Reply-To: <CAKv+Gu9pVAWWRyM+oTpzGUCdeuMXkdnz5cAJnZk3jfE9uKVREw@mail.gmail.com>
-References: <20160119014332.GB2919@dhcp-128-65.nay.redhat.com>
- <569DCB30.9010501@linaro.org>
- <20160119122848.GA2904@dhcp-128-65.nay.redhat.com>
- <20160119125114.GH25024@leverpostej>
- <20160119134553.GA2986@dhcp-128-65.nay.redhat.com>
- <20160119140139.GC26545@leverpostej> <569F1A33.4000208@linaro.org>
- <20160120120257.GD25829@leverpostej>
- <20160120123620.GE25829@leverpostej>
- <CAKv+Gu9pVAWWRyM+oTpzGUCdeuMXkdnz5cAJnZk3jfE9uKVREw@mail.gmail.com>
-Message-ID: <20160120150432.GB28169@leverpostej>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 20 Jan 2016 09:05:22 -0600
+Subject: [LINUX PATCH 4/5] Documentation: mmc: Updated the binding doc for
+ Arasan SDHCI.
+In-Reply-To: <4FF8F58FAA9D5D4193D4E554E4352C5902C527B7@XAP-PVEXMBX02.xlnx.xilinx.com>
+References: <1453213055-35563-1-git-send-email-lakshmis@xilinx.com>
+ <1453213055-35563-4-git-send-email-lakshmis@xilinx.com>
+ <20160119171611.GA2708@rob-hp-laptop>
+ <4FF8F58FAA9D5D4193D4E554E4352C5902C527B7@XAP-PVEXMBX02.xlnx.xilinx.com>
+Message-ID: <CAL_JsqLAwzFc2X2UKF5scYuf_h3xNcLibnMLhFnKZR_=0=JR8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 20, 2016 at 03:59:08PM +0100, Ard Biesheuvel wrote:
-> On 20 January 2016 at 13:36, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Ard, Ganapatrao, the below is something we need to consider for the
-> > combination of the NUMA & kexec approaches. It only becomes a problem
-> > if/when we preserve DT memory nodes in the presence of EFI, though it
-> > would be nice to not box ourselves into a corner.
-> >
-> > On Wed, Jan 20, 2016 at 12:02:58PM +0000, Mark Rutland wrote:
-> >> On Wed, Jan 20, 2016 at 02:25:07PM +0900, AKASHI Takahiro wrote:
-> >> > On 01/19/2016 11:01 PM, Mark Rutland wrote:
-> >> > >For NUMA topology in !ACPI kernels, we might need to also retain and
-> >> > >parse memory nodes, but only for toplogy information. The kernel would
-> >> > >still only use memory as described by the EFI memory map.
-> >> > >
-> >> > >There's a horrible edge case I've spotted if performing a chain of
-> >> > >cross-endian kexecs: LE -> BE -> LE, as the BE kernel would have to
-> >> > >respect the EFI memory map so as to avoid corrupting it for the
-> >> > >subsequent LE kernel. Other than this I believe everything should just
-> >> > >work.
-> >> >
-> >> > BE kernel doesn't support UEFI yet and cannot access UEFI memmap table. So,
-> >> > for LE -> BE, we don't use a dtb generated from /sys/firmware/fdt (or /proc/device-tree)
-> >> > (as in the case of LE -> LE) and require users to provide a dtb file explicitly.
-> >>
-> >> As I mentioned above, the problem exists when memory nodes also exist
-> >> (for describing NUMA topology). In that case the BE kernel would try to
-> >> use the information from the memory nodes.
-> >>
-> >> > For BE -> LE, BE kernel doesn't know wther UEFI memmap table is available or not
-> >> > and so use the same (explicitly-provided) dtb (as LE -> LE in !UEFI)
-> >>
-> >> See above. The problem I imagine is:
-> >>
-> >> LE kernel - uses EFI mmap, takes NUMA information from DT memory nodes
-> >>
-> >>     v       kexec
-> >>
-> >> BE kernel - uses DT memory nodes
-> >>           - clobbers EFI runtime regions as it sees them as available
-> >>
-> >>     v       kexec
-> >>
-> >> LE kernel - uses EFI mmap, takes NUMA information from DT memory nodes
-> >>           - tries to call EFI runtime services, and explodes.
-> >
-> > I'm not really sure what the best approach is here, but I thought that
-> > it would be good to raise awareness of the edge-case.
-> >
-> 
-> I think we should simply allow the BE kernel to deal with a UEFI
-> memory map. It only involves a bit of byte swapping (which I already
-> implemented at some point)
-> 
-> It would require some minor refactoring to make the UEFI init code
-> separate from all the other bits, but I don't see any major issues
-> here
+On Tue, Jan 19, 2016 at 11:51 PM, Lakshmi Sai Krishna Potthuri
+<lakshmi.sai.krishna.potthuri@xilinx.com> wrote:
+> Hi,
+>
+>> -----Original Message-----
+>> From: Rob Herring [mailto:robh at kernel.org]
+>> Sent: Tuesday, January 19, 2016 10:46 PM
+>> To: Lakshmi Sai Krishna Potthuri
+>> Cc: Michal Simek; Soren Brinkmann; Ulf Hansson; Kevin Hao; Emil P. Lenchak;
+>> Tobias Klauser; Sudeep Holla; Adrian Hunter; Jisheng Zhang; Ivan T. Ivanov;
+>> Scott Branden; Vincent Yang; Haibo Chen; Marek Vasut;
+>> ludovic.desroches at atmel.com; Pawel Moll; Mark Rutland; Ian Campbell;
+>> Kumar Gala; Suman Tripathi; Shawn Lin; devicetree at vger.kernel.org; Harini
+>> Katakam; linux-mmc at vger.kernel.org; linux-kernel at vger.kernel.org;
+>> Lakshmi Sai Krishna Potthuri; Anirudha Sarangi; Punnaiah Choudary Kalluri;
+>> linux-arm-kernel at lists.infradead.org
+>> Subject: Re: [LINUX PATCH 4/5] Documentation: mmc: Updated the binding
+>> doc for Arasan SDHCI.
+>>
+>> On Tue, Jan 19, 2016 at 07:47:34PM +0530, P L Sai Krishna wrote:
+>> > This patch adds broken-mmc-highspeed property to the binding doc for
+>> > Arasan SDHCI.
+>> >
+>> > Signed-off-by: P L Sai Krishna <lakshmis@xilinx.com>
+>> > ---
+> <snip>
+>> > -
+>> > +  - broken-mmc-highspeed: Indicates to force
+>> > +                           the controller to use in standard speed.
+>>
+>> We already have the inverse of this with "cap-mmc-highspeed".
+>>
+>> The only potential problem is it will need to be added to existing DTs if you
+>> start disabling high speed by default. Maybe that's not an issue for users of
+>> the Arasan driver.
+>>
+>
+> It might be an issue for other users.
+> I know that it will be an issue for older Xilinx SoC (Zynq), for ex.
+>
+>> Otherwise, you should determine this with a more specific compatible string.
+>>
+>
+> Since this feature might be broken on any SoC, I thought it would be
+> good to provide a dt property.
+> Using a compatibility string will offer no flexibility as per board or silicon.
 
-Ok. I had assumed that getting the BE kernel to deal with the UEFI
-memory map would be a bit more involved.
+I've thought about this some more. Since this is an override of the
+SDHCI capabilities register, I'm okay with this property. However, it
+should be common to all SDHCI controller and handled in the core SDHCI
+code. Another way this could be handled is directly provide an
+override value for the capability register in the DT. Then we don't
+have to provide a property for every capability bit.
 
-I'm happy to be proven wrong. :)
+Additionally, the Arasan binding needs to have SOC specific compatible
+strings. IP vendor strings alone have been proven often to be
+insufficient.
 
-Thanks,
-Mark.
+Rob
