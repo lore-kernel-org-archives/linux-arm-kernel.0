@@ -1,29 +1,43 @@
-From: zhangqing@rock-chips.com (zhangqing)
-Date: Wed, 20 Jan 2016 02:28:05 -0800
-Subject: [PATCH v3 0/3] SoC: rockchip: support power domain for RK3368
-In-Reply-To: <1452508600-3512-1-git-send-email-zhangqing@rock-chips.com>
-References: <1452508600-3512-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <569F6135.1070902@rock-chips.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 19 Jan 2016 18:34:34 -0800
+Subject: [PATCH] mmc: pwrseq_simple: Make reset-gpios optional to match doc
+In-Reply-To: <CABxcv=mYRG0rikgtY-fPj_BFhY8hgn_LYjcxEeY14rZD-BHpfg@mail.gmail.com>
+References: <20160108090726.13066.66125.stgit@localhost>
+ <CABxcv=mYRG0rikgtY-fPj_BFhY8hgn_LYjcxEeY14rZD-BHpfg@mail.gmail.com>
+Message-ID: <20160120023433.GG19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+* Javier Martinez Canillas <javier@dowhile0.org> [160108 08:42]:
+> On Fri, Jan 8, 2016 at 6:07 AM, Martin Fuzzey <mfuzzey@parkeon.com> wrote:
+> > The DT binding doc says reset-gpios is an optional property but the code
+> > currently bails out if it is omitted.
+> >
+> > Make the code match the documentation.
+...
+> Tony already posted a fix for this before [0] but got some feedback so
+> is likely to post a v2 soon.
 
-On 01/11/2016 02:36 AM, zhangqing wrote:
-> add pd id in rk3368-power.h
-> modify pm_domains.c to support RK3368 SoC
-> add RK3368 document for Rockchip power domains
->
-> zhangqing (3):
->    dt-bindings: add power-domain header for RK3368 SoCs
->    soc: rockchip: power-domain: Modify power domain driver for rk3368
->    dt-bindings: modify document of Rockchip power domains
+Hmm I think my patch would end up looking pretty much like Martin's
+patch after fixing the comments. Based on what I understood, Ulf
+wants to keep pwrseq_simple, well, simple as discussed in [0].
 
-Are there any other questions about the three patches.Please review.
->
->   .../bindings/soc/rockchip/power_domain.txt         | 21 ++++++++++++++
->   drivers/soc/rockchip/pm_domains.c                  | 33 ++++++++++++++++++++++
->   include/dt-bindings/power/rk3368-power.h           | 28 ++++++++++++++++++
->   3 files changed, 82 insertions(+)
->   create mode 100644 include/dt-bindings/power/rk3368-power.h
->
+It also seems Ulf also wants to leave out the allocation, and does
+want to add any deeper knowledge of the state of the GPIOs in
+pwrse-simple. Instead, we can do device specific pwrseq for things
+like Marvell 8787 and so on.
+
+Ulf may have more comments, but $subject patch fixes the issue
+I'm seeing with wl12xx on omap5 devices:
+
+Tested-by: Tony Lindgren <tony@atomide.com>
+
+Probably should be tagged Cc: stable # v4.4 when applied.
+
+Regards,
+
+Tony
+
+> [0]: http://www.spinics.net/lists/linux-mmc/msg34398.html
