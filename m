@@ -1,52 +1,56 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 21 Jan 2016 00:04:09 +0800
-Subject: [PATCH v1 3/3] mmc: pwrseq: convert to proper platform device
-In-Reply-To: <1453286796-9746-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <201601210051.TQCHmnMK%fengguang.wu@intel.com>
+From: bart.vanassche@sandisk.com (Bart Van Assche)
+Date: Wed, 20 Jan 2016 08:10:32 -0800
+Subject: [PATCH] scsi: qla2xxxx: avoid type mismatch in comparison
+In-Reply-To: <1603472.f34vvTrhuN@wuerfel>
+References: <1603472.f34vvTrhuN@wuerfel>
+Message-ID: <569FB178.9050101@sandisk.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
+On 01/20/2016 02:47 AM, Arnd Bergmann wrote:
+> A recent bug fix added code that does
+>
+>          bool logged_out = (status & 0xFFFF);
+>          if (logged_out == CTIO_PORT_LOGGED_OUT)
+> 		...
+>
+> This looks wrong because we are comparing a boolean with an
+> integer constant, ang gcc warns about it accordingly:
+>
+> drivers/scsi/qla2xxx/qla_target.c: In function 'qlt_do_ctio_completion':
+> drivers/scsi/qla2xxx/qla_target.c:3587:20: warning: comparison of constant '41' with boolean expression is always false [-Wbool-compare]
+>          (logged_out == CTIO_PORT_LOGGED_OUT) ?
+>
+> The correct fix is presumably to make that variable an 'int'.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 71cdc0796465 ("qla2xxx: Delete session if initiator is gone from FW")
+> ---
+> The patch introducing this is currenly in linux-next through the target-updates/for-next
+> branch.
+>
+> diff --git a/drivers/scsi/qla2xxx/qla_target.c b/drivers/scsi/qla2xxx/qla_target.c
+> index c7ab9e69c881..8075a4cdb45c 100644
+> --- a/drivers/scsi/qla2xxx/qla_target.c
+> +++ b/drivers/scsi/qla2xxx/qla_target.c
+> @@ -3580,7 +3580,7 @@ static void qlt_do_ctio_completion(struct scsi_qla_host *vha, uint32_t handle,
+>   		case CTIO_PORT_LOGGED_OUT:
+>   		case CTIO_PORT_UNAVAILABLE:
+>   		{
+> -			bool logged_out = (status & 0xFFFF);
+> +			int logged_out = (status & 0xFFFF);
+>   			ql_dbg(ql_dbg_tgt_mgt, vha, 0xf059,
+>   			    "qla_target(%d): CTIO with %s status %x "
+>   			    "received (state %x, se_cmd %p)\n", vha->vp_idx,
+>
 
-[auto build test ERROR on ulf.hansson-mmc/next]
-[also build test ERROR on next-20160120]
-[cannot apply to v4.4]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Hello Arnd,
 
-url:    https://github.com/0day-ci/linux/commits/Srinivas-Kandagatla/mmc-pwrseq-convert-to-proper-driver/20160120-185020
-base:   https://git.linaro.org/people/ulf.hansson/mmc next
-config: tile-allmodconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=tile 
+Please read the e-mail thread that is available at 
+http://thread.gmane.org/gmane.linux.scsi/108899/focus=108943. That 
+thread namely makes it clear that the above patch is not the proper way 
+to fix that code.
 
-All error/warnings (new ones prefixed by >>):
+Thanks,
 
->> drivers/mmc/core/pwrseq_simple.c:149:1: warning: data definition has no type or storage class [enabled by default]
->> drivers/mmc/core/pwrseq_simple.c:149:1: error: type defaults to 'int' in declaration of 'device_initcall'
-   drivers/mmc/core/pwrseq_simple.c:149:1: warning: parameter names (without types) in function declaration [enabled by default]
-   drivers/mmc/core/pwrseq_simple.c:149:1: warning: 'mmc_pwrseq_simple_driver_init' defined but not used
-   cc1: some warnings being treated as errors
-
-vim +149 drivers/mmc/core/pwrseq_simple.c
-
-   143		.driver = {
-   144			.name = "pwrseq_simple",
-   145			.of_match_table = mmc_pwrseq_simple_of_match,
-   146		},
-   147	};
-   148	
- > 149	builtin_platform_driver(mmc_pwrseq_simple_driver);
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 42887 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160121/27e6bf60/attachment-0001.obj>
+Bart.
