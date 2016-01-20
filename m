@@ -1,51 +1,16 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 20 Jan 2016 20:53:08 +0800
-Subject: [PATCH v1 3/3] mmc: pwrseq: convert to proper platform device
-In-Reply-To: <1453286796-9746-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <201601202021.zTCtxQVb%fengguang.wu@intel.com>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Wed, 20 Jan 2016 13:57:00 +0100
+Subject: [PATCH 0/6] ARM: dts: update Ka-Ro i.MX6 module support
+Message-ID: <1453294626-17608-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
+This patch set updates the Ka-Ro electronics i.MX6 based module
+support and adds support for some new modules and a new baseboard.
 
-[auto build test ERROR on ulf.hansson-mmc/next]
-[also build test ERROR on next-20160120]
-[cannot apply to v4.4]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
-
-url:    https://github.com/0day-ci/linux/commits/Srinivas-Kandagatla/mmc-pwrseq-convert-to-proper-driver/20160120-185020
-base:   https://git.linaro.org/people/ulf.hansson/mmc next
-config: openrisc-allmodconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=openrisc 
-
-All error/warnings (new ones prefixed by >>):
-
->> drivers/mmc/core/pwrseq_emmc.c:120:1: warning: data definition has no type or storage class
->> drivers/mmc/core/pwrseq_emmc.c:120:1: error: type defaults to 'int' in declaration of 'device_initcall'
-   drivers/mmc/core/pwrseq_emmc.c:120:1: warning: parameter names (without types) in function declaration
-   drivers/mmc/core/pwrseq_emmc.c:120:1: warning: 'mmc_pwrseq_emmc_driver_init' defined but not used
-
-vim +120 drivers/mmc/core/pwrseq_emmc.c
-
-   114		.driver = {
-   115			.name = "pwrseq_emmc",
-   116			.of_match_table = mmc_pwrseq_emmc_of_match,
-   117		},
-   118	};
-   119	
- > 120	builtin_platform_driver(mmc_pwrseq_emmc_driver);
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 36494 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160120/886d81bb/attachment-0001.obj>
+dma: enable mxs-dma for imx6ul
+ARM: dts: imx6: use correct mclk frequency for audio
+ARM: dts: imx6qdl-tx6: add ENET_OUT clock to fec node
+ARM: dts: imx6: change TX6 module names due to new HW
+ARM: dts: imx6: add support for more Ka-Ro electronics
+ARM: dts: imx6: add support for the Ka-Ro electronics
