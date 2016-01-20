@@ -1,54 +1,125 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Wed, 20 Jan 2016 08:22:41 +0530
-Subject: [PATCH] arm64: dts: Add PSCI function IDs for cpu-{on,off} on
- exynos7
-In-Reply-To: <20160119103224.GA25024@leverpostej>
-References: <1453198884-28723-1-git-send-email-alim.akhtar@samsung.com>
- <20160119103224.GA25024@leverpostej>
-Message-ID: <569EF679.5040909@samsung.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Wed, 20 Jan 2016 10:54:07 +0800
+Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
+In-Reply-To: <20160119140526.GD26545@leverpostej>
+References: <cover.1452884156.git.geoff@infradead.org>
+ <fb4506943bbaed8b0657ed367ebd57e4064d57ed.1452884156.git.geoff@infradead.org>
+ <20160115201601.GR3262@leverpostej> <569CBDBC.5050500@linaro.org>
+ <20160119014332.GB2919@dhcp-128-65.nay.redhat.com>
+ <20160119121721.GG25024@leverpostej>
+ <20160119135233.GB2986@dhcp-128-65.nay.redhat.com>
+ <20160119140526.GD26545@leverpostej>
+Message-ID: <20160120025407.GB2999@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 01/19/16 at 02:05pm, Mark Rutland wrote:
+> On Tue, Jan 19, 2016 at 09:52:33PM +0800, Dave Young wrote:
+> > On 01/19/16 at 12:17pm, Mark Rutland wrote:
+> > > On Tue, Jan 19, 2016 at 09:43:32AM +0800, Dave Young wrote:
+> > > > On 01/18/16 at 07:26pm, AKASHI Takahiro wrote:
+> > > > > On 01/16/2016 05:16 AM, Mark Rutland wrote:
+> > > > > >On Fri, Jan 15, 2016 at 07:18:38PM +0000, Geoff Levand wrote:
+> > > > > >>From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > > > > >>
+> > > > > >>This patch adds arch specific descriptions about kdump usage on arm64
+> > > > > >>to kdump.txt.
+> > > > > >>
+> > > > > >>Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > > > > >>---
+> > > > > >>  Documentation/kdump/kdump.txt | 23 ++++++++++++++++++++++-
+> > > > > >>  1 file changed, 22 insertions(+), 1 deletion(-)
+> > > > > >>
+> > > > > >>diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
+> > > > > >>index bc4bd5a..36cf978 100644
+> > > > > >>--- a/Documentation/kdump/kdump.txt
+> > > > > >>+++ b/Documentation/kdump/kdump.txt
+> > > > > >>@@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
+> > > > > >>  a remote system.
+> > > > > >>
+> > > > > >>  Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
+> > > > > >>-s390x and arm architectures.
+> > > > > >>+s390x, arm and arm64 architectures.
+> > > > > >>
+> > > > > >>  When the system kernel boots, it reserves a small section of memory for
+> > > > > >>  the dump-capture kernel. This ensures that ongoing Direct Memory Access
+> > > > > >>@@ -249,6 +249,20 @@ Dump-capture kernel config options (Arch Dependent, arm)
+> > > > > >>
+> > > > > >>      AUTO_ZRELADDR=y
+> > > > > >>
+> > > > > >>+Dump-capture kernel config options (Arch Dependent, arm64)
+> > > > > >>+----------------------------------------------------------
+> > > > > >>+
+> > > > > >>+1) The maximum memory size on the dump-capture kernel must be limited by
+> > > > > >>+   specifying:
+> > > > > >>+
+> > > > > >>+   mem=X[MG]
+> > > > > >>+
+> > > > > >>+   where X should be less than or equal to the size in "crashkernel="
+> > > > > >>+   boot parameter. Kexec-tools will automatically add this.
+> > > > > >
+> > > > > >
+> > > > > >This is extremely fragile, and will trivially fail when the kernel can
+> > > > > >be loaded anywhere (see [1]).
+> > > > > 
+> > > > > As I said before, this restriction also exists on arm, but I understand
+> > > > > that recent Ard's patches break it.
+> > > > > 
+> > > > > >We must explicitly describe the set of regions the crash kernel may use
+> > > > > >(i.e. we need base and size). NAK in the absence of that.
+> > > > > 
+> > > > > There seem to exist several approaches:
+> > > > > (a) use a device-tree property, "linux,usable-memory", in addition to "reg"
+> > > > >     under "memory" node
+> > > > > (b) use a kernel's early parameter, "memmap=nn[@#$]ss"
+> > > > > 
+> > > > > Power PC takes (a), while this does not work on efi-started kernel
+> > > > > because dtb has no "memory" nodes under efi.
+> > > > > X86 takes (b). If we take this, we will need to overwrite a weak
+> > > > > early_init_dt_add_memory().
+> > > > 
+> > > > X86 takes another way in latest kexec-tools and kexec_file_load, that is
+> > > > recreating E820 table and pass it to kexec/kdump kernel, if the entries
+> > > > are over E820 limitation then turn to use setup_data list for remain
+> > > > entries.
+> > > 
+> > > This would imply modifying the EFI memory map or the memory nodes, which
+> > > I'm not keen on.
+> > > 
+> > > I would prefer that they are left _pristine_, and we describe the
+> > > restriction on the kdump kernel with additional properties under
+> > > /chosen.
+> > > 
+> > > That leaves us with more useful information about the environment of the
+> > > first kernel, is simpler for userspace (it's resilient to updates to the
+> > > UEFI memory map spec, for example), and is simple for the crash kernel.
+> > 
+> > In theory kexec as boot loader should prepare correct efi memmap and pass
+> > to kernel, but as you said yes it will increase complexity. We need banlance
+> > them.
+> 
+> I'd argue that the "correct efi memmap" is what we were given by the
+> firmware initially -- none of that information is any less true.
 
-On 01/19/2016 04:02 PM, Mark Rutland wrote:
-> On Tue, Jan 19, 2016 at 03:51:24PM +0530, Alim Akhtar wrote:
->> This patch adds cpu-{on,off} function IDs as per PSCI specification,
->> with this we can boot multiple CPUs and can use cpu hotplug on
->> exynos7 platform.
->>
->> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->> ---
->>   arch/arm64/boot/dts/exynos/exynos7.dtsi |    2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
->> index f9c5a549c2c0..1a2bb3b453e5 100644
->> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
->> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
->> @@ -65,6 +65,8 @@
->>   	psci {
->>   		compatible = "arm,psci-0.2";
->>   		method = "smc";
->> +		cpu_on = <0xC4000003>;
->> +		cpu_off = <0x84000002>;
->>   	};
->
-> There is no need for this patch.
->
-> The "arm,psci-0.2" compatible string implicitly tells the kernel that
-> the full set of mandatory PSCI 0.2 functions are present, with the IDs
-> mandated by PSCI 0.2. That includes CPU_ON and CPU_OFF amongst others.
->
-> The only reason to provide IDs is to function on kernels without PSCI
-> 0.2 support. Given the compatible string hasn't been updated for that,
-> this is insufficient for that case.
->
-Ah, right, this patch is not required for psci,0.2, thanks for 
-clarification.
-sorry for the noise.
+In X86 boot loader will cook a E820 map for kernel use, there's no such needs
+in arm so maybe it is acceptable to use same memmap to avoid modifying it only
+for kdump.
 
+I think I will not insist though I like more about doing something in
+bootloader instead of in kernel.
+
+> 
+> For kdump all we need to ensure is that the kdump kernel only uses the
+> memory that was specially reserved for it by the first kernel. The
+> simplest way of doing that is to tell the kdump kernel which specific
+> region(s) of memory were reserved for it, leaving the EFI memory map
+> alone.
+
+Yes, agreed that it is simpler.
+
+> 
 > Thanks,
 > Mark.
->
->
+
+Thanks
+Dave
