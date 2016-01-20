@@ -1,82 +1,84 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Wed, 20 Jan 2016 16:08:03 +0100
-Subject: [PATCH V2] mmc: pwrseq_simple: Make reset-gpios optional to match doc
-Message-ID: <20160120150803.32073.63845.stgit@localhost>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 20 Jan 2016 17:12:18 +0200
+Subject: [PATCH v6 1/2] ACPI: introduce a function to find the first
+ physical device
+In-Reply-To: <1453300171-25473-2-git-send-email-aleksey.makarov@linaro.org>
+References: <1453300171-25473-1-git-send-email-aleksey.makarov@linaro.org>
+ <1453300171-25473-2-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <CAHp75VcdtU6izThE+Z2ODnYoXk-uhweXzUtFwSze_jJHw3+38g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DT binding doc says reset-gpios is an optional property but the code
-currently bails out if it is omitted.
+On Wed, Jan 20, 2016 at 4:29 PM, Aleksey Makarov
+<aleksey.makarov@linaro.org> wrote:
+> Factor out the code that finds the first physical device
+> of a given ACPI device.  It is used in several places.
+>
+> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
 
-This is a regression since it breaks previously working device trees.
-Fix it by restoring the original documented behaviour.
+Hmm? Sorry, didn't notice one style issue and there is one is matter
+of taste below.
 
-Fixes: ce037275861e ("mmc: pwrseq_simple: use GPIO descriptors array API")
-Tested-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
+> --- a/drivers/acpi/acpi_platform.c
+> +++ b/drivers/acpi/acpi_platform.c
+> @@ -43,7 +43,6 @@ static const struct acpi_device_id forbidden_id_list[] = {
 
----
-V2:
-Fix review comments by Ulf Hansson:
-    * Handle -ENOSYS case when CONFIG_GPIOLIB not selected
-      This causes checkpatch to complain with
-	   "WARNING: ENOSYS means 'invalid syscall nr' and nothing else"
-      but I guess that's ok here.
-    * Update patch description to make it clear this is a regression fix
-    * Add Fixes tag
+> +       pdevinfo.parent = adev->parent ?
+> +               acpi_get_first_physical_node(adev->parent) : NULL;
 
-Add Tested-by tag from Tony Lingdren
----
- drivers/mmc/core/pwrseq_simple.c |   22 ++++++++++++++--------
- 1 file changed, 14 insertions(+), 8 deletions(-)
+Matter of taste, but I believe if-else looks better here even when
+consumes +2 LOC.
+Or, does it fit 80? How wide then?
 
-diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
-index d10538b..96f45ca 100644
---- a/drivers/mmc/core/pwrseq_simple.c
-+++ b/drivers/mmc/core/pwrseq_simple.c
-@@ -29,15 +29,18 @@ struct mmc_pwrseq_simple {
- static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
- 					      int value)
- {
--	int i;
- 	struct gpio_descs *reset_gpios = pwrseq->reset_gpios;
--	int values[reset_gpios->ndescs];
- 
--	for (i = 0; i < reset_gpios->ndescs; i++)
--		values[i] = value;
-+	if (!IS_ERR(reset_gpios)) {
-+		int i;
-+		int values[reset_gpios->ndescs];
- 
--	gpiod_set_array_value_cansleep(reset_gpios->ndescs, reset_gpios->desc,
--				       values);
-+		for (i = 0; i < reset_gpios->ndescs; i++)
-+			values[i] = value;
-+
-+		gpiod_set_array_value_cansleep(
-+			reset_gpios->ndescs, reset_gpios->desc, values);
-+	}
- }
- 
- static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
-@@ -79,7 +82,8 @@ static void mmc_pwrseq_simple_free(struct mmc_host *host)
- 	struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
- 					struct mmc_pwrseq_simple, pwrseq);
- 
--	gpiod_put_array(pwrseq->reset_gpios);
-+	if (!IS_ERR(pwrseq->reset_gpios))
-+		gpiod_put_array(pwrseq->reset_gpios);
- 
- 	if (!IS_ERR(pwrseq->ext_clk))
- 		clk_put(pwrseq->ext_clk);
-@@ -112,7 +116,9 @@ struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
- 	}
- 
- 	pwrseq->reset_gpios = gpiod_get_array(dev, "reset", GPIOD_OUT_HIGH);
--	if (IS_ERR(pwrseq->reset_gpios)) {
-+	if (IS_ERR(pwrseq->reset_gpios) &&
-+	    PTR_ERR(pwrseq->reset_gpios) != -ENOENT &&
-+	    PTR_ERR(pwrseq->reset_gpios) != -ENOSYS) {
- 		ret = PTR_ERR(pwrseq->reset_gpios);
- 		goto clk_put;
- 	}
+> --- a/drivers/acpi/bus.c
+> +++ b/drivers/acpi/bus.c
+> @@ -478,24 +478,35 @@ static void acpi_device_remove_notify_handler(struct acpi_device *device)
+>                               Device Matching
+>     -------------------------------------------------------------------------- */
+>
+> -static struct acpi_device *acpi_primary_dev_companion(struct acpi_device *adev,
+> -                                                     const struct device *dev)
+> +/**
+> + * acpi_device_fix_parent - Get first physical node of an ACPI device
+
+'node' -> 'device node'
+Name of the function is wrong.
+
+> + * @adev: ACPI device in question
+> + */
+> +struct device *acpi_get_first_physical_node(struct acpi_device *adev)
+>  {
+>         struct mutex *physical_node_lock = &adev->physical_node_lock;
+> +       struct device *node = NULL;
+>
+>         mutex_lock(physical_node_lock);
+> -       if (list_empty(&adev->physical_node_list)) {
+> -               adev = NULL;
+> -       } else {
+> -               const struct acpi_device_physical_node *node;
+>
+> +       if (!list_empty(&adev->physical_node_list))
+>                 node = list_first_entry(&adev->physical_node_list,
+> -                                       struct acpi_device_physical_node, node);
+> -               if (node->dev != dev)
+> -                       adev = NULL;
+> -       }
+> +                               struct acpi_device_physical_node, node)->dev;
+
+I didn't notice this '->dev' thingy. I supposed that the function
+returns struct acpi_device_physical_node *, not struct device *.
+
+Currently the name is not aligned with returned value.
+
+> +
+>         mutex_unlock(physical_node_lock);
+> -       return adev;
+> +
+> +       return node;
+> +}
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
