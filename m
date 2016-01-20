@@ -1,41 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Jan 2016 11:47:14 +0100
-Subject: [PATCH] scsi: qla2xxxx: avoid type mismatch in comparison
-Message-ID: <1603472.f34vvTrhuN@wuerfel>
+Date: Wed, 20 Jan 2016 11:58:51 +0100
+Subject: [PATCH] ASoC: avoid unused variable warning for rt5659_acpi_match
+In-Reply-To: <20160120104555.GY6588@sirena.org.uk>
+References: <2238845.aZnycJVYKR@wuerfel> <20160120104555.GY6588@sirena.org.uk>
+Message-ID: <20191003.vNJkcIvuCq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent bug fix added code that does
+On Wednesday 20 January 2016 10:45:55 Mark Brown wrote:
+> On Wed, Jan 20, 2016 at 11:43:48AM +0100, Arnd Bergmann wrote:
+> > The newly added rt5659 codec driver unconditionally defines an
+> > ACPI device match table but then uses ACPI_PTR() to remove the
+> > only reference to it, so we get a harmless build warning:
+> 
+> > sound/soc/codecs/rt5659.c:4200:30: warning: 'rt5659_acpi_match' defined but not used [-Wunused-variable]
+> >  static struct acpi_device_id rt5659_acpi_match[] = {
+> 
+> > This removes the ACPI_PTR() to avoid the warning.
+> 
+> Why is this a better fix than conditionally defining the table?
 
-        bool logged_out = (status & 0xFFFF);
-        if (logged_out == CTIO_PORT_LOGGED_OUT)
-		...
+I'm not overly fond of adding #ifdef if it can be avoided. In this case,
+both approaches seemed reasonable (either add an #ifdef or waste a couple
+of bytes), and I picked at random. I'll send you the alternative as well,
+please apply whichever one you prefer.
 
-This looks wrong because we are comparing a boolean with an
-integer constant, ang gcc warns about it accordingly:
-
-drivers/scsi/qla2xxx/qla_target.c: In function 'qlt_do_ctio_completion':
-drivers/scsi/qla2xxx/qla_target.c:3587:20: warning: comparison of constant '41' with boolean expression is always false [-Wbool-compare]
-        (logged_out == CTIO_PORT_LOGGED_OUT) ?
-
-The correct fix is presumably to make that variable an 'int'.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 71cdc0796465 ("qla2xxx: Delete session if initiator is gone from FW")
----
-The patch introducing this is currenly in linux-next through the target-updates/for-next
-branch.
-
-diff --git a/drivers/scsi/qla2xxx/qla_target.c b/drivers/scsi/qla2xxx/qla_target.c
-index c7ab9e69c881..8075a4cdb45c 100644
---- a/drivers/scsi/qla2xxx/qla_target.c
-+++ b/drivers/scsi/qla2xxx/qla_target.c
-@@ -3580,7 +3580,7 @@ static void qlt_do_ctio_completion(struct scsi_qla_host *vha, uint32_t handle,
- 		case CTIO_PORT_LOGGED_OUT:
- 		case CTIO_PORT_UNAVAILABLE:
- 		{
--			bool logged_out = (status & 0xFFFF);
-+			int logged_out = (status & 0xFFFF);
- 			ql_dbg(ql_dbg_tgt_mgt, vha, 0xf059,
- 			    "qla_target(%d): CTIO with %s status %x "
- 			    "received (state %x, se_cmd %p)\n", vha->vp_idx,
+	Arnd
