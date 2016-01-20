@@ -1,38 +1,75 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Wed, 20 Jan 2016 11:09:08 +0100
-Subject: [PATCHv2 15/16] ARM: dts: imx6ul: add kpp support
+Date: Wed, 20 Jan 2016 11:09:00 +0100
+Subject: [PATCHv2 07/16] ARM: dts: imx6ul: add pwm[1-4] nodes
 In-Reply-To: <1453284549-16363-1-git-send-email-LW@KARO-electronics.de>
 References: <1452619291-13625-1-git-send-email-LW@KARO-electronics.de>
  <1453284549-16363-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1453284549-16363-16-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1453284549-16363-8-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device node for the i.MX6UL keypad controller.
+Add device nodes for the PWM uinits 1..4 which were missing in the
+original commit for i.MX6UL support.
 
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx6ul.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/imx6ul.dtsi | 44 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 8499b3d..7177899 100644
+index 863777e..40ea5f0 100644
 --- a/arch/arm/boot/dts/imx6ul.dtsi
 +++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -471,6 +471,14 @@
+@@ -248,6 +248,50 @@
  				status = "disabled";
  			};
  
-+			kpp: kpp at 020b8000 {
-+				compatible = "fsl,imx6ul-kpp", "fsl,imx6q-kpp", "fsl,imx21-kpp";
-+				reg = <0x020b8000 0x4000>;
-+				interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6UL_CLK_KPP>;
++			pwm1: pwm at 02080000 {
++				compatible = "fsl,imx6ul-pwm", "fsl,imx27-pwm";
++				reg = <0x02080000 0x4000>;
++				interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6UL_CLK_PWM1>,
++					 <&clks IMX6UL_CLK_PWM1>;
++				clock-names = "ipg", "per";
++				#pwm-cells = <2>;
 +				status = "disabled";
 +			};
 +
- 			wdog1: wdog at 020bc000 {
- 				compatible = "fsl,imx6ul-wdt", "fsl,imx21-wdt";
- 				reg = <0x020bc000 0x4000>;
++			pwm2: pwm at 02084000 {
++				compatible = "fsl,imx6ul-pwm", "fsl,imx27-pwm";
++				reg = <0x02084000 0x4000>;
++				interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6UL_CLK_PWM2>,
++					 <&clks IMX6UL_CLK_PWM2>;
++				clock-names = "ipg", "per";
++				#pwm-cells = <2>;
++				status = "disabled";
++			};
++
++			pwm3: pwm at 02088000 {
++				compatible = "fsl,imx6ul-pwm", "fsl,imx27-pwm";
++				reg = <0x02088000 0x4000>;
++				interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6UL_CLK_PWM3>,
++					 <&clks IMX6UL_CLK_PWM3>;
++				clock-names = "ipg", "per";
++				#pwm-cells = <2>;
++				status = "disabled";
++			};
++
++			pwm4: pwm at 0208c000 {
++				compatible = "fsl,imx6ul-pwm", "fsl,imx27-pwm";
++				reg = <0x0208c000 0x4000>;
++				interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6UL_CLK_PWM4>,
++					 <&clks IMX6UL_CLK_PWM4>;
++				clock-names = "ipg", "per";
++				#pwm-cells = <2>;
++				status = "disabled";
++			};
++
+ 			gpt1: gpt at 02098000 {
+ 				compatible = "fsl,imx6ul-gpt", "fsl,imx6sx-gpt";
+ 				reg = <0x02098000 0x4000>;
 -- 
 2.1.4
