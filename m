@@ -1,34 +1,62 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 20 Jan 2016 14:14:48 -0300
-Subject: [PATCH 8/8] ARM: multi_v7_defconfig: Remove MAX77802 RTC Kconfig
- symbol
-In-Reply-To: <1453310088-29985-1-git-send-email-javier@osg.samsung.com>
-References: <1453310088-29985-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1453310088-29985-9-git-send-email-javier@osg.samsung.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 20 Jan 2016 18:16:14 +0100
+Subject: [PATCH v2 3/7] ARM: dts: kirkwood: gpio-leds fixes for
+ linkstation ls-wxl/wsxl
+In-Reply-To: <1453304038-28345-4-git-send-email-rogershimizu@gmail.com>
+References: <1453211342-25214-1-git-send-email-rogershimizu@gmail.com>
+ <1453304038-28345-1-git-send-email-rogershimizu@gmail.com>
+ <1453304038-28345-4-git-send-email-rogershimizu@gmail.com>
+Message-ID: <20160120171614.GP28750@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver has been removed so the Kconfig symbol is not valid anymore.
+On Thu, Jan 21, 2016 at 12:33:54AM +0900, Roger Shimizu wrote:
+> Make all leds initially to "off" state except power indicator, so pins below
+> change from active_low to active_high:
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+So what happens when you echo 1 to /sys/class/led/lswxl:red:func/brightness ?
 
+1 should turn the LED on, 0 off. This is what
+GPIO_ACTIVE_LOW/GPIO_ACTIVE_HIGH is about, and these are independent
+of the initial off/on state.
 
----
+   Andrew
 
- arch/arm/configs/multi_v7_defconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 314f6be2dca2..bdb42c09332c 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -664,7 +664,6 @@ CONFIG_RTC_DRV_MAX8907=y
- CONFIG_RTC_DRV_MAX8997=m
- CONFIG_RTC_DRV_MAX77686=y
- CONFIG_RTC_DRV_RK808=m
--CONFIG_RTC_DRV_MAX77802=m
- CONFIG_RTC_DRV_RS5C372=m
- CONFIG_RTC_DRV_PALMAS=y
- CONFIG_RTC_DRV_ST_LPC=y
--- 
-2.5.0
+>   - gpio-leds: "lswxl:red:func" pin
+>   - gpio-leds: "lswxl:red:hdderr{0,1}" pin
+> 
+> Fixes: e54e4b1b622e ("ARM: dts: add buffalo linkstation ls-wxl/wsxl")
+> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
+> ---
+>  arch/arm/boot/dts/kirkwood-lswxl.dts | 7 +++----
+>  1 file changed, 3 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/kirkwood-lswxl.dts b/arch/arm/boot/dts/kirkwood-lswxl.dts
+> index 0e93f6d19259..f4700a60065b 100644
+> --- a/arch/arm/boot/dts/kirkwood-lswxl.dts
+> +++ b/arch/arm/boot/dts/kirkwood-lswxl.dts
+> @@ -206,18 +206,17 @@
+>  
+>  		led at 5 {
+>  			label = "lswxl:red:func";
+> -			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
+> -			default-state = "keep";
+> +			gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
+>  		};
+>  
+>  		led at 6 {
+>  			label = "lswxl:red:hdderr0";
+> -			gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
+> +			gpios = <&gpio0 8 GPIO_ACTIVE_HIGH>;
+>  		};
+>  
+>  		led at 7 {
+>  			label = "lswxl:red:hdderr1";
+> -			gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
+> +			gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
+>  		};
+>  	};
+>  
+> -- 
+> 2.1.4
+> 
