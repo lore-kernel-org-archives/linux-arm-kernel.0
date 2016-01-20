@@ -1,40 +1,29 @@
-From: peter@korsgaard.com (Peter Korsgaard)
-Date: Wed, 20 Jan 2016 08:40:11 +0100
-Subject: [PATCH v5 1/2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD
- driver
-In-Reply-To: <B256D81BAE5131468A838E5D7A243641D63F61F4@penmbx01> (Wenyou
- Yang's message of "Wed, 20 Jan 2016 07:26:56 +0000")
-References: <1452747845-2962-1-git-send-email-wenyou.yang@atmel.com>
- <1452747845-2962-2-git-send-email-wenyou.yang@atmel.com>
- <87pox41dy9.fsf@dell.be.48ers.dk>
- <B256D81BAE5131468A838E5D7A243641D63ECA51@penmbx01>
- <8737tzz33h.fsf@dell.be.48ers.dk>
- <B256D81BAE5131468A838E5D7A243641D63F61F4@penmbx01>
-Message-ID: <87d1swvgv8.fsf@dell.be.48ers.dk>
+From: uri.mashiach@compulab.co.il (Uri Mashiach)
+Date: Wed, 20 Jan 2016 09:40:25 +0200
+Subject: [PATCH 0/3] ARM: dts: cm-t335: add peripherals - part 2
+In-Reply-To: <1451475695-26921-1-git-send-email-uri.mashiach@compulab.co.il>
+References: <1451475695-26921-1-git-send-email-uri.mashiach@compulab.co.il>
+Message-ID: <569F39E9.2070506@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Yang," == Yang, Wenyou <Wenyou.Yang@atmel.com> writes:
+Gentle ping
 
-Hi,
-
->> But the charger driver can just as well do:
- >> 
- >> dev_get_regmap(dev->parent);
- >> 
- >> instead of:
- >> 
- >> dev_get_drvdata(pdev->dev.parent)->regmap.
-
- > For regulator, it works use the core do dev_get_regmap(dev->parent),
- > but for charger, it need to export *act8945a.
-
-Why?
-
-Just like the regulator core does, your battery driver can do:
-
-dev_get_regmap(dev->parent);
+On 12/30/2015 01:41 PM, Uri Mashiach wrote:
+> Add support for the following peripherals:
+> - CAN BUS
+> - Touchscreen
+> - Audio
+>
+> Uri Mashiach (3):
+>    ARM: dts: cm-t335: Add support for CAN bus
+>    ARM: dts: cm-t335: add touchscreen support
+>    ARM: dts: cm-t335: add audio support
+>
+>   arch/arm/boot/dts/am335x-cm-t335.dts | 116 +++++++++++++++++++++++++++++++++++
+>   1 file changed, 116 insertions(+)
+>
 
 -- 
-Venlig hilsen,
-Peter Korsgaard 
+Regards,
+Uri
