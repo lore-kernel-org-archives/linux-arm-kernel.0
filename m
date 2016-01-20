@@ -1,45 +1,42 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 20 Jan 2016 14:22:43 +0000
-Subject: [PATCH V3 11/21] pci, acpi: Move ACPI host bridge device
- companion assignment to core code.
-In-Reply-To: <569F8E38.5030101@semihalf.com>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <1452691267-32240-12-git-send-email-tn@semihalf.com>
- <20160119160224.GD5276@red-moon> <569F6D67.5000000@semihalf.com>
- <20160120123849.GA13437@red-moon> <569F8E38.5030101@semihalf.com>
-Message-ID: <20160120142243.GB13437@red-moon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 20 Jan 2016 14:23:32 +0000
+Subject: arm64/efi handling of persistent memory
+In-Reply-To: <CAKv+Gu_KEDMdeF5zWL6EEwJyo+kt0u6HeaqrcVOEP9YHeu7uuw@mail.gmail.com>
+References: <94D0CD8314A33A4D9D801C0FE68B40295BEBD864@G9W0745.americas.hpqcorp.net>
+ <20151218110651.GL25034@bivouac.eciton.net>
+ <20151218114546.GD29219@leverpostej>
+ <CAKv+Gu_KEDMdeF5zWL6EEwJyo+kt0u6HeaqrcVOEP9YHeu7uuw@mail.gmail.com>
+Message-ID: <20160120142330.GA28169@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 20, 2016 at 02:40:08PM +0100, Tomasz Nowicki wrote:
+Hi,
 
-[...]
+For those newly Cc'd, the initially reported problem is that arm64 Linux
+currently treats persistent memory as with any other memory (happily clobbering
+it), per [1].
 
-> >>>>+	/* Root bridge device needs to be sure of parent ACPI type */
-> >>>>+	ACPI_COMPANION_SET(&device->dev, device);
-> >>>
-> >>>I do not understand why the code above is needed, can you elaborate
-> >>>please ?
-> >>>
-> >>
-> >>This makes sure that device->dev can be identified as ACPI device,
-> >>so we can use to_acpi_device_node() and assign companion safely
-> >>below.
-> >
-> >I do not follow. If you refer to the fwnode handle type, that is
-> >already set by ACPI core code (before acpi_pci_root_add() is called,
-> >in acpi_init_device_object()).
-> 
-> acpi_init_device_object() sets ACPI fwnode handle type only for
-> "device", but not for "device->dev" which is what is passed as an
-> argument to pci_create_root_bus().
-> 
-> Without ACPI_COMPANION_SET(&device->dev, device) here, no one can be
-> sure if we have ACPI device in pci_create_root_bus().
+On Fri, Dec 18, 2015 at 02:07:10PM +0100, Ard Biesheuvel wrote:
+> Before we start hacking away at this at the arm64/EFI level, do we
+> have any documentation and/or consensus regarding how persistent
+> memory should be treated in the first place? Should it be covered by
+> memblock? Should it be covered by the linear mapping? Should it be
+> memblock_reserve()'d?
 
-Ok, got it. The question is whether this should be done in ACPI
-core instead (is there a reason why it should *not* be done ?), but I
-now understand your point.
+I'm hoping that the lack of replies has more to do with the recent
+holiday than a lack of opinion...
+
+I think that it's sensible to say that at minimum we need to ensure that we
+don't treat it as available RAM (i.e. we don't clobber it with random data) for
+now.
+
+Per [2] it's not clear to me what the consensus is on memblock, the linear
+mapping, and the use of struct page, though that's months old so perhaps that's
+been figured out since. I've Cc'd some of the attendees in case they can
+clarify the situation.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/394707.html
+[2] https://lwn.net/Articles/636096/
 
 Thanks,
-Lorenzo
+Mark.
