@@ -1,113 +1,43 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 20 Jan 2016 14:55:06 +0800
-Subject: [PATCH v3 2/2] regulator: add documentation for ACT8945A's regulator
- DT bindings
-In-Reply-To: <1453272906-23183-1-git-send-email-wenyou.yang@atmel.com>
-References: <1453272906-23183-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1453272906-23183-3-git-send-email-wenyou.yang@atmel.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Wed, 20 Jan 2016 15:00:44 +0800
+Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
+In-Reply-To: <20160120063856.GA3725@dhcp-128-65.nay.redhat.com>
+References: <569CBDBC.5050500@linaro.org>
+ <20160119014332.GB2919@dhcp-128-65.nay.redhat.com>
+ <569DCB30.9010501@linaro.org>
+ <20160119122848.GA2904@dhcp-128-65.nay.redhat.com>
+ <20160119125114.GH25024@leverpostej>
+ <20160119134553.GA2986@dhcp-128-65.nay.redhat.com>
+ <20160119140139.GC26545@leverpostej>
+ <20160120024946.GA2999@dhcp-128-65.nay.redhat.com>
+ <569F2439.9000604@linaro.org>
+ <20160120063856.GA3725@dhcp-128-65.nay.redhat.com>
+Message-ID: <20160120070044.GF2999@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for the DT bindings of the regulator
-subdevice of ACT8945A MFD.
+> > So I'm not still sure about what are advantages of a property under /chosen
+> > over "memmap=" kernel parameter.
+> > Both are simple and can have the same effect with minimizing changes to dtb.
+> > (But if, in the latter case, we have to provide *all* the memory-related information
+> > through "memmap=" parameters, it would be much complicated.)
+> 
+> Maybe I did not say it clearly, I prefer kexec syscall/tool to modifiy dtb
+> or uefi-memmap so that we do not need any extra kernel cmdline.
+> 
+> For x86 we would like to drop the memmap= usage in kexec-tools but we can not
+> do that for a compatibility problem about calgary iommu. So that currently
+> kexec-tools supports both recreating E820 maps and passing memmap=.
+> 
+> We should think it carefully because it will be hard to remove once we support it.
+> IMO handling it in code is better than using an external interface.
+> 
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
+Also seems semantic of memmap=exactmap is different than current use in the implementation
+exactmap means we need pass each range seperately including reserved, acpi and other types
+We can not reuse ranges in uefi memmap for other than usable memory.
 
-Changes in v3:
- - change the regulator name.
+It will also have the cmdline array size issue.
 
-Changes in v2:
- - add Acked-by Rob Herring.
-
- .../bindings/regulator/act8945a-regulator.txt      |   78 ++++++++++++++++++++
- 1 file changed, 78 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
-
-diff --git a/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt b/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
-new file mode 100644
-index 0000000..0e08a3e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
-@@ -0,0 +1,78 @@
-+Device-Tree bindings for regulators of Active-semi ACT8945A Multi-Function Device
-+
-+Required properties:
-+ - compatible: "active-semi,act8945a-regulator"
-+
-+Optional properties:
-+- active-semi,vsel-high: Indicates if the VSEL pin is set to logic-high.
-+  If this property is missing, assume the VSEL pin is set to logic-low.
-+
-+Optional input supply properties:
-+  - vp1-supply: The input supply for REG_DCDC1
-+  - vp2-supply: The input supply for REG_DCDC2
-+  - vp3-supply: The input supply for REG_DCDC3
-+  - inl45-supply: The input supply for REG_LDO1 and REG_LDO2
-+  - inl67-supply: The input supply for REG_LDO3 and REG_LDO4
-+
-+Any standard regulator properties can be used to configure the single regulator.
-+
-+The valid names for regulators are:
-+	REG_DCDC1, REG_DCDC2, REG_DCDC3, REG_LDO1, REG_LDO2, REG_LDO3, REG_LDO4.
-+
-+Example:
-+
-+	pmic {
-+		compatible = "active-semi,act8945a-regulator";
-+		active-semi,vsel-high;
-+
-+		regulators {
-+			vdd_1v35_reg: REG_DCDC1 {
-+				regulator-name = "VDD_1V35";
-+				regulator-min-microvolt = <1350000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_1v2_reg: REG_DCDC2 {
-+				regulator-name = "VDD_1V2";
-+				regulator-min-microvolt = <1100000>;
-+				regulator-max-microvolt = <1300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_3v3_reg: REG_DCDC3 {
-+				regulator-name = "VDD_3V3";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_fuse_reg: REG_LDO1 {
-+				regulator-name = "VDD_FUSE";
-+				regulator-min-microvolt = <2500000>;
-+				regulator-max-microvolt = <2500000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_3v3_lp_reg: REG_LDO2 {
-+				regulator-name = "VDD_3V3_LP";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_led_reg: REG_LDO3 {
-+				regulator-name = "VDD_LED";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_sdhc_1v8_reg: REG_LDO4 {
-+				regulator-name = "VDD_SDHC_1V8";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
--- 
-1.7.9.5
+Thanks
+Dave
