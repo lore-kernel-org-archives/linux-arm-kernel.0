@@ -1,63 +1,62 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 20 Jan 2016 12:36:21 +0000
-Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
-In-Reply-To: <20160120120257.GD25829@leverpostej>
-References: <20160115201601.GR3262@leverpostej> <569CBDBC.5050500@linaro.org>
- <20160119014332.GB2919@dhcp-128-65.nay.redhat.com>
- <569DCB30.9010501@linaro.org>
- <20160119122848.GA2904@dhcp-128-65.nay.redhat.com>
- <20160119125114.GH25024@leverpostej>
- <20160119134553.GA2986@dhcp-128-65.nay.redhat.com>
- <20160119140139.GC26545@leverpostej> <569F1A33.4000208@linaro.org>
- <20160120120257.GD25829@leverpostej>
-Message-ID: <20160120123620.GE25829@leverpostej>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 20 Jan 2016 12:38:49 +0000
+Subject: [PATCH V3 11/21] pci, acpi: Move ACPI host bridge device
+ companion assignment to core code.
+In-Reply-To: <569F6D67.5000000@semihalf.com>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <1452691267-32240-12-git-send-email-tn@semihalf.com>
+ <20160119160224.GD5276@red-moon> <569F6D67.5000000@semihalf.com>
+Message-ID: <20160120123849.GA13437@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ard, Ganapatrao, the below is something we need to consider for the
-combination of the NUMA & kexec approaches. It only becomes a problem
-if/when we preserve DT memory nodes in the presence of EFI, though it
-would be nice to not box ourselves into a corner.
+On Wed, Jan 20, 2016 at 12:20:07PM +0100, Tomasz Nowicki wrote:
+> On 19.01.2016 17:02, Lorenzo Pieralisi wrote:
+> >On Wed, Jan 13, 2016 at 02:20:57PM +0100, Tomasz Nowicki wrote:
+> [...]
+> >>device via pci_create_root_bus parameter (as the ACPI device type)
+> >
+> >I do not understand what you mean by "as the ACPI device type".
+> 
+> See below.
+> 
+> >
+> >>and using ACPI_COMPANION_SET in core code for ACPI boot method.
+> >>ACPI_COMPANION_SET is safe to run for all cases DT, ACPI and DT&ACPI.
+> >>
+> >>Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >>Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> >>---
+> >>  drivers/acpi/pci_root.c | 5 ++++-
+> >>  drivers/pci/probe.c     | 2 ++
+> >>  2 files changed, 6 insertions(+), 1 deletion(-)
+> >>
+> >>diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+> >>index ae3fe4e..a65c8c2 100644
+> >>--- a/drivers/acpi/pci_root.c
+> >>+++ b/drivers/acpi/pci_root.c
+> >>@@ -846,7 +846,10 @@ struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
+> >>
+> >>  	pci_acpi_root_add_resources(info);
+> >>  	pci_add_resource(&info->resources, &root->secondary);
+> >>-	bus = pci_create_root_bus(NULL, busnum, ops->pci_ops,
+> >>+
+> >>+	/* Root bridge device needs to be sure of parent ACPI type */
+> >>+	ACPI_COMPANION_SET(&device->dev, device);
+> >
+> >I do not understand why the code above is needed, can you elaborate
+> >please ?
+> >
+> 
+> This makes sure that device->dev can be identified as ACPI device,
+> so we can use to_acpi_device_node() and assign companion safely
+> below.
 
-On Wed, Jan 20, 2016 at 12:02:58PM +0000, Mark Rutland wrote:
-> On Wed, Jan 20, 2016 at 02:25:07PM +0900, AKASHI Takahiro wrote:
-> > On 01/19/2016 11:01 PM, Mark Rutland wrote:
-> > >For NUMA topology in !ACPI kernels, we might need to also retain and
-> > >parse memory nodes, but only for toplogy information. The kernel would
-> > >still only use memory as described by the EFI memory map.
-> > >
-> > >There's a horrible edge case I've spotted if performing a chain of
-> > >cross-endian kexecs: LE -> BE -> LE, as the BE kernel would have to
-> > >respect the EFI memory map so as to avoid corrupting it for the
-> > >subsequent LE kernel. Other than this I believe everything should just
-> > >work.
-> > 
-> > BE kernel doesn't support UEFI yet and cannot access UEFI memmap table. So,
-> > for LE -> BE, we don't use a dtb generated from /sys/firmware/fdt (or /proc/device-tree)
-> > (as in the case of LE -> LE) and require users to provide a dtb file explicitly.
-> 
-> As I mentioned above, the problem exists when memory nodes also exist
-> (for describing NUMA topology). In that case the BE kernel would try to
-> use the information from the memory nodes.
-> 
-> > For BE -> LE, BE kernel doesn't know wther UEFI memmap table is available or not
-> > and so use the same (explicitly-provided) dtb (as LE -> LE in !UEFI)
-> 
-> See above. The problem I imagine is:
-> 
-> LE kernel - uses EFI mmap, takes NUMA information from DT memory nodes
-> 
->     v       kexec
-> 
-> BE kernel - uses DT memory nodes
->           - clobbers EFI runtime regions as it sees them as available
-> 
->     v       kexec
-> 
-> LE kernel - uses EFI mmap, takes NUMA information from DT memory nodes
->           - tries to call EFI runtime services, and explodes.
+I do not follow. If you refer to the fwnode handle type, that is
+already set by ACPI core code (before acpi_pci_root_add() is called,
+in acpi_init_device_object()).
 
-I'm not really sure what the best approach is here, but I thought that
-it would be good to raise awareness of the edge-case.
+Did you add the code above to solve a real issue you encountered ?
 
-Mark.
+Thanks,
+Lorenzo
