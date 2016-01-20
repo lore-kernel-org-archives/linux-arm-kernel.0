@@ -1,29 +1,53 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Wed, 20 Jan 2016 16:10:46 +0000
-Subject: [RFC PATCH v3] irqchip: Add support for Tango interrupt controller
-In-Reply-To: <569FAFF5.4090909@arm.com> (Marc Zyngier's message of "Wed, 20
- Jan 2016 16:04:05 +0000")
-References: <569CE0F2.1060507@sigmadesigns.com>
- <569D0B80.1010908@sigmadesigns.com>
- <569D165E.4060004@sigmadesigns.com> <569FAFF5.4090909@arm.com>
-Message-ID: <yw1xr3hcqlix.fsf@unicorn.mansr.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 20 Jan 2016 16:22:15 +0000
+Subject: [PATCH 3/3] arm/arm64: pci: remove arch specific
+ pcibios_enable_device()
+In-Reply-To: <20151123134921.GB4236@arm.com>
+References: <1447779838-15585-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1447779838-15585-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <20151123134921.GB4236@arm.com>
+Message-ID: <20160120162215.GE13437@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Zyngier <marc.zyngier@arm.com> writes:
+On Mon, Nov 23, 2015 at 01:49:21PM +0000, Will Deacon wrote:
+> On Tue, Nov 17, 2015 at 05:03:58PM +0000, Lorenzo Pieralisi wrote:
+> > The arm/arm64 pcibios_enable_device() implementations exist solely
+> > to prevent enabling PCI resources on PROBE_ONLY systems, since
+> > on those systems the PCI resources are currently not claimed (ie
+> > validated and inserted in the PCI resource tree) therefore they can
+> > not be enabled since this would trigger PCI set-ups failures.
+> > 
+> > By introducing resources claiming in the PCI host controllers set-ups
+> > that have PROBE_ONLY as a probe option, there is no need for arch specific
+> > pcibios_enable_device() implementations anymore in that the kernel can
+> > rely on the generic pcibios_enable_device() implementation without
+> > resorting to arch specific code to work around the missing resources
+> > claiming enumeration step.
+> > 
+> > This patch removes the pcibios_enable_device() implementations from
+> > the arm/arm64 arch back-ends.
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > ---
+> >  arch/arm/kernel/bios32.c | 12 ------------
+> >  arch/arm64/kernel/pci.c  | 13 -------------
+> >  2 files changed, 25 deletions(-)
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
->> +	if (of_property_read_u32(node, "reg", &ctl))
->> +		panic("%s: failed to get reg base", node->name);
->> +
->> +	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
->> +	chip->ctl = ctl;
->> +	chip->base = base;
+Thanks, unfortunately I spotted that ARM platforms can set
+PCI_PROBE_ONLY also via command line (pcibios_setup()), which means
+that I have to add resource claiming to all ARM PCI controllers that
+check PCI_PROBE_ONLY (inclusive of ARM bios32) to really make sure we
+can apply this patch or alternatevely we add the resource claiming
+to the pcibios_fixup_bus() callback (but we can claim resources only if
+PCI_PROBE_ONLY is set lest we trigger regressions) which would be the
+simpler solution.
 
-As I said before, this assumes the outer DT node uses a ranges
-property.  Normally reg properties work the same whether they specify an
-offset within an outer "ranges" or have a full address directly.  It
-would be easy enough to make this work with either, so I don't see any
-reason not to.
-
--- 
-M?ns Rullg?rd
+Lorenzo
