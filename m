@@ -1,104 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 20 Jan 2016 12:28:40 -0600
-Subject: [PATCH v2 1/4] dt-bindings: power: reset: add document for
- reboot-mode driver
-In-Reply-To: <1452598189-8272-1-git-send-email-andy.yan@rock-chips.com>
-References: <1452598029-8222-1-git-send-email-andy.yan@rock-chips.com>
- <1452598189-8272-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <20160120182840.GA15741@rob-hp-laptop>
+From: bp@alien8.de (Borislav Petkov)
+Date: Wed, 20 Jan 2016 19:35:43 +0100
+Subject: [PATCH v2 1/3] Documentation: Update the APM X-Gene SoC EDAC DTS
+ binding for missing RB
+In-Reply-To: <1453250812-15097-2-git-send-email-lho@apm.com>
+References: <1453250812-15097-1-git-send-email-lho@apm.com>
+ <1453250812-15097-2-git-send-email-lho@apm.com>
+Message-ID: <20160120183543.GK23186@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 07:29:49PM +0800, Andy Yan wrote:
-> add device tree binding document for reboot-mode driver
-> 
-> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-> 
-> ---
-> 
-> Changes in v2: None
-> Changes in v1: None
-> 
->  .../bindings/power/reset/reboot-mode.txt           | 41 +++++++++++++++++
->  .../bindings/power/reset/syscon-reboot-mode.txt    | 52 ++++++++++++++++++++++
->  2 files changed, 93 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power/reset/reboot-mode.txt
->  create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/power/reset/reboot-mode.txt b/Documentation/devicetree/bindings/power/reset/reboot-mode.txt
-> new file mode 100644
-> index 0000000..81d9f66
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/reset/reboot-mode.txt
-> @@ -0,0 +1,41 @@
-> +Generic reboot mode core map driver
-> +
-> +This driver get reboot mode arguments and call the write
-> +interface to stores the magic value in special register
-> +or ram . Then the bootloader can read it and take different
-> +action according to the argument stored.
-> +
-> +Required properties:
-> +- compatible: only support "syscon-reboot-mode" now.
-> +
-> +Each mode is represented as a sub-node of reboot_mode:
-> +
-> +Subnode required properties:
-> +- linux,mode: reboot mode command,such as "loader", "recovery", "fastboot".
-> +- loader,magic: magic number for the mode, this is vendor specific.
-> +
-> +Example:
-> +	reboot_mode {
+On Tue, Jan 19, 2016 at 05:46:50PM -0700, Loc Ho wrote:
+>  This patch updates the APM X-Gene SoC EDAC documentation binding to
+>  reference the missing register bus for the the SoC EDAC.
+>  
+>  Signed-off-by: Loc Ho <lho@apm.com>
+>  ---
+>   .../devicetree/bindings/edac/apm-xgene-edac.txt    |   12 ++++++++++++
+>   1 files changed, 12 insertions(+), 0 deletions(-)
+>  
+>  diff --git a/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+>  index 78e2a31..17b29af 100644
+>  --- a/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+>  +++ b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+>  @@ -20,6 +20,12 @@ Required properties:
+>   - interrupts            : Interrupt-specifier for MCU, PMD, L3, or SoC error
+>   			  IRQ(s).
+>   
+>  +Optional property:
+>  +- regmap-rb		: Regmap of the register bus resource. This properity
+>  +			  is optional only for compatibility. If the RB
+>  +			  erorr conditions are not cleared, it will
 
-reboot-mode instead please.
+s/erorr/error/
 
-> +		compatible = "syscon-reboot-mode";
-> +		offset = <0x40>;
+Please integrate a spellchecker into your patch creation workflow.
 
-This doc by itself is a little confusing. For example, is a child of the 
-syscon node? I would remove offset (and perhaps compatible) from this 
-example.
+Thanks.
 
-> +
-> +		loader {
-> +			linux,mode = "loader";
-> +			loader,magic = <BOOT_LOADER>;
-> +		};
+-- 
+Regards/Gruss,
+    Boris.
 
-Sorry, my previous suggestion was not clear. I'm suggesting get rid of 
-the subnodes and just do properties like this:
-
-loader = <BOOT_LOADER>;
-maskrom = <BOOT_MASKROM>;
-
-That's the same amount of information unless node names and linux,mode 
-values are going to diverge. Do they need to? I can't see a reason.
-
-
-We need to be clear what loader means. More specifically, it is boot 
-into bootloader shell. 
-
-> +
-> +		maskrom {
-
-In theory, the bootrom could have multiple modes. This typically means a 
-USB download mode. So perhaps a more precise name would be 
-"rom-download". 
-
-In chips I'm familiar with the bootrom mode is selected via a different 
-mechanism than the secondary bootloader modes, but I suppose the same 
-mechanism could be used.
-
-> +			linux,mode = "maskrom";
-> +			loader,magic = <BOOT_MASKROM>;
-> +		};
-> +
-> +		recovery {
-> +			linux,mode = "recovery";
-> +			loader,magic = <BOOT_RECOVERY>;
-> +		};
-> +
-> +		fastboot {
-> +			linux,mode = "fastboot";
-> +			loader,magic = <BOOT_FASTBOOT>;
-> +		};
+ECO tip #101: Trim your mails when you reply.
