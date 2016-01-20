@@ -1,42 +1,84 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 20 Jan 2016 14:23:32 +0000
-Subject: arm64/efi handling of persistent memory
-In-Reply-To: <CAKv+Gu_KEDMdeF5zWL6EEwJyo+kt0u6HeaqrcVOEP9YHeu7uuw@mail.gmail.com>
-References: <94D0CD8314A33A4D9D801C0FE68B40295BEBD864@G9W0745.americas.hpqcorp.net>
- <20151218110651.GL25034@bivouac.eciton.net>
- <20151218114546.GD29219@leverpostej>
- <CAKv+Gu_KEDMdeF5zWL6EEwJyo+kt0u6HeaqrcVOEP9YHeu7uuw@mail.gmail.com>
-Message-ID: <20160120142330.GA28169@leverpostej>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Wed, 20 Jan 2016 20:29:25 +0600
+Subject: [PATCH v6 0/2] Add AMBA bus probing support to ACPI
+Message-ID: <1453300171-25473-1-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+As discussed when Shannon Zhao sent a patch to add platform_device support
+to pl061 driver. Russell and other maintainers prefered that ACPI learned
+how to create AMBA devices rather than converting/adding platform_device
+support to AMBA drivers.
 
-For those newly Cc'd, the initially reported problem is that arm64 Linux
-currently treats persistent memory as with any other memory (happily clobbering
-it), per [1].
+http://comments.gmane.org/gmane.linux.ports.arm.kernel/431364
 
-On Fri, Dec 18, 2015 at 02:07:10PM +0100, Ard Biesheuvel wrote:
-> Before we start hacking away at this at the arm64/EFI level, do we
-> have any documentation and/or consensus regarding how persistent
-> memory should be treated in the first place? Should it be covered by
-> memblock? Should it be covered by the linear mapping? Should it be
-> memblock_reserve()'d?
+This patchset
 
-I'm hoping that the lack of replies has more to do with the recent
-holiday than a lack of opinion...
+1) Adds basic AMBA device probing support to ACPI, it uses a whitelist of
+device IDs as the number of AMBA devices is limited. Currently the only id
+present is of the GPIO device that is used in QEMU for arm64.
 
-I think that it's sensible to say that at minimum we need to ensure that we
-don't treat it as available RAM (i.e. we don't clobber it with random data) for
-now.
+2) Adds the plumbing into ACPI probe sequence.
 
-Per [2] it's not clear to me what the consensus is on memblock, the linear
-mapping, and the use of struct page, though that's months old so perhaps that's
-been figured out since. I've Cc'd some of the attendees in case they can
-clarify the situation.
+3) Factors out the code that finds the first physical node of an ACPI device.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/394707.html
-[2] https://lwn.net/Articles/636096/
+v6:
+- Fix style issues (Andy Shevchenko)
+- Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Thanks,
-Mark.
+v5:
+https://lkml.kernel.org/g/1452518790-27053-1-git-send-email-aleksey.makarov at linaro.org
+- Introduce a new function acpi_get_first_physical_node() in a separate patch
+  (Andy Shevchenko)
+- Combine the patch "ACPI: amba bus probing support" with the one line patch
+  "ACPI: scan add in amba probing"
+- Drop patch "serial: amba-pl011: add ACPI support to AMBA probe" until maintainers
+  decide on the further directions (see [1, 2])
+- Don't initialize dev->dev.parent and set the device's name with amba_device_alloc()
+  (Russell King)
+- Fix minor bugs and style issues (Andy Shevchenko)
+
+[1] https://lkml.kernel.org/g/20160106100700.GA19062 at n2100.arm.linux.org.uk
+[2] https://lkml.kernel.org/g/20160106110350.GB3599 at xora-haswell.xora.org.uk
+
+v4:
+https://lkml.kernel.org/g/1450880383-29560-1-git-send-email-aleksey.makarov at linaro.org
+- A memory leak has been fixed (Vladimir Zapolskiy)
+- ACPI_COMPANION() -> has_acpi_companion() (Andy Shevchenko)
+- pr_err() -> dev_err() (Andy Shevchenko)
+- The call to amba_register_dummy_clk() has been moved to to acpi_amba_init()
+  (Vladimir Zapolskiy)
+- Return value has been fixed (Vladimir Zapolskiy)
+
+v3:
+https://lkml.kernel.org/g/1450716100-13688-1-git-send-email-aleksey.makarov at linaro.org
+- Compilation without CONFIG_ARM_AMBA has been fixed
+
+v2:
+https://lkml.kernel.org/g/1450709399-7246-1-git-send-email-aleksey.makarov at linaro.org
+- A new ACPI scan handler for AMBA devices has been implemented
+- The order of `if` branches in amba-pl011.c has been changed
+- A couple of `static`s have been added
+- The compilation of the acpi_amba.c unit has made conditional
+- A comment on SBSA UART has been added
+
+v1:
+https://lkml.kernel.org/g/1443609530-21524-1-git-send-email-graeme.gregory at linaro.org
+
+Aleksey Makarov (1):
+  ACPI: introduce a function to find the first physical device
+
+Graeme Gregory (1):
+  ACPI: amba bus probing support
+
+ drivers/acpi/Makefile        |   1 +
+ drivers/acpi/acpi_amba.c     | 122 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/acpi/acpi_platform.c |  19 +------
+ drivers/acpi/bus.c           |  33 ++++++++----
+ drivers/acpi/internal.h      |   6 +++
+ drivers/acpi/scan.c          |   1 +
+ 6 files changed, 154 insertions(+), 28 deletions(-)
+ create mode 100644 drivers/acpi/acpi_amba.c
+
+-- 
+2.7.0
