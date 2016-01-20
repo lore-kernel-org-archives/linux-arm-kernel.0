@@ -1,39 +1,61 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 20 Jan 2016 16:06:21 +0800
-Subject: [PATCH 2/4] net: mvneta: Try to get named core clock first
+Date: Wed, 20 Jan 2016 16:06:22 +0800
+Subject: [PATCH 3/4] net: mvneta: mmc: get optional axi clk
 In-Reply-To: <1453277183-5412-1-git-send-email-jszhang@marvell.com>
 References: <1453277183-5412-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1453277183-5412-3-git-send-email-jszhang@marvell.com>
+Message-ID: <1453277183-5412-4-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Some platforms may provide more than one clk for the mvneta IP, for
-example Marvell BG4CT provides "core" clk for the mac core, and "axi"
-clk for the AXI bus logic.
-
-To support for more than one clock, we'll need to distinguish between
-the clock by name. Change clock probing to first try to get "core"
-clock before falling back to unnamed clock.
+example Marvell BG4CT provides "core" clk for the mac core, and
+"axi" clk for the AXI bus logic. Obviously this "axi" clk also need to
+be enabled. This patch adds this optional "axi" clk support.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- drivers/net/ethernet/marvell/mvneta.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/marvell/mvneta.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 79e0c7d..aca0a73 100644
+index aca0a73..6bb709a 100644
 --- a/drivers/net/ethernet/marvell/mvneta.c
 +++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -3605,7 +3605,9 @@ static int mvneta_probe(struct platform_device *pdev)
+@@ -373,6 +373,8 @@ struct mvneta_port {
  
- 	pp->indir[0] = rxq_def;
+ 	/* Core clock */
+ 	struct clk *clk;
++	/* AXI clock */
++	struct clk *clk_axi;
+ 	u8 mcast_count[256];
+ 	u16 tx_ring_size;
+ 	u16 rx_ring_size;
+@@ -3615,6 +3617,10 @@ static int mvneta_probe(struct platform_device *pdev)
  
--	pp->clk = devm_clk_get(&pdev->dev, NULL);
-+	pp->clk = devm_clk_get(&pdev->dev, "core");
-+	if (IS_ERR(pp->clk))
-+		pp->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(pp->clk)) {
- 		err = PTR_ERR(pp->clk);
- 		goto err_put_phy_node;
+ 	clk_prepare_enable(pp->clk);
+ 
++	pp->clk_axi = devm_clk_get(&pdev->dev, "axi");
++	if (!IS_ERR(pp->clk_axi))
++		clk_prepare_enable(pp->clk_axi);
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	pp->base = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(pp->base)) {
+@@ -3727,6 +3733,7 @@ err_free_ports:
+ 	free_percpu(pp->ports);
+ err_clk:
+ 	clk_disable_unprepare(pp->clk);
++	clk_disable_unprepare(pp->clk_axi);
+ err_put_phy_node:
+ 	of_node_put(phy_node);
+ err_free_irq:
+@@ -3744,6 +3751,7 @@ static int mvneta_remove(struct platform_device *pdev)
+ 
+ 	unregister_netdev(dev);
+ 	clk_disable_unprepare(pp->clk);
++	clk_disable_unprepare(pp->clk_axi);
+ 	free_percpu(pp->ports);
+ 	free_percpu(pp->stats);
+ 	irq_dispose_mapping(dev->irq);
 -- 
 2.7.0.rc3
