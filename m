@@ -1,71 +1,69 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 20 Jan 2016 15:04:25 +0800
-Subject: [PATCH v5 2/2] power: add documentation for ACT8945A's charger DT
- bindings
-In-Reply-To: <1453273465-24060-1-git-send-email-wenyou.yang@atmel.com>
-References: <1453273465-24060-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1453273465-24060-3-git-send-email-wenyou.yang@atmel.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Wed, 20 Jan 2016 07:12:40 +0000
+Subject: [PATCH 1/2] regulator: act8945a: add regulator driver for ACT8945A
+In-Reply-To: <20160115175757.GA6588@sirena.org.uk>
+References: <1452218938-10621-1-git-send-email-wenyou.yang@atmel.com>
+ <1452218938-10621-2-git-send-email-wenyou.yang@atmel.com>
+ <20160115175757.GA6588@sirena.org.uk>
+Message-ID: <B256D81BAE5131468A838E5D7A243641D63F61A7@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for the DT bindings of the charger
-subdevice of ACT8945A MFD.
+Hi Mark,
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
+Thank you for your review.
 
-Changes in v5:
- - collect Reviewed-by from Krzysztof.
+> -----Original Message-----
+> From: Mark Brown [mailto:broonie at kernel.org]
+> Sent: 2016?1?16? 1:58
+> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
+> Cc: Liam Girdwood <lgirdwood@gmail.com>; Rob Herring <robh+dt@kernel.org>;
+> Pawel Moll <pawel.moll@arm.com>; Mark Rutland <mark.rutland@arm.com>; Ian
+> Campbell <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>;
+> Ferre, Nicolas <Nicolas.FERRE@atmel.com>; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> devicetree at vger.kernel.org
+> Subject: Re: [PATCH 1/2] regulator: act8945a: add regulator driver for ACT8945A
+> 
+> On Fri, Jan 08, 2016 at 10:08:57AM +0800, Wenyou Yang wrote:
+> 
+> > +	np = of_get_child_by_name(pdev->dev.of_node, "regulators");
+> > +	if (!np) {
+> > +		dev_err(&pdev->dev, "regulator node not found\n");
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	matches = act8945a_matches;
+> > +	num_matches = ARRAY_SIZE(act8945a_matches);
+> > +
+> > +	ret = of_regulator_match(&pdev->dev, np, matches, num_matches);
+> 
+> Don't open code this, use the core regulators_node and of_match implementation
+> instead.
 
-Changes in v4:
- - change the properties with more legible name, clearer description.
+Good. In the next version, I use the code implementation, and remove the redundant code.
 
-Changes in v3: None
-Changes in v2: None
+Thank you for your advice.
 
- .../devicetree/bindings/power/act8945a-charger.txt |   33 ++++++++++++++++++++
- 1 file changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/act8945a-charger.txt
+> 
+> > +		dev_info(act8945a_dev->dev, "%s regulator registered\n",
+> > +			desc->name);
+> 
+> This is just noise, please remove it - let the core handle notifying users.
 
-diff --git a/Documentation/devicetree/bindings/power/act8945a-charger.txt b/Documentation/devicetree/bindings/power/act8945a-charger.txt
-new file mode 100644
-index 0000000..2055da7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/act8945a-charger.txt
-@@ -0,0 +1,33 @@
-+Device-Tree bindings for charger of Active-semi ACT8945A Multi-Function Device
-+
-+Required properties:
-+ - compatible: "active-semi,act8945a-charger".
-+ - active-semi,chglev-gpios: charge current level phandle with args
-+   as described in ../gpio/gpio.txt.
-+
-+Optional properties:
-+ - active-semi,check-battery-temperature: boolean to check the battery
-+   temperature or not.
-+ - active-semi,input-voltage-threshold-microvolt: unit: mV;
-+   Specifies the charger's input over-voltage threshold value;
-+   The value can be: 6600, 7000, 7500, 8000; default: 6600
-+ - active-semi,precondition-timeout: unit: minutes;
-+   Specifies the charger's PRECONDITION safety timer setting value;
-+   The value can be: 40, 60, 80, 0; If 0, it means to disable this timer;
-+   default: 40.
-+ - active-semi,total-timeout: unit: hours;
-+   Specifies the charger's total safety timer setting value;
-+   The value can be: 3, 4, 5, 0; If 0, it means to disable this timer;
-+   default: 3.
-+
-+Example:
-+
-+	charger {
-+		compatible = "active-semi,act8945a-charger";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_charger_chglev>;
-+		active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
-+		active-semi,input-voltage-threshold-microvolt = <6600>;
-+		active-semi,precondition-timeout = <40>;
-+		active-semi,total-timeout = <3>;
-+	};
--- 
-1.7.9.5
+It is fixed in version 2.
+
+> 
+> > +static int __init act8945a_pmic_init(void) {
+> > +	return platform_driver_register(&act8945a_pmic_driver);
+> > +}
+> > +subsys_initcall(act8945a_pmic_init);
+> 
+> Please use module_platform_driver() unless there is a strong reason to do
+> otherwise.
+
+It is fixed in version 2 too.
+
+
+Best Regards,
+Wenyou Yang
