@@ -1,56 +1,29 @@
-From: bart.vanassche@sandisk.com (Bart Van Assche)
-Date: Wed, 20 Jan 2016 08:10:32 -0800
-Subject: [PATCH] scsi: qla2xxxx: avoid type mismatch in comparison
-In-Reply-To: <1603472.f34vvTrhuN@wuerfel>
-References: <1603472.f34vvTrhuN@wuerfel>
-Message-ID: <569FB178.9050101@sandisk.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Wed, 20 Jan 2016 16:10:46 +0000
+Subject: [RFC PATCH v3] irqchip: Add support for Tango interrupt controller
+In-Reply-To: <569FAFF5.4090909@arm.com> (Marc Zyngier's message of "Wed, 20
+ Jan 2016 16:04:05 +0000")
+References: <569CE0F2.1060507@sigmadesigns.com>
+ <569D0B80.1010908@sigmadesigns.com>
+ <569D165E.4060004@sigmadesigns.com> <569FAFF5.4090909@arm.com>
+Message-ID: <yw1xr3hcqlix.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2016 02:47 AM, Arnd Bergmann wrote:
-> A recent bug fix added code that does
->
->          bool logged_out = (status & 0xFFFF);
->          if (logged_out == CTIO_PORT_LOGGED_OUT)
-> 		...
->
-> This looks wrong because we are comparing a boolean with an
-> integer constant, ang gcc warns about it accordingly:
->
-> drivers/scsi/qla2xxx/qla_target.c: In function 'qlt_do_ctio_completion':
-> drivers/scsi/qla2xxx/qla_target.c:3587:20: warning: comparison of constant '41' with boolean expression is always false [-Wbool-compare]
->          (logged_out == CTIO_PORT_LOGGED_OUT) ?
->
-> The correct fix is presumably to make that variable an 'int'.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 71cdc0796465 ("qla2xxx: Delete session if initiator is gone from FW")
-> ---
-> The patch introducing this is currenly in linux-next through the target-updates/for-next
-> branch.
->
-> diff --git a/drivers/scsi/qla2xxx/qla_target.c b/drivers/scsi/qla2xxx/qla_target.c
-> index c7ab9e69c881..8075a4cdb45c 100644
-> --- a/drivers/scsi/qla2xxx/qla_target.c
-> +++ b/drivers/scsi/qla2xxx/qla_target.c
-> @@ -3580,7 +3580,7 @@ static void qlt_do_ctio_completion(struct scsi_qla_host *vha, uint32_t handle,
->   		case CTIO_PORT_LOGGED_OUT:
->   		case CTIO_PORT_UNAVAILABLE:
->   		{
-> -			bool logged_out = (status & 0xFFFF);
-> +			int logged_out = (status & 0xFFFF);
->   			ql_dbg(ql_dbg_tgt_mgt, vha, 0xf059,
->   			    "qla_target(%d): CTIO with %s status %x "
->   			    "received (state %x, se_cmd %p)\n", vha->vp_idx,
->
+Marc Zyngier <marc.zyngier@arm.com> writes:
 
-Hello Arnd,
+>> +	if (of_property_read_u32(node, "reg", &ctl))
+>> +		panic("%s: failed to get reg base", node->name);
+>> +
+>> +	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
+>> +	chip->ctl = ctl;
+>> +	chip->base = base;
 
-Please read the e-mail thread that is available at 
-http://thread.gmane.org/gmane.linux.scsi/108899/focus=108943. That 
-thread namely makes it clear that the above patch is not the proper way 
-to fix that code.
+As I said before, this assumes the outer DT node uses a ranges
+property.  Normally reg properties work the same whether they specify an
+offset within an outer "ranges" or have a full address directly.  It
+would be easy enough to make this work with either, so I don't see any
+reason not to.
 
-Thanks,
-
-Bart.
+-- 
+M?ns Rullg?rd
