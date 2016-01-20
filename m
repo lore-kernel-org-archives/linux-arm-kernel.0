@@ -1,62 +1,39 @@
-From: henryc.chen@mediatek.com (Henry Chen)
-Date: Wed, 20 Jan 2016 12:52:44 +0800
-Subject: [PATCH] soc: mediatek: PMIC wrap: clear the STAUPD_TRIG bit of
- WDT_SRC_EN
-Message-ID: <1453265564-16379-1-git-send-email-henryc.chen@mediatek.com>
+From: hs.liao@mediatek.com (hs.liao at mediatek.com)
+Date: Wed, 20 Jan 2016 13:14:37 +0800
+Subject: [RFC 0/3] MT8173 CMDQ support
+Message-ID: <1453266881-16849-1-git-send-email-hs.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since STAUPD interrupts aren't handled on mt8173, disable watchdog timeout
-monitor of STAUPD to avoid WDT_INT triggered by STAUPD.
 
-Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
----
- drivers/soc/mediatek/mtk-pmic-wrap.c | 19 +++++++++++++++++--
- 1 file changed, 17 insertions(+), 2 deletions(-)
+Hi,
 
-diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-index af919b1..998f561 100644
---- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-+++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-@@ -60,6 +60,15 @@
- #define PWRAP_MAN_CMD_OP_OUTD		(0x9 << 8)
- #define PWRAP_MAN_CMD_OP_OUTQ		(0xa << 8)
- 
-+/* macro for Watch Dog Timer Source */
-+#define PWRAP_WDT_SRC_EN_STAUPD_TRIG		(1 << 25)
-+#define PWRAP_WDT_SRC_EN_HARB_STAUPD_DLE	(1 << 20)
-+#define PWRAP_WDT_SRC_EN_HARB_STAUPD_ALE	(1 << 6)
-+#define PWRAP_WDT_SRC_MASK_ALL			0xffffffff
-+#define PWRAP_WDT_SRC_MASK_NO_STAUPD	~(PWRAP_WDT_SRC_EN_STAUPD_TRIG | \
-+					  PWRAP_WDT_SRC_EN_HARB_STAUPD_DLE | \
-+					  PWRAP_WDT_SRC_EN_HARB_STAUPD_ALE)
-+
- /* macro for slave device wrapper registers */
- #define PWRAP_DEW_BASE			0xbc00
- #define PWRAP_DEW_EVENT_OUT_EN		(PWRAP_DEW_BASE + 0x0)
-@@ -830,7 +839,7 @@ MODULE_DEVICE_TABLE(of, of_pwrap_match_tbl);
- 
- static int pwrap_probe(struct platform_device *pdev)
- {
--	int ret, irq;
-+	int ret, irq, wdt_src;
- 	struct pmic_wrapper *wrp;
- 	struct device_node *np = pdev->dev.of_node;
- 	const struct of_device_id *of_id =
-@@ -920,7 +929,13 @@ static int pwrap_probe(struct platform_device *pdev)
- 
- 	/* Initialize watchdog, may not be done by the bootloader */
- 	pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
--	pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
-+	/*
-+	 * Since STAUPD was not used on mt8173 platform,
-+	 * so STAUPD of WDT_SRC which should be turned off
-+	 */
-+	wdt_src = pwrap_is_mt8135(wrp) ?
-+			PWRAP_WDT_SRC_MASK_ALL : PWRAP_WDT_SRC_MASK_NO_STAUPD;
-+	pwrap_writel(wrp, wdt_src, PWRAP_WDT_SRC_EN);
- 	pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
- 	pwrap_writel(wrp, ~((1 << 31) | (1 << 1)), PWRAP_INT_EN);
- 
+This is the first version to add Mediatek MT8173 Command Queue(CMDQ)
+support. The CMDQ is used to help read/write registers with critical
+time limitation, such as updating display configuration during the
+vblank. It controls Global Command Engine (GCE) hardware to achieve
+this requirement.
+
+These patches have a build dependency on top of v4.4-rc1.
+
+Best regards,
+HS Liao
+
+HS Liao (3):
+  dt-bindings: soc: Add documentation for the MediaTek GCE unit
+  arm64: dts: mt8173: Add GCE node
+  CMDQ: Mediatek CMDQ driver
+
+ .../devicetree/bindings/soc/mediatek/gce.txt       |   33 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |    8 +
+ drivers/soc/mediatek/Kconfig                       |   10 +
+ drivers/soc/mediatek/Makefile                      |    1 +
+ drivers/soc/mediatek/mtk-cmdq.c                    | 3532 ++++++++++++++++++++
+ include/soc/mediatek/cmdq.h                        |  225 ++
+ 6 files changed, 3809 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/gce.txt
+ create mode 100644 drivers/soc/mediatek/mtk-cmdq.c
+ create mode 100644 include/soc/mediatek/cmdq.h
+
 -- 
-1.8.1.1.dirty
+1.7.9.5
