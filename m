@@ -1,56 +1,50 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 20 Jan 2016 14:04:31 -0800
-Subject: [PATCH v3 04/13] clk: at91: make IRQ optional and register them
- later
-In-Reply-To: <20160116134558.716ef7d5@bbrezillon>
-References: <1449248628-3486-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1449248628-3486-5-git-send-email-alexandre.belloni@free-electrons.com>
- <20160115020237.GJ22188@codeaurora.org>
- <20160115103901.1b987f53@bbrezillon>
- <20160116012612.GA20466@codeaurora.org>
- <20160116134558.716ef7d5@bbrezillon>
-Message-ID: <20160120220431.GB12841@codeaurora.org>
+Date: Wed, 20 Jan 2016 14:16:56 -0800
+Subject: [PATCH v2] clk-divider: make sure read-only dividers do not
+ write to their register
+In-Reply-To: <3578615.iBrKplh45Q@phil>
+References: <8710207.gKyLbM2bKY@phil>
+ <3578615.iBrKplh45Q@phil>
+Message-ID: <20160120221604.GC12841@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16, Boris Brezillon wrote:
-> Actually the PMC is not only exposing clocks. You have a bit in one of
-> its registers that is used by a USB driver to enable a BIAS, and
-> probably other things that are not directly related to clocks. Hence
-> the idea to declare the PMC as an MFD/syscon device (which is in turn
-> providing an IRQ chip).
+On 01/20, Heiko Stuebner wrote:
+> Commit e6d5e7d90be9 ("clk-divider: Fix READ_ONLY when divider > 1") removed
+> the special ops struct for read-only clocks and instead opted to handle
+> them regularly.
 > 
-> Note that the irq problem we're talking about cannot be addressed by
-> simply moving everything into the ->probe() function of the platform
-> driver: we need the clock quite early in the boot process (it's
-> required for the initial clocksource device), in the other hand you
-> can't request threaded irqs when you're so early in the boot process,
-> and this becomes a problem when you apply the preempt-RT patch which
-> moves all standard irqs to threaded ones.
-> So the idea was to use polling instead of the irq event until we are
-> able to register threaded irqs, and then switch to an irq-able approach
-> once everything is in place (platform devices are probed after the
-> thread infrastructure has been setup, which is why we used this trick).
+> On the rk3368 this results in breakage as aclkm now gets set a value.
+> While it is the same divider value, the A53 core still doesn't like it,
+> which can result in the cpu ending up in a hang.
+> The reason being that "ACLKENMasserts one clock cycle before the rising
+> edge of ACLKM" and the clock should only be touched when STANDBYWFIL2
+> is asserted.
+> 
+> So make sure read-only clocks don't touch the clock-register at all
+> even if only writing the same value, as even writing the same value
+> may not be safe in all cases.
+> 
+> Fixes: e6d5e7d90be9 ("clk-divider: Fix READ_ONLY when divider > 1")
+> Reported-by: Zhang Qing <zhangqing@rock-chips.com>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Reviewed-by: James Hogan <james.hogan@imgtec.com>
+> ---
 
-Just one more thought. If we had one platform driver for the
-entire PMC could we also have an OF_CLK_DECLARE for it as well?
-Then that OF_CLK_DECLARE could run early, register whatever
-clocks are essential for the clocksource to work, and defer the
-rest of the clock registration to when the device driver probes?
-We'd still need some sort of global list of clocks that we
-registered early, and this list might need to be per PMC if
-there's more than one PMC, but we'd have all the clk_hw pointers
-available when the platform driver probed. Oh and we'd need
-clk_get() to return PROBE_DEFER too so that consumer drivers
-could be deferred until the PMC driver probes.
+Hmph, the same patch[1] has been sitting in my inbox for months
+now but I never got a response to my last question and then
+forgot about it. I'll repeat the question here and hopefully we
+can finish the discussion.
 
-I suppose this would be making more global variables, which isn't
-preferred, so let's worry about this clk_hw vs clk pointer
-problem later. We'll have to keep this driver in mind when we're
-converting over clk providers to registering clk_hw pointers with
-the of clk provider layer.
+Maybe it would make more sense to have different ops for read
+only dividers? The clk_set_rate op would be empty, while we would
+have proper recalc_rate and round_rate ops. We can't just flat
+out revert commit e6d5e7d90be9 (clk-divider: Fix READ_ONLY when
+divider > 1, 2014-11-14) because that will introduce the problem
+that it was fixing, but as long as we implement round_rate in
+addition to recalc_rate it should work.
 
- Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+[1] http://lkml.kernel.org/r/1428392806-14538-1-git-send-email-jy0922.shim at samsung.com
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
