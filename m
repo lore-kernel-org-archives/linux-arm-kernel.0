@@ -1,125 +1,29 @@
 From: dyoung@redhat.com (Dave Young)
-Date: Wed, 20 Jan 2016 10:54:07 +0800
-Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
-In-Reply-To: <20160119140526.GD26545@leverpostej>
+Date: Wed, 20 Jan 2016 10:56:21 +0800
+Subject: [PATCH 00/19] arm64 kexec kernel patches v13
+In-Reply-To: <1453248900.21755.8.camel@infradead.org>
 References: <cover.1452884156.git.geoff@infradead.org>
- <fb4506943bbaed8b0657ed367ebd57e4064d57ed.1452884156.git.geoff@infradead.org>
- <20160115201601.GR3262@leverpostej> <569CBDBC.5050500@linaro.org>
- <20160119014332.GB2919@dhcp-128-65.nay.redhat.com>
- <20160119121721.GG25024@leverpostej>
- <20160119135233.GB2986@dhcp-128-65.nay.redhat.com>
- <20160119140526.GD26545@leverpostej>
-Message-ID: <20160120025407.GB2999@dhcp-128-65.nay.redhat.com>
+ <20160119123230.GB2904@dhcp-128-65.nay.redhat.com>
+ <1453248900.21755.8.camel@infradead.org>
+Message-ID: <20160120025621.GC2999@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/16 at 02:05pm, Mark Rutland wrote:
-> On Tue, Jan 19, 2016 at 09:52:33PM +0800, Dave Young wrote:
-> > On 01/19/16 at 12:17pm, Mark Rutland wrote:
-> > > On Tue, Jan 19, 2016 at 09:43:32AM +0800, Dave Young wrote:
-> > > > On 01/18/16 at 07:26pm, AKASHI Takahiro wrote:
-> > > > > On 01/16/2016 05:16 AM, Mark Rutland wrote:
-> > > > > >On Fri, Jan 15, 2016 at 07:18:38PM +0000, Geoff Levand wrote:
-> > > > > >>From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > > > > >>
-> > > > > >>This patch adds arch specific descriptions about kdump usage on arm64
-> > > > > >>to kdump.txt.
-> > > > > >>
-> > > > > >>Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > > > > >>---
-> > > > > >>  Documentation/kdump/kdump.txt | 23 ++++++++++++++++++++++-
-> > > > > >>  1 file changed, 22 insertions(+), 1 deletion(-)
-> > > > > >>
-> > > > > >>diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-> > > > > >>index bc4bd5a..36cf978 100644
-> > > > > >>--- a/Documentation/kdump/kdump.txt
-> > > > > >>+++ b/Documentation/kdump/kdump.txt
-> > > > > >>@@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
-> > > > > >>  a remote system.
-> > > > > >>
-> > > > > >>  Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
-> > > > > >>-s390x and arm architectures.
-> > > > > >>+s390x, arm and arm64 architectures.
-> > > > > >>
-> > > > > >>  When the system kernel boots, it reserves a small section of memory for
-> > > > > >>  the dump-capture kernel. This ensures that ongoing Direct Memory Access
-> > > > > >>@@ -249,6 +249,20 @@ Dump-capture kernel config options (Arch Dependent, arm)
-> > > > > >>
-> > > > > >>      AUTO_ZRELADDR=y
-> > > > > >>
-> > > > > >>+Dump-capture kernel config options (Arch Dependent, arm64)
-> > > > > >>+----------------------------------------------------------
-> > > > > >>+
-> > > > > >>+1) The maximum memory size on the dump-capture kernel must be limited by
-> > > > > >>+   specifying:
-> > > > > >>+
-> > > > > >>+   mem=X[MG]
-> > > > > >>+
-> > > > > >>+   where X should be less than or equal to the size in "crashkernel="
-> > > > > >>+   boot parameter. Kexec-tools will automatically add this.
-> > > > > >
-> > > > > >
-> > > > > >This is extremely fragile, and will trivially fail when the kernel can
-> > > > > >be loaded anywhere (see [1]).
-> > > > > 
-> > > > > As I said before, this restriction also exists on arm, but I understand
-> > > > > that recent Ard's patches break it.
-> > > > > 
-> > > > > >We must explicitly describe the set of regions the crash kernel may use
-> > > > > >(i.e. we need base and size). NAK in the absence of that.
-> > > > > 
-> > > > > There seem to exist several approaches:
-> > > > > (a) use a device-tree property, "linux,usable-memory", in addition to "reg"
-> > > > >     under "memory" node
-> > > > > (b) use a kernel's early parameter, "memmap=nn[@#$]ss"
-> > > > > 
-> > > > > Power PC takes (a), while this does not work on efi-started kernel
-> > > > > because dtb has no "memory" nodes under efi.
-> > > > > X86 takes (b). If we take this, we will need to overwrite a weak
-> > > > > early_init_dt_add_memory().
-> > > > 
-> > > > X86 takes another way in latest kexec-tools and kexec_file_load, that is
-> > > > recreating E820 table and pass it to kexec/kdump kernel, if the entries
-> > > > are over E820 limitation then turn to use setup_data list for remain
-> > > > entries.
-> > > 
-> > > This would imply modifying the EFI memory map or the memory nodes, which
-> > > I'm not keen on.
-> > > 
-> > > I would prefer that they are left _pristine_, and we describe the
-> > > restriction on the kdump kernel with additional properties under
-> > > /chosen.
-> > > 
-> > > That leaves us with more useful information about the environment of the
-> > > first kernel, is simpler for userspace (it's resilient to updates to the
-> > > UEFI memory map spec, for example), and is simple for the crash kernel.
-> > 
-> > In theory kexec as boot loader should prepare correct efi memmap and pass
-> > to kernel, but as you said yes it will increase complexity. We need banlance
-> > them.
+On 01/19/16 at 04:15pm, Geoff Levand wrote:
+> On Tue, 2016-01-19 at 20:32 +0800, Dave Young wrote:
+> > Geoff, another question about kexec-tools part is, can the kexec
+> > -tools code
+> > been written in kernel? We have the infrastructure for kexec_file_load.
 > 
-> I'd argue that the "correct efi memmap" is what we were given by the
-> firmware initially -- none of that information is any less true.
+> I see no technical reason why the arm64 kernel cannot support
+> kexec_file_load.
 
-In X86 boot loader will cook a E820 map for kernel use, there's no such needs
-in arm so maybe it is acceptable to use same memmap to avoid modifying it only
-for kdump.
-
-I think I will not insist though I like more about doing something in
-bootloader instead of in kernel.
+Cool, care to port it to kernel so that we have kexec_file_load only in arm64
+we do not need to support both kexec_load and kexec_file_load?
 
 > 
-> For kdump all we need to ensure is that the kdump kernel only uses the
-> memory that was specially reserved for it by the first kernel. The
-> simplest way of doing that is to tell the kdump kernel which specific
-> region(s) of memory were reserved for it, leaving the EFI memory map
-> alone.
-
-Yes, agreed that it is simpler.
-
+> -Geoff
 > 
-> Thanks,
-> Mark.
 
 Thanks
 Dave
