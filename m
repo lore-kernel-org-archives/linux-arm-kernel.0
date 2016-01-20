@@ -1,42 +1,54 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Wed, 20 Jan 2016 12:25:44 -0800
-Subject: [PATCH v2 1/4] dt-bindings: power: reset: add document for
- reboot-mode driver
-In-Reply-To: <CAL_Jsq+suCyqSi+cJiVLuA0aZKSciAaeUKW9A5Y_X_3wyW60Ug@mail.gmail.com>
-References: <1452598029-8222-1-git-send-email-andy.yan@rock-chips.com>
- <1452598189-8272-1-git-send-email-andy.yan@rock-chips.com>
- <20160120182840.GA15741@rob-hp-laptop>
- <CALAqxLVvJqL60nKfrDiZ+p-1ujxuG72iUN3DCvEE3WJ9bpnGLA@mail.gmail.com>
- <CAL_Jsq+suCyqSi+cJiVLuA0aZKSciAaeUKW9A5Y_X_3wyW60Ug@mail.gmail.com>
-Message-ID: <CALAqxLVY7mg2arS7u63fRow8Ln2u7hbrfFf1h2UcoojtwJMRyw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 Jan 2016 21:31:16 +0100
+Subject: CONFIG_CPU_SW_DOMAIN_PAN breakage on ARM11 MPCore
+In-Reply-To: <569FE8A9.4080700@openwrt.org>
+References: <569D71F3.7000408@openwrt.org>
+ <20160120195722.GU19062@n2100.arm.linux.org.uk>
+ <569FE8A9.4080700@openwrt.org>
+Message-ID: <1504723.MNMEXN8hkX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 20, 2016 at 11:53 AM, Rob Herring <robh@kernel.org> wrote:
-> On Wed, Jan 20, 2016 at 12:47 PM, John Stultz <john.stultz@linaro.org> wrote:
-> The question here really is will we ever need additional data for each
-> mode (in the DT) besides "magic". We can do some amount of extending
-> the property like allowing more that single 32-bit value. We can't mix
-> strings and integers though. If we don't need that, then lets go with
-> the more concise approach. This isn't really an evolving area.
-> Selecting boot mode/device has existed for a long time on PCs (it is
-> fixed list in the IPMI spec for example). So I can't imagine that we'd
-> have to extend this, but I'd like to hear thoughts on it. You had
-> mentioned the Galaxy Nexus having a value and a string, but I'd find
-> it surprising if the bootloader actually uses the string.
+On Wednesday 20 January 2016 21:06:01 Felix Fietkau wrote:
+> > 
+> > config CPU_SW_DOMAIN_PAN
+> >       bool "Enable use of CPU domains to implement privileged no-access"
+> >       depends on MMU && !ARM_LPAE
+> >       default y
+> >       help
+> >         Increase kernel security by ensuring that normal kernel accesses
+> >         are unable to access userspace addresses.  This can help prevent
+> >         use-after-free bugs becoming an exploitable privilege escalation
+> >         by ensuring that magic values (such as LIST_POISON) will always
+> >         fault when dereferenced.
+> > 
+> >         Note: This option is incompatible with ARM11 MPcore and must not
+> >         be used with kernels which are to run on this CPU, whether in SMP
+> >         or UP mode.
+> > 
+> >         CPUs with low-vector mappings use a best-efforts implementation.
+> >         Their lower 1MB needs to remain accessible for the vectors, but
+> >         the remainder of userspace will become appropriately inaccessible.
+> > 
+> > Unfortunately, that's still going to lead to people hitting this, and
+> > possibly wasting a long time debugging it needlessly - but I don't
+> > have any better solution for this.
+>
+> We should at least add a dependency to disable this when support for a
+> known ARM11 MPCore platform is selected. Maybe add a CPU_MPCORE bool for
+> this.
 
-So I've been told the galaxy nexus and possibly other older TI
-hardware used only a string.
+Just depending on (!ARCH_CNS3XXX && !REALVIEW_EB_ARM11MP &&
+!MACH_REALVIEW_PB11MP) would be sufficient technically, but adding a
+CPU_ARM11MPCORE seems a little nicer.
 
-And the HTC implementations I've seen have code for both a string and
-command to be placed, but usually don't actually copy anything to the
-string address (which suggest its not used by the bootloader, as you
-note).
+The downside is that it departs from the the idea that starting with
+ARMv6 we only have configuration symbols for the architecture level
+(CPU_V6, CPU_V7), but we also have a CPU_PJ4 symbol that breaks this
+rule.
 
-Either way, we'd have to extend or implement a new driver, but that's
-a bridge I think we can cross later when we see such hardware support
-upstream (rather then try to create a super driver that handles
-everything a creative firmware developer could come up with).
+If we add the CPU_ARM11MPCORE symbol, we may also want to update
+CONFIG_SMP to depend on (CPU_ARM11MPCORE || CPU_V7) instead of CPU_V6K,
+and we can force-enable SMP_ON_UP whenever (CPU_V6 && !CPU_ARM11MPCORE)
 
-thanks
--john
+	Arnd
