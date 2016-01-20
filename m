@@ -1,96 +1,54 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Wed, 20 Jan 2016 10:04:27 +0100
-Subject: iProc bus scanning regression (after "PCI: iproc: Add PAXC
- interface support")
-In-Reply-To: <569F41B1.6000005@broadcom.com>
-References: <CACna6rx2t7Zg_xSVvYqZTW2dYEgRugaorV58Zy1YZ4Wy=+L4fQ@mail.gmail.com>
- <CACna6rzMK4Htci8AucHVi1TNjBkxdQiy60MWJ234J8=4B_vteA@mail.gmail.com>
- <569F41B1.6000005@broadcom.com>
-Message-ID: <CACna6rzjEZohOT=Sc-0K1HaDYwDoYe219ogUeCSB087FG+ttBw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 20 Jan 2016 09:06:11 +0000
+Subject: [PATCH 1/3] irqchip/GIC: Add workaround for aliased GIC400
+In-Reply-To: <CADaLNDmTTM36-bqT+h2WOgX8TebhYoAMNSf=fe_qusxZj-8DSw@mail.gmail.com>
+References: <CADaLNDmTTM36-bqT+h2WOgX8TebhYoAMNSf=fe_qusxZj-8DSw@mail.gmail.com>
+Message-ID: <20160120090611.2c8e3649@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 January 2016 at 09:13, Ray Jui <rjui@broadcom.com> wrote:
-> On 1/19/2016 11:02 PM, Rafa? Mi?ecki wrote:
->>
->> On 20 January 2016 at 07:53, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
->>>
->>> In OpenWrt trunk code we use iProc driver for PCIe controllers on bcma
->>> bus (PCIE_IPROC_BCMA). Right now we use 4.1 kernel but we backported
->>> all iProc changes. Unfortunately backporting set queued for 4.5 broke
->>> bus scanning on some routers.
->>>
->>> Most BCM4708 / BCM4709 chipsets have 3 PCIe controllers. All known
->>> routers use only first 2 of them. Even if router has 3 PCIe cards, the
->>> last two cards are connected to the 2nd PCIe controller.
->>>
->>> So that PAXC patch broke support for routers with 3 cards, 2 of them
->>> at the 2nd controller. It doesn't affect routers with just 2 cards.
->>> This problem was tracked down in:
->>> https://dev.openwrt.org/ticket/21393
->>>
->>> I'm attaching two OpenWrt boot logs.
->>> 1) r48381
->>> It contains all backported iProc changes. The log looks "nice", but
->>> only one card (0000:01:00.0) was detected.
->>> 2) r48382
->>> It contains "Revert "PCI: iproc: Add PAXC interface support"" patch.
->>> It contains many "[Firmware Bug]: reg 0x??: invalid BAR (can't size)"
->>> messages but there are all 3 cards detected: 0000:01:00.0,
->>> 0001:03:00.0 and 0001:04:00.0 (see brcmfmac messages).
->>>
->>> Can you take a look at this problem, please?
->>
->>
->> linux-arm-kernel@ stopped my e-mail due to its size. Sending
->> compressed attachments.
->>
->
-> I'm a bit confused by these logs that you provided. Based on the log, there
-> seems to be 3 PCIe root complexes populated on the platform, domain
-> 0000:00:00.0, 0001:00:00:0, 0002:00:00:0 are the 3 root complexes. Root
-> complex 0002 seems to have nothing connected since it does not detect any
-> EP.
->
-> Is the first card installed on root complex 0 (domain 0000), but the second
-> card and 3rd card are both installed on root complex 1 (domain 0001) on
-> different slots or something?
+Hi Duc,
 
-I believe this is the case. Devices 0001:03:00.0 and 0001:04:00.0
-suggest it's one bus (domain 0001) and just different slots. Please
-note BCM4708/BCM4709 is a SoC, there aren't physical connectors, I
-don't know hardware design details.
+On Tue, 19 Jan 2016 11:12:15 -0800
+Duc Dang <dhdang@apm.com> wrote:
 
+> On Sun, Sep 13, 2015 at 4:14 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >
+> > The GICv2 architecture mandates that the two 4kB GIC regions are
+> > contiguous, and on two separate physical pages (so that access to
+> > the second page can be trapped by a hypervisor). This doesn't work
+> > very well when PAGE_SIZE is 64kB.
+> >
+> > A relatively common hack^Wway to work around this is to alias each
+> > 4kB region over its own 64kB page. Of course in this case, the base
+> > address you want to use is not really the begining of the region,
+> > but base + 60kB (so that you get a contiguous 8kB region over two
+> > distinct pages).
+> >
+> > Normally, this would be described in DT with a new property, but
+> > some HW is already out there, and the firmware makes sure that
+> > it will override whatever you put in the GIC node. Duh. And of course,
+> > said firmware source code is not available, despite being based
+> > on u-boot.
+> >
+> > The workaround is to detect the case where the CPU interface size
+> > is set to 128kB, and verify the aliasing by checking that the ID
+> > register for GIC400 (which is the only GIC wired this way so far)
+> > is the same at base and base + 0xF000. In this case, we update
+> > the GIC base address and let it roll.
+> 
+> Hi Marc,
+> 
+> When booting ACPI with X-Gene Mustang, I saw it hangs when EOI mode is
+> enabled, should we have ACPI version for gic_check_eoimode as well?
 
-> I suspect a potential issue is in this function:
->
-> 173 static inline bool iproc_pcie_device_is_valid(struct iproc_pcie *pcie,
-> 174                                               unsigned int slot,
-> 175                                               unsigned int fn)
-> 176 {
-> 177         if (slot > 0)
-> 178                 return false;
-> 179
-> 180         /* PAXC can only support limited number of functions */
-> 181         if (pcie->type == IPROC_PCIE_PAXC && fn >= MAX_NUM_PAXC_PF)
-> 182                 return false;
-> 183
-> 184         return true;
-> 185 }
->
-> Compared to the original code, it's different. Can you try passing bus
-> number into the function as another argument and do the following check on
-> line 177:
->
-> if (busnum == 0 && slot > 0)
->     return false;
->
-> instead of
->
-> if (slot > 0)
->     return false;
+ACPI doesn't provide the size of the CPU interface, so you cannot
+perform the same kind of check and bug workaround. I'm afraid you have
+to fix your ACPI tables (which shouldn't be a problem since nobody is
+using ACPI in production so far...).
 
-I'll prepare an image and ask R8000 owner to give it a try.
+Thanks,
 
+	M.
 -- 
-Rafa?
+Jazz is not dead. It just smells funny.
