@@ -1,37 +1,135 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Jan 2016 11:40:03 +0100
-Subject: [PATCH] serial: amba-pl011: mark vendor_zte as __maybe_unused
-Message-ID: <1973012.CU51qOk9Kt@wuerfel>
+Date: Wed, 20 Jan 2016 11:42:26 +0100
+Subject: [PATCH] net: i40e: avoid unused function warnings
+Message-ID: <2806620.EpZqDlZTO3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pl011 driver has gone back and forth on the definition of the
-ZTE specific variation of the hardware definitions, but the
-current state is that the vendor definition is left in place
-yet unused:
+The addition of the geneve tunnel offload code left a couple
+of functions unconditionally defined but empty whenever CONFIG_VXLAN
+and CONFIG_GENEVE are disabled. gcc warns about this:
 
-drivers/tty/serial/amba-pl011.c:190:27: warning: 'vendor_zte' defined but not used [-Wunused-variable]
+i40e_main.c:7049:13: warning: 'i40e_sync_udp_filters_subtask' defined but not used [-Wunused-function]
+i40e_main.c:8516:13: warning: 'i40e_add_vxlan_port' defined but not used [-Wunused-function]
+i40e_main.c:8561:13: warning: 'i40e_del_vxlan_port' defined but not used [-Wunused-function]
+i40e_main.c:8596:13: warning: 'i40e_add_geneve_port' defined but not used [-Wunused-function]
+i40e_main.c:8643:13: warning: 'i40e_del_geneve_port' defined but not used [-Wunused-function]
 
-I don't know what the plan forward is to get this code to work,
-but the current behavior is a bit annoying as we get a warning
-whenever we build this driver.
-
-This patch does not help us to make it work, but at least
-shuts up the warning.
+This moves the #ifdef statements to the outside of the affected
+functions, which avoids the warnings.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 7ec758718920 ("tty: amba-pl011: add support for ZTE UART (EXPERIMENTAL)")
+Fixes: 6a899024058d ("i40e: geneve tunnel offload support")
+---
+This is a harmless regression against v4.4, found on ARM randconfig builds
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index c0da0ccbbcf5..4cdfe8f806df 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -187,7 +187,7 @@ static const u16 pl011_zte_offsets[REG_ARRAY_SIZE] = {
- 	[REG_DMACR] = ZX_UART011_DMACR,
- };
+diff --git a/drivers/net/ethernet/intel/i40e/i40e_main.c b/drivers/net/ethernet/intel/i40e/i40e_main.c
+index bb4612c159fd..49ab0426b773 100644
+--- a/drivers/net/ethernet/intel/i40e/i40e_main.c
++++ b/drivers/net/ethernet/intel/i40e/i40e_main.c
+@@ -7056,7 +7056,6 @@ static void i40e_handle_mdd_event(struct i40e_pf *pf)
+  **/
+ static void i40e_sync_udp_filters_subtask(struct i40e_pf *pf)
+ {
+-#if IS_ENABLED(CONFIG_VXLAN) || IS_ENABLED(CONFIG_GENEVE)
+ 	struct i40e_hw *hw = &pf->hw;
+ 	i40e_status ret;
+ 	__be16 port;
+@@ -7090,7 +7089,6 @@ static void i40e_sync_udp_filters_subtask(struct i40e_pf *pf)
+ 			}
+ 		}
+ 	}
+-#endif
+ }
  
--static struct vendor_data vendor_zte = {
-+static struct vendor_data vendor_zte __maybe_unused = {
- 	.reg_offset		= pl011_zte_offsets,
- 	.access_32b		= true,
- 	.ifls			= UART011_IFLS_RX4_8|UART011_IFLS_TX4_8,
+ /**
+@@ -7117,9 +7115,8 @@ static void i40e_service_task(struct work_struct *work)
+ 	i40e_watchdog_subtask(pf);
+ 	i40e_fdir_reinit_subtask(pf);
+ 	i40e_sync_filters_subtask(pf);
+-#if IS_ENABLED(CONFIG_VXLAN) || IS_ENABLED(CONFIG_GENEVE)
+-	i40e_sync_udp_filters_subtask(pf);
+-#endif
++	if (IS_ENABLED(CONFIG_VXLAN) || IS_ENABLED(CONFIG_GENEVE))
++		i40e_sync_udp_filters_subtask(pf);
+ 	i40e_clean_adminq_subtask(pf);
+ 
+ 	i40e_service_event_complete(pf);
+@@ -8515,6 +8512,7 @@ static u8 i40e_get_udp_port_idx(struct i40e_pf *pf, __be16 port)
+ }
+ 
+ #endif
++#if IS_ENABLED(CONFIG_VXLAN)
+ /**
+  * i40e_add_vxlan_port - Get notifications about VXLAN ports that come up
+  * @netdev: This physical port's netdev
+@@ -8524,7 +8522,6 @@ static u8 i40e_get_udp_port_idx(struct i40e_pf *pf, __be16 port)
+ static void i40e_add_vxlan_port(struct net_device *netdev,
+ 				sa_family_t sa_family, __be16 port)
+ {
+-#if IS_ENABLED(CONFIG_VXLAN)
+ 	struct i40e_netdev_priv *np = netdev_priv(netdev);
+ 	struct i40e_vsi *vsi = np->vsi;
+ 	struct i40e_pf *pf = vsi->back;
+@@ -8557,7 +8554,6 @@ static void i40e_add_vxlan_port(struct net_device *netdev,
+ 	pf->udp_ports[next_idx].type = I40E_AQC_TUNNEL_TYPE_VXLAN;
+ 	pf->pending_udp_bitmap |= BIT_ULL(next_idx);
+ 	pf->flags |= I40E_FLAG_UDP_FILTER_SYNC;
+-#endif
+ }
+ 
+ /**
+@@ -8569,7 +8565,6 @@ static void i40e_add_vxlan_port(struct net_device *netdev,
+ static void i40e_del_vxlan_port(struct net_device *netdev,
+ 				sa_family_t sa_family, __be16 port)
+ {
+-#if IS_ENABLED(CONFIG_VXLAN)
+ 	struct i40e_netdev_priv *np = netdev_priv(netdev);
+ 	struct i40e_vsi *vsi = np->vsi;
+ 	struct i40e_pf *pf = vsi->back;
+@@ -8592,9 +8587,10 @@ static void i40e_del_vxlan_port(struct net_device *netdev,
+ 		netdev_warn(netdev, "vxlan port %d was not found, not deleting\n",
+ 			    ntohs(port));
+ 	}
+-#endif
+ }
++#endif
+ 
++#if IS_ENABLED(CONFIG_GENEVE)
+ /**
+  * i40e_add_geneve_port - Get notifications about GENEVE ports that come up
+  * @netdev: This physical port's netdev
+@@ -8604,7 +8600,6 @@ static void i40e_del_vxlan_port(struct net_device *netdev,
+ static void i40e_add_geneve_port(struct net_device *netdev,
+ 				 sa_family_t sa_family, __be16 port)
+ {
+-#if IS_ENABLED(CONFIG_GENEVE)
+ 	struct i40e_netdev_priv *np = netdev_priv(netdev);
+ 	struct i40e_vsi *vsi = np->vsi;
+ 	struct i40e_pf *pf = vsi->back;
+@@ -8639,7 +8634,6 @@ static void i40e_add_geneve_port(struct net_device *netdev,
+ 	pf->flags |= I40E_FLAG_UDP_FILTER_SYNC;
+ 
+ 	dev_info(&pf->pdev->dev, "adding geneve port %d\n", ntohs(port));
+-#endif
+ }
+ 
+ /**
+@@ -8651,7 +8645,6 @@ static void i40e_add_geneve_port(struct net_device *netdev,
+ static void i40e_del_geneve_port(struct net_device *netdev,
+ 				 sa_family_t sa_family, __be16 port)
+ {
+-#if IS_ENABLED(CONFIG_GENEVE)
+ 	struct i40e_netdev_priv *np = netdev_priv(netdev);
+ 	struct i40e_vsi *vsi = np->vsi;
+ 	struct i40e_pf *pf = vsi->back;
+@@ -8677,8 +8670,8 @@ static void i40e_del_geneve_port(struct net_device *netdev,
+ 		netdev_warn(netdev, "geneve port %d was not found, not deleting\n",
+ 			    ntohs(port));
+ 	}
+-#endif
+ }
++#endif
+ 
+ static int i40e_get_phys_port_id(struct net_device *netdev,
+ 				 struct netdev_phys_item_id *ppid)
