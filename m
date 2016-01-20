@@ -1,50 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 20 Jan 2016 10:35:02 -0600
-Subject: [PATCH v4 3/4] soc: mediatek: Add MT2701 power dt-bindings
-In-Reply-To: <1453282161.16515.9.camel@mtksdaap41>
-References: <1453270097-53853-1-git-send-email-jamesjj.liao@mediatek.com>
- <1453270097-53853-4-git-send-email-jamesjj.liao@mediatek.com>
- <1453282161.16515.9.camel@mtksdaap41>
-Message-ID: <20160120163502.GA22147@rob-hp-laptop>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Wed, 20 Jan 2016 17:36:57 +0100
+Subject: [RFC PATCH v3] irqchip: Add support for Tango interrupt controller
+In-Reply-To: <yw1xmvs0qkue.fsf@unicorn.mansr.com>
+References: <569CE0F2.1060507@sigmadesigns.com>
+ <569D0B80.1010908@sigmadesigns.com> <569D165E.4060004@sigmadesigns.com>
+ <569FAFF5.4090909@arm.com> <yw1xr3hcqlix.fsf@unicorn.mansr.com>
+ <569FB471.8000909@arm.com> <yw1xmvs0qkue.fsf@unicorn.mansr.com>
+Message-ID: <569FB7A9.9080309@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 20, 2016 at 05:29:21PM +0800, Yingjoe Chen wrote:
-> On Wed, 2016-01-20 at 14:08 +0800, James Liao wrote:
-> > From: Shunli Wang <shunli.wang@mediatek.com>
-> > 
-> > Add power dt-bindings for MT2701.
-> > 
-> > Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
-> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/soc/mediatek/scpsys.txt    |  6 +++--
-> >  include/dt-bindings/power/mt2701-power.h           | 27 ++++++++++++++++++++++
-> >  2 files changed, 31 insertions(+), 2 deletions(-)
-> >  create mode 100644 include/dt-bindings/power/mt2701-power.h
-> > 
-> > diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> > index a6c8afc..807d87f 100644
-> > --- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> > +++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> > @@ -9,10 +9,12 @@ domain control.
-> >  
-> >  The driver implements the Generic PM domain bindings described in
-> >  power/power_domain.txt. It provides the power domains defined in
-> > -include/dt-bindings/power/mt8173-power.h.
-> > +include/dt-bindings/power/mt8173-power.h and mt2701-power.h.
-> >  
-> >  Required properties:
-> > -- compatible: Must be "mediatek,mt8173-scpsys"
-> > +- compatible: Should be:
-> > +	- "mediatek,mt8173-scpsys"
-> > +	- "mediatek,mt2701-scpsys"
-> >  - #power-domain-cells: Must be 1
-> >  - reg: Address range of the SCPSYS unit
-> >  - infracfg: must contain a phandle to the infracfg controller
+On 20/01/2016 17:25, M?ns Rullg?rd wrote:
+
+> Marc Zyngier <marc.zyngier@arm.com> writes:
 > 
-> Please sort the list.
+>> On 20/01/16 16:10, M?ns Rullg?rd wrote:
+>>
+>>> Marc Zyngier <marc.zyngier@arm.com> writes:
+>>>
+>>>>> +	if (of_property_read_u32(node, "reg", &ctl))
+>>>>> +		panic("%s: failed to get reg base", node->name);
+>>>>> +
+>>>>> +	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
+>>>>> +	chip->ctl = ctl;
+>>>>> +	chip->base = base;
+>>>
+>>> As I said before, this assumes the outer DT node uses a ranges
+>>> property.  Normally reg properties work the same whether they specify an
+>>> offset within an outer "ranges" or have a full address directly.  It
+>>> would be easy enough to make this work with either, so I don't see any
+>>> reason not to.
+>>
+>> Yup, that is a good point. I guess Marc can address this in the next
+>> round, since we need a DT binding anyway.
+> 
+> I'd suggest using of_address_to_resource() on both nodes and subtracting
+> the start addresses returned.
 
-And s/Should be/Should be one of/
-
-Rob
+For my own reference, Marc Zyngier suggested:
+"you should use of_iomap to map the child nodes, and not mess with
+the parent one."
