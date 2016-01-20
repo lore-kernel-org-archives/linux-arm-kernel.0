@@ -1,202 +1,56 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Wed, 20 Jan 2016 14:35:43 +0800
-Subject: [PATCH v4 2/6] dt-bindings: ARM: Mediatek: Document bindings for
- MT2701
+Date: Wed, 20 Jan 2016 14:35:47 +0800
+Subject: [PATCH v4 6/6] reset: mediatek: Add MT2701 reset driver
 In-Reply-To: <1453271747-57397-1-git-send-email-jamesjj.liao@mediatek.com>
 References: <1453271747-57397-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1453271747-57397-3-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1453271747-57397-7-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the binding documentation for apmixedsys, bdpsys,
-ethsys, hifsys, imgsys, infracfg, mmsys, pericfg, topckgen and
-vdecsys for Mediatek MT2701.
+From: Shunli Wang <shunli.wang@mediatek.com>
 
+In infrasys and perifsys, there are many reset
+control bits for kinds of modules. These bits are
+used as actual reset controllers to be registered
+into kernel's generic reset controller framework.
+
+Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
 Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
 Tested-by: John Crispin <blogic@openwrt.org>
 ---
- .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |  1 +
- .../bindings/arm/mediatek/mediatek,bdpsys.txt      | 22 ++++++++++++++++++++++
- .../bindings/arm/mediatek/mediatek,ethsys.txt      | 22 ++++++++++++++++++++++
- .../bindings/arm/mediatek/mediatek,hifsys.txt      | 22 ++++++++++++++++++++++
- .../bindings/arm/mediatek/mediatek,imgsys.txt      |  1 +
- .../bindings/arm/mediatek/mediatek,infracfg.txt    |  1 +
- .../bindings/arm/mediatek/mediatek,mmsys.txt       |  1 +
- .../bindings/arm/mediatek/mediatek,pericfg.txt     |  1 +
- .../bindings/arm/mediatek/mediatek,topckgen.txt    |  1 +
- .../bindings/arm/mediatek/mediatek,vdecsys.txt     |  1 +
- 10 files changed, 73 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,hifsys.txt
+ drivers/clk/mediatek/clk-mt2701.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-index 936166f..a701e19 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-@@ -6,6 +6,7 @@ The Mediatek apmixedsys controller provides the PLLs to the system.
- Required Properties:
+diff --git a/drivers/clk/mediatek/clk-mt2701.c b/drivers/clk/mediatek/clk-mt2701.c
+index 82f9c1c..4e5b51f 100644
+--- a/drivers/clk/mediatek/clk-mt2701.c
++++ b/drivers/clk/mediatek/clk-mt2701.c
+@@ -665,6 +665,8 @@ static void __init mtk_infrasys_init(struct device_node *node)
+ 	if (r)
+ 		pr_err("%s(): could not register clock provider: %d\n",
+ 			__func__, r);
++
++	mtk_register_reset_controller(node, 2, 0x30);
+ }
+ CLK_OF_DECLARE(mtk_infrasys, "mediatek,mt2701-infracfg", mtk_infrasys_init);
  
- - compatible: Should be:
-+	- "mediatek,mt2701-apmixedsys"
- 	- "mediatek,mt8135-apmixedsys"
- 	- "mediatek,mt8173-apmixedsys"
- - #clock-cells: Must be 1
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
-new file mode 100644
-index 0000000..4137196
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
-@@ -0,0 +1,22 @@
-+Mediatek bdpsys controller
-+============================
+@@ -782,6 +784,8 @@ static void __init mtk_pericfg_init(struct device_node *node)
+ 	if (r)
+ 		pr_err("%s(): could not register clock provider: %d\n",
+ 			__func__, r);
 +
-+The Mediatek bdpsys controller provides various clocks to the system.
-+
-+Required Properties:
-+
-+- compatible: Should be:
-+	- "mediatek,mt2701-bdpsys", "syscon"
-+- #clock-cells: Must be 1
-+
-+The bdpsys controller uses the common clk binding from
-+Documentation/devicetree/bindings/clock/clock-bindings.txt
-+The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-+
-+Example:
-+
-+bdpsys: clock-controller at 1c000000 {
-+	compatible = "mediatek,mt2701-bdpsys", "syscon";
-+	reg = <0 0x1c000000 0 0x1000>;
-+	#clock-cells = <1>;
-+};
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
-new file mode 100644
-index 0000000..768f3a5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
-@@ -0,0 +1,22 @@
-+Mediatek ethsys controller
-+============================
-+
-+The Mediatek ethsys controller provides various clocks to the system.
-+
-+Required Properties:
-+
-+- compatible: Should be:
-+	- "mediatek,mt2701-ethsys", "syscon"
-+- #clock-cells: Must be 1
-+
-+The ethsys controller uses the common clk binding from
-+Documentation/devicetree/bindings/clock/clock-bindings.txt
-+The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-+
-+Example:
-+
-+ethsys: clock-controller at 1b000000 {
-+	compatible = "mediatek,mt2701-ethsys", "syscon";
-+	reg = <0 0x1b000000 0 0x1000>;
-+	#clock-cells = <1>;
-+};
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,hifsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,hifsys.txt
-new file mode 100644
-index 0000000..b7a39b6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,hifsys.txt
-@@ -0,0 +1,22 @@
-+Mediatek hifsys controller
-+============================
-+
-+The Mediatek hifsys controller provides various clocks to the system.
-+
-+Required Properties:
-+
-+- compatible: Should be:
-+	- "mediatek,mt2701-hifsys", "syscon"
-+- #clock-cells: Must be 1
-+
-+The hifsys controller uses the common clk binding from
-+Documentation/devicetree/bindings/clock/clock-bindings.txt
-+The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-+
-+Example:
-+
-+hifsys: clock-controller at 1a000000 {
-+	compatible = "mediatek,mt2701-hifsys", "syscon";
-+	reg = <0 0x1a000000 0 0x1000>;
-+	#clock-cells = <1>;
-+};
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
-index b1f2ce1..9bda7f7 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
-@@ -6,6 +6,7 @@ The Mediatek imgsys controller provides various clocks to the system.
- Required Properties:
++	mtk_register_reset_controller(node, 2, 0x0);
+ }
+ CLK_OF_DECLARE(mtk_pericfg, "mediatek,mt2701-pericfg", mtk_pericfg_init);
  
- - compatible: Should be:
-+	- "mediatek,mt2701-imgsys", "syscon"
- 	- "mediatek,mt8173-imgsys", "syscon"
- - #clock-cells: Must be 1
- 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
-index f6cd3e4..2f11a69 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
-@@ -7,6 +7,7 @@ outputs to the system.
- Required Properties:
- 
- - compatible: Should be:
-+	- "mediatek,mt2701-infracfg", "syscon"
- 	- "mediatek,mt8135-infracfg", "syscon"
- 	- "mediatek,mt8173-infracfg", "syscon"
- - #clock-cells: Must be 1
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-index 4385946..c9d9d43 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-@@ -6,6 +6,7 @@ The Mediatek mmsys controller provides various clocks to the system.
- Required Properties:
- 
- - compatible: Should be:
-+	- "mediatek,mt2701-mmsys", "syscon"
- 	- "mediatek,mt8173-mmsys", "syscon"
- - #clock-cells: Must be 1
- 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
-index f25b854..d3454cd 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
-@@ -7,6 +7,7 @@ outputs to the system.
- Required Properties:
- 
- - compatible: Should be:
-+	- "mediatek,mt2701-pericfg", "syscon"
- 	- "mediatek,mt8135-pericfg", "syscon"
- 	- "mediatek,mt8173-pericfg", "syscon"
- - #clock-cells: Must be 1
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-index f9e9179..602e5bc 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-@@ -6,6 +6,7 @@ The Mediatek topckgen controller provides various clocks to the system.
- Required Properties:
- 
- - compatible: Should be:
-+	- "mediatek,mt2701-topckgen"
- 	- "mediatek,mt8135-topckgen"
- 	- "mediatek,mt8173-topckgen"
- - #clock-cells: Must be 1
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
-index 1faacf1..f5b1e7d 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
-@@ -6,6 +6,7 @@ The Mediatek vdecsys controller provides various clocks to the system.
- Required Properties:
- 
- - compatible: Should be:
-+	- "mediatek,mt2701-vdecsys", "syscon"
- 	- "mediatek,mt8173-vdecsys", "syscon"
- - #clock-cells: Must be 1
+@@ -996,6 +1000,8 @@ static void __init mtk_hifsys_init(struct device_node *node)
+ 	if (r)
+ 		pr_err("%s(): could not register clock provider: %d\n",
+ 			__func__, r);
++
++	mtk_register_reset_controller(node, 1, 0x34);
+ }
+ CLK_OF_DECLARE(mtk_hifsys, "mediatek,mt2701-hifsys", mtk_hifsys_init);
  
 -- 
 1.9.1
