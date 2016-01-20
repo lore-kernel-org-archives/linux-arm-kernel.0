@@ -1,26 +1,42 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Wed, 20 Jan 2016 12:53:52 +0300
-Subject: [patch] drm: rockchip: signedness bug in dw_mipi_dsi_get_lane_bps()
-Message-ID: <20160120095352.GA19898@mwanda>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Wed, 20 Jan 2016 11:09:01 +0100
+Subject: [PATCHv2 08/16] ARM: dts: imx6ul: add sdma support
+In-Reply-To: <1453284549-16363-1-git-send-email-LW@KARO-electronics.de>
+References: <1452619291-13625-1-git-send-email-LW@KARO-electronics.de>
+ <1453284549-16363-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1453284549-16363-9-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"bpp" needs to be signed for the error handling to work.
+Add device node for the i.MX6UL SDMA unit.
 
-Fixes: 84e05408fcfe ('drm: rockchip: Support Synopsys DW MIPI DSI')
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/boot/dts/imx6ul.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 7bfe243..c35e5af 100644
---- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-+++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -461,7 +461,8 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index 40ea5f0..9c719b2 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -548,6 +548,18 @@
+ 				clock-names = "ipg", "per";
+ 			};
  
- static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi)
- {
--	unsigned int bpp, i, pre;
-+	int bpp;
-+	unsigned int i, pre;
- 	unsigned long mpclk, pllref, tmp;
- 	unsigned int m = 1, n = 1, target_mbps = 1000;
- 	unsigned int max_mbps = dptdin_map[ARRAY_SIZE(dptdin_map) - 1].max_mbps;
++			sdma: sdma at 020ec000 {
++				compatible = "fsl,imx6ul-sdma", "fsl,imx6q-sdma",
++					     "fsl,imx35-sdma";
++				reg = <0x020ec000 0x4000>;
++				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6UL_CLK_SDMA>,
++					 <&clks IMX6UL_CLK_SDMA>;
++				clock-names = "ipg", "ahb";
++				#dma-cells = <3>;
++				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q.bin";
++			};
++
+ 			pwm5: pwm at 020f0000 {
+ 				compatible = "fsl,imx6ul-pwm", "fsl,imx27-pwm";
+ 				reg = <0x020f0000 0x4000>;
+-- 
+2.1.4
