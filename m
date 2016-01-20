@@ -1,37 +1,68 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Wed, 20 Jan 2016 10:25:48 +0000
-Subject: [RFC PATCH v2 0/4] CPUs capacity information for heterogeneous
- systems
-In-Reply-To: <20160119175038.GS6588@sirena.org.uk>
-References: <1452262172-31861-1-git-send-email-juri.lelli@arm.com>
- <20160119150551.GI6344@twins.programming.kicks-ass.net>
- <20160119175038.GS6588@sirena.org.uk>
-Message-ID: <20160120102548.GO8573@e106622-lin>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 Jan 2016 11:31:49 +0100
+Subject: [PATCH] xen: allocate gntdev_copy_batch dynamically
+Message-ID: <4664421.nvl14CijWp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/01/16 17:50, Mark Brown wrote:
-> On Tue, Jan 19, 2016 at 04:05:51PM +0100, Peter Zijlstra wrote:
-> > On Fri, Jan 08, 2016 at 02:09:28PM +0000, Juri Lelli wrote:
-> 
-> > >     cons: - not easy to come up with a clean solution, as it seems interaction
-> > >             with several subsystems (e.g., cpufreq) is required
-> > >           - not easy to agree upon a single benchmark (that has to be both
-> > >             representative and simple enough to run at boot)
-> > >           - numbers might (and do) vary from boot to boot
-> 
-> > This last point is a total pain for benchmarking, it means nothing is
-> > every reproducible.
-> 
-> > Therefore, I would always augment the above (2) with the below (3), such
-> > that you can overwrite the results with a known stable set of numbers:
-> 
-> The suggestion when the previous version was being discussed was that
-> there are supposed to be some other knobs one uses for tuning and one
-> was never supposed to use these numbers.
+struct gntdev_copy_batch is arguably too large to fit on the kernel stack,
+and we get a warning about the stack usage in gntdev_ioctl_grant_copy:
 
-Right, DT solution might live without a sysfs interface, as you want to
-use those other knobs for runtime tuning. Dynamic solution instead, and
-I think this is what Peter was also pointing out, will most probably
-require a sysfs interface for cases in which variation of default values
-from boot to boot is not acceptable.
+drivers/xen/gntdev.c:949:1: error: the frame size of 1240 bytes is larger than 1024 bytes
+
+This changes the code to us a dynamic allocation instead.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: a4cdb556cae0 ("xen/gntdev: add ioctl for grant copy")
+---
+This is a regression against v4.4, found with ARM randconfig testing.
+
+diff --git a/drivers/xen/gntdev.c b/drivers/xen/gntdev.c
+index dc495383ad73..cc753b3a7154 100644
+--- a/drivers/xen/gntdev.c
++++ b/drivers/xen/gntdev.c
+@@ -915,15 +915,16 @@ static int gntdev_grant_copy_seg(struct gntdev_copy_batch *batch,
+ static long gntdev_ioctl_grant_copy(struct gntdev_priv *priv, void __user *u)
+ {
+ 	struct ioctl_gntdev_grant_copy copy;
+-	struct gntdev_copy_batch batch;
++	struct gntdev_copy_batch *batch;
+ 	unsigned int i;
+ 	int ret = 0;
+ 
+ 	if (copy_from_user(&copy, u, sizeof(copy)))
+ 		return -EFAULT;
+ 
+-	batch.nr_ops = 0;
+-	batch.nr_pages = 0;
++	batch = kzalloc(sizeof(*batch), GFP_KERNEL);
++	if (!batch)
++		return -ENOMEM;
+ 
+ 	for (i = 0; i < copy.count; i++) {
+ 		struct gntdev_grant_copy_segment seg;
+@@ -933,18 +934,20 @@ static long gntdev_ioctl_grant_copy(struct gntdev_priv *priv, void __user *u)
+ 			goto out;
+ 		}
+ 
+-		ret = gntdev_grant_copy_seg(&batch, &seg, &copy.segments[i].status);
++		ret = gntdev_grant_copy_seg(batch, &seg, &copy.segments[i].status);
+ 		if (ret < 0)
+ 			goto out;
+ 
+ 		cond_resched();
+ 	}
+-	if (batch.nr_ops)
+-		ret = gntdev_copy(&batch);
++	if (batch->nr_ops)
++		ret = gntdev_copy(batch);
++	kfree(batch);
+ 	return ret;
+ 
+   out:
+-	gntdev_put_pages(&batch);
++	gntdev_put_pages(batch);
++	kfree(batch);
+ 	return ret;
+ }
+ 
