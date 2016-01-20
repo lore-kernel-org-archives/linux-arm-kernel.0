@@ -1,40 +1,31 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 20 Jan 2016 22:35:21 +0200
-Subject: [4.4-rt2 PATCH] ARM: highmem: take into account FIX_KMAP_BEGIN in
- switch_kmaps()
-In-Reply-To: <20160120202317.GV19062@n2100.arm.linux.org.uk>
-References: <1452867647-1410-1-git-send-email-grygorii.strashko@ti.com>
- <20160120202139.GC2741@linutronix.de>
- <20160120202317.GV19062@n2100.arm.linux.org.uk>
-Message-ID: <569FEF89.1020806@ti.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Wed, 20 Jan 2016 13:15:49 -0800
+Subject: [PATCH 00/19] arm64 kexec kernel patches v13
+In-Reply-To: <20160120025621.GC2999@dhcp-128-65.nay.redhat.com>
+References: <cover.1452884156.git.geoff@infradead.org>
+ <20160119123230.GB2904@dhcp-128-65.nay.redhat.com>
+ <1453248900.21755.8.camel@infradead.org>
+ <20160120025621.GC2999@dhcp-128-65.nay.redhat.com>
+Message-ID: <1453324549.21755.10.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2016 10:23 PM, Russell King - ARM Linux wrote:
-> On Wed, Jan 20, 2016 at 09:21:39PM +0100, Sebastian Andrzej Siewior wrote:
->> * Grygorii Strashko | 2016-01-15 16:20:47 [+0200]:
->>
->>> --- a/arch/arm/mm/highmem.c
->>> +++ b/arch/arm/mm/highmem.c
->>> @@ -175,7 +180,7 @@ void switch_kmaps(struct task_struct *prev_p, struct task_struct *next_p)
->>> 	 * Restore @next_p's kmap_atomic mappings
->>> 	 */
->>> 	for (i = 0; i < next_p->kmap_idx; i++) {
->>> -		int idx = i + KM_TYPE_NR * smp_processor_id();
->>> +		int idx = fixmap_idx(i);
->>>
->>> 		if (!pte_none(next_p->kmap_pte[i]))
->>> 			set_fixmap_pte(idx, next_p->kmap_pte[i]);
->>
->> Grygorii, if you remove this chunk then it should apply upstream. Could
->> you forward it upstream then please? So the -RT piece would shrink a
->> little:)
->
-> Or I could commit my own patch which forms a proportion of this change.
->
+On Wed, 2016-01-20 at 10:56 +0800, Dave Young wrote:
+> On 01/19/16 at 04:15pm, Geoff Levand wrote:
+> > On Tue, 2016-01-19 at 20:32 +0800, Dave Young wrote:
+> > > Geoff, another question about kexec-tools part is, can the kexec
+> > > -tools code
+> > > been written in kernel? We have the infrastructure for
+> > > kexec_file_load.
+> > 
+> > I see no technical reason why the arm64 kernel cannot support
+> > kexec_file_load.
+> 
+> Cool, care to port it to kernel so that we have kexec_file_load only
+> in arm64
+> we do not need to support both kexec_load and kexec_file_load?
+> 
 
-np from my side.
+I have no plans to do so.  Feel free to submit a patch.
 
--- 
-regards,
--grygorii
+-Geoff
