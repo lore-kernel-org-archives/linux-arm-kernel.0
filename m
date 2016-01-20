@@ -1,65 +1,119 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Jan 2016 12:05:55 +0100
-Subject: [PATCH v2] ASoC: avoid unused variable warning for rt5659_acpi_match
-Message-ID: <1477393.QDzvbob2TI@wuerfel>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 20 Jan 2016 12:07:30 +0100 (CET)
+Subject: [PATCH 4.4-rt2] fix
+ arm-at91-pit-remove-irq-handler-when-clock-is-unused.patch
+In-Reply-To: <20160118184247.GQ3367@piout.net>
+References: <1452997394-8554-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1452997394-8554-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160118172522.GB12309@linutronix.de> <20160118184247.GQ3367@piout.net>
+Message-ID: <alpine.DEB.2.11.1601201158280.3575@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added rt5659 codec driver unconditionally defines an
-ACPI device match table but then uses ACPI_PTR() to remove the
-only reference to it, so we get a harmless build warning:
+On Mon, 18 Jan 2016, Alexandre Belloni wrote:
+> On 18/01/2016 at 18:25:22 +0100, Sebastian Andrzej Siewior wrote :
+> > * Alexandre Belloni | 2016-01-17 03:23:14 [+0100]:
+> > 
+> > >index 80d74c4adcbe..43b50634d640 100644
+> > >--- a/drivers/clocksource/timer-atmel-pit.c
+> > >+++ b/drivers/clocksource/timer-atmel-pit.c
+> > >@@ -96,11 +96,44 @@ static int pit_clkevt_shutdown(struct clock_event_device *dev)
+> > > 
+> > > 	/* disable irq, leaving the clocksource active */
+> > > 	pit_write(data->base, AT91_PIT_MR, (data->cycle - 1) | AT91_PIT_PITEN);
+> > >-	free_irq(atmel_pit_irq, data);
+> > >+	if (!clockevent_state_detached(dev))
+> > >+		free_irq(data->irq, data);
+> > 
+> > I did it in the meantime without clockevent_state_detached(). From what
+> > it looks, it first sets the state and then invokes
+> > pit_clkevt_shutdown(). Any particular reason for this?
+> > 
+> 
+> Yeah, I forgot to mention that. Freeing the irq unconditionally
+> results in:
 
-sound/soc/codecs/rt5659.c:4200:30: warning: 'rt5659_acpi_match' defined but not used [-Wunused-variable]
- static struct acpi_device_id rt5659_acpi_match[] = {
+Well freeing the irq from that context in RT only works because its called
+before SYSTEM_STATE=RUNNING. So no, this was wrong forever.
 
-This changes both the OF match table and the ACPI match table
-to follow the same style, using ACPI_PTR/of_match_ptr to
-make the reference conditional, and using an #ifdef to hide
-the table. This also adds the missing MODULE_DEVICE_TABLE for
-the OF case and adapts the formatting to the same style.
+The issue we are dealing with is that the timer interrupt is shared with the
+uart. So the timer has IRQ_NO_THREAD set and the uart interrupt gets force
+threaded. So that results in a failure to request the interrupt for the
+UART. That's not RT specific, that already happens in mainline if you add
+'threadirqs' to the command line.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-I still want to give this some time in the random build testing to avoid
-introducing a stupid mistake, please apply after tomorrow unless you
-hear from me otherwise.
+So until the DT folks come to senses and we get that dummy demux chip done, I
+came up with the following - completely untested - solution.
 
-diff --git a/sound/soc/codecs/rt5659.c b/sound/soc/codecs/rt5659.c
-index c166d9394c69..efe87af33f8f 100644
---- a/sound/soc/codecs/rt5659.c
-+++ b/sound/soc/codecs/rt5659.c
-@@ -4183,24 +4183,29 @@ void rt5659_i2c_shutdown(struct i2c_client *client)
- 	regmap_write(rt5659->regmap, RT5659_RESET, 0);
- }
+The downside of this is, that the timer will be delayed until the uart thread
+returns, but with the replacement clockevent in place on RT that's a non
+issue. For mainline it's obviously better than what we have now.
+
+Thanks,
+
+	tglx
+
+8<---------------
+
+--- a/include/linux/interrupt.h
++++ b/include/linux/interrupt.h
+@@ -61,6 +61,10 @@
+  *                interrupt handler after suspending interrupts. For system
+  *                wakeup devices users need to implement wakeup detection in
+  *                their interrupt handlers.
++ * IRQF_COND_ONESHOT - If the IRQ is shared between a NO_THREAD user and a
++ *		regular interrupt, force the ONESHOT flag on the NO_THREAD user
++ *		when threaded irqs are enforced. Workaround for silly ATMEL
++ *		SoCs which share the timer and the UART interrupt
+  * IRQF_NO_SOFTIRQ_CALL - Do not process softirqs in the irq thread context (RT)
+  */
+ #define IRQF_SHARED		0x00000080
+@@ -75,7 +79,8 @@
+ #define IRQF_NO_THREAD		0x00010000
+ #define IRQF_EARLY_RESUME	0x00020000
+ #define IRQF_COND_SUSPEND	0x00040000
+-#define IRQF_NO_SOFTIRQ_CALL	0x00080000
++#define IRQF_COND_ONESHOT	0x00080000
++#define IRQF_NO_SOFTIRQ_CALL	0x00100000
  
-+#ifdef CONFIG_OF
- static const struct of_device_id rt5659_of_match[] = {
- 	{ .compatible = "realtek,rt5658", },
- 	{ .compatible = "realtek,rt5659", },
--	{},
-+	{ },
- };
-+MODULE_DEVICE_TABLE(of, rt5659_of_match)
-+#endif
+ #define IRQF_TIMER		(__IRQF_TIMER | IRQF_NO_SUSPEND | IRQF_NO_THREAD)
  
-+#ifdef CONFIG_ACPI
- static struct acpi_device_id rt5659_acpi_match[] = {
--		{ "10EC5658", 0},
--		{ "10EC5659", 0},
--		{ },
-+	{ "10EC5658", 0, },
-+	{ "10EC5659", 0, },
-+	{ },
- };
- MODULE_DEVICE_TABLE(acpi, rt5659_acpi_match);
-+#endif
+--- a/kernel/irq/manage.c
++++ b/kernel/irq/manage.c
+@@ -1208,6 +1208,14 @@ static int
+ 	new->irq = irq;
  
- struct i2c_driver rt5659_i2c_driver = {
- 	.driver = {
- 		.name = "rt5659",
- 		.owner = THIS_MODULE,
--		.of_match_table = rt5659_of_match,
-+		.of_match_table = of_match_ptr(rt5659_of_match),
- 		.acpi_match_table = ACPI_PTR(rt5659_acpi_match),
- 	},
- 	.probe = rt5659_i2c_probe,
+ 	/*
++	 * Workaround for silly ATMEL SoCs with shared timer and uart
++	 * interrupt.
++	 */
++	if (force_irqthreads && (new->flags & IRQF_COND_ONESHOT) &&
++	    (new->flags & IRQF_NO_THREAD))
++		new->flags |= IRQF_ONESHOT;
++
++	/*
+ 	 * Check whether the interrupt nests into another interrupt
+ 	 * thread.
+ 	 */
+--- a/drivers/clocksource/timer-atmel-pit.c
++++ b/drivers/clocksource/timer-atmel-pit.c
+@@ -208,7 +208,7 @@ static void __init at91sam926x_pit_commo
+ 
+ 	/* Set up irq handler */
+ 	ret = request_irq(data->irq, at91sam926x_pit_interrupt,
+-			  IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
++			  IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL| IRQF_COND_ONESHOT,
+ 			  "at91_tick", data);
+ 	if (ret)
+ 		panic(pr_fmt("Unable to setup IRQ\n"));
+--- a/drivers/clocksource/timer-atmel-st.c
++++ b/drivers/clocksource/timer-atmel-st.c
+@@ -216,7 +216,7 @@ static void __init atmel_st_timer_init(s
+ 
+ 	/* Make IRQs happen for the system timer */
+ 	ret = request_irq(irq, at91rm9200_timer_interrupt,
+-			  IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
++			  IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL | IRQF_COND_ONESHOT,
+ 			  "at91_tick", regmap_st);
+ 	if (ret)
+ 		panic(pr_fmt("Unable to setup IRQ\n"));
