@@ -1,56 +1,27 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Wed, 20 Jan 2016 17:43:09 +0100
-Subject: [RFC PATCH v3] irqchip: Add support for Tango interrupt controller
-In-Reply-To: <yw1xegdcqk8n.fsf@unicorn.mansr.com>
-References: <569CE0F2.1060507@sigmadesigns.com>
- <569D0B80.1010908@sigmadesigns.com> <569D165E.4060004@sigmadesigns.com>
- <569FAFF5.4090909@arm.com> <yw1xr3hcqlix.fsf@unicorn.mansr.com>
- <569FB471.8000909@arm.com> <yw1xmvs0qkue.fsf@unicorn.mansr.com>
- <569FB7A9.9080309@sigmadesigns.com> <yw1xegdcqk8n.fsf@unicorn.mansr.com>
-Message-ID: <569FB91D.9030704@sigmadesigns.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 20 Jan 2016 16:42:58 +0000
+Subject: [PATCH 1/2] regulator: ltc3589: make IRQ optional
+In-Reply-To: <1453292992-1788-2-git-send-email-LW@KARO-electronics.de>
+References: <1453292992-1788-1-git-send-email-LW@KARO-electronics.de>
+ <1453292992-1788-2-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20160120164258.GF6588@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/01/2016 17:38, M?ns Rullg?rd wrote:
+On Wed, Jan 20, 2016 at 01:29:51PM +0100, Lothar Wa?mann wrote:
 
-> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
-> 
->> On 20/01/2016 17:25, M?ns Rullg?rd wrote:
->>
->>> Marc Zyngier <marc.zyngier@arm.com> writes:
->>>
->>>> On 20/01/16 16:10, M?ns Rullg?rd wrote:
->>>>
->>>>> Marc Zyngier <marc.zyngier@arm.com> writes:
->>>>>
->>>>>>> +	if (of_property_read_u32(node, "reg", &ctl))
->>>>>>> +		panic("%s: failed to get reg base", node->name);
->>>>>>> +
->>>>>>> +	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
->>>>>>> +	chip->ctl = ctl;
->>>>>>> +	chip->base = base;
->>>>>
->>>>> As I said before, this assumes the outer DT node uses a ranges
->>>>> property.  Normally reg properties work the same whether they specify an
->>>>> offset within an outer "ranges" or have a full address directly.  It
->>>>> would be easy enough to make this work with either, so I don't see any
->>>>> reason not to.
->>>>
->>>> Yup, that is a good point. I guess Marc can address this in the next
->>>> round, since we need a DT binding anyway.
->>>
->>> I'd suggest using of_address_to_resource() on both nodes and subtracting
->>> the start addresses returned.
->>
->> For my own reference, Marc Zyngier suggested:
->> "you should use of_iomap to map the child nodes, and not mess with
->> the parent one."
-> 
-> That's going to get very messy since the generic irqchip code needs all
-> the registers as offsets from a common base address.
+> This pin is used as IRQ pin for the LTC3589 PMIC on the Ka-Ro
+> electronics TX48 module. Make the IRQ optional in the driver and use a
+> polling routine instead if no IRQ is specified in DT.
+> Otherwise the driver will continuously generate interrupts and make
+> the system unusable.
 
-The two suggestions are over my head at the moment.
-
-Do you want to submit v4 and have Marc Z take a look?
-
-Regards.
+How will the driver generate interrupts if there is no interrupt
+physically present in the system?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160120/a0fbe171/attachment-0001.sig>
