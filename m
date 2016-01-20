@@ -1,81 +1,58 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Wed, 20 Jan 2016 02:32:27 -0800
-Subject: [PATCH] soc: mediatek: PMIC wrap: clear the STAUPD_TRIG bit of
- WDT_SRC_EN
-In-Reply-To: <1453265564-16379-1-git-send-email-henryc.chen@mediatek.com>
-References: <1453265564-16379-1-git-send-email-henryc.chen@mediatek.com>
-Message-ID: <CAGS+omCFOUgTHxeUn0snrkBjvcR1bSOAAmkBHppF8nM37P1vrw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 Jan 2016 11:33:37 +0100
+Subject: [PATCH] drm: exynos: make PM functions as __maybe_unused
+Message-ID: <12427702.1DA55iFFLW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2016 at 8:52 PM, Henry Chen <henryc.chen@mediatek.com> wrote:
-> Since STAUPD interrupts aren't handled on mt8173, disable watchdog timeout
-> monitor of STAUPD to avoid WDT_INT triggered by STAUPD.
->
-> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+The newly added runtime-pm support for exynos-drm encloses the
+pm functions in an #ifdef, but not the functions that are called
+from them and nowhere else, which produces warnings:
 
-> ---
->  drivers/soc/mediatek/mtk-pmic-wrap.c | 19 +++++++++++++++++--
->  1 file changed, 17 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> index af919b1..998f561 100644
-> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> @@ -60,6 +60,15 @@
->  #define PWRAP_MAN_CMD_OP_OUTD          (0x9 << 8)
->  #define PWRAP_MAN_CMD_OP_OUTQ          (0xa << 8)
->
-> +/* macro for Watch Dog Timer Source */
-> +#define PWRAP_WDT_SRC_EN_STAUPD_TRIG           (1 << 25)
-> +#define PWRAP_WDT_SRC_EN_HARB_STAUPD_DLE       (1 << 20)
-> +#define PWRAP_WDT_SRC_EN_HARB_STAUPD_ALE       (1 << 6)
-> +#define PWRAP_WDT_SRC_MASK_ALL                 0xffffffff
-> +#define PWRAP_WDT_SRC_MASK_NO_STAUPD   ~(PWRAP_WDT_SRC_EN_STAUPD_TRIG | \
-> +                                         PWRAP_WDT_SRC_EN_HARB_STAUPD_DLE | \
-> +                                         PWRAP_WDT_SRC_EN_HARB_STAUPD_ALE)
-> +
->  /* macro for slave device wrapper registers */
->  #define PWRAP_DEW_BASE                 0xbc00
->  #define PWRAP_DEW_EVENT_OUT_EN         (PWRAP_DEW_BASE + 0x0)
-> @@ -830,7 +839,7 @@ MODULE_DEVICE_TABLE(of, of_pwrap_match_tbl);
->
->  static int pwrap_probe(struct platform_device *pdev)
->  {
-> -       int ret, irq;
-> +       int ret, irq, wdt_src;
->         struct pmic_wrapper *wrp;
->         struct device_node *np = pdev->dev.of_node;
->         const struct of_device_id *of_id =
-> @@ -920,7 +929,13 @@ static int pwrap_probe(struct platform_device *pdev)
->
->         /* Initialize watchdog, may not be done by the bootloader */
->         pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
-> -       pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
-> +       /*
-> +        * Since STAUPD was not used on mt8173 platform,
-> +        * so STAUPD of WDT_SRC which should be turned off
-> +        */
+drm/exynos/exynos_drm_dsi.c:733:13: warning: 'exynos_dsi_disable_clock' defined but not used [-Wunused-function]
+ static void exynos_dsi_disable_clock(struct exynos_dsi *dsi)
+             ^
+drm/exynos/exynos_drm_dsi.c:1291:13: warning: 'exynos_dsi_disable_irq' defined but not used [-Wunused-function]
+ static void exynos_dsi_disable_irq(struct exynos_dsi *dsi)
+             ^
 
-It is a little awkward that "!pwrap_is_mt8135(wrp)" means mt8173.  Is
-this always true?
-Why aren't we clearing STAUPD for mt8135 too?
-I assume it is because mt8135 does not define this bit?
-What about other devices that are not mt8135 or mt8173?
+This removes the #ifdef and instead marks the functions as
+__maybe_unused, so gcc can silently discard them and all called
+functions when CONFIG_PM is disabled.
 
-Perhaps change the comment to:
-"This driver does not use STAUPD, so clear this WDT SRC for all
-devices for which it exists to avoid unhandled interrupts"
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: ba6e47795d83 ("drm/exynos: dsi: add runtime pm support")
+---
+This is a regression against 4.4, found on ARM randconfig testing
 
-Other than that, this patch is:
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-
-> +       wdt_src = pwrap_is_mt8135(wrp) ?
-> +                       PWRAP_WDT_SRC_MASK_ALL : PWRAP_WDT_SRC_MASK_NO_STAUPD;
-> +       pwrap_writel(wrp, wdt_src, PWRAP_WDT_SRC_EN);
->         pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
->         pwrap_writel(wrp, ~((1 << 31) | (1 << 1)), PWRAP_INT_EN);
->
-> --
-> 1.8.1.1.dirty
->
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+index d84a498ef099..e977a81af2e6 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+@@ -1906,8 +1906,7 @@ static int exynos_dsi_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM
+-static int exynos_dsi_suspend(struct device *dev)
++static int __maybe_unused exynos_dsi_suspend(struct device *dev)
+ {
+ 	struct drm_encoder *encoder = dev_get_drvdata(dev);
+ 	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
+@@ -1938,7 +1937,7 @@ static int exynos_dsi_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int exynos_dsi_resume(struct device *dev)
++static int __maybe_unused exynos_dsi_resume(struct device *dev)
+ {
+ 	struct drm_encoder *encoder = dev_get_drvdata(dev);
+ 	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
+@@ -1972,7 +1971,6 @@ err_clk:
+ 
+ 	return ret;
+ }
+-#endif
+ 
+ static const struct dev_pm_ops exynos_dsi_pm_ops = {
+ 	SET_RUNTIME_PM_OPS(exynos_dsi_suspend, exynos_dsi_resume, NULL)
