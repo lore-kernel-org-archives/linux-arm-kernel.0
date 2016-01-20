@@ -1,86 +1,128 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Wed, 20 Jan 2016 00:13:37 -0800
-Subject: iProc bus scanning regression (after "PCI: iproc: Add PAXC
- interface support")
-In-Reply-To: <CACna6rzMK4Htci8AucHVi1TNjBkxdQiy60MWJ234J8=4B_vteA@mail.gmail.com>
-References: <CACna6rx2t7Zg_xSVvYqZTW2dYEgRugaorV58Zy1YZ4Wy=+L4fQ@mail.gmail.com>
- <CACna6rzMK4Htci8AucHVi1TNjBkxdQiy60MWJ234J8=4B_vteA@mail.gmail.com>
-Message-ID: <569F41B1.6000005@broadcom.com>
+From: heiko.carstens@de.ibm.com (Heiko Carstens)
+Date: Wed, 20 Jan 2016 09:16:44 +0100
+Subject: [PATCH v6 20/21] all: s390: make compat wrappers the generic
+ solution
+In-Reply-To: <20160119175223.GA6603@yury-N73SV>
+References: <20160115124646.GD4130@osiris> <20160119175223.GA6603@yury-N73SV>
+Message-ID: <20160120081643.GB3395@osiris>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafal,
+On Tue, Jan 19, 2016 at 08:52:23PM +0300, Yury Norov wrote:
+> > > +asmlinkage long compat_sys_creat(const char __user *pathname,
+> > > umode_t mode);
+> > > +asmlinkage long compat_sys_link(const char __user *oldname,
+> > > +                             const char __user *newname);
+> > > +asmlinkage long compat_sys_chdir(const char __user *filename);
+> > > +asmlinkage long compat_sys_mknod(const char __user *filename,
+> > > umode_t mode,
+> > > +                             unsigned dev);
+> >
+> > Are these really needed?
+> 
+> 91 of ~160 wrapped syscalls produce compile time error without it on
+> arm64:
+> arch/arm64/kernel/sys_ilp32.c:59:35: error: ?compat_sys_io_destroy? undeclared here (not in a function)
+>  #define __SC_WRAP(nr, sym) [nr] = compat_##sym,
+>                                    ^
+> include/uapi/asm-generic/unistd.h:39:1: note: in expansion of macro ?__SC_WRAP?
+> __SC_WRAP(__NR_io_destroy, sys_io_destroy)
+> ^
+> 
+> I think, it's better to leave it as is...
 
-On 1/19/2016 11:02 PM, Rafa? Mi?ecki wrote:
-> On 20 January 2016 at 07:53, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
->> In OpenWrt trunk code we use iProc driver for PCIe controllers on bcma
->> bus (PCIE_IPROC_BCMA). Right now we use 4.1 kernel but we backported
->> all iProc changes. Unfortunately backporting set queued for 4.5 broke
->> bus scanning on some routers.
->>
->> Most BCM4708 / BCM4709 chipsets have 3 PCIe controllers. All known
->> routers use only first 2 of them. Even if router has 3 PCIe cards, the
->> last two cards are connected to the 2nd PCIe controller.
->>
->> So that PAXC patch broke support for routers with 3 cards, 2 of them
->> at the 2nd controller. It doesn't affect routers with just 2 cards.
->> This problem was tracked down in:
->> https://dev.openwrt.org/ticket/21393
->>
->> I'm attaching two OpenWrt boot logs.
->> 1) r48381
->> It contains all backported iProc changes. The log looks "nice", but
->> only one card (0000:01:00.0) was detected.
->> 2) r48382
->> It contains "Revert "PCI: iproc: Add PAXC interface support"" patch.
->> It contains many "[Firmware Bug]: reg 0x??: invalid BAR (can't size)"
->> messages but there are all 3 cards detected: 0000:01:00.0,
->> 0001:03:00.0 and 0001:04:00.0 (see brcmfmac messages).
->>
->> Can you take a look at this problem, please?
->
-> linux-arm-kernel@ stopped my e-mail due to its size. Sending
-> compressed attachments.
->
+I see. The syscall tables on arm seem to be generated in C code. So you
+need the declarations.
 
-I'm a bit confused by these logs that you provided. Based on the log, 
-there seems to be 3 PCIe root complexes populated on the platform, 
-domain 0000:00:00.0, 0001:00:00:0, 0002:00:00:0 are the 3 root 
-complexes. Root complex 0002 seems to have nothing connected since it 
-does not detect any EP.
+> diff --git a/fs/readdir.c b/fs/readdir.c
+> index ced6791..d34cc49 100644
+> --- a/fs/readdir.c
+> +++ b/fs/readdir.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/dirent.h>
+>  #include <linux/security.h>
+>  #include <linux/syscalls.h>
+> +#include <linux/compat.h>
+>  #include <linux/unistd.h>
+> 
+>  #include <asm/uaccess.h>
+> @@ -274,8 +275,13 @@ efault:
+>  	return -EFAULT;
+>  }
+> 
+> +#ifndef __ARCH_WANT_COMPAT_SYS_GETDENTS64
+> +SYSCALL_DEFINE_WRAP3(getdents64, unsigned int, fd,
+> +		struct linux_dirent64 __user *, dirent, unsigned int, count)
+> +#else
+>  SYSCALL_DEFINE3(getdents64, unsigned int, fd,
+>  		struct linux_dirent64 __user *, dirent, unsigned int, count)
+> +#endif
+>  {
+>  	struct fd f;
+>  	struct linux_dirent64 __user * lastdirent;
 
-Is the first card installed on root complex 0 (domain 0000), but the 
-second card and 3rd card are both installed on root complex 1 (domain 
-0001) on different slots or something?
+This is a non-obvious change at first glance. I think it would make sense
+to split this patch into at least three or four separate patches:
+- one which introduces the infrastructure
+- one which converts the non-obvious syscalls like this one
+- one which converts the rest
+- one which enables the architectures
 
-I suspect a potential issue is in this function:
+> diff --git a/include/linux/compat.h b/include/linux/compat.h
+> index a76c917..293864c 100644
+> --- a/include/linux/compat.h
+> +++ b/include/linux/compat.h
+> @@ -55,6 +55,52 @@
+>  	}								\
+>  	static inline long C_SYSC##name(__MAP(x,__SC_DECL,__VA_ARGS__))
+> 
+> +#define SYSCALL_DEFINE_WRAP1(name, ...) SYSCALL_DEFINE_WRAPx(1, _##name, __VA_ARGS__)
+> +#define SYSCALL_DEFINE_WRAP2(name, ...) SYSCALL_DEFINE_WRAPx(2, _##name, __VA_ARGS__)
+> +#define SYSCALL_DEFINE_WRAP3(name, ...) SYSCALL_DEFINE_WRAPx(3, _##name, __VA_ARGS__)
+> +#define SYSCALL_DEFINE_WRAP4(name, ...) SYSCALL_DEFINE_WRAPx(4, _##name, __VA_ARGS__)
+> +#define SYSCALL_DEFINE_WRAP5(name, ...) SYSCALL_DEFINE_WRAPx(5, _##name, __VA_ARGS__)
+> +#define SYSCALL_DEFINE_WRAP6(name, ...) SYSCALL_DEFINE_WRAPx(6, _##name, __VA_ARGS__)
+> +
+> +#ifndef __SC_COMPAT_TYPE
+> +#define __SC_COMPAT_TYPE(t, a) \
+> +	__typeof(__builtin_choose_expr(sizeof(t) > 4, 0L, (t)0)) a
+> +#endif
+> +
+> +#ifndef __SC_COMPAT_CAST
+> +#define __SC_COMPAT_CAST(t, a)	((t) ((t)(-1) < 0 ? (s64)(s32)(a) : (u64)(u32)(a)))
+> +#endif
 
-173 static inline bool iproc_pcie_device_is_valid(struct iproc_pcie *pcie,
-174                                               unsigned int slot,
-175                                               unsigned int fn)
-176 {
-177         if (slot > 0)
-178                 return false;
-179
-180         /* PAXC can only support limited number of functions */
-181         if (pcie->type == IPROC_PCIE_PAXC && fn >= MAX_NUM_PAXC_PF)
-182                 return false;
-183
-184         return true;
-185 }
+You might consider adding a BUILD_BUG_ON() here, like within the s390 variant.
 
-Compared to the original code, it's different. Can you try passing bus 
-number into the function as another argument and do the following check 
-on line 177:
+Personally I don't like the SYSCALL_DEFINE_WRAPx names too much. But that
+can be changed easily if somebody comes up with a better name for it.
 
-if (busnum == 0 && slot > 0)
-     return false;
+> +#define SYSCALL_DEFINE_WRAPx(x, name, ...)						\
+> +asmlinkage long sys##name(__MAP(x,__SC_DECL,__VA_ARGS__));				\
+> +asmlinkage long compat_sys##name(__MAP(x,__SC_DECL,__VA_ARGS__))			\
+> +		__attribute__((alias(__stringify(compat_SyS##name))));			\
+> +asmlinkage long notrace compat_SyS##name(__MAP(x,__SC_COMPAT_TYPE,__VA_ARGS__));	\
+> +asmlinkage long notrace compat_SyS##name(__MAP(x,__SC_COMPAT_TYPE,__VA_ARGS__))		\
+> +{											\
+> +	return sys##name(__MAP(x,__SC_COMPAT_CAST,__VA_ARGS__));			\
+> +}											\
+> +SYSCALL_DEFINEx(x, name, __VA_ARGS__)
 
-instead of
+Given that the system call functions might be inlined, I think it would
+make sense to remove the "notrace" attribute. Otherwise we would end up
+with lots of untraceable (and unpatchable) functions. I didn't care back
+then for the small compat wrappers...
 
-if (slot > 0)
-     return false;
+> diff --git a/kernel/sys_ni.c b/kernel/sys_ni.c
+> index 0623787..ab14c3f 100644
+> --- a/kernel/sys_ni.c
+> +++ b/kernel/sys_ni.c
+> @@ -17,27 +17,41 @@ asmlinkage long sys_ni_syscall(void)
+>  }
+> 
+>  cond_syscall(sys_quotactl);
+> +cond_syscall(compat_sys_quotactl);
 
-Thanks,
+It might make sense to add a define which adds both variants.
 
-Ray
+Btw. for future versions please add linux-arch to cc.
