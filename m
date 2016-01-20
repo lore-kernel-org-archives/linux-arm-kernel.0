@@ -1,66 +1,40 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 20 Jan 2016 17:20:19 +0800
-Subject: [PATCH v2 1/4] net: mvneta: sort the headers in alphabetic order
+Date: Wed, 20 Jan 2016 17:20:20 +0800
+Subject: [PATCH v2 2/4] net: mvneta: Try to get named core clock first
 In-Reply-To: <1453281622-7829-1-git-send-email-jszhang@marvell.com>
 References: <1453281622-7829-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1453281622-7829-2-git-send-email-jszhang@marvell.com>
+Message-ID: <1453281622-7829-3-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorting the headers in alphabetic order will help to reduce the conflict
-when adding new headers in the future.
+Some platforms may provide more than one clk for the mvneta IP, for
+example Marvell BG4CT provides "core" clk for the mac core, and "axi"
+clk for the AXI bus logic.
+
+To support for more than one clock, we'll need to distinguish between
+the clock by name. Change clock probing to first try to get "core"
+clock before falling back to unnamed clock.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvneta.c | 26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+ drivers/net/ethernet/marvell/mvneta.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index fabc8df..8e85a53 100644
+index 8e85a53..736a9ec 100644
 --- a/drivers/net/ethernet/marvell/mvneta.c
 +++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -11,28 +11,28 @@
-  * warranty of any kind, whether express or implied.
-  */
+@@ -3605,7 +3605,9 @@ static int mvneta_probe(struct platform_device *pdev)
  
--#include <linux/kernel.h>
--#include <linux/netdevice.h>
-+#include <linux/clk.h>
-+#include <linux/cpu.h>
- #include <linux/etherdevice.h>
--#include <linux/platform_device.h>
--#include <linux/skbuff.h>
-+#include <linux/if_vlan.h>
- #include <linux/inetdevice.h>
--#include <linux/mbus.h>
--#include <linux/module.h>
- #include <linux/interrupt.h>
--#include <linux/if_vlan.h>
--#include <net/ip.h>
--#include <net/ipv6.h>
- #include <linux/io.h>
--#include <net/tso.h>
-+#include <linux/kernel.h>
-+#include <linux/mbus.h>
-+#include <linux/module.h>
-+#include <linux/netdevice.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <linux/of_mdio.h>
- #include <linux/of_net.h>
--#include <linux/of_address.h>
- #include <linux/phy.h>
--#include <linux/clk.h>
--#include <linux/cpu.h>
-+#include <linux/platform_device.h>
-+#include <linux/skbuff.h>
-+#include <net/ip.h>
-+#include <net/ipv6.h>
-+#include <net/tso.h>
+ 	pp->indir[0] = rxq_def;
  
- /* Registers */
- #define MVNETA_RXQ_CONFIG_REG(q)                (0x1400 + ((q) << 2))
+-	pp->clk = devm_clk_get(&pdev->dev, NULL);
++	pp->clk = devm_clk_get(&pdev->dev, "core");
++	if (IS_ERR(pp->clk))
++		pp->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(pp->clk)) {
+ 		err = PTR_ERR(pp->clk);
+ 		goto err_put_phy_node;
 -- 
 2.7.0.rc3
