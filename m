@@ -1,54 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Jan 2016 21:31:16 +0100
-Subject: CONFIG_CPU_SW_DOMAIN_PAN breakage on ARM11 MPCore
-In-Reply-To: <569FE8A9.4080700@openwrt.org>
-References: <569D71F3.7000408@openwrt.org>
- <20160120195722.GU19062@n2100.arm.linux.org.uk>
- <569FE8A9.4080700@openwrt.org>
-Message-ID: <1504723.MNMEXN8hkX@wuerfel>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 20 Jan 2016 22:35:21 +0200
+Subject: [4.4-rt2 PATCH] ARM: highmem: take into account FIX_KMAP_BEGIN in
+ switch_kmaps()
+In-Reply-To: <20160120202317.GV19062@n2100.arm.linux.org.uk>
+References: <1452867647-1410-1-git-send-email-grygorii.strashko@ti.com>
+ <20160120202139.GC2741@linutronix.de>
+ <20160120202317.GV19062@n2100.arm.linux.org.uk>
+Message-ID: <569FEF89.1020806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 January 2016 21:06:01 Felix Fietkau wrote:
-> > 
-> > config CPU_SW_DOMAIN_PAN
-> >       bool "Enable use of CPU domains to implement privileged no-access"
-> >       depends on MMU && !ARM_LPAE
-> >       default y
-> >       help
-> >         Increase kernel security by ensuring that normal kernel accesses
-> >         are unable to access userspace addresses.  This can help prevent
-> >         use-after-free bugs becoming an exploitable privilege escalation
-> >         by ensuring that magic values (such as LIST_POISON) will always
-> >         fault when dereferenced.
-> > 
-> >         Note: This option is incompatible with ARM11 MPcore and must not
-> >         be used with kernels which are to run on this CPU, whether in SMP
-> >         or UP mode.
-> > 
-> >         CPUs with low-vector mappings use a best-efforts implementation.
-> >         Their lower 1MB needs to remain accessible for the vectors, but
-> >         the remainder of userspace will become appropriately inaccessible.
-> > 
-> > Unfortunately, that's still going to lead to people hitting this, and
-> > possibly wasting a long time debugging it needlessly - but I don't
-> > have any better solution for this.
+On 01/20/2016 10:23 PM, Russell King - ARM Linux wrote:
+> On Wed, Jan 20, 2016 at 09:21:39PM +0100, Sebastian Andrzej Siewior wrote:
+>> * Grygorii Strashko | 2016-01-15 16:20:47 [+0200]:
+>>
+>>> --- a/arch/arm/mm/highmem.c
+>>> +++ b/arch/arm/mm/highmem.c
+>>> @@ -175,7 +180,7 @@ void switch_kmaps(struct task_struct *prev_p, struct task_struct *next_p)
+>>> 	 * Restore @next_p's kmap_atomic mappings
+>>> 	 */
+>>> 	for (i = 0; i < next_p->kmap_idx; i++) {
+>>> -		int idx = i + KM_TYPE_NR * smp_processor_id();
+>>> +		int idx = fixmap_idx(i);
+>>>
+>>> 		if (!pte_none(next_p->kmap_pte[i]))
+>>> 			set_fixmap_pte(idx, next_p->kmap_pte[i]);
+>>
+>> Grygorii, if you remove this chunk then it should apply upstream. Could
+>> you forward it upstream then please? So the -RT piece would shrink a
+>> little:)
 >
-> We should at least add a dependency to disable this when support for a
-> known ARM11 MPCore platform is selected. Maybe add a CPU_MPCORE bool for
-> this.
+> Or I could commit my own patch which forms a proportion of this change.
+>
 
-Just depending on (!ARCH_CNS3XXX && !REALVIEW_EB_ARM11MP &&
-!MACH_REALVIEW_PB11MP) would be sufficient technically, but adding a
-CPU_ARM11MPCORE seems a little nicer.
+np from my side.
 
-The downside is that it departs from the the idea that starting with
-ARMv6 we only have configuration symbols for the architecture level
-(CPU_V6, CPU_V7), but we also have a CPU_PJ4 symbol that breaks this
-rule.
-
-If we add the CPU_ARM11MPCORE symbol, we may also want to update
-CONFIG_SMP to depend on (CPU_ARM11MPCORE || CPU_V7) instead of CPU_V6K,
-and we can force-enable SMP_ON_UP whenever (CPU_V6 && !CPU_ARM11MPCORE)
-
-	Arnd
+-- 
+regards,
+-grygorii
