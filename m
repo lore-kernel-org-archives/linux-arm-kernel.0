@@ -1,66 +1,104 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Wed, 20 Jan 2016 18:09:23 +0000
-Subject: [RFC PATCH v3] irqchip: Add support for Tango interrupt controller
-In-Reply-To: <569FB91D.9030704@sigmadesigns.com> (Marc Gonzalez's message of
- "Wed, 20 Jan 2016 17:43:09 +0100")
-References: <569CE0F2.1060507@sigmadesigns.com>
- <569D0B80.1010908@sigmadesigns.com>
- <569D165E.4060004@sigmadesigns.com> <569FAFF5.4090909@arm.com>
- <yw1xr3hcqlix.fsf@unicorn.mansr.com> <569FB471.8000909@arm.com>
- <yw1xmvs0qkue.fsf@unicorn.mansr.com>
- <569FB7A9.9080309@sigmadesigns.com>
- <yw1xegdcqk8n.fsf@unicorn.mansr.com>
- <569FB91D.9030704@sigmadesigns.com>
-Message-ID: <yw1x1t9cqg18.fsf@unicorn.mansr.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 20 Jan 2016 12:28:40 -0600
+Subject: [PATCH v2 1/4] dt-bindings: power: reset: add document for
+ reboot-mode driver
+In-Reply-To: <1452598189-8272-1-git-send-email-andy.yan@rock-chips.com>
+References: <1452598029-8222-1-git-send-email-andy.yan@rock-chips.com>
+ <1452598189-8272-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <20160120182840.GA15741@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+On Tue, Jan 12, 2016 at 07:29:49PM +0800, Andy Yan wrote:
+> add device tree binding document for reboot-mode driver
+> 
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> 
+> ---
+> 
+> Changes in v2: None
+> Changes in v1: None
+> 
+>  .../bindings/power/reset/reboot-mode.txt           | 41 +++++++++++++++++
+>  .../bindings/power/reset/syscon-reboot-mode.txt    | 52 ++++++++++++++++++++++
+>  2 files changed, 93 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power/reset/reboot-mode.txt
+>  create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/power/reset/reboot-mode.txt b/Documentation/devicetree/bindings/power/reset/reboot-mode.txt
+> new file mode 100644
+> index 0000000..81d9f66
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/reset/reboot-mode.txt
+> @@ -0,0 +1,41 @@
+> +Generic reboot mode core map driver
+> +
+> +This driver get reboot mode arguments and call the write
+> +interface to stores the magic value in special register
+> +or ram . Then the bootloader can read it and take different
+> +action according to the argument stored.
+> +
+> +Required properties:
+> +- compatible: only support "syscon-reboot-mode" now.
+> +
+> +Each mode is represented as a sub-node of reboot_mode:
+> +
+> +Subnode required properties:
+> +- linux,mode: reboot mode command,such as "loader", "recovery", "fastboot".
+> +- loader,magic: magic number for the mode, this is vendor specific.
+> +
+> +Example:
+> +	reboot_mode {
 
-> On 20/01/2016 17:38, M?ns Rullg?rd wrote:
->
->> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
->> 
->>> On 20/01/2016 17:25, M?ns Rullg?rd wrote:
->>>
->>>> Marc Zyngier <marc.zyngier@arm.com> writes:
->>>>
->>>>> On 20/01/16 16:10, M?ns Rullg?rd wrote:
->>>>>
->>>>>> Marc Zyngier <marc.zyngier@arm.com> writes:
->>>>>>
->>>>>>>> +	if (of_property_read_u32(node, "reg", &ctl))
->>>>>>>> +		panic("%s: failed to get reg base", node->name);
->>>>>>>> +
->>>>>>>> +	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
->>>>>>>> +	chip->ctl = ctl;
->>>>>>>> +	chip->base = base;
->>>>>>
->>>>>> As I said before, this assumes the outer DT node uses a ranges
->>>>>> property.  Normally reg properties work the same whether they specify an
->>>>>> offset within an outer "ranges" or have a full address directly.  It
->>>>>> would be easy enough to make this work with either, so I don't see any
->>>>>> reason not to.
->>>>>
->>>>> Yup, that is a good point. I guess Marc can address this in the next
->>>>> round, since we need a DT binding anyway.
->>>>
->>>> I'd suggest using of_address_to_resource() on both nodes and subtracting
->>>> the start addresses returned.
->>>
->>> For my own reference, Marc Zyngier suggested:
->>> "you should use of_iomap to map the child nodes, and not mess with
->>> the parent one."
->> 
->> That's going to get very messy since the generic irqchip code needs all
->> the registers as offsets from a common base address.
->
-> The two suggestions are over my head at the moment.
->
-> Do you want to submit v4 and have Marc Z take a look?
+reboot-mode instead please.
 
-Done.  If this isn't acceptable either, I'm out of ideas that don't end
-up being far uglier than anything suggested so far.
+> +		compatible = "syscon-reboot-mode";
+> +		offset = <0x40>;
 
--- 
-M?ns Rullg?rd
+This doc by itself is a little confusing. For example, is a child of the 
+syscon node? I would remove offset (and perhaps compatible) from this 
+example.
+
+> +
+> +		loader {
+> +			linux,mode = "loader";
+> +			loader,magic = <BOOT_LOADER>;
+> +		};
+
+Sorry, my previous suggestion was not clear. I'm suggesting get rid of 
+the subnodes and just do properties like this:
+
+loader = <BOOT_LOADER>;
+maskrom = <BOOT_MASKROM>;
+
+That's the same amount of information unless node names and linux,mode 
+values are going to diverge. Do they need to? I can't see a reason.
+
+
+We need to be clear what loader means. More specifically, it is boot 
+into bootloader shell. 
+
+> +
+> +		maskrom {
+
+In theory, the bootrom could have multiple modes. This typically means a 
+USB download mode. So perhaps a more precise name would be 
+"rom-download". 
+
+In chips I'm familiar with the bootrom mode is selected via a different 
+mechanism than the secondary bootloader modes, but I suppose the same 
+mechanism could be used.
+
+> +			linux,mode = "maskrom";
+> +			loader,magic = <BOOT_MASKROM>;
+> +		};
+> +
+> +		recovery {
+> +			linux,mode = "recovery";
+> +			loader,magic = <BOOT_RECOVERY>;
+> +		};
+> +
+> +		fastboot {
+> +			linux,mode = "fastboot";
+> +			loader,magic = <BOOT_FASTBOOT>;
+> +		};
