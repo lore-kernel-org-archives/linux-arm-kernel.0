@@ -1,63 +1,70 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 20 Jan 2016 16:53:04 +0900
-Subject: [PATCH v5 1/2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD
- driver
-In-Reply-To: <569F3C45.7090109@atmel.com>
-References: <1452747845-2962-1-git-send-email-wenyou.yang@atmel.com>
- <1452747845-2962-2-git-send-email-wenyou.yang@atmel.com>
- <87pox41dy9.fsf@dell.be.48ers.dk>
- <B256D81BAE5131468A838E5D7A243641D63ECA51@penmbx01>
- <8737tzz33h.fsf@dell.be.48ers.dk>
- <B256D81BAE5131468A838E5D7A243641D63F61F4@penmbx01>
- <87d1swvgv8.fsf@dell.be.48ers.dk> <569F3C45.7090109@atmel.com>
-Message-ID: <569F3CE0.6020107@samsung.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 20 Jan 2016 17:01:06 +0900
+Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
+In-Reply-To: <20160120070044.GF2999@dhcp-128-65.nay.redhat.com>
+References: <569CBDBC.5050500@linaro.org>
+ <20160119014332.GB2919@dhcp-128-65.nay.redhat.com>
+ <569DCB30.9010501@linaro.org>
+ <20160119122848.GA2904@dhcp-128-65.nay.redhat.com>
+ <20160119125114.GH25024@leverpostej>
+ <20160119134553.GA2986@dhcp-128-65.nay.redhat.com>
+ <20160119140139.GC26545@leverpostej>
+ <20160120024946.GA2999@dhcp-128-65.nay.redhat.com>
+ <569F2439.9000604@linaro.org>
+ <20160120063856.GA3725@dhcp-128-65.nay.redhat.com>
+ <20160120070044.GF2999@dhcp-128-65.nay.redhat.com>
+Message-ID: <569F3EC2.4020807@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.01.2016 16:50, Yang, Wenyou wrote:
-> Hi Peter,
-> 
-> On 2016/1/20 15:40, Peter Korsgaard wrote:
->>>>>>> "Yang," == Yang, Wenyou <Wenyou.Yang@atmel.com> writes:
->> Hi,
+On 01/20/2016 04:00 PM, Dave Young wrote:
+>>> So I'm not still sure about what are advantages of a property under /chosen
+>>> over "memmap=" kernel parameter.
+>>> Both are simple and can have the same effect with minimizing changes to dtb.
+>>> (But if, in the latter case, we have to provide *all* the memory-related information
+>>> through "memmap=" parameters, it would be much complicated.)
 >>
->>>> But the charger driver can just as well do:
->>   >>
->>   >> dev_get_regmap(dev->parent);
->>   >>
->>   >> instead of:
->>   >>
->>   >> dev_get_drvdata(pdev->dev.parent)->regmap.
->>
->>   > For regulator, it works use the core do dev_get_regmap(dev->parent),
->>   > but for charger, it need to export *act8945a.
->>
->> Why?
-> 
-> There is a callback (*get_property)(...), who will read the charger
-> register via regmap,
-> 
-> but it doesn't provide the argument for regmap.
-> 
-> include/linux/power_supply.h
-> 
-> struct power_supply_desc {
->         [ ... ]
->         int (*get_property)(struct power_supply *psy,
->                              enum power_supply_property psp,
->                              union power_supply_propval *val);
->         [ ... ]
-> 
-> }
-> 
->>
->> Just like the regulator core does, your battery driver can do:
->>
->> dev_get_regmap(dev->parent);
->>
+>> Maybe I did not say it clearly, I prefer kexec syscall/tool to modifiy dtb
+>> or uefi-memmap so that we do not need any extra kernel cmdline.
 
-Why can't you store the pointer to regmap as power supply driver data?
-There is really no need for the structure containing only one pointer.
+Yes, I understand.
+But on arm64, kexec-tools can generate a "memmap=" parameter for crash kernel's
+memory region without any user's interaction.
+(please note that this parameter eventually goes into dtb's cmdline property in
+/chosen.)
 
-BR,
-Krzysztof
+In this sense, it is no different from an extra property under /chosen
+as kexec-tools can also add it to dtb passed to the crash dump kernel.
+
+(See what I mean?)
+
+>> For x86 we would like to drop the memmap= usage in kexec-tools
+
+I didn't know that :)
+
+>> but we can not
+>> do that for a compatibility problem about calgary iommu. So that currently
+>> kexec-tools supports both recreating E820 maps and passing memmap=.
+>>
+>> We should think it carefully because it will be hard to remove once we support it.
+
+Absolutely.
+
+>> IMO handling it in code is better than using an external interface.
+>
+> Also seems semantic of memmap=exactmap is different than current use in the implementation
+> exactmap means we need pass each range seperately including reserved, acpi and other types
+> We can not reuse ranges in uefi memmap for other than usable memory.
+
+
+If necessary, we may use a different name, say, "usablememmap=" for arm64
+or just extend "mem=" semantics (allowing XX at YY format) to avoid any confusion.
+
+Thanks,
+-Takahiro AKASHI
+
+> It will also have the cmdline array size issue.k
+ >
+> Thanks
+> Dave
+>
