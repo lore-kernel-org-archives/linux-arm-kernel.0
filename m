@@ -1,48 +1,59 @@
-From: peter@korsgaard.com (Peter Korsgaard)
-Date: Wed, 20 Jan 2016 08:41:55 +0100
-Subject: [PATCH v2 1/2] regulator: act8945a: add regulator driver for
- ACT8945A
-In-Reply-To: <B256D81BAE5131468A838E5D7A243641D63F6228@penmbx01> (Wenyou
- Yang's message of "Wed, 20 Jan 2016 07:37:36 +0000")
-References: <1452586629-1117-1-git-send-email-wenyou.yang@atmel.com>
- <1452586629-1117-2-git-send-email-wenyou.yang@atmel.com>
- <87oacp5zl7.fsf@dell.be.48ers.dk>
- <B256D81BAE5131468A838E5D7A243641D63EBC6E@penmbx01>
- <87egdk39ji.fsf@dell.be.48ers.dk>
- <B256D81BAE5131468A838E5D7A243641D63EBEC7@penmbx01>
- <87a8o82xq3.fsf@dell.be.48ers.dk>
- <B256D81BAE5131468A838E5D7A243641D63F6228@penmbx01>
-Message-ID: <878u3kvgsc.fsf@dell.be.48ers.dk>
+From: wenyou.yang@atmel.com (Yang, Wenyou)
+Date: Wed, 20 Jan 2016 15:50:29 +0800
+Subject: [PATCH v5 1/2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD
+ driver
+In-Reply-To: <87d1swvgv8.fsf@dell.be.48ers.dk>
+References: <1452747845-2962-1-git-send-email-wenyou.yang@atmel.com>
+ <1452747845-2962-2-git-send-email-wenyou.yang@atmel.com>
+ <87pox41dy9.fsf@dell.be.48ers.dk>
+ <B256D81BAE5131468A838E5D7A243641D63ECA51@penmbx01>
+ <8737tzz33h.fsf@dell.be.48ers.dk>
+ <B256D81BAE5131468A838E5D7A243641D63F61F4@penmbx01>
+ <87d1swvgv8.fsf@dell.be.48ers.dk>
+Message-ID: <569F3C45.7090109@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Yang," == Yang, Wenyou <Wenyou.Yang@atmel.com> writes:
+Hi Peter,
 
-Hi,
+On 2016/1/20 15:40, Peter Korsgaard wrote:
+>>>>>> "Yang," == Yang, Wenyou <Wenyou.Yang@atmel.com> writes:
+> Hi,
+>
+>>> But the charger driver can just as well do:
+>   >>
+>   >> dev_get_regmap(dev->parent);
+>   >>
+>   >> instead of:
+>   >>
+>   >> dev_get_drvdata(pdev->dev.parent)->regmap.
+>
+>   > For regulator, it works use the core do dev_get_regmap(dev->parent),
+>   > but for charger, it need to export *act8945a.
+>
+> Why?
 
->> > The MFD sub device is registered as a platform device, the existing  > act8865
- >> driver is registered as an i2c_driver. How do they match? :)
- >> 
- >> > Could you point out which exiting driver for me to reference.  Thank you!
- >> 
- >> What I'm saying is that it isn't nice that we end up with both act8865-regulator.c
- >> and act8954-regulator.c doing 95% the same. This can either be fixed by:
- >> 
- >> - Adding act8865 support to your mfd driver (but only registering the
- >> regulator subdev for act8865) and changing the existing
- >> act8865-regulator driver to work as a mfd subdev (platform device)
- >> 
- >> - Extending the act8865-regulator driver to register as a platform
- >> driver in ADDITION to a i2c driver so it can be used with mfd. The
- >> driver already uses regmap so it should only be a matter of adding the
- >> pdev probe/remove functions.
+There is a callback (*get_property)(...), who will read the charger 
+register via regmap,
 
- > After think twice, I think this will complicates the act8865-regulator driver.
+but it doesn't provide the argument for regmap.
 
-I don't think it will add a lot of complication (E.G. basically just the
-platform probe/remove functions), but Ok - I'll wait and see your
-simplified driver.
+include/linux/power_supply.h
 
--- 
-Venlig hilsen,
-Peter Korsgaard 
+struct power_supply_desc {
+         [ ... ]
+         int (*get_property)(struct power_supply *psy,
+                              enum power_supply_property psp,
+                              union power_supply_propval *val);
+         [ ... ]
+
+}
+
+>
+> Just like the regulator core does, your battery driver can do:
+>
+> dev_get_regmap(dev->parent);
+>
+
+Best Regards,
+Wenyou Yang
