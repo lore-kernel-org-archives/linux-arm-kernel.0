@@ -1,70 +1,114 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 20 Jan 2016 17:18:29 -0500
-Subject: [PATCH V12 3/7] dma: add Qualcomm Technologies HIDMA management
- driver
-In-Reply-To: <569917C7.9000804@codeaurora.org>
-References: <1452523550-8920-1-git-send-email-okaya@codeaurora.org>
- <1452523550-8920-4-git-send-email-okaya@codeaurora.org>
- <20160115145629.GI3262@leverpostej> <56990CD4.6020405@arm.com>
- <20160115153656.GM3262@leverpostej> <569917C7.9000804@codeaurora.org>
-Message-ID: <56A007B5.9070502@codeaurora.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 20 Jan 2016 23:25:03 +0100
+Subject: [PATCH v7 5/5] ARM: dts: rockchip: add support mipi panel
+ tv080wum-nl0
+In-Reply-To: <569EDE2F.6060400@rock-chips.com>
+References: <1452053038-32098-1-git-send-email-zyw@rock-chips.com>
+ <1649978.zzK0Pex4sR@phil> <569EDE2F.6060400@rock-chips.com>
+Message-ID: <4804270.fNNME6HN13@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+Am Mittwoch, 20. Januar 2016, 09:09:03 schrieb Chris Zhong:
+> Hi Heiko
+> 
+> On 01/20/2016 03:26 AM, Heiko Stuebner wrote:
+> > Hi Chris,
+> > 
+> > Am Mittwoch, 6. Januar 2016, 12:03:57 schrieb Chris Zhong:
+> >> This tv080wum-nl0 panel is a mipi panel, it can use in MIPI_TX socket
+> >> of rk3288 evb board.
+> >> 
+> >> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> > 
+> > [...]
+> > 
+> >> diff --git a/arch/arm/boot/dts/rk3288-evb-act8846.dts
+> >> b/arch/arm/boot/dts/rk3288-evb-act8846.dts index e662147..7d5475b
+> >> 100644
+> >> --- a/arch/arm/boot/dts/rk3288-evb-act8846.dts
+> >> +++ b/arch/arm/boot/dts/rk3288-evb-act8846.dts
+> >> @@ -50,6 +50,8 @@
+> >> 
+> >>   		gpio = <&gpio7 3 GPIO_ACTIVE_HIGH>;
+> >>   		pinctrl-names = "default";
+> >>   		pinctrl-0 = <&lcd_en>;
+> >> 
+> >> +		regulator-always-on;
+> >> +		regulator-boot-on;
+> > 
+> > Is this only needed for the panel itself and can you try to get the
+> > panel
+> > supplies set up correctly instead in that case please?
+> 
+> It is not only for panel, LCDC_VDD need this supply too.
+> And rk3288-evb-rk808.dts has set this regulator to always on, so I do
+> the same thing in here.
 
-On 1/15/2016 11:01 AM, Sinan Kaya wrote:
->> I'm concerned with how this is safe, and with the userspace interface.
->> > e.g. if the user wants to up the QoS for a VM, how to they find the
->> > right channel in sysfs  to alter?
-> The HW supports changing the QoS values on the flight. In order to locate the
-> object, I'm exporting a 
-> 
-> I tried to address your concern on v10 last series. Here is brief summary.
-> 
-> Each channel device has a sysfs entry named chid.
-> What:		/sys/devices/platform/hidma-*/chid
-> +		/sys/devices/platform/QCOM8061:*/chid
-> 
-> 
-> Each management object has one priority and weight file per channel.
-> +What:		/sys/devices/platform/hidma-mgmt*/chanops/chan*/priority
-> +		/sys/devices/platform/QCOM8060:*/chanops/chan*/priority
-> 
-> Suppose you want to change the priority of a channel you assigned to guess,
-> the userspace application goes and reads the chid value of the channel.
-> 
-> Then goes to chanops/chan<chid>/ directory and can change priority and weight 
-> parameters here.
-> 
-> Here is how the directory looks like. QCOM8060:00 is a management object.
-> QCOM8061:0x are the channel objects.
-> 
-> /sys/devices/platform/QCOM8060:00# ls
-> QCOM8061:00
-> QCOM8061:01
-> QCOM8061:02
-> QCOM8061:03
-> QCOM8061:04
-> QCOM8061:05
-> chanops
-> <other common attributes>
-> 
-> 
-> 
-> 
+ok, so we keep the regulator-always-on for now, but could probably still add 
+the supply to the panel as well? That way once vcc_lcd handling is complete 
+in the future, we don't get surprises :-)
 
-
-Did this answer your question? 
-
-I'm capturing all the questions and answers as FAQ into the cover letter as I keep
-repeating myself for every single reviewer.
-
-Besides from the "lack of documentation", is there any code related change you'd like to
-discuss in the series.
+I guess I can add that power-supply property myself when applying.
 
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Heiko
+
+> 
+> >>   		regulator-name = "vcc_lcd";
+> >>   		vin-supply = <&vcc_io>;
+> >>   	
+> >>   	};
+> >> 
+> >> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi
+> >> b/arch/arm/boot/dts/rk3288-evb.dtsi index 4faabdb..0c91858 100644
+> >> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
+> >> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+> >> @@ -47,7 +47,7 @@
+> >> 
+> >>   		reg = <0x0 0x80000000>;
+> >>   	
+> >>   	};
+> >> 
+> >> -	backlight {
+> >> +	backlight: backlight {
+> >> 
+> >>   		compatible = "pwm-backlight";
+> >>   		brightness-levels = <
+> >>   		
+> >>   			  0   1   2   3   4   5   6   7
+> >> 
+> >> @@ -183,6 +183,16 @@
+> >> 
+> >>   	status = "okay";
+> >>   
+> >>   };
+> >> 
+> >> +&mipi_dsi {
+> >> +	status = "okay";
+> >> +	panel {
+> >> +		compatible ="boe,tv080wum-nl0";
+> >> +		reg = <0>;
+> >> +		backlight = <&backlight>;
+> >> +		status = "okay";
+> > 
+> > in the evb-schematics I see, vcc_lcd as supply for the panel.
+> > 
+> > So I'd think the panel node here should have a
+> > 
+> > 	power-supply = <&vcc_lcd>;
+> > 
+> > instead of having the always-on above?
+> > 
+> > 
+> > Thanks
+> > Heiko
+> > 
+> >> +	};
+> >> +};
+> >> +
+> >> 
+> >>   &sdmmc {
+> >>   
+> >>   	bus-width = <4>;
+> >>   	cap-mmc-highspeed;
