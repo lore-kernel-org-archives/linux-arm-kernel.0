@@ -1,119 +1,90 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 20 Jan 2016 12:07:30 +0100 (CET)
-Subject: [PATCH 4.4-rt2] fix
- arm-at91-pit-remove-irq-handler-when-clock-is-unused.patch
-In-Reply-To: <20160118184247.GQ3367@piout.net>
-References: <1452997394-8554-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1452997394-8554-2-git-send-email-alexandre.belloni@free-electrons.com>
- <20160118172522.GB12309@linutronix.de> <20160118184247.GQ3367@piout.net>
-Message-ID: <alpine.DEB.2.11.1601201158280.3575@nanos>
+From: henryc.chen@mediatek.com (Henry Chen)
+Date: Wed, 20 Jan 2016 19:11:52 +0800
+Subject: [PATCH] soc: mediatek: PMIC wrap: clear the STAUPD_TRIG bit of
+ WDT_SRC_EN
+In-Reply-To: <CAGS+omCFOUgTHxeUn0snrkBjvcR1bSOAAmkBHppF8nM37P1vrw@mail.gmail.com>
+References: <1453265564-16379-1-git-send-email-henryc.chen@mediatek.com>
+ <CAGS+omCFOUgTHxeUn0snrkBjvcR1bSOAAmkBHppF8nM37P1vrw@mail.gmail.com>
+Message-ID: <1453288312.8457.9.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Jan 2016, Alexandre Belloni wrote:
-> On 18/01/2016 at 18:25:22 +0100, Sebastian Andrzej Siewior wrote :
-> > * Alexandre Belloni | 2016-01-17 03:23:14 [+0100]:
-> > 
-> > >index 80d74c4adcbe..43b50634d640 100644
-> > >--- a/drivers/clocksource/timer-atmel-pit.c
-> > >+++ b/drivers/clocksource/timer-atmel-pit.c
-> > >@@ -96,11 +96,44 @@ static int pit_clkevt_shutdown(struct clock_event_device *dev)
-> > > 
-> > > 	/* disable irq, leaving the clocksource active */
-> > > 	pit_write(data->base, AT91_PIT_MR, (data->cycle - 1) | AT91_PIT_PITEN);
-> > >-	free_irq(atmel_pit_irq, data);
-> > >+	if (!clockevent_state_detached(dev))
-> > >+		free_irq(data->irq, data);
-> > 
-> > I did it in the meantime without clockevent_state_detached(). From what
-> > it looks, it first sets the state and then invokes
-> > pit_clkevt_shutdown(). Any particular reason for this?
-> > 
+On Wed, 2016-01-20 at 02:32 -0800, Daniel Kurtz wrote:
+> On Tue, Jan 19, 2016 at 8:52 PM, Henry Chen <henryc.chen@mediatek.com> wrote:
+> > Since STAUPD interrupts aren't handled on mt8173, disable watchdog timeout
+> > monitor of STAUPD to avoid WDT_INT triggered by STAUPD.
+> >
+> > Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
 > 
-> Yeah, I forgot to mention that. Freeing the irq unconditionally
-> results in:
+> > ---
+> >  drivers/soc/mediatek/mtk-pmic-wrap.c | 19 +++++++++++++++++--
+> >  1 file changed, 17 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> > index af919b1..998f561 100644
+> > --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> > +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> > @@ -60,6 +60,15 @@
+> >  #define PWRAP_MAN_CMD_OP_OUTD          (0x9 << 8)
+> >  #define PWRAP_MAN_CMD_OP_OUTQ          (0xa << 8)
+> >
+> > +/* macro for Watch Dog Timer Source */
+> > +#define PWRAP_WDT_SRC_EN_STAUPD_TRIG           (1 << 25)
+> > +#define PWRAP_WDT_SRC_EN_HARB_STAUPD_DLE       (1 << 20)
+> > +#define PWRAP_WDT_SRC_EN_HARB_STAUPD_ALE       (1 << 6)
+> > +#define PWRAP_WDT_SRC_MASK_ALL                 0xffffffff
+> > +#define PWRAP_WDT_SRC_MASK_NO_STAUPD   ~(PWRAP_WDT_SRC_EN_STAUPD_TRIG | \
+> > +                                         PWRAP_WDT_SRC_EN_HARB_STAUPD_DLE | \
+> > +                                         PWRAP_WDT_SRC_EN_HARB_STAUPD_ALE)
+> > +
+> >  /* macro for slave device wrapper registers */
+> >  #define PWRAP_DEW_BASE                 0xbc00
+> >  #define PWRAP_DEW_EVENT_OUT_EN         (PWRAP_DEW_BASE + 0x0)
+> > @@ -830,7 +839,7 @@ MODULE_DEVICE_TABLE(of, of_pwrap_match_tbl);
+> >
+> >  static int pwrap_probe(struct platform_device *pdev)
+> >  {
+> > -       int ret, irq;
+> > +       int ret, irq, wdt_src;
+> >         struct pmic_wrapper *wrp;
+> >         struct device_node *np = pdev->dev.of_node;
+> >         const struct of_device_id *of_id =
+> > @@ -920,7 +929,13 @@ static int pwrap_probe(struct platform_device *pdev)
+> >
+> >         /* Initialize watchdog, may not be done by the bootloader */
+> >         pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
+> > -       pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
+> > +       /*
+> > +        * Since STAUPD was not used on mt8173 platform,
+> > +        * so STAUPD of WDT_SRC which should be turned off
+> > +        */
+> 
+> It is a little awkward that "!pwrap_is_mt8135(wrp)" means mt8173.  Is
+> this always true?
+> Why aren't we clearing STAUPD for mt8135 too?
+> I assume it is because mt8135 does not define this bit?
+> What about other devices that are not mt8135 or mt8173?
 
-Well freeing the irq from that context in RT only works because its called
-before SYSTEM_STATE=RUNNING. So no, this was wrong forever.
+MT8135 used STAUPD because it have pwrap event pin and it was different
+with mt8173. pwrap event have been removed on mt8173, so it no need to
+set STAUPD.
 
-The issue we are dealing with is that the timer interrupt is shared with the
-uart. So the timer has IRQ_NO_THREAD set and the uart interrupt gets force
-threaded. So that results in a failure to request the interrupt for the
-UART. That's not RT specific, that already happens in mainline if you add
-'threadirqs' to the command line.
+Henry
 
-So until the DT folks come to senses and we get that dummy demux chip done, I
-came up with the following - completely untested - solution.
+> Perhaps change the comment to:
+> "This driver does not use STAUPD, so clear this WDT SRC for all
+> devices for which it exists to avoid unhandled interrupts"
+> 
 
-The downside of this is, that the timer will be delayed until the uart thread
-returns, but with the replacement clockevent in place on RT that's a non
-issue. For mainline it's obviously better than what we have now.
-
-Thanks,
-
-	tglx
-
-8<---------------
-
---- a/include/linux/interrupt.h
-+++ b/include/linux/interrupt.h
-@@ -61,6 +61,10 @@
-  *                interrupt handler after suspending interrupts. For system
-  *                wakeup devices users need to implement wakeup detection in
-  *                their interrupt handlers.
-+ * IRQF_COND_ONESHOT - If the IRQ is shared between a NO_THREAD user and a
-+ *		regular interrupt, force the ONESHOT flag on the NO_THREAD user
-+ *		when threaded irqs are enforced. Workaround for silly ATMEL
-+ *		SoCs which share the timer and the UART interrupt
-  * IRQF_NO_SOFTIRQ_CALL - Do not process softirqs in the irq thread context (RT)
-  */
- #define IRQF_SHARED		0x00000080
-@@ -75,7 +79,8 @@
- #define IRQF_NO_THREAD		0x00010000
- #define IRQF_EARLY_RESUME	0x00020000
- #define IRQF_COND_SUSPEND	0x00040000
--#define IRQF_NO_SOFTIRQ_CALL	0x00080000
-+#define IRQF_COND_ONESHOT	0x00080000
-+#define IRQF_NO_SOFTIRQ_CALL	0x00100000
- 
- #define IRQF_TIMER		(__IRQF_TIMER | IRQF_NO_SUSPEND | IRQF_NO_THREAD)
- 
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -1208,6 +1208,14 @@ static int
- 	new->irq = irq;
- 
- 	/*
-+	 * Workaround for silly ATMEL SoCs with shared timer and uart
-+	 * interrupt.
-+	 */
-+	if (force_irqthreads && (new->flags & IRQF_COND_ONESHOT) &&
-+	    (new->flags & IRQF_NO_THREAD))
-+		new->flags |= IRQF_ONESHOT;
-+
-+	/*
- 	 * Check whether the interrupt nests into another interrupt
- 	 * thread.
- 	 */
---- a/drivers/clocksource/timer-atmel-pit.c
-+++ b/drivers/clocksource/timer-atmel-pit.c
-@@ -208,7 +208,7 @@ static void __init at91sam926x_pit_commo
- 
- 	/* Set up irq handler */
- 	ret = request_irq(data->irq, at91sam926x_pit_interrupt,
--			  IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
-+			  IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL| IRQF_COND_ONESHOT,
- 			  "at91_tick", data);
- 	if (ret)
- 		panic(pr_fmt("Unable to setup IRQ\n"));
---- a/drivers/clocksource/timer-atmel-st.c
-+++ b/drivers/clocksource/timer-atmel-st.c
-@@ -216,7 +216,7 @@ static void __init atmel_st_timer_init(s
- 
- 	/* Make IRQs happen for the system timer */
- 	ret = request_irq(irq, at91rm9200_timer_interrupt,
--			  IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
-+			  IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL | IRQF_COND_ONESHOT,
- 			  "at91_tick", regmap_st);
- 	if (ret)
- 		panic(pr_fmt("Unable to setup IRQ\n"));
+> Other than that, this patch is:
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> 
+> > +       wdt_src = pwrap_is_mt8135(wrp) ?
+> > +                       PWRAP_WDT_SRC_MASK_ALL : PWRAP_WDT_SRC_MASK_NO_STAUPD;
+> > +       pwrap_writel(wrp, wdt_src, PWRAP_WDT_SRC_EN);
+> >         pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
+> >         pwrap_writel(wrp, ~((1 << 31) | (1 << 1)), PWRAP_INT_EN);
+> >
+> > --
+> > 1.8.1.1.dirty
+> >
