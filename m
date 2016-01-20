@@ -1,88 +1,64 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 20 Jan 2016 12:36:32 +0100
-Subject: [PATCH] mmc: pwrseq_simple: Make reset-gpios optional to match doc
-In-Reply-To: <20160108090726.13066.66125.stgit@localhost>
-References: <20160108090726.13066.66125.stgit@localhost>
-Message-ID: <CAPDyKFpgCDHp1atgnZL6GtU9VwiJr0RR-4vW+m=uWHwnN3pz3A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 Jan 2016 12:46:24 +0100
+Subject: [PATCH] ASoC: avoid unused variable warning for rt5659_acpi_match
+Message-ID: <1957179.2R1q7SBuPk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Tony, Javier, linux-omap
+The newly added rt5659 codec driver unconditionally defines an
+ACPI device match table but then uses ACPI_PTR() to remove the
+only reference to it, so we get a harmless build warning:
 
-On 8 January 2016 at 10:07, Martin Fuzzey <mfuzzey@parkeon.com> wrote:
-> The DT binding doc says reset-gpios is an optional property but the code
-> currently bails out if it is omitted.
->
-> Make the code match the documentation.
+sound/soc/codecs/rt5659.c:4200:30: warning: 'rt5659_acpi_match' defined but not used [-Wunused-variable]
+ static struct acpi_device_id rt5659_acpi_match[] = {
 
-As Tony pointed out, this is actually a regression. Can you please
-update the change-log according to that.
+This changes both the OF match table and the ACPI match table
+to follow the same style, using ACPI_PTR/of_match_ptr to
+make the reference conditional, and using an #ifdef to hide
+the table. This also adds the missing MODULE_DEVICE_TABLE for
+the OF case and adapts the formatting to the same style.
 
->
-> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+v3: actually builds with CONFIG_OF enabled, testing in a couple of
+configurations with and without OF
 
-Please add a fixes tag:
-Fixes: ce037275861e ("mmc: pwrseq_simple: use GPIO descriptors array API")
-
-> ---
->  drivers/mmc/core/pwrseq_simple.c |   21 +++++++++++++--------
->  1 file changed, 13 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
-> index d10538b..4d2962b 100644
-> --- a/drivers/mmc/core/pwrseq_simple.c
-> +++ b/drivers/mmc/core/pwrseq_simple.c
-> @@ -29,15 +29,18 @@ struct mmc_pwrseq_simple {
->  static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
->                                               int value)
->  {
-> -       int i;
->         struct gpio_descs *reset_gpios = pwrseq->reset_gpios;
-> -       int values[reset_gpios->ndescs];
->
-> -       for (i = 0; i < reset_gpios->ndescs; i++)
-> -               values[i] = value;
-> +       if (!IS_ERR(reset_gpios)) {
-> +               int i;
-> +               int values[reset_gpios->ndescs];
->
-> -       gpiod_set_array_value_cansleep(reset_gpios->ndescs, reset_gpios->desc,
-> -                                      values);
-> +               for (i = 0; i < reset_gpios->ndescs; i++)
-> +                       values[i] = value;
-> +
-> +               gpiod_set_array_value_cansleep(
-> +                       reset_gpios->ndescs, reset_gpios->desc, values);
-> +       }
->  }
->
->  static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
-> @@ -79,7 +82,8 @@ static void mmc_pwrseq_simple_free(struct mmc_host *host)
->         struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
->                                         struct mmc_pwrseq_simple, pwrseq);
->
-> -       gpiod_put_array(pwrseq->reset_gpios);
-> +       if (!IS_ERR(pwrseq->reset_gpios))
-> +               gpiod_put_array(pwrseq->reset_gpios);
->
->         if (!IS_ERR(pwrseq->ext_clk))
->                 clk_put(pwrseq->ext_clk);
-> @@ -112,7 +116,8 @@ struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
->         }
->
->         pwrseq->reset_gpios = gpiod_get_array(dev, "reset", GPIOD_OUT_HIGH);
-> -       if (IS_ERR(pwrseq->reset_gpios)) {
-> +       if (IS_ERR(pwrseq->reset_gpios) &&
-> +           PTR_ERR(pwrseq->reset_gpios) != -ENOENT) {
-
-You need to check also for != -ENOSYS, as otherwise when
-CONFIG_GPIOLIB is unset we will treat that as an error.
-This is also what the original code did.
-
->                 ret = PTR_ERR(pwrseq->reset_gpios);
->                 goto clk_put;
->         }
->
-
-Kind regards
-Uffe
+diff --git a/sound/soc/codecs/rt5659.c b/sound/soc/codecs/rt5659.c
+index c166d9394c69..fb8ea05c0de1 100644
+--- a/sound/soc/codecs/rt5659.c
++++ b/sound/soc/codecs/rt5659.c
+@@ -4183,24 +4183,29 @@ void rt5659_i2c_shutdown(struct i2c_client *client)
+ 	regmap_write(rt5659->regmap, RT5659_RESET, 0);
+ }
+ 
++#ifdef CONFIG_OF
+ static const struct of_device_id rt5659_of_match[] = {
+ 	{ .compatible = "realtek,rt5658", },
+ 	{ .compatible = "realtek,rt5659", },
+-	{},
++	{ },
+ };
++MODULE_DEVICE_TABLE(of, rt5659_of_match);
++#endif
+ 
++#ifdef CONFIG_ACPI
+ static struct acpi_device_id rt5659_acpi_match[] = {
+-		{ "10EC5658", 0},
+-		{ "10EC5659", 0},
+-		{ },
++	{ "10EC5658", 0, },
++	{ "10EC5659", 0, },
++	{ },
+ };
+ MODULE_DEVICE_TABLE(acpi, rt5659_acpi_match);
++#endif
+ 
+ struct i2c_driver rt5659_i2c_driver = {
+ 	.driver = {
+ 		.name = "rt5659",
+ 		.owner = THIS_MODULE,
+-		.of_match_table = rt5659_of_match,
++		.of_match_table = of_match_ptr(rt5659_of_match),
+ 		.acpi_match_table = ACPI_PTR(rt5659_acpi_match),
+ 	},
+ 	.probe = rt5659_i2c_probe,
