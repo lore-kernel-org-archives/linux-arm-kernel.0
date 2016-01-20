@@ -1,40 +1,27 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 20 Jan 2016 10:45:30 +0000
-Subject: [PATCH v1 0/3] mmc: pwrseq: convert to proper driver
-Message-ID: <1453286730-9616-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 20 Jan 2016 10:45:55 +0000
+Subject: [PATCH] ASoC: avoid unused variable warning for rt5659_acpi_match
+In-Reply-To: <2238845.aZnycJVYKR@wuerfel>
+References: <2238845.aZnycJVYKR@wuerfel>
+Message-ID: <20160120104555.GY6588@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf, 
+On Wed, Jan 20, 2016 at 11:43:48AM +0100, Arnd Bergmann wrote:
+> The newly added rt5659 codec driver unconditionally defines an
+> ACPI device match table but then uses ACPI_PTR() to remove the
+> only reference to it, so we get a harmless build warning:
 
-This patchset aims at converting the pwrseq devices to proper in built drivers,
-The issue is that on Qualcomm based platforms, most of the gpios require
-a pinctrl setup. Existing pwrseq code does not do any kind of pinctrl setup.
-So this makes the pwrseq unusable on those platfroms.
+> sound/soc/codecs/rt5659.c:4200:30: warning: 'rt5659_acpi_match' defined but not used [-Wunused-variable]
+>  static struct acpi_device_id rt5659_acpi_match[] = {
 
-Convert the pwrseq to proper drivers so that they can reuse
-common driver setup like pinctrl from drivers/base/pinctrl.c
-This solution works much better and would make pwrseq to reuse 
-all the driver setup done in the common code.
+> This removes the ACPI_PTR() to avoid the warning.
 
-
-Changes since RFC:
-	- Fixed issues reported by kbuild test robot.
-	- return EPROBE_DEFER from *_alloc() suggested by Ulf.
-
-Thanks,
-srini
-
-Srinivas Kandagatla (3):
-  mmc: pwrseq_simple: add to_pwrseq_simple() macro
-  mmc: pwrseq_emmc: add to_pwrseq_emmc() macro
-  mmc: pwrseq: convert to proper platform device
-
- drivers/mmc/core/pwrseq.c        | 112 +++++++++++++++++++++------------------
- drivers/mmc/core/pwrseq.h        |  13 +++--
- drivers/mmc/core/pwrseq_emmc.c   |  74 ++++++++++++++++----------
- drivers/mmc/core/pwrseq_simple.c |  86 ++++++++++++++++++------------
- 4 files changed, 168 insertions(+), 117 deletions(-)
-
--- 
-1.9.1
+Why is this a better fix than conditionally defining the table?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160120/ce9df5db/attachment.sig>
