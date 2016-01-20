@@ -1,30 +1,286 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Jan 2016 23:54:46 +0100
-Subject: [PATCH] net: i40e: avoid unused function warnings
-In-Reply-To: <1453329885.2958.32.camel@intel.com>
-References: <2806620.EpZqDlZTO3@wuerfel> <8814508.SjLecHrQqA@wuerfel>
- <1453329885.2958.32.camel@intel.com>
-Message-ID: <6894276.2dlRmisKUo@wuerfel>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 21 Jan 2016 00:08:16 +0100
+Subject: [PATCH] ARM64: dts: rockchip: Add GeekBox config
+In-Reply-To: <1453307913-8907-1-git-send-email-afaerber@suse.de>
+References: <1453307913-8907-1-git-send-email-afaerber@suse.de>
+Message-ID: <6705185.M2rneQv8FF@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 January 2016 14:44:45 Jeff Kirsher wrote:
-> Yeah, I have a fix for that as well.
+Am Mittwoch, 20. Januar 2016, 17:38:33 schrieb Andreas F?rber:
+> The GeekBox contains an MXM3 module with a Rockchip RK3368 SoC.
+> Some connectors are available directly on the module.
 > 
-> You can confirm by pulling my next-queue tree (dev-queue branch).
-> git://git.kernel.org/pub/scm/linux/kernel/git/jkirsher/next-queue.git d
-> ev-queue
+> This adds initial support, namely serial, PMIC and USB.
 > 
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  Hi Heiko,
+> 
+>  Here's an initial shot at a .dts for GeekBox.
+>  GMAC was not yet working for me.
+> 
+>  Regards,
+>  Andreas
+> 
+>  arch/arm64/boot/dts/rockchip/Makefile            |   1 +
+>  arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts  |  48 +++++
+>  arch/arm64/boot/dts/rockchip/rk3368-geekbox.dtsi | 242
+> +++++++++++++++++++++++ 3 files changed, 291 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+>  create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-geekbox.dtsi
 
-I checked out that branch, but still see both warnings in that one, plus
-a new build error in igb, which I don't see in linux-next:
+You might want to explain your reasoning for having a dtsi and an empty 
+standalone dts. I guess you want to add a second one for module+baseboard?
 
-drivers/net/ethernet/intel/igb/igb_cdev.c: In function 'igb_mapring':
-drivers/net/ethernet/intel/igb/igb_cdev.c:150:2: error: implicit declaration of function 'set_pages_uc' [-Werror=implicit-function-declaration]
-  set_pages_uc(virt_to_page(ring->desc), ring->size >> PAGE_SHIFT);
-  ^
-drivers/net/ethernet/intel/igb/igb_cdev.c: In function 'igb_unmapring':
-drivers/net/ethernet/intel/igb/igb_cdev.c:275:2: error: implicit declaration of function 'set_pages_wb' [-Werror=implicit-function-declaration]
-  set_pages_wb(virt_to_page(ring->desc), ring->size >> PAGE_SHIFT);
+The interesting artifact here is, that the baseboard can actually be used 
+standalone and the baseboard just extends it where in contrast a rk3288 
+rock2 for example isn't actually usable without a baseboard.
 
-	Arnd
+So I'm wondering if this really should be encoded in the dts or should uses 
+something like dts overlays instead to enable one geekbox module to be used 
+alone and in the "landingship".
+
+
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/Makefile
+> b/arch/arm64/boot/dts/rockchip/Makefile index e3f0b5f..df37865 100644
+> --- a/arch/arm64/boot/dts/rockchip/Makefile
+> +++ b/arch/arm64/boot/dts/rockchip/Makefile
+> @@ -1,4 +1,5 @@
+>  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
+> +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
+>  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
+> 
+>  always		:= $(dtb-y)
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+> b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts new file mode 100644
+> index 0000000..eb24ecd
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+> @@ -0,0 +1,48 @@
+> +/*
+> + * Copyright (c) 2016 Andreas F?rber
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "rk3368-geekbox.dtsi"
+> +
+> +/ {
+> +	model = "GeekBox";
+> +};
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dtsi
+> b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dtsi new file mode 100644
+> index 0000000..f083cdb
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/rockchip/rk3368-geekbox.dtsi
+> @@ -0,0 +1,242 @@
+> +/*
+> + * Copyright (c) 2016 Andreas F?rber
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +#include "rk3368.dtsi"
+> +
+> +/ {
+> +	compatible = "geekbuying,geekbox", "rockchip,rk3368";
+
+you're introducing
+- a new vendor name (geekbuying), so should update 
+Documentation/devicetree/bindings/vendor-prefixes.txt in a separate patch
+- a new board, so should update 
+Documentation/devicetree/bindings/arm/rockchip.txt
+
+
+> +
+> +	chosen {
+> +		stdout-path = "serial2:115200n8";
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x0 0x0 0x0 0x80000000>;
+> +	};
+> +
+> +	leds: gpio-leds {
+> +		compatible = "gpio-leds";
+> +
+> +		blue {
+> +			gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;
+> +			label = "geekbox:blue:led";
+> +			default-state = "on";
+> +		};
+> +
+> +		red {
+> +			gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>;
+> +			label = "geekbox:red:led";
+> +			default-state = "off";
+> +		};
+> +	};
+> +
+> +	vcc_sys: vcc-sys-regulator {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc_sys";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +	};
+> +};
+> +
+> +&i2c0 {
+> +	status = "okay";
+> +
+> +	rk808: pmic at 1b {
+> +		compatible = "rockchip,rk808";
+> +		reg = <0x1b>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pmic_int>, <&pmic_sleep>;
+> +		interrupt-parent = <&gpio0>;
+> +		interrupts = <5 IRQ_TYPE_LEVEL_LOW>;
+> +		rockchip,system-power-controller;
+> +		vcc1-supply = <&vcc_sys>;
+> +		vcc2-supply = <&vcc_sys>;
+> +		vcc3-supply = <&vcc_sys>;
+> +		vcc4-supply = <&vcc_sys>;
+> +		vcc6-supply = <&vcc_sys>;
+> +		vcc7-supply = <&vcc_sys>;
+> +		vcc8-supply = <&vcc_io>;
+> +		vcc9-supply = <&vcc_sys>;
+> +		vcc10-supply = <&vcc_sys>;
+> +		vcc11-supply = <&vcc_sys>;
+> +		vcc12-supply = <&vcc_io>;
+> +		clock-output-names = "xin32k", "rk808-clkout2";
+> +		#clock-cells = <1>;
+> +
+> +		regulators {
+> +			vdd_cpu: DCDC_REG1 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-min-microvolt = <700000>;
+> +				regulator-max-microvolt = <1500000>;
+> +				regulator-name = "vdd_cpu";
+> +			};
+> +
+> +			vdd_log: DCDC_REG2 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-min-microvolt = <700000>;
+> +				regulator-max-microvolt = <1500000>;
+> +				regulator-name = "vdd_log";
+> +			};
+> +
+> +			vcc_ddr: DCDC_REG3 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-name = "vcc_ddr";
+> +			};
+> +
+> +			vcc_io: DCDC_REG4 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-name = "vcc_io";
+> +			};
+> +
+> +			vcc18_flash: LDO_REG1 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-name = "vcc18_flash";
+> +			};
+> +
+> +			vcc33_lcd: LDO_REG2 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-name = "vcc33_lcd";
+> +			};
+> +
+> +			vdd_10: LDO_REG3 {
+> +				regulator-always-on;
+
+why all others also "boot-on" and this one not?
+
+
+Otherwise that looks fine
+
+Heiko
