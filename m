@@ -1,76 +1,55 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 20 Jan 2016 14:01:44 +0000
-Subject: [PATCH 03/19] arm64: Add new asm macro copy_page
-In-Reply-To: <f7dcd4d1b5a9b77eaef50f22f4040a26c6b40487.1452884156.git.geoff@infradead.org>
-References: <cover.1452884156.git.geoff@infradead.org>
- <f7dcd4d1b5a9b77eaef50f22f4040a26c6b40487.1452884156.git.geoff@infradead.org>
-Message-ID: <569F9348.2000100@arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 20 Jan 2016 14:12:55 +0000
+Subject: [PATCH v1 3/3] mmc: pwrseq: convert to proper platform device
+In-Reply-To: <201601202021.zTCtxQVb%fengguang.wu@intel.com>
+References: <201601202021.zTCtxQVb%fengguang.wu@intel.com>
+Message-ID: <569F95E7.4080305@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
+Hi Ulf,
+Just realized that this patch is totally broken when mmc support is 
+built as module. I will fix it and resend after v4.5-rc1
 
-On 15/01/16 19:18, Geoff Levand wrote:
+Thanks for kbuild test robot :-)
 
-Can I donate a commit message:
+--srini
 
-Kexec and hibernate need to copy pages of memory, but may not have all
-of the kernel mapped, and are unable to call copy_page().
-
-Convert copy_page() to a macro, so that it can be inlined in these
-situations.
-
-
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
+On 20/01/16 12:53, kbuild test robot wrote:
+> Hi Srinivas,
+>
+> [auto build test ERROR on ulf.hansson-mmc/next]
+> [also build test ERROR on next-20160120]
+> [cannot apply to v4.4]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+>
+> url:    https://github.com/0day-ci/linux/commits/Srinivas-Kandagatla/mmc-pwrseq-convert-to-proper-driver/20160120-185020
+> base:   https://git.linaro.org/people/ulf.hansson/mmc next
+> config: openrisc-allmodconfig (attached as .config)
+> reproduce:
+>          wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>          chmod +x ~/bin/make.cross
+>          # save the attached .config to linux build tree
+>          make.cross ARCH=openrisc
+>
+> All error/warnings (new ones prefixed by >>):
+>
+>>> drivers/mmc/core/pwrseq_emmc.c:120:1: warning: data definition has no type or storage class
+>>> drivers/mmc/core/pwrseq_emmc.c:120:1: error: type defaults to 'int' in declaration of 'device_initcall'
+>     drivers/mmc/core/pwrseq_emmc.c:120:1: warning: parameter names (without types) in function declaration
+>     drivers/mmc/core/pwrseq_emmc.c:120:1: warning: 'mmc_pwrseq_emmc_driver_init' defined but not used
+>
+> vim +120 drivers/mmc/core/pwrseq_emmc.c
+>
+>     114		.driver = {
+>     115			.name = "pwrseq_emmc",
+>     116			.of_match_table = mmc_pwrseq_emmc_of_match,
+>     117		},
+>     118	};
+>     119	
+>   > 120	builtin_platform_driver(mmc_pwrseq_emmc_driver);
+>
 > ---
->  arch/arm64/include/asm/assembler.h | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> index 21979a4..c47a623 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -24,6 +24,7 @@
->  #define __ASM_ASSEMBLER_H
->  
->  #include <asm/asm-offsets.h>
-> +#include <asm/page.h>
->  #include <asm/pgtable-hwdef.h>
->  #include <asm/ptrace.h>
->  #include <asm/thread_info.h>
-> @@ -240,6 +241,24 @@ lr	.req	x30		// link register
->  	.endm
->  
->  /*
-> + * copy_page - copy src to dest using temp registers t1-t8
-> + */
-> +	.macro copy_page dest:req src:req t1:req t2:req t3:req t4:req t5:req t6:req t7:req t8:req
-> +1:	ldp	\t1, \t2, [\src]
-
-Using '1' as a label here means callers can't jump back over it using
-the same label. The convention with USER() and alternatives is to use
-unlikely values like '9999'.
-
-
-> +	ldp	\t3, \t4, [\src, #16]
-> +	ldp	\t5, \t6, [\src, #32]
-> +	ldp	\t7, \t8, [\src, #48]
-> +	add	\src, \src, #64
-> +	stnp	\t1, \t2, [\dest]
-> +	stnp	\t3, \t4, [\dest, #16]
-> +	stnp	\t5, \t6, [\dest, #32]
-> +	stnp	\t7, \t8, [\dest, #48]
-> +	add	\dest, \dest, #64
-> +	tst	\src, #(PAGE_SIZE - 1)
-> +	b.ne	1b
-> +	.endm
-
-It may be worth updating lib/copy_page.S to use this macro.
-
-
-I will fix the code in hibernate to use this!
-
-Thanks,
-
-
-James
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+>
