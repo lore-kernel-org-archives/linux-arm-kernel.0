@@ -1,102 +1,54 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 21 Jan 2016 13:26:31 +0800
-Subject: [PATCH RFC 04/15] mmc: sunxi: Support vqmmc regulator
+Date: Thu, 21 Jan 2016 13:26:30 +0800
+Subject: [PATCH RFC 03/15] mmc: sunxi: Block signal voltage switching (CMD11)
 In-Reply-To: <1453354002-28366-1-git-send-email-wens@csie.org>
 References: <1453354002-28366-1-git-send-email-wens@csie.org>
-Message-ID: <1453354002-28366-5-git-send-email-wens@csie.org>
+Message-ID: <1453354002-28366-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-eMMC chips require 2 power supplies, vmmc for internal logic, and vqmmc
-for driving output buffers. vqmmc also controls signaling voltage. Most
-boards we've seen use the same regulator for both, nevertheless the 2
-have different usages, and should be set separately.
+Allwinner's mmc controller supports signal voltage switching. This is
+supported in code in Allwinner's kernel. However, publicly available
+boards all tie it to a fixed 3.0/3.3V regulator, with options to tie
+it to 1.8V for eMMC on some.
 
-This patch adds support for vqmmc regulator supply, including voltage
-switching. The MMC core can use this to try different signaling voltages
-for eMMC.
+Since Allwinner's kernel is an ancient 3.4, it is hard to say whether
+adapting it's code to a modern mainline kernel would work. Block signal
+voltage switching until someone has proper hardware to implement and
+test this.
+
+This only affects SD UHS-1 modes, as eMMC switches the voltage directly
+without any signaling.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/mmc/host/sunxi-mmc.c | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ drivers/mmc/host/sunxi-mmc.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
 diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 0495ae7da6d6..4bec87458317 100644
+index 790f01662b4e..0495ae7da6d6 100644
 --- a/drivers/mmc/host/sunxi-mmc.c
 +++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -28,6 +28,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/slab.h>
- #include <linux/reset.h>
-+#include <linux/regulator/consumer.h>
- 
- #include <linux/of_address.h>
- #include <linux/of_gpio.h>
-@@ -256,6 +257,9 @@ struct sunxi_mmc_host {
- 	struct mmc_request *mrq;
- 	struct mmc_request *manual_stop_mrq;
- 	int		ferror;
-+
-+	/* vqmmc */
-+	bool		vqmmc_enabled;
- };
- 
- static int sunxi_mmc_reset_host(struct sunxi_mmc_host *host)
-@@ -716,6 +720,16 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		if (host->ferror)
- 			return;
- 
-+		if (!IS_ERR(mmc->supply.vqmmc)) {
-+			host->ferror = regulator_enable(mmc->supply.vqmmc);
-+			if (host->ferror) {
-+				dev_err(mmc_dev(mmc),
-+					"failed to enable vqmmc\n");
-+				return;
-+			}
-+			host->vqmmc_enabled = true;
-+		}
-+
- 		host->ferror = sunxi_mmc_init_host(mmc);
- 		if (host->ferror)
- 			return;
-@@ -727,6 +741,9 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		dev_dbg(mmc_dev(mmc), "power off!\n");
- 		sunxi_mmc_reset_host(host);
- 		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
-+		if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled)
-+			regulator_disable(mmc->supply.vqmmc);
-+		host->vqmmc_enabled = false;
- 		break;
+@@ -816,6 +816,20 @@ static void sunxi_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
+ 		}
  	}
  
-@@ -758,6 +775,19 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 	}
- }
- 
-+static int sunxi_mmc_volt_switch(struct mmc_host *mmc, struct mmc_ios *ios)
-+{
-+	/* vqmmc regulator is available */
-+	if (!IS_ERR(mmc->supply.vqmmc))
-+		return mmc_regulator_set_vqmmc(mmc, ios);
++	/*
++	 * TODO Support signal voltage switching
++	 *
++	 * Compared to Allwinner's kernel, recent updates in the mmc core
++	 * mean this should be as easy as setting the flags in cmd_val and
++	 * imask, and waiting for it to finish. However no boards support
++	 * this so this cannot be tested. Block it for now.
++	 */
++	if (cmd->opcode == SD_SWITCH_VOLTAGE) {
++		mrq->cmd->error = -EPERM;
++		mmc_request_done(mmc, mrq);
++		return;
++	}
 +
-+	/* no vqmmc regulator, assume fixed regulator at 3/3.3V */
-+	if (mmc->ios.signal_voltage == MMC_SIGNAL_VOLTAGE_330)
-+		return 0;
-+
-+	return -EINVAL;
-+}
-+
- static void sunxi_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
- {
- 	struct sunxi_mmc_host *host = mmc_priv(mmc);
-@@ -923,6 +953,7 @@ static struct mmc_host_ops sunxi_mmc_ops = {
- 	.get_ro		 = mmc_gpio_get_ro,
- 	.get_cd		 = mmc_gpio_get_cd,
- 	.enable_sdio_irq = sunxi_mmc_enable_sdio_irq,
-+	.start_signal_voltage_switch = sunxi_mmc_volt_switch,
- 	.hw_reset	 = sunxi_mmc_hw_reset,
- 	.card_busy	 = sunxi_mmc_card_busy,
- };
+ 	if (cmd->opcode == MMC_GO_IDLE_STATE) {
+ 		cmd_val |= SDXC_SEND_INIT_SEQUENCE;
+ 		imask |= SDXC_COMMAND_DONE;
 -- 
 2.7.0.rc3
