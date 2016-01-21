@@ -1,75 +1,49 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 21 Jan 2016 14:49:14 +0000
-Subject: [PATCH v2 0/3] Mediatek EFUSE Support
-In-Reply-To: <56A0EF61.5080500@gmail.com>
-References: <1447930014-19579-1-git-send-email-andrew-ct.chen@mediatek.com>
- <CAGS+omA8XK6ksd7Ma8yAUbkSsHR6yQxjFrV+HGbd83UiH6T51g@mail.gmail.com>
- <566E94CA.1050700@linaro.org> <56A0A5E1.5050105@gmail.com>
- <56A0EBF0.2020703@linaro.org> <56A0EF61.5080500@gmail.com>
-Message-ID: <56A0EFEA.506@linaro.org>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 21 Jan 2016 11:50:59 -0300
+Subject: [PATCH 0/8] rtc: max77686: Extend driver and add max77802 support
+In-Reply-To: <56A02791.9010409@samsung.com>
+References: <1453310088-29985-1-git-send-email-javier@osg.samsung.com>
+ <20160121003047.GF3367@piout.net> <56A02791.9010409@samsung.com>
+Message-ID: <56A0F053.6070405@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
-
-On 21/01/16 14:46, Matthias Brugger wrote:
->
->
-> On 21/01/16 15:32, Srinivas Kandagatla wrote:
->>
->>
->> On 21/01/16 09:33, Matthias Brugger wrote:
+On 01/20/2016 09:34 PM, Krzysztof Kozlowski wrote:
+> On 21.01.2016 09:30, Alexandre Belloni wrote:
+>>> I believe all patches should go through the RTC tree with proper acks or
+>>> wait until the RTC patches land to pick the defconfig changes.
 >>>
->>>
->>> On 14/12/15 11:07, Srinivas Kandagatla wrote:
->>>> Hi Andrew,
->>>>
->>>> On 14/12/15 04:27, Daniel Kurtz wrote:
->>>>> Hi Srinivas,
->>>>>
->>>>> On Thu, Nov 19, 2015 at 6:46 PM, Andrew-CT Chen
->>>>> <andrew-ct.chen@mediatek.com> wrote:
->>>>>> This patch adds EFUSE support driver which is used by other drivers
->>>>>> like thermal sensor and HDMI impedance.
->>>>>>
->>>>>> There are some efuses these fuses store things like calibration data,
->>>>>> speed bins.. etc. Drivers like thermal sensor, HDMI impedance would
->>>>>> read out this data for configuring the driver.
->>>>>>
->>>>>> Change in v2:
->>>>>> 1. Rebase to 4.4-rc1
->>>>>> 2. Modify the driver Makefile for more consistent with other drivers
->>>>>> 3. Modify the compatible string to "mediatek,mt8173-efuse" and
->>>>>> "mediatek,efuse"
->>>>>
->>>>> Do you still plan to queue this for v4.5?
->>>>>
->>>> Sorry guys, for the long delay in replying your pings, got busy with
->>>> regular office stuff :-)
->>>>
->>>> Yes, It should go in v4.5, I did send request with my sign-off to Greg,
->>>> he should take it via char-misc tree.
->>>>
->>>
->>> I can't see this patches in the char-misc tree [1].
->>> Can you please double check?
 >>
->> Hi Matthias,
->> Thanks for the patience. You should expect them to see after v4.5-rc1,
->> that's when Greg said he would push the patches.
->>
+>> I think Olof would prefer the last patches to go through arm-soc.
 >
-> I'm a bit puzzled. Wouldn't that mean that they will get into mainline
-> for v4.6.
+> That would be preferred but merging them before the 5/8 would cause a
+> loss of functionality on these defconfigs making it non-bisectable
 
-The delay was due to Christmas holidays, this driver is 4.5 material, so 
-it would endup in v4.5-rc2 instead of v4.5-rc1.
+Exactly, that's why I suggested merging all through RTC with proper acks.
 
-thanks
-srini
-> I just want to know if I can take patch 3/3 through my v4.5-next branch
-> (which eventually will be merged into v4.6-rc1) or if I have to wait.
+> approach. I think it would be good to preserve bisectability in that
+> matter so either:
+> 1. a tag from RTC on top of which these patches would be applied in arm-soc,
 
+I didn't suggest that option because I thought it would be a lot of burden
+for such a trivial change.
+
+> 2. take them to RTC tree with our acks.
 >
-> Thanks,
-> Matthias
+
+Or another option is to not pick the defconfig changes and I can repost
+those again once the RTC changes land into mainline.
+
+But of course if up to you to decide since I'm not a maintainer :)
+  
+> Best regards,
+> Krzysztof
+>
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
