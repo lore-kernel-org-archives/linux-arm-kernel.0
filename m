@@ -1,75 +1,84 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Thu, 21 Jan 2016 10:50:04 +0100
-Subject: [PATCH] ARM: dts: n900: Include adp1653 device
-In-Reply-To: <20160121092909.GH5783@n2100.arm.linux.org.uk>
-References: <1451086812-3729-1-git-send-email-pali.rohar@gmail.com>
- <20160121091241.GS7192@pali>
- <20160121092909.GH5783@n2100.arm.linux.org.uk>
-Message-ID: <20160121095004.GW7192@pali>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 21 Jan 2016 17:48:32 +0800
+Subject: [PATCH v3 1/1] USB: core: let USB device know device node
+In-Reply-To: <1989217.907WTZoGvq@wuerfel>
+References: <4405270.vcz87Q878u@wuerfel> <5639398.uJHXq6DsMC@wuerfel>
+ <20160121031524.GA29893@shlinux2> <1989217.907WTZoGvq@wuerfel>
+Message-ID: <20160121094832.GA22037@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ok, but for whole month I do not see any response that somebody take
-this patch into some queue or tree. Which could means that patch was
-either ignored or is living somewhere and could be lost.
+On Thu, Jan 21, 2016 at 09:41:20AM +0100, Arnd Bergmann wrote:
+> On Thursday 21 January 2016 11:15:24 Peter Chen wrote:
+> > 
+> > Just adding from device driver view and change the name from "roohub" to
+> > "port".
+> > 
+> > It is the port number (1-9), but not the root hub number.
+> > 
+> > At the most of embedded platforms, we have only one port per controller.
+> > For example, at the non-hub boards, if there are two Standard-A ports,
+> > there are from two different USB controllers.
+> > But for Alan's case, it has six ports, and all from the one USB controller,
+> > port 1 to port 6 are from the HS root hub, port 7 to port 9 are from the SS
+> > root hub.
+> > 
+> > For the single port controller platform, the dts will be like below, port_1 is
+> > under the HS root hub, port_2 is under the SS root hub.
+> > 
+> > &usb1 {
+> >         port_1: nxp at 1 {
+> >                 compatible = "usb15a2,007d";
+> >                 reg = <0x01>;
+> > 
+> >                 hub: genesys at 1 {
+> >                         compatible = "usb05e3,0608";
+> >                         reg = <0x01>;
+> >                 };
+> >         };
+> > 
+> >         port_2: nxp at 2 {
+> >                 compatible = "usb15a2,007d";
+> >                 reg = <0x02>;
+> > 
+> >                 hub: genesys at 1 {
+> >                         compatible = "usb05e3,0608";
+> >                         reg = <0x01>;
+> >                 };
+> >         };
+> > };
+> 
+> But why are you modeling ports of the root hub as hubs themselves?
+> 
+> I would expect the example above to look like
+> 
+> &usb1 {
+>         hub at 1 {
+>                 compatible = "usb05e3,0608";
+>                 reg = <0x01>;
+>         };
+> 
+> 	hub at 2 {
+>                 compatible = "usb05e3,0608";
+>                 reg = <0x01>;
+>         };
+> };
 
-On Thursday 21 January 2016 09:29:10 Russell King - ARM Linux wrote:
-> The merge window is open, which is when development code that was merged
-> in good time prior to the merge window is sent upstream to Linus.  Linux
-> maintainers may choose not to merge new code into their tree to avoid
-> disrupting the utility of linux-next until the merge window has closed.
+You are right, I should not add root hub or port description in
+device tree, only the description for the device on that port is enough.
+
 > 
-> linux-next is an integration tree to help find merge conflicts, it
-> exists to assist with the merge windows, not as a general test ground.
-> Thus, linux-next must only contain code for either the current open
-> merge window, or if the merge window is closed, the next merge window.
+> So two hubs at ports 1 and 2 of the USB controller that integrates
+> the root hub and shares a device node with it.
 > 
-> On Thu, Jan 21, 2016 at 10:12:41AM +0100, Pali Roh?r wrote:
-> > On Saturday 26 December 2015 00:40:12 Pali Roh?r wrote:
-> > > This patch adds adp1653 device into n900 DT structure. DT support in
-> > > adp1653 driver is there since v4.2-rc1 version.
-> > > 
-> > > Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> > > ---
-> > >  arch/arm/boot/dts/omap3-n900.dts |   15 +++++++++++++++
-> > >  1 file changed, 15 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-> > > index 5f5e0f3..ba93642 100644
-> > > --- a/arch/arm/boot/dts/omap3-n900.dts
-> > > +++ b/arch/arm/boot/dts/omap3-n900.dts
-> > > @@ -522,6 +522,21 @@
-> > >  		amstaos,cover-comp-gain = <16>;
-> > >  	};
-> > >  
-> > > +	adp1653: led-controller at 30 {
-> > > +		compatible = "adi,adp1653";
-> > > +		reg = <0x30>;
-> > > +		enable-gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
-> > > +
-> > > +		flash {
-> > > +			flash-timeout-us = <500000>;
-> > > +			flash-max-microamp = <320000>;
-> > > +			led-max-microamp = <50000>;
-> > > +		};
-> > > +		indicator {
-> > > +			led-max-microamp = <17500>;
-> > > +		};
-> > > +	};
-> > > +
-> > >  	lp5523: lp5523 at 32 {
-> > >  		compatible = "national,lp5523";
-> > >  		reg = <0x32>;
-> > 
-> > PING, who can take this patch?
-> > 
-> > I still do not see it in linus tree nor in others like arm-soc...
-> > 
-> > -- 
-> > Pali Roh?r
-> > pali.rohar at gmail.com
-> 
+
+Ok, so the "reg" is the address for certain root hub (HS or SS), not
+the unity address for the whole controller, if it is, do we really
+need to add two nodes for one physical port, HS and SS will not be used
+at the same time. And if the reg is the same, how can we know
+which node is from current recognized device.
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
+
+Best Regards,
+Peter Chen
