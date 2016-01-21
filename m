@@ -1,31 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 21 Jan 2016 18:25:18 +0000
-Subject: [PATCH] ARM: s3c64xx: Select GPIO_GENERIC_PLATFORM for Cragganmore
-Message-ID: <1453400718-26720-1-git-send-email-broonie@kernel.org>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 21 Jan 2016 18:38:42 +0000
+Subject: [PATCH] arm64: dts: apq8016-sbc: Add aliases to spi device.
+Message-ID: <1453401522-27291-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cragganmore machine driver provides platform data for the generic GPIO
-platform driver which uses structures only defined if the driver is
-enabled. Since there is little reason to use the platform without the GPIOs
-add a select to avoid build failures.
+This patch adds aliases to spi device so that it can get proper bus
+number rather than a random number.
 
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm/mach-s3c64xx/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index 7c0c420c3016..98d2aa9393f1 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -310,6 +310,7 @@ config MACH_WLF_CRAGG_6410
- 	depends on I2C=y
- 	select CPU_S3C6410
- 	select LEDS_GPIO_REGISTER
-+	select GPIO_GENERIC_PLATFORM
- 	select S3C64XX_DEV_SPI0
- 	select S3C64XX_SETUP_FB_24BPP
- 	select S3C64XX_SETUP_I2C1
+diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+index db17c5d..6eb096e 100644
+--- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+@@ -24,6 +24,8 @@
+ 		i2c0	= &blsp_i2c2;
+ 		i2c1	= &blsp_i2c6;
+ 		i2c3	= &blsp_i2c4;
++		spi0	= &blsp_spi5;
++		spi1	= &blsp_spi3;
+ 	};
+ 
+ 	chosen {
 -- 
-2.7.0.rc3
+1.9.1
