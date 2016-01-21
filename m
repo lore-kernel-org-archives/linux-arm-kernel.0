@@ -1,36 +1,67 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 21 Jan 2016 16:28:02 +0000
-Subject: [PATCH v2 1/2] regulator: Add coupled regulator
-In-Reply-To: <20160121154649.GE3997@lukather>
-References: <1452605842-9317-1-git-send-email-maxime.ripard@free-electrons.com>
- <1452605842-9317-2-git-send-email-maxime.ripard@free-electrons.com>
- <20160112143100.GA14628@rob-hp-laptop>
- <20160115085734.GG4581@lukather>
- <20160117000434.GB7774@rob-hp-laptop>
- <20160118162538.GH6588@sirena.org.uk>
- <20160121154649.GE3997@lukather>
-Message-ID: <20160121162802.GL6588@sirena.org.uk>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Thu, 21 Jan 2016 16:31:49 +0000
+Subject: [PATCH v3 21/21] arm64: efi: invoke EFI_RNG_PROTOCOL to supply
+ KASLR randomness
+In-Reply-To: <1452518355-4606-23-git-send-email-ard.biesheuvel@linaro.org>
+References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1452518355-4606-23-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160121163149.GH2510@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 21, 2016 at 04:46:49PM +0100, Maxime Ripard wrote:
+On Mon, 11 Jan, at 02:19:15PM, Ard Biesheuvel wrote:
+> Since arm64 does not use a decompressor that supplies an execution
+> environment where it is feasible to some extent to provide a source of
+> randomness, the arm64 KASLR kernel depends on the bootloader to supply
+> some random bits in register x1 upon kernel entry.
+> 
+> On UEFI systems, we can use the EFI_RNG_PROTOCOL, if supplied, to obtain
+> some random bits. At the same time, use it to randomize the offset of the
+> kernel Image in physical memory.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/Kconfig                             |  5 ++
+>  arch/arm64/kernel/efi-entry.S                  |  7 +-
+>  drivers/firmware/efi/libstub/arm-stub.c        | 17 ++---
+>  drivers/firmware/efi/libstub/arm64-stub.c      | 67 +++++++++++++++-----
+>  drivers/firmware/efi/libstub/efi-stub-helper.c | 10 +++
+>  drivers/firmware/efi/libstub/efistub.h         |  2 +
+>  6 files changed, 82 insertions(+), 26 deletions(-)
 
-> I guess a separate driver would make it easier to deal with cases like
-> the one you suggested (shutting down when the load is going to be
-> lower). I don't see how we could have a good DT representation of that
-> if we're going to use lists.
+[...]
 
-We can have a driver regardless of what the DT looks like, it's a
-question of how things get instantiated.
+> diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
+> index 2a7a3015d7e0..e8a3b8cd53cc 100644
+> --- a/drivers/firmware/efi/libstub/efi-stub-helper.c
+> +++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
+> @@ -32,6 +32,10 @@
+>  
+>  static unsigned long __chunk_size = EFI_READ_CHUNK_SIZE;
+>  
+> +#ifdef CONFIG_RANDOMIZE_BASE
+> +bool __nokaslr;
+> +#endif
+> +
+>  /*
+>   * Allow the platform to override the allocation granularity: this allows
+>   * systems that have the capability to run with a larger page size to deal
+> @@ -317,6 +321,12 @@ efi_status_t efi_parse_options(char *cmdline)
+>  {
+>  	char *str;
+>  
+> +#ifdef CONFIG_RANDOMIZE_BASE
+> +	str = strstr(cmdline, "nokaslr");
+> +	if (str && (str == cmdline || *(str - 1) == ' '))
+> +		__nokaslr = true;
+> +#endif
+> +
+>  	/*
+>  	 * If no EFI parameters were specified on the cmdline we've got
+>  	 * nothing to do.
 
-> Anyway, I'm fine with both approaches, just let me know what you
-> prefer.
+Could we not keep the "nokaslr" parsing inside of arm-stub.c? It's not
+really specific to EFI and doesn't make use of any of the code in
+efi_parse_options() anyhow.
 
-Without seeing an implementation of the lists it's hard to say.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160121/32f95c74/attachment.sig>
+As an added bonus, __nokaslr could then become static.
