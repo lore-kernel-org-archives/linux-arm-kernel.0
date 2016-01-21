@@ -1,33 +1,44 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 21 Jan 2016 13:26:37 +0800
-Subject: [PATCH RFC 10/15] ARM: dts: sun8i: Include SDC2_RST pin in
- mmc2_8bit_pins
+Date: Thu, 21 Jan 2016 13:26:41 +0800
+Subject: [PATCH RFC 14/15] ARM: dts: sun9i: a80-optimus: Enable hardware reset
+ and HS-DDR for eMMC
 In-Reply-To: <1453354002-28366-1-git-send-email-wens@csie.org>
 References: <1453354002-28366-1-git-send-email-wens@csie.org>
-Message-ID: <1453354002-28366-11-git-send-email-wens@csie.org>
+Message-ID: <1453354002-28366-15-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mmc2_8bit_pins is used with eMMC chips, which also have a reset pin.
-The MMC controller also has a reset output that is supported.
+mmc2 has a special pin for eMMC hardware reset, which is controllable
+from the controller. Add the "mmc-cap-hw-reset" property to denote that
+this controller supports this function, and the pins are actually used.
+
+Also increase the signal drive strength for mmc2 pins, for HS-DDR mode
+support.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a23-a33.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/sun9i-a80-optimus.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index 6f88fb0ddbc7..7e05e09e61c7 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -381,7 +381,7 @@
- 				allwinner,pins = "PC5", "PC6", "PC8",
- 						 "PC9", "PC10", "PC11",
- 						 "PC12", "PC13", "PC14",
--						 "PC15";
-+						 "PC15", "PC16";
- 				allwinner,function = "mmc2";
- 				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+index c0060e4f7379..958160e40fd0 100644
+--- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
++++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+@@ -174,9 +174,15 @@
+ 	vmmc-supply = <&reg_vcc3v0>;
+ 	bus-width = <8>;
+ 	non-removable;
++	cap-mmc-hw-reset;
+ 	status = "okay";
+ };
+ 
++&mmc2_8bit_pins {
++	/* Increase drive strength for DDR modes */
++	allwinner,drive = <SUN4I_PINCTRL_40_MA>;
++};
++
+ &reg_usb1_vbus {
+ 	pinctrl-0 = <&usb1_vbus_pin_optimus>;
+ 	gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
 -- 
 2.7.0.rc3
