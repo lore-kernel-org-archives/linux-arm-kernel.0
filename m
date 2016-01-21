@@ -1,56 +1,46 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 21 Jan 2016 14:26:00 -0500 (EST)
-Subject: [PATCH v2 0/5] omap assembly fixes for CONFIG_DEBUG_RODATA
-In-Reply-To: <1453403527-21308-1-git-send-email-tony@atomide.com>
-References: <1453403527-21308-1-git-send-email-tony@atomide.com>
-Message-ID: <alpine.LFD.2.20.1601211424241.2140@knanqh.ubzr>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Thu, 21 Jan 2016 20:34:07 +0100
+Subject: 4.5-rc0: n900 battery charging reverts to 100mA,
+ indicator turns back on
+In-Reply-To: <20160121184234.GA17679@amd>
+References: <20160121184234.GA17679@amd>
+Message-ID: <201601212034.07727@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Jan 2016, Tony Lindgren wrote:
+On Thursday 21 January 2016 19:42:34 Pavel Machek wrote:
+> Hi!
+> 
+> In 4.4, n900 battery charging works. If indicator is turned off, it
+> stays off, and if I select 1.8A charge, it sticks. (There may be
+> problems after system suspend and resume. But normal operation seems
+> to be pretty reliable).
 
-> Hi all,
->  
-> Here are read-only data fixes for omaps discovered few weeks ago
-> with "[PATCH v2] ARM: mm: flip priority of CONFIG_DEBUG_RODATA"
-> that caused issues during deeper idle states on omaps [0].
->  
-> Please review and test if possible. I'd like to merge these fixes
-> during v4.5-rc cycle to remove these blockers for making it possible
-> to have CONFIG_DEBUG_RODATA enabled by default.
->  
-> Regards,
+Hm... right, bq2415x driver does not have support for suspend/resume. 
+Before suspend registers should be stored and after resume restored, 
+plus check charger auto detection.
 
-For the series:
+> In 4.5-rc0 (7fdec82af6a9e190e53d07a1463d2a9ac49a8750) battery
+> charging works for few hours. But then indicator (yellow light on
+> 3color LED) turns back on, and if I ask for 1.8A charge, it goes
+> back to .1A, discharging battery.
+> 
+> Any ideas?
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Look into bq24150a sysfs node what changes. Also if there is something 
+in dmesg.
 
-> Tony
-> 
-> Changes since v1:
-> 
-> - Fix missing ldr in patch 2/5 as Noticed by Nicolas Pitre. This
->   had gone unnoticed as the code just happened to work on omap36xx
->   without actually toggling the L2 cache. And patches 4 and 5 are setting
->   the address, not the value unlike patch 2/5. I've added some comments
->   to patch 2/5 too.
-> 
-> - Fix a typo noticed by Sergei Shtylyov in patch 3/5.
-> 
-> [0] https://lkml.org/lkml/2015/12/2/908
-> 
-> Tony Lindgren (5):
->   ARM: OMAP2+: Fix wait_dll_lock_timed for rodata
->   ARM: OMAP2+: Fix l2dis_3630 for rodata
->   ARM: OMAP2+: Fix save_secure_ram_context for rodata
->   ARM: OMAP2+: Fix l2_inv_api_params for rodata
->   ARM: OMAP2+: Fix ppa_zero_params and ppa_por_params for rodata
-> 
->  arch/arm/mach-omap2/sleep34xx.S | 61 ++++++++++++++++++++---------------------
->  arch/arm/mach-omap2/sleep44xx.S | 25 +++++++++++------
->  2 files changed, 47 insertions(+), 39 deletions(-)
-> 
-> -- 
-> 2.7.0.rc3
-> 
-> 
+> Best regards,
+> 									Pavel
+
+
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160121/a69c7324/attachment.sig>
