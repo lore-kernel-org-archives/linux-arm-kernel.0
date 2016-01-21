@@ -1,49 +1,63 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 21 Jan 2016 11:50:59 -0300
-Subject: [PATCH 0/8] rtc: max77686: Extend driver and add max77802 support
-In-Reply-To: <56A02791.9010409@samsung.com>
-References: <1453310088-29985-1-git-send-email-javier@osg.samsung.com>
- <20160121003047.GF3367@piout.net> <56A02791.9010409@samsung.com>
-Message-ID: <56A0F053.6070405@osg.samsung.com>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Fri, 22 Jan 2016 00:00:36 +0900
+Subject: [PATCH v2] ARM: dts: orion5x: gpio pin fixes for linkstation lswtgl
+In-Reply-To: <1453286688-9533-1-git-send-email-rogershimizu@gmail.com>
+References: <1453286688-9533-1-git-send-email-rogershimizu@gmail.com>
+Message-ID: <1453388436-8390-1-git-send-email-rogershimizu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Here're a few gpio pin related fixes:
+  - remove pinctrl-0 definition from pinctrl, since those pins are used
+    in other places such as gpio-fan and regulators.
+  - keep initial state of power led
+  - fix for alarm pin of gpio-fan.
 
-On 01/20/2016 09:34 PM, Krzysztof Kozlowski wrote:
-> On 21.01.2016 09:30, Alexandre Belloni wrote:
->>> I believe all patches should go through the RTC tree with proper acks or
->>> wait until the RTC patches land to pick the defconfig changes.
->>>
->>
->> I think Olof would prefer the last patches to go through arm-soc.
->
-> That would be preferred but merging them before the 5/8 would cause a
-> loss of functionality on these defconfigs making it non-bisectable
+Fixes: dc57844a736f ("ARM: dts: orion5x: add buffalo linkstation ls-wtgl")
+Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
+---
+ arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Exactly, that's why I suggested merging all through RTC with proper acks.
-
-> approach. I think it would be good to preserve bisectability in that
-> matter so either:
-> 1. a tag from RTC on top of which these patches would be applied in arm-soc,
-
-I didn't suggest that option because I thought it would be a lot of burden
-for such a trivial change.
-
-> 2. take them to RTC tree with our acks.
->
-
-Or another option is to not pick the defconfig changes and I can repost
-those again once the RTC changes land into mainline.
-
-But of course if up to you to decide since I'm not a maintainer :)
-  
-> Best regards,
-> Krzysztof
->
-
-Best regards,
+diff --git a/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts b/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
+index 3daec912b4bf..420788229e6f 100644
+--- a/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
++++ b/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
+@@ -1,7 +1,8 @@
+ /*
+  * Device Tree file for Buffalo Linkstation LS-WTGL
+  *
+- * Copyright (C) 2015, Roger Shimizu <rogershimizu@gmail.com>
++ * Copyright (C) 2015, 2016
++ * Roger Shimizu <rogershimizu@gmail.com>
+  *
+  * This file is dual-licensed: you can use it either under the terms
+  * of the GPL or the X11 license, at your option. Note that this dual
+@@ -69,8 +70,6 @@
+ 
+ 		internal-regs {
+ 			pinctrl: pinctrl at 10000 {
+-				pinctrl-0 = <&pmx_usb_power &pmx_power_hdd
+-					&pmx_fan_low &pmx_fan_high &pmx_fan_lock>;
+ 				pinctrl-names = "default";
+ 
+ 				pmx_led_power: pmx-leds {
+@@ -162,6 +161,7 @@
+ 		led at 1 {
+ 			label = "lswtgl:blue:power";
+ 			gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
++			default-state = "keep";
+ 		};
+ 
+ 		led at 2 {
+@@ -188,7 +188,7 @@
+ 				3250 1
+ 				5000 0>;
+ 
+-		alarm-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
++		alarm-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
+ 	};
+ 
+ 	restart_poweroff {
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.1.4
