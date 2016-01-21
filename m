@@ -1,62 +1,83 @@
-From: w.egorov@phytec.de (Wadim Egorov)
-Date: Thu, 21 Jan 2016 13:57:13 +0100
-Subject: [PATCH] ARM: dts: rockchip: Bump sd card pin drive strength up on
- firefly boards
-Message-ID: <1453381033-3479-1-git-send-email-w.egorov@phytec.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 21 Jan 2016 13:02:17 +0000
+Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
+In-Reply-To: <56A06FF3.8050706@linaro.org>
+References: <569DCB30.9010501@linaro.org>
+ <20160119122848.GA2904@dhcp-128-65.nay.redhat.com>
+ <20160119125114.GH25024@leverpostej>
+ <20160119134553.GA2986@dhcp-128-65.nay.redhat.com>
+ <20160119140139.GC26545@leverpostej> <569F1A33.4000208@linaro.org>
+ <20160120120257.GD25829@leverpostej>
+ <20160120123620.GE25829@leverpostej>
+ <CAKv+Gu9pVAWWRyM+oTpzGUCdeuMXkdnz5cAJnZk3jfE9uKVREw@mail.gmail.com>
+ <56A06FF3.8050706@linaro.org>
+Message-ID: <20160121130217.GF2581@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems some firefly boards need 12mA drive strength for sdmmc.
-Using 4mA/8mA drive strength will cause the kernel to fail to recognize
-the sd card correctly.
-Increased the sdmmc lines drive strength from 4mA to 12mA.
+On Thu, Jan 21, 2016 at 02:43:15PM +0900, AKASHI Takahiro wrote:
+> On 01/20/2016 11:59 PM, Ard Biesheuvel wrote:
+> >On 20 January 2016 at 13:36, Mark Rutland <mark.rutland@arm.com> wrote:
+> >>Ard, Ganapatrao, the below is something we need to consider for the
+> >>combination of the NUMA & kexec approaches. It only becomes a problem
+> >>if/when we preserve DT memory nodes in the presence of EFI, though it
+> >>would be nice to not box ourselves into a corner.
+> >>
+> >>On Wed, Jan 20, 2016 at 12:02:58PM +0000, Mark Rutland wrote:
+> >>>On Wed, Jan 20, 2016 at 02:25:07PM +0900, AKASHI Takahiro wrote:
+> >>>>On 01/19/2016 11:01 PM, Mark Rutland wrote:
+> >>>>>For NUMA topology in !ACPI kernels, we might need to also retain and
+> >>>>>parse memory nodes, but only for toplogy information. The kernel would
+> >>>>>still only use memory as described by the EFI memory map.
+> >>>>>
+> >>>>>There's a horrible edge case I've spotted if performing a chain of
+> >>>>>cross-endian kexecs: LE -> BE -> LE, as the BE kernel would have to
+> >>>>>respect the EFI memory map so as to avoid corrupting it for the
+> >>>>>subsequent LE kernel. Other than this I believe everything should just
+> >>>>>work.
+> >>>>
+> >>>>BE kernel doesn't support UEFI yet and cannot access UEFI memmap table. So,
+> >>>>for LE -> BE, we don't use a dtb generated from /sys/firmware/fdt (or /proc/device-tree)
+> >>>>(as in the case of LE -> LE) and require users to provide a dtb file explicitly.
+> >>>
+> >>>As I mentioned above, the problem exists when memory nodes also exist
+> >>>(for describing NUMA topology). In that case the BE kernel would try to
+> >>>use the information from the memory nodes.
+> >>>
+> >>>>For BE -> LE, BE kernel doesn't know wther UEFI memmap table is available or not
+> >>>>and so use the same (explicitly-provided) dtb (as LE -> LE in !UEFI)
+> >>>
+> >>>See above. The problem I imagine is:
+> >>>
+> >>>LE kernel - uses EFI mmap, takes NUMA information from DT memory nodes
+> >>>
+> >>>     v       kexec
+> >>>
+> >>>BE kernel - uses DT memory nodes
+> >>>           - clobbers EFI runtime regions as it sees them as available
+> >>>
+> >>>     v       kexec
+> >>>
+> >>>LE kernel - uses EFI mmap, takes NUMA information from DT memory nodes
+> >>>           - tries to call EFI runtime services, and explodes.
+> >>
+> >>I'm not really sure what the best approach is here, but I thought that
+> >>it would be good to raise awareness of the edge-case.
+> >>
+> >
+> >I think we should simply allow the BE kernel to deal with a UEFI
+> >memory map. It only involves a bit of byte swapping (which I already
+> >implemented at some point)
+> 
+> Just from my curiosity,
+> will runtime services be also available on BE kernel with LE uefi?
 
-Signed-off-by: Wadim Egorov <w.egorov@phytec.de>
----
- arch/arm/boot/dts/rk3288-firefly.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+It may be possible to implement that (I recall that Ard had a go), but
+that's far more complicated than simply supporting the EFI memory map,
+as you need separate (endian-swapped) page tables and other data
+structures, lose the ability to handle exceptions, etc.
 
-diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
-index 4e3fd9a..49ec20d 100644
---- a/arch/arm/boot/dts/rk3288-firefly.dtsi
-+++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
-@@ -408,6 +408,11 @@
- 		output-low;
- 	};
- 
-+	pcfg_pull_up_drv_12ma: pcfg-pull-up-drv-12ma {
-+		bias-pull-up;
-+		drive-strength = <12>;
-+	};
-+
- 	act8846 {
- 		pwr_hold: pwr-hold {
- 			rockchip,pins = <0 1 RK_FUNC_GPIO &pcfg_output_high>;
-@@ -457,6 +462,25 @@
- 	};
- 
- 	sdmmc {
-+		/*
-+		 * Default drive strength isn't enough to achieve even
-+		 * high-speed mode on firefly board so bump up to 12ma.
-+		 */
-+		sdmmc_bus4: sdmmc-bus4 {
-+			rockchip,pins = <6 16 RK_FUNC_1 &pcfg_pull_up_drv_12ma>,
-+					<6 17 RK_FUNC_1 &pcfg_pull_up_drv_12ma>,
-+					<6 18 RK_FUNC_1 &pcfg_pull_up_drv_12ma>,
-+					<6 19 RK_FUNC_1 &pcfg_pull_up_drv_12ma>;
-+		};
-+
-+		sdmmc_clk: sdmmc-clk {
-+			rockchip,pins = <6 20 RK_FUNC_1 &pcfg_pull_none_12ma>;
-+		};
-+
-+		sdmmc_cmd: sdmmc-cmd {
-+			rockchip,pins = <6 21 RK_FUNC_1 &pcfg_pull_up_drv_12ma>;
-+		};
-+
- 		sdmmc_pwr: sdmmc-pwr {
- 			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
- 		};
--- 
-1.9.1
+All that's suggested above is supporting the memory map.
+
+Thanks,
+Mark.
