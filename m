@@ -1,49 +1,46 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 21 Jan 2016 20:11:45 +0100
-Subject: [PATCH v12.1 07/17] drm: rockchip: dp: add rockchip platform dp
- driver
-In-Reply-To: <1453197893-13413-1-git-send-email-ykk@rock-chips.com>
-References: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
- <1453197893-13413-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <7132332.jmLRiUjx3U@phil>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 21 Jan 2016 11:12:02 -0800
+Subject: [PATCH v2 0/5] omap assembly fixes for CONFIG_DEBUG_RODATA
+Message-ID: <1453403527-21308-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yakir,
+Hi all,
+ 
+Here are read-only data fixes for omaps discovered few weeks ago
+with "[PATCH v2] ARM: mm: flip priority of CONFIG_DEBUG_RODATA"
+that caused issues during deeper idle states on omaps [0].
+ 
+Please review and test if possible. I'd like to merge these fixes
+during v4.5-rc cycle to remove these blockers for making it possible
+to have CONFIG_DEBUG_RODATA enabled by default.
+ 
+Regards,
+ 
+Tony
 
-Am Dienstag, 19. Januar 2016, 18:04:53 schrieb Yakir Yang:
-> Rockchip have three clocks for dp controller, we leave pclk_edp
-> to analogix_dp driver control, and keep the sclk_edp_24m and
-> sclk_edp in platform driver.
-> 
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
+Changes since v1:
 
-[...]
+- Fix missing ldr in patch 2/5 as Noticed by Nicolas Pitre. This
+  had gone unnoticed as the code just happened to work on omap36xx
+  without actually toggling the L2 cache. And patches 4 and 5 are setting
+  the address, not the value unlike patch 2/5. I've added some comments
+  to patch 2/5 too.
 
-> +static int rockchip_dp_drm_create_encoder(struct rockchip_dp_device *dp)
-> +{
-> +	struct drm_encoder *encoder = &dp->encoder;
-> +	struct drm_device *drm_dev = dp->drm_dev;
-> +	struct device *dev = dp->dev;
-> +	int ret;
-> +
-> +	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm_dev,
-> +							     dev->of_node);
-> +	DRM_DEBUG_KMS("possible_crtcs = 0x%x\n", encoder->possible_crtcs);
-> +
-> +	ret = drm_encoder_init(drm_dev, encoder, &rockchip_dp_encoder_funcs,
-> +			       DRM_MODE_ENCODER_TMDS);
+- Fix a typo noticed by Sergei Shtylyov in patch 3/5.
 
-should be
-+			       DRM_MODE_ENCODER_TMDS, NULL);
+[0] https://lkml.org/lkml/2015/12/2/908
 
-Exynos-side seems to be ok though.
+Tony Lindgren (5):
+  ARM: OMAP2+: Fix wait_dll_lock_timed for rodata
+  ARM: OMAP2+: Fix l2dis_3630 for rodata
+  ARM: OMAP2+: Fix save_secure_ram_context for rodata
+  ARM: OMAP2+: Fix l2_inv_api_params for rodata
+  ARM: OMAP2+: Fix ppa_zero_params and ppa_por_params for rodata
 
-With the adapted v12.1 patches it applies cleanly and display is working as 
-well. So with the thing above fixed, you could resubmit a full v13, 
-especially as you want to drop patch 16 as discussed there.
+ arch/arm/mach-omap2/sleep34xx.S | 61 ++++++++++++++++++++---------------------
+ arch/arm/mach-omap2/sleep44xx.S | 25 +++++++++++------
+ 2 files changed, 47 insertions(+), 39 deletions(-)
 
-
-Heiko
+-- 
+2.7.0.rc3
