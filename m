@@ -1,53 +1,25 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Thu, 21 Jan 2016 16:39:14 -0600
-Subject: [PATCH v2 1/4] ARM: dts: imx7d: add arch timer
-In-Reply-To: <1452014237-12848-1-git-send-email-Frank.Li@nxp.com>
-References: <1452014237-12848-1-git-send-email-Frank.Li@nxp.com>
-Message-ID: <CAHrpEqS2upM1FANu9tjzmwxscOH3Y56S7naj7sPF9dKmn51_zw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 21 Jan 2016 17:09:40 -0600
+Subject: [PATCH] Documentation: rockchip-dw-mshc: add RK3368 dw-mshc
+ description
+In-Reply-To: <1453379529-5148-1-git-send-email-shawn.lin@rock-chips.com>
+References: <1453379529-5148-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <20160121230940.GA1609@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 5, 2016 at 11:17 AM, Frank Li <Frank.Li@nxp.com> wrote:
-> From: Frank Li <Frank.Li@freescale.com>
->
-> Since uboot v2016.01-rc2, which supported basic psci for i.mx7d.
-> So imx7d's second core can be enabled by psci.
->
-> Without arch timer, every timer event will be boardcasted to each core.
-> arch timer has local timer irq for each core.
->
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+On Thu, Jan 21, 2016 at 08:32:09PM +0800, Shawn Lin wrote:
+> rk3368 dtsi file add dw-mshc compatible "rockchip,rk3368-dw-mshc"
+> but didn't add it into rockchip-dw-mshc.txt.
+> 
+> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
 > ---
+> 
+>  Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-Ping
+Acked-by: Rob Herring <robh@kernel.org>
 
->
-> Change from v1 to v2:
->  * refine commit message show the relationship between smp and arch timer
->
->  arch/arm/boot/dts/imx7d.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-> index 489604a..a621af6 100644
-> --- a/arch/arm/boot/dts/imx7d.dtsi
-> +++ b/arch/arm/boot/dts/imx7d.dtsi
-> @@ -119,6 +119,15 @@
->                 clock-output-names = "osc";
->         };
->
-> +       timer {
-> +               compatible = "arm,armv7-timer";
-> +               interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +                            <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +                            <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +                            <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-> +               interrupt-parent = <&intc>;
-> +       };
-> +
->         etr at 30086000 {
->                 compatible = "arm,coresight-tmc", "arm,primecell";
->                 reg = <0x30086000 0x1000>;
-> --
-> 2.5.2
->
+I'm assuming Heiko will take this.
+
+Rob
