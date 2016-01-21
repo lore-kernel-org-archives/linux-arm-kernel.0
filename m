@@ -1,79 +1,116 @@
-From: john@metanate.com (John Keeping)
-Date: Thu, 21 Jan 2016 18:19:34 +0000
-Subject: [PATCH v2] drm/rockchip: respect CONFIG_DRM_FBDEV_EMULATION
-In-Reply-To: <20160121165251.GO19130@phenom.ffwll.local>
-References: <1453384426-32617-1-git-send-email-john@metanate.com>
- <20160121165251.GO19130@phenom.ffwll.local>
-Message-ID: <20160121181934.76cb2c03.john@metanate.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 21 Jan 2016 18:22:18 +0000
+Subject: [PATCH V3 13/21] pci, acpi: Provide generic way to assign bus
+ domain number.
+In-Reply-To: <1452691267-32240-14-git-send-email-tn@semihalf.com>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <1452691267-32240-14-git-send-email-tn@semihalf.com>
+Message-ID: <20160121182218.GA21175@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If DRM_FBDEV_EMULATION is not selected in the config then we can save a
-bit of space by not including the framebuffer code.
+Hi Tomasz,
 
-Signed-off-by: John Keeping <john@metanate.com>
----
-On Thu, 21 Jan 2016 17:52:51 +0100, Daniel Vetter wrote:
+On Wed, Jan 13, 2016 at 02:20:59PM +0100, Tomasz Nowicki wrote:
 
-> On Thu, Jan 21, 2016 at 01:53:46PM +0000, John Keeping wrote:
-> > If DRM_FBDEV_EMULATION is not selected in the config then we should not
-> > setup a framebuffer console.  
-> 
-> It should just magically work, and this patch here just removes a bit more
-> dead code in the rockchip driver itself that's not needed in case fbdev
-> emulation is disabled.
-> 
-> Can you please double-check this is the case and then resend with a
-> clarified commit message?
+[...]
 
-You're right, it does work without this change, so this is just to save
-a bit of space when we don't need this feature.
+> @@ -4796,14 +4797,34 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+>  	 * API and update the use_dt_domains value to keep track of method we
+>  	 * are using to assign domain numbers (use_dt_domains = 0).
+>  	 *
+> +	 * IF ACPI, we expect non-DT method (use_dt_domains == -1)
+> +	 * and call _SEG method for corresponding host bridge device.
+> +	 * If _SEG method does not exist, following ACPI spec (6.5.6)
+> +	 * all PCI buses belong to domain 0.
+> +	 *
+>  	 * All other combinations imply we have a platform that is trying
+> -	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
+> -	 * which is a recipe for domain mishandling and it is prevented by
+> -	 * invalidating the domain value (domain = -1) and printing a
+> -	 * corresponding error.
+> +	 * to mix domain numbers obtained from DT, ACPI and
+> +	 * pci_get_new_domain_nr(), which is a recipe for domain mishandling and
+> +	 * it is prevented by invalidating the domain value (domain = -1) and
+> +	 * printing a corresponding error.
+>  	 */
+> +
+>  	if (domain >= 0 && use_dt_domains) {
+>  		use_dt_domains = 1;
+> +#ifdef CONFIG_ACPI
+> +	} else if (!acpi_disabled && use_dt_domains == -1) {
+> +		struct acpi_device *acpi_dev = to_acpi_device(parent);
+> +		unsigned long long segment = 0;
+> +		acpi_status status;
+> +
+> +		status = acpi_evaluate_integer(acpi_dev->handle,
+> +					       METHOD_NAME__SEG, NULL,
+> +					       &segment);
+> +		if (ACPI_FAILURE(status) && status != AE_NOT_FOUND)
+> +			dev_err(&acpi_dev->dev,  "can't evaluate _SEG\n");
+> +
+> +		domain = segment;
+> +#endif
 
-v2:
-- change commit message to clarify that this is only to remove some dead
-  code
+I think you can reshuffle a bit the code to make it easier to follow.
 
- drivers/gpu/drm/rockchip/Makefile             |  3 ++-
- drivers/gpu/drm/rockchip/rockchip_drm_fbdev.h | 11 +++++++++++
- 2 files changed, 13 insertions(+), 1 deletion(-)
+How about this ? (on top of mainline, I just compiled it do not
+take it verbatim):
 
-diff --git a/drivers/gpu/drm/rockchip/Makefile b/drivers/gpu/drm/rockchip/Makefile
-index a4e03bc..f6a809a 100644
---- a/drivers/gpu/drm/rockchip/Makefile
-+++ b/drivers/gpu/drm/rockchip/Makefile
-@@ -2,8 +2,9 @@
- # Makefile for the drm device driver.  This driver provides support for the
- # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
+-- >8 --
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index d1a7105..467a316 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -7,6 +7,7 @@
+  *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
+  */
  
--rockchipdrm-y := rockchip_drm_drv.o rockchip_drm_fb.o rockchip_drm_fbdev.o \
-+rockchipdrm-y := rockchip_drm_drv.o rockchip_drm_fb.o \
- 		rockchip_drm_gem.o rockchip_drm_vop.o
-+rockchipdrm-$(CONFIG_DRM_FBDEV_EMULATION) += rockchip_drm_fbdev.o
++#include <linux/acpi.h>
+ #include <linux/kernel.h>
+ #include <linux/delay.h>
+ #include <linux/init.h>
+@@ -4769,7 +4770,27 @@ int pci_get_new_domain_nr(void)
+ }
  
- obj-$(CONFIG_ROCKCHIP_DW_HDMI) += dw_hdmi-rockchip.o
- obj-$(CONFIG_ROCKCHIP_DW_MIPI_DSI) += dw-mipi-dsi.o
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.h b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.h
-index 50432e9..73718c5 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.h
-@@ -15,7 +15,18 @@
- #ifndef _ROCKCHIP_DRM_FBDEV_H
- #define _ROCKCHIP_DRM_FBDEV_H
- 
-+#ifdef CONFIG_DRM_FBDEV_EMULATION
- int rockchip_drm_fbdev_init(struct drm_device *dev);
- void rockchip_drm_fbdev_fini(struct drm_device *dev);
-+#else
-+static inline int rockchip_drm_fbdev_init(struct drm_device *dev)
+ #ifdef CONFIG_PCI_DOMAINS_GENERIC
+-void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
++/* Feel free to add this to drivers/acpi as a helper */
++#ifdef CONFIG_ACPI
++int pci_bus_acpi_domain_nr(struct device *parent)
 +{
-+	return 0;
++	struct acpi_device *acpi_dev = to_acpi_device(parent);
++	unsigned long long segment = 0;
++	acpi_status status;
++
++	status = acpi_evaluate_integer(acpi_dev->handle,
++				       METHOD_NAME__SEG, NULL,
++				       &segment);
++	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND)
++		dev_err(&acpi_dev->dev,  "can't evaluate _SEG\n");
++
++	return segment;
++}
++#else
++int pci_bus_acpi_domain_nr(struct device *parent) { return -1; }
++#endif
++
++int pci_bus_of_domain_nr(struct device *parent)
+ {
+ 	static int use_dt_domains = -1;
+ 	int domain = of_get_pci_domain_nr(parent->of_node);
+@@ -4811,7 +4832,13 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+ 		domain = -1;
+ 	}
+ 
+-	bus->domain_nr = domain;
++	return domain;
 +}
 +
-+static inline void rockchip_drm_fbdev_fini(struct drm_device *dev)
++void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
 +{
-+}
-+#endif
- 
- #endif /* _ROCKCHIP_DRM_FBDEV_H */
--- 
-2.7.0.226.gfe986fe
++	bus->domain_nr = acpi_disabled ? pci_bus_of_domain_nr(parent) :
++					 pci_bus_acpi_domain_nr(parent);
+ }
+ #endif
+ #endif
