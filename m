@@ -1,69 +1,66 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Fri, 22 Jan 2016 00:06:11 +0900
-Subject: [PATCH v2 6/7] ARM: dts: kirkwood: split lswxl dts to linkstation
- lswsxl and lswxl
-In-Reply-To: <569FC227.2040300@gmail.com>
-References: <1453211342-25214-1-git-send-email-rogershimizu@gmail.com>
- <1453304038-28345-1-git-send-email-rogershimizu@gmail.com>
- <1453304038-28345-7-git-send-email-rogershimizu@gmail.com>
- <569FC227.2040300@gmail.com>
-Message-ID: <CAEQ9gEmBe9aUgCCOES5hhObTJ4W5-8YNDydM9E=NVxF09enoMA@mail.gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 21 Jan 2016 12:15:47 -0300
+Subject: [PATCH 0/8] rtc: max77686: Extend driver and add max77802 support
+In-Reply-To: <56A02AD4.40107@samsung.com>
+References: <1453310088-29985-1-git-send-email-javier@osg.samsung.com>
+ <56A02AD4.40107@samsung.com>
+Message-ID: <56A0F623.8000004@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 21, 2016 at 2:21 AM, Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com> wrote:
-> On 01/20/2016 04:33 PM, Roger Shimizu wrote:
->>
->> LS-WXL/WSXL are both kirkwood-6281 based 2-Bay NAS devices, which share
->> many MPP pins. However they are slightly different:
->>    - There're two red LED indicator on LS-WXL to show when HDD fails,
->>      but there's no such on LS-WSXL.
->>    - There's 4-level speed adjustable FAN on LS-WXL, but not LS-WSXL.
->>
->> So after the split, common part goes into .dtsi file:
->>    - kirkwood-linkstation.dtsi
->>    - kirkwood-linkstation-duo-6281.dtsi
->> while all rest part goes into device specific .dts file:
->>    - kirkwood-linkstation-lswsxl.dts
->>    - kirkwood-linkstation-lswxl.dts
->>
->> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
->> ---
->
-> [...]
->>
->> diff --git a/arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi
->> b/arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi
->> new file mode 100644
->> index 000000000000..47b8f185839d
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi
->> @@ -0,0 +1,185 @@
->
-> [...]
->>
->> +/ {
->> +       ocp at f1000000 {
->> +               pinctrl: pin-controller at 10000 {
->
->
-> Roger,
->
-> nice series! Mind to send another patch moving pinctrl stuff
-> and sata below to node references for both boards?
->
-> Kirkwood has &pinctrl and &sata labels, it helps to keep the bus
-> structure out of the board files. &mdio is an example for that.
->
-> I might be easier not to squash that into this series but
-> send another one later.
+Hello Krzysztof,
 
-Dear Sebastian,
+On 01/20/2016 09:48 PM, Krzysztof Kozlowski wrote:
+> On 21.01.2016 02:14, Javier Martinez Canillas wrote:
+>> Hello,
+>>
+>> On a recent disussion [0] with Krzysztof Kozlowski and Laxman Dewangan,
+>> we came to the conclusion that the max77686 and max77802 RTC are almost
+>> the same with only a few differences so there shouldn't be two separate
+>> drivers and is better to extend max77686 driver and delete rtc-max77802.
+>>
+>> By making the driver more generic, other RTC IP blocks from Maxim PMICs
+>> could be supported as well like the max77620.
+>>
+>> Patches #1 is just a trivial cleanup.
+>>
+>> Patch #2 allows to support RTCs that need a shorter delay when updating
+>> the RTC.
+>>
+>> Patch #3 adds a driver data structure to avoid hard-coding parameters
+>> specific to a certain RTC such as the needed delay and RTC register mask.
+>>
+>> Patch #4 changes the driver to use a mapping table instead of using the
+>> max77686 registers offsets directly to allow supporting RTC with other
+>> registers addresses and layout.
+>>
+>> Patch #5 Adds support for max77802 to max77686 RTC driver and patch #6
+>> removes the old driver since is not needed anymore.
+>>
+>> Finally patch #7 and patch #8 removes the Kconfig symbol from defconfigs.
+>>
+>> I've tested this patch-set on an Exynos5800 Peach Pi Chromebook that has
+>> a max77802 PMIC and the RTC was working correctly but I don't have a
+>> machine with max77686 so I will really appreaciate if someone can test
+>> that no regressions were introduced.
+>>
+>
+> Thanks for the submission. I like the approach. I'll start reviewing the
+> code and testing it... or maybe I'll wait with testing for v2 because I
+> already sent some comments. :)
+>
+> Anyway I will provide later tested-by on max77686.
+>
 
-Understand your point.
-I'll create a patch by your suggestion, when this series get committed.
-Thanks for your advice!
+Thanks a lot for your detailed review. I'll post v2 shortly so you can
+just test that.
+  
+> Best regards,
+> Krzysztof
+>
 
-Cheers,
-Roger
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
