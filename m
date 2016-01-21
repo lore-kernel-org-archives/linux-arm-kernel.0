@@ -1,111 +1,63 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 21 Jan 2016 12:19:04 +0100
-Subject: [PATCH RFC 00/15] mmc: sunxi: Support vqmmc regulator and eMMC
- DDR modes
-In-Reply-To: <1453354002-28366-1-git-send-email-wens@csie.org>
-References: <1453354002-28366-1-git-send-email-wens@csie.org>
-Message-ID: <56A0BEA8.1030901@redhat.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Thu, 21 Jan 2016 19:16:51 +0800
+Subject: [PATCH v2] ARM: zx296702-ad1: remove deprecated usage of mmc
+Message-ID: <1453375011-548-1-git-send-email-shawn.lin@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+supports-highspeed property and slot are deprecated for dw_mmc,
+this patch remove slot node and replace supports-highspeed with
+cap-sd-highspeed and cap-mmc-highspeed.
 
-On 21-01-16 06:26, Chen-Yu Tsai wrote:
-> Hi everyone,
->
-> This series adds support for vqmmc regulator and eMMC DDR modes for
-> sunxi-mmc. Allwinner's MMC controller supports eMMC 4.41 on earlier
-> SoCs, and up to 5.0 on latest ones. UHS-1 modes are also supported
-> by the hardware, but these are not covered in this series, as no
-> boards have dedicated regulators for vqmmc.
->
-> To support these faster modes, these patches adds vqmmc regulator
-> support, which is used by the mmc core to switch to faster modes,
-> even if the signaling voltage is fixed. Signal voltage switching
-> support is also added, but not tested, as no available hardware has
-> a dedicated vqmmc regulator.
->
-> Support for eMMC reset in the controller, vs a GPIO and pwrseq, is
-> also added where applicable.
+Cc: Jaehoon Chung <jh80.chung@samsung.com>
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
 
-Thanks for working on this. I've send my remarks to a few of the patches,
-the ones I've not remarked on look good to me.
+---
 
-Regards,
+Changes in v2:
+- remove slot suggested by Jaehoon
 
-Hans
+ arch/arm/boot/dts/zx296702-ad1.dts | 18 ++++++------------
+ 1 file changed, 6 insertions(+), 12 deletions(-)
 
-
->
-> Patch 1 documents the mmc host init sequence. When the driver was
-> ported, this part was copied verbatim and not documented. With inline
-> comments from later SDKs and datasheet register definitions, this part
-> is now clearer.
->
-> Patch 2 makes the .set_ios callback return on errors from
-> mmc_regulator_set_ocr.
->
-> Patch 3 adds support (enabling/disable, and voltage control) for vqmmc
-> regulator to sunxi-mmc.
->
-> Patch 4 adds support signal voltage switch for the mmc controller. The
-> Allwinner MMC controller uses a special bit for sending signal voltage
-> switching command.
->
-> Patch 5 adds timing delays for MMC_DDR52 mode.
->
-> Patch 6 adds support for 8 bit eMMC DDR52 mode. Under this mode, the
-> controller must run at twice the card clock, and different timing delays
-> are needed.
->
-> Patch 7 enables eMMC HS-DDR for sunxi-mmc.
->
-> Patch 8 adds mmc3 pins for 8 bit emmc for A31/A31s.
->
-> Patch 9 switches from mmc2 to mmc3 for the onboard eMMC on Sinlinx
-> SinA31s. According to Allwinner, only mmc3 supports eMMC DDR52 on
-> A31/A31s.
->
-> Patch 10 adds the eMMC reset pin to the emmc pingroup for A23/A33.
->
-> Patch 11 enables eMMC hardware reset and eMMC DDR52 mode for SinA33.
->
-> Patch 12 switches A80 to sun9i specific mmc compatible. A80 has different
-> timing delays, and a larger FIFO (TODO).
->
-> Patch 13 adds the eMMC reset pin to the emmc pingroup for A80.
->
-> Patch 14 enables eMMC hardware reset and eMMC DDR52 mode for A80 Optimus.
->
-> Patch 15 enables eMMC hardware reset and eMMC DDR52 mode for Cubieboard4.
->
-> Chen-Yu Tsai (15):
->    mmc: sunxi: Document host init sequence
->    mmc: sunxi: Return error on mmc_regulator_set_ocr() fail in .set_ios
->      op
->    mmc: sunxi: Block signal voltage switching (CMD11)
->    mmc: sunxi: Support vqmmc regulator
->    mmc: sunxi: Support MMC_DDR52 timing modes
->    mmc: sunxi: Support 8 bit eMMC DDR transfer modes
->    mmc: sunxi: Enable eMMC HS-DDR (MMC_CAP_1_8V_DDR) support
->    ARM: dts: sun6i: Add mmc3 pins for 8 bit emmc
->    ARM: dts: sun6i: sina31s: Switch to mmc3 for onboard eMMC
->    ARM: dts: sun8i: Include SDC2_RST pin in mmc2_8bit_pins
->    ARM: dts: sun8i: sina33: Enable hardware reset and HS-DDR for eMMC
->    ARM: dts: sun9i: Use sun9i specific mmc compatible
->    ARM: dts: sun9i: Include SDC2_RST pin in mmc2_8bit_pins
->    ARM: dts: sun9i: a80-optimus: Enable hardware reset and HS-DDR for
->      eMMC
->    ARM: dts: sun9i: cubieboard4: Enable hardware reset and HS-DDR for
->      eMMC
->
->   arch/arm/boot/dts/sun6i-a31.dtsi               | 10 +++
->   arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi |  6 +-
->   arch/arm/boot/dts/sun8i-a23-a33.dtsi           |  2 +-
->   arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts |  3 +
->   arch/arm/boot/dts/sun9i-a80-cubieboard4.dts    |  6 ++
->   arch/arm/boot/dts/sun9i-a80-optimus.dts        |  6 ++
->   arch/arm/boot/dts/sun9i-a80.dtsi               | 11 +--
->   drivers/mmc/host/sunxi-mmc.c                   | 98 +++++++++++++++++++++++---
->   8 files changed, 126 insertions(+), 16 deletions(-)
->
+diff --git a/arch/arm/boot/dts/zx296702-ad1.dts b/arch/arm/boot/dts/zx296702-ad1.dts
+index 081f980..c2ffa9d 100644
+--- a/arch/arm/boot/dts/zx296702-ad1.dts
++++ b/arch/arm/boot/dts/zx296702-ad1.dts
+@@ -19,28 +19,22 @@
+ 
+ &mmc0 {
+ 	num-slots = <1>;
+-	supports-highspeed;
++	bus-width = <4>;
++	cap-sd-highspeed;
++	cap-mmc-highspeed;
+ 	non-removable;
+ 	disable-wp;
+ 	status = "okay";
+-
+-	slot at 0 {
+-		reg = <0>;
+-		bus-width = <4>;
+-	};
+ };
+ 
+ &mmc1 {
+ 	num-slots = <1>;
+-	supports-highspeed;
++	bus-width = <8>;
++	cap-sd-highspeed;
++	cap-mmc-highspeed;
+ 	non-removable;
+ 	disable-wp;
+ 	status = "okay";
+-
+-	slot at 0 {
+-		reg = <0>;
+-		bus-width = <8>;
+-	};
+ };
+ 
+ &uart0 {
+-- 
+2.3.7
