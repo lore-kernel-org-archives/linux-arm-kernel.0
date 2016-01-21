@@ -1,42 +1,43 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 21 Jan 2016 13:26:38 +0800
-Subject: [PATCH RFC 11/15] ARM: dts: sun8i: sina33: Enable hardware reset and
- HS-DDR for eMMC
+Date: Thu, 21 Jan 2016 13:26:36 +0800
+Subject: [PATCH RFC 09/15] ARM: dts: sun6i: sina31s: Switch to mmc3 for
+ onboard eMMC
 In-Reply-To: <1453354002-28366-1-git-send-email-wens@csie.org>
 References: <1453354002-28366-1-git-send-email-wens@csie.org>
-Message-ID: <1453354002-28366-12-git-send-email-wens@csie.org>
+Message-ID: <1453354002-28366-10-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mmc2 has a special pin for eMMC hardware reset, which is controllable
-from the controller. Add the "mmc-cap-hw-reset" property to denote that
-this controller supports this function, and the pins are actually used.
-
-Also increase the signal drive strength for mmc2 pins, for HS-DDR mode
-support.
+According to Allwinner, only mmc3 supports 8 bit DDR transfers for eMMC.
+Switch to mmc3 for the onboard eMMC, and also assign vqmmc for signal
+voltage sensing/switching, and "cap-mmc-hw-reset" to denote this
+instance can use eMMC hardware reset.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-index 13ce68f06dd6..bd2a3beb4629 100644
---- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-+++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-@@ -109,10 +109,13 @@
- 	vmmc-supply = <&reg_vcc3v0>;
+diff --git a/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi b/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
+index ea69fb8ad4d8..4ec0c8679b2e 100644
+--- a/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
+@@ -61,12 +61,14 @@
+ };
+ 
+ /* eMMC on core board */
+-&mmc2 {
++&mmc3 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc2_8bit_emmc_pins>;
++	pinctrl-0 = <&mmc3_8bit_emmc_pins>;
+ 	vmmc-supply = <&reg_dcdc1>;
++	vqmmc-supply = <&reg_dcdc1>;
  	bus-width = <8>;
  	non-removable;
 +	cap-mmc-hw-reset;
  	status = "okay";
  };
  
- &mmc2_8bit_pins {
-+	/* Increase drive strength for DDR modes */
-+	allwinner,drive = <SUN4I_PINCTRL_40_MA>;
- 	/* eMMC is missing pull-ups */
- 	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- };
 -- 
 2.7.0.rc3
