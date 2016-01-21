@@ -1,75 +1,93 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 20 Jan 2016 21:08:26 -0800
-Subject: [PATCH] ARM: dts: imx6: enable pl310 "shared attribute override
- enable" bit
-In-Reply-To: <1453346938-5625-1-git-send-email-b38611@freescale.com>
-References: <1453346938-5625-1-git-send-email-b38611@freescale.com>
-Message-ID: <4df58eebc9995bcdb91f2f16b3093ed7@agner.ch>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Thu, 21 Jan 2016 13:18:57 +0800
+Subject: [PATCH v4 2/6] dt-bindings: ARM: Mediatek: Document bindings
+ for MT2701
+In-Reply-To: <20160120163236.GA21035@rob-hp-laptop>
+References: <1453271747-57397-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1453271747-57397-3-git-send-email-jamesjj.liao@mediatek.com>
+ <20160120163236.GA21035@rob-hp-laptop>
+Message-ID: <1453353537.5384.33.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+Hi Rob,
 
-On 2016-01-20 19:28, Fugang Duan wrote:
-> The default behavior of the L220 or PL310 cache controllers with respect
-> to the shareable attribute is to transform "normal memory non-cacheable
-> transactions" into "cacheable no allocate" (for reads) or "write through
-> no write allocate" (for writes).
+On Wed, 2016-01-20 at 10:32 -0600, Rob Herring wrote:
+> On Wed, Jan 20, 2016 at 02:35:43PM +0800, James Liao wrote:
+> > This patch adds the binding documentation for apmixedsys, bdpsys,
+> > ethsys, hifsys, imgsys, infracfg, mmsys, pericfg, topckgen and
+> > vdecsys for Mediatek MT2701.
+> > 
+> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> > Tested-by: John Crispin <blogic@openwrt.org>
+> > ---
+> >  .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |  1 +
+> >  .../bindings/arm/mediatek/mediatek,bdpsys.txt      | 22 ++++++++++++++++++++++
+> >  .../bindings/arm/mediatek/mediatek,ethsys.txt      | 22 ++++++++++++++++++++++
+> >  .../bindings/arm/mediatek/mediatek,hifsys.txt      | 22 ++++++++++++++++++++++
+> >  .../bindings/arm/mediatek/mediatek,imgsys.txt      |  1 +
+> >  .../bindings/arm/mediatek/mediatek,infracfg.txt    |  1 +
+> >  .../bindings/arm/mediatek/mediatek,mmsys.txt       |  1 +
+> >  .../bindings/arm/mediatek/mediatek,pericfg.txt     |  1 +
+> >  .../bindings/arm/mediatek/mediatek,topckgen.txt    |  1 +
+> >  .../bindings/arm/mediatek/mediatek,vdecsys.txt     |  1 +
+> >  10 files changed, 73 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
+> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
+> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,hifsys.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
+> > index 936166f..a701e19 100644
+> > --- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
+> > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
+> > @@ -6,6 +6,7 @@ The Mediatek apmixedsys controller provides the PLLs to the system.
+> >  Required Properties:
+> >  
+> >  - compatible: Should be:
+> > +	- "mediatek,mt2701-apmixedsys"
+> >  	- "mediatek,mt8135-apmixedsys"
+> >  	- "mediatek,mt8173-apmixedsys"
+> >  - #clock-cells: Must be 1
+> > diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
+> > new file mode 100644
+> > index 0000000..4137196
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
+> > @@ -0,0 +1,22 @@
+> > +Mediatek bdpsys controller
+> > +============================
+> > +
+> > +The Mediatek bdpsys controller provides various clocks to the system.
 > 
-> On i.MX6 series platforms, enet/audio/usb/nand DMA buffer have corruption
-> without CMA. So set this property "arm,shared-override" in L2 dts node to
-> enable "shared attribute override enable" bit.
+> As you clarified these blocks provide more that just clocks. Please list 
+> all the functions here and on the others.
 
-Do you happen to know if Vybrid could also suffer this too? Some IP's
-are the same/similar ones...
+Some blocks may provide clock and reset controller at the same time. But
+most of them will not provide functions directly. Instead, some DT
+blocks which provide specific functions may refer to these controller
+nodes due to it need to access the same register space.
 
-Did this manifest in any way?
+For example, scpsys (the power domain provider) refers to infracfg
+because it need to control infracfg registers when power on/off domains:
 
---
-Stefan
+	scpsys: scpsys at 10006000 {
+		compatible = "mediatek,mt2701-scpsys";
+		#power-domain-cells = <1>;
+		reg = <0 0x10006000 0 0x1000>;
+		infracfg = <&infracfg>;
+	};
 
+So I think it should not need to list all functions for each blocks
+here.
 
-> 
-> Signed-off-by: Fugang Duan <B38611@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6qdl.dtsi | 1 +
->  arch/arm/boot/dts/imx6sl.dtsi  | 1 +
->  arch/arm/boot/dts/imx6sx.dtsi  | 1 +
->  3 files changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index 4f6ae92..b4de39a 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -185,6 +185,7 @@
->  			cache-level = <2>;
->  			arm,tag-latency = <4 2 3>;
->  			arm,data-latency = <4 2 3>;
-> +			arm,shared-override;
->  		};
->  
->  		pcie: pcie at 0x01000000 {
-> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> index d12b250..3b80b45 100644
-> --- a/arch/arm/boot/dts/imx6sl.dtsi
-> +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> @@ -113,6 +113,7 @@
->  			cache-level = <2>;
->  			arm,tag-latency = <4 2 3>;
->  			arm,data-latency = <4 2 3>;
-> +			arm,shared-override;
->  		};
->  
->  		pmu {
-> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-> index a5f7602..42f8f3b 100644
-> --- a/arch/arm/boot/dts/imx6sx.dtsi
-> +++ b/arch/arm/boot/dts/imx6sx.dtsi
-> @@ -155,6 +155,7 @@
->  			cache-level = <2>;
->  			arm,tag-latency = <4 2 3>;
->  			arm,data-latency = <4 2 3>;
-> +			arm,shared-override;
->  		};
->  
->  		dma_apbh: dma-apbh at 01804000 {
+> > +
+> > +Required Properties:
+> > +
+> > +- compatible: Should be:
+> > +	- "mediatek,mt2701-bdpsys", "syscon"
+> > +- #clock-cells: Must be 1
+> > +
+> > +The bdpsys controller uses the common clk binding from
+> > +Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > +The available clocks are defined in dt-bindings/clock/mt*-clk.h.
+> > +
