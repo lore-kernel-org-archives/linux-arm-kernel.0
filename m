@@ -1,34 +1,34 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 21 Jan 2016 13:26:40 +0800
-Subject: [PATCH RFC 13/15] ARM: dts: sun9i: Include SDC2_RST pin in
- mmc2_8bit_pins
+Date: Thu, 21 Jan 2016 13:26:34 +0800
+Subject: [PATCH RFC 07/15] mmc: sunxi: Enable eMMC HS-DDR (MMC_CAP_1_8V_DDR)
+ support
 In-Reply-To: <1453354002-28366-1-git-send-email-wens@csie.org>
 References: <1453354002-28366-1-git-send-email-wens@csie.org>
-Message-ID: <1453354002-28366-14-git-send-email-wens@csie.org>
+Message-ID: <1453354002-28366-8-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mmc2_8bit_pins is used with eMMC chips, which also have a reset pin.
-The MMC controller also has a reset output that is supported.
+Now that clock delay settings for 8 bit DDR are correct, and vqmmc
+support is available, we can enable MMC_CAP_1_8V_DDR support. This
+enables MMC HS-DDR at up to 52 MHz, even if signal voltage switching
+is not available.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun9i-a80.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/mmc/host/sunxi-mmc.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index f4f61b02be1a..f68b3242b33a 100644
---- a/arch/arm/boot/dts/sun9i-a80.dtsi
-+++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -704,7 +704,8 @@
- 			mmc2_8bit_pins: mmc2_8bit {
- 				allwinner,pins = "PC6", "PC7", "PC8", "PC9",
- 						 "PC10", "PC11", "PC12",
--						 "PC13", "PC14", "PC15";
-+						 "PC13", "PC14", "PC15",
-+						 "PC16";
- 				allwinner,function = "mmc2";
- 				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index d05928091b34..f3a7f36e38c2 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -1145,6 +1145,7 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+ 	mmc->f_min		=   400000;
+ 	mmc->f_max		= 50000000;
+ 	mmc->caps	       |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
++				  MMC_CAP_1_8V_DDR |
+ 				  MMC_CAP_ERASE | MMC_CAP_SDIO_IRQ;
+ 
+ 	ret = mmc_of_parse(mmc);
 -- 
 2.7.0.rc3
