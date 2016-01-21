@@ -1,57 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Jan 2016 13:21:08 +0100
-Subject: [PATCH] 8250: uniphier: allow modular build with 8250 console
-In-Reply-To: <CAK7LNATVtLk6UTh+r9JTZrKq-veEXetDdRutZ_=zQOd-WyAO0g@mail.gmail.com>
-References: <3965359.aMgb8o9MaG@wuerfel>
- <CAK7LNATVtLk6UTh+r9JTZrKq-veEXetDdRutZ_=zQOd-WyAO0g@mail.gmail.com>
-Message-ID: <4548262.MV5j98YUVi@wuerfel>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 21 Jan 2016 20:23:19 +0800
+Subject: [PATCH RFC 09/15] ARM: dts: sun6i: sina31s: Switch to mmc3 for
+ onboard eMMC
+In-Reply-To: <56A0BE25.1020309@redhat.com>
+References: <1453354002-28366-1-git-send-email-wens@csie.org>
+ <1453354002-28366-10-git-send-email-wens@csie.org>
+ <56A0BE25.1020309@redhat.com>
+Message-ID: <CAGb2v64-Hx_uCHZVw61OUc-z_KvHHf7gWduwfMQq6T_1ZDtCdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 January 2016 20:39:03 Masahiro Yamada wrote:
-> 2016-01-14 7:33 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> > The recently added uniphier 8250 port driver supports early console
-> > probing, and it supports being built as a module, but the combination
-> > of the two fails to link:
-> >
-> > ERROR: "early_serial8250_setup" [drivers/tty/serial/8250/8250_uniphier.ko] undefined!
-> >
-> > Given that earlycon support in a loadable module makes no sense,
-> > making that code conditional on 'MODULE' is a correct solution.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: b8d20e06eaad ("serial: 8250_uniphier: add earlycon support")
-> >
-> > diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
-> > index bab6b3ae2540..1b7bd26555b7 100644
-> > --- a/drivers/tty/serial/8250/8250_uniphier.c
-> > +++ b/drivers/tty/serial/8250/8250_uniphier.c
-> > @@ -35,7 +35,7 @@ struct uniphier8250_priv {
-> >         spinlock_t atomic_write_lock;
-> >  };
-> >
-> > -#ifdef CONFIG_SERIAL_8250_CONSOLE
-> > +#if defined(CONFIG_SERIAL_8250_CONSOLE) && !defined(MODULE)
-> >  static int __init uniphier_early_console_setup(struct earlycon_device *device,
-> >                                                const char *options)
-> >  {
-> >
-> >
-> 
-> 
-> If my patch (https://patchwork.kernel.org/patch/8029331/) is accepted,
-> this build error will be fixed as well.  But I doubt it is accepted soon...
-> 
-> So, I am OK with this workaround to fix "make allmodconfig".
-> 
-> Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> 
+On Thu, Jan 21, 2016 at 7:16 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+> On 21-01-16 06:26, Chen-Yu Tsai wrote:
+>>
+>> According to Allwinner, only mmc3 supports 8 bit DDR transfers for eMMC.
+>> Switch to mmc3 for the onboard eMMC, and also assign vqmmc for signal
+>> voltage sensing/switching, and "cap-mmc-hw-reset" to denote this
+>> instance can use eMMC hardware reset.
+>
+>
+> This is going to need some more explanation, does this mean
+> that the old dtsi is wrong and the emmc does not work there are all ?
 
-Good point. Adding the DT maintainers to Cc. Guys, any chance of you
-picking up Masahiro's patch for 4.5?
+mmc2 works fine for either 4 bit SDR/DDR or 8 bit SDR only. It does
+not work for 8 bit DDR. I actually tested all the above combinations.
 
-It can't hurt to have both patches merged, so it would still be good
-to have mine in the serial driver fixes, but we can live with either
-of the two to fix the build.
+Also see https://groups.google.com/d/msg/linux-sunxi/pMzwMWwLALw/6WGgCN1eAQAJ
 
-	Arnd
+About old DTs not working:
+
+a) The old DT will not work with the mmc patches, as it will try 8 bit DDR
+   and fail. Also, the old DT does not use the highest drive strength for
+   the mmc pins, meaning it might not work for the other chip families.
+
+b) Old DT + old kernel works fine (8 bit high-speed), just slower.
+
+An alternative would be to drop MMC_CAP_1_8V_DDR from the driver, and
+use the "mmc-ddr-1_8v" DT capability flag at the dtsi or board level.
+There's no real way to describe "don't use 8 bit with MMC DDR" in the DT.
+
+
+Regards
+ChenYu
+
+>
+> Regards,
+>
+> Hans
+>
+>
+>
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>   arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi | 6 ++++--
+>>   1 file changed, 4 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
+>> b/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
+>> index ea69fb8ad4d8..4ec0c8679b2e 100644
+>> --- a/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
+>> +++ b/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
+>> @@ -61,12 +61,14 @@
+>>   };
+>>
+>>   /* eMMC on core board */
+>> -&mmc2 {
+>> +&mmc3 {
+>>         pinctrl-names = "default";
+>> -       pinctrl-0 = <&mmc2_8bit_emmc_pins>;
+>> +       pinctrl-0 = <&mmc3_8bit_emmc_pins>;
+>>         vmmc-supply = <&reg_dcdc1>;
+>> +       vqmmc-supply = <&reg_dcdc1>;
+>>         bus-width = <8>;
+>>         non-removable;
+>> +       cap-mmc-hw-reset;
+>>         status = "okay";
+>>   };
+>>
+>>
+>
