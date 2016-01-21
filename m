@@ -1,176 +1,77 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 21 Jan 2016 09:38:17 +0100
-Subject: [PATCH v2 3/4] ARM: dts: rockchip: add syscon-reboot-mode node
-In-Reply-To: <1452598378-8371-1-git-send-email-andy.yan@rock-chips.com>
-References: <1452598029-8222-1-git-send-email-andy.yan@rock-chips.com>
- <1452598378-8371-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <56A098F9.5020100@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 21 Jan 2016 09:38:21 +0100
+Subject: [PATCH 1/2] ARM: dts: r8a7793: add CAN clocks
+In-Reply-To: <1453352981-16104-2-git-send-email-horms+renesas@verge.net.au>
+References: <1453352981-16104-1-git-send-email-horms+renesas@verge.net.au>
+ <1453352981-16104-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdX5sZ7yNjgu8Ns26+91+ui2YuVfGavJi_XRa6Kd-yzoBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Simon,
 
-
-On 12/01/16 12:32, Andy Yan wrote:
-> Rockchip platform use a SYSCON mapped register store
-> the reboot mode magic value for bootloader to use when
-> system reboot. So add syscon-reboot-mode driver DT node
-> for rk3xxx,rk3288 platform
+On Thu, Jan 21, 2016 at 6:09 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> The R-Car CAN controllers can derive the CAN bus clock not only from their
+> peripheral clock input (clkp1) but also from the other internal clock
+> (clkp2) and external clock fed on CAN_CLK pin. Describe those clocks in
+> the device tree along with  the USB_EXTAL clock from which clkp2 is
+> derived.
 >
-> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> Based on work by Sergei Shtylyov for the r8a7791 SoC.
 >
+> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > ---
+>  arch/arm/boot/dts/r8a7793.dtsi | 20 +++++++++++++++++++-
+>  1 file changed, 19 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+> index 0ce7cc420c9d..5d9375fa6759 100644
+> --- a/arch/arm/boot/dts/r8a7793.dtsi
+> +++ b/arch/arm/boot/dts/r8a7793.dtsi
+> @@ -706,12 +706,30 @@
+>                         clock-output-names = "extal";
+>                 };
+>
+> +               /* External USB clock - can be overridden by the board */
+> +               usb_extal_clk: usb_extal_clk {
+> +                       compatible = "fixed-clock";
+> +                       #clock-cells = <0>;
+> +                       clock-frequency = <48000000>;
+> +                       clock-output-names = "usb_extal";
+> +               };
+> +
+> +               /* External CAN clock */
+> +               can_clk: can_clk {
+> +                       compatible = "fixed-clock";
+> +                       #clock-cells = <0>;
+> +                       /* This value must be overridden by the board. */
+> +                       clock-frequency = <0>;
+> +                       clock-output-names = "can_clk";
+> +                       status = "disabled";
+> +               };
+> +
+>                 /* Special CPG clocks */
+>                 cpg_clocks: cpg_clocks at e6150000 {
+>                         compatible = "renesas,r8a7793-cpg-clocks",
+>                                      "renesas,rcar-gen2-cpg-clocks";
+>                         reg = <0 0xe6150000 0 0x1000>;
+> -                       clocks = <&extal_clk>;
+> +                       clocks = <&extal_clk &usb_extal_clk>;
+>                         #clock-cells = <1>;
+>                         clock-output-names = "main", "pll0", "pll1", "pll3",
+>                                              "lb", "qspi", "sdh", "sd0", "z",
 
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+To create the "rcan" clock, it should be listed in clock-output-names.
 
->
-> Changes in v2:
-> - make this node as a subnode of PMU
->
-> Changes in v1:
-> - correct the maskrom magic number
-> - use macro defined in rockchip_boot-mode.h for reboot-mode DT node
->
->   arch/arm/boot/dts/rk3288.dtsi                | 31 ++++++++++++++++++++++++++
->   arch/arm/boot/dts/rk3xxx.dtsi                | 33 +++++++++++++++++++++++++++-
->   include/dt-bindings/soc/rockchip_boot-mode.h | 30 +++++++++++++++++++++++++
->   3 files changed, 93 insertions(+), 1 deletion(-)
->   create mode 100644 include/dt-bindings/soc/rockchip_boot-mode.h
->
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index 04ea209..4e49fb7 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -45,6 +45,7 @@
->   #include <dt-bindings/clock/rk3288-cru.h>
->   #include <dt-bindings/thermal/thermal.h>
->   #include <dt-bindings/power/rk3288-power.h>
-> +#include <dt-bindings/soc/rockchip_boot-mode.h>
->   #include "skeleton.dtsi"
->
->   / {
-> @@ -712,6 +713,36 @@
->   				clocks = <&cru ACLK_GPU>;
->   			};
->   		};
-> +
-> +		reboot-mode {
-> +			compatible = "syscon-reboot-mode";
-> +			offset = <0x94>;
-> +
-> +			normal {
-> +				linux,mode = "normal";
-> +				loader,magic = <BOOT_NORMAL>;
-> +			};
-> +
-> +			loader {
-> +				linux,mode = "loader";
-> +				loader,magic = <BOOT_LOADER>;
-> +			};
-> +
-> +			maskrom {
-> +				linux,mode = "maskrom";
-> +				loader,magic = <BOOT_MASKROM>;
-> +			};
-> +
-> +			recovery {
-> +				linux,mode = "recovery";
-> +				loader,magic = <BOOT_RECOVERY>;
-> +			};
-> +
-> +			fastboot {
-> +				linux,mode = "fastboot";
-> +				loader,magic = <BOOT_FASTBOOT>;
-> +			};
-> +		};
->   	};
->
->   	sgrf: syscon at ff740000 {
-> diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
-> index 4497d28..58af546 100644
-> --- a/arch/arm/boot/dts/rk3xxx.dtsi
-> +++ b/arch/arm/boot/dts/rk3xxx.dtsi
-> @@ -43,6 +43,7 @@
->
->   #include <dt-bindings/interrupt-controller/irq.h>
->   #include <dt-bindings/interrupt-controller/arm-gic.h>
-> +#include <dt-bindings/soc/rockchip_boot-mode.h>
->   #include "skeleton.dtsi"
->
->   / {
-> @@ -242,8 +243,38 @@
->   	};
->
->   	pmu: pmu at 20004000 {
-> -		compatible = "rockchip,rk3066-pmu", "syscon";
-> +		compatible = "rockchip,rk3066-pmu", "syscon", "simple-mfd";
->   		reg = <0x20004000 0x100>;
-> +
-> +		reboot-mode {
-> +			compatible = "syscon-reboot-mode";
-> +			offset = <0x40>;
-> +
-> +			normal {
-> +				linux,mode = "normal";
-> +				loader,magic = <BOOT_NORMAL>;
-> +			};
-> +
-> +			loader {
-> +				linux,mode = "loader";
-> +				loader,magic = <BOOT_LOADER>;
-> +			};
-> +
-> +			maskrom {
-> +				linux,mode = "maskrom";
-> +				loader,magic = <BOOT_MASKROM>;
-> +			};
-> +
-> +			recovery {
-> +				linux,mode = "recovery";
-> +				loader,magic = <BOOT_RECOVERY>;
-> +			};
-> +
-> +			fastboot {
-> +				linux,mode = "fastboot";
-> +				loader,magic = <BOOT_FASTBOOT>;
-> +			};
-> +		};
->   	};
->
->   	grf: grf at 20008000 {
-> diff --git a/include/dt-bindings/soc/rockchip_boot-mode.h b/include/dt-bindings/soc/rockchip_boot-mode.h
-> new file mode 100644
-> index 0000000..eedf113
-> --- /dev/null
-> +++ b/include/dt-bindings/soc/rockchip_boot-mode.h
-> @@ -0,0 +1,30 @@
-> +#ifndef __ROCKCHIP_BOOT_MODE_H
-> +#define __ROCKCHIP_BOOT_MODE_H
-> +
-> +/*high 24 bits is tag, low 8 bits is type*/
-> +#define	REBOOT_FLAG		0x5242C300
-> +/* normal boot */
-> +#define	BOOT_NORMAL		(REBOOT_FLAG + 0)
-> +/* enter loader rockusb mode */
-> +#define	BOOT_LOADER		(REBOOT_FLAG + 1)
-> +/* enter maskrom rockusb mode */
-> +#define	BOOT_MASKROM		(0xEF08A53C)
-> +/* enter recovery */
-> +#define	BOOT_RECOVERY		(REBOOT_FLAG + 3)
-> +/* do not enter recover */
-> +#define	BOOT_NORECOVER		(REBOOT_FLAG + 4)
-> +/* boot second OS*/
-> +#define	BOOT_SECONDOS		(REBOOT_FLAG + 5)
-> +/* enter recover and wipe data. */
-> +#define	BOOT_WIPEDATA		(REBOOT_FLAG + 6)
-> +/* enter recover and wipe all data. */
-> +#define	BOOT_WIPEALL		(REBOOT_FLAG + 7)
-> +/* check firmware img with backup part*/
-> +#define	BOOT_CHECKIMG		(REBOOT_FLAG + 8)
-> + /* enter fast boot mode */
-> +#define	BOOT_FASTBOOT		(REBOOT_FLAG + 9)
-> +#define	BOOT_SECUREBOOT_DISABLE	(REBOOT_FLAG + 10)
-> +/* enter charge mode */
-> +#define	BOOT_CHARGING		(REBOOT_FLAG + 11)
-> +
-> +#endif
->
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
