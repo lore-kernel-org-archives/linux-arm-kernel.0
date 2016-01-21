@@ -1,83 +1,62 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 21 Jan 2016 13:02:17 +0000
-Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
-In-Reply-To: <56A06FF3.8050706@linaro.org>
-References: <569DCB30.9010501@linaro.org>
- <20160119122848.GA2904@dhcp-128-65.nay.redhat.com>
- <20160119125114.GH25024@leverpostej>
- <20160119134553.GA2986@dhcp-128-65.nay.redhat.com>
- <20160119140139.GC26545@leverpostej> <569F1A33.4000208@linaro.org>
- <20160120120257.GD25829@leverpostej>
- <20160120123620.GE25829@leverpostej>
- <CAKv+Gu9pVAWWRyM+oTpzGUCdeuMXkdnz5cAJnZk3jfE9uKVREw@mail.gmail.com>
- <56A06FF3.8050706@linaro.org>
-Message-ID: <20160121130217.GF2581@leverpostej>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 21 Jan 2016 14:22:56 +0100
+Subject: RCU lockup? (was: Re: [PATCH v2 tip/core/rcu 10/14] rcu: Don't
+ redundantly disable irqs in rcu_irq_{enter,exit}())
+Message-ID: <CAMuHMdWz0U-uUs1Ox_13YOA0AfVPTx24nTA3=hx5Z5kcHr8SbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 21, 2016 at 02:43:15PM +0900, AKASHI Takahiro wrote:
-> On 01/20/2016 11:59 PM, Ard Biesheuvel wrote:
-> >On 20 January 2016 at 13:36, Mark Rutland <mark.rutland@arm.com> wrote:
-> >>Ard, Ganapatrao, the below is something we need to consider for the
-> >>combination of the NUMA & kexec approaches. It only becomes a problem
-> >>if/when we preserve DT memory nodes in the presence of EFI, though it
-> >>would be nice to not box ourselves into a corner.
-> >>
-> >>On Wed, Jan 20, 2016 at 12:02:58PM +0000, Mark Rutland wrote:
-> >>>On Wed, Jan 20, 2016 at 02:25:07PM +0900, AKASHI Takahiro wrote:
-> >>>>On 01/19/2016 11:01 PM, Mark Rutland wrote:
-> >>>>>For NUMA topology in !ACPI kernels, we might need to also retain and
-> >>>>>parse memory nodes, but only for toplogy information. The kernel would
-> >>>>>still only use memory as described by the EFI memory map.
-> >>>>>
-> >>>>>There's a horrible edge case I've spotted if performing a chain of
-> >>>>>cross-endian kexecs: LE -> BE -> LE, as the BE kernel would have to
-> >>>>>respect the EFI memory map so as to avoid corrupting it for the
-> >>>>>subsequent LE kernel. Other than this I believe everything should just
-> >>>>>work.
-> >>>>
-> >>>>BE kernel doesn't support UEFI yet and cannot access UEFI memmap table. So,
-> >>>>for LE -> BE, we don't use a dtb generated from /sys/firmware/fdt (or /proc/device-tree)
-> >>>>(as in the case of LE -> LE) and require users to provide a dtb file explicitly.
-> >>>
-> >>>As I mentioned above, the problem exists when memory nodes also exist
-> >>>(for describing NUMA topology). In that case the BE kernel would try to
-> >>>use the information from the memory nodes.
-> >>>
-> >>>>For BE -> LE, BE kernel doesn't know wther UEFI memmap table is available or not
-> >>>>and so use the same (explicitly-provided) dtb (as LE -> LE in !UEFI)
-> >>>
-> >>>See above. The problem I imagine is:
-> >>>
-> >>>LE kernel - uses EFI mmap, takes NUMA information from DT memory nodes
-> >>>
-> >>>     v       kexec
-> >>>
-> >>>BE kernel - uses DT memory nodes
-> >>>           - clobbers EFI runtime regions as it sees them as available
-> >>>
-> >>>     v       kexec
-> >>>
-> >>>LE kernel - uses EFI mmap, takes NUMA information from DT memory nodes
-> >>>           - tries to call EFI runtime services, and explodes.
-> >>
-> >>I'm not really sure what the best approach is here, but I thought that
-> >>it would be good to raise awareness of the edge-case.
-> >>
-> >
-> >I think we should simply allow the BE kernel to deal with a UEFI
-> >memory map. It only involves a bit of byte swapping (which I already
-> >implemented at some point)
-> 
-> Just from my curiosity,
-> will runtime services be also available on BE kernel with LE uefi?
+Hi Paul,
 
-It may be possible to implement that (I recall that Ard had a go), but
-that's far more complicated than simply supporting the EFI memory map,
-as you need separate (endian-swapped) page tables and other data
-structures, lose the ability to handle exceptions, etc.
+On Thu, Dec 10, 2015 at 12:10 AM, Paul E. McKenney
+<paulmck@linux.vnet.ibm.com> wrote:
+> This commit replaces a local_irq_save()/local_irq_restore() pair with
+> a lockdep assertion that interrupts are already disabled.  This should
+> remove the corresponding overhead from the interrupt entry/exit fastpaths.
+>
+> This change was inspired by the fact that Iftekhar Ahmed's mutation
+> testing showed that removing rcu_irq_enter()'s call to local_ird_restore()
+> had no effect, which might indicate that interrupts were always enabled
+> anyway.
+>
+> Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> ---
+>  include/linux/rcupdate.h   |  4 ++--
+>  include/linux/rcutiny.h    |  8 ++++++++
+>  include/linux/rcutree.h    |  2 ++
+>  include/linux/tracepoint.h |  4 ++--
+>  kernel/rcu/tree.c          | 32 ++++++++++++++++++++++++++------
+>  5 files changed, 40 insertions(+), 10 deletions(-)
 
-All that's suggested above is supporting the memory map.
+This commit (7c9906ca5e582a773fff696975e312cef58a7386) is triggering lock ups
+during boot on r8a7791/koelsch (dual Cortex A15). Probably this commit does not
+contain the real bug, but a symptom.
 
-Thanks,
-Mark.
+Unfortunately I cannot reproduce it with CONFIG_PROVE_RCU=y.
+
+I started seeing the issue when disabling an innocent option in
+shmobile_defconfig. I tracked it down to the removal of an unused C function,
+containing hardware support for another system. Replacing the C function by
+a dummy function with the right number of "asm("nop")"s (depending on kernel
+version and/or kernel config, sigh) made the issue go away.
+Adding or removing nops makes the issue reappear, and has some impact on
+how early the issue happens (sometimes as late as early userspace).
+Adding a multiple of 16 nops has no impact.
+So it looks like something that should be cacheline-aligned isn't...
+
+CONFIG_TREE_RCU=y
+
+Do you have a suggestion?
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
