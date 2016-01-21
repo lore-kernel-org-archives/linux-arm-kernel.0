@@ -1,46 +1,39 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Thu, 21 Jan 2016 10:34:53 +0800
-Subject: [PATCH] serial: amba-pl011: mark vendor_zte as __maybe_unused
-In-Reply-To: <1973012.CU51qOk9Kt@wuerfel>
-References: <1973012.CU51qOk9Kt@wuerfel>
-Message-ID: <CABymUCMwgcEHDBEHCy=4E2bLbDdqQ+KO3ijB0Rz-m0uczWne7Q@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 21 Jan 2016 11:41:12 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.5
+Message-ID: <cover.1453343917.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-01-20 18:40 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> The pl011 driver has gone back and forth on the definition of the
-> ZTE specific variation of the hardware definitions, but the
-> current state is that the vendor definition is left in place
-> yet unused:
->
-> drivers/tty/serial/amba-pl011.c:190:27: warning: 'vendor_zte' defined but not used [-Wunused-variable]
->
-> I don't know what the plan forward is to get this code to work,
-> but the current behavior is a bit annoying as we get a warning
-> whenever we build this driver.
->
-> This patch does not help us to make it work, but at least
-> shuts up the warning.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 7ec758718920 ("tty: amba-pl011: add support for ZTE UART (EXPERIMENTAL)")
->
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index c0da0ccbbcf5..4cdfe8f806df 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -187,7 +187,7 @@ static const u16 pl011_zte_offsets[REG_ARRAY_SIZE] = {
->         [REG_DMACR] = ZX_UART011_DMACR,
->  };
->
-> -static struct vendor_data vendor_zte = {
-> +static struct vendor_data vendor_zte __maybe_unused = {
->         .reg_offset             = pl011_zte_offsets,
->         .access_32b             = true,
->         .ifls                   = UART011_IFLS_RX4_8|UART011_IFLS_TX4_8,
->
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Thanks for handling this. I am OK with the patch. Will prepare a patch
-to make ZTE uart work after Timur's pending pl011 patch is merged.
+Please consider these Renesas ARM based SoC fixes for v4.5.
 
-Jun
+This corrects the extal1 frequency on the armadillo800eva board.
+This problem seems to have been around for a while and I would
+like it considered for stable.
+
+
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.5
+
+for you to fetch changes up to c61f30a255550bbfc6b83c1ca720661489cac4c0:
+
+  ARM: dts: armadillo800eva Correct extal1 frequency to 24 MHz (2016-01-18 11:17:49 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Fixes for v4.5
+
+Correct extal1 frequency of armadillo800eva board
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: dts: armadillo800eva Correct extal1 frequency to 24 MHz
+
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
