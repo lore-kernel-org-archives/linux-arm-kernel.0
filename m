@@ -1,61 +1,54 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 21 Jan 2016 13:26:39 +0800
-Subject: [PATCH RFC 12/15] ARM: dts: sun9i: Use sun9i specific mmc compatible
+Date: Thu, 21 Jan 2016 13:26:28 +0800
+Subject: [PATCH RFC 01/15] mmc: sunxi: Document host init sequence
 In-Reply-To: <1453354002-28366-1-git-send-email-wens@csie.org>
 References: <1453354002-28366-1-git-send-email-wens@csie.org>
-Message-ID: <1453354002-28366-13-git-send-email-wens@csie.org>
+Message-ID: <1453354002-28366-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun9i/A80 MMC controllers have a larger FIFO, and the FIFO DMA
-trigger levels can be increased. Also, the mmc module clock parent
-has a higher clock rate, and the sample and output delay phases
-are different.
+sunxi_mmc_init_host() originated from Allwinner kernel sources. The
+magic numbers written to various registers was never documented.
+
+Add comments for values found in Allwinner user manuals.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun9i-a80.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/mmc/host/sunxi-mmc.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index e838f206f2a0..f4f61b02be1a 100644
---- a/arch/arm/boot/dts/sun9i-a80.dtsi
-+++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -543,7 +543,7 @@
- 		};
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index 83de82bceafc..cce5ca540857 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -284,16 +284,28 @@ static int sunxi_mmc_init_host(struct mmc_host *mmc)
+ 	if (sunxi_mmc_reset_host(host))
+ 		return -EIO;
  
- 		mmc0: mmc at 01c0f000 {
--			compatible = "allwinner,sun5i-a13-mmc";
-+			compatible = "allwinner,sun9i-a80-mmc";
- 			reg = <0x01c0f000 0x1000>;
- 			clocks = <&mmc_config_clk 0>, <&mmc0_clk 0>,
- 				 <&mmc0_clk 1>, <&mmc0_clk 2>;
-@@ -557,7 +557,7 @@
- 		};
++	/*
++	 * Burst 8 transfers, RX trigger level: 7, TX trigger level: 8
++	 *
++	 * TODO: sun9i has a larger FIFO and supports higher trigger values
++	 */
+ 	mmc_writel(host, REG_FTRGL, 0x20070008);
++	/* Maximum timeout value */
+ 	mmc_writel(host, REG_TMOUT, 0xffffffff);
++	/* Unmask SDIO interrupt if needed */
+ 	mmc_writel(host, REG_IMASK, host->sdio_imask);
++	/* Clear all pending interrupts */
+ 	mmc_writel(host, REG_RINTR, 0xffffffff);
++	/* Debug register? undocumented */
+ 	mmc_writel(host, REG_DBGC, 0xdeb);
++	/* Enable CEATA support */
+ 	mmc_writel(host, REG_FUNS, SDXC_CEATA_ON);
++	/* Set DMA descriptor list base address */
+ 	mmc_writel(host, REG_DLBA, host->sg_dma);
  
- 		mmc1: mmc at 01c10000 {
--			compatible = "allwinner,sun5i-a13-mmc";
-+			compatible = "allwinner,sun9i-a80-mmc";
- 			reg = <0x01c10000 0x1000>;
- 			clocks = <&mmc_config_clk 1>, <&mmc1_clk 0>,
- 				 <&mmc1_clk 1>, <&mmc1_clk 2>;
-@@ -571,7 +571,7 @@
- 		};
+ 	rval = mmc_readl(host, REG_GCTRL);
+ 	rval |= SDXC_INTERRUPT_ENABLE_BIT;
++	/* Undocumented, but found in Allwinner code */
+ 	rval &= ~SDXC_ACCESS_DONE_DIRECT;
+ 	mmc_writel(host, REG_GCTRL, rval);
  
- 		mmc2: mmc at 01c11000 {
--			compatible = "allwinner,sun5i-a13-mmc";
-+			compatible = "allwinner,sun9i-a80-mmc";
- 			reg = <0x01c11000 0x1000>;
- 			clocks = <&mmc_config_clk 2>, <&mmc2_clk 0>,
- 				 <&mmc2_clk 1>, <&mmc2_clk 2>;
-@@ -585,7 +585,7 @@
- 		};
- 
- 		mmc3: mmc at 01c12000 {
--			compatible = "allwinner,sun5i-a13-mmc";
-+			compatible = "allwinner,sun9i-a80-mmc";
- 			reg = <0x01c12000 0x1000>;
- 			clocks = <&mmc_config_clk 3>, <&mmc3_clk 0>,
- 				 <&mmc3_clk 1>, <&mmc3_clk 2>;
 -- 
 2.7.0.rc3
