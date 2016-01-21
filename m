@@ -1,27 +1,49 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 21 Jan 2016 19:42:34 +0100
-Subject: 4.5-rc0: n900 battery charging reverts to 100mA, indicator turns
- back on
-Message-ID: <20160121184234.GA17679@amd>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 21 Jan 2016 20:11:45 +0100
+Subject: [PATCH v12.1 07/17] drm: rockchip: dp: add rockchip platform dp
+ driver
+In-Reply-To: <1453197893-13413-1-git-send-email-ykk@rock-chips.com>
+References: <1450873538-18304-1-git-send-email-ykk@rock-chips.com>
+ <1453197893-13413-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <7132332.jmLRiUjx3U@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Yakir,
 
-In 4.4, n900 battery charging works. If indicator is turned off, it
-stays off, and if I select 1.8A charge, it sticks. (There may be
-problems after system suspend and resume. But normal operation seems
-to be pretty reliable).
+Am Dienstag, 19. Januar 2016, 18:04:53 schrieb Yakir Yang:
+> Rockchip have three clocks for dp controller, we leave pclk_edp
+> to analogix_dp driver control, and keep the sclk_edp_24m and
+> sclk_edp in platform driver.
+> 
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> ---
 
-In 4.5-rc0 (7fdec82af6a9e190e53d07a1463d2a9ac49a8750) battery charging
-works for few hours. But then indicator (yellow light on 3color LED)
-turns back on, and if I ask for 1.8A charge, it goes back to .1A,
-discharging battery.
+[...]
 
-Any ideas?
+> +static int rockchip_dp_drm_create_encoder(struct rockchip_dp_device *dp)
+> +{
+> +	struct drm_encoder *encoder = &dp->encoder;
+> +	struct drm_device *drm_dev = dp->drm_dev;
+> +	struct device *dev = dp->dev;
+> +	int ret;
+> +
+> +	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm_dev,
+> +							     dev->of_node);
+> +	DRM_DEBUG_KMS("possible_crtcs = 0x%x\n", encoder->possible_crtcs);
+> +
+> +	ret = drm_encoder_init(drm_dev, encoder, &rockchip_dp_encoder_funcs,
+> +			       DRM_MODE_ENCODER_TMDS);
 
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+should be
++			       DRM_MODE_ENCODER_TMDS, NULL);
+
+Exynos-side seems to be ok though.
+
+With the adapted v12.1 patches it applies cleanly and display is working as 
+well. So with the thing above fixed, you could resubmit a full v13, 
+especially as you want to drop patch 16 as discussed there.
+
+
+Heiko
