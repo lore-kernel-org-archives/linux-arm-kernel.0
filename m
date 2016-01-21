@@ -1,67 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 21 Jan 2016 13:01:17 -0800
-Subject: [PATCH] ARM: omap2plus_defconfig: Enable ARM_KERNMEM_PERMS and few
- loadable modules
-Message-ID: <1453410077-17024-1-git-send-email-tony@atomide.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 21 Jan 2016 22:14:48 +0100
+Subject: 4.5-rc0: n900 battery charging reverts to 100mA, indicator turns
+ back on
+In-Reply-To: <20160121194126.GB13448@amd>
+References: <20160121184234.GA17679@amd> <20160121191525.GA26215@earth>
+ <20160121194126.GB13448@amd>
+Message-ID: <20160121211447.GA4984@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With recent omap assembly fixes for CONFIG_DEBUG_RODATA, we can
-now use DEBUG_RODATA. Let's enable ARM_KERNMEM_PERMS so that
-DEBUG_RODATA gets selected by default. This way we can make sure
-any related issues are caught early.
+Hi,
 
-And while testing things on various devices, I noticed we're
-missing few loadable modules to make things more usable:
+On Thu, Jan 21, 2016 at 08:41:26PM +0100, Pavel Machek wrote:
+> Hmm. It looks like 7fdec82af6a does not yet contain 88025632515a. Let
+> me try to add that fix, instead...
 
-- USB Ethernet for smsc75xx, we only have smsc97xx right now
+Right, your checkout does not contain the power supply
+pull request. I think it's unlikely, that the patch will
+fix your issue.
 
-- Basic USB serial drivers for things like ftdi and pl2303 ports
+Since there are no other power supply changes between 4.4 and your
+checkout, the next most likely candidate is the usb tree (which has
+been merged before the commit you mentioned).
 
-- Blinking leds with pca963x
+> > P.S.: No need to Cc me two times and when you update your
+> > script/contacts, please use sre at kernel.org :)
+> 
+> Address book updated :-)
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/configs/omap2plus_defconfig | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Thanks.
 
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -50,6 +50,7 @@ CONFIG_SOC_AM33XX=y
- CONFIG_SOC_AM43XX=y
- CONFIG_SOC_DRA7XX=y
- CONFIG_ARM_THUMBEE=y
-+CONFIG_ARM_KERNMEM_PERMS=y
- CONFIG_ARM_ERRATA_411920=y
- CONFIG_ARM_ERRATA_430973=y
- CONFIG_SMP=y
-@@ -177,6 +178,7 @@ CONFIG_TI_CPTS=y
- CONFIG_AT803X_PHY=y
- CONFIG_SMSC_PHY=y
- CONFIG_USB_USBNET=m
-+CONFIG_USB_NET_SMSC75XX=m
- CONFIG_USB_NET_SMSC95XX=m
- CONFIG_USB_ALI_M5632=y
- CONFIG_USB_AN2720=y
-@@ -354,6 +356,11 @@ CONFIG_USB_MUSB_DSPS=m
- CONFIG_USB_INVENTRA_DMA=y
- CONFIG_USB_TI_CPPI41_DMA=y
- CONFIG_USB_DWC3=m
-+CONFIG_USB_SERIAL=m
-+CONFIG_USB_SERIAL_GENERIC=y
-+CONFIG_USB_SERIAL_SIMPLE=m
-+CONFIG_USB_SERIAL_FTDI_SIO=m
-+CONFIG_USB_SERIAL_PL2303=m
- CONFIG_USB_TEST=m
- CONFIG_AM335X_PHY_USB=y
- CONFIG_USB_GADGET=m
-@@ -387,6 +394,7 @@ CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=m
- CONFIG_LEDS_GPIO=m
- CONFIG_LEDS_PWM=m
-+CONFIG_LEDS_PCA963X=m
- CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_TIMER=m
- CONFIG_LEDS_TRIGGER_ONESHOT=m
--- 
-2.7.0.rc3
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160121/52841701/attachment.sig>
