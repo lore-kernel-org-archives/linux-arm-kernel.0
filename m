@@ -1,81 +1,53 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 21 Jan 2016 17:18:07 +0100
-Subject: [PATCH v3 0/7] ARM: dts: kirkwood: fixes and split of linkstation
- dts for ls-wvl/vl and ls-wxl/wsxl
-In-Reply-To: <CAEQ9gEkVXWr2cvMVqp+9=J+F3iuer0eygnb_LkDAdAOPz55Bmw@mail.gmail.com>
- (Roger Shimizu's message of "Fri, 22 Jan 2016 01:05:28 +0900")
-References: <1453211342-25214-1-git-send-email-rogershimizu@gmail.com>
- <1453387130-6914-1-git-send-email-rogershimizu@gmail.com>
- <87d1suhqh8.fsf@free-electrons.com>
- <CAEQ9gEkVXWr2cvMVqp+9=J+F3iuer0eygnb_LkDAdAOPz55Bmw@mail.gmail.com>
-Message-ID: <878u3ihpog.fsf@free-electrons.com>
+From: treding@nvidia.com (Thierry Reding)
+Date: Thu, 21 Jan 2016 17:20:37 +0100
+Subject: [PATCH v3 3/5] soc: rockchip: add reboot notifier driver
+In-Reply-To: <2250962.OgUpqMgY4k@wuerfel>
+References: <1447840044-19689-1-git-send-email-andy.yan@rock-chips.com>
+ <15127971.1juVbocOjP@wuerfel>
+ <20151228092054.GA29195@ulmo.nvidia.com>
+ <2250962.OgUpqMgY4k@wuerfel>
+Message-ID: <20160121162035.GG647@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
- 
- On jeu., janv. 21 2016, Roger Shimizu <rogershimizu@gmail.com> wrote:
+On Mon, Dec 28, 2015 at 04:35:46PM +0100, Arnd Bergmann wrote:
+> On Monday 28 December 2015 10:20:56 Thierry Reding wrote:
+> > > > > HTC apparently uses a separate RAM area to pass the reboot reason,
+> > > > > and they have a driver to store that, which is separate from the
+> > > > > driver that they use for actually rebooting the machine.
+> > > > 
+> > > > I wasn't very clear, but the PMC_SCRATCH0 register is used to store the
+> > > > reset reason. It supports the recovery mode, which I think is really an
+> > > > Android thing, "bootloader" will typically cause the bootloader not to
+> > > > boot anything, and "forced-recovery" will go into a recovery mode that
+> > > > is used to bootstrap the device (usually by uploading a "miniloader"
+> > > > that initializes RAM, downloads a bootloader for booting or flashing an
+> > > > operating system, ...).
+> > > > 
+> > > > The write that resets the SoC is to a different register.
+> > > 
+> > > So is this scratch register interpreted by some maskrom code, or by code that
+> > > can be provided by the OEM?
+> > 
+> > My understanding is that its interpreted both by what's called BootROM
+> > on Tegra (I guess that's what you call "maskrom code") and the system's
+> > bootloader. The BootROM cannot typically be replaced by the OEM, but it
+> > is quite typical for the bootloader to differ between devices.
+> 
+> Ok, so not maskrom (which would not be OEM specific, but hardcoded for
+> the chip) but rather some form of PROM. This means we can only guess
+> that all OEMs use the same protocol but in theory someone could have
+> implemented an incompatible BootROM, but it's also possible that HTC
+> just ignore the register entirely and implement the same thing separately.
 
-> On Fri, Jan 22, 2016 at 1:00 AM, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
->> Hi Roger,
->>
->>  On jeu., janv. 21 2016, Roger Shimizu <rogershimizu@gmail.com> wrote:
->>
->>> Dear kirkwood maintainers,
->>>
->>> Linkstation dts for ls-wxl and ls-wvl need some fixes:
->>>   - [patch 1/7] and [patch 2/7] are fixes for gpio pin
->>>   - [patch 3/7] and [patch 4/7] are fixes for gpio led
->>> Above 4 patches can be safely backported to 4.3/4.4 stable kernel.
->>>
->>> And in order to support more buffalo linkstation devices in convenient way,
->>> I split current 2 dts files into a few comoon dtsi files and device specific
->>> dts files.
->>>   - [patch 5/7] relicense dts under GPLv2/X11
->>>   - [patch 6/7] split dts for lswxl
->>>   - [patch 7/7] split dts for lswvl
->>>
->>> Changes in v2:
->>>   - separate the fix and relicense patch
->>>   - add "linkstation:" to all led labels
->>> Changes in v3:
->>>   - address Andrew Lunn's suggestion to change commit message
->>>     for [patch 3/7] and [patch 4/7]
->>>   - add Andrew Lunn's "Reviewed-by"
->>>   - address active high/low for the power LED
->>
->> I will apply this series on the mvebu branches when v4.5-rc1 will be
->> released (so it should be the next week).
->
-> Dear Gregory,
->
-> Thanks for your feedback!
->
-> Just curious,
-> since patch 0001~0004 are fixes, could it be applied earlier?
+I wasn't being clear, the BootROM is hardcoded for the chip, I'm not
+aware of a way to replace it once the chip's taped out.
 
-Our branches go to Linus tree through the arm-soc tree. As they have
-just did a pull request I doubt a new one will be done this week.
-
-Moreover all our patches are based on the rc1: having a single refrence
-helps the arm-soc subsystem to merge all the contributions, that's why I
-am waiting for next week.
-
-And finally for this patch it is obviously too late for for 4.4 but we
-have plenty of time for 4.5. However, I plan to send these fixes to
-arm-soc early next week so it should be in 4.5-rc2, and as soon it will
-be in Linus tree then it should be backported to 4.4 and 4.3 by the
-stable team.
-
-Gregory
-
->
-> Cheers,
-> Roger
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160121/8a6f284b/attachment.sig>
