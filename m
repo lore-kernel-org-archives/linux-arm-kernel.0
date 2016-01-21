@@ -1,93 +1,59 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Thu, 21 Jan 2016 13:18:57 +0800
-Subject: [PATCH v4 2/6] dt-bindings: ARM: Mediatek: Document bindings
- for MT2701
-In-Reply-To: <20160120163236.GA21035@rob-hp-laptop>
-References: <1453271747-57397-1-git-send-email-jamesjj.liao@mediatek.com>
- <1453271747-57397-3-git-send-email-jamesjj.liao@mediatek.com>
- <20160120163236.GA21035@rob-hp-laptop>
-Message-ID: <1453353537.5384.33.camel@mtksdaap41>
+Date: Thu, 21 Jan 2016 13:22:26 +0800
+Subject: [PATCH v4 3/4] soc: mediatek: Add MT2701 power dt-bindings
+In-Reply-To: <20160120163502.GA22147@rob-hp-laptop>
+References: <1453270097-53853-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1453270097-53853-4-git-send-email-jamesjj.liao@mediatek.com>
+ <1453282161.16515.9.camel@mtksdaap41>
+ <20160120163502.GA22147@rob-hp-laptop>
+Message-ID: <1453353746.5384.35.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Yingjoe, Rob,
 
-On Wed, 2016-01-20 at 10:32 -0600, Rob Herring wrote:
-> On Wed, Jan 20, 2016 at 02:35:43PM +0800, James Liao wrote:
-> > This patch adds the binding documentation for apmixedsys, bdpsys,
-> > ethsys, hifsys, imgsys, infracfg, mmsys, pericfg, topckgen and
-> > vdecsys for Mediatek MT2701.
+On Wed, 2016-01-20 at 10:35 -0600, Rob Herring wrote:
+> On Wed, Jan 20, 2016 at 05:29:21PM +0800, Yingjoe Chen wrote:
+> > On Wed, 2016-01-20 at 14:08 +0800, James Liao wrote:
+> > > From: Shunli Wang <shunli.wang@mediatek.com>
+> > > 
+> > > Add power dt-bindings for MT2701.
+> > > 
+> > > Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+> > > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> > > ---
+> > >  .../devicetree/bindings/soc/mediatek/scpsys.txt    |  6 +++--
+> > >  include/dt-bindings/power/mt2701-power.h           | 27 ++++++++++++++++++++++
+> > >  2 files changed, 31 insertions(+), 2 deletions(-)
+> > >  create mode 100644 include/dt-bindings/power/mt2701-power.h
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+> > > index a6c8afc..807d87f 100644
+> > > --- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+> > > +++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+> > > @@ -9,10 +9,12 @@ domain control.
+> > >  
+> > >  The driver implements the Generic PM domain bindings described in
+> > >  power/power_domain.txt. It provides the power domains defined in
+> > > -include/dt-bindings/power/mt8173-power.h.
+> > > +include/dt-bindings/power/mt8173-power.h and mt2701-power.h.
+> > >  
+> > >  Required properties:
+> > > -- compatible: Must be "mediatek,mt8173-scpsys"
+> > > +- compatible: Should be:
+> > > +	- "mediatek,mt8173-scpsys"
+> > > +	- "mediatek,mt2701-scpsys"
+> > >  - #power-domain-cells: Must be 1
+> > >  - reg: Address range of the SCPSYS unit
+> > >  - infracfg: must contain a phandle to the infracfg controller
 > > 
-> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> > Tested-by: John Crispin <blogic@openwrt.org>
-> > ---
-> >  .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |  1 +
-> >  .../bindings/arm/mediatek/mediatek,bdpsys.txt      | 22 ++++++++++++++++++++++
-> >  .../bindings/arm/mediatek/mediatek,ethsys.txt      | 22 ++++++++++++++++++++++
-> >  .../bindings/arm/mediatek/mediatek,hifsys.txt      | 22 ++++++++++++++++++++++
-> >  .../bindings/arm/mediatek/mediatek,imgsys.txt      |  1 +
-> >  .../bindings/arm/mediatek/mediatek,infracfg.txt    |  1 +
-> >  .../bindings/arm/mediatek/mediatek,mmsys.txt       |  1 +
-> >  .../bindings/arm/mediatek/mediatek,pericfg.txt     |  1 +
-> >  .../bindings/arm/mediatek/mediatek,topckgen.txt    |  1 +
-> >  .../bindings/arm/mediatek/mediatek,vdecsys.txt     |  1 +
-> >  10 files changed, 73 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
-> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
-> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,hifsys.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-> > index 936166f..a701e19 100644
-> > --- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-> > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-> > @@ -6,6 +6,7 @@ The Mediatek apmixedsys controller provides the PLLs to the system.
-> >  Required Properties:
-> >  
-> >  - compatible: Should be:
-> > +	- "mediatek,mt2701-apmixedsys"
-> >  	- "mediatek,mt8135-apmixedsys"
-> >  	- "mediatek,mt8173-apmixedsys"
-> >  - #clock-cells: Must be 1
-> > diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
-> > new file mode 100644
-> > index 0000000..4137196
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
-> > @@ -0,0 +1,22 @@
-> > +Mediatek bdpsys controller
-> > +============================
-> > +
-> > +The Mediatek bdpsys controller provides various clocks to the system.
+> > Please sort the list.
 > 
-> As you clarified these blocks provide more that just clocks. Please list 
-> all the functions here and on the others.
+> And s/Should be/Should be one of/
 
-Some blocks may provide clock and reset controller at the same time. But
-most of them will not provide functions directly. Instead, some DT
-blocks which provide specific functions may refer to these controller
-nodes due to it need to access the same register space.
+OK. I'll modify it in next patch.
 
-For example, scpsys (the power domain provider) refers to infracfg
-because it need to control infracfg registers when power on/off domains:
 
-	scpsys: scpsys at 10006000 {
-		compatible = "mediatek,mt2701-scpsys";
-		#power-domain-cells = <1>;
-		reg = <0 0x10006000 0 0x1000>;
-		infracfg = <&infracfg>;
-	};
+Best regards,
 
-So I think it should not need to list all functions for each blocks
-here.
-
-> > +
-> > +Required Properties:
-> > +
-> > +- compatible: Should be:
-> > +	- "mediatek,mt2701-bdpsys", "syscon"
-> > +- #clock-cells: Must be 1
-> > +
-> > +The bdpsys controller uses the common clk binding from
-> > +Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > +The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-> > +
+James
