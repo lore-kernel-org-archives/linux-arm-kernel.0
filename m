@@ -1,79 +1,60 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 21 Jan 2016 10:33:21 +0100
-Subject: [PATCH v2 0/3] Mediatek EFUSE Support
-In-Reply-To: <566E94CA.1050700@linaro.org>
-References: <1447930014-19579-1-git-send-email-andrew-ct.chen@mediatek.com>
- <CAGS+omA8XK6ksd7Ma8yAUbkSsHR6yQxjFrV+HGbd83UiH6T51g@mail.gmail.com>
- <566E94CA.1050700@linaro.org>
-Message-ID: <56A0A5E1.5050105@gmail.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 21 Jan 2016 18:44:03 +0900
+Subject: [PATCH] ARM: zx296702-ad1: remove deprecated supports-highspeed
+In-Reply-To: <1453366905-3964-1-git-send-email-shawn.lin@rock-chips.com>
+References: <1453366905-3964-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <56A0A863.1010103@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi, Shaw.
 
+On 01/21/2016 06:01 PM, Shawn Lin wrote:
+> supports-highspeed property is deprecated for dw_mmc,
+> this patch replace it with cap-sd-highspeed and cap-mmc-highspeed.
+> 
+> Cc: Jaehoon Chung <jh80.chung@samsung.com>
+> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+> ---
+> 
+>  arch/arm/boot/dts/zx296702-ad1.dts | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/zx296702-ad1.dts b/arch/arm/boot/dts/zx296702-ad1.dts
+> index 081f980..bfbcd805d 100644
+> --- a/arch/arm/boot/dts/zx296702-ad1.dts
+> +++ b/arch/arm/boot/dts/zx296702-ad1.dts
+> @@ -19,7 +19,8 @@
+>  
+>  &mmc0 {
+>  	num-slots = <1>;
+> -	supports-highspeed;
+> +	cap-sd-highspeed;
+> +	cap-mmc-highspeed;
+>  	non-removable;
+>  	disable-wp;
+>  	status = "okay";
 
-On 14/12/15 11:07, Srinivas Kandagatla wrote:
-> Hi Andrew,
->
-> On 14/12/15 04:27, Daniel Kurtz wrote:
->> Hi Srinivas,
->>
->> On Thu, Nov 19, 2015 at 6:46 PM, Andrew-CT Chen
->> <andrew-ct.chen@mediatek.com> wrote:
->>> This patch adds EFUSE support driver which is used by other drivers
->>> like thermal sensor and HDMI impedance.
->>>
->>> There are some efuses these fuses store things like calibration data,
->>> speed bins.. etc. Drivers like thermal sensor, HDMI impedance would
->>> read out this data for configuring the driver.
->>>
->>> Change in v2:
->>> 1. Rebase to 4.4-rc1
->>> 2. Modify the driver Makefile for more consistent with other drivers
->>> 3. Modify the compatible string to "mediatek,mt8173-efuse" and
->>> "mediatek,efuse"
->>
->> Do you still plan to queue this for v4.5?
->>
-> Sorry guys, for the long delay in replying your pings, got busy with
-> regular office stuff :-)
->
-> Yes, It should go in v4.5, I did send request with my sign-off to Greg,
-> he should take it via char-misc tree.
->
+I saw the below codes..
 
-I can't see this patches in the char-misc tree [1].
-Can you please double check?
+slot at 0 {
+	reg = <0>;
+	bus-width = <4>;
+};
 
-Thanks,
-Matthias
+Slot is also deprecated.. You can change those..
 
-[1] https://git.kernel.org/cgit/linux/kernel/git/gregkh/char-misc.git/
+Best Regards,
+Jaehoon Chung
 
-> Thanks,
-> srini
->>>
->>> Andrew-CT Chen (3):
->>>    dt-bindings: add document of mediatek efuse driver
->>>    nvmem: mediatek: Add Mediatek EFUSE driver
->>>    dts: arm64: Add EFUSE device node
->>>
->>>   .../devicetree/bindings/nvmem/mtk-efuse.txt        | 36 +++++++++
->>>   arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  5 ++
->>>   drivers/nvmem/Kconfig                              | 11 +++
->>>   drivers/nvmem/Makefile                             |  2 +
->>>   drivers/nvmem/mtk-efuse.c                          | 89
->>> ++++++++++++++++++++++
->>>   5 files changed, 143 insertions(+)
->>>   create mode 100644
->>> Documentation/devicetree/bindings/nvmem/mtk-efuse.txt
->>>   create mode 100644 drivers/nvmem/mtk-efuse.c
->>>
->>> --
->>> 1.9.1
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe
->>> linux-kernel" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>> Please read the FAQ at  http://www.tux.org/lkml/
+> @@ -32,7 +33,8 @@
+>  
+>  &mmc1 {
+>  	num-slots = <1>;
+> -	supports-highspeed;
+> +	cap-sd-highspeed;
+> +	cap-mmc-highspeed;
+>  	non-removable;
+>  	disable-wp;
+>  	status = "okay";
+> 
