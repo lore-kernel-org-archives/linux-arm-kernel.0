@@ -1,29 +1,78 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 21 Jan 2016 08:38:57 -0800
-Subject: [PATCH] ARM: dts: n900: Include adp1653 device
-In-Reply-To: <20160121101828.GA7411@amd>
-References: <1451086812-3729-1-git-send-email-pali.rohar@gmail.com>
- <20160121091241.GS7192@pali>
- <20160121092909.GH5783@n2100.arm.linux.org.uk>
- <20160121101828.GA7411@amd>
-Message-ID: <20160121163857.GH19432@atomide.com>
+From: davidm@egauge.net (David Mosberger-Tang)
+Date: Thu, 21 Jan 2016 09:48:56 -0700
+Subject: [PATCH] drivers: power: reset: at91-reset: Provide reset reason via
+ sysfs (amended with Signed-off-by tag)
+Message-ID: <1453394936-16616-1-git-send-email-davidm@egauge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [160121 02:19]:
-> On Thu 2016-01-21 09:29:10, Russell King - ARM Linux wrote:
-> > The merge window is open, which is when development code that was merged
-> > in good time prior to the merge window is sent upstream to Linus.  Linux
-> > maintainers may choose not to merge new code into their tree to avoid
-> > disrupting the utility of linux-next until the merge window has
-> > closed.
-> 
-> Support for new hardware is normally allowed after -rc1.
+Rather than just printing the reset-reason at boot-time, make it available
+via sysfs as attribute "reset_reason" of the reset controller.  For example,
+on SAMA5D2 Xplained, this sysfs attribute is available at:
 
-Yeah most maintainers avoid looking at new code until -rc1. Or until
-regresssions are out of the way. So patience please. Fixes are
-welcome any time though.
+ /sys/devices/platform/ahb/ahb:apb/f8048000.rstc/reset_reason
 
-Regards,
+Signed-off-by: David Mosberger <davidm@egauge.net>
+---
+ drivers/power/reset/at91-reset.c | 24 +++++++++++++++++++++---
+ 1 file changed, 21 insertions(+), 3 deletions(-)
 
-Tony
+diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
+index 264b9b8..184516b 100644
+--- a/drivers/power/reset/at91-reset.c
++++ b/drivers/power/reset/at91-reset.c
+@@ -45,6 +45,11 @@ enum reset_type {
+ 	RESET_TYPE_USER		= 4,
+ };
+ 
++static ssize_t reset_reason_show(struct device *,
++				 struct device_attribute *attr,
++				 char *);
++static DEVICE_ATTR(reset_reason, S_IRUSR, reset_reason_show, NULL);
++
+ static void __iomem *at91_ramc_base[2], *at91_rstc_base;
+ 
+ /*
+@@ -132,7 +137,7 @@ static int sama5d3_restart(struct notifier_block *this, unsigned long mode,
+ 	return NOTIFY_DONE;
+ }
+ 
+-static void __init at91_reset_status(struct platform_device *pdev)
++static const char *at91_reset_reason(struct platform_device *pdev)
+ {
+ 	u32 reg = readl(at91_rstc_base + AT91_RSTC_SR);
+ 	char *reason;
+@@ -157,8 +162,15 @@ static void __init at91_reset_status(struct platform_device *pdev)
+ 		reason = "unknown reset";
+ 		break;
+ 	}
++	return reason;
++}
+ 
+-	pr_info("AT91: Starting after %s\n", reason);
++static ssize_t reset_reason_show(struct device *dev,
++				 struct device_attribute *attr,
++				 char *buf)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	return strcpy(buf, at91_reset_reason(pdev));
+ }
+ 
+ static const struct of_device_id at91_ramc_of_match[] = {
+@@ -250,7 +262,13 @@ static int at91_reset_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
+-	at91_reset_status(pdev);
++	ret = device_create_file(&pdev->dev, &dev_attr_reset_reason);
++	if (ret) {
++		dev_err(&pdev->dev, "Could not create sysfs entry\n");
++		return ret;
++	}
++
++	pr_info("AT91: Starting after %s\n", at91_reset_reason(pdev));
+ 
+ 	return 0;
+ }
+-- 
+1.9.1
