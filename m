@@ -1,54 +1,44 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 21 Jan 2016 13:26:30 +0800
-Subject: [PATCH RFC 03/15] mmc: sunxi: Block signal voltage switching (CMD11)
+Date: Thu, 21 Jan 2016 13:26:42 +0800
+Subject: [PATCH RFC 15/15] ARM: dts: sun9i: cubieboard4: Enable hardware reset
+ and HS-DDR for eMMC
 In-Reply-To: <1453354002-28366-1-git-send-email-wens@csie.org>
 References: <1453354002-28366-1-git-send-email-wens@csie.org>
-Message-ID: <1453354002-28366-4-git-send-email-wens@csie.org>
+Message-ID: <1453354002-28366-16-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner's mmc controller supports signal voltage switching. This is
-supported in code in Allwinner's kernel. However, publicly available
-boards all tie it to a fixed 3.0/3.3V regulator, with options to tie
-it to 1.8V for eMMC on some.
+mmc2 has a special pin for eMMC hardware reset, which is controllable
+from the controller. Add the "mmc-cap-hw-reset" property to denote that
+this controller supports this function, and the pins are actually used.
 
-Since Allwinner's kernel is an ancient 3.4, it is hard to say whether
-adapting it's code to a modern mainline kernel would work. Block signal
-voltage switching until someone has proper hardware to implement and
-test this.
-
-This only affects SD UHS-1 modes, as eMMC switches the voltage directly
-without any signaling.
+Also increase the signal drive strength for mmc2 pins, for HS-DDR mode
+support.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/mmc/host/sunxi-mmc.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 790f01662b4e..0495ae7da6d6 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -816,6 +816,20 @@ static void sunxi_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
- 		}
- 	}
+diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+index 382bd9fc5647..eb2ccd0a3bd5 100644
+--- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
++++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+@@ -111,9 +111,15 @@
+ 	vmmc-supply = <&reg_vcc3v0>;
+ 	bus-width = <8>;
+ 	non-removable;
++	cap-mmc-hw-reset;
+ 	status = "okay";
+ };
  
-+	/*
-+	 * TODO Support signal voltage switching
-+	 *
-+	 * Compared to Allwinner's kernel, recent updates in the mmc core
-+	 * mean this should be as easy as setting the flags in cmd_val and
-+	 * imask, and waiting for it to finish. However no boards support
-+	 * this so this cannot be tested. Block it for now.
-+	 */
-+	if (cmd->opcode == SD_SWITCH_VOLTAGE) {
-+		mrq->cmd->error = -EPERM;
-+		mmc_request_done(mmc, mrq);
-+		return;
-+	}
++&mmc2_8bit_pins {
++	/* Increase drive strength for DDR modes */
++	allwinner,drive = <SUN4I_PINCTRL_40_MA>;
++};
 +
- 	if (cmd->opcode == MMC_GO_IDLE_STATE) {
- 		cmd_val |= SDXC_SEND_INIT_SEQUENCE;
- 		imask |= SDXC_COMMAND_DONE;
+ &r_ir {
+ 	status = "okay";
+ };
 -- 
 2.7.0.rc3
