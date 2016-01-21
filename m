@@ -1,47 +1,53 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 21 Jan 2016 10:21:15 -0500 (EST)
-Subject: [PATCH v3 1/1] USB: core: let USB device know device node
-In-Reply-To: <3851350.Ox9dssDdWY@wuerfel>
-Message-ID: <Pine.LNX.4.44L0.1601211015010.2275-100000@iolanthe.rowland.org>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Thu, 21 Jan 2016 15:42:34 +0000
+Subject: [PATCH v3 18/21] efi: stub: implement efi_get_random_bytes()
+ based on EFI_RNG_PROTOCOL
+In-Reply-To: <1452518355-4606-20-git-send-email-ard.biesheuvel@linaro.org>
+References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1452518355-4606-20-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160121154234.GE2510@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Jan 2016, Arnd Bergmann wrote:
-
-> On Thursday 21 January 2016 17:48:32 Peter Chen wrote:
-> > 
-> > > 
-> > > So two hubs at ports 1 and 2 of the USB controller that integrates
-> > > the root hub and shares a device node with it.
-> > > 
-> > Ok, so the "reg" is the address for certain root hub (HS or SS), not
-> > the unity address for the whole controller, if it is, do we really
-> > need to add two nodes for one physical port, HS and SS will not be used
-> > at the same time. And if the reg is the same, how can we know
-> > which node is from current recognized device.
+On Mon, 11 Jan, at 02:19:12PM, Ard Biesheuvel wrote:
+> This exposes the firmware's implementation of EFI_RNG_PROTOCOL via a new
+> function efi_get_random_bytes().
 > 
-> The "reg" is the address that the parent device uses to talk to the child
-> device. If you know which of the two that child is attached to, then I
-> think you don't need both, but I think we have to use the entire addressing.
-> 
-> In Alan's example, there are six HS ports and three SS ports, but as I
-> understand it, there is no guarantee that the numbering between the two
-> is identical, and that the three SS ports always refer to the three HS
-> ports. In particular for devices soldered on-board (rather than connected
-> through a standard plug), I would guess that it is possible to connect
-> them to separate child devices though I have to admit that I do not
-> understand enough of the standard to know for sure.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  drivers/firmware/efi/libstub/Makefile  |  2 +-
+>  drivers/firmware/efi/libstub/efistub.h |  3 ++
+>  drivers/firmware/efi/libstub/random.c  | 35 ++++++++++++++++++++
+>  include/linux/efi.h                    |  5 ++-
+>  4 files changed, 43 insertions(+), 2 deletions(-)
 
-The spec allows for a lot of flexibility.  It even allows for "tier 
-mismatches", in which (for example) the SS connection for a particular 
-port is routed directly to the root hub while the HS connection for the 
-same port is routed through an intermediate hub!
+[...]
 
-There is only one major constraint: With the exception of hubs, no USB
-device is allowed to use both the SS and the HS buses at the same time.  
-A device has to decide on one speed and use only the corresponding bus.  
-USB-3 hubs, on the other hand, are required to connect to both buses.  
-They appear as two separate logical devices: a SS hub on the SS bus and
-a HS hub on the HS bus.
+> @@ -0,0 +1,35 @@
+> +/*
+> + * Copyright (C) 2016 Linaro Ltd;  <ard.biesheuvel@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#include <linux/efi.h>
+> +#include <asm/efi.h>
+> +
+> +#include "efistub.h"
+> +
+> +struct efi_rng_protocol_t {
+> +	efi_status_t (*get_info)(struct efi_rng_protocol_t *,
+> +				 unsigned long *, efi_guid_t *);
+> +	efi_status_t (*get_rng)(struct efi_rng_protocol_t *,
+> +				efi_guid_t *, unsigned long, u8 *out);
+> +};
 
-Alan Stern
+This is not the usual naming convention for EFI structs, it should
+either be 'struct efi_rng_protocol' or 'efi_rng_protocol_t'.
+
+But apart from that, this patch looks fine.
+
+Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
