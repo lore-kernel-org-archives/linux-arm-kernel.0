@@ -1,62 +1,28 @@
-From: b38611@freescale.com (Fugang Duan)
-Date: Thu, 21 Jan 2016 12:40:41 +0800
-Subject: [PATCH] ARM: dts: imx6: enable pl310 "shared attribute override
- enable" bit
-Message-ID: <1453351241-7458-1-git-send-email-b38611@freescale.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 21 Jan 2016 13:52:44 +0900
+Subject: [PATCH 0/2] ARM: shmobile: r8a777[89]: use GIC_* defines
+Message-ID: <1453351966-10968-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default behavior of the L220 or PL310 cache controllers with respect
-to the shareable attribute is to transform "normal memory non-cacheable
-transactions" into "cacheable no allocate" (for reads) or "write through
-no write allocate" (for writes).
+Hi,
 
-On i.MX6 series platforms, enet/audio/usb/nand DMA buffer have corruption
-without CMA. So set this property "arm,shared-override" in L2 dts node to
-enable "shared attribute override enable" bit.
+this short series uses GIC_* defines in the r8a779[34] device trees as
+appropriate.
 
-Signed-off-by: Fugang Duan <B38611@freescale.com>
----
- arch/arm/boot/dts/imx6qdl.dtsi | 1 +
- arch/arm/boot/dts/imx6sl.dtsi  | 1 +
- arch/arm/boot/dts/imx6sx.dtsi  | 1 +
- 3 files changed, 3 insertions(+)
+This is a follow-up for similar work for the r8a779[0134] SoCs.
+I plan to post follow up patches to update the device trees for
+other Renesas SoCs depending on the success of this series.
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 4f6ae92..b4de39a 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -185,6 +185,7 @@
- 			cache-level = <2>;
- 			arm,tag-latency = <4 2 3>;
- 			arm,data-latency = <4 2 3>;
-+			arm,shared-override;
- 		};
- 
- 		pcie: pcie at 0x01000000 {
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index d12b250..3b80b45 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -113,6 +113,7 @@
- 			cache-level = <2>;
- 			arm,tag-latency = <4 2 3>;
- 			arm,data-latency = <4 2 3>;
-+			arm,shared-override;
- 		};
- 
- 		pmu {
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index a5f7602..42f8f3b 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -155,6 +155,7 @@
- 			cache-level = <2>;
- 			arm,tag-latency = <4 2 3>;
- 			arm,data-latency = <4 2 3>;
-+			arm,shared-override;
- 		};
- 
- 		dma_apbh: dma-apbh at 01804000 {
+Based on renesas-devel-20160118-v4.4
+
+Simon Horman (2):
+  ARM: dts: r8a7778: use GIC_* defines
+  ARM: dts: r8a7779: use GIC_* defines
+
+ arch/arm/boot/dts/r8a7778.dtsi | 87 +++++++++++++++++++++---------------------
+ arch/arm/boot/dts/r8a7779.dtsi | 78 ++++++++++++++++++-------------------
+ 2 files changed, 83 insertions(+), 82 deletions(-)
+
 -- 
-1.9.1
+2.1.4
