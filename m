@@ -1,60 +1,76 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 21 Jan 2016 14:24:07 +0000
-Subject: Problem with commit 924eb47512 ("ASoC: dwc: fix dma stop
- transferring issue")
-Message-ID: <1453386247.2858.58.camel@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 21 Jan 2016 15:32:14 +0100
+Subject: [PATCH] ARM64: Fix compiling with GCC 6 and Atomics enabled
+In-Reply-To: <56A0CFC9.1070401@arm.com>
+References: <1450498655-3820-1-git-send-email-apinski@cavium.com>
+ <20151221123843.GM23092@arm.com>
+ <CAKv+Gu_aUvckKpwWw+Xo5VkFEA8-uT9xU0-m5NgAzAc1d53uhQ@mail.gmail.com>
+ <20151221125130.GO23092@arm.com>
+ <CAKv+Gu99J8CXxqqtZqRa0Wzbf+-7=EDOnmYadLOj-rtVFPTScQ@mail.gmail.com>
+ <20151221133730.GP23092@arm.com> <56A0CFC9.1070401@arm.com>
+Message-ID: <CAKv+Gu9c3+YfeJsf4oiM_rjb0t-2qOsx2ynn=0bGT0N9K1OT8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On 21 January 2016 at 13:32, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
+> On 21/12/15 13:37, Will Deacon wrote:
+>> On Mon, Dec 21, 2015 at 01:58:30PM +0100, Ard Biesheuvel wrote:
+>>> On 21 December 2015 at 13:51, Will Deacon <will.deacon@arm.com> wrote:
+>>>> On Mon, Dec 21, 2015 at 01:46:22PM +0100, Ard Biesheuvel wrote:
+>>>>> On 21 December 2015 at 13:38, Will Deacon <will.deacon@arm.com> wrote:
+>>>>>> On Fri, Dec 18, 2015 at 08:17:35PM -0800, Andrew Pinski wrote:
+>>>>>>> The problem here is that GCC 6 and above emits .arch now
+>>>>>>> for each function so now the global .arch_extension has
+>>>>>>> no effect.  This fixes the problem by putting
+>>>>>>> .arch_extension inside ARM64_LSE_ATOMIC_INSN so
+>>>>>>> it is enabled for each place where LSE is used.
+>>>>>>
+>>>>>> Hmm, this is going to affect arch/arm/ much more heavily than arch/arm64.
+>>>>>> .arch_extension is used for virt, mp and sec over there, and it may be
+>>>>>> tricky to isolate the actual instruction usage (at least, virt looks
+>>>>>> lost in kvm/arm.c).
+>>>>>>
+>>>>>> Why can't gas have an option to accept all instruction encodings that it
+>>>>>> knows about, inspite of any .arch directives?
+>>>>>>
+>>>>>
+>>>>> Modern GAS supports things like -march=armv7-a+mp+sec+virt, so it
+>>>>> probably makes sense to pass that on the command line when building
+>>>>> for v7 (or +sec only for v6) if the assembler is found to support it
+>>>>> at build time.
+>>>>
+>>>> Does that override a more restrictive .arch directive emitted by the
+>>>> compiler?
+>>>>
+>>>
+>>> It seems to be additive: -march=armv7-a+mp+sec allows a .S file
+>>> containing a virt arch_extension + both hvc and smc instructions to be
+>>> assembled.
+>>
+>> The problem I'm seeing is if I have something like:
+>>
+>>   .arch_extension lse
+>>
+>> before something like:
+>>
+>>   .cpu cortex-a57+fp+simd+crc
+>>
+>> -or-
+>>
+>>   .arch armv8-a+fp+simd+crc
+>>
+>> then I can no longer assemble lse instructions. So the .cpu/.arch
+>> directive is undoing the .arch_extension. We can fix this by following
+>> Andrew's suggestion to have .arch_extension before every point of use,
+>> but the whole thing would be much simpler if we could just tell gas to
+>> assemble harder.
+>>
+>> Maybe we just need to construct the mother of all -march options based
+>> on build-time checks in the Makefile?
+>>
+>
+> Since I've been bitten by this I'm curious what was conclusion on this
+> topic?
+>
 
-In trying to work out why audio stopped working on ARM's Juno board I
-bisected the problem to $subject commit and reverting this fixed things.
-The symptoms of broken audio was that alsa-utils' speaker-test produced
-very short duration 'churps' rather than the voice sample naming each
-speaker channel. (Additional note, audio on Juno is routed through a
-HDMI transmitter and the patches to support that aren't in the mainline
-kernel tree.)
-
-Now, I don't have any documentation for the Designware I2S device so the
-following is my speculation from looking at the code and guessing what's
-going on...
-
-1. $subject patch makes i2s_start() unmask interrupts for all four
-hardware channels. 
-
-2. i2s_stop masks interrupts for all four channels.
-
-3. dw_i2s_hw_params unmasks interrupts for only the number of hardware
-channels as required for the specified audio stream format.
-
-So, playing stereo sound (one hardware channel) on my Juno board is
-going wrong because i2s_start() now unmasks interrupts for the other 3
-unused hardware channels and these are immediately generating
-interrupts, making the code think the buffer has finished transmission
-(or underflowed, or something like that, remember I'm speculating here).
-
-Now, if audio playback/capture is always achieved by using this sequence
-of calls:
-
-dw_i2s_hw_params
-i2s_start
-i2s_stop
-
-then it seems to me that $subject patch is redundant and should be
-reverted. However, if this is allowed (possibly is, depends on how
-dw_i2s_trigger can be called) ...
-
-dw_i2s_hw_params
-i2s_start
-i2s_stop
-i2s_start
-i2s_stop
-
-then we need to change i2s_start to unmask interrupts for just the
-hardware channels being used. I can have a go at producing a patch for
-that if that's deemed the correct solution. (Looks like we'd need to
-stash the number of used hardware channels in struct dw_i2s_dev).
-
--- 
-Tixy
+None that I'm aware of
