@@ -1,44 +1,76 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 22 Jan 2016 01:33:51 +0900
-Subject: [PATCH v2] of: drop symbols declared by _OF_DECLARE() from modules
-Message-ID: <1453394031-16578-1-git-send-email-yamada.masahiro@socionext.com>
+From: davidm@egauge.net (David Mosberger-Tang)
+Date: Thu, 21 Jan 2016 09:35:20 -0700
+Subject: [PATCH] drivers: power: reset: at91-reset: Provide reset reason via
+ sysfs.
+Message-ID: <1453394120-15878-1-git-send-email-davidm@egauge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The users of this macro (OF_EARLYCON_DECLARE, CLK_OF_DECLARE,
-IRQCHIP_DECLARE, etc.) are only parsed in the early boot stage.
-Such symbols contained in modules are never used.
+Rather than just printing the reset-reason at boot-time, make it available
+via sysfs as attribute "reset_reason" of the reset controller.  For example,
+on SAMA5D2 Xplained, this sysfs attribute is available at:
 
-This commit fixes the link error introduced by commit b8d20e06eaad
-("serial: 8250_uniphier: add earlycon support"); the combination
-of CONFIG_SERIAL_8250_UNIPHIER=m and CONFIG_SERIAL_8250_CONSOLE=y
-fails to link:
-
-ERROR: "early_serial8250_setup" [drivers/tty/serial/8250/8250_uniphier.ko] undefined!
-
-Fixes: b8d20e06eaad ("serial: 8250_uniphier: add earlycon support")
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+ /sys/devices/platform/ahb/ahb:apb/f8048000.rstc/reset_reason
 ---
+ drivers/power/reset/at91-reset.c | 24 +++++++++++++++++++++---
+ 1 file changed, 21 insertions(+), 3 deletions(-)
 
-Changes in v2:
-  - Describe the bug fixed by this commit
-
- include/linux/of.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/include/linux/of.h b/include/linux/of.h
-index dd10626..dc6e396 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -929,7 +929,7 @@ static inline int of_get_available_child_count(const struct device_node *np)
- 	return num;
+diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
+index 264b9b8..184516b 100644
+--- a/drivers/power/reset/at91-reset.c
++++ b/drivers/power/reset/at91-reset.c
+@@ -45,6 +45,11 @@ enum reset_type {
+ 	RESET_TYPE_USER		= 4,
+ };
+ 
++static ssize_t reset_reason_show(struct device *,
++				 struct device_attribute *attr,
++				 char *);
++static DEVICE_ATTR(reset_reason, S_IRUSR, reset_reason_show, NULL);
++
+ static void __iomem *at91_ramc_base[2], *at91_rstc_base;
+ 
+ /*
+@@ -132,7 +137,7 @@ static int sama5d3_restart(struct notifier_block *this, unsigned long mode,
+ 	return NOTIFY_DONE;
  }
  
--#ifdef CONFIG_OF
-+#if defined(CONFIG_OF) && !defined(MODULE)
- #define _OF_DECLARE(table, name, compat, fn, fn_type)			\
- 	static const struct of_device_id __of_table_##name		\
- 		__used __section(__##table##_of_table)			\
+-static void __init at91_reset_status(struct platform_device *pdev)
++static const char *at91_reset_reason(struct platform_device *pdev)
+ {
+ 	u32 reg = readl(at91_rstc_base + AT91_RSTC_SR);
+ 	char *reason;
+@@ -157,8 +162,15 @@ static void __init at91_reset_status(struct platform_device *pdev)
+ 		reason = "unknown reset";
+ 		break;
+ 	}
++	return reason;
++}
+ 
+-	pr_info("AT91: Starting after %s\n", reason);
++static ssize_t reset_reason_show(struct device *dev,
++				 struct device_attribute *attr,
++				 char *buf)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	return strcpy(buf, at91_reset_reason(pdev));
+ }
+ 
+ static const struct of_device_id at91_ramc_of_match[] = {
+@@ -250,7 +262,13 @@ static int at91_reset_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
+-	at91_reset_status(pdev);
++	ret = device_create_file(&pdev->dev, &dev_attr_reset_reason);
++	if (ret) {
++		dev_err(&pdev->dev, "Could not create sysfs entry\n");
++		return ret;
++	}
++
++	pr_info("AT91: Starting after %s\n", at91_reset_reason(pdev));
+ 
+ 	return 0;
+ }
 -- 
 1.9.1
