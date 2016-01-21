@@ -1,58 +1,44 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 21 Jan 2016 08:09:13 -0600
-Subject: [PATCH] 8250: uniphier: allow modular build with 8250 console
-In-Reply-To: <4548262.MV5j98YUVi@wuerfel>
-References: <3965359.aMgb8o9MaG@wuerfel>
- <CAK7LNATVtLk6UTh+r9JTZrKq-veEXetDdRutZ_=zQOd-WyAO0g@mail.gmail.com>
- <4548262.MV5j98YUVi@wuerfel>
-Message-ID: <CAL_JsqKCnxenDN-5OP1yqAyyW1-cuhs47CeosAj12hr89e6CrA@mail.gmail.com>
+From: emilio.lopez@collabora.co.uk (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Thu, 21 Jan 2016 11:10:37 -0300
+Subject: [PATCH 0/2] defer clk_gets on orphan clocks
+Message-ID: <1453385439-10154-1-git-send-email-emilio.lopez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 21, 2016 at 6:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 21 January 2016 20:39:03 Masahiro Yamada wrote:
->> 2016-01-14 7:33 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
->> > The recently added uniphier 8250 port driver supports early console
->> > probing, and it supports being built as a module, but the combination
->> > of the two fails to link:
->> >
->> > ERROR: "early_serial8250_setup" [drivers/tty/serial/8250/8250_uniphier.ko] undefined!
->> >
->> > Given that earlycon support in a loadable module makes no sense,
->> > making that code conditional on 'MODULE' is a correct solution.
->> >
->> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> > Fixes: b8d20e06eaad ("serial: 8250_uniphier: add earlycon support")
->> >
->> > diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
->> > index bab6b3ae2540..1b7bd26555b7 100644
->> > --- a/drivers/tty/serial/8250/8250_uniphier.c
->> > +++ b/drivers/tty/serial/8250/8250_uniphier.c
->> > @@ -35,7 +35,7 @@ struct uniphier8250_priv {
->> >         spinlock_t atomic_write_lock;
->> >  };
->> >
->> > -#ifdef CONFIG_SERIAL_8250_CONSOLE
->> > +#if defined(CONFIG_SERIAL_8250_CONSOLE) && !defined(MODULE)
->> >  static int __init uniphier_early_console_setup(struct earlycon_device *device,
->> >                                                const char *options)
->> >  {
->> >
->> >
->>
->>
->> If my patch (https://patchwork.kernel.org/patch/8029331/) is accepted,
->> this build error will be fixed as well.  But I doubt it is accepted soon...
->>
->> So, I am OK with this workaround to fix "make allmodconfig".
->>
->> Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->>
->
-> Good point. Adding the DT maintainers to Cc. Guys, any chance of you
-> picking up Masahiro's patch for 4.5?
+Hi everyone,
 
-I will if you can update the commit log with the details here about it
-fixing an actual problem.
+This is mostly a resend of Heiko's patch from [0] together with a fix for
+the breakage seen on sunxi when it was applied.
 
-Rob
+Ideally we would move off our own protected clocks thing to the CCF
+implementation when it is merged and solve this nicely. Meanwhile, we
+can solve this non-intrusively by delaying the clock protection a bit.
+This way the rk people can enjoy the happiness brought by working sensors
+and WiFi[1] while sunxi boards still boot and operate just fine.
+
+I have tested this on a Cubieboard 1 (A10) and A10S OLinuXino Micro (A10S)
+as well as remotely boot-tested a Radxa Rock2 Square (rk3288)
+
+As always, all comments welcome :)
+
+Thanks!
+Emilio
+
+[0] http://www.spinics.net/lists/arm-kernel/msg462821.html
+[1] http://www.spinics.net/lists/arm-kernel/msg473236.html
+
+Emilio L?pez (1):
+  clk: sunxi: delay protected clocks until arch initcall
+
+Heiko Stuebner (1):
+  clk: defer clk_gets on orphan clocks
+
+ drivers/clk/clk-conf.c        |  5 +++--
+ drivers/clk/clk.c             | 48 ++++++++++++++++++++++++++++++++++---------
+ drivers/clk/clk.h             | 10 ++++++---
+ drivers/clk/clkdev.c          |  4 ++--
+ drivers/clk/sunxi/clk-sunxi.c | 22 ++++++++++++++++----
+ 5 files changed, 68 insertions(+), 21 deletions(-)
+
+-- 
+2.7.0
