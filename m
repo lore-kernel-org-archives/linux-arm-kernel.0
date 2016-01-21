@@ -1,116 +1,85 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 21 Jan 2016 20:28:56 +0800
-Subject: [PATCH RFC 09/15] ARM: dts: sun6i: sina31s: Switch to mmc3 for
- onboard eMMC
-In-Reply-To: <56A0CE45.6010608@redhat.com>
-References: <1453354002-28366-1-git-send-email-wens@csie.org>
- <1453354002-28366-10-git-send-email-wens@csie.org>
- <56A0BE25.1020309@redhat.com>
- <CAGb2v64-Hx_uCHZVw61OUc-z_KvHHf7gWduwfMQq6T_1ZDtCdA@mail.gmail.com>
- <56A0CE45.6010608@redhat.com>
-Message-ID: <CAGb2v66zzbmm_6OjWbFgd0Uq_gUjowRpx2u1akDnUD63OMTuVA@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 21 Jan 2016 12:32:09 +0000
+Subject: [PATCH] ARM64: Fix compiling with GCC 6 and Atomics enabled
+In-Reply-To: <20151221133730.GP23092@arm.com>
+References: <1450498655-3820-1-git-send-email-apinski@cavium.com>
+ <20151221123843.GM23092@arm.com>
+ <CAKv+Gu_aUvckKpwWw+Xo5VkFEA8-uT9xU0-m5NgAzAc1d53uhQ@mail.gmail.com>
+ <20151221125130.GO23092@arm.com>
+ <CAKv+Gu99J8CXxqqtZqRa0Wzbf+-7=EDOnmYadLOj-rtVFPTScQ@mail.gmail.com>
+ <20151221133730.GP23092@arm.com>
+Message-ID: <56A0CFC9.1070401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 21, 2016 at 8:25 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
-> On 21-01-16 13:23, Chen-Yu Tsai wrote:
->>
->> On Thu, Jan 21, 2016 at 7:16 PM, Hans de Goede <hdegoede@redhat.com>
->> wrote:
->>>
->>> Hi,
->>>
->>> On 21-01-16 06:26, Chen-Yu Tsai wrote:
+On 21/12/15 13:37, Will Deacon wrote:
+> On Mon, Dec 21, 2015 at 01:58:30PM +0100, Ard Biesheuvel wrote:
+>> On 21 December 2015 at 13:51, Will Deacon <will.deacon@arm.com> wrote:
+>>> On Mon, Dec 21, 2015 at 01:46:22PM +0100, Ard Biesheuvel wrote:
+>>>> On 21 December 2015 at 13:38, Will Deacon <will.deacon@arm.com> wrote:
+>>>>> On Fri, Dec 18, 2015 at 08:17:35PM -0800, Andrew Pinski wrote:
+>>>>>> The problem here is that GCC 6 and above emits .arch now
+>>>>>> for each function so now the global .arch_extension has
+>>>>>> no effect.  This fixes the problem by putting
+>>>>>> .arch_extension inside ARM64_LSE_ATOMIC_INSN so
+>>>>>> it is enabled for each place where LSE is used.
+>>>>>
+>>>>> Hmm, this is going to affect arch/arm/ much more heavily than arch/arm64.
+>>>>> .arch_extension is used for virt, mp and sec over there, and it may be
+>>>>> tricky to isolate the actual instruction usage (at least, virt looks
+>>>>> lost in kvm/arm.c).
+>>>>>
+>>>>> Why can't gas have an option to accept all instruction encodings that it
+>>>>> knows about, inspite of any .arch directives?
+>>>>>
 >>>>
->>>>
->>>> According to Allwinner, only mmc3 supports 8 bit DDR transfers for eMMC.
->>>> Switch to mmc3 for the onboard eMMC, and also assign vqmmc for signal
->>>> voltage sensing/switching, and "cap-mmc-hw-reset" to denote this
->>>> instance can use eMMC hardware reset.
+>>>> Modern GAS supports things like -march=armv7-a+mp+sec+virt, so it
+>>>> probably makes sense to pass that on the command line when building
+>>>> for v7 (or +sec only for v6) if the assembler is found to support it
+>>>> at build time.
 >>>
+>>> Does that override a more restrictive .arch directive emitted by the
+>>> compiler?
 >>>
->>>
->>> This is going to need some more explanation, does this mean
->>> that the old dtsi is wrong and the emmc does not work there are all ?
 >>
->>
->> mmc2 works fine for either 4 bit SDR/DDR or 8 bit SDR only. It does
->> not work for 8 bit DDR. I actually tested all the above combinations.
->>
->> Also see
->> https://groups.google.com/d/msg/linux-sunxi/pMzwMWwLALw/6WGgCN1eAQAJ
->>
->> About old DTs not working:
->>
->> a) The old DT will not work with the mmc patches, as it will try 8 bit DDR
->>     and fail. Also, the old DT does not use the highest drive strength for
->>     the mmc pins, meaning it might not work for the other chip families.
->>
->> b) Old DT + old kernel works fine (8 bit high-speed), just slower.
->>
->> An alternative would be to drop MMC_CAP_1_8V_DDR from the driver, and
->> use the "mmc-ddr-1_8v" DT capability flag at the dtsi or board level.
->> There's no real way to describe "don't use 8 bit with MMC DDR" in the DT.
->
->
-> OK, so what is confusing me, is how can we choose between the emmc being
-> connected to mmc2 resp mmc3, are there dipswitches on the board? Or can both
-> mmc controllers be routed to the outside on the same port/pins ?
+>> It seems to be additive: -march=armv7-a+mp+sec allows a .S file
+>> containing a virt arch_extension + both hvc and smc instructions to be
+>> assembled.
+> 
+> The problem I'm seeing is if I have something like:
+> 
+>   .arch_extension lse
+> 
+> before something like:
+> 
+>   .cpu cortex-a57+fp+simd+crc
+> 
+> -or-
+> 
+>   .arch armv8-a+fp+simd+crc
+> 
+> then I can no longer assemble lse instructions. So the .cpu/.arch
+> directive is undoing the .arch_extension. We can fix this by following
+> Andrew's suggestion to have .arch_extension before every point of use,
+> but the whole thing would be much simpler if we could just tell gas to
+> assemble harder.
+> 
+> Maybe we just need to construct the mother of all -march options based
+> on build-time checks in the Makefile?
+> 
 
-They are on the same pins, just with a different mux value/function.
-I believe the previous patch explains this.
+Since I've been bitten by this I'm curious what was conclusion on this
+topic?
 
-ChenYu
+Thanks
+Vladimir
 
->
-> Regards,
->
-> Hans
->
->
->
->>
->>
->> Regards
->> ChenYu
->>
->>>
->>> Regards,
->>>
->>> Hans
->>>
->>>
->>>
->>>>
->>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>>> ---
->>>>    arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi | 6 ++++--
->>>>    1 file changed, 4 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
->>>> b/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
->>>> index ea69fb8ad4d8..4ec0c8679b2e 100644
->>>> --- a/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
->>>> +++ b/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
->>>> @@ -61,12 +61,14 @@
->>>>    };
->>>>
->>>>    /* eMMC on core board */
->>>> -&mmc2 {
->>>> +&mmc3 {
->>>>          pinctrl-names = "default";
->>>> -       pinctrl-0 = <&mmc2_8bit_emmc_pins>;
->>>> +       pinctrl-0 = <&mmc3_8bit_emmc_pins>;
->>>>          vmmc-supply = <&reg_dcdc1>;
->>>> +       vqmmc-supply = <&reg_dcdc1>;
->>>>          bus-width = <8>;
->>>>          non-removable;
->>>> +       cap-mmc-hw-reset;
->>>>          status = "okay";
->>>>    };
->>>>
->>>>
->>>
->
+> Will
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
+> 
