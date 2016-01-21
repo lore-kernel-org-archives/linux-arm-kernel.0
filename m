@@ -1,89 +1,51 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 21 Jan 2016 11:49:21 +0100
-Subject: [PATCH] soc: mediatek: PMIC wrap: Delete unused regmap support
-In-Reply-To: <1453372919-15602-1-git-send-email-matthias.bgg@gmail.com>
-References: <1453372919-15602-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <56A0B7B1.3080209@gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu, 21 Jan 2016 18:53:46 +0800
+Subject: [PATCH v2 RESEND 0/4] arm64: Hi6220: enable CPU idle states
+Message-ID: <1453373630-4693-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch series is to enable CPU idle states for Hi6220.
+
+Hi6220 uses PSCIv0.2 compliance interface, so directly use ARM's generic
+CPUIdle driver. Patch 1 is to reserve memory regions so make sure MCU can
+work well to handle power controlling; Patch 2/3 enable sp804 timer as
+broadcast timer during idle states; Patch 4 registers CPU power down state
+and cluster power down state.
+
+Patch 1 "arm64: dts: Reserve memory regions for hi6220" reserves memory
+regions by carve out from memory node; This follows up Mark Rutland's
+suggestion to avoid risks, such like kernel's linear mapping for reserved
+secure memory region may introduce speculative accesses triggering aborts
+from trustzone controller (TZC) and potential cache alias problem.
+
+Rob Herring expressed reservations for this method and says "regions should
+be marked as reserved, it's not really worth holding up this platform
+further", so appreciate Rob helped to make progress for this series.
+
+The resend patch series have been rebased on mainline kernel, and tested on
+Hikey board. During testing I found CPUIdle menu governor is broken, this
+bug has been reported by Sudeep; Rafael J. Wysocki already has committed
+patch [1] to fix this issue. Testing pass after applied Rafael's patch.
+
+Changes from v1:
+* According to Sudeep's review, fix binding for idle-states
+* According to Rob's review, due timers share same clock source with apb
+  clock, so just only pass one clock phandle
+
+[1] http://article.gmane.org/gmane.linux.kernel.commits.head/573361
 
 
-On 21/01/16 11:41, Matthias Brugger wrote:
-> PMIC wrapper does not use regmap support, although some regmap
-> code slipped into the driver. This patch deletes this code parts.
->
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> ---
+Leo Yan (4):
+  arm64: dts: Reserve memory regions for hi6220
+  arm64: Kconfig: select sp804 timer for ARCH_HISI
+  arm64: dts: add sp804 timer node for Hi6220
+  arm64: dts: enable idle states for Hi6220
 
-Well no. Actually the mt6397 uses the regmap of its parent.
-So forget about this patch...
+ arch/arm64/Kconfig.platforms                   |  1 +
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 16 ++++++++---
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 40 ++++++++++++++++++++++++++
+ 3 files changed, 53 insertions(+), 4 deletions(-)
 
->   drivers/soc/mediatek/mtk-pmic-wrap.c | 25 -------------------------
->   1 file changed, 25 deletions(-)
->
-> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> index 105597a..83b22bf 100644
-> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> @@ -18,7 +18,6 @@
->   #include <linux/module.h>
->   #include <linux/of_device.h>
->   #include <linux/platform_device.h>
-> -#include <linux/regmap.h>
->   #include <linux/reset.h>
->
->   #define PWRAP_MT8135_BRIDGE_IORD_ARB_EN		0x4
-> @@ -366,7 +365,6 @@ static struct pmic_wrapper_type pwrap_mt8173 = {
->   struct pmic_wrapper {
->   	struct device *dev;
->   	void __iomem *base;
-> -	struct regmap *regmap;
->   	int *regs;
->   	enum pwrap_type type;
->   	u32 arb_en_all;
-> @@ -475,16 +473,6 @@ static int pwrap_read(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
->   	return 0;
->   }
->
-> -static int pwrap_regmap_read(void *context, u32 adr, u32 *rdata)
-> -{
-> -	return pwrap_read(context, adr, rdata);
-> -}
-> -
-> -static int pwrap_regmap_write(void *context, u32 adr, u32 wdata)
-> -{
-> -	return pwrap_write(context, adr, wdata);
-> -}
-> -
->   static int pwrap_reset_spislave(struct pmic_wrapper *wrp)
->   {
->   	int ret, i;
-> @@ -780,15 +768,6 @@ static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
->   	return IRQ_HANDLED;
->   }
->
-> -static const struct regmap_config pwrap_regmap_config = {
-> -	.reg_bits = 16,
-> -	.val_bits = 16,
-> -	.reg_stride = 2,
-> -	.reg_read = pwrap_regmap_read,
-> -	.reg_write = pwrap_regmap_write,
-> -	.max_register = 0xffff,
-> -};
-> -
->   static struct of_device_id of_pwrap_match_tbl[] = {
->   	{
->   		.compatible = "mediatek,mt8135-pwrap",
-> @@ -904,10 +883,6 @@ static int pwrap_probe(struct platform_device *pdev)
->   	if (ret)
->   		goto err_out2;
->
-> -	wrp->regmap = devm_regmap_init(wrp->dev, NULL, wrp, &pwrap_regmap_config);
-> -	if (IS_ERR(wrp->regmap))
-> -		return PTR_ERR(wrp->regmap);
-> -
->   	ret = of_platform_populate(np, NULL, NULL, wrp->dev);
->   	if (ret) {
->   		dev_dbg(wrp->dev, "failed to create child devices at %s\n",
->
+-- 
+1.9.1
