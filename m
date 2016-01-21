@@ -1,33 +1,108 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Thu, 21 Jan 2016 10:14:37 +0100
-Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
-In-Reply-To: <569052FE.1040008@gmail.com>
-References: <20160106174713.GL12777@atomide.com> <568D5669.4040801@gmail.com>
- <20160106182650.GM12777@atomide.com> <568D5F54.7040900@gmail.com>
- <20160107180700.GN12777@atomide.com> <568EDC8D.7070205@gmail.com>
- <20160108022619.GS12777@atomide.com> <568F4596.8020206@gmail.com>
- <20160108075913.GN11364@pali> <569052FE.1040008@gmail.com>
-Message-ID: <20160121091437.GT7192@pali>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 21 Jan 2016 10:18:01 +0100
+Subject: [PATCH] soc: mediatek: PMIC wrap: clear the STAUPD_TRIG bit of
+ WDT_SRC_EN
+In-Reply-To: <1453288312.8457.9.camel@mtksdaap41>
+References: <1453265564-16379-1-git-send-email-henryc.chen@mediatek.com>
+ <CAGS+omCFOUgTHxeUn0snrkBjvcR1bSOAAmkBHppF8nM37P1vrw@mail.gmail.com>
+ <1453288312.8457.9.camel@mtksdaap41>
+Message-ID: <56A0A249.30003@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 09 January 2016 02:23:26 Ivaylo Dimitrov wrote:
-> Hi,
-> 
-> On  8.01.2016 09:59, Pali Roh?r wrote:
-> >On Friday 08 January 2016 07:13:58 Ivaylo Dimitrov wrote:
-> >>And it looks like the problems happens sometimes on oops too.
-> >
-> >In linux-n900 tree is enabled mtdoops driver which store oops to
-> >specified MTD device. So maybe this access cause it?
-> >
-> 
-> The key word here is "sometimes". i.e sometimes it hapens on normal reboot,
-> sometimes it happens on oops.
 
-So where is problem? In omap-gpmc? mtd? onenand? or ubifs? Or in
-different component? Do we know at least this?
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+On 20/01/16 12:11, Henry Chen wrote:
+> On Wed, 2016-01-20 at 02:32 -0800, Daniel Kurtz wrote:
+>> On Tue, Jan 19, 2016 at 8:52 PM, Henry Chen <henryc.chen@mediatek.com> wrote:
+>>> Since STAUPD interrupts aren't handled on mt8173, disable watchdog timeout
+>>> monitor of STAUPD to avoid WDT_INT triggered by STAUPD.
+>>>
+>>> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+>>
+>>> ---
+>>>   drivers/soc/mediatek/mtk-pmic-wrap.c | 19 +++++++++++++++++--
+>>>   1 file changed, 17 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+>>> index af919b1..998f561 100644
+>>> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+>>> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+>>> @@ -60,6 +60,15 @@
+>>>   #define PWRAP_MAN_CMD_OP_OUTD          (0x9 << 8)
+>>>   #define PWRAP_MAN_CMD_OP_OUTQ          (0xa << 8)
+>>>
+>>> +/* macro for Watch Dog Timer Source */
+>>> +#define PWRAP_WDT_SRC_EN_STAUPD_TRIG           (1 << 25)
+>>> +#define PWRAP_WDT_SRC_EN_HARB_STAUPD_DLE       (1 << 20)
+>>> +#define PWRAP_WDT_SRC_EN_HARB_STAUPD_ALE       (1 << 6)
+>>> +#define PWRAP_WDT_SRC_MASK_ALL                 0xffffffff
+>>> +#define PWRAP_WDT_SRC_MASK_NO_STAUPD   ~(PWRAP_WDT_SRC_EN_STAUPD_TRIG | \
+>>> +                                         PWRAP_WDT_SRC_EN_HARB_STAUPD_DLE | \
+>>> +                                         PWRAP_WDT_SRC_EN_HARB_STAUPD_ALE)
+>>> +
+>>>   /* macro for slave device wrapper registers */
+>>>   #define PWRAP_DEW_BASE                 0xbc00
+>>>   #define PWRAP_DEW_EVENT_OUT_EN         (PWRAP_DEW_BASE + 0x0)
+>>> @@ -830,7 +839,7 @@ MODULE_DEVICE_TABLE(of, of_pwrap_match_tbl);
+>>>
+>>>   static int pwrap_probe(struct platform_device *pdev)
+>>>   {
+>>> -       int ret, irq;
+>>> +       int ret, irq, wdt_src;
+>>>          struct pmic_wrapper *wrp;
+>>>          struct device_node *np = pdev->dev.of_node;
+>>>          const struct of_device_id *of_id =
+>>> @@ -920,7 +929,13 @@ static int pwrap_probe(struct platform_device *pdev)
+>>>
+>>>          /* Initialize watchdog, may not be done by the bootloader */
+>>>          pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
+>>> -       pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
+>>> +       /*
+>>> +        * Since STAUPD was not used on mt8173 platform,
+>>> +        * so STAUPD of WDT_SRC which should be turned off
+>>> +        */
+>>
+>> It is a little awkward that "!pwrap_is_mt8135(wrp)" means mt8173.  Is
+>> this always true?
+>> Why aren't we clearing STAUPD for mt8135 too?
+>> I assume it is because mt8135 does not define this bit?
+>> What about other devices that are not mt8135 or mt8173?
+>
+> MT8135 used STAUPD because it have pwrap event pin and it was different
+> with mt8173. pwrap event have been removed on mt8173, so it no need to
+> set STAUPD.
+>
+
+I think we already had this discussion once. It seems as if there are 
+different versions of pmic-wrapper. An older version used by mt8135 and 
+e.g. mt6589 and a newer one used by mt8173.
+
+So I agree with Daniel that we should check pwrap_is_mt8173 instead.
+
+Apart from that the patch looks good.
+
+Regards,
+Matthias
+
+> Henry
+>
+>> Perhaps change the comment to:
+>> "This driver does not use STAUPD, so clear this WDT SRC for all
+>> devices for which it exists to avoid unhandled interrupts"
+>>
+>
+>> Other than that, this patch is:
+>> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+>>
+>>> +       wdt_src = pwrap_is_mt8135(wrp) ?
+>>> +                       PWRAP_WDT_SRC_MASK_ALL : PWRAP_WDT_SRC_MASK_NO_STAUPD;
+>>> +       pwrap_writel(wrp, wdt_src, PWRAP_WDT_SRC_EN);
+>>>          pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
+>>>          pwrap_writel(wrp, ~((1 << 31) | (1 << 1)), PWRAP_INT_EN);
+>>>
+>>> --
+>>> 1.8.1.1.dirty
+>>>
+>
+>
