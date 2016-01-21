@@ -1,54 +1,55 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 21 Jan 2016 12:14:23 +0100
-Subject: [PATCH RFC 05/15] mmc: sunxi: Support MMC_DDR52 timing modes
-In-Reply-To: <1453354002-28366-6-git-send-email-wens@csie.org>
+Date: Thu, 21 Jan 2016 12:16:53 +0100
+Subject: [PATCH RFC 09/15] ARM: dts: sun6i: sina31s: Switch to mmc3 for
+ onboard eMMC
+In-Reply-To: <1453354002-28366-10-git-send-email-wens@csie.org>
 References: <1453354002-28366-1-git-send-email-wens@csie.org>
- <1453354002-28366-6-git-send-email-wens@csie.org>
-Message-ID: <56A0BD8F.2000805@redhat.com>
+ <1453354002-28366-10-git-send-email-wens@csie.org>
+Message-ID: <56A0BE25.1020309@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
 On 21-01-16 06:26, Chen-Yu Tsai wrote:
-> DDR transfer modes include UHS-1 DDR50 and MMC HS-DDR (or MMC_DDR52).
-> Consider MMC_DDR52 when setting clock delays.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->   drivers/mmc/host/sunxi-mmc.c | 6 ++++--
->   1 file changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 4bec87458317..b403a2433eec 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -687,7 +687,8 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->   		oclk_dly = host->clk_delays[SDXC_CLK_25M].output;
->   		sclk_dly = host->clk_delays[SDXC_CLK_25M].sample;
->   	} else if (rate <= 50000000) {
+> According to Allwinner, only mmc3 supports 8 bit DDR transfers for eMMC.
+> Switch to mmc3 for the onboard eMMC, and also assign vqmmc for signal
+> voltage sensing/switching, and "cap-mmc-hw-reset" to denote this
+> instance can use eMMC hardware reset.
 
-Shouldn't this be <= 52000000 then, considering that we may@one point get
-some PLL setup where we may actually be able to do 52000000 for MMC_TIMING_MMC_DDR52 ?
-
-> -		if (ios->timing == MMC_TIMING_UHS_DDR50) {
-> +		if (ios->timing == MMC_TIMING_UHS_DDR50 ||
-> +		    ios->timing == MMC_TIMING_MMC_DDR52) {
->   			oclk_dly = host->clk_delays[SDXC_CLK_50M_DDR].output;
->   			sclk_dly = host->clk_delays[SDXC_CLK_50M_DDR].sample;
->   		} else {
-> @@ -762,7 +763,8 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->
->   	/* set ddr mode */
->   	rval = mmc_readl(host, REG_GCTRL);
-> -	if (ios->timing == MMC_TIMING_UHS_DDR50)
-> +	if (ios->timing == MMC_TIMING_UHS_DDR50 ||
-> +	    ios->timing == MMC_TIMING_MMC_DDR52)
->   		rval |= SDXC_DDR_MODE;
->   	else
->   		rval &= ~SDXC_DDR_MODE;
->
+This is going to need some more explanation, does this mean
+that the old dtsi is wrong and the emmc does not work there are all ?
 
 Regards,
 
 Hans
+
+
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>   arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi | 6 ++++--
+>   1 file changed, 4 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi b/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
+> index ea69fb8ad4d8..4ec0c8679b2e 100644
+> --- a/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
+> +++ b/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
+> @@ -61,12 +61,14 @@
+>   };
+>
+>   /* eMMC on core board */
+> -&mmc2 {
+> +&mmc3 {
+>   	pinctrl-names = "default";
+> -	pinctrl-0 = <&mmc2_8bit_emmc_pins>;
+> +	pinctrl-0 = <&mmc3_8bit_emmc_pins>;
+>   	vmmc-supply = <&reg_dcdc1>;
+> +	vqmmc-supply = <&reg_dcdc1>;
+>   	bus-width = <8>;
+>   	non-removable;
+> +	cap-mmc-hw-reset;
+>   	status = "okay";
+>   };
+>
+>
