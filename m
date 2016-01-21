@@ -1,58 +1,69 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 21 Jan 2016 10:21:50 +0100
-Subject: [PATCH] clk: rockchip: rk3036: Add apll as the critical clock
-In-Reply-To: <1453279037-23971-1-git-send-email-zhengxing@rock-chips.com>
-References: <1453279037-23971-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <7538210.fX6mmzZ75v@phil>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 21 Jan 2016 09:29:10 +0000
+Subject: [PATCH] ARM: dts: n900: Include adp1653 device
+In-Reply-To: <20160121091241.GS7192@pali>
+References: <1451086812-3729-1-git-send-email-pali.rohar@gmail.com>
+ <20160121091241.GS7192@pali>
+Message-ID: <20160121092909.GH5783@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xing,
+The merge window is open, which is when development code that was merged
+in good time prior to the merge window is sent upstream to Linus.  Linux
+maintainers may choose not to merge new code into their tree to avoid
+disrupting the utility of linux-next until the merge window has closed.
 
-Am Mittwoch, 20. Januar 2016, 16:37:17 schrieb Xing Zheng:
-> The apll may be closed if there are some child clock nodes below
-> it when the device startup. Therefore, the apll should be keep
-> critical.
+linux-next is an integration tree to help find merge conflicts, it
+exists to assist with the merge windows, not as a general test ground.
+Thus, linux-next must only contain code for either the current open
+merge window, or if the merge window is closed, the next merge window.
+
+On Thu, Jan 21, 2016 at 10:12:41AM +0100, Pali Roh?r wrote:
+> On Saturday 26 December 2015 00:40:12 Pali Roh?r wrote:
+> > This patch adds adp1653 device into n900 DT structure. DT support in
+> > adp1653 driver is there since v4.2-rc1 version.
+> > 
+> > Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+> > ---
+> >  arch/arm/boot/dts/omap3-n900.dts |   15 +++++++++++++++
+> >  1 file changed, 15 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+> > index 5f5e0f3..ba93642 100644
+> > --- a/arch/arm/boot/dts/omap3-n900.dts
+> > +++ b/arch/arm/boot/dts/omap3-n900.dts
+> > @@ -522,6 +522,21 @@
+> >  		amstaos,cover-comp-gain = <16>;
+> >  	};
+> >  
+> > +	adp1653: led-controller at 30 {
+> > +		compatible = "adi,adp1653";
+> > +		reg = <0x30>;
+> > +		enable-gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
+> > +
+> > +		flash {
+> > +			flash-timeout-us = <500000>;
+> > +			flash-max-microamp = <320000>;
+> > +			led-max-microamp = <50000>;
+> > +		};
+> > +		indicator {
+> > +			led-max-microamp = <17500>;
+> > +		};
+> > +	};
+> > +
+> >  	lp5523: lp5523 at 32 {
+> >  		compatible = "national,lp5523";
+> >  		reg = <0x32>;
 > 
-> The apll tree like this:
->     pll_apll
->        apll
->           armclk
->              pclk_dbg
->              aclk_core_pre
->           aclk_hvec
->           uart_pll_clk
->              uart2_src
->                 uart2_frac
->              uart1_src
->                 uart1_frac
->              uart0_src
->                 uart0_frac
-
-can you find out which of those clocks does cause your hang?
-Because things like the uart-clocks for example should be handled by their 
-driver already, at the time the clk_disable_unused runs(). So I'd really 
-like the critical clock to be the actually needed clock.
-
-Thanks
-Heiko
-
-
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> ---
+> PING, who can take this patch?
 > 
->  drivers/clk/rockchip/clk-rk3036.c |    1 +
->  1 file changed, 1 insertion(+)
+> I still do not see it in linus tree nor in others like arm-soc...
 > 
-> diff --git a/drivers/clk/rockchip/clk-rk3036.c
-> b/drivers/clk/rockchip/clk-rk3036.c index ebce980..483913b 100644
-> --- a/drivers/clk/rockchip/clk-rk3036.c
-> +++ b/drivers/clk/rockchip/clk-rk3036.c
-> @@ -425,6 +425,7 @@ static struct rockchip_clk_branch
-> rk3036_clk_branches[] __initdata = { };
-> 
->  static const char *const rk3036_critical_clocks[] __initconst = {
-> +	"apll",
->  	"aclk_cpu",
->  	"aclk_peri",
->  	"hclk_peri",
+> -- 
+> Pali Roh?r
+> pali.rohar at gmail.com
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
