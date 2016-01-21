@@ -1,112 +1,81 @@
-From: henryc.chen@mediatek.com (Henry Chen)
-Date: Thu, 21 Jan 2016 18:28:24 +0800
-Subject: [PATCH] soc: mediatek: PMIC wrap: clear the STAUPD_TRIG bit of
- WDT_SRC_EN
-In-Reply-To: <56A0A249.30003@gmail.com>
-References: <1453265564-16379-1-git-send-email-henryc.chen@mediatek.com>
- <CAGS+omCFOUgTHxeUn0snrkBjvcR1bSOAAmkBHppF8nM37P1vrw@mail.gmail.com>
- <1453288312.8457.9.camel@mtksdaap41> <56A0A249.30003@gmail.com>
-Message-ID: <1453372104.8457.12.camel@mtksdaap41>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 21 Jan 2016 11:41:59 +0100
+Subject: [PATCH] soc: mediatek: PMIC wrap: Delete unused regmap support
+Message-ID: <1453372919-15602-1-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-01-21 at 10:18 +0100, Matthias Brugger wrote:
-> 
-> On 20/01/16 12:11, Henry Chen wrote:
-> > On Wed, 2016-01-20 at 02:32 -0800, Daniel Kurtz wrote:
-> >> On Tue, Jan 19, 2016 at 8:52 PM, Henry Chen <henryc.chen@mediatek.com> wrote:
-> >>> Since STAUPD interrupts aren't handled on mt8173, disable watchdog timeout
-> >>> monitor of STAUPD to avoid WDT_INT triggered by STAUPD.
-> >>>
-> >>> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
-> >>
-> >>> ---
-> >>>   drivers/soc/mediatek/mtk-pmic-wrap.c | 19 +++++++++++++++++--
-> >>>   1 file changed, 17 insertions(+), 2 deletions(-)
-> >>>
-> >>> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> >>> index af919b1..998f561 100644
-> >>> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> >>> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> >>> @@ -60,6 +60,15 @@
-> >>>   #define PWRAP_MAN_CMD_OP_OUTD          (0x9 << 8)
-> >>>   #define PWRAP_MAN_CMD_OP_OUTQ          (0xa << 8)
-> >>>
-> >>> +/* macro for Watch Dog Timer Source */
-> >>> +#define PWRAP_WDT_SRC_EN_STAUPD_TRIG           (1 << 25)
-> >>> +#define PWRAP_WDT_SRC_EN_HARB_STAUPD_DLE       (1 << 20)
-> >>> +#define PWRAP_WDT_SRC_EN_HARB_STAUPD_ALE       (1 << 6)
-> >>> +#define PWRAP_WDT_SRC_MASK_ALL                 0xffffffff
-> >>> +#define PWRAP_WDT_SRC_MASK_NO_STAUPD   ~(PWRAP_WDT_SRC_EN_STAUPD_TRIG | \
-> >>> +                                         PWRAP_WDT_SRC_EN_HARB_STAUPD_DLE | \
-> >>> +                                         PWRAP_WDT_SRC_EN_HARB_STAUPD_ALE)
-> >>> +
-> >>>   /* macro for slave device wrapper registers */
-> >>>   #define PWRAP_DEW_BASE                 0xbc00
-> >>>   #define PWRAP_DEW_EVENT_OUT_EN         (PWRAP_DEW_BASE + 0x0)
-> >>> @@ -830,7 +839,7 @@ MODULE_DEVICE_TABLE(of, of_pwrap_match_tbl);
-> >>>
-> >>>   static int pwrap_probe(struct platform_device *pdev)
-> >>>   {
-> >>> -       int ret, irq;
-> >>> +       int ret, irq, wdt_src;
-> >>>          struct pmic_wrapper *wrp;
-> >>>          struct device_node *np = pdev->dev.of_node;
-> >>>          const struct of_device_id *of_id =
-> >>> @@ -920,7 +929,13 @@ static int pwrap_probe(struct platform_device *pdev)
-> >>>
-> >>>          /* Initialize watchdog, may not be done by the bootloader */
-> >>>          pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
-> >>> -       pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
-> >>> +       /*
-> >>> +        * Since STAUPD was not used on mt8173 platform,
-> >>> +        * so STAUPD of WDT_SRC which should be turned off
-> >>> +        */
-> >>
-> >> It is a little awkward that "!pwrap_is_mt8135(wrp)" means mt8173.  Is
-> >> this always true?
-> >> Why aren't we clearing STAUPD for mt8135 too?
-> >> I assume it is because mt8135 does not define this bit?
-> >> What about other devices that are not mt8135 or mt8173?
-> >
-> > MT8135 used STAUPD because it have pwrap event pin and it was different
-> > with mt8173. pwrap event have been removed on mt8173, so it no need to
-> > set STAUPD.
-> >
-> 
-> I think we already had this discussion once. It seems as if there are 
-> different versions of pmic-wrapper. An older version used by mt8135 and 
-> e.g. mt6589 and a newer one used by mt8173.
-> 
-> So I agree with Daniel that we should check pwrap_is_mt8173 instead.
+PMIC wrapper does not use regmap support, although some regmap
+code slipped into the driver. This patch deletes this code parts.
 
-> Apart from that the patch looks good.
-> 
+Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+---
+ drivers/soc/mediatek/mtk-pmic-wrap.c | 25 -------------------------
+ 1 file changed, 25 deletions(-)
 
-Ok, I will send a patch to change that, thanks.
-Henry 
-
-> Regards,
-> Matthias
-> 
-> > Henry
-> >
-> >> Perhaps change the comment to:
-> >> "This driver does not use STAUPD, so clear this WDT SRC for all
-> >> devices for which it exists to avoid unhandled interrupts"
-> >>
-> >
-> >> Other than that, this patch is:
-> >> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-> >>
-> >>> +       wdt_src = pwrap_is_mt8135(wrp) ?
-> >>> +                       PWRAP_WDT_SRC_MASK_ALL : PWRAP_WDT_SRC_MASK_NO_STAUPD;
-> >>> +       pwrap_writel(wrp, wdt_src, PWRAP_WDT_SRC_EN);
-> >>>          pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
-> >>>          pwrap_writel(wrp, ~((1 << 31) | (1 << 1)), PWRAP_INT_EN);
-> >>>
-> >>> --
-> >>> 1.8.1.1.dirty
-> >>>
-> >
-> >
+diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+index 105597a..83b22bf 100644
+--- a/drivers/soc/mediatek/mtk-pmic-wrap.c
++++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+@@ -18,7 +18,6 @@
+ #include <linux/module.h>
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
+-#include <linux/regmap.h>
+ #include <linux/reset.h>
+ 
+ #define PWRAP_MT8135_BRIDGE_IORD_ARB_EN		0x4
+@@ -366,7 +365,6 @@ static struct pmic_wrapper_type pwrap_mt8173 = {
+ struct pmic_wrapper {
+ 	struct device *dev;
+ 	void __iomem *base;
+-	struct regmap *regmap;
+ 	int *regs;
+ 	enum pwrap_type type;
+ 	u32 arb_en_all;
+@@ -475,16 +473,6 @@ static int pwrap_read(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
+ 	return 0;
+ }
+ 
+-static int pwrap_regmap_read(void *context, u32 adr, u32 *rdata)
+-{
+-	return pwrap_read(context, adr, rdata);
+-}
+-
+-static int pwrap_regmap_write(void *context, u32 adr, u32 wdata)
+-{
+-	return pwrap_write(context, adr, wdata);
+-}
+-
+ static int pwrap_reset_spislave(struct pmic_wrapper *wrp)
+ {
+ 	int ret, i;
+@@ -780,15 +768,6 @@ static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static const struct regmap_config pwrap_regmap_config = {
+-	.reg_bits = 16,
+-	.val_bits = 16,
+-	.reg_stride = 2,
+-	.reg_read = pwrap_regmap_read,
+-	.reg_write = pwrap_regmap_write,
+-	.max_register = 0xffff,
+-};
+-
+ static struct of_device_id of_pwrap_match_tbl[] = {
+ 	{
+ 		.compatible = "mediatek,mt8135-pwrap",
+@@ -904,10 +883,6 @@ static int pwrap_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto err_out2;
+ 
+-	wrp->regmap = devm_regmap_init(wrp->dev, NULL, wrp, &pwrap_regmap_config);
+-	if (IS_ERR(wrp->regmap))
+-		return PTR_ERR(wrp->regmap);
+-
+ 	ret = of_platform_populate(np, NULL, NULL, wrp->dev);
+ 	if (ret) {
+ 		dev_dbg(wrp->dev, "failed to create child devices at %s\n",
+-- 
+2.6.2
