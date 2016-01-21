@@ -1,207 +1,204 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Thu, 21 Jan 2016 14:49:43 +0800
-Subject: [PATCH v2] clk: rockchip: Add support for multiple clock providers
-In-Reply-To: <3395528.oy9qVuyESf@phil>
-References: <1453280809-3120-1-git-send-email-zhengxing@rock-chips.com>
- <3395528.oy9qVuyESf@phil>
-Message-ID: <56A07F87.2060400@rock-chips.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 21 Jan 2016 15:53:42 +0900
+Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
+In-Reply-To: <20160120114929.GB25829@leverpostej>
+References: <20160115201601.GR3262@leverpostej> <569CBDBC.5050500@linaro.org>
+ <20160119014332.GB2919@dhcp-128-65.nay.redhat.com>
+ <569DCB30.9010501@linaro.org>
+ <20160119122848.GA2904@dhcp-128-65.nay.redhat.com>
+ <20160119125114.GH25024@leverpostej>
+ <20160119134553.GA2986@dhcp-128-65.nay.redhat.com>
+ <20160119140139.GC26545@leverpostej>
+ <20160120024946.GA2999@dhcp-128-65.nay.redhat.com>
+ <569F2439.9000604@linaro.org> <20160120114929.GB25829@leverpostej>
+Message-ID: <56A08076.8060302@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Heiko,
-     Thank you for your reply.
-
-On 2016?01?21? 07:38, Heiko Stuebner wrote:
-> Hi,
+On 01/20/2016 08:49 PM, Mark Rutland wrote:
+> On Wed, Jan 20, 2016 at 03:07:53PM +0900, AKASHI Takahiro wrote:
+>> On 01/20/2016 11:49 AM, Dave Young wrote:
+>>> On 01/19/16 at 02:01pm, Mark Rutland wrote:
+>>>> On Tue, Jan 19, 2016 at 09:45:53PM +0800, Dave Young wrote:
+>>>>> On 01/19/16 at 12:51pm, Mark Rutland wrote:
+>>>>>> On Tue, Jan 19, 2016 at 08:28:48PM +0800, Dave Young wrote:
+>>>>>>> On 01/19/16 at 02:35pm, AKASHI Takahiro wrote:
+>>>>>>>> On 01/19/2016 10:43 AM, Dave Young wrote:
+>>>>>>>>> X86 takes another way in latest kexec-tools and kexec_file_load, that is
+>>>>>>>>> recreating E820 table and pass it to kexec/kdump kernel, if the entries
+>>>>>>>>> are over E820 limitation then turn to use setup_data list for remain
+>>>>>>>>> entries.
+>>>>>>>>
+>>>>>>>> Thanks. I will visit x86 code again.
+>>>>>>>>
+>>>>>>>>> I think it is X86 specific. Personally I think device tree property is
+>>>>>>>>> better.
+>>>>>>>>
+>>>>>>>> Do you think so?
+>>>>>>>
+>>>>>>> I'm not sure it is the best way. For X86 we run into problem with
+>>>>>>> memmap= design, one example is pci domain X (X>1) need the pci memory
+>>>>>>> ranges being passed to kdump kernel. When we passed reserved ranges in /proc/iomem
+>>>>>>> to 2nd kernel we find that cmdline[] array is not big enough.
+>>>>>>
+>>>>>> I'm not sure how PCI ranges relate to the memory map used for normal
+>>>>>> memory (i.e. RAM), though I'm probably missing some caveat with the way
+>>>>>> ACPI and UEFI describe PCI. Why does memmap= affect PCI memory?
+>>>>>
+>>>>> Here is the old patch which was rejected in kexec-tools:
+>>>>> http://lists.infradead.org/pipermail/kexec/2013-February/007924.html
+>>>>>
+>>>>>>
+>>>>>> If the kernel got the rest of its system topology from DT, the PCI
+>>>>>> regions would be described there.
+>>>>>
+>>>>> Yes, if kdump kernel use same DT as 1st kernel.
+>>>>
+>>>> Other than for testing purposes, I don't see why you'd pass the kdump
+>>>> kernel a DTB inconsistent with that the 1st kernel was passsed (other
+>>>> than some proerties under /chosen).
+>>>>
+>>>> We added /sys/firmware/fdt specifically to allow the kexec tools to get
+>>>> the exact DTB the first kernel used. There's no reason for tools to have
+>>>> to make something up.
+>>>
+>>> Agreed, but kexec-tools has an option to pass in any dtb files. Who knows
+>>> how one will use it unless dropping the option and use /sys/firmware/fdt
+>>> unconditionally.
+>>
+>> As a matter of fact, specifying proper command line parameters as well as
+>> dtb is partly users' responsibility for kdump to work correctly.
+>> (especially for BE kernel)
+>>
+>>> If we choose to implement kexec_file_load only in kernel, the interfaces
+>>> provided are kernel, initrd and cmdline. We can always use same dtb.
+>>
+>> I would say that we can always use the same dtb even with kexec_load
+>> from user's perspective. Right?
 >
-> Am Mittwoch, 20. Januar 2016, 17:06:49 schrieb Xing Zheng:
->> There are need to support Multi-CRUs probability in future, but
->> it is not supported on the current Rockchip Clock Framework.
->>
->> Therefore, this patch add support a provider as the parameter
->> handler when we call the clock register functions for per CRU.
->>
->> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> overall this looks really nice. Thanks for following up on our talk so
-> quickly :-) .
+> No.
 >
->> ---
->>
->> Changes in v2:
->> - Fix missed to call rockchip_clk_common_cru_init when SoCs clock init.
->>
->>   drivers/clk/rockchip/clk-rk3036.c |   15 +++--
->>   drivers/clk/rockchip/clk-rk3188.c |   40 ++++++++-----
->>   drivers/clk/rockchip/clk-rk3228.c |   15 +++--
->>   drivers/clk/rockchip/clk-rk3288.c |   17 ++++--
->>   drivers/clk/rockchip/clk-rk3368.c |   19 +++---
->>   drivers/clk/rockchip/clk.c        |  120
->> +++++++++++++++++++++++-------------- drivers/clk/rockchip/clk.h        |
->>    35 ++++++++---
->>   7 files changed, 170 insertions(+), 91 deletions(-)
->>
->> diff --git a/drivers/clk/rockchip/clk-rk3036.c
->> b/drivers/clk/rockchip/clk-rk3036.c index 483913b..050ad13 100644
->> --- a/drivers/clk/rockchip/clk-rk3036.c
->> +++ b/drivers/clk/rockchip/clk-rk3036.c
->> @@ -434,6 +434,7 @@ static const char *const rk3036_critical_clocks[]
->> __initconst = {
->>
->>   static void __init rk3036_clk_init(struct device_node *np)
->>   {
->> +	struct rockchip_clk_provider *ctx;
->>   	void __iomem *reg_base;
->>   	struct clk *clk;
->>
->> @@ -443,7 +444,9 @@ static void __init rk3036_clk_init(struct device_node
->> *np) return;
->>   	}
->>
->> -	rockchip_clk_init(np, reg_base, CLK_NR_CLKS);
->> +	ctx = rockchip_clk_init(reg_base, CLK_NR_CLKS);
->> +
->> +	rockchip_clk_common_cru_init(np);
->>
->>   	/* xin12m is created by an cru-internal divider */
->>   	clk = clk_register_fixed_factor(NULL, "xin12m", "xin24m", 0, 1, 2);
->> @@ -473,15 +476,15 @@ static void __init rk3036_clk_init(struct
->> device_node *np) pr_warn("%s: could not register clock sclk_macref_out:
->> %ld\n", __func__, PTR_ERR(clk));
->>
->> -	rockchip_clk_register_plls(rk3036_pll_clks,
->> +	rockchip_clk_register_plls(ctx, rk3036_pll_clks,
->>   				   ARRAY_SIZE(rk3036_pll_clks),
->>   				   RK3036_GRF_SOC_STATUS0);
->> -	rockchip_clk_register_branches(rk3036_clk_branches,
->> +	rockchip_clk_register_branches(ctx, rk3036_clk_branches,
->>   				  ARRAY_SIZE(rk3036_clk_branches));
->>   	rockchip_clk_protect_critical(rk3036_critical_clocks,
->>   				      ARRAY_SIZE(rk3036_critical_clocks));
->>
->> -	rockchip_clk_register_armclk(ARMCLK, "armclk",
->> +	rockchip_clk_register_armclk(ctx, ARMCLK, "armclk",
->>   			mux_armclk_p, ARRAY_SIZE(mux_armclk_p),
->>   			&rk3036_cpuclk_data, rk3036_cpuclk_rates,
->>   			ARRAY_SIZE(rk3036_cpuclk_rates));
->> @@ -489,6 +492,8 @@ static void __init rk3036_clk_init(struct device_node
->> *np) rockchip_register_softrst(np, 9, reg_base + RK2928_SOFTRST_CON(0),
->> ROCKCHIP_SOFTRST_HIWORD_MASK);
->>
->> -	rockchip_register_restart_notifier(RK2928_GLB_SRST_FST, NULL);
->> +	rockchip_register_restart_notifier(ctx, RK2928_GLB_SRST_FST, NULL);
->> +
->> +	rockchip_clk_of_add_provider(np, ctx);
->>   }
->>   CLK_OF_DECLARE(rk3036_cru, "rockchip,rk3036-cru", rk3036_clk_init);
->> diff --git a/drivers/clk/rockchip/clk-rk3188.c
->> b/drivers/clk/rockchip/clk-rk3188.c index 7f7444c..338a22e 100644
->> --- a/drivers/clk/rockchip/clk-rk3188.c
->> +++ b/drivers/clk/rockchip/clk-rk3188.c
->> @@ -750,18 +750,19 @@ static const char *const rk3188_critical_clocks[]
->> __initconst = { "pclk_peri",
->>   };
->>
->> -static void __init rk3188_common_clk_init(struct device_node *np)
->> +static struct rockchip_clk_provider *__init rk3188_common_clk_init(struct
->> device_node *np) {
->> +	struct rockchip_clk_provider *ctx;
->>   	void __iomem *reg_base;
->>   	struct clk *clk;
->>
->>   	reg_base = of_iomap(np, 0);
->> -	if (!reg_base) {
->> -		pr_err("%s: could not map cru region\n", __func__);
->> -		return;
->> -	}
->> +	if (!reg_base)
->> +		panic("%s: could not map cru region\n", __func__);
-> I don't believe in doing panics everywhere :-), please do
-> 	return ERR_PTR(-ENOMEM);
-> here and in similar locations and let the top-most caller handle errors.
-Done.
->> @@ -260,27 +261,49 @@ static struct clk
->> *rockchip_clk_register_frac_branch(const char *name, return clk;
->>   }
->>
->> -static DEFINE_SPINLOCK(clk_lock);
->> -static struct clk **clk_table;
->> -static void __iomem *reg_base;
->> -static struct clk_onecell_data clk_data;
->>   static struct device_node *cru_node;
-> please also include the devicetree node into the ctx struct. That way we can
-> keep track of all of them (when there are multiple).
-In my opinion, I am a bit worried about the function 
-rockchip_clk_get_grf, it just refer to
-common CRU node to acquire global GRF regmap. And the function is 
-non-parameter,
-so, I think I will add ctx as parameter in the clk-pll.c.
+> This breaks using kexec for boot-loader purposes, and imposes a policy.
 
-And, there are the same feature between PLL lock status in the 
-GRF_SOC_STATUSx and the
-the lock bit of CRU_xPLL_CONx. They are coexsit on some SoCs like 
-RK3036/RK3228/RK3288/RK3368,
-there is only GRF_SOC_STATUSx on some SoCs like RK3066/RK3188.
-AFAIK,  there are not the bits of PLL lock status in the GRF_SOC_STATUSx 
-any more in future, like RK3399.
-Therefore, we should add some patches to keep the checking PLL lock 
-status compatibility.
+What kind of policy?
+I said "can", but if we want to use other setting/configuration, we can
+still have a full control.
 
-BTW, it looks that there are too many place call the 
-rockchip_clk_get_grf, and they looks
-like unused? Should we remove them?
->>   static struct regmap *grf;
->>
->> -void __init rockchip_clk_init(struct device_node *np, void __iomem *base,
->> -			      unsigned long nr_clks)
->> +struct rockchip_clk_provider *__init rockchip_clk_init(
->> +			void __iomem *base, unsigned long nr_clks)
->>   {
->> -	reg_base = base;
->> -	cru_node = np;
->> -	grf = ERR_PTR(-EPROBE_DEFER);
->> +	struct rockchip_clk_provider *ctx;
->> +	struct clk **clk_table;
->> +	int i;
->> +
->> +	ctx = kzalloc(sizeof(struct rockchip_clk_provider), GFP_KERNEL);
->> +	if (!ctx)
->> +		panic("could not allocate clock provider context.\n");
-> as I wrote above, please return a real error here. Especially when there are
-> multiple clock controllers, it might actually get a bit farther in cases
-> when only one of them fails, which might help in debugging underlying issues
-> in such cases.
-Done.
->>   	clk_table = kcalloc(nr_clks, sizeof(struct clk *), GFP_KERNEL);
->>   	if (!clk_table)
->> -		pr_err("%s: could not allocate clock lookup table\n", __func__);
->> +		panic("could not allocate clock lookup table\n");
-> same here (and kfree the ctx from above before returning)
-Done.
->> +
->> +	for (i = 0; i < nr_clks; ++i)
->> +		clk_table[i] = ERR_PTR(-ENOENT);
->> +
->> +	ctx->reg_base = base;
->> +	ctx->clk_data.clks = clk_table;
->> +	ctx->clk_data.clk_num = nr_clks;
->> +	spin_lock_init(&ctx->lock);
->> +
->> +	return ctx;
->> +}
->>
->> -	clk_data.clks = clk_table;
->> -	clk_data.clk_num = nr_clks;
->> -	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
->> +void __init rockchip_clk_common_cru_init(struct device_node *np)
->> +{
->> +	cru_node = np;
->> +	grf = ERR_PTR(-EPROBE_DEFER);
-> I'm not sure why this is a separate function. Setting the node pointer (into
-> the new struct as written above) can still happen in rockchip_clk_init, and
-> initializing the global grf pointer as well.
-Done.
+> For better or worse kexec_file_load has always imposed a constrained
+> Linux-only policy, so that's a different story.
 >
-> Heiko
-Thanks.
+>>>> There's a horrible edge case I've spotted if performing a chain of
+>>>> cross-endian kexecs: LE -> BE -> LE, as the BE kernel would have to
+>>>> respect the EFI memory map so as to avoid corrupting it for the
+>>>> subsequent LE kernel. Other than this I believe everything should just
+>>>> work.
+>>>
+>>> Firmware do not know kernel endianniess, kernel should respect firmware
+>>> maps and adapt to it, it sounds like a generic issue not specfic to kexec.
+>>
+>> On arm64, a kernel image header has a bit field to specify the image's endianness.
+>> Anyway, our current implementation replies on a user-supplied dtb to start BE kernel.
+>
+> The firmware should _never_ care about the kernel's endianness. The
+> bootlaoder or first kernel shouldn't care about the next kernel's
+> endianness apart from in exceptional circumstances. The DTB for a LE
+> kernel should look identical to that passed to a BE kernel.
 
-- Xing Zheng
+Please note that I didn't say anything different from your last two statements.
+The current arm64 kexec implementation doesn't do anything specific to BE,
+but as far as BE kernel doesn't support UEFI, users are responsible for
+providing a proper dtb.
+
+> In my mind, the only valid reason to look at that bit is so that
+> bootloaders can provide a warning if the CPU does not implement that
+> endianness.
+>
+> The issue I mention above should be solved by changes to the BE kernel.
+>
+>>>>> Is it possible to modify uefi memmap for kdump case?
+>>>>
+>>>> Technically it would be possible, however I don't think it's necessary,
+>>>> and I think it would be disadvantageous to do so.
+>>>>
+>>>> Describing the range(s) the crash kernel can use in separate properties
+>>>> under /chosen has a number of advantages.
+>>>
+>>> Ok, I got the points. We have a is_kdump_kernel() by checking if there is
+>>> elfcorehdr_addr kernel cmdline. This is mainly for some drivers which
+>>> do not work well in kdump kernel some uncertain reasons. But ideally I
+>>> think kernel should handle things just like in 1st kernel and avoid to use
+>>> it.
+>>
+>> So I'm not still sure about what are advantages of a property under /chosen
+>> over "memmap=" kernel parameter.
+>> Both are simple and can have the same effect with minimizing changes to dtb.
+>> (But if, in the latter case, we have to provide *all* the memory-related information
+>> through "memmap=" parameters, it would be much complicated.)
+>
+> The reason I prefer a property over command line additions include:
+
+Take some examples:
+(a) a property under /chosen
+   {
+     chosen = {
+       cmdline = "elfcorehdr=AA at BB maxcpus=1 ...";
+     }
+     usable-memory = <XX YY>;
+     memory {
+       ...
+     }
+   }
+
+(b) a kernel command line parameter
+   (I use the same name, "usable-memory", to show the similarity. may use another name though.)
+   {
+     chosen = {
+       cmdline = "elfcorehdr=AA at BB maxcpus=1 usable-memory=YY at XX ...";
+     }
+     memory {
+       ...
+     }
+   }
+
+> * It keeps the command line simple (as you mention the opposite is
+>    "complicated").
+
+I think both are simple.
+
+> * It is logically separate from options the user may pass to the kernel
+>    in that the restricted region(s) of memory avaialble are effectively
+>    properties of the system (in that the crashed OS is part of the system
+>    state).
+
+"elfcorehdr=" parameter already breaks your point.
+"elfcorehdr=" looks to be, what you say, a system property, and is actually
+added by kexec-tools on all architectures, and "usable-memory", whether it is
+a DT property or a kernel parameter, will also be added by kexec-tools.
+(Users don't have to care.)
+
+> * The semantics of the command line parsing can change subtly over time
+>    (for example, see 51e158c12aca3c9a, which terminates command line
+>    parseing at "--"). Maknig sure that a command line option will
+>    actually be parsed by the next kernel is not trivial.
+>
+>    Keeping this information isolated from the command line is more
+>    robust.
+
+Even so, who wants to use kdump without testing?
+and this is not a kdump specific issue.
+
+> * Addition of a property is a self-contained operation, that doesn't
+>    require any knowledge about the command line.
+
+I don't get your point here.
+For a kernel parameter, early_param() can encapsulate all the stuffs necessary.
+Once the kernel recognizes a usable memory region, limiting available
+memory should be done in the exact same way.
+
+Thanks,
+-Takahiro AKASHI
+
+
+> Thanks,
+> Mark.
+>
