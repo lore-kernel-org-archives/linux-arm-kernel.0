@@ -1,60 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 21 Jan 2016 17:12:42 +0100
-Subject: [PATCH v3 18/21] efi: stub: implement efi_get_random_bytes()
- based on EFI_RNG_PROTOCOL
-In-Reply-To: <20160121154234.GE2510@codeblueprint.co.uk>
-References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
- <1452518355-4606-20-git-send-email-ard.biesheuvel@linaro.org>
- <20160121154234.GE2510@codeblueprint.co.uk>
-Message-ID: <CAKv+Gu8JgCiKkq9CgoXY8b8LAzhBp_6K_qtJv5OBszwPPVEgTw@mail.gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Thu, 21 Jan 2016 08:06:57 -0800
+Subject: RCU lockup? (was: Re: [PATCH v2 tip/core/rcu 10/14] rcu: Don't
+ redundantly disable irqs in rcu_irq_{enter,exit}())
+In-Reply-To: <CAMuHMdWz0U-uUs1Ox_13YOA0AfVPTx24nTA3=hx5Z5kcHr8SbQ@mail.gmail.com>
+References: <CAMuHMdWz0U-uUs1Ox_13YOA0AfVPTx24nTA3=hx5Z5kcHr8SbQ@mail.gmail.com>
+Message-ID: <20160121160657.GW3818@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 January 2016 at 16:42, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> On Mon, 11 Jan, at 02:19:12PM, Ard Biesheuvel wrote:
->> This exposes the firmware's implementation of EFI_RNG_PROTOCOL via a new
->> function efi_get_random_bytes().
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  drivers/firmware/efi/libstub/Makefile  |  2 +-
->>  drivers/firmware/efi/libstub/efistub.h |  3 ++
->>  drivers/firmware/efi/libstub/random.c  | 35 ++++++++++++++++++++
->>  include/linux/efi.h                    |  5 ++-
->>  4 files changed, 43 insertions(+), 2 deletions(-)
->
-> [...]
->
->> @@ -0,0 +1,35 @@
->> +/*
->> + * Copyright (C) 2016 Linaro Ltd;  <ard.biesheuvel@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + */
->> +
->> +#include <linux/efi.h>
->> +#include <asm/efi.h>
->> +
->> +#include "efistub.h"
->> +
->> +struct efi_rng_protocol_t {
->> +     efi_status_t (*get_info)(struct efi_rng_protocol_t *,
->> +                              unsigned long *, efi_guid_t *);
->> +     efi_status_t (*get_rng)(struct efi_rng_protocol_t *,
->> +                             efi_guid_t *, unsigned long, u8 *out);
->> +};
->
-> This is not the usual naming convention for EFI structs, it should
-> either be 'struct efi_rng_protocol' or 'efi_rng_protocol_t'.
->
+On Thu, Jan 21, 2016 at 02:22:56PM +0100, Geert Uytterhoeven wrote:
+> Hi Paul,
+> 
+> On Thu, Dec 10, 2015 at 12:10 AM, Paul E. McKenney
+> <paulmck@linux.vnet.ibm.com> wrote:
+> > This commit replaces a local_irq_save()/local_irq_restore() pair with
+> > a lockdep assertion that interrupts are already disabled.  This should
+> > remove the corresponding overhead from the interrupt entry/exit fastpaths.
+> >
+> > This change was inspired by the fact that Iftekhar Ahmed's mutation
+> > testing showed that removing rcu_irq_enter()'s call to local_ird_restore()
+> > had no effect, which might indicate that interrupts were always enabled
+> > anyway.
+> >
+> > Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> > ---
+> >  include/linux/rcupdate.h   |  4 ++--
+> >  include/linux/rcutiny.h    |  8 ++++++++
+> >  include/linux/rcutree.h    |  2 ++
+> >  include/linux/tracepoint.h |  4 ++--
+> >  kernel/rcu/tree.c          | 32 ++++++++++++++++++++++++++------
+> >  5 files changed, 40 insertions(+), 10 deletions(-)
+> 
+> This commit (7c9906ca5e582a773fff696975e312cef58a7386) is triggering lock ups
+> during boot on r8a7791/koelsch (dual Cortex A15). Probably this commit does not
+> contain the real bug, but a symptom.
 
-OK, I will change that.
+On the off-chance that it is related, here is Ding Tianhong's patch
+that addressed some lockups:
 
-> But apart from that, this patch looks fine.
->
-> Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
+http://www.eenyhelp.com/patch-rfc-locking-mutexes-dont-spin-owner-when-wait-list-not-null-help-215929641.html
 
-Thanks
+Does that help in your case?
+
+> Unfortunately I cannot reproduce it with CONFIG_PROVE_RCU=y.
+> 
+> I started seeing the issue when disabling an innocent option in
+> shmobile_defconfig. I tracked it down to the removal of an unused C function,
+> containing hardware support for another system. Replacing the C function by
+> a dummy function with the right number of "asm("nop")"s (depending on kernel
+> version and/or kernel config, sigh) made the issue go away.
+> Adding or removing nops makes the issue reappear, and has some impact on
+> how early the issue happens (sometimes as late as early userspace).
+> Adding a multiple of 16 nops has no impact.
+> So it looks like something that should be cacheline-aligned isn't...
+
+The other possibility is that it is timing related.  Either way, fun
+to find...
+
+> CONFIG_TREE_RCU=y
+> 
+> Do you have a suggestion?
+
+Only trying Ding's patch...
+
+							Thanx, Paul
