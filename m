@@ -1,51 +1,60 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 21 Jan 2016 18:53:46 +0800
-Subject: [PATCH v2 RESEND 0/4] arm64: Hi6220: enable CPU idle states
-Message-ID: <1453373630-4693-1-git-send-email-leo.yan@linaro.org>
+Date: Thu, 21 Jan 2016 18:53:47 +0800
+Subject: [PATCH v2 RESEND 1/4] arm64: dts: Reserve memory regions for hi6220
+In-Reply-To: <1453373630-4693-1-git-send-email-leo.yan@linaro.org>
+References: <1453373630-4693-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1453373630-4693-2-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is to enable CPU idle states for Hi6220.
+On Hi6220, below memory regions in DDR have specific purpose:
 
-Hi6220 uses PSCIv0.2 compliance interface, so directly use ARM's generic
-CPUIdle driver. Patch 1 is to reserve memory regions so make sure MCU can
-work well to handle power controlling; Patch 2/3 enable sp804 timer as
-broadcast timer during idle states; Patch 4 registers CPU power down state
-and cluster power down state.
+  0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
+  0x06df,f000 - 0x06df,ffff: For mailbox message data;
+  0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
+  0x3e00,0000 - 0x3fff,ffff: For OP-TEE.
 
-Patch 1 "arm64: dts: Reserve memory regions for hi6220" reserves memory
-regions by carve out from memory node; This follows up Mark Rutland's
-suggestion to avoid risks, such like kernel's linear mapping for reserved
-secure memory region may introduce speculative accesses triggering aborts
-from trustzone controller (TZC) and potential cache alias problem.
+This patch reserves these memory regions in DT.
 
-Rob Herring expressed reservations for this method and says "regions should
-be marked as reserved, it's not really worth holding up this platform
-further", so appreciate Rob helped to make progress for this series.
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
 
-The resend patch series have been rebased on mainline kernel, and tested on
-Hikey board. During testing I found CPUIdle menu governor is broken, this
-bug has been reported by Sudeep; Rafael J. Wysocki already has committed
-patch [1] to fix this issue. Testing pass after applied Rafael's patch.
-
-Changes from v1:
-* According to Sudeep's review, fix binding for idle-states
-* According to Rob's review, due timers share same clock source with apb
-  clock, so just only pass one clock phandle
-
-[1] http://article.gmane.org/gmane.linux.kernel.commits.head/573361
-
-
-Leo Yan (4):
-  arm64: dts: Reserve memory regions for hi6220
-  arm64: Kconfig: select sp804 timer for ARCH_HISI
-  arm64: dts: add sp804 timer node for Hi6220
-  arm64: dts: enable idle states for Hi6220
-
- arch/arm64/Kconfig.platforms                   |  1 +
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 16 ++++++++---
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 40 ++++++++++++++++++++++++++
- 3 files changed, 53 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+index 8d43a0f..1997e4d 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+@@ -7,9 +7,6 @@
+ 
+ /dts-v1/;
+ 
+-/*Reserved 1MB memory for MCU*/
+-/memreserve/ 0x05e00000 0x00100000;
+-
+ #include "hi6220.dtsi"
+ 
+ / {
+@@ -27,8 +24,19 @@
+ 		stdout-path = "serial3:115200n8";
+ 	};
+ 
++	/*
++	 * Reserve below regions from memory node:
++	 *
++	 *  0x05e0,0000 - 0x05ef,ffff: MCU firmware runtime using
++	 *  0x06df,f000 - 0x06df,ffff: Mailbox message data
++	 *  0x0740,f000 - 0x0740,ffff: MCU firmware section
++	 *  0x3e00,0000 - 0x3fff,ffff: OP-TEE
++	 */
+ 	memory at 0 {
+ 		device_type = "memory";
+-		reg = <0x0 0x0 0x0 0x40000000>;
++		reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
++		      <0x00000000 0x05f00000 0x00000000 0x00eff000>,
++		      <0x00000000 0x06e00000 0x00000000 0x0060f000>,
++		      <0x00000000 0x07410000 0x00000000 0x36bf0000>;
+ 	};
+ };
 -- 
 1.9.1
