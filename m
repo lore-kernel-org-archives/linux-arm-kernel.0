@@ -1,67 +1,44 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Thu, 21 Jan 2016 16:31:49 +0000
-Subject: [PATCH v3 21/21] arm64: efi: invoke EFI_RNG_PROTOCOL to supply
- KASLR randomness
-In-Reply-To: <1452518355-4606-23-git-send-email-ard.biesheuvel@linaro.org>
-References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
- <1452518355-4606-23-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160121163149.GH2510@codeblueprint.co.uk>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 22 Jan 2016 01:33:51 +0900
+Subject: [PATCH v2] of: drop symbols declared by _OF_DECLARE() from modules
+Message-ID: <1453394031-16578-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Jan, at 02:19:15PM, Ard Biesheuvel wrote:
-> Since arm64 does not use a decompressor that supplies an execution
-> environment where it is feasible to some extent to provide a source of
-> randomness, the arm64 KASLR kernel depends on the bootloader to supply
-> some random bits in register x1 upon kernel entry.
-> 
-> On UEFI systems, we can use the EFI_RNG_PROTOCOL, if supplied, to obtain
-> some random bits. At the same time, use it to randomize the offset of the
-> kernel Image in physical memory.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/Kconfig                             |  5 ++
->  arch/arm64/kernel/efi-entry.S                  |  7 +-
->  drivers/firmware/efi/libstub/arm-stub.c        | 17 ++---
->  drivers/firmware/efi/libstub/arm64-stub.c      | 67 +++++++++++++++-----
->  drivers/firmware/efi/libstub/efi-stub-helper.c | 10 +++
->  drivers/firmware/efi/libstub/efistub.h         |  2 +
->  6 files changed, 82 insertions(+), 26 deletions(-)
+The users of this macro (OF_EARLYCON_DECLARE, CLK_OF_DECLARE,
+IRQCHIP_DECLARE, etc.) are only parsed in the early boot stage.
+Such symbols contained in modules are never used.
 
-[...]
+This commit fixes the link error introduced by commit b8d20e06eaad
+("serial: 8250_uniphier: add earlycon support"); the combination
+of CONFIG_SERIAL_8250_UNIPHIER=m and CONFIG_SERIAL_8250_CONSOLE=y
+fails to link:
 
-> diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
-> index 2a7a3015d7e0..e8a3b8cd53cc 100644
-> --- a/drivers/firmware/efi/libstub/efi-stub-helper.c
-> +++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
-> @@ -32,6 +32,10 @@
->  
->  static unsigned long __chunk_size = EFI_READ_CHUNK_SIZE;
->  
-> +#ifdef CONFIG_RANDOMIZE_BASE
-> +bool __nokaslr;
-> +#endif
-> +
->  /*
->   * Allow the platform to override the allocation granularity: this allows
->   * systems that have the capability to run with a larger page size to deal
-> @@ -317,6 +321,12 @@ efi_status_t efi_parse_options(char *cmdline)
->  {
->  	char *str;
->  
-> +#ifdef CONFIG_RANDOMIZE_BASE
-> +	str = strstr(cmdline, "nokaslr");
-> +	if (str && (str == cmdline || *(str - 1) == ' '))
-> +		__nokaslr = true;
-> +#endif
-> +
->  	/*
->  	 * If no EFI parameters were specified on the cmdline we've got
->  	 * nothing to do.
+ERROR: "early_serial8250_setup" [drivers/tty/serial/8250/8250_uniphier.ko] undefined!
 
-Could we not keep the "nokaslr" parsing inside of arm-stub.c? It's not
-really specific to EFI and doesn't make use of any of the code in
-efi_parse_options() anyhow.
+Fixes: b8d20e06eaad ("serial: 8250_uniphier: add earlycon support")
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
 
-As an added bonus, __nokaslr could then become static.
+Changes in v2:
+  - Describe the bug fixed by this commit
+
+ include/linux/of.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/linux/of.h b/include/linux/of.h
+index dd10626..dc6e396 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -929,7 +929,7 @@ static inline int of_get_available_child_count(const struct device_node *np)
+ 	return num;
+ }
+ 
+-#ifdef CONFIG_OF
++#if defined(CONFIG_OF) && !defined(MODULE)
+ #define _OF_DECLARE(table, name, compat, fn, fn_type)			\
+ 	static const struct of_device_id __of_table_##name		\
+ 		__used __section(__##table##_of_table)			\
+-- 
+1.9.1
