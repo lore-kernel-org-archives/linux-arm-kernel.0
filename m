@@ -1,77 +1,69 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 21 Jan 2016 09:38:21 +0100
-Subject: [PATCH 1/2] ARM: dts: r8a7793: add CAN clocks
-In-Reply-To: <1453352981-16104-2-git-send-email-horms+renesas@verge.net.au>
-References: <1453352981-16104-1-git-send-email-horms+renesas@verge.net.au>
- <1453352981-16104-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdX5sZ7yNjgu8Ns26+91+ui2YuVfGavJi_XRa6Kd-yzoBQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Jan 2016 09:41:20 +0100
+Subject: [PATCH v3 1/1] USB: core: let USB device know device node
+In-Reply-To: <20160121031524.GA29893@shlinux2>
+References: <4405270.vcz87Q878u@wuerfel> <5639398.uJHXq6DsMC@wuerfel>
+ <20160121031524.GA29893@shlinux2>
+Message-ID: <1989217.907WTZoGvq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Thu, Jan 21, 2016 at 6:09 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> The R-Car CAN controllers can derive the CAN bus clock not only from their
-> peripheral clock input (clkp1) but also from the other internal clock
-> (clkp2) and external clock fed on CAN_CLK pin. Describe those clocks in
-> the device tree along with  the USB_EXTAL clock from which clkp2 is
-> derived.
->
-> Based on work by Sergei Shtylyov for the r8a7791 SoC.
->
-> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/boot/dts/r8a7793.dtsi | 20 +++++++++++++++++++-
->  1 file changed, 19 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-> index 0ce7cc420c9d..5d9375fa6759 100644
-> --- a/arch/arm/boot/dts/r8a7793.dtsi
-> +++ b/arch/arm/boot/dts/r8a7793.dtsi
-> @@ -706,12 +706,30 @@
->                         clock-output-names = "extal";
+On Thursday 21 January 2016 11:15:24 Peter Chen wrote:
+> 
+> Just adding from device driver view and change the name from "roohub" to
+> "port".
+> 
+> It is the port number (1-9), but not the root hub number.
+> 
+> At the most of embedded platforms, we have only one port per controller.
+> For example, at the non-hub boards, if there are two Standard-A ports,
+> there are from two different USB controllers.
+> But for Alan's case, it has six ports, and all from the one USB controller,
+> port 1 to port 6 are from the HS root hub, port 7 to port 9 are from the SS
+> root hub.
+> 
+> For the single port controller platform, the dts will be like below, port_1 is
+> under the HS root hub, port_2 is under the SS root hub.
+> 
+> &usb1 {
+>         port_1: nxp at 1 {
+>                 compatible = "usb15a2,007d";
+>                 reg = <0x01>;
+> 
+>                 hub: genesys at 1 {
+>                         compatible = "usb05e3,0608";
+>                         reg = <0x01>;
 >                 };
->
-> +               /* External USB clock - can be overridden by the board */
-> +               usb_extal_clk: usb_extal_clk {
-> +                       compatible = "fixed-clock";
-> +                       #clock-cells = <0>;
-> +                       clock-frequency = <48000000>;
-> +                       clock-output-names = "usb_extal";
-> +               };
-> +
-> +               /* External CAN clock */
-> +               can_clk: can_clk {
-> +                       compatible = "fixed-clock";
-> +                       #clock-cells = <0>;
-> +                       /* This value must be overridden by the board. */
-> +                       clock-frequency = <0>;
-> +                       clock-output-names = "can_clk";
-> +                       status = "disabled";
-> +               };
-> +
->                 /* Special CPG clocks */
->                 cpg_clocks: cpg_clocks at e6150000 {
->                         compatible = "renesas,r8a7793-cpg-clocks",
->                                      "renesas,rcar-gen2-cpg-clocks";
->                         reg = <0 0xe6150000 0 0x1000>;
-> -                       clocks = <&extal_clk>;
-> +                       clocks = <&extal_clk &usb_extal_clk>;
->                         #clock-cells = <1>;
->                         clock-output-names = "main", "pll0", "pll1", "pll3",
->                                              "lb", "qspi", "sdh", "sd0", "z",
+>         };
+> 
+>         port_2: nxp at 2 {
+>                 compatible = "usb15a2,007d";
+>                 reg = <0x02>;
+> 
+>                 hub: genesys at 1 {
+>                         compatible = "usb05e3,0608";
+>                         reg = <0x01>;
+>                 };
+>         };
+> };
 
-To create the "rcan" clock, it should be listed in clock-output-names.
+But why are you modeling ports of the root hub as hubs themselves?
 
-Gr{oetje,eeting}s,
+I would expect the example above to look like
 
-                        Geert
+&usb1 {
+        hub at 1 {
+                compatible = "usb05e3,0608";
+                reg = <0x01>;
+        };
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+	hub at 2 {
+                compatible = "usb05e3,0608";
+                reg = <0x01>;
+        };
+};
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+So two hubs at ports 1 and 2 of the USB controller that integrates
+the root hub and shares a device node with it.
+
+	Arnd
