@@ -1,88 +1,58 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 21 Jan 2016 10:21:59 +0100
-Subject: [PATCH] ARM: dts: imx6: enable pl310 "shared attribute override
- enable" bit
-In-Reply-To: <4df58eebc9995bcdb91f2f16b3093ed7@agner.ch>
-References: <1453346938-5625-1-git-send-email-b38611@freescale.com>
- <4df58eebc9995bcdb91f2f16b3093ed7@agner.ch>
-Message-ID: <1453368119.3183.19.camel@pengutronix.de>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 21 Jan 2016 10:21:50 +0100
+Subject: [PATCH] clk: rockchip: rk3036: Add apll as the critical clock
+In-Reply-To: <1453279037-23971-1-git-send-email-zhengxing@rock-chips.com>
+References: <1453279037-23971-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <7538210.fX6mmzZ75v@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 20.01.2016, 21:08 -0800 schrieb Stefan Agner:
-> Hi Andy,
-> 
-> On 2016-01-20 19:28, Fugang Duan wrote:
-> > The default behavior of the L220 or PL310 cache controllers with respect
-> > to the shareable attribute is to transform "normal memory non-cacheable
-> > transactions" into "cacheable no allocate" (for reads) or "write through
-> > no write allocate" (for writes).
-> > 
-> > On i.MX6 series platforms, enet/audio/usb/nand DMA buffer have corruption
-> > without CMA. So set this property "arm,shared-override" in L2 dts node to
-> > enable "shared attribute override enable" bit.
-> 
-> Do you happen to know if Vybrid could also suffer this too? Some IP's
-> are the same/similar ones...
-> 
-This is a bug in the default configuration of the PL310 L2 cache
-controller. AFAIK Vybrid does not use this IP block, so it should be
-safe.
+Hi Xing,
 
-Regards,
-Lucas
+Am Mittwoch, 20. Januar 2016, 16:37:17 schrieb Xing Zheng:
+> The apll may be closed if there are some child clock nodes below
+> it when the device startup. Therefore, the apll should be keep
+> critical.
+> 
+> The apll tree like this:
+>     pll_apll
+>        apll
+>           armclk
+>              pclk_dbg
+>              aclk_core_pre
+>           aclk_hvec
+>           uart_pll_clk
+>              uart2_src
+>                 uart2_frac
+>              uart1_src
+>                 uart1_frac
+>              uart0_src
+>                 uart0_frac
 
-> Did this manifest in any way?
-> 
-> --
-> Stefan
-> 
-> 
-> > 
-> > Signed-off-by: Fugang Duan <B38611@freescale.com>
-> > ---
-> >  arch/arm/boot/dts/imx6qdl.dtsi | 1 +
-> >  arch/arm/boot/dts/imx6sl.dtsi  | 1 +
-> >  arch/arm/boot/dts/imx6sx.dtsi  | 1 +
-> >  3 files changed, 3 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> > index 4f6ae92..b4de39a 100644
-> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> > @@ -185,6 +185,7 @@
-> >  			cache-level = <2>;
-> >  			arm,tag-latency = <4 2 3>;
-> >  			arm,data-latency = <4 2 3>;
-> > +			arm,shared-override;
-> >  		};
-> >  
-> >  		pcie: pcie at 0x01000000 {
-> > diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> > index d12b250..3b80b45 100644
-> > --- a/arch/arm/boot/dts/imx6sl.dtsi
-> > +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> > @@ -113,6 +113,7 @@
-> >  			cache-level = <2>;
-> >  			arm,tag-latency = <4 2 3>;
-> >  			arm,data-latency = <4 2 3>;
-> > +			arm,shared-override;
-> >  		};
-> >  
-> >  		pmu {
-> > diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-> > index a5f7602..42f8f3b 100644
-> > --- a/arch/arm/boot/dts/imx6sx.dtsi
-> > +++ b/arch/arm/boot/dts/imx6sx.dtsi
-> > @@ -155,6 +155,7 @@
-> >  			cache-level = <2>;
-> >  			arm,tag-latency = <4 2 3>;
-> >  			arm,data-latency = <4 2 3>;
-> > +			arm,shared-override;
-> >  		};
-> >  
-> >  		dma_apbh: dma-apbh at 01804000 {
+can you find out which of those clocks does cause your hang?
+Because things like the uart-clocks for example should be handled by their 
+driver already, at the time the clk_disable_unused runs(). So I'd really 
+like the critical clock to be the actually needed clock.
 
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Thanks
+Heiko
+
+
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+> ---
+> 
+>  drivers/clk/rockchip/clk-rk3036.c |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/clk/rockchip/clk-rk3036.c
+> b/drivers/clk/rockchip/clk-rk3036.c index ebce980..483913b 100644
+> --- a/drivers/clk/rockchip/clk-rk3036.c
+> +++ b/drivers/clk/rockchip/clk-rk3036.c
+> @@ -425,6 +425,7 @@ static struct rockchip_clk_branch
+> rk3036_clk_branches[] __initdata = { };
+> 
+>  static const char *const rk3036_critical_clocks[] __initconst = {
+> +	"apll",
+>  	"aclk_cpu",
+>  	"aclk_peri",
+>  	"hclk_peri",
