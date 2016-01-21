@@ -1,5 +1,5 @@
 From: dyoung@redhat.com (Dave Young)
-Date: Thu, 21 Jan 2016 10:57:53 +0800
+Date: Thu, 21 Jan 2016 11:03:22 +0800
 Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
 In-Reply-To: <20160120115436.GC25829@leverpostej>
 References: <20160119014332.GB2919@dhcp-128-65.nay.redhat.com>
@@ -12,38 +12,17 @@ References: <20160119014332.GB2919@dhcp-128-65.nay.redhat.com>
  <569F2439.9000604@linaro.org>
  <20160120063856.GA3725@dhcp-128-65.nay.redhat.com>
  <20160120115436.GC25829@leverpostej>
-Message-ID: <20160121025753.GB7950@dhcp-128-65.nay.redhat.com>
+Message-ID: <20160121030322.GC7950@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Mark
-
-On 01/20/16 at 11:54am, Mark Rutland wrote:
-> On Wed, Jan 20, 2016 at 02:38:56PM +0800, Dave Young wrote:
-> > Maybe I did not say it clearly, I prefer kexec syscall/tool to modifiy dtb
-> > or uefi-memmap so that we do not need any extra kernel cmdline.
-> 
 > I am strongly opposed to modifying the FW-provided memroy map
 > information, for the reasons I expressed in other replies.
 > 
 > What are your concerns with a property under /chosen?
-> 
-> > For x86 we would like to drop the memmap= usage in kexec-tools but we can not
-> > do that for a compatibility problem about calgary iommu. So that currently
-> > kexec-tools supports both recreating E820 maps and passing memmap=.
-> > 
-> > We should think it carefully because it will be hard to remove once we support it.
-> 
-> I agree that we don't want a plethora of solutions that we have to
-> support forever.
-> 
-> > IMO handling it in code is better than using an external interface.
-> 
-> I'm not sure what you mean by this. What is the "external interface",
-> and which code do you beleive it is better to handle this in?
 
-I think we have covered all these in another reply. Let's continue
-the discussion if needed in that thread.
+If we choose a simpler way between memmap= and /chosen property then
+I think a property in /chosen looks better to me.
 
 Thanks
 Dave
