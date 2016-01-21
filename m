@@ -1,60 +1,57 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 21 Jan 2016 18:44:03 +0900
-Subject: [PATCH] ARM: zx296702-ad1: remove deprecated supports-highspeed
-In-Reply-To: <1453366905-3964-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1453366905-3964-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <56A0A863.1010103@samsung.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Thu, 21 Jan 2016 10:47:18 +0100
+Subject: [PATCH] ARM: dts: omap3: Include missing bandgap data for
+ ti-soc-thermal driver
+In-Reply-To: <1451086345-3340-1-git-send-email-pali.rohar@gmail.com>
+References: <1451086345-3340-1-git-send-email-pali.rohar@gmail.com>
+Message-ID: <20160121094718.GV7192@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Shaw.
-
-On 01/21/2016 06:01 PM, Shawn Lin wrote:
-> supports-highspeed property is deprecated for dw_mmc,
-> this patch replace it with cap-sd-highspeed and cap-mmc-highspeed.
+On Saturday 26 December 2015 00:32:25 Pali Roh?r wrote:
+> Driver for omap3 with documentation is there since v4.4-rc1.
 > 
-> Cc: Jaehoon Chung <jh80.chung@samsung.com>
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
 > ---
+>  arch/arm/boot/dts/omap34xx.dtsi |    5 +++++
+>  arch/arm/boot/dts/omap36xx.dtsi |    5 +++++
+>  2 files changed, 10 insertions(+)
 > 
->  arch/arm/boot/dts/zx296702-ad1.dts | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/zx296702-ad1.dts b/arch/arm/boot/dts/zx296702-ad1.dts
-> index 081f980..bfbcd805d 100644
-> --- a/arch/arm/boot/dts/zx296702-ad1.dts
-> +++ b/arch/arm/boot/dts/zx296702-ad1.dts
-> @@ -19,7 +19,8 @@
+> diff --git a/arch/arm/boot/dts/omap34xx.dtsi b/arch/arm/boot/dts/omap34xx.dtsi
+> index 4f6b2d5..c3f488f 100644
+> --- a/arch/arm/boot/dts/omap34xx.dtsi
+> +++ b/arch/arm/boot/dts/omap34xx.dtsi
+> @@ -54,6 +54,11 @@
+>  				#size-cells = <0>;
+>  			};
+>  		};
+> +
+> +		bandgap {
+> +			reg = <0x48002524 0x4>;
+> +			compatible = "ti,omap34xx-bandgap";
+> +		};
+>  	};
+>  };
 >  
->  &mmc0 {
->  	num-slots = <1>;
-> -	supports-highspeed;
-> +	cap-sd-highspeed;
-> +	cap-mmc-highspeed;
->  	non-removable;
->  	disable-wp;
->  	status = "okay";
-
-I saw the below codes..
-
-slot at 0 {
-	reg = <0>;
-	bus-width = <4>;
-};
-
-Slot is also deprecated.. You can change those..
-
-Best Regards,
-Jaehoon Chung
-
-> @@ -32,7 +33,8 @@
+> diff --git a/arch/arm/boot/dts/omap36xx.dtsi b/arch/arm/boot/dts/omap36xx.dtsi
+> index 86253de..00f98c1 100644
+> --- a/arch/arm/boot/dts/omap36xx.dtsi
+> +++ b/arch/arm/boot/dts/omap36xx.dtsi
+> @@ -86,6 +86,11 @@
+>  				#size-cells = <0>;
+>  			};
+>  		};
+> +
+> +		bandgap {
+> +			reg = <0x48002524 0x4>;
+> +			compatible = "ti,omap36xx-bandgap";
+> +		};
+>  	};
+>  };
 >  
->  &mmc1 {
->  	num-slots = <1>;
-> -	supports-highspeed;
-> +	cap-sd-highspeed;
-> +	cap-mmc-highspeed;
->  	non-removable;
->  	disable-wp;
->  	status = "okay";
-> 
+
+PING! Who can take this patch?
+
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
