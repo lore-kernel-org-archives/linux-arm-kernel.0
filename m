@@ -1,69 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Jan 2016 09:29:10 +0000
-Subject: [PATCH] ARM: dts: n900: Include adp1653 device
-In-Reply-To: <20160121091241.GS7192@pali>
-References: <1451086812-3729-1-git-send-email-pali.rohar@gmail.com>
- <20160121091241.GS7192@pali>
-Message-ID: <20160121092909.GH5783@n2100.arm.linux.org.uk>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 21 Jan 2016 10:33:21 +0100
+Subject: [PATCH v2 0/3] Mediatek EFUSE Support
+In-Reply-To: <566E94CA.1050700@linaro.org>
+References: <1447930014-19579-1-git-send-email-andrew-ct.chen@mediatek.com>
+ <CAGS+omA8XK6ksd7Ma8yAUbkSsHR6yQxjFrV+HGbd83UiH6T51g@mail.gmail.com>
+ <566E94CA.1050700@linaro.org>
+Message-ID: <56A0A5E1.5050105@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The merge window is open, which is when development code that was merged
-in good time prior to the merge window is sent upstream to Linus.  Linux
-maintainers may choose not to merge new code into their tree to avoid
-disrupting the utility of linux-next until the merge window has closed.
 
-linux-next is an integration tree to help find merge conflicts, it
-exists to assist with the merge windows, not as a general test ground.
-Thus, linux-next must only contain code for either the current open
-merge window, or if the merge window is closed, the next merge window.
 
-On Thu, Jan 21, 2016 at 10:12:41AM +0100, Pali Roh?r wrote:
-> On Saturday 26 December 2015 00:40:12 Pali Roh?r wrote:
-> > This patch adds adp1653 device into n900 DT structure. DT support in
-> > adp1653 driver is there since v4.2-rc1 version.
-> > 
-> > Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/omap3-n900.dts |   15 +++++++++++++++
-> >  1 file changed, 15 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-> > index 5f5e0f3..ba93642 100644
-> > --- a/arch/arm/boot/dts/omap3-n900.dts
-> > +++ b/arch/arm/boot/dts/omap3-n900.dts
-> > @@ -522,6 +522,21 @@
-> >  		amstaos,cover-comp-gain = <16>;
-> >  	};
-> >  
-> > +	adp1653: led-controller at 30 {
-> > +		compatible = "adi,adp1653";
-> > +		reg = <0x30>;
-> > +		enable-gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
-> > +
-> > +		flash {
-> > +			flash-timeout-us = <500000>;
-> > +			flash-max-microamp = <320000>;
-> > +			led-max-microamp = <50000>;
-> > +		};
-> > +		indicator {
-> > +			led-max-microamp = <17500>;
-> > +		};
-> > +	};
-> > +
-> >  	lp5523: lp5523 at 32 {
-> >  		compatible = "national,lp5523";
-> >  		reg = <0x32>;
-> 
-> PING, who can take this patch?
-> 
-> I still do not see it in linus tree nor in others like arm-soc...
-> 
-> -- 
-> Pali Roh?r
-> pali.rohar at gmail.com
+On 14/12/15 11:07, Srinivas Kandagatla wrote:
+> Hi Andrew,
+>
+> On 14/12/15 04:27, Daniel Kurtz wrote:
+>> Hi Srinivas,
+>>
+>> On Thu, Nov 19, 2015 at 6:46 PM, Andrew-CT Chen
+>> <andrew-ct.chen@mediatek.com> wrote:
+>>> This patch adds EFUSE support driver which is used by other drivers
+>>> like thermal sensor and HDMI impedance.
+>>>
+>>> There are some efuses these fuses store things like calibration data,
+>>> speed bins.. etc. Drivers like thermal sensor, HDMI impedance would
+>>> read out this data for configuring the driver.
+>>>
+>>> Change in v2:
+>>> 1. Rebase to 4.4-rc1
+>>> 2. Modify the driver Makefile for more consistent with other drivers
+>>> 3. Modify the compatible string to "mediatek,mt8173-efuse" and
+>>> "mediatek,efuse"
+>>
+>> Do you still plan to queue this for v4.5?
+>>
+> Sorry guys, for the long delay in replying your pings, got busy with
+> regular office stuff :-)
+>
+> Yes, It should go in v4.5, I did send request with my sign-off to Greg,
+> he should take it via char-misc tree.
+>
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+I can't see this patches in the char-misc tree [1].
+Can you please double check?
+
+Thanks,
+Matthias
+
+[1] https://git.kernel.org/cgit/linux/kernel/git/gregkh/char-misc.git/
+
+> Thanks,
+> srini
+>>>
+>>> Andrew-CT Chen (3):
+>>>    dt-bindings: add document of mediatek efuse driver
+>>>    nvmem: mediatek: Add Mediatek EFUSE driver
+>>>    dts: arm64: Add EFUSE device node
+>>>
+>>>   .../devicetree/bindings/nvmem/mtk-efuse.txt        | 36 +++++++++
+>>>   arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  5 ++
+>>>   drivers/nvmem/Kconfig                              | 11 +++
+>>>   drivers/nvmem/Makefile                             |  2 +
+>>>   drivers/nvmem/mtk-efuse.c                          | 89
+>>> ++++++++++++++++++++++
+>>>   5 files changed, 143 insertions(+)
+>>>   create mode 100644
+>>> Documentation/devicetree/bindings/nvmem/mtk-efuse.txt
+>>>   create mode 100644 drivers/nvmem/mtk-efuse.c
+>>>
+>>> --
+>>> 1.9.1
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe
+>>> linux-kernel" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>> Please read the FAQ at  http://www.tux.org/lkml/
