@@ -1,30 +1,123 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 21 Jan 2016 18:38:42 +0000
-Subject: [PATCH] arm64: dts: apq8016-sbc: Add aliases to spi device.
-Message-ID: <1453401522-27291-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Thu, 21 Jan 2016 19:38:51 +0100
+Subject: [PATCH V3 13/21] pci, acpi: Provide generic way to assign bus
+ domain number.
+In-Reply-To: <20160121182218.GA21175@red-moon>
+References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
+ <1452691267-32240-14-git-send-email-tn@semihalf.com>
+ <20160121182218.GA21175@red-moon>
+Message-ID: <56A125BB.9040109@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds aliases to spi device so that it can get proper bus
-number rather than a random number.
+On 21.01.2016 19:22, Lorenzo Pieralisi wrote:
+> Hi Tomasz,
+>
+> On Wed, Jan 13, 2016 at 02:20:59PM +0100, Tomasz Nowicki wrote:
+>
+> [...]
+>
+>> @@ -4796,14 +4797,34 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+>>   	 * API and update the use_dt_domains value to keep track of method we
+>>   	 * are using to assign domain numbers (use_dt_domains = 0).
+>>   	 *
+>> +	 * IF ACPI, we expect non-DT method (use_dt_domains == -1)
+>> +	 * and call _SEG method for corresponding host bridge device.
+>> +	 * If _SEG method does not exist, following ACPI spec (6.5.6)
+>> +	 * all PCI buses belong to domain 0.
+>> +	 *
+>>   	 * All other combinations imply we have a platform that is trying
+>> -	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
+>> -	 * which is a recipe for domain mishandling and it is prevented by
+>> -	 * invalidating the domain value (domain = -1) and printing a
+>> -	 * corresponding error.
+>> +	 * to mix domain numbers obtained from DT, ACPI and
+>> +	 * pci_get_new_domain_nr(), which is a recipe for domain mishandling and
+>> +	 * it is prevented by invalidating the domain value (domain = -1) and
+>> +	 * printing a corresponding error.
+>>   	 */
+>> +
+>>   	if (domain >= 0 && use_dt_domains) {
+>>   		use_dt_domains = 1;
+>> +#ifdef CONFIG_ACPI
+>> +	} else if (!acpi_disabled && use_dt_domains == -1) {
+>> +		struct acpi_device *acpi_dev = to_acpi_device(parent);
+>> +		unsigned long long segment = 0;
+>> +		acpi_status status;
+>> +
+>> +		status = acpi_evaluate_integer(acpi_dev->handle,
+>> +					       METHOD_NAME__SEG, NULL,
+>> +					       &segment);
+>> +		if (ACPI_FAILURE(status) && status != AE_NOT_FOUND)
+>> +			dev_err(&acpi_dev->dev,  "can't evaluate _SEG\n");
+>> +
+>> +		domain = segment;
+>> +#endif
+>
+> I think you can reshuffle a bit the code to make it easier to follow.
+>
+> How about this ? (on top of mainline, I just compiled it do not
+> take it verbatim):
+>
+> -- >8 --
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index d1a7105..467a316 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -7,6 +7,7 @@
+>    *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
+>    */
+>
+> +#include <linux/acpi.h>
+>   #include <linux/kernel.h>
+>   #include <linux/delay.h>
+>   #include <linux/init.h>
+> @@ -4769,7 +4770,27 @@ int pci_get_new_domain_nr(void)
+>   }
+>
+>   #ifdef CONFIG_PCI_DOMAINS_GENERIC
+> -void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+> +/* Feel free to add this to drivers/acpi as a helper */
+> +#ifdef CONFIG_ACPI
+> +int pci_bus_acpi_domain_nr(struct device *parent)
+> +{
+> +	struct acpi_device *acpi_dev = to_acpi_device(parent);
+> +	unsigned long long segment = 0;
+> +	acpi_status status;
+> +
+> +	status = acpi_evaluate_integer(acpi_dev->handle,
+> +				       METHOD_NAME__SEG, NULL,
+> +				       &segment);
+> +	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND)
+> +		dev_err(&acpi_dev->dev,  "can't evaluate _SEG\n");
+> +
+> +	return segment;
+> +}
+> +#else
+> +int pci_bus_acpi_domain_nr(struct device *parent) { return -1; }
+> +#endif
+> +
+> +int pci_bus_of_domain_nr(struct device *parent)
+>   {
+>   	static int use_dt_domains = -1;
+>   	int domain = of_get_pci_domain_nr(parent->of_node);
+> @@ -4811,7 +4832,13 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+>   		domain = -1;
+>   	}
+>
+> -	bus->domain_nr = domain;
+> +	return domain;
+> +}
+> +
+> +void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+> +{
+> +	bus->domain_nr = acpi_disabled ? pci_bus_of_domain_nr(parent) :
+> +					 pci_bus_acpi_domain_nr(parent);
+>   }
+>   #endif
+>   #endif
+>
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+It looks nice, I will integrate your patch. Thanks!
 
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-index db17c5d..6eb096e 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-@@ -24,6 +24,8 @@
- 		i2c0	= &blsp_i2c2;
- 		i2c1	= &blsp_i2c6;
- 		i2c3	= &blsp_i2c4;
-+		spi0	= &blsp_spi5;
-+		spi1	= &blsp_spi3;
- 	};
- 
- 	chosen {
--- 
-1.9.1
+Tomasz
