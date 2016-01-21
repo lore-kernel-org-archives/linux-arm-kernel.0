@@ -1,111 +1,79 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 21 Jan 2016 13:26:33 +0800
-Subject: [PATCH RFC 06/15] mmc: sunxi: Support 8 bit eMMC DDR transfer modes
-In-Reply-To: <1453354002-28366-1-git-send-email-wens@csie.org>
-References: <1453354002-28366-1-git-send-email-wens@csie.org>
-Message-ID: <1453354002-28366-7-git-send-email-wens@csie.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 21 Jan 2016 14:43:15 +0900
+Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
+In-Reply-To: <CAKv+Gu9pVAWWRyM+oTpzGUCdeuMXkdnz5cAJnZk3jfE9uKVREw@mail.gmail.com>
+References: <20160115201601.GR3262@leverpostej> <569CBDBC.5050500@linaro.org>
+ <20160119014332.GB2919@dhcp-128-65.nay.redhat.com>
+ <569DCB30.9010501@linaro.org>
+ <20160119122848.GA2904@dhcp-128-65.nay.redhat.com>
+ <20160119125114.GH25024@leverpostej>
+ <20160119134553.GA2986@dhcp-128-65.nay.redhat.com>
+ <20160119140139.GC26545@leverpostej> <569F1A33.4000208@linaro.org>
+ <20160120120257.GD25829@leverpostej> <20160120123620.GE25829@leverpostej>
+ <CAKv+Gu9pVAWWRyM+oTpzGUCdeuMXkdnz5cAJnZk3jfE9uKVREw@mail.gmail.com>
+Message-ID: <56A06FF3.8050706@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner's MMC controller needs to run at double the card clock rate
-for 8 bit DDR transfer modes. Interestingly, this is not needed for
-4 bit DDR transfers.
+On 01/20/2016 11:59 PM, Ard Biesheuvel wrote:
+> On 20 January 2016 at 13:36, Mark Rutland <mark.rutland@arm.com> wrote:
+>> Ard, Ganapatrao, the below is something we need to consider for the
+>> combination of the NUMA & kexec approaches. It only becomes a problem
+>> if/when we preserve DT memory nodes in the presence of EFI, though it
+>> would be nice to not box ourselves into a corner.
+>>
+>> On Wed, Jan 20, 2016 at 12:02:58PM +0000, Mark Rutland wrote:
+>>> On Wed, Jan 20, 2016 at 02:25:07PM +0900, AKASHI Takahiro wrote:
+>>>> On 01/19/2016 11:01 PM, Mark Rutland wrote:
+>>>>> For NUMA topology in !ACPI kernels, we might need to also retain and
+>>>>> parse memory nodes, but only for toplogy information. The kernel would
+>>>>> still only use memory as described by the EFI memory map.
+>>>>>
+>>>>> There's a horrible edge case I've spotted if performing a chain of
+>>>>> cross-endian kexecs: LE -> BE -> LE, as the BE kernel would have to
+>>>>> respect the EFI memory map so as to avoid corrupting it for the
+>>>>> subsequent LE kernel. Other than this I believe everything should just
+>>>>> work.
+>>>>
+>>>> BE kernel doesn't support UEFI yet and cannot access UEFI memmap table. So,
+>>>> for LE -> BE, we don't use a dtb generated from /sys/firmware/fdt (or /proc/device-tree)
+>>>> (as in the case of LE -> LE) and require users to provide a dtb file explicitly.
+>>>
+>>> As I mentioned above, the problem exists when memory nodes also exist
+>>> (for describing NUMA topology). In that case the BE kernel would try to
+>>> use the information from the memory nodes.
+>>>
+>>>> For BE -> LE, BE kernel doesn't know wther UEFI memmap table is available or not
+>>>> and so use the same (explicitly-provided) dtb (as LE -> LE in !UEFI)
+>>>
+>>> See above. The problem I imagine is:
+>>>
+>>> LE kernel - uses EFI mmap, takes NUMA information from DT memory nodes
+>>>
+>>>      v       kexec
+>>>
+>>> BE kernel - uses DT memory nodes
+>>>            - clobbers EFI runtime regions as it sees them as available
+>>>
+>>>      v       kexec
+>>>
+>>> LE kernel - uses EFI mmap, takes NUMA information from DT memory nodes
+>>>            - tries to call EFI runtime services, and explodes.
+>>
+>> I'm not really sure what the best approach is here, but I thought that
+>> it would be good to raise awareness of the edge-case.
+>>
+>
+> I think we should simply allow the BE kernel to deal with a UEFI
+> memory map. It only involves a bit of byte swapping (which I already
+> implemented at some point)
 
-Different clock delays are needed for 8 bit eMMC DDR, due to the
-increased module clock rate. For the A80 though, the same values for
-4 bit and 8 bit are shared. The new values for the other SoCs were from
-A83T user manual's "new timing mode" default values, which describes
-them in clock phase, rather than delay periods. These values were used
-without any modification. They may not be correct, but they work.
+Just from my curiosity,
+will runtime services be also available on BE kernel with LE uefi?
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/mmc/host/sunxi-mmc.c | 33 ++++++++++++++++++++++++++-------
- 1 file changed, 26 insertions(+), 7 deletions(-)
+-Takahiro AKASHI
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index b403a2433eec..d05928091b34 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -215,6 +215,7 @@
- #define SDXC_CLK_25M		1
- #define SDXC_CLK_50M		2
- #define SDXC_CLK_50M_DDR	3
-+#define SDXC_CLK_50M_DDR_8BIT	4
- 
- struct sunxi_mmc_clk_delay {
- 	u32 output;
-@@ -656,11 +657,17 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 				  struct mmc_ios *ios)
- {
- 	u32 rate, oclk_dly, rval, sclk_dly;
-+	u32 clock = ios->clock;
- 	int ret;
- 
--	rate = clk_round_rate(host->clk_mmc, ios->clock);
-+	/* 8 bit DDR requires a higher module clock */
-+	if (ios->timing == MMC_TIMING_MMC_DDR52 &&
-+	    ios->bus_width == MMC_BUS_WIDTH_8)
-+		clock <<= 1;
-+
-+	rate = clk_round_rate(host->clk_mmc, clock);
- 	dev_dbg(mmc_dev(host->mmc), "setting clk to %d, rounded %d\n",
--		ios->clock, rate);
-+		clock, rate);
- 
- 	/* setting clock rate */
- 	ret = clk_set_rate(host->clk_mmc, rate);
-@@ -677,6 +684,12 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 	/* clear internal divider */
- 	rval = mmc_readl(host, REG_CLKCR);
- 	rval &= ~0xff;
-+	/* set internal divider for 8 bit eMMC DDR, so card clock is right */
-+	if (ios->timing == MMC_TIMING_MMC_DDR52 &&
-+	    ios->bus_width == MMC_BUS_WIDTH_8) {
-+		rval |= 1;
-+		rate >>= 1;
-+	}
- 	mmc_writel(host, REG_CLKCR, rval);
- 
- 	/* determine delays */
-@@ -687,13 +700,16 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 		oclk_dly = host->clk_delays[SDXC_CLK_25M].output;
- 		sclk_dly = host->clk_delays[SDXC_CLK_25M].sample;
- 	} else if (rate <= 50000000) {
--		if (ios->timing == MMC_TIMING_UHS_DDR50 ||
--		    ios->timing == MMC_TIMING_MMC_DDR52) {
--			oclk_dly = host->clk_delays[SDXC_CLK_50M_DDR].output;
--			sclk_dly = host->clk_delays[SDXC_CLK_50M_DDR].sample;
--		} else {
-+		if (ios->timing != MMC_TIMING_UHS_DDR50 &&
-+		    ios->timing != MMC_TIMING_MMC_DDR52) {
- 			oclk_dly = host->clk_delays[SDXC_CLK_50M].output;
- 			sclk_dly = host->clk_delays[SDXC_CLK_50M].sample;
-+		} else if (ios->bus_width == MMC_BUS_WIDTH_8) {
-+			oclk_dly = host->clk_delays[SDXC_CLK_50M_DDR_8BIT].output;
-+			sclk_dly = host->clk_delays[SDXC_CLK_50M_DDR_8BIT].sample;
-+		} else {
-+			oclk_dly = host->clk_delays[SDXC_CLK_50M_DDR].output;
-+			sclk_dly = host->clk_delays[SDXC_CLK_50M_DDR].sample;
- 		}
- 	} else {
- 		return -EINVAL;
-@@ -965,6 +981,8 @@ static const struct sunxi_mmc_clk_delay sunxi_mmc_clk_delays[] = {
- 	[SDXC_CLK_25M]		= { .output = 180, .sample =  75 },
- 	[SDXC_CLK_50M]		= { .output =  90, .sample = 120 },
- 	[SDXC_CLK_50M_DDR]	= { .output =  60, .sample = 120 },
-+	/* Value from A83T "new timing mode". Works but might not be right. */
-+	[SDXC_CLK_50M_DDR_8BIT]	= { .output =  90, .sample = 180 },
- };
- 
- static const struct sunxi_mmc_clk_delay sun9i_mmc_clk_delays[] = {
-@@ -972,6 +990,7 @@ static const struct sunxi_mmc_clk_delay sun9i_mmc_clk_delays[] = {
- 	[SDXC_CLK_25M]		= { .output = 180, .sample =  75 },
- 	[SDXC_CLK_50M]		= { .output = 150, .sample = 120 },
- 	[SDXC_CLK_50M_DDR]	= { .output =  90, .sample = 120 },
-+	[SDXC_CLK_50M_DDR_8BIT]	= { .output =  90, .sample = 120 },
- };
- 
- static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
--- 
-2.7.0.rc3
+> It would require some minor refactoring to make the UEFI init code
+> separate from all the other bits, but I don't see any major issues
+> here
+>
