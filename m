@@ -1,40 +1,60 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Fri, 22 Jan 2016 01:23:57 +0900
-Subject: [PATCH v3 0/7] ARM: dts: kirkwood: fixes and split of linkstation
- dts for ls-wvl/vl and ls-wxl/wsxl
-In-Reply-To: <878u3ihpog.fsf@free-electrons.com>
-References: <1453211342-25214-1-git-send-email-rogershimizu@gmail.com>
- <1453387130-6914-1-git-send-email-rogershimizu@gmail.com>
- <87d1suhqh8.fsf@free-electrons.com>
- <CAEQ9gEkVXWr2cvMVqp+9=J+F3iuer0eygnb_LkDAdAOPz55Bmw@mail.gmail.com>
- <878u3ihpog.fsf@free-electrons.com>
-Message-ID: <CAEQ9gEk=WSKwNmskRchYi5kYrhJrc6CpmpgaqLM7-0pKvGx0rA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 21 Jan 2016 16:26:46 +0000
+Subject: [PATCH 1/2] regulator: ltc3589: make IRQ optional
+In-Reply-To: <20160121123311.5346e40d@ipc1.ka-ro>
+References: <1453292992-1788-1-git-send-email-LW@KARO-electronics.de>
+ <1453292992-1788-2-git-send-email-LW@KARO-electronics.de>
+ <20160120164258.GF6588@sirena.org.uk>
+ <20160121080524.27af489f@ipc1.ka-ro>
+ <20160121102015.GI6588@sirena.org.uk>
+ <20160121112611.34e17cb2@ipc1.ka-ro>
+ <20160121111115.GJ6588@sirena.org.uk>
+ <20160121123311.5346e40d@ipc1.ka-ro>
+Message-ID: <20160121162646.GK6588@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 22, 2016 at 1:18 AM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
->  On jeu., janv. 21 2016, Roger Shimizu <rogershimizu@gmail.com> wrote:
->> Just curious,
->> since patch 0001~0004 are fixes, could it be applied earlier?
->
-> Our branches go to Linus tree through the arm-soc tree. As they have
-> just did a pull request I doubt a new one will be done this week.
->
-> Moreover all our patches are based on the rc1: having a single refrence
-> helps the arm-soc subsystem to merge all the contributions, that's why I
-> am waiting for next week.
->
-> And finally for this patch it is obviously too late for for 4.4 but we
-> have plenty of time for 4.5. However, I plan to send these fixes to
-> arm-soc early next week so it should be in 4.5-rc2, and as soon it will
-> be in Linus tree then it should be backported to 4.4 and 4.3 by the
-> stable team.
+On Thu, Jan 21, 2016 at 12:33:11PM +0100, Lothar Wa?mann wrote:
+> > On Thu, Jan 21, 2016 at 11:26:11AM +0100, Lothar Wa?mann wrote:
+> > > > On Thu, Jan 21, 2016 at 08:05:24AM +0100, Lothar Wa?mann wrote:
+> > > > > > On Wed, Jan 20, 2016 at 01:29:51PM +0100, Lothar Wa?mann wrote:
 
-Dear Gregory,
+> > > > > > > This pin is used as IRQ pin for the LTC3589 PMIC on the Ka-Ro
+> > > > > > > electronics TX48 module. Make the IRQ optional in the driver and use a
+> > > > > > > polling routine instead if no IRQ is specified in DT.
+> > > > > > > Otherwise the driver will continuously generate interrupts and make
+> > > > > > > the system unusable.
 
-Understand the status. Will wait for the merge next week.
-Thank you!
+> It won't. That's the whole purpose of this patch.
+> I'm afraid, I don't quite understand what you want to say...
 
-Cheers,
-Roger
+Your commit message (quoted above) claims that without this patch if no
+interrupt is supplied then the unsupplied interrupt will somehow be left
+screaming and make the system unusable.  This doesn't make sense, if
+there is no interrupt there is nothing to scream.
+
+> Without this patch there will be a constantly active interrupt, which
+> will stall the system because the nNMI interrupt (on the EXTINTn pin) is
+> level triggered.
+> Since the polarity of the interrupt input is fixed, there is no way to
+> use it in our HW.
+
+So, contrary to what you've been saying, the interrupt is actually
+connected (and worse, connected to a NMI) but apparently not described
+in DT.  Why is it sensible to make the driver poll (which will affect
+all systems using this device, even those that don't care) and not just
+describe the interrupt in DT so it can be handled promptly in the normal
+fashion?  Presumably this will run into serious problems if the
+interrupt actually fires at runtime since the NMI will scream, it's not
+clear to me how the poll will manage to run successfully in that case.
+
+This really feels like a very system specific workaround which is
+attempting to address things in the wrong place and coming up with
+something very non-obvious as a result.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160121/1fd8fa11/attachment-0001.sig>
