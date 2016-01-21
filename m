@@ -1,66 +1,75 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 21 Jan 2016 11:50:34 +0000
-Subject: [PATCH v2 12/16] ARM: Xen: Document UEFI support on Xen ARM
- virtual platforms
-In-Reply-To: <569E3D9F.6050808@linaro.org>
-References: <1452840929-19612-1-git-send-email-zhaoshenglong@huawei.com>
- <1452840929-19612-13-git-send-email-zhaoshenglong@huawei.com>
- <20160118105115.GD21067@leverpostej>
- <alpine.DEB.2.02.1601181710270.9400@kaball.uk.xensource.com>
- <569E0F15.8090001@huawei.com> <20160119104747.GB25024@leverpostej>
- <alpine.DEB.2.02.1601191217190.9400@kaball.uk.xensource.com>
- <20160119131348.GJ25024@leverpostej> <569E3D9F.6050808@linaro.org>
-Message-ID: <20160121115033.GC2581@leverpostej>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 21 Jan 2016 19:55:01 +0800
+Subject: [PATCH RFC 05/15] mmc: sunxi: Support MMC_DDR52 timing modes
+In-Reply-To: <56A0BD8F.2000805@redhat.com>
+References: <1453354002-28366-1-git-send-email-wens@csie.org>
+ <1453354002-28366-6-git-send-email-wens@csie.org>
+ <56A0BD8F.2000805@redhat.com>
+Message-ID: <CAGb2v640b6tygtu1TkBEYM6Uf6JqpytzqUQ-Y1uxKf9PUwpQaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 19, 2016 at 09:43:59PM +0800, Shannon Zhao wrote:
-> 
-> On 2016/1/19 21:13, Mark Rutland wrote:
-> >On Tue, Jan 19, 2016 at 12:23:17PM +0000, Stefano Stabellini wrote:
-> >>>On Tue, 19 Jan 2016, Mark Rutland wrote:
-> >>>> >On Tue, Jan 19, 2016 at 06:25:25PM +0800, Shannon Zhao wrote:
-> >>>>>>> > > >>We don't do this in Documentation/arm/uefi.txt, and I don't see why we
-> >>>>>>> > > >>should do so here.
-> >>>>>>> > > >>
-> >>>>>>> > > >>Does Xen handle arbitrary size memory map descriptors? I'm not sure what
-> >>>>>>> > > >>new information might be passed in future additions to the descriptor
-> >>>>>>> > > >>format, and I'm not sure what should happen in the Dom0 case.
-> >>>>>> > > >
-> >>>>>> > > >Xen passes to Dom0 the memory map in the same format as the native
-> >>>>>> > > >memory map.
-> >>>> >
-> >>>> >Does Xen parse or modify the EFI memory map in any way?
-> >>>
-> >>>Xen:
-> >>>- calls EFI_BOOT_SERVICES.GetMemoryMap()
-> >>>- takes note of the memory regions for its own usage
-> >>>- create the fdt notes, including efi-mmap-start, with a pointer to it
-> >>>
-> >>>
-> >>>> >Does it pass the raw values returned by EFI_BOOT_SERVICES.GetMemoryMap()
-> >>>> >through to the xen,uefi-* properties, or does is make any static
-> >>>> >assumptions about what the values will be?
-> >>>
-> >>>It just passes the raw values.
-> >I take it that means that any memory carved out for Xen itself is
-> >described/discovered via a separate mechanism? How does that work
-> 
-> For Xen hypervisor booting on UEFI, it get the EFI memory map
-> through the similar way like Linux, e.g. call
-> EFI_BOOT_SERVICES.GetMemoryMap().
-> For Dom0, Xen will create a new EFI memory map for Dom0.
-> 
-> See [PATCH v3 52/62] arm/acpi: Prepare EFI memory descriptor for Dom0
-> http://lists.xen.org/archives/html/xen-devel/2015-11/msg01884.html
+On Thu, Jan 21, 2016 at 7:14 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+> On 21-01-16 06:26, Chen-Yu Tsai wrote:
+>>
+>> DDR transfer modes include UHS-1 DDR50 and MMC HS-DDR (or MMC_DDR52).
+>> Consider MMC_DDR52 when setting clock delays.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>   drivers/mmc/host/sunxi-mmc.c | 6 ++++--
+>>   1 file changed, 4 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+>> index 4bec87458317..b403a2433eec 100644
+>> --- a/drivers/mmc/host/sunxi-mmc.c
+>> +++ b/drivers/mmc/host/sunxi-mmc.c
+>> @@ -687,7 +687,8 @@ static int sunxi_mmc_clk_set_rate(struct
+>> sunxi_mmc_host *host,
+>>                 oclk_dly = host->clk_delays[SDXC_CLK_25M].output;
+>>                 sclk_dly = host->clk_delays[SDXC_CLK_25M].sample;
+>>         } else if (rate <= 50000000) {
+>
+>
+> Shouldn't this be <= 52000000 then, considering that we may@one point get
+> some PLL setup where we may actually be able to do 52000000 for
+> MMC_TIMING_MMC_DDR52 ?
 
-Ok. So Xen will parse the EFI memory map, and will create a new memory
-map to pass to the Dom0 kernel, presumably with some memory having been
-carved out for Xen itself, and never described to Dom0.
+Given that mmc->f_max = 50000000, the core will never try any clock rate higher
+than 50 MHz, and iirc clk_round_rate always rounds down. We could increase both
+numbers at the same time when we actually encounter such hardware.
 
-So if there's any extension to that in future, Dom0 may see problems.
-There's not much that can be done about that, however, and extensions to
-the descriptors seem unlikely at present.
+Or we could increase both now, which I actually did in an earlier version, but
+it really made no difference with current hardware.
 
-Thanks,
-Mark.
+
+Regards
+ChenYu
+
+>
+>> -               if (ios->timing == MMC_TIMING_UHS_DDR50) {
+>> +               if (ios->timing == MMC_TIMING_UHS_DDR50 ||
+>> +                   ios->timing == MMC_TIMING_MMC_DDR52) {
+>>                         oclk_dly =
+>> host->clk_delays[SDXC_CLK_50M_DDR].output;
+>>                         sclk_dly =
+>> host->clk_delays[SDXC_CLK_50M_DDR].sample;
+>>                 } else {
+>> @@ -762,7 +763,8 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc,
+>> struct mmc_ios *ios)
+>>
+>>         /* set ddr mode */
+>>         rval = mmc_readl(host, REG_GCTRL);
+>> -       if (ios->timing == MMC_TIMING_UHS_DDR50)
+>> +       if (ios->timing == MMC_TIMING_UHS_DDR50 ||
+>> +           ios->timing == MMC_TIMING_MMC_DDR52)
+>>                 rval |= SDXC_DDR_MODE;
+>>         else
+>>                 rval &= ~SDXC_DDR_MODE;
+>>
+>
+> Regards,
+>
+> Hans
