@@ -1,43 +1,52 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Thu, 21 Jan 2016 17:01:45 +0800
-Subject: [PATCH] ARM: zx296702-ad1: remove deprecated supports-highspeed
-Message-ID: <1453366905-3964-1-git-send-email-shawn.lin@rock-chips.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Thu, 21 Jan 2016 10:12:41 +0100
+Subject: [PATCH] ARM: dts: n900: Include adp1653 device
+In-Reply-To: <1451086812-3729-1-git-send-email-pali.rohar@gmail.com>
+References: <1451086812-3729-1-git-send-email-pali.rohar@gmail.com>
+Message-ID: <20160121091241.GS7192@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-supports-highspeed property is deprecated for dw_mmc,
-this patch replace it with cap-sd-highspeed and cap-mmc-highspeed.
+On Saturday 26 December 2015 00:40:12 Pali Roh?r wrote:
+> This patch adds adp1653 device into n900 DT structure. DT support in
+> adp1653 driver is there since v4.2-rc1 version.
+> 
+> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+> ---
+>  arch/arm/boot/dts/omap3-n900.dts |   15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+> index 5f5e0f3..ba93642 100644
+> --- a/arch/arm/boot/dts/omap3-n900.dts
+> +++ b/arch/arm/boot/dts/omap3-n900.dts
+> @@ -522,6 +522,21 @@
+>  		amstaos,cover-comp-gain = <16>;
+>  	};
+>  
+> +	adp1653: led-controller at 30 {
+> +		compatible = "adi,adp1653";
+> +		reg = <0x30>;
+> +		enable-gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
+> +
+> +		flash {
+> +			flash-timeout-us = <500000>;
+> +			flash-max-microamp = <320000>;
+> +			led-max-microamp = <50000>;
+> +		};
+> +		indicator {
+> +			led-max-microamp = <17500>;
+> +		};
+> +	};
+> +
+>  	lp5523: lp5523 at 32 {
+>  		compatible = "national,lp5523";
+>  		reg = <0x32>;
 
-Cc: Jaehoon Chung <jh80.chung@samsung.com>
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
----
+PING, who can take this patch?
 
- arch/arm/boot/dts/zx296702-ad1.dts | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+I still do not see it in linus tree nor in others like arm-soc...
 
-diff --git a/arch/arm/boot/dts/zx296702-ad1.dts b/arch/arm/boot/dts/zx296702-ad1.dts
-index 081f980..bfbcd805d 100644
---- a/arch/arm/boot/dts/zx296702-ad1.dts
-+++ b/arch/arm/boot/dts/zx296702-ad1.dts
-@@ -19,7 +19,8 @@
- 
- &mmc0 {
- 	num-slots = <1>;
--	supports-highspeed;
-+	cap-sd-highspeed;
-+	cap-mmc-highspeed;
- 	non-removable;
- 	disable-wp;
- 	status = "okay";
-@@ -32,7 +33,8 @@
- 
- &mmc1 {
- 	num-slots = <1>;
--	supports-highspeed;
-+	cap-sd-highspeed;
-+	cap-mmc-highspeed;
- 	non-removable;
- 	disable-wp;
- 	status = "okay";
 -- 
-2.3.7
+Pali Roh?r
+pali.rohar at gmail.com
