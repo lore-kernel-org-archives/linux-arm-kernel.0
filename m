@@ -1,174 +1,62 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 21 Jan 2016 11:15:24 +0800
-Subject: [PATCH v3 1/1] USB: core: let USB device know device node
-In-Reply-To: <5639398.uJHXq6DsMC@wuerfel>
-References: <4405270.vcz87Q878u@wuerfel> <2538302.jXP5WXojXY@wuerfel>
- <20160120125026.GA16519@shlinux2> <5639398.uJHXq6DsMC@wuerfel>
-Message-ID: <20160121031524.GA29893@shlinux2>
+From: b38611@freescale.com (Fugang Duan)
+Date: Thu, 21 Jan 2016 11:28:58 +0800
+Subject: [PATCH] ARM: dts: imx6: enable pl310 "shared attribute override
+ enable" bit
+Message-ID: <1453346938-5625-1-git-send-email-b38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 20, 2016 at 03:19:36PM +0100, Arnd Bergmann wrote:
-> On Wednesday 20 January 2016 20:50:26 Peter Chen wrote:
-> > On Wed, Jan 20, 2016 at 10:07:13AM +0100, Arnd Bergmann wrote:
-> > > On Wednesday 20 January 2016 11:48:39 Peter Chen wrote:
-> > > > > 
-> > > > > > Alternatively, you could use one of the high bits of the 'reg' value
-> > > > > > to indicate which root hub is used. I'm sure that would work as
-> > > > > > well, but be less obvious.
-> > > > > 
-> > > > > It's probably best to stick with the same numbering that the hardware 
-> > > > > uses.
-> > > > 
-> > > > Seems we are talking about root hub, not the device in the
-> > > > root hub. So for multiple ports controller, we have to own node for 
-> > > > root hub. Assume your example, there is a genesys HUB at physical
-> > > > port 1, I suggest a dts node description like below, please correct
-> > > > me if anything wrong.
-> > > > 
-> > > > &usb1 {
-> > > >         roothub_1: nxp at 1 {
-> > > >                 compatible = "usb15a2,007d";
-> > > >                 reg = <0x01>;
-> > > > 
-> > > >                 hub: genesys at 1 {
-> > > >                         compatible = "usb05e3,0608";
-> > > >                         reg = <0x01>;
-> > > >                 };
-> > > >         };
-> > > > 
-> > > >         roothub_2: nxp at 2 {
-> > > >                 compatible = "usb15a2,007d";
-> > > >                 reg = <0x02>;
-> > > >         };
-> > > > 
-> > > >         ...
-> > > > 
-> > > >         roothub_7: nxp at 7 {
-> > > >                 compatible = "usb15a2,007d";
-> > > >                 reg = <0x07>;
-> > > > 
-> > > >                 hub: genesys at 1 {
-> > > >                         compatible = "usb05e3,0608";
-> > > >                         reg = <0x01>;
-> > > >                 };
-> > > >         };
-> > > > 
-> > > >         ...
-> > > > 
-> > > >         roothub_9: nxp at 9 {
-> > > >                 compatible = "usb15a2,007d";
-> > > >                 reg = <0x09>;
-> > > >         };
-> > > > };
-> > > 
-> > > This looks wrong to me: if I understand it right, you are now modeling
-> > > each port of the root hub as a separate hub, so you end up with
-> > > a total of 11 hub nodes when there should only be one or two.
-> > > 
-> > 
-> > How about below from both driver and device tree view:
-> > 
-> > 1. From the USB driver view
-> > 
-> > 			USB Controller
-> > 				|
-> > 				|
-> > 	   ---------------------|----------------
-> > 		|				|	
-> > 	    root hub(HS)		root hub(SS, optional)
-> > 		|				|
-> > 	---------------------		-------------------------	
-> > 	|	|	... |		|	  |         |
-> >       port 1	port 2	   port 6	port 1	port 2	  port 3
-> > 	|				|
-> >      genesys hub (if HS)	      genesys hub (if SS)	
-> > 
-> > 2. dts node:
-> > 
-> > &usb1 {
-> >         port_1: nxp at 1 {
-> >                 compatible = "usb15a2,007d";
-> >                 reg = <0x01>;
-> > 
-> >                 hub: genesys at 1 {
-> >                         compatible = "usb05e3,0608";
-> >                         reg = <0x01>;
-> >                 };
-> >         };
-> > 
-> >         port_2: nxp at 2 {
-> >                 compatible = "usb15a2,007d";
-> >                 reg = <0x02>;
-> >         };
-> > 
-> >         ...
-> > 
-> >         port_7: nxp at 7 {
-> >                 compatible = "usb15a2,007d";
-> >                 reg = <0x07>;
-> > 
-> >                 hub: genesys at 1 {
-> >                         compatible = "usb05e3,0608";
-> >                         reg = <0x01>;
-> >                 };
-> >         };
-> > 
-> >         ...
-> > 
-> >         port_9: nxp at 9 {
-> >                 compatible = "usb15a2,007d";
-> >                 reg = <0x09>;
-> >         };
-> > };
-> > 
-> > - If the above are ok, is it ok we add two nodes for the same device
-> > in case the speed negotiation is different at some situations?
-> > - Usually, it should be ok we only add nodes at device tree which
-> > the hard wired device on it, like port_1 and port 7 at above, right?
-> 
-> This looks identical to the version before, what is the difference?
-> 
+The default behavior of the L220 or PL310 cache controllers with respect
+to the shareable attribute is to transform "normal memory non-cacheable
+transactions" into "cacheable no allocate" (for reads) or "write through
+no write allocate" (for writes).
 
-Just adding from device driver view and change the name from "roohub" to
-"port".
+On i.MX6 series platforms, enet/audio/usb/nand DMA buffer have corruption
+without CMA. So set this property "arm,shared-override" in L2 dts node to
+enable "shared attribute override enable" bit.
 
-It is the port number (1-9), but not the root hub number.
+Signed-off-by: Fugang Duan <B38611@freescale.com>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi | 1 +
+ arch/arm/boot/dts/imx6sl.dtsi  | 1 +
+ arch/arm/boot/dts/imx6sx.dtsi  | 1 +
+ 3 files changed, 3 insertions(+)
 
-At the most of embedded platforms, we have only one port per controller.
-For example, at the non-hub boards, if there are two Standard-A ports,
-there are from two different USB controllers.
-But for Alan's case, it has six ports, and all from the one USB controller,
-port 1 to port 6 are from the HS root hub, port 7 to port 9 are from the SS
-root hub.
-
-For the single port controller platform, the dts will be like below, port_1 is
-under the HS root hub, port_2 is under the SS root hub.
-
-&usb1 {
-        port_1: nxp at 1 {
-                compatible = "usb15a2,007d";
-                reg = <0x01>;
-
-                hub: genesys at 1 {
-                        compatible = "usb05e3,0608";
-                        reg = <0x01>;
-                };
-        };
-
-        port_2: nxp at 2 {
-                compatible = "usb15a2,007d";
-                reg = <0x02>;
-
-                hub: genesys at 1 {
-                        compatible = "usb05e3,0608";
-                        reg = <0x01>;
-                };
-        };
-};
-
-
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 4f6ae92..b4de39a 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -185,6 +185,7 @@
+ 			cache-level = <2>;
+ 			arm,tag-latency = <4 2 3>;
+ 			arm,data-latency = <4 2 3>;
++			arm,shared-override;
+ 		};
+ 
+ 		pcie: pcie at 0x01000000 {
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index d12b250..3b80b45 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -113,6 +113,7 @@
+ 			cache-level = <2>;
+ 			arm,tag-latency = <4 2 3>;
+ 			arm,data-latency = <4 2 3>;
++			arm,shared-override;
+ 		};
+ 
+ 		pmu {
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index a5f7602..42f8f3b 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -155,6 +155,7 @@
+ 			cache-level = <2>;
+ 			arm,tag-latency = <4 2 3>;
+ 			arm,data-latency = <4 2 3>;
++			arm,shared-override;
+ 		};
+ 
+ 		dma_apbh: dma-apbh at 01804000 {
 -- 
-
-Best Regards,
-Peter Chen
+1.9.1
