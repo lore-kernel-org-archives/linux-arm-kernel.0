@@ -1,56 +1,58 @@
-From: john@metanate.com (John Keeping)
-Date: Thu, 21 Jan 2016 13:53:46 +0000
-Subject: [PATCH] drm/rockchip: respect CONFIG_DRM_FBDEV_EMULATION
-Message-ID: <1453384426-32617-1-git-send-email-john@metanate.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 21 Jan 2016 08:09:13 -0600
+Subject: [PATCH] 8250: uniphier: allow modular build with 8250 console
+In-Reply-To: <4548262.MV5j98YUVi@wuerfel>
+References: <3965359.aMgb8o9MaG@wuerfel>
+ <CAK7LNATVtLk6UTh+r9JTZrKq-veEXetDdRutZ_=zQOd-WyAO0g@mail.gmail.com>
+ <4548262.MV5j98YUVi@wuerfel>
+Message-ID: <CAL_JsqKCnxenDN-5OP1yqAyyW1-cuhs47CeosAj12hr89e6CrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If DRM_FBDEV_EMULATION is not selected in the config then we should not
-setup a framebuffer console.
+On Thu, Jan 21, 2016 at 6:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 21 January 2016 20:39:03 Masahiro Yamada wrote:
+>> 2016-01-14 7:33 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+>> > The recently added uniphier 8250 port driver supports early console
+>> > probing, and it supports being built as a module, but the combination
+>> > of the two fails to link:
+>> >
+>> > ERROR: "early_serial8250_setup" [drivers/tty/serial/8250/8250_uniphier.ko] undefined!
+>> >
+>> > Given that earlycon support in a loadable module makes no sense,
+>> > making that code conditional on 'MODULE' is a correct solution.
+>> >
+>> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> > Fixes: b8d20e06eaad ("serial: 8250_uniphier: add earlycon support")
+>> >
+>> > diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
+>> > index bab6b3ae2540..1b7bd26555b7 100644
+>> > --- a/drivers/tty/serial/8250/8250_uniphier.c
+>> > +++ b/drivers/tty/serial/8250/8250_uniphier.c
+>> > @@ -35,7 +35,7 @@ struct uniphier8250_priv {
+>> >         spinlock_t atomic_write_lock;
+>> >  };
+>> >
+>> > -#ifdef CONFIG_SERIAL_8250_CONSOLE
+>> > +#if defined(CONFIG_SERIAL_8250_CONSOLE) && !defined(MODULE)
+>> >  static int __init uniphier_early_console_setup(struct earlycon_device *device,
+>> >                                                const char *options)
+>> >  {
+>> >
+>> >
+>>
+>>
+>> If my patch (https://patchwork.kernel.org/patch/8029331/) is accepted,
+>> this build error will be fixed as well.  But I doubt it is accepted soon...
+>>
+>> So, I am OK with this workaround to fix "make allmodconfig".
+>>
+>> Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>>
+>
+> Good point. Adding the DT maintainers to Cc. Guys, any chance of you
+> picking up Masahiro's patch for 4.5?
 
-Signed-off-by: John Keeping <john@metanate.com>
----
- drivers/gpu/drm/rockchip/Makefile             |  3 ++-
- drivers/gpu/drm/rockchip/rockchip_drm_fbdev.h | 11 +++++++++++
- 2 files changed, 13 insertions(+), 1 deletion(-)
+I will if you can update the commit log with the details here about it
+fixing an actual problem.
 
-diff --git a/drivers/gpu/drm/rockchip/Makefile b/drivers/gpu/drm/rockchip/Makefile
-index a4e03bc..f6a809a 100644
---- a/drivers/gpu/drm/rockchip/Makefile
-+++ b/drivers/gpu/drm/rockchip/Makefile
-@@ -2,8 +2,9 @@
- # Makefile for the drm device driver.  This driver provides support for the
- # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
- 
--rockchipdrm-y := rockchip_drm_drv.o rockchip_drm_fb.o rockchip_drm_fbdev.o \
-+rockchipdrm-y := rockchip_drm_drv.o rockchip_drm_fb.o \
- 		rockchip_drm_gem.o rockchip_drm_vop.o
-+rockchipdrm-$(CONFIG_DRM_FBDEV_EMULATION) += rockchip_drm_fbdev.o
- 
- obj-$(CONFIG_ROCKCHIP_DW_HDMI) += dw_hdmi-rockchip.o
- obj-$(CONFIG_ROCKCHIP_DW_MIPI_DSI) += dw-mipi-dsi.o
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.h b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.h
-index 50432e9..73718c5 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.h
-@@ -15,7 +15,18 @@
- #ifndef _ROCKCHIP_DRM_FBDEV_H
- #define _ROCKCHIP_DRM_FBDEV_H
- 
-+#ifdef CONFIG_DRM_FBDEV_EMULATION
- int rockchip_drm_fbdev_init(struct drm_device *dev);
- void rockchip_drm_fbdev_fini(struct drm_device *dev);
-+#else
-+static inline int rockchip_drm_fbdev_init(struct drm_device *dev)
-+{
-+	return 0;
-+}
-+
-+static inline void rockchip_drm_fbdev_fini(struct drm_device *dev)
-+{
-+}
-+#endif
- 
- #endif /* _ROCKCHIP_DRM_FBDEV_H */
--- 
-2.7.0.226.gfe986fe
+Rob
