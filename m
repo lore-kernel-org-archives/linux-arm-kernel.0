@@ -1,40 +1,53 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 21 Jan 2016 11:41:19 +0900
-Subject: [PATCH] ARM: dts: armadillo800eva Correct extal1 frequency to 24 MHz
-In-Reply-To: <cover.1453343917.git.horms+renesas@verge.net.au>
-References: <cover.1453343917.git.horms+renesas@verge.net.au>
-Message-ID: <c61f30a255550bbfc6b83c1ca720661489cac4c0.1453343917.git.horms+renesas@verge.net.au>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Thu, 21 Jan 2016 10:45:25 +0800
+Subject: [PATCH v3 1/6] clk: mediatek: Refine the makefile to support
+ multiple clock drivers
+In-Reply-To: <1453343300.28078.6.camel@mtksdaap41>
+References: <1452587470-61506-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1452587470-61506-2-git-send-email-jamesjj.liao@mediatek.com>
+ <1453343300.28078.6.camel@mtksdaap41>
+Message-ID: <1453344325.28078.9.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On Thu, 2016-01-21 at 10:28 +0800, Yingjoe Chen wrote:
+> On Tue, 2016-01-12 at 16:31 +0800, James Liao wrote:
+> > Add a Kconfig to define clock configuration for each SoC, and
+> > modify the Makefile to build drivers that only selected in config.
+> > 
+> > Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> > ---
+> >  drivers/clk/Kconfig           |  1 +
+> >  drivers/clk/mediatek/Kconfig  | 23 +++++++++++++++++++++++
+> >  drivers/clk/mediatek/Makefile |  6 +++---
+> >  3 files changed, 27 insertions(+), 3 deletions(-)
+> >  create mode 100644 drivers/clk/mediatek/Kconfig
+> > 
+> > diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> > index c3e3a02..b7a37dc 100644
+> > --- a/drivers/clk/Kconfig
+> > +++ b/drivers/clk/Kconfig
+> > @@ -198,3 +198,4 @@ source "drivers/clk/mvebu/Kconfig"
+> >  
+> >  source "drivers/clk/samsung/Kconfig"
+> >  source "drivers/clk/tegra/Kconfig"
+> > +source "drivers/clk/mediatek/Kconfig"
+> 
+> 
+> Hi James,
+> 
+> drivers/clk/mediatek/Kconfig add user selectable options, menuconfig
+> will list them outside of "Common Clock Framework" sub-menu if you
+> source the file here. Kconfig for samsung & tegra doesn't have any, so
+> it is OK for them to stay here.
+> 
+> Please move it inside the menu, also it seems the source lines are
+> sorted now, so let's keep them sorted.
 
-On r8a7740/armadillo, actual clock rates are ca. 4% lower than reported
-by /sys/kernel/debug/clk/clk_summary. Correct the extal1 frequency from
-25 MHz to 24 MHz to fix this.
 
-This matches the Armadillo-800 EVA Product Manual, which claims the main
-crystal runs at 24 MHz, and the old legacy/reference board code.
+After looking at drivers/clk/Kconfig history, it seems we have similar
+issue before. I think we should move all sources under clk menu to
+prevent this from happening.
 
-Fixes: 25aa7ba3fdfb ("ARM: shmobile: armadillo800eva: Sync DTS")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-index 105d9c95de4a..5c76dcc89df5 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-@@ -180,7 +180,7 @@
- };
- 
- &extal1_clk {
--	clock-frequency = <25000000>;
-+	clock-frequency = <24000000>;
- };
- &extal2_clk {
- 	clock-frequency = <48000000>;
--- 
-2.1.4
+Joe.C
