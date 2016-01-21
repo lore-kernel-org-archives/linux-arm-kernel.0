@@ -1,89 +1,145 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 21 Jan 2016 14:32:16 +0000
-Subject: [PATCH v2 0/3] Mediatek EFUSE Support
-In-Reply-To: <56A0A5E1.5050105@gmail.com>
-References: <1447930014-19579-1-git-send-email-andrew-ct.chen@mediatek.com>
- <CAGS+omA8XK6ksd7Ma8yAUbkSsHR6yQxjFrV+HGbd83UiH6T51g@mail.gmail.com>
- <566E94CA.1050700@linaro.org> <56A0A5E1.5050105@gmail.com>
-Message-ID: <56A0EBF0.2020703@linaro.org>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Thu, 21 Jan 2016 23:38:44 +0900
+Subject: [PATCH v3 1/7] ARM: dts: kirkwood: gpio pin fixes for linkstation
+ ls-wxl/wsxl
+In-Reply-To: <1453387130-6914-1-git-send-email-rogershimizu@gmail.com>
+References: <1453387130-6914-1-git-send-email-rogershimizu@gmail.com>
+Message-ID: <1453387130-6914-2-git-send-email-rogershimizu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+For kirkwood, gpio pins starts from 32 are in the 2nd bank, so it should be
+converted to "gpio1 <pin minus 32>" in dts file.
+e.g. gpio 40 should be "gpio1 8"
 
+Besides, a few other pin fixes for ls-wxl/wsxl, to match with mpp pin
+definition:
+  - gpio-leds: "lswxl:blue:power" pin
+  - gpio-leds: "lswxl:red:func" pin
+  - gpio-leds: "lswxl:red:hdderr0" pin
+  - gpio-leds: "lswxl:red:hdderr1" pin
+  - gpio-fan:  low/high/alarm pin
 
-On 21/01/16 09:33, Matthias Brugger wrote:
->
->
-> On 14/12/15 11:07, Srinivas Kandagatla wrote:
->> Hi Andrew,
->>
->> On 14/12/15 04:27, Daniel Kurtz wrote:
->>> Hi Srinivas,
->>>
->>> On Thu, Nov 19, 2015 at 6:46 PM, Andrew-CT Chen
->>> <andrew-ct.chen@mediatek.com> wrote:
->>>> This patch adds EFUSE support driver which is used by other drivers
->>>> like thermal sensor and HDMI impedance.
->>>>
->>>> There are some efuses these fuses store things like calibration data,
->>>> speed bins.. etc. Drivers like thermal sensor, HDMI impedance would
->>>> read out this data for configuring the driver.
->>>>
->>>> Change in v2:
->>>> 1. Rebase to 4.4-rc1
->>>> 2. Modify the driver Makefile for more consistent with other drivers
->>>> 3. Modify the compatible string to "mediatek,mt8173-efuse" and
->>>> "mediatek,efuse"
->>>
->>> Do you still plan to queue this for v4.5?
->>>
->> Sorry guys, for the long delay in replying your pings, got busy with
->> regular office stuff :-)
->>
->> Yes, It should go in v4.5, I did send request with my sign-off to Greg,
->> he should take it via char-misc tree.
->>
->
-> I can't see this patches in the char-misc tree [1].
-> Can you please double check?
+The pin/bank issue was found when discussing Debian Bug #810894
+  [https://bugs.debian.org/810894#47]
 
-Hi Matthias,
-Thanks for the patience. You should expect them to see after v4.5-rc1, 
-that's when Greg said he would push the patches.
+Fixes: e54e4b1b622e ("ARM: dts: add buffalo linkstation ls-wxl/wsxl")
+Reported-by: Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>
+Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/boot/dts/kirkwood-lswxl.dts | 29 +++++++++++++++--------------
+ 1 file changed, 15 insertions(+), 14 deletions(-)
 
-thanks,
-srini
->
-> Thanks,
-> Matthias
->
-> [1] https://git.kernel.org/cgit/linux/kernel/git/gregkh/char-misc.git/
->
->> Thanks,
->> srini
->>>>
->>>> Andrew-CT Chen (3):
->>>>    dt-bindings: add document of mediatek efuse driver
->>>>    nvmem: mediatek: Add Mediatek EFUSE driver
->>>>    dts: arm64: Add EFUSE device node
->>>>
->>>>   .../devicetree/bindings/nvmem/mtk-efuse.txt        | 36 +++++++++
->>>>   arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  5 ++
->>>>   drivers/nvmem/Kconfig                              | 11 +++
->>>>   drivers/nvmem/Makefile                             |  2 +
->>>>   drivers/nvmem/mtk-efuse.c                          | 89
->>>> ++++++++++++++++++++++
->>>>   5 files changed, 143 insertions(+)
->>>>   create mode 100644
->>>> Documentation/devicetree/bindings/nvmem/mtk-efuse.txt
->>>>   create mode 100644 drivers/nvmem/mtk-efuse.c
->>>>
->>>> --
->>>> 1.9.1
->>>>
->>>> --
->>>> To unsubscribe from this list: send the line "unsubscribe
->>>> linux-kernel" in
->>>> the body of a message to majordomo at vger.kernel.org
->>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>> Please read the FAQ at  http://www.tux.org/lkml/
+diff --git a/arch/arm/boot/dts/kirkwood-lswxl.dts b/arch/arm/boot/dts/kirkwood-lswxl.dts
+index f5db16a08597..0e93f6d19259 100644
+--- a/arch/arm/boot/dts/kirkwood-lswxl.dts
++++ b/arch/arm/boot/dts/kirkwood-lswxl.dts
+@@ -1,7 +1,8 @@
+ /*
+  * Device Tree file for Buffalo Linkstation LS-WXL/WSXL
+  *
+- * Copyright (C) 2015, rogershimizu at gmail.com
++ * Copyright (C) 2015, 2016
++ * Roger Shimizu <rogershimizu@gmail.com>
+  *
+  * This program is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU General Public License
+@@ -156,21 +157,21 @@
+ 		button at 1 {
+ 			label = "Function Button";
+ 			linux,code = <KEY_OPTION>;
+-			gpios = <&gpio1 41 GPIO_ACTIVE_LOW>;
++			gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
+ 		};
+ 
+ 		button at 2 {
+ 			label = "Power-on Switch";
+ 			linux,code = <KEY_RESERVED>;
+ 			linux,input-type = <5>;
+-			gpios = <&gpio1 42 GPIO_ACTIVE_LOW>;
++			gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
+ 		};
+ 
+ 		button at 3 {
+ 			label = "Power-auto Switch";
+ 			linux,code = <KEY_ESC>;
+ 			linux,input-type = <5>;
+-			gpios = <&gpio1 43 GPIO_ACTIVE_LOW>;
++			gpios = <&gpio1 11 GPIO_ACTIVE_LOW>;
+ 		};
+ 	};
+ 
+@@ -185,12 +186,12 @@
+ 
+ 		led at 1 {
+ 			label = "lswxl:blue:func";
+-			gpios = <&gpio1 36 GPIO_ACTIVE_LOW>;
++			gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
+ 		};
+ 
+ 		led at 2 {
+ 			label = "lswxl:red:alarm";
+-			gpios = <&gpio1 49 GPIO_ACTIVE_LOW>;
++			gpios = <&gpio1 17 GPIO_ACTIVE_LOW>;
+ 		};
+ 
+ 		led at 3 {
+@@ -200,23 +201,23 @@
+ 
+ 		led at 4 {
+ 			label = "lswxl:blue:power";
+-			gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
++			gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
+ 		};
+ 
+ 		led at 5 {
+ 			label = "lswxl:red:func";
+-			gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
++			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
+ 			default-state = "keep";
+ 		};
+ 
+ 		led at 6 {
+ 			label = "lswxl:red:hdderr0";
+-			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
++			gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
+ 		};
+ 
+ 		led at 7 {
+ 			label = "lswxl:red:hdderr1";
+-			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
++			gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
+ 		};
+ 	};
+ 
+@@ -225,15 +226,15 @@
+ 		pinctrl-0 = <&pmx_fan_low &pmx_fan_high &pmx_fan_lock>;
+ 		pinctrl-names = "default";
+ 
+-		gpios = <&gpio0 47 GPIO_ACTIVE_LOW
+-			 &gpio0 48 GPIO_ACTIVE_LOW>;
++		gpios = <&gpio1 16 GPIO_ACTIVE_LOW
++			 &gpio1 15 GPIO_ACTIVE_LOW>;
+ 
+ 		gpio-fan,speed-map = <0 3
+ 				1500 2
+ 				3250 1
+ 				5000 0>;
+ 
+-		alarm-gpios = <&gpio1 49 GPIO_ACTIVE_HIGH>;
++		alarm-gpios = <&gpio1 8 GPIO_ACTIVE_HIGH>;
+ 	};
+ 
+ 	restart_poweroff {
+@@ -256,7 +257,7 @@
+ 			enable-active-high;
+ 			regulator-always-on;
+ 			regulator-boot-on;
+-			gpio = <&gpio0 37 GPIO_ACTIVE_HIGH>;
++			gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
+ 		};
+ 		hdd_power0: regulator at 2 {
+ 			compatible = "regulator-fixed";
+-- 
+2.1.4
