@@ -1,46 +1,55 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 21 Jan 2016 11:12:02 -0800
-Subject: [PATCH v2 0/5] omap assembly fixes for CONFIG_DEBUG_RODATA
-Message-ID: <1453403527-21308-1-git-send-email-tony@atomide.com>
+Date: Thu, 21 Jan 2016 11:12:05 -0800
+Subject: [PATCH 3/5] ARM: OMAP2+: Fix save_secure_ram_context for rodata
+In-Reply-To: <1453403527-21308-1-git-send-email-tony@atomide.com>
+References: <1453403527-21308-1-git-send-email-tony@atomide.com>
+Message-ID: <1453403527-21308-4-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+We don't want to write to .text and we can move save_secure_ram_context
+into .data as it all gets copied into SRAM anyways.
+
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Laura Abbott <labbott@redhat.com>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Nishanth Menon <nm@ti.com>
+Cc: Richard Woodruff <r-woodruff2@ti.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Cc: Tero Kristo <t-kristo@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/sleep34xx.S | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
+index 5659d96..8e2a7ac 100644
+--- a/arch/arm/mach-omap2/sleep34xx.S
++++ b/arch/arm/mach-omap2/sleep34xx.S
+@@ -92,8 +92,12 @@ ENTRY(enable_omap3630_toggle_l2_on_restore)
+ 	ldmfd	sp!, {pc}	@ restore regs and return
+ ENDPROC(enable_omap3630_toggle_l2_on_restore)
  
-Here are read-only data fixes for omaps discovered few weeks ago
-with "[PATCH v2] ARM: mm: flip priority of CONFIG_DEBUG_RODATA"
-that caused issues during deeper idle states on omaps [0].
+-	.text
+-/* Function to call rom code to save secure ram context */
++/*
++ * Function to call rom code to save secure ram context. This gets
++ * relocated to SRAM, so it can be all in .data section. Otherwise
++ * we need to initialize api_params separately.
++ */
++	.data
+ 	.align	3
+ ENTRY(save_secure_ram_context)
+ 	stmfd	sp!, {r4 - r11, lr}	@ save registers on stack
+@@ -127,6 +131,8 @@ ENDPROC(save_secure_ram_context)
+ ENTRY(save_secure_ram_context_sz)
+ 	.word	. - save_secure_ram_context
  
-Please review and test if possible. I'd like to merge these fixes
-during v4.5-rc cycle to remove these blockers for making it possible
-to have CONFIG_DEBUG_RODATA enabled by default.
- 
-Regards,
- 
-Tony
-
-Changes since v1:
-
-- Fix missing ldr in patch 2/5 as Noticed by Nicolas Pitre. This
-  had gone unnoticed as the code just happened to work on omap36xx
-  without actually toggling the L2 cache. And patches 4 and 5 are setting
-  the address, not the value unlike patch 2/5. I've added some comments
-  to patch 2/5 too.
-
-- Fix a typo noticed by Sergei Shtylyov in patch 3/5.
-
-[0] https://lkml.org/lkml/2015/12/2/908
-
-Tony Lindgren (5):
-  ARM: OMAP2+: Fix wait_dll_lock_timed for rodata
-  ARM: OMAP2+: Fix l2dis_3630 for rodata
-  ARM: OMAP2+: Fix save_secure_ram_context for rodata
-  ARM: OMAP2+: Fix l2_inv_api_params for rodata
-  ARM: OMAP2+: Fix ppa_zero_params and ppa_por_params for rodata
-
- arch/arm/mach-omap2/sleep34xx.S | 61 ++++++++++++++++++++---------------------
- arch/arm/mach-omap2/sleep44xx.S | 25 +++++++++++------
- 2 files changed, 47 insertions(+), 39 deletions(-)
-
++	.text
++
+ /*
+  * ======================
+  * == Idle entry point ==
 -- 
 2.7.0.rc3
