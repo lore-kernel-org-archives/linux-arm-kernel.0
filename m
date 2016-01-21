@@ -1,158 +1,90 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 21 Jan 2016 16:56:24 +0100
-Subject: [linux-sunxi][PATCH v3 4/5] ARM: dts: sun4i: Add Itead A10 Core
- support
-In-Reply-To: <CAEKpxBnt18EWoamdUtPO6FSyXdVc2Ct6aMgBJQo3P9HPweKi-w@mail.gmail.com>
-References: <1452766555-16409-1-git-send-email-codekipper@gmail.com>
- <1452766555-16409-5-git-send-email-codekipper@gmail.com>
- <20160118194410.GS4581@lukather>
- <CAEKpxBnt18EWoamdUtPO6FSyXdVc2Ct6aMgBJQo3P9HPweKi-w@mail.gmail.com>
-Message-ID: <20160121155624.GH3997@lukather>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 21 Jan 2016 17:00:51 +0100
+Subject: [PATCH v3 0/7] ARM: dts: kirkwood: fixes and split of linkstation
+ dts for ls-wvl/vl and ls-wxl/wsxl
+In-Reply-To: <1453387130-6914-1-git-send-email-rogershimizu@gmail.com> (Roger
+ Shimizu's message of "Thu, 21 Jan 2016 23:38:43 +0900")
+References: <1453211342-25214-1-git-send-email-rogershimizu@gmail.com>
+ <1453387130-6914-1-git-send-email-rogershimizu@gmail.com>
+Message-ID: <87d1suhqh8.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcus,
+Hi Roger,
+ 
+ On jeu., janv. 21 2016, Roger Shimizu <rogershimizu@gmail.com> wrote:
 
-Please keep all the recipients in Cc.
-
-On Tue, Jan 19, 2016 at 08:52:09AM +0100, Code Kipper wrote:
-> On 18 January 2016 at 20:44, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Thu, Jan 14, 2016 at 11:15:54AM +0100, codekipper at gmail.com wrote:
-> >> From: Marcus Cooper <codekipper@gmail.com>
-> >>
-> >> The A10 Itead Core module comes with 4GB NAND and 1GB DDR RAM. All of the
-> >> I/O interfaces are exposed via 4 groups of 2*30 1mm pitched female headers.
-> >>
-> >> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
-> >> ---
-> >>  arch/arm/boot/dts/sun4i-a10-itead-core.dtsi | 86 +++++++++++++++++++++++++++++
-> >>  1 file changed, 86 insertions(+)
-> >>  create mode 100644 arch/arm/boot/dts/sun4i-a10-itead-core.dtsi
-> >>
-> >> diff --git a/arch/arm/boot/dts/sun4i-a10-itead-core.dtsi b/arch/arm/boot/dts/sun4i-a10-itead-core.dtsi
-> >> new file mode 100644
-> >> index 0000000..97f653a
-> >> --- /dev/null
-> >> +++ b/arch/arm/boot/dts/sun4i-a10-itead-core.dtsi
-> >> @@ -0,0 +1,86 @@
-> >> +/*
-> >> + * Copyright 2015 - Marcus Cooper <codekipper@gmail.com>
-> >> + *
-> >> + * This file is dual-licensed: you can use it either under the terms
-> >> + * of the GPL or the X11 license, at your option. Note that this dual
-> >> + * licensing only applies to this file, and not this project as a
-> >> + * whole.
-> >> + *
-> >> + *  a) This file is free software; you can redistribute it and/or
-> >> + *     modify it under the terms of the GNU General Public License as
-> >> + *     published by the Free Software Foundation; either version 2 of the
-> >> + *     License, or (at your option) any later version.
-> >> + *
-> >> + *     This file is distributed in the hope that it will be useful,
-> >> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> + *     GNU General Public License for more details.
-> >> + *
-> >> + * Or, alternatively,
-> >> + *
-> >> + *  b) Permission is hereby granted, free of charge, to any person
-> >> + *     obtaining a copy of this software and associated documentation
-> >> + *     files (the "Software"), to deal in the Software without
-> >> + *     restriction, including without limitation the rights to use,
-> >> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> >> + *     sell copies of the Software, and to permit persons to whom the
-> >> + *     Software is furnished to do so, subject to the following
-> >> + *     conditions:
-> >> + *
-> >> + *     The above copyright notice and this permission notice shall be
-> >> + *     included in all copies or substantial portions of the Software.
-> >> + *
-> >> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> >> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> >> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> >> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> >> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> >> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> >> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> >> + *     OTHER DEALINGS IN THE SOFTWARE.
-> >> + */
-> >> +
-> >> +#include "sun4i-a10.dtsi"
-> >> +#include "sunxi-itead-core-common.dtsi"
-> >> +
-> >> +&cpu0 {
-> >> +     cpu-supply = <&reg_dcdc2>;
-> >> +};
-> >> +
-> >> +&i2c0 {
-> >> +     pinctrl-names = "default";
-> >> +     pinctrl-0 = <&i2c0_pins_a>;
-> >> +     status = "okay";
-> >> +
-> >> +     axp209: pmic at 34 {
-> >> +             reg = <0x34>;
-> >> +             interrupts = <0>;
-> >> +     };
-> >> +};
-> >> +
-> >> +#include "axp209.dtsi"
-> >> +
-> >> +&reg_dcdc2 {
-> >> +     regulator-always-on;
-> >> +     regulator-min-microvolt = <1000000>;
-> >> +     regulator-max-microvolt = <1400000>;
-> >> +     regulator-name = "vdd-cpu";
-> >> +};
-> >> +
-> >> +&reg_dcdc3 {
-> >> +     regulator-always-on;
-> >> +     regulator-min-microvolt = <1000000>;
-> >> +     regulator-max-microvolt = <1400000>;
-> >> +     regulator-name = "vdd-int-dll";
-> >> +};
-> >> +
-> >> +&reg_ldo1 {
-> >> +     regulator-name = "vdd-rtc";
-> >> +};
-> >> +
-> >> +&reg_ldo2 {
-> >> +     regulator-always-on;
-> >> +     regulator-min-microvolt = <3000000>;
-> >> +     regulator-max-microvolt = <3000000>;
-> >> +     regulator-name = "avcc";
-> >> +};
-> >> --
-> >> 2.7.0
-> >
-> > Is there any difference with the A20 one?
+> Dear kirkwood maintainers,
 >
-> Yep....this one references the a10 dtsi
+> Linkstation dts for ls-wxl and ls-wvl need some fixes:
+>   - [patch 1/7] and [patch 2/7] are fixes for gpio pin
+>   - [patch 3/7] and [patch 4/7] are fixes for gpio led
+> Above 4 patches can be safely backported to 4.3/4.4 stable kernel.
+>
+> And in order to support more buffalo linkstation devices in convenient way,
+> I split current 2 dts files into a few comoon dtsi files and device specific
+> dts files.
+>   - [patch 5/7] relicense dts under GPLv2/X11
+>   - [patch 6/7] split dts for lswxl
+>   - [patch 7/7] split dts for lswvl
+>
+> Changes in v2:
+>   - separate the fix and relicense patch
+>   - add "linkstation:" to all led labels
+> Changes in v3:
+>   - address Andrew Lunn's suggestion to change commit message
+>     for [patch 3/7] and [patch 4/7]
+>   - add Andrew Lunn's "Reviewed-by"
+>   - address active high/low for the power LED
 
-The difference between the A10 and A20 can always be done at the board
-level anyway.
+I will apply this series on the mvebu branches when v4.5-rc1 will be
+released (so it should be the next week).
 
-> and the way interrupt for the pmic is declared is different.
+Thanks,
 
-And you could have everything but that interrupt in the common DT from
-what I can see.
+Greogry
 
-
-> At first the dcdc3 max voltage was different but now they're the
-> same so maybe this can go into the common dtsi. I'll have a play
-> before the next patchset.
-
-Yep, please do. Thanks!
-Maxime
+>
+> Cheers.
+>
+> Roger Shimizu (7):
+>   ARM: dts: kirkwood: gpio pin fixes for linkstation ls-wxl/wsxl
+>   ARM: dts: kirkwood: gpio pin fixes for linkstation ls-wvl/vl
+>   ARM: dts: kirkwood: gpio-leds fixes for linkstation ls-wxl/wsxl
+>   ARM: dts: kirkwood: gpio-leds fixes for linkstation ls-wvl/vl
+>   ARM: dts: kirkwood: relicense dts of ls-wvl/vl and ls-wxl/wsxl under
+>     GPLv2/X11
+>   ARM: dts: kirkwood: split lswxl dts to linkstation lswsxl and lswxl
+>   ARM: dts: kirkwood: split lswvl dts to linkstation lsvl and lswvl
+>
+>  .../devicetree/bindings/arm/marvell,kirkwood.txt   |   6 +-
+>  arch/arm/boot/dts/Makefile                         |   6 +-
+>  arch/arm/boot/dts/kirkwood-linkstation-6282.dtsi   | 192 +++++++++++++
+>  .../boot/dts/kirkwood-linkstation-duo-6281.dtsi    | 186 +++++++++++++
+>  arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts    |  57 ++++
+>  arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts  |  57 ++++
+>  arch/arm/boot/dts/kirkwood-linkstation-lswvl.dts   | 112 ++++++++
+>  arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts   | 116 ++++++++
+>  arch/arm/boot/dts/kirkwood-linkstation.dtsi        | 202 ++++++++++++++
+>  arch/arm/boot/dts/kirkwood-lswvl.dts               | 301 ---------------------
+>  arch/arm/boot/dts/kirkwood-lswxl.dts               | 301 ---------------------
+>  11 files changed, 930 insertions(+), 606 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-6282.dtsi
+>  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi
+>  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts
+>  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts
+>  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lswvl.dts
+>  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts
+>  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation.dtsi
+>  delete mode 100644 arch/arm/boot/dts/kirkwood-lswvl.dts
+>  delete mode 100644 arch/arm/boot/dts/kirkwood-lswxl.dts
+>
+> -- 
+> 2.1.4
+>
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160121/354c4c23/attachment.sig>
