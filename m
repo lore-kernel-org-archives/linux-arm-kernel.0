@@ -1,38 +1,115 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 21 Jan 2016 17:23:33 -0300
-Subject: [PATCH v2 10/10] ARM: multi_v7_defconfig: Remove MAX77802 RTC Kconfig
- symbol
-In-Reply-To: <1453407813-14646-1-git-send-email-javier@osg.samsung.com>
-References: <1453407813-14646-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1453407813-14646-11-git-send-email-javier@osg.samsung.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 21 Jan 2016 21:53:09 +0100
+Subject: [PATCH v3] clk-divider: make sure read-only dividers do not write to
+ their register
+Message-ID: <4666170.lmsMJxAogk@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver has been removed so the Kconfig symbol is not valid anymore.
+Commit e6d5e7d90be9 ("clk-divider: Fix READ_ONLY when divider > 1") removed
+the special ops struct for read-only clocks and instead opted to handle
+them inside the regular ops.
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+On the rk3368 this results in breakage as aclkm now gets set a value.
+While it is the same divider value, the A53 core still doesn't like it,
+which can result in the cpu ending up in a hang.
+The reason being that "ACLKENMasserts one clock cycle before the rising
+edge of ACLKM" and the clock should only be touched when STANDBYWFIL2
+is asserted.
 
+To fix this, reintroduce the read-only ops but do include the round_rate
+callback. That way no writes that may be unsafe are done to the divider
+register in any case.
 
+The Rockchip use of the clk_divider_ops is adapted to this split again,
+as is the nxp, lpc18xx-ccu driver that was included since the original
+commit. On lpc18xx-ccu the divider seems to always be read-only
+so only uses the new ops now.
+
+Fixes: e6d5e7d90be9 ("clk-divider: Fix READ_ONLY when divider > 1")
+Reported-by: Zhang Qing <zhangqing@rock-chips.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
+changes in v3:
+- instead of bailing out of set_rate, reintroduce the _ro_ops
+  with added round_rate callback, as requested by Stephen
+changes in v2:
+- emphasize that even setting the same divider may be unsafe
 
-Changes in v2:
-- Add Krzysztof Kozlowski's Reviewed-by tag to patch #10.
+ drivers/clk/clk-divider.c         | 11 ++++++++++-
+ drivers/clk/nxp/clk-lpc18xx-ccu.c |  2 +-
+ drivers/clk/rockchip/clk.c        |  4 +++-
+ include/linux/clk-provider.h      |  1 +
+ 4 files changed, 15 insertions(+), 3 deletions(-)
 
- arch/arm/configs/multi_v7_defconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 314f6be2dca2..bdb42c09332c 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -664,7 +664,6 @@ CONFIG_RTC_DRV_MAX8907=y
- CONFIG_RTC_DRV_MAX8997=m
- CONFIG_RTC_DRV_MAX77686=y
- CONFIG_RTC_DRV_RK808=m
--CONFIG_RTC_DRV_MAX77802=m
- CONFIG_RTC_DRV_RS5C372=m
- CONFIG_RTC_DRV_PALMAS=y
- CONFIG_RTC_DRV_ST_LPC=y
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index ded3ff4..aa1dacd 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -423,6 +423,12 @@ const struct clk_ops clk_divider_ops = {
+ };
+ EXPORT_SYMBOL_GPL(clk_divider_ops);
+ 
++const struct clk_ops clk_divider_ro_ops = {
++	.recalc_rate = clk_divider_recalc_rate,
++	.round_rate = clk_divider_round_rate,
++};
++EXPORT_SYMBOL_GPL(clk_divider_ro_ops);
++
+ static struct clk *_register_divider(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u8 width,
+@@ -446,7 +452,10 @@ static struct clk *_register_divider(struct device *dev, const char *name,
+ 		return ERR_PTR(-ENOMEM);
+ 
+ 	init.name = name;
+-	init.ops = &clk_divider_ops;
++	if (clk_divider_flags & CLK_DIVIDER_READ_ONLY)
++		init.ops = &clk_divider_ro_ops;
++	else
++		init.ops = &clk_divider_ops;
+ 	init.flags = flags | CLK_IS_BASIC;
+ 	init.parent_names = (parent_name ? &parent_name: NULL);
+ 	init.num_parents = (parent_name ? 1 : 0);
+diff --git a/drivers/clk/nxp/clk-lpc18xx-ccu.c b/drivers/clk/nxp/clk-lpc18xx-ccu.c
+index 13aabbb..558da89 100644
+--- a/drivers/clk/nxp/clk-lpc18xx-ccu.c
++++ b/drivers/clk/nxp/clk-lpc18xx-ccu.c
+@@ -222,7 +222,7 @@ static void lpc18xx_ccu_register_branch_gate_div(struct lpc18xx_clk_branch *bran
+ 		div->width = 1;
+ 
+ 		div_hw = &div->hw;
+-		div_ops = &clk_divider_ops;
++		div_ops = &clk_divider_ro_ops;
+ 	}
+ 
+ 	branch->gate.reg = branch->offset + reg_base;
+diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
+index d9a0b5d..f7e8693 100644
+--- a/drivers/clk/rockchip/clk.c
++++ b/drivers/clk/rockchip/clk.c
+@@ -90,7 +90,9 @@ static struct clk *rockchip_clk_register_branch(const char *name,
+ 		div->width = div_width;
+ 		div->lock = lock;
+ 		div->table = div_table;
+-		div_ops = &clk_divider_ops;
++		div_ops = (div_flags & CLK_DIVIDER_READ_ONLY)
++						? &clk_divider_ro_ops
++						: &clk_divider_ops;
+ 	}
+ 
+ 	clk = clk_register_composite(NULL, name, parent_names, num_parents,
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 1143e38..408a60d 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -385,6 +385,7 @@ struct clk_divider {
+ #define CLK_DIVIDER_MAX_AT_ZERO		BIT(6)
+ 
+ extern const struct clk_ops clk_divider_ops;
++extern const struct clk_ops clk_divider_ro_ops;
+ 
+ unsigned long divider_recalc_rate(struct clk_hw *hw, unsigned long parent_rate,
+ 		unsigned int val, const struct clk_div_table *table,
 -- 
-2.5.0
+2.6.4
