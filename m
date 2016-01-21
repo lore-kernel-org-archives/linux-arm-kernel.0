@@ -1,62 +1,93 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 21 Jan 2016 14:22:56 +0100
-Subject: RCU lockup? (was: Re: [PATCH v2 tip/core/rcu 10/14] rcu: Don't
- redundantly disable irqs in rcu_irq_{enter,exit}())
-Message-ID: <CAMuHMdWz0U-uUs1Ox_13YOA0AfVPTx24nTA3=hx5Z5kcHr8SbQ@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 21 Jan 2016 14:23:38 +0100
+Subject: [PATCH V2] mmc: pwrseq_simple: Make reset-gpios optional to match
+ doc
+In-Reply-To: <20160120150803.32073.63845.stgit@localhost>
+References: <20160120150803.32073.63845.stgit@localhost>
+Message-ID: <CAPDyKFq0O_Xt=R5=7SVKKiYS8YozXUM+5S8ukzmz8vo4BJmLOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On 20 January 2016 at 16:08, Martin Fuzzey <mfuzzey@parkeon.com> wrote:
+> The DT binding doc says reset-gpios is an optional property but the code
+> currently bails out if it is omitted.
+>
+> This is a regression since it breaks previously working device trees.
+> Fix it by restoring the original documented behaviour.
+>
+> Fixes: ce037275861e ("mmc: pwrseq_simple: use GPIO descriptors array API")
+> Tested-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
 
-On Thu, Dec 10, 2015 at 12:10 AM, Paul E. McKenney
-<paulmck@linux.vnet.ibm.com> wrote:
-> This commit replaces a local_irq_save()/local_irq_restore() pair with
-> a lockdep assertion that interrupts are already disabled.  This should
-> remove the corresponding overhead from the interrupt entry/exit fastpaths.
+Thanks, applied for fixes!
+
+Kind regards
+Uffe
+
 >
-> This change was inspired by the fact that Iftekhar Ahmed's mutation
-> testing showed that removing rcu_irq_enter()'s call to local_ird_restore()
-> had no effect, which might indicate that interrupts were always enabled
-> anyway.
->
-> Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
 > ---
->  include/linux/rcupdate.h   |  4 ++--
->  include/linux/rcutiny.h    |  8 ++++++++
->  include/linux/rcutree.h    |  2 ++
->  include/linux/tracepoint.h |  4 ++--
->  kernel/rcu/tree.c          | 32 ++++++++++++++++++++++++++------
->  5 files changed, 40 insertions(+), 10 deletions(-)
-
-This commit (7c9906ca5e582a773fff696975e312cef58a7386) is triggering lock ups
-during boot on r8a7791/koelsch (dual Cortex A15). Probably this commit does not
-contain the real bug, but a symptom.
-
-Unfortunately I cannot reproduce it with CONFIG_PROVE_RCU=y.
-
-I started seeing the issue when disabling an innocent option in
-shmobile_defconfig. I tracked it down to the removal of an unused C function,
-containing hardware support for another system. Replacing the C function by
-a dummy function with the right number of "asm("nop")"s (depending on kernel
-version and/or kernel config, sigh) made the issue go away.
-Adding or removing nops makes the issue reappear, and has some impact on
-how early the issue happens (sometimes as late as early userspace).
-Adding a multiple of 16 nops has no impact.
-So it looks like something that should be cacheline-aligned isn't...
-
-CONFIG_TREE_RCU=y
-
-Do you have a suggestion?
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> V2:
+> Fix review comments by Ulf Hansson:
+>     * Handle -ENOSYS case when CONFIG_GPIOLIB not selected
+>       This causes checkpatch to complain with
+>            "WARNING: ENOSYS means 'invalid syscall nr' and nothing else"
+>       but I guess that's ok here.
+>     * Update patch description to make it clear this is a regression fix
+>     * Add Fixes tag
+>
+> Add Tested-by tag from Tony Lingdren
+> ---
+>  drivers/mmc/core/pwrseq_simple.c |   22 ++++++++++++++--------
+>  1 file changed, 14 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
+> index d10538b..96f45ca 100644
+> --- a/drivers/mmc/core/pwrseq_simple.c
+> +++ b/drivers/mmc/core/pwrseq_simple.c
+> @@ -29,15 +29,18 @@ struct mmc_pwrseq_simple {
+>  static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
+>                                               int value)
+>  {
+> -       int i;
+>         struct gpio_descs *reset_gpios = pwrseq->reset_gpios;
+> -       int values[reset_gpios->ndescs];
+>
+> -       for (i = 0; i < reset_gpios->ndescs; i++)
+> -               values[i] = value;
+> +       if (!IS_ERR(reset_gpios)) {
+> +               int i;
+> +               int values[reset_gpios->ndescs];
+>
+> -       gpiod_set_array_value_cansleep(reset_gpios->ndescs, reset_gpios->desc,
+> -                                      values);
+> +               for (i = 0; i < reset_gpios->ndescs; i++)
+> +                       values[i] = value;
+> +
+> +               gpiod_set_array_value_cansleep(
+> +                       reset_gpios->ndescs, reset_gpios->desc, values);
+> +       }
+>  }
+>
+>  static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
+> @@ -79,7 +82,8 @@ static void mmc_pwrseq_simple_free(struct mmc_host *host)
+>         struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
+>                                         struct mmc_pwrseq_simple, pwrseq);
+>
+> -       gpiod_put_array(pwrseq->reset_gpios);
+> +       if (!IS_ERR(pwrseq->reset_gpios))
+> +               gpiod_put_array(pwrseq->reset_gpios);
+>
+>         if (!IS_ERR(pwrseq->ext_clk))
+>                 clk_put(pwrseq->ext_clk);
+> @@ -112,7 +116,9 @@ struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
+>         }
+>
+>         pwrseq->reset_gpios = gpiod_get_array(dev, "reset", GPIOD_OUT_HIGH);
+> -       if (IS_ERR(pwrseq->reset_gpios)) {
+> +       if (IS_ERR(pwrseq->reset_gpios) &&
+> +           PTR_ERR(pwrseq->reset_gpios) != -ENOENT &&
+> +           PTR_ERR(pwrseq->reset_gpios) != -ENOSYS) {
+>                 ret = PTR_ERR(pwrseq->reset_gpios);
+>                 goto clk_put;
+>         }
+>
