@@ -1,29 +1,54 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 21 Jan 2016 14:09:39 +0900
-Subject: [PATCH 0/2] ARM: dts: r8a7793: add CAN to device tree
-Message-ID: <1453352981-16104-1-git-send-email-horms+renesas@verge.net.au>
+Date: Thu, 21 Jan 2016 14:09:41 +0900
+Subject: [PATCH 2/2] ARM: dts: r8a7793: add CAN nodes to device tree
+In-Reply-To: <1453352981-16104-1-git-send-email-horms+renesas@verge.net.au>
+References: <1453352981-16104-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1453352981-16104-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add CAN nodes to r8a7793 device tree.
 
-this short series adds CAN clocks and nodes to the r8a7793 device tree.
+Based on work by Sergei Shtylyov for the r8a7791 SoC.
 
-I am not aware of an r8a7793 board that exposes CAN - the gose
-board does not appear to - and thus am unsure of a way to test these changes.
-However, they are based on what is present for the r8a7791 SoC and
-I am unable to find a difference in the SoC documentation.
+Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7793.dtsi | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-As far as I can tell the r8a7794 is in a similar situation and
-I plan to post a follow-up series for that SoC depending on feedback
-for this series.
-
-Simon Horman (2):
-  ARM: dts: r8a7793: add CAN clocks
-  ARM: dts: r8a7793: add CAN nodes to device tree
-
- arch/arm/boot/dts/r8a7793.dtsi | 42 +++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 41 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index 5d9375fa6759..a602233c314d 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -692,6 +692,28 @@
+ 		};
+ 	};
+ 
++	can0: can at e6e80000 {
++		compatible = "renesas,can-r8a7793";
++		reg = <0 0xe6e80000 0 0x1000>;
++		interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R8A7793_CLK_RCAN0>,
++			 <&cpg_clocks R8A7793_CLK_RCAN>, <&can_clk>;
++		clock-names = "clkp1", "clkp2", "can_clk";
++		power-domains = <&cpg_clocks>;
++		status = "disabled";
++	};
++
++	can1: can at e6e88000 {
++		compatible = "renesas,can-r8a7793";
++		reg = <0 0xe6e88000 0 0x1000>;
++		interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R8A7793_CLK_RCAN1>,
++			 <&cpg_clocks R8A7793_CLK_RCAN>, <&can_clk>;
++		clock-names = "clkp1", "clkp2", "can_clk";
++		power-domains = <&cpg_clocks>;
++		status = "disabled";
++	};
++
+ 	clocks {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
 -- 
 2.1.4
