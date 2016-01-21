@@ -1,34 +1,45 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 21 Jan 2016 09:56:21 -0700
-Subject: [RESEND PATCH 0/2] Remove the mistakes detected by the check
- tools.
-In-Reply-To: <cover.1453271738.git.eric.long@linaro.org>
-References: <cover.1453271738.git.eric.long@linaro.org>
-Message-ID: <CANLsYkzqFaPs2XbF0kC_jbG1=Jry2+bZMHMq-m9gUxMkoLAhnA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 21 Jan 2016 16:54:08 +0000
+Subject: [PATCH] ARM: dts: n900: Include adp1653 device
+In-Reply-To: <20160121163857.GH19432@atomide.com>
+References: <1451086812-3729-1-git-send-email-pali.rohar@gmail.com>
+ <20160121091241.GS7192@pali>
+ <20160121092909.GH5783@n2100.arm.linux.org.uk>
+ <20160121101828.GA7411@amd> <20160121163857.GH19432@atomide.com>
+Message-ID: <20160121165408.GJ5783@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 January 2016 at 23:39, Eric Long <eric.long@linaro.org> wrote:
-> Both of the two patches optimize the code and remove the mistakes and
-> warnings detected by the check tools.
->
-> Eric Long (2):
->   coresight: tmc/etm4x: Remove the mistakes detected by sparse tool
->   coresight: Remove the mistakes detected by smatch tool
->
->  drivers/hwtracing/coresight/coresight-etm4x.c |    2 +-
->  drivers/hwtracing/coresight/coresight-tmc.c   |    6 +++---
->  drivers/hwtracing/coresight/of_coresight.c    |    2 +-
->  3 files changed, 5 insertions(+), 5 deletions(-)
->
+On Thu, Jan 21, 2016 at 08:38:57AM -0800, Tony Lindgren wrote:
+> * Pavel Machek <pavel@ucw.cz> [160121 02:19]:
+> > On Thu 2016-01-21 09:29:10, Russell King - ARM Linux wrote:
+> > > The merge window is open, which is when development code that was merged
+> > > in good time prior to the merge window is sent upstream to Linus.  Linux
+> > > maintainers may choose not to merge new code into their tree to avoid
+> > > disrupting the utility of linux-next until the merge window has
+> > > closed.
+> > 
+> > Support for new hardware is normally allowed after -rc1.
+> 
+> Yeah most maintainers avoid looking at new code until -rc1. Or until
+> regresssions are out of the way. So patience please. Fixes are
+> welcome any time though.
 
-Please run checkpath.pl on your patches.  Also if the changes are of a
-different nature, ex. indentation problem and wrong argument to a
-function, please provide two separate patches.
+Indeed.  However, unlike Pavel's comment, many maintainers choose not
+to merge code for new hardware until the merge window - it's very rare
+that support for new hardware is merged during the -rc phase.
 
-Thanks,
-Mathieu
+If it were otherwise, I would've been able to get the Hummingboard 2
+DTS patches in, or the etnaviv team would've been able to get the
+Etnaviv GPU DRM driver in during the 4.4-rc cycle, or the Dove PMU
+driver, or... etc.
 
-> --
-> 1.7.9.5
->
+Practically, new code waits for merge windows, because no one wants
+to de-stabilise the progression of the -rc series with new code, and
+Linus wants to see -rc merges fairly quiet and be mostly bug fixes
+so he can feel good about a final release around -rc6 to -rc7 time.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
