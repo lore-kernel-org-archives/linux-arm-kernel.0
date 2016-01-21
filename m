@@ -1,28 +1,23 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 21 Jan 2016 08:05:24 +0100
-Subject: [PATCH 1/2] regulator: ltc3589: make IRQ optional
-In-Reply-To: <20160120164258.GF6588@sirena.org.uk>
-References: <1453292992-1788-1-git-send-email-LW@KARO-electronics.de>
- <1453292992-1788-2-git-send-email-LW@KARO-electronics.de>
- <20160120164258.GF6588@sirena.org.uk>
-Message-ID: <20160121080524.27af489f@ipc1.ka-ro>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 21 Jan 2016 09:18:43 +0200
+Subject: co-maintainance of remoteproc/rpmsg/hwspinlock
+Message-ID: <CAK=WgbaVDNq1j-R5DKT29csO_jYs6i17iByofC+_jLn2aOgq0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi everyone,
 
-> On Wed, Jan 20, 2016 at 01:29:51PM +0100, Lothar Wa?mann wrote:
-> 
-> > This pin is used as IRQ pin for the LTC3589 PMIC on the Ka-Ro
-> > electronics TX48 module. Make the IRQ optional in the driver and use a
-> > polling routine instead if no IRQ is specified in DT.
-> > Otherwise the driver will continuously generate interrupts and make
-> > the system unusable.
-> 
-> How will the driver generate interrupts if there is no interrupt
-> physically present in the system?
->
-It's using timer interrupts to poll the LTC3589 state.
+Due to lack of time in the next few months, I've asked Bjorn Andersson for
+help with the remoteproc/rpmsg/hwspinlock maintainership.
 
+Bjorn has kindly agreed to step up and co-maintain
+remoteproc/rpmsg/hwspinlock with me, and we expect that Bjorn will start
+picking up patches as soon as the next development cycle begins.
 
-Lothar Wa?mann
+Bjorn, thanks so much and please feel free to send a MAINTAINERS patch
+adding yourself as a maintainer for these three subsystems.
+
+I will still be available for any assistance or questions,
+
+Best wishes,
+Ohad.
