@@ -1,54 +1,54 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 21 Jan 2016 12:33:11 +0100
-Subject: [PATCH 1/2] regulator: ltc3589: make IRQ optional
-In-Reply-To: <20160121111115.GJ6588@sirena.org.uk>
-References: <1453292992-1788-1-git-send-email-LW@KARO-electronics.de>
- <1453292992-1788-2-git-send-email-LW@KARO-electronics.de>
- <20160120164258.GF6588@sirena.org.uk>
- <20160121080524.27af489f@ipc1.ka-ro>
- <20160121102015.GI6588@sirena.org.uk>
- <20160121112611.34e17cb2@ipc1.ka-ro>
- <20160121111115.GJ6588@sirena.org.uk>
-Message-ID: <20160121123311.5346e40d@ipc1.ka-ro>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 21 Jan 2016 20:39:03 +0900
+Subject: [PATCH] 8250: uniphier: allow modular build with 8250 console
+In-Reply-To: <3965359.aMgb8o9MaG@wuerfel>
+References: <3965359.aMgb8o9MaG@wuerfel>
+Message-ID: <CAK7LNATVtLk6UTh+r9JTZrKq-veEXetDdRutZ_=zQOd-WyAO0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
 
-> On Thu, Jan 21, 2016 at 11:26:11AM +0100, Lothar Wa?mann wrote:
-> > > On Thu, Jan 21, 2016 at 08:05:24AM +0100, Lothar Wa?mann wrote:
-> > > > > On Wed, Jan 20, 2016 at 01:29:51PM +0100, Lothar Wa?mann wrote:
-> 
-> > > > > > This pin is used as IRQ pin for the LTC3589 PMIC on the Ka-Ro
-> > > > > > electronics TX48 module. Make the IRQ optional in the driver and use a
-> > > > > > polling routine instead if no IRQ is specified in DT.
-> > > > > > Otherwise the driver will continuously generate interrupts and make
-> > > > > > the system unusable.
-> 
-> > > > > How will the driver generate interrupts if there is no interrupt
-> > > > > physically present in the system?
-> 
-> > > > It's using timer interrupts to poll the LTC3589 state.
-> 
-> > > I know that is what your patch does, my question is why you say in your
-> > > commit log that "Otherwise the driver will continuously generate
-> > > interrupts and make the system unusable".
-> 
-> > Because the interrupt is level triggered and the polarity of the
-> > EXTINT pin is inverted, the interrupt will be constantly active when
-> > the IRQ pin of the LTC3589 is inactive.
-> 
-> So, to repeat my original question, how will that generate interrupts if
-> there is no interrupt physically present in the system?
+
+2016-01-14 7:33 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> The recently added uniphier 8250 port driver supports early console
+> probing, and it supports being built as a module, but the combination
+> of the two fails to link:
 >
-It won't. That's the whole purpose of this patch.
-I'm afraid, I don't quite understand what you want to say...
+> ERROR: "early_serial8250_setup" [drivers/tty/serial/8250/8250_uniphier.ko] undefined!
+>
+> Given that earlycon support in a loadable module makes no sense,
+> making that code conditional on 'MODULE' is a correct solution.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: b8d20e06eaad ("serial: 8250_uniphier: add earlycon support")
+>
+> diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
+> index bab6b3ae2540..1b7bd26555b7 100644
+> --- a/drivers/tty/serial/8250/8250_uniphier.c
+> +++ b/drivers/tty/serial/8250/8250_uniphier.c
+> @@ -35,7 +35,7 @@ struct uniphier8250_priv {
+>         spinlock_t atomic_write_lock;
+>  };
+>
+> -#ifdef CONFIG_SERIAL_8250_CONSOLE
+> +#if defined(CONFIG_SERIAL_8250_CONSOLE) && !defined(MODULE)
+>  static int __init uniphier_early_console_setup(struct earlycon_device *device,
+>                                                const char *options)
+>  {
+>
+>
 
-Without this patch there will be a constantly active interrupt, which
-will stall the system because the nNMI interrupt (on the EXTINTn pin) is
-level triggered.
-Since the polarity of the interrupt input is fixed, there is no way to
-use it in our HW.
+
+If my patch (https://patchwork.kernel.org/patch/8029331/) is accepted,
+this build error will be fixed as well.  But I doubt it is accepted soon...
+
+So, I am OK with this workaround to fix "make allmodconfig".
+
+Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
 
-Lothar Wa?mann
+
+-- 
+Best Regards
+Masahiro Yamada
