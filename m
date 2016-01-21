@@ -1,93 +1,60 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 21 Jan 2016 14:23:38 +0100
-Subject: [PATCH V2] mmc: pwrseq_simple: Make reset-gpios optional to match
- doc
-In-Reply-To: <20160120150803.32073.63845.stgit@localhost>
-References: <20160120150803.32073.63845.stgit@localhost>
-Message-ID: <CAPDyKFq0O_Xt=R5=7SVKKiYS8YozXUM+5S8ukzmz8vo4BJmLOg@mail.gmail.com>
+From: jikos@kernel.org (Jiri Kosina)
+Date: Thu, 21 Jan 2016 14:37:29 +0100 (CET)
+Subject: [PATCH] hid: add support for Lilliput touchscreen
+In-Reply-To: <1449863264-14184-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1449863264-14184-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <alpine.LNX.2.00.1601211435360.21446@cbobk.fhfr.pm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 January 2016 at 16:08, Martin Fuzzey <mfuzzey@parkeon.com> wrote:
-> The DT binding doc says reset-gpios is an optional property but the code
-> currently bails out if it is omitted.
->
-> This is a regression since it breaks previously working device trees.
-> Fix it by restoring the original documented behaviour.
->
-> Fixes: ce037275861e ("mmc: pwrseq_simple: use GPIO descriptors array API")
-> Tested-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
+On Fri, 11 Dec 2015, Srinivas Kandagatla wrote:
 
-Thanks, applied for fixes!
+> diff --git a/drivers/hid/hid-core.c b/drivers/hid/hid-core.c
+> index c6f7a69..4350376 100644
+> --- a/drivers/hid/hid-core.c
+> +++ b/drivers/hid/hid-core.c
+> @@ -2051,6 +2051,7 @@ static const struct hid_device_id hid_have_special_driver[] = {
+>  	{ HID_USB_DEVICE(USB_VENDOR_ID_ZEROPLUS, 0x0005) },
+>  	{ HID_USB_DEVICE(USB_VENDOR_ID_ZEROPLUS, 0x0030) },
+>  	{ HID_USB_DEVICE(USB_VENDOR_ID_ZYDACRON, USB_DEVICE_ID_ZYDACRON_REMOTE_CONTROL) },
+> +	{ HID_USB_DEVICE(USB_VENDOR_ID_LILLIPUT, USB_PROD_ID_LILLIPUT) },
 
-Kind regards
-Uffe
+Could you please keep the list sorted?
 
->
-> ---
-> V2:
-> Fix review comments by Ulf Hansson:
->     * Handle -ENOSYS case when CONFIG_GPIOLIB not selected
->       This causes checkpatch to complain with
->            "WARNING: ENOSYS means 'invalid syscall nr' and nothing else"
->       but I guess that's ok here.
->     * Update patch description to make it clear this is a regression fix
->     * Add Fixes tag
->
-> Add Tested-by tag from Tony Lingdren
-> ---
->  drivers/mmc/core/pwrseq_simple.c |   22 ++++++++++++++--------
->  1 file changed, 14 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
-> index d10538b..96f45ca 100644
-> --- a/drivers/mmc/core/pwrseq_simple.c
-> +++ b/drivers/mmc/core/pwrseq_simple.c
-> @@ -29,15 +29,18 @@ struct mmc_pwrseq_simple {
->  static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
->                                               int value)
->  {
-> -       int i;
->         struct gpio_descs *reset_gpios = pwrseq->reset_gpios;
-> -       int values[reset_gpios->ndescs];
->
-> -       for (i = 0; i < reset_gpios->ndescs; i++)
-> -               values[i] = value;
-> +       if (!IS_ERR(reset_gpios)) {
-> +               int i;
-> +               int values[reset_gpios->ndescs];
->
-> -       gpiod_set_array_value_cansleep(reset_gpios->ndescs, reset_gpios->desc,
-> -                                      values);
-> +               for (i = 0; i < reset_gpios->ndescs; i++)
-> +                       values[i] = value;
+>  
+>  	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT, USB_DEVICE_ID_MS_PRESENTER_8K_BT) },
+>  	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_NINTENDO, USB_DEVICE_ID_NINTENDO_WIIMOTE) },
+> diff --git a/drivers/hid/hid-ids.h b/drivers/hid/hid-ids.h
+> index 9024a3d..f87993f 100644
+> --- a/drivers/hid/hid-ids.h
+> +++ b/drivers/hid/hid-ids.h
+> @@ -1055,4 +1055,8 @@
+>  #define USB_DEVICE_ID_RAPHNET_2NES2SNES	0x0002
+>  #define USB_DEVICE_ID_RAPHNET_4NES4SNES	0x0003
+>  
+> +/* Lilliput Capacitive TouchScreen */
+> +#define USB_VENDOR_ID_LILLIPUT  0x1391
+> +#define USB_PROD_ID_LILLIPUT    0x2112
 > +
-> +               gpiod_set_array_value_cansleep(
-> +                       reset_gpios->ndescs, reset_gpios->desc, values);
-> +       }
->  }
->
->  static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
-> @@ -79,7 +82,8 @@ static void mmc_pwrseq_simple_free(struct mmc_host *host)
->         struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
->                                         struct mmc_pwrseq_simple, pwrseq);
->
-> -       gpiod_put_array(pwrseq->reset_gpios);
-> +       if (!IS_ERR(pwrseq->reset_gpios))
-> +               gpiod_put_array(pwrseq->reset_gpios);
->
->         if (!IS_ERR(pwrseq->ext_clk))
->                 clk_put(pwrseq->ext_clk);
-> @@ -112,7 +116,9 @@ struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
->         }
->
->         pwrseq->reset_gpios = gpiod_get_array(dev, "reset", GPIOD_OUT_HIGH);
-> -       if (IS_ERR(pwrseq->reset_gpios)) {
-> +       if (IS_ERR(pwrseq->reset_gpios) &&
-> +           PTR_ERR(pwrseq->reset_gpios) != -ENOENT &&
-> +           PTR_ERR(pwrseq->reset_gpios) != -ENOSYS) {
->                 ret = PTR_ERR(pwrseq->reset_gpios);
->                 goto clk_put;
->         }
->
+>  #endif
+> diff --git a/drivers/hid/hid-multitouch.c b/drivers/hid/hid-multitouch.c
+> index 3d664d0..580749e 100644
+> --- a/drivers/hid/hid-multitouch.c
+> +++ b/drivers/hid/hid-multitouch.c
+> @@ -1209,6 +1209,11 @@ static const struct hid_device_id mt_devices[] = {
+>  		MT_USB_DEVICE(USB_VENDOR_ID_CJTOUCH,
+>  			USB_DEVICE_ID_CJTOUCH_MULTI_TOUCH_0040) },
+>  
+> +	/* Lilliput multitouch panels */
+> +	{  .driver_data = MT_CLS_DEFAULT,
+> +		HID_USB_DEVICE(USB_VENDOR_ID_LILLIPUT,
+> +			USB_PROD_ID_LILLIPUT) },
+> +
+
+This is a bit out of order as well.
+
+Thanks,
+
+-- 
+Jiri Kosina
+SUSE Labs
