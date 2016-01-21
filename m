@@ -1,63 +1,69 @@
 From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Fri, 22 Jan 2016 00:00:36 +0900
-Subject: [PATCH v2] ARM: dts: orion5x: gpio pin fixes for linkstation lswtgl
-In-Reply-To: <1453286688-9533-1-git-send-email-rogershimizu@gmail.com>
-References: <1453286688-9533-1-git-send-email-rogershimizu@gmail.com>
-Message-ID: <1453388436-8390-1-git-send-email-rogershimizu@gmail.com>
+Date: Fri, 22 Jan 2016 00:06:11 +0900
+Subject: [PATCH v2 6/7] ARM: dts: kirkwood: split lswxl dts to linkstation
+ lswsxl and lswxl
+In-Reply-To: <569FC227.2040300@gmail.com>
+References: <1453211342-25214-1-git-send-email-rogershimizu@gmail.com>
+ <1453304038-28345-1-git-send-email-rogershimizu@gmail.com>
+ <1453304038-28345-7-git-send-email-rogershimizu@gmail.com>
+ <569FC227.2040300@gmail.com>
+Message-ID: <CAEQ9gEmBe9aUgCCOES5hhObTJ4W5-8YNDydM9E=NVxF09enoMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here're a few gpio pin related fixes:
-  - remove pinctrl-0 definition from pinctrl, since those pins are used
-    in other places such as gpio-fan and regulators.
-  - keep initial state of power led
-  - fix for alarm pin of gpio-fan.
+On Thu, Jan 21, 2016 at 2:21 AM, Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com> wrote:
+> On 01/20/2016 04:33 PM, Roger Shimizu wrote:
+>>
+>> LS-WXL/WSXL are both kirkwood-6281 based 2-Bay NAS devices, which share
+>> many MPP pins. However they are slightly different:
+>>    - There're two red LED indicator on LS-WXL to show when HDD fails,
+>>      but there's no such on LS-WSXL.
+>>    - There's 4-level speed adjustable FAN on LS-WXL, but not LS-WSXL.
+>>
+>> So after the split, common part goes into .dtsi file:
+>>    - kirkwood-linkstation.dtsi
+>>    - kirkwood-linkstation-duo-6281.dtsi
+>> while all rest part goes into device specific .dts file:
+>>    - kirkwood-linkstation-lswsxl.dts
+>>    - kirkwood-linkstation-lswxl.dts
+>>
+>> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
+>> ---
+>
+> [...]
+>>
+>> diff --git a/arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi
+>> b/arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi
+>> new file mode 100644
+>> index 000000000000..47b8f185839d
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi
+>> @@ -0,0 +1,185 @@
+>
+> [...]
+>>
+>> +/ {
+>> +       ocp at f1000000 {
+>> +               pinctrl: pin-controller at 10000 {
+>
+>
+> Roger,
+>
+> nice series! Mind to send another patch moving pinctrl stuff
+> and sata below to node references for both boards?
+>
+> Kirkwood has &pinctrl and &sata labels, it helps to keep the bus
+> structure out of the board files. &mdio is an example for that.
+>
+> I might be easier not to squash that into this series but
+> send another one later.
 
-Fixes: dc57844a736f ("ARM: dts: orion5x: add buffalo linkstation ls-wtgl")
-Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
----
- arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Dear Sebastian,
 
-diff --git a/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts b/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
-index 3daec912b4bf..420788229e6f 100644
---- a/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
-+++ b/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
-@@ -1,7 +1,8 @@
- /*
-  * Device Tree file for Buffalo Linkstation LS-WTGL
-  *
-- * Copyright (C) 2015, Roger Shimizu <rogershimizu@gmail.com>
-+ * Copyright (C) 2015, 2016
-+ * Roger Shimizu <rogershimizu@gmail.com>
-  *
-  * This file is dual-licensed: you can use it either under the terms
-  * of the GPL or the X11 license, at your option. Note that this dual
-@@ -69,8 +70,6 @@
- 
- 		internal-regs {
- 			pinctrl: pinctrl at 10000 {
--				pinctrl-0 = <&pmx_usb_power &pmx_power_hdd
--					&pmx_fan_low &pmx_fan_high &pmx_fan_lock>;
- 				pinctrl-names = "default";
- 
- 				pmx_led_power: pmx-leds {
-@@ -162,6 +161,7 @@
- 		led at 1 {
- 			label = "lswtgl:blue:power";
- 			gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
-+			default-state = "keep";
- 		};
- 
- 		led at 2 {
-@@ -188,7 +188,7 @@
- 				3250 1
- 				5000 0>;
- 
--		alarm-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
-+		alarm-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
- 	};
- 
- 	restart_poweroff {
--- 
-2.1.4
+Understand your point.
+I'll create a patch by your suggestion, when this series get committed.
+Thanks for your advice!
+
+Cheers,
+Roger
