@@ -1,51 +1,32 @@
 From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Thu, 21 Jan 2016 10:12:41 +0100
-Subject: [PATCH] ARM: dts: n900: Include adp1653 device
-In-Reply-To: <1451086812-3729-1-git-send-email-pali.rohar@gmail.com>
-References: <1451086812-3729-1-git-send-email-pali.rohar@gmail.com>
-Message-ID: <20160121091241.GS7192@pali>
+Date: Thu, 21 Jan 2016 10:14:37 +0100
+Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
+In-Reply-To: <569052FE.1040008@gmail.com>
+References: <20160106174713.GL12777@atomide.com> <568D5669.4040801@gmail.com>
+ <20160106182650.GM12777@atomide.com> <568D5F54.7040900@gmail.com>
+ <20160107180700.GN12777@atomide.com> <568EDC8D.7070205@gmail.com>
+ <20160108022619.GS12777@atomide.com> <568F4596.8020206@gmail.com>
+ <20160108075913.GN11364@pali> <569052FE.1040008@gmail.com>
+Message-ID: <20160121091437.GT7192@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 26 December 2015 00:40:12 Pali Roh?r wrote:
-> This patch adds adp1653 device into n900 DT structure. DT support in
-> adp1653 driver is there since v4.2-rc1 version.
+On Saturday 09 January 2016 02:23:26 Ivaylo Dimitrov wrote:
+> Hi,
 > 
-> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> ---
->  arch/arm/boot/dts/omap3-n900.dts |   15 +++++++++++++++
->  1 file changed, 15 insertions(+)
+> On  8.01.2016 09:59, Pali Roh?r wrote:
+> >On Friday 08 January 2016 07:13:58 Ivaylo Dimitrov wrote:
+> >>And it looks like the problems happens sometimes on oops too.
+> >
+> >In linux-n900 tree is enabled mtdoops driver which store oops to
+> >specified MTD device. So maybe this access cause it?
+> >
 > 
-> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-> index 5f5e0f3..ba93642 100644
-> --- a/arch/arm/boot/dts/omap3-n900.dts
-> +++ b/arch/arm/boot/dts/omap3-n900.dts
-> @@ -522,6 +522,21 @@
->  		amstaos,cover-comp-gain = <16>;
->  	};
->  
-> +	adp1653: led-controller at 30 {
-> +		compatible = "adi,adp1653";
-> +		reg = <0x30>;
-> +		enable-gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
-> +
-> +		flash {
-> +			flash-timeout-us = <500000>;
-> +			flash-max-microamp = <320000>;
-> +			led-max-microamp = <50000>;
-> +		};
-> +		indicator {
-> +			led-max-microamp = <17500>;
-> +		};
-> +	};
-> +
->  	lp5523: lp5523 at 32 {
->  		compatible = "national,lp5523";
->  		reg = <0x32>;
+> The key word here is "sometimes". i.e sometimes it hapens on normal reboot,
+> sometimes it happens on oops.
 
-PING, who can take this patch?
-
-I still do not see it in linus tree nor in others like arm-soc...
+So where is problem? In omap-gpmc? mtd? onenand? or ubifs? Or in
+different component? Do we know at least this?
 
 -- 
 Pali Roh?r
