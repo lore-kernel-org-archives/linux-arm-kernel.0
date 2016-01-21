@@ -1,85 +1,31 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 21 Jan 2016 12:32:09 +0000
-Subject: [PATCH] ARM64: Fix compiling with GCC 6 and Atomics enabled
-In-Reply-To: <20151221133730.GP23092@arm.com>
-References: <1450498655-3820-1-git-send-email-apinski@cavium.com>
- <20151221123843.GM23092@arm.com>
- <CAKv+Gu_aUvckKpwWw+Xo5VkFEA8-uT9xU0-m5NgAzAc1d53uhQ@mail.gmail.com>
- <20151221125130.GO23092@arm.com>
- <CAKv+Gu99J8CXxqqtZqRa0Wzbf+-7=EDOnmYadLOj-rtVFPTScQ@mail.gmail.com>
- <20151221133730.GP23092@arm.com>
-Message-ID: <56A0CFC9.1070401@arm.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Thu, 21 Jan 2016 20:32:09 +0800
+Subject: [PATCH] Documentation: rockchip-dw-mshc: add RK3368 dw-mshc
+ description
+Message-ID: <1453379529-5148-1-git-send-email-shawn.lin@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/12/15 13:37, Will Deacon wrote:
-> On Mon, Dec 21, 2015 at 01:58:30PM +0100, Ard Biesheuvel wrote:
->> On 21 December 2015 at 13:51, Will Deacon <will.deacon@arm.com> wrote:
->>> On Mon, Dec 21, 2015 at 01:46:22PM +0100, Ard Biesheuvel wrote:
->>>> On 21 December 2015 at 13:38, Will Deacon <will.deacon@arm.com> wrote:
->>>>> On Fri, Dec 18, 2015 at 08:17:35PM -0800, Andrew Pinski wrote:
->>>>>> The problem here is that GCC 6 and above emits .arch now
->>>>>> for each function so now the global .arch_extension has
->>>>>> no effect.  This fixes the problem by putting
->>>>>> .arch_extension inside ARM64_LSE_ATOMIC_INSN so
->>>>>> it is enabled for each place where LSE is used.
->>>>>
->>>>> Hmm, this is going to affect arch/arm/ much more heavily than arch/arm64.
->>>>> .arch_extension is used for virt, mp and sec over there, and it may be
->>>>> tricky to isolate the actual instruction usage (at least, virt looks
->>>>> lost in kvm/arm.c).
->>>>>
->>>>> Why can't gas have an option to accept all instruction encodings that it
->>>>> knows about, inspite of any .arch directives?
->>>>>
->>>>
->>>> Modern GAS supports things like -march=armv7-a+mp+sec+virt, so it
->>>> probably makes sense to pass that on the command line when building
->>>> for v7 (or +sec only for v6) if the assembler is found to support it
->>>> at build time.
->>>
->>> Does that override a more restrictive .arch directive emitted by the
->>> compiler?
->>>
->>
->> It seems to be additive: -march=armv7-a+mp+sec allows a .S file
->> containing a virt arch_extension + both hvc and smc instructions to be
->> assembled.
-> 
-> The problem I'm seeing is if I have something like:
-> 
->   .arch_extension lse
-> 
-> before something like:
-> 
->   .cpu cortex-a57+fp+simd+crc
-> 
-> -or-
-> 
->   .arch armv8-a+fp+simd+crc
-> 
-> then I can no longer assemble lse instructions. So the .cpu/.arch
-> directive is undoing the .arch_extension. We can fix this by following
-> Andrew's suggestion to have .arch_extension before every point of use,
-> but the whole thing would be much simpler if we could just tell gas to
-> assemble harder.
-> 
-> Maybe we just need to construct the mother of all -march options based
-> on build-time checks in the Makefile?
-> 
+rk3368 dtsi file add dw-mshc compatible "rockchip,rk3368-dw-mshc"
+but didn't add it into rockchip-dw-mshc.txt.
 
-Since I've been bitten by this I'm curious what was conclusion on this
-topic?
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+---
 
-Thanks
-Vladimir
+ Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-> Will
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
-> 
+diff --git a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+index 3dc13b6..634e249 100644
+--- a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
++++ b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+@@ -13,6 +13,7 @@ Required Properties:
+ 	- "rockchip,rk2928-dw-mshc": for Rockchip RK2928 and following,
+ 							before RK3288
+ 	- "rockchip,rk3288-dw-mshc": for Rockchip RK3288
++	- "rockchip,rk3368-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3368
+ 
+ Optional Properties:
+ * clocks: from common clock binding: if ciu_drive and ciu_sample are
+-- 
+2.3.7
