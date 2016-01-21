@@ -1,18 +1,17 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 21 Jan 2016 11:12:03 -0800
-Subject: [PATCH 1/5] ARM: OMAP2+: Fix wait_dll_lock_timed for rodata
+Date: Thu, 21 Jan 2016 11:12:04 -0800
+Subject: [PATCH 2/5] ARM: OMAP2+: Fix l2dis_3630 for rodata
 In-Reply-To: <1453403527-21308-1-git-send-email-tony@atomide.com>
 References: <1453403527-21308-1-git-send-email-tony@atomide.com>
-Message-ID: <1453403527-21308-2-git-send-email-tony@atomide.com>
+Message-ID: <1453403527-21308-3-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't want to be writing to .text so it can be set rodata.
-Fix error "Unable to handle kernel paging request at virtual address
-c012396c" in wait_dll_lock_timed if CONFIG_DEBUG_RODATA is selected.
+We don't want to write to .text section. Let's move l2dis_3630
+to .data and access it via a pointer.
 
-As these counters are for debugging only and unused, we can just
-remove them.
+For calculating the offset, let's optimize out the add and do it
+in ldr/str as suggested by Nicolas Pitre <nicolas.pitre@linaro.org>.
 
 Cc: Kees Cook <keescook@chromium.org>
 Cc: Laura Abbott <labbott@redhat.com>
@@ -23,63 +22,57 @@ Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Tero Kristo <t-kristo@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/sleep34xx.S | 22 ----------------------
- 1 file changed, 22 deletions(-)
+ arch/arm/mach-omap2/sleep34xx.S | 17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
-index eafd120..787cfda 100644
+index 787cfda..5659d96 100644
 --- a/arch/arm/mach-omap2/sleep34xx.S
 +++ b/arch/arm/mach-omap2/sleep34xx.S
-@@ -289,12 +289,6 @@ wait_sdrc_ready:
- 	bic	r5, r5, #0x40
- 	str	r5, [r4]
+@@ -86,8 +86,9 @@ ENTRY(enable_omap3630_toggle_l2_on_restore)
+ 	stmfd	sp!, {lr}	@ save registers on stack
+ 	/* Setup so that we will disable and enable l2 */
+ 	mov	r1, #0x1
+-	adrl	r2, l2dis_3630	@ may be too distant for plain adr
+-	str	r1, [r2]
++	adrl	r3, l2dis_3630_offset	@ may be too distant for plain adr
++	ldr	r2, [r3]		@ value for offset
++	str	r1, [r2, r3]		@ write to l2dis_3630
+ 	ldmfd	sp!, {pc}	@ restore regs and return
+ ENDPROC(enable_omap3630_toggle_l2_on_restore)
  
--/*
-- * PC-relative stores lead to undefined behaviour in Thumb-2: use a r7 as a
-- * base instead.
-- * Be careful not to clobber r7 when maintaing this code.
-- */
--
- is_dll_in_lock_mode:
- 	/* Is dll in lock mode? */
- 	ldr	r4, sdrc_dlla_ctrl
-@@ -302,11 +296,7 @@ is_dll_in_lock_mode:
- 	tst	r5, #0x4
- 	bne	exit_nonoff_modes	@ Return if locked
- 	/* wait till dll locks */
--	adr	r7, kick_counter
- wait_dll_lock_timed:
--	ldr	r4, wait_dll_lock_counter
--	add	r4, r4, #1
--	str	r4, [r7, #wait_dll_lock_counter - kick_counter]
- 	ldr	r4, sdrc_dlla_status
- 	/* Wait 20uS for lock */
- 	mov	r6, #8
-@@ -330,9 +320,6 @@ kick_dll:
- 	orr	r6, r6, #(1<<3)		@ enable dll
- 	str	r6, [r4]
- 	dsb
--	ldr	r4, kick_counter
--	add	r4, r4, #1
--	str	r4, [r7]		@ kick_counter
- 	b	wait_dll_lock_timed
+@@ -415,7 +416,9 @@ ENTRY(omap3_restore)
+ 	cmp	r2, #0x0	@ Check if target power state was OFF or RET
+ 	bne	logic_l1_restore
  
- exit_nonoff_modes:
-@@ -360,15 +347,6 @@ sdrc_dlla_status:
- 	.word	SDRC_DLLA_STATUS_V
- sdrc_dlla_ctrl:
- 	.word	SDRC_DLLA_CTRL_V
--	/*
--	 * When exporting to userspace while the counters are in SRAM,
--	 * these 2 words need to be@the end to facilitate retrival!
--	 */
--kick_counter:
--	.word	0
--wait_dll_lock_counter:
--	.word	0
--
- ENTRY(omap3_do_wfi_sz)
- 	.word	. - omap3_do_wfi
+-	ldr	r0, l2dis_3630
++	adr	r1, l2dis_3630_offset	@ address for offset
++	ldr	r0, [r1]		@ value for offset
++	ldr	r0, [r1, r0]		@ value at l2dis_3630
+ 	cmp	r0, #0x1	@ should we disable L2 on 3630?
+ 	bne	skipl2dis
+ 	mrc	p15, 0, r0, c1, c0, 1
+@@ -484,7 +487,9 @@ l2_inv_gp:
+ 	mov	r12, #0x2
+ 	smc	#0			@ Call SMI monitor (smieq)
+ logic_l1_restore:
+-	ldr	r1, l2dis_3630
++	adr	r0, l2dis_3630_offset	@ adress for offset
++	ldr	r1, [r0]		@ value for offset
++	ldr	r1, [r0, r1]		@ value at l2dis_3630
+ 	cmp	r1, #0x1		@ Test if L2 re-enable needed on 3630
+ 	bne	skipl2reen
+ 	mrc	p15, 0, r1, c1, c0, 1
+@@ -513,6 +518,10 @@ control_stat:
+ 	.word	CONTROL_STAT
+ control_mem_rta:
+ 	.word	CONTROL_MEM_RTA_CTRL
++l2dis_3630_offset:
++	.long	l2dis_3630 - .
++
++	.data
+ l2dis_3630:
+ 	.word	0
  
 -- 
 2.7.0.rc3
