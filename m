@@ -1,59 +1,79 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 22 Jan 2016 17:12:06 +0100
-Subject: [PATCH] ARM: dts: at91: sama5d4_xplained: properly mux phy
- interrupt
-In-Reply-To: <1452846618-17854-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1452846618-17854-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <56A254D6.3070105@atmel.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 22 Jan 2016 17:15:51 +0100
+Subject: [PATCH repost] arm: plat-omap: Add PWM dmtimer platform data quirks
+In-Reply-To: <20151130183707.GK2517@atomide.com>
+References: <20151130183707.GK2517@atomide.com>
+Message-ID: <1453479351-21825-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 15/01/2016 09:30, Alexandre Belloni a ?crit :
-> No interrupt were received from the phy because PIOE 1 may not be properly
-> muxed. It prevented proper link detection, especially since commit
-> 321beec5047a ("net: phy: Use interrupts when available in NOLINK state")
-> disables polling.
-> 
-> Cc: <stable@vger.kernel.org> # 4.4
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+In order to set the currently platform dependent dmtimer
+functions pointers as platform data for the pwm-omap-dmtimer
+platform driver, add it to plat-omap auxdata_lookup table.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Suggested-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm/mach-omap2/pdata-quirks.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-And added to the upcoming at91-4.5-fixes branch.
+Tony, Thierry,
 
-thanks!
+The previous patches are now upstream, here is a repost of the patch re-tested
+against mainline.
 
+Ref: http://lkml.kernel.org/r/56374592.4060201 at baylibre.com 
+Patchset: http://lkml.kernel.org/r/5620ED2C.1090107 at baylibre.com
 
-> ---
->  arch/arm/boot/dts/at91-sama5d4_xplained.dts | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91-sama5d4_xplained.dts b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-> index 131614f28e75..8cf9999cb0cd 100644
-> --- a/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-> @@ -86,6 +86,8 @@
->  			macb0: ethernet at f8020000 {
->  				phy-mode = "rmii";
->  				status = "okay";
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_macb0_rmii &pinctrl_macb0_phy_irq>;
->  
->  				phy0: ethernet-phy at 1 {
->  					interrupt-parent = <&pioE>;
-> @@ -152,6 +154,10 @@
->  						atmel,pins =
->  							<AT91_PIOE 8 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
->  					};
-> +					pinctrl_macb0_phy_irq: macb0_phy_irq_0 {
-> +						atmel,pins =
-> +							<AT91_PIOE 1 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
-> +					};
->  				};
->  			};
->  		};
-> 
+Neil
 
-
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index e781e4f..a935d28 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -23,6 +23,8 @@
+ #include <linux/platform_data/pinctrl-single.h>
+ #include <linux/platform_data/iommu-omap.h>
+ #include <linux/platform_data/wkup_m3.h>
++#include <linux/platform_data/pwm_omap_dmtimer.h>
++#include <plat/dmtimer.h>
+ 
+ #include "common.h"
+ #include "common-board-devices.h"
+@@ -449,6 +451,24 @@ void omap_auxdata_legacy_init(struct device *dev)
+ 	dev->platform_data = &twl_gpio_auxdata;
+ }
+ 
++/* Dual mode timer PWM callbacks platdata */
++#if IS_ENABLED(CONFIG_OMAP_DM_TIMER)
++struct pwm_omap_dmtimer_pdata pwm_dmtimer_pdata = {
++	.request_by_node = omap_dm_timer_request_by_node,
++	.free = omap_dm_timer_free,
++	.enable = omap_dm_timer_enable,
++	.disable = omap_dm_timer_disable,
++	.get_fclk = omap_dm_timer_get_fclk,
++	.start = omap_dm_timer_start,
++	.stop = omap_dm_timer_stop,
++	.set_load = omap_dm_timer_set_load,
++	.set_match = omap_dm_timer_set_match,
++	.set_pwm = omap_dm_timer_set_pwm,
++	.set_prescaler = omap_dm_timer_set_prescaler,
++	.write_counter = omap_dm_timer_write_counter,
++};
++#endif
++
+ /*
+  * Few boards still need auxdata populated before we populate
+  * the dev entries in of_platform_populate().
+@@ -502,6 +522,9 @@ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("ti,am4372-wkup-m3", 0x44d00000, "44d00000.wkup_m3",
+ 		       &wkup_m3_data),
+ #endif
++#if IS_ENABLED(CONFIG_OMAP_DM_TIMER)
++	OF_DEV_AUXDATA("ti,omap-dmtimer-pwm", 0, NULL, &pwm_dmtimer_pdata),
++#endif
+ #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
+ 	OF_DEV_AUXDATA("ti,omap4-iommu", 0x4a066000, "4a066000.mmu",
+ 		       &omap4_iommu_pdata),
 -- 
-Nicolas Ferre
+1.9.1
