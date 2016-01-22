@@ -1,65 +1,93 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Sat, 23 Jan 2016 00:06:02 +0100
-Subject: [PATCH V3 00/10] Introduce ACPI world to GICv3 & ITS irqchip
-In-Reply-To: <1453209083-3358-1-git-send-email-tn@semihalf.com>
-References: <1453209083-3358-1-git-send-email-tn@semihalf.com>
-Message-ID: <20160122230602.GB24726@rric.localdomain>
+From: slash.tmp@free.fr (Mason)
+Date: Sat, 23 Jan 2016 00:15:29 +0100
+Subject: Unhandled fault: page domain fault (0x81b) at 0x00e41008
+In-Reply-To: <20160122193408.GE19062@n2100.arm.linux.org.uk>
+References: <56A268E7.7040004@free.fr>
+ <20160122174814.GD19062@n2100.arm.linux.org.uk> <56A27C00.5060004@free.fr>
+ <20160122193408.GE19062@n2100.arm.linux.org.uk>
+Message-ID: <56A2B811.8010306@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.01.16 14:11:13, Tomasz Nowicki wrote:
-> Patches base on Suravee's ACPI GICv2m support:
-> https://lkml.org/lkml/2015/12/10/475
-> 
-> The following git branch contains submitted patches along with
-> the useful patches from the test point of view (mainly ACPI ARM64 PCI support).
-> https://github.com/semihalf-nowicki-tomasz/linux.git (gicv3-its-acpi-v3)
-> 
-> Series has been tested on Cavium ThunderX server.
-> 
-> v2 -> v3
-> - rebased on top of 4.4
-> - fixes and improvements for redistributor init via GICC structures
-> - fixes as per kbuild reports
-> 
-> v1 -> v2
-> - rebased on top of 4.4-rc4
-> - use pci_msi_domain_get_msi_rid for requester ID to device ID translation
-> 
-> Hanjun Guo (1):
->   irqchip / GICv3: remove gic root node in ITS
-> 
-> Tomasz Nowicki (9):
->   irqchip / GICv3: Refactor gic_of_init() for GICv3 driver
->   irqchip / GICv3: Add ACPI support for GICv3+ initialization
->   irqchip,GICv3,ACPI: Add redistributor support via GICC structures.
->   irqchip, gicv3, its: Mark its_init() and its children as __init
->   irqchip, GICv3, ITS: Refator ITS dt init code to prepare for ACPI.
->   ARM64, ACPI, PCI: I/O Remapping Table (IORT) initial support.
->   irqchip, gicv3, its: Probe ITS in the ACPI way.
->   acpi, gicv3, msi: Factor out code that might be reused for ACPI
->     equivalent.
->   acpi, gicv3, its: Use MADT ITS subtable to do PCI/MSI domain
->     initialization.
-> 
->  drivers/acpi/Kconfig                     |   3 +
->  drivers/acpi/Makefile                    |   1 +
->  drivers/acpi/iort.c                      | 326 +++++++++++++++++++++++++++++
->  drivers/irqchip/Kconfig                  |   1 +
->  drivers/irqchip/irq-gic-v3-its-pci-msi.c |  85 ++++++--
->  drivers/irqchip/irq-gic-v3-its.c         | 143 +++++++++----
->  drivers/irqchip/irq-gic-v3.c             | 344 ++++++++++++++++++++++++++-----
->  drivers/pci/msi.c                        |   3 +
->  include/linux/iort.h                     |  38 ++++
->  include/linux/irqchip/arm-gic-v3.h       |   2 +-
->  10 files changed, 845 insertions(+), 101 deletions(-)
->  create mode 100644 drivers/acpi/iort.c
->  create mode 100644 include/linux/iort.h
+On 22/01/2016 20:34, Russell King - ARM Linux wrote:
 
-Tested on various ThunderX single and dual node systems.
+> It's possible to use access_ok() + __copy_from_user(), but that's
+> really frowned upon because it's _very_ easy to get it wrong - and
+> then you have a security bug.
 
-Tested-by: Robert Richter <rrichter@cavium.com>
+I was following advice from LDD3.
 
-Thanks Tomasz,
+>>> Drivers and platform code should use copy_from_user()/copy_to_user()
+>>> to block-copy data to/from userspace, and get_user()/put_user() to
+>>> copy individual bytes, shorts and int/longs.  (It doesn't matter
+>>> who you are, that's the official guidance.)
+>>
+>> The problem is that the kernel module's API is already set
+>> in stone, and it requires block copies with specific access
+>> sizes, e.g. block_copy8, block_copy16, block_copy32.
+> 
+> Rather than making these statements, you need to explain what, how
+> and why.
+> 
+> What do these "block_copy8, block_copy16, block_copy32" functions
+> do?  Does the "8", "16" and "32" refer to the access size?  Why do
+> they need to make accesses to userspace using these specific sizes?
+> What causes this restriction?
 
--Robert
+Interfaces are somewhat arbitrary. The problem statement
+was as follows.
+
+Implement functions for copying a range of addresses
+FROM user-space, TO physical addresses,
+(and also the other way around)
+in access size of 8, 16, 32 bits.
+
+So, a little over a decade ago, someone decided that these
+functions would have the following prototype:
+
+int read_data8  (u8  *user_addr, u8  *phys_addr, int count)
+int read_data16 (u16 *user_addr, u16 *phys_addr, int count)
+int read_data32 (u32 *user_addr, u32 *phys_addr, int count)
+
+int write_data8 (u8  *user_addr, u8  *phys_addr, int count)
+int write_data16(u16 *user_addr, u16 *phys_addr, int count)
+int write_data32(u32 *user_addr, u32 *phys_addr, int count)
+
+
+IIUC what you're saying, the only 100% correct solution
+would be something like this:
+
+(Note: the following code is simplified, as count may be
+larger than vmalloc space, so the operation needs to be
+"chunked" or "tiled".)
+
+int read_data8 (u8 *user_addr, u8 *phys_addr, int count)
+{
+  int i, err = 0;
+
+  /* map phys_addr into kernel VA */
+  void *va = ioremap(phys_addr, count);
+  if (va == NULL) return some_error;
+
+  for (i = 0; i < count; ++i) {
+    u8 val = readb(va + i);
+    err = put_user(val, user_addr + i);
+    if (err) break;
+  }
+
+  iounmap(va);
+  return err;
+}
+
+Is this what you are suggesting?
+
+I expect this to be quite slow.
+
+The problem is that one important user of the API is a
+program used to copy the contents of files to "remote"
+RAM, i.e. RAM not managed by Linux, to pass that
+information to a secure processor, which then copies
+it to the DSPs. And this operation is on the critical
+path (at boot-time) and must be as fast as possible.
+
+Regards.
