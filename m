@@ -1,28 +1,25 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 22 Jan 2016 08:30:48 -0800
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.5
-In-Reply-To: <cover.1453343917.git.horms+renesas@verge.net.au>
-References: <cover.1453343917.git.horms+renesas@verge.net.au>
-Message-ID: <CAOesGMi-S9XiBLaV5kvXG=fPDV2V0TybEZRxDuyGORyw0mPp4w@mail.gmail.com>
+Date: Fri, 22 Jan 2016 08:35:00 -0800
+Subject: [GIT PULL] Amlogic DT changes for 4.5
+In-Reply-To: <CAOQ7t2ZrdOVedX4OcxKYAayaDWSFsZNuv988oED7oDRnu70Wiw@mail.gmail.com>
+References: <CAOQ7t2ZrdOVedX4OcxKYAayaDWSFsZNuv988oED7oDRnu70Wiw@mail.gmail.com>
+Message-ID: <CAOesGMgg+uRJ-zxOhE2+Ysg0PURxRt92fw7KPwf4Gnu8nJbiUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 20, 2016 at 6:41 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
->
-> Please consider these Renesas ARM based SoC fixes for v4.5.
->
-> This corrects the extal1 frequency on the armadillo800eva board.
-> This problem seems to have been around for a while and I would
-> like it considered for stable.
+Hi Carlo,
+
+On Mon, Jan 4, 2016 at 2:18 AM, Carlo Caione <carlo@caione.org> wrote:
+> Hi,
+> just a few patches for the Meson8b SoC. Wim has already added the new
+> watchdog driver to linux-watchdog-next.
+
+Arnd caught this, but I didn't since I don't keep as close an eye on
+pull requests sent directly to me. In the future, please send the
+requests to arm at kernel.org and we'll get them from there!
 
 
-If you want it for stable you should cc stable in the
-signed-off-series, or send it separately to Greg. We usually don't
-filter out on our own due to volume.
-
-Merged the branch. Thanks!
+Thanks,
 
 
 -Olof
