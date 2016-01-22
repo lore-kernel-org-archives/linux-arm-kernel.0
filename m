@@ -1,129 +1,43 @@
 From: lho@apm.com (Loc Ho)
-Date: Fri, 22 Jan 2016 13:47:04 -0700
-Subject: [PATCH v3 2/3] edac: xgene: Add missing SoC register bus error
- handling and fix CE promotes to UE
+Date: Fri, 22 Jan 2016 13:47:05 -0700
+Subject: [PATCH v3 3/3] arm64: Update the APM X-Gene EDAC node with the RB
+ register resource
 In-Reply-To: <1453495625-28006-1-git-send-email-lho@apm.com>
 References: <1453495625-28006-1-git-send-email-lho@apm.com>
-Message-ID: <1453495625-28006-3-git-send-email-lho@apm.com>
+Message-ID: <1453495625-28006-4-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing register bus error handling for APM X-Gene EDAC SoC and
-fix an checking condition for CE error promotes to UE.
+Add the RB register resource as requires with the updated driver.
 
 Signed-off-by: Loc Ho <lho@apm.com>
 ---
- drivers/edac/xgene_edac.c |   70 ++++++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 69 insertions(+), 1 deletions(-)
+ arch/arm64/boot/dts/apm/apm-storm.dtsi |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/edac/xgene_edac.c b/drivers/edac/xgene_edac.c
-index 41f8764..250c330 100644
---- a/drivers/edac/xgene_edac.c
-+++ b/drivers/edac/xgene_edac.c
-@@ -61,6 +61,7 @@ struct xgene_edac {
- 	struct regmap		*mcba_map;
- 	struct regmap		*mcbb_map;
- 	struct regmap		*efuse_map;
-+	struct regmap		*rb_map;
- 	void __iomem		*pcp_csr;
- 	spinlock_t		lock;
- 	struct dentry           *dfs;
-@@ -1057,7 +1058,7 @@ static bool xgene_edac_l3_promote_to_uc_err(u32 l3cesr, u32 l3celr)
- 		case 0x041:
- 			return true;
- 		}
--	} else if (L3C_ELR_ERRSYN(l3celr) == 9)
-+	} else if (L3C_ELR_ERRWAY(l3celr) == 9)
- 		return true;
+diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+index fe30f76..3e40bd4 100644
+--- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+@@ -493,6 +493,11 @@
+ 			reg = <0x0 0x1054a000 0x0 0x20>;
+ 		};
  
- 	return false;
-@@ -1353,6 +1354,17 @@ static int xgene_edac_l3_remove(struct xgene_edac_dev_ctx *l3)
- #define GLBL_MDED_ERRH			0x0848
- #define GLBL_MDED_ERRHMASK		0x084c
- 
-+/* IO Bus Registers */
-+#define RBCSR				0x0000
-+#define STICKYERR_MASK			BIT(0)
-+#define RBEIR				0x0008
-+#define AGENT_OFFLINE_ERR_MASK		BIT(30)
-+#define UNIMPL_RBPAGE_ERR_MASK		BIT(29)
-+#define WORD_ALIGNED_ERR_MASK		BIT(28)
-+#define PAGE_ACCESS_ERR_MASK		BIT(27)
-+#define WRITE_ACCESS_MASK		BIT(26)
-+#define RBERRADDR_RD(src)		((src) & 0x03FFFFFF)
++		rb: rb at 7e000000 {
++			compatible = "apm,xgene-rb", "syscon";
++			reg = <0x0 0x7e000000 0x0 0x10>;
++		};
 +
- static const char * const soc_mem_err_v1[] = {
- 	"10GbE0",
- 	"10GbE1",
-@@ -1470,6 +1482,51 @@ static void xgene_edac_rb_report(struct edac_device_ctl_info *edac_dev)
- 	u32 err_addr_hi;
- 	u32 reg;
- 
-+	/* If the register bus resource isn't available, just skip it */
-+	if (!ctx->edac->rb_map)
-+		goto rb_skip;
-+
-+	/*
-+	 * Check RB access errors
-+	 * 1. Out of range
-+	 * 2. Un-implemented page
-+	 * 3. Un-aligned access
-+	 * 4. Offline slave IP
-+	 */
-+	if (regmap_read(ctx->edac->rb_map, RBCSR, &reg))
-+		return;
-+	if (reg & STICKYERR_MASK) {
-+		bool write;
-+		u32 address;
-+
-+		dev_err(edac_dev->dev, "IOB bus access error(s)\n");
-+		if (regmap_read(ctx->edac->rb_map, RBEIR, &reg))
-+			return;
-+		write = reg & WRITE_ACCESS_MASK ? 1 : 0;
-+		address = RBERRADDR_RD(reg);
-+		if (reg & AGENT_OFFLINE_ERR_MASK)
-+			dev_err(edac_dev->dev,
-+				"IOB bus %s access to offline agent error\n",
-+				write ? "write" : "read");
-+		if (reg & UNIMPL_RBPAGE_ERR_MASK)
-+			dev_err(edac_dev->dev,
-+				"IOB bus %s access to unimplemented page error\n",
-+				write ? "write" : "read");
-+		if (reg & WORD_ALIGNED_ERR_MASK)
-+			dev_err(edac_dev->dev,
-+				"IOB bus %s word aligned access error\n",
-+				write ? "write" : "read");
-+		if (reg & PAGE_ACCESS_ERR_MASK)
-+			dev_err(edac_dev->dev,
-+				"IOB bus %s to page out of range access error\n",
-+				write ? "write" : "read");
-+		if (regmap_write(ctx->edac->rb_map, RBEIR, 0))
-+			return;
-+		if (regmap_write(ctx->edac->rb_map, RBCSR, 0))
-+			return;
-+	}
-+rb_skip:
-+
- 	/* IOB Bridge agent transaction error interrupt */
- 	reg = readl(ctx->dev_csr + IOBBATRANSERRINTSTS);
- 	if (!reg)
-@@ -1852,6 +1909,17 @@ static int xgene_edac_probe(struct platform_device *pdev)
- 		goto out_err;
- 	}
- 
-+	/*
-+	 * NOTE: The register bus resource is optional for compatibility
-+	 * reason.
-+	 */
-+	edac->rb_map = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
-+						       "regmap-rb");
-+	if (IS_ERR(edac->rb_map)) {
-+		dev_warn(edac->dev, "missing syscon regmap rb\n");
-+		edac->rb_map = NULL;
-+	}
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	edac->pcp_csr = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(edac->pcp_csr)) {
+ 		edac at 78800000 {
+ 			compatible = "apm,xgene-edac";
+ 			#address-cells = <2>;
+@@ -502,6 +507,7 @@
+ 			regmap-mcba = <&mcba>;
+ 			regmap-mcbb = <&mcbb>;
+ 			regmap-efuse = <&efuse>;
++			regmap-rb = <&rb>;
+ 			reg = <0x0 0x78800000 0x0 0x100>;
+ 			interrupts = <0x0 0x20 0x4>,
+ 				     <0x0 0x21 0x4>,
 -- 
 1.7.1
