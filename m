@@ -1,50 +1,71 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 22 Jan 2016 08:41:10 +0100
-Subject: [PATCH] Eliminate the .eh_frame sections from the aarch64 vmlinux
- and kernel modules
-In-Reply-To: <1453434986-19307-1-git-send-email-wcohen@redhat.com>
-References: <1453434986-19307-1-git-send-email-wcohen@redhat.com>
-Message-ID: <CAKv+Gu9j7VGqoOWOZ1T1CVQZfSy9HL9wzvAX83bRiks=6b3dzw@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 22 Jan 2016 08:46:37 +0100
+Subject: [PATCH 1/2] ARM: dts: r8a7793: add CAN clocks
+In-Reply-To: <20160122004823.GA15068@verge.net.au>
+References: <1453352981-16104-1-git-send-email-horms+renesas@verge.net.au>
+ <1453352981-16104-2-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdX5sZ7yNjgu8Ns26+91+ui2YuVfGavJi_XRa6Kd-yzoBQ@mail.gmail.com>
+ <20160121121525.GA6833@verge.net.au>
+ <20160122004823.GA15068@verge.net.au>
+Message-ID: <CAMuHMdXDrFFhsTQ_2arc4rq-NiX-pg_a60YbJZE352Tg856-yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 January 2016 at 04:56, William Cohen <wcohen@redhat.com> wrote:
-> By default the aarch64 gcc generates .eh_frame sections.  Unlike
-> .debug_frame sections, the .eh_frame sections are loaded into memory
-> when the associated code is loaded.  On an example kernel being built
-> with this default the .eh_frame section in vmlinux used an extra 1.7MB
-> of memory.  The x86 disables the creation of the .eh_frame section.
-> The aarch64 should probably do the same to save some memory.
+On Fri, Jan 22, 2016 at 1:48 AM, Simon Horman <horms@verge.net.au> wrote:
+>> > > --- a/arch/arm/boot/dts/r8a7793.dtsi
+>> > > +++ b/arch/arm/boot/dts/r8a7793.dtsi
+>> > > @@ -706,12 +706,30 @@
+>> > >                         clock-output-names = "extal";
+>> > >                 };
+>> > >
+>> > > +               /* External USB clock - can be overridden by the board */
+>> > > +               usb_extal_clk: usb_extal_clk {
+>> > > +                       compatible = "fixed-clock";
+>> > > +                       #clock-cells = <0>;
+>> > > +                       clock-frequency = <48000000>;
+>> > > +                       clock-output-names = "usb_extal";
+>> > > +               };
+>> > > +
+>> > > +               /* External CAN clock */
+>> > > +               can_clk: can_clk {
+>> > > +                       compatible = "fixed-clock";
+>> > > +                       #clock-cells = <0>;
+>> > > +                       /* This value must be overridden by the board. */
+>> > > +                       clock-frequency = <0>;
+>> > > +                       clock-output-names = "can_clk";
+>> > > +                       status = "disabled";
+>> > > +               };
+>> > > +
+>> > >                 /* Special CPG clocks */
+>> > >                 cpg_clocks: cpg_clocks at e6150000 {
+>> > >                         compatible = "renesas,r8a7793-cpg-clocks",
+>> > >                                      "renesas,rcar-gen2-cpg-clocks";
+>> > >                         reg = <0 0xe6150000 0 0x1000>;
+>> > > -                       clocks = <&extal_clk>;
+>> > > +                       clocks = <&extal_clk &usb_extal_clk>;
+>> > >                         #clock-cells = <1>;
+>> > >                         clock-output-names = "main", "pll0", "pll1", "pll3",
+>> > >                                              "lb", "qspi", "sdh", "sd0", "z",
+>> >
+>> > To create the "rcan" clock, it should be listed in clock-output-names.
 >
+> Checking this morning I see that it is already there.
+> The next line of the file is:
+>
+>                                              "rcan", "adsp";
 
-With my GCC-4.9.3 Linaro toolchain, I am not getting .eh_frame
-sections only .debug_frame sections. The patch still makes sense imo,
-but it appears to be redundant in some cases, and it would be useful
-to figure out why. Which toolchain have you tested this with?
+I stand corrected.
 
+BTW, that means you saw "failed to register ... rcan" messages
+before?
 
-> Signed-off-by: William Cohen <wcohen@redhat.com>
-> ---
->  arch/arm64/Makefile | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> index cd822d8..094a137 100644
-> --- a/arch/arm64/Makefile
-> +++ b/arch/arm64/Makefile
-> @@ -27,6 +27,7 @@ $(warning LSE atomics not supported by binutils)
->  endif
->
->  KBUILD_CFLAGS  += -mgeneral-regs-only $(lseinstr)
-> +KBUILD_CFLAGS  += -fno-asynchronous-unwind-tables
->  KBUILD_AFLAGS  += $(lseinstr)
->
->  ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
-> --
-> 2.5.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
