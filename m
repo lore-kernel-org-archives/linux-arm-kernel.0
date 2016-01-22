@@ -1,79 +1,41 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Thu, 21 Jan 2016 16:07:41 -0800
-Subject: [PATCH] drivers: net: xgene: fix extra IRQ issue
-Message-ID: <1453421261-4295-1-git-send-email-isubramanian@apm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 22 Jan 2016 09:21:44 +0900
+Subject: [PATCH] ARM: s3c64xx: Select GPIO_GENERIC_PLATFORM for Cragganmore
+In-Reply-To: <1453400718-26720-1-git-send-email-broonie@kernel.org>
+References: <1453400718-26720-1-git-send-email-broonie@kernel.org>
+Message-ID: <56A17618.4030008@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For interrupt controller that doesn't support irq_disable and hardware
-with level interrupt, an extra interrupt may be pending. This patch fixes
-the issue by setting IRQ_DISABLE_UNLAZY flag for the interrupt line,
-as suggested by,
+On 22.01.2016 03:25, Mark Brown wrote:
+> The Cragganmore machine driver provides platform data for the generic GPIO
+> platform driver which uses structures only defined if the driver is
+> enabled. Since there is little reason to use the platform without the GPIOs
+> add a select to avoid build failures.
+> 
+> Signed-off-by: Mark Brown <broonie@kernel.org>
+> ---
+>  arch/arm/mach-s3c64xx/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+> index 7c0c420c3016..98d2aa9393f1 100644
+> --- a/arch/arm/mach-s3c64xx/Kconfig
+> +++ b/arch/arm/mach-s3c64xx/Kconfig
+> @@ -310,6 +310,7 @@ config MACH_WLF_CRAGG_6410
+>  	depends on I2C=y
+>  	select CPU_S3C6410
+>  	select LEDS_GPIO_REGISTER
+> +	select GPIO_GENERIC_PLATFORM
+>  	select S3C64XX_DEV_SPI0
+>  	select S3C64XX_SETUP_FB_24BPP
+>  	select S3C64XX_SETUP_I2C1
+> 
 
-'commit e9849777d0e2 ("genirq: Add flag to force mask in
-		       disable_irq[_nosync]()")'
 
-Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-Tested-by: Toan Le <toanle@apm.com>
----
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 12 +++++++++---
- drivers/net/ethernet/apm/xgene/xgene_enet_main.h |  1 +
- 2 files changed, 10 insertions(+), 3 deletions(-)
+Thanks for the patch!
+This was already fixed by Arnd:
+http://marc.info/?l=linux-gpio&m=145237423205247&w=2
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index a4799c1..5eb9b20 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -628,6 +628,7 @@ static int xgene_enet_register_irq(struct net_device *ndev)
- 	int ret;
- 
- 	ring = pdata->rx_ring;
-+	irq_set_status_flags(ring->irq, IRQ_DISABLE_UNLAZY);
- 	ret = devm_request_irq(dev, ring->irq, xgene_enet_rx_irq,
- 			       IRQF_SHARED, ring->irq_name, ring);
- 	if (ret)
-@@ -635,6 +636,7 @@ static int xgene_enet_register_irq(struct net_device *ndev)
- 
- 	if (pdata->cq_cnt) {
- 		ring = pdata->tx_ring->cp_ring;
-+		irq_set_status_flags(ring->irq, IRQ_DISABLE_UNLAZY);
- 		ret = devm_request_irq(dev, ring->irq, xgene_enet_rx_irq,
- 				       IRQF_SHARED, ring->irq_name, ring);
- 		if (ret) {
-@@ -649,15 +651,19 @@ static int xgene_enet_register_irq(struct net_device *ndev)
- static void xgene_enet_free_irq(struct net_device *ndev)
- {
- 	struct xgene_enet_pdata *pdata;
-+	struct xgene_enet_desc_ring *ring;
- 	struct device *dev;
- 
- 	pdata = netdev_priv(ndev);
- 	dev = ndev_to_dev(ndev);
--	devm_free_irq(dev, pdata->rx_ring->irq, pdata->rx_ring);
-+	ring = pdata->rx_ring;
-+	irq_clear_status_flags(ring->irq, IRQ_DISABLE_UNLAZY);
-+	devm_free_irq(dev, ring->irq, ring);
- 
- 	if (pdata->cq_cnt) {
--		devm_free_irq(dev, pdata->tx_ring->cp_ring->irq,
--			      pdata->tx_ring->cp_ring);
-+		ring = pdata->tx_ring->cp_ring;
-+		irq_clear_status_flags(ring->irq, IRQ_DISABLE_UNLAZY);
-+		devm_free_irq(dev, ring->irq, ring);
- 	}
- }
- 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-index 70d5b62..248dfc4 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-@@ -25,6 +25,7 @@
- #include <linux/acpi.h>
- #include <linux/clk.h>
- #include <linux/efi.h>
-+#include <linux/irq.h>
- #include <linux/io.h>
- #include <linux/of_platform.h>
- #include <linux/of_net.h>
--- 
-1.9.1
+Best regards,
+Krzysztof
