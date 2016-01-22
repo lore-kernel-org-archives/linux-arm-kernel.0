@@ -1,72 +1,66 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 22 Jan 2016 10:55:01 -0500 (EST)
-Subject: [PATCH v3 1/1] USB: core: let USB device know device node
-In-Reply-To: <2404899.20LhULZo7N@wuerfel>
-Message-ID: <Pine.LNX.4.44L0.1601221023350.1626-100000@iolanthe.rowland.org>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Fri, 22 Jan 2016 16:58:07 +0100
+Subject: [RFC PATCH v3] irqchip: Add support for Tango interrupt controller
+In-Reply-To: <yw1x1t9cqg18.fsf@unicorn.mansr.com>
+References: <569CE0F2.1060507@sigmadesigns.com>
+ <569D0B80.1010908@sigmadesigns.com> <569D165E.4060004@sigmadesigns.com>
+ <569FAFF5.4090909@arm.com> <yw1xr3hcqlix.fsf@unicorn.mansr.com>
+ <569FB471.8000909@arm.com> <yw1xmvs0qkue.fsf@unicorn.mansr.com>
+ <569FB7A9.9080309@sigmadesigns.com> <yw1xegdcqk8n.fsf@unicorn.mansr.com>
+ <569FB91D.9030704@sigmadesigns.com> <yw1x1t9cqg18.fsf@unicorn.mansr.com>
+Message-ID: <56A2518F.6060808@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 Jan 2016, Arnd Bergmann wrote:
+On 20/01/2016 19:09, M?ns Rullg?rd wrote:
 
-> > > 		hub at 3 { /* same external  hub, highspeed mode */
-> > > 			compatible = "usb2109,0812.591",
-> > > 				     "usb2109,0812",
-> > > 				     "usb2109,class9.0.1",
-> > > 				     "usb2109,class9.0",
-> > > 				     "usb2109,class9";
-> > > 
-> > > 			#address-cells = <1>;
-> > > 			#size-cells = <0>;
-> > > 			reg = <3>;
-> > > 
-> > 
-> > Why "reg" is 3 here?
+> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 > 
-> My mistake. It should be hub at 1 and reg=<1>;
+>> On 20/01/2016 17:38, M?ns Rullg?rd wrote:
+>>
+>>> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+>>>
+>>>> On 20/01/2016 17:25, M?ns Rullg?rd wrote:
+>>>>
+>>>>> Marc Zyngier <marc.zyngier@arm.com> writes:
+>>>>>
+>>>>>> On 20/01/16 16:10, M?ns Rullg?rd wrote:
+>>>>>>
+>>>>>>> Marc Zyngier <marc.zyngier@arm.com> writes:
+>>>>>>>
+>>>>>>>>> +	if (of_property_read_u32(node, "reg", &ctl))
+>>>>>>>>> +		panic("%s: failed to get reg base", node->name);
+>>>>>>>>> +
+>>>>>>>>> +	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
+>>>>>>>>> +	chip->ctl = ctl;
+>>>>>>>>> +	chip->base = base;
+>>>>>>>
+>>>>>>> As I said before, this assumes the outer DT node uses a ranges
+>>>>>>> property.  Normally reg properties work the same whether they specify an
+>>>>>>> offset within an outer "ranges" or have a full address directly.  It
+>>>>>>> would be easy enough to make this work with either, so I don't see any
+>>>>>>> reason not to.
+>>>>>>
+>>>>>> Yup, that is a good point. I guess Marc can address this in the next
+>>>>>> round, since we need a DT binding anyway.
+>>>>>
+>>>>> I'd suggest using of_address_to_resource() on both nodes and subtracting
+>>>>> the start addresses returned.
+>>>>
+>>>> For my own reference, Marc Zyngier suggested:
+>>>> "you should use of_iomap to map the child nodes, and not mess with
+>>>> the parent one."
+>>>
+>>> That's going to get very messy since the generic irqchip code needs all
+>>> the registers as offsets from a common base address.
+>>
+>> The two suggestions are over my head at the moment.
+>>
+>> Do you want to submit v4 and have Marc Z take a look?
 > 
-> I accidentally confused the port number and the device number.
+> Done.  If this isn't acceptable either, I'm out of ideas that don't end
+> up being far uglier than anything suggested so far.
 
-I thought you did it this way because you were numbering the SS
-root-hub ports 1-2 and the HS root-hub ports 3-4.
+With your latest patch, can I drop the ranges property?
 
-There's something I should have made clear earlier.  This scheme for
-putting SS and HS USB-3 root-hub ports in the same number space is part
-of the xHCI spec.  It's not AFAIK required (or even mentioned) by the
-USB-3 spec, which means other types of USB-3 host controllers might do
-it differently.
-
-The scheme which numbers SS and HS ports separately, both starting from
-1, is mandated by the USB-3 spec for non-root hubs.  But since that
-spec doesn't say much about root hubs, the OS is free to treat them
-however it likes.  We have chosen to make root hubs appear as similar
-as possible to non-root hubs; however I believe that Windows (for
-example) may do things differently.
-
-At any rate, since DT strives to reflect the actual hardware 
-properties, you probably should use the xHCI numbering scheme when 
-describing the ports of an xHCI root hub.
-
-
-> > > Is it possible to have a hub in an interface of a multifunction device
-> > > or are they always single-configuration single-interface devices?
-> > > 
-> > 
-> > I have not seen such kinds of devices, but it is possible in theory.
-> 
-> Ok, so if the USB spec allows it, we should probably try to handle it too.
-
-No, the spec does not allow it.  In fact, the spec divides all USB 
-devices into two classes: hubs and functions.  A function is anything 
-that isn't a hub.  And a hub is never allowed to contain more than one 
-configuration and interface.
-
-The spec does allow for multiple functions to be packaged in the same 
-physical device.  In this case, the physical device contains a hub 
-along with various functions permanently connected to it.
-
-For example, the old Apple USB keyboards are compound devices.  They
-contain an internal 3-port hub; one of the ports is permanently wired
-to the keyboard controller and the other two are exposed to the user,
-allowing a mouse and something else to be attached.
-
-Alan Stern
+Regards.
