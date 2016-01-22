@@ -1,63 +1,58 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 22 Jan 2016 11:55:03 +0000
-Subject: [PATCH v2] kernel: add kcov code coverage
-In-Reply-To: <CACT4Y+YTKoh+WEOT9Vr3EmLad3fcd-SPaeBPwgfGsr56OLXW-w@mail.gmail.com>
-References: <1452689318-107172-1-git-send-email-dvyukov@google.com>
- <CAPAsAGx_0pVjtKA2RwwpStRG2-L+5X6W14QbrQaMYhdg30EeAQ@mail.gmail.com>
- <CACT4Y+bHjfkrZ4jWZf+j6FKnj2GQv1t94Y9LJm4=WFyb8C0J8w@mail.gmail.com>
- <CAPAsAGzjX2OJ7SRt4gM1VqEEm5=xERUtfcEDi05o5bwOTdNhpQ@mail.gmail.com>
- <CACT4Y+YvL_L9a2dBfoXQ0AKpKmnypfObtt7k97j_i2Qiu=wnQg@mail.gmail.com>
- <20160118141352.GM21067@leverpostej>
- <CACT4Y+ZdtKTM8Nrko_oweTDYF+SF7+A78-UG8YeoqEcreWRVwQ@mail.gmail.com>
- <CACT4Y+YTKoh+WEOT9Vr3EmLad3fcd-SPaeBPwgfGsr56OLXW-w@mail.gmail.com>
-Message-ID: <20160122115503.GA10370@leverpostej>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 22 Jan 2016 09:09:28 -0300
+Subject: [PATCH v2 10/10] ARM: multi_v7_defconfig: Remove MAX77802 RTC
+ Kconfig symbol
+In-Reply-To: <56A1FD25.7020008@nvidia.com>
+References: <1453407813-14646-1-git-send-email-javier@osg.samsung.com>
+ <1453407813-14646-11-git-send-email-javier@osg.samsung.com>
+ <56A1FD25.7020008@nvidia.com>
+Message-ID: <56A21BF8.8000901@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 18, 2016 at 09:09:43PM +0100, Dmitry Vyukov wrote:
-> On Mon, Jan 18, 2016 at 8:44 PM, Dmitry Vyukov <dvyukov@google.com> wrote:
-> > I've got several comments regarding the 4-byte compressed PCs. We've
-> > also discussed this internally.
-> > As the result in v4 I made it possible to export both compressed
-> > 4-byte PCs and full 8-byte PCs.
-> > Now init ioctl accepts the following struct and kernel can say whether
-> > it will export 4- or 8-byte PCs:
-> >
-> > struct kcov_init_trace {
-> >         unsigned long        flags; /* In: reserved, must be 0. */
-> >         unsigned long        size; /* In: trace buffer size. */
-> >         unsigned long        version;  /* Out: trace format, currently 1. */
-> >         /*
-> >          * Output.
-> >          * pc_size can be 4 or 8. If pc_size = 4 on a 64-bit arch,
-> >          * returned PCs are compressed by subtracting pc_base and then
-> >          * truncating to 4 bytes.
-> >          */
-> >         unsigned long        pc_size;
-> >         unsigned long        pc_base;
-> > };
-> >
-> > So for KASLR or other archs we can just export full 8-byte PCs.
-> >
-> > Regarding KASLR and dynamically loaded modules. I've looked at my
-> > use-case and concluded
-> > that most of the time I can work with "non-stable" PCs within a single
-> > VM. Whenever I need to
-> > store PCs persistently or send to another machine, I think I can
-> > "canonicalize" PCs using
-> > /proc/modules and /proc/kallsyms to something like (module hash,
-> > module offset). So kernel does
-> > not need to do this during coverage collection.
-> 
-> On second though, maybe it's better to just always export unsigned long PCs...
-> Need to measure how much memory coverage information consumes,
-> and how much slower it is with uint64 PCs. Maybe I can live with large PCs,
-> or maybe I can make syzkaller require !KASLR and compress PCs in user-space...
-> Need to think about this more.
+Hello Laxman,
 
-I can imagine we might keep the expanded module range even in the
-absence of full KASLR, though I don't know how realistic that thought
-is.
+On 01/22/2016 06:57 AM, Laxman Dewangan wrote:
+>
+> On Friday 22 January 2016 01:53 AM, Javier Martinez Canillas wrote:
+>> The driver has been removed so the Kconfig symbol is not valid anymore.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>
+>>
+>> ---
+>>
+>> Changes in v2:
+>> - Add Krzysztof Kozlowski's Reviewed-by tag to patch #10.
+>>
+>>   arch/arm/configs/multi_v7_defconfig | 1 -
+>>   1 file changed, 1 deletion(-)
+>>
+>> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+>> index 314f6be2dca2..bdb42c09332c 100644
+>> --- a/arch/arm/configs/multi_v7_defconfig
+>> +++ b/arch/arm/configs/multi_v7_defconfig
+>> @@ -664,7 +664,6 @@ CONFIG_RTC_DRV_MAX8907=y
+>>   CONFIG_RTC_DRV_MAX8997=m
+>>   CONFIG_RTC_DRV_MAX77686=y
+>>   CONFIG_RTC_DRV_RK808=m
+>> -CONFIG_RTC_DRV_MAX77802=m
+>
+> Do you need to make
+>
+> CONFIG_RTC_DRV_MAX77686=m
+>
 
-Thanks,
-Mark.
+Yes we should, the RTC_DRV_MAX778686 Kconfig symbol was enabled in multi_v7
+before the "build as much as possible as a module" policy was asked so got
+enabled built-in. The RTC_DRV_MAX77802 was introduced later so it was asked
+to be built as a module instead.
+
+I think we could do that as a separate patch though, once this series land.
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
