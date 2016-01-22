@@ -1,88 +1,50 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri, 22 Jan 2016 19:06:52 +0800
-Subject: [PATCH v7 9/9] spi: rockchip: modify DMA max burst to 1
-In-Reply-To: <1453460812-8498-1-git-send-email-wxt@rock-chips.com>
-References: <1453460812-8498-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1453460812-8498-10-git-send-email-wxt@rock-chips.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 22 Jan 2016 12:11:25 +0100
+Subject: [PATCH v3 0/3] i.MX6 LDB mux/divider glitch workaround
+Message-ID: <1453461088-31549-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Addy Ke <addy.ke@rock-chips.com>
+Hi,
 
-Generic dma controller on Rockchips' platform cannot support
-DMAFLUSHP instruction which make dma to flush the req of non-aligned
-or non-multiple of what we need. That will cause an unrecoverable
-dma bus error. The saftest way is to set dma max burst to 1.
+The previous version was broken for i.MX6S/DL since
+disable_anatop_clocks() would try to check the parent of clk_periph_pre,
+but it was called before clk_periph_pre was registered.
+disable_anatop_clocks() then went on and failed to not disable the
+memory clock.
 
-Signed-off-by: Addy ke <addy.ke@rock-chips.com>
-Fixes: 64e36824b32b06 ("spi/rockchip: add driver for Rockchip...")
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-cc: Heiko Stuebner <heiko@sntech.de>
-cc: Olof Johansson <olof@lixom.net>
-cc: Doug Anderson <dianders@chromium.org>
-cc: Sonny Rao <sonnyrao@chromium.org>
+So it appears there is a yet unreleased ERR009219, which I have not yet
+seen, that supposedly describes the LDB mux glitch issue, and a draft
+engineering bulletin EB821 that describes the clock switching procedure.
+Shawn, do you have access to these documents?
 
-Acked-by: Mark Brown <broonie@kernel.org>
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Especially the comment explaining init_ldb_clks() should be double checked
+against the erratum once available, as that contains my interpretation of
+the original patch comment.
 
----
+regards
+Philipp
 
-Changes in v7: None
-Changes in v6:
-- remove quirks and get dma caps in order to limit burst
+Changes since v2:
+ - Fix DL/S support. disable_anatop_clocks() checks whether pll2_pfd2_396m
+   is the parent of clk_periph_pre to avoid disabling the memory clock.
+   For this to work, disable_anatop_clocks() must be called only after
+   clk_periph_pre is registered.
+ - Replace magic numbers with #defines
+ - Improve the comment describing init_ldb_di_clks()
+ - Improve selection checking and error messages
 
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
-Changes in v1: None
+Fabio Estevam (1):
+  ARM: imx6: Fix procedure to switch the parent of LDB_DI_CLK
 
- drivers/spi/spi-rockchip.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+Philipp Zabel (2):
+  ARM: imx6: Mask mmdc_ch1 handshake for periph2_sel and
+    mmdc_ch1_axi_podf
+  ARM: imx6: Make the LDB_DI0 and LDB_DI1 clocks read-only.
 
-diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index 79a8bc4..aa9561f 100644
---- a/drivers/spi/spi-rockchip.c
-+++ b/drivers/spi/spi-rockchip.c
-@@ -199,6 +199,7 @@ struct rockchip_spi {
- 	struct sg_table rx_sg;
- 	struct rockchip_spi_dma_data dma_rx;
- 	struct rockchip_spi_dma_data dma_tx;
-+	struct dma_slave_caps dma_caps;
- };
- 
- static inline void spi_enable_chip(struct rockchip_spi *rs, int enable)
-@@ -449,7 +450,10 @@ static void rockchip_spi_prepare_dma(struct rockchip_spi *rs)
- 		rxconf.direction = rs->dma_rx.direction;
- 		rxconf.src_addr = rs->dma_rx.addr;
- 		rxconf.src_addr_width = rs->n_bytes;
--		rxconf.src_maxburst = rs->n_bytes;
-+		if (rs->dma_caps.max_burst > 4)
-+			rxconf.src_maxburst = 4;
-+		else
-+			rxconf.src_maxburst = 1;
- 		dmaengine_slave_config(rs->dma_rx.ch, &rxconf);
- 
- 		rxdesc = dmaengine_prep_slave_sg(
-@@ -466,7 +470,10 @@ static void rockchip_spi_prepare_dma(struct rockchip_spi *rs)
- 		txconf.direction = rs->dma_tx.direction;
- 		txconf.dst_addr = rs->dma_tx.addr;
- 		txconf.dst_addr_width = rs->n_bytes;
--		txconf.dst_maxburst = rs->n_bytes;
-+		if (rs->dma_caps.max_burst > 4)
-+			txconf.dst_maxburst = 4;
-+		else
-+			txconf.dst_maxburst = 1;
- 		dmaengine_slave_config(rs->dma_tx.ch, &txconf);
- 
- 		txdesc = dmaengine_prep_slave_sg(
-@@ -730,6 +737,7 @@ static int rockchip_spi_probe(struct platform_device *pdev)
- 	}
- 
- 	if (rs->dma_tx.ch && rs->dma_rx.ch) {
-+		dma_get_slave_caps(rs->dma_rx.ch, &(rs->dma_caps));
- 		rs->dma_tx.addr = (dma_addr_t)(mem->start + ROCKCHIP_SPI_TXDR);
- 		rs->dma_rx.addr = (dma_addr_t)(mem->start + ROCKCHIP_SPI_RXDR);
- 		rs->dma_tx.direction = DMA_MEM_TO_DEV;
+ drivers/clk/imx/clk-imx6q.c | 294 ++++++++++++++++++++++++++++++++++++++++++--
+ drivers/clk/imx/clk.h       |   8 ++
+ 2 files changed, 292 insertions(+), 10 deletions(-)
+
 -- 
-1.9.1
+2.7.0.rc3
