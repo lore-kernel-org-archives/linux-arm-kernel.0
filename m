@@ -1,152 +1,121 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 22 Jan 2016 13:19:03 -0800
-Subject: [PATCH v2] ARM: mm: mark section-aligned portion of rodata NX
-In-Reply-To: <CAGXu5j+Pc7ucC4tmxHyDW7aW88pwQvMejuR2Ehdxp=vY+pv-5w@mail.gmail.com>
-References: <20151207223534.GA13722@www.outflux.net>
- <CAKv+Gu9EeKQk7GOAPV2cvff10=kD49u+oP-yEiOrJBPOF=QNtw@mail.gmail.com>
- <CAGXu5j+Pc7ucC4tmxHyDW7aW88pwQvMejuR2Ehdxp=vY+pv-5w@mail.gmail.com>
-Message-ID: <CAGXu5jLDK8eVO2kUD1cB3TArL8k8pF=igc3O04Fa40QgQ2pwNw@mail.gmail.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Fri, 22 Jan 2016 22:31:05 +0100
+Subject: iProc bus scanning regression (after "PCI: iproc: Add PAXC
+ interface support")
+In-Reply-To: <569FC9FA.4090607@broadcom.com>
+References: <CACna6rx2t7Zg_xSVvYqZTW2dYEgRugaorV58Zy1YZ4Wy=+L4fQ@mail.gmail.com>
+ <CACna6rzMK4Htci8AucHVi1TNjBkxdQiy60MWJ234J8=4B_vteA@mail.gmail.com>
+ <569F41B1.6000005@broadcom.com>
+ <CACna6rxyMoarw=Yq93gijXeXx5bm35hzAs-+9w3SaXg7e1thtQ@mail.gmail.com>
+ <569FC9FA.4090607@broadcom.com>
+Message-ID: <56A29F99.8020207@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 8, 2015 at 10:38 AM, Kees Cook <keescook@chromium.org> wrote:
-> On Mon, Dec 7, 2015 at 11:47 PM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> On 7 December 2015 at 23:35, Kees Cook <keescook@chromium.org> wrote:
->>> When rodata is large enough that it crosses a section boundary after the
->>> kernel text, mark the rest NX. This is as close to full NX of rodata as
->>> we can get without splitting page tables or doing section alignment via
->>> CONFIG_DEBUG_ALIGN_RODATA.
+On 01/20/2016 06:55 PM, Ray Jui wrote:
+> Hi Rafal,
+> 
+> On 1/20/2016 8:43 AM, Rafa? Mi?ecki wrote:
+>> On 20 January 2016 at 09:13, Ray Jui <rjui@broadcom.com> wrote:
+>>> On 1/19/2016 11:02 PM, Rafa? Mi?ecki wrote:
+>>>>
+>>>> On 20 January 2016 at 07:53, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+>>>>>
+>>>>> In OpenWrt trunk code we use iProc driver for PCIe controllers on bcma
+>>>>> bus (PCIE_IPROC_BCMA). Right now we use 4.1 kernel but we backported
+>>>>> all iProc changes. Unfortunately backporting set queued for 4.5 broke
+>>>>> bus scanning on some routers.
+>>>>>
+>>>>> Most BCM4708 / BCM4709 chipsets have 3 PCIe controllers. All known
+>>>>> routers use only first 2 of them. Even if router has 3 PCIe cards, the
+>>>>> last two cards are connected to the 2nd PCIe controller.
+>>>>>
+>>>>> So that PAXC patch broke support for routers with 3 cards, 2 of them
+>>>>> at the 2nd controller. It doesn't affect routers with just 2 cards.
+>>>>> This problem was tracked down in:
+>>>>> https://dev.openwrt.org/ticket/21393
+>>>>>
+>>>>> I'm attaching two OpenWrt boot logs.
+>>>>> 1) r48381
+>>>>> It contains all backported iProc changes. The log looks "nice", but
+>>>>> only one card (0000:01:00.0) was detected.
+>>>>> 2) r48382
+>>>>> It contains "Revert "PCI: iproc: Add PAXC interface support"" patch.
+>>>>> It contains many "[Firmware Bug]: reg 0x??: invalid BAR (can't size)"
+>>>>> messages but there are all 3 cards detected: 0000:01:00.0,
+>>>>> 0001:03:00.0 and 0001:04:00.0 (see brcmfmac messages).
+>>>>>
+>>>>> Can you take a look at this problem, please?
+>>>>
+>>>>
+>>>> linux-arm-kernel@ stopped my e-mail due to its size. Sending
+>>>> compressed attachments.
+>>>>
 >>>
->>> When the config is:
+>>> I'm a bit confused by these logs that you provided. Based on the log,
+>>> there
+>>> seems to be 3 PCIe root complexes populated on the platform, domain
+>>> 0000:00:00.0, 0001:00:00:0, 0002:00:00:0 are the 3 root complexes. Root
+>>> complex 0002 seems to have nothing connected since it does not detect
+>>> any
+>>> EP.
 >>>
->>>  CONFIG_DEBUG_RODATA=y
->>>  # CONFIG_DEBUG_ALIGN_RODATA is not set
+>>> Is the first card installed on root complex 0 (domain 0000), but the
+>>> second
+>>> card and 3rd card are both installed on root complex 1 (domain 0001) on
+>>> different slots or something?
 >>>
->>> Before:
+>>> I suspect a potential issue is in this function:
 >>>
->>> ---[ Kernel Mapping ]---
->>> 0x80000000-0x80100000           1M     RW NX SHD
->>> 0x80100000-0x80a00000           9M     ro x  SHD
->>> 0x80a00000-0xa0000000         502M     RW NX SHD
+>>> 173 static inline bool iproc_pcie_device_is_valid(struct iproc_pcie
+>>> *pcie,
+>>> 174                                               unsigned int slot,
+>>> 175                                               unsigned int fn)
+>>> 176 {
+>>> 177         if (slot > 0)
+>>> 178                 return false;
+>>> 179
+>>> 180         /* PAXC can only support limited number of functions */
+>>> 181         if (pcie->type == IPROC_PCIE_PAXC && fn >= MAX_NUM_PAXC_PF)
+>>> 182                 return false;
+>>> 183
+>>> 184         return true;
+>>> 185 }
 >>>
->>> After:
+>>> Compared to the original code, it's different. Can you try passing bus
+>>> number into the function as another argument and do the following
+>>> check on
+>>> line 177:
 >>>
->>> ---[ Kernel Mapping ]---
->>> 0x80000000-0x80100000           1M     RW NX SHD
->>> 0x80100000-0x80700000           6M     ro x  SHD
->>> 0x80700000-0x80a00000           3M     ro NX SHD
->>> 0x80a00000-0xa0000000         502M     RW NX SHD
+>>> if (busnum == 0 && slot > 0)
+>>>      return false;
 >>>
->>> Signed-off-by: Kees Cook <keescook@chromium.org>
->>> ---
->>> v2:
->>> - static declaration, ard
->>> ---
->>>  arch/arm/kernel/vmlinux.lds.S | 9 +++++++--
->>>  arch/arm/mm/init.c            | 7 ++++---
->>>  2 files changed, 11 insertions(+), 5 deletions(-)
+>>> instead of
 >>>
->>> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
->>> index a6e395c53a48..9c249c71fda1 100644
->>> --- a/arch/arm/kernel/vmlinux.lds.S
->>> +++ b/arch/arm/kernel/vmlinux.lds.S
->>> @@ -8,9 +8,7 @@
->>>  #include <asm/thread_info.h>
->>>  #include <asm/memory.h>
->>>  #include <asm/page.h>
->>> -#ifdef CONFIG_DEBUG_RODATA
->>>  #include <asm/pgtable.h>
->>> -#endif
->>>
->>>  #define PROC_INFO                                                      \
->>>         . = ALIGN(4);                                                   \
->>> @@ -337,6 +335,13 @@ SECTIONS
->>>  }
->>>
->>>  /*
->>> + * Without CONFIG_DEBUG_ALIGN_RODATA, __start_rodata_section_aligned will
->>> + * be the first section-aligned location after __start_rodata. Otherwise,
->>> + * it will be equal to __start_rodata.
->>> + */
->>> +__start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
->>> +
->>> +/*
->>>   * These must never be empty
->>>   * If you have to comment these two assert statements out, your
->>>   * binutils is too old (for other reasons as well)
->>> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
->>> index 321d3683dc7c..6b16f6cf4843 100644
->>> --- a/arch/arm/mm/init.c
->>> +++ b/arch/arm/mm/init.c
->>> @@ -579,6 +579,9 @@ struct section_perm {
->>>         pmdval_t clear;
->>>  };
->>>
->>> +/* First section-aligned location at or after __start_rodata. */
->>> +extern char __start_rodata_section_aligned[];
->>> +
->>>  static struct section_perm nx_perms[] = {
->>>         /* Make pages tables, etc before _stext RW (set NX). */
->>>         {
->>> @@ -596,16 +599,14 @@ static struct section_perm nx_perms[] = {
->>>                 .mask   = ~PMD_SECT_XN,
->>>                 .prot   = PMD_SECT_XN,
->>>         },
->>> -#ifdef CONFIG_DEBUG_ALIGN_RODATA
->>>         /* Make rodata NX (set RO in ro_perms below). */
->>>         {
->>>                 .name   = "rodata NX",
->>> -               .start  = (unsigned long)__start_rodata,
->>> +               .start  = (unsigned long)__start_rodata_section_aligned,
->>>                 .end    = (unsigned long)__init_begin,
+>>> if (slot > 0)
+>>>      return false;
 >>
->> What happens if start > end ?
->
-> It isn't possible, since rodata will be after text and before
-> init_begin, so it must either less than or equal to init_begin. The
-> equal case is quite possible, and that's fine, since both cases are
-> (correctly) silently ignored by set_section_perms:
->
->                 for (addr = perms[i].start; addr < perms[i].end; addr
-> += SECTION_SIZE)
->                     section_update(....
->
-> -Kees
-
-Hi Ard,
-
-Is this v2 ok? I'd like to have your Ack before sending it to the patch tracker.
-
-Thanks!
-
--Kees
-
->
+>> This did work, thanks! I can see again all these scary
+>> [Firmware Bug]: reg 0x??: invalid BAR (can't size)
+>> messages but also all 3 cards were detected!
 >>
->>>                 .mask   = ~PMD_SECT_XN,
->>>                 .prot   = PMD_SECT_XN,
->>>         },
->>> -#endif
->>>  };
->>>
->>>  static struct section_perm ro_perms[] = {
->>> --
->>> 1.9.1
->>>
->>>
->>> --
->>> Kees Cook
->>> Chrome OS & Brillo Security
->
->
->
-> --
-> Kees Cook
-> Chrome OS & Brillo Security
+>> Will you submit a patch for this, please?
+>>
+> 
+> Thanks for helping to test.
+> 
+> Let me run a few tests on my platforms today and after that I'll submit
+> a fix.
+> 
+> Thanks,
+> 
+> Ray
 
+Rafa? is this a device with this PCIe switch chip? So are there really 2
+PCie devices connetced to the 2nd controller?
 
+To use the 3rd PCIe controller some special PCIe Phy setup is needed and
+as far as I understood USB 3.0 will not work any more in this case,
+because they are sharing the same Phy.
 
--- 
-Kees Cook
-Chrome OS & Brillo Security
+Hauke
