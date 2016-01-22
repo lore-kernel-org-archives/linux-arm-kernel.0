@@ -1,55 +1,129 @@
-From: tthayer@opensource.altera.com (Thor Thayer)
-Date: Fri, 22 Jan 2016 16:05:51 -0600
-Subject: [PATCHv8 1/4] EDAC, altera: Add Altera L2 Cache and OCRAM EDAC
- Support
-In-Reply-To: <20160122180830.GH9806@pd.tnic>
-References: <1453397668-32094-1-git-send-email-tthayer@opensource.altera.com>
- <56A1C5DE.1080501@mentor.com> <56A24C34.3000303@opensource.altera.com>
- <56A25F59.5070306@mentor.com> <20160122180830.GH9806@pd.tnic>
-Message-ID: <56A2A7BF.1000307@opensource.altera.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 22 Jan 2016 23:08:21 +0100
+Subject: [PATCH v2] ARM: mm: mark section-aligned portion of rodata NX
+In-Reply-To: <CAGXu5jLDK8eVO2kUD1cB3TArL8k8pF=igc3O04Fa40QgQ2pwNw@mail.gmail.com>
+References: <20151207223534.GA13722@www.outflux.net>
+ <CAKv+Gu9EeKQk7GOAPV2cvff10=kD49u+oP-yEiOrJBPOF=QNtw@mail.gmail.com>
+ <CAGXu5j+Pc7ucC4tmxHyDW7aW88pwQvMejuR2Ehdxp=vY+pv-5w@mail.gmail.com>
+ <CAGXu5jLDK8eVO2kUD1cB3TArL8k8pF=igc3O04Fa40QgQ2pwNw@mail.gmail.com>
+Message-ID: <CAKv+Gu9aAiDAtFWMJVfCvod4=Nw+NUoAqU_bspK_V2Nm3jYjNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 01/22/2016 12:08 PM, Borislav Petkov wrote:
-> On Fri, Jan 22, 2016 at 06:56:57PM +0200, Vladimir Zapolskiy wrote:
->> it sounds like the author of the original change is Dinh, but if you agreed
->> about authorship transfer, then "From: Thor Thayer" statement should be
->> correct, but in any case your SoB should follow Dinh's SoB, if you decide to
->> keep the latter one.
+On 22 January 2016 at 22:19, Kees Cook <keescook@chromium.org> wrote:
+> On Tue, Dec 8, 2015 at 10:38 AM, Kees Cook <keescook@chromium.org> wrote:
+>> On Mon, Dec 7, 2015 at 11:47 PM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>> On 7 December 2015 at 23:35, Kees Cook <keescook@chromium.org> wrote:
+>>>> When rodata is large enough that it crosses a section boundary after the
+>>>> kernel text, mark the rest NX. This is as close to full NX of rodata as
+>>>> we can get without splitting page tables or doing section alignment via
+>>>> CONFIG_DEBUG_ALIGN_RODATA.
+>>>>
+>>>> When the config is:
+>>>>
+>>>>  CONFIG_DEBUG_RODATA=y
+>>>>  # CONFIG_DEBUG_ALIGN_RODATA is not set
+>>>>
+>>>> Before:
+>>>>
+>>>> ---[ Kernel Mapping ]---
+>>>> 0x80000000-0x80100000           1M     RW NX SHD
+>>>> 0x80100000-0x80a00000           9M     ro x  SHD
+>>>> 0x80a00000-0xa0000000         502M     RW NX SHD
+>>>>
+>>>> After:
+>>>>
+>>>> ---[ Kernel Mapping ]---
+>>>> 0x80000000-0x80100000           1M     RW NX SHD
+>>>> 0x80100000-0x80700000           6M     ro x  SHD
+>>>> 0x80700000-0x80a00000           3M     ro NX SHD
+>>>> 0x80a00000-0xa0000000         502M     RW NX SHD
+>>>>
+>>>> Signed-off-by: Kees Cook <keescook@chromium.org>
+>>>> ---
+>>>> v2:
+>>>> - static declaration, ard
+>>>> ---
+>>>>  arch/arm/kernel/vmlinux.lds.S | 9 +++++++--
+>>>>  arch/arm/mm/init.c            | 7 ++++---
+>>>>  2 files changed, 11 insertions(+), 5 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+>>>> index a6e395c53a48..9c249c71fda1 100644
+>>>> --- a/arch/arm/kernel/vmlinux.lds.S
+>>>> +++ b/arch/arm/kernel/vmlinux.lds.S
+>>>> @@ -8,9 +8,7 @@
+>>>>  #include <asm/thread_info.h>
+>>>>  #include <asm/memory.h>
+>>>>  #include <asm/page.h>
+>>>> -#ifdef CONFIG_DEBUG_RODATA
+>>>>  #include <asm/pgtable.h>
+>>>> -#endif
+>>>>
+>>>>  #define PROC_INFO                                                      \
+>>>>         . = ALIGN(4);                                                   \
+>>>> @@ -337,6 +335,13 @@ SECTIONS
+>>>>  }
+>>>>
+>>>>  /*
+>>>> + * Without CONFIG_DEBUG_ALIGN_RODATA, __start_rodata_section_aligned will
+>>>> + * be the first section-aligned location after __start_rodata. Otherwise,
+>>>> + * it will be equal to __start_rodata.
+>>>> + */
+>>>> +__start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
+>>>> +
+>>>> +/*
+>>>>   * These must never be empty
+>>>>   * If you have to comment these two assert statements out, your
+>>>>   * binutils is too old (for other reasons as well)
+>>>> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+>>>> index 321d3683dc7c..6b16f6cf4843 100644
+>>>> --- a/arch/arm/mm/init.c
+>>>> +++ b/arch/arm/mm/init.c
+>>>> @@ -579,6 +579,9 @@ struct section_perm {
+>>>>         pmdval_t clear;
+>>>>  };
+>>>>
+>>>> +/* First section-aligned location at or after __start_rodata. */
+>>>> +extern char __start_rodata_section_aligned[];
+>>>> +
+>>>>  static struct section_perm nx_perms[] = {
+>>>>         /* Make pages tables, etc before _stext RW (set NX). */
+>>>>         {
+>>>> @@ -596,16 +599,14 @@ static struct section_perm nx_perms[] = {
+>>>>                 .mask   = ~PMD_SECT_XN,
+>>>>                 .prot   = PMD_SECT_XN,
+>>>>         },
+>>>> -#ifdef CONFIG_DEBUG_ALIGN_RODATA
+>>>>         /* Make rodata NX (set RO in ro_perms below). */
+>>>>         {
+>>>>                 .name   = "rodata NX",
+>>>> -               .start  = (unsigned long)__start_rodata,
+>>>> +               .start  = (unsigned long)__start_rodata_section_aligned,
+>>>>                 .end    = (unsigned long)__init_begin,
+>>>
+>>> What happens if start > end ?
 >>
->> This consideration may apply to the other changes in the changeset as well.
+>> It isn't possible, since rodata will be after text and before
+>> init_begin, so it must either less than or equal to init_begin. The
+>> equal case is quite possible, and that's fine, since both cases are
+>> (correctly) silently ignored by set_section_perms:
+>>
+>>                 for (addr = perms[i].start; addr < perms[i].end; addr
+>> += SECTION_SIZE)
+>>                     section_update(....
+>>
+>> -Kees
 >
-> So the patch author should be in the From:
+> Hi Ard,
 >
-> If Thor has changed the original patch considerably, then you Thor and
-> Dinh could decide amongst each other who should be the author.
+> Is this v2 ok? I'd like to have your Ack before sending it to the patch tracker.
 >
-> If Thor becomes the author and lands in From:, then the commit message
-> could state something like "based on original work from Dinh" or
-> "Originally-from: Dinh" and so on. "git log" has some examples.
->
-> The SOB chain shows who handled the patch on its way upstream. So in
-> this case, it should be:
->
-> SOB: Dinh (if From: is Dinh - otherwise Originally-by:)
-> SOB: Thor
-> SOB: Boris
->
-> if I'm going to pick it up and send it to Linus.
->
-> Ok?
->
-OK. Thank you for the explanation, it is much clearer now. I apologize 
-for creating this confusion.
 
-I was the original author for the previous versions of patches (1-6) but 
-since I was out for a portion of last year, Dinh picked up version 7 and 
-submitted it.
+Looks fine to me
 
-Since I'm taking it back over, Dinh and I agreed that I'll be the only 
-signoff from now on. Additionally, I'll make sure I'm the From: going 
-forward.
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Thor
+Thanks,
+Ard.
