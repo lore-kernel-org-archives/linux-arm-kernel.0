@@ -1,67 +1,44 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Fri, 22 Jan 2016 13:15:27 +0100
-Subject: [PATCH v2] kernel: add kcov code coverage
-In-Reply-To: <20160122115503.GA10370@leverpostej>
-References: <1452689318-107172-1-git-send-email-dvyukov@google.com>
- <CAPAsAGx_0pVjtKA2RwwpStRG2-L+5X6W14QbrQaMYhdg30EeAQ@mail.gmail.com>
- <CACT4Y+bHjfkrZ4jWZf+j6FKnj2GQv1t94Y9LJm4=WFyb8C0J8w@mail.gmail.com>
- <CAPAsAGzjX2OJ7SRt4gM1VqEEm5=xERUtfcEDi05o5bwOTdNhpQ@mail.gmail.com>
- <CACT4Y+YvL_L9a2dBfoXQ0AKpKmnypfObtt7k97j_i2Qiu=wnQg@mail.gmail.com>
- <20160118141352.GM21067@leverpostej>
- <CACT4Y+ZdtKTM8Nrko_oweTDYF+SF7+A78-UG8YeoqEcreWRVwQ@mail.gmail.com>
- <CACT4Y+YTKoh+WEOT9Vr3EmLad3fcd-SPaeBPwgfGsr56OLXW-w@mail.gmail.com>
- <20160122115503.GA10370@leverpostej>
-Message-ID: <CACT4Y+bvReSkPa5mtb4+Uy6GsoDiuawLzfzMPoJF++1X=H06aA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 22 Jan 2016 13:39:25 +0100
+Subject: [PATCH] soc: mediatek: SCPSYS: Fix double enabling of regulators
+Message-ID: <1453466365-24406-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 22, 2016 at 12:55 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Jan 18, 2016 at 09:09:43PM +0100, Dmitry Vyukov wrote:
->> On Mon, Jan 18, 2016 at 8:44 PM, Dmitry Vyukov <dvyukov@google.com> wrote:
->> > I've got several comments regarding the 4-byte compressed PCs. We've
->> > also discussed this internally.
->> > As the result in v4 I made it possible to export both compressed
->> > 4-byte PCs and full 8-byte PCs.
->> > Now init ioctl accepts the following struct and kernel can say whether
->> > it will export 4- or 8-byte PCs:
->> >
->> > struct kcov_init_trace {
->> >         unsigned long        flags; /* In: reserved, must be 0. */
->> >         unsigned long        size; /* In: trace buffer size. */
->> >         unsigned long        version;  /* Out: trace format, currently 1. */
->> >         /*
->> >          * Output.
->> >          * pc_size can be 4 or 8. If pc_size = 4 on a 64-bit arch,
->> >          * returned PCs are compressed by subtracting pc_base and then
->> >          * truncating to 4 bytes.
->> >          */
->> >         unsigned long        pc_size;
->> >         unsigned long        pc_base;
->> > };
->> >
->> > So for KASLR or other archs we can just export full 8-byte PCs.
->> >
->> > Regarding KASLR and dynamically loaded modules. I've looked at my
->> > use-case and concluded
->> > that most of the time I can work with "non-stable" PCs within a single
->> > VM. Whenever I need to
->> > store PCs persistently or send to another machine, I think I can
->> > "canonicalize" PCs using
->> > /proc/modules and /proc/kallsyms to something like (module hash,
->> > module offset). So kernel does
->> > not need to do this during coverage collection.
->>
->> On second though, maybe it's better to just always export unsigned long PCs...
->> Need to measure how much memory coverage information consumes,
->> and how much slower it is with uint64 PCs. Maybe I can live with large PCs,
->> or maybe I can make syzkaller require !KASLR and compress PCs in user-space...
->> Need to think about this more.
->
-> I can imagine we might keep the expanded module range even in the
-> absence of full KASLR, though I don't know how realistic that thought
-> is.
+With CONFIG_PM enabled do not call genpd->power_on manually as this
+will cause the regulators being turned on once in SCPSYS probe and
+then again when the genpd core turns on the domains. Instead, call
+genpd->power_on only with CONFIG_PM disabled and tell the genpd core
+that the domains are disabled when registered.
 
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/soc/mediatek/mtk-scpsys.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
 
-The last version of the patch just exposes PCs as unsigned longs
-without any compression. So it should not be a problem (at least for
-kernel, now it's user responsibility to make sense out of the PCs).
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+index 0221387..78227db 100644
+--- a/drivers/soc/mediatek/mtk-scpsys.c
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -500,14 +500,13 @@ static int __init scpsys_probe(struct platform_device *pdev)
+ 		genpd->dev_ops.active_wakeup = scpsys_active_wakeup;
+ 
+ 		/*
+-		 * Initially turn on all domains to make the domains usable
+-		 * with !CONFIG_PM and to get the hardware in sync with the
+-		 * software.  The unused domains will be switched off during
+-		 * late_init time.
++		 * With CONFIG_PM disabled turn on all domains to make the
++		 * hardware usable.
+ 		 */
+-		genpd->power_on(genpd);
++		if (!IS_ENABLED(CONFIG_PM))
++			genpd->power_on(genpd);
+ 
+-		pm_genpd_init(genpd, NULL, false);
++		pm_genpd_init(genpd, NULL, true);
+ 	}
+ 
+ 	/*
+-- 
+2.7.0.rc3
