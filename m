@@ -1,91 +1,62 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 21 Jan 2016 20:43:08 -0800
-Subject: [PATCH] ARM: dts: imx6: enable pl310 "shared attribute override
- enable" bit
-In-Reply-To: <1453368119.3183.19.camel@pengutronix.de>
-References: <1453346938-5625-1-git-send-email-b38611@freescale.com>
- <4df58eebc9995bcdb91f2f16b3093ed7@agner.ch>
- <1453368119.3183.19.camel@pengutronix.de>
-Message-ID: <69f1d2c00ea70882a0d1f0701f8ae2f5@agner.ch>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 22 Jan 2016 13:50:34 +0900
+Subject: [PATCH 16/19] arm64: kdump: add kdump support
+In-Reply-To: <56A0E869.1020906@arm.com>
+References: <cover.1452884156.git.geoff@infradead.org>
+ <c1faadcc74ca0670413396b36e2bdcc02b15bcd9.1452884156.git.geoff@infradead.org>
+ <56A0E869.1020906@arm.com>
+Message-ID: <56A1B51A.3000001@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-01-21 01:21, Lucas Stach wrote:
-> Am Mittwoch, den 20.01.2016, 21:08 -0800 schrieb Stefan Agner:
->> Hi Andy,
->>
->> On 2016-01-20 19:28, Fugang Duan wrote:
->> > The default behavior of the L220 or PL310 cache controllers with respect
->> > to the shareable attribute is to transform "normal memory non-cacheable
->> > transactions" into "cacheable no allocate" (for reads) or "write through
->> > no write allocate" (for writes).
->> >
->> > On i.MX6 series platforms, enet/audio/usb/nand DMA buffer have corruption
->> > without CMA. So set this property "arm,shared-override" in L2 dts node to
->> > enable "shared attribute override enable" bit.
->>
->> Do you happen to know if Vybrid could also suffer this too? Some IP's
->> are the same/similar ones...
->>
-> This is a bug in the default configuration of the PL310 L2 cache
-> controller. AFAIK Vybrid does not use this IP block, so it should be
-> safe.
+James,
 
-The ones with a 1 in the second digit come with the PL310 L2 cache
-controller (e.g. VF610). Currently U-Boot does not touch the L2 cache
-controller at all, however, reading this discussion sounds like this
-would be a good idea in the future...
+On 01/21/2016 11:17 PM, James Morse wrote:
+> Hi!
+>
+> On 15/01/16 19:18, Geoff Levand wrote:
+>> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>
+>> On crash dump kernel, all the information about primary kernel's core
+>> image is available in elf core header specified by "elfcorehdr=" boot
+>> parameter. reserve_elfcorehdr() will set aside the region to avoid any
+>> corruption by crash dump kernel.
+>>
+>> Crash dump kernel will access the system memory of primary kernel via
+>> copy_oldmem_page(), which reads one page by ioremap'ing it since it does
+>> not reside in linear mapping on crash dump kernel.
+>> Please note that we should add "mem=X[MG]" boot parameter to limit the
+>> memory size and avoid the following assertion at ioremap():
+>> 	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
+>> 		return NULL;
+>> when accessing any pages beyond the usable memories of crash dump kernel.
+>>
+>> We also need our own elfcorehdr_read() here since the weak definition of
+>> elfcorehdr_read() utilizes copy_oldmem_page() and will hit the assertion
+>> above on arm64.
+>
+> How does this work for a different-endian crash kernel?
+>
+> It looks like fs/proc/vmcore.c:parse_crash_elf64_headers() does some
+> validation on the elf-headers that doesn't look like it will work if
+> elfcorehdr:endian != kernel:endian.
 
---
-Stefan
+Good point!
 
->> Did this manifest in any way?
->>
->> --
->> Stefan
->>
->>
->> >
->> > Signed-off-by: Fugang Duan <B38611@freescale.com>
->> > ---
->> >  arch/arm/boot/dts/imx6qdl.dtsi | 1 +
->> >  arch/arm/boot/dts/imx6sl.dtsi  | 1 +
->> >  arch/arm/boot/dts/imx6sx.dtsi  | 1 +
->> >  3 files changed, 3 insertions(+)
->> >
->> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
->> > index 4f6ae92..b4de39a 100644
->> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
->> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
->> > @@ -185,6 +185,7 @@
->> >  			cache-level = <2>;
->> >  			arm,tag-latency = <4 2 3>;
->> >  			arm,data-latency = <4 2 3>;
->> > +			arm,shared-override;
->> >  		};
->> >
->> >  		pcie: pcie at 0x01000000 {
->> > diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
->> > index d12b250..3b80b45 100644
->> > --- a/arch/arm/boot/dts/imx6sl.dtsi
->> > +++ b/arch/arm/boot/dts/imx6sl.dtsi
->> > @@ -113,6 +113,7 @@
->> >  			cache-level = <2>;
->> >  			arm,tag-latency = <4 2 3>;
->> >  			arm,data-latency = <4 2 3>;
->> > +			arm,shared-override;
->> >  		};
->> >
->> >  		pmu {
->> > diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
->> > index a5f7602..42f8f3b 100644
->> > --- a/arch/arm/boot/dts/imx6sx.dtsi
->> > +++ b/arch/arm/boot/dts/imx6sx.dtsi
->> > @@ -155,6 +155,7 @@
->> >  			cache-level = <2>;
->> >  			arm,tag-latency = <4 2 3>;
->> >  			arm,data-latency = <4 2 3>;
->> > +			arm,shared-override;
->> >  		};
->> >
->> >  		dma_apbh: dma-apbh at 01804000 {
+> Is it worth preventing this corner case by getting kexec-tools to
+> prevent linux with a different endianness being loaded as a kdump kernel?
+
+It may be, but I think that people should always check whether or not kdump
+will work in their environment before puting the system in practical use.
+
+(I know the check costs almost nothing though.)
+
+Thanks,
+-Takahiro AKASHI
+
+>
+> Thanks,
+>
+> James
+>
+>
