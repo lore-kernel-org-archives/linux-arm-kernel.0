@@ -1,72 +1,63 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 22 Jan 2016 12:48:27 +0100
-Subject: [PATCH] ARM: at91/dt: sama5d2 Xplained: add phy address and IRQ
- for macb0
-In-Reply-To: <1453462174-27688-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1453462174-27688-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20160122114827.GF3608@piout.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 22 Jan 2016 11:55:03 +0000
+Subject: [PATCH v2] kernel: add kcov code coverage
+In-Reply-To: <CACT4Y+YTKoh+WEOT9Vr3EmLad3fcd-SPaeBPwgfGsr56OLXW-w@mail.gmail.com>
+References: <1452689318-107172-1-git-send-email-dvyukov@google.com>
+ <CAPAsAGx_0pVjtKA2RwwpStRG2-L+5X6W14QbrQaMYhdg30EeAQ@mail.gmail.com>
+ <CACT4Y+bHjfkrZ4jWZf+j6FKnj2GQv1t94Y9LJm4=WFyb8C0J8w@mail.gmail.com>
+ <CAPAsAGzjX2OJ7SRt4gM1VqEEm5=xERUtfcEDi05o5bwOTdNhpQ@mail.gmail.com>
+ <CACT4Y+YvL_L9a2dBfoXQ0AKpKmnypfObtt7k97j_i2Qiu=wnQg@mail.gmail.com>
+ <20160118141352.GM21067@leverpostej>
+ <CACT4Y+ZdtKTM8Nrko_oweTDYF+SF7+A78-UG8YeoqEcreWRVwQ@mail.gmail.com>
+ <CACT4Y+YTKoh+WEOT9Vr3EmLad3fcd-SPaeBPwgfGsr56OLXW-w@mail.gmail.com>
+Message-ID: <20160122115503.GA10370@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/01/2016 at 12:29:34 +0100, Nicolas Ferre wrote :
-> After 57a38effa598 (net: phy: micrel: disable broadcast for KSZ8081/KSZ8091)
-> the macb0 interface have difficulties to come back from power saving mode if
-has
-
-> address not explicitely set up.
-
-explicitly
-
-> As the micrel phy on the board is actually configured to show up at address 1
-> we use this explicitly.
-> Adding the phy node and its real address fixes the issue.
-
-
-Maybe you should add that this also add the proper pinmuxing for the
-IRQ.
+On Mon, Jan 18, 2016 at 09:09:43PM +0100, Dmitry Vyukov wrote:
+> On Mon, Jan 18, 2016 at 8:44 PM, Dmitry Vyukov <dvyukov@google.com> wrote:
+> > I've got several comments regarding the 4-byte compressed PCs. We've
+> > also discussed this internally.
+> > As the result in v4 I made it possible to export both compressed
+> > 4-byte PCs and full 8-byte PCs.
+> > Now init ioctl accepts the following struct and kernel can say whether
+> > it will export 4- or 8-byte PCs:
+> >
+> > struct kcov_init_trace {
+> >         unsigned long        flags; /* In: reserved, must be 0. */
+> >         unsigned long        size; /* In: trace buffer size. */
+> >         unsigned long        version;  /* Out: trace format, currently 1. */
+> >         /*
+> >          * Output.
+> >          * pc_size can be 4 or 8. If pc_size = 4 on a 64-bit arch,
+> >          * returned PCs are compressed by subtracting pc_base and then
+> >          * truncating to 4 bytes.
+> >          */
+> >         unsigned long        pc_size;
+> >         unsigned long        pc_base;
+> > };
+> >
+> > So for KASLR or other archs we can just export full 8-byte PCs.
+> >
+> > Regarding KASLR and dynamically loaded modules. I've looked at my
+> > use-case and concluded
+> > that most of the time I can work with "non-stable" PCs within a single
+> > VM. Whenever I need to
+> > store PCs persistently or send to another machine, I think I can
+> > "canonicalize" PCs using
+> > /proc/modules and /proc/kallsyms to something like (module hash,
+> > module offset). So kernel does
+> > not need to do this during coverage collection.
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  arch/arm/boot/dts/at91-sama5d2_xplained.dts | 12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> index 77ddff036409..e683856c507c 100644
-> --- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> @@ -114,9 +114,15 @@
->  
->  			macb0: ethernet at f8008000 {
->  				pinctrl-names = "default";
-> -				pinctrl-0 = <&pinctrl_macb0_default>;
-> +				pinctrl-0 = <&pinctrl_macb0_default &pinctrl_macb0_phy_irq>;
->  				phy-mode = "rmii";
->  				status = "okay";
-> +
-> +				ethernet-phy at 1 {
-> +					reg = <0x1>;
-> +					interrupt-parent = <&pioA>;
-> +					interrupts = <73 IRQ_TYPE_LEVEL_LOW>;
-> +				};
->  			};
->  
->  			pdmic at f8018000 {
-> @@ -300,6 +306,10 @@
->  					bias-disable;
->  				};
->  
-> +				pinctrl_macb0_phy_irq: macb0_phy_irq {
-> +					pinmux = <PIN_PC9__GPIO>;
-> +				};
-> +
->  				pinctrl_pdmic_default: pdmic_default {
->  					pinmux = <PIN_PB26__PDMIC_DAT>,
->  						<PIN_PB27__PDMIC_CLK>;
-> -- 
-> 2.1.3
-> 
+> On second though, maybe it's better to just always export unsigned long PCs...
+> Need to measure how much memory coverage information consumes,
+> and how much slower it is with uint64 PCs. Maybe I can live with large PCs,
+> or maybe I can make syzkaller require !KASLR and compress PCs in user-space...
+> Need to think about this more.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+I can imagine we might keep the expanded module range even in the
+absence of full KASLR, though I don't know how realistic that thought
+is.
+
+Thanks,
+Mark.
