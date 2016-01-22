@@ -1,66 +1,59 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Fri, 22 Jan 2016 16:58:07 +0100
-Subject: [RFC PATCH v3] irqchip: Add support for Tango interrupt controller
-In-Reply-To: <yw1x1t9cqg18.fsf@unicorn.mansr.com>
-References: <569CE0F2.1060507@sigmadesigns.com>
- <569D0B80.1010908@sigmadesigns.com> <569D165E.4060004@sigmadesigns.com>
- <569FAFF5.4090909@arm.com> <yw1xr3hcqlix.fsf@unicorn.mansr.com>
- <569FB471.8000909@arm.com> <yw1xmvs0qkue.fsf@unicorn.mansr.com>
- <569FB7A9.9080309@sigmadesigns.com> <yw1xegdcqk8n.fsf@unicorn.mansr.com>
- <569FB91D.9030704@sigmadesigns.com> <yw1x1t9cqg18.fsf@unicorn.mansr.com>
-Message-ID: <56A2518F.6060808@sigmadesigns.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 22 Jan 2016 17:12:06 +0100
+Subject: [PATCH] ARM: dts: at91: sama5d4_xplained: properly mux phy
+ interrupt
+In-Reply-To: <1452846618-17854-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1452846618-17854-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <56A254D6.3070105@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/01/2016 19:09, M?ns Rullg?rd wrote:
-
-> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+Le 15/01/2016 09:30, Alexandre Belloni a ?crit :
+> No interrupt were received from the phy because PIOE 1 may not be properly
+> muxed. It prevented proper link detection, especially since commit
+> 321beec5047a ("net: phy: Use interrupts when available in NOLINK state")
+> disables polling.
 > 
->> On 20/01/2016 17:38, M?ns Rullg?rd wrote:
->>
->>> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
->>>
->>>> On 20/01/2016 17:25, M?ns Rullg?rd wrote:
->>>>
->>>>> Marc Zyngier <marc.zyngier@arm.com> writes:
->>>>>
->>>>>> On 20/01/16 16:10, M?ns Rullg?rd wrote:
->>>>>>
->>>>>>> Marc Zyngier <marc.zyngier@arm.com> writes:
->>>>>>>
->>>>>>>>> +	if (of_property_read_u32(node, "reg", &ctl))
->>>>>>>>> +		panic("%s: failed to get reg base", node->name);
->>>>>>>>> +
->>>>>>>>> +	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
->>>>>>>>> +	chip->ctl = ctl;
->>>>>>>>> +	chip->base = base;
->>>>>>>
->>>>>>> As I said before, this assumes the outer DT node uses a ranges
->>>>>>> property.  Normally reg properties work the same whether they specify an
->>>>>>> offset within an outer "ranges" or have a full address directly.  It
->>>>>>> would be easy enough to make this work with either, so I don't see any
->>>>>>> reason not to.
->>>>>>
->>>>>> Yup, that is a good point. I guess Marc can address this in the next
->>>>>> round, since we need a DT binding anyway.
->>>>>
->>>>> I'd suggest using of_address_to_resource() on both nodes and subtracting
->>>>> the start addresses returned.
->>>>
->>>> For my own reference, Marc Zyngier suggested:
->>>> "you should use of_iomap to map the child nodes, and not mess with
->>>> the parent one."
->>>
->>> That's going to get very messy since the generic irqchip code needs all
->>> the registers as offsets from a common base address.
->>
->> The two suggestions are over my head at the moment.
->>
->> Do you want to submit v4 and have Marc Z take a look?
+> Cc: <stable@vger.kernel.org> # 4.4
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+And added to the upcoming at91-4.5-fixes branch.
+
+thanks!
+
+
+> ---
+>  arch/arm/boot/dts/at91-sama5d4_xplained.dts | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> Done.  If this isn't acceptable either, I'm out of ideas that don't end
-> up being far uglier than anything suggested so far.
+> diff --git a/arch/arm/boot/dts/at91-sama5d4_xplained.dts b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
+> index 131614f28e75..8cf9999cb0cd 100644
+> --- a/arch/arm/boot/dts/at91-sama5d4_xplained.dts
+> +++ b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
+> @@ -86,6 +86,8 @@
+>  			macb0: ethernet at f8020000 {
+>  				phy-mode = "rmii";
+>  				status = "okay";
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_macb0_rmii &pinctrl_macb0_phy_irq>;
+>  
+>  				phy0: ethernet-phy at 1 {
+>  					interrupt-parent = <&pioE>;
+> @@ -152,6 +154,10 @@
+>  						atmel,pins =
+>  							<AT91_PIOE 8 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
+>  					};
+> +					pinctrl_macb0_phy_irq: macb0_phy_irq_0 {
+> +						atmel,pins =
+> +							<AT91_PIOE 1 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
+> +					};
+>  				};
+>  			};
+>  		};
+> 
 
-With your latest patch, can I drop the ranges property?
 
-Regards.
+-- 
+Nicolas Ferre
