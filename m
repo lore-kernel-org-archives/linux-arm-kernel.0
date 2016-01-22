@@ -1,86 +1,54 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 22 Jan 2016 11:25:37 +0000
-Subject: [PATCH V3 13/21] pci, acpi: Provide generic way to assign bus
- domain number.
-In-Reply-To: <56A125BB.9040109@semihalf.com>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <1452691267-32240-14-git-send-email-tn@semihalf.com>
- <20160121182218.GA21175@red-moon> <56A125BB.9040109@semihalf.com>
-Message-ID: <20160122112536.GA2610@red-moon>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 22 Jan 2016 12:29:34 +0100
+Subject: [PATCH] ARM: at91/dt: sama5d2 Xplained: add phy address and IRQ for
+ macb0
+Message-ID: <1453462174-27688-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 21, 2016 at 07:38:51PM +0100, Tomasz Nowicki wrote:
+After 57a38effa598 (net: phy: micrel: disable broadcast for KSZ8081/KSZ8091)
+the macb0 interface have difficulties to come back from power saving mode if
+address not explicitely set up.
+As the micrel phy on the board is actually configured to show up at address 1
+we use this explicitly.
+Adding the phy node and its real address fixes the issue.
 
-[...]
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-> >I think you can reshuffle a bit the code to make it easier to follow.
-> >
-> >How about this ? (on top of mainline, I just compiled it do not
-> >take it verbatim):
-> >
-> >-- >8 --
-> >diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> >index d1a7105..467a316 100644
-> >--- a/drivers/pci/pci.c
-> >+++ b/drivers/pci/pci.c
-> >@@ -7,6 +7,7 @@
-> >   *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
-> >   */
-> >
-> >+#include <linux/acpi.h>
-> >  #include <linux/kernel.h>
-> >  #include <linux/delay.h>
-> >  #include <linux/init.h>
-> >@@ -4769,7 +4770,27 @@ int pci_get_new_domain_nr(void)
-> >  }
-> >
-> >  #ifdef CONFIG_PCI_DOMAINS_GENERIC
-> >-void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> >+/* Feel free to add this to drivers/acpi as a helper */
-> >+#ifdef CONFIG_ACPI
-> >+int pci_bus_acpi_domain_nr(struct device *parent)
-> >+{
-> >+	struct acpi_device *acpi_dev = to_acpi_device(parent);
-> >+	unsigned long long segment = 0;
-> >+	acpi_status status;
-> >+
-> >+	status = acpi_evaluate_integer(acpi_dev->handle,
-> >+				       METHOD_NAME__SEG, NULL,
-> >+				       &segment);
-> >+	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND)
-> >+		dev_err(&acpi_dev->dev,  "can't evaluate _SEG\n");
-> >+
-> >+	return segment;
-> >+}
-> >+#else
-> >+int pci_bus_acpi_domain_nr(struct device *parent) { return -1; }
-> >+#endif
-> >+
-> >+int pci_bus_of_domain_nr(struct device *parent)
-> >  {
-> >  	static int use_dt_domains = -1;
-> >  	int domain = of_get_pci_domain_nr(parent->of_node);
-> >@@ -4811,7 +4832,13 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> >  		domain = -1;
-> >  	}
-> >
-> >-	bus->domain_nr = domain;
-> >+	return domain;
-> >+}
-> >+
-> >+void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> >+{
-> >+	bus->domain_nr = acpi_disabled ? pci_bus_of_domain_nr(parent) :
-> >+					 pci_bus_acpi_domain_nr(parent);
-> >  }
-> >  #endif
-> >  #endif
-> >
-> 
-> It looks nice, I will integrate your patch. Thanks!
-
-While at it, as I mentioned, please move the ACPI helper function to
-drivers/acpi, thanks.
-
-Lorenzo
+diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+index 77ddff036409..e683856c507c 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+@@ -114,9 +114,15 @@
+ 
+ 			macb0: ethernet at f8008000 {
+ 				pinctrl-names = "default";
+-				pinctrl-0 = <&pinctrl_macb0_default>;
++				pinctrl-0 = <&pinctrl_macb0_default &pinctrl_macb0_phy_irq>;
+ 				phy-mode = "rmii";
+ 				status = "okay";
++
++				ethernet-phy at 1 {
++					reg = <0x1>;
++					interrupt-parent = <&pioA>;
++					interrupts = <73 IRQ_TYPE_LEVEL_LOW>;
++				};
+ 			};
+ 
+ 			pdmic at f8018000 {
+@@ -300,6 +306,10 @@
+ 					bias-disable;
+ 				};
+ 
++				pinctrl_macb0_phy_irq: macb0_phy_irq {
++					pinmux = <PIN_PC9__GPIO>;
++				};
++
+ 				pinctrl_pdmic_default: pdmic_default {
+ 					pinmux = <PIN_PB26__PDMIC_DAT>,
+ 						<PIN_PB27__PDMIC_CLK>;
+-- 
+2.1.3
