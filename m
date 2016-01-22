@@ -1,225 +1,89 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Fri, 22 Jan 2016 09:56:42 +0800
-Subject: [PATCH v13 17/17] drm: bridge: analogix/dp: Fix the possible dead
- lock in bridge disable time
-In-Reply-To: <1453427614-23053-1-git-send-email-ykk@rock-chips.com>
-References: <1453427614-23053-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1453427802-24787-1-git-send-email-ykk@rock-chips.com>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Fri, 22 Jan 2016 11:38:13 +0800
+Subject: [RFC 1/3] dt-bindings: soc: Add documentation for the MediaTek
+ GCE unit
+In-Reply-To: <20160120163826.GA23400@rob-hp-laptop>
+References: <1453266881-16849-1-git-send-email-hs.liao@mediatek.com>
+ <1453266881-16849-2-git-send-email-hs.liao@mediatek.com>
+ <20160120163826.GA23400@rob-hp-laptop>
+Message-ID: <1453433893.15298.13.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It may caused a dead lock if we flush the hpd work in bridge disable time.
+Hi Rob,
 
-The normal flow would like:
-  IN --> DRM IOCTL
-        1. Acquire crtc_ww_class_mutex (DRM IOCTL)
-  IN --> analogix_dp_bridge
-        2. Acquire hpd work lock (Flush hpd work)
-        3. HPD work already in idle, no need to run the work function.
-  OUT <-- analogix_dp_bridge
-  OUT <-- DRM IOCTL
+On Wed, 2016-01-20 at 10:38 -0600, Rob Herring wrote:
+> On Wed, Jan 20, 2016 at 01:14:38PM +0800, hs.liao at mediatek.com wrote:
+> > From: HS Liao <hs.liao@mediatek.com>
+> > 
+> > This adds documentation for the MediaTek Global Command Engine (GCE) unit
+> > found in MT8173 SoCs.
+> > 
+> > Signed-off-by: HS Liao <hs.liao@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/soc/mediatek/gce.txt       |   33 ++++++++++++++++++++
+> >  1 file changed, 33 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/gce.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/soc/mediatek/gce.txt b/Documentation/devicetree/bindings/soc/mediatek/gce.txt
+> > new file mode 100644
+> > index 0000000..878b11e
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/soc/mediatek/gce.txt
+> > @@ -0,0 +1,33 @@
+> > +MediaTek GCE
+> > +===============
+> > +
+> > +The Global Command Engine (GCE) is used to help read/write registers with
+> > +critical time limitation, such as updating display configuration during the
+> > +vblank. The GCE can be used to implement the Command Queue (CMDQ) driver.
+> > +Currently, the GCE only supports display related hardwares, but we expect
+> > +it can be extended to other hardwares for future requirements.
+> 
+> That's a hardware limitation or just s/w is only using it for display? 
+> If the latter, that's not really relevant to this binding and should be 
+> removed.
 
-The dead lock flow would like:
-  IN --> DRM IOCTL
-        1. Acquire crtc_ww_class_mutex (DRM IOCTL)
-  IN --> analogix_dp_bridge
-        2. Acquire hpd work lock (Flush hpd work)
-  IN --> analogix_dp_hotplug
-  IN --> drm_helper_hpd_irq_event
-        3. Acquire mode_config lock (This lock already have been acquired in previous step 1)
-** Dead Lock Now **
+Just s/w is only using it for display.
+I will remove it from next patch.
 
-It's wrong to flush the hpd work in bridge->disable time, I guess the
-original code just want to ensure the delay work must be finish before
-encoder disabled.
+> > +
+> > +Required properties:
+> > +- compatible: Must be "mediatek,mt8173-gce"
+> > +- reg: Address range of the GCE unit
+> > +- interrupts: The interrupt signal from the GCE block
+> > +- clock: Clocks according to the common clock binding
+> > +- clock-names: Must be "gce" to stand for GCE clock
+> > +
+> > +Example:
+> > +
+> > +	gce: gce at 10212000 {
+> > +		compatible = "mediatek,mt8173-gce";
+> > +		reg = <0 0x10212000 0 0x1000>;
+> > +		interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_LOW>;
+> > +		clocks = <&infracfg CLK_INFRA_GCE>;
+> > +		clock-names = "gce";
+> > +	};
+> > +
+> > +	mmsys: clock-controller at 14000000 {
+> > +		compatible = "mediatek,mt8173-mmsys", "syscon";
+> > +		reg = <0 0x14000000 0 0x1000>;
+> > +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> > +		#clock-cells = <1>;
+> > +		mediatek,gce = <&gce>;
+> 
+> Not documented.
 
-The flush work in bridge disable time is try to ensure the HPD event
-won't be missed before display card disabled, actually we can take a
-fast respond way(interrupt thread) to update DRM HPD event to fix the
-delay update and possible dead lock.
+It's just an example about how gce is used by display mmsys.
+After I discussed with Mediatek display owner,
+we think this can be moved to display device tree document.
+Do you agree with this suggestion?
+If so, I will remove it from next patch, too.
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
-Changes in v13: None
-Changes in v12: None
-Changes in v11: None
-Changes in v10: None
-Changes in v9: None
-Changes in v8: None
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+> > +	};
+> > -- 
+> > 1.7.9.5
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 62 ++++++++++------------
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  3 +-
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  | 26 +++++++++
- 3 files changed, 55 insertions(+), 36 deletions(-)
-
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index 5292b28..7699597 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -851,47 +851,40 @@ static void analogix_dp_enable_scramble(struct analogix_dp_device *dp,
- 	}
- }
- 
--static irqreturn_t analogix_dp_irq_handler(int irq, void *arg)
-+static irqreturn_t analogix_dp_hardirq(int irq, void *arg)
- {
- 	struct analogix_dp_device *dp = arg;
--
-+	irqreturn_t ret = IRQ_NONE;
- 	enum dp_irq_type irq_type;
- 
- 	irq_type = analogix_dp_get_irq_type(dp);
--	switch (irq_type) {
--	case DP_IRQ_TYPE_HP_CABLE_IN:
--		dev_dbg(dp->dev, "Received irq - cable in\n");
--		schedule_work(&dp->hotplug_work);
--		analogix_dp_clear_hotplug_interrupts(dp);
--		break;
--	case DP_IRQ_TYPE_HP_CABLE_OUT:
--		dev_dbg(dp->dev, "Received irq - cable out\n");
--		analogix_dp_clear_hotplug_interrupts(dp);
--		break;
--	case DP_IRQ_TYPE_HP_CHANGE:
--		/*
--		 * We get these change notifications once in a while, but there
--		 * is nothing we can do with them. Just ignore it for now and
--		 * only handle cable changes.
--		 */
--		dev_dbg(dp->dev, "Received irq - hotplug change; ignoring.\n");
--		analogix_dp_clear_hotplug_interrupts(dp);
--		break;
--	default:
--		dev_err(dp->dev, "Received irq - unknown type!\n");
--		break;
-+	if (irq_type != DP_IRQ_TYPE_UNKNOWN) {
-+		analogix_dp_mute_hpd_interrupt(dp);
-+		ret = IRQ_WAKE_THREAD;
- 	}
--	return IRQ_HANDLED;
-+
-+	return ret;
- }
- 
--static void analogix_dp_hotplug(struct work_struct *work)
-+static irqreturn_t analogix_dp_irq_thread(int irq, void *arg)
- {
--	struct analogix_dp_device *dp;
-+	struct analogix_dp_device *dp = arg;
-+	enum dp_irq_type irq_type;
-+
-+	irq_type = analogix_dp_get_irq_type(dp);
-+	if (irq_type & DP_IRQ_TYPE_HP_CABLE_IN ||
-+	    irq_type & DP_IRQ_TYPE_HP_CABLE_OUT) {
-+		dev_dbg(dp->dev, "Detected cable status changed!\n");
-+		if (dp->drm_dev)
-+			drm_helper_hpd_irq_event(dp->drm_dev);
-+	}
- 
--	dp = container_of(work, struct analogix_dp_device, hotplug_work);
-+	if (irq_type != DP_IRQ_TYPE_UNKNOWN) {
-+		analogix_dp_clear_hotplug_interrupts(dp);
-+		analogix_dp_unmute_hpd_interrupt(dp);
-+	}
- 
--	if (dp->drm_dev)
--		drm_helper_hpd_irq_event(dp->drm_dev);
-+	return IRQ_HANDLED;
- }
- 
- static void analogix_dp_commit(struct analogix_dp_device *dp)
-@@ -1077,7 +1070,6 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
- 	}
- 
- 	disable_irq(dp->irq);
--	flush_work(&dp->hotplug_work);
- 	phy_power_off(dp->phy);
- 
- 	if (dp->plat_data->power_off)
-@@ -1336,8 +1328,6 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
- 		return -ENODEV;
- 	}
- 
--	INIT_WORK(&dp->hotplug_work, analogix_dp_hotplug);
--
- 	pm_runtime_enable(dev);
- 
- 	phy_power_on(dp->phy);
-@@ -1351,8 +1341,10 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
- 
- 	analogix_dp_init_dp(dp);
- 
--	ret = devm_request_irq(&pdev->dev, dp->irq, analogix_dp_irq_handler,
--			       irq_flags, "analogix-dp", dp);
-+	ret = devm_request_threaded_irq(&pdev->dev, dp->irq,
-+					analogix_dp_hardirq,
-+					analogix_dp_irq_thread,
-+					irq_flags, "analogix-dp", dp);
- 	if (ret) {
- 		dev_err(&pdev->dev, "failed to request irq\n");
- 		goto err_disable_pm_runtime;
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-index 40a0759..a4e1330 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-@@ -172,7 +172,6 @@ struct analogix_dp_device {
- 
- 	struct video_info	video_info;
- 	struct link_train	link_train;
--	struct work_struct	hotplug_work;
- 	struct phy		*phy;
- 	int			dpms_mode;
- 	int			hpd_gpio;
-@@ -191,6 +190,8 @@ void analogix_dp_init_interrupt(struct analogix_dp_device *dp);
- void analogix_dp_reset(struct analogix_dp_device *dp);
- void analogix_dp_swreset(struct analogix_dp_device *dp);
- void analogix_dp_config_interrupt(struct analogix_dp_device *dp);
-+void analogix_dp_mute_hpd_interrupt(struct analogix_dp_device *dp);
-+void analogix_dp_unmute_hpd_interrupt(struct analogix_dp_device *dp);
- enum pll_status analogix_dp_get_pll_lock_status(struct analogix_dp_device *dp);
- void analogix_dp_set_pll_power_down(struct analogix_dp_device *dp, bool enable);
- void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-index cba3ffd..49205ef 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-@@ -185,6 +185,32 @@ void analogix_dp_config_interrupt(struct analogix_dp_device *dp)
- 	writel(reg, dp->reg_base + ANALOGIX_DP_INT_STA_MASK);
- }
- 
-+void analogix_dp_mute_hpd_interrupt(struct analogix_dp_device *dp)
-+{
-+	u32 reg;
-+
-+	/* 0: mask, 1: unmask */
-+	reg = readl(dp->reg_base + ANALOGIX_DP_COMMON_INT_MASK_4);
-+	reg &= ~COMMON_INT_MASK_4;
-+	writel(reg, dp->reg_base + ANALOGIX_DP_COMMON_INT_MASK_4);
-+
-+	reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA_MASK);
-+	reg &= ~INT_STA_MASK;
-+	writel(reg, dp->reg_base + ANALOGIX_DP_INT_STA_MASK);
-+}
-+
-+void analogix_dp_unmute_hpd_interrupt(struct analogix_dp_device *dp)
-+{
-+	u32 reg;
-+
-+	/* 0: mask, 1: unmask */
-+	reg = COMMON_INT_MASK_4;
-+	writel(reg, dp->reg_base + ANALOGIX_DP_COMMON_INT_MASK_4);
-+
-+	reg = INT_STA_MASK;
-+	writel(reg, dp->reg_base + ANALOGIX_DP_INT_STA_MASK);
-+}
-+
- enum pll_status analogix_dp_get_pll_lock_status(struct analogix_dp_device *dp)
- {
- 	u32 reg;
--- 
-1.9.1
+Thanks,
+HS Liao
+> > 
