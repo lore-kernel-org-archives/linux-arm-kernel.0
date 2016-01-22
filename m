@@ -1,75 +1,83 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 22 Jan 2016 09:48:24 +0900
-Subject: [PATCH 1/2] ARM: dts: r8a7793: add CAN clocks
-In-Reply-To: <20160121121525.GA6833@verge.net.au>
-References: <1453352981-16104-1-git-send-email-horms+renesas@verge.net.au>
- <1453352981-16104-2-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdX5sZ7yNjgu8Ns26+91+ui2YuVfGavJi_XRa6Kd-yzoBQ@mail.gmail.com>
- <20160121121525.GA6833@verge.net.au>
-Message-ID: <20160122004823.GA15068@verge.net.au>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Fri, 22 Jan 2016 09:07:44 +0800
+Subject: [PATCH v2] drm/rockchip: respect CONFIG_DRM_FBDEV_EMULATION
+In-Reply-To: <20160121181934.76cb2c03.john@metanate.com>
+References: <1453384426-32617-1-git-send-email-john@metanate.com>	<20160121165251.GO19130@phenom.ffwll.local>
+ <20160121181934.76cb2c03.john@metanate.com>
+Message-ID: <56A180E0.6090601@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 21, 2016 at 09:15:27PM +0900, Simon Horman wrote:
-> On ?,  1? 21, 2016 at 09:38:21?? +0100, Geert Uytterhoeven wrote:
-> > Hi Simon,
-> > 
-> > On Thu, Jan 21, 2016 at 6:09 AM, Simon Horman
-> > <horms+renesas@verge.net.au> wrote:
-> > > The R-Car CAN controllers can derive the CAN bus clock not only from their
-> > > peripheral clock input (clkp1) but also from the other internal clock
-> > > (clkp2) and external clock fed on CAN_CLK pin. Describe those clocks in
-> > > the device tree along with  the USB_EXTAL clock from which clkp2 is
-> > > derived.
-> > >
-> > > Based on work by Sergei Shtylyov for the r8a7791 SoC.
-> > >
-> > > Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > ---
-> > >  arch/arm/boot/dts/r8a7793.dtsi | 20 +++++++++++++++++++-
-> > >  1 file changed, 19 insertions(+), 1 deletion(-)
-> > >
-> > > diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-> > > index 0ce7cc420c9d..5d9375fa6759 100644
-> > > --- a/arch/arm/boot/dts/r8a7793.dtsi
-> > > +++ b/arch/arm/boot/dts/r8a7793.dtsi
-> > > @@ -706,12 +706,30 @@
-> > >                         clock-output-names = "extal";
-> > >                 };
-> > >
-> > > +               /* External USB clock - can be overridden by the board */
-> > > +               usb_extal_clk: usb_extal_clk {
-> > > +                       compatible = "fixed-clock";
-> > > +                       #clock-cells = <0>;
-> > > +                       clock-frequency = <48000000>;
-> > > +                       clock-output-names = "usb_extal";
-> > > +               };
-> > > +
-> > > +               /* External CAN clock */
-> > > +               can_clk: can_clk {
-> > > +                       compatible = "fixed-clock";
-> > > +                       #clock-cells = <0>;
-> > > +                       /* This value must be overridden by the board. */
-> > > +                       clock-frequency = <0>;
-> > > +                       clock-output-names = "can_clk";
-> > > +                       status = "disabled";
-> > > +               };
-> > > +
-> > >                 /* Special CPG clocks */
-> > >                 cpg_clocks: cpg_clocks at e6150000 {
-> > >                         compatible = "renesas,r8a7793-cpg-clocks",
-> > >                                      "renesas,rcar-gen2-cpg-clocks";
-> > >                         reg = <0 0xe6150000 0 0x1000>;
-> > > -                       clocks = <&extal_clk>;
-> > > +                       clocks = <&extal_clk &usb_extal_clk>;
-> > >                         #clock-cells = <1>;
-> > >                         clock-output-names = "main", "pll0", "pll1", "pll3",
-> > >                                              "lb", "qspi", "sdh", "sd0", "z",
-> > 
-> > To create the "rcan" clock, it should be listed in clock-output-names.
+On 2016?01?22? 02:19, John Keeping wrote:
+> If DRM_FBDEV_EMULATION is not selected in the config then we can save a
+> bit of space by not including the framebuffer code.
+>
+> Signed-off-by: John Keeping <john@metanate.com>
+> ---
+> On Thu, 21 Jan 2016 17:52:51 +0100, Daniel Vetter wrote:
+>
+>> On Thu, Jan 21, 2016 at 01:53:46PM +0000, John Keeping wrote:
+>>> If DRM_FBDEV_EMULATION is not selected in the config then we should not
+>>> setup a framebuffer console.
+>> It should just magically work, and this patch here just removes a bit more
+>> dead code in the rockchip driver itself that's not needed in case fbdev
+>> emulation is disabled.
+>>
+>> Can you please double-check this is the case and then resend with a
+>> clarified commit message?
+> You're right, it does work without this change, so this is just to save
+> a bit of space when we don't need this feature.
+>
+> v2:
+> - change commit message to clarify that this is only to remove some dead
+>    code
+>
+>   drivers/gpu/drm/rockchip/Makefile             |  3 ++-
+>   drivers/gpu/drm/rockchip/rockchip_drm_fbdev.h | 11 +++++++++++
+>   2 files changed, 13 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/Makefile b/drivers/gpu/drm/rockchip/Makefile
+> index a4e03bc..f6a809a 100644
+> --- a/drivers/gpu/drm/rockchip/Makefile
+> +++ b/drivers/gpu/drm/rockchip/Makefile
+> @@ -2,8 +2,9 @@
+>   # Makefile for the drm device driver.  This driver provides support for the
+>   # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
+>   
+> -rockchipdrm-y := rockchip_drm_drv.o rockchip_drm_fb.o rockchip_drm_fbdev.o \
+> +rockchipdrm-y := rockchip_drm_drv.o rockchip_drm_fb.o \
+>   		rockchip_drm_gem.o rockchip_drm_vop.o
+> +rockchipdrm-$(CONFIG_DRM_FBDEV_EMULATION) += rockchip_drm_fbdev.o
+>   
+>   obj-$(CONFIG_ROCKCHIP_DW_HDMI) += dw_hdmi-rockchip.o
+>   obj-$(CONFIG_ROCKCHIP_DW_MIPI_DSI) += dw-mipi-dsi.o
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.h b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.h
+> index 50432e9..73718c5 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.h
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.h
+> @@ -15,7 +15,18 @@
+>   #ifndef _ROCKCHIP_DRM_FBDEV_H
+>   #define _ROCKCHIP_DRM_FBDEV_H
+>   
+> +#ifdef CONFIG_DRM_FBDEV_EMULATION
+>   int rockchip_drm_fbdev_init(struct drm_device *dev);
+>   void rockchip_drm_fbdev_fini(struct drm_device *dev);
+> +#else
+> +static inline int rockchip_drm_fbdev_init(struct drm_device *dev)
+> +{
+> +	return 0;
+> +}
+> +
+> +static inline void rockchip_drm_fbdev_fini(struct drm_device *dev)
+> +{
+> +}
+> +#endif
+>   
+>   #endif /* _ROCKCHIP_DRM_FBDEV_H */
 
-Checking this morning I see that it is already there.
-The next line of the file is:
+Looks good and it works on my popmetal board.
 
-					     "rcan", "adsp";
+Applied to my branch:-) .
+
+-- 
+?ark Yao
