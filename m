@@ -1,369 +1,89 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 22 Jan 2016 12:11:28 +0100
-Subject: [PATCH v3 3/3] ARM: imx6: Fix procedure to switch the parent of
- LDB_DI_CLK
-In-Reply-To: <1453461088-31549-1-git-send-email-p.zabel@pengutronix.de>
-References: <1453461088-31549-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1453461088-31549-4-git-send-email-p.zabel@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 22 Jan 2016 11:13:32 +0000
+Subject: [PATCH 18/19] arm64: kdump: update a kernel doc
+In-Reply-To: <56A1CAD2.70403@linaro.org>
+References: <20160119122848.GA2904@dhcp-128-65.nay.redhat.com>
+ <20160119125114.GH25024@leverpostej>
+ <20160119134553.GA2986@dhcp-128-65.nay.redhat.com>
+ <20160119140139.GC26545@leverpostej>
+ <20160120024946.GA2999@dhcp-128-65.nay.redhat.com>
+ <569F2439.9000604@linaro.org> <20160120114929.GB25829@leverpostej>
+ <56A08076.8060302@linaro.org> <20160121120210.GD2581@leverpostej>
+ <56A1CAD2.70403@linaro.org>
+Message-ID: <20160122111331.GA23620@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Jan 22, 2016 at 03:23:14PM +0900, AKASHI Takahiro wrote:
+> On 01/21/2016 09:02 PM, Mark Rutland wrote:
+> >On Thu, Jan 21, 2016 at 03:53:42PM +0900, AKASHI Takahiro wrote:
+> >>On 01/20/2016 08:49 PM, Mark Rutland wrote:
+> >>>On Wed, Jan 20, 2016 at 03:07:53PM +0900, AKASHI Takahiro wrote:
+> >>>>On 01/20/2016 11:49 AM, Dave Young wrote:
+> >>>>>Firmware do not know kernel endianniess, kernel should respect firmware
+> >>>>>maps and adapt to it, it sounds like a generic issue not specfic to kexec.
+> >>>>
+> >>>>On arm64, a kernel image header has a bit field to specify the image's endianness.
+> >>>>Anyway, our current implementation replies on a user-supplied dtb to start BE kernel.
+> >>>
+> >>>The firmware should _never_ care about the kernel's endianness. The
+> >>>bootlaoder or first kernel shouldn't care about the next kernel's
+> >>>endianness apart from in exceptional circumstances. The DTB for a LE
+> >>>kernel should look identical to that passed to a BE kernel.
+> >>
+> >>Please note that I didn't say anything different from your last two statements.
+> >>The current arm64 kexec implementation doesn't do anything specific to BE,
+> >>but as far as BE kernel doesn't support UEFI, users are responsible for
+> >>providing a proper dtb.
+> >
+> >I'm just confused as to what you mean by a "proper dtb" in that case.
+> >
+> >If you just mean one with memory nodes hacked in, then that would
+> >currently be a way to make that work, yes.
+> 
+> One of useful cases that I have in my mind is kdump.
+> We may want to use a small sub-set of dtb, especially devices, to
+> make the reboot more reliable. Device drivers are likely to be vulnerable
+> at crash.
 
-Due to incorrect placement of the clock gate cell in the ldb_di[x]_clk
-tree, the glitchy parent mux of ldb_di[x]_clk can cause a glitch to
-enter the ldb_di_ipu_div divider. If the divider gets locked up, no
-ldb_di[x]_clk is generated, and the LVDS display will hang when the
-ipu_di_clk is sourced from ldb_di_clk.
+I don't think that we can reliably have userspace carve out devices from
+the DTB or from ACPI tables in order to achieve that. That's going to
+end up complex and/or incomplete. We also can't do this in the
+kexec_load_file / Secure Boot case.
 
-To fix the problem, both the new and current parent of the ldb_di_clk
-should be disabled before the switch. This patch ensures that correct
-steps are followed when ldb_di_clk parent is switched in the beginning
-of boot. The glitchy muxes are then registered as read-only. The clock
-parent can be selected using the assigned-clocks and
-assigned-clock-parents properties of the ccm device tree node:
+That's not to say we cannot try, as it's possible when using kexec_load.
+However, it's only going to be possible on a subset of systems, and it
+would probably make sense to reserve this approach to those cases we
+cannot work around by other means (e.g. whitelisting "safe" devices in
+the kdump kernel, forcing explicit resets, etc).
 
-	&clks {
-		assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
-				  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
-		assigned-clock-parents = <&clks IMX6QDL_CLK_MMDC_CH1_AXI>,
-					 <&clks IMX6QDL_CLK_PLL5_VIDEO_DIV>;
-	};
+> >It seems like the better option is to fix the BE kernel to support a
+> >UEFI memory map, as that solves other issues.
+> 
+> Why did Ard throw away his patch?
 
-Signed-off-by: Ranjani Vaidyanathan <Ranjani.Vaidyanathan@freescale.com>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
-Changes since v2:
- - Fix DL/S support. disable_anatop_clocks() checks whether pll2_pfd2_396m
-   is the parent of clk_periph_pre to avoid disabling the memory clock.
-   For this to work, disable_anatop_clocks() must be called only after
-   clk_periph_pre is registered.
- - Replace magic numbers with #defines
- - Improve the comment describing init_ldb_di_clks()
- - Improve selection checking and error messages
----
- drivers/clk/imx/clk-imx6q.c | 275 +++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 270 insertions(+), 5 deletions(-)
+In the absence of kexec it wasn't necessary, it only supported a subset
+of the runtime services (and no other features like DMI IIRC), and it
+looked like it would be painful to debug (if something went wrong while
+a CPU was in LE mode, we couldn't even panic()).
 
-diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
-index b4b2541..1fdd9f6 100644
---- a/drivers/clk/imx/clk-imx6q.c
-+++ b/drivers/clk/imx/clk-imx6q.c
-@@ -137,9 +137,90 @@ static struct clk ** const uart_clks[] __initconst = {
- 	NULL
- };
- 
-+static int ldb_di_sel_by_clock_id(int clock_id)
-+{
-+	switch (clock_id) {
-+	case IMX6QDL_CLK_PLL5_VIDEO_DIV:
-+		if (clk_on_imx6q() &&
-+		    imx_get_soc_revision() == IMX_CHIP_REVISION_1_0)
-+			return -ENOENT;
-+		return 0;
-+	case IMX6QDL_CLK_PLL2_PFD0_352M:
-+		return 1;
-+	case IMX6QDL_CLK_PLL2_PFD2_396M:
-+		return 2;
-+	case IMX6QDL_CLK_MMDC_CH1_AXI:
-+		return 3;
-+	case IMX6QDL_CLK_PLL3_USB_OTG:
-+		return 4;
-+	default:
-+		return -ENOENT;
-+	}
-+}
-+
-+static void of_assigned_ldb_sels(struct device_node *node,
-+				 unsigned int *ldb_di0_sel,
-+				 unsigned int *ldb_di1_sel)
-+{
-+	struct of_phandle_args clkspec;
-+	int index, rc, num_parents;
-+	int parent, child, sel;
-+
-+	num_parents = of_count_phandle_with_args(node, "assigned-clock-parents",
-+						 "#clock-cells");
-+	for (index = 0; index < num_parents; index++) {
-+		rc = of_parse_phandle_with_args(node, "assigned-clock-parents",
-+					"#clock-cells", index, &clkspec);
-+		if (rc < 0) {
-+			/* skip empty (null) phandles */
-+			if (rc == -ENOENT)
-+				continue;
-+			else
-+				return;
-+		}
-+		if (clkspec.np != node || clkspec.args[0] >= IMX6QDL_CLK_END) {
-+			pr_err("ccm: parent clock %d not in ccm\n", index);
-+			return;
-+		}
-+		parent = clkspec.args[0];
-+
-+		rc = of_parse_phandle_with_args(node, "assigned-clocks",
-+				"#clock-cells", index, &clkspec);
-+		if (rc < 0)
-+			return;
-+		if (clkspec.np != node || clkspec.args[0] >= IMX6QDL_CLK_END) {
-+			pr_err("ccm: child clock %d not in ccm\n", index);
-+			return;
-+		}
-+		child = clkspec.args[0];
-+
-+		if (child != IMX6QDL_CLK_LDB_DI0_SEL &&
-+		    child != IMX6QDL_CLK_LDB_DI1_SEL)
-+			continue;
-+
-+		sel = ldb_di_sel_by_clock_id(parent);
-+		if (sel < 0) {
-+			pr_err("ccm: invalid ldb_di%d parent clock: %d\n",
-+			       child == IMX6QDL_CLK_LDB_DI1_SEL, parent);
-+			continue;
-+		}
-+
-+		if (child == IMX6QDL_CLK_LDB_DI0_SEL)
-+			*ldb_di0_sel = sel;
-+		if (child == IMX6QDL_CLK_LDB_DI1_SEL)
-+			*ldb_di1_sel = sel;
-+	}
-+}
-+
- #define CCM_CCDR		0x04
-+#define CCM_CCSR		0x0c
-+#define CCM_CS2CDR		0x2c
- 
--#define CCDR_MMDC_CH1_MASK	BIT(16)
-+#define CCDR_MMDC_CH1_MASK		BIT(16)
-+#define CCSR_PLL3_SW_CLK_SEL		BIT(0)
-+
-+#define CS2CDR_LDB_DI0_CLK_SEL_SHIFT	9
-+#define CS2CDR_LDB_DI1_CLK_SEL_SHIFT	12
- 
- static void __init imx6q_mmdc_ch1_mask_handshake(void __iomem *ccm_base)
- {
-@@ -150,10 +231,184 @@ static void __init imx6q_mmdc_ch1_mask_handshake(void __iomem *ccm_base)
- 	writel_relaxed(reg, ccm_base + CCM_CCDR);
- }
- 
-+/*
-+ * The only way to disable the MMDC_CH1 clock is to move it to pll3_sw_clk
-+ * via periph2_clk2_sel and then to disable pll3_sw_clk by selecting the
-+ * bypass clock source, since there is no CG bit for mmdc_ch1.
-+ */
-+static void mmdc_ch1_disable(void __iomem *ccm_base)
-+{
-+	unsigned int reg;
-+
-+	clk_set_parent(clk[IMX6QDL_CLK_PERIPH2_CLK2_SEL],
-+		       clk[IMX6QDL_CLK_PLL3_USB_OTG]);
-+
-+	/*
-+	 * Handshake with mmdc_ch1 module must be masked when changing
-+	 * periph2_clk_sel.
-+	 */
-+	clk_set_parent(clk[IMX6QDL_CLK_PERIPH2], clk[IMX6QDL_CLK_PERIPH2_CLK2]);
-+
-+	/* Disable pll3_sw_clk by selecting the bypass clock source */
-+	reg = readl_relaxed(ccm_base + CCM_CCSR);
-+	reg |= CCSR_PLL3_SW_CLK_SEL;
-+	writel_relaxed(reg, ccm_base + CCM_CCSR);
-+}
-+
-+static void mmdc_ch1_reenable(void __iomem *ccm_base)
-+{
-+	unsigned int reg;
-+
-+	/* Enable pll3_sw_clk by disabling the bypass */
-+	reg = readl_relaxed(ccm_base + CCM_CCSR);
-+	reg &= ~CCSR_PLL3_SW_CLK_SEL;
-+	writel_relaxed(reg, ccm_base + CCM_CCSR);
-+
-+	clk_set_parent(clk[IMX6QDL_CLK_PERIPH2], clk[IMX6QDL_CLK_PERIPH2_PRE]);
-+}
-+
-+/*
-+ * We have to follow a strict procedure when changing the LDB clock source,
-+ * otherwise we risk introducing a glitch that can lock up the LDB divider.
-+ * Things to keep in mind:
-+ *
-+ * 1. The current and new parent clock inputs to the mux must be disabled.
-+ * 2. The default clock input for ldb_di0/1_clk_sel is mmdc_ch1_axi, which
-+ *    has no CG bit.
-+ * 3. pll2_pfd2_396m can not be gated if it is used as memory clock.
-+ * 4. In the RTL implementation of the LDB_DI_CLK_SEL muxes the top four
-+ *    options are in one mux and the PLL3 option along with three unused
-+ *    inputs is in a second mux. There is a third mux with two inputs used
-+ *    to decide between the first and second 4-port mux:
-+ *
-+ *    pll5_video_div 0 --|\
-+ *    pll2_pfd0_352m 1 --| |_
-+ *    pll2_pfd2_396m 2 --| | `-|\
-+ *    mmdc_ch1_axi   3 --|/    | |
-+ *                             | |--
-+ *    pll3_usb_otg   4 --|\    | |
-+ *                   5 --| |_,-|/
-+ *                   6 --| |
-+ *                   7 --|/
-+ *
-+ * The ldb_di0/1_clk_sel[1:0] bits control both 4-port muxes@the same time.
-+ * The ldb_di0/1_clk_sel[2] bit controls the 2-port mux. The code below
-+ * switches the parent to the bottom mux first and then manipulates the top
-+ * mux to ensure that no glitch will enter the divider.
-+ */
-+static void init_ldb_clks(struct device_node *np, void __iomem *ccm_base)
-+{
-+	unsigned int reg;
-+	unsigned int sel[2][4];
-+	int i;
-+
-+	reg = readl_relaxed(ccm_base + CCM_CS2CDR);
-+	sel[0][0] = (reg >> CS2CDR_LDB_DI0_CLK_SEL_SHIFT) & 7;
-+	sel[1][0] = (reg >> CS2CDR_LDB_DI1_CLK_SEL_SHIFT) & 7;
-+
-+	sel[0][3] = sel[0][2] = sel[0][1] = sel[0][0];
-+	sel[1][3] = sel[1][2] = sel[1][1] = sel[1][0];
-+
-+	of_assigned_ldb_sels(np, &sel[0][3], &sel[1][3]);
-+
-+	for (i = 0; i < 2; i++) {
-+		/* Warn if a glitch might have been introduced already */
-+		if (sel[i][0] != 3) {
-+			pr_warn("ccm: ldb_di%d_sel already changed from reset value: %d\n",
-+				i, sel[i][0]);
-+		}
-+
-+		if (sel[i][0] == sel[i][3])
-+			continue;
-+
-+		/* Only switch to or from pll2_pfd2_396m if it is disabled */
-+		if ((sel[i][0] == 2 || sel[i][3] == 2) &&
-+		    (clk_get_parent(clk[IMX6QDL_CLK_PERIPH_PRE]) ==
-+		     clk[IMX6QDL_CLK_PLL2_PFD2_396M])) {
-+			pr_err("ccm: ldb_di%d_sel: couldn't disable pll2_pfd2_396m\n",
-+			       i);
-+			sel[i][3] = sel[i][2] = sel[i][1] = sel[i][0];
-+			continue;
-+		}
-+
-+		/*
-+		 * It is unclear whether the procedure works for switching from
-+		 * pll3_usb_otg to any other parent than pll5_video_div
-+		 */
-+		if (sel[i][0] > 3 && sel[i][0] != (sel[i][3] | 4)) {
-+			pr_err("ccm: ldb_di%d_sel workaround only for top mux\n",
-+			       i);
-+			sel[i][3] = sel[i][2] = sel[i][1] = sel[i][0];
-+			continue;
-+		}
-+
-+		/* First switch to the bottom mux */
-+		sel[i][1] = sel[i][0] | 4;
-+
-+		/* Then configure the top mux before switching back to it */
-+		sel[i][2] = sel[i][3] | 4;
-+
-+		pr_debug("ccm: switching ldb_di0_sel: %d->%d->%d->%d\n",
-+			 sel[i][0], sel[i][1], sel[i][2], sel[i][3]);
-+	}
-+
-+	if (sel[0][0] == sel[0][3] && sel[1][0] == sel[1][3])
-+		return;
-+
-+	mmdc_ch1_disable(ccm_base);
-+
-+	for (i = 1; i < 4; i++) {
-+		reg = readl_relaxed(ccm_base + CCM_CS2CDR);
-+		reg &= ~((7 << CS2CDR_LDB_DI0_CLK_SEL_SHIFT) |
-+			 (7 << CS2CDR_LDB_DI1_CLK_SEL_SHIFT));
-+		reg |= ((sel[0][i] << CS2CDR_LDB_DI0_CLK_SEL_SHIFT) |
-+			(sel[1][i] << CS2CDR_LDB_DI0_CLK_SEL_SHIFT));
-+		writel_relaxed(reg, ccm_base + CCM_CS2CDR);
-+	}
-+
-+	mmdc_ch1_reenable(ccm_base);
-+}
-+
-+#define CCM_ANALOG_PLL_VIDEO	0xa0
-+#define CCM_ANALOG_PFD_480	0xf0
-+#define CCM_ANALOG_PFD_528	0x100
-+
-+#define PLL_ENABLE		BIT(13)
-+
-+#define PFD0_CLKGATE		BIT(7)
-+#define PFD1_CLKGATE		BIT(15)
-+#define PFD2_CLKGATE		BIT(23)
-+#define PFD3_CLKGATE		BIT(31)
-+
-+static void disable_anatop_clocks(void __iomem *anatop_base)
-+{
-+	unsigned int reg;
-+
-+	/* Make sure PLL2 PFDs 0-2 are gated */
-+	reg = readl_relaxed(anatop_base + CCM_ANALOG_PFD_528);
-+	/* Cannot gate PFD2 if pll2_pfd2_396m is the parent of MMDC clock */
-+	if (clk_get_parent(clk[IMX6QDL_CLK_PERIPH_PRE]) ==
-+	    clk[IMX6QDL_CLK_PLL2_PFD2_396M])
-+		reg |= PFD0_CLKGATE | PFD1_CLKGATE;
-+	else
-+		reg |= PFD0_CLKGATE | PFD1_CLKGATE | PFD2_CLKGATE;
-+	writel_relaxed(reg, anatop_base + CCM_ANALOG_PFD_528);
-+
-+	/* Make sure PLL3 PFDs 0-3 are gated */
-+	reg = readl_relaxed(anatop_base + CCM_ANALOG_PFD_480);
-+	reg |= PFD0_CLKGATE | PFD1_CLKGATE | PFD2_CLKGATE | PFD3_CLKGATE;
-+	writel_relaxed(reg, anatop_base + CCM_ANALOG_PFD_480);
-+
-+	/* Make sure PLL5 is disabled */
-+	reg = readl_relaxed(anatop_base + CCM_ANALOG_PLL_VIDEO);
-+	reg &= ~PLL_ENABLE;
-+	writel_relaxed(reg, anatop_base + CCM_ANALOG_PLL_VIDEO);
-+}
-+
- static void __init imx6q_clocks_init(struct device_node *ccm_node)
- {
- 	struct device_node *np;
--	void __iomem *base;
-+	void __iomem *anatop_base, *base;
- 	int i;
- 	int ret;
- 
-@@ -166,7 +421,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_ANACLK2] = imx_obtain_fixed_clock("anaclk2", 0);
- 
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
--	base = of_iomap(np, 0);
-+	anatop_base = base = of_iomap(np, 0);
- 	WARN_ON(!base);
- 
- 	/* Audio/video PLL post dividers do not work on i.MX6q revision 1.0 */
-@@ -291,8 +546,6 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	base = of_iomap(np, 0);
- 	WARN_ON(!base);
- 
--	imx6q_mmdc_ch1_mask_handshake(base);
--
- 	/*                                              name                reg       shift width parent_names     num_parents */
- 	clk[IMX6QDL_CLK_STEP]             = imx_clk_mux("step",	            base + 0xc,  8,  1, step_sels,	   ARRAY_SIZE(step_sels));
- 	clk[IMX6QDL_CLK_PLL1_SW]          = imx_clk_mux("pll1_sw",	    base + 0xc,  2,  1, pll1_sw_sels,      ARRAY_SIZE(pll1_sw_sels));
-@@ -313,6 +566,18 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_GPU3D_SHADER_SEL] = imx_clk_mux("gpu3d_shader_sel", base + 0x18, 8,  2, gpu3d_shader_sels, ARRAY_SIZE(gpu3d_shader_sels));
- 	clk[IMX6QDL_CLK_IPU1_SEL]         = imx_clk_mux("ipu1_sel",         base + 0x3c, 9,  2, ipu_sels,          ARRAY_SIZE(ipu_sels));
- 	clk[IMX6QDL_CLK_IPU2_SEL]         = imx_clk_mux("ipu2_sel",         base + 0x3c, 14, 2, ipu_sels,          ARRAY_SIZE(ipu_sels));
-+
-+	disable_anatop_clocks(anatop_base);
-+
-+	imx6q_mmdc_ch1_mask_handshake(base);
-+
-+	/*
-+	 * The LDB_DI0/1_SEL muxes are registered read-only due to a hardware
-+	 * bug. Set the muxes to the requested values before registering the
-+	 * ldb_di_sel clocks.
-+	 */
-+	init_ldb_clks(np, base);
-+
- 	clk[IMX6QDL_CLK_LDB_DI0_SEL]      = imx_clk_mux_ldb("ldb_di0_sel", base + 0x2c, 9,  3, ldb_di_sels,      ARRAY_SIZE(ldb_di_sels));
- 	clk[IMX6QDL_CLK_LDB_DI1_SEL]      = imx_clk_mux_ldb("ldb_di1_sel", base + 0x2c, 12, 3, ldb_di_sels,      ARRAY_SIZE(ldb_di_sels));
- 	clk[IMX6QDL_CLK_IPU1_DI0_PRE_SEL] = imx_clk_mux_flags("ipu1_di0_pre_sel", base + 0x34, 6,  3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels), CLK_SET_RATE_PARENT);
--- 
-2.7.0.rc3
+Given BE kernels on UEFI were never supported until that point, there
+wasn't a compelling reason to support that case.
+
+Even if we support the UEFI memory map, I don't think it's worth the
+effort to support runtime services, ACPI, and related code that's only
+ever been tested on LE. So realistically this would only work on systems
+using UEFI && DT rather than UEFI && ACPI.
+
+> So, are you now suggesting that we put both "elfcorehdr=" and
+> "usable-memory=" under /chosen in dtb?
+
+Yes.
+
+> That's fair enough.  (as far as nobody cares about incompatibility
+> with other archs.)
+
+Glad to hear! :)
+
+Thanks,
+Mark.
