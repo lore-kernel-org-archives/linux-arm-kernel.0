@@ -1,52 +1,30 @@
-From: zhongkaihua@huawei.com (zhongkaihua)
-Date: Fri, 22 Jan 2016 09:00:23 +0000
-Subject: =?gb2312?B?tPC4tDogW1BBVENIIFYzIDEvM10gYXJtNjQ6IGR0czogQWRkIEhpNjIyMCBn?=
- =?gb2312?Q?pio_configuration_nodes?=
-In-Reply-To: <569E3C0F.3040603@arm.com>
-References: <1453200681-26406-1-git-send-email-zhongkaihua@huawei.com>
- <569E3C0F.3040603@arm.com>
-Message-ID: <191FB6491B9FFA40828A83010D6755E9299D97A3@SZXEMI501-MBS.china.huawei.com>
+From: eric.long@linaro.org (Eric Long)
+Date: Fri, 22 Jan 2016 17:15:04 +0800
+Subject: [RESEND PATCH 0/2] Remove the mistakes detected by the check
+ tools.
+In-Reply-To: <CANLsYkzqFaPs2XbF0kC_jbG1=Jry2+bZMHMq-m9gUxMkoLAhnA@mail.gmail.com>
+References: <cover.1453271738.git.eric.long@linaro.org>
+ <CANLsYkzqFaPs2XbF0kC_jbG1=Jry2+bZMHMq-m9gUxMkoLAhnA@mail.gmail.com>
+Message-ID: <CAL=D6xaMAG04tnx_WCbTkcGpyAVBVnz3au1ahDFB72k4DpbKsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 2016/1/19 21:37, Sudeep Holla wrote:
+On 22 January 2016 at 00:56, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
 >
->
-> On 19/01/16 10:51, Zhong Kaihua wrote:
->> arm64: dts: Add Hi6220 gpio configuration nodes
->>
->> Signed-off-by: Zhong Kaihua <zhongkaihua@huawei.com>
->>                 Kong Xinwei <kong.kongxinwei@hisilicon.com>
->>
->> Acked-by: Rob Herring <robh@kernel.org>
->> ---
->>   .../devicetree/bindings/gpio/gpio-hi6220.txt       |  23 +
->>   arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |   1 +
->>   arch/arm64/boot/dts/hisilicon/hi6220.dtsi          | 259 +++++++++
->>   arch/arm64/boot/dts/hisilicon/hikey-gpio.dtsi      | 607 +++++++++++++++++++++
->>   4 files changed, 890 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/gpio/gpio-hi6220.txt
->>   create mode 100644 arch/arm64/boot/dts/hisilicon/hikey-gpio.dtsi
->>
->> diff --git a/Documentation/devicetree/bindings/gpio/gpio-hi6220.txt b/Documentation/devicetree/bindings/gpio/gpio-hi6220.txt
->> new file mode 100644
->> index 0000000..a9cbf21
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/gpio/gpio-hi6220.txt
->> @@ -0,0 +1,23 @@
->> +Hisilicon Hi6220 GPIO controller bindings
->> +
->> +Required properties:
->> +    - compatible: "arm,pl061","arm,primecell"
->> +    - gpio-controller: Marks the device node as a GPIO controller.
->> +    - #gpio-cells: Should be 2. See gpio.txt in this directory for a
->> +         description of    the cells format.
->> +    - interrupt-controller: Mark the device node as an interrupt controller
->> +
->
-> Why do you need extra binding document here as the compatible is same as
-> [1] ? You can extend that if required and add example there IMO.
+> Please run checkpath.pl on your patches.  Also if the changes are of a
+> different nature, ex. indentation problem and wrong argument to a
+> function, please provide two separate patches.
 >
 
-Ok, I will remove the binding document in the next version. Thanks.
+Hi Mathieu,
+
+I had already ran checkpath.pl, and there was no error and warning.
+All the changes are either indentation problems or wrong argument,
+except one static defined problem. So I think there is no need to
+separate the patch.
+By the way, the patches I had send were created base on the check
+tools, one for smatch and another for sparse. In case I need to separate
+the patches, do I need to follow the this principle. Thanks.
+
+Best Regards.
+Eric
