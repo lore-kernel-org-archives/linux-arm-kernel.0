@@ -1,98 +1,76 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 22 Jan 2016 14:23:23 -0800
-Subject: [GIT PULL 2/2] ARM: SoC updates for Nvidia Tegra for v4.5 merge window
-Message-ID: <20160122222323.GA14865@localhost>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 22 Jan 2016 16:31:36 -0600
+Subject: [RFC PATCH 3/5] dt-bindings: thermal: Add optional properties of
+ Mediatek thermal controller
+In-Reply-To: <1453452029-20843-4-git-send-email-pi-cheng.chen@linaro.org>
+References: <1453452029-20843-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1453452029-20843-4-git-send-email-pi-cheng.chen@linaro.org>
+Message-ID: <20160122223136.GA21819@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Jan 22, 2016 at 04:40:27PM +0800, Pi-Cheng Chen wrote:
+> This adds optional properties of Mediatek thermal controller which are
+> required by SVS engine integrated with Mediatek thermal controller.
+> 
+> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+> ---
+>  .../bindings/thermal/mediatek-thermal.txt          | 23 ++++++++++++++++------
+>  1 file changed, 17 insertions(+), 6 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+> index 81f9a51..acaacaa 100644
+> --- a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+> +++ b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+> @@ -7,6 +7,11 @@ this device needs phandles to the AUXADC. Also it controls a mux in the
+>  apmixedsys register space via AHB bus accesses, so a phandle to the APMIXEDSYS
+>  is also needed.
+>  
+> +There is another hardware engine, SVS (Smart Voltage Scaling) which shares the
+> +same block of banked registers with Mediatek thermal controller. Hence the
+> +driver of SVS is integrated with the driver of Mediatek thermal controller. The
+> +properties required by SVS engine are optional for Mediatek thermal controller.
+> +
+>  Required properties:
+>  - compatible: "mediatek,mt8173-thermal"
+>  - reg: Address range of the thermal controller
+> @@ -21,9 +26,15 @@ Required properties:
+>  - #thermal-sensor-cells : Should be 0. See ./thermal.txt for a description.
+>  
+>  Optional properties:
+> -- nvmem-cells: A phandle to the calibration data provided by a nvmem device. If
+> -               unspecified default values shall be used.
+> -- nvmem-cell-names: Should be "calibration-data"
+> +- clocks, clock-names: Clocks that are optional for the thermal controller.
+> +	       Specify to enable SVS engine.
+> +	       "svs_pll": The PLL clock should be switched to during
+> +			  initialization stage of SVS engine.
+> +	       "svs_mux": The MUX clock controls the clock input of SVS engine.
+> +- nvmem-cells: A list of phandles to the calibration data provided by a nvmem
+> +	       device. If unspecified default values shall be used. The SVS
+> +	       engine will be disabled if no SVS calibration data is specified.
+> +- nvmem-cell-names: Should be "calibration-data" and "svs-calibration-data"
+>  
+>  Example:
+>  
+> @@ -33,11 +44,11 @@ Example:
+>  		reg = <0 0x1100b000 0 0x1000>;
+>  		interrupts = <0 70 IRQ_TYPE_LEVEL_LOW>;
+>  		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
+> -		clock-names = "therm", "auxadc";
+> +		clock-names = "therm", "auxadc", ;
 
-The following changes since commit e324654294907a420ab3773efe8849a935f37bf0:
+Huh?
 
-  ARM: use "depends on" for SoC configs instead of "if" after prompt (2015-12-01 22:44:51 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-tegra
-
-for you to fetch changes up to 5f4900bd8e2528ff783e329b193bfe8ce5638a98:
-
-  Merge tag 'tegra-for-4.5-dt' of git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux into late/tegra (2016-01-12 10:15:01 -0800)
-
-----------------------------------------------------------------
-ARM: SoC support for Tegra platforms for v4.5
-
-Here's a single-SoC topic branch that we've staged separately. Mainly
-because it was hard to sort the branch contents in a way that fit our
-existing branches due to some refactorings.
-
-The code has been in -next for quite a while, but we staged it in arm-soc
-a bit late, which is why we've kept it separate from the other updates
-and are sending it separately here.
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      ARM: tegra: select USB_ULPI from EHCI rather than platform
-
-Jon Hunter (1):
-      ARM: tegra: Ensure entire dcache is flushed on entering LP0/1
-
-Olof Johansson (3):
-      Merge branch 'treewide/cleanup' into late/tegra
-      Merge tag 'tegra-for-4.5-soc' of git://git.kernel.org/.../tegra/linux into late/tegra
-      Merge tag 'tegra-for-4.5-dt' of git://git.kernel.org/.../tegra/linux into late/tegra
-
-Thierry Reding (15):
-      soc/tegra: Provide per-SoC Kconfig symbols
-      soc/tegra: Add Tegra210 support
-      amba: Hide TEGRA_AHB symbol
-      Merge branch 'for-4.5/clk' into for-4.5/dt
-      Merge branch 'for-4.5/soc' into for-4.5/dt
-      arm64: tegra: Add Tegra132 support
-      arm64: tegra: Add NVIDIA Tegra132 Norrin support
-      arm64: tegra: Add Tegra210 support
-      arm64: tegra: Add NVIDIA P2530 main board support
-      arm64: tegra: Add NVIDIA P2595 I/O board support
-      arm64: tegra: Add NVIDIA P2371 board support
-      arm64: tegra: Add NVIDIA P2571 board support
-      arm64: tegra: Add NVIDIA Jetson TX1 support
-      arm64: tegra: Add NVIDIA P2597 I/O board support
-      arm64: tegra: Add NVIDIA Jetson TX1 Developer Kit support
-
- .../bindings/clock/nvidia,tegra210-car.txt         |   56 +
- arch/arm/mach-tegra/Kconfig                        |   52 -
- arch/arm/mach-tegra/sleep-tegra20.S                |    3 +
- arch/arm/mach-tegra/sleep-tegra30.S                |    3 +
- arch/arm64/Kconfig.platforms                       |   12 -
- arch/arm64/boot/dts/Makefile                       |    1 +
- arch/arm64/boot/dts/nvidia/Makefile                |    7 +
- arch/arm64/boot/dts/nvidia/tegra132-norrin.dts     | 1130 +++++++++++++++++
- arch/arm64/boot/dts/nvidia/tegra132.dtsi           |  990 +++++++++++++++
- arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi     |   45 +
- arch/arm64/boot/dts/nvidia/tegra210-p2371-0000.dts |    9 +
- arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts |    9 +
- arch/arm64/boot/dts/nvidia/tegra210-p2530.dtsi     |   50 +
- arch/arm64/boot/dts/nvidia/tegra210-p2571.dts      | 1302 ++++++++++++++++++++
- arch/arm64/boot/dts/nvidia/tegra210-p2595.dtsi     | 1272 +++++++++++++++++++
- arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi     | 1270 +++++++++++++++++++
- arch/arm64/boot/dts/nvidia/tegra210.dtsi           |  805 ++++++++++++
- drivers/amba/Kconfig                               |    2 +-
- drivers/soc/Kconfig                                |    1 +
- drivers/soc/tegra/Kconfig                          |   83 ++
- drivers/usb/host/Kconfig                           |    2 +
- include/dt-bindings/clock/tegra210-car.h           |  401 ++++++
- 22 files changed, 7440 insertions(+), 65 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra210-car.txt
- create mode 100644 arch/arm64/boot/dts/nvidia/Makefile
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra132.dtsi
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra210-p2371-0000.dts
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra210-p2530.dtsi
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra210-p2571.dts
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra210-p2595.dtsi
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra210.dtsi
- create mode 100644 drivers/soc/tegra/Kconfig
- create mode 100644 include/dt-bindings/clock/tegra210-car.h
+>  		resets = <&pericfg MT8173_PERI_THERM_SW_RST>;
+>  		reset-names = "therm";
+>  		mediatek,auxadc = <&auxadc>;
+>  		mediatek,apmixedsys = <&apmixedsys>;
+> -		nvmem-cells = <&thermal_calibration_data>;
+> -		nvmem-cell-names = "calibration-data";
+> +		nvmem-cells = <&thermal_calibration_data>, <&svs-calibration>;
+> +		nvmem-cell-names = "calibration-data", "svs-calibration-data";
+>  	};
+> -- 
+> 1.9.1
+> 
