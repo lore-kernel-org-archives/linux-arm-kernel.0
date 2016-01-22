@@ -1,95 +1,105 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Fri, 22 Jan 2016 15:49:08 +0800
-Subject: [PATCH] clk: rockchip: rk3036: Add apll as the critical clock
-In-Reply-To: <7538210.fX6mmzZ75v@phil>
-References: <1453279037-23971-1-git-send-email-zhengxing@rock-chips.com>
- <7538210.fX6mmzZ75v@phil>
-Message-ID: <56A1DEF4.2070409@rock-chips.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 22 Jan 2016 07:57:41 +0000
+Subject: A problem about SPI Interrupt Configuration
+In-Reply-To: <569EF315.2060203@huawei.com>
+References: <569EF315.2060203@huawei.com>
+Message-ID: <20160122075741.6a704855@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Wed, 20 Jan 2016 10:38:13 +0800
+Yang Yingliang <yangyingliang@huawei.com> wrote:
 
-On 2016?01?21? 17:21, Heiko Stuebner wrote:
-> Hi Xing,
->
-> Am Mittwoch, 20. Januar 2016, 16:37:17 schrieb Xing Zheng:
->> The apll may be closed if there are some child clock nodes below
->> it when the device startup. Therefore, the apll should be keep
->> critical.
->>
->> The apll tree like this:
->>      pll_apll
->>         apll
->>            armclk
->>               pclk_dbg
->>               aclk_core_pre
->>            aclk_hvec
->>            uart_pll_clk
->>               uart2_src
->>                  uart2_frac
->>               uart1_src
->>                  uart1_frac
->>               uart0_src
->>                  uart0_frac
-> can you find out which of those clocks does cause your hang?
-> Because things like the uart-clocks for example should be handled by their
-> driver already, at the time the clk_disable_unused runs(). So I'd really
-> like the critical clock to be the actually needed clock.
->
-> Thanks
-> Heiko
+Hi Yang,
 
-It looks like that we call the rockchip_rk3036_pll_disable cause the 
-apll is diabled.
-I think the diabled tracing like this:
-1. All of uart0_frac~uart2_frac are branch_fraction_divider type, they 
-have CLK_SET_RATE_UNGATE flag,
-2. I enable cpufreq configs on the rk3036_defconfig, the default cpu 
-freq is 600MHz durning loader, when startup it is 816MHz with default DTS.
-Therefore, cpu freq will be change rate 600MHz to 816MHz then call 
-clk_change_rate.
-3. With the flag CLK_SET_RATE_UNGATE, triggering call clk_core_disable. 
-In here, it will recursively close all of uart gates, finally, to call 
-the root
-parent diable callback that is rockchip_rk3036_pll_disable.
+> Hi, Marc
+> 
+> I got some error messages "RWP timeout, gone fishing".
+> 
+> The case is :
+> 
+> 			CPU0												CPU1
+> 													acquire desc->lock in __setup_irq()
+> 															enable irq in __setup_irq()
+> read iar in gic_handle_irq()
+> waiting for desc->lock in handle_fasteoi_irq()
+> 												call gic_set_affinity() from setup_affinity()
+> 												waiting for the irq deactive in gic_do_wait_for_rwp()
+> 
+> 
+> The hardware will not clear GICD_CTLR.RWP until the interrupt is not
+> active. The interrupt is keeping active while it's waiting for
+> desc->lock on cpu0. But the lock is hold by cpu1 while it's waiting for
+> the interrupt is not active. It causes a deadlock here in 1s.
+> 
+> 
+> And the GICv3 SPEC says:
+> 
+> 4.5.5 SPI Interrupt Configuration
+> To configure an SPI interrupt, to ensure that interrupts are never 
+> distributed using partially updated configuration
+> information, software must:
+> o Ensure the interrupt is not active
+> o Ensure that the interrupt is disabled
+> o This might be done either by writing to GICD_CTLR to clear the enables 
+> for a group, or
+> o By writing to GICD_ICENABLERn to clear the Enable bit of the interrupt 
+> (see section 5.3.11).
+> o In both cases, software must poll GICD_CTLR.RWP to ensure the effects 
+> are visible (see section
+> 5.3.20).
+> o Program the routing (if appropriate), priority and group
+> o Enable the interrupt (if required)
+> 
+> Because it says "Ensure the interrupt is not active", so I can not tell
+> it is a hardware or software problem.
+> 
+> Can you please give some advice?
 
-The disble log:
-[ 1.074186] clk_change_rate -- CLK_SET_RATE_UNGATE name: uart2_frac, 
-parent: uart2_src, core->flags = 0x00000424
-[ 1.105722] clk_gate_endisable -- name: uart2_frac, parent: uart2_src, 
-enable = 0
-[ 1.110125] clk_gate_endisable -- name: uart2_src, parent: uart_pll_clk, 
-enable = 0
-[ 2.604445] rockchip_rk3036_pll_disable -- name: pll_apll, parent: xin24m
+Thanks for the accurate description of the problem. This looks to be a
+core issue, or at least a problem between core code and the way the GIC
+behaves, unfortunately. The architecture expects the interrupt to be
+fully configured before it is enabled and made active, while the core
+code does this the other way around.
 
-Therefore, I am considering uart_pll_clk hang onto gpll, or add it into 
-the critical clock replace using apll...
+Can you please have a go at the patch below and let me know if it
+improve things? This is just a test, and definitely not the complete
+solution, but I'd like to find out if I'm on the right track.
 
-If there are some mistake, please correct me. :-)
+Thanks,
 
-Thanks.
+	M.
 
->
->
->> Signed-off-by: Xing Zheng<zhengxing@rock-chips.com>
->> ---
->>
->>   drivers/clk/rockchip/clk-rk3036.c |    1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/clk/rockchip/clk-rk3036.c
->> b/drivers/clk/rockchip/clk-rk3036.c index ebce980..483913b 100644
->> --- a/drivers/clk/rockchip/clk-rk3036.c
->> +++ b/drivers/clk/rockchip/clk-rk3036.c
->> @@ -425,6 +425,7 @@ static struct rockchip_clk_branch
->> rk3036_clk_branches[] __initdata = { };
->>
->>   static const char *const rk3036_critical_clocks[] __initconst = {
->> +	"apll",
->>   	"aclk_cpu",
->>   	"aclk_peri",
->>   	"hclk_peri",
->
->
->
+diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+index 0eebaee..e5802fb 100644
+--- a/kernel/irq/manage.c
++++ b/kernel/irq/manage.c
+@@ -1303,12 +1303,6 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
+ 		if (new->flags & IRQF_ONESHOT)
+ 			desc->istate |= IRQS_ONESHOT;
+ 
+-		if (irq_settings_can_autoenable(desc))
+-			irq_startup(desc, true);
+-		else
+-			/* Undo nested disables: */
+-			desc->depth = 1;
+-
+ 		/* Exclude IRQ from balancing if requested */
+ 		if (new->flags & IRQF_NOBALANCING) {
+ 			irq_settings_set_no_balancing(desc);
+@@ -1318,6 +1312,12 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
+ 		/* Set default affinity mask once everything is setup */
+ 		setup_affinity(desc, mask);
+ 
++		if (irq_settings_can_autoenable(desc))
++			irq_startup(desc, true);
++		else
++			/* Undo nested disables: */
++			desc->depth = 1;
++
+ 	} else if (new->flags & IRQF_TRIGGER_MASK) {
+ 		unsigned int nmsk = new->flags & IRQF_TRIGGER_MASK;
+ 		unsigned int omsk = irq_settings_get_trigger_mask(desc);
+
+-- 
+Without deviation from the norm, progress is not possible.
