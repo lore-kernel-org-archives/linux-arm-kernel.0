@@ -1,49 +1,65 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Fri, 22 Jan 2016 15:05:23 -0800
-Subject: [PATCH v4 1/3] mailbox: Add support for APM X-Gene platform
- mailbox driver
-In-Reply-To: <201601162056.dOHk9NgN%fengguang.wu@intel.com>
-References: <abff73c051fd06a9dd3b04a1e7957ad5a9b69a18.1452912126.git.dhdang@apm.com>
- <201601162056.dOHk9NgN%fengguang.wu@intel.com>
-Message-ID: <CADaLNDmRL-PcwaM7=V_711cLDz=sf-BOycX7EnPcxtY8f_cEYg@mail.gmail.com>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Sat, 23 Jan 2016 00:06:02 +0100
+Subject: [PATCH V3 00/10] Introduce ACPI world to GICv3 & ITS irqchip
+In-Reply-To: <1453209083-3358-1-git-send-email-tn@semihalf.com>
+References: <1453209083-3358-1-git-send-email-tn@semihalf.com>
+Message-ID: <20160122230602.GB24726@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 16, 2016 at 4:31 AM, kbuild test robot <lkp@intel.com> wrote:
-> Hi Duc,
->
-> [auto build test WARNING on robh/for-next]
-> [also build test WARNING on v4.4 next-20160115]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
->
-> url:    https://github.com/0day-ci/linux/commits/Duc-Dang/mailbox-Add-support-for-APM-X-Gene-platform-mailbox-driver/20160116-110535
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
-> config: arm64-allyesconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm64
->
-> All warnings (new ones prefixed by >>):
->
->>> WARNING: vmlinux.o(.data+0xfd6260): Section mismatch in reference from the variable slimpro_mbox_driver to the variable .init.text:$x
->    The variable slimpro_mbox_driver references
->    the variable __init $x
->    If the reference is valid then annotate the
->    variable with or __refdata (see linux/init.h) or name the variable:
+On 19.01.16 14:11:13, Tomasz Nowicki wrote:
+> Patches base on Suravee's ACPI GICv2m support:
+> https://lkml.org/lkml/2015/12/10/475
+> 
+> The following git branch contains submitted patches along with
+> the useful patches from the test point of view (mainly ACPI ARM64 PCI support).
+> https://github.com/semihalf-nowicki-tomasz/linux.git (gicv3-its-acpi-v3)
+> 
+> Series has been tested on Cavium ThunderX server.
+> 
+> v2 -> v3
+> - rebased on top of 4.4
+> - fixes and improvements for redistributor init via GICC structures
+> - fixes as per kbuild reports
+> 
+> v1 -> v2
+> - rebased on top of 4.4-rc4
+> - use pci_msi_domain_get_msi_rid for requester ID to device ID translation
+> 
+> Hanjun Guo (1):
+>   irqchip / GICv3: remove gic root node in ITS
+> 
+> Tomasz Nowicki (9):
+>   irqchip / GICv3: Refactor gic_of_init() for GICv3 driver
+>   irqchip / GICv3: Add ACPI support for GICv3+ initialization
+>   irqchip,GICv3,ACPI: Add redistributor support via GICC structures.
+>   irqchip, gicv3, its: Mark its_init() and its children as __init
+>   irqchip, GICv3, ITS: Refator ITS dt init code to prepare for ACPI.
+>   ARM64, ACPI, PCI: I/O Remapping Table (IORT) initial support.
+>   irqchip, gicv3, its: Probe ITS in the ACPI way.
+>   acpi, gicv3, msi: Factor out code that might be reused for ACPI
+>     equivalent.
+>   acpi, gicv3, its: Use MADT ITS subtable to do PCI/MSI domain
+>     initialization.
+> 
+>  drivers/acpi/Kconfig                     |   3 +
+>  drivers/acpi/Makefile                    |   1 +
+>  drivers/acpi/iort.c                      | 326 +++++++++++++++++++++++++++++
+>  drivers/irqchip/Kconfig                  |   1 +
+>  drivers/irqchip/irq-gic-v3-its-pci-msi.c |  85 ++++++--
+>  drivers/irqchip/irq-gic-v3-its.c         | 143 +++++++++----
+>  drivers/irqchip/irq-gic-v3.c             | 344 ++++++++++++++++++++++++++-----
+>  drivers/pci/msi.c                        |   3 +
+>  include/linux/iort.h                     |  38 ++++
+>  include/linux/irqchip/arm-gic-v3.h       |   2 +-
+>  10 files changed, 845 insertions(+), 101 deletions(-)
+>  create mode 100644 drivers/acpi/iort.c
+>  create mode 100644 include/linux/iort.h
 
-I fixed the build warning, will post and updated after further comment
-from Jassi.
+Tested on various ThunderX single and dual node systems.
 
-I did not catch it before posting my patch because I did not compile
-with  CONFIG_DEBUG_SECTION_MISMATCH=y. I will make sure I have this
-option enabled for my build process going forward.
+Tested-by: Robert Richter <rrichter@cavium.com>
 
-Regards,
-Duc Dang.
->
->
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Thanks Tomasz,
+
+-Robert
