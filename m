@@ -1,25 +1,79 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 21 Jan 2016 17:09:40 -0600
-Subject: [PATCH] Documentation: rockchip-dw-mshc: add RK3368 dw-mshc
- description
-In-Reply-To: <1453379529-5148-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1453379529-5148-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <20160121230940.GA1609@rob-hp-laptop>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Thu, 21 Jan 2016 16:07:41 -0800
+Subject: [PATCH] drivers: net: xgene: fix extra IRQ issue
+Message-ID: <1453421261-4295-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 21, 2016 at 08:32:09PM +0800, Shawn Lin wrote:
-> rk3368 dtsi file add dw-mshc compatible "rockchip,rk3368-dw-mshc"
-> but didn't add it into rockchip-dw-mshc.txt.
-> 
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> ---
-> 
->  Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt | 1 +
->  1 file changed, 1 insertion(+)
+For interrupt controller that doesn't support irq_disable and hardware
+with level interrupt, an extra interrupt may be pending. This patch fixes
+the issue by setting IRQ_DISABLE_UNLAZY flag for the interrupt line,
+as suggested by,
 
-Acked-by: Rob Herring <robh@kernel.org>
+'commit e9849777d0e2 ("genirq: Add flag to force mask in
+		       disable_irq[_nosync]()")'
 
-I'm assuming Heiko will take this.
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+Tested-by: Toan Le <toanle@apm.com>
+---
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 12 +++++++++---
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h |  1 +
+ 2 files changed, 10 insertions(+), 3 deletions(-)
 
-Rob
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+index a4799c1..5eb9b20 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+@@ -628,6 +628,7 @@ static int xgene_enet_register_irq(struct net_device *ndev)
+ 	int ret;
+ 
+ 	ring = pdata->rx_ring;
++	irq_set_status_flags(ring->irq, IRQ_DISABLE_UNLAZY);
+ 	ret = devm_request_irq(dev, ring->irq, xgene_enet_rx_irq,
+ 			       IRQF_SHARED, ring->irq_name, ring);
+ 	if (ret)
+@@ -635,6 +636,7 @@ static int xgene_enet_register_irq(struct net_device *ndev)
+ 
+ 	if (pdata->cq_cnt) {
+ 		ring = pdata->tx_ring->cp_ring;
++		irq_set_status_flags(ring->irq, IRQ_DISABLE_UNLAZY);
+ 		ret = devm_request_irq(dev, ring->irq, xgene_enet_rx_irq,
+ 				       IRQF_SHARED, ring->irq_name, ring);
+ 		if (ret) {
+@@ -649,15 +651,19 @@ static int xgene_enet_register_irq(struct net_device *ndev)
+ static void xgene_enet_free_irq(struct net_device *ndev)
+ {
+ 	struct xgene_enet_pdata *pdata;
++	struct xgene_enet_desc_ring *ring;
+ 	struct device *dev;
+ 
+ 	pdata = netdev_priv(ndev);
+ 	dev = ndev_to_dev(ndev);
+-	devm_free_irq(dev, pdata->rx_ring->irq, pdata->rx_ring);
++	ring = pdata->rx_ring;
++	irq_clear_status_flags(ring->irq, IRQ_DISABLE_UNLAZY);
++	devm_free_irq(dev, ring->irq, ring);
+ 
+ 	if (pdata->cq_cnt) {
+-		devm_free_irq(dev, pdata->tx_ring->cp_ring->irq,
+-			      pdata->tx_ring->cp_ring);
++		ring = pdata->tx_ring->cp_ring;
++		irq_clear_status_flags(ring->irq, IRQ_DISABLE_UNLAZY);
++		devm_free_irq(dev, ring->irq, ring);
+ 	}
+ }
+ 
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
+index 70d5b62..248dfc4 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
+@@ -25,6 +25,7 @@
+ #include <linux/acpi.h>
+ #include <linux/clk.h>
+ #include <linux/efi.h>
++#include <linux/irq.h>
+ #include <linux/io.h>
+ #include <linux/of_platform.h>
+ #include <linux/of_net.h>
+-- 
+1.9.1
