@@ -1,37 +1,77 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Fri, 22 Jan 2016 09:23:54 -0800
-Subject: mainline build: 137 builds: 0 failed, 137 passed,
- 296 warnings (v4.4-10454-g3e1e21c7bfcf)
-In-Reply-To: <1605429.kGqaIzLx7t@wuerfel>
-References: <56a1c8c2.6953c20a.25484.ffff85a9@mx.google.com>
- <1605429.kGqaIzLx7t@wuerfel>
-Message-ID: <CANMBJr7W5uooa5+1tbTSfToeM6tS69E80ZB0E1gdcSnVaTaDaQ@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 22 Jan 2016 10:29:13 -0700
+Subject: [RESEND PATCH 0/2] Remove the mistakes detected by the check
+ tools.
+In-Reply-To: <CAL=D6xaMAG04tnx_WCbTkcGpyAVBVnz3au1ahDFB72k4DpbKsA@mail.gmail.com>
+References: <cover.1453271738.git.eric.long@linaro.org>
+ <CANLsYkzqFaPs2XbF0kC_jbG1=Jry2+bZMHMq-m9gUxMkoLAhnA@mail.gmail.com>
+ <CAL=D6xaMAG04tnx_WCbTkcGpyAVBVnz3au1ahDFB72k4DpbKsA@mail.gmail.com>
+Message-ID: <CANLsYkw28iDcisHjXWKdNXLVzfX3h01eEvvhzVZ2bbTX3bJ+eA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 January 2016 at 05:19, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 21 January 2016 22:14:26 kernelci. org bot wrote:
->> Warnings summary:
+On 22 January 2016 at 02:15, Eric Long <eric.long@linaro.org> wrote:
+> On 22 January 2016 at 00:56, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
 >>
->>     224  <stdin>:1307:2: warning: #warning syscall copy_file_range not implemented [-Wcpp]
+>> Please run checkpath.pl on your patches.  Also if the changes are of a
+>> different nature, ex. indentation problem and wrong argument to a
+>> function, please provide two separate patches.
+>>
 >
-> I don't think anyone has sent this so far, sending a patch now.
+> Hi Mathieu,
 >
->>      29  drivers/tty/serial/amba-pl011.c:190:27: warning: 'vendor_zte' defined but not used [-Wunused-variable]
->
-> Patch sent a couple of days ago, got an Ack and waiting to be applied.
->
->>      12  net/bluetooth/mgmt.c:5493:8: warning: 'r192' may be used uninitialized in this function [-Wmaybe-uninitialized]
->>      12  net/bluetooth/mgmt.c:5493:8: warning: 'h192' may be used uninitialized in this function [-Wmaybe-uninitialized]
->
-> This happens only in gcc-4.7 and gcc-4.8
->
->>       5  crypto/wp512.c:987:1: warning: the frame size of 1168 bytes is larger than 1024 bytes [-Wframe-larger-than=]
->>       1  crypto/wp512.c:987:1: warning: the frame size of 1112 bytes is larger than 1024 bytes [-Wframe-larger-than=]
->
-> and this one only in gcc-4.7
->
-> Any chance we can update the toolchain on kernelci.org to 4.9 or higher?
-> I'm normally testing with gcc-5.2, which has a little better warnings.
+> I had already ran checkpath.pl, and there was no error and warning.
 
-I'm ok with upgrading to 4.9 or higher. Kevin any issues with this?
+Using a 4.4 kernel I got the following chackpatch warnings:
+
+mpoirier at t430:~/work/linaro/coresight/kernel-maint$
+./scripts/checkpatch.pl
+0001-coresight-Remove-the-mistakes-detected-by-sparse-too.patch
+0002-coresight-Remove-the-mistakes-detected-by-smatch-too.patch
+---------------------------------------------------------------
+0001-coresight-Remove-the-mistakes-detected-by-sparse-too.patch
+---------------------------------------------------------------
+WARNING: A patch subject line should describe the change not the tool
+that found it
+#4:
+Subject: [PATCH 1/2] coresight: Remove the mistakes detected by sparse tool
+
+total: 0 errors, 1 warnings, 32 lines checked
+
+0001-coresight-Remove-the-mistakes-detected-by-sparse-too.patch has
+style problems, please review.
+---------------------------------------------------------------
+0002-coresight-Remove-the-mistakes-detected-by-smatch-too.patch
+---------------------------------------------------------------
+WARNING: A patch subject line should describe the change not the tool
+that found it
+#4:
+Subject: [PATCH 2/2] coresight: Remove the mistakes detected by smatch tool
+
+total: 0 errors, 1 warnings, 8 lines checked
+
+0002-coresight-Remove-the-mistakes-detected-by-smatch-too.patch has
+style problems, please review.
+
+NOTE: If any of the errors are false positives, please report
+      them to the maintainer, see CHECKPATCH in MAINTAINERS.
+mpoirier at t430:~/work/linaro/coresight/kernel-maint$ ls
+
+
+> All the changes are either indentation problems or wrong argument,
+> except one static defined problem. So I think there is no need to
+> separate the patch.
+
+After fixing the above checkpatch warning bunching changes by tools
+won't make sense anymore.
+
+> By the way, the patches I had send were created base on the check
+> tools, one for smatch and another for sparse. In case I need to separate
+> the patches, do I need to follow the this principle. Thanks.
+
+It's usually one semantic change per patch - the tool that highlighted
+the problem is secondary.
+
+>
+> Best Regards.
+> Eric
