@@ -1,349 +1,260 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 22 Jan 2016 16:55:20 +0000
-Subject: [PATCH v3 08/21] arm64: add support for module PLTs
-In-Reply-To: <1452518355-4606-9-git-send-email-ard.biesheuvel@linaro.org>
-References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
- <1452518355-4606-9-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160122165517.GD11645@leverpostej>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Fri, 22 Jan 2016 18:56:57 +0200
+Subject: [PATCHv8 1/4] EDAC, altera: Add Altera L2 Cache and OCRAM EDAC
+ Support
+In-Reply-To: <56A24C34.3000303@opensource.altera.com>
+References: <1453397668-32094-1-git-send-email-tthayer@opensource.altera.com>
+ <56A1C5DE.1080501@mentor.com> <56A24C34.3000303@opensource.altera.com>
+Message-ID: <56A25F59.5070306@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Hi Thor,
 
-This looks good.
-
-My comments below are mostly nits, and much of the rest probably betrays
-my lack of familiarity with ELF.
-
-On Mon, Jan 11, 2016 at 02:19:01PM +0100, Ard Biesheuvel wrote:
-> This adds support for emitting PLTs at module load time for relative
-> branches that are out of range. This is a prerequisite for KASLR, which
-> may place the kernel and the modules anywhere in the vmalloc area,
-> making it more likely that branch target offsets exceed the maximum
-> range of +/- 128 MB.
+On 22.01.2016 17:35, Thor Thayer wrote:
+> Hi Vladimir,
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/Kconfig              |   9 ++
->  arch/arm64/Makefile             |   6 +-
->  arch/arm64/include/asm/module.h |  11 ++
->  arch/arm64/kernel/Makefile      |   1 +
->  arch/arm64/kernel/module-plts.c | 137 ++++++++++++++++++++
->  arch/arm64/kernel/module.c      |  12 ++
->  arch/arm64/kernel/module.lds    |   4 +
->  7 files changed, 179 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index ffa3c549a4ba..778df20bf623 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -363,6 +363,7 @@ config ARM64_ERRATUM_843419
->  	bool "Cortex-A53: 843419: A load or store might access an incorrect address"
->  	depends on MODULES
->  	default y
-> +	select ARM64_MODULE_CMODEL_LARGE
->  	help
->  	  This option builds kernel modules using the large memory model in
->  	  order to avoid the use of the ADRP instruction, which can cause
-> @@ -702,6 +703,14 @@ config ARM64_LSE_ATOMICS
->  
->  endmenu
->  
-> +config ARM64_MODULE_CMODEL_LARGE
-> +	bool
-> +
-> +config ARM64_MODULE_PLTS
-> +	bool
-> +	select ARM64_MODULE_CMODEL_LARGE
-> +	select HAVE_MOD_ARCH_SPECIFIC
-> +
->  endmenu
->  
->  menu "Boot options"
-> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> index cd822d8454c0..db462980c6be 100644
-> --- a/arch/arm64/Makefile
-> +++ b/arch/arm64/Makefile
-> @@ -41,10 +41,14 @@ endif
->  
->  CHECKFLAGS	+= -D__aarch64__
->  
-> -ifeq ($(CONFIG_ARM64_ERRATUM_843419), y)
-> +ifeq ($(CONFIG_ARM64_MODULE_CMODEL_LARGE), y)
->  KBUILD_CFLAGS_MODULE	+= -mcmodel=large
->  endif
->  
-> +ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
-> +KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module.lds
-> +endif
-> +
->  # Default value
->  head-y		:= arch/arm64/kernel/head.o
->  
-> diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
-> index e80e232b730e..7b8cd3dc9d8e 100644
-> --- a/arch/arm64/include/asm/module.h
-> +++ b/arch/arm64/include/asm/module.h
-> @@ -20,4 +20,15 @@
->  
->  #define MODULE_ARCH_VERMAGIC	"aarch64"
->  
-> +#ifdef CONFIG_ARM64_MODULE_PLTS
-> +struct mod_arch_specific {
-> +	struct elf64_shdr	*core_plt;
-> +	struct elf64_shdr	*init_plt;
-> +	int			core_plt_count;
-> +	int			init_plt_count;
-> +};
-> +#endif
-> +
-> +u64 get_module_plt(struct module *mod, void *loc, u64 val);
-> +
->  #endif /* __ASM_MODULE_H */
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index 474691f8b13a..f42b0fff607f 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -30,6 +30,7 @@ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
->  					   ../../arm/kernel/opcodes.o
->  arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
->  arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
-> +arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
->  arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
->  arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
->  arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
-> diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
-> new file mode 100644
-> index 000000000000..4a8ef9ea01ee
-> --- /dev/null
-> +++ b/arch/arm64/kernel/module-plts.c
-> @@ -0,0 +1,137 @@
-> +/*
-> + * Copyright (C) 2014-2015 Linaro Ltd. <ard.biesheuvel@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/elf.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +
-> +struct plt_entry {
-> +	__le32	mov0;	/* movn	x16, #0x....			*/
-> +	__le32	mov1;	/* movk	x16, #0x...., lsl #16		*/
-> +	__le32	mov2;	/* movk	x16, #0x...., lsl #32		*/
-> +	__le32	br;	/* br	x16				*/
-> +} __aligned(8);
-
-We only need natural alignment for the instructions, so what's the
-alignment for? I can't see that anything else cares.
-
-It might be worth a comment regarding why why use x16 (i.e. because the
-AAPCS says that as IP0 it is valid for veneers/PLTs to clobber).
-
-> +static bool in_init(const struct module *mod, void *addr)
-> +{
-> +	return (u64)addr - (u64)mod->module_init < mod->init_size;
-> +}
-> +
-> +u64 get_module_plt(struct module *mod, void *loc, u64 val)
-> +{
-> +	struct plt_entry entry = {
-> +		cpu_to_le32(0x92800010 | (((~val      ) & 0xffff)) << 5),
-> +		cpu_to_le32(0xf2a00010 | ((( val >> 16) & 0xffff)) << 5),
-> +		cpu_to_le32(0xf2c00010 | ((( val >> 32) & 0xffff)) << 5),
-> +		cpu_to_le32(0xd61f0200)
-> +	}, *plt;
-
-It would be nice if we could un-magic this, though I see that reusing
-the existing insn or reloc_insn code is painful here.
-
-> +	int i, *count;
-> +
-> +	if (in_init(mod, loc)) {
-> +		plt = (struct plt_entry *)mod->arch.init_plt->sh_addr;
-> +		count = &mod->arch.init_plt_count;
-> +	} else {
-> +		plt = (struct plt_entry *)mod->arch.core_plt->sh_addr;
-> +		count = &mod->arch.core_plt_count;
-> +	}
-> +
-> +	/* Look for an existing entry pointing to 'val' */
-> +	for (i = 0; i < *count; i++)
-> +		if (plt[i].mov0 == entry.mov0 &&
-> +		    plt[i].mov1 == entry.mov1 &&
-> +		    plt[i].mov2 == entry.mov2)
-> +			return (u64)&plt[i];
-
-I think that at the cost of redundantly comparing the br x16, you could
-simplify this by comparing the whole struct, e.g.
-
-	for (i = 0; i < *count; i++)
-		if (plt[i] == entry)
-			return (u64)&plt[i];
-
-Which would also work if we change the veneer for some reason.
-
-> +
-> +	i = (*count)++;
-
-given i == *count at the end of the loop, you could just increment
-*count here.
-
-> +	plt[i] = entry;
-> +	return (u64)&plt[i];
-> +}
-> +
-> +static int duplicate_rel(Elf64_Addr base, const Elf64_Rela *rela, int num)
-
-Perhaps: static bool is_duplicate_rel
-
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < num; i++) {
-> +		if (rela[i].r_info == rela[num].r_info &&
-> +		    rela[i].r_addend == rela[num].r_addend)
-> +			return 1;
-> +	}
-> +	return 0;
-> +}
-> +
-> +/* Count how many PLT entries we may need */
-> +static unsigned int count_plts(Elf64_Addr base, const Elf64_Rela *rela, int num)
-> +{
-> +	unsigned int ret = 0;
-> +	int i;
-> +
-> +	/*
-> +	 * Sure, this is order(n^2), but it's usually short, and not
-> +	 * time critical
-> +	 */
-> +	for (i = 0; i < num; i++)
-> +		switch (ELF64_R_TYPE(rela[i].r_info)) {
-> +		case R_AARCH64_JUMP26:
-> +		case R_AARCH64_CALL26:
-> +			if (!duplicate_rel(base, rela, i))
-> +				ret++;
-> +			break;
-> +		}
-
-While braces aren't strictly required on the for loop, i think it would
-look better with them given the contained logic is non-trivial.
-
-> +	return ret;
-> +}
-> +
-> +int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
-> +			      char *secstrings, struct module *mod)
-> +{
-> +	unsigned long core_plts = 0, init_plts = 0;
-> +	Elf64_Shdr *s, *sechdrs_end = sechdrs + ehdr->e_shnum;
-> +
-> +	/*
-> +	 * To store the PLTs, we expand the .text section for core module code
-> +	 * and the .init.text section for initialization code.
-> +	 */
-
-That comment is a bit misleading, given we don't touch .text and
-.init.text, but rather .core.plt and .init.plt, relying on
-layout_sections to group those with .text and .init.text.
-
-> +	for (s = sechdrs; s < sechdrs_end; ++s)
-> +		if (strcmp(".core.plt", secstrings + s->sh_name) == 0)
-> +			mod->arch.core_plt = s;
-> +		else if (strcmp(".init.plt", secstrings + s->sh_name) == 0)
-> +			mod->arch.init_plt = s;
-
-This would be nicer with braces.
-
-> +
-> +	if (!mod->arch.core_plt || !mod->arch.init_plt) {
-> +		pr_err("%s: sections missing\n", mod->name);
-> +		return -ENOEXEC;
-> +	}
-> +
-> +	for (s = sechdrs + 1; s < sechdrs_end; ++s) {
-
-Could we have a comment as to why we skip the first Shdr? I recall it's
-in some way special, but I can't recall why/how.
-
-> +		const Elf64_Rela *rels = (void *)ehdr + s->sh_offset;
-> +		int numrels = s->sh_size / sizeof(Elf64_Rela);
-> +		Elf64_Shdr *dstsec = sechdrs + s->sh_info;
-> +
-> +		if (s->sh_type != SHT_RELA)
-> +			continue;
-
-We only have RELA, and no REL?
-
-Thanks,
-Mark.
-
-> +
-> +		if (strstr(secstrings + s->sh_name, ".init"))
-> +			init_plts += count_plts(dstsec->sh_addr, rels, numrels);
-> +		else
-> +			core_plts += count_plts(dstsec->sh_addr, rels, numrels);
-> +	}
-> +
-> +	mod->arch.core_plt->sh_type = SHT_NOBITS;
-> +	mod->arch.core_plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> +	mod->arch.core_plt->sh_addralign = L1_CACHE_BYTES;
-> +	mod->arch.core_plt->sh_size = core_plts * sizeof(struct plt_entry);
-> +	mod->arch.core_plt_count = 0;
-> +
-> +	mod->arch.init_plt->sh_type = SHT_NOBITS;
-> +	mod->arch.init_plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> +	mod->arch.init_plt->sh_addralign = L1_CACHE_BYTES;
-> +	mod->arch.init_plt->sh_size = init_plts * sizeof(struct plt_entry);
-> +	mod->arch.init_plt_count = 0;
-> +	pr_debug("%s: core.plt=%lld, init.plt=%lld\n", __func__,
-> +		 mod->arch.core_plt->sh_size, mod->arch.init_plt->sh_size);
-> +	return 0;
-> +}
-> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-> index 93e970231ca9..3a298b0e21bb 100644
-> --- a/arch/arm64/kernel/module.c
-> +++ b/arch/arm64/kernel/module.c
-> @@ -38,6 +38,11 @@ void *module_alloc(unsigned long size)
->  				GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
->  				NUMA_NO_NODE, __builtin_return_address(0));
->  
-> +	if (!p && IS_ENABLED(CONFIG_ARM64_MODULE_PLTS))
-> +		p = __vmalloc_node_range(size, MODULE_ALIGN, VMALLOC_START,
-> +				VMALLOC_END, GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
-> +				NUMA_NO_NODE, __builtin_return_address(0));
-> +
->  	if (p && (kasan_module_alloc(p, size) < 0)) {
->  		vfree(p);
->  		return NULL;
-> @@ -361,6 +366,13 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
->  		case R_AARCH64_CALL26:
->  			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 26,
->  					     AARCH64_INSN_IMM_26);
-> +
-> +			if (IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) &&
-> +			    ovf == -ERANGE) {
-> +				val = get_module_plt(me, loc, val);
-> +				ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2,
-> +						     26, AARCH64_INSN_IMM_26);
-> +			}
->  			break;
->  
->  		default:
-> diff --git a/arch/arm64/kernel/module.lds b/arch/arm64/kernel/module.lds
-> new file mode 100644
-> index 000000000000..3682fa107918
-> --- /dev/null
-> +++ b/arch/arm64/kernel/module.lds
-> @@ -0,0 +1,4 @@
-> +SECTIONS {
-> +        .core.plt : { BYTE(0) }
-> +        .init.plt : { BYTE(0) }
-> +}
-> -- 
-> 2.5.0
+> On 01/22/2016 12:02 AM, Vladimir Zapolskiy wrote:
+>> Hi Thor,
+>>
+>> On 21.01.2016 19:34, tthayer at opensource.altera.com wrote:
+>>> From: Thor Thayer <tthayer@opensource.altera.com>
+>>>
+>>> Adding L2 Cache and On-Chip RAM EDAC support for the
+>>> Altera SoCs using the EDAC device  model. The SDRAM
+>>> controller is using the Memory Controller model.
+>>>
+>>> Each type of ECC is individually configurable.
+>>>
+>>> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+>>> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+>>
+>> You are sending a change authored by yourself for review, but you add Dinh's
+>> SoB, what's his role here?
+>>
+>> See Documentation/SubmittingPatches "Sign your work".
+>>
+>> [snip]
 > 
+> While I was working in a different group at Altera last year, Dinh 
+> submitted the previous patch revision so I kept his signed off by for 
+> continuity. I'll just use myself in the future. Thank you for clarifying.
+
+it sounds like the author of the original change is Dinh, but if you agreed
+about authorship transfer, then "From: Thor Thayer" statement should be
+correct, but in any case your SoB should follow Dinh's SoB, if you decide to
+keep the latter one.
+
+This consideration may apply to the other changes in the changeset as well.
+
+>>
+>>> +/*
+>>> + * altr_edac_device_probe()
+>>> + *	This is a generic EDAC device driver that will support
+>>> + *	various Altera memory devices such as the L2 cache ECC and
+>>> + *	OCRAM ECC as well as the memories for other peripherals.
+>>> + *	Module specific initialization is done by passing the
+>>> + *	function index in the device tree.
+>>> + */
+>>> +static int altr_edac_device_probe(struct platform_device *pdev)
+>>> +{
+>>> +	struct edac_device_ctl_info *dci;
+>>> +	struct altr_edac_device_dev *drvdata;
+>>> +	struct resource *r;
+>>> +	int res = 0;
+>>> +	struct device_node *np = pdev->dev.of_node;
+>>> +	char *ecc_name = (char *)np->name;
+>>> +	static int dev_instance;
+>>> +	struct dentry *debugfs;
+>>> +
+>>> +	if (!devres_open_group(&pdev->dev, NULL, GFP_KERNEL)) {
+>>> +		edac_printk(KERN_ERR, EDAC_DEVICE,
+>>> +			    "Unable to open devm\n");
+>>> +		return -ENOMEM;
+>>> +	}
+>>> +
+>>> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>> +	if (!r) {
+>>> +		edac_printk(KERN_ERR, EDAC_DEVICE,
+>>> +			    "Unable to get mem resource\n");
+>>
+>> Missing devres_release_group(&pdev->dev, NULL) on error path.
+>>
+> Yes. Thank you.
+> 
+>>> +		return -ENODEV;
+>>> +	}
+>>> +
+>>> +	if (!devm_request_mem_region(&pdev->dev, r->start, resource_size(r),
+>>> +				     dev_name(&pdev->dev))) {
+>>> +		edac_printk(KERN_ERR, EDAC_DEVICE,
+>>> +			    "%s:Error requesting mem region\n", ecc_name);
+>>
+>> See above.
+>>
+>>> +		return -EBUSY;
+>>> +	}
+>>> +
+>>> +	dci = edac_device_alloc_ctl_info(sizeof(*drvdata), ecc_name,
+>>> +					 1, ecc_name, 1, 0, NULL, 0,
+>>> +					 dev_instance++);
+>>> +
+>>> +	if (!dci) {
+>>> +		edac_printk(KERN_ERR, EDAC_DEVICE,
+>>> +			    "%s: Unable to allocate EDAC device\n", ecc_name);
+>>
+>> See above.
+>>
+>>> +		return -ENOMEM;
+>>> +	}
+>>> +
+>>> +	drvdata = dci->pvt_info;
+>>> +	dci->dev = &pdev->dev;
+>>> +	platform_set_drvdata(pdev, dci);
+>>> +	drvdata->edac_dev_name = ecc_name;
+>>> +
+>>> +	drvdata->base = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+>>> +	if (!drvdata->base)
+>>> +		goto err;
+>>> +
+>>> +	/* Get driver specific data for this EDAC device */
+>>> +	drvdata->data = of_match_node(altr_edac_device_of_match, np)->data;
+>>> +
+>>> +	/* Check specific dependencies for the module */
+>>> +	if (drvdata->data->setup) {
+>>> +		res = drvdata->data->setup(pdev, drvdata->base);
+>>> +		if (res < 0)
+>>> +			goto err;
+>>> +	}
+>>> +
+>>> +	drvdata->sb_irq = platform_get_irq(pdev, 0);
+>>> +	res = devm_request_irq(&pdev->dev, drvdata->sb_irq,
+>>> +			       altr_edac_device_handler,
+>>> +			       0, dev_name(&pdev->dev), dci);
+>>> +	if (res < 0)
+>>> +		goto err;
+>>> +
+>>> +	drvdata->db_irq = platform_get_irq(pdev, 1);
+>>> +	res = devm_request_irq(&pdev->dev, drvdata->db_irq,
+>>> +			       altr_edac_device_handler,
+>>> +			       0, dev_name(&pdev->dev), dci);
+>>> +	if (res < 0)
+>>> +		goto err;
+>>> +
+>>> +	dci->mod_name = "Altera ECC Manager";
+>>> +	dci->dev_name = drvdata->edac_dev_name;
+>>> +
+>>> +	debugfs = edac_debugfs_create_dir(ecc_name);
+>>> +	if (debugfs)
+>>> +		altr_create_edacdev_dbgfs(dci, drvdata->data, debugfs);
+>>> +
+>>> +	if (edac_device_add_device(dci))
+>>> +		goto err;
+>>> +
+>>> +	devres_close_group(&pdev->dev, NULL);
+>>> +
+>>> +	return 0;
+>>> +err:
+>>> +	edac_printk(KERN_ERR, EDAC_DEVICE,
+>>> +		    "%s:Error setting up EDAC device: %d\n", ecc_name, res);
+>>> +	devres_release_group(&pdev->dev, NULL);
+>>> +	edac_device_free_ctl_info(dci);
+>>> +
+>>> +	return res;
+>>> +}
+>>> +
+>>> +static int altr_edac_device_remove(struct platform_device *pdev)
+>>> +{
+>>> +	struct edac_device_ctl_info *dci = platform_get_drvdata(pdev);
+>>> +
+>>> +	edac_device_del_device(&pdev->dev);
+>>> +	edac_device_free_ctl_info(dci);
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static struct platform_driver altr_edac_device_driver = {
+>>> +	.probe =  altr_edac_device_probe,
+>>> +	.remove = altr_edac_device_remove,
+>>> +	.driver = {
+>>> +		.name = "altr_edac_device",
+>>> +		.of_match_table = altr_edac_device_of_match,
+>>> +	},
+>>> +};
+>>> +module_platform_driver(altr_edac_device_driver);
+>>> +
+>>> +/*********************** OCRAM EDAC Device Functions *********************/
+>>> +
+>>> +#ifdef CONFIG_EDAC_ALTERA_OCRAM
+>>> +
+>>> +static void *ocram_alloc_mem(size_t size, void **other)
+>>> +{
+>>> +	struct device_node *np;
+>>> +	struct gen_pool *gp;
+>>> +	void *sram_addr;
+>>> +
+>>> +	np = of_find_compatible_node(NULL, NULL, "altr,socfpga-ocram-ecc");
+>>> +	if (!np)
+>>> +		return NULL;
+>>> +
+>>> +	gp = of_gen_pool_get(np, "iram", 0);
+>>> +	if (!gp) {
+>>> +		of_node_put(np);
+>>> +		return NULL;
+>>> +	}
+>>> +	of_node_put(np);
+>>
+>> 	gp = of_gen_pool_get(np, "iram", 0);
+>> 	of_node_put(np);
+>> 	if (!gp)
+>> 		return NULL;
+>>
+>> version is better.
+>>
+> 
+> I'm sorry, can you elaborate? Are you saying I should return something 
+> other than NULL?
+
+Here I propose to do a tiny code optimization, 4 lines vs yours 6 lines of
+code without any functional difference.
+
+>>> +
+>>> +	sram_addr = (void *)gen_pool_alloc(gp, size / sizeof(size_t));
+>>> +	if (!sram_addr)
+>>> +		return NULL;
+>>> +
+>>> +	memset(sram_addr, 0, size);
+>>
+>> Potential memory corruption, you allocate (size / sizeof(size_t)) bytes and
+>> then write size bytes.
+>>
+> 
+> Yes, good catch. I thought I'd fixed this but missed it when I came back.
+> 
+>>> +	wmb();	/* Ensure data is written out */
+>>> +
+>>> +	*other = gp;	/* Remember this handle for freeing  later */
+>>> +
+>>> +	return sram_addr;
+>>> +}
+>>> +
+>>> +static void ocram_free_mem(void *p, size_t size, void *other)
+>>> +{
+>>> +	gen_pool_free((struct gen_pool *)other, (u32)p, size / sizeof(size_t));
+>>
+>> See a comment above.
+>>
+>>> +}
+>>> +
+>>
+>>
+> 
+> Thank you for reviewing.
+> 
+
+No problem :)
+
+--
+With best wishes,
+Vladimir
