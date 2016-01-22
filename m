@@ -1,139 +1,114 @@
-From: liguo.zhang@mediatek.com (Liguo Zhang)
-Date: Fri, 22 Jan 2016 17:38:02 +0800
-Subject: [PATCH] i2c: mt8173: add 4GB mode support in i2c driver.
-Message-ID: <1453455482-3218-1-git-send-email-liguo.zhang@mediatek.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Fri, 22 Jan 2016 10:55:45 +0100
+Subject: [PATCH v5 1/6] clk: hisilicon: add CRG driver for hi3519 soc
+In-Reply-To: <56A1ED53.60309@huawei.com>
+References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
+ <1452219400-32478-2-git-send-email-xuejiancheng@huawei.com>
+ <20160112221211.GB22188@codeaurora.org> <5695BE65.3070409@huawei.com>
+ <20160113185707.1168.85601@quark.deferred.io> <56979F9F.5080201@huawei.com>
+ <5698A650.5010600@huawei.com>
+ <CAL_JsqJPcPgS=cKNqv9j5Ch3ZHbUmci1LRedBWV1gV=5kCz68Q@mail.gmail.com>
+ <CAAObsKBbUaGi-ZWg+Y-OCq=xVOgBJroMTVsqP2JpVHPQWcM4=w@mail.gmail.com>
+ <56A1ED53.60309@huawei.com>
+Message-ID: <CAAObsKAdd_M_Kjmc=c=MbVB29hDFpxCaE6cjrsyWGOLXz7++1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If 4GB mode is enable, we should add 4gb mode support in i2c driver.
-Set 4GB mode register to support 4GB mode.
+On 22 January 2016 at 09:50, xuejiancheng <xuejiancheng@huawei.com> wrote:
+> On 2016/1/20 14:38, Tomeu Vizoso wrote:
+>> On 19 January 2016 at 19:20, Rob Herring <robh+dt@kernel.org> wrote:
+>>> On Fri, Jan 15, 2016 at 1:57 AM, xuejiancheng <xuejiancheng@huawei.com> wrote:
+>>>>
+>>>> On 2016/1/14 21:16, xuejiancheng wrote:
+>>>>> Hi Mike,
+>>>>>
+>>>>> On 2016/1/14 2:57, Michael Turquette wrote:
+>>>>>> Quoting xuejiancheng (2016-01-12 19:03:01)
+>>>>>>> Hi Stephen,
+>>>>>>>    Thank you very much for your reply.
+>>>>>>>
+>>>>>>> On 2016/1/13 6:12, Stephen Boyd wrote:
+>>>>>>>> On 01/08, Jiancheng Xue wrote:
+>>>>>>>>> diff --git a/drivers/clk/hisilicon/Kconfig b/drivers/clk/hisilicon/Kconfig
+>>>>>>>>> index e434854..b6baebf 100644
+>>>>>>>>> --- a/drivers/clk/hisilicon/Kconfig
+>>>>>>>>> +++ b/drivers/clk/hisilicon/Kconfig
+>>>>>>>>> @@ -1,3 +1,10 @@
+>>>>>>>>> +config COMMON_CLK_HI3519
+>>>>>>>>> +    tristate "Clock Driver for Hi3519"
+>>>>>>>>
+>>>>>>>> It looks like this has to be bool. Otherwise it needs to be a
+>>>>>>>> platform driver and the hisilicon APIs need to be exported and
+>>>>>>>> lose their __init markings.
+>>>>>>>>
+>>>>>>> Yes,it's a problem. I will fix it in next version. Thank you.
+>>>>>>
+>>>>>> The best solution would be to make this clock driver a real platform
+>>>>>> driver.
+>>>>>>
+>>>>> Now the work clock of the clocksource timer-sp804 is provided by this driver. So
+>>>>> it need to be registered early by CLK_OF_DECLARE. If the timer clock is treated
+>>>>> as a fixed-clock provider, this driver can be implemented as a platform driver.
+>>>>> Then the crg device must be registered before other clock consumer devices.Accordingly
+>>>>> the crg device node must be written above all other clock consumer devices node in dts files.
+>>>>> I think it is also a dependence.
+>>>>>
+>>>>> Can you help me understand why it is better to make this driver a platform driver?
+>>>>> Thank you very much!
+>>>>>
+>>>> arch_initcall(customize_machine)
+>>>> -->of_platform_populate
+>>>>    -->of_platform_bus_create
+>>>>      -->of_amba_device_create
+>>>>         -->amba_device_add
+>>>>            -->amba_get_enable_pclk
+>>>> The call sequence above shows that the clock of the amba device must be registered before
+>>>> amba_device_add. The clock of "arm,pl011" uart is registered in the probe function of the
+>>>> platform driver "hi3519-crg". So the platform device "hi3519-crg" must be created before
+>>>> the amba device "arm,pl011" uart.
+>>>
+>>> It is a problem, but Tomeu had a fix to support deferred probes here.
+>>> That was part of the on-demand probing series, but maybe it needs to
+>>> be applied separately if we are moving clock drivers to platform
+>>> drivers.
+>>
+>> Hi,
+>>
+>> Marek Szyprowski has kindly taken those two patches as part of a series of him:
+>>
+>> http://lkml.kernel.org/g/1450868368-5650-1-git-send-email-m.szyprowski at samsung.com
+>>
+>> I think it would be great if you could test them and report.
+>>
+> Hi Tomeu,
+>
+> I have applied the patch "https://lkml.org/lkml/2015/12/23/105" and tested on my hi3519-demb board.
+> It works even if the apb_pclk is registered later than the amba-pl011 device being registered.
+>
+> But I think it is a problem if amba_read_periphid() returns -ENOMEM or -ENODEV when apb_pclk is available.
+> In this condition?amba_match() returns a non zero value which means the driver and device matches
+> and the amba_probe() will be called, but amba_device->periphid remains as 0. Then amba_lookup() called in
+> amba_probe() will return a null id pointer.The null pointer will be passed to amba_driver->probe() and
+> this may cause a segment fault.
 
-Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
----
- drivers/i2c/busses/i2c-mt65xx.c |   41 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+But, have you applied the other patches in the series? There's one
+that should handle the other error codes.
 
-diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
-index aec8e6c..80d3c79 100644
---- a/drivers/i2c/busses/i2c-mt65xx.c
-+++ b/drivers/i2c/busses/i2c-mt65xx.c
-@@ -60,6 +60,7 @@
- #define I2C_DMA_INT_FLAG_NONE		0x0000
- #define I2C_DMA_CLR_FLAG		0x0000
- #define I2C_DMA_HARD_RST		0x0002
-+#define I2C_DMA_4G_MODE			0x0001
- 
- #define I2C_DEFAULT_SPEED		100000	/* hz */
- #define MAX_FS_MODE_SPEED		400000
-@@ -88,6 +89,8 @@ enum DMA_REGS_OFFSET {
- 	OFFSET_RX_MEM_ADDR = 0x20,
- 	OFFSET_TX_LEN = 0x24,
- 	OFFSET_RX_LEN = 0x28,
-+	OFFSET_TX_4G_MODE = 0x54,
-+	OFFSET_RX_4G_MODE = 0x58,
- };
- 
- enum i2c_trans_st_rs {
-@@ -133,6 +136,7 @@ struct mtk_i2c_compatible {
- 	unsigned char dcm: 1;
- 	unsigned char auto_restart: 1;
- 	unsigned char aux_len_reg: 1;
-+	unsigned char support_33bits: 1;
- };
- 
- struct mtk_i2c {
-@@ -182,6 +186,7 @@ static const struct mtk_i2c_compatible mt6577_compat = {
- 	.dcm = 1,
- 	.auto_restart = 0,
- 	.aux_len_reg = 0,
-+	.support_33bits = 0,
- };
- 
- static const struct mtk_i2c_compatible mt6589_compat = {
-@@ -190,6 +195,7 @@ static const struct mtk_i2c_compatible mt6589_compat = {
- 	.dcm = 0,
- 	.auto_restart = 0,
- 	.aux_len_reg = 0,
-+	.support_33bits = 0,
- };
- 
- static const struct mtk_i2c_compatible mt8173_compat = {
-@@ -198,6 +204,7 @@ static const struct mtk_i2c_compatible mt8173_compat = {
- 	.dcm = 1,
- 	.auto_restart = 1,
- 	.aux_len_reg = 1,
-+	.support_33bits = 1,
- };
- 
- static const struct of_device_id mtk_i2c_of_match[] = {
-@@ -373,6 +380,7 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 	u16 start_reg;
- 	u16 control_reg;
- 	u16 restart_flag = 0;
-+	u32 reg_4g_mode = 0;
- 	dma_addr_t rpaddr = 0;
- 	dma_addr_t wpaddr = 0;
- 	int ret;
-@@ -439,6 +447,13 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 					msgs->len, DMA_FROM_DEVICE);
- 		if (dma_mapping_error(i2c->dev, rpaddr))
- 			return -ENOMEM;
-+
-+		if (i2c->dev_comp->support_33bits) {
-+			reg_4g_mode = (rpaddr & 0x100000000ULL) ?
-+				       I2C_DMA_4G_MODE : I2C_DMA_CLR_FLAG;
-+			writel(reg_4g_mode, i2c->pdmabase + OFFSET_RX_4G_MODE);
-+		}
-+
- 		writel((u32)rpaddr, i2c->pdmabase + OFFSET_RX_MEM_ADDR);
- 		writel(msgs->len, i2c->pdmabase + OFFSET_RX_LEN);
- 	} else if (i2c->op == I2C_MASTER_WR) {
-@@ -448,6 +463,13 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 					msgs->len, DMA_TO_DEVICE);
- 		if (dma_mapping_error(i2c->dev, wpaddr))
- 			return -ENOMEM;
-+
-+		if (i2c->dev_comp->support_33bits) {
-+			reg_4g_mode = (wpaddr & 0x100000000ULL) ?
-+				       I2C_DMA_4G_MODE : I2C_DMA_CLR_FLAG;
-+			writel(reg_4g_mode, i2c->pdmabase + OFFSET_TX_4G_MODE);
-+		}
-+
- 		writel((u32)wpaddr, i2c->pdmabase + OFFSET_TX_MEM_ADDR);
- 		writel(msgs->len, i2c->pdmabase + OFFSET_TX_LEN);
- 	} else {
-@@ -465,6 +487,17 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 					 msgs->len, DMA_TO_DEVICE);
- 			return -ENOMEM;
- 		}
-+
-+		if (i2c->dev_comp->support_33bits) {
-+			reg_4g_mode = (wpaddr & 0x100000000ULL) ?
-+				       I2C_DMA_4G_MODE : I2C_DMA_CLR_FLAG;
-+			writel(reg_4g_mode, i2c->pdmabase + OFFSET_TX_4G_MODE);
-+
-+			reg_4g_mode = (rpaddr & 0x100000000ULL) ?
-+				       I2C_DMA_4G_MODE : I2C_DMA_CLR_FLAG;
-+			writel(reg_4g_mode, i2c->pdmabase + OFFSET_RX_4G_MODE);
-+		}
-+
- 		writel((u32)wpaddr, i2c->pdmabase + OFFSET_TX_MEM_ADDR);
- 		writel((u32)rpaddr, i2c->pdmabase + OFFSET_RX_MEM_ADDR);
- 		writel(msgs->len, i2c->pdmabase + OFFSET_TX_LEN);
-@@ -729,6 +762,14 @@ static int mtk_i2c_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
-+	if (i2c->dev_comp->support_33bits) {
-+		ret = dma_set_mask(&pdev->dev, DMA_BIT_MASK(33));
-+		if (ret) {
-+			dev_err(&pdev->dev, "dma_set_mask return error.\n");
-+			return ret;
-+		}
-+	}
-+
- 	ret = mtk_i2c_clock_enable(i2c);
- 	if (ret) {
- 		dev_err(&pdev->dev, "clock enable failed!\n");
--- 
-1.7.9.5
+In any case, any feedback you have on that series should be given in
+the other thread.
+
+Regards,
+
+Tomeu
+
+> Regards,
+>
+> Jiancheng
+>
+>> Thanks,
+>>
+>> Tomeu
+>>
+>> .
+>>
+>
