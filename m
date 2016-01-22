@@ -1,77 +1,49 @@
-From: benjamin.tissoires@gmail.com (Benjamin Tissoires)
-Date: Fri, 22 Jan 2016 23:39:48 +0100
-Subject: [PATCH] hid: add support for Lilliput touchscreen
-In-Reply-To: <alpine.LNX.2.00.1601211435360.21446@cbobk.fhfr.pm>
-References: <1449863264-14184-1-git-send-email-srinivas.kandagatla@linaro.org>
- <alpine.LNX.2.00.1601211435360.21446@cbobk.fhfr.pm>
-Message-ID: <CAN+gG=Fs9Sm3GwQrn+yGcgz8ono_VM+DwLqBLSGumqYMnXD__Q@mail.gmail.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Fri, 22 Jan 2016 15:05:23 -0800
+Subject: [PATCH v4 1/3] mailbox: Add support for APM X-Gene platform
+ mailbox driver
+In-Reply-To: <201601162056.dOHk9NgN%fengguang.wu@intel.com>
+References: <abff73c051fd06a9dd3b04a1e7957ad5a9b69a18.1452912126.git.dhdang@apm.com>
+ <201601162056.dOHk9NgN%fengguang.wu@intel.com>
+Message-ID: <CADaLNDmRL-PcwaM7=V_711cLDz=sf-BOycX7EnPcxtY8f_cEYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 21, 2016 at 2:37 PM, Jiri Kosina <jikos@kernel.org> wrote:
-> On Fri, 11 Dec 2015, Srinivas Kandagatla wrote:
+On Sat, Jan 16, 2016 at 4:31 AM, kbuild test robot <lkp@intel.com> wrote:
+> Hi Duc,
 >
->> diff --git a/drivers/hid/hid-core.c b/drivers/hid/hid-core.c
->> index c6f7a69..4350376 100644
->> --- a/drivers/hid/hid-core.c
->> +++ b/drivers/hid/hid-core.c
->> @@ -2051,6 +2051,7 @@ static const struct hid_device_id hid_have_special_driver[] = {
->>       { HID_USB_DEVICE(USB_VENDOR_ID_ZEROPLUS, 0x0005) },
->>       { HID_USB_DEVICE(USB_VENDOR_ID_ZEROPLUS, 0x0030) },
->>       { HID_USB_DEVICE(USB_VENDOR_ID_ZYDACRON, USB_DEVICE_ID_ZYDACRON_REMOTE_CONTROL) },
->> +     { HID_USB_DEVICE(USB_VENDOR_ID_LILLIPUT, USB_PROD_ID_LILLIPUT) },
+> [auto build test WARNING on robh/for-next]
+> [also build test WARNING on v4.4 next-20160115]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 >
-> Could you please keep the list sorted?
+> url:    https://github.com/0day-ci/linux/commits/Duc-Dang/mailbox-Add-support-for-APM-X-Gene-platform-mailbox-driver/20160116-110535
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
+> config: arm64-allyesconfig (attached as .config)
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm64
 >
->>
->>       { HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT, USB_DEVICE_ID_MS_PRESENTER_8K_BT) },
->>       { HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_NINTENDO, USB_DEVICE_ID_NINTENDO_WIIMOTE) },
->> diff --git a/drivers/hid/hid-ids.h b/drivers/hid/hid-ids.h
->> index 9024a3d..f87993f 100644
->> --- a/drivers/hid/hid-ids.h
->> +++ b/drivers/hid/hid-ids.h
->> @@ -1055,4 +1055,8 @@
->>  #define USB_DEVICE_ID_RAPHNET_2NES2SNES      0x0002
->>  #define USB_DEVICE_ID_RAPHNET_4NES4SNES      0x0003
->>
->> +/* Lilliput Capacitive TouchScreen */
->> +#define USB_VENDOR_ID_LILLIPUT  0x1391
->> +#define USB_PROD_ID_LILLIPUT    0x2112
->> +
->>  #endif
->> diff --git a/drivers/hid/hid-multitouch.c b/drivers/hid/hid-multitouch.c
->> index 3d664d0..580749e 100644
->> --- a/drivers/hid/hid-multitouch.c
->> +++ b/drivers/hid/hid-multitouch.c
->> @@ -1209,6 +1209,11 @@ static const struct hid_device_id mt_devices[] = {
->>               MT_USB_DEVICE(USB_VENDOR_ID_CJTOUCH,
->>                       USB_DEVICE_ID_CJTOUCH_MULTI_TOUCH_0040) },
->>
->> +     /* Lilliput multitouch panels */
->> +     {  .driver_data = MT_CLS_DEFAULT,
+> All warnings (new ones prefixed by >>):
+>
+>>> WARNING: vmlinux.o(.data+0xfd6260): Section mismatch in reference from the variable slimpro_mbox_driver to the variable .init.text:$x
+>    The variable slimpro_mbox_driver references
+>    the variable __init $x
+>    If the reference is valid then annotate the
+>    variable with or __refdata (see linux/init.h) or name the variable:
 
-NACK without further explanations.
+I fixed the build warning, will post and updated after further comment
+from Jassi.
 
-Why do you need to patch the kernel an already working touchscreen?
-MT_CLS_DEFAULT is the default as its name stands, and we do not need
-to add a per device entry for it.
+I did not catch it before posting my patch because I did not compile
+with  CONFIG_DEBUG_SECTION_MISMATCH=y. I will make sure I have this
+option enabled for my build process going forward.
 
-Cheers,
-Benjamin
-
->> +             HID_USB_DEVICE(USB_VENDOR_ID_LILLIPUT,
->> +                     USB_PROD_ID_LILLIPUT) },
->> +
+Regards,
+Duc Dang.
 >
-> This is a bit out of order as well.
 >
-> Thanks,
->
-> --
-> Jiri Kosina
-> SUSE Labs
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-input" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
