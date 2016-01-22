@@ -1,50 +1,77 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 22 Jan 2016 12:11:25 +0100
-Subject: [PATCH v3 0/3] i.MX6 LDB mux/divider glitch workaround
-Message-ID: <1453461088-31549-1-git-send-email-p.zabel@pengutronix.de>
+Date: Fri, 22 Jan 2016 12:11:27 +0100
+Subject: [PATCH v3 2/3] ARM: imx6: Make the LDB_DI0 and LDB_DI1 clocks
+ read-only.
+In-Reply-To: <1453461088-31549-1-git-send-email-p.zabel@pengutronix.de>
+References: <1453461088-31549-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1453461088-31549-3-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Due to incorrect placement of the clock gate cell in the ldb_di[x]_clk
+tree, the glitchy parent mux of ldb_di[x]_clk can cause a glitch to
+enter the ldb_di_ipu_div divider. If the divider gets locked up, no
+ldb_di[x]_clk is generated, and the LVDS display will hang when the
+ipu_di_clk is sourced from ldb_di_clk.
 
-The previous version was broken for i.MX6S/DL since
-disable_anatop_clocks() would try to check the parent of clk_periph_pre,
-but it was called before clk_periph_pre was registered.
-disable_anatop_clocks() then went on and failed to not disable the
-memory clock.
+To fix the problem, both the new and current parent of the ldb_di_clk
+should be disabled before the switch. As this can not be guaranteed by
+the clock framework during runtime, make the ldb_di[x]_sel muxes read-only.
+A workaround to set the muxes once during boot could be added to the
+kernel or bootloader.
 
-So it appears there is a yet unreleased ERR009219, which I have not yet
-seen, that supposedly describes the LDB mux glitch issue, and a draft
-engineering bulletin EB821 that describes the clock switching procedure.
-Shawn, do you have access to these documents?
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ drivers/clk/imx/clk-imx6q.c | 10 ++--------
+ drivers/clk/imx/clk.h       |  8 ++++++++
+ 2 files changed, 10 insertions(+), 8 deletions(-)
 
-Especially the comment explaining init_ldb_clks() should be double checked
-against the erratum once available, as that contains my interpretation of
-the original patch comment.
-
-regards
-Philipp
-
-Changes since v2:
- - Fix DL/S support. disable_anatop_clocks() checks whether pll2_pfd2_396m
-   is the parent of clk_periph_pre to avoid disabling the memory clock.
-   For this to work, disable_anatop_clocks() must be called only after
-   clk_periph_pre is registered.
- - Replace magic numbers with #defines
- - Improve the comment describing init_ldb_di_clks()
- - Improve selection checking and error messages
-
-Fabio Estevam (1):
-  ARM: imx6: Fix procedure to switch the parent of LDB_DI_CLK
-
-Philipp Zabel (2):
-  ARM: imx6: Mask mmdc_ch1 handshake for periph2_sel and
-    mmdc_ch1_axi_podf
-  ARM: imx6: Make the LDB_DI0 and LDB_DI1 clocks read-only.
-
- drivers/clk/imx/clk-imx6q.c | 294 ++++++++++++++++++++++++++++++++++++++++++--
- drivers/clk/imx/clk.h       |   8 ++
- 2 files changed, 292 insertions(+), 10 deletions(-)
-
+diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
+index ef7afa5..b4b2541 100644
+--- a/drivers/clk/imx/clk-imx6q.c
++++ b/drivers/clk/imx/clk-imx6q.c
+@@ -313,8 +313,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk[IMX6QDL_CLK_GPU3D_SHADER_SEL] = imx_clk_mux("gpu3d_shader_sel", base + 0x18, 8,  2, gpu3d_shader_sels, ARRAY_SIZE(gpu3d_shader_sels));
+ 	clk[IMX6QDL_CLK_IPU1_SEL]         = imx_clk_mux("ipu1_sel",         base + 0x3c, 9,  2, ipu_sels,          ARRAY_SIZE(ipu_sels));
+ 	clk[IMX6QDL_CLK_IPU2_SEL]         = imx_clk_mux("ipu2_sel",         base + 0x3c, 14, 2, ipu_sels,          ARRAY_SIZE(ipu_sels));
+-	clk[IMX6QDL_CLK_LDB_DI0_SEL]      = imx_clk_mux_flags("ldb_di0_sel", base + 0x2c, 9,  3, ldb_di_sels,      ARRAY_SIZE(ldb_di_sels), CLK_SET_RATE_PARENT);
+-	clk[IMX6QDL_CLK_LDB_DI1_SEL]      = imx_clk_mux_flags("ldb_di1_sel", base + 0x2c, 12, 3, ldb_di_sels,      ARRAY_SIZE(ldb_di_sels), CLK_SET_RATE_PARENT);
++	clk[IMX6QDL_CLK_LDB_DI0_SEL]      = imx_clk_mux_ldb("ldb_di0_sel", base + 0x2c, 9,  3, ldb_di_sels,      ARRAY_SIZE(ldb_di_sels));
++	clk[IMX6QDL_CLK_LDB_DI1_SEL]      = imx_clk_mux_ldb("ldb_di1_sel", base + 0x2c, 12, 3, ldb_di_sels,      ARRAY_SIZE(ldb_di_sels));
+ 	clk[IMX6QDL_CLK_IPU1_DI0_PRE_SEL] = imx_clk_mux_flags("ipu1_di0_pre_sel", base + 0x34, 6,  3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels), CLK_SET_RATE_PARENT);
+ 	clk[IMX6QDL_CLK_IPU1_DI1_PRE_SEL] = imx_clk_mux_flags("ipu1_di1_pre_sel", base + 0x34, 15, 3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels), CLK_SET_RATE_PARENT);
+ 	clk[IMX6QDL_CLK_IPU2_DI0_PRE_SEL] = imx_clk_mux_flags("ipu2_di0_pre_sel", base + 0x38, 6,  3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels), CLK_SET_RATE_PARENT);
+@@ -514,12 +514,6 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 
+ 	clk_register_clkdev(clk[IMX6QDL_CLK_ENET_REF], "enet_ref", NULL);
+ 
+-	if ((imx_get_soc_revision() != IMX_CHIP_REVISION_1_0) ||
+-	    clk_on_imx6dl()) {
+-		clk_set_parent(clk[IMX6QDL_CLK_LDB_DI0_SEL], clk[IMX6QDL_CLK_PLL5_VIDEO_DIV]);
+-		clk_set_parent(clk[IMX6QDL_CLK_LDB_DI1_SEL], clk[IMX6QDL_CLK_PLL5_VIDEO_DIV]);
+-	}
+-
+ 	clk_set_rate(clk[IMX6QDL_CLK_PLL3_PFD1_540M], 540000000);
+ 	if (clk_on_imx6dl())
+ 		clk_set_parent(clk[IMX6QDL_CLK_IPU1_SEL], clk[IMX6QDL_CLK_PLL3_PFD1_540M]);
+diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
+index c94ac5c..19a887c 100644
+--- a/drivers/clk/imx/clk.h
++++ b/drivers/clk/imx/clk.h
+@@ -136,6 +136,14 @@ static inline struct clk *imx_clk_mux_flags(const char *name,
+ 			&imx_ccm_lock);
+ }
+ 
++static inline struct clk *imx_clk_mux_ldb(const char *name, void __iomem *reg,
++		u8 shift, u8 width, const char **parents, int num_parents)
++{
++	return clk_register_mux(NULL, name, parents, num_parents,
++			CLK_SET_RATE_NO_REPARENT | CLK_SET_RATE_PARENT, reg,
++			shift, width, CLK_MUX_READ_ONLY, &imx_ccm_lock);
++}
++
+ static inline struct clk *imx_clk_fixed_factor(const char *name,
+ 		const char *parent, unsigned int mult, unsigned int div)
+ {
 -- 
 2.7.0.rc3
