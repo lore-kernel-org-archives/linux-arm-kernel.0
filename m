@@ -1,129 +1,66 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Fri, 22 Jan 2016 14:44:47 +0800
-Subject: [PATCH v7 2/2] mfd: add documentation for ACT8945A DT bindings
-In-Reply-To: <1453445087-2791-1-git-send-email-wenyou.yang@atmel.com>
-References: <1453445087-2791-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1453445087-2791-3-git-send-email-wenyou.yang@atmel.com>
+Date: Fri, 22 Jan 2016 14:53:28 +0800
+Subject: [PATCH v7 0/2] power: act8945a: add charger driver for the sub-device
+ of ACT8945A MFD
+Message-ID: <1453445610-19275-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Active-semi ACT8945A PMIC is a Multi-Function Device, it has
-two subdevices:
+The ACT8945A is a Multi Function Device with the following subdevices:
  - Regulator
  - Charger
 
-This patch adds documentation for ACT8945A DT bindings.
+This patch set is to add regulator driver for ACT8945A.
+It is based on the patch set:
+	http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/401044.html
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
+Changes in v7:
+ - use the helper dev_get_regmap(pdev->dev.parent, NULL) to get regmap.
+ - remove *act8945a_dev member from struct act8945a_charger.
+ - remove *psy member from struct act8945a_charger.
+ - merge _parse_dt() and _charger_config() functions, remove relevent
+   members from struct act8945a_charger.
+ - remove unused platform_set_drvdata(pdev, charger) statement.
 
-Changes in v7: None
 Changes in v6:
- - change the regulator name.
+ - change the type value to unsigned int.
 
-Changes in v5: None
-Changes in v4: None
+Changes in v5:
+ - remove spare spaces after #define.
+ - add OF match table.
+ - collect Reviewed-by from Krzysztof.
+
+Changes in v4:
+ - use spaces after #define, not tabs.
+ - use BIT(n) macros to substitute (0x01 << x).
+ - change dt properties with more legible name.
+ - change the properties with more legible name, clearer description.
+
 Changes in v3:
- - fix the tabbing errors in Example.
- - use "pmic at 5b" label, not "act8945a at 5b" in Example.
- - collect Acked-by from Rob.
+ - update the file header with short version license and author line.
+ - remove unused member of struct act8945a_charger, dev.
+ - action due to removing the member of stuct act8945a_dev, dev.
+ - remove the unnecessary print out.
+ - remove the unnecessary act8945a_charger_remove().
+ - fix align of the code-style.
 
 Changes in v2:
- - use more specific label in Example.
- - add pmic and charger nodes in Example.
+ 1./ Substitute of_property_read_bool() for of_get_property().
+ 2./ Substitute devm_power_supply_register() for power_supply_register().
+ 3./ Use module_platform_driver(), instead of subsys_initcall().
+ 4./ Substitute MODULE_LICENSE("GPL") for MODULE_LICENSE("GPL v2").
 
- Documentation/devicetree/bindings/mfd/act8945a.txt |   82 ++++++++++++++++++++
- 1 file changed, 82 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/act8945a.txt
+Wenyou Yang (2):
+  power: act8945a: add charger driver for ACT8945A
+  power: add documentation for ACT8945A's charger DT bindings
 
-diff --git a/Documentation/devicetree/bindings/mfd/act8945a.txt b/Documentation/devicetree/bindings/mfd/act8945a.txt
-new file mode 100644
-index 0000000..f2a8387
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/act8945a.txt
-@@ -0,0 +1,82 @@
-+Device-Tree bindings for Active-semi ACT8945A MFD driver
-+
-+Required properties:
-+ - compatible: "active-semi,act8945a".
-+ - reg: the I2C slave address for the ACT8945A chip
-+
-+The chip exposes two subdevices:
-+ - a regulators: see ../regulator/act8945a-regulator.txt
-+ - a charger: see ../power/act8945a-charger.txt
-+
-+Example:
-+	pmic at 5b {
-+		compatible = "active-semi,act8945a";
-+		reg = <0x5b>;
-+		status = "okay";
-+
-+		pmic {
-+			compatible = "active-semi,act8945a-regulator";
-+			active-semi,vsel-high;
-+
-+			regulators {
-+				vdd_1v35_reg: REG_DCDC1 {
-+					regulator-name = "VDD_1V35";
-+					regulator-min-microvolt = <1350000>;
-+					regulator-max-microvolt = <1350000>;
-+					regulator-always-on;
-+				};
-+
-+				vdd_1v2_reg: REG_DCDC2 {
-+					regulator-name = "VDD_1V2";
-+					regulator-min-microvolt = <1100000>;
-+					regulator-max-microvolt = <1300000>;
-+					regulator-always-on;
-+				};
-+
-+				vdd_3v3_reg: REG_DCDC3 {
-+					regulator-name = "VDD_3V3";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-always-on;
-+				};
-+
-+				vdd_fuse_reg: REG_LDO1 {
-+					regulator-name = "VDD_FUSE";
-+					regulator-min-microvolt = <2500000>;
-+					regulator-max-microvolt = <2500000>;
-+					regulator-always-on;
-+				};
-+
-+				vdd_3v3_lp_reg: REG_LDO2 {
-+					regulator-name = "VDD_3V3_LP";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-always-on;
-+				};
-+
-+				vdd_led_reg: REG_LDO3 {
-+					regulator-name = "VDD_LED";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-always-on;
-+				};
-+
-+				vdd_sdhc_1v8_reg: REG_LDO4 {
-+					regulator-name = "VDD_SDHC_1V8";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+			};
-+		};
-+
-+		charger {
-+			compatible = "active-semi,act8945a-charger";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_charger_chglev>;
-+			active-semi,chglev-gpio = <&pioA 12 GPIO_ACTIVE_HIGH>;
-+			active-semi,input_voltage_threshold = <6600>;
-+			active-semi,precondition_timeout = <40>;
-+			active-semi,total_timeout = <3>;
-+		};
-+	};
+ .../devicetree/bindings/power/act8945a-charger.txt |   33 ++
+ drivers/power/Kconfig                              |    7 +
+ drivers/power/Makefile                             |    1 +
+ drivers/power/act8945a_charger.c                   |  362 ++++++++++++++++++++
+ 4 files changed, 403 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power/act8945a-charger.txt
+ create mode 100644 drivers/power/act8945a_charger.c
+
 -- 
 1.7.9.5
