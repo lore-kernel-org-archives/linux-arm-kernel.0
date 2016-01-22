@@ -1,129 +1,46 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 22 Jan 2016 23:08:21 +0100
-Subject: [PATCH v2] ARM: mm: mark section-aligned portion of rodata NX
-In-Reply-To: <CAGXu5jLDK8eVO2kUD1cB3TArL8k8pF=igc3O04Fa40QgQ2pwNw@mail.gmail.com>
-References: <20151207223534.GA13722@www.outflux.net>
- <CAKv+Gu9EeKQk7GOAPV2cvff10=kD49u+oP-yEiOrJBPOF=QNtw@mail.gmail.com>
- <CAGXu5j+Pc7ucC4tmxHyDW7aW88pwQvMejuR2Ehdxp=vY+pv-5w@mail.gmail.com>
- <CAGXu5jLDK8eVO2kUD1cB3TArL8k8pF=igc3O04Fa40QgQ2pwNw@mail.gmail.com>
-Message-ID: <CAKv+Gu9aAiDAtFWMJVfCvod4=Nw+NUoAqU_bspK_V2Nm3jYjNw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 22 Jan 2016 14:22:25 -0800
+Subject: [GIT PULL 1/2] ARM: SoC fixes for v4.5 merge window
+Message-ID: <20160122222225.GA14759@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 January 2016 at 22:19, Kees Cook <keescook@chromium.org> wrote:
-> On Tue, Dec 8, 2015 at 10:38 AM, Kees Cook <keescook@chromium.org> wrote:
->> On Mon, Dec 7, 2015 at 11:47 PM, Ard Biesheuvel
->> <ard.biesheuvel@linaro.org> wrote:
->>> On 7 December 2015 at 23:35, Kees Cook <keescook@chromium.org> wrote:
->>>> When rodata is large enough that it crosses a section boundary after the
->>>> kernel text, mark the rest NX. This is as close to full NX of rodata as
->>>> we can get without splitting page tables or doing section alignment via
->>>> CONFIG_DEBUG_ALIGN_RODATA.
->>>>
->>>> When the config is:
->>>>
->>>>  CONFIG_DEBUG_RODATA=y
->>>>  # CONFIG_DEBUG_ALIGN_RODATA is not set
->>>>
->>>> Before:
->>>>
->>>> ---[ Kernel Mapping ]---
->>>> 0x80000000-0x80100000           1M     RW NX SHD
->>>> 0x80100000-0x80a00000           9M     ro x  SHD
->>>> 0x80a00000-0xa0000000         502M     RW NX SHD
->>>>
->>>> After:
->>>>
->>>> ---[ Kernel Mapping ]---
->>>> 0x80000000-0x80100000           1M     RW NX SHD
->>>> 0x80100000-0x80700000           6M     ro x  SHD
->>>> 0x80700000-0x80a00000           3M     ro NX SHD
->>>> 0x80a00000-0xa0000000         502M     RW NX SHD
->>>>
->>>> Signed-off-by: Kees Cook <keescook@chromium.org>
->>>> ---
->>>> v2:
->>>> - static declaration, ard
->>>> ---
->>>>  arch/arm/kernel/vmlinux.lds.S | 9 +++++++--
->>>>  arch/arm/mm/init.c            | 7 ++++---
->>>>  2 files changed, 11 insertions(+), 5 deletions(-)
->>>>
->>>> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
->>>> index a6e395c53a48..9c249c71fda1 100644
->>>> --- a/arch/arm/kernel/vmlinux.lds.S
->>>> +++ b/arch/arm/kernel/vmlinux.lds.S
->>>> @@ -8,9 +8,7 @@
->>>>  #include <asm/thread_info.h>
->>>>  #include <asm/memory.h>
->>>>  #include <asm/page.h>
->>>> -#ifdef CONFIG_DEBUG_RODATA
->>>>  #include <asm/pgtable.h>
->>>> -#endif
->>>>
->>>>  #define PROC_INFO                                                      \
->>>>         . = ALIGN(4);                                                   \
->>>> @@ -337,6 +335,13 @@ SECTIONS
->>>>  }
->>>>
->>>>  /*
->>>> + * Without CONFIG_DEBUG_ALIGN_RODATA, __start_rodata_section_aligned will
->>>> + * be the first section-aligned location after __start_rodata. Otherwise,
->>>> + * it will be equal to __start_rodata.
->>>> + */
->>>> +__start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
->>>> +
->>>> +/*
->>>>   * These must never be empty
->>>>   * If you have to comment these two assert statements out, your
->>>>   * binutils is too old (for other reasons as well)
->>>> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
->>>> index 321d3683dc7c..6b16f6cf4843 100644
->>>> --- a/arch/arm/mm/init.c
->>>> +++ b/arch/arm/mm/init.c
->>>> @@ -579,6 +579,9 @@ struct section_perm {
->>>>         pmdval_t clear;
->>>>  };
->>>>
->>>> +/* First section-aligned location at or after __start_rodata. */
->>>> +extern char __start_rodata_section_aligned[];
->>>> +
->>>>  static struct section_perm nx_perms[] = {
->>>>         /* Make pages tables, etc before _stext RW (set NX). */
->>>>         {
->>>> @@ -596,16 +599,14 @@ static struct section_perm nx_perms[] = {
->>>>                 .mask   = ~PMD_SECT_XN,
->>>>                 .prot   = PMD_SECT_XN,
->>>>         },
->>>> -#ifdef CONFIG_DEBUG_ALIGN_RODATA
->>>>         /* Make rodata NX (set RO in ro_perms below). */
->>>>         {
->>>>                 .name   = "rodata NX",
->>>> -               .start  = (unsigned long)__start_rodata,
->>>> +               .start  = (unsigned long)__start_rodata_section_aligned,
->>>>                 .end    = (unsigned long)__init_begin,
->>>
->>> What happens if start > end ?
->>
->> It isn't possible, since rodata will be after text and before
->> init_begin, so it must either less than or equal to init_begin. The
->> equal case is quite possible, and that's fine, since both cases are
->> (correctly) silently ignored by set_section_perms:
->>
->>                 for (addr = perms[i].start; addr < perms[i].end; addr
->> += SECTION_SIZE)
->>                     section_update(....
->>
->> -Kees
->
-> Hi Ard,
->
-> Is this v2 ok? I'd like to have your Ack before sending it to the patch tracker.
->
+Hi Linus,
 
-Looks fine to me
+The following changes since commit 2cb58c016673c4c8b8ec59e71c5ec4b2c6a76afb:
 
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+  ARM: realview: don't select SMP_ON_UP for UP builds (2015-12-31 23:52:20 +0100)
 
-Thanks,
-Ard.
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git armsoc-fixes
+
+for you to fetch changes up to 53c517a83741718e35dd0494eb271c3c6e3820e5:
+
+  Merge tag 'renesas-fixes-for-v4.5' of git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas into fixes (2016-01-22 08:28:23 -0800)
+
+----------------------------------------------------------------
+ARM: SoC fixes for v4.5 merge window
+
+A few fixes for fallout that we didn't catch in time in -next, or smaller
+warning fixes that have been discovered since.
+
+----------------------------------------------------------------
+Arnd Bergmann (2):
+      ARM: debug-ll: fix BCM63xx entry for multiplatform
+      soc: qcom/spm: shut up uninitialized variable warning
+
+Geert Uytterhoeven (1):
+      ARM: dts: armadillo800eva Correct extal1 frequency to 24 MHz
+
+Linus Walleij (1):
+      ARM: realview: fix device tree build
+
+Olof Johansson (1):
+      Merge tag 'renesas-fixes-for-v4.5' of git://git.kernel.org/.../horms/renesas into fixes
+
+ arch/arm/Kconfig.debug                        | 17 ++++++-----------
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts |  2 +-
+ arch/arm/mach-realview/Makefile               |  3 +--
+ drivers/soc/qcom/spm.c                        |  2 +-
+ 4 files changed, 9 insertions(+), 15 deletions(-)
