@@ -1,41 +1,139 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 22 Jan 2016 10:17:56 +0100
-Subject: [PATCH 0/2] ARM: shmobile: r8a777[89]: use GIC_* defines
-In-Reply-To: <1453351966-10968-1-git-send-email-horms+renesas@verge.net.au>
-References: <1453351966-10968-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdU7FwRB4k=6oKq=eYDk9eOM6ffRinLv+TMNMpU0GsZWCA@mail.gmail.com>
+From: liguo.zhang@mediatek.com (Liguo Zhang)
+Date: Fri, 22 Jan 2016 17:38:02 +0800
+Subject: [PATCH] i2c: mt8173: add 4GB mode support in i2c driver.
+Message-ID: <1453455482-3218-1-git-send-email-liguo.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+If 4GB mode is enable, we should add 4gb mode support in i2c driver.
+Set 4GB mode register to support 4GB mode.
 
-On Thu, Jan 21, 2016 at 5:52 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> this short series uses GIC_* defines in the r8a779[34] device trees as
-> appropriate.
->
-> This is a follow-up for similar work for the r8a779[0134] SoCs.
-> I plan to post follow up patches to update the device trees for
-> other Renesas SoCs depending on the success of this series.
->
-> Based on renesas-devel-20160118-v4.4
+Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
+---
+ drivers/i2c/busses/i2c-mt65xx.c |   41 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-Thank you!
-
-> Simon Horman (2):
->   ARM: dts: r8a7778: use GIC_* defines
->   ARM: dts: r8a7779: use GIC_* defines
-
-Both
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
+index aec8e6c..80d3c79 100644
+--- a/drivers/i2c/busses/i2c-mt65xx.c
++++ b/drivers/i2c/busses/i2c-mt65xx.c
+@@ -60,6 +60,7 @@
+ #define I2C_DMA_INT_FLAG_NONE		0x0000
+ #define I2C_DMA_CLR_FLAG		0x0000
+ #define I2C_DMA_HARD_RST		0x0002
++#define I2C_DMA_4G_MODE			0x0001
+ 
+ #define I2C_DEFAULT_SPEED		100000	/* hz */
+ #define MAX_FS_MODE_SPEED		400000
+@@ -88,6 +89,8 @@ enum DMA_REGS_OFFSET {
+ 	OFFSET_RX_MEM_ADDR = 0x20,
+ 	OFFSET_TX_LEN = 0x24,
+ 	OFFSET_RX_LEN = 0x28,
++	OFFSET_TX_4G_MODE = 0x54,
++	OFFSET_RX_4G_MODE = 0x58,
+ };
+ 
+ enum i2c_trans_st_rs {
+@@ -133,6 +136,7 @@ struct mtk_i2c_compatible {
+ 	unsigned char dcm: 1;
+ 	unsigned char auto_restart: 1;
+ 	unsigned char aux_len_reg: 1;
++	unsigned char support_33bits: 1;
+ };
+ 
+ struct mtk_i2c {
+@@ -182,6 +186,7 @@ static const struct mtk_i2c_compatible mt6577_compat = {
+ 	.dcm = 1,
+ 	.auto_restart = 0,
+ 	.aux_len_reg = 0,
++	.support_33bits = 0,
+ };
+ 
+ static const struct mtk_i2c_compatible mt6589_compat = {
+@@ -190,6 +195,7 @@ static const struct mtk_i2c_compatible mt6589_compat = {
+ 	.dcm = 0,
+ 	.auto_restart = 0,
+ 	.aux_len_reg = 0,
++	.support_33bits = 0,
+ };
+ 
+ static const struct mtk_i2c_compatible mt8173_compat = {
+@@ -198,6 +204,7 @@ static const struct mtk_i2c_compatible mt8173_compat = {
+ 	.dcm = 1,
+ 	.auto_restart = 1,
+ 	.aux_len_reg = 1,
++	.support_33bits = 1,
+ };
+ 
+ static const struct of_device_id mtk_i2c_of_match[] = {
+@@ -373,6 +380,7 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 	u16 start_reg;
+ 	u16 control_reg;
+ 	u16 restart_flag = 0;
++	u32 reg_4g_mode = 0;
+ 	dma_addr_t rpaddr = 0;
+ 	dma_addr_t wpaddr = 0;
+ 	int ret;
+@@ -439,6 +447,13 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 					msgs->len, DMA_FROM_DEVICE);
+ 		if (dma_mapping_error(i2c->dev, rpaddr))
+ 			return -ENOMEM;
++
++		if (i2c->dev_comp->support_33bits) {
++			reg_4g_mode = (rpaddr & 0x100000000ULL) ?
++				       I2C_DMA_4G_MODE : I2C_DMA_CLR_FLAG;
++			writel(reg_4g_mode, i2c->pdmabase + OFFSET_RX_4G_MODE);
++		}
++
+ 		writel((u32)rpaddr, i2c->pdmabase + OFFSET_RX_MEM_ADDR);
+ 		writel(msgs->len, i2c->pdmabase + OFFSET_RX_LEN);
+ 	} else if (i2c->op == I2C_MASTER_WR) {
+@@ -448,6 +463,13 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 					msgs->len, DMA_TO_DEVICE);
+ 		if (dma_mapping_error(i2c->dev, wpaddr))
+ 			return -ENOMEM;
++
++		if (i2c->dev_comp->support_33bits) {
++			reg_4g_mode = (wpaddr & 0x100000000ULL) ?
++				       I2C_DMA_4G_MODE : I2C_DMA_CLR_FLAG;
++			writel(reg_4g_mode, i2c->pdmabase + OFFSET_TX_4G_MODE);
++		}
++
+ 		writel((u32)wpaddr, i2c->pdmabase + OFFSET_TX_MEM_ADDR);
+ 		writel(msgs->len, i2c->pdmabase + OFFSET_TX_LEN);
+ 	} else {
+@@ -465,6 +487,17 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 					 msgs->len, DMA_TO_DEVICE);
+ 			return -ENOMEM;
+ 		}
++
++		if (i2c->dev_comp->support_33bits) {
++			reg_4g_mode = (wpaddr & 0x100000000ULL) ?
++				       I2C_DMA_4G_MODE : I2C_DMA_CLR_FLAG;
++			writel(reg_4g_mode, i2c->pdmabase + OFFSET_TX_4G_MODE);
++
++			reg_4g_mode = (rpaddr & 0x100000000ULL) ?
++				       I2C_DMA_4G_MODE : I2C_DMA_CLR_FLAG;
++			writel(reg_4g_mode, i2c->pdmabase + OFFSET_RX_4G_MODE);
++		}
++
+ 		writel((u32)wpaddr, i2c->pdmabase + OFFSET_TX_MEM_ADDR);
+ 		writel((u32)rpaddr, i2c->pdmabase + OFFSET_RX_MEM_ADDR);
+ 		writel(msgs->len, i2c->pdmabase + OFFSET_TX_LEN);
+@@ -729,6 +762,14 @@ static int mtk_i2c_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
++	if (i2c->dev_comp->support_33bits) {
++		ret = dma_set_mask(&pdev->dev, DMA_BIT_MASK(33));
++		if (ret) {
++			dev_err(&pdev->dev, "dma_set_mask return error.\n");
++			return ret;
++		}
++	}
++
+ 	ret = mtk_i2c_clock_enable(i2c);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "clock enable failed!\n");
+-- 
+1.7.9.5
