@@ -1,46 +1,37 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 22 Jan 2016 19:08:30 +0100
-Subject: [PATCHv8 1/4] EDAC, altera: Add Altera L2 Cache and OCRAM EDAC
- Support
-In-Reply-To: <56A25F59.5070306@mentor.com>
-References: <1453397668-32094-1-git-send-email-tthayer@opensource.altera.com>
- <56A1C5DE.1080501@mentor.com>
- <56A24C34.3000303@opensource.altera.com>
- <56A25F59.5070306@mentor.com>
-Message-ID: <20160122180830.GH9806@pd.tnic>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 22 Jan 2016 13:38:59 -0500
+Subject: [PATCH V12 3/7] dma: add Qualcomm Technologies HIDMA management
+ driver
+In-Reply-To: <20160115152257.GK3262@leverpostej>
+References: <1452523550-8920-1-git-send-email-okaya@codeaurora.org>
+ <1452523550-8920-4-git-send-email-okaya@codeaurora.org>
+ <20160115145629.GI3262@leverpostej> <56990C40.4050407@codeaurora.org>
+ <20160115152257.GK3262@leverpostej>
+Message-ID: <56A27743.40008@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 22, 2016 at 06:56:57PM +0200, Vladimir Zapolskiy wrote:
-> it sounds like the author of the original change is Dinh, but if you agreed
-> about authorship transfer, then "From: Thor Thayer" statement should be
-> correct, but in any case your SoB should follow Dinh's SoB, if you decide to
-> keep the latter one.
-> 
-> This consideration may apply to the other changes in the changeset as well.
+On 1/15/2016 10:22 AM, Mark Rutland wrote:
+> Typically VFIO-platform also comes with a corresponding reset driver.
+> You don't need one?
 
-So the patch author should be in the From:
+Digging this further, I do need a HIDMA reset driver. The reset driver is useful if HIDMA 
+operation is aborted in the middle and guest machine is shutdown. 
 
-If Thor has changed the original patch considerably, then you Thor and
-Dinh could decide amongst each other who should be the author.
+I'm preparing a reset driver and I'll post it soon. 
 
-If Thor becomes the author and lands in From:, then the commit message
-could state something like "based on original work from Dinh" or
-"Originally-from: Dinh" and so on. "git log" has some examples.
+In the meantime, I have observed a lack of ACPI HID support in the platform reset interface
+vfio_platform_lookup_reset and vfio_platform_probe_common specifically.
 
-The SOB chain shows who handled the patch on its way upstream. So in
-this case, it should be:
+The interface is querying objects with "compatible" string. Of course on a true ACPI system
+with proper named HIDs except PRP001, "compatible" attribute does not exist. I'm also preparing a
+patch for this too.
 
-SOB: Dinh (if From: is Dinh - otherwise Originally-by:)
-SOB: Thor
-SOB: Boris
-
-if I'm going to pick it up and send it to Linus.
-
-Ok?
+Since VFIO patches go through another branch and the reset driver also needs to go through vfio along 
+with the ACPI object querying support, would you like this to be addressed independently with a different series 
+or have it reviewed altogether here then figure out the merge path later?
 
 -- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
