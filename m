@@ -1,51 +1,102 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 22 Jan 2016 17:18:15 +0000
-Subject: [PATCH v3 3/9] ASoC: rockchip: i2s: add support for grabbing
- output clock to codec
-In-Reply-To: <CAPz6YkWt-iXS6P4QBBoq3v3i7ZAGGu6=_9AHw4qgevEwDwbdTA@mail.gmail.com>
-References: <1452865796-23527-1-git-send-email-wxt@rock-chips.com>
- <1452865796-23527-4-git-send-email-wxt@rock-chips.com>
- <20160115174623.GZ6588@sirena.org.uk>
- <CAPz6YkWt-iXS6P4QBBoq3v3i7ZAGGu6=_9AHw4qgevEwDwbdTA@mail.gmail.com>
-Message-ID: <20160122171815.GD6588@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 22 Jan 2016 17:19:35 +0000
+Subject: [PATCH v3 08/21] arm64: add support for module PLTs
+In-Reply-To: <CAKv+Gu-5uN9iZf00ABRmzgxW2QCM+rWkh12B981gP=mfhq8NGQ@mail.gmail.com>
+References: <1452518355-4606-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1452518355-4606-9-git-send-email-ard.biesheuvel@linaro.org>
+ <20160122165517.GD11645@leverpostej>
+ <CAKv+Gu-5uN9iZf00ABRmzgxW2QCM+rWkh12B981gP=mfhq8NGQ@mail.gmail.com>
+Message-ID: <20160122171935.GF11645@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 01:48:04PM -0800, Sonny Rao wrote:
-> On Fri, Jan 15, 2016 at 9:46 AM, Mark Brown <broonie@kernel.org> wrote:
+On Fri, Jan 22, 2016 at 06:06:52PM +0100, Ard Biesheuvel wrote:
+> On 22 January 2016 at 17:55, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> +static bool in_init(const struct module *mod, void *addr)
+> >> +{
+> >> +     return (u64)addr - (u64)mod->module_init < mod->init_size;
+> >> +}
+> >> +
+> >> +u64 get_module_plt(struct module *mod, void *loc, u64 val)
+> >> +{
+> >> +     struct plt_entry entry = {
+> >> +             cpu_to_le32(0x92800010 | (((~val      ) & 0xffff)) << 5),
+> >> +             cpu_to_le32(0xf2a00010 | ((( val >> 16) & 0xffff)) << 5),
+> >> +             cpu_to_le32(0xf2c00010 | ((( val >> 32) & 0xffff)) << 5),
+> >> +             cpu_to_le32(0xd61f0200)
+> >> +     }, *plt;
+> >
+> > It would be nice if we could un-magic this, though I see that reusing
+> > the existing insn or reloc_insn code is painful here.
+> >
+> 
+> Well, I could #define PLT0 PLT1 PLT2 etc, and document them a bit
+> better, but having all the instruction machinery for emitting the
+> exact same instructions each time seems a bit overkill imo.
 
-> > If the I2S block is providing a clock to the CODEC then that's what the
-> > software should do so that the CODEC can gate and ungate the clock as
-> > required.  This patch has the I2S block using a clock, not providing
-> > one.
+Well, almost the same (the target address does change after all).
 
-> From my read of the clock diagram for RK3288  there is a single clock
-> signal (labeled "clk_i2s0") that comes out of a fractional divider,
-> and it is split such that one path gets sent to the I2S block and the
-> second path is sent to a mux after which that signal is sent to an
-> external pin that goes to the codec.
+I agree that this looks more complicated using the insn machinery, based
+on local experimentation. Oh well...
+ 
+> >> +     int i, *count;
+> >> +
+> >> +     if (in_init(mod, loc)) {
+> >> +             plt = (struct plt_entry *)mod->arch.init_plt->sh_addr;
+> >> +             count = &mod->arch.init_plt_count;
+> >> +     } else {
+> >> +             plt = (struct plt_entry *)mod->arch.core_plt->sh_addr;
+> >> +             count = &mod->arch.core_plt_count;
+> >> +     }
+> >> +
+> >> +     /* Look for an existing entry pointing to 'val' */
+> >> +     for (i = 0; i < *count; i++)
+> >> +             if (plt[i].mov0 == entry.mov0 &&
+> >> +                 plt[i].mov1 == entry.mov1 &&
+> >> +                 plt[i].mov2 == entry.mov2)
+> >> +                     return (u64)&plt[i];
+> >
+> > I think that at the cost of redundantly comparing the br x16, you could
+> > simplify this by comparing the whole struct, e.g.
+> >
+> >         for (i = 0; i < *count; i++)
+> >                 if (plt[i] == entry)
+> 
+> You can use struct types in assignments, but not in comparisons,
+> strangely enough
 
-> There are separate clock gates for the two paths: one for the I2S
-> block and one after that mux before the external pin.
+Ah, sorry for the noise.
 
-> I'm not sure if it's being modeled that way in the Linux code or not,
-> but at least physically I don't think this clock signal actually goes
-> through the I2S block before being sent to the codec.
+> >> +     for (s = sechdrs + 1; s < sechdrs_end; ++s) {
+> >
+> > Could we have a comment as to why we skip the first Shdr? I recall it's
+> > in some way special, but I can't recall why/how.
+> >
+> 
+> I don't remember exactly, and some of this code originated on ia64 IIRC.
+> Probably better to simply start from [0]
 
-That's not really the issue here, the issue is that it's not the I2S
-controller that is consuming the clock so it should not be the I2S
-controller driver that ensures that the clock is enabled.  The driver
-that manages the clock should be the one that uses it, like I say this
-means you should add the code to enable the clock to the CODEC driver if
-the CODEC driver needs the clock enabled.
+Ok.
 
-> Does that help clarify?
+> >> +             const Elf64_Rela *rels = (void *)ehdr + s->sh_offset;
+> >> +             int numrels = s->sh_size / sizeof(Elf64_Rela);
+> >> +             Elf64_Shdr *dstsec = sechdrs + s->sh_info;
+> >> +
+> >> +             if (s->sh_type != SHT_RELA)
+> >> +                     continue;
+> >
+> > We only have RELA, and no REL?
+> >
+> 
+> Nope.
+> 
+> arch/arm64/Kconfig:86:  select MODULES_USE_ELF_RELA
 
-The problem here isn't a lack of clarity in the situation.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160122/4510a8e8/attachment.sig>
+Evidently I didn't do enough background reading.
+
+> As I said, this code will look different in the next version, but I
+> will make sure to take your review points.
+
+Cheers! :)
+
+Mark.
