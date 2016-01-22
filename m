@@ -1,79 +1,92 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 22 Jan 2016 17:15:51 +0100
-Subject: [PATCH repost] arm: plat-omap: Add PWM dmtimer platform data quirks
-In-Reply-To: <20151130183707.GK2517@atomide.com>
-References: <20151130183707.GK2517@atomide.com>
-Message-ID: <1453479351-21825-1-git-send-email-narmstrong@baylibre.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 22 Jan 2016 17:23:33 +0100
+Subject: [PATCH v3 1/1] USB: core: let USB device know device node
+In-Reply-To: <Pine.LNX.4.44L0.1601221023350.1626-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1601221023350.1626-100000@iolanthe.rowland.org>
+Message-ID: <2649144.tYaWDcKkag@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to set the currently platform dependent dmtimer
-functions pointers as platform data for the pwm-omap-dmtimer
-platform driver, add it to plat-omap auxdata_lookup table.
+On Friday 22 January 2016 10:55:01 Alan Stern wrote:
+> On Fri, 22 Jan 2016, Arnd Bergmann wrote:
+> 
+> > > > 		hub at 3 { /* same external  hub, highspeed mode */
+> > > > 			compatible = "usb2109,0812.591",
+> > > > 				     "usb2109,0812",
+> > > > 				     "usb2109,class9.0.1",
+> > > > 				     "usb2109,class9.0",
+> > > > 				     "usb2109,class9";
+> > > > 
+> > > > 			#address-cells = <1>;
+> > > > 			#size-cells = <0>;
+> > > > 			reg = <3>;
+> > > > 
+> > > 
+> > > Why "reg" is 3 here?
+> > 
+> > My mistake. It should be hub at 1 and reg=<1>;
+> > 
+> > I accidentally confused the port number and the device number.
+> 
+> I thought you did it this way because you were numbering the SS
+> root-hub ports 1-2 and the HS root-hub ports 3-4.
 
-Suggested-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm/mach-omap2/pdata-quirks.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+Right, I was confusing myself after the question. It was intentional
+after all.
 
-Tony, Thierry,
+> There's something I should have made clear earlier.  This scheme for
+> putting SS and HS USB-3 root-hub ports in the same number space is part
+> of the xHCI spec.  It's not AFAIK required (or even mentioned) by the
+> USB-3 spec, which means other types of USB-3 host controllers might do
+> it differently.
+> 
+> The scheme which numbers SS and HS ports separately, both starting from
+> 1, is mandated by the USB-3 spec for non-root hubs.  But since that
+> spec doesn't say much about root hubs, the OS is free to treat them
+> however it likes.  We have chosen to make root hubs appear as similar
+> as possible to non-root hubs; however I believe that Windows (for
+> example) may do things differently.
+> 
+> At any rate, since DT strives to reflect the actual hardware 
+> properties, you probably should use the xHCI numbering scheme when 
+> describing the ports of an xHCI root hub.
 
-The previous patches are now upstream, here is a repost of the patch re-tested
-against mainline.
+Yes, indeed that is what I was trying to say here.
 
-Ref: http://lkml.kernel.org/r/56374592.4060201 at baylibre.com 
-Patchset: http://lkml.kernel.org/r/5620ED2C.1090107 at baylibre.com
+> > > > Is it possible to have a hub in an interface of a multifunction device
+> > > > or are they always single-configuration single-interface devices?
+> > > > 
+> > > 
+> > > I have not seen such kinds of devices, but it is possible in theory.
+> > 
+> > Ok, so if the USB spec allows it, we should probably try to handle it too.
+> 
+> No, the spec does not allow it.  In fact, the spec divides all USB 
+> devices into two classes: hubs and functions.  A function is anything 
+> that isn't a hub.  And a hub is never allowed to contain more than one 
+> configuration and interface.
 
-Neil
+Ok, that helps.
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index e781e4f..a935d28 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -23,6 +23,8 @@
- #include <linux/platform_data/pinctrl-single.h>
- #include <linux/platform_data/iommu-omap.h>
- #include <linux/platform_data/wkup_m3.h>
-+#include <linux/platform_data/pwm_omap_dmtimer.h>
-+#include <plat/dmtimer.h>
- 
- #include "common.h"
- #include "common-board-devices.h"
-@@ -449,6 +451,24 @@ void omap_auxdata_legacy_init(struct device *dev)
- 	dev->platform_data = &twl_gpio_auxdata;
- }
- 
-+/* Dual mode timer PWM callbacks platdata */
-+#if IS_ENABLED(CONFIG_OMAP_DM_TIMER)
-+struct pwm_omap_dmtimer_pdata pwm_dmtimer_pdata = {
-+	.request_by_node = omap_dm_timer_request_by_node,
-+	.free = omap_dm_timer_free,
-+	.enable = omap_dm_timer_enable,
-+	.disable = omap_dm_timer_disable,
-+	.get_fclk = omap_dm_timer_get_fclk,
-+	.start = omap_dm_timer_start,
-+	.stop = omap_dm_timer_stop,
-+	.set_load = omap_dm_timer_set_load,
-+	.set_match = omap_dm_timer_set_match,
-+	.set_pwm = omap_dm_timer_set_pwm,
-+	.set_prescaler = omap_dm_timer_set_prescaler,
-+	.write_counter = omap_dm_timer_write_counter,
-+};
-+#endif
-+
- /*
-  * Few boards still need auxdata populated before we populate
-  * the dev entries in of_platform_populate().
-@@ -502,6 +522,9 @@ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,am4372-wkup-m3", 0x44d00000, "44d00000.wkup_m3",
- 		       &wkup_m3_data),
- #endif
-+#if IS_ENABLED(CONFIG_OMAP_DM_TIMER)
-+	OF_DEV_AUXDATA("ti,omap-dmtimer-pwm", 0, NULL, &pwm_dmtimer_pdata),
-+#endif
- #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
- 	OF_DEV_AUXDATA("ti,omap4-iommu", 0x4a066000, "4a066000.mmu",
- 		       &omap4_iommu_pdata),
--- 
-1.9.1
+> The spec does allow for multiple functions to be packaged in the same 
+> physical device.  In this case, the physical device contains a hub 
+> along with various functions permanently connected to it.
+> 
+> For example, the old Apple USB keyboards are compound devices.  They
+> contain an internal 3-port hub; one of the ports is permanently wired
+> to the keyboard controller and the other two are exposed to the user,
+> allowing a mouse and something else to be attached.
+
+Good, that is straightforward to represent in a way that matches both
+the DT binding and the Linux-internal representation.
+
+We just have to decide what to do for non-hub devices that the OF
+specification calls "combined nodes" (device class 0, one configuration,
+one interface) and that, like hubs do not have one of_node per interface
+plus one per device, but only one node.
+
+Should we bind the of_node to the usb_device, the usb_interface or both
+in this case? Doing both might be problematic and would need more
+testing to be sure it works.
+
+	Arnd
