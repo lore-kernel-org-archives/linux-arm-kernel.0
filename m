@@ -1,28 +1,40 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 22 Jan 2016 14:33:13 +0100
-Subject: [PATCH] ARM: dts: rockchip: Bump sd card pin drive strength up on
- firefly boards
-In-Reply-To: <1453381033-3479-1-git-send-email-w.egorov@phytec.de>
-References: <1453381033-3479-1-git-send-email-w.egorov@phytec.de>
-Message-ID: <1922254.O59ZZAW3Pv@phil>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 22 Jan 2016 14:47:36 +0100
+Subject: [PATCH] ARM: add copy_file_range system call
+Message-ID: <6994292.VtUkPlizQj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 21. Januar 2016, 13:57:13 schrieb Wadim Egorov:
-> It seems some firefly boards need 12mA drive strength for sdmmc.
-> Using 4mA/8mA drive strength will cause the kernel to fail to recognize
-> the sd card correctly.
-> Increased the sdmmc lines drive strength from 4mA to 12mA.
-> 
-> Signed-off-by: Wadim Egorov <w.egorov@phytec.de>
+The copy_file_range system call was added in linux-4.5 needs to
+be added to the system call tables on all architectures.
 
-applied to my dts32 branch for 4.6.
+This is the change for arch/arm.
 
-As I said somewhere on IRC before, it might be worthwhile to bump the 
-default drive-strength at some point, but so far it seems the minimal needed 
-values seem to diverge (8mA on Veyron, 12ma [4mA on mine] on firefly and 
-seemingly 4mA working fine on the Rock2). So I guess we'll postpone that a 
-bit more until we have more datapoints ;-)
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-
-Heiko
+diff --git a/arch/arm/include/uapi/asm/unistd.h b/arch/arm/include/uapi/asm/unistd.h
+index ede692ffa32e..5dd2528e9e45 100644
+--- a/arch/arm/include/uapi/asm/unistd.h
++++ b/arch/arm/include/uapi/asm/unistd.h
+@@ -417,6 +417,7 @@
+ #define __NR_userfaultfd		(__NR_SYSCALL_BASE+388)
+ #define __NR_membarrier			(__NR_SYSCALL_BASE+389)
+ #define __NR_mlock2			(__NR_SYSCALL_BASE+390)
++#define __NR_copy_file_range		(__NR_SYSCALL_BASE+391)
+ 
+ /*
+  * The following SWIs are ARM private.
+diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
+index ac368bb068d1..8ff325ae6d0e 100644
+--- a/arch/arm/kernel/calls.S
++++ b/arch/arm/kernel/calls.S
+@@ -399,7 +399,8 @@
+ 		CALL(sys_execveat)
+ 		CALL(sys_userfaultfd)
+ 		CALL(sys_membarrier)
+-		CALL(sys_mlock2)
++/* 390 */	CALL(sys_mlock2)
++		CALL(sys_copy_file_range)
+ #ifndef syscalls_counted
+ .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
+ #define syscalls_counted
