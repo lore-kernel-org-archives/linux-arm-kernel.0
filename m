@@ -1,29 +1,21 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Fri, 22 Jan 2016 09:56:11 +0800
-Subject: [PATCH v13 13/17] drm: bridge: analogix/dp: try force hpd after plug
- in lookup failed
+Date: Fri, 22 Jan 2016 09:55:59 +0800
+Subject: [PATCH v13 11/17] drm: bridge: analogix/dp: add some rk3288 special
+ registers setting
 In-Reply-To: <1453427614-23053-1-git-send-email-ykk@rock-chips.com>
 References: <1453427614-23053-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1453427771-24543-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1453427759-24403-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some edp screen do not have hpd signal, so we can't just return
-failed when hpd plug in detect failed.
-
-This is an hardware property, so we need add a devicetree property
-"analogix,need-force-hpd" to indicate this sutiation.
+RK3288 need some special registers setting, we can separate
+them out by the dev_type of plat_data.
 
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
 Changes in v13: None
 Changes in v12: None
-Changes in v11:
-- Rename the "analogix,need-force-hpd" to common 'force-hpd' (Rob)
-- Add the ack from Rob Herring
-
+Changes in v11: None
 Changes in v10: None
 Changes in v9: None
 Changes in v8: None
@@ -31,162 +23,200 @@ Changes in v7: None
 Changes in v6: None
 Changes in v5: None
 Changes in v4: None
-Changes in v3:
-- Add "analogix,need-force-hpd" to indicate whether driver need foce
-  hpd when hpd detect failed.
+Changes in v3: None
+Changes in v2:
+- Fix compile failed dut to phy_pd_addr variable misspell error
 
-Changes in v2: None
+ drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 76 ++++++++++++++---------
+ drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h | 12 ++++
+ 2 files changed, 60 insertions(+), 28 deletions(-)
 
- .../bindings/display/bridge/analogix_dp.txt        |  4 ++-
- .../bindings/display/exynos/exynos_dp.txt          |  1 +
- .../display/rockchip/analogix_dp-rockchip.txt      |  1 +
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 35 ++++++++++++++++++----
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  2 ++
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  |  9 ++++++
- 6 files changed, 46 insertions(+), 6 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-index 7659a7a..4f2ba8c 100644
---- a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-+++ b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-@@ -22,6 +22,9 @@ Required properties for dp-controller:
- 		from general PHY binding: Should be "dp".
- 
- Optional properties for dp-controller:
-+	-force-hpd:
-+		Indicate driver need force hpd when hpd detect failed, this
-+		is used for some eDP screen which don't have hpd signal.
- 	-hpd-gpios:
- 		Hotplug detect GPIO.
- 		Indicates which GPIO should be used for hotplug detection
-@@ -31,7 +34,6 @@ Optional properties for dp-controller:
- 		* Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
- 		* Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
- 
--
- [1]: Documentation/devicetree/bindings/media/video-interfaces.txt
- -------------------------------------------------------------------------------
- 
-diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-index 4fa8aca..ade5d8e 100644
---- a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-+++ b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-@@ -56,6 +56,7 @@ For the below properties, please refer to Analogix DP binding document:
- 	-phys (required)
- 	-phy-names (required)
- 	-hpd-gpios (optional)
-+	 force-hpd (optional)
- 
- Deprecated properties for DisplayPort:
- -interlaced:            deprecated prop that can parsed from drm_display_mode.
-diff --git a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
-index 04d99e3..e832ff9 100644
---- a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
-+++ b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
-@@ -32,6 +32,7 @@ For the below properties, please refer to Analogix DP binding document:
- - phys (required)
- - phy-names (required)
- - hpd-gpios (optional)
-+- force-hpd (optional)
- -------------------------------------------------------------------------------
- 
- Example:
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index a62e8d0..13986b7 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -62,15 +62,38 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
- {
- 	int timeout_loop = 0;
- 
--	while (analogix_dp_get_plug_in_status(dp) != 0) {
-+	while (timeout_loop < DP_TIMEOUT_LOOP_COUNT) {
-+		if (analogix_dp_get_plug_in_status(dp) == 0)
-+			return 0;
-+
- 		timeout_loop++;
--		if (timeout_loop > DP_TIMEOUT_LOOP_COUNT) {
--			dev_err(dp->dev, "failed to get hpd plug status\n");
--			return -ETIMEDOUT;
--		}
- 		usleep_range(10, 11);
- 	}
- 
-+	/*
-+	 * Some edp screen do not have hpd signal, so we can't just
-+	 * return failed when hpd plug in detect failed, DT property
-+	 * "force-hpd" would indicate whether driver need this.
-+	 */
-+	if (!dp->force_hpd)
-+		return -ETIMEDOUT;
-+
-+	/*
-+	 * The eDP TRM indicate that if HPD_STATUS(RO) is 0, AUX CH
-+	 * will not work, so we need to give a force hpd action to
-+	 * set HPD_STATUS manually.
-+	 */
-+	dev_dbg(dp->dev, "failed to get hpd plug status, try to force hpd\n");
-+
-+	analogix_dp_force_hpd(dp);
-+
-+	if (analogix_dp_get_plug_in_status(dp) != 0) {
-+		dev_err(dp->dev, "failed to get hpd plug in status\n");
-+		return -EINVAL;
-+	}
-+
-+	dev_dbg(dp->dev, "success to get plug in status after force hpd\n");
-+
- 	return 0;
- }
- 
-@@ -1291,6 +1314,8 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
- 	if (IS_ERR(dp->reg_base))
- 		return PTR_ERR(dp->reg_base);
- 
-+	dp->force_hpd = of_property_read_bool(dev->of_node, "force-hpd");
-+
- 	dp->hpd_gpio = of_get_named_gpio(dev->of_node, "hpd-gpios", 0);
- 	if (!gpio_is_valid(dp->hpd_gpio))
- 		dp->hpd_gpio = of_get_named_gpio(dev->of_node,
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-index 6cc53d4..a8cba64 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-@@ -154,6 +154,7 @@ struct analogix_dp_device {
- 	struct phy		*phy;
- 	int			dpms_mode;
- 	int			hpd_gpio;
-+	bool                    force_hpd;
- 
- 	struct analogix_dp_plat_data *plat_data;
- };
-@@ -174,6 +175,7 @@ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
- 				       bool enable);
- void analogix_dp_init_analog_func(struct analogix_dp_device *dp);
- void analogix_dp_init_hpd(struct analogix_dp_device *dp);
-+void analogix_dp_force_hpd(struct analogix_dp_device *dp);
- enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp);
- void analogix_dp_clear_hotplug_interrupts(struct analogix_dp_device *dp);
- void analogix_dp_reset_aux(struct analogix_dp_device *dp);
 diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-index 1e24b37..cba3ffd 100644
+index 3858df5..1e24b37 100644
 --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
 +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-@@ -365,6 +365,15 @@ void analogix_dp_init_hpd(struct analogix_dp_device *dp)
- 	writel(reg, dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
- }
+@@ -15,6 +15,8 @@
+ #include <linux/delay.h>
+ #include <linux/gpio.h>
  
-+void analogix_dp_force_hpd(struct analogix_dp_device *dp)
-+{
-+	u32 reg;
++#include <drm/bridge/analogix_dp.h>
 +
-+	reg = readl(dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
-+	reg = (F_HPD | HPD_CTRL);
-+	writel(reg, dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
-+}
+ #include "analogix_dp_core.h"
+ #include "analogix_dp_reg.h"
+ 
+@@ -72,6 +74,14 @@ void analogix_dp_init_analog_param(struct analogix_dp_device *dp)
+ 	reg = SEL_24M | TX_DVDD_BIT_1_0625V;
+ 	writel(reg, dp->reg_base + ANALOGIX_DP_ANALOG_CTL_2);
+ 
++	if (dp->plat_data && (dp->plat_data->dev_type == RK3288_DP)) {
++		writel(REF_CLK_24M, dp->reg_base + ANALOGIX_DP_PLL_REG_1);
++		writel(0x95, dp->reg_base + ANALOGIX_DP_PLL_REG_2);
++		writel(0x40, dp->reg_base + ANALOGIX_DP_PLL_REG_3);
++		writel(0x58, dp->reg_base + ANALOGIX_DP_PLL_REG_4);
++		writel(0x22, dp->reg_base + ANALOGIX_DP_PLL_REG_5);
++	}
 +
- enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp)
+ 	reg = DRIVE_DVDD_BIT_1_0625V | VCO_BIT_600_MICRO;
+ 	writel(reg, dp->reg_base + ANALOGIX_DP_ANALOG_CTL_3);
+ 
+@@ -206,81 +216,85 @@ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
+ 				       bool enable)
  {
  	u32 reg;
++	u32 phy_pd_addr = ANALOGIX_DP_PHY_PD;
++
++	if (dp->plat_data && (dp->plat_data->dev_type == RK3288_DP))
++		phy_pd_addr = ANALOGIX_DP_PD;
+ 
+ 	switch (block) {
+ 	case AUX_BLOCK:
+ 		if (enable) {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_pd_addr);
+ 			reg |= AUX_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_pd_addr);
+ 		} else {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_pd_addr);
+ 			reg &= ~AUX_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_pd_addr);
+ 		}
+ 		break;
+ 	case CH0_BLOCK:
+ 		if (enable) {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_pd_addr);
+ 			reg |= CH0_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_pd_addr);
+ 		} else {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_pd_addr);
+ 			reg &= ~CH0_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_pd_addr);
+ 		}
+ 		break;
+ 	case CH1_BLOCK:
+ 		if (enable) {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_pd_addr);
+ 			reg |= CH1_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_pd_addr);
+ 		} else {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_pd_addr);
+ 			reg &= ~CH1_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_pd_addr);
+ 		}
+ 		break;
+ 	case CH2_BLOCK:
+ 		if (enable) {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_pd_addr);
+ 			reg |= CH2_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_pd_addr);
+ 		} else {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_pd_addr);
+ 			reg &= ~CH2_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_pd_addr);
+ 		}
+ 		break;
+ 	case CH3_BLOCK:
+ 		if (enable) {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_pd_addr);
+ 			reg |= CH3_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_pd_addr);
+ 		} else {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_pd_addr);
+ 			reg &= ~CH3_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_pd_addr);
+ 		}
+ 		break;
+ 	case ANALOG_TOTAL:
+ 		if (enable) {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_pd_addr);
+ 			reg |= DP_PHY_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_pd_addr);
+ 		} else {
+-			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
++			reg = readl(dp->reg_base + phy_pd_addr);
+ 			reg &= ~DP_PHY_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_pd_addr);
+ 		}
+ 		break;
+ 	case POWER_ALL:
+ 		if (enable) {
+ 			reg = DP_PHY_PD | AUX_PD | CH3_PD | CH2_PD |
+ 				CH1_PD | CH0_PD;
+-			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(reg, dp->reg_base + phy_pd_addr);
+ 		} else {
+-			writel(0x00, dp->reg_base + ANALOGIX_DP_PHY_PD);
++			writel(0x00, dp->reg_base + phy_pd_addr);
+ 		}
+ 		break;
+ 	default:
+@@ -399,8 +413,14 @@ void analogix_dp_init_aux(struct analogix_dp_device *dp)
+ 	analogix_dp_reset_aux(dp);
+ 
+ 	/* Disable AUX transaction H/W retry */
+-	reg = AUX_BIT_PERIOD_EXPECTED_DELAY(3) | AUX_HW_RETRY_COUNT_SEL(0) |
+-	      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
++	if (dp->plat_data && (dp->plat_data->dev_type == RK3288_DP))
++		reg = AUX_BIT_PERIOD_EXPECTED_DELAY(0) |
++		      AUX_HW_RETRY_COUNT_SEL(3) |
++		      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
++	else
++		reg = AUX_BIT_PERIOD_EXPECTED_DELAY(3) |
++		      AUX_HW_RETRY_COUNT_SEL(0) |
++		      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
+ 	writel(reg, dp->reg_base + ANALOGIX_DP_AUX_HW_RETRY_CTL);
+ 
+ 	/* Receive AUX Channel DEFER commands equal to DEFFER_COUNT*64 */
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
+index 738db4c..337912b 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
+@@ -22,6 +22,14 @@
+ #define ANALOGIX_DP_VIDEO_CTL_8			0x3C
+ #define ANALOGIX_DP_VIDEO_CTL_10		0x44
+ 
++#define ANALOGIX_DP_PLL_REG_1			0xfc
++#define ANALOGIX_DP_PLL_REG_2			0x9e4
++#define ANALOGIX_DP_PLL_REG_3			0x9e8
++#define ANALOGIX_DP_PLL_REG_4			0x9ec
++#define ANALOGIX_DP_PLL_REG_5			0xa00
++
++#define ANALOGIX_DP_PD				0x12c
++
+ #define ANALOGIX_DP_LANE_MAP			0x35C
+ 
+ #define ANALOGIX_DP_ANALOG_CTL_1		0x370
+@@ -154,6 +162,10 @@
+ #define VSYNC_POLARITY_CFG			(0x1 << 1)
+ #define HSYNC_POLARITY_CFG			(0x1 << 0)
+ 
++/* ANALOGIX_DP_PLL_REG_1 */
++#define REF_CLK_24M				(0x1 << 1)
++#define REF_CLK_27M				(0x0 << 1)
++
+ /* ANALOGIX_DP_LANE_MAP */
+ #define LANE3_MAP_LOGIC_LANE_0			(0x0 << 6)
+ #define LANE3_MAP_LOGIC_LANE_1			(0x1 << 6)
 -- 
 1.9.1
