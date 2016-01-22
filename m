@@ -1,410 +1,62 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Fri, 22 Jan 2016 06:42:54 +0000
-Subject: [PATCH v6 1/2] power: act8945a: add charger driver for ACT8945A
-In-Reply-To: <87ziw0rob8.fsf@dell.be.48ers.dk>
-References: <1453274383-24835-1-git-send-email-wenyou.yang@atmel.com>
- <1453274383-24835-2-git-send-email-wenyou.yang@atmel.com>
- <87ziw0rob8.fsf@dell.be.48ers.dk>
-Message-ID: <B256D81BAE5131468A838E5D7A243641D63F7B7D@penmbx01>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Fri, 22 Jan 2016 14:44:45 +0800
+Subject: [PATCH v7 0/2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD driver
+Message-ID: <1453445087-2791-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+This patch set adds support for the Active-semi ACT8945A PMIC
+MFD driver. It is a Multi Function Device with the following
+subdevices:
+ - Regulator
+ - Charger
 
-Thank you for so much advice.
+It is interfaced to the host controller using I2C interface,
+ACT8945A is a child device of the I2C.
 
+Changes in v7:
+ - remove struct act8945a_dev to .c file.
+ - remove unused .h file.
 
-> -----Original Message-----
-> From: Peter Korsgaard [mailto:jacmet at gmail.com] On Behalf Of Peter Korsgaard
-> Sent: 2016?1?21? 4:25
-> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
-> Cc: Sebastian Reichel <sre@kernel.org>; Dmitry Eremin-Solenikov
-> <dbaryshkov@gmail.com>; David Woodhouse <dwmw2@infradead.org>; Rob
-> Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>; Mark
-> Rutland <mark.rutland@arm.com>; Ian Campbell <ijc+devicetree@hellion.org.uk>;
-> Kumar Gala <galak@codeaurora.org>; Krzysztof Kozlowski
-> <k.kozlowski@samsung.com>; Javier Martinez Canillas <javier@dowhile0.org>;
-> Lee Jones <lee.jones@linaro.org>; Peter Korsgaard <jacmet@gmail.com>; Ferre,
-> Nicolas <Nicolas.FERRE@atmel.com>; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org; linux-pm at vger.kernel.org
-> Subject: Re: [PATCH v6 1/2] power: act8945a: add charger driver for ACT8945A
-> 
-> >>>>> "Wenyou" == Wenyou Yang <wenyou.yang@atmel.com> writes:
-> 
->  > This patch adds new driver for Active-semi ACT8945A ActivePath  > charger
-> (part of ACT8945A MFD driver) providing power supply class  > information to
-> userspace.
-> 
->  > The driver can be configured through DT (such as, total timer,  > precondition
-> timer and input over-voltage threshold).
-> 
->  > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>  > ---
-> 
->  > Changes in v6:
->  >  - change the type value to unsigned int.
-> 
-> [snip]
-> 
-> > +++ b/drivers/power/act8945a_charger.c
->  > @@ -0,0 +1,375 @@
->  > +/*
->  > + * Power supply driver for the Active-semi ACT8945A PMIC  > + *  > + *
-> Copyright (C) 2015 Atmel Corporation  > + *  > + * Author: Wenyou Yang
-> <wenyou.yang@atmel.com>  > + *  > + * This program is free software; you can
-> redistribute it and/or modify  > + * it under the terms of the GNU General Public
-> License version 2 as  > + * published by the Free Software Foundation.
->  > + *
->  > + */
->  > +#include <linux/module.h>
->  > +#include <linux/mfd/act8945a.h>
->  > +#include <linux/of.h>
->  > +#include <linux/of_gpio.h>
->  > +#include <linux/platform_device.h>
->  > +#include <linux/power_supply.h>
->  > +#include <linux/regmap.h>
->  > +
->  > +static const char *act8945a_charger_model = "ACT8945A";  > +static const
-> char *act8945a_charger_manufacturer = "Active-semi";  > +  > +/**  > + *
-> ACT8945A Charger Register Map  > + */  > +  > +/* 0x70: Reserved */
->  > +#define ACT8945A_APCH_CFG		0x71
->  > +#define ACT8945A_APCH_STATUS		0x78
->  > +#define ACT8945A_APCH_CTRL		0x79
->  > +#define ACT8945A_APCH_STATE		0x7A
->  > +
->  > +/* ACT8945A_APCH_CFG */
->  > +#define APCH_CFG_OVPSET			(0x3 << 0)
->  > +#define APCH_CFG_OVPSET_6V6		(0x0 << 0)
->  > +#define APCH_CFG_OVPSET_7V		(0x1 << 0)
->  > +#define APCH_CFG_OVPSET_7V5		(0x2 << 0)
->  > +#define APCH_CFG_OVPSET_8V		(0x3 << 0)
->  > +#define APCH_CFG_PRETIMO		(0x3 << 2)
->  > +#define APCH_CFG_PRETIMO_40_MIN		(0x0 << 2)
->  > +#define APCH_CFG_PRETIMO_60_MIN		(0x1 << 2)
->  > +#define APCH_CFG_PRETIMO_80_MIN		(0x2 << 2)
->  > +#define APCH_CFG_PRETIMO_DISABLED	(0x3 << 2)
->  > +#define APCH_CFG_TOTTIMO		(0x3 << 4)
->  > +#define APCH_CFG_TOTTIMO_3_HOUR		(0x0 << 4)
->  > +#define APCH_CFG_TOTTIMO_4_HOUR		(0x1 << 4)
->  > +#define APCH_CFG_TOTTIMO_5_HOUR		(0x2 << 4)
->  > +#define APCH_CFG_TOTTIMO_DISABLED	(0x3 << 4)
->  > +#define APCH_CFG_SUSCHG			(0x1 << 7)
->  > +
->  > +#define APCH_STATUS_CHGDAT		BIT(0)
->  > +#define APCH_STATUS_INDAT		BIT(1)
->  > +#define APCH_STATUS_TEMPDAT		BIT(2)
->  > +#define APCH_STATUS_TIMRDAT		BIT(3)
->  > +#define APCH_STATUS_CHGSTAT		BIT(4)
->  > +#define APCH_STATUS_INSTAT		BIT(5)
->  > +#define APCH_STATUS_TEMPSTAT		BIT(6)
->  > +#define APCH_STATUS_TIMRSTAT		BIT(7)
->  > +
->  > +#define APCH_CTRL_CHGEOCOUT		BIT(0)
->  > +#define APCH_CTRL_INDIS			BIT(1)
->  > +#define APCH_CTRL_TEMPOUT		BIT(2)
->  > +#define APCH_CTRL_TIMRPRE		BIT(3)
->  > +#define APCH_CTRL_CHGEOCIN		BIT(4)
->  > +#define APCH_CTRL_INCON			BIT(5)
->  > +#define APCH_CTRL_TEMPIN		BIT(6)
->  > +#define APCH_CTRL_TIMRTOT		BIT(7)
->  > +
->  > +#define APCH_STATE_ACINSTAT		(0x1 << 1)
->  > +#define APCH_STATE_CSTATE		(0x3 << 4)
->  > +#define APCH_STATE_CSTATE_SHIFT		4
->  > +#define APCH_STATE_CSTATE_DISABLED	0x00
->  > +#define APCH_STATE_CSTATE_EOC		0x01
->  > +#define APCH_STATE_CSTATE_FAST		0x02
->  > +#define APCH_STATE_CSTATE_PRE		0x03
->  > +
->  > +struct act8945a_charger {
->  > +	struct act8945a_dev *act8945a_dev;
-> 
-> I still don't see the point in this struct act8945a_dev instead of just having a
-> pointer to a regmap here (more about that later).
-> 
-> > +	struct power_supply *psy;
-> 
-> You use devm and only use this in the probe, so not needed.
-> 
-> > +
->  > +	u32 tolal_time_out;
-> 
-> Typo, should be total_time_out
-> 
-> > +	u32 pre_time_out;
->  > +	u32 input_voltage_threshold;
-> 
-> These 3 parameters are only used to keep track of data between
-> _parse_dt() and _charger_config() which you call right after eachother. If you
-> merge those two functions then these can be dropped.
+Changes in v6:
+ - change MFD_ACT8945A type from bool to tristate.
+ - revert depends on to 'I2C'.
+ - change the regulator name.
 
-Yes, you are right,  it is clearer.
+Changes in v5:
+ - change depends on to 'I2C=y'.
 
-> 
-> 
-> > +	bool battery_temperature;
->  > +	int chglev_pin;
->  > +	int chglev_value;
-> 
-> Same for these two.
-> 
-> 
-> > +};
->  > +
->  > +static int act8945a_get_charger_state(struct regmap *regmap, int *val)  > +{
->  > +	int ret;
->  > +	unsigned int status, state;
->  > +
->  > +	ret = regmap_read(regmap, ACT8945A_APCH_STATUS, &status);
->  > +	if (ret < 0)
->  > +		return ret;
->  > +
->  > +	ret = regmap_read(regmap, ACT8945A_APCH_STATE, &state);
->  > +	if (ret < 0)
->  > +		return ret;
->  > +
->  > +	state &= APCH_STATE_CSTATE;
->  > +	state >>= APCH_STATE_CSTATE_SHIFT;
->  > +
->  > +	if (state == APCH_STATE_CSTATE_EOC) {
->  > +		if (status & APCH_STATUS_CHGDAT)
->  > +			*val = POWER_SUPPLY_STATUS_FULL;
->  > +		else
->  > +			*val = POWER_SUPPLY_STATUS_NOT_CHARGING;
->  > +	} else if ((state == APCH_STATE_CSTATE_FAST) ||
->  > +		   (state == APCH_STATE_CSTATE_PRE)) {
->  > +		*val = POWER_SUPPLY_STATUS_CHARGING;
->  > +	} else {
->  > +		*val = POWER_SUPPLY_STATUS_NOT_CHARGING;
->  > +	}
->  > +
->  > +	return 0;
->  > +}
->  > +
->  > +static int act8945a_get_charge_type(struct regmap *regmap, int *val)  > +{
->  > +	int ret;
->  > +	unsigned int state;
->  > +
->  > +	ret = regmap_read(regmap, ACT8945A_APCH_STATE, &state);
->  > +	if (ret < 0)
->  > +		return ret;
->  > +
->  > +	state &= APCH_STATE_CSTATE;
->  > +	state >>= APCH_STATE_CSTATE_SHIFT;
->  > +
->  > +	switch (state) {
->  > +	case APCH_STATE_CSTATE_PRE:
->  > +		*val = POWER_SUPPLY_CHARGE_TYPE_TRICKLE;
->  > +		break;
->  > +	case APCH_STATE_CSTATE_FAST:
->  > +		*val = POWER_SUPPLY_CHARGE_TYPE_FAST;
->  > +		break;
->  > +	case APCH_STATE_CSTATE_EOC:
->  > +	case APCH_STATE_CSTATE_DISABLED:
->  > +	default:
->  > +		*val = POWER_SUPPLY_CHARGE_TYPE_NONE;
->  > +	}
->  > +
->  > +	return 0;
->  > +}
->  > +
->  > +static int act8945a_get_battery_health(struct act8945a_charger *charger,
->  > +				       struct regmap *regmap, int *val)
->  > +{
->  > +	int ret;
->  > +	unsigned int status;
->  > +
->  > +	ret = regmap_read(regmap, ACT8945A_APCH_STATUS, &status);
->  > +	if (ret < 0)
->  > +		return ret;
->  > +
->  > +	if (charger->battery_temperature && !(status &
-> APCH_STATUS_TEMPDAT))
->  > +		*val = POWER_SUPPLY_HEALTH_OVERHEAT;
->  > +	else if (!(status & APCH_STATUS_INDAT))
->  > +		*val = POWER_SUPPLY_HEALTH_OVERVOLTAGE;
->  > +	else if (status & APCH_STATUS_TIMRDAT)
->  > +		*val = POWER_SUPPLY_HEALTH_SAFETY_TIMER_EXPIRE;
->  > +	else
->  > +		*val = POWER_SUPPLY_HEALTH_GOOD;
->  > +
->  > +	return 0;
->  > +}
->  > +
->  > +static enum power_supply_property act8945a_charger_props[] = {
->  > +	POWER_SUPPLY_PROP_STATUS,
->  > +	POWER_SUPPLY_PROP_CHARGE_TYPE,
->  > +	POWER_SUPPLY_PROP_TECHNOLOGY,
->  > +	POWER_SUPPLY_PROP_HEALTH,
->  > +	POWER_SUPPLY_PROP_MODEL_NAME,
->  > +	POWER_SUPPLY_PROP_MANUFACTURER
->  > +};
->  > +
->  > +static int act8945a_charger_get_property(struct power_supply *psy,
->  > +					 enum power_supply_property prop,
->  > +					 union power_supply_propval *val)
->  > +{
->  > +	struct act8945a_charger *charger = power_supply_get_drvdata(psy);
->  > +	struct regmap *regmap = charger->act8945a_dev->regmap;
->  > +	int ret = 0;
->  > +
->  > +	switch (prop) {
->  > +	case POWER_SUPPLY_PROP_STATUS:
->  > +		ret = act8945a_get_charger_state(regmap, &val->intval);
->  > +		break;
->  > +	case POWER_SUPPLY_PROP_CHARGE_TYPE:
->  > +		ret = act8945a_get_charge_type(regmap, &val->intval);
->  > +		break;
->  > +	case POWER_SUPPLY_PROP_TECHNOLOGY:
->  > +		val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
->  > +		break;
->  > +	case POWER_SUPPLY_PROP_HEALTH:
->  > +		ret = act8945a_get_battery_health(charger,
->  > +						  regmap, &val->intval);
->  > +		break;
->  > +	case POWER_SUPPLY_PROP_MODEL_NAME:
->  > +		val->strval = act8945a_charger_model;
->  > +		break;
->  > +	case POWER_SUPPLY_PROP_MANUFACTURER:
->  > +		val->strval = act8945a_charger_manufacturer;
->  > +		break;
->  > +	default:
->  > +		return -EINVAL;
->  > +	}
->  > +
->  > +	return ret;
->  > +}
->  > +
->  > +static const struct power_supply_desc act8945a_charger_desc = {
->  > +	.name		= "act8945a-charger",
->  > +	.type		= POWER_SUPPLY_TYPE_BATTERY,
->  > +	.get_property	= act8945a_charger_get_property,
->  > +	.properties	= act8945a_charger_props,
->  > +	.num_properties	= ARRAY_SIZE(act8945a_charger_props),
->  > +};
->  > +
->  > +#define DEFAULT_TOTAL_TIME_OUT		3
->  > +#define DEFAULT_PRE_TIME_OUT		40
->  > +#define DEFAULT_INPUT_OVP_THRESHOLD	6600
->  > +
->  > +static int act8945a_charger_parse_dt(struct device *dev,
->  > +				     struct act8945a_charger *charger)
->  > +{
->  > +	struct device_node *np = dev->of_node;
->  > +	enum of_gpio_flags flags;
->  > +
->  > +	if (!np) {
->  > +		dev_err(dev, "no charger of node\n");
->  > +		return -EINVAL;
->  > +	}
->  > +
->  > +	charger->chglev_pin = of_get_named_gpio_flags(np,
->  > +				"active-semi,chglev-gpios", 0, &flags);
->  > +
->  > +	charger->chglev_value = (flags == OF_GPIO_ACTIVE_LOW) ? 0 : 1;
->  > +
->  > +	charger->battery_temperature = of_property_read_bool(np,
->  > +				"active-semi,check-battery-temperature");
->  > +
->  > +	if (of_property_read_u32(np,
->  > +			"active-semi,input-voltage-threshold-microvolt",
->  > +			&charger->input_voltage_threshold))
->  > +		charger->input_voltage_threshold = DEFAULT_PRE_TIME_OUT;
->  > +
->  > +	if (of_property_read_u32(np, "active-semi,precondition-timeout",
->  > +				 &charger->pre_time_out))
->  > +		charger->pre_time_out = DEFAULT_PRE_TIME_OUT;
->  > +
->  > +	if (of_property_read_u32(np, "active-semi,total-timeout",
->  > +				 &charger->tolal_time_out))
->  > +		charger->tolal_time_out = DEFAULT_TOTAL_TIME_OUT;
->  > +
->  > +	return 0;
->  > +}
->  > +
->  > +static int act8945a_charger_config(struct act8945a_charger *charger)  > +{
->  > +	struct regmap *regmap = charger->act8945a_dev->regmap;
->  > +	unsigned int value = 0;
->  > +
->  > +	if (gpio_is_valid(charger->chglev_pin))
->  > +		gpio_set_value(charger->chglev_pin, charger->chglev_value);
->  > +
->  > +	switch (charger->input_voltage_threshold) {
->  > +	case 8000:
->  > +		value |= APCH_CFG_OVPSET_8V;
->  > +		break;
->  > +	case 7500:
->  > +		value |= APCH_CFG_OVPSET_7V5;
->  > +		break;
->  > +	case 7000:
->  > +		value |= APCH_CFG_OVPSET_7V;
->  > +		break;
->  > +	case 6600:
->  > +	default:
->  > +		value |= APCH_CFG_OVPSET_6V6;
->  > +		break;
->  > +	}
->  > +
->  > +	switch (charger->pre_time_out) {
->  > +	case 60:
->  > +		value |= APCH_CFG_PRETIMO_60_MIN;
->  > +		break;
->  > +	case 80:
->  > +		value |= APCH_CFG_PRETIMO_80_MIN;
->  > +		break;
->  > +	case 0:
->  > +		value |= APCH_CFG_PRETIMO_DISABLED;
->  > +		break;
->  > +	case 40:
->  > +	default:
->  > +		value |= APCH_CFG_PRETIMO_40_MIN;
->  > +		break;
->  > +	}
->  > +
->  > +	switch (charger->tolal_time_out) {
->  > +	case 4:
->  > +		value |= APCH_CFG_TOTTIMO_4_HOUR;
->  > +		break;
->  > +	case 5:
->  > +		value |= APCH_CFG_TOTTIMO_5_HOUR;
->  > +		break;
->  > +	case 0:
->  > +		value |= APCH_CFG_TOTTIMO_DISABLED;
->  > +		break;
->  > +	case 3:
->  > +	default:
->  > +		value |= APCH_CFG_TOTTIMO_3_HOUR;
->  > +		break;
->  > +	}
->  > +
->  > +	return regmap_write(regmap, ACT8945A_APCH_CFG, value);
->  > +}
->  > +
->  > +static int act8945a_charger_probe(struct platform_device *pdev)  > +{
->  > +	struct act8945a_dev *act8945a_dev = dev_get_drvdata(pdev->dev.parent);
->  > +	struct act8945a_charger *charger;
->  > +	struct power_supply_config psy_cfg = {};
->  > +	int ret;
->  > +
->  > +	charger = devm_kzalloc(&pdev->dev, sizeof(*charger), GFP_KERNEL);
->  > +	if (!charger)
->  > +		return -ENOMEM;
->  > +
->  > +	platform_set_drvdata(pdev, charger);
-> 
-> Never used, so you can drop this.
-> 
->  > +
->  > +	charger->act8945a_dev = act8945a_dev;
-> 
-> Once again, why can't you just do something like:
-> 
->      charger->regmap = dev_get_regmap(pdev->dev.parent);
-> 
-> And drop this act8945_dev structure?
-> 
-> --
-> Bye, Peter Korsgaard
+Changes in v4:
+ - add a space before .compatible.
+ - collect Reviewed-by from Krzysztof Kozlowski.
 
+Changes in v3:
+ - fix the tabbing errors in Example.
+ - use "pmic at 5b" label, not "act8945a at 5b" in Example.
+ - collect Acked-by from Rob.
 
-Best Regards,
-Wenyou Yang
+Changes in v2:
+ - add more help information in Kconfig.
+ - update the file header with short version license and author line.
+ - remove unused structure members (dev, i2c_client) of stuct act8945a_dev.
+ - use define "PLATFORM_DEVID_NONE" for mfd_add_devices(), instead of '-1'.
+ - use more explicit info to indicate the failure to add sub devices.
+ - remove the unnecessary print out.
+ - substitute MODULE_LICENSE("GPL") for MODULE_LICENSE("GPL v2").
+ - use more specific label in Example.
+ - add pmic and charger nodes in Example.
+
+Wenyou Yang (2):
+  mfd: act8945a: add Active-semi ACT8945A PMIC MFD driver
+  mfd: add documentation for ACT8945A DT bindings
+
+ Documentation/devicetree/bindings/mfd/act8945a.txt |   82 ++++++++++++++
+ drivers/mfd/Kconfig                                |   11 ++
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/act8945a.c                             |  112 ++++++++++++++++++++
+ 4 files changed, 206 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/act8945a.txt
+ create mode 100644 drivers/mfd/act8945a.c
+
+-- 
+1.7.9.5
