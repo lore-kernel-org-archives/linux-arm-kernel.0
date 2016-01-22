@@ -1,42 +1,88 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri, 22 Jan 2016 19:06:49 +0800
-Subject: [PATCH v7 6/9] ARM: dts: add pl330-broken-no-flushp quirk for rk3036
- SoCs
+Date: Fri, 22 Jan 2016 19:06:52 +0800
+Subject: [PATCH v7 9/9] spi: rockchip: modify DMA max burst to 1
 In-Reply-To: <1453460812-8498-1-git-send-email-wxt@rock-chips.com>
 References: <1453460812-8498-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1453460812-8498-7-git-send-email-wxt@rock-chips.com>
+Message-ID: <1453460812-8498-10-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pl330 integrated in rk3036 platform that doesn't support
-DMAFLUSHP function. So we add 'arm,pl330-broken-no-flushp' quirk
-for rk3036.
+From: Addy Ke <addy.ke@rock-chips.com>
 
+Generic dma controller on Rockchips' platform cannot support
+DMAFLUSHP instruction which make dma to flush the req of non-aligned
+or non-multiple of what we need. That will cause an unrecoverable
+dma bus error. The saftest way is to set dma max burst to 1.
+
+Signed-off-by: Addy ke <addy.ke@rock-chips.com>
+Fixes: 64e36824b32b06 ("spi/rockchip: add driver for Rockchip...")
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+cc: Heiko Stuebner <heiko@sntech.de>
+cc: Olof Johansson <olof@lixom.net>
+cc: Doug Anderson <dianders@chromium.org>
+cc: Sonny Rao <sonnyrao@chromium.org>
+
+Acked-by: Mark Brown <broonie@kernel.org>
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+
 ---
 
 Changes in v7: None
-Changes in v6: None
+Changes in v6:
+- remove quirks and get dma caps in order to limit burst
+
 Changes in v5: None
 Changes in v4: None
 Changes in v3: None
 Changes in v2: None
 Changes in v1: None
 
- arch/arm/boot/dts/rk3036.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/spi/spi-rockchip.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
-index ee457a2..242cafc 100644
---- a/arch/arm/boot/dts/rk3036.dtsi
-+++ b/arch/arm/boot/dts/rk3036.dtsi
-@@ -102,6 +102,7 @@
- 		pdma: pdma at 20078000 {
- 			compatible = "arm,pl330", "arm,primecell";
- 			reg = <0x20078000 0x4000>;
-+			arm,pl330-broken-no-flushp;
- 			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
- 			#dma-cells = <1>;
+diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+index 79a8bc4..aa9561f 100644
+--- a/drivers/spi/spi-rockchip.c
++++ b/drivers/spi/spi-rockchip.c
+@@ -199,6 +199,7 @@ struct rockchip_spi {
+ 	struct sg_table rx_sg;
+ 	struct rockchip_spi_dma_data dma_rx;
+ 	struct rockchip_spi_dma_data dma_tx;
++	struct dma_slave_caps dma_caps;
+ };
+ 
+ static inline void spi_enable_chip(struct rockchip_spi *rs, int enable)
+@@ -449,7 +450,10 @@ static void rockchip_spi_prepare_dma(struct rockchip_spi *rs)
+ 		rxconf.direction = rs->dma_rx.direction;
+ 		rxconf.src_addr = rs->dma_rx.addr;
+ 		rxconf.src_addr_width = rs->n_bytes;
+-		rxconf.src_maxburst = rs->n_bytes;
++		if (rs->dma_caps.max_burst > 4)
++			rxconf.src_maxburst = 4;
++		else
++			rxconf.src_maxburst = 1;
+ 		dmaengine_slave_config(rs->dma_rx.ch, &rxconf);
+ 
+ 		rxdesc = dmaengine_prep_slave_sg(
+@@ -466,7 +470,10 @@ static void rockchip_spi_prepare_dma(struct rockchip_spi *rs)
+ 		txconf.direction = rs->dma_tx.direction;
+ 		txconf.dst_addr = rs->dma_tx.addr;
+ 		txconf.dst_addr_width = rs->n_bytes;
+-		txconf.dst_maxburst = rs->n_bytes;
++		if (rs->dma_caps.max_burst > 4)
++			txconf.dst_maxburst = 4;
++		else
++			txconf.dst_maxburst = 1;
+ 		dmaengine_slave_config(rs->dma_tx.ch, &txconf);
+ 
+ 		txdesc = dmaengine_prep_slave_sg(
+@@ -730,6 +737,7 @@ static int rockchip_spi_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	if (rs->dma_tx.ch && rs->dma_rx.ch) {
++		dma_get_slave_caps(rs->dma_rx.ch, &(rs->dma_caps));
+ 		rs->dma_tx.addr = (dma_addr_t)(mem->start + ROCKCHIP_SPI_TXDR);
+ 		rs->dma_rx.addr = (dma_addr_t)(mem->start + ROCKCHIP_SPI_RXDR);
+ 		rs->dma_tx.direction = DMA_MEM_TO_DEV;
 -- 
 1.9.1
