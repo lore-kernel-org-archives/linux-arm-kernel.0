@@ -1,53 +1,46 @@
-From: amitoj1606@gmail.com (Amitoj Kaur Chawla)
-Date: Fri, 22 Jan 2016 23:38:38 +0530
-Subject: [PATCH] bus: vexpress-config: Add missing of_node_put
-Message-ID: <20160122180838.GA12069@amitoj-Inspiron-3542>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 22 Jan 2016 19:08:30 +0100
+Subject: [PATCHv8 1/4] EDAC, altera: Add Altera L2 Cache and OCRAM EDAC
+ Support
+In-Reply-To: <56A25F59.5070306@mentor.com>
+References: <1453397668-32094-1-git-send-email-tthayer@opensource.altera.com>
+ <56A1C5DE.1080501@mentor.com>
+ <56A24C34.3000303@opensource.altera.com>
+ <56A25F59.5070306@mentor.com>
+Message-ID: <20160122180830.GH9806@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for_each_compatible_node performs an of_node_get on each iteration, so
-to break out of the loop an of_node_put is required.
+On Fri, Jan 22, 2016 at 06:56:57PM +0200, Vladimir Zapolskiy wrote:
+> it sounds like the author of the original change is Dinh, but if you agreed
+> about authorship transfer, then "From: Thor Thayer" statement should be
+> correct, but in any case your SoB should follow Dinh's SoB, if you decide to
+> keep the latter one.
+> 
+> This consideration may apply to the other changes in the changeset as well.
 
-Found using Coccinelle. The semantic patch used for this is as follows:
+So the patch author should be in the From:
 
-// <smpl>
-@@
-expression e;
-local idexpression n;
-@@
+If Thor has changed the original patch considerably, then you Thor and
+Dinh could decide amongst each other who should be the author.
 
- for_each_compatible_node(n, ...) {
-   ... when != of_node_put(n)
-       when != e = n
-(
-   return n;
-+  of_node_put(n);
-?  return ...;
-)
-   ...
- }
-// </smpl>
+If Thor becomes the author and lands in From:, then the commit message
+could state something like "based on original work from Dinh" or
+"Originally-from: Dinh" and so on. "git log" has some examples.
 
-Signed-off-by: Amitoj Kaur Chawla <amitoj1606@gmail.com>
----
- drivers/bus/vexpress-config.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+The SOB chain shows who handled the patch on its way upstream. So in
+this case, it should be:
 
-diff --git a/drivers/bus/vexpress-config.c b/drivers/bus/vexpress-config.c
-index 6575c0f..c3cb76b 100644
---- a/drivers/bus/vexpress-config.c
-+++ b/drivers/bus/vexpress-config.c
-@@ -192,8 +192,10 @@ static int __init vexpress_config_init(void)
- 	/* Need the config devices early, before the "normal" devices... */
- 	for_each_compatible_node(node, NULL, "arm,vexpress,config-bus") {
- 		err = vexpress_config_populate(node);
--		if (err)
-+		if (err) {
-+			of_node_put(node);
- 			break;
-+		}
- 	}
- 
- 	return err;
+SOB: Dinh (if From: is Dinh - otherwise Originally-by:)
+SOB: Thor
+SOB: Boris
+
+if I'm going to pick it up and send it to Linus.
+
+Ok?
+
 -- 
-1.9.1
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
