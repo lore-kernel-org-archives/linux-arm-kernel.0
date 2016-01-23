@@ -1,91 +1,41 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sat, 23 Jan 2016 09:18:44 +0100
-Subject: [PATCH v2 3/3] mtd: nand: sunxi: add randomizer support
-In-Reply-To: <20160123025713.GA90611@google.com>
-References: <1449054067-16751-1-git-send-email-boris.brezillon@free-electrons.com>
- <1449054067-16751-4-git-send-email-boris.brezillon@free-electrons.com>
- <20160123025713.GA90611@google.com>
-Message-ID: <20160123091844.4826ffe6@bbrezillon>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 23 Jan 2016 17:55:30 +0900
+Subject: [PATCH] ARM: tegra: remove redundant ARM_L1_CACHE_SHIFT_6 select
+Message-ID: <1453539330-11903-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+These two are both ARMv7 SoCs.  They need not explicitly select
+ARM_L1_CACHE_SHIFT_6 because it is enabled along with CPU_V7.
 
-On Fri, 22 Jan 2016 18:57:13 -0800
-Brian Norris <computersforpeace@gmail.com> wrote:
+Refer to commit a092f2b15399 ("ARM: 7291/1: cache: assume 64-byte L1
+cachelines for ARMv7 CPUs").
 
-> All three look good, so pushed to l2-mtd.git/next. One comment below:
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Thanks.
+ drivers/soc/tegra/Kconfig | 2 --
+ 1 file changed, 2 deletions(-)
 
-> 
-> On Wed, Dec 02, 2015 at 12:01:07PM +0100, Boris Brezillon wrote:
-> 
-> ...
-> 
-> > +static u16 sunxi_nfc_randomizer_state(struct mtd_info *mtd, int page, bool ecc)
-> > +{
-> > +	const u16 *seeds = sunxi_nfc_randomizer_page_seeds;
-> > +	int mod = mtd->erasesize / mtd->writesize;
-> 
-> Richard suggested you use the mtd.h helper here. Patch below.
-
-Yep, I forgot to do this change.
-
-> 
-> > +
-> > +	if (mod > ARRAY_SIZE(sunxi_nfc_randomizer_page_seeds))
-> > +		mod = ARRAY_SIZE(sunxi_nfc_randomizer_page_seeds);
-> > +
-> > +	if (ecc) {
-> > +		if (mtd->ecc_step_size == 512)
-> > +			seeds = sunxi_nfc_randomizer_ecc512_seeds;
-> > +		else
-> > +			seeds = sunxi_nfc_randomizer_ecc1024_seeds;
-> > +	}
-> > +
-> > +	return seeds[page % mod];
-> > +}
-> 
-> From: Brian Norris <computersforpeace@gmail.com>
-> Date: Fri, 22 Jan 2016 18:54:02 -0800
-> Subject: [PATCH] mtd: nand: sunxi: use mtd_div_by_ws() helper
-> 
-> Suggested-by: Richard Weinberger <richard@nod.at>
-> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-> ---
->  drivers/mtd/nand/sunxi_nand.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-> index 5f700719d5c2..b5ea6b312df0 100644
-> --- a/drivers/mtd/nand/sunxi_nand.c
-> +++ b/drivers/mtd/nand/sunxi_nand.c
-> @@ -624,7 +624,7 @@ static u16 sunxi_nfc_randomizer_step(u16 state, int count)
->  static u16 sunxi_nfc_randomizer_state(struct mtd_info *mtd, int page, bool ecc)
->  {
->  	const u16 *seeds = sunxi_nfc_randomizer_page_seeds;
-> -	int mod = mtd->erasesize / mtd->writesize;
-> +	int mod = mtd_div_by_ws(mtd->erasesize, mtd);
-
-Just a comment (which should not prevent you from applying this patch).
-Isn't it a bit overkill to cast the erasesize to a 64 bit value, and
-then do a do_div on it. Shouldn't happen often though, because
-->writesize_shift should be != 0 in most (all?) cases.
-
-Another related remark: with the MLC/paired pages stuff I'll have to
-retrieve this information (number of write units per erase block) quite
-often, so maybe we should have a field (and/or an helper) for that.
-
-Thanks,
-
-Boris
-
-
+diff --git a/drivers/soc/tegra/Kconfig b/drivers/soc/tegra/Kconfig
+index d0c3c3e..03089ad 100644
+--- a/drivers/soc/tegra/Kconfig
++++ b/drivers/soc/tegra/Kconfig
+@@ -31,7 +31,6 @@ config ARCH_TEGRA_3x_SOC
+ config ARCH_TEGRA_114_SOC
+ 	bool "Enable support for Tegra114 family"
+ 	select ARM_ERRATA_798181 if SMP
+-	select ARM_L1_CACHE_SHIFT_6
+ 	select HAVE_ARM_ARCH_TIMER
+ 	select PINCTRL_TEGRA114
+ 	select TEGRA_TIMER
+@@ -41,7 +40,6 @@ config ARCH_TEGRA_114_SOC
+ 
+ config ARCH_TEGRA_124_SOC
+ 	bool "Enable support for Tegra124 family"
+-	select ARM_L1_CACHE_SHIFT_6
+ 	select HAVE_ARM_ARCH_TIMER
+ 	select PINCTRL_TEGRA124
+ 	select TEGRA_TIMER
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
