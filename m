@@ -1,97 +1,32 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Sat, 23 Jan 2016 17:39:23 +0800
-Subject: [PATCH v3 08/12] arm64, numa: rework numa_add_memblk()
-In-Reply-To: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Sat, 23 Jan 2016 11:25:23 +0100
+Subject: [PATCH v3 04/12] acpi, numa: introduce ACPI_HAS_NUMA_ARCH_FIXUP
+In-Reply-To: <1453541967-3744-5-git-send-email-guohanjun@huawei.com>
 References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1453541967-3744-9-git-send-email-guohanjun@huawei.com>
+ <1453541967-3744-5-git-send-email-guohanjun@huawei.com>
+Message-ID: <20160123102523.GC24726@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+On 23.01.16 17:39:19, Hanjun Guo wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
+> 
+> acpi_numa_arch_fixup() is only used for IA64, x86 introduce a dummy
+> function for it, when we came to a new architecture (such as ARM64),
+> we need to introduce another dummy one to make the code compile.
+> 
+> That's pretty boring so introduce ACPI_HAS_NUMA_ARCH_FIXUP and
+> select it for IA64, introduce a stub function for acpi_numa_arch_fixup()
+> then it's pretty clean for x86 and ARM64.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/ia64/Kconfig    | 1 +
 
-Rework numa_add_memblk() to update the parameter "u64 size"
-to "u64 end", this will make it consistent with x86 and
-can simplify the code later.
+I see an implementation of acpi_numa_arch_fixup() only for ia64. Why
+not move it to arch/ia64 then and call it from setup_arch() in
+arch/ia64/kernel/setup.c after acpi_numa_init()? It looks like we
+don't need a generic solution for this. This avoids any kconfig
+handling for this at all.
 
-Updates for arch/arm64/mm/numa.c should squash to core NUMA
-patches from Ganapat.
-
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- arch/arm64/kernel/acpi_numa.c |  2 +-
- arch/arm64/kernel/of_numa.c   |  2 +-
- arch/arm64/mm/numa.c          | 12 ++++++------
- 3 files changed, 8 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm64/kernel/acpi_numa.c b/arch/arm64/kernel/acpi_numa.c
-index 15fb935..3bcf058 100644
---- a/arch/arm64/kernel/acpi_numa.c
-+++ b/arch/arm64/kernel/acpi_numa.c
-@@ -184,7 +184,7 @@ int __init acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
- 		node, pxm,
- 		(unsigned long long) start, (unsigned long long) end - 1);
- 
--	if (numa_add_memblk(node, start, (end - start)) < 0) {
-+	if (numa_add_memblk(node, start, end) < 0) {
- 		bad_srat();
- 		return -EINVAL;
- 	}
-diff --git a/arch/arm64/kernel/of_numa.c b/arch/arm64/kernel/of_numa.c
-index 2f9e34b..aa6f3a3 100644
---- a/arch/arm64/kernel/of_numa.c
-+++ b/arch/arm64/kernel/of_numa.c
-@@ -168,7 +168,7 @@ static int __init early_init_parse_memory_node(unsigned long node)
- 		pr_debug("NUMA-DT:  base = %llx , node = %u\n",
- 				base, nid);
- 
--		if (numa_add_memblk(nid, base, size) < 0)
-+		if (numa_add_memblk(nid, base, base + size) < 0)
- 			return -EINVAL;
- 	}
- 
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index e974995..2b04b8a 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -137,25 +137,25 @@ void numa_store_cpu_info(unsigned int cpu)
-  * numa_add_memblk - Set node id to memblk
-  * @nid: NUMA node ID of the new memblk
-  * @start: Start address of the new memblk
-- * @size:  Size of the new memblk
-+ * @end:  End address of the new memblk
-  *
-  * RETURNS:
-  * 0 on success, -errno on failure.
-  */
--int __init numa_add_memblk(int nid, u64 start, u64 size)
-+int __init numa_add_memblk(int nid, u64 start, u64 end)
- {
- 	int ret;
- 
--	ret = memblock_set_node(start, size, &memblock.memory, nid);
-+	ret = memblock_set_node(start, (end - start), &memblock.memory, nid);
- 	if (ret < 0) {
- 		pr_err("NUMA: memblock [0x%llx - 0x%llx] failed to add on node %d\n",
--			start, (start + size - 1), nid);
-+			start, (end - 1), nid);
- 		return ret;
- 	}
- 
- 	node_set(nid, numa_nodes_parsed);
- 	pr_info("NUMA: Adding memblock [0x%llx - 0x%llx] on node %d\n",
--			start, (start + size - 1), nid);
-+			start, (end - 1), nid);
- 	return ret;
- }
- EXPORT_SYMBOL(numa_add_memblk);
-@@ -366,7 +366,7 @@ static int __init dummy_numa_init(void)
- 	       0LLU, PFN_PHYS(max_pfn) - 1);
- 
- 	for_each_memblock(memory, mblk) {
--		ret = numa_add_memblk(0, mblk->base, mblk->size);
-+		ret = numa_add_memblk(0, mblk->base, mblk->base + mblk->size);
- 		if (unlikely(ret < 0))
- 			return ret;
- 	}
--- 
-1.9.1
+-Robert
