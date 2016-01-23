@@ -1,119 +1,125 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 22 Jan 2016 23:57:04 +0000
-Subject: Unhandled fault: page domain fault (0x81b) at 0x00e41008
-In-Reply-To: <56A2B811.8010306@free.fr>
-References: <56A268E7.7040004@free.fr>
- <20160122174814.GD19062@n2100.arm.linux.org.uk>
- <56A27C00.5060004@free.fr>
- <20160122193408.GE19062@n2100.arm.linux.org.uk>
- <56A2B811.8010306@free.fr>
-Message-ID: <20160122235704.GF19062@n2100.arm.linux.org.uk>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 22 Jan 2016 18:17:49 -0800
+Subject: [PATCH v2] arm64: kernel: fix architected PMU registers
+ unconditional access
+In-Reply-To: <1452696603-27611-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1452696603-27611-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <56A2E2CD.80904@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 23, 2016 at 12:15:29AM +0100, Mason wrote:
-> On 22/01/2016 20:34, Russell King - ARM Linux wrote:
-> > What do these "block_copy8, block_copy16, block_copy32" functions
-> > do?  Does the "8", "16" and "32" refer to the access size?  Why do
-> > they need to make accesses to userspace using these specific sizes?
-> > What causes this restriction?
-> 
-> Interfaces are somewhat arbitrary. The problem statement
-> was as follows.
-> 
-> Implement functions for copying a range of addresses
-> FROM user-space, TO physical addresses,
-> (and also the other way around)
-> in access size of 8, 16, 32 bits.
-> 
-> So, a little over a decade ago, someone decided that these
-> functions would have the following prototype:
-> 
-> int read_data8  (u8  *user_addr, u8  *phys_addr, int count)
-> int read_data16 (u16 *user_addr, u16 *phys_addr, int count)
-> int read_data32 (u32 *user_addr, u32 *phys_addr, int count)
-> 
-> int write_data8 (u8  *user_addr, u8  *phys_addr, int count)
-> int write_data16(u16 *user_addr, u16 *phys_addr, int count)
-> int write_data32(u32 *user_addr, u32 *phys_addr, int count)
+On 01/13/2016 06:50 AM, Lorenzo Pieralisi wrote:
+> The Performance Monitors extension is an optional feature of the
+> AArch64 architecture, therefore, in order to access Performance
+> Monitors registers safely, the kernel should detect the architected
+> PMU unit presence through the ID_AA64DFR0_EL1 register PMUVer field
+> before accessing them.
+>
+> This patch implements a guard by reading the ID_AA64DFR0_EL1 register
+> PMUVer field to detect the architected PMU presence and prevent accessing
+> PMU system registers if the Performance Monitors extension is not
+> implemented in the core.
+>
+> Fixes: 60792ad349f3 ("arm64: kernel: enforce pmuserenr_el0 initialization and restore")
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Reported-by: Guenter Roeck <linux@roeck-us.net>
+> Tested-by: Guenter Roeck <linux@roeck-us.net>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Peter Maydell <peter.maydell@linaro.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
 
-Of course, physical addresses are _integers_ and not pointers... (I can't
-help but say that because every time I see that mistake, I'm duty bound
-to educate to prevent anyone thinking this kind of thing is a good idea.)
+Hi,
 
-> (Note: the following code is simplified, as count may be
-> larger than vmalloc space, so the operation needs to be
-> "chunked" or "tiled".)
-> 
-> int read_data8 (u8 *user_addr, u8 *phys_addr, int count)
-> {
->   int i, err = 0;
-> 
->   /* map phys_addr into kernel VA */
->   void *va = ioremap(phys_addr, count);
->   if (va == NULL) return some_error;
-> 
->   for (i = 0; i < count; ++i) {
->     u8 val = readb(va + i);
->     err = put_user(val, user_addr + i);
->     if (err) break;
->   }
-> 
->   iounmap(va);
->   return err;
-> }
-> 
-> Is this what you are suggesting?
-> 
-> I expect this to be quite slow.
+this patch is still missing in mainline.
 
-That probably will be quite slow.  How about this instead:
+Did it get lost ?
 
-int read_data8(u8 __user *user_addr, phys_addr_t phys_addr, size_t bytes)
-{
-	const size_t batch_size = PAGE_SIZE;
-	void __user *user_pos = user_addr;
-	void __iomem *va;
-	size_t i, j;
-	u8 *buf;
-	int err;
+Thanks,
+Guenter
 
-	va = ioremap(phys_addr, bytes);
-	buf = kmalloc(batch_size);
-	if (!va || !buf) {
-		iounmap(va);
-		kfree(buf);
-		return -ENOMEM;
-	}
-
-	for (i = 0; i < bytes; i += batch_size) {
-		size_t len = bytes - i;
-		if (len > batch_size)
-			len = batch_size;
-
-		for (j = 0; j < len; j += sizeof(*buf))
-			buf[j / sizeof(*buf)] = readb_relaxed(va + i + j);
-
-		if (copy_to_user(user_pos, buf, len)) {
-			err = -EFAULT;
-			break;
-		}
-
-		user_pos += len;
-	}
-
-	iounmap(va);
-	kfree(buf);
-	return err;
-}
-
-You can change the batch size by altering the "batch_size" variable,
-though I suspect you'll find that the above may be reasonably fast.
-
-You should only need to change the "u8" data types and the iomem
-accessor for your other read functions.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
-according to speedtest.net.
+> ---
+> v1 -> v2
+>
+> - Updated the PMUVer field conditional check to take into account
+>    future PMU versions
+>
+> v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/398090.html
+>
+> Will,
+>
+> rebased on top of mainline, we should be tagging stable before merging.
+>
+> It applies to current mainline (commit 67990608c8b9).
+>
+> Tested on Juno and QEMU.
+>
+> Thanks,
+> Lorenzo
+>
+>   arch/arm64/kernel/head.S    |  5 +++++
+>   arch/arm64/mm/proc-macros.S | 12 ++++++++++++
+>   arch/arm64/mm/proc.S        |  4 ++--
+>   3 files changed, 19 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index ffe9c2b..917d981 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -514,9 +514,14 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
+>   #endif
+>
+>   	/* EL2 debug */
+> +	mrs	x0, id_aa64dfr0_el1		// Check ID_AA64DFR0_EL1 PMUVer
+> +	sbfx	x0, x0, #8, #4
+> +	cmp	x0, #1
+> +	b.lt	4f				// Skip if no PMU present
+>   	mrs	x0, pmcr_el0			// Disable debug access traps
+>   	ubfx	x0, x0, #11, #5			// to EL2 and allow access to
+>   	msr	mdcr_el2, x0			// all PMU counters from EL1
+> +4:
+>
+>   	/* Stage-2 translation */
+>   	msr	vttbr_el2, xzr
+> diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
+> index 146bd99..e6a30e1 100644
+> --- a/arch/arm64/mm/proc-macros.S
+> +++ b/arch/arm64/mm/proc-macros.S
+> @@ -84,3 +84,15 @@
+>   	b.lo	9998b
+>   	dsb	\domain
+>   	.endm
+> +
+> +/*
+> + * reset_pmuserenr_el0 - reset PMUSERENR_EL0 if PMUv3 present
+> + */
+> +	.macro	reset_pmuserenr_el0, tmpreg
+> +	mrs	\tmpreg, id_aa64dfr0_el1	// Check ID_AA64DFR0_EL1 PMUVer
+> +	sbfx	\tmpreg, \tmpreg, #8, #4
+> +	cmp	\tmpreg, #1			// Skip if no PMU present
+> +	b.lt	9000f
+> +	msr	pmuserenr_el0, xzr		// Disable PMU access from EL0
+> +9000:
+> +	.endm
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index a3d867e..c164d2c 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -117,7 +117,7 @@ ENTRY(cpu_do_resume)
+>   	 */
+>   	ubfx	x11, x11, #1, #1
+>   	msr	oslar_el1, x11
+> -	msr	pmuserenr_el0, xzr		// Disable PMU access from EL0
+> +	reset_pmuserenr_el0 x0			// Disable PMU access from EL0
+>   	mov	x0, x12
+>   	dsb	nsh		// Make sure local tlb invalidation completed
+>   	isb
+> @@ -154,7 +154,7 @@ ENTRY(__cpu_setup)
+>   	msr	cpacr_el1, x0			// Enable FP/ASIMD
+>   	mov	x0, #1 << 12			// Reset mdscr_el1 and disable
+>   	msr	mdscr_el1, x0			// access to the DCC from EL0
+> -	msr	pmuserenr_el0, xzr		// Disable PMU access from EL0
+> +	reset_pmuserenr_el0 x0			// Disable PMU access from EL0
+>   	/*
+>   	 * Memory region attributes for LPAE:
+>   	 *
+>
