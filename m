@@ -1,65 +1,174 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Sat, 23 Jan 2016 11:19:35 +0800
-Subject: [PATCH v3 08/17] Xen: public/hvm: sync changes of
- HVM_PARAM_CALLBACK_VIA ABI from Xen
+Date: Sat, 23 Jan 2016 11:19:44 +0800
+Subject: [PATCH v3 17/17] Xen: EFI: Parse DT parameters for Xen specific UEFI
 In-Reply-To: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1453519184-11908-9-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1453519184-11908-18-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Sync the changes of HVM_PARAM_CALLBACK_VIA ABI introduced by
-Xen commit <ca5c54b6ff05> (public/hvm: export the HVM_PARAM_CALLBACK_VIA
-ABI in the API).
+Add a new function to parse DT parameters for Xen specific UEFI just
+like the way for normal UEFI. Then it could reuse the existing codes.
+
+If Xen supports EFI, initialize runtime services.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- include/xen/interface/hvm/params.h | 27 +++++++++++++++++++++------
- 1 file changed, 21 insertions(+), 6 deletions(-)
+CC: Matt Fleming <matt@codeblueprint.co.uk>
+---
+ arch/arm/xen/enlighten.c   |  6 ++++++
+ arch/arm64/kernel/efi.c    | 17 ++++++++++++-----
+ drivers/firmware/efi/efi.c | 45 ++++++++++++++++++++++++++++++++++++++-------
+ 3 files changed, 56 insertions(+), 12 deletions(-)
 
-diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
-index a6c7991..70ad208 100644
---- a/include/xen/interface/hvm/params.h
-+++ b/include/xen/interface/hvm/params.h
-@@ -27,16 +27,31 @@
-  * Parameter space for HVMOP_{set,get}_param.
-  */
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index cdc0bd2..608d735 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -245,6 +245,12 @@ static int __init fdt_find_hyper_node(unsigned long node, const char *uname,
+ 	    !strncmp(hyper_node.prefix, s, strlen(hyper_node.prefix)))
+ 		hyper_node.version = s + strlen(hyper_node.prefix);
  
-+#define HVM_PARAM_CALLBACK_IRQ 0
- /*
-  * How should CPU0 event-channel notifications be delivered?
-- * val[63:56] == 0: val[55:0] is a delivery GSI (Global System Interrupt).
-- * val[63:56] == 1: val[55:0] is a delivery PCI INTx line, as follows:
-- *                  Domain = val[47:32], Bus  = val[31:16],
-- *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
-- * val[63:56] == 2: val[7:0] is a vector number.
-+ *
-  * If val == 0 then CPU0 event-channel notifications are not delivered.
-+ * If val != 0, val[63:56] encodes the type, as follows:
-+ */
++	if (IS_ENABLED(CONFIG_XEN_EFI)) {
++		/* Check if Xen supports EFI */
++		if (of_get_flat_dt_subnode_by_name(node, "uefi") > 0)
++			set_bit(EFI_PARAVIRT, &efi.flags);
++	}
 +
-+#define HVM_PARAM_CALLBACK_TYPE_GSI      0
-+/*
-+ * val[55:0] is a delivery GSI.  GSI 0 cannot be used, as it aliases val == 0,
-+ * and disables all notifications.
-+ */
-+
-+#define HVM_PARAM_CALLBACK_TYPE_PCI_INTX 1
-+/*
-+ * val[55:0] is a delivery PCI INTx line:
-+ * Domain = val[47:32], Bus = val[31:16] DevFn = val[15:8], IntX = val[1:0]
-+ */
-+
-+#define HVM_PARAM_CALLBACK_TYPE_VECTOR   2
-+/*
-+ * val[7:0] is a vector number.  Check for XENFEAT_hvm_callback_vector to know
-+ * if this delivery method is available.
-  */
--#define HVM_PARAM_CALLBACK_IRQ 0
+ 	return 0;
+ }
  
- #define HVM_PARAM_STORE_PFN    1
- #define HVM_PARAM_STORE_EVTCHN 2
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 4eeb171..3c46129 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -33,6 +33,7 @@
+ #include <asm/mmu_context.h>
+ #include <asm/mmu.h>
+ #include <asm/pgtable.h>
++#include <asm/xen/xen-ops.h>
+ 
+ struct efi_memory_map memmap;
+ 
+@@ -308,13 +309,19 @@ static int __init arm64_enable_runtime_services(void)
+ 	}
+ 	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
+ 
+-	if (!efi_virtmap_init()) {
+-		pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
+-		return -ENOMEM;
++	if (IS_ENABLED(CONFIG_XEN_EFI) && efi_enabled(EFI_PARAVIRT)) {
++		/* Set up runtime services function pointers for Xen Dom0 */
++		xen_efi_runtime_setup();
++	} else {
++		if (!efi_virtmap_init()) {
++			pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
++			return -ENOMEM;
++		}
++
++		/* Set up runtime services function pointers */
++		efi_native_runtime_setup();
+ 	}
+ 
+-	/* Set up runtime services function pointers */
+-	efi_native_runtime_setup();
+ 	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+ 
+ 	efi.runtime_version = efi.systab->hdr.revision;
+diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+index 027ca21..bdcf6d7 100644
+--- a/drivers/firmware/efi/efi.c
++++ b/drivers/firmware/efi/efi.c
+@@ -498,12 +498,14 @@ device_initcall(efi_load_efivars);
+ 		FIELD_SIZEOF(struct efi_fdt_params, field) \
+ 	}
+ 
+-static __initdata struct {
++struct params {
+ 	const char name[32];
+ 	const char propname[32];
+ 	int offset;
+ 	int size;
+-} dt_params[] = {
++};
++
++static struct params fdt_params[] __initdata = {
+ 	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
+ 	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
+ 	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
+@@ -511,24 +513,45 @@ static __initdata struct {
+ 	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
+ };
+ 
++static struct params xen_fdt_params[] __initdata = {
++	UEFI_PARAM("System Table", "xen,uefi-system-table", system_table),
++	UEFI_PARAM("MemMap Address", "xen,uefi-mmap-start", mmap),
++	UEFI_PARAM("MemMap Size", "xen,uefi-mmap-size", mmap_size),
++	UEFI_PARAM("MemMap Desc. Size", "xen,uefi-mmap-desc-size", desc_size),
++	UEFI_PARAM("MemMap Desc. Version", "xen,uefi-mmap-desc-ver", desc_ver)
++};
++
+ struct param_info {
+ 	int found;
+ 	void *params;
++	struct params *dt_params;
++	int size;
+ };
+ 
+ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+ 				       int depth, void *data)
+ {
+ 	struct param_info *info = data;
++	struct params *dt_params = info->dt_params;
+ 	const void *prop;
+ 	void *dest;
+ 	u64 val;
+-	int i, len;
++	int i, len, offset;
+ 
+-	if (depth != 1 || strcmp(uname, "chosen") != 0)
+-		return 0;
++	if (efi_enabled(EFI_PARAVIRT)) {
++		if (depth != 1 || strcmp(uname, "hypervisor") != 0)
++			return 0;
+ 
+-	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
++		offset = of_get_flat_dt_subnode_by_name(node, "uefi");
++		if (offset < 0)
++			return 0;
++		node = offset;
++	} else {
++		if (depth != 1 || strcmp(uname, "chosen") != 0)
++			return 0;
++	}
++
++	for (i = 0; i < info->size; i++) {
+ 		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
+ 		if (!prop)
+ 			return 0;
+@@ -559,12 +582,20 @@ int __init efi_get_fdt_params(struct efi_fdt_params *params)
+ 	info.found = 0;
+ 	info.params = params;
+ 
++	if (efi_enabled(EFI_PARAVIRT)) {
++		info.dt_params = xen_fdt_params;
++		info.size = ARRAY_SIZE(xen_fdt_params);
++	} else {
++		info.dt_params = fdt_params;
++		info.size = ARRAY_SIZE(fdt_params);
++	}
++
+ 	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
+ 	if (!info.found)
+ 		pr_info("UEFI not found.\n");
+ 	else if (!ret)
+ 		pr_err("Can't find '%s' in device tree!\n",
+-		       dt_params[info.found].name);
++		       info.dt_params[info.found].name);
+ 
+ 	return ret;
+ }
 -- 
 2.0.4
