@@ -1,41 +1,30 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 23 Jan 2016 17:55:30 +0900
-Subject: [PATCH] ARM: tegra: remove redundant ARM_L1_CACHE_SHIFT_6 select
-Message-ID: <1453539330-11903-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Sat, 23 Jan 2016 18:04:12 +0900
+Subject: [PATCH] arm64: defconfig: enable UniPhier I2C (FIFO-builtin) driver
+Message-ID: <1453539852-18020-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These two are both ARMv7 SoCs.  They need not explicitly select
-ARM_L1_CACHE_SHIFT_6 because it is enabled along with CPU_V7.
-
-Refer to commit a092f2b15399 ("ARM: 7291/1: cache: assume 64-byte L1
-cachelines for ARMv7 CPUs").
+This driver is used by the UniPhier PH1-LD10 SoC
+(arch/arm64/boot/dts/socionext/uniphier-ph1-ld10.dtsi).
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- drivers/soc/tegra/Kconfig | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/soc/tegra/Kconfig b/drivers/soc/tegra/Kconfig
-index d0c3c3e..03089ad 100644
---- a/drivers/soc/tegra/Kconfig
-+++ b/drivers/soc/tegra/Kconfig
-@@ -31,7 +31,6 @@ config ARCH_TEGRA_3x_SOC
- config ARCH_TEGRA_114_SOC
- 	bool "Enable support for Tegra114 family"
- 	select ARM_ERRATA_798181 if SMP
--	select ARM_L1_CACHE_SHIFT_6
- 	select HAVE_ARM_ARCH_TIMER
- 	select PINCTRL_TEGRA114
- 	select TEGRA_TIMER
-@@ -41,7 +40,6 @@ config ARCH_TEGRA_114_SOC
- 
- config ARCH_TEGRA_124_SOC
- 	bool "Enable support for Tegra124 family"
--	select ARM_L1_CACHE_SHIFT_6
- 	select HAVE_ARM_ARCH_TIMER
- 	select PINCTRL_TEGRA124
- 	select TEGRA_TIMER
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 18ca9fb..2e2e4c1 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -136,6 +136,7 @@ CONFIG_VIRTIO_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C=y
+ CONFIG_I2C_QUP=y
++CONFIG_I2C_UNIPHIER_F=y
+ CONFIG_I2C_RCAR=y
+ CONFIG_SPI=y
+ CONFIG_SPI_PL022=y
 -- 
 1.9.1
