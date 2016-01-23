@@ -1,62 +1,55 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 22 Jan 2016 18:57:13 -0800
-Subject: [PATCH v2 3/3] mtd: nand: sunxi: add randomizer support
-In-Reply-To: <1449054067-16751-4-git-send-email-boris.brezillon@free-electrons.com>
-References: <1449054067-16751-1-git-send-email-boris.brezillon@free-electrons.com>
- <1449054067-16751-4-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160123025713.GA90611@google.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Sat, 23 Jan 2016 11:19:39 +0800
+Subject: [PATCH v3 12/17] ARM64: ACPI: Check if it runs on Xen to enable or
+ disable ACPI
+In-Reply-To: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1453519184-11908-13-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All three look good, so pushed to l2-mtd.git/next. One comment below:
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-On Wed, Dec 02, 2015 at 12:01:07PM +0100, Boris Brezillon wrote:
+When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
+a /hypervisor node in DT. So check if it needs to enable ACPI.
 
-...
-
-> +static u16 sunxi_nfc_randomizer_state(struct mtd_info *mtd, int page, bool ecc)
-> +{
-> +	const u16 *seeds = sunxi_nfc_randomizer_page_seeds;
-> +	int mod = mtd->erasesize / mtd->writesize;
-
-Richard suggested you use the mtd.h helper here. Patch below.
-
-> +
-> +	if (mod > ARRAY_SIZE(sunxi_nfc_randomizer_page_seeds))
-> +		mod = ARRAY_SIZE(sunxi_nfc_randomizer_page_seeds);
-> +
-> +	if (ecc) {
-> +		if (mtd->ecc_step_size == 512)
-> +			seeds = sunxi_nfc_randomizer_ecc512_seeds;
-> +		else
-> +			seeds = sunxi_nfc_randomizer_ecc1024_seeds;
-> +	}
-> +
-> +	return seeds[page % mod];
-> +}
-
-From: Brian Norris <computersforpeace@gmail.com>
-Date: Fri, 22 Jan 2016 18:54:02 -0800
-Subject: [PATCH] mtd: nand: sunxi: use mtd_div_by_ws() helper
-
-Suggested-by: Richard Weinberger <richard@nod.at>
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- drivers/mtd/nand/sunxi_nand.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+CC: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ arch/arm64/kernel/acpi.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index 5f700719d5c2..b5ea6b312df0 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -624,7 +624,7 @@ static u16 sunxi_nfc_randomizer_step(u16 state, int count)
- static u16 sunxi_nfc_randomizer_state(struct mtd_info *mtd, int page, bool ecc)
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index d1ce8e2..4e92be0 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
  {
- 	const u16 *seeds = sunxi_nfc_randomizer_page_seeds;
--	int mod = mtd->erasesize / mtd->writesize;
-+	int mod = mtd_div_by_ws(mtd->erasesize, mtd);
+ 	/*
+ 	 * Return 1 as soon as we encounter a node at depth 1 that is
+-	 * not the /chosen node.
++	 * not the /chosen node, or /hypervisor node when running on Xen.
+ 	 */
+-	if (depth == 1 && (strcmp(uname, "chosen") != 0))
+-		return 1;
++	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
++		if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
++			return 1;
++	}
++
+ 	return 0;
+ }
  
- 	if (mod > ARRAY_SIZE(sunxi_nfc_randomizer_page_seeds))
- 		mod = ARRAY_SIZE(sunxi_nfc_randomizer_page_seeds);
+@@ -184,7 +187,8 @@ void __init acpi_boot_table_init(void)
+ 	/*
+ 	 * Enable ACPI instead of device tree unless
+ 	 * - ACPI has been disabled explicitly (acpi=off), or
+-	 * - the device tree is not empty (it has more than just a /chosen node)
++	 * - the device tree is not empty (it has more than just a /chosen node,
++	 *   and a /hypervisor node when running on Xen)
+ 	 *   and ACPI has not been force enabled (acpi=force)
+ 	 */
+ 	if (param_acpi_off ||
 -- 
-2.7.0.rc3.207.g0ac5344
+2.0.4
