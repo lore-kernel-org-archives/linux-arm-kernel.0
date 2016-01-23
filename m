@@ -1,30 +1,31 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 24 Jan 2016 04:23:24 +0900
-Subject: [PATCH] ARM: pxa: let PXA27x select PINCTRL
-Message-ID: <1453577004-15295-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Sun, 24 Jan 2016 04:25:13 +0900
+Subject: [PATCH] pinctrl: pxa: export pxa2xx_pinctrl_init()
+Message-ID: <1453577113-14423-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To use the newly added PXA27x pinctrl driver, this commit is needed
-as well as commit 4b15ec9d42b2 ("pinctrl: activate pxa architecture").
+Building pinctrl-pxa27x.c as a module causes a link error:
+
+ERROR: "pxa2xx_pinctrl_init" [drivers/pinctrl/pxa/pinctrl-pxa27x.ko] undefined!
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/mach-pxa/Kconfig | 1 +
+ drivers/pinctrl/pxa/pinctrl-pxa2xx.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index f096836..35bc0fe 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -618,6 +618,7 @@ config PXA25x
- config PXA27x
- 	bool
- 	select CPU_XSCALE
-+	select PINCTRL
- 	help
- 	  Select code specific to PXA27x variants
+diff --git a/drivers/pinctrl/pxa/pinctrl-pxa2xx.c b/drivers/pinctrl/pxa/pinctrl-pxa2xx.c
+index d90e205..216f227 100644
+--- a/drivers/pinctrl/pxa/pinctrl-pxa2xx.c
++++ b/drivers/pinctrl/pxa/pinctrl-pxa2xx.c
+@@ -426,6 +426,7 @@ int pxa2xx_pinctrl_init(struct platform_device *pdev,
  
+ 	return 0;
+ }
++EXPORT_SYMBOL(pxa2xx_pinctrl_init);
+ 
+ int pxa2xx_pinctrl_exit(struct platform_device *pdev)
+ {
 -- 
 1.9.1
