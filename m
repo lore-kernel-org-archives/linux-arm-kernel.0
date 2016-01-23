@@ -1,62 +1,91 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 23 Jan 2016 12:21:55 +0800
-Subject: [PATCH RFC 09/15] ARM: dts: sun6i: sina31s: Switch to mmc3 for
- onboard eMMC
-In-Reply-To: <20160122203927.GC3682@lukather>
-References: <1453354002-28366-1-git-send-email-wens@csie.org>
- <1453354002-28366-10-git-send-email-wens@csie.org>
- <20160122203927.GC3682@lukather>
-Message-ID: <CAGb2v658auQfvZy8jr__bmuk6=zGicvvE=5Fa5pOnubkgYvjDA@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sat, 23 Jan 2016 09:18:44 +0100
+Subject: [PATCH v2 3/3] mtd: nand: sunxi: add randomizer support
+In-Reply-To: <20160123025713.GA90611@google.com>
+References: <1449054067-16751-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1449054067-16751-4-git-send-email-boris.brezillon@free-electrons.com>
+ <20160123025713.GA90611@google.com>
+Message-ID: <20160123091844.4826ffe6@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 23, 2016 at 4:39 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Thu, Jan 21, 2016 at 01:26:36PM +0800, Chen-Yu Tsai wrote:
->> According to Allwinner, only mmc3 supports 8 bit DDR transfers for eMMC.
->> Switch to mmc3 for the onboard eMMC, and also assign vqmmc for signal
->> voltage sensing/switching, and "cap-mmc-hw-reset" to denote this
->> instance can use eMMC hardware reset.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi | 6 ++++--
->>  1 file changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi b/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
->> index ea69fb8ad4d8..4ec0c8679b2e 100644
->> --- a/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
->> +++ b/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
->> @@ -61,12 +61,14 @@
->>  };
->>
->>  /* eMMC on core board */
->> -&mmc2 {
->> +&mmc3 {
->>       pinctrl-names = "default";
->> -     pinctrl-0 = <&mmc2_8bit_emmc_pins>;
->> +     pinctrl-0 = <&mmc3_8bit_emmc_pins>;
->>       vmmc-supply = <&reg_dcdc1>;
->> +     vqmmc-supply = <&reg_dcdc1>;
->
-> That seems odd. IIRC the VCC was supposed to be fixed and VCCQ could
-> be either at 1.8 or 3V. Having the same regulator on both would make
-> VCCQ forced to 3.3V, which seems to go against your commit log.
->
-> What's the catch ? :)
+Hi Brian,
 
-That is how the board is routed. Which means the only use for
-vqmmc-supply is the driver will know that it can only do 3.3V,
-i.e. voltage sensing.
+On Fri, 22 Jan 2016 18:57:13 -0800
+Brian Norris <computersforpeace@gmail.com> wrote:
 
-It is the reason I requested Olimex to look into this. Allwinner
-reference designs all tie vqmmc directly to 3.3V.
+> All three look good, so pushed to l2-mtd.git/next. One comment below:
 
-Actually with the latest driver patches, this is not even needed. To
-make the driver backward compatible, if no vqmmc-supply is given, it
-just assumes 3.3V signaling.
+Thanks.
 
-Regards
-ChenYu
+> 
+> On Wed, Dec 02, 2015 at 12:01:07PM +0100, Boris Brezillon wrote:
+> 
+> ...
+> 
+> > +static u16 sunxi_nfc_randomizer_state(struct mtd_info *mtd, int page, bool ecc)
+> > +{
+> > +	const u16 *seeds = sunxi_nfc_randomizer_page_seeds;
+> > +	int mod = mtd->erasesize / mtd->writesize;
+> 
+> Richard suggested you use the mtd.h helper here. Patch below.
+
+Yep, I forgot to do this change.
+
+> 
+> > +
+> > +	if (mod > ARRAY_SIZE(sunxi_nfc_randomizer_page_seeds))
+> > +		mod = ARRAY_SIZE(sunxi_nfc_randomizer_page_seeds);
+> > +
+> > +	if (ecc) {
+> > +		if (mtd->ecc_step_size == 512)
+> > +			seeds = sunxi_nfc_randomizer_ecc512_seeds;
+> > +		else
+> > +			seeds = sunxi_nfc_randomizer_ecc1024_seeds;
+> > +	}
+> > +
+> > +	return seeds[page % mod];
+> > +}
+> 
+> From: Brian Norris <computersforpeace@gmail.com>
+> Date: Fri, 22 Jan 2016 18:54:02 -0800
+> Subject: [PATCH] mtd: nand: sunxi: use mtd_div_by_ws() helper
+> 
+> Suggested-by: Richard Weinberger <richard@nod.at>
+> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+> ---
+>  drivers/mtd/nand/sunxi_nand.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+> index 5f700719d5c2..b5ea6b312df0 100644
+> --- a/drivers/mtd/nand/sunxi_nand.c
+> +++ b/drivers/mtd/nand/sunxi_nand.c
+> @@ -624,7 +624,7 @@ static u16 sunxi_nfc_randomizer_step(u16 state, int count)
+>  static u16 sunxi_nfc_randomizer_state(struct mtd_info *mtd, int page, bool ecc)
+>  {
+>  	const u16 *seeds = sunxi_nfc_randomizer_page_seeds;
+> -	int mod = mtd->erasesize / mtd->writesize;
+> +	int mod = mtd_div_by_ws(mtd->erasesize, mtd);
+
+Just a comment (which should not prevent you from applying this patch).
+Isn't it a bit overkill to cast the erasesize to a 64 bit value, and
+then do a do_div on it. Shouldn't happen often though, because
+->writesize_shift should be != 0 in most (all?) cases.
+
+Another related remark: with the MLC/paired pages stuff I'll have to
+retrieve this information (number of write units per erase block) quite
+often, so maybe we should have a field (and/or an helper) for that.
+
+Thanks,
+
+Boris
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
