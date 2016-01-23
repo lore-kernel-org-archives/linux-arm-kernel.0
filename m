@@ -1,83 +1,83 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Sat, 23 Jan 2016 11:19:37 +0800
-Subject: [PATCH v3 10/17] arm/xen: Get event-channel irq through HVM_PARAM
- when booting with ACPI
+Date: Sat, 23 Jan 2016 11:19:43 +0800
+Subject: [PATCH v3 16/17] FDT: Add a helper to get specified name subnode
 In-Reply-To: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1453519184-11908-11-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1453519184-11908-17-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-When booting with ACPI, it could get the event-channel irq through
-HVM_PARAM_CALLBACK_IRQ.
+Sometimes it needs to check if there is a node in FDT by full path.
+Introduce this helper to get the specified name subnode if it exists.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm/xen/enlighten.c | 36 +++++++++++++++++++++++++++++++++++-
- 1 file changed, 35 insertions(+), 1 deletion(-)
+CC: Rob Herring <robh@kernel.org>
+---
+ drivers/of/fdt.c       | 35 +++++++++++++++++++++++++++++++++++
+ include/linux/of_fdt.h |  2 ++
+ 2 files changed, 37 insertions(+)
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 6d90a62..0e010bb 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -29,6 +29,7 @@
- #include <linux/time64.h>
- #include <linux/timekeeping.h>
- #include <linux/timekeeper_internal.h>
-+#include <linux/acpi.h>
- 
- #include <linux/mm.h>
- 
-@@ -262,6 +263,35 @@ void __init xen_early_init(void)
- 		add_preferred_console("hvc", 0, NULL);
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index 655f79d..112ec16 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -645,6 +645,41 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
  }
  
-+static void __init xen_acpi_guest_init_events_irq(void)
+ /**
++ * of_get_flat_dt_subnode_by_name - get subnode of specified node by name
++ *
++ * @node: the parent node
++ * @uname: the name of subnode
++ * @return offset of the subnode, or -FDT_ERR_NOTFOUND if there is none
++ */
++
++int of_get_flat_dt_subnode_by_name(unsigned long node, const char *uname)
 +{
-+#ifdef CONFIG_ACPI
-+	struct xen_hvm_param a;
-+	int interrupt, trigger, polarity;
++	const void *blob = initial_boot_params;
++	int offset;
++	const char *pathp;
 +
-+	a.domid = DOMID_SELF;
-+	a.index = HVM_PARAM_CALLBACK_IRQ;
-+	xen_events_irq = 0;
++	/* Find first subnode if it exists */
++	offset = fdt_first_subnode(blob, node);
++	if (offset < 0)
++		return -FDT_ERR_NOTFOUND;
++	pathp = fdt_get_name(blob, offset, NULL);
++	if (strncmp(pathp, uname, strlen(uname)) == 0)
++		return offset;
 +
-+	if (!HYPERVISOR_hvm_op(HVMOP_get_param, &a)) {
-+		if ((a.value >> 56) == HVM_PARAM_CALLBACK_TYPE_EVENT) {
-+			interrupt = a.value & 0xff;
-+			trigger = ((a.value >> 8) & 0x1) ? ACPI_EDGE_SENSITIVE
-+							 : ACPI_LEVEL_SENSITIVE;
-+			polarity = ((a.value >> 8) & 0x2) ? ACPI_ACTIVE_LOW
-+							  : ACPI_ACTIVE_HIGH;
-+			xen_events_irq = acpi_register_gsi(NULL, interrupt,
-+							   trigger, polarity);
-+		}
-+	}
-+#endif
++	/* Find other subnodes */
++	do {
++		offset = fdt_next_subnode(blob, offset);
++		if (offset < 0)
++			return -FDT_ERR_NOTFOUND;
++		pathp = fdt_get_name(blob, offset, NULL);
++		if (strncmp(pathp, uname, strlen(uname)) == 0)
++			return offset;
++	} while (offset >= 0);
++
++	return -FDT_ERR_NOTFOUND;
 +}
 +
-+static void __init xen_dt_guest_init_events_irq(void)
-+{
-+	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
-+}
-+
- static int __init xen_guest_init(void)
- {
- 	struct xen_add_to_physmap xatp;
-@@ -270,7 +300,11 @@ static int __init xen_guest_init(void)
- 	if (!xen_domain())
- 		return 0;
- 
--	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
-+	if (!acpi_disabled)
-+		xen_acpi_guest_init_events_irq();
-+	else
-+		xen_dt_guest_init_events_irq();
-+
- 	if (!xen_events_irq) {
- 		pr_err("Xen event channel interrupt not found\n");
- 		return -ENODEV;
++/**
+  * of_get_flat_dt_root - find the root node in the flat blob
+  */
+ unsigned long __init of_get_flat_dt_root(void)
+diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+index df9ef38..fc28162 100644
+--- a/include/linux/of_fdt.h
++++ b/include/linux/of_fdt.h
+@@ -52,6 +52,8 @@ extern char __dtb_end[];
+ extern int of_scan_flat_dt(int (*it)(unsigned long node, const char *uname,
+ 				     int depth, void *data),
+ 			   void *data);
++extern int of_get_flat_dt_subnode_by_name(unsigned long node,
++					  const char *uname);
+ extern const void *of_get_flat_dt_prop(unsigned long node, const char *name,
+ 				       int *size);
+ extern int of_flat_dt_is_compatible(unsigned long node, const char *name);
 -- 
 2.0.4
