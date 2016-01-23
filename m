@@ -1,73 +1,106 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Sat, 23 Jan 2016 11:19:34 +0800
-Subject: [PATCH v3 07/17] Xen: ARM: Add support for mapping AMBA device mmio
+Date: Sat, 23 Jan 2016 11:19:42 +0800
+Subject: [PATCH v3 15/17] ARM64: XEN: Add a function to initialize Xen
+ specific UEFI runtime services
 In-Reply-To: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1453519184-11908-8-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1453519184-11908-16-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add a bus_notifier for AMBA bus device in order to map the device
-mmio regions when DOM0 booting with ACPI.
+When running on Xen hypervisor, runtime services are supported through
+hypercall. Add a Xen specific function to initialize runtime services.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- drivers/xen/arm-device.c | 43 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+ arch/arm64/include/asm/xen/xen-ops.h |  6 ++++++
+ arch/arm64/xen/Makefile              |  1 +
+ arch/arm64/xen/efi.c                 | 40 ++++++++++++++++++++++++++++++++++++
+ drivers/xen/Kconfig                  |  2 +-
+ 4 files changed, 48 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/include/asm/xen/xen-ops.h
+ create mode 100644 arch/arm64/xen/efi.c
 
-diff --git a/drivers/xen/arm-device.c b/drivers/xen/arm-device.c
-index 76e26e5..3854043 100644
---- a/drivers/xen/arm-device.c
-+++ b/drivers/xen/arm-device.c
-@@ -139,3 +139,46 @@ static int __init register_xen_platform_notifier(void)
- }
+diff --git a/arch/arm64/include/asm/xen/xen-ops.h b/arch/arm64/include/asm/xen/xen-ops.h
+new file mode 100644
+index 0000000..ec154e7
+--- /dev/null
++++ b/arch/arm64/include/asm/xen/xen-ops.h
+@@ -0,0 +1,6 @@
++#ifndef _ASM_XEN_OPS_H
++#define _ASM_XEN_OPS_H
++
++void xen_efi_runtime_setup(void);
++
++#endif /* _ASM_XEN_OPS_H */
+diff --git a/arch/arm64/xen/Makefile b/arch/arm64/xen/Makefile
+index 74a8d87..62e6fe2 100644
+--- a/arch/arm64/xen/Makefile
++++ b/arch/arm64/xen/Makefile
+@@ -1,2 +1,3 @@
+ xen-arm-y	+= $(addprefix ../../arm/xen/, enlighten.o grant-table.o p2m.o mm.o)
+ obj-y		:= xen-arm.o hypercall.o
++obj-$(CONFIG_XEN_EFI) += efi.o
+diff --git a/arch/arm64/xen/efi.c b/arch/arm64/xen/efi.c
+new file mode 100644
+index 0000000..b9cae65
+--- /dev/null
++++ b/arch/arm64/xen/efi.c
+@@ -0,0 +1,40 @@
++/*
++ * Copyright (c) 2015, Linaro Limited, Shannon Zhao
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/efi.h>
++#include <xen/xen-ops.h>
++#include <asm/xen/xen-ops.h>
++
++/* Set XEN EFI runtime services function pointers. Other fileds of struct efi,
++ * e.g. efi.systab, will be set like normal EFI.
++ */
++void __init xen_efi_runtime_setup(void)
++{
++	efi.get_time                 = xen_efi_get_time;
++	efi.set_time                 = xen_efi_set_time;
++	efi.get_wakeup_time          = xen_efi_get_wakeup_time;
++	efi.set_wakeup_time          = xen_efi_set_wakeup_time;
++	efi.get_variable             = xen_efi_get_variable;
++	efi.get_next_variable        = xen_efi_get_next_variable;
++	efi.set_variable             = xen_efi_set_variable;
++	efi.query_variable_info      = xen_efi_query_variable_info;
++	efi.update_capsule           = xen_efi_update_capsule;
++	efi.query_capsule_caps       = xen_efi_query_capsule_caps;
++	efi.get_next_high_mono_count = xen_efi_get_next_high_mono_count;
++	efi.reset_system             = NULL; /* Functionality provided by Xen. */
++}
++EXPORT_SYMBOL_GPL(xen_efi_runtime_setup);
+diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
+index 73708ac..27d216a 100644
+--- a/drivers/xen/Kconfig
++++ b/drivers/xen/Kconfig
+@@ -268,7 +268,7 @@ config XEN_HAVE_PVMMU
  
- arch_initcall(register_xen_platform_notifier);
-+
-+#ifdef CONFIG_ARM_AMBA
-+#include <linux/amba/bus.h>
-+
-+static int xen_amba_notifier(struct notifier_block *nb,
-+			     unsigned long action, void *data)
-+{
-+	struct amba_device *adev = to_amba_device(data);
-+	int r = 0;
-+
-+	switch (action) {
-+	case BUS_NOTIFY_ADD_DEVICE:
-+		r = xen_map_device_mmio(&adev->res, 1);
-+		break;
-+	case BUS_NOTIFY_DEL_DEVICE:
-+		r = xen_unmap_device_mmio(&adev->res, 1);
-+		break;
-+	default:
-+		return NOTIFY_DONE;
-+	}
-+	if (r)
-+		dev_err(&adev->dev, "AMBA: Failed to %s device %s MMIO!\n",
-+			action == BUS_NOTIFY_ADD_DEVICE ? "map" :
-+			(action == BUS_NOTIFY_DEL_DEVICE ? "unmap" : "?"),
-+			adev->dev.init_name);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block amba_device_nb = {
-+	.notifier_call = xen_amba_notifier,
-+};
-+
-+static int __init register_xen_amba_notifier(void)
-+{
-+	if (!xen_initial_domain() || acpi_disabled)
-+		return 0;
-+
-+	return bus_register_notifier(&amba_bustype, &amba_device_nb);
-+}
-+
-+arch_initcall(register_xen_amba_notifier);
-+#endif
+ config XEN_EFI
+ 	def_bool y
+-	depends on X86_64 && EFI
++	depends on (ARM64 || X86_64) && EFI
+ 
+ config XEN_AUTO_XLATE
+ 	def_bool y
 -- 
 2.0.4
