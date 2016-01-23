@@ -1,80 +1,45 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Sun, 24 Jan 2016 00:36:39 +0200
-Subject: [PATCH 1/2] ARM: DTS: kirkwood-openrd-client: fix audio
-In-Reply-To: <1453588600-14831-1-git-send-email-aaro.koskinen@iki.fi>
-References: <1453588600-14831-1-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <1453588600-14831-2-git-send-email-aaro.koskinen@iki.fi>
+From: slash.tmp@free.fr (Mason)
+Date: Sat, 23 Jan 2016 23:46:06 +0100
+Subject: Unhandled fault: page domain fault (0x81b) at 0x00e41008
+In-Reply-To: <56A3E84A.1000604@free.fr>
+References: <56A268E7.7040004@free.fr>
+ <20160122174814.GD19062@n2100.arm.linux.org.uk> <56A27C00.5060004@free.fr>
+ <20160122193408.GE19062@n2100.arm.linux.org.uk> <56A2B811.8010306@free.fr>
+ <20160122235704.GF19062@n2100.arm.linux.org.uk> <56A3609E.3000400@free.fr>
+ <20160123113438.GG19062@n2100.arm.linux.org.uk> <56A3E84A.1000604@free.fr>
+Message-ID: <56A402AE.6070503@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix audio on kirkwood-openrd-client:
+On 23/01/2016 21:53, Mason wrote:
 
-1) The audio-controller was left disabled.
+> But I would consider mmaping /dev/mem even simpler: it doesn't
+> require writing a single line of kernel code, and it works as
+> expected. The gist of the code is:
+> 
+>   fd = open("/path/to/file", O_RDONLY);
+>   mem_fd = open("/dev/mem", O_WRONLY | O_SYNC);
+>   va = mmap(NULL, len, PROT_WRITE, MAP_SHARED, mem_fd, phys_addr);
+>   read(fd, va, len);
+> 
+> And that's it. If I understand correctly, the mem driver
+> will copy the file contents directly to "remote" RAM.
+> 
+> Is there something wrong with this solution, in your opinion?
 
-2) The probe fails because cs42l51 is missing #sound-dai-cells.
+For my own reference, Arnd had several comments:
 
-	/sound/simple-audio-card,codec: could not get #sound-dai-cells for /ocp at f1000000/i2c at 11000/cs42l51 at 4a
-	asoc-simple-card sound: parse error -22
-	asoc-simple-card: probe of sound failed with error -22
-
-3) The mapping is incorrect:
-
-	asoc-simple-card sound: cs42l51-hifi <-> spdif mapping ok
-
-   should be:
-
-	asoc-simple-card sound: cs42l51-hifi <-> i2s mapping ok
-
-Reported-by: Rick Thomas <rbthomas@pobox.com>
-Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
----
- arch/arm/boot/dts/kirkwood-openrd-client.dts | 6 +++++-
- arch/arm/boot/dts/kirkwood.dtsi              | 2 +-
- 2 files changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/kirkwood-openrd-client.dts b/arch/arm/boot/dts/kirkwood-openrd-client.dts
-index 887b9c1..96ff59d 100644
---- a/arch/arm/boot/dts/kirkwood-openrd-client.dts
-+++ b/arch/arm/boot/dts/kirkwood-openrd-client.dts
-@@ -20,6 +20,9 @@
- 	compatible = "marvell,openrd-client", "marvell,openrd", "marvell,kirkwood-88f6281", "marvell,kirkwood";
- 
- 	ocp at f1000000 {
-+		audio-controller at a0000 {
-+			status = "okay";
-+		};
- 		i2c at 11000 {
- 			status = "okay";
- 			clock-frequency = <400000>;
-@@ -27,6 +30,7 @@
- 			cs42l51: cs42l51 at 4a {
- 				compatible = "cirrus,cs42l51";
- 				reg = <0x4a>;
-+				#sound-dai-cells = <0>;
- 			};
- 		};
- 	};
-@@ -37,7 +41,7 @@
- 		simple-audio-card,mclk-fs = <256>;
- 
- 		simple-audio-card,cpu {
--			sound-dai = <&audio0>;
-+			sound-dai = <&audio0 0>;
- 		};
- 
- 		simple-audio-card,codec {
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index 7b5a4a1..7445a15 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -381,7 +381,7 @@
- 
- 		audio0: audio-controller at a0000 {
- 			compatible = "marvell,kirkwood-audio";
--			#sound-dai-cells = <0>;
-+			#sound-dai-cells = <1>;
- 			reg = <0xa0000 0x2210>;
- 			interrupts = <24>;
- 			clocks = <&gate_clk 9>;
--- 
-2.4.0
+> /dev/mem is deprecated and often gets disabled because it is a
+> security hole. Your driver can implement its own mmap function
+> if needed.
+> 
+> On the user space side, you have to be careful to use aligned
+> accesses on device memory, you can't just memcpy into a buffer
+> from mmap()
+>
+> /dev/mem maps memory as MT_DEVICE, which has stricter rules
+> [than ordinary RAM]. If you want an mmap of this memory, you
+> should really implement your own with the correct attributes.
+> 
+> read may or may not do unaligned accesses, depending on a lot of
+> factors like compiler optimization flags when building the kernel
