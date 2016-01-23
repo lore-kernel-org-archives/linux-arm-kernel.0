@@ -1,60 +1,166 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Sat, 23 Jan 2016 16:18:16 +0100
-Subject: [linux-sunxi][PATCH v4 0/3] ARM: dt: sunxi: Add Itead Ibox support
-Message-ID: <1453562299-18495-1-git-send-email-codekipper@gmail.com>
+Date: Sat, 23 Jan 2016 16:18:17 +0100
+Subject: [linux-sunxi][PATCH v4 1/3] ARM: dts: sunxi: Add
+ sunxi-itead-core-common.dtsi
+In-Reply-To: <1453562299-18495-1-git-send-email-codekipper@gmail.com>
+References: <1453562299-18495-1-git-send-email-codekipper@gmail.com>
+Message-ID: <1453562299-18495-2-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-Hi All,
+Itead have a core module board that can be populated with either
+an Allwinner A10 or A20 SoC. This patch creates a common dtsi
+which these boards can use.
 
-this patch series is an extension of the initial patch delivery for the
-Itead Ibox as found here
-https://groups.google.com/d/msg/linux-sunxi/GR_co3ObW8s/0BTPQljmAAAJ.
-
-There seems to be a few Itead variants out there based on their A10/A20
-core module and this patch series attempts to organise the device tree
-files with some consideration that these variants may be added later.
-
-I've also converted the A10 Itead Iteaduino dts to use this common file.
-As I don't have this board to verify the changes I simply compared the
-output of the fdtdump before and after applying these patches. The only
-difference was the reduction to the dcdc2 max voltage.
-
-BR,
-CK
-
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
-Changes since v3:
-- Removed spi0 from Itead Ibox dts.
-- Removed unneccessary header references.
-- Removed Itead A10/A20 Core dtsi, moving what SoC specific parts to the
-  board dts and generic parts to the common dtsi.
-- fixed naming delimiters in compatibles.
-
-Changes since v2:
-- removed duplicate naming
-- moved enabling of some peripherals to board level.
-
-Changes since v1:
-- Added audio codec.
-- Seperated into individual patches
-- added Itead A10 core dtsi
-- modified sun4i-a10-itead-iteaduino-plus.dts to use itead common core dtsii
-
-Marcus Cooper (3):
-  ARM: dts: sunxi: Add sunxi-itead-core-common.dtsi
-  ARM: dts: sun7i: Add Itead Ibox support
-  ARM: dts: sun4i: Itead Iteaduino to use common code
-
- arch/arm/boot/dts/Makefile                         |   1 +
- .../boot/dts/sun4i-a10-itead-iteaduino-plus.dts    |  86 +------------
- arch/arm/boot/dts/sun7i-a20-itead-ibox.dts         | 125 +++++++++++++++++++
- arch/arm/boot/dts/sunxi-itead-core-common.dtsi     | 136 +++++++++++++++++++++
- 4 files changed, 264 insertions(+), 84 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+ arch/arm/boot/dts/sunxi-itead-core-common.dtsi | 136 +++++++++++++++++++++++++
+ 1 file changed, 136 insertions(+)
  create mode 100644 arch/arm/boot/dts/sunxi-itead-core-common.dtsi
 
+diff --git a/arch/arm/boot/dts/sunxi-itead-core-common.dtsi b/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
+new file mode 100644
+index 0000000..2565d51
+--- /dev/null
++++ b/arch/arm/boot/dts/sunxi-itead-core-common.dtsi
+@@ -0,0 +1,136 @@
++/*
++ * Copyright 2015 - Marcus Cooper <codekipper@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "sunxi-common-regulators.dtsi"
++
++/ {
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
++
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "okay";
++
++	axp209: pmic at 34 {
++		reg = <0x34>;
++	};
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++#include "axp209.dtsi"
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-int-dll";
++};
++
++&reg_ldo1 {
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
++};
++
++&reg_usb1_vbus {
++	status = "okay";
++};
++
++&reg_usb2_vbus {
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usbphy {
++	usb1_vbus-supply = <&reg_usb1_vbus>;
++	usb2_vbus-supply = <&reg_usb2_vbus>;
++	status = "okay";
++};
 -- 
 2.7.0
