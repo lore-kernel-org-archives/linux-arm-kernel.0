@@ -1,68 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 23 Jan 2016 11:34:38 +0000
-Subject: Unhandled fault: page domain fault (0x81b) at 0x00e41008
-In-Reply-To: <56A3609E.3000400@free.fr>
-References: <56A268E7.7040004@free.fr>
- <20160122174814.GD19062@n2100.arm.linux.org.uk>
- <56A27C00.5060004@free.fr>
- <20160122193408.GE19062@n2100.arm.linux.org.uk>
- <56A2B811.8010306@free.fr>
- <20160122235704.GF19062@n2100.arm.linux.org.uk>
- <56A3609E.3000400@free.fr>
-Message-ID: <20160123113438.GG19062@n2100.arm.linux.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 23 Jan 2016 13:04:25 +0100
+Subject: 4.5-rc0: n900 battery charging reverts to 100mA, indicator turns
+ back on
+In-Reply-To: <201601212034.07727@pali>
+References: <20160121184234.GA17679@amd>
+ <201601212034.07727@pali>
+Message-ID: <20160123120424.GA12497@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 23, 2016 at 12:14:38PM +0100, Mason wrote:
-> One more thing: for the important use-case I described
-> (copying a file to remote RAM) the existing code was using
-> write_data8! Obvious optimization was to use write_data32
-> but this still means two unnecessary copies:
+On Thu 2016-01-21 20:34:07, Pali Roh?r wrote:
+> On Thursday 21 January 2016 19:42:34 Pavel Machek wrote:
+> > Hi!
+> > 
+> > In 4.4, n900 battery charging works. If indicator is turned off, it
+> > stays off, and if I select 1.8A charge, it sticks. (There may be
+> > problems after system suspend and resume. But normal operation seems
+> > to be pretty reliable).
 > 
-> 1) copying file contents to user-space temp buffer
-> 2) copying user-space to temp kernel buffer
-> 3) finally move data to remote RAM
+> Hm... right, bq2415x driver does not have support for suspend/resume. 
+> Before suspend registers should be stored and after resume restored, 
+> plus check charger auto detection.
 > 
-> I had a different approach which avoids the 2 copies:
-> In user-space, mmap the physical address using /dev/mem
-> and just use the read syscall to copy from filesystem
-> into remote RAM.
+> > In 4.5-rc0 (7fdec82af6a9e190e53d07a1463d2a9ac49a8750) battery
+> > charging works for few hours. But then indicator (yellow light on
+> > 3color LED) turns back on, and if I ask for 1.8A charge, it goes
+> > back to .1A, discharging battery.
+> > 
+> > Any ideas?
 > 
-> I don't need to worry about access size in that specific
-> instance (since I'm copying to RAM).
-> 
-> What do you think about that?
+> Look into bq24150a sysfs node what changes. Also if there is something 
+> in dmesg.
 
-Well, there's an issue here I didn't cover previously, and that is that
-the kernel has a firmware interface - a method by which drivers can
-request firmware for their devices from userspace.  This is the accepted
-way to upload firmware from userspace for any device.  It's more
-complex, but you ought to look at it as a proper solution to your
-problem.  Look at linux/firmware.h for information on this, and an
-example usage can be seen in drivers/dma/imx-sdma.c - others can be
-found by grepping for that header.
+Hmm, seems like I can't reproduce that any more. I now noticed that if
+I suspend machine it auto-resumes quickly, so maybe suspend was
+responsbile. I'll try running 4.5-rc0 for a while...
 
-However, if you're going to stick with your approach, there's a way to
-avoid the need to copy into userspace and then copy back out.  It's
-called sendfile().  This can be used to send part (or all) of one file
-to another file descriptor.  It's intended use was to accelerate
-server applications such as apache, but it seems to be a good fit
-for what you want.
-
-If you arrange for your module to provide an anonymous file descriptor,
-you can use that as the destination file descriptor for uploading the
-contents of your file to using sendfile().  The anonymous file
-descriptor's f_ops->write method should be called as if userspace
-were writing the firmware into this file descriptor - but without the
-data being copied into and back out of userspace.
-
-As the file descriptor will be writable, you can also use lseek() and
-write() to invoke the f_ops->write method for any file offset, so you
-can also use it to upload at any offset and length via standard APIs.
-
-It seems to me that such a solution has a very nice elegance to it.
-
+Thanks,
+									Pavel
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
