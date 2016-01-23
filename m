@@ -1,83 +1,65 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Sat, 23 Jan 2016 11:19:43 +0800
-Subject: [PATCH v3 16/17] FDT: Add a helper to get specified name subnode
+Date: Sat, 23 Jan 2016 11:19:35 +0800
+Subject: [PATCH v3 08/17] Xen: public/hvm: sync changes of
+ HVM_PARAM_CALLBACK_VIA ABI from Xen
 In-Reply-To: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1453519184-11908-17-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1453519184-11908-9-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Sometimes it needs to check if there is a node in FDT by full path.
-Introduce this helper to get the specified name subnode if it exists.
+Sync the changes of HVM_PARAM_CALLBACK_VIA ABI introduced by
+Xen commit <ca5c54b6ff05> (public/hvm: export the HVM_PARAM_CALLBACK_VIA
+ABI in the API).
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
-CC: Rob Herring <robh@kernel.org>
----
- drivers/of/fdt.c       | 35 +++++++++++++++++++++++++++++++++++
- include/linux/of_fdt.h |  2 ++
- 2 files changed, 37 insertions(+)
+ include/xen/interface/hvm/params.h | 27 +++++++++++++++++++++------
+ 1 file changed, 21 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index 655f79d..112ec16 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -645,6 +645,41 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
- }
+diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
+index a6c7991..70ad208 100644
+--- a/include/xen/interface/hvm/params.h
++++ b/include/xen/interface/hvm/params.h
+@@ -27,16 +27,31 @@
+  * Parameter space for HVMOP_{set,get}_param.
+  */
  
- /**
-+ * of_get_flat_dt_subnode_by_name - get subnode of specified node by name
++#define HVM_PARAM_CALLBACK_IRQ 0
+ /*
+  * How should CPU0 event-channel notifications be delivered?
+- * val[63:56] == 0: val[55:0] is a delivery GSI (Global System Interrupt).
+- * val[63:56] == 1: val[55:0] is a delivery PCI INTx line, as follows:
+- *                  Domain = val[47:32], Bus  = val[31:16],
+- *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
+- * val[63:56] == 2: val[7:0] is a vector number.
 + *
-+ * @node: the parent node
-+ * @uname: the name of subnode
-+ * @return offset of the subnode, or -FDT_ERR_NOTFOUND if there is none
+  * If val == 0 then CPU0 event-channel notifications are not delivered.
++ * If val != 0, val[63:56] encodes the type, as follows:
 + */
 +
-+int of_get_flat_dt_subnode_by_name(unsigned long node, const char *uname)
-+{
-+	const void *blob = initial_boot_params;
-+	int offset;
-+	const char *pathp;
++#define HVM_PARAM_CALLBACK_TYPE_GSI      0
++/*
++ * val[55:0] is a delivery GSI.  GSI 0 cannot be used, as it aliases val == 0,
++ * and disables all notifications.
++ */
 +
-+	/* Find first subnode if it exists */
-+	offset = fdt_first_subnode(blob, node);
-+	if (offset < 0)
-+		return -FDT_ERR_NOTFOUND;
-+	pathp = fdt_get_name(blob, offset, NULL);
-+	if (strncmp(pathp, uname, strlen(uname)) == 0)
-+		return offset;
++#define HVM_PARAM_CALLBACK_TYPE_PCI_INTX 1
++/*
++ * val[55:0] is a delivery PCI INTx line:
++ * Domain = val[47:32], Bus = val[31:16] DevFn = val[15:8], IntX = val[1:0]
++ */
 +
-+	/* Find other subnodes */
-+	do {
-+		offset = fdt_next_subnode(blob, offset);
-+		if (offset < 0)
-+			return -FDT_ERR_NOTFOUND;
-+		pathp = fdt_get_name(blob, offset, NULL);
-+		if (strncmp(pathp, uname, strlen(uname)) == 0)
-+			return offset;
-+	} while (offset >= 0);
-+
-+	return -FDT_ERR_NOTFOUND;
-+}
-+
-+/**
-  * of_get_flat_dt_root - find the root node in the flat blob
++#define HVM_PARAM_CALLBACK_TYPE_VECTOR   2
++/*
++ * val[7:0] is a vector number.  Check for XENFEAT_hvm_callback_vector to know
++ * if this delivery method is available.
   */
- unsigned long __init of_get_flat_dt_root(void)
-diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-index df9ef38..fc28162 100644
---- a/include/linux/of_fdt.h
-+++ b/include/linux/of_fdt.h
-@@ -52,6 +52,8 @@ extern char __dtb_end[];
- extern int of_scan_flat_dt(int (*it)(unsigned long node, const char *uname,
- 				     int depth, void *data),
- 			   void *data);
-+extern int of_get_flat_dt_subnode_by_name(unsigned long node,
-+					  const char *uname);
- extern const void *of_get_flat_dt_prop(unsigned long node, const char *name,
- 				       int *size);
- extern int of_flat_dt_is_compatible(unsigned long node, const char *name);
+-#define HVM_PARAM_CALLBACK_IRQ 0
+ 
+ #define HVM_PARAM_STORE_PFN    1
+ #define HVM_PARAM_STORE_EVTCHN 2
 -- 
 2.0.4
