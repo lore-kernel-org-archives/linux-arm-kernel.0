@@ -1,85 +1,147 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Sat, 23 Jan 2016 17:39:19 +0800
-Subject: [PATCH v3 04/12] acpi, numa: introduce ACPI_HAS_NUMA_ARCH_FIXUP
+Date: Sat, 23 Jan 2016 17:39:22 +0800
+Subject: [PATCH v3 07/12] acpi,
+ numa: move acpi_numa_slit_init() to common place
 In-Reply-To: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
 References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1453541967-3744-5-git-send-email-guohanjun@huawei.com>
+Message-ID: <1453541967-3744-8-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-acpi_numa_arch_fixup() is only used for IA64, x86 introduce a dummy
-function for it, when we came to a new architecture (such as ARM64),
-we need to introduce another dummy one to make the code compile.
-
-That's pretty boring so introduce ACPI_HAS_NUMA_ARCH_FIXUP and
-select it for IA64, introduce a stub function for acpi_numa_arch_fixup()
-then it's pretty clean for x86 and ARM64.
+acpi_numa_slit_init() is used by both x86 and arm64, and
+the code is the same, move it to common place to simplify
+the code, and mark it as __weak because the different
+implimentation for ia64.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/ia64/Kconfig    | 1 +
- arch/x86/mm/srat.c   | 2 --
- drivers/acpi/Kconfig | 3 +++
- include/linux/acpi.h | 5 +++++
- 4 files changed, 9 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/acpi_numa.c | 31 -------------------------------
+ arch/x86/mm/srat.c            | 27 ---------------------------
+ drivers/acpi/numa.c           | 30 ++++++++++++++++++++++++++++++
+ 3 files changed, 30 insertions(+), 58 deletions(-)
 
-diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-index eb0249e..1285cef 100644
---- a/arch/ia64/Kconfig
-+++ b/arch/ia64/Kconfig
-@@ -17,6 +17,7 @@ config IA64
- 	select ACPI if (!IA64_HP_SIM)
- 	select ACPI_SYSTEM_POWER_STATES_SUPPORT if ACPI
- 	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
-+	select ACPI_HAS_NUMA_ARCH_FIXUP if ACPI
- 	select HAVE_UNSTABLE_SCHED_CLOCK
- 	select HAVE_IDE
- 	select HAVE_OPROFILE
-diff --git a/arch/x86/mm/srat.c b/arch/x86/mm/srat.c
-index c2aea63..9fa1746 100644
---- a/arch/x86/mm/srat.c
-+++ b/arch/x86/mm/srat.c
-@@ -210,8 +210,6 @@ out_err:
- 	return -1;
+diff --git a/arch/arm64/kernel/acpi_numa.c b/arch/arm64/kernel/acpi_numa.c
+index f7f7533..15fb935 100644
+--- a/arch/arm64/kernel/acpi_numa.c
++++ b/arch/arm64/kernel/acpi_numa.c
+@@ -64,37 +64,6 @@ void __init acpi_numa_set_node_info(unsigned int cpu, u64 hwid)
+ 	cpu_to_node_map[cpu] = nid;
  }
  
--void __init acpi_numa_arch_fixup(void) {}
+-/*
+- * Callback for SLIT parsing.
+- * It will get the distance information presented by SLIT
+- * and init the distance matrix of numa nodes
+- */
+-void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
+-{
+-	int i, j;
 -
- int __init x86_acpi_numa_init(void)
+-	for (i = 0; i < slit->locality_count; i++) {
+-		const int from_node = pxm_to_node(i);
+-
+-		if (from_node == NUMA_NO_NODE)
+-			continue;
+-
+-		for (j = 0; j < slit->locality_count; j++) {
+-			const int to_node = pxm_to_node(j);
+-
+-			if (to_node == NUMA_NO_NODE)
+-				continue;
+-
+-			pr_debug("SLIT: Distance[%d][%d] = %d\n",
+-					from_node, to_node,
+-					slit->entry[
+-					slit->locality_count * i + j]);
+-			numa_set_distance(from_node, to_node,
+-				slit->entry[slit->locality_count * i + j]);
+-		}
+-	}
+-}
+-
+ static int __init get_mpidr_in_madt(int acpi_id, u64 *mpidr)
  {
- 	int ret;
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index 5eef4cb..d6d5749 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -57,6 +57,9 @@ config ACPI_SYSTEM_POWER_STATES_SUPPORT
- config ACPI_CCA_REQUIRED
- 	bool
+ 	unsigned long madt_end, entry;
+diff --git a/arch/x86/mm/srat.c b/arch/x86/mm/srat.c
+index 9fa1746..92a640a 100644
+--- a/arch/x86/mm/srat.c
++++ b/arch/x86/mm/srat.c
+@@ -42,33 +42,6 @@ static __init inline int srat_disabled(void)
+ 	return acpi_numa < 0;
+ }
  
-+config ACPI_HAS_NUMA_ARCH_FIXUP
-+	bool
-+
- config ACPI_DEBUGGER
- 	bool "AML debugger interface (EXPERIMENTAL)"
- 	select ACPI_DEBUG
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 1991aea..574d829 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -173,7 +173,12 @@ void acpi_numa_slit_init (struct acpi_table_slit *slit);
- void acpi_numa_processor_affinity_init (struct acpi_srat_cpu_affinity *pa);
- void acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa);
- int acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
-+
-+#ifdef CONFIG_ACPI_HAS_NUMA_ARCH_FIXUP
- void acpi_numa_arch_fixup(void);
-+#else
-+static inline void acpi_numa_arch_fixup(void) { }
-+#endif
+-/*
+- * Callback for SLIT parsing.  pxm_to_node() returns NUMA_NO_NODE for
+- * I/O localities since SRAT does not list them.  I/O localities are
+- * not supported@this point.
+- */
+-void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
+-{
+-	int i, j;
+-
+-	for (i = 0; i < slit->locality_count; i++) {
+-		const int from_node = pxm_to_node(i);
+-
+-		if (from_node == NUMA_NO_NODE)
+-			continue;
+-
+-		for (j = 0; j < slit->locality_count; j++) {
+-			const int to_node = pxm_to_node(j);
+-
+-			if (to_node == NUMA_NO_NODE)
+-				continue;
+-
+-			numa_set_distance(from_node, to_node,
+-				slit->entry[slit->locality_count * i + j]);
+-		}
+-	}
+-}
+-
+ /* Callback for Proximity Domain -> x2APIC mapping */
+ void __init
+ acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
+diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
+index 4728525..b33915e 100644
+--- a/drivers/acpi/numa.c
++++ b/drivers/acpi/numa.c
+@@ -209,6 +209,36 @@ static int __init slit_valid(struct acpi_table_slit *slit)
+ 	return 1;
+ }
  
- #ifndef PHYS_CPUID_INVALID
- typedef u32 phys_cpuid_t;
++/*
++ * Callback for SLIT parsing. It will get the distance information
++ * presented by SLIT and init the distance matrix of numa nodes
++ */
++void __init __weak acpi_numa_slit_init(struct acpi_table_slit *slit)
++{
++	int i, j;
++
++	for (i = 0; i < slit->locality_count; i++) {
++		const int from_node = pxm_to_node(i);
++
++		if (from_node == NUMA_NO_NODE)
++			continue;
++
++		for (j = 0; j < slit->locality_count; j++) {
++			const int to_node = pxm_to_node(j);
++
++			if (to_node == NUMA_NO_NODE)
++				continue;
++
++			numa_set_distance(from_node, to_node,
++				slit->entry[slit->locality_count * i + j]);
++
++			pr_debug("SLIT: Distance[%d][%d] = %d\n",
++				 from_node, to_node,
++				 slit->entry[slit->locality_count * i + j]);
++		}
++	}
++}
++
+ static int __init acpi_parse_slit(struct acpi_table_header *table)
+ {
+ 	struct acpi_table_slit *slit = (struct acpi_table_slit *)table;
 -- 
 1.9.1
