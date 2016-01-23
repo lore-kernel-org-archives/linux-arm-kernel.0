@@ -1,57 +1,55 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Sat, 23 Jan 2016 12:55:34 -0800
-Subject: [PATCH v2 3/3] mtd: nand: sunxi: add randomizer support
-In-Reply-To: <20160123091844.4826ffe6@bbrezillon>
-References: <1449054067-16751-1-git-send-email-boris.brezillon@free-electrons.com>
- <1449054067-16751-4-git-send-email-boris.brezillon@free-electrons.com>
- <20160123025713.GA90611@google.com>
- <20160123091844.4826ffe6@bbrezillon>
-Message-ID: <20160123205534.GB35559@google.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 23 Jan 2016 23:07:44 +0100
+Subject: [PATCH] ARM: pxa: let PXA27x select PINCTRL
+In-Reply-To: <1453577004-15295-1-git-send-email-yamada.masahiro@socionext.com>
+ (Masahiro Yamada's message of "Sun, 24 Jan 2016 04:23:24 +0900")
+References: <1453577004-15295-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <87k2n0ar0v.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 23, 2016 at 09:18:44AM +0100, Boris Brezillon wrote:
-> On Fri, 22 Jan 2016 18:57:13 -0800
-> Brian Norris <computersforpeace@gmail.com> wrote:
-> > 
-> > From: Brian Norris <computersforpeace@gmail.com>
-> > Date: Fri, 22 Jan 2016 18:54:02 -0800
-> > Subject: [PATCH] mtd: nand: sunxi: use mtd_div_by_ws() helper
-> > 
-> > Suggested-by: Richard Weinberger <richard@nod.at>
-> > Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-> 
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Masahiro Yamada <yamada.masahiro@socionext.com> writes:
 
-Applied.
+> To use the newly added PXA27x pinctrl driver, this commit is needed
+> as well as commit 4b15ec9d42b2 ("pinctrl: activate pxa architecture").
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+No, that's a bit to narrow selecting pinctrl for only pxa27x architecture.
 
-> > ---
-> >  drivers/mtd/nand/sunxi_nand.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-> > index 5f700719d5c2..b5ea6b312df0 100644
-> > --- a/drivers/mtd/nand/sunxi_nand.c
-> > +++ b/drivers/mtd/nand/sunxi_nand.c
-> > @@ -624,7 +624,7 @@ static u16 sunxi_nfc_randomizer_step(u16 state, int count)
-> >  static u16 sunxi_nfc_randomizer_state(struct mtd_info *mtd, int page, bool ecc)
-> >  {
-> >  	const u16 *seeds = sunxi_nfc_randomizer_page_seeds;
-> > -	int mod = mtd->erasesize / mtd->writesize;
-> > +	int mod = mtd_div_by_ws(mtd->erasesize, mtd);
-> 
-> Just a comment (which should not prevent you from applying this patch).
-> Isn't it a bit overkill to cast the erasesize to a 64 bit value, and
-> then do a do_div on it. Shouldn't happen often though, because
-> ->writesize_shift should be != 0 in most (all?) cases.
+I have this patch in my local tree for 2 monthes (see [1]). This is the patch
+I'd rather have. I had not posted it as I didn't think the pinctrl work was over
+yet. I know at least that pxa3xx is ready (as pinctrl-single should be used),
+and I had not the time to create the map for pxa25x.
 
-drivers/mtd/nand/ assumes power-of-2 dimensions for many things, so
-probably.
+Cheers.
 
-> Another related remark: with the MLC/paired pages stuff I'll have to
-> retrieve this information (number of write units per erase block) quite
-> often, so maybe we should have a field (and/or an helper) for that.
+--
+Robert
 
-Perhaps.
+---8<---
+>From 8e0da8ff579bd38a7923f15a905133814153ebdb Mon Sep 17 00:00:00 2001
+From: Robert Jarzmik <robert.jarzmik@free.fr>
+Date: Sun, 1 Nov 2015 20:07:31 +0100
+Subject: [PATCH] ARM: pxa: use pinctrl
 
-Brian
+Select pinctrl for all PXA architectures.
+
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 34e1569a11ee..e876e86f5b0a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -618,6 +618,7 @@ config ARCH_PXA
+ 	select HAVE_IDE
+ 	select IRQ_DOMAIN
+ 	select MULTI_IRQ_HANDLER
++	select PINCTRL
+ 	select PLAT_PXA
+ 	select SPARSE_IRQ
+ 	help
+-- 
+2.1.4
