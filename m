@@ -1,35 +1,30 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 23 Jan 2016 19:01:04 +0100
-Subject: [PATCH 0/4] rotary-encoder: use generic device properties
-In-Reply-To: <1453138902-11657-1-git-send-email-dmitry.torokhov@gmail.com>
- (Dmitry Torokhov's message of "Mon, 18 Jan 2016 09:41:38 -0800")
-References: <1453138902-11657-1-git-send-email-dmitry.torokhov@gmail.com>
-Message-ID: <87r3h8b2fz.fsf@belgarion.home>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 24 Jan 2016 04:23:24 +0900
+Subject: [PATCH] ARM: pxa: let PXA27x select PINCTRL
+Message-ID: <1453577004-15295-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry Torokhov <dmitry.torokhov@gmail.com> writes:
+To use the newly added PXA27x pinctrl driver, this commit is needed
+as well as commit 4b15ec9d42b2 ("pinctrl: activate pxa architecture").
 
-> Hi,
->
-> This series tries to move the driver away from legacy platform data towards
-> using platform-independent way of retrieving both configuration parameters and
-> GPIOs (device_property_read_* and gpiod APIs).
->
-> This is based on top of 2 Timo's patches converting the driver to use devm* API
-> and threaded IRQs. I uploaded all changes into 'rotary-encoder' branch of my
-> tree.
->
-> I do not have hard ware so please give it a spin, especially on raumfield as it
-> uses branch new way of passing platform parameters to the driver.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Hi Dmitry,
+ arch/arm/mach-pxa/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
->From the pxa architecture point of view, it looks fine to me.
-Daniel, I seem to remember you had this raumfeld hardware, would you have the
-opportunity to give this serie a try ?
-
-Cheers.
-
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index f096836..35bc0fe 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -618,6 +618,7 @@ config PXA25x
+ config PXA27x
+ 	bool
+ 	select CPU_XSCALE
++	select PINCTRL
+ 	help
+ 	  Select code specific to PXA27x variants
+ 
 -- 
-Robert
+1.9.1
