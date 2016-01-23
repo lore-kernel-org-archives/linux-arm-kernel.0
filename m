@@ -1,36 +1,35 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 23 Jan 2016 16:17:22 +0000
-Subject: [PATCH 2/2] iio:adc:at91-sama5d2: code cleanup
-In-Reply-To: <1453106516-17935-2-git-send-email-ludovic.desroches@atmel.com>
-References: <1453106516-17935-1-git-send-email-ludovic.desroches@atmel.com>
- <1453106516-17935-2-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <56A3A792.2000901@kernel.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 23 Jan 2016 19:01:04 +0100
+Subject: [PATCH 0/4] rotary-encoder: use generic device properties
+In-Reply-To: <1453138902-11657-1-git-send-email-dmitry.torokhov@gmail.com>
+ (Dmitry Torokhov's message of "Mon, 18 Jan 2016 09:41:38 -0800")
+References: <1453138902-11657-1-git-send-email-dmitry.torokhov@gmail.com>
+Message-ID: <87r3h8b2fz.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/16 08:41, Ludovic Desroches wrote:
-> Use var type for sizeof argument instead of the struct name.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Applied, thanks.
+Dmitry Torokhov <dmitry.torokhov@gmail.com> writes:
 
-Jonathan
-> ---
->  drivers/iio/adc/at91-sama5d2_adc.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
-> index f2d8bd5..dbee13a 100644
-> --- a/drivers/iio/adc/at91-sama5d2_adc.c
-> +++ b/drivers/iio/adc/at91-sama5d2_adc.c
-> @@ -353,8 +353,7 @@ static int at91_adc_probe(struct platform_device *pdev)
->  	struct resource	*res;
->  	int ret;
->  
-> -	indio_dev = devm_iio_device_alloc(&pdev->dev,
-> -					  sizeof(struct at91_adc_state));
-> +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*st));
->  	if (!indio_dev)
->  		return -ENOMEM;
->  
-> 
+> Hi,
+>
+> This series tries to move the driver away from legacy platform data towards
+> using platform-independent way of retrieving both configuration parameters and
+> GPIOs (device_property_read_* and gpiod APIs).
+>
+> This is based on top of 2 Timo's patches converting the driver to use devm* API
+> and threaded IRQs. I uploaded all changes into 'rotary-encoder' branch of my
+> tree.
+>
+> I do not have hard ware so please give it a spin, especially on raumfield as it
+> uses branch new way of passing platform parameters to the driver.
+
+Hi Dmitry,
+
+>From the pxa architecture point of view, it looks fine to me.
+Daniel, I seem to remember you had this raumfeld hardware, would you have the
+opportunity to give this serie a try ?
+
+Cheers.
+
+-- 
+Robert
