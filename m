@@ -1,33 +1,101 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Sat, 23 Jan 2016 11:19:32 +0800
-Subject: [PATCH v3 05/17] xen: memory : Add new XENMAPSPACE type
- XENMAPSPACE_dev_mmio
+Date: Sat, 23 Jan 2016 11:19:28 +0800
+Subject: [PATCH v3 01/17] Xen: ACPI: Hide UART used by Xen
 In-Reply-To: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1453519184-11908-6-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1453519184-11908-2-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add a new type of Xen map space for Dom0 to map device's MMIO region.
+ACPI 6.0 introduces a new table STAO to list the devices which are used
+by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
+UART is used by Xen. So here it hides UART from Dom0.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- include/xen/interface/memory.h | 1 +
- 1 file changed, 1 insertion(+)
+CC: "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI)
+CC: Len Brown <lenb@kernel.org> (supporter:ACPI)
+CC: linux-acpi at vger.kernel.org (open list:ACPI)
+---
+ drivers/acpi/bus.c | 36 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 35 insertions(+), 1 deletion(-)
 
-diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
-index 2ecfe4f..9aa8988 100644
---- a/include/xen/interface/memory.h
-+++ b/include/xen/interface/memory.h
-@@ -160,6 +160,7 @@ DEFINE_GUEST_HANDLE_STRUCT(xen_machphys_mapping_t);
- #define XENMAPSPACE_gmfn_foreign 4 /* GMFN from another dom,
- 				    * XENMEM_add_to_physmap_range only.
- 				    */
-+#define XENMAPSPACE_dev_mmio     5 /* device mmio region */
+diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
+index a212cef..7f85b54 100644
+--- a/drivers/acpi/bus.c
++++ b/drivers/acpi/bus.c
+@@ -46,6 +46,7 @@ ACPI_MODULE_NAME("bus");
+ struct acpi_device *acpi_root;
+ struct proc_dir_entry *acpi_root_dir;
+ EXPORT_SYMBOL(acpi_root_dir);
++static u64 spcr_uart_addr;
  
- /*
-  * Sets the GPFN at which a particular page appears in the specified guest's
+ #ifdef CONFIG_X86
+ #ifdef CONFIG_ACPI_CUSTOM_DSDT
+@@ -105,6 +106,22 @@ acpi_status acpi_bus_get_status_handle(acpi_handle handle,
+ 	return status;
+ }
+ 
++static bool acpi_check_device_is_ignored(acpi_handle handle)
++{
++	acpi_status status;
++	u64 addr;
++
++	/* Check if it should ignore the UART device */
++	if (spcr_uart_addr != 0) {
++		status = acpi_evaluate_integer(handle, METHOD_NAME__ADR, NULL,
++					       &addr);
++		if (ACPI_SUCCESS(status) && addr == spcr_uart_addr)
++			return true;
++	}
++
++	return false;
++}
++
+ int acpi_bus_get_status(struct acpi_device *device)
+ {
+ 	acpi_status status;
+@@ -114,7 +131,8 @@ int acpi_bus_get_status(struct acpi_device *device)
+ 	if (ACPI_FAILURE(status))
+ 		return -ENODEV;
+ 
+-	acpi_set_device_status(device, sta);
++	if (!acpi_check_device_is_ignored(device->handle))
++		acpi_set_device_status(device, sta);
+ 
+ 	if (device->status.functional && !device->status.present) {
+ 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Device [%s] status [%08x]: "
+@@ -1069,6 +1087,8 @@ EXPORT_SYMBOL_GPL(acpi_kobj);
+ static int __init acpi_init(void)
+ {
+ 	int result;
++	acpi_status status;
++	struct acpi_table_stao *stao_ptr;
+ 
+ 	if (acpi_disabled) {
+ 		printk(KERN_INFO PREFIX "Interpreter disabled.\n");
+@@ -1081,6 +1101,20 @@ static int __init acpi_init(void)
+ 		acpi_kobj = NULL;
+ 	}
+ 
++	/* If there is STAO table, check whether it needs to ignore the UART
++	 * device in SPCR table.
++	 */
++	status = acpi_get_table(ACPI_SIG_STAO, 0,
++				(struct acpi_table_header **)&stao_ptr);
++	if (ACPI_SUCCESS(status) && stao_ptr->ignore_uart) {
++		struct acpi_table_spcr *spcr_ptr;
++
++		status = acpi_get_table(ACPI_SIG_SPCR, 0,
++					(struct acpi_table_header **)&spcr_ptr);
++		if (ACPI_SUCCESS(status))
++			spcr_uart_addr = spcr_ptr->serial_port.address;
++	}
++
+ 	init_acpi_device_notify();
+ 	result = acpi_bus_init();
+ 	if (result) {
 -- 
 2.0.4
