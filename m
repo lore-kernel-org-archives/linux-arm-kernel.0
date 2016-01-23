@@ -1,108 +1,73 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Sat, 23 Jan 2016 11:19:27 +0800
-Subject: [PATCH v3 00/17] Add ACPI support for Xen Dom0 on ARM64
-Message-ID: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
+Date: Sat, 23 Jan 2016 11:19:34 +0800
+Subject: [PATCH v3 07/17] Xen: ARM: Add support for mapping AMBA device mmio
+In-Reply-To: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1453519184-11908-8-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-This patch set adds ACPI support for Xen Dom0 on ARM64. The relevant Xen
-ACPI on ARM64 design document could be found from [1].
+Add a bus_notifier for AMBA bus device in order to map the device
+mmio regions when DOM0 booting with ACPI.
 
-This patch set adds a new FDT node "uefi" under /hypervisor to pass UEFI
-information. Introduce a bus notifier of AMBA and Platform bus to map
-the new added device's MMIO space. Make Xen domain use
-xlated_setup_gnttab_pages to setup grant table and a new hypercall to
-get event-channel irq.
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ drivers/xen/arm-device.c | 43 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-Regarding the initialization flow of Linux kernel, it needs to move
-xen_early_init() before efi_init(). Then xen_early_init() will check
-whether it runs on Xen through the /hypervisor node and efi_init() will
-call a new function fdt_find_xen_uefi_params(), to parse those
-xen,uefi-* parameters just like the existing efi_get_fdt_params().
-
-And in arm64_enable_runtime_services() it will check whether it runs on
-Xen and call another new function xen_efi_runtime_setup() to setup
-runtime service instead of efi_native_runtime_setup(). The
-xen_efi_runtime_setup() will assign the runtime function pointers with
-the functions of driver/xen/efi.c.
-
-And since we pass a /hypervisor node and a /chosen node to Dom0, it
-needs to check whether the DTS only contains a /hypervisor node and a
-/chosen node in acpi_boot_table_init().
-
-Patches are tested on FVP base model. The corresponding Xen patches can
-be fetched from [2].
-
-Thanks,
-Shannon
-
-[1] http://lists.xen.org/archives/html/xen-devel/2015-11/msg00488.html
-[2] http://git.linaro.org/people/shannon.zhao/xen.git  ACPI_XEN_ARM_V3
-
-Changes since v2:
-* Use 0 to check if it should ignore the UART
-* Fix the use of page_to_xen_pfn
-* Factor ACPI and DT parts in xen_guest_init
-* Check "uefi" node by full path
-* Fix the statement of Documentation/devicetree/bindings/arm/xen.txt
-
-Changes since v1:
-* Rebase on linux mainline and wallclock patch from Stefano
-* Refactor AMBA and platform device MMIO map to one file
-* Use EFI_PARAVIRT to check if it supports XEN EFI
-* Refactor Xen EFI codes
-* Address other comments
-
-Shannon Zhao (17):
-  Xen: ACPI: Hide UART used by Xen
-  xen/grant-table: Move xlated_setup_gnttab_pages to common place
-  Xen: xlate: Use page_to_xen_pfn instead of page_to_pfn
-  arm/xen: Use xen_xlate_map_ballooned_pages to setup grant table
-  xen: memory : Add new XENMAPSPACE type XENMAPSPACE_dev_mmio
-  Xen: ARM: Add support for mapping platform device mmio
-  Xen: ARM: Add support for mapping AMBA device mmio
-  Xen: public/hvm: sync changes of HVM_PARAM_CALLBACK_VIA ABI from Xen
-  xen/hvm/params: Add a new delivery type for event-channel in
-    HVM_PARAM_CALLBACK_IRQ
-  arm/xen: Get event-channel irq through HVM_PARAM when booting with
-    ACPI
-  ARM: XEN: Move xen_early_init() before efi_init()
-  ARM64: ACPI: Check if it runs on Xen to enable or disable ACPI
-  ARM: Xen: Document UEFI support on Xen ARM virtual platforms
-  XEN: EFI: Move x86 specific codes to architecture directory
-  ARM64: XEN: Add a function to initialize Xen specific UEFI runtime
-    services
-  FDT: Add a helper to get specified name subnode
-  Xen: EFI: Parse DT parameters for Xen specific UEFI
-
- Documentation/devicetree/bindings/arm/xen.txt |  34 +++++
- arch/arm/xen/enlighten.c                      | 109 +++++++++++----
- arch/arm64/include/asm/xen/xen-ops.h          |   6 +
- arch/arm64/kernel/acpi.c                      |  12 +-
- arch/arm64/kernel/efi.c                       |  17 ++-
- arch/arm64/kernel/setup.c                     |   2 +-
- arch/arm64/xen/Makefile                       |   1 +
- arch/arm64/xen/efi.c                          |  40 ++++++
- arch/x86/xen/efi.c                            | 112 ++++++++++++++++
- arch/x86/xen/grant-table.c                    |  57 +-------
- drivers/acpi/bus.c                            |  36 ++++-
- drivers/firmware/efi/efi.c                    |  45 ++++++-
- drivers/of/fdt.c                              |  35 +++++
- drivers/xen/Kconfig                           |   2 +-
- drivers/xen/Makefile                          |   1 +
- drivers/xen/arm-device.c                      | 184 ++++++++++++++++++++++++++
- drivers/xen/efi.c                             | 174 +++++-------------------
- drivers/xen/xlate_mmu.c                       |  67 ++++++++++
- include/linux/of_fdt.h                        |   2 +
- include/xen/interface/hvm/params.h            |  36 ++++-
- include/xen/interface/memory.h                |   1 +
- include/xen/xen-ops.h                         |  32 +++--
- 22 files changed, 757 insertions(+), 248 deletions(-)
- create mode 100644 arch/arm64/include/asm/xen/xen-ops.h
- create mode 100644 arch/arm64/xen/efi.c
- create mode 100644 drivers/xen/arm-device.c
-
+diff --git a/drivers/xen/arm-device.c b/drivers/xen/arm-device.c
+index 76e26e5..3854043 100644
+--- a/drivers/xen/arm-device.c
++++ b/drivers/xen/arm-device.c
+@@ -139,3 +139,46 @@ static int __init register_xen_platform_notifier(void)
+ }
+ 
+ arch_initcall(register_xen_platform_notifier);
++
++#ifdef CONFIG_ARM_AMBA
++#include <linux/amba/bus.h>
++
++static int xen_amba_notifier(struct notifier_block *nb,
++			     unsigned long action, void *data)
++{
++	struct amba_device *adev = to_amba_device(data);
++	int r = 0;
++
++	switch (action) {
++	case BUS_NOTIFY_ADD_DEVICE:
++		r = xen_map_device_mmio(&adev->res, 1);
++		break;
++	case BUS_NOTIFY_DEL_DEVICE:
++		r = xen_unmap_device_mmio(&adev->res, 1);
++		break;
++	default:
++		return NOTIFY_DONE;
++	}
++	if (r)
++		dev_err(&adev->dev, "AMBA: Failed to %s device %s MMIO!\n",
++			action == BUS_NOTIFY_ADD_DEVICE ? "map" :
++			(action == BUS_NOTIFY_DEL_DEVICE ? "unmap" : "?"),
++			adev->dev.init_name);
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block amba_device_nb = {
++	.notifier_call = xen_amba_notifier,
++};
++
++static int __init register_xen_amba_notifier(void)
++{
++	if (!xen_initial_domain() || acpi_disabled)
++		return 0;
++
++	return bus_register_notifier(&amba_bustype, &amba_device_nb);
++}
++
++arch_initcall(register_xen_amba_notifier);
++#endif
 -- 
 2.0.4
