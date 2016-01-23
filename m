@@ -1,125 +1,140 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 22 Jan 2016 18:17:49 -0800
-Subject: [PATCH v2] arm64: kernel: fix architected PMU registers
- unconditional access
-In-Reply-To: <1452696603-27611-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1452696603-27611-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <56A2E2CD.80904@roeck-us.net>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 22 Jan 2016 20:35:13 -0600
+Subject: [PATCHv8 2/4] ARM: dts: Add Altera L2 Cache and OCRAM EDAC entries
+In-Reply-To: <1453397668-32094-2-git-send-email-tthayer@opensource.altera.com>
+References: <1453397668-32094-1-git-send-email-tthayer@opensource.altera.com>
+ <1453397668-32094-2-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20160123023513.GA2081@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2016 06:50 AM, Lorenzo Pieralisi wrote:
-> The Performance Monitors extension is an optional feature of the
-> AArch64 architecture, therefore, in order to access Performance
-> Monitors registers safely, the kernel should detect the architected
-> PMU unit presence through the ID_AA64DFR0_EL1 register PMUVer field
-> before accessing them.
->
-> This patch implements a guard by reading the ID_AA64DFR0_EL1 register
-> PMUVer field to detect the architected PMU presence and prevent accessing
-> PMU system registers if the Performance Monitors extension is not
-> implemented in the core.
->
-> Fixes: 60792ad349f3 ("arm64: kernel: enforce pmuserenr_el0 initialization and restore")
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Reported-by: Guenter Roeck <linux@roeck-us.net>
-> Tested-by: Guenter Roeck <linux@roeck-us.net>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Peter Maydell <peter.maydell@linaro.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-
-Hi,
-
-this patch is still missing in mainline.
-
-Did it get lost ?
-
-Thanks,
-Guenter
-
+On Thu, Jan 21, 2016 at 11:34:26AM -0600, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
+> 
+> Adding the device tree entries and bindings needed to support
+> the Altera L2 cache and On-Chip RAM EDAC. This patch relies upon
+> an earlier patch to declare and setup On-chip RAM properly.
+> http://www.spinics.net/lists/devicetree/msg51117.html
+> 
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 > ---
-> v1 -> v2
->
-> - Updated the PMUVer field conditional check to take into account
->    future PMU versions
->
-> v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/398090.html
->
-> Will,
->
-> rebased on top of mainline, we should be tagging stable before merging.
->
-> It applies to current mainline (commit 67990608c8b9).
->
-> Tested on Juno and QEMU.
->
-> Thanks,
-> Lorenzo
->
->   arch/arm64/kernel/head.S    |  5 +++++
->   arch/arm64/mm/proc-macros.S | 12 ++++++++++++
->   arch/arm64/mm/proc.S        |  4 ++--
->   3 files changed, 19 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index ffe9c2b..917d981 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -514,9 +514,14 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
->   #endif
->
->   	/* EL2 debug */
-> +	mrs	x0, id_aa64dfr0_el1		// Check ID_AA64DFR0_EL1 PMUVer
-> +	sbfx	x0, x0, #8, #4
-> +	cmp	x0, #1
-> +	b.lt	4f				// Skip if no PMU present
->   	mrs	x0, pmcr_el0			// Disable debug access traps
->   	ubfx	x0, x0, #11, #5			// to EL2 and allow access to
->   	msr	mdcr_el2, x0			// all PMU counters from EL1
-> +4:
->
->   	/* Stage-2 translation */
->   	msr	vttbr_el2, xzr
-> diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
-> index 146bd99..e6a30e1 100644
-> --- a/arch/arm64/mm/proc-macros.S
-> +++ b/arch/arm64/mm/proc-macros.S
-> @@ -84,3 +84,15 @@
->   	b.lo	9998b
->   	dsb	\domain
->   	.endm
+> v8: Fix node names to include chip family and use ecc manager
+>     to better describe the driver. Rename socfpga-edac.txt to
+>     socfpga-eccmgr.txt.
+> v7: No Change
+> v6: Change to nested EDAC device nodes based on community
+>     feedback. Remove L2 syscon. Use consolidated binding.
+> v3-5: No Change
+> v2: Remove OCRAM declaration and reference prior patch.
+> ---
+>  .../bindings/arm/altera/socfpga-eccmgr.txt         |   49 ++++++++++++++++++++
+>  arch/arm/boot/dts/socfpga.dtsi                     |   20 ++++++++
+>  2 files changed, 69 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+
+A couple of nits, otherwise:
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+> new file mode 100644
+> index 0000000..4f45690
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+> @@ -0,0 +1,49 @@
+> +Altera SoCFPGA ECC Manager
+> +This driver uses the EDAC framework to implement the SOCFPGA ECC Manager.
+> +The ECC Manager counts and corrects single bit errors and counts/handles
+> +double bit errors which are uncorrectable.
 > +
-> +/*
-> + * reset_pmuserenr_el0 - reset PMUSERENR_EL0 if PMUv3 present
-> + */
-> +	.macro	reset_pmuserenr_el0, tmpreg
-> +	mrs	\tmpreg, id_aa64dfr0_el1	// Check ID_AA64DFR0_EL1 PMUVer
-> +	sbfx	\tmpreg, \tmpreg, #8, #4
-> +	cmp	\tmpreg, #1			// Skip if no PMU present
-> +	b.lt	9000f
-> +	msr	pmuserenr_el0, xzr		// Disable PMU access from EL0
-> +9000:
-> +	.endm
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index a3d867e..c164d2c 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -117,7 +117,7 @@ ENTRY(cpu_do_resume)
->   	 */
->   	ubfx	x11, x11, #1, #1
->   	msr	oslar_el1, x11
-> -	msr	pmuserenr_el0, xzr		// Disable PMU access from EL0
-> +	reset_pmuserenr_el0 x0			// Disable PMU access from EL0
->   	mov	x0, x12
->   	dsb	nsh		// Make sure local tlb invalidation completed
->   	isb
-> @@ -154,7 +154,7 @@ ENTRY(__cpu_setup)
->   	msr	cpacr_el1, x0			// Enable FP/ASIMD
->   	mov	x0, #1 << 12			// Reset mdscr_el1 and disable
->   	msr	mdscr_el1, x0			// access to the DCC from EL0
-> -	msr	pmuserenr_el0, xzr		// Disable PMU access from EL0
-> +	reset_pmuserenr_el0 x0			// Disable PMU access from EL0
->   	/*
->   	 * Memory region attributes for LPAE:
->   	 *
->
+> +Required Properties:
+> +- compatible : Should be "altr,socfpga-ecc-manager"
+> +- #address-cells: must be 1
+> +- #size-cells: must be 1
+> +- ranges : standard definition, should translate from local addresses
+> +
+> +Subcomponents:
+> +
+> +L2 Cache ECC
+> +Required Properties:
+> +- compatible : Should be "altr,socfpga-l2-ecc"
+> +- reg : Address and size for ECC error interrupt clear registers.
+> +- interrupts : Should be single bit error interrupt, then double bit error
+> +	interrupt. Note the rising edge type.
+> +
+> +On Chip RAM ECC
+> +Required Properties:
+> +- compatible : Should be "altr,socfpga-ocram-ecc"
+> +- reg : Address and size for ECC error interrupt clear registers.
+> +- iram : phandle to On-Chip RAM definition.
+> +- interrupts : Should be single bit error interrupt, then double bit error
+> +	interrupt. Note the rising edge type.
+> +
+> +Example:
+> +
+> +	eccmgr: eccmgr at 0xffd08140 {
+
+drop the '0x'
+
+> +		compatible = "altr,socfpga-ecc-manager";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		l2-ecc at ffd08140 {
+> +			compatible = "altr,socfpga-l2-ecc";
+> +			reg = <0xffd08140 0x4>;
+> +			interrupts = <0 36 1>, <0 37 1>;
+> +		};
+> +
+> +		ocram-ecc at ffd08144 {
+> +			compatible = "altr,socfpga-ocram-ecc";
+> +			reg = <0xffd08144 0x4>;
+> +			iram = <&ocram>;
+> +			interrupts = <0 178 1>, <0 179 1>;
+> +		};
+> +	};
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> index 39c470e..9bb383e 100644
+> --- a/arch/arm/boot/dts/socfpga.dtsi
+> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> @@ -656,6 +656,26 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		eccmgr: eccmgr at 0xffd08140 {
+
+and here.
+
+> +			compatible = "altr,socfpga-ecc-manager";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +
+> +			l2-ecc at ffd08140 {
+> +				compatible = "altr,socfpga-l2-ecc";
+> +				reg = <0xffd08140 0x4>;
+> +				interrupts = <0 36 1>, <0 37 1>;
+> +			};
+> +
+> +			ocram-ecc at ffd08144 {
+> +				compatible = "altr,socfpga-ocram-ecc";
+> +				reg = <0xffd08144 0x4>;
+> +				iram = <&ocram>;
+> +				interrupts = <0 178 1>, <0 179 1>;
+> +			};
+> +		};
+> +
+>  		L2: l2-cache at fffef000 {
+>  			compatible = "arm,pl310-cache";
+>  			reg = <0xfffef000 0x1000>;
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
