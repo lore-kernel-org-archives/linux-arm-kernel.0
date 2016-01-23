@@ -1,42 +1,23 @@
 From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Sun, 24 Jan 2016 00:36:40 +0200
-Subject: [PATCH 2/2] ASoC: simple-card: don't fail if sysclk setting is not
- supported
-In-Reply-To: <1453588600-14831-1-git-send-email-aaro.koskinen@iki.fi>
-References: <1453588600-14831-1-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <1453588600-14831-3-git-send-email-aaro.koskinen@iki.fi>
+Date: Sun, 24 Jan 2016 00:36:38 +0200
+Subject: [PATCH 0/2] ARM/sound: fix audio on kirkwood-openrd-client
+Message-ID: <1453588600-14831-1-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit e22579713ae1 ("ASoC: simple card: set cpu-dai sysclk
-with mclk-fs") added sysclk / SND_SOC_CLOCK_OUT setting, that makes
-asoc_simple_card_hw_params fail if the operation is not supported,
-although the intention clearly was to ignore ENOTSUPP. Fix it.
+Hi,
 
-The patch fixes audio playback on Kirkwood / OpenRD client,
-where the following errors are seen:
+Audio playback has been broken some time on OpenRD client. With the
+following patches I got the audio file playback working with mplayer.
 
-	asoc-simple-card sound: ASoC: machine hw_params failed: -524
-	alsa-lib: /alsa-lib-1.0.28/src/pcm/pcm_hw.c:327:(snd_pcm_hw_hw_params) SNDRV_PCM_IOCTL_HW_PARAMS failed (-524): Unknown error 524
+Aaro Koskinen (2):
+  ARM: DTS: kirkwood-openrd-client: fix audio
+  ASoC: simple-card: don't fail if sysclk setting is not supported
 
-Fixes: e22579713ae1 ("ASoC: simple card: set cpu-dai sysclk with mclk-fs")
-Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
----
- sound/soc/generic/simple-card.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/kirkwood-openrd-client.dts | 6 +++++-
+ arch/arm/boot/dts/kirkwood.dtsi              | 2 +-
+ sound/soc/generic/simple-card.c              | 2 +-
+ 3 files changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/sound/soc/generic/simple-card.c b/sound/soc/generic/simple-card.c
-index 54c3320..ff6fcd9 100644
---- a/sound/soc/generic/simple-card.c
-+++ b/sound/soc/generic/simple-card.c
-@@ -100,7 +100,7 @@ static int asoc_simple_card_hw_params(struct snd_pcm_substream *substream,
- 		if (ret && ret != -ENOTSUPP)
- 			goto err;
- 	}
--
-+	return 0;
- err:
- 	return ret;
- }
 -- 
 2.4.0
