@@ -1,25 +1,42 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 23 Jan 2016 23:15:17 +0100
-Subject: [PATCH] pinctrl: pxa: export pxa2xx_pinctrl_init()
-In-Reply-To: <1453577113-14423-1-git-send-email-yamada.masahiro@socionext.com>
- (Masahiro Yamada's message of "Sun, 24 Jan 2016 04:25:13 +0900")
-References: <1453577113-14423-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <87fuxoaqoa.fsf@belgarion.home>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Sun, 24 Jan 2016 00:36:40 +0200
+Subject: [PATCH 2/2] ASoC: simple-card: don't fail if sysclk setting is not
+ supported
+In-Reply-To: <1453588600-14831-1-git-send-email-aaro.koskinen@iki.fi>
+References: <1453588600-14831-1-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <1453588600-14831-3-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Masahiro Yamada <yamada.masahiro@socionext.com> writes:
+Commit e22579713ae1 ("ASoC: simple card: set cpu-dai sysclk
+with mclk-fs") added sysclk / SND_SOC_CLOCK_OUT setting, that makes
+asoc_simple_card_hw_params fail if the operation is not supported,
+although the intention clearly was to ignore ENOTSUPP. Fix it.
 
-> Building pinctrl-pxa27x.c as a module causes a link error:
->
-> ERROR: "pxa2xx_pinctrl_init" [drivers/pinctrl/pxa/pinctrl-pxa27x.ko] undefined!
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Yeah, I see no other way out to spare namespace polution.
+The patch fixes audio playback on Kirkwood / OpenRD client,
+where the following errors are seen:
 
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+	asoc-simple-card sound: ASoC: machine hw_params failed: -524
+	alsa-lib: /alsa-lib-1.0.28/src/pcm/pcm_hw.c:327:(snd_pcm_hw_hw_params) SNDRV_PCM_IOCTL_HW_PARAMS failed (-524): Unknown error 524
 
-Cheers.
+Fixes: e22579713ae1 ("ASoC: simple card: set cpu-dai sysclk with mclk-fs")
+Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+---
+ sound/soc/generic/simple-card.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/sound/soc/generic/simple-card.c b/sound/soc/generic/simple-card.c
+index 54c3320..ff6fcd9 100644
+--- a/sound/soc/generic/simple-card.c
++++ b/sound/soc/generic/simple-card.c
+@@ -100,7 +100,7 @@ static int asoc_simple_card_hw_params(struct snd_pcm_substream *substream,
+ 		if (ret && ret != -ENOTSUPP)
+ 			goto err;
+ 	}
+-
++	return 0;
+ err:
+ 	return ret;
+ }
 -- 
-Robert
+2.4.0
