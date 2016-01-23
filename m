@@ -1,71 +1,40 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 23 Jan 2016 13:10:22 +0100
-Subject: N900 sleep mode (in 4.5-rc0, if that matters)
-Message-ID: <20160123121022.GB12497@amd>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 23 Jan 2016 23:06:28 +0900
+Subject: [PATCH] bus: uniphier-system-bus: revive tristate prompt
+Message-ID: <1453557988-2874-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+At first, commit 4b7f48d395a7 ("bus: uniphier-system-bus: add UniPhier
+System Bus driver") introduced this driver as a tristate one.
 
-I enabled the sleep leds, and am using following script to set the
-machine up for power management:
+Then, commit 326ea45aa827 ("bus: uniphier: allow only built-in
+driver") temporarily made it boolean in order to fix a link error
+in case it is compiled as a module.
 
-#!/bin/bash
-uarts=$(find /sys/class/tty/ttyO*/device/power/ -type d)
-for uart in $uarts; do
-    echo 3000 > $uart/autosuspend_delay_ms
-    done
-    uarts=$(find /sys/class/tty/ttyO*/power/ -type d)
-for uart in $uarts; do
-        echo enabled > $uart/wakeup
-	    echo auto > $uart/control
-	    done
-sudo mount /dev/zero -t debugfs /sys/kernel/debug/
-echo 1 > /sys/kernel/debug/pm_debug/enable_off_mode
+The root cause was fixed by commit b80443c2211c ("of/platform: export
+of_default_bus_match_table").
 
-So far, the LEDs stubbornly stay on :-(. Machine is booted off
-sd-card, and I'm connected to it over wifi. GSM is active, X is
-running.
+Now this driver can really be a module.
 
-Normally, ping looks like this:
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-64 bytes from 192.168.43.15: icmp_seq=371 ttl=64 time=2.18 ms
-64 bytes from 192.168.43.15: icmp_seq=372 ttl=64 time=2.21 ms
-64 bytes from 192.168.43.15: icmp_seq=373 ttl=64 time=2.94 ms
+ drivers/bus/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-When I enable the off mode:
-echo 1 > /sys/kernel/debug/pm_debug/enable_off_mode
-
-Wifi is no longer happy:
-
-64 bytes from 192.168.43.15: icmp_seq=426 ttl=64 time=351 ms
-64 bytes from 192.168.43.15: icmp_seq=427 ttl=64 time=178 ms
-64 bytes from 192.168.43.15: icmp_seq=428 ttl=64 time=2.36 ms
-
-and touchscreen stops working:
-
-[99480.564910] tsc2005 spi1.0: TSC200X not responding - resetting
-[99486.995758] bq27xxx-battery 2-0055: battery is not calibrated!
-ignoring capacity values
-[99488.564147] tsc2005 spi1.0: TSC200X not responding - resetting
-[99495.550018] bq27xxx-battery 2-0055: battery is not calibrated!
-ignoring capacity values
-[99496.564208] tsc2005 spi1.0: TSC200X not responding - resetting
-[99504.129852] bq27xxx-battery 2-0055: battery is not calibrated!
-ignoring capacity values
-[99504.564208] tsc2005 spi1.0: TSC200X not responding - resetting
-
-echo 0 > /sys/kernel/debug/pm_debug/enable_off_mode
-
-Fixes both wifi and touchscreen. Is off_mode expected to break
-touchscreen? Any ideas what needs to be shut down so that the sleep
-leds go off?
-
-Power consumption seems to be in 500mA range, regardless of
-off_mode. That would mean about 2 hours of battery life, AFAICT.
-
-Best regards,
-									Pavel
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index 129d47b..9a92c07 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -132,7 +132,7 @@ config SUNXI_RSB
+ 	  and AC100/AC200 ICs.
+ 
+ config UNIPHIER_SYSTEM_BUS
+-	bool "UniPhier System Bus driver"
++	tristate "UniPhier System Bus driver"
+ 	depends on ARCH_UNIPHIER && OF
+ 	default y
+ 	help
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.9.1
