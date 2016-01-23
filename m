@@ -1,146 +1,62 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Sat, 23 Jan 2016 11:19:38 +0800
-Subject: [PATCH v3 11/17] ARM: XEN: Move xen_early_init() before efi_init()
-In-Reply-To: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1453519184-11908-12-git-send-email-zhaoshenglong@huawei.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 23 Jan 2016 12:21:55 +0800
+Subject: [PATCH RFC 09/15] ARM: dts: sun6i: sina31s: Switch to mmc3 for
+ onboard eMMC
+In-Reply-To: <20160122203927.GC3682@lukather>
+References: <1453354002-28366-1-git-send-email-wens@csie.org>
+ <1453354002-28366-10-git-send-email-wens@csie.org>
+ <20160122203927.GC3682@lukather>
+Message-ID: <CAGb2v658auQfvZy8jr__bmuk6=zGicvvE=5Fa5pOnubkgYvjDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+On Sat, Jan 23, 2016 at 4:39 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Thu, Jan 21, 2016 at 01:26:36PM +0800, Chen-Yu Tsai wrote:
+>> According to Allwinner, only mmc3 supports 8 bit DDR transfers for eMMC.
+>> Switch to mmc3 for the onboard eMMC, and also assign vqmmc for signal
+>> voltage sensing/switching, and "cap-mmc-hw-reset" to denote this
+>> instance can use eMMC hardware reset.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi | 6 ++++--
+>>  1 file changed, 4 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi b/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
+>> index ea69fb8ad4d8..4ec0c8679b2e 100644
+>> --- a/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
+>> +++ b/arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
+>> @@ -61,12 +61,14 @@
+>>  };
+>>
+>>  /* eMMC on core board */
+>> -&mmc2 {
+>> +&mmc3 {
+>>       pinctrl-names = "default";
+>> -     pinctrl-0 = <&mmc2_8bit_emmc_pins>;
+>> +     pinctrl-0 = <&mmc3_8bit_emmc_pins>;
+>>       vmmc-supply = <&reg_dcdc1>;
+>> +     vqmmc-supply = <&reg_dcdc1>;
+>
+> That seems odd. IIRC the VCC was supposed to be fixed and VCCQ could
+> be either at 1.8 or 3V. Having the same regulator on both would make
+> VCCQ forced to 3.3V, which seems to go against your commit log.
+>
+> What's the catch ? :)
 
-Move xen_early_init() before efi_init(), then when calling efi_init()
-could initialize Xen specific UEFI.
+That is how the board is routed. Which means the only use for
+vqmmc-supply is the driver will know that it can only do 3.3V,
+i.e. voltage sensing.
 
-Check if it runs on Xen hypervisor through the flat dts.
+It is the reason I requested Olimex to look into this. Allwinner
+reference designs all tie vqmmc directly to 3.3V.
 
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
----
- arch/arm/xen/enlighten.c  | 56 ++++++++++++++++++++++++++++++++++-------------
- arch/arm64/kernel/setup.c |  2 +-
- 2 files changed, 42 insertions(+), 16 deletions(-)
+Actually with the latest driver patches, this is not even needed. To
+make the driver backward compatible, if no vqmmc-supply is given, it
+just assumes 3.3V signaling.
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 0e010bb..cdc0bd2 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -19,6 +19,7 @@
- #include <linux/irqreturn.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_fdt.h>
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
- #include <linux/cpuidle.h>
-@@ -52,8 +53,6 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS] __initdata;
- 
- static __read_mostly unsigned int xen_events_irq;
- 
--static __initdata struct device_node *xen_node;
--
- int xen_remap_domain_gfn_array(struct vm_area_struct *vma,
- 			       unsigned long addr,
- 			       xen_pfn_t *gfn, int nr,
-@@ -222,6 +221,33 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
- 	return IRQ_HANDLED;
- }
- 
-+static __initdata struct {
-+	const char *compat;
-+	const char *prefix;
-+	const char *version;
-+	bool found;
-+} hyper_node = {"xen,xen", "xen,xen-", NULL, false};
-+
-+static int __init fdt_find_hyper_node(unsigned long node, const char *uname,
-+				      int depth, void *data)
-+{
-+	const void *s = NULL;
-+	int len;
-+
-+	if (depth != 1 || strcmp(uname, "hypervisor") != 0)
-+		return 0;
-+
-+	if (of_flat_dt_is_compatible(node, hyper_node.compat))
-+		hyper_node.found = true;
-+
-+	s = of_get_flat_dt_prop(node, "compatible", &len);
-+	if (strlen(hyper_node.prefix) + 3  < len &&
-+	    !strncmp(hyper_node.prefix, s, strlen(hyper_node.prefix)))
-+		hyper_node.version = s + strlen(hyper_node.prefix);
-+
-+	return 0;
-+}
-+
- /*
-  * see Documentation/devicetree/bindings/arm/xen.txt for the
-  * documentation of the Xen Device Tree format.
-@@ -229,26 +255,18 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
- #define GRANT_TABLE_PHYSADDR 0
- void __init xen_early_init(void)
- {
--	int len;
--	const char *s = NULL;
--	const char *version = NULL;
--	const char *xen_prefix = "xen,xen-";
--
--	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
--	if (!xen_node) {
-+	of_scan_flat_dt(fdt_find_hyper_node, NULL);
-+	if (!hyper_node.found) {
- 		pr_debug("No Xen support\n");
- 		return;
- 	}
--	s = of_get_property(xen_node, "compatible", &len);
--	if (strlen(xen_prefix) + 3  < len &&
--			!strncmp(xen_prefix, s, strlen(xen_prefix)))
--		version = s + strlen(xen_prefix);
--	if (version == NULL) {
-+
-+	if (hyper_node.version == NULL) {
- 		pr_debug("Xen version not found\n");
- 		return;
- 	}
- 
--	pr_info("Xen %s support found\n", version);
-+	pr_info("Xen %s support found\n", hyper_node.version);
- 
- 	xen_domain_type = XEN_HVM_DOMAIN;
- 
-@@ -289,6 +307,14 @@ static void __init xen_acpi_guest_init_events_irq(void)
- 
- static void __init xen_dt_guest_init_events_irq(void)
- {
-+	struct device_node *xen_node;
-+
-+	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
-+	if (!xen_node) {
-+		pr_err("Xen support was detected before, but it has disappeared\n");
-+		return;
-+	}
-+
- 	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
- }
- 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 8119479..a4a2878 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -313,6 +313,7 @@ void __init setup_arch(char **cmdline_p)
- 	 */
- 	local_async_enable();
- 
-+	xen_early_init();
- 	efi_init();
- 	arm64_memblock_init();
- 
-@@ -334,7 +335,6 @@ void __init setup_arch(char **cmdline_p)
- 	} else {
- 		psci_acpi_init();
- 	}
--	xen_early_init();
- 
- 	cpu_read_bootcpu_ops();
- 	smp_init_cpus();
--- 
-2.0.4
+Regards
+ChenYu
