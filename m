@@ -1,175 +1,132 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Sat, 23 Jan 2016 16:18:18 +0100
-Subject: [linux-sunxi][PATCH v4 2/3] ARM: dts: sun7i: Add Itead Ibox support
-In-Reply-To: <1453562299-18495-1-git-send-email-codekipper@gmail.com>
-References: <1453562299-18495-1-git-send-email-codekipper@gmail.com>
-Message-ID: <1453562299-18495-3-git-send-email-codekipper@gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 24 Jan 2016 00:32:09 +0900
+Subject: [PATCH] pinctrl: sunxi: guard sub-directory with CONFIG_PINCTRL_SUNXI
+Message-ID: <1453563129-30332-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+CONFIG_PINCTRL_SUNXI is more suitable than CONFIG_ARCH_SUNXI
+to guard the drivers/pinctrl/sunxi/ directory.
+(I renamed CONFIG_PINCTRL_SUNXI_COMMON to CONFIG_PINCTRL_SUNXI.)
 
-The Itead Ibox is a multi board device based on the Allwinner A20 SoC.
-It contains the A20 Itead Core module and a base board for the external
-interfaces.
-
-The core module comes with 4GB NAND and 1GB DDR RAM.
-
-The base board to which the core board is connected provides 3 USB 2.0 Host
-ports, 1 USB 2.0 OTG, 1 uSD slot, 10/100 Ethernet port, HDMI, IR receiver,
-SPDIF and a 32-pin GPIO header. This header expands the features of core
-board by exposing the VGA pins, audio In/Out pins, SATA, SPI, I2C, UARTS,
-USB-OTG and power.
-
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
- arch/arm/boot/dts/Makefile                 |   1 +
- arch/arm/boot/dts/sun7i-a20-itead-ibox.dts | 125 +++++++++++++++++++++++++++++
- 2 files changed, 126 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index da910b2..5c5e8f4 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -638,6 +638,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-cubieboard2.dtb \
- 	sun7i-a20-cubietruck.dtb \
- 	sun7i-a20-hummingbird.dtb \
-+	sun7i-a20-itead-ibox.dtb \
- 	sun7i-a20-i12-tvbox.dtb \
- 	sun7i-a20-icnova-swac.dtb \
- 	sun7i-a20-m3.dtb \
-diff --git a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
-new file mode 100644
-index 0000000..661c21d
---- /dev/null
-+++ b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
-@@ -0,0 +1,125 @@
-+/*
-+ * Copyright 2015 - Marcus Cooper <codekipper@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun7i-a20.dtsi"
-+#include "sunxi-itead-core-common.dtsi"
-+
-+/ {
-+	model = "Itead Ibox A20";
-+	compatible = "itead,itead-ibox-a20", "allwinner,sun7i-a20";
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_itead_core>;
-+
-+		green {
-+			label = "itead_core:green:usr";
-+			gpios = <&pio 7 20 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+
-+		blue {
-+			label = "itead_core:blue:usr";
-+			gpios = <&pio 7 21 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+	};
-+};
-+
-+&ahci {
-+	target-supply = <&reg_ahci_5v>;
-+	status = "okay";
-+};
-+
-+&codec {
-+	status = "okay";
-+};
-+
-+&gmac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gmac_pins_mii_a>;
-+	phy = <&phy1>;
-+	phy-mode = "mii";
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&i2c0 {
-+	axp209: pmic at 34 {
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+&ir0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir0_rx_pins_a>;
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&pio {
-+	led_pins_itead_core: led_pins at 0 {
-+		allwinner,pins = "PH20","PH21";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&reg_ahci_5v {
-+	status = "okay";
-+};
+ drivers/pinctrl/Makefile       |  2 +-
+ drivers/pinctrl/sunxi/Kconfig  | 30 +++++++++++++++---------------
+ drivers/pinctrl/sunxi/Makefile |  2 +-
+ 3 files changed, 17 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+index 04b633f..63a6f0b 100644
+--- a/drivers/pinctrl/Makefile
++++ b/drivers/pinctrl/Makefile
+@@ -45,7 +45,7 @@ obj-$(CONFIG_ARCH_QCOM)		+= qcom/
+ obj-$(CONFIG_PINCTRL_SAMSUNG)	+= samsung/
+ obj-$(CONFIG_PINCTRL_SH_PFC)	+= sh-pfc/
+ obj-$(CONFIG_PINCTRL_SPEAR)	+= spear/
+-obj-$(CONFIG_ARCH_SUNXI)	+= sunxi/
++obj-$(CONFIG_PINCTRL_SUNXI)	+= sunxi/
+ obj-$(CONFIG_PINCTRL_UNIPHIER)	+= uniphier/
+ obj-$(CONFIG_ARCH_VT8500)	+= vt8500/
+ obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
+diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
+index f8dbc8b..ac8388e 100644
+--- a/drivers/pinctrl/sunxi/Kconfig
++++ b/drivers/pinctrl/sunxi/Kconfig
+@@ -1,67 +1,67 @@
+ if ARCH_SUNXI
+ 
+-config PINCTRL_SUNXI_COMMON
++config PINCTRL_SUNXI
+ 	bool
+ 	select PINMUX
+ 	select GENERIC_PINCONF
+ 
+ config PINCTRL_SUN4I_A10
+ 	def_bool MACH_SUN4I
+-	select PINCTRL_SUNXI_COMMON
++	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN5I_A10S
+ 	def_bool MACH_SUN5I
+-	select PINCTRL_SUNXI_COMMON
++	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN5I_A13
+ 	def_bool MACH_SUN5I
+-	select PINCTRL_SUNXI_COMMON
++	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN6I_A31
+ 	def_bool MACH_SUN6I
+-	select PINCTRL_SUNXI_COMMON
++	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN6I_A31S
+ 	def_bool MACH_SUN6I
+-	select PINCTRL_SUNXI_COMMON
++	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN6I_A31_R
+ 	def_bool MACH_SUN6I
+ 	depends on RESET_CONTROLLER
+-	select PINCTRL_SUNXI_COMMON
++	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN7I_A20
+ 	def_bool MACH_SUN7I
+-	select PINCTRL_SUNXI_COMMON
++	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN8I_A23
+ 	def_bool MACH_SUN8I
+-	select PINCTRL_SUNXI_COMMON
++	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN8I_A33
+ 	def_bool MACH_SUN8I
+-	select PINCTRL_SUNXI_COMMON
++	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN8I_A83T
+ 	def_bool MACH_SUN8I
+-	select PINCTRL_SUNXI_COMMON
++	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN8I_A23_R
+ 	def_bool MACH_SUN8I
+ 	depends on RESET_CONTROLLER
+-	select PINCTRL_SUNXI_COMMON
++	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN8I_H3
+ 	def_bool MACH_SUN8I
+-	select PINCTRL_SUNXI_COMMON
++	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN9I_A80
+ 	def_bool MACH_SUN9I
+-	select PINCTRL_SUNXI_COMMON
++	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN9I_A80_R
+ 	def_bool MACH_SUN9I
+ 	depends on RESET_CONTROLLER
+-	select PINCTRL_SUNXI_COMMON
++	select PINCTRL_SUNXI
+ 
+ endif
+diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
+index ef82f22..dac1bd0 100644
+--- a/drivers/pinctrl/sunxi/Makefile
++++ b/drivers/pinctrl/sunxi/Makefile
+@@ -1,5 +1,5 @@
+ # Core
+-obj-$(CONFIG_PINCTRL_SUNXI_COMMON)	+= pinctrl-sunxi.o
++obj-y					+= pinctrl-sunxi.o
+ 
+ # SoC Drivers
+ obj-$(CONFIG_PINCTRL_SUN4I_A10)		+= pinctrl-sun4i-a10.o
 -- 
-2.7.0
+1.9.1
