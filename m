@@ -1,32 +1,37 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Sat, 23 Jan 2016 11:25:23 +0100
-Subject: [PATCH v3 04/12] acpi, numa: introduce ACPI_HAS_NUMA_ARCH_FIXUP
-In-Reply-To: <1453541967-3744-5-git-send-email-guohanjun@huawei.com>
-References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
- <1453541967-3744-5-git-send-email-guohanjun@huawei.com>
-Message-ID: <20160123102523.GC24726@rric.localdomain>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 23 Jan 2016 18:50:40 +0800
+Subject: [PATCH RFC 12/15] ARM: dts: sun9i: Use sun9i specific mmc
+ compatible
+In-Reply-To: <20160122204402.GE3682@lukather>
+References: <1453354002-28366-1-git-send-email-wens@csie.org>
+ <1453354002-28366-13-git-send-email-wens@csie.org>
+ <20160122204402.GE3682@lukather>
+Message-ID: <CAGb2v671vypQxPcmnWa86ipCgRd0prqeTcTkbH_G+Q+AM71zFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.01.16 17:39:19, Hanjun Guo wrote:
-> From: Hanjun Guo <hanjun.guo@linaro.org>
-> 
-> acpi_numa_arch_fixup() is only used for IA64, x86 introduce a dummy
-> function for it, when we came to a new architecture (such as ARM64),
-> we need to introduce another dummy one to make the code compile.
-> 
-> That's pretty boring so introduce ACPI_HAS_NUMA_ARCH_FIXUP and
-> select it for IA64, introduce a stub function for acpi_numa_arch_fixup()
-> then it's pretty clean for x86 and ARM64.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/ia64/Kconfig    | 1 +
+On Sat, Jan 23, 2016 at 4:44 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Thu, Jan 21, 2016 at 01:26:39PM +0800, Chen-Yu Tsai wrote:
+>> sun9i/A80 MMC controllers have a larger FIFO, and the FIFO DMA
+>> trigger levels can be increased. Also, the mmc module clock parent
+>> has a higher clock rate, and the sample and output delay phases
+>> are different.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
+> Applied, thanks!
+>
+> Does that count as a fix, or does the A80 board can safely operate
+> without it?
 
-I see an implementation of acpi_numa_arch_fixup() only for ia64. Why
-not move it to arch/ia64 then and call it from setup_arch() in
-arch/ia64/kernel/setup.c after acpi_numa_init()? It looks like we
-don't need a generic solution for this. This avoids any kconfig
-handling for this at all.
+The compatible was added in v4.3, in commit 51424b286067 ("mmc:
+sunxi: Fix clk-delay settings").
 
--Robert
+I've not tested using the old compatibles with 50/52 MHz DDR. They
+do work just fine with the transfer modes we already supported.
+
+Either way its been there for a while so i don't see any need to
+pick it out as a fix.
+
+ChenYu
