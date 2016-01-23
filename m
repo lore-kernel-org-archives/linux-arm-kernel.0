@@ -1,47 +1,60 @@
-From: codekipper@gmail.com (Code Kipper)
-Date: Sat, 23 Jan 2016 15:50:44 +0100
-Subject: [linux-sunxi][PATCH v3 3/5] ARM: dts: sun7i: Add Itead Ibox
- support
-In-Reply-To: <20160121155408.GG3997@lukather>
-References: <1452766555-16409-1-git-send-email-codekipper@gmail.com>
- <1452766555-16409-4-git-send-email-codekipper@gmail.com>
- <20160118194100.GR4581@lukather>
- <CAEKpxBkTStWMNE6FT=zFLGhvxvb0Con-_idD9Oj8eKf2B5TKGg@mail.gmail.com>
- <20160121155408.GG3997@lukather>
-Message-ID: <CAEKpxBkww_8HjpBNi7sUH-ixGmBLqQEPWM0kvq4tTZtbOa=7Pg@mail.gmail.com>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Sat, 23 Jan 2016 16:18:16 +0100
+Subject: [linux-sunxi][PATCH v4 0/3] ARM: dt: sunxi: Add Itead Ibox support
+Message-ID: <1453562299-18495-1-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 January 2016 at 16:54, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Tue, Jan 19, 2016 at 08:43:34AM +0100, Code Kipper wrote:
->> >> +&spi0 {
->> >> +     pinctrl-names = "default";
->> >> +     pinctrl-0 = <&spi0_pins_a>,
->> >> +                 <&spi0_cs0_pins_a>;
->> >> +     status = "okay";
->> >
->> > What device is connected to that bus?
->>
->> These lead out to the header on the side of the box and is also
->> enabled in the fex. If we remove this we might as well remove sata as
->> that is also done via this header.
->
-> AFAIK, the SATA is not muxable, so the pins on this header can only be
-> used for that anyway.
->
-> What I'm more concerned about is pins that are just "generic" pins
-> that can have multiple functions that are not really enforced by any
-> design choice.
-No worries...it will be gone in the next release.
+From: Marcus Cooper <codekipper@gmail.com>
+
+Hi All,
+
+this patch series is an extension of the initial patch delivery for the
+Itead Ibox as found here
+https://groups.google.com/d/msg/linux-sunxi/GR_co3ObW8s/0BTPQljmAAAJ.
+
+There seems to be a few Itead variants out there based on their A10/A20
+core module and this patch series attempts to organise the device tree
+files with some consideration that these variants may be added later.
+
+I've also converted the A10 Itead Iteaduino dts to use this common file.
+As I don't have this board to verify the changes I simply compared the
+output of the fdtdump before and after applying these patches. The only
+difference was the reduction to the dcdc2 max voltage.
+
 BR,
 CK
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+
+---
+Changes since v3:
+- Removed spi0 from Itead Ibox dts.
+- Removed unneccessary header references.
+- Removed Itead A10/A20 Core dtsi, moving what SoC specific parts to the
+  board dts and generic parts to the common dtsi.
+- fixed naming delimiters in compatibles.
+
+Changes since v2:
+- removed duplicate naming
+- moved enabling of some peripherals to board level.
+
+Changes since v1:
+- Added audio codec.
+- Seperated into individual patches
+- added Itead A10 core dtsi
+- modified sun4i-a10-itead-iteaduino-plus.dts to use itead common core dtsii
+
+Marcus Cooper (3):
+  ARM: dts: sunxi: Add sunxi-itead-core-common.dtsi
+  ARM: dts: sun7i: Add Itead Ibox support
+  ARM: dts: sun4i: Itead Iteaduino to use common code
+
+ arch/arm/boot/dts/Makefile                         |   1 +
+ .../boot/dts/sun4i-a10-itead-iteaduino-plus.dts    |  86 +------------
+ arch/arm/boot/dts/sun7i-a20-itead-ibox.dts         | 125 +++++++++++++++++++
+ arch/arm/boot/dts/sunxi-itead-core-common.dtsi     | 136 +++++++++++++++++++++
+ 4 files changed, 264 insertions(+), 84 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+ create mode 100644 arch/arm/boot/dts/sunxi-itead-core-common.dtsi
+
+-- 
+2.7.0
