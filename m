@@ -1,75 +1,33 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Sat, 23 Jan 2016 11:19:40 +0800
-Subject: [PATCH v3 13/17] ARM: Xen: Document UEFI support on Xen ARM virtual
- platforms
+Date: Sat, 23 Jan 2016 11:19:32 +0800
+Subject: [PATCH v3 05/17] xen: memory : Add new XENMAPSPACE type
+ XENMAPSPACE_dev_mmio
 In-Reply-To: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1453519184-11908-14-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1453519184-11908-6-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
-scan this to get the UEFI information.
+Add a new type of Xen map space for Dom0 to map device's MMIO region.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
-CC: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/arm/xen.txt | 34 +++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ include/xen/interface/memory.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
-index 0f7b9c2..aa69405 100644
---- a/Documentation/devicetree/bindings/arm/xen.txt
-+++ b/Documentation/devicetree/bindings/arm/xen.txt
-@@ -15,6 +15,26 @@ the following properties:
- - interrupts: the interrupt used by Xen to inject event notifications.
-   A GIC node is also required.
+diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
+index 2ecfe4f..9aa8988 100644
+--- a/include/xen/interface/memory.h
++++ b/include/xen/interface/memory.h
+@@ -160,6 +160,7 @@ DEFINE_GUEST_HANDLE_STRUCT(xen_machphys_mapping_t);
+ #define XENMAPSPACE_gmfn_foreign 4 /* GMFN from another dom,
+ 				    * XENMEM_add_to_physmap_range only.
+ 				    */
++#define XENMAPSPACE_dev_mmio     5 /* device mmio region */
  
-+To support UEFI on Xen ARM virtual platforms, Xen populates the FDT "uefi" node
-+under /hypervisor with following parameters:
-+
-+________________________________________________________________________________
-+Name                      | Size   | Description
-+================================================================================
-+xen,uefi-system-table     | 64-bit | Guest physical address of the UEFI System
-+			  |	   | Table.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-start       | 64-bit | Guest physical address of the UEFI memory
-+			  |	   | map.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
-+                          |        | pointed to in previous entry.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
-+                          |        | memory map.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
-+--------------------------------------------------------------------------------
- 
- Example (assuming #address-cells = <2> and #size-cells = <2>):
- 
-@@ -22,4 +42,18 @@ hypervisor {
- 	compatible = "xen,xen-4.3", "xen,xen";
- 	reg = <0 0xb0000000 0 0x20000>;
- 	interrupts = <1 15 0xf08>;
-+	uefi {
-+		xen,uefi-system-table = <0xXXXXXXXX>;
-+		xen,uefi-mmap-start = <0xXXXXXXXX>;
-+		xen,uefi-mmap-size = <0xXXXXXXXX>;
-+		xen,uefi-mmap-desc-size = <0xXXXXXXXX>;
-+		xen,uefi-mmap-desc-ver = <0xXXXXXXXX>;
-+        };
- };
-+
-+The format and meaning of these "xen,uefi-*" parameters are similar to those in
-+Documentation/arm/uefi.txt which are used by normal UEFI. But to distinguish
-+from normal UEFI, for Xen ARM virtual platforms it needs to introduce a Xen
-+specific UEFI which requires Xen hypervisor to provide hypercalls for Dom0 to
-+make use of the runtime services. Therefore, it defines these parameters under
-+/hypervisor node.
+ /*
+  * Sets the GPFN at which a particular page appears in the specified guest's
 -- 
 2.0.4
