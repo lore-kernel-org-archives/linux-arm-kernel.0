@@ -1,66 +1,47 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 24 Jan 2016 21:39:11 +0100
-Subject: [PATCH] ARM: pxa: let PXA27x select PINCTRL
-References: <1453577004-15295-1-git-send-email-yamada.masahiro@socionext.com>
- <87k2n0ar0v.fsf@belgarion.home> <1495788.v3fMfHFcmP@wuerfel>
-Message-ID: <87zivuaf0w.fsf@belgarion.home>
+From: rbthomas@pobox.com (Rick Thomas)
+Date: Sun, 24 Jan 2016 12:56:09 -0800
+Subject: [PATCH 1/2] ARM: DTS: kirkwood-openrd-client: fix audio
+In-Reply-To: <20160124173701.GU3880@lunn.ch>
+References: <1453588600-14831-1-git-send-email-aaro.koskinen@iki.fi>
+ <1453588600-14831-2-git-send-email-aaro.koskinen@iki.fi>
+ <20160124173701.GU3880@lunn.ch>
+Message-ID: <411C1DFA-3E76-42B0-866C-7C3C0D990039@pobox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
 
-> On Saturday 23 January 2016 23:07:44 Robert Jarzmik wrote:
->> I have this patch in my local tree for 2 monthes (see [1]). This is the patch
->> I'd rather have. I had not posted it as I didn't think the pinctrl work was over
->> yet. I know at least that pxa3xx is ready (as pinctrl-single should be used),
->> and I had not the time to create the map for pxa25x.
->
-> Once you are done, does that mean the plat-pxa/mfp.c stuff becomes
-> completely unused on pxa, or will it coexist with pinctrl?
-At first it will coexist.
-The main blocker so far I have are :
- - the pinconf in platform_data platform to define sleep state pin levels
-   (aka. MFPR_LPM_DRIVE_LOW and MFPR_LPM_DRIVE_HIGH)
-   I have [1], but it's not working yet, ie. upon entering suspend to RAM, the
-   GPIO sleep registers are not programmed as expected.
- - all the pxa machine code have to be migrated from MFP to pinctrl
+On Jan 24, 2016, at 9:37 AM, Andrew Lunn <andrew@lunn.ch> wrote:
 
-So it will take time.
+> On Sun, Jan 24, 2016 at 12:36:39AM +0200, Aaro Koskinen wrote:
+>> Fix audio on kirkwood-openrd-client:
+>> 
+>> 1) The audio-controller was left disabled.
+>> 
+>> 2) The probe fails because cs42l51 is missing #sound-dai-cells.
+>> 
+>> 	/sound/simple-audio-card,codec: could not get #sound-dai-cells for /ocp at f1000000/i2c at 11000/cs42l51 at 4a
+>> 	asoc-simple-card sound: parse error -22
+>> 	asoc-simple-card: probe of sound failed with error -22
+>> 
+>> 3) The mapping is incorrect:
+>> 
+>> 	asoc-simple-card sound: cs42l51-hifi <-> spdif mapping ok
+>> 
+>>   should be:
+>> 
+>> 	asoc-simple-card sound: cs42l51-hifi <-> i2s mapping ok
+>> 
+>> Reported-by: Rick Thomas <rbthomas@pobox.com>
+>> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> 
+> It would be good to have a Tested-by: from Rick.
+> 
+> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+> 
+> 	     Andrew
 
-> I'm asking because it seems that at that point, the entire plat-pxa
-> directory can be removed, with the dma.c and ssp.c files getting
-> moved to mach-pxa, and mfp.c moved to mach-mmp. :-)
-dma.c will die soon enough anyway, ssp.c will move to mach-pxa indeed, and as
-for mfp.c it requires a bit of work.
 
-Cheers.
+If someone will make a .deb I can download, I'll be happy to install it and test it.  Please be explicit in describing what and how you want tested.
 
--- 
-Robert
 
-[1] Extract of my samples in mioa701.c :
-#define PMGROUP(pin) #pin
-#define PMMUX(dev, pin, func)							\
-	PIN_MAP_MUX_GROUP(#dev, PINCTRL_STATE_DEFAULT, "pxa27x-pinctrl",	\
-			  "P" PMGROUP(pin), #func)
-#define PMCONF_SLEEP(dev, pin, mode)						\
-	PIN_MAP_CONFIGS_PIN(#dev, PINCTRL_STATE_SLEEP, "pxa27x-pinctrl",	\
-			  "P" PMGROUP(pin), gpio_ ## mode ## _sleep_mode)
-
-static unsigned long gpio_pull_sleep_mode[] = {
-	PIN_CONF_PACKED(PIN_CONFIG_OUTPUT, 0),
-};
-
-static unsigned long gpio_push_sleep_mode[] = {
-	PIN_CONF_PACKED(PIN_CONFIG_OUTPUT, 1),
-};
-
-static struct pinctrl_map pinmap[] __initdata = {
-	/* USB */
-	PMMUX(pxa27x-udc, GPIO13_nUSB_DETECT, gpio_in),
-	PMMUX(pxa27x-udc, GPIO22_USB_ENABLE, gpio_in),
-	PMCONF_SLEEP(pxa27x-udc, GPIO22_USB_ENABLE, pull),
-};
-...
-	/* pxa2xx_mfp_config(ARRAY_AND_SIZE(mioa701_pin_config)); */
-	pinctrl_register_mappings(pinmap, ARRAY_SIZE(pinmap));
+Rick
