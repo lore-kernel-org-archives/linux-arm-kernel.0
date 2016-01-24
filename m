@@ -1,85 +1,26 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Sun, 24 Jan 2016 17:12:43 +0100 (CET)
-Subject: [PATCH 02/13] atmel-isi: move the is_support() close to try/set
- format function
-In-Reply-To: <1453119709-20940-3-git-send-email-rainyfeeling@gmail.com>
-References: <1453119709-20940-1-git-send-email-rainyfeeling@gmail.com>
- <1453119709-20940-3-git-send-email-rainyfeeling@gmail.com>
-Message-ID: <Pine.LNX.4.64.1601241712040.16570@axis700.grange>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Mon, 25 Jan 2016 01:29:23 +0900
+Subject: [PATCH] ARM: dts: kirkwood: add device tree for buffalo linkstation
+ ls-qvl;
+Message-ID: <1453652964-21489-1-git-send-email-rogershimizu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Jan 2016, Josh Wu wrote:
+Dear Kirkwood Maintainers,
 
-> As is_support() only used by try/set format function so put them
+Mario created dts for Linkstation LS-QVL, which is 4-bay NAS, based
+on my dts for 2-bay LS-WVL.
+He asked me to post the dts to ARM on hehalf of him, so here I created
+the patch set!
 
-Typo: "is_supported()"
+Roger Shimizu (1):
+  ARM: dts: kirkwood: add device tree for buffalo linkstation ls-qvl
 
-Thanks
-Guennadi
+ .../devicetree/bindings/arm/marvell,kirkwood.txt   |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts   | 135 +++++++++++++++++++++
+ 3 files changed, 137 insertions(+)
+ create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts
 
-> together.
-> 
-> Signed-off-by: Josh Wu <rainyfeeling@gmail.com>
-> ---
-> 
->  drivers/media/platform/soc_camera/atmel-isi.c | 36 +++++++++++++--------------
->  1 file changed, 18 insertions(+), 18 deletions(-)
-> 
-> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-> index dc81df3..3793b68 100644
-> --- a/drivers/media/platform/soc_camera/atmel-isi.c
-> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-> @@ -189,24 +189,6 @@ static void configure_geometry(struct atmel_isi *isi, u32 width,
->  	return;
->  }
->  
-> -static bool is_supported(struct soc_camera_device *icd,
-> -		const u32 pixformat)
-> -{
-> -	switch (pixformat) {
-> -	/* YUV, including grey */
-> -	case V4L2_PIX_FMT_GREY:
-> -	case V4L2_PIX_FMT_YUYV:
-> -	case V4L2_PIX_FMT_UYVY:
-> -	case V4L2_PIX_FMT_YVYU:
-> -	case V4L2_PIX_FMT_VYUY:
-> -	/* RGB */
-> -	case V4L2_PIX_FMT_RGB565:
-> -		return true;
-> -	default:
-> -		return false;
-> -	}
-> -}
-> -
->  static irqreturn_t atmel_isi_handle_streaming(struct atmel_isi *isi)
->  {
->  	if (isi->active) {
-> @@ -571,6 +553,24 @@ static int isi_camera_init_videobuf(struct vb2_queue *q,
->  	return vb2_queue_init(q);
->  }
->  
-> +static bool is_supported(struct soc_camera_device *icd,
-> +		const u32 pixformat)
-> +{
-> +	switch (pixformat) {
-> +	/* YUV, including grey */
-> +	case V4L2_PIX_FMT_GREY:
-> +	case V4L2_PIX_FMT_YUYV:
-> +	case V4L2_PIX_FMT_UYVY:
-> +	case V4L2_PIX_FMT_YVYU:
-> +	case V4L2_PIX_FMT_VYUY:
-> +	/* RGB */
-> +	case V4L2_PIX_FMT_RGB565:
-> +		return true;
-> +	default:
-> +		return false;
-> +	}
-> +}
-> +
->  static int try_or_set_fmt(struct soc_camera_device *icd,
->  		   struct v4l2_format *f,
->  		   struct v4l2_subdev_format *format)
-> -- 
-> 1.9.1
-> 
+-- 
+2.1.4
