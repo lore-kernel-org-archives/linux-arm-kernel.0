@@ -1,33 +1,46 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 24 Jan 2016 12:33:18 +0100
-Subject: [PATCH V7 0/6] i2c: qup: Add support for v2 tags and bam dma
-In-Reply-To: <000101d152a2$23bb1da0$6b3158e0$@codeaurora.org>
-References: <1453197766-18976-1-git-send-email-sricharan@codeaurora.org>
- <000101d152a2$23bb1da0$6b3158e0$@codeaurora.org>
-Message-ID: <20160124113318.GB1775@katana>
+From: slash.tmp@free.fr (Mason)
+Date: Sun, 24 Jan 2016 14:27:25 +0100
+Subject: Unhandled fault: page domain fault (0x81b) at 0x00e41008
+In-Reply-To: <20160123235905.GE10826@n2100.arm.linux.org.uk>
+References: <56A268E7.7040004@free.fr>
+ <20160122174814.GD19062@n2100.arm.linux.org.uk> <56A27C00.5060004@free.fr>
+ <20160122193408.GE19062@n2100.arm.linux.org.uk> <56A2B811.8010306@free.fr>
+ <20160122235704.GF19062@n2100.arm.linux.org.uk> <56A3609E.3000400@free.fr>
+ <20160123113438.GG19062@n2100.arm.linux.org.uk> <56A3E84A.1000604@free.fr>
+ <20160123235905.GE10826@n2100.arm.linux.org.uk>
+Message-ID: <56A4D13D.3030906@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Sricharan R (6):
-> >   i2c: qup: Change qup_wait_writeready function to use for all timeouts
-> >   i2c: qup: Add V2 tags support
-> >   i2c: qup: Transfer each i2c_msg in i2c_msgs without a stop bit
-> >   i2c: qup: Add bam dma capabilities
-> >   dts: msm8974: Add blsp2_bam dma node
-> >   dts: msm8974: Add dma channels for blsp2_i2c1 node
-> > 
->  Wolfram,  Does the first 4 patches looks good to be picked up  ?
+On 24/01/2016 00:59, Russell King - ARM Linux wrote:
 
-Except for patch 3 (I replied seperately), the rest looks okay to me. I
-wondered a little if it would make sense to make a new driver for v2 +
-DMA, because the additions were quite massive. But I'll leave it up to
-you if there is enough shared code between the two versions, so that a
-single driver will be better.
+> I'll quote what you said in previous mails in this thread,
+> so there's no misunderstanding.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160124/b18a0447/attachment.sig>
+Russell,
+
+Our "software stack" provides the kernel API under discussion:
+
+  {read,write}_data{8,16,32}
+
+These 6 functions must be implemented, because they are part
+of the API we provide to customers. As the "page domain fault"
+underscores, my own implementation is incorrect. I am grateful
+for the implementation you suggested up-thread, and will test
+its performance on Monday.
+
+
+Our "software stack" also provides several user-space tools,
+some of which use the above kernel API. One of those tools is
+the one I described, to copy files to remote RAM.
+
+The current code uses write_data8, but the implementation is
+irrelevant. Any implementation is acceptable, as long as the
+tool works as expected. So I can take advantage of the tool's
+specificities to optimize.
+
+
+Anyway, thanks again for the guidance and advice, and please
+give a little more credit.
+
+Regards.
