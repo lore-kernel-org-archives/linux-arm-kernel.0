@@ -1,85 +1,66 @@
-From: egtvedt@samfundet.no (Hans-Christian Noren Egtvedt)
-Date: Sun, 24 Jan 2016 21:37:21 +0100
-Subject: [PATCH 03/15] dmaengine: dw: rename masters to reflect actual
- topology
-In-Reply-To: <yw1xsi1mlogt.fsf@unicorn.mansr.com>
-References: <1453663322-14474-1-git-send-email-mans@mansr.com>
- <1453663322-14474-4-git-send-email-mans@mansr.com>
- <20160124200959.GA15633@samfundet.no>
- <yw1xsi1mlogt.fsf@unicorn.mansr.com>
-Message-ID: <20160124203720.GA29010@samfundet.no>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 24 Jan 2016 21:39:11 +0100
+Subject: [PATCH] ARM: pxa: let PXA27x select PINCTRL
+References: <1453577004-15295-1-git-send-email-yamada.masahiro@socionext.com>
+ <87k2n0ar0v.fsf@belgarion.home> <1495788.v3fMfHFcmP@wuerfel>
+Message-ID: <87zivuaf0w.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Around Sun 24 Jan 2016 20:19:46 +0000 or thereabout, M?ns Rullg?rd wrote:
-> Hans-Christian Noren Egtvedt <egtvedt@samfundet.no> writes:
->> Around Sun 24 Jan 2016 19:21:50 +0000 or thereabout, Mans Rullgard wrote:
->>> From: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
->>> 
->>> The source and destination masters are reflecting buses or their layers to
->>> where the different devices can be connected. The patch changes the master
->>> names to reflect which one is related to which independently on the transfer
->>> direction.
->>> 
->>> The outcome of the change is that the memory data width is now always limited
->>> by a data width of the master which is dedicated to communicate to memory.
->>> 
->>> The patch will not break anything since all current users have the same data
->>> width for all masters. Though it would be nice to revisit avr32 plaforms to
->>> check what is the actual hardware topology is used there. It seems that it has
->>> one bus and two masters on it as stated by Table 8-2, that's why everything
->>> works independently on the master in use. The purpose of the sequential patch
->>> is to fix the driver for configuration of more that one bus.
->>
->> Not entirely sure what you want to have confirmed here. There are multiple
->> masters and slaves on the HMATRIX internal bus on AVR32, and the DMA
->> controller supports up to three simultaneous configurations.
->>
->> Sounds good to support configuration of more than one bus. I thought we
->> always did support that? Perhaps it was a non-standard avr32 implementation.
-> 
-> The DW DMA controller on the AT32AP7000 serves the MCI, AC97, and ABDAC
-> peripherals.  It appears to work regardless of the values put in the
-> various master select fields.  Perhaps the topology is hardwired in the
-> DMA controller and those fields are ignored.  The AVR32 works both
-> before and after this patch series, the main purpose of which (at least
-> my patches) is to fix the SATA driver on 460EX.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-DEST_PER and SRC_PER in the DMA controller selects this, numbers placed here
-should match the table you most likely found, 9-3.
+> On Saturday 23 January 2016 23:07:44 Robert Jarzmik wrote:
+>> I have this patch in my local tree for 2 monthes (see [1]). This is the patch
+>> I'd rather have. I had not posted it as I didn't think the pinctrl work was over
+>> yet. I know at least that pxa3xx is ready (as pinctrl-single should be used),
+>> and I had not the time to create the map for pxa25x.
+>
+> Once you are done, does that mean the plat-pxa/mfp.c stuff becomes
+> completely unused on pxa, or will it coexist with pinctrl?
+At first it will coexist.
+The main blocker so far I have are :
+ - the pinconf in platform_data platform to define sleep state pin levels
+   (aka. MFPR_LPM_DRIVE_LOW and MFPR_LPM_DRIVE_HIGH)
+   I have [1], but it's not working yet, ie. upon entering suspend to RAM, the
+   GPIO sleep registers are not programmed as expected.
+ - all the pxa machine code have to be migrated from MFP to pinctrl
 
-Wiring the handshake connections is done with the struct dw_dma_slave src_id
-or dst_id member, depending on data direction. Configured in the at32ap700x.c
-machine code.
+So it will take time.
 
-It is not hard wired on avr32, as there are not one-to-one configurations and
-masters.
+> I'm asking because it seems that at that point, the entire plat-pxa
+> directory can be removed, with the dma.c and ssp.c files getting
+> moved to mach-pxa, and mfp.c moved to mach-mmp. :-)
+dma.c will die soon enough anyway, ssp.c will move to mach-pxa indeed, and as
+for mfp.c it requires a bit of work.
 
->>> The change is done in the assumption that src_master and dst_master are
->>> reflecting a connection to the memory and peripheral correspondently on all
->>> platforms except 460ex.
+Cheers.
 
-OK, I have no knowledge about the 460ex.
-
->>> Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
->>> Signed-off-by: Mans Rullgard <mans@mansr.com>
->>
->> For the avr32 related stuff:
->>
->> Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
->>
->>> ---
->>>  Documentation/devicetree/bindings/dma/snps-dma.txt |  4 ++--
->>>  arch/avr32/mach-at32ap/at32ap700x.c                | 16 ++++++++--------
->>>  drivers/ata/sata_dwc_460ex.c                       |  4 ++--
->>>  drivers/dma/dw/core.c                              | 15 +++++++--------
->>>  drivers/dma/dw/platform.c                          | 12 ++++++------
->>>  drivers/dma/dw/regs.h                              |  4 ++--
->>>  drivers/spi/spi-pxa2xx-pci.c                       |  8 ++++----
->>>  drivers/tty/serial/8250/8250_pci.c                 |  8 ++++----
->>>  include/linux/platform_data/dma-dw.h               |  8 ++++----
->>>  9 files changed, 39 insertions(+), 40 deletions(-)
->>
->> <snipp diff>
 -- 
-Best regards, Hans-Christian Egtvedt
+Robert
+
+[1] Extract of my samples in mioa701.c :
+#define PMGROUP(pin) #pin
+#define PMMUX(dev, pin, func)							\
+	PIN_MAP_MUX_GROUP(#dev, PINCTRL_STATE_DEFAULT, "pxa27x-pinctrl",	\
+			  "P" PMGROUP(pin), #func)
+#define PMCONF_SLEEP(dev, pin, mode)						\
+	PIN_MAP_CONFIGS_PIN(#dev, PINCTRL_STATE_SLEEP, "pxa27x-pinctrl",	\
+			  "P" PMGROUP(pin), gpio_ ## mode ## _sleep_mode)
+
+static unsigned long gpio_pull_sleep_mode[] = {
+	PIN_CONF_PACKED(PIN_CONFIG_OUTPUT, 0),
+};
+
+static unsigned long gpio_push_sleep_mode[] = {
+	PIN_CONF_PACKED(PIN_CONFIG_OUTPUT, 1),
+};
+
+static struct pinctrl_map pinmap[] __initdata = {
+	/* USB */
+	PMMUX(pxa27x-udc, GPIO13_nUSB_DETECT, gpio_in),
+	PMMUX(pxa27x-udc, GPIO22_USB_ENABLE, gpio_in),
+	PMCONF_SLEEP(pxa27x-udc, GPIO22_USB_ENABLE, pull),
+};
+...
+	/* pxa2xx_mfp_config(ARRAY_AND_SIZE(mioa701_pin_config)); */
+	pinctrl_register_mappings(pinmap, ARRAY_SIZE(pinmap));
