@@ -1,26 +1,32 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sun, 24 Jan 2016 23:52:20 +0100
-Subject: [PATCH v3 0/3] SoC: rockchip: support power domain for RK3368
-In-Reply-To: <1452508600-3512-1-git-send-email-zhangqing@rock-chips.com>
-References: <1452508600-3512-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <25506007.ZijpbXfFGZ@diego>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Mon, 25 Jan 2016 08:20:02 +0900
+Subject: [PATCH v2] ARM: dts: kirkwood: add device tree for buffalo
+ linkstation ls-qvl
+In-Reply-To: <1453652964-21489-1-git-send-email-rogershimizu@gmail.com>
+References: <1453652964-21489-1-git-send-email-rogershimizu@gmail.com>
+Message-ID: <1453677603-25803-1-git-send-email-rogershimizu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Elaine,
+Dear Kirkwood Maintainers,
 
-Am Montag, 11. Januar 2016, 02:36:37 schrieb zhangqing:
-> add pd id in rk3368-power.h
-> modify pm_domains.c to support RK3368 SoC
-> add RK3368 document for Rockchip power domains
-> 
-> zhangqing (3):
->   dt-bindings: add power-domain header for RK3368 SoCs
->   soc: rockchip: power-domain: Modify power domain driver for rk3368
->   dt-bindings: modify document of Rockchip power domains
+Mario created dts for Linkstation LS-QVL, which is 4-bay NAS, based
+on my dts for 2-bay LS-WVL.
+He asked me to post the dts to ARM on hehalf of him, so here I created
+the patch set!
 
-applied all 3 to appropriate branches for 4.6
+Changes in v2:
+  - add my "Signed-off-by"
+  - fix typo in commit message
 
+Roger Shimizu (1):
+  ARM: dts: kirkwood: add device tree for buffalo linkstation ls-qvl
 
-Thanks
-Heiko
+ .../devicetree/bindings/arm/marvell,kirkwood.txt   |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts   | 135 +++++++++++++++++++++
+ 3 files changed, 137 insertions(+)
+ create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts
+
+-- 
+2.1.4
