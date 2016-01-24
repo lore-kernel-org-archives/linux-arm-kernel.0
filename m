@@ -1,296 +1,280 @@
 From: mans@mansr.com (Mans Rullgard)
-Date: Sun, 24 Jan 2016 19:21:50 +0000
-Subject: [PATCH 03/15] dmaengine: dw: rename masters to reflect actual topology
+Date: Sun, 24 Jan 2016 19:21:54 +0000
+Subject: [PATCH 07/15] dmaengine: dw: revisit data_width property
 In-Reply-To: <1453663322-14474-1-git-send-email-mans@mansr.com>
 References: <1453663322-14474-1-git-send-email-mans@mansr.com>
-Message-ID: <1453663322-14474-4-git-send-email-mans@mansr.com>
+Message-ID: <1453663322-14474-8-git-send-email-mans@mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 
-The source and destination masters are reflecting buses or their layers to
-where the different devices can be connected. The patch changes the master
-names to reflect which one is related to which independently on the transfer
-direction.
+There are several changes are done here:
 
-The outcome of the change is that the memory data width is now always limited
-by a data width of the master which is dedicated to communicate to memory.
+ - Convert the property to be in bytes
 
-The patch will not break anything since all current users have the same data
-width for all masters. Though it would be nice to revisit avr32 plaforms to
-check what is the actual hardware topology is used there. It seems that it has
-one bus and two masters on it as stated by Table 8-2, that's why everything
-works independently on the master in use. The purpose of the sequential patch
-is to fix the driver for configuration of more that one bus.
+   Much more convenient than keeping encoded value.
 
-The change is done in the assumption that src_master and dst_master are
-reflecting a connection to the memory and peripheral correspondently on all
-platforms except 460ex.
+ - Use one value for all AHB masters for now
+
+   It seems in practice we have no controllers where masters have different
+   data bus width, we still might return to distinct values when there is a use
+   case.
+
+ - Rename data_width to data-width in the device tree bindings.
+
+ - While here, replace dwc_fast_ffs() by __ffs().
 
 Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 Signed-off-by: Mans Rullgard <mans@mansr.com>
 ---
- Documentation/devicetree/bindings/dma/snps-dma.txt |  4 ++--
- arch/avr32/mach-at32ap/at32ap700x.c                | 16 ++++++++--------
- drivers/ata/sata_dwc_460ex.c                       |  4 ++--
- drivers/dma/dw/core.c                              | 15 +++++++--------
- drivers/dma/dw/platform.c                          | 12 ++++++------
- drivers/dma/dw/regs.h                              |  4 ++--
- drivers/spi/spi-pxa2xx-pci.c                       |  8 ++++----
- drivers/tty/serial/8250/8250_pci.c                 |  8 ++++----
- include/linux/platform_data/dma-dw.h               |  8 ++++----
- 9 files changed, 39 insertions(+), 40 deletions(-)
+This patch changes the DT binding, so it should probably be amended for
+compatibility with old device trees.  I've included it as is since I think
+the change as such is good.
+---
+ Documentation/devicetree/bindings/dma/snps-dma.txt |  5 ++-
+ arch/arc/boot/dts/abilis_tb10x.dtsi                |  2 +-
+ arch/arm/boot/dts/spear13xx.dtsi                   |  4 +--
+ drivers/dma/dw/core.c                              | 40 +++-------------------
+ drivers/dma/dw/platform.c                          |  8 ++---
+ drivers/dma/dw/regs.h                              |  2 +-
+ include/linux/platform_data/dma-dw.h               |  5 ++-
+ 7 files changed, 16 insertions(+), 50 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/dma/snps-dma.txt b/Documentation/devicetree/bindings/dma/snps-dma.txt
-index c261598164a7..c99c1ffac199 100644
+index c99c1ffac199..fe7f7710a6b4 100644
 --- a/Documentation/devicetree/bindings/dma/snps-dma.txt
 +++ b/Documentation/devicetree/bindings/dma/snps-dma.txt
-@@ -47,8 +47,8 @@ The four cells in order are:
+@@ -13,8 +13,7 @@ Required properties:
+ - chan_priority: priority of channels. 0 (default): increase from chan 0->n, 1:
+   increase from chan n->0
+ - block_size: Maximum block size supported by the controller
+-- data_width: Maximum data width supported by hardware per AHB master
+-  (0 - 8bits, 1 - 16bits, ..., 5 - 256bits)
++- data-width: Maximum data width supported by hardware (in bytes)
  
- 1. A phandle pointing to the DMA controller
- 2. The DMA request line number
--3. Source master for transfers on allocated channel
--4. Destination master for transfers on allocated channel
-+3. Memory master for transfers on allocated channel
-+4. Peripheral master for transfers on allocated channel
  
- Example:
- 	
-diff --git a/arch/avr32/mach-at32ap/at32ap700x.c b/arch/avr32/mach-at32ap/at32ap700x.c
-index bf445aa48282..00d6dcc1d9b6 100644
---- a/arch/avr32/mach-at32ap/at32ap700x.c
-+++ b/arch/avr32/mach-at32ap/at32ap700x.c
-@@ -1365,8 +1365,8 @@ at32_add_device_mci(unsigned int id, struct mci_platform_data *data)
- 	slave->dma_dev = &dw_dmac0_device.dev;
- 	slave->src_id = 0;
- 	slave->dst_id = 1;
--	slave->src_master = 1;
--	slave->dst_master = 0;
-+	slave->m_master = 1;
-+	slave->p_master = 0;
+ Optional properties:
+@@ -38,7 +37,7 @@ Example:
+ 		chan_allocation_order = <1>;
+ 		chan_priority = <1>;
+ 		block_size = <0xfff>;
+-		data_width = <3 3>;
++		data-width = <8>;
+ 	};
  
- 	data->dma_slave = slave;
- 	data->dma_filter = at32_mci_dma_filter;
-@@ -2061,16 +2061,16 @@ at32_add_device_ac97c(unsigned int id, struct ac97c_platform_data *data,
- 	if (flags & AC97C_CAPTURE) {
- 		rx_dws->dma_dev = &dw_dmac0_device.dev;
- 		rx_dws->src_id = 3;
--		rx_dws->src_master = 0;
--		rx_dws->dst_master = 1;
-+		rx_dws->m_master = 0;
-+		rx_dws->p_master = 1;
- 	}
+ DMA clients connected to the Designware DMA controller must use the format
+diff --git a/arch/arc/boot/dts/abilis_tb10x.dtsi b/arch/arc/boot/dts/abilis_tb10x.dtsi
+index cfb5052239a1..2f53bedb0cde 100644
+--- a/arch/arc/boot/dts/abilis_tb10x.dtsi
++++ b/arch/arc/boot/dts/abilis_tb10x.dtsi
+@@ -112,7 +112,7 @@
+ 			chan_allocation_order = <0>;
+ 			chan_priority = <1>;
+ 			block_size = <0x7ff>;
+-			data_width = <2>;
++			data-width = <4>;
+ 			clocks = <&ahb_clk>;
+ 			clock-names = "hclk";
+ 		};
+diff --git a/arch/arm/boot/dts/spear13xx.dtsi b/arch/arm/boot/dts/spear13xx.dtsi
+index 14594ce8c18a..474b66fa6a32 100644
+--- a/arch/arm/boot/dts/spear13xx.dtsi
++++ b/arch/arm/boot/dts/spear13xx.dtsi
+@@ -117,7 +117,7 @@
+ 			chan_priority = <1>;
+ 			block_size = <0xfff>;
+ 			dma-masters = <2>;
+-			data_width = <3 3>;
++			data-width = <8>;
+ 		};
  
- 	/* Check if DMA slave interface for playback should be configured. */
- 	if (flags & AC97C_PLAYBACK) {
- 		tx_dws->dma_dev = &dw_dmac0_device.dev;
- 		tx_dws->dst_id = 4;
--		tx_dws->src_master = 0;
--		tx_dws->dst_master = 1;
-+		tx_dws->m_master = 0;
-+		tx_dws->p_master = 1;
- 	}
+ 		dma at eb000000 {
+@@ -133,7 +133,7 @@
+ 			chan_allocation_order = <1>;
+ 			chan_priority = <1>;
+ 			block_size = <0xfff>;
+-			data_width = <3 3>;
++			data-width = <8>;
+ 		};
  
- 	if (platform_device_add_data(pdev, data,
-@@ -2141,8 +2141,8 @@ at32_add_device_abdac(unsigned int id, struct atmel_abdac_pdata *data)
- 
- 	dws->dma_dev = &dw_dmac0_device.dev;
- 	dws->dst_id = 2;
--	dws->src_master = 0;
--	dws->dst_master = 1;
-+	dws->m_master = 0;
-+	dws->p_master = 1;
- 
- 	if (platform_device_add_data(pdev, data,
- 				sizeof(struct atmel_abdac_pdata)))
-diff --git a/drivers/ata/sata_dwc_460ex.c b/drivers/ata/sata_dwc_460ex.c
-index 902034991517..80bdcabc293f 100644
---- a/drivers/ata/sata_dwc_460ex.c
-+++ b/drivers/ata/sata_dwc_460ex.c
-@@ -201,8 +201,8 @@ static struct sata_dwc_host_priv host_pvt;
- static struct dw_dma_slave sata_dwc_dma_dws = {
- 	.src_id = 0,
- 	.dst_id = 0,
--	.src_master = 0,
--	.dst_master = 1,
-+	.m_master = 1,
-+	.p_master = 0,
- };
- 
- /*
+ 		fsmc: flash at b0000000 {
 diff --git a/drivers/dma/dw/core.c b/drivers/dma/dw/core.c
-index 03ec88f1c161..8d1b87ff2ac6 100644
+index 140ea59ec882..28278e4c77ad 100644
 --- a/drivers/dma/dw/core.c
 +++ b/drivers/dma/dw/core.c
-@@ -50,8 +50,8 @@
- 		 | DWC_CTLL_SRC_MSIZE(_smsize)			\
- 		 | DWC_CTLL_LLP_D_EN				\
- 		 | DWC_CTLL_LLP_S_EN				\
--		 | DWC_CTLL_DMS(_dwc->dst_master)		\
--		 | DWC_CTLL_SMS(_dwc->src_master));		\
-+		 | DWC_CTLL_DMS(_dwc->p_master)			\
-+		 | DWC_CTLL_SMS(_dwc->m_master));		\
- 	})
+@@ -168,21 +168,6 @@ static void dwc_initialize(struct dw_dma_chan *dwc)
  
- /*
-@@ -722,8 +722,7 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
+ /*----------------------------------------------------------------------*/
+ 
+-static inline unsigned int dwc_fast_ffs(unsigned long long v)
+-{
+-	/*
+-	 * We can be a lot more clever here, but this should take care
+-	 * of the most common optimization.
+-	 */
+-	if (!(v & 7))
+-		return 3;
+-	else if (!(v & 3))
+-		return 2;
+-	else if (!(v & 1))
+-		return 1;
+-	return 0;
+-}
+-
+ static inline void dwc_dump_chan_regs(struct dw_dma_chan *dwc)
+ {
+ 	dev_err(chan2dev(&dwc->chan),
+@@ -712,7 +697,6 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
+ 	size_t			offset;
+ 	unsigned int		src_width;
+ 	unsigned int		dst_width;
+-	unsigned int		data_width;
+ 	u32			ctllo;
+ 
+ 	dev_vdbg(chan2dev(chan),
+@@ -726,10 +710,7 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
  
  	dwc->direction = DMA_MEM_TO_MEM;
  
--	data_width = min_t(unsigned int, dw->data_width[dwc->src_master],
--			   dw->data_width[dwc->dst_master]);
-+	data_width = dw->data_width[dwc->m_master];
+-	data_width = dw->data_width[dwc->m_master];
+-
+-	src_width = dst_width = min_t(unsigned int, data_width,
+-				      dwc_fast_ffs(src | dest | len));
++	src_width = dst_width = __ffs(dw->data_width | src | dest | len);
  
- 	src_width = dst_width = min_t(unsigned int, data_width,
- 				      dwc_fast_ffs(src | dest | len));
-@@ -815,7 +814,7 @@ dwc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 	ctllo = DWC_DEFAULT_CTLLO(chan)
+ 			| DWC_CTLL_DST_WIDTH(dst_width)
+@@ -792,7 +773,6 @@ dwc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 	dma_addr_t		reg;
+ 	unsigned int		reg_width;
+ 	unsigned int		mem_width;
+-	unsigned int		data_width;
+ 	unsigned int		i;
+ 	struct scatterlist	*sg;
+ 	size_t			total_len = 0;
+@@ -818,8 +798,6 @@ dwc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
  		ctllo |= sconfig->device_fc ? DWC_CTLL_FC(DW_DMA_FC_P_M2P) :
  			DWC_CTLL_FC(DW_DMA_FC_D_M2P);
  
--		data_width = dw->data_width[dwc->src_master];
-+		data_width = dw->data_width[dwc->m_master];
- 
+-		data_width = dw->data_width[dwc->m_master];
+-
  		for_each_sg(sgl, sg, sg_len, i) {
  			struct dw_desc	*desc;
-@@ -871,7 +870,7 @@ slave_sg_todev_fill_desc:
+ 			u32		len, dlen, mem;
+@@ -827,8 +805,7 @@ dwc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 			mem = sg_dma_address(sg);
+ 			len = sg_dma_len(sg);
+ 
+-			mem_width = min_t(unsigned int,
+-					  data_width, dwc_fast_ffs(mem | len));
++			mem_width = __ffs(dw->data_width | mem | len);
+ 
+ slave_sg_todev_fill_desc:
+ 			desc = dwc_desc_get(dwc);
+@@ -874,8 +851,6 @@ slave_sg_todev_fill_desc:
  		ctllo |= sconfig->device_fc ? DWC_CTLL_FC(DW_DMA_FC_P_P2M) :
  			DWC_CTLL_FC(DW_DMA_FC_D_P2M);
  
--		data_width = dw->data_width[dwc->dst_master];
-+		data_width = dw->data_width[dwc->m_master];
- 
+-		data_width = dw->data_width[dwc->m_master];
+-
  		for_each_sg(sgl, sg, sg_len, i) {
  			struct dw_desc	*desc;
-@@ -949,8 +948,8 @@ bool dw_dma_filter(struct dma_chan *chan, void *param)
- 	dwc->src_id = dws->src_id;
- 	dwc->dst_id = dws->dst_id;
+ 			u32		len, dlen, mem;
+@@ -883,8 +858,7 @@ slave_sg_todev_fill_desc:
+ 			mem = sg_dma_address(sg);
+ 			len = sg_dma_len(sg);
  
--	dwc->src_master = dws->src_master;
--	dwc->dst_master = dws->dst_master;
-+	dwc->m_master = dws->m_master;
-+	dwc->p_master = dws->p_master;
+-			mem_width = min_t(unsigned int,
+-					  data_width, dwc_fast_ffs(mem | len));
++			mem_width = __ffs(dw->data_width | mem | len);
  
- 	return true;
- }
+ slave_sg_fromdev_fill_desc:
+ 			desc = dwc_desc_get(dwc);
+@@ -1531,10 +1505,7 @@ int dw_dma_probe(struct dw_dma_chip *chip, struct dw_dma_platform_data *pdata)
+ 		/* Get hardware configuration parameters */
+ 		pdata->nr_channels = (dw_params >> DW_PARAMS_NR_CHAN & 7) + 1;
+ 		pdata->nr_masters = (dw_params >> DW_PARAMS_NR_MASTER & 3) + 1;
+-		for (i = 0; i < pdata->nr_masters; i++) {
+-			pdata->data_width[i] =
+-				(dw_params >> DW_PARAMS_DATA_WIDTH(i) & 3) + 2;
+-		}
++		pdata->data_width = 4 << (dw_params >> DW_PARAMS_DATA_WIDTH(0) & 3);
+ 		max_blk_size = dma_readl(dw, MAX_BLK_SIZE);
+ 
+ 		/* Fill platform data with the default values */
+@@ -1556,8 +1527,7 @@ int dw_dma_probe(struct dw_dma_chip *chip, struct dw_dma_platform_data *pdata)
+ 
+ 	/* Get hardware configuration parameters */
+ 	dw->nr_masters = pdata->nr_masters;
+-	for (i = 0; i < dw->nr_masters; i++)
+-		dw->data_width[i] = pdata->data_width[i];
++	dw->data_width = pdata->data_width;
+ 
+ 	/* Calculate all channel mask before DMA setup */
+ 	dw->all_chan_mask = (1 << pdata->nr_channels) - 1;
 diff --git a/drivers/dma/dw/platform.c b/drivers/dma/dw/platform.c
-index 26edbe3a27ac..d3e1abcebd7f 100644
+index d3e1abcebd7f..89d0461f5dcc 100644
 --- a/drivers/dma/dw/platform.c
 +++ b/drivers/dma/dw/platform.c
-@@ -42,13 +42,13 @@ static struct dma_chan *dw_dma_of_xlate(struct of_phandle_args *dma_spec,
+@@ -102,8 +102,8 @@ dw_dma_parse_dt(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct dw_dma_platform_data *pdata;
+-	u32 tmp, arr[DW_DMA_MAX_NR_MASTERS];
+ 	u32 nr_channels;
++	u32 tmp;
  
- 	slave.src_id = dma_spec->args[0];
- 	slave.dst_id = dma_spec->args[0];
--	slave.src_master = dma_spec->args[1];
--	slave.dst_master = dma_spec->args[2];
-+	slave.m_master = dma_spec->args[1];
-+	slave.p_master = dma_spec->args[2];
+ 	if (!np) {
+ 		dev_err(&pdev->dev, "Missing DT data\n");
+@@ -138,10 +138,8 @@ dw_dma_parse_dt(struct platform_device *pdev)
+ 		pdata->nr_masters = tmp;
+ 	}
  
- 	if (WARN_ON(slave.src_id >= DW_DMA_MAX_NR_REQUESTS ||
- 		    slave.dst_id >= DW_DMA_MAX_NR_REQUESTS ||
--		    slave.src_master >= dw->nr_masters ||
--		    slave.dst_master >= dw->nr_masters))
-+		    slave.m_master >= dw->nr_masters ||
-+		    slave.p_master >= dw->nr_masters))
- 		return NULL;
+-	if (!of_property_read_u32_array(np, "data_width", arr,
+-				pdata->nr_masters))
+-		for (tmp = 0; tmp < pdata->nr_masters; tmp++)
+-			pdata->data_width[tmp] = arr[tmp];
++	if (!of_property_read_u32(np, "data-width", &tmp))
++		pdata->data_width = tmp;
  
- 	dma_cap_zero(cap);
-@@ -66,8 +66,8 @@ static bool dw_dma_acpi_filter(struct dma_chan *chan, void *param)
- 		.dma_dev = dma_spec->dev,
- 		.src_id = dma_spec->slave_id,
- 		.dst_id = dma_spec->slave_id,
--		.src_master = 1,
--		.dst_master = 0,
-+		.m_master = 1,
-+		.p_master = 0,
- 	};
- 
- 	return dw_dma_filter(chan, &slave);
+ 	return pdata;
+ }
 diff --git a/drivers/dma/dw/regs.h b/drivers/dma/dw/regs.h
-index afd340958266..0391f8ff6919 100644
+index e4b277565165..87bc97fca084 100644
 --- a/drivers/dma/dw/regs.h
 +++ b/drivers/dma/dw/regs.h
-@@ -249,8 +249,8 @@ struct dw_dma_chan {
- 	/* custom slave configuration */
- 	u8			src_id;
- 	u8			dst_id;
--	u8			src_master;
--	u8			dst_master;
-+	u8			m_master;
-+	u8			p_master;
+@@ -285,7 +285,7 @@ struct dw_dma {
  
- 	/* configuration passed via .device_config */
- 	struct dma_slave_config dma_sconfig;
-diff --git a/drivers/spi/spi-pxa2xx-pci.c b/drivers/spi/spi-pxa2xx-pci.c
-index d19d7f28aecb..01ccc7448313 100644
---- a/drivers/spi/spi-pxa2xx-pci.c
-+++ b/drivers/spi/spi-pxa2xx-pci.c
-@@ -132,16 +132,16 @@ static int pxa2xx_spi_pci_probe(struct pci_dev *dev,
- 		struct dw_dma_slave *slave = c->tx_param;
- 
- 		slave->dma_dev = &dma_dev->dev;
--		slave->src_master = 1;
--		slave->dst_master = 0;
-+		slave->m_master = 1;
-+		slave->p_master = 0;
- 	}
- 
- 	if (c->rx_param) {
- 		struct dw_dma_slave *slave = c->rx_param;
- 
- 		slave->dma_dev = &dma_dev->dev;
--		slave->src_master = 1;
--		slave->dst_master = 0;
-+		slave->m_master = 1;
-+		slave->p_master = 0;
- 	}
- 
- 	spi_pdata.dma_filter = lpss_dma_filter;
-diff --git a/drivers/tty/serial/8250/8250_pci.c b/drivers/tty/serial/8250/8250_pci.c
-index 4097f3f65b3b..aa1b5cc7e158 100644
---- a/drivers/tty/serial/8250/8250_pci.c
-+++ b/drivers/tty/serial/8250/8250_pci.c
-@@ -1473,13 +1473,13 @@ byt_serial_setup(struct serial_private *priv,
- 		return -EINVAL;
- 	}
- 
--	rx_param->src_master = 1;
--	rx_param->dst_master = 0;
-+	rx_param->m_master = 1;
-+	rx_param->p_master = 0;
- 
- 	dma->rxconf.src_maxburst = 16;
- 
--	tx_param->src_master = 1;
--	tx_param->dst_master = 0;
-+	tx_param->m_master = 1;
-+	tx_param->p_master = 0;
- 
- 	dma->txconf.dst_maxburst = 16;
- 
-diff --git a/include/linux/platform_data/dma-dw.h b/include/linux/platform_data/dma-dw.h
-index 03b6095d3b18..b881b978e486 100644
---- a/include/linux/platform_data/dma-dw.h
-+++ b/include/linux/platform_data/dma-dw.h
-@@ -21,15 +21,15 @@
-  * @dma_dev:	required DMA master device
-  * @src_id:	src request line
-  * @dst_id:	dst request line
-- * @src_master: src master for transfers on allocated channel.
-- * @dst_master: dest master for transfers on allocated channel.
-+ * @m_master:	memory master for transfers on allocated channel
-+ * @p_master:	peripheral master for transfers on allocated channel
-  */
- struct dw_dma_slave {
- 	struct device		*dma_dev;
- 	u8			src_id;
- 	u8			dst_id;
--	u8			src_master;
--	u8			dst_master;
-+	u8			m_master;
-+	u8			p_master;
+ 	/* hardware configuration */
+ 	unsigned char		nr_masters;
+-	unsigned char		data_width[DW_DMA_MAX_NR_MASTERS];
++	unsigned char		data_width;
  };
  
- /**
+ static inline struct dw_dma_regs __iomem *__dw_regs(struct dw_dma *dw)
+diff --git a/include/linux/platform_data/dma-dw.h b/include/linux/platform_data/dma-dw.h
+index b881b978e486..4120a3eb71ca 100644
+--- a/include/linux/platform_data/dma-dw.h
++++ b/include/linux/platform_data/dma-dw.h
+@@ -42,8 +42,7 @@ struct dw_dma_slave {
+  * @chan_priority: Set channel priority increasing from 0 to 7 or 7 to 0.
+  * @block_size: Maximum block size supported by the controller
+  * @nr_masters: Number of AHB masters supported by the controller
+- * @data_width: Maximum data width supported by hardware per AHB master
+- *		(0 - 8bits, 1 - 16bits, ..., 5 - 256bits)
++ * @data_width: Maximum data width supported by hardware (in bytes)
+  */
+ struct dw_dma_platform_data {
+ 	unsigned int	nr_channels;
+@@ -57,7 +56,7 @@ struct dw_dma_platform_data {
+ 	unsigned char	chan_priority;
+ 	unsigned short	block_size;
+ 	unsigned char	nr_masters;
+-	unsigned char	data_width[DW_DMA_MAX_NR_MASTERS];
++	unsigned char	data_width;
+ };
+ 
+ #endif /* _PLATFORM_DATA_DMA_DW_H */
 -- 
 2.7.0
