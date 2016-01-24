@@ -1,99 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 23 Jan 2016 23:59:06 +0000
-Subject: Unhandled fault: page domain fault (0x81b) at 0x00e41008
-In-Reply-To: <56A3E84A.1000604@free.fr>
-References: <56A268E7.7040004@free.fr>
- <20160122174814.GD19062@n2100.arm.linux.org.uk>
- <56A27C00.5060004@free.fr>
- <20160122193408.GE19062@n2100.arm.linux.org.uk>
- <56A2B811.8010306@free.fr>
- <20160122235704.GF19062@n2100.arm.linux.org.uk>
- <56A3609E.3000400@free.fr>
- <20160123113438.GG19062@n2100.arm.linux.org.uk>
- <56A3E84A.1000604@free.fr>
-Message-ID: <20160123235905.GE10826@n2100.arm.linux.org.uk>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Sun, 24 Jan 2016 12:56:03 +0800
+Subject: [PATCH v3 04/12] acpi, numa: introduce ACPI_HAS_NUMA_ARCH_FIXUP
+In-Reply-To: <20160123102523.GC24726@rric.localdomain>
+References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
+ <1453541967-3744-5-git-send-email-guohanjun@huawei.com>
+ <20160123102523.GC24726@rric.localdomain>
+Message-ID: <56A45963.40105@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 23, 2016 at 09:53:30PM +0100, Mason wrote:
-> But I would consider mmaping /dev/mem even simpler: it doesn't
-> require writing a single line of kernel code, and it works as
-> expected. The gist of the code is:
-> 
->   fd = open("/path/to/file", O_RDONLY);
->   mem_fd = open("/dev/mem", O_WRONLY | O_SYNC);
->   va = mmap(NULL, len, PROT_WRITE, MAP_SHARED, mem_fd, phys_addr);
->   read(fd, va, len);
-> 
-> And that's it. If I understand correctly, the mem driver
-> will copy the file contents directly to "remote" RAM.
-> 
-> Is there something wrong with this solution, in your opinion?
+On 01/23/2016 06:25 PM, Robert Richter wrote:
+> On 23.01.16 17:39:19, Hanjun Guo wrote:
+>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>
+>> acpi_numa_arch_fixup() is only used for IA64, x86 introduce a dummy
+>> function for it, when we came to a new architecture (such as ARM64),
+>> we need to introduce another dummy one to make the code compile.
+>>
+>> That's pretty boring so introduce ACPI_HAS_NUMA_ARCH_FIXUP and
+>> select it for IA64, introduce a stub function for acpi_numa_arch_fixup()
+>> then it's pretty clean for x86 and ARM64.
+>>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>   arch/ia64/Kconfig    | 1 +
+>
+> I see an implementation of acpi_numa_arch_fixup() only for ia64. Why
+> not move it to arch/ia64 then and call it from setup_arch() in
+> arch/ia64/kernel/setup.c after acpi_numa_init()? It looks like we
+> don't need a generic solution for this. This avoids any kconfig
+> handling for this at all.
 
-I'll quote what you said in previous mails in this thread, so
-there's no misunderstanding.  Let's call this exhibit A.  You said:
+It's much simpler as you suggested, I will update it in next
+version, thank you Robert :)
 
-> I said:
-> > Drivers and platform code should use copy_from_user()/copy_to_user()
-> > to block-copy data to/from userspace, and get_user()/put_user() to
-> > copy individual bytes, shorts and int/longs.  (It doesn't matter
-> > who you are, that's the official guidance.)
-> 
-> The problem is that the kernel module's API is already set
-> in stone, and it requires block copies with specific access
-> sizes, e.g. block_copy8, block_copy16, block_copy32.
-
-Okay, so in this email, we established that there was a requirement
-to use specific access sizes, which turned out to be 8-bit, 16-bit
-and 32-bit.  You discounted using copy_from_user()/copy_to_user().
-You confirmed this in a following email, which I'll call exhibit B:
-
-> Implement functions for copying a range of addresses
-> FROM user-space, TO physical addresses,
-> (and also the other way around)
-> in access size of 8, 16, 32 bits.
-
-Do you agree that you said these things?  (I'll assume you will agree,
-because you're going to look _real_ stupid if you don't, because it's
-all in the public archives.)
-
-Okay, now let's consider what you've just said.  For the avoidance of
-any doubt, I'll re-quote the exact bit which I'm referring to:
-
-> But I would consider mmaping /dev/mem even simpler: it doesn't
-> require writing a single line of kernel code, and it works as
-> expected. The gist of the code is:
-> 
->   fd = open("/path/to/file", O_RDONLY);
->   mem_fd = open("/dev/mem", O_WRONLY | O_SYNC);
->   va = mmap(NULL, len, PROT_WRITE, MAP_SHARED, mem_fd, phys_addr);
->   read(fd, va, len);
-
-Okay, now, read() uses copy_to_user() to copy the data from kernel
-space into userspace - and in this instance, that happens to be the
-mapping you've set up against /dev/mem, which corresponds to the
-physical addresses.  In other words, it's writing to the same
-"phys_addr" as your block_copy*() functions, except it's writing
-using copy_to_user().  You have stated (as we can see above) that
-your solution using read() "works as expected".  That's great,
-however...
-
-In exhibit A and B, you've repeatedly stated why you are unable to
-use the copy_*_user() functions for this purpose, making the claims
-that specific access sizes are required.  You have just proven that
-you are wrong, and that my _very_ _first_ reply in this thread was
-correct.  Rather than trying it out (and finding that it _would_
-have worked) you've instead argued against it, wasting my time.
-
-I am far from impressed.
-
-I suggest you read Aesop's Fables, specifically The Boy Who Cried
-Wolf.  It seems rather appropriate here, and illustrates what can
-happen if this behaviour continues.
-
-Please, smarten up your act.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Hanjun
