@@ -1,46 +1,86 @@
-From: slash.tmp@free.fr (Mason)
-Date: Sun, 24 Jan 2016 14:27:25 +0100
-Subject: Unhandled fault: page domain fault (0x81b) at 0x00e41008
-In-Reply-To: <20160123235905.GE10826@n2100.arm.linux.org.uk>
-References: <56A268E7.7040004@free.fr>
- <20160122174814.GD19062@n2100.arm.linux.org.uk> <56A27C00.5060004@free.fr>
- <20160122193408.GE19062@n2100.arm.linux.org.uk> <56A2B811.8010306@free.fr>
- <20160122235704.GF19062@n2100.arm.linux.org.uk> <56A3609E.3000400@free.fr>
- <20160123113438.GG19062@n2100.arm.linux.org.uk> <56A3E84A.1000604@free.fr>
- <20160123235905.GE10826@n2100.arm.linux.org.uk>
-Message-ID: <56A4D13D.3030906@free.fr>
+From: johannes@sipsolutions.net (Johannes Berg)
+Date: Sun, 24 Jan 2016 17:02:26 +0100
+Subject: [PATCH 2/2] arm/mach-imx: enable big endian mode
+In-Reply-To: <1453651346-12760-1-git-send-email-johannes@sipsolutions.net>
+References: <1453651346-12760-1-git-send-email-johannes@sipsolutions.net>
+Message-ID: <1453651346-12760-2-git-send-email-johannes@sipsolutions.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/01/2016 00:59, Russell King - ARM Linux wrote:
+Enable ARM big-endian mode on mach-imx. This requires adding some
+byte swapping in the debug functions (which otherwise hang forever)
+and of course the secondary core bringup.
 
-> I'll quote what you said in previous mails in this thread,
-> so there's no misunderstanding.
+Tested (on top of 4.4) on i.MX6 HummingBoard quad-core (IMX6Q).
 
-Russell,
+The patch is pretty much as suggested by Arnd Bergmann, thanks!
 
-Our "software stack" provides the kernel API under discussion:
+Signed-off-by: Johannes Berg <johannes@sipsolutions.net>
+---
+ arch/arm/include/debug/imx.S | 3 +++
+ arch/arm/mach-imx/Kconfig    | 1 +
+ arch/arm/mach-imx/headsmp.S  | 2 ++
+ 3 files changed, 6 insertions(+)
 
-  {read,write}_data{8,16,32}
-
-These 6 functions must be implemented, because they are part
-of the API we provide to customers. As the "page domain fault"
-underscores, my own implementation is incorrect. I am grateful
-for the implementation you suggested up-thread, and will test
-its performance on Monday.
-
-
-Our "software stack" also provides several user-space tools,
-some of which use the above kernel API. One of those tools is
-the one I described, to copy files to remote RAM.
-
-The current code uses write_data8, but the implementation is
-irrelevant. Any implementation is acceptable, as long as the
-tool works as expected. So I can take advantage of the tool's
-specificities to optimize.
-
-
-Anyway, thanks again for the guidance and advice, and please
-give a little more credit.
-
-Regards.
+diff --git a/arch/arm/include/debug/imx.S b/arch/arm/include/debug/imx.S
+index 619d8cc1ac12..92c44760d656 100644
+--- a/arch/arm/include/debug/imx.S
++++ b/arch/arm/include/debug/imx.S
+@@ -11,6 +11,7 @@
+  *
+  */
+ 
++#include <asm/assembler.h>
+ #include "imx-uart.h"
+ 
+ /*
+@@ -34,6 +35,7 @@
+ 		.endm
+ 
+ 		.macro	senduart,rd,rx
++		ARM_BE8(rev \rd, \rd)
+ 		str	\rd, [\rx, #0x40]	@ TXDATA
+ 		.endm
+ 
+@@ -42,6 +44,7 @@
+ 
+ 		.macro	busyuart,rd,rx
+ 1002:		ldr	\rd, [\rx, #0x98]	@ SR2
++		ARM_BE8(rev \rd, \rd)
+ 		tst	\rd, #1 << 3		@ TXDC
+ 		beq	1002b			@ wait until transmit done
+ 		.endm
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 8ceda2844c4f..c98138bc1cea 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -8,6 +8,7 @@ menuconfig ARCH_MXC
+ 	select PM_OPP if PM
+ 	select SOC_BUS
+ 	select SRAM
++	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	help
+ 	  Support for Freescale MXC/iMX-based family of processors
+ 
+diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
+index b5e976816b63..6c28d28b3c64 100644
+--- a/arch/arm/mach-imx/headsmp.S
++++ b/arch/arm/mach-imx/headsmp.S
+@@ -12,6 +12,7 @@
+ 
+ #include <linux/linkage.h>
+ #include <linux/init.h>
++#include <asm/assembler.h>
+ 
+ diag_reg_offset:
+ 	.word	g_diag_reg - .
+@@ -25,6 +26,7 @@ diag_reg_offset:
+ 	.endm
+ 
+ ENTRY(v7_secondary_startup)
++ARM_BE8(setend be)			@ go BE8 if entered LE
+ 	set_diag_reg
+ 	b	secondary_startup
+ ENDPROC(v7_secondary_startup)
+-- 
+2.6.2
