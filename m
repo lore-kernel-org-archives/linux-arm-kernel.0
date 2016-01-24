@@ -1,35 +1,28 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 24 Jan 2016 17:59:37 +0100
-Subject: [PATCH RFC 15/15] ARM: dts: sun9i: cubieboard4: Enable hardware
- reset and HS-DDR for eMMC
-In-Reply-To: <1453354002-28366-16-git-send-email-wens@csie.org>
-References: <1453354002-28366-1-git-send-email-wens@csie.org>
- <1453354002-28366-16-git-send-email-wens@csie.org>
-Message-ID: <20160124165937.GF7908@lukather>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 24 Jan 2016 18:19:09 +0100
+Subject: [PATCH] ARM: dts: kirkwood: add device tree for buffalo
+ linkstation ls-qvl
+In-Reply-To: <1453652964-21489-2-git-send-email-rogershimizu@gmail.com>
+References: <1453652964-21489-1-git-send-email-rogershimizu@gmail.com>
+ <1453652964-21489-2-git-send-email-rogershimizu@gmail.com>
+Message-ID: <20160124171909.GQ3880@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 21, 2016 at 01:26:42PM +0800, Chen-Yu Tsai wrote:
-> mmc2 has a special pin for eMMC hardware reset, which is controllable
-> from the controller. Add the "mmc-cap-hw-reset" property to denote that
-> this controller supports this function, and the pins are actually used.
+On Mon, Jan 25, 2016 at 01:29:24AM +0900, Roger Shimizu wrote:
+> Add dts file to support Buffalo Linkstation LS-WTGL,
+> which is marvell kirkwood based 4-bay 3.5" HDD NAS.
+> Product info:
+>   - (JPN) http://buffalo.jp/product/hdd/network/ls-qvl_r5/
+>   - (ENG) http://www.buffalotech.com/products/network-storage/home-and-small-office/linkstation-pro-quad
 > 
-> Also increase the signal drive strength for mmc2 pins, for HS-DDR mode
-> support.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Mario Lange <mario_lange@gmx.net>
+> Reviewed-by: Roger Shimizu <rogershimizu@gmail.com>
 
-Applied, thanks!
-Maxime
+Hi Roger
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160124/1a7ee276/attachment.sig>
+This needs your Signed-off-by as well, not just a Reviewed-by.  
+
+Otherwise this looks good.
+
+	  Andrew
