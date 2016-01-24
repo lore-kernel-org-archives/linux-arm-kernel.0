@@ -1,38 +1,64 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 24 Jan 2016 22:20:12 -0800 (PST)
-Subject: [PATCH] net: simplify napi_synchronize() to avoid warnings
-In-Reply-To: <2817787.9jKELuxj8h@wuerfel>
-References: <2817787.9jKELuxj8h@wuerfel>
-Message-ID: <20160124.222012.1063840610459462933.davem@davemloft.net>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 25 Jan 2016 00:19:27 +0200
+Subject: [PATCH v2 13/26] drm/fb_cma_helper: Remove implicit call to
+ disable_unused_functions
+In-Reply-To: <20160115101730.GH19130@phenom.ffwll.local>
+References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
+ <2014724.QmjXVju9UW@avalon> <20160115101730.GH19130@phenom.ffwll.local>
+Message-ID: <1484612.l42nGNbAu5@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 22 Jan 2016 11:43:44 +0100
+Hi Daniel,
 
-> The napi_synchronize() function is defined twice: The definition
-> for SMP builds waits for other CPUs to be done, while the uniprocessor
-> variant just contains a barrier and ignores its argument.
-> 
-> In the mvneta driver, this leads to a warning about an unused variable
-> when we lookup the NAPI struct of another CPU and then don't use it:
-> 
-> ethernet/marvell/mvneta.c: In function 'mvneta_percpu_notifier':
-> ethernet/marvell/mvneta.c:2910:30: error: unused variable 'other_port' [-Werror=unused-variable]
-> 
-> There are no other CPUs on a UP build, so that code never runs, but
-> gcc does not know this.
-> 
-> The nicest solution seems to be to turn the napi_synchronize() helper
-> into an inline function for the UP case as well, as that leads gcc to
-> not complain about the argument being unused. Once we do that, we can
-> also combine the two cases into a single function definition and use
-> if(IS_ENABLED()) rather than #ifdef to make it look a bit nicer.
-> 
-> The warning first came up in linux-4.4, but I failed to catch it
-> earlier.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: f86428854480 ("net: mvneta: Statically assign queues to CPUs")
+On Friday 15 January 2016 11:17:30 Daniel Vetter wrote:
+> On Fri, Jan 15, 2016 at 01:13:05AM +0200, Laurent Pinchart wrote:
+> > On Thursday 14 January 2016 16:24:56 Maxime Ripard wrote:
+> >> The drm_fbdev_cma_init function always calls the
+> >> drm_helper_disable_unused_functions. Since it's part of the usual probe
+> >> process, all the drivers using that helper will end up having their
+> >> encoder and CRTC disable functions called at probe if their device has
+> >> not been reported as enabled.
+> >> 
+> >> This could be fixed by reading out from the registers the current state
+> >> of the device if it is enabled, but even that will not handle the case
+> >> where the device is actually disabled.
+> >> 
+> >> Moreover, the drivers using the atomic modesetting expect that their
+> >> enable and disable callback to be called when the device is already
+> >> enabled or disabled (respectively).
+> >> 
+> >> We can however fix this issue by moving the call to
+> >> drm_helper_disable_unused_functions out of drm_fbdev_cma_init and make
+> >> the drivers needing it (all the drivers calling drm_fbdev_cma_init and
+> >> not using the atomic modesetting) explicitly call it.
+> > 
+> > I'd rather add it to all drivers that call drm_fbdev_cma_init(). All the
+> > atomic ones must have special code to cope with it that could be rendered
+> > useless by the removal of the drm_helper_disable_unused_functions() call.
+> > That code should be removed too, and it would be easier to check drivers
+> > one by one and fixing them individually (outside of this patch series,
+> > unless you insist ;-)) when removing the explicit
+> > drm_helper_disable_unused_functions() call.
+>
+> I had the same thought, but figured there's really no good reason ever to
+> do this. I suspect most of that disable_unused_function stuff we have all
+> over is supreme cargo-cult anyway ;-)
 
-I guess this is fine, applied, thanks Arnd.
+I'm not sure you got my point. Yes, the drm_helper_disable_unused_functions() 
+call should be removed from atomic drivers, but that will leave support code 
+added for the sole reason of avoiding the crash in the drivers. That code will 
+likely not be noticed and will stay there rotting. If we added 
+drm_helper_disable_unused_functions() calls to all atomic drivers then driver 
+authors will hopefully check carefully if there's any support code that can be 
+removed when removing the function call. It would act as a kind of FIXME 
+reminder.
+
+> > Other than that the patch looks fine to me.
+> 
+> So went ahead and applied to drm-misc.
+
+-- 
+Regards,
+
+Laurent Pinchart
