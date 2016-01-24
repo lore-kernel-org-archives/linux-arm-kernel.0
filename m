@@ -1,49 +1,98 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Sun, 24 Jan 2016 23:49:18 +0100
-Subject: [PATCH] ARM: imx6sx-sdb: add i2c3 node
-Message-ID: <1453675758.6691.17.camel@googlemail.com>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Sun, 24 Jan 2016 23:48:21 +0100
+Subject: [PATCH v4 0/2] ARM: dts: imx6: Add support for Toradex Apalis iMX6Q/D
+ SoM/Ixora carrier board
+Message-ID: <1453675703-31594-1-git-send-email-marcel.ziswiler@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds node i2c bus 3 to get the appropriate userland device
-file. So for prototyping it's possible to experiment within userland.
 
-Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
----
- arch/arm/boot/dts/imx6sx-sdb.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+This patch series adds support for Toradex Apalis iMX6Q/D SoM module [1] and
+Ixora carrier board [2].
 
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-index e0dc1ee..3d91627 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-@@ -197,6 +197,13 @@
- 	status = "okay";
- };
- 
-+&i2c3 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3>;
-+	status = "okay";
-+};
-+
- &i2c4 {
-         clock-frequency = <100000>;
-         pinctrl-names = "default";
-@@ -398,6 +405,13 @@
- 			>;
- 		};
- 
-+		pinctrl_i2c3: i2c3grp {
-+			fsl,pins = <
-+				MX6SX_PAD_KEY_ROW4__I2C3_SDA		0x4001b8b1
-+				MX6SX_PAD_KEY_COL4__I2C3_SCL		0x4001b8b1
-+			>;
-+		};
-+
- 		pinctrl_i2c4: i2c4grp {
- 			fsl,pins = <
- 				MX6SX_PAD_CSI_DATA07__I2C4_SDA		0x4001b8b1
+Petr ?tetiar has simply taken content of DTSes from Toradex's Git tree [3],
+removed not mainlined stuff and fixed all errors returned by checkpatch script.
+
+Please note that RESET_MOCI# used as mini-PCIe PERST# is not directly
+GPIO1_IO28 but rather inverted (e.g. active-high and ored with RESETBMCU coming
+off the PMIC but that is not relevant in this context). As changing the
+reset-gpio polarity wasn't previously supported Petr ?tetiar's
+"PCI: imx6: Fix reset-gpio to work with active low GPIO" fix [4] is needed.
+
+1. https://www.toradex.com/computer-on-modules/apalis-arm-family/freescale-imx-6
+2. https://www.toradex.com/products/carrier-boards/ixora-carrier-board
+3. https://git.toradex.com/cgit/linux-toradex.git/log/?h=toradex_imx_3.14.28_1.0.0_ga
+4. https://patchwork.ozlabs.org/patch/552886/
+
+Changes in v4:
+- integrated review feedback from Fabio
+
+Changes in v3:
+- integrated review feedback from Petr
+- integrated review feedback from Stefan
+- move I2C DDC enablement and assignement handling into carrier board DTS where it belongs
+- move CAN nodes up a little to keep the alphabetical order
+- added an explanatory comment about PWR_I2C usage
+- integrated review feedback from Petr
+- integrated review feedback from Stefan
+- fix comment concerning Apalis GPIO usage as GPIO7 is only used for PCIe switch reset on Apalis Evaluation board
+- move I2C DDC handling into carrier board DTS where it belongs
+- simplify RTC alias
+
+Changes in v2:
+- clarify exact Apalis iMX6Q/D SoM type in cover letter
+- clarify exact Apalis iMX6Q/D module type and Ixora carrier board in model
+  node
+- got rid of obsolete mmc aliases
+- working SGTL5000 audio/sound integration
+- working STMPE811 touch screen controller integration
+- integrated review feedback from Lucas
+- left and even added some more comments as I don't see why putting any
+  explanatory comments in dts' should be such a bad thing to do
+- completely got rid of the memory node as that is something typically filled
+  in by the boot loader e.g. U-Boot
+- without the regulators simple-bus it no longer boots
+- even though we supposedly shipped a few hundred V1.0a modules drop DCE UART
+  support for now and simplify file layout
+- replaced obsolete no-1-8-v by mainline supported voltage-ranges = <3300 3300>
+  usdhc property and yes card detects are indeed active low (;-p)
+- integrated review feedback from Stefan
+- fixed Ethernet PHY reset & interrupt (requires Micrel PHY driver to be
+  enabled)
+- fixed HDMI DDC (requires GPIO-based bitbanging I2C to be enabled)
+- fixed SPDIF
+- clarify exact Apalis iMX6Q/D SoM type in cover letter
+- clarify exact Apalis iMX6Q/D module type and Ixora carrier board in model
+  node
+- got rid of obsolete mmc aliases
+- working SGTL5000 audio/sound integration
+- working STMPE811 touch screen controller integration
+- integrated review feedback from Lucas
+- left and even added some more comments as I don't see why putting any
+  explanatory comments in dts' should be such a bad thing to do
+- completely got rid of the memory node as that is something typically filled
+  in by the boot loader e.g. U-Boot
+- without the regulators simple-bus it no longer boots
+- even though we supposedly shipped a few hundred V1.0a modules drop DCE UART
+  support for now and simplify file layout
+- replaced obsolete no-1-8-v by mainline supported voltage-ranges = <3300 3300>
+  usdhc property and yes card detects are indeed active low (;-p)
+- integrated review feedback from Stefan
+- fixed Ethernet PHY reset & interrupt (requires Micrel PHY driver to be
+  enabled)
+- fixed HDMI DDC (requires GPIO-based bitbanging I2C to be enabled)
+- fixed SPDIF
+
+Petr ?tetiar (2):
+  ARM: dts: imx6: Add support for Toradex Apalis iMX6Q/D SoM
+  ARM: dts: imx6: Add support for Toradex Ixora carrier board
+
+ arch/arm/boot/dts/Makefile               |    1 +
+ arch/arm/boot/dts/imx6q-apalis-ixora.dts |  275 ++++++++
+ arch/arm/boot/dts/imx6qdl-apalis.dtsi    | 1011 ++++++++++++++++++++++++++++++
+ 3 files changed, 1287 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-apalis-ixora.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-apalis.dtsi
+
 -- 
-2.1.4
+2.5.0
