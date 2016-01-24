@@ -1,34 +1,49 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Sun, 24 Jan 2016 22:38:57 +0000
-Subject: [PATCH 03/15] dmaengine: dw: rename masters to reflect actual
- topology
-In-Reply-To: <20160124223629.GI6588@sirena.org.uk> (Mark Brown's message of
- "Sun, 24 Jan 2016 22:36:29 +0000")
-References: <1453663322-14474-1-git-send-email-mans@mansr.com>
- <1453663322-14474-4-git-send-email-mans@mansr.com>
- <20160124223629.GI6588@sirena.org.uk>
-Message-ID: <yw1xk2myli0u.fsf@unicorn.mansr.com>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Sun, 24 Jan 2016 23:49:18 +0100
+Subject: [PATCH] ARM: imx6sx-sdb: add i2c3 node
+Message-ID: <1453675758.6691.17.camel@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown <broonie@kernel.org> writes:
+This patch adds node i2c bus 3 to get the appropriate userland device
+file. So for prototyping it's possible to experiment within userland.
 
-> On Sun, Jan 24, 2016 at 07:21:50PM +0000, Mans Rullgard wrote:
->> From: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
->> 
->> The source and destination masters are reflecting buses or their layers to
->> where the different devices can be connected. The patch changes the master
->> names to reflect which one is related to which independently on the transfer
->> direction.
->
-> This is patch 3 of a series but I don't have anything else in the
-> series.  What is going on with the rest of the series - what are the
-> dependencies and so on?
+Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+---
+ arch/arm/boot/dts/imx6sx-sdb.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-I give up.  Seriously, this is impossible.  If I don't include everybody
-in the slightest way related to any patch in the series, I get
-complaints that patches are missing.  If I do, the lists reject it all
-due to too many recipients.  What the hell am I supposed to do?
-
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
+index e0dc1ee..3d91627 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
++++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
+@@ -197,6 +197,13 @@
+ 	status = "okay";
+ };
+ 
++&i2c3 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	status = "okay";
++};
++
+ &i2c4 {
+         clock-frequency = <100000>;
+         pinctrl-names = "default";
+@@ -398,6 +405,13 @@
+ 			>;
+ 		};
+ 
++		pinctrl_i2c3: i2c3grp {
++			fsl,pins = <
++				MX6SX_PAD_KEY_ROW4__I2C3_SDA		0x4001b8b1
++				MX6SX_PAD_KEY_COL4__I2C3_SCL		0x4001b8b1
++			>;
++		};
++
+ 		pinctrl_i2c4: i2c4grp {
+ 			fsl,pins = <
+ 				MX6SX_PAD_CSI_DATA07__I2C4_SDA		0x4001b8b1
 -- 
-M?ns Rullg?rd
+2.1.4
