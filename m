@@ -1,70 +1,54 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:04:03 +0100
-Subject: [PATCH] fbdev: s6e8ax0: avoid unused function warnings
-Message-ID: <1453734300-1958304-1-git-send-email-arnd@arndb.de>
+Date: Mon, 25 Jan 2016 16:05:18 +0100
+Subject: [PATCH] fbdev: da8xx-fb: remove incorrect type cast
+Message-ID: <1453734351-1958373-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The s6e8ax0 suspend/resume functions are hidden inside of an #ifdef
-when CONFIG_PM is set to avoid unused function warnings, but they
-call some other functions that nothing else calls, and we get warnings
-about those:
+The probe function correct passes a dma_addr_t pointer into
+dma_alloc_coherent(), but has a cast to resource_size_t, which
+might be different from dma_addr_t:
 
-drivers/video/fbdev/exynos/s6e8ax0.c:449:13: error: 's6e8ax0_sleep_in' defined but not used [-Werror=unused-function]
-drivers/video/fbdev/exynos/s6e8ax0.c:485:13: error: 's6e8ax0_display_off' defined but not used [-Werror=unused-function]
+drivers/video/fbdev/da8xx-fb.c: In function 'fb_probe':
+drivers/video/fbdev/da8xx-fb.c:1431:10: error: passing argument 3 of 'dma_alloc_coherent' from incompatible pointer type [-Werror=incompatible-pointer-types]
 
-This marks the PM functions as __maybe_unused so the compiler can
-silently drop them when they are not referenced.
+This removes the cast, which avoids the warning.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/video/fbdev/exynos/s6e8ax0.c | 13 ++++---------
- 1 file changed, 4 insertions(+), 9 deletions(-)
+ drivers/video/fbdev/da8xx-fb.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/video/fbdev/exynos/s6e8ax0.c b/drivers/video/fbdev/exynos/s6e8ax0.c
-index 95873f26e39c..de2f3e793786 100644
---- a/drivers/video/fbdev/exynos/s6e8ax0.c
-+++ b/drivers/video/fbdev/exynos/s6e8ax0.c
-@@ -829,8 +829,7 @@ static int s6e8ax0_probe(struct mipi_dsim_lcd_device *dsim_dev)
- 	return 0;
- }
+diff --git a/drivers/video/fbdev/da8xx-fb.c b/drivers/video/fbdev/da8xx-fb.c
+index 0081725c6b5b..6b2a06d09f2b 100644
+--- a/drivers/video/fbdev/da8xx-fb.c
++++ b/drivers/video/fbdev/da8xx-fb.c
+@@ -152,7 +152,7 @@ static void lcdc_write(unsigned int val, unsigned int addr)
  
--#ifdef CONFIG_PM
--static int s6e8ax0_suspend(struct mipi_dsim_lcd_device *dsim_dev)
-+static int __maybe_unused s6e8ax0_suspend(struct mipi_dsim_lcd_device *dsim_dev)
- {
- 	struct s6e8ax0 *lcd = dev_get_drvdata(&dsim_dev->dev);
+ struct da8xx_fb_par {
+ 	struct device		*dev;
+-	resource_size_t p_palette_base;
++	dma_addr_t		p_palette_base;
+ 	unsigned char *v_palette_base;
+ 	dma_addr_t		vram_phys;
+ 	unsigned long		vram_size;
+@@ -1428,7 +1428,7 @@ static int fb_probe(struct platform_device *device)
  
-@@ -843,7 +842,7 @@ static int s6e8ax0_suspend(struct mipi_dsim_lcd_device *dsim_dev)
- 	return 0;
- }
+ 	par->vram_virt = dma_alloc_coherent(NULL,
+ 					    par->vram_size,
+-					    (resource_size_t *) &par->vram_phys,
++					    &par->vram_phys,
+ 					    GFP_KERNEL | GFP_DMA);
+ 	if (!par->vram_virt) {
+ 		dev_err(&device->dev,
+@@ -1448,7 +1448,7 @@ static int fb_probe(struct platform_device *device)
  
--static int s6e8ax0_resume(struct mipi_dsim_lcd_device *dsim_dev)
-+static int __maybe_unused s6e8ax0_resume(struct mipi_dsim_lcd_device *dsim_dev)
- {
- 	struct s6e8ax0 *lcd = dev_get_drvdata(&dsim_dev->dev);
- 
-@@ -855,10 +854,6 @@ static int s6e8ax0_resume(struct mipi_dsim_lcd_device *dsim_dev)
- 
- 	return 0;
- }
--#else
--#define s6e8ax0_suspend		NULL
--#define s6e8ax0_resume		NULL
--#endif
- 
- static struct mipi_dsim_lcd_driver s6e8ax0_dsim_ddi_driver = {
- 	.name = "s6e8ax0",
-@@ -867,8 +862,8 @@ static struct mipi_dsim_lcd_driver s6e8ax0_dsim_ddi_driver = {
- 	.power_on = s6e8ax0_power_on,
- 	.set_sequence = s6e8ax0_set_sequence,
- 	.probe = s6e8ax0_probe,
--	.suspend = s6e8ax0_suspend,
--	.resume = s6e8ax0_resume,
-+	.suspend = IS_ENABLED(CONFIG_PM) ? s6e8ax0_suspend : NULL,
-+	.resume = IS_ENABLED(CONFIG_PM) ? s6e8ax0_resume : NULL,
- };
- 
- static int s6e8ax0_init(void)
+ 	/* allocate palette buffer */
+ 	par->v_palette_base = dma_zalloc_coherent(NULL, PALETTE_SIZE,
+-						  (resource_size_t *)&par->p_palette_base,
++						  &par->p_palette_base,
+ 						  GFP_KERNEL | GFP_DMA);
+ 	if (!par->v_palette_base) {
+ 		dev_err(&device->dev,
 -- 
 2.7.0
