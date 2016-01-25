@@ -1,34 +1,52 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 17:15:47 +0100
-Subject: [PATCH v2 00/21] arm64: Virtualization Host Extension support
-In-Reply-To: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <2703557.vyWRuMlGU2@wuerfel>
+Date: Mon, 25 Jan 2016 16:58:50 +0100
+Subject: [PATCH] regulator: return NULL for dummy bulk_get operation
+Message-ID: <1453737537-1960121-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 January 2016 15:53:34 Marc Zyngier wrote:
-> host and guest, reducing the overhead of virtualization.
-> 
-> In order to have the same kernel binary running on all versions of the
-> architecture, this series makes heavy use of runtime code patching.
-> 
-> The first 20 patches massage the KVM code to deal with VHE and enable
-> Linux to run at EL2. The last patch catches an ugly case when VHE
-> capable CPUs are paired with some of their less capable siblings. This
-> should never happen, but hey...
-> 
-> I have deliberately left out some of the more "advanced"
-> optimizations, as they are likely to distract the reviewer from the
-> core infrastructure, which is what I care about at the moment.
+Drivers that call regulator_bulk_get or devm_regulator_bulk_get when
+CONFIG_REGULATOR is disabled see the function return successfully, but
+cannot use the "consumer" pointers that are meant to be returned from
+the functions, as the values are uninitialized. Gcc warns about this:
 
-One question: as you mention that you use a lot of runtime code patching
-to make this work transparently, how does this compare to runtime patching
-the existing kernel to run in EL2 mode without VHE? Is that even possible?
+drivers/usb/phy/phy-qcom-8x16-usb.c: In function 'phy_8x16_probe':
+drivers/usb/phy/phy-qcom-8x16-usb.c:284:13: error: 'regs[0].consumer' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+drivers/usb/phy/phy-qcom-8x16-usb.c:285:13: error: 'regs[1].consumer' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+drivers/usb/phy/phy-qcom-8x16-usb.c:286:12: error: 'regs[2].consumer' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 
-My interpretation so far as always been "that's too complicated to
-do because it would require a lot of runtime patching", but now we seem
-to get that anyway because we want to run a hypervisor-enabled kernel in
-either EL1 or EL2 depending on the presence of another feature.
+To make the code behave in a reproducible way, this changes the
+two dummy function to behave like the non-bulk regulator_get
+and devm_regulator_get functions to, returning a NULL pointer with
+a successful return code. This also gets rid of the warnings.
 
-	Arnd
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ include/linux/regulator/consumer.h | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/include/linux/regulator/consumer.h b/include/linux/regulator/consumer.h
+index 48603506f8de..f4774bf707c2 100644
+--- a/include/linux/regulator/consumer.h
++++ b/include/linux/regulator/consumer.h
+@@ -404,13 +404,17 @@ static inline int regulator_bulk_get(struct device *dev,
+ 				     int num_consumers,
+ 				     struct regulator_bulk_data *consumers)
+ {
++	int i;
++	for (i=0; i < num_consumers; i++)
++		consumers[i].consumer = NULL;
++
+ 	return 0;
+ }
+ 
+ static inline int devm_regulator_bulk_get(struct device *dev, int num_consumers,
+ 					  struct regulator_bulk_data *consumers)
+ {
+-	return 0;
++	return regulator_bulk_get(dev, num_consumers, consumers);
+ }
+ 
+ static inline int regulator_bulk_enable(int num_consumers,
+-- 
+2.7.0
