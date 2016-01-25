@@ -1,67 +1,81 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Mon, 25 Jan 2016 20:24:59 +0200
-Subject: [PATCH 1/2] ARM: DTS: kirkwood-openrd-client: fix audio
-In-Reply-To: <8E11A1EE-D73B-462E-A493-39571A17F2C3@pobox.com>
-References: <1453588600-14831-1-git-send-email-aaro.koskinen@iki.fi>
- <1453588600-14831-2-git-send-email-aaro.koskinen@iki.fi>
- <20160124173701.GU3880@lunn.ch>
- <411C1DFA-3E76-42B0-866C-7C3C0D990039@pobox.com>
- <20160124214020.GA28667@jirafa.cyrius.com>
- <8E11A1EE-D73B-462E-A493-39571A17F2C3@pobox.com>
-Message-ID: <20160125182459.GE15550@darkstar.musicnaut.iki.fi>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 25 Jan 2016 10:30:22 -0800
+Subject: mtd: pxa3xx_nand: issue with command time out
+In-Reply-To: <874meddqu5.fsf@belgarion.home>
+References: <5695CEF0.1080100@alliedtelesis.co.nz>
+ <87a8o9ex9r.fsf@belgarion.home>
+ <569827BC.10601@alliedtelesis.co.nz>
+ <874meddqu5.fsf@belgarion.home>
+Message-ID: <20160125183022.GA41251@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Robert,
 
-On Sun, Jan 24, 2016 at 07:26:43PM -0800, Rick Thomas wrote:
-> > root at base:~# cat /proc/asound/devices 
-> >   2: [ 0]   : control
-> >   3: [ 0- 0]: digital audio playback
-> >   4: [ 0- 0]: digital audio capture
-> >  33:        : timer
-> > root at base:~# cat /proc/asound/cards   
-> >  0 [i2scs42l51hifi ]: i2s-cs42l51-hif - i2s-cs42l51-hifi
-> >                       i2s-cs42l51-hifi
+On Sun, Jan 17, 2016 at 12:53:06AM +0100, Robert Jarzmik wrote:
+> Michael Wang <Michael.Wang@alliedtelesis.co.nz> writes:
 > 
-> Full of hope, I did "aptitude install mp321" which went without any visible problems.
+> > The complete output of debug traces and boot log from your debug patch
+> > is in the attachment.
 > 
-> Then hooked up a pair of earphones to the "speaker" plug on the Client and ran
+> Okay, thanks, that's great.
+> Might a ask another capture, but with :
+>  1) the timestamps this time
+>     (ie. CONFIG_PRINTK_TIME=y) ? This will give me the timing of your failure,
+>     in the dmesg you will provide me.
+>  2) on the first line of drain_fifo(), add a single :
+>     nand_readl(info, NDSR)
 > 
-> > root at base:~# mpg321 -v /tmp/Jersey.mp3 
-> > High Performance MPEG 1.0/2.0/2.5 Audio Player for Layer 1, 2, and 3.
-> > Version 0.3.2-1 (2012/03/25). Written and copyrights by Joe Drew,
-> > now maintained by Nanakos Chrysostomos and others.
-> > Uses code from various people. See 'README' for more!
-> > THIS SOFTWARE COMES WITH ABSOLUTELY NO WARRANTY! USE AT YOUR OWN RISK!
-> > Title	: The Jersey Bounce              Artist : Zazuzaz                       
-> > Album	: An Evening with ZaZuZaz        Year	 : 2000
-> > Comment : Amazon.com Song ID: 201809221  Genre : Jazz                          
-> > 
-> > Directory: /tmp
-> > Playing MPEG stream from Jersey.mp3 ...
-> > MPEG 1.0, Layer: III, Freq: 44100, mode: Joint-Stereo, modext: 0, BPF : 2560
-> > Channels: 2, copyright: No, original: Yes, CRC: No, emphasis: 0.
-> > Bitrate: 128 Kbits/s, Extension value: 0
-> > Audio: 1:1 conversion, rate: 44100, encoding: signed 16 bit, channels: 2
-> > ALSA lib pcm.c:2267:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.front
-> > ^C                                                                            
-> > [0:20] Decoding of Jersey.mp3 finished.
+> This will enable me to see how your board behaves on the temporal aspect, as
+> today I only have this, which looks correct AFAICT:
 > 
-> So it seemed to be running OK...  But there was no sound in the
-> earphones. I also tried adding option "-g 50" to set the gain explicitly.
-> Still no sound.
+> pxa3xx-nand f10d0000.nand: pxa3xx_nand_start():445 nand_writel(0x1, NDECCCTRL)
+> pxa3xx-nand f10d0000.nand: pxa3xx_nand_start():465 nand_writel(0xfff, NDSR)
+> pxa3xx-nand f10d0000.nand: pxa3xx_nand_start():466 nand_writel(0x0, NDCR)
+> pxa3xx-nand f10d0000.nand: pxa3xx_nand_start():467 nand_writel(0xd104b000, NDCR)
 > 
-> Is there a hardware jumper I need to set to activate sound on the
-> OpenRD Client board?
+> pxa3xx-nand f10d0000.nand: pxa3xx_nand_irq():656 nand_readl(NDSR): 0x1
+> pxa3xx-nand f10d0000.nand: pxa3xx_nand_irq():706 nand_writel(0x1, NDSR)
+> pxa3xx-nand f10d0000.nand: pxa3xx_nand_irq():720 nand_writel(0x100d3000, NDCB0)
+> pxa3xx-nand f10d0000.nand: pxa3xx_nand_irq():721 nand_writel(0x4ff0000, NDCB0)
+> pxa3xx-nand f10d0000.nand: pxa3xx_nand_irq():722 nand_writel(0x2, NDCB0)
+> pxa3xx-nand f10d0000.nand: pxa3xx_nand_irq():726 nand_writel(0x820, NDCB0)
+>   => RJK: here the read command is submitted
+> 
+> pxa3xx-nand f10d0000.nand: pxa3xx_nand_irq():656 nand_readl(NDSR): 0x1800
+> pxa3xx-nand f10d0000.nand: pxa3xx_nand_irq():706 nand_writel(0x1800, NDSR)
+>   => RJK: here the read command is completed
+> 
+> pxa3xx-nand f10d0000.nand: pxa3xx_nand_irq():656 nand_readl(NDSR): 0x2
+> pxa3xx-nand f10d0000.nand: Wait time out!!!
+>   => RJK: here data is available in NAND controller, and yet it's too late
+> 
+> pxa3xx-nand f10d0000.nand: pxa3xx_nand_stop():476 nand_readl(0x0000): 0xd104b000
+> pxa3xx-nand f10d0000.nand: pxa3xx_nand_irq_thread():636 nand_writel(0x6, 0x0014)
+>   => RJK: here we finish the read data transfer operation, too late
 
-On my board I need to say "amixer set PCM on". Can you post the full
-output from "amixer" without any parameters?
+I'm not extremely familiar with this driver, but you've caused me to
+take a second look at this commit:
 
-Also check if you have this line in dmesg:
+commit 24542257a3b987025d4b998ec2d15e556c98ad3f
+Author: Robert Jarzmik <robert.jarzmik@free.fr>
+Date:   Fri Feb 20 19:36:43 2015 +0100
 
-	asoc-simple-card sound: cs42l51-hifi <-> i2s mapping ok
+    mtd: pxa3xx-nand: handle PIO in threaded interrupt
 
-If it says "spdif" the player runs but is silent.
 
-A.
+And now I'm wondering: when does the completion get triggered? i.e.:
+
+	complete(&info->cmd_complete);
+
+?
+
+It seems to me like you've short-circuited some of the IRQ handling
+code, so that the threaded handler is buggy. AIUI, if the completion
+event ever happens, it's actually happening *before* the full (threaded)
+handler is actually finished, since it occurs in pxa3xx_nand_irq(),
+before pxa3xx_nand_irq_thread() ever runs. Now, I'm not sure if that
+causes a real problem in practice, since you used IRQF_ONESHOT, but I
+would think that's also suspect.
+
+Brian
