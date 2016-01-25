@@ -1,58 +1,89 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 25 Jan 2016 21:53:49 +0800
-Subject: [PATCH v6] kernel: add kcov code coverage
-In-Reply-To: <1453726850-49137-1-git-send-email-dvyukov@google.com>
-Message-ID: <201601252108.oXiP6kOR%fengguang.wu@intel.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 25 Jan 2016 13:55:01 +0000
+Subject: [PATCH v3 03/17] Xen: xlate: Use page_to_xen_pfn instead of
+ page_to_pfn
+In-Reply-To: <1453519184-11908-4-git-send-email-zhaoshenglong@huawei.com>
+References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453519184-11908-4-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <alpine.DEB.2.02.1601251351440.9687@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+On Sat, 23 Jan 2016, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Use page_to_xen_pfn in case of 64KB page.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 
-[auto build test ERROR on v4.5-rc1]
-[also build test ERROR on next-20160125]
-[cannot apply to tip/x86/core kbuild/for-next]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Please update the commit message, something like:
 
-url:    https://github.com/0day-ci/linux/commits/Dmitry-Vyukov/kernel-add-kcov-code-coverage/20160125-210230
-config: x86_64-allyesconfig (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+"Make xen_xlate_map_ballooned_pages work with 64K pages. In that case
+Kernel pages are 64K in size but Xen pages remain 4K in size. Xen pfns
+refer to 4K pages."
 
-All errors (new ones prefixed by >>):
+Provided that you change the commit message:
 
->> Makefile:679: Cannot use CONFIG_KCOV: -fsanitize-coverage=trace-pc is not supported by compiler
->> gcc-5: error: unrecognized command line option '-fsanitize-coverage=trace-pc'
-   make[2]: *** [arch/x86/purgatory/purgatory.o] Error 1
->> gcc-5: error: unrecognized command line option '-fsanitize-coverage=trace-pc'
-   make[2]: *** [arch/x86/purgatory/sha256.o] Error 1
->> gcc-5: error: unrecognized command line option '-fsanitize-coverage=trace-pc'
-   make[2]: *** [arch/x86/purgatory/string.o] Error 1
-   make[2]: Target 'arch/x86/purgatory/kexec-purgatory.c' not remade because of errors.
-   make[1]: *** [archprepare] Error 2
-   make[1]: Target 'prepare' not remade because of errors.
-   make: *** [sub-make] Error 2
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-vim +679 Makefile
 
-   673	endif
-   674	endif
-   675	KBUILD_CFLAGS += $(stackp-flag)
-   676	
-   677	ifdef CONFIG_KCOV
-   678	  ifeq ($(call cc-option, $(CFLAGS_KCOV)),)
- > 679	    $(warning Cannot use CONFIG_KCOV: \
-   680	             -fsanitize-coverage=trace-pc is not supported by compiler)
-   681	  endif
-   682	endif
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 52342 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160125/5a544464/attachment-0001.obj>
+>  drivers/xen/xlate_mmu.c | 26 ++++++++++++++++----------
+>  1 file changed, 16 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
+> index 9692656..28f728b 100644
+> --- a/drivers/xen/xlate_mmu.c
+> +++ b/drivers/xen/xlate_mmu.c
+> @@ -207,9 +207,12 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
+>  	void *vaddr;
+>  	int rc;
+>  	unsigned int i;
+> +	unsigned long nr_pages;
+> +	xen_pfn_t xen_pfn = 0;
+>  
+>  	BUG_ON(nr_grant_frames == 0);
+> -	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
+> +	nr_pages = DIV_ROUND_UP(nr_grant_frames, XEN_PFN_PER_PAGE);
+> +	pages = kcalloc(nr_pages, sizeof(pages[0]), GFP_KERNEL);
+>  	if (!pages)
+>  		return -ENOMEM;
+>  
+> @@ -218,22 +221,25 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
+>  		kfree(pages);
+>  		return -ENOMEM;
+>  	}
+> -	rc = alloc_xenballooned_pages(nr_grant_frames, pages);
+> +	rc = alloc_xenballooned_pages(nr_pages, pages);
+>  	if (rc) {
+> -		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
+> -			nr_grant_frames, rc);
+> +		pr_warn("%s Couldn't balloon alloc %ld pages rc:%d\n", __func__,
+> +			nr_pages, rc);
+>  		kfree(pages);
+>  		kfree(pfns);
+>  		return rc;
+>  	}
+> -	for (i = 0; i < nr_grant_frames; i++)
+> -		pfns[i] = page_to_pfn(pages[i]);
+> +	for (i = 0; i < nr_grant_frames; i++) {
+> +		if ((i % XEN_PFN_PER_PAGE) == 0)
+> +			xen_pfn = page_to_xen_pfn(pages[i / XEN_PFN_PER_PAGE]);
+> +		pfns[i] = pfn_to_gfn(xen_pfn++);
+> +	}
+>  
+> -	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
+> +	vaddr = vmap(pages, nr_pages, 0, PAGE_KERNEL);
+>  	if (!vaddr) {
+> -		pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
+> -			nr_grant_frames, rc);
+> -		free_xenballooned_pages(nr_grant_frames, pages);
+> +		pr_warn("%s Couldn't map %ld pages rc:%d\n", __func__,
+> +			nr_pages, rc);
+> +		free_xenballooned_pages(nr_pages, pages);
+>  		kfree(pages);
+>  		kfree(pfns);
+>  		return -ENOMEM;
+> -- 
+> 2.0.4
+> 
+> 
