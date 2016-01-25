@@ -1,322 +1,93 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Wed, 20 Jan 2016 20:59:01 +0100
-Subject: [PATCH V2 09/11] soc: mediatek: PMIC wrap: add a slave specific struct
-In-Reply-To: <1453319943-35491-1-git-send-email-blogic@openwrt.org>
-References: <1453319943-35491-1-git-send-email-blogic@openwrt.org>
-Message-ID: <1453319943-35491-9-git-send-email-blogic@openwrt.org>
+From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
+Date: Mon, 25 Jan 2016 10:46:28 +0100
+Subject: [PATCH v4 1/2] ARM: dts: imx6: Add support for Toradex Apalis
+ iMX6Q/D SoM
+In-Reply-To: <1453675703-31594-2-git-send-email-marcel.ziswiler@toradex.com>
+References: <1453675703-31594-1-git-send-email-marcel.ziswiler@toradex.com>
+ <1453675703-31594-2-git-send-email-marcel.ziswiler@toradex.com>
+Message-ID: <20160125094628.GH27359@ibawizard.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a new struct pwrap_slv_type that we use to store the slave
-specific data. The patch adds 2 new helper functions to access the dew
-registers. The slave type is looked up via the wrappers child node.
+Marcel Ziswiler <marcel.ziswiler@toradex.com> [2016-01-24 23:48:22]:
 
-Signed-off-by: John Crispin <blogic@openwrt.org>
----
- drivers/soc/mediatek/mtk-pmic-wrap.c |  170 +++++++++++++++++++++++++---------
- 1 file changed, 124 insertions(+), 46 deletions(-)
+Hi Marcel,
 
-diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-index 54553b4..21d8e5a 100644
---- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-+++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-@@ -69,33 +69,64 @@
- 					  PWRAP_WDT_SRC_EN_HARB_STAUPD_DLE | \
- 					  PWRAP_WDT_SRC_EN_HARB_STAUPD_ALE)
- 
--/* macro for slave device wrapper registers */
--#define PWRAP_DEW_BASE			0xbc00
--#define PWRAP_DEW_EVENT_OUT_EN		(PWRAP_DEW_BASE + 0x0)
--#define PWRAP_DEW_DIO_EN		(PWRAP_DEW_BASE + 0x2)
--#define PWRAP_DEW_EVENT_SRC_EN		(PWRAP_DEW_BASE + 0x4)
--#define PWRAP_DEW_EVENT_SRC		(PWRAP_DEW_BASE + 0x6)
--#define PWRAP_DEW_EVENT_FLAG		(PWRAP_DEW_BASE + 0x8)
--#define PWRAP_DEW_READ_TEST		(PWRAP_DEW_BASE + 0xa)
--#define PWRAP_DEW_WRITE_TEST		(PWRAP_DEW_BASE + 0xc)
--#define PWRAP_DEW_CRC_EN		(PWRAP_DEW_BASE + 0xe)
--#define PWRAP_DEW_CRC_VAL		(PWRAP_DEW_BASE + 0x10)
--#define PWRAP_DEW_MON_GRP_SEL		(PWRAP_DEW_BASE + 0x12)
--#define PWRAP_DEW_MON_FLAG_SEL		(PWRAP_DEW_BASE + 0x14)
--#define PWRAP_DEW_EVENT_TEST		(PWRAP_DEW_BASE + 0x16)
--#define PWRAP_DEW_CIPHER_KEY_SEL	(PWRAP_DEW_BASE + 0x18)
--#define PWRAP_DEW_CIPHER_IV_SEL		(PWRAP_DEW_BASE + 0x1a)
--#define PWRAP_DEW_CIPHER_LOAD		(PWRAP_DEW_BASE + 0x1c)
--#define PWRAP_DEW_CIPHER_START		(PWRAP_DEW_BASE + 0x1e)
--#define PWRAP_DEW_CIPHER_RDY		(PWRAP_DEW_BASE + 0x20)
--#define PWRAP_DEW_CIPHER_MODE		(PWRAP_DEW_BASE + 0x22)
--#define PWRAP_DEW_CIPHER_SWRST		(PWRAP_DEW_BASE + 0x24)
--#define PWRAP_MT8173_DEW_CIPHER_IV0	(PWRAP_DEW_BASE + 0x26)
--#define PWRAP_MT8173_DEW_CIPHER_IV1	(PWRAP_DEW_BASE + 0x28)
--#define PWRAP_MT8173_DEW_CIPHER_IV2	(PWRAP_DEW_BASE + 0x2a)
--#define PWRAP_MT8173_DEW_CIPHER_IV3	(PWRAP_DEW_BASE + 0x2c)
--#define PWRAP_MT8173_DEW_CIPHER_IV4	(PWRAP_DEW_BASE + 0x2e)
--#define PWRAP_MT8173_DEW_CIPHER_IV5	(PWRAP_DEW_BASE + 0x30)
-+/* defines for slave device wrapper registers */
-+enum dew_regs {
-+	PWRAP_DEW_BASE,
-+	PWRAP_DEW_EVENT_OUT_EN,
-+	PWRAP_DEW_DIO_EN,
-+	PWRAP_DEW_EVENT_SRC_EN,
-+	PWRAP_DEW_EVENT_SRC,
-+	PWRAP_DEW_EVENT_FLAG,
-+	PWRAP_DEW_READ_TEST,
-+	PWRAP_DEW_WRITE_TEST,
-+	PWRAP_DEW_CRC_EN,
-+	PWRAP_DEW_CRC_VAL,
-+	PWRAP_DEW_MON_GRP_SEL,
-+	PWRAP_DEW_MON_FLAG_SEL,
-+	PWRAP_DEW_EVENT_TEST,
-+	PWRAP_DEW_CIPHER_KEY_SEL,
-+	PWRAP_DEW_CIPHER_IV_SEL,
-+	PWRAP_DEW_CIPHER_LOAD,
-+	PWRAP_DEW_CIPHER_START,
-+	PWRAP_DEW_CIPHER_RDY,
-+	PWRAP_DEW_CIPHER_MODE,
-+	PWRAP_DEW_CIPHER_SWRST,
-+	PWRAP_MT8173_DEW_CIPHER_IV0,
-+	PWRAP_MT8173_DEW_CIPHER_IV1,
-+	PWRAP_MT8173_DEW_CIPHER_IV2,
-+	PWRAP_MT8173_DEW_CIPHER_IV3,
-+	PWRAP_MT8173_DEW_CIPHER_IV4,
-+	PWRAP_MT8173_DEW_CIPHER_IV5,
-+};
-+
-+static const u32 mt6397_regs[] = {
-+	[PWRAP_DEW_BASE] =		0xbc00,
-+	[PWRAP_DEW_EVENT_OUT_EN] =	0xbc00,
-+	[PWRAP_DEW_DIO_EN] =		0xbc02,
-+	[PWRAP_DEW_EVENT_SRC_EN] =	0xbc04,
-+	[PWRAP_DEW_EVENT_SRC] =		0xbc06,
-+	[PWRAP_DEW_EVENT_FLAG] =	0xbc08,
-+	[PWRAP_DEW_READ_TEST] =		0xbc0a,
-+	[PWRAP_DEW_WRITE_TEST] =	0xbc0c,
-+	[PWRAP_DEW_CRC_EN] =		0xbc0e,
-+	[PWRAP_DEW_CRC_VAL] =		0xbc10,
-+	[PWRAP_DEW_MON_GRP_SEL] =	0xbc12,
-+	[PWRAP_DEW_MON_FLAG_SEL] =	0xbc14,
-+	[PWRAP_DEW_EVENT_TEST] =	0xbc16,
-+	[PWRAP_DEW_CIPHER_KEY_SEL] =	0xbc18,
-+	[PWRAP_DEW_CIPHER_IV_SEL] =	0xbc1a,
-+	[PWRAP_DEW_CIPHER_LOAD] =	0xbc1c,
-+	[PWRAP_DEW_CIPHER_START] =	0xbc1e,
-+	[PWRAP_DEW_CIPHER_RDY] =	0xbc20,
-+	[PWRAP_DEW_CIPHER_MODE] =	0xbc22,
-+	[PWRAP_DEW_CIPHER_SWRST] =	0xbc24,
-+	[PWRAP_MT8173_DEW_CIPHER_IV0] = 0xbc26,
-+	[PWRAP_MT8173_DEW_CIPHER_IV1] = 0xbc28,
-+	[PWRAP_MT8173_DEW_CIPHER_IV2] = 0xbc2a,
-+	[PWRAP_MT8173_DEW_CIPHER_IV3] = 0xbc2c,
-+	[PWRAP_MT8173_DEW_CIPHER_IV4] = 0xbc2e,
-+	[PWRAP_MT8173_DEW_CIPHER_IV5] = 0xbc30,
-+};
- 
- enum pwrap_regs {
- 	PWRAP_MUX_SEL,
-@@ -349,16 +380,26 @@ static int mt8135_regs[] = {
- 	[PWRAP_DCM_DBC_PRD] =		0x160,
- };
- 
-+enum pmic_type {
-+	PMIC_MT6397,
-+};
-+
- enum pwrap_type {
- 	PWRAP_MT8135,
- 	PWRAP_MT8173,
- };
- 
-+struct pwrap_slv_type {
-+	const u32 *dew_regs;
-+	enum pmic_type type;
-+};
-+
- struct pmic_wrapper {
- 	struct device *dev;
- 	void __iomem *base;
- 	struct regmap *regmap;
- 	const struct pmic_wrapper_type *master;
-+	const struct pwrap_slv_type *slave;
- 	struct clk *clk_spi;
- 	struct clk *clk_wrap;
- 	struct reset_control *rstc;
-@@ -484,6 +525,16 @@ static int pwrap_read(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
- 	return 0;
- }
- 
-+static int pwrap_dew_write(struct pmic_wrapper *wrp, u32 reg, u32 wdata)
-+{
-+	return pwrap_write(wrp, wrp->slave->dew_regs[reg], wdata);
-+}
-+
-+static int pwrap_dew_read(struct pmic_wrapper *wrp, u32 reg, u32 *rdata)
-+{
-+	return pwrap_read(wrp, wrp->slave->dew_regs[reg], rdata);
-+}
-+
- static int pwrap_regmap_read(void *context, u32 adr, u32 *rdata)
- {
- 	return pwrap_read(context, adr, rdata);
-@@ -544,7 +595,7 @@ static int pwrap_init_sidly(struct pmic_wrapper *wrp)
- 
- 	for (i = 0; i < 4; i++) {
- 		pwrap_writel(wrp, i, PWRAP_SIDLY);
--		pwrap_read(wrp, PWRAP_DEW_READ_TEST, &rdata);
-+		pwrap_dew_read(wrp, PWRAP_DEW_READ_TEST, &rdata);
- 		if (rdata == PWRAP_DEW_READ_TEST_VAL) {
- 			dev_dbg(wrp->dev, "[Read Test] pass, SIDLY=%x\n", i);
- 			pass |= 1 << i;
-@@ -593,7 +644,7 @@ static bool pwrap_is_pmic_cipher_ready(struct pmic_wrapper *wrp)
- 	u32 rdata;
- 	int ret;
- 
--	ret = pwrap_read(wrp, PWRAP_DEW_CIPHER_RDY, &rdata);
-+	ret = pwrap_dew_read(wrp, PWRAP_DEW_CIPHER_RDY, &rdata);
- 	if (ret)
- 		return 0;
- 
-@@ -621,12 +672,12 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
- 	}
- 
- 	/* Config cipher mode @PMIC */
--	pwrap_write(wrp, PWRAP_DEW_CIPHER_SWRST, 0x1);
--	pwrap_write(wrp, PWRAP_DEW_CIPHER_SWRST, 0x0);
--	pwrap_write(wrp, PWRAP_DEW_CIPHER_KEY_SEL, 0x1);
--	pwrap_write(wrp, PWRAP_DEW_CIPHER_IV_SEL, 0x2);
--	pwrap_write(wrp, PWRAP_DEW_CIPHER_LOAD, 0x1);
--	pwrap_write(wrp, PWRAP_DEW_CIPHER_START, 0x1);
-+	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_SWRST, 0x1);
-+	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_SWRST, 0x0);
-+	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_KEY_SEL, 0x1);
-+	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_IV_SEL, 0x2);
-+	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_LOAD, 0x1);
-+	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_START, 0x1);
- 
- 	/* wait for cipher data ready@AP */
- 	ret = pwrap_wait_for_state(wrp, pwrap_is_cipher_ready);
-@@ -643,7 +694,7 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
- 	}
- 
- 	/* wait for cipher mode idle */
--	pwrap_write(wrp, PWRAP_DEW_CIPHER_MODE, 0x1);
-+	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_MODE, 0x1);
- 	ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle_and_sync_idle);
- 	if (ret) {
- 		dev_err(wrp->dev, "cipher mode idle fail, ret=%d\n", ret);
-@@ -653,8 +704,9 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
- 	pwrap_writel(wrp, 1, PWRAP_CIPHER_MODE);
- 
- 	/* Write Test */
--	if (pwrap_write(wrp, PWRAP_DEW_WRITE_TEST, PWRAP_DEW_WRITE_TEST_VAL) ||
--	    pwrap_read(wrp, PWRAP_DEW_WRITE_TEST, &rdata) ||
-+	if (pwrap_dew_write(wrp, PWRAP_DEW_WRITE_TEST,
-+			    PWRAP_DEW_WRITE_TEST_VAL) ||
-+	    pwrap_dew_read(wrp, PWRAP_DEW_WRITE_TEST, &rdata) ||
- 			(rdata != PWRAP_DEW_WRITE_TEST_VAL)) {
- 		dev_err(wrp->dev, "rdata=0x%04X\n", rdata);
- 		return -EFAULT;
-@@ -677,8 +729,8 @@ static int pwrap_mt8135_init_special(struct pmic_wrapper *wrp)
- 	writel(0x7ff, wrp->bridge_base + PWRAP_MT8135_BRIDGE_INT_EN);
- 
- 	/* enable PMIC event out and sources */
--	if (pwrap_write(wrp, PWRAP_DEW_EVENT_OUT_EN, 0x1) ||
--		pwrap_write(wrp, PWRAP_DEW_EVENT_SRC_EN, 0xffff)) {
-+	if (pwrap_dew_write(wrp, PWRAP_DEW_EVENT_OUT_EN, 0x1) ||
-+		pwrap_dew_write(wrp, PWRAP_DEW_EVENT_SRC_EN, 0xffff)) {
- 		dev_err(wrp->dev, "enable dewrap fail\n");
- 		return -EFAULT;
- 	}
-@@ -689,8 +741,8 @@ static int pwrap_mt8135_init_special(struct pmic_wrapper *wrp)
- static int pwrap_mt8173_init_special(struct pmic_wrapper *wrp)
- {
- 	/* PMIC_DEWRAP enables */
--	if (pwrap_write(wrp, PWRAP_DEW_EVENT_OUT_EN, 0x1) ||
--		pwrap_write(wrp, PWRAP_DEW_EVENT_SRC_EN, 0xffff)) {
-+	if (pwrap_dew_write(wrp, PWRAP_DEW_EVENT_OUT_EN, 0x1) ||
-+		pwrap_dew_write(wrp, PWRAP_DEW_EVENT_SRC_EN, 0xffff)) {
- 		dev_err(wrp->dev, "enable dewrap fail\n");
- 		return -EFAULT;
- 	}
-@@ -734,7 +786,7 @@ static int pwrap_init(struct pmic_wrapper *wrp)
- 		return ret;
- 
- 	/* Enable dual IO mode */
--	pwrap_write(wrp, PWRAP_DEW_DIO_EN, 1);
-+	pwrap_dew_write(wrp, PWRAP_DEW_DIO_EN, 1);
- 
- 	/* Check IDLE & INIT_DONE in advance */
- 	ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle_and_sync_idle);
-@@ -746,7 +798,7 @@ static int pwrap_init(struct pmic_wrapper *wrp)
- 	pwrap_writel(wrp, 1, PWRAP_DIO_EN);
- 
- 	/* Read Test */
--	pwrap_read(wrp, PWRAP_DEW_READ_TEST, &rdata);
-+	pwrap_dew_read(wrp, PWRAP_DEW_READ_TEST, &rdata);
- 	if (rdata != PWRAP_DEW_READ_TEST_VAL) {
- 		dev_err(wrp->dev, "Read test failed after switch to DIO mode: 0x%04x != 0x%04x\n",
- 				PWRAP_DEW_READ_TEST_VAL, rdata);
-@@ -759,12 +811,13 @@ static int pwrap_init(struct pmic_wrapper *wrp)
- 		return ret;
- 
- 	/* Signature checking - using CRC */
--	if (pwrap_write(wrp, PWRAP_DEW_CRC_EN, 0x1))
-+	if (pwrap_dew_write(wrp, PWRAP_DEW_CRC_EN, 0x1))
- 		return -EFAULT;
- 
- 	pwrap_writel(wrp, 0x1, PWRAP_CRC_EN);
- 	pwrap_writel(wrp, 0x0, PWRAP_SIG_MODE);
--	pwrap_writel(wrp, PWRAP_DEW_CRC_VAL, PWRAP_SIG_ADR);
-+	pwrap_writel(wrp, wrp->slave->dew_regs[PWRAP_DEW_CRC_VAL],
-+		     PWRAP_SIG_ADR);
- 	pwrap_writel(wrp, wrp->master->arb_en_all, PWRAP_HIPRIO_ARB_EN);
- 
- 	if (wrp->master->type == PWRAP_MT8135)
-@@ -817,6 +870,21 @@ static const struct regmap_config pwrap_regmap_config = {
- 	.max_register = 0xffff,
- };
- 
-+static const struct pwrap_slv_type pmic_mt6397 = {
-+	.dew_regs = mt6397_regs,
-+	.type = PMIC_MT6397,
-+};
-+
-+static const struct of_device_id of_slave_match_tbl[] = {
-+	{
-+		.compatible = "mediatek,mt6397",
-+		.data = &pmic_mt6397,
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+MODULE_DEVICE_TABLE(of, of_slave_match_tbl);
-+
- static struct pmic_wrapper_type pwrap_mt8135 = {
- 	.regs = mt8135_regs,
- 	.type = PWRAP_MT8135,
-@@ -860,8 +928,17 @@ static int pwrap_probe(struct platform_device *pdev)
- 	struct device_node *np = pdev->dev.of_node;
- 	const struct of_device_id *of_id =
- 		of_match_device(of_pwrap_match_tbl, &pdev->dev);
-+	const struct of_device_id *of_slave_id = NULL;
- 	struct resource *res;
- 
-+	if (pdev->dev.of_node->child)
-+		of_slave_id = of_match_node(of_slave_match_tbl,
-+					    pdev->dev.of_node->child);
-+	if (!of_slave_id) {
-+		dev_dbg(&pdev->dev, "slave pmic should be defined in dts\n");
-+		return -EINVAL;
-+	}
-+
- 	wrp = devm_kzalloc(&pdev->dev, sizeof(*wrp), GFP_KERNEL);
- 	if (!wrp)
- 		return -ENOMEM;
-@@ -869,6 +946,7 @@ static int pwrap_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, wrp);
- 
- 	wrp->master = of_id->data;
-+	wrp->slave = of_slave_id->data;
- 	wrp->dev = &pdev->dev;
- 
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "pwrap");
--- 
-1.7.10.4
+sorry for not commenting on your v3, I've missed it :(
+
+> +	regulators {
+> +		compatible = "simple-bus";
+> +
+
+I've commented this on your v2 already. One of the Lucas's comments[1] about
+this node was following:
+
+    "Get rid of this simple bus. It's not there in hardware and regulators
+    care board level components just like the nodes above and below."
+
+It works for me(tm) with following Apalis dtsi[2] on 4.4.0-rc3+ from
+arm-soc/for-next[3] with my changes based on this commit:
+
+    commit ce504c3d47508fd5590bc9b644e4318a2b5b9aa5
+    Author: Olof Johansson <olof@lixom.net>
+    Date:   Tue Jan 12 10:29:35 2016 -0800
+
+        ARM: SoC: document merges
+
+    root at OpenWrt:/# uname -a
+    Linux OpenWrt 4.4.0-rc3+ #121 SMP Mon Jan 25 10:06:14 CET 2016 armv7l GNU/Linux
+
+    root at OpenWrt:/# cat /proc/device-tree/model
+    Toradex Apalis iMX6Q/D on Gaben Flexi SBC
+
+    root at OpenWrt:/# cat /sys/kernel/debug/regulator/regulator_summary
+     regulator                      use open bypass voltage current     min     max
+    -------------------------------------------------------------------------------
+     regulator-dummy                  0    2      0     0mV     0mA     0mV     0mV 
+        2188000.ethernet                                                0mV     0mV
+        2090000.flexcan                                                 0mV     0mV
+     vdd1p1                           0    0      0  1100mV     0mA   800mV  1375mV 
+     vdd3p0                           0    0      0  3000mV     0mA  2800mV  3150mV 
+     vdd2p5                           0    0      0  2400mV     0mA  2000mV  2750mV 
+     vddarm                           0    1      0  1250mV     0mA   725mV  1450mV 
+        cpu0                                                         1250mV  1250mV
+     vddpu                            1    2      0  1250mV     0mA   725mV  1450mV 
+        cpu0                                                         1250mV  1250mV
+        20dc000.gpc                                                     0mV     0mV
+     vddsoc                           0    1      0  1250mV     0mA   725mV  1450mV 
+        cpu0                                                         1250mV  1250mV
+     1P8V                             0    0      0  1800mV     0mA  1800mV  1800mV 
+     2P5V                             0    0      0  2500mV     0mA  2500mV  2500mV 
+     3P3V                             0    2      0  3300mV     0mA  3300mV  3300mV 
+        2198000.usdhc                                                3300mV  3400mV
+        2194000.usdhc                                                3300mV  3400mV
+     usb_host_vbus_hub                1    1      0  5000mV     0mA  5000mV  5000mV 
+        usb_host_vbus                 1    1      0  5000mV     0mA  5000mV  5000mV 
+           2184200.usb                                                  0mV     0mV
+     usb_otg_vbus                     0    1      0  5000mV     0mA  5000mV  5000mV 
+        2184000.usb                                                     0mV     0mV
+     SW1AB                            0    0      0  1375mV     0mA   300mV  1875mV 
+     SW1C                             0    0      0  1375mV     0mA   300mV  1875mV 
+     SW2                              0    0      0  1000mV     0mA     0mV     0mV 
+     SW3A                             0    0      0  1500mV     0mA   400mV  1975mV 
+     SW3B                             0    0      0  1500mV     0mA     0mV     0mV 
+     SW4                              0    0      0  1000mV     0mA     0mV     0mV 
+     SWBST                            0    0      0  5000mV     0mA  5000mV  5150mV 
+     VSNVS                            0    0      0  3000mV     0mA  1000mV  3000mV 
+     VREFDDR                          0    0      0   750mV     0mA   750mV   750mV 
+     VGEN1                            0    0      0  1500mV     0mA   800mV  1550mV 
+     VGEN2                            0    0      0  1500mV     0mA   800mV  1550mV 
+     VGEN3                            0    0      0  3000mV     0mA  1800mV  3300mV 
+     VGEN4                            0    0      0  1800mV     0mA  1800mV  3300mV 
+     VGEN5                            0    0      0  2500mV     0mA  1800mV  3300mV 
+     VGEN6                            0    0      0  2800mV     0mA  1800mV  3300mV 
+
+What problems are you having if you remove that parent regulators node?
+
+1. http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386456.html
+2. https://raw.githubusercontent.com/ynezz/linux-2.6/5a211784544a3a460df7e7e45479010ae3feaf76/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+3. git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
+
+Thanks for your work!
+
+-- ynezz
