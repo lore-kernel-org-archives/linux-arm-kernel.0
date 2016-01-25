@@ -1,75 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:41:51 +0100
-Subject: [PATCH] mtd: avoid stack overflow in MTD CFI code
-Message-ID: <1453736525-1959191-3-git-send-email-arnd@arndb.de>
+Date: Mon, 25 Jan 2016 16:44:38 +0100
+Subject: [PATCH] cpufreq: pxa2xx: fix pxa_cpufreq_change_voltage prototype
+Message-ID: <1453736683-1959283-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When map_word gets too large, we use a lot of kernel stack, and for
-MTD_MAP_BANK_WIDTH_32, this means we use more than the recommended
-1024 bytes in a number of functions:
+There are two definitions of pxa_cpufreq_change_voltage, with slightly
+different prototypes after one of them had its argument marked 'const'.
+Now the other one (for !CONFIG_REGULATOR) produces a harmless warning:
 
-drivers/mtd/chips/cfi_cmdset_0020.c: In function 'cfi_staa_write_buffers':
-drivers/mtd/chips/cfi_cmdset_0020.c:651:1: warning: the frame size of 1336 bytes is larger than 1024 bytes [-Wframe-larger-than=]
-drivers/mtd/chips/cfi_cmdset_0020.c: In function 'cfi_staa_erase_varsize':
-drivers/mtd/chips/cfi_cmdset_0020.c:972:1: warning: the frame size of 1208 bytes is larger than 1024 bytes [-Wframe-larger-than=]
-drivers/mtd/chips/cfi_cmdset_0001.c: In function 'do_write_buffer':
-drivers/mtd/chips/cfi_cmdset_0001.c:1835:1: warning: the frame size of 1240 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+drivers/cpufreq/pxa2xx-cpufreq.c: In function 'pxa_set_target':
+drivers/cpufreq/pxa2xx-cpufreq.c:291:36: warning: passing argument 1 of 'pxa_cpufreq_change_voltage' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+   ret = pxa_cpufreq_change_voltage(&pxa_freq_settings[idx]);
+                                    ^
+drivers/cpufreq/pxa2xx-cpufreq.c:205:12: note: expected 'struct pxa_freqs *' but argument is of type 'const struct pxa_freqs *'
+ static int pxa_cpufreq_change_voltage(struct pxa_freqs *pxa_freq)
+            ^
 
-This can be avoided if all operations on the map word are done
-indirectly and the stack gets reused between the calls. We can
-mostly achieve this by selecting MTD_COMPLEX_MAPPINGS whenever
-MTD_MAP_BANK_WIDTH_32 is set, but for the case that no other
-bank width is enabled, we also need to use a non-constant
-map_bankwidth() to convince the compiler to use less stack.
+This changes the prototype in the same way as the other, which
+avoids the warning.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 03c229906311 ("cpufreq: pxa: make pxa_freqs arrays const")
 ---
- drivers/mtd/chips/Kconfig |  1 +
- include/linux/mtd/map.h   | 19 +++++++------------
- 2 files changed, 8 insertions(+), 12 deletions(-)
+ drivers/cpufreq/pxa2xx-cpufreq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mtd/chips/Kconfig b/drivers/mtd/chips/Kconfig
-index 3b3dabce58de..b24be7d75c9c 100644
---- a/drivers/mtd/chips/Kconfig
-+++ b/drivers/mtd/chips/Kconfig
-@@ -115,6 +115,7 @@ config MTD_MAP_BANK_WIDTH_16
- 
- config MTD_MAP_BANK_WIDTH_32
- 	bool "Support 256-bit buswidth" if MTD_CFI_GEOMETRY
-+	select MTD_COMPLEX_MAPPINGS
- 	default n
- 	help
- 	  If you wish to support CFI devices on a physical bus which is
-diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
-index 58f3ba709ade..e20fcf678155 100644
---- a/include/linux/mtd/map.h
-+++ b/include/linux/mtd/map.h
-@@ -122,18 +122,13 @@
- #endif
- 
- #ifdef CONFIG_MTD_MAP_BANK_WIDTH_32
--# ifdef map_bankwidth
--#  undef map_bankwidth
--#  define map_bankwidth(map) ((map)->bankwidth)
--#  undef map_bankwidth_is_large
--#  define map_bankwidth_is_large(map) (map_bankwidth(map) > BITS_PER_LONG/8)
--#  undef map_words
--#  define map_words(map) map_calc_words(map)
--# else
--#  define map_bankwidth(map) 32
--#  define map_bankwidth_is_large(map) (1)
--#  define map_words(map) map_calc_words(map)
--# endif
-+/* always use indirect access for 256-bit to preserve kernel stack */
-+# undef map_bankwidth
-+# define map_bankwidth(map) ((map)->bankwidth)
-+# undef map_bankwidth_is_large
-+# define map_bankwidth_is_large(map) (map_bankwidth(map) > BITS_PER_LONG/8)
-+# undef map_words
-+# define map_words(map) map_calc_words(map)
- #define map_bankwidth_is_32(map) (map_bankwidth(map) == 32)
- #undef MAX_MAP_BANKWIDTH
- #define MAX_MAP_BANKWIDTH 32
+diff --git a/drivers/cpufreq/pxa2xx-cpufreq.c b/drivers/cpufreq/pxa2xx-cpufreq.c
+index efe3b215fd34..46fee1539cc8 100644
+--- a/drivers/cpufreq/pxa2xx-cpufreq.c
++++ b/drivers/cpufreq/pxa2xx-cpufreq.c
+@@ -202,7 +202,7 @@ static void __init pxa_cpufreq_init_voltages(void)
+ 	}
+ }
+ #else
+-static int pxa_cpufreq_change_voltage(struct pxa_freqs *pxa_freq)
++static int pxa_cpufreq_change_voltage(const struct pxa_freqs *pxa_freq)
+ {
+ 	return 0;
+ }
 -- 
 2.7.0
