@@ -1,112 +1,103 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 15:53:54 +0000
-Subject: [PATCH v2 20/21] arm64: VHE: Add support for running Linux in EL2 mode
+Date: Mon, 25 Jan 2016 15:53:41 +0000
+Subject: [PATCH v2 07/21] arm64: KVM: VHE: Patch out kern_hyp_va
 In-Reply-To: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
 References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453737235-16522-21-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453737235-16522-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With ARMv8.1 VHE, the architecture is able to (almost) transparently
-run the kernel at EL2, despite being written for EL1.
+The kern_hyp_va macro is pretty meaninless with VHE, as there is
+only one mapping - the kernel one.
 
-This patch takes care of the "almost" part, mostly preventing the kernel
-from dropping from EL2 to EL1, and setting up the HYP configuration.
+In order to keep the code readable and efficient, use runtime
+patching to replace the 'and' instruction used to compute the VA
+with a 'nop'.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/Kconfig       | 13 +++++++++++++
- arch/arm64/kernel/head.S | 32 +++++++++++++++++++++++++++++++-
- 2 files changed, 44 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/kvm_mmu.h | 11 ++++++++++-
+ arch/arm64/kvm/hyp/hyp.h         | 25 ++++++++++++++++++++++---
+ 2 files changed, 32 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 8cc6228..ada34df 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -750,6 +750,19 @@ config ARM64_LSE_ATOMICS
- 	  not support these instructions and requires the kernel to be
- 	  built with binutils >= 2.25.
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index d3e6d7b..62f0d14 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -23,13 +23,16 @@
+ #include <asm/cpufeature.h>
  
-+config ARM64_VHE
-+	bool "Enable support for Virtualization Host Extension (VHE)"
-+	default y
-+	help
-+	  Virtualization Host Extension (VHE) allows the kernel to run
-+	  directly at EL2 (instead of EL1) on processors that support
-+	  it. This leads to better performance for KVM, as it reduces
-+	  the cost of the world switch.
+ /*
+- * As we only have the TTBR0_EL2 register, we cannot express
++ * As ARMv8.0 only has the TTBR0_EL2 register, we cannot express
+  * "negative" addresses. This makes it impossible to directly share
+  * mappings with the kernel.
+  *
+  * Instead, give the HYP mode its own VA region at a fixed offset from
+  * the kernel by just masking the top bits (which are all ones for a
+  * kernel address).
++ *
++ * ARMv8.1 (using VHE) does have a TTBR1_EL2, and doesn't use these
++ * macros (the entire kernel runs at EL2).
+  */
+ #define HYP_PAGE_OFFSET_SHIFT	VA_BITS
+ #define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
+@@ -56,6 +59,8 @@
+ 
+ #ifdef __ASSEMBLY__
+ 
++#include <asm/alternative.h>
++#include <asm/cpufeature.h>
+ #include <asm/kvm_arm.h>
+ 
+ .macro setup_vtcr tmp1, tmp2
+@@ -84,7 +89,11 @@
+  * reg: VA to be converted.
+  */
+ .macro kern_hyp_va	reg
++alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
+ 	and	\reg, \reg, #HYP_PAGE_OFFSET_MASK
++alternative_else
++	nop
++alternative_endif
+ .endm
+ 
+ #else
+diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+index fb27517..fc502f3 100644
+--- a/arch/arm64/kvm/hyp/hyp.h
++++ b/arch/arm64/kvm/hyp/hyp.h
+@@ -25,9 +25,28 @@
+ 
+ #define __hyp_text __section(.hyp.text) notrace
+ 
+-#define kern_hyp_va(v) (typeof(v))((unsigned long)(v) & HYP_PAGE_OFFSET_MASK)
+-#define hyp_kern_va(v) (typeof(v))((unsigned long)(v) - HYP_PAGE_OFFSET \
+-						      + PAGE_OFFSET)
++static inline unsigned long __kern_hyp_va(unsigned long v)
++{
++	asm volatile(ALTERNATIVE("and %0, %0, %1",
++				 "nop",
++				 ARM64_HAS_VIRT_HOST_EXTN)
++		     : "+r" (v) : "i" (HYP_PAGE_OFFSET_MASK));
++	return v;
++}
 +
-+	  Selecting this option allows the VHE feature to be detected
-+	  at runtime, and does not affect processors that do not
-+	  implement this feature.
++#define kern_hyp_va(v) (typeof(v))(__kern_hyp_va((unsigned long)(v)))
 +
- endmenu
- 
- endmenu
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index ffe9c2b..2a7134c 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -30,6 +30,7 @@
- #include <asm/cache.h>
- #include <asm/cputype.h>
- #include <asm/kernel-pgtable.h>
-+#include <asm/kvm_mmu.h>
- #include <asm/memory.h>
- #include <asm/pgtable-hwdef.h>
- #include <asm/pgtable.h>
-@@ -464,8 +465,25 @@ CPU_LE(	bic	x0, x0, #(3 << 24)	)	// Clear the EE and E0E bits for EL1
- 	isb
- 	ret
- 
-+2:
-+#ifdef CONFIG_ARM64_VHE
-+	/*
-+	 * Check for VHE being present. For the rest of the EL2 setup,
-+	 * x2 being non-zero indicates that we do have VHE, and that the
-+	 * kernel is intended to run@EL2.
-+	 */
-+	mrs	x2, id_aa64mmfr1_el1
-+	ubfx	x2, x2, #8, #4
-+#else
-+	mov	x2, xzr
-+#endif
++static inline unsigned long __hyp_kern_va(unsigned long v)
++{
++	u64 offset = PAGE_OFFSET - HYP_PAGE_OFFSET;
++	asm volatile(ALTERNATIVE("add %0, %0, %1",
++				 "nop",
++				 ARM64_HAS_VIRT_HOST_EXTN)
++		     : "+r" (v) : "r" (offset));
++	return v;
++}
 +
- 	/* Hyp configuration. */
--2:	mov	x0, #(1 << 31)			// 64-bit EL1
-+	mov	x0, #HCR_RW			// 64-bit EL1
-+	cbz	x2, set_hcr
-+	orr	x0, x0, #HCR_TGE		// Enable Host Extensions
-+	orr	x0, x0, #HCR_E2H
-+set_hcr:
- 	msr	hcr_el2, x0
++#define hyp_kern_va(v) (typeof(v))(__hyp_kern_va((unsigned long)(v)))
  
- 	/* Generic timers. */
-@@ -507,6 +525,9 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
- 
- 	/* Coprocessor traps. */
- 	mov	x0, #0x33ff
-+	cbz	x2, set_cptr
-+	orr	x0, x0, #(3 << 20)		// Don't trap FP
-+set_cptr:
- 	msr	cptr_el2, x0			// Disable copro. traps to EL2
- 
- #ifdef CONFIG_COMPAT
-@@ -521,6 +542,15 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
- 	/* Stage-2 translation */
- 	msr	vttbr_el2, xzr
- 
-+	cbz	x2, install_el2_stub
-+
-+	setup_vtcr x4, x5
-+
-+	mov	w20, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
-+	isb
-+	ret
-+
-+install_el2_stub:
- 	/* Hypervisor stub */
- 	adrp	x0, __hyp_stub_vectors
- 	add	x0, x0, #:lo12:__hyp_stub_vectors
+ /**
+  * hyp_alternate_select - Generates patchable code sequences that are
 -- 
 2.1.4
