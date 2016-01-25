@@ -1,38 +1,46 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 25 Jan 2016 10:41:47 -0800
-Subject: [PATCH 2/4] arm: let set_memory_xx(addr, 0) succeed.
-In-Reply-To: <1453561543-14756-3-git-send-email-mika.penttila@nextfour.com>
-References: <1453561543-14756-1-git-send-email-mika.penttila@nextfour.com>
- <1453561543-14756-3-git-send-email-mika.penttila@nextfour.com>
-Message-ID: <56A66C6B.7000806@redhat.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 25 Jan 2016 19:44:01 +0100
+Subject: [PATCH V2 4/4] mfd: mediatek: add MT6323 support to MT6397 driver
+In-Reply-To: <56A64108.7020807@openwrt.org>
+References: <1453716887-38442-1-git-send-email-blogic@openwrt.org>
+ <20160125124112.GG3368@x1> <56A64108.7020807@openwrt.org>
+Message-ID: <3476571.0yU9yvPsKF@linux-gy6r.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2016 07:05 AM, mika.penttila at nextfour.com wrote:
-> From: Mika Penttil? <mika.penttila@nextfour.com>
->
-> This makes set_memory_xx() consistent with x86.
->
-> Signed-off-by: Mika Penttil? mika.penttila at nextfour.com
->
-> ---
->   arch/arm/mm/pageattr.c | 3 +++
->   1 file changed, 3 insertions(+)
->
-> diff --git a/arch/arm/mm/pageattr.c b/arch/arm/mm/pageattr.c
-> index be7fe4b..9edf6b0 100644
-> --- a/arch/arm/mm/pageattr.c
-> +++ b/arch/arm/mm/pageattr.c
-> @@ -49,6 +49,9 @@ static int change_memory_common(unsigned long addr, int numpages,
->   		WARN_ON_ONCE(1);
->   	}
->
-> +	if (!numpages)
-> +		return 0;
-> +
->   	if (start < MODULES_VADDR || start >= MODULES_END)
->   		return -EINVAL;
->
->
+On Monday 25 Jan 2016 16:36:40 John Crispin wrote:
+> Hi,
+> 
+> On 25/01/2016 13:41, Lee Jones wrote:
+> > Please honour the subject format of the subsystem you are contributing
+> > to.
+> > 
+> > `git log --oneline -- $subsystem` gives you this.
+> > 
+> > On Mon, 25 Jan 2016, John Crispin wrote:
+> >> Signed-off-by: John Crispin <blogic@openwrt.org>
+> >> ---
+> 
+> [...]
+> 
+> >> @@ -261,6 +271,15 @@ static int mt6397_probe(struct platform_device
+> >> *pdev)
+> >> 
+> >>  	}
+> >>  	
+> >>  	switch (id & 0xff) {
+> >> 
+> >> +	case MT6323_CID_CODE:
+> >> +		mt6397->int_con[0] = MT6323_INT_CON0;
+> > 
+> > This is confusing.  You're still using memory allocated for a mt6397
+> > device.
+> 
+> the variable is currently defined as struct mt6397_chip *mt6397;
+> shall i only change the name or also create a patch to rename the struct ?
+> 
 
-Reviewed-by: Laura Abbott <labbott@redhat.com>
+I think we should rename the struct and the file as well.
+
+Cheers,
+Matthias
