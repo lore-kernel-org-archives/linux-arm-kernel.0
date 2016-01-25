@@ -1,39 +1,47 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 25 Jan 2016 15:23:03 -0500
-Subject: [PATCH v2] drivers: ata: wake port before DMA stop for ALPM
-In-Reply-To: <1452547346-31735-1-git-send-email-dpetigara@broadcom.com>
-References: <1452547346-31735-1-git-send-email-dpetigara@broadcom.com>
-Message-ID: <20160125202303.GK3628@mtj.duckdns.org>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 25 Jan 2016 20:25:55 +0000
+Subject: [RESEND PATCH V2] ARM64: tegra: Add chosen node for tegra132 norrin
+Message-ID: <1453753555-14634-1-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 11, 2016 at 01:22:26PM -0800, Danesh Petigara wrote:
-> The AHCI driver code stops and starts port DMA engines at will
-> without considering the power state of the particular port. The
-> AHCI specification isn't very clear on how to handle this scenario,
-> leaving implementation open to interpretation.
-> 
-> Broadcom's STB SATA host controller is unable to handle port DMA
-> controller restarts when the port in question is in low power mode.
-> When a port enters partial or slumber mode, its PHY is powered down.
-> When a controller restart is requested, the controller's internal
-> state machine expects the PHY to be brought back up by software which
-> never happens in this case, resulting in failures.
-> 
-> To avoid this situation, logic is added to manually wake up the port
-> just before its DMA engine is stopped, if the port happens to be in
-> a low power state. HBA initiated power management ensures that the port
-> eventually returns to its configured low power state, when the link is
-> idle (as per the conditions listed in the spec). A new host flag is also
-> added to ensure this logic is only exercised for hosts with the above
-> limitation.
-> 
-> Signed-off-by: Danesh Petigara <dpetigara@broadcom.com>
-> Reviewed-by: Markus Mayer <mmayer@broadcom.com>
+The NVIDIA bootloader, nvtboot, expects the "chosen" node to be present
+in the device-tree blob and if it is not then it fails to boot the kernel.
+Add the chosen node so we can boot the kernel on Tegra132 Norrin with the
+nvtboot bootloader.
 
-Applied to libata/for-4.5-fixes w/ some formatting changes.
+Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+Acked-by: Thierry Reding <treding@nvidia.com>
+---
+v1 -> v2 changes:
+- minor fixes to commit message
 
-Thanks.
+Ideally, we would like to get this into v4.5 as a fix for Tegra132 Norrin
+so that we can enable booting this board as part of our automated testing
+setup for Tegra [0][1]. Thierry suggested I send this directly as a fix
+to ARM-SOC. Let me know if this is ok. I have not included a "fixes" as it
+may not be needed for all bootloaders, but if you need this we could put:
 
+Fixes: 0f279eb arm64: tegra: Add NVIDIA Tegra132 Norrin support
+
+[0] http://nvtb.github.io/linux/
+[1] http://nvtb.github.io/linux-next/
+
+ arch/arm64/boot/dts/nvidia/tegra132-norrin.dts | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts b/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
+index 7dfe1c085966..62f33fc84e3e 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
++++ b/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
+@@ -12,6 +12,8 @@
+ 		rtc1 = "/rtc at 0,7000e000";
+ 	};
+ 
++	chosen { };
++
+ 	memory {
+ 		device_type = "memory";
+ 		reg = <0x0 0x80000000 0x0 0x80000000>;
 -- 
-tejun
+2.1.4
