@@ -1,128 +1,160 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 16:38:39 +0000
-Subject: [PATCH 23/27] ARM: KVM: Turn CP15 defines to an enum
+Date: Mon, 25 Jan 2016 16:38:28 +0000
+Subject: [PATCH 12/27] ARM: KVM: Add VFP save/restore
 In-Reply-To: <1453739923-17846-1-git-send-email-marc.zyngier@arm.com>
 References: <1453739923-17846-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453739923-17846-24-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453739923-17846-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just like on arm64, having the CP15 registers expressed as a set
-of #defines has been very conflict-prone. Let's turn it into an
-enum, which should make it more manageable.
+This is almost a copy/paste of the existing version, with a couple
+of subtle differences:
+- Only write to FPEXC once on the save path
+- Add an isb when enabling VFP access
+
+The patch also defines a few sysreg accessors and a __vfp_enabled
+predicate that test the VFP trapping state.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_asm.h  | 33 ---------------------------------
- arch/arm/include/asm/kvm_host.h | 39 +++++++++++++++++++++++++++++++++++++++
- arch/arm/kvm/guest.c            |  1 -
- 3 files changed, 39 insertions(+), 34 deletions(-)
+ arch/arm/kvm/hyp/Makefile |  1 +
+ arch/arm/kvm/hyp/hyp.h    | 13 +++++++++
+ arch/arm/kvm/hyp/vfp.S    | 68 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 82 insertions(+)
+ create mode 100644 arch/arm/kvm/hyp/vfp.S
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 4841225..0895f5b 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -21,39 +21,6 @@
+diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
+index d8acbb6..5a45f4c 100644
+--- a/arch/arm/kvm/hyp/Makefile
++++ b/arch/arm/kvm/hyp/Makefile
+@@ -6,3 +6,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
+ obj-$(CONFIG_KVM_ARM_HOST) += cp15-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
++obj-$(CONFIG_KVM_ARM_HOST) += vfp.o
+diff --git a/arch/arm/kvm/hyp/hyp.h b/arch/arm/kvm/hyp/hyp.h
+index 7eb1c21..dce0f73 100644
+--- a/arch/arm/kvm/hyp/hyp.h
++++ b/arch/arm/kvm/hyp/hyp.h
+@@ -21,6 +21,7 @@
+ #include <linux/compiler.h>
+ #include <linux/kvm_host.h>
+ #include <asm/kvm_mmu.h>
++#include <asm/vfp.h>
  
- #include <asm/virt.h>
+ #define __hyp_text __section(.hyp.text) notrace
  
--/* 0 is reserved as an invalid value. */
--#define c0_MPIDR	1	/* MultiProcessor ID Register */
--#define c0_CSSELR	2	/* Cache Size Selection Register */
--#define c1_SCTLR	3	/* System Control Register */
--#define c1_ACTLR	4	/* Auxiliary Control Register */
--#define c1_CPACR	5	/* Coprocessor Access Control */
--#define c2_TTBR0	6	/* Translation Table Base Register 0 */
--#define c2_TTBR0_high	7	/* TTBR0 top 32 bits */
--#define c2_TTBR1	8	/* Translation Table Base Register 1 */
--#define c2_TTBR1_high	9	/* TTBR1 top 32 bits */
--#define c2_TTBCR	10	/* Translation Table Base Control R. */
--#define c3_DACR		11	/* Domain Access Control Register */
--#define c5_DFSR		12	/* Data Fault Status Register */
--#define c5_IFSR		13	/* Instruction Fault Status Register */
--#define c5_ADFSR	14	/* Auxilary Data Fault Status R */
--#define c5_AIFSR	15	/* Auxilary Instrunction Fault Status R */
--#define c6_DFAR		16	/* Data Fault Address Register */
--#define c6_IFAR		17	/* Instruction Fault Address Register */
--#define c7_PAR		18	/* Physical Address Register */
--#define c7_PAR_high	19	/* PAR top 32 bits */
--#define c9_L2CTLR	20	/* Cortex A15/A7 L2 Control Register */
--#define c10_PRRR	21	/* Primary Region Remap Register */
--#define c10_NMRR	22	/* Normal Memory Remap Register */
--#define c12_VBAR	23	/* Vector Base Address Register */
--#define c13_CID		24	/* Context ID Register */
--#define c13_TID_URW	25	/* Thread ID, User R/W */
--#define c13_TID_URO	26	/* Thread ID, User R/O */
--#define c13_TID_PRIV	27	/* Thread ID, Privileged */
--#define c14_CNTKCTL	28	/* Timer Control Register (PL1) */
--#define c10_AMAIR0	29	/* Auxilary Memory Attribute Indirection Reg0 */
--#define c10_AMAIR1	30	/* Auxilary Memory Attribute Indirection Reg1 */
--#define NR_CP15_REGS	31	/* Number of regs (incl. invalid) */
--
- #define ARM_EXCEPTION_RESET	  0
- #define ARM_EXCEPTION_UNDEFINED   1
- #define ARM_EXCEPTION_SOFTWARE    2
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 62fa788..eec701d 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -88,6 +88,45 @@ struct kvm_vcpu_fault_info {
- 	u32 hyp_pc;		/* PC when exception was taken from Hyp mode */
- };
+@@ -31,6 +32,8 @@
+ 	"mrc", "mcr", __stringify(p15, Op1, %0, CRn, CRm, Op2), u32
+ #define __ACCESS_CP15_64(Op1, CRm)		\
+ 	"mrrc", "mcrr", __stringify(p15, Op1, %Q0, %R0, CRm), u64
++#define __ACCESS_VFP(CRn)			\
++	"mrc", "mcr", __stringify(p10, 7, %0, CRn, cr0, 0), u32
  
-+/*
-+ * 0 is reserved as an invalid value.
-+ * Order should be kept in sync with the save/restore code.
-+ */
-+enum vcpu_sysreg {
-+	__INVALID_SYSREG__,
-+	c0_MPIDR,		/* MultiProcessor ID Register */
-+	c0_CSSELR,		/* Cache Size Selection Register */
-+	c1_SCTLR,		/* System Control Register */
-+	c1_ACTLR,		/* Auxiliary Control Register */
-+	c1_CPACR,		/* Coprocessor Access Control */
-+	c2_TTBR0,		/* Translation Table Base Register 0 */
-+	c2_TTBR0_high,		/* TTBR0 top 32 bits */
-+	c2_TTBR1,		/* Translation Table Base Register 1 */
-+	c2_TTBR1_high,		/* TTBR1 top 32 bits */
-+	c2_TTBCR,		/* Translation Table Base Control R. */
-+	c3_DACR,		/* Domain Access Control Register */
-+	c5_DFSR,		/* Data Fault Status Register */
-+	c5_IFSR,		/* Instruction Fault Status Register */
-+	c5_ADFSR,		/* Auxilary Data Fault Status R */
-+	c5_AIFSR,		/* Auxilary Instrunction Fault Status R */
-+	c6_DFAR,		/* Data Fault Address Register */
-+	c6_IFAR,		/* Instruction Fault Address Register */
-+	c7_PAR,			/* Physical Address Register */
-+	c7_PAR_high,		/* PAR top 32 bits */
-+	c9_L2CTLR,		/* Cortex A15/A7 L2 Control Register */
-+	c10_PRRR,		/* Primary Region Remap Register */
-+	c10_NMRR,		/* Normal Memory Remap Register */
-+	c12_VBAR,		/* Vector Base Address Register */
-+	c13_CID,		/* Context ID Register */
-+	c13_TID_URW,		/* Thread ID, User R/W */
-+	c13_TID_URO,		/* Thread ID, User R/O */
-+	c13_TID_PRIV,		/* Thread ID, Privileged */
-+	c14_CNTKCTL,		/* Timer Control Register (PL1) */
-+	c10_AMAIR0,		/* Auxilary Memory Attribute Indirection Reg0 */
-+	c10_AMAIR1,		/* Auxilary Memory Attribute Indirection Reg1 */
-+	NR_CP15_REGS		/* Number of regs (incl. invalid) */
-+};
+ #define __write_sysreg(v, r, w, c, t)	asm volatile(w " " c : : "r" ((t)(v)))
+ #define write_sysreg(v, ...)		__write_sysreg(v, __VA_ARGS__)
+@@ -53,6 +56,7 @@
+ #define VMPIDR		__ACCESS_CP15(c0, 4, c0, 5)
+ #define SCTLR		__ACCESS_CP15(c1, 0, c0, 0)
+ #define CPACR		__ACCESS_CP15(c1, 0, c0, 2)
++#define HCPTR		__ACCESS_CP15(c1, 4, c1, 2)
+ #define TTBCR		__ACCESS_CP15(c2, 0, c0, 2)
+ #define DACR		__ACCESS_CP15(c3, 0, c0, 0)
+ #define DFSR		__ACCESS_CP15(c5, 0, c0, 0)
+@@ -77,6 +81,8 @@
+ #define CNTV_CTL	__ACCESS_CP15(c14, 0, c3, 1)
+ #define CNTHCTL		__ACCESS_CP15(c14, 4, c1, 0)
+ 
++#define VFP_FPEXC	__ACCESS_VFP(FPEXC)
 +
- struct kvm_cpu_context {
- 	struct kvm_regs	gp_regs;
- 	struct vfp_hard_struct vfp;
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index 86e26fb..12cbb68 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -25,7 +25,6 @@
- #include <asm/cputype.h>
- #include <asm/uaccess.h>
- #include <asm/kvm.h>
--#include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_coproc.h>
+ void __timer_save_state(struct kvm_vcpu *vcpu);
+ void __timer_restore_state(struct kvm_vcpu *vcpu);
  
+@@ -86,4 +92,11 @@ void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+ void __sysreg_save_state(struct kvm_cpu_context *ctxt);
+ void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
+ 
++void asmlinkage __vfp_save_state(struct vfp_hard_struct *vfp);
++void asmlinkage __vfp_restore_state(struct vfp_hard_struct *vfp);
++static inline bool __vfp_enabled(void)
++{
++	return !(read_sysreg(HCPTR) & (HCPTR_TCP(11) | HCPTR_TCP(10)));
++}
++
+ #endif /* __ARM_KVM_HYP_H__ */
+diff --git a/arch/arm/kvm/hyp/vfp.S b/arch/arm/kvm/hyp/vfp.S
+new file mode 100644
+index 0000000..7c297e8
+--- /dev/null
++++ b/arch/arm/kvm/hyp/vfp.S
+@@ -0,0 +1,68 @@
++/*
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/linkage.h>
++#include <asm/vfpmacros.h>
++
++	.text
++	.pushsection	.hyp.text, "ax"
++
++/* void __vfp_save_state(struct vfp_hard_struct *vfp); */
++ENTRY(__vfp_save_state)
++	push	{r4, r5}
++	VFPFMRX	r1, FPEXC
++
++	@ Make sure *really* VFP is enabled so we can touch the registers.
++	orr	r5, r1, #FPEXC_EN
++	tst	r5, #FPEXC_EX		@ Check for VFP Subarchitecture
++	bic	r5, r5, #FPEXC_EX	@ FPEXC_EX disable
++	VFPFMXR	FPEXC, r5
++	isb
++
++	VFPFMRX	r2, FPSCR
++	beq	1f
++
++	@ If FPEXC_EX is 0, then FPINST/FPINST2 reads are upredictable, so
++	@ we only need to save them if FPEXC_EX is set.
++	VFPFMRX r3, FPINST
++	tst	r5, #FPEXC_FP2V
++	VFPFMRX r4, FPINST2, ne		@ vmrsne
++1:
++	VFPFSTMIA r0, r5		@ Save VFP registers
++	stm	r0, {r1-r4}		@ Save FPEXC, FPSCR, FPINST, FPINST2
++	pop	{r4, r5}
++	bx	lr
++ENDPROC(__vfp_save_state)
++
++/* void __vfp_restore_state(struct vfp_hard_struct *vfp);
++ * Assume FPEXC_EN is on and FPEXC_EX is off */
++ENTRY(__vfp_restore_state)
++	VFPFLDMIA r0, r1		@ Load VFP registers
++	ldm	r0, {r0-r3}		@ Load FPEXC, FPSCR, FPINST, FPINST2
++
++	VFPFMXR FPSCR, r1
++	tst	r0, #FPEXC_EX		@ Check for VFP Subarchitecture
++	beq	1f
++	VFPFMXR FPINST, r2
++	tst	r0, #FPEXC_FP2V
++	VFPFMXR FPINST2, r3, ne
++1:
++	VFPFMXR FPEXC, r0		@ FPEXC	(last, in case !EN)
++	bx	lr
++ENDPROC(__vfp_restore_state)
++
++	.popsection
 -- 
 2.1.4
