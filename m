@@ -1,40 +1,108 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:54:25 +0100
-Subject: [PATCH] char: nwbutton: avoid unused variable warning
-Message-ID: <1453737270-1959897-1-git-send-email-arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 25 Jan 2016 15:53:40 +0000
+Subject: [PATCH v2 06/21] arm64: KVM: VHE: Patch out use of HVC
+In-Reply-To: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453737235-16522-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_NWBUTTON_REBOOT is disabled, we get a warning about
-an unused variable:
+With VHE, the host never issues an HVC instruction to get into the
+KVM code, as we can simply branch there.
 
-drivers/char/nwbutton.c:37:12: warning: 'reboot_count' defined but not used [-Wunused-variable]
- static int reboot_count = NUM_PRESSES_REBOOT; /* Number of presses to reboot */
+Use runtime code patching to simplify things a bit.
 
-Using if(IS_ENABLED()) instead of #ifdef around the user makes the
-code nicer to read and avoids the warning.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/char/nwbutton.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ arch/arm64/kvm/hyp.S           |  7 +++++++
+ arch/arm64/kvm/hyp/hyp-entry.S | 38 +++++++++++++++++++++++++++++---------
+ 2 files changed, 36 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/char/nwbutton.c b/drivers/char/nwbutton.c
-index 76c490fa0511..0e184426db98 100644
---- a/drivers/char/nwbutton.c
-+++ b/drivers/char/nwbutton.c
-@@ -129,10 +129,9 @@ static void button_consume_callbacks (int bpcount)
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 0ccdcbb..0689a74 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -17,7 +17,9 @@
  
- static void button_sequence_finished (unsigned long parameters)
- {
--#ifdef CONFIG_NWBUTTON_REBOOT		/* Reboot using button is enabled */
--	if (button_press_count == reboot_count)
-+	if (IS_ENABLED(CONFIG_NWBUTTON_REBOOT) &&
-+	    button_press_count == reboot_count)
- 		kill_cad_pid(SIGINT, 1);	/* Ask init to reboot us */
--#endif /* CONFIG_NWBUTTON_REBOOT */
- 	button_consume_callbacks (button_press_count);
- 	bcount = sprintf (button_output_buffer, "%d\n", button_press_count);
- 	button_press_count = 0;		/* Reset the button press counter */
+ #include <linux/linkage.h>
+ 
++#include <asm/alternative.h>
+ #include <asm/assembler.h>
++#include <asm/cpufeature.h>
+ 
+ /*
+  * u64 kvm_call_hyp(void *hypfn, ...);
+@@ -38,6 +40,11 @@
+  * arch/arm64/kernel/hyp_stub.S.
+  */
+ ENTRY(kvm_call_hyp)
++alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
+ 	hvc	#0
+ 	ret
++alternative_else
++	b	__vhe_hyp_call
++	nop
++alternative_endif
+ ENDPROC(kvm_call_hyp)
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index 93e8d983..9e0683f 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -38,6 +38,32 @@
+ 	ldp	x0, x1, [sp], #16
+ .endm
+ 
++.macro do_el2_call
++	/*
++	 * Shuffle the parameters before calling the function
++	 * pointed to in x0. Assumes parameters in x[1,2,3].
++	 */
++	stp	lr, xzr, [sp, #-16]!
++	mov	lr, x0
++	mov	x0, x1
++	mov	x1, x2
++	mov	x2, x3
++	blr	lr
++	ldp	lr, xzr, [sp], #16
++.endm
++
++ENTRY(__vhe_hyp_call)
++	do_el2_call
++	/*
++	 * We used to rely on having an exception return to get
++	 * an implicit isb. In the E2H case, we don't have it anymore.
++	 * rather than changing all the leaf functions, just do it here
++	 * before returning to the rest of the kernel.
++	 */
++	isb
++	ret
++ENDPROC(__vhe_hyp_call)
++	
+ el1_sync:				// Guest trapped into EL2
+ 	save_x0_to_x3
+ 
+@@ -58,19 +84,13 @@ el1_sync:				// Guest trapped into EL2
+ 	mrs	x0, vbar_el2
+ 	b	2f
+ 
+-1:	stp	lr, xzr, [sp, #-16]!
+-
++1:
+ 	/*
+-	 * Compute the function address in EL2, and shuffle the parameters.
++	 * Perform the EL2 call
+ 	 */
+ 	kern_hyp_va	x0
+-	mov	lr, x0
+-	mov	x0, x1
+-	mov	x1, x2
+-	mov	x2, x3
+-	blr	lr
++	do_el2_call
+ 
+-	ldp	lr, xzr, [sp], #16
+ 2:	eret
+ 
+ el1_trap:
 -- 
-2.7.0
+2.1.4
