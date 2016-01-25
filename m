@@ -1,62 +1,31 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 25 Jan 2016 11:33:59 +0000
-Subject: [PATCH] ARM: virt: enable GICv3 system registers
-Message-ID: <1453721639-24733-1-git-send-email-jean-philippe.brucker@arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 25 Jan 2016 20:40:44 +0900
+Subject: [PATCH] ARM: tango: use "depends on" instead of "if" after prompt
+Message-ID: <1453722044-23005-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv8 introduces system registers for the Generic Interrupt Controller's
-CPU and virtual interfaces.
-When GICv3 is implemented, EL2 needs to allow the kernel to use those
-registers, by changing the value of ICC_HSRE.
+This platform was recently added, so missed the global fixup by
+commit e32465429490 ("ARM: use "depends on" for SoC configs instead
+of "if" after prompt").  Fix it now.
 
-Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
- arch/arm/kernel/hyp-stub.S |   24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index 2a55373..0b1e4a9 100644
---- a/arch/arm/kernel/hyp-stub.S
-+++ b/arch/arm/kernel/hyp-stub.S
-@@ -17,6 +17,7 @@
-  */
- 
- #include <linux/init.h>
-+#include <linux/irqchip/arm-gic-v3.h>
- #include <linux/linkage.h>
- #include <asm/assembler.h>
- #include <asm/virt.h>
-@@ -161,6 +162,29 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
- 1:
- #endif
- 
-+#ifdef CONFIG_ARM_GIC_V3
-+	@ Check whether GICv3 system registers are available
-+	mrc	p15, 0, r7, c0, c1, 1	@ ID_PFR1
-+	ubfx	r7, r7, #28, #4
-+	cmp	r7, #1
-+	bne	2f
-+
-+	@ Enable system register accesses
-+	mrc	p15, 4, r7, c12, c9, 5	@ ICC_HSRE
-+	orr	r7, r7, #(ICC_SRE_EL2_ENABLE | ICC_SRE_EL2_SRE)
-+	mcr	p15, 4, r7, c12, c9, 5	@ ICC_HSRE
-+	isb
-+
-+	@ SRE bit could be forced to 0 by firmware.
-+	@ Check whether it sticks before accessing any other sysreg
-+	mrc	p15, 4, r7, c12, c9, 5	@ ICC_HSRE
-+	tst	r7, #ICC_SRE_EL2_SRE
-+	beq	2f
-+	mov	r7, #0
-+	mcr	p15, 4, r7, c12, c11, 0	@ ICH_HCR
-+2:
-+#endif
-+
- 	bx	lr			@ The boot CPU mode is left in r4.
- ENDPROC(__hyp_stub_install_secondary)
- 
+ arch/arm/mach-tango/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-tango/Kconfig b/arch/arm/mach-tango/Kconfig
+index d6a3714..ebe15b9 100644
+--- a/arch/arm/mach-tango/Kconfig
++++ b/arch/arm/mach-tango/Kconfig
+@@ -1,5 +1,6 @@
+ config ARCH_TANGO
+-	bool "Sigma Designs Tango4 (SMP87xx)" if ARCH_MULTI_V7
++	bool "Sigma Designs Tango4 (SMP87xx)"
++	depends on ARCH_MULTI_V7
+ 	# Cortex-A9 MPCore r3p0, PL310 r3p2
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARM_ERRATA_754322
 -- 
-1.7.9.5
+1.9.1
