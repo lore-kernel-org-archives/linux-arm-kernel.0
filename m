@@ -1,246 +1,322 @@
 From: blogic@openwrt.org (John Crispin)
-Date: Mon, 25 Jan 2016 10:53:24 +0100
-Subject: [PATCH V3 11/11] soc: mediatek: PMIC wrap: add MT2701/7623 support
+Date: Mon, 25 Jan 2016 10:53:22 +0100
+Subject: [PATCH V3 09/11] soc: mediatek: PMIC wrap: add a slave specific struct
 In-Reply-To: <1453715604-36856-1-git-send-email-blogic@openwrt.org>
 References: <1453715604-36856-1-git-send-email-blogic@openwrt.org>
-Message-ID: <1453715604-36856-12-git-send-email-blogic@openwrt.org>
+Message-ID: <1453715604-36856-10-git-send-email-blogic@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the registers, callbacks and data structures required to make the
-wrapper work on MT2701 and MT7623.
+This patch adds a new struct pwrap_slv_type that we use to store the slave
+specific data. The patch adds 2 new helper functions to access the dew
+registers. The slave type is looked up via the wrappers child node.
 
 Signed-off-by: John Crispin <blogic@openwrt.org>
 ---
- drivers/soc/mediatek/mtk-pmic-wrap.c |  160 ++++++++++++++++++++++++++++++++++
- 1 file changed, 160 insertions(+)
+ drivers/soc/mediatek/mtk-pmic-wrap.c |  170 +++++++++++++++++++++++++---------
+ 1 file changed, 124 insertions(+), 46 deletions(-)
 
 diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-index 85c4314..7e0d159 100644
+index 54553b4..21d8e5a 100644
 --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
 +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-@@ -52,6 +52,7 @@
- #define PWRAP_DEW_WRITE_TEST_VAL	0xa55a
+@@ -69,33 +69,64 @@
+ 					  PWRAP_WDT_SRC_EN_HARB_STAUPD_DLE | \
+ 					  PWRAP_WDT_SRC_EN_HARB_STAUPD_ALE)
  
- /* macro for manual command */
-+#define PWRAP_MAN_CMD_SPI_WRITE_NEW	(1 << 14)
- #define PWRAP_MAN_CMD_SPI_WRITE		(1 << 13)
- #define PWRAP_MAN_CMD_OP_CSH		(0x0 << 8)
- #define PWRAP_MAN_CMD_OP_CSL		(0x1 << 8)
-@@ -214,6 +215,17 @@ enum pwrap_regs {
- 	PWRAP_DCM_EN,
- 	PWRAP_DCM_DBC_PRD,
- 
-+	/* MT2701 only regs */
-+	PWRAP_OP_TYPE,
-+	PWRAP_MSB_FIRST,
-+	PWRAP_GPS_STA,
-+	PWRAP_ADC_CMD_ADDR,
-+	PWRAP_PWRAP_ADC_CMD,
-+	PWRAP_ADC_RDY_ADDR,
-+	PWRAP_ADC_RDATA_ADDR1,
-+	PWRAP_ADC_RDATA_ADDR2,
-+	PWRAP_ADC_WRAP_SEL,
-+
- 	/* MT8135 only regs */
- 	PWRAP_CSHEXT,
- 	PWRAP_EVENT_IN_EN,
-@@ -250,6 +262,96 @@ enum pwrap_regs {
- 	PWRAP_CIPHER_EN,
- };
- 
-+static int mt2701_regs[] = {
-+	[PWRAP_MUX_SEL] =		0x0,
-+	[PWRAP_WRAP_EN] =		0x4,
-+	[PWRAP_DIO_EN] =		0x8,
-+	[PWRAP_SIDLY] =			0xc,
-+	[PWRAP_OP_TYPE] =		0x10,
-+	[PWRAP_MSB_FIRST] =		0x14,
-+	[PWRAP_RDDMY] =			0x18,
-+	[PWRAP_SI_CK_CON] =		0x1c,
-+	[PWRAP_CSHEXT_WRITE] =		0x20,
-+	[PWRAP_CSHEXT_READ] =		0x24,
-+	[PWRAP_CSLEXT_START] =		0x28,
-+	[PWRAP_CSLEXT_END] =		0x2c,
-+	[PWRAP_STAUPD_PRD] =		0x30,
-+	[PWRAP_STAUPD_GRPEN] =		0x34,
-+	[PWRAP_STAUPD_MAN_TRIG] =	0x38,
-+	[PWRAP_STAUPD_STA] =		0x3c,
-+	[PWRAP_GPS_STA] =		0x40,
-+	[PWRAP_WRAP_STA] =		0x44,
-+	[PWRAP_HARB_INIT] =		0x48,
-+	[PWRAP_HARB_HPRIO] =		0x4c,
-+	[PWRAP_HIPRIO_ARB_EN] =		0x50,
-+	[PWRAP_HARB_STA0] =		0x54,
-+	[PWRAP_HARB_STA1] =		0x58,
-+	[PWRAP_MAN_EN] =		0x5c,
-+	[PWRAP_MAN_CMD] =		0x60,
-+	[PWRAP_MAN_RDATA] =		0x64,
-+	[PWRAP_MAN_VLDCLR] =		0x68,
-+	[PWRAP_WACS0_EN] =		0x6c,
-+	[PWRAP_INIT_DONE0] =		0x70,
-+	[PWRAP_WACS0_CMD] =		0x74,
-+	[PWRAP_WACS0_RDATA] =		0x78,
-+	[PWRAP_WACS0_VLDCLR] =		0x7c,
-+	[PWRAP_WACS1_EN] =		0x80,
-+	[PWRAP_INIT_DONE1] =		0x84,
-+	[PWRAP_WACS1_CMD] =		0x88,
-+	[PWRAP_WACS1_RDATA] =		0x8c,
-+	[PWRAP_WACS1_VLDCLR] =		0x90,
-+	[PWRAP_WACS2_EN] =		0x94,
-+	[PWRAP_INIT_DONE2] =		0x98,
-+	[PWRAP_WACS2_CMD] =		0x9c,
-+	[PWRAP_WACS2_RDATA] =		0xa0,
-+	[PWRAP_WACS2_VLDCLR] =		0xa4,
-+	[PWRAP_INT_EN] =		0xa8,
-+	[PWRAP_INT_FLG_RAW] =		0xac,
-+	[PWRAP_INT_FLG] =		0xb0,
-+	[PWRAP_INT_CLR] =		0xb4,
-+	[PWRAP_SIG_ADR] =		0xb8,
-+	[PWRAP_SIG_MODE] =		0xbc,
-+	[PWRAP_SIG_VALUE] =		0xc0,
-+	[PWRAP_SIG_ERRVAL] =		0xc4,
-+	[PWRAP_CRC_EN] =		0xc8,
-+	[PWRAP_TIMER_EN] =		0xcc,
-+	[PWRAP_TIMER_STA] =		0xd0,
-+	[PWRAP_WDT_UNIT] =		0xd4,
-+	[PWRAP_WDT_SRC_EN] =		0xd8,
-+	[PWRAP_WDT_FLG] =		0xdc,
-+	[PWRAP_DEBUG_INT_SEL] =		0xe0,
-+	[PWRAP_DVFS_ADR0] =		0xe4,
-+	[PWRAP_DVFS_WDATA0] =		0xe8,
-+	[PWRAP_DVFS_ADR1] =		0xec,
-+	[PWRAP_DVFS_WDATA1] =		0xf0,
-+	[PWRAP_DVFS_ADR2] =		0xf4,
-+	[PWRAP_DVFS_WDATA2] =		0xf8,
-+	[PWRAP_DVFS_ADR3] =		0xfc,
-+	[PWRAP_DVFS_WDATA3] =		0x100,
-+	[PWRAP_DVFS_ADR4] =		0x104,
-+	[PWRAP_DVFS_WDATA4] =		0x108,
-+	[PWRAP_DVFS_ADR5] =		0x10c,
-+	[PWRAP_DVFS_WDATA5] =		0x110,
-+	[PWRAP_DVFS_ADR6] =		0x114,
-+	[PWRAP_DVFS_WDATA6] =		0x118,
-+	[PWRAP_DVFS_ADR7] =		0x11c,
-+	[PWRAP_DVFS_WDATA7] =		0x120,
-+	[PWRAP_CIPHER_KEY_SEL] =	0x124,
-+	[PWRAP_CIPHER_IV_SEL] =		0x128,
-+	[PWRAP_CIPHER_EN] =		0x12c,
-+	[PWRAP_CIPHER_RDY] =		0x130,
-+	[PWRAP_CIPHER_MODE] =		0x134,
-+	[PWRAP_CIPHER_SWRST] =		0x138,
-+	[PWRAP_DCM_EN] =		0x13c,
-+	[PWRAP_DCM_DBC_PRD] =		0x140,
-+	[PWRAP_ADC_CMD_ADDR] =		0x144,
-+	[PWRAP_PWRAP_ADC_CMD] =		0x148,
-+	[PWRAP_ADC_RDY_ADDR] =		0x14c,
-+	[PWRAP_ADC_RDATA_ADDR1] =	0x150,
-+	[PWRAP_ADC_RDATA_ADDR2] =	0x154,
-+	[PWRAP_ADC_WRAP_SEL] =		0x184,
+-/* macro for slave device wrapper registers */
+-#define PWRAP_DEW_BASE			0xbc00
+-#define PWRAP_DEW_EVENT_OUT_EN		(PWRAP_DEW_BASE + 0x0)
+-#define PWRAP_DEW_DIO_EN		(PWRAP_DEW_BASE + 0x2)
+-#define PWRAP_DEW_EVENT_SRC_EN		(PWRAP_DEW_BASE + 0x4)
+-#define PWRAP_DEW_EVENT_SRC		(PWRAP_DEW_BASE + 0x6)
+-#define PWRAP_DEW_EVENT_FLAG		(PWRAP_DEW_BASE + 0x8)
+-#define PWRAP_DEW_READ_TEST		(PWRAP_DEW_BASE + 0xa)
+-#define PWRAP_DEW_WRITE_TEST		(PWRAP_DEW_BASE + 0xc)
+-#define PWRAP_DEW_CRC_EN		(PWRAP_DEW_BASE + 0xe)
+-#define PWRAP_DEW_CRC_VAL		(PWRAP_DEW_BASE + 0x10)
+-#define PWRAP_DEW_MON_GRP_SEL		(PWRAP_DEW_BASE + 0x12)
+-#define PWRAP_DEW_MON_FLAG_SEL		(PWRAP_DEW_BASE + 0x14)
+-#define PWRAP_DEW_EVENT_TEST		(PWRAP_DEW_BASE + 0x16)
+-#define PWRAP_DEW_CIPHER_KEY_SEL	(PWRAP_DEW_BASE + 0x18)
+-#define PWRAP_DEW_CIPHER_IV_SEL		(PWRAP_DEW_BASE + 0x1a)
+-#define PWRAP_DEW_CIPHER_LOAD		(PWRAP_DEW_BASE + 0x1c)
+-#define PWRAP_DEW_CIPHER_START		(PWRAP_DEW_BASE + 0x1e)
+-#define PWRAP_DEW_CIPHER_RDY		(PWRAP_DEW_BASE + 0x20)
+-#define PWRAP_DEW_CIPHER_MODE		(PWRAP_DEW_BASE + 0x22)
+-#define PWRAP_DEW_CIPHER_SWRST		(PWRAP_DEW_BASE + 0x24)
+-#define PWRAP_MT8173_DEW_CIPHER_IV0	(PWRAP_DEW_BASE + 0x26)
+-#define PWRAP_MT8173_DEW_CIPHER_IV1	(PWRAP_DEW_BASE + 0x28)
+-#define PWRAP_MT8173_DEW_CIPHER_IV2	(PWRAP_DEW_BASE + 0x2a)
+-#define PWRAP_MT8173_DEW_CIPHER_IV3	(PWRAP_DEW_BASE + 0x2c)
+-#define PWRAP_MT8173_DEW_CIPHER_IV4	(PWRAP_DEW_BASE + 0x2e)
+-#define PWRAP_MT8173_DEW_CIPHER_IV5	(PWRAP_DEW_BASE + 0x30)
++/* defines for slave device wrapper registers */
++enum dew_regs {
++	PWRAP_DEW_BASE,
++	PWRAP_DEW_EVENT_OUT_EN,
++	PWRAP_DEW_DIO_EN,
++	PWRAP_DEW_EVENT_SRC_EN,
++	PWRAP_DEW_EVENT_SRC,
++	PWRAP_DEW_EVENT_FLAG,
++	PWRAP_DEW_READ_TEST,
++	PWRAP_DEW_WRITE_TEST,
++	PWRAP_DEW_CRC_EN,
++	PWRAP_DEW_CRC_VAL,
++	PWRAP_DEW_MON_GRP_SEL,
++	PWRAP_DEW_MON_FLAG_SEL,
++	PWRAP_DEW_EVENT_TEST,
++	PWRAP_DEW_CIPHER_KEY_SEL,
++	PWRAP_DEW_CIPHER_IV_SEL,
++	PWRAP_DEW_CIPHER_LOAD,
++	PWRAP_DEW_CIPHER_START,
++	PWRAP_DEW_CIPHER_RDY,
++	PWRAP_DEW_CIPHER_MODE,
++	PWRAP_DEW_CIPHER_SWRST,
++	PWRAP_MT8173_DEW_CIPHER_IV0,
++	PWRAP_MT8173_DEW_CIPHER_IV1,
++	PWRAP_MT8173_DEW_CIPHER_IV2,
++	PWRAP_MT8173_DEW_CIPHER_IV3,
++	PWRAP_MT8173_DEW_CIPHER_IV4,
++	PWRAP_MT8173_DEW_CIPHER_IV5,
 +};
 +
- static int mt8173_regs[] = {
- 	[PWRAP_MUX_SEL] =		0x0,
- 	[PWRAP_WRAP_EN] =		0x4,
-@@ -411,6 +513,7 @@ enum pmic_type {
++static const u32 mt6397_regs[] = {
++	[PWRAP_DEW_BASE] =		0xbc00,
++	[PWRAP_DEW_EVENT_OUT_EN] =	0xbc00,
++	[PWRAP_DEW_DIO_EN] =		0xbc02,
++	[PWRAP_DEW_EVENT_SRC_EN] =	0xbc04,
++	[PWRAP_DEW_EVENT_SRC] =		0xbc06,
++	[PWRAP_DEW_EVENT_FLAG] =	0xbc08,
++	[PWRAP_DEW_READ_TEST] =		0xbc0a,
++	[PWRAP_DEW_WRITE_TEST] =	0xbc0c,
++	[PWRAP_DEW_CRC_EN] =		0xbc0e,
++	[PWRAP_DEW_CRC_VAL] =		0xbc10,
++	[PWRAP_DEW_MON_GRP_SEL] =	0xbc12,
++	[PWRAP_DEW_MON_FLAG_SEL] =	0xbc14,
++	[PWRAP_DEW_EVENT_TEST] =	0xbc16,
++	[PWRAP_DEW_CIPHER_KEY_SEL] =	0xbc18,
++	[PWRAP_DEW_CIPHER_IV_SEL] =	0xbc1a,
++	[PWRAP_DEW_CIPHER_LOAD] =	0xbc1c,
++	[PWRAP_DEW_CIPHER_START] =	0xbc1e,
++	[PWRAP_DEW_CIPHER_RDY] =	0xbc20,
++	[PWRAP_DEW_CIPHER_MODE] =	0xbc22,
++	[PWRAP_DEW_CIPHER_SWRST] =	0xbc24,
++	[PWRAP_MT8173_DEW_CIPHER_IV0] = 0xbc26,
++	[PWRAP_MT8173_DEW_CIPHER_IV1] = 0xbc28,
++	[PWRAP_MT8173_DEW_CIPHER_IV2] = 0xbc2a,
++	[PWRAP_MT8173_DEW_CIPHER_IV3] = 0xbc2c,
++	[PWRAP_MT8173_DEW_CIPHER_IV4] = 0xbc2e,
++	[PWRAP_MT8173_DEW_CIPHER_IV5] = 0xbc30,
++};
+ 
+ enum pwrap_regs {
+ 	PWRAP_MUX_SEL,
+@@ -349,16 +380,26 @@ static int mt8135_regs[] = {
+ 	[PWRAP_DCM_DBC_PRD] =		0x160,
  };
  
++enum pmic_type {
++	PMIC_MT6397,
++};
++
  enum pwrap_type {
-+	PWRAP_MT2701,
  	PWRAP_MT8135,
  	PWRAP_MT8173,
  };
-@@ -660,6 +763,30 @@ static int pwrap_mt8173_init_reg_clock(struct pmic_wrapper *wrp)
- 	return 0;
- }
  
-+static int pwrap_mt2701_init_reg_clock(struct pmic_wrapper *wrp)
-+{
-+	switch (wrp->slave->type) {
-+	case PMIC_MT6397:
-+		pwrap_writel(wrp, 0xc, PWRAP_RDDMY);
-+		pwrap_writel(wrp, 0x4, PWRAP_CSHEXT_WRITE);
-+		pwrap_writel(wrp, 0x0, PWRAP_CSHEXT_READ);
-+		pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_START);
-+		pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_END);
-+		break;
-+
-+	case PMIC_MT6323:
-+		pwrap_writel(wrp, 0x8, PWRAP_RDDMY);
-+		pwrap_dew_write(wrp, PWRAP_DEW_RDDMY_NO, 0x8);
-+		pwrap_writel(wrp, 0x5, PWRAP_CSHEXT_WRITE);
-+		pwrap_writel(wrp, 0x0, PWRAP_CSHEXT_READ);
-+		pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_START);
-+		pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_END);
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
- static bool pwrap_is_cipher_ready(struct pmic_wrapper *wrp)
- {
- 	return pwrap_readl(wrp, PWRAP_CIPHER_RDY) & 1;
-@@ -692,6 +819,7 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
- 		pwrap_writel(wrp, 1, PWRAP_CIPHER_LOAD);
- 		pwrap_writel(wrp, 1, PWRAP_CIPHER_START);
- 		break;
-+	case PWRAP_MT2701:
- 	case PWRAP_MT8173:
- 		pwrap_writel(wrp, 1, PWRAP_CIPHER_EN);
- 		break;
-@@ -784,6 +912,24 @@ static int pwrap_mt8173_init_special(struct pmic_wrapper *wrp)
- 	return 0;
- }
- 
-+static int pwrap_mt2701_init_special(struct pmic_wrapper *wrp)
-+{
-+	/* GPS_INTF initialization */
-+	switch (wrp->slave->type) {
-+	case PMIC_MT6323:
-+		pwrap_writel(wrp, 0x076c, PWRAP_ADC_CMD_ADDR);
-+		pwrap_writel(wrp, 0x8000, PWRAP_PWRAP_ADC_CMD);
-+		pwrap_writel(wrp, 0x072c, PWRAP_ADC_RDY_ADDR);
-+		pwrap_writel(wrp, 0x072e, PWRAP_ADC_RDATA_ADDR1);
-+		pwrap_writel(wrp, 0x0730, PWRAP_ADC_RDATA_ADDR2);
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
- static int pwrap_init(struct pmic_wrapper *wrp)
- {
- 	int ret;
-@@ -927,6 +1073,17 @@ static const struct of_device_id of_slave_match_tbl[] = {
- };
- MODULE_DEVICE_TABLE(of, of_slave_match_tbl);
- 
-+static const struct pmic_wrapper_type pwrap_mt2701 = {
-+	.regs = mt2701_regs,
-+	.type = PWRAP_MT2701,
-+	.arb_en_all = 0x3f,
-+	.int_en_all = BIT(31) | BIT(2),
-+	.spi_w = PWRAP_MAN_CMD_SPI_WRITE_NEW,
-+	.wdt_src = PWRAP_WDT_SRC_MASK_ALL,
-+	.init_reg_clock = pwrap_mt2701_init_reg_clock,
-+	.init_special = pwrap_mt2701_init_special,
++struct pwrap_slv_type {
++	const u32 *dew_regs;
++	enum pmic_type type;
 +};
++
+ struct pmic_wrapper {
+ 	struct device *dev;
+ 	void __iomem *base;
+ 	struct regmap *regmap;
+ 	const struct pmic_wrapper_type *master;
++	const struct pwrap_slv_type *slave;
+ 	struct clk *clk_spi;
+ 	struct clk *clk_wrap;
+ 	struct reset_control *rstc;
+@@ -484,6 +525,16 @@ static int pwrap_read(struct pmic_wrapper *wrp, u32 adr, u32 *rdata)
+ 	return 0;
+ }
+ 
++static int pwrap_dew_write(struct pmic_wrapper *wrp, u32 reg, u32 wdata)
++{
++	return pwrap_write(wrp, wrp->slave->dew_regs[reg], wdata);
++}
++
++static int pwrap_dew_read(struct pmic_wrapper *wrp, u32 reg, u32 *rdata)
++{
++	return pwrap_read(wrp, wrp->slave->dew_regs[reg], rdata);
++}
++
+ static int pwrap_regmap_read(void *context, u32 adr, u32 *rdata)
+ {
+ 	return pwrap_read(context, adr, rdata);
+@@ -544,7 +595,7 @@ static int pwrap_init_sidly(struct pmic_wrapper *wrp)
+ 
+ 	for (i = 0; i < 4; i++) {
+ 		pwrap_writel(wrp, i, PWRAP_SIDLY);
+-		pwrap_read(wrp, PWRAP_DEW_READ_TEST, &rdata);
++		pwrap_dew_read(wrp, PWRAP_DEW_READ_TEST, &rdata);
+ 		if (rdata == PWRAP_DEW_READ_TEST_VAL) {
+ 			dev_dbg(wrp->dev, "[Read Test] pass, SIDLY=%x\n", i);
+ 			pass |= 1 << i;
+@@ -593,7 +644,7 @@ static bool pwrap_is_pmic_cipher_ready(struct pmic_wrapper *wrp)
+ 	u32 rdata;
+ 	int ret;
+ 
+-	ret = pwrap_read(wrp, PWRAP_DEW_CIPHER_RDY, &rdata);
++	ret = pwrap_dew_read(wrp, PWRAP_DEW_CIPHER_RDY, &rdata);
+ 	if (ret)
+ 		return 0;
+ 
+@@ -621,12 +672,12 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
+ 	}
+ 
+ 	/* Config cipher mode @PMIC */
+-	pwrap_write(wrp, PWRAP_DEW_CIPHER_SWRST, 0x1);
+-	pwrap_write(wrp, PWRAP_DEW_CIPHER_SWRST, 0x0);
+-	pwrap_write(wrp, PWRAP_DEW_CIPHER_KEY_SEL, 0x1);
+-	pwrap_write(wrp, PWRAP_DEW_CIPHER_IV_SEL, 0x2);
+-	pwrap_write(wrp, PWRAP_DEW_CIPHER_LOAD, 0x1);
+-	pwrap_write(wrp, PWRAP_DEW_CIPHER_START, 0x1);
++	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_SWRST, 0x1);
++	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_SWRST, 0x0);
++	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_KEY_SEL, 0x1);
++	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_IV_SEL, 0x2);
++	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_LOAD, 0x1);
++	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_START, 0x1);
+ 
+ 	/* wait for cipher data ready@AP */
+ 	ret = pwrap_wait_for_state(wrp, pwrap_is_cipher_ready);
+@@ -643,7 +694,7 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
+ 	}
+ 
+ 	/* wait for cipher mode idle */
+-	pwrap_write(wrp, PWRAP_DEW_CIPHER_MODE, 0x1);
++	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_MODE, 0x1);
+ 	ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle_and_sync_idle);
+ 	if (ret) {
+ 		dev_err(wrp->dev, "cipher mode idle fail, ret=%d\n", ret);
+@@ -653,8 +704,9 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
+ 	pwrap_writel(wrp, 1, PWRAP_CIPHER_MODE);
+ 
+ 	/* Write Test */
+-	if (pwrap_write(wrp, PWRAP_DEW_WRITE_TEST, PWRAP_DEW_WRITE_TEST_VAL) ||
+-	    pwrap_read(wrp, PWRAP_DEW_WRITE_TEST, &rdata) ||
++	if (pwrap_dew_write(wrp, PWRAP_DEW_WRITE_TEST,
++			    PWRAP_DEW_WRITE_TEST_VAL) ||
++	    pwrap_dew_read(wrp, PWRAP_DEW_WRITE_TEST, &rdata) ||
+ 			(rdata != PWRAP_DEW_WRITE_TEST_VAL)) {
+ 		dev_err(wrp->dev, "rdata=0x%04X\n", rdata);
+ 		return -EFAULT;
+@@ -677,8 +729,8 @@ static int pwrap_mt8135_init_special(struct pmic_wrapper *wrp)
+ 	writel(0x7ff, wrp->bridge_base + PWRAP_MT8135_BRIDGE_INT_EN);
+ 
+ 	/* enable PMIC event out and sources */
+-	if (pwrap_write(wrp, PWRAP_DEW_EVENT_OUT_EN, 0x1) ||
+-		pwrap_write(wrp, PWRAP_DEW_EVENT_SRC_EN, 0xffff)) {
++	if (pwrap_dew_write(wrp, PWRAP_DEW_EVENT_OUT_EN, 0x1) ||
++		pwrap_dew_write(wrp, PWRAP_DEW_EVENT_SRC_EN, 0xffff)) {
+ 		dev_err(wrp->dev, "enable dewrap fail\n");
+ 		return -EFAULT;
+ 	}
+@@ -689,8 +741,8 @@ static int pwrap_mt8135_init_special(struct pmic_wrapper *wrp)
+ static int pwrap_mt8173_init_special(struct pmic_wrapper *wrp)
+ {
+ 	/* PMIC_DEWRAP enables */
+-	if (pwrap_write(wrp, PWRAP_DEW_EVENT_OUT_EN, 0x1) ||
+-		pwrap_write(wrp, PWRAP_DEW_EVENT_SRC_EN, 0xffff)) {
++	if (pwrap_dew_write(wrp, PWRAP_DEW_EVENT_OUT_EN, 0x1) ||
++		pwrap_dew_write(wrp, PWRAP_DEW_EVENT_SRC_EN, 0xffff)) {
+ 		dev_err(wrp->dev, "enable dewrap fail\n");
+ 		return -EFAULT;
+ 	}
+@@ -734,7 +786,7 @@ static int pwrap_init(struct pmic_wrapper *wrp)
+ 		return ret;
+ 
+ 	/* Enable dual IO mode */
+-	pwrap_write(wrp, PWRAP_DEW_DIO_EN, 1);
++	pwrap_dew_write(wrp, PWRAP_DEW_DIO_EN, 1);
+ 
+ 	/* Check IDLE & INIT_DONE in advance */
+ 	ret = pwrap_wait_for_state(wrp, pwrap_is_fsm_idle_and_sync_idle);
+@@ -746,7 +798,7 @@ static int pwrap_init(struct pmic_wrapper *wrp)
+ 	pwrap_writel(wrp, 1, PWRAP_DIO_EN);
+ 
+ 	/* Read Test */
+-	pwrap_read(wrp, PWRAP_DEW_READ_TEST, &rdata);
++	pwrap_dew_read(wrp, PWRAP_DEW_READ_TEST, &rdata);
+ 	if (rdata != PWRAP_DEW_READ_TEST_VAL) {
+ 		dev_err(wrp->dev, "Read test failed after switch to DIO mode: 0x%04x != 0x%04x\n",
+ 				PWRAP_DEW_READ_TEST_VAL, rdata);
+@@ -759,12 +811,13 @@ static int pwrap_init(struct pmic_wrapper *wrp)
+ 		return ret;
+ 
+ 	/* Signature checking - using CRC */
+-	if (pwrap_write(wrp, PWRAP_DEW_CRC_EN, 0x1))
++	if (pwrap_dew_write(wrp, PWRAP_DEW_CRC_EN, 0x1))
+ 		return -EFAULT;
+ 
+ 	pwrap_writel(wrp, 0x1, PWRAP_CRC_EN);
+ 	pwrap_writel(wrp, 0x0, PWRAP_SIG_MODE);
+-	pwrap_writel(wrp, PWRAP_DEW_CRC_VAL, PWRAP_SIG_ADR);
++	pwrap_writel(wrp, wrp->slave->dew_regs[PWRAP_DEW_CRC_VAL],
++		     PWRAP_SIG_ADR);
+ 	pwrap_writel(wrp, wrp->master->arb_en_all, PWRAP_HIPRIO_ARB_EN);
+ 
+ 	if (wrp->master->type == PWRAP_MT8135)
+@@ -817,6 +870,21 @@ static const struct regmap_config pwrap_regmap_config = {
+ 	.max_register = 0xffff,
+ };
+ 
++static const struct pwrap_slv_type pmic_mt6397 = {
++	.dew_regs = mt6397_regs,
++	.type = PMIC_MT6397,
++};
++
++static const struct of_device_id of_slave_match_tbl[] = {
++	{
++		.compatible = "mediatek,mt6397",
++		.data = &pmic_mt6397,
++	}, {
++		/* sentinel */
++	}
++};
++MODULE_DEVICE_TABLE(of, of_slave_match_tbl);
 +
  static struct pmic_wrapper_type pwrap_mt8135 = {
  	.regs = mt8135_regs,
  	.type = PWRAP_MT8135,
-@@ -952,6 +1109,9 @@ static struct pmic_wrapper_type pwrap_mt8173 = {
+@@ -860,8 +928,17 @@ static int pwrap_probe(struct platform_device *pdev)
+ 	struct device_node *np = pdev->dev.of_node;
+ 	const struct of_device_id *of_id =
+ 		of_match_device(of_pwrap_match_tbl, &pdev->dev);
++	const struct of_device_id *of_slave_id = NULL;
+ 	struct resource *res;
  
- static struct of_device_id of_pwrap_match_tbl[] = {
- 	{
-+		.compatible = "mediatek,mt2701-pwrap",
-+		.data = &pwrap_mt2701,
-+	}, {
- 		.compatible = "mediatek,mt8135-pwrap",
- 		.data = &pwrap_mt8135,
- 	}, {
++	if (pdev->dev.of_node->child)
++		of_slave_id = of_match_node(of_slave_match_tbl,
++					    pdev->dev.of_node->child);
++	if (!of_slave_id) {
++		dev_dbg(&pdev->dev, "slave pmic should be defined in dts\n");
++		return -EINVAL;
++	}
++
+ 	wrp = devm_kzalloc(&pdev->dev, sizeof(*wrp), GFP_KERNEL);
+ 	if (!wrp)
+ 		return -ENOMEM;
+@@ -869,6 +946,7 @@ static int pwrap_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, wrp);
+ 
+ 	wrp->master = of_id->data;
++	wrp->slave = of_slave_id->data;
+ 	wrp->dev = &pdev->dev;
+ 
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "pwrap");
 -- 
 1.7.10.4
