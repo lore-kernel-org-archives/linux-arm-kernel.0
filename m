@@ -1,46 +1,38 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 25 Jan 2016 19:57:26 +0300
-Subject: [PATCH 4/5] all: wrap getdents64 syscall
-In-Reply-To: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1453741047-5498-5-git-send-email-ynorov@caviumnetworks.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Jan 2016 17:53:48 +0100
+Subject: [PATCH 1/4] crypto: sunxi - don't print uninitialized data
+Message-ID: <1453740845-1980433-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This system call may be handled by compat handler if
-__ARCH_WANT_COMPAT_SYS_GETDENTS64 is defined. So we
-should declare wrapper otherwise only.
+gcc correctly warns that the printk output contains a variable that
+is not initialized in some cases:
 
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+drivers/crypto/sunxi-ss/sun4i-ss-cipher.c: In function 'sun4i_ss_cipher_poll':
+drivers/crypto/sunxi-ss/sun4i-ss-cipher.c:254:76: warning: 'todo' may be used uninitialized in this function [-Wmaybe-uninitialized]
+drivers/crypto/sunxi-ss/sun4i-ss-cipher.c:144:15: note: 'todo' was declared here
+
+This adds an explicit initialization to zero in the exact case where it
+was missing, to avoid leaking stack data to the console and to shut up
+that warning.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- fs/readdir.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/crypto/sunxi-ss/sun4i-ss-cipher.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/fs/readdir.c b/fs/readdir.c
-index ced6791..d34cc49 100644
---- a/fs/readdir.c
-+++ b/fs/readdir.c
-@@ -17,6 +17,7 @@
- #include <linux/dirent.h>
- #include <linux/security.h>
- #include <linux/syscalls.h>
-+#include <linux/compat.h>
- #include <linux/unistd.h>
+diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
+index a19ee127edca..db52ae16c147 100644
+--- a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
++++ b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
+@@ -246,6 +246,8 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
+ 				sg_miter_next(&mi);
+ 				oi = 0;
+ 			}
++		} else {
++			todo = 0;
+ 		}
  
- #include <asm/uaccess.h>
-@@ -274,8 +275,13 @@ efault:
- 	return -EFAULT;
- }
- 
-+#ifndef __ARCH_WANT_COMPAT_SYS_GETDENTS64
-+SYSCALL_DEFINE_WRAP3(getdents64, unsigned int, fd,
-+		struct linux_dirent64 __user *, dirent, unsigned int, count)
-+#else
- SYSCALL_DEFINE3(getdents64, unsigned int, fd,
- 		struct linux_dirent64 __user *, dirent, unsigned int, count)
-+#endif
- {
- 	struct fd f;
- 	struct linux_dirent64 __user * lastdirent;
+ 		spaces = readl(ss->base + SS_FCSR);
 -- 
-2.5.0
+2.7.0
