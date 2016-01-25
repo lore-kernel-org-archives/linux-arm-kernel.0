@@ -1,93 +1,56 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Mon, 25 Jan 2016 09:55:23 +0800
-Subject: [PATCH v3 1/1] USB: core: let USB device know device node
-In-Reply-To: <Pine.LNX.4.44L0.1601221023350.1626-100000@iolanthe.rowland.org>
-References: <2404899.20LhULZo7N@wuerfel>
- <Pine.LNX.4.44L0.1601221023350.1626-100000@iolanthe.rowland.org>
-Message-ID: <CAL411-otEfB6c0u1emtZCFJWtgzJ1Vttx53KbccbMRYFNRurFQ@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 25 Jan 2016 11:07:32 +0900
+Subject: [PATCH] ARM: pxa: let PXA27x select PINCTRL
+In-Reply-To: <2718527.DDjjtjgllW@wuerfel>
+References: <1453577004-15295-1-git-send-email-yamada.masahiro@socionext.com>
+ <1495788.v3fMfHFcmP@wuerfel> <87zivuaf0w.fsf@belgarion.home>
+ <2718527.DDjjtjgllW@wuerfel>
+Message-ID: <CAK7LNATMuMHRfeYAJ9jwMrsnFOxxGdegcAGB40k=M611gZOZUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 22, 2016 at 11:55 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Fri, 22 Jan 2016, Arnd Bergmann wrote:
->
->> > >           hub at 3 { /* same external  hub, highspeed mode */
->> > >                   compatible = "usb2109,0812.591",
->> > >                                "usb2109,0812",
->> > >                                "usb2109,class9.0.1",
->> > >                                "usb2109,class9.0",
->> > >                                "usb2109,class9";
->> > >
->> > >                   #address-cells = <1>;
->> > >                   #size-cells = <0>;
->> > >                   reg = <3>;
->> > >
+Hi Robert,
+
+2016-01-25 6:33 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Sunday 24 January 2016 21:39:11 Robert Jarzmik wrote:
+>> Arnd Bergmann <arnd@arndb.de> writes:
+>>
+>> > On Saturday 23 January 2016 23:07:44 Robert Jarzmik wrote:
+>> >> I have this patch in my local tree for 2 monthes (see [1]). This is the patch
+>> >> I'd rather have. I had not posted it as I didn't think the pinctrl work was over
+>> >> yet. I know at least that pxa3xx is ready (as pinctrl-single should be used),
+>> >> and I had not the time to create the map for pxa25x.
 >> >
->> > Why "reg" is 3 here?
+>> > Once you are done, does that mean the plat-pxa/mfp.c stuff becomes
+>> > completely unused on pxa, or will it coexist with pinctrl?
+>> At first it will coexist.
+>> The main blocker so far I have are :
+>>  - the pinconf in platform_data platform to define sleep state pin levels
+>>    (aka. MFPR_LPM_DRIVE_LOW and MFPR_LPM_DRIVE_HIGH)
+>>    I have [1], but it's not working yet, ie. upon entering suspend to RAM, the
+>>    GPIO sleep registers are not programmed as expected.
+>>  - all the pxa machine code have to be migrated from MFP to pinctrl
 >>
->> My mistake. It should be hub at 1 and reg=<1>;
->>
->> I accidentally confused the port number and the device number.
+>> So it will take time.
 >
-> I thought you did it this way because you were numbering the SS
-> root-hub ports 1-2 and the HS root-hub ports 3-4.
+> Ok.
 >
-
-In Arnd's example, there is only one port under root hub.
-And there are more than one ports under non-root hubs.
-
-> There's something I should have made clear earlier.  This scheme for
-> putting SS and HS USB-3 root-hub ports in the same number space is part
-> of the xHCI spec.  It's not AFAIK required (or even mentioned) by the
-> USB-3 spec, which means other types of USB-3 host controllers might do
-> it differently.
+>> > I'm asking because it seems that at that point, the entire plat-pxa
+>> > directory can be removed, with the dma.c and ssp.c files getting
+>> > moved to mach-pxa, and mfp.c moved to mach-mmp. :-)
+>> dma.c will die soon enough anyway, ssp.c will move to mach-pxa indeed, and as
+>> for mfp.c it requires a bit of work.
 >
-> The scheme which numbers SS and HS ports separately, both starting from
-> 1, is mandated by the USB-3 spec for non-root hubs.  But since that
-> spec doesn't say much about root hubs, the OS is free to treat them
-> however it likes.  We have chosen to make root hubs appear as similar
-> as possible to non-root hubs; however I believe that Windows (for
-> example) may do things differently.
->
-> At any rate, since DT strives to reflect the actual hardware
-> properties, you probably should use the xHCI numbering scheme when
-> describing the ports of an xHCI root hub.
->
+> Sounds good.
 >
 
-I will do these differently between root hub and non-root hub.
 
-Thanks.
-Peter
+It's OK if you will this later.
+Just disregard mine.
 
-
->> > > Is it possible to have a hub in an interface of a multifunction device
->> > > or are they always single-configuration single-interface devices?
->> > >
->> >
->> > I have not seen such kinds of devices, but it is possible in theory.
->>
->> Ok, so if the USB spec allows it, we should probably try to handle it too.
->
-> No, the spec does not allow it.  In fact, the spec divides all USB
-> devices into two classes: hubs and functions.  A function is anything
-> that isn't a hub.  And a hub is never allowed to contain more than one
-> configuration and interface.
->
-> The spec does allow for multiple functions to be packaged in the same
-> physical device.  In this case, the physical device contains a hub
-> along with various functions permanently connected to it.
->
-> For example, the old Apple USB keyboards are compound devices.  They
-> contain an internal 3-port hub; one of the ports is permanently wired
-> to the keyboard controller and the other two are exposed to the user,
-> allowing a mouse and something else to be attached.
->
-> Alan Stern
->
 
 
 
 -- 
-BR,
-Peter Chen
+Best Regards
+Masahiro Yamada
