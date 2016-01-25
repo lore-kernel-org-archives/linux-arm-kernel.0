@@ -1,47 +1,79 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 16:38:29 +0000
-Subject: [PATCH 13/27] ARM: KVM: Add banked registers save/restore
+Date: Mon, 25 Jan 2016 16:38:32 +0000
+Subject: [PATCH 16/27] ARM: KVM: Add the new world switch implementation
 In-Reply-To: <1453739923-17846-1-git-send-email-marc.zyngier@arm.com>
 References: <1453739923-17846-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453739923-17846-14-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453739923-17846-17-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Banked registers are one of the many perks of the 32bit architecture,
-and the world switch needs to cope with it.
-
-This requires some "special" accessors, as these are not accessed
-using a standard coprocessor instruction.
+The new world switch implementation is modeled after the arm64 one,
+calling the various save/restore functions in turn, and having as
+little state as possible.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/hyp/Makefile    |  1 +
- arch/arm/kvm/hyp/banked-sr.c | 77 ++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/kvm/hyp/hyp.h       | 11 +++++++
- 3 files changed, 89 insertions(+)
- create mode 100644 arch/arm/kvm/hyp/banked-sr.c
+ arch/arm/kvm/hyp/Makefile |   1 +
+ arch/arm/kvm/hyp/hyp.h    |   7 +++
+ arch/arm/kvm/hyp/switch.c | 136 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 144 insertions(+)
+ create mode 100644 arch/arm/kvm/hyp/switch.c
 
 diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
-index 5a45f4c..173bd1d 100644
+index c779690..cfab402 100644
 --- a/arch/arm/kvm/hyp/Makefile
 +++ b/arch/arm/kvm/hyp/Makefile
-@@ -7,3 +7,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += cp15-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+@@ -9,3 +9,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
  obj-$(CONFIG_KVM_ARM_HOST) += vfp.o
-+obj-$(CONFIG_KVM_ARM_HOST) += banked-sr.o
-diff --git a/arch/arm/kvm/hyp/banked-sr.c b/arch/arm/kvm/hyp/banked-sr.c
+ obj-$(CONFIG_KVM_ARM_HOST) += banked-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += entry.o
++obj-$(CONFIG_KVM_ARM_HOST) += switch.o
+diff --git a/arch/arm/kvm/hyp/hyp.h b/arch/arm/kvm/hyp/hyp.h
+index b3f6ed2..2ca651f 100644
+--- a/arch/arm/kvm/hyp/hyp.h
++++ b/arch/arm/kvm/hyp/hyp.h
+@@ -60,11 +60,16 @@
+ #define CNTV_CVAL	__ACCESS_CP15_64(3, c14)
+ #define CNTVOFF		__ACCESS_CP15_64(4, c14)
+ 
++#define MIDR		__ACCESS_CP15(c0, 0, c0, 0)
+ #define CSSELR		__ACCESS_CP15(c0, 2, c0, 0)
++#define VMIDR		__ACCESS_CP15(c0, 4, c0, 0)
+ #define VMPIDR		__ACCESS_CP15(c0, 4, c0, 5)
+ #define SCTLR		__ACCESS_CP15(c1, 0, c0, 0)
+ #define CPACR		__ACCESS_CP15(c1, 0, c0, 2)
++#define HCR		__ACCESS_CP15(c1, 4, c1, 0)
++#define HDCR		__ACCESS_CP15(c1, 4, c1, 1)
+ #define HCPTR		__ACCESS_CP15(c1, 4, c1, 2)
++#define HSTR		__ACCESS_CP15(c1, 4, c1, 3)
+ #define TTBCR		__ACCESS_CP15(c2, 0, c0, 2)
+ #define DACR		__ACCESS_CP15(c3, 0, c0, 0)
+ #define DFSR		__ACCESS_CP15(c5, 0, c0, 0)
+@@ -73,6 +78,7 @@
+ #define AIFSR		__ACCESS_CP15(c5, 0, c1, 1)
+ #define DFAR		__ACCESS_CP15(c6, 0, c0, 0)
+ #define IFAR		__ACCESS_CP15(c6, 0, c0, 2)
++#define HDFAR		__ACCESS_CP15(c6, 4, c0, 0)
+ #define ICIALLUIS	__ACCESS_CP15(c7, 0, c1, 0)
+ #define TLBIALLIS	__ACCESS_CP15(c8, 0, c3, 0)
+ #define TLBIALLNSNHIS	__ACCESS_CP15(c8, 4, c3, 4)
+@@ -85,6 +91,7 @@
+ #define TID_URW		__ACCESS_CP15(c13, 0, c0, 2)
+ #define TID_URO		__ACCESS_CP15(c13, 0, c0, 3)
+ #define TID_PRIV	__ACCESS_CP15(c13, 0, c0, 4)
++#define HTPIDR		__ACCESS_CP15(c13, 4, c0, 2)
+ #define CNTKCTL		__ACCESS_CP15(c14, 0, c1, 0)
+ #define CNTV_CTL	__ACCESS_CP15(c14, 0, c3, 1)
+ #define CNTHCTL		__ACCESS_CP15(c14, 4, c1, 0)
+diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
 new file mode 100644
-index 0000000..d02dc80
+index 0000000..f715b0d
 --- /dev/null
-+++ b/arch/arm/kvm/hyp/banked-sr.c
-@@ -0,0 +1,77 @@
++++ b/arch/arm/kvm/hyp/switch.c
+@@ -0,0 +1,136 @@
 +/*
-+ * Original code:
-+ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-+ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
-+ *
-+ * Mostly rewritten in C by Marc Zyngier <marc.zyngier@arm.com>
++ * Copyright (C) 2015 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -56,89 +88,124 @@ index 0000000..d02dc80
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
++#include <asm/kvm_asm.h>
 +#include "hyp.h"
 +
 +__asm__(".arch_extension     virt");
 +
-+void __hyp_text __banked_save_state(struct kvm_cpu_context *ctxt)
++static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu, u32 *fpexc)
 +{
-+	ctxt->gp_regs.usr_regs.ARM_sp	= read_special(SP_usr);
-+	ctxt->gp_regs.usr_regs.ARM_pc	= read_special(ELR_hyp);
-+	ctxt->gp_regs.usr_regs.ARM_cpsr	= read_special(SPSR);
-+	ctxt->gp_regs.KVM_ARM_SVC_sp	= read_special(SP_svc);
-+	ctxt->gp_regs.KVM_ARM_SVC_lr	= read_special(LR_svc);
-+	ctxt->gp_regs.KVM_ARM_SVC_spsr	= read_special(SPSR_svc);
-+	ctxt->gp_regs.KVM_ARM_ABT_sp	= read_special(SP_abt);
-+	ctxt->gp_regs.KVM_ARM_ABT_lr	= read_special(LR_abt);
-+	ctxt->gp_regs.KVM_ARM_ABT_spsr	= read_special(SPSR_abt);
-+	ctxt->gp_regs.KVM_ARM_UND_sp	= read_special(SP_und);
-+	ctxt->gp_regs.KVM_ARM_UND_lr	= read_special(LR_und);
-+	ctxt->gp_regs.KVM_ARM_UND_spsr	= read_special(SPSR_und);
-+	ctxt->gp_regs.KVM_ARM_IRQ_sp	= read_special(SP_irq);
-+	ctxt->gp_regs.KVM_ARM_IRQ_lr	= read_special(LR_irq);
-+	ctxt->gp_regs.KVM_ARM_IRQ_spsr	= read_special(SPSR_irq);
-+	ctxt->gp_regs.KVM_ARM_FIQ_r8	= read_special(R8_fiq);
-+	ctxt->gp_regs.KVM_ARM_FIQ_r9	= read_special(R9_fiq);
-+	ctxt->gp_regs.KVM_ARM_FIQ_r10	= read_special(R10_fiq);
-+	ctxt->gp_regs.KVM_ARM_FIQ_fp	= read_special(R11_fiq);
-+	ctxt->gp_regs.KVM_ARM_FIQ_ip	= read_special(R12_fiq);
-+	ctxt->gp_regs.KVM_ARM_FIQ_sp	= read_special(SP_fiq);
-+	ctxt->gp_regs.KVM_ARM_FIQ_lr	= read_special(LR_fiq);
-+	ctxt->gp_regs.KVM_ARM_FIQ_spsr	= read_special(SPSR_fiq);
++	u32 val;
++
++	/*
++	 * We are about to set HCPTR.TCP10/11 to trap all floating point
++	 * register accesses to HYP, however, the ARM ARM clearly states that
++	 * traps are only taken to HYP if the operation would not otherwise
++	 * trap to SVC.  Therefore, always make sure that for 32-bit guests,
++	 * we set FPEXC.EN to prevent traps to SVC, when setting the TCP bits.
++	 */
++	val = read_sysreg(VFP_FPEXC);
++	*fpexc = val;
++	if (!(val & FPEXC_EN)) {
++		write_sysreg(val | FPEXC_EN, VFP_FPEXC);
++		isb();
++	}
++
++	write_sysreg(vcpu->arch.hcr | vcpu->arch.irq_lines, HCR);
++	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
++	write_sysreg(HSTR_T(15), HSTR);
++	write_sysreg(HCPTR_TTA | HCPTR_TCP(10) | HCPTR_TCP(11), HCPTR);
++	val = read_sysreg(HDCR);
++	write_sysreg(val | HDCR_TPM | HDCR_TPMCR, HDCR);
 +}
 +
-+void __hyp_text __banked_restore_state(struct kvm_cpu_context *ctxt)
++static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
 +{
-+	write_special(ctxt->gp_regs.usr_regs.ARM_sp,	SP_usr);
-+	write_special(ctxt->gp_regs.usr_regs.ARM_pc,	ELR_hyp);
-+	write_special(ctxt->gp_regs.usr_regs.ARM_cpsr,	SPSR_cxsf);
-+	write_special(ctxt->gp_regs.KVM_ARM_SVC_sp,	SP_svc);
-+	write_special(ctxt->gp_regs.KVM_ARM_SVC_lr,	LR_svc);
-+	write_special(ctxt->gp_regs.KVM_ARM_SVC_spsr,	SPSR_svc);
-+	write_special(ctxt->gp_regs.KVM_ARM_ABT_sp,	SP_abt);
-+	write_special(ctxt->gp_regs.KVM_ARM_ABT_lr,	LR_abt);
-+	write_special(ctxt->gp_regs.KVM_ARM_ABT_spsr,	SPSR_abt);
-+	write_special(ctxt->gp_regs.KVM_ARM_UND_sp,	SP_und);
-+	write_special(ctxt->gp_regs.KVM_ARM_UND_lr,	LR_und);
-+	write_special(ctxt->gp_regs.KVM_ARM_UND_spsr,	SPSR_und);
-+	write_special(ctxt->gp_regs.KVM_ARM_IRQ_sp,	SP_irq);
-+	write_special(ctxt->gp_regs.KVM_ARM_IRQ_lr,	LR_irq);
-+	write_special(ctxt->gp_regs.KVM_ARM_IRQ_spsr,	SPSR_irq);
-+	write_special(ctxt->gp_regs.KVM_ARM_FIQ_r8,	R8_fiq);
-+	write_special(ctxt->gp_regs.KVM_ARM_FIQ_r9,	R9_fiq);
-+	write_special(ctxt->gp_regs.KVM_ARM_FIQ_r10,	R10_fiq);
-+	write_special(ctxt->gp_regs.KVM_ARM_FIQ_fp,	R11_fiq);
-+	write_special(ctxt->gp_regs.KVM_ARM_FIQ_ip,	R12_fiq);
-+	write_special(ctxt->gp_regs.KVM_ARM_FIQ_sp,	SP_fiq);
-+	write_special(ctxt->gp_regs.KVM_ARM_FIQ_lr,	LR_fiq);
-+	write_special(ctxt->gp_regs.KVM_ARM_FIQ_spsr,	SPSR_fiq);
++	u32 val;
++
++	write_sysreg(0, HCR);
++	write_sysreg(0, HSTR);
++	val = read_sysreg(HDCR);
++	write_sysreg(val & ~(HDCR_TPM | HDCR_TPMCR), HDCR);
++	write_sysreg(0, HCPTR);
 +}
-diff --git a/arch/arm/kvm/hyp/hyp.h b/arch/arm/kvm/hyp/hyp.h
-index dce0f73..278eb1f 100644
---- a/arch/arm/kvm/hyp/hyp.h
-+++ b/arch/arm/kvm/hyp/hyp.h
-@@ -45,6 +45,14 @@
- })
- #define read_sysreg(...)		__read_sysreg(__VA_ARGS__)
- 
-+#define write_special(v, r)					\
-+	asm volatile("msr " __stringify(r) ", %0" : : "r" (v))
-+#define read_special(r) ({					\
-+	u32 __val;						\
-+	asm volatile("mrs %0, " __stringify(r) : "=r" (__val));	\
-+	__val;							\
-+})
 +
- #define TTBR0		__ACCESS_CP15_64(0, c2)
- #define TTBR1		__ACCESS_CP15_64(1, c2)
- #define VTTBR		__ACCESS_CP15_64(6, c2)
-@@ -99,4 +107,7 @@ static inline bool __vfp_enabled(void)
- 	return !(read_sysreg(HCPTR) & (HCPTR_TCP(11) | HCPTR_TCP(10)));
- }
- 
-+void __hyp_text __banked_save_state(struct kvm_cpu_context *ctxt);
-+void __hyp_text __banked_restore_state(struct kvm_cpu_context *ctxt);
++static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
++{
++	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
++	write_sysreg(kvm->arch.vttbr, VTTBR);
++	write_sysreg(vcpu->arch.midr, VMIDR);
++}
 +
- #endif /* __ARM_KVM_HYP_H__ */
++static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
++{
++	write_sysreg(0, VTTBR);
++	write_sysreg(read_sysreg(MIDR), VMIDR);
++}
++
++static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
++{
++	__vgic_v2_save_state(vcpu);
++}
++
++static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
++{
++	__vgic_v2_restore_state(vcpu);
++}
++
++static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
++{
++	struct kvm_cpu_context *host_ctxt;
++	struct kvm_cpu_context *guest_ctxt;
++	bool fp_enabled;
++	u64 exit_code;
++	u32 fpexc;
++
++	vcpu = kern_hyp_va(vcpu);
++	write_sysreg(vcpu, HTPIDR);
++
++	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
++	guest_ctxt = &vcpu->arch.ctxt;
++
++	__sysreg_save_state(host_ctxt);
++	__banked_save_state(host_ctxt);
++
++	__activate_traps(vcpu, &fpexc);
++	__activate_vm(vcpu);
++
++	__vgic_restore_state(vcpu);
++	__timer_restore_state(vcpu);
++
++	__sysreg_restore_state(guest_ctxt);
++	__banked_restore_state(guest_ctxt);
++
++	/* Jump in the fire! */
++	exit_code = __guest_enter(vcpu, host_ctxt);
++	/* And we're baaack! */
++
++	fp_enabled = __vfp_enabled();
++
++	__banked_save_state(guest_ctxt);
++	__sysreg_save_state(guest_ctxt);
++	__timer_save_state(vcpu);
++	__vgic_save_state(vcpu);
++
++	__deactivate_traps(vcpu);
++	__deactivate_vm(vcpu);
++
++	__banked_restore_state(host_ctxt);
++	__sysreg_restore_state(host_ctxt);
++
++	if (fp_enabled) {
++		__vfp_save_state(&guest_ctxt->vfp);
++		__vfp_restore_state(&host_ctxt->vfp);
++	}
++
++	write_sysreg(fpexc, VFP_FPEXC);
++
++	return exit_code;
++}
++
++__alias(__guest_run) int __weak __kvm_vcpu_run(struct kvm_vcpu *vcpu);
 -- 
 2.1.4
