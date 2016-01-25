@@ -1,41 +1,49 @@
-From: davidm@egauge.net (David Mosberger)
-Date: Mon, 25 Jan 2016 09:24:04 -0700
-Subject: [PATCH] misc: atmel-secumod: Driver for Atmel "security module".
-In-Reply-To: <20160125110921.GA4027@piout.net>
-References: <1453348655-31182-1-git-send-email-davidm@egauge.net>
- <20160125110921.GA4027@piout.net>
-Message-ID: <CALnQHM13cGnoma_3erb0oCnRD0sYGGNF1E1cgzCJHrEXbvJpRQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Jan 2016 17:26:17 +0100
+Subject: [PATCH v2 00/21] arm64: Virtualization Host Extension support
+In-Reply-To: <56A64C09.4060702@arm.com>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <2703557.vyWRuMlGU2@wuerfel> <56A64C09.4060702@arm.com>
+Message-ID: <1602215.WjO3PgfQ53@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alexandre,
+On Monday 25 January 2016 16:23:37 Marc Zyngier wrote:
+> On 25/01/16 16:15, Arnd Bergmann wrote:
+> > On Monday 25 January 2016 15:53:34 Marc Zyngier wrote:
+> >> host and guest, reducing the overhead of virtualization.
+> >>
+> >> In order to have the same kernel binary running on all versions of the
+> >> architecture, this series makes heavy use of runtime code patching.
+> >>
+> >> The first 20 patches massage the KVM code to deal with VHE and enable
+> >> Linux to run at EL2. The last patch catches an ugly case when VHE
+> >> capable CPUs are paired with some of their less capable siblings. This
+> >> should never happen, but hey...
+> >>
+> >> I have deliberately left out some of the more "advanced"
+> >> optimizations, as they are likely to distract the reviewer from the
+> >> core infrastructure, which is what I care about at the moment.
+> > 
+> > One question: as you mention that you use a lot of runtime code patching
+> > to make this work transparently, how does this compare to runtime patching
+> > the existing kernel to run in EL2 mode without VHE? Is that even possible?
+> 
+> I haven't explored that particular avenue - by the look of it, this
+> would require a lot more work, as v8.0 EL2 lacks a number of features
+> that Linux currently requires (like having two TTBRs, for example).
 
-On Mon, Jan 25, 2016 at 4:09 AM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
+Ok, I see.
 
-> I know this does more than that but I think those thre sections should
-> be registered using the nvmem framework. The sysfs file creation and
-> accesses then comes for free.
+> > My interpretation so far as always been "that's too complicated to
+> > do because it would require a lot of runtime patching", but now we seem
+> > to get that anyway because we want to run a hypervisor-enabled kernel in
+> > either EL1 or EL2 depending on the presence of another feature.
+> 
+> The kernel itself is mostly untouched (what runs at EL1 also runs at EL2
+> without any patching, because the new EL2 is now a superset of EL1). It
+> is the hypervisor code that gets a beating with the code-patching stick.
 
-I think Finn's patches would have to go in for that first, since the
-existing nvram code is a mess.
-Even with Finn's patches in, I think it could go either way.  I'm not
-exactly sure how some of the
-features of the security module would be used: key management, auto
-erasing, there is a strange
-"backup mode" vs "normal mode" which is not well documented, etc.  So
-I think it may well end up
-being sufficiently different to warrant a separate driver.
+Thanks for the explanation, makes sense.
 
-> Another idea is also to expose it using a genpool so it can be accessed
-> as sram from inside the kernel.
-
-That may be a fine idea, but as far as our application is concerned,
-we need user-level access
-to the battery-backed RAM.
-
-Best regards,
-
-  --david
--- 
-eGauge Systems LLC, http://egauge.net/, 1.877-EGAUGE1, fax 720.545.9768
+	Arnd
