@@ -1,44 +1,44 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 25 Jan 2016 15:55:10 +0000
-Subject: [PATCH V2] ARM64: tegra: Add chosen node for tegra132 norrin
-Message-ID: <1453737310-11391-1-git-send-email-jonathanh@nvidia.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 25 Jan 2016 16:19:24 +0000
+Subject: [PATCH] irqchip: s3c24xx: mark init_eint as __maybe_unused
+In-Reply-To: <1453737499-1960073-1-git-send-email-arnd@arndb.de>
+References: <1453737499-1960073-1-git-send-email-arnd@arndb.de>
+Message-ID: <56A64B0C.2010809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NVIDIA bootloader, nvtboot, expects the "chosen" node to be present
-in the device-tree blob and if it is not then it fails to boot the kernel.
-Add the chosen node so we can boot the kernel on Tegra132 Norrin with the
-nvtboot bootloader.
+On 25/01/16 15:58, Arnd Bergmann wrote:
+> The init_eint array in the s3c24xx irqchip driver is used by
+> every individual chip variant, but Kconfig allows building
+> the driver when they are all disabled, and that leads to
+> a harmless compile-time warning:
+> 
+> drivers/irqchip/irq-s3c24xx.c:608:28: error: 'init_eint' defined but not used [-Werror=unused-variable]
+> 
+> This marks the array as __maybe_unused to avoid the warning.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/irqchip/irq-s3c24xx.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/irqchip/irq-s3c24xx.c b/drivers/irqchip/irq-s3c24xx.c
+> index c71914e8f596..5dc5a760c723 100644
+> --- a/drivers/irqchip/irq-s3c24xx.c
+> +++ b/drivers/irqchip/irq-s3c24xx.c
+> @@ -605,7 +605,7 @@ err:
+>  	return ERR_PTR(ret);
+>  }
+>  
+> -static struct s3c_irq_data init_eint[32] = {
+> +static struct s3c_irq_data __maybe_unused init_eint[32] = {
+>  	{ .type = S3C_IRQTYPE_NONE, }, /* reserved */
+>  	{ .type = S3C_IRQTYPE_NONE, }, /* reserved */
+>  	{ .type = S3C_IRQTYPE_NONE, }, /* reserved */
+> 
 
-Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-Acked-by: Thierry Reding <treding@nvidia.com>
----
-Ideally, we would like to get this into v4.5 as a fix for Tegra132 Norrin
-so that we can enable booting this board as part of our automated testing
-setup for Tegra [0][1]. Thierry suggested I send this directly as a fix
-to ARM-SOC. Let me know if this is ok. I have not included a "fixes" as it
-may not be needed for all bootloaders, but if you need this we could put:
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Fixes: 0f279eb arm64: tegra: Add NVIDIA Tegra132 Norrin support
-
-[0] http://nvtb.github.io/linux/
-[1] http://nvtb.github.io/linux-next/
-
- arch/arm64/boot/dts/nvidia/tegra132-norrin.dts | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts b/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
-index 7dfe1c085966..62f33fc84e3e 100644
---- a/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
-+++ b/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
-@@ -12,6 +12,8 @@
- 		rtc1 = "/rtc at 0,7000e000";
- 	};
- 
-+	chosen { };
-+
- 	memory {
- 		device_type = "memory";
- 		reg = <0x0 0x80000000 0x0 0x80000000>;
+	M.
 -- 
-2.1.4
+Jazz is not dead. It just smells funny...
