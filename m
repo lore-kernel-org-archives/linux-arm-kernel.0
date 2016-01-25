@@ -1,72 +1,67 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 26 Jan 2016 08:40:41 +0900
-Subject: [PATCH] drm/exynos: fix building without CONFIG_PM_SLEEP
-In-Reply-To: <9569056.LBRz4v8fSj@wuerfel>
-References: <9569056.LBRz4v8fSj@wuerfel>
-Message-ID: <CAJKOXPdF_MYmysaQg=W7_6WzpCA=5auO6zLbvNYmCRqg+2L05Q@mail.gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 25 Jan 2016 20:45:37 -0300
+Subject: [PATCH v2 00/10] rtc: max77686: Extend driver and add max77802
+ support
+In-Reply-To: <20160125160633.GB11740@piout.net>
+References: <1453407813-14646-1-git-send-email-javier@osg.samsung.com>
+ <20160125160633.GB11740@piout.net>
+Message-ID: <56A6B3A1.8040202@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-11-18 0:08 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> The runtime PM operations use the suspend/resume functions
-> even when CONFIG_PM_SLEEP is not set, but this now fails
-> for the exynos DRM driver:
->
-> exynos_mixer.c:1289:61: error: 'exynos_mixer_resume' undeclared here (not in a function)
->   SET_RUNTIME_PM_OPS(exynos_mixer_suspend, exynos_mixer_resume, NULL)
->
-> This removes the #ifdef and instead marks the functions as
-> __maybe_unused, which does the right thing in all cases and
-> also looks nicer.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes:   ("drm/exynos: add pm_runtime to Mixer")
+Hello Alexandre,
 
-Dear Inki,
+On 01/25/2016 01:06 PM, Alexandre Belloni wrote:
+> Hi,
+>
+> On 21/01/2016 at 17:23:23 -0300, Javier Martinez Canillas wrote :
+>> On a recent disussion [0] with Krzysztof Kozlowski and Laxman Dewangan,
+>> we came to the conclusion that the max77686 and max77802 RTC are almost
+>> the same with only a few differences so there shouldn't be two separate
+>> drivers and is better to extend max77686 driver and delete rtc-max77802.
+>>
+>> By making the driver more generic, other RTC IP blocks from Maxim PMICs
+>> could be supported as well like the max77620.
+>>
+>> This is a v2 of a series that do this, that address issues pointed out
+>> by Krzysztof Kozlowski. The v1 can be found at [1].
+>>
+>> I've tested this patch-set on an Exynos5800 Peach Pi Chromebook that has
+>> a max77802 PMIC and the RTC was working correctly but I don't have a
+>> machine with max77686 so I will really appreaciate if someone can test
+>> that no regressions were introduced.
+>>
+>> On an IRC conversation, Alexandre suggested to use the field support in
+>> the regmap API to avoid needing a translation table. I spent some time
+>> to look at it and I'm not so sure if it fits that well in this case.
+>>
+>> It's true that we could model each register as if it has a single field
+>> and provide a different reg address but I'm not sure if that would make
+>> things more clear or cause more confusion for future code archaeologists.
+>>
+>
+> Yeah, Mark suggested that regmap_field may be what we were looking for
+> but I'm not convinced it really fits.
+>
 
-Ping? On 4.5-rc1 this is still broken. Can you apply this for fixes
-for current rc-cycle?
+Ok.
+  
+>> In any case, I think this series are a move in the right direction since
+>> removes code duplication and a complete driver and also allows others to
+>> reuse the driver for another RTC chip. We can later simplify and use the
+>> regmap field API or extend the regmap core if that could make things even
+>> simpler but I propose to do it as a follow up.
+>>
+>
+> I don't have any objection or other comment on that series. So
+> basically, I'm waiting for v3 and I'll apply it.
+>
+>
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Great, I'll post a v3 tomorrow then. Thanks!
 
 Best regards,
-Krzysztof
-
-
->
-> diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
-> index 7498c6e76a53..fcaf71df77c1 100644
-> --- a/drivers/gpu/drm/exynos/exynos_mixer.c
-> +++ b/drivers/gpu/drm/exynos/exynos_mixer.c
-> @@ -1230,8 +1230,7 @@ static int mixer_remove(struct platform_device *pdev)
->         return 0;
->  }
->
-> -#ifdef CONFIG_PM_SLEEP
-> -static int exynos_mixer_suspend(struct device *dev)
-> +static int __maybe_unused exynos_mixer_suspend(struct device *dev)
->  {
->         struct mixer_context *ctx = dev_get_drvdata(dev);
->         struct mixer_resources *res = &ctx->mixer_res;
-> @@ -1247,7 +1246,7 @@ static int exynos_mixer_suspend(struct device *dev)
->         return 0;
->  }
->
-> -static int exynos_mixer_resume(struct device *dev)
-> +static int __maybe_unused exynos_mixer_resume(struct device *dev)
->  {
->         struct mixer_context *ctx = dev_get_drvdata(dev);
->         struct mixer_resources *res = &ctx->mixer_res;
-> @@ -1283,7 +1282,6 @@ static int exynos_mixer_resume(struct device *dev)
->
->         return 0;
->  }
-> -#endif
->
->  static const struct dev_pm_ops exynos_mixer_pm_ops = {
->         SET_RUNTIME_PM_OPS(exynos_mixer_suspend, exynos_mixer_resume, NULL)
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
