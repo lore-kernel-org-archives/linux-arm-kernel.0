@@ -1,212 +1,473 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Tue, 26 Jan 2016 01:44:10 +0900
-Subject: [PATCH v3] ARM: dts: kirkwood: add device tree for buffalo
- linkstation ls-qvl
-In-Reply-To: <1453652964-21489-1-git-send-email-rogershimizu@gmail.com>
-References: <1453652964-21489-1-git-send-email-rogershimizu@gmail.com>
-Message-ID: <1453740250-16765-1-git-send-email-rogershimizu@gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 25 Jan 2016 16:44:09 +0000
+Subject: [PATCH v3 14/17] XEN: EFI: Move x86 specific codes to architecture
+ directory
+In-Reply-To: <1453519184-11908-15-git-send-email-zhaoshenglong@huawei.com>
+References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453519184-11908-15-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <alpine.DEB.2.02.1601251643230.9687@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mario Lange <mario_lange@gmx.net>
+On Sat, 23 Jan 2016, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Move x86 specific codes to architecture directory and export those EFI
+> runtime service functions. This will be useful for initializing runtime
+> service on ARM later.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add dts file to support Buffalo Linkstation LS-QVL,
-which is marvell kirkwood based 4-bay 3.5" HDD NAS.
-Product info:
-  - (JPN) http://buffalo.jp/product/hdd/network/ls-qvl_r5/
-  - (ENG) http://www.buffalotech.com/products/network-storage/home-and-small-office/linkstation-pro-quad
+This patch causes a build breakage on x86:
 
-Signed-off-by: Mario Lange <mario_lange@gmx.net>
-Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
----
+arch/x86/xen/efi.c: In function ?xen_efi_probe?:
+arch/x86/xen/efi.c:101:2: error: implicit declaration of function ?HYPERVISOR_platform_op? [-Werror=implicit-function-declaration]
 
-Dear Kirkwood Maintainers,
 
-This is only 1 patch, so I learned that "cover letter" can be embedded here.
 
-Mario created dts for Linkstation LS-QVL, which is 4-bay NAS, based
-on my dts for 2-bay LS-WVL.
-He asked me to post the dts to ARM on hehalf of him, so here I created
-the patch set!
-
-Changes in v2:
-  - add my "Signed-off-by"
-  - fix typo in commit message
-Changes in v3:
-  - add top "From" to address Jason Cooper's suggestion
-  - add Andrew Lunn's "Reviewed-by"
-
- .../devicetree/bindings/arm/marvell,kirkwood.txt   |   1 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts   | 135 +++++++++++++++++++++
- 3 files changed, 137 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts
-
-diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-index 0d5d0f607d6c..345db8031196 100644
---- a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-@@ -19,6 +19,7 @@ SoC. Currently known SoC compatibles are:
- And in addition, the compatible shall be extended with the specific
- board. Currently known boards are:
- 
-+"buffalo,linkstation-lsqvl"
- "buffalo,linkstation-lsvl"
- "buffalo,linkstation-lswsxl"
- "buffalo,linkstation-lswxl"
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 3e2cf27d2368..68625754f398 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -183,6 +183,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
- 	kirkwood-is2.dtb \
- 	kirkwood-km_kirkwood.dtb \
- 	kirkwood-laplug.dtb \
-+	kirkwood-linkstation-lsqvl.dtb \
- 	kirkwood-linkstation-lsvl.dtb \
- 	kirkwood-linkstation-lswsxl.dtb \
- 	kirkwood-linkstation-lswvl.dtb \
-diff --git a/arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts b/arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts
-new file mode 100644
-index 000000000000..6dc0df2969f0
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts
-@@ -0,0 +1,135 @@
-+/*
-+ * Device Tree file for Buffalo Linkstation LS-QVL
-+ *
-+ * Copyright (C) 2016, Mario Lange <mario_lange@gmx.net>
-+ *
-+ * Based on kirkwood-linkstation-lswvl.dts,
-+ * Copyright (C) 2015, 2016
-+ * Roger Shimizu <rogershimizu@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "kirkwood-linkstation-6282.dtsi"
-+
-+/ {
-+	model = "Buffalo Linkstation LS-QVL";
-+	compatible = "buffalo,lsqvl", "marvell,kirkwood-88f6282", "marvell,kirkwood";
-+
-+	memory { /* 256 MB */
-+		device_type = "memory";
-+		reg = <0x00000000 0x10000000>;
-+	};
-+
-+	ocp at f1000000 {
-+		pinctrl: pin-controller at 10000 {
-+			pmx_power_hdd1: pmx-power-hdd1 {
-+				marvell,pins = "mpp9";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_hdderr0: pmx-led-hdderr0 {
-+				marvell,pins = "mpp34";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_hdderr1: pmx-led-hdderr1 {
-+				marvell,pins = "mpp35";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_hdderr2: pmx-led-hdderr2 {
-+				marvell,pins = "mpp24";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_hdderr3: pmx-led-hdderr3 {
-+				marvell,pins = "mpp25";
-+				marvell,function = "gpio";
-+			};
-+		};
-+
-+		sata at 80000 {
-+			nr-ports = <2>;
-+		};
-+	};
-+
-+	gpio_leds {
-+		pinctrl-0 = <&pmx_led_function_red &pmx_led_alarm
-+			     &pmx_led_info &pmx_led_power
-+			     &pmx_led_function_blue
-+			     &pmx_led_hdderr0
-+			     &pmx_led_hdderr1
-+			     &pmx_led_hdderr2
-+			     &pmx_led_hdderr3>;
-+
-+		red-hdderr0-led {
-+			label = "linkstation:red:hdderr0";
-+			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		red-hdderr1-led {
-+			label = "linkstation:red:hdderr1";
-+			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		red-hdderr2-led {
-+			label = "linkstation:red:hdderr2";
-+			gpios = <&gpio0 24 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		red-hdderr3-led {
-+			label = "linkstation:red:hdderr3";
-+			gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	regulators {
-+		pinctrl-0 = <&pmx_power_hdd0 &pmx_power_hdd1 &pmx_usb_vbus>;
-+
-+		hdd_power1: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "HDD1 Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio0 9 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+};
--- 
-2.1.4
+>  arch/x86/xen/efi.c    | 112 ++++++++++++++++++++++++++++++++
+>  drivers/xen/efi.c     | 174 ++++++++++----------------------------------------
+>  include/xen/xen-ops.h |  30 ++++++---
+>  3 files changed, 168 insertions(+), 148 deletions(-)
+> 
+> diff --git a/arch/x86/xen/efi.c b/arch/x86/xen/efi.c
+> index be14cc3..86527f1 100644
+> --- a/arch/x86/xen/efi.c
+> +++ b/arch/x86/xen/efi.c
+> @@ -20,10 +20,122 @@
+>  #include <linux/init.h>
+>  #include <linux/string.h>
+>  
+> +#include <xen/xen.h>
+>  #include <xen/xen-ops.h>
+> +#include <xen/interface/platform.h>
+>  
+>  #include <asm/page.h>
+>  #include <asm/setup.h>
+> +#include <asm/xen/hypercall.h>
+> +
+> +static efi_char16_t vendor[100] __initdata;
+> +
+> +static efi_system_table_t efi_systab_xen __initdata = {
+> +	.hdr = {
+> +		.signature	= EFI_SYSTEM_TABLE_SIGNATURE,
+> +		.revision	= 0, /* Initialized later. */
+> +		.headersize	= 0, /* Ignored by Linux Kernel. */
+> +		.crc32		= 0, /* Ignored by Linux Kernel. */
+> +		.reserved	= 0
+> +	},
+> +	.fw_vendor	= EFI_INVALID_TABLE_ADDR, /* Initialized later. */
+> +	.fw_revision	= 0,			  /* Initialized later. */
+> +	.con_in_handle	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
+> +	.con_in		= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
+> +	.con_out_handle	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
+> +	.con_out	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
+> +	.stderr_handle	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
+> +	.stderr		= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
+> +	.runtime	= (efi_runtime_services_t *)EFI_INVALID_TABLE_ADDR,
+> +						  /* Not used under Xen. */
+> +	.boottime	= (efi_boot_services_t *)EFI_INVALID_TABLE_ADDR,
+> +						  /* Not used under Xen. */
+> +	.nr_tables	= 0,			  /* Initialized later. */
+> +	.tables		= EFI_INVALID_TABLE_ADDR  /* Initialized later. */
+> +};
+> +
+> +static const struct efi efi_xen __initconst = {
+> +	.systab                   = NULL, /* Initialized later. */
+> +	.runtime_version	  = 0,    /* Initialized later. */
+> +	.mps                      = EFI_INVALID_TABLE_ADDR,
+> +	.acpi                     = EFI_INVALID_TABLE_ADDR,
+> +	.acpi20                   = EFI_INVALID_TABLE_ADDR,
+> +	.smbios                   = EFI_INVALID_TABLE_ADDR,
+> +	.smbios3                  = EFI_INVALID_TABLE_ADDR,
+> +	.sal_systab               = EFI_INVALID_TABLE_ADDR,
+> +	.boot_info                = EFI_INVALID_TABLE_ADDR,
+> +	.hcdp                     = EFI_INVALID_TABLE_ADDR,
+> +	.uga                      = EFI_INVALID_TABLE_ADDR,
+> +	.uv_systab                = EFI_INVALID_TABLE_ADDR,
+> +	.fw_vendor                = EFI_INVALID_TABLE_ADDR,
+> +	.runtime                  = EFI_INVALID_TABLE_ADDR,
+> +	.config_table             = EFI_INVALID_TABLE_ADDR,
+> +	.get_time                 = xen_efi_get_time,
+> +	.set_time                 = xen_efi_set_time,
+> +	.get_wakeup_time          = xen_efi_get_wakeup_time,
+> +	.set_wakeup_time          = xen_efi_set_wakeup_time,
+> +	.get_variable             = xen_efi_get_variable,
+> +	.get_next_variable        = xen_efi_get_next_variable,
+> +	.set_variable             = xen_efi_set_variable,
+> +	.query_variable_info      = xen_efi_query_variable_info,
+> +	.update_capsule           = xen_efi_update_capsule,
+> +	.query_capsule_caps       = xen_efi_query_capsule_caps,
+> +	.get_next_high_mono_count = xen_efi_get_next_high_mono_count,
+> +	.reset_system             = NULL, /* Functionality provided by Xen. */
+> +	.set_virtual_address_map  = NULL, /* Not used under Xen. */
+> +	.memmap                   = NULL, /* Not used under Xen. */
+> +	.flags			  = 0     /* Initialized later. */
+> +};
+> +
+> +static efi_system_table_t __init *xen_efi_probe(void)
+> +{
+> +	struct xen_platform_op op = {
+> +		.cmd = XENPF_firmware_info,
+> +		.u.firmware_info = {
+> +			.type = XEN_FW_EFI_INFO,
+> +			.index = XEN_FW_EFI_CONFIG_TABLE
+> +		}
+> +	};
+> +	union xenpf_efi_info *info = &op.u.firmware_info.u.efi_info;
+> +
+> +	if (!xen_initial_domain() || HYPERVISOR_platform_op(&op) < 0)
+> +		return NULL;
+> +
+> +	/* Here we know that Xen runs on EFI platform. */
+> +
+> +	efi = efi_xen;
+> +
+> +	efi_systab_xen.tables = info->cfg.addr;
+> +	efi_systab_xen.nr_tables = info->cfg.nent;
+> +
+> +	op.cmd = XENPF_firmware_info;
+> +	op.u.firmware_info.type = XEN_FW_EFI_INFO;
+> +	op.u.firmware_info.index = XEN_FW_EFI_VENDOR;
+> +	info->vendor.bufsz = sizeof(vendor);
+> +	set_xen_guest_handle(info->vendor.name, vendor);
+> +
+> +	if (HYPERVISOR_platform_op(&op) == 0) {
+> +		efi_systab_xen.fw_vendor = __pa_symbol(vendor);
+> +		efi_systab_xen.fw_revision = info->vendor.revision;
+> +	} else
+> +		efi_systab_xen.fw_vendor = __pa_symbol(L"UNKNOWN");
+> +
+> +	op.cmd = XENPF_firmware_info;
+> +	op.u.firmware_info.type = XEN_FW_EFI_INFO;
+> +	op.u.firmware_info.index = XEN_FW_EFI_VERSION;
+> +
+> +	if (HYPERVISOR_platform_op(&op) == 0)
+> +		efi_systab_xen.hdr.revision = info->version;
+> +
+> +	op.cmd = XENPF_firmware_info;
+> +	op.u.firmware_info.type = XEN_FW_EFI_INFO;
+> +	op.u.firmware_info.index = XEN_FW_EFI_RT_VERSION;
+> +
+> +	if (HYPERVISOR_platform_op(&op) == 0)
+> +		efi.runtime_version = info->version;
+> +
+> +	return &efi_systab_xen;
+> +}
+>  
+>  void __init xen_efi_init(void)
+>  {
+> diff --git a/drivers/xen/efi.c b/drivers/xen/efi.c
+> index be7e56a..22f71ff 100644
+> --- a/drivers/xen/efi.c
+> +++ b/drivers/xen/efi.c
+> @@ -38,7 +38,7 @@
+>  
+>  #define efi_data(op)	(op.u.efi_runtime_call)
+>  
+> -static efi_status_t xen_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc)
+> +efi_status_t xen_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc)
+>  {
+>  	struct xen_platform_op op = INIT_EFI_OP(get_time);
+>  
+> @@ -59,8 +59,9 @@ static efi_status_t xen_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc)
+>  
+>  	return efi_data(op).status;
+>  }
+> +EXPORT_SYMBOL_GPL(xen_efi_get_time);
+>  
+> -static efi_status_t xen_efi_set_time(efi_time_t *tm)
+> +efi_status_t xen_efi_set_time(efi_time_t *tm)
+>  {
+>  	struct xen_platform_op op = INIT_EFI_OP(set_time);
+>  
+> @@ -72,10 +73,10 @@ static efi_status_t xen_efi_set_time(efi_time_t *tm)
+>  
+>  	return efi_data(op).status;
+>  }
+> +EXPORT_SYMBOL_GPL(xen_efi_set_time);
+>  
+> -static efi_status_t xen_efi_get_wakeup_time(efi_bool_t *enabled,
+> -					    efi_bool_t *pending,
+> -					    efi_time_t *tm)
+> +efi_status_t xen_efi_get_wakeup_time(efi_bool_t *enabled, efi_bool_t *pending,
+> +				     efi_time_t *tm)
+>  {
+>  	struct xen_platform_op op = INIT_EFI_OP(get_wakeup_time);
+>  
+> @@ -95,8 +96,9 @@ static efi_status_t xen_efi_get_wakeup_time(efi_bool_t *enabled,
+>  
+>  	return efi_data(op).status;
+>  }
+> +EXPORT_SYMBOL_GPL(xen_efi_get_wakeup_time);
+>  
+> -static efi_status_t xen_efi_set_wakeup_time(efi_bool_t enabled, efi_time_t *tm)
+> +efi_status_t xen_efi_set_wakeup_time(efi_bool_t enabled, efi_time_t *tm)
+>  {
+>  	struct xen_platform_op op = INIT_EFI_OP(set_wakeup_time);
+>  
+> @@ -113,12 +115,11 @@ static efi_status_t xen_efi_set_wakeup_time(efi_bool_t enabled, efi_time_t *tm)
+>  
+>  	return efi_data(op).status;
+>  }
+> +EXPORT_SYMBOL_GPL(xen_efi_set_wakeup_time);
+>  
+> -static efi_status_t xen_efi_get_variable(efi_char16_t *name,
+> -					 efi_guid_t *vendor,
+> -					 u32 *attr,
+> -					 unsigned long *data_size,
+> -					 void *data)
+> +efi_status_t xen_efi_get_variable(efi_char16_t *name, efi_guid_t *vendor,
+> +				  u32 *attr, unsigned long *data_size,
+> +				  void *data)
+>  {
+>  	struct xen_platform_op op = INIT_EFI_OP(get_variable);
+>  
+> @@ -138,10 +139,11 @@ static efi_status_t xen_efi_get_variable(efi_char16_t *name,
+>  
+>  	return efi_data(op).status;
+>  }
+> +EXPORT_SYMBOL_GPL(xen_efi_get_variable);
+>  
+> -static efi_status_t xen_efi_get_next_variable(unsigned long *name_size,
+> -					      efi_char16_t *name,
+> -					      efi_guid_t *vendor)
+> +efi_status_t xen_efi_get_next_variable(unsigned long *name_size,
+> +				       efi_char16_t *name,
+> +				       efi_guid_t *vendor)
+>  {
+>  	struct xen_platform_op op = INIT_EFI_OP(get_next_variable_name);
+>  
+> @@ -161,12 +163,11 @@ static efi_status_t xen_efi_get_next_variable(unsigned long *name_size,
+>  
+>  	return efi_data(op).status;
+>  }
+> +EXPORT_SYMBOL_GPL(xen_efi_get_next_variable);
+>  
+> -static efi_status_t xen_efi_set_variable(efi_char16_t *name,
+> -					 efi_guid_t *vendor,
+> -					 u32 attr,
+> -					 unsigned long data_size,
+> -					 void *data)
+> +efi_status_t xen_efi_set_variable(efi_char16_t *name, efi_guid_t *vendor,
+> +				 u32 attr, unsigned long data_size,
+> +				 void *data)
+>  {
+>  	struct xen_platform_op op = INIT_EFI_OP(set_variable);
+>  
+> @@ -183,11 +184,11 @@ static efi_status_t xen_efi_set_variable(efi_char16_t *name,
+>  
+>  	return efi_data(op).status;
+>  }
+> +EXPORT_SYMBOL_GPL(xen_efi_set_variable);
+>  
+> -static efi_status_t xen_efi_query_variable_info(u32 attr,
+> -						u64 *storage_space,
+> -						u64 *remaining_space,
+> -						u64 *max_variable_size)
+> +efi_status_t xen_efi_query_variable_info(u32 attr, u64 *storage_space,
+> +					 u64 *remaining_space,
+> +					 u64 *max_variable_size)
+>  {
+>  	struct xen_platform_op op = INIT_EFI_OP(query_variable_info);
+>  
+> @@ -205,8 +206,9 @@ static efi_status_t xen_efi_query_variable_info(u32 attr,
+>  
+>  	return efi_data(op).status;
+>  }
+> +EXPORT_SYMBOL_GPL(xen_efi_query_variable_info);
+>  
+> -static efi_status_t xen_efi_get_next_high_mono_count(u32 *count)
+> +efi_status_t xen_efi_get_next_high_mono_count(u32 *count)
+>  {
+>  	struct xen_platform_op op = INIT_EFI_OP(get_next_high_monotonic_count);
+>  
+> @@ -217,10 +219,10 @@ static efi_status_t xen_efi_get_next_high_mono_count(u32 *count)
+>  
+>  	return efi_data(op).status;
+>  }
+> +EXPORT_SYMBOL_GPL(xen_efi_get_next_high_mono_count);
+>  
+> -static efi_status_t xen_efi_update_capsule(efi_capsule_header_t **capsules,
+> -					   unsigned long count,
+> -					   unsigned long sg_list)
+> +efi_status_t xen_efi_update_capsule(efi_capsule_header_t **capsules,
+> +				    unsigned long count, unsigned long sg_list)
+>  {
+>  	struct xen_platform_op op = INIT_EFI_OP(update_capsule);
+>  
+> @@ -237,11 +239,11 @@ static efi_status_t xen_efi_update_capsule(efi_capsule_header_t **capsules,
+>  
+>  	return efi_data(op).status;
+>  }
+> +EXPORT_SYMBOL_GPL(xen_efi_update_capsule);
+>  
+> -static efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
+> -					       unsigned long count,
+> -					       u64 *max_size,
+> -					       int *reset_type)
+> +efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
+> +					unsigned long count, u64 *max_size,
+> +					int *reset_type)
+>  {
+>  	struct xen_platform_op op = INIT_EFI_OP(query_capsule_capabilities);
+>  
+> @@ -260,112 +262,4 @@ static efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
+>  
+>  	return efi_data(op).status;
+>  }
+> -
+> -static efi_char16_t vendor[100] __initdata;
+> -
+> -static efi_system_table_t efi_systab_xen __initdata = {
+> -	.hdr = {
+> -		.signature	= EFI_SYSTEM_TABLE_SIGNATURE,
+> -		.revision	= 0, /* Initialized later. */
+> -		.headersize	= 0, /* Ignored by Linux Kernel. */
+> -		.crc32		= 0, /* Ignored by Linux Kernel. */
+> -		.reserved	= 0
+> -	},
+> -	.fw_vendor	= EFI_INVALID_TABLE_ADDR, /* Initialized later. */
+> -	.fw_revision	= 0,			  /* Initialized later. */
+> -	.con_in_handle	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
+> -	.con_in		= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
+> -	.con_out_handle	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
+> -	.con_out	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
+> -	.stderr_handle	= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
+> -	.stderr		= EFI_INVALID_TABLE_ADDR, /* Not used under Xen. */
+> -	.runtime	= (efi_runtime_services_t *)EFI_INVALID_TABLE_ADDR,
+> -						  /* Not used under Xen. */
+> -	.boottime	= (efi_boot_services_t *)EFI_INVALID_TABLE_ADDR,
+> -						  /* Not used under Xen. */
+> -	.nr_tables	= 0,			  /* Initialized later. */
+> -	.tables		= EFI_INVALID_TABLE_ADDR  /* Initialized later. */
+> -};
+> -
+> -static const struct efi efi_xen __initconst = {
+> -	.systab                   = NULL, /* Initialized later. */
+> -	.runtime_version	  = 0,    /* Initialized later. */
+> -	.mps                      = EFI_INVALID_TABLE_ADDR,
+> -	.acpi                     = EFI_INVALID_TABLE_ADDR,
+> -	.acpi20                   = EFI_INVALID_TABLE_ADDR,
+> -	.smbios                   = EFI_INVALID_TABLE_ADDR,
+> -	.smbios3                  = EFI_INVALID_TABLE_ADDR,
+> -	.sal_systab               = EFI_INVALID_TABLE_ADDR,
+> -	.boot_info                = EFI_INVALID_TABLE_ADDR,
+> -	.hcdp                     = EFI_INVALID_TABLE_ADDR,
+> -	.uga                      = EFI_INVALID_TABLE_ADDR,
+> -	.uv_systab                = EFI_INVALID_TABLE_ADDR,
+> -	.fw_vendor                = EFI_INVALID_TABLE_ADDR,
+> -	.runtime                  = EFI_INVALID_TABLE_ADDR,
+> -	.config_table             = EFI_INVALID_TABLE_ADDR,
+> -	.get_time                 = xen_efi_get_time,
+> -	.set_time                 = xen_efi_set_time,
+> -	.get_wakeup_time          = xen_efi_get_wakeup_time,
+> -	.set_wakeup_time          = xen_efi_set_wakeup_time,
+> -	.get_variable             = xen_efi_get_variable,
+> -	.get_next_variable        = xen_efi_get_next_variable,
+> -	.set_variable             = xen_efi_set_variable,
+> -	.query_variable_info      = xen_efi_query_variable_info,
+> -	.update_capsule           = xen_efi_update_capsule,
+> -	.query_capsule_caps       = xen_efi_query_capsule_caps,
+> -	.get_next_high_mono_count = xen_efi_get_next_high_mono_count,
+> -	.reset_system             = NULL, /* Functionality provided by Xen. */
+> -	.set_virtual_address_map  = NULL, /* Not used under Xen. */
+> -	.memmap                   = NULL, /* Not used under Xen. */
+> -	.flags			  = 0     /* Initialized later. */
+> -};
+> -
+> -efi_system_table_t __init *xen_efi_probe(void)
+> -{
+> -	struct xen_platform_op op = {
+> -		.cmd = XENPF_firmware_info,
+> -		.u.firmware_info = {
+> -			.type = XEN_FW_EFI_INFO,
+> -			.index = XEN_FW_EFI_CONFIG_TABLE
+> -		}
+> -	};
+> -	union xenpf_efi_info *info = &op.u.firmware_info.u.efi_info;
+> -
+> -	if (!xen_initial_domain() || HYPERVISOR_platform_op(&op) < 0)
+> -		return NULL;
+> -
+> -	/* Here we know that Xen runs on EFI platform. */
+> -
+> -	efi = efi_xen;
+> -
+> -	efi_systab_xen.tables = info->cfg.addr;
+> -	efi_systab_xen.nr_tables = info->cfg.nent;
+> -
+> -	op.cmd = XENPF_firmware_info;
+> -	op.u.firmware_info.type = XEN_FW_EFI_INFO;
+> -	op.u.firmware_info.index = XEN_FW_EFI_VENDOR;
+> -	info->vendor.bufsz = sizeof(vendor);
+> -	set_xen_guest_handle(info->vendor.name, vendor);
+> -
+> -	if (HYPERVISOR_platform_op(&op) == 0) {
+> -		efi_systab_xen.fw_vendor = __pa_symbol(vendor);
+> -		efi_systab_xen.fw_revision = info->vendor.revision;
+> -	} else
+> -		efi_systab_xen.fw_vendor = __pa_symbol(L"UNKNOWN");
+> -
+> -	op.cmd = XENPF_firmware_info;
+> -	op.u.firmware_info.type = XEN_FW_EFI_INFO;
+> -	op.u.firmware_info.index = XEN_FW_EFI_VERSION;
+> -
+> -	if (HYPERVISOR_platform_op(&op) == 0)
+> -		efi_systab_xen.hdr.revision = info->version;
+> -
+> -	op.cmd = XENPF_firmware_info;
+> -	op.u.firmware_info.type = XEN_FW_EFI_INFO;
+> -	op.u.firmware_info.index = XEN_FW_EFI_RT_VERSION;
+> -
+> -	if (HYPERVISOR_platform_op(&op) == 0)
+> -		efi.runtime_version = info->version;
+> -
+> -	return &efi_systab_xen;
+> -}
+> +EXPORT_SYMBOL_GPL(xen_efi_query_capsule_caps);
+> diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
+> index 42be31a..c83a338 100644
+> --- a/include/xen/xen-ops.h
+> +++ b/include/xen/xen-ops.h
+> @@ -85,14 +85,28 @@ int xen_xlate_map_ballooned_pages(xen_pfn_t **pfns, void **vaddr,
+>  
+>  bool xen_running_on_version_or_later(unsigned int major, unsigned int minor);
+>  
+> -#ifdef CONFIG_XEN_EFI
+> -extern efi_system_table_t *xen_efi_probe(void);
+> -#else
+> -static inline efi_system_table_t __init *xen_efi_probe(void)
+> -{
+> -	return NULL;
+> -}
+> -#endif
+> +efi_status_t xen_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc);
+> +efi_status_t xen_efi_set_time(efi_time_t *tm);
+> +efi_status_t xen_efi_get_wakeup_time(efi_bool_t *enabled, efi_bool_t *pending,
+> +				     efi_time_t *tm);
+> +efi_status_t xen_efi_set_wakeup_time(efi_bool_t enabled, efi_time_t *tm);
+> +efi_status_t xen_efi_get_variable(efi_char16_t *name, efi_guid_t *vendor,
+> +				  u32 *attr, unsigned long *data_size,
+> +				  void *data);
+> +efi_status_t xen_efi_get_next_variable(unsigned long *name_size,
+> +				       efi_char16_t *name, efi_guid_t *vendor);
+> +efi_status_t xen_efi_set_variable(efi_char16_t *name, efi_guid_t *vendor,
+> +				  u32 attr, unsigned long data_size,
+> +				  void *data);
+> +efi_status_t xen_efi_query_variable_info(u32 attr, u64 *storage_space,
+> +					 u64 *remaining_space,
+> +					 u64 *max_variable_size);
+> +efi_status_t xen_efi_get_next_high_mono_count(u32 *count);
+> +efi_status_t xen_efi_update_capsule(efi_capsule_header_t **capsules,
+> +				    unsigned long count, unsigned long sg_list);
+> +efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
+> +					unsigned long count, u64 *max_size,
+> +					int *reset_type);
+>  
+>  #ifdef CONFIG_PREEMPT
+>  
+> -- 
+> 2.0.4
+> 
+> 
