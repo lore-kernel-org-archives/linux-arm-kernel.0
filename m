@@ -1,20 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 25 Jan 2016 10:50:47 +0000
-Subject: [PATCH v2] ARM: imx_v6_v7_defconfig: Enable GPU support
-In-Reply-To: <1453682984-5785-1-git-send-email-festevam@gmail.com>
-References: <1453682984-5785-1-git-send-email-festevam@gmail.com>
-Message-ID: <20160125105047.GJ10826@n2100.arm.linux.org.uk>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Mon, 25 Jan 2016 11:54:07 +0100
+Subject: [PATCH 1/2] drm/rockchip: Don't build rockchip_drm_vop as modules
+In-Reply-To: <1452673328-29188-2-git-send-email-mark.yao@rock-chips.com>
+References: <1452673328-29188-1-git-send-email-mark.yao@rock-chips.com>
+ <1452673328-29188-2-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1453719247.30130.22.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 24, 2016 at 10:49:44PM -0200, Fabio Estevam wrote:
-> Select CONFIG_DRM_ETNAVIV, so that GPU support can be enabled by default.
+On Wed, 2016-01-13 at 16:22 +0800, Mark Yao wrote:
+> rockchip_drm_vop's module init had moved to rockchip_vop_reg.c
+> so no need to build rockchip_drm_vop.ko
 
-Not yet, we know that there's the potential for oopsing the kernel by
-reading a debugfs file on iMX6 platforms (due to the VG core).  Let's
-get that fixed first, so it's not visible "by default".
+Looks like this didn't make it for the Linux 4.5 merge window, which
+unfortunately means in 4.5-rc1 DRM on rockchip is broken :/
+
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> ---
+> ?drivers/gpu/drm/rockchip/Makefile |????5 ++---
+> ?1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/Makefile
+> b/drivers/gpu/drm/rockchip/Makefile
+> index a9d380f..9e6e992 100644
+> --- a/drivers/gpu/drm/rockchip/Makefile
+> +++ b/drivers/gpu/drm/rockchip/Makefile
+> @@ -3,9 +3,8 @@
+> ?# Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
+> ?
+> ?rockchipdrm-y := rockchip_drm_drv.o rockchip_drm_fb.o
+> rockchip_drm_fbdev.o \
+> -		rockchip_drm_gem.o
+> +		rockchip_drm_gem.o rockchip_drm_vop.o
+> ?
+> ?obj-$(CONFIG_ROCKCHIP_DW_HDMI) += dw_hdmi-rockchip.o
+> ?
+> -obj-$(CONFIG_DRM_ROCKCHIP) += rockchipdrm.o rockchip_drm_vop.o \
+> -				rockchip_vop_reg.o
+> +obj-$(CONFIG_DRM_ROCKCHIP) += rockchipdrm.o rockchip_vop_reg.o
 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Sjoerd Simons
+Collabora Ltd.
