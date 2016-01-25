@@ -1,69 +1,61 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 25 Jan 2016 13:46:22 -0700
-Subject: [PATCH V8 20/23] perf tools: making function set_max_cpu_num()
- non static
-In-Reply-To: <1452807977-8069-21-git-send-email-mathieu.poirier@linaro.org>
-References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
- <1452807977-8069-21-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <CANLsYkzmTMi3jmVjwNiNsw6P5pPkZEz6zYWFsVzayy+r2ojTTA@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 25 Jan 2016 21:48:02 +0100
+Subject: mtd: pxa3xx_nand: issue with command time out
+In-Reply-To: <20160125183022.GA41251@google.com> (Brian Norris's message of
+ "Mon, 25 Jan 2016 10:30:22 -0800")
+References: <5695CEF0.1080100@alliedtelesis.co.nz>
+ <87a8o9ex9r.fsf@belgarion.home> <569827BC.10601@alliedtelesis.co.nz>
+ <874meddqu5.fsf@belgarion.home> <20160125183022.GA41251@google.com>
+Message-ID: <87fuxl9yil.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 January 2016 at 14:46, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
-> For memory allocation purposes, code located in other places
-> then util/cpumap.c may want to know how many CPUs the system has.
->
-> This patch is making function set_max_cpu_num() available to
-> other parts of the perf tool so that global variable
-> 'max_cpu_num' gets the right value when referenced by cpu__max_cpu().
->
-> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->  tools/perf/util/cpumap.c | 2 +-
->  tools/perf/util/cpumap.h | 1 +
->  2 files changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/tools/perf/util/cpumap.c b/tools/perf/util/cpumap.c
-> index 10af1e7524fb..ae179320c0c0 100644
-> --- a/tools/perf/util/cpumap.c
-> +++ b/tools/perf/util/cpumap.c
-> @@ -380,7 +380,7 @@ out:
->  }
->
->  /* Determine highest possible cpu in the system for sparse allocation */
-> -static void set_max_cpu_num(void)
-> +void set_max_cpu_num(void)
->  {
->         const char *mnt;
->         char path[PATH_MAX];
-> diff --git a/tools/perf/util/cpumap.h b/tools/perf/util/cpumap.h
-> index 85f7772457fa..45fa963345eb 100644
-> --- a/tools/perf/util/cpumap.h
-> +++ b/tools/perf/util/cpumap.h
-> @@ -14,6 +14,7 @@ struct cpu_map {
->         int map[];
->  };
->
-> +void set_max_cpu_num(void);
->  struct cpu_map *cpu_map__new(const char *cpu_list);
->  struct cpu_map *cpu_map__empty_new(int nr);
->  struct cpu_map *cpu_map__dummy_new(void);
-> --
-> 2.1.4
->
+Brian Norris <computersforpeace@gmail.com> writes:
 
-Arnaldo,
+> Hi Robert,
+>
+> On Sun, Jan 17, 2016 at 12:53:06AM +0100, Robert Jarzmik wrote:
+> commit 24542257a3b987025d4b998ec2d15e556c98ad3f
+> Author: Robert Jarzmik <robert.jarzmik@free.fr>
+> Date:   Fri Feb 20 19:36:43 2015 +0100
+>
+>     mtd: pxa3xx-nand: handle PIO in threaded interrupt
+>
+>
+> And now I'm wondering: when does the completion get triggered? i.e.:
+>
+> 	complete(&info->cmd_complete);
 
-I can't queue this patch for 4.6 without at least a reviewed by from you.
+> It seems to me like you've short-circuited some of the IRQ handling
+> code, so that the threaded handler is buggy. AIUI, if the completion
+> event ever happens, it's actually happening *before* the full (threaded)
+> handler is actually finished, since it occurs in pxa3xx_nand_irq(),
+> before pxa3xx_nand_irq_thread() ever runs. Now, I'm not sure if that
+> causes a real problem in practice, since you used IRQF_ONESHOT, but I
+> would think that's also suspect.
 
-It has been rebased to 4.5-rc1 here [1] for your convenience.  I will
-be happy to use another baseline should that be more adequate for you.
-The same goes for [2]
+I think you're very right, this "goto NORMAL_IRQ_EXIT" creates a
+short-cirtcuit. That makes me think that I should :
+ - add
+static void pxa3xx_nand_data_finished(struct pxa3xx_nand_info *info)
+{
+	unsigned int done;
 
-Thanks,
-Mathieu
+ 	cmd_done = info->cs ? NDSR_CS1_CMDD : NDSR_CS0_CMDD;
+	nand_writel(info, NDSR, cmd_done);
+        complete(&inf0->cmd_complete);
+}
 
-[1]. https://git.linaro.org/people/mathieu.poirier/coresight.git/shortlog/refs/heads/perf-v4.5-rc1-V8
+ - in pxa3xx_nand_irq_thread(), I should add at the end:
+	pxa3xx_nand_data_finished(info);
+
+ - in pxa3xx_nand_data_dma_irq(), I should add at the end:
+	pxa3xx_nand_data_finished(info);
+
+Ezequiel, would you have a look at that code snippet and tell me if I'm missing
+something in the driver's structure ?
+
+Cheers.
+
+--
+Robert
