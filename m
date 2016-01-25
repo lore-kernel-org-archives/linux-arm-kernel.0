@@ -1,103 +1,88 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 15:53:41 +0000
-Subject: [PATCH v2 07/21] arm64: KVM: VHE: Patch out kern_hyp_va
+Date: Mon, 25 Jan 2016 15:53:39 +0000
+Subject: [PATCH v2 05/21] arm64: KVM: VHE: Turn VTCR_EL2 setup into a reusable
+ macro
 In-Reply-To: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
 References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453737235-16522-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453737235-16522-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kern_hyp_va macro is pretty meaninless with VHE, as there is
-only one mapping - the kernel one.
+On a VHE-capable system, there is no point in setting VTCR_EL2
+at KVM init time. We can perfectly set it up when the kernel
+boots, removing the need for a more complicated configuration.
 
-In order to keep the code readable and efficient, use runtime
-patching to replace the 'and' instruction used to compute the VA
-with a 'nop'.
+In order to allow this, turn VTCR_EL2 setup into a macro that
+we'll be able to reuse at boot time.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_mmu.h | 11 ++++++++++-
- arch/arm64/kvm/hyp/hyp.h         | 25 ++++++++++++++++++++++---
- 2 files changed, 32 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/kvm_mmu.h | 23 +++++++++++++++++++++++
+ arch/arm64/kvm/hyp-init.S        | 18 +-----------------
+ 2 files changed, 24 insertions(+), 17 deletions(-)
 
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index d3e6d7b..62f0d14 100644
+index 7364339..d3e6d7b 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -23,13 +23,16 @@
- #include <asm/cpufeature.h>
- 
- /*
-- * As we only have the TTBR0_EL2 register, we cannot express
-+ * As ARMv8.0 only has the TTBR0_EL2 register, we cannot express
-  * "negative" addresses. This makes it impossible to directly share
-  * mappings with the kernel.
-  *
-  * Instead, give the HYP mode its own VA region at a fixed offset from
-  * the kernel by just masking the top bits (which are all ones for a
-  * kernel address).
-+ *
-+ * ARMv8.1 (using VHE) does have a TTBR1_EL2, and doesn't use these
-+ * macros (the entire kernel runs at EL2).
-  */
- #define HYP_PAGE_OFFSET_SHIFT	VA_BITS
- #define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
-@@ -56,6 +59,8 @@
+@@ -56,6 +56,29 @@
  
  #ifdef __ASSEMBLY__
  
-+#include <asm/alternative.h>
-+#include <asm/cpufeature.h>
- #include <asm/kvm_arm.h>
- 
- .macro setup_vtcr tmp1, tmp2
-@@ -84,7 +89,11 @@
++#include <asm/kvm_arm.h>
++
++.macro setup_vtcr tmp1, tmp2
++	mov	\tmp1, #(VTCR_EL2_FLAGS & 0xffff)
++	movk	\tmp1, #(VTCR_EL2_FLAGS >> 16), lsl #16
++	/*
++	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
++	 * VTCR_EL2.
++	 */
++	mrs	\tmp2, id_aa64mmfr0_el1
++	bfi	\tmp1, \tmp2, #16, #3
++	/*
++	 * Read the VMIDBits bits from ID_AA64MMFR1_EL1 and set the VS bit in
++	 * VTCR_EL2.
++	 */
++	mrs	\tmp2, ID_AA64MMFR1_EL1
++	ubfx	\tmp2, \tmp2, #5, #1
++	lsl	\tmp2, \tmp2, #VTCR_EL2_VS
++	orr	\tmp1, \tmp1, \tmp2
++
++	msr	vtcr_el2, \tmp1
++	isb
++.endm
+ /*
+  * Convert a kernel VA into a HYP VA.
   * reg: VA to be converted.
-  */
- .macro kern_hyp_va	reg
-+alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
- 	and	\reg, \reg, #HYP_PAGE_OFFSET_MASK
-+alternative_else
-+	nop
-+alternative_endif
- .endm
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index 3e568dc..4143e2c 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -87,23 +87,7 @@ __do_hyp_init:
+ #endif
+ 	msr	tcr_el2, x4
  
- #else
-diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-index fb27517..fc502f3 100644
---- a/arch/arm64/kvm/hyp/hyp.h
-+++ b/arch/arm64/kvm/hyp/hyp.h
-@@ -25,9 +25,28 @@
+-	ldr	x4, =VTCR_EL2_FLAGS
+-	/*
+-	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
+-	 * VTCR_EL2.
+-	 */
+-	mrs	x5, ID_AA64MMFR0_EL1
+-	bfi	x4, x5, #16, #3
+-	/*
+-	 * Read the VMIDBits bits from ID_AA64MMFR1_EL1 and set the VS bit in
+-	 * VTCR_EL2.
+-	 */
+-	mrs	x5, ID_AA64MMFR1_EL1
+-	ubfx	x5, x5, #5, #1
+-	lsl	x5, x5, #VTCR_EL2_VS
+-	orr	x4, x4, x5
+-
+-	msr	vtcr_el2, x4
++	setup_vtcr x4, x5
  
- #define __hyp_text __section(.hyp.text) notrace
- 
--#define kern_hyp_va(v) (typeof(v))((unsigned long)(v) & HYP_PAGE_OFFSET_MASK)
--#define hyp_kern_va(v) (typeof(v))((unsigned long)(v) - HYP_PAGE_OFFSET \
--						      + PAGE_OFFSET)
-+static inline unsigned long __kern_hyp_va(unsigned long v)
-+{
-+	asm volatile(ALTERNATIVE("and %0, %0, %1",
-+				 "nop",
-+				 ARM64_HAS_VIRT_HOST_EXTN)
-+		     : "+r" (v) : "i" (HYP_PAGE_OFFSET_MASK));
-+	return v;
-+}
-+
-+#define kern_hyp_va(v) (typeof(v))(__kern_hyp_va((unsigned long)(v)))
-+
-+static inline unsigned long __hyp_kern_va(unsigned long v)
-+{
-+	u64 offset = PAGE_OFFSET - HYP_PAGE_OFFSET;
-+	asm volatile(ALTERNATIVE("add %0, %0, %1",
-+				 "nop",
-+				 ARM64_HAS_VIRT_HOST_EXTN)
-+		     : "+r" (v) : "r" (offset));
-+	return v;
-+}
-+
-+#define hyp_kern_va(v) (typeof(v))(__hyp_kern_va((unsigned long)(v)))
- 
- /**
-  * hyp_alternate_select - Generates patchable code sequences that are
+ 	mrs	x4, mair_el1
+ 	msr	mair_el2, x4
 -- 
 2.1.4
