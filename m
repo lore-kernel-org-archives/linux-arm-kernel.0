@@ -1,66 +1,122 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 15:53:46 +0000
-Subject: [PATCH v2 12/21] arm64: KVM: VHE: Enable minimal sysreg save/restore
+Date: Mon, 25 Jan 2016 15:53:55 +0000
+Subject: [PATCH v2 21/21] arm64: Panic when VHE and non VHE CPUs coexist
 In-Reply-To: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
 References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453737235-16522-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453737235-16522-22-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're now in a position where we can introduce VHE's minimal
-save/restore, which is limited to the handful of shared sysregs.
+Having both VHE and non-VHE capable CPUs in the same system
+is likely to be a recipe for disaster.
 
-Add the required alternative function calls that result in a
-"do nothing" call on VHE, and the normal save/restore for non-VHE.
+If the boot CPU has VHE, but a secondary is not, we won't be
+able to downgrade and run the kernel at EL1. Add CPU hotplug
+to the mix, and this produces a terrifying mess.
+
+Let's solve the problem once and for all. If you mix VHE and
+non-VHE CPUs in the same system, you deserve to loose, and this
+patch makes sure you don't get a chance.
+
+This is implemented by storing the kernel execution level in
+a global variable. Secondaries will park themselves in a
+WFI loop if they observe a mismatch. Also, the primary CPU
+will detect that the secondary CPU has died on a mismatched
+execution level. Panic will follow.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/sysreg-sr.c | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/virt.h | 17 +++++++++++++++++
+ arch/arm64/kernel/head.S      | 19 +++++++++++++++++++
+ arch/arm64/kernel/smp.c       |  3 +++
+ 3 files changed, 39 insertions(+)
 
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 7d7d757..36bbdec 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -23,6 +23,9 @@
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index 9f22dd6..f81a345 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -36,6 +36,11 @@
+  */
+ extern u32 __boot_cpu_mode[2];
  
- #include "hyp.h"
- 
-+/* Yes, this does nothing, on purpose */
-+static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
++/*
++ * __run_cpu_mode records the mode the boot CPU uses for the kernel.
++ */
++extern u32 __run_cpu_mode[2];
 +
+ void __hyp_set_vectors(phys_addr_t phys_vector_base);
+ phys_addr_t __hyp_get_vectors(void);
+ 
+@@ -60,6 +65,18 @@ static inline bool is_kernel_in_hyp_mode(void)
+ 	return el == CurrentEL_EL2;
+ }
+ 
++static inline bool is_kernel_mode_mismatched(void)
++{
++	/*
++	 * A mismatched CPU will have written its own CurrentEL in
++	 * __run_cpu_mode[1] (initially set to zero) after failing to
++	 * match the value in __run_cpu_mode[0]. Thus, a non-zero
++	 * value in __run_cpu_mode[1] is enough to detect the
++	 * pathological case.
++	 */
++	return !!ACCESS_ONCE(__run_cpu_mode[1]);
++}
++
+ /* The section containing the hypervisor text */
+ extern char __hyp_text_start[];
+ extern char __hyp_text_end[];
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 2a7134c..bc44cf8 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -577,7 +577,23 @@ ENTRY(set_cpu_boot_mode_flag)
+ 1:	str	w20, [x1]			// This CPU has booted in EL1
+ 	dmb	sy
+ 	dc	ivac, x1			// Invalidate potentially stale cache line
++	adr_l	x1, __run_cpu_mode
++	ldr	w0, [x1]
++	mrs	x20, CurrentEL
++	cbz	x0, skip_el_check
++	cmp	x0, x20
++	bne	mismatched_el
++skip_el_check:			// Only the first CPU gets to set the rule
++	str	w20, [x1]
++	dmb	sy
++	dc	ivac, x1	// Invalidate potentially stale cache line
+ 	ret
++mismatched_el:
++	str	w20, [x1, #4]
++	dmb	sy
++	dc	ivac, x1	// Invalidate potentially stale cache line
++1:	wfi
++	b	1b
+ ENDPROC(set_cpu_boot_mode_flag)
+ 
  /*
-  * Non-VHE: Both host and guest must save everything.
-  *
-@@ -67,9 +70,13 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
- 	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg_el1(spsr);
- }
+@@ -592,6 +608,9 @@ ENDPROC(set_cpu_boot_mode_flag)
+ ENTRY(__boot_cpu_mode)
+ 	.long	BOOT_CPU_MODE_EL2
+ 	.long	BOOT_CPU_MODE_EL1
++ENTRY(__run_cpu_mode)
++	.long	0
++	.long	0
+ 	.popsection
  
-+static hyp_alternate_select(__sysreg_call_save_state,
-+			    __sysreg_save_state, __sysreg_do_nothing,
-+			    ARM64_HAS_VIRT_HOST_EXTN);
+ 	/*
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index b1adc51..bc7650a 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -113,6 +113,9 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+ 			pr_crit("CPU%u: failed to come online\n", cpu);
+ 			ret = -EIO;
+ 		}
 +
- void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
- {
--	__sysreg_save_state(ctxt);
-+	__sysreg_call_save_state()(ctxt);
- 	__sysreg_save_common_state(ctxt);
- }
- 
-@@ -116,9 +123,13 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
- 	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
- }
- 
-+static hyp_alternate_select(__sysreg_call_restore_host_state,
-+			    __sysreg_restore_state, __sysreg_do_nothing,
-+			    ARM64_HAS_VIRT_HOST_EXTN);
-+
- void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
- {
--	__sysreg_restore_state(ctxt);
-+	__sysreg_call_restore_host_state()(ctxt);
- 	__sysreg_restore_common_state(ctxt);
- }
- 
++		if (is_kernel_mode_mismatched())
++			panic("CPU%u: incompatible execution level", cpu);
+ 	} else {
+ 		pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
+ 	}
 -- 
 2.1.4
