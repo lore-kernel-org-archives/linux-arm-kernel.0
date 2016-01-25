@@ -1,41 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:03:01 +0100
-Subject: [PATCH] fbdev: mmp: print IRQ resource using %pR format string
-Message-ID: <1453734191-1958245-1-git-send-email-arnd@arndb.de>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Mon, 25 Jan 2016 21:07:12 +0600
+Subject: [PATCH 2/3] ACPI: parse SPCR and enable matching console
+In-Reply-To: <CAHp75VeosA-54-G1oSo3cBo2KRO+rK=Q4DJxmz93WxUPORqf1Q@mail.gmail.com>
+References: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>
+ <1453722324-22407-3-git-send-email-aleksey.makarov@linaro.org>
+ <CAHp75VeosA-54-G1oSo3cBo2KRO+rK=Q4DJxmz93WxUPORqf1Q@mail.gmail.com>
+Message-ID: <56A63A20.4040602@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-resource_size_t cannot be printed using the %x format string
-when we it is defined as u64:
 
-drivers/video/fbdev/mmp/hw/mmp_ctrl.c: In function 'mmphw_probe':
-drivers/video/fbdev/mmp/hw/mmp_ctrl.c:506:22: error: format '%x' expects argument of type 'unsigned int', but argument 4 has type 'resource_size_t {aka long long unsigned int}' [-Werror=format=]
-   dev_err(ctrl->dev, "%s: res %x - %x map failed\n", __func__,
-                      ^
-drivers/video/fbdev/mmp/hw/mmp_ctrl.c:506:22: error: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'resource_size_t {aka long long unsigned int}' [-Werror=format=]
+On 25.01.2016 20:14, Andy Shevchenko wrote:
+> On Mon, Jan 25, 2016 at 1:45 PM, Aleksey Makarov
+> <aleksey.makarov@linaro.org> wrote:
+>> 'ARM Server Base Boot Requiremets' [1] mention SPCR
+>> (Serial Port Console Redirection Table) [2] as a mandatory ACPI table
+>> that specifies the configuration of serial console.
+>>
+>> Parse this table and check if any registered console match
+>> the description.  If it does, enable that console.
+>>
+>> To implement that, introduce a new member
+>> int (*acpi_match)(struct console *, struct acpi_table_spcr *)
+>> of struct console.  It allows drivers to check if they provide
+>> a matching console device.
+>>
+>> [1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
+>> [2] http://msdn.microsoft.com/en-us/library/windows/hardware/dn639131(v=vs.85).aspx
+>
+> Can you split this to several patches?
 
-This changes the format string to %pR, which is interpreted
-by the printk implementation to pretty-print a resource
-structure.
+I am not sure I should.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/video/fbdev/mmp/hw/mmp_ctrl.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+> I see preparatory patch in console code, i.e.
+> delete_from_console_list(), adding SPCR support to ACPI, enabling it.
 
-diff --git a/drivers/video/fbdev/mmp/hw/mmp_ctrl.c b/drivers/video/fbdev/mmp/hw/mmp_ctrl.c
-index de54a4748065..b6f83d5df9fd 100644
---- a/drivers/video/fbdev/mmp/hw/mmp_ctrl.c
-+++ b/drivers/video/fbdev/mmp/hw/mmp_ctrl.c
-@@ -503,8 +503,7 @@ static int mmphw_probe(struct platform_device *pdev)
- 	ctrl->reg_base = devm_ioremap_nocache(ctrl->dev,
- 			res->start, resource_size(res));
- 	if (ctrl->reg_base == NULL) {
--		dev_err(ctrl->dev, "%s: res %x - %x map failed\n", __func__,
--			res->start, res->end);
-+		dev_err(ctrl->dev, "%s: res %pR map failed\n", __func__, res);
- 		ret = -ENOMEM;
- 		goto failed;
- 	}
--- 
-2.7.0
+It would be difficult to justify delete_from_console_list() in a 
+separate patches before the rest of the changes. And enabling SPCR in a 
+separate patch also looks oddly for me.
+
+It would be great to have other comments on this before I fix this in 
+the next version.
+
+Thank you
