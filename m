@@ -1,57 +1,64 @@
 From: eric.long@linaro.org (Eric Long)
-Date: Mon, 25 Jan 2016 16:34:55 +0800
-Subject: [PATCH v2 1/2] coresight: "DEVICE_ATTR_RO" should defined as static.
+Date: Mon, 25 Jan 2016 16:34:56 +0800
+Subject: [PATCH v2 2/2] coresight: etm4x: Check every parameter used by
+ dma_xx_coherent.
 In-Reply-To: <cover.1453708131.git.eric.long@linaro.org>
 References: <cover.1453708131.git.eric.long@linaro.org>
-Message-ID: <8deddd68ec28fa1bd9ce007694f13ff27cb99191.1453708131.git.eric.long@linaro.org>
+Message-ID: <00fb1f689658102676c338a2c4fd95046346f588.1453708131.git.eric.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"DEVICE_ATTR_RO(name)" should be defined as static. And
-there is an unnecessary space at the front of the code.
+The dma_alloc_coherent return an "void *" not an "void __iomen *".
+It uses the wrong parameters when calls dma_free_coherent function.
 
 The sparse tool output logs as the following:
-coresight-etm4x.c:2224:1: warning: symbol 'dev_attr_trcoslsr' was
-not declared. Should it be static?
-coresight-etm4x.c:2225:1: warning: symbol 'dev_attr_trcpdcr' was
-not declared. Should it be static?
-coresight-etm4x.c:2226:1: warning: symbol 'dev_attr_trcpdsr' was
-not declared. Should it be static?
-And the smatch tool output logs as the following:
-of_coresight.c:89 of_coresight_alloc_memory() warn:
-inconsistent indenting
+coresight-tmc.c:199:23:    expected void *<noident>
+coresight-tmc.c:199:23:    got void [noderef] <asn:2>*vaddr
+coresight-tmc.c:336:30: warning: incorrect type in assignment
+(different address spaces)
+coresight-tmc.c:336:30:    expected char *buf
+coresight-tmc.c:336:30:    got void [noderef] <asn:2>*
+coresight-tmc.c:769:50: warning: incorrect type in argument 4
+(different base types)
+coresight-tmc.c:769:50:    expected unsigned long long
+[unsigned] [usertype] dma_handle
+coresight-tmc.c:769:50:    got restricted gfp_t
 
 Signed-off-by: Eric Long <eric.long@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm4x.c |    2 +-
- drivers/hwtracing/coresight/of_coresight.c    |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index a670764..1ec6798 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -2219,7 +2219,7 @@ static ssize_t name##_show(struct device *_dev,				\
- 	return scnprintf(buf, PAGE_SIZE, "0x%x\n",			\
- 			 readl_relaxed(drvdata->base + offset));	\
- }									\
--DEVICE_ATTR_RO(name)
-+static DEVICE_ATTR_RO(name)
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index a57c7ec..5b052d1 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -124,7 +124,7 @@ struct tmc_drvdata {
+ 	bool			reading;
+ 	char			*buf;
+ 	dma_addr_t		paddr;
+-	void __iomem		*vaddr;
++	void			*vaddr;
+ 	u32			size;
+ 	bool			enable;
+ 	enum tmc_config_type	config_type;
+@@ -766,7 +766,7 @@ err_misc_register:
+ err_devm_kzalloc:
+ 	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR)
+ 		dma_free_coherent(dev, drvdata->size,
+-				&drvdata->paddr, GFP_KERNEL);
++				drvdata->vaddr, drvdata->paddr);
+ 	return ret;
+ }
  
- coresight_simple_func(trcoslsr, TRCOSLSR);
- coresight_simple_func(trcpdcr, TRCPDCR);
-diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-index b097361..3cc57c1 100644
---- a/drivers/hwtracing/coresight/of_coresight.c
-+++ b/drivers/hwtracing/coresight/of_coresight.c
-@@ -86,7 +86,7 @@ static int of_coresight_alloc_memory(struct device *dev,
- 		return -ENOMEM;
+@@ -778,7 +778,7 @@ static int tmc_remove(struct amba_device *adev)
+ 	coresight_unregister(drvdata->csdev);
+ 	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR)
+ 		dma_free_coherent(drvdata->dev, drvdata->size,
+-				  &drvdata->paddr, GFP_KERNEL);
++				  drvdata->vaddr, drvdata->paddr);
  
- 	/* Children connected to this component via @outports */
--	 pdata->child_names = devm_kzalloc(dev, pdata->nr_outport *
-+	pdata->child_names = devm_kzalloc(dev, pdata->nr_outport *
- 					  sizeof(*pdata->child_names),
- 					  GFP_KERNEL);
- 	if (!pdata->child_names)
+ 	return 0;
+ }
 -- 
 1.7.9.5
