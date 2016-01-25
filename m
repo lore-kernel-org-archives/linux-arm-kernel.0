@@ -1,62 +1,40 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 25 Jan 2016 15:32:00 +0000
-Subject: [PATCH v3 12/17] ARM64: ACPI: Check if it runs on Xen to enable
- or disable ACPI
-In-Reply-To: <1453519184-11908-13-git-send-email-zhaoshenglong@huawei.com>
-References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
- <1453519184-11908-13-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <alpine.DEB.2.02.1601251531280.9687@kaball.uk.xensource.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Jan 2016 16:32:44 +0100
+Subject: [PATCH] ncpfs: avoid unused variable warning
+Message-ID: <1453735996-1958733-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 23 Jan 2016, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
-> a /hypervisor node in DT. So check if it needs to enable ACPI.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+When CONFIG_NCPFS_NLS is not set, we get a harmless warning
+about an unused local variable, because that is only passed
+into a macro that does not evaluate its argument:
 
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+fs/ncpfs/dir.c:136:23: warning: unused variable 'sb' [-Wunused-variable]
 
+This replaces the trivial macro with an equally trivial
+inline function, which avoids the warning.
 
-> CC: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/kernel/acpi.c | 12 ++++++++----
->  1 file changed, 8 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index d1ce8e2..4e92be0 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
->  {
->  	/*
->  	 * Return 1 as soon as we encounter a node at depth 1 that is
-> -	 * not the /chosen node.
-> +	 * not the /chosen node, or /hypervisor node when running on Xen.
->  	 */
-> -	if (depth == 1 && (strcmp(uname, "chosen") != 0))
-> -		return 1;
-> +	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
-> +		if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
-> +			return 1;
-> +	}
-> +
->  	return 0;
->  }
->  
-> @@ -184,7 +187,8 @@ void __init acpi_boot_table_init(void)
->  	/*
->  	 * Enable ACPI instead of device tree unless
->  	 * - ACPI has been disabled explicitly (acpi=off), or
-> -	 * - the device tree is not empty (it has more than just a /chosen node)
-> +	 * - the device tree is not empty (it has more than just a /chosen node,
-> +	 *   and a /hypervisor node when running on Xen)
->  	 *   and ACPI has not been force enabled (acpi=force)
->  	 */
->  	if (param_acpi_off ||
-> -- 
-> 2.0.4
-> 
-> 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 621e155a3591 ("fs: change d_compare for rcu-walk")
+---
+ fs/ncpfs/ncplib_kernel.h | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/fs/ncpfs/ncplib_kernel.h b/fs/ncpfs/ncplib_kernel.h
+index 5233fbc1747a..2bbd70f26d0a 100644
+--- a/fs/ncpfs/ncplib_kernel.h
++++ b/fs/ncpfs/ncplib_kernel.h
+@@ -148,7 +148,10 @@ int ncp__io2vol(unsigned char *, unsigned int *,
+ int ncp__vol2io(unsigned char *, unsigned int *,
+ 				const unsigned char *, unsigned int, int);
+ 
+-#define NCP_IO_TABLE(sb)	NULL
++static inline struct nls_table *NCP_IO_TABLE(struct super_block *sb)
++{
++	return NULL;
++}
+ #define ncp_tolower(t, c)	tolower(c)
+ #define ncp_toupper(t, c)	toupper(c)
+ #define ncp_io2vol(S,m,i,n,k,U)	ncp__io2vol(m,i,n,k,U)
+-- 
+2.7.0
