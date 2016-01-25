@@ -1,25 +1,16 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 25 Jan 2016 11:45:06 +0000
-Subject: [PATCHv3 12/18] arm64: mm: add __{pud,pgd}_populate
+Date: Mon, 25 Jan 2016 11:45:07 +0000
+Subject: [PATCHv3 13/18] arm64: mm: add functions to walk tables in fixmap
 In-Reply-To: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
 References: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1453722312-23076-13-git-send-email-mark.rutland@arm.com>
+Message-ID: <1453722312-23076-14-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently have __pmd_populate for creating a pmd table entry given
-the physical address of a pte, but don't have equivalents for the pud or
-pgd levels of table.
-
-To enable us to manipulate tables which are mapped outside of the linear
-mapping (where we have a PA, but not a linear map VA), it is useful to
-have these functions.
-
-This patch adds __{pud,pgd}_populate. As these should not be called when
-the kernel uses folded {pmd,pud}s, in these cases they expand to
-BUILD_BUG(). So long as the appropriate checks are made on the {pud,pgd}
-entry prior to attempting population, these should be optimized out at
-compile time.
+As a preparatory step to allow us to allocate early page tables from
+unmapped memory using memblock_alloc, add new p??_{set,clear}_fixmap*
+functions which can be used to walk page tables outside of the linear
+mapping by using fixmap slots.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
@@ -29,58 +20,107 @@ Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/pgalloc.h | 26 ++++++++++++++++++++++----
- 1 file changed, 22 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/fixmap.h  | 10 ++++++++++
+ arch/arm64/include/asm/pgtable.h | 26 ++++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+)
 
-diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
-index c150539..ff98585 100644
---- a/arch/arm64/include/asm/pgalloc.h
-+++ b/arch/arm64/include/asm/pgalloc.h
-@@ -42,11 +42,20 @@ static inline void pmd_free(struct mm_struct *mm, pmd_t *pmd)
- 	free_page((unsigned long)pmd);
- }
+diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+index 3097045..1a617d4 100644
+--- a/arch/arm64/include/asm/fixmap.h
++++ b/arch/arm64/include/asm/fixmap.h
+@@ -62,6 +62,16 @@ enum fixed_addresses {
  
--static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
-+static inline void __pud_populate(pud_t *pud, phys_addr_t pmd, pudval_t prot)
- {
--	set_pud(pud, __pud(__pa(pmd) | PMD_TYPE_TABLE));
-+	set_pud(pud, __pud(pmd | prot));
- }
+ 	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
+ 	FIX_BTMAP_BEGIN = FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1,
++
++	/*
++	 * Used for kernel page table creation, so unmapped memory may be used
++	 * for tables.
++	 */
++	FIX_PTE,
++	FIX_PMD,
++	FIX_PUD,
++	FIX_PGD,
++
+ 	__end_of_fixed_addresses
+ };
  
-+static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
-+{
-+	__pud_populate(pud, __pa(pmd), PMD_TYPE_TABLE);
-+}
-+#else
-+static inline void __pud_populate(pud_t *pud, phys_addr_t pmd, pudval_t prot)
-+{
-+	BUILD_BUG();
-+}
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 201dbe2..2fb94ef 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -57,6 +57,7 @@
+ 
+ #ifndef __ASSEMBLY__
+ 
++#include <asm/fixmap.h>
+ #include <linux/mmdebug.h>
+ 
+ extern void __pte_error(const char *file, int line, unsigned long val);
+@@ -439,6 +440,10 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+ #define pte_unmap(pte)			do { } while (0)
+ #define pte_unmap_nested(pte)		do { } while (0)
+ 
++#define pte_set_fixmap(addr)		((pte_t *)set_fixmap_offset(FIX_PTE, addr))
++#define pte_set_fixmap_offset(pmd, addr)	pte_set_fixmap(pte_offset_phys(pmd, addr))
++#define pte_clear_fixmap()		clear_fixmap(FIX_PTE)
++
+ #define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
+ 
+ /*
+@@ -478,12 +483,21 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
+ #define pmd_offset_phys(dir, addr)	(pud_page_paddr(*(dir)) + pmd_index(addr) * sizeof(pmd_t))
+ #define pmd_offset(dir, addr)		((pmd_t *)__va(pmd_offset_phys((dir), (addr))))
+ 
++#define pmd_set_fixmap(addr)		((pmd_t *)set_fixmap_offset(FIX_PMD, addr))
++#define pmd_set_fixmap_offset(pud, addr)	pmd_set_fixmap(pmd_offset_phys(pud, addr))
++#define pmd_clear_fixmap()		clear_fixmap(FIX_PMD)
++
+ #define pud_page(pud)		pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
+ 
+ #else
+ 
+ #define pud_page_paddr(pud)	({ BUILD_BUG(); 0; })
+ 
++/* Match pmd_offset folding in <asm/generic/pgtable-nopmd.h> */
++#define pmd_set_fixmap(addr)		NULL
++#define pmd_set_fixmap_offset(pudp, addr)	((pmd_t *)pudp)
++#define pmd_clear_fixmap()
++
  #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
  
  #if CONFIG_PGTABLE_LEVELS > 3
-@@ -62,11 +71,20 @@ static inline void pud_free(struct mm_struct *mm, pud_t *pud)
- 	free_page((unsigned long)pud);
- }
+@@ -516,12 +530,21 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+ #define pud_offset_phys(dir, addr)	(pgd_page_paddr(*(dir)) + pud_index(addr) * sizeof(pud_t))
+ #define pud_offset(dir, addr)		((pud_t *)__va(pud_offset_phys((dir), (addr))))
  
--static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pud_t *pud)
-+static inline void __pgd_populate(pgd_t *pgdp, phys_addr_t pud, pgdval_t prot)
++#define pud_set_fixmap(addr)		((pud_t *)set_fixmap_offset(FIX_PUD, addr))
++#define pud_set_fixmap_offset(pgd, addr)	pud_set_fixmap(pud_offset_phys(pgd, addr))
++#define pud_clear_fixmap()		clear_fixmap(FIX_PUD)
++
+ #define pgd_page(pgd)		pfn_to_page(__phys_to_pfn(pgd_val(pgd) & PHYS_MASK))
+ 
+ #else
+ 
+ #define pgd_page_paddr(pgd)	({ BUILD_BUG(); 0;})
+ 
++/* Match pud_offset folding in <asm/generic/pgtable-nopud.h> */
++#define pud_set_fixmap(addr)		NULL
++#define pud_set_fixmap_offset(pgdp, addr)	((pud_t *)pgdp)
++#define pud_clear_fixmap()
++
+ #endif  /* CONFIG_PGTABLE_LEVELS > 3 */
+ 
+ #define pgd_ERROR(pgd)		__pgd_error(__FILE__, __LINE__, pgd_val(pgd))
+@@ -536,6 +559,9 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+ /* to find an entry in a kernel page-table-directory */
+ #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
+ 
++#define pgd_set_fixmap(addr)	((pgd_t *)set_fixmap_offset(FIX_PGD, addr))
++#define pgd_clear_fixmap()	clear_fixmap(FIX_PGD)
++
+ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
  {
--	set_pgd(pgd, __pgd(__pa(pud) | PUD_TYPE_TABLE));
-+	set_pgd(pgdp, __pgd(pud | prot));
- }
- 
-+static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pud_t *pud)
-+{
-+	__pgd_populate(pgd, __pa(pud), PUD_TYPE_TABLE);
-+}
-+#else
-+static inline void __pgd_populate(pgd_t *pgdp, phys_addr_t pud, pgdval_t prot)
-+{
-+	BUILD_BUG();
-+}
- #endif	/* CONFIG_PGTABLE_LEVELS > 3 */
- 
- extern pgd_t *pgd_alloc(struct mm_struct *mm);
+ 	const pteval_t mask = PTE_USER | PTE_PXN | PTE_UXN | PTE_RDONLY |
 -- 
 1.9.1
