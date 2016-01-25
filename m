@@ -1,100 +1,83 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 25 Jan 2016 15:19:37 +0000
-Subject: [PATCH v3 10/17] arm/xen: Get event-channel irq through HVM_PARAM
- when booting with ACPI
-In-Reply-To: <1453519184-11908-11-git-send-email-zhaoshenglong@huawei.com>
-References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
- <1453519184-11908-11-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <alpine.DEB.2.02.1601251512580.9687@kaball.uk.xensource.com>
+From: amitoj1606@gmail.com (Amitoj Kaur Chawla)
+Date: Mon, 25 Jan 2016 20:51:37 +0530
+Subject: [PATCH] media: platform: exynos4-is: media-dev: Add missing
+ of_node_put
+Message-ID: <20160125152136.GA19484@amitoj-Inspiron-3542>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 23 Jan 2016, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> When booting with ACPI, it could get the event-channel irq through
-> HVM_PARAM_CALLBACK_IRQ.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm/xen/enlighten.c | 36 +++++++++++++++++++++++++++++++++++-
->  1 file changed, 35 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index 6d90a62..0e010bb 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -29,6 +29,7 @@
->  #include <linux/time64.h>
->  #include <linux/timekeeping.h>
->  #include <linux/timekeeper_internal.h>
-> +#include <linux/acpi.h>
->  
->  #include <linux/mm.h>
->  
-> @@ -262,6 +263,35 @@ void __init xen_early_init(void)
->  		add_preferred_console("hvc", 0, NULL);
->  }
->  
-> +static void __init xen_acpi_guest_init_events_irq(void)
+for_each_available_child_of_node and for_each_child_of_node perform an
+of_node_get on each iteration, so to break out of the loop an of_node_put is
+required.
 
-please rename it to "xen_acpi_guest_init"
+Found using Coccinelle. The simplified version of the semantic patch
+that is used for this is as follows:
 
+// <smpl>
+@@
+local idexpression n;
+expression e,r;
+@@
 
-> +{
-> +#ifdef CONFIG_ACPI
-> +	struct xen_hvm_param a;
-> +	int interrupt, trigger, polarity;
-> +
-> +	a.domid = DOMID_SELF;
-> +	a.index = HVM_PARAM_CALLBACK_IRQ;
-> +	xen_events_irq = 0;
-> +
-> +	if (!HYPERVISOR_hvm_op(HVMOP_get_param, &a)) {
-> +		if ((a.value >> 56) == HVM_PARAM_CALLBACK_TYPE_EVENT) {
-> +			interrupt = a.value & 0xff;
-> +			trigger = ((a.value >> 8) & 0x1) ? ACPI_EDGE_SENSITIVE
-> +							 : ACPI_LEVEL_SENSITIVE;
-> +			polarity = ((a.value >> 8) & 0x2) ? ACPI_ACTIVE_LOW
-> +							  : ACPI_ACTIVE_HIGH;
-> +			xen_events_irq = acpi_register_gsi(NULL, interrupt,
-> +							   trigger, polarity);
-> +		}
-> +	}
-> +#endif
-> +}
-> +
-> +static void __init xen_dt_guest_init_events_irq(void)
+ for_each_available_child_of_node(r,n) {
+   ...
+(
+   of_node_put(n);
+|
+   e = n
+|
++  of_node_put(n);
+?  break;
+)
+   ...
+ }
+... when != n
+// </smpl>
 
-"xen_dt_guest_init"
+Signed-off-by: Amitoj Kaur Chawla <amitoj1606@gmail.com>
+---
+ drivers/media/platform/exynos4-is/media-dev.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-Provided that you make these two changes:
-
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-
-
-> +{
-> +	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
-> +}
-> +
->  static int __init xen_guest_init(void)
->  {
->  	struct xen_add_to_physmap xatp;
-> @@ -270,7 +300,11 @@ static int __init xen_guest_init(void)
->  	if (!xen_domain())
->  		return 0;
->  
-> -	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
-> +	if (!acpi_disabled)
-> +		xen_acpi_guest_init_events_irq();
-> +	else
-> +		xen_dt_guest_init_events_irq();
-> +
->  	if (!xen_events_irq) {
->  		pr_err("Xen event channel interrupt not found\n");
->  		return -ENODEV;
-> -- 
-> 2.0.4
-> 
-> 
+diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
+index 4f5586a..09f6e54 100644
+--- a/drivers/media/platform/exynos4-is/media-dev.c
++++ b/drivers/media/platform/exynos4-is/media-dev.c
+@@ -430,8 +430,10 @@ static int fimc_md_register_sensor_entities(struct fimc_md *fmd)
+ 			continue;
+ 
+ 		ret = fimc_md_parse_port_node(fmd, port, index);
+-		if (ret < 0)
++		if (ret < 0) {
++			of_node_put(node);
+ 			goto rpm_put;
++		}
+ 		index++;
+ 	}
+ 
+@@ -442,8 +444,10 @@ static int fimc_md_register_sensor_entities(struct fimc_md *fmd)
+ 
+ 	for_each_child_of_node(ports, node) {
+ 		ret = fimc_md_parse_port_node(fmd, node, index);
+-		if (ret < 0)
++		if (ret < 0) {
++			of_node_put(node);
+ 			break;
++		}
+ 		index++;
+ 	}
+ rpm_put:
+@@ -651,8 +655,10 @@ static int fimc_md_register_platform_entities(struct fimc_md *fmd,
+ 			ret = fimc_md_register_platform_entity(fmd, pdev,
+ 							plat_entity);
+ 		put_device(&pdev->dev);
+-		if (ret < 0)
++		if (ret < 0) {
++			of_node_put(node);
+ 			break;
++		}
+ 	}
+ 
+ 	return ret;
+-- 
+1.9.1
