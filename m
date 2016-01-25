@@ -1,46 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 17:51:21 +0100
-Subject: [PATCH] crypto: hash - select CRYPTO_HASH where needed
-Message-ID: <1453740685-1980366-1-git-send-email-arnd@arndb.de>
+From: labbott@fedoraproject.org (Laura Abbott)
+Date: Mon, 25 Jan 2016 08:52:12 -0800
+Subject: [RFC][PATCH 1/4] arm64: Drop alloc function from create_mapping
+In-Reply-To: <1453740735-17898-1-git-send-email-labbott@fedoraproject.org>
+References: <1453740735-17898-1-git-send-email-labbott@fedoraproject.org>
+Message-ID: <1453740735-17898-2-git-send-email-labbott@fedoraproject.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ghash and poly1305 hash implementations can be enabled when
-CONFIG_CRYPTO_HASH is turned off, causing a link error:
+create_mapping is only used in fixmap_remap_fdt. All the create_mapping
+calls need to happen on existing translation table pages without
+additional allocations. Rather than have an alloc function be called
+and fail, just set it to NULL and catch it's use.
 
-crypto/built-in.o: In function `ghash_mod_init':
-(.init.text+0xd0): undefined reference to `crypto_register_shash'
-crypto/built-in.o: In function `ghash_mod_exit':
-(.exit.text+0xb4): undefined reference to `crypto_unregister_shash'
-crypto/built-in.o: In function `poly1305_mod_init':
-(.init.text+0xb4): undefined reference to `crypto_register_shash'
-crypto/built-in.o: In function `poly1305_mod_exit':
-(.exit.text+0x98): undefined reference to `crypto_unregister_shash'
-
-This adds an explicit 'select', like all other hashes have it.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
 ---
- crypto/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/mm/mmu.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/crypto/Kconfig b/crypto/Kconfig
-index 99109b93604a..2d76676a1253 100644
---- a/crypto/Kconfig
-+++ b/crypto/Kconfig
-@@ -472,11 +472,13 @@ config CRYPTO_CRCT10DIF_PCLMUL
- config CRYPTO_GHASH
- 	tristate "GHASH digest algorithm"
- 	select CRYPTO_GF128MUL
-+	select CRYPTO_HASH
- 	help
- 	  GHASH is message digest algorithm for GCM (Galois/Counter Mode).
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index e141762..2d6e7cf 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -116,7 +116,9 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 	pte_t *pte;
  
- config CRYPTO_POLY1305
- 	tristate "Poly1305 authenticator algorithm"
-+	select CRYPTO_HASH
- 	help
- 	  Poly1305 authenticator algorithm, RFC7539.
+ 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
+-		phys_addr_t pte_phys = pgtable_alloc();
++		phys_addr_t pte_phys;
++		BUG_ON(!pgtable_alloc);
++		pte_phys = pgtable_alloc();
+ 		pte = pte_fixmap(pte_phys);
+ 		if (pmd_sect(*pmd))
+ 			split_pmd(pmd, pte);
+@@ -158,7 +160,9 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 	 * Check for initial section mappings in the pgd/pud and remove them.
+ 	 */
+ 	if (pud_none(*pud) || pud_sect(*pud)) {
+-		phys_addr_t pmd_phys = pgtable_alloc();
++		phys_addr_t pmd_phys;
++		BUG_ON(!pgtable_alloc);
++		pmd_phys = pgtable_alloc();
+ 		pmd = pmd_fixmap(pmd_phys);
+ 		if (pud_sect(*pud)) {
+ 			/*
+@@ -223,7 +227,9 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+ 	unsigned long next;
  
+ 	if (pgd_none(*pgd)) {
+-		phys_addr_t pud_phys = pgtable_alloc();
++		phys_addr_t pud_phys;
++		BUG_ON(!pgtable_alloc);
++		pud_phys = pgtable_alloc();
+ 		__pgd_populate(pgd, pud_phys, PUD_TYPE_TABLE);
+ 	}
+ 	BUG_ON(pgd_bad(*pgd));
+@@ -319,7 +325,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+ 		return;
+ 	}
+ 	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
+-			     early_pgtable_alloc);
++			     NULL);
+ }
+ 
+ void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
 -- 
-2.7.0
+2.5.0
