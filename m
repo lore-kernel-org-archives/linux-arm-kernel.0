@@ -1,52 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:58:50 +0100
-Subject: [PATCH] regulator: return NULL for dummy bulk_get operation
-Message-ID: <1453737537-1960121-1-git-send-email-arnd@arndb.de>
+Date: Mon, 25 Jan 2016 17:06:27 +0100
+Subject: [PATCH] watchdog: imgdpc: select WATCHDOG_CORE
+Message-ID: <1453737991-1960626-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drivers that call regulator_bulk_get or devm_regulator_bulk_get when
-CONFIG_REGULATOR is disabled see the function return successfully, but
-cannot use the "consumer" pointers that are meant to be returned from
-the functions, as the values are uninitialized. Gcc warns about this:
+The imgpdc_wdt driver can be built on all architectures with
+CONFIG_COMPILE_TEST, but fails if no other watchdog driver is
+enabled:
 
-drivers/usb/phy/phy-qcom-8x16-usb.c: In function 'phy_8x16_probe':
-drivers/usb/phy/phy-qcom-8x16-usb.c:284:13: error: 'regs[0].consumer' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-drivers/usb/phy/phy-qcom-8x16-usb.c:285:13: error: 'regs[1].consumer' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-drivers/usb/phy/phy-qcom-8x16-usb.c:286:12: error: 'regs[2].consumer' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+drivers/watchdog/built-in.o: In function `pdc_wdt_remove':
+imgpdc_wdt.c:(.text+0x74): undefined reference to `watchdog_unregister_device'
 
-To make the code behave in a reproducible way, this changes the
-two dummy function to behave like the non-bulk regulator_get
-and devm_regulator_get functions to, returning a NULL pointer with
-a successful return code. This also gets rid of the warnings.
+This adds the normal 'select WATCHDOG_CORE' that is needed to
+ensure the driver always builds cleanly.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- include/linux/regulator/consumer.h | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/watchdog/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/include/linux/regulator/consumer.h b/include/linux/regulator/consumer.h
-index 48603506f8de..f4774bf707c2 100644
---- a/include/linux/regulator/consumer.h
-+++ b/include/linux/regulator/consumer.h
-@@ -404,13 +404,17 @@ static inline int regulator_bulk_get(struct device *dev,
- 				     int num_consumers,
- 				     struct regulator_bulk_data *consumers)
- {
-+	int i;
-+	for (i=0; i < num_consumers; i++)
-+		consumers[i].consumer = NULL;
-+
- 	return 0;
- }
- 
- static inline int devm_regulator_bulk_get(struct device *dev, int num_consumers,
- 					  struct regulator_bulk_data *consumers)
- {
--	return 0;
-+	return regulator_bulk_get(dev, num_consumers, consumers);
- }
- 
- static inline int regulator_bulk_enable(int num_consumers,
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index 4f0e7be0da34..0dc61f1a552e 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -1383,6 +1383,7 @@ config IMGPDC_WDT
+ 	tristate "Imagination Technologies PDC Watchdog Timer"
+ 	depends on HAS_IOMEM
+ 	depends on METAG || MIPS || COMPILE_TEST
++	select WATCHDOG_CORE
+ 	help
+ 	  Driver for Imagination Technologies PowerDown Controller
+ 	  Watchdog Timer.
 -- 
 2.7.0
