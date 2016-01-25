@@ -1,56 +1,59 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Mon, 25 Jan 2016 12:19:26 +0100
-Subject: [PATCH] ARM: dts: rockchip: Assign RK3288 EDP_24M input centrally
-Message-ID: <1453720766-13086-1-git-send-email-sjoerd.simons@collabora.co.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 25 Jan 2016 12:19:36 +0100
+Subject: [PATCH 2/3] ARM: dts: sama5d4: add labels for watchdog and
+ pinctrl nodes
+In-Reply-To: <1453293337-16078-3-git-send-email-LW@KARO-electronics.de>
+References: <1453293337-16078-1-git-send-email-LW@KARO-electronics.de>
+ <1453293337-16078-3-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20160125111936.GC4027@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EDP 24M clock can be fed either by an SoC internal fixed clock or
-from an external IC. Change the default parent to the internal clock in
-the main rk3288 dtsi, to ensure (by default) it gets setup with a
-non-orphaned clock (hardware defaults to the externa clock).
+Hi,
 
-This prevents potential issues when the clock framework get support for
-deferring on orphaned clocks, while specific boards can always change
-the parent clock if an external input is preferred.
+On 20/01/2016 at 13:35:36 +0100, Lothar Wa?mann wrote :
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Ditto, this needs a commit message.
 
----
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 
- arch/arm/boot/dts/rk3288-veyron.dtsi | 5 -----
- arch/arm/boot/dts/rk3288.dtsi        | 3 +++
- 2 files changed, 3 insertions(+), 5 deletions(-)
+Else,
 
-diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
-index 9fce91f..5e61f07 100644
---- a/arch/arm/boot/dts/rk3288-veyron.dtsi
-+++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
-@@ -340,11 +340,6 @@
- 	i2c-scl-rising-time-ns = <1000>;
- };
- 
--&power {
--	assigned-clocks = <&cru SCLK_EDP_24M>;
--	assigned-clock-parents = <&xin24m>;
--};
--
- &pwm1 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 8ac49f3..03bb747 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -630,6 +630,9 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 
-+			assigned-clocks = <&cru SCLK_EDP_24M>;
-+			assigned-clock-parents = <&xin24m>;
-+
- 			/*
- 			 * Note: Although SCLK_* are the working clocks
- 			 * of device without including on the NOC, needed for
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+
+
+> ---
+>  arch/arm/boot/dts/sama5d4.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+> index 6c0dc89..fb40014 100644
+> --- a/arch/arm/boot/dts/sama5d4.dtsi
+> +++ b/arch/arm/boot/dts/sama5d4.dtsi
+> @@ -1299,7 +1299,7 @@
+>  				clocks = <&h32ck>;
+>  			};
+>  
+> -			watchdog at fc068640 {
+> +			watchdog: watchdog at fc068640 {
+>  				compatible = "atmel,sama5d4-wdt";
+>  				reg = <0xfc068640 0x10>;
+>  				clocks = <&clk32k>;
+> @@ -1351,7 +1351,7 @@
+>  			};
+>  
+>  
+> -			pinctrl at fc06a000 {
+> +			pinctrl: pinctrl at fc06a000 {
+>  				#address-cells = <1>;
+>  				#size-cells = <1>;
+>  				compatible = "atmel,at91sam9x5-pinctrl", "atmel,at91rm9200-pinctrl", "simple-bus";
+> -- 
+> 2.1.4
+> 
+
 -- 
-2.7.0
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
