@@ -1,92 +1,100 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 25 Jan 2016 16:17:00 +0100
-Subject: [PATCH v3 0/7] ARM: dts: kirkwood: fixes and split of linkstation
- dts for ls-wvl/vl and ls-wxl/wsxl
-In-Reply-To: <1453387130-6914-1-git-send-email-rogershimizu@gmail.com> (Roger
- Shimizu's message of "Thu, 21 Jan 2016 23:38:43 +0900")
-References: <1453211342-25214-1-git-send-email-rogershimizu@gmail.com>
- <1453387130-6914-1-git-send-email-rogershimizu@gmail.com>
-Message-ID: <87h9i1eljn.fsf@free-electrons.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 25 Jan 2016 15:19:37 +0000
+Subject: [PATCH v3 10/17] arm/xen: Get event-channel irq through HVM_PARAM
+ when booting with ACPI
+In-Reply-To: <1453519184-11908-11-git-send-email-zhaoshenglong@huawei.com>
+References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453519184-11908-11-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <alpine.DEB.2.02.1601251512580.9687@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
- 
- On jeu., janv. 21 2016, Roger Shimizu <rogershimizu@gmail.com> wrote:
+On Sat, 23 Jan 2016, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> When booting with ACPI, it could get the event-channel irq through
+> HVM_PARAM_CALLBACK_IRQ.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm/xen/enlighten.c | 36 +++++++++++++++++++++++++++++++++++-
+>  1 file changed, 35 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index 6d90a62..0e010bb 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -29,6 +29,7 @@
+>  #include <linux/time64.h>
+>  #include <linux/timekeeping.h>
+>  #include <linux/timekeeper_internal.h>
+> +#include <linux/acpi.h>
+>  
+>  #include <linux/mm.h>
+>  
+> @@ -262,6 +263,35 @@ void __init xen_early_init(void)
+>  		add_preferred_console("hvc", 0, NULL);
+>  }
+>  
+> +static void __init xen_acpi_guest_init_events_irq(void)
 
-> Dear kirkwood maintainers,
->
-> Linkstation dts for ls-wxl and ls-wvl need some fixes:
->   - [patch 1/7] and [patch 2/7] are fixes for gpio pin
->   - [patch 3/7] and [patch 4/7] are fixes for gpio led
-> Above 4 patches can be safely backported to 4.3/4.4 stable kernel.
-
-Paches 1-4 are applied on mvebu/fixes
->
-> And in order to support more buffalo linkstation devices in convenient way,
-> I split current 2 dts files into a few comoon dtsi files and device specific
-> dts files.
->   - [patch 5/7] relicense dts under GPLv2/X11
->   - [patch 6/7] split dts for lswxl
->   - [patch 7/7] split dts for lswvl
+please rename it to "xen_acpi_guest_init"
 
 
-Paches 5-7 are applied on mvebu/dt
+> +{
+> +#ifdef CONFIG_ACPI
+> +	struct xen_hvm_param a;
+> +	int interrupt, trigger, polarity;
+> +
+> +	a.domid = DOMID_SELF;
+> +	a.index = HVM_PARAM_CALLBACK_IRQ;
+> +	xen_events_irq = 0;
+> +
+> +	if (!HYPERVISOR_hvm_op(HVMOP_get_param, &a)) {
+> +		if ((a.value >> 56) == HVM_PARAM_CALLBACK_TYPE_EVENT) {
+> +			interrupt = a.value & 0xff;
+> +			trigger = ((a.value >> 8) & 0x1) ? ACPI_EDGE_SENSITIVE
+> +							 : ACPI_LEVEL_SENSITIVE;
+> +			polarity = ((a.value >> 8) & 0x2) ? ACPI_ACTIVE_LOW
+> +							  : ACPI_ACTIVE_HIGH;
+> +			xen_events_irq = acpi_register_gsi(NULL, interrupt,
+> +							   trigger, polarity);
+> +		}
+> +	}
+> +#endif
+> +}
+> +
+> +static void __init xen_dt_guest_init_events_irq(void)
 
-Thanks,
+"xen_dt_guest_init"
 
-Gregory
+Provided that you make these two changes:
 
->
-> Changes in v2:
->   - separate the fix and relicense patch
->   - add "linkstation:" to all led labels
-> Changes in v3:
->   - address Andrew Lunn's suggestion to change commit message
->     for [patch 3/7] and [patch 4/7]
->   - add Andrew Lunn's "Reviewed-by"
->   - address active high/low for the power LED 
->
-> Cheers.
->
-> Roger Shimizu (7):
->   ARM: dts: kirkwood: gpio pin fixes for linkstation ls-wxl/wsxl
->   ARM: dts: kirkwood: gpio pin fixes for linkstation ls-wvl/vl
->   ARM: dts: kirkwood: gpio-leds fixes for linkstation ls-wxl/wsxl
->   ARM: dts: kirkwood: gpio-leds fixes for linkstation ls-wvl/vl
->   ARM: dts: kirkwood: relicense dts of ls-wvl/vl and ls-wxl/wsxl under
->     GPLv2/X11
->   ARM: dts: kirkwood: split lswxl dts to linkstation lswsxl and lswxl
->   ARM: dts: kirkwood: split lswvl dts to linkstation lsvl and lswvl
->
->  .../devicetree/bindings/arm/marvell,kirkwood.txt   |   6 +-
->  arch/arm/boot/dts/Makefile                         |   6 +-
->  arch/arm/boot/dts/kirkwood-linkstation-6282.dtsi   | 192 +++++++++++++
->  .../boot/dts/kirkwood-linkstation-duo-6281.dtsi    | 186 +++++++++++++
->  arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts    |  57 ++++
->  arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts  |  57 ++++
->  arch/arm/boot/dts/kirkwood-linkstation-lswvl.dts   | 112 ++++++++
->  arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts   | 116 ++++++++
->  arch/arm/boot/dts/kirkwood-linkstation.dtsi        | 202 ++++++++++++++
->  arch/arm/boot/dts/kirkwood-lswvl.dts               | 301 ---------------------
->  arch/arm/boot/dts/kirkwood-lswxl.dts               | 301 ---------------------
->  11 files changed, 930 insertions(+), 606 deletions(-)
->  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-6282.dtsi
->  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-duo-6281.dtsi
->  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lswvl.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation.dtsi
->  delete mode 100644 arch/arm/boot/dts/kirkwood-lswvl.dts
->  delete mode 100644 arch/arm/boot/dts/kirkwood-lswxl.dts
->
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+
+
+
+> +{
+> +	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
+> +}
+> +
+>  static int __init xen_guest_init(void)
+>  {
+>  	struct xen_add_to_physmap xatp;
+> @@ -270,7 +300,11 @@ static int __init xen_guest_init(void)
+>  	if (!xen_domain())
+>  		return 0;
+>  
+> -	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
+> +	if (!acpi_disabled)
+> +		xen_acpi_guest_init_events_irq();
+> +	else
+> +		xen_dt_guest_init_events_irq();
+> +
+>  	if (!xen_events_irq) {
+>  		pr_err("Xen event channel interrupt not found\n");
+>  		return -ENODEV;
 > -- 
-> 2.1.4
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> 2.0.4
+> 
+> 
