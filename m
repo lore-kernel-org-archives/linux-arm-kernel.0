@@ -1,43 +1,31 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 25 Jan 2016 18:10:31 +0900
-Subject: [RESEND v2 1/2] clk: samsung: Don't build ARMv8 clock drivers on
- ARMv7
-In-Reply-To: <4282078.QlIpNj3Oa6@wuerfel>
-References: <1453683021-6998-1-git-send-email-k.kozlowski@samsung.com>
- <1453683021-6998-2-git-send-email-k.kozlowski@samsung.com>
- <4282078.QlIpNj3Oa6@wuerfel>
-Message-ID: <56A5E687.3060209@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 25 Jan 2016 10:26:15 +0100
+Subject: [PATCH] clk: sunxi: usb: Sort clk providers by chip family and
+ name
+In-Reply-To: <1453701300-28241-1-git-send-email-wens@csie.org>
+References: <1453701300-28241-1-git-send-email-wens@csie.org>
+Message-ID: <20160125092615.GJ7908@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.01.2016 17:59, Arnd Bergmann wrote:
-> On Monday 25 January 2016 09:50:20 Krzysztof Kozlowski wrote:
->>
->> +# ARM64 SoCs (e.g. Exynos5433, Exynos7):
->> +config EXYNOS_ARM64_COMMON_CLK
->> +       def_bool ARCH_EXYNOS
->> +       depends on ARM64 || COMPILE_TEST
->> +       select COMMON_CLK_SAMSUNG
->>
+On Mon, Jan 25, 2016 at 01:55:00PM +0800, Chen-Yu Tsai wrote:
+> The latest addition of H3 USB clocks placed them at the bottom. Move it
+> before A80 (sun9i), so they are sorted by SoC family then name.
 > 
-> So you always enable it on ARM64 when ARCH_EXYNOS is enabled, but
-> enable it silently on ARM32 when COMPILE_TEST is set?
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Hmm... indeed it would better to make it toggle-able when COMPILE_TEST.
+Applied, thanks!
 
-> That sounds wrong. How about
-> 
-> config EXYNOS_ARM64_COMMON_CLK
-> 	bool "EXYNOS 64-bit clock support" if COMPILE_TEST
-> 	default ARM64 && ARCH_EXYNOS
-> 	depends on (ARM64 && ARCH_EXYNOS) || COMPILE_TEST
-> 	select COMMON_CLK_SAMSUNG
+Maxime
 
-Although this looks more complicated but it does the trick. Thanks for
-the hint. Only one (not related directly to this change) issue - with
-COMPILE_TEST the "EXYNOS 64-bit clock support" option goes above the
-common clock framework (up to drivers section) because it is not part of
-the Clocks menu. I'll fix it in v3.
-
-Best regards,
-Krzysztof
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160125/c47ecc2e/attachment.sig>
