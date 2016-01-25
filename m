@@ -1,60 +1,59 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:59:09 +0100
-Subject: [PATCH] pinctrl: nomadik: hide unused functions
-Message-ID: <1453737557-1960171-1-git-send-email-arnd@arndb.de>
+Date: Mon, 25 Jan 2016 17:02:24 +0100
+Subject: [PATCH] mfd: db8500: avoid uninitialized variable reference
+Message-ID: <1453737752-1960326-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The nomadik pinctrl driver has two functions that are only used
-for debugfs output and are otherwise unused:
+The prcmu_config_clkout() function ensures that the 'clkout' argument
+can only be '0' or '1' using an appropriate BUG_ON(), so the compiler
+should know that the div_mask, mask, and bits variables are always
+initialized later on. However, it doesn't understand this in gcc-5.2
+and produces a false positive warning instead:
 
-drivers/pinctrl/nomadik/pinctrl-abx500.c:194:12: error: 'abx500_get_pull_updown' defined but not used
-drivers/pinctrl/nomadik/pinctrl-abx500.c:471:12: error: 'abx500_get_mode' defined but not used
+drivers/mfd/db8500-prcmu.c: In function 'prcmu_config_clkout':
+drivers/mfd/db8500-prcmu.c:762:10: error: 'div_mask' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+  if (val & div_mask) {
+          ^
+drivers/mfd/db8500-prcmu.c:769:13: error: 'mask' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+    if ((val & mask & ~div_mask) != bits) {
+             ^
+drivers/mfd/db8500-prcmu.c:757:7: error: 'bits' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 
-This makes the function definitions conditional to avoid the
-harmless warnings.
+Replacing the switch() statement with an equivalent if() lets
+gcc figure this out reliably and avoids the warnings.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/pinctrl/nomadik/pinctrl-abx500.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/mfd/db8500-prcmu.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/pinctrl/nomadik/pinctrl-abx500.c b/drivers/pinctrl/nomadik/pinctrl-abx500.c
-index 085e60106ec2..1f7469c9857d 100644
---- a/drivers/pinctrl/nomadik/pinctrl-abx500.c
-+++ b/drivers/pinctrl/nomadik/pinctrl-abx500.c
-@@ -191,6 +191,7 @@ static void abx500_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
- 		dev_err(pct->dev, "%s write failed (%d)\n", __func__, ret);
- }
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index 12099b09a9a7..c0a86aeb1733 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -739,20 +739,17 @@ int prcmu_config_clkout(u8 clkout, u8 source, u8 div)
+ 	if (!div && !requests[clkout])
+ 		return -EINVAL;
  
-+#ifdef CONFIG_DEBUG_FS
- static int abx500_get_pull_updown(struct abx500_pinctrl *pct, int offset,
- 				  enum abx500_gpio_pull_updown *pull_updown)
- {
-@@ -226,6 +227,7 @@ out:
+-	switch (clkout) {
+-	case 0:
++	if (clkout == 0) {
+ 		div_mask = PRCM_CLKOCR_CLKODIV0_MASK;
+ 		mask = (PRCM_CLKOCR_CLKODIV0_MASK | PRCM_CLKOCR_CLKOSEL0_MASK);
+ 		bits = ((source << PRCM_CLKOCR_CLKOSEL0_SHIFT) |
+ 			(div << PRCM_CLKOCR_CLKODIV0_SHIFT));
+-		break;
+-	case 1:
++	} else {
+ 		div_mask = PRCM_CLKOCR_CLKODIV1_MASK;
+ 		mask = (PRCM_CLKOCR_CLKODIV1_MASK | PRCM_CLKOCR_CLKOSEL1_MASK |
+ 			PRCM_CLKOCR_CLK1TYPE);
+ 		bits = ((source << PRCM_CLKOCR_CLKOSEL1_SHIFT) |
+ 			(div << PRCM_CLKOCR_CLKODIV1_SHIFT));
+-		break;
+ 	}
+ 	bits &= mask;
  
- 	return ret;
- }
-+#endif
- 
- static int abx500_set_pull_updown(struct abx500_pinctrl *pct,
- 				  int offset, enum abx500_gpio_pull_updown val)
-@@ -468,6 +470,7 @@ out:
- 	return ret;
- }
- 
-+#ifdef CONFIG_DEBUG_FS
- static int abx500_get_mode(struct pinctrl_dev *pctldev, struct gpio_chip *chip,
- 			  unsigned gpio)
- {
-@@ -553,8 +556,6 @@ out:
- 	return ret;
- }
- 
--#ifdef CONFIG_DEBUG_FS
--
- #include <linux/seq_file.h>
- 
- static void abx500_gpio_dbg_show_one(struct seq_file *s,
 -- 
 2.7.0
