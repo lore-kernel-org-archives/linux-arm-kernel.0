@@ -1,45 +1,95 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 25 Jan 2016 19:57:27 +0300
-Subject: [PATCH 5/5] all: introduce COMPAT_WRAPPER option and enable it for
- s390
-In-Reply-To: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1453741047-5498-6-git-send-email-ynorov@caviumnetworks.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Jan 2016 16:42:43 +0000
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160115215853.GC3818@linux.vnet.ibm.com>
+References: <20160114121449.GC15828@arm.com> <5697F6D2.60409@imgtec.com>
+ <20160114203430.GC3818@linux.vnet.ibm.com>
+ <56980C91.1010403@imgtec.com>
+ <20160114212913.GF3818@linux.vnet.ibm.com>
+ <20160115085554.GF3421@worktop> <20160115091348.GA27936@worktop>
+ <20160115174612.GV3818@linux.vnet.ibm.com>
+ <20160115212714.GM3421@worktop>
+ <20160115215853.GC3818@linux.vnet.ibm.com>
+Message-ID: <20160125164242.GF22927@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
----
- arch/Kconfig      | 4 ++++
- arch/s390/Kconfig | 1 +
- 2 files changed, 5 insertions(+)
+On Fri, Jan 15, 2016 at 01:58:53PM -0800, Paul E. McKenney wrote:
+> On Fri, Jan 15, 2016 at 10:27:14PM +0100, Peter Zijlstra wrote:
+> > On Fri, Jan 15, 2016 at 09:46:12AM -0800, Paul E. McKenney wrote:
+> > > On Fri, Jan 15, 2016 at 10:13:48AM +0100, Peter Zijlstra wrote:
+> > 
+> > > > And the stuff we're confused about is how best to express the difference
+> > > > and guarantees of these two forms of transitivity and how exactly they
+> > > > interact.
+> > > 
+> > > Hoping my memory-barrier.txt patch helps here...
+> > 
+> > Yes, that seems a good start. But yesterday you raised the 'fun' point
+> > of two globally ordered sequences connected by a single local link.
+> 
+> The conclusion that I am slowly coming to is that litmus tests should
+> not be thought of as linear chains, but rather as cycles.  If you think
+> of it as a cycle, then it doesn't matter where the local link is, just
+> how many of them and how they are connected.
 
-diff --git a/arch/Kconfig b/arch/Kconfig
-index 4e949e5..ab7692e 100644
---- a/arch/Kconfig
-+++ b/arch/Kconfig
-@@ -518,6 +518,10 @@ config HAVE_COPY_THREAD_TLS
- 	  normal C parameter passing, rather than extracting the syscall
- 	  argument from pt_regs.
- 
-+config COMPAT_WRAPPER
-+	bool
-+	depends on COMPAT
-+
- #
- # ABI hall of shame
- #
-diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
-index 3a55f49..88f48b0 100644
---- a/arch/s390/Kconfig
-+++ b/arch/s390/Kconfig
-@@ -336,6 +336,7 @@ config COMPAT
- 	select COMPAT_BINFMT_ELF if BINFMT_ELF
- 	select ARCH_WANT_OLD_COMPAT_IPC
- 	select COMPAT_OLD_SIGACTION
-+	select COMPAT_WRAPPER
- 	depends on MULTIUSER
- 	help
- 	  Select this option if you want to enable your system kernel to
--- 
-2.5.0
+Do you have some examples of this? I'm struggling to make it work in my
+mind, or are you talking specifically in the context of the kernel
+memory model?
+
+> But I will admit that there are some rather strange litmus tests that
+> challenge this cycle-centric view, for example, the one shown below.
+> It turns out that herd and ppcmem disagree on the outcome.  (The Power
+> architects side with ppcmem.)
+> 
+> > And I think I'm still confused on LWSYNC (in the smp_wmb case) when one
+> > of the stores looses a conflict, and if that scenario matters. If it
+> > does, we should inspect the same case for other barriers.
+> 
+> Indeed.  I am still working on how these should be described.  My
+> current thought is to be quite conservative on what ordering is
+> actually respected, however, the current task is formalizing how
+> RCU plays with the rest of the memory model.
+> 
+> 							Thanx, Paul
+> 
+> ------------------------------------------------------------------------
+> 
+> PPC Overlapping Group-B sets version 4
+> ""
+> (* When the Group-B sets from two different barriers involve instructions in
+>    the same thread, within that thread one set must contain the other.
+> 
+> 	P0	P1	P2
+> 	Rx=1	Wy=1	Wz=2
+> 	dep.	lwsync	lwsync
+> 	Ry=0	Wz=1	Wx=1
+> 	Rz=1
+> 
+> 	assert(!(z=2))
+> 
+>    Forbidden by ppcmem, allowed by herd.
+> *)
+> {
+> 0:r1=x; 0:r2=y; 0:r3=z;
+> 1:r1=x; 1:r2=y; 1:r3=z; 1:r4=1;
+> 2:r1=x; 2:r2=y; 2:r3=z; 2:r4=1; 2:r5=2;
+> }
+>  P0		| P1		| P2		;
+>  lwz r6,0(r1)	| stw r4,0(r2)	| stw r5,0(r3)	;
+>  xor r7,r6,r6	| lwsync	| lwsync	;
+>  lwzx r7,r7,r2	| stw r4,0(r3)	| stw r4,0(r1)	;
+>  lwz r8,0(r3)	|		|		;
+> 
+> exists
+> (z=2 /\ 0:r6=1 /\ 0:r7=0 /\ 0:r8=1)
+
+That really hurts. Assuming that the "assert(!(z=2))" is actually there
+to constrain the coherence order of z to be {0->1->2}, then I think that
+this test is forbidden on arm using dmb instead of lwsync. That said, I
+also don't think the Rz=1 in P0 changes anything.
+
+The double negatives don't help here! (it is forbidden to guarantee that
+z is not always 2).
+
+Will
