@@ -1,56 +1,71 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 25 Jan 2016 17:06:33 +0100
-Subject: [PATCH v2 00/10] rtc: max77686: Extend driver and add max77802
- support
-In-Reply-To: <1453407813-14646-1-git-send-email-javier@osg.samsung.com>
-References: <1453407813-14646-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <20160125160633.GB11740@piout.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Jan 2016 16:26:14 +0000
+Subject: [PATCH v2 00/21] arm64: Virtualization Host Extension support
+In-Reply-To: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160125162613.GD22927@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jan 25, 2016 at 03:53:34PM +0000, Marc Zyngier wrote:
+> ARMv8.1 comes with the "Virtualization Host Extension" (VHE for
+> short), which enables simpler support of Type-2 hypervisors.
+> 
+> This extension allows the kernel to directly run at EL2, and
+> significantly reduces the number of system registers shared between
+> host and guest, reducing the overhead of virtualization.
+> 
+> In order to have the same kernel binary running on all versions of the
+> architecture, this series makes heavy use of runtime code patching.
+> 
+> The first 20 patches massage the KVM code to deal with VHE and enable
+> Linux to run at EL2. The last patch catches an ugly case when VHE
+> capable CPUs are paired with some of their less capable siblings. This
+> should never happen, but hey...
+> 
+> I have deliberately left out some of the more "advanced"
+> optimizations, as they are likely to distract the reviewer from the
+> core infrastructure, which is what I care about at the moment.
+> 
+> A few things to note:
+> 
+> - Given that the code has been almost entierely rewritten, I've
+>   dropped all Acks from the new patches
+> 
+> - GDB is currently busted on VHE systems, as it checks for version 6
+>   on the debug architecture, while VHE is version 7. The binutils
+>   people are on the case.
 
-On 21/01/2016 at 17:23:23 -0300, Javier Martinez Canillas wrote :
-> On a recent disussion [0] with Krzysztof Kozlowski and Laxman Dewangan,
-> we came to the conclusion that the max77686 and max77802 RTC are almost
-> the same with only a few differences so there shouldn't be two separate
-> drivers and is better to extend max77686 driver and delete rtc-max77802.
-> 
-> By making the driver more generic, other RTC IP blocks from Maxim PMICs
-> could be supported as well like the max77620.
-> 
-> This is a v2 of a series that do this, that address issues pointed out
-> by Krzysztof Kozlowski. The v1 can be found at [1].
-> 
-> I've tested this patch-set on an Exynos5800 Peach Pi Chromebook that has
-> a max77802 PMIC and the RTC was working correctly but I don't have a
-> machine with max77686 so I will really appreaciate if someone can test
-> that no regressions were introduced.
-> 
-> On an IRC conversation, Alexandre suggested to use the field support in
-> the regmap API to avoid needing a translation table. I spent some time
-> to look at it and I'm not so sure if it fits that well in this case.
-> 
-> It's true that we could model each register as if it has a single field
-> and provide a different reg address but I'm not sure if that would make
-> things more clear or cause more confusion for future code archaeologists.
-> 
+[...]
 
-Yeah, Mark suggested that regmap_field may be what we were looking for
-but I'm not convinced it really fits.
+>  arch/arm/include/asm/virt.h          |   5 ++
+>  arch/arm/kvm/arm.c                   | 151 +++++++++++++++++++------------
+>  arch/arm/kvm/mmu.c                   |   7 ++
+>  arch/arm64/Kconfig                   |  13 +++
+>  arch/arm64/include/asm/cpufeature.h  |   3 +-
+>  arch/arm64/include/asm/kvm_arm.h     |   1 +
+>  arch/arm64/include/asm/kvm_emulate.h |   3 +
+>  arch/arm64/include/asm/kvm_mmu.h     |  34 ++++++-
+>  arch/arm64/include/asm/virt.h        |  27 ++++++
+>  arch/arm64/kernel/asm-offsets.c      |   3 -
+>  arch/arm64/kernel/cpufeature.c       |  15 +++-
+>  arch/arm64/kernel/head.S             |  51 ++++++++++-
+>  arch/arm64/kernel/smp.c              |   3 +
+>  arch/arm64/kvm/hyp-init.S            |  18 +---
+>  arch/arm64/kvm/hyp.S                 |   7 ++
+>  arch/arm64/kvm/hyp/entry.S           |   6 ++
+>  arch/arm64/kvm/hyp/hyp-entry.S       | 107 +++++++---------------
+>  arch/arm64/kvm/hyp/hyp.h             | 119 ++++++++++++++++++++++--
+>  arch/arm64/kvm/hyp/switch.c          | 170 +++++++++++++++++++++++++++++++----
+>  arch/arm64/kvm/hyp/sysreg-sr.c       | 147 ++++++++++++++++++++----------
+>  arch/arm64/kvm/hyp/timer-sr.c        |  10 +--
+>  drivers/clocksource/arm_arch_timer.c |  96 ++++++++++++--------
+>  22 files changed, 724 insertions(+), 272 deletions(-)
 
-> In any case, I think this series are a move in the right direction since
-> removes code duplication and a complete driver and also allows others to
-> reuse the driver for another RTC chip. We can later simplify and use the
-> regmap field API or extend the regmap core if that could make things even
-> simpler but I propose to do it as a follow up.
-> 
+Have you tried hw_breakpoint/perf/ptrace with these changes? I was under
+the impression that the debug architecture was aware of E2H and did need
+some changes made. I know you say that GDB is broken anyway, but we should
+check that the kernel does the right thing if userspace pokes it the
+right way.
 
-I don't have any objection or other comment on that series. So
-basically, I'm waiting for v3 and I'll apply it.
-
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Will
