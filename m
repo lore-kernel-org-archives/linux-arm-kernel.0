@@ -1,146 +1,77 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 15:53:44 +0000
-Subject: [PATCH v2 10/21] arm64: KVM: VHE: Split save/restore of sysregs
- shared between EL1 and EL2
+Date: Mon, 25 Jan 2016 15:53:51 +0000
+Subject: [PATCH v2 17/21] arm64: KVM: VHE: Add alternative panic handling
 In-Reply-To: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
 References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453737235-16522-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453737235-16522-18-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A handful of system registers are still shared between EL1 and EL2,
-even while using VHE. These are tpidr*_el[01], actlr_el1, sp0, elr,
-and spsr.
+As the kernel fully runs in HYP when VHE is enabled, we can
+directly branch to the kernel's panic() implementation, and
+not perform an exception return.
 
-In order to facilitate the introduction of a VHE-specific sysreg
-save/restore, make move the access to these registers to their
-own save/restore functions.
-
-No functionnal change.
+Add the alternative code to deal with this.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/sysreg-sr.c | 48 +++++++++++++++++++++++++++++-------------
- 1 file changed, 33 insertions(+), 15 deletions(-)
+ arch/arm64/kvm/hyp/switch.c | 35 +++++++++++++++++++++++++++--------
+ 1 file changed, 27 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index bd5b543..61bad17 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -23,13 +23,29 @@
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 77f7c94..0cadb7f 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -211,11 +211,34 @@ __alias(__guest_run) int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
  
- #include "hyp.h"
+ static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%p\n";
  
--/* ctxt is already in the HYP VA space */
-+/*
-+ * Non-VHE: Both host and guest must save everything.
-+ *
-+ * VHE: Host must save tpidr*_el[01], actlr_el1, sp0, pc, pstate, and
-+ * guest must save everything.
-+ */
+-void __hyp_text __noreturn __hyp_panic(void)
++static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par)
+ {
+ 	unsigned long str_va = (unsigned long)__hyp_panic_string;
+-	u64 spsr = read_sysreg(spsr_el2);
+-	u64 elr = read_sysreg(elr_el2);
 +
-+static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
-+{
-+	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
-+	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
-+	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
-+	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
-+	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
-+	ctxt->gp_regs.regs.pc		= read_sysreg(elr_el2);
-+	ctxt->gp_regs.regs.pstate	= read_sysreg(spsr_el2);
++	__hyp_do_panic(hyp_kern_va(str_va),
++		       spsr,  elr,
++		       read_sysreg(esr_el2),   read_sysreg_el2(far),
++		       read_sysreg(hpfar_el2), par,
++		       (void *)read_sysreg(tpidr_el2));
 +}
 +
- static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
- {
- 	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
- 	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
- 	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg(sctlr_el1);
--	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
- 	ctxt->sys_regs[CPACR_EL1]	= read_sysreg(cpacr_el1);
- 	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg(ttbr0_el1);
- 	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg(ttbr1_el1);
-@@ -41,17 +57,11 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
- 	ctxt->sys_regs[MAIR_EL1]	= read_sysreg(mair_el1);
- 	ctxt->sys_regs[VBAR_EL1]	= read_sysreg(vbar_el1);
- 	ctxt->sys_regs[CONTEXTIDR_EL1]	= read_sysreg(contextidr_el1);
--	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
--	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
--	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
- 	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg(amair_el1);
- 	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg(cntkctl_el1);
- 	ctxt->sys_regs[PAR_EL1]		= read_sysreg(par_el1);
- 	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
- 
--	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
--	ctxt->gp_regs.regs.pc		= read_sysreg(elr_el2);
--	ctxt->gp_regs.regs.pstate	= read_sysreg(spsr_el2);
- 	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
- 	ctxt->gp_regs.elr_el1		= read_sysreg(elr_el1);
- 	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg(spsr_el1);
-@@ -60,11 +70,24 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
- void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
- {
- 	__sysreg_save_state(ctxt);
-+	__sysreg_save_common_state(ctxt);
- }
- 
- void __hyp_text __sysreg_save_guest_state(struct kvm_cpu_context *ctxt)
- {
- 	__sysreg_save_state(ctxt);
-+	__sysreg_save_common_state(ctxt);
++static void __hyp_text __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par)
++{
++	panic(__hyp_panic_string,
++	      spsr,  elr,
++	      read_sysreg_el2(esr),   read_sysreg_el2(far),
++	      read_sysreg(hpfar_el2), par,
++	      (void *)read_sysreg(tpidr_el2));
 +}
 +
-+static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctxt)
++static hyp_alternate_select(__hyp_call_panic,
++			    __hyp_call_panic_nvhe, __hyp_call_panic_vhe,
++			    ARM64_HAS_VIRT_HOST_EXTN);
++
++void __hyp_text __noreturn __hyp_panic(void)
 +{
-+	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  actlr_el1);
-+	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
-+	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
-+	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
-+	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
-+	write_sysreg(ctxt->gp_regs.regs.pc,	  elr_el2);
-+	write_sysreg(ctxt->gp_regs.regs.pstate,	  spsr_el2);
++	u64 spsr = read_sysreg_el2(spsr);
++	u64 elr = read_sysreg_el2(elr);
+ 	u64 par = read_sysreg(par_el1);
+ 
+ 	if (read_sysreg(vttbr_el2)) {
+@@ -230,11 +253,7 @@ void __hyp_text __noreturn __hyp_panic(void)
+ 	}
+ 
+ 	/* Call panic for real */
+-	__hyp_do_panic(hyp_kern_va(str_va),
+-		       spsr,  elr,
+-		       read_sysreg(esr_el2),   read_sysreg(far_el2),
+-		       read_sysreg(hpfar_el2), par,
+-		       (void *)read_sysreg(tpidr_el2));
++	__hyp_call_panic()(spsr, elr, par);
+ 
+ 	unreachable();
  }
- 
- static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
-@@ -72,7 +95,6 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
- 	write_sysreg(ctxt->sys_regs[MPIDR_EL1],	  vmpidr_el2);
- 	write_sysreg(ctxt->sys_regs[CSSELR_EL1],  csselr_el1);
- 	write_sysreg(ctxt->sys_regs[SCTLR_EL1],	  sctlr_el1);
--	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  actlr_el1);
- 	write_sysreg(ctxt->sys_regs[CPACR_EL1],	  cpacr_el1);
- 	write_sysreg(ctxt->sys_regs[TTBR0_EL1],	  ttbr0_el1);
- 	write_sysreg(ctxt->sys_regs[TTBR1_EL1],	  ttbr1_el1);
-@@ -84,17 +106,11 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
- 	write_sysreg(ctxt->sys_regs[MAIR_EL1],	  mair_el1);
- 	write_sysreg(ctxt->sys_regs[VBAR_EL1],	  vbar_el1);
- 	write_sysreg(ctxt->sys_regs[CONTEXTIDR_EL1], contextidr_el1);
--	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
--	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
--	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
- 	write_sysreg(ctxt->sys_regs[AMAIR_EL1],	  amair_el1);
- 	write_sysreg(ctxt->sys_regs[CNTKCTL_EL1], cntkctl_el1);
- 	write_sysreg(ctxt->sys_regs[PAR_EL1],	  par_el1);
- 	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
- 
--	write_sysreg(ctxt->gp_regs.regs.sp,	sp_el0);
--	write_sysreg(ctxt->gp_regs.regs.pc,	elr_el2);
--	write_sysreg(ctxt->gp_regs.regs.pstate,	spsr_el2);
- 	write_sysreg(ctxt->gp_regs.sp_el1,	sp_el1);
- 	write_sysreg(ctxt->gp_regs.elr_el1,	elr_el1);
- 	write_sysreg(ctxt->gp_regs.spsr[KVM_SPSR_EL1], spsr_el1);
-@@ -103,11 +119,13 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
- void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
- {
- 	__sysreg_restore_state(ctxt);
-+	__sysreg_restore_common_state(ctxt);
- }
- 
- void __hyp_text __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt)
- {
- 	__sysreg_restore_state(ctxt);
-+	__sysreg_restore_common_state(ctxt);
- }
- 
- void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
 -- 
 2.1.4
