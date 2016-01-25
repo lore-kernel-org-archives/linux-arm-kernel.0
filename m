@@ -1,47 +1,56 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 25 Jan 2016 11:32:51 +0100
-Subject: [PATCH] ARM64: rk3368: add tuning clk for emmc and sdmmc
-In-Reply-To: <1453707223-28855-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1453707223-28855-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <8282572.0k5rjtDfQ3@diego>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Mon, 25 Jan 2016 12:36:50 +0200
+Subject: [PATCH 07/15] dmaengine: dw: revisit data_width property
+In-Reply-To: <yw1xfuxmkl19.fsf@unicorn.mansr.com>
+References: <1453663322-14474-1-git-send-email-mans@mansr.com>
+ <1453663322-14474-8-git-send-email-mans@mansr.com>
+ <C2D7FE5348E1B147BCA15975FBA23075F4E86560@us01wembx1.internal.synopsys.com>
+ <1453711547.2521.209.camel@linux.intel.com>
+ <yw1xfuxmkl19.fsf@unicorn.mansr.com>
+Message-ID: <1453718210.2521.219.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-Am Montag, 25. Januar 2016, 15:33:43 schrieb Shawn Lin:
-> Add tuning clk for emmc and sdmmc, otherwise I get
-> the following failure while enabling mmc-hs200-1_8v.
+On Mon, 2016-01-25 at 10:31 +0000, M?ns Rullg?rd wrote:
+> Andy Shevchenko <andriy.shevchenko@linux.intel.com> writes:
 > 
-> dwmmc_rockchip ff0f0000.dwmmc: Tuning clock (sample_clk) not defined.
-> mmc0: tuning execution failed
-> mmc0: error -5 whilst initialising MMC card
+> > On Mon, 2016-01-25 at 07:32 +0000, Vineet Gupta wrote:
+> > > On Monday 25 January 2016 12:55 AM, Mans Rullgard wrote:
+
+> > > > --- a/Documentation/devicetree/bindings/dma/snps-dma.txt
+> > > > +++ b/Documentation/devicetree/bindings/dma/snps-dma.txt
+> > > > @@ -13,8 +13,7 @@ Required properties:
+> > > > ?- chan_priority: priority of channels. 0 (default): increase
+> > > > from
+> > > > chan 0->n, 1:
+> > > > ???increase from chan n->0
+> > > > ?- block_size: Maximum block size supported by the controller
+> > > > -- data_width: Maximum data width supported by hardware per AHB
+> > > > master
+> > > > -??(0 - 8bits, 1 - 16bits, ..., 5 - 256bits)
+> > > > +- data-width: Maximum data width supported by hardware (in
+> > > > bytes)
+> > > 
+> > > To the reader this suggests a value truely byte granular, but
+> > > code
+> > > uses ffs
+> > > implying that it is still power of 2.
+> > > Can you mention this here (....in bytes, always power of 2).
+> > 
+> > While this comment is good, I have still note that using non-power
+> > of 2
+> > values will not break anything. Least power of two number will be
+> > used
+> > in that case. So, means I would suggest to replace 'always' by
+> > 'better
+> > to be' or something like that.
 > 
-> With it
-> dwmmc_rockchip ff0f0000.dwmmc: Successfully tuned phase to 170
-> mmc0: new HS200 MMC card at address 0001
-> mmcblk0: mmc0:0001 M8G1GC 7.28 GiB
-> 
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+> Although the code rounds down, the hardware actually works in powers
+> of
+> two, and it's better to document this.
 
-applied to my dts64 branch for 4.6
+Let's do "(in bytes, power of 2)" then?
 
-I've adapted the subject to
-	arm64: dts: rockchip: add rk3368 tuning clk for emmc and sdmmc
-to follow the format used there (it doesn't seem 100% consistent between socs)
-
-
->  		clock-freq-min-max = <400000 150000000>;
->  		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>;
->  		clock-names = "biu", "ciu";
-> +		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>,
-> +			 <&cru SCLK_EMMC_DRV>, <&cru SCLK_EMMC_SAMPLE>;
-> +		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
->  		fifo-depth = <0x100>;
->  		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
->  		status = "disabled";
-
-I've also removed the duplicate clock entry here ;-)
-
-
-Heiko
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
