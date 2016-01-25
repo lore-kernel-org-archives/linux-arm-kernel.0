@@ -1,53 +1,139 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 25 Jan 2016 20:48:33 +0800
-Subject: [PATCH V3 2/2] regulator: mt6323: Add support for MT6323 regulator
-In-Reply-To: <1453722989-41622-2-git-send-email-blogic@openwrt.org>
-Message-ID: <201601252014.ogTG5JRy%fengguang.wu@intel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 25 Jan 2016 12:50:12 +0000
+Subject: [PATCH v7 2/2] mfd: add documentation for ACT8945A DT bindings
+In-Reply-To: <1453445087-2791-3-git-send-email-wenyou.yang@atmel.com>
+References: <1453445087-2791-1-git-send-email-wenyou.yang@atmel.com>
+ <1453445087-2791-3-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20160125125012.GM3368@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen,
+On Fri, 22 Jan 2016, Wenyou Yang wrote:
 
-[auto build test ERROR on regulator/for-next]
-[also build test ERROR on v4.5-rc1 next-20160125]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+> The Active-semi ACT8945A PMIC is a Multi-Function Device, it has
+> two subdevices:
+>  - Regulator
+>  - Charger
+> 
+> This patch adds documentation for ACT8945A DT bindings.
+> 
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-url:    https://github.com/0day-ci/linux/commits/John-Crispin/dt-bindings-regulator-Add-document-for-MT6323-regulator/20160125-184401
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git for-next
-config: m68k-allyesconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=m68k 
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-All errors (new ones prefixed by >>):
+> ---
+> 
+> Changes in v7: None
+> Changes in v6:
+>  - change the regulator name.
+> 
+> Changes in v5: None
+> Changes in v4: None
+> Changes in v3:
+>  - fix the tabbing errors in Example.
+>  - use "pmic at 5b" label, not "act8945a at 5b" in Example.
+>  - collect Acked-by from Rob.
+> 
+> Changes in v2:
+>  - use more specific label in Example.
+>  - add pmic and charger nodes in Example.
+> 
+>  Documentation/devicetree/bindings/mfd/act8945a.txt |   82 ++++++++++++++++++++
+>  1 file changed, 82 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/act8945a.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/act8945a.txt b/Documentation/devicetree/bindings/mfd/act8945a.txt
+> new file mode 100644
+> index 0000000..f2a8387
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/act8945a.txt
+> @@ -0,0 +1,82 @@
+> +Device-Tree bindings for Active-semi ACT8945A MFD driver
+> +
+> +Required properties:
+> + - compatible: "active-semi,act8945a".
+> + - reg: the I2C slave address for the ACT8945A chip
+> +
+> +The chip exposes two subdevices:
+> + - a regulators: see ../regulator/act8945a-regulator.txt
+> + - a charger: see ../power/act8945a-charger.txt
+> +
+> +Example:
+> +	pmic at 5b {
+> +		compatible = "active-semi,act8945a";
+> +		reg = <0x5b>;
+> +		status = "okay";
+> +
+> +		pmic {
+> +			compatible = "active-semi,act8945a-regulator";
+> +			active-semi,vsel-high;
+> +
+> +			regulators {
+> +				vdd_1v35_reg: REG_DCDC1 {
+> +					regulator-name = "VDD_1V35";
+> +					regulator-min-microvolt = <1350000>;
+> +					regulator-max-microvolt = <1350000>;
+> +					regulator-always-on;
+> +				};
+> +
+> +				vdd_1v2_reg: REG_DCDC2 {
+> +					regulator-name = "VDD_1V2";
+> +					regulator-min-microvolt = <1100000>;
+> +					regulator-max-microvolt = <1300000>;
+> +					regulator-always-on;
+> +				};
+> +
+> +				vdd_3v3_reg: REG_DCDC3 {
+> +					regulator-name = "VDD_3V3";
+> +					regulator-min-microvolt = <3300000>;
+> +					regulator-max-microvolt = <3300000>;
+> +					regulator-always-on;
+> +				};
+> +
+> +				vdd_fuse_reg: REG_LDO1 {
+> +					regulator-name = "VDD_FUSE";
+> +					regulator-min-microvolt = <2500000>;
+> +					regulator-max-microvolt = <2500000>;
+> +					regulator-always-on;
+> +				};
+> +
+> +				vdd_3v3_lp_reg: REG_LDO2 {
+> +					regulator-name = "VDD_3V3_LP";
+> +					regulator-min-microvolt = <3300000>;
+> +					regulator-max-microvolt = <3300000>;
+> +					regulator-always-on;
+> +				};
+> +
+> +				vdd_led_reg: REG_LDO3 {
+> +					regulator-name = "VDD_LED";
+> +					regulator-min-microvolt = <3300000>;
+> +					regulator-max-microvolt = <3300000>;
+> +					regulator-always-on;
+> +				};
+> +
+> +				vdd_sdhc_1v8_reg: REG_LDO4 {
+> +					regulator-name = "VDD_SDHC_1V8";
+> +					regulator-min-microvolt = <1800000>;
+> +					regulator-max-microvolt = <1800000>;
+> +					regulator-always-on;
+> +				};
+> +			};
+> +		};
+> +
+> +		charger {
+> +			compatible = "active-semi,act8945a-charger";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_charger_chglev>;
+> +			active-semi,chglev-gpio = <&pioA 12 GPIO_ACTIVE_HIGH>;
+> +			active-semi,input_voltage_threshold = <6600>;
+> +			active-semi,precondition_timeout = <40>;
+> +			active-semi,total_timeout = <3>;
+> +		};
+> +	};
 
->> drivers/regulator/mt6323-regulator.c:20:40: fatal error: linux/mfd/mt6323/registers.h: No such file or directory
-    #include <linux/mfd/mt6323/registers.h>
-                                           ^
-   compilation terminated.
-
-vim +20 drivers/regulator/mt6323-regulator.c
-
-    14	
-    15	#include <linux/module.h>
-    16	#include <linux/of.h>
-    17	#include <linux/platform_device.h>
-    18	#include <linux/regmap.h>
-    19	#include <linux/mfd/mt6397/core.h>
-  > 20	#include <linux/mfd/mt6323/registers.h>
-    21	#include <linux/regulator/driver.h>
-    22	#include <linux/regulator/machine.h>
-    23	#include <linux/regulator/mt6323-regulator.h>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 35266 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160125/9a0e9490/attachment-0001.obj>
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
