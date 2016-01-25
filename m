@@ -1,24 +1,19 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 25 Jan 2016 11:45:03 +0000
-Subject: [PATCHv3 09/18] arm64: mm: move pte_* macros
+Date: Mon, 25 Jan 2016 11:45:08 +0000
+Subject: [PATCHv3 14/18] arm64: mm: use fixmap when creating page tables
 In-Reply-To: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
 References: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1453722312-23076-10-git-send-email-mark.rutland@arm.com>
+Message-ID: <1453722312-23076-15-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For pmd, pud, and pgd levels of table, functions including p?d_index and
-p?d_offset are defined after the p?d_page_vaddr function for the
-immediately higher level of table.
+As a preparatory step to allow us to allocate early page tables from
+unmapped memory using memblock_alloc, modify the __create_mapping
+callees to map and unmap the tables they modify using fixmap entries.
 
-The pte functions however are defined much earlier, even though several
-rely on the later definition of pmd_page_vaddr. While this isn't
-currently a problem as these are macros, it prevents the logical
-grouping of later C functions (which cannot rely on prototypes for
-functions not yet defined).
-
-Move these definitions after pmd_page_vaddr, for consistency with the
-placement of these functions for other levels of table.
+All but the top-level pgd initialisation is performed via the fixmap.
+Subsequent patches will inject the pgd physical address, and migrate to
+using the FIX_PGD slot.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
@@ -28,46 +23,183 @@ Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/pgtable.h | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ arch/arm64/mm/mmu.c | 61 +++++++++++++++++++++++++++++++++++------------------
+ 1 file changed, 41 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index ccf3c48..5b39143 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -134,16 +134,6 @@ extern unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)];
- #define pte_clear(mm,addr,ptep)	set_pte(ptep, __pte(0))
- #define pte_page(pte)		(pfn_to_page(pte_pfn(pte)))
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 8879aed..5248b02 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -63,19 +63,30 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+ }
+ EXPORT_SYMBOL(phys_mem_access_prot);
  
--/* Find an entry in the third-level page table. */
--#define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
--
--#define pte_offset_kernel(dir,addr)	(pmd_page_vaddr(*(dir)) + pte_index(addr))
--
--#define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
--#define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir), (addr))
--#define pte_unmap(pte)			do { } while (0)
--#define pte_unmap_nested(pte)		do { } while (0)
--
- /*
-  * The following only work if pte_present(). Undefined behaviour otherwise.
-  */
-@@ -438,6 +428,16 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
- 	return __va(pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK);
+-static void __init *early_pgtable_alloc(void)
++static phys_addr_t __init early_pgtable_alloc(void)
+ {
+ 	phys_addr_t phys;
+ 	void *ptr;
+ 
+ 	phys = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
+ 	BUG_ON(!phys);
+-	ptr = __va(phys);
++
++	/*
++	 * The FIX_{PGD,PUD,PMD} slots may be in active use, but the FIX_PTE
++	 * slot will be free, so we can (ab)use the FIX_PTE slot to initialise
++	 * any level of table.
++	 */
++	ptr = pte_set_fixmap(phys);
++
+ 	memset(ptr, 0, PAGE_SIZE);
+ 
+-	/* Ensure the zeroed page is visible to the page table walker */
+-	dsb(ishst);
+-	return ptr;
++	/*
++	 * Implicit barriers also ensure the zeroed page is visible to the page
++	 * table walker
++	 */
++	pte_clear_fixmap();
++
++	return phys;
  }
  
-+/* Find an entry in the third-level page table. */
-+#define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+ /*
+@@ -99,24 +110,28 @@ static void split_pmd(pmd_t *pmd, pte_t *pte)
+ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 				  unsigned long end, unsigned long pfn,
+ 				  pgprot_t prot,
+-				  void *(*pgtable_alloc)(void))
++				  phys_addr_t (*pgtable_alloc)(void))
+ {
+ 	pte_t *pte;
+ 
+ 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
+-		pte = pgtable_alloc();
++		phys_addr_t pte_phys = pgtable_alloc();
++		pte = pte_set_fixmap(pte_phys);
+ 		if (pmd_sect(*pmd))
+ 			split_pmd(pmd, pte);
+-		__pmd_populate(pmd, __pa(pte), PMD_TYPE_TABLE);
++		__pmd_populate(pmd, pte_phys, PMD_TYPE_TABLE);
+ 		flush_tlb_all();
++		pte_clear_fixmap();
+ 	}
+ 	BUG_ON(pmd_bad(*pmd));
+ 
+-	pte = pte_offset_kernel(pmd, addr);
++	pte = pte_set_fixmap_offset(pmd, addr);
+ 	do {
+ 		set_pte(pte, pfn_pte(pfn, prot));
+ 		pfn++;
+ 	} while (pte++, addr += PAGE_SIZE, addr != end);
 +
-+#define pte_offset_kernel(dir,addr)	(pmd_page_vaddr(*(dir)) + pte_index(addr))
++	pte_clear_fixmap();
+ }
+ 
+ static void split_pud(pud_t *old_pud, pmd_t *pmd)
+@@ -134,7 +149,7 @@ static void split_pud(pud_t *old_pud, pmd_t *pmd)
+ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+ 				  unsigned long addr, unsigned long end,
+ 				  phys_addr_t phys, pgprot_t prot,
+-				  void *(*pgtable_alloc)(void))
++				  phys_addr_t (*pgtable_alloc)(void))
+ {
+ 	pmd_t *pmd;
+ 	unsigned long next;
+@@ -143,7 +158,8 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+ 	 * Check for initial section mappings in the pgd/pud and remove them.
+ 	 */
+ 	if (pud_none(*pud) || pud_sect(*pud)) {
+-		pmd = pgtable_alloc();
++		phys_addr_t pmd_phys = pgtable_alloc();
++		pmd = pmd_set_fixmap(pmd_phys);
+ 		if (pud_sect(*pud)) {
+ 			/*
+ 			 * need to have the 1G of mappings continue to be
+@@ -151,12 +167,13 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+ 			 */
+ 			split_pud(pud, pmd);
+ 		}
+-		pud_populate(mm, pud, pmd);
++		__pud_populate(pud, pmd_phys, PUD_TYPE_TABLE);
+ 		flush_tlb_all();
++		pmd_clear_fixmap();
+ 	}
+ 	BUG_ON(pud_bad(*pud));
+ 
+-	pmd = pmd_offset(pud, addr);
++	pmd = pmd_set_fixmap_offset(pud, addr);
+ 	do {
+ 		next = pmd_addr_end(addr, end);
+ 		/* try section mapping first */
+@@ -182,6 +199,8 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+ 		}
+ 		phys += next - addr;
+ 	} while (pmd++, addr = next, addr != end);
 +
-+#define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
-+#define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir), (addr))
-+#define pte_unmap(pte)			do { } while (0)
-+#define pte_unmap_nested(pte)		do { } while (0)
++	pmd_clear_fixmap();
+ }
+ 
+ static inline bool use_1G_block(unsigned long addr, unsigned long next,
+@@ -199,18 +218,18 @@ static inline bool use_1G_block(unsigned long addr, unsigned long next,
+ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+ 				  unsigned long addr, unsigned long end,
+ 				  phys_addr_t phys, pgprot_t prot,
+-				  void *(*pgtable_alloc)(void))
++				  phys_addr_t (*pgtable_alloc)(void))
+ {
+ 	pud_t *pud;
+ 	unsigned long next;
+ 
+ 	if (pgd_none(*pgd)) {
+-		pud = pgtable_alloc();
+-		pgd_populate(mm, pgd, pud);
++		phys_addr_t pud_phys = pgtable_alloc();
++		__pgd_populate(pgd, pud_phys, PUD_TYPE_TABLE);
+ 	}
+ 	BUG_ON(pgd_bad(*pgd));
+ 
+-	pud = pud_offset(pgd, addr);
++	pud = pud_set_fixmap_offset(pgd, addr);
+ 	do {
+ 		next = pud_addr_end(addr, end);
+ 
+@@ -243,6 +262,8 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+ 		}
+ 		phys += next - addr;
+ 	} while (pud++, addr = next, addr != end);
 +
- #define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
++	pud_clear_fixmap();
+ }
  
  /*
+@@ -252,7 +273,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+ 				    phys_addr_t phys, unsigned long virt,
+ 				    phys_addr_t size, pgprot_t prot,
+-				    void *(*pgtable_alloc)(void))
++				    phys_addr_t (*pgtable_alloc)(void))
+ {
+ 	unsigned long addr, length, end, next;
+ 
+@@ -275,14 +296,14 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+ 	} while (pgd++, addr = next, addr != end);
+ }
+ 
+-static void *late_pgtable_alloc(void)
++static phys_addr_t late_pgtable_alloc(void)
+ {
+ 	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
+ 	BUG_ON(!ptr);
+ 
+ 	/* Ensure the zeroed page is visible to the page table walker */
+ 	dsb(ishst);
+-	return ptr;
++	return __pa(ptr);
+ }
+ 
+ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
 -- 
 1.9.1
