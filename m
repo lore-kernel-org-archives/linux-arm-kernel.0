@@ -1,122 +1,296 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 15:53:55 +0000
-Subject: [PATCH v2 21/21] arm64: Panic when VHE and non VHE CPUs coexist
+Date: Mon, 25 Jan 2016 15:53:38 +0000
+Subject: [PATCH v2 04/21] arm64: KVM: Skip HYP setup when already running in
+ HYP
 In-Reply-To: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
 References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453737235-16522-22-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453737235-16522-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having both VHE and non-VHE capable CPUs in the same system
-is likely to be a recipe for disaster.
+With the kernel running at EL2, there is no point trying to
+configure page tables for HYP, as the kernel is already mapped.
 
-If the boot CPU has VHE, but a secondary is not, we won't be
-able to downgrade and run the kernel at EL1. Add CPU hotplug
-to the mix, and this produces a terrifying mess.
-
-Let's solve the problem once and for all. If you mix VHE and
-non-VHE CPUs in the same system, you deserve to loose, and this
-patch makes sure you don't get a chance.
-
-This is implemented by storing the kernel execution level in
-a global variable. Secondaries will park themselves in a
-WFI loop if they observe a mismatch. Also, the primary CPU
-will detect that the secondary CPU has died on a mismatched
-execution level. Panic will follow.
+Take this opportunity to refactor the whole init a bit, allowing
+the various parts of the hypervisor bringup to be split across
+multiple functions.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/virt.h | 17 +++++++++++++++++
- arch/arm64/kernel/head.S      | 19 +++++++++++++++++++
- arch/arm64/kernel/smp.c       |  3 +++
- 3 files changed, 39 insertions(+)
+ arch/arm/kvm/arm.c | 151 +++++++++++++++++++++++++++++++++--------------------
+ arch/arm/kvm/mmu.c |   7 +++
+ 2 files changed, 100 insertions(+), 58 deletions(-)
 
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index 9f22dd6..f81a345 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -36,6 +36,11 @@
-  */
- extern u32 __boot_cpu_mode[2];
- 
-+/*
-+ * __run_cpu_mode records the mode the boot CPU uses for the kernel.
-+ */
-+extern u32 __run_cpu_mode[2];
-+
- void __hyp_set_vectors(phys_addr_t phys_vector_base);
- phys_addr_t __hyp_get_vectors(void);
- 
-@@ -60,6 +65,18 @@ static inline bool is_kernel_in_hyp_mode(void)
- 	return el == CurrentEL_EL2;
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index dda1959..66e2d04 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -1035,6 +1035,67 @@ static inline void hyp_cpu_pm_init(void)
  }
+ #endif
  
-+static inline bool is_kernel_mode_mismatched(void)
++static void teardown_common_resources(void)
 +{
-+	/*
-+	 * A mismatched CPU will have written its own CurrentEL in
-+	 * __run_cpu_mode[1] (initially set to zero) after failing to
-+	 * match the value in __run_cpu_mode[0]. Thus, a non-zero
-+	 * value in __run_cpu_mode[1] is enough to detect the
-+	 * pathological case.
-+	 */
-+	return !!ACCESS_ONCE(__run_cpu_mode[1]);
++	free_percpu(kvm_host_cpu_state);
 +}
 +
- /* The section containing the hypervisor text */
- extern char __hyp_text_start[];
- extern char __hyp_text_end[];
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 2a7134c..bc44cf8 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -577,7 +577,23 @@ ENTRY(set_cpu_boot_mode_flag)
- 1:	str	w20, [x1]			// This CPU has booted in EL1
- 	dmb	sy
- 	dc	ivac, x1			// Invalidate potentially stale cache line
-+	adr_l	x1, __run_cpu_mode
-+	ldr	w0, [x1]
-+	mrs	x20, CurrentEL
-+	cbz	x0, skip_el_check
-+	cmp	x0, x20
-+	bne	mismatched_el
-+skip_el_check:			// Only the first CPU gets to set the rule
-+	str	w20, [x1]
-+	dmb	sy
-+	dc	ivac, x1	// Invalidate potentially stale cache line
- 	ret
-+mismatched_el:
-+	str	w20, [x1, #4]
-+	dmb	sy
-+	dc	ivac, x1	// Invalidate potentially stale cache line
-+1:	wfi
-+	b	1b
- ENDPROC(set_cpu_boot_mode_flag)
++static int init_common_resources(void)
++{
++	kvm_host_cpu_state = alloc_percpu(kvm_cpu_context_t);
++	if (!kvm_host_cpu_state) {
++		kvm_err("Cannot allocate host CPU state\n");
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++
++static int init_subsystems(void)
++{
++	int err;
++
++	/*
++	 * Init HYP view of VGIC
++	 */
++	err = kvm_vgic_hyp_init();
++	switch (err) {
++	case 0:
++		vgic_present = true;
++		break;
++	case -ENODEV:
++	case -ENXIO:
++		vgic_present = false;
++		break;
++	default:
++		return err;
++	}
++
++	/*
++	 * Init HYP architected timer support
++	 */
++	err = kvm_timer_hyp_init();
++	if (err)
++		return err;
++
++	kvm_perf_init();
++	kvm_coproc_table_init();
++
++	return 0;
++}
++
++static void teardown_hyp_mode(void)
++{
++	int cpu;
++
++	if (is_kernel_in_hyp_mode())
++		return;
++
++	free_hyp_pgds();
++	for_each_possible_cpu(cpu)
++		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
++}
++
+ /**
+  * Inits Hyp-mode on all online CPUs
+  */
+@@ -1043,6 +1104,9 @@ static int init_hyp_mode(void)
+ 	int cpu;
+ 	int err = 0;
  
- /*
-@@ -592,6 +608,9 @@ ENDPROC(set_cpu_boot_mode_flag)
- ENTRY(__boot_cpu_mode)
- 	.long	BOOT_CPU_MODE_EL2
- 	.long	BOOT_CPU_MODE_EL1
-+ENTRY(__run_cpu_mode)
-+	.long	0
-+	.long	0
- 	.popsection
++	if (is_kernel_in_hyp_mode())
++		return 0;
++
+ 	/*
+ 	 * Allocate Hyp PGD and setup Hyp identity mapping
+ 	 */
+@@ -1065,7 +1129,7 @@ static int init_hyp_mode(void)
+ 		stack_page = __get_free_page(GFP_KERNEL);
+ 		if (!stack_page) {
+ 			err = -ENOMEM;
+-			goto out_free_stack_pages;
++			goto out_err;
+ 		}
+ 
+ 		per_cpu(kvm_arm_hyp_stack_page, cpu) = stack_page;
+@@ -1077,13 +1141,13 @@ static int init_hyp_mode(void)
+ 	err = create_hyp_mappings(__kvm_hyp_code_start, __kvm_hyp_code_end);
+ 	if (err) {
+ 		kvm_err("Cannot map world-switch code\n");
+-		goto out_free_mappings;
++		goto out_err;
+ 	}
+ 
+ 	err = create_hyp_mappings(__start_rodata, __end_rodata);
+ 	if (err) {
+ 		kvm_err("Cannot map rodata section\n");
+-		goto out_free_mappings;
++		goto out_err;
+ 	}
  
  	/*
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index b1adc51..bc7650a 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -113,6 +113,9 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
- 			pr_crit("CPU%u: failed to come online\n", cpu);
- 			ret = -EIO;
+@@ -1095,20 +1159,10 @@ static int init_hyp_mode(void)
+ 
+ 		if (err) {
+ 			kvm_err("Cannot map hyp stack\n");
+-			goto out_free_mappings;
++			goto out_err;
  		}
-+
-+		if (is_kernel_mode_mismatched())
-+			panic("CPU%u: incompatible execution level", cpu);
- 	} else {
- 		pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
  	}
+ 
+-	/*
+-	 * Map the host CPU structures
+-	 */
+-	kvm_host_cpu_state = alloc_percpu(kvm_cpu_context_t);
+-	if (!kvm_host_cpu_state) {
+-		err = -ENOMEM;
+-		kvm_err("Cannot allocate host CPU state\n");
+-		goto out_free_mappings;
+-	}
+-
+ 	for_each_possible_cpu(cpu) {
+ 		kvm_cpu_context_t *cpu_ctxt;
+ 
+@@ -1117,7 +1171,7 @@ static int init_hyp_mode(void)
+ 
+ 		if (err) {
+ 			kvm_err("Cannot map host CPU state: %d\n", err);
+-			goto out_free_context;
++			goto out_err;
+ 		}
+ 	}
+ 
+@@ -1126,34 +1180,22 @@ static int init_hyp_mode(void)
+ 	 */
+ 	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
+ 
+-	/*
+-	 * Init HYP view of VGIC
+-	 */
+-	err = kvm_vgic_hyp_init();
+-	switch (err) {
+-	case 0:
+-		vgic_present = true;
+-		break;
+-	case -ENODEV:
+-	case -ENXIO:
+-		vgic_present = false;
+-		break;
+-	default:
+-		goto out_free_context;
+-	}
+-
+-	/*
+-	 * Init HYP architected timer support
+-	 */
+-	err = kvm_timer_hyp_init();
+-	if (err)
+-		goto out_free_context;
+-
+ #ifndef CONFIG_HOTPLUG_CPU
+ 	free_boot_hyp_pgd();
+ #endif
+ 
+-	kvm_perf_init();
++	cpu_notifier_register_begin();
++
++	err = __register_cpu_notifier(&hyp_init_cpu_nb);
++
++	cpu_notifier_register_done();
++
++	if (err) {
++		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
++		goto out_err;
++	}
++
++	hyp_cpu_pm_init();
+ 
+ 	/* set size of VMID supported by CPU */
+ 	kvm_vmid_bits = kvm_get_vmid_bits();
+@@ -1162,14 +1204,9 @@ static int init_hyp_mode(void)
+ 	kvm_info("Hyp mode initialized successfully\n");
+ 
+ 	return 0;
+-out_free_context:
+-	free_percpu(kvm_host_cpu_state);
+-out_free_mappings:
+-	free_hyp_pgds();
+-out_free_stack_pages:
+-	for_each_possible_cpu(cpu)
+-		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
++
+ out_err:
++	teardown_hyp_mode();
+ 	kvm_err("error initializing Hyp mode: %d\n", err);
+ 	return err;
+ }
+@@ -1213,26 +1250,24 @@ int kvm_arch_init(void *opaque)
+ 		}
+ 	}
+ 
+-	cpu_notifier_register_begin();
++	err = init_common_resources();
++	if (err)
++		return err;
+ 
+ 	err = init_hyp_mode();
+ 	if (err)
+ 		goto out_err;
+ 
+-	err = __register_cpu_notifier(&hyp_init_cpu_nb);
+-	if (err) {
+-		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
+-		goto out_err;
+-	}
+-
+-	cpu_notifier_register_done();
+-
+-	hyp_cpu_pm_init();
++	err = init_subsystems();
++	if (err)
++		goto out_hyp;
+ 
+-	kvm_coproc_table_init();
+ 	return 0;
++
++out_hyp:
++	teardown_hyp_mode();
+ out_err:
+-	cpu_notifier_register_done();
++	teardown_common_resources();
+ 	return err;
+ }
+ 
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index aba61fd..920d0c3 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -28,6 +28,7 @@
+ #include <asm/kvm_mmio.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_emulate.h>
++#include <asm/virt.h>
+ 
+ #include "trace.h"
+ 
+@@ -598,6 +599,9 @@ int create_hyp_mappings(void *from, void *to)
+ 	unsigned long start = KERN_TO_HYP((unsigned long)from);
+ 	unsigned long end = KERN_TO_HYP((unsigned long)to);
+ 
++	if (is_kernel_in_hyp_mode())
++		return 0;
++
+ 	start = start & PAGE_MASK;
+ 	end = PAGE_ALIGN(end);
+ 
+@@ -630,6 +634,9 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
+ 	unsigned long start = KERN_TO_HYP((unsigned long)from);
+ 	unsigned long end = KERN_TO_HYP((unsigned long)to);
+ 
++	if (is_kernel_in_hyp_mode())
++		return 0;
++
+ 	/* Check for a valid kernel IO mapping */
+ 	if (!is_vmalloc_addr(from) || !is_vmalloc_addr(to - 1))
+ 		return -EINVAL;
 -- 
 2.1.4
