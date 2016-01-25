@@ -1,90 +1,100 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Tue, 26 Jan 2016 00:06:27 +0800
-Subject: [PATCH v2] ARM: dts: rockchip: add support emac for RK3036
-In-Reply-To: <1453725488-5279-1-git-send-email-wxt@rock-chips.com>
-References: <1453725488-5279-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <56A64803.8070006@gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 25 Jan 2016 16:06:10 +0000
+Subject: [PATCH v3 13/17] ARM: Xen: Document UEFI support on Xen ARM
+ virtual platforms
+In-Reply-To: <20160125155921.GF27372@leverpostej>
+References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453519184-11908-14-git-send-email-zhaoshenglong@huawei.com>
+ <alpine.DEB.2.02.1601251539430.9687@kaball.uk.xensource.com>
+ <20160125155921.GF27372@leverpostej>
+Message-ID: <alpine.DEB.2.02.1601251604150.9687@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 25 Jan 2016, Mark Rutland wrote:
+> On Mon, Jan 25, 2016 at 03:50:52PM +0000, Stefano Stabellini wrote:
+> > On Sat, 23 Jan 2016, Shannon Zhao wrote:
+> > > From: Shannon Zhao <shannon.zhao@linaro.org>
+> > > 
+> > > Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
+> > > scan this to get the UEFI information.
+> > > 
+> > > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> > > Acked-by: Rob Herring <robh@kernel.org>
+> > > ---
+> > > CC: Rob Herring <robh@kernel.org>
+> > > ---
+> > >  Documentation/devicetree/bindings/arm/xen.txt | 34 +++++++++++++++++++++++++++
+> > >  1 file changed, 34 insertions(+)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
+> > > index 0f7b9c2..aa69405 100644
+> > > --- a/Documentation/devicetree/bindings/arm/xen.txt
+> > > +++ b/Documentation/devicetree/bindings/arm/xen.txt
+> > > @@ -15,6 +15,26 @@ the following properties:
+> > >  - interrupts: the interrupt used by Xen to inject event notifications.
+> > >    A GIC node is also required.
+> > >  
+> > > +To support UEFI on Xen ARM virtual platforms, Xen populates the FDT "uefi" node
+> > > +under /hypervisor with following parameters:
+> > > +
+> > > +________________________________________________________________________________
+> > > +Name                      | Size   | Description
+> > > +================================================================================
+> > > +xen,uefi-system-table     | 64-bit | Guest physical address of the UEFI System
+> > > +			  |	   | Table.
+> > > +--------------------------------------------------------------------------------
+> > > +xen,uefi-mmap-start       | 64-bit | Guest physical address of the UEFI memory
+> > > +			  |	   | map.
+> > > +--------------------------------------------------------------------------------
+> > > +xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
+> > > +                          |        | pointed to in previous entry.
+> > > +--------------------------------------------------------------------------------
+> > > +xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
+> > > +                          |        | memory map.
+> > > +--------------------------------------------------------------------------------
+> > > +xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
+> > > +--------------------------------------------------------------------------------
+> > >  
+> > >  Example (assuming #address-cells = <2> and #size-cells = <2>):
+> > >  
+> > > @@ -22,4 +42,18 @@ hypervisor {
+> > >  	compatible = "xen,xen-4.3", "xen,xen";
+> > >  	reg = <0 0xb0000000 0 0x20000>;
+> > >  	interrupts = <1 15 0xf08>;
+> > > +	uefi {
+> > > +		xen,uefi-system-table = <0xXXXXXXXX>;
+> > > +		xen,uefi-mmap-start = <0xXXXXXXXX>;
+> > > +		xen,uefi-mmap-size = <0xXXXXXXXX>;
+> > > +		xen,uefi-mmap-desc-size = <0xXXXXXXXX>;
+> > > +		xen,uefi-mmap-desc-ver = <0xXXXXXXXX>;
+> > > +        };
+> > >  };
+> > > +
+> > > +The format and meaning of these "xen,uefi-*" parameters are similar to those in
+> > > +Documentation/arm/uefi.txt which are used by normal UEFI. But to distinguish
+> > > +from normal UEFI, for Xen ARM virtual platforms it needs to introduce a Xen
+> > > +specific UEFI which requires Xen hypervisor to provide hypercalls for Dom0 to
+> > > +make use of the runtime services. Therefore, it defines these parameters under
+> > > +/hypervisor node.
+> > 
+> > Please replace the paragraph with the following which mentions
+> > include/xen/interface/platform.h and improves the wording:
+> > 
+> > "The format and meaning of the "xen,uefi-*" parameters are similar to
+> > those in Documentation/arm/uefi.txt, which are provided by the regular
+> > UEFI stub. However they differ because they are provided by the Xen
+> > hypervisor, together with a set of UEFI runtime services implemented via
+> > hypercalls, see include/xen/interface/platform.h."
+> 
+> I would prefer if we didn't refer to Linux paths here, for the usual
+> rationale of keeping bindings distinct from Linux implementation
+> details.
+> 
+> Could we either drop the "see include/xen/interface/platform.h" part, or
+> refer to some Xen documentation?
 
+Sure, in fact the canonical headers are the ones in the Xen tree anyway.
+We could use the following instead:
 
-? 2016?01?25? 20:38, Caesar Wang ??:
-> From: zhengxing <zhengxing@rock-chips.com>
->
-> This patch describe the emac, and we need to let mac clock under
-> the APLL which is able to provide the accurate 50MHz what mac_ref
-> need.
->
-> This patch makes the emac parent clock is DPLL instead of APLL.
-> since that will cause some unstable things if the cpufreq is working.
->
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->
-> ---
-[...]
-> diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
-> index 7897449..436c77a 100644
-> --- a/arch/arm/boot/dts/rk3036.dtsi
-> +++ b/arch/arm/boot/dts/rk3036.dtsi
-> @@ -186,6 +186,27 @@
->   		status = "disabled";
->   	};
->   
-> +	emac: ethernet at 10200000 {
-> +		compatible = "rockchip,rk3036-emac", "snps,arc-emac";
-> +		reg = <0x10200000 0x4000>;
-> +		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		rockchip,grf = <&grf>;
-> +		clocks = <&cru HCLK_MAC>, <&cru SCLK_MACREF>, <&cru SCLK_MAC>;
-> +		clock-names = "hclk", "macref", "macclk";
-> +		/*
-> +		 * Fix the emac parent clock is DPLL instead of APLL.
-> +		 * since that will cause some unstable things if the cpufreq
-> +		 * is working. (e.g: the accurate 50MHz what mac_ref need)
-> +		 */
-> +		assigned-clocks = <&cru SCLK_MACPLL>;
-> +		assigned-clock-parents = <&cru PLL_DPLL>;
-
-This patch depends on the clock patch. :-( ?still in my work branch)
-
-> +		max-speed = <100>;
-> +		phy-mode = "rmii";
-> +		status = "disabled";
-> +	};
-> +
->   	sdmmc: dwmmc at 10214000 {
->   		compatible = "rockchip,rk3036-dw-mshc", "rockchip,rk3288-dw-mshc";
->   		reg = <0x10214000 0x4000>;
-> @@ -556,6 +577,24 @@
->   			};
->   		};
->   
-> +		emac {
-> +			emac_xfer: emac-xfer {
-> +				rockchip,pins = <2 10 RK_FUNC_1 &pcfg_pull_default>, /* crs_dvalid */
-> +						<2 13 RK_FUNC_1 &pcfg_pull_default>, /* tx_en */
-> +						<2 14 RK_FUNC_1 &pcfg_pull_default>, /* mac_clk */
-> +						<2 15 RK_FUNC_1 &pcfg_pull_default>, /* rx_err */
-> +						<2 16 RK_FUNC_1 &pcfg_pull_default>, /* rxd1 */
-> +						<2 17 RK_FUNC_1 &pcfg_pull_default>, /* rxd0 */
-> +						<2 18 RK_FUNC_1 &pcfg_pull_default>, /* txd1 */
-> +						<2 19 RK_FUNC_1 &pcfg_pull_default>; /* txd0 */
-> +			};
-> +
-> +			emac_mdio: emac-mdio {
-> +				rockchip,pins = <2 12 RK_FUNC_1 &pcfg_pull_default>, /* mac_md */
-> +						<2 25 RK_FUNC_1 &pcfg_pull_default>; /* mac_mdclk */
-> +			};
-> +		};
-> +
->   		i2c0 {
->   			i2c0_xfer: i2c0-xfer {
->   				rockchip,pins = <0 0 RK_FUNC_1 &pcfg_pull_none>,
-
--- 
-Thanks,
-Caesar
+http://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,platform.h.html 
