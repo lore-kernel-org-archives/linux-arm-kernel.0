@@ -1,66 +1,77 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 16:38:40 +0000
-Subject: [PATCH 24/27] ARM: KVM: Cleanup asm-offsets.c
+Date: Mon, 25 Jan 2016 16:38:36 +0000
+Subject: [PATCH 20/27] ARM: KVM: Change kvm_call_hyp return type to unsigned
+ long
 In-Reply-To: <1453739923-17846-1-git-send-email-marc.zyngier@arm.com>
 References: <1453739923-17846-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453739923-17846-25-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453739923-17846-21-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we don't have much assembler left, most of the KVM stuff
-in asm-offsets.c is now superfluous. Let's get rid of it.
+Having u64 as the kvm_call_hyp return type is problematic, as
+it forces all kind of tricks for the return values from HYP
+to be promoted to 64bit (LE has the LSB in r0, and BE has them
+in r1).
+
+Since the only user of the return value is perfectly happy with
+a 32bit value, let's make kvm_call_hyp return an unsigned long,
+which is 32bit on ARM.
+
+This solves yet another headache.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kernel/asm-offsets.c | 30 ------------------------------
- 1 file changed, 30 deletions(-)
+ arch/arm/include/asm/kvm_host.h |  2 +-
+ arch/arm/kvm/interrupts.S       | 10 ++--------
+ 2 files changed, 3 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-index 2f3e0b0..1f24c32 100644
---- a/arch/arm/kernel/asm-offsets.c
-+++ b/arch/arm/kernel/asm-offsets.c
-@@ -170,42 +170,12 @@ int main(void)
-   DEFINE(CACHE_WRITEBACK_GRANULE, __CACHE_WRITEBACK_GRANULE);
-   BLANK();
- #ifdef CONFIG_KVM_ARM_HOST
--  DEFINE(VCPU_KVM,		offsetof(struct kvm_vcpu, kvm));
--  DEFINE(VCPU_MIDR,		offsetof(struct kvm_vcpu, arch.midr));
-   DEFINE(VCPU_GUEST_CTXT,	offsetof(struct kvm_vcpu, arch.ctxt));
-   DEFINE(VCPU_HOST_CTXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
-   DEFINE(CPU_CTXT_VFP,		offsetof(struct kvm_cpu_context, vfp));
--  DEFINE(CPU_CTXT_CP15,		offsetof(struct kvm_cpu_context, cp15));
-   DEFINE(CPU_CTXT_GP_REGS,	offsetof(struct kvm_cpu_context, gp_regs));
-   DEFINE(GP_REGS_USR,		offsetof(struct kvm_regs, usr_regs));
--  DEFINE(GP_REGS_SVC,		offsetof(struct kvm_regs, svc_regs));
--  DEFINE(GP_REGS_ABT,		offsetof(struct kvm_regs, abt_regs));
--  DEFINE(GP_REGS_UND,		offsetof(struct kvm_regs, und_regs));
--  DEFINE(GP_REGS_IRQ,		offsetof(struct kvm_regs, irq_regs));
--  DEFINE(GP_REGS_FIQ,		offsetof(struct kvm_regs, fiq_regs));
--  DEFINE(GP_REGS_PC,		offsetof(struct kvm_regs, usr_regs.ARM_pc));
--  DEFINE(GP_REGS_CPSR,		offsetof(struct kvm_regs, usr_regs.ARM_cpsr));
--  DEFINE(VCPU_HCR,		offsetof(struct kvm_vcpu, arch.hcr));
--  DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
--  DEFINE(VCPU_HSR,		offsetof(struct kvm_vcpu, arch.fault.hsr));
--  DEFINE(VCPU_HxFAR,		offsetof(struct kvm_vcpu, arch.fault.hxfar));
--  DEFINE(VCPU_HPFAR,		offsetof(struct kvm_vcpu, arch.fault.hpfar));
-   DEFINE(VCPU_HYP_PC,		offsetof(struct kvm_vcpu, arch.fault.hyp_pc));
--  DEFINE(VCPU_VGIC_CPU,		offsetof(struct kvm_vcpu, arch.vgic_cpu));
--  DEFINE(VGIC_V2_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_hcr));
--  DEFINE(VGIC_V2_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_vmcr));
--  DEFINE(VGIC_V2_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v2.vgic_misr));
--  DEFINE(VGIC_V2_CPU_EISR,	offsetof(struct vgic_cpu, vgic_v2.vgic_eisr));
--  DEFINE(VGIC_V2_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_v2.vgic_elrsr));
--  DEFINE(VGIC_V2_CPU_APR,	offsetof(struct vgic_cpu, vgic_v2.vgic_apr));
--  DEFINE(VGIC_V2_CPU_LR,	offsetof(struct vgic_cpu, vgic_v2.vgic_lr));
--  DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
--  DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
--  DEFINE(VCPU_TIMER_CNTV_CVAL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_cval));
--  DEFINE(KVM_TIMER_CNTVOFF,	offsetof(struct kvm, arch.timer.cntvoff));
--  DEFINE(KVM_TIMER_ENABLED,	offsetof(struct kvm, arch.timer.enabled));
--  DEFINE(KVM_VGIC_VCTRL,	offsetof(struct kvm, arch.vgic.vctrl_base));
--  DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
- #endif
-   BLANK();
- #ifdef CONFIG_VDSO
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 897c5d8..62fa788 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -165,7 +165,7 @@ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
+ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
+ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
+ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
+-u64 kvm_call_hyp(void *hypfn, ...);
++unsigned long kvm_call_hyp(void *hypfn, ...);
+ void force_vm_exit(const cpumask_t *mask);
+ 
+ #define KVM_ARCH_WANT_MMU_NOTIFIER
+diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+index 7bfb289..01eb169 100644
+--- a/arch/arm/kvm/interrupts.S
++++ b/arch/arm/kvm/interrupts.S
+@@ -207,20 +207,14 @@ after_vfp_restore:
+ 
+ 	restore_host_regs
+ 	clrex				@ Clear exclusive monitor
+-#ifndef CONFIG_CPU_ENDIAN_BE8
+ 	mov	r0, r1			@ Return the return code
+-	mov	r1, #0			@ Clear upper bits in return value
+-#else
+-	@ r1 already has return code
+-	mov	r0, #0			@ Clear upper bits in return value
+-#endif /* CONFIG_CPU_ENDIAN_BE8 */
+ 	bx	lr			@ return to IOCTL
+ 
+ /********************************************************************
+  *  Call function in Hyp mode
+  *
+  *
+- * u64 kvm_call_hyp(void *hypfn, ...);
++ * unsigned long kvm_call_hyp(void *hypfn, ...);
+  *
+  * This is not really a variadic function in the classic C-way and care must
+  * be taken when calling this to ensure parameters are passed in registers
+@@ -231,7 +225,7 @@ after_vfp_restore:
+  * passed as r0, r1, and r2 (a maximum of 3 arguments in addition to the
+  * function pointer can be passed).  The function being called must be mapped
+  * in Hyp mode (see init_hyp_mode in arch/arm/kvm/arm.c).  Return values are
+- * passed in r0 and r1.
++ * passed in r0 (strictly 32bit).
+  *
+  * A function pointer with a value of 0xffffffff has a special meaning,
+  * and is used to implement __hyp_get_vectors in the same way as in
 -- 
 2.1.4
