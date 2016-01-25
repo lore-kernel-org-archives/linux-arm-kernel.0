@@ -1,27 +1,72 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 26 Jan 2016 07:21:56 +0800
-Subject: [PATCH] acpi: implement Generic Event Device
-In-Reply-To: <1453757387-28154-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <201601260728.zwrjxeIK%fengguang.wu@intel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 26 Jan 2016 08:40:41 +0900
+Subject: [PATCH] drm/exynos: fix building without CONFIG_PM_SLEEP
+In-Reply-To: <9569056.LBRz4v8fSj@wuerfel>
+References: <9569056.LBRz4v8fSj@wuerfel>
+Message-ID: <CAJKOXPdF_MYmysaQg=W7_6WzpCA=5auO6zLbvNYmCRqg+2L05Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
+2015-11-18 0:08 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> The runtime PM operations use the suspend/resume functions
+> even when CONFIG_PM_SLEEP is not set, but this now fails
+> for the exynos DRM driver:
+>
+> exynos_mixer.c:1289:61: error: 'exynos_mixer_resume' undeclared here (not in a function)
+>   SET_RUNTIME_PM_OPS(exynos_mixer_suspend, exynos_mixer_resume, NULL)
+>
+> This removes the #ifdef and instead marks the functions as
+> __maybe_unused, which does the right thing in all cases and
+> also looks nicer.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes:   ("drm/exynos: add pm_runtime to Mixer")
 
-[auto build test WARNING on pm/linux-next]
-[also build test WARNING on v4.5-rc1 next-20160125]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Dear Inki,
 
-url:    https://github.com/0day-ci/linux/commits/Sinan-Kaya/acpi-implement-Generic-Event-Device/20160126-053245
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+Ping? On 4.5-rc1 this is still broken. Can you apply this for fixes
+for current rc-cycle?
+
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
 
 
-coccinelle warnings: (new ones prefixed by >>)
-
->> drivers/acpi/evged.c:152:3-8: No need to set .owner here. The core will do it.
-
-Please review and possibly fold the followup patch.
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+>
+> diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
+> index 7498c6e76a53..fcaf71df77c1 100644
+> --- a/drivers/gpu/drm/exynos/exynos_mixer.c
+> +++ b/drivers/gpu/drm/exynos/exynos_mixer.c
+> @@ -1230,8 +1230,7 @@ static int mixer_remove(struct platform_device *pdev)
+>         return 0;
+>  }
+>
+> -#ifdef CONFIG_PM_SLEEP
+> -static int exynos_mixer_suspend(struct device *dev)
+> +static int __maybe_unused exynos_mixer_suspend(struct device *dev)
+>  {
+>         struct mixer_context *ctx = dev_get_drvdata(dev);
+>         struct mixer_resources *res = &ctx->mixer_res;
+> @@ -1247,7 +1246,7 @@ static int exynos_mixer_suspend(struct device *dev)
+>         return 0;
+>  }
+>
+> -static int exynos_mixer_resume(struct device *dev)
+> +static int __maybe_unused exynos_mixer_resume(struct device *dev)
+>  {
+>         struct mixer_context *ctx = dev_get_drvdata(dev);
+>         struct mixer_resources *res = &ctx->mixer_res;
+> @@ -1283,7 +1282,6 @@ static int exynos_mixer_resume(struct device *dev)
+>
+>         return 0;
+>  }
+> -#endif
+>
+>  static const struct dev_pm_ops exynos_mixer_pm_ops = {
+>         SET_RUNTIME_PM_OPS(exynos_mixer_suspend, exynos_mixer_resume, NULL)
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
