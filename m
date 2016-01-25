@@ -1,109 +1,135 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 16:38:35 +0000
-Subject: [PATCH 19/27] ARM: KVM: Add panic handling code
+Date: Mon, 25 Jan 2016 16:38:26 +0000
+Subject: [PATCH 10/27] ARM: KVM: Add timer save/restore
 In-Reply-To: <1453739923-17846-1-git-send-email-marc.zyngier@arm.com>
 References: <1453739923-17846-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453739923-17846-20-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453739923-17846-11-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of spinning forever, let's "properly" handle any unexpected
-exception ("properly" meaning "print a spat on the console and die").
-
-This has proved useful quite a few times...
+This patch shouldn't exist, as we should be able to reuse the
+arm64 version for free. I'll get there eventually, but in the
+meantime I need a timer ticking.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/hyp/hyp-entry.S | 28 +++++++++++++++++++++-------
- arch/arm/kvm/hyp/switch.c    | 38 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 59 insertions(+), 7 deletions(-)
+ arch/arm/kvm/hyp/Makefile   |  1 +
+ arch/arm/kvm/hyp/hyp.h      |  8 +++++
+ arch/arm/kvm/hyp/timer-sr.c | 71 +++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 80 insertions(+)
+ create mode 100644 arch/arm/kvm/hyp/timer-sr.c
 
-diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-index 44bc11f..ca412ad 100644
---- a/arch/arm/kvm/hyp/hyp-entry.S
-+++ b/arch/arm/kvm/hyp/hyp-entry.S
-@@ -75,15 +75,29 @@ __kvm_hyp_vector:
+diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
+index 9f96fcb..9241ae8 100644
+--- a/arch/arm/kvm/hyp/Makefile
++++ b/arch/arm/kvm/hyp/Makefile
+@@ -4,3 +4,4 @@
  
- .macro invalid_vector label, cause
- 	.align
--\label:	b	.
-+\label:	mov	r0, #\cause
-+	b	__hyp_panic
- .endm
- 
--	invalid_vector	hyp_reset
--	invalid_vector	hyp_undef
--	invalid_vector	hyp_svc
--	invalid_vector	hyp_pabt
--	invalid_vector	hyp_dabt
--	invalid_vector	hyp_fiq
-+	invalid_vector	hyp_reset	ARM_EXCEPTION_RESET
-+	invalid_vector	hyp_undef	ARM_EXCEPTION_UNDEFINED
-+	invalid_vector	hyp_svc		ARM_EXCEPTION_SOFTWARE
-+	invalid_vector	hyp_pabt	ARM_EXCEPTION_PREF_ABORT
-+	invalid_vector	hyp_dabt	ARM_EXCEPTION_DATA_ABORT
-+	invalid_vector	hyp_fiq		ARM_EXCEPTION_FIQ
+ obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
+ obj-$(CONFIG_KVM_ARM_HOST) += cp15-sr.o
++obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
+diff --git a/arch/arm/kvm/hyp/hyp.h b/arch/arm/kvm/hyp/hyp.h
+index ab2cb82..4924418 100644
+--- a/arch/arm/kvm/hyp/hyp.h
++++ b/arch/arm/kvm/hyp/hyp.h
+@@ -46,6 +46,9 @@
+ #define TTBR1		__ACCESS_CP15_64(1, c2)
+ #define VTTBR		__ACCESS_CP15_64(6, c2)
+ #define PAR		__ACCESS_CP15_64(0, c7)
++#define CNTV_CVAL	__ACCESS_CP15_64(3, c14)
++#define CNTVOFF		__ACCESS_CP15_64(4, c14)
 +
-+ENTRY(__hyp_do_panic)
-+	mrs	lr, cpsr
-+	bic	lr, lr, #MODE_MASK
-+	orr	lr, lr, #SVC_MODE
-+THUMB(	orr	lr, lr, #PSR_T_BIT	)
-+	msr	spsr_cxsf, lr
-+	ldr	lr, =panic
-+	msr	ELR_hyp, lr
-+	ldr	lr, =kvm_call_hyp
-+	clrex
-+	eret
-+ENDPROC(__hyp_do_panic)
- 
- hyp_hvc:
- 	/*
-diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
-index 8bfd729..67f3944 100644
---- a/arch/arm/kvm/hyp/switch.c
-+++ b/arch/arm/kvm/hyp/switch.c
-@@ -188,3 +188,41 @@ again:
- }
- 
- __alias(__guest_run) int __weak __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+ #define CSSELR		__ACCESS_CP15(c0, 2, c0, 0)
+ #define VMPIDR		__ACCESS_CP15(c0, 4, c0, 5)
+ #define SCTLR		__ACCESS_CP15(c1, 0, c0, 0)
+@@ -71,6 +74,11 @@
+ #define TID_URO		__ACCESS_CP15(c13, 0, c0, 3)
+ #define TID_PRIV	__ACCESS_CP15(c13, 0, c0, 4)
+ #define CNTKCTL		__ACCESS_CP15(c14, 0, c1, 0)
++#define CNTV_CTL	__ACCESS_CP15(c14, 0, c3, 1)
++#define CNTHCTL		__ACCESS_CP15(c14, 4, c1, 0)
 +
-+static const char * const __hyp_panic_string[] = {
-+	[ARM_EXCEPTION_RESET]      = "\nHYP panic: RST?? PC:%08x CPSR:%08x",
-+	[ARM_EXCEPTION_UNDEFINED]  = "\nHYP panic: UNDEF PC:%08x CPSR:%08x",
-+	[ARM_EXCEPTION_SOFTWARE]   = "\nHYP panic: SVC?? PC:%08x CPSR:%08x",
-+	[ARM_EXCEPTION_PREF_ABORT] = "\nHYP panic: PABRT PC:%08x CPSR:%08x",
-+	[ARM_EXCEPTION_DATA_ABORT] = "\nHYP panic: DABRT PC:%08x ADDR:%08x",
-+	[ARM_EXCEPTION_IRQ]        = "\nHYP panic: IRQ?? PC:%08x CPSR:%08x",
-+	[ARM_EXCEPTION_FIQ]        = "\nHYP panic: FIQ?? PC:%08x CPSR:%08x",
-+	[ARM_EXCEPTION_HVC]        = "\nHYP panic: HVC?? PC:%08x CPSR:%08x",
-+};
++void __timer_save_state(struct kvm_vcpu *vcpu);
++void __timer_restore_state(struct kvm_vcpu *vcpu);
+ 
+ void __sysreg_save_state(struct kvm_cpu_context *ctxt);
+ void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
+diff --git a/arch/arm/kvm/hyp/timer-sr.c b/arch/arm/kvm/hyp/timer-sr.c
+new file mode 100644
+index 0000000..d7535fd
+--- /dev/null
++++ b/arch/arm/kvm/hyp/timer-sr.c
+@@ -0,0 +1,71 @@
++/*
++ * Copyright (C) 2012-2015 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+void __hyp_text __noreturn __hyp_panic(int cause)
++#include <clocksource/arm_arch_timer.h>
++#include <linux/compiler.h>
++#include <linux/kvm_host.h>
++
++#include <asm/kvm_mmu.h>
++
++#include "hyp.h"
++
++/* vcpu is already in the HYP VA space */
++void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
 +{
-+	u32 elr = read_special(ELR_hyp);
-+	u32 val;
++	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
++	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
++	u64 val;
 +
-+	if (cause == ARM_EXCEPTION_DATA_ABORT)
-+		val = read_sysreg(HDFAR);
-+	else
-+		val = read_special(SPSR);
-+
-+	if (read_sysreg(VTTBR)) {
-+		struct kvm_vcpu *vcpu;
-+		struct kvm_cpu_context *host_ctxt;
-+
-+		vcpu = (struct kvm_vcpu *)read_sysreg(HTPIDR);
-+		host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-+		__deactivate_traps(vcpu);
-+		__deactivate_vm(vcpu);
-+		__sysreg_restore_state(host_ctxt);
++	if (kvm->arch.timer.enabled) {
++		timer->cntv_ctl = read_sysreg(CNTV_CTL);
++		timer->cntv_cval = read_sysreg(CNTV_CVAL);
 +	}
 +
-+	/* Call panic for real */
-+	__hyp_do_panic(__hyp_panic_string[cause], elr, val);
++	/* Disable the virtual timer */
++	write_sysreg(0, CNTV_CTL);
 +
-+	unreachable();
++	/* Allow physical timer/counter access for the host */
++	val = read_sysreg(CNTHCTL);
++	val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
++	write_sysreg(val, CNTHCTL);
++
++	/* Clear cntvoff for the host */
++	write_sysreg(0, CNTVOFF);
++}
++
++void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
++{
++	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
++	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
++	u64 val;
++
++	/*
++	 * Disallow physical timer access for the guest
++	 * Physical counter access is allowed
++	 */
++	val = read_sysreg(CNTHCTL);
++	val &= ~CNTHCTL_EL1PCEN;
++	val |= CNTHCTL_EL1PCTEN;
++	write_sysreg(val, CNTHCTL);
++
++	if (kvm->arch.timer.enabled) {
++		write_sysreg(kvm->arch.timer.cntvoff, CNTVOFF);
++		write_sysreg(timer->cntv_cval, CNTV_CVAL);
++		isb();
++		write_sysreg(timer->cntv_ctl, CNTV_CTL);
++	}
 +}
 -- 
 2.1.4
