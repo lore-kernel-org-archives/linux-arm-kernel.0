@@ -1,46 +1,41 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Mon, 25 Jan 2016 15:56:24 +0100
-Subject: [PATCH 0/5] crypto: atmel-sha: fix registration issue and other
- bugs
-In-Reply-To: <20160125144849.GH8840@gondor.apana.org.au>
-References: <cover.1452867917.git.cyrille.pitchen@atmel.com>
- <20160125144849.GH8840@gondor.apana.org.au>
-Message-ID: <56A63798.5050208@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Jan 2016 16:03:01 +0100
+Subject: [PATCH] fbdev: mmp: print IRQ resource using %pR format string
+Message-ID: <1453734191-1958245-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Herbert,
+resource_size_t cannot be printed using the %x format string
+when we it is defined as u64:
 
-Le 25/01/2016 15:48, Herbert Xu a ?crit :
-> On Fri, Jan 15, 2016 at 03:49:30PM +0100, Cyrille Pitchen wrote:
->> Hi all,
->>
->> This series of patches fixes many issues such as the algo registration failure
->> or the broken support of context switches.
->>
->> This series was applied to linux-next and tested on a sama5d2 xplained
->> ultra board. We now pass the tcrypt tests in the following modes:
->> -  2: sha1
->> -  6: sha256
->> - 11: sha384
->> - 12: sha512
->> - 33: sha224
->>
->> The context switch fix was tested with a userspace program using the cryptodev
->> module. This single thread program computes the SHA256 hashes of many files
->> by splitting then into fixed size chunks. The chunks of each file are
->> processed by calling 'update' operations using a round robin algorithm.
->>
->> However, the .import() / .export() implementation was NOT tested!
->> Nonetheless the last patch is needed to fix the registration issue, otherwise
->> atmel_sha_probe() would still fail.
-> 
-> Patch 1-4 applied.  Please fix the alignment issue with patch 5.
-> 
+drivers/video/fbdev/mmp/hw/mmp_ctrl.c: In function 'mmphw_probe':
+drivers/video/fbdev/mmp/hw/mmp_ctrl.c:506:22: error: format '%x' expects argument of type 'unsigned int', but argument 4 has type 'resource_size_t {aka long long unsigned int}' [-Werror=format=]
+   dev_err(ctrl->dev, "%s: res %x - %x map failed\n", __func__,
+                      ^
+drivers/video/fbdev/mmp/hw/mmp_ctrl.c:506:22: error: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'resource_size_t {aka long long unsigned int}' [-Werror=format=]
 
-OK, I will fix it soon!
+This changes the format string to %pR, which is interpreted
+by the printk implementation to pretty-print a resource
+structure.
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/video/fbdev/mmp/hw/mmp_ctrl.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Best regards,
-
-Cyrille
+diff --git a/drivers/video/fbdev/mmp/hw/mmp_ctrl.c b/drivers/video/fbdev/mmp/hw/mmp_ctrl.c
+index de54a4748065..b6f83d5df9fd 100644
+--- a/drivers/video/fbdev/mmp/hw/mmp_ctrl.c
++++ b/drivers/video/fbdev/mmp/hw/mmp_ctrl.c
+@@ -503,8 +503,7 @@ static int mmphw_probe(struct platform_device *pdev)
+ 	ctrl->reg_base = devm_ioremap_nocache(ctrl->dev,
+ 			res->start, resource_size(res));
+ 	if (ctrl->reg_base == NULL) {
+-		dev_err(ctrl->dev, "%s: res %x - %x map failed\n", __func__,
+-			res->start, res->end);
++		dev_err(ctrl->dev, "%s: res %pR map failed\n", __func__, res);
+ 		ret = -ENOMEM;
+ 		goto failed;
+ 	}
+-- 
+2.7.0
