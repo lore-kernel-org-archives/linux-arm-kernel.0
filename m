@@ -1,71 +1,61 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 25 Jan 2016 11:21:12 +0000
-Subject: [PATCH v6 07/12] arm-cci: Add routines to save/restore all counters
+Date: Mon, 25 Jan 2016 11:21:14 +0000
+Subject: [PATCH v6 09/12] arm-cci: Provide hook for writing to PMU counters
 In-Reply-To: <1453720877-24962-1-git-send-email-suzuki.poulose@arm.com>
 References: <1453720877-24962-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1453720877-24962-8-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1453720877-24962-10-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds helper routines to disable the counter controls for
-all the counters on the CCI PMU and restore it back, by
-preserving the original state in caller provided mask.
+Add a hook for writing to CCI PMU counters. This callback
+can be used for CCI models which requires some extra work
+to program the PMU counter values. To accommodate group writes
+and single counter writes, the call back accepts a bitmask
+of the counter indices which need to be programmed with the
+given value.
 
 Cc: Punit Agrawal <punit.agrawal@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- drivers/bus/arm-cci.c |   38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ drivers/bus/arm-cci.c |   11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index f8f6a17..997ad36 100644
+index 9d700e1..4e68593 100644
 --- a/drivers/bus/arm-cci.c
 +++ b/drivers/bus/arm-cci.c
-@@ -719,6 +719,44 @@ static void pmu_set_event(struct cci_pmu *cci_pmu, int idx, unsigned long event)
+@@ -129,6 +129,7 @@ struct cci_pmu_model {
+ 	struct event_range event_ranges[CCI_IF_MAX];
+ 	int (*validate_hw_event)(struct cci_pmu *, unsigned long);
+ 	int (*get_event_idx)(struct cci_pmu *, struct cci_pmu_hw_events *, unsigned long);
++	void (*write_counters)(struct cci_pmu *, unsigned long *);
+ };
+ 
+ static struct cci_pmu_model cci_pmu_models[];
+@@ -867,7 +868,7 @@ static void pmu_write_counter(struct cci_pmu *cci_pmu, u32 value, int idx)
+ 	pmu_write_register(cci_pmu, value, idx, CCI_PMU_CNTR);
  }
  
- /*
-+ * For all counters on the CCI-PMU, disable any 'enabled' counters,
-+ * saving the changed counters in the mask, so that we can restore
-+ * it later using pmu_restore_counters. The mask is private to the
-+ * caller. We cannot rely on the used_mask maintained by the CCI_PMU
-+ * as it only tells us if the counter is assigned to perf_event or not.
-+ * The state of the perf_event cannot be locked by the PMU layer, hence
-+ * we check the individual counter status (which can be locked by
-+ * cci_pm->hw_events->pmu_lock).
-+ *
-+ * @mask should be initialised to empty by the caller.
-+ */
-+static void __maybe_unused
-+pmu_save_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
+-static void pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
++static void __pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
+ {
+ 	int i;
+ 	struct cci_pmu_hw_events *cci_hw = &cci_pmu->hw_events;
+@@ -881,6 +882,14 @@ static void pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
+ 	}
+ }
+ 
++static void pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
 +{
-+	int i;
-+
-+	for (i = 0; i < cci_pmu->num_cntrs; i++) {
-+		if (pmu_counter_is_enabled(cci_pmu, i)) {
-+			set_bit(i, mask);
-+			pmu_disable_counter(cci_pmu, i);
-+		}
-+	}
++	if (cci_pmu->model->write_counters)
++		cci_pmu->model->write_counters(cci_pmu, mask);
++	else
++		__pmu_write_counters(cci_pmu, mask);
 +}
 +
-+/*
-+ * Restore the status of the counters. Reversal of the pmu_save_counters().
-+ * For each counter set in the mask, enable the counter back.
-+ */
-+static void __maybe_unused
-+pmu_restore_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
-+{
-+	int i;
-+
-+	for_each_set_bit(i, mask, cci_pmu->num_cntrs)
-+		pmu_enable_counter(cci_pmu, i);
-+}
-+
-+/*
-  * Returns the number of programmable counters actually implemented
-  * by the cci
-  */
+ static u64 pmu_event_update(struct perf_event *event)
+ {
+ 	struct hw_perf_event *hwc = &event->hw;
 -- 
 1.7.9.5
