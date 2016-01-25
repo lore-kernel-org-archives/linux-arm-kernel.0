@@ -1,38 +1,95 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 17:53:48 +0100
-Subject: [PATCH 1/4] crypto: sunxi - don't print uninitialized data
-Message-ID: <1453740845-1980433-1-git-send-email-arnd@arndb.de>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Mon, 25 Jan 2016 19:57:22 +0300
+Subject: [PATCH 0/5] all: s390: make compat wrappers the generic solution
+Message-ID: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc correctly warns that the printk output contains a variable that
-is not initialized in some cases:
+The problem that makes us use wrappers is that some compat
+architectures allows user code to access top halves of registers.
+This is not a problem for syscalls that are already handled by compat
+code, or for that who has types of the same size in kernel and
+userspace. In case of s390 and lp64/ilp32 the problem is in pointer
+types, long, unsigned long. 
 
-drivers/crypto/sunxi-ss/sun4i-ss-cipher.c: In function 'sun4i_ss_cipher_poll':
-drivers/crypto/sunxi-ss/sun4i-ss-cipher.c:254:76: warning: 'todo' may be used uninitialized in this function [-Wmaybe-uninitialized]
-drivers/crypto/sunxi-ss/sun4i-ss-cipher.c:144:15: note: 'todo' was declared here
+S390 folks already have the solution for it. In this patchset,
+it is turned to be general, as arm64/ilp32 needs it too.
 
-This adds an explicit initialization to zero in the exact case where it
-was missing, to avoid leaking stack data to the console and to shut up
-that warning.
+This patchset is created as the part of the work of enabling arm64
+with ILP32 user mode. See details here:
+http://thread.gmane.org/gmane.linux.kernel/2126946
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/crypto/sunxi-ss/sun4i-ss-cipher.c | 2 ++
- 1 file changed, 2 insertions(+)
+Build-tested on s390.
 
-diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
-index a19ee127edca..db52ae16c147 100644
---- a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
-+++ b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
-@@ -246,6 +246,8 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
- 				sg_miter_next(&mi);
- 				oi = 0;
- 			}
-+		} else {
-+			todo = 0;
- 		}
- 
- 		spaces = readl(ss->base + SS_FCSR);
+Yury Norov (5):
+  all: s390: move wrapper infrastructure to generic headers
+  all: declare new wrappers
+  all: s390: redefine wrappers in generic code
+  all: non-obvious wrappers
+  introduce COMPAT_WRAPPER option and enable it for S390
+
+ arch/Kconfig                      |   4 +
+ arch/s390/Kconfig                 |   1 +
+ arch/s390/include/asm/compat.h    |  17 ++-
+ arch/s390/kernel/Makefile         |   2 +-
+ arch/s390/kernel/compat_wrapper.c | 179 ------------------------
+ arch/s390/kernel/entry.h          |   2 +
+ arch/s390/pci/pci_mmio.c          |   5 +-
+ drivers/char/random.c             |   3 +-
+ fs/aio.c                          |   4 +-
+ fs/buffer.c                       |   3 +-
+ fs/dcache.c                       |   3 +-
+ fs/eventpoll.c                    |   4 +-
+ fs/exec.c                         |   2 +-
+ fs/fhandle.c                      |   3 +-
+ fs/filesystems.c                  |   3 +-
+ fs/namei.c                        |  29 ++--
+ fs/namespace.c                    |   7 +-
+ fs/notify/inotify/inotify_user.c  |   3 +-
+ fs/open.c                         |  20 +--
+ fs/pipe.c                         |   5 +-
+ fs/quota/quota.c                  |   3 +-
+ fs/read_write.c                   |   2 +-
+ fs/readdir.c                      |   6 +
+ fs/select.c                       |   3 +-
+ fs/splice.c                       |   4 +-
+ fs/stat.c                         |   5 +-
+ fs/xattr.c                        |  25 ++--
+ include/linux/compat.h            | 280 ++++++++++++++++++++++++++++++++++++++
+ include/linux/syscalls.h          |  57 +-------
+ include/linux/syscalls_structs.h  |  60 ++++++++
+ include/uapi/asm-generic/unistd.h | 224 +++++++++++++++---------------
+ ipc/mqueue.c                      |   3 +-
+ kernel/acct.c                     |   3 +-
+ kernel/bpf/syscall.c              |   3 +-
+ kernel/capability.c               |   5 +-
+ kernel/events/core.c              |   2 +-
+ kernel/fork.c                     |  12 +-
+ kernel/groups.c                   |   5 +-
+ kernel/kcmp.c                     |   3 +-
+ kernel/module.c                   |   7 +-
+ kernel/printk/printk.c            |   3 +-
+ kernel/reboot.c                   |   3 +-
+ kernel/sched/core.c               |  11 +-
+ kernel/seccomp.c                  |   2 +-
+ kernel/signal.c                   |   6 +-
+ kernel/sys.c                      |  16 +--
+ kernel/sys_ni.c                   | 104 +++++++-------
+ mm/madvise.c                      |   3 +-
+ mm/mincore.c                      |   3 +-
+ mm/mlock.c                        |   7 +-
+ mm/mmap.c                         |   7 +-
+ mm/mprotect.c                     |   3 +-
+ mm/mremap.c                       |   3 +-
+ mm/msync.c                        |   3 +-
+ mm/nommu.c                        |   7 +-
+ mm/shmem.c                        |   3 +-
+ mm/swapfile.c                     |   5 +-
+ net/socket.c                      |  14 +-
+ security/keys/keyctl.c            |   5 +-
+ 59 files changed, 699 insertions(+), 520 deletions(-)
+ delete mode 100644 arch/s390/kernel/compat_wrapper.c
+ create mode 100644 include/linux/syscalls_structs.h
+
 -- 
-2.7.0
+2.5.0
