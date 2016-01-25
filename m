@@ -1,43 +1,38 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Mon, 25 Jan 2016 08:14:55 -0800
-Subject: [PATCH 1/3] printk: make preferred_console local static bool
-In-Reply-To: <56A62314.3020803@linaro.org>
-References: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>
- <1453722324-22407-2-git-send-email-aleksey.makarov@linaro.org>
- <1453725901.28952.53.camel@perches.com> <56A61A6F.10409@linaro.org>
- <1453728205.28952.62.camel@perches.com> <56A62314.3020803@linaro.org>
-Message-ID: <56A649FF.1070505@hurleysoftware.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Mon, 25 Jan 2016 18:17:58 +0200
+Subject: [PATCH] stm: add proper dependencies on the subsystem
+In-Reply-To: <1453737579-1960217-1-git-send-email-arnd@arndb.de>
+References: <1453737579-1960217-1-git-send-email-arnd@arndb.de>
+Message-ID: <871t95hbux.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2016 05:28 AM, Aleksey Makarov wrote:
-> 
-> 
-> On 25.01.2016 19:23, Joe Perches wrote:
->> On Mon, 2016-01-25 at 18:51 +0600, Aleksey Makarov wrote:
->>>
->>> On 25.01.2016 18:45, Joe Perches wrote:
->>>> On Mon, 2016-01-25 at 17:45 +0600, Aleksey Makarov wrote:
->>>>> The variable preferred_console is used only inside register_console()
->>>>> and it's semantics is boolean.  Make it clear.
->>>>
->>>> This loses the index of the preferred console.
->>>> I'm not sure this is better.
->>>
->>> That index is not used anywhere.  I believe the patch makes things clear.
->>
->> Well, with this change the name and its use
->> is a bit misleading.  Maybe changing it to
->> something like use_selected_console is better.
-> 
-> Thank you. I will fix this in the next version.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Ideally, the transform should be
+> As several people have pointed out, the Kconfig dependencies for
+> stm are confusing, because you can enable the individual features
+> even when the subsystem itself is disabled.
+>
+> It turns out that randconfig tests even show the a build-time
+> bug because of this:
+>
+> drivers/hwtracing/stm/built-in.o: In function `dummy_stm_init':
+> drivers/hwtracing/stm/dummy_stm.c:53: undefined reference to `stm_register_device'
+> drivers/hwtracing/stm/built-in.o: In function `dummy_stm_exit':
+> drivers/hwtracing/stm/dummy_stm.c:58: undefined reference to `stm_unregister_device'
+> drivers/hwtracing/stm/built-in.o:(.debug_addr+0x14): undefined reference to `stm_register_device'
+> drivers/hwtracing/stm/built-in.o:(.debug_addr+0x1c): undefined reference to `stm_unregister_device'
+>
+> This adds the missing 'depends on STM' lines.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 2c41538191e1 ("stm class: dummy_stm: Add dummy driver for testing stm class")
 
- preferred_console => has_preferred
- selected_console => preferred_console
+http://marc.info/?l=linux-kernel&m=144680658616967
 
-This would match the actual use of add_preferred_console()
+Unfortunately I wasn't able to get any fixes in 4.4 or anywhere else so
+far.
 
-Regards,
-Peter Hurley
+Thanks,
+--
+Alex
