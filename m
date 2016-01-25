@@ -1,56 +1,266 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Mon, 25 Jan 2016 12:36:50 +0200
-Subject: [PATCH 07/15] dmaengine: dw: revisit data_width property
-In-Reply-To: <yw1xfuxmkl19.fsf@unicorn.mansr.com>
-References: <1453663322-14474-1-git-send-email-mans@mansr.com>
- <1453663322-14474-8-git-send-email-mans@mansr.com>
- <C2D7FE5348E1B147BCA15975FBA23075F4E86560@us01wembx1.internal.synopsys.com>
- <1453711547.2521.209.camel@linux.intel.com>
- <yw1xfuxmkl19.fsf@unicorn.mansr.com>
-Message-ID: <1453718210.2521.219.camel@linux.intel.com>
+From: blogic@openwrt.org (John Crispin)
+Date: Mon, 25 Jan 2016 11:40:04 +0100
+Subject: [PATCH V2 1/2] dt-bindings: regulator: Add document for MT6323
+ regulator
+Message-ID: <1453718405-40815-1-git-send-email-blogic@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-01-25 at 10:31 +0000, M?ns Rullg?rd wrote:
-> Andy Shevchenko <andriy.shevchenko@linux.intel.com> writes:
-> 
-> > On Mon, 2016-01-25 at 07:32 +0000, Vineet Gupta wrote:
-> > > On Monday 25 January 2016 12:55 AM, Mans Rullgard wrote:
+Based on the MT6397 binding documentation.
 
-> > > > --- a/Documentation/devicetree/bindings/dma/snps-dma.txt
-> > > > +++ b/Documentation/devicetree/bindings/dma/snps-dma.txt
-> > > > @@ -13,8 +13,7 @@ Required properties:
-> > > > ?- chan_priority: priority of channels. 0 (default): increase
-> > > > from
-> > > > chan 0->n, 1:
-> > > > ???increase from chan n->0
-> > > > ?- block_size: Maximum block size supported by the controller
-> > > > -- data_width: Maximum data width supported by hardware per AHB
-> > > > master
-> > > > -??(0 - 8bits, 1 - 16bits, ..., 5 - 256bits)
-> > > > +- data-width: Maximum data width supported by hardware (in
-> > > > bytes)
-> > > 
-> > > To the reader this suggests a value truely byte granular, but
-> > > code
-> > > uses ffs
-> > > implying that it is still power of 2.
-> > > Can you mention this here (....in bytes, always power of 2).
-> > 
-> > While this comment is good, I have still note that using non-power
-> > of 2
-> > values will not break anything. Least power of two number will be
-> > used
-> > in that case. So, means I would suggest to replace 'always' by
-> > 'better
-> > to be' or something like that.
-> 
-> Although the code rounds down, the hardware actually works in powers
-> of
-> two, and it's better to document this.
+Signed-off-by: John Crispin <blogic@openwrt.org>
+Cc: devicetree at vger.kernel.org
+---
+ .../bindings/regulator/mt6323-regulator.txt        |  241 ++++++++++++++++++++
+ 1 file changed, 241 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
 
-Let's do "(in bytes, power of 2)" then?
-
+diff --git a/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+new file mode 100644
+index 0000000..4412102
+--- /dev/null
++++ b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+@@ -0,0 +1,241 @@
++Mediatek MT6323 Regulator Driver
++
++Required properties:
++- compatible: "mediatek,mt6323-regulator"
++- mt6323regulator: List of regulators provided by this controller. It is named
++  according to its regulator type, buck_<name> and ldo_<name>.
++  The definition for each of these nodes is defined using the standard binding
++  for regulators at Documentation/devicetree/bindings/regulator/regulator.txt.
++
++The valid names for regulators are::
++BUCK:
++  buck_vproc, buck_vsys, buck_vpa
++LDO:
++  ldo_vtcxo, ldo_vcn28, ldo_vcn33_bt, ldo_vcn33_wifi, ldo_va, ldo_vcama,
++  ldo_vio28, ldo_vusb, ldo_vmc, ldo_vmch, ldo_vemc3v3, ldo_vgp1, ldo_vgp2,
++  ldo_vgp3, ldo_vcn18, ldo_vsim1, ldo_vsim2, ldo_vrtc, ldo_vcamaf, ldo_vibr,
++  ldo_vrf18, ldo_vm, ldo_vio18, ldo_vcamd, ldo_vcamio
++
++Example:
++
++	pmic: mt6323 {
++		compatible = "mediatek,mt6323";
++
++		mt6323regulator: mt6323regulator{
++			compatible = "mediatek,mt6323-regulator";
++
++			mt6323_vproc_reg: buck_vproc{
++				regulator-name = "vproc";
++				regulator-min-microvolt = < 700000>;
++				regulator-max-microvolt = <1350000>;
++				regulator-ramp-delay = <12500>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vsys_reg: buck_vsys{
++				regulator-name = "vsys";
++				regulator-min-microvolt = <1400000>;
++				regulator-max-microvolt = <2987500>;
++				regulator-ramp-delay = <25000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vpa_reg: buck_vpa{
++				regulator-name = "vpa";
++				regulator-min-microvolt = < 500000>;
++				regulator-max-microvolt = <3650000>;
++			};
++
++			mt6323_vtcxo_reg: ldo_vtcxo{
++				regulator-name = "vtcxo";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-enable-ramp-delay = <90>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vcn28_reg: ldo_vcn28{
++				regulator-name = "vcn28";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-enable-ramp-delay = <185>;
++			};
++
++			mt6323_vcn33_bt_reg: ldo_vcn33_bt{
++				regulator-name = "vcn33_bt";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3600000>;
++				regulator-enable-ramp-delay = <185>;
++			};
++
++			mt6323_vcn33_wifi_reg: ldo_vcn33_wifi{
++				regulator-name = "vcn33_wifi";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3600000>;
++				regulator-enable-ramp-delay = <185>;
++			};
++
++			mt6323_va_reg: ldo_va{
++				regulator-name = "va";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-enable-ramp-delay = <216>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vcama_reg: ldo_vcama{
++				regulator-name = "vcama";
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vio28_reg: ldo_vio28{
++				regulator-name = "vio28";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-enable-ramp-delay = <216>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vusb_reg: ldo_vusb{
++				regulator-name = "vusb";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <216>;
++				regulator-boot-on;
++			};
++
++			mt6323_vmc_reg: ldo_vmc{
++				regulator-name = "vmc";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <36>;
++				regulator-boot-on;
++			};
++
++			mt6323_vmch_reg: ldo_vmch{
++				regulator-name = "vmch";
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <36>;
++				regulator-boot-on;
++			};
++
++			mt6323_vemc3v3_reg: ldo_vemc3v3{
++				regulator-name = "vemc3v3";
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <36>;
++				regulator-boot-on;
++			};
++
++			mt6323_vgp1_reg: ldo_vgp1{
++				regulator-name = "vgp1";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vgp2_reg: ldo_vgp2{
++				regulator-name = "vgp2";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vgp3_reg: ldo_vgp3{
++				regulator-name = "vgp3";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vcn18_reg: ldo_vcn18{
++				regulator-name = "vcn18";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vsim1_reg: ldo_vsim1{
++				regulator-name = "vsim1";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vsim2_reg: ldo_vsim2{
++				regulator-name = "vsim2";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vrtc_reg: ldo_vrtc{
++				regulator-name = "vrtc";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vcamaf_reg: ldo_vcamaf{
++				regulator-name = "vcamaf";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vibr_reg: ldo_vibr{
++				regulator-name = "vibr";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <36>;
++			};
++
++			mt6323_vrf18_reg: ldo_vrf18{
++				regulator-name = "vrf18";
++				regulator-min-microvolt = <1825000>;
++				regulator-max-microvolt = <1825000>;
++				regulator-enable-ramp-delay = <187>;
++			};
++
++			mt6323_vm_reg: ldo_vm{
++				regulator-name = "vm";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-enable-ramp-delay = <216>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vio18_reg: ldo_vio18{
++				regulator-name = "vio18";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-enable-ramp-delay = <216>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vcamd_reg: ldo_vcamd{
++				regulator-name = "vcamd";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vcamio_reg: ldo_vcamio{
++				regulator-name = "vcamio";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++		};
++	};
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+1.7.10.4
