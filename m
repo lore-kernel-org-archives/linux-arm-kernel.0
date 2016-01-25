@@ -1,40 +1,52 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:32:44 +0100
-Subject: [PATCH] ncpfs: avoid unused variable warning
-Message-ID: <1453735996-1958733-1-git-send-email-arnd@arndb.de>
+Date: Mon, 25 Jan 2016 16:32:45 +0100
+Subject: [PATCH] gfs2: avoid uninitialized variable warning
+In-Reply-To: <1453735996-1958733-1-git-send-email-arnd@arndb.de>
+References: <1453735996-1958733-1-git-send-email-arnd@arndb.de>
+Message-ID: <1453735996-1958733-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_NCPFS_NLS is not set, we get a harmless warning
-about an unused local variable, because that is only passed
-into a macro that does not evaluate its argument:
+We get a bogus warning about a potential uninitialized variable
+use in gfs2, because the compiler does not figure out that we
+never use the leaf number if get_leaf_nr() returns an error:
 
-fs/ncpfs/dir.c:136:23: warning: unused variable 'sb' [-Wunused-variable]
+fs/gfs2/dir.c: In function 'get_first_leaf':
+fs/gfs2/dir.c:802:9: warning: 'leaf_no' may be used uninitialized in this function [-Wmaybe-uninitialized]
+fs/gfs2/dir.c: In function 'dir_split_leaf':
+fs/gfs2/dir.c:1021:8: warning: 'leaf_no' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
-This replaces the trivial macro with an equally trivial
-inline function, which avoids the warning.
+Changing the 'if (!error)' to 'if (!IS_ERR_VALUE(error))' is
+sufficient to let gcc understand that this is exactly the same
+condition as in IS_ERR() so it can optimize the code path enough
+to understand it.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 621e155a3591 ("fs: change d_compare for rcu-walk")
 ---
- fs/ncpfs/ncplib_kernel.h | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ fs/gfs2/dir.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/fs/ncpfs/ncplib_kernel.h b/fs/ncpfs/ncplib_kernel.h
-index 5233fbc1747a..2bbd70f26d0a 100644
---- a/fs/ncpfs/ncplib_kernel.h
-+++ b/fs/ncpfs/ncplib_kernel.h
-@@ -148,7 +148,10 @@ int ncp__io2vol(unsigned char *, unsigned int *,
- int ncp__vol2io(unsigned char *, unsigned int *,
- 				const unsigned char *, unsigned int, int);
+diff --git a/fs/gfs2/dir.c b/fs/gfs2/dir.c
+index 6a92592304fb..d4014af4f064 100644
+--- a/fs/gfs2/dir.c
++++ b/fs/gfs2/dir.c
+@@ -798,7 +798,7 @@ static int get_first_leaf(struct gfs2_inode *dip, u32 index,
+ 	int error;
  
--#define NCP_IO_TABLE(sb)	NULL
-+static inline struct nls_table *NCP_IO_TABLE(struct super_block *sb)
-+{
-+	return NULL;
-+}
- #define ncp_tolower(t, c)	tolower(c)
- #define ncp_toupper(t, c)	toupper(c)
- #define ncp_io2vol(S,m,i,n,k,U)	ncp__io2vol(m,i,n,k,U)
+ 	error = get_leaf_nr(dip, index, &leaf_no);
+-	if (!error)
++	if (!IS_ERR_VALUE(error))
+ 		error = get_leaf(dip, leaf_no, bh_out);
+ 
+ 	return error;
+@@ -1014,7 +1014,7 @@ static int dir_split_leaf(struct inode *inode, const struct qstr *name)
+ 
+ 	index = name->hash >> (32 - dip->i_depth);
+ 	error = get_leaf_nr(dip, index, &leaf_no);
+-	if (error)
++	if (IS_ERR_VALUE(error))
+ 		return error;
+ 
+ 	/*  Get the old leaf block  */
 -- 
 2.7.0
