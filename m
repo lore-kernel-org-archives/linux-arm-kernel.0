@@ -1,63 +1,90 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 25 Jan 2016 21:15:37 +0800
-Subject: [PATCH RFC 01/11] clk: composite: Add unregister function
+Date: Mon, 25 Jan 2016 21:15:40 +0800
+Subject: [PATCH RFC 04/11] clk: sunxi: factors: Add unregister function
 In-Reply-To: <1453727747-23307-1-git-send-email-wens@csie.org>
 References: <1453727747-23307-1-git-send-email-wens@csie.org>
-Message-ID: <1453727747-23307-2-git-send-email-wens@csie.org>
+Message-ID: <1453727747-23307-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@free-electrons.com>
+sunxi's factors clk did not have an unregister function. This means
+multiple structs were leaked whenever a factors clk was unregistered.
 
-The composite clock didn't have any unregistration function, which forced
-us to use clk_unregister directly on it.
+Add an unregister function for it. Also keep pointers to the mux and
+gate structs so they can be freed.
 
-While it was already not great from an API point of view, it also meant
-that we were leaking the clk_composite structure allocated in
-clk_register_composite.
-
-Add a clk_unregister_composite function to fix this.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/clk-composite.c  | 15 +++++++++++++++
- include/linux/clk-provider.h |  1 +
- 2 files changed, 16 insertions(+)
+ drivers/clk/sunxi/clk-factors.c | 24 ++++++++++++++++++++++++
+ drivers/clk/sunxi/clk-factors.h |  5 +++++
+ 2 files changed, 29 insertions(+)
 
-diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-index 4735de0660cc..f4c38f209594 100644
---- a/drivers/clk/clk-composite.c
-+++ b/drivers/clk/clk-composite.c
-@@ -288,3 +288,18 @@ err:
- 	kfree(composite);
- 	return clk;
+diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+index 1de57c22a358..b464ca4a232e 100644
+--- a/drivers/clk/sunxi/clk-factors.c
++++ b/drivers/clk/sunxi/clk-factors.c
+@@ -202,6 +202,8 @@ struct clk *sunxi_factors_register(struct device_node *node,
+ 		if (!gate)
+ 			goto err_gate;
+ 
++		factors->gate = gate;
++
+ 		/* set up gate properties */
+ 		gate->reg = reg;
+ 		gate->bit_idx = data->enable;
+@@ -215,6 +217,8 @@ struct clk *sunxi_factors_register(struct device_node *node,
+ 		if (!mux)
+ 			goto err_mux;
+ 
++		factors->mux = mux;
++
+ 		/* set up gate properties */
+ 		mux->reg = reg;
+ 		mux->shift = data->mux;
+@@ -254,3 +258,23 @@ err_gate:
+ err_factors:
+ 	return NULL;
  }
 +
-+void clk_unregister_composite(struct clk *clk)
++void sunxi_factors_unregister(struct device_node *node, struct clk *clk)
 +{
-+	struct clk_composite *composite;
-+	struct clk_hw *hw;
++	struct clk_hw *hw = __clk_get_hw(clk);
++	struct clk_factors *factors;
++	const char *name;
 +
-+	hw = __clk_get_hw(clk);
 +	if (!hw)
 +		return;
 +
-+	composite = to_clk_composite(hw);
++	factors = to_clk_factors(hw);
++	name = clk_hw_get_name(hw);
 +
-+	clk_unregister(clk);
-+	kfree(composite);
++	/* No unregister call for clkdev_* */
++	of_clk_del_provider(node);
++	clk_unregister_composite(clk);
++	kfree(factors->mux);
++	kfree(factors->gate);
++	kfree(factors);
 +}
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 1143e38555a4..fa3dd6ba970b 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -585,6 +585,7 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
- 		struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
- 		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
- 		unsigned long flags);
-+void clk_unregister_composite(struct clk *clk);
+diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
+index 060319be2b99..7ea1379a7cda 100644
+--- a/drivers/clk/sunxi/clk-factors.h
++++ b/drivers/clk/sunxi/clk-factors.h
+@@ -34,6 +34,9 @@ struct clk_factors {
+ 	const struct clk_factors_config *config;
+ 	void (*get_factors) (u32 *rate, u32 parent, u8 *n, u8 *k, u8 *m, u8 *p);
+ 	spinlock_t *lock;
++	/* for cleanup */
++	struct clk_mux *mux;
++	struct clk_gate *gate;
+ };
  
- /***
-  * struct clk_gpio_gate - gpio gated clock
+ struct clk *sunxi_factors_register(struct device_node *node,
+@@ -41,4 +44,6 @@ struct clk *sunxi_factors_register(struct device_node *node,
+ 				   spinlock_t *lock,
+ 				   void __iomem *reg);
+ 
++void sunxi_factors_unregister(struct device_node *node, struct clk *clk);
++
+ #endif
 -- 
 2.7.0
