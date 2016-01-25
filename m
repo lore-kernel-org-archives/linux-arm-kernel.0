@@ -1,101 +1,206 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 25 Jan 2016 09:50:33 -0800
-Subject: [PATCH] serial: imx: fix dcd interrupt firing during probe
-In-Reply-To: <1451531565-1233-1-git-send-email-marcel.ziswiler@toradex.com>
-References: <1451531565-1233-1-git-send-email-marcel.ziswiler@toradex.com>
-Message-ID: <d2768fb8b08ac6ab71fc4e20582a0fd4@agner.ch>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 25 Jan 2016 18:55:19 +0100
+Subject: [PATCH v3 00/12] pwm: add support for atomic update
+In-Reply-To: <20160125170855.GA10182@ulmo>
+References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <2341981.a79ioYM9Es@diego> <20151110173416.GB21727@ulmo>
+ <CAD=FV=WL3jYEgVe-m6QcAyQwfJgdX4J5OtKisKwyoKOrTSpEQA@mail.gmail.com>
+ <20160125170855.GA10182@ulmo>
+Message-ID: <20160125185519.436339fc@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcel,
+Hi Thierry,
 
-[also added Lucas]
+On Mon, 25 Jan 2016 18:08:55 +0100
+Thierry Reding <thierry.reding@gmail.com> wrote:
 
-On 2015-12-30 19:12, Marcel Ziswiler wrote:
-> Continuing on the Apalis iMX6 mainlining work started by Petr ?tetiar I
-> noticed that it only boots when rebooting from NXP's downstream 3.14.28
-> kernel or mainline otherwise (e.g. when cold booted) I did not get any
-> serial debug output at all. Enabling earlyprintk I got the following:
+> On Mon, Jan 25, 2016 at 08:28:31AM -0800, Doug Anderson wrote:
+> > Thierry and Boris,
+> > 
+> > On Tue, Nov 10, 2015 at 9:34 AM, Thierry Reding
+> > <thierry.reding@gmail.com> wrote:
+> > > On Mon, Oct 19, 2015 at 12:12:12PM +0200, Heiko St?bner wrote:
+> > >> Hi Thierry,
+> > >>
+> > >> Am Montag, 21. September 2015, 11:33:17 schrieb Boris Brezillon:
+> > >> > Hello,
+> > >> >
+> > >> > This series adds support for atomic PWM update, or IOW, the capability
+> > >> > to update all the parameters of a PWM device (enabled/disabled, period,
+> > >> > duty and polarity) in one go.
+> > >>
+> > >> is anything more blocking this series? It's now sitting on the lists for
+> > >> nearly a month and everybody seems happy with it, so it would be really nice
+> > >> to have in mainline :-) .
+> > >>
+> > >> Especially as this also makes it possible for Rockchip Chromebooks to actually
+> > >> control the logic-regulator that is implemented as pwm-regulator there.
+> > >
+> > > Last time I tried to put this into linux-next I got immediately
+> > > bombarded by a number of build failures, so I backed things out. The
+> > > current plan is to give this another try after v4.4-rc1.
+> > 
+> > We're now into the 4.5 timeframe.  Does anyone have a concrete set of
+> > things that need to happen before this patch series makes it into
+> > mainline?
 > 
-> [    1.136806] INFO: trying to register non-static key.
-> [    1.136871] 2020000.serial: ttymxc0 at MMIO 0x2020000 (irq = 25,
-> base_baud = 5000000) is a IMX
-> [    1.150651] the code is fine but needs lockdep annotation.
-> [    1.150653] turning off the locking correctness validator.
-> [    1.150664] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.4.0-rc6-
-> next-20151223-00002-g6008f30-dirty #27
-> [    1.150668] Hardware name: Freescale i.MX6 Quad/DualLite (Device
-> Tree)
-> [    1.150675] Backtrace:
-> [    1.150701] [<c010c45c>] (dump_backtrace) from [<c010c654>]
-> (show_stack+0x18/0x1c)
-> [    1.150722]  r7:00000000 r6:c0d20848 r5:00000000 r4:00000000
-> [    1.150739] [<c010c63c>] (show_stack) from [<c03dadcc>]
-> (dump_stack+0x8c/0xa4)
-> [    1.150760] [<c03dad40>] (dump_stack) from [<c016b60c>]
-> (__lock_acquire+0x1d88/0x1eb4)
-> [    1.150774]  r7:00000000 r6:c0d063f8 r5:c155f834 r4:e503bc20
-> [    1.150785] [<c0169884>] (__lock_acquire) from [<c016bf54>]
-> (lock_acquire+0x74/0x94)
-> [    1.150803]  r10:c0d6eb5e r9:e597b300 r8:00000019 r7:00000001
-> r6:00000001 r5:60000193
-> [    1.150808]  r4:00000000
-> [    1.150821] [<c016bee0>] (lock_acquire) from [<c08d49d4>]
-> (_raw_spin_lock_irqsave+0x40/0x54)
-> [    1.150834]  r7:000052c8 r6:c0481470 r5:40000193 r4:e503bc10
-> [    1.150852] [<c08d4994>] (_raw_spin_lock_irqsave) from [<c0481470>]
-> (imx_rxint+0x20/0x2a4)
-> [    1.150862]  r6:00000000 r5:000052d0 r4:e503bc10
-> [    1.150874] [<c0481450>] (imx_rxint) from [<c0482540>]
-> (imx_int+0x170/0x1f4)
-> 
-> Debugging a little further I noticed this actually happening after
-> calling devm_request_irq() during serial_imx_probe() even before
-> uart_add_one_port() did initialise the spin_lock acquired in
-> imx_rxint(). Turns out the data carrier detect interrupt fired
-> immediately upon requesting interrupts. This patch fixes this by
-> explicitly disabling data carrier detect before requesting interrupts.
+> I think the current status is that we're more or less blocked on the
+> decision on what the reset state of the PWM should be. The question is
+> what to do if the PWM hardware readout differs from the settings found
+> in DT.
 
-I actually hit a very similar issue on the Colibri iMX6 and hence looked
-into this too. In our downstream tree, I fixed it in imx_startup, which
-is probably the wrong place actually...
+I think I already explained my PoV regarding the default/reference
+setting (or what you later call the software state).
+To me, this has never matched the state of the PWM device, it's just a
+reference duty-cycle and polarity configuration that PWM users can
+decide to apply or not. Currently, there's no mechanism to apply the
+reference PWM config when a user request a PWM (which is the only
+moment we could be able to apply this config, since reference configs
+are per users and not attached to the PWM device itself).
+
+All I'm trying to do in this series is teach some PWM users to make use
+of hardware read-out state instead of blindly applying a default config
+that can generate glitches in the PWM signal.
 
 > 
-> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> > From searching I see that the latest version of this series is v4 and
+> > there are a smattering of comments on the 24-patch series.  Presumably
+> > a v5 needs to be posted to address those things.
+> > 
+> > ...but it looks like the big sticking point is that Boris is waiting
+> > for a response to his questions in
+> > <https://patchwork.kernel.org/patch/7622881/>.  Thierry: can you give
+> > Boris some direction for what else he needs to do?  We need to come up
+> > with _some_ solution since this series gets us much better support for
+> > PWM regulators.  Without this series or some other solution, PWM
+> > regulators aren't usable in mainline on any system that uses them for
+> > system-critical rails.  Nearly all Rockchip reference boards and
+> > shipping devices uses a PWM regulator for the system-critidal "logic"
+> > rail.  That means any patches which need to change this rail in Linux
+> > are blocked.
 > 
-> ---
+> I really don't understand this design decision. I presume that the PWM
+> controlling this system-critical logic is driven by the SoC? So if the
+> regulator is system-critical, doesn't that make it a chicken and egg
+> problem? How can the SoC turn the PWM on if it doesn't have power? But
+> perhaps I'm completely misunderstanding what you're saying. Perhaps if
+> somebody could summarize how exactly this works, it would help better
+> understand the requirements or what's the correct thing to do.
 > 
->  drivers/tty/serial/imx.c | 5 +++++
->  1 file changed, 5 insertions(+)
+> > If there's already been off-list discussion and Boris already knows
+> > what the next steps are then my apologies and I'll wait patiently for
+> > the next series.  ;)
 > 
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index 9362f54c..b1588f9 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -2032,6 +2032,11 @@ static int serial_imx_probe(struct platform_device *pdev)
->  		 UCR1_TXMPTYEN | UCR1_RTSDEN);
->  	writel_relaxed(reg, sport->port.membase + UCR1);
->  
-> +	/* Disable data carrier detect before requesting interrupts */
-> +	reg = readl_relaxed(sport->port.membase + UCR3);
-> +	reg &= ~(UCR3_DCD);
-> +	writel_relaxed(reg, sport->port.membase + UCR3);
-> +
+> I don't think we reached a conclusion on this. And to be honest, I'm not
+> sure what the right way forward is in this situation. So in order to
+> make some forward progress I suggest we start a discussion, hopefully
+> that will clarify the situation and help lead to the conclusion. Let me
+> recap where we are:
+> 
+> Boris' series has two goals: 1) allow seamless hand-off from firmware to
+> kernel of a PWM channel and 2) apply changes to a regulator in a single
+> atomic operation. To achieve this the concept of PWM state is introduced
+> which encapsulates the settings of a PWM channel. On driver probe the
+> current state will be read from hardware and when one or more parameters
+> are to be changed, the current state is duplicated, the new values set
+> in the state and the new state applied.
+> 
+> The problem that we've encountered is that since the PWM parameters are
+> specified in DT (or board files), there is the possibility of the PWM
+> hardware state and the board parameters disagreeing. To resolve such
+> situations there must be a point in time where both hardware state and
+> software state must be synchronized.
 
-Note that UCR3_DCD has a different meaning in DCE mode. As a DCE, the
-bit should be kept 1 (we assume that the carrier is detected by
-default...)
+Maybe we're just hunting ghosts here. There's only one valid state, and
+this is the 'hardware state'. I reused the pwm_state struct to store the
+reference config (what you call software state), but actually that's
+not a state, that's a configuration template, it will only become the
+PWM state after being applied.
+Maybe I should use another struct to clarify that.
 
-The dte_mode bit should be initialized at that point, hence just making
-that code conditional should account for that.
+> Now the most straightforward way to
+> do that would be to simply apply the software state and be done with it.
 
-What I also noticed is that the RI signal suffers the very same issue.
-We do not use the signal on our Colibri board, but we should disable
-that interrupt too.
+Why that? I mean what's the problem of having a reference/template
+config that PWM users can rely on if they want to, and still keep
+the real state retrieved from hardware read-out? This way PWM users can
+decide which one they want to use.
 
---
-Stefan
+> However the software state initially lacks the duty cycle because it is
+> a parameter that usually depends on the use-case (for backlight for
+> instance it controls the brightness, for regulators it controls the
+> output voltage, ...).
 
->  	clk_disable_unprepare(sport->clk_ipg);
->  
->  	/*
+Yes, and I perfectly understand that, we don't want to encode the
+default duty cycle in the DT.
+
+> 
+> Applying the software state as-is also means that there's no reason at
+> all to read out the hardware state in the first place, because it will
+> simply be discarded.
+
+Yes, but as stated above, this can be a source of glitches, which is
+exactly what we're trying to avoid.
+
+> 
+> An alternative would be to discard the software state and trust the
+> hardware to be configured correctly. That's somewhat risky because we
+> don't know if the hardware is properly configured. Or Linux might have
+> different requirements from the firmware and hence needs to configure
+> the PWM differently.
+
+Yep, I agree on that too.
+
+> 
+> Neither of the above are very attractive options. The best I've been
+> able to come up with so far is to completely remove this decision from
+> the PWM subsystem and let users handle this. That is, a PWM regulator
+> driver would have to have all the knowledge about how to configure the
+> PWM for its needs. So upon probe, the PWM regulator driver would inspect
+> the current state of the PWM and adjust if necessary, then apply again.
+> Ideally of course it wouldn't have to do anything because the hardware
+> PWM state would match the software configuration. The idea here is that
+> the PWM regulator driver knows exactly what duty cycle to configure to
+> obtain the desired output voltage.
+
+That complicates a lot of things. I also suggested another approach:
+provide an API to express the duty-cycle value relatively to the period
+value (I actually sent a proposal for that, but you didn't comment on
+it).
+This would keep the PWM user implementations simple, and let the PWM
+core switch from the bootloader/firmware period/polarity config to the
+DT/PWM-lookup-table one on the first pwm_set_rel_duty_cycle() call.
+
+> 
+> That doesn't really get us closer, though. There is still the issue of
+> the user having to deal with two states: the current hardware state and
+> the software state as configured in DT or board files.
+
+At the risk of repeating myself, I don't think we ever had a software
+state, and existing PWM users are just assuming that the PWM devices
+they are requesting were not used before. IOW, yes, patching PWM users
+to support smoother transitions on the PWM devices require some changes,
+but in the other hand, that's not like they were doing any better
+before that series. And they still have the choice to completely ignore
+the current PWM state and blindly apply their own config (extracted
+from the reference PWM config)
+
+Best Regards,
+
+Boris
+
+> 
+> Like I said, I'm on the fence about this, so I'd appreciate any comments
+> and perhaps insight from user subsystem maintainers on how they'd like
+> this to look, or how this has been done with other resources (GPIOs,
+> ...?)
+> 
+> Thierry
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
