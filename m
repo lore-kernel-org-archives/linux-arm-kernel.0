@@ -1,70 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:31:35 +0100
-Subject: [PATCH] input: sirf onkey: allow modular build
-Message-ID: <1453735950-1958677-1-git-send-email-arnd@arndb.de>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 25 Jan 2016 15:32:00 +0000
+Subject: [PATCH v3 12/17] ARM64: ACPI: Check if it runs on Xen to enable
+ or disable ACPI
+In-Reply-To: <1453519184-11908-13-git-send-email-zhaoshenglong@huawei.com>
+References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453519184-11908-13-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <alpine.DEB.2.02.1601251531280.9687@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_INPUT may itself be a loadable module, but the sirf power key
-driver is listed as 'bool', which makes it possible to select
-a broken configuration with the driver built-in but the subsystem
-not loaded. In this configuration, we get a link error:
+On Sat, 23 Jan 2016, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
+> a /hypervisor node in DT. So check if it needs to enable ACPI.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 
-drivers/input/built-in.o: In function `sirfsoc_pwrc_isr':
-drivers/input/misc/sirfsoc-onkey.c:63: undefined reference to `input_event'
-drivers/input/built-in.o: In function `sirfsoc_pwrc_isr':
-include/linux/input.h:414: undefined reference to `input_event'
-drivers/input/built-in.o: In function `sirfsoc_pwrc_probe':
-drivers/input/misc/sirfsoc-onkey.c:132: undefined reference to `devm_input_allocate_device'
-drivers/input/misc/sirfsoc-onkey.c:139: undefined reference to `input_set_capability'
-drivers/input/misc/sirfsoc-onkey.c:161: undefined reference to `input_register_device'
-drivers/input/built-in.o: In function `sirfsoc_pwrc_report_event':
-drivers/input/misc/sirfsoc-onkey.c:48: undefined reference to `input_event'
-drivers/input/built-in.o: In function `sirfsoc_pwrc_report_event':
-include/linux/input.h:414: undefined reference to `input_event'
-drivers/input/built-in.o:(.debug_addr+0x24): undefined reference to `input_event'
-drivers/input/built-in.o:(.debug_addr+0xbc): undefined reference to `devm_input_allocate_device'
-drivers/input/built-in.o:(.debug_addr+0x104): undefined reference to `input_set_capability'
-drivers/input/built-in.o:(.debug_addr+0x128): undefined reference to `input_register_device'
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-This marks the driver as 'tristate' so it becomes possible to have
-it in a loadable module, mainly to help with randconfig builds.
 
-We also have to add a missing semicolon here, which ended up not
-being needed in built-in mode because the following MODULE_DEVICE_TABLE
-is an empty macro followed by another semicolon then.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/input/misc/Kconfig         | 2 +-
- drivers/input/misc/sirfsoc-onkey.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
-index d6d16fa78281..1f2337abcf2f 100644
---- a/drivers/input/misc/Kconfig
-+++ b/drivers/input/misc/Kconfig
-@@ -733,7 +733,7 @@ config INPUT_XEN_KBDDEV_FRONTEND
- 	  module will be called xen-kbdfront.
- 
- config INPUT_SIRFSOC_ONKEY
--	bool "CSR SiRFSoC power on/off/suspend key support"
-+	tristate "CSR SiRFSoC power on/off/suspend key support"
- 	depends on ARCH_SIRF && OF
- 	default y
- 	help
-diff --git a/drivers/input/misc/sirfsoc-onkey.c b/drivers/input/misc/sirfsoc-onkey.c
-index 9d5b89befe6f..ed7237f19539 100644
---- a/drivers/input/misc/sirfsoc-onkey.c
-+++ b/drivers/input/misc/sirfsoc-onkey.c
-@@ -101,7 +101,7 @@ static void sirfsoc_pwrc_close(struct input_dev *input)
- static const struct of_device_id sirfsoc_pwrc_of_match[] = {
- 	{ .compatible = "sirf,prima2-pwrc" },
- 	{},
--}
-+};
- MODULE_DEVICE_TABLE(of, sirfsoc_pwrc_of_match);
- 
- static int sirfsoc_pwrc_probe(struct platform_device *pdev)
--- 
-2.7.0
+> CC: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/kernel/acpi.c | 12 ++++++++----
+>  1 file changed, 8 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index d1ce8e2..4e92be0 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
+>  {
+>  	/*
+>  	 * Return 1 as soon as we encounter a node at depth 1 that is
+> -	 * not the /chosen node.
+> +	 * not the /chosen node, or /hypervisor node when running on Xen.
+>  	 */
+> -	if (depth == 1 && (strcmp(uname, "chosen") != 0))
+> -		return 1;
+> +	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
+> +		if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
+> +			return 1;
+> +	}
+> +
+>  	return 0;
+>  }
+>  
+> @@ -184,7 +187,8 @@ void __init acpi_boot_table_init(void)
+>  	/*
+>  	 * Enable ACPI instead of device tree unless
+>  	 * - ACPI has been disabled explicitly (acpi=off), or
+> -	 * - the device tree is not empty (it has more than just a /chosen node)
+> +	 * - the device tree is not empty (it has more than just a /chosen node,
+> +	 *   and a /hypervisor node when running on Xen)
+>  	 *   and ACPI has not been force enabled (acpi=force)
+>  	 */
+>  	if (param_acpi_off ||
+> -- 
+> 2.0.4
+> 
+> 
