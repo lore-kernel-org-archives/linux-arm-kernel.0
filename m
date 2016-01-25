@@ -1,53 +1,89 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 25 Jan 2016 14:39:57 +0000
-Subject: [PATCH v7 04/10] mfd: axp20x: Add missing copyright notice
-In-Reply-To: <1452655854-1528-5-git-send-email-wens@csie.org>
-References: <1452655854-1528-1-git-send-email-wens@csie.org>
- <1452655854-1528-5-git-send-email-wens@csie.org>
-Message-ID: <20160125143957.GS3368@x1>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Jan 2016 14:41:34 +0000
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160115192845.GA12510@linux.vnet.ibm.com>
+References: <20160114121449.GC15828@arm.com> <5697F6D2.60409@imgtec.com>
+ <20160114203430.GC3818@linux.vnet.ibm.com>
+ <56980C91.1010403@imgtec.com>
+ <20160114212913.GF3818@linux.vnet.ibm.com>
+ <569814F2.50801@imgtec.com>
+ <20160114225510.GJ3818@linux.vnet.ibm.com>
+ <20160115102431.GB2131@arm.com>
+ <20160115175401.GW3818@linux.vnet.ibm.com>
+ <20160115192845.GA12510@linux.vnet.ibm.com>
+Message-ID: <20160125144133.GB22927@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Jan 2016, Chen-Yu Tsai wrote:
-
-> When the driver was merged, the original author did not include a proper
-> copyright notice. This patch adds the notice, backdated to when the
-> driver was merged.
-
-This is very wordy. 
-
-"Supply a backdated copyright notice."
-
-> Cc: Carlo Caione <carlo@caione.org>
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
+On Fri, Jan 15, 2016 at 11:28:45AM -0800, Paul E. McKenney wrote:
+> On Fri, Jan 15, 2016 at 09:54:01AM -0800, Paul E. McKenney wrote:
+> > On Fri, Jan 15, 2016 at 10:24:32AM +0000, Will Deacon wrote:
+> > > See my earlier reply [1] (but also, your WRC Linux example looks more
+> > > like a variant on WWC and I couldn't really follow it).
+> > 
+> > I will revisit my WRC Linux example.  And yes, creating litmus tests
+> > that use non-fake dependencies is still a bit of an undertaking.  :-/
+> > I am sure that it will seem more natural with time and experience...
 > 
-> New patch in v7.
+> Hmmm...  You are quite right, I did do WWC.  I need to change cpu2()'s
+> last access from a store to a load to get WRC.  Plus the levels of
+> indirection definitely didn't match up, did they?
+
+Nope, it was pretty baffling!
+
+> 	struct foo {
+> 		struct foo *next;
+> 	};
+> 	struct foo a;
+> 	struct foo b;
+> 	struct foo c = { &a };
+> 	struct foo d = { &b };
+> 	struct foo x = { &c };
+> 	struct foo y = { &d };
+> 	struct foo *r1, *r2, *r3;
 > 
-> ---
->  drivers/mfd/axp20x.c | 2 ++
->  1 file changed, 2 insertions(+)
+> 	void cpu0(void)
+> 	{
+> 		WRITE_ONCE(x.next, &y);
+> 	}
+> 
+> 	void cpu1(void)
+> 	{
+> 		r1 = lockless_dereference(x.next);
+> 		WRITE_ONCE(r1->next, &x);
+> 	}
+> 
+> 	void cpu2(void)
+> 	{
+> 		r2 = lockless_dereference(y.next);
+> 		r3 = READ_ONCE(r2->next);
+> 	}
+> 
+> In this case, it is legal to end the run with:
+> 
+> 	r1 == &y && r2 == &x && r3 == &c
+> 
+> Please see below for a ppcmem litmus test.
+> 
+> So, did I get it right this time?  ;-)
 
-Patch looks fine though:
+The code above looks correct to me (in that it matches WRC+addrs),
+but your litmus test:
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+> PPC WRCnf+addrs
+> ""
+> {
+> 0:r2=x; 0:r3=y;
+> 1:r2=x; 1:r3=y;
+> 2:r2=x; 2:r3=y;
+> c=a; d=b; x=c; y=d;
+> }
+>  P0           | P1            | P2            ;
+>  stw r3,0(r2) | lwz r8,0(r2)  | lwz r8,0(r3)  ;
+>               | stw r2,0(r3)  | lwz r9,0(r8)  ;
+> exists
+> (1:r8=y /\ 2:r8=x /\ 2:r9=c)
 
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index 3e186f2dcac3..cec51e689d1d 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -5,6 +5,8 @@
->   * converters, LDOs, multiple 12-bit ADCs of voltage, current and temperature
->   * as well as configurable GPIOs.
->   *
-> + * Copyright (C) 2014 Carlo Caione
-> + *
->   * Author: Carlo Caione <carlo@caione.org>
->   *
->   * This program is free software; you can redistribute it and/or modify
+Seems to be missing the address dependency on P1.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Will
