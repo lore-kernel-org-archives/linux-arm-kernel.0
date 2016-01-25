@@ -1,32 +1,23 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 25 Jan 2016 11:44:57 +0000
-Subject: [PATCHv3 03/18] arm64: mm: place empty_zero_page in bss
+Date: Mon, 25 Jan 2016 11:45:04 +0000
+Subject: [PATCHv3 10/18] arm64: mm: add functions to walk page tables by PA
 In-Reply-To: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
 References: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1453722312-23076-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <1453722312-23076-11-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the zero page is set up in paging_init, and thus we cannot use
-the zero page earlier. We use the zero page as a reserved TTBR value
-from which no TLB entries may be allocated (e.g. when uninstalling the
-idmap). To enable such usage earlier (as may be required for invasive
-changes to the kernel page tables), and to minimise the time that the
-idmap is active, we need to be able to use the zero page before
-paging_init.
+To allow us to walk tables allocated into the fixmap, we need to acquire
+the physical address of a page, rather than the virtual address in the
+linear map.
 
-This patch follows the example set by x86, by allocating the zero page
-at compile time, in .bss. This means that the zero page itself is
-available immediately upon entry to start_kernel (as we zero .bss before
-this), and also means that the zero page takes up no space in the raw
-Image binary. The associated struct page is allocated in bootmem_init,
-and remains unavailable until this time.
+This patch adds new p??_page_paddr and p??_offset_phys functions to
+acquire the physical address of a next-level table, and changes
+p??_offset* into macros which simply convert this to a linear map VA.
+This renders p??_page_vaddr unused, and hence they are removed.
 
-Outside of arch code, the only users of empty_zero_page assume that the
-empty_zero_page symbol refers to the zeroed memory itself, and that
-ZERO_PAGE(x) must be used to acquire the associated struct page,
-following the example of x86. This patch also brings arm64 inline with
-these assumptions.
+At the pgd level, a new pgd_offset_raw function is added to find the
+relevant PGD entry given the base of a PGD and a virtual address.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
@@ -36,83 +27,103 @@ Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/mmu_context.h | 2 +-
- arch/arm64/include/asm/pgtable.h     | 4 ++--
- arch/arm64/kernel/head.S             | 1 +
- arch/arm64/mm/mmu.c                  | 9 +--------
- 4 files changed, 5 insertions(+), 11 deletions(-)
+ arch/arm64/include/asm/pgtable.h | 39 +++++++++++++++++++++++----------------
+ 1 file changed, 23 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 2416578..600eacb 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -48,7 +48,7 @@ static inline void contextidr_thread_switch(struct task_struct *next)
-  */
- static inline void cpu_set_reserved_ttbr0(void)
- {
--	unsigned long ttbr = page_to_phys(empty_zero_page);
-+	unsigned long ttbr = virt_to_phys(empty_zero_page);
- 
- 	asm(
- 	"	msr	ttbr0_el1, %0			// set TTBR0\n"
 diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 2d545d7a..ccf3c48 100644
+index 5b39143..201dbe2 100644
 --- a/arch/arm64/include/asm/pgtable.h
 +++ b/arch/arm64/include/asm/pgtable.h
-@@ -121,8 +121,8 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
-  * ZERO_PAGE is a global shared page that is always zero: used
-  * for zero-mapped memory areas etc..
-  */
--extern struct page *empty_zero_page;
--#define ZERO_PAGE(vaddr)	(empty_zero_page)
-+extern unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)];
-+#define ZERO_PAGE(vaddr)	virt_to_page(empty_zero_page)
+@@ -423,15 +423,16 @@ static inline void pmd_clear(pmd_t *pmdp)
+ 	set_pmd(pmdp, __pmd(0));
+ }
  
- #define pte_ERROR(pte)		__pte_error(__FILE__, __LINE__, pte_val(pte))
- 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index ffe9c2b..51370f8 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -421,6 +421,7 @@ __mmap_switched:
- 	adr_l	x2, __bss_stop
- 	sub	x2, x2, x0
- 	bl	__pi_memset
-+	dsb	ishst				// Make zero page visible to PTW
- 
- 	adr_l	sp, initial_sp, x4
- 	mov	x4, sp
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index b25d5cb..cdbf055 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -49,7 +49,7 @@ u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
-  * Empty_zero_page is a special page that is used for zero-initialized data
-  * and COW.
-  */
--struct page *empty_zero_page;
-+unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)] __page_aligned_bss;
- EXPORT_SYMBOL(empty_zero_page);
- 
- pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
-@@ -459,18 +459,11 @@ void fixup_init(void)
-  */
- void __init paging_init(void)
+-static inline pte_t *pmd_page_vaddr(pmd_t pmd)
++static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
  {
--	void *zero_page;
--
- 	map_mem();
- 	fixup_executable();
+-	return __va(pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK);
++	return pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK;
+ }
  
--	/* allocate the zero page. */
--	zero_page = early_pgtable_alloc();
--
- 	bootmem_init();
+ /* Find an entry in the third-level page table. */
+ #define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
  
--	empty_zero_page = virt_to_page(zero_page);
--
- 	/*
- 	 * TTBR0 is only used for the identity mapping at this stage. Make it
- 	 * point to zero page to avoid speculatively fetching new entries.
+-#define pte_offset_kernel(dir,addr)	(pmd_page_vaddr(*(dir)) + pte_index(addr))
++#define pte_offset_phys(dir,addr)	(pmd_page_paddr(*(dir)) + pte_index(addr) * sizeof(pte_t))
++#define pte_offset_kernel(dir,addr)	((pte_t *)__va(pte_offset_phys((dir), (addr))))
+ 
+ #define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
+ #define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir), (addr))
+@@ -466,21 +467,23 @@ static inline void pud_clear(pud_t *pudp)
+ 	set_pud(pudp, __pud(0));
+ }
+ 
+-static inline pmd_t *pud_page_vaddr(pud_t pud)
++static inline phys_addr_t pud_page_paddr(pud_t pud)
+ {
+-	return __va(pud_val(pud) & PHYS_MASK & (s32)PAGE_MASK);
++	return pud_val(pud) & PHYS_MASK & (s32)PAGE_MASK;
+ }
+ 
+ /* Find an entry in the second-level page table. */
+ #define pmd_index(addr)		(((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
+ 
+-static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+-{
+-	return (pmd_t *)pud_page_vaddr(*pud) + pmd_index(addr);
+-}
++#define pmd_offset_phys(dir, addr)	(pud_page_paddr(*(dir)) + pmd_index(addr) * sizeof(pmd_t))
++#define pmd_offset(dir, addr)		((pmd_t *)__va(pmd_offset_phys((dir), (addr))))
+ 
+ #define pud_page(pud)		pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
+ 
++#else
++
++#define pud_page_paddr(pud)	({ BUILD_BUG(); 0; })
++
+ #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
+ 
+ #if CONFIG_PGTABLE_LEVELS > 3
+@@ -502,21 +505,23 @@ static inline void pgd_clear(pgd_t *pgdp)
+ 	set_pgd(pgdp, __pgd(0));
+ }
+ 
+-static inline pud_t *pgd_page_vaddr(pgd_t pgd)
++static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+ {
+-	return __va(pgd_val(pgd) & PHYS_MASK & (s32)PAGE_MASK);
++	return pgd_val(pgd) & PHYS_MASK & (s32)PAGE_MASK;
+ }
+ 
+ /* Find an entry in the frst-level page table. */
+ #define pud_index(addr)		(((addr) >> PUD_SHIFT) & (PTRS_PER_PUD - 1))
+ 
+-static inline pud_t *pud_offset(pgd_t *pgd, unsigned long addr)
+-{
+-	return (pud_t *)pgd_page_vaddr(*pgd) + pud_index(addr);
+-}
++#define pud_offset_phys(dir, addr)	(pgd_page_paddr(*(dir)) + pud_index(addr) * sizeof(pud_t))
++#define pud_offset(dir, addr)		((pud_t *)__va(pud_offset_phys((dir), (addr))))
+ 
+ #define pgd_page(pgd)		pfn_to_page(__phys_to_pfn(pgd_val(pgd) & PHYS_MASK))
+ 
++#else
++
++#define pgd_page_paddr(pgd)	({ BUILD_BUG(); 0;})
++
+ #endif  /* CONFIG_PGTABLE_LEVELS > 3 */
+ 
+ #define pgd_ERROR(pgd)		__pgd_error(__FILE__, __LINE__, pgd_val(pgd))
+@@ -524,7 +529,9 @@ static inline pud_t *pud_offset(pgd_t *pgd, unsigned long addr)
+ /* to find an entry in a page-table-directory */
+ #define pgd_index(addr)		(((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
+ 
+-#define pgd_offset(mm, addr)	((mm)->pgd+pgd_index(addr))
++#define pgd_offset_raw(pgd, addr)	((pgd) + pgd_index(addr))
++
++#define pgd_offset(mm, addr)	(pgd_offset_raw((mm)->pgd, (addr)))
+ 
+ /* to find an entry in a kernel page-table-directory */
+ #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
 -- 
 1.9.1
