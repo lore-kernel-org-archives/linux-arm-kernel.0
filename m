@@ -1,51 +1,46 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 25 Jan 2016 15:08:33 +0000
-Subject: [PATCH v3 09/17] xen/hvm/params: Add a new delivery type for
- event-channel in HVM_PARAM_CALLBACK_IRQ
-In-Reply-To: <1453519184-11908-10-git-send-email-zhaoshenglong@huawei.com>
-References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
- <1453519184-11908-10-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <alpine.DEB.2.02.1601251508130.9687@kaball.uk.xensource.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 25 Jan 2016 15:09:13 +0000
+Subject: [PATCH 04/19] arm64: Cleanup SCTLR flags
+In-Reply-To: <701b44f00cdb8dbc7881c12508f55e993b9ce6dd.1452884156.git.geoff@infradead.org>
+References: <cover.1452884156.git.geoff@infradead.org>
+ <701b44f00cdb8dbc7881c12508f55e993b9ce6dd.1452884156.git.geoff@infradead.org>
+Message-ID: <56A63A99.2000506@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 23 Jan 2016, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Add a new delivery type:
-> val[63:56] == 3: val[15:8] is flag: val[7:0] is a PPI.
-> To the flag, bit 0 stands the interrupt mode is edge(1) or level(0) and
-> bit 1 stands the interrupt polarity is active low(1) or high(0).
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Hi Geoff,
 
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-
->  include/xen/interface/hvm/params.h | 9 +++++++++
->  1 file changed, 9 insertions(+)
+On 15/01/16 19:18, Geoff Levand wrote:
+> We currently have macros defining flags for the arm64 sctlr registers in both
+> kvm_arm.h and sysreg.h.  To clean things up and simplify move the definitions
+> of the SCTLR_EL2 flags from kvm_arm.h to sysreg.h, rename any SCTLR_EL1 or
+> SCTLR_EL2 flags that are common to both registers to be SCTLR_ELx, with 'x'
+> indicating a common flag, and fixup all files to include the proper header or
+> to use the new macro names.
 > 
-> diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
-> index 70ad208..5dd629f 100644
-> --- a/include/xen/interface/hvm/params.h
-> +++ b/include/xen/interface/hvm/params.h
-> @@ -53,6 +53,15 @@
->   * if this delivery method is available.
->   */
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+
+> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+> index 178ba22..1d7e502 100644
+> --- a/arch/arm64/kvm/hyp-init.S
+> +++ b/arch/arm64/kvm/hyp-init.S
+> @@ -20,7 +20,7 @@
+>  #include <asm/assembler.h>
+>  #include <asm/kvm_arm.h>
+>  #include <asm/kvm_mmu.h>
+> -#include <asm/pgtable-hwdef.h>
+
+I think this one crept in... this header file is needed for the
+definition of TCR_T0SZ_OFFSET and TCR_TxSZ_WIDTH.
+
+
+> +#include <asm/sysreg.h>
 >  
-> +#define HVM_PARAM_CALLBACK_TYPE_EVENT    3
-> +/*
-> + * val[15:8] is flag of event-channel interrupt:
-> + *  bit 0: interrupt is edge(1) or level(0) triggered
-> + *  bit 1: interrupt is active low(1) or high(0)
-> + * val[7:0] is PPI number used by event-channel.
-> + * This is only used by ARM/ARM64.
-> + */
-> +
->  #define HVM_PARAM_STORE_PFN    1
->  #define HVM_PARAM_STORE_EVTCHN 2
->  
-> -- 
-> 2.0.4
-> 
-> 
+>  	.text
+>  	.pushsection	.hyp.idmap.text, "ax"
+
+
+Thanks,
+
+James
