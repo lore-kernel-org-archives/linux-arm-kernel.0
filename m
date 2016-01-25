@@ -1,43 +1,51 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 25 Jan 2016 21:08:44 +0600
-Subject: [PATCH 3/3] serial: pl011: add acpi_match for amba-pl011.c
-In-Reply-To: <CAHp75VftJ1eBzbL6Ch4Dtrz0f_Lnm2aaMveUjT0TcEDhjW=Uwg@mail.gmail.com>
-References: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>
- <1453722324-22407-4-git-send-email-aleksey.makarov@linaro.org>
- <CAHp75VcnEOB8_GMwi894XJXN+CtJr_vDxGMP0GHw4JhALynDyw@mail.gmail.com>
- <CAHp75VftJ1eBzbL6Ch4Dtrz0f_Lnm2aaMveUjT0TcEDhjW=Uwg@mail.gmail.com>
-Message-ID: <56A63A7C.3040800@linaro.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 25 Jan 2016 15:08:33 +0000
+Subject: [PATCH v3 09/17] xen/hvm/params: Add a new delivery type for
+ event-channel in HVM_PARAM_CALLBACK_IRQ
+In-Reply-To: <1453519184-11908-10-git-send-email-zhaoshenglong@huawei.com>
+References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453519184-11908-10-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <alpine.DEB.2.02.1601251508130.9687@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, 23 Jan 2016, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Add a new delivery type:
+> val[63:56] == 3: val[15:8] is flag: val[7:0] is a PPI.
+> To the flag, bit 0 stands the interrupt mode is edge(1) or level(0) and
+> bit 1 stands the interrupt polarity is active low(1) or high(0).
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
 
-On 25.01.2016 20:22, Andy Shevchenko wrote:
-> On Mon, Jan 25, 2016 at 4:21 PM, Andy Shevchenko
-> <andy.shevchenko@gmail.com> wrote:
->> On Mon, Jan 25, 2016 at 1:45 PM, Aleksey Makarov
->> <aleksey.makarov@linaro.org> wrote:
->>> Add an implementation of acpi_match() to the pl011 driver.
->>> It allows to check if the console matches one specified with
->>> ACPI SPCR table.
->>
->> I don't know Rafael's opinion on this, but I would split it to extend
->> ACPI header first with reference to newest revision of Microsoft
->> document.
-
-This makes sense.
-
->>> --- a/include/acpi/actbl2.h
->>> +++ b/include/acpi/actbl2.h
->>> @@ -371,6 +371,10 @@ struct acpi_dbg2_device {
->>>
->>>   #define ACPI_DBG2_16550_COMPATIBLE  0x0000
->>>   #define ACPI_DBG2_16550_SUBSET      0x0001
->>> +#define ACPI_DBG2_ARM_PL011         0x0003
->>> +#define ACPI_DBG2_ARM_SBSA_GENERIC  0x000e
->>> +#define ACPI_DBG2_ARM_DCC           0x000f
->>> +#define ACPI_DBG2_DCM2835           0x0010
->
-> ^^^ Exactly because of such typos. Should be BCM
-
-I will fix this, thank you.
+>  include/xen/interface/hvm/params.h | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
+> index 70ad208..5dd629f 100644
+> --- a/include/xen/interface/hvm/params.h
+> +++ b/include/xen/interface/hvm/params.h
+> @@ -53,6 +53,15 @@
+>   * if this delivery method is available.
+>   */
+>  
+> +#define HVM_PARAM_CALLBACK_TYPE_EVENT    3
+> +/*
+> + * val[15:8] is flag of event-channel interrupt:
+> + *  bit 0: interrupt is edge(1) or level(0) triggered
+> + *  bit 1: interrupt is active low(1) or high(0)
+> + * val[7:0] is PPI number used by event-channel.
+> + * This is only used by ARM/ARM64.
+> + */
+> +
+>  #define HVM_PARAM_STORE_PFN    1
+>  #define HVM_PARAM_STORE_EVTCHN 2
+>  
+> -- 
+> 2.0.4
+> 
+> 
