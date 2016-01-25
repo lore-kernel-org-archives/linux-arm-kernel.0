@@ -1,44 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:45:49 +0100
-Subject: [PATCH] power: collie_battery: hide unused variable
-Message-ID: <1453736756-1959377-2-git-send-email-arnd@arndb.de>
+Date: Mon, 25 Jan 2016 16:45:50 +0100
+Subject: [PATCH] mm/memcontrol: avoid a spurious gcc warning
+Message-ID: <1453736756-1959377-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'wakeup_enabled' variable in this driver is only accessed
-by the optional power management functions and we get a warning
-when they are disabled:
+When CONFIG_DEBUG_VM is set, the various VM_BUG_ON() confuse gcc to
+the point where it cannot remember that 'memcg' is known to be initialized:
 
-drivers/power/collie_battery.c:29:12: error: 'wakeup_enabled' defined but not used [-Werror=unused-variable]
+mm/memcontrol.c: In function 'mem_cgroup_can_attach':
+mm/memcontrol.c:4791:9: warning: 'memcg' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
-This moves the definition next to the users inside the same #ifdef,
-which avoids the warning.
+On ARM gcc-5.1, the above happens when any two or more of the VM_BUG_ON()
+are active, but not when I remove most or all of them. This is clearly
+random behavior and the only way I've found to shut up the warning is
+to add an explicit initialization.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/power/collie_battery.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ mm/memcontrol.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/power/collie_battery.c b/drivers/power/collie_battery.c
-index 8a971b3dbe58..3a0bc608d4b5 100644
---- a/drivers/power/collie_battery.c
-+++ b/drivers/power/collie_battery.c
-@@ -26,7 +26,6 @@
- static DEFINE_MUTEX(bat_lock); /* protects gpio pins */
- static struct work_struct bat_work;
- static struct ucb1x00 *ucb;
--static int wakeup_enabled;
- 
- struct collie_bat {
- 	int status;
-@@ -291,6 +290,8 @@ static struct gpio collie_batt_gpios[] = {
- };
- 
- #ifdef CONFIG_PM
-+static int wakeup_enabled;
-+
- static int collie_bat_suspend(struct ucb1x00_dev *dev)
- {
- 	/* flush all pending status updates */
+diff --git a/mm/memcontrol.c b/mm/memcontrol.c
+index d06cae2de783..9340eb981653 100644
+--- a/mm/memcontrol.c
++++ b/mm/memcontrol.c
+@@ -4762,6 +4762,7 @@ static int mem_cgroup_can_attach(struct cgroup_taskset *tset)
+ 	 * multiple.
+ 	 */
+ 	p = NULL;
++	memcg = NULL;
+ 	cgroup_taskset_for_each_leader(leader, css, tset) {
+ 		WARN_ON_ONCE(p);
+ 		p = leader;
 -- 
 2.7.0
