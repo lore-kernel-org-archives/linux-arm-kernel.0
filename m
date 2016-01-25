@@ -1,84 +1,50 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 25 Jan 2016 15:50:52 +0000
-Subject: [PATCH v3 13/17] ARM: Xen: Document UEFI support on Xen ARM
- virtual platforms
-In-Reply-To: <1453519184-11908-14-git-send-email-zhaoshenglong@huawei.com>
-References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
- <1453519184-11908-14-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <alpine.DEB.2.02.1601251539430.9687@kaball.uk.xensource.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Jan 2016 16:50:46 +0100
+Subject: [PATCH] staging: iio: ad5933: avoid uninitialized variable in error
+ case
+Message-ID: <1453737099-1959671-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 23 Jan 2016, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
-> scan this to get the UEFI information.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
-> CC: Rob Herring <robh@kernel.org>
-> ---
->  Documentation/devicetree/bindings/arm/xen.txt | 34 +++++++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
-> index 0f7b9c2..aa69405 100644
-> --- a/Documentation/devicetree/bindings/arm/xen.txt
-> +++ b/Documentation/devicetree/bindings/arm/xen.txt
-> @@ -15,6 +15,26 @@ the following properties:
->  - interrupts: the interrupt used by Xen to inject event notifications.
->    A GIC node is also required.
->  
-> +To support UEFI on Xen ARM virtual platforms, Xen populates the FDT "uefi" node
-> +under /hypervisor with following parameters:
-> +
-> +________________________________________________________________________________
-> +Name                      | Size   | Description
-> +================================================================================
-> +xen,uefi-system-table     | 64-bit | Guest physical address of the UEFI System
-> +			  |	   | Table.
-> +--------------------------------------------------------------------------------
-> +xen,uefi-mmap-start       | 64-bit | Guest physical address of the UEFI memory
-> +			  |	   | map.
-> +--------------------------------------------------------------------------------
-> +xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
-> +                          |        | pointed to in previous entry.
-> +--------------------------------------------------------------------------------
-> +xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
-> +                          |        | memory map.
-> +--------------------------------------------------------------------------------
-> +xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
-> +--------------------------------------------------------------------------------
->  
->  Example (assuming #address-cells = <2> and #size-cells = <2>):
->  
-> @@ -22,4 +42,18 @@ hypervisor {
->  	compatible = "xen,xen-4.3", "xen,xen";
->  	reg = <0 0xb0000000 0 0x20000>;
->  	interrupts = <1 15 0xf08>;
-> +	uefi {
-> +		xen,uefi-system-table = <0xXXXXXXXX>;
-> +		xen,uefi-mmap-start = <0xXXXXXXXX>;
-> +		xen,uefi-mmap-size = <0xXXXXXXXX>;
-> +		xen,uefi-mmap-desc-size = <0xXXXXXXXX>;
-> +		xen,uefi-mmap-desc-ver = <0xXXXXXXXX>;
-> +        };
->  };
-> +
-> +The format and meaning of these "xen,uefi-*" parameters are similar to those in
-> +Documentation/arm/uefi.txt which are used by normal UEFI. But to distinguish
-> +from normal UEFI, for Xen ARM virtual platforms it needs to introduce a Xen
-> +specific UEFI which requires Xen hypervisor to provide hypercalls for Dom0 to
-> +make use of the runtime services. Therefore, it defines these parameters under
-> +/hypervisor node.
+The ad5933_i2c_read function returns an error code to indicate
+whether it could read data or not. However ad5933_work() ignores
+this return code and just accesses the data unconditionally,
+which gets detected by gcc as a possible bug:
 
-Please replace the paragraph with the following which mentions
-include/xen/interface/platform.h and improves the wording:
+drivers/staging/iio/impedance-analyzer/ad5933.c: In function 'ad5933_work':
+drivers/staging/iio/impedance-analyzer/ad5933.c:649:16: warning: 'status' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
-"The format and meaning of the "xen,uefi-*" parameters are similar to
-those in Documentation/arm/uefi.txt, which are provided by the regular
-UEFI stub. However they differ because they are provided by the Xen
-hypervisor, together with a set of UEFI runtime services implemented via
-hypercalls, see include/xen/interface/platform.h."
+This adds minimal error handling so we only evaluate the
+data if it was correctly read.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/staging/iio/impedance-analyzer/ad5933.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/staging/iio/impedance-analyzer/ad5933.c b/drivers/staging/iio/impedance-analyzer/ad5933.c
+index 10c43dda0f5a..304bb464e478 100644
+--- a/drivers/staging/iio/impedance-analyzer/ad5933.c
++++ b/drivers/staging/iio/impedance-analyzer/ad5933.c
+@@ -647,6 +647,7 @@ static void ad5933_work(struct work_struct *work)
+ 	__be16 buf[2];
+ 	int val[2];
+ 	unsigned char status;
++	int ret;
+ 
+ 	mutex_lock(&indio_dev->mlock);
+ 	if (st->state == AD5933_CTRL_INIT_START_FREQ) {
+@@ -658,9 +659,9 @@ static void ad5933_work(struct work_struct *work)
+ 		return;
+ 	}
+ 
+-	ad5933_i2c_read(st->client, AD5933_REG_STATUS, 1, &status);
++	ret = ad5933_i2c_read(st->client, AD5933_REG_STATUS, 1, &status);
+ 
+-	if (status & AD5933_STAT_DATA_VALID) {
++	if (!ret && (status & AD5933_STAT_DATA_VALID)) {
+ 		int scan_count = bitmap_weight(indio_dev->active_scan_mask,
+ 					       indio_dev->masklength);
+ 		ad5933_i2c_read(st->client,
+-- 
+2.7.0
