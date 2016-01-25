@@ -1,94 +1,112 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 19:16:55 +0000
-Subject: [PATCH v2 00/21] arm64: Virtualization Host Extension support
-In-Reply-To: <20160125164435.GG22927@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <20160125162613.GD22927@arm.com> <56A64F53.4000201@arm.com>
- <20160125164435.GG22927@arm.com>
-Message-ID: <56A674A7.9010208@arm.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Mon, 25 Jan 2016 11:30:07 -0800
+Subject: [PATCH] serial: imx: fix dcd interrupt firing during probe
+In-Reply-To: <d2768fb8b08ac6ab71fc4e20582a0fd4@agner.ch>
+References: <1451531565-1233-1-git-send-email-marcel.ziswiler@toradex.com>
+ <d2768fb8b08ac6ab71fc4e20582a0fd4@agner.ch>
+Message-ID: <56A677BF.7040808@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/01/16 16:44, Will Deacon wrote:
-> On Mon, Jan 25, 2016 at 04:37:39PM +0000, Marc Zyngier wrote:
->> On 25/01/16 16:26, Will Deacon wrote:
->>> On Mon, Jan 25, 2016 at 03:53:34PM +0000, Marc Zyngier wrote:
->>>> ARMv8.1 comes with the "Virtualization Host Extension" (VHE for
->>>> short), which enables simpler support of Type-2 hypervisors.
->>>>
->>>> This extension allows the kernel to directly run at EL2, and
->>>> significantly reduces the number of system registers shared between
->>>> host and guest, reducing the overhead of virtualization.
->>>>
->>>> In order to have the same kernel binary running on all versions of the
->>>> architecture, this series makes heavy use of runtime code patching.
->>>>
->>>> The first 20 patches massage the KVM code to deal with VHE and enable
->>>> Linux to run at EL2. The last patch catches an ugly case when VHE
->>>> capable CPUs are paired with some of their less capable siblings. This
->>>> should never happen, but hey...
->>>>
->>>> I have deliberately left out some of the more "advanced"
->>>> optimizations, as they are likely to distract the reviewer from the
->>>> core infrastructure, which is what I care about at the moment.
->>>>
->>>> A few things to note:
->>>>
->>>> - Given that the code has been almost entierely rewritten, I've
->>>>   dropped all Acks from the new patches
->>>>
->>>> - GDB is currently busted on VHE systems, as it checks for version 6
->>>>   on the debug architecture, while VHE is version 7. The binutils
->>>>   people are on the case.
->>>
->>> [...]
->>>
->>>>  arch/arm/include/asm/virt.h          |   5 ++
->>>>  arch/arm/kvm/arm.c                   | 151 +++++++++++++++++++------------
->>>>  arch/arm/kvm/mmu.c                   |   7 ++
->>>>  arch/arm64/Kconfig                   |  13 +++
->>>>  arch/arm64/include/asm/cpufeature.h  |   3 +-
->>>>  arch/arm64/include/asm/kvm_arm.h     |   1 +
->>>>  arch/arm64/include/asm/kvm_emulate.h |   3 +
->>>>  arch/arm64/include/asm/kvm_mmu.h     |  34 ++++++-
->>>>  arch/arm64/include/asm/virt.h        |  27 ++++++
->>>>  arch/arm64/kernel/asm-offsets.c      |   3 -
->>>>  arch/arm64/kernel/cpufeature.c       |  15 +++-
->>>>  arch/arm64/kernel/head.S             |  51 ++++++++++-
->>>>  arch/arm64/kernel/smp.c              |   3 +
->>>>  arch/arm64/kvm/hyp-init.S            |  18 +---
->>>>  arch/arm64/kvm/hyp.S                 |   7 ++
->>>>  arch/arm64/kvm/hyp/entry.S           |   6 ++
->>>>  arch/arm64/kvm/hyp/hyp-entry.S       | 107 +++++++---------------
->>>>  arch/arm64/kvm/hyp/hyp.h             | 119 ++++++++++++++++++++++--
->>>>  arch/arm64/kvm/hyp/switch.c          | 170 +++++++++++++++++++++++++++++++----
->>>>  arch/arm64/kvm/hyp/sysreg-sr.c       | 147 ++++++++++++++++++++----------
->>>>  arch/arm64/kvm/hyp/timer-sr.c        |  10 +--
->>>>  drivers/clocksource/arm_arch_timer.c |  96 ++++++++++++--------
->>>>  22 files changed, 724 insertions(+), 272 deletions(-)
->>>
->>> Have you tried hw_breakpoint/perf/ptrace with these changes? I was under
->>> the impression that the debug architecture was aware of E2H and did need
->>> some changes made. I know you say that GDB is broken anyway, but we should
->>> check that the kernel does the right thing if userspace pokes it the
->>> right way.
->>
->> I did use HW breakpoints on the model by hacking the host kernel to
->> return Debug Version 6 instead of 7, and things seem to work as
->> expected. strace also works out of the box.
->>
->> As for perf, did you have something precise in mind?
+On 01/25/2016 09:50 AM, Stefan Agner wrote:
+> Hi Marcel,
 > 
-> It would be worth trying things like the filter options on perf events
-> (perf stat -e cycles:k to count cycles in kernel space) and also
-> breakpoints (perf stat -e mem:<addr>:rwx on kernel addresses).
+> [also added Lucas]
+> 
+> On 2015-12-30 19:12, Marcel Ziswiler wrote:
+>> Continuing on the Apalis iMX6 mainlining work started by Petr ?tetiar I
+>> noticed that it only boots when rebooting from NXP's downstream 3.14.28
+>> kernel or mainline otherwise (e.g. when cold booted) I did not get any
+>> serial debug output at all. Enabling earlyprintk I got the following:
+>>
+>> [    1.136806] INFO: trying to register non-static key.
+>> [    1.136871] 2020000.serial: ttymxc0 at MMIO 0x2020000 (irq = 25,
+>> base_baud = 5000000) is a IMX
+>> [    1.150651] the code is fine but needs lockdep annotation.
+>> [    1.150653] turning off the locking correctness validator.
+>> [    1.150664] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.4.0-rc6-
+>> next-20151223-00002-g6008f30-dirty #27
+>> [    1.150668] Hardware name: Freescale i.MX6 Quad/DualLite (Device
+>> Tree)
+>> [    1.150675] Backtrace:
+>> [    1.150701] [<c010c45c>] (dump_backtrace) from [<c010c654>]
+>> (show_stack+0x18/0x1c)
+>> [    1.150722]  r7:00000000 r6:c0d20848 r5:00000000 r4:00000000
+>> [    1.150739] [<c010c63c>] (show_stack) from [<c03dadcc>]
+>> (dump_stack+0x8c/0xa4)
+>> [    1.150760] [<c03dad40>] (dump_stack) from [<c016b60c>]
+>> (__lock_acquire+0x1d88/0x1eb4)
+>> [    1.150774]  r7:00000000 r6:c0d063f8 r5:c155f834 r4:e503bc20
+>> [    1.150785] [<c0169884>] (__lock_acquire) from [<c016bf54>]
+>> (lock_acquire+0x74/0x94)
+>> [    1.150803]  r10:c0d6eb5e r9:e597b300 r8:00000019 r7:00000001
+>> r6:00000001 r5:60000193
+>> [    1.150808]  r4:00000000
+>> [    1.150821] [<c016bee0>] (lock_acquire) from [<c08d49d4>]
+>> (_raw_spin_lock_irqsave+0x40/0x54)
+>> [    1.150834]  r7:000052c8 r6:c0481470 r5:40000193 r4:e503bc10
+>> [    1.150852] [<c08d4994>] (_raw_spin_lock_irqsave) from [<c0481470>]
+>> (imx_rxint+0x20/0x2a4)
+>> [    1.150862]  r6:00000000 r5:000052d0 r4:e503bc10
+>> [    1.150874] [<c0481450>] (imx_rxint) from [<c0482540>]
+>> (imx_int+0x170/0x1f4)
+>>
+>> Debugging a little further I noticed this actually happening after
+>> calling devm_request_irq() during serial_imx_probe() even before
+>> uart_add_one_port()
 
-So indeed these didn't work (perf reported 0 for kernel accesses). The
-fixes are pretty trivial, and I've put them on top of my kvm-arm64/vhe
-branch, for those who want to have a look.
+The imx driver is in the minority by claiming the irq @ probe time.
+The vast majority of uart drivers claim the irq in their startup() methods.
 
-Thanks,
+Regards,
+Peter Hurley
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+
+>> did initialise the spin_lock acquired in
+>> imx_rxint(). Turns out the data carrier detect interrupt fired
+>> immediately upon requesting interrupts. This patch fixes this by
+>> explicitly disabling data carrier detect before requesting interrupts.
+> 
+> I actually hit a very similar issue on the Colibri iMX6 and hence looked
+> into this too. In our downstream tree, I fixed it in imx_startup, which
+> is probably the wrong place actually...
+> 
+>>
+>> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+>>
+>> ---
+>>
+>>  drivers/tty/serial/imx.c | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+>> index 9362f54c..b1588f9 100644
+>> --- a/drivers/tty/serial/imx.c
+>> +++ b/drivers/tty/serial/imx.c
+>> @@ -2032,6 +2032,11 @@ static int serial_imx_probe(struct platform_device *pdev)
+>>  		 UCR1_TXMPTYEN | UCR1_RTSDEN);
+>>  	writel_relaxed(reg, sport->port.membase + UCR1);
+>>  
+>> +	/* Disable data carrier detect before requesting interrupts */
+>> +	reg = readl_relaxed(sport->port.membase + UCR3);
+>> +	reg &= ~(UCR3_DCD);
+>> +	writel_relaxed(reg, sport->port.membase + UCR3);
+>> +
+> 
+> Note that UCR3_DCD has a different meaning in DCE mode. As a DCE, the
+> bit should be kept 1 (we assume that the carrier is detected by
+> default...)
+> 
+> The dte_mode bit should be initialized at that point, hence just making
+> that code conditional should account for that.
+> 
+> What I also noticed is that the RI signal suffers the very same issue.
+> We do not use the signal on our Colibri board, but we should disable
+> that interrupt too.
+> 
+> --
+> Stefan
+> 
+>>  	clk_disable_unprepare(sport->clk_ipg);
+>>  
+>>  	/*
