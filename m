@@ -1,207 +1,128 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 16:38:34 +0000
-Subject: [PATCH 18/27] ARM: KVM: Add HYP mode entry code
+Date: Mon, 25 Jan 2016 16:38:39 +0000
+Subject: [PATCH 23/27] ARM: KVM: Turn CP15 defines to an enum
 In-Reply-To: <1453739923-17846-1-git-send-email-marc.zyngier@arm.com>
 References: <1453739923-17846-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453739923-17846-19-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453739923-17846-24-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This part is almost entierely borrowed from the existing code, just
-slightly simplifying the HYP function call (as we now save SPSR_hyp
-in the world switch).
+Just like on arm64, having the CP15 registers expressed as a set
+of #defines has been very conflict-prone. Let's turn it into an
+enum, which should make it more manageable.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/hyp/Makefile    |   1 +
- arch/arm/kvm/hyp/hyp-entry.S | 157 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm/kvm/hyp/hyp.h       |   2 +
- 3 files changed, 160 insertions(+)
- create mode 100644 arch/arm/kvm/hyp/hyp-entry.S
+ arch/arm/include/asm/kvm_asm.h  | 33 ---------------------------------
+ arch/arm/include/asm/kvm_host.h | 39 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/kvm/guest.c            |  1 -
+ 3 files changed, 39 insertions(+), 34 deletions(-)
 
-diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
-index cfab402..a7d3a7e 100644
---- a/arch/arm/kvm/hyp/Makefile
-+++ b/arch/arm/kvm/hyp/Makefile
-@@ -9,4 +9,5 @@ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += vfp.o
- obj-$(CONFIG_KVM_ARM_HOST) += banked-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += entry.o
-+obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
- obj-$(CONFIG_KVM_ARM_HOST) += switch.o
-diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-new file mode 100644
-index 0000000..44bc11f
---- /dev/null
-+++ b/arch/arm/kvm/hyp/hyp-entry.S
-@@ -0,0 +1,157 @@
-+/*
-+ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-+ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, version 2, as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/kvm_arm.h>
-+#include <asm/kvm_asm.h>
-+
-+	.arch_extension     virt
-+
-+	.text
-+	.pushsection	.hyp.text, "ax"
-+
-+.macro load_vcpu	reg
-+	mrc	p15, 4, \reg, c13, c0, 2	@ HTPIDR
-+.endm
-+
-+/********************************************************************
-+ * Hypervisor exception vector and handlers
-+ *
-+ *
-+ * The KVM/ARM Hypervisor ABI is defined as follows:
-+ *
-+ * Entry to Hyp mode from the host kernel will happen _only_ when an HVC
-+ * instruction is issued since all traps are disabled when running the host
-+ * kernel as per the Hyp-mode initialization at boot time.
-+ *
-+ * HVC instructions cause a trap to the vector page + offset 0x14 (see hyp_hvc
-+ * below) when the HVC instruction is called from SVC mode (i.e. a guest or the
-+ * host kernel) and they cause a trap to the vector page + offset 0x8 when HVC
-+ * instructions are called from within Hyp-mode.
-+ *
-+ * Hyp-ABI: Calling HYP-mode functions from host (in SVC mode):
-+ *    Switching to Hyp mode is done through a simple HVC #0 instruction. The
-+ *    exception vector code will check that the HVC comes from VMID==0.
-+ *    - r0 contains a pointer to a HYP function
-+ *    - r1, r2, and r3 contain arguments to the above function.
-+ *    - The HYP function will be called with its arguments in r0, r1 and r2.
-+ *    On HYP function return, we return directly to SVC.
-+ *
-+ * Note that the above is used to execute code in Hyp-mode from a host-kernel
-+ * point of view, and is a different concept from performing a world-switch and
-+ * executing guest code SVC mode (with a VMID != 0).
-+ */
-+
-+	.align 5
-+__hyp_vector:
-+	.global	__hyp_vector
-+__kvm_hyp_vector:
-+	.weak __kvm_hyp_vector
-+
-+	@ Hyp-mode exception vector
-+	W(b)	hyp_reset
-+	W(b)	hyp_undef
-+	W(b)	hyp_svc
-+	W(b)	hyp_pabt
-+	W(b)	hyp_dabt
-+	W(b)	hyp_hvc
-+	W(b)	hyp_irq
-+	W(b)	hyp_fiq
-+
-+.macro invalid_vector label, cause
-+	.align
-+\label:	b	.
-+.endm
-+
-+	invalid_vector	hyp_reset
-+	invalid_vector	hyp_undef
-+	invalid_vector	hyp_svc
-+	invalid_vector	hyp_pabt
-+	invalid_vector	hyp_dabt
-+	invalid_vector	hyp_fiq
-+
-+hyp_hvc:
-+	/*
-+	 * Getting here is either because of a trap from a guest,
-+	 * or from executing HVC from the host kernel, which means
-+	 * "do something in Hyp mode".
-+	 */
-+	push	{r0, r1, r2}
-+
-+	@ Check syndrome register
-+	mrc	p15, 4, r1, c5, c2, 0	@ HSR
-+	lsr	r0, r1, #HSR_EC_SHIFT
-+	cmp	r0, #HSR_EC_HVC
-+	bne	guest_trap		@ Not HVC instr.
-+
-+	/*
-+	 * Let's check if the HVC came from VMID 0 and allow simple
-+	 * switch to Hyp mode
-+	 */
-+	mrrc    p15, 6, r0, r2, c2
-+	lsr     r2, r2, #16
-+	and     r2, r2, #0xff
-+	cmp     r2, #0
-+	bne	guest_trap		@ Guest called HVC
-+
-+	/*
-+	 * Getting here means host called HVC, we shift parameters and branch
-+	 * to Hyp function.
-+	 */
-+	pop	{r0, r1, r2}
-+
-+	/* Check for __hyp_get_vectors */
-+	cmp	r0, #-1
-+	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
-+	beq	1f
-+
-+	push	{lr}
-+
-+	mov	lr, r0
-+	mov	r0, r1
-+	mov	r1, r2
-+	mov	r2, r3
-+
-+THUMB(	orr	lr, #1)
-+	blx	lr			@ Call the HYP function
-+
-+	pop	{lr}
-+1:	eret
-+
-+guest_trap:
-+	load_vcpu r0			@ Load VCPU pointer to r0
-+
-+	@ Check if we need the fault information
-+	lsr	r1, r1, #HSR_EC_SHIFT
-+#ifdef CONFIG_VFPv3
-+	cmp	r1, #HSR_EC_CP_0_13
-+	beq	__vfp_guest_restore
-+#endif
-+
-+	mov	r1, #ARM_EXCEPTION_HVC
-+	b	__guest_exit
-+
-+hyp_irq:
-+	push	{r0, r1, r2}
-+	mov	r1, #ARM_EXCEPTION_IRQ
-+	load_vcpu r0			@ Load VCPU pointer to r0
-+	b	__guest_exit
-+
-+	.ltorg
-+
-+	.popsection
-diff --git a/arch/arm/kvm/hyp/hyp.h b/arch/arm/kvm/hyp/hyp.h
-index 7ddca54..8bbd2a7 100644
---- a/arch/arm/kvm/hyp/hyp.h
-+++ b/arch/arm/kvm/hyp/hyp.h
-@@ -123,4 +123,6 @@ void __hyp_text __banked_restore_state(struct kvm_cpu_context *ctxt);
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 4841225..0895f5b 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -21,39 +21,6 @@
  
- int asmlinkage __guest_enter(struct kvm_vcpu *vcpu,
- 			     struct kvm_cpu_context *host);
-+int asmlinkage __hyp_do_panic(const char *, int, u32);
+ #include <asm/virt.h>
+ 
+-/* 0 is reserved as an invalid value. */
+-#define c0_MPIDR	1	/* MultiProcessor ID Register */
+-#define c0_CSSELR	2	/* Cache Size Selection Register */
+-#define c1_SCTLR	3	/* System Control Register */
+-#define c1_ACTLR	4	/* Auxiliary Control Register */
+-#define c1_CPACR	5	/* Coprocessor Access Control */
+-#define c2_TTBR0	6	/* Translation Table Base Register 0 */
+-#define c2_TTBR0_high	7	/* TTBR0 top 32 bits */
+-#define c2_TTBR1	8	/* Translation Table Base Register 1 */
+-#define c2_TTBR1_high	9	/* TTBR1 top 32 bits */
+-#define c2_TTBCR	10	/* Translation Table Base Control R. */
+-#define c3_DACR		11	/* Domain Access Control Register */
+-#define c5_DFSR		12	/* Data Fault Status Register */
+-#define c5_IFSR		13	/* Instruction Fault Status Register */
+-#define c5_ADFSR	14	/* Auxilary Data Fault Status R */
+-#define c5_AIFSR	15	/* Auxilary Instrunction Fault Status R */
+-#define c6_DFAR		16	/* Data Fault Address Register */
+-#define c6_IFAR		17	/* Instruction Fault Address Register */
+-#define c7_PAR		18	/* Physical Address Register */
+-#define c7_PAR_high	19	/* PAR top 32 bits */
+-#define c9_L2CTLR	20	/* Cortex A15/A7 L2 Control Register */
+-#define c10_PRRR	21	/* Primary Region Remap Register */
+-#define c10_NMRR	22	/* Normal Memory Remap Register */
+-#define c12_VBAR	23	/* Vector Base Address Register */
+-#define c13_CID		24	/* Context ID Register */
+-#define c13_TID_URW	25	/* Thread ID, User R/W */
+-#define c13_TID_URO	26	/* Thread ID, User R/O */
+-#define c13_TID_PRIV	27	/* Thread ID, Privileged */
+-#define c14_CNTKCTL	28	/* Timer Control Register (PL1) */
+-#define c10_AMAIR0	29	/* Auxilary Memory Attribute Indirection Reg0 */
+-#define c10_AMAIR1	30	/* Auxilary Memory Attribute Indirection Reg1 */
+-#define NR_CP15_REGS	31	/* Number of regs (incl. invalid) */
+-
+ #define ARM_EXCEPTION_RESET	  0
+ #define ARM_EXCEPTION_UNDEFINED   1
+ #define ARM_EXCEPTION_SOFTWARE    2
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 62fa788..eec701d 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -88,6 +88,45 @@ struct kvm_vcpu_fault_info {
+ 	u32 hyp_pc;		/* PC when exception was taken from Hyp mode */
+ };
+ 
++/*
++ * 0 is reserved as an invalid value.
++ * Order should be kept in sync with the save/restore code.
++ */
++enum vcpu_sysreg {
++	__INVALID_SYSREG__,
++	c0_MPIDR,		/* MultiProcessor ID Register */
++	c0_CSSELR,		/* Cache Size Selection Register */
++	c1_SCTLR,		/* System Control Register */
++	c1_ACTLR,		/* Auxiliary Control Register */
++	c1_CPACR,		/* Coprocessor Access Control */
++	c2_TTBR0,		/* Translation Table Base Register 0 */
++	c2_TTBR0_high,		/* TTBR0 top 32 bits */
++	c2_TTBR1,		/* Translation Table Base Register 1 */
++	c2_TTBR1_high,		/* TTBR1 top 32 bits */
++	c2_TTBCR,		/* Translation Table Base Control R. */
++	c3_DACR,		/* Domain Access Control Register */
++	c5_DFSR,		/* Data Fault Status Register */
++	c5_IFSR,		/* Instruction Fault Status Register */
++	c5_ADFSR,		/* Auxilary Data Fault Status R */
++	c5_AIFSR,		/* Auxilary Instrunction Fault Status R */
++	c6_DFAR,		/* Data Fault Address Register */
++	c6_IFAR,		/* Instruction Fault Address Register */
++	c7_PAR,			/* Physical Address Register */
++	c7_PAR_high,		/* PAR top 32 bits */
++	c9_L2CTLR,		/* Cortex A15/A7 L2 Control Register */
++	c10_PRRR,		/* Primary Region Remap Register */
++	c10_NMRR,		/* Normal Memory Remap Register */
++	c12_VBAR,		/* Vector Base Address Register */
++	c13_CID,		/* Context ID Register */
++	c13_TID_URW,		/* Thread ID, User R/W */
++	c13_TID_URO,		/* Thread ID, User R/O */
++	c13_TID_PRIV,		/* Thread ID, Privileged */
++	c14_CNTKCTL,		/* Timer Control Register (PL1) */
++	c10_AMAIR0,		/* Auxilary Memory Attribute Indirection Reg0 */
++	c10_AMAIR1,		/* Auxilary Memory Attribute Indirection Reg1 */
++	NR_CP15_REGS		/* Number of regs (incl. invalid) */
++};
 +
- #endif /* __ARM_KVM_HYP_H__ */
+ struct kvm_cpu_context {
+ 	struct kvm_regs	gp_regs;
+ 	struct vfp_hard_struct vfp;
+diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+index 86e26fb..12cbb68 100644
+--- a/arch/arm/kvm/guest.c
++++ b/arch/arm/kvm/guest.c
+@@ -25,7 +25,6 @@
+ #include <asm/cputype.h>
+ #include <asm/uaccess.h>
+ #include <asm/kvm.h>
+-#include <asm/kvm_asm.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_coproc.h>
+ 
 -- 
 2.1.4
