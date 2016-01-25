@@ -1,65 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:52:40 +0100
-Subject: [PATCH] iio: ade7753: avoid uninitialized data
-Message-ID: <1453737174-1959778-1-git-send-email-arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 25 Jan 2016 15:53:37 +0000
+Subject: [PATCH v2 03/21] arm64: Add ARM64_HAS_VIRT_HOST_EXTN feature
+In-Reply-To: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453737235-16522-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ade7753_spi_read_reg_16() will either successfully read a value
-from SPI, or return a failure code without delivering data. However,
-the ade7753_stop_device() and ade7753_reset() functions use the returned
-data without checking for an error condition first. Gcc detects this
-as a possible bug and warns about it:
+Add a new ARM64_HAS_VIRT_HOST_EXTN features to indicate that the
+CPU has the ARMv8.1 VHE capability.
 
-drivers/staging/iio/meter/ade7753.c: In function 'ade7753_remove':
-drivers/staging/iio/meter/ade7753.c:348:6: error: 'val' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-  val |= BIT(4);  /* AD converters can be turned off */
-      ^
-drivers/staging/iio/meter/ade7753.c:345:6: note: 'val' was declared here
-  u16 val;
-      ^
-drivers/staging/iio/meter/ade7753.c: In function 'ade7753_probe':
-drivers/staging/iio/meter/ade7753.c:222:6: error: 'val' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+This will be used to trigger kernel patching in KVM.
 
-In both cases, we can avoids the warning by checking the return code
-before using the data.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/staging/iio/meter/ade7753.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/cpufeature.h |  3 ++-
+ arch/arm64/kernel/cpufeature.c      | 15 +++++++++++++--
+ 2 files changed, 15 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/staging/iio/meter/ade7753.c b/drivers/staging/iio/meter/ade7753.c
-index f129039bece3..69287108f793 100644
---- a/drivers/staging/iio/meter/ade7753.c
-+++ b/drivers/staging/iio/meter/ade7753.c
-@@ -217,8 +217,12 @@ error_ret:
- static int ade7753_reset(struct device *dev)
- {
- 	u16 val;
-+	int ret;
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 8f271b8..c705d6a 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -30,8 +30,9 @@
+ #define ARM64_HAS_LSE_ATOMICS			5
+ #define ARM64_WORKAROUND_CAVIUM_23154		6
+ #define ARM64_WORKAROUND_834220			7
++#define ARM64_HAS_VIRT_HOST_EXTN		8
+ 
+-#define ARM64_NCAPS				8
++#define ARM64_NCAPS				9
+ 
+ #ifndef __ASSEMBLY__
+ 
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 5c90aa4..8d3961e 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -26,6 +26,9 @@
+ #include <asm/cpu_ops.h>
+ #include <asm/processor.h>
+ #include <asm/sysreg.h>
++#include <asm/virt.h>
 +
-+	ret = ade7753_spi_read_reg_16(dev, ADE7753_MODE, &val);
-+	if (ret)
-+		return ret;
++#include <linux/irqchip/arm-gic-v3.h>
  
--	ade7753_spi_read_reg_16(dev, ADE7753_MODE, &val);
- 	val |= BIT(6); /* Software Chip Reset */
+ unsigned long elf_hwcap __read_mostly;
+ EXPORT_SYMBOL_GPL(elf_hwcap);
+@@ -587,8 +590,6 @@ u64 read_system_reg(u32 id)
+ 	return regp->sys_val;
+ }
  
- 	return ade7753_spi_write_reg_16(dev, ADE7753_MODE, val);
-@@ -343,8 +347,12 @@ error_ret:
- static int ade7753_stop_device(struct device *dev)
+-#include <linux/irqchip/arm-gic-v3.h>
+-
+ static bool
+ feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
  {
- 	u16 val;
-+	int ret;
+@@ -621,6 +622,11 @@ static bool has_useable_gicv3_cpuif(const struct arm64_cpu_capabilities *entry)
+ 	return has_sre;
+ }
+ 
++static bool runs_at_el2(const struct arm64_cpu_capabilities *entry)
++{
++	return is_kernel_in_hyp_mode();
++}
 +
-+	ret = ade7753_spi_read_reg_16(dev, ADE7753_MODE, &val);
-+	if (ret)
-+		return ret;
+ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "GIC system register CPU interface",
+@@ -651,6 +657,11 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.min_field_value = 2,
+ 	},
+ #endif /* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
++	{
++		.desc = "Virtualization Host Extensions",
++		.capability = ARM64_HAS_VIRT_HOST_EXTN,
++		.matches = runs_at_el2,
++	},
+ 	{},
+ };
  
--	ade7753_spi_read_reg_16(dev, ADE7753_MODE, &val);
- 	val |= BIT(4);  /* AD converters can be turned off */
- 
- 	return ade7753_spi_write_reg_16(dev, ADE7753_MODE, val);
 -- 
-2.7.0
+2.1.4
