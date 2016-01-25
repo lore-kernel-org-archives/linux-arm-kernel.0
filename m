@@ -1,150 +1,240 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 25 Jan 2016 11:21:09 +0000
-Subject: [PATCH v6 04/12] arm-cci: Delay PMU counter writes to pmu::pmu_enable
+Date: Mon, 25 Jan 2016 11:21:06 +0000
+Subject: [PATCH v6 01/12] arm-cci: simplify sysfs attr handling
 In-Reply-To: <1453720877-24962-1-git-send-email-suzuki.poulose@arm.com>
 References: <1453720877-24962-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1453720877-24962-5-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1453720877-24962-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CCI PMU driver always reprograms the counters to a safe value (half of the
-counter max, = 2^31) before starting the profiling to account for extreme
-interrupt latencies. Also, the cost of writing to a PMU counter could be
-very costly on some PMUs(e.g, CCI-500). In order to ammortise the cost of
-programming the counters, this patch delays the counter writes to pmu::pmu_enable().
-We use the PER_HES_ARCH flag to keep track of the counters which need to
-be programmed. Before turning on the PMU, we go through the counters that
-were marked for write, and perform the operation in a batch.
+From: Mark Rutland <mark.rutland@arm.com>
 
-To unify all the counter writes to pmu_enable(), this patch also makes sure that
-we disable-and-enable the PMU in the irq handler to program any counters that
-overflowed.
+There's no need to dynamically initialise attribute pointers when we can
+get the compiler to do it for us. We also don't need a dev_ext_attribute
+for the cpumask, as the drvdata for a PMU device is a pointer to struct
+pmu.
 
-Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+Reviewed-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 Cc: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
-Changes since V5:
-  - Disable-and-Enable PMU while in irq_handler to batch the counter writes
-    for overflowed counters and also to unify the counter writes to pmu_enable().
----
- drivers/bus/arm-cci.c |   57 ++++++++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 52 insertions(+), 5 deletions(-)
+ drivers/bus/arm-cci.c |  100 +++++++++++++------------------------------------
+ 1 file changed, 25 insertions(+), 75 deletions(-)
 
 diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 1e1e9a3..df04b625 100644
+index 577cc4b..ee47e6b 100644
 --- a/drivers/bus/arm-cci.c
 +++ b/drivers/bus/arm-cci.c
-@@ -159,6 +159,8 @@ enum cci_models {
- 	CCI_MODEL_MAX
+@@ -121,10 +121,8 @@ struct cci_pmu_model {
+ 	u32 fixed_hw_cntrs;
+ 	u32 num_hw_cntrs;
+ 	u32 cntr_size;
+-	u64 nformat_attrs;
+-	u64 nevent_attrs;
+-	struct dev_ext_attribute *format_attrs;
+-	struct dev_ext_attribute *event_attrs;
++	struct attribute **format_attrs;
++	struct attribute **event_attrs;
+ 	struct event_range event_ranges[CCI_IF_MAX];
+ 	int (*validate_hw_event)(struct cci_pmu *, unsigned long);
+ 	int (*get_event_idx)(struct cci_pmu *, struct cci_pmu_hw_events *, unsigned long);
+@@ -166,8 +164,10 @@ static ssize_t cci_pmu_format_show(struct device *dev,
+ static ssize_t cci_pmu_event_show(struct device *dev,
+ 			struct device_attribute *attr, char *buf);
+ 
+-#define CCI_EXT_ATTR_ENTRY(_name, _func, _config) \
+-	{ __ATTR(_name, S_IRUGO, _func, NULL), (void *)_config }
++#define CCI_EXT_ATTR_ENTRY(_name, _func, _config) 				\
++	&((struct dev_ext_attribute[]) {					\
++		{ __ATTR(_name, S_IRUGO, _func, NULL), (void *)_config }	\
++	})[0].attr.attr
+ 
+ #define CCI_FORMAT_EXT_ATTR_ENTRY(_name, _config) \
+ 	CCI_EXT_ATTR_ENTRY(_name, cci_pmu_format_show, (char *)_config)
+@@ -242,12 +242,13 @@ enum cci400_perf_events {
+ static ssize_t cci400_pmu_cycle_event_show(struct device *dev,
+ 			struct device_attribute *attr, char *buf);
+ 
+-static struct dev_ext_attribute cci400_pmu_format_attrs[] = {
++static struct attribute *cci400_pmu_format_attrs[] = {
+ 	CCI_FORMAT_EXT_ATTR_ENTRY(event, "config:0-4"),
+ 	CCI_FORMAT_EXT_ATTR_ENTRY(source, "config:5-7"),
++	NULL
  };
  
-+static void pmu_write_counters(struct cci_pmu *cci_pmu,
-+				 unsigned long *mask);
- static ssize_t cci_pmu_format_show(struct device *dev,
- 			struct device_attribute *attr, char *buf);
- static ssize_t cci_pmu_event_show(struct device *dev,
-@@ -606,11 +608,44 @@ static int cci500_validate_hw_event(struct cci_pmu *cci_pmu,
- }
- #endif	/* CONFIG_ARM_CCI500_PMU */
+-static struct dev_ext_attribute cci400_r0_pmu_event_attrs[] = {
++static struct attribute *cci400_r0_pmu_event_attrs[] = {
+ 	/* Slave events */
+ 	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_any, 0x0),
+ 	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_device, 0x01),
+@@ -279,9 +280,10 @@ static struct dev_ext_attribute cci400_r0_pmu_event_attrs[] = {
+ 	CCI_EVENT_EXT_ATTR_ENTRY(mi_wrq_stall_tt_full, 0x1A),
+ 	/* Special event for cycles counter */
+ 	CCI400_CYCLE_EVENT_EXT_ATTR_ENTRY(cycles, 0xff),
++	NULL
+ };
  
-+/*
-+ * Program the CCI PMU counters which have PERF_HES_ARCH set
-+ * with the event period and mark them ready before we enable
-+ * PMU.
-+ */
-+void cci_pmu_sync_counters(struct cci_pmu *cci_pmu)
-+{
-+	int i;
-+	struct cci_pmu_hw_events *cci_hw = &cci_pmu->hw_events;
-+
-+	DECLARE_BITMAP(mask, cci_pmu->num_cntrs);
-+
-+	bitmap_zero(mask, cci_pmu->num_cntrs);
-+	for_each_set_bit(i, cci_pmu->hw_events.used_mask, cci_pmu->num_cntrs) {
-+		struct perf_event *event = cci_hw->events[i];
-+
-+		if (WARN_ON(!event))
-+			continue;
-+
-+		/* Leave the events which are not counting */
-+		if (event->hw.state & PERF_HES_STOPPED)
-+			continue;
-+		if (event->hw.state & PERF_HES_ARCH) {
-+			set_bit(i, mask);
-+			event->hw.state &= ~PERF_HES_ARCH;
-+		}
-+	}
-+
-+	pmu_write_counters(cci_pmu, mask);
-+}
-+
- /* Should be called with cci_pmu->hw_events->pmu_lock held */
--static void __cci_pmu_enable(void)
-+static void __cci_pmu_enable(struct cci_pmu *cci_pmu)
+-static struct dev_ext_attribute cci400_r1_pmu_event_attrs[] = {
++static struct attribute *cci400_r1_pmu_event_attrs[] = {
+ 	/* Slave events */
+ 	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_any, 0x0),
+ 	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_device, 0x01),
+@@ -325,6 +327,7 @@ static struct dev_ext_attribute cci400_r1_pmu_event_attrs[] = {
+ 	CCI_EVENT_EXT_ATTR_ENTRY(mi_wrq_unique_or_line_unique_addr_hazard, 0x11),
+ 	/* Special event for cycles counter */
+ 	CCI400_CYCLE_EVENT_EXT_ATTR_ENTRY(cycles, 0xff),
++	NULL
+ };
+ 
+ static ssize_t cci400_pmu_cycle_event_show(struct device *dev,
+@@ -480,12 +483,13 @@ static inline struct cci_pmu_model *probe_cci_model(struct platform_device *pdev
+ static ssize_t cci500_pmu_global_event_show(struct device *dev,
+ 				struct device_attribute *attr, char *buf);
+ 
+-static struct dev_ext_attribute cci500_pmu_format_attrs[] = {
++static struct attribute *cci500_pmu_format_attrs[] = {
+ 	CCI_FORMAT_EXT_ATTR_ENTRY(event, "config:0-4"),
+ 	CCI_FORMAT_EXT_ATTR_ENTRY(source, "config:5-8"),
++	NULL,
+ };
+ 
+-static struct dev_ext_attribute cci500_pmu_event_attrs[] = {
++static struct attribute *cci500_pmu_event_attrs[] = {
+ 	/* Slave events */
+ 	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_arvalid, 0x0),
+ 	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_dev, 0x1),
+@@ -546,6 +550,7 @@ static struct dev_ext_attribute cci500_pmu_event_attrs[] = {
+ 	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_rq_stall_addr_hazard, 0xD),
+ 	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snopp_rq_stall_tt_full, 0xE),
+ 	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_rq_tzmp1_prot, 0xF),
++	NULL
+ };
+ 
+ static ssize_t cci500_pmu_global_event_show(struct device *dev,
+@@ -1176,9 +1181,8 @@ static int cci_pmu_event_init(struct perf_event *event)
+ static ssize_t pmu_cpumask_attr_show(struct device *dev,
+ 				     struct device_attribute *attr, char *buf)
  {
- 	u32 val;
+-	struct dev_ext_attribute *eattr = container_of(attr,
+-					struct dev_ext_attribute, attr);
+-	struct cci_pmu *cci_pmu = eattr->var;
++	struct pmu *pmu = dev_get_drvdata(dev);
++	struct cci_pmu *cci_pmu = to_cci_pmu(pmu);
  
-+	cci_pmu_sync_counters(cci_pmu);
-+
- 	/* Enable all the PMU counters. */
- 	val = readl_relaxed(cci_ctrl_base + CCI_PMCR) | CCI_PMCR_CEN;
- 	writel(val, cci_ctrl_base + CCI_PMCR);
-@@ -791,8 +826,7 @@ static void pmu_write_counter(struct perf_event *event, u32 value)
- 		pmu_write_register(cci_pmu, value, idx, CCI_PMU_CNTR);
+ 	int n = scnprintf(buf, PAGE_SIZE - 1, "%*pbl",
+ 			  cpumask_pr_args(&cci_pmu->cpus));
+@@ -1187,13 +1191,11 @@ static ssize_t pmu_cpumask_attr_show(struct device *dev,
+ 	return n;
  }
  
--static void __maybe_unused
--pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
-+static void pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
+-static struct dev_ext_attribute pmu_cpumask_attr = {
+-	__ATTR(cpumask, S_IRUGO, pmu_cpumask_attr_show, NULL),
+-	NULL,		/* Populated in cci_pmu_init */
+-};
++static struct device_attribute pmu_cpumask_attr =
++	__ATTR(cpumask, S_IRUGO, pmu_cpumask_attr_show, NULL);
+ 
+ static struct attribute *pmu_attrs[] = {
+-	&pmu_cpumask_attr.attr.attr,
++	&pmu_cpumask_attr.attr,
+ 	NULL,
+ };
+ 
+@@ -1218,60 +1220,14 @@ static const struct attribute_group *pmu_attr_groups[] = {
+ 	NULL
+ };
+ 
+-static struct attribute **alloc_attrs(struct platform_device *pdev,
+-				int n, struct dev_ext_attribute *source)
+-{
+-	int i;
+-	struct attribute **attrs;
+-
+-	/* Alloc n + 1 (for terminating NULL) */
+-	attrs  = devm_kcalloc(&pdev->dev, n + 1, sizeof(struct attribute *),
+-								GFP_KERNEL);
+-	if (!attrs)
+-		return attrs;
+-	for(i = 0; i < n; i++)
+-		attrs[i] = &source[i].attr.attr;
+-	return attrs;
+-}
+-
+-static int cci_pmu_init_attrs(struct cci_pmu *cci_pmu, struct platform_device *pdev)
+-{
+-	const struct cci_pmu_model *model = cci_pmu->model;
+-	struct attribute **attrs;
+-
+-	/*
+-	 * All allocations below are managed, hence doesn't need to be
+-	 * free'd explicitly in case of an error.
+-	 */
+-
+-	if (model->nevent_attrs) {
+-		attrs = alloc_attrs(pdev, model->nevent_attrs,
+-						model->event_attrs);
+-		if (!attrs)
+-			return -ENOMEM;
+-		pmu_event_attr_group.attrs = attrs;
+-	}
+-	if (model->nformat_attrs) {
+-		attrs = alloc_attrs(pdev, model->nformat_attrs,
+-						 model->format_attrs);
+-		if (!attrs)
+-			return -ENOMEM;
+-		pmu_format_attr_group.attrs = attrs;
+-	}
+-	pmu_cpumask_attr.var = cci_pmu;
+-
+-	return 0;
+-}
+-
+ static int cci_pmu_init(struct cci_pmu *cci_pmu, struct platform_device *pdev)
  {
- 	int i;
- 	struct cci_pmu_hw_events *cci_hw = &cci_pmu->hw_events;
-@@ -840,7 +874,14 @@ void pmu_event_set_period(struct perf_event *event)
- 	 */
- 	u64 val = 1ULL << 31;
- 	local64_set(&hwc->prev_count, val);
--	pmu_write_counter(event, val);
-+
-+	/*
-+	 * CCI PMU uses PERF_HES_ARCH to keep track of the counters, whose
-+	 * values needs to be sync-ed with the s/w state before the PMU is
-+	 * enabled.
-+	 * Mark this counter for sync.
-+	 */
-+	hwc->state |= PERF_HES_ARCH;
- }
+-	char *name = cci_pmu->model->name;
++	const struct cci_pmu_model *model = cci_pmu->model;
++	char *name = model->name;
+ 	u32 num_cntrs;
+-	int rc;
  
- static irqreturn_t pmu_handle_irq(int irq_num, void *dev)
-@@ -851,6 +892,9 @@ static irqreturn_t pmu_handle_irq(int irq_num, void *dev)
- 	int idx, handled = IRQ_NONE;
+-	rc = cci_pmu_init_attrs(cci_pmu, pdev);
+-	if (rc)
+-		return rc;
++	pmu_event_attr_group.attrs = model->event_attrs;
++	pmu_format_attr_group.attrs = model->format_attrs;
  
- 	raw_spin_lock_irqsave(&events->pmu_lock, flags);
-+
-+	/* Disable the PMU while we walk through the counters */
-+	__cci_pmu_disable();
- 	/*
- 	 * Iterate over counters and update the corresponding perf events.
- 	 * This should work regardless of whether we have per-counter overflow
-@@ -877,6 +921,9 @@ static irqreturn_t pmu_handle_irq(int irq_num, void *dev)
- 		pmu_event_set_period(event);
- 		handled = IRQ_HANDLED;
- 	}
-+
-+	/* Enable the PMU and sync possibly overflowed counters */
-+	__cci_pmu_enable(cci_pmu);
- 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
- 
- 	return IRQ_RETVAL(handled);
-@@ -920,7 +967,7 @@ static void cci_pmu_enable(struct pmu *pmu)
- 		return;
- 
- 	raw_spin_lock_irqsave(&hw_events->pmu_lock, flags);
--	__cci_pmu_enable();
-+	__cci_pmu_enable(cci_pmu);
- 	raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
- 
- }
+ 	cci_pmu->pmu = (struct pmu) {
+ 		.name		= cci_pmu->model->name,
+@@ -1336,9 +1292,7 @@ static struct cci_pmu_model cci_pmu_models[] = {
+ 		.num_hw_cntrs = 4,
+ 		.cntr_size = SZ_4K,
+ 		.format_attrs = cci400_pmu_format_attrs,
+-		.nformat_attrs = ARRAY_SIZE(cci400_pmu_format_attrs),
+ 		.event_attrs = cci400_r0_pmu_event_attrs,
+-		.nevent_attrs = ARRAY_SIZE(cci400_r0_pmu_event_attrs),
+ 		.event_ranges = {
+ 			[CCI_IF_SLAVE] = {
+ 				CCI400_R0_SLAVE_PORT_MIN_EV,
+@@ -1358,9 +1312,7 @@ static struct cci_pmu_model cci_pmu_models[] = {
+ 		.num_hw_cntrs = 4,
+ 		.cntr_size = SZ_4K,
+ 		.format_attrs = cci400_pmu_format_attrs,
+-		.nformat_attrs = ARRAY_SIZE(cci400_pmu_format_attrs),
+ 		.event_attrs = cci400_r1_pmu_event_attrs,
+-		.nevent_attrs = ARRAY_SIZE(cci400_r1_pmu_event_attrs),
+ 		.event_ranges = {
+ 			[CCI_IF_SLAVE] = {
+ 				CCI400_R1_SLAVE_PORT_MIN_EV,
+@@ -1382,9 +1334,7 @@ static struct cci_pmu_model cci_pmu_models[] = {
+ 		.num_hw_cntrs = 8,
+ 		.cntr_size = SZ_64K,
+ 		.format_attrs = cci500_pmu_format_attrs,
+-		.nformat_attrs = ARRAY_SIZE(cci500_pmu_format_attrs),
+ 		.event_attrs = cci500_pmu_event_attrs,
+-		.nevent_attrs = ARRAY_SIZE(cci500_pmu_event_attrs),
+ 		.event_ranges = {
+ 			[CCI_IF_SLAVE] = {
+ 				CCI500_SLAVE_PORT_MIN_EV,
 -- 
 1.7.9.5
