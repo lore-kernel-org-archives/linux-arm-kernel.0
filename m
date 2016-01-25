@@ -1,33 +1,108 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 25 Jan 2016 12:24:29 +0000
-Subject: [PATCH 03/15] dmaengine: dw: rename masters to reflect actual
- topology
-In-Reply-To: <1453710902.2521.203.camel@linux.intel.com>
-References: <1453663322-14474-1-git-send-email-mans@mansr.com>
- <1453663322-14474-4-git-send-email-mans@mansr.com>
- <20160124223629.GI6588@sirena.org.uk>
- <1453710902.2521.203.camel@linux.intel.com>
-Message-ID: <20160125122429.GN6588@sirena.org.uk>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Mon, 25 Jan 2016 13:24:44 +0100 (CET)
+Subject: [PATCH] bus: vexpress-config: Add missing of_node_put
+In-Reply-To: <20160125121720.GC1194@e106497-lin.cambridge.arm.com>
+References: <20160122180838.GA12069@amitoj-Inspiron-3542>
+ <20160125121720.GC1194@e106497-lin.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.10.1601251323190.2510@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 10:35:02AM +0200, Andy Shevchenko wrote:
-> On Sun, 2016-01-24 at 22:36 +0000, Mark Brown wrote:
 
-> > This is patch 3 of a series but I don't have anything else in the
-> > series.??What is going on with the rest of the series - what are the
-> > dependencies and so on?
 
-> Mark, sorry about that, but in this particular case you may consider
-> this patch is a standalone one. You are in the Cc list due to SPI
-> driver small change. This change isn't modifying functionality of the
-> driver.
+On Mon, 25 Jan 2016, liviu.dudau at arm.com wrote:
 
-And there's no dependency relationship with the rest of the series?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160125/8fc890a0/attachment.sig>
+> On Fri, Jan 22, 2016 at 11:38:38PM +0530, Amitoj Kaur Chawla wrote:
+> > for_each_compatible_node performs an of_node_get on each iteration, so
+> > to break out of the loop an of_node_put is required.
+> >
+> > Found using Coccinelle. The semantic patch used for this is as follows:
+> >
+> > // <smpl>
+> > @@
+> > expression e;
+> > local idexpression n;
+> > @@
+> >
+> >  for_each_compatible_node(n, ...) {
+> >    ... when != of_node_put(n)
+> >        when != e = n
+> > (
+> >    return n;
+> > +  of_node_put(n);
+> > ?  return ...;
+> > )
+> >    ...
+> >  }
+> > // </smpl>
+> >
+> > Signed-off-by: Amitoj Kaur Chawla <amitoj1606@gmail.com>
+>
+> Hi Amitoj,
+>
+> > ---
+> >  drivers/bus/vexpress-config.c | 4 +++-
+> >  1 file changed, 3 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/bus/vexpress-config.c b/drivers/bus/vexpress-config.c
+> > index 6575c0f..c3cb76b 100644
+> > --- a/drivers/bus/vexpress-config.c
+> > +++ b/drivers/bus/vexpress-config.c
+> > @@ -192,8 +192,10 @@ static int __init vexpress_config_init(void)
+> >  	/* Need the config devices early, before the "normal" devices... */
+> >  	for_each_compatible_node(node, NULL, "arm,vexpress,config-bus") {
+> >  		err = vexpress_config_populate(node);
+> > -		if (err)
+> > +		if (err) {
+> > +			of_node_put(node);
+> >  			break;
+> > +		}
+>
+> This automatically generated patch only solves half of the problem (for the error
+> path).
+>
+> >  	}
+> >
+> >  	return err;
+> > --
+> > 1.9.1
+> >
+>
+> I feel that a better patch would be the following, where the node is released
+> regardless of the result of vexpress_config_populate().
+>
+> --8<--------------------------------------------------------------------------
+> diff --git a/drivers/bus/vexpress-config.c b/drivers/bus/vexpress-config.c
+> index 6575c0f..c57453d 100644
+> --- a/drivers/bus/vexpress-config.c
+> +++ b/drivers/bus/vexpress-config.c
+> @@ -192,6 +192,7 @@ static int __init vexpress_config_init(void)
+>  	/* Need the config devices early, before the "normal" devices... */
+>  	for_each_compatible_node(node, NULL, "arm,vexpress,config-bus") {
+>  		err = vexpress_config_populate(node);
+> +		of_node_put(node);
+
+This is not correct.  for_each_compatible_node will do the free if you go
+around the loop.  This change would lead to a double free in the non error
+case.
+
+julia
+
+>  		if (err)
+>  			break;
+>  	}
+> -->8--------------------------------------------------------------------------
+>
+> Best regards,
+> Liviu
+>
+> --
+> ====================
+> | I would like to |
+> | fix the world,  |
+> | but they're not |
+> | giving me the   |
+>  \ source code!  /
+>   ---------------
+>     ?\_(?)_/?
+>
