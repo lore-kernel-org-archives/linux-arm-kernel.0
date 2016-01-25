@@ -1,92 +1,100 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:41:50 +0100
-Subject: [PATCH] mtd: only use __xipram annotation when XIP_KERNEL is set
-Message-ID: <1453736525-1959191-2-git-send-email-arnd@arndb.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 25 Jan 2016 16:41:01 +0100
+Subject: [PATCH] ARM: DTS: kirkwood-openrd: provide template for
+ RS-232/485 configuration
+In-Reply-To: <1453581437-14135-1-git-send-email-aaro.koskinen@iki.fi> (Aaro
+ Koskinen's message of "Sat, 23 Jan 2016 22:37:17 +0200")
+References: <1453581437-14135-1-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <878u3dekfm.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When XIP_KERNEL is enabled, some functions are defined in the .data
-ELF section because we require them to be in RAM whenever we communicate
-with the flash chip. However this causes problems when FTRACE is
-enabled and gcc emits calls to __gnu_mcount_nc in the function
-prolog:
-
-drivers/built-in.o: In function `cfi_chip_setup':
-:(.data+0x272fc): relocation truncated to fit: R_ARM_CALL against symbol `__gnu_mcount_nc' defined in .text section in arch/arm/kernel/built-in.o
-drivers/built-in.o: In function `cfi_probe_chip':
-:(.data+0x27de8): relocation truncated to fit: R_ARM_CALL against symbol `__gnu_mcount_nc' defined in .text section in arch/arm/kernel/built-in.o
-/tmp/ccY172rP.s: Assembler messages:
-/tmp/ccY172rP.s:70: Warning: ignoring changed section attributes for .data
-/tmp/ccY172rP.s: Error: 1 warning, treating warnings as errors
-make[5]: *** [drivers/mtd/chips/cfi_probe.o] Error 1
-/tmp/ccK4rjeO.s: Assembler messages:
-/tmp/ccK4rjeO.s:421: Warning: ignoring changed section attributes for .data
-/tmp/ccK4rjeO.s: Error: 1 warning, treating warnings as errors
-make[5]: *** [drivers/mtd/chips/cfi_util.o] Error 1
-/tmp/ccUvhCYR.s: Assembler messages:
-/tmp/ccUvhCYR.s:1895: Warning: ignoring changed section attributes for .data
-/tmp/ccUvhCYR.s: Error: 1 warning, treating warnings as errors
-
-Specifically, this does not work because the .data section is not
-marked executable, which leads LD to not generate trampolines for
-long calls.
-
-This moves the __xipram functions into their own .xiptext section instead.
-The section is still placed next to .data and located in RAM but is marked
-executable, which avoids the build errors.
-
-Also, we only need to place the XIP functions into a separate section
-if both CONFIG_XIP_KERNEL and CONFIG_MTD_XIP are set: When only MTD_XIP
-is used, the whole kernel is still in RAM and we do not need to worry
-about pulling out the rug under it. When only XIP_KERNEL but not MTD_XIP
-is set, the kernel is in some form of ROM, but we never write to it.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- include/asm-generic/vmlinux.lds.h |  1 +
- include/linux/mtd/xip.h           | 10 ++++++----
- 2 files changed, 7 insertions(+), 4 deletions(-)
-
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index c4bd0e2c173c..73a2c72e4252 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -199,6 +199,7 @@
+Hi Aaro,
  
- /* .data section */
- #define DATA_DATA							\
-+	*(.xiptext)							\
- 	*(.data)							\
- 	*(.ref.data)							\
- 	*(.data..shared_aligned) /* percpu related */			\
-diff --git a/include/linux/mtd/xip.h b/include/linux/mtd/xip.h
-index abed4dec5c2f..e373690cce0a 100644
---- a/include/linux/mtd/xip.h
-+++ b/include/linux/mtd/xip.h
-@@ -30,7 +30,9 @@
-  * obviously not be running from flash.  The __xipram is therefore marking
-  * those functions so they get relocated to ram.
-  */
--#define __xipram noinline __attribute__ ((__section__ (".data")))
-+#ifdef CONFIG_XIP_KERNEL
-+#define __xipram noinline __attribute__ ((__section__ (".xiptext")))
-+#endif
- 
- /*
-  * Each architecture has to provide the following macros.  They must access
-@@ -90,10 +92,10 @@
- #define xip_cpu_idle()  do { } while (0)
- #endif
- 
--#else
-+#endif /* CONFIG_MTD_XIP */
- 
-+#ifndef __xipram
- #define __xipram
--
--#endif /* CONFIG_MTD_XIP */
-+#endif
- 
- #endif /* __LINUX_MTD_XIP_H__ */
+ On sam., janv. 23 2016, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
+
+> Some OpenRD boards have RS-232 and RS-486 connectors wired, but using them
+> needs a custom DTB as the current DTB configures SD card slot instead.
+>
+> This patch adds documentation into the DTS on how to change
+> the configuration.
+>
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+
+Applied on mvebu/dt with Andrew Reviewed-by tag
+
+Thanks,
+
+Gregory
+
+> ---
+>  arch/arm/boot/dts/kirkwood-openrd.dtsi | 31 ++++++++++++++++++++++++++++++-
+>  1 file changed, 30 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/kirkwood-openrd.dtsi b/arch/arm/boot/dts/kirkwood-openrd.dtsi
+> index f65b727..24f1d30 100644
+> --- a/arch/arm/boot/dts/kirkwood-openrd.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood-openrd.dtsi
+> @@ -40,7 +40,7 @@
+>  			pinctrl-0 = <&pmx_select28 &pmx_sdio_cd &pmx_select34>;
+>  			pinctrl-names = "default";
+>  
+> -			pmx_select28: pmx-select-rs232-rs484 {
+> +			pmx_select28: pmx-select-rs232-rs485 {
+>  				marvell,pins = "mpp28";
+>  				marvell,function = "gpio";
+>  			};
+> @@ -65,10 +65,39 @@
+>  			status = "okay";
+>  			cd-gpios = <&gpio0 29 9>;
+>  		};
+> +		gpio at 10100 {
+> +			p28 {
+> +				gpio-hog;
+> +				gpios = <28 GPIO_ACTIVE_HIGH>;
+> +				/*
+> +				 * SelRS232or485 selects between RS-232 or RS-485
+> +				 * mode for the second UART.
+> +				 *
+> +				 * Low: RS-232
+> +				 * High: RS-485
+> +				 *
+> +				 * To use the second UART, you need to change also
+> +				 * the SelUARTorSD.
+> +				 */
+> +				output-low;
+> +				line-name = "SelRS232or485";
+> +			};
+> +		};
+>  		gpio at 10140 {
+>  			p2 {
+>  				gpio-hog;
+>  				gpios = <2 GPIO_ACTIVE_HIGH>;
+> +				/*
+> +				 * SelUARTorSD selects between the second UART
+> +				 * (serial at 12100) and SD (mvsdio at 90000).
+> +				 *
+> +				 * Low: UART
+> +				 * High: SD
+> +				 *
+> +				 * When changing this line make sure the newly
+> +				 * selected device node is enabled and the
+> +				 * previously selected device node is disabled.
+> +				 */
+>  				output-high; /* Select SD by default */
+>  				line-name = "SelUARTorSD";
+>  			};
+> -- 
+> 2.4.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 -- 
-2.7.0
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
