@@ -1,65 +1,62 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 25 Jan 2016 14:35:35 +0100
-Subject: [PATCH 2/3] ARM: dts: sama5d4: add labels for watchdog and
- pinctrl nodes
-In-Reply-To: <20160125111936.GC4027@piout.net>
-References: <1453293337-16078-1-git-send-email-LW@KARO-electronics.de>
- <1453293337-16078-3-git-send-email-LW@KARO-electronics.de>
- <20160125111936.GC4027@piout.net>
-Message-ID: <56A624A7.30403@atmel.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 25 Jan 2016 14:36:06 +0100
+Subject: ARM: mvebu_v5_defconfig: Enable sound module needed for OpenRD
+In-Reply-To: <20160111042540.GA31022@jirafa.cyrius.com> (Martin Michlmayr's
+ message of "Sun, 10 Jan 2016 20:25:40 -0800")
+References: <20160111042540.GA31022@jirafa.cyrius.com>
+Message-ID: <87zivteq7t.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 25/01/2016 12:19, Alexandre Belloni a ?crit :
-> Hi,
-> 
-> On 20/01/2016 at 13:35:36 +0100, Lothar Wa?mann wrote :
-> 
-> Ditto, this needs a commit message.
-> 
->> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> 
-> Else,
-> 
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Hi Martin,
+ 
+ On lun., janv. 11 2016, Martin Michlmayr <tbm@cyrius.com> wrote:
 
-I agree with this:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> OpenRD-Client requires the CS42L51 codec.
 
-Thanks, bye.
+This patch do not apply anymore on v4.5-rc1.
 
+Could you regenerate it, please?
 
->> ---
->>  arch/arm/boot/dts/sama5d4.dtsi | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
->> index 6c0dc89..fb40014 100644
->> --- a/arch/arm/boot/dts/sama5d4.dtsi
->> +++ b/arch/arm/boot/dts/sama5d4.dtsi
->> @@ -1299,7 +1299,7 @@
->>  				clocks = <&h32ck>;
->>  			};
->>  
->> -			watchdog at fc068640 {
->> +			watchdog: watchdog at fc068640 {
->>  				compatible = "atmel,sama5d4-wdt";
->>  				reg = <0xfc068640 0x10>;
->>  				clocks = <&clk32k>;
->> @@ -1351,7 +1351,7 @@
->>  			};
->>  
->>  
->> -			pinctrl at fc06a000 {
->> +			pinctrl: pinctrl at fc06a000 {
->>  				#address-cells = <1>;
->>  				#size-cells = <1>;
->>  				compatible = "atmel,at91sam9x5-pinctrl", "atmel,at91rm9200-pinctrl", "simple-bus";
->> -- 
->> 2.1.4
->>
-> 
+Then I will apply it on mvebu/defconfig with Andrew'w Reviewed-by tag.
 
+Thanks,
+
+Gregory
+
+>
+> Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
+> ---
+>  arch/arm/configs/mvebu_v5_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/configs/mvebu_v5_defconfig
+> b/arch/arm/configs/mvebu_v5_defconfig
+> index 79e6260..25c788a 100644
+> --- a/arch/arm/configs/mvebu_v5_defconfig
+> +++ b/arch/arm/configs/mvebu_v5_defconfig
+> @@ -109,6 +109,7 @@ CONFIG_SND=y
+>  CONFIG_SND_SOC=y
+>  CONFIG_SND_KIRKWOOD_SOC=y
+>  CONFIG_SND_SOC_ALC5623=y
+> +CONFIG_SND_SOC_CS42L51_I2C=y
+>  CONFIG_SND_SIMPLE_CARD=y
+>  CONFIG_REGULATOR=y
+>  CONFIG_REGULATOR_FIXED_VOLTAGE=y
+> -- 
+> 2.1.4
+>
+> -- 
+> Martin Michlmayr
+> http://www.cyrius.com/
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Nicolas Ferre
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
