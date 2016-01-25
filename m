@@ -1,105 +1,372 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Mon, 25 Jan 2016 11:57:46 -0500
-Subject: [PATCH V3 18/21] ACPI, PCI: Refine the way to handle
- translation_offset for ACPI resources
-In-Reply-To: <20160125095252.GB32652@red-moon>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <1452691267-32240-19-git-send-email-tn@semihalf.com>
- <20160119122026.GA5185@red-moon> <20160125095252.GB32652@red-moon>
-Message-ID: <1453741066.28109.117.camel@redhat.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Mon, 25 Jan 2016 19:57:23 +0300
+Subject: [PATCH 1/5] all: s390: move wrapper infrastructure to generic headers
+In-Reply-To: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1453741047-5498-2-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-01-25 at 09:52 +0000, Lorenzo Pieralisi wrote:
-> On Tue, Jan 19, 2016 at 12:20:26PM +0000, Lorenzo Pieralisi wrote:
-> > Gerry,
-> > 
-> > On Wed, Jan 13, 2016 at 02:21:04PM +0100, Tomasz Nowicki wrote:
-> > > From: Liu Jiang <jiang.liu@linux.intel.com>
-> > > 
-> > > Some architectures, such as IA64 and ARM64, have no instructions to
-> > > directly access PCI IO ports, so they map PCI IO ports into PCI MMIO
-> > > address space. Typically PCI host bridges on those architectures take
-> > > the responsibility to map (translate) PCI IO port transactions into
-> > > Memory-Mapped IO transactions. ACPI specification provides support
-> > > of such a usage case by using resource translation_offset.
-> > > 
-> > > But current ACPI resource parsing interface isn't neutral enough,
-> > > it still has some special logic for IA64. So refine the ACPI resource
-> > > parsing interface and IA64 code to neutrally handle translation_offset
-> > > by:
-> > > 1) ACPI resource parsing interface doesn't do any translation, it just
-> > > ???save the translation_offset to be used by arch code.
-> > > 2) Arch code will do the mapping(translation) based on arch specific
-> > > ???information. Typically it does:
-> > > 2.a) Translate per PCI domain IO port address space into system global
-> > > ???IO port address space.
-> > > 2.b) Setup MMIO address mapping for IO ports.
-> > 
-> > This patch fixes IO space handling on IA64 and should go in as a fix.
-> > 
-> > IA64 PCI IO space is currently broken (Hanjun tested this on an IA64 box).
-> > 
-> > The first broken commit is:
-> > 
-> > 3772aea7d6f3 ("ia64/PCI/ACPI: Use common ACPI resource parsing interface for host bridge")
-> > 
-> > because acpi core code checks (in acpi_dev_ioresource_flags()) the
-> > resource.end>=0x10003, which fails on ia64 - currently resource.end is
-> > set in acpi_decode_space() to:
-> > 
-> > AddressMaximum + AddressTranslation
-> > 
-> > where AddressTranslation is the CPU physical address mapping IO space
-> > on IA64, the >=0x10003 check in acpi_dev_ioresource_flags always
-> > triggers and the IO resource is then disabled.
-> > 
-> > Do you want me to re-send this patch as a fix, with updated commit log ?
-> 
-> Two more points to discuss here. IA64, in its prepare_resources() callback
-> calls acpi_pci_probe_root_resources() in turn. That function parses the
-> _CRS and validate the resources (acpi_pci_root_validate_resources()).
-> 
-> That does not make sense IMO, because IA64 changes the IO port resources
-> after calling acpi_pci_probe_root_resources(), hence the validation
-> carried out in acpi_pci_probe_root_resources(), at least for IO ports
-> seems wrong (what's the point of validating the CRS against
-> ioport_resource if we change the _CRS IO space resources afterwards ?).
-> 
+__SC_COMPAT_CAST for s390 is too specific due to 31-bit pointer length, so it's
+moved to arch/s390/include/asm/compat.h. Generic declaration assumes that long,
+unsigned long and pointer types are all 32-bit length.
 
-I agree that acpi_pci_root_validate_resources() is doing the wrong thing
-generally. The current code (without this patch series) is checking CPU
-bus address range for PCI IO window against ioport_resource which is based
-on ioport cookies made up by the kernel. This patch takes out the addition
-of the translation offset so the check is now PCI bus io address range
-validated against the cookies in ioport_resource. I think that works by
-chance because all ia64 PCI segments use the same PCI bus io address
-range based at zero. So the PCI bus io addresses will always look valid
-against ia64 IO space zero in the ioport_resource list. The PCI ioports
-actually get installed after ia64 changes the resource to hold the
-cookie. Interestingly, ia64 also installs an iomem resource for the CPU
-bus address of the ioport range window. The generic ACPI PCI host?
-code should probably do the same in pci_acpi_root_prepare_resource().
-And at some point, it might make sense to consolidate the ia64 ioport
-cookie handling with that done by the devicetree interfaces used by
-the generic ACPI PCI host code.
+linux/syscalls_structs.h header is introduced, because from now (see next patch)
+structure types listed there are needed for both normal and compat mode.
 
-> Second point: we are aware that by removing the offset addition in
-> acpi_decode_space(), if for any reason on x86 or IA64 a resource has
-> that offset !=0 (speaking in terms of memory resources for instance)
-> we are in trouble. Jiang mentioned that on x86 and IA64 offset is always
-> 0x0 for memory resources, but just want to make sure we are all aware
-> of this potential pitfall.
+cond_syscall_wrapped now defined two symbols: sys_foo() and compat_sys_foo(), if
+compat wrappers are enabled.
 
-I think that has always been the case. At least for x86 which doesn't
-appear to have ever used the offset in _CRS. In any case, it still
-leaves us with the same problem where acpi_pci_root_validate_resources()
-is validating PCI bus addresses against something different (cookies/cpu
-iospace for ioport, CPU bus for iomem).
+Here __SC_WRAP() macro is introduced as well. s390 doesn't need it as it uses
+asm-generated syscall table. But architectures that generate that tables with
+C code (ARM64/ILP32) should redefine it as '#define __SC_WRAP(name) compat_##name'.
 
-> 
-> Comments appreciated, it is time to a) fix IA64 and b) get this _CRS
-> parsing consolidation done.
-> 
-> Thanks,
-> Lorenzo
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+---
+ arch/s390/include/asm/compat.h    | 17 +++++++++--
+ arch/s390/kernel/compat_wrapper.c | 51 -------------------------------
+ include/linux/compat.h            | 63 +++++++++++++++++++++++++++++++++++++++
+ include/linux/syscalls.h          | 57 +----------------------------------
+ include/linux/syscalls_structs.h  | 60 +++++++++++++++++++++++++++++++++++++
+ include/uapi/asm-generic/unistd.h |  4 +++
+ kernel/sys_ni.c                   |  8 +++++
+ 7 files changed, 151 insertions(+), 109 deletions(-)
+ create mode 100644 include/linux/syscalls_structs.h
+
+diff --git a/arch/s390/include/asm/compat.h b/arch/s390/include/asm/compat.h
+index d350ed9..46cb4be 100644
+--- a/arch/s390/include/asm/compat.h
++++ b/arch/s390/include/asm/compat.h
+@@ -7,13 +7,26 @@
+ #include <linux/sched.h>
+ #include <linux/thread_info.h>
+ 
+-#define __TYPE_IS_PTR(t) (!__builtin_types_compatible_p(typeof(0?(t)0:0ULL), u64))
+-
+ #define __SC_DELOUSE(t,v) ({ \
+ 	BUILD_BUG_ON(sizeof(t) > 4 && !__TYPE_IS_PTR(t)); \
+ 	(t)(__TYPE_IS_PTR(t) ? ((v) & 0x7fffffff) : (v)); \
+ })
+ 
++#define __SC_COMPAT_CAST(t, a)						\
++({									\
++	long __ReS = a;							\
++									\
++	BUILD_BUG_ON((sizeof(t) > 4) && !__TYPE_IS_L(t) &&		\
++		     !__TYPE_IS_UL(t) && !__TYPE_IS_PTR(t));		\
++	if (__TYPE_IS_L(t))						\
++		__ReS = (s32)a;						\
++	if (__TYPE_IS_UL(t))						\
++		__ReS = (u32)a;						\
++	if (__TYPE_IS_PTR(t))						\
++		__ReS = a & 0x7fffffff;					\
++	(t)__ReS;							\
++})
++
+ #define PSW32_MASK_PER		0x40000000UL
+ #define PSW32_MASK_DAT		0x04000000UL
+ #define PSW32_MASK_IO		0x02000000UL
+diff --git a/arch/s390/kernel/compat_wrapper.c b/arch/s390/kernel/compat_wrapper.c
+index fac4eed..527f75d 100644
+--- a/arch/s390/kernel/compat_wrapper.c
++++ b/arch/s390/kernel/compat_wrapper.c
+@@ -8,57 +8,6 @@
+ #include <linux/compat.h>
+ #include "entry.h"
+ 
+-#define COMPAT_SYSCALL_WRAP1(name, ...) \
+-	COMPAT_SYSCALL_WRAPx(1, _##name, __VA_ARGS__)
+-#define COMPAT_SYSCALL_WRAP2(name, ...) \
+-	COMPAT_SYSCALL_WRAPx(2, _##name, __VA_ARGS__)
+-#define COMPAT_SYSCALL_WRAP3(name, ...) \
+-	COMPAT_SYSCALL_WRAPx(3, _##name, __VA_ARGS__)
+-#define COMPAT_SYSCALL_WRAP4(name, ...) \
+-	COMPAT_SYSCALL_WRAPx(4, _##name, __VA_ARGS__)
+-#define COMPAT_SYSCALL_WRAP5(name, ...) \
+-	COMPAT_SYSCALL_WRAPx(5, _##name, __VA_ARGS__)
+-#define COMPAT_SYSCALL_WRAP6(name, ...) \
+-	COMPAT_SYSCALL_WRAPx(6, _##name, __VA_ARGS__)
+-
+-#define __SC_COMPAT_TYPE(t, a) \
+-	__typeof(__builtin_choose_expr(sizeof(t) > 4, 0L, (t)0)) a
+-
+-#define __SC_COMPAT_CAST(t, a)						\
+-({									\
+-	long __ReS = a;							\
+-									\
+-	BUILD_BUG_ON((sizeof(t) > 4) && !__TYPE_IS_L(t) &&		\
+-		     !__TYPE_IS_UL(t) && !__TYPE_IS_PTR(t));		\
+-	if (__TYPE_IS_L(t))						\
+-		__ReS = (s32)a;						\
+-	if (__TYPE_IS_UL(t))						\
+-		__ReS = (u32)a;						\
+-	if (__TYPE_IS_PTR(t))						\
+-		__ReS = a & 0x7fffffff;					\
+-	(t)__ReS;							\
+-})
+-
+-/*
+- * The COMPAT_SYSCALL_WRAP macro generates system call wrappers to be used by
+- * compat tasks. These wrappers will only be used for system calls where only
+- * the system call arguments need sign or zero extension or zeroing of the upper
+- * 33 bits of pointers.
+- * Note: since the wrapper function will afterwards call a system call which
+- * again performs zero and sign extension for all system call arguments with
+- * a size of less than eight bytes, these compat wrappers only touch those
+- * system call arguments with a size of eight bytes ((unsigned) long and
+- * pointers). Zero and sign extension for e.g. int parameters will be done by
+- * the regular system call wrappers.
+- */
+-#define COMPAT_SYSCALL_WRAPx(x, name, ...)					\
+-asmlinkage long sys##name(__MAP(x,__SC_DECL,__VA_ARGS__));			\
+-asmlinkage long notrace compat_sys##name(__MAP(x,__SC_COMPAT_TYPE,__VA_ARGS__));\
+-asmlinkage long notrace compat_sys##name(__MAP(x,__SC_COMPAT_TYPE,__VA_ARGS__))	\
+-{										\
+-	return sys##name(__MAP(x,__SC_COMPAT_CAST,__VA_ARGS__));		\
+-}
+-
+ COMPAT_SYSCALL_WRAP2(creat, const char __user *, pathname, umode_t, mode);
+ COMPAT_SYSCALL_WRAP2(link, const char __user *, oldname, const char __user *, newname);
+ COMPAT_SYSCALL_WRAP1(unlink, const char __user *, pathname);
+diff --git a/include/linux/compat.h b/include/linux/compat.h
+index a76c917..1a761ea 100644
+--- a/include/linux/compat.h
++++ b/include/linux/compat.h
+@@ -718,4 +718,67 @@ asmlinkage long compat_sys_fanotify_mark(int, unsigned int, __u32, __u32,
+ #define is_compat_task() (0)
+ 
+ #endif /* CONFIG_COMPAT */
++
++#ifdef CONFIG_COMPAT_WRAPPER
++
++#ifndef __TYPE_IS_PTR
++#define __TYPE_IS_PTR(t) (!__builtin_types_compatible_p(typeof(0?(t)0:0ULL), u64))
++#endif
++
++#ifndef __SC_COMPAT_TYPE
++#define __SC_COMPAT_TYPE(t, a) \
++	__typeof(__builtin_choose_expr(sizeof(t) > 4, 0L, (t)0)) a
++#endif
++
++#ifndef __SC_COMPAT_CAST
++#define __SC_COMPAT_CAST(t, a) ({					\
++	BUILD_BUG_ON((sizeof(t) > 4) && !__TYPE_IS_L(t) &&		\
++		     !__TYPE_IS_UL(t) && !__TYPE_IS_PTR(t));		\
++	((t) ((t)(-1) < 0 ? (s64)(s32)(a) : (u64)(u32)(a)));		\
++})
++#endif
++
++#ifndef SYSCALL_DEFINE_WRAPx
++/*
++ * The SYSCALL_DEFINE_WRAP macro generates system call wrappers to be used by
++ * compat tasks. These wrappers will only be used for system calls where only
++ * the system call arguments need sign or zero extension or zeroing of upper
++ * bits of pointers.
++ * Note: since the wrapper function will afterwards call a system call which
++ * again performs zero and sign extension for all system call arguments with
++ * a size of less than eight bytes, these compat wrappers only touch those
++ * system call arguments with a size of eight bytes ((unsigned) long and
++ * pointers). Zero and sign extension for e.g. int parameters will be done by
++ * the regular system call wrappers.
++ */
++#define SYSCALL_DEFINE_WRAPx(x, name, ...)						\
++asmlinkage long sys##name(__MAP(x,__SC_DECL,__VA_ARGS__));				\
++asmlinkage long compat_sys##name(__MAP(x,__SC_DECL,__VA_ARGS__))			\
++		__attribute__((alias(__stringify(compat_SyS##name))));			\
++asmlinkage long compat_SyS##name(__MAP(x,__SC_COMPAT_TYPE,__VA_ARGS__));		\
++asmlinkage long compat_SyS##name(__MAP(x,__SC_COMPAT_TYPE,__VA_ARGS__))			\
++{											\
++	return sys##name(__MAP(x,__SC_COMPAT_CAST,__VA_ARGS__));			\
++}											\
++SYSCALL_DEFINEx(x, name, __VA_ARGS__)
++#endif
++
++#define SYSCALL_DEFINE_WRAP1(name, ...) SYSCALL_DEFINE_WRAPx(1, _##name, __VA_ARGS__)
++#define SYSCALL_DEFINE_WRAP2(name, ...) SYSCALL_DEFINE_WRAPx(2, _##name, __VA_ARGS__)
++#define SYSCALL_DEFINE_WRAP3(name, ...) SYSCALL_DEFINE_WRAPx(3, _##name, __VA_ARGS__)
++#define SYSCALL_DEFINE_WRAP4(name, ...) SYSCALL_DEFINE_WRAPx(4, _##name, __VA_ARGS__)
++#define SYSCALL_DEFINE_WRAP5(name, ...) SYSCALL_DEFINE_WRAPx(5, _##name, __VA_ARGS__)
++#define SYSCALL_DEFINE_WRAP6(name, ...) SYSCALL_DEFINE_WRAPx(6, _##name, __VA_ARGS__)
++
++#else
++
++#define SYSCALL_DEFINE_WRAP1	SYSCALL_DEFINE1
++#define SYSCALL_DEFINE_WRAP2    SYSCALL_DEFINE2
++#define SYSCALL_DEFINE_WRAP3    SYSCALL_DEFINE3
++#define SYSCALL_DEFINE_WRAP4    SYSCALL_DEFINE4
++#define SYSCALL_DEFINE_WRAP5    SYSCALL_DEFINE5
++#define SYSCALL_DEFINE_WRAP6    SYSCALL_DEFINE6
++
++#endif /* CONFIG_COMPAT_WRAPPER */
++
+ #endif /* _LINUX_COMPAT_H */
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index c2b66a2..1942cf4 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -11,62 +11,7 @@
+ #ifndef _LINUX_SYSCALLS_H
+ #define _LINUX_SYSCALLS_H
+ 
+-struct epoll_event;
+-struct iattr;
+-struct inode;
+-struct iocb;
+-struct io_event;
+-struct iovec;
+-struct itimerspec;
+-struct itimerval;
+-struct kexec_segment;
+-struct linux_dirent;
+-struct linux_dirent64;
+-struct list_head;
+-struct mmap_arg_struct;
+-struct msgbuf;
+-struct user_msghdr;
+-struct mmsghdr;
+-struct msqid_ds;
+-struct new_utsname;
+-struct nfsctl_arg;
+-struct __old_kernel_stat;
+-struct oldold_utsname;
+-struct old_utsname;
+-struct pollfd;
+-struct rlimit;
+-struct rlimit64;
+-struct rusage;
+-struct sched_param;
+-struct sched_attr;
+-struct sel_arg_struct;
+-struct semaphore;
+-struct sembuf;
+-struct shmid_ds;
+-struct sockaddr;
+-struct stat;
+-struct stat64;
+-struct statfs;
+-struct statfs64;
+-struct __sysctl_args;
+-struct sysinfo;
+-struct timespec;
+-struct timeval;
+-struct timex;
+-struct timezone;
+-struct tms;
+-struct utimbuf;
+-struct mq_attr;
+-struct compat_stat;
+-struct compat_timeval;
+-struct robust_list_head;
+-struct getcpu_cache;
+-struct old_linux_dirent;
+-struct perf_event_attr;
+-struct file_handle;
+-struct sigaltstack;
+-union bpf_attr;
+-
++#include <linux/syscalls_structs.h>
+ #include <linux/types.h>
+ #include <linux/aio_abi.h>
+ #include <linux/capability.h>
+diff --git a/include/linux/syscalls_structs.h b/include/linux/syscalls_structs.h
+new file mode 100644
+index 0000000..a920cbc
+--- /dev/null
++++ b/include/linux/syscalls_structs.h
+@@ -0,0 +1,60 @@
++#ifndef _LINUX_SYSCALL_STRUCTS_H
++#define _LINUX_SYSCALL_STRUCTS_H
++
++struct epoll_event;
++struct iattr;
++struct inode;
++struct iocb;
++struct io_event;
++struct iovec;
++struct itimerspec;
++struct itimerval;
++struct kexec_segment;
++struct linux_dirent;
++struct linux_dirent64;
++struct list_head;
++struct mmap_arg_struct;
++struct msgbuf;
++struct user_msghdr;
++struct mmsghdr;
++struct msqid_ds;
++struct new_utsname;
++struct nfsctl_arg;
++struct __old_kernel_stat;
++struct oldold_utsname;
++struct old_utsname;
++struct pollfd;
++struct rlimit;
++struct rlimit64;
++struct rusage;
++struct sched_param;
++struct sched_attr;
++struct sel_arg_struct;
++struct semaphore;
++struct sembuf;
++struct shmid_ds;
++struct sockaddr;
++struct stat;
++struct stat64;
++struct statfs;
++struct statfs64;
++struct __sysctl_args;
++struct sysinfo;
++struct timespec;
++struct timeval;
++struct timex;
++struct timezone;
++struct tms;
++struct utimbuf;
++struct mq_attr;
++struct compat_stat;
++struct compat_timeval;
++struct robust_list_head;
++struct getcpu_cache;
++struct old_linux_dirent;
++struct perf_event_attr;
++struct file_handle;
++struct sigaltstack;
++union bpf_attr;
++
++#endif /* _LINUX_SYSCALL_STRUCTS_H */
+diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
+index 1324b02..a8380ad 100644
+--- a/include/uapi/asm-generic/unistd.h
++++ b/include/uapi/asm-generic/unistd.h
+@@ -29,6 +29,10 @@
+ #define __SC_COMP_3264(_nr, _32, _64, _comp) __SC_3264(_nr, _32, _64)
+ #endif
+ 
++#ifndef __SC_WRAP
++#define __SC_WRAP __SYSCALL
++#endif
++
+ #define __NR_io_setup 0
+ __SC_COMP(__NR_io_setup, sys_io_setup, compat_sys_io_setup)
+ #define __NR_io_destroy 1
+diff --git a/kernel/sys_ni.c b/kernel/sys_ni.c
+index 0623787..8c99a45 100644
+--- a/kernel/sys_ni.c
++++ b/kernel/sys_ni.c
+@@ -16,6 +16,14 @@ asmlinkage long sys_ni_syscall(void)
+ 	return -ENOSYS;
+ }
+ 
++#ifdef CONFIG_COMPAT_WRAPPER
++#define cond_syscall_wrapped(name)	\
++	cond_syscall(name);		\
++	cond_syscall(compat_##name);
++#else
++#define cond_syscall_wrapped	cond_syscall
++#endif
++
+ cond_syscall(sys_quotactl);
+ cond_syscall(sys32_quotactl);
+ cond_syscall(sys_acct);
+-- 
+2.5.0
