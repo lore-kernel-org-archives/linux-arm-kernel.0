@@ -1,206 +1,192 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 25 Jan 2016 18:55:19 +0100
-Subject: [PATCH v3 00/12] pwm: add support for atomic update
-In-Reply-To: <20160125170855.GA10182@ulmo>
-References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
- <2341981.a79ioYM9Es@diego> <20151110173416.GB21727@ulmo>
- <CAD=FV=WL3jYEgVe-m6QcAyQwfJgdX4J5OtKisKwyoKOrTSpEQA@mail.gmail.com>
- <20160125170855.GA10182@ulmo>
-Message-ID: <20160125185519.436339fc@bbrezillon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Jan 2016 18:02:34 +0000
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160115173912.GU3818@linux.vnet.ibm.com>
+References: <569565DA.2010903@imgtec.com> <20160113104516.GE25458@arm.com>
+ <5696CF08.8080700@imgtec.com> <20160114121449.GC15828@arm.com>
+ <5697F6D2.60409@imgtec.com>
+ <20160114203430.GC3818@linux.vnet.ibm.com>
+ <56980C91.1010403@imgtec.com>
+ <20160114212913.GF3818@linux.vnet.ibm.com>
+ <20160115085554.GF3421@worktop>
+ <20160115173912.GU3818@linux.vnet.ibm.com>
+Message-ID: <20160125180234.GA26732@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+Hi Paul,
 
-On Mon, 25 Jan 2016 18:08:55 +0100
-Thierry Reding <thierry.reding@gmail.com> wrote:
-
-> On Mon, Jan 25, 2016 at 08:28:31AM -0800, Doug Anderson wrote:
-> > Thierry and Boris,
+On Fri, Jan 15, 2016 at 09:39:12AM -0800, Paul E. McKenney wrote:
+> On Fri, Jan 15, 2016 at 09:55:54AM +0100, Peter Zijlstra wrote:
+> > On Thu, Jan 14, 2016 at 01:29:13PM -0800, Paul E. McKenney wrote:
+> > > So smp_mb() provides transitivity, as do pairs of smp_store_release()
+> > > and smp_read_acquire(), 
 > > 
-> > On Tue, Nov 10, 2015 at 9:34 AM, Thierry Reding
-> > <thierry.reding@gmail.com> wrote:
-> > > On Mon, Oct 19, 2015 at 12:12:12PM +0200, Heiko St?bner wrote:
-> > >> Hi Thierry,
-> > >>
-> > >> Am Montag, 21. September 2015, 11:33:17 schrieb Boris Brezillon:
-> > >> > Hello,
-> > >> >
-> > >> > This series adds support for atomic PWM update, or IOW, the capability
-> > >> > to update all the parameters of a PWM device (enabled/disabled, period,
-> > >> > duty and polarity) in one go.
-> > >>
-> > >> is anything more blocking this series? It's now sitting on the lists for
-> > >> nearly a month and everybody seems happy with it, so it would be really nice
-> > >> to have in mainline :-) .
-> > >>
-> > >> Especially as this also makes it possible for Rockchip Chromebooks to actually
-> > >> control the logic-regulator that is implemented as pwm-regulator there.
-> > >
-> > > Last time I tried to put this into linux-next I got immediately
-> > > bombarded by a number of build failures, so I backed things out. The
-> > > current plan is to give this another try after v4.4-rc1.
+> > But they provide different grades of transitivity, which is where all
+> > the confusion lays.
 > > 
-> > We're now into the 4.5 timeframe.  Does anyone have a concrete set of
-> > things that need to happen before this patch series makes it into
-> > mainline?
-> 
-> I think the current status is that we're more or less blocked on the
-> decision on what the reset state of the PWM should be. The question is
-> what to do if the PWM hardware readout differs from the settings found
-> in DT.
-
-I think I already explained my PoV regarding the default/reference
-setting (or what you later call the software state).
-To me, this has never matched the state of the PWM device, it's just a
-reference duty-cycle and polarity configuration that PWM users can
-decide to apply or not. Currently, there's no mechanism to apply the
-reference PWM config when a user request a PWM (which is the only
-moment we could be able to apply this config, since reference configs
-are per users and not attached to the PWM device itself).
-
-All I'm trying to do in this series is teach some PWM users to make use
-of hardware read-out state instead of blindly applying a default config
-that can generate glitches in the PWM signal.
-
-> 
-> > From searching I see that the latest version of this series is v4 and
-> > there are a smattering of comments on the 24-patch series.  Presumably
-> > a v5 needs to be posted to address those things.
+> > smp_mb() is strongly/globally transitive, all CPUs will agree on the order.
 > > 
-> > ...but it looks like the big sticking point is that Boris is waiting
-> > for a response to his questions in
-> > <https://patchwork.kernel.org/patch/7622881/>.  Thierry: can you give
-> > Boris some direction for what else he needs to do?  We need to come up
-> > with _some_ solution since this series gets us much better support for
-> > PWM regulators.  Without this series or some other solution, PWM
-> > regulators aren't usable in mainline on any system that uses them for
-> > system-critical rails.  Nearly all Rockchip reference boards and
-> > shipping devices uses a PWM regulator for the system-critidal "logic"
-> > rail.  That means any patches which need to change this rail in Linux
-> > are blocked.
+> > Whereas the RCpc release+acquire is weakly so, only the two cpus
+> > involved in the handover will agree on the order.
 > 
-> I really don't understand this design decision. I presume that the PWM
-> controlling this system-critical logic is driven by the SoC? So if the
-> regulator is system-critical, doesn't that make it a chicken and egg
-> problem? How can the SoC turn the PWM on if it doesn't have power? But
-> perhaps I'm completely misunderstanding what you're saying. Perhaps if
-> somebody could summarize how exactly this works, it would help better
-> understand the requirements or what's the correct thing to do.
+> Good point!
 > 
-> > If there's already been off-list discussion and Boris already knows
-> > what the next steps are then my apologies and I'll wait patiently for
-> > the next series.  ;)
+> Using grace periods in place of smp_mb() also provides strong/global
+> transitivity, but also insanely high latencies.  ;-)
 > 
-> I don't think we reached a conclusion on this. And to be honest, I'm not
-> sure what the right way forward is in this situation. So in order to
-> make some forward progress I suggest we start a discussion, hopefully
-> that will clarify the situation and help lead to the conclusion. Let me
-> recap where we are:
+> The patch below updates Documentation/memory-barriers.txt to define
+> local vs. global transitivity.  The corresponding ppcmem litmus test
+> is included below as well.
 > 
-> Boris' series has two goals: 1) allow seamless hand-off from firmware to
-> kernel of a PWM channel and 2) apply changes to a regulator in a single
-> atomic operation. To achieve this the concept of PWM state is introduced
-> which encapsulates the settings of a PWM channel. On driver probe the
-> current state will be read from hardware and when one or more parameters
-> are to be changed, the current state is duplicated, the new values set
-> in the state and the new state applied.
+> Should we start putting litmus tests for the various examples
+> somewhere, perhaps in a litmus-tests directory within each participating
+> architecture?  I have a pile of powerpc-related litmus tests on my laptop,
+> but they probably aren't doing all that much good there.
+
+I too would like to have the litmus tests in the kernel so that we can
+refer to them from memory-barriers.txt. Ideally they wouldn't be targetted
+to a particular arch, however.
+
+> PPC local-transitive
+> ""
+> {
+> 0:r1=1; 0:r2=u; 0:r3=v; 0:r4=x; 0:r5=y; 0:r6=z;
+> 1:r1=1; 1:r2=u; 1:r3=v; 1:r4=x; 1:r5=y; 1:r6=z;
+> 2:r1=1; 2:r2=u; 2:r3=v; 2:r4=x; 2:r5=y; 2:r6=z;
+> 3:r1=1; 3:r2=u; 3:r3=v; 3:r4=x; 3:r5=y; 3:r6=z;
+> }
+>  P0           | P1           | P2           | P3           ;
+>  lwz r9,0(r4) | lwz r9,0(r5) | lwz r9,0(r6) | stw r1,0(r3) ;
+>  lwsync       | lwsync       | lwsync       | sync         ;
+>  stw r1,0(r2) | lwz r8,0(r3) | stw r1,0(r7) | lwz r9,0(r2) ;
+>  lwsync       | lwz r7,0(r2) |              |              ;
+>  stw r1,0(r5) | lwsync       |              |              ;
+>               | stw r1,0(r6) |              |              ;
+> exists
+> (* (0:r9=0 /\ 1:r9=1 /\ 2:r9=1 /\ 1:r8=0 /\ 3:r9=0) *)
+> (* (0:r9=1 /\ 1:r9=1 /\ 2:r9=1) *)
+> (* (0:r9=0 /\ 1:r9=1 /\ 2:r9=1 /\ 1:r7=0) *)
+> (0:r9=0 /\ 1:r9=1 /\ 2:r9=1 /\ 1:r7=0)
+
+i.e. we should rewrite this using READ_ONCE/WRITE_ONCE and smp_mb() etc.
+
+> ------------------------------------------------------------------------
 > 
-> The problem that we've encountered is that since the PWM parameters are
-> specified in DT (or board files), there is the possibility of the PWM
-> hardware state and the board parameters disagreeing. To resolve such
-> situations there must be a point in time where both hardware state and
-> software state must be synchronized.
-
-Maybe we're just hunting ghosts here. There's only one valid state, and
-this is the 'hardware state'. I reused the pwm_state struct to store the
-reference config (what you call software state), but actually that's
-not a state, that's a configuration template, it will only become the
-PWM state after being applied.
-Maybe I should use another struct to clarify that.
-
-> Now the most straightforward way to
-> do that would be to simply apply the software state and be done with it.
-
-Why that? I mean what's the problem of having a reference/template
-config that PWM users can rely on if they want to, and still keep
-the real state retrieved from hardware read-out? This way PWM users can
-decide which one they want to use.
-
-> However the software state initially lacks the duty cycle because it is
-> a parameter that usually depends on the use-case (for backlight for
-> instance it controls the brightness, for regulators it controls the
-> output voltage, ...).
-
-Yes, and I perfectly understand that, we don't want to encode the
-default duty cycle in the DT.
-
+> commit 2cb4e83a1b5c89c8e39b8a64bd89269d05913e41
+> Author: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> Date:   Fri Jan 15 09:30:42 2016 -0800
 > 
-> Applying the software state as-is also means that there's no reason at
-> all to read out the hardware state in the first place, because it will
-> simply be discarded.
-
-Yes, but as stated above, this can be a source of glitches, which is
-exactly what we're trying to avoid.
-
+>     documentation: Distinguish between local and global transitivity
+>     
+>     The introduction of smp_load_acquire() and smp_store_release() had
+>     the side effect of introducing a weaker notion of transitivity:
+>     The transitivity of full smp_mb() barriers is global, but that
+>     of smp_store_release()/smp_load_acquire() chains is local.  This
+>     commit therefore introduces the notion of local transitivity and
+>     gives an example.
+>     
+>     Reported-by: Peter Zijlstra <peterz@infradead.org>
+>     Reported-by: Will Deacon <will.deacon@arm.com>
+>     Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
 > 
-> An alternative would be to discard the software state and trust the
-> hardware to be configured correctly. That's somewhat risky because we
-> don't know if the hardware is properly configured. Or Linux might have
-> different requirements from the firmware and hence needs to configure
-> the PWM differently.
+> diff --git a/Documentation/memory-barriers.txt b/Documentation/memory-barriers.txt
+> index c66ba46d8079..d8109ed99342 100644
+> --- a/Documentation/memory-barriers.txt
+> +++ b/Documentation/memory-barriers.txt
+> @@ -1318,8 +1318,82 @@ or a level of cache, CPU 2 might have early access to CPU 1's writes.
+>  General barriers are therefore required to ensure that all CPUs agree
+>  on the combined order of CPU 1's and CPU 2's accesses.
+>  
+> -To reiterate, if your code requires transitivity, use general barriers
+> -throughout.
+> +General barriers provide "global transitivity", so that all CPUs will
+> +agree on the order of operations.  In contrast, a chain of release-acquire
+> +pairs provides only "local transitivity", so that only those CPUs on
+> +the chain are guaranteed to agree on the combined order of the accesses.
 
-Yep, I agree on that too.
+Thanks for having a go at this. I tried defining something axiomatically,
+but got stuck pretty quickly. In my scheme, I used "data-directed
+transitivity" instead of "local transitivity", since the latter seems to
+be a bit of a misnomer.
 
-> 
-> Neither of the above are very attractive options. The best I've been
-> able to come up with so far is to completely remove this decision from
-> the PWM subsystem and let users handle this. That is, a PWM regulator
-> driver would have to have all the knowledge about how to configure the
-> PWM for its needs. So upon probe, the PWM regulator driver would inspect
-> the current state of the PWM and adjust if necessary, then apply again.
-> Ideally of course it wouldn't have to do anything because the hardware
-> PWM state would match the software configuration. The idea here is that
-> the PWM regulator driver knows exactly what duty cycle to configure to
-> obtain the desired output voltage.
+> +For example, switching to C code in deference to Herman Hollerith:
+> +
+> +	int u, v, x, y, z;
+> +
+> +	void cpu0(void)
+> +	{
+> +		r0 = smp_load_acquire(&x);
+> +		WRITE_ONCE(u, 1);
+> +		smp_store_release(&y, 1);
+> +	}
+> +
+> +	void cpu1(void)
+> +	{
+> +		r1 = smp_load_acquire(&y);
+> +		r4 = READ_ONCE(v);
+> +		r5 = READ_ONCE(u);
+> +		smp_store_release(&z, 1);
+> +	}
+> +
+> +	void cpu2(void)
+> +	{
+> +		r2 = smp_load_acquire(&z);
+> +		smp_store_release(&x, 1);
+> +	}
+> +
+> +	void cpu3(void)
+> +	{
+> +		WRITE_ONCE(v, 1);
+> +		smp_mb();
+> +		r3 = READ_ONCE(u);
+> +	}
+> +
+> +Because cpu0(), cpu1(), and cpu2() participate in a local transitive
+> +chain of smp_store_release()/smp_load_acquire() pairs, the following
+> +outcome is prohibited:
+> +
+> +	r0 == 1 && r1 == 1 && r2 == 1
+> +
+> +Furthermore, because of the release-acquire relationship between cpu0()
+> +and cpu1(), cpu1() must see cpu0()'s writes, so that the following
+> +outcome is prohibited:
+> +
+> +	r1 == 1 && r5 == 0
+> +
+> +However, the transitivity of release-acquire is local to the participating
+> +CPUs and does not apply to cpu3().  Therefore, the following outcome
+> +is possible:
+> +
+> +	r0 == 0 && r1 == 1 && r2 == 1 && r3 == 0 && r4 == 0
 
-That complicates a lot of things. I also suggested another approach:
-provide an API to express the duty-cycle value relatively to the period
-value (I actually sent a proposal for that, but you didn't comment on
-it).
-This would keep the PWM user implementations simple, and let the PWM
-core switch from the bootloader/firmware period/polarity config to the
-DT/PWM-lookup-table one on the first pwm_set_rel_duty_cycle() call.
+I think you should be completely explicit and include r5 == 1 here, too.
 
-> 
-> That doesn't really get us closer, though. There is still the issue of
-> the user having to deal with two states: the current hardware state and
-> the software state as configured in DT or board files.
+Also -- where would you add the smp_mb__after_release_acquire to fix
+(i.e. forbid) this? Immediately after cpu1()'s read of y?
 
-At the risk of repeating myself, I don't think we ever had a software
-state, and existing PWM users are just assuming that the PWM devices
-they are requesting were not used before. IOW, yes, patching PWM users
-to support smoother transitions on the PWM devices require some changes,
-but in the other hand, that's not like they were doing any better
-before that series. And they still have the choice to completely ignore
-the current PWM state and blindly apply their own config (extracted
-from the reference PWM config)
+> +Although cpu0(), cpu1(), and cpu2() will see their respective reads and
+> +writes in order, CPUs not involved in the release-acquire chain might
+> +well disagree on the order.  This disagreement stems from the fact that
+> +the weak memory-barrier instructions used to implement smp_load_acquire()
+> +and smp_store_release() are not required to order prior stores against
+> +subsequent loads in all cases.  This means that cpu3() can see cpu0()'s
+> +store to u as happening -after- cpu1()'s load from v, even though
+> +both cpu0() and cpu1() agree that these two operations occurred in the
+> +intended order.
+> +
+> +However, please keep in mind that smp_load_acquire() is not magic.
+> +In particular, it simply reads from its argument with ordering.  It does
+> +-not- ensure that any particular value will be read.  Therefore, the
+> +following outcome is possible:
+> +
+> +	r0 == 0 && r1 == 0 && r2 == 0 && r5 == 0
+> +
+> +Note that this outcome can happen even on a mythical sequentially
+> +consistent system where nothing is ever reordered.
 
-Best Regards,
+I'm not sure this last bit is strictly necessary. If somebody thinks that
+acquire/release involve some sort of implicit synchronisation, I think
+they may have bigger problems with memory-barriers.txt.
 
-Boris
-
-> 
-> Like I said, I'm on the fence about this, so I'd appreciate any comments
-> and perhaps insight from user subsystem maintainers on how they'd like
-> this to look, or how this has been done with other resources (GPIOs,
-> ...?)
-> 
-> Thierry
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Will
