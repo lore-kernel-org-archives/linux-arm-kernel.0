@@ -1,78 +1,116 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 16:38:41 +0000
-Subject: [PATCH 25/27] ARM: KVM: Remove unused hyp_pc field
+Date: Mon, 25 Jan 2016 16:38:33 +0000
+Subject: [PATCH 17/27] ARM: KVM: Add populating of fault data structure
 In-Reply-To: <1453739923-17846-1-git-send-email-marc.zyngier@arm.com>
 References: <1453739923-17846-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453739923-17846-26-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453739923-17846-18-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This field was never populated, and the panic code already
-does something similar. Delete the related code.
+On guest exit, we must take care of populating our fault data
+structure so that the host code can handle it. This includes
+resolving the IPA for permission faults, which can result in
+restarting the guest.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_emulate.h | 5 -----
- arch/arm/include/asm/kvm_host.h    | 1 -
- arch/arm/kernel/asm-offsets.c      | 1 -
- arch/arm/kvm/handle_exit.c         | 5 -----
- 4 files changed, 12 deletions(-)
+ arch/arm/kvm/hyp/hyp.h    |  4 ++++
+ arch/arm/kvm/hyp/switch.c | 54 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 58 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index f710616..8a8c6de 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -108,11 +108,6 @@ static inline phys_addr_t kvm_vcpu_get_fault_ipa(struct kvm_vcpu *vcpu)
- 	return ((phys_addr_t)vcpu->arch.fault.hpfar & HPFAR_MASK) << 8;
+diff --git a/arch/arm/kvm/hyp/hyp.h b/arch/arm/kvm/hyp/hyp.h
+index 2ca651f..7ddca54 100644
+--- a/arch/arm/kvm/hyp/hyp.h
++++ b/arch/arm/kvm/hyp/hyp.h
+@@ -76,10 +76,14 @@
+ #define IFSR		__ACCESS_CP15(c5, 0, c0, 1)
+ #define ADFSR		__ACCESS_CP15(c5, 0, c1, 0)
+ #define AIFSR		__ACCESS_CP15(c5, 0, c1, 1)
++#define HSR		__ACCESS_CP15(c5, 4, c2, 0)
+ #define DFAR		__ACCESS_CP15(c6, 0, c0, 0)
+ #define IFAR		__ACCESS_CP15(c6, 0, c0, 2)
+ #define HDFAR		__ACCESS_CP15(c6, 4, c0, 0)
++#define HIFAR		__ACCESS_CP15(c6, 4, c0, 2)
++#define HPFAR		__ACCESS_CP15(c6, 4, c0, 4)
+ #define ICIALLUIS	__ACCESS_CP15(c7, 0, c1, 0)
++#define ATS1CPR		__ACCESS_CP15(c7, 0, c8, 0)
+ #define TLBIALLIS	__ACCESS_CP15(c8, 0, c3, 0)
+ #define TLBIALLNSNHIS	__ACCESS_CP15(c8, 4, c3, 4)
+ #define PRRR		__ACCESS_CP15(c10, 0, c2, 0)
+diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+index f715b0d..8bfd729 100644
+--- a/arch/arm/kvm/hyp/switch.c
++++ b/arch/arm/kvm/hyp/switch.c
+@@ -80,6 +80,56 @@ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+ 	__vgic_v2_restore_state(vcpu);
  }
  
--static inline unsigned long kvm_vcpu_get_hyp_pc(struct kvm_vcpu *vcpu)
--{
--	return vcpu->arch.fault.hyp_pc;
--}
--
- static inline bool kvm_vcpu_dabt_isvalid(struct kvm_vcpu *vcpu)
++static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
++{
++	u32 hsr = read_sysreg(HSR);
++	u8 ec = hsr >> HSR_EC_SHIFT;
++	u32 hpfar, far;
++
++	vcpu->arch.fault.hsr = hsr;
++
++	if (ec == HSR_EC_IABT)
++		far = read_sysreg(HIFAR);
++	else if (ec == HSR_EC_DABT)
++		far = read_sysreg(HDFAR);
++	else
++		return true;
++
++	/*
++	 * B3.13.5 Reporting exceptions taken to the Non-secure PL2 mode:
++	 *
++	 * Abort on the stage 2 translation for a memory access from a
++	 * Non-secure PL1 or PL0 mode:
++	 *
++	 * For any Access flag fault or Translation fault, and also for any
++	 * Permission fault on the stage 2 translation of a memory access
++	 * made as part of a translation table walk for a stage 1 translation,
++	 * the HPFAR holds the IPA that caused the fault. Otherwise, the HPFAR
++	 * is UNKNOWN.
++	 */
++	if (!(hsr & HSR_DABT_S1PTW) && (hsr & HSR_FSC_TYPE) == FSC_PERM) {
++		u64 par, tmp;
++
++		par = read_sysreg(PAR);
++		write_sysreg(far, ATS1CPR);
++		isb();
++
++		tmp = read_sysreg(PAR);
++		write_sysreg(par, PAR);
++
++		if (unlikely(tmp & 1))
++			return false; /* Translation failed, back to guest */
++
++		hpfar = ((tmp >> 12) & ((1UL << 28) - 1)) << 4;
++	} else {
++		hpfar = read_sysreg(HPFAR);
++	}
++
++	vcpu->arch.fault.hxfar = far;
++	vcpu->arch.fault.hpfar = hpfar;
++	return true;
++}
++
+ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
  {
- 	return kvm_vcpu_get_hsr(vcpu) & HSR_ISV;
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index eec701d..703eea7 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -85,7 +85,6 @@ struct kvm_vcpu_fault_info {
- 	u32 hsr;		/* Hyp Syndrome Register */
- 	u32 hxfar;		/* Hyp Data/Inst. Fault Address Register */
- 	u32 hpfar;		/* Hyp IPA Fault Address Register */
--	u32 hyp_pc;		/* PC when exception was taken from Hyp mode */
- };
+ 	struct kvm_cpu_context *host_ctxt;
+@@ -107,9 +157,13 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+ 	__banked_restore_state(guest_ctxt);
  
- /*
-diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-index 1f24c32..27d0581 100644
---- a/arch/arm/kernel/asm-offsets.c
-+++ b/arch/arm/kernel/asm-offsets.c
-@@ -175,7 +175,6 @@ int main(void)
-   DEFINE(CPU_CTXT_VFP,		offsetof(struct kvm_cpu_context, vfp));
-   DEFINE(CPU_CTXT_GP_REGS,	offsetof(struct kvm_cpu_context, gp_regs));
-   DEFINE(GP_REGS_USR,		offsetof(struct kvm_regs, usr_regs));
--  DEFINE(VCPU_HYP_PC,		offsetof(struct kvm_vcpu, arch.fault.hyp_pc));
- #endif
-   BLANK();
- #ifdef CONFIG_VDSO
-diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-index 3ede90d..5377d753 100644
---- a/arch/arm/kvm/handle_exit.c
-+++ b/arch/arm/kvm/handle_exit.c
-@@ -147,11 +147,6 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	switch (exception_index) {
- 	case ARM_EXCEPTION_IRQ:
- 		return 1;
--	case ARM_EXCEPTION_UNDEFINED:
--		kvm_err("Undefined exception in Hyp mode at: %#08lx\n",
--			kvm_vcpu_get_hyp_pc(vcpu));
--		BUG();
--		panic("KVM: Hypervisor undefined exception!\n");
- 	case ARM_EXCEPTION_DATA_ABORT:
- 	case ARM_EXCEPTION_PREF_ABORT:
- 	case ARM_EXCEPTION_HVC:
+ 	/* Jump in the fire! */
++again:
+ 	exit_code = __guest_enter(vcpu, host_ctxt);
+ 	/* And we're baaack! */
+ 
++	if (exit_code == ARM_EXCEPTION_HVC && !__populate_fault_info(vcpu))
++		goto again;
++
+ 	fp_enabled = __vfp_enabled();
+ 
+ 	__banked_save_state(guest_ctxt);
 -- 
 2.1.4
