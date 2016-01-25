@@ -1,95 +1,45 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 25 Jan 2016 19:57:22 +0300
-Subject: [PATCH 0/5] all: s390: make compat wrappers the generic solution
-Message-ID: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
+Date: Mon, 25 Jan 2016 19:57:27 +0300
+Subject: [PATCH 5/5] all: introduce COMPAT_WRAPPER option and enable it for
+ s390
+In-Reply-To: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1453741047-5498-6-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The problem that makes us use wrappers is that some compat
-architectures allows user code to access top halves of registers.
-This is not a problem for syscalls that are already handled by compat
-code, or for that who has types of the same size in kernel and
-userspace. In case of s390 and lp64/ilp32 the problem is in pointer
-types, long, unsigned long. 
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+---
+ arch/Kconfig      | 4 ++++
+ arch/s390/Kconfig | 1 +
+ 2 files changed, 5 insertions(+)
 
-S390 folks already have the solution for it. In this patchset,
-it is turned to be general, as arm64/ilp32 needs it too.
-
-This patchset is created as the part of the work of enabling arm64
-with ILP32 user mode. See details here:
-http://thread.gmane.org/gmane.linux.kernel/2126946
-
-Build-tested on s390.
-
-Yury Norov (5):
-  all: s390: move wrapper infrastructure to generic headers
-  all: declare new wrappers
-  all: s390: redefine wrappers in generic code
-  all: non-obvious wrappers
-  introduce COMPAT_WRAPPER option and enable it for S390
-
- arch/Kconfig                      |   4 +
- arch/s390/Kconfig                 |   1 +
- arch/s390/include/asm/compat.h    |  17 ++-
- arch/s390/kernel/Makefile         |   2 +-
- arch/s390/kernel/compat_wrapper.c | 179 ------------------------
- arch/s390/kernel/entry.h          |   2 +
- arch/s390/pci/pci_mmio.c          |   5 +-
- drivers/char/random.c             |   3 +-
- fs/aio.c                          |   4 +-
- fs/buffer.c                       |   3 +-
- fs/dcache.c                       |   3 +-
- fs/eventpoll.c                    |   4 +-
- fs/exec.c                         |   2 +-
- fs/fhandle.c                      |   3 +-
- fs/filesystems.c                  |   3 +-
- fs/namei.c                        |  29 ++--
- fs/namespace.c                    |   7 +-
- fs/notify/inotify/inotify_user.c  |   3 +-
- fs/open.c                         |  20 +--
- fs/pipe.c                         |   5 +-
- fs/quota/quota.c                  |   3 +-
- fs/read_write.c                   |   2 +-
- fs/readdir.c                      |   6 +
- fs/select.c                       |   3 +-
- fs/splice.c                       |   4 +-
- fs/stat.c                         |   5 +-
- fs/xattr.c                        |  25 ++--
- include/linux/compat.h            | 280 ++++++++++++++++++++++++++++++++++++++
- include/linux/syscalls.h          |  57 +-------
- include/linux/syscalls_structs.h  |  60 ++++++++
- include/uapi/asm-generic/unistd.h | 224 +++++++++++++++---------------
- ipc/mqueue.c                      |   3 +-
- kernel/acct.c                     |   3 +-
- kernel/bpf/syscall.c              |   3 +-
- kernel/capability.c               |   5 +-
- kernel/events/core.c              |   2 +-
- kernel/fork.c                     |  12 +-
- kernel/groups.c                   |   5 +-
- kernel/kcmp.c                     |   3 +-
- kernel/module.c                   |   7 +-
- kernel/printk/printk.c            |   3 +-
- kernel/reboot.c                   |   3 +-
- kernel/sched/core.c               |  11 +-
- kernel/seccomp.c                  |   2 +-
- kernel/signal.c                   |   6 +-
- kernel/sys.c                      |  16 +--
- kernel/sys_ni.c                   | 104 +++++++-------
- mm/madvise.c                      |   3 +-
- mm/mincore.c                      |   3 +-
- mm/mlock.c                        |   7 +-
- mm/mmap.c                         |   7 +-
- mm/mprotect.c                     |   3 +-
- mm/mremap.c                       |   3 +-
- mm/msync.c                        |   3 +-
- mm/nommu.c                        |   7 +-
- mm/shmem.c                        |   3 +-
- mm/swapfile.c                     |   5 +-
- net/socket.c                      |  14 +-
- security/keys/keyctl.c            |   5 +-
- 59 files changed, 699 insertions(+), 520 deletions(-)
- delete mode 100644 arch/s390/kernel/compat_wrapper.c
- create mode 100644 include/linux/syscalls_structs.h
-
+diff --git a/arch/Kconfig b/arch/Kconfig
+index 4e949e5..ab7692e 100644
+--- a/arch/Kconfig
++++ b/arch/Kconfig
+@@ -518,6 +518,10 @@ config HAVE_COPY_THREAD_TLS
+ 	  normal C parameter passing, rather than extracting the syscall
+ 	  argument from pt_regs.
+ 
++config COMPAT_WRAPPER
++	bool
++	depends on COMPAT
++
+ #
+ # ABI hall of shame
+ #
+diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
+index 3a55f49..88f48b0 100644
+--- a/arch/s390/Kconfig
++++ b/arch/s390/Kconfig
+@@ -336,6 +336,7 @@ config COMPAT
+ 	select COMPAT_BINFMT_ELF if BINFMT_ELF
+ 	select ARCH_WANT_OLD_COMPAT_IPC
+ 	select COMPAT_OLD_SIGACTION
++	select COMPAT_WRAPPER
+ 	depends on MULTIUSER
+ 	help
+ 	  Select this option if you want to enable your system kernel to
 -- 
 2.5.0
