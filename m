@@ -1,34 +1,62 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 25 Jan 2016 11:37:10 +0000
-Subject: [PATCH V2 1/2] dt-bindings: regulator: Add document for MT6323
- regulator
-In-Reply-To: <1453718405-40815-1-git-send-email-blogic@openwrt.org>
-References: <1453718405-40815-1-git-send-email-blogic@openwrt.org>
-Message-ID: <20160125113710.GJ6588@sirena.org.uk>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Mon, 25 Jan 2016 11:33:59 +0000
+Subject: [PATCH] ARM: virt: enable GICv3 system registers
+Message-ID: <1453721639-24733-1-git-send-email-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 11:40:04AM +0100, John Crispin wrote:
-> Based on the MT6397 binding documentation.
-> 
-> Signed-off-by: John Crispin <blogic@openwrt.org>
-> Cc: devicetree at vger.kernel.org
+ARMv8 introduces system registers for the Generic Interrupt Controller's
+CPU and virtual interfaces.
+When GICv3 is implemented, EL2 needs to allow the kernel to use those
+registers, by changing the value of ICC_HSRE.
 
-In reply to your previous submission I said:
+Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kernel/hyp-stub.S |   24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-| important.  Please also use subject lines matching the style for the
-| subsystem (for patch 1).
-
-Please don't ignore review comments, people are generally making them
-for a reason and are likely to have the same concerns if issues remain
-unaddressed.  Having to repeat the same comments can get repetitive and
-make people question the value of time spent reviewing.  If you disagree
-with the review comments that's fine but you need to reply and discuss
-your concerns so that the reviewer can understand your decisions.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160125/d1457ad8/attachment.sig>
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index 2a55373..0b1e4a9 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -17,6 +17,7 @@
+  */
+ 
+ #include <linux/init.h>
++#include <linux/irqchip/arm-gic-v3.h>
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
+ #include <asm/virt.h>
+@@ -161,6 +162,29 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
+ 1:
+ #endif
+ 
++#ifdef CONFIG_ARM_GIC_V3
++	@ Check whether GICv3 system registers are available
++	mrc	p15, 0, r7, c0, c1, 1	@ ID_PFR1
++	ubfx	r7, r7, #28, #4
++	cmp	r7, #1
++	bne	2f
++
++	@ Enable system register accesses
++	mrc	p15, 4, r7, c12, c9, 5	@ ICC_HSRE
++	orr	r7, r7, #(ICC_SRE_EL2_ENABLE | ICC_SRE_EL2_SRE)
++	mcr	p15, 4, r7, c12, c9, 5	@ ICC_HSRE
++	isb
++
++	@ SRE bit could be forced to 0 by firmware.
++	@ Check whether it sticks before accessing any other sysreg
++	mrc	p15, 4, r7, c12, c9, 5	@ ICC_HSRE
++	tst	r7, #ICC_SRE_EL2_SRE
++	beq	2f
++	mov	r7, #0
++	mcr	p15, 4, r7, c12, c11, 0	@ ICH_HCR
++2:
++#endif
++
+ 	bx	lr			@ The boot CPU mode is left in r4.
+ ENDPROC(__hyp_stub_install_secondary)
+ 
+-- 
+1.7.9.5
