@@ -1,40 +1,79 @@
 From: labbott@fedoraproject.org (Laura Abbott)
-Date: Mon, 25 Jan 2016 08:52:11 -0800
-Subject: [RFC][PATCH 0/4] ARCH_SUPPORTS_DEBUG_PAGEALLOC for arm64
-Message-ID: <1453740735-17898-1-git-send-email-labbott@fedoraproject.org>
+Date: Mon, 25 Jan 2016 08:52:13 -0800
+Subject: [RFC][PATCH 2/4] arm64: Add option to force mapping with PAGE_SIZE
+ pages
+In-Reply-To: <1453740735-17898-1-git-send-email-labbott@fedoraproject.org>
+References: <1453740735-17898-1-git-send-email-labbott@fedoraproject.org>
+Message-ID: <1453740735-17898-3-git-send-email-labbott@fedoraproject.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Under some circumstances (e.g. debugging) it may be useful to have all
+kernel memory mapped using PAGE_SIZE pages. Add an option for this.
 
-Hi,
+Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+---
+ arch/arm64/Kconfig  | 11 +++++++++++
+ arch/arm64/mm/mmu.c | 10 +++++++---
+ 2 files changed, 18 insertions(+), 3 deletions(-)
 
-This series implements proper debug page alloc support for arm64.
-Pages are unmapped on free. This series is based on top of Mark
-Rutland's work to TLB conflicts in early MMU mapping
-(lkml.kernel.org/g/<1451930211-22460-1-git-send-email-mark.rutland@arm.com>)
-and Ard Biesheuvel's patch to allow set_memory_* to work on vmalloc
-regions (<1453125665-26627-1-git-send-email-ard.biesheuvel@linaro.org>)
-
-The most important part is to force all memory to be mapped with page
-mappings. Once that happens it's trivial to use the existing page_attr
-infrastructure to clear the valid bit and cause faults. I know there was
-an attempt at this a while back (can't find it in my archives) but the
-changes by Mark make this significantly easier and probably with fewer
-TLB conflicts.
-
-As always, comments are appreciated.
-
-Laura Abbott (4):
-  arm64: Drop alloc function from create_mapping
-  arm64: Add option to force mapping with PAGE_SIZE pages
-  arm64: Add support for ARCH_SUPPORTS_DEBUG_PAGEALLOC
-  arm64: ptdump: Indicate whether memory should be faulting
-
- arch/arm64/Kconfig       | 14 ++++++++++++++
- arch/arm64/mm/dump.c     |  5 +++++
- arch/arm64/mm/mmu.c      | 24 +++++++++++++++++-------
- arch/arm64/mm/pageattr.c | 40 +++++++++++++++++++++++++++++++++-------
- 4 files changed, 69 insertions(+), 14 deletions(-)
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index ffa3c54..faf7eac 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -504,6 +504,17 @@ config HOTPLUG_CPU
+ 	  Say Y here to experiment with turning CPUs off and on.  CPUs
+ 	  can be controlled through /sys/devices/system/cpu.
+ 
++config FORCE_PAGES
++	bool "Force all memory mappings to be PAGE_SIZE"
++	help
++	  For performance reasons, kernel memory may be mapped with
++	  page table entries larger than the expected PAGE_SIZE. This results
++	  in better TLB performance but prevents adjustment of page table
++	  attributes at runtime. Say Y here to have all kernel memory mapped
++	  with PAGE_SIZE entries.
++
++	  If unsure, say N.
++
+ source kernel/Kconfig.preempt
+ source kernel/Kconfig.hz
+ 
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 2d6e7cf..450d38a 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -181,7 +181,8 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 	do {
+ 		next = pmd_addr_end(addr, end);
+ 		/* try section mapping first */
+-		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
++		if (((addr | next | phys) & ~SECTION_MASK) == 0 &&
++		      (!IS_ENABLED(CONFIG_FORCE_PAGES) || !pgtable_alloc)) {
+ 			pmd_t old_pmd =*pmd;
+ 			set_pmd(pmd, __pmd(phys |
+ 					   pgprot_val(mk_sect_prot(prot))));
+@@ -208,8 +209,11 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ }
+ 
+ static inline bool use_1G_block(unsigned long addr, unsigned long next,
+-			unsigned long phys)
++			unsigned long phys, phys_addr_t (*pgtable_alloc)(void))
+ {
++	if (pgtable_alloc && IS_ENABLED(CONFIG_FORCE_PAGES))
++		return false;
++
+ 	if (PAGE_SHIFT != 12)
+ 		return false;
+ 
+@@ -241,7 +245,7 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+ 		/*
+ 		 * For 4K granule only, attempt to put down a 1GB block
+ 		 */
+-		if (use_1G_block(addr, next, phys)) {
++		if (use_1G_block(addr, next, phys, pgtable_alloc)) {
+ 			pud_t old_pud = *pud;
+ 			set_pud(pud, __pud(phys |
+ 					   pgprot_val(mk_sect_prot(prot))));
 -- 
 2.5.0
