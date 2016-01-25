@@ -1,43 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:44:38 +0100
-Subject: [PATCH] cpufreq: pxa2xx: fix pxa_cpufreq_change_voltage prototype
-Message-ID: <1453736683-1959283-1-git-send-email-arnd@arndb.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 25 Jan 2016 16:43:50 +0100
+Subject: [PATCH] ARM: mv78xx0: use "depends on" instead of "if" after
+ prompt
+In-Reply-To: <1453722250-23297-1-git-send-email-yamada.masahiro@socionext.com>
+ (Masahiro Yamada's message of "Mon, 25 Jan 2016 20:44:10 +0900")
+References: <1453722250-23297-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <874me1ekax.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two definitions of pxa_cpufreq_change_voltage, with slightly
-different prototypes after one of them had its argument marked 'const'.
-Now the other one (for !CONFIG_REGULATOR) produces a harmless warning:
+Hi Masahiro,
+ 
+ On lun., janv. 25 2016, Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
 
-drivers/cpufreq/pxa2xx-cpufreq.c: In function 'pxa_set_target':
-drivers/cpufreq/pxa2xx-cpufreq.c:291:36: warning: passing argument 1 of 'pxa_cpufreq_change_voltage' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
-   ret = pxa_cpufreq_change_voltage(&pxa_freq_settings[idx]);
-                                    ^
-drivers/cpufreq/pxa2xx-cpufreq.c:205:12: note: expected 'struct pxa_freqs *' but argument is of type 'const struct pxa_freqs *'
- static int pxa_cpufreq_change_voltage(struct pxa_freqs *pxa_freq)
-            ^
+> This platform recently moved to multi-platform, so missed the global
+> fixup by commit e32465429490 ("ARM: use "depends on" for SoC configs
+> instead of "if" after prompt").  Fix it now.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-This changes the prototype in the same way as the other, which
-avoids the warning.
+Applied on mvebu/cleanup
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 03c229906311 ("cpufreq: pxa: make pxa_freqs arrays const")
----
- drivers/cpufreq/pxa2xx-cpufreq.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks,
 
-diff --git a/drivers/cpufreq/pxa2xx-cpufreq.c b/drivers/cpufreq/pxa2xx-cpufreq.c
-index efe3b215fd34..46fee1539cc8 100644
---- a/drivers/cpufreq/pxa2xx-cpufreq.c
-+++ b/drivers/cpufreq/pxa2xx-cpufreq.c
-@@ -202,7 +202,7 @@ static void __init pxa_cpufreq_init_voltages(void)
- 	}
- }
- #else
--static int pxa_cpufreq_change_voltage(struct pxa_freqs *pxa_freq)
-+static int pxa_cpufreq_change_voltage(const struct pxa_freqs *pxa_freq)
- {
- 	return 0;
- }
+Gregory
+> ---
+>
+>  arch/arm/mach-mv78xx0/Kconfig | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-mv78xx0/Kconfig b/arch/arm/mach-mv78xx0/Kconfig
+> index a32575f..c32f855 100644
+> --- a/arch/arm/mach-mv78xx0/Kconfig
+> +++ b/arch/arm/mach-mv78xx0/Kconfig
+> @@ -1,5 +1,6 @@
+>  menuconfig ARCH_MV78XX0
+> -	bool "Marvell MV78xx0" if ARCH_MULTI_V5
+> +	bool "Marvell MV78xx0"
+> +	depends on ARCH_MULTI_V5
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select CPU_FEROCEON
+>  	select MVEBU_MBUS
+> -- 
+> 1.9.1
+>
+
 -- 
-2.7.0
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
