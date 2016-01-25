@@ -1,296 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 15:53:38 +0000
-Subject: [PATCH v2 04/21] arm64: KVM: Skip HYP setup when already running in
- HYP
-In-Reply-To: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453737235-16522-5-git-send-email-marc.zyngier@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Jan 2016 16:54:04 +0100
+Subject: [PATCH] clk: st: avoid uninitialized variable use
+Message-ID: <1453737255-1959849-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the kernel running at EL2, there is no point trying to
-configure page tables for HYP, as the kernel is already mapped.
+My previous patch fixed some warnings about printing a couple
+of variables that are always uninitialized in quadfs_pll_fs660c32_set_rate(),
+but I now got a warning that only shows up in some configurations (i.e.
+without gcc -Os) about the params.ndiv being used uninitialized in the
+error case:
 
-Take this opportunity to refactor the whole init a bit, allowing
-the various parts of the hypervisor bringup to be split across
-multiple functions.
+drivers/clk/st/clkgen-fsyn.c: In function 'quadfs_pll_fs660c32_set_rate':
+drivers/clk/st/clkgen-fsyn.c:584:75: warning: 'params.ndiv' may be used uninitialized in this function [-Wmaybe-uninitialized]
+drivers/clk/st/clkgen-fsyn.c:574:16: note: 'params.ndiv' was declared here
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+This changes the error handling so we bail for invalid arguments rather
+than continuing with uninitialized data.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/kvm/arm.c | 151 +++++++++++++++++++++++++++++++++--------------------
- arch/arm/kvm/mmu.c |   7 +++
- 2 files changed, 100 insertions(+), 58 deletions(-)
+ drivers/clk/st/clkgen-fsyn.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index dda1959..66e2d04 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1035,6 +1035,67 @@ static inline void hyp_cpu_pm_init(void)
- }
- #endif
+diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
+index ccb324d97160..dec4eaaecc00 100644
+--- a/drivers/clk/st/clkgen-fsyn.c
++++ b/drivers/clk/st/clkgen-fsyn.c
+@@ -574,12 +574,16 @@ static int quadfs_pll_fs660c32_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct stm_fs params;
+ 	long hwrate = 0;
+ 	unsigned long flags = 0;
++	int ret;
  
-+static void teardown_common_resources(void)
-+{
-+	free_percpu(kvm_host_cpu_state);
-+}
-+
-+static int init_common_resources(void)
-+{
-+	kvm_host_cpu_state = alloc_percpu(kvm_cpu_context_t);
-+	if (!kvm_host_cpu_state) {
-+		kvm_err("Cannot allocate host CPU state\n");
-+		return -ENOMEM;
-+	}
-+
-+	return 0;
-+}
-+
-+static int init_subsystems(void)
-+{
-+	int err;
-+
-+	/*
-+	 * Init HYP view of VGIC
-+	 */
-+	err = kvm_vgic_hyp_init();
-+	switch (err) {
-+	case 0:
-+		vgic_present = true;
-+		break;
-+	case -ENODEV:
-+	case -ENXIO:
-+		vgic_present = false;
-+		break;
-+	default:
-+		return err;
-+	}
-+
-+	/*
-+	 * Init HYP architected timer support
-+	 */
-+	err = kvm_timer_hyp_init();
-+	if (err)
-+		return err;
-+
-+	kvm_perf_init();
-+	kvm_coproc_table_init();
-+
-+	return 0;
-+}
-+
-+static void teardown_hyp_mode(void)
-+{
-+	int cpu;
-+
-+	if (is_kernel_in_hyp_mode())
-+		return;
-+
-+	free_hyp_pgds();
-+	for_each_possible_cpu(cpu)
-+		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
-+}
-+
- /**
-  * Inits Hyp-mode on all online CPUs
-  */
-@@ -1043,6 +1104,9 @@ static int init_hyp_mode(void)
- 	int cpu;
- 	int err = 0;
- 
-+	if (is_kernel_in_hyp_mode())
-+		return 0;
-+
- 	/*
- 	 * Allocate Hyp PGD and setup Hyp identity mapping
- 	 */
-@@ -1065,7 +1129,7 @@ static int init_hyp_mode(void)
- 		stack_page = __get_free_page(GFP_KERNEL);
- 		if (!stack_page) {
- 			err = -ENOMEM;
--			goto out_free_stack_pages;
-+			goto out_err;
- 		}
- 
- 		per_cpu(kvm_arm_hyp_stack_page, cpu) = stack_page;
-@@ -1077,13 +1141,13 @@ static int init_hyp_mode(void)
- 	err = create_hyp_mappings(__kvm_hyp_code_start, __kvm_hyp_code_end);
- 	if (err) {
- 		kvm_err("Cannot map world-switch code\n");
--		goto out_free_mappings;
-+		goto out_err;
- 	}
- 
- 	err = create_hyp_mappings(__start_rodata, __end_rodata);
- 	if (err) {
- 		kvm_err("Cannot map rodata section\n");
--		goto out_free_mappings;
-+		goto out_err;
- 	}
- 
- 	/*
-@@ -1095,20 +1159,10 @@ static int init_hyp_mode(void)
- 
- 		if (err) {
- 			kvm_err("Cannot map hyp stack\n");
--			goto out_free_mappings;
-+			goto out_err;
- 		}
- 	}
- 
--	/*
--	 * Map the host CPU structures
--	 */
--	kvm_host_cpu_state = alloc_percpu(kvm_cpu_context_t);
--	if (!kvm_host_cpu_state) {
--		err = -ENOMEM;
--		kvm_err("Cannot allocate host CPU state\n");
--		goto out_free_mappings;
--	}
--
- 	for_each_possible_cpu(cpu) {
- 		kvm_cpu_context_t *cpu_ctxt;
- 
-@@ -1117,7 +1171,7 @@ static int init_hyp_mode(void)
- 
- 		if (err) {
- 			kvm_err("Cannot map host CPU state: %d\n", err);
--			goto out_free_context;
-+			goto out_err;
- 		}
- 	}
- 
-@@ -1126,34 +1180,22 @@ static int init_hyp_mode(void)
- 	 */
- 	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
- 
--	/*
--	 * Init HYP view of VGIC
--	 */
--	err = kvm_vgic_hyp_init();
--	switch (err) {
--	case 0:
--		vgic_present = true;
--		break;
--	case -ENODEV:
--	case -ENXIO:
--		vgic_present = false;
--		break;
--	default:
--		goto out_free_context;
--	}
--
--	/*
--	 * Init HYP architected timer support
--	 */
--	err = kvm_timer_hyp_init();
--	if (err)
--		goto out_free_context;
--
- #ifndef CONFIG_HOTPLUG_CPU
- 	free_boot_hyp_pgd();
- #endif
- 
--	kvm_perf_init();
-+	cpu_notifier_register_begin();
-+
-+	err = __register_cpu_notifier(&hyp_init_cpu_nb);
-+
-+	cpu_notifier_register_done();
-+
-+	if (err) {
-+		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
-+		goto out_err;
-+	}
-+
-+	hyp_cpu_pm_init();
- 
- 	/* set size of VMID supported by CPU */
- 	kvm_vmid_bits = kvm_get_vmid_bits();
-@@ -1162,14 +1204,9 @@ static int init_hyp_mode(void)
- 	kvm_info("Hyp mode initialized successfully\n");
- 
- 	return 0;
--out_free_context:
--	free_percpu(kvm_host_cpu_state);
--out_free_mappings:
--	free_hyp_pgds();
--out_free_stack_pages:
--	for_each_possible_cpu(cpu)
--		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
-+
- out_err:
-+	teardown_hyp_mode();
- 	kvm_err("error initializing Hyp mode: %d\n", err);
- 	return err;
- }
-@@ -1213,26 +1250,24 @@ int kvm_arch_init(void *opaque)
- 		}
- 	}
- 
--	cpu_notifier_register_begin();
-+	err = init_common_resources();
-+	if (err)
-+		return err;
- 
- 	err = init_hyp_mode();
- 	if (err)
- 		goto out_err;
- 
--	err = __register_cpu_notifier(&hyp_init_cpu_nb);
--	if (err) {
--		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
--		goto out_err;
--	}
--
--	cpu_notifier_register_done();
--
--	hyp_cpu_pm_init();
-+	err = init_subsystems();
-+	if (err)
-+		goto out_hyp;
- 
--	kvm_coproc_table_init();
- 	return 0;
-+
-+out_hyp:
-+	teardown_hyp_mode();
- out_err:
--	cpu_notifier_register_done();
-+	teardown_common_resources();
- 	return err;
- }
- 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index aba61fd..920d0c3 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -28,6 +28,7 @@
- #include <asm/kvm_mmio.h>
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
-+#include <asm/virt.h>
- 
- #include "trace.h"
- 
-@@ -598,6 +599,9 @@ int create_hyp_mappings(void *from, void *to)
- 	unsigned long start = KERN_TO_HYP((unsigned long)from);
- 	unsigned long end = KERN_TO_HYP((unsigned long)to);
- 
-+	if (is_kernel_in_hyp_mode())
-+		return 0;
-+
- 	start = start & PAGE_MASK;
- 	end = PAGE_ALIGN(end);
- 
-@@ -630,6 +634,9 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
- 	unsigned long start = KERN_TO_HYP((unsigned long)from);
- 	unsigned long end = KERN_TO_HYP((unsigned long)to);
- 
-+	if (is_kernel_in_hyp_mode())
-+		return 0;
-+
- 	/* Check for a valid kernel IO mapping */
- 	if (!is_vmalloc_addr(from) || !is_vmalloc_addr(to - 1))
+ 	if (!rate || !parent_rate)
  		return -EINVAL;
+ 
+-	if (!clk_fs660c32_vco_get_params(parent_rate, rate, &params))
+-		clk_fs660c32_vco_get_rate(parent_rate, &params, &hwrate);
++	ret = clk_fs660c32_vco_get_params(parent_rate, rate, &params);
++	if (ret)
++		return ret;
++
++	clk_fs660c32_vco_get_rate(parent_rate, &params, &hwrate);
+ 
+ 	pr_debug("%s: %s new rate %ld [ndiv=0x%x]\n",
+ 		 __func__, clk_hw_get_name(hw),
 -- 
-2.1.4
+2.7.0
