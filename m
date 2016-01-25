@@ -1,40 +1,52 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Mon, 25 Jan 2016 13:05:52 +0100
-Subject: [PATCH V2 1/2] dt-bindings: regulator: Add document for MT6323
- regulator
-In-Reply-To: <20160125113710.GJ6588@sirena.org.uk>
-References: <1453718405-40815-1-git-send-email-blogic@openwrt.org>
- <20160125113710.GJ6588@sirena.org.uk>
-Message-ID: <56A60FA0.3060503@openwrt.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 25 Jan 2016 17:40:43 +0530
+Subject: [PATCH 1/6] dma: enable mxs-dma for imx6ul
+In-Reply-To: <1453294626-17608-2-git-send-email-LW@KARO-electronics.de>
+References: <1453294626-17608-1-git-send-email-LW@KARO-electronics.de>
+ <1453294626-17608-2-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20160125121043.GJ11130@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jan 20, 2016 at 01:57:01PM +0100, Lothar Wa?mann wrote:
+> The mxs-dma unit is also available on i.MX6UL. Make it possible to
+> select it in Kconfig.
 
+It should be dmaengine:xxx
 
-On 25/01/2016 12:37, Mark Brown wrote:
-> On Mon, Jan 25, 2016 at 11:40:04AM +0100, John Crispin wrote:
->> Based on the MT6397 binding documentation.
->>
->> Signed-off-by: John Crispin <blogic@openwrt.org>
->> Cc: devicetree at vger.kernel.org
+With that
+
+Acked-by: Vinod Koul <vinod.koul@intel.com>
+
 > 
-> In reply to your previous submission I said:
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> ---
+>  drivers/dma/Kconfig | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 > 
-> | important.  Please also use subject lines matching the style for the
-> | subsystem (for patch 1).
-> 
-> Please don't ignore review comments, people are generally making them
-> for a reason and are likely to have the same concerns if issues remain
-> unaddressed.  Having to repeat the same comments can get repetitive and
-> make people question the value of time spent reviewing.  If you disagree
-> with the review comments that's fine but you need to reply and discuss
-> your concerns so that the reviewer can understand your decisions.
+> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+> index 79b1390..2516524 100644
+> --- a/drivers/dma/Kconfig
+> +++ b/drivers/dma/Kconfig
+> @@ -341,12 +341,13 @@ config MV_XOR
+>  
+>  config MXS_DMA
+>  	bool "MXS DMA support"
+> -	depends on SOC_IMX23 || SOC_IMX28 || SOC_IMX6Q
+> +	depends on SOC_IMX23 || SOC_IMX28 || SOC_IMX6Q || SOC_MX6UL
+>  	select STMP_DEVICE
+>  	select DMA_ENGINE
+>  	help
+>  	  Support the MXS DMA engine. This engine including APBH-DMA
+> -	  and APBX-DMA is integrated into Freescale i.MX23/28/MX6Q/MX6DL chips.
+> +	  and APBX-DMA is integrated into Freescale
+> +	  i.MX23/28/MX6Q/MX6DL/MX6UL chips.
+>  
+>  config MX3_IPU
+>  	bool "MX3x Image Processing Unit support"
+> -- 
+> 2.1.4
 > 
 
-Hi,
-
-sorry about that. I've been juggling with a pile of patches the last
-couple of weeks and missed folding the fixup into the patch before
-sending it. I've just sent you a V3.
-
-	John
+-- 
+~Vinod
