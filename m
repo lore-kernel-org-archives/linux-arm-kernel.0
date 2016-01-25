@@ -1,222 +1,169 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 25 Jan 2016 16:29:46 -0500
-Subject: [PATCH] acpi: implement Generic Event Device
-Message-ID: <1453757387-28154-1-git-send-email-okaya@codeaurora.org>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon, 25 Jan 2016 15:32:32 -0600
+Subject: [PATCH] irqchip: gicv3-its: Introduce indirect device-ITT table
+ support
+Message-ID: <1453757552-9591-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Generic Event Device described in ACPI 6.1 allows platforms to handle
-platform interrupts in ACPI ASL statements. It borrows constructs like
-_EVT from GPIO events. All interrupts are listed in _CRS and the handler
-is written in _EVT method. Here is an example.
+Current ITS driver implementation limits the device ID to a few
+number of bits depending on memory that has been allocated to a
+flat DEV-ITT table. Some of the devices are not usable when device
+ID is spread out across a large range of 32 bit values.
 
-Device (GED0)
-{
+This patch covers more DEVID bits by implementing the GIC-ITS indirect
+device table. This feature is enabled automatically during driver
+probe if the flat table is not adequate to hold all DEVID bits.
 
-	Name (_HID, "ACPI0013")
-	Name (_UID, 0)
-	Name(_CRS, ResourceTemplate ()
-	{
-		Interrupt(ResourceConsumer, Edge, ActiveHigh, Shared, , , )
-		 {123}
-	})
-
-	Method (_EVT, 1) {
-		if (Lequal(123, Arg0))
-		{
-		}
-	}
-}
-
-Wake capability has not been implemented yet.
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Change-Id: I9c6d005de8c76414557fd18bb3ed028aef11083e
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 ---
- drivers/acpi/Makefile |   1 +
- drivers/acpi/evged.c  | 162 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 163 insertions(+)
- create mode 100644 drivers/acpi/evged.c
+ drivers/irqchip/irq-gic-v3-its.c   | 76 ++++++++++++++++++++++++++++++++++++--
+ include/linux/irqchip/arm-gic-v3.h |  1 +
+ 2 files changed, 73 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-index b5e7cd8..4dbb732 100644
---- a/drivers/acpi/Makefile
-+++ b/drivers/acpi/Makefile
-@@ -46,6 +46,7 @@ acpi-y				+= acpi_pnp.o
- acpi-y				+= int340x_thermal.o
- acpi-y				+= power.o
- acpi-y				+= event.o
-+acpi-$(CONFIG_ACPI_REDUCED_HARDWARE_ONLY) += evged.o
- acpi-y				+= sysfs.o
- acpi-y				+= property.o
- acpi-$(CONFIG_X86)		+= acpi_cmos_rtc.o
-diff --git a/drivers/acpi/evged.c b/drivers/acpi/evged.c
-new file mode 100644
-index 0000000..a904676
---- /dev/null
-+++ b/drivers/acpi/evged.c
-@@ -0,0 +1,162 @@
-+/*
-+ * Generic Event Device for ACPI.
-+ *
-+ * Copyright (c) 2016, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * Generic Event Device allows platforms to handle
-+ * interrupts in ACPI ASL statements. It follows very similar
-+ * _EVT method approach from GPIO events.
-+ * All interrupts are listed in _CRS and the handler
-+ * is written in _EVT method. Here is an example.
-+ *
-+ * Device (GED0)
-+ * {
-+ *
-+ *     Name (_HID, "ACPI0013")
-+ *     Name (_UID, 0)
-+ *     Method (_CRS, 0x0, Serialized)
-+ *     {
-+ *		Name (RBUF, ResourceTemplate ()
-+ *		{
-+ *		Interrupt(ResourceConsumer, Edge, ActiveHigh, Shared, , , )
-+ *		{123}
-+ *		}
-+ *     })
-+ *
-+ *     Method (_EVT, 1) {
-+ *             if (Lequal(123, Arg0))
-+ *             {
-+ *             }
-+ *     }
-+ * }
-+ *
-+ */
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index e23d1d1..4d919fa 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -41,6 +41,8 @@
+ 
+ #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
+ #define ITS_FLAGS_WORKAROUND_CAVIUM_22375	(1ULL << 1)
++#define ITS_FLAGS_DEVICE_NEEDS_FLUSHING		(1ULL << 2)
++#define ITS_FLAGS_INDIRECT_DEVICE_TABLE		(1ULL << 3)
+ 
+ #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
+ 
+@@ -71,6 +73,10 @@ struct its_node {
+ 	struct list_head	its_device_list;
+ 	u64			flags;
+ 	u32			ite_size;
++	u32			dev_table_idx;
++	u32			dev_table_shift;
++	u32			max_devid;
++	u32			order;
+ };
+ 
+ #define ITS_ITT_ALIGN		SZ_256
+@@ -824,6 +830,8 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 	u64 typer;
+ 	u32 ids;
+ 
++#define ITS_DEVICE_MAX_ORDER	min(MAX_ORDER-1, get_order(SZ_8M))
 +
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/list.h>
-+#include <linux/platform_device.h>
-+#include <linux/acpi.h>
+ 	if (its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_22375) {
+ 		/*
+ 		 * erratum 22375: only alloc 8MB table size
+@@ -867,10 +875,10 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 			 */
+ 			order = max(get_order((1UL << ids) * entry_size),
+ 				    order);
+-			if (order >= MAX_ORDER) {
+-				order = MAX_ORDER - 1;
+-				pr_warn("%s: Device Table too large, reduce its page order to %u\n",
+-					node_name, order);
++			if (order >= ITS_DEVICE_MAX_ORDER) {
++				/* Update flags for two-level setup */
++				its->flags |= ITS_FLAGS_INDIRECT_DEVICE_TABLE;
++				order = ITS_DEVICE_MAX_ORDER;
+ 			}
+ 		}
+ 
+@@ -911,6 +919,26 @@ retry_baser:
+ 			break;
+ 		}
+ 
++		/* Enable two-level (indirect) device table if it is required */
++		if ((type == GITS_BASER_TYPE_DEVICE) &&
++		    (its->flags & ITS_FLAGS_INDIRECT_DEVICE_TABLE)) {
++			u32 shift = ilog2(psz / entry_size);
++			u32 max_ids = ilog2(alloc_size >> 3) + shift;
 +
-+#define MODULE_NAME	"acpi-ged"
++			if (ids > max_ids) {
++				pr_warn(
++					"ITS: @%pa DEVID too large reduce %u->%u\n",
++					&its->phys_base, ids, max_ids);
++			}
++			its->max_devid =  (1UL << max_ids) - 1;
++			its->order = get_order(psz);
++			its->dev_table_idx = i;
++			its->dev_table_shift = shift;
++			if (!(val & GITS_BASER_SHAREABILITY_MASK))
++				its->flags |= ITS_FLAGS_DEVICE_NEEDS_FLUSHING;
++			val |= GITS_BASER_INDIRECT;
++		}
 +
-+struct acpi_ged_event {
-+	struct list_head node;
-+	struct device *dev;
-+	unsigned int gsi;
-+	unsigned int irq;
-+	acpi_handle handle;
-+};
-+
-+static irqreturn_t acpi_ged_irq_handler(int irq, void *data)
+ 		val |= alloc_pages - 1;
+ 
+ 		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
+@@ -1134,6 +1162,32 @@ static struct its_device *its_find_device(struct its_node *its, u32 dev_id)
+ 	return its_dev;
+ }
+ 
++static int its_alloc_device_table(struct its_node *its, u32 dev_id)
 +{
-+	struct acpi_ged_event *event = data;
-+	acpi_status acpi_ret;
++	u64 *devtbl = its->tables[its->dev_table_idx];
++	u32 alloc_size = (1 << its->order) * PAGE_SIZE;
++	u32 idx = dev_id >> its->dev_table_shift;
++	struct page *page;
 +
-+	acpi_ret = acpi_execute_simple_method(event->handle, NULL, event->gsi);
-+	if (ACPI_FAILURE(acpi_ret))
-+		dev_err_once(event->dev, "IRQ method execution failed\n");
++	/* Do nothing if the level-2 DEV-ITT entry was mapped earlier */
++	if (devtbl[idx])
++		return 0;
 +
-+	return IRQ_HANDLED;
-+}
++	/* Allocate memory for level-2 device table & map to level-1 table */
++	page = alloc_pages(GFP_KERNEL | __GFP_ZERO, its->order);
++	if (!page)
++		return -ENOMEM;
 +
-+static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
-+					      void *context)
-+{
-+	struct acpi_ged_event *event;
-+	unsigned int irq;
-+	unsigned int gsi;
-+	unsigned int irqflags = IRQF_ONESHOT;
-+	struct device *dev = context;
-+	acpi_handle handle = ACPI_HANDLE(dev);
-+	acpi_handle evt_handle;
-+	struct resource r;
-+	struct acpi_resource_irq *p = &ares->data.irq;
-+	struct acpi_resource_extended_irq *pext = &ares->data.extended_irq;
++	devtbl[idx] = page_to_phys(page) | GITS_BASER_VALID;
 +
-+	if (ares->type == ACPI_RESOURCE_TYPE_END_TAG)
-+		return AE_OK;
-+
-+	if (!acpi_dev_resource_interrupt(ares, 0, &r)) {
-+		dev_err(dev, "unable to parse IRQ resource\n");
-+		return AE_ERROR;
-+	}
-+	if (ares->type == ACPI_RESOURCE_TYPE_IRQ)
-+		gsi = p->interrupts[0];
-+	else
-+		gsi = pext->interrupts[0];
-+
-+	irq = r.start;
-+
-+	if (ACPI_FAILURE(acpi_get_handle(handle, "_EVT", &evt_handle))) {
-+		dev_err(dev, "cannot locate _EVT method\n");
-+		return AE_ERROR;
-+	}
-+
-+	dev_info(dev, "GED listening GSI %u @ IRQ %u\n", gsi, irq);
-+
-+	event = devm_kzalloc(dev, sizeof(*event), GFP_KERNEL);
-+	if (!event)
-+		return AE_ERROR;
-+
-+	event->gsi = gsi;
-+	event->dev = dev;
-+	event->irq = irq;
-+	event->handle = evt_handle;
-+
-+	if (r.flags & IORESOURCE_IRQ_SHAREABLE)
-+		irqflags |= IRQF_SHARED;
-+
-+	if (devm_request_threaded_irq(dev, irq, NULL, acpi_ged_irq_handler,
-+				      irqflags, "ACPI:Ged", event)) {
-+		dev_err(dev, "failed to setup event handler for irq %u\n", irq);
-+		return AE_ERROR;
-+	}
-+
-+	return AE_OK;
-+}
-+
-+static int ged_probe(struct platform_device *pdev)
-+{
-+	acpi_status acpi_ret;
-+
-+	acpi_ret = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), "_CRS",
-+				       acpi_ged_request_interrupt, &pdev->dev);
-+	if (ACPI_FAILURE(acpi_ret)) {
-+		dev_err(&pdev->dev, "unable to parse the _CRS record\n");
-+		return -EINVAL;
++	if (its->flags & ITS_FLAGS_DEVICE_NEEDS_FLUSHING) {
++		__flush_dcache_area(page_address(page), alloc_size);
++		__flush_dcache_area(devtbl + idx, sizeof(*devtbl));
 +	}
 +
 +	return 0;
 +}
 +
-+static const struct acpi_device_id ged_acpi_ids[] = {
-+	{"ACPI0013"},
-+	{},
-+};
+ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 					    int nvecs)
+ {
+@@ -1147,6 +1201,20 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 	int nr_ites;
+ 	int sz;
+ 
++	if (dev_id > its->max_devid) {
++		pr_err("ITS: dev_id too large %d\n", dev_id);
++		return NULL;
++	}
 +
-+static struct platform_driver ged_driver = {
-+	.probe = ged_probe,
-+	.driver = {
-+		.name = MODULE_NAME,
-+		.owner = THIS_MODULE,
-+		.acpi_match_table = ACPI_PTR(ged_acpi_ids),
-+	},
-+};
++	/* Ensure memory for level-2 table is allocated for dev_id */
++	if (its->flags & ITS_FLAGS_INDIRECT_DEVICE_TABLE) {
++		int ret;
 +
-+static int __init ged_init(void)
-+{
-+	return platform_driver_register(&ged_driver);
-+}
++		ret = its_alloc_device_table(its, dev_id);
++		if (ret)
++			return NULL;
++	}
 +
-+subsys_initcall(ged_init);
+ 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+ 	/*
+ 	 * At least one bit of EventID is being used, hence a minimum
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index d5d798b..04dfe09 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -206,6 +206,7 @@
+ #define GITS_BASER_NR_REGS		8
+ 
+ #define GITS_BASER_VALID		(1UL << 63)
++#define GITS_BASER_INDIRECT		(1UL << 62)
+ #define GITS_BASER_nCnB			(0UL << 59)
+ #define GITS_BASER_nC			(1UL << 59)
+ #define GITS_BASER_RaWt			(2UL << 59)
 -- 
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Qualcomm Technologies, Inc. on behalf
+of the Qualcomm Innovation Center, Inc.  The Qualcomm Innovation Center, Inc. 
+is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
