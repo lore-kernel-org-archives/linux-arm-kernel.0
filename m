@@ -1,36 +1,36 @@
 From: zhangqing@rock-chips.com (Zhang Qing)
-Date: Mon, 25 Jan 2016 08:56:00 -0800
-Subject: [PATCH v1 1/3] clk: rockchip: rk3368: fix edp_24m parent
+Date: Mon, 25 Jan 2016 08:56:02 -0800
+Subject: [PATCH v1 3/3] clk: rockchip: rk3368: enable the CLK_SET_RATE_PARENT
+ flag for i2s_2ch
 In-Reply-To: <1453740962-8556-1-git-send-email-zhangqing@rock-chips.com>
 References: <1453740962-8556-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1453740962-8556-2-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1453740962-8556-4-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: zhangqing <zhangqing@rock-chips.com>
 
-The edp_24m parent select bit define is:
-1'b0:xin24m
-1'b1:1'b0(dummy)
-so adapt the parent sel bit to the currect one.
+I2S_2CH set freq need to select parent and calculate parent freq.
+so just mark it as the CLK_SET_RATE_PARENT flag.
 
 Signed-off-by: zhangqing <zhangqing@rock-chips.com>
 ---
- drivers/clk/rockchip/clk-rk3368.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/rockchip/clk-rk3368.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/clk/rockchip/clk-rk3368.c b/drivers/clk/rockchip/clk-rk3368.c
-index be0ede5..4885e6b 100644
+index 58ef08b..5ceb536 100644
 --- a/drivers/clk/rockchip/clk-rk3368.c
 +++ b/drivers/clk/rockchip/clk-rk3368.c
-@@ -121,7 +121,7 @@ PNAME(mux_i2s_2ch_p)		= { "i2s_2ch_src", "i2s_2ch_frac",
- 				    "dummy", "xin12m" };
- PNAME(mux_spdif_8ch_p)		= { "spdif_8ch_pre", "spdif_8ch_frac",
- 				    "ext_i2s", "xin12m" };
--PNAME(mux_edp_24m_p)		= { "dummy", "xin24m" };
-+PNAME(mux_edp_24m_p)		= { "xin24m", "dummy" };
- PNAME(mux_vip_out_p)		= { "vip_src", "xin24m" };
- PNAME(mux_usbphy480m_p)		= { "usbotg_out", "xin24m" };
- PNAME(mux_hsic_usbphy480m_p)	= { "usbotg_out", "dummy" };
+@@ -363,7 +363,8 @@ static struct rockchip_clk_branch rk3368_clk_branches[] __initdata = {
+ 	COMPOSITE_FRAC(0, "i2s_2ch_frac", "i2s_2ch_src", CLK_SET_RATE_PARENT,
+ 			RK3368_CLKSEL_CON(54), 0,
+ 			RK3368_CLKGATE_CON(5), 14, GFLAGS),
+-	COMPOSITE_NODIV(SCLK_I2S_2CH, "sclk_i2s_2ch", mux_i2s_2ch_p, 0,
++	COMPOSITE_NODIV(SCLK_I2S_2CH, "sclk_i2s_2ch", mux_i2s_2ch_p,
++			CLK_SET_RATE_PARENT,
+ 			RK3368_CLKSEL_CON(53), 8, 2, MFLAGS,
+ 			RK3368_CLKGATE_CON(5), 15, GFLAGS),
+ 
 -- 
 1.9.1
