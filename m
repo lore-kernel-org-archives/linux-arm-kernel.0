@@ -1,33 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 16:38:42 +0000
-Subject: [PATCH 26/27] ARM: KVM: Remove handling of
- ARM_EXCEPTION_DATA/PREF_ABORT
-In-Reply-To: <1453739923-17846-1-git-send-email-marc.zyngier@arm.com>
-References: <1453739923-17846-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453739923-17846-27-git-send-email-marc.zyngier@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 25 Jan 2016 08:41:52 -0800
+Subject: [PATCH] watchdog: imgdpc: select WATCHDOG_CORE
+In-Reply-To: <1453737991-1960626-1-git-send-email-arnd@arndb.de>
+References: <1453737991-1960626-1-git-send-email-arnd@arndb.de>
+Message-ID: <56A65050.5010708@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are now handled as a panic, so there is little point in
-keeping them around.
+On 01/25/2016 08:06 AM, Arnd Bergmann wrote:
+> The imgpdc_wdt driver can be built on all architectures with
+> CONFIG_COMPILE_TEST, but fails if no other watchdog driver is
+> enabled:
+>
+> drivers/watchdog/built-in.o: In function `pdc_wdt_remove':
+> imgpdc_wdt.c:(.text+0x74): undefined reference to `watchdog_unregister_device'
+>
+> This adds the normal 'select WATCHDOG_CORE' that is needed to
+> ensure the driver always builds cleanly.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kvm/handle_exit.c | 2 --
- 1 file changed, 2 deletions(-)
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-index 5377d753..3f1ef0d 100644
---- a/arch/arm/kvm/handle_exit.c
-+++ b/arch/arm/kvm/handle_exit.c
-@@ -147,8 +147,6 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	switch (exception_index) {
- 	case ARM_EXCEPTION_IRQ:
- 		return 1;
--	case ARM_EXCEPTION_DATA_ABORT:
--	case ARM_EXCEPTION_PREF_ABORT:
- 	case ARM_EXCEPTION_HVC:
- 		/*
- 		 * See ARM ARM B1.14.1: "Hyp traps on instructions
--- 
-2.1.4
+> ---
+>   drivers/watchdog/Kconfig | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index 4f0e7be0da34..0dc61f1a552e 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -1383,6 +1383,7 @@ config IMGPDC_WDT
+>   	tristate "Imagination Technologies PDC Watchdog Timer"
+>   	depends on HAS_IOMEM
+>   	depends on METAG || MIPS || COMPILE_TEST
+> +	select WATCHDOG_CORE
+>   	help
+>   	  Driver for Imagination Technologies PowerDown Controller
+>   	  Watchdog Timer.
+>
