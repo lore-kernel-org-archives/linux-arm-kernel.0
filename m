@@ -1,59 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 25 Jan 2016 11:45:11 +0000
-Subject: [PATCHv3 17/18] arm64: ensure _stext and _etext are page-aligned
-In-Reply-To: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
-References: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1453722312-23076-18-git-send-email-mark.rutland@arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 25 Jan 2016 17:35:41 +0530
+Subject: [PATCH 03/15] dmaengine: dw: rename masters to reflect actual
+ topology
+In-Reply-To: <yw1xk2myli0u.fsf@unicorn.mansr.com>
+References: <1453663322-14474-1-git-send-email-mans@mansr.com>
+ <1453663322-14474-4-git-send-email-mans@mansr.com>
+ <20160124223629.GI6588@sirena.org.uk>
+ <yw1xk2myli0u.fsf@unicorn.mansr.com>
+Message-ID: <20160125120541.GH11130@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we have separate ALIGN_DEBUG_RO{,_MIN} directives to align
-_etext and __init_begin. While we ensure that __init_begin is
-page-aligned, we do not provide the same guarantee for _etext. This is
-not problematic currently as the alignment of __init_begin is sufficient
-to prevent issues when we modify permissions.
+On Sun, Jan 24, 2016 at 10:38:57PM +0000, M?ns Rullg?rd wrote:
+> Mark Brown <broonie@kernel.org> writes:
+> 
+> > On Sun, Jan 24, 2016 at 07:21:50PM +0000, Mans Rullgard wrote:
+> >> From: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> >> 
+> >> The source and destination masters are reflecting buses or their layers to
+> >> where the different devices can be connected. The patch changes the master
+> >> names to reflect which one is related to which independently on the transfer
+> >> direction.
+> >
+> > This is patch 3 of a series but I don't have anything else in the
+> > series.  What is going on with the rest of the series - what are the
+> > dependencies and so on?
+> 
+> I give up.  Seriously, this is impossible.  If I don't include everybody
+> in the slightest way related to any patch in the series, I get
+> complaints that patches are missing.  If I do, the lists reject it all
+> due to too many recipients.  What the hell am I supposed to do?
 
-Subsequent patches will assume page alignment of segments of the kernel
-we wish to map with different permissions. To ensure this, move _etext
-after the ALIGN_DEBUG_RO_MIN for the init section. This renders the
-prior ALIGN_DEBUG_RO irrelevant, and hence it is removed. Likewise,
-upgrade to ALIGN_DEBUG_RO_MIN(PAGE_SIZE) for _stext.
+Right practice is to CC everyone in cover-letter and mention which subsystem
+this is intended to be merged thru and CC relevant folks on the patches.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Jeremy Linton <jeremy.linton@arm.com>
-Cc: Laura Abbott <labbott@fedoraproject.org>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/vmlinux.lds.S | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+That gives everyone context and right attention and lesser noise on patches
 
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index e3928f5..b78a3c7 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -95,7 +95,7 @@ SECTIONS
- 		_text = .;
- 		HEAD_TEXT
- 	}
--	ALIGN_DEBUG_RO
-+	ALIGN_DEBUG_RO_MIN(PAGE_SIZE)
- 	.text : {			/* Real text segment		*/
- 		_stext = .;		/* Text and read-only data	*/
- 			__exception_text_start = .;
-@@ -116,10 +116,9 @@ SECTIONS
- 	RO_DATA(PAGE_SIZE)
- 	EXCEPTION_TABLE(8)
- 	NOTES
--	ALIGN_DEBUG_RO
--	_etext = .;			/* End of text and rodata section */
- 
- 	ALIGN_DEBUG_RO_MIN(PAGE_SIZE)
-+	_etext = .;			/* End of text and rodata section */
- 	__init_begin = .;
- 
- 	INIT_TEXT_SECTION(8)
 -- 
-1.9.1
+~Vinod
