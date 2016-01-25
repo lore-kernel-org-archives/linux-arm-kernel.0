@@ -1,72 +1,70 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 25 Jan 2016 15:06:05 +0000
-Subject: [PATCH v3 08/17] Xen: public/hvm: sync changes of
- HVM_PARAM_CALLBACK_VIA ABI from Xen
-In-Reply-To: <1453519184-11908-9-git-send-email-zhaoshenglong@huawei.com>
-References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
- <1453519184-11908-9-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <alpine.DEB.2.02.1601251505530.9687@kaball.uk.xensource.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Jan 2016 16:04:03 +0100
+Subject: [PATCH] fbdev: s6e8ax0: avoid unused function warnings
+Message-ID: <1453734300-1958304-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 23 Jan 2016, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Sync the changes of HVM_PARAM_CALLBACK_VIA ABI introduced by
-> Xen commit <ca5c54b6ff05> (public/hvm: export the HVM_PARAM_CALLBACK_VIA
-> ABI in the API).
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+The s6e8ax0 suspend/resume functions are hidden inside of an #ifdef
+when CONFIG_PM is set to avoid unused function warnings, but they
+call some other functions that nothing else calls, and we get warnings
+about those:
 
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+drivers/video/fbdev/exynos/s6e8ax0.c:449:13: error: 's6e8ax0_sleep_in' defined but not used [-Werror=unused-function]
+drivers/video/fbdev/exynos/s6e8ax0.c:485:13: error: 's6e8ax0_display_off' defined but not used [-Werror=unused-function]
 
+This marks the PM functions as __maybe_unused so the compiler can
+silently drop them when they are not referenced.
 
->  include/xen/interface/hvm/params.h | 27 +++++++++++++++++++++------
->  1 file changed, 21 insertions(+), 6 deletions(-)
-> 
-> diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
-> index a6c7991..70ad208 100644
-> --- a/include/xen/interface/hvm/params.h
-> +++ b/include/xen/interface/hvm/params.h
-> @@ -27,16 +27,31 @@
->   * Parameter space for HVMOP_{set,get}_param.
->   */
->  
-> +#define HVM_PARAM_CALLBACK_IRQ 0
->  /*
->   * How should CPU0 event-channel notifications be delivered?
-> - * val[63:56] == 0: val[55:0] is a delivery GSI (Global System Interrupt).
-> - * val[63:56] == 1: val[55:0] is a delivery PCI INTx line, as follows:
-> - *                  Domain = val[47:32], Bus  = val[31:16],
-> - *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
-> - * val[63:56] == 2: val[7:0] is a vector number.
-> + *
->   * If val == 0 then CPU0 event-channel notifications are not delivered.
-> + * If val != 0, val[63:56] encodes the type, as follows:
-> + */
-> +
-> +#define HVM_PARAM_CALLBACK_TYPE_GSI      0
-> +/*
-> + * val[55:0] is a delivery GSI.  GSI 0 cannot be used, as it aliases val == 0,
-> + * and disables all notifications.
-> + */
-> +
-> +#define HVM_PARAM_CALLBACK_TYPE_PCI_INTX 1
-> +/*
-> + * val[55:0] is a delivery PCI INTx line:
-> + * Domain = val[47:32], Bus = val[31:16] DevFn = val[15:8], IntX = val[1:0]
-> + */
-> +
-> +#define HVM_PARAM_CALLBACK_TYPE_VECTOR   2
-> +/*
-> + * val[7:0] is a vector number.  Check for XENFEAT_hvm_callback_vector to know
-> + * if this delivery method is available.
->   */
-> -#define HVM_PARAM_CALLBACK_IRQ 0
->  
->  #define HVM_PARAM_STORE_PFN    1
->  #define HVM_PARAM_STORE_EVTCHN 2
-> -- 
-> 2.0.4
-> 
-> 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/video/fbdev/exynos/s6e8ax0.c | 13 ++++---------
+ 1 file changed, 4 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/video/fbdev/exynos/s6e8ax0.c b/drivers/video/fbdev/exynos/s6e8ax0.c
+index 95873f26e39c..de2f3e793786 100644
+--- a/drivers/video/fbdev/exynos/s6e8ax0.c
++++ b/drivers/video/fbdev/exynos/s6e8ax0.c
+@@ -829,8 +829,7 @@ static int s6e8ax0_probe(struct mipi_dsim_lcd_device *dsim_dev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM
+-static int s6e8ax0_suspend(struct mipi_dsim_lcd_device *dsim_dev)
++static int __maybe_unused s6e8ax0_suspend(struct mipi_dsim_lcd_device *dsim_dev)
+ {
+ 	struct s6e8ax0 *lcd = dev_get_drvdata(&dsim_dev->dev);
+ 
+@@ -843,7 +842,7 @@ static int s6e8ax0_suspend(struct mipi_dsim_lcd_device *dsim_dev)
+ 	return 0;
+ }
+ 
+-static int s6e8ax0_resume(struct mipi_dsim_lcd_device *dsim_dev)
++static int __maybe_unused s6e8ax0_resume(struct mipi_dsim_lcd_device *dsim_dev)
+ {
+ 	struct s6e8ax0 *lcd = dev_get_drvdata(&dsim_dev->dev);
+ 
+@@ -855,10 +854,6 @@ static int s6e8ax0_resume(struct mipi_dsim_lcd_device *dsim_dev)
+ 
+ 	return 0;
+ }
+-#else
+-#define s6e8ax0_suspend		NULL
+-#define s6e8ax0_resume		NULL
+-#endif
+ 
+ static struct mipi_dsim_lcd_driver s6e8ax0_dsim_ddi_driver = {
+ 	.name = "s6e8ax0",
+@@ -867,8 +862,8 @@ static struct mipi_dsim_lcd_driver s6e8ax0_dsim_ddi_driver = {
+ 	.power_on = s6e8ax0_power_on,
+ 	.set_sequence = s6e8ax0_set_sequence,
+ 	.probe = s6e8ax0_probe,
+-	.suspend = s6e8ax0_suspend,
+-	.resume = s6e8ax0_resume,
++	.suspend = IS_ENABLED(CONFIG_PM) ? s6e8ax0_suspend : NULL,
++	.resume = IS_ENABLED(CONFIG_PM) ? s6e8ax0_resume : NULL,
+ };
+ 
+ static int s6e8ax0_init(void)
+-- 
+2.7.0
