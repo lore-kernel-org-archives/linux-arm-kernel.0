@@ -1,19 +1,30 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 25 Jan 2016 11:45:08 +0000
-Subject: [PATCHv3 14/18] arm64: mm: use fixmap when creating page tables
+Date: Mon, 25 Jan 2016 11:44:56 +0000
+Subject: [PATCHv3 02/18] arm64: mm: specialise pagetable allocators
 In-Reply-To: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
 References: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1453722312-23076-15-git-send-email-mark.rutland@arm.com>
+Message-ID: <1453722312-23076-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As a preparatory step to allow us to allocate early page tables from
-unmapped memory using memblock_alloc, modify the __create_mapping
-callees to map and unmap the tables they modify using fixmap entries.
+We pass a size parameter to early_alloc and late_alloc, but these are
+only ever used to allocate single pages. In late_alloc we always
+allocate a single page.
 
-All but the top-level pgd initialisation is performed via the fixmap.
-Subsequent patches will inject the pgd physical address, and migrate to
-using the FIX_PGD slot.
+Both allocators provide us with zeroed pages (such that all entries are
+invalid), but we have no barriers between allocating a page and adding
+that page to existing (live) tables. A concurrent page table walk may
+see stale data, leading to a number of issues.
+
+This patch specialises the two allocators for page tables. The size
+parameter is removed and the necessary dsb(ishst) is folded into each.
+To make it clear that the functions are intended for use for page table
+allocation, they are renamed to {early,late}_pgtable_alloc, with the
+related function pointed renamed to pgtable_alloc.
+
+As the dsb(ishst) is now in the allocator, the existing barrier for the
+zero page is redundant and thus is removed. The previously missing
+include of barrier.h is added.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
@@ -23,183 +34,188 @@ Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/mm/mmu.c | 61 +++++++++++++++++++++++++++++++++++------------------
- 1 file changed, 41 insertions(+), 20 deletions(-)
+ arch/arm64/mm/mmu.c | 52 +++++++++++++++++++++++++++-------------------------
+ 1 file changed, 27 insertions(+), 25 deletions(-)
 
 diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 8879aed..5248b02 100644
+index 58faeaa..b25d5cb 100644
 --- a/arch/arm64/mm/mmu.c
 +++ b/arch/arm64/mm/mmu.c
-@@ -63,19 +63,30 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+@@ -30,6 +30,7 @@
+ #include <linux/slab.h>
+ #include <linux/stop_machine.h>
+ 
++#include <asm/barrier.h>
+ #include <asm/cputype.h>
+ #include <asm/fixmap.h>
+ #include <asm/kernel-pgtable.h>
+@@ -62,15 +63,18 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
  }
  EXPORT_SYMBOL(phys_mem_access_prot);
  
--static void __init *early_pgtable_alloc(void)
-+static phys_addr_t __init early_pgtable_alloc(void)
+-static void __init *early_alloc(unsigned long sz)
++static void __init *early_pgtable_alloc(void)
  {
  	phys_addr_t phys;
  	void *ptr;
  
- 	phys = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
+-	phys = memblock_alloc(sz, sz);
++	phys = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
  	BUG_ON(!phys);
--	ptr = __va(phys);
+ 	ptr = __va(phys);
+-	memset(ptr, 0, sz);
++	memset(ptr, 0, PAGE_SIZE);
 +
-+	/*
-+	 * The FIX_{PGD,PUD,PMD} slots may be in active use, but the FIX_PTE
-+	 * slot will be free, so we can (ab)use the FIX_PTE slot to initialise
-+	 * any level of table.
-+	 */
-+	ptr = pte_set_fixmap(phys);
-+
- 	memset(ptr, 0, PAGE_SIZE);
- 
--	/* Ensure the zeroed page is visible to the page table walker */
--	dsb(ishst);
--	return ptr;
-+	/*
-+	 * Implicit barriers also ensure the zeroed page is visible to the page
-+	 * table walker
-+	 */
-+	pte_clear_fixmap();
-+
-+	return phys;
++	/* Ensure the zeroed page is visible to the page table walker */
++	dsb(ishst);
+ 	return ptr;
  }
  
- /*
-@@ -99,24 +110,28 @@ static void split_pmd(pmd_t *pmd, pte_t *pte)
+@@ -95,12 +99,12 @@ static void split_pmd(pmd_t *pmd, pte_t *pte)
  static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
  				  unsigned long end, unsigned long pfn,
  				  pgprot_t prot,
--				  void *(*pgtable_alloc)(void))
-+				  phys_addr_t (*pgtable_alloc)(void))
+-				  void *(*alloc)(unsigned long size))
++				  void *(*pgtable_alloc)(void))
  {
  	pte_t *pte;
  
  	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
--		pte = pgtable_alloc();
-+		phys_addr_t pte_phys = pgtable_alloc();
-+		pte = pte_set_fixmap(pte_phys);
+-		pte = alloc(PTRS_PER_PTE * sizeof(pte_t));
++		pte = pgtable_alloc();
  		if (pmd_sect(*pmd))
  			split_pmd(pmd, pte);
--		__pmd_populate(pmd, __pa(pte), PMD_TYPE_TABLE);
-+		__pmd_populate(pmd, pte_phys, PMD_TYPE_TABLE);
- 		flush_tlb_all();
-+		pte_clear_fixmap();
- 	}
- 	BUG_ON(pmd_bad(*pmd));
- 
--	pte = pte_offset_kernel(pmd, addr);
-+	pte = pte_set_fixmap_offset(pmd, addr);
- 	do {
- 		set_pte(pte, pfn_pte(pfn, prot));
- 		pfn++;
- 	} while (pte++, addr += PAGE_SIZE, addr != end);
-+
-+	pte_clear_fixmap();
- }
- 
- static void split_pud(pud_t *old_pud, pmd_t *pmd)
-@@ -134,7 +149,7 @@ static void split_pud(pud_t *old_pud, pmd_t *pmd)
+ 		__pmd_populate(pmd, __pa(pte), PMD_TYPE_TABLE);
+@@ -130,7 +134,7 @@ static void split_pud(pud_t *old_pud, pmd_t *pmd)
  static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
  				  unsigned long addr, unsigned long end,
  				  phys_addr_t phys, pgprot_t prot,
--				  void *(*pgtable_alloc)(void))
-+				  phys_addr_t (*pgtable_alloc)(void))
+-				  void *(*alloc)(unsigned long size))
++				  void *(*pgtable_alloc)(void))
  {
  	pmd_t *pmd;
  	unsigned long next;
-@@ -143,7 +158,8 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+@@ -139,7 +143,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
  	 * Check for initial section mappings in the pgd/pud and remove them.
  	 */
  	if (pud_none(*pud) || pud_sect(*pud)) {
--		pmd = pgtable_alloc();
-+		phys_addr_t pmd_phys = pgtable_alloc();
-+		pmd = pmd_set_fixmap(pmd_phys);
+-		pmd = alloc(PTRS_PER_PMD * sizeof(pmd_t));
++		pmd = pgtable_alloc();
  		if (pud_sect(*pud)) {
  			/*
  			 * need to have the 1G of mappings continue to be
-@@ -151,12 +167,13 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 			 */
- 			split_pud(pud, pmd);
- 		}
--		pud_populate(mm, pud, pmd);
-+		__pud_populate(pud, pmd_phys, PUD_TYPE_TABLE);
- 		flush_tlb_all();
-+		pmd_clear_fixmap();
- 	}
- 	BUG_ON(pud_bad(*pud));
- 
--	pmd = pmd_offset(pud, addr);
-+	pmd = pmd_set_fixmap_offset(pud, addr);
- 	do {
- 		next = pmd_addr_end(addr, end);
- 		/* try section mapping first */
-@@ -182,6 +199,8 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+@@ -174,7 +178,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+ 			}
+ 		} else {
+ 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
+-				       prot, alloc);
++				       prot, pgtable_alloc);
  		}
  		phys += next - addr;
  	} while (pmd++, addr = next, addr != end);
-+
-+	pmd_clear_fixmap();
- }
- 
- static inline bool use_1G_block(unsigned long addr, unsigned long next,
-@@ -199,18 +218,18 @@ static inline bool use_1G_block(unsigned long addr, unsigned long next,
+@@ -195,13 +199,13 @@ static inline bool use_1G_block(unsigned long addr, unsigned long next,
  static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
  				  unsigned long addr, unsigned long end,
  				  phys_addr_t phys, pgprot_t prot,
--				  void *(*pgtable_alloc)(void))
-+				  phys_addr_t (*pgtable_alloc)(void))
+-				  void *(*alloc)(unsigned long size))
++				  void *(*pgtable_alloc)(void))
  {
  	pud_t *pud;
  	unsigned long next;
  
  	if (pgd_none(*pgd)) {
--		pud = pgtable_alloc();
--		pgd_populate(mm, pgd, pud);
-+		phys_addr_t pud_phys = pgtable_alloc();
-+		__pgd_populate(pgd, pud_phys, PUD_TYPE_TABLE);
+-		pud = alloc(PTRS_PER_PUD * sizeof(pud_t));
++		pud = pgtable_alloc();
+ 		pgd_populate(mm, pgd, pud);
  	}
  	BUG_ON(pgd_bad(*pgd));
- 
--	pud = pud_offset(pgd, addr);
-+	pud = pud_set_fixmap_offset(pgd, addr);
- 	do {
- 		next = pud_addr_end(addr, end);
- 
-@@ -243,6 +262,8 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+@@ -234,7 +238,8 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+ 				}
+ 			}
+ 		} else {
+-			alloc_init_pmd(mm, pud, addr, next, phys, prot, alloc);
++			alloc_init_pmd(mm, pud, addr, next, phys, prot,
++				       pgtable_alloc);
  		}
  		phys += next - addr;
  	} while (pud++, addr = next, addr != end);
-+
-+	pud_clear_fixmap();
- }
- 
- /*
-@@ -252,7 +273,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+@@ -247,7 +252,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
  static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
  				    phys_addr_t phys, unsigned long virt,
  				    phys_addr_t size, pgprot_t prot,
--				    void *(*pgtable_alloc)(void))
-+				    phys_addr_t (*pgtable_alloc)(void))
+-				    void *(*alloc)(unsigned long size))
++				    void *(*pgtable_alloc)(void))
  {
  	unsigned long addr, length, end, next;
  
-@@ -275,14 +296,14 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+@@ -265,18 +270,18 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+ 	end = addr + length;
+ 	do {
+ 		next = pgd_addr_end(addr, end);
+-		alloc_init_pud(mm, pgd, addr, next, phys, prot, alloc);
++		alloc_init_pud(mm, pgd, addr, next, phys, prot, pgtable_alloc);
+ 		phys += next - addr;
  	} while (pgd++, addr = next, addr != end);
  }
  
--static void *late_pgtable_alloc(void)
-+static phys_addr_t late_pgtable_alloc(void)
+-static void *late_alloc(unsigned long size)
++static void *late_pgtable_alloc(void)
  {
- 	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
+-	void *ptr;
+-
+-	BUG_ON(size > PAGE_SIZE);
+-	ptr = (void *)__get_free_page(PGALLOC_GFP);
++	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
  	BUG_ON(!ptr);
- 
- 	/* Ensure the zeroed page is visible to the page table walker */
- 	dsb(ishst);
--	return ptr;
-+	return __pa(ptr);
++
++	/* Ensure the zeroed page is visible to the page table walker */
++	dsb(ishst);
+ 	return ptr;
  }
  
- static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+@@ -289,7 +294,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+ 		return;
+ 	}
+ 	__create_mapping(&init_mm, pgd_offset_k(virt), phys, virt,
+-			 size, prot, early_alloc);
++			 size, prot, early_pgtable_alloc);
+ }
+ 
+ void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+@@ -297,7 +302,7 @@ void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+ 			       pgprot_t prot)
+ {
+ 	__create_mapping(mm, pgd_offset(mm, virt), phys, virt, size, prot,
+-				late_alloc);
++				late_pgtable_alloc);
+ }
+ 
+ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+@@ -310,7 +315,7 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+ 	}
+ 
+ 	return __create_mapping(&init_mm, pgd_offset_k(virt),
+-				phys, virt, size, prot, late_alloc);
++				phys, virt, size, prot, late_pgtable_alloc);
+ }
+ 
+ #ifdef CONFIG_DEBUG_RODATA
+@@ -460,15 +465,12 @@ void __init paging_init(void)
+ 	fixup_executable();
+ 
+ 	/* allocate the zero page. */
+-	zero_page = early_alloc(PAGE_SIZE);
++	zero_page = early_pgtable_alloc();
+ 
+ 	bootmem_init();
+ 
+ 	empty_zero_page = virt_to_page(zero_page);
+ 
+-	/* Ensure the zero page is visible to the page table walker */
+-	dsb(ishst);
+-
+ 	/*
+ 	 * TTBR0 is only used for the identity mapping at this stage. Make it
+ 	 * point to zero page to avoid speculatively fetching new entries.
 -- 
 1.9.1
