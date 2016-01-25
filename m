@@ -1,41 +1,82 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 25 Jan 2016 09:15:45 -0800
-Subject: [PATCH] ARM: bcm: use const and __initconst for smp_operations
-In-Reply-To: <1453721475-15156-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1453721475-15156-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <56A65841.1040100@broadcom.com>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Tue, 26 Jan 2016 02:20:34 +0900
+Subject: [PATCH v2] ARM: dts: orion5x: gpio pin fixes for linkstation
+ lswtgl
+In-Reply-To: <87d1spel60.fsf@free-electrons.com>
+References: <1453286688-9533-1-git-send-email-rogershimizu@gmail.com>
+ <1453388436-8390-1-git-send-email-rogershimizu@gmail.com>
+ <87d1spel60.fsf@free-electrons.com>
+Message-ID: <CAEQ9gE=NoUpnqaPaz4UU8PB8G68rDTaemDM_nuWEqr6R5wPXPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masahiro,
+Dear Andrew, Gregory,
 
-On 1/25/2016 3:31 AM, Masahiro Yamada wrote:
-> This newly added code missed the global fixup by commit 75305275a721
-> ("ARM: use const and __initconst for smp_operations").  So fix it now.
+On Tue, Jan 26, 2016 at 12:25 AM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi Roger,
 >
-> Also, add missing "static" qualifier.
+>  On jeu., janv. 21 2016, Roger Shimizu <rogershimizu@gmail.com> wrote:
 >
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+>> Here're a few gpio pin related fixes:
+>>   - remove pinctrl-0 definition from pinctrl, since those pins are used
+>>     in other places such as gpio-fan and regulators.
+>>   - keep initial state of power led
+>>   - fix for alarm pin of gpio-fan.
+>>
+>> Fixes: dc57844a736f ("ARM: dts: orion5x: add buffalo linkstation ls-wtgl")
+>> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
 >
->   arch/arm/mach-bcm/platsmp.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-bcm/platsmp.c b/arch/arm/mach-bcm/platsmp.c
-> index 575defc..cfae9c7 100644
-> --- a/arch/arm/mach-bcm/platsmp.c
-> +++ b/arch/arm/mach-bcm/platsmp.c
-> @@ -283,7 +283,7 @@ static const struct smp_operations bcm_smp_ops __initconst = {
->   CPU_METHOD_OF_DECLARE(bcm_smp_bcm281xx, "brcm,bcm11351-cpu-method",
->   			&bcm_smp_ops);
->
-> -struct smp_operations nsp_smp_ops __initdata = {
-> +static const struct smp_operations nsp_smp_ops __initconst = {
->   	.smp_prepare_cpus	= bcm_smp_prepare_cpus,
->   	.smp_boot_secondary	= nsp_boot_secondary,
->   };
->
+> Applied on mvebu/fixes with Andrew Reviewed-by tag
 
-This fix looks good to me. Thanks!
+Thanks for the review and apply of my patch!
+After this patch, now there's not any error/warning in dmesg. I feel great!
 
-Reviewed-by: Ray Jui <rjui@broadcom.com>
+However, there's still one thing missing, the MTD, which stores the
+u-boot environment.
+Maybe you're not the right person to ask this question, but I believe
+you know how to reach the right one.
+Please help, or forward to the right person for me. Thank you!
+
+For the kirkwood based Linkstation, such as LS-WXL or LS-WVL, the MTD
+is a spi/m25p40 device.
+But for LS-WTGL orion5x based Linkstation, I tried a few ways, still
+cannot get the MTD device out.
+
+I also referred the orion5x-rd88f5182-nas.dts, to add
+devbus_bootcs/devbus_cs1, but didn't work.
+
+The MTD working kernel is a patch for kernel 2.6, which is not DTB,
+but in lagacy way.
+The patch can be get from:
+- https://github.com/rogers0/linux-2.6_squeeze-security/blob/master/debian/patches/features/arm/ls-produo/01_ls-produo_driver.patch
+
+MTD related part seems like:
+
++#define LSPRODUO_NOR_BOOT_BASE 0xf4000000
++#define LSPRODUO_NOR_BOOT_SIZE SZ_256K
+
++static struct resource lsproduo_nor_flash_resource = {
++ .flags = IORESOURCE_MEM,
++ .start = LSPRODUO_NOR_BOOT_BASE,
++ .end = LSPRODUO_NOR_BOOT_BASE + LSPRODUO_NOR_BOOT_SIZE - 1,
++};
+
++static struct platform_device lsproduo_nor_flash = {
++ .name = "physmap-flash",
++ .id = 0,
++ .dev = {
++ .platform_data = &lsproduo_nor_flash_data,
++ },
++ .num_resources = 1,
++ .resource = &lsproduo_nor_flash_resource,
++};
+
++ orion5x_setup_dev_boot_win(LSPRODUO_NOR_BOOT_BASE,
++ LSPRODUO_NOR_BOOT_SIZE);
++ platform_device_register(&lsproduo_nor_flash);
+
+I'd appreciate your help!
+
+Cheers,
+Roger
