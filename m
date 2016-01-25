@@ -1,52 +1,90 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:32:45 +0100
-Subject: [PATCH] gfs2: avoid uninitialized variable warning
-In-Reply-To: <1453735996-1958733-1-git-send-email-arnd@arndb.de>
-References: <1453735996-1958733-1-git-send-email-arnd@arndb.de>
-Message-ID: <1453735996-1958733-2-git-send-email-arnd@arndb.de>
+Date: Mon, 25 Jan 2016 16:34:53 +0100
+Subject: [PATCH] nfs: blocklayout: avoid warnings on 32-bit sector_t
+Message-ID: <1453736106-1958809-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We get a bogus warning about a potential uninitialized variable
-use in gfs2, because the compiler does not figure out that we
-never use the leaf number if get_leaf_nr() returns an error:
+sector_t can be either 32-bit or 64-bit wide, but in the former
+case, the NFS blocklayout code produces a couple of warnings:
 
-fs/gfs2/dir.c: In function 'get_first_leaf':
-fs/gfs2/dir.c:802:9: warning: 'leaf_no' may be used uninitialized in this function [-Wmaybe-uninitialized]
-fs/gfs2/dir.c: In function 'dir_split_leaf':
-fs/gfs2/dir.c:1021:8: warning: 'leaf_no' may be used uninitialized in this function [-Wmaybe-uninitialized]
+blocklayout.c: In function 'bl_read_pagelist':
+blocklayout.c:225:45: error: large integer implicitly truncated to unsigned type [-Werror=overflow]
+  struct pnfs_block_dev_map map = { .start = NFS4_MAX_UINT64 };
+                                             ^
+blocklayout.c:282:16: error: large integer implicitly truncated to unsigned type [-Werror=overflow]
+    map.start = NFS4_MAX_UINT64;
+                ^
+blocklayout.c: In function 'bl_write_pagelist':
+blocklayout.c:368:45: error: large integer implicitly truncated to unsigned type [-Werror=overflow]
+  struct pnfs_block_dev_map map = { .start = NFS4_MAX_UINT64 };
+                                             ^
+blocklayout.c: In function 'bl_free_layout_hdr':
+blocklayout.c:443:37: error: large integer implicitly truncated to unsigned type [-Werror=overflow]
+  err = ext_tree_remove(bl, true, 0, LLONG_MAX);
+                                     ^
+blocklayout.c: In function 'bl_return_range':
+blocklayout.c:708:9: error: large integer implicitly truncated to unsigned type [-Werror=overflow]
+   end = round_down(NFS4_MAX_UINT64, PAGE_SIZE);
 
-Changing the 'if (!error)' to 'if (!IS_ERR_VALUE(error))' is
-sufficient to let gcc understand that this is exactly the same
-condition as in IS_ERR() so it can optimize the code path enough
-to understand it.
+In all instances, NFS4_MAX_UINT64 is meant to just refer to the largest
+representable unsigned integer, and the warning is for the implicit
+type conversiont to a smaller type. As the conversion is ok, we
+can use an explict cast to stop the warning.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- fs/gfs2/dir.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ fs/nfs/blocklayout/blocklayout.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/fs/gfs2/dir.c b/fs/gfs2/dir.c
-index 6a92592304fb..d4014af4f064 100644
---- a/fs/gfs2/dir.c
-+++ b/fs/gfs2/dir.c
-@@ -798,7 +798,7 @@ static int get_first_leaf(struct gfs2_inode *dip, u32 index,
- 	int error;
+diff --git a/fs/nfs/blocklayout/blocklayout.c b/fs/nfs/blocklayout/blocklayout.c
+index ddd0138f410c..94b2f9e272c5 100644
+--- a/fs/nfs/blocklayout/blocklayout.c
++++ b/fs/nfs/blocklayout/blocklayout.c
+@@ -222,7 +222,7 @@ static enum pnfs_try_status
+ bl_read_pagelist(struct nfs_pgio_header *header)
+ {
+ 	struct pnfs_block_layout *bl = BLK_LSEG2EXT(header->lseg);
+-	struct pnfs_block_dev_map map = { .start = NFS4_MAX_UINT64 };
++	struct pnfs_block_dev_map map = { .start = (sector_t)NFS4_MAX_UINT64 };
+ 	struct bio *bio = NULL;
+ 	struct pnfs_block_extent be;
+ 	sector_t isect, extent_length = 0;
+@@ -279,7 +279,7 @@ bl_read_pagelist(struct nfs_pgio_header *header)
+ 			zero_user_segment(pages[i], pg_offset, pg_len);
  
- 	error = get_leaf_nr(dip, index, &leaf_no);
--	if (!error)
-+	if (!IS_ERR_VALUE(error))
- 		error = get_leaf(dip, leaf_no, bh_out);
+ 			/* invalidate map */
+-			map.start = NFS4_MAX_UINT64;
++			map.start = (sector_t)NFS4_MAX_UINT64;
+ 		} else {
+ 			bio = do_add_page_to_bio(bio,
+ 						 header->page_array.npages - i,
+@@ -365,7 +365,7 @@ static enum pnfs_try_status
+ bl_write_pagelist(struct nfs_pgio_header *header, int sync)
+ {
+ 	struct pnfs_block_layout *bl = BLK_LSEG2EXT(header->lseg);
+-	struct pnfs_block_dev_map map = { .start = NFS4_MAX_UINT64 };
++	struct pnfs_block_dev_map map = { .start = (sector_t)NFS4_MAX_UINT64 };
+ 	struct bio *bio = NULL;
+ 	struct pnfs_block_extent be;
+ 	sector_t isect, extent_length = 0;
+@@ -440,7 +440,7 @@ static void bl_free_layout_hdr(struct pnfs_layout_hdr *lo)
  
- 	return error;
-@@ -1014,7 +1014,7 @@ static int dir_split_leaf(struct inode *inode, const struct qstr *name)
+ 	dprintk("%s enter\n", __func__);
  
- 	index = name->hash >> (32 - dip->i_depth);
- 	error = get_leaf_nr(dip, index, &leaf_no);
--	if (error)
-+	if (IS_ERR_VALUE(error))
- 		return error;
+-	err = ext_tree_remove(bl, true, 0, LLONG_MAX);
++	err = ext_tree_remove(bl, true, 0, (sector_t)LLONG_MAX);
+ 	WARN_ON(err);
  
- 	/*  Get the old leaf block  */
+ 	kfree(bl);
+@@ -705,7 +705,7 @@ bl_return_range(struct pnfs_layout_hdr *lo,
+ 
+ 		end = offset + (range->length >> SECTOR_SHIFT);
+ 	} else {
+-		end = round_down(NFS4_MAX_UINT64, PAGE_SIZE);
++		end = round_down((sector_t)NFS4_MAX_UINT64, PAGE_SIZE);
+ 	}
+ 
+ 	ext_tree_remove(bl, range->iomode & IOMODE_RW, offset, end);
 -- 
 2.7.0
