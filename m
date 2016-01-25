@@ -1,58 +1,87 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 25 Jan 2016 18:06:58 +0000
-Subject: [PATCH v4 0/7] arm64: Verify early CPU features
-Message-ID: <1453745225-27736-1-git-send-email-suzuki.poulose@arm.com>
+Date: Mon, 25 Jan 2016 18:07:00 +0000
+Subject: [PATCH v4 2/7] arm64: Introduce cpu_die_early
+In-Reply-To: <1453745225-27736-1-git-send-email-suzuki.poulose@arm.com>
+References: <1453745225-27736-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1453745225-27736-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suzuki K. Poulose <suzuki.poulose@arm.com>
 
-This series adds support for verifying some of the cpufeatures
-that are decided early in the boot process based on the boot
-CPU and cannot be delayed until all the CPUs are up (e.g, ASIDBits
-and may be VHE?). It also adds support for handling the failures
-in booting the secondary CPUs which could not be synchronised
-with the master CPU, otherwise.
+Or in other words, make fail_incapable_cpu() reusable.
 
-It also adds one of the users of this early hook, check for ASIDBits.
-The mm_context id is based on the ASIDBits width supported by the
-boot CPU and is used early in the initialisation. So we need to make
-sure that all the secondary CPUs supports the width reported by the
-booting CPU, failing which we crash the system.
+We use fail_incapable_cpu() to kill a secondary CPU early during the
+bringup, which doesn't have the system advertised capabilities.
+This patch makes the routine more generic, to kill a secondary
+booting CPU, getting rid of the dependency on capability struct.
+This can be used by checks which are not necessarily attached to
+a capability struct (e.g, cpu ASIDBits).
 
-This series has been tested on Juno, Fast model by injecting smaller
-ASIDBits, lack of page-size support and missing features(PAN)
+In that process, renames the function to cpu_die_early() to better
+match its functionality. This will be moved to arch/arm64/kernel/smp.c
+later.
 
-Changes since V3:
- - Sanitise the boot status handling code, removing unnecessary dsb()/isb().
-   (aka: write the code with a little bit more of thought), removed RFC tag.
- - Store the status in head.txt when MMU turned off.
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/kernel/cpufeature.c |   24 +++++++++++++++---------
+ 1 file changed, 15 insertions(+), 9 deletions(-)
 
-Changes since V2:
- - Add support for synchronising the booting status of a secondary
-   CPU. Added RFC Tag. Patch - 4
- - Panic the system with incompatible ASIDBits
-
-
-
-Suzuki K. Poulose (7):
-  arm64: Add a helper for parking CPUs in a loop
-  arm64: Introduce cpu_die_early
-  arm64: Move cpu_die_early to smp.c
-  arm64: Handle early CPU boot failures
-  arm64: Enable CPU capability verification unconditionally
-  arm64: Add helper for extracting ASIDBits
-  arm64: Ensure the secondary CPUs have safe ASIDBits size
-
- arch/arm64/include/asm/cpufeature.h  |    6 ---
- arch/arm64/include/asm/mmu_context.h |    2 +
- arch/arm64/include/asm/smp.h         |   35 +++++++++++++++++
- arch/arm64/kernel/asm-offsets.c      |    2 +
- arch/arm64/kernel/cpufeature.c       |   48 +++++++++--------------
- arch/arm64/kernel/head.S             |   39 +++++++++++++++++--
- arch/arm64/kernel/smp.c              |   69 ++++++++++++++++++++++++++++++++++
- arch/arm64/mm/context.c              |   51 ++++++++++++++++++-------
- 8 files changed, 199 insertions(+), 53 deletions(-)
-
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index cc4a089..8275e7d 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -827,15 +827,15 @@ static u64 __raw_read_system_reg(u32 sys_id)
+ }
+ 
+ /*
+- * Park the CPU which doesn't have the capability as advertised
+- * by the system.
++ * Kill the calling secondary CPU, early in bringup before it is turned
++ * online.
+  */
+-static void fail_incapable_cpu(char *cap_type,
+-				 const struct arm64_cpu_capabilities *cap)
++void cpu_die_early(void)
+ {
+ 	int cpu = smp_processor_id();
+ 
+-	pr_crit("CPU%d: missing %s : %s\n", cpu, cap_type, cap->desc);
++	pr_crit("CPU%d: will not boot\n", cpu);
++
+ 	/* Mark this CPU absent */
+ 	set_cpu_present(cpu, 0);
+ 
+@@ -873,8 +873,11 @@ void verify_local_cpu_capabilities(void)
+ 		 * If the new CPU misses an advertised feature, we cannot proceed
+ 		 * further, park the cpu.
+ 		 */
+-		if (!feature_matches(__raw_read_system_reg(caps[i].sys_reg), &caps[i]))
+-			fail_incapable_cpu("arm64_features", &caps[i]);
++		if (!feature_matches(__raw_read_system_reg(caps[i].sys_reg), &caps[i])) {
++			pr_crit("CPU%d: missing feature: %s\n",
++					smp_processor_id(), caps[i].desc);
++			cpu_die_early();
++		}
+ 		if (caps[i].enable)
+ 			caps[i].enable(NULL);
+ 	}
+@@ -882,8 +885,11 @@ void verify_local_cpu_capabilities(void)
+ 	for (i = 0, caps = arm64_hwcaps; caps[i].desc; i++) {
+ 		if (!cpus_have_hwcap(&caps[i]))
+ 			continue;
+-		if (!feature_matches(__raw_read_system_reg(caps[i].sys_reg), &caps[i]))
+-			fail_incapable_cpu("arm64_hwcaps", &caps[i]);
++		if (!feature_matches(__raw_read_system_reg(caps[i].sys_reg), &caps[i])) {
++			pr_crit("CPU%d: missing HWCAP: %s\n",
++					smp_processor_id(), caps[i].desc);
++			cpu_die_early();
++		}
+ 	}
+ }
+ 
 -- 
 1.7.9.5
