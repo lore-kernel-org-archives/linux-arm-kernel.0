@@ -1,38 +1,36 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 25 Jan 2016 22:48:49 +0800
-Subject: [PATCH 0/5] crypto: atmel-sha: fix registration issue and other
- bugs
-In-Reply-To: <cover.1452867917.git.cyrille.pitchen@atmel.com>
-References: <cover.1452867917.git.cyrille.pitchen@atmel.com>
-Message-ID: <20160125144849.GH8840@gondor.apana.org.au>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 25 Jan 2016 08:54:16 -0600
+Subject: [PATCH v2] of: drop symbols declared by _OF_DECLARE() from modules
+In-Reply-To: <1453394031-16578-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1453394031-16578-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAL_Jsq+gk81AYJsPoMtLdXqoXs_q6p=gsa476PObCB8kqYsm=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 03:49:30PM +0100, Cyrille Pitchen wrote:
-> Hi all,
-> 
-> This series of patches fixes many issues such as the algo registration failure
-> or the broken support of context switches.
-> 
-> This series was applied to linux-next and tested on a sama5d2 xplained
-> ultra board. We now pass the tcrypt tests in the following modes:
-> -  2: sha1
-> -  6: sha256
-> - 11: sha384
-> - 12: sha512
-> - 33: sha224
-> 
-> The context switch fix was tested with a userspace program using the cryptodev
-> module. This single thread program computes the SHA256 hashes of many files
-> by splitting then into fixed size chunks. The chunks of each file are
-> processed by calling 'update' operations using a round robin algorithm.
-> 
-> However, the .import() / .export() implementation was NOT tested!
-> Nonetheless the last patch is needed to fix the registration issue, otherwise
-> atmel_sha_probe() would still fail.
+On Thu, Jan 21, 2016 at 10:33 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> The users of this macro (OF_EARLYCON_DECLARE, CLK_OF_DECLARE,
+> IRQCHIP_DECLARE, etc.) are only parsed in the early boot stage.
+> Such symbols contained in modules are never used.
+>
+> This commit fixes the link error introduced by commit b8d20e06eaad
+> ("serial: 8250_uniphier: add earlycon support"); the combination
+> of CONFIG_SERIAL_8250_UNIPHIER=m and CONFIG_SERIAL_8250_CONSOLE=y
+> fails to link:
+>
+> ERROR: "early_serial8250_setup" [drivers/tty/serial/8250/8250_uniphier.ko] undefined!
+>
+> Fixes: b8d20e06eaad ("serial: 8250_uniphier: add earlycon support")
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>
+> Changes in v2:
+>   - Describe the bug fixed by this commit
+>
+>  include/linux/of.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Patch 1-4 applied.  Please fix the alignment issue with patch 5.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Applied, thanks.
+
+Rob
