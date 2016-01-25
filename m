@@ -1,67 +1,60 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 15:53:47 +0000
-Subject: [PATCH v2 13/21] arm64: KVM: VHE: Make __fpsimd_enabled VHE aware
-In-Reply-To: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453737235-16522-14-git-send-email-marc.zyngier@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Jan 2016 16:59:09 +0100
+Subject: [PATCH] pinctrl: nomadik: hide unused functions
+Message-ID: <1453737557-1960171-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As non-VHE and VHE have different ways to express the trapping of
-FPSIMD registers to EL2, make __fpsimd_enabled a patchable predicate
-and provide a VHE implementation.
+The nomadik pinctrl driver has two functions that are only used
+for debugfs output and are otherwise unused:
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+drivers/pinctrl/nomadik/pinctrl-abx500.c:194:12: error: 'abx500_get_pull_updown' defined but not used
+drivers/pinctrl/nomadik/pinctrl-abx500.c:471:12: error: 'abx500_get_mode' defined but not used
+
+This makes the function definitions conditional to avoid the
+harmless warnings.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm64/kvm/hyp/hyp.h    |  5 +----
- arch/arm64/kvm/hyp/switch.c | 19 +++++++++++++++++++
- 2 files changed, 20 insertions(+), 4 deletions(-)
+ drivers/pinctrl/nomadik/pinctrl-abx500.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-index 5dfa883..44eaff7 100644
---- a/arch/arm64/kvm/hyp/hyp.h
-+++ b/arch/arm64/kvm/hyp/hyp.h
-@@ -171,10 +171,7 @@ void __debug_cond_restore_host_state(struct kvm_vcpu *vcpu);
+diff --git a/drivers/pinctrl/nomadik/pinctrl-abx500.c b/drivers/pinctrl/nomadik/pinctrl-abx500.c
+index 085e60106ec2..1f7469c9857d 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-abx500.c
++++ b/drivers/pinctrl/nomadik/pinctrl-abx500.c
+@@ -191,6 +191,7 @@ static void abx500_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
+ 		dev_err(pct->dev, "%s write failed (%d)\n", __func__, ret);
+ }
  
- void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
- void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
--static inline bool __fpsimd_enabled(void)
--{
--	return !(read_sysreg(cptr_el2) & CPTR_EL2_TFP);
--}
-+bool __fpsimd_enabled(void);
- 
- u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
- void __noreturn __hyp_do_panic(unsigned long, ...);
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 9071dee..6f264dc 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -17,6 +17,25 @@
- 
- #include "hyp.h"
- 
-+static bool __hyp_text __fpsimd_enabled_nvhe(void)
-+{
-+	return !(read_sysreg(cptr_el2) & CPTR_EL2_TFP);
-+}
-+
-+static bool __hyp_text __fpsimd_enabled_vhe(void)
-+{
-+	return !!(read_sysreg(cpacr_el1) & (3 << 20));
-+}
-+
-+static hyp_alternate_select(__fpsimd_is_enabled,
-+			    __fpsimd_enabled_nvhe, __fpsimd_enabled_vhe,
-+			    ARM64_HAS_VIRT_HOST_EXTN);
-+
-+bool __hyp_text __fpsimd_enabled(void)
-+{
-+	return __fpsimd_is_enabled()();
-+}
-+
- static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
++#ifdef CONFIG_DEBUG_FS
+ static int abx500_get_pull_updown(struct abx500_pinctrl *pct, int offset,
+ 				  enum abx500_gpio_pull_updown *pull_updown)
  {
- 	u64 val;
+@@ -226,6 +227,7 @@ out:
+ 
+ 	return ret;
+ }
++#endif
+ 
+ static int abx500_set_pull_updown(struct abx500_pinctrl *pct,
+ 				  int offset, enum abx500_gpio_pull_updown val)
+@@ -468,6 +470,7 @@ out:
+ 	return ret;
+ }
+ 
++#ifdef CONFIG_DEBUG_FS
+ static int abx500_get_mode(struct pinctrl_dev *pctldev, struct gpio_chip *chip,
+ 			  unsigned gpio)
+ {
+@@ -553,8 +556,6 @@ out:
+ 	return ret;
+ }
+ 
+-#ifdef CONFIG_DEBUG_FS
+-
+ #include <linux/seq_file.h>
+ 
+ static void abx500_gpio_dbg_show_one(struct seq_file *s,
 -- 
-2.1.4
+2.7.0
