@@ -1,41 +1,31 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Mon, 25 Jan 2016 16:01:41 +0200
-Subject: [PATCH 03/15] dmaengine: dw: rename masters to reflect actual
- topology
-In-Reply-To: <20160125122429.GN6588@sirena.org.uk>
-References: <1453663322-14474-1-git-send-email-mans@mansr.com>
- <1453663322-14474-4-git-send-email-mans@mansr.com>
- <20160124223629.GI6588@sirena.org.uk>
- <1453710902.2521.203.camel@linux.intel.com>
- <20160125122429.GN6588@sirena.org.uk>
-Message-ID: <1453730501.2521.222.camel@linux.intel.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 25 Jan 2016 15:04:31 +0100
+Subject: [PATCH v3 7/8] clk: rockchip: fix usbphy-related clocks
+In-Reply-To: <1447968149-10979-8-git-send-email-heiko@sntech.de>
+References: <1447968149-10979-1-git-send-email-heiko@sntech.de>
+ <1447968149-10979-8-git-send-email-heiko@sntech.de>
+Message-ID: <4016576.NEsgSPjyJ9@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-01-25 at 12:24 +0000, Mark Brown wrote:
-> On Mon, Jan 25, 2016 at 10:35:02AM +0200, Andy Shevchenko wrote:
-> > On Sun, 2016-01-24 at 22:36 +0000, Mark Brown wrote:
-> 
-> > > This is patch 3 of a series but I don't have anything else in the
-> > > series.??What is going on with the rest of the series - what are
-> > > the
-> > > dependencies and so on?
-> 
-> > Mark, sorry about that, but in this particular case you may
-> > consider
-> > this patch is a standalone one. You are in the Cc list due to SPI
-> > driver small change. This change isn't modifying functionality of
-> > the
-> > driver.
-> 
-> And there's no dependency relationship with the rest of the series?
+Kishon,
 
-Yes, in this particular case. To confirm I even rebased locally the
-series to be 100% sure.
+Am Donnerstag, 19. November 2015, 22:22:28 schrieb Heiko Stuebner:
+> The otgphy clocks really only drive the phy blocks. These in turn
+> contain plls that then generate the 480m clocks the clock controller
+> uses to supply some other clocks like uart0, gpu or the video-codec.
+> 
+> So fix this structure to actually respect that hirarchy and removed
+> that usb480m fixed-rate clock working as a placeholder till now, as
+> this wouldn't even work if the supplying phy gets turned off while
+> its pll-output gets used elsewhere.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Reviewed-by: Douglas Anderson <dianders@chromium.org>
 
-The complete series can be found in
-https://bitbucket.org/mansr/linux-dwc/branch/dwc-sata
+it looks like this patch didn't make your cutoff time for sending your stuff 
+to Greg. As the core phy series up to patch 5 is in mainline now, I've just 
+applied this patch to my clk-branch for 4.6.
 
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+
+Heiko
