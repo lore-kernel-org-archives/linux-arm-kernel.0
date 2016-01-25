@@ -1,83 +1,41 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Mon, 25 Jan 2016 15:02:55 +0100
-Subject: [PATCH V2 2/2] regulator: mt6323: Add support for MT6323 regulator
-In-Reply-To: <CABxcv==VGNyS2ukCGLoYM9OPbTWjQ3jOvCa-HAVMv3whDcnStg@mail.gmail.com>
-References: <1453718405-40815-1-git-send-email-blogic@openwrt.org>
- <1453718405-40815-2-git-send-email-blogic@openwrt.org>
- <CABxcv=kWnUwpCo=JJbnPAARRM226YfBJw_6yF7MiE8-7iqBD+Q@mail.gmail.com>
- <56A612E2.1010509@openwrt.org> <20160125123538.GO6588@sirena.org.uk>
- <56A61F78.6070703@openwrt.org>
- <CABxcv=m32FLmLzuGC-KFmZ5q-8TmC1FrhdOw+WB-d_L53gg_tg@mail.gmail.com>
- <CABxcv==AzZju5a3Na0OQf6PmsM_J8auPLzxffLsZ09at8DWXew@mail.gmail.com>
- <56A6271E.8060607@openwrt.org>
- <CABxcv==VGNyS2ukCGLoYM9OPbTWjQ3jOvCa-HAVMv3whDcnStg@mail.gmail.com>
-Message-ID: <56A62B0F.2090707@openwrt.org>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Mon, 25 Jan 2016 16:01:41 +0200
+Subject: [PATCH 03/15] dmaengine: dw: rename masters to reflect actual
+ topology
+In-Reply-To: <20160125122429.GN6588@sirena.org.uk>
+References: <1453663322-14474-1-git-send-email-mans@mansr.com>
+ <1453663322-14474-4-git-send-email-mans@mansr.com>
+ <20160124223629.GI6588@sirena.org.uk>
+ <1453710902.2521.203.camel@linux.intel.com>
+ <20160125122429.GN6588@sirena.org.uk>
+Message-ID: <1453730501.2521.222.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 2016-01-25 at 12:24 +0000, Mark Brown wrote:
+> On Mon, Jan 25, 2016 at 10:35:02AM +0200, Andy Shevchenko wrote:
+> > On Sun, 2016-01-24 at 22:36 +0000, Mark Brown wrote:
+> 
+> > > This is patch 3 of a series but I don't have anything else in the
+> > > series.??What is going on with the rest of the series - what are
+> > > the
+> > > dependencies and so on?
+> 
+> > Mark, sorry about that, but in this particular case you may
+> > consider
+> > this patch is a standalone one. You are in the Cc list due to SPI
+> > driver small change. This change isn't modifying functionality of
+> > the
+> > driver.
+> 
+> And there's no dependency relationship with the rest of the series?
 
+Yes, in this particular case. To confirm I even rebased locally the
+series to be 100% sure.
 
-On 25/01/2016 15:01, Javier Martinez Canillas wrote:
-> Hello John,
-> 
-> On Mon, Jan 25, 2016 at 10:46 AM, John Crispin <blogic@openwrt.org> wrote:
->>
->>
->> On 25/01/2016 14:25, Javier Martinez Canillas wrote:
->>> On Mon, Jan 25, 2016 at 10:19 AM, Javier Martinez Canillas
->>> <javier@dowhile0.org> wrote:
->>>
->>> [snip]
->>>
->>>>
->>>> In fact, the kernel is currently not matching the compatible, it is
->>>> only matching because you provided a .of_compatible is provided in the
->>>> mfd_cell.
->>>>
->>>
->>> Sorry my English was a bit off in this paragraph...
->>>
->>> I tried to say that OF does not traverse MFD sub-devices and lookups a
->>> device driver that matches the compatible automatically since a MFD
->>> device is not a bus. Currently it is only trying to match a compatible
->>> string because the mfd_cell has a .of_compatible set so an of_node is
->>> assigned on mfd_add_device().
->>>
->>> But it is failing to match because no OF device table is provided and
->>> the platform bus match callback is falling back to the driver .name to
->>> match so the compatible is not really used as Mark said.
->>>
->>> Best regards,
->>> Javier
->>>
->>
->> Hi,
->>
->> just so i am sure to have understood properly. i just need to drop the
->> compatible string from [1/2] and resend. if this is the case i will fix
->> the mt6397 binding doc while at it.
->>
-> 
-> And you will also need to remove the .of_compatible =
-> "mediatek,mt6323-regulator" from patch "[PATCH V2 4/4] mfd: mediatek:
-> add MT6323 support to MT6397 driver" since otherwise an
-> MODALIAS=of:foo will be reported instead of an MODALIAS=platform:foo
-> 
-> But if I were you, I would keep the MFD driver and DT binding as they
-> are and provide a .id_table and .of_match_table to the mt6323
-> regulator platform driver.
-> 
-> I'll write patches for the mt6397 regulator driver adding those tables
-> since it has the same issue and you can see what I mean.
-> 
->>         John
-> 
-> Best regards,
-> Javier
-> 
+The complete series can be found in
+https://bitbucket.org/mansr/linux-dwc/branch/dwc-sata
 
-Hi Javier,
-
-fine i'll do that then. thanks for the elaborate explanation.
-
-	John
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
