@@ -1,32 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 09:59:51 +0100
-Subject: [RESEND v2 1/2] clk: samsung: Don't build ARMv8 clock drivers on
- ARMv7
-In-Reply-To: <1453683021-6998-2-git-send-email-k.kozlowski@samsung.com>
-References: <1453683021-6998-1-git-send-email-k.kozlowski@samsung.com>
- <1453683021-6998-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <4282078.QlIpNj3Oa6@wuerfel>
+From: zhangqing@rock-chips.com (Zhang Qing)
+Date: Mon, 25 Jan 2016 08:55:59 -0800
+Subject: [PATCH v1 0/3] clk: rockchip: rk3368: fix some error for rk3368 clk
+Message-ID: <1453740962-8556-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 January 2016 09:50:20 Krzysztof Kozlowski wrote:
-> 
-> +# ARM64 SoCs (e.g. Exynos5433, Exynos7):
-> +config EXYNOS_ARM64_COMMON_CLK
-> +       def_bool ARCH_EXYNOS
-> +       depends on ARM64 || COMPILE_TEST
-> +       select COMMON_CLK_SAMSUNG
-> 
+From: zhangqing <zhangqing@rock-chips.com>
 
-So you always enable it on ARM64 when ARCH_EXYNOS is enabled, but
-enable it silently on ARM32 when COMPILE_TEST is set?
+modify edp_24m parent select bit.
+enable CLK_SET_RATE_PARENT flag for spdif_8ch and i2s_2ch.
 
-That sounds wrong. How about
+zhangqing (3):
+  clk: rockchip: rk3368: fix edp_24m parent
+  clk: rockchip: rk3368: enable the CLK_SET_RATE_PARENT flag for
+    spdif_8ch
+  clk: rockchip: rk3368: enable the CLK_SET_RATE_PARENT flag for i2s_2ch
 
-config EXYNOS_ARM64_COMMON_CLK
-	bool "EXYNOS 64-bit clock support" if COMPILE_TEST
-	default ARM64 && ARCH_EXYNOS
-	depends on (ARM64 && ARCH_EXYNOS) || COMPILE_TEST
-	select COMMON_CLK_SAMSUNG
+ drivers/clk/rockchip/clk-rk3368.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-	Arnd
+-- 
+1.9.1
