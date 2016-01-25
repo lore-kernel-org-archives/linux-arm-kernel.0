@@ -1,90 +1,158 @@
-From: rbthomas@pobox.com (Rick Thomas)
-Date: Sun, 24 Jan 2016 19:26:43 -0800
-Subject: [PATCH 1/2] ARM: DTS: kirkwood-openrd-client: fix audio
-In-Reply-To: <20160124214020.GA28667@jirafa.cyrius.com>
-References: <1453588600-14831-1-git-send-email-aaro.koskinen@iki.fi>
- <1453588600-14831-2-git-send-email-aaro.koskinen@iki.fi>
- <20160124173701.GU3880@lunn.ch>
- <411C1DFA-3E76-42B0-866C-7C3C0D990039@pobox.com>
- <20160124214020.GA28667@jirafa.cyrius.com>
-Message-ID: <8E11A1EE-D73B-462E-A493-39571A17F2C3@pobox.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Mon, 25 Jan 2016 11:57:37 +0800
+Subject: [PATCH v3 1/1] USB: core: let USB device know device node
+In-Reply-To: <2404899.20LhULZo7N@wuerfel>
+References: <Pine.LNX.4.44L0.1601211015010.2275-100000@iolanthe.rowland.org>
+ <2930830.FLp5q7oBTi@wuerfel> <20160122065901.GA31145@shlinux2>
+ <2404899.20LhULZo7N@wuerfel>
+Message-ID: <CAL411-qfzcynzc=YrepzcA6EmFuxy-Ri4xRQ+R-QVBDEPZXtZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jan 22, 2016 at 6:18 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 22 January 2016 14:59:01 Peter Chen wrote:
+>> On Thu, Jan 21, 2016 at 11:24:21PM +0100, Arnd Bergmann wrote:
+>> > On Thursday 21 January 2016 10:21:15 Alan Stern wrote:
+>> > > On Thu, 21 Jan 2016, Arnd Bergmann wrote:
+>> > > > On Thursday 21 January 2016 17:48:32 Peter Chen wrote:
+>> >             hub at 1 { /* external hub, superspeed mode class 9/subclass 0/proto 3 */
+>> >                     compatible = "usb2109,0812.591",
+>> >                                  "usb2109,0812",
+>> >                                  "usb2109,class9.0.3",
+>> >                                  "usb2109,class9.0",
+>> >                                  "usb2109,class9";
+>> >                     compatible = "usb2109,0812";
+>>
+>> Do we really need to write "compatible" so complicated?
+>
+> The binding mandates it this way, but I guess we could decide to
+> make it a Linux-specific extension that we allow some of them to
+> be left out.
+>
 
-On Jan 24, 2016, at 1:40 PM, Martin Michlmayr <tbm@cyrius.com> wrote:
+If no one objects, I would like to use "usbVid, Pid" pattern.
 
-> * Rick Thomas <rbthomas@pobox.com> [2016-01-24 12:56]:
->>> It would be good to have a Tested-by: from Rick.
->>> 
->> If someone will make a .deb I can download, I'll be happy to install
->> it and test it.  Please be explicit in describing what and how you
->> want tested.
-> 
-> Check your email. :)
-> 
-> -- 
-> Martin Michlmayr
-> http://www.cyrius.com/
-> 
+>> >                     #address-cells = <1>;
+>> >                     #size-cells = <0>;
+>> >                     reg = <1>;
+>> >
+>> >                     communications at 4 { /* superspeed ethernet device */
+>> >                             compatible = "usb0b95,1790.100",
+>> >                                          "usb0b95,1790",
+>> >                                          "usb0b95,class255.255.0",
+>> >                                          "usb0b95,class255.255",
+>> >                                          "usb0b95,class255",
+>> >                                          "usbif0b95,1790.100",
+>> >                                          "usbif0b95,1790",
+>> >                                          "usbif0b95,class255.255.0",
+>> >                                          "usbif0b95,class255.255,
+>> >                                          "usbif0b95,class255";
+>> >                             reg = <4>;
+>> >                     };
+>> >
+>> >                     storage at 1 { /* superspeed flash drive */
+>> >                             compatible = "usb1234,5678.600",
+>> >                                          "usb1234,5678",
+>> >                                          "usbif1234,class8.6.80",
+>> >                                          "usbif1234,class8.6",
+>> >                                          "usbif1234,class8",
+>> >                                          "usbif,class8.6.80",
+>> >                                          "usbif,class8.6",
+>> >                                          "usbif,class8";
+>> >                             reg = <1>;
+>> >                     };
+>> >             };
+>> >
+>> >             hub at 3 { /* same external  hub, highspeed mode */
+>> >                     compatible = "usb2109,0812.591",
+>> >                                  "usb2109,0812",
+>> >                                  "usb2109,class9.0.1",
+>> >                                  "usb2109,class9.0",
+>> >                                  "usb2109,class9";
+>> >
+>> >                     #address-cells = <1>;
+>> >                     #size-cells = <0>;
+>> >                     reg = <3>;
+>> >
+>>
+>> Why "reg" is 3 here?
+>
+> My mistake. It should be hub at 1 and reg=<1>;
+>
+> I accidentally confused the port number and the device number.
+
+I think it should be hub at 2 and reg=<0x2>.
+According to Alan, we should use xHCI numbering scheme when
+describing the ports of an xHCI root hub.
+
+Peter
 
 
-Got it.
+>
+>> >                             wireless at 0,1 { /* bluetooth config 0, if 1 */
+>> >                                     compatible = "usbif0a12,0001.134.config0.1",
+>> >                                                     "usbif0a12,0001.config0.1",
+>> >                                                     "usbif0a12,class224.1.1",
+>> >                                                     "usbif0a12,class224.1",
+>> >                                                     "usbif0a12,class224",
+>> >                                                     "usbif,class224.1.1",
+>> >                                                     "usbif,class224.1",
+>> >                                                     "usbif,class224";
+>> >                                     reg = <0 0>;
+>> >                             };
+>> >                     };
+>> >             };
+>> >     };
+>> >
+>> > In that description, I have included all four kinds of nodes from
+>> > the spec: host controller, device (wireless at 2), interface (wireless at 0.1,
+>> > wireless at 0.2) and combined (hub at 1, hub at 3, storage at 1, communications at 4).
+>> >
+>> > Peter's example only contained hubs in combined nodes, no device or
+>> > interface nodes. I wonder if the code is able to parse all four
+>> > kinds of nodes though, and if we actually need that.
+>> >
+>>
+>> My proposal patch only handles the node under the USB device, not include
+>> the USB interfaces under such device, we can add it after finalize
+>> how to describe it at device tree.
+>
+> We should at least handle the case of multiple hubs connected to one
+> another I think. No need to limit it to directly connected devices
+> when it's easy enough to do hubs as well.
+>
+>> > Do we have a 'struct device' for each interface?
+>> >
+>>
+>> Yes, we have, but there are different 'struct device' between USB device
+>> and USB interfaces under this USB device. See usb_set_configuration,
+>> drivers/usb/core/message.c
+>
+> Ok, got it. So we can set the of_node pointer of a struct usb_interface
+> to the child node of the usb->interface->usb_dev that matches the
+> configuration/interface tuple.
+>
+> For combined device nodes (class 0 device, single configuration, single
+> interface), I suppose we have both a 'struct usb_device' and a 'struct
+> usb_interface' that we could attach the of_node to, but we can
+> decide to always just use one of the two, to avoid having the
+> same of_node pointer in multiple 'struct device' instances.
+>
+> Or we simplify it so we always put the of_node just in the usb_device
+> or the usb_interface, even if both are listed.
+>
+>> > Is it possible to have a hub in an interface of a multifunction device
+>> > or are they always single-configuration single-interface devices?
+>> >
+>>
+>> I have not seen such kinds of devices, but it is possible in theory.
+>
+> Ok, so if the USB spec allows it, we should probably try to handle it too.
+>
+>         Arnd
 
-Looks like mmc works with that kernel.  I was able to mount /dev/mmcblk0p1 and read files from it.
 
-Sound we have some progress:
 
-> root at base:~# ls -l /dev/snd
-> total 0
-> drwxr-xr-x 2 root root       60 Jan 24 18:23 by-path
-> crw-rw---- 1 root audio 116,  2 Jan 24 18:23 controlC0
-> crw-rw---- 1 root audio 116,  4 Jan 24 18:23 pcmC0D0c
-> crw-rw---- 1 root audio 116,  3 Jan 24 18:23 pcmC0D0p
-> crw-rw---- 1 root audio 116,  1 Jan 24 18:23 seq
-> crw-rw---- 1 root audio 116, 33 Jan 24 18:23 timer
-> root at base:~# cat /proc/asound/devices 
->   2: [ 0]   : control
->   3: [ 0- 0]: digital audio playback
->   4: [ 0- 0]: digital audio capture
->  33:        : timer
-> root at base:~# cat /proc/asound/cards   
->  0 [i2scs42l51hifi ]: i2s-cs42l51-hif - i2s-cs42l51-hifi
->                       i2s-cs42l51-hifi
-
-Full of hope, I did "aptitude install mp321" which went without any visible problems.
-
-Then hooked up a pair of earphones to the "speaker" plug on the Client and ran
-
-> root at base:~# mpg321 -v /tmp/Jersey.mp3 
-> High Performance MPEG 1.0/2.0/2.5 Audio Player for Layer 1, 2, and 3.
-> Version 0.3.2-1 (2012/03/25). Written and copyrights by Joe Drew,
-> now maintained by Nanakos Chrysostomos and others.
-> Uses code from various people. See 'README' for more!
-> THIS SOFTWARE COMES WITH ABSOLUTELY NO WARRANTY! USE AT YOUR OWN RISK!
-> Title	: The Jersey Bounce              Artist : Zazuzaz                       
-> Album	: An Evening with ZaZuZaz        Year	 : 2000
-> Comment : Amazon.com Song ID: 201809221  Genre : Jazz                          
-> 
-> Directory: /tmp
-> Playing MPEG stream from Jersey.mp3 ...
-> MPEG 1.0, Layer: III, Freq: 44100, mode: Joint-Stereo, modext: 0, BPF : 2560
-> Channels: 2, copyright: No, original: Yes, CRC: No, emphasis: 0.
-> Bitrate: 128 Kbits/s, Extension value: 0
-> Audio: 1:1 conversion, rate: 44100, encoding: signed 16 bit, channels: 2
-> ALSA lib pcm.c:2267:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.front
-> ^C                                                                            
-> [0:20] Decoding of Jersey.mp3 finished.
-
-So it seemed to be running OK...  But there was no sound in the earphones.  I also tried adding option "-g 50" to set the gain explicitly.  Still no sound.
-
-Is there a hardware jumper I need to set to activate sound on the OpenRD Client board?
-
-Do I need to install another package? For example, "aptitude search '~i alsa'" gives no output, indicating, I believe, that there are no installed packages with "alsa" in their name.
-
-The message:
-> ALSA lib pcm.c:2267:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.front
-seems suspicious.
-
-Any thoughts?
-Rick
+-- 
+BR,
+Peter Chen
