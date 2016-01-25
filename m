@@ -1,36 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 17:06:27 +0100
-Subject: [PATCH] watchdog: imgdpc: select WATCHDOG_CORE
-Message-ID: <1453737991-1960626-1-git-send-email-arnd@arndb.de>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Mon, 25 Jan 2016 08:11:58 -0800
+Subject: [PATCH 0/3] ACPI: parse the SPCR table
+In-Reply-To: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>
+References: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <56A6494E.3090303@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imgpdc_wdt driver can be built on all architectures with
-CONFIG_COMPILE_TEST, but fails if no other watchdog driver is
-enabled:
+On 01/25/2016 03:45 AM, Aleksey Makarov wrote:
+> This patchset is based on the patchset by Leif Lindholm [1]
+> 
+> 'ARM Server Base Boot Requirements' [2] mention SPCR 
+> (Serial Port Console Redirection Table) [3] as a mandatory
+> ACPI table that specifies the configuration of serial console.
+> 
+> Licensing concerns have prevented implementing it in the past, but as of
+> 10 August 2015, these tables have both been released also under 
+> OWF 1.0 [4].
 
-drivers/watchdog/built-in.o: In function `pdc_wdt_remove':
-imgpdc_wdt.c:(.text+0x74): undefined reference to `watchdog_unregister_device'
+This license has a patent retaliation provision, which makes it
+incompatible with GPLv2.
 
-This adds the normal 'select WATCHDOG_CORE' that is needed to
-ensure the driver always builds cleanly.
+*If the license applies to this code*, then this patch set does not
+meet the criteria for submission.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/watchdog/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Regards,
+Peter Hurley
 
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 4f0e7be0da34..0dc61f1a552e 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -1383,6 +1383,7 @@ config IMGPDC_WDT
- 	tristate "Imagination Technologies PDC Watchdog Timer"
- 	depends on HAS_IOMEM
- 	depends on METAG || MIPS || COMPILE_TEST
-+	select WATCHDOG_CORE
- 	help
- 	  Driver for Imagination Technologies PowerDown Controller
- 	  Watchdog Timer.
--- 
-2.7.0
+
+> SPCR support is included in QEMU's ARM mach-virt since 2.4 release.
+> 
+> Parse the SPCR table and check if any registered console match
+> the description.  If it does, enable that console.
+> 
+> To implement that, introduce a new member
+> int (*acpi_match)(struct console *, struct acpi_table_spcr *);
+> of struct console.  It allows drivers to check if they provide
+> a matching console device.
+> 
+> Also add an implementation of this member function to the pl011 driver
+> and fix a minor issue in kernel/printk/printk.c
+> 
+> [1] https://lkml.kernel.org/g/1441716217-23786-1-git-send-email-leif.lindholm at linaro.org
+> [2] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
+> [3] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
+> [4] http://www.openwebfoundation.org/legal/the-owf-1-0-agreements/owfa-1-0
+> 
+> Aleksey Makarov (3):
+>   printk: make preferred_console local static bool
+>   ACPI: parse SPCR and enable matching console
+>   serial: pl011: add acpi_match for amba-pl011.c
+> 
+>  arch/arm64/Kconfig              |  1 +
+>  drivers/acpi/Kconfig            |  3 ++
+>  drivers/acpi/Makefile           |  1 +
+>  drivers/acpi/spcr.c             | 85 +++++++++++++++++++++++++++++++++++++
+>  drivers/tty/serial/amba-pl011.c | 14 ++++++
+>  include/acpi/actbl2.h           |  4 ++
+>  include/linux/console.h         | 12 ++++++
+>  kernel/printk/printk.c          | 94 +++++++++++++++++++++++++++++++----------
+>  8 files changed, 191 insertions(+), 23 deletions(-)
+>  create mode 100644 drivers/acpi/spcr.c
+> 
