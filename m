@@ -1,45 +1,72 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 25 Jan 2016 21:07:12 +0600
-Subject: [PATCH 2/3] ACPI: parse SPCR and enable matching console
-In-Reply-To: <CAHp75VeosA-54-G1oSo3cBo2KRO+rK=Q4DJxmz93WxUPORqf1Q@mail.gmail.com>
-References: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>
- <1453722324-22407-3-git-send-email-aleksey.makarov@linaro.org>
- <CAHp75VeosA-54-G1oSo3cBo2KRO+rK=Q4DJxmz93WxUPORqf1Q@mail.gmail.com>
-Message-ID: <56A63A20.4040602@linaro.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 25 Jan 2016 15:06:05 +0000
+Subject: [PATCH v3 08/17] Xen: public/hvm: sync changes of
+ HVM_PARAM_CALLBACK_VIA ABI from Xen
+In-Reply-To: <1453519184-11908-9-git-send-email-zhaoshenglong@huawei.com>
+References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453519184-11908-9-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <alpine.DEB.2.02.1601251505530.9687@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, 23 Jan 2016, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Sync the changes of HVM_PARAM_CALLBACK_VIA ABI introduced by
+> Xen commit <ca5c54b6ff05> (public/hvm: export the HVM_PARAM_CALLBACK_VIA
+> ABI in the API).
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 
-On 25.01.2016 20:14, Andy Shevchenko wrote:
-> On Mon, Jan 25, 2016 at 1:45 PM, Aleksey Makarov
-> <aleksey.makarov@linaro.org> wrote:
->> 'ARM Server Base Boot Requiremets' [1] mention SPCR
->> (Serial Port Console Redirection Table) [2] as a mandatory ACPI table
->> that specifies the configuration of serial console.
->>
->> Parse this table and check if any registered console match
->> the description.  If it does, enable that console.
->>
->> To implement that, introduce a new member
->> int (*acpi_match)(struct console *, struct acpi_table_spcr *)
->> of struct console.  It allows drivers to check if they provide
->> a matching console device.
->>
->> [1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
->> [2] http://msdn.microsoft.com/en-us/library/windows/hardware/dn639131(v=vs.85).aspx
->
-> Can you split this to several patches?
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-I am not sure I should.
 
-> I see preparatory patch in console code, i.e.
-> delete_from_console_list(), adding SPCR support to ACPI, enabling it.
-
-It would be difficult to justify delete_from_console_list() in a 
-separate patches before the rest of the changes. And enabling SPCR in a 
-separate patch also looks oddly for me.
-
-It would be great to have other comments on this before I fix this in 
-the next version.
-
-Thank you
+>  include/xen/interface/hvm/params.h | 27 +++++++++++++++++++++------
+>  1 file changed, 21 insertions(+), 6 deletions(-)
+> 
+> diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
+> index a6c7991..70ad208 100644
+> --- a/include/xen/interface/hvm/params.h
+> +++ b/include/xen/interface/hvm/params.h
+> @@ -27,16 +27,31 @@
+>   * Parameter space for HVMOP_{set,get}_param.
+>   */
+>  
+> +#define HVM_PARAM_CALLBACK_IRQ 0
+>  /*
+>   * How should CPU0 event-channel notifications be delivered?
+> - * val[63:56] == 0: val[55:0] is a delivery GSI (Global System Interrupt).
+> - * val[63:56] == 1: val[55:0] is a delivery PCI INTx line, as follows:
+> - *                  Domain = val[47:32], Bus  = val[31:16],
+> - *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
+> - * val[63:56] == 2: val[7:0] is a vector number.
+> + *
+>   * If val == 0 then CPU0 event-channel notifications are not delivered.
+> + * If val != 0, val[63:56] encodes the type, as follows:
+> + */
+> +
+> +#define HVM_PARAM_CALLBACK_TYPE_GSI      0
+> +/*
+> + * val[55:0] is a delivery GSI.  GSI 0 cannot be used, as it aliases val == 0,
+> + * and disables all notifications.
+> + */
+> +
+> +#define HVM_PARAM_CALLBACK_TYPE_PCI_INTX 1
+> +/*
+> + * val[55:0] is a delivery PCI INTx line:
+> + * Domain = val[47:32], Bus = val[31:16] DevFn = val[15:8], IntX = val[1:0]
+> + */
+> +
+> +#define HVM_PARAM_CALLBACK_TYPE_VECTOR   2
+> +/*
+> + * val[7:0] is a vector number.  Check for XENFEAT_hvm_callback_vector to know
+> + * if this delivery method is available.
+>   */
+> -#define HVM_PARAM_CALLBACK_IRQ 0
+>  
+>  #define HVM_PARAM_STORE_PFN    1
+>  #define HVM_PARAM_STORE_EVTCHN 2
+> -- 
+> 2.0.4
+> 
+> 
