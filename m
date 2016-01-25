@@ -1,54 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:05:18 +0100
-Subject: [PATCH] fbdev: da8xx-fb: remove incorrect type cast
-Message-ID: <1453734351-1958373-1-git-send-email-arnd@arndb.de>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Mon, 25 Jan 2016 21:08:44 +0600
+Subject: [PATCH 3/3] serial: pl011: add acpi_match for amba-pl011.c
+In-Reply-To: <CAHp75VftJ1eBzbL6Ch4Dtrz0f_Lnm2aaMveUjT0TcEDhjW=Uwg@mail.gmail.com>
+References: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>
+ <1453722324-22407-4-git-send-email-aleksey.makarov@linaro.org>
+ <CAHp75VcnEOB8_GMwi894XJXN+CtJr_vDxGMP0GHw4JhALynDyw@mail.gmail.com>
+ <CAHp75VftJ1eBzbL6Ch4Dtrz0f_Lnm2aaMveUjT0TcEDhjW=Uwg@mail.gmail.com>
+Message-ID: <56A63A7C.3040800@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The probe function correct passes a dma_addr_t pointer into
-dma_alloc_coherent(), but has a cast to resource_size_t, which
-might be different from dma_addr_t:
 
-drivers/video/fbdev/da8xx-fb.c: In function 'fb_probe':
-drivers/video/fbdev/da8xx-fb.c:1431:10: error: passing argument 3 of 'dma_alloc_coherent' from incompatible pointer type [-Werror=incompatible-pointer-types]
 
-This removes the cast, which avoids the warning.
+On 25.01.2016 20:22, Andy Shevchenko wrote:
+> On Mon, Jan 25, 2016 at 4:21 PM, Andy Shevchenko
+> <andy.shevchenko@gmail.com> wrote:
+>> On Mon, Jan 25, 2016 at 1:45 PM, Aleksey Makarov
+>> <aleksey.makarov@linaro.org> wrote:
+>>> Add an implementation of acpi_match() to the pl011 driver.
+>>> It allows to check if the console matches one specified with
+>>> ACPI SPCR table.
+>>
+>> I don't know Rafael's opinion on this, but I would split it to extend
+>> ACPI header first with reference to newest revision of Microsoft
+>> document.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/video/fbdev/da8xx-fb.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+This makes sense.
 
-diff --git a/drivers/video/fbdev/da8xx-fb.c b/drivers/video/fbdev/da8xx-fb.c
-index 0081725c6b5b..6b2a06d09f2b 100644
---- a/drivers/video/fbdev/da8xx-fb.c
-+++ b/drivers/video/fbdev/da8xx-fb.c
-@@ -152,7 +152,7 @@ static void lcdc_write(unsigned int val, unsigned int addr)
- 
- struct da8xx_fb_par {
- 	struct device		*dev;
--	resource_size_t p_palette_base;
-+	dma_addr_t		p_palette_base;
- 	unsigned char *v_palette_base;
- 	dma_addr_t		vram_phys;
- 	unsigned long		vram_size;
-@@ -1428,7 +1428,7 @@ static int fb_probe(struct platform_device *device)
- 
- 	par->vram_virt = dma_alloc_coherent(NULL,
- 					    par->vram_size,
--					    (resource_size_t *) &par->vram_phys,
-+					    &par->vram_phys,
- 					    GFP_KERNEL | GFP_DMA);
- 	if (!par->vram_virt) {
- 		dev_err(&device->dev,
-@@ -1448,7 +1448,7 @@ static int fb_probe(struct platform_device *device)
- 
- 	/* allocate palette buffer */
- 	par->v_palette_base = dma_zalloc_coherent(NULL, PALETTE_SIZE,
--						  (resource_size_t *)&par->p_palette_base,
-+						  &par->p_palette_base,
- 						  GFP_KERNEL | GFP_DMA);
- 	if (!par->v_palette_base) {
- 		dev_err(&device->dev,
--- 
-2.7.0
+>>> --- a/include/acpi/actbl2.h
+>>> +++ b/include/acpi/actbl2.h
+>>> @@ -371,6 +371,10 @@ struct acpi_dbg2_device {
+>>>
+>>>   #define ACPI_DBG2_16550_COMPATIBLE  0x0000
+>>>   #define ACPI_DBG2_16550_SUBSET      0x0001
+>>> +#define ACPI_DBG2_ARM_PL011         0x0003
+>>> +#define ACPI_DBG2_ARM_SBSA_GENERIC  0x000e
+>>> +#define ACPI_DBG2_ARM_DCC           0x000f
+>>> +#define ACPI_DBG2_DCM2835           0x0010
+>
+> ^^^ Exactly because of such typos. Should be BCM
+
+I will fix this, thank you.
