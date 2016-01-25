@@ -1,67 +1,40 @@
 From: labbott@fedoraproject.org (Laura Abbott)
-Date: Mon, 25 Jan 2016 08:52:12 -0800
-Subject: [RFC][PATCH 1/4] arm64: Drop alloc function from create_mapping
-In-Reply-To: <1453740735-17898-1-git-send-email-labbott@fedoraproject.org>
-References: <1453740735-17898-1-git-send-email-labbott@fedoraproject.org>
-Message-ID: <1453740735-17898-2-git-send-email-labbott@fedoraproject.org>
+Date: Mon, 25 Jan 2016 08:52:11 -0800
+Subject: [RFC][PATCH 0/4] ARCH_SUPPORTS_DEBUG_PAGEALLOC for arm64
+Message-ID: <1453740735-17898-1-git-send-email-labbott@fedoraproject.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-create_mapping is only used in fixmap_remap_fdt. All the create_mapping
-calls need to happen on existing translation table pages without
-additional allocations. Rather than have an alloc function be called
-and fail, just set it to NULL and catch it's use.
 
-Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
----
- arch/arm64/mm/mmu.c | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+Hi,
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index e141762..2d6e7cf 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -116,7 +116,9 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 	pte_t *pte;
- 
- 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
--		phys_addr_t pte_phys = pgtable_alloc();
-+		phys_addr_t pte_phys;
-+		BUG_ON(!pgtable_alloc);
-+		pte_phys = pgtable_alloc();
- 		pte = pte_fixmap(pte_phys);
- 		if (pmd_sect(*pmd))
- 			split_pmd(pmd, pte);
-@@ -158,7 +160,9 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 	 * Check for initial section mappings in the pgd/pud and remove them.
- 	 */
- 	if (pud_none(*pud) || pud_sect(*pud)) {
--		phys_addr_t pmd_phys = pgtable_alloc();
-+		phys_addr_t pmd_phys;
-+		BUG_ON(!pgtable_alloc);
-+		pmd_phys = pgtable_alloc();
- 		pmd = pmd_fixmap(pmd_phys);
- 		if (pud_sect(*pud)) {
- 			/*
-@@ -223,7 +227,9 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
- 	unsigned long next;
- 
- 	if (pgd_none(*pgd)) {
--		phys_addr_t pud_phys = pgtable_alloc();
-+		phys_addr_t pud_phys;
-+		BUG_ON(!pgtable_alloc);
-+		pud_phys = pgtable_alloc();
- 		__pgd_populate(pgd, pud_phys, PUD_TYPE_TABLE);
- 	}
- 	BUG_ON(pgd_bad(*pgd));
-@@ -319,7 +325,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
- 		return;
- 	}
- 	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
--			     early_pgtable_alloc);
-+			     NULL);
- }
- 
- void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+This series implements proper debug page alloc support for arm64.
+Pages are unmapped on free. This series is based on top of Mark
+Rutland's work to TLB conflicts in early MMU mapping
+(lkml.kernel.org/g/<1451930211-22460-1-git-send-email-mark.rutland@arm.com>)
+and Ard Biesheuvel's patch to allow set_memory_* to work on vmalloc
+regions (<1453125665-26627-1-git-send-email-ard.biesheuvel@linaro.org>)
+
+The most important part is to force all memory to be mapped with page
+mappings. Once that happens it's trivial to use the existing page_attr
+infrastructure to clear the valid bit and cause faults. I know there was
+an attempt at this a while back (can't find it in my archives) but the
+changes by Mark make this significantly easier and probably with fewer
+TLB conflicts.
+
+As always, comments are appreciated.
+
+Laura Abbott (4):
+  arm64: Drop alloc function from create_mapping
+  arm64: Add option to force mapping with PAGE_SIZE pages
+  arm64: Add support for ARCH_SUPPORTS_DEBUG_PAGEALLOC
+  arm64: ptdump: Indicate whether memory should be faulting
+
+ arch/arm64/Kconfig       | 14 ++++++++++++++
+ arch/arm64/mm/dump.c     |  5 +++++
+ arch/arm64/mm/mmu.c      | 24 +++++++++++++++++-------
+ arch/arm64/mm/pageattr.c | 40 +++++++++++++++++++++++++++++++++-------
+ 4 files changed, 69 insertions(+), 14 deletions(-)
+
 -- 
 2.5.0
