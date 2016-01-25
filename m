@@ -1,304 +1,351 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 25 Jan 2016 21:15:46 +0800
-Subject: [PATCH RFC 10/11] clk: sunxi: rewrite sun6i-ar100 using factors clk
+Date: Mon, 25 Jan 2016 21:15:45 +0800
+Subject: [PATCH RFC 09/11] clk: sunxi: rewrite sun6i-a31-ahb1-clk using
+ factors clk with custom recalc
 In-Reply-To: <1453727747-23307-1-git-send-email-wens@csie.org>
 References: <1453727747-23307-1-git-send-email-wens@csie.org>
-Message-ID: <1453727747-23307-11-git-send-email-wens@csie.org>
+Message-ID: <1453727747-23307-10-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun6i's AR100 clock is a classic factors clk case:
-
-AR100 = ((parent mux) >> p) / (m + 1)
+The factors clk implementation has been extended to support custom
+recalc callbacks to support clocks that use one factor for certain
+parents only, like a pre-divider.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi/clk-sun6i-ar100.c | 235 ++++++++++--------------------------
- 1 file changed, 61 insertions(+), 174 deletions(-)
+ drivers/clk/sunxi/clk-sunxi.c | 291 ++++++++++++------------------------------
+ 1 file changed, 83 insertions(+), 208 deletions(-)
 
-diff --git a/drivers/clk/sunxi/clk-sun6i-ar100.c b/drivers/clk/sunxi/clk-sun6i-ar100.c
-index 20887686bdbe..a7f5777834eb 100644
---- a/drivers/clk/sunxi/clk-sun6i-ar100.c
-+++ b/drivers/clk/sunxi/clk-sun6i-ar100.c
-@@ -8,211 +8,97 @@
-  *
-  */
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 56d4fdcf9c89..32d0bfa4913b 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -28,214 +28,6 @@
  
-+#include <linux/bitops.h>
- #include <linux/clk-provider.h>
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
-+#include <linux/spinlock.h>
+ static DEFINE_SPINLOCK(clk_lock);
  
--#define SUN6I_AR100_MAX_PARENTS		4
--#define SUN6I_AR100_SHIFT_MASK		0x3
--#define SUN6I_AR100_SHIFT_MAX		SUN6I_AR100_SHIFT_MASK
--#define SUN6I_AR100_SHIFT_SHIFT		4
--#define SUN6I_AR100_DIV_MASK		0x1f
--#define SUN6I_AR100_DIV_MAX		(SUN6I_AR100_DIV_MASK + 1)
--#define SUN6I_AR100_DIV_SHIFT		8
--#define SUN6I_AR100_MUX_MASK		0x3
--#define SUN6I_AR100_MUX_SHIFT		16
+-/**
+- * sun6i_a31_ahb1_clk_setup() - Setup function for a31 ahb1 composite clk
+- */
 -
--struct ar100_clk {
+-#define SUN6I_AHB1_MAX_PARENTS		4
+-#define SUN6I_AHB1_MUX_PARENT_PLL6	3
+-#define SUN6I_AHB1_MUX_SHIFT		12
+-/* un-shifted mask is what mux_clk expects */
+-#define SUN6I_AHB1_MUX_MASK		0x3
+-#define SUN6I_AHB1_MUX_GET_PARENT(reg)	((reg >> SUN6I_AHB1_MUX_SHIFT) & \
+-					 SUN6I_AHB1_MUX_MASK)
+-
+-#define SUN6I_AHB1_DIV_SHIFT		4
+-#define SUN6I_AHB1_DIV_MASK		(0x3 << SUN6I_AHB1_DIV_SHIFT)
+-#define SUN6I_AHB1_DIV_GET(reg)		((reg & SUN6I_AHB1_DIV_MASK) >> \
+-						SUN6I_AHB1_DIV_SHIFT)
+-#define SUN6I_AHB1_DIV_SET(reg, div)	((reg & ~SUN6I_AHB1_DIV_MASK) | \
+-						(div << SUN6I_AHB1_DIV_SHIFT))
+-#define SUN6I_AHB1_PLL6_DIV_SHIFT	6
+-#define SUN6I_AHB1_PLL6_DIV_MASK	(0x3 << SUN6I_AHB1_PLL6_DIV_SHIFT)
+-#define SUN6I_AHB1_PLL6_DIV_GET(reg)	((reg & SUN6I_AHB1_PLL6_DIV_MASK) >> \
+-						SUN6I_AHB1_PLL6_DIV_SHIFT)
+-#define SUN6I_AHB1_PLL6_DIV_SET(reg, div) ((reg & ~SUN6I_AHB1_PLL6_DIV_MASK) | \
+-						(div << SUN6I_AHB1_PLL6_DIV_SHIFT))
+-
+-struct sun6i_ahb1_clk {
 -	struct clk_hw hw;
 -	void __iomem *reg;
 -};
 -
--static inline struct ar100_clk *to_ar100_clk(struct clk_hw *hw)
+-#define to_sun6i_ahb1_clk(_hw) container_of(_hw, struct sun6i_ahb1_clk, hw)
+-
+-static unsigned long sun6i_ahb1_clk_recalc_rate(struct clk_hw *hw,
+-						unsigned long parent_rate)
 -{
--	return container_of(hw, struct ar100_clk, hw);
+-	struct sun6i_ahb1_clk *ahb1 = to_sun6i_ahb1_clk(hw);
+-	unsigned long rate;
+-	u32 reg;
+-
+-	/* Fetch the register value */
+-	reg = readl(ahb1->reg);
+-
+-	/* apply pre-divider first if parent is pll6 */
+-	if (SUN6I_AHB1_MUX_GET_PARENT(reg) == SUN6I_AHB1_MUX_PARENT_PLL6)
+-		parent_rate /= SUN6I_AHB1_PLL6_DIV_GET(reg) + 1;
+-
+-	/* clk divider */
+-	rate = parent_rate >> SUN6I_AHB1_DIV_GET(reg);
+-
+-	return rate;
 -}
 -
--static unsigned long ar100_recalc_rate(struct clk_hw *hw,
--				       unsigned long parent_rate)
+-static long sun6i_ahb1_clk_round(unsigned long rate, u8 *divp, u8 *pre_divp,
+-				 u8 parent, unsigned long parent_rate)
 -{
--	struct ar100_clk *clk = to_ar100_clk(hw);
--	u32 val = readl(clk->reg);
--	int shift = (val >> SUN6I_AR100_SHIFT_SHIFT) & SUN6I_AR100_SHIFT_MASK;
--	int div = (val >> SUN6I_AR100_DIV_SHIFT) & SUN6I_AR100_DIV_MASK;
+-	u8 div, calcp, calcm = 1;
 -
--	return (parent_rate >> shift) / (div + 1);
+-	/*
+-	 * clock can only divide, so we will never be able to achieve
+-	 * frequencies higher than the parent frequency
+-	 */
+-	if (parent_rate && rate > parent_rate)
+-		rate = parent_rate;
+-
+-	div = DIV_ROUND_UP(parent_rate, rate);
+-
+-	/* calculate pre-divider if parent is pll6 */
+-	if (parent == SUN6I_AHB1_MUX_PARENT_PLL6) {
+-		if (div < 4)
+-			calcp = 0;
+-		else if (div / 2 < 4)
+-			calcp = 1;
+-		else if (div / 4 < 4)
+-			calcp = 2;
+-		else
+-			calcp = 3;
+-
+-		calcm = DIV_ROUND_UP(div, 1 << calcp);
+-	} else {
+-		calcp = __roundup_pow_of_two(div);
+-		calcp = calcp > 3 ? 3 : calcp;
+-	}
+-
+-	/* we were asked to pass back divider values */
+-	if (divp) {
+-		*divp = calcp;
+-		*pre_divp = calcm - 1;
+-	}
+-
+-	return (parent_rate / calcm) >> calcp;
 -}
 -
--static int ar100_determine_rate(struct clk_hw *hw,
--				struct clk_rate_request *req)
+-static int sun6i_ahb1_clk_determine_rate(struct clk_hw *hw,
+-					 struct clk_rate_request *req)
 -{
--	int nparents = clk_hw_get_num_parents(hw);
--	long best_rate = -EINVAL;
--	int i;
+-	struct clk_hw *parent, *best_parent = NULL;
+-	int i, num_parents;
+-	unsigned long parent_rate, best = 0, child_rate, best_child_rate = 0;
 -
--	req->best_parent_hw = NULL;
--
--	for (i = 0; i < nparents; i++) {
--		unsigned long parent_rate;
--		unsigned long tmp_rate;
--		struct clk_hw *parent;
--		unsigned long div;
--		int shift;
--
+-	/* find the parent that can help provide the fastest rate <= rate */
+-	num_parents = clk_hw_get_num_parents(hw);
+-	for (i = 0; i < num_parents; i++) {
 -		parent = clk_hw_get_parent_by_index(hw, i);
--		parent_rate = clk_hw_get_rate(parent);
--		div = DIV_ROUND_UP(parent_rate, req->rate);
--
--		/*
--		 * The AR100 clk contains 2 divisors:
--		 * - one power of 2 divisor
--		 * - one regular divisor
--		 *
--		 * First check if we can safely shift (or divide by a power
--		 * of 2) without losing precision on the requested rate.
--		 */
--		shift = ffs(div) - 1;
--		if (shift > SUN6I_AR100_SHIFT_MAX)
--			shift = SUN6I_AR100_SHIFT_MAX;
--
--		div >>= shift;
--
--		/*
--		 * Then if the divisor is still bigger than what the HW
--		 * actually supports, use a bigger shift (or power of 2
--		 * divider) value and accept to lose some precision.
--		 */
--		while (div > SUN6I_AR100_DIV_MAX) {
--			shift++;
--			div >>= 1;
--			if (shift > SUN6I_AR100_SHIFT_MAX)
--				break;
--		}
--
--		/*
--		 * If the shift value (or power of 2 divider) is bigger
--		 * than what the HW actually support, skip this parent.
--		 */
--		if (shift > SUN6I_AR100_SHIFT_MAX)
+-		if (!parent)
 -			continue;
+-		if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT)
+-			parent_rate = clk_hw_round_rate(parent, req->rate);
+-		else
+-			parent_rate = clk_hw_get_rate(parent);
 -
--		tmp_rate = (parent_rate >> shift) / div;
--		if (!req->best_parent_hw || tmp_rate > best_rate) {
--			req->best_parent_hw = parent;
--			req->best_parent_rate = parent_rate;
--			best_rate = tmp_rate;
+-		child_rate = sun6i_ahb1_clk_round(req->rate, NULL, NULL, i,
+-						  parent_rate);
+-
+-		if (child_rate <= req->rate && child_rate > best_child_rate) {
+-			best_parent = parent;
+-			best = parent_rate;
+-			best_child_rate = child_rate;
 -		}
 -	}
 -
--	if (best_rate < 0)
--		return best_rate;
+-	if (!best_parent)
+-		return -EINVAL;
 -
--	req->rate = best_rate;
+-	req->best_parent_hw = best_parent;
+-	req->best_parent_rate = best;
+-	req->rate = best_child_rate;
 -
 -	return 0;
 -}
 -
--static int ar100_set_parent(struct clk_hw *hw, u8 index)
+-static int sun6i_ahb1_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+-				   unsigned long parent_rate)
 -{
--	struct ar100_clk *clk = to_ar100_clk(hw);
--	u32 val = readl(clk->reg);
+-	struct sun6i_ahb1_clk *ahb1 = to_sun6i_ahb1_clk(hw);
+-	unsigned long flags;
+-	u8 div, pre_div, parent;
+-	u32 reg;
 -
--	if (index >= SUN6I_AR100_MAX_PARENTS)
--		return -EINVAL;
+-	spin_lock_irqsave(&clk_lock, flags);
 -
--	val &= ~(SUN6I_AR100_MUX_MASK << SUN6I_AR100_MUX_SHIFT);
--	val |= (index << SUN6I_AR100_MUX_SHIFT);
--	writel(val, clk->reg);
+-	reg = readl(ahb1->reg);
+-
+-	/* need to know which parent is used to apply pre-divider */
+-	parent = SUN6I_AHB1_MUX_GET_PARENT(reg);
+-	sun6i_ahb1_clk_round(rate, &div, &pre_div, parent, parent_rate);
+-
+-	reg = SUN6I_AHB1_DIV_SET(reg, div);
+-	reg = SUN6I_AHB1_PLL6_DIV_SET(reg, pre_div);
+-	writel(reg, ahb1->reg);
+-
+-	spin_unlock_irqrestore(&clk_lock, flags);
 -
 -	return 0;
 -}
-+#include "clk-factors.h"
- 
--static u8 ar100_get_parent(struct clk_hw *hw)
+-
+-static const struct clk_ops sun6i_ahb1_clk_ops = {
+-	.determine_rate	= sun6i_ahb1_clk_determine_rate,
+-	.recalc_rate	= sun6i_ahb1_clk_recalc_rate,
+-	.set_rate	= sun6i_ahb1_clk_set_rate,
+-};
+-
+-static void __init sun6i_ahb1_clk_setup(struct device_node *node)
 -{
--	struct ar100_clk *clk = to_ar100_clk(hw);
--	return (readl(clk->reg) >> SUN6I_AR100_MUX_SHIFT) &
--	       SUN6I_AR100_MUX_MASK;
--}
+-	struct clk *clk;
+-	struct sun6i_ahb1_clk *ahb1;
+-	struct clk_mux *mux;
+-	const char *clk_name = node->name;
+-	const char *parents[SUN6I_AHB1_MAX_PARENTS];
+-	void __iomem *reg;
+-	int i;
 -
--static int ar100_set_rate(struct clk_hw *hw, unsigned long rate,
--			  unsigned long parent_rate)
-+/**
-+ * sun6i_get_ar100_factors - Calculates factors p, m for AR100
-+ *
-+ * AR100 rate is calculated as follows
-+ * rate = (parent_rate >> p) / (m + 1);
-+ */
-+static void sun6i_get_ar100_factors(struct factors_request *req)
- {
--	unsigned long div = parent_rate / rate;
--	struct ar100_clk *clk = to_ar100_clk(hw);
--	u32 val = readl(clk->reg);
-+	unsigned long div;
- 	int shift;
+-	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+-	if (IS_ERR(reg))
+-		return;
+-
+-	/* we have a mux, we will have >1 parents */
+-	i = of_clk_parent_fill(node, parents, SUN6I_AHB1_MAX_PARENTS);
+-	of_property_read_string(node, "clock-output-names", &clk_name);
+-
+-	ahb1 = kzalloc(sizeof(struct sun6i_ahb1_clk), GFP_KERNEL);
+-	if (!ahb1)
+-		return;
+-
+-	mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
+-	if (!mux) {
+-		kfree(ahb1);
+-		return;
+-	}
+-
+-	/* set up clock properties */
+-	mux->reg = reg;
+-	mux->shift = SUN6I_AHB1_MUX_SHIFT;
+-	mux->mask = SUN6I_AHB1_MUX_MASK;
+-	mux->lock = &clk_lock;
+-	ahb1->reg = reg;
+-
+-	clk = clk_register_composite(NULL, clk_name, parents, i,
+-				     &mux->hw, &clk_mux_ops,
+-				     &ahb1->hw, &sun6i_ahb1_clk_ops,
+-				     NULL, NULL, 0);
+-
+-	if (!IS_ERR(clk)) {
+-		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+-		clk_register_clkdev(clk, clk_name, NULL);
+-	}
+-}
+-CLK_OF_DECLARE(sun6i_a31_ahb1, "allwinner,sun6i-a31-ahb1-clk", sun6i_ahb1_clk_setup);
+-
+ /* Maximum number of parents our clocks have */
+ #define SUNXI_MAX_PARENTS	5
  
--	if (parent_rate % rate)
--		return -EINVAL;
-+	/* clock only divides */
-+	if (req->rate > req->parent_rate)
-+		req->rate = req->parent_rate;
- 
--	shift = ffs(div) - 1;
--	if (shift > SUN6I_AR100_SHIFT_MAX)
--		shift = SUN6I_AR100_SHIFT_MAX;
-+	div = DIV_ROUND_UP(req->parent_rate, req->rate);
- 
--	div >>= shift;
-+	if (div < 32)
-+		shift = 0;
-+	else if (div >> 1 < 32)
-+		shift = 1;
-+	else if (div >> 2 < 32)
-+		shift = 2;
-+	else
-+		shift = 3;
- 
--	if (div > SUN6I_AR100_DIV_MAX)
--		return -EINVAL;
-+	div >>= shift;
- 
--	val &= ~((SUN6I_AR100_SHIFT_MASK << SUN6I_AR100_SHIFT_SHIFT) |
--		 (SUN6I_AR100_DIV_MASK << SUN6I_AR100_DIV_SHIFT));
--	val |= (shift << SUN6I_AR100_SHIFT_SHIFT) |
--	       (div << SUN6I_AR100_DIV_SHIFT);
--	writel(val, clk->reg);
-+	if (div > 32)
-+		div = 32;
- 
--	return 0;
-+	req->rate = (req->parent_rate >> shift) / div;
-+	req->m = div - 1;
-+	req->p = shift;
+@@ -490,6 +282,68 @@ static void sun5i_a13_get_ahb_factors(struct factors_request *req)
+ 	req->p = div;
  }
  
--static struct clk_ops ar100_ops = {
--	.recalc_rate = ar100_recalc_rate,
--	.determine_rate = ar100_determine_rate,
--	.set_parent = ar100_set_parent,
--	.get_parent = ar100_get_parent,
--	.set_rate = ar100_set_rate,
-+static const struct clk_factors_config sun6i_ar100_config = {
-+	.mwidth = 5,
-+	.mshift = 8,
-+	.pwidth = 2,
-+	.pshift = 4,
++#define SUN6I_AHB1_PARENT_PLL6	3
++
++/**
++ * sun6i_a31_get_ahb_factors() - calculates m, p factors for AHB
++ * AHB rate is calculated as follows
++ * rate = parent_rate >> p
++ *
++ * if parent is pll6, then
++ * parent_rate = pll6 rate / (m + 1)
++ */
++
++static void sun6i_get_ahb1_factors(struct factors_request *req)
++{
++	u8 div, calcp, calcm = 1;
++
++	/*
++	 * clock can only divide, so we will never be able to achieve
++	 * frequencies higher than the parent frequency
++	 */
++	if (req->parent_rate && req->rate > req->parent_rate)
++		req->rate = req->parent_rate;
++
++	div = DIV_ROUND_UP(req->parent_rate, req->rate);
++
++	/* calculate pre-divider if parent is pll6 */
++	if (req->parent_index == SUN6I_AHB1_PARENT_PLL6) {
++		if (div < 4)
++			calcp = 0;
++		else if (div / 2 < 4)
++			calcp = 1;
++		else if (div / 4 < 4)
++			calcp = 2;
++		else
++			calcp = 3;
++
++		calcm = DIV_ROUND_UP(div, 1 << calcp);
++	} else {
++		calcp = __roundup_pow_of_two(div);
++		calcp = calcp > 3 ? 3 : calcp;
++	}
++
++	req->rate = (req->parent_rate / calcm) >> calcp;
++	req->p = calcp;
++	req->m = calcm - 1;
++}
++
++/**
++ * sun6i_ahb1_recalc() - calculates AHB clock rate from m, p factors and
++ *			 parent index
++ */
++static void sun6i_ahb1_recalc(struct factors_request *req)
++{
++	req->rate = req->parent_rate;
++
++	/* apply pre-divider first if parent is pll6 */
++	if (req->parent_index == SUN6I_AHB1_PARENT_PLL6)
++		req->rate /= req->m + 1;
++
++	/* clk divider */
++	req->rate >>= req->p;
++}
++
+ /**
+  * sun4i_get_apb1_factors() - calculates m, p factors for APB1
+  * APB1 rate is calculated as follows
+@@ -619,6 +473,13 @@ static const struct clk_factors_config sun5i_a13_ahb_config = {
+ 	.pwidth = 2,
  };
  
-+static const struct factors_data sun6i_ar100_data __initconst = {
-+	.mux = 16,
-+	.muxmask = GENMASK(1, 0),
-+	.table = &sun6i_ar100_config,
-+	.getter = sun6i_get_ar100_factors,
++static const struct clk_factors_config sun6i_ahb1_config = {
++	.mshift = 6,
++	.mwidth = 2,
++	.pshift = 4,
++	.pwidth = 2,
 +};
 +
-+static DEFINE_SPINLOCK(sun6i_ar100_lock);
+ static const struct clk_factors_config sun4i_apb1_config = {
+ 	.mshift = 0,
+ 	.mwidth = 5,
+@@ -686,6 +547,14 @@ static const struct factors_data sun5i_a13_ahb_data __initconst = {
+ 	.getter = sun5i_a13_get_ahb_factors,
+ };
+ 
++static const struct factors_data sun6i_ahb1_data __initconst = {
++	.mux = 12,
++	.muxmask = BIT(1) | BIT(0),
++	.table = &sun6i_ahb1_config,
++	.getter = sun6i_get_ahb1_factors,
++	.recalc = sun6i_ahb1_recalc,
++};
 +
- static int sun6i_a31_ar100_clk_probe(struct platform_device *pdev)
- {
--	const char *parents[SUN6I_AR100_MAX_PARENTS];
- 	struct device_node *np = pdev->dev.of_node;
--	const char *clk_name = np->name;
--	struct clk_init_data init;
--	struct ar100_clk *ar100;
- 	struct resource *r;
-+	void __iomem *reg;
- 	struct clk *clk;
--	int nparents;
--
--	ar100 = devm_kzalloc(&pdev->dev, sizeof(*ar100), GFP_KERNEL);
--	if (!ar100)
--		return -ENOMEM;
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	ar100->reg = devm_ioremap_resource(&pdev->dev, r);
--	if (IS_ERR(ar100->reg))
--		return PTR_ERR(ar100->reg);
-+	reg = devm_ioremap_resource(&pdev->dev, r);
-+	if (IS_ERR(reg))
-+		return PTR_ERR(reg);
- 
--	nparents = of_clk_get_parent_count(np);
--	if (nparents > SUN6I_AR100_MAX_PARENTS)
--		nparents = SUN6I_AR100_MAX_PARENTS;
--
--	of_clk_parent_fill(np, parents, nparents);
-+	clk = sunxi_factors_register(np, &sun6i_ar100_data, &sun6i_ar100_lock,
-+				     reg);
-+	if (!clk)
-+		return -ENOMEM;
- 
--	of_property_read_string(np, "clock-output-names", &clk_name);
-+	platform_set_drvdata(pdev, clk);
- 
--	init.name = clk_name;
--	init.ops = &ar100_ops;
--	init.parent_names = parents;
--	init.num_parents = nparents;
--	init.flags = 0;
-+	return 0;
-+}
- 
--	ar100->hw.init = &init;
-+static int sun6i_a31_ar100_clk_remove(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct clk *clk = platform_get_drvdata(pdev);
- 
--	clk = clk_register(&pdev->dev, &ar100->hw);
--	if (IS_ERR(clk))
--		return PTR_ERR(clk);
-+	sunxi_factors_unregister(np, clk);
- 
--	return of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+	return 0;
+ static const struct factors_data sun4i_apb1_data __initconst = {
+ 	.mux = 24,
+ 	.muxmask = BIT(1) | BIT(0),
+@@ -725,6 +594,12 @@ static struct clk * __init sunxi_factors_clk_setup(struct device_node *node,
+ 	return clk;
  }
  
- static const struct of_device_id sun6i_a31_ar100_clk_dt_ids[] = {
-@@ -227,6 +113,7 @@ static struct platform_driver sun6i_a31_ar100_clk_driver = {
- 		.of_match_table = sun6i_a31_ar100_clk_dt_ids,
- 	},
- 	.probe = sun6i_a31_ar100_clk_probe,
-+	.remove = sun6i_a31_ar100_clk_remove,
- };
- module_platform_driver(sun6i_a31_ar100_clk_driver);
++static void __init sun6i_ahb1_clk_setup(struct device_node *node)
++{
++	sunxi_factors_clk_setup(node, &sun6i_ahb1_data);
++}
++CLK_OF_DECLARE(sun6i_a31_ahb1, "allwinner,sun6i-a31-ahb1-clk",
++	       sun6i_ahb1_clk_setup);
  
+ 
+ /**
 -- 
 2.7.0
