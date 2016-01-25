@@ -1,95 +1,122 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Jan 2016 16:42:43 +0000
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160115215853.GC3818@linux.vnet.ibm.com>
-References: <20160114121449.GC15828@arm.com> <5697F6D2.60409@imgtec.com>
- <20160114203430.GC3818@linux.vnet.ibm.com>
- <56980C91.1010403@imgtec.com>
- <20160114212913.GF3818@linux.vnet.ibm.com>
- <20160115085554.GF3421@worktop> <20160115091348.GA27936@worktop>
- <20160115174612.GV3818@linux.vnet.ibm.com>
- <20160115212714.GM3421@worktop>
- <20160115215853.GC3818@linux.vnet.ibm.com>
-Message-ID: <20160125164242.GF22927@arm.com>
+From: labbott@fedoraproject.org (Laura Abbott)
+Date: Mon, 25 Jan 2016 08:52:14 -0800
+Subject: [RFC][PATCH 3/4] arm64: Add support for ARCH_SUPPORTS_DEBUG_PAGEALLOC
+In-Reply-To: <1453740735-17898-1-git-send-email-labbott@fedoraproject.org>
+References: <1453740735-17898-1-git-send-email-labbott@fedoraproject.org>
+Message-ID: <1453740735-17898-4-git-send-email-labbott@fedoraproject.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 15, 2016 at 01:58:53PM -0800, Paul E. McKenney wrote:
-> On Fri, Jan 15, 2016 at 10:27:14PM +0100, Peter Zijlstra wrote:
-> > On Fri, Jan 15, 2016 at 09:46:12AM -0800, Paul E. McKenney wrote:
-> > > On Fri, Jan 15, 2016 at 10:13:48AM +0100, Peter Zijlstra wrote:
-> > 
-> > > > And the stuff we're confused about is how best to express the difference
-> > > > and guarantees of these two forms of transitivity and how exactly they
-> > > > interact.
-> > > 
-> > > Hoping my memory-barrier.txt patch helps here...
-> > 
-> > Yes, that seems a good start. But yesterday you raised the 'fun' point
-> > of two globally ordered sequences connected by a single local link.
-> 
-> The conclusion that I am slowly coming to is that litmus tests should
-> not be thought of as linear chains, but rather as cycles.  If you think
-> of it as a cycle, then it doesn't matter where the local link is, just
-> how many of them and how they are connected.
+With support for forcing all memory, we can now easily map and unmap
+individual pages for debugging purposes. Add support for
+ARCH_SUPPORTS_DEBUG_PAGEALLOC to map and unmap pages when this
+debugging feature is enabled.
 
-Do you have some examples of this? I'm struggling to make it work in my
-mind, or are you talking specifically in the context of the kernel
-memory model?
+Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+---
+ arch/arm64/Kconfig       |  3 +++
+ arch/arm64/mm/pageattr.c | 40 +++++++++++++++++++++++++++++++++-------
+ 2 files changed, 36 insertions(+), 7 deletions(-)
 
-> But I will admit that there are some rather strange litmus tests that
-> challenge this cycle-centric view, for example, the one shown below.
-> It turns out that herd and ppcmem disagree on the outcome.  (The Power
-> architects side with ppcmem.)
-> 
-> > And I think I'm still confused on LWSYNC (in the smp_wmb case) when one
-> > of the stores looses a conflict, and if that scenario matters. If it
-> > does, we should inspect the same case for other barriers.
-> 
-> Indeed.  I am still working on how these should be described.  My
-> current thought is to be quite conservative on what ordering is
-> actually respected, however, the current task is formalizing how
-> RCU plays with the rest of the memory model.
-> 
-> 							Thanx, Paul
-> 
-> ------------------------------------------------------------------------
-> 
-> PPC Overlapping Group-B sets version 4
-> ""
-> (* When the Group-B sets from two different barriers involve instructions in
->    the same thread, within that thread one set must contain the other.
-> 
-> 	P0	P1	P2
-> 	Rx=1	Wy=1	Wz=2
-> 	dep.	lwsync	lwsync
-> 	Ry=0	Wz=1	Wx=1
-> 	Rz=1
-> 
-> 	assert(!(z=2))
-> 
->    Forbidden by ppcmem, allowed by herd.
-> *)
-> {
-> 0:r1=x; 0:r2=y; 0:r3=z;
-> 1:r1=x; 1:r2=y; 1:r3=z; 1:r4=1;
-> 2:r1=x; 2:r2=y; 2:r3=z; 2:r4=1; 2:r5=2;
-> }
->  P0		| P1		| P2		;
->  lwz r6,0(r1)	| stw r4,0(r2)	| stw r5,0(r3)	;
->  xor r7,r6,r6	| lwsync	| lwsync	;
->  lwzx r7,r7,r2	| stw r4,0(r3)	| stw r4,0(r1)	;
->  lwz r8,0(r3)	|		|		;
-> 
-> exists
-> (z=2 /\ 0:r6=1 /\ 0:r7=0 /\ 0:r8=1)
-
-That really hurts. Assuming that the "assert(!(z=2))" is actually there
-to constrain the coherence order of z to be {0->1->2}, then I think that
-this test is forbidden on arm using dmb instead of lwsync. That said, I
-also don't think the Rz=1 in P0 changes anything.
-
-The double negatives don't help here! (it is forbidden to guarantee that
-z is not always 2).
-
-Will
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index faf7eac..0d757eb 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -518,6 +518,9 @@ config FORCE_PAGES
+ source kernel/Kconfig.preempt
+ source kernel/Kconfig.hz
+ 
++config ARCH_SUPPORTS_DEBUG_PAGEALLOC
++	def_bool y if FORCE_PAGES
++
+ config ARCH_HAS_HOLES_MEMORYMODEL
+ 	def_bool y if SPARSEMEM
+ 
+diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+index 1360a02..16efc7c 100644
+--- a/arch/arm64/mm/pageattr.c
++++ b/arch/arm64/mm/pageattr.c
+@@ -38,7 +38,8 @@ static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
+ }
+ 
+ static int change_memory_common(unsigned long addr, int numpages,
+-				pgprot_t set_mask, pgprot_t clear_mask)
++				pgprot_t set_mask, pgprot_t clear_mask,
++				bool ignore_vma_check)
+ {
+ 	unsigned long start = addr;
+ 	unsigned long size = PAGE_SIZE*numpages;
+@@ -65,11 +66,14 @@ static int change_memory_common(unsigned long addr, int numpages,
+ 	 *
+ 	 * So check whether the [addr, addr + size) interval is entirely
+ 	 * covered by precisely one VM area that has the VM_ALLOC flag set.
++	 *
++	 * The one exception to this is is we're forcing everything to be
++	 * page mapped
+ 	 */
+ 	area = find_vm_area((void *)addr);
+-	if (!area ||
++	if (!ignore_vma_check && (!area ||
+ 	    end > (unsigned long)area->addr + area->size ||
+-	    !(area->flags & VM_ALLOC))
++	    !(area->flags & VM_ALLOC)))
+ 		return -EINVAL;
+ 
+ 	data.set_mask = set_mask;
+@@ -86,21 +90,24 @@ int set_memory_ro(unsigned long addr, int numpages)
+ {
+ 	return change_memory_common(addr, numpages,
+ 					__pgprot(PTE_RDONLY),
+-					__pgprot(PTE_WRITE));
++					__pgprot(PTE_WRITE),
++					false);
+ }
+ 
+ int set_memory_rw(unsigned long addr, int numpages)
+ {
+ 	return change_memory_common(addr, numpages,
+ 					__pgprot(PTE_WRITE),
+-					__pgprot(PTE_RDONLY));
++					__pgprot(PTE_RDONLY),
++					false);
+ }
+ 
+ int set_memory_nx(unsigned long addr, int numpages)
+ {
+ 	return change_memory_common(addr, numpages,
+ 					__pgprot(PTE_PXN),
+-					__pgprot(0));
++					__pgprot(0),
++					false);
+ }
+ EXPORT_SYMBOL_GPL(set_memory_nx);
+ 
+@@ -108,6 +115,25 @@ int set_memory_x(unsigned long addr, int numpages)
+ {
+ 	return change_memory_common(addr, numpages,
+ 					__pgprot(0),
+-					__pgprot(PTE_PXN));
++					__pgprot(PTE_PXN),
++					false);
+ }
+ EXPORT_SYMBOL_GPL(set_memory_x);
++
++#ifdef CONFIG_ARCH_SUPPORTS_DEBUG_PAGEALLOC
++void __kernel_map_pages(struct page *page, int numpages, int enable)
++{
++	unsigned long addr = (unsigned long) page_address(page);
++
++	if (enable)
++		change_memory_common(addr, numpages,
++					__pgprot(PTE_VALID),
++					__pgprot(0),
++					true);
++	else
++		change_memory_common(addr, numpages,
++					__pgprot(0),
++					__pgprot(PTE_VALID),
++					true);
++}
++#endif
+-- 
+2.5.0
