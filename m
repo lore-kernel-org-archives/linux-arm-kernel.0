@@ -1,108 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 15:53:40 +0000
-Subject: [PATCH v2 06/21] arm64: KVM: VHE: Patch out use of HVC
-In-Reply-To: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453737235-16522-7-git-send-email-marc.zyngier@arm.com>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Mon, 25 Jan 2016 16:17:26 +0000
+Subject: [PATCH] watchdog: imgdpc: select WATCHDOG_CORE
+In-Reply-To: <1453737991-1960626-1-git-send-email-arnd@arndb.de>
+References: <1453737991-1960626-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160125161726.GB23845@jhogan-linux.le.imgtec.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With VHE, the host never issues an HVC instruction to get into the
-KVM code, as we can simply branch there.
+On Mon, Jan 25, 2016 at 05:06:27PM +0100, Arnd Bergmann wrote:
+> The imgpdc_wdt driver can be built on all architectures with
+> CONFIG_COMPILE_TEST, but fails if no other watchdog driver is
+> enabled:
+> 
+> drivers/watchdog/built-in.o: In function `pdc_wdt_remove':
+> imgpdc_wdt.c:(.text+0x74): undefined reference to `watchdog_unregister_device'
+> 
+> This adds the normal 'select WATCHDOG_CORE' that is needed to
+> ensure the driver always builds cleanly.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Use runtime code patching to simplify things a bit.
+Reviewed-by: James Hogan <james.hogan@imgtec.com>
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kvm/hyp.S           |  7 +++++++
- arch/arm64/kvm/hyp/hyp-entry.S | 38 +++++++++++++++++++++++++++++---------
- 2 files changed, 36 insertions(+), 9 deletions(-)
+Cheers
+James
 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 0ccdcbb..0689a74 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -17,7 +17,9 @@
- 
- #include <linux/linkage.h>
- 
-+#include <asm/alternative.h>
- #include <asm/assembler.h>
-+#include <asm/cpufeature.h>
- 
- /*
-  * u64 kvm_call_hyp(void *hypfn, ...);
-@@ -38,6 +40,11 @@
-  * arch/arm64/kernel/hyp_stub.S.
-  */
- ENTRY(kvm_call_hyp)
-+alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
- 	hvc	#0
- 	ret
-+alternative_else
-+	b	__vhe_hyp_call
-+	nop
-+alternative_endif
- ENDPROC(kvm_call_hyp)
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index 93e8d983..9e0683f 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -38,6 +38,32 @@
- 	ldp	x0, x1, [sp], #16
- .endm
- 
-+.macro do_el2_call
-+	/*
-+	 * Shuffle the parameters before calling the function
-+	 * pointed to in x0. Assumes parameters in x[1,2,3].
-+	 */
-+	stp	lr, xzr, [sp, #-16]!
-+	mov	lr, x0
-+	mov	x0, x1
-+	mov	x1, x2
-+	mov	x2, x3
-+	blr	lr
-+	ldp	lr, xzr, [sp], #16
-+.endm
-+
-+ENTRY(__vhe_hyp_call)
-+	do_el2_call
-+	/*
-+	 * We used to rely on having an exception return to get
-+	 * an implicit isb. In the E2H case, we don't have it anymore.
-+	 * rather than changing all the leaf functions, just do it here
-+	 * before returning to the rest of the kernel.
-+	 */
-+	isb
-+	ret
-+ENDPROC(__vhe_hyp_call)
-+	
- el1_sync:				// Guest trapped into EL2
- 	save_x0_to_x3
- 
-@@ -58,19 +84,13 @@ el1_sync:				// Guest trapped into EL2
- 	mrs	x0, vbar_el2
- 	b	2f
- 
--1:	stp	lr, xzr, [sp, #-16]!
--
-+1:
- 	/*
--	 * Compute the function address in EL2, and shuffle the parameters.
-+	 * Perform the EL2 call
- 	 */
- 	kern_hyp_va	x0
--	mov	lr, x0
--	mov	x0, x1
--	mov	x1, x2
--	mov	x2, x3
--	blr	lr
-+	do_el2_call
- 
--	ldp	lr, xzr, [sp], #16
- 2:	eret
- 
- el1_trap:
--- 
-2.1.4
+> ---
+>  drivers/watchdog/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index 4f0e7be0da34..0dc61f1a552e 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -1383,6 +1383,7 @@ config IMGPDC_WDT
+>  	tristate "Imagination Technologies PDC Watchdog Timer"
+>  	depends on HAS_IOMEM
+>  	depends on METAG || MIPS || COMPILE_TEST
+> +	select WATCHDOG_CORE
+>  	help
+>  	  Driver for Imagination Technologies PowerDown Controller
+>  	  Watchdog Timer.
+> -- 
+> 2.7.0
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160125/05cfd116/attachment.sig>
