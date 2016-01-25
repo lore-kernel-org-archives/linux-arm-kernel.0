@@ -1,91 +1,63 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 25 Jan 2016 16:24:46 +0200
-Subject: [PATCH 1/3] printk: make preferred_console local static bool
-In-Reply-To: <1453722324-22407-2-git-send-email-aleksey.makarov@linaro.org>
-References: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>
- <1453722324-22407-2-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <CAHp75Ve+7N+7CCNNQDBBzOZWY-iuVz=9q8vp5TYQhABM2M3cwg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 25 Jan 2016 14:26:09 +0000
+Subject: [PATCH v5 5/6] mfd: dt-bindings: add device tree bindings for
+ Hi3519 sysctrl
+In-Reply-To: <5675031.hi9rRCqFXs@wuerfel>
+References: <1452219400-32478-1-git-send-email-xuejiancheng@huawei.com>
+ <20160112083946.GN19803@x1> <5694C725.6010502@huawei.com>
+ <5675031.hi9rRCqFXs@wuerfel>
+Message-ID: <20160125142609.GR3368@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 1:45 PM, Aleksey Makarov
-<aleksey.makarov@linaro.org> wrote:
-> The variable preferred_console is used only inside register_console()
-> and it's semantics is boolean.  Make it clear.
+On Tue, 12 Jan 2016, Arnd Bergmann wrote:
 
-However the patch looks okay it brings imbalance to understanding how
-exactly the preferred console is chosen.
-Even in case of restricted usage I would leave things as is for now.
+> On Tuesday 12 January 2016 17:28:05 xuejiancheng wrote:
+> > >>>>>
+> > >>>> Not yet.
+> > >>>> Arnd Bergmann and Rob Herring all suggested adding a specific compatible string
+> > >>>> with the SOC name. This binding is just used for describing the compatible string now.
+> > >>>> When more functions on hi3519 SOC are added later, the specific driver will be also
+> > >>>> needed.
+> > >>>
+> > >>> Save this binding until it has more functionality.  We here "I'll add
+> > >>> to this later" all too often.
+> > >>>
+> > >>
+> > >> In the hi3519.dtsi file, there is a system-controller device node described like below:
+> > >> sysctrl: system-controller at 12010000 {
+> > >>      compatible = "hisilicon,hi3519-sysctrl", "syscon";
+> > >>      reg = <0x12010000 0x1000>;
+> > >> };
+> > >> Do you mean that I should remove "hisilicon,hi3519-sysctrl" and just use "syscon" as the
+> > >> compatible string??
+> > > 
+> > > Where is this compatible string _used_?
+> > > 
+> > >> If I want to add "hisilicon,hi3519-sysctrl" for hi3519. where should I put this binding?
+> > >> Could you give some suggestions?  Thank you very much!
+> > > 
+> > > If you're not using the compatible i.e. the device doesn't have its
+> > > own driver yet, then there is no need to supply the binding at all, is
+> > > there?
+> > > 
+> > 
+> > OK. Thank you.
+> > 
+> 
+> Sorry for stepping in late here. I still think that every syscon device should
+> come with a specific compatible string, so we have the option of creating a
+> driver later on, and I'd like to see a binding document that lists those strings
+> (which I believe exists here).
+> 
+> It's really hard to add compatible strings later on, anything else we can
+> work around by keying off that string and adding a workaround in the kernel.
 
->
-> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-> ---
->  kernel/printk/printk.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
-> index 2ce8826..37e531f 100644
-> --- a/kernel/printk/printk.c
-> +++ b/kernel/printk/printk.c
-> @@ -143,7 +143,6 @@ static struct console *exclusive_console;
->  static struct console_cmdline console_cmdline[MAX_CMDLINECONSOLES];
->
->  static int selected_console = -1;
-> -static int preferred_console = -1;
->  int console_set_on_cmdline;
->  EXPORT_SYMBOL(console_set_on_cmdline);
->
-> @@ -2456,6 +2455,7 @@ void register_console(struct console *newcon)
->         unsigned long flags;
->         struct console *bcon = NULL;
->         struct console_cmdline *c;
-> +       static bool preferred_console;
->
->         if (console_drivers)
->                 for_each_console(bcon)
-> @@ -2482,15 +2482,15 @@ void register_console(struct console *newcon)
->         if (console_drivers && console_drivers->flags & CON_BOOT)
->                 bcon = console_drivers;
->
-> -       if (preferred_console < 0 || bcon || !console_drivers)
-> -               preferred_console = selected_console;
-> +       if (!preferred_console || bcon || !console_drivers)
-> +               preferred_console = selected_console >= 0;
->
->         /*
->          *      See if we want to use this console driver. If we
->          *      didn't select a console we take the first one
->          *      that registers here.
->          */
-> -       if (preferred_console < 0) {
-> +       if (!preferred_console) {
->                 if (newcon->index < 0)
->                         newcon->index = 0;
->                 if (newcon->setup == NULL ||
-> @@ -2498,7 +2498,7 @@ void register_console(struct console *newcon)
->                         newcon->flags |= CON_ENABLED;
->                         if (newcon->device) {
->                                 newcon->flags |= CON_CONSDEV;
-> -                               preferred_console = 0;
-> +                               preferred_console = true;
->                         }
->                 }
->         }
-> @@ -2533,7 +2533,7 @@ void register_console(struct console *newcon)
->                 newcon->flags |= CON_ENABLED;
->                 if (i == selected_console) {
->                         newcon->flags |= CON_CONSDEV;
-> -                       preferred_console = selected_console;
-> +                       preferred_console = true;
->                 }
->                 break;
->         }
-> --
-> 2.7.0
->
-
-
+Why is it more difficult (or any different) to add a compatible string
+later (when it is used) over now (when it is not used)?
 
 -- 
-With Best Regards,
-Andy Shevchenko
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
