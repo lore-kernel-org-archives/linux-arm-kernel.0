@@ -1,45 +1,58 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 25 Jan 2016 13:52:20 +0000
-Subject: [PATCH 1/2] regulator: ltc3589: make IRQ optional
-In-Reply-To: <20160125135109.760ba5f0@ipc1.ka-ro>
-References: <20160121102015.GI6588@sirena.org.uk>
- <20160121112611.34e17cb2@ipc1.ka-ro>
- <20160121111115.GJ6588@sirena.org.uk>
- <20160121123311.5346e40d@ipc1.ka-ro>
- <20160121162646.GK6588@sirena.org.uk>
- <20160122064145.36b7f2b4@ipc1.ka-ro>
- <20160122162610.GZ6588@sirena.org.uk>
- <20160125133731.72669115@ipc1.ka-ro>
- <20160125124123.GQ6588@sirena.org.uk>
- <20160125135109.760ba5f0@ipc1.ka-ro>
-Message-ID: <20160125135220.GR6588@sirena.org.uk>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 25 Jan 2016 21:53:49 +0800
+Subject: [PATCH v6] kernel: add kcov code coverage
+In-Reply-To: <1453726850-49137-1-git-send-email-dvyukov@google.com>
+Message-ID: <201601252108.oXiP6kOR%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 01:51:09PM +0100, Lothar Wa?mann wrote:
-> On Mon, 25 Jan 2016 12:41:23 +0000 Mark Brown wrote:
+Hi Dmitry,
 
-> > The above, for example - make the interrupt optional.
+[auto build test ERROR on v4.5-rc1]
+[also build test ERROR on next-20160125]
+[cannot apply to tip/x86/core kbuild/for-next]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-> This will make it impossible to notify the system about
-> overtemperature (and undervoltage).
-> I implemented polling to be able to get at least overtemperature
-> warnings.
-> (Undervoltage cannot be handled sensibly without interrupt anyway)
+url:    https://github.com/0day-ci/linux/commits/Dmitry-Vyukov/kernel-add-kcov-code-coverage/20160125-210230
+config: x86_64-allyesconfig (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-I'm not convinced that justifies constantly polling, if the system
-designers cared you'd hope they'd have wired it up to a working
-interrupt.  People commonly don't, realistically thermal warnings are
-usually set near the point where the silicon will be physically damaged
-and typically by the time they fire the system is already experiencing
-catastrophic problems at a system level.
+All errors (new ones prefixed by >>):
 
-The polling is at the very least a separate change, and making the
-interrupt work would be a much better option.
+>> Makefile:679: Cannot use CONFIG_KCOV: -fsanitize-coverage=trace-pc is not supported by compiler
+>> gcc-5: error: unrecognized command line option '-fsanitize-coverage=trace-pc'
+   make[2]: *** [arch/x86/purgatory/purgatory.o] Error 1
+>> gcc-5: error: unrecognized command line option '-fsanitize-coverage=trace-pc'
+   make[2]: *** [arch/x86/purgatory/sha256.o] Error 1
+>> gcc-5: error: unrecognized command line option '-fsanitize-coverage=trace-pc'
+   make[2]: *** [arch/x86/purgatory/string.o] Error 1
+   make[2]: Target 'arch/x86/purgatory/kexec-purgatory.c' not remade because of errors.
+   make[1]: *** [archprepare] Error 2
+   make[1]: Target 'prepare' not remade because of errors.
+   make: *** [sub-make] Error 2
+
+vim +679 Makefile
+
+   673	endif
+   674	endif
+   675	KBUILD_CFLAGS += $(stackp-flag)
+   676	
+   677	ifdef CONFIG_KCOV
+   678	  ifeq ($(call cc-option, $(CFLAGS_KCOV)),)
+ > 679	    $(warning Cannot use CONFIG_KCOV: \
+   680	             -fsanitize-coverage=trace-pc is not supported by compiler)
+   681	  endif
+   682	endif
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
+Name: .config.gz
+Type: application/octet-stream
+Size: 52342 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160125/ba4fa286/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160125/5a544464/attachment-0001.obj>
