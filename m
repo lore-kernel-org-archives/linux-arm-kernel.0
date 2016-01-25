@@ -1,52 +1,32 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Mon, 25 Jan 2016 17:31:15 +0800
-Subject: [PATCH v3 1/1] USB: core: let USB device know device node
-In-Reply-To: <1825868.A6VKDYvWaj@wuerfel>
-References: <Pine.LNX.4.44L0.1601211015010.2275-100000@iolanthe.rowland.org>
- <2404899.20LhULZo7N@wuerfel>
- <CAL411-qfzcynzc=YrepzcA6EmFuxy-Ri4xRQ+R-QVBDEPZXtZQ@mail.gmail.com>
- <1825868.A6VKDYvWaj@wuerfel>
-Message-ID: <20160125093114.GA13749@shlinux2>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Mon, 25 Jan 2016 10:34:29 +0100
+Subject: [PATCH v3 08/12] arm64, numa: rework numa_add_memblk()
+In-Reply-To: <1453541967-3744-9-git-send-email-guohanjun@huawei.com>
+References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
+ <1453541967-3744-9-git-send-email-guohanjun@huawei.com>
+Message-ID: <20160125093429.GD24726@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 09:50:53AM +0100, Arnd Bergmann wrote:
-> On Monday 25 January 2016 11:57:37 Peter Chen wrote:
-> > >> >
-> > >> >             hub at 3 { /* same external  hub, highspeed mode */
-> > >> >                     compatible = "usb2109,0812.591",
-> > >> >                                  "usb2109,0812",
-> > >> >                                  "usb2109,class9.0.1",
-> > >> >                                  "usb2109,class9.0",
-> > >> >                                  "usb2109,class9";
-> > >> >
-> > >> >                     #address-cells = <1>;
-> > >> >                     #size-cells = <0>;
-> > >> >                     reg = >;
-> > >> >
-> > >>
-> > >> Why "reg" is 3 here?
-> > >
-> > > My mistake. It should be hub at 1 and reg=<1>;
-> > >
-> > > I accidentally confused the port number and the device number.
-> > 
-> > I think it should be hub at 2 and reg=<0x2>.
-> > According to Alan, we should use xHCI numbering scheme when
-> > describing the ports of an xHCI root hub.
-> 
-> For a single-port root hub, that would be right. My PC has
-> two ports, so the first port has reg=<0x1> for SS and
-> reg=<0x3> for HS.
-> 
+On 23.01.16 17:39:23, Hanjun Guo wrote:
+> Rework numa_add_memblk() to update the parameter "u64 size"
+> to "u64 end", this will make it consistent with x86 and
+> can simplify the code later.
 
-Yes, you are right.
+> --- a/arch/arm64/kernel/of_numa.c
+> +++ b/arch/arm64/kernel/of_numa.c
+> @@ -168,7 +168,7 @@ static int __init early_init_parse_memory_node(unsigned long node)
+>  		pr_debug("NUMA-DT:  base = %llx , node = %u\n",
+>  				base, nid);
+>  
+> -		if (numa_add_memblk(nid, base, size) < 0)
+> +		if (numa_add_memblk(nid, base, base + size) < 0)
 
-Alan, do you know which physical number is larger for
-the same port, HS or SS port? Is it spec defined or vendor defined?
-I haven't found related information at xHCI spec.
+The overall function usage looks more like as it should use size
+instead of end. Even in the x86 implementation end is calculated from
+base + size. So better change x86 code to use size instead.
 
--- 
+Though this might involve to change the interface for
+numa_add_memblk_to() for unifcation too.
 
-Best Regards,
-Peter Chen
+-Robert
