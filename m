@@ -1,59 +1,51 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 25 Jan 2016 12:19:36 +0100
-Subject: [PATCH 2/3] ARM: dts: sama5d4: add labels for watchdog and
- pinctrl nodes
-In-Reply-To: <1453293337-16078-3-git-send-email-LW@KARO-electronics.de>
-References: <1453293337-16078-1-git-send-email-LW@KARO-electronics.de>
- <1453293337-16078-3-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20160125111936.GC4027@piout.net>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Mon, 25 Jan 2016 11:21:07 +0000
+Subject: [PATCH v6 02/12] arm-cci: Group writes to counter
+In-Reply-To: <1453720877-24962-1-git-send-email-suzuki.poulose@arm.com>
+References: <1453720877-24962-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1453720877-24962-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add a helper to group the writes to PMU counter, this will be
+used to delay setting the event period to pmu::pmu_enable()
 
-On 20/01/2016 at 13:35:36 +0100, Lothar Wa?mann wrote :
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Punit Agrawal <punit.agrawal@arm.com>
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+---
+Changes since V5:
+  - Use the prev_count from event->hw for the counter value, than
+    using a single value for all the counters.
+---
+ drivers/bus/arm-cci.c |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-Ditto, this needs a commit message.
-
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-
-Else,
-
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
-
-
-> ---
->  arch/arm/boot/dts/sama5d4.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-> index 6c0dc89..fb40014 100644
-> --- a/arch/arm/boot/dts/sama5d4.dtsi
-> +++ b/arch/arm/boot/dts/sama5d4.dtsi
-> @@ -1299,7 +1299,7 @@
->  				clocks = <&h32ck>;
->  			};
->  
-> -			watchdog at fc068640 {
-> +			watchdog: watchdog at fc068640 {
->  				compatible = "atmel,sama5d4-wdt";
->  				reg = <0xfc068640 0x10>;
->  				clocks = <&clk32k>;
-> @@ -1351,7 +1351,7 @@
->  			};
->  
->  
-> -			pinctrl at fc06a000 {
-> +			pinctrl: pinctrl at fc06a000 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
->  				compatible = "atmel,at91sam9x5-pinctrl", "atmel,at91rm9200-pinctrl", "simple-bus";
-> -- 
-> 2.1.4
-> 
-
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index ee47e6b..936fa9b 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -771,6 +771,21 @@ static void pmu_write_counter(struct perf_event *event, u32 value)
+ 		pmu_write_register(cci_pmu, value, idx, CCI_PMU_CNTR);
+ }
+ 
++static void __maybe_unused
++pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
++{
++	int i;
++	struct cci_pmu_hw_events *cci_hw = &cci_pmu->hw_events;
++
++	for_each_set_bit(i, mask, cci_pmu->num_cntrs) {
++		struct perf_event *event = cci_hw->events[i];
++
++		if (WARN_ON(!event))
++			continue;
++		pmu_write_counter(event, (u32)local64_read(&event->hw.prev_count));
++	}
++}
++
+ static u64 pmu_event_update(struct perf_event *event)
+ {
+ 	struct hw_perf_event *hwc = &event->hw;
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.9.5
