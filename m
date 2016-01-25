@@ -1,170 +1,222 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Mon, 25 Jan 2016 18:29:55 -0300
-Subject: [PATCH V8 20/23] perf tools: making function set_max_cpu_num()
- non static
-In-Reply-To: <20160125211242.GF22501@kernel.org>
-References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
- <1452807977-8069-21-git-send-email-mathieu.poirier@linaro.org>
- <CANLsYkzmTMi3jmVjwNiNsw6P5pPkZEz6zYWFsVzayy+r2ojTTA@mail.gmail.com>
- <20160125211242.GF22501@kernel.org>
-Message-ID: <20160125212955.GG22501@kernel.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 25 Jan 2016 16:29:46 -0500
+Subject: [PATCH] acpi: implement Generic Event Device
+Message-ID: <1453757387-28154-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Mon, Jan 25, 2016 at 06:12:42PM -0300, Arnaldo Carvalho de Melo escreveu:
-> Em Mon, Jan 25, 2016 at 01:46:22PM -0700, Mathieu Poirier escreveu:
-> > On 14 January 2016 at 14:46, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
-> > > For memory allocation purposes, code located in other places
-> > > then util/cpumap.c may want to know how many CPUs the system has.
-> > >
-> > > This patch is making function set_max_cpu_num() available to
-> > > other parts of the perf tool so that global variable
-> > > 'max_cpu_num' gets the right value when referenced by cpu__max_cpu().
-> > >
-> > > Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-> > > Cc: Ingo Molnar <mingo@redhat.com>
-> > > Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
-> > > Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> > > ---
-> > >  tools/perf/util/cpumap.c | 2 +-
-> > >  tools/perf/util/cpumap.h | 1 +
-> > >  2 files changed, 2 insertions(+), 1 deletion(-)
-> > >
-> > > diff --git a/tools/perf/util/cpumap.c b/tools/perf/util/cpumap.c
-> > > index 10af1e7524fb..ae179320c0c0 100644
-> > > --- a/tools/perf/util/cpumap.c
-> > > +++ b/tools/perf/util/cpumap.c
-> > > @@ -380,7 +380,7 @@ out:
-> > >  }
-> > >
-> > >  /* Determine highest possible cpu in the system for sparse allocation */
-> > > -static void set_max_cpu_num(void)
-> > > +void set_max_cpu_num(void)
-> > >  {
-> > >         const char *mnt;
-> > >         char path[PATH_MAX];
-> > > diff --git a/tools/perf/util/cpumap.h b/tools/perf/util/cpumap.h
-> > > index 85f7772457fa..45fa963345eb 100644
-> > > --- a/tools/perf/util/cpumap.h
-> > > +++ b/tools/perf/util/cpumap.h
-> > > @@ -14,6 +14,7 @@ struct cpu_map {
-> > >         int map[];
-> > >  };
-> > >
-> > > +void set_max_cpu_num(void);
-> > >  struct cpu_map *cpu_map__new(const char *cpu_list);
-> > >  struct cpu_map *cpu_map__empty_new(int nr);
-> > >  struct cpu_map *cpu_map__dummy_new(void);
-> > > --
-> > > 2.1.4
-> > >
-> > 
-> > Arnaldo,
-> > 
-> > I can't queue this patch for 4.6 without at least a reviewed by from you.
-> 
-> This one I remember, looks ugly, the name set_max_cpu_num() looks
-> strange, when that was restricted (static) to that cpumap.c file, it
-> wasn't a problem, exporting it for wider usage looks bad.
-> 
-> You've been waiting for this for quite a while, it seems, lemme stop
-> what I am doing to check this...
+Generic Event Device described in ACPI 6.1 allows platforms to handle
+platform interrupts in ACPI ASL statements. It borrows constructs like
+_EVT from GPIO events. All interrupts are listed in _CRS and the handler
+is written in _EVT method. Here is an example.
 
-So, please check the patch below, what you need then is just to use
-cpu__max_cpu().
+Device (GED0)
+{
 
-- Arnaldo
+	Name (_HID, "ACPI0013")
+	Name (_UID, 0)
+	Name(_CRS, ResourceTemplate ()
+	{
+		Interrupt(ResourceConsumer, Edge, ActiveHigh, Shared, , , )
+		 {123}
+	})
 
-diff --git a/tools/perf/util/cpumap.c b/tools/perf/util/cpumap.c
-index fa935093a599..9bcf2bed3a6d 100644
---- a/tools/perf/util/cpumap.c
-+++ b/tools/perf/util/cpumap.c
-@@ -8,6 +8,10 @@
- #include <linux/bitmap.h>
- #include "asm/bug.h"
- 
-+static int max_cpu_num;
-+static int max_node_num;
-+static int *cpunode_map;
+	Method (_EVT, 1) {
+		if (Lequal(123, Arg0))
+		{
+		}
+	}
+}
+
+Wake capability has not been implemented yet.
+
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/acpi/Makefile |   1 +
+ drivers/acpi/evged.c  | 162 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 163 insertions(+)
+ create mode 100644 drivers/acpi/evged.c
+
+diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+index b5e7cd8..4dbb732 100644
+--- a/drivers/acpi/Makefile
++++ b/drivers/acpi/Makefile
+@@ -46,6 +46,7 @@ acpi-y				+= acpi_pnp.o
+ acpi-y				+= int340x_thermal.o
+ acpi-y				+= power.o
+ acpi-y				+= event.o
++acpi-$(CONFIG_ACPI_REDUCED_HARDWARE_ONLY) += evged.o
+ acpi-y				+= sysfs.o
+ acpi-y				+= property.o
+ acpi-$(CONFIG_X86)		+= acpi_cmos_rtc.o
+diff --git a/drivers/acpi/evged.c b/drivers/acpi/evged.c
+new file mode 100644
+index 0000000..a904676
+--- /dev/null
++++ b/drivers/acpi/evged.c
+@@ -0,0 +1,162 @@
++/*
++ * Generic Event Device for ACPI.
++ *
++ * Copyright (c) 2016, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Generic Event Device allows platforms to handle
++ * interrupts in ACPI ASL statements. It follows very similar
++ * _EVT method approach from GPIO events.
++ * All interrupts are listed in _CRS and the handler
++ * is written in _EVT method. Here is an example.
++ *
++ * Device (GED0)
++ * {
++ *
++ *     Name (_HID, "ACPI0013")
++ *     Name (_UID, 0)
++ *     Method (_CRS, 0x0, Serialized)
++ *     {
++ *		Name (RBUF, ResourceTemplate ()
++ *		{
++ *		Interrupt(ResourceConsumer, Edge, ActiveHigh, Shared, , , )
++ *		{123}
++ *		}
++ *     })
++ *
++ *     Method (_EVT, 1) {
++ *             if (Lequal(123, Arg0))
++ *             {
++ *             }
++ *     }
++ * }
++ *
++ */
 +
- static struct cpu_map *cpu_map__default_new(void)
- {
- 	struct cpu_map *cpus;
-@@ -486,6 +490,32 @@ out:
- 		pr_err("Failed to read max nodes, using default of %d\n", max_node_num);
- }
- 
-+int cpu__max_node(void)
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/list.h>
++#include <linux/platform_device.h>
++#include <linux/acpi.h>
++
++#define MODULE_NAME	"acpi-ged"
++
++struct acpi_ged_event {
++	struct list_head node;
++	struct device *dev;
++	unsigned int gsi;
++	unsigned int irq;
++	acpi_handle handle;
++};
++
++static irqreturn_t acpi_ged_irq_handler(int irq, void *data)
 +{
-+	if (unlikely(!max_node_num))
-+		set_max_node_num();
++	struct acpi_ged_event *event = data;
++	acpi_status acpi_ret;
 +
-+	return max_node_num;
++	acpi_ret = acpi_execute_simple_method(event->handle, NULL, event->gsi);
++	if (ACPI_FAILURE(acpi_ret))
++		dev_err_once(event->dev, "IRQ method execution failed\n");
++
++	return IRQ_HANDLED;
 +}
 +
-+int cpu__max_cpu(void)
++static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
++					      void *context)
 +{
-+	if (unlikely(!max_cpu_num))
-+		set_max_cpu_num();
++	struct acpi_ged_event *event;
++	unsigned int irq;
++	unsigned int gsi;
++	unsigned int irqflags = IRQF_ONESHOT;
++	struct device *dev = context;
++	acpi_handle handle = ACPI_HANDLE(dev);
++	acpi_handle evt_handle;
++	struct resource r;
++	struct acpi_resource_irq *p = &ares->data.irq;
++	struct acpi_resource_extended_irq *pext = &ares->data.extended_irq;
 +
-+	return max_cpu_num;
-+}
++	if (ares->type == ACPI_RESOURCE_TYPE_END_TAG)
++		return AE_OK;
 +
-+int cpu__get_node(int cpu)
-+{
-+	if (unlikely(cpunode_map == NULL)) {
-+		pr_debug("cpu_map not initialized\n");
-+		return -1;
++	if (!acpi_dev_resource_interrupt(ares, 0, &r)) {
++		dev_err(dev, "unable to parse IRQ resource\n");
++		return AE_ERROR;
++	}
++	if (ares->type == ACPI_RESOURCE_TYPE_IRQ)
++		gsi = p->interrupts[0];
++	else
++		gsi = pext->interrupts[0];
++
++	irq = r.start;
++
++	if (ACPI_FAILURE(acpi_get_handle(handle, "_EVT", &evt_handle))) {
++		dev_err(dev, "cannot locate _EVT method\n");
++		return AE_ERROR;
 +	}
 +
-+	return cpunode_map[cpu];
++	dev_info(dev, "GED listening GSI %u @ IRQ %u\n", gsi, irq);
++
++	event = devm_kzalloc(dev, sizeof(*event), GFP_KERNEL);
++	if (!event)
++		return AE_ERROR;
++
++	event->gsi = gsi;
++	event->dev = dev;
++	event->irq = irq;
++	event->handle = evt_handle;
++
++	if (r.flags & IORESOURCE_IRQ_SHAREABLE)
++		irqflags |= IRQF_SHARED;
++
++	if (devm_request_threaded_irq(dev, irq, NULL, acpi_ged_irq_handler,
++				      irqflags, "ACPI:Ged", event)) {
++		dev_err(dev, "failed to setup event handler for irq %u\n", irq);
++		return AE_ERROR;
++	}
++
++	return AE_OK;
 +}
 +
- static int init_cpunode_map(void)
- {
- 	int i;
-diff --git a/tools/perf/util/cpumap.h b/tools/perf/util/cpumap.h
-index 71c41b9efabb..81a2562aaa2b 100644
---- a/tools/perf/util/cpumap.h
-+++ b/tools/perf/util/cpumap.h
-@@ -57,37 +57,11 @@ static inline bool cpu_map__empty(const struct cpu_map *map)
- 	return map ? map->map[0] == -1 : true;
- }
- 
--int max_cpu_num;
--int max_node_num;
--int *cpunode_map;
--
- int cpu__setup_cpunode_map(void);
- 
--static inline int cpu__max_node(void)
--{
--	if (unlikely(!max_node_num))
--		pr_debug("cpu_map not initialized\n");
--
--	return max_node_num;
--}
--
--static inline int cpu__max_cpu(void)
--{
--	if (unlikely(!max_cpu_num))
--		pr_debug("cpu_map not initialized\n");
--
--	return max_cpu_num;
--}
--
--static inline int cpu__get_node(int cpu)
--{
--	if (unlikely(cpunode_map == NULL)) {
--		pr_debug("cpu_map not initialized\n");
--		return -1;
--	}
--
--	return cpunode_map[cpu];
--}
-+int cpu__max_node(void);
-+int cpu__max_cpu(void);
-+int cpu__get_node(int cpu);
- 
- int cpu_map__build_map(struct cpu_map *cpus, struct cpu_map **res,
- 		       int (*f)(struct cpu_map *map, int cpu, void *data),
++static int ged_probe(struct platform_device *pdev)
++{
++	acpi_status acpi_ret;
++
++	acpi_ret = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), "_CRS",
++				       acpi_ged_request_interrupt, &pdev->dev);
++	if (ACPI_FAILURE(acpi_ret)) {
++		dev_err(&pdev->dev, "unable to parse the _CRS record\n");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static const struct acpi_device_id ged_acpi_ids[] = {
++	{"ACPI0013"},
++	{},
++};
++
++static struct platform_driver ged_driver = {
++	.probe = ged_probe,
++	.driver = {
++		.name = MODULE_NAME,
++		.owner = THIS_MODULE,
++		.acpi_match_table = ACPI_PTR(ged_acpi_ids),
++	},
++};
++
++static int __init ged_init(void)
++{
++	return platform_driver_register(&ged_driver);
++}
++
++subsys_initcall(ged_init);
+-- 
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
