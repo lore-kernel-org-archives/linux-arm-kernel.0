@@ -1,67 +1,92 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:41:49 +0100
-Subject: [PATCH] tick: sched: hide unused oneshot timer code
-Message-ID: <1453736525-1959191-1-git-send-email-arnd@arndb.de>
+Date: Mon, 25 Jan 2016 16:41:50 +0100
+Subject: [PATCH] mtd: only use __xipram annotation when XIP_KERNEL is set
+Message-ID: <1453736525-1959191-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A couple of functions in kernel/time/tick-sched.c are only
-relevant for oneshot timer mode, i.e. when hires-timers or
-nohz mode are enabled. If both are disabled, we get gcc warnings
-about them:
+When XIP_KERNEL is enabled, some functions are defined in the .data
+ELF section because we require them to be in RAM whenever we communicate
+with the flash chip. However this causes problems when FTRACE is
+enabled and gcc emits calls to __gnu_mcount_nc in the function
+prolog:
 
-kernel/time/tick-sched.c:98:16: warning: 'tick_init_jiffy_update' defined but not used [-Wunused-function]
- static ktime_t tick_init_jiffy_update(void)
-                ^
-kernel/time/tick-sched.c:112:13: warning: 'tick_sched_do_timer' defined but not used [-Wunused-function]
- static void tick_sched_do_timer(ktime_t now)
-             ^
-kernel/time/tick-sched.c:134:13: warning: 'tick_sched_handle' defined but not used [-Wunused-function]
- static void tick_sched_handle(struct tick_sched *ts, struct pt_regs *regs)
-             ^
+drivers/built-in.o: In function `cfi_chip_setup':
+:(.data+0x272fc): relocation truncated to fit: R_ARM_CALL against symbol `__gnu_mcount_nc' defined in .text section in arch/arm/kernel/built-in.o
+drivers/built-in.o: In function `cfi_probe_chip':
+:(.data+0x27de8): relocation truncated to fit: R_ARM_CALL against symbol `__gnu_mcount_nc' defined in .text section in arch/arm/kernel/built-in.o
+/tmp/ccY172rP.s: Assembler messages:
+/tmp/ccY172rP.s:70: Warning: ignoring changed section attributes for .data
+/tmp/ccY172rP.s: Error: 1 warning, treating warnings as errors
+make[5]: *** [drivers/mtd/chips/cfi_probe.o] Error 1
+/tmp/ccK4rjeO.s: Assembler messages:
+/tmp/ccK4rjeO.s:421: Warning: ignoring changed section attributes for .data
+/tmp/ccK4rjeO.s: Error: 1 warning, treating warnings as errors
+make[5]: *** [drivers/mtd/chips/cfi_util.o] Error 1
+/tmp/ccUvhCYR.s: Assembler messages:
+/tmp/ccUvhCYR.s:1895: Warning: ignoring changed section attributes for .data
+/tmp/ccUvhCYR.s: Error: 1 warning, treating warnings as errors
 
-This encloses the whole set of functions in an appropriate ifdef
-to avoid the warning and to make it clearer when they are used.
+Specifically, this does not work because the .data section is not
+marked executable, which leads LD to not generate trampolines for
+long calls.
+
+This moves the __xipram functions into their own .xiptext section instead.
+The section is still placed next to .data and located in RAM but is marked
+executable, which avoids the build errors.
+
+Also, we only need to place the XIP functions into a separate section
+if both CONFIG_XIP_KERNEL and CONFIG_MTD_XIP are set: When only MTD_XIP
+is used, the whole kernel is still in RAM and we do not need to worry
+about pulling out the rug under it. When only XIP_KERNEL but not MTD_XIP
+is set, the kernel is in some form of ROM, but we never write to it.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- kernel/time/tick-sched.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ include/asm-generic/vmlinux.lds.h |  1 +
+ include/linux/mtd/xip.h           | 10 ++++++----
+ 2 files changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
-index 9d7a053545f5..1b02ab516373 100644
---- a/kernel/time/tick-sched.c
-+++ b/kernel/time/tick-sched.c
-@@ -36,16 +36,17 @@
-  */
- static DEFINE_PER_CPU(struct tick_sched, tick_cpu_sched);
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index c4bd0e2c173c..73a2c72e4252 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -199,6 +199,7 @@
  
--/*
-- * The time, when the last jiffy update happened. Protected by jiffies_lock.
-- */
--static ktime_t last_jiffies_update;
--
- struct tick_sched *tick_get_tick_sched(int cpu)
- {
- 	return &per_cpu(tick_cpu_sched, cpu);
- }
- 
-+#if defined(CONFIG_NO_HZ_COMMON) || defined(CONFIG_HIGH_RES_TIMERS)
-+/*
-+ * The time, when the last jiffy update happened. Protected by jiffies_lock.
-+ */
-+static ktime_t last_jiffies_update;
-+
- /*
-  * Must be called with interrupts disabled !
+ /* .data section */
+ #define DATA_DATA							\
++	*(.xiptext)							\
+ 	*(.data)							\
+ 	*(.ref.data)							\
+ 	*(.data..shared_aligned) /* percpu related */			\
+diff --git a/include/linux/mtd/xip.h b/include/linux/mtd/xip.h
+index abed4dec5c2f..e373690cce0a 100644
+--- a/include/linux/mtd/xip.h
++++ b/include/linux/mtd/xip.h
+@@ -30,7 +30,9 @@
+  * obviously not be running from flash.  The __xipram is therefore marking
+  * those functions so they get relocated to ram.
   */
-@@ -151,6 +152,7 @@ static void tick_sched_handle(struct tick_sched *ts, struct pt_regs *regs)
- 	update_process_times(user_mode(regs));
- 	profile_tick(CPU_PROFILING);
- }
+-#define __xipram noinline __attribute__ ((__section__ (".data")))
++#ifdef CONFIG_XIP_KERNEL
++#define __xipram noinline __attribute__ ((__section__ (".xiptext")))
 +#endif
  
- #ifdef CONFIG_NO_HZ_FULL
- cpumask_var_t tick_nohz_full_mask;
+ /*
+  * Each architecture has to provide the following macros.  They must access
+@@ -90,10 +92,10 @@
+ #define xip_cpu_idle()  do { } while (0)
+ #endif
+ 
+-#else
++#endif /* CONFIG_MTD_XIP */
+ 
++#ifndef __xipram
+ #define __xipram
+-
+-#endif /* CONFIG_MTD_XIP */
++#endif
+ 
+ #endif /* __LINUX_MTD_XIP_H__ */
 -- 
 2.7.0
