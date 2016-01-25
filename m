@@ -1,36 +1,109 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:48:28 +0100
-Subject: [PATCH] power: APM_EMULATION does not depend on PM
-Message-ID: <1453736913-1959469-1-git-send-email-arnd@arndb.de>
+Date: Mon, 25 Jan 2016 16:50:20 +0100
+Subject: [PATCH] mmc: omap_hsmmc: don't print uninitialized variables
+Message-ID: <1453737031-1959584-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The APM emulation code does multiple things, and some of them depend on
-PM_SLEEP, while the battery management does not. However, selecting
-the symbol like SHARPSL_PM does causes a Kconfig warning:
+When DT based probing is used but the DMA request fails, the
+driver will print uninitialized stack data from the rx_req
+and tx_req variables, as indicated by this warning:
 
-warning: (SHARPSL_PM && PMAC_APM_EMU) selects APM_EMULATION which has unmet direct dependencies (PM && SYS_SUPPORTS_APM_EMULATION)
+drivers/mmc/host/omap_hsmmc.c: In function 'omap_hsmmc_probe':
+drivers/mmc/host/omap_hsmmc.c:2162:3: warning: 'rx_req' may be used uninitialized in this function [-Wmaybe-uninitialized]
+   dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
 
->From all I can tell, this is completely harmless, and we can simply allow
-APM_EMULATION to be enabled here, even if PM is not.
+This restructures the function to separate the simple DT probe
+from the more complex platform data code path, and only
+prints the information that is actually available and
+needed in case of an error, which makes it nicer to read
+and avoids the warning.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- kernel/power/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mmc/host/omap_hsmmc.c | 48 +++++++++++++++++++++----------------------
+ 1 file changed, 23 insertions(+), 25 deletions(-)
 
-diff --git a/kernel/power/Kconfig b/kernel/power/Kconfig
-index 02e8dfaa1ce2..68d3ebc12601 100644
---- a/kernel/power/Kconfig
-+++ b/kernel/power/Kconfig
-@@ -235,7 +235,7 @@ config PM_TRACE_RTC
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index b6639ea0bf18..e06b1881b6a1 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -2002,8 +2002,6 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	int ret, irq;
+ 	const struct of_device_id *match;
+-	dma_cap_mask_t mask;
+-	unsigned tx_req, rx_req;
+ 	const struct omap_mmc_of_data *data;
+ 	void __iomem *base;
  
- config APM_EMULATION
- 	tristate "Advanced Power Management Emulation"
--	depends on PM && SYS_SUPPORTS_APM_EMULATION
-+	depends on SYS_SUPPORTS_APM_EMULATION
- 	help
- 	  APM is a BIOS specification for saving power using several different
- 	  techniques. This is mostly useful for battery powered laptops with
+@@ -2133,7 +2131,17 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ 
+ 	omap_hsmmc_conf_bus_power(host);
+ 
+-	if (!pdev->dev.of_node) {
++	host->tx_chan = dma_request_slave_channel(&pdev->dev, "tx");
++	host->rx_chan = dma_request_slave_channel(&pdev->dev, "rx");
++	if (!host->tx_chan || !host->rx_chan) {
++		dma_cap_mask_t mask;
++		unsigned tx_req, rx_req;
++
++		dev_err(mmc_dev(host->mmc), "falling back to manual DMA configuration\n");
++
++		dma_cap_zero(mask);
++		dma_cap_set(DMA_SLAVE, mask);
++
+ 		res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "tx");
+ 		if (!res) {
+ 			dev_err(mmc_dev(host->mmc), "cannot get DMA TX channel\n");
+@@ -2141,6 +2149,12 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ 			goto err_irq;
+ 		}
+ 		tx_req = res->start;
++		host->tx_chan = dma_request_channel(mask, omap_dma_filter_fn, &tx_req);
++		if (!host->rx_chan) {
++			dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", tx_req);
++			ret = -ENXIO;
++			goto err_irq;
++		}
+ 
+ 		res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "rx");
+ 		if (!res) {
+@@ -2149,29 +2163,13 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ 			goto err_irq;
+ 		}
+ 		rx_req = res->start;
+-	}
+-
+-	dma_cap_zero(mask);
+-	dma_cap_set(DMA_SLAVE, mask);
+-
+-	host->rx_chan =
+-		dma_request_slave_channel_compat(mask, omap_dma_filter_fn,
+-						 &rx_req, &pdev->dev, "rx");
++		host->tx_chan = dma_request_channel(mask, omap_dma_filter_fn, &rx_req);
+ 
+-	if (!host->rx_chan) {
+-		dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
+-		ret = -ENXIO;
+-		goto err_irq;
+-	}
+-
+-	host->tx_chan =
+-		dma_request_slave_channel_compat(mask, omap_dma_filter_fn,
+-						 &tx_req, &pdev->dev, "tx");
+-
+-	if (!host->tx_chan) {
+-		dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", tx_req);
+-		ret = -ENXIO;
+-		goto err_irq;
++		if (!host->tx_chan) {
++			dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
++			ret = -ENXIO;
++			goto err_irq;
++		}
+ 	}
+ 
+ 	/* Request IRQ for MMC operations */
 -- 
 2.7.0
