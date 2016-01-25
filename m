@@ -1,24 +1,56 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Mon, 25 Jan 2016 22:54:34 +0100
-Subject: [PATCH v4 2/2] acpi: apei: Enable APEI multiple GHES source to
- share an single external IRQ
-In-Reply-To: <CAPw-ZTmmK1RvKQVpNLtP=X+cxMVj3wYqq78x1eZ+2w5+5Q1dYg@mail.gmail.com>
-References: <1453335459-3617-1-git-send-email-lho@apm.com>
- <1453335459-3617-3-git-send-email-lho@apm.com>
- <CAPw-ZTmmK1RvKQVpNLtP=X+cxMVj3wYqq78x1eZ+2w5+5Q1dYg@mail.gmail.com>
-Message-ID: <20160125215433.GE4322@pd.tnic>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Jan 2016 22:54:56 +0100
+Subject: [PATCH 1/3] tty: nozomi: avoid a harmless gcc warning
+Message-ID: <1453758918-3577213-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 01:25:00PM -0800, Loc Ho wrote:
-> Can this be pull into 4.5-rcX given that it was already ack'ed week back?
+The nozomi wireless data driver has its own helper function to
+transfer data from a FIFO, doing an extra byte swap on big-endian
+architectures, presumably to bring the data back into byte-serial
+order after readw() or readl() perform their implicit byteswap.
 
-It is still Rafael's decision, as I've already stated.
+This helper function is used in the receive_data() function to
+first read the length into a 32-bit variable, which causes
+a compile-time warning:
 
-Rafael?
+drivers/tty/nozomi.c: In function 'receive_data':
+drivers/tty/nozomi.c:857:9: warning: 'size' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
+The problem is that gcc is unsure whether the data was actually
+read or not. We know that it is at this point, so we can replace
+it with a single readl() to shut up that warning.
+
+I am leaving the byteswap in there, to preserve the existing
+behavior, even though this seems fishy: Reading the length of
+the data into a cpu-endian variable should normally not use
+a second byteswap on big-endian systems, unless the hardware
+is aware of the CPU endianess.
+
+There appears to be a lot more confusion about endianess in this
+driver, so it probably has not worked on big-endian systems in
+a long time, if ever, and I have no way to test it. It's well
+possible that this driver has not been used by anyone in a while,
+the last patch that looks like it was tested on the hardware is
+from 2008.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/tty/nozomi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/tty/nozomi.c b/drivers/tty/nozomi.c
+index 80f9de907563..5cc80b80c82b 100644
+--- a/drivers/tty/nozomi.c
++++ b/drivers/tty/nozomi.c
+@@ -823,7 +823,7 @@ static int receive_data(enum port_type index, struct nozomi *dc)
+ 	struct tty_struct *tty = tty_port_tty_get(&port->port);
+ 	int i, ret;
+ 
+-	read_mem32((u32 *) &size, addr, 4);
++	size = __le32_to_cpu(readl(addr));
+ 	/*  DBG1( "%d bytes port: %d", size, index); */
+ 
+ 	if (tty && test_bit(TTY_THROTTLED, &tty->flags)) {
 -- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
+2.7.0
