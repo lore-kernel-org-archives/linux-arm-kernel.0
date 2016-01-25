@@ -1,63 +1,46 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 16:38:18 +0000
-Subject: [PATCH 02/27] ARM: KVM: Remove __kvm_hyp_code_start/__kvm_hyp_code_end
+Date: Mon, 25 Jan 2016 16:38:23 +0000
+Subject: [PATCH 07/27] ARM: KVM: Add system register accessor macros
 In-Reply-To: <1453739923-17846-1-git-send-email-marc.zyngier@arm.com>
 References: <1453739923-17846-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453739923-17846-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453739923-17846-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we've unified the way we refer to the HYP text between
-arm and arm64, drop __kvm_hyp_code_start/end, and just use the
-__hyp_text_start/end symbols.
+In order to move system register (CP15, mostly) access to C code,
+add a few macros to facilitate this, and minimize the difference
+between 32 and 64bit CP15 registers.
+
+This will get heavily used in the following patches.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_asm.h   | 3 ---
- arch/arm/kvm/arm.c               | 2 +-
- arch/arm64/include/asm/kvm_asm.h | 3 ---
- 3 files changed, 1 insertion(+), 7 deletions(-)
+ arch/arm/kvm/hyp/hyp.h | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index fa2fd25..4841225 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -93,9 +93,6 @@ extern char __kvm_hyp_exit_end[];
+diff --git a/arch/arm/kvm/hyp/hyp.h b/arch/arm/kvm/hyp/hyp.h
+index c723870..727089f 100644
+--- a/arch/arm/kvm/hyp/hyp.h
++++ b/arch/arm/kvm/hyp/hyp.h
+@@ -27,4 +27,19 @@
+ #define kern_hyp_va(v) (v)
+ #define hyp_kern_va(v) (v)
  
- extern char __kvm_hyp_vector[];
- 
--#define	__kvm_hyp_code_start	__hyp_text_start
--#define __kvm_hyp_code_end	__hyp_text_end
--
- extern void __kvm_flush_vm_context(void);
- extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
- extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index dda1959..0a26d20 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1074,7 +1074,7 @@ static int init_hyp_mode(void)
- 	/*
- 	 * Map the Hyp-code called directly from the host
- 	 */
--	err = create_hyp_mappings(__kvm_hyp_code_start, __kvm_hyp_code_end);
-+	err = create_hyp_mappings(__hyp_text_start, __hyp_text_end);
- 	if (err) {
- 		kvm_err("Cannot map world-switch code\n");
- 		goto out_free_mappings;
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index 52b777b..2ad8930 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -35,9 +35,6 @@ extern char __kvm_hyp_init_end[];
- 
- extern char __kvm_hyp_vector[];
- 
--#define	__kvm_hyp_code_start	__hyp_text_start
--#define	__kvm_hyp_code_end	__hyp_text_end
--
- extern void __kvm_flush_vm_context(void);
- extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
- extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
++#define __ACCESS_CP15(CRn, Op1, CRm, Op2)	\
++	"mrc", "mcr", __stringify(p15, Op1, %0, CRn, CRm, Op2), u32
++#define __ACCESS_CP15_64(Op1, CRm)		\
++	"mrrc", "mcrr", __stringify(p15, Op1, %Q0, %R0, CRm), u64
++
++#define __write_sysreg(v, r, w, c, t)	asm volatile(w " " c : : "r" ((t)(v)))
++#define write_sysreg(v, ...)		__write_sysreg(v, __VA_ARGS__)
++
++#define __read_sysreg(r, w, c, t) ({				\
++	t __val;						\
++	asm volatile(r " " c : "=r" (__val));			\
++	__val;							\
++})
++#define read_sysreg(...)		__read_sysreg(__VA_ARGS__)
++
+ #endif /* __ARM_KVM_HYP_H__ */
 -- 
 2.1.4
