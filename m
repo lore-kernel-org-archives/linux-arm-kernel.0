@@ -1,77 +1,67 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 15:53:51 +0000
-Subject: [PATCH v2 17/21] arm64: KVM: VHE: Add alternative panic handling
+Date: Mon, 25 Jan 2016 15:53:47 +0000
+Subject: [PATCH v2 13/21] arm64: KVM: VHE: Make __fpsimd_enabled VHE aware
 In-Reply-To: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
 References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453737235-16522-18-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453737235-16522-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the kernel fully runs in HYP when VHE is enabled, we can
-directly branch to the kernel's panic() implementation, and
-not perform an exception return.
-
-Add the alternative code to deal with this.
+As non-VHE and VHE have different ways to express the trapping of
+FPSIMD registers to EL2, make __fpsimd_enabled a patchable predicate
+and provide a VHE implementation.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/switch.c | 35 +++++++++++++++++++++++++++--------
- 1 file changed, 27 insertions(+), 8 deletions(-)
+ arch/arm64/kvm/hyp/hyp.h    |  5 +----
+ arch/arm64/kvm/hyp/switch.c | 19 +++++++++++++++++++
+ 2 files changed, 20 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+index 5dfa883..44eaff7 100644
+--- a/arch/arm64/kvm/hyp/hyp.h
++++ b/arch/arm64/kvm/hyp/hyp.h
+@@ -171,10 +171,7 @@ void __debug_cond_restore_host_state(struct kvm_vcpu *vcpu);
+ 
+ void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
+ void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
+-static inline bool __fpsimd_enabled(void)
+-{
+-	return !(read_sysreg(cptr_el2) & CPTR_EL2_TFP);
+-}
++bool __fpsimd_enabled(void);
+ 
+ u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
+ void __noreturn __hyp_do_panic(unsigned long, ...);
 diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 77f7c94..0cadb7f 100644
+index 9071dee..6f264dc 100644
 --- a/arch/arm64/kvm/hyp/switch.c
 +++ b/arch/arm64/kvm/hyp/switch.c
-@@ -211,11 +211,34 @@ __alias(__guest_run) int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+@@ -17,6 +17,25 @@
  
- static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%p\n";
+ #include "hyp.h"
  
--void __hyp_text __noreturn __hyp_panic(void)
-+static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par)
- {
- 	unsigned long str_va = (unsigned long)__hyp_panic_string;
--	u64 spsr = read_sysreg(spsr_el2);
--	u64 elr = read_sysreg(elr_el2);
-+
-+	__hyp_do_panic(hyp_kern_va(str_va),
-+		       spsr,  elr,
-+		       read_sysreg(esr_el2),   read_sysreg_el2(far),
-+		       read_sysreg(hpfar_el2), par,
-+		       (void *)read_sysreg(tpidr_el2));
-+}
-+
-+static void __hyp_text __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par)
++static bool __hyp_text __fpsimd_enabled_nvhe(void)
 +{
-+	panic(__hyp_panic_string,
-+	      spsr,  elr,
-+	      read_sysreg_el2(esr),   read_sysreg_el2(far),
-+	      read_sysreg(hpfar_el2), par,
-+	      (void *)read_sysreg(tpidr_el2));
++	return !(read_sysreg(cptr_el2) & CPTR_EL2_TFP);
 +}
 +
-+static hyp_alternate_select(__hyp_call_panic,
-+			    __hyp_call_panic_nvhe, __hyp_call_panic_vhe,
++static bool __hyp_text __fpsimd_enabled_vhe(void)
++{
++	return !!(read_sysreg(cpacr_el1) & (3 << 20));
++}
++
++static hyp_alternate_select(__fpsimd_is_enabled,
++			    __fpsimd_enabled_nvhe, __fpsimd_enabled_vhe,
 +			    ARM64_HAS_VIRT_HOST_EXTN);
 +
-+void __hyp_text __noreturn __hyp_panic(void)
++bool __hyp_text __fpsimd_enabled(void)
 +{
-+	u64 spsr = read_sysreg_el2(spsr);
-+	u64 elr = read_sysreg_el2(elr);
- 	u64 par = read_sysreg(par_el1);
- 
- 	if (read_sysreg(vttbr_el2)) {
-@@ -230,11 +253,7 @@ void __hyp_text __noreturn __hyp_panic(void)
- 	}
- 
- 	/* Call panic for real */
--	__hyp_do_panic(hyp_kern_va(str_va),
--		       spsr,  elr,
--		       read_sysreg(esr_el2),   read_sysreg(far_el2),
--		       read_sysreg(hpfar_el2), par,
--		       (void *)read_sysreg(tpidr_el2));
-+	__hyp_call_panic()(spsr, elr, par);
- 
- 	unreachable();
- }
++	return __fpsimd_is_enabled()();
++}
++
+ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ {
+ 	u64 val;
 -- 
 2.1.4
