@@ -1,24 +1,57 @@
 From: eric.long@linaro.org (Eric Long)
-Date: Mon, 25 Jan 2016 16:34:54 +0800
-Subject: [PATCH v2 0/2] Modify static defined and wrong parameter used.
-Message-ID: <cover.1453708131.git.eric.long@linaro.org>
+Date: Mon, 25 Jan 2016 16:34:55 +0800
+Subject: [PATCH v2 1/2] coresight: "DEVICE_ATTR_RO" should defined as static.
+In-Reply-To: <cover.1453708131.git.eric.long@linaro.org>
+References: <cover.1453708131.git.eric.long@linaro.org>
+Message-ID: <8deddd68ec28fa1bd9ce007694f13ff27cb99191.1453708131.git.eric.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both of the two patches optimize the code and remove the mistakes
-and warnings detected by the check tools.
+"DEVICE_ATTR_RO(name)" should be defined as static. And
+there is an unnecessary space at the front of the code.
 
-Changes since v1:
- - Adjust the patch by the changes not by the check tools.
+The sparse tool output logs as the following:
+coresight-etm4x.c:2224:1: warning: symbol 'dev_attr_trcoslsr' was
+not declared. Should it be static?
+coresight-etm4x.c:2225:1: warning: symbol 'dev_attr_trcpdcr' was
+not declared. Should it be static?
+coresight-etm4x.c:2226:1: warning: symbol 'dev_attr_trcpdsr' was
+not declared. Should it be static?
+And the smatch tool output logs as the following:
+of_coresight.c:89 of_coresight_alloc_memory() warn:
+inconsistent indenting
 
-Eric Long (2):
-  coresight: "DEVICE_ATTR_RO" should defined as static.
-  coresight: etm4x: Check every parameter used by dma_xx_coherent.
-
+Signed-off-by: Eric Long <eric.long@linaro.org>
+---
  drivers/hwtracing/coresight/coresight-etm4x.c |    2 +-
- drivers/hwtracing/coresight/coresight-tmc.c   |    6 +++---
  drivers/hwtracing/coresight/of_coresight.c    |    2 +-
- 3 files changed, 5 insertions(+), 5 deletions(-)
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index a670764..1ec6798 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -2219,7 +2219,7 @@ static ssize_t name##_show(struct device *_dev,				\
+ 	return scnprintf(buf, PAGE_SIZE, "0x%x\n",			\
+ 			 readl_relaxed(drvdata->base + offset));	\
+ }									\
+-DEVICE_ATTR_RO(name)
++static DEVICE_ATTR_RO(name)
+ 
+ coresight_simple_func(trcoslsr, TRCOSLSR);
+ coresight_simple_func(trcpdcr, TRCPDCR);
+diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+index b097361..3cc57c1 100644
+--- a/drivers/hwtracing/coresight/of_coresight.c
++++ b/drivers/hwtracing/coresight/of_coresight.c
+@@ -86,7 +86,7 @@ static int of_coresight_alloc_memory(struct device *dev,
+ 		return -ENOMEM;
+ 
+ 	/* Children connected to this component via @outports */
+-	 pdata->child_names = devm_kzalloc(dev, pdata->nr_outport *
++	pdata->child_names = devm_kzalloc(dev, pdata->nr_outport *
+ 					  sizeof(*pdata->child_names),
+ 					  GFP_KERNEL);
+ 	if (!pdata->child_names)
 -- 
 1.7.9.5
