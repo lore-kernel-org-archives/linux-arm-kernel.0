@@ -1,34 +1,57 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 25 Jan 2016 11:14:28 +0100
-Subject: [PATCH v1 0/3] clk: rockchip: rk3368: fix some error for rk3368
- clk
-In-Reply-To: <1453740962-8556-1-git-send-email-zhangqing@rock-chips.com>
-References: <1453740962-8556-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1616798.0SYvlcg7vJ@diego>
+From: blogic@openwrt.org (John Crispin)
+Date: Mon, 25 Jan 2016 11:14:44 +0100
+Subject: [PATCH V2 1/4] dt-bindings: mfd: Add bindings for the MediaTek MT6323
+ PMIC
+In-Reply-To: <1453716887-38442-1-git-send-email-blogic@openwrt.org>
+References: <1453716887-38442-1-git-send-email-blogic@openwrt.org>
+Message-ID: <1453716887-38442-2-git-send-email-blogic@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: John Crispin <blogic@openwrt.org>
+Cc: devicetree at vger.kernel.org
+---
+ Documentation/devicetree/bindings/mfd/mt6397.txt |   10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-Am Montag, 25. Januar 2016, 08:55:59 schrieb Zhang Qing:
-> From: zhangqing <zhangqing@rock-chips.com>
-> 
-> modify edp_24m parent select bit.
-> enable CLK_SET_RATE_PARENT flag for spdif_8ch and i2s_2ch.
-> 
-> zhangqing (3):
->   clk: rockchip: rk3368: fix edp_24m parent
->   clk: rockchip: rk3368: enable the CLK_SET_RATE_PARENT flag for
->     spdif_8ch
->   clk: rockchip: rk3368: enable the CLK_SET_RATE_PARENT flag for i2s_2ch
-
-applied all 3 to my clk branch for 4.6.
-
-I've modified patches 2+3 to keep the line-alingment (= move the CLK_SET_PARENT 
-to the line above). In the clock trees I really like to keep the structure 
-identical over all clocks (and thus ignore the 80 column limit in parts) to 
-make reading the large lists easier, as now everything always is in the same 
-place.
-
-
-Heiko
+diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
+index 15043e6..949c85f 100644
+--- a/Documentation/devicetree/bindings/mfd/mt6397.txt
++++ b/Documentation/devicetree/bindings/mfd/mt6397.txt
+@@ -1,6 +1,6 @@
+-MediaTek MT6397 Multifunction Device Driver
++MediaTek MT6397/MT6323 Multifunction Device Driver
+ 
+-MT6397 is a multifunction device with the following sub modules:
++MT6397/MT6323 is a multifunction device with the following sub modules:
+ - Regulator
+ - RTC
+ - Audio codec
+@@ -8,14 +8,14 @@ MT6397 is a multifunction device with the following sub modules:
+ - Clock
+ 
+ It is interfaced to host controller using SPI interface by a proprietary hardware
+-called PMIC wrapper or pwrap. MT6397 MFD is a child device of pwrap.
++called PMIC wrapper or pwrap. MT6397/MT6323 MFD is a child device of pwrap.
+ See the following for pwarp node definitions:
+ Documentation/devicetree/bindings/soc/pwrap.txt
+ 
+ This document describes the binding for MFD device and its sub module.
+ 
+ Required properties:
+-compatible: "mediatek,mt6397"
++compatible: "mediatek,mt6397" or "mediatek,mt6323"
+ 
+ Optional subnodes:
+ 
+@@ -26,6 +26,8 @@ Optional subnodes:
+ 	Required properties:
+ 		- compatible: "mediatek,mt6397-regulator"
+ 	see Documentation/devicetree/bindings/regulator/mt6397-regulator.txt
++		- compatible: "mediatek,mt6323-regulator"
++	see Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+ - codec
+ 	Required properties:
+ 		- compatible: "mediatek,mt6397-codec"
+-- 
+1.7.10.4
