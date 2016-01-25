@@ -1,36 +1,24 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Mon, 25 Jan 2016 10:35:02 +0200
-Subject: [PATCH 03/15] dmaengine: dw: rename masters to reflect actual
- topology
-In-Reply-To: <20160124223629.GI6588@sirena.org.uk>
-References: <1453663322-14474-1-git-send-email-mans@mansr.com>
- <1453663322-14474-4-git-send-email-mans@mansr.com>
- <20160124223629.GI6588@sirena.org.uk>
-Message-ID: <1453710902.2521.203.camel@linux.intel.com>
+From: eric.long@linaro.org (Eric Long)
+Date: Mon, 25 Jan 2016 16:34:54 +0800
+Subject: [PATCH v2 0/2] Modify static defined and wrong parameter used.
+Message-ID: <cover.1453708131.git.eric.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2016-01-24 at 22:36 +0000, Mark Brown wrote:
-> On Sun, Jan 24, 2016 at 07:21:50PM +0000, Mans Rullgard wrote:
-> > From: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> > 
-> > The source and destination masters are reflecting buses or their
-> > layers to
-> > where the different devices can be connected. The patch changes the
-> > master
-> > names to reflect which one is related to which independently on the
-> > transfer
-> > direction.
-> 
-> This is patch 3 of a series but I don't have anything else in the
-> series.??What is going on with the rest of the series - what are the
-> dependencies and so on?
+Both of the two patches optimize the code and remove the mistakes
+and warnings detected by the check tools.
 
-Mark, sorry about that, but in this particular case you may consider
-this patch is a standalone one. You are in the Cc list due to SPI
-driver small change. This change isn't modifying functionality of the
-driver.
+Changes since v1:
+ - Adjust the patch by the changes not by the check tools.
+
+Eric Long (2):
+  coresight: "DEVICE_ATTR_RO" should defined as static.
+  coresight: etm4x: Check every parameter used by dma_xx_coherent.
+
+ drivers/hwtracing/coresight/coresight-etm4x.c |    2 +-
+ drivers/hwtracing/coresight/coresight-tmc.c   |    6 +++---
+ drivers/hwtracing/coresight/of_coresight.c    |    2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+1.7.9.5
