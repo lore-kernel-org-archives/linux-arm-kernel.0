@@ -1,31 +1,44 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 24 Jan 2016 22:49:44 -0200
-Subject: [PATCH v2] ARM: imx_v6_v7_defconfig: Enable GPU support
-Message-ID: <1453682984-5785-1-git-send-email-festevam@gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 25 Jan 2016 09:50:19 +0900
+Subject: [RESEND v2 0/2] arm64: EXYNOS: Consolidate Exynos7 symbol
+Message-ID: <1453683021-6998-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select CONFIG_DRM_ETNAVIV, so that GPU support can be enabled by default.
+Dear Michael and Stephen,
 
-Signed-off-by: Fabio Estevam <festevam@gmail.com>
----
-Changes since v1:
-- Rebase against 4.5-rc1
 
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Patch 2 *depends* on patch 1. I was thinking about merging this through
+arm-soc tree after getting your acks.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 2d5253d..be08ce7 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -231,6 +231,7 @@ CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
- CONFIG_DRM_IMX_TVE=y
- CONFIG_DRM_IMX_LDB=y
- CONFIG_DRM_IMX_HDMI=y
-+CONFIG_DRM_ETNAVIV=y
- CONFIG_FB_MXS=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_L4F00242T03=y
+Can you look at patch 1 here and share your comments?
+
+
+
+Short introduction
+==================
+We don't need ARCH_EXYNOS7 symbol because all ARMv8 platforms should
+fall under generic ARCH_EXYNOS. In the same time there is no sense
+in building clocks for these ARMv8 SoCs on ARMv7 builds. In future
+this will also influence PMU [1] driver.
+
+
+Best regards,
+Krzysztof
+
+[1] https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg48090.html
+
+
+Krzysztof Kozlowski (2):
+  clk: samsung: Don't build ARMv8 clock drivers on ARMv7
+  arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS
+
+ arch/arm64/Kconfig.platforms        | 11 ++---------
+ arch/arm64/boot/dts/exynos/Makefile |  2 +-
+ arch/arm64/configs/defconfig        |  2 +-
+ drivers/clk/samsung/Kconfig         |  6 ++++++
+ drivers/clk/samsung/Makefile        |  4 ++--
+ 5 files changed, 12 insertions(+), 13 deletions(-)
+
 -- 
 1.9.1
