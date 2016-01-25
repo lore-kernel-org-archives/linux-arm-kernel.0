@@ -1,38 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 22:54:57 +0100
-Subject: [PATCH 2/3] tty: cyclades: cyz_interrupt is only used for PCI
+Date: Mon, 25 Jan 2016 22:54:58 +0100
+Subject: [PATCH 3/3] tty: hvc_xen: hide xen_console_remove when unused
 In-Reply-To: <1453758918-3577213-1-git-send-email-arnd@arndb.de>
 References: <1453758918-3577213-1-git-send-email-arnd@arndb.de>
-Message-ID: <1453758918-3577213-2-git-send-email-arnd@arndb.de>
+Message-ID: <1453758918-3577213-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_PCI is not set, enabling CONFIG_CYZ_INTR has no
-practical effect other than generating a warning about an
-unused function:
+xencons_disconnect_backend() is only called from xen_console_remove(),
+which is conditionally compiled, so we get a harmless warning when
+CONFIG_HVC_XEN_FRONTEND is unset:
 
-drivers/tty/cyclades.c:1184:20: warning: 'cyz_interrupt' defined but not used [-Wunused-function]
- static irqreturn_t cyz_interrupt(int irq, void *dev_id)
+hvc/hvc_xen.c:350:12: error: 'xen_console_remove' defined but not used [-Werror=unused-function]
 
-This adds a dependency to avoid that warning.
+This moves the function down into the same #ifdef section to silence
+the warning.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/tty/Kconfig | 2 +-
+ drivers/tty/hvc/hvc_xen.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/tty/Kconfig b/drivers/tty/Kconfig
-index c01f45095877..82c4d2e45319 100644
---- a/drivers/tty/Kconfig
-+++ b/drivers/tty/Kconfig
-@@ -226,7 +226,7 @@ config CYCLADES
+diff --git a/drivers/tty/hvc/hvc_xen.c b/drivers/tty/hvc/hvc_xen.c
+index fa816b7193b6..11725422dacb 100644
+--- a/drivers/tty/hvc/hvc_xen.c
++++ b/drivers/tty/hvc/hvc_xen.c
+@@ -323,6 +323,7 @@ void xen_console_resume(void)
+ 	}
+ }
  
- config CYZ_INTR
- 	bool "Cyclades-Z interrupt mode operation"
--	depends on CYCLADES
-+	depends on CYCLADES && PCI
- 	help
- 	  The Cyclades-Z family of multiport cards allows 2 (two) driver op
- 	  modes: polling and interrupt. In polling mode, the driver will check
++#ifdef CONFIG_HVC_XEN_FRONTEND
+ static void xencons_disconnect_backend(struct xencons_info *info)
+ {
+ 	if (info->irq > 0)
+@@ -363,7 +364,6 @@ static int xen_console_remove(struct xencons_info *info)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_HVC_XEN_FRONTEND
+ static int xencons_remove(struct xenbus_device *dev)
+ {
+ 	return xen_console_remove(dev_get_drvdata(&dev->dev));
 -- 
 2.7.0
