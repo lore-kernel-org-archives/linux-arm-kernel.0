@@ -1,38 +1,63 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Mon, 25 Jan 2016 14:13:28 +0100
-Subject: [PATCH V2 2/2] regulator: mt6323: Add support for MT6323 regulator
-In-Reply-To: <20160125123538.GO6588@sirena.org.uk>
-References: <1453718405-40815-1-git-send-email-blogic@openwrt.org>
- <1453718405-40815-2-git-send-email-blogic@openwrt.org>
- <CABxcv=kWnUwpCo=JJbnPAARRM226YfBJw_6yF7MiE8-7iqBD+Q@mail.gmail.com>
- <56A612E2.1010509@openwrt.org> <20160125123538.GO6588@sirena.org.uk>
-Message-ID: <56A61F78.6070703@openwrt.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 25 Jan 2016 21:15:37 +0800
+Subject: [PATCH RFC 01/11] clk: composite: Add unregister function
+In-Reply-To: <1453727747-23307-1-git-send-email-wens@csie.org>
+References: <1453727747-23307-1-git-send-email-wens@csie.org>
+Message-ID: <1453727747-23307-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
 
+The composite clock didn't have any unregistration function, which forced
+us to use clk_unregister directly on it.
 
-On 25/01/2016 13:35, Mark Brown wrote:
-> On Mon, Jan 25, 2016 at 01:19:46PM +0100, John Crispin wrote:
->> On 25/01/2016 13:11, Javier Martinez Canillas wrote:
-> 
->>> You don't have a .of_match table but according the DT bindings, the
->>> compatible string "mediatek,mt6323-regulator" should be used so there
->>> should be a OF match table or the vendor prefix of the compatible
->>> string won't be used for matching (i.e: fallbacks to the driver .name
->>> for match).
-> 
->> the driver is probed via drivers/mfd/mt6397-core.c and does not require
->> the OF match table. It loads fine just like the mt6397 driver.
-> 
-> That's fine but you shouldn't have the compatible string in your binding
-> document since it's not actually used or needed.
-> 
-Hi,
+While it was already not great from an API point of view, it also meant
+that we were leaking the clk_composite structure allocated in
+clk_register_composite.
 
-correct me if i am wrong but if we remove the compatible string from the
-binding document, then we will also have to remove it from the dts and
-then the kernel won't be able to match the node to the driver and thus
-the regulator phandle derefs will fail.
+Add a clk_unregister_composite function to fix this.
 
-	John
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/clk/clk-composite.c  | 15 +++++++++++++++
+ include/linux/clk-provider.h |  1 +
+ 2 files changed, 16 insertions(+)
+
+diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+index 4735de0660cc..f4c38f209594 100644
+--- a/drivers/clk/clk-composite.c
++++ b/drivers/clk/clk-composite.c
+@@ -288,3 +288,18 @@ err:
+ 	kfree(composite);
+ 	return clk;
+ }
++
++void clk_unregister_composite(struct clk *clk)
++{
++	struct clk_composite *composite;
++	struct clk_hw *hw;
++
++	hw = __clk_get_hw(clk);
++	if (!hw)
++		return;
++
++	composite = to_clk_composite(hw);
++
++	clk_unregister(clk);
++	kfree(composite);
++}
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 1143e38555a4..fa3dd6ba970b 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -585,6 +585,7 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+ 		struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
+ 		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
+ 		unsigned long flags);
++void clk_unregister_composite(struct clk *clk);
+ 
+ /***
+  * struct clk_gpio_gate - gpio gated clock
+-- 
+2.7.0
