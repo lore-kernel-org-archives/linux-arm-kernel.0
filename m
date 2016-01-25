@@ -1,26 +1,201 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 25 Jan 2016 05:23:25 -0800
-Subject: [PATCH 1/3] printk: make preferred_console local static bool
-In-Reply-To: <56A61A6F.10409@linaro.org>
-References: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>
- <1453722324-22407-2-git-send-email-aleksey.makarov@linaro.org>
- <1453725901.28952.53.camel@perches.com> <56A61A6F.10409@linaro.org>
-Message-ID: <1453728205.28952.62.camel@perches.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 25 Jan 2016 14:24:10 +0100
+Subject: [PATCH v2] ARM: dts: kirkwood: add device tree for buffalo
+ linkstation ls-qvl
+In-Reply-To: <1453677603-25803-2-git-send-email-rogershimizu@gmail.com>
+References: <1453652964-21489-1-git-send-email-rogershimizu@gmail.com>
+ <1453677603-25803-2-git-send-email-rogershimizu@gmail.com>
+Message-ID: <20160125132410.GA3880@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-01-25 at 18:51 +0600, Aleksey Makarov wrote:
+On Mon, Jan 25, 2016 at 08:20:03AM +0900, Roger Shimizu wrote:
+> Add dts file to support Buffalo Linkstation LS-QVL,
+> which is marvell kirkwood based 4-bay 3.5" HDD NAS.
+> Product info:
+>   - (JPN) http://buffalo.jp/product/hdd/network/ls-qvl_r5/
+>   - (ENG) http://www.buffalotech.com/products/network-storage/home-and-small-office/linkstation-pro-quad
 > 
-> On 25.01.2016 18:45, Joe Perches wrote:
-> > On Mon, 2016-01-25 at 17:45 +0600, Aleksey Makarov wrote:
-> > > The variable preferred_console is used only inside register_console()
-> > > and it's semantics is boolean.??Make it clear.
-> > 
-> > This loses the index of the preferred console.
-> > I'm not sure this is better.
-> 
-> That index is not used anywhere.??I believe the patch makes things clear.
+> Signed-off-by: Mario Lange <mario_lange@gmx.net>
+> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
 
-Well, with this change the name and its use
-is a bit misleading. ?Maybe changing it to
-something like use_selected_console is better.
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+
+Thanks
+	Andrew
+
+> ---
+>  .../devicetree/bindings/arm/marvell,kirkwood.txt   |   1 +
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts   | 135 +++++++++++++++++++++
+>  3 files changed, 137 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+> index 0d5d0f607d6c..345db8031196 100644
+> --- a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+> +++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+> @@ -19,6 +19,7 @@ SoC. Currently known SoC compatibles are:
+>  And in addition, the compatible shall be extended with the specific
+>  board. Currently known boards are:
+>  
+> +"buffalo,linkstation-lsqvl"
+>  "buffalo,linkstation-lsvl"
+>  "buffalo,linkstation-lswsxl"
+>  "buffalo,linkstation-lswxl"
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 3e2cf27d2368..68625754f398 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -183,6 +183,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
+>  	kirkwood-is2.dtb \
+>  	kirkwood-km_kirkwood.dtb \
+>  	kirkwood-laplug.dtb \
+> +	kirkwood-linkstation-lsqvl.dtb \
+>  	kirkwood-linkstation-lsvl.dtb \
+>  	kirkwood-linkstation-lswsxl.dtb \
+>  	kirkwood-linkstation-lswvl.dtb \
+> diff --git a/arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts b/arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts
+> new file mode 100644
+> index 000000000000..6dc0df2969f0
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts
+> @@ -0,0 +1,135 @@
+> +/*
+> + * Device Tree file for Buffalo Linkstation LS-QVL
+> + *
+> + * Copyright (C) 2016, Mario Lange <mario_lange@gmx.net>
+> + *
+> + * Based on kirkwood-linkstation-lswvl.dts,
+> + * Copyright (C) 2015, 2016
+> + * Roger Shimizu <rogershimizu@gmail.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "kirkwood-linkstation-6282.dtsi"
+> +
+> +/ {
+> +	model = "Buffalo Linkstation LS-QVL";
+> +	compatible = "buffalo,lsqvl", "marvell,kirkwood-88f6282", "marvell,kirkwood";
+> +
+> +	memory { /* 256 MB */
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x10000000>;
+> +	};
+> +
+> +	ocp at f1000000 {
+> +		pinctrl: pin-controller at 10000 {
+> +			pmx_power_hdd1: pmx-power-hdd1 {
+> +				marvell,pins = "mpp9";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_hdderr0: pmx-led-hdderr0 {
+> +				marvell,pins = "mpp34";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_hdderr1: pmx-led-hdderr1 {
+> +				marvell,pins = "mpp35";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_hdderr2: pmx-led-hdderr2 {
+> +				marvell,pins = "mpp24";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_hdderr3: pmx-led-hdderr3 {
+> +				marvell,pins = "mpp25";
+> +				marvell,function = "gpio";
+> +			};
+> +		};
+> +
+> +		sata at 80000 {
+> +			nr-ports = <2>;
+> +		};
+> +	};
+> +
+> +	gpio_leds {
+> +		pinctrl-0 = <&pmx_led_function_red &pmx_led_alarm
+> +			     &pmx_led_info &pmx_led_power
+> +			     &pmx_led_function_blue
+> +			     &pmx_led_hdderr0
+> +			     &pmx_led_hdderr1
+> +			     &pmx_led_hdderr2
+> +			     &pmx_led_hdderr3>;
+> +
+> +		red-hdderr0-led {
+> +			label = "linkstation:red:hdderr0";
+> +			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
+> +		};
+> +
+> +		red-hdderr1-led {
+> +			label = "linkstation:red:hdderr1";
+> +			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
+> +		};
+> +
+> +		red-hdderr2-led {
+> +			label = "linkstation:red:hdderr2";
+> +			gpios = <&gpio0 24 GPIO_ACTIVE_LOW>;
+> +		};
+> +
+> +		red-hdderr3-led {
+> +			label = "linkstation:red:hdderr3";
+> +			gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
+> +		};
+> +	};
+> +
+> +	regulators {
+> +		pinctrl-0 = <&pmx_power_hdd0 &pmx_power_hdd1 &pmx_usb_vbus>;
+> +
+> +		hdd_power1: regulator at 3 {
+> +			compatible = "regulator-fixed";
+> +			reg = <3>;
+> +			regulator-name = "HDD1 Power";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			enable-active-high;
+> +			regulator-always-on;
+> +			regulator-boot-on;
+> +			gpio = <&gpio0 9 GPIO_ACTIVE_HIGH>;
+> +		};
+> +	};
+> +};
+> -- 
+> 2.1.4
+> 
