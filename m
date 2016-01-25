@@ -1,57 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 25 Jan 2016 16:29:58 +0100
-Subject: [PATCH v7 04/10] mfd: axp20x: Add missing copyright notice
-In-Reply-To: <20160125143957.GS3368@x1>
-References: <1452655854-1528-1-git-send-email-wens@csie.org>
- <1452655854-1528-5-git-send-email-wens@csie.org>
- <20160125143957.GS3368@x1>
-Message-ID: <20160125152958.GO7908@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Jan 2016 16:30:41 +0100
+Subject: [PATCH] input: xpad: remove unused function
+Message-ID: <1453735884-1958624-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+There are two definitions of xpad_identify_controller(), one is used
+when CONFIG_JOYSTICK_XPAD_LEDS is set, but the other one is empty
+and never used, and we get a gcc warning about it:
 
-On Mon, Jan 25, 2016 at 02:39:57PM +0000, Lee Jones wrote:
-> On Wed, 13 Jan 2016, Chen-Yu Tsai wrote:
-> 
-> > When the driver was merged, the original author did not include a proper
-> > copyright notice. This patch adds the notice, backdated to when the
-> > driver was merged.
-> 
-> This is very wordy. 
-> 
-> "Supply a backdated copyright notice."
-> 
-> > Cc: Carlo Caione <carlo@caione.org>
-> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> > ---
-> > 
-> > New patch in v7.
-> > 
-> > ---
-> >  drivers/mfd/axp20x.c | 2 ++
-> >  1 file changed, 2 insertions(+)
-> 
-> Patch looks fine though:
-> 
-> Acked-by: Lee Jones <lee.jones@linaro.org>
+drivers/input/joystick/xpad.c:1210:13: warning: 'xpad_identify_controller' defined but not used [-Wunused-function]
 
-How do you want to merge these patches ?
+This removes the second definition.
 
-AFAIK, it's mostly MFD patches that could go through your tree, so
-feel free to apply them, I'll apply the DT parts.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: cae705baa40b ("Input: xpad - re-send LED command on present event")
+---
+ drivers/input/joystick/xpad.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-Thanks!
-Maxime
-
+diff --git a/drivers/input/joystick/xpad.c b/drivers/input/joystick/xpad.c
+index 6727954ab74b..e8a84d12b7ff 100644
+--- a/drivers/input/joystick/xpad.c
++++ b/drivers/input/joystick/xpad.c
+@@ -1207,7 +1207,6 @@ static void xpad_led_disconnect(struct usb_xpad *xpad)
+ #else
+ static int xpad_led_probe(struct usb_xpad *xpad) { return 0; }
+ static void xpad_led_disconnect(struct usb_xpad *xpad) { }
+-static void xpad_identify_controller(struct usb_xpad *xpad) { }
+ #endif
+ 
+ static int xpad_start_input(struct usb_xpad *xpad)
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160125/c6069823/attachment-0001.sig>
+2.7.0
