@@ -1,61 +1,128 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 25 Jan 2016 21:48:02 +0100
-Subject: mtd: pxa3xx_nand: issue with command time out
-In-Reply-To: <20160125183022.GA41251@google.com> (Brian Norris's message of
- "Mon, 25 Jan 2016 10:30:22 -0800")
-References: <5695CEF0.1080100@alliedtelesis.co.nz>
- <87a8o9ex9r.fsf@belgarion.home> <569827BC.10601@alliedtelesis.co.nz>
- <874meddqu5.fsf@belgarion.home> <20160125183022.GA41251@google.com>
-Message-ID: <87fuxl9yil.fsf@belgarion.home>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 25 Jan 2016 13:48:28 -0700
+Subject: [PATCH V8 21/23] perf tools: adding perf_evlist to
+ *info_priv_size()
+In-Reply-To: <1452807977-8069-22-git-send-email-mathieu.poirier@linaro.org>
+References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
+ <1452807977-8069-22-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <CANLsYkyc85famRPpfZk+O3iHXdbULV8-a=izUq=GbgMeiGw=Og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Brian Norris <computersforpeace@gmail.com> writes:
-
-> Hi Robert,
+On 14 January 2016 at 14:46, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+> On some architecture the size of the private header may
+> be dependent on the number of tracers used in the session.  As
+> such adding a "struct perf_evlist *" parameter, which should
+> contain all the required information.
 >
-> On Sun, Jan 17, 2016 at 12:53:06AM +0100, Robert Jarzmik wrote:
-> commit 24542257a3b987025d4b998ec2d15e556c98ad3f
-> Author: Robert Jarzmik <robert.jarzmik@free.fr>
-> Date:   Fri Feb 20 19:36:43 2015 +0100
+> Also adjusting the existing client of the interface to take
+> the new parameter into account.
 >
->     mtd: pxa3xx-nand: handle PIO in threaded interrupt
+> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+> Cc: Ingo Molnar <mingo@redhat.com>
+> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+>  tools/perf/arch/x86/util/intel-bts.c | 4 +++-
+>  tools/perf/arch/x86/util/intel-pt.c  | 4 +++-
+>  tools/perf/util/auxtrace.c           | 7 ++++---
+>  tools/perf/util/auxtrace.h           | 6 ++++--
+>  4 files changed, 14 insertions(+), 7 deletions(-)
 >
+> diff --git a/tools/perf/arch/x86/util/intel-bts.c b/tools/perf/arch/x86/util/intel-bts.c
+> index 9b94ce520917..4685a40777cc 100644
+> --- a/tools/perf/arch/x86/util/intel-bts.c
+> +++ b/tools/perf/arch/x86/util/intel-bts.c
+> @@ -60,7 +60,9 @@ struct branch {
+>         u64 misc;
+>  };
 >
-> And now I'm wondering: when does the completion get triggered? i.e.:
+> -static size_t intel_bts_info_priv_size(struct auxtrace_record *itr __maybe_unused)
+> +static size_t
+> +intel_bts_info_priv_size(struct auxtrace_record *itr __maybe_unused,
+> +                        struct perf_evlist *evlist __maybe_unused)
+>  {
+>         return INTEL_BTS_AUXTRACE_PRIV_SIZE;
+>  }
+> diff --git a/tools/perf/arch/x86/util/intel-pt.c b/tools/perf/arch/x86/util/intel-pt.c
+> index b02af064f0f9..e5c1f2e21f87 100644
+> --- a/tools/perf/arch/x86/util/intel-pt.c
+> +++ b/tools/perf/arch/x86/util/intel-pt.c
+> @@ -273,7 +273,9 @@ intel_pt_pmu_default_config(struct perf_pmu *intel_pt_pmu)
+>         return attr;
+>  }
 >
-> 	complete(&info->cmd_complete);
+> -static size_t intel_pt_info_priv_size(struct auxtrace_record *itr __maybe_unused)
+> +static size_t
+> +intel_pt_info_priv_size(struct auxtrace_record *itr __maybe_unused,
+> +                       struct perf_evlist *evlist __maybe_unused)
+>  {
+>         return INTEL_PT_AUXTRACE_PRIV_SIZE;
+>  }
+> diff --git a/tools/perf/util/auxtrace.c b/tools/perf/util/auxtrace.c
+> index 7f10430af39c..cc1c9ce5cc56 100644
+> --- a/tools/perf/util/auxtrace.c
+> +++ b/tools/perf/util/auxtrace.c
+> @@ -478,10 +478,11 @@ void auxtrace_heap__pop(struct auxtrace_heap *heap)
+>                          heap_array[last].ordinal);
+>  }
+>
+> -size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr)
+> +size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr,
+> +                                      struct perf_evlist *evlist)
+>  {
+>         if (itr)
+> -               return itr->info_priv_size(itr);
+> +               return itr->info_priv_size(itr, evlist);
+>         return 0;
+>  }
+>
+> @@ -852,7 +853,7 @@ int perf_event__synthesize_auxtrace_info(struct auxtrace_record *itr,
+>         int err;
+>
+>         pr_debug2("Synthesizing auxtrace information\n");
+> -       priv_size = auxtrace_record__info_priv_size(itr);
+> +       priv_size = auxtrace_record__info_priv_size(itr, session->evlist);
+>         ev = zalloc(sizeof(struct auxtrace_info_event) + priv_size);
+>         if (!ev)
+>                 return -ENOMEM;
+> diff --git a/tools/perf/util/auxtrace.h b/tools/perf/util/auxtrace.h
+> index b86f90db1352..e5a8e2d4f2af 100644
+> --- a/tools/perf/util/auxtrace.h
+> +++ b/tools/perf/util/auxtrace.h
+> @@ -293,7 +293,8 @@ struct auxtrace_record {
+>         int (*recording_options)(struct auxtrace_record *itr,
+>                                  struct perf_evlist *evlist,
+>                                  struct record_opts *opts);
+> -       size_t (*info_priv_size)(struct auxtrace_record *itr);
+> +       size_t (*info_priv_size)(struct auxtrace_record *itr,
+> +                                struct perf_evlist *evlist);
+>         int (*info_fill)(struct auxtrace_record *itr,
+>                          struct perf_session *session,
+>                          struct auxtrace_info_event *auxtrace_info,
+> @@ -429,7 +430,8 @@ int auxtrace_parse_snapshot_options(struct auxtrace_record *itr,
+>  int auxtrace_record__options(struct auxtrace_record *itr,
+>                              struct perf_evlist *evlist,
+>                              struct record_opts *opts);
+> -size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr);
+> +size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr,
+> +                                      struct perf_evlist *evlist);
+>  int auxtrace_record__info_fill(struct auxtrace_record *itr,
+>                                struct perf_session *session,
+>                                struct auxtrace_info_event *auxtrace_info,
+> --
+> 2.1.4
+>
 
-> It seems to me like you've short-circuited some of the IRQ handling
-> code, so that the threaded handler is buggy. AIUI, if the completion
-> event ever happens, it's actually happening *before* the full (threaded)
-> handler is actually finished, since it occurs in pxa3xx_nand_irq(),
-> before pxa3xx_nand_irq_thread() ever runs. Now, I'm not sure if that
-> causes a real problem in practice, since you used IRQF_ONESHOT, but I
-> would think that's also suspect.
+Arnaldo,
 
-I think you're very right, this "goto NORMAL_IRQ_EXIT" creates a
-short-cirtcuit. That makes me think that I should :
- - add
-static void pxa3xx_nand_data_finished(struct pxa3xx_nand_info *info)
-{
-	unsigned int done;
+As with my previous email, I can't queue this patch for 4.6 without at
+least a reviewed by from you.
 
- 	cmd_done = info->cs ? NDSR_CS1_CMDD : NDSR_CS0_CMDD;
-	nand_writel(info, NDSR, cmd_done);
-        complete(&inf0->cmd_complete);
-}
+It has been rebased to 4.5-rc1 here [1] for your convenience.  I will
+be happy to use another baseline should that be more adequate for you.
 
- - in pxa3xx_nand_irq_thread(), I should add at the end:
-	pxa3xx_nand_data_finished(info);
+Thanks,
+Mathieu
 
- - in pxa3xx_nand_data_dma_irq(), I should add at the end:
-	pxa3xx_nand_data_finished(info);
-
-Ezequiel, would you have a look at that code snippet and tell me if I'm missing
-something in the driver's structure ?
-
-Cheers.
-
---
-Robert
+[1]. https://git.linaro.org/people/mathieu.poirier/coresight.git/shortlog/refs/heads/perf-v4.5-rc1-V8
