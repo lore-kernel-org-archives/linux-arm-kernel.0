@@ -1,87 +1,58 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 25 Jan 2016 18:07:00 +0000
-Subject: [PATCH v4 2/7] arm64: Introduce cpu_die_early
+Date: Mon, 25 Jan 2016 18:06:59 +0000
+Subject: [PATCH v4 1/7] arm64: Add a helper for parking CPUs in a loop
 In-Reply-To: <1453745225-27736-1-git-send-email-suzuki.poulose@arm.com>
 References: <1453745225-27736-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1453745225-27736-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1453745225-27736-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suzuki K. Poulose <suzuki.poulose@arm.com>
 
-Or in other words, make fail_incapable_cpu() reusable.
-
-We use fail_incapable_cpu() to kill a secondary CPU early during the
-bringup, which doesn't have the system advertised capabilities.
-This patch makes the routine more generic, to kill a secondary
-booting CPU, getting rid of the dependency on capability struct.
-This can be used by checks which are not necessarily attached to
-a capability struct (e.g, cpu ASIDBits).
-
-In that process, renames the function to cpu_die_early() to better
-match its functionality. This will be moved to arch/arm64/kernel/smp.c
-later.
+Adds a routine which can be used to park CPUs (spinning in kernel)
+when they can't be killed.
 
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c |   24 +++++++++++++++---------
- 1 file changed, 15 insertions(+), 9 deletions(-)
+ arch/arm64/include/asm/smp.h   |    8 ++++++++
+ arch/arm64/kernel/cpufeature.c |    5 +----
+ 2 files changed, 9 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+index d9c3d6a..53b53a9 100644
+--- a/arch/arm64/include/asm/smp.h
++++ b/arch/arm64/include/asm/smp.h
+@@ -69,4 +69,12 @@ extern int __cpu_disable(void);
+ extern void __cpu_die(unsigned int cpu);
+ extern void cpu_die(void);
+ 
++static inline void cpu_park_loop(void)
++{
++	for (;;) {
++		wfe();
++		wfi();
++	}
++}
++
+ #endif /* ifndef __ASM_SMP_H */
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index cc4a089..8275e7d 100644
+index 5c90aa4..cc4a089 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -827,15 +827,15 @@ static u64 __raw_read_system_reg(u32 sys_id)
+@@ -842,10 +842,7 @@ static void fail_incapable_cpu(char *cap_type,
+ 	/* Check if we can park ourselves */
+ 	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
+ 		cpu_ops[cpu]->cpu_die(cpu);
+-	asm(
+-	"1:	wfe\n"
+-	"	wfi\n"
+-	"	b	1b");
++	cpu_park_loop();
  }
  
  /*
-- * Park the CPU which doesn't have the capability as advertised
-- * by the system.
-+ * Kill the calling secondary CPU, early in bringup before it is turned
-+ * online.
-  */
--static void fail_incapable_cpu(char *cap_type,
--				 const struct arm64_cpu_capabilities *cap)
-+void cpu_die_early(void)
- {
- 	int cpu = smp_processor_id();
- 
--	pr_crit("CPU%d: missing %s : %s\n", cpu, cap_type, cap->desc);
-+	pr_crit("CPU%d: will not boot\n", cpu);
-+
- 	/* Mark this CPU absent */
- 	set_cpu_present(cpu, 0);
- 
-@@ -873,8 +873,11 @@ void verify_local_cpu_capabilities(void)
- 		 * If the new CPU misses an advertised feature, we cannot proceed
- 		 * further, park the cpu.
- 		 */
--		if (!feature_matches(__raw_read_system_reg(caps[i].sys_reg), &caps[i]))
--			fail_incapable_cpu("arm64_features", &caps[i]);
-+		if (!feature_matches(__raw_read_system_reg(caps[i].sys_reg), &caps[i])) {
-+			pr_crit("CPU%d: missing feature: %s\n",
-+					smp_processor_id(), caps[i].desc);
-+			cpu_die_early();
-+		}
- 		if (caps[i].enable)
- 			caps[i].enable(NULL);
- 	}
-@@ -882,8 +885,11 @@ void verify_local_cpu_capabilities(void)
- 	for (i = 0, caps = arm64_hwcaps; caps[i].desc; i++) {
- 		if (!cpus_have_hwcap(&caps[i]))
- 			continue;
--		if (!feature_matches(__raw_read_system_reg(caps[i].sys_reg), &caps[i]))
--			fail_incapable_cpu("arm64_hwcaps", &caps[i]);
-+		if (!feature_matches(__raw_read_system_reg(caps[i].sys_reg), &caps[i])) {
-+			pr_crit("CPU%d: missing HWCAP: %s\n",
-+					smp_processor_id(), caps[i].desc);
-+			cpu_die_early();
-+		}
- 	}
- }
- 
 -- 
 1.7.9.5
