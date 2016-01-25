@@ -1,20 +1,25 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 25 Jan 2016 11:44:59 +0000
-Subject: [PATCHv3 05/18] arm64: unmap idmap earlier
+Date: Mon, 25 Jan 2016 11:45:06 +0000
+Subject: [PATCHv3 12/18] arm64: mm: add __{pud,pgd}_populate
 In-Reply-To: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
 References: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1453722312-23076-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <1453722312-23076-13-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During boot we leave the idmap in place until paging_init, as we
-previously had to wait for the zero page to become allocated and
-accessible.
+We currently have __pmd_populate for creating a pmd table entry given
+the physical address of a pte, but don't have equivalents for the pud or
+pgd levels of table.
 
-Now that we have a statically-allocated zero page, we can uninstall the
-idmap much earlier in the boot process, making it far easier to spot
-accidental use of physical addresses. This also brings the cold boot
-path in line with the secondary boot path.
+To enable us to manipulate tables which are mapped outside of the linear
+mapping (where we have a PA, but not a linear map VA), it is useful to
+have these functions.
+
+This patch adds __{pud,pgd}_populate. As these should not be called when
+the kernel uses folded {pmd,pud}s, in these cases they expand to
+BUILD_BUG(). So long as the appropriate checks are made on the {pud,pgd}
+entry prior to attempting population, these should be optimized out at
+compile time.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
@@ -24,43 +29,58 @@ Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/setup.c | 6 ++++++
- arch/arm64/mm/mmu.c       | 6 ------
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm64/include/asm/pgalloc.h | 26 ++++++++++++++++++++++----
+ 1 file changed, 22 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index f6621ba..cfed56f 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -314,6 +314,12 @@ void __init setup_arch(char **cmdline_p)
- 	 */
- 	local_async_enable();
- 
-+	/*
-+	 * TTBR0 is only used for the identity mapping at this stage. Make it
-+	 * point to zero page to avoid speculatively fetching new entries.
-+	 */
-+	cpu_uninstall_idmap();
-+
- 	efi_init();
- 	arm64_memblock_init();
- 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index e85a719..c3ea9df 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -463,12 +463,6 @@ void __init paging_init(void)
- 	fixup_executable();
- 
- 	bootmem_init();
--
--	/*
--	 * TTBR0 is only used for the identity mapping at this stage. Make it
--	 * point to zero page to avoid speculatively fetching new entries.
--	 */
--	cpu_uninstall_idmap();
+diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
+index c150539..ff98585 100644
+--- a/arch/arm64/include/asm/pgalloc.h
++++ b/arch/arm64/include/asm/pgalloc.h
+@@ -42,11 +42,20 @@ static inline void pmd_free(struct mm_struct *mm, pmd_t *pmd)
+ 	free_page((unsigned long)pmd);
  }
  
- /*
+-static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
++static inline void __pud_populate(pud_t *pud, phys_addr_t pmd, pudval_t prot)
+ {
+-	set_pud(pud, __pud(__pa(pmd) | PMD_TYPE_TABLE));
++	set_pud(pud, __pud(pmd | prot));
+ }
+ 
++static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
++{
++	__pud_populate(pud, __pa(pmd), PMD_TYPE_TABLE);
++}
++#else
++static inline void __pud_populate(pud_t *pud, phys_addr_t pmd, pudval_t prot)
++{
++	BUILD_BUG();
++}
+ #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
+ 
+ #if CONFIG_PGTABLE_LEVELS > 3
+@@ -62,11 +71,20 @@ static inline void pud_free(struct mm_struct *mm, pud_t *pud)
+ 	free_page((unsigned long)pud);
+ }
+ 
+-static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pud_t *pud)
++static inline void __pgd_populate(pgd_t *pgdp, phys_addr_t pud, pgdval_t prot)
+ {
+-	set_pgd(pgd, __pgd(__pa(pud) | PUD_TYPE_TABLE));
++	set_pgd(pgdp, __pgd(pud | prot));
+ }
+ 
++static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pud_t *pud)
++{
++	__pgd_populate(pgd, __pa(pud), PUD_TYPE_TABLE);
++}
++#else
++static inline void __pgd_populate(pgd_t *pgdp, phys_addr_t pud, pgdval_t prot)
++{
++	BUILD_BUG();
++}
+ #endif	/* CONFIG_PGTABLE_LEVELS > 3 */
+ 
+ extern pgd_t *pgd_alloc(struct mm_struct *mm);
 -- 
 1.9.1
