@@ -1,77 +1,33 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 16:38:36 +0000
-Subject: [PATCH 20/27] ARM: KVM: Change kvm_call_hyp return type to unsigned
- long
+Date: Mon, 25 Jan 2016 16:38:43 +0000
+Subject: [PATCH 27/27] ARM: KVM: Remove __kvm_hyp_exit/__kvm_hyp_exit_end
 In-Reply-To: <1453739923-17846-1-git-send-email-marc.zyngier@arm.com>
 References: <1453739923-17846-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453739923-17846-21-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453739923-17846-28-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having u64 as the kvm_call_hyp return type is problematic, as
-it forces all kind of tricks for the return values from HYP
-to be promoted to 64bit (LE has the LSB in r0, and BE has them
-in r1).
-
-Since the only user of the return value is perfectly happy with
-a 32bit value, let's make kvm_call_hyp return an unsigned long,
-which is 32bit on ARM.
-
-This solves yet another headache.
+I have no idea what these were for - probably a leftover from an
+early implementation. Good bye!
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h |  2 +-
- arch/arm/kvm/interrupts.S       | 10 ++--------
- 2 files changed, 3 insertions(+), 9 deletions(-)
+ arch/arm/include/asm/kvm_asm.h | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 897c5d8..62fa788 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -165,7 +165,7 @@ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
- int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
- int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
- int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
--u64 kvm_call_hyp(void *hypfn, ...);
-+unsigned long kvm_call_hyp(void *hypfn, ...);
- void force_vm_exit(const cpumask_t *mask);
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 0895f5b..80f4e4a 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -55,9 +55,6 @@ struct kvm_vcpu;
+ extern char __kvm_hyp_init[];
+ extern char __kvm_hyp_init_end[];
  
- #define KVM_ARCH_WANT_MMU_NOTIFIER
-diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-index 7bfb289..01eb169 100644
---- a/arch/arm/kvm/interrupts.S
-+++ b/arch/arm/kvm/interrupts.S
-@@ -207,20 +207,14 @@ after_vfp_restore:
+-extern char __kvm_hyp_exit[];
+-extern char __kvm_hyp_exit_end[];
+-
+ extern char __kvm_hyp_vector[];
  
- 	restore_host_regs
- 	clrex				@ Clear exclusive monitor
--#ifndef CONFIG_CPU_ENDIAN_BE8
- 	mov	r0, r1			@ Return the return code
--	mov	r1, #0			@ Clear upper bits in return value
--#else
--	@ r1 already has return code
--	mov	r0, #0			@ Clear upper bits in return value
--#endif /* CONFIG_CPU_ENDIAN_BE8 */
- 	bx	lr			@ return to IOCTL
- 
- /********************************************************************
-  *  Call function in Hyp mode
-  *
-  *
-- * u64 kvm_call_hyp(void *hypfn, ...);
-+ * unsigned long kvm_call_hyp(void *hypfn, ...);
-  *
-  * This is not really a variadic function in the classic C-way and care must
-  * be taken when calling this to ensure parameters are passed in registers
-@@ -231,7 +225,7 @@ after_vfp_restore:
-  * passed as r0, r1, and r2 (a maximum of 3 arguments in addition to the
-  * function pointer can be passed).  The function being called must be mapped
-  * in Hyp mode (see init_hyp_mode in arch/arm/kvm/arm.c).  Return values are
-- * passed in r0 and r1.
-+ * passed in r0 (strictly 32bit).
-  *
-  * A function pointer with a value of 0xffffffff has a special meaning,
-  * and is used to implement __hyp_get_vectors in the same way as in
+ extern void __kvm_flush_vm_context(void);
 -- 
 2.1.4
