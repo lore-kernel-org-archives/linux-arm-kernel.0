@@ -1,58 +1,129 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 21:52:43 +0100
-Subject: mainline build: 137 builds: 0 failed, 137 passed,
- 296 warnings (v4.4-10454-g3e1e21c7bfcf)
-In-Reply-To: <7hio2hr08f.fsf@kernel.org>
-References: <56a1c8c2.6953c20a.25484.ffff85a9@mx.google.com>
- <CANMBJr7W5uooa5+1tbTSfToeM6tS69E80ZB0E1gdcSnVaTaDaQ@mail.gmail.com>
- <7hio2hr08f.fsf@kernel.org>
-Message-ID: <2640068.aDOyd9eL7v@wuerfel>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Mon, 25 Jan 2016 18:08:58 -0300
+Subject: [PATCH V8 21/23] perf tools: adding perf_evlist to
+ *info_priv_size()
+In-Reply-To: <CANLsYkyc85famRPpfZk+O3iHXdbULV8-a=izUq=GbgMeiGw=Og@mail.gmail.com>
+References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
+ <1452807977-8069-22-git-send-email-mathieu.poirier@linaro.org>
+ <CANLsYkyc85famRPpfZk+O3iHXdbULV8-a=izUq=GbgMeiGw=Og@mail.gmail.com>
+Message-ID: <20160125210858.GC22501@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 January 2016 10:18:56 Kevin Hilman wrote:
-> Tyler Baker <tyler.baker@linaro.org> writes:
-> 
-> > On 22 January 2016 at 05:19, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> On Thursday 21 January 2016 22:14:26 kernelci. org bot wrote:
-> >>> Warnings summary:
-> >>>
-> >>>     224  <stdin>:1307:2: warning: #warning syscall copy_file_range not implemented [-Wcpp]
-> >>
-> >> I don't think anyone has sent this so far, sending a patch now.
-> >>
-> >>>      29  drivers/tty/serial/amba-pl011.c:190:27: warning: 'vendor_zte' defined but not used [-Wunused-variable]
-> >>
-> >> Patch sent a couple of days ago, got an Ack and waiting to be applied.
-> >>
-> >>>      12  net/bluetooth/mgmt.c:5493:8: warning: 'r192' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> >>>      12  net/bluetooth/mgmt.c:5493:8: warning: 'h192' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> >>
-> >> This happens only in gcc-4.7 and gcc-4.8
-> >>
-> >>>       5  crypto/wp512.c:987:1: warning: the frame size of 1168 bytes is larger than 1024 bytes [-Wframe-larger-than=]
-> >>>       1  crypto/wp512.c:987:1: warning: the frame size of 1112 bytes is larger than 1024 bytes [-Wframe-larger-than=]
-> >>
-> >> and this one only in gcc-4.7
-> >>
-> >> Any chance we can update the toolchain on kernelci.org to 4.9 or higher?
-> >> I'm normally testing with gcc-5.2, which has a little better warnings.
+Em Mon, Jan 25, 2016 at 01:48:28PM -0700, Mathieu Poirier escreveu:
+> On 14 January 2016 at 14:46, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+> > On some architecture the size of the private header may
+> > be dependent on the number of tracers used in the session.  As
+> > such adding a "struct perf_evlist *" parameter, which should
+> > contain all the required information.
 > >
-> > I'm ok with upgrading to 4.9 or higher. Kevin any issues with this?
+> > Also adjusting the existing client of the interface to take
+> > the new parameter into account.
+> >
+> > Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+> > Cc: Ingo Molnar <mingo@redhat.com>
+> > Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+> > Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> > ---
+> >  tools/perf/arch/x86/util/intel-bts.c | 4 +++-
+> >  tools/perf/arch/x86/util/intel-pt.c  | 4 +++-
+> >  tools/perf/util/auxtrace.c           | 7 ++++---
+> >  tools/perf/util/auxtrace.h           | 6 ++++--
+> >  4 files changed, 14 insertions(+), 7 deletions(-)
+> >
+> > diff --git a/tools/perf/arch/x86/util/intel-bts.c b/tools/perf/arch/x86/util/intel-bts.c
+> > index 9b94ce520917..4685a40777cc 100644
+> > --- a/tools/perf/arch/x86/util/intel-bts.c
+> > +++ b/tools/perf/arch/x86/util/intel-bts.c
+> > @@ -60,7 +60,9 @@ struct branch {
+> >         u64 misc;
+> >  };
+> >
+> > -static size_t intel_bts_info_priv_size(struct auxtrace_record *itr __maybe_unused)
+> > +static size_t
+> > +intel_bts_info_priv_size(struct auxtrace_record *itr __maybe_unused,
+> > +                        struct perf_evlist *evlist __maybe_unused)
+> >  {
+> >         return INTEL_BTS_AUXTRACE_PRIV_SIZE;
+> >  }
+> > diff --git a/tools/perf/arch/x86/util/intel-pt.c b/tools/perf/arch/x86/util/intel-pt.c
+> > index b02af064f0f9..e5c1f2e21f87 100644
+> > --- a/tools/perf/arch/x86/util/intel-pt.c
+> > +++ b/tools/perf/arch/x86/util/intel-pt.c
+> > @@ -273,7 +273,9 @@ intel_pt_pmu_default_config(struct perf_pmu *intel_pt_pmu)
+> >         return attr;
+> >  }
+> >
+> > -static size_t intel_pt_info_priv_size(struct auxtrace_record *itr __maybe_unused)
+> > +static size_t
+> > +intel_pt_info_priv_size(struct auxtrace_record *itr __maybe_unused,
+> > +                       struct perf_evlist *evlist __maybe_unused)
+> >  {
+> >         return INTEL_PT_AUXTRACE_PRIV_SIZE;
+> >  }
+> > diff --git a/tools/perf/util/auxtrace.c b/tools/perf/util/auxtrace.c
+> > index 7f10430af39c..cc1c9ce5cc56 100644
+> > --- a/tools/perf/util/auxtrace.c
+> > +++ b/tools/perf/util/auxtrace.c
+> > @@ -478,10 +478,11 @@ void auxtrace_heap__pop(struct auxtrace_heap *heap)
+> >                          heap_array[last].ordinal);
+> >  }
+> >
+> > -size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr)
+> > +size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr,
+> > +                                      struct perf_evlist *evlist)
+> >  {
+> >         if (itr)
+> > -               return itr->info_priv_size(itr);
+> > +               return itr->info_priv_size(itr, evlist);
+> >         return 0;
+> >  }
+> >
+> > @@ -852,7 +853,7 @@ int perf_event__synthesize_auxtrace_info(struct auxtrace_record *itr,
+> >         int err;
+> >
+> >         pr_debug2("Synthesizing auxtrace information\n");
+> > -       priv_size = auxtrace_record__info_priv_size(itr);
+> > +       priv_size = auxtrace_record__info_priv_size(itr, session->evlist);
+> >         ev = zalloc(sizeof(struct auxtrace_info_event) + priv_size);
+> >         if (!ev)
+> >                 return -ENOMEM;
+> > diff --git a/tools/perf/util/auxtrace.h b/tools/perf/util/auxtrace.h
+> > index b86f90db1352..e5a8e2d4f2af 100644
+> > --- a/tools/perf/util/auxtrace.h
+> > +++ b/tools/perf/util/auxtrace.h
+> > @@ -293,7 +293,8 @@ struct auxtrace_record {
+> >         int (*recording_options)(struct auxtrace_record *itr,
+> >                                  struct perf_evlist *evlist,
+> >                                  struct record_opts *opts);
+> > -       size_t (*info_priv_size)(struct auxtrace_record *itr);
+> > +       size_t (*info_priv_size)(struct auxtrace_record *itr,
+> > +                                struct perf_evlist *evlist);
+> >         int (*info_fill)(struct auxtrace_record *itr,
+> >                          struct perf_session *session,
+> >                          struct auxtrace_info_event *auxtrace_info,
+> > @@ -429,7 +430,8 @@ int auxtrace_parse_snapshot_options(struct auxtrace_record *itr,
+> >  int auxtrace_record__options(struct auxtrace_record *itr,
+> >                              struct perf_evlist *evlist,
+> >                              struct record_opts *opts);
+> > -size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr);
+> > +size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr,
+> > +                                      struct perf_evlist *evlist);
+> >  int auxtrace_record__info_fill(struct auxtrace_record *itr,
+> >                                struct perf_session *session,
+> >                                struct auxtrace_info_event *auxtrace_info,
+> > --
+> > 2.1.4
+> >
 > 
-> No objection in principle, but we probably can't do this across the
-> board without fallout.
+> Arnaldo,
 > 
-> I suspect we'll have issues with older stable kernels that have never
-> been compiled with > 4.7, but I haven't actually tried.
+> As with my previous email, I can't queue this patch for 4.6 without at
+> least a reviewed by from you.
 > 
+> It has been rebased to 4.5-rc1 here [1] for your convenience.  I will
+> be happy to use another baseline should that be more adequate for you.
 
-My guess is that there is very little of that. We had one issues with
-gcc-4.8 through 4.8.2 generating bad code, but aside of that I don't
-remember a recent case where a newer compiler broke stuff.
+Adrian, are you ok with this?
 
-There might be a couple of extra warnings in older kernels, but I've
-tried to ensure that all new warnings that got introduced from more
-recent gcc versions are fixed mainline kernels.
-
-	Arnd
+- Arnaldo
