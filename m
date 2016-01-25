@@ -1,30 +1,17 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 25 Jan 2016 11:44:56 +0000
-Subject: [PATCHv3 02/18] arm64: mm: specialise pagetable allocators
+Date: Mon, 25 Jan 2016 11:44:58 +0000
+Subject: [PATCHv3 04/18] arm64: unify idmap removal
 In-Reply-To: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
 References: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1453722312-23076-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1453722312-23076-5-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We pass a size parameter to early_alloc and late_alloc, but these are
-only ever used to allocate single pages. In late_alloc we always
-allocate a single page.
+We currently open-code the removal of the idmap and restoration of the
+current task's MMU state in a few places.
 
-Both allocators provide us with zeroed pages (such that all entries are
-invalid), but we have no barriers between allocating a page and adding
-that page to existing (live) tables. A concurrent page table walk may
-see stale data, leading to a number of issues.
-
-This patch specialises the two allocators for page tables. The size
-parameter is removed and the necessary dsb(ishst) is folded into each.
-To make it clear that the functions are intended for use for page table
-allocation, they are renamed to {early,late}_pgtable_alloc, with the
-related function pointed renamed to pgtable_alloc.
-
-As the dsb(ishst) is now in the allocator, the existing barrier for the
-zero page is redundant and thus is removed. The previously missing
-include of barrier.h is added.
+Before introducing yet more copies of this sequence, unify these to call
+a new helper, cpu_uninstall_idmap.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
@@ -32,190 +19,139 @@ Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/mm/mmu.c | 52 +++++++++++++++++++++++++++-------------------------
- 1 file changed, 27 insertions(+), 25 deletions(-)
+ arch/arm64/include/asm/mmu_context.h | 25 +++++++++++++++++++++++++
+ arch/arm64/kernel/setup.c            |  1 +
+ arch/arm64/kernel/smp.c              |  4 +---
+ arch/arm64/kernel/suspend.c          | 20 ++++----------------
+ arch/arm64/mm/mmu.c                  |  4 +---
+ 5 files changed, 32 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 58faeaa..b25d5cb 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -30,6 +30,7 @@
- #include <linux/slab.h>
- #include <linux/stop_machine.h>
- 
-+#include <asm/barrier.h>
+diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+index 600eacb..b1b2514 100644
+--- a/arch/arm64/include/asm/mmu_context.h
++++ b/arch/arm64/include/asm/mmu_context.h
+@@ -27,6 +27,7 @@
+ #include <asm-generic/mm_hooks.h>
  #include <asm/cputype.h>
- #include <asm/fixmap.h>
- #include <asm/kernel-pgtable.h>
-@@ -62,15 +63,18 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+ #include <asm/pgtable.h>
++#include <asm/tlbflush.h>
+ 
+ #ifdef CONFIG_PID_IN_CONTEXTIDR
+ static inline void contextidr_thread_switch(struct task_struct *next)
+@@ -90,6 +91,30 @@ static inline void cpu_set_default_tcr_t0sz(void)
  }
- EXPORT_SYMBOL(phys_mem_access_prot);
  
--static void __init *early_alloc(unsigned long sz)
-+static void __init *early_pgtable_alloc(void)
- {
- 	phys_addr_t phys;
- 	void *ptr;
- 
--	phys = memblock_alloc(sz, sz);
-+	phys = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
- 	BUG_ON(!phys);
- 	ptr = __va(phys);
--	memset(ptr, 0, sz);
-+	memset(ptr, 0, PAGE_SIZE);
+ /*
++ * Remove the idmap from TTBR0_EL1 and install the pgd of the active mm.
++ *
++ * The idmap lives in the same VA range as userspace, but uses global entries
++ * and may use a different TCR_EL1.T0SZ. To avoid issues resulting from
++ * speculative TLB fetches, we must temporarily install the reserved page
++ * tables while we invalidate the TLBs and set up the correct TCR_EL1.T0SZ.
++ *
++ * If current is a not a user task, the mm covers the TTBR1_EL1 page tables,
++ * which should not be installed in TTBR0_EL1. In this case we can leave the
++ * reserved page tables in place.
++ */
++static inline void cpu_uninstall_idmap(void)
++{
++	struct mm_struct *mm = current->active_mm;
 +
-+	/* Ensure the zeroed page is visible to the page table walker */
-+	dsb(ishst);
- 	return ptr;
- }
- 
-@@ -95,12 +99,12 @@ static void split_pmd(pmd_t *pmd, pte_t *pte)
- static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 				  unsigned long end, unsigned long pfn,
- 				  pgprot_t prot,
--				  void *(*alloc)(unsigned long size))
-+				  void *(*pgtable_alloc)(void))
- {
- 	pte_t *pte;
- 
- 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
--		pte = alloc(PTRS_PER_PTE * sizeof(pte_t));
-+		pte = pgtable_alloc();
- 		if (pmd_sect(*pmd))
- 			split_pmd(pmd, pte);
- 		__pmd_populate(pmd, __pa(pte), PMD_TYPE_TABLE);
-@@ -130,7 +134,7 @@ static void split_pud(pud_t *old_pud, pmd_t *pmd)
- static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 				  unsigned long addr, unsigned long end,
- 				  phys_addr_t phys, pgprot_t prot,
--				  void *(*alloc)(unsigned long size))
-+				  void *(*pgtable_alloc)(void))
- {
- 	pmd_t *pmd;
- 	unsigned long next;
-@@ -139,7 +143,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 	 * Check for initial section mappings in the pgd/pud and remove them.
- 	 */
- 	if (pud_none(*pud) || pud_sect(*pud)) {
--		pmd = alloc(PTRS_PER_PMD * sizeof(pmd_t));
-+		pmd = pgtable_alloc();
- 		if (pud_sect(*pud)) {
- 			/*
- 			 * need to have the 1G of mappings continue to be
-@@ -174,7 +178,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 			}
- 		} else {
- 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
--				       prot, alloc);
-+				       prot, pgtable_alloc);
- 		}
- 		phys += next - addr;
- 	} while (pmd++, addr = next, addr != end);
-@@ -195,13 +199,13 @@ static inline bool use_1G_block(unsigned long addr, unsigned long next,
- static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- 				  unsigned long addr, unsigned long end,
- 				  phys_addr_t phys, pgprot_t prot,
--				  void *(*alloc)(unsigned long size))
-+				  void *(*pgtable_alloc)(void))
- {
- 	pud_t *pud;
- 	unsigned long next;
- 
- 	if (pgd_none(*pgd)) {
--		pud = alloc(PTRS_PER_PUD * sizeof(pud_t));
-+		pud = pgtable_alloc();
- 		pgd_populate(mm, pgd, pud);
- 	}
- 	BUG_ON(pgd_bad(*pgd));
-@@ -234,7 +238,8 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- 				}
- 			}
- 		} else {
--			alloc_init_pmd(mm, pud, addr, next, phys, prot, alloc);
-+			alloc_init_pmd(mm, pud, addr, next, phys, prot,
-+				       pgtable_alloc);
- 		}
- 		phys += next - addr;
- 	} while (pud++, addr = next, addr != end);
-@@ -247,7 +252,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
- 				    phys_addr_t phys, unsigned long virt,
- 				    phys_addr_t size, pgprot_t prot,
--				    void *(*alloc)(unsigned long size))
-+				    void *(*pgtable_alloc)(void))
- {
- 	unsigned long addr, length, end, next;
- 
-@@ -265,18 +270,18 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
- 	end = addr + length;
- 	do {
- 		next = pgd_addr_end(addr, end);
--		alloc_init_pud(mm, pgd, addr, next, phys, prot, alloc);
-+		alloc_init_pud(mm, pgd, addr, next, phys, prot, pgtable_alloc);
- 		phys += next - addr;
- 	} while (pgd++, addr = next, addr != end);
- }
- 
--static void *late_alloc(unsigned long size)
-+static void *late_pgtable_alloc(void)
- {
--	void *ptr;
--
--	BUG_ON(size > PAGE_SIZE);
--	ptr = (void *)__get_free_page(PGALLOC_GFP);
-+	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
- 	BUG_ON(!ptr);
++	cpu_set_reserved_ttbr0();
++	local_flush_tlb_all();
++	cpu_set_default_tcr_t0sz();
 +
-+	/* Ensure the zeroed page is visible to the page table walker */
-+	dsb(ishst);
- 	return ptr;
- }
++	if (mm != &init_mm)
++		cpu_switch_mm(mm->pgd, mm);
++}
++
++/*
+  * It would be nice to return ASIDs back to the allocator, but unfortunately
+  * that introduces a race with a generation rollover where we could erroneously
+  * free an ASID allocated in a future generation. We could workaround this by
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 8119479..f6621ba 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -62,6 +62,7 @@
+ #include <asm/memblock.h>
+ #include <asm/efi.h>
+ #include <asm/xen/hypervisor.h>
++#include <asm/mmu_context.h>
  
-@@ -289,7 +294,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
- 		return;
- 	}
- 	__create_mapping(&init_mm, pgd_offset_k(virt), phys, virt,
--			 size, prot, early_alloc);
-+			 size, prot, early_pgtable_alloc);
- }
+ phys_addr_t __fdt_pointer __initdata;
  
- void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-@@ -297,7 +302,7 @@ void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
- 			       pgprot_t prot)
- {
- 	__create_mapping(mm, pgd_offset(mm, virt), phys, virt, size, prot,
--				late_alloc);
-+				late_pgtable_alloc);
- }
- 
- static void create_mapping_late(phys_addr_t phys, unsigned long virt,
-@@ -310,7 +315,7 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
- 	}
- 
- 	return __create_mapping(&init_mm, pgd_offset_k(virt),
--				phys, virt, size, prot, late_alloc);
-+				phys, virt, size, prot, late_pgtable_alloc);
- }
- 
- #ifdef CONFIG_DEBUG_RODATA
-@@ -460,15 +465,12 @@ void __init paging_init(void)
- 	fixup_executable();
- 
- 	/* allocate the zero page. */
--	zero_page = early_alloc(PAGE_SIZE);
-+	zero_page = early_pgtable_alloc();
- 
- 	bootmem_init();
- 
- 	empty_zero_page = virt_to_page(zero_page);
- 
--	/* Ensure the zero page is visible to the page table walker */
--	dsb(ishst);
--
- 	/*
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index b1adc51..68e7f79 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -149,9 +149,7 @@ asmlinkage void secondary_start_kernel(void)
  	 * TTBR0 is only used for the identity mapping at this stage. Make it
  	 * point to zero page to avoid speculatively fetching new entries.
+ 	 */
+-	cpu_set_reserved_ttbr0();
+-	local_flush_tlb_all();
+-	cpu_set_default_tcr_t0sz();
++	cpu_uninstall_idmap();
+ 
+ 	preempt_disable();
+ 	trace_hardirqs_off();
+diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+index 1095aa4..6605539 100644
+--- a/arch/arm64/kernel/suspend.c
++++ b/arch/arm64/kernel/suspend.c
+@@ -60,7 +60,6 @@ void __init cpu_suspend_set_dbg_restorer(void (*hw_bp_restore)(void *))
+  */
+ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ {
+-	struct mm_struct *mm = current->active_mm;
+ 	int ret;
+ 	unsigned long flags;
+ 
+@@ -87,22 +86,11 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ 	ret = __cpu_suspend_enter(arg, fn);
+ 	if (ret == 0) {
+ 		/*
+-		 * We are resuming from reset with TTBR0_EL1 set to the
+-		 * idmap to enable the MMU; set the TTBR0 to the reserved
+-		 * page tables to prevent speculative TLB allocations, flush
+-		 * the local tlb and set the default tcr_el1.t0sz so that
+-		 * the TTBR0 address space set-up is properly restored.
+-		 * If the current active_mm != &init_mm we entered cpu_suspend
+-		 * with mappings in TTBR0 that must be restored, so we switch
+-		 * them back to complete the address space configuration
+-		 * restoration before returning.
++		 * We are resuming from reset with the idmap active in TTBR0_EL1.
++		 * We must uninstall the idmap and restore the expected MMU
++		 * state before we can possibly return to userspace.
+ 		 */
+-		cpu_set_reserved_ttbr0();
+-		local_flush_tlb_all();
+-		cpu_set_default_tcr_t0sz();
+-
+-		if (mm != &init_mm)
+-			cpu_switch_mm(mm->pgd, mm);
++		cpu_uninstall_idmap();
+ 
+ 		/*
+ 		 * Restore per-cpu offset before any kernel
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index cdbf055..e85a719 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -468,9 +468,7 @@ void __init paging_init(void)
+ 	 * TTBR0 is only used for the identity mapping at this stage. Make it
+ 	 * point to zero page to avoid speculatively fetching new entries.
+ 	 */
+-	cpu_set_reserved_ttbr0();
+-	local_flush_tlb_all();
+-	cpu_set_default_tcr_t0sz();
++	cpu_uninstall_idmap();
+ }
+ 
+ /*
 -- 
 1.9.1
