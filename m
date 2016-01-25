@@ -1,21 +1,23 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 25 Jan 2016 10:26:15 +0100
-Subject: [PATCH] clk: sunxi: usb: Sort clk providers by chip family and
- name
-In-Reply-To: <1453701300-28241-1-git-send-email-wens@csie.org>
-References: <1453701300-28241-1-git-send-email-wens@csie.org>
-Message-ID: <20160125092615.GJ7908@lukather>
+Date: Mon, 25 Jan 2016 10:27:03 +0100
+Subject: [PATCH] pinctrl: sunxi: guard sub-directory with
+ CONFIG_PINCTRL_SUNXI
+In-Reply-To: <1453563129-30332-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1453563129-30332-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20160125092703.GK7908@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 01:55:00PM +0800, Chen-Yu Tsai wrote:
-> The latest addition of H3 USB clocks placed them at the bottom. Move it
-> before A80 (sun9i), so they are sorted by SoC family then name.
+On Sun, Jan 24, 2016 at 12:32:09AM +0900, Masahiro Yamada wrote:
+> CONFIG_PINCTRL_SUNXI is more suitable than CONFIG_ARCH_SUNXI
+> to guard the drivers/pinctrl/sunxi/ directory.
+> (I renamed CONFIG_PINCTRL_SUNXI_COMMON to CONFIG_PINCTRL_SUNXI.)
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Applied, thanks!
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
+Thanks!
 Maxime
 
 -- 
@@ -28,4 +30,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160125/c47ecc2e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160125/d223da20/attachment.sig>
