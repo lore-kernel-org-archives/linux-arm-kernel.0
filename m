@@ -1,239 +1,101 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 25 Jan 2016 18:03:37 +0100
-Subject: [PATCH v3] ARM: dts: kirkwood: add device tree for buffalo
- linkstation ls-qvl
-In-Reply-To: <1453740250-16765-1-git-send-email-rogershimizu@gmail.com> (Roger
- Shimizu's message of "Tue, 26 Jan 2016 01:44:10 +0900")
-References: <1453652964-21489-1-git-send-email-rogershimizu@gmail.com>
- <1453740250-16765-1-git-send-email-rogershimizu@gmail.com>
-Message-ID: <87zivtd21i.fsf@free-electrons.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 25 Jan 2016 09:50:33 -0800
+Subject: [PATCH] serial: imx: fix dcd interrupt firing during probe
+In-Reply-To: <1451531565-1233-1-git-send-email-marcel.ziswiler@toradex.com>
+References: <1451531565-1233-1-git-send-email-marcel.ziswiler@toradex.com>
+Message-ID: <d2768fb8b08ac6ab71fc4e20582a0fd4@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
- 
- On lun., janv. 25 2016, Roger Shimizu <rogershimizu@gmail.com> wrote:
+Hi Marcel,
 
-> From: Mario Lange <mario_lange@gmx.net>
->
-> Add dts file to support Buffalo Linkstation LS-QVL,
-> which is marvell kirkwood based 4-bay 3.5" HDD NAS.
-> Product info:
->   - (JPN) http://buffalo.jp/product/hdd/network/ls-qvl_r5/
->   - (ENG) http://www.buffalotech.com/products/network-storage/home-and-small-office/linkstation-pro-quad
->
-> Signed-off-by: Mario Lange <mario_lange@gmx.net>
-> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
-> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+[also added Lucas]
+
+On 2015-12-30 19:12, Marcel Ziswiler wrote:
+> Continuing on the Apalis iMX6 mainlining work started by Petr ?tetiar I
+> noticed that it only boots when rebooting from NXP's downstream 3.14.28
+> kernel or mainline otherwise (e.g. when cold booted) I did not get any
+> serial debug output at all. Enabling earlyprintk I got the following:
+> 
+> [    1.136806] INFO: trying to register non-static key.
+> [    1.136871] 2020000.serial: ttymxc0 at MMIO 0x2020000 (irq = 25,
+> base_baud = 5000000) is a IMX
+> [    1.150651] the code is fine but needs lockdep annotation.
+> [    1.150653] turning off the locking correctness validator.
+> [    1.150664] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.4.0-rc6-
+> next-20151223-00002-g6008f30-dirty #27
+> [    1.150668] Hardware name: Freescale i.MX6 Quad/DualLite (Device
+> Tree)
+> [    1.150675] Backtrace:
+> [    1.150701] [<c010c45c>] (dump_backtrace) from [<c010c654>]
+> (show_stack+0x18/0x1c)
+> [    1.150722]  r7:00000000 r6:c0d20848 r5:00000000 r4:00000000
+> [    1.150739] [<c010c63c>] (show_stack) from [<c03dadcc>]
+> (dump_stack+0x8c/0xa4)
+> [    1.150760] [<c03dad40>] (dump_stack) from [<c016b60c>]
+> (__lock_acquire+0x1d88/0x1eb4)
+> [    1.150774]  r7:00000000 r6:c0d063f8 r5:c155f834 r4:e503bc20
+> [    1.150785] [<c0169884>] (__lock_acquire) from [<c016bf54>]
+> (lock_acquire+0x74/0x94)
+> [    1.150803]  r10:c0d6eb5e r9:e597b300 r8:00000019 r7:00000001
+> r6:00000001 r5:60000193
+> [    1.150808]  r4:00000000
+> [    1.150821] [<c016bee0>] (lock_acquire) from [<c08d49d4>]
+> (_raw_spin_lock_irqsave+0x40/0x54)
+> [    1.150834]  r7:000052c8 r6:c0481470 r5:40000193 r4:e503bc10
+> [    1.150852] [<c08d4994>] (_raw_spin_lock_irqsave) from [<c0481470>]
+> (imx_rxint+0x20/0x2a4)
+> [    1.150862]  r6:00000000 r5:000052d0 r4:e503bc10
+> [    1.150874] [<c0481450>] (imx_rxint) from [<c0482540>]
+> (imx_int+0x170/0x1f4)
+> 
+> Debugging a little further I noticed this actually happening after
+> calling devm_request_irq() during serial_imx_probe() even before
+> uart_add_one_port() did initialise the spin_lock acquired in
+> imx_rxint(). Turns out the data carrier detect interrupt fired
+> immediately upon requesting interrupts. This patch fixes this by
+> explicitly disabling data carrier detect before requesting interrupts.
+
+I actually hit a very similar issue on the Colibri iMX6 and hence looked
+into this too. In our downstream tree, I fixed it in imx_startup, which
+is probably the wrong place actually...
+
+> 
+> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> 
 > ---
->
-> Dear Kirkwood Maintainers,
->
-> This is only 1 patch, so I learned that "cover letter" can be embedded here.
->
-> Mario created dts for Linkstation LS-QVL, which is 4-bay NAS, based
-> on my dts for 2-bay LS-WVL.
-> He asked me to post the dts to ARM on hehalf of him, so here I created
-> the patch set!
->
-> Changes in v2:
->   - add my "Signed-off-by"
->   - fix typo in commit message
-> Changes in v3:
->   - add top "From" to address Jason Cooper's suggestion
->   - add Andrew Lunn's "Reviewed-by"
-
-Thanks for all your work, I was about to apply it but as I already
-applied your previous patches I didn't manage to do it.
-
-
-Would you mind rebasing your patch on the mvebu/dt branch that I have
-just push on git://git.infradead.org/linux-mvebu.git ?
-
-If not, I think I would manage to do it for you.
-
-Thanks again,
-
-Gregory
-
->
->  .../devicetree/bindings/arm/marvell,kirkwood.txt   |   1 +
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts   | 135 +++++++++++++++++++++
->  3 files changed, 137 insertions(+)
->  create mode 100644 arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts
->
-> diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-> index 0d5d0f607d6c..345db8031196 100644
-> --- a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-> +++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-> @@ -19,6 +19,7 @@ SoC. Currently known SoC compatibles are:
->  And in addition, the compatible shall be extended with the specific
->  board. Currently known boards are:
+> 
+>  drivers/tty/serial/imx.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index 9362f54c..b1588f9 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -2032,6 +2032,11 @@ static int serial_imx_probe(struct platform_device *pdev)
+>  		 UCR1_TXMPTYEN | UCR1_RTSDEN);
+>  	writel_relaxed(reg, sport->port.membase + UCR1);
 >  
-> +"buffalo,linkstation-lsqvl"
->  "buffalo,linkstation-lsvl"
->  "buffalo,linkstation-lswsxl"
->  "buffalo,linkstation-lswxl"
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 3e2cf27d2368..68625754f398 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -183,6 +183,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
->  	kirkwood-is2.dtb \
->  	kirkwood-km_kirkwood.dtb \
->  	kirkwood-laplug.dtb \
-> +	kirkwood-linkstation-lsqvl.dtb \
->  	kirkwood-linkstation-lsvl.dtb \
->  	kirkwood-linkstation-lswsxl.dtb \
->  	kirkwood-linkstation-lswvl.dtb \
-> diff --git a/arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts b/arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts
-> new file mode 100644
-> index 000000000000..6dc0df2969f0
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts
-> @@ -0,0 +1,135 @@
-> +/*
-> + * Device Tree file for Buffalo Linkstation LS-QVL
-> + *
-> + * Copyright (C) 2016, Mario Lange <mario_lange@gmx.net>
-> + *
-> + * Based on kirkwood-linkstation-lswvl.dts,
-> + * Copyright (C) 2015, 2016
-> + * Roger Shimizu <rogershimizu@gmail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
+> +	/* Disable data carrier detect before requesting interrupts */
+> +	reg = readl_relaxed(sport->port.membase + UCR3);
+> +	reg &= ~(UCR3_DCD);
+> +	writel_relaxed(reg, sport->port.membase + UCR3);
 > +
-> +/dts-v1/;
-> +#include "kirkwood-linkstation-6282.dtsi"
-> +
-> +/ {
-> +	model = "Buffalo Linkstation LS-QVL";
-> +	compatible = "buffalo,lsqvl", "marvell,kirkwood-88f6282", "marvell,kirkwood";
-> +
-> +	memory { /* 256 MB */
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x10000000>;
-> +	};
-> +
-> +	ocp at f1000000 {
-> +		pinctrl: pin-controller at 10000 {
-> +			pmx_power_hdd1: pmx-power-hdd1 {
-> +				marvell,pins = "mpp9";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_hdderr0: pmx-led-hdderr0 {
-> +				marvell,pins = "mpp34";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_hdderr1: pmx-led-hdderr1 {
-> +				marvell,pins = "mpp35";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_hdderr2: pmx-led-hdderr2 {
-> +				marvell,pins = "mpp24";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_hdderr3: pmx-led-hdderr3 {
-> +				marvell,pins = "mpp25";
-> +				marvell,function = "gpio";
-> +			};
-> +		};
-> +
-> +		sata at 80000 {
-> +			nr-ports = <2>;
-> +		};
-> +	};
-> +
-> +	gpio_leds {
-> +		pinctrl-0 = <&pmx_led_function_red &pmx_led_alarm
-> +			     &pmx_led_info &pmx_led_power
-> +			     &pmx_led_function_blue
-> +			     &pmx_led_hdderr0
-> +			     &pmx_led_hdderr1
-> +			     &pmx_led_hdderr2
-> +			     &pmx_led_hdderr3>;
-> +
-> +		red-hdderr0-led {
-> +			label = "linkstation:red:hdderr0";
-> +			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		red-hdderr1-led {
-> +			label = "linkstation:red:hdderr1";
-> +			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		red-hdderr2-led {
-> +			label = "linkstation:red:hdderr2";
-> +			gpios = <&gpio0 24 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		red-hdderr3-led {
-> +			label = "linkstation:red:hdderr3";
-> +			gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
-> +		};
-> +	};
-> +
-> +	regulators {
-> +		pinctrl-0 = <&pmx_power_hdd0 &pmx_power_hdd1 &pmx_usb_vbus>;
-> +
-> +		hdd_power1: regulator at 3 {
-> +			compatible = "regulator-fixed";
-> +			reg = <3>;
-> +			regulator-name = "HDD1 Power";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			enable-active-high;
-> +			regulator-always-on;
-> +			regulator-boot-on;
-> +			gpio = <&gpio0 9 GPIO_ACTIVE_HIGH>;
-> +		};
-> +	};
-> +};
-> -- 
-> 2.1.4
->
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Note that UCR3_DCD has a different meaning in DCE mode. As a DCE, the
+bit should be kept 1 (we assume that the carrier is detected by
+default...)
+
+The dte_mode bit should be initialized at that point, hence just making
+that code conditional should account for that.
+
+What I also noticed is that the RI signal suffers the very same issue.
+We do not use the signal on our Colibri board, but we should disable
+that interrupt too.
+
+--
+Stefan
+
+>  	clk_disable_unprepare(sport->clk_ipg);
+>  
+>  	/*
