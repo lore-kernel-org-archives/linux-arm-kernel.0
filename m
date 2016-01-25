@@ -1,67 +1,104 @@
 From: blogic@openwrt.org (John Crispin)
-Date: Mon, 25 Jan 2016 10:53:20 +0100
-Subject: [PATCH V3 07/11] soc: mediatek: PMIC wrap: move wdt_src into the
- pmic_wrapper_type struct
+Date: Mon, 25 Jan 2016 10:53:23 +0100
+Subject: [PATCH V3 10/11] soc: mediatek: PMIC wrap: add mt6323 slave support
 In-Reply-To: <1453715604-36856-1-git-send-email-blogic@openwrt.org>
 References: <1453715604-36856-1-git-send-email-blogic@openwrt.org>
-Message-ID: <1453715604-36856-8-git-send-email-blogic@openwrt.org>
+Message-ID: <1453715604-36856-11-git-send-email-blogic@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the handling of wdt_src consitent with the rest of the code.
+Add support for MT6323 slaves. This PMIC can be found on MT2701 and MT7623
+EVB. The only function that we need to touch is pwrap_init_cipher().
 
 Signed-off-by: John Crispin <blogic@openwrt.org>
 ---
- drivers/soc/mediatek/mtk-pmic-wrap.c |    9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/soc/mediatek/mtk-pmic-wrap.c |   46 ++++++++++++++++++++++++++++++++--
+ 1 file changed, 44 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-index ba7b6b5..8bb091b 100644
+index 21d8e5a..85c4314 100644
 --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
 +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-@@ -373,6 +373,7 @@ struct pmic_wrapper_type {
- 	u32 arb_en_all;
- 	u32 int_en_all;
- 	u32 spi_w;
-+	u32 wdt_src;
- 	int (*init_reg_clock)(struct pmic_wrapper *wrp);
- 	int (*init_special)(struct pmic_wrapper *wrp);
+@@ -97,6 +97,31 @@ enum dew_regs {
+ 	PWRAP_MT8173_DEW_CIPHER_IV3,
+ 	PWRAP_MT8173_DEW_CIPHER_IV4,
+ 	PWRAP_MT8173_DEW_CIPHER_IV5,
++
++	/* MT6323 only regs */
++	PWRAP_DEW_CRC_SWRST,
++	PWRAP_DEW_CIPHER_EN,
++	PWRAP_DEW_RDDMY_NO,
++	PWRAP_DEW_RDATA_DLY_SEL,
++};
++
++static const u32 mt6323_regs[] = {
++	[PWRAP_DEW_BASE] =		0x0000,
++	[PWRAP_DEW_DIO_EN] =		0x018a,
++	[PWRAP_DEW_READ_TEST] =		0x018c,
++	[PWRAP_DEW_WRITE_TEST] =	0x018e,
++	[PWRAP_DEW_CRC_SWRST] =		0x0190,
++	[PWRAP_DEW_CRC_EN] =		0x0192,
++	[PWRAP_DEW_CRC_VAL] =		0x0194,
++	[PWRAP_DEW_MON_GRP_SEL] =	0x0196,
++	[PWRAP_DEW_CIPHER_KEY_SEL] =	0x0198,
++	[PWRAP_DEW_CIPHER_IV_SEL] =	0x019a,
++	[PWRAP_DEW_CIPHER_EN] =		0x019c,
++	[PWRAP_DEW_CIPHER_RDY] =	0x019e,
++	[PWRAP_DEW_CIPHER_MODE] =	0x01a0,
++	[PWRAP_DEW_CIPHER_SWRST] =	0x01a2,
++	[PWRAP_DEW_RDDMY_NO] =		0x01a4,
++	[PWRAP_DEW_RDATA_DLY_SEL] =	0x01a6,
  };
-@@ -828,6 +829,7 @@ static struct pmic_wrapper_type pwrap_mt8135 = {
- 	.arb_en_all = 0x1ff,
- 	.int_en_all = BIT(31) | BIT(1),
- 	.spi_w = PWRAP_MAN_CMD_SPI_WRITE,
-+	.wdt_src = PWRAP_WDT_SRC_MASK_ALL,
- 	.init_reg_clock = pwrap_mt8135_init_reg_clock,
- 	.init_special = pwrap_mt8135_init_special,
- };
-@@ -838,6 +840,7 @@ static struct pmic_wrapper_type pwrap_mt8173 = {
- 	.arb_en_all = 0x3f,
- 	.int_en_all = BIT(31) | BIT(1),
- 	.spi_w = PWRAP_MAN_CMD_SPI_WRITE,
-+	.wdt_src = PWRAP_WDT_SRC_MASK_NO_STAUPD,
- 	.init_reg_clock = pwrap_mt8173_init_reg_clock,
- 	.init_special = pwrap_mt8173_init_special,
- };
-@@ -857,7 +860,7 @@ MODULE_DEVICE_TABLE(of, of_pwrap_match_tbl);
  
- static int pwrap_probe(struct platform_device *pdev)
- {
--	int ret, irq, wdt_src;
-+	int ret, irq;
- 	struct pmic_wrapper *wrp;
- 	struct device_node *np = pdev->dev.of_node;
- 	const struct of_device_id *of_id =
-@@ -947,9 +950,7 @@ static int pwrap_probe(struct platform_device *pdev)
- 	 * Since STAUPD was not used on mt8173 platform,
- 	 * so STAUPD of WDT_SRC which should be turned off
- 	 */
--	wdt_src = pwrap_is_mt8173(wrp) ?
--			PWRAP_WDT_SRC_MASK_NO_STAUPD : PWRAP_WDT_SRC_MASK_ALL;
--	pwrap_writel(wrp, wdt_src, PWRAP_WDT_SRC_EN);
-+	pwrap_writel(wrp, wrp->master->wdt_src, PWRAP_WDT_SRC_EN);
- 	pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
- 	pwrap_writel(wrp, ~wrp->master->int_en_all, PWRAP_INT_EN);
+ static const u32 mt6397_regs[] = {
+@@ -381,6 +406,7 @@ static int mt8135_regs[] = {
+ };
  
+ enum pmic_type {
++	PMIC_MT6323,
+ 	PMIC_MT6397,
+ };
+ 
+@@ -676,8 +702,16 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
+ 	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_SWRST, 0x0);
+ 	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_KEY_SEL, 0x1);
+ 	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_IV_SEL, 0x2);
+-	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_LOAD, 0x1);
+-	pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_START, 0x1);
++
++	switch (wrp->slave->type) {
++	case PMIC_MT6397:
++		pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_LOAD, 0x1);
++		pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_START, 0x1);
++		break;
++	case PMIC_MT6323:
++		pwrap_dew_write(wrp, PWRAP_DEW_CIPHER_EN, 0x1);
++		break;
++	}
+ 
+ 	/* wait for cipher data ready at AP */
+ 	ret = pwrap_wait_for_state(wrp, pwrap_is_cipher_ready);
+@@ -870,6 +904,11 @@ static const struct regmap_config pwrap_regmap_config = {
+ 	.max_register = 0xffff,
+ };
+ 
++static const struct pwrap_slv_type pmic_mt6323 = {
++	.dew_regs = mt6323_regs,
++	.type = PMIC_MT6323,
++};
++
+ static const struct pwrap_slv_type pmic_mt6397 = {
+ 	.dew_regs = mt6397_regs,
+ 	.type = PMIC_MT6397,
+@@ -877,6 +916,9 @@ static const struct pwrap_slv_type pmic_mt6397 = {
+ 
+ static const struct of_device_id of_slave_match_tbl[] = {
+ 	{
++		.compatible = "mediatek,mt6323",
++		.data = &pmic_mt6323,
++	}, {
+ 		.compatible = "mediatek,mt6397",
+ 		.data = &pmic_mt6397,
+ 	}, {
 -- 
 1.7.10.4
