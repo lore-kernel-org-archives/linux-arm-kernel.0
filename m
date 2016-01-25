@@ -1,56 +1,67 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:39:12 +0100
-Subject: [PATCH] profile: hide unused functions when !CONFIG_PROC_FS
-Message-ID: <1453736359-1959049-1-git-send-email-arnd@arndb.de>
+Date: Mon, 25 Jan 2016 16:41:49 +0100
+Subject: [PATCH] tick: sched: hide unused oneshot timer code
+Message-ID: <1453736525-1959191-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A couple of functions and variables in the profile implementation are
-used only on SMP systems by the procfs code, but are unused if
-either procfs is disabled or in uniprocessor kernels. gcc prints
-a harmless warning about the unused symbols:
+A couple of functions in kernel/time/tick-sched.c are only
+relevant for oneshot timer mode, i.e. when hires-timers or
+nohz mode are enabled. If both are disabled, we get gcc warnings
+about them:
 
-kernel/profile.c:243:13: error: 'profile_flip_buffers' defined but not used [-Werror=unused-function]
- static void profile_flip_buffers(void)
+kernel/time/tick-sched.c:98:16: warning: 'tick_init_jiffy_update' defined but not used [-Wunused-function]
+ static ktime_t tick_init_jiffy_update(void)
+                ^
+kernel/time/tick-sched.c:112:13: warning: 'tick_sched_do_timer' defined but not used [-Wunused-function]
+ static void tick_sched_do_timer(ktime_t now)
              ^
-kernel/profile.c:266:13: error: 'profile_discard_flip_buffers' defined but not used [-Werror=unused-function]
- static void profile_discard_flip_buffers(void)
+kernel/time/tick-sched.c:134:13: warning: 'tick_sched_handle' defined but not used [-Wunused-function]
+ static void tick_sched_handle(struct tick_sched *ts, struct pt_regs *regs)
              ^
-kernel/profile.c:330:12: error: 'profile_cpu_callback' defined but not used [-Werror=unused-function]
- static int profile_cpu_callback(struct notifier_block *info,
-            ^
 
-This adds further #ifdef to the file, to annotate exactly in
-which cases they are used. I have done several thousand ARM randconfig
-kernels with this patch applied and no longer get any warnings in
-this file.
+This encloses the whole set of functions in an appropriate ifdef
+to avoid the warning and to make it clearer when they are used.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- kernel/profile.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ kernel/time/tick-sched.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/kernel/profile.c b/kernel/profile.c
-index 99513e1160e5..9cd8e18e6f18 100644
---- a/kernel/profile.c
-+++ b/kernel/profile.c
-@@ -44,7 +44,7 @@ int prof_on __read_mostly;
- EXPORT_SYMBOL_GPL(prof_on);
+diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
+index 9d7a053545f5..1b02ab516373 100644
+--- a/kernel/time/tick-sched.c
++++ b/kernel/time/tick-sched.c
+@@ -36,16 +36,17 @@
+  */
+ static DEFINE_PER_CPU(struct tick_sched, tick_cpu_sched);
  
- static cpumask_var_t prof_cpu_mask;
--#ifdef CONFIG_SMP
-+#if defined(CONFIG_SMP) && defined(CONFIG_PROC_FS)
- static DEFINE_PER_CPU(struct profile_hit *[2], cpu_profile_hits);
- static DEFINE_PER_CPU(int, cpu_profile_flip);
- static DEFINE_MUTEX(profile_flip_mutex);
-@@ -201,7 +201,7 @@ int profile_event_unregister(enum profile_type type, struct notifier_block *n)
+-/*
+- * The time, when the last jiffy update happened. Protected by jiffies_lock.
+- */
+-static ktime_t last_jiffies_update;
+-
+ struct tick_sched *tick_get_tick_sched(int cpu)
+ {
+ 	return &per_cpu(tick_cpu_sched, cpu);
  }
- EXPORT_SYMBOL_GPL(profile_event_unregister);
  
--#ifdef CONFIG_SMP
-+#if defined(CONFIG_SMP) && defined(CONFIG_PROC_FS)
++#if defined(CONFIG_NO_HZ_COMMON) || defined(CONFIG_HIGH_RES_TIMERS)
++/*
++ * The time, when the last jiffy update happened. Protected by jiffies_lock.
++ */
++static ktime_t last_jiffies_update;
++
  /*
-  * Each cpu has a pair of open-addressed hashtables for pending
-  * profile hits. read_profile() IPI's all cpus to request them
+  * Must be called with interrupts disabled !
+  */
+@@ -151,6 +152,7 @@ static void tick_sched_handle(struct tick_sched *ts, struct pt_regs *regs)
+ 	update_process_times(user_mode(regs));
+ 	profile_tick(CPU_PROFILING);
+ }
++#endif
+ 
+ #ifdef CONFIG_NO_HZ_FULL
+ cpumask_var_t tick_nohz_full_mask;
 -- 
 2.7.0
