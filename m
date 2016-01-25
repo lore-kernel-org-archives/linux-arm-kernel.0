@@ -1,116 +1,40 @@
-From: liviu.dudau@arm.com (liviu.dudau at arm.com)
-Date: Mon, 25 Jan 2016 12:51:05 +0000
-Subject: [PATCH] bus: vexpress-config: Add missing of_node_put
-In-Reply-To: <alpine.DEB.2.10.1601251323190.2510@hadrien>
-References: <20160122180838.GA12069@amitoj-Inspiron-3542>
- <20160125121720.GC1194@e106497-lin.cambridge.arm.com>
- <alpine.DEB.2.10.1601251323190.2510@hadrien>
-Message-ID: <20160125125104.GD1194@e106497-lin.cambridge.arm.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Mon, 25 Jan 2016 13:51:09 +0100
+Subject: [PATCH 1/2] regulator: ltc3589: make IRQ optional
+In-Reply-To: <20160125124123.GQ6588@sirena.org.uk>
+References: <20160120164258.GF6588@sirena.org.uk>
+ <20160121080524.27af489f@ipc1.ka-ro>
+ <20160121102015.GI6588@sirena.org.uk>
+ <20160121112611.34e17cb2@ipc1.ka-ro>
+ <20160121111115.GJ6588@sirena.org.uk>
+ <20160121123311.5346e40d@ipc1.ka-ro>
+ <20160121162646.GK6588@sirena.org.uk>
+ <20160122064145.36b7f2b4@ipc1.ka-ro>
+ <20160122162610.GZ6588@sirena.org.uk>
+ <20160125133731.72669115@ipc1.ka-ro>
+ <20160125124123.GQ6588@sirena.org.uk>
+Message-ID: <20160125135109.760ba5f0@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 01:24:44PM +0100, Julia Lawall wrote:
-> 
-> 
-> On Mon, 25 Jan 2016, liviu.dudau at arm.com wrote:
-> 
-> > On Fri, Jan 22, 2016 at 11:38:38PM +0530, Amitoj Kaur Chawla wrote:
-> > > for_each_compatible_node performs an of_node_get on each iteration, so
-> > > to break out of the loop an of_node_put is required.
-> > >
-> > > Found using Coccinelle. The semantic patch used for this is as follows:
-> > >
-> > > // <smpl>
-> > > @@
-> > > expression e;
-> > > local idexpression n;
-> > > @@
-> > >
-> > >  for_each_compatible_node(n, ...) {
-> > >    ... when != of_node_put(n)
-> > >        when != e = n
-> > > (
-> > >    return n;
-> > > +  of_node_put(n);
-> > > ?  return ...;
-> > > )
-> > >    ...
-> > >  }
-> > > // </smpl>
-> > >
-> > > Signed-off-by: Amitoj Kaur Chawla <amitoj1606@gmail.com>
-> >
-> > Hi Amitoj,
-> >
-> > > ---
-> > >  drivers/bus/vexpress-config.c | 4 +++-
-> > >  1 file changed, 3 insertions(+), 1 deletion(-)
-> > >
-> > > diff --git a/drivers/bus/vexpress-config.c b/drivers/bus/vexpress-config.c
-> > > index 6575c0f..c3cb76b 100644
-> > > --- a/drivers/bus/vexpress-config.c
-> > > +++ b/drivers/bus/vexpress-config.c
-> > > @@ -192,8 +192,10 @@ static int __init vexpress_config_init(void)
-> > >  	/* Need the config devices early, before the "normal" devices... */
-> > >  	for_each_compatible_node(node, NULL, "arm,vexpress,config-bus") {
-> > >  		err = vexpress_config_populate(node);
-> > > -		if (err)
-> > > +		if (err) {
-> > > +			of_node_put(node);
-> > >  			break;
-> > > +		}
-> >
-> > This automatically generated patch only solves half of the problem (for the error
-> > path).
-> >
-> > >  	}
-> > >
-> > >  	return err;
-> > > --
-> > > 1.9.1
-> > >
-> >
-> > I feel that a better patch would be the following, where the node is released
-> > regardless of the result of vexpress_config_populate().
-> >
-> > --8<--------------------------------------------------------------------------
-> > diff --git a/drivers/bus/vexpress-config.c b/drivers/bus/vexpress-config.c
-> > index 6575c0f..c57453d 100644
-> > --- a/drivers/bus/vexpress-config.c
-> > +++ b/drivers/bus/vexpress-config.c
-> > @@ -192,6 +192,7 @@ static int __init vexpress_config_init(void)
-> >  	/* Need the config devices early, before the "normal" devices... */
-> >  	for_each_compatible_node(node, NULL, "arm,vexpress,config-bus") {
-> >  		err = vexpress_config_populate(node);
-> > +		of_node_put(node);
-> 
-> This is not correct.  for_each_compatible_node will do the free if you go
-> around the loop.  This change would lead to a double free in the non error
-> case.
+Hi,
 
-You are correct and I withdraw my patch.
-
-For the original patch:
-
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
-
-Best regards,
-Liviu
-
+On Mon, 25 Jan 2016 12:41:23 +0000 Mark Brown wrote:
+> On Mon, Jan 25, 2016 at 01:37:31PM +0100, Lothar Wa?mann wrote:
+> > On Fri, 22 Jan 2016 16:26:10 +0000 Mark Brown wrote:
 > 
-> julia
+> > > You're not just making the interrupt optional, you are also implementing
+> > > polling support.  That's really unusual and there's no clear reason for
 > 
-> >  		if (err)
-> >  			break;
-> >  	}
-> > -->8--------------------------------------------------------------------------
+> > Any suggestions how to handle this case in a more sensible way?
+> 
+> The above, for example - make the interrupt optional.
+>
+This will make it impossible to notify the system about
+overtemperature (and undervoltage).
+I implemented polling to be able to get at least overtemperature
+warnings.
+(Undervoltage cannot be handled sensibly without interrupt anyway)
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+
+Lothar Wa?mann
