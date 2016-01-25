@@ -1,34 +1,31 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Mon, 25 Jan 2016 00:35:57 +0000
-Subject: [PATCH] ARM: dts: porter: add sound support
-In-Reply-To: <1872468.4EonQLNEFn@wasted.cogentembedded.com>
-References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
- <1872468.4EonQLNEFn@wasted.cogentembedded.com>
-Message-ID: <87k2mya48g.wl%kuninori.morimoto.gx@renesas.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 24 Jan 2016 22:49:44 -0200
+Subject: [PATCH v2] ARM: imx_v6_v7_defconfig: Enable GPU support
+Message-ID: <1453682984-5785-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Select CONFIG_DRM_ETNAVIV, so that GPU support can be enabled by default.
 
-Hi
-
-> Define the Porter board dependent part of the R8A7791 sound device node.
-> Add device node for Asahi Kasei AK4642 stereo codec  to the I2C2 bus.
-> Add the "simple-audio-card" device node to interconnect the SoC sound
-> device  and the codec.
-> 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-
-> +/*
-> + * SSI-AK4642
-> + *
-> + * SW3: 1: AK4642
-> + *      3: ADV7511
-
-This is no a big deal, but according to my schematic,
-porter is using JP3, not SW3, but no one cares ;P
-
-Best regards
+Signed-off-by: Fabio Estevam <festevam@gmail.com>
 ---
-Kuninori Morimoto
+Changes since v1:
+- Rebase against 4.5-rc1
+
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 2d5253d..be08ce7 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -231,6 +231,7 @@ CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
+ CONFIG_DRM_IMX_TVE=y
+ CONFIG_DRM_IMX_LDB=y
+ CONFIG_DRM_IMX_HDMI=y
++CONFIG_DRM_ETNAVIV=y
+ CONFIG_FB_MXS=y
+ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_LCD_L4F00242T03=y
+-- 
+1.9.1
