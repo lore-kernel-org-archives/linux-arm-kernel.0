@@ -1,49 +1,32 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 25 Jan 2016 09:57:53 +0100
-Subject: [PATCH v4 0/2] new control V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME
-In-Reply-To: <CAOMLVLh7EnMgVfzV7JQy6DSKSaanqHn5kNkTLVrbTCihjphzYA@mail.gmail.com>
-References: <1453187230-97231-1-git-send-email-wuchengli@chromium.org>
- <CAOMLVLh7EnMgVfzV7JQy6DSKSaanqHn5kNkTLVrbTCihjphzYA@mail.gmail.com>
-Message-ID: <56A5E391.8050505@xs4all.nl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Jan 2016 09:59:51 +0100
+Subject: [RESEND v2 1/2] clk: samsung: Don't build ARMv8 clock drivers on
+ ARMv7
+In-Reply-To: <1453683021-6998-2-git-send-email-k.kozlowski@samsung.com>
+References: <1453683021-6998-1-git-send-email-k.kozlowski@samsung.com>
+ <1453683021-6998-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <4282078.QlIpNj3Oa6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2016 05:46 AM, Wu-Cheng Li (???) wrote:
-> Hi Hans,
-> Can you look at the patch again? I've changed the name from
-> V4L2_CID_MPEG_VIDEO_FORCE_I_FRAME to
-> V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME. Thanks.
-
-Looks good to me. I'm planning to make a pull request for this once v4.5-rc1 is
-merged into our media_tree repo.
-
-Regards,
-
-	Hans
-
+On Monday 25 January 2016 09:50:20 Krzysztof Kozlowski wrote:
 > 
-> Wu-Cheng
+> +# ARM64 SoCs (e.g. Exynos5433, Exynos7):
+> +config EXYNOS_ARM64_COMMON_CLK
+> +       def_bool ARCH_EXYNOS
+> +       depends on ARM64 || COMPILE_TEST
+> +       select COMMON_CLK_SAMSUNG
 > 
-> On Tue, Jan 19, 2016 at 3:07 PM, Wu-Cheng Li <wuchengli@chromium.org> wrote:
->> v4 changes:
->> - Change the name to V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME.
->> - Add commit message to s5p-mfc patch.
->>
->> Wu-Cheng Li (2):
->>   v4l: add V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME.
->>   s5p-mfc: add the support of V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME.
->>
->>  Documentation/DocBook/media/v4l/controls.xml |  8 ++++++++
->>  drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 12 ++++++++++++
->>  drivers/media/v4l2-core/v4l2-ctrls.c         |  2 ++
->>  include/uapi/linux/v4l2-controls.h           |  1 +
->>  4 files changed, 23 insertions(+)
->>
->> --
->> 2.6.0.rc2.230.g3dd15c0
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+
+So you always enable it on ARM64 when ARCH_EXYNOS is enabled, but
+enable it silently on ARM32 when COMPILE_TEST is set?
+
+That sounds wrong. How about
+
+config EXYNOS_ARM64_COMMON_CLK
+	bool "EXYNOS 64-bit clock support" if COMPILE_TEST
+	default ARM64 && ARCH_EXYNOS
+	depends on (ARM64 && ARCH_EXYNOS) || COMPILE_TEST
+	select COMMON_CLK_SAMSUNG
+
+	Arnd
