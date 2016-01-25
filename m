@@ -1,80 +1,26 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Mon, 25 Jan 2016 18:12:42 -0300
-Subject: [PATCH V8 20/23] perf tools: making function set_max_cpu_num()
- non static
-In-Reply-To: <CANLsYkzmTMi3jmVjwNiNsw6P5pPkZEz6zYWFsVzayy+r2ojTTA@mail.gmail.com>
-References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
- <1452807977-8069-21-git-send-email-mathieu.poirier@linaro.org>
- <CANLsYkzmTMi3jmVjwNiNsw6P5pPkZEz6zYWFsVzayy+r2ojTTA@mail.gmail.com>
-Message-ID: <20160125211242.GF22501@kernel.org>
+From: lho@apm.com (Loc Ho)
+Date: Mon, 25 Jan 2016 13:23:44 -0800
+Subject: [PATCH v4 1/2] acpi: Fix proper return code for function
+ acpi_gsi_to_irq
+In-Reply-To: <1453335459-3617-2-git-send-email-lho@apm.com>
+References: <1453335459-3617-1-git-send-email-lho@apm.com>
+ <1453335459-3617-2-git-send-email-lho@apm.com>
+Message-ID: <CAPw-ZTnm5F3Kt+_J6HoNCYbx8R7JVkME5yA9V-hAwRtr8ge9ZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Mon, Jan 25, 2016 at 01:46:22PM -0700, Mathieu Poirier escreveu:
-> On 14 January 2016 at 14:46, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
-> > For memory allocation purposes, code located in other places
-> > then util/cpumap.c may want to know how many CPUs the system has.
-> >
-> > This patch is making function set_max_cpu_num() available to
-> > other parts of the perf tool so that global variable
-> > 'max_cpu_num' gets the right value when referenced by cpu__max_cpu().
-> >
-> > Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-> > Cc: Ingo Molnar <mingo@redhat.com>
-> > Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
-> > Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> > ---
-> >  tools/perf/util/cpumap.c | 2 +-
-> >  tools/perf/util/cpumap.h | 1 +
-> >  2 files changed, 2 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/tools/perf/util/cpumap.c b/tools/perf/util/cpumap.c
-> > index 10af1e7524fb..ae179320c0c0 100644
-> > --- a/tools/perf/util/cpumap.c
-> > +++ b/tools/perf/util/cpumap.c
-> > @@ -380,7 +380,7 @@ out:
-> >  }
-> >
-> >  /* Determine highest possible cpu in the system for sparse allocation */
-> > -static void set_max_cpu_num(void)
-> > +void set_max_cpu_num(void)
-> >  {
-> >         const char *mnt;
-> >         char path[PATH_MAX];
-> > diff --git a/tools/perf/util/cpumap.h b/tools/perf/util/cpumap.h
-> > index 85f7772457fa..45fa963345eb 100644
-> > --- a/tools/perf/util/cpumap.h
-> > +++ b/tools/perf/util/cpumap.h
-> > @@ -14,6 +14,7 @@ struct cpu_map {
-> >         int map[];
-> >  };
-> >
-> > +void set_max_cpu_num(void);
-> >  struct cpu_map *cpu_map__new(const char *cpu_list);
-> >  struct cpu_map *cpu_map__empty_new(int nr);
-> >  struct cpu_map *cpu_map__dummy_new(void);
-> > --
-> > 2.1.4
-> >
-> 
-> Arnaldo,
-> 
-> I can't queue this patch for 4.6 without at least a reviewed by from you.
+Hi,
 
-This one I remember, looks ugly, the name set_max_cpu_num() looks
-strange, when that was restricted (static) to that cpumap.c file, it
-wasn't a problem, exporting it for wider usage looks bad.
+On Wed, Jan 20, 2016 at 4:17 PM, Loc Ho <lho@apm.com> wrote:
+>
+> The function acpi_gsi_to_irq must return 0 on success as the caller
+> ghes_probe expects an 0 for success. This change also matches x86
+> implementation.
+>
+> Signed-off-by: Tuan Phan <tphan@apm.com>
+> Signed-off-by: Loc Ho <lho@apm.com>
 
-You've been waiting for this for quite a while, it seems, lemme stop
-what I am doing to check this...
 
-- Arnaldo
- 
-> It has been rebased to 4.5-rc1 here [1] for your convenience.  I will
-> be happy to use another baseline should that be more adequate for you.
-> The same goes for [2]
-> 
-> Thanks,
-> Mathieu
-> 
-> [1]. https://git.linaro.org/people/mathieu.poirier/coresight.git/shortlog/refs/heads/perf-v4.5-rc1-V8
+Any issue with this version? If not, can this be pulled into 4.5?
+
+-Loc
