@@ -1,108 +1,150 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 25 Jan 2016 11:21:05 +0000
-Subject: [PATCH v6 00/12] arm-cci: PMU driver updates
-Message-ID: <1453720877-24962-1-git-send-email-suzuki.poulose@arm.com>
+Date: Mon, 25 Jan 2016 11:21:09 +0000
+Subject: [PATCH v6 04/12] arm-cci: Delay PMU counter writes to pmu::pmu_enable
+In-Reply-To: <1453720877-24962-1-git-send-email-suzuki.poulose@arm.com>
+References: <1453720877-24962-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1453720877-24962-5-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series includes:
+CCI PMU driver always reprograms the counters to a safe value (half of the
+counter max, = 2^31) before starting the profiling to account for extreme
+interrupt latencies. Also, the cost of writing to a PMU counter could be
+very costly on some PMUs(e.g, CCI-500). In order to ammortise the cost of
+programming the counters, this patch delays the counter writes to pmu::pmu_enable().
+We use the PER_HES_ARCH flag to keep track of the counters which need to
+be programmed. Before turning on the PMU, we go through the counters that
+were marked for write, and perform the operation in a batch.
 
- - Simplified sysfs attribute handling for CCI PMU (Patch 1)
- - Work around for writing to CCI-500/550(introduced later) PMU
-   counters (Patches 2-10)
- - Support for CCI-550 PMU (11-12) with Acked-bys.
+To unify all the counter writes to pmu_enable(), this patch also makes sure that
+we disable-and-enable the PMU in the irq handler to program any counters that
+overflowed.
 
-Since all of these are related I am clubbing it all in one series
-so that it is easier to carry them around (and merge it possibly).
-
-The CCI PMU driver sets the event counter to the half of the maximum
-value(2^31) it can count before we start the counters via
-pmu_event_set_period(). This is done to give us the best chance to
-handle the overflow interrupt, taking care of extreme interrupt latencies.
-
-However, CCI-500 comes with advanced power saving schemes, which disables
-the clock to the event counters unless the counters are enabled to count
-(PMCR.CEN). This prevents the driver from writing the period to the
-counters before starting them.  Also, there is no way we can reset the
-individual event counter to 0 (PMCR.RST resets all the counters, losing
-their current readings). However the value of the counter is preserved and
-could be read back, when the counters are not enabled.
-
-So we cannot reliably use the counters and compute the number of events
-generated during the sampling period since we don't have the value of the
-counter at start.
-
-Here are the possible solutions:
-
- 1) Disable clock gating on CCI-500 by setting Control_Override_Reg[bit3].
-    - The Control_Override_Reg is secure (and hence not programmable from
-      Linux), and also has an impact on power consumption.
-
- 2) Change the order of operations
-	i.e,
-	a) Program and enable individual counters
-	b) Enable counting on all the counters by setting PMCR.CEN
-	c) Write the period to the individual counters
-	d) Disable the counters
-    - This could cause in unnecessary noise in the other counters and is
-      costly (we should repeat this for all enabled counters).
-
- 3) Don't set the counter value, instead use the current count as the
-    starting count and compute the delta at the end of sampling.
-
- 4) Modified version of 2, which disables all the other counters, except
-    the target counter, with the target counter programmed with an invalid
-    event code(which guarantees that the counter won't change during the
-    operation).
-
-This patch implements option 4 for CCI-500(and CCI-550). CCI-400 behavior
-remains unchanged.
-
-The tree on top of 4.5-rc1 is available at :
-
-    git://linux-arm.org/linux-skp.git   cci-updates/4.5-rc1
-
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Punit Agrawal <punit.agrawal@arm.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+---
 Changes since V5:
- - Delay writes from irq handler by disabling the PMU (suggested by Mark Rutland)
-   unifying the counter programming to __pmu_enable
+  - Disable-and-Enable PMU while in irq_handler to batch the counter writes
+    for overflowed counters and also to unify the counter writes to pmu_enable().
+---
+ drivers/bus/arm-cci.c |   57 ++++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 52 insertions(+), 5 deletions(-)
 
-Changes since V4:
- - Drop transaction hooks. Instead, group and delay the writes to pmu_enable().
- - Rebased to 4.4-rc8
-
-Changes sinces V3:
- - Added transaction hooks to batch the writes to PMU counters for
-   group events.
- - Pulled ARM CCI 550 PMU support patches
-
-Changes since V2:
- - Rebased to 4.4-rc1 + Mark's patch to simply PMU syfs attributes [1]
- - Address comments on v2.
- - Split the introduction of write_counter hook to a separate patch
-
-Changes since V1:
- - Choose 4 instead of 3 above, suggested by Mark Rutland
-
-Mark Rutland (1):
-  arm-cci: simplify sysfs attr handling
-
-Suzuki K. Poulose (11):
-  arm-cci: Group writes to counter
-  arm-cci: Refactor CCI PMU enable/disable methods
-  arm-cci: Delay PMU counter writes to pmu::pmu_enable
-  arm-cci: write_counter: Remove redundant check
-  arm-cci: Get the status of a counter
-  arm-cci: Add routines to save/restore all counters
-  __cci_pmu_enable: Make counter sync optional
-  arm-cci: Provide hook for writing to PMU counters
-  arm-cci: CCI-500: Work around PMU counter writes
-  arm-cci500: Rearrange PMU driver for code sharing with CCI-550 PMU
-  arm-cci: CoreLink CCI-550 PMU driver
-
- Documentation/devicetree/bindings/arm/cci.txt |    2 +
- drivers/bus/Kconfig                           |   10 +-
- drivers/bus/arm-cci.c                         |  611 +++++++++++++++++--------
- 3 files changed, 427 insertions(+), 196 deletions(-)
-
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index 1e1e9a3..df04b625 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -159,6 +159,8 @@ enum cci_models {
+ 	CCI_MODEL_MAX
+ };
+ 
++static void pmu_write_counters(struct cci_pmu *cci_pmu,
++				 unsigned long *mask);
+ static ssize_t cci_pmu_format_show(struct device *dev,
+ 			struct device_attribute *attr, char *buf);
+ static ssize_t cci_pmu_event_show(struct device *dev,
+@@ -606,11 +608,44 @@ static int cci500_validate_hw_event(struct cci_pmu *cci_pmu,
+ }
+ #endif	/* CONFIG_ARM_CCI500_PMU */
+ 
++/*
++ * Program the CCI PMU counters which have PERF_HES_ARCH set
++ * with the event period and mark them ready before we enable
++ * PMU.
++ */
++void cci_pmu_sync_counters(struct cci_pmu *cci_pmu)
++{
++	int i;
++	struct cci_pmu_hw_events *cci_hw = &cci_pmu->hw_events;
++
++	DECLARE_BITMAP(mask, cci_pmu->num_cntrs);
++
++	bitmap_zero(mask, cci_pmu->num_cntrs);
++	for_each_set_bit(i, cci_pmu->hw_events.used_mask, cci_pmu->num_cntrs) {
++		struct perf_event *event = cci_hw->events[i];
++
++		if (WARN_ON(!event))
++			continue;
++
++		/* Leave the events which are not counting */
++		if (event->hw.state & PERF_HES_STOPPED)
++			continue;
++		if (event->hw.state & PERF_HES_ARCH) {
++			set_bit(i, mask);
++			event->hw.state &= ~PERF_HES_ARCH;
++		}
++	}
++
++	pmu_write_counters(cci_pmu, mask);
++}
++
+ /* Should be called with cci_pmu->hw_events->pmu_lock held */
+-static void __cci_pmu_enable(void)
++static void __cci_pmu_enable(struct cci_pmu *cci_pmu)
+ {
+ 	u32 val;
+ 
++	cci_pmu_sync_counters(cci_pmu);
++
+ 	/* Enable all the PMU counters. */
+ 	val = readl_relaxed(cci_ctrl_base + CCI_PMCR) | CCI_PMCR_CEN;
+ 	writel(val, cci_ctrl_base + CCI_PMCR);
+@@ -791,8 +826,7 @@ static void pmu_write_counter(struct perf_event *event, u32 value)
+ 		pmu_write_register(cci_pmu, value, idx, CCI_PMU_CNTR);
+ }
+ 
+-static void __maybe_unused
+-pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
++static void pmu_write_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
+ {
+ 	int i;
+ 	struct cci_pmu_hw_events *cci_hw = &cci_pmu->hw_events;
+@@ -840,7 +874,14 @@ void pmu_event_set_period(struct perf_event *event)
+ 	 */
+ 	u64 val = 1ULL << 31;
+ 	local64_set(&hwc->prev_count, val);
+-	pmu_write_counter(event, val);
++
++	/*
++	 * CCI PMU uses PERF_HES_ARCH to keep track of the counters, whose
++	 * values needs to be sync-ed with the s/w state before the PMU is
++	 * enabled.
++	 * Mark this counter for sync.
++	 */
++	hwc->state |= PERF_HES_ARCH;
+ }
+ 
+ static irqreturn_t pmu_handle_irq(int irq_num, void *dev)
+@@ -851,6 +892,9 @@ static irqreturn_t pmu_handle_irq(int irq_num, void *dev)
+ 	int idx, handled = IRQ_NONE;
+ 
+ 	raw_spin_lock_irqsave(&events->pmu_lock, flags);
++
++	/* Disable the PMU while we walk through the counters */
++	__cci_pmu_disable();
+ 	/*
+ 	 * Iterate over counters and update the corresponding perf events.
+ 	 * This should work regardless of whether we have per-counter overflow
+@@ -877,6 +921,9 @@ static irqreturn_t pmu_handle_irq(int irq_num, void *dev)
+ 		pmu_event_set_period(event);
+ 		handled = IRQ_HANDLED;
+ 	}
++
++	/* Enable the PMU and sync possibly overflowed counters */
++	__cci_pmu_enable(cci_pmu);
+ 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+ 
+ 	return IRQ_RETVAL(handled);
+@@ -920,7 +967,7 @@ static void cci_pmu_enable(struct pmu *pmu)
+ 		return;
+ 
+ 	raw_spin_lock_irqsave(&hw_events->pmu_lock, flags);
+-	__cci_pmu_enable();
++	__cci_pmu_enable(cci_pmu);
+ 	raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
+ 
+ }
 -- 
 1.7.9.5
