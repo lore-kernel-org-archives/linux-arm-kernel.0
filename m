@@ -1,56 +1,263 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 25 Jan 2016 11:45:05 +0000
-Subject: [PATCHv3 11/18] arm64: mm: avoid redundant __pa(__va(x))
-In-Reply-To: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
-References: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1453722312-23076-12-git-send-email-mark.rutland@arm.com>
+From: blogic@openwrt.org (John Crispin)
+Date: Mon, 25 Jan 2016 12:56:28 +0100
+Subject: [PATCH V3 1/2] regulator: Add document for MT6323 regulator
+Message-ID: <1453722989-41622-1-git-send-email-blogic@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we "upgrade" to a section mapping, we free any table we made
-redundant by giving it back to memblock. To get the PA, we acquire the
-physical address and convert this to a VA, then subsequently convert
-this back to a PA.
-
-This works currently, but will not work if the tables are not accessed
-via linear map VAs (e.g. is we use fixmap slots).
-
-This patch uses {pmd,pud}_page_paddr to acquire the PA. This avoids the
-__pa(__va()) round trip, saving some work and avoiding reliance on the
-linear mapping.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Jeremy Linton <jeremy.linton@arm.com>
-Cc: Laura Abbott <labbott@fedoraproject.org>
-Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: John Crispin <blogic@openwrt.org>
+Cc: devicetree at vger.kernel.org
 ---
- arch/arm64/mm/mmu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ .../bindings/regulator/mt6323-regulator.txt        |  241 ++++++++++++++++++++
+ 1 file changed, 241 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index c3ea9df..8879aed 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -171,7 +171,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 			if (!pmd_none(old_pmd)) {
- 				flush_tlb_all();
- 				if (pmd_table(old_pmd)) {
--					phys_addr_t table = __pa(pte_offset_map(&old_pmd, 0));
-+					phys_addr_t table = pmd_page_paddr(old_pmd);
- 					if (!WARN_ON_ONCE(slab_is_available()))
- 						memblock_free(table, PAGE_SIZE);
- 				}
-@@ -232,7 +232,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- 			if (!pud_none(old_pud)) {
- 				flush_tlb_all();
- 				if (pud_table(old_pud)) {
--					phys_addr_t table = __pa(pmd_offset(&old_pud, 0));
-+					phys_addr_t table = pud_page_paddr(old_pud);
- 					if (!WARN_ON_ONCE(slab_is_available()))
- 						memblock_free(table, PAGE_SIZE);
- 				}
+diff --git a/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+new file mode 100644
+index 0000000..4412102
+--- /dev/null
++++ b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+@@ -0,0 +1,241 @@
++Mediatek MT6323 Regulator Driver
++
++Required properties:
++- compatible: "mediatek,mt6323-regulator"
++- mt6323regulator: List of regulators provided by this controller. It is named
++  according to its regulator type, buck_<name> and ldo_<name>.
++  The definition for each of these nodes is defined using the standard binding
++  for regulators at Documentation/devicetree/bindings/regulator/regulator.txt.
++
++The valid names for regulators are::
++BUCK:
++  buck_vproc, buck_vsys, buck_vpa
++LDO:
++  ldo_vtcxo, ldo_vcn28, ldo_vcn33_bt, ldo_vcn33_wifi, ldo_va, ldo_vcama,
++  ldo_vio28, ldo_vusb, ldo_vmc, ldo_vmch, ldo_vemc3v3, ldo_vgp1, ldo_vgp2,
++  ldo_vgp3, ldo_vcn18, ldo_vsim1, ldo_vsim2, ldo_vrtc, ldo_vcamaf, ldo_vibr,
++  ldo_vrf18, ldo_vm, ldo_vio18, ldo_vcamd, ldo_vcamio
++
++Example:
++
++	pmic: mt6323 {
++		compatible = "mediatek,mt6323";
++
++		mt6323regulator: mt6323regulator{
++			compatible = "mediatek,mt6323-regulator";
++
++			mt6323_vproc_reg: buck_vproc{
++				regulator-name = "vproc";
++				regulator-min-microvolt = < 700000>;
++				regulator-max-microvolt = <1350000>;
++				regulator-ramp-delay = <12500>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vsys_reg: buck_vsys{
++				regulator-name = "vsys";
++				regulator-min-microvolt = <1400000>;
++				regulator-max-microvolt = <2987500>;
++				regulator-ramp-delay = <25000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vpa_reg: buck_vpa{
++				regulator-name = "vpa";
++				regulator-min-microvolt = < 500000>;
++				regulator-max-microvolt = <3650000>;
++			};
++
++			mt6323_vtcxo_reg: ldo_vtcxo{
++				regulator-name = "vtcxo";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-enable-ramp-delay = <90>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vcn28_reg: ldo_vcn28{
++				regulator-name = "vcn28";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-enable-ramp-delay = <185>;
++			};
++
++			mt6323_vcn33_bt_reg: ldo_vcn33_bt{
++				regulator-name = "vcn33_bt";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3600000>;
++				regulator-enable-ramp-delay = <185>;
++			};
++
++			mt6323_vcn33_wifi_reg: ldo_vcn33_wifi{
++				regulator-name = "vcn33_wifi";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3600000>;
++				regulator-enable-ramp-delay = <185>;
++			};
++
++			mt6323_va_reg: ldo_va{
++				regulator-name = "va";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-enable-ramp-delay = <216>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vcama_reg: ldo_vcama{
++				regulator-name = "vcama";
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vio28_reg: ldo_vio28{
++				regulator-name = "vio28";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-enable-ramp-delay = <216>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vusb_reg: ldo_vusb{
++				regulator-name = "vusb";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <216>;
++				regulator-boot-on;
++			};
++
++			mt6323_vmc_reg: ldo_vmc{
++				regulator-name = "vmc";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <36>;
++				regulator-boot-on;
++			};
++
++			mt6323_vmch_reg: ldo_vmch{
++				regulator-name = "vmch";
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <36>;
++				regulator-boot-on;
++			};
++
++			mt6323_vemc3v3_reg: ldo_vemc3v3{
++				regulator-name = "vemc3v3";
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <36>;
++				regulator-boot-on;
++			};
++
++			mt6323_vgp1_reg: ldo_vgp1{
++				regulator-name = "vgp1";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vgp2_reg: ldo_vgp2{
++				regulator-name = "vgp2";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vgp3_reg: ldo_vgp3{
++				regulator-name = "vgp3";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vcn18_reg: ldo_vcn18{
++				regulator-name = "vcn18";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vsim1_reg: ldo_vsim1{
++				regulator-name = "vsim1";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vsim2_reg: ldo_vsim2{
++				regulator-name = "vsim2";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vrtc_reg: ldo_vrtc{
++				regulator-name = "vrtc";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vcamaf_reg: ldo_vcamaf{
++				regulator-name = "vcamaf";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vibr_reg: ldo_vibr{
++				regulator-name = "vibr";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <36>;
++			};
++
++			mt6323_vrf18_reg: ldo_vrf18{
++				regulator-name = "vrf18";
++				regulator-min-microvolt = <1825000>;
++				regulator-max-microvolt = <1825000>;
++				regulator-enable-ramp-delay = <187>;
++			};
++
++			mt6323_vm_reg: ldo_vm{
++				regulator-name = "vm";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-enable-ramp-delay = <216>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vio18_reg: ldo_vio18{
++				regulator-name = "vio18";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-enable-ramp-delay = <216>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			mt6323_vcamd_reg: ldo_vcamd{
++				regulator-name = "vcamd";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++
++			mt6323_vcamio_reg: ldo_vcamio{
++				regulator-name = "vcamio";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-enable-ramp-delay = <216>;
++			};
++		};
++	};
 -- 
-1.9.1
+1.7.10.4
