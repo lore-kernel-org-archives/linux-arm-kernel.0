@@ -1,52 +1,78 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 25 Jan 2016 16:43:50 +0100
-Subject: [PATCH] ARM: mv78xx0: use "depends on" instead of "if" after
- prompt
-In-Reply-To: <1453722250-23297-1-git-send-email-yamada.masahiro@socionext.com>
- (Masahiro Yamada's message of "Mon, 25 Jan 2016 20:44:10 +0900")
-References: <1453722250-23297-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <874me1ekax.fsf@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Jan 2016 16:45:48 +0100
+Subject: [PATCH] cpufreq: cpufreq-dt: avoid uninitialized variable warnings:
+Message-ID: <1453736756-1959377-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masahiro,
+gcc warns quite a bit about values returned from allocate_resources()
+in cpufreq-dt.c:
+
+cpufreq-dt.c: In function 'cpufreq_init':
+cpufreq-dt.c:327:6: error: 'cpu_dev' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+cpufreq-dt.c:197:17: note: 'cpu_dev' was declared here
+cpufreq-dt.c:376:2: error: 'cpu_clk' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+cpufreq-dt.c:199:14: note: 'cpu_clk' was declared here
+cpufreq-dt.c: In function 'dt_cpufreq_probe':
+cpufreq-dt.c:461:2: error: 'cpu_clk' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+cpufreq-dt.c:447:14: note: 'cpu_clk' was declared here
+
+The problem is that it's slightly hard for gcc to follow return
+codes across PTR_ERR() calls.
+This patch uses explicit assignments to the "ret" variable to make
+it easier for gcc to verify that the code is actually correct,
+without the need to add a bogus initialization.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/cpufreq/cpufreq-dt.c | 15 +++++++--------
+ 1 file changed, 7 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
+index 9bc37c437874..0ca74d070058 100644
+--- a/drivers/cpufreq/cpufreq-dt.c
++++ b/drivers/cpufreq/cpufreq-dt.c
+@@ -142,15 +142,16 @@ static int allocate_resources(int cpu, struct device **cdev,
  
- On lun., janv. 25 2016, Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
-
-> This platform recently moved to multi-platform, so missed the global
-> fixup by commit e32465429490 ("ARM: use "depends on" for SoC configs
-> instead of "if" after prompt").  Fix it now.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-
-Applied on mvebu/cleanup
-
-Thanks,
-
-Gregory
-> ---
->
->  arch/arm/mach-mv78xx0/Kconfig | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-mv78xx0/Kconfig b/arch/arm/mach-mv78xx0/Kconfig
-> index a32575f..c32f855 100644
-> --- a/arch/arm/mach-mv78xx0/Kconfig
-> +++ b/arch/arm/mach-mv78xx0/Kconfig
-> @@ -1,5 +1,6 @@
->  menuconfig ARCH_MV78XX0
-> -	bool "Marvell MV78xx0" if ARCH_MULTI_V5
-> +	bool "Marvell MV78xx0"
-> +	depends on ARCH_MULTI_V5
->  	select ARCH_REQUIRE_GPIOLIB
->  	select CPU_FEROCEON
->  	select MVEBU_MBUS
-> -- 
-> 1.9.1
->
-
+ try_again:
+ 	cpu_reg = regulator_get_optional(cpu_dev, reg);
+-	if (IS_ERR(cpu_reg)) {
++	ret = PTR_ERR_OR_ZERO(cpu_reg);
++	if (ret) {
+ 		/*
+ 		 * If cpu's regulator supply node is present, but regulator is
+ 		 * not yet registered, we should try defering probe.
+ 		 */
+-		if (PTR_ERR(cpu_reg) == -EPROBE_DEFER) {
++		if (ret == -EPROBE_DEFER) {
+ 			dev_dbg(cpu_dev, "cpu%d regulator not ready, retry\n",
+ 				cpu);
+-			return -EPROBE_DEFER;
++			return ret;
+ 		}
+ 
+ 		/* Try with "cpu-supply" */
+@@ -159,18 +160,16 @@ try_again:
+ 			goto try_again;
+ 		}
+ 
+-		dev_dbg(cpu_dev, "no regulator for cpu%d: %ld\n",
+-			cpu, PTR_ERR(cpu_reg));
++		dev_dbg(cpu_dev, "no regulator for cpu%d: %d\n", cpu, ret);
+ 	}
+ 
+ 	cpu_clk = clk_get(cpu_dev, NULL);
+-	if (IS_ERR(cpu_clk)) {
++	ret = PTR_ERR_OR_ZERO(cpu_clk);
++	if (ret) {
+ 		/* put regulator */
+ 		if (!IS_ERR(cpu_reg))
+ 			regulator_put(cpu_reg);
+ 
+-		ret = PTR_ERR(cpu_clk);
+-
+ 		/*
+ 		 * If cpu's clk node is present, but clock is not yet
+ 		 * registered, we should try defering probe.
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.7.0
