@@ -1,37 +1,71 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 25 Jan 2016 11:21:11 +0000
-Subject: [PATCH v6 06/12] arm-cci: Get the status of a counter
+Date: Mon, 25 Jan 2016 11:21:12 +0000
+Subject: [PATCH v6 07/12] arm-cci: Add routines to save/restore all counters
 In-Reply-To: <1453720877-24962-1-git-send-email-suzuki.poulose@arm.com>
 References: <1453720877-24962-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1453720877-24962-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1453720877-24962-8-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add helper routines to check if the counter is enabled or not.
+Adds helper routines to disable the counter controls for
+all the counters on the CCI PMU and restore it back, by
+preserving the original state in caller provided mask.
 
 Cc: Punit Agrawal <punit.agrawal@arm.com>
 Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- drivers/bus/arm-cci.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/bus/arm-cci.c |   38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
 diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 4710d51..f8f6a17 100644
+index f8f6a17..997ad36 100644
 --- a/drivers/bus/arm-cci.c
 +++ b/drivers/bus/arm-cci.c
-@@ -707,6 +707,12 @@ static void pmu_enable_counter(struct cci_pmu *cci_pmu, int idx)
- 	pmu_write_register(cci_pmu, 1, idx, CCI_PMU_CNTR_CTRL);
+@@ -719,6 +719,44 @@ static void pmu_set_event(struct cci_pmu *cci_pmu, int idx, unsigned long event)
  }
  
-+static bool __maybe_unused
-+pmu_counter_is_enabled(struct cci_pmu *cci_pmu, int idx)
+ /*
++ * For all counters on the CCI-PMU, disable any 'enabled' counters,
++ * saving the changed counters in the mask, so that we can restore
++ * it later using pmu_restore_counters. The mask is private to the
++ * caller. We cannot rely on the used_mask maintained by the CCI_PMU
++ * as it only tells us if the counter is assigned to perf_event or not.
++ * The state of the perf_event cannot be locked by the PMU layer, hence
++ * we check the individual counter status (which can be locked by
++ * cci_pm->hw_events->pmu_lock).
++ *
++ * @mask should be initialised to empty by the caller.
++ */
++static void __maybe_unused
++pmu_save_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
 +{
-+	return (pmu_read_register(cci_pmu, idx, CCI_PMU_CNTR_CTRL) & 0x1) != 0;
++	int i;
++
++	for (i = 0; i < cci_pmu->num_cntrs; i++) {
++		if (pmu_counter_is_enabled(cci_pmu, i)) {
++			set_bit(i, mask);
++			pmu_disable_counter(cci_pmu, i);
++		}
++	}
 +}
 +
- static void pmu_set_event(struct cci_pmu *cci_pmu, int idx, unsigned long event)
- {
- 	pmu_write_register(cci_pmu, event, idx, CCI_PMU_EVT_SEL);
++/*
++ * Restore the status of the counters. Reversal of the pmu_save_counters().
++ * For each counter set in the mask, enable the counter back.
++ */
++static void __maybe_unused
++pmu_restore_counters(struct cci_pmu *cci_pmu, unsigned long *mask)
++{
++	int i;
++
++	for_each_set_bit(i, mask, cci_pmu->num_cntrs)
++		pmu_enable_counter(cci_pmu, i);
++}
++
++/*
+  * Returns the number of programmable counters actually implemented
+  * by the cci
+  */
 -- 
 1.7.9.5
