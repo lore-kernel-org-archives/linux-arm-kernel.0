@@ -1,33 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 25 Jan 2016 10:27:03 +0100
-Subject: [PATCH] pinctrl: sunxi: guard sub-directory with
- CONFIG_PINCTRL_SUNXI
-In-Reply-To: <1453563129-30332-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1453563129-30332-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20160125092703.GK7908@lukather>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 25 Jan 2016 09:36:05 +0000
+Subject: [PATCH v2] arm64: kernel: fix architected PMU registers
+ unconditional access
+In-Reply-To: <56A2E2CD.80904@roeck-us.net>
+References: <1452696603-27611-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <56A2E2CD.80904@roeck-us.net>
+Message-ID: <20160125093604.GA32652@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 24, 2016 at 12:32:09AM +0900, Masahiro Yamada wrote:
-> CONFIG_PINCTRL_SUNXI is more suitable than CONFIG_ARCH_SUNXI
-> to guard the drivers/pinctrl/sunxi/ directory.
-> (I renamed CONFIG_PINCTRL_SUNXI_COMMON to CONFIG_PINCTRL_SUNXI.)
+Hi Guenter,
+
+On Fri, Jan 22, 2016 at 06:17:49PM -0800, Guenter Roeck wrote:
+> On 01/13/2016 06:50 AM, Lorenzo Pieralisi wrote:
+> >The Performance Monitors extension is an optional feature of the
+> >AArch64 architecture, therefore, in order to access Performance
+> >Monitors registers safely, the kernel should detect the architected
+> >PMU unit presence through the ID_AA64DFR0_EL1 register PMUVer field
+> >before accessing them.
+> >
+> >This patch implements a guard by reading the ID_AA64DFR0_EL1 register
+> >PMUVer field to detect the architected PMU presence and prevent accessing
+> >PMU system registers if the Performance Monitors extension is not
+> >implemented in the core.
+> >
+> >Fixes: 60792ad349f3 ("arm64: kernel: enforce pmuserenr_el0 initialization and restore")
+> >Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >Reported-by: Guenter Roeck <linux@roeck-us.net>
+> >Tested-by: Guenter Roeck <linux@roeck-us.net>
+> >Cc: Will Deacon <will.deacon@arm.com>
+> >Cc: Peter Maydell <peter.maydell@linaro.org>
+> >Cc: Mark Rutland <mark.rutland@arm.com>
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Hi,
+> 
+> this patch is still missing in mainline.
+> 
+> Did it get lost ?
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+No it did not, it will be sent shortly, thanks.
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160125/d223da20/attachment.sig>
+Lorenzo
