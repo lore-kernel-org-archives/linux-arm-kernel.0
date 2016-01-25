@@ -1,117 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 25 Jan 2016 12:33:53 +0000
-Subject: [PATCH V2 2/4] mfd: mediatek: int_con and int_status may vary in
- location
-In-Reply-To: <1453716887-38442-3-git-send-email-blogic@openwrt.org>
-References: <1453716887-38442-1-git-send-email-blogic@openwrt.org>
- <1453716887-38442-3-git-send-email-blogic@openwrt.org>
-Message-ID: <20160125123353.GE3368@x1>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 25 Jan 2016 12:35:38 +0000
+Subject: [PATCH V2 2/2] regulator: mt6323: Add support for MT6323 regulator
+In-Reply-To: <56A612E2.1010509@openwrt.org>
+References: <1453718405-40815-1-git-send-email-blogic@openwrt.org>
+ <1453718405-40815-2-git-send-email-blogic@openwrt.org>
+ <CABxcv=kWnUwpCo=JJbnPAARRM226YfBJw_6yF7MiE8-7iqBD+Q@mail.gmail.com>
+ <56A612E2.1010509@openwrt.org>
+Message-ID: <20160125123538.GO6588@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Jan 2016, John Crispin wrote:
+On Mon, Jan 25, 2016 at 01:19:46PM +0100, John Crispin wrote:
+> On 25/01/2016 13:11, Javier Martinez Canillas wrote:
 
-> MT6323 has the INT_CON and INT_STATUS located at a different position.
-> Make the registers locations configurable.
-> 
-> Signed-off-by: John Crispin <blogic@openwrt.org>
-> ---
->  drivers/mfd/mt6397-core.c       |   27 +++++++++++++++++----------
->  include/linux/mfd/mt6397/core.h |    2 ++
->  2 files changed, 19 insertions(+), 10 deletions(-)
+> > You don't have a .of_match table but according the DT bindings, the
+> > compatible string "mediatek,mt6323-regulator" should be used so there
+> > should be a OF match table or the vendor prefix of the compatible
+> > string won't be used for matching (i.e: fallbacks to the driver .name
+> > for match).
 
-For my own reference:
-  Acked-by: Lee Jones <lee.jones@linaro.org>
+> the driver is probed via drivers/mfd/mt6397-core.c and does not require
+> the OF match table. It loads fine just like the mt6397 driver.
 
-> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-> index 1749c1c..75ad0fe 100644
-> --- a/drivers/mfd/mt6397-core.c
-> +++ b/drivers/mfd/mt6397-core.c
-> @@ -69,8 +69,10 @@ static void mt6397_irq_sync_unlock(struct irq_data *data)
->  {
->  	struct mt6397_chip *mt6397 = irq_data_get_irq_chip_data(data);
->  
-> -	regmap_write(mt6397->regmap, MT6397_INT_CON0, mt6397->irq_masks_cur[0]);
-> -	regmap_write(mt6397->regmap, MT6397_INT_CON1, mt6397->irq_masks_cur[1]);
-> +	regmap_write(mt6397->regmap, mt6397->int_con[0],
-> +		     mt6397->irq_masks_cur[0]);
-> +	regmap_write(mt6397->regmap, mt6397->int_con[1],
-> +		     mt6397->irq_masks_cur[1]);
->  
->  	mutex_unlock(&mt6397->irqlock);
->  }
-> @@ -147,8 +149,8 @@ static irqreturn_t mt6397_irq_thread(int irq, void *data)
->  {
->  	struct mt6397_chip *mt6397 = data;
->  
-> -	mt6397_irq_handle_reg(mt6397, MT6397_INT_STATUS0, 0);
-> -	mt6397_irq_handle_reg(mt6397, MT6397_INT_STATUS1, 16);
-> +	mt6397_irq_handle_reg(mt6397, mt6397->int_status[0], 0);
-> +	mt6397_irq_handle_reg(mt6397, mt6397->int_status[1], 16);
->  
->  	return IRQ_HANDLED;
->  }
-> @@ -177,8 +179,8 @@ static int mt6397_irq_init(struct mt6397_chip *mt6397)
->  	mutex_init(&mt6397->irqlock);
->  
->  	/* Mask all interrupt sources */
-> -	regmap_write(mt6397->regmap, MT6397_INT_CON0, 0x0);
-> -	regmap_write(mt6397->regmap, MT6397_INT_CON1, 0x0);
-> +	regmap_write(mt6397->regmap, mt6397->int_con[0], 0x0);
-> +	regmap_write(mt6397->regmap, mt6397->int_con[1], 0x0);
->  
->  	mt6397->irq_domain = irq_domain_add_linear(mt6397->dev->of_node,
->  		MT6397_IRQ_NR, &mt6397_irq_domain_ops, mt6397);
-> @@ -203,8 +205,8 @@ static int mt6397_irq_suspend(struct device *dev)
->  {
->  	struct mt6397_chip *chip = dev_get_drvdata(dev);
->  
-> -	regmap_write(chip->regmap, MT6397_INT_CON0, chip->wake_mask[0]);
-> -	regmap_write(chip->regmap, MT6397_INT_CON1, chip->wake_mask[1]);
-> +	regmap_write(chip->regmap, chip->int_con[0], chip->wake_mask[0]);
-> +	regmap_write(chip->regmap, chip->int_con[1], chip->wake_mask[1]);
->  
->  	enable_irq_wake(chip->irq);
->  
-> @@ -215,8 +217,8 @@ static int mt6397_irq_resume(struct device *dev)
->  {
->  	struct mt6397_chip *chip = dev_get_drvdata(dev);
->  
-> -	regmap_write(chip->regmap, MT6397_INT_CON0, chip->irq_masks_cur[0]);
-> -	regmap_write(chip->regmap, MT6397_INT_CON1, chip->irq_masks_cur[1]);
-> +	regmap_write(chip->regmap, chip->int_con[0], chip->irq_masks_cur[0]);
-> +	regmap_write(chip->regmap, chip->int_con[1], chip->irq_masks_cur[1]);
->  
->  	disable_irq_wake(chip->irq);
->  
-> @@ -237,6 +239,11 @@ static int mt6397_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  
->  	mt6397->dev = &pdev->dev;
-> +	mt6397->int_con[0] = MT6397_INT_CON0;
-> +	mt6397->int_con[1] = MT6397_INT_CON1;
-> +	mt6397->int_status[0] = MT6397_INT_STATUS0;
-> +	mt6397->int_status[1] = MT6397_INT_STATUS1;
-> +
->  	/*
->  	 * mt6397 MFD is child device of soc pmic wrapper.
->  	 * Regmap is set from its parent.
-> diff --git a/include/linux/mfd/mt6397/core.h b/include/linux/mfd/mt6397/core.h
-> index 45b8e8a..d678f52 100644
-> --- a/include/linux/mfd/mt6397/core.h
-> +++ b/include/linux/mfd/mt6397/core.h
-> @@ -60,6 +60,8 @@ struct mt6397_chip {
->  	u16 wake_mask[2];
->  	u16 irq_masks_cur[2];
->  	u16 irq_masks_cache[2];
-> +	u16 int_con[2];
-> +	u16 int_status[2];
->  };
->  
->  #endif /* __MFD_MT6397_CORE_H__ */
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+That's fine but you shouldn't have the compatible string in your binding
+document since it's not actually used or needed.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160125/af9d38a9/attachment-0001.sig>
