@@ -1,73 +1,53 @@
-From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
-Date: Mon, 25 Jan 2016 07:32:16 +0000
-Subject: [PATCH 07/15] dmaengine: dw: revisit data_width property
-References: <1453663322-14474-1-git-send-email-mans@mansr.com>
- <1453663322-14474-8-git-send-email-mans@mansr.com>
-Message-ID: <C2D7FE5348E1B147BCA15975FBA23075F4E86560@us01wembx1.internal.synopsys.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Mon, 25 Jan 2016 15:33:43 +0800
+Subject: [PATCH] ARM64: rk3368: add tuning clk for emmc and sdmmc
+Message-ID: <1453707223-28855-1-git-send-email-shawn.lin@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 January 2016 12:55 AM, Mans Rullgard wrote:
-> From: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
->
-> There are several changes are done here:
->
->  - Convert the property to be in bytes
->
->    Much more convenient than keeping encoded value.
->
->  - Use one value for all AHB masters for now
->
->    It seems in practice we have no controllers where masters have different
->    data bus width, we still might return to distinct values when there is a use
->    case.
->
->  - Rename data_width to data-width in the device tree bindings.
->
->  - While here, replace dwc_fast_ffs() by __ffs().
->
-> Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> Signed-off-by: Mans Rullgard <mans@mansr.com>
-> ---
-> This patch changes the DT binding, so it should probably be amended for
-> compatibility with old device trees.  I've included it as is since I think
-> the change as such is good.
-> ---
->  Documentation/devicetree/bindings/dma/snps-dma.txt |  5 ++-
->  arch/arc/boot/dts/abilis_tb10x.dtsi                |  2 +-
->  arch/arm/boot/dts/spear13xx.dtsi                   |  4 +--
->  drivers/dma/dw/core.c                              | 40 +++-------------------
->  drivers/dma/dw/platform.c                          |  8 ++---
->  drivers/dma/dw/regs.h                              |  2 +-
->  include/linux/platform_data/dma-dw.h               |  5 ++-
->  7 files changed, 16 insertions(+), 50 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/dma/snps-dma.txt b/Documentation/devicetree/bindings/dma/snps-dma.txt
-> index c99c1ffac199..fe7f7710a6b4 100644
-> --- a/Documentation/devicetree/bindings/dma/snps-dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/snps-dma.txt
-> @@ -13,8 +13,7 @@ Required properties:
->  - chan_priority: priority of channels. 0 (default): increase from chan 0->n, 1:
->    increase from chan n->0
->  - block_size: Maximum block size supported by the controller
-> -- data_width: Maximum data width supported by hardware per AHB master
-> -  (0 - 8bits, 1 - 16bits, ..., 5 - 256bits)
-> +- data-width: Maximum data width supported by hardware (in bytes)
+Add tuning clk for emmc and sdmmc, otherwise I get
+the following failure while enabling mmc-hs200-1_8v.
 
-To the reader this suggests a value truely byte granular, but code uses ffs
-implying that it is still power of 2.
-Can you mention this here (....in bytes, always power of 2).
+dwmmc_rockchip ff0f0000.dwmmc: Tuning clock (sample_clk) not defined.
+mmc0: tuning execution failed
+mmc0: error -5 whilst initialising MMC card
 
-> ...
-> @@ -726,10 +710,7 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
->  
->  	dwc->direction = DMA_MEM_TO_MEM;
->  
-> -	data_width = dw->data_width[dwc->m_master];
-> -
-> -	src_width = dst_width = min_t(unsigned int, data_width,
-> -				      dwc_fast_ffs(src | dest | len));
-> +	src_width = dst_width = __ffs(dw->data_width | src | dest | len);
-> ...
+With it
+dwmmc_rockchip ff0f0000.dwmmc: Successfully tuned phase to 170
+mmc0: new HS200 MMC card at address 0001
+mmcblk0: mmc0:0001 M8G1GC 7.28 GiB
 
--Vineet
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+---
+
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+index 122777b..1cf3cf7 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+@@ -231,8 +231,9 @@
+ 		compatible = "rockchip,rk3368-dw-mshc", "rockchip,rk3288-dw-mshc";
+ 		reg = <0x0 0xff0c0000 0x0 0x4000>;
+ 		clock-freq-min-max = <400000 150000000>;
+-		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>;
+-		clock-names = "biu", "ciu";
++		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>,
++			 <&cru SCLK_SDMMC_DRV>, <&cru SCLK_SDMMC_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+ 		fifo-depth = <0x100>;
+ 		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+@@ -256,6 +257,9 @@
+ 		clock-freq-min-max = <400000 150000000>;
+ 		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>;
+ 		clock-names = "biu", "ciu";
++		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>,
++			 <&cru SCLK_EMMC_DRV>, <&cru SCLK_EMMC_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+ 		fifo-depth = <0x100>;
+ 		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+ 		status = "disabled";
+-- 
+2.3.7
