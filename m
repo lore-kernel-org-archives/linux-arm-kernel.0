@@ -1,32 +1,68 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 25 Jan 2016 19:28:52 +0600
-Subject: [PATCH 1/3] printk: make preferred_console local static bool
-In-Reply-To: <1453728205.28952.62.camel@perches.com>
-References: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>
- <1453722324-22407-2-git-send-email-aleksey.makarov@linaro.org>
- <1453725901.28952.53.camel@perches.com> <56A61A6F.10409@linaro.org>
- <1453728205.28952.62.camel@perches.com>
-Message-ID: <56A62314.3020803@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 25 Jan 2016 14:32:19 +0100
+Subject: ARM: mvebu_v5_defconfig: Remove obsolete SND_KIRKWOOD_SOC_T5325
+In-Reply-To: <20160116172629.GC9880@lunn.ch> (Andrew Lunn's message of "Sat,
+ 16 Jan 2016 18:26:29 +0100")
+References: <20160111042512.GA30997@jirafa.cyrius.com>
+ <20160116172629.GC9880@lunn.ch>
+Message-ID: <877fixg4yk.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Martin
+ 
+ On sam., janv. 16 2016, Andrew Lunn <andrew@lunn.ch> wrote:
 
-
-On 25.01.2016 19:23, Joe Perches wrote:
-> On Mon, 2016-01-25 at 18:51 +0600, Aleksey Makarov wrote:
->>
->> On 25.01.2016 18:45, Joe Perches wrote:
->>> On Mon, 2016-01-25 at 17:45 +0600, Aleksey Makarov wrote:
->>>> The variable preferred_console is used only inside register_console()
->>>> and it's semantics is boolean.  Make it clear.
->>>
->>> This loses the index of the preferred console.
->>> I'm not sure this is better.
->>
->> That index is not used anywhere.  I believe the patch makes things clear.
+> On Sun, Jan 10, 2016 at 08:25:12PM -0800, Martin Michlmayr wrote:
+>> The kirkwood-t5325 driver driver was removed in commit 270a85c80c86
+>> ("ASoC: kirkwood: Remove unused drivers") in favour of DT based
+>> simple-card equivalents.  Remove the obsolete config option.
+>> 
+>> Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
 >
-> Well, with this change the name and its use
-> is a bit misleading.  Maybe changing it to
-> something like use_selected_console is better.
+> Reviewd-by: Andrew Lunn <andrew@lunn.ch>
 
-Thank you. I will fix this in the next version.
+Actually this change was already done in 8c95b85c0ba2 ("ARM: mvebu:
+update v5 defconfig"). So I won't apply it.
+
+Thanks,
+
+Gregory
+
+>
+> Thanks
+> 	Andrew
+>
+>> ---
+>>  arch/arm/configs/mvebu_v5_defconfig | 1 -
+>>  1 file changed, 1 deletion(-)
+>> 
+>> diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
+>> index 824de49..79e6260 100644
+>> --- a/arch/arm/configs/mvebu_v5_defconfig
+>> +++ b/arch/arm/configs/mvebu_v5_defconfig
+>> @@ -108,7 +108,6 @@ CONFIG_SOUND=y
+>>  CONFIG_SND=y
+>>  CONFIG_SND_SOC=y
+>>  CONFIG_SND_KIRKWOOD_SOC=y
+>> -CONFIG_SND_KIRKWOOD_SOC_T5325=y
+>>  CONFIG_SND_SOC_ALC5623=y
+>>  CONFIG_SND_SIMPLE_CARD=y
+>>  CONFIG_REGULATOR=y
+>> -- 
+>> 2.1.4
+>> 
+>> -- 
+>> Martin Michlmayr
+>> http://www.cyrius.com/
+>> 
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
