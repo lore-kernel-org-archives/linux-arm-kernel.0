@@ -1,31 +1,81 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 25 Jan 2016 10:06:23 -0700
-Subject: [PATCH v2 0/2] Modify static defined and wrong parameter used.
-In-Reply-To: <cover.1453708131.git.eric.long@linaro.org>
-References: <cover.1453708131.git.eric.long@linaro.org>
-Message-ID: <CANLsYkxvCvb1auV+SgQ_q9DVypj9dpD0mhhKhoD9fUwmrmk6Pg@mail.gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 25 Jan 2016 16:53:02 +0000
+Subject: [PATCH v9 21/21] KVM: ARM64: Add a new vcpu device control group
+ for PMUv3
+In-Reply-To: <1452839275-19368-22-git-send-email-zhaoshenglong@huawei.com>
+References: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452839275-19368-22-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <CAFEAcA-rVDLajQ7s5KcwkVsACtRtEqN+wkpR6RWMkvBBPJY8fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 January 2016 at 01:34, Eric Long <eric.long@linaro.org> wrote:
-> Both of the two patches optimize the code and remove the mistakes
-> and warnings detected by the check tools.
+On 15 January 2016 at 06:27, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 >
-> Changes since v1:
->  - Adjust the patch by the changes not by the check tools.
+> To configure the virtual PMUv3 overflow interrupt number, we use the
+> vcpu kvm_device ioctl, encapsulating the KVM_ARM_VCPU_PMU_V3_IRQ
+> attribute within the KVM_ARM_VCPU_PMU_V3_CTRL group.
 >
-> Eric Long (2):
->   coresight: "DEVICE_ATTR_RO" should defined as static.
->   coresight: etm4x: Check every parameter used by dma_xx_coherent.
+> After configuring the PMUv3, call the vcpu iotcl with attribute
+> KVM_ARM_VCPU_PMU_V3_INIT to initialize the PMUv3.
 >
->  drivers/hwtracing/coresight/coresight-etm4x.c |    2 +-
->  drivers/hwtracing/coresight/coresight-tmc.c   |    6 +++---
->  drivers/hwtracing/coresight/of_coresight.c    |    2 +-
->  3 files changed, 5 insertions(+), 5 deletions(-)
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+> CC: Peter Maydell <peter.maydell@linaro.org>
+> ---
+>  Documentation/virtual/kvm/devices/vcpu.txt |  24 ++++++
+>  arch/arm/include/asm/kvm_host.h            |  15 ++++
+>  arch/arm/kvm/arm.c                         |   3 +
+>  arch/arm64/include/asm/kvm_host.h          |   6 ++
+>  arch/arm64/include/uapi/asm/kvm.h          |   5 ++
+>  arch/arm64/kvm/guest.c                     |  51 ++++++++++++
+>  include/kvm/arm_pmu.h                      |  23 ++++++
+>  virt/kvm/arm/pmu.c                         | 128 +++++++++++++++++++++++++++++
+>  8 files changed, 255 insertions(+)
 >
-> --
-> 1.7.9.5
+> diff --git a/Documentation/virtual/kvm/devices/vcpu.txt b/Documentation/virtual/kvm/devices/vcpu.txt
+> index 3cc59c5..60cbac8 100644
+> --- a/Documentation/virtual/kvm/devices/vcpu.txt
+> +++ b/Documentation/virtual/kvm/devices/vcpu.txt
+> @@ -6,3 +6,27 @@ KVM_GET_DEVICE_ATTR, and KVM_HAS_DEVICE_ATTR. The interface uses the same struct
+>  kvm_device_attr as other devices, but targets VCPU-wide settings and controls.
 >
+>  The groups and attributes per virtual cpu, if any, are architecture specific.
+> +
+> +1. GROUP: KVM_ARM_VCPU_PMU_V3_CTRL
+> +Architectures: ARM64
+> +
+> +1.1. ATTRIBUTE: KVM_ARM_VCPU_PMU_V3_IRQ
+> +Parameters: in kvm_device_attr.addr the address for PMU overflow interrupt
+> +Returns: -EBUSY: The PMU overflow interrupt is already set
+> +         -ENODEV: Not set the corresponding vcpu feature bit or getting the PMU
+> +                  overflow interrupt number while it's not set
+> +         -EINVAL: Invalid PMU overflow interrupt number supplied
+> +
+> +A value describing the PMUv3 (Performance Monitor Unit v3) overflow interrupt
+> +number for this vcpu. This interrupt could be a PPI or SPI, but the interrupt
+> +type must be same for each vcpu. As a PPI, the interrupt number is same for all
+> +vcpus, while as a SPI it must be different for each vcpu.
+> +
+> +1.2 ATTRIBUTE: KVM_ARM_VCPU_PMU_V3_INIT
+> +Parameters: no additional parameter in kvm_device_attr.addr
+> +Returns: -ENODEV: No PMUv3 supported
+> +         -ENXIO: PMUv3 not properly configured as required prior to calling this
+> +                 attribute
+> +         -EBUSY: PMUv3 already initialized
+> +
+> +Request the initialization of the PMUv3.
 
-I have applied both patches - thanks.
-Mathieu
+The other thing we could do here (now the PMU is part of the vCPU 'device'
+rather than its own thing) is to have a single INIT ioctl that says
+"we're done doing all the SET_DEVICE_ATTR calls to configure the vCPU".
+But I'm fine with this way too.
+
+You can have my
+Acked-by: Peter Maydell <peter.maydell@linaro.org>
+
+for the userspace API parts of patches 19, 20 and 21 (with the minor typo
+fixes etc Andrew has posted).
+
+thanks
+-- PMM
