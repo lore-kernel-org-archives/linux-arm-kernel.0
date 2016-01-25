@@ -1,148 +1,56 @@
-From: tthayer@opensource.altera.com (Thor Thayer)
-Date: Mon, 25 Jan 2016 09:42:33 -0600
-Subject: [PATCHv8 2/4] ARM: dts: Add Altera L2 Cache and OCRAM EDAC entries
-In-Reply-To: <20160123023513.GA2081@rob-hp-laptop>
-References: <1453397668-32094-1-git-send-email-tthayer@opensource.altera.com>
- <1453397668-32094-2-git-send-email-tthayer@opensource.altera.com>
- <20160123023513.GA2081@rob-hp-laptop>
-Message-ID: <56A64269.1030500@opensource.altera.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Jan 2016 16:39:12 +0100
+Subject: [PATCH] profile: hide unused functions when !CONFIG_PROC_FS
+Message-ID: <1453736359-1959049-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+A couple of functions and variables in the profile implementation are
+used only on SMP systems by the procfs code, but are unused if
+either procfs is disabled or in uniprocessor kernels. gcc prints
+a harmless warning about the unused symbols:
 
+kernel/profile.c:243:13: error: 'profile_flip_buffers' defined but not used [-Werror=unused-function]
+ static void profile_flip_buffers(void)
+             ^
+kernel/profile.c:266:13: error: 'profile_discard_flip_buffers' defined but not used [-Werror=unused-function]
+ static void profile_discard_flip_buffers(void)
+             ^
+kernel/profile.c:330:12: error: 'profile_cpu_callback' defined but not used [-Werror=unused-function]
+ static int profile_cpu_callback(struct notifier_block *info,
+            ^
 
-On 01/22/2016 08:35 PM, Rob Herring wrote:
-> On Thu, Jan 21, 2016 at 11:34:26AM -0600, tthayer at opensource.altera.com wrote:
->> From: Thor Thayer <tthayer@opensource.altera.com>
->>
->> Adding the device tree entries and bindings needed to support
->> the Altera L2 cache and On-Chip RAM EDAC. This patch relies upon
->> an earlier patch to declare and setup On-chip RAM properly.
->> http://www.spinics.net/lists/devicetree/msg51117.html
->>
->> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
->> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
->> ---
->> v8: Fix node names to include chip family and use ecc manager
->>      to better describe the driver. Rename socfpga-edac.txt to
->>      socfpga-eccmgr.txt.
->> v7: No Change
->> v6: Change to nested EDAC device nodes based on community
->>      feedback. Remove L2 syscon. Use consolidated binding.
->> v3-5: No Change
->> v2: Remove OCRAM declaration and reference prior patch.
->> ---
->>   .../bindings/arm/altera/socfpga-eccmgr.txt         |   49 ++++++++++++++++++++
->>   arch/arm/boot/dts/socfpga.dtsi                     |   20 ++++++++
->>   2 files changed, 69 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
->
-> A couple of nits, otherwise:
->
-> Acked-by: Rob Herring <robh@kernel.org>
->
+This adds further #ifdef to the file, to annotate exactly in
+which cases they are used. I have done several thousand ARM randconfig
+kernels with this patch applied and no longer get any warnings in
+this file.
 
-Great! I will make these changes for my next version that fixes some 
-coding issue. Thank you for reviewing.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ kernel/profile.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
->>
->> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
->> new file mode 100644
->> index 0000000..4f45690
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
->> @@ -0,0 +1,49 @@
->> +Altera SoCFPGA ECC Manager
->> +This driver uses the EDAC framework to implement the SOCFPGA ECC Manager.
->> +The ECC Manager counts and corrects single bit errors and counts/handles
->> +double bit errors which are uncorrectable.
->> +
->> +Required Properties:
->> +- compatible : Should be "altr,socfpga-ecc-manager"
->> +- #address-cells: must be 1
->> +- #size-cells: must be 1
->> +- ranges : standard definition, should translate from local addresses
->> +
->> +Subcomponents:
->> +
->> +L2 Cache ECC
->> +Required Properties:
->> +- compatible : Should be "altr,socfpga-l2-ecc"
->> +- reg : Address and size for ECC error interrupt clear registers.
->> +- interrupts : Should be single bit error interrupt, then double bit error
->> +	interrupt. Note the rising edge type.
->> +
->> +On Chip RAM ECC
->> +Required Properties:
->> +- compatible : Should be "altr,socfpga-ocram-ecc"
->> +- reg : Address and size for ECC error interrupt clear registers.
->> +- iram : phandle to On-Chip RAM definition.
->> +- interrupts : Should be single bit error interrupt, then double bit error
->> +	interrupt. Note the rising edge type.
->> +
->> +Example:
->> +
->> +	eccmgr: eccmgr at 0xffd08140 {
->
-> drop the '0x'
->
->> +		compatible = "altr,socfpga-ecc-manager";
->> +		#address-cells = <1>;
->> +		#size-cells = <1>;
->> +		ranges;
->> +
->> +		l2-ecc at ffd08140 {
->> +			compatible = "altr,socfpga-l2-ecc";
->> +			reg = <0xffd08140 0x4>;
->> +			interrupts = <0 36 1>, <0 37 1>;
->> +		};
->> +
->> +		ocram-ecc at ffd08144 {
->> +			compatible = "altr,socfpga-ocram-ecc";
->> +			reg = <0xffd08144 0x4>;
->> +			iram = <&ocram>;
->> +			interrupts = <0 178 1>, <0 179 1>;
->> +		};
->> +	};
->> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
->> index 39c470e..9bb383e 100644
->> --- a/arch/arm/boot/dts/socfpga.dtsi
->> +++ b/arch/arm/boot/dts/socfpga.dtsi
->> @@ -656,6 +656,26 @@
->>   			status = "disabled";
->>   		};
->>
->> +		eccmgr: eccmgr at 0xffd08140 {
->
-> and here.
->
->> +			compatible = "altr,socfpga-ecc-manager";
->> +			#address-cells = <1>;
->> +			#size-cells = <1>;
->> +			ranges;
->> +
->> +			l2-ecc at ffd08140 {
->> +				compatible = "altr,socfpga-l2-ecc";
->> +				reg = <0xffd08140 0x4>;
->> +				interrupts = <0 36 1>, <0 37 1>;
->> +			};
->> +
->> +			ocram-ecc at ffd08144 {
->> +				compatible = "altr,socfpga-ocram-ecc";
->> +				reg = <0xffd08144 0x4>;
->> +				iram = <&ocram>;
->> +				interrupts = <0 178 1>, <0 179 1>;
->> +			};
->> +		};
->> +
->>   		L2: l2-cache at fffef000 {
->>   			compatible = "arm,pl310-cache";
->>   			reg = <0xfffef000 0x1000>;
->> --
->> 1.7.9.5
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/kernel/profile.c b/kernel/profile.c
+index 99513e1160e5..9cd8e18e6f18 100644
+--- a/kernel/profile.c
++++ b/kernel/profile.c
+@@ -44,7 +44,7 @@ int prof_on __read_mostly;
+ EXPORT_SYMBOL_GPL(prof_on);
+ 
+ static cpumask_var_t prof_cpu_mask;
+-#ifdef CONFIG_SMP
++#if defined(CONFIG_SMP) && defined(CONFIG_PROC_FS)
+ static DEFINE_PER_CPU(struct profile_hit *[2], cpu_profile_hits);
+ static DEFINE_PER_CPU(int, cpu_profile_flip);
+ static DEFINE_MUTEX(profile_flip_mutex);
+@@ -201,7 +201,7 @@ int profile_event_unregister(enum profile_type type, struct notifier_block *n)
+ }
+ EXPORT_SYMBOL_GPL(profile_event_unregister);
+ 
+-#ifdef CONFIG_SMP
++#if defined(CONFIG_SMP) && defined(CONFIG_PROC_FS)
+ /*
+  * Each cpu has a pair of open-addressed hashtables for pending
+  * profile hits. read_profile() IPI's all cpus to request them
+-- 
+2.7.0
