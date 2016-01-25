@@ -1,59 +1,75 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 17:02:24 +0100
-Subject: [PATCH] mfd: db8500: avoid uninitialized variable reference
-Message-ID: <1453737752-1960326-1-git-send-email-arnd@arndb.de>
+Date: Mon, 25 Jan 2016 17:02:49 +0100
+Subject: [PATCH] clocksource: select CLKSRC_MMIO where needed
+Message-ID: <1453737776-1960372-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The prcmu_config_clkout() function ensures that the 'clkout' argument
-can only be '0' or '1' using an appropriate BUG_ON(), so the compiler
-should know that the div_mask, mask, and bits variables are always
-initialized later on. However, it doesn't understand this in gcc-5.2
-and produces a false positive warning instead:
+The Tegra clocksource implementation uses the clocksource_mmio helper
+functions, but currently can be configured without them, which fails:
 
-drivers/mfd/db8500-prcmu.c: In function 'prcmu_config_clkout':
-drivers/mfd/db8500-prcmu.c:762:10: error: 'div_mask' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-  if (val & div_mask) {
-          ^
-drivers/mfd/db8500-prcmu.c:769:13: error: 'mask' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-    if ((val & mask & ~div_mask) != bits) {
-             ^
-drivers/mfd/db8500-prcmu.c:757:7: error: 'bits' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+drivers/clocksource/built-in.o: In function `tegra20_init_timer':
+:(.init.text+0xac): undefined reference to `clocksource_mmio_init'
+:(.init.text+0x140): undefined reference to `clocksource_mmio_readl_up'
 
-Replacing the switch() statement with an equivalent if() lets
-gcc figure this out reliably and avoids the warnings.
+The same problem exists for Digicolor:
+
+drivers/clocksource/built-in.o: In function `digicolor_timer_init':
+:(.init.text+0xfa): undefined reference to `clocksource_mmio_init'
+:(.init.text+0x14c): undefined reference to `clocksource_mmio_readl_down'
+
+I've inspected the Kconfig file to look for other cases that I have not
+yet run into, and added an explicit 'select' to each one to ensure we
+can successfully link the drivers.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/mfd/db8500-prcmu.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+ drivers/clocksource/Kconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 12099b09a9a7..c0a86aeb1733 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -739,20 +739,17 @@ int prcmu_config_clkout(u8 clkout, u8 source, u8 div)
- 	if (!div && !requests[clkout])
- 		return -EINVAL;
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 56777f04d2d9..f70b4f3b4857 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -30,6 +30,7 @@ config CLKSRC_MMIO
+ config DIGICOLOR_TIMER
+ 	bool "Digicolor timer driver" if COMPILE_TEST
+ 	depends on GENERIC_CLOCKEVENTS
++	select CLKSRC_MMIO
+ 	help
+ 	  Enables the support for the digicolor timer driver.
  
--	switch (clkout) {
--	case 0:
-+	if (clkout == 0) {
- 		div_mask = PRCM_CLKOCR_CLKODIV0_MASK;
- 		mask = (PRCM_CLKOCR_CLKODIV0_MASK | PRCM_CLKOCR_CLKOSEL0_MASK);
- 		bits = ((source << PRCM_CLKOCR_CLKOSEL0_SHIFT) |
- 			(div << PRCM_CLKOCR_CLKODIV0_SHIFT));
--		break;
--	case 1:
-+	} else {
- 		div_mask = PRCM_CLKOCR_CLKODIV1_MASK;
- 		mask = (PRCM_CLKOCR_CLKODIV1_MASK | PRCM_CLKOCR_CLKOSEL1_MASK |
- 			PRCM_CLKOCR_CLK1TYPE);
- 		bits = ((source << PRCM_CLKOCR_CLKOSEL1_SHIFT) |
- 			(div << PRCM_CLKOCR_CLKODIV1_SHIFT));
--		break;
- 	}
- 	bits &= mask;
+@@ -55,6 +56,7 @@ config ARMADA_370_XP_TIMER
+ 	bool "Armada 370 and XP timer driver" if COMPILE_TEST
+ 	depends on ARM
+ 	select CLKSRC_OF
++	select CLKSRC_MMIO
+ 	help
+ 	  Enables the support for the Armada 370 and XP timer driver.
  
+@@ -89,6 +91,7 @@ config SUN5I_HSTIMER
+ 
+ config TEGRA_TIMER
+ 	bool "Tegra timer driver" if COMPILE_TEST
++	select CLKSRC_MMIO
+ 	depends on ARM
+ 	help
+ 	  Enables support for the Tegra driver.
+@@ -263,6 +266,7 @@ config FSL_FTM_TIMER
+ 
+ config VF_PIT_TIMER
+ 	bool
++	select CLKSRC_MMIO
+ 	help
+ 	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
+ 
+@@ -394,6 +398,7 @@ config CLKSRC_ST_LPC
+ 	bool "Low power clocksource found in the LPC" if COMPILE_TEST
+ 	select CLKSRC_OF if OF
+ 	depends on HAS_IOMEM
++	select CLKSRC_MMIO
+ 	help
+ 	  Enable this option to use the Low Power controller timer
+ 	  as clocksource.
 -- 
 2.7.0
