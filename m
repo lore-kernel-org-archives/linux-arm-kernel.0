@@ -1,15 +1,15 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 25 Jan 2016 09:31:23 +0100
-Subject: [PATCH] ARM: dts: r8a7740: use GIC_* defines
-In-Reply-To: <1453683178-31713-1-git-send-email-horms+renesas@verge.net.au>
-References: <1453683178-31713-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWpz-78fcdxjt8VBvtbchxYd90wq+kobXBEq6eV3A+Uxw@mail.gmail.com>
+Date: Mon, 25 Jan 2016 09:31:38 +0100
+Subject: [PATCH] ARM: dts: r8a73a4: use GIC_* defines
+In-Reply-To: <1453683169-31641-1-git-send-email-horms+renesas@verge.net.au>
+References: <1453683169-31641-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXct-auQjPEwO2NWRy0Rd+O-RfbdgbFFey+ARZBY3ovcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Jan 25, 2016 at 1:52 AM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
-> Use GIC_* defines for GIC interrupt cells in r8a7740 device tree.
+> Use GIC_* defines for GIC interrupt cells in r8a73a4 device tree.
 >
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
