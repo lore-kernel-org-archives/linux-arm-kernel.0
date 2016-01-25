@@ -1,121 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 Jan 2016 15:53:42 +0000
-Subject: [PATCH v2 08/21] arm64: KVM: VHE: Introduce unified system register
- accessors
-In-Reply-To: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453737235-16522-9-git-send-email-marc.zyngier@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 25 Jan 2016 15:57:00 +0000
+Subject: [PATCH V2] ARM64: tegra: Add chosen node for tegra132 norrin
+In-Reply-To: <1453737310-11391-1-git-send-email-jonathanh@nvidia.com>
+References: <1453737310-11391-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <56A645CC.5070907@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VHE brings its own bag of new system registers, or rather system
-register accessors, as it define new ways to access both guest
-and host system registers. For example, from the host:
 
-- The host TCR_EL2 register is accessed using the TCR_EL1 accessor
-- The guest TCR_EL1 register is accessed using the TCR_EL12 accessor
+On 25/01/16 15:55, Jon Hunter wrote:
+> The NVIDIA bootloader, nvtboot, expects the "chosen" node to be present
+> in the device-tree blob and if it is not then it fails to boot the kernel.
+> Add the chosen node so we can boot the kernel on Tegra132 Norrin with the
+> nvtboot bootloader.
+> 
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> Acked-by: Thierry Reding <treding@nvidia.com>
+> ---
+> Ideally, we would like to get this into v4.5 as a fix for Tegra132 Norrin
+> so that we can enable booting this board as part of our automated testing
+> setup for Tegra [0][1]. Thierry suggested I send this directly as a fix
+> to ARM-SOC. Let me know if this is ok. I have not included a "fixes" as it
+> may not be needed for all bootloaders, but if you need this we could put:
+> 
+> Fixes: 0f279eb arm64: tegra: Add NVIDIA Tegra132 Norrin support
+> 
+> [0] http://nvtb.github.io/linux/
+> [1] http://nvtb.github.io/linux-next/
 
-Obviously, this is confusing. A way to somehow reduce the complexity
-of writing code for both ARMv8 and ARMv8.1 is to use a set of unified
-accessors that will generate the right sysreg, depending on the mode
-the CPU is running in. For example:
+Forgot to mentioned that the differences for v1 -> v2 are just some
+minor corrections to the commit message.
 
-- read_sysreg_el1(tcr) will use TCR_EL1 on ARMv8, and TCR_EL12 on
-  ARMv8.1 with VHE.
-- read_sysreg_el2(tcr) will use TCR_EL2 on ARMv8, and TCR_EL1 on
-  ARMv8.1 with VHE.
+Jon
 
-We end up with three sets of accessors ({read,write}_sysreg_el[012])
-that can be directly used from C code. We take this opportunity to
-also add the definition for the new VHE sysregs.(
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kvm/hyp/hyp.h | 72 ++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 72 insertions(+)
-
-diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-index fc502f3..744c919 100644
---- a/arch/arm64/kvm/hyp/hyp.h
-+++ b/arch/arm64/kvm/hyp/hyp.h
-@@ -48,6 +48,78 @@ static inline unsigned long __hyp_kern_va(unsigned long v)
- 
- #define hyp_kern_va(v) (typeof(v))(__hyp_kern_va((unsigned long)(v)))
- 
-+#define read_sysreg_elx(r,nvh,vh)					\
-+	({								\
-+		u64 reg;						\
-+		asm volatile(ALTERNATIVE("mrs %0, " __stringify(r##nvh),\
-+					 "mrs_s %0, " __stringify(r##vh),\
-+					 ARM64_HAS_VIRT_HOST_EXTN)	\
-+			     : "=r" (reg));				\
-+		reg;							\
-+	})
-+
-+#define write_sysreg_elx(v,r,nvh,vh)					\
-+	do {								\
-+		u64 __val = (u64)(v);					\
-+		asm volatile(ALTERNATIVE("msr " __stringify(r##nvh) ", %x0",\
-+					 "msr_s " __stringify(r##vh) ", %x0",\
-+					 ARM64_HAS_VIRT_HOST_EXTN)	\
-+					 : : "rZ" (__val));		\
-+	} while (0)
-+
-+/*
-+ * Unified accessors for registers that have a different encoding
-+ * between VHE and non-VHE. They must be specified without their "ELx"
-+ * encoding.
-+ */
-+#define read_sysreg_el2(r)						\
-+	({								\
-+		u64 reg;						\
-+		asm volatile(ALTERNATIVE("mrs %0, " __stringify(r##_EL2),\
-+					 "mrs %0, " __stringify(r##_EL1),\
-+					 ARM64_HAS_VIRT_HOST_EXTN)	\
-+			     : "=r" (reg));				\
-+		reg;							\
-+	})
-+
-+#define write_sysreg_el2(v,r)						\
-+	do {								\
-+		u64 __val = (u64)(v);					\
-+		asm volatile(ALTERNATIVE("msr " __stringify(r##_EL2) ", %x0",\
-+					 "msr " __stringify(r##_EL1) ", %x0",\
-+					 ARM64_HAS_VIRT_HOST_EXTN)	\
-+					 : : "rZ" (__val));		\
-+	} while (0)
-+
-+#define read_sysreg_el0(r)	read_sysreg_elx(r, _EL0, _EL02)
-+#define write_sysreg_el0(v,r)	write_sysreg_elx(v, r, _EL0, _EL02)
-+#define read_sysreg_el1(r)	read_sysreg_elx(r, _EL1, _EL12)
-+#define write_sysreg_el1(v,r)	write_sysreg_elx(v, r, _EL1, _EL12)
-+
-+/* The VHE specific system registers and their encoding */
-+#define sctlr_EL12              sys_reg(3, 5, 1, 0, 0)
-+#define cpacr_EL12              sys_reg(3, 5, 1, 0, 2)
-+#define ttbr0_EL12              sys_reg(3, 5, 2, 0, 0)
-+#define ttbr1_EL12              sys_reg(3, 5, 2, 0, 1)
-+#define tcr_EL12                sys_reg(3, 5, 2, 0, 2)
-+#define afsr0_EL12              sys_reg(3, 5, 5, 1, 0)
-+#define afsr1_EL12              sys_reg(3, 5, 5, 1, 1)
-+#define esr_EL12                sys_reg(3, 5, 5, 2, 0)
-+#define far_EL12                sys_reg(3, 5, 6, 0, 0)
-+#define mair_EL12               sys_reg(3, 5, 10, 2, 0)
-+#define amair_EL12              sys_reg(3, 5, 10, 3, 0)
-+#define vbar_EL12               sys_reg(3, 5, 12, 0, 0)
-+#define contextidr_EL12         sys_reg(3, 5, 13, 0, 1)
-+#define cntkctl_EL12            sys_reg(3, 5, 14, 1, 0)
-+#define cntp_tval_EL02          sys_reg(3, 5, 14, 2, 0)
-+#define cntp_ctl_EL02           sys_reg(3, 5, 14, 2, 1)
-+#define cntp_cval_EL02          sys_reg(3, 5, 14, 2, 2)
-+#define cntv_tval_EL02          sys_reg(3, 5, 14, 3, 0)
-+#define cntv_ctl_EL02           sys_reg(3, 5, 14, 3, 1)
-+#define cntv_cval_EL02          sys_reg(3, 5, 14, 3, 2)
-+#define spsr_EL12               sys_reg(3, 5, 4, 0, 0)
-+#define elr_EL12                sys_reg(3, 5, 4, 0, 1)
-+
- /**
-  * hyp_alternate_select - Generates patchable code sequences that are
-  * used to switch between two implementations of a function, depending
--- 
-2.1.4
+>  arch/arm64/boot/dts/nvidia/tegra132-norrin.dts | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts b/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
+> index 7dfe1c085966..62f33fc84e3e 100644
+> --- a/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
+> +++ b/arch/arm64/boot/dts/nvidia/tegra132-norrin.dts
+> @@ -12,6 +12,8 @@
+>  		rtc1 = "/rtc at 0,7000e000";
+>  	};
+>  
+> +	chosen { };
+> +
+>  	memory {
+>  		device_type = "memory";
+>  		reg = <0x0 0x80000000 0x0 0x80000000>;
+> 
