@@ -1,100 +1,75 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 25 Jan 2016 16:41:01 +0100
-Subject: [PATCH] ARM: DTS: kirkwood-openrd: provide template for
- RS-232/485 configuration
-In-Reply-To: <1453581437-14135-1-git-send-email-aaro.koskinen@iki.fi> (Aaro
- Koskinen's message of "Sat, 23 Jan 2016 22:37:17 +0200")
-References: <1453581437-14135-1-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <878u3dekfm.fsf@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Jan 2016 16:41:51 +0100
+Subject: [PATCH] mtd: avoid stack overflow in MTD CFI code
+Message-ID: <1453736525-1959191-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Aaro,
+When map_word gets too large, we use a lot of kernel stack, and for
+MTD_MAP_BANK_WIDTH_32, this means we use more than the recommended
+1024 bytes in a number of functions:
+
+drivers/mtd/chips/cfi_cmdset_0020.c: In function 'cfi_staa_write_buffers':
+drivers/mtd/chips/cfi_cmdset_0020.c:651:1: warning: the frame size of 1336 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+drivers/mtd/chips/cfi_cmdset_0020.c: In function 'cfi_staa_erase_varsize':
+drivers/mtd/chips/cfi_cmdset_0020.c:972:1: warning: the frame size of 1208 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+drivers/mtd/chips/cfi_cmdset_0001.c: In function 'do_write_buffer':
+drivers/mtd/chips/cfi_cmdset_0001.c:1835:1: warning: the frame size of 1240 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+
+This can be avoided if all operations on the map word are done
+indirectly and the stack gets reused between the calls. We can
+mostly achieve this by selecting MTD_COMPLEX_MAPPINGS whenever
+MTD_MAP_BANK_WIDTH_32 is set, but for the case that no other
+bank width is enabled, we also need to use a non-constant
+map_bankwidth() to convince the compiler to use less stack.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/mtd/chips/Kconfig |  1 +
+ include/linux/mtd/map.h   | 19 +++++++------------
+ 2 files changed, 8 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/mtd/chips/Kconfig b/drivers/mtd/chips/Kconfig
+index 3b3dabce58de..b24be7d75c9c 100644
+--- a/drivers/mtd/chips/Kconfig
++++ b/drivers/mtd/chips/Kconfig
+@@ -115,6 +115,7 @@ config MTD_MAP_BANK_WIDTH_16
  
- On sam., janv. 23 2016, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-
-> Some OpenRD boards have RS-232 and RS-486 connectors wired, but using them
-> needs a custom DTB as the current DTB configures SD card slot instead.
->
-> This patch adds documentation into the DTS on how to change
-> the configuration.
->
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-
-Applied on mvebu/dt with Andrew Reviewed-by tag
-
-Thanks,
-
-Gregory
-
-> ---
->  arch/arm/boot/dts/kirkwood-openrd.dtsi | 31 ++++++++++++++++++++++++++++++-
->  1 file changed, 30 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/kirkwood-openrd.dtsi b/arch/arm/boot/dts/kirkwood-openrd.dtsi
-> index f65b727..24f1d30 100644
-> --- a/arch/arm/boot/dts/kirkwood-openrd.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood-openrd.dtsi
-> @@ -40,7 +40,7 @@
->  			pinctrl-0 = <&pmx_select28 &pmx_sdio_cd &pmx_select34>;
->  			pinctrl-names = "default";
->  
-> -			pmx_select28: pmx-select-rs232-rs484 {
-> +			pmx_select28: pmx-select-rs232-rs485 {
->  				marvell,pins = "mpp28";
->  				marvell,function = "gpio";
->  			};
-> @@ -65,10 +65,39 @@
->  			status = "okay";
->  			cd-gpios = <&gpio0 29 9>;
->  		};
-> +		gpio at 10100 {
-> +			p28 {
-> +				gpio-hog;
-> +				gpios = <28 GPIO_ACTIVE_HIGH>;
-> +				/*
-> +				 * SelRS232or485 selects between RS-232 or RS-485
-> +				 * mode for the second UART.
-> +				 *
-> +				 * Low: RS-232
-> +				 * High: RS-485
-> +				 *
-> +				 * To use the second UART, you need to change also
-> +				 * the SelUARTorSD.
-> +				 */
-> +				output-low;
-> +				line-name = "SelRS232or485";
-> +			};
-> +		};
->  		gpio at 10140 {
->  			p2 {
->  				gpio-hog;
->  				gpios = <2 GPIO_ACTIVE_HIGH>;
-> +				/*
-> +				 * SelUARTorSD selects between the second UART
-> +				 * (serial at 12100) and SD (mvsdio at 90000).
-> +				 *
-> +				 * Low: UART
-> +				 * High: SD
-> +				 *
-> +				 * When changing this line make sure the newly
-> +				 * selected device node is enabled and the
-> +				 * previously selected device node is disabled.
-> +				 */
->  				output-high; /* Select SD by default */
->  				line-name = "SelUARTorSD";
->  			};
-> -- 
-> 2.4.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
+ config MTD_MAP_BANK_WIDTH_32
+ 	bool "Support 256-bit buswidth" if MTD_CFI_GEOMETRY
++	select MTD_COMPLEX_MAPPINGS
+ 	default n
+ 	help
+ 	  If you wish to support CFI devices on a physical bus which is
+diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
+index 58f3ba709ade..e20fcf678155 100644
+--- a/include/linux/mtd/map.h
++++ b/include/linux/mtd/map.h
+@@ -122,18 +122,13 @@
+ #endif
+ 
+ #ifdef CONFIG_MTD_MAP_BANK_WIDTH_32
+-# ifdef map_bankwidth
+-#  undef map_bankwidth
+-#  define map_bankwidth(map) ((map)->bankwidth)
+-#  undef map_bankwidth_is_large
+-#  define map_bankwidth_is_large(map) (map_bankwidth(map) > BITS_PER_LONG/8)
+-#  undef map_words
+-#  define map_words(map) map_calc_words(map)
+-# else
+-#  define map_bankwidth(map) 32
+-#  define map_bankwidth_is_large(map) (1)
+-#  define map_words(map) map_calc_words(map)
+-# endif
++/* always use indirect access for 256-bit to preserve kernel stack */
++# undef map_bankwidth
++# define map_bankwidth(map) ((map)->bankwidth)
++# undef map_bankwidth_is_large
++# define map_bankwidth_is_large(map) (map_bankwidth(map) > BITS_PER_LONG/8)
++# undef map_words
++# define map_words(map) map_calc_words(map)
+ #define map_bankwidth_is_32(map) (map_bankwidth(map) == 32)
+ #undef MAX_MAP_BANKWIDTH
+ #define MAX_MAP_BANKWIDTH 32
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.7.0
