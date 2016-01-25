@@ -1,36 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:58:08 +0100
-Subject: [PATCH] irqchip: s3c24xx: mark init_eint as __maybe_unused
-Message-ID: <1453737499-1960073-1-git-send-email-arnd@arndb.de>
+From: davidm@egauge.net (David Mosberger)
+Date: Mon, 25 Jan 2016 09:17:55 -0700
+Subject: [PATCH] drivers: power: reset: at91-reset: Provide reset reason
+ via sysfs (amended with Signed-off-by tag)
+In-Reply-To: <20160125085539.GB16261@piout.net>
+References: <1453394936-16616-1-git-send-email-davidm@egauge.net>
+ <20160125085539.GB16261@piout.net>
+Message-ID: <CALnQHM2vwhKPkrOABV9idrMrWync-Hi7MdZ_dEyEOEp3_k77yQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The init_eint array in the s3c24xx irqchip driver is used by
-every individual chip variant, but Kconfig allows building
-the driver when they are all disabled, and that leads to
-a harmless compile-time warning:
+Alexandre,
 
-drivers/irqchip/irq-s3c24xx.c:608:28: error: 'init_eint' defined but not used [-Werror=unused-variable]
+Thanks for taking a look at the patch.
 
-This marks the array as __maybe_unused to avoid the warning.
+On Mon, Jan 25, 2016 at 1:55 AM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/irqchip/irq-s3c24xx.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> All sysfs files have to be documented. Can you add some documentation in
+> Documentation/ABI ?
 
-diff --git a/drivers/irqchip/irq-s3c24xx.c b/drivers/irqchip/irq-s3c24xx.c
-index c71914e8f596..5dc5a760c723 100644
---- a/drivers/irqchip/irq-s3c24xx.c
-+++ b/drivers/irqchip/irq-s3c24xx.c
-@@ -605,7 +605,7 @@ err:
- 	return ERR_PTR(ret);
- }
- 
--static struct s3c_irq_data init_eint[32] = {
-+static struct s3c_irq_data __maybe_unused init_eint[32] = {
- 	{ .type = S3C_IRQTYPE_NONE, }, /* reserved */
- 	{ .type = S3C_IRQTYPE_NONE, }, /* reserved */
- 	{ .type = S3C_IRQTYPE_NONE, }, /* reserved */
+I'm not familiar with out this is organized and what file this would
+have to be added to.  Other than that, sure I'd be happy to write
+something up.
+
+> Also, I think this should be added as a generic file for the whole subsystem.
+
+A patch that shows what you have in mind would be helpful here.
+
+>> -     pr_info("AT91: Starting after %s\n", reason);
+
+You must have missed:
+
+>> +     pr_info("AT91: Starting after %s\n", at91_reset_reason(pdev));
+
+Best regards,
+
+  --david
 -- 
-2.7.0
+eGauge Systems LLC, http://egauge.net/, 1.877-EGAUGE1, fax 720.545.9768
