@@ -1,26 +1,46 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 25 Jan 2016 20:55:16 +0600
-Subject: [PATCH 1/3] printk: make preferred_console local static bool
-In-Reply-To: <CAHp75Ve+7N+7CCNNQDBBzOZWY-iuVz=9q8vp5TYQhABM2M3cwg@mail.gmail.com>
-References: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>
- <1453722324-22407-2-git-send-email-aleksey.makarov@linaro.org>
- <CAHp75Ve+7N+7CCNNQDBBzOZWY-iuVz=9q8vp5TYQhABM2M3cwg@mail.gmail.com>
-Message-ID: <56A63754.7030108@linaro.org>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Mon, 25 Jan 2016 15:56:24 +0100
+Subject: [PATCH 0/5] crypto: atmel-sha: fix registration issue and other
+ bugs
+In-Reply-To: <20160125144849.GH8840@gondor.apana.org.au>
+References: <cover.1452867917.git.cyrille.pitchen@atmel.com>
+ <20160125144849.GH8840@gondor.apana.org.au>
+Message-ID: <56A63798.5050208@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Herbert,
+
+Le 25/01/2016 15:48, Herbert Xu a ?crit :
+> On Fri, Jan 15, 2016 at 03:49:30PM +0100, Cyrille Pitchen wrote:
+>> Hi all,
+>>
+>> This series of patches fixes many issues such as the algo registration failure
+>> or the broken support of context switches.
+>>
+>> This series was applied to linux-next and tested on a sama5d2 xplained
+>> ultra board. We now pass the tcrypt tests in the following modes:
+>> -  2: sha1
+>> -  6: sha256
+>> - 11: sha384
+>> - 12: sha512
+>> - 33: sha224
+>>
+>> The context switch fix was tested with a userspace program using the cryptodev
+>> module. This single thread program computes the SHA256 hashes of many files
+>> by splitting then into fixed size chunks. The chunks of each file are
+>> processed by calling 'update' operations using a round robin algorithm.
+>>
+>> However, the .import() / .export() implementation was NOT tested!
+>> Nonetheless the last patch is needed to fix the registration issue, otherwise
+>> atmel_sha_probe() would still fail.
+> 
+> Patch 1-4 applied.  Please fix the alignment issue with patch 5.
+> 
+
+OK, I will fix it soon!
 
 
-On 25.01.2016 20:24, Andy Shevchenko wrote:
-> On Mon, Jan 25, 2016 at 1:45 PM, Aleksey Makarov
-> <aleksey.makarov@linaro.org> wrote:
->> The variable preferred_console is used only inside register_console()
->> and it's semantics is boolean.  Make it clear.
->
-> However the patch looks okay it brings imbalance to understanding how
-> exactly the preferred console is chosen.
+Best regards,
 
-On the contrary, I would say it makes things more clear.
-
-Also please consider this patch preparatory for the further changes.
-See my replies to Joe Perches.
+Cyrille
