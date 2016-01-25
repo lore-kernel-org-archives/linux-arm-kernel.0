@@ -1,40 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 09:50:53 +0100
-Subject: [PATCH v3 1/1] USB: core: let USB device know device node
-In-Reply-To: <CAL411-qfzcynzc=YrepzcA6EmFuxy-Ri4xRQ+R-QVBDEPZXtZQ@mail.gmail.com>
-References: <Pine.LNX.4.44L0.1601211015010.2275-100000@iolanthe.rowland.org>
- <2404899.20LhULZo7N@wuerfel>
- <CAL411-qfzcynzc=YrepzcA6EmFuxy-Ri4xRQ+R-QVBDEPZXtZQ@mail.gmail.com>
-Message-ID: <1825868.A6VKDYvWaj@wuerfel>
+Date: Mon, 25 Jan 2016 09:53:57 +0100
+Subject: [PATCH 2/2] ARM: versatile: move restart to the device tree
+In-Reply-To: <1453710656-14280-1-git-send-email-linus.walleij@linaro.org>
+References: <1453710656-14280-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <3893384.79tPr7Rxbf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 January 2016 11:57:37 Peter Chen wrote:
-> >> >
-> >> >             hub at 3 { /* same external  hub, highspeed mode */
-> >> >                     compatible = "usb2109,0812.591",
-> >> >                                  "usb2109,0812",
-> >> >                                  "usb2109,class9.0.1",
-> >> >                                  "usb2109,class9.0",
-> >> >                                  "usb2109,class9";
-> >> >
-> >> >                     #address-cells = <1>;
-> >> >                     #size-cells = <0>;
-> >> >                     reg = >;
-> >> >
-> >>
-> >> Why "reg" is 3 here?
-> >
-> > My mistake. It should be hub at 1 and reg=<1>;
-> >
-> > I accidentally confused the port number and the device number.
+On Monday 25 January 2016 09:30:56 Linus Walleij wrote:
+> We have a power/reset driver for the Versatile family
+> in drivers/power/reset so let's just activate that driver
+> and use it and get rid of some non-DT remnants.
 > 
-> I think it should be hub at 2 and reg=<0x2>.
-> According to Alan, we should use xHCI numbering scheme when
-> describing the ports of an xHCI root hub.
+> Cc: Sebastian Reichel <sre@kernel.org>
+> Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: Rob Herring <robh@kernel.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> 
 
-For a single-port root hub, that would be right. My PC has
-two ports, so the first port has reg=<0x1> for SS and
-reg=<0x3> for HS.
+Good idea.
 
-	Arnd
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+I don't see patch 1/2 here. Maybe that was caught by the list
+spam filters in some way?
