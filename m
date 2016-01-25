@@ -1,45 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 16:36:25 +0100
-Subject: [PATCH] drm: armada: use dma_addr_t properly
-Message-ID: <1453736189-1958878-1-git-send-email-arnd@arndb.de>
+From: blogic@openwrt.org (John Crispin)
+Date: Mon, 25 Jan 2016 16:36:40 +0100
+Subject: [PATCH V2 4/4] mfd: mediatek: add MT6323 support to MT6397 driver
+In-Reply-To: <20160125124112.GG3368@x1>
+References: <1453716887-38442-1-git-send-email-blogic@openwrt.org>
+ <1453716887-38442-5-git-send-email-blogic@openwrt.org>
+ <20160125124112.GG3368@x1>
+Message-ID: <56A64108.7020807@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The armada_gem driver stores a DMA address token in a resource_size_t.
-This is safe because both are always at least 32 bits wide and can store
-any address that is accessible by this driver.
+Hi,
 
-However, it is a slight type mismatch when we assign it from/to
-an sg_dma_address() value, and we get a warning in any configuration
-in which resource_size_t is shorter than dma_addr_t:
+On 25/01/2016 13:41, Lee Jones wrote:
+> Please honour the subject format of the subsystem you are contributing
+> to.
+> 
+> `git log --oneline -- $subsystem` gives you this.
+> 
+> On Mon, 25 Jan 2016, John Crispin wrote:
+> 
+>> Signed-off-by: John Crispin <blogic@openwrt.org>
+>> ---
 
-drivers/gpu/drm/armada/armada_gem.c: In function 'armada_gem_alloc_private_object':
-arch/arm/include/asm/dma-mapping.h:16:24: warning: large integer implicitly truncated to unsigned type [-Woverflow]
- #define DMA_ERROR_CODE (~(dma_addr_t)0x0)
-                        ^
-drivers/gpu/drm/armada/armada_gem.c:204:18: note: in expansion of macro 'DMA_ERROR_CODE'
-  obj->dev_addr = DMA_ERROR_CODE;
-                  ^
 
-Changing the type to dma_addr_t solves both issues.
+[...]
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/gpu/drm/armada/armada_gem.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+>> @@ -261,6 +271,15 @@ static int mt6397_probe(struct platform_device *pdev)
+>>  	}
+>>  
+>>  	switch (id & 0xff) {
+>> +	case MT6323_CID_CODE:
+>> +		mt6397->int_con[0] = MT6323_INT_CON0;
+> 
+> This is confusing.  You're still using memory allocated for a mt6397
+> device.
+> 
 
-diff --git a/drivers/gpu/drm/armada/armada_gem.h b/drivers/gpu/drm/armada/armada_gem.h
-index b000ea3a829a..270cff02c1cd 100644
---- a/drivers/gpu/drm/armada/armada_gem.h
-+++ b/drivers/gpu/drm/armada/armada_gem.h
-@@ -15,7 +15,7 @@ struct armada_gem_object {
- 	struct drm_gem_object	obj;
- 	void			*addr;
- 	phys_addr_t		phys_addr;
--	resource_size_t		dev_addr;
-+	dma_addr_t		dev_addr;
- 	struct drm_mm_node	*linear;	/* for linear backed */
- 	struct page		*page;		/* for page backed */
- 	struct sg_table		*sgt;		/* for imported */
--- 
-2.7.0
+the variable is currently defined as struct mt6397_chip *mt6397;
+shall i only change the name or also create a patch to rename the struct ?
+
+	John
