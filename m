@@ -1,69 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jan 2016 17:44:12 +0100
-Subject: [PATCH 3/3] thermal: allow u8500-thermal driver to be a module
-In-Reply-To: <1453740264-1972562-1-git-send-email-arnd@arndb.de>
-References: <1453740264-1972562-1-git-send-email-arnd@arndb.de>
-Message-ID: <1453740264-1972562-4-git-send-email-arnd@arndb.de>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 25 Jan 2016 16:47:29 +0000
+Subject: [PATCH v9 19/21] KVM: ARM64: Add a new feature bit for PMUv3
+In-Reply-To: <569DE171.1070602@huawei.com>
+References: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452839275-19368-20-git-send-email-zhaoshenglong@huawei.com>
+ <20160115110816.GE3915@hawk.localdomain> <569DE171.1070602@huawei.com>
+Message-ID: <CAFEAcA_fyEp3tihjbCyQBzU6vex4273Sp78J4Kg1UXkkyX+1Pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the thermal subsystem is a loadable module, the u8500 driver
-fails to build:
+On 19 January 2016 at 07:10, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+> Yes, for checking the CAP true/false is enough. Maybe I think the number
+> of host counters could be useful for QEMU to know the number and for
+> supporting cross-type vcpu, but I'm not sure. If someone else has no
+> other suggestion, I will change it to what you suggest.
 
-drivers/thermal/built-in.o: In function `db8500_thermal_probe':
-db8500_thermal.c:(.text+0x96c): undefined reference to `thermal_zone_device_register'
-drivers/thermal/built-in.o: In function `db8500_thermal_work':
-db8500_thermal.c:(.text+0xab4): undefined reference to `thermal_zone_device_update'
+Do we care about the number of host counters? We might want to
+know how many counters the guest sees, but we can do that by
+using KVM_GET_ONE_REG to look at the guest PMCR_EL0, right?
 
-This changes the symbol to a tristate, so Kconfig can track the
-dependency correctly.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/mfd/db8500-prcmu.c | 3 +++
- drivers/thermal/Kconfig    | 4 ++--
- 2 files changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 2f4a1279b094..c0a86aeb1733 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -2045,6 +2045,7 @@ int db8500_prcmu_config_hotmon(u8 low, u8 high)
- 
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(db8500_prcmu_config_hotmon);
- 
- static int config_hot_period(u16 val)
- {
-@@ -2071,11 +2072,13 @@ int db8500_prcmu_start_temp_sense(u16 cycles32k)
- 
- 	return config_hot_period(cycles32k);
- }
-+EXPORT_SYMBOL_GPL(db8500_prcmu_start_temp_sense);
- 
- int db8500_prcmu_stop_temp_sense(void)
- {
- 	return config_hot_period(0xFFFF);
- }
-+EXPORT_SYMBOL_GPL(db8500_prcmu_stop_temp_sense);
- 
- static int prcmu_a9wdog(u8 cmd, u8 d0, u8 d1, u8 d2, u8 d3)
- {
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index 0852fd028dc9..7c92c09be213 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -237,8 +237,8 @@ config DOVE_THERMAL
- 	  framework.
- 
- config DB8500_THERMAL
--	bool "DB8500 thermal management"
--	depends on ARCH_U8500
-+	tristate "DB8500 thermal management"
-+	depends on MFD_DB8500_PRCMU
- 	default y
- 	help
- 	  Adds DB8500 thermal management implementation according to the thermal
--- 
-2.7.0
+thanks
+-- PMM
