@@ -1,83 +1,107 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 26 Jan 2016 22:49:12 +0100
-Subject: [PATCH] pinctrl: mvebu: fix num_settings in mpp group assignment
-In-Reply-To: <20160126182251.GF15550@darkstar.musicnaut.iki.fi>
-References: <20160126182251.GF15550@darkstar.musicnaut.iki.fi>
-Message-ID: <1453844952-28292-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue, 26 Jan 2016 13:51:15 -0800
+Subject: [RFC][PATCH 2/4] arm64: Add option to force mapping with
+ PAGE_SIZE pages
+In-Reply-To: <20160126111438.GA5059@leverpostej>
+References: <1453740735-17898-1-git-send-email-labbott@fedoraproject.org>
+ <1453740735-17898-3-git-send-email-labbott@fedoraproject.org>
+ <20160126111438.GA5059@leverpostej>
+Message-ID: <56A7EA53.6080206@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When assigning mpp settings from static mpp modes to mpp groups,
-we do not want any groups that have no setting for a specific Kirkwood
-variant. However, when there is at least a single setting, we need to
-assign the number of all settings in this mode to grp->num_settings
-as we are reusing the static modes table.
+On 01/26/2016 03:14 AM, Mark Rutland wrote:
+> Hi,
+>
+> On Mon, Jan 25, 2016 at 08:52:13AM -0800, Laura Abbott wrote:
+>> Under some circumstances (e.g. debugging) it may be useful to have all
+>> kernel memory mapped using PAGE_SIZE pages. Add an option for this.
+>>
+>> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+>> ---
+>>   arch/arm64/Kconfig  | 11 +++++++++++
+>>   arch/arm64/mm/mmu.c | 10 +++++++---
+>>   2 files changed, 18 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index ffa3c54..faf7eac 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -504,6 +504,17 @@ config HOTPLUG_CPU
+>>   	  Say Y here to experiment with turning CPUs off and on.  CPUs
+>>   	  can be controlled through /sys/devices/system/cpu.
+>>
+>> +config FORCE_PAGES
+>> +	bool "Force all memory mappings to be PAGE_SIZE"
+>> +	help
+>> +	  For performance reasons, kernel memory may be mapped with
+>> +	  page table entries larger than the expected PAGE_SIZE. This results
+>> +	  in better TLB performance but prevents adjustment of page table
+>> +	  attributes at runtime. Say Y here to have all kernel memory mapped
+>> +	  with PAGE_SIZE entries.
+>> +
+>> +	  If unsure, say N.
+>> +
+>
+> I think we can make this a boot-time option, given that we're simply
+> flipping a boolean that only directly affects a small amount of boot
+> code. I doubt there would be a noticeable overhead, and it makes it more
+> likely that we can use this to debug production kernels.
+>
+> Is there a usecase other than DEBUG_PAGEALLOC that you have in mind? If
+> not, we could just hang this off of debug_pagealloc_enabled(), as we
+> parse the early params before we create the usual page tables.
+>
 
-Fixes: 0581b16b1840 ("pinctrl: mvebu: complain about missing group after checking variant")
-Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Aaro,
+I only had DEBUG_PAGEALLOC use case in mind but I'm not sure about linking
+the two completely. I'll see about adding a boot option instead of the
+Kconfig option and then disabling debug_pagealloc if it isn't set.
 
-thanks for reporting the issue. It really looks like we should rework
-the mpp mode/setting/group assignment one day. Please apply this fix
-and report back with a Tested-by if it works.
-
-Sebastian
----
- drivers/pinctrl/mvebu/pinctrl-mvebu.c | 23 +++++++++++++++++------
- 1 file changed, 17 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-index e4d473811bb3..4a3c7fe533b5 100644
---- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-@@ -663,11 +663,11 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
- 	/* assign mpp modes to groups */
- 	for (n = 0; n < soc->nmodes; n++) {
- 		struct mvebu_mpp_mode *mode = &soc->modes[n];
--		struct mvebu_mpp_ctrl_setting *set = &mode->settings[0];
-+		struct mvebu_mpp_ctrl_setting *set;
- 		struct mvebu_pinctrl_group *grp;
- 		unsigned num_settings;
- 
--		for (num_settings = 0; ; set++) {
-+		for (num_settings = 0, set = &mode->settings[0]; ; set++) {
- 			if (!set->name)
- 				break;
- 
-@@ -676,6 +676,21 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
- 				continue;
- 
- 			num_settings++;
-+		}
-+
-+		/* skip modes with no settings for this variant */
-+		if (!num_settings)
-+			continue;
-+
-+		for (num_settings = 0, set = &mode->settings[0]; ; set++) {
-+			if (!set->name)
-+				break;
-+
-+			num_settings++;
-+
-+			/* skip unsupported settings for this variant */
-+			if (pctl->variant && !(pctl->variant & set->variant))
-+				continue;
- 
- 			/* find gpio/gpo/gpi settings */
- 			if (strcmp(set->name, "gpio") == 0)
-@@ -687,10 +702,6 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
- 				set->flags = MVEBU_SETTING_GPI;
- 		}
- 
--		/* skip modes with no settings for this variant */
--		if (!num_settings)
--			continue;
--
- 		grp = mvebu_pinctrl_find_group_by_pid(pctl, mode->pid);
- 		if (!grp) {
- 			dev_warn(&pdev->dev, "unknown pinctrl group %d\n",
--- 
-2.1.4
+Thanks,
+Laura
+  
+> Thanks,
+> Mark.
+>
+>>   source kernel/Kconfig.preempt
+>>   source kernel/Kconfig.hz
+>>
+>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>> index 2d6e7cf..450d38a 100644
+>> --- a/arch/arm64/mm/mmu.c
+>> +++ b/arch/arm64/mm/mmu.c
+>> @@ -181,7 +181,8 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+>>   	do {
+>>   		next = pmd_addr_end(addr, end);
+>>   		/* try section mapping first */
+>> -		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
+>> +		if (((addr | next | phys) & ~SECTION_MASK) == 0 &&
+>> +		      (!IS_ENABLED(CONFIG_FORCE_PAGES) || !pgtable_alloc)) {
+>>   			pmd_t old_pmd =*pmd;
+>>   			set_pmd(pmd, __pmd(phys |
+>>   					   pgprot_val(mk_sect_prot(prot))));
+>> @@ -208,8 +209,11 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+>>   }
+>>
+>>   static inline bool use_1G_block(unsigned long addr, unsigned long next,
+>> -			unsigned long phys)
+>> +			unsigned long phys, phys_addr_t (*pgtable_alloc)(void))
+>>   {
+>> +	if (pgtable_alloc && IS_ENABLED(CONFIG_FORCE_PAGES))
+>> +		return false;
+>> +
+>>   	if (PAGE_SHIFT != 12)
+>>   		return false;
+>>
+>> @@ -241,7 +245,7 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+>>   		/*
+>>   		 * For 4K granule only, attempt to put down a 1GB block
+>>   		 */
+>> -		if (use_1G_block(addr, next, phys)) {
+>> +		if (use_1G_block(addr, next, phys, pgtable_alloc)) {
+>>   			pud_t old_pud = *pud;
+>>   			set_pud(pud, __pud(phys |
+>>   					   pgprot_val(mk_sect_prot(prot))));
+>> --
+>> 2.5.0
+>>
