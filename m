@@ -1,37 +1,52 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 27 Jan 2016 00:17:40 +0800
-Subject: [PATCH 06/10] vfio: introduce
- vfio_group_alloc_map_/unmap_free_reserved_iova
-In-Reply-To: <1453813968-2024-7-git-send-email-eric.auger@linaro.org>
-Message-ID: <201601270035.rJBZW1lE%fengguang.wu@intel.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Tue, 26 Jan 2016 16:21:43 +0000
+Subject: [PATCH] arm64: Add support for Half precision floating point
+In-Reply-To: <20160126160257.GB28238@arm.com>
+References: <1453823566-26742-1-git-send-email-suzuki.poulose@arm.com>
+ <20160126160257.GB28238@arm.com>
+Message-ID: <56A79D17.2000009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On 26/01/16 16:02, Will Deacon wrote:
+> Hi Suzuki,
+>
+> On Tue, Jan 26, 2016 at 03:52:46PM +0000, Suzuki K Poulose wrote:
+>> ARMv8.2 extensions [1] include an optional feature, which supports
+>> half precision(16bit) floating point/asimd data processing
+>> instructions. This patch adds support for detecting and exposing
+>> the same to the userspace via HWCAPs
 
-[auto build test ERROR on v4.5-rc1]
-[also build test ERROR on next-20160125]
-[cannot apply to iommu/next]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-url:    https://github.com/0day-ci/linux/commits/Eric-Auger/KVM-PCIe-MSI-passthrough-on-ARM-ARM64/20160126-211921
-config: x86_64-randconfig-s3-01262306 (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+>> +#define HWCAP_FPHP		(1 << 9)
+>> +#define HWCAP_ASIMDHP		(1 << 10)
+>
+> Where did we get to with the mrs trapping you proposed here?
+>
+>    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/374609.html
 
-All errors (new ones prefixed by >>):
+We are yet to get some feedback from glibc/gcc folks. Siddhesh was looking
+to make use of it [2]. But haven't heard anything back. Ramana mentioned
+(in private) that they had some plans to take a look at it.
 
->> ERROR: "alloc_iova" [drivers/vfio/vfio_iommu_type1.ko] undefined!
->> ERROR: "free_iova" [drivers/vfio/vfio_iommu_type1.ko] undefined!
+>
+> At some point, we need to consider whether or not we want to continue
+> adding new HWCAPs or whether your suggestion above is actually useful
+> to userspace.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 23402 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/38c4b575/attachment-0001.obj>
+Definitely.
+
+
+> Did the libc guys get anywhere with a prototype? What do we need to do
+> to make progress with it?
+
+I am not sure.
+
+Siddesh, Ramana,
+
+Could you please let us know your plans ?
+
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/381422.html
+
+Thanks
+Suzuki
