@@ -1,58 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Jan 2016 11:09:27 +0000
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160126103200.GI6375@twins.programming.kicks-ass.net>
-References: <56969F4B.7070001@imgtec.com>
- <20160113204844.GV6357@twins.programming.kicks-ass.net>
- <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
- <56980145.5030901@imgtec.com>
- <20160114204827.GE3818@linux.vnet.ibm.com>
- <56981212.7050301@imgtec.com>
- <20160114222046.GH3818@linux.vnet.ibm.com>
- <20160126102402.GE6357@twins.programming.kicks-ass.net>
- <20160126103200.GI6375@twins.programming.kicks-ass.net>
-Message-ID: <20160126110053.GA21553@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 26 Jan 2016 12:11:59 +0100
+Subject: [PATCH 0/6] Versatile flash protection in DT
+Message-ID: <1453806725-4880-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 11:32:00AM +0100, Peter Zijlstra wrote:
-> On Tue, Jan 26, 2016 at 11:24:02AM +0100, Peter Zijlstra wrote:
-> 
-> > Yeah, this goes under the header: memory-barriers.txt is _NOT_ a
-> > specification (I seem to keep repeating this).
-> 
-> Do we want this ?
-> 
-> ---
->  Documentation/memory-barriers.txt | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/Documentation/memory-barriers.txt b/Documentation/memory-barriers.txt
-> index a61be39c7b51..433326ebdc26 100644
-> --- a/Documentation/memory-barriers.txt
-> +++ b/Documentation/memory-barriers.txt
-> @@ -1,3 +1,4 @@
-> +
->  			 ============================
->  			 LINUX KERNEL MEMORY BARRIERS
->  			 ============================
-> @@ -5,6 +6,22 @@
->  By: David Howells <dhowells@redhat.com>
->      Paul E. McKenney <paulmck@linux.vnet.ibm.com>
->  
-> +==========
-> +DISCLAIMER
-> +==========
-> +
-> +This document is not a specification; it is intentionally (for the sake of
-> +brevity) and unintentionally (due to being human) incomplete. This document is
-> +meant as a guide to using the various memory barriers provided by Linux, but
-> +in case of any doubt (and there are many) please ask.
+This patch set augments the physmap driver to react to the
+"arm,versatile-flash" compatible string by installing special
+VPP/writeprotect handling so that the corresponding boardfile
+code can be removed from the ARM boardfiles.
 
-It might be worth adding you and me to the top of the file, to save Paul
-Cc'ing us on questions (get_maintainer.pl points at poor old Corbet for
-this file).
+The patches pretty much speak for themselves, I would eventually
+like to have the two mtd patches merged into the MTD tree
+by themselves, and the rest of the patches merged into the
+ARM SoC tree, as there is no compile-time dependency between
+them and we can do a smooth transition along with other
+cleanup patches in the ARM SoC tree.
 
-But yes, it seems that something like this is required.
+Linus Walleij (6):
+  mtd: augment the "arm,versatile-flash" bindings
+  mtd: physmap_of: add a hook for Versatile write protection
+  ARM: versatile: move flash registration to the device tree
+  ARM: integrator: move flash registration to device tree
+  ARM: realview: add flash devices to the PB1176 DTS
+  ARM: realview: fix up PB11MP flash compat strings
 
-Will
+ .../devicetree/bindings/mtd/arm-versatile.txt      |  20 +-
+ arch/arm/boot/dts/arm-realview-pb1176.dts          |  32 +++
+ arch/arm/boot/dts/arm-realview-pb11mp.dts          |   4 +-
+ arch/arm/boot/dts/integrator.dtsi                  |   3 +-
+ arch/arm/boot/dts/versatile-ab.dts                 |   5 +-
+ arch/arm/mach-integrator/integrator_ap.c           |  62 -----
+ arch/arm/mach-integrator/integrator_cp.c           |  51 -----
+ arch/arm/mach-versatile/versatile_dt.c             |  47 ----
+ drivers/mtd/maps/Kconfig                           |  10 +
+ drivers/mtd/maps/Makefile                          |   1 +
+ drivers/mtd/maps/physmap_of.c                      |   6 +
+ drivers/mtd/maps/physmap_of_versatile.c            | 253 +++++++++++++++++++++
+ drivers/mtd/maps/physmap_of_versatile.h            |  16 ++
+ 13 files changed, 344 insertions(+), 166 deletions(-)
+ create mode 100644 drivers/mtd/maps/physmap_of_versatile.c
+ create mode 100644 drivers/mtd/maps/physmap_of_versatile.h
+
+-- 
+2.4.3
