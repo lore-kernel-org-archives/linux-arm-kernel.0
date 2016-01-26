@@ -1,15 +1,17 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 26 Jan 2016 09:41:45 +0900
-Subject: [RFT 1/2] [media] exynos4-is: Add missing endpoint of_node_put on
+Date: Tue, 26 Jan 2016 09:41:46 +0900
+Subject: [RFT 2/2] [media] exynos4-is: Add missing port parent of_node_put on
  error paths
-Message-ID: <1453768906-28979-1-git-send-email-k.kozlowski@samsung.com>
+In-Reply-To: <1453768906-28979-1-git-send-email-k.kozlowski@samsung.com>
+References: <1453768906-28979-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1453768906-28979-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In fimc_md_parse_port_node() endpoint node is get with of_get_next_child()
-but it is not put on error path.
+In fimc_md_parse_port_node() remote port parent node is get with
+of_graph_get_remote_port_parent() but it is not put on error path.
 
-Fixes: 56fa1a6a6a7d ("[media] s5p-fimc: Change the driver directory name to exynos4-is")
+Fixes: fa91f1056f17 ("[media] exynos4-is: Add support for asynchronous subdevices registration")
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
 ---
@@ -20,20 +22,20 @@ Not tested on hardware, only built+static checkers.
  1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
-index f3b2dd30ec77..de0977479327 100644
+index de0977479327..d2e564878e06 100644
 --- a/drivers/media/platform/exynos4-is/media-dev.c
 +++ b/drivers/media/platform/exynos4-is/media-dev.c
-@@ -339,8 +339,10 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
- 		return 0;
+@@ -385,8 +385,10 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
+ 	else
+ 		pd->fimc_bus_type = pd->sensor_bus_type;
  
- 	v4l2_of_parse_endpoint(ep, &endpoint);
--	if (WARN_ON(endpoint.base.port == 0) || index >= FIMC_MAX_SENSORS)
-+	if (WARN_ON(endpoint.base.port == 0) || index >= FIMC_MAX_SENSORS) {
-+		of_node_put(ep);
+-	if (WARN_ON(index >= ARRAY_SIZE(fmd->sensor)))
++	if (WARN_ON(index >= ARRAY_SIZE(fmd->sensor))) {
++		of_node_put(rem);
  		return -EINVAL;
 +	}
  
- 	pd->mux_id = (endpoint.base.port - 1) & 0x1;
- 
+ 	fmd->sensor[index].asd.match_type = V4L2_ASYNC_MATCH_OF;
+ 	fmd->sensor[index].asd.match.of.node = rem;
 -- 
 1.9.1
