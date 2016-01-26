@@ -1,44 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Jan 2016 15:09:55 +0100
-Subject: [PATCH 1/7] [media] pwc: hide unused label
-Message-ID: <1453817424-3080054-1-git-send-email-arnd@arndb.de>
+Date: Tue, 26 Jan 2016 15:09:56 +0100
+Subject: [PATCH 2/7] [media] hdpvr: hide unused variable
+In-Reply-To: <1453817424-3080054-1-git-send-email-arnd@arndb.de>
+References: <1453817424-3080054-1-git-send-email-arnd@arndb.de>
+Message-ID: <1453817424-3080054-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pwc driver causes a warning when CONFIG_USB_PWC_INPUT_EVDEV is unset:
+The i2c client pointer is only used when CONFIG_I2C is set, and
+otherwise produces a compile-time warning:
 
-drivers/media/usb/pwc/pwc-if.c: In function 'usb_pwc_probe':
-drivers/media/usb/pwc/pwc-if.c:1115:1: warning: label 'err_video_unreg' defined but not used [-Wunused-label]
+drivers/media/usb/hdpvr/hdpvr-core.c: In function 'hdpvr_probe':
+drivers/media/usb/hdpvr/hdpvr-core.c:276:21: error: unused variable 'client' [-Werror=unused-variable]
 
-Obviously, the cleanup of &pdev->vdev is not needed without the input device,
-so we can just move it inside of the existing #ifdef and remove the
-extra label.
+This uses the same #ifdef to hide the variable when the code using
+it is hidden.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/media/usb/pwc/pwc-if.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ drivers/media/usb/hdpvr/hdpvr-core.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/media/usb/pwc/pwc-if.c b/drivers/media/usb/pwc/pwc-if.c
-index 086cf1c7bd7d..bdd416af84c7 100644
---- a/drivers/media/usb/pwc/pwc-if.c
-+++ b/drivers/media/usb/pwc/pwc-if.c
-@@ -1106,14 +1106,13 @@ static int usb_pwc_probe(struct usb_interface *intf, const struct usb_device_id
- 	if (rc) {
- 		input_free_device(pdev->button_dev);
- 		pdev->button_dev = NULL;
--		goto err_video_unreg;
-+		video_unregister_device(&pdev->vdev);
-+		goto err_unregister_v4l2_dev;
- 	}
- #endif
- 
- 	return 0;
- 
--err_video_unreg:
--	video_unregister_device(&pdev->vdev);
- err_unregister_v4l2_dev:
- 	v4l2_device_unregister(&pdev->v4l2_dev);
- err_free_controls:
+diff --git a/drivers/media/usb/hdpvr/hdpvr-core.c b/drivers/media/usb/hdpvr/hdpvr-core.c
+index 3fc64197b4e6..08f0ca7aa012 100644
+--- a/drivers/media/usb/hdpvr/hdpvr-core.c
++++ b/drivers/media/usb/hdpvr/hdpvr-core.c
+@@ -273,7 +273,9 @@ static int hdpvr_probe(struct usb_interface *interface,
+ 	struct hdpvr_device *dev;
+ 	struct usb_host_interface *iface_desc;
+ 	struct usb_endpoint_descriptor *endpoint;
++#if IS_ENABLED(CONFIG_I2C)
+ 	struct i2c_client *client;
++#endif
+ 	size_t buffer_size;
+ 	int i;
+ 	int retval = -ENOMEM;
 -- 
 2.7.0
