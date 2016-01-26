@@ -1,183 +1,168 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 26 Jan 2016 15:38:13 +0100 (CET)
-Subject: [PATCH 06/13] atmel-isi: check ISI_SR's flags by polling instead
- of interrupt
-In-Reply-To: <CAJe_HAeKRtAzcz+s7D_5sXp9pnnM1Mhvu_3L1HQGPLsJLJbTSw@mail.gmail.com>
-References: <1453119709-20940-1-git-send-email-rainyfeeling@gmail.com>
- <1453121545-27528-1-git-send-email-rainyfeeling@gmail.com>
- <Pine.LNX.4.64.1601241757340.16570@axis700.grange>
- <CAJe_HAeKRtAzcz+s7D_5sXp9pnnM1Mhvu_3L1HQGPLsJLJbTSw@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1601261528560.28816@axis700.grange>
+From: eyalr@ti.com (Reizer, Eyal)
+Date: Tue, 26 Jan 2016 14:38:54 +0000
+Subject: [PATCH 1/3] ti-st: use device handles and add device tree binding
+References: <1450870253-8694-1-git-send-email-eyalr@ti.com>
+ <8665E2433BC68541A24DFFCA87B70F5B23759A5B@DFRE01.ent.ti.com>
+ <20151229183534.GM12450@rob-hp-laptop>
+Message-ID: <8665E2433BC68541A24DFFCA87B70F5B237793A1@DFRE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Jan 2016, Josh Wu wrote:
+Hi Rob,
 
-> Hi, Guennadi
+Ping on this. Have you seen my comments below?
+I am trying to understand if fixing the smaller comments discussed below would allow this 
+patch-set to be accepted so we at least have a working support as with previous kernels?
+Or do we basically drop support for ti_st until it is implemented as a slave device?
+
+Can you please let me know your thoughts?
+
+Best Regards,
+Eyal
+
+> -----Original Message-----
+> From: Reizer, Eyal
+> Sent: Sunday, January 17, 2016 9:57 AM
+> To: 'Rob Herring'
+> Cc: devicetree at vger.kernel.org; linux-omap at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; pawel.moll at arm.com; mark.rutland at arm.com;
+> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; tony at atomide.com;
+> linux at arm.linux.org.uk; Balbi, Felipe
+> Subject: RE: [PATCH 1/3] ti-st: use device handles and add device tree binding
 > 
-> 2016-01-25 0:58 GMT+08:00 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
-> > On Mon, 18 Jan 2016, Josh Wu wrote:
+> Sorry for the delayed response.
+> 
+> > -----Original Message-----
+> > From: Rob Herring [mailto:robh at kernel.org]
+> > Sent: Tuesday, December 29, 2015 8:36 PM
+> > To: Reizer, Eyal
+> > Cc: devicetree at vger.kernel.org; linux-omap at vger.kernel.org; linux-arm-
+> > kernel at lists.infradead.org; pawel.moll at arm.com; mark.rutland at arm.com;
+> > ijc+devicetree at hellion.org.uk; galak at codeaurora.org; tony at atomide.com;
+> > linux at arm.linux.org.uk
+> > Subject: Re: [PATCH 1/3] ti-st: use device handles and add device tree
+> > binding
 > >
-> >> In current code, we use a interrupt to check whether ISI reset/disable
-> >> action is done. Actually, we also can check ISI SR to check the
-> >> reset/disable action by polling, and it is simpler and straight forward.
-> >>
-> >> So this patch use isi_hw_wait_status() to check the action status. As
-> >> the interrupt checking the status is useless, so just remove the interrupt
-> >> & completion code.
+> > On Wed, Dec 23, 2015 at 11:38:29AM +0000, Reizer, Eyal wrote:
+> > > - Add support for getting the platform data which includes the uart
+> > >   used and gpio pin used for enable from device tree.
+> > >
+> > > - Fix the implementation for using device handle for the uart and
+> > >   gpiod for the enable pin, instead of device name (as string) used
+> > >   for the uart and pio number which are both bad practice.
+> > >
+> > > Signed-off-by: Eyal Reizer <eyalr@ti.com>
+> > > ---
+> > >  Documentation/devicetree/bindings/misc/ti-st.txt |   42 ++++++
+> > >  arch/arm/mach-omap2/pdata-quirks.c               |   16 ++-
+> > >  drivers/misc/ti-st/st_kim.c                      |  159 ++++++++++++++++------
+> > >  drivers/misc/ti-st/st_ll.c                       |   16 ++-
+> > >  include/linux/ti_wilink_st.h                     |   13 +-
 > >
-> > Sorry, I'm not convinced. Switching from interrupt-driven to polling seems
-> > counter-productive to me. Why do you want this?
+> > I'd suggest you look at commit c0bd1b9e58959c5 (Revert "ti-st: add
+> > device tree support") first.
+> >
+> > >  5 files changed, 190 insertions(+), 56 deletions(-)  create mode
+> > > 100644 Documentation/devicetree/bindings/misc/ti-st.txt
+> > >
+> > > diff --git a/Documentation/devicetree/bindings/misc/ti-st.txt
+> > > b/Documentation/devicetree/bindings/misc/ti-st.txt
+> > > new file mode 100644
+> > > index 0000000..4490da6
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/misc/ti-st.txt
+> > > @@ -0,0 +1,42 @@
+> > > +TI Wilink 6/7/8 (wl12xx/wl18xx) Shared transport driver
+> >
+> > Bindings shouldn't be describing drivers...
+> >
 > 
-> Yes, it is counter-productive If such code is called very frequently.
-> But here we only used for reset and disable the hardware.
+> OK, understood
 > 
-> I think it is more straightforward and simple when we just check
-> status register after write the reset or disable the ISI control
-> register. Using interrupt here is over designed.
-
-I still don't see how you're gaining from this. If you were writing new 
-code and you would say: "you know, this path will only be hit rarely, we 
-don't know whether interrupt would work, but we have here this simple 
-polling solution, that works" I would understand. But you already have a 
-technically-superior solution in place! And it works, right? Why change 
-it? On the one hand it's your hardware and it's up to you which direction 
-to develop it, and my task is just to help you integrate your work into 
-the mainline. On the other hand I really don't see any benefits, sorry. 
-I'd prefer not to do this unless you can explain the benefits.
-
-> for the sake of performance I should use cpu_releax() instead of
-> msleep() when waiting for the status bit.
-
-Don't think that's a good idea. cpu_relax() allows the scheduler to switch 
-over to a different task, but if none is active, it'll come back instead 
-of going to sleep. Unless of course your event really kicks in very 
-quickly - much faster than 1ms. But depending on your architecture 
-implementation, msleep(1) might also be implemented as a busy look, then 
-cpu_relax() would be better.
-
-Thanks
-Guennadi
-
+> > > +
+> > > +TI?s Wireless Connectivity chips support Bluetooth (BT), WiFi, and
+> > > +GPS technology cores in a single die.
+> > > +
+> > > +Such a multi-core combo chip will be interfaced to the application
+> > > +processor using a single physical port (like UART).
+> > > +
+> > > +Shared Transport (ST) software enables BT and GPS protocols or
+> > > +software components to interact with their respective cores over
+> > > +single
+> > physical port.
+> > > +ST uses logical channels, over physical transport, to communicate
+> > > +with individual cores.
+> > > +
+> > > +Logical channels 1, 2, 3, and 4 are used for BT packets, channel 8
+> > > +for FM, channel 9 for GPS and channels 30, 31, 32, and 33 are used
+> > > +for Chip Power Management (PM).
+> >
+> > All this is irrelevant for a binding.
+> >
+> 
+> OK, understood
+> 
+> > > +
+> > > +This node provides properties for passing parameters to the ti
+> > > +shared transport driver.
+> > > +
+> > > +Required properties:
+> > > + - compatible: should be the following:
+> > > +    * "kim" - ti-st parameters
+> >
+> > Who is kim? Certainly not a description of a h/w block.
+> 
+> Not sure about the origin of this name but according to the following link:
+> http://processors.wiki.ti.com/index.php/Shared_Transport_Driver
+> KIM is "Kernel Initialization Manager" that enables communication with BT and
+> GPS cores.
+> 
+> >
+> > > +
+> > > +Optional properties:
+> > > + - nshutdown-gpios : specifies attributes for gpio ping used for enabling
+> > > +	the bluetooth,gps and FM sub systems
+> > > + - serial-device : the phandle for the phisical uart used for interacting
+> > > + 	with the wilink device
+> >
+> > There have been multiple discussions on serial slave devices recently.
+> > I'm not going to accept any device binding without a common uart slave
+> > device binding first.
+> >
+> 
+> Perhaps I am reading it wrong but I think this is a different discussion.
+> The shared transport driver is already in the kernel for pretty long time.
+> AFAIK the original author is not around to maintain it.
+> Currently it is useless  as no bindings exist for it and all customers I have seen
+> using ti_st that upgrade to newer kernels have broken support and have to
+> manually patch the kernel for adding bindings for it.
+> 
+> Having a new uart slave device that may provide similar functionality is a
+> different discussion as it would require a total different implementation.
+> But what do we do now with the implementation that is already there.
+> Don't we want it to work and at least have working bindings for it?
+> 
+> > > + - flow_cntrl : Indicates if uart flow control is used
+> > > + - flow_cntrl : uart baud rate in BPS
+> >
+> > Typo here, but these should be part of a common serial slave binding.
+> >
+> > Don't use '_' in property names.
+> >
+> 
+> Will fix this
+> 
+> > > +
+> > > +Example:
+> > > +
+> > > +kim {
+> > > +	compatible = "kim";
+> > > +	nshutdown-gpios = <&gpio3 21 GPIO_ACTIVE_HIGH>;
+> > > +	serial-device = <&uart1>;
+> > > +	flow_cntrl = <1>;
+> > > +	flow_cntrl = <3000000>;
+> > > +};
+> > > +
 > 
 > Best Regards,
-> Josh Wu
-> 
-> >
-> > Thanks
-> > Guennadi
-> >
-> >>
-> >> Signed-off-by: Josh Wu <rainyfeeling@gmail.com>
-> >> ---
-> >>
-> >>  drivers/media/platform/soc_camera/atmel-isi.c | 59 ++++++---------------------
-> >>  1 file changed, 13 insertions(+), 46 deletions(-)
-> >>
-> >> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-> >> index f0508ea..4ddc309 100644
-> >> --- a/drivers/media/platform/soc_camera/atmel-isi.c
-> >> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-> >> @@ -12,7 +12,6 @@
-> >>   */
-> >>
-> >>  #include <linux/clk.h>
-> >> -#include <linux/completion.h>
-> >>  #include <linux/delay.h>
-> >>  #include <linux/fs.h>
-> >>  #include <linux/init.h>
-> >> @@ -81,7 +80,6 @@ struct atmel_isi {
-> >>       struct isi_dma_desc             dma_desc[MAX_BUFFER_NUM];
-> >>       bool                            enable_preview_path;
-> >>
-> >> -     struct completion               complete;
-> >>       /* ISI peripherial clock */
-> >>       struct clk                      *pclk;
-> >>       unsigned int                    irq;
-> >> @@ -281,51 +279,14 @@ static irqreturn_t isi_interrupt(int irq, void *dev_id)
-> >>       mask = isi_readl(isi, ISI_INTMASK);
-> >>       pending = status & mask;
-> >>
-> >> -     if (pending & ISI_CTRL_SRST) {
-> >> -             complete(&isi->complete);
-> >> -             isi_writel(isi, ISI_INTDIS, ISI_CTRL_SRST);
-> >> -             ret = IRQ_HANDLED;
-> >> -     } else if (pending & ISI_CTRL_DIS) {
-> >> -             complete(&isi->complete);
-> >> -             isi_writel(isi, ISI_INTDIS, ISI_CTRL_DIS);
-> >> -             ret = IRQ_HANDLED;
-> >> -     } else {
-> >> -             if (likely(pending & ISI_SR_CXFR_DONE) ||
-> >> -                             likely(pending & ISI_SR_PXFR_DONE))
-> >> -                     ret = atmel_isi_handle_streaming(isi);
-> >> -     }
-> >> +     if (likely(pending & ISI_SR_CXFR_DONE) ||
-> >> +         likely(pending & ISI_SR_PXFR_DONE))
-> >> +             ret = atmel_isi_handle_streaming(isi);
-> >>
-> >>       spin_unlock(&isi->lock);
-> >>       return ret;
-> >>  }
-> >>
-> >> -#define      WAIT_ISI_RESET          1
-> >> -#define      WAIT_ISI_DISABLE        0
-> >> -static int atmel_isi_wait_status(struct atmel_isi *isi, int wait_reset)
-> >> -{
-> >> -     unsigned long timeout;
-> >> -     /*
-> >> -      * The reset or disable will only succeed if we have a
-> >> -      * pixel clock from the camera.
-> >> -      */
-> >> -     init_completion(&isi->complete);
-> >> -
-> >> -     if (wait_reset) {
-> >> -             isi_writel(isi, ISI_INTEN, ISI_CTRL_SRST);
-> >> -             isi_writel(isi, ISI_CTRL, ISI_CTRL_SRST);
-> >> -     } else {
-> >> -             isi_writel(isi, ISI_INTEN, ISI_CTRL_DIS);
-> >> -             isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
-> >> -     }
-> >> -
-> >> -     timeout = wait_for_completion_timeout(&isi->complete,
-> >> -                     msecs_to_jiffies(500));
-> >> -     if (timeout == 0)
-> >> -             return -ETIMEDOUT;
-> >> -
-> >> -     return 0;
-> >> -}
-> >> -
-> >>  /* ------------------------------------------------------------------
-> >>       Videobuf operations
-> >>     ------------------------------------------------------------------*/
-> >> @@ -493,8 +454,11 @@ static int start_streaming(struct vb2_queue *vq, unsigned int count)
-> >>       pm_runtime_get_sync(ici->v4l2_dev.dev);
-> >>
-> >>       /* Reset ISI */
-> >> -     ret = atmel_isi_wait_status(isi, WAIT_ISI_RESET);
-> >> -     if (ret < 0) {
-> >> +     isi_writel(isi, ISI_CTRL, ISI_CTRL_SRST);
-> >> +
-> >> +     /* Check Reset status */
-> >> +     ret  = isi_hw_wait_status(isi, ISI_CTRL_SRST, 500);
-> >> +     if (ret) {
-> >>               dev_err(icd->parent, "Reset ISI timed out\n");
-> >>               pm_runtime_put(ici->v4l2_dev.dev);
-> >>               return ret;
-> >> @@ -549,8 +513,11 @@ static void stop_streaming(struct vb2_queue *vq)
-> >>                       ISI_SR_CXFR_DONE | ISI_SR_PXFR_DONE);
-> >>
-> >>       /* Disable ISI and wait for it is done */
-> >> -     ret = atmel_isi_wait_status(isi, WAIT_ISI_DISABLE);
-> >> -     if (ret < 0)
-> >> +     isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
-> >> +
-> >> +     /* Check Reset status */
-> >> +     ret  = isi_hw_wait_status(isi, ISI_CTRL_DIS, 500);
-> >> +     if (ret)
-> >>               dev_err(icd->parent, "Disable ISI timed out\n");
-> >>
-> >>       pm_runtime_put(ici->v4l2_dev.dev);
-> >> --
-> >> 1.9.1
-> >>
-> 
+> Eyal
