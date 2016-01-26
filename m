@@ -1,19 +1,66 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 26 Jan 2016 14:23:30 -0800
-Subject: [PATCH V2] ARM: BCM5301X: Add DT for D-Link DIR-885L
-In-Reply-To: <1453845752-8174-1-git-send-email-zajec5@gmail.com>
-References: <1453670964-23572-1-git-send-email-zajec5@gmail.com>
- <1453845752-8174-1-git-send-email-zajec5@gmail.com>
-Message-ID: <56A7F1E2.9050702@gmail.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Tue, 26 Jan 2016 14:33:40 -0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <CA+55aFxjb+2rs2wVHtiSCcOzgMrE8H=yDeNcjyujPQudDCtLgw@mail.gmail.com>
+References: <20160114204827.GE3818@linux.vnet.ibm.com>
+ <20160118081929.GA30420@gondor.apana.org.au>
+ <20160118154629.GB3818@linux.vnet.ibm.com>
+ <20160126165207.GB6029@fixme-laptop.cn.ibm.com>
+ <20160126172227.GG6357@twins.programming.kicks-ass.net>
+ <CA+55aFzcC6C8imPs5vk4yH1Y2YHjnAdFM9HCkVs04COxuDQH6w@mail.gmail.com>
+ <20160126201037.GU4503@linux.vnet.ibm.com>
+ <CA+55aFxjb+2rs2wVHtiSCcOzgMrE8H=yDeNcjyujPQudDCtLgw@mail.gmail.com>
+Message-ID: <CA+55aFwxTJd+uibcxtZD3tGnj_n=LMwyAa0s8qyx_OF0OMWQkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/16 14:02, Rafa? Mi?ecki wrote:
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+On Tue, Jan 26, 2016 at 2:15 PM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+>
+> You might as well just write it as
+>
+>     struct foo x = READ_ONCE(*ptr);
+>     x->bar = 5;
+>
+> because that "smp_read_barrier_depends()" does NOTHING wrt the second write.
 
-It would be nice to have a more descriptive commit message which
-describes what you are doing here, like amount of memory, buttons/LEDs etc.
+Just to clarify: on alpha it adds a memory barrier, but that memory
+barrier is useless.
 
-Thanks!
--- 
-Florian
+On non-alpha, it is a no-op, and obviously does nothing simply because
+it generates no code.
+
+So if anybody believes that the "smp_read_barrier_depends()" does
+something, they are *wrong*.
+
+And if anybody sends out an email with that smp_read_barrier_depends()
+in an example, they are actively just confusing other people, which is
+even worse than just being wrong. Which is why I jumped in.
+
+So stop perpetuating the myth that smp_read_barrier_depends() does
+something here. It does not. It's a bug, and it has become this "mind
+virus" for some people that seem to believe that it does something.
+
+I had to remove this crap once from the kernel already, see commit
+105ff3cbf225 ("atomic: remove all traces of READ_ONCE_CTRL() and
+atomic*_read_ctrl()").
+
+I don't want to ever see that broken construct again. And I want to
+make sure that everybody is educated about how broken it was. I'm
+extremely unhappy that it came up again.
+
+If it turns out that some architecture does actually need a barrier
+between a read and a dependent write, then that will mean that
+
+ (a) we'll have to make up a _new_ barrier, because
+"smp_read_barrier_depends()" is not that barrier. We'll presumably
+then have to make that new barrier part of "rcu_derefence()" and
+friends.
+
+ (b) we will have found an architecture with even worse memory
+ordering semantics than alpha, and we'll have to stop castigating
+alpha for being the worst memory ordering ever.
+
+but I sincerely hope that we'll never find that kind of broken architecture.
+
+               Linus
