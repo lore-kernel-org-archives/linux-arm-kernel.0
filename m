@@ -1,116 +1,90 @@
-From: rainyfeeling@gmail.com (Josh Wu)
-Date: Tue, 26 Jan 2016 22:07:13 +0800
-Subject: [PATCH 07/13] atmel-isi: move hw code into isi_hw_initialize()
-In-Reply-To: <Pine.LNX.4.64.1601241906070.16570@axis700.grange>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 26 Jan 2016 15:10:30 +0100 (CET)
+Subject: [PATCH 12/13] atmel-isi: use union for the fbd (frame buffer
+ descriptor)
+In-Reply-To: <CAJe_HAeTWqaqFHPbLGzbTKV6s2xDxf+Dg8DFc6HAqs03RJFh3g@mail.gmail.com>
 References: <1453119709-20940-1-git-send-email-rainyfeeling@gmail.com>
  <1453121545-27528-1-git-send-email-rainyfeeling@gmail.com>
- <1453121545-27528-2-git-send-email-rainyfeeling@gmail.com>
- <Pine.LNX.4.64.1601241906070.16570@axis700.grange>
-Message-ID: <CAJe_HAfYykQraPc81j5z4=kkKzntzwX+5iVWqbeDjjSkqHYSxw@mail.gmail.com>
+ <1453121545-27528-8-git-send-email-rainyfeeling@gmail.com>
+ <Pine.LNX.4.64.1601241931430.16570@axis700.grange>
+ <CAJe_HAeTWqaqFHPbLGzbTKV6s2xDxf+Dg8DFc6HAqs03RJFh3g@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1601261509120.28816@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Guennadi
+Hi Josh,
 
-Thanks for the reivew.
+(resending with all CC)
 
-2016-01-25 2:09 GMT+08:00 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
-> On Mon, 18 Jan 2016, Josh Wu wrote:
->
->> That make hw operation code separate with general code.
->>
->> Also since reset action can be failed, so add a return value for
->> isi_hw_initialze().
->>
->> Signed-off-by: Josh Wu <rainyfeeling@gmail.com>
->> ---
->>
->>  drivers/media/platform/soc_camera/atmel-isi.c | 34 +++++++++++++++++----------
->>  1 file changed, 21 insertions(+), 13 deletions(-)
->>
->> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
->> index 4ddc309..ed4d04b 100644
->> --- a/drivers/media/platform/soc_camera/atmel-isi.c
->> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
->> @@ -203,10 +203,27 @@ static int isi_hw_wait_status(struct atmel_isi *isi, int status_flag,
->>       return 0;
->>  }
->>
->> -static void isi_hw_initialize(struct atmel_isi *isi)
->> +static int isi_hw_initialize(struct atmel_isi *isi)
->>  {
->>       u32 common_flags = isi->bus_param;
->>       u32 cfg1 = 0;
->> +     int ret;
->> +
->> +     /* Reset ISI */
->> +     isi_writel(isi, ISI_CTRL, ISI_CTRL_SRST);
->> +
->> +     /* Check Reset status */
->> +     ret  = isi_hw_wait_status(isi, ISI_CTRL_SRST, 500);
->
-> You could also remove the superfluous space while at it.
+On Tue, 26 Jan 2016, Josh Wu wrote:
 
-sure, I'll fix the duplicated space here.
+> Hi, Guennadi
+> 
+> Thanks for the review.
+> 
+> 2016-01-25 3:31 GMT+08:00 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
+> > On Mon, 18 Jan 2016, Josh Wu wrote:
+> >
+> >> From: Josh Wu <josh.wu@atmel.com>
+> >>
+> >> This way, we can easy to add other type of fbd for new hardware.
+> >
+> > Ok, I've applied all your 13 patches to check, what the resulting driver
+> > would look like. To me it looks like you really abstract away _everything_
+> > remotely hardware-specific. What is left is yet another abstraction layer,
+> > into which you can pack a wide range of hardware types, which are very
+> > different from the original ISI. I mean, you could probably pack - to some
+> > extent, maybe sacrificing some features - other existing soc-camera
+> > drivers, like MX3, MX2, CEU,... - essentially those, using VB2. And I
+> > don't think that's a good idea. We have a class of V4L2 camera bridge
+> > drivers, that's fine. They use all the standard APIs to connect to the
+> > user-space and to other V4L2 drivers in video pipelines - V4L2 ioctl()s,
+> > subdev, Media Controller, VB2, V4L2 control API etc. Under that we have
+> > soc-camera - mainly for a few existing bridge drivers, because it takes a
+> > part of bridge driver's implementation freedom away and many or most
+> > modern camera bridge interfaces are more complex, than what soc-camera
+> > currently supports, and extending it makes little sense, it is just more
+> > logical to create a full-features V4L2 bridge driver with a full access to
+> > all relevant APIs.
+> 
+> It sounds the general v4l2 driver framework is more suitable than
+> soc-camera framework for the new hardware.
 
-Best Regards,
-Josh Wu
+Then, please, go for one!
 
->
-> Thanks
-> Guennadi
->
->> +     if (ret) {
->> +             dev_err(isi->soc_host.icd->parent, "Reset ISI timed out\n");
->> +             return ret;
->> +     }
->> +
->> +     /* Disable all interrupts */
->> +     isi_writel(isi, ISI_INTDIS, (u32)~0UL);
->> +
->> +     /* Clear any pending interrupt */
->> +     isi_readl(isi, ISI_STATUS);
->>
->>       /* set bus param for ISI */
->>       if (common_flags & V4L2_MBUS_HSYNC_ACTIVE_LOW)
->> @@ -229,6 +246,8 @@ static void isi_hw_initialize(struct atmel_isi *isi)
->>
->>       isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
->>       isi_writel(isi, ISI_CFG1, cfg1);
->> +
->> +     return 0;
->>  }
->>
->>  static irqreturn_t atmel_isi_handle_streaming(struct atmel_isi *isi)
->> @@ -453,27 +472,16 @@ static int start_streaming(struct vb2_queue *vq, unsigned int count)
->>
->>       pm_runtime_get_sync(ici->v4l2_dev.dev);
->>
->> -     /* Reset ISI */
->> -     isi_writel(isi, ISI_CTRL, ISI_CTRL_SRST);
->> -
->> -     /* Check Reset status */
->> -     ret  = isi_hw_wait_status(isi, ISI_CTRL_SRST, 500);
->> +     ret = isi_hw_initialize(isi);
->>       if (ret) {
->> -             dev_err(icd->parent, "Reset ISI timed out\n");
->>               pm_runtime_put(ici->v4l2_dev.dev);
->>               return ret;
->>       }
->> -     /* Disable all interrupts */
->> -     isi_writel(isi, ISI_INTDIS, (u32)~0UL);
->> -
->> -     isi_hw_initialize(isi);
->>
->>       configure_geometry(isi, icd->user_width, icd->user_height,
->>                               icd->current_fmt);
->>
->>       spin_lock_irq(&isi->lock);
->> -     /* Clear any pending interrupt */
->> -     isi_readl(isi, ISI_STATUS);
->>
->>       if (count)
->>               start_dma(isi, isi->active);
->> --
->> 1.9.1
->>
+> So is it easy for v4l2 platform driver to use the soc-camera sensors?
+
+Not sure, haven't tried in a while. It used to be difficult, but it must 
+have become more simple, I think there are examples of that in the 
+mainline. I think em28xx does that, but probably in the meantime the 
+integration possibilities have become even better.
+
+> > With your patches #12 and #13 you seem to be creating
+> > an even tighter, narrower API for very thin drivers. That just provide a
+> > couple of hardware-related functions and create a V4L2 bridge driver from
+> > that. What kind of hardware is that new controller, that you'd like to
+> > support by the same driver? Wouldn't it be better to create a new driver
+> > for it? Is it really similar to the ISI controller?
+> 
+> The new hardware is SAMA5D2 Image Sensor Controller. You can find the
+> datasheet here:
+> http://www.atmel.com/Images/Atmel-11267-32-bit-Cortex-A5-Microcontroller-SAMA5D2_Datasheet.pdf
+> 
+> Actually, The ISC hardware is very different from ISI hardware. ISC
+> has no Preivew/Codec path, it just has many data blocks to process
+> sensor data.
+> With the abstraction of my patches, ISC can rewrite the interrupt
+> handler, initialization, configure and etc to work in same ISI driver,
+> though. But like you mentioned, it's very tight, maybe it's not easy
+> to add extend functions.
+> 
+> So I was convinced to write a new v4l2 camera driver for ISC if it is
+> easy to support soc-camera sensors.
+
+Please, write a new driver :)
+
+Thanks
+Guennadi
+
+> Best Regards,
+> Josh Wu
