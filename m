@@ -1,59 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Jan 2016 14:24:15 +0000
-Subject: [PATCH] irqchip/gic-v3-its: Recompute the number of pages on page
- size change
-Message-ID: <1453818255-1289-1-git-send-email-marc.zyngier@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Tue, 26 Jan 2016 14:25:43 +0000
+Subject: [PATCH v2 21/21] arm64: Panic when VHE and non VHE CPUs coexist
+In-Reply-To: <1453737235-16522-22-git-send-email-marc.zyngier@arm.com>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <1453737235-16522-22-git-send-email-marc.zyngier@arm.com>
+Message-ID: <56A781E7.2050408@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the programming of a GITS_BASERn register fails because of
-an unsupported ITS page size, we retry it with a smaller page size.
-Unfortunately, we don't recompute the number of allocated ITS pages,
-indicating the wrong value computed in the original allocation.
+On 25/01/16 15:53, Marc Zyngier wrote:
+> Having both VHE and non-VHE capable CPUs in the same system
+> is likely to be a recipe for disaster.
 
-A convenient fix is to free the pages we allocated, update the
-page size, and restart the allocation. This will ensure that
-we always allocate the right amount in the case of a device
-table, specially if we have to reduce the allocation order
-to stay within the boundaries of the ITS maximum allocation.
 
-Reported-by: Ma Jun <majun258@huawei.com>
-Tested-by: Ma Jun <majun258@huawei.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index b1adc51..bc7650a 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -113,6 +113,9 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+>   			pr_crit("CPU%u: failed to come online\n", cpu);
+>   			ret = -EIO;
+>   		}
+> +
+> +		if (is_kernel_mode_mismatched())
+> +			panic("CPU%u: incompatible execution level", cpu);
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index e23d1d1..3447549 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -875,6 +875,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
- 		}
- 
- 		alloc_size = (1 << order) * PAGE_SIZE;
-+retry_alloc_baser:
- 		alloc_pages = (alloc_size / psz);
- 		if (alloc_pages > GITS_BASER_PAGES_MAX) {
- 			alloc_pages = GITS_BASER_PAGES_MAX;
-@@ -938,13 +939,16 @@ retry_baser:
- 			 * size and retry. If we reach 4K, then
- 			 * something is horribly wrong...
- 			 */
-+			free_pages((unsigned long)base, order);
-+			its->tables[i] = NULL;
-+
- 			switch (psz) {
- 			case SZ_16K:
- 				psz = SZ_4K;
--				goto retry_baser;
-+				goto retry_alloc_baser;
- 			case SZ_64K:
- 				psz = SZ_16K;
--				goto retry_baser;
-+				goto retry_alloc_baser;
- 			}
- 		}
- 
--- 
-2.1.4
+
+fyi,
+
+I have a series which tries to perform some checks for early CPU features,
+like this at [1] and adds support for early CPU boot failures, passing the error
+status back to the master. May be we could move this check there(once it settles),
+and fail the CPU boot with CPU_PANIC_KERNEL status.
+
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/401727.html
+
+Thanks
+Suzuki
