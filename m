@@ -1,86 +1,252 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 26 Jan 2016 20:27:29 +0800
-Subject: [PATCH v3 16/17] FDT: Add a helper to get specified name subnode
-In-Reply-To: <alpine.DEB.2.02.1601261156340.3619@kaball.uk.xensource.com>
-References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
- <1453519184-11908-17-git-send-email-zhaoshenglong@huawei.com>
- <alpine.DEB.2.02.1601261156340.3619@kaball.uk.xensource.com>
-Message-ID: <56A76631.2070802@huawei.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 26 Jan 2016 14:38:25 +0200
+Subject: [PATCH] acpi: implement Generic Event Device
+In-Reply-To: <1453757387-28154-1-git-send-email-okaya@codeaurora.org>
+References: <1453757387-28154-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <CAHp75Ve98Z3xOxSQMG5ncpGggj+jmBmnWvw0ROXwK=s6X9N_QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jan 25, 2016 at 11:29 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+
+Few comments below.
+
+> Generic Event Device described in ACPI 6.1 allows platforms to handle
+> platform interrupts in ACPI ASL statements. It borrows constructs like
+> _EVT from GPIO events.
+
+Can it share code with gpiolib-acpi.c ? I see some duplication.
+
+> All interrupts are listed in _CRS and the handler
+> is written in _EVT method. Here is an example.
 
 
-On 2016/1/26 20:11, Stefano Stabellini wrote:
-> On Sat, 23 Jan 2016, Shannon Zhao wrote:
->> > From: Shannon Zhao <shannon.zhao@linaro.org>
->> > 
->> > Sometimes it needs to check if there is a node in FDT by full path.
->> > Introduce this helper to get the specified name subnode if it exists.
->> > 
->> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> > ---
->> > CC: Rob Herring <robh@kernel.org>
->> > ---
->> >  drivers/of/fdt.c       | 35 +++++++++++++++++++++++++++++++++++
->> >  include/linux/of_fdt.h |  2 ++
->> >  2 files changed, 37 insertions(+)
->> > 
->> > diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
->> > index 655f79d..112ec16 100644
->> > --- a/drivers/of/fdt.c
->> > +++ b/drivers/of/fdt.c
->> > @@ -645,6 +645,41 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
->> >  }
->> >  
->> >  /**
->> > + * of_get_flat_dt_subnode_by_name - get subnode of specified node by name
->> > + *
->> > + * @node: the parent node
->> > + * @uname: the name of subnode
->> > + * @return offset of the subnode, or -FDT_ERR_NOTFOUND if there is none
->> > + */
->> > +
->> > +int of_get_flat_dt_subnode_by_name(unsigned long node, const char *uname)
->> > +{
->> > +	const void *blob = initial_boot_params;
->> > +	int offset;
->> > +	const char *pathp;
->> > +
->> > +	/* Find first subnode if it exists */
->> > +	offset = fdt_first_subnode(blob, node);
->> > +	if (offset < 0)
->> > +		return -FDT_ERR_NOTFOUND;
->> > +	pathp = fdt_get_name(blob, offset, NULL);
->> > +	if (strncmp(pathp, uname, strlen(uname)) == 0)
->> > +		return offset;
-> Wouldn't this check succeed even if uname is "uefi" and the node
-> name is actually "uefiiiii"?  You might have to use strcmp.
-> 
-Ah, yes. Will fix this.
+>
+> Device (GED0)
+> {
+>
+>         Name (_HID, "ACPI0013")
+>         Name (_UID, 0)
+>         Name(_CRS, ResourceTemplate ()
+>         {
+>                 Interrupt(ResourceConsumer, Edge, ActiveHigh, Shared, , , )
+>                  {123}
+>         })
+>
+>         Method (_EVT, 1) {
+>                 if (Lequal(123, Arg0))
+>                 {
+>                 }
+>         }
+> }
+>
+> Wake capability has not been implemented yet.
+>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/acpi/Makefile |   1 +
+>  drivers/acpi/evged.c  | 162 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 163 insertions(+)
+>  create mode 100644 drivers/acpi/evged.c
+>
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index b5e7cd8..4dbb732 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -46,6 +46,7 @@ acpi-y                                += acpi_pnp.o
+>  acpi-y                         += int340x_thermal.o
+>  acpi-y                         += power.o
+>  acpi-y                         += event.o
+> +acpi-$(CONFIG_ACPI_REDUCED_HARDWARE_ONLY) += evged.o
+>  acpi-y                         += sysfs.o
+>  acpi-y                         += property.o
+>  acpi-$(CONFIG_X86)             += acpi_cmos_rtc.o
+> diff --git a/drivers/acpi/evged.c b/drivers/acpi/evged.c
+> new file mode 100644
+> index 0000000..a904676
+> --- /dev/null
+> +++ b/drivers/acpi/evged.c
+> @@ -0,0 +1,162 @@
+> +/*
+> + * Generic Event Device for ACPI.
+> + *
+> + * Copyright (c) 2016, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * Generic Event Device allows platforms to handle
+> + * interrupts in ACPI ASL statements. It follows very similar
+> + * _EVT method approach from GPIO events.
+> + * All interrupts are listed in _CRS and the handler
+> + * is written in _EVT method. Here is an example.
 
-> 
->> > +	/* Find other subnodes */
->> > +	do {
->> > +		offset = fdt_next_subnode(blob, offset);
->> > +		if (offset < 0)
->> > +			return -FDT_ERR_NOTFOUND;
->> > +		pathp = fdt_get_name(blob, offset, NULL);
->> > +		if (strncmp(pathp, uname, strlen(uname)) == 0)
->> > +			return offset;
->> > +	} while (offset >= 0);
-> Rather than writing the name check twice, I think it would be best to
-> code this loop as:
-> 
->     for (offset = fdt_first_subnode(blob, offset);
->          offset >= 0;
->          offset = fdt_next_subnode(blob, offset)) {
-> 
->          /* do name check */
-> 
-> 
-> 
-Thanks for your suggestion. Will change this.
+Can it be wider on screen?
+
+> + *
+> + * Device (GED0)
+> + * {
+> + *
+> + *     Name (_HID, "ACPI0013")
+> + *     Name (_UID, 0)
+> + *     Method (_CRS, 0x0, Serialized)
+> + *     {
+> + *             Name (RBUF, ResourceTemplate ()
+> + *             {
+> + *             Interrupt(ResourceConsumer, Edge, ActiveHigh, Shared, , , )
+> + *             {123}
+> + *             }
+> + *     })
+> + *
+> + *     Method (_EVT, 1) {
+> + *             if (Lequal(123, Arg0))
+> + *             {
+> + *             }
+> + *     }
+> + * }
+> + *
+> + */
+> +
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/list.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/acpi.h>
+> +
+> +#define MODULE_NAME    "acpi-ged"
+> +
+> +struct acpi_ged_event {
+> +       struct list_head node;
+> +       struct device *dev;
+> +       unsigned int gsi;
+> +       unsigned int irq;
+> +       acpi_handle handle;
+> +};
+> +
+> +static irqreturn_t acpi_ged_irq_handler(int irq, void *data)
+> +{
+> +       struct acpi_ged_event *event = data;
+> +       acpi_status acpi_ret;
+> +
+> +       acpi_ret = acpi_execute_simple_method(event->handle, NULL, event->gsi);
+> +       if (ACPI_FAILURE(acpi_ret))
+> +               dev_err_once(event->dev, "IRQ method execution failed\n");
+> +
+> +       return IRQ_HANDLED;
+> +}
+> +
+> +static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
+> +                                             void *context)
+> +{
+> +       struct acpi_ged_event *event;
+> +       unsigned int irq;
+> +       unsigned int gsi;
+> +       unsigned int irqflags = IRQF_ONESHOT;
+> +       struct device *dev = context;
+> +       acpi_handle handle = ACPI_HANDLE(dev);
+> +       acpi_handle evt_handle;
+> +       struct resource r;
+> +       struct acpi_resource_irq *p = &ares->data.irq;
+> +       struct acpi_resource_extended_irq *pext = &ares->data.extended_irq;
+> +
+> +       if (ares->type == ACPI_RESOURCE_TYPE_END_TAG)
+> +               return AE_OK;
+> +
+> +       if (!acpi_dev_resource_interrupt(ares, 0, &r)) {
+> +               dev_err(dev, "unable to parse IRQ resource\n");
+> +               return AE_ERROR;
+> +       }
+> +       if (ares->type == ACPI_RESOURCE_TYPE_IRQ)
+> +               gsi = p->interrupts[0];
+> +       else
+> +               gsi = pext->interrupts[0];
+> +
+> +       irq = r.start;
+> +
+> +       if (ACPI_FAILURE(acpi_get_handle(handle, "_EVT", &evt_handle))) {
+> +               dev_err(dev, "cannot locate _EVT method\n");
+> +               return AE_ERROR;
+> +       }
+> +
+> +       dev_info(dev, "GED listening GSI %u @ IRQ %u\n", gsi, irq);
+
+
+
+> +
+> +       event = devm_kzalloc(dev, sizeof(*event), GFP_KERNEL);
+> +       if (!event)
+> +               return AE_ERROR;
+> +
+> +       event->gsi = gsi;
+> +       event->dev = dev;
+> +       event->irq = irq;
+> +       event->handle = evt_handle;
+> +
+> +       if (r.flags & IORESOURCE_IRQ_SHAREABLE)
+> +               irqflags |= IRQF_SHARED;
+> +
+> +       if (devm_request_threaded_irq(dev, irq, NULL, acpi_ged_irq_handler,
+> +                                     irqflags, "ACPI:Ged", event)) {
+> +               dev_err(dev, "failed to setup event handler for irq %u\n", irq);
+> +               return AE_ERROR;
+> +       }
+
+The above part is clearly belongs to ged_probe().
+
+> +
+> +       return AE_OK;
+> +}
+> +
+> +static int ged_probe(struct platform_device *pdev)
+> +{
+> +       acpi_status acpi_ret;
+> +
+> +       acpi_ret = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), "_CRS",
+> +                                      acpi_ged_request_interrupt, &pdev->dev);
+> +       if (ACPI_FAILURE(acpi_ret)) {
+> +               dev_err(&pdev->dev, "unable to parse the _CRS record\n");
+> +               return -EINVAL;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct acpi_device_id ged_acpi_ids[] = {
+> +       {"ACPI0013"},
+> +       {},
+> +};
+> +
+> +static struct platform_driver ged_driver = {
+> +       .probe = ged_probe,
+> +       .driver = {
+> +               .name = MODULE_NAME,
+
+> +               .owner = THIS_MODULE,
+
+Do you need this one?
+
+
+> +               .acpi_match_table = ACPI_PTR(ged_acpi_ids),
+> +       },
+> +};
+> +
+> +static int __init ged_init(void)
+> +{
+> +       return platform_driver_register(&ged_driver);
+> +}
+> +
+
+> +subsys_initcall(ged_init);
+
+Any specific reason to have on that level?
 
 -- 
-Shannon
+With Best Regards,
+Andy Shevchenko
