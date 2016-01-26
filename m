@@ -1,119 +1,46 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 26 Jan 2016 11:48:26 +0000
-Subject: iommu/arm-smmu-v2 ASID/VMID calculation
-In-Reply-To: <6F24A28A-6302-4C48-A933-B47A9735808C@caviumnetworks.com>
-References: <198F501C-8D30-4EB5-BC40-4F40BB75D40B@caviumnetworks.com>
- <20160125170312.GJ22927@arm.com>
- <E978AB4F-5CB0-42D8-8152-04C77DB664A1@caviumnetworks.com>
- <6F24A28A-6302-4C48-A933-B47A9735808C@caviumnetworks.com>
-Message-ID: <56A75D0A.7000806@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Jan 2016 12:49:36 +0100
+Subject: [PATCH 1/2] crypto: jitterentropy - always select CRYPTO_RNG
+In-Reply-To: <20160126103018.GA19508@gondor.apana.org.au>
+References: <1453740644-1980309-1-git-send-email-arnd@arndb.de>
+ <20160126103018.GA19508@gondor.apana.org.au>
+Message-ID: <29082633.aRvKnNisWH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/16 03:11, Chalamarla, Tirumalesh wrote:
-> one my colleague points out, ASIDPNE also implementation defined.
+On Tuesday 26 January 2016 18:30:18 Herbert Xu wrote:
+> On Mon, Jan 25, 2016 at 05:50:34PM +0100, Arnd Bergmann wrote:
+> > When building the jitterentropy driver by itself, we get a link error
+> > when CRYPTO_RNG is not enabled as well:
+> > 
+> > crypto/built-in.o: In function `jent_mod_init':
+> > jitterentropy-kcapi.c:(.init.text+0x98): undefined reference to `crypto_register_rng'
+> > crypto/built-in.o: In function `jent_mod_exit':
+> > jitterentropy-kcapi.c:(.exit.text+0x60): undefined reference to `crypto_unregister_rng'
+> > 
+> > This moves the 'select CRYPTO_RNG' from CRYPTO_DRBG to CRYPTO_JITTERENTROPY
+> > to ensure the API is always there when it's used, not just when DRBG is
+> > also enabled.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> >  crypto/Kconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/crypto/Kconfig b/crypto/Kconfig
+> > index 7240821137fd..99109b93604a 100644
+> > --- a/crypto/Kconfig
+> > +++ b/crypto/Kconfig
+> > @@ -1586,13 +1586,13 @@ config CRYPTO_DRBG_CTR
+> >  config CRYPTO_DRBG
+> >       tristate
+> >       default CRYPTO_DRBG_MENU
+> > -     select CRYPTO_RNG
+> 
+> I think we should leave this there as DRBG itself is an RNG and
+> it just uses JITTERENTROPY which happens to be an RNG.
 
-ASIDPNE only covers whether the SMMU's TLBs may ignore broadcast 
-_invalidation_ or not, not lookups. Broadcast TLB lookups are not a thing.
+Good idea. Should I resend a modified version or do you want to just
+adapt it yourself?
 
-> Thanks,
-> Tirumalesh.
->
->
->
-> On 1/25/16, 4:48 PM, "linux-arm-kernel on behalf of Chalamarla, Tirumalesh" <linux-arm-kernel-bounces at lists.infradead.org on behalf of Tirumalesh.Chalamarla@caviumnetworks.com> wrote:
->
->> I don?t think it followed spec.
->>
->> The SMMU spec (IHI0062C) says (section 2.2):
->>
->>    - The exact behavior of any TLB functionality is IMPLEMENTATION DEFINED
->>
->> Section 2.2 describes the constraints on sharing (e.g. multiple contexts
->> using the same ASID says):
->>
->>       "If multiple context banks have hte same attributes but describe
->>        different translations, the results of a TLB lookup are UNPREDICTABLE".
-
-Multiple context banks within the same SMMU, that is.
-
->> The present smmu driver assumes ASID should only be unique per SMMU, this might not be true for all
->> Implementations.
-
-Where "SMMU" implies "set of context banks behind a single programming 
-interface", i.e. it should be true for all architecturally-compliant 
-implementations.
-
-What if you take your system, fire up two cores with SMP disabled, and 
-run an independent instance of Linux on each, with all the system 
-resources divided up equally between them and no communication? If one 
-OS using one SMMU can make the other OS using a different SMMU go wrong, 
-then the hardware is simply broken. Sure, we can probably quirk ASID 
-allocation in the driver, but it raises the question of what else we 
-would need to do to keep SMMUs which believe they're supposed to be 
-independent from DoS'ing each other..
-
-Robin.
-
->> On 1/25/16, 9:03 AM, "Will Deacon" <will.deacon@arm.com> wrote:
->>
->>> On Thu, Jan 21, 2016 at 06:52:34PM +0000, Chalamarla, Tirumalesh wrote:
->>>> Hi Will,
->>>
->>> Hello,
->>>
->>>> Current ASID/VMID calculation logic makes lot of assumption about internal TLB
->>>> implementation of SMMU,
->>>
->>> Not really. It makes assumptions that the hardware follows the architecture,
->>> which is hardly unreasonable as a starting point.
->>>
->>>> Systems like ThunderX have more than one smmu in the system and it can use same
->>>> TLBs with more than one of them and expects ASID to be unique
->>>
->>> ... but that's broken. If you built a system where the CPUs shared a TLB,
->>> you would run into issues as well.
->>>
->>> How does this work with things like arm_smmu_tlb_sync and the TLBGSTATUS
->>> register?
->>>
->>>> Current logic
->>>>
->>>> #define ARM_SMMU_CB_ASID(cfg)           ((cfg)->cbndx)
->>>> #define ARM_SMMU_CB_VMID(cfg)           ((cfg)->cbndx + 1)
->>>>
->>>>
->>>> Can this be replaced by something like
->>>>
->>>>
->>>> #define ARM_SMMU_CB_ASID(cfg, smmu)             (((smmu)->idx << (smmu)->asid_shift) | (cfg)->cbndx)
->>>> #define ARM_SMMU_CB_VMID(cfg, smmu)             (((smmu)->idx << (smmu)->vmid_shift) | (cfg)->cbndx + 1)
->>>>
->>>>
->>>> Idx and shift can be passed from device-tree.
->>>>
->>>>
->>>> Please let me know if this is acceptable, I will prepare a proper patch
->>>> and send to list.
->>>>
->>>>
->>>> If this is not acceptable through an alternative suggestion.
->>>
->>> If we're going to put something into the device-tree, then it should be
->>> an erratum property describing the offset to be applied to ASID/VMIDs.
->>> You also need to take care not to describe overlapping numberspaces.
->> I don?t think that is an errata.
->>>
->>> How many context banks do you implement in each SMMU?
->> 128.
->>>
->>> Will
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
->
+	Arnd
