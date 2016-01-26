@@ -1,100 +1,171 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Jan 2016 16:33:24 +0000
-Subject: [PATCH 2/4] irqchip: irq-armada-370-xp: use the generic MSI
- infrastructure
-In-Reply-To: <20160126165240.5436c514@free-electrons.com>
-References: <1450707546-15060-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1450707546-15060-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <56A77EB6.3030907@arm.com> <20160126165240.5436c514@free-electrons.com>
-Message-ID: <56A79FD4.4070800@arm.com>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Tue, 26 Jan 2016 14:36:44 -0200
+Subject: [PATCH 6/7] [media] em28xx: add MEDIA_TUNER dependency
+In-Reply-To: <6929423.KuNZKsBgHV@wuerfel>
+References: <1453817424-3080054-1-git-send-email-arnd@arndb.de>
+ <1453817424-3080054-6-git-send-email-arnd@arndb.de>
+ <20160126123308.6d59d373@recife.lan> <6929423.KuNZKsBgHV@wuerfel>
+Message-ID: <20160126143644.1d104040@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/16 15:52, Thomas Petazzoni wrote:
-> Marc,
-> 
-> On Tue, 26 Jan 2016 14:12:06 +0000, Marc Zyngier wrote:
-> 
->> I finally found some bandwidth to have a look at this. A few comments below:
-> 
-> Great, thanks! Since 4.5-rc1 is out, I was about to resend this patch
-> series, so your review comes exactly at the right time. Some comments
-> below.
-> 
->>> +static struct irq_chip armada_370_xp_msi_irq_chip = {
->>> +	.name = "armada_370_xp_msi_irq",
->>> +	.irq_enable = pci_msi_unmask_irq,
->>> +	.irq_disable = pci_msi_mask_irq,
->>> +	.irq_mask = pci_msi_mask_irq,
->>> +	.irq_unmask = pci_msi_unmask_irq,
->>
->> Having only mask/unmask ought to be enough.
-> 
-> OK, will fix.
-> 
->>> -	return hwirq;
->>> -}
->>> +static struct msi_domain_info armada_370_xp_msi_domain_info = {
->>> +	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
->>> +		   MSI_FLAG_MULTI_PCI_MSI),
->>
->> And not MSI-X? That seems rather strange (I'm pretty sure it just works).
-> 
-> See commit 830cbe4b7a918613276aa3d3b28d24410623f92c ("irqchip:
-> armada-370-xp: implement the ->check_device() msi_chip operation") in
-> which we changed the driver to explicitly disable MSI-X support. The HW
-> does support it, but we haven't enabled it yet in the irqchip driver,
-> and we a PCI device driver tries to use MSI-X, it fails badly.
-> 
-> So, I'd like to keep the enabling of MSI-X as a separate exercise, if
-> you don't mind :-)
+Em Tue, 26 Jan 2016 16:53:38 +0100
+Arnd Bergmann <arnd@arndb.de> escreveu:
 
-Sure. It would be interesting to find out what is triggering the issue,
-so having that as a separate patch is fine.
+> On Tuesday 26 January 2016 12:33:08 Mauro Carvalho Chehab wrote:
+> > Em Tue, 26 Jan 2016 15:10:00 +0100
+> > Arnd Bergmann <arnd@arndb.de> escreveu:
+> >   
+> > > em28xx selects VIDEO_TUNER, which has a dependency on MEDIA_TUNER,
+> > > so we get a Kconfig warning if that is disabled:
+> > > 
+> > > warning: (VIDEO_PVRUSB2 && VIDEO_USBVISION && VIDEO_GO7007 && VIDEO_AU0828_V4L2 && VIDEO_CX231XX && VIDEO_TM6000 && VIDEO_EM28XX && VIDEO_IVTV && VIDEO_MXB && VIDEO_CX18 && VIDEO_CX23885 && VIDEO_CX88 && VIDEO_BT848 && VIDEO_SAA7134 && VIDEO_SAA7164) selects VIDEO_TUNER which has unmet direct dependencies (MEDIA_SUPPORT && MEDIA_TUNER)  
+> > 
+> > This warning is bogus, as it is OK to select VIDEO_TUNER even if MEDIA_TUNER
+> > is not defined.
+> > 
+> > See how MEDIA_TUNER is defined:
+> > 
+> > 
+> > config MEDIA_TUNER
+> > 	tristate
+> > 	depends on (MEDIA_ANALOG_TV_SUPPORT || MEDIA_DIGITAL_TV_SUPPORT || MEDIA_RADIO_SUPPORT || MEDIA_SDR_SUPPORT) && I2C
+> > 	default y
+> > 	select MEDIA_TUNER_XC2028 if MEDIA_SUBDRV_AUTOSELECT
+> > 	select MEDIA_TUNER_XC5000 if MEDIA_SUBDRV_AUTOSELECT
+> > 	select MEDIA_TUNER_XC4000 if MEDIA_SUBDRV_AUTOSELECT
+> > 	select MEDIA_TUNER_MT20XX if MEDIA_SUBDRV_AUTOSELECT
+> > 	select MEDIA_TUNER_TDA8290 if MEDIA_SUBDRV_AUTOSELECT
+> > 	select MEDIA_TUNER_TEA5761 if MEDIA_SUBDRV_AUTOSELECT && MEDIA_RADIO_SUPPORT
+> > 	select MEDIA_TUNER_TEA5767 if MEDIA_SUBDRV_AUTOSELECT && MEDIA_RADIO_SUPPORT
+> > 	select MEDIA_TUNER_SIMPLE if MEDIA_SUBDRV_AUTOSELECT
+> > 	select MEDIA_TUNER_TDA9887 if MEDIA_SUBDRV_AUTOSELECT
+> > 	select MEDIA_TUNER_MC44S803 if MEDIA_SUBDRV_AUTOSELECT
+> > 
+> > MEDIA_TUNER is just one of the media Kconfig workarounds to its limitation of
+> > not allowing to select a device that has dependencies. It is true if the user
+> > selected either TV or radio media devices. It works together with 
+> > MEDIA_SUBDRV_AUTOSELECT. When both are enabled, it selects all
+> > media tuners. That makes easier for end users to not need to worry about
+> > manually selecting the needed tuners.
+> > 
+> > Advanced users may, instead, manually select the media tuner that his
+> > hardware needs. In such case, it doesn't matter if MEDIA_TUNER
+> > is enabled or not.
+> > 
+> > As this is due to a Kconfig limitation, I've no idea how to fix or get
+> > hid of it, but making em28xx dependent of MEDIA_TUNER is wrong.  
+> 
+> I don't understand what limitation you see here. 
+
+Before MEDIA_TUNER, what we had was something like:
+
+	config MEDIA_driver_foo
+	select VIDEO_tuner_bar if MEDIA_SUBDRV_AUTOSELECT
+	select MEDIA_frontend_foobar if MEDIA_SUBDRV_AUTOSELECT
+	...
+
+However, as different I2C drivers had different dependencies, this
+used to cause lots of troubles. So, one of the Kbuild maintainers
+came out with the idea of converting from select into depends on.
+The MEDIA_TUNER is just an ancillary invisible option to make it
+work at the tuner's side, as usually what we want is to have all
+tuners selected, as we don't have a one to one mapping about what
+driver supports what tuner (nor we wanted to do it, as this would
+mean lots of work for not much gain).
+
+> The definition
+> of the VIDEO_TUNER symbol is an empty 'tristate' symbol with a
+> dependency on MEDIA_TUNER to ensure we get a warning if MEDIA_TUNER
+> is not enabled, and to ensure it is set to 'm' if MEDIA_TUNER=m and
+> a "bool" driver selects VIDEO_TUNER.
+
+No, VIDEO_TUNER is there because we wanted to be able to use select
+to enable V4L2 tuner core support and let people to manually select
+the needed I2C devices with MEDIA_SUBDRV_AUTOSELECT unselected.
 
 > 
->>> -	msg.address_lo = msi_doorbell_addr;
->>> -	msg.address_hi = 0;
->>> -	msg.data = 0xf00 | (hwirq + 16);
->>> +	irq_domain_set_info(domain, virq, hwirq, &armada_370_xp_msi_bottom_irq_chip,
->>> +			    domain->host_data, handle_simple_irq,
->>> +			    NULL, NULL);
->>>  
->>> -	pci_write_msi_msg(virq, &msg);
->>> -	return 0;
->>> +	return hwirq;
->>
->> So you are allocating one bit at a time, irrespective of nr_irqs. This
->> implies that you can't support MULTI_MSI here (you'd need to guarantee a
->> contiguous allocation of nr_irqs bits). So either you amend your
->> allocator to deal with those (pretty easy), or you drop MULTI_MSI from
->> your msi_domain_info.
+> You are saying that the first one is not correct, so I assume we
+> still need the second meaning. We could probably do that like the
+> patch below (untested) that makes the intention much more explicit.
 > 
-> Correct. Since the patch is already a bit complicated, I'm going to
-> drop MULTI_MSI from this patch, and then add another patch which adds
-> MULTI_MSI support (after adapting the alloc/free functions accordingly).
-
-OK.
-
+> 	Arnd
 > 
->>> +	armada_370_xp_msi_inner_domain =
->>> +		irq_domain_add_linear(NULL, PCI_MSI_DOORBELL_NR,
->>> +				      &armada_370_xp_msi_domain_ops, NULL);
->>
->> nit: Please keep the assignment on a single line.
-> 
-> Unfortunately, due to the long name of the variable and the function,
-> keeping the assignment on a single line quickly reaches the 80 columns
-> limit, and each argument has to be put on its own line, making the
-> thing even less pretty. I tend to prefer splitting the assignment on
-> several lines like done here in such cases, but if you really don't
-> like, then I don't mind changing that.
+> diff --git a/drivers/media/v4l2-core/Kconfig b/drivers/media/v4l2-core/Kconfig
+> index 9beece00869b..1050bdf1848f 100644
+> --- a/drivers/media/v4l2-core/Kconfig
+> +++ b/drivers/media/v4l2-core/Kconfig
+> @@ -37,7 +37,11 @@ config VIDEO_PCI_SKELETON
+>  # Used by drivers that need tuner.ko
+>  config VIDEO_TUNER
+>  	tristate
+> -	depends on MEDIA_TUNER
+> +
+> +config VIDEO_TUNER_MODULE
+> +	tristate # must not be built-in if MEDIA_TUNER=m because of I2C
+> +	default y if VIDEO_TUNER=y || MEDIA_TUNER=y
+> +	default m if VIDEO_TUNER=m
 
-I definitely don't mind having lines larger than 80 chars (I've retired
-my vt100 a while ago), but that's your call in the end.
+Doesn't need to worry about that, because all drivers that select VIDEO_TUNER
+depend on I2C:
 
-Thanks,
+drivers/media/pci/bt8xx/Kconfig:        select VIDEO_TUNER
+drivers/media/pci/cx18/Kconfig: select VIDEO_TUNER
+drivers/media/pci/cx23885/Kconfig:      select VIDEO_TUNER
+drivers/media/pci/cx88/Kconfig: select VIDEO_TUNER
+drivers/media/pci/ivtv/Kconfig: select VIDEO_TUNER
+drivers/media/pci/saa7134/Kconfig:      select VIDEO_TUNER
+drivers/media/pci/saa7146/Kconfig:      select VIDEO_TUNER
+drivers/media/pci/saa7164/Kconfig:      select VIDEO_TUNER
+drivers/media/usb/au0828/Kconfig:       select VIDEO_TUNER
+drivers/media/usb/cx231xx/Kconfig:      select VIDEO_TUNER
+drivers/media/usb/em28xx/Kconfig:       select VIDEO_TUNER
+drivers/media/usb/go7007/Kconfig:       select VIDEO_TUNER
+drivers/media/usb/pvrusb2/Kconfig:      select VIDEO_TUNER
+drivers/media/usb/tm6000/Kconfig:       select VIDEO_TUNER
+drivers/media/usb/usbvision/Kconfig:    select VIDEO_TUNER
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+This will always be the case for PCI/USB drivers that support analog TV,
+as those drivers need to implement the I2C adapter code inside them.
+
+>  
+>  # Used by drivers that need v4l2-mem2mem.ko
+>  config V4L2_MEM2MEM_DEV
+> diff --git a/drivers/media/v4l2-core/Makefile b/drivers/media/v4l2-core/Makefile
+> index 1dc8bba2b198..971af6398d6d 100644
+> --- a/drivers/media/v4l2-core/Makefile
+> +++ b/drivers/media/v4l2-core/Makefile
+> @@ -21,7 +21,7 @@ obj-$(CONFIG_VIDEO_V4L2) += videodev.o
+>  obj-$(CONFIG_VIDEO_V4L2) += v4l2-common.o
+>  obj-$(CONFIG_VIDEO_V4L2) += v4l2-dv-timings.o
+>  
+> -obj-$(CONFIG_VIDEO_TUNER) += tuner.o
+> +obj-$(CONFIG_VIDEO_TUNER_MODULE) += tuner.o
+>  
+>  obj-$(CONFIG_V4L2_MEM2MEM_DEV) += v4l2-mem2mem.o
+
+Yes, the above could work. This is simpler fix, and should work fine for
+all current usecases:
+
+diff --git a/drivers/media/v4l2-core/Kconfig b/drivers/media/v4l2-core/Kconfig
+index 9beece00869b..b30e1c879a57 100644
+--- a/drivers/media/v4l2-core/Kconfig
++++ b/drivers/media/v4l2-core/Kconfig
+@@ -37,7 +37,7 @@ config VIDEO_PCI_SKELETON
+ # Used by drivers that need tuner.ko
+ config VIDEO_TUNER
+ 	tristate
+-	depends on MEDIA_TUNER
++	default MEDIA_TUNER
+ 
+ # Used by drivers that need v4l2-mem2mem.ko
+ config V4L2_MEM2MEM_DEV
+
+
+Ok, if we'll have platform drivers for analog TV using the I2C bus
+at directly in SoC, then your solution is better, but the tuner core
+driver may not be the best way of doing it. So, for now, I would use
+the simpler version.
+
+Regards,
+Mauro
