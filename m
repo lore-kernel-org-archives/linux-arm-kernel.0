@@ -1,201 +1,193 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 26 Jan 2016 17:05:02 +0900
-Subject: [PATCH v3 1/3] clk: samsung: Enable COMPILE_TEST for Samsung clocks
-In-Reply-To: <1453795504-12302-1-git-send-email-k.kozlowski@samsung.com>
-References: <1453795504-12302-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1453795504-12302-2-git-send-email-k.kozlowski@samsung.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 26 Jan 2016 17:07:47 +0900
+Subject: [RFC] arm64: ftrace with regs for livepatch support
+In-Reply-To: <56A5E346.8020406@huawei.com>
+References: <564F0846.5000001@linaro.org> <567E5DA7.70904@huawei.com>
+ <569DF394.4000105@linaro.org> <569EE216.6030000@huawei.com>
+ <569EFB04.6070807@linaro.org> <56A5E346.8020406@huawei.com>
+Message-ID: <56A72953.9030500@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the COMPILE_TEST to get build coverage of some of Samsung clock
-controller drivers. Still some of them will ne built only if
-approppriate SoC is chosen (like SOC_EXYNOS4415 or ARCH_S3C64XX).
+On 01/25/2016 05:56 PM, Li Bin wrote:
+>
+>
+> on 2016/1/20 11:12, AKASHI Takahiro wrote:
+>> Li,
+>>
+>> On 01/20/2016 10:25 AM, Li Bin wrote:
+>>> Hi Takahiro,
+>>> Thanks for your reply firstly.
+>>>
+>>> on 2016/1/19 16:28, AKASHI Takahiro wrote:
+>>>>>> 1) instruction sequence
+>>>>>> Unlike x86, we have to preserve link register(x30) explicitly on arm64 since
+>>>>>> a ftrace help function will be invoked before a function prologue. so we
+>>>>>> need a few, not one, instructions here. Two possible ways:
+>>>>>>
+>>>>>>     (a) stp x29, x30, [sp, #-16]!
+>>>>>>         mov x29, sp
+>>>>>>         bl <mcount>
+>>>>>>         ldp x29, x30, [sp], #16
+>>>>>>         <function prologue>
+>>>>>>         ...
+>>>>>>
+>>>>>>     (b) mov x9, x30
+>>>>>>         bl <mcount>
+>>>>>>         mov x30, x9
+>>>>>>         <function prologue>
+>>>>>>         ...
+>>>>>>
+>>>>>> (a) complies with a normal calling convention.
+>>>>>> (b) is Li Bin's idea in his old patch. While (b) can save some memory
+>>>>>> accesses by using a scratch register(x9 in this example), we have no way
+>>>>>> to recover an actual value for this register.
+>>>>>>
+>>>>>>          Q#1. Which approach should we take here?
+>>>>>>
+>>>>>>
+>>>>>> 2) replacing an instruction sequence
+>>>>>>       (This issue is orthogonal to Q#1.)
+>>>>>>
+>>>>>> Replacing can happen anytime, so we have to do it (without any locking) in
+>>>>>> such a safe way that any task either calls a helper or doesn't call it, but
+>>>>>> never runs in any intermediate state.
+>>>>>>
+>>>>>> Again here, two possible ways:
+>>>>>>
+>>>>>>      (a) initialize the code in the shape of (A') at boot time,
+>>>>>>                (B) -> (B') -> (A')
+>>>>>>          then switching to (A) or (A')
+>>>>>>      (b) take a few steps each time. For example,
+>>>>>>          to enable tracing,
+>>>>>>                (B) -> (B') -> (A') -> (A)
+>>>>>>          to disable tracing,
+>>>>>>                (A) -> (A') -> (B') -> (A)
+>>>>>>          Obviously, we need cache flushing/invalidation and barriers between.
+>>>>>>
+>>>>>>        (A)                                (A')
+>>>>>>            stp x29, x30, [sp, #-16]!           b 1f
+>>>>>>            mov x29, sp                         mov x29, sp
+>>>>>>            bl <_mcount>                        bl <_mcount>
+>>>>>>            ldp x29, x30, [sp], #16             ld x29, x30, [sp], #16
+>>>>>>                                             1:
+>>>>>>            <function prologue>
+>>>>>>            <function body>
+>>>>>>            ...
+>>>>>>
+>>>>>>        (B)                                (B')
+>>>>>>            nop                                 b 1f
+>>>>>>            nop                                 nop
+>>>>>>            nop                                 nop
+>>>>>>            nop                                 nop
+>>>>>>                                             1:
+>>>>>>            <function prologue>
+>>>>>>            <function body>
+>>>>>>            ...
+>>>>>>
+>>>>>
+>>>>> Hi takahiro,
+>>>>> This method can not guarantee the correctness of replacing the multi instrucions
+>>>>> from  (A') to (B') or from (B') to (A'), even if under kstop_machine especially for
+>>>>> preemptable kernel or NMI context (which will be supported on arm64 in future).
+>>>>> Right?
+>>>>
+>>>> You seem to be right.
+>>>> I thought that we could use aarch64_insn_patch_text() here, but
+>>>> it doesn't ensure any atomicity of replacement.
+>>>> Switching from (A') to (A) or (A) to (A') can be used instead,
+>>>> but the performance penalty will not be acceptable.
+>>>>
+>>>> Why does your livepatch with -mfentry work?
+>>>>
+>>>
+>>> For my method with -mfentry, the instruction replacement for converting
+>>> nops to ftrace calls or back is as following,
+>>>
+>>>       (A)    mov x9, x30                     (A')  mov x9, x30
+>>>               nop           <-------------->     bl <__fentry__>
+>>>               mov x30, x9                            mov x30, x9
+>>>               <function prologue>            <function prologue>
+>>>
+>>> so it is compatible with the current recordmcount and ftrace logic, and the
+>>> only effect is that introducing two extra low cost mov instruction.
+>>
+>> Last night I thought this issue and reached almost the same conclusion :)
+>> The only other way would be to forcedly suppress gcc's instruction
+>> scheduling in a function prologue and generate an always-the-same prologue.
+>> But this will be unlikely.
+>> (requiring pt_regs for livepatch is just too much.)
+>>
+>> Other than a performance impact (I'm still not sure about it),
+>> we might have a problem *with -fprolog-add=N* when the kernel sets up this
+>> multiple-instructions sequence in each traceable function at boot time because
+>> we have no way to do so transparently. I will check the ftrace code.
+>>
+>
+> So can we promote the gcc community to consider the -mfentry feature which
+> follows x86/s390/mips/sh example to support this method?
+> https://gcc.gnu.org/ml/gcc-patches/2015-10/msg02250.html
 
-Anyway in case of COMPILE_TEST the Samsung clocks would show up in main
-drivers section because they are not inside the "Common Clock Framework"
-menu item. Move them under the "Common Clock Framework".
+I think we can also initialize ftrace in case of -fprolog-add=N option.
 
-This changes the logic of selecting Samsung clocks from specific
-architectures. Now the COMMON_CLK should be selected before selecting
-specific clock (like S3C2410_COMMON_CLK or COMMON_CLK_SAMSUNG).
+First, ftrace_init() is called in start_kernel() so early that no other threads
+are run. Then ftrace_init() calls ftrace_update_code() with local irq disabled.
+This means that ftrace_make_call/nop() can be executed in a *safe* mode.
+The problem is that we have to modify not only the second NOP, but also all the three
+NOPs either to nop;nop;nop or mov; bl; mov at boot time.
+Fortunately, the first and third instruction will never be modified later and so
+we can do as follows:
+ftrace_make_call/nop(...)
+{
+     if (1st instruction == NOP) --- (*)
+         write 1st instruction.
+         write 3rd instruction.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+     write nop to 2nd.
+}
+(or we don't even need (*).)
 
----
+It is a bit ugly, but works.
 
-Changes since v2:
-New patch.
----
- arch/arm/Kconfig              | 1 +
- arch/arm/mach-exynos/Kconfig  | 1 +
- arch/arm/mach-s3c24xx/Kconfig | 8 ++++++++
- arch/arm/mach-s5pv210/Kconfig | 1 +
- arch/arm64/Kconfig.platforms  | 1 +
- drivers/clk/Kconfig           | 2 +-
- drivers/clk/samsung/Kconfig   | 9 ++++-----
- 7 files changed, 17 insertions(+), 6 deletions(-)
+So now I don't super strongly advocate -fprolog-add=N, but if this option can also be
+used to implement livepatch (precisely, FTRACE_WITH_REGS) on other archs or just for
+other purposes,  I don't want to deny this approach yet.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a5d416ec1d01..0bf888a4515a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -691,6 +691,7 @@ config ARCH_S3C64XX
- 	select ATAGS
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_SAMSUNG_PWM
-+	select COMMON_CLK
- 	select COMMON_CLK_SAMSUNG
- 	select CPU_V6K
- 	select GENERIC_CLOCKEVENTS
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 2098e0a3c48b..9749afe0e0a7 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -14,6 +14,7 @@ menuconfig ARCH_EXYNOS
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_AMBA
- 	select ARM_GIC
-+	select COMMON_CLK
- 	select COMMON_CLK_SAMSUNG
- 	select EXYNOS_THERMAL
- 	select EXYNOS_SROM if PM
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index ef68ecb27396..5f02f1fa970d 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -28,6 +28,7 @@ config CPU_S3C2410
- 	bool "SAMSUNG S3C2410"
- 	default y
- 	select CPU_ARM920T
-+	select COMMON_CLK
- 	select S3C2410_COMMON_CLK
- 	select ARM_S3C2410_CPUFREQ if ARM_S3C24XX_CPUFREQ
- 	select S3C2410_PM if PM
-@@ -54,6 +55,7 @@ config CPU_S3C2416
- config CPU_S3C2440
- 	bool "SAMSUNG S3C2440"
- 	select CPU_ARM920T
-+	select COMMON_CLK
- 	select S3C2410_COMMON_CLK
- 	select S3C2410_PM if PM_SLEEP
- 	help
-@@ -62,6 +64,7 @@ config CPU_S3C2440
- config CPU_S3C2442
- 	bool "SAMSUNG S3C2442"
- 	select CPU_ARM920T
-+	select COMMON_CLK
- 	select S3C2410_COMMON_CLK
- 	select S3C2410_PM if PM_SLEEP
- 	help
-@@ -196,6 +199,7 @@ config ARCH_BAST
- 	bool "Simtec Electronics BAST (EB2410ITX)"
- 	select ISA
- 	select MACH_BAST_IDE
-+	select COMMON_CLK
- 	select S3C2410_COMMON_DCLK
- 	select S3C2410_IOTIMING if ARM_S3C2410_CPUFREQ
- 	select S3C24XX_SIMTEC_NOR
-@@ -273,6 +277,7 @@ config MACH_TCT_HAMMER
- config MACH_VR1000
- 	bool "Thorcom VR1000"
- 	select MACH_BAST_IDE
-+	select COMMON_CLK
- 	select S3C2410_COMMON_DCLK
- 	select S3C24XX_SIMTEC_NOR
- 	select S3C24XX_SIMTEC_PM if PM
-@@ -443,6 +448,7 @@ comment "S3C2440 Boards"
- config MACH_ANUBIS
- 	bool "Simtec Electronics ANUBIS"
- 	select HAVE_PATA_PLATFORM
-+	select COMMON_CLK
- 	select S3C2410_COMMON_DCLK
- 	select S3C2440_XTAL_12000000
- 	select S3C24XX_SIMTEC_PM if PM
-@@ -482,6 +488,7 @@ config MACH_NEXCODER_2440
- 
- config MACH_OSIRIS
- 	bool "Simtec IM2440D20 (OSIRIS) module"
-+	select COMMON_CLK
- 	select S3C2410_COMMON_DCLK
- 	select S3C2410_IOTIMING if ARM_S3C2440_CPUFREQ
- 	select S3C2440_XTAL_12000000
-@@ -553,6 +560,7 @@ config MACH_RX1950
- 	bool "HP iPAQ rx1950"
- 	select I2C
- 	select PM_H1940 if PM
-+	select COMMON_CLK
- 	select S3C2410_COMMON_DCLK
- 	select S3C2410_IOTIMING if ARM_S3C2440_CPUFREQ
- 	select S3C2440_XTAL_16934400
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 330bfc8fcd52..ddeef87d8223 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -13,6 +13,7 @@ config ARCH_S5PV210
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_VIC
- 	select CLKSRC_SAMSUNG_PWM
-+	select COMMON_CLK
- 	select COMMON_CLK_SAMSUNG
- 	select HAVE_S3C2410_I2C if I2C
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 4043c35962cc..953f4ec0a0d9 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -20,6 +20,7 @@ config ARCH_EXYNOS
- config ARCH_EXYNOS7
- 	bool "ARMv8 based Samsung Exynos7"
- 	select ARCH_EXYNOS
-+	select COMMON_CLK
- 	select COMMON_CLK_SAMSUNG
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
- 	select HAVE_S3C_RTC if RTC_CLASS
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index c3e3a02f7f1f..f6695bd09809 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -190,11 +190,11 @@ config COMMON_CLK_CDCE706
- 
- source "drivers/clk/bcm/Kconfig"
- source "drivers/clk/hisilicon/Kconfig"
-+source "drivers/clk/samsung/Kconfig"
- source "drivers/clk/qcom/Kconfig"
- 
- endmenu
- 
- source "drivers/clk/mvebu/Kconfig"
- 
--source "drivers/clk/samsung/Kconfig"
- source "drivers/clk/tegra/Kconfig"
-diff --git a/drivers/clk/samsung/Kconfig b/drivers/clk/samsung/Kconfig
-index 84196ecdaa12..dd6093a33f84 100644
---- a/drivers/clk/samsung/Kconfig
-+++ b/drivers/clk/samsung/Kconfig
-@@ -1,9 +1,8 @@
- config COMMON_CLK_SAMSUNG
--	bool
--	select COMMON_CLK
-+	bool "Samsung Exynos clock controller support" if COMPILE_TEST
- 
- config S3C2410_COMMON_CLK
--	bool
-+	bool "Samsung S3C2410 clock controller support" if COMPILE_TEST
- 	select COMMON_CLK_SAMSUNG
- 	help
- 	  Build the s3c2410 clock driver based on the common clock framework.
-@@ -17,10 +16,10 @@ config S3C2410_COMMON_DCLK
- 	  framework.
- 
- config S3C2412_COMMON_CLK
--	bool
-+	bool "Samsung S3C2412 clock controller support" if COMPILE_TEST
- 	select COMMON_CLK_SAMSUNG
- 
- config S3C2443_COMMON_CLK
--	bool
-+	bool "Samsung S3C2443 clock controller support" if COMPILE_TEST
- 	select COMMON_CLK_SAMSUNG
- 
--- 
-1.9.1
+Thanks,
+-Takahiro AKASHI
+
+> Thanks,
+> Li Bin
+>
+>> Thanks,
+>> -Takahiro AKASHI
+>>
+>>> Thanks,
+>>> Li Bin
+>>>
+>>>> -Takahiro AKASHI
+>>>>
+>>>>> Thanks,
+>>>>> Li Bin
+>>>>>
+>>>>>> (a) is much simpler, but (b) has less performance penalty(?) when tracing
+>>>>>> is disabled. I'm afraid that I might simplify the issue too much.
+>>>>>>
+>>>>>>           Q#2. Which one is more preferable?
+>>>>>>
+>>>>>>
+>>>>>> [1] https://gcc.gnu.org/ml/gcc/2015-05/msg00267.html, and
+>>>>>>        https://gcc.gnu.org/ml/gcc/2015-10/msg00090.html
+>>>>>>
+>>>>>>
+>>>>>> Thanks,
+>>>>>> -Takahiro AKASHI
+>>>>>>
+>>>>>> .
+>>>>>>
+>>>
+>>>
+>>
+>> .
+>>
+>
