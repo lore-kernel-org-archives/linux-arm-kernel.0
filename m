@@ -1,30 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Jan 2016 22:35:51 +0000
-Subject: Problem with component helpers and probe deferral in 4.5-rc1
-In-Reply-To: <1453831153.2850.107.camel@linaro.org>
-References: <1453831153.2850.107.camel@linaro.org>
-Message-ID: <20160126223551.GU10826@n2100.arm.linux.org.uk>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Wed, 27 Jan 2016 09:38:05 +1100
+Subject: Fwd: [robh:dt/next 2/2] fdt_ro.c:undefined reference to `strnlen'
+In-Reply-To: <alpine.LFD.2.20.1601261636510.19789@knanqh.ubzr>
+References: <201601270337.wm7hjDwR%fengguang.wu@intel.com>
+ <CAL_JsqJ2C=OQa5ntYH3MLQ87+=ELHAtgFpg5QNQpQ0-RgzQeiw@mail.gmail.com>
+ <alpine.LFD.2.20.1601261636510.19789@knanqh.ubzr>
+Message-ID: <20160126223805.GE16692@voom.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 05:59:13PM +0000, Jon Medhurst (Tixy) wrote:
-> I believe I've found a problem with the component helpers and/or how
-> drivers use them. I discovered this whilst trying to get ARM's HDLCD
-> driver [1] working on 4.5-rc1, however I believe that code is following
-> a pattern used by drivers already in 4.5 and the problem isn't specific
-> to it. This is what I have observed...
+On Tue, Jan 26, 2016 at 04:52:18PM -0500, Nicolas Pitre wrote:
+> On Tue, 26 Jan 2016, Rob Herring wrote:
+> 
+> > With the latest dtc I've imported to the kernel, there is a new
+> > dependency on strnlen. This is giving the ARM decompressor an error. I
+> > have a couple of ideas on how to fix it:
+> > 
+> > - Move string related functions in dtc to separate file
+> > - Add lib/string.c to the decompressor build
+> > - Build the decompressor with function-sections to discard the string
+> > related functions and avoid the linker error. Also, there's probably a
+> > bit of other unused code that would get dropped. function-sections
+> > doesn't work for the kernel in general, but may for the decompressor.
+> > Nico may know.
+> 
+> Use of function-sections turns out to be more involved than I wish. And 
+> we've put many special restrictions on the decompressor already. And 
+> linking dtc (only part of it actually) into the decompressor is only for 
+> legacy stuff and I'd prefer we don't spend too much time on legacy 
+> stuff.  Yadda yadda.
+> 
+> So instead I'd simply paste a simple implementation of strnlen into 
+> arch/arm/boot/compressed/string.c and be done with it.  The one in 
+> lib/string.c looks dead simple for what it's worth.
 
-Hmm, it all looks plausible, and I'm again left wondering how the code
-passed testing over the last year (I've been running this code for
-ages both on iMX6 and Dove, where deferred probing does happen.)
+I think that would be my preferred option too.
 
-Your patch looks like the right thing to do, so I'll add it to the
-component tree shortly - it should end up in linux-next in a few days
-time.
-
-Thanks.
+> 
+> > - Don't update dtc and take the rest of the day off.
+> 
+> That is always an option.  Does it really need to be updated?  ;-)
+> 
+> 
+> Nicolas
 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/52124933/attachment.sig>
