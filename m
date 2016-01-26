@@ -1,138 +1,113 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Tue, 26 Jan 2016 22:46:10 +0530
-Subject: [PATCH v9 2/6] Documentation, dt, arm64/arm: dt bindings for numa.
-In-Reply-To: <20160120141806.GA8434@rob-hp-laptop>
-References: <1453134965-6125-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1453134965-6125-3-git-send-email-gkulkarni@caviumnetworks.com>
- <20160120141806.GA8434@rob-hp-laptop>
-Message-ID: <CAFpQJXXtrZk19XBM=BTGZMgtNy-xppoG7NZ_nDAv=Nt5P62e6g@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 26 Jan 2016 18:10:33 +0100
+Subject: [PATCH v4 06/22] arm64: add support for ioremap() block mappings
+In-Reply-To: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1453828249-14467-7-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob, Mark,
+This wires up the existing generic huge-vmap feature, which allows
+ioremap() to use PMD or PUD sized block mappings.
 
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ Documentation/features/vm/huge-vmap/arch-support.txt |  2 +-
+ arch/arm64/Kconfig                                   |  1 +
+ arch/arm64/include/asm/memory.h                      |  6 +++
+ arch/arm64/mm/mmu.c                                  | 41 ++++++++++++++++++++
+ 4 files changed, 49 insertions(+), 1 deletion(-)
 
-On Wed, Jan 20, 2016 at 7:48 PM, Rob Herring <robh@kernel.org> wrote:
-> On Mon, Jan 18, 2016 at 10:06:01PM +0530, Ganapatrao Kulkarni wrote:
->> DT bindings for numa mapping of memory, cores and IOs.
->>
->> Reviewed-by: Robert Richter <rrichter@cavium.com>
->> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
->> ---
->>  Documentation/devicetree/bindings/arm/numa.txt | 272 +++++++++++++++++++++++++
->>  1 file changed, 272 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
->
-> This is looks okay to me, but some cosmetic things on the example.
-can i have your Ack please?
->
->> +==============================================================================
->> +4 - Example dts
->> +==============================================================================
->> +
->> +2 sockets system consists of 2 boards connected through ccn bus and
->> +each board having one socket/soc of 8 cpus, memory and pci bus.
->> +
->> +     memory at 00c00000 {
->
-> Drop the leading 0s on unit addresses.
-i will correct these in next version.
->
->> +             device_type = "memory";
->> +             reg = <0x0 0x00c00000 0x0 0x80000000>;
->> +             /* node 0 */
->> +             numa-node-id = <0>;
->> +     };
->> +
->> +     memory at 10000000000 {
->> +             device_type = "memory";
->> +             reg = <0x100 0x00000000 0x0 0x80000000>;
->> +             /* node 1 */
->> +             numa-node-id = <1>;
->> +     };
->> +
->> +     cpus {
->> +             #address-cells = <2>;
->> +             #size-cells = <0>;
->> +
->> +             cpu at 000 {
->
-> Same here (leaving one of course).
->
->> +                     device_type = "cpu";
->> +                     compatible =  "arm,armv8";
->> +                     reg = <0x0 0x000>;
->> +                     enable-method = "psci";
->> +                     /* node 0 */
->> +                     numa-node-id = <0>;
->> +             };
->> +             cpu at 001 {
->
-> and so on...
->
->> +                     device_type = "cpu";
->> +                     compatible =  "arm,armv8";
->> +                     reg = <0x0 0x001>;
->
-> Either all leading 0s or none.
->
->> +                     reg = <0x0 0x008>;
->> +                     enable-method = "psci";
->> +                     /* node 1 */
->
-> Kind of a pointless comment.
->
-> Wouldn't each cluster of cpus for a given numa node be in a different
-> cpu affinity? Certainly not required by the architecture, but the common
-> case at least.
->
->> +                     numa-node-id = <1>;
->> +             };
->
-> [...]
->
->> +     pcie0: pcie0 at 0x8480,00000000 {
->
-> Drop the 0x and the comma.
->
->> +             compatible = "arm,armv8";
->> +             device_type = "pci";
->> +             bus-range = <0 255>;
->> +             #size-cells = <2>;
->> +             #address-cells = <3>;
->> +             reg = <0x8480 0x00000000 0 0x10000000>;  /* Configuration space */
->> +             ranges = <0x03000000 0x8010 0x00000000 0x8010 0x00000000 0x70 0x00000000>;
->> +             /* node 0 */
->> +             numa-node-id = <0>;
->> +        };
->> +
->> +     pcie1: pcie1 at 0x9480,00000000 {
->
-> ditto
->
->> +             compatible = "arm,armv8";
->> +             device_type = "pci";
->> +             bus-range = <0 255>;
->> +             #size-cells = <2>;
->> +             #address-cells = <3>;
->> +             reg = <0x9480 0x00000000 0 0x10000000>;  /* Configuration space */
->> +             ranges = <0x03000000 0x9010 0x00000000 0x9010 0x00000000 0x70 0x00000000>;
->> +             /* node 1 */
->> +             numa-node-id = <1>;
->> +        };
->> +
->> +     distance-map {
->> +             compatible = "numa-distance-map-v1";
->> +             distance-matrix = <0 0 10>,
->> +                               <0 1 20>,
->> +                               <1 1 10>;
->> +     };
->> --
->> 1.8.1.4
-thanks
-Ganapat
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/Documentation/features/vm/huge-vmap/arch-support.txt b/Documentation/features/vm/huge-vmap/arch-support.txt
+index af6816bccb43..df1d1f3c9af2 100644
+--- a/Documentation/features/vm/huge-vmap/arch-support.txt
++++ b/Documentation/features/vm/huge-vmap/arch-support.txt
+@@ -9,7 +9,7 @@
+     |       alpha: | TODO |
+     |         arc: | TODO |
+     |         arm: | TODO |
+-    |       arm64: | TODO |
++    |       arm64: |  ok  |
+     |       avr32: | TODO |
+     |    blackfin: | TODO |
+     |         c6x: | TODO |
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 8cc62289a63e..cd767fa3037a 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -49,6 +49,7 @@ config ARM64
+ 	select HAVE_ALIGNED_STRUCT_PAGE if SLUB
+ 	select HAVE_ARCH_AUDITSYSCALL
+ 	select HAVE_ARCH_BITREVERSE
++	select HAVE_ARCH_HUGE_VMAP
+ 	select HAVE_ARCH_JUMP_LABEL
+ 	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP && !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+ 	select HAVE_ARCH_KGDB
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index bea9631b34a8..aebc739f5a11 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -106,6 +106,12 @@
+ #define MT_S2_NORMAL		0xf
+ #define MT_S2_DEVICE_nGnRE	0x1
+ 
++#ifdef CONFIG_ARM64_4K_PAGES
++#define IOREMAP_MAX_ORDER	(PUD_SHIFT)
++#else
++#define IOREMAP_MAX_ORDER	(PMD_SHIFT)
++#endif
++
+ #ifndef __ASSEMBLY__
+ 
+ extern phys_addr_t		memstart_addr;
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index cb3a7bdb4e23..b84915723ea0 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -710,3 +710,44 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
+ 
+ 	return dt_virt;
+ }
++
++int __init arch_ioremap_pud_supported(void)
++{
++	/* only 4k granule supports level 1 block mappings */
++	return IS_ENABLED(CONFIG_ARM64_4K_PAGES);
++}
++
++int __init arch_ioremap_pmd_supported(void)
++{
++	return 1;
++}
++
++int pud_set_huge(pud_t *pud, phys_addr_t phys, pgprot_t prot)
++{
++	BUG_ON(phys & ~PUD_MASK);
++	set_pud(pud, __pud(phys | PUD_TYPE_SECT | pgprot_val(mk_sect_prot(prot))));
++	return 1;
++}
++
++int pmd_set_huge(pmd_t *pmd, phys_addr_t phys, pgprot_t prot)
++{
++	BUG_ON(phys & ~PMD_MASK);
++	set_pmd(pmd, __pmd(phys | PMD_TYPE_SECT | pgprot_val(mk_sect_prot(prot))));
++	return 1;
++}
++
++int pud_clear_huge(pud_t *pud)
++{
++	if (!pud_sect(*pud))
++		return 0;
++	pud_clear(pud);
++	return 1;
++}
++
++int pmd_clear_huge(pmd_t *pmd)
++{
++	if (!pmd_sect(*pmd))
++		return 0;
++	pmd_clear(pmd);
++	return 1;
++}
+-- 
+2.5.0
