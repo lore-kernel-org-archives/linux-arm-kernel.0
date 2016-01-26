@@ -1,157 +1,30 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Tue, 26 Jan 2016 23:35:16 +0100
-Subject: [PATCH V3] ARM: BCM5301X: Add DT for D-Link DIR-885L
-In-Reply-To: <1453845752-8174-1-git-send-email-zajec5@gmail.com>
-References: <1453845752-8174-1-git-send-email-zajec5@gmail.com>
-Message-ID: <1453847716-9406-1-git-send-email-zajec5@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 26 Jan 2016 22:35:51 +0000
+Subject: Problem with component helpers and probe deferral in 4.5-rc1
+In-Reply-To: <1453831153.2850.107.camel@linaro.org>
+References: <1453831153.2850.107.camel@linaro.org>
+Message-ID: <20160126223551.GU10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's device based on BCM47094 which is quite similar to BCM4709 except
-for higher CPU frequency. This device has 2 flash memories, it boots
-from serial one and stores firmware on NAND. Other than that we define
-standard stuff like LEDs, buttons and UART.
+On Tue, Jan 26, 2016 at 05:59:13PM +0000, Jon Medhurst (Tixy) wrote:
+> I believe I've found a problem with the component helpers and/or how
+> drivers use them. I discovered this whilst trying to get ARM's HDLCD
+> driver [1] working on 4.5-rc1, however I believe that code is following
+> a pattern used by drivers already in 4.5 and the problem isn't specific
+> to it. This is what I have observed...
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
----
-V2: Include "dir-" in filename.
-V3: Commit message
-    Drop "earlyprintk" (which is unwanted, we should switch to earlycon)
-    Define lowmem only (like on all other devices), we still miss swiotlb
----
- arch/arm/boot/dts/Makefile                    |   1 +
- arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts | 111 ++++++++++++++++++++++++++
- 2 files changed, 112 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+Hmm, it all looks plausible, and I'm again left wondering how the code
+passed testing over the last year (I've been running this code for
+ages both on iMX6 and Dove, where deferred probing does happen.)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index eab8a7f..d7fcd46 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -76,6 +76,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm4709-buffalo-wxr-1900dhp.dtb \
- 	bcm4709-netgear-r7000.dtb \
- 	bcm4709-netgear-r8000.dtb \
-+	bcm47094-dlink-dir-885l.dtb \
- 	bcm94708.dtb \
- 	bcm94709.dtb \
- 	bcm953012k.dtb
-diff --git a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-new file mode 100644
-index 0000000..6c83538
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-@@ -0,0 +1,111 @@
-+/*
-+ * Broadcom BCM470X / BCM5301X ARM platform code.
-+ * DTS for D-Link DIR-885L
-+ *
-+ * Copyright (C) 2016 Rafa? Mi?ecki <zajec5@gmail.com>
-+ *
-+ * Licensed under the GNU/GPL. See COPYING for details.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm4708.dtsi"
-+#include "bcm5301x-nand-cs0-bch8.dtsi"
-+
-+/ {
-+	compatible = "dlink,dir-885l", "brcm,bcm47094", "brcm,bcm4708";
-+	model = "D-Link DIR-885L";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+	};
-+
-+	memory {
-+		reg = <0x00000000 0x08000000>;
-+	};
-+
-+	nand: nand at 18028000 {
-+		nandcs at 0 {
-+			partition at 0 {
-+				label = "firmware";
-+				reg = <0x00000000 0x08000000>;
-+			};
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		power-white {
-+			label = "bcm53xx:white:power";
-+			gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		wan-white {
-+			label = "bcm53xx:white:wan";
-+			gpios = <&chipcommon 1 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		power-amber {
-+			label = "bcm53xx:amber:power";
-+			gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		wan-amber {
-+			label = "bcm53xx:amber:wan";
-+			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		usb3-white {
-+			label = "bcm53xx:white:usb3";
-+			gpios = <&chipcommon 8 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		2ghz {
-+			label = "bcm53xx:white:2ghz";
-+			gpios = <&chipcommon 13 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		5ghz {
-+			label = "bcm53xx:white:5ghz";
-+			gpios = <&chipcommon 14 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		wps {
-+			label = "WPS";
-+			linux,code = <KEY_WPS_BUTTON>;
-+			gpios = <&chipcommon 7 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		/* Switch: router / extender */
-+		extender {
-+			label = "Extender";
-+			linux,code = <BTN_0>;
-+			gpios = <&chipcommon 10 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		restart {
-+			label = "Reset";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&chipcommon 17 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+	clock-frequency = <125000000>;
-+};
+Your patch looks like the right thing to do, so I'll add it to the
+component tree shortly - it should end up in linux-next in a few days
+time.
+
+Thanks.
+
 -- 
-1.8.4.5
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
