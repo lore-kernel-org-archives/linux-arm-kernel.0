@@ -1,36 +1,27 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 26 Jan 2016 16:16:15 +0800
-Subject: [PATCH v3 14/17] XEN: EFI: Move x86 specific codes to architecture
- directory
-In-Reply-To: <alpine.DEB.2.02.1601251643230.9687@kaball.uk.xensource.com>
-References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
- <1453519184-11908-15-git-send-email-zhaoshenglong@huawei.com>
- <alpine.DEB.2.02.1601251643230.9687@kaball.uk.xensource.com>
-Message-ID: <56A72B4F.2040909@huawei.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 26 Jan 2016 09:23:45 +0100
+Subject: [PATCH] rtc: mt6397: add IRQ domain dependency
+In-Reply-To: <1453737892-1960479-1-git-send-email-arnd@arndb.de>
+References: <1453737892-1960479-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160126082345.GD11740@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2016/1/26 0:44, Stefano Stabellini wrote:
-> On Sat, 23 Jan 2016, Shannon Zhao wrote:
->> > From: Shannon Zhao <shannon.zhao@linaro.org>
->> > 
->> > Move x86 specific codes to architecture directory and export those EFI
->> > runtime service functions. This will be useful for initializing runtime
->> > service on ARM later.
->> > 
->> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> This patch causes a build breakage on x86:
+On 25/01/2016 at 17:04:46 +0100, Arnd Bergmann wrote :
+> The mt6397 RTC driver can be built either when the MFD_MT6397 driver
+> is enabled (which selects IRQ_DOMAIN), or when compile testing.
+> The latter however fails without IRQ domains:
 > 
-> arch/x86/xen/efi.c: In function ?xen_efi_probe?:
-> arch/x86/xen/efi.c:101:2: error: implicit declaration of function ?HYPERVISOR_platform_op? [-Werror=implicit-function-declaration]
+> drivers/rtc/rtc-mt6397.c: In function 'mtk_rtc_probe':
+> drivers/rtc/rtc-mt6397.c:326:13: error: implicit declaration of function 'irq_create_mapping' [-Werror=implicit-function-declaration]
+>   rtc->irq = irq_create_mapping(mt6397_chip->irq_domain, res->start);
 > 
-This patch is based on following patch [1]. Maybe you need to update
-your branch. :)
-
-[1] xen: rename dom0_op to platform_op
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=cfafae940381207d48b11a73a211142dba5947d3
+> This adds an explicit dependency for the COMPILE_TEST case.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Applied, thanks.
 
 -- 
-Shannon
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
