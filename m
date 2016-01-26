@@ -1,59 +1,77 @@
-From: xuejiancheng@huawei.com (xuejiancheng)
-Date: Tue, 26 Jan 2016 11:07:01 +0800
-Subject: [PATCH v7 4/6] ARM: debug: add hi3519 debug uart
-In-Reply-To: <1453690883-31220-5-git-send-email-xuejiancheng@huawei.com>
-References: <1453690883-31220-1-git-send-email-xuejiancheng@huawei.com>
- <1453690883-31220-5-git-send-email-xuejiancheng@huawei.com>
-Message-ID: <56A6E2D5.7040104@huawei.com>
+From: henryc.chen@mediatek.com (Henry Chen)
+Date: Tue, 26 Jan 2016 11:07:23 +0800
+Subject: [PATCH V2 4/4] mfd: mediatek: add MT6323 support to MT6397 driver
+In-Reply-To: <56A670A3.5030100@openwrt.org>
+References: <1453716887-38442-1-git-send-email-blogic@openwrt.org>
+ <20160125124112.GG3368@x1> <56A64108.7020807@openwrt.org>
+ <3476571.0yU9yvPsKF@linux-gy6r.site> <56A670A3.5030100@openwrt.org>
+Message-ID: <1453777643.26374.11.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2016/1/25 11:01, Jiancheng Xue wrote:
-> add hi3519 debug uart
+On Mon, 2016-01-25 at 19:59 +0100, John Crispin wrote:
 > 
-> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
-> ---
->  arch/arm/Kconfig.debug | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+> On 25/01/2016 19:44, Matthias Brugger wrote:
+> > On Monday 25 Jan 2016 16:36:40 John Crispin wrote:
+> >> Hi,
+> >>
+> >> On 25/01/2016 13:41, Lee Jones wrote:
+> >>> Please honour the subject format of the subsystem you are contributing
+> >>> to.
+> >>>
+> >>> `git log --oneline -- $subsystem` gives you this.
+> >>>
+> >>> On Mon, 25 Jan 2016, John Crispin wrote:
+> >>>> Signed-off-by: John Crispin <blogic@openwrt.org>
+> >>>> ---
+> >>
+> >> [...]
+> >>
+> >>>> @@ -261,6 +271,15 @@ static int mt6397_probe(struct platform_device
+> >>>> *pdev)
+> >>>>
+> >>>>  	}
+> >>>>  	
+> >>>>  	switch (id & 0xff) {
+> >>>>
+> >>>> +	case MT6323_CID_CODE:
+> >>>> +		mt6397->int_con[0] = MT6323_INT_CON0;
+> >>>
+> >>> This is confusing.  You're still using memory allocated for a mt6397
+> >>> device.
+> >>
+> >> the variable is currently defined as struct mt6397_chip *mt6397;
+> >> shall i only change the name or also create a patch to rename the struct ?
+> >>
+> > 
+> > I think we should rename the struct and the file as well.
+> > 
+> > Cheers,
+> > Matthias
 > 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index c6b6175..b02a7c1 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -260,6 +260,14 @@ choice
->  		  Say Y here if you want kernel low-level debugging support
->  		  on Cortina Gemini based platforms.
->  
-> +	config DEBUG_HI3519_UART
-> +		bool "Hisilicon HI3519 Debug UART"
-> +		depends on ARCH_HISI
-> +		select DEBUG_UART_PL01X
-> +		help
-> +		  Say Y here if you want kernel low-level debugging support
-> +		  on HI3519 UART.
-> +
->  	config DEBUG_HI3620_UART
->  		bool "Hisilicon HI3620 Debug UART"
->  		depends on ARCH_HI3xxx
-> @@ -1451,6 +1459,7 @@ config DEBUG_UART_PHYS
->  	default 0x11002000 if DEBUG_MT8127_UART0
->  	default 0x11006000 if DEBUG_MT6589_UART0
->  	default 0x11009000 if DEBUG_MT8135_UART3
-> +	default 0x12100000 if DEBUG_HI3519_UART
->  	default 0x16000000 if DEBUG_INTEGRATOR
->  	default 0x18000300 if DEBUG_BCM_5301X
->  	default 0x18010000 if DEBUG_SIRFATLAS7_UART0
-> @@ -1514,6 +1523,7 @@ config DEBUG_UART_PHYS
->  	default 0xfcb00000 if DEBUG_HI3620_UART
->  	default 0xfd883000 if DEBUG_ALPINE_UART0
->  	default 0xfe800000 if ARCH_IOP32X
-> +	default 0xfef00000 if DEBUG_HI3519_UART
-
-Sorry. This line is put in a wrong place by my mistake. I'll correct it in next version.
-
->  	default 0xff690000 if DEBUG_RK32_UART2
->  	default 0xffc02000 if DEBUG_SOCFPGA_UART0
->  	default 0xffc02100 if DEBUG_SOCFPGA_UART1
+> Hi,
 > 
+> that would have been my next question. renaming the struct would imply
+> renaming the driver and the whole namespace contained within. We would
+> then also need to change the Kconfig and Makefile. I am happy to do this
+> but want to be sure that is is actually wanted.
+> 
+> 	John
+Hi,
+
+Since mt6323 was similar with mt6397, I think we can reuse the
+mt6397_chip without duplicate code.
+
+Maybe we can rename the local variable name to avoid confusing.
+
+struct mt6397_chip *mt_pmic;
+...
+...
+switch (id & 0xff) {
+	case MT6323_CID_CODE:
+		mt_pmic->int_con[0] = MT6323_INT_CON0;
+		mt_pmic->int_con[1] = MT6323_INT_CON1;
+...
+...
+
+Henry
