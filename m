@@ -1,178 +1,115 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 26 Jan 2016 10:08:21 -0700
-Subject: [PATCH V8 20/23] perf tools: making function set_max_cpu_num()
- non static
-In-Reply-To: <20160125212955.GG22501@kernel.org>
-References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
- <1452807977-8069-21-git-send-email-mathieu.poirier@linaro.org>
- <CANLsYkzmTMi3jmVjwNiNsw6P5pPkZEz6zYWFsVzayy+r2ojTTA@mail.gmail.com>
- <20160125211242.GF22501@kernel.org>
- <20160125212955.GG22501@kernel.org>
-Message-ID: <CANLsYkwbBCwT0B4NV0pGo+avyyX9kiPzYZK5WtmfHaqnW8Q6uA@mail.gmail.com>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Tue, 26 Jan 2016 15:08:19 -0200
+Subject: [PATCH 6/7] [media] em28xx: add MEDIA_TUNER dependency
+In-Reply-To: <5775609.WPlM7VCgVr@wuerfel>
+References: <1453817424-3080054-1-git-send-email-arnd@arndb.de>
+ <6929423.KuNZKsBgHV@wuerfel> <20160126143644.1d104040@recife.lan>
+ <5775609.WPlM7VCgVr@wuerfel>
+Message-ID: <20160126150819.04cab5a9@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 January 2016 at 14:29, Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
-> Em Mon, Jan 25, 2016 at 06:12:42PM -0300, Arnaldo Carvalho de Melo escreveu:
->> Em Mon, Jan 25, 2016 at 01:46:22PM -0700, Mathieu Poirier escreveu:
->> > On 14 January 2016 at 14:46, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
->> > > For memory allocation purposes, code located in other places
->> > > then util/cpumap.c may want to know how many CPUs the system has.
->> > >
->> > > This patch is making function set_max_cpu_num() available to
->> > > other parts of the perf tool so that global variable
->> > > 'max_cpu_num' gets the right value when referenced by cpu__max_cpu().
->> > >
->> > > Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
->> > > Cc: Ingo Molnar <mingo@redhat.com>
->> > > Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
->> > > Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->> > > ---
->> > >  tools/perf/util/cpumap.c | 2 +-
->> > >  tools/perf/util/cpumap.h | 1 +
->> > >  2 files changed, 2 insertions(+), 1 deletion(-)
->> > >
->> > > diff --git a/tools/perf/util/cpumap.c b/tools/perf/util/cpumap.c
->> > > index 10af1e7524fb..ae179320c0c0 100644
->> > > --- a/tools/perf/util/cpumap.c
->> > > +++ b/tools/perf/util/cpumap.c
->> > > @@ -380,7 +380,7 @@ out:
->> > >  }
->> > >
->> > >  /* Determine highest possible cpu in the system for sparse allocation */
->> > > -static void set_max_cpu_num(void)
->> > > +void set_max_cpu_num(void)
->> > >  {
->> > >         const char *mnt;
->> > >         char path[PATH_MAX];
->> > > diff --git a/tools/perf/util/cpumap.h b/tools/perf/util/cpumap.h
->> > > index 85f7772457fa..45fa963345eb 100644
->> > > --- a/tools/perf/util/cpumap.h
->> > > +++ b/tools/perf/util/cpumap.h
->> > > @@ -14,6 +14,7 @@ struct cpu_map {
->> > >         int map[];
->> > >  };
->> > >
->> > > +void set_max_cpu_num(void);
->> > >  struct cpu_map *cpu_map__new(const char *cpu_list);
->> > >  struct cpu_map *cpu_map__empty_new(int nr);
->> > >  struct cpu_map *cpu_map__dummy_new(void);
->> > > --
->> > > 2.1.4
->> > >
->> >
->> > Arnaldo,
->> >
->> > I can't queue this patch for 4.6 without at least a reviewed by from you.
->>
->> This one I remember, looks ugly, the name set_max_cpu_num() looks
->> strange, when that was restricted (static) to that cpumap.c file, it
->> wasn't a problem, exporting it for wider usage looks bad.
->>
->> You've been waiting for this for quite a while, it seems, lemme stop
->> what I am doing to check this...
->
-> So, please check the patch below, what you need then is just to use
-> cpu__max_cpu().
+Em Tue, 26 Jan 2016 17:51:11 +0100
+Arnd Bergmann <arnd@arndb.de> escreveu:
 
-I like your approach - thanks for the review.  I will spin V9 when I
-have received Adrian's comments.
+> On Tuesday 26 January 2016 14:36:44 Mauro Carvalho Chehab wrote:
+> > Em Tue, 26 Jan 2016 16:53:38 +0100
+> > Arnd Bergmann <arnd@arndb.de> escreveu:  
+> > > On Tuesday 26 January 2016 12:33:08 Mauro Carvalho Chehab wrote:  
+> > > > Em Tue, 26 Jan 2016 15:10:00 +0100
+> > > > Advanced users may, instead, manually select the media tuner that his
+> > > > hardware needs. In such case, it doesn't matter if MEDIA_TUNER
+> > > > is enabled or not.
+> > > > 
+> > > > As this is due to a Kconfig limitation, I've no idea how to fix or get
+> > > > hid of it, but making em28xx dependent of MEDIA_TUNER is wrong.    
+> > > 
+> > > I don't understand what limitation you see here.   
+> > 
+> > Before MEDIA_TUNER, what we had was something like:
+> > 
+> > 	config MEDIA_driver_foo
+> > 	select VIDEO_tuner_bar if MEDIA_SUBDRV_AUTOSELECT
+> > 	select MEDIA_frontend_foobar if MEDIA_SUBDRV_AUTOSELECT
+> > 	...
+> > 
+> > However, as different I2C drivers had different dependencies, this
+> > used to cause lots of troubles. So, one of the Kbuild maintainers
+> > came out with the idea of converting from select into depends on.
+> > The MEDIA_TUNER is just an ancillary invisible option to make it
+> > work at the tuner's side, as usually what we want is to have all
+> > tuners selected, as we don't have a one to one mapping about what
+> > driver supports what tuner (nor we wanted to do it, as this would
+> > mean lots of work for not much gain).  
+> 
+> Ok
+> 
+> > > The definition
+> > > of the VIDEO_TUNER symbol is an empty 'tristate' symbol with a
+> > > dependency on MEDIA_TUNER to ensure we get a warning if MEDIA_TUNER
+> > > is not enabled, and to ensure it is set to 'm' if MEDIA_TUNER=m and
+> > > a "bool" driver selects VIDEO_TUNER.  
+> > 
+> > No, VIDEO_TUNER is there because we wanted to be able to use select
+> > to enable V4L2 tuner core support and let people to manually select
+> > the needed I2C devices with MEDIA_SUBDRV_AUTOSELECT unselected.  
+> 
+> I meant what the dependency is there for, not the symbol itself.
+> It's clear what the symbol does.
+> 
+> > > diff --git a/drivers/media/v4l2-core/Kconfig b/drivers/media/v4l2-core/Kconfig
+> > > index 9beece00869b..1050bdf1848f 100644
+> > > --- a/drivers/media/v4l2-core/Kconfig
+> > > +++ b/drivers/media/v4l2-core/Kconfig
+> > > @@ -37,7 +37,11 @@ config VIDEO_PCI_SKELETON
+> > >  # Used by drivers that need tuner.ko
+> > >  config VIDEO_TUNER
+> > >  	tristate
+> > > -	depends on MEDIA_TUNER
+> > > +
+> > > +config VIDEO_TUNER_MODULE
+> > > +	tristate # must not be built-in if MEDIA_TUNER=m because of I2C
+> > > +	default y if VIDEO_TUNER=y || MEDIA_TUNER=y
+> > > +	default m if VIDEO_TUNER=m  
+> > 
+> > Doesn't need to worry about that, because all drivers that select VIDEO_TUNER
+> > depend on I2C:
+> >   
+> 
+> Ok, then the dependency does not do anything other than generate a
+> warning.
+> 
+> > diff --git a/drivers/media/v4l2-core/Kconfig b/drivers/media/v4l2-core/Kconfig
+> > index 9beece00869b..b30e1c879a57 100644
+> > --- a/drivers/media/v4l2-core/Kconfig
+> > +++ b/drivers/media/v4l2-core/Kconfig
+> > @@ -37,7 +37,7 @@ config VIDEO_PCI_SKELETON
+> >  # Used by drivers that need tuner.ko
+> >  config VIDEO_TUNER
+> >  	tristate
+> > -	depends on MEDIA_TUNER
+> > +	default MEDIA_TUNER
+> >  
+> >  # Used by drivers that need v4l2-mem2mem.ko
+> >  config V4L2_MEM2MEM_DEV  
+> 
+> So this means it's now enabled if MEDIA_TUNER is enabled, whereas
+> before it was only enabled when explicitly selected. That sounds
+> like a useful change, but it also seems unrelated to the warning
+> fix, and should probably be a separate change, while for now
+> we can simply remove the 'depends on' line without any replacement.
 
-Mathieu
+True.
 
->
-> - Arnaldo
->
-> diff --git a/tools/perf/util/cpumap.c b/tools/perf/util/cpumap.c
-> index fa935093a599..9bcf2bed3a6d 100644
-> --- a/tools/perf/util/cpumap.c
-> +++ b/tools/perf/util/cpumap.c
-> @@ -8,6 +8,10 @@
->  #include <linux/bitmap.h>
->  #include "asm/bug.h"
->
-> +static int max_cpu_num;
-> +static int max_node_num;
-> +static int *cpunode_map;
-> +
->  static struct cpu_map *cpu_map__default_new(void)
->  {
->         struct cpu_map *cpus;
-> @@ -486,6 +490,32 @@ out:
->                 pr_err("Failed to read max nodes, using default of %d\n", max_node_num);
->  }
->
-> +int cpu__max_node(void)
-> +{
-> +       if (unlikely(!max_node_num))
-> +               set_max_node_num();
-> +
-> +       return max_node_num;
-> +}
-> +
-> +int cpu__max_cpu(void)
-> +{
-> +       if (unlikely(!max_cpu_num))
-> +               set_max_cpu_num();
-> +
-> +       return max_cpu_num;
-> +}
-> +
-> +int cpu__get_node(int cpu)
-> +{
-> +       if (unlikely(cpunode_map == NULL)) {
-> +               pr_debug("cpu_map not initialized\n");
-> +               return -1;
-> +       }
-> +
-> +       return cpunode_map[cpu];
-> +}
-> +
->  static int init_cpunode_map(void)
->  {
->         int i;
-> diff --git a/tools/perf/util/cpumap.h b/tools/perf/util/cpumap.h
-> index 71c41b9efabb..81a2562aaa2b 100644
-> --- a/tools/perf/util/cpumap.h
-> +++ b/tools/perf/util/cpumap.h
-> @@ -57,37 +57,11 @@ static inline bool cpu_map__empty(const struct cpu_map *map)
->         return map ? map->map[0] == -1 : true;
->  }
->
-> -int max_cpu_num;
-> -int max_node_num;
-> -int *cpunode_map;
-> -
->  int cpu__setup_cpunode_map(void);
->
-> -static inline int cpu__max_node(void)
-> -{
-> -       if (unlikely(!max_node_num))
-> -               pr_debug("cpu_map not initialized\n");
-> -
-> -       return max_node_num;
-> -}
-> -
-> -static inline int cpu__max_cpu(void)
-> -{
-> -       if (unlikely(!max_cpu_num))
-> -               pr_debug("cpu_map not initialized\n");
-> -
-> -       return max_cpu_num;
-> -}
-> -
-> -static inline int cpu__get_node(int cpu)
-> -{
-> -       if (unlikely(cpunode_map == NULL)) {
-> -               pr_debug("cpu_map not initialized\n");
-> -               return -1;
-> -       }
-> -
-> -       return cpunode_map[cpu];
-> -}
-> +int cpu__max_node(void);
-> +int cpu__max_cpu(void);
-> +int cpu__get_node(int cpu);
->
->  int cpu_map__build_map(struct cpu_map *cpus, struct cpu_map **res,
->                        int (*f)(struct cpu_map *map, int cpu, void *data),
+> > Ok, if we'll have platform drivers for analog TV using the I2C bus
+> > at directly in SoC, then your solution is better, but the tuner core
+> > driver may not be the best way of doing it. So, for now, I would use
+> > the simpler version.  
+> 
+> Ok. Do you want me to submit a new version or do you prefer to write
+> one yourself? With or without the 'default'?
+
+Feel free to submit a new version without the default.
+
+Thanks!
+Mauro
