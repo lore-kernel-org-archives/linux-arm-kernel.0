@@ -1,28 +1,43 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Tue, 26 Jan 2016 20:25:06 +0300
-Subject: [PATCH 00/10] KVM PCIe/MSI passthrough on ARM/ARM64
-In-Reply-To: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
-References: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <000001d1585e$8097d7e0$81c787a0$@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Jan 2016 09:25:28 -0800
+Subject: N900 sleep mode (in 4.5-rc0, if that matters)
+In-Reply-To: <20160126140010.GA29723@amd>
+References: <20160123121022.GB12497@amd> <20160125163332.GT19432@atomide.com>
+ <20160126140010.GA29723@amd>
+Message-ID: <20160126172527.GY3500@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
- I'd like just to clarify some things for myself and better wrap my head around it...
+* Pavel Machek <pavel@ucw.cz> [160126 06:01]:
+> 
+> It seems like I have rather lot of blocking bits:
+> 
+> 00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
 
-> On x86 all accesses to the 1MB PA region [FEE0_0000h - FEF0_000h] are directed
-> as interrupt messages: accesses to this special PA window directly target the
-> APIC configuration space and not DRAM, meaning the downstream IOMMU is bypassed.
+Looks like most of these are for GPIO banks, that's OK those get saved
+and restored in the idle loop.
 
- So, this is effectively the same as always having hardwired 1:1 mappings on all IOMMUs, isn't it ?
- If so, then we can't we just do the same, just by forcing similar 1:1 mapping? This is what i tried to do in my patchset. All of
-you are talking about a situation which arises when we are emulating different machine with different physical addresses layout. And
-e. g. if our host has MSI at 0xABADCAFE, our target could have valid RAM at the same location, and we need to handle it somehow,
-therefore we have to move our MSI window out of target's RAM. But how does this work on a PC then? What if our host is PC, and we
-want to emulate some ARM board, which has RAM at FE00 0000 ? Or does it mean that PC architecture is flawed and can reliably handle
-PCI passthrough only for itself ?
+Here bit 18 UART4 is a mystery though.. It's uart4 on 36xx but reserved
+on 34xx. I do have that too on my n900, but it's hitting off mode with
+v4.4.
 
-Kind regards,
-Pavel Fedin
-Senior Engineer
-Samsung Electronics Research center Russia
+> ffdffe8d 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00200072
+> 0000000d 48004a28 (fa004a28) cm_idlest3_core
+> 
+> cm_idlest1_core changes periodicall often, to 00218072. The rest seems
+> constant.
+
+For cm_idlest1_core 42 is the answer.. Here you have bits 4 and 5
+blocking which is for OTG and it's PHY. That's a known issue with
+musb and setting pm_runtime_irq_safe() on the MUSB parent.
+
+If you do rmmod omap2430 and phy-twl4030usb chances are the LEDs will
+start going off assuming the McSPI bit goes low with WLAN idling.
+
+Looks like we have some regression with v4.5-rc1 where n900 is not
+hitting deeper idle states though. I'll run git bisect between
+v4.4..v4.5-rc1.
+
+Regards,
+
+Tony
