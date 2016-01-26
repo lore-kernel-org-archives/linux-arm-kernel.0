@@ -1,57 +1,38 @@
-From: rientjes@google.com (David Rientjes)
-Date: Mon, 25 Jan 2016 18:34:07 -0800 (PST)
-Subject: [PATCH 3/4] arm64: let set_memory_xx(addr, 0) succeed.
-In-Reply-To: <56A66D28.1080204@redhat.com>
-References: <1453561543-14756-1-git-send-email-mika.penttila@nextfour.com>
- <1453561543-14756-4-git-send-email-mika.penttila@nextfour.com>
- <56A66D28.1080204@redhat.com>
-Message-ID: <alpine.DEB.2.10.1601251832420.10939@chino.kir.corp.google.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Tue, 26 Jan 2016 10:34:40 +0800
+Subject: [PATCH v6 0/1] Introduce Innosilicon HDMI driver on Rockchip
+ platforms
+In-Reply-To: <30308769.0Ysu5UYYQv@diego>
+References: <1453686197-20975-1-git-send-email-ykk@rock-chips.com>
+ <30308769.0Ysu5UYYQv@diego>
+Message-ID: <56A6DB40.9030209@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Jan 2016, Laura Abbott wrote:
+Hi Heiko,
 
-> On 01/23/2016 07:05 AM, mika.penttila at nextfour.com wrote:
-> > From: Mika Penttil? <mika.penttila@nextfour.com>
-> > 
-> > This makes set_memory_xx() consistent with x86.
-> > 
-> > Signed-off-by: Mika Penttil? mika.penttila at nextfour.com
-> > 
-> > ---
-> >   arch/arm64/mm/pageattr.c | 3 +++
-> >   1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-> > index 3571c73..52220dd 100644
-> > --- a/arch/arm64/mm/pageattr.c
-> > +++ b/arch/arm64/mm/pageattr.c
-> > @@ -51,6 +51,9 @@ static int change_memory_common(unsigned long addr, int
-> > numpages,
-> >   		WARN_ON_ONCE(1);
-> >   	}
-> > 
-> > +	if (!numpages)
-> > +		return 0;
-> > +
-> >   	if (start < MODULES_VADDR || start >= MODULES_END)
-> >   		return -EINVAL;
-> > 
-> > 
-> 
-> I think this is going to conflict with Ard's patch
-> lkml.kernel.org/g/<1453125665-26627-1-git-send-email-ard.biesheuvel@linaro.org>
-> 
-> Can you rebase on top of that?
-> 
+On 01/25/2016 08:47 PM, Heiko St?bner wrote:
+> Am Montag, 25. Januar 2016, 09:43:17 schrieb Yakir Yang:
+>> Here are a brief introduction to Innosilicon HDMI IP:
+>>    - Support HDMI 1.4a, HDCP 1.2 and DVI 1.0 standard compliant transmitter
+>>    - Support HDMI1.4 a/b 3D function defined in HDMI 1.4 a/b spec
+>>    - Digital video interface supports a pixel size of 24, 30, 36, 48bits
+>> color depth in RGB - S/PDIF output supports PCM, Dolby Digital, DTS digital
+>> audio transmission (32-192kHz Fs) using IEC60958 and IEC 61937
+>>    - The EDID and CEC function are also supported by Innosilicon HDMI
+>> Transmitter Controlle
+> have you lost separate the devicetree-binding patch somewhere?
+>
+> I don't remember it getting applied and Mark may miss it if it's only
+> contained in some old series.
 
-Also, I think patch 2 and 3 can be folded together since the change is the 
-same to both functions.
+Ops, I may misunderstand the rule, I thought if patch was acked by 
+maintainer, then I should keep it no changed. Hmmm, so not Acked but 
+Applied, thanks, I would update now.
 
-I think the changelog should be expanded to explain that 
-charge_memory_common() with numpages == 0 should be a no-op.
-
-When both of those are done, and it's rebased as requested, feel free to 
-add my:
-
-	Acked-by: David Rientjes <rientjes@google.com>
+Yakir
+>
+> Heiko
+>
+>
+>
