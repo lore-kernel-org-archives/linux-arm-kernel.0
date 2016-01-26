@@ -1,71 +1,43 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 26 Jan 2016 12:12:04 +0100
-Subject: [PATCH 5/6] ARM: realview: add flash devices to the PB1176 DTS
+Date: Tue, 26 Jan 2016 12:12:05 +0100
+Subject: [PATCH 6/6] ARM: realview: fix up PB11MP flash compat strings
 In-Reply-To: <1453806725-4880-1-git-send-email-linus.walleij@linaro.org>
 References: <1453806725-4880-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1453806725-4880-6-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1453806725-4880-7-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the flash memories and ROM to the PB1175 DTS file.
-The secure flash is marked as "disabled" by default so as to
-protect the user from overwriting the boot monitor.
+The two flash memories in the PB11MPCore have their VPP/WP
+lines controlled from the system controller add-on in the MTD
+subsystem. "arm,versatile-flash" is the first compatible string
+to use to get the right support.
 
 Cc: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/arm-realview-pb1176.dts | 32 +++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm/boot/dts/arm-realview-pb11mp.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/arm-realview-pb1176.dts b/arch/arm/boot/dts/arm-realview-pb1176.dts
-index 1bc64cda819e..b7d727ef1868 100644
---- a/arch/arm/boot/dts/arm-realview-pb1176.dts
-+++ b/arch/arm/boot/dts/arm-realview-pb1176.dts
-@@ -106,6 +106,31 @@
- 		clock-frequency = <0>;
+diff --git a/arch/arm/boot/dts/arm-realview-pb11mp.dts b/arch/arm/boot/dts/arm-realview-pb11mp.dts
+index da755c9851a7..63d6a051839f 100644
+--- a/arch/arm/boot/dts/arm-realview-pb11mp.dts
++++ b/arch/arm/boot/dts/arm-realview-pb11mp.dts
+@@ -230,14 +230,14 @@
+ 
+ 	flash0 at 40000000 {
+ 		/* 2 * 32MiB NOR Flash memory */
+-		compatible = "arm,vexpress-flash", "cfi-flash";
++		compatible = "arm,versatile-flash", "cfi-flash";
+ 		reg = <0x40000000 0x04000000>;
+ 		bank-width = <4>;
  	};
  
-+	flash at 30000000 {
+ 	flash1 at 44000000 {
+ 		// 2 * 32MiB NOR Flash memory
+-		compatible = "arm,vexpress-flash", "cfi-flash";
 +		compatible = "arm,versatile-flash", "cfi-flash";
-+		reg = <0x30000000 0x4000000>;
-+		bank-width = <4>;
-+	};
-+
-+	fpga_flash at 38000000 {
-+		compatible = "arm,versatile-flash", "cfi-flash";
-+		reg = <0x38000000 0x800000>;
-+		bank-width = <4>;
-+	};
-+
-+	/*
-+	 * The "secure flash" contains things like the boot
-+	 * monitor so we don't want people to accidentally
-+	 * screw this up. Mark the device tree node disabled
-+	 * by default.
-+	 */
-+	secflash at 3c000000 {
-+		compatible = "arm,versatile-flash", "cfi-flash";
-+		reg = <0x3c000000 0x4000000>;
-+		bank-width = <4>;
-+		status = "disabled";
-+	};
-+
- 	soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -297,6 +322,13 @@
- 			clocks = <&uartclk>, <&pclk>;
- 			clock-names = "uartclk", "apb_pclk";
- 		};
-+
-+		/* Direct-mapped development chip ROM */
-+		pb1176_rom at 10200000 {
-+			compatible = "direct-mapped";
-+			reg = <0x10200000 0x4000>;
-+			bank-width = <1>;
-+		};
+ 		reg = <0x44000000 0x04000000>;
+ 		bank-width = <4>;
  	};
- 
- 	/* These peripherals are inside the FPGA rather than the DevChip */
 -- 
 2.4.3
