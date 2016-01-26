@@ -1,62 +1,105 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 26 Jan 2016 18:06:34 +0000
-Subject: [PATCH 1/4] iommu/arm-smmu: Treat all device transactions as
- unprivileged
+Date: Tue, 26 Jan 2016 18:06:36 +0000
+Subject: [PATCH 3/4] iommu/arm-smmu: Support DMA-API domains
 In-Reply-To: <cover.1453830752.git.robin.murphy@arm.com>
 References: <cover.1453830752.git.robin.murphy@arm.com>
-Message-ID: <6c5730256333b8d941f2c0371c1ab709a454938c.1453830752.git.robin.murphy@arm.com>
+Message-ID: <713b480816536d959b31befe2758b526eabcf0ab.1453830752.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IOMMU API has no concept of privilege so assumes all devices and
-mappings are equal, and indeed most non-CPU master devices on an AMBA
-interconnect make little use of the attribute bits on the bus thus by
-default perform unprivileged data accesses.
-
-Some devices, however, believe themselves more equal than others, such
-as programmable DMA controllers whose 'master' thread issues bus
-transactions marked as privileged instruction fetches, while the data
-accesses of its channel threads (under the control of Linux, at least)
-are marked as unprivileged. This poses a problem for implementing the
-DMA API on an IOMMU conforming to ARM VMSAv8, under which a page that is
-unprivileged-writeable is also implicitly privileged-execute-never.
-Given that, there is no one set of attributes with which iommu_map() can
-implement, say, dma_alloc_coherent() that will allow every possible type
-of access without something running into unexecepted permission faults.
-
-Fortunately the SMMU architecture provides a means to mitigate such
-issues by overriding the incoming attributes of a transaction; make use
-of that to strip the privileged/unprivileged status off incoming
-transactions, leaving just the instruction/data dichotomy which the
-IOMMU API does at least understand; Four states good, two states better.
+With DMA mapping ops provided by the iommu-dma code, only a minimal
+contribution from the IOMMU driver is needed to create a suitable
+DMA-API domain for them to use. Implement this for the ARM SMMUs.
 
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/iommu/arm-smmu.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/iommu/arm-smmu-v3.c | 10 +++++++++-
+ drivers/iommu/arm-smmu.c    | 10 +++++++++-
+ 2 files changed, 18 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 2087534..f003b3a 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -21,6 +21,7 @@
+  */
+ 
+ #include <linux/delay.h>
++#include <linux/dma-iommu.h>
+ #include <linux/err.h>
+ #include <linux/interrupt.h>
+ #include <linux/iommu.h>
+@@ -1396,7 +1397,7 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ {
+ 	struct arm_smmu_domain *smmu_domain;
+ 
+-	if (type != IOMMU_DOMAIN_UNMANAGED)
++	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
+ 		return NULL;
+ 
+ 	/*
+@@ -1408,6 +1409,12 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ 	if (!smmu_domain)
+ 		return NULL;
+ 
++	if (type == IOMMU_DOMAIN_DMA &&
++	    iommu_get_dma_cookie(&smmu_domain->domain)) {
++		kfree(smmu_domain);
++		return NULL;
++	}
++
+ 	mutex_init(&smmu_domain->init_mutex);
+ 	spin_lock_init(&smmu_domain->pgtbl_lock);
+ 	return &smmu_domain->domain;
+@@ -1436,6 +1443,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
+ 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+ 	struct arm_smmu_device *smmu = smmu_domain->smmu;
+ 
++	iommu_put_dma_cookie(domain);
+ 	free_io_pgtable_ops(smmu_domain->pgtbl_ops);
+ 
+ 	/* Free the CD and ASID, if we allocated them */
 diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 59ee4b8..1f9093d 100644
+index d1b7dc1..18e0e10 100644
 --- a/drivers/iommu/arm-smmu.c
 +++ b/drivers/iommu/arm-smmu.c
-@@ -167,6 +167,9 @@
- #define S2CR_TYPE_BYPASS		(1 << S2CR_TYPE_SHIFT)
- #define S2CR_TYPE_FAULT			(2 << S2CR_TYPE_SHIFT)
+@@ -29,6 +29,7 @@
+ #define pr_fmt(fmt) "arm-smmu: " fmt
  
-+#define S2CR_PRIVCFG_SHIFT		24
-+#define S2CR_PRIVCFG_UNPRIV		(2 << S2CR_PRIVCFG_SHIFT)
+ #include <linux/delay.h>
++#include <linux/dma-iommu.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/err.h>
+ #include <linux/interrupt.h>
+@@ -976,7 +977,7 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ {
+ 	struct arm_smmu_domain *smmu_domain;
+ 
+-	if (type != IOMMU_DOMAIN_UNMANAGED)
++	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
+ 		return NULL;
+ 	/*
+ 	 * Allocate the domain and initialise some of its data structures.
+@@ -987,6 +988,12 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ 	if (!smmu_domain)
+ 		return NULL;
+ 
++	if (type == IOMMU_DOMAIN_DMA &&
++	    iommu_get_dma_cookie(&smmu_domain->domain)) {
++		kfree(smmu_domain);
++		return NULL;
++	}
 +
- /* Context bank attribute registers */
- #define ARM_SMMU_GR1_CBAR(n)		(0x0 + ((n) << 2))
- #define CBAR_VMID_SHIFT			0
-@@ -1083,7 +1086,7 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
- 		u32 idx, s2cr;
+ 	mutex_init(&smmu_domain->init_mutex);
+ 	spin_lock_init(&smmu_domain->pgtbl_lock);
  
- 		idx = cfg->smrs ? cfg->smrs[i].idx : cfg->streamids[i];
--		s2cr = S2CR_TYPE_TRANS |
-+		s2cr = S2CR_TYPE_TRANS | S2CR_PRIVCFG_UNPRIV |
- 		       (smmu_domain->cfg.cbndx << S2CR_CBNDX_SHIFT);
- 		writel_relaxed(s2cr, gr0_base + ARM_SMMU_GR0_S2CR(idx));
- 	}
+@@ -1001,6 +1008,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
+ 	 * Free the domain resources. We assume that all devices have
+ 	 * already been detached.
+ 	 */
++	iommu_put_dma_cookie(domain);
+ 	arm_smmu_destroy_domain_context(domain);
+ 	kfree(smmu_domain);
+ }
 -- 
 2.7.0.25.gfc10eb5.dirty
