@@ -1,67 +1,49 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 26 Jan 2016 14:52:56 -0600
-Subject: [PATCH v9 5/6] PCI: generic: Make pci-host-generic driver numa
- aware
-In-Reply-To: <20160126205005.GD17600@localhost>
-References: <1453134965-6125-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1453134965-6125-6-git-send-email-gkulkarni@caviumnetworks.com>
- <20160126205005.GD17600@localhost>
-Message-ID: <20160126205256.GA26268@localhost>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 26 Jan 2016 21:57:27 +0100
+Subject: [PATCH 11/17] arm/samsung: Change s3c_pm_run_res() to use System RAM
+ type
+In-Reply-To: <1453841853-11383-1-git-send-email-bp@alien8.de>
+References: <1453841853-11383-1-git-send-email-bp@alien8.de>
+Message-ID: <1453841853-11383-12-git-send-email-bp@alien8.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 02:50:05PM -0600, Bjorn Helgaas wrote:
-> On Mon, Jan 18, 2016 at 10:06:04PM +0530, Ganapatrao Kulkarni wrote:
-> > update numa_node of device associated with pci bus.
-> > moved down devm_kzalloc to allocate from node memory.
-> > 
-> > Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> > ---
-> >  drivers/pci/host/pci-host-generic.c | 9 ++++++---
-> >  1 file changed, 6 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> > index 5434c90..0e1ce06 100644
-> > --- a/drivers/pci/host/pci-host-generic.c
-> > +++ b/drivers/pci/host/pci-host-generic.c
-> > @@ -215,11 +215,9 @@ static int gen_pci_probe(struct platform_device *pdev)
-> >  	const struct of_device_id *of_id;
-> >  	struct device *dev = &pdev->dev;
-> >  	struct device_node *np = dev->of_node;
-> > -	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-> > +	struct gen_pci *pci;
-> >  	struct pci_bus *bus, *child;
-> >  
-> > -	if (!pci)
-> > -		return -ENOMEM;
-> >  
-> >  	type = of_get_property(np, "device_type", NULL);
-> >  	if (!type || strcmp(type, "pci")) {
-> > @@ -230,6 +228,11 @@ static int gen_pci_probe(struct platform_device *pdev)
-> >  	of_pci_check_probe_only();
-> >  
-> >  	of_id = of_match_node(gen_pci_of_match, np);
-> > +	set_dev_node(dev, of_node_to_nid(np));
-> 
-> I like the idea of this patch, but why do we need to call
-> set_dev_node() here in driver code?  Shouldn't that be done by the
-> OF/platform device infrastructure so that all drivers for platform devices
-> get this benefit?
+From: Toshi Kani <toshi.kani@hpe.com>
 
-Sorry, I'm just a day late and a dollar short.  I see David and Lorenzo
-have already responded about this.
+Change s3c_pm_run_res() to check with IORESOURCE_SYSTEM_RAM, instead of
+strcmp() with "System RAM", to walk through System RAM ranges in the
+iomem table.
 
-> > +	pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-> > +	if (!pci)
-> > +		return -ENOMEM;
-> > +
-> >  	pci->cfg.ops = (struct gen_pci_cfg_bus_ops *)of_id->data;
-> >  	pci->host.dev.parent = dev;
-> >  	INIT_LIST_HEAD(&pci->host.windows);
-> > -- 
-> > 1.8.1.4
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-arch" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+No functional change is made to the interface.
+
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Toshi Kani <toshi.kani@hpe.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: linux-arch at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-mm <linux-mm@kvack.org>
+Cc: linux-samsung-soc at vger.kernel.org
+Link: http://lkml.kernel.org/r/1452020081-26534-11-git-send-email-toshi.kani at hpe.com
+Signed-off-by: Borislav Petkov <bp@suse.de>
+---
+ arch/arm/plat-samsung/pm-check.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/plat-samsung/pm-check.c b/arch/arm/plat-samsung/pm-check.c
+index 04aff2c31b46..70f2f699bed3 100644
+--- a/arch/arm/plat-samsung/pm-check.c
++++ b/arch/arm/plat-samsung/pm-check.c
+@@ -53,8 +53,8 @@ static void s3c_pm_run_res(struct resource *ptr, run_fn_t fn, u32 *arg)
+ 		if (ptr->child != NULL)
+ 			s3c_pm_run_res(ptr->child, fn, arg);
+ 
+-		if ((ptr->flags & IORESOURCE_MEM) &&
+-		    strcmp(ptr->name, "System RAM") == 0) {
++		if ((ptr->flags & IORESOURCE_SYSTEM_RAM)
++				== IORESOURCE_SYSTEM_RAM) {
+ 			S3C_PMDBG("Found system RAM at %08lx..%08lx\n",
+ 				  (unsigned long)ptr->start,
+ 				  (unsigned long)ptr->end);
+-- 
+2.3.5
