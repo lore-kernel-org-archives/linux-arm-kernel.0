@@ -1,45 +1,161 @@
 From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Tue, 26 Jan 2016 10:06:59 +0800
-Subject: [PATCH] arm64: dts: rockchip: remove broken-cd from emmc and sdio
-Message-ID: <1453774019-10225-1-git-send-email-shawn.lin@rock-chips.com>
+Date: Tue, 26 Jan 2016 10:23:27 +0800
+Subject: [PATCH] arm: dts: rockchip: remove broken-cd from emmc and sdio
+In-Reply-To: <1453774003-10184-1-git-send-email-shawn.lin@rock-chips.com>
+References: <1453774003-10184-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <56A6D89F.9020602@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only one of "broken-cd" and "non-removable" should be supplied
-according to Documentation/devicetree/bindings/mmc/mmc.txt.
-Obviously emmc and sdio-wifi are non-removable devices, while
-broken-cd is for removable device whose card detect pin is broken.
++ Xing and Caesar
 
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
----
+Hi Xing and Caesar,
 
- arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi | 1 -
- arch/arm64/boot/dts/rockchip/rk3368-r88.dts  | 1 -
- 2 files changed, 2 deletions(-)
+For future dts, we should avoid to add these two properties
+together. :)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi b/arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi
-index 8c219cc..19616a4 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi
-@@ -152,7 +152,6 @@
- };
- 
- &emmc {
--	broken-cd;
- 	bus-width = <8>;
- 	cap-mmc-highspeed;
- 	disable-wp;
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368-r88.dts b/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-index 104cbee..047c8f5 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-@@ -185,7 +185,6 @@
- };
- 
- &emmc {
--	broken-cd;
- 	bus-width = <8>;
- 	cap-mmc-highspeed;
- 	disable-wp;
+On 2016/1/26 10:06, Shawn Lin wrote:
+> Only one of "broken-cd" and "non-removable" should be supplied
+> according to Documentation/devicetree/bindings/mmc/mmc.txt.
+> Obviously emmc and sdio-wifi are non-removable devices, while
+> broken-cd is for removable device whose card detect pin is broken.
+>
+> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+> ---
+>
+>   arch/arm/boot/dts/rk3036-kylin.dts     | 1 -
+>   arch/arm/boot/dts/rk3036.dtsi          | 1 -
+>   arch/arm/boot/dts/rk3066a-rayeager.dts | 2 --
+>   arch/arm/boot/dts/rk3228-evb.dts       | 1 -
+>   arch/arm/boot/dts/rk3288-evb.dtsi      | 1 -
+>   arch/arm/boot/dts/rk3288-firefly.dtsi  | 2 --
+>   arch/arm/boot/dts/rk3288-popmetal.dts  | 1 -
+>   arch/arm/boot/dts/rk3288-veyron.dtsi   | 2 --
+>   8 files changed, 11 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/rk3036-kylin.dts b/arch/arm/boot/dts/rk3036-kylin.dts
+> index 992f9ca..023153a 100644
+> --- a/arch/arm/boot/dts/rk3036-kylin.dts
+> +++ b/arch/arm/boot/dts/rk3036-kylin.dts
+> @@ -262,7 +262,6 @@
+>   &sdio {
+>   	status = "okay";
+>
+> -	broken-cd;
+>   	bus-width = <4>;
+>   	cap-sdio-irq;
+>   	default-sample-phase = <90>;
+> diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+> index b9567c1..cf54066 100644
+> --- a/arch/arm/boot/dts/rk3036.dtsi
+> +++ b/arch/arm/boot/dts/rk3036.dtsi
+> @@ -214,7 +214,6 @@
+>   		compatible = "rockchip,rk3288-dw-mshc";
+>   		reg = <0x1021c000 0x4000>;
+>   		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+> -		broken-cd;
+>   		bus-width = <8>;
+>   		cap-mmc-highspeed;
+>   		clock-frequency = <37500000>;
+> diff --git a/arch/arm/boot/dts/rk3066a-rayeager.dts b/arch/arm/boot/dts/rk3066a-rayeager.dts
+> index 341c1f8..e9db017 100644
+> --- a/arch/arm/boot/dts/rk3066a-rayeager.dts
+> +++ b/arch/arm/boot/dts/rk3066a-rayeager.dts
+> @@ -170,7 +170,6 @@
+>   };
+>
+>   &emmc {
+> -	broken-cd;
+>   	bus-width = <8>;
+>   	cap-mmc-highspeed;
+>   	disable-wp;
+> @@ -336,7 +335,6 @@
+>   };
+>
+>   &mmc1 {
+> -	broken-cd;
+>   	bus-width = <4>;
+>   	disable-wp;
+>   	non-removable;
+> diff --git a/arch/arm/boot/dts/rk3228-evb.dts b/arch/arm/boot/dts/rk3228-evb.dts
+> index e3898b8..a6d6a7b 100644
+> --- a/arch/arm/boot/dts/rk3228-evb.dts
+> +++ b/arch/arm/boot/dts/rk3228-evb.dts
+> @@ -53,7 +53,6 @@
+>   };
+>
+>   &emmc {
+> -	broken-cd;
+>   	cap-mmc-highspeed;
+>   	mmc-ddr-1_8v;
+>   	disable-wp;
+> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
+> index 4faabdb..f90e408 100644
+> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
+> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+> @@ -172,7 +172,6 @@
+>   };
+>
+>   &emmc {
+> -	broken-cd;
+>   	bus-width = <8>;
+>   	cap-mmc-highspeed;
+>   	disable-wp;
+> diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
+> index 4e3fd9a..3f36af7 100644
+> --- a/arch/arm/boot/dts/rk3288-firefly.dtsi
+> +++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
+> @@ -208,7 +208,6 @@
+>   };
+>
+>   &emmc {
+> -	broken-cd;
+>   	bus-width = <8>;
+>   	cap-mmc-highspeed;
+>   	disable-wp;
+> @@ -485,7 +484,6 @@
+>   };
+>
+>   &sdio0 {
+> -	broken-cd;
+>   	bus-width = <4>;
+>   	disable-wp;
+>   	non-removable;
+> diff --git a/arch/arm/boot/dts/rk3288-popmetal.dts b/arch/arm/boot/dts/rk3288-popmetal.dts
+> index 65c4756..cc2be77 100644
+> --- a/arch/arm/boot/dts/rk3288-popmetal.dts
+> +++ b/arch/arm/boot/dts/rk3288-popmetal.dts
+> @@ -162,7 +162,6 @@
+>   };
+>
+>   &emmc {
+> -	broken-cd;
+>   	bus-width = <8>;
+>   	cap-mmc-highspeed;
+>   	disable-wp;
+> diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
+> index 9fce91f..725e08b 100644
+> --- a/arch/arm/boot/dts/rk3288-veyron.dtsi
+> +++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
+> @@ -146,7 +146,6 @@
+>   &emmc {
+>   	status = "okay";
+>
+> -	broken-cd;
+>   	bus-width = <8>;
+>   	cap-mmc-highspeed;
+>   	rockchip,default-sample-phase = <158>;
+> @@ -352,7 +351,6 @@
+>   &sdio0 {
+>   	status = "okay";
+>
+> -	broken-cd;
+>   	bus-width = <4>;
+>   	cap-sd-highspeed;
+>   	cap-sdio-irq;
+>
+
+
 -- 
-2.3.7
+Best Regards
+Shawn Lin
