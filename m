@@ -1,35 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Jan 2016 22:46:02 +0100
-Subject: [PATCH] [media] v4l: remove MEDIA_TUNER dependency for VIDEO_TUNER
-Message-ID: <1453844772-3395901-1-git-send-email-arnd@arndb.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 26 Jan 2016 22:49:12 +0100
+Subject: [PATCH] pinctrl: mvebu: fix num_settings in mpp group assignment
+In-Reply-To: <20160126182251.GF15550@darkstar.musicnaut.iki.fi>
+References: <20160126182251.GF15550@darkstar.musicnaut.iki.fi>
+Message-ID: <1453844952-28292-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-em28xx selects VIDEO_TUNER, which has a dependency on MEDIA_TUNER,
-so we get a Kconfig warning if that is disabled:
+When assigning mpp settings from static mpp modes to mpp groups,
+we do not want any groups that have no setting for a specific Kirkwood
+variant. However, when there is at least a single setting, we need to
+assign the number of all settings in this mode to grp->num_settings
+as we are reusing the static modes table.
 
-warning: (VIDEO_PVRUSB2 && VIDEO_USBVISION && VIDEO_GO7007 && VIDEO_AU0828_V4L2 && VIDEO_CX231XX && VIDEO_TM6000 && VIDEO_EM28XX && VIDEO_IVTV && VIDEO_MXB && VIDEO_CX18 && VIDEO_CX23885 && VIDEO_CX88 && VIDEO_BT848 && VIDEO_SAA7134 && VIDEO_SAA7164) selects VIDEO_TUNER which has unmet direct dependencies (MEDIA_SUPPORT && MEDIA_TUNER)
-
-VIDEO_TUNER does not actually depend on MEDIA_TUNER, and the
-dependency does nothing except cause the above warning, so let's
-remove it.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 0581b16b1840 ("pinctrl: mvebu: complain about missing group after checking variant")
+Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- drivers/media/v4l2-core/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+Aaro,
 
-diff --git a/drivers/media/v4l2-core/Kconfig b/drivers/media/v4l2-core/Kconfig
-index 9beece00869b..29b3436d0910 100644
---- a/drivers/media/v4l2-core/Kconfig
-+++ b/drivers/media/v4l2-core/Kconfig
-@@ -37,7 +37,6 @@ config VIDEO_PCI_SKELETON
- # Used by drivers that need tuner.ko
- config VIDEO_TUNER
- 	tristate
--	depends on MEDIA_TUNER
+thanks for reporting the issue. It really looks like we should rework
+the mpp mode/setting/group assignment one day. Please apply this fix
+and report back with a Tested-by if it works.
+
+Sebastian
+---
+ drivers/pinctrl/mvebu/pinctrl-mvebu.c | 23 +++++++++++++++++------
+ 1 file changed, 17 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+index e4d473811bb3..4a3c7fe533b5 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
++++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+@@ -663,11 +663,11 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+ 	/* assign mpp modes to groups */
+ 	for (n = 0; n < soc->nmodes; n++) {
+ 		struct mvebu_mpp_mode *mode = &soc->modes[n];
+-		struct mvebu_mpp_ctrl_setting *set = &mode->settings[0];
++		struct mvebu_mpp_ctrl_setting *set;
+ 		struct mvebu_pinctrl_group *grp;
+ 		unsigned num_settings;
  
- # Used by drivers that need v4l2-mem2mem.ko
- config V4L2_MEM2MEM_DEV
+-		for (num_settings = 0; ; set++) {
++		for (num_settings = 0, set = &mode->settings[0]; ; set++) {
+ 			if (!set->name)
+ 				break;
+ 
+@@ -676,6 +676,21 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+ 				continue;
+ 
+ 			num_settings++;
++		}
++
++		/* skip modes with no settings for this variant */
++		if (!num_settings)
++			continue;
++
++		for (num_settings = 0, set = &mode->settings[0]; ; set++) {
++			if (!set->name)
++				break;
++
++			num_settings++;
++
++			/* skip unsupported settings for this variant */
++			if (pctl->variant && !(pctl->variant & set->variant))
++				continue;
+ 
+ 			/* find gpio/gpo/gpi settings */
+ 			if (strcmp(set->name, "gpio") == 0)
+@@ -687,10 +702,6 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+ 				set->flags = MVEBU_SETTING_GPI;
+ 		}
+ 
+-		/* skip modes with no settings for this variant */
+-		if (!num_settings)
+-			continue;
+-
+ 		grp = mvebu_pinctrl_find_group_by_pid(pctl, mode->pid);
+ 		if (!grp) {
+ 			dev_warn(&pdev->dev, "unknown pinctrl group %d\n",
 -- 
-2.7.0
+2.1.4
