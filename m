@@ -1,51 +1,55 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Tue, 26 Jan 2016 22:40:23 +0800
-Subject: [PATCH 1/7] [media] pwc: hide unused label
-In-Reply-To: <1453817424-3080054-1-git-send-email-arnd@arndb.de>
-Message-ID: <201601262220.9anACqoR%fengguang.wu@intel.com>
+Date: Tue, 26 Jan 2016 22:43:10 +0800
+Subject: [PATCH 09/10] vfio-pci: create an iommu mapping for msi address
+In-Reply-To: <1453813968-2024-10-git-send-email-eric.auger@linaro.org>
+Message-ID: <201601262259.1kktHLzi%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Eric,
 
-[auto build test ERROR on linuxtv-media/master]
-[also build test ERROR on v4.5-rc1 next-20160125]
+[auto build test WARNING on v4.5-rc1]
+[also build test WARNING on next-20160125]
+[cannot apply to iommu/next]
 [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-url:    https://github.com/0day-ci/linux/commits/Arnd-Bergmann/pwc-hide-unused-label/20160126-221727
-base:   git://linuxtv.org/media_tree.git master
-config: xtensa-allyesconfig (attached as .config)
+url:    https://github.com/0day-ci/linux/commits/Eric-Auger/KVM-PCIe-MSI-passthrough-on-ARM-ARM64/20160126-211921
+config: i386-allmodconfig (attached as .config)
 reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
         # save the attached .config to linux build tree
-        make.cross ARCH=xtensa 
+        make ARCH=i386 
 
-All errors (new ones prefixed by >>):
+All warnings (new ones prefixed by >>):
 
-   drivers/media/usb/pwc/pwc-if.c: In function 'usb_pwc_probe':
->> drivers/media/usb/pwc/pwc-if.c:1092:3: error: label 'err_video_unreg' used but not defined
-      goto err_video_unreg;
-      ^
+   drivers/vfio/pci/vfio_pci_intrs.c: In function 'vfio_set_mapped_msi_addr':
+>> drivers/vfio/pci/vfio_pci_intrs.c:324:43: warning: left shift count >= width of type [-Wshift-count-overflow]
+     msi_addr = (phys_addr_t)(msg.address_hi) << 32 |
+                                              ^
+>> drivers/vfio/pci/vfio_pci_intrs.c:333:34: warning: right shift count >= width of type [-Wshift-count-overflow]
+     msg.address_hi = (u32)(msi_iova >> 32);
+                                     ^
 
-vim +/err_video_unreg +1092 drivers/media/usb/pwc/pwc-if.c
+vim +324 drivers/vfio/pci/vfio_pci_intrs.c
 
-479567ce3 drivers/media/video/pwc/pwc-if.c Hans Verkuil    2010-09-12  1086  
-e32a7eccd drivers/media/video/pwc/pwc-if.c Nam Ph?m Th?nh  2009-01-12  1087  #ifdef CONFIG_USB_PWC_INPUT_EVDEV
-e32a7eccd drivers/media/video/pwc/pwc-if.c Nam Ph?m Th?nh  2009-01-12  1088  	/* register webcam snapshot button input device */
-e32a7eccd drivers/media/video/pwc/pwc-if.c Nam Ph?m Th?nh  2009-01-12  1089  	pdev->button_dev = input_allocate_device();
-e32a7eccd drivers/media/video/pwc/pwc-if.c Nam Ph?m Th?nh  2009-01-12  1090  	if (!pdev->button_dev) {
-89dec01b7 drivers/media/video/pwc/pwc-if.c Dmitry Torokhov 2009-08-14  1091  		rc = -ENOMEM;
-89dec01b7 drivers/media/video/pwc/pwc-if.c Dmitry Torokhov 2009-08-14 @1092  		goto err_video_unreg;
-e32a7eccd drivers/media/video/pwc/pwc-if.c Nam Ph?m Th?nh  2009-01-12  1093  	}
-e32a7eccd drivers/media/video/pwc/pwc-if.c Nam Ph?m Th?nh  2009-01-12  1094  
-89dec01b7 drivers/media/video/pwc/pwc-if.c Dmitry Torokhov 2009-08-14  1095  	usb_make_path(udev, pdev->button_phys, sizeof(pdev->button_phys));
-
-:::::: The code at line 1092 was first introduced by commit
-:::::: 89dec01b7e251697720ac3d6a5310d72359eba69 V4L/DVB (12489): pwc - fix few use-after-free and memory leaks
-
-:::::: TO: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-:::::: CC: Mauro Carvalho Chehab <mchehab@redhat.com>
+   318		dma_addr_t msi_iova;
+   319		struct vfio_group *group = vdev->vfio_group;
+   320		struct msi_msg msg;
+   321		int ret;
+   322	
+   323		get_cached_msi_msg(irq, &msg);
+ > 324		msi_addr = (phys_addr_t)(msg.address_hi) << 32 |
+   325				(phys_addr_t)(msg.address_lo);
+   326	
+   327		ret = vfio_group_alloc_map_reserved_iova(group, msi_addr,
+   328							 IOMMU_WRITE, &msi_iova);
+   329		if (ret)
+   330			goto out;
+   331	
+   332		/* Re-program the msi-address with the iova */
+ > 333		msg.address_hi = (u32)(msi_iova >> 32);
+   334		msg.address_lo = (u32)(msi_iova & 0xffffffff);
+   335		pci_write_msi_msg(irq, &msg);
+   336	
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -54,6 +58,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/octet-stream
-Size: 44066 bytes
+Size: 53452 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160126/06efdb71/attachment-0001.obj>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160126/8f75d4cc/attachment-0001.obj>
