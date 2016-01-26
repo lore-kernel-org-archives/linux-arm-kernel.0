@@ -1,65 +1,68 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 26 Jan 2016 18:10:48 +0100
-Subject: [PATCH v4 21/22] efi: stub: use high allocation for converted command
- line
-In-Reply-To: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1453828249-14467-22-git-send-email-ard.biesheuvel@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 26 Jan 2016 17:13:15 +0000
+Subject: [PATCH v3 3/3] iommu/io-pgtable: Avoid redundant TLB syncs
+In-Reply-To: <cover.1453723096.git.robin.murphy@arm.com>
+References: <cover.1453723096.git.robin.murphy@arm.com>
+Message-ID: <81a5e784494a04713e152659c95b34e92d944f32.1453723096.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before we can move the command line processing before the allocation
-of the kernel, which is required for detecting the 'nokaslr' option
-which controls that allocation, move the converted command line higher
-up in memory, to prevent it from interfering with the kernel itself.
+In certain unmapping situations it is quite possible to end up issuing
+back-to-back TLB synchronisations, which at best is a waste of time and
+effort, and at worst causes some hardware to get rather confused. Whilst
+the pagetable implementations, or the IOMMU drivers, or both, could keep
+track of things to avoid this happening, it seems to make the most sense
+to prevent code duplication and add some simple state tracking in the
+common interface between the two.
 
-Since x86 needs the address to fit in 32 bits, use UINT_MAX as the upper
-bound there. Otherwise, use ULONG_MAX (i.e., no limit)
-
-Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/x86/include/asm/efi.h                     | 2 ++
- drivers/firmware/efi/libstub/efi-stub-helper.c | 7 ++++++-
- 2 files changed, 8 insertions(+), 1 deletion(-)
+ drivers/iommu/io-pgtable.h | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
-index 0010c78c4998..08b1f2f6ea50 100644
---- a/arch/x86/include/asm/efi.h
-+++ b/arch/x86/include/asm/efi.h
-@@ -25,6 +25,8 @@
- #define EFI32_LOADER_SIGNATURE	"EL32"
- #define EFI64_LOADER_SIGNATURE	"EL64"
- 
-+#define MAX_CMDLINE_ADDRESS	UINT_MAX
-+
- #ifdef CONFIG_X86_32
- 
- 
-diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
-index f07d4a67fa76..29ed2f9b218c 100644
---- a/drivers/firmware/efi/libstub/efi-stub-helper.c
-+++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
-@@ -649,6 +649,10 @@ static u8 *efi_utf16_to_utf8(u8 *dst, const u16 *src, int n)
- 	return dst;
+diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+index 95c5565..4faee7d 100644
+--- a/drivers/iommu/io-pgtable.h
++++ b/drivers/iommu/io-pgtable.h
+@@ -132,12 +132,14 @@ void free_io_pgtable_ops(struct io_pgtable_ops *ops);
+  * @fmt:    The page table format.
+  * @cookie: An opaque token provided by the IOMMU driver and passed back to
+  *          any callback routines.
++ * @tlb_sync_pending: Private flag for optimising out redundant syncs.
+  * @cfg:    A copy of the page table configuration.
+  * @ops:    The page table operations in use for this set of page tables.
+  */
+ struct io_pgtable {
+ 	enum io_pgtable_fmt	fmt;
+ 	void			*cookie;
++	bool			tlb_sync_pending;
+ 	struct io_pgtable_cfg	cfg;
+ 	struct io_pgtable_ops	ops;
+ };
+@@ -147,17 +149,22 @@ struct io_pgtable {
+ static inline void io_pgtable_tlb_flush_all(struct io_pgtable *iop)
+ {
+ 	iop->cfg.tlb->tlb_flush_all(iop->cookie);
++	iop->tlb_sync_pending = true;
  }
  
-+#ifndef MAX_CMDLINE_ADDRESS
-+#define MAX_CMDLINE_ADDRESS	ULONG_MAX
-+#endif
-+
- /*
-  * Convert the unicode UEFI command line to ASCII to pass to kernel.
-  * Size of memory allocated return in *cmd_line_len.
-@@ -684,7 +688,8 @@ char *efi_convert_cmdline(efi_system_table_t *sys_table_arg,
+ static inline void io_pgtable_tlb_add_flush(struct io_pgtable *iop,
+ 		unsigned long iova, size_t size, size_t granule, bool leaf)
+ {
+ 	iop->cfg.tlb->tlb_add_flush(iova, size, granule, leaf, iop->cookie);
++	iop->tlb_sync_pending = true;
+ }
  
- 	options_bytes++;	/* NUL termination */
+ static inline void io_pgtable_tlb_sync(struct io_pgtable *iop)
+ {
+-	iop->cfg.tlb->tlb_sync(iop->cookie);
++	if (iop->tlb_sync_pending) {
++		iop->cfg.tlb->tlb_sync(iop->cookie);
++		iop->tlb_sync_pending = false;
++	}
+ }
  
--	status = efi_low_alloc(sys_table_arg, options_bytes, 0, &cmdline_addr);
-+	status = efi_high_alloc(sys_table_arg, options_bytes, 0,
-+				&cmdline_addr, MAX_CMDLINE_ADDRESS);
- 	if (status != EFI_SUCCESS)
- 		return NULL;
- 
+ /**
 -- 
-2.5.0
+2.7.0.25.gfc10eb5
