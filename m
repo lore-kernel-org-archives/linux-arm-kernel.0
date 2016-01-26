@@ -1,84 +1,183 @@
-From: boqun.feng@gmail.com (Boqun Feng)
-Date: Tue, 26 Jan 2016 22:35:33 +0800
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160126121608.GE21553@arm.com>
-References: <56980C91.1010403@imgtec.com>
- <20160114212913.GF3818@linux.vnet.ibm.com>
- <20160115085554.GF3421@worktop> <20160115091348.GA27936@worktop>
- <20160115174612.GV3818@linux.vnet.ibm.com>
- <20160115212714.GM3421@worktop>
- <20160115215853.GC3818@linux.vnet.ibm.com>
- <20160125164242.GF22927@arm.com>
- <20160126060322.GJ4503@linux.vnet.ibm.com>
- <20160126121608.GE21553@arm.com>
-Message-ID: <20160126143533.GA6029@fixme-laptop.cn.ibm.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 26 Jan 2016 15:38:13 +0100 (CET)
+Subject: [PATCH 06/13] atmel-isi: check ISI_SR's flags by polling instead
+ of interrupt
+In-Reply-To: <CAJe_HAeKRtAzcz+s7D_5sXp9pnnM1Mhvu_3L1HQGPLsJLJbTSw@mail.gmail.com>
+References: <1453119709-20940-1-git-send-email-rainyfeeling@gmail.com>
+ <1453121545-27528-1-git-send-email-rainyfeeling@gmail.com>
+ <Pine.LNX.4.64.1601241757340.16570@axis700.grange>
+ <CAJe_HAeKRtAzcz+s7D_5sXp9pnnM1Mhvu_3L1HQGPLsJLJbTSw@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1601261528560.28816@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Tue, 26 Jan 2016, Josh Wu wrote:
 
-On Tue, Jan 26, 2016 at 12:16:09PM +0000, Will Deacon wrote:
-> On Mon, Jan 25, 2016 at 10:03:22PM -0800, Paul E. McKenney wrote:
-> > On Mon, Jan 25, 2016 at 04:42:43PM +0000, Will Deacon wrote:
-> > > On Fri, Jan 15, 2016 at 01:58:53PM -0800, Paul E. McKenney wrote:
-> > > > PPC Overlapping Group-B sets version 4
-> > > > ""
-> > > > (* When the Group-B sets from two different barriers involve instructions in
-> > > >    the same thread, within that thread one set must contain the other.
-> > > > 
-> > > > 	P0	P1	P2
-> > > > 	Rx=1	Wy=1	Wz=2
-> > > > 	dep.	lwsync	lwsync
-> > > > 	Ry=0	Wz=1	Wx=1
-> > > > 	Rz=1
-> > > > 
-> > > > 	assert(!(z=2))
-> > > > 
-> > > >    Forbidden by ppcmem, allowed by herd.
-> > > > *)
-> > > > {
-> > > > 0:r1=x; 0:r2=y; 0:r3=z;
-> > > > 1:r1=x; 1:r2=y; 1:r3=z; 1:r4=1;
-> > > > 2:r1=x; 2:r2=y; 2:r3=z; 2:r4=1; 2:r5=2;
-> > > > }
-> > > >  P0		| P1		| P2		;
-> > > >  lwz r6,0(r1)	| stw r4,0(r2)	| stw r5,0(r3)	;
-> > > >  xor r7,r6,r6	| lwsync	| lwsync	;
-> > > >  lwzx r7,r7,r2	| stw r4,0(r3)	| stw r4,0(r1)	;
-> > > >  lwz r8,0(r3)	|		|		;
-> > > > 
-> > > > exists
-> > > > (z=2 /\ 0:r6=1 /\ 0:r7=0 /\ 0:r8=1)
-> > > 
-> > > That really hurts. Assuming that the "assert(!(z=2))" is actually there
-> > > to constrain the coherence order of z to be {0->1->2}, then I think that
-> > > this test is forbidden on arm using dmb instead of lwsync. That said, I
-> > > also don't think the Rz=1 in P0 changes anything.
-> > 
-> > What about the smp_wmb() variant of dmb that orders only stores?
+> Hi, Guennadi
 > 
-> Tricky, but I think it still works out if the coherence order of z is as
-> I described above. The line of reasoning is weird though -- I ended up
-> considering the two cases where P0 reads z before and after it reads x
-                                             ^^^^^^^^^^^^^^^
-Because of the fact that two reads on the same processors can't be
-executed simultaneously? I feel like this is exactly something herd
-missed.
-
-> and what that means for the read of y.
+> 2016-01-25 0:58 GMT+08:00 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
+> > On Mon, 18 Jan 2016, Josh Wu wrote:
+> >
+> >> In current code, we use a interrupt to check whether ISI reset/disable
+> >> action is done. Actually, we also can check ISI SR to check the
+> >> reset/disable action by polling, and it is simpler and straight forward.
+> >>
+> >> So this patch use isi_hw_wait_status() to check the action status. As
+> >> the interrupt checking the status is useless, so just remove the interrupt
+> >> & completion code.
+> >
+> > Sorry, I'm not convinced. Switching from interrupt-driven to polling seems
+> > counter-productive to me. Why do you want this?
 > 
+> Yes, it is counter-productive If such code is called very frequently.
+> But here we only used for reset and disable the hardware.
+> 
+> I think it is more straightforward and simple when we just check
+> status register after write the reset or disable the ISI control
+> register. Using interrupt here is over designed.
 
-And the reasoning on PPC is similar, so looks like the read of z on P0
-is a necessary condition for the exists clause to be forbidden.
+I still don't see how you're gaining from this. If you were writing new 
+code and you would say: "you know, this path will only be hit rarely, we 
+don't know whether interrupt would work, but we have here this simple 
+polling solution, that works" I would understand. But you already have a 
+technically-superior solution in place! And it works, right? Why change 
+it? On the one hand it's your hardware and it's up to you which direction 
+to develop it, and my task is just to help you integrate your work into 
+the mainline. On the other hand I really don't see any benefits, sorry. 
+I'd prefer not to do this unless you can explain the benefits.
 
-Regards,
-Boqun
+> for the sake of performance I should use cpu_releax() instead of
+> msleep() when waiting for the status bit.
 
-> Will
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160126/233e96e6/attachment.sig>
+Don't think that's a good idea. cpu_relax() allows the scheduler to switch 
+over to a different task, but if none is active, it'll come back instead 
+of going to sleep. Unless of course your event really kicks in very 
+quickly - much faster than 1ms. But depending on your architecture 
+implementation, msleep(1) might also be implemented as a busy look, then 
+cpu_relax() would be better.
+
+Thanks
+Guennadi
+
+> 
+> Best Regards,
+> Josh Wu
+> 
+> >
+> > Thanks
+> > Guennadi
+> >
+> >>
+> >> Signed-off-by: Josh Wu <rainyfeeling@gmail.com>
+> >> ---
+> >>
+> >>  drivers/media/platform/soc_camera/atmel-isi.c | 59 ++++++---------------------
+> >>  1 file changed, 13 insertions(+), 46 deletions(-)
+> >>
+> >> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+> >> index f0508ea..4ddc309 100644
+> >> --- a/drivers/media/platform/soc_camera/atmel-isi.c
+> >> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+> >> @@ -12,7 +12,6 @@
+> >>   */
+> >>
+> >>  #include <linux/clk.h>
+> >> -#include <linux/completion.h>
+> >>  #include <linux/delay.h>
+> >>  #include <linux/fs.h>
+> >>  #include <linux/init.h>
+> >> @@ -81,7 +80,6 @@ struct atmel_isi {
+> >>       struct isi_dma_desc             dma_desc[MAX_BUFFER_NUM];
+> >>       bool                            enable_preview_path;
+> >>
+> >> -     struct completion               complete;
+> >>       /* ISI peripherial clock */
+> >>       struct clk                      *pclk;
+> >>       unsigned int                    irq;
+> >> @@ -281,51 +279,14 @@ static irqreturn_t isi_interrupt(int irq, void *dev_id)
+> >>       mask = isi_readl(isi, ISI_INTMASK);
+> >>       pending = status & mask;
+> >>
+> >> -     if (pending & ISI_CTRL_SRST) {
+> >> -             complete(&isi->complete);
+> >> -             isi_writel(isi, ISI_INTDIS, ISI_CTRL_SRST);
+> >> -             ret = IRQ_HANDLED;
+> >> -     } else if (pending & ISI_CTRL_DIS) {
+> >> -             complete(&isi->complete);
+> >> -             isi_writel(isi, ISI_INTDIS, ISI_CTRL_DIS);
+> >> -             ret = IRQ_HANDLED;
+> >> -     } else {
+> >> -             if (likely(pending & ISI_SR_CXFR_DONE) ||
+> >> -                             likely(pending & ISI_SR_PXFR_DONE))
+> >> -                     ret = atmel_isi_handle_streaming(isi);
+> >> -     }
+> >> +     if (likely(pending & ISI_SR_CXFR_DONE) ||
+> >> +         likely(pending & ISI_SR_PXFR_DONE))
+> >> +             ret = atmel_isi_handle_streaming(isi);
+> >>
+> >>       spin_unlock(&isi->lock);
+> >>       return ret;
+> >>  }
+> >>
+> >> -#define      WAIT_ISI_RESET          1
+> >> -#define      WAIT_ISI_DISABLE        0
+> >> -static int atmel_isi_wait_status(struct atmel_isi *isi, int wait_reset)
+> >> -{
+> >> -     unsigned long timeout;
+> >> -     /*
+> >> -      * The reset or disable will only succeed if we have a
+> >> -      * pixel clock from the camera.
+> >> -      */
+> >> -     init_completion(&isi->complete);
+> >> -
+> >> -     if (wait_reset) {
+> >> -             isi_writel(isi, ISI_INTEN, ISI_CTRL_SRST);
+> >> -             isi_writel(isi, ISI_CTRL, ISI_CTRL_SRST);
+> >> -     } else {
+> >> -             isi_writel(isi, ISI_INTEN, ISI_CTRL_DIS);
+> >> -             isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+> >> -     }
+> >> -
+> >> -     timeout = wait_for_completion_timeout(&isi->complete,
+> >> -                     msecs_to_jiffies(500));
+> >> -     if (timeout == 0)
+> >> -             return -ETIMEDOUT;
+> >> -
+> >> -     return 0;
+> >> -}
+> >> -
+> >>  /* ------------------------------------------------------------------
+> >>       Videobuf operations
+> >>     ------------------------------------------------------------------*/
+> >> @@ -493,8 +454,11 @@ static int start_streaming(struct vb2_queue *vq, unsigned int count)
+> >>       pm_runtime_get_sync(ici->v4l2_dev.dev);
+> >>
+> >>       /* Reset ISI */
+> >> -     ret = atmel_isi_wait_status(isi, WAIT_ISI_RESET);
+> >> -     if (ret < 0) {
+> >> +     isi_writel(isi, ISI_CTRL, ISI_CTRL_SRST);
+> >> +
+> >> +     /* Check Reset status */
+> >> +     ret  = isi_hw_wait_status(isi, ISI_CTRL_SRST, 500);
+> >> +     if (ret) {
+> >>               dev_err(icd->parent, "Reset ISI timed out\n");
+> >>               pm_runtime_put(ici->v4l2_dev.dev);
+> >>               return ret;
+> >> @@ -549,8 +513,11 @@ static void stop_streaming(struct vb2_queue *vq)
+> >>                       ISI_SR_CXFR_DONE | ISI_SR_PXFR_DONE);
+> >>
+> >>       /* Disable ISI and wait for it is done */
+> >> -     ret = atmel_isi_wait_status(isi, WAIT_ISI_DISABLE);
+> >> -     if (ret < 0)
+> >> +     isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+> >> +
+> >> +     /* Check Reset status */
+> >> +     ret  = isi_hw_wait_status(isi, ISI_CTRL_DIS, 500);
+> >> +     if (ret)
+> >>               dev_err(icd->parent, "Disable ISI timed out\n");
+> >>
+> >>       pm_runtime_put(ici->v4l2_dev.dev);
+> >> --
+> >> 1.9.1
+> >>
+> 
