@@ -1,108 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Jan 2016 10:31:45 +0100
-Subject: [PATCH] ntb: perf test: fix address space confusion
-Message-ID: <1453800729-2501235-1-git-send-email-arnd@arndb.de>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 26 Jan 2016 10:52:25 +0100
+Subject: [PATCH v3 3/9] ASoC: rockchip: i2s: add support for grabbing
+ output clock to codec
+In-Reply-To: <56A57733.8020200@rock-chips.com>
+References: <1452865796-23527-1-git-send-email-wxt@rock-chips.com>
+ <20160122171815.GD6588@sirena.org.uk> <56A57733.8020200@rock-chips.com>
+Message-ID: <2073307.S3XLZp3hP0@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ntb driver assigns between pointers an __iomem tokens, and
-also casts them to 64-bit integers, which results in compiler
-warnings on 32-bit systems:
+Hi Jay,
 
-drivers/ntb/test/ntb_perf.c: In function 'perf_copy':
-drivers/ntb/test/ntb_perf.c:213:10: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
-  vbase = (u64)(u64 *)mw->vbase;
-          ^
-drivers/ntb/test/ntb_perf.c:214:14: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
-  dst_vaddr = (u64)(u64 *)dst;
-              ^
+Am Montag, 25. Januar 2016, 09:15:31 schrieb Jianqun Xu:
+> ? 23/01/2016 01:18, Mark Brown ??:
+> > On Fri, Jan 15, 2016 at 01:48:04PM -0800, Sonny Rao wrote:
+> >> On Fri, Jan 15, 2016 at 9:46 AM, Mark Brown <broonie@kernel.org> wrote:
+> >>> If the I2S block is providing a clock to the CODEC then that's what the
+> >>> software should do so that the CODEC can gate and ungate the clock as
+> >>> required.  This patch has the I2S block using a clock, not providing
+> >>> one.
+> >>> 
+> >>  From my read of the clock diagram for RK3288  there is a single clock
+> >> 
+> >> signal (labeled "clk_i2s0") that comes out of a fractional divider,
+> >> and it is split such that one path gets sent to the I2S block and the
+> >> second path is sent to a mux after which that signal is sent to an
+> >> external pin that goes to the codec.
+> >> 
+> >> There are separate clock gates for the two paths: one for the I2S
+> >> block and one after that mux before the external pin.
+> >> 
+> >> I'm not sure if it's being modeled that way in the Linux code or not,
+> >> but at least physically I don't think this clock signal actually goes
+> >> through the I2S block before being sent to the codec.
+> > 
+> > That's not really the issue here, the issue is that it's not the I2S
+> > controller that is consuming the clock so it should not be the I2S
+> > controller driver that ensures that the clock is enabled.  The driver
+> > that manages the clock should be the one that uses it, like I say this
+> > means you should add the code to enable the clock to the CODEC driver if
+> > the CODEC driver needs the clock enabled.
+> 
+> Agree, now we almost use the simple-card for the CODEC driver, so I
+> think we should enable the mclk(i2s-outclk) in the simple-card driver,
+> is it ?
+> 
+> I found a subnode property from simple-card document:
+> - mclk-fs                               : Multiplication factor between
+> stream
+>                                            rate and codec mclk, applied
+> only for
+>                                            the dai-link.
+> But the property responsible to the factor, not care if the mclk source
+> clock is enabled or not. So does the simple-card driver can add support
+> to enable/disable mclk ?
 
-This adds __iomem annotations where needed and changes the temporary
-variables to iomem pointers to avoid casting them to u64. I did not
-see the problem in linux-next earlier, but it show showed up in
-4.5-rc1.
+The mclk-input is part of the codec I'd think. So you'd want the clocks-
+property in the i2c entry describing the codec itself and implement the clk 
+operations in the codec driver as well.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 8a7b6a778a85 ("ntb: ntb perf tool")
----
- drivers/ntb/test/ntb_perf.c | 21 +++++++++++----------
- 1 file changed, 11 insertions(+), 10 deletions(-)
+See codec-drivers for da7213, da7218,max98090 and many more for reference.
 
-diff --git a/drivers/ntb/test/ntb_perf.c b/drivers/ntb/test/ntb_perf.c
-index c8a37ba4b4f9..6bdc1e7b7503 100644
---- a/drivers/ntb/test/ntb_perf.c
-+++ b/drivers/ntb/test/ntb_perf.c
-@@ -178,7 +178,7 @@ static void perf_copy_callback(void *data)
- 	atomic_dec(&pctx->dma_sync);
- }
- 
--static ssize_t perf_copy(struct pthr_ctx *pctx, char *dst,
-+static ssize_t perf_copy(struct pthr_ctx *pctx, char __iomem *dst,
- 			 char *src, size_t size)
- {
- 	struct perf_ctx *perf = pctx->perf;
-@@ -189,7 +189,8 @@ static ssize_t perf_copy(struct pthr_ctx *pctx, char *dst,
- 	dma_cookie_t cookie;
- 	size_t src_off, dst_off;
- 	struct perf_mw *mw = &perf->mw;
--	u64 vbase, dst_vaddr;
-+	void __iomem *vbase;
-+	void __iomem *dst_vaddr;
- 	dma_addr_t dst_phys;
- 	int retries = 0;
- 
-@@ -204,14 +205,14 @@ static ssize_t perf_copy(struct pthr_ctx *pctx, char *dst,
- 	}
- 
- 	device = chan->device;
--	src_off = (size_t)src & ~PAGE_MASK;
--	dst_off = (size_t)dst & ~PAGE_MASK;
-+	src_off = (uintptr_t)src & ~PAGE_MASK;
-+	dst_off = (uintptr_t __force)dst & ~PAGE_MASK;
- 
- 	if (!is_dma_copy_aligned(device, src_off, dst_off, size))
- 		return -ENODEV;
- 
--	vbase = (u64)(u64 *)mw->vbase;
--	dst_vaddr = (u64)(u64 *)dst;
-+	vbase = mw->vbase;
-+	dst_vaddr = dst;
- 	dst_phys = mw->phys_addr + (dst_vaddr - vbase);
- 
- 	unmap = dmaengine_get_unmap_data(device->dev, 1, GFP_NOWAIT);
-@@ -261,13 +262,13 @@ err_get_unmap:
- 	return 0;
- }
- 
--static int perf_move_data(struct pthr_ctx *pctx, char *dst, char *src,
-+static int perf_move_data(struct pthr_ctx *pctx, char __iomem *dst, char *src,
- 			  u64 buf_size, u64 win_size, u64 total)
- {
- 	int chunks, total_chunks, i;
- 	int copied_chunks = 0;
- 	u64 copied = 0, result;
--	char *tmp = dst;
-+	char __iomem *tmp = dst;
- 	u64 perf, diff_us;
- 	ktime_t kstart, kstop, kdiff;
- 
-@@ -324,7 +325,7 @@ static int ntb_perf_thread(void *data)
- 	struct perf_ctx *perf = pctx->perf;
- 	struct pci_dev *pdev = perf->ntb->pdev;
- 	struct perf_mw *mw = &perf->mw;
--	char *dst;
-+	char __iomem *dst;
- 	u64 win_size, buf_size, total;
- 	void *src;
- 	int rc, node, i;
-@@ -364,7 +365,7 @@ static int ntb_perf_thread(void *data)
- 	if (buf_size > MAX_TEST_SIZE)
- 		buf_size = MAX_TEST_SIZE;
- 
--	dst = (char *)mw->vbase;
-+	dst = (char __iomem *)mw->vbase;
- 
- 	atomic_inc(&perf->tsync);
- 	while (atomic_read(&perf->tsync) != perf->perf_threads)
--- 
-2.7.0
+
+Heiko
+
+
+
+> >> Does that help clarify?
+> > 
+> > The problem here isn't a lack of clarity in the situation.
