@@ -1,58 +1,39 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 26 Jan 2016 11:24:02 +0100
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160114222046.GH3818@linux.vnet.ibm.com>
-References: <569565DA.2010903@imgtec.com> <20160113104516.GE25458@arm.com>
- <56969F4B.7070001@imgtec.com>
- <20160113204844.GV6357@twins.programming.kicks-ass.net>
- <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
- <56980145.5030901@imgtec.com>
- <20160114204827.GE3818@linux.vnet.ibm.com>
- <56981212.7050301@imgtec.com>
- <20160114222046.GH3818@linux.vnet.ibm.com>
-Message-ID: <20160126102402.GE6357@twins.programming.kicks-ass.net>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 26 Jan 2016 11:41:30 +0100
+Subject: [PATCH V3 2/2] regulator: mt6323: Add support for MT6323 regulator
+In-Reply-To: <1453722989-41622-2-git-send-email-blogic@openwrt.org>
+References: <1453722989-41622-1-git-send-email-blogic@openwrt.org>
+ <1453722989-41622-2-git-send-email-blogic@openwrt.org>
+Message-ID: <1453804890.17181.93.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 02:20:46PM -0800, Paul E. McKenney wrote:
-> On Thu, Jan 14, 2016 at 01:24:34PM -0800, Leonid Yegoshin wrote:
-> > On 01/14/2016 12:48 PM, Paul E. McKenney wrote:
-> > >
-> > >So SYNC_RMB is intended to implement smp_rmb(), correct?
-> > Yes.
-> > >
-> > >You could use SYNC_ACQUIRE() to implement read_barrier_depends() and
-> > >smp_read_barrier_depends(), but SYNC_RMB probably does not suffice.
-> > 
-> > If smp_read_barrier_depends() is used to separate not only two reads
-> > but read pointer and WRITE basing on that pointer (example below) -
-> > yes. I just doesn't see any example of this in famous
-> > Documentation/memory-barriers.txt and had no chance to know what you
-> > use it in this way too.
-> 
-> Well, Documentation/memory-barriers.txt was intended as a guide for Linux
-> kernel hackers, and not for hardware architects.
+John,
 
-Yeah, this goes under the header: memory-barriers.txt is _NOT_ a
-specification (I seem to keep repeating this).
+On ma, 2016-01-25 at 12:56 +0100, John Crispin wrote:
+> --- /dev/null
+> +++ b/drivers/regulator/mt6323-regulator.c
 
-> ------------------------------------------------------------------------
-> 
-> commit 955720966e216b00613fcf60188d507c103f0e80
-> Author: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> Date:   Thu Jan 14 14:17:04 2016 -0800
-> 
->     documentation: Subsequent writes ordered by rcu_dereference()
->     
->     The current memory-barriers.txt does not address the possibility of
->     a write to a dereferenced pointer.  This should be rare, 
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
 
-How are these rare? Isn't:
+This states this file is licensed GPL v2 only.
 
-	rcu_read_lock()
-	obj = rcu_dereference(ptr);
-	if (!atomic_inc_not_zero(&obj->ref))
-		obj = NULL;
-	rcu_read_unlock();
+> +MODULE_LICENSE("GPL");
 
-a _very_ common thing to do?
+And, according to include/linux/module.h, this means "GNU Public License
+v2 or later".
+
+So I think there's a (subtle) mismatch between the license ident used
+for this driver and the comment above.
+
+Thanks,
+
+
+Paul Bolle
