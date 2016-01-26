@@ -1,39 +1,97 @@
 From: rainyfeeling@gmail.com (Josh Wu)
-Date: Tue, 26 Jan 2016 22:16:57 +0800
-Subject: [PATCH 06/13] atmel-isi: check ISI_SR's flags by polling instead
- of interrupt
-In-Reply-To: <Pine.LNX.4.64.1601241757340.16570@axis700.grange>
+Date: Tue, 26 Jan 2016 22:24:10 +0800
+Subject: [PATCH 12/13] atmel-isi: use union for the fbd (frame buffer
+ descriptor)
+In-Reply-To: <Pine.LNX.4.64.1601261509120.28816@axis700.grange>
 References: <1453119709-20940-1-git-send-email-rainyfeeling@gmail.com>
  <1453121545-27528-1-git-send-email-rainyfeeling@gmail.com>
- <Pine.LNX.4.64.1601241757340.16570@axis700.grange>
-Message-ID: <CAJe_HAeKRtAzcz+s7D_5sXp9pnnM1Mhvu_3L1HQGPLsJLJbTSw@mail.gmail.com>
+ <1453121545-27528-8-git-send-email-rainyfeeling@gmail.com>
+ <Pine.LNX.4.64.1601241931430.16570@axis700.grange>
+ <CAJe_HAeTWqaqFHPbLGzbTKV6s2xDxf+Dg8DFc6HAqs03RJFh3g@mail.gmail.com>
+ <Pine.LNX.4.64.1601261509120.28816@axis700.grange>
+Message-ID: <CAJe_HAdtFCmYKeCgfs9FeE80ckH3+WRfejmc_WOxdxZEntgL8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi, Guennadi
 
-2016-01-25 0:58 GMT+08:00 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
-> On Mon, 18 Jan 2016, Josh Wu wrote:
+2016-01-26 22:10 GMT+08:00 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
+> Hi Josh,
 >
->> In current code, we use a interrupt to check whether ISI reset/disable
->> action is done. Actually, we also can check ISI SR to check the
->> reset/disable action by polling, and it is simpler and straight forward.
+> (resending with all CC)
+>
+> On Tue, 26 Jan 2016, Josh Wu wrote:
+>
+>> Hi, Guennadi
 >>
->> So this patch use isi_hw_wait_status() to check the action status. As
->> the interrupt checking the status is useless, so just remove the interrupt
->> & completion code.
+>> Thanks for the review.
+>>
+>> 2016-01-25 3:31 GMT+08:00 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
+>> > On Mon, 18 Jan 2016, Josh Wu wrote:
+>> >
+>> >> From: Josh Wu <josh.wu@atmel.com>
+>> >>
+>> >> This way, we can easy to add other type of fbd for new hardware.
+>> >
+>> > Ok, I've applied all your 13 patches to check, what the resulting driver
+>> > would look like. To me it looks like you really abstract away _everything_
+>> > remotely hardware-specific. What is left is yet another abstraction layer,
+>> > into which you can pack a wide range of hardware types, which are very
+>> > different from the original ISI. I mean, you could probably pack - to some
+>> > extent, maybe sacrificing some features - other existing soc-camera
+>> > drivers, like MX3, MX2, CEU,... - essentially those, using VB2. And I
+>> > don't think that's a good idea. We have a class of V4L2 camera bridge
+>> > drivers, that's fine. They use all the standard APIs to connect to the
+>> > user-space and to other V4L2 drivers in video pipelines - V4L2 ioctl()s,
+>> > subdev, Media Controller, VB2, V4L2 control API etc. Under that we have
+>> > soc-camera - mainly for a few existing bridge drivers, because it takes a
+>> > part of bridge driver's implementation freedom away and many or most
+>> > modern camera bridge interfaces are more complex, than what soc-camera
+>> > currently supports, and extending it makes little sense, it is just more
+>> > logical to create a full-features V4L2 bridge driver with a full access to
+>> > all relevant APIs.
+>>
+>> It sounds the general v4l2 driver framework is more suitable than
+>> soc-camera framework for the new hardware.
 >
-> Sorry, I'm not convinced. Switching from interrupt-driven to polling seems
-> counter-productive to me. Why do you want this?
+> Then, please, go for one!
+>
+>> So is it easy for v4l2 platform driver to use the soc-camera sensors?
+>
+> Not sure, haven't tried in a while. It used to be difficult, but it must
+> have become more simple, I think there are examples of that in the
+> mainline. I think em28xx does that, but probably in the meantime the
+> integration possibilities have become even better.
 
-Yes, it is counter-productive If such code is called very frequently.
-But here we only used for reset and disable the hardware.
+I'll try to see what I'll get.
 
-I think it is more straightforward and simple when we just check
-status register after write the reset or disable the ISI control
-register. Using interrupt here is over designed.
-for the sake of performance I should use cpu_releax() instead of
-msleep() when waiting for the status bit.
+>
+>> > With your patches #12 and #13 you seem to be creating
+>> > an even tighter, narrower API for very thin drivers. That just provide a
+>> > couple of hardware-related functions and create a V4L2 bridge driver from
+>> > that. What kind of hardware is that new controller, that you'd like to
+>> > support by the same driver? Wouldn't it be better to create a new driver
+>> > for it? Is it really similar to the ISI controller?
+>>
+>> The new hardware is SAMA5D2 Image Sensor Controller. You can find the
+>> datasheet here:
+>> http://www.atmel.com/Images/Atmel-11267-32-bit-Cortex-A5-Microcontroller-SAMA5D2_Datasheet.pdf
+>>
+>> Actually, The ISC hardware is very different from ISI hardware. ISC
+>> has no Preivew/Codec path, it just has many data blocks to process
+>> sensor data.
+>> With the abstraction of my patches, ISC can rewrite the interrupt
+>> handler, initialization, configure and etc to work in same ISI driver,
+>> though. But like you mentioned, it's very tight, maybe it's not easy
+>> to add extend functions.
+>>
+>> So I was convinced to write a new v4l2 camera driver for ISC if it is
+>> easy to support soc-camera sensors.
+>
+> Please, write a new driver :)
+
+Ok, so for this serial patch, I will drop the abstract interface
+relevant patches, and keep the refactor patch in v2. Thanks.
 
 Best Regards,
 Josh Wu
@@ -42,116 +100,5 @@ Josh Wu
 > Thanks
 > Guennadi
 >
->>
->> Signed-off-by: Josh Wu <rainyfeeling@gmail.com>
->> ---
->>
->>  drivers/media/platform/soc_camera/atmel-isi.c | 59 ++++++---------------------
->>  1 file changed, 13 insertions(+), 46 deletions(-)
->>
->> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
->> index f0508ea..4ddc309 100644
->> --- a/drivers/media/platform/soc_camera/atmel-isi.c
->> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
->> @@ -12,7 +12,6 @@
->>   */
->>
->>  #include <linux/clk.h>
->> -#include <linux/completion.h>
->>  #include <linux/delay.h>
->>  #include <linux/fs.h>
->>  #include <linux/init.h>
->> @@ -81,7 +80,6 @@ struct atmel_isi {
->>       struct isi_dma_desc             dma_desc[MAX_BUFFER_NUM];
->>       bool                            enable_preview_path;
->>
->> -     struct completion               complete;
->>       /* ISI peripherial clock */
->>       struct clk                      *pclk;
->>       unsigned int                    irq;
->> @@ -281,51 +279,14 @@ static irqreturn_t isi_interrupt(int irq, void *dev_id)
->>       mask = isi_readl(isi, ISI_INTMASK);
->>       pending = status & mask;
->>
->> -     if (pending & ISI_CTRL_SRST) {
->> -             complete(&isi->complete);
->> -             isi_writel(isi, ISI_INTDIS, ISI_CTRL_SRST);
->> -             ret = IRQ_HANDLED;
->> -     } else if (pending & ISI_CTRL_DIS) {
->> -             complete(&isi->complete);
->> -             isi_writel(isi, ISI_INTDIS, ISI_CTRL_DIS);
->> -             ret = IRQ_HANDLED;
->> -     } else {
->> -             if (likely(pending & ISI_SR_CXFR_DONE) ||
->> -                             likely(pending & ISI_SR_PXFR_DONE))
->> -                     ret = atmel_isi_handle_streaming(isi);
->> -     }
->> +     if (likely(pending & ISI_SR_CXFR_DONE) ||
->> +         likely(pending & ISI_SR_PXFR_DONE))
->> +             ret = atmel_isi_handle_streaming(isi);
->>
->>       spin_unlock(&isi->lock);
->>       return ret;
->>  }
->>
->> -#define      WAIT_ISI_RESET          1
->> -#define      WAIT_ISI_DISABLE        0
->> -static int atmel_isi_wait_status(struct atmel_isi *isi, int wait_reset)
->> -{
->> -     unsigned long timeout;
->> -     /*
->> -      * The reset or disable will only succeed if we have a
->> -      * pixel clock from the camera.
->> -      */
->> -     init_completion(&isi->complete);
->> -
->> -     if (wait_reset) {
->> -             isi_writel(isi, ISI_INTEN, ISI_CTRL_SRST);
->> -             isi_writel(isi, ISI_CTRL, ISI_CTRL_SRST);
->> -     } else {
->> -             isi_writel(isi, ISI_INTEN, ISI_CTRL_DIS);
->> -             isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
->> -     }
->> -
->> -     timeout = wait_for_completion_timeout(&isi->complete,
->> -                     msecs_to_jiffies(500));
->> -     if (timeout == 0)
->> -             return -ETIMEDOUT;
->> -
->> -     return 0;
->> -}
->> -
->>  /* ------------------------------------------------------------------
->>       Videobuf operations
->>     ------------------------------------------------------------------*/
->> @@ -493,8 +454,11 @@ static int start_streaming(struct vb2_queue *vq, unsigned int count)
->>       pm_runtime_get_sync(ici->v4l2_dev.dev);
->>
->>       /* Reset ISI */
->> -     ret = atmel_isi_wait_status(isi, WAIT_ISI_RESET);
->> -     if (ret < 0) {
->> +     isi_writel(isi, ISI_CTRL, ISI_CTRL_SRST);
->> +
->> +     /* Check Reset status */
->> +     ret  = isi_hw_wait_status(isi, ISI_CTRL_SRST, 500);
->> +     if (ret) {
->>               dev_err(icd->parent, "Reset ISI timed out\n");
->>               pm_runtime_put(ici->v4l2_dev.dev);
->>               return ret;
->> @@ -549,8 +513,11 @@ static void stop_streaming(struct vb2_queue *vq)
->>                       ISI_SR_CXFR_DONE | ISI_SR_PXFR_DONE);
->>
->>       /* Disable ISI and wait for it is done */
->> -     ret = atmel_isi_wait_status(isi, WAIT_ISI_DISABLE);
->> -     if (ret < 0)
->> +     isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
->> +
->> +     /* Check Reset status */
->> +     ret  = isi_hw_wait_status(isi, ISI_CTRL_DIS, 500);
->> +     if (ret)
->>               dev_err(icd->parent, "Disable ISI timed out\n");
->>
->>       pm_runtime_put(ici->v4l2_dev.dev);
->> --
->> 1.9.1
->>
+>> Best Regards,
+>> Josh Wu
