@@ -1,26 +1,30 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Jan 2016 17:45:04 +0000
-Subject: [PATCH v4 05/22] arm64: kvm: deal with kernel symbols outside of
- linear mapping
-In-Reply-To: <1453828249-14467-6-git-send-email-ard.biesheuvel@linaro.org>
-References: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
- <1453828249-14467-6-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <56A7B0A0.3020003@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 26 Jan 2016 18:06:33 +0000
+Subject: [PATCH 0/4] Miscellaneous ARM SMMU patches
+Message-ID: <cover.1453830752.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/16 17:10, Ard Biesheuvel wrote:
-> KVM on arm64 uses a fixed offset between the linear mapping at EL1 and
-> the HYP mapping at EL2. Before we can move the kernel virtual mapping
-> out of the linear mapping, we have to make sure that references to kernel
-> symbols that are accessed via the HYP mapping are translated to their
-> linear equivalent.
-> 
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Hi Will,
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Here's my current "miscellaneous SMMU enhancements" branch for your
+consideration. Patch #1 solves a subtle corner case that cropped up
+while exercising stage 1 context formats on the DMA330-MMU500 model;
+#3 will be wanted fairly soon for DMA ops integration so may as well
+get some exposure now; #2 and #4 are more nice-to-haves.
 
-	M.
+Thanks,
+Robin.
+
+Robin Murphy (4):
+  iommu/arm-smmu: Treat all device transactions as unprivileged
+  iommu/arm-smmu: Allow disabling unmatched stream bypass
+  iommu/arm-smmu: Support DMA-API domains
+  iommu/arm-smmu: Use per-context TLB sync as appropriate
+
+ drivers/iommu/arm-smmu-v3.c | 10 +++++-
+ drivers/iommu/arm-smmu.c    | 79 ++++++++++++++++++++++++++++++++++-----------
+ 2 files changed, 69 insertions(+), 20 deletions(-)
+
 -- 
-Jazz is not dead. It just smells funny...
+2.7.0.25.gfc10eb5.dirty
