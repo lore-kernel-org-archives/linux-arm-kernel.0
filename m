@@ -1,71 +1,113 @@
-From: ralf@ramses-pyramidenbau.de (Ralf Ramsauer)
-Date: Tue, 26 Jan 2016 17:59:17 +0100
-Subject: [PATCH v2 1/2] ARM: tegra: Fixed typo
-In-Reply-To: <1453827558-10954-1-git-send-email-ralf@ramses-pyramidenbau.de>
-References: <1453827558-10954-1-git-send-email-ralf@ramses-pyramidenbau.de>
-Message-ID: <1453827558-10954-2-git-send-email-ralf@ramses-pyramidenbau.de>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 26 Jan 2016 17:01:22 +0000
+Subject: [PATCH V4 16/16] ARM64: tegra: select PM_GENERIC_DOMAINS
+In-Reply-To: <5697D7E2.3030209@nvidia.com>
+References: <1449241037-22193-1-git-send-email-jonathanh@nvidia.com>
+ <8579242.omBpg1aLr2@wuerfel>
+ <CAPDyKFrewx5CbS9QKZAxqq0Gu+TywQ3nkDGZFURR=PJLtkDuyQ@mail.gmail.com>
+ <11122786.kKumQ3Dhls@wuerfel> <5697D7E2.3030209@nvidia.com>
+Message-ID: <56A7A662.4090203@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ralf Ramsauer <ralf@ramses-pyramidenbau.de>
----
- arch/arm/boot/dts/tegra114.dtsi | 2 +-
- arch/arm/boot/dts/tegra124.dtsi | 2 +-
- arch/arm/boot/dts/tegra20.dtsi  | 2 +-
- arch/arm/boot/dts/tegra30.dtsi  | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+Hi Arnd, Ulf,
 
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index d845bd1..5017ed8 100644
---- a/arch/arm/boot/dts/tegra114.dtsi
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -256,7 +256,7 @@
- 	 * driver and APB DMA based serial driver for higher baudrate
- 	 * and performace. To enable the 8250 based driver, the compatible
- 	 * is "nvidia,tegra114-uart", "nvidia,tegra20-uart" and to enable
--	 * the APB DMA based serial driver, the comptible is
-+	 * the APB DMA based serial driver, the compatible is
- 	 * "nvidia,tegra114-hsuart", "nvidia,tegra30-hsuart".
- 	 */
- 	uarta: serial at 70006000 {
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 68669f7..995289b 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -322,7 +322,7 @@
- 	 * driver and APB DMA based serial driver for higher baudrate
- 	 * and performace. To enable the 8250 based driver, the compatible
- 	 * is "nvidia,tegra124-uart", "nvidia,tegra20-uart" and to enable
--	 * the APB DMA based serial driver, the comptible is
-+	 * the APB DMA based serial driver, the compatible is
- 	 * "nvidia,tegra124-hsuart", "nvidia,tegra30-hsuart".
- 	 */
- 	uarta: serial at 0,70006000 {
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 33173e1..8fb61b9 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -309,7 +309,7 @@
- 	 * driver and APB DMA based serial driver for higher baudrate
- 	 * and performace. To enable the 8250 based driver, the compatible
- 	 * is "nvidia,tegra20-uart" and to enable the APB DMA based serial
--	 * driver, the comptible is "nvidia,tegra20-hsuart".
-+	 * driver, the compatible is "nvidia,tegra20-hsuart".
- 	 */
- 	uarta: serial at 70006000 {
- 		compatible = "nvidia,tegra20-uart";
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 313e260..c6edc8c 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -371,7 +371,7 @@
- 	 * driver and APB DMA based serial driver for higher baudrate
- 	 * and performace. To enable the 8250 based driver, the compatible
- 	 * is "nvidia,tegra30-uart", "nvidia,tegra20-uart" and to enable
--	 * the APB DMA based serial driver, the comptible is
-+	 * the APB DMA based serial driver, the compatible is
- 	 * "nvidia,tegra30-hsuart", "nvidia,tegra20-hsuart".
- 	 */
- 	uarta: serial at 70006000 {
--- 
-2.4.10
+On 14/01/16 17:16, Jon Hunter wrote:
+> 
+> On 14/01/16 09:21, Arnd Bergmann wrote:
+>> On Thursday 14 January 2016 09:57:14 Ulf Hansson wrote:
+>>> On 13 January 2016 at 21:43, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>> On Wednesday 13 January 2016 18:03:24 Thierry Reding wrote:
+>>>>> On Fri, Dec 04, 2015 at 02:57:17PM +0000, Jon Hunter wrote:
+>>>>>> Enable PM_GENERIC_DOMAINS for tegra 64-bit devices. To ensure that devices
+>>>>>> dependent upon a particular power-domain are only probed when that power
+>>>>>> domain has been powered up, requires that PM is made mandatory for tegra
+>>>>>> 64-bit devices and so select this option for tegra as well.
+>>>>>>
+>>>>>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+>>>>>> ---
+>>>>>>  arch/arm64/Kconfig.platforms | 2 ++
+>>>>>>  1 file changed, 2 insertions(+)
+>>>>>>
+>>>>>> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+>>>>>> index 9806324fa215..e0b5bd0aff0f 100644
+>>>>>> --- a/arch/arm64/Kconfig.platforms
+>>>>>> +++ b/arch/arm64/Kconfig.platforms
+>>>>>> @@ -93,6 +93,8 @@ config ARCH_TEGRA
+>>>>>>       select GENERIC_CLOCKEVENTS
+>>>>>>       select HAVE_CLK
+>>>>>>       select PINCTRL
+>>>>>> +     select PM
+>>>>>> +     select PM_GENERIC_DOMAINS
+>>>>>>       select RESET_CONTROLLER
+>>>>>>       help
+>>>>>>         This enables support for the NVIDIA Tegra SoC family.
+>>>>>
+>>>>> This has potential consequences for multi-platform builds, doesn't it?
+>>>>> All of a sudden any combination of builds that includes Tegra won't be
+>>>>> possible to build without PM support.
+>>>>>
+>>>>> Adding linux-arm-kernel at lists.infradead.org for visibility.
+>>>>>
+>>>>>
+>>>>
+>>>> Agreed, it would be better to add 'depends on PM_GENERIC_DOMAINS'
+>>>> dependencies in the drivers that require it.
+>>>>
+>>>
+>>> The problem with that approach is that if those drivers are cross SoC
+>>> drivers. In some cases PM isn't needed and it is.
+>>>
+>>> Of course I don't have the in depth knowledge about the drivers being
+>>> used in Tegra which may need PM, perhaps it's not that many?
+>>>
+>>> Anyway, to me it seems like ARCH_TEGRA should depend on PM instead.
+>>> Would that work?
+>>
+>> That seems a little over-restrictive, as it prevents you from
+>> building a tegra kernel even if none of the drivers that rely
+>> on the pm domains are used, but it would work.
+>>
+>> I've looked again at how other platforms (on arm32) do it, and
+>> a lot of them use "select PM_GENERIC_DOMAINS if PM", so they don't
+>> automatically enable PM, but they enable the pmdomain code if
+>> PM is already set. No driver really "depends on PM_GENERIC_DOMAINS",
+>> so we shouldn't really start that now or we end up with circular
+>> dependencies in the long run.
+> 
+> What I am not a fan of in the current gen-pd implementation, is if we
+> have !PM but the platform has power-domains, then there is no way to
+> determine if a device within a power-domain can be probed safely. Some
+> arm platforms force all the power-domains on during early init in the
+> case of !PM. IMO this is still not ideal, because if a power-domain
+> failed to turn on during early init, then you should probably call
+> BUG(). Ideally the kernel should be able to boot and only probe the
+> devices you know that can be probed safely.
+> 
+> So for platforms have use PM_GENERIC_DOMAINS, I think really they should
+> select PM and not "select PM_GENERIC_DOMAINS if PM". IMO, "select
+> PM_GENERIC_DOMAINS if PM" seems fragile.
+
+Any more thoughts on this?
+
+I have been discussing with Thierry and we think that selecting PM for
+tegra still makes the most sense. The question is, is this ok for
+multi-configs?
+
+The only other suggestion/thought I have is to allow
+PM_GENERIC_DOMAINS_OF to be selected independently of PM so that we can
+have minimal support for PM domains that allows you to register PM
+domains with the kernel and their current state, but does not allow you
+to control them, etc. This way tegra could always select
+PM_GENERIC_DOMAINS_OF regardless of PM, and we would be able to
+determine if we can probe a device safely.
+
+I am not sure that Rafael is too keen on this approach but that is the
+only alternative I have come up with.
+
+I have a rough outline of a patch for this here [0] FWIW.
+
+Cheers
+Jon
+
+[0] https://github.com/jonhunter/linux/commits/gpd
