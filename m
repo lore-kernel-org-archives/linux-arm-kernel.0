@@ -1,100 +1,103 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 26 Jan 2016 18:15:49 +0800
-Subject: [PATCH v4 09/13] mmc: sdhci-pxav3: use sdhci_pltfm_init for private
+Date: Tue, 26 Jan 2016 18:15:51 +0800
+Subject: [PATCH v4 11/13] mmc: sdhci-tegra: use sdhci_pltfm_init for private
  allocation
 In-Reply-To: <1453803353-6266-1-git-send-email-jszhang@marvell.com>
 References: <1453803353-6266-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1453803353-6266-10-git-send-email-jszhang@marvell.com>
+Message-ID: <1453803353-6266-12-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Commit 0e748234293f ("mmc: sdhci: Add size for caller in init+register")
 allows users of sdhci_pltfm to allocate private space in calls to
-sdhci_pltfm_init+sdhci_pltfm_register. This patch migrates sdhci-pxav3
+sdhci_pltfm_init+sdhci_pltfm_register. This patch migrates sdhci-tegra
 to this allocation.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/mmc/host/sdhci-pxav3.c | 20 ++++++++------------
- 1 file changed, 8 insertions(+), 12 deletions(-)
+ drivers/mmc/host/sdhci-tegra.c | 21 +++++++--------------
+ 1 file changed, 7 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-index f5edf9d..c88d2ba 100644
---- a/drivers/mmc/host/sdhci-pxav3.c
-+++ b/drivers/mmc/host/sdhci-pxav3.c
-@@ -132,7 +132,7 @@ static int armada_38x_quirks(struct platform_device *pdev,
- {
- 	struct device_node *np = pdev->dev.of_node;
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct sdhci_pxa *pxa = pltfm_host->priv;
-+	struct sdhci_pxa *pxa = sdhci_pltfm_priv(pltfm_host);
- 	struct resource *res;
- 
- 	host->quirks &= ~SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN;
-@@ -201,7 +201,7 @@ static void pxav3_reset(struct sdhci_host *host, u8 mask)
- static void pxav3_gen_init_74_clocks(struct sdhci_host *host, u8 power_mode)
+diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
+index 83c4bf7..2c3c57b 100644
+--- a/drivers/mmc/host/sdhci-tegra.c
++++ b/drivers/mmc/host/sdhci-tegra.c
+@@ -63,7 +63,7 @@ struct sdhci_tegra {
+ static u16 tegra_sdhci_readw(struct sdhci_host *host, int reg)
  {
  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct sdhci_pxa *pxa = pltfm_host->priv;
-+	struct sdhci_pxa *pxa = sdhci_pltfm_priv(pltfm_host);
- 	u16 tmp;
- 	int count;
+-	struct sdhci_tegra *tegra_host = pltfm_host->priv;
++	struct sdhci_tegra *tegra_host = sdhci_pltfm_priv(pltfm_host);
+ 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
  
-@@ -250,7 +250,7 @@ static void pxav3_gen_init_74_clocks(struct sdhci_host *host, u8 power_mode)
- static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+ 	if (unlikely((soc_data->nvquirks & NVQUIRK_FORCE_SDHCI_SPEC_200) &&
+@@ -99,7 +99,7 @@ static void tegra_sdhci_writew(struct sdhci_host *host, u16 val, int reg)
+ static void tegra_sdhci_writel(struct sdhci_host *host, u32 val, int reg)
  {
  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct sdhci_pxa *pxa = pltfm_host->priv;
-+	struct sdhci_pxa *pxa = sdhci_pltfm_priv(pltfm_host);
- 	u16 ctrl_2;
+-	struct sdhci_tegra *tegra_host = pltfm_host->priv;
++	struct sdhci_tegra *tegra_host = sdhci_pltfm_priv(pltfm_host);
+ 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
  
- 	/*
-@@ -370,16 +370,12 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
- 	const struct of_device_id *match;
- 	int ret;
+ 	/* Seems like we're getting spurious timeout and crc errors, so
+@@ -131,7 +131,7 @@ static unsigned int tegra_sdhci_get_ro(struct sdhci_host *host)
+ static void tegra_sdhci_reset(struct sdhci_host *host, u8 mask)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+-	struct sdhci_tegra *tegra_host = pltfm_host->priv;
++	struct sdhci_tegra *tegra_host = sdhci_pltfm_priv(pltfm_host);
+ 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
+ 	u32 misc_ctrl, clk_ctrl;
  
--	pxa = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_pxa), GFP_KERNEL);
--	if (!pxa)
--		return -ENOMEM;
--
--	host = sdhci_pltfm_init(pdev, &sdhci_pxav3_pdata, 0);
-+	host = sdhci_pltfm_init(pdev, &sdhci_pxav3_pdata, sizeof(*pxa));
+@@ -184,7 +184,7 @@ static void tegra_sdhci_set_bus_width(struct sdhci_host *host, int bus_width)
+ static void tegra_sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+-	struct sdhci_tegra *tegra_host = pltfm_host->priv;
++	struct sdhci_tegra *tegra_host = sdhci_pltfm_priv(pltfm_host);
+ 	unsigned long host_clk;
+ 
+ 	if (!clock)
+@@ -201,7 +201,7 @@ static void tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
+ 					  unsigned timing)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+-	struct sdhci_tegra *tegra_host = pltfm_host->priv;
++	struct sdhci_tegra *tegra_host = sdhci_pltfm_priv(pltfm_host);
+ 
+ 	if (timing == MMC_TIMING_UHS_DDR50)
+ 		tegra_host->ddr_signaling = true;
+@@ -380,20 +380,14 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	soc_data = match->data;
+ 
+-	host = sdhci_pltfm_init(pdev, soc_data->pdata, 0);
++	host = sdhci_pltfm_init(pdev, soc_data->pdata, sizeof(*tegra_host));
  	if (IS_ERR(host))
  		return PTR_ERR(host);
- 
  	pltfm_host = sdhci_priv(host);
--	pltfm_host->priv = pxa;
-+	pxa = sdhci_pltfm_priv(pltfm_host);
  
- 	pxa->clk_io = devm_clk_get(dev, "io");
- 	if (IS_ERR(pxa->clk_io))
-@@ -486,7 +482,7 @@ static int sdhci_pxav3_remove(struct platform_device *pdev)
- {
- 	struct sdhci_host *host = platform_get_drvdata(pdev);
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct sdhci_pxa *pxa = pltfm_host->priv;
-+	struct sdhci_pxa *pxa = sdhci_pltfm_priv(pltfm_host);
+-	tegra_host = devm_kzalloc(&pdev->dev, sizeof(*tegra_host), GFP_KERNEL);
+-	if (!tegra_host) {
+-		dev_err(mmc_dev(host->mmc), "failed to allocate tegra_host\n");
+-		rc = -ENOMEM;
+-		goto err_alloc_tegra_host;
+-	}
++	tegra_host = sdhci_pltfm_priv(pltfm_host);
+ 	tegra_host->ddr_signaling = false;
+ 	tegra_host->soc_data = soc_data;
+-	pltfm_host->priv = tegra_host;
  
- 	pm_runtime_get_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
-@@ -535,7 +531,7 @@ static int sdhci_pxav3_runtime_suspend(struct device *dev)
- {
- 	struct sdhci_host *host = dev_get_drvdata(dev);
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct sdhci_pxa *pxa = pltfm_host->priv;
-+	struct sdhci_pxa *pxa = sdhci_pltfm_priv(pltfm_host);
- 	int ret;
- 
- 	ret = sdhci_runtime_suspend_host(host);
-@@ -553,7 +549,7 @@ static int sdhci_pxav3_runtime_resume(struct device *dev)
- {
- 	struct sdhci_host *host = dev_get_drvdata(dev);
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct sdhci_pxa *pxa = pltfm_host->priv;
-+	struct sdhci_pxa *pxa = sdhci_pltfm_priv(pltfm_host);
- 
- 	clk_prepare_enable(pxa->clk_io);
- 	if (!IS_ERR(pxa->clk_core))
+ 	rc = mmc_of_parse(host->mmc);
+ 	if (rc)
+@@ -429,7 +423,6 @@ err_add_host:
+ err_clk_get:
+ err_power_req:
+ err_parse_dt:
+-err_alloc_tegra_host:
+ 	sdhci_pltfm_free(pdev);
+ 	return rc;
+ }
 -- 
 2.7.0
