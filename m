@@ -1,38 +1,98 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Jan 2016 08:31:39 +0000
-Subject: [PATCH v4 1/2] acpi: Fix proper return code for function
- acpi_gsi_to_irq
-In-Reply-To: <CAPw-ZTnm5F3Kt+_J6HoNCYbx8R7JVkME5yA9V-hAwRtr8ge9ZA@mail.gmail.com>
-References: <1453335459-3617-1-git-send-email-lho@apm.com>
- <1453335459-3617-2-git-send-email-lho@apm.com>
- <CAPw-ZTnm5F3Kt+_J6HoNCYbx8R7JVkME5yA9V-hAwRtr8ge9ZA@mail.gmail.com>
-Message-ID: <56A72EEB.5040205@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 26 Jan 2016 08:34:33 +0000
+Subject: [PATCH V2 4/4] mfd: mediatek: add MT6323 support to MT6397 driver
+In-Reply-To: <56A71CE5.4080201@openwrt.org>
+References: <1453716887-38442-1-git-send-email-blogic@openwrt.org>
+ <20160125124112.GG3368@x1> <56A64108.7020807@openwrt.org>
+ <3476571.0yU9yvPsKF@linux-gy6r.site> <56A670A3.5030100@openwrt.org>
+ <1453777643.26374.11.camel@mtksdaap41>
+ <56A71CE5.4080201@openwrt.org>
+Message-ID: <20160126083433.GX3368@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Loc,
-
-On 25/01/16 21:23, Loc Ho wrote:
+On Tue, 26 Jan 2016, John Crispin wrote:
+> On 26/01/2016 04:07, Henry Chen wrote:
+> > On Mon, 2016-01-25 at 19:59 +0100, John Crispin wrote:
+> >>
+> >> On 25/01/2016 19:44, Matthias Brugger wrote:
+> >>> On Monday 25 Jan 2016 16:36:40 John Crispin wrote:
+> >>>> Hi,
+> >>>>
+> >>>> On 25/01/2016 13:41, Lee Jones wrote:
+> >>>>> Please honour the subject format of the subsystem you are contributing
+> >>>>> to.
+> >>>>>
+> >>>>> `git log --oneline -- $subsystem` gives you this.
+> >>>>>
+> >>>>> On Mon, 25 Jan 2016, John Crispin wrote:
+> >>>>>> Signed-off-by: John Crispin <blogic@openwrt.org>
+> >>>>>> ---
+> >>>>
+> >>>> [...]
+> >>>>
+> >>>>>> @@ -261,6 +271,15 @@ static int mt6397_probe(struct platform_device
+> >>>>>> *pdev)
+> >>>>>>
+> >>>>>>  	}
+> >>>>>>  	
+> >>>>>>  	switch (id & 0xff) {
+> >>>>>>
+> >>>>>> +	case MT6323_CID_CODE:
+> >>>>>> +		mt6397->int_con[0] = MT6323_INT_CON0;
+> >>>>>
+> >>>>> This is confusing.  You're still using memory allocated for a mt6397
+> >>>>> device.
+> >>>>
+> >>>> the variable is currently defined as struct mt6397_chip *mt6397;
+> >>>> shall i only change the name or also create a patch to rename the struct ?
+> >>>>
+> >>>
+> >>> I think we should rename the struct and the file as well.
+> >>>
+> >>> Cheers,
+> >>> Matthias
+> >>
+> >> Hi,
+> >>
+> >> that would have been my next question. renaming the struct would imply
+> >> renaming the driver and the whole namespace contained within. We would
+> >> then also need to change the Kconfig and Makefile. I am happy to do this
+> >> but want to be sure that is is actually wanted.
+> >>
+> >> 	John
+> > Hi,
+> > 
+> > Since mt6323 was similar with mt6397, I think we can reuse the
+> > mt6397_chip without duplicate code.
+> > 
+> > Maybe we can rename the local variable name to avoid confusing.
+> > 
+> > struct mt6397_chip *mt_pmic;
+> > ...
+> > ...
+> > switch (id & 0xff) {
+> > 	case MT6323_CID_CODE:
+> > 		mt_pmic->int_con[0] = MT6323_INT_CON0;
+> > 		mt_pmic->int_con[1] = MT6323_INT_CON1;
+> > ...
+> > ...
+> > 
+> > Henry
+> 
 > Hi,
 > 
-> On Wed, Jan 20, 2016 at 4:17 PM, Loc Ho <lho@apm.com> wrote:
->>
->> The function acpi_gsi_to_irq must return 0 on success as the caller
->> ghes_probe expects an 0 for success. This change also matches x86
->> implementation.
->>
->> Signed-off-by: Tuan Phan <tphan@apm.com>
->> Signed-off-by: Loc Ho <lho@apm.com>
-> 
-> 
-> Any issue with this version? If not, can this be pulled into 4.5?
+> IMHO we should either rename the namespace or not. renaming some
+> variables seems weird as that will just move the confusion/inconsistency
+> to another place in the code. I am however rather indifferent on this
+> matter.
 
-How is that 4.5 material? Does it fix an observable bug or a regression
-from a previous? If not, then this is probably to be postponed until
-4.6, together with the code that makes use of it.
+It's common to name a driver after the device which was enabled first,
+so no need to rename the files or CONFIGs; however, it does seem
+prudent to generify the struct (both parts).
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
