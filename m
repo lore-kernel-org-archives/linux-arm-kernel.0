@@ -1,86 +1,97 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Tue, 26 Jan 2016 11:08:57 +0800
-Subject: [PATCH v7 2/2] dt-bindings: add document for Innosilicon HDMI on
- Rockchip platform
-In-Reply-To: <1453777142-30119-1-git-send-email-ykk@rock-chips.com>
-References: <1453777142-30119-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1453777737-1386-1-git-send-email-ykk@rock-chips.com>
+From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
+Date: Tue, 26 Jan 2016 03:11:27 +0000
+Subject: iommu/arm-smmu-v2 ASID/VMID calculation
+In-Reply-To: <E978AB4F-5CB0-42D8-8152-04C77DB664A1@caviumnetworks.com>
+References: <198F501C-8D30-4EB5-BC40-4F40BB75D40B@caviumnetworks.com>
+ <20160125170312.GJ22927@arm.com>
+ <E978AB4F-5CB0-42D8-8152-04C77DB664A1@caviumnetworks.com>
+Message-ID: <6F24A28A-6302-4C48-A933-B47A9735808C@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+one my colleague points out, ASIDPNE also implementation defined. 
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2:
-- Add the Acked-by tags from Rob
-- Correct the misspell "rk3036-dw-hdmi" (Heiko)
+Thanks,
+Tirumalesh.  
 
- .../display/rockchip/inno_hdmi-rockchip.txt        | 50 ++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
 
-diff --git a/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
-new file mode 100644
-index 0000000..8096a29
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
-@@ -0,0 +1,50 @@
-+Rockchip specific extensions to the Innosilicon HDMI
-+================================
-+
-+Required properties:
-+- compatible:
-+	"rockchip,rk3036-inno-hdmi";
-+- reg:
-+	Physical base address and length of the controller's registers.
-+- clocks, clock-names:
-+	Phandle to hdmi controller clock, name should be "pclk"
-+- interrupts:
-+	HDMI interrupt number
-+- ports:
-+	Contain one port node with endpoint definitions as defined in
-+	Documentation/devicetree/bindings/graph.txt.
-+- pinctrl-0, pinctrl-name:
-+	Switch the iomux of HPD/CEC pins to HDMI function.
-+
-+Example:
-+hdmi: hdmi at 20034000 {
-+	compatible = "rockchip,rk3036-inno-hdmi";
-+	reg = <0x20034000 0x4000>;
-+	interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
-+	clocks = <&cru  PCLK_HDMI>;
-+	clock-names = "pclk";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hdmi_ctl>;
-+	status = "disabled";
-+
-+	hdmi_in: port {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		hdmi_in_lcdc: endpoint at 0 {
-+			reg = <0>;
-+			remote-endpoint = <&lcdc_out_hdmi>;
-+		};
-+	};
-+};
-+
-+&pinctrl {
-+	hdmi {
-+		hdmi_ctl: hdmi-ctl {
-+			rockchip,pins = <1 8  RK_FUNC_1 &pcfg_pull_none>,
-+					<1 9  RK_FUNC_1 &pcfg_pull_none>,
-+					<1 10 RK_FUNC_1 &pcfg_pull_none>,
-+					<1 11 RK_FUNC_1 &pcfg_pull_none>;
-+		};
-+	};
-+
-+};
--- 
-1.9.1
+
+On 1/25/16, 4:48 PM, "linux-arm-kernel on behalf of Chalamarla, Tirumalesh" <linux-arm-kernel-bounces at lists.infradead.org on behalf of Tirumalesh.Chalamarla@caviumnetworks.com> wrote:
+
+>I don?t think it followed spec.
+>
+>The SMMU spec (IHI0062C) says (section 2.2):
+>
+>   - The exact behavior of any TLB functionality is IMPLEMENTATION DEFINED
+>
+>Section 2.2 describes the constraints on sharing (e.g. multiple contexts
+>using the same ASID says):
+>
+>      "If multiple context banks have hte same attributes but describe
+>       different translations, the results of a TLB lookup are UNPREDICTABLE".
+>
+>
+>
+>The present smmu driver assumes ASID should only be unique per SMMU, this might not be true for all 
+>Implementations. 
+>
+>
+>
+>
+>On 1/25/16, 9:03 AM, "Will Deacon" <will.deacon@arm.com> wrote:
+>
+>>On Thu, Jan 21, 2016 at 06:52:34PM +0000, Chalamarla, Tirumalesh wrote:
+>>> Hi Will,
+>>
+>>Hello,
+>>
+>>> Current ASID/VMID calculation logic makes lot of assumption about internal TLB
+>>> implementation of SMMU,
+>>
+>>Not really. It makes assumptions that the hardware follows the architecture,
+>>which is hardly unreasonable as a starting point.
+>>
+>>> Systems like ThunderX have more than one smmu in the system and it can use same
+>>> TLBs with more than one of them and expects ASID to be unique 
+>>
+>>... but that's broken. If you built a system where the CPUs shared a TLB,
+>>you would run into issues as well.
+>>
+>>How does this work with things like arm_smmu_tlb_sync and the TLBGSTATUS
+>>register?
+>>
+>>> Current logic
+>>> 
+>>> #define ARM_SMMU_CB_ASID(cfg)           ((cfg)->cbndx)
+>>> #define ARM_SMMU_CB_VMID(cfg)           ((cfg)->cbndx + 1)
+>>> 
+>>> 
+>>> Can this be replaced by something like
+>>> 
+>>> 
+>>> #define ARM_SMMU_CB_ASID(cfg, smmu)             (((smmu)->idx << (smmu)->asid_shift) | (cfg)->cbndx)
+>>> #define ARM_SMMU_CB_VMID(cfg, smmu)             (((smmu)->idx << (smmu)->vmid_shift) | (cfg)->cbndx + 1)
+>>> 
+>>> 
+>>> Idx and shift can be passed from device-tree.
+>>> 
+>>> 
+>>> Please let me know if this is acceptable, I will prepare a proper patch
+>>> and send to list.
+>>> 
+>>> 
+>>> If this is not acceptable through an alternative suggestion.
+>>
+>>If we're going to put something into the device-tree, then it should be
+>>an erratum property describing the offset to be applied to ASID/VMIDs.
+>>You also need to take care not to describe overlapping numberspaces.
+>I don?t think that is an errata. 
+>>
+>>How many context banks do you implement in each SMMU?
+>128.
+>>
+>>Will
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
