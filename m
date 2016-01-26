@@ -1,77 +1,31 @@
-From: henryc.chen@mediatek.com (Henry Chen)
-Date: Tue, 26 Jan 2016 11:07:23 +0800
-Subject: [PATCH V2 4/4] mfd: mediatek: add MT6323 support to MT6397 driver
-In-Reply-To: <56A670A3.5030100@openwrt.org>
-References: <1453716887-38442-1-git-send-email-blogic@openwrt.org>
- <20160125124112.GG3368@x1> <56A64108.7020807@openwrt.org>
- <3476571.0yU9yvPsKF@linux-gy6r.site> <56A670A3.5030100@openwrt.org>
-Message-ID: <1453777643.26374.11.camel@mtksdaap41>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Tue, 26 Jan 2016 11:40:25 +0800
+Subject: [PATCH v9 19/21] KVM: ARM64: Add a new feature bit for PMUv3
+In-Reply-To: <CAFEAcA_fyEp3tihjbCyQBzU6vex4273Sp78J4Kg1UXkkyX+1Pg@mail.gmail.com>
+References: <1452839275-19368-1-git-send-email-zhaoshenglong@huawei.com>
+ <1452839275-19368-20-git-send-email-zhaoshenglong@huawei.com>
+ <20160115110816.GE3915@hawk.localdomain> <569DE171.1070602@huawei.com>
+ <CAFEAcA_fyEp3tihjbCyQBzU6vex4273Sp78J4Kg1UXkkyX+1Pg@mail.gmail.com>
+Message-ID: <56A6EAA9.3010506@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-01-25 at 19:59 +0100, John Crispin wrote:
-> 
-> On 25/01/2016 19:44, Matthias Brugger wrote:
-> > On Monday 25 Jan 2016 16:36:40 John Crispin wrote:
-> >> Hi,
-> >>
-> >> On 25/01/2016 13:41, Lee Jones wrote:
-> >>> Please honour the subject format of the subsystem you are contributing
-> >>> to.
-> >>>
-> >>> `git log --oneline -- $subsystem` gives you this.
-> >>>
-> >>> On Mon, 25 Jan 2016, John Crispin wrote:
-> >>>> Signed-off-by: John Crispin <blogic@openwrt.org>
-> >>>> ---
-> >>
-> >> [...]
-> >>
-> >>>> @@ -261,6 +271,15 @@ static int mt6397_probe(struct platform_device
-> >>>> *pdev)
-> >>>>
-> >>>>  	}
-> >>>>  	
-> >>>>  	switch (id & 0xff) {
-> >>>>
-> >>>> +	case MT6323_CID_CODE:
-> >>>> +		mt6397->int_con[0] = MT6323_INT_CON0;
-> >>>
-> >>> This is confusing.  You're still using memory allocated for a mt6397
-> >>> device.
-> >>
-> >> the variable is currently defined as struct mt6397_chip *mt6397;
-> >> shall i only change the name or also create a patch to rename the struct ?
-> >>
-> > 
-> > I think we should rename the struct and the file as well.
-> > 
-> > Cheers,
-> > Matthias
-> 
-> Hi,
-> 
-> that would have been my next question. renaming the struct would imply
-> renaming the driver and the whole namespace contained within. We would
-> then also need to change the Kconfig and Makefile. I am happy to do this
-> but want to be sure that is is actually wanted.
-> 
-> 	John
-Hi,
 
-Since mt6323 was similar with mt6397, I think we can reuse the
-mt6397_chip without duplicate code.
 
-Maybe we can rename the local variable name to avoid confusing.
+On 2016/1/26 0:47, Peter Maydell wrote:
+> On 19 January 2016 at 07:10, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+>> > Yes, for checking the CAP true/false is enough. Maybe I think the number
+>> > of host counters could be useful for QEMU to know the number and for
+>> > supporting cross-type vcpu, but I'm not sure. If someone else has no
+>> > other suggestion, I will change it to what you suggest.
+> Do we care about the number of host counters?
+Currently we don't care about it. Anyway it could be added if it's
+necessary in the future.
 
-struct mt6397_chip *mt_pmic;
-...
-...
-switch (id & 0xff) {
-	case MT6323_CID_CODE:
-		mt_pmic->int_con[0] = MT6323_INT_CON0;
-		mt_pmic->int_con[1] = MT6323_INT_CON1;
-...
-...
+> We might want to
+> know how many counters the guest sees, but we can do that by
+> using KVM_GET_ONE_REG to look at the guest PMCR_EL0, right?
+Yes, right.
 
-Henry
+-- 
+Shannon
