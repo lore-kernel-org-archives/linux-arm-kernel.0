@@ -1,59 +1,45 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 26 Jan 2016 16:21:35 +0100
-Subject: [PATCH V2 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge driver
- to work on both Zynq and Microblaze
-In-Reply-To: <2270955.TlqP7HlQk4@wuerfel>
-References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
- <4734542.KZZp0TeeeM@wuerfel> <56A74370.4090000@xilinx.com>
- <2270955.TlqP7HlQk4@wuerfel>
-Message-ID: <56A78EFF.1010503@xilinx.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Jan 2016 16:26:31 +0100
+Subject: [PATCH v2] mmc: omap_hsmmc: don't print uninitialized variables
+Message-ID: <3411189.gO0215GrNM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.1.2016 13:11, Arnd Bergmann wrote:
-> On Tuesday 26 January 2016 10:59:12 Michal Simek wrote:
->>>> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
->>>> index 3e3757f..1981948 100644
->>>> --- a/drivers/pci/host/pcie-xilinx.c
->>>> +++ b/drivers/pci/host/pcie-xilinx.c
->>>> @@ -92,7 +92,12 @@
->>>>  #define ECAM_DEV_NUM_SHIFT          12
->>>>  
->>>>  /* Number of MSI IRQs */
->>>> -#define XILINX_NUM_MSI_IRQS         128
->>>> +#define XILINX_NUM_MSI_IRQS 128
->>>> +#ifdef CONFIG_ARM
->>>> +#define TOT_NR_IRQS         XILINX_NUM_MSI_IRQS
->>>> +#else
->>>> +#define TOT_NR_IRQS         (NR_IRQS + XILINX_NUM_MSI_IRQS)
->>>> +#endif
->>>
->>> Something looks wrong here in the microblaze variant. What does NR_IRQS
->>> have to do with it?
->>
->> Arnd: What was the story regarding NR_IRQS?
->> I remember some discussion about it but just forget.
->>
->> Default value in include/asm-generic/irq.h is 64.
->> Current value is 32 because microblaze primary interrupt controller is
->> axi_intc core which has up to 32 input lines.
-> 
-> The value in asm-generic is completely arbitrary, it's just something
-> that happens to work for a number of the simpler architectures.
-> 
-> Traditionally, there is a a fixed NR_IRQS which defines the maximum
-> number of interrupts that can be used, and each irqchip has a fixed
-> start offset below that number.
-> 
-> On modern systems, you have CONFIG_SPARSE_IRQ, which lets an irqchip
-> allocate its own interrupts, without an upper limit. This is more
-> flexible and avoids preallocating space for all irq_desc instances,
-> so it saves memory.
+When DT based probing is used but the DMA request fails, the
+driver will print uninitialized stack data from the rx_req
+and tx_req variables, as indicated by this warning:
 
-ok. That was the story. I will look if there is any issue to enable
-SPARSE_IRQ for Microblaze.
+drivers/mmc/host/omap_hsmmc.c: In function 'omap_hsmmc_probe':
+drivers/mmc/host/omap_hsmmc.c:2162:3: warning: 'rx_req' may be used uninitialized in this function [-Wmaybe-uninitialized]
+   dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
 
-I also need to move intc driver out of arch.
+This removes the DMA request line number from the warning, which
+is the easiest solution and won't hurt us any more as we are
+planning to remove the legacy code path anyway.
 
-Thanks,
-Michal
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+A simpler patch as v1 with the same result, as suggested by Peter Ujfalusi.
+
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index b6639ea0bf18..87f0d840a166 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -2159,7 +2159,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ 						 &rx_req, &pdev->dev, "rx");
+ 
+ 	if (!host->rx_chan) {
+-		dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
++		dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel\n");
+ 		ret = -ENXIO;
+ 		goto err_irq;
+ 	}
+@@ -2169,7 +2169,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ 						 &tx_req, &pdev->dev, "tx");
+ 
+ 	if (!host->tx_chan) {
+-		dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", tx_req);
++		dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel\n");
+ 		ret = -ENXIO;
+ 		goto err_irq;
+ 	}
