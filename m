@@ -1,64 +1,103 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 26 Jan 2016 09:54:38 +0100
-Subject: ARM: mvebu_v5_defconfig: Enable sound module needed for OpenRD
-In-Reply-To: <20160125214547.GB12980@jirafa.cyrius.com> (Martin Michlmayr's
- message of "Mon, 25 Jan 2016 13:45:47 -0800")
-References: <20160111042540.GA31022@jirafa.cyrius.com>
- <87zivteq7t.fsf@free-electrons.com>
- <20160125214547.GB12980@jirafa.cyrius.com>
-Message-ID: <87io2gd8kx.fsf@free-electrons.com>
+Date: Tue, 26 Jan 2016 09:58:57 +0100
+Subject: [PATCH 1/2] ARM: DTS: kirkwood-openrd-client: fix audio
+In-Reply-To: <1453588600-14831-2-git-send-email-aaro.koskinen@iki.fi> (Aaro
+ Koskinen's message of "Sun, 24 Jan 2016 00:36:39 +0200")
+References: <1453588600-14831-1-git-send-email-aaro.koskinen@iki.fi>
+ <1453588600-14831-2-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <87egd4d8dq.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+Hi Aaro,
  
- On lun., janv. 25 2016, Martin Michlmayr <tbm@cyrius.com> wrote:
+ On sam., janv. 23 2016, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
 
-> * Gregory CLEMENT <gregory.clement@free-electrons.com> [2016-01-25 14:36]:
->>  On lun., janv. 11 2016, Martin Michlmayr <tbm@cyrius.com> wrote:
->> > OpenRD-Client requires the CS42L51 codec.
->> 
->> This patch do not apply anymore on v4.5-rc1.
->> 
->> Could you regenerate it, please?
->> 
->> Then I will apply it on mvebu/defconfig with Andrew'w Reviewed-by tag.
+> Fix audio on kirkwood-openrd-client:
 >
-> ARM: mvebu_v5_defconfig: Enable sound module needed for OpenRD
+> 1) The audio-controller was left disabled.
 >
-> OpenRD-Client requires the CS42L51 codec.
+> 2) The probe fails because cs42l51 is missing #sound-dai-cells.
 >
-> Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
-> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+> 	/sound/simple-audio-card,codec: could not get #sound-dai-cells for /ocp at f1000000/i2c at 11000/cs42l51 at 4a
+> 	asoc-simple-card sound: parse error -22
+> 	asoc-simple-card: probe of sound failed with error -22
+>
+> 3) The mapping is incorrect:
+>
+> 	asoc-simple-card sound: cs42l51-hifi <-> spdif mapping ok
+>
+>    should be:
+>
+> 	asoc-simple-card sound: cs42l51-hifi <-> i2s mapping ok
+>
+> Reported-by: Rick Thomas <rbthomas@pobox.com>
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
 
-This is not what I expected, it is not a proper patch so I can't apply
-it. However I did it myself.
-
-
-So, I applied on mvebu/defconfig
+Applied on mvebu/dt with Reviewed-by tag from Andrew Lunn and Tested-by
+tag from Rick Thomas.
 
 Thanks,
 
 Gregory
 
-
+> ---
+>  arch/arm/boot/dts/kirkwood-openrd-client.dts | 6 +++++-
+>  arch/arm/boot/dts/kirkwood.dtsi              | 2 +-
+>  2 files changed, 6 insertions(+), 2 deletions(-)
 >
-> diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
-> index af29780..9317e5a 100644
-> --- a/arch/arm/configs/mvebu_v5_defconfig
-> +++ b/arch/arm/configs/mvebu_v5_defconfig
-> @@ -137,6 +137,7 @@ CONFIG_SND=y
->  CONFIG_SND_SOC=y
->  CONFIG_SND_KIRKWOOD_SOC=y
->  CONFIG_SND_SOC_ALC5623=y
-> +CONFIG_SND_SOC_CS42L51_I2C=y
->  CONFIG_SND_SIMPLE_CARD=y
->  CONFIG_HID_DRAGONRISE=y
->  CONFIG_HID_GYRATION=y
->
+> diff --git a/arch/arm/boot/dts/kirkwood-openrd-client.dts b/arch/arm/boot/dts/kirkwood-openrd-client.dts
+> index 887b9c1..96ff59d 100644
+> --- a/arch/arm/boot/dts/kirkwood-openrd-client.dts
+> +++ b/arch/arm/boot/dts/kirkwood-openrd-client.dts
+> @@ -20,6 +20,9 @@
+>  	compatible = "marvell,openrd-client", "marvell,openrd", "marvell,kirkwood-88f6281", "marvell,kirkwood";
+>  
+>  	ocp at f1000000 {
+> +		audio-controller at a0000 {
+> +			status = "okay";
+> +		};
+>  		i2c at 11000 {
+>  			status = "okay";
+>  			clock-frequency = <400000>;
+> @@ -27,6 +30,7 @@
+>  			cs42l51: cs42l51 at 4a {
+>  				compatible = "cirrus,cs42l51";
+>  				reg = <0x4a>;
+> +				#sound-dai-cells = <0>;
+>  			};
+>  		};
+>  	};
+> @@ -37,7 +41,7 @@
+>  		simple-audio-card,mclk-fs = <256>;
+>  
+>  		simple-audio-card,cpu {
+> -			sound-dai = <&audio0>;
+> +			sound-dai = <&audio0 0>;
+>  		};
+>  
+>  		simple-audio-card,codec {
+> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+> index 7b5a4a1..7445a15 100644
+> --- a/arch/arm/boot/dts/kirkwood.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> @@ -381,7 +381,7 @@
+>  
+>  		audio0: audio-controller at a0000 {
+>  			compatible = "marvell,kirkwood-audio";
+> -			#sound-dai-cells = <0>;
+> +			#sound-dai-cells = <1>;
+>  			reg = <0xa0000 0x2210>;
+>  			interrupts = <24>;
+>  			clocks = <&gate_clk 9>;
 > -- 
-> Martin Michlmayr
-> http://www.cyrius.com/
+> 2.4.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
 Gregory Clement, Free Electrons
