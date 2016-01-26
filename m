@@ -1,61 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Jan 2016 11:54:35 +0000
-Subject: iommu/arm-smmu-v2 ASID/VMID calculation
-In-Reply-To: <6F24A28A-6302-4C48-A933-B47A9735808C@caviumnetworks.com>
-References: <198F501C-8D30-4EB5-BC40-4F40BB75D40B@caviumnetworks.com>
- <20160125170312.GJ22927@arm.com>
- <E978AB4F-5CB0-42D8-8152-04C77DB664A1@caviumnetworks.com>
- <6F24A28A-6302-4C48-A933-B47A9735808C@caviumnetworks.com>
-Message-ID: <20160126115435.GB21553@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 26 Jan 2016 12:04:32 +0000
+Subject: [PATCH] regulator: return NULL for dummy bulk_get operation
+In-Reply-To: <1453737537-1960121-1-git-send-email-arnd@arndb.de>
+References: <1453737537-1960121-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160126120432.GF6588@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 03:11:27AM +0000, Chalamarla, Tirumalesh wrote:
-> one my colleague points out, ASIDPNE also implementation defined. 
+On Mon, Jan 25, 2016 at 04:58:50PM +0100, Arnd Bergmann wrote:
+> Drivers that call regulator_bulk_get or devm_regulator_bulk_get when
+> CONFIG_REGULATOR is disabled see the function return successfully, but
+> cannot use the "consumer" pointers that are meant to be returned from
+> the functions, as the values are uninitialized. Gcc warns about this:
 
-It looks pretty well defined to me, despite being a hint:
+> drivers/usb/phy/phy-qcom-8x16-usb.c: In function 'phy_8x16_probe':
+> drivers/usb/phy/phy-qcom-8x16-usb.c:284:13: error: 'regs[0].consumer' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> drivers/usb/phy/phy-qcom-8x16-usb.c:285:13: error: 'regs[1].consumer' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> drivers/usb/phy/phy-qcom-8x16-usb.c:286:12: error: 'regs[2].consumer' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 
-  This ASIDPNE indication is only a hint, and an SMMU can ignore it. In
-  particular, if the SMMU implementation does not support the ASIDPNE
-  feature, broadcast TLB invalidate operations ignore this hint and
-  invalidate matching TLB entries when broadcast TLB invalidation is
-  enabled.
+The usage in that driver looks a bit dodgy - the disable function is
+just an open coding of regulator_bulk_disable() with no error checking
+while the enable function is doing a series of set_voltage() calls on
+every enable which look a lot like values that I'd expect to come from
+constraints rather than being set explicitly (the VDD values are an API
+abuse we know about in the Qualcomm drivers).  The fact that it never
+varies the voltage is a warning sign that the driver might not want to
+be using set_voltage() at all, and it should at least do that once on
+init if there's a use case.  A quick glance at in tree DTs suggests that
+there's no actual runtime variation.
 
-But what does this have to do with the problem at hand?
-
-> >I don?t think it followed spec.
-> >
-> >The SMMU spec (IHI0062C) says (section 2.2):
-> >
-> >   - The exact behavior of any TLB functionality is IMPLEMENTATION DEFINED
-
-... and immediately qualifies that with:
-
-  The SMMU architecture does not limit how a TLB is implemented, provided
-  it obeys the TLB Invalidate operations.
-
-which is to say, you can build the TLB how you like, providing that it
-follows the programmers model for invalidation. Otherwise portable
-software will break and people will send patches to "fix" it.
-
-> >Section 2.2 describes the constraints on sharing (e.g. multiple contexts
-> >using the same ASID says):
-> >
-> >      "If multiple context banks have hte same attributes but describe
-> >       different translations, the results of a TLB lookup are UNPREDICTABLE".
-
-That's describing a TLB conflict. These don't occur, because we ensure
-each of your 128 context banks has different attributes (i.e. ASID/VMID).
-
-The problem is that you have shared state between multiple SMMU instances,
-which I don't think is correct. I'm fine with a workaround, but I don't
-want this logic to be used on other implementations where it is not
-needed.
-
-> >The present smmu driver assumes ASID should only be unique per SMMU, this
-> >might not be true for all Implementations. 
-
-So far, it appears to be true for all Implementations apart from yours
-and therefore needs to be quirked.
-
-Will
+I'm not 100% convinced this didn't actually warn us about a real
+problem.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160126/192be020/attachment.sig>
