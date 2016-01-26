@@ -1,77 +1,71 @@
 From: ralf@ramses-pyramidenbau.de (Ralf Ramsauer)
-Date: Tue, 26 Jan 2016 17:59:18 +0100
-Subject: [PATCH v2 2/2] ARM: tegra: Add high speed UARTs to Jetson TK1 device
- tree
+Date: Tue, 26 Jan 2016 17:59:17 +0100
+Subject: [PATCH v2 1/2] ARM: tegra: Fixed typo
 In-Reply-To: <1453827558-10954-1-git-send-email-ralf@ramses-pyramidenbau.de>
 References: <1453827558-10954-1-git-send-email-ralf@ramses-pyramidenbau.de>
-Message-ID: <1453827558-10954-3-git-send-email-ralf@ramses-pyramidenbau.de>
+Message-ID: <1453827558-10954-2-git-send-email-ralf@ramses-pyramidenbau.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the APB DMA high speed UARTs of the Jetson TK1. So
-far, they were only enabled in NVidia's official BSP.
-
-Those additional UARTs are exposed on the expansion connector J3A2:
-
- UART1:
-  Pin 41: BR_UART1_TXD
-  Pin 44: BR_UART1_RXD
-
- UART2:
-  Pin 65: UART2_RXD
-  Pin 68: UART2_TXD
-  Pin 71: UART2_CTS_L
-  Pin 74: UART2_RTS_L
-
 Signed-off-by: Ralf Ramsauer <ralf@ramses-pyramidenbau.de>
 ---
- arch/arm/boot/dts/tegra124-jetson-tk1.dts | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm/boot/dts/tegra114.dtsi | 2 +-
+ arch/arm/boot/dts/tegra124.dtsi | 2 +-
+ arch/arm/boot/dts/tegra20.dtsi  | 2 +-
+ arch/arm/boot/dts/tegra30.dtsi  | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-index 66b4451..4ee2e63 100644
---- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-+++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-@@ -12,7 +12,11 @@
- 	aliases {
- 		rtc0 = "/i2c at 0,7000d000/pmic at 40";
- 		rtc1 = "/rtc at 0,7000e000";
-+
-+		/* This order keeps the mapping DB9 connector <-> ttyS0 */
- 		serial0 = &uartd;
-+		serial1 = &uarta;
-+		serial2 = &uartb;
- 	};
- 
- 	memory {
-@@ -1367,6 +1371,28 @@
- 		};
- 	};
- 
-+	/*
-+	 * First high speed UART, exposed on the expansion connector J3A2
-+	 *   Pin 41: BR_UART1_TXD
-+	 *   Pin 44: BR_UART1_RXD
-+	 */
-+	serial at 0,70006000 {
-+		compatible = "nvidia,tegra124-hsuart", "nvidia,tegra30-hsuart";
-+		status = "okay";
-+	};
-+
-+	/*
-+	 * Second high speed UART, exposed on the expansion connector J3A2
-+	 *   Pin 65: UART2_RXD
-+	 *   Pin 68: UART2_TXD
-+	 *   Pin 71: UART2_CTS_L
-+	 *   Pin 74: UART2_RTS_L
-+	 */
-+	serial at 0,70006040 {
-+		compatible = "nvidia,tegra124-hsuart", "nvidia,tegra30-hsuart";
-+		status = "okay";
-+	};
-+
- 	/* DB9 serial port */
- 	serial at 0,70006300 {
- 		status = "okay";
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index d845bd1..5017ed8 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -256,7 +256,7 @@
+ 	 * driver and APB DMA based serial driver for higher baudrate
+ 	 * and performace. To enable the 8250 based driver, the compatible
+ 	 * is "nvidia,tegra114-uart", "nvidia,tegra20-uart" and to enable
+-	 * the APB DMA based serial driver, the comptible is
++	 * the APB DMA based serial driver, the compatible is
+ 	 * "nvidia,tegra114-hsuart", "nvidia,tegra30-hsuart".
+ 	 */
+ 	uarta: serial at 70006000 {
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index 68669f7..995289b 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -322,7 +322,7 @@
+ 	 * driver and APB DMA based serial driver for higher baudrate
+ 	 * and performace. To enable the 8250 based driver, the compatible
+ 	 * is "nvidia,tegra124-uart", "nvidia,tegra20-uart" and to enable
+-	 * the APB DMA based serial driver, the comptible is
++	 * the APB DMA based serial driver, the compatible is
+ 	 * "nvidia,tegra124-hsuart", "nvidia,tegra30-hsuart".
+ 	 */
+ 	uarta: serial at 0,70006000 {
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 33173e1..8fb61b9 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -309,7 +309,7 @@
+ 	 * driver and APB DMA based serial driver for higher baudrate
+ 	 * and performace. To enable the 8250 based driver, the compatible
+ 	 * is "nvidia,tegra20-uart" and to enable the APB DMA based serial
+-	 * driver, the comptible is "nvidia,tegra20-hsuart".
++	 * driver, the compatible is "nvidia,tegra20-hsuart".
+ 	 */
+ 	uarta: serial at 70006000 {
+ 		compatible = "nvidia,tegra20-uart";
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 313e260..c6edc8c 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -371,7 +371,7 @@
+ 	 * driver and APB DMA based serial driver for higher baudrate
+ 	 * and performace. To enable the 8250 based driver, the compatible
+ 	 * is "nvidia,tegra30-uart", "nvidia,tegra20-uart" and to enable
+-	 * the APB DMA based serial driver, the comptible is
++	 * the APB DMA based serial driver, the compatible is
+ 	 * "nvidia,tegra30-hsuart", "nvidia,tegra20-hsuart".
+ 	 */
+ 	uarta: serial at 70006000 {
 -- 
 2.4.10
