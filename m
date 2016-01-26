@@ -1,37 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Jan 2016 17:17:24 +0100
-Subject: [PATCH] [SUBMITTED] [media] pwc: hide unused label
-Message-ID: <1453825059-3339577-1-git-send-email-arnd@arndb.de>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 27 Jan 2016 00:17:40 +0800
+Subject: [PATCH 06/10] vfio: introduce
+ vfio_group_alloc_map_/unmap_free_reserved_iova
+In-Reply-To: <1453813968-2024-7-git-send-email-eric.auger@linaro.org>
+Message-ID: <201601270035.rJBZW1lE%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pwc driver causes a warning when CONFIG_USB_PWC_INPUT_EVDEV is unset:
+Hi Eric,
 
-drivers/media/usb/pwc/pwc-if.c: In function 'usb_pwc_probe':
-drivers/media/usb/pwc/pwc-if.c:1115:1: warning: label 'err_video_unreg' defined but not used [-Wunused-label]
+[auto build test ERROR on v4.5-rc1]
+[also build test ERROR on next-20160125]
+[cannot apply to iommu/next]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-This moves the unused label and code inside another #ifdef to
-get rid of the warning.
+url:    https://github.com/0day-ci/linux/commits/Eric-Auger/KVM-PCIe-MSI-passthrough-on-ARM-ARM64/20160126-211921
+config: x86_64-randconfig-s3-01262306 (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+All errors (new ones prefixed by >>):
+
+>> ERROR: "alloc_iova" [drivers/vfio/vfio_iommu_type1.ko] undefined!
+>> ERROR: "free_iova" [drivers/vfio/vfio_iommu_type1.ko] undefined!
+
 ---
- drivers/media/usb/pwc/pwc-if.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/media/usb/pwc/pwc-if.c b/drivers/media/usb/pwc/pwc-if.c
-index 086cf1c7bd7d..432554d07e6e 100644
---- a/drivers/media/usb/pwc/pwc-if.c
-+++ b/drivers/media/usb/pwc/pwc-if.c
-@@ -1112,8 +1112,10 @@ static int usb_pwc_probe(struct usb_interface *intf, const struct usb_device_id
- 
- 	return 0;
- 
-+#ifdef CONFIG_USB_PWC_INPUT_EVDEV
- err_video_unreg:
- 	video_unregister_device(&pdev->vdev);
-+#endif
- err_unregister_v4l2_dev:
- 	v4l2_device_unregister(&pdev->v4l2_dev);
- err_free_controls:
--- 
-2.7.0
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 23402 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/38c4b575/attachment-0001.obj>
