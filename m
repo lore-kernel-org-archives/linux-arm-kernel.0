@@ -1,78 +1,135 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Tue, 26 Jan 2016 15:37:42 +0800
-Subject: Unhandled level 2 translation fault on A72 board.
-Message-ID: <56A72246.4050105@huawei.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Tue, 26 Jan 2016 15:35:33 +0800
+Subject: [PATCH v2 1/4] dt-bindings: power: reset: add document for
+ reboot-mode driver
+In-Reply-To: <20160125171134.GA21713@rob-hp-laptop>
+References: <1452598029-8222-1-git-send-email-andy.yan@rock-chips.com>
+ <1452598189-8272-1-git-send-email-andy.yan@rock-chips.com>
+ <20160120182840.GA15741@rob-hp-laptop> <56A07A6D.3010406@rock-chips.com>
+ <20160125171134.GA21713@rob-hp-laptop>
+Message-ID: <56A721C5.4050606@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone:
+Hi Rob:
 
-I met this problem when running the hackbench test on A72 chip board:
+On 2016?01?26? 01:11, Rob Herring wrote:
+> On Thu, Jan 21, 2016 at 02:27:57PM +0800, Andy Yan wrote:
+>> Hi Rob:
+>>     thanks for your review.
+>> On 2016?01?21? 02:28, Rob Herring wrote:
+>>> On Tue, Jan 12, 2016 at 07:29:49PM +0800, Andy Yan wrote:
+>>>> add device tree binding document for reboot-mode driver
+>>>>
+>>>> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+>>>>
+>>>> ---
+>>>>
+>>>> Changes in v2: None
+>>>> Changes in v1: None
+>>>>
+>>>>   .../bindings/power/reset/reboot-mode.txt           | 41 +++++++++++++++++
+>>>>   .../bindings/power/reset/syscon-reboot-mode.txt    | 52 ++++++++++++++++++++++
+>>>>   2 files changed, 93 insertions(+)
+>>>>   create mode 100644 Documentation/devicetree/bindings/power/reset/reboot-mode.txt
+>>>>   create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/power/reset/reboot-mode.txt b/Documentation/devicetree/bindings/power/reset/reboot-mode.txt
+>>>> new file mode 100644
+>>>> index 0000000..81d9f66
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/power/reset/reboot-mode.txt
+>>>> @@ -0,0 +1,41 @@
+>>>> +Generic reboot mode core map driver
+> [...]
+>
+>>>> +		compatible = "syscon-reboot-mode";
+>>>> +		offset = <0x40>;
+>>> This doc by itself is a little confusing. For example, is a child of the
+>>> syscon node? I would remove offset (and perhaps compatible) from this
+>>> example.
+>>     Yes, is a child of a syscon mapped node. For example, Rockchip platform
+>> use a register of PMU(rk3066/rk3288) or GRF(rk3036), PMU and GRF are aleady
+>> mapped by syscon.
+>>     offset and compatible are used by write interface driver like
+>> syscon-reboot-mode.c. If you don't like it appear in the core map doc, I
+>> will move it to the syscon-reboot-mode.txt?
+> Yes, try to make this doc stand on its own. It will obviously be
+> incomplete lacking information on where in the DT it goes. So perhaps a
+> note stating reboot-mode node location is defined in platform specific
+> binding docs.
+>
+>>>> +
+>>>> +		loader {
+>>>> +			linux,mode = "loader";
+>>>> +			loader,magic = <BOOT_LOADER>;
+>>>> +		};
+>>> Sorry, my previous suggestion was not clear. I'm suggesting get rid of
+>>> the subnodes and just do properties like this:
+>>>
+>>> loader = <BOOT_LOADER>;
+>>> maskrom = <BOOT_MASKROM>;
+>>>
+>>> That's the same amount of information unless node names and linux,mode
+>>> values are going to diverge. Do they need to? I can't see a reason.
+>>      Because the command"linux,mode" and value"loader,magic" is vendor
+>> specific. I don't know what commands and how many mode other platform will
+>> use. So as John says in his reply, this sort of flexibility help us adapt
+>> the driver to different hardware/system environments.
+> The only part of "reboot to fastboot" that is vendor specific would be
+> the magic value. While we can have custom modes, we should standardize
+> the common ones as much as possible. As I pointed out in my reply to
+> John, we can still support vendor specific modes with just a property.
 
-sh[4779]: unhandled level 2 translation fault (11) at 0x7f96be0c80, esr 0x830000
-06 
-pgd = ffffffc01a1f0000 
-[7f96be0c80] *pgd=0000000084a20003, *pud=0000000084a20003, *pmd=0000000000000000
+     Based your reply to John, I rebuild the code like bellow, I hope this
+     is what you mean.
 
-CPU: 1 PID: 4779 Comm: sh Tainted: G O 4.1.15+ #21 
-Hardware name: Hisilicon PhosphorHi1382 EVB (DT) 
-task: ffffffc0163cc500 ti: ffffffc083abc000 task.ti: ffffffc083abc000 
-PC is at 0x7f96be0c80 
-LR is at 0x7fb2684eb4 
-pc : [<0000007f96be0c80>] lr : [<0000007fb2684eb4>] pstate: 60000000 
-sp : 0000007fe9bfc4a0 
-x29: 0000007fe9bfc4a0 x28: 0000000000000000 
-x27: 0000000000000000 x26: 0000000019834cc8 
-x25: 00000000ffffffff x24: 00000000004b8000 
-x23: 0000007fe9bfdf39 x22: 0000000019834cc8 
-x21: 0000000000000000 x20: 0000000000000005 
-x19: 0000007fb27305f0 x18: 0000000000000000 
-x17: 0000007fb2684c40 x16: 00000000004b5560 
-x15: 0000007fb2807030 x14: 0000007fb25e8084 
-x13: ffffffffffffffff x12: 0000000000000020 
-x11: 0101010101010101 x10: 7f7f7f7f7f7f7f7f 
-x9 : fefefefefefefeff x8 : 0000000000000040 
-x7 : 00000000004909b8 x6 : 0000007fe9bfdf39 
-x5 : 0000000000000000 x4 : 0000000000000002 
-x3 : 0000000000000003 x2 : 0000007fb2732000 
-x1 : 0000007fb2730618 x0 : 0000007f96be0c80 
+     DTS file:
+     reboot-mode {
+                         compatible = "syscon-reboot-mode";
+                         offset = <0x94>;
+                         mode-normal = <BOOT_NORMAL>;
+                         mode-recovery = <BOOT_RECOVERY>;
+                         mode-fastboot = <BOOT_FASTBOOT>;
+                         mode-loader = <BOOT_LOADER>;
+                         mode-maskrom = <BOOT_MASKROM>;
+                 };
 
-sh[4963]: unhandled level 2 translation fault (11) at 0x00000000, esr 0x92000006
-pgd = ffffffc0180c6000 
-[00000000] *pgd=0000000015157003, *pud=0000000015157003, *pmd=0000000000000000 
 
-CPU: 0 PID: 4963 Comm: sh Tainted: G O 4.1.15+ #21 
-Hardware name: Hisilicon PhosphorHi1382 EVB (DT) 
-task: ffffffc0163cb980 ti: ffffffc0840c8000 task.ti: ffffffc0840c8000 
-PC is at 0x42c0c8 
-LR is at 0x42c03c 
-pc : [<000000000042c0c8>] lr : [<000000000042c03c>] pstate: 80000000 
-sp : 0000007fcb3d70f0 
-x29: 0000007fcb3d7e10 x28: 0000000000000000 
-x27: 0000000000000000 x26: 000000003888fcc8 
-x25: 00000000ffffffff x24: 00000000004b8000 
-x23: 0000000000000000 x22: 0000000038890238 
-x21: 000000003888ff20 x20: 0000000000001500 
-x19: 0000000000000000 x18: 0000000000000000 
-x17: 0000007f88fee630 x16: 00000000004b5d40 
-x15: 0000007f89171030 x14: 0000007f88f52084 
-x13: ffffffffffffffff x12: 0000000000000020 
-x11: 0000007f89098a28 x10: 0000000000000000 
-x9 : 0000000000000000 x8 : 0000000000000104 
-x7 : 0000007f8909a000 x6 : 0000000000000000 
-x5 : 0000000000000000 x4 : 0000000000000000 
-x3 : 0000000000000000 x2 : 0000000000000000 
-x1 : 0000000000000002 x0 : 000000003888ff20 
+    driver:
 
-????????????????????????????????????
+     #define PREFIX "mode-"
 
-if I run the benchmark only on the core which is in the same cluster, it looks fine and no error happened,
-but if I enable the core which in the different cluster, it will happened.
+     struct property *prop;
+     size_t len = strlen(PREFIX);
+     for_each_property_of_node(dev->of_node, prop) {
+                 if (len > strlen(prop->name) || strncmp(prop->name, 
+PREFIX, len))
+                         continue;
+                 info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
+                 if (!info)
+                         return -ENOMEM;
+                 strcpy(info->mode, prop->name + len);
+                 if (of_property_read_u32(dev->of_node, prop->name, 
+&info->magic)) {
+                         dev_err(dev, "reboot mode %s without magic 
+number\n",
+                                 info->mode);
+                         devm_kfree(dev, info);
+                         continue;
+                 }
+                 list_add_tail(&info->list, &reboot->head);
+         }
 
-I remember that I met the same problem on the A57 and fix it by enable the [bit6] of the CPUECTLR_EL1 and enable MN,
-But this time, I enable the same setting and looks no effort, I have no idea about this problem, does A57 and A72 has
-so big difference on TLB?
 
-Thanks for any suggestion.
-
-Ding
+>>> We need to be clear what loader means. More specifically, it is boot
+>>> into bootloader shell.
+>>      Actually, Rockchip platform will reboot into a bootloader download mode
+>> with this command. This mode can download faster than maskrom download mode.
+> My point is proven. I assumed one thing and you meant something else.
+> Doesn't matter what the mode is, just needs to be clear.
+>
+> Rob
+>
+>
+>
