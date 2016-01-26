@@ -1,40 +1,58 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Tue, 26 Jan 2016 19:36:48 +0900
-Subject: [PATCH v3] ARM: dts: kirkwood: add device tree for buffalo
- linkstation ls-qvl
-In-Reply-To: <87a8nsd4uk.fsf@free-electrons.com>
-References: <1453652964-21489-1-git-send-email-rogershimizu@gmail.com>
- <1453740250-16765-1-git-send-email-rogershimizu@gmail.com>
- <87zivtd21i.fsf@free-electrons.com>
- <CAEQ9gEnqgi01E0nE3Yw_8gTGe-_1+T3=HgPKNAcjDD+c2AP=bw@mail.gmail.com>
- <87vb6hd0hh.fsf@free-electrons.com>
- <CAEQ9gEk0Z-Zgm1aqVQaYRpWVp35VcC2sVAH9Qz+1kCMHHYLWkw@mail.gmail.com>
- <87a8nsd4uk.fsf@free-electrons.com>
-Message-ID: <CAEQ9gEn11D261BDMpKyn9H2gHjnWbsys4a+dLoOCsHo5Xxqx5g@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 26 Jan 2016 11:24:02 +0100
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160114222046.GH3818@linux.vnet.ibm.com>
+References: <569565DA.2010903@imgtec.com> <20160113104516.GE25458@arm.com>
+ <56969F4B.7070001@imgtec.com>
+ <20160113204844.GV6357@twins.programming.kicks-ass.net>
+ <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
+ <56980145.5030901@imgtec.com>
+ <20160114204827.GE3818@linux.vnet.ibm.com>
+ <56981212.7050301@imgtec.com>
+ <20160114222046.GH3818@linux.vnet.ibm.com>
+Message-ID: <20160126102402.GE6357@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 7:15 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
->  On mar., janv. 26 2016, Roger Shimizu <rogershimizu@gmail.com> wrote:
->> For that ls-wvl patch, "git am <patch 07>" would fail,
->> but after "patch -p1 < .git/rebase-apply/patch", and then "git add -A;
->> git am --continue", that patch can be applied.
->> After that, I can successfully apply this ls-qvl patch.
->>
->> I'm not sure whether you use "git am" to apply patches.
->> Maybe you use other similar ways. Please try and let me know if still
->> need my rebase.
->
-> Usually I applied the patch directly from emacs, which call a kind of
-> git am. However your patches did not apply directly, I had to reduce the
-> context by using git am -C2. I did it for the patch 5 and 6, and I
-> forgot ot do it for patch 7. Now it is done and indeed this patch
-> applied well ontop of it.
+On Thu, Jan 14, 2016 at 02:20:46PM -0800, Paul E. McKenney wrote:
+> On Thu, Jan 14, 2016 at 01:24:34PM -0800, Leonid Yegoshin wrote:
+> > On 01/14/2016 12:48 PM, Paul E. McKenney wrote:
+> > >
+> > >So SYNC_RMB is intended to implement smp_rmb(), correct?
+> > Yes.
+> > >
+> > >You could use SYNC_ACQUIRE() to implement read_barrier_depends() and
+> > >smp_read_barrier_depends(), but SYNC_RMB probably does not suffice.
+> > 
+> > If smp_read_barrier_depends() is used to separate not only two reads
+> > but read pointer and WRITE basing on that pointer (example below) -
+> > yes. I just doesn't see any example of this in famous
+> > Documentation/memory-barriers.txt and had no chance to know what you
+> > use it in this way too.
+> 
+> Well, Documentation/memory-barriers.txt was intended as a guide for Linux
+> kernel hackers, and not for hardware architects.
 
-Learned that "git am" can try -C2 when there's small conflicts.
-And glad to hear that all my work got applied well.
-Thank you!
+Yeah, this goes under the header: memory-barriers.txt is _NOT_ a
+specification (I seem to keep repeating this).
 
-Cheers,
-Roger
+> ------------------------------------------------------------------------
+> 
+> commit 955720966e216b00613fcf60188d507c103f0e80
+> Author: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> Date:   Thu Jan 14 14:17:04 2016 -0800
+> 
+>     documentation: Subsequent writes ordered by rcu_dereference()
+>     
+>     The current memory-barriers.txt does not address the possibility of
+>     a write to a dereferenced pointer.  This should be rare, 
+
+How are these rare? Isn't:
+
+	rcu_read_lock()
+	obj = rcu_dereference(ptr);
+	if (!atomic_inc_not_zero(&obj->ref))
+		obj = NULL;
+	rcu_read_unlock();
+
+a _very_ common thing to do?
