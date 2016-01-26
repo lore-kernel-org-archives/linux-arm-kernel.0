@@ -1,85 +1,54 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 26 Jan 2016 13:26:02 -0800
-Subject: [RFC][PATCH 1/4] arm64: Drop alloc function from create_mapping
-In-Reply-To: <20160126112211.GB5059@leverpostej>
-References: <1453740735-17898-1-git-send-email-labbott@fedoraproject.org>
- <1453740735-17898-2-git-send-email-labbott@fedoraproject.org>
- <20160126112211.GB5059@leverpostej>
-Message-ID: <56A7E46A.9060102@redhat.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Tue, 26 Jan 2016 13:46:19 -0800
+Subject: [PATCH v4 0/2] pci: Add host controller driver for Cavium ThunderX
+ PCIe
+Message-ID: <1453844781-24380-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/26/2016 03:22 AM, Mark Rutland wrote:
-> On Mon, Jan 25, 2016 at 08:52:12AM -0800, Laura Abbott wrote:
->> create_mapping is only used in fixmap_remap_fdt. All the create_mapping
->> calls need to happen on existing translation table pages without
->> additional allocations. Rather than have an alloc function be called
->> and fail, just set it to NULL and catch it's use.
->
-> This looks sensible to me, though I think we should rename
-> create_mapping to something that makes it clear that not allocating
-> pages is a deliberate design decision, and thus it must be called with
-> care.
->
-> Perhaps create_mapping_noalloc?
+From: David Daney <david.daney@cavium.com>
 
-I was wondering about that. That name sounds clearer.
+Some Cavium ThunderX processors require quirky access methods for the
+config space of the PCIe bridge.
 
->
-> Thanks,
-> Mark.
->
->> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
->> ---
->>   arch/arm64/mm/mmu.c | 14 ++++++++++----
->>   1 file changed, 10 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> index e141762..2d6e7cf 100644
->> --- a/arch/arm64/mm/mmu.c
->> +++ b/arch/arm64/mm/mmu.c
->> @@ -116,7 +116,9 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
->>   	pte_t *pte;
->>
->>   	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
->> -		phys_addr_t pte_phys = pgtable_alloc();
->> +		phys_addr_t pte_phys;
->> +		BUG_ON(!pgtable_alloc);
->> +		pte_phys = pgtable_alloc();
->>   		pte = pte_fixmap(pte_phys);
->>   		if (pmd_sect(*pmd))
->>   			split_pmd(pmd, pte);
->> @@ -158,7 +160,9 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
->>   	 * Check for initial section mappings in the pgd/pud and remove them.
->>   	 */
->>   	if (pud_none(*pud) || pud_sect(*pud)) {
->> -		phys_addr_t pmd_phys = pgtable_alloc();
->> +		phys_addr_t pmd_phys;
->> +		BUG_ON(!pgtable_alloc);
->> +		pmd_phys = pgtable_alloc();
->>   		pmd = pmd_fixmap(pmd_phys);
->>   		if (pud_sect(*pud)) {
->>   			/*
->> @@ -223,7 +227,9 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
->>   	unsigned long next;
->>
->>   	if (pgd_none(*pgd)) {
->> -		phys_addr_t pud_phys = pgtable_alloc();
->> +		phys_addr_t pud_phys;
->> +		BUG_ON(!pgtable_alloc);
->> +		pud_phys = pgtable_alloc();
->>   		__pgd_populate(pgd, pud_phys, PUD_TYPE_TABLE);
->>   	}
->>   	BUG_ON(pgd_bad(*pgd));
->> @@ -319,7 +325,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
->>   		return;
->>   	}
->>   	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
->> -			     early_pgtable_alloc);
->> +			     NULL);
->>   }
->>
->>   void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
->> --
->> 2.5.0
->>
+There are two patches:
+
+1) Refactor code in pci-host-generic so that it can more easily be
+   used by other drivers.  This splits the driver for CAM and ECAM
+   access methods to a separate file from the common host driver code.
+
+2) Add the ThunderX PCIe driver, which leverages the code in
+   pci-host-generic
+
+Changes from v3: Add some Acked-by, rebased to v4.5.0-rc1
+
+Changes from v2: Improve device tree binding example as noted by Rob
+Herring.  Rename pcie-thunder-pem.* to pci-thunder-pem.* for better
+consistency.  Update MAINTAINERS to reflect the changes.
+
+Changes from v1: Split CAM and ECAM code from common driver code as
+suggested by Arnd Bergmann.  Fix spelling errors in
+pcie-thunder-pem.txt
+
+
+
+David Daney (2):
+  PCI: generic: Refactor code to enable reuse by other drivers.
+  pci, pci-thunder-pem: Add PCIe host driver for ThunderX processors.
+
+ .../devicetree/bindings/pci/pci-thunder-pem.txt    |  43 ++++
+ MAINTAINERS                                        |   9 +
+ drivers/pci/host/Kconfig                           |  11 +
+ drivers/pci/host/Makefile                          |   2 +
+ drivers/pci/host/pci-host-common.c                 | 194 ++++++++++++++
+ drivers/pci/host/pci-host-common.h                 |  47 ++++
+ drivers/pci/host/pci-host-generic.c                | 181 +------------
+ drivers/pci/host/pci-thunder-pem.c                 | 283 +++++++++++++++++++++
+ 8 files changed, 593 insertions(+), 177 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/pci-thunder-pem.txt
+ create mode 100644 drivers/pci/host/pci-host-common.c
+ create mode 100644 drivers/pci/host/pci-host-common.h
+ create mode 100644 drivers/pci/host/pci-thunder-pem.c
+
+-- 
+1.8.3.1
