@@ -1,47 +1,59 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 26 Jan 2016 18:30:18 +0800
-Subject: [PATCH 1/2] crypto: jitterentropy - always select CRYPTO_RNG
-In-Reply-To: <1453740644-1980309-1-git-send-email-arnd@arndb.de>
-References: <1453740644-1980309-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160126103018.GA19508@gondor.apana.org.au>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 26 Jan 2016 11:32:00 +0100
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160126102402.GE6357@twins.programming.kicks-ass.net>
+References: <20160113104516.GE25458@arm.com> <56969F4B.7070001@imgtec.com>
+ <20160113204844.GV6357@twins.programming.kicks-ass.net>
+ <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
+ <56980145.5030901@imgtec.com>
+ <20160114204827.GE3818@linux.vnet.ibm.com>
+ <56981212.7050301@imgtec.com>
+ <20160114222046.GH3818@linux.vnet.ibm.com>
+ <20160126102402.GE6357@twins.programming.kicks-ass.net>
+Message-ID: <20160126103200.GI6375@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 05:50:34PM +0100, Arnd Bergmann wrote:
-> When building the jitterentropy driver by itself, we get a link error
-> when CRYPTO_RNG is not enabled as well:
-> 
-> crypto/built-in.o: In function `jent_mod_init':
-> jitterentropy-kcapi.c:(.init.text+0x98): undefined reference to `crypto_register_rng'
-> crypto/built-in.o: In function `jent_mod_exit':
-> jitterentropy-kcapi.c:(.exit.text+0x60): undefined reference to `crypto_unregister_rng'
-> 
-> This moves the 'select CRYPTO_RNG' from CRYPTO_DRBG to CRYPTO_JITTERENTROPY
-> to ensure the API is always there when it's used, not just when DRBG is
-> also enabled.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  crypto/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/crypto/Kconfig b/crypto/Kconfig
-> index 7240821137fd..99109b93604a 100644
-> --- a/crypto/Kconfig
-> +++ b/crypto/Kconfig
-> @@ -1586,13 +1586,13 @@ config CRYPTO_DRBG_CTR
->  config CRYPTO_DRBG
->  	tristate
->  	default CRYPTO_DRBG_MENU
-> -	select CRYPTO_RNG
+On Tue, Jan 26, 2016 at 11:24:02AM +0100, Peter Zijlstra wrote:
 
-I think we should leave this there as DRBG itself is an RNG and
-it just uses JITTERENTROPY which happens to be an RNG.
+> Yeah, this goes under the header: memory-barriers.txt is _NOT_ a
+> specification (I seem to keep repeating this).
 
-Otherwise this looks OK to me.
+Do we want this ?
 
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+---
+ Documentation/memory-barriers.txt | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/Documentation/memory-barriers.txt b/Documentation/memory-barriers.txt
+index a61be39c7b51..433326ebdc26 100644
+--- a/Documentation/memory-barriers.txt
++++ b/Documentation/memory-barriers.txt
+@@ -1,3 +1,4 @@
++
+ 			 ============================
+ 			 LINUX KERNEL MEMORY BARRIERS
+ 			 ============================
+@@ -5,6 +6,22 @@
+ By: David Howells <dhowells@redhat.com>
+     Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+ 
++==========
++DISCLAIMER
++==========
++
++This document is not a specification; it is intentionally (for the sake of
++brevity) and unintentionally (due to being human) incomplete. This document is
++meant as a guide to using the various memory barriers provided by Linux, but
++in case of any doubt (and there are many) please ask.
++
++I repeat, this document is not a specification of what Linux expects from
++hardware.
++
++=====
++INDEX
++=====
++
+ Contents:
+ 
+  (*) Abstract memory access model.
