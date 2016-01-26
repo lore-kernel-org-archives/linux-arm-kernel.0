@@ -1,55 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 26 Jan 2016 16:11:51 +0000
-Subject: [PATCH] arm64: Add support for Half precision floating point
-In-Reply-To: <20160126160257.GB28238@arm.com>
-References: <1453823566-26742-1-git-send-email-suzuki.poulose@arm.com>
- <20160126160257.GB28238@arm.com>
-Message-ID: <20160126161151.GE14823@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Jan 2016 17:17:24 +0100
+Subject: [PATCH] [SUBMITTED] [media] pwc: hide unused label
+Message-ID: <1453825059-3339577-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 04:02:58PM +0000, Will Deacon wrote:
-> On Tue, Jan 26, 2016 at 03:52:46PM +0000, Suzuki K Poulose wrote:
-> > ARMv8.2 extensions [1] include an optional feature, which supports
-> > half precision(16bit) floating point/asimd data processing
-> > instructions. This patch adds support for detecting and exposing
-> > the same to the userspace via HWCAPs
-> > 
-> > [1] https://community.arm.com/groups/processors/blog/2016/01/05/armv8-a-architecture-evolution
-> > 
-> > Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> > ---
-> >  arch/arm64/include/uapi/asm/hwcap.h |    2 ++
-> >  arch/arm64/kernel/cpufeature.c      |    2 ++
-> >  arch/arm64/kernel/cpuinfo.c         |    2 ++
-> >  3 files changed, 6 insertions(+)
-> > 
-> > diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
-> > index 361c8a8..a739287 100644
-> > --- a/arch/arm64/include/uapi/asm/hwcap.h
-> > +++ b/arch/arm64/include/uapi/asm/hwcap.h
-> > @@ -28,5 +28,7 @@
-> >  #define HWCAP_SHA2		(1 << 6)
-> >  #define HWCAP_CRC32		(1 << 7)
-> >  #define HWCAP_ATOMICS		(1 << 8)
-> > +#define HWCAP_FPHP		(1 << 9)
-> > +#define HWCAP_ASIMDHP		(1 << 10)
-> 
-> Where did we get to with the mrs trapping you proposed here?
-> 
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/374609.html
-> 
-> At some point, we need to consider whether or not we want to continue
-> adding new HWCAPs or whether your suggestion above is actually useful
-> to userspace.
+The pwc driver causes a warning when CONFIG_USB_PWC_INPUT_EVDEV is unset:
 
-IMO, even if we merge the MRS emulation, I would still like to see
-HWCAPs exported. We are not short on bits yet (53 to go ;)).
+drivers/media/usb/pwc/pwc-if.c: In function 'usb_pwc_probe':
+drivers/media/usb/pwc/pwc-if.c:1115:1: warning: label 'err_video_unreg' defined but not used [-Wunused-label]
 
-> Did the libc guys get anywhere with a prototype? What do we need to do
-> to make progress with it?
+This moves the unused label and code inside another #ifdef to
+get rid of the warning.
 
-This investigation should indeed continue but I think it is orthogonal.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/media/usb/pwc/pwc-if.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
+diff --git a/drivers/media/usb/pwc/pwc-if.c b/drivers/media/usb/pwc/pwc-if.c
+index 086cf1c7bd7d..432554d07e6e 100644
+--- a/drivers/media/usb/pwc/pwc-if.c
++++ b/drivers/media/usb/pwc/pwc-if.c
+@@ -1112,8 +1112,10 @@ static int usb_pwc_probe(struct usb_interface *intf, const struct usb_device_id
+ 
+ 	return 0;
+ 
++#ifdef CONFIG_USB_PWC_INPUT_EVDEV
+ err_video_unreg:
+ 	video_unregister_device(&pdev->vdev);
++#endif
+ err_unregister_v4l2_dev:
+ 	v4l2_device_unregister(&pdev->v4l2_dev);
+ err_free_controls:
 -- 
-Catalin
+2.7.0
