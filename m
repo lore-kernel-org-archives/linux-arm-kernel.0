@@ -1,53 +1,57 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Tue, 26 Jan 2016 02:23:48 -0800
-Subject: [PATCH v6] clk: mediatek: Export CPU mux clocks for CPU frequency
- control
-In-Reply-To: <20151217090628.GA317@quark.deferred.io>
-References: <1442230072-31593-1-git-send-email-pi-cheng.chen@linaro.org>
- <CAGS+omCkYTPyjMk6QaoxGAL4QVU8VcpWyFqWhST+iP2EFRcRYg@mail.gmail.com>
- <CALx668XVnhhLJWs7RBxvaX=SU=S9=wFVT9HMDP2edqiH4Jio4A@mail.gmail.com>
- <20151217090628.GA317@quark.deferred.io>
-Message-ID: <CAGS+omBWEVac_in-ZDurf4R5tje3hzJPyr5nsP2Z_v7F8sSCUg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 26 Jan 2016 11:25:32 +0100
+Subject: [PATCH 2/2] serial: atmel: add support for new UART version
+In-Reply-To: <201601260224.Djb6afTp%fengguang.wu@intel.com>
+References: <201601260224.Djb6afTp%fengguang.wu@intel.com>
+Message-ID: <56A7499C.8090109@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael, Pi-Cheng,
+Le 25/01/2016 19:34, kbuild test robot a ?crit :
+> Hi Nicolas,
+> 
+> [auto build test ERROR on usb/usb-testing]
+> [also build test ERROR on v4.5-rc1 next-20160125]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Nicolas-Ferre/serial-atmel-trivial-clean-the-IP-version-decoding-code/20160126-014116
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git usb-testing
+> config: i386-allmodconfig (attached as .config)
+> reproduce:
+>         # save the attached .config to linux build tree
+>         make ARCH=i386 
+> 
+> All errors (new ones prefixed by >>):
+> 
+>    drivers/tty/serial/atmel_serial.c: In function 'atmel_get_ip_name':
+>>> drivers/tty/serial/atmel_serial.c:1717:2: error: 'new_uart' undeclared (first use in this function)
 
-On Thu, Dec 17, 2015 at 1:06 AM, Michael Turquette
-<mturquette@baylibre.com> wrote:
->
-> On 12/01, Pi-Cheng Chen wrote:
-> > On Mon, Nov 30, 2015 at 11:48 AM, Daniel Kurtz <djkurtz@chromium.org> wrote:
-> > > Hi Pi-Cheng and Michael,
-> > >
-> > > On Mon, Sep 14, 2015 at 7:27 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
-> > >> From: "pi-cheng.chen" <pi-cheng.chen@linaro.org>
-> > >>
-> > >> This patch adds CPU mux clocks which are used by Mediatek cpufreq driver
-> > >> for intermediate clock source switching.
-> > >
-> > > It looks like this patch was never picked up.
-> > > It is required for MT8173 cpufreq.
-> > >
-> > > What is the plan to get this one merged?
-> >
-> > Hi Dan,
-> > Mike is working on a new CCF feature called "coordinated clock rate changes"
-> > which would help to migrate mt8173-cpufreq driver to generic cpufreq-dt
-> > driver, and I am working with him to port MT8173 clock driver on the new
-> > feature. So I think that's why this patch was not picked since it will
-> > be migrated to new implementation once the new feature's ready.
-> >
-> > @Mike:
-> > Are you plannig to post those patches on the mailing list ?
-> > Or is it fine for you to take this first and then I will refine it for
-> > the new feature later?
->
-> I plan to post those patches next week.
+Sorry for this dumb error and the associated noise!
 
-Were these patches ever posted?
-Or should we consider going ahead and trying to merge this 4-month old
-MTK CPU mux clock patch into v4.5 before it is too late?
+I send a v2 immediately.
 
-Thanks,
--Dan
+>      new_uart = 0x55415254; /* UART */
+>      ^
+>    drivers/tty/serial/atmel_serial.c:1717:2: note: each undeclared identifier is reported only once for each function it appears in
+> 
+> vim +/new_uart +1717 drivers/tty/serial/atmel_serial.c
+> 
+>   1711		int name = atmel_uart_readl(port, ATMEL_US_NAME);
+>   1712		u32 version;
+>   1713		u32 usart, dbgu_uart;
+>   1714		/* ASCII decoding for IP version */
+>   1715		usart = 0x55534152;	/* USAR(T) */
+>   1716		dbgu_uart = 0x44424755;	/* DBGU */
+>> 1717		new_uart = 0x55415254;	/* UART */
+>   1718	
+>   1719		atmel_port->has_hw_timer = false;
+>   1720	
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> 
+
+
+-- 
+Nicolas Ferre
