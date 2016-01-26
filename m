@@ -1,93 +1,26 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Tue, 26 Jan 2016 17:27:16 +0200
-Subject: [PATCH V8 18/23] coresight: etm-perf: new PMU driver for ETM
- tracers
-In-Reply-To: <1452807977-8069-19-git-send-email-mathieu.poirier@linaro.org>
-References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
- <1452807977-8069-19-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <878u3c744r.fsf@ashishki-desk.ger.corp.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Jan 2016 16:29:18 +0100
+Subject: [PATCH 1/7] [media] pwc: hide unused label
+In-Reply-To: <1453817424-3080054-1-git-send-email-arnd@arndb.de>
+References: <1453817424-3080054-1-git-send-email-arnd@arndb.de>
+Message-ID: <2829409.X8sFnRsOHN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+On Tuesday 26 January 2016 15:09:55 Arnd Bergmann wrote:
+> The pwc driver causes a warning when CONFIG_USB_PWC_INPUT_EVDEV is unset:
+> 
+> drivers/media/usb/pwc/pwc-if.c: In function 'usb_pwc_probe':
+> drivers/media/usb/pwc/pwc-if.c:1115:1: warning: label 'err_video_unreg' defined but not used [-Wunused-label]
+> 
+> Obviously, the cleanup of &pdev->vdev is not needed without the input device,
+> so we can just move it inside of the existing #ifdef and remove the
+> extra label.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
 
-> +static int etm_event_init(struct perf_event *event)
-> +{
-> +	if (event->attr.type != etm_pmu.type)
-> +		return -ENOENT;
-> +
-> +	if (event->cpu >= nr_cpu_ids)
-> +		return -EINVAL;
+Please ignore patch 1. I made some late changes and failed to noticed
+the build failure I introduced in another configuration.
 
-perf_event_alloc() already does this. Except for this one doesn't cover
-the negative space.
-
-[snip]
-
-> +static void etm_free_aux(void *data)
-> +{
-> +	struct etm_event_data *event_data = data;
-> +
-> +	pr_err("Queing work\n");
-
-Probably not pr_err().
-
-> +	schedule_work(&event_data->work);
-> +}
-
-[snip]
-
-> +static void etm_event_start(struct perf_event *event, int flags)
-> +{
-> +	int cpu = smp_processor_id();
-> +	struct etm_event_data *event_data;
-> +	struct perf_output_handle *handle = this_cpu_ptr(&ctx_handle);
-> +	struct coresight_device *sink, *csdev = per_cpu(csdev_src, cpu);
-> +
-> +	if (!csdev)
-> +		goto fail;
-> +
-> +	/*
-> +	 * Deal with the ring buffer API and get a handle on the
-> +	 * session's information.
-> +	 */
-> +	event_data = perf_aux_output_begin(handle, event);
-> +	if (WARN_ON_ONCE(!event_data))
-> +		goto fail;
-
-There really shouldn't be a warning here. I understand that the 'no
-buffer' case is taped over by the !csdev check above, but there are
-other ligitimate reasons for perf_aux_output_begin() to return NULL,
-like no-space-left.
-
-> +
-> +	/* We need a sink, no need to continue without one */
-> +	sink = coresight_get_sink(event_data->path[cpu]);
-> +	if (!sink || !sink_ops(sink)->set_buffer)
-> +		goto fail_end_stop;
-
-Is this possible after the coresight_build_path() things in setup_aux?
-Might be a better candidate for WARN_*ONCE().
-
-> +
-> +	/* Configure the sink */
-> +	if (sink_ops(sink)->set_buffer(sink, handle,
-> +				       event_data->snk_config))
-> +		goto fail_end_stop;
-> +
-> +	/* Nothing will happen without a path */
-> +	if (coresight_enable_path(event_data->path[cpu], CS_MODE_PERF))
-> +		goto fail_end_stop;
-
-I'd like to understand all the potential failures here, because it's
-really a good idea to keep those to a minimum for the sake of
-consistency. That is, if the user succeeded in creating an event, about
-the only good reason for the event not starting is a filled up buffer.
-
-This is why it makes a lot of sense to keep all the
-coresight_build_path()/coresight_enable_path() to the .event_init()
-phase and let them fail early, if they should fail.
-
-Regards,
---
-Alex
+	Arnd
