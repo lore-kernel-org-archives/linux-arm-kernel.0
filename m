@@ -1,19 +1,64 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 25 Jan 2016 20:44:52 -0600
-Subject: [PATCH V3 01/11] dt-bindings: ARM: Mediatek: add MT2701/7623
- string to the PMIC wrapper doc
-In-Reply-To: <1453715604-36856-2-git-send-email-blogic@openwrt.org>
-References: <1453715604-36856-1-git-send-email-blogic@openwrt.org>
- <1453715604-36856-2-git-send-email-blogic@openwrt.org>
-Message-ID: <20160126024452.GA25985@rob-hp-laptop>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Tue, 26 Jan 2016 10:59:02 +0800
+Subject: [PATCH v7 0/2] Add Rockchip Inno-HDMI driver
+Message-ID: <1453777142-30119-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 10:53:14AM +0100, John Crispin wrote:
-> Signed-off-by: John Crispin <blogic@openwrt.org>
-> Cc: devicetree at vger.kernel.org
-> ---
->  Documentation/devicetree/bindings/soc/mediatek/pwrap.txt |    1 +
->  1 file changed, 1 insertion(+)
 
-Acked-by: Rob Herring robh at kernel.org>
+Here are a brief introduction to Innosilicon HDMI IP:
+  - Support HDMI 1.4a, HDCP 1.2 and DVI 1.0 standard compliant transmitter
+  - Support HDMI1.4 a/b 3D function defined in HDMI 1.4 a/b spec
+  - Digital video interface supports a pixel size of 24, 30, 36, 48bits color depth in RGB
+  - S/PDIF output supports PCM, Dolby Digital, DTS digital audio transmission
+    (32-192kHz Fs) using IEC60958 and IEC 61937
+  - The EDID and CEC function are also supported by Innosilicon HDMI Transmitter Controlle
+
+Changes in v7:
+- Correct the module licnese statement (Paul)
+     - MODULE_LICENSE("GPL");
+     + MODULE_LICENSE("GPL v2");
+- Start indentation with tabs and fix the misspell in Kconfig (Paul)
+- Carry the lost device-binding document (Heiko)
+
+Changes in v6:
+- Rebase the Makefile/Kconfig files which add by Chris's rockchip-mipi driver (Caeser)
+
+Changes in v5:
+- Use hdmi_infoframe helper functions to packed the infoframe (Russell)
+- Remove the unused double wait_for_completion_timeout for ddc transfer (Russell)
+- Remove the unused local variable in "inno_hdmi_i2c_write()" function (Russell)
+
+Changes in v4:
+- Modify the commit title "drm/rockchip: hdmi: ..." (Mark)
+- Correct the "DKMS" to "DPMS" (Mark)
+- Fix over 80 characters problems (Mark)
+- Remove encoder .prepare/.commit helper functions, and move the vop mode
+configure function into encoder .enable helper functions. (Mark)
+
+Changes in v3:
+- Use encoder enable/disable function, and remove the encoder DPMS function
+- Keep HDMI PLL power on in standby mode
+
+Changes in v2:
+- Using DRM atomic helper functions for connector init (Mark)
+- Remove "hdmi->connector.encoder = encoder;" (Mark)
+- Add the Acked-by tags from Rob
+- Correct the misspell "rk3036-dw-hdmi" (Heiko)
+
+Yakir Yang (2):
+  drm/rockchip: hdmi: add Innosilicon HDMI support
+  dt-bindings: add document for Innosilicon HDMI on Rockchip platform
+
+ .../display/rockchip/inno_hdmi-rockchip.txt        |  50 ++
+ drivers/gpu/drm/rockchip/Kconfig                   |   8 +
+ drivers/gpu/drm/rockchip/Makefile                  |   1 +
+ drivers/gpu/drm/rockchip/inno_hdmi.c               | 941 +++++++++++++++++++++
+ drivers/gpu/drm/rockchip/inno_hdmi.h               | 362 ++++++++
+ 5 files changed, 1362 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
+ create mode 100644 drivers/gpu/drm/rockchip/inno_hdmi.c
+ create mode 100644 drivers/gpu/drm/rockchip/inno_hdmi.h
+
+-- 
+1.9.1
