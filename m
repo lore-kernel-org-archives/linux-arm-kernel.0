@@ -1,113 +1,178 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 26 Jan 2016 17:01:22 +0000
-Subject: [PATCH V4 16/16] ARM64: tegra: select PM_GENERIC_DOMAINS
-In-Reply-To: <5697D7E2.3030209@nvidia.com>
-References: <1449241037-22193-1-git-send-email-jonathanh@nvidia.com>
- <8579242.omBpg1aLr2@wuerfel>
- <CAPDyKFrewx5CbS9QKZAxqq0Gu+TywQ3nkDGZFURR=PJLtkDuyQ@mail.gmail.com>
- <11122786.kKumQ3Dhls@wuerfel> <5697D7E2.3030209@nvidia.com>
-Message-ID: <56A7A662.4090203@nvidia.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 26 Jan 2016 10:08:21 -0700
+Subject: [PATCH V8 20/23] perf tools: making function set_max_cpu_num()
+ non static
+In-Reply-To: <20160125212955.GG22501@kernel.org>
+References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
+ <1452807977-8069-21-git-send-email-mathieu.poirier@linaro.org>
+ <CANLsYkzmTMi3jmVjwNiNsw6P5pPkZEz6zYWFsVzayy+r2ojTTA@mail.gmail.com>
+ <20160125211242.GF22501@kernel.org>
+ <20160125212955.GG22501@kernel.org>
+Message-ID: <CANLsYkwbBCwT0B4NV0pGo+avyyX9kiPzYZK5WtmfHaqnW8Q6uA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Ulf,
-
-On 14/01/16 17:16, Jon Hunter wrote:
-> 
-> On 14/01/16 09:21, Arnd Bergmann wrote:
->> On Thursday 14 January 2016 09:57:14 Ulf Hansson wrote:
->>> On 13 January 2016 at 21:43, Arnd Bergmann <arnd@arndb.de> wrote:
->>>> On Wednesday 13 January 2016 18:03:24 Thierry Reding wrote:
->>>>> On Fri, Dec 04, 2015 at 02:57:17PM +0000, Jon Hunter wrote:
->>>>>> Enable PM_GENERIC_DOMAINS for tegra 64-bit devices. To ensure that devices
->>>>>> dependent upon a particular power-domain are only probed when that power
->>>>>> domain has been powered up, requires that PM is made mandatory for tegra
->>>>>> 64-bit devices and so select this option for tegra as well.
->>>>>>
->>>>>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
->>>>>> ---
->>>>>>  arch/arm64/Kconfig.platforms | 2 ++
->>>>>>  1 file changed, 2 insertions(+)
->>>>>>
->>>>>> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
->>>>>> index 9806324fa215..e0b5bd0aff0f 100644
->>>>>> --- a/arch/arm64/Kconfig.platforms
->>>>>> +++ b/arch/arm64/Kconfig.platforms
->>>>>> @@ -93,6 +93,8 @@ config ARCH_TEGRA
->>>>>>       select GENERIC_CLOCKEVENTS
->>>>>>       select HAVE_CLK
->>>>>>       select PINCTRL
->>>>>> +     select PM
->>>>>> +     select PM_GENERIC_DOMAINS
->>>>>>       select RESET_CONTROLLER
->>>>>>       help
->>>>>>         This enables support for the NVIDIA Tegra SoC family.
->>>>>
->>>>> This has potential consequences for multi-platform builds, doesn't it?
->>>>> All of a sudden any combination of builds that includes Tegra won't be
->>>>> possible to build without PM support.
->>>>>
->>>>> Adding linux-arm-kernel at lists.infradead.org for visibility.
->>>>>
->>>>>
->>>>
->>>> Agreed, it would be better to add 'depends on PM_GENERIC_DOMAINS'
->>>> dependencies in the drivers that require it.
->>>>
->>>
->>> The problem with that approach is that if those drivers are cross SoC
->>> drivers. In some cases PM isn't needed and it is.
->>>
->>> Of course I don't have the in depth knowledge about the drivers being
->>> used in Tegra which may need PM, perhaps it's not that many?
->>>
->>> Anyway, to me it seems like ARCH_TEGRA should depend on PM instead.
->>> Would that work?
+On 25 January 2016 at 14:29, Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+> Em Mon, Jan 25, 2016 at 06:12:42PM -0300, Arnaldo Carvalho de Melo escreveu:
+>> Em Mon, Jan 25, 2016 at 01:46:22PM -0700, Mathieu Poirier escreveu:
+>> > On 14 January 2016 at 14:46, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+>> > > For memory allocation purposes, code located in other places
+>> > > then util/cpumap.c may want to know how many CPUs the system has.
+>> > >
+>> > > This patch is making function set_max_cpu_num() available to
+>> > > other parts of the perf tool so that global variable
+>> > > 'max_cpu_num' gets the right value when referenced by cpu__max_cpu().
+>> > >
+>> > > Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+>> > > Cc: Ingo Molnar <mingo@redhat.com>
+>> > > Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+>> > > Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> > > ---
+>> > >  tools/perf/util/cpumap.c | 2 +-
+>> > >  tools/perf/util/cpumap.h | 1 +
+>> > >  2 files changed, 2 insertions(+), 1 deletion(-)
+>> > >
+>> > > diff --git a/tools/perf/util/cpumap.c b/tools/perf/util/cpumap.c
+>> > > index 10af1e7524fb..ae179320c0c0 100644
+>> > > --- a/tools/perf/util/cpumap.c
+>> > > +++ b/tools/perf/util/cpumap.c
+>> > > @@ -380,7 +380,7 @@ out:
+>> > >  }
+>> > >
+>> > >  /* Determine highest possible cpu in the system for sparse allocation */
+>> > > -static void set_max_cpu_num(void)
+>> > > +void set_max_cpu_num(void)
+>> > >  {
+>> > >         const char *mnt;
+>> > >         char path[PATH_MAX];
+>> > > diff --git a/tools/perf/util/cpumap.h b/tools/perf/util/cpumap.h
+>> > > index 85f7772457fa..45fa963345eb 100644
+>> > > --- a/tools/perf/util/cpumap.h
+>> > > +++ b/tools/perf/util/cpumap.h
+>> > > @@ -14,6 +14,7 @@ struct cpu_map {
+>> > >         int map[];
+>> > >  };
+>> > >
+>> > > +void set_max_cpu_num(void);
+>> > >  struct cpu_map *cpu_map__new(const char *cpu_list);
+>> > >  struct cpu_map *cpu_map__empty_new(int nr);
+>> > >  struct cpu_map *cpu_map__dummy_new(void);
+>> > > --
+>> > > 2.1.4
+>> > >
+>> >
+>> > Arnaldo,
+>> >
+>> > I can't queue this patch for 4.6 without at least a reviewed by from you.
 >>
->> That seems a little over-restrictive, as it prevents you from
->> building a tegra kernel even if none of the drivers that rely
->> on the pm domains are used, but it would work.
+>> This one I remember, looks ugly, the name set_max_cpu_num() looks
+>> strange, when that was restricted (static) to that cpumap.c file, it
+>> wasn't a problem, exporting it for wider usage looks bad.
 >>
->> I've looked again at how other platforms (on arm32) do it, and
->> a lot of them use "select PM_GENERIC_DOMAINS if PM", so they don't
->> automatically enable PM, but they enable the pmdomain code if
->> PM is already set. No driver really "depends on PM_GENERIC_DOMAINS",
->> so we shouldn't really start that now or we end up with circular
->> dependencies in the long run.
-> 
-> What I am not a fan of in the current gen-pd implementation, is if we
-> have !PM but the platform has power-domains, then there is no way to
-> determine if a device within a power-domain can be probed safely. Some
-> arm platforms force all the power-domains on during early init in the
-> case of !PM. IMO this is still not ideal, because if a power-domain
-> failed to turn on during early init, then you should probably call
-> BUG(). Ideally the kernel should be able to boot and only probe the
-> devices you know that can be probed safely.
-> 
-> So for platforms have use PM_GENERIC_DOMAINS, I think really they should
-> select PM and not "select PM_GENERIC_DOMAINS if PM". IMO, "select
-> PM_GENERIC_DOMAINS if PM" seems fragile.
+>> You've been waiting for this for quite a while, it seems, lemme stop
+>> what I am doing to check this...
+>
+> So, please check the patch below, what you need then is just to use
+> cpu__max_cpu().
 
-Any more thoughts on this?
+I like your approach - thanks for the review.  I will spin V9 when I
+have received Adrian's comments.
 
-I have been discussing with Thierry and we think that selecting PM for
-tegra still makes the most sense. The question is, is this ok for
-multi-configs?
+Mathieu
 
-The only other suggestion/thought I have is to allow
-PM_GENERIC_DOMAINS_OF to be selected independently of PM so that we can
-have minimal support for PM domains that allows you to register PM
-domains with the kernel and their current state, but does not allow you
-to control them, etc. This way tegra could always select
-PM_GENERIC_DOMAINS_OF regardless of PM, and we would be able to
-determine if we can probe a device safely.
-
-I am not sure that Rafael is too keen on this approach but that is the
-only alternative I have come up with.
-
-I have a rough outline of a patch for this here [0] FWIW.
-
-Cheers
-Jon
-
-[0] https://github.com/jonhunter/linux/commits/gpd
+>
+> - Arnaldo
+>
+> diff --git a/tools/perf/util/cpumap.c b/tools/perf/util/cpumap.c
+> index fa935093a599..9bcf2bed3a6d 100644
+> --- a/tools/perf/util/cpumap.c
+> +++ b/tools/perf/util/cpumap.c
+> @@ -8,6 +8,10 @@
+>  #include <linux/bitmap.h>
+>  #include "asm/bug.h"
+>
+> +static int max_cpu_num;
+> +static int max_node_num;
+> +static int *cpunode_map;
+> +
+>  static struct cpu_map *cpu_map__default_new(void)
+>  {
+>         struct cpu_map *cpus;
+> @@ -486,6 +490,32 @@ out:
+>                 pr_err("Failed to read max nodes, using default of %d\n", max_node_num);
+>  }
+>
+> +int cpu__max_node(void)
+> +{
+> +       if (unlikely(!max_node_num))
+> +               set_max_node_num();
+> +
+> +       return max_node_num;
+> +}
+> +
+> +int cpu__max_cpu(void)
+> +{
+> +       if (unlikely(!max_cpu_num))
+> +               set_max_cpu_num();
+> +
+> +       return max_cpu_num;
+> +}
+> +
+> +int cpu__get_node(int cpu)
+> +{
+> +       if (unlikely(cpunode_map == NULL)) {
+> +               pr_debug("cpu_map not initialized\n");
+> +               return -1;
+> +       }
+> +
+> +       return cpunode_map[cpu];
+> +}
+> +
+>  static int init_cpunode_map(void)
+>  {
+>         int i;
+> diff --git a/tools/perf/util/cpumap.h b/tools/perf/util/cpumap.h
+> index 71c41b9efabb..81a2562aaa2b 100644
+> --- a/tools/perf/util/cpumap.h
+> +++ b/tools/perf/util/cpumap.h
+> @@ -57,37 +57,11 @@ static inline bool cpu_map__empty(const struct cpu_map *map)
+>         return map ? map->map[0] == -1 : true;
+>  }
+>
+> -int max_cpu_num;
+> -int max_node_num;
+> -int *cpunode_map;
+> -
+>  int cpu__setup_cpunode_map(void);
+>
+> -static inline int cpu__max_node(void)
+> -{
+> -       if (unlikely(!max_node_num))
+> -               pr_debug("cpu_map not initialized\n");
+> -
+> -       return max_node_num;
+> -}
+> -
+> -static inline int cpu__max_cpu(void)
+> -{
+> -       if (unlikely(!max_cpu_num))
+> -               pr_debug("cpu_map not initialized\n");
+> -
+> -       return max_cpu_num;
+> -}
+> -
+> -static inline int cpu__get_node(int cpu)
+> -{
+> -       if (unlikely(cpunode_map == NULL)) {
+> -               pr_debug("cpu_map not initialized\n");
+> -               return -1;
+> -       }
+> -
+> -       return cpunode_map[cpu];
+> -}
+> +int cpu__max_node(void);
+> +int cpu__max_cpu(void);
+> +int cpu__get_node(int cpu);
+>
+>  int cpu_map__build_map(struct cpu_map *cpus, struct cpu_map **res,
+>                        int (*f)(struct cpu_map *map, int cpu, void *data),
