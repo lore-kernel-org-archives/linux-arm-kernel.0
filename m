@@ -1,124 +1,88 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 26 Jan 2016 14:00:07 +0000
-Subject: [PATCH V2 4/4] mfd: mediatek: add MT6323 support to MT6397 driver
-In-Reply-To: <56A76100.1020307@openwrt.org>
-References: <1453716887-38442-1-git-send-email-blogic@openwrt.org>
- <20160125124112.GG3368@x1> <56A64108.7020807@openwrt.org>
- <3476571.0yU9yvPsKF@linux-gy6r.site> <56A670A3.5030100@openwrt.org>
- <1453777643.26374.11.camel@mtksdaap41>
- <56A71CE5.4080201@openwrt.org> <20160126083433.GX3368@x1>
- <56A76100.1020307@openwrt.org>
-Message-ID: <20160126140007.GZ3368@x1>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 26 Jan 2016 15:00:10 +0100
+Subject: N900 sleep mode (in 4.5-rc0, if that matters)
+In-Reply-To: <20160125163332.GT19432@atomide.com>
+References: <20160123121022.GB12497@amd> <20160125163332.GT19432@atomide.com>
+Message-ID: <20160126140010.GA29723@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Jan 2016, John Crispin wrote:
+Hi!
 
+> > Power consumption seems to be in 500mA range, regardless of
+> > off_mode. That would mean about 2 hours of battery life, AFAICT.
 > 
+> Sounds like you have USB connected and charging? You can
+> get into just few mW range with the mainline kernel for sure
+> on omap3. It's just a quetion of fixing whatever few drivers
+> that are still causing issues on n900.
 > 
-> On 26/01/2016 09:34, Lee Jones wrote:
-> > On Tue, 26 Jan 2016, John Crispin wrote:
-> >> On 26/01/2016 04:07, Henry Chen wrote:
-> >>> On Mon, 2016-01-25 at 19:59 +0100, John Crispin wrote:
-> >>>>
-> >>>> On 25/01/2016 19:44, Matthias Brugger wrote:
-> >>>>> On Monday 25 Jan 2016 16:36:40 John Crispin wrote:
-> >>>>>> Hi,
-> >>>>>>
-> >>>>>> On 25/01/2016 13:41, Lee Jones wrote:
-> >>>>>>> Please honour the subject format of the subsystem you are contributing
-> >>>>>>> to.
-> >>>>>>>
-> >>>>>>> `git log --oneline -- $subsystem` gives you this.
-> >>>>>>>
-> >>>>>>> On Mon, 25 Jan 2016, John Crispin wrote:
-> >>>>>>>> Signed-off-by: John Crispin <blogic@openwrt.org>
-> >>>>>>>> ---
-> >>>>>>
-> >>>>>> [...]
-> >>>>>>
-> >>>>>>>> @@ -261,6 +271,15 @@ static int mt6397_probe(struct platform_device
-> >>>>>>>> *pdev)
-> >>>>>>>>
-> >>>>>>>>  	}
-> >>>>>>>>  	
-> >>>>>>>>  	switch (id & 0xff) {
-> >>>>>>>>
-> >>>>>>>> +	case MT6323_CID_CODE:
-> >>>>>>>> +		mt6397->int_con[0] = MT6323_INT_CON0;
-> >>>>>>>
-> >>>>>>> This is confusing.  You're still using memory allocated for a mt6397
-> >>>>>>> device.
-> >>>>>>
-> >>>>>> the variable is currently defined as struct mt6397_chip *mt6397;
-> >>>>>> shall i only change the name or also create a patch to rename the struct ?
-> >>>>>>
-> >>>>>
-> >>>>> I think we should rename the struct and the file as well.
-> >>>>>
-> >>>>> Cheers,
-> >>>>> Matthias
-> >>>>
-> >>>> Hi,
-> >>>>
-> >>>> that would have been my next question. renaming the struct would imply
-> >>>> renaming the driver and the whole namespace contained within. We would
-> >>>> then also need to change the Kconfig and Makefile. I am happy to do this
-> >>>> but want to be sure that is is actually wanted.
-> >>>>
-> >>>> 	John
-> >>> Hi,
-> >>>
-> >>> Since mt6323 was similar with mt6397, I think we can reuse the
-> >>> mt6397_chip without duplicate code.
-> >>>
-> >>> Maybe we can rename the local variable name to avoid confusing.
-> >>>
-> >>> struct mt6397_chip *mt_pmic;
-> >>> ...
-> >>> ...
-> >>> switch (id & 0xff) {
-> >>> 	case MT6323_CID_CODE:
-> >>> 		mt_pmic->int_con[0] = MT6323_INT_CON0;
-> >>> 		mt_pmic->int_con[1] = MT6323_INT_CON1;
-> >>> ...
-> >>> ...
-> >>>
-> >>> Henry
-> >>
-> >> Hi,
-> >>
-> >> IMHO we should either rename the namespace or not. renaming some
-> >> variables seems weird as that will just move the confusion/inconsistency
-> >> to another place in the code. I am however rather indifferent on this
-> >> matter.
-> > 
-> > It's common to name a driver after the device which was enabled first,
-> > so no need to rename the files or CONFIGs; however, it does seem
-> > prudent to generify the struct (both parts).
-> > 
-> 
-> Hi,
-> 
-> renaming struct mt6397_chip is not as straightforward as it seems as
-> other drivers such as pinctrl and rtc share the data structure with the
-> mfd driver.
-> 
-> i have kept the structs name as is for now and only renamed the instance.
+> Typically you need at least USB disconnected and LCD blanked
+> to start hitting the deeper idle states :)
 
-That's fine.
+Ok, no 4.4 kernel + your patch this time, USB disconnected, LCD
+blanked, but wifi connected and X session running on inactive vt. GSM
+connected to network.
 
-> If you want i can create a separate series that addresses only the
-> renaming of the structure. The "rename struct mt6397" patch would need
-> to do a change to drivers from 3 subsystems in 1 single commit as not to
-> break compile and merge order.
+It seems like I have rather lot of blocking bits:
 
-I'll leave this up to you.
+usbhost_pwrdm
+(ON),OFF:3321,RET:37501,INA:0,ON:40823,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+sgx_pwrdm
+(OFF),OFF:1,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+core_pwrdm
+(ON),OFF:0,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+per_pwrdm
+(ON),OFF:3321,RET:33,INA:0,ON:3355,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+dss_pwrdm
+(ON),OFF:3321,RET:19014,INA:0,ON:22336,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+cam_pwrdm
+(ON),OFF:3321,RET:37500,INA:2,ON:40824,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+neon_pwrdm (ON),OFF:3321,RET:37501,INA:0,ON:40823,RET-LOGIC-OFF:0
+mpu_pwrdm
+(ON),OFF:3321,RET:37501,INA:0,ON:40823,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+iva2_pwrdm
+(OFF),OFF:1,RET:1,INA:0,ON:2,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0,RE
+T-MEMBANK3-OFF:0,RET-MEMBANK4-OFF:0
+usbhost_clkdm->usbhost_pwrdm (1)
+sgx_clkdm->sgx_pwrdm (0)
+per_clkdm->per_pwrdm (19)
+cam_clkdm->cam_pwrdm (1)
+dss_clkdm->dss_pwrdm (1)
+d2d_clkdm->core_pwrdm (0)
+iva2_clkdm->iva2_pwrdm (0)
+mpu_clkdm->mpu_pwrdm (0)
+core_l4_clkdm->core_pwrdm (20)
+core_l3_clkdm->core_pwrdm (2)
+neon_clkdm->neon_pwrdm (0)
+00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
+ffdffe8d 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00200072
+0000000d 48004a28 (fa004a28) cm_idlest3_core
 
-The real problem from my PoV was the instance name.
+cm_idlest1_core changes periodicall often, to 00218072. The rest seems
+constant.
 
+I'm using script below:
+
+#!/bin/bash
+uarts=$(find /sys/class/tty/ttyO*/device/power/ -type d)
+for uart in $uarts; do
+    echo 3000 > $uart/autosuspend_delay_ms
+    done
+    uarts=$(find /sys/class/tty/ttyO*/power/ -type d)
+    for uart in $uarts; do
+        echo enabled > $uart/wakeup
+	    echo auto > $uart/control
+	    done
+	    sudo mount /dev/zero -t debugfs /sys/kernel/debug/
+	    echo 1 > /sys/kernel/debug/pm_debug/enable_off_mode
+
+sudo cat /sys/kernel/debug/pm_debug/count
+
+. Does it mean that more than 5 devices block the suspend?
+
+Best regards,
+								Pavel
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
