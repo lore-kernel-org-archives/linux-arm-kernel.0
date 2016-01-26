@@ -1,49 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Jan 2016 15:09:58 +0100
-Subject: [PATCH 4/7] [media] b2c2: flexcop: avoid unused function warnings
+Date: Tue, 26 Jan 2016 15:09:59 +0100
+Subject: [PATCH 5/7] [media] em28xx: only use mt9v011 if camera support is
+ enabled
 In-Reply-To: <1453817424-3080054-1-git-send-email-arnd@arndb.de>
 References: <1453817424-3080054-1-git-send-email-arnd@arndb.de>
-Message-ID: <1453817424-3080054-4-git-send-email-arnd@arndb.de>
+Message-ID: <1453817424-3080054-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flexcop driver has two functions that are normally used, except
-when multiple frontend drivers are disabled:
+In randconfig builds that select VIDEO_EM28XX_V4L2 and
+MEDIA_SUBDRV_AUTOSELECT, but not MEDIA_CAMERA_SUPPORT, we get
+a Kconfig warning:
 
-drivers/media/common/b2c2/flexcop-fe-tuner.c:42:12: warning: 'flexcop_set_voltage' defined but not used [-Wunused-function]
-drivers/media/common/b2c2/flexcop-fe-tuner.c:71:12: warning: 'flexcop_sleep' defined but not used [-Wunused-function]
+ warning: (VIDEO_EM28XX_V4L2) selects VIDEO_MT9V011 which has unmet direct dependencies (MEDIA_SUPPORT && I2C && VIDEO_V4L2 && MEDIA_CAMERA_SUPPORT)
 
-This avoids the build warning by updating the #ifdef for flexcop_set_voltage
-to the exact condition under which it is used. For flexcop_sleep, the
-condition is rather complex, so I resort to marking it as __maybe_unused,
-so the compiler can silently drop it.
+This avoids the warning by making that 'select' conditional on
+MEDIA_CAMERA_SUPPORT. Alternatively we could mark EM28XX as
+'depends on MEDIA_CAMERA_SUPPORT', but it does not seem to
+have any real dependency on that itself.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/media/common/b2c2/flexcop-fe-tuner.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/media/usb/em28xx/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/media/common/b2c2/flexcop-fe-tuner.c b/drivers/media/common/b2c2/flexcop-fe-tuner.c
-index 9c59f4306883..f5956402fc69 100644
---- a/drivers/media/common/b2c2/flexcop-fe-tuner.c
-+++ b/drivers/media/common/b2c2/flexcop-fe-tuner.c
-@@ -38,7 +38,7 @@ static int flexcop_fe_request_firmware(struct dvb_frontend *fe,
- #endif
+diff --git a/drivers/media/usb/em28xx/Kconfig b/drivers/media/usb/em28xx/Kconfig
+index e382210c4ada..75323f5efd0f 100644
+--- a/drivers/media/usb/em28xx/Kconfig
++++ b/drivers/media/usb/em28xx/Kconfig
+@@ -11,7 +11,7 @@ config VIDEO_EM28XX_V4L2
+ 	select VIDEO_SAA711X if MEDIA_SUBDRV_AUTOSELECT
+ 	select VIDEO_TVP5150 if MEDIA_SUBDRV_AUTOSELECT
+ 	select VIDEO_MSP3400 if MEDIA_SUBDRV_AUTOSELECT
+-	select VIDEO_MT9V011 if MEDIA_SUBDRV_AUTOSELECT
++	select VIDEO_MT9V011 if MEDIA_SUBDRV_AUTOSELECT && MEDIA_CAMERA_SUPPORT
  
- /* lnb control */
--#if FE_SUPPORTED(MT312) || FE_SUPPORTED(STV0299)
-+#if (FE_SUPPORTED(MT312) || FE_SUPPORTED(STV0299)) && FE_SUPPORTED(PLL)
- static int flexcop_set_voltage(struct dvb_frontend *fe,
- 			       enum fe_sec_voltage voltage)
- {
-@@ -68,7 +68,7 @@ static int flexcop_set_voltage(struct dvb_frontend *fe,
- #endif
- 
- #if FE_SUPPORTED(S5H1420) || FE_SUPPORTED(STV0299) || FE_SUPPORTED(MT312)
--static int flexcop_sleep(struct dvb_frontend* fe)
-+static int __maybe_unused flexcop_sleep(struct dvb_frontend* fe)
- {
- 	struct flexcop_device *fc = fe->dvb->priv;
- 	if (fc->fe_sleep)
+ 	---help---
+ 	  This is a video4linux driver for Empia 28xx based TV cards.
 -- 
 2.7.0
