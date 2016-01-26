@@ -1,63 +1,55 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 26 Jan 2016 10:59:12 +0100
-Subject: [PATCH V2 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge driver
- to work on both Zynq and Microblaze
-In-Reply-To: <4734542.KZZp0TeeeM@wuerfel>
-References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
- <1452620173-4905-4-git-send-email-bharatku@xilinx.com>
- <4734542.KZZp0TeeeM@wuerfel>
-Message-ID: <56A74370.4090000@xilinx.com>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Tue, 26 Jan 2016 19:06:16 +0900
+Subject: [PATCH v3] ARM: dts: kirkwood: add device tree for buffalo
+ linkstation ls-qvl
+In-Reply-To: <87vb6hd0hh.fsf@free-electrons.com>
+References: <1453652964-21489-1-git-send-email-rogershimizu@gmail.com>
+ <1453740250-16765-1-git-send-email-rogershimizu@gmail.com>
+ <87zivtd21i.fsf@free-electrons.com>
+ <CAEQ9gEnqgi01E0nE3Yw_8gTGe-_1+T3=HgPKNAcjDD+c2AP=bw@mail.gmail.com>
+ <87vb6hd0hh.fsf@free-electrons.com>
+Message-ID: <CAEQ9gEk0Z-Zgm1aqVQaYRpWVp35VcC2sVAH9Qz+1kCMHHYLWkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.1.2016 23:27, Arnd Bergmann wrote:
-> On Tuesday 12 January 2016 23:06:11 Bharat Kumar Gogada wrote:
->> Modifying Xilinx AXI PCIe Host Bridge Soft IP driver to work on both
->> Zynq and Microblaze Architectures.
->> With these modifications drivers/pci/host/pcie-xilinx.c, will
->> work on both Zynq and Microblaze Architectures.
->>
->> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
->> Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
-> 
-> I think this patch should be split into three, as you are doing three
-> unrelated things here.
-> 
->> ---
->> Changes:
->> Changed Total number of MSI IRQ count logic according to both architectures.
->> Updated MSI assigning functions accordingly to new count.
->> Modified irq_domain_add_linear with new MSI IRQ count.
->> Added #ifdef to pci_fixup_irqs which is ARM specific API.
->> ---
->>  drivers/pci/host/pcie-xilinx.c | 22 +++++++++++++++++-----
->>  1 file changed, 17 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
->> index 3e3757f..1981948 100644
->> --- a/drivers/pci/host/pcie-xilinx.c
->> +++ b/drivers/pci/host/pcie-xilinx.c
->> @@ -92,7 +92,12 @@
->>  #define ECAM_DEV_NUM_SHIFT		12
->>  
->>  /* Number of MSI IRQs */
->> -#define XILINX_NUM_MSI_IRQS		128
->> +#define XILINX_NUM_MSI_IRQS	128
->> +#ifdef CONFIG_ARM
->> +#define TOT_NR_IRQS		XILINX_NUM_MSI_IRQS
->> +#else
->> +#define TOT_NR_IRQS		(NR_IRQS + XILINX_NUM_MSI_IRQS)
->> +#endif
-> 
-> Something looks wrong here in the microblaze variant. What does NR_IRQS
-> have to do with it?
+[lists seems rejected my previous email, so re-send]
 
-Arnd: What was the story regarding NR_IRQS?
-I remember some discussion about it but just forget.
+Dear Gregory,
 
-Default value in include/asm-generic/irq.h is 64.
-Current value is 32 because microblaze primary interrupt controller is
-axi_intc core which has up to 32 input lines.
+On Tue, Jan 26, 2016 at 2:37 AM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi Roger,
+>
+>  On lun., janv. 25 2016, Roger Shimizu <rogershimizu@gmail.com> wrote:
+>
+>> On Tue, Jan 26, 2016 at 2:03 AM, Gregory CLEMENT
+>> <gregory.clement@free-electrons.com> wrote:
+>>>
+>>> Thanks for all your work, I was about to apply it but as I already
+>>> applied your previous patches I didn't manage to do it.
+>>>
+>>>
+>>> Would you mind rebasing your patch on the mvebu/dt branch that I have
+>>> just push on git://git.infradead.org/linux-mvebu.git ?
 
-Thanks,
-Michal
+I find you missed one of my patches on "mvebu/dt" branch:
+
+>   - [patch 7/7] split dts for lswvl [0]
+
+[0]: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/400937.html
+
+For that ls-wvl patch, "git am <patch 07>" would fail,
+but after "patch -p1 < .git/rebase-apply/patch", and then "git add -A;
+git am --continue", that patch can be applied.
+After that, I can successfully apply this ls-qvl patch.
+
+I'm not sure whether you use "git am" to apply patches.
+Maybe you use other similar ways. Please try and let me know if still
+need my rebase.
+Thank you!
+
+Cheers,
+Roger
+-- 
+Roger Shimizu, GMT +9 Tokyo
+PGP/GPG: 17B3ACB1
