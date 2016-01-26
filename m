@@ -1,111 +1,184 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Tue, 26 Jan 2016 13:05:20 +0100
-Subject: [PATCH V2 4/4] mfd: mediatek: add MT6323 support to MT6397 driver
-In-Reply-To: <20160126083433.GX3368@x1>
-References: <1453716887-38442-1-git-send-email-blogic@openwrt.org>
- <20160125124112.GG3368@x1> <56A64108.7020807@openwrt.org>
- <3476571.0yU9yvPsKF@linux-gy6r.site> <56A670A3.5030100@openwrt.org>
- <1453777643.26374.11.camel@mtksdaap41> <56A71CE5.4080201@openwrt.org>
- <20160126083433.GX3368@x1>
-Message-ID: <56A76100.1020307@openwrt.org>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Tue, 26 Jan 2016 12:05:59 +0000
+Subject: [PATCH v3 17/17] Xen: EFI: Parse DT parameters for Xen specific
+ UEFI
+In-Reply-To: <1453519184-11908-18-git-send-email-zhaoshenglong@huawei.com>
+References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453519184-11908-18-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20160126120559.GB7478@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 26/01/2016 09:34, Lee Jones wrote:
-> On Tue, 26 Jan 2016, John Crispin wrote:
->> On 26/01/2016 04:07, Henry Chen wrote:
->>> On Mon, 2016-01-25 at 19:59 +0100, John Crispin wrote:
->>>>
->>>> On 25/01/2016 19:44, Matthias Brugger wrote:
->>>>> On Monday 25 Jan 2016 16:36:40 John Crispin wrote:
->>>>>> Hi,
->>>>>>
->>>>>> On 25/01/2016 13:41, Lee Jones wrote:
->>>>>>> Please honour the subject format of the subsystem you are contributing
->>>>>>> to.
->>>>>>>
->>>>>>> `git log --oneline -- $subsystem` gives you this.
->>>>>>>
->>>>>>> On Mon, 25 Jan 2016, John Crispin wrote:
->>>>>>>> Signed-off-by: John Crispin <blogic@openwrt.org>
->>>>>>>> ---
->>>>>>
->>>>>> [...]
->>>>>>
->>>>>>>> @@ -261,6 +271,15 @@ static int mt6397_probe(struct platform_device
->>>>>>>> *pdev)
->>>>>>>>
->>>>>>>>  	}
->>>>>>>>  	
->>>>>>>>  	switch (id & 0xff) {
->>>>>>>>
->>>>>>>> +	case MT6323_CID_CODE:
->>>>>>>> +		mt6397->int_con[0] = MT6323_INT_CON0;
->>>>>>>
->>>>>>> This is confusing.  You're still using memory allocated for a mt6397
->>>>>>> device.
->>>>>>
->>>>>> the variable is currently defined as struct mt6397_chip *mt6397;
->>>>>> shall i only change the name or also create a patch to rename the struct ?
->>>>>>
->>>>>
->>>>> I think we should rename the struct and the file as well.
->>>>>
->>>>> Cheers,
->>>>> Matthias
->>>>
->>>> Hi,
->>>>
->>>> that would have been my next question. renaming the struct would imply
->>>> renaming the driver and the whole namespace contained within. We would
->>>> then also need to change the Kconfig and Makefile. I am happy to do this
->>>> but want to be sure that is is actually wanted.
->>>>
->>>> 	John
->>> Hi,
->>>
->>> Since mt6323 was similar with mt6397, I think we can reuse the
->>> mt6397_chip without duplicate code.
->>>
->>> Maybe we can rename the local variable name to avoid confusing.
->>>
->>> struct mt6397_chip *mt_pmic;
->>> ...
->>> ...
->>> switch (id & 0xff) {
->>> 	case MT6323_CID_CODE:
->>> 		mt_pmic->int_con[0] = MT6323_INT_CON0;
->>> 		mt_pmic->int_con[1] = MT6323_INT_CON1;
->>> ...
->>> ...
->>>
->>> Henry
->>
->> Hi,
->>
->> IMHO we should either rename the namespace or not. renaming some
->> variables seems weird as that will just move the confusion/inconsistency
->> to another place in the code. I am however rather indifferent on this
->> matter.
+On Sat, 23 Jan, at 11:19:44AM, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> It's common to name a driver after the device which was enabled first,
-> so no need to rename the files or CONFIGs; however, it does seem
-> prudent to generify the struct (both parts).
+> Add a new function to parse DT parameters for Xen specific UEFI just
+> like the way for normal UEFI. Then it could reuse the existing codes.
 > 
+> If Xen supports EFI, initialize runtime services.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+> CC: Matt Fleming <matt@codeblueprint.co.uk>
+> ---
+>  arch/arm/xen/enlighten.c   |  6 ++++++
+>  arch/arm64/kernel/efi.c    | 17 ++++++++++++-----
+>  drivers/firmware/efi/efi.c | 45 ++++++++++++++++++++++++++++++++++++++-------
+>  3 files changed, 56 insertions(+), 12 deletions(-)
+ 
+Looks OK to me, but I've added some people to Cc that have touched
+these files in the past, and it would be good to get their ACKs.
 
-Hi,
+Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
 
-renaming struct mt6397_chip is not as straightforward as it seems as
-other drivers such as pinctrl and rtc share the data structure with the
-mfd driver.
-
-i have kept the structs name as is for now and only renamed the instance.
-
-If you want i can create a separate series that addresses only the
-renaming of the structure. The "rename struct mt6397" patch would need
-to do a change to drivers from 3 subsystems in 1 single commit as not to
-break compile and merge order.
-
-	John
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index cdc0bd2..608d735 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -245,6 +245,12 @@ static int __init fdt_find_hyper_node(unsigned long node, const char *uname,
+>  	    !strncmp(hyper_node.prefix, s, strlen(hyper_node.prefix)))
+>  		hyper_node.version = s + strlen(hyper_node.prefix);
+>  
+> +	if (IS_ENABLED(CONFIG_XEN_EFI)) {
+> +		/* Check if Xen supports EFI */
+> +		if (of_get_flat_dt_subnode_by_name(node, "uefi") > 0)
+> +			set_bit(EFI_PARAVIRT, &efi.flags);
+> +	}
+> +
+>  	return 0;
+>  }
+>  
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index 4eeb171..3c46129 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -33,6 +33,7 @@
+>  #include <asm/mmu_context.h>
+>  #include <asm/mmu.h>
+>  #include <asm/pgtable.h>
+> +#include <asm/xen/xen-ops.h>
+>  
+>  struct efi_memory_map memmap;
+>  
+> @@ -308,13 +309,19 @@ static int __init arm64_enable_runtime_services(void)
+>  	}
+>  	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
+>  
+> -	if (!efi_virtmap_init()) {
+> -		pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
+> -		return -ENOMEM;
+> +	if (IS_ENABLED(CONFIG_XEN_EFI) && efi_enabled(EFI_PARAVIRT)) {
+> +		/* Set up runtime services function pointers for Xen Dom0 */
+> +		xen_efi_runtime_setup();
+> +	} else {
+> +		if (!efi_virtmap_init()) {
+> +			pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
+> +			return -ENOMEM;
+> +		}
+> +
+> +		/* Set up runtime services function pointers */
+> +		efi_native_runtime_setup();
+>  	}
+>  
+> -	/* Set up runtime services function pointers */
+> -	efi_native_runtime_setup();
+>  	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+>  
+>  	efi.runtime_version = efi.systab->hdr.revision;
+> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+> index 027ca21..bdcf6d7 100644
+> --- a/drivers/firmware/efi/efi.c
+> +++ b/drivers/firmware/efi/efi.c
+> @@ -498,12 +498,14 @@ device_initcall(efi_load_efivars);
+>  		FIELD_SIZEOF(struct efi_fdt_params, field) \
+>  	}
+>  
+> -static __initdata struct {
+> +struct params {
+>  	const char name[32];
+>  	const char propname[32];
+>  	int offset;
+>  	int size;
+> -} dt_params[] = {
+> +};
+> +
+> +static struct params fdt_params[] __initdata = {
+>  	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
+>  	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
+>  	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
+> @@ -511,24 +513,45 @@ static __initdata struct {
+>  	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
+>  };
+>  
+> +static struct params xen_fdt_params[] __initdata = {
+> +	UEFI_PARAM("System Table", "xen,uefi-system-table", system_table),
+> +	UEFI_PARAM("MemMap Address", "xen,uefi-mmap-start", mmap),
+> +	UEFI_PARAM("MemMap Size", "xen,uefi-mmap-size", mmap_size),
+> +	UEFI_PARAM("MemMap Desc. Size", "xen,uefi-mmap-desc-size", desc_size),
+> +	UEFI_PARAM("MemMap Desc. Version", "xen,uefi-mmap-desc-ver", desc_ver)
+> +};
+> +
+>  struct param_info {
+>  	int found;
+>  	void *params;
+> +	struct params *dt_params;
+> +	int size;
+>  };
+>  
+>  static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+>  				       int depth, void *data)
+>  {
+>  	struct param_info *info = data;
+> +	struct params *dt_params = info->dt_params;
+>  	const void *prop;
+>  	void *dest;
+>  	u64 val;
+> -	int i, len;
+> +	int i, len, offset;
+>  
+> -	if (depth != 1 || strcmp(uname, "chosen") != 0)
+> -		return 0;
+> +	if (efi_enabled(EFI_PARAVIRT)) {
+> +		if (depth != 1 || strcmp(uname, "hypervisor") != 0)
+> +			return 0;
+>  
+> -	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
+> +		offset = of_get_flat_dt_subnode_by_name(node, "uefi");
+> +		if (offset < 0)
+> +			return 0;
+> +		node = offset;
+> +	} else {
+> +		if (depth != 1 || strcmp(uname, "chosen") != 0)
+> +			return 0;
+> +	}
+> +
+> +	for (i = 0; i < info->size; i++) {
+>  		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
+>  		if (!prop)
+>  			return 0;
+> @@ -559,12 +582,20 @@ int __init efi_get_fdt_params(struct efi_fdt_params *params)
+>  	info.found = 0;
+>  	info.params = params;
+>  
+> +	if (efi_enabled(EFI_PARAVIRT)) {
+> +		info.dt_params = xen_fdt_params;
+> +		info.size = ARRAY_SIZE(xen_fdt_params);
+> +	} else {
+> +		info.dt_params = fdt_params;
+> +		info.size = ARRAY_SIZE(fdt_params);
+> +	}
+> +
+>  	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
+>  	if (!info.found)
+>  		pr_info("UEFI not found.\n");
+>  	else if (!ret)
+>  		pr_err("Can't find '%s' in device tree!\n",
+> -		       dt_params[info.found].name);
+> +		       info.dt_params[info.found].name);
+>  
+>  	return ret;
+>  }
+> -- 
+> 2.0.4
+> 
+> 
