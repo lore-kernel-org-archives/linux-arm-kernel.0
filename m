@@ -1,95 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Jan 2016 23:05:31 +0100
-Subject: [PATCH] mac80211: avoid excessive stack usage in sta_info
-Message-ID: <1453845942-3402704-1-git-send-email-arnd@arndb.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 27 Jan 2016 01:14:21 +0300
+Subject: [PATCH] ARM: dts: porter: add MAX3355 support
+In-Reply-To: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+Message-ID: <4506196.xOgpYRO52t@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_OPTIMIZE_INLINING is set, the sta_info_insert_finish
-function consumes more stack than normally, exceeding the
-1024 byte limit on ARM:
+Now that Maxim Integrated MAX3355 'extcon' driver and device tree bindings
+are upstream along with the 'extcon' hook  in the Renesas USBHS driver, we
+can add  MAX3355 device node to  the Porter device tree and properly refer
+to it from the USBHS node instead of using  "renesas,enable-gpio" property
+which only allowed checking the USB ID pin  at the driver probe time;  now
+this  pin's  state can be monitored dynamically!
 
-net/mac80211/sta_info.c: In function 'sta_info_insert_finish':
-net/mac80211/sta_info.c:561:1: error: the frame size of 1080 bytes is larger than 1024 bytes [-Werror=frame-larger-than=]
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-It turns out that there are two functions that put a 'struct station_info'
-on the stack: __sta_info_destroy_part2 and sta_info_insert_finish, and
-this structure alone requires up to 792 bytes.
-
-Hoping that both are called rarely enough, this replaces the
-on-stack structure with a dynamic allocation, which unfortunately
-requires some suboptimal error handling for out-of-memory.
-
-The __sta_info_destroy_part2 function is actually affected by the
-stack usage twice because it calls cfg80211_del_sta_sinfo(), which
-has another instance of struct station_info on its stack.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 98b6218388e3 ("mac80211/cfg80211: add station events")
-Fixes: 6f7a8d26e266 ("mac80211: send statistics with delete station event")
 ---
- net/mac80211/sta_info.c | 24 ++++++++++++++++--------
- 1 file changed, 16 insertions(+), 8 deletions(-)
+This patch is against 'renesas-devel-20160126-v4.5-rc1' tag of Simon Horman's
+'renesas.git' repo.
 
-diff --git a/net/mac80211/sta_info.c b/net/mac80211/sta_info.c
-index 4402ad5b27d1..a29199ec4c3c 100644
---- a/net/mac80211/sta_info.c
-+++ b/net/mac80211/sta_info.c
-@@ -498,11 +498,17 @@ static int sta_info_insert_finish(struct sta_info *sta) __acquires(RCU)
- {
- 	struct ieee80211_local *local = sta->local;
- 	struct ieee80211_sub_if_data *sdata = sta->sdata;
--	struct station_info sinfo;
-+	struct station_info *sinfo;
- 	int err = 0;
+ arch/arm/boot/dts/r8a7791-porter.dts |    8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+Index: renesas/arch/arm/boot/dts/r8a7791-porter.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791-porter.dts
++++ renesas/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -90,6 +90,12 @@
+ 			  1800000 0>;
+ 	};
  
- 	lockdep_assert_held(&local->sta_mtx);
- 
-+	sinfo = kzalloc(sizeof(struct station_info), GFP_KERNEL);
-+	if (!sinfo) {
-+		err = -ENOMEM;
-+		goto out_err;
-+	}
++	max3355: usb-otg {
++		compatible = "maxim,max3355";
++		maxim,shdn-gpios = <&gpio2 4 GPIO_ACTIVE_HIGH>;
++		id-gpios = <&gpio5 31 GPIO_ACTIVE_HIGH>;
++	};
 +
- 	/* check if STA exists already */
- 	if (sta_info_get_bss(sdata, sta->sta.addr)) {
- 		err = -EEXIST;
-@@ -534,10 +540,9 @@ static int sta_info_insert_finish(struct sta_info *sta) __acquires(RCU)
- 	ieee80211_sta_debugfs_add(sta);
- 	rate_control_add_sta_debugfs(sta);
+ 	hdmi-out {
+ 		compatible = "hdmi-connector";
+ 		type = "a";
+@@ -394,7 +400,7 @@
+ 	pinctrl-names = "default";
  
--	memset(&sinfo, 0, sizeof(sinfo));
--	sinfo.filled = 0;
--	sinfo.generation = local->sta_generation;
--	cfg80211_new_sta(sdata->dev, sta->sta.addr, &sinfo, GFP_KERNEL);
-+	sinfo->generation = local->sta_generation;
-+	cfg80211_new_sta(sdata->dev, sta->sta.addr, sinfo, GFP_KERNEL);
-+	kfree(sinfo);
+ 	status = "okay";
+-	renesas,enable-gpio = <&gpio5 31 GPIO_ACTIVE_HIGH>;
++	extcon = <&max3355>;
+ };
  
- 	sta_dbg(sdata, "Inserted STA %pM\n", sta->sta.addr);
- 
-@@ -898,7 +903,7 @@ static void __sta_info_destroy_part2(struct sta_info *sta)
- {
- 	struct ieee80211_local *local = sta->local;
- 	struct ieee80211_sub_if_data *sdata = sta->sdata;
--	struct station_info sinfo = {};
-+	struct station_info *sinfo;
- 	int ret;
- 
- 	/*
-@@ -936,8 +941,11 @@ static void __sta_info_destroy_part2(struct sta_info *sta)
- 
- 	sta_dbg(sdata, "Removed STA %pM\n", sta->sta.addr);
- 
--	sta_set_sinfo(sta, &sinfo);
--	cfg80211_del_sta_sinfo(sdata->dev, sta->sta.addr, &sinfo, GFP_KERNEL);
-+	sinfo = kzalloc(sizeof(*sinfo), GFP_KERNEL);
-+	if (sinfo)
-+		sta_set_sinfo(sta, sinfo);
-+	cfg80211_del_sta_sinfo(sdata->dev, sta->sta.addr, sinfo, GFP_KERNEL);
-+	kfree(sinfo);
- 
- 	rate_control_remove_sta_debugfs(sta);
- 	ieee80211_sta_debugfs_remove(sta);
--- 
-2.7.0
+ &usbphy {
