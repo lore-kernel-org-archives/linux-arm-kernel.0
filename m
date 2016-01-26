@@ -1,94 +1,39 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 26 Jan 2016 15:29:21 -0800
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <CA+55aFwxTJd+uibcxtZD3tGnj_n=LMwyAa0s8qyx_OF0OMWQkA@mail.gmail.com>
-References: <20160114204827.GE3818@linux.vnet.ibm.com>
- <20160118081929.GA30420@gondor.apana.org.au>
- <20160118154629.GB3818@linux.vnet.ibm.com>
- <20160126165207.GB6029@fixme-laptop.cn.ibm.com>
- <20160126172227.GG6357@twins.programming.kicks-ass.net>
- <CA+55aFzcC6C8imPs5vk4yH1Y2YHjnAdFM9HCkVs04COxuDQH6w@mail.gmail.com>
- <20160126201037.GU4503@linux.vnet.ibm.com>
- <CA+55aFxjb+2rs2wVHtiSCcOzgMrE8H=yDeNcjyujPQudDCtLgw@mail.gmail.com>
- <CA+55aFwxTJd+uibcxtZD3tGnj_n=LMwyAa0s8qyx_OF0OMWQkA@mail.gmail.com>
-Message-ID: <20160126232921.GY4503@linux.vnet.ibm.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 26 Jan 2016 20:31:28 -0300
+Subject: [PATCH v6 0/5] dma-mapping: Patches for speeding up allocation
+In-Reply-To: <1452533428-12762-1-git-send-email-dianders@chromium.org>
+References: <1452533428-12762-1-git-send-email-dianders@chromium.org>
+Message-ID: <CABxcv==WXG4zq8mr+KE4zKNkgG9y8etUQM7ZQiB2rPeKz1ySLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 02:33:40PM -0800, Linus Torvalds wrote:
-> On Tue, Jan 26, 2016 at 2:15 PM, Linus Torvalds
-> <torvalds@linux-foundation.org> wrote:
-> >
-> > You might as well just write it as
-> >
-> >     struct foo x = READ_ONCE(*ptr);
-> >     x->bar = 5;
-> >
-> > because that "smp_read_barrier_depends()" does NOTHING wrt the second write.
-> 
-> Just to clarify: on alpha it adds a memory barrier, but that memory
-> barrier is useless.
+Hello Doug,
 
-No trailing data-dependent read, so agreed, no smp_read_barrier_depends()
-needed.  That said, I believe that we should encourage rcu_dereference*()
-or lockless_dereference() instead of READ_ONCE() for documentation
-reasons, though.
+On Mon, Jan 11, 2016 at 2:30 PM, Douglas Anderson <dianders@chromium.org> wrote:
 
-> On non-alpha, it is a no-op, and obviously does nothing simply because
-> it generates no code.
-> 
-> So if anybody believes that the "smp_read_barrier_depends()" does
-> something, they are *wrong*.
+[snip]
 
-The other problem with smp_read_barrier_depends() is that it is often
-a pain figuring out which prior load it is supposed to apply to.
-Hence my preference for rcu_dereference*() and lockless_dereference().
+>
+> All testing was done on the chromeos kernel-3.8 and kernel-3.14.
+> Sanity (compile / boot) testing was done on a v4.4-rc6-based kernel on
+> rk3288, though the video codec isn't there.  I don't have graphics / MFC
+> working well on exynos, so the MFC change was only compile-tested
+> upstream.  Hopefully someone upstream whose setup for MFC can give a
+> Tested-by for these?
+>
 
-> And if anybody sends out an email with that smp_read_barrier_depends()
-> in an example, they are actively just confusing other people, which is
-> even worse than just being wrong. Which is why I jumped in.
-> 
-> So stop perpetuating the myth that smp_read_barrier_depends() does
-> something here. It does not. It's a bug, and it has become this "mind
-> virus" for some people that seem to believe that it does something.
+I tested these patches on a Exynos5800 Peach Pi Chromebook. The
+s5p-mfc driver probes correctly and the allocation succeeds.
 
-It looks like I should add words to memory-barriers.txt de-emphasizing
-smp_read_barrier_depends().  I will take a look at that.
+I also tried to test actual video decoding using Gstreamer but ran
+into issues (not related to this series) so testing that won't be
+trivial for me.
 
-> I had to remove this crap once from the kernel already, see commit
-> 105ff3cbf225 ("atomic: remove all traces of READ_ONCE_CTRL() and
-> atomic*_read_ctrl()").
-> 
-> I don't want to ever see that broken construct again. And I want to
-> make sure that everybody is educated about how broken it was. I'm
-> extremely unhappy that it came up again.
+It shouldn't block Doug's series though IMHO since he tested on his
+platform and the patches speeds up allocation there, so is an
+improvement.
 
-Well, if it makes you feel better, that was control dependencies and this
-was data dependencies.  So it was not -exactly- the same.  ;-)
+Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-(Sorry, couldn't resist...)
-
-> If it turns out that some architecture does actually need a barrier
-> between a read and a dependent write, then that will mean that
-> 
->  (a) we'll have to make up a _new_ barrier, because
-> "smp_read_barrier_depends()" is not that barrier. We'll presumably
-> then have to make that new barrier part of "rcu_derefence()" and
-> friends.
-
-Agreed.  We can worry about whether or not we replace the current
-smp_read_barrier_depends() with that new barrier when and if such
-hardware appears.
-
->  (b) we will have found an architecture with even worse memory
-> ordering semantics than alpha, and we'll have to stop castigating
-> alpha for being the worst memory ordering ever.
-
-;-) ;-) ;-)
-
-> but I sincerely hope that we'll never find that kind of broken architecture.
-
-Apparently at least some hardware vendors are reading memory-barriers.txt,
-so perhaps the odds of that kind of breakage have reduced.
-
-								Thanx, Paul
+Best regards,
+Javier
