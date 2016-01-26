@@ -1,82 +1,62 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 26 Jan 2016 09:47:04 -0600
-Subject: [PATCH 1/3] ti-st: use device handles and add device tree binding
-In-Reply-To: <8665E2433BC68541A24DFFCA87B70F5B2376B680@DFRE01.ent.ti.com>
-References: <1450870253-8694-1-git-send-email-eyalr@ti.com>
- <8665E2433BC68541A24DFFCA87B70F5B23759A5B@DFRE01.ent.ti.com>
- <20151229183534.GM12450@rob-hp-laptop>
- <8665E2433BC68541A24DFFCA87B70F5B2376B680@DFRE01.ent.ti.com>
-Message-ID: <CAL_JsqLpU_5EKQyALMvfBFQL52ncFx+LvdTibLb2AUtVuTn=vw@mail.gmail.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 26 Jan 2016 15:52:46 +0000
+Subject: [PATCH] arm64: Add support for Half precision floating point
+Message-ID: <1453823566-26742-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 17, 2016 at 1:57 AM, Reizer, Eyal <eyalr@ti.com> wrote:
-> Sorry for the delayed response.
->
->> -----Original Message-----
->> From: Rob Herring [mailto:robh at kernel.org]
->> Sent: Tuesday, December 29, 2015 8:36 PM
->> To: Reizer, Eyal
->> Cc: devicetree at vger.kernel.org; linux-omap at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; pawel.moll at arm.com; mark.rutland at arm.com;
->> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; tony at atomide.com;
->> linux at arm.linux.org.uk
->> Subject: Re: [PATCH 1/3] ti-st: use device handles and add device tree binding
->>
->> On Wed, Dec 23, 2015 at 11:38:29AM +0000, Reizer, Eyal wrote:
->> > - Add support for getting the platform data which includes the uart
->> >   used and gpio pin used for enable from device tree.
->> >
->> > - Fix the implementation for using device handle for the uart and
->> >   gpiod for the enable pin, instead of device name (as string) used
->> >   for the uart and pio number which are both bad practice.
->> >
->> > Signed-off-by: Eyal Reizer <eyalr@ti.com>
+ARMv8.2 extensions [1] include an optional feature, which supports
+half precision(16bit) floating point/asimd data processing
+instructions. This patch adds support for detecting and exposing
+the same to the userspace via HWCAPs
 
-[...]
+[1] https://community.arm.com/groups/processors/blog/2016/01/05/armv8-a-architecture-evolution
 
->> > +Optional properties:
->> > + - nshutdown-gpios : specifies attributes for gpio ping used for enabling
->> > +   the bluetooth,gps and FM sub systems
->> > + - serial-device : the phandle for the phisical uart used for interacting
->> > +   with the wilink device
->>
->> There have been multiple discussions on serial slave devices recently.
->> I'm not going to accept any device binding without a common uart slave
->> device binding first.
->>
->
-> Perhaps I am reading it wrong but I think this is a different discussion.
-> The shared transport driver is already in the kernel for pretty long time.
-> AFAIK the original author is not around to maintain it.
-> Currently it is useless  as no bindings exist for it and all customers I have seen using ti_st that upgrade
-> to newer kernels have broken support and have to manually patch the kernel for adding bindings for it.
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/include/uapi/asm/hwcap.h |    2 ++
+ arch/arm64/kernel/cpufeature.c      |    2 ++
+ arch/arm64/kernel/cpuinfo.c         |    2 ++
+ 3 files changed, 6 insertions(+)
 
-If should not be required to have a binding. You could still enumerate
-it the old way even for DT platforms. It should not have been broken
-if an upstream platform supported it.
-
-> Having a new uart slave device that may provide similar functionality is a different discussion as it would
-> require a total different implementation.
-> But what do we do now with the implementation that is already there.
-> Don't we want it to work and at least have working bindings for it?
-
-For the kernel yes, the implementation would certainly be different,
-but that is not what I'm saying. The bindings should be unaffected by
-kernel implementation. You can't do it one way for what you need now
-and then change the DT binding when the kernel changes. It is an API.
-We should be able to reach conclusion on binding side. The kernel side
-can move to a uart device subsystem if/when that exists.
-
-Essentially, we need a common binding doc that defines:
-
-- location of uart slave nodes
-- common properties (baudrate, flow-control, etc.
-
-That's not very much. We (DT maintainers) have been clear that we want
-to see devices as child nodes of the UART they are attached to.
-There's mainly been debate about using a phandle instead. I'll be fine
-with using a phandle instead of a child node, but only after we have
-some clear need for it.
-
-Rob
+diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
+index 361c8a8..a739287 100644
+--- a/arch/arm64/include/uapi/asm/hwcap.h
++++ b/arch/arm64/include/uapi/asm/hwcap.h
+@@ -28,5 +28,7 @@
+ #define HWCAP_SHA2		(1 << 6)
+ #define HWCAP_CRC32		(1 << 7)
+ #define HWCAP_ATOMICS		(1 << 8)
++#define HWCAP_FPHP		(1 << 9)
++#define HWCAP_ASIMDHP		(1 << 10)
+ 
+ #endif /* _UAPI__ASM_HWCAP_H */
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 5c90aa4..798898e 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -673,7 +673,9 @@ static const struct arm64_cpu_capabilities arm64_hwcaps[] = {
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_CRC32_SHIFT, 1, CAP_HWCAP, HWCAP_CRC32),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_ATOMICS_SHIFT, 2, CAP_HWCAP, HWCAP_ATOMICS),
+ 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, 0, CAP_HWCAP, HWCAP_FP),
++	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, 1, CAP_HWCAP, HWCAP_FPHP),
+ 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, 0, CAP_HWCAP, HWCAP_ASIMD),
++	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, 1, CAP_HWCAP, HWCAP_ASIMDHP),
+ #ifdef CONFIG_COMPAT
+ 	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_AES_SHIFT, 2, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_PMULL),
+ 	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_AES_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_AES),
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index 212ae63..05523f0 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -59,6 +59,8 @@ static const char *const hwcap_str[] = {
+ 	"sha2",
+ 	"crc32",
+ 	"atomics",
++	"fphp",
++	"asimdhp",
+ 	NULL
+ };
+ 
+-- 
+1.7.9.5
