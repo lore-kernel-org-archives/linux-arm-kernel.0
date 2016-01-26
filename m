@@ -1,47 +1,79 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Tue, 26 Jan 2016 15:44:10 +0300
-Subject: [PATCH] clk: rockchip: Reparent hclk_rom,
- hclk_i2s0 and hclk_spdif to hclk_cpubus on RK3066/RK3188
-Message-ID: <1453812250-11819-1-git-send-email-al.kochet@gmail.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Tue, 26 Jan 2016 20:46:36 +0800
+Subject: [PATCH V3 06/11] soc: mediatek: PMIC wrap:: SPI_WRITE needs a
+ different bitmask for MT2701/7623
+In-Reply-To: <1453715604-36856-7-git-send-email-blogic@openwrt.org>
+References: <1453715604-36856-1-git-send-email-blogic@openwrt.org>
+ <1453715604-36856-7-git-send-email-blogic@openwrt.org>
+Message-ID: <1453812396.10901.8.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to make peripherals (rom, i2s0 or spdif) accessible via cpu,
-hclk_cpubus gate must be opened. Without that all accesses (readl/writel)
-return wrong data.
 
-The patch fixes regression introduced by recent clock code.
 
-Fixes: 78eaf6095cc763c ("clk: rockchip: disable unused clocks")
+nit for the subject:
 
-Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+soc: mediatek: PMIC wrap:: SPI_WRITE needs a different bitmask for
+MT2701/7623
+                        ^^ extra : here.
 
-CC: linux-clk at vger.kernel.org
-CC: linux-arm-kernel at lists.infradead.org
-CC: linux-rockchip at lists.infradead.org
-CC: linux-kernel at vger.kernel.org
-CC: stable at vger.kernel.org # 4.1.x-
----
- drivers/clk/rockchip/clk-rk3188.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Otherwise the patch looks good to me.
 
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index abb4760..54b88a6 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -429,10 +429,10 @@ static struct rockchip_clk_branch common_clk_branches[] __initdata = {
- 	GATE(0, "aclk_strc_sys", "aclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(4), 10, GFLAGS),
- 
- 	/* hclk_cpu gates */
--	GATE(HCLK_ROM, "hclk_rom", "hclk_cpu", 0, RK2928_CLKGATE_CON(5), 6, GFLAGS),
--	GATE(HCLK_I2S0, "hclk_i2s0", "hclk_cpu", 0, RK2928_CLKGATE_CON(7), 2, GFLAGS),
--	GATE(HCLK_SPDIF, "hclk_spdif", "hclk_cpu", 0, RK2928_CLKGATE_CON(7), 1, GFLAGS),
- 	GATE(0, "hclk_cpubus", "hclk_cpu", 0, RK2928_CLKGATE_CON(4), 8, GFLAGS),
-+	GATE(HCLK_ROM, "hclk_rom", "hclk_cpubus", 0, RK2928_CLKGATE_CON(5), 6, GFLAGS),
-+	GATE(HCLK_I2S0, "hclk_i2s0", "hclk_cpubus", 0, RK2928_CLKGATE_CON(7), 2, GFLAGS),
-+	GATE(HCLK_SPDIF, "hclk_spdif", "hclk_cpubus", 0, RK2928_CLKGATE_CON(7), 1, GFLAGS),
- 	/* hclk_ahb2apb is part of a clk branch */
- 	GATE(0, "hclk_vio_bus", "hclk_cpu", 0, RK2928_CLKGATE_CON(6), 12, GFLAGS),
- 	GATE(HCLK_LCDC0, "hclk_lcdc0", "hclk_cpu", 0, RK2928_CLKGATE_CON(6), 1, GFLAGS),
--- 
-1.7.9.5
+Joe.C
+
+On Mon, 2016-01-25 at 10:53 +0100, John Crispin wrote:
+> MT2701 and MT7623 use a different bitmask for the SPI_WRITE command.
+> 
+> Signed-off-by: John Crispin <blogic@openwrt.org>
+> ---
+>  drivers/soc/mediatek/mtk-pmic-wrap.c |   11 +++++++----
+>  1 file changed, 7 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> index 948fc73..ba7b6b5 100644
+> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> @@ -372,6 +372,7 @@ struct pmic_wrapper_type {
+>  	enum pwrap_type type;
+>  	u32 arb_en_all;
+>  	u32 int_en_all;
+> +	u32 spi_w;
+>  	int (*init_reg_clock)(struct pmic_wrapper *wrp);
+>  	int (*init_special)(struct pmic_wrapper *wrp);
+>  };
+> @@ -511,15 +512,15 @@ static int pwrap_reset_spislave(struct pmic_wrapper *wrp)
+>  	pwrap_writel(wrp, 1, PWRAP_MAN_EN);
+>  	pwrap_writel(wrp, 0, PWRAP_DIO_EN);
+>  
+> -	pwrap_writel(wrp, PWRAP_MAN_CMD_SPI_WRITE | PWRAP_MAN_CMD_OP_CSL,
+> +	pwrap_writel(wrp, wrp->master->spi_w | PWRAP_MAN_CMD_OP_CSL,
+>  			PWRAP_MAN_CMD);
+> -	pwrap_writel(wrp, PWRAP_MAN_CMD_SPI_WRITE | PWRAP_MAN_CMD_OP_OUTS,
+> +	pwrap_writel(wrp, wrp->master->spi_w | PWRAP_MAN_CMD_OP_OUTS,
+>  			PWRAP_MAN_CMD);
+> -	pwrap_writel(wrp, PWRAP_MAN_CMD_SPI_WRITE | PWRAP_MAN_CMD_OP_CSH,
+> +	pwrap_writel(wrp, wrp->master->spi_w | PWRAP_MAN_CMD_OP_CSH,
+>  			PWRAP_MAN_CMD);
+>  
+>  	for (i = 0; i < 4; i++)
+> -		pwrap_writel(wrp, PWRAP_MAN_CMD_SPI_WRITE | PWRAP_MAN_CMD_OP_OUTS,
+> +		pwrap_writel(wrp, wrp->master->spi_w | PWRAP_MAN_CMD_OP_OUTS,
+>  				PWRAP_MAN_CMD);
+>  
+>  	ret = pwrap_wait_for_state(wrp, pwrap_is_sync_idle);
+> @@ -826,6 +827,7 @@ static struct pmic_wrapper_type pwrap_mt8135 = {
+>  	.type = PWRAP_MT8135,
+>  	.arb_en_all = 0x1ff,
+>  	.int_en_all = BIT(31) | BIT(1),
+> +	.spi_w = PWRAP_MAN_CMD_SPI_WRITE,
+>  	.init_reg_clock = pwrap_mt8135_init_reg_clock,
+>  	.init_special = pwrap_mt8135_init_special,
+>  };
+> @@ -835,6 +837,7 @@ static struct pmic_wrapper_type pwrap_mt8173 = {
+>  	.type = PWRAP_MT8173,
+>  	.arb_en_all = 0x3f,
+>  	.int_en_all = BIT(31) | BIT(1),
+> +	.spi_w = PWRAP_MAN_CMD_SPI_WRITE,
+>  	.init_reg_clock = pwrap_mt8173_init_reg_clock,
+>  	.init_special = pwrap_mt8173_init_special,
+>  };
