@@ -1,82 +1,97 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Tue, 26 Jan 2016 17:53:56 +0200
-Subject: [PATCH V8 16/23] coresight: etb10: implementing AUX API
-In-Reply-To: <1452807977-8069-17-git-send-email-mathieu.poirier@linaro.org>
-References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
- <1452807977-8069-17-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <8760yg72wb.fsf@ashishki-desk.ger.corp.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Jan 2016 16:53:38 +0100
+Subject: [PATCH 6/7] [media] em28xx: add MEDIA_TUNER dependency
+In-Reply-To: <20160126123308.6d59d373@recife.lan>
+References: <1453817424-3080054-1-git-send-email-arnd@arndb.de>
+ <1453817424-3080054-6-git-send-email-arnd@arndb.de>
+ <20160126123308.6d59d373@recife.lan>
+Message-ID: <6929423.KuNZKsBgHV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+On Tuesday 26 January 2016 12:33:08 Mauro Carvalho Chehab wrote:
+> Em Tue, 26 Jan 2016 15:10:00 +0100
+> Arnd Bergmann <arnd@arndb.de> escreveu:
+> 
+> > em28xx selects VIDEO_TUNER, which has a dependency on MEDIA_TUNER,
+> > so we get a Kconfig warning if that is disabled:
+> > 
+> > warning: (VIDEO_PVRUSB2 && VIDEO_USBVISION && VIDEO_GO7007 && VIDEO_AU0828_V4L2 && VIDEO_CX231XX && VIDEO_TM6000 && VIDEO_EM28XX && VIDEO_IVTV && VIDEO_MXB && VIDEO_CX18 && VIDEO_CX23885 && VIDEO_CX88 && VIDEO_BT848 && VIDEO_SAA7134 && VIDEO_SAA7164) selects VIDEO_TUNER which has unmet direct dependencies (MEDIA_SUPPORT && MEDIA_TUNER)
+> 
+> This warning is bogus, as it is OK to select VIDEO_TUNER even if MEDIA_TUNER
+> is not defined.
+> 
+> See how MEDIA_TUNER is defined:
+> 
+> 
+> config MEDIA_TUNER
+> 	tristate
+> 	depends on (MEDIA_ANALOG_TV_SUPPORT || MEDIA_DIGITAL_TV_SUPPORT || MEDIA_RADIO_SUPPORT || MEDIA_SDR_SUPPORT) && I2C
+> 	default y
+> 	select MEDIA_TUNER_XC2028 if MEDIA_SUBDRV_AUTOSELECT
+> 	select MEDIA_TUNER_XC5000 if MEDIA_SUBDRV_AUTOSELECT
+> 	select MEDIA_TUNER_XC4000 if MEDIA_SUBDRV_AUTOSELECT
+> 	select MEDIA_TUNER_MT20XX if MEDIA_SUBDRV_AUTOSELECT
+> 	select MEDIA_TUNER_TDA8290 if MEDIA_SUBDRV_AUTOSELECT
+> 	select MEDIA_TUNER_TEA5761 if MEDIA_SUBDRV_AUTOSELECT && MEDIA_RADIO_SUPPORT
+> 	select MEDIA_TUNER_TEA5767 if MEDIA_SUBDRV_AUTOSELECT && MEDIA_RADIO_SUPPORT
+> 	select MEDIA_TUNER_SIMPLE if MEDIA_SUBDRV_AUTOSELECT
+> 	select MEDIA_TUNER_TDA9887 if MEDIA_SUBDRV_AUTOSELECT
+> 	select MEDIA_TUNER_MC44S803 if MEDIA_SUBDRV_AUTOSELECT
+> 
+> MEDIA_TUNER is just one of the media Kconfig workarounds to its limitation of
+> not allowing to select a device that has dependencies. It is true if the user
+> selected either TV or radio media devices. It works together with 
+> MEDIA_SUBDRV_AUTOSELECT. When both are enabled, it selects all
+> media tuners. That makes easier for end users to not need to worry about
+> manually selecting the needed tuners.
+> 
+> Advanced users may, instead, manually select the media tuner that his
+> hardware needs. In such case, it doesn't matter if MEDIA_TUNER
+> is enabled or not.
+> 
+> As this is due to a Kconfig limitation, I've no idea how to fix or get
+> hid of it, but making em28xx dependent of MEDIA_TUNER is wrong.
 
-> Adding an ETB10 specific AUX area operations to be used
-> by the perf framework when events are initialised.
->
-> Part of this operation involves modeling the mmap'ed area
-> based on the specific ways a sink buffer gathers information.
+I don't understand what limitation you see here. The definition
+of the VIDEO_TUNER symbol is an empty 'tristate' symbol with a
+dependency on MEDIA_TUNER to ensure we get a warning if MEDIA_TUNER
+is not enabled, and to ensure it is set to 'm' if MEDIA_TUNER=m and
+a "bool" driver selects VIDEO_TUNER.
 
-I don't mind being CC'd on the rest of the patches too, btw. :)
+You are saying that the first one is not correct, so I assume we
+still need the second meaning. We could probably do that like the
+patch below (untested) that makes the intention much more explicit.
 
-> +static unsigned long etb_reset_buffer(struct coresight_device *csdev,
-> +				      struct perf_output_handle *handle,
-> +				      void *sink_config, bool *lost)
-> +{
-> +	unsigned long size = 0;
-> +	struct cs_buffers *buf = sink_config;
-> +
-> +	if (buf) {
-> +		/*
-> +		 * In snapshot mode ->data_size holds the new address of the
-> +		 * ring buffer's head.  The size itself is the whole address
-> +		 * range since we want the latest information.
-> +		 */
-> +		if (buf->snapshot)
-> +			handle->head = local_xchg(&buf->data_size,
-> +						  buf->nr_pages << PAGE_SHIFT);
-> +
-> +		/*
-> +		 * Tell the tracer PMU how much we got in this run and if
-> +		 * something went wrong along the way.  Nobody else can use
-> +		 * this cs_buffers instance until we are done.  As such
-> +		 * resetting parameters here and squaring off with the ring
-> +		 * buffer API in the tracer PMU is fine.
-> +		 */
-> +		*lost = local_xchg(&buf->lost, 0);
+	Arnd
 
-This is a thin ice, you can't really make assumptions about bool's
-storage size or even type, afaict.
-
-> +		size = local_xchg(&buf->data_size, 0);
-> +	}
-> +
-> +	return size;
-> +}
-> +
-> +static void etb_update_buffer(struct coresight_device *csdev,
-> +			      struct perf_output_handle *handle,
-> +			      void *sink_config)
-> +{
-> +	int i, cur;
-> +	u8 *buf_ptr;
-> +	u32 read_ptr, write_ptr, capacity;
-> +	u32 status, read_data, to_read;
-> +	unsigned long flags, offset;
-> +	struct cs_buffers *buf = sink_config;
-> +	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-> +
-> +	if (!buf)
-> +		return;
-> +
-> +	capacity = drvdata->buffer_depth * ETB_FRAME_SIZE_WORDS;
-> +
-> +	spin_lock_irqsave(&drvdata->spinlock, flags);
-
-This spinlock seems to be held over the entire readout operation,
-however, I can't find clear rules wrt what structures etc are serialized
-on it. Instead, the comment says "only one at a time pls". Same for
-etm's big drvdata spinlock.
-
-Regards,
---
-Alex
+diff --git a/drivers/media/v4l2-core/Kconfig b/drivers/media/v4l2-core/Kconfig
+index 9beece00869b..1050bdf1848f 100644
+--- a/drivers/media/v4l2-core/Kconfig
++++ b/drivers/media/v4l2-core/Kconfig
+@@ -37,7 +37,11 @@ config VIDEO_PCI_SKELETON
+ # Used by drivers that need tuner.ko
+ config VIDEO_TUNER
+ 	tristate
+-	depends on MEDIA_TUNER
++
++config VIDEO_TUNER_MODULE
++	tristate # must not be built-in if MEDIA_TUNER=m because of I2C
++	default y if VIDEO_TUNER=y || MEDIA_TUNER=y
++	default m if VIDEO_TUNER=m
+ 
+ # Used by drivers that need v4l2-mem2mem.ko
+ config V4L2_MEM2MEM_DEV
+diff --git a/drivers/media/v4l2-core/Makefile b/drivers/media/v4l2-core/Makefile
+index 1dc8bba2b198..971af6398d6d 100644
+--- a/drivers/media/v4l2-core/Makefile
++++ b/drivers/media/v4l2-core/Makefile
+@@ -21,7 +21,7 @@ obj-$(CONFIG_VIDEO_V4L2) += videodev.o
+ obj-$(CONFIG_VIDEO_V4L2) += v4l2-common.o
+ obj-$(CONFIG_VIDEO_V4L2) += v4l2-dv-timings.o
+ 
+-obj-$(CONFIG_VIDEO_TUNER) += tuner.o
++obj-$(CONFIG_VIDEO_TUNER_MODULE) += tuner.o
+ 
+ obj-$(CONFIG_V4L2_MEM2MEM_DEV) += v4l2-mem2mem.o
+ 
