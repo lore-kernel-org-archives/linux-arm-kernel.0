@@ -1,46 +1,88 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Tue, 26 Jan 2016 12:54:40 +0800
-Subject: [PATCH] rtc: mt6397: add IRQ domain dependency
-In-Reply-To: <1453737892-1960479-1-git-send-email-arnd@arndb.de>
-References: <1453737892-1960479-1-git-send-email-arnd@arndb.de>
-Message-ID: <1453784080.15263.2.camel@mtksdaap41>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 26 Jan 2016 13:55:14 +0900
+Subject: [PATCH] drm/exynos: fix building without CONFIG_PM_SLEEP
+In-Reply-To: <CAJKOXPdF_MYmysaQg=W7_6WzpCA=5auO6zLbvNYmCRqg+2L05Q@mail.gmail.com>
+References: <9569056.LBRz4v8fSj@wuerfel>
+ <CAJKOXPdF_MYmysaQg=W7_6WzpCA=5auO6zLbvNYmCRqg+2L05Q@mail.gmail.com>
+Message-ID: <56A6FC32.9000801@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-01-25 at 17:04 +0100, Arnd Bergmann wrote:
-> The mt6397 RTC driver can be built either when the MFD_MT6397 driver
-> is enabled (which selects IRQ_DOMAIN), or when compile testing.
-> The latter however fails without IRQ domains:
-> 
-> drivers/rtc/rtc-mt6397.c: In function 'mtk_rtc_probe':
-> drivers/rtc/rtc-mt6397.c:326:13: error: implicit declaration of function 'irq_create_mapping' [-Werror=implicit-function-declaration]
->   rtc->irq = irq_create_mapping(mt6397_chip->irq_domain, res->start);
-> 
-> This adds an explicit dependency for the COMPILE_TEST case.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/rtc/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-> index 376322f71fd5..4395608bf7fc 100644
-> --- a/drivers/rtc/Kconfig
-> +++ b/drivers/rtc/Kconfig
-> @@ -1603,7 +1603,7 @@ config RTC_DRV_MOXART
->  
->  config RTC_DRV_MT6397
->  	tristate "Mediatek Real Time Clock driver"
-> -	depends on MFD_MT6397 || COMPILE_TEST
-> +	depends on MFD_MT6397 || (COMPILE_TEST && IRQ_DOMAIN)
->  	help
->  	  This selects the Mediatek(R) RTC driver. RTC is part of Mediatek
->  	  MT6397 PMIC. You should enable MT6397 PMIC MFD before select
 
-Hi Arnd,
 
-Thanks your correction.
-Acked-by: Eddie Huang <eddie.huang@mediatek.com>
+2016? 01? 26? 08:40? Krzysztof Kozlowski ?(?) ? ?:
+> 2015-11-18 0:08 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+>> The runtime PM operations use the suspend/resume functions
+>> even when CONFIG_PM_SLEEP is not set, but this now fails
+>> for the exynos DRM driver:
+>>
+>> exynos_mixer.c:1289:61: error: 'exynos_mixer_resume' undeclared here (not in a function)
+>>   SET_RUNTIME_PM_OPS(exynos_mixer_suspend, exynos_mixer_resume, NULL)
+>>
+>> This removes the #ifdef and instead marks the functions as
+>> __maybe_unused, which does the right thing in all cases and
+>> also looks nicer.
+>>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Fixes:   ("drm/exynos: add pm_runtime to Mixer")
+> 
+> Dear Inki,
+> 
+> Ping? On 4.5-rc1 this is still broken. Can you apply this for fixes
+> for current rc-cycle?
 
-Regards,
-Eddie
+Got it.
+
+Thanks,
+Inki Dae
+
+> 
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> Best regards,
+> Krzysztof
+> 
+> 
+>>
+>> diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
+>> index 7498c6e76a53..fcaf71df77c1 100644
+>> --- a/drivers/gpu/drm/exynos/exynos_mixer.c
+>> +++ b/drivers/gpu/drm/exynos/exynos_mixer.c
+>> @@ -1230,8 +1230,7 @@ static int mixer_remove(struct platform_device *pdev)
+>>         return 0;
+>>  }
+>>
+>> -#ifdef CONFIG_PM_SLEEP
+>> -static int exynos_mixer_suspend(struct device *dev)
+>> +static int __maybe_unused exynos_mixer_suspend(struct device *dev)
+>>  {
+>>         struct mixer_context *ctx = dev_get_drvdata(dev);
+>>         struct mixer_resources *res = &ctx->mixer_res;
+>> @@ -1247,7 +1246,7 @@ static int exynos_mixer_suspend(struct device *dev)
+>>         return 0;
+>>  }
+>>
+>> -static int exynos_mixer_resume(struct device *dev)
+>> +static int __maybe_unused exynos_mixer_resume(struct device *dev)
+>>  {
+>>         struct mixer_context *ctx = dev_get_drvdata(dev);
+>>         struct mixer_resources *res = &ctx->mixer_res;
+>> @@ -1283,7 +1282,6 @@ static int exynos_mixer_resume(struct device *dev)
+>>
+>>         return 0;
+>>  }
+>> -#endif
+>>
+>>  static const struct dev_pm_ops exynos_mixer_pm_ops = {
+>>         SET_RUNTIME_PM_OPS(exynos_mixer_suspend, exynos_mixer_resume, NULL)
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 
