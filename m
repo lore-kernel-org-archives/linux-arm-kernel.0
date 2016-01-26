@@ -1,89 +1,84 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 26 Jan 2016 10:48:53 +0900
-Subject: [PATCH] 8250: uniphier: allow modular build with 8250 console
-In-Reply-To: <CAK7LNARo+rpKVDAY_h9vPKh_1vteYgjNS=nf0ukz2ThzPNxvmg@mail.gmail.com>
-References: <3965359.aMgb8o9MaG@wuerfel>
- <CAK7LNATVtLk6UTh+r9JTZrKq-veEXetDdRutZ_=zQOd-WyAO0g@mail.gmail.com>
- <4548262.MV5j98YUVi@wuerfel>
- <CAL_JsqKCnxenDN-5OP1yqAyyW1-cuhs47CeosAj12hr89e6CrA@mail.gmail.com>
- <CAK7LNARo+rpKVDAY_h9vPKh_1vteYgjNS=nf0ukz2ThzPNxvmg@mail.gmail.com>
-Message-ID: <CAK7LNAQoqS0mwkyR9pTJVEDjWYDuhWQYqrMJxWSRQ-bwk51FXw@mail.gmail.com>
+From: rbthomas@pobox.com (Rick Thomas)
+Date: Mon, 25 Jan 2016 17:55:17 -0800
+Subject: [PATCH 1/2] ARM: DTS: kirkwood-openrd-client: fix audio
+In-Reply-To: <20160125182459.GE15550@darkstar.musicnaut.iki.fi>
+References: <1453588600-14831-1-git-send-email-aaro.koskinen@iki.fi>
+ <1453588600-14831-2-git-send-email-aaro.koskinen@iki.fi>
+ <20160124173701.GU3880@lunn.ch>
+ <411C1DFA-3E76-42B0-866C-7C3C0D990039@pobox.com>
+ <20160124214020.GA28667@jirafa.cyrius.com>
+ <8E11A1EE-D73B-462E-A493-39571A17F2C3@pobox.com>
+ <20160125182459.GE15550@darkstar.musicnaut.iki.fi>
+Message-ID: <E4776C8C-158A-4A3D-B6D8-A6D347CE94B1@pobox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just for clarification:
 
-The build error was fixed by another patch
-(https://patchwork.kernel.org/patch/8082931/)
+On Jan 25, 2016, at 10:24 AM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
 
-So, this one is unneeded.
+> Hi,
+> 
+> On Sun, Jan 24, 2016 at 07:26:43PM -0800, Rick Thomas wrote:
+>>> root at base:~# cat /proc/asound/devices 
+>>>  2: [ 0]   : control
+>>>  3: [ 0- 0]: digital audio playback
+>>>  4: [ 0- 0]: digital audio capture
+>>> 33:        : timer
+>>> root at base:~# cat /proc/asound/cards   
+>>> 0 [i2scs42l51hifi ]: i2s-cs42l51-hif - i2s-cs42l51-hifi
+>>>                      i2s-cs42l51-hifi
+>> 
+>> Full of hope, I did "aptitude install mp321" which went without any visible problems.
+>> 
+>> Then hooked up a pair of earphones to the "speaker" plug on the Client and ran
+>> 
+>>> root at base:~# mpg321 -v /tmp/Jersey.mp3 
+>>> High Performance MPEG 1.0/2.0/2.5 Audio Player for Layer 1, 2, and 3.
+>>> Version 0.3.2-1 (2012/03/25). Written and copyrights by Joe Drew,
+>>> now maintained by Nanakos Chrysostomos and others.
+>>> Uses code from various people. See 'README' for more!
+>>> THIS SOFTWARE COMES WITH ABSOLUTELY NO WARRANTY! USE AT YOUR OWN RISK!
+>>> Title	: The Jersey Bounce              Artist : Zazuzaz                       
+>>> Album	: An Evening with ZaZuZaz        Year	 : 2000
+>>> Comment : Amazon.com Song ID: 201809221  Genre : Jazz                          
+>>> 
+>>> Directory: /tmp
+>>> Playing MPEG stream from Jersey.mp3 ...
+>>> MPEG 1.0, Layer: III, Freq: 44100, mode: Joint-Stereo, modext: 0, BPF : 2560
+>>> Channels: 2, copyright: No, original: Yes, CRC: No, emphasis: 0.
+>>> Bitrate: 128 Kbits/s, Extension value: 0
+>>> Audio: 1:1 conversion, rate: 44100, encoding: signed 16 bit, channels: 2
+>>> ALSA lib pcm.c:2267:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.front
+>>> ^C                                                                            
+>>> [0:20] Decoding of Jersey.mp3 finished.
+>> 
+>> So it seemed to be running OK...  But there was no sound in the
+>> earphones. I also tried adding option "-g 50" to set the gain explicitly.
+>> Still no sound.
+>> 
+>> Is there a hardware jumper I need to set to activate sound on the
+>> OpenRD Client board?
+> 
+> On my board I need to say "amixer set PCM on". Can you post the full
+> output from "amixer" without any parameters?
+> 
+> Also check if you have this line in dmesg:
+> 
+> 	asoc-simple-card sound: cs42l51-hifi <-> i2s mapping ok
+> 
+> If it says "spdif" the player runs but is silent.
+> 
+> A.
 
+Martin suggested that I install alsa-utils and run alsamixer in order to remove any extraneous "mute" setting.  I did that (I didn't realize alsamixer was runnable from the command line -- good to know!)
 
+I did that and it worked!  "The Jersey Bounce" never sounded so good!
 
-2016-01-22 1:50 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Hi Rob.
->
->
-> 2016-01-21 23:09 GMT+09:00 Rob Herring <robh+dt@kernel.org>:
->> On Thu, Jan 21, 2016 at 6:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> On Thursday 21 January 2016 20:39:03 Masahiro Yamada wrote:
->>>> 2016-01-14 7:33 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
->>>> > The recently added uniphier 8250 port driver supports early console
->>>> > probing, and it supports being built as a module, but the combination
->>>> > of the two fails to link:
->>>> >
->>>> > ERROR: "early_serial8250_setup" [drivers/tty/serial/8250/8250_uniphier.ko] undefined!
->>>> >
->>>> > Given that earlycon support in a loadable module makes no sense,
->>>> > making that code conditional on 'MODULE' is a correct solution.
->>>> >
->>>> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>>> > Fixes: b8d20e06eaad ("serial: 8250_uniphier: add earlycon support")
->>>> >
->>>> > diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
->>>> > index bab6b3ae2540..1b7bd26555b7 100644
->>>> > --- a/drivers/tty/serial/8250/8250_uniphier.c
->>>> > +++ b/drivers/tty/serial/8250/8250_uniphier.c
->>>> > @@ -35,7 +35,7 @@ struct uniphier8250_priv {
->>>> >         spinlock_t atomic_write_lock;
->>>> >  };
->>>> >
->>>> > -#ifdef CONFIG_SERIAL_8250_CONSOLE
->>>> > +#if defined(CONFIG_SERIAL_8250_CONSOLE) && !defined(MODULE)
->>>> >  static int __init uniphier_early_console_setup(struct earlycon_device *device,
->>>> >                                                const char *options)
->>>> >  {
->>>> >
->>>> >
->>>>
->>>>
->>>> If my patch (https://patchwork.kernel.org/patch/8029331/) is accepted,
->>>> this build error will be fixed as well.  But I doubt it is accepted soon...
->>>>
->>>> So, I am OK with this workaround to fix "make allmodconfig".
->>>>
->>>> Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->>>>
->>>
->>> Good point. Adding the DT maintainers to Cc. Guys, any chance of you
->>> picking up Masahiro's patch for 4.5?
->>
->> I will if you can update the commit log with the details here about it
->> fixing an actual problem.
->
-> I did so in v2.
->
-> Thanks!
->
->
->
->
-> --
-> Best Regards
-> Masahiro Yamada
+I'll do the tests that Aaro suggest, just for completeness, but it will have to wait til later tonight.
 
+So we can add -- 
 
+Tested-by: Rick Thomas <rbthomas@pobox.com>
 
--- 
-Best Regards
-Masahiro Yamada
+Enjoy!
+Rick
