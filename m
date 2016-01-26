@@ -1,72 +1,108 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Tue, 26 Jan 2016 17:31:50 +0800
-Subject: [PATCH V3 09/11] soc: mediatek: PMIC wrap: add a slave specific
- struct
-In-Reply-To: <1453715604-36856-10-git-send-email-blogic@openwrt.org>
-References: <1453715604-36856-1-git-send-email-blogic@openwrt.org>
- <1453715604-36856-10-git-send-email-blogic@openwrt.org>
-Message-ID: <1453800710.10901.6.camel@mtksdaap41>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Jan 2016 10:31:45 +0100
+Subject: [PATCH] ntb: perf test: fix address space confusion
+Message-ID: <1453800729-2501235-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The ntb driver assigns between pointers an __iomem tokens, and
+also casts them to 64-bit integers, which results in compiler
+warnings on 32-bit systems:
 
-Hi John,
+drivers/ntb/test/ntb_perf.c: In function 'perf_copy':
+drivers/ntb/test/ntb_perf.c:213:10: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
+  vbase = (u64)(u64 *)mw->vbase;
+          ^
+drivers/ntb/test/ntb_perf.c:214:14: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
+  dst_vaddr = (u64)(u64 *)dst;
+              ^
 
-Thanks for preparing the patch.
+This adds __iomem annotations where needed and changes the temporary
+variables to iomem pointers to avoid casting them to u64. I did not
+see the problem in linux-next earlier, but it show showed up in
+4.5-rc1.
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 8a7b6a778a85 ("ntb: ntb perf tool")
+---
+ drivers/ntb/test/ntb_perf.c | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
 
-
-On Mon, 2016-01-25 at 10:53 +0100, John Crispin wrote:
-> This patch adds a new struct pwrap_slv_type that we use to store the slave
-> specific data. The patch adds 2 new helper functions to access the dew
-> registers. The slave type is looked up via the wrappers child node.
-> 
-> Signed-off-by: John Crispin <blogic@openwrt.org>
-> ---
->  drivers/soc/mediatek/mtk-pmic-wrap.c |  170 +++++++++++++++++++++++++---------
->  1 file changed, 124 insertions(+), 46 deletions(-)
-> 
-> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> index 54553b4..21d8e5a 100644
-> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-<...>
-
-> +/* defines for slave device wrapper registers */
-> +enum dew_regs {
-> +	PWRAP_DEW_BASE,
-> +	PWRAP_DEW_EVENT_OUT_EN,
-> +	PWRAP_DEW_DIO_EN,
-> +	PWRAP_DEW_EVENT_SRC_EN,
-> +	PWRAP_DEW_EVENT_SRC,
-> +	PWRAP_DEW_EVENT_FLAG,
-> +	PWRAP_DEW_READ_TEST,
-> +	PWRAP_DEW_WRITE_TEST,
-> +	PWRAP_DEW_CRC_EN,
-> +	PWRAP_DEW_CRC_VAL,
-> +	PWRAP_DEW_MON_GRP_SEL,
-> +	PWRAP_DEW_MON_FLAG_SEL,
-> +	PWRAP_DEW_EVENT_TEST,
-> +	PWRAP_DEW_CIPHER_KEY_SEL,
-> +	PWRAP_DEW_CIPHER_IV_SEL,
-> +	PWRAP_DEW_CIPHER_LOAD,
-> +	PWRAP_DEW_CIPHER_START,
-> +	PWRAP_DEW_CIPHER_RDY,
-> +	PWRAP_DEW_CIPHER_MODE,
-> +	PWRAP_DEW_CIPHER_SWRST,
-> +	PWRAP_MT8173_DEW_CIPHER_IV0,
-> +	PWRAP_MT8173_DEW_CIPHER_IV1,
-> +	PWRAP_MT8173_DEW_CIPHER_IV2,
-> +	PWRAP_MT8173_DEW_CIPHER_IV3,
-> +	PWRAP_MT8173_DEW_CIPHER_IV4,
-> +	PWRAP_MT8173_DEW_CIPHER_IV5,
-
-
-For PWRAP_MT8173_DEW_*, since they exist on pmic mt6397, it seems
-strange to name them with MT8173 name. I guess we got this name because
-MTK internal code base try to support them in MT8173.
-
-On the other hand, these are not used in current code, maybe we can just
-remove them?
-
-Joe.C
+diff --git a/drivers/ntb/test/ntb_perf.c b/drivers/ntb/test/ntb_perf.c
+index c8a37ba4b4f9..6bdc1e7b7503 100644
+--- a/drivers/ntb/test/ntb_perf.c
++++ b/drivers/ntb/test/ntb_perf.c
+@@ -178,7 +178,7 @@ static void perf_copy_callback(void *data)
+ 	atomic_dec(&pctx->dma_sync);
+ }
+ 
+-static ssize_t perf_copy(struct pthr_ctx *pctx, char *dst,
++static ssize_t perf_copy(struct pthr_ctx *pctx, char __iomem *dst,
+ 			 char *src, size_t size)
+ {
+ 	struct perf_ctx *perf = pctx->perf;
+@@ -189,7 +189,8 @@ static ssize_t perf_copy(struct pthr_ctx *pctx, char *dst,
+ 	dma_cookie_t cookie;
+ 	size_t src_off, dst_off;
+ 	struct perf_mw *mw = &perf->mw;
+-	u64 vbase, dst_vaddr;
++	void __iomem *vbase;
++	void __iomem *dst_vaddr;
+ 	dma_addr_t dst_phys;
+ 	int retries = 0;
+ 
+@@ -204,14 +205,14 @@ static ssize_t perf_copy(struct pthr_ctx *pctx, char *dst,
+ 	}
+ 
+ 	device = chan->device;
+-	src_off = (size_t)src & ~PAGE_MASK;
+-	dst_off = (size_t)dst & ~PAGE_MASK;
++	src_off = (uintptr_t)src & ~PAGE_MASK;
++	dst_off = (uintptr_t __force)dst & ~PAGE_MASK;
+ 
+ 	if (!is_dma_copy_aligned(device, src_off, dst_off, size))
+ 		return -ENODEV;
+ 
+-	vbase = (u64)(u64 *)mw->vbase;
+-	dst_vaddr = (u64)(u64 *)dst;
++	vbase = mw->vbase;
++	dst_vaddr = dst;
+ 	dst_phys = mw->phys_addr + (dst_vaddr - vbase);
+ 
+ 	unmap = dmaengine_get_unmap_data(device->dev, 1, GFP_NOWAIT);
+@@ -261,13 +262,13 @@ err_get_unmap:
+ 	return 0;
+ }
+ 
+-static int perf_move_data(struct pthr_ctx *pctx, char *dst, char *src,
++static int perf_move_data(struct pthr_ctx *pctx, char __iomem *dst, char *src,
+ 			  u64 buf_size, u64 win_size, u64 total)
+ {
+ 	int chunks, total_chunks, i;
+ 	int copied_chunks = 0;
+ 	u64 copied = 0, result;
+-	char *tmp = dst;
++	char __iomem *tmp = dst;
+ 	u64 perf, diff_us;
+ 	ktime_t kstart, kstop, kdiff;
+ 
+@@ -324,7 +325,7 @@ static int ntb_perf_thread(void *data)
+ 	struct perf_ctx *perf = pctx->perf;
+ 	struct pci_dev *pdev = perf->ntb->pdev;
+ 	struct perf_mw *mw = &perf->mw;
+-	char *dst;
++	char __iomem *dst;
+ 	u64 win_size, buf_size, total;
+ 	void *src;
+ 	int rc, node, i;
+@@ -364,7 +365,7 @@ static int ntb_perf_thread(void *data)
+ 	if (buf_size > MAX_TEST_SIZE)
+ 		buf_size = MAX_TEST_SIZE;
+ 
+-	dst = (char *)mw->vbase;
++	dst = (char __iomem *)mw->vbase;
+ 
+ 	atomic_inc(&perf->tsync);
+ 	while (atomic_read(&perf->tsync) != perf->perf_threads)
+-- 
+2.7.0
