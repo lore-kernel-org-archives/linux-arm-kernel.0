@@ -1,100 +1,137 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 26 Jan 2016 13:12:46 +0000
-Subject: [PATCH 08/10] vfio: introduce vfio_group_require_msi_mapping
+Date: Tue, 26 Jan 2016 13:12:47 +0000
+Subject: [PATCH 09/10] vfio-pci: create an iommu mapping for msi address
 In-Reply-To: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
 References: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1453813968-2024-9-git-send-email-eric.auger@linaro.org>
+Message-ID: <1453813968-2024-10-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This new function enables to know whether msi write transaction
-addresses must be mapped.
+Some platforms require the MSI address programmed in the PCI
+device to be an IOVA and not a host physical address.
+This is typically the case for ARM and PowerPC, as opposed
+to x86. This patch allocates an IOVA page and maps it onto
+the physical page which contains the target MSI write transaction
+address. In case an IOMMU binding already exists between those 2,
+simply reprogram the device.
 
+The binding is destroyed by the VFIO IOMMU backend.
+
+Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
----
- drivers/vfio/vfio.c             | 22 ++++++++++++++++++++++
- drivers/vfio/vfio_iommu_type1.c |  8 ++++++++
- include/linux/vfio.h            |  2 ++
- 3 files changed, 32 insertions(+)
 
-diff --git a/drivers/vfio/vfio.c b/drivers/vfio/vfio.c
-index 2760d4c..f3df5a10 100644
---- a/drivers/vfio/vfio.c
-+++ b/drivers/vfio/vfio.c
-@@ -793,6 +793,28 @@ static int vfio_iommu_group_notifier(struct notifier_block *nb,
- 	return NOTIFY_OK;
+---
+---
+ drivers/vfio/pci/vfio_pci_intrs.c | 73 ++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 68 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/vfio/pci/vfio_pci_intrs.c b/drivers/vfio/pci/vfio_pci_intrs.c
+index 3b3ba15..bac24c9 100644
+--- a/drivers/vfio/pci/vfio_pci_intrs.c
++++ b/drivers/vfio/pci/vfio_pci_intrs.c
+@@ -305,6 +305,57 @@ static int vfio_msi_enable(struct vfio_pci_device *vdev, int nvec, bool msix)
+ 	return 0;
  }
  
-+bool vfio_group_require_msi_mapping(struct vfio_group *group)
++/**
++ * vfio_set_mapped_msi_addr: overwrites the msi physical address with an iova
++ *
++ * @pdev: vfio pci device handle
++ * @irq: irq linux number
++ * returns 0 upon success, < 0 on failure
++ */
++static int vfio_set_mapped_msi_addr(struct vfio_pci_device *vdev, int irq)
 +{
-+	struct vfio_container *container = group->container;
-+	struct vfio_iommu_driver *driver;
-+	bool ret;
++	phys_addr_t msi_addr;
++	dma_addr_t msi_iova;
++	struct vfio_group *group = vdev->vfio_group;
++	struct msi_msg msg;
++	int ret;
 +
-+	down_read(&container->group_lock);
++	get_cached_msi_msg(irq, &msg);
++	msi_addr = (phys_addr_t)(msg.address_hi) << 32 |
++			(phys_addr_t)(msg.address_lo);
 +
-+	driver = container->iommu_driver;
-+	if (!driver || !driver->ops || !driver->ops->require_msi_mapping) {
-+		ret = -EINVAL;
-+		goto up;
-+	}
++	ret = vfio_group_alloc_map_reserved_iova(group, msi_addr,
++						 IOMMU_WRITE, &msi_iova);
++	if (ret)
++		goto out;
 +
-+	ret = driver->ops->require_msi_mapping(container->iommu_data);
++	/* Re-program the msi-address with the iova */
++	msg.address_hi = (u32)(msi_iova >> 32);
++	msg.address_lo = (u32)(msi_iova & 0xffffffff);
++	pci_write_msi_msg(irq, &msg);
 +
-+up:
-+	up_read(&container->group_lock);
++out:
 +	return ret;
 +}
-+EXPORT_SYMBOL_GPL(vfio_group_require_msi_mapping);
 +
- /**
-  * VFIO driver API
-  */
-diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index a79e2a8..2f085d3 100644
---- a/drivers/vfio/vfio_iommu_type1.c
-+++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -1179,6 +1179,13 @@ unlock:
- 	return ret;
- }
- 
-+static bool vfio_iommu_type1_require_msi_mapping(void *iommu_data)
++/**
++ * vfio_unset_mapped_msi_addr: decrement the ref counter of the msi iova page
++ * associated to the linux irq (in case it is null unmaps and frees resources)
++ *
++ * @pdev: vfio pci device handle
++ * @irq: irq linux number
++ */
++static void vfio_unset_mapped_msi_addr(struct vfio_pci_device *vdev, int irq)
 +{
-+	struct vfio_iommu *iommu = iommu_data;
++	dma_addr_t msi_iova;
++	struct vfio_group *group = vdev->vfio_group;
++	struct msi_msg msg;
 +
-+	return vfio_domains_require_msi_mapping(iommu);
++	get_cached_msi_msg(irq, &msg);
++	msi_iova = (u64)(msg.address_hi) << 32 | (u64)(msg.address_lo);
++	vfio_group_unmap_free_reserved_iova(group, msi_iova);
 +}
 +
- static void *vfio_iommu_type1_open(unsigned long arg)
+ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
+ 				      int vector, int fd, bool msix)
  {
- 	struct vfio_iommu *iommu;
-@@ -1336,6 +1343,7 @@ static const struct vfio_iommu_driver_ops vfio_iommu_driver_ops_type1 = {
- 		vfio_iommu_type1_alloc_map_reserved_iova,
- 	.unmap_free_reserved_iova	=
- 		vfio_iommu_type1_unmap_free_reserved_iova,
-+	.require_msi_mapping		= vfio_iommu_type1_require_msi_mapping,
- };
+@@ -318,6 +369,7 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
+ 		return -EINVAL;
  
- static int __init vfio_iommu_type1_init(void)
-diff --git a/include/linux/vfio.h b/include/linux/vfio.h
-index f7eaf30..3e6cbeb 100644
---- a/include/linux/vfio.h
-+++ b/include/linux/vfio.h
-@@ -58,6 +58,7 @@ extern void *vfio_del_group_dev(struct device *dev);
- extern struct vfio_device *vfio_device_get_from_dev(struct device *dev);
- extern void vfio_device_put(struct vfio_device *device);
- extern void *vfio_device_data(struct vfio_device *device);
-+extern bool vfio_group_require_msi_mapping(struct vfio_group *group);
+ 	if (vdev->ctx[vector].trigger) {
++		vfio_unset_mapped_msi_addr(vdev, irq);
+ 		free_irq(irq, vdev->ctx[vector].trigger);
+ 		irq_bypass_unregister_producer(&vdev->ctx[vector].producer);
+ 		kfree(vdev->ctx[vector].name);
+@@ -355,11 +407,8 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
  
- /**
-  * struct vfio_iommu_driver_ops - VFIO IOMMU driver callbacks
-@@ -85,6 +86,7 @@ struct vfio_iommu_driver_ops {
- 	int		(*unmap_free_reserved_iova)(void *iommu_data,
- 						    struct iommu_group *group,
- 						    dma_addr_t iova);
-+	bool		(*require_msi_mapping)(void *iommu_data);
- };
+ 	ret = request_irq(irq, vfio_msihandler, 0,
+ 			  vdev->ctx[vector].name, trigger);
+-	if (ret) {
+-		kfree(vdev->ctx[vector].name);
+-		eventfd_ctx_put(trigger);
+-		return ret;
+-	}
++	if (ret)
++		goto error_free;
  
- extern int vfio_register_iommu_driver(const struct vfio_iommu_driver_ops *ops);
+ 	vdev->ctx[vector].producer.token = trigger;
+ 	vdev->ctx[vector].producer.irq = irq;
+@@ -369,9 +418,23 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
+ 		"irq bypass producer (token %p) registration fails: %d\n",
+ 		vdev->ctx[vector].producer.token, ret);
+ 
++	if (vfio_group_require_msi_mapping(vdev->vfio_group)) {
++		ret = vfio_set_mapped_msi_addr(vdev, irq);
++		if (ret)
++			goto error_free_irq;
++	}
++
+ 	vdev->ctx[vector].trigger = trigger;
+ 
+ 	return 0;
++
++error_free_irq:
++	free_irq(irq, vdev->ctx[vector].trigger);
++error_free:
++	kfree(vdev->ctx[vector].name);
++	eventfd_ctx_put(trigger);
++	return ret;
++
+ }
+ 
+ static int vfio_msi_set_block(struct vfio_pci_device *vdev, unsigned start,
 -- 
 1.9.1
