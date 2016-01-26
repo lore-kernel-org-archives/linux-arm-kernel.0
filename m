@@ -1,41 +1,36 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 26 Jan 2016 09:41:46 +0900
-Subject: [RFT 2/2] [media] exynos4-is: Add missing port parent of_node_put on
- error paths
-In-Reply-To: <1453768906-28979-1-git-send-email-k.kozlowski@samsung.com>
-References: <1453768906-28979-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1453768906-28979-2-git-send-email-k.kozlowski@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 26 Jan 2016 09:43:10 +0900
+Subject: [PATCH] ARM: dts: porter: add sound support
+In-Reply-To: <87k2mya48g.wl%kuninori.morimoto.gx@renesas.com>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+ <1872468.4EonQLNEFn@wasted.cogentembedded.com>
+ <87k2mya48g.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20160126004310.GJ26945@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In fimc_md_parse_port_node() remote port parent node is get with
-of_graph_get_remote_port_parent() but it is not put on error path.
+On Mon, Jan 25, 2016 at 12:35:57AM +0000, Kuninori Morimoto wrote:
+> 
+> Hi
+> 
+> > Define the Porter board dependent part of the R8A7791 sound device node.
+> > Add device node for Asahi Kasei AK4642 stereo codec  to the I2C2 bus.
+> > Add the "simple-audio-card" device node to interconnect the SoC sound
+> > device  and the codec.
+> > 
+> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Fixes: fa91f1056f17 ("[media] exynos4-is: Add support for asynchronous subdevices registration")
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Thanks, I have queued this up.
 
----
+> > +/*
+> > + * SSI-AK4642
+> > + *
+> > + * SW3: 1: AK4642
+> > + *      3: ADV7511
+> 
+> This is no a big deal, but according to my schematic,
+> porter is using JP3, not SW3, but no one cares ;P
 
-Not tested on hardware, only built+static checkers.
----
- drivers/media/platform/exynos4-is/media-dev.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
-index de0977479327..d2e564878e06 100644
---- a/drivers/media/platform/exynos4-is/media-dev.c
-+++ b/drivers/media/platform/exynos4-is/media-dev.c
-@@ -385,8 +385,10 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
- 	else
- 		pd->fimc_bus_type = pd->sensor_bus_type;
- 
--	if (WARN_ON(index >= ARRAY_SIZE(fmd->sensor)))
-+	if (WARN_ON(index >= ARRAY_SIZE(fmd->sensor))) {
-+		of_node_put(rem);
- 		return -EINVAL;
-+	}
- 
- 	fmd->sensor[index].asd.match_type = V4L2_ASYNC_MATCH_OF;
- 	fmd->sensor[index].asd.match.of.node = rem;
--- 
-1.9.1
+Sergei, please feel free to provide a follow-up patch to address this.
