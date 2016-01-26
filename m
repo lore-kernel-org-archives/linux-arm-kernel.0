@@ -1,90 +1,61 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 26 Jan 2016 16:07:16 +0000
-Subject: Have any influence on set_memory_** about below patch ??
-In-Reply-To: <56A77D37.10107@huawei.com>
-References: <5693A740.7070408@huawei.com> <20160111133145.GM6499@leverpostej>
- <569454F6.1060207@huawei.com> <20160112111531.GA4858@leverpostej>
- <5695DA67.5080201@huawei.com> <56A77D37.10107@huawei.com>
-Message-ID: <20160126160715.GB29086@leverpostej>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 26 Jan 2016 17:07:39 +0100
+Subject: [PATCH 3/4] irqchip: irq-armada-370-xp: use shorter names for
+ irq_chip
+In-Reply-To: <871tadfly0.fsf@free-electrons.com>
+References: <1450707546-15060-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1450707546-15060-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <871tadfly0.fsf@free-electrons.com>
+Message-ID: <20160126170739.5e8321a0@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 10:05:43PM +0800, zhong jiang wrote:
-> Hi, Mark,
+Gregory,
+
+Thanks for your feedback!
+
+On Wed, 23 Dec 2015 12:23:19 +0100, Gregory CLEMENT wrote:
+
+> >  static struct irq_chip armada_370_xp_irq_chip = {
+> > -	.name		= "armada_370_xp_irq",
+> > +	.name		= "MPIC",
 > 
-> I have some confuse about the tlb conflict when split from 2M block to 4K pages.
-> I think if core A starts to split page table from 2M to 4K pages, with the
-> operation __sync_icache_dcache to make sure flush the pte to PoU.
+> MPIC is the name also used by the power PC interrupt controller, so it
+> would be confusing to use exactly the same name.
 
-I don't follow why you would use __sync_icache_dcache here. This has
-nothing to do with the I-cache (as the VA->PA mappings stay the same at
-splitting time). 
+Not really: on a given system, you won't have the PowerPC interrupt
+controller and the Marvell interrupt controller. For example, for the
+ARM GIC, /proc/interrupts only shows GIC-0, not "ARM GIC-0".
 
-For ARMv8 (or ARMv7 with ID_MMFR3.CohWalk > 0), the TLB walks are fully
-coherent, and do not require page tables to be cleaned to the PoU in
-order to be visible.
+> What about calling it "MRVL MPIC" or "MVEBU MPIC"?
+> the name remains short but it won't be confused with the power PC ones.
 
-> Other core will have three kinds of situation:
-> 
-> 1. have the old pmd cached in tlb, so it will see the old physical address.
+Those names are still too long for a nice /proc/interrupts output:
 
-The presence of the old entry in the TLB does not guarantee that the new
-entry cannot also be allocated. The TLB can allocate a new TLB entry at
-any point in time for any active, valid page table entry (or combination
-of entries).
+# cat /proc/interrupts 
+           CPU0       CPU1       
+ 17:       2878       2726     GIC-0  29 Edge      twd
+ 18:          0          0  MRVL MPIC   5 Level     armada_370_xp_per_cpu_tick
+ 21:        142          0     GIC-0  34 Level     mv64xxx_i2c
+ 22:        235          0     GIC-0  44 Level     serial
+ 37:          0          0     GIC-0  50 Level     ehci_hcd:usb1
+ 41:          0          0     GIC-0  53 Level     f10a3800.rtc
+ 42:          0          0     GIC-0  58 Level     ahci-mvebu[f10a8000.sata]
+ 43:          0          0     GIC-0  60 Level     ahci-mvebu[f10e0000.sata]
+ 44:       1040          0     GIC-0  57 Level     mmc0
+ 45:          0          0     GIC-0  48 Level     xhci-hcd:usb2
+ 46:          0          0     GIC-0  49 Level     xhci-hcd:usb4
+108:          2          0     GIC-0  54 Level     f1060800.xor
+109:          2          0     GIC-0  97 Level     f1060900.xor
+110:          2          0  MRVL MSI MPIC 524288 Edge      eth0
 
-For instance, perhaps when walking the page tables, the walker allocates
-TLB entries for all valid page table entries in the same cache line, on
-the assumption that future accesses are likely to be nearby in the VA
-space. The TLB might handle duplicate (identical) entries by design, but
-not conflicting ones. For this case, a (speculative) walk of of a nearby
-page could result in allocation of a conflicting entry.
+Of course that's really a minor detail, but I don't think it's worth
+making those names longer than "MSI MPIC" and "MPIC".
 
-> 2. have no old pmd cached in tlb, it will see the new entry when
->  __sync_icache_dcache is over.
+Thanks!
 
-The TLB can fetch any valid, active entry at any time.
-
-It could fetch the old value from memory before the write was completed,
-then a subsequent fetch of the new value could occur. This devolves into
-the case I describe above for (1).
-
-> 3. have no old pmd cached in tlb, it maybe see the old entry before
-> __sync_icache_dcache is over. But, if the core A finish tlbi and dsb sy, all
-> the tlbs will see the new pte.
-
-The TLB can fetch any valid, active entry at any time. It could fetch
-the old entry, then the new entry, before the TLB maintenance completes.
-
-If other asynchronous logic (e.g. speculative execution, I-cache
-fetches, or page table walks) uses the results of an amalgamated
-translation, the CPU may access a physical address that was not intended
-to be accessed (perhaps resulting in an SError), or could allocate the
-wrong data into caches or TLBs, leading to further issues.
-
-The same problem applies as with (2), which devolves to (1).
-
-> In my opinion, It seems that the below example will only trigger tlb conflict
-> when merging to huge page.
-> 
-> For example, without BBM a page table update would look something like:
->  1)	str	<newpte>, [<*pte>]
->  2)	dsb	ish
->  3)	tlbi	vmalle1is
->  4)	dsb	ish
->  5)	isb
-> 
-> So I have no idea about how to trigger conflict when tlb conflict.
-> Can you give some advice and example ?
-
-I have explained above how this may occur, on one possible
-implementation. There are many possible problems that I have not
-described above, which are avoided by a Break-Before-Make seuqence.
-
-Even in the presence of conflicting entries a CPU might not raise a TLB
-conflict. It is also architecturally valid to match one entry, or to
-match an amalgamation of the two. So you may not be able to trigger
-problems resulting from a conflict on all implementations.
-
-Thanks,
-Mark.
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
