@@ -1,297 +1,157 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Jan 2016 14:12:06 +0000
-Subject: [PATCH 2/4] irqchip: irq-armada-370-xp: use the generic MSI
- infrastructure
-In-Reply-To: <1450707546-15060-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1450707546-15060-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1450707546-15060-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <56A77EB6.3030907@arm.com>
+From: rainyfeeling@gmail.com (Josh Wu)
+Date: Tue, 26 Jan 2016 22:16:57 +0800
+Subject: [PATCH 06/13] atmel-isi: check ISI_SR's flags by polling instead
+ of interrupt
+In-Reply-To: <Pine.LNX.4.64.1601241757340.16570@axis700.grange>
+References: <1453119709-20940-1-git-send-email-rainyfeeling@gmail.com>
+ <1453121545-27528-1-git-send-email-rainyfeeling@gmail.com>
+ <Pine.LNX.4.64.1601241757340.16570@axis700.grange>
+Message-ID: <CAJe_HAeKRtAzcz+s7D_5sXp9pnnM1Mhvu_3L1HQGPLsJLJbTSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi, Guennadi
 
-I finally found some bandwidth to have a look at this. A few comments below:
+2016-01-25 0:58 GMT+08:00 Guennadi Liakhovetski <g.liakhovetski@gmx.de>:
+> On Mon, 18 Jan 2016, Josh Wu wrote:
+>
+>> In current code, we use a interrupt to check whether ISI reset/disable
+>> action is done. Actually, we also can check ISI SR to check the
+>> reset/disable action by polling, and it is simpler and straight forward.
+>>
+>> So this patch use isi_hw_wait_status() to check the action status. As
+>> the interrupt checking the status is useless, so just remove the interrupt
+>> & completion code.
+>
+> Sorry, I'm not convinced. Switching from interrupt-driven to polling seems
+> counter-productive to me. Why do you want this?
 
-On 21/12/15 14:19, Thomas Petazzoni wrote:
-> This commit moves the irq-armada-370-xp driver from using the
-> PCI-specific MSI infrastructure to the generic MSI infrastructure, to
-> which drivers are progressively converted.
-> 
-> In this hardware, the MSI controller is directly bundled inside the
-> interrupt controller, so we have a single Device Tree node to which
-> multiple IRQ domaines are attached: the wired interrupt domain and the
-> MSI interrupt domain. In order to ensure that they can be
-> differentiated, we have to force the bus_token of the wired interrupt
-> domain to be DOMAIN_BUS_WIRED. The MSI domain bus_token is
-> automatically set to the appropriate value by
-> pci_msi_create_irq_domain().
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/irqchip/Kconfig             |   1 +
->  drivers/irqchip/irq-armada-370-xp.c | 151 +++++++++++++++---------------------
->  2 files changed, 65 insertions(+), 87 deletions(-)
-> 
-> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index ab672b0..8ccb60e 100644
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -51,6 +51,7 @@ config ARMADA_370_XP_IRQ
->  	bool
->  	default y if ARCH_MVEBU
->  	select GENERIC_IRQ_CHIP
-> +	select PCI_MSI_IRQ_DOMAIN if PCI_MSI
->  
->  config ATMEL_AIC_IRQ
->  	bool
-> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-> index 3f3a8c3..304166b 100644
-> --- a/drivers/irqchip/irq-armada-370-xp.c
-> +++ b/drivers/irqchip/irq-armada-370-xp.c
-> @@ -71,6 +71,7 @@ static u32 doorbell_mask_reg;
->  static int parent_irq;
->  #ifdef CONFIG_PCI_MSI
->  static struct irq_domain *armada_370_xp_msi_domain;
-> +static struct irq_domain *armada_370_xp_msi_inner_domain;
->  static DECLARE_BITMAP(msi_used, PCI_MSI_DOORBELL_NR);
->  static DEFINE_MUTEX(msi_used_lock);
->  static phys_addr_t msi_doorbell_addr;
-> @@ -115,127 +116,102 @@ static void armada_370_xp_irq_unmask(struct irq_data *d)
->  
->  #ifdef CONFIG_PCI_MSI
->  
-> -static int armada_370_xp_alloc_msi(void)
-> -{
-> -	int hwirq;
-> -
-> -	mutex_lock(&msi_used_lock);
-> -	hwirq = find_first_zero_bit(&msi_used, PCI_MSI_DOORBELL_NR);
-> -	if (hwirq >= PCI_MSI_DOORBELL_NR)
-> -		hwirq = -ENOSPC;
-> -	else
-> -		set_bit(hwirq, msi_used);
-> -	mutex_unlock(&msi_used_lock);
-> +static struct irq_chip armada_370_xp_msi_irq_chip = {
-> +	.name = "armada_370_xp_msi_irq",
-> +	.irq_enable = pci_msi_unmask_irq,
-> +	.irq_disable = pci_msi_mask_irq,
-> +	.irq_mask = pci_msi_mask_irq,
-> +	.irq_unmask = pci_msi_unmask_irq,
+Yes, it is counter-productive If such code is called very frequently.
+But here we only used for reset and disable the hardware.
 
-Having only mask/unmask ought to be enough.
+I think it is more straightforward and simple when we just check
+status register after write the reset or disable the ISI control
+register. Using interrupt here is over designed.
+for the sake of performance I should use cpu_releax() instead of
+msleep() when waiting for the status bit.
 
-> +};
->  
-> -	return hwirq;
-> -}
-> +static struct msi_domain_info armada_370_xp_msi_domain_info = {
-> +	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
-> +		   MSI_FLAG_MULTI_PCI_MSI),
+Best Regards,
+Josh Wu
 
-And not MSI-X? That seems rather strange (I'm pretty sure it just works).
-
-> +	.chip	= &armada_370_xp_msi_irq_chip,
-> +};
->  
-> -static void armada_370_xp_free_msi(int hwirq)
-> +static void armada_370_xp_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
->  {
-> -	mutex_lock(&msi_used_lock);
-> -	if (!test_bit(hwirq, msi_used))
-> -		pr_err("trying to free unused MSI#%d\n", hwirq);
-> -	else
-> -		clear_bit(hwirq, msi_used);
-> -	mutex_unlock(&msi_used_lock);
-> +	msg->address_lo = lower_32_bits(msi_doorbell_addr);
-> +	msg->address_hi = upper_32_bits(msi_doorbell_addr);
-> +	msg->data = 0xf00 | (data->hwirq + PCI_MSI_DOORBELL_START);
->  }
->  
-> -static int armada_370_xp_setup_msi_irq(struct msi_controller *chip,
-> -				       struct pci_dev *pdev,
-> -				       struct msi_desc *desc)
-> +static int armada_370_xp_msi_set_affinity(struct irq_data *irq_data,
-> +					  const struct cpumask *mask, bool force)
->  {
-> -	struct msi_msg msg;
-> -	int virq, hwirq;
-> +	 return -EINVAL;
-> +}
->  
-> -	/* We support MSI, but not MSI-X */
-> -	if (desc->msi_attrib.is_msix)
-> -		return -EINVAL;
-> +static struct irq_chip armada_370_xp_msi_bottom_irq_chip = {
-> +	.name			= "MPIC MSI",
-> +	.irq_compose_msi_msg	= armada_370_xp_compose_msi_msg,
-> +	.irq_set_affinity	= armada_370_xp_msi_set_affinity,
-> +};
->  
-> -	hwirq = armada_370_xp_alloc_msi();
-> -	if (hwirq < 0)
-> -		return hwirq;
-> +static int armada_370_xp_msi_alloc(struct irq_domain *domain, unsigned int virq,
-> +				   unsigned int nr_irqs, void *args)
-> +{
-> +	int hwirq;
->  
-> -	virq = irq_create_mapping(armada_370_xp_msi_domain, hwirq);
-> -	if (!virq) {
-> -		armada_370_xp_free_msi(hwirq);
-> -		return -EINVAL;
-> +	mutex_lock(&msi_used_lock);
-> +	hwirq = find_first_zero_bit(&msi_used, PCI_MSI_DOORBELL_NR);
-> +	if (hwirq >= PCI_MSI_DOORBELL_NR) {
-> +		mutex_unlock(&msi_used_lock);
-> +		return -ENOSPC;
->  	}
->  
-> -	irq_set_msi_desc(virq, desc);
-> +	set_bit(hwirq, msi_used);
-> +	mutex_unlock(&msi_used_lock);
->  
-> -	msg.address_lo = msi_doorbell_addr;
-> -	msg.address_hi = 0;
-> -	msg.data = 0xf00 | (hwirq + 16);
-> +	irq_domain_set_info(domain, virq, hwirq, &armada_370_xp_msi_bottom_irq_chip,
-> +			    domain->host_data, handle_simple_irq,
-> +			    NULL, NULL);
->  
-> -	pci_write_msi_msg(virq, &msg);
-> -	return 0;
-> +	return hwirq;
-
-So you are allocating one bit at a time, irrespective of nr_irqs. This
-implies that you can't support MULTI_MSI here (you'd need to guarantee a
-contiguous allocation of nr_irqs bits). So either you amend your
-allocator to deal with those (pretty easy), or you drop MULTI_MSI from
-your msi_domain_info.
-
->  }
->  
-> -static void armada_370_xp_teardown_msi_irq(struct msi_controller *chip,
-> -					   unsigned int irq)
-> +static void armada_370_xp_msi_free(struct irq_domain *domain,
-> +				   unsigned int virq, unsigned int nr_irqs)
->  {
-> -	struct irq_data *d = irq_get_irq_data(irq);
-> -	unsigned long hwirq = d->hwirq;
-> +	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
->  
-> -	irq_dispose_mapping(irq);
-> -	armada_370_xp_free_msi(hwirq);
-> -}
-> -
-> -static struct irq_chip armada_370_xp_msi_irq_chip = {
-> -	.name = "armada_370_xp_msi_irq",
-> -	.irq_enable = pci_msi_unmask_irq,
-> -	.irq_disable = pci_msi_mask_irq,
-> -	.irq_mask = pci_msi_mask_irq,
-> -	.irq_unmask = pci_msi_unmask_irq,
-> -};
-> -
-> -static int armada_370_xp_msi_map(struct irq_domain *domain, unsigned int virq,
-> -				 irq_hw_number_t hw)
-> -{
-> -	irq_set_chip_and_handler(virq, &armada_370_xp_msi_irq_chip,
-> -				 handle_simple_irq);
-> -
-> -	return 0;
-> +	mutex_lock(&msi_used_lock);
-> +	if (!test_bit(d->hwirq, msi_used))
-> +		pr_err("trying to free unused MSI#%lu\n", d->hwirq);
-> +	else
-> +		clear_bit(d->hwirq, msi_used);
-> +	mutex_unlock(&msi_used_lock);
->  }
->  
-> -static const struct irq_domain_ops armada_370_xp_msi_irq_ops = {
-> -	.map = armada_370_xp_msi_map,
-> +static const struct irq_domain_ops armada_370_xp_msi_domain_ops = {
-> +	.alloc	= armada_370_xp_msi_alloc,
-> +	.free	= armada_370_xp_msi_free,
->  };
->  
->  static int armada_370_xp_msi_init(struct device_node *node,
->  				  phys_addr_t main_int_phys_base)
->  {
-> -	struct msi_controller *msi_chip;
->  	u32 reg;
-> -	int ret;
->  
->  	msi_doorbell_addr = main_int_phys_base +
->  		ARMADA_370_XP_SW_TRIG_INT_OFFS;
->  
-> -	msi_chip = kzalloc(sizeof(*msi_chip), GFP_KERNEL);
-> -	if (!msi_chip)
-> +	armada_370_xp_msi_inner_domain =
-> +		irq_domain_add_linear(NULL, PCI_MSI_DOORBELL_NR,
-> +				      &armada_370_xp_msi_domain_ops, NULL);
-
-nit: Please keep the assignment on a single line.
-
-> +	if (!armada_370_xp_msi_inner_domain)
->  		return -ENOMEM;
->  
-> -	msi_chip->setup_irq = armada_370_xp_setup_msi_irq;
-> -	msi_chip->teardown_irq = armada_370_xp_teardown_msi_irq;
-> -	msi_chip->of_node = node;
-> -
->  	armada_370_xp_msi_domain =
-> -		irq_domain_add_linear(NULL, PCI_MSI_DOORBELL_NR,
-> -				      &armada_370_xp_msi_irq_ops,
-> -				      NULL);
-> +		pci_msi_create_irq_domain(of_node_to_fwnode(node),
-> +					  &armada_370_xp_msi_domain_info,
-> +					  armada_370_xp_msi_inner_domain);
-
-Same here.
-
->  	if (!armada_370_xp_msi_domain) {
-> -		kfree(msi_chip);
-> +		irq_domain_remove(armada_370_xp_msi_inner_domain);
->  		return -ENOMEM;
->  	}
->  
-> -	ret = of_pci_msi_chip_add(msi_chip);
-> -	if (ret < 0) {
-> -		irq_domain_remove(armada_370_xp_msi_domain);
-> -		kfree(msi_chip);
-> -		return ret;
-> -	}
-> -
->  	reg = readl(per_cpu_int_base + ARMADA_370_XP_IN_DRBEL_MSK_OFFS)
->  		| PCI_MSI_DOORBELL_MASK;
->  
-> @@ -427,12 +403,12 @@ static void armada_370_xp_handle_msi_irq(struct pt_regs *regs, bool is_chained)
->  			continue;
->  
->  		if (is_chained) {
-> -			irq = irq_find_mapping(armada_370_xp_msi_domain,
-> +			irq = irq_find_mapping(armada_370_xp_msi_inner_domain,
->  					       msinr - 16);
->  			generic_handle_irq(irq);
->  		} else {
->  			irq = msinr - 16;
-> -			handle_domain_irq(armada_370_xp_msi_domain,
-> +			handle_domain_irq(armada_370_xp_msi_inner_domain,
->  					  irq, regs);
->  		}
->  	}
-> @@ -604,6 +580,7 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
->  	armada_370_xp_mpic_domain =
->  		irq_domain_add_linear(node, nr_irqs,
->  				&armada_370_xp_mpic_irq_ops, NULL);
-> +	armada_370_xp_mpic_domain->bus_token = DOMAIN_BUS_WIRED;
->  
->  	BUG_ON(!armada_370_xp_mpic_domain);
-
-Given the assignment just above, this BUG_ON has become pretty useless...
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>
+> Thanks
+> Guennadi
+>
+>>
+>> Signed-off-by: Josh Wu <rainyfeeling@gmail.com>
+>> ---
+>>
+>>  drivers/media/platform/soc_camera/atmel-isi.c | 59 ++++++---------------------
+>>  1 file changed, 13 insertions(+), 46 deletions(-)
+>>
+>> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+>> index f0508ea..4ddc309 100644
+>> --- a/drivers/media/platform/soc_camera/atmel-isi.c
+>> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+>> @@ -12,7 +12,6 @@
+>>   */
+>>
+>>  #include <linux/clk.h>
+>> -#include <linux/completion.h>
+>>  #include <linux/delay.h>
+>>  #include <linux/fs.h>
+>>  #include <linux/init.h>
+>> @@ -81,7 +80,6 @@ struct atmel_isi {
+>>       struct isi_dma_desc             dma_desc[MAX_BUFFER_NUM];
+>>       bool                            enable_preview_path;
+>>
+>> -     struct completion               complete;
+>>       /* ISI peripherial clock */
+>>       struct clk                      *pclk;
+>>       unsigned int                    irq;
+>> @@ -281,51 +279,14 @@ static irqreturn_t isi_interrupt(int irq, void *dev_id)
+>>       mask = isi_readl(isi, ISI_INTMASK);
+>>       pending = status & mask;
+>>
+>> -     if (pending & ISI_CTRL_SRST) {
+>> -             complete(&isi->complete);
+>> -             isi_writel(isi, ISI_INTDIS, ISI_CTRL_SRST);
+>> -             ret = IRQ_HANDLED;
+>> -     } else if (pending & ISI_CTRL_DIS) {
+>> -             complete(&isi->complete);
+>> -             isi_writel(isi, ISI_INTDIS, ISI_CTRL_DIS);
+>> -             ret = IRQ_HANDLED;
+>> -     } else {
+>> -             if (likely(pending & ISI_SR_CXFR_DONE) ||
+>> -                             likely(pending & ISI_SR_PXFR_DONE))
+>> -                     ret = atmel_isi_handle_streaming(isi);
+>> -     }
+>> +     if (likely(pending & ISI_SR_CXFR_DONE) ||
+>> +         likely(pending & ISI_SR_PXFR_DONE))
+>> +             ret = atmel_isi_handle_streaming(isi);
+>>
+>>       spin_unlock(&isi->lock);
+>>       return ret;
+>>  }
+>>
+>> -#define      WAIT_ISI_RESET          1
+>> -#define      WAIT_ISI_DISABLE        0
+>> -static int atmel_isi_wait_status(struct atmel_isi *isi, int wait_reset)
+>> -{
+>> -     unsigned long timeout;
+>> -     /*
+>> -      * The reset or disable will only succeed if we have a
+>> -      * pixel clock from the camera.
+>> -      */
+>> -     init_completion(&isi->complete);
+>> -
+>> -     if (wait_reset) {
+>> -             isi_writel(isi, ISI_INTEN, ISI_CTRL_SRST);
+>> -             isi_writel(isi, ISI_CTRL, ISI_CTRL_SRST);
+>> -     } else {
+>> -             isi_writel(isi, ISI_INTEN, ISI_CTRL_DIS);
+>> -             isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+>> -     }
+>> -
+>> -     timeout = wait_for_completion_timeout(&isi->complete,
+>> -                     msecs_to_jiffies(500));
+>> -     if (timeout == 0)
+>> -             return -ETIMEDOUT;
+>> -
+>> -     return 0;
+>> -}
+>> -
+>>  /* ------------------------------------------------------------------
+>>       Videobuf operations
+>>     ------------------------------------------------------------------*/
+>> @@ -493,8 +454,11 @@ static int start_streaming(struct vb2_queue *vq, unsigned int count)
+>>       pm_runtime_get_sync(ici->v4l2_dev.dev);
+>>
+>>       /* Reset ISI */
+>> -     ret = atmel_isi_wait_status(isi, WAIT_ISI_RESET);
+>> -     if (ret < 0) {
+>> +     isi_writel(isi, ISI_CTRL, ISI_CTRL_SRST);
+>> +
+>> +     /* Check Reset status */
+>> +     ret  = isi_hw_wait_status(isi, ISI_CTRL_SRST, 500);
+>> +     if (ret) {
+>>               dev_err(icd->parent, "Reset ISI timed out\n");
+>>               pm_runtime_put(ici->v4l2_dev.dev);
+>>               return ret;
+>> @@ -549,8 +513,11 @@ static void stop_streaming(struct vb2_queue *vq)
+>>                       ISI_SR_CXFR_DONE | ISI_SR_PXFR_DONE);
+>>
+>>       /* Disable ISI and wait for it is done */
+>> -     ret = atmel_isi_wait_status(isi, WAIT_ISI_DISABLE);
+>> -     if (ret < 0)
+>> +     isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+>> +
+>> +     /* Check Reset status */
+>> +     ret  = isi_hw_wait_status(isi, ISI_CTRL_DIS, 500);
+>> +     if (ret)
+>>               dev_err(icd->parent, "Disable ISI timed out\n");
+>>
+>>       pm_runtime_put(ici->v4l2_dev.dev);
+>> --
+>> 1.9.1
+>>
