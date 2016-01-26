@@ -1,57 +1,40 @@
-From: lho@apm.com (Loc Ho)
-Date: Tue, 26 Jan 2016 15:13:30 -0800
-Subject: [PATCH v3] ARM64: kernel: implement ACPI parking protocol
-In-Reply-To: <1453806638-23167-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1453806638-23167-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <CAPw-ZTk=BbXAPgWAV=3Np0qvLA+i+U5eh+nxHS=2uMjKohdUfA@mail.gmail.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 27 Jan 2016 00:14:54 +0100
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <20160126224804.GB19432@atomide.com>
+References: <20160126224804.GB19432@atomide.com>
+Message-ID: <CAJZ5v0i79X5JjOZiu4cOZ0Esd5BxAvutF8d17asDzq9ECcML-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Tue, Jan 26, 2016 at 11:48 PM, Tony Lindgren <tony@atomide.com> wrote:
+> Hi,
+>
+> Looks like commit 5de85b9d57ab ("PM / runtime: Re-init runtime
+> PM states at probe error and driver unbind") broke PM on at least
+> omap3. It seems we now need to additionally also call
+> pm_runtime_dont_use_autosuspend() to get things working again?
+>
+> The following fixes idling on omap3, but I'm wondering if we
+> should do something in pm_runtime_reinit() instead?
 
-On Tue, Jan 26, 2016 at 3:10 AM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> The SBBR and ACPI specifications allow ACPI based systems that do not
-> implement PSCI (eg systems with no EL3) to boot through the ACPI parking
-> protocol specification[1].
->
-> This patch implements the ACPI parking protocol CPU operations, and adds
-> code that eases parsing the parking protocol data structures to the
-> ARM64 SMP initializion carried out at the same time as cpus enumeration.
->
-> To wake-up the CPUs from the parked state, this patch implements a
-> wakeup IPI for ARM64 (ie arch_send_wakeup_ipi_mask()) that mirrors the
-> ARM one, so that a specific IPI is sent for wake-up purpose in order
-> to distinguish it from other IPI sources.
->
-> Given the current ACPI MADT parsing API, the patch implements a glue
-> layer that helps passing MADT GICC data structure from SMP initialization
-> code to the parking protocol implementation somewhat overriding the CPU
-> operations interfaces. This to avoid creating a completely trasparent
-> DT/ACPI CPU operations layer that would require creating opaque
-> structure handling for CPUs data (DT represents CPU through DT nodes, ACPI
-> through static MADT table entries), which seems overkill given that ACPI
-> on ARM64 mandates only two booting protocols (PSCI and parking protocol),
-> so there is no need for further protocol additions.
->
-> Based on the original work by Mark Salter <msalter@redhat.com>
->
-> [1] https://acpica.org/sites/acpica/files/MP%20Startup%20for%20ARM%20platforms.docx
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Loc Ho <lho@apm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Mark Salter <msalter@redhat.com>
-> Cc: Al Stone <ahs3@redhat.com>
+Well, does it actually help if you add
+pm_runtime_dont_use_autosuspend(dev) to pm_runtime_reinit()?
 
-I had tested this with X-Gene Mustang board. It applies cleanly
-against 4.5.0-rc1 and detected all CPU's. For those of you want to try
-this, you need an FW update if you are using APM Tianocore. Otherwise,
-it will stuck in very early booting stage.
+> 8< ---------------------
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -2232,6 +2232,7 @@ err_irq:
+>                 dma_release_channel(host->tx_chan);
+>         if (host->rx_chan)
+>                 dma_release_channel(host->rx_chan);
+> +       pm_runtime_dont_use_autosuspend(host->dev);
+>         pm_runtime_put_sync(host->dev);
+>         pm_runtime_disable(host->dev);
+>         if (host->dbclk)
+> --
+
 
 Thanks,
-Loc
+Rafael
