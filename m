@@ -1,49 +1,90 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Jan 2016 16:02:58 +0000
-Subject: [PATCH] arm64: Add support for Half precision floating point
-In-Reply-To: <1453823566-26742-1-git-send-email-suzuki.poulose@arm.com>
-References: <1453823566-26742-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160126160257.GB28238@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 26 Jan 2016 16:07:16 +0000
+Subject: Have any influence on set_memory_** about below patch ??
+In-Reply-To: <56A77D37.10107@huawei.com>
+References: <5693A740.7070408@huawei.com> <20160111133145.GM6499@leverpostej>
+ <569454F6.1060207@huawei.com> <20160112111531.GA4858@leverpostej>
+ <5695DA67.5080201@huawei.com> <56A77D37.10107@huawei.com>
+Message-ID: <20160126160715.GB29086@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
-
-On Tue, Jan 26, 2016 at 03:52:46PM +0000, Suzuki K Poulose wrote:
-> ARMv8.2 extensions [1] include an optional feature, which supports
-> half precision(16bit) floating point/asimd data processing
-> instructions. This patch adds support for detecting and exposing
-> the same to the userspace via HWCAPs
+On Tue, Jan 26, 2016 at 10:05:43PM +0800, zhong jiang wrote:
+> Hi, Mark,
 > 
-> [1] https://community.arm.com/groups/processors/blog/2016/01/05/armv8-a-architecture-evolution
+> I have some confuse about the tlb conflict when split from 2M block to 4K pages.
+> I think if core A starts to split page table from 2M to 4K pages, with the
+> operation __sync_icache_dcache to make sure flush the pte to PoU.
+
+I don't follow why you would use __sync_icache_dcache here. This has
+nothing to do with the I-cache (as the VA->PA mappings stay the same at
+splitting time). 
+
+For ARMv8 (or ARMv7 with ID_MMFR3.CohWalk > 0), the TLB walks are fully
+coherent, and do not require page tables to be cleaned to the PoU in
+order to be visible.
+
+> Other core will have three kinds of situation:
 > 
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/include/uapi/asm/hwcap.h |    2 ++
->  arch/arm64/kernel/cpufeature.c      |    2 ++
->  arch/arm64/kernel/cpuinfo.c         |    2 ++
->  3 files changed, 6 insertions(+)
+> 1. have the old pmd cached in tlb, so it will see the old physical address.
+
+The presence of the old entry in the TLB does not guarantee that the new
+entry cannot also be allocated. The TLB can allocate a new TLB entry at
+any point in time for any active, valid page table entry (or combination
+of entries).
+
+For instance, perhaps when walking the page tables, the walker allocates
+TLB entries for all valid page table entries in the same cache line, on
+the assumption that future accesses are likely to be nearby in the VA
+space. The TLB might handle duplicate (identical) entries by design, but
+not conflicting ones. For this case, a (speculative) walk of of a nearby
+page could result in allocation of a conflicting entry.
+
+> 2. have no old pmd cached in tlb, it will see the new entry when
+>  __sync_icache_dcache is over.
+
+The TLB can fetch any valid, active entry at any time.
+
+It could fetch the old value from memory before the write was completed,
+then a subsequent fetch of the new value could occur. This devolves into
+the case I describe above for (1).
+
+> 3. have no old pmd cached in tlb, it maybe see the old entry before
+> __sync_icache_dcache is over. But, if the core A finish tlbi and dsb sy, all
+> the tlbs will see the new pte.
+
+The TLB can fetch any valid, active entry at any time. It could fetch
+the old entry, then the new entry, before the TLB maintenance completes.
+
+If other asynchronous logic (e.g. speculative execution, I-cache
+fetches, or page table walks) uses the results of an amalgamated
+translation, the CPU may access a physical address that was not intended
+to be accessed (perhaps resulting in an SError), or could allocate the
+wrong data into caches or TLBs, leading to further issues.
+
+The same problem applies as with (2), which devolves to (1).
+
+> In my opinion, It seems that the below example will only trigger tlb conflict
+> when merging to huge page.
 > 
-> diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
-> index 361c8a8..a739287 100644
-> --- a/arch/arm64/include/uapi/asm/hwcap.h
-> +++ b/arch/arm64/include/uapi/asm/hwcap.h
-> @@ -28,5 +28,7 @@
->  #define HWCAP_SHA2		(1 << 6)
->  #define HWCAP_CRC32		(1 << 7)
->  #define HWCAP_ATOMICS		(1 << 8)
-> +#define HWCAP_FPHP		(1 << 9)
-> +#define HWCAP_ASIMDHP		(1 << 10)
+> For example, without BBM a page table update would look something like:
+>  1)	str	<newpte>, [<*pte>]
+>  2)	dsb	ish
+>  3)	tlbi	vmalle1is
+>  4)	dsb	ish
+>  5)	isb
+> 
+> So I have no idea about how to trigger conflict when tlb conflict.
+> Can you give some advice and example ?
 
-Where did we get to with the mrs trapping you proposed here?
+I have explained above how this may occur, on one possible
+implementation. There are many possible problems that I have not
+described above, which are avoided by a Break-Before-Make seuqence.
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/374609.html
+Even in the presence of conflicting entries a CPU might not raise a TLB
+conflict. It is also architecturally valid to match one entry, or to
+match an amalgamation of the two. So you may not be able to trigger
+problems resulting from a conflict on all implementations.
 
-At some point, we need to consider whether or not we want to continue
-adding new HWCAPs or whether your suggestion above is actually useful
-to userspace.
-
-Did the libc guys get anywhere with a prototype? What do we need to do
-to make progress with it?
-
-Will
+Thanks,
+Mark.
