@@ -1,37 +1,35 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 26 Jan 2016 18:44:27 +0800
-Subject: [PATCH 1/4] crypto: sunxi - don't print uninitialized data
-In-Reply-To: <1453740845-1980433-1-git-send-email-arnd@arndb.de>
-References: <1453740845-1980433-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160126104427.GA19583@gondor.apana.org.au>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 26 Jan 2016 18:42:34 +0800
+Subject: [PATCH] mmc: sdhci-of-at91: fix pm runtime unbalanced issue in error
+ path
+Message-ID: <1453804954-3490-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 05:53:48PM +0100, Arnd Bergmann wrote:
-> gcc correctly warns that the printk output contains a variable that
-> is not initialized in some cases:
-> 
-> drivers/crypto/sunxi-ss/sun4i-ss-cipher.c: In function 'sun4i_ss_cipher_poll':
-> drivers/crypto/sunxi-ss/sun4i-ss-cipher.c:254:76: warning: 'todo' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> drivers/crypto/sunxi-ss/sun4i-ss-cipher.c:144:15: note: 'todo' was declared here
-> 
-> This adds an explicit initialization to zero in the exact case where it
-> was missing, to avoid leaking stack data to the console and to shut up
-> that warning.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+The device power usage counter is increased by pm_runtime_get_noresume
+but isn't decreased in err_add_host error path.
 
-This is actually a bogus warning because todo is always initialised
-but gcc can't see that because it's behind multiple conditionals.
+Fix this issue by calling pm_runtime_put_noidle() in the error path to
+restore the device's power usage counter.
 
-It would be great if we can restructure the code so that gcc can see
-this while at the same time also improving the readability of the
-loop.
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Fixes: f5f17813ae9b ("mmc: sdhci-of-at91: add PM support)
+---
+ drivers/mmc/host/sdhci-of-at91.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Otherwise just initialise it at the top or use uninitialised_var.
-
-Thanks,
+diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
+index 7db7163..3bf6f31 100644
+--- a/drivers/mmc/host/sdhci-of-at91.c
++++ b/drivers/mmc/host/sdhci-of-at91.c
+@@ -210,7 +210,7 @@ static int sdhci_at91_probe(struct platform_device *pdev)
+ 
+ pm_runtime_disable:
+ 	pm_runtime_disable(&pdev->dev);
+-	pm_runtime_set_suspended(&pdev->dev);
++	pm_runtime_put_noidle(&pdev->dev);
+ clocks_disable_unprepare:
+ 	clk_disable_unprepare(priv->gck);
+ 	clk_disable_unprepare(priv->mainck);
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+2.7.0
