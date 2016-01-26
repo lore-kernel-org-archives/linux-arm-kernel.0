@@ -1,212 +1,58 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 26 Jan 2016 12:04:06 +0100
-Subject: [PATCH v2] serial: atmel: Use atmel_port consistently
-In-Reply-To: <1452817319-9309-1-git-send-email-kyle.roeschley@ni.com>
-References: <1452817319-9309-1-git-send-email-kyle.roeschley@ni.com>
-Message-ID: <1453806246-13405-1-git-send-email-nicolas.ferre@atmel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 26 Jan 2016 11:03:59 +0000
+Subject: Unhandled level 2 translation fault on A72 board.
+In-Reply-To: <56A72246.4050105@huawei.com>
+References: <56A72246.4050105@huawei.com>
+Message-ID: <20160126110358.GA23579@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jaeden Amero <jaeden.amero@ni.com>
+On Tue, Jan 26, 2016 at 03:37:42PM +0800, Ding Tianhong wrote:
+> I met this problem when running the hackbench test on A72 chip board:
+> 
+> sh[4779]: unhandled level 2 translation fault (11) at 0x7f96be0c80, esr 0x83000006 
+> pgd = ffffffc01a1f0000 
+> [7f96be0c80] *pgd=0000000084a20003, *pud=0000000084a20003, *pmd=0000000000000000
+> 
+> CPU: 1 PID: 4779 Comm: sh Tainted: G O 4.1.15+ #21 
+> Hardware name: Hisilicon PhosphorHi1382 EVB (DT) 
+> task: ffffffc0163cc500 ti: ffffffc083abc000 task.ti: ffffffc083abc000 
+> PC is at 0x7f96be0c80 
+> LR is at 0x7fb2684eb4 
+> pc : [<0000007f96be0c80>] lr : [<0000007fb2684eb4>] pstate: 60000000 
 
-In all functions other than atmel_serial_probe_fifos,
-atmel_serial_probe, and atmel_console_init, the name "port" is used to
-refer to an instance of struct uart_port. In many of these functions,
-"atmel_port" is used to refer to an instance of struct atmel_uart_port.
+So here it's user space trying to execute from 0x7f96be0c80 (instruction
+abort).
 
-We make the use of the name "port" consistent by making
-atmel_serial_probe_fifos, atmel_serial_probe, and atmel_console_init
-use "atmel_port" to refer to an instance of struct atmel_uart_port
-instead of the previous name of "port".
+> sh[4963]: unhandled level 2 translation fault (11) at 0x00000000, esr 0x92000006
+> pgd = ffffffc0180c6000 
+> [00000000] *pgd=0000000015157003, *pud=0000000015157003, *pmd=0000000000000000 
+> 
+> CPU: 0 PID: 4963 Comm: sh Tainted: G O 4.1.15+ #21 
+> Hardware name: Hisilicon PhosphorHi1382 EVB (DT) 
+> task: ffffffc0163cb980 ti: ffffffc0840c8000 task.ti: ffffffc0840c8000 
+> PC is at 0x42c0c8 
+> LR is at 0x42c03c 
+> pc : [<000000000042c0c8>] lr : [<000000000042c03c>] pstate: 80000000 
 
-Signed-off-by: Jaeden Amero <jaeden.amero@ni.com>
-Signed-off-by: Kyle Roeschley <kyle.roeschley@ni.com>
-Acked-by: Karthik Manamcheri <karthik.manamcheri@ni.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-v2: - fix typo in variable
+And here you have a null pointer dereference.
 
- drivers/tty/serial/atmel_serial.c | 81 ++++++++++++++++++++-------------------
- 1 file changed, 41 insertions(+), 40 deletions(-)
+> if I run the benchmark only on the core which is in the same cluster,
+> it looks fine and no error happened, but if I enable the core which in
+> the different cluster, it will happened.
+> 
+> I remember that I met the same problem on the A57 and fix it by enable
+> the [bit6] of the CPUECTLR_EL1 and enable MN, But this time, I enable
+> the same setting and looks no effort, I have no idea about this
+> problem, does A57 and A72 has so big difference on TLB?
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 1c0884d8ef32..555111955b75 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -2478,13 +2478,13 @@ static int __init atmel_console_init(void)
- 		struct atmel_uart_data *pdata =
- 			dev_get_platdata(&atmel_default_console_device->dev);
- 		int id = pdata->num;
--		struct atmel_uart_port *port = &atmel_ports[id];
-+		struct atmel_uart_port *atmel_port = &atmel_ports[id];
- 
--		port->backup_imr = 0;
--		port->uart.line = id;
-+		atmel_port->backup_imr = 0;
-+		atmel_port->uart.line = id;
- 
- 		add_preferred_console(ATMEL_DEVICENAME, id, NULL);
--		ret = atmel_init_port(port, atmel_default_console_device);
-+		ret = atmel_init_port(atmel_port, atmel_default_console_device);
- 		if (ret)
- 			return ret;
- 		register_console(&atmel_console);
-@@ -2599,23 +2599,23 @@ static int atmel_serial_resume(struct platform_device *pdev)
- #define atmel_serial_resume NULL
- #endif
- 
--static void atmel_serial_probe_fifos(struct atmel_uart_port *port,
-+static void atmel_serial_probe_fifos(struct atmel_uart_port *atmel_port,
- 				     struct platform_device *pdev)
- {
--	port->fifo_size = 0;
--	port->rts_low = 0;
--	port->rts_high = 0;
-+	atmel_port->fifo_size = 0;
-+	atmel_port->rts_low = 0;
-+	atmel_port->rts_high = 0;
- 
- 	if (of_property_read_u32(pdev->dev.of_node,
- 				 "atmel,fifo-size",
--				 &port->fifo_size))
-+				 &atmel_port->fifo_size))
- 		return;
- 
--	if (!port->fifo_size)
-+	if (!atmel_port->fifo_size)
- 		return;
- 
--	if (port->fifo_size < ATMEL_MIN_FIFO_SIZE) {
--		port->fifo_size = 0;
-+	if (atmel_port->fifo_size < ATMEL_MIN_FIFO_SIZE) {
-+		atmel_port->fifo_size = 0;
- 		dev_err(&pdev->dev, "Invalid FIFO size\n");
- 		return;
- 	}
-@@ -2628,22 +2628,22 @@ static void atmel_serial_probe_fifos(struct atmel_uart_port *port,
- 	 * Threshold to a reasonably high value respecting this 16 data
- 	 * empirical rule when possible.
- 	 */
--	port->rts_high = max_t(int, port->fifo_size >> 1,
--			       port->fifo_size - ATMEL_RTS_HIGH_OFFSET);
--	port->rts_low  = max_t(int, port->fifo_size >> 2,
--			       port->fifo_size - ATMEL_RTS_LOW_OFFSET);
-+	atmel_port->rts_high = max_t(int, atmel_port->fifo_size >> 1,
-+			       atmel_port->fifo_size - ATMEL_RTS_HIGH_OFFSET);
-+	atmel_port->rts_low  = max_t(int, atmel_port->fifo_size >> 2,
-+			       atmel_port->fifo_size - ATMEL_RTS_LOW_OFFSET);
- 
- 	dev_info(&pdev->dev, "Using FIFO (%u data)\n",
--		 port->fifo_size);
-+		 atmel_port->fifo_size);
- 	dev_dbg(&pdev->dev, "RTS High Threshold : %2u data\n",
--		port->rts_high);
-+		atmel_port->rts_high);
- 	dev_dbg(&pdev->dev, "RTS Low Threshold  : %2u data\n",
--		port->rts_low);
-+		atmel_port->rts_low);
- }
- 
- static int atmel_serial_probe(struct platform_device *pdev)
- {
--	struct atmel_uart_port *port;
-+	struct atmel_uart_port *atmel_port;
- 	struct device_node *np = pdev->dev.of_node;
- 	struct atmel_uart_data *pdata = dev_get_platdata(&pdev->dev);
- 	void *data;
-@@ -2674,14 +2674,14 @@ static int atmel_serial_probe(struct platform_device *pdev)
- 		goto err;
- 	}
- 
--	port = &atmel_ports[ret];
--	port->backup_imr = 0;
--	port->uart.line = ret;
--	atmel_serial_probe_fifos(port, pdev);
-+	atmel_port = &atmel_ports[ret];
-+	atmel_port->backup_imr = 0;
-+	atmel_port->uart.line = ret;
-+	atmel_serial_probe_fifos(atmel_port, pdev);
- 
--	spin_lock_init(&port->lock_suspended);
-+	spin_lock_init(&atmel_port->lock_suspended);
- 
--	ret = atmel_init_port(port, pdev);
-+	ret = atmel_init_port(atmel_port, pdev);
- 	if (ret)
- 		goto err_clear_bit;
- 
-@@ -2691,34 +2691,34 @@ static int atmel_serial_probe(struct platform_device *pdev)
- 		goto err_clear_bit;
- 	}
- 
--	if (!atmel_use_pdc_rx(&port->uart)) {
-+	if (!atmel_use_pdc_rx(&atmel_port->uart)) {
- 		ret = -ENOMEM;
- 		data = kmalloc(sizeof(struct atmel_uart_char)
- 				* ATMEL_SERIAL_RINGSIZE, GFP_KERNEL);
- 		if (!data)
- 			goto err_alloc_ring;
--		port->rx_ring.buf = data;
-+		atmel_port->rx_ring.buf = data;
- 	}
- 
--	rs485_enabled = port->uart.rs485.flags & SER_RS485_ENABLED;
-+	rs485_enabled = atmel_port->uart.rs485.flags & SER_RS485_ENABLED;
- 
--	ret = uart_add_one_port(&atmel_uart, &port->uart);
-+	ret = uart_add_one_port(&atmel_uart, &atmel_port->uart);
- 	if (ret)
- 		goto err_add_port;
- 
- #ifdef CONFIG_SERIAL_ATMEL_CONSOLE
--	if (atmel_is_console_port(&port->uart)
-+	if (atmel_is_console_port(&atmel_port->uart)
- 			&& ATMEL_CONSOLE_DEVICE->flags & CON_ENABLED) {
- 		/*
- 		 * The serial core enabled the clock for us, so undo
- 		 * the clk_prepare_enable() in atmel_console_setup()
- 		 */
--		clk_disable_unprepare(port->clk);
-+		clk_disable_unprepare(atmel_port->clk);
- 	}
- #endif
- 
- 	device_init_wakeup(&pdev->dev, 1);
--	platform_set_drvdata(pdev, port);
-+	platform_set_drvdata(pdev, atmel_port);
- 
- 	/*
- 	 * The peripheral clock has been disabled by atmel_init_port():
-@@ -2727,9 +2727,10 @@ static int atmel_serial_probe(struct platform_device *pdev)
- 	clk_prepare_enable(port->clk);
- 
- 	if (rs485_enabled) {
--		atmel_uart_writel(&port->uart, ATMEL_US_MR,
-+		atmel_uart_writel(&atmel_port->uart, ATMEL_US_MR,
- 				  ATMEL_US_USMODE_NORMAL);
--		atmel_uart_writel(&port->uart, ATMEL_US_CR, ATMEL_US_RTSEN);
-+		atmel_uart_writel(&atmel_port->uart, ATMEL_US_CR,
-+				  ATMEL_US_RTSEN);
- 	}
- 
- 	/*
-@@ -2746,12 +2747,12 @@ static int atmel_serial_probe(struct platform_device *pdev)
- 	return 0;
- 
- err_add_port:
--	kfree(port->rx_ring.buf);
--	port->rx_ring.buf = NULL;
-+	kfree(atmel_port->rx_ring.buf);
-+	atmel_port->rx_ring.buf = NULL;
- err_alloc_ring:
--	if (!atmel_is_console_port(&port->uart)) {
--		clk_put(port->clk);
--		port->clk = NULL;
-+	if (!atmel_is_console_port(&atmel_port->uart)) {
-+		clk_put(atmel_port->clk);
-+		atmel_port->clk = NULL;
- 	}
- err_clear_bit:
- 	clear_bit(port->uart.line, atmel_ports_in_use);
+I can't tell for sure it's a TLB issue. The kernel page table dump shows
+*pmd being 0, so the fault is correctly called "level 2 translation
+fault". It also seems that there is no vma at this address, hence the
+kernel reports it as unhandled. It looks like data corruption which
+could be caused by cache or TLB incoherence. Just make sure the
+interconnect linking the two clusters is configured correctly by
+_firmware_ before Linux starts.
+
 -- 
-2.1.3
+Catalin
