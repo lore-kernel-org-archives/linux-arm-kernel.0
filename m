@@ -1,48 +1,28 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 26 Jan 2016 18:22:27 +0100
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160126165207.GB6029@fixme-laptop.cn.ibm.com>
-References: <20160114204827.GE3818@linux.vnet.ibm.com>
- <20160118081929.GA30420@gondor.apana.org.au>
- <20160118154629.GB3818@linux.vnet.ibm.com>
- <20160126165207.GB6029@fixme-laptop.cn.ibm.com>
-Message-ID: <20160126172227.GG6357@twins.programming.kicks-ass.net>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Tue, 26 Jan 2016 20:25:06 +0300
+Subject: [PATCH 00/10] KVM PCIe/MSI passthrough on ARM/ARM64
+In-Reply-To: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
+References: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <000001d1585e$8097d7e0$81c787a0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 12:52:07AM +0800, Boqun Feng wrote:
-> I recall that last time you and Linus came into a conclusion that even
-> on Alpha, a barrier for read->write with data dependency is unnecessary:
-> 
-> http://article.gmane.org/gmane.linux.kernel/2077661
-> 
-> And in an earlier mail of that thread, Linus made his point that
-> smp_read_barrier_depends() should only be used to order read->read.
-> 
-> So right now, are we going to extend the semantics of
-> smp_read_barrier_depends()? Can we just make smp_read_barrier_depends()
-> still only work for read->read, and assume all the architectures won't
-> reorder read->write with data dependency, so that the code above having
-> a smp_rmb() also works?
+ Hello!
+ I'd like just to clarify some things for myself and better wrap my head around it...
 
-That discussions was about control dependencies. So writes that _depend_
-on a prior read having an explicit value.
+> On x86 all accesses to the 1MB PA region [FEE0_0000h - FEF0_000h] are directed
+> as interrupt messages: accesses to this special PA window directly target the
+> APIC configuration space and not DRAM, meaning the downstream IOMMU is bypassed.
 
-So something like:
+ So, this is effectively the same as always having hardwired 1:1 mappings on all IOMMUs, isn't it ?
+ If so, then we can't we just do the same, just by forcing similar 1:1 mapping? This is what i tried to do in my patchset. All of
+you are talking about a situation which arises when we are emulating different machine with different physical addresses layout. And
+e. g. if our host has MSI at 0xABADCAFE, our target could have valid RAM at the same location, and we need to handle it somehow,
+therefore we have to move our MSI window out of target's RAM. But how does this work on a PC then? What if our host is PC, and we
+want to emulate some ARM board, which has RAM at FE00 0000 ? Or does it mean that PC architecture is flawed and can reliably handle
+PCI passthrough only for itself ?
 
-	struct foo *x = READ_ONCE(*ptr);
-	smp_read_barrier_depends()
-	if (x->val == 5)
-		x->bar = 5;
-
-In that case, the load of x->val must be complete and its value
-determined _before_ the store to x->bar can happen.
-
-This is distinct from:
-
-	struct foo *x = READ_ONCE(*ptr);
-	smp_read_barrier_depends();
-	x->bar = 5;
-
-And its the second case where smp_read_barrier_depends() read->write
-order matters.
+Kind regards,
+Pavel Fedin
+Senior Engineer
+Samsung Electronics Research center Russia
