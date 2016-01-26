@@ -1,91 +1,62 @@
-From: cmetcalf@ezchip.com (Chris Metcalf)
-Date: Tue, 26 Jan 2016 15:43:40 -0500
-Subject: [PATCH] help guest boot up on AArch64 host with GICv2
-In-Reply-To: <569CB034.1060307@arm.com>
-References: <56995068.9050207@ezchip.com> <569CB034.1060307@arm.com>
-Message-ID: <56A7DA7C.8090202@ezchip.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 26 Jan 2016 14:50:05 -0600
+Subject: [PATCH v9 5/6] PCI: generic: Make pci-host-generic driver numa
+ aware
+In-Reply-To: <1453134965-6125-6-git-send-email-gkulkarni@caviumnetworks.com>
+References: <1453134965-6125-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1453134965-6125-6-git-send-email-gkulkarni@caviumnetworks.com>
+Message-ID: <20160126205005.GD17600@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2016 04:28 AM, Marc Zyngier wrote:
-> Hi Chris,
->
-> On 15/01/16 20:02, Chris Metcalf wrote:
->> We are using GICv2 compatibility mode in the Fast Models/Foundation
->> Models simulations we are running because the boot code (ATF/UEFI)
->> doesn't support GICv3 in our system at the moment.
->>
->> However, starting with kernel 4.2, the guest couldn't boot up because it
->> wasn't getting timer interrupts.  I tracked this down to a kernel commit
->> that switched to using the "alternatives" mechanism -- rather than
->> seeing either a GICv2 or GICv3 and configuring appropriately, the KVM
->> code just configured the code that saves/restores the vgic state based
->> on the presence of the system register interface to the GIC CPU
->> interface.  See the attached patch for a fix that manages this
->> differently and allows me to boot up the guest in this configuration.
->>
->> However, even assuming this patch can be taken into an upstream tree, I
->> still have a couple of additional problems:
->>
->> - I can boot up with the Foundation Models using this change, but not
->> with the Fast Models (again, using a v3 GIC but in v2 compatibility mode
->> in the device tree).  The Fast Models dts looks like it has the same
->> configuration for the GIC and the timers so I'm not sure what's going on
->> here.  Any suggestions appreciated.
->>
->> - Without this change, I could only boot kernels up to 4.1.  With the
->> change, I can boot kernels up to 4.3.  But 4.4 won't boot for me either;
->> I haven't bisected it down yet.  So any suggestions on what might be
->> going wrong here would also be appreciated.
->>
->> We are planning to eventually use GICv3 mode in our software stack but
->> for the time being I assume it is interesting to resolve issues with GIC
->> v2 compatibility mode on GIC v3.
->>
-> I'm afraid that this is the wrong approach. Whilst 4.2 was a bit too
-> eager to use GICv3 (only checking the CPU capability and ignoring the
-> actual state of the EL2/EL3 SRE bits), the fact that 4.4 doesn't boot is
-> probably the sign of a broken firmware that enables the system register
-> interface at EL3, letting the rest of the software stack to use GICv3 in
-> native mode, and yet providing a GICv2 DT.
->
-> This combination is unpredictable, and is likely to  cause issues on
-> some HW implementations.
->
-> Could you please point me to the firmware you're using?
->
-> Also, please check the following patches:
->
-> 6d32ab2 arm64: Update booting requirements for GICv3 in GICv2 mode
-> 76e52dd irqchip/gic: Warn if GICv3 system registers are enabled
-> 963fcd4 arm64: cpufeatures: Check ICC_EL1_SRE.SRE before enabling
-> ARM64_HAS_SYSREG_GIC_CPUIF
-> 7cabd00 irqchip/gic-v3: Make gic_enable_sre an inline function
-> d271976 arm64: el2_setup: Make sure ICC_SRE_EL2.SRE sticks before using
-> GICv3 sysregs
->
-> Can you point me to the one that prevents you from booting?
+On Mon, Jan 18, 2016 at 10:06:04PM +0530, Ganapatrao Kulkarni wrote:
+> update numa_node of device associated with pci bus.
+> moved down devm_kzalloc to allocate from node memory.
+> 
+> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> ---
+>  drivers/pci/host/pci-host-generic.c | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index 5434c90..0e1ce06 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -215,11 +215,9 @@ static int gen_pci_probe(struct platform_device *pdev)
+>  	const struct of_device_id *of_id;
+>  	struct device *dev = &pdev->dev;
+>  	struct device_node *np = dev->of_node;
+> -	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> +	struct gen_pci *pci;
+>  	struct pci_bus *bus, *child;
+>  
+> -	if (!pci)
+> -		return -ENOMEM;
+>  
+>  	type = of_get_property(np, "device_type", NULL);
+>  	if (!type || strcmp(type, "pci")) {
+> @@ -230,6 +228,11 @@ static int gen_pci_probe(struct platform_device *pdev)
+>  	of_pci_check_probe_only();
+>  
+>  	of_id = of_match_node(gen_pci_of_match, np);
+> +	set_dev_node(dev, of_node_to_nid(np));
 
-The problematic commit is 963fcd4, because it calls gic_enable_sre()
-in the host kernel even with a GICv2 DT specified, and this seems to
-put things in a state such that we don't receive virtual timer
-interrupts in the guest when we boot it up.  (I'm not that familiar with
-the QEMU DT but it is providing a GIC v2 to the guest.)
+I like the idea of this patch, but why do we need to call
+set_dev_node() here in driver code?  Shouldn't that be done by the
+OF/platform device infrastructure so that all drivers for platform devices
+get this benefit?
 
-With a v4.5-rc1 host, if I "return false" before the code in gic_enable_sre()
-that tries to actually enable the SRE, and then hardcode the
-__vgic_v2_XXX_state() save/restore calls into the __vgic_XXX_state()
-routines, then my guest boots up OK.
-
-We are using a modified ARM version of EDK v3.0-rc0, and a modified
-ARM Trusted Firmware based on commit 963fcd4 (between v1.1 and 1.2).
-We certainly haven't touched any of the GIC code in either one.
-
-I tried to modify the host DT to enable GICv3, but then the host itself
-hangs on boot, so clearly more is needed.  (To be fair I've only tested
-v4.4 in that configuration, not v4.5-rc1.)  The firmware isn't yet using
-GICv3 so perhaps that is part of the problem.
-
--- 
-Chris Metcalf, EZChip Semiconductor
-http://www.ezchip.com
+> +	pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> +	if (!pci)
+> +		return -ENOMEM;
+> +
+>  	pci->cfg.ops = (struct gen_pci_cfg_bus_ops *)of_id->data;
+>  	pci->host.dev.parent = dev;
+>  	INIT_LIST_HEAD(&pci->host.windows);
+> -- 
+> 1.8.1.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arch" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
