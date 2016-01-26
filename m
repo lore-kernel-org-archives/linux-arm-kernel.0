@@ -1,29 +1,54 @@
-From: shaun.ren@linux.com (Shaun Ren)
-Date: Mon, 25 Jan 2016 18:27:28 -0800
-Subject: [PATCH 2/2] Staging: rts5208: Add missing dma_mapping_error
-In-Reply-To: <1453775248-15965-1-git-send-email-shaun.ren@linux.com>
-References: <1453775248-15965-1-git-send-email-shaun.ren@linux.com>
-Message-ID: <1453775248-15965-3-git-send-email-shaun.ren@linux.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Tue, 26 Jan 2016 10:28:03 +0800
+Subject: [PATCH v6] drm/rockchip: hdmi: add Innosilicon HDMI support
+In-Reply-To: <1453769119.17181.37.camel@tiscali.nl>
+References: <1453686197-20975-1-git-send-email-ykk@rock-chips.com>
+ <1453686430-21470-1-git-send-email-ykk@rock-chips.com>
+ <1453769119.17181.37.camel@tiscali.nl>
+Message-ID: <56A6D9B3.4070006@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Shaun Ren <shaun.ren@linux.com>
----
- drivers/staging/rts5208/rtsx_transport.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Hi Paul,
 
-diff --git a/drivers/staging/rts5208/rtsx_transport.c b/drivers/staging/rts5208/rtsx_transport.c
-index eff9a4b621..43787df 100644
---- a/drivers/staging/rts5208/rtsx_transport.c
-+++ b/drivers/staging/rts5208/rtsx_transport.c
-@@ -663,7 +663,7 @@ static int rtsx_transfer_buf(struct rtsx_chip *chip, u8 card, void *buf,
- 		return -ENXIO;
- 
- 	addr = dma_map_single(&rtsx->pci->dev, buf, len, dma_dir);
--	if (!addr)
-+	if (dma_mapping_error(&rtsx->pci->dev, addr))
- 		return -ENOMEM;
- 
- 	if (card == SD_CARD)
--- 
-2.7.0
+On 01/26/2016 08:45 AM, Paul Bolle wrote:
+> On ma, 2016-01-25 at 09:47 +0800, Yakir Yang wrote:
+>> --- a/drivers/gpu/drm/rockchip/Kconfig
+>> +++ b/drivers/gpu/drm/rockchip/Kconfig
+>> +config ROCKCHIP_INNO_HDMI
+>> +	tristate "Rockchip specific extensions for Innosilicon HDMI"
+>> +        depends on DRM_ROCKCHIP
+>> +        help
+>> +	  This selects support for Rockchip SoC specific extensions
+>> +	  for the Innosilicon HDMI driver. If you want to enable
+>> +	  HDMI on RK3036 based SoC, you should selet this option.
+> (Really trivial: start indentation with tabs only, please. And
+> s/selet/select/.)
+Got it
+>> --- /dev/null
+>> +++ b/drivers/gpu/drm/rockchip/inno_hdmi.c
+>> + * This software is licensed under the terms of the GNU General
+>> Public
+>> + * License version 2, as published by the Free Software Foundation,
+>> and
+>> + * may be copied, distributed, and modified under those terms.
+> This states this file is licensed GPL v2 only.
+>
+>> +MODULE_LICENSE("GPL");
+> And, according to include/linux/module.h, this means "GNU Public License
+> v2 or later".
+>
+> So I think there's a (subtle) mismatch between the license ident used
+> for this driver and the comment above.
+
+Ah, thanks.
+
+- Yakir
+
+> Thanks,
+>
+>
+> Paul Bolle
+>
+>
+>
