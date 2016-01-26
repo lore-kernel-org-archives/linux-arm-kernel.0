@@ -1,90 +1,146 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Tue, 26 Jan 2016 08:14:45 +0100
-Subject: [PATCH V2 4/4] mfd: mediatek: add MT6323 support to MT6397 driver
-In-Reply-To: <1453777643.26374.11.camel@mtksdaap41>
-References: <1453716887-38442-1-git-send-email-blogic@openwrt.org>
- <20160125124112.GG3368@x1> <56A64108.7020807@openwrt.org>
- <3476571.0yU9yvPsKF@linux-gy6r.site> <56A670A3.5030100@openwrt.org>
- <1453777643.26374.11.camel@mtksdaap41>
-Message-ID: <56A71CE5.4080201@openwrt.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 26 Jan 2016 07:16:28 +0000 (UTC)
+Subject: OMAP baseline test results for v4.5-rc1
+Message-ID: <alpine.DEB.2.02.1601260714350.4443@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Here are some basic OMAP test results for Linux v4.5-rc1.
+Logs and other details at:
 
-On 26/01/2016 04:07, Henry Chen wrote:
-> On Mon, 2016-01-25 at 19:59 +0100, John Crispin wrote:
->>
->> On 25/01/2016 19:44, Matthias Brugger wrote:
->>> On Monday 25 Jan 2016 16:36:40 John Crispin wrote:
->>>> Hi,
->>>>
->>>> On 25/01/2016 13:41, Lee Jones wrote:
->>>>> Please honour the subject format of the subsystem you are contributing
->>>>> to.
->>>>>
->>>>> `git log --oneline -- $subsystem` gives you this.
->>>>>
->>>>> On Mon, 25 Jan 2016, John Crispin wrote:
->>>>>> Signed-off-by: John Crispin <blogic@openwrt.org>
->>>>>> ---
->>>>
->>>> [...]
->>>>
->>>>>> @@ -261,6 +271,15 @@ static int mt6397_probe(struct platform_device
->>>>>> *pdev)
->>>>>>
->>>>>>  	}
->>>>>>  	
->>>>>>  	switch (id & 0xff) {
->>>>>>
->>>>>> +	case MT6323_CID_CODE:
->>>>>> +		mt6397->int_con[0] = MT6323_INT_CON0;
->>>>>
->>>>> This is confusing.  You're still using memory allocated for a mt6397
->>>>> device.
->>>>
->>>> the variable is currently defined as struct mt6397_chip *mt6397;
->>>> shall i only change the name or also create a patch to rename the struct ?
->>>>
->>>
->>> I think we should rename the struct and the file as well.
->>>
->>> Cheers,
->>> Matthias
->>
->> Hi,
->>
->> that would have been my next question. renaming the struct would imply
->> renaming the driver and the whole namespace contained within. We would
->> then also need to change the Kconfig and Makefile. I am happy to do this
->> but want to be sure that is is actually wanted.
->>
->> 	John
-> Hi,
-> 
-> Since mt6323 was similar with mt6397, I think we can reuse the
-> mt6397_chip without duplicate code.
-> 
-> Maybe we can rename the local variable name to avoid confusing.
-> 
-> struct mt6397_chip *mt_pmic;
-> ...
-> ...
-> switch (id & 0xff) {
-> 	case MT6323_CID_CODE:
-> 		mt_pmic->int_con[0] = MT6323_INT_CON0;
-> 		mt_pmic->int_con[1] = MT6323_INT_CON1;
-> ...
-> ...
-> 
-> Henry
+    http://www.pwsan.com/omap/testlogs/test_v4.5-rc1/20160125130134/
 
-Hi,
 
-IMHO we should either rename the namespace or not. renaming some
-variables seems weird as that will just move the confusion/inconsistency
-to another place in the code. I am however rather indifferent on this
-matter.
+Test summary
+------------
 
-	John
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-stk-om44,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
+
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+
+Build warnings from toolchain: uImage:
+    (none)
+
+Build warnings from toolchain: uImage+dtb:
+    (none)
+
+Build warnings from toolchain: zImage:
+    FAIL ( 1/17): multi_v7_defconfig
+
+Boot to userspace:
+    FAIL ( 1/18): 2430sdp
+    skip ( 3/18): 5912osk, 3517evm, 5430es2sbct54
+    Pass (14/18): am335xbonelt, am437xsk, am335xbone, 4430es2panda,
+		  4460pandaes, 4460varsomom, 37xxevm, 3530es3beagle,
+		  3530es31beagle, 3730beaglexm, 3730es12beaglexm,
+		  cmt3517, 5430es2uevm, 2420n800
+
+Kernel warnings during boot to userspace:
+    FAIL ( 1/18): cmt3517
+
+PM: chip retention via suspend:
+    FAIL ( 7/11): am335xbonelt, 4430es2panda, 4460pandaes,
+		  4460varsomom, 37xxevm, 2430sdp, 5430es2uevm
+    Pass ( 4/11): 3530es3beagle, 3530es31beagle, 3730beaglexm,
+		  3730es12beaglexm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 9/11): am335xbonelt, 4430es2panda, 4460pandaes,
+		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  2430sdp, 5430es2uevm
+    Pass ( 2/11): 3730beaglexm, 3730es12beaglexm
+
+PM: chip off (except CORE, due to errata) via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 2/ 4): 37xxevm, 3530es3beagle
+    Pass ( 2/ 4): 3530es31beagle, 3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    FAIL ( 3/ 4): 37xxevm, 3530es3beagle, 3530es31beagle
+    Pass ( 1/ 4): 3730es12beaglexm
+
+Kernel warnings during PM test:
+    (none)
+
+Obsolete Kconfig symbols:
+    FAIL ( 3/20): omap1_defconfig, omap2plus_defconfig,
+		  multi_v7_defconfig
+
+
+vmlinux object size
+(delta in bytes from test_v4.4 (afd2ff9b7e1b367172f18ba7f693dfb62bdcb2dc)):
+   text     data      bss    total  kernel
+ +62177     +840    +3080   +66097  omap1_defconfig
+ +63185     +840    +3048   +67073  omap1_defconfig_1510innovator_only
+ +19728     +616    +3048   +23392  omap1_defconfig_5912osk_only
++587090  +106000    +4536  +697626  multi_v7_defconfig
++164152   +24212    +4600  +192964  omap2plus_defconfig
++154881   +21064    +4264  +180209  omap2plus_defconfig_2430sdp_only
++163876   +22484    +4472  +190832  omap2plus_defconfig_am33xx_only
++163900   +22292    +4536  +190728  omap2plus_defconfig_am43xx_only
++164984   +24412    +4600  +193996  omap2plus_defconfig_cpupm
++164120   +22428    +4472  +191020  omap2plus_defconfig_dra7xx_only
+ +66222    +1464    +4224   +71910  omap2plus_defconfig_n800_multi_omap2xxx
+ +59183     +264    +4168   +63615  omap2plus_defconfig_n800_only_a
++163124   +24028    +4472  +191624  omap2plus_defconfig_no_pm
++163912   +22324    +4536  +190772  omap2plus_defconfig_omap2_4_only
++163964   +22836    +4536  +191336  omap2plus_defconfig_omap3_4_only
++163968   +22388    +4536  +190892  omap2plus_defconfig_omap5_only
+ +42252    +1512    +4444   +48208  rmk_omap3430_ldp_allnoconfig
+ +72856    +1888    +3120   +77864  rmk_omap3430_ldp_oldconfig
+ +42476     -280    +4044   +46240  rmk_omap4430_sdp_allnoconfig
++216371    +3912    +3456  +223739  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v4.4 (afd2ff9b7e1b367172f18ba7f693dfb62bdcb2dc))
+  avail  rsrvd   high  freed  board          kconfig
+   -60k    60k      .      .  2420n800       omap2plus_defconfig_n800_only_a
+  -188k   188k      .      .  2430sdp        omap2plus_defconfig
+  -192k   192k      .     4k  3530es31beagle omap2plus_defconfig
+  -192k   192k      .     4k  3530es3beagle  omap2plus_defconfig
+  -192k   192k      .     4k  3730beaglexm   omap2plus_defconfig
+  -188k   188k      .     4k  37xxevm        omap2plus_defconfig
+  -188k   188k      .     4k  4430es2panda   omap2plus_defconfig
+  -188k   188k      .     4k  4460pandaes    omap2plus_defconfig
+  -188k   188k      .     4k  4460varsomom   omap2plus_defconfig
+  -192k   192k      .     4k  5430es2uevm    omap2plus_defconfig
+  -188k   188k      .     4k  am335xbone     omap2plus_defconfig_am33xx_only
+  -192k   192k      .     4k  am335xbonelt   omap2plus_defconfig
+  -192k   192k      .     4k  am437xsk       omap2plus_defconfig
