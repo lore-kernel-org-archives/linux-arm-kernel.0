@@ -1,75 +1,69 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Tue, 26 Jan 2016 21:10:36 +0900
-Subject: [RFC] scripts: make extract-vmlinux support ARM vmlinuz
-Message-ID: <1453810236-2082-1-git-send-email-rogershimizu@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Jan 2016 13:11:20 +0100
+Subject: [PATCH V2 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge driver
+ to work on both Zynq and Microblaze
+In-Reply-To: <56A74370.4090000@xilinx.com>
+References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
+ <4734542.KZZp0TeeeM@wuerfel> <56A74370.4090000@xilinx.com>
+Message-ID: <2270955.TlqP7HlQk4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vmlinuz on ARM seems is not an ELF, so scripts/extract-vmlinux
-need to support such case.
+On Tuesday 26 January 2016 10:59:12 Michal Simek wrote:
+> >> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+> >> index 3e3757f..1981948 100644
+> >> --- a/drivers/pci/host/pcie-xilinx.c
+> >> +++ b/drivers/pci/host/pcie-xilinx.c
+> >> @@ -92,7 +92,12 @@
+> >>  #define ECAM_DEV_NUM_SHIFT          12
+> >>  
+> >>  /* Number of MSI IRQs */
+> >> -#define XILINX_NUM_MSI_IRQS         128
+> >> +#define XILINX_NUM_MSI_IRQS 128
+> >> +#ifdef CONFIG_ARM
+> >> +#define TOT_NR_IRQS         XILINX_NUM_MSI_IRQS
+> >> +#else
+> >> +#define TOT_NR_IRQS         (NR_IRQS + XILINX_NUM_MSI_IRQS)
+> >> +#endif
+> > 
+> > Something looks wrong here in the microblaze variant. What does NR_IRQS
+> > have to do with it?
+> 
+> Arnd: What was the story regarding NR_IRQS?
+> I remember some discussion about it but just forget.
+> 
+> Default value in include/asm-generic/irq.h is 64.
+> Current value is 32 because microblaze primary interrupt controller is
+> axi_intc core which has up to 32 input lines.
 
-This fix is tested on amd64 and armel platform.
+The value in asm-generic is completely arbitrary, it's just something
+that happens to work for a number of the simpler architectures.
 
-Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
----
+Traditionally, there is a a fixed NR_IRQS which defines the maximum
+number of interrupts that can be used, and each irqchip has a fixed
+start offset below that number.
 
-Dear Michal and Russell,
+On modern systems, you have CONFIG_SPARSE_IRQ, which lets an irqchip
+allocate its own interrupts, without an upper limit. This is more
+flexible and avoids preallocating space for all irq_desc instances,
+so it saves memory.
 
-I'm studying ARM booting process, and happened to find scripts/extract-vmlinux
-in kernel tree is broken on ARM for long time. [0][1]
+This code however doesn't do either of the two on microblaze:
 
-[0]: https://bugs.launchpad.net/linaro-ubuntu/+bug/1050453
-[1]: https://bugs.linaro.org/show_bug.cgi?id=461
++       irq = pos;
++#ifdef CONFIG_MICROBLAZE
++#define TOT_NR_IRQS            (NR_IRQS + XILINX_NUM_MSI_IRQS)
++       irq = XILINX_NUM_MSI_IRQS + pos;
++#endif
++       if (irq < TOT_NR_IRQS)
+                set_bit(pos, msi_irq_in_use);
 
-The patch I created looks like dirty hack, and I don't know the status of 
-whether vmlinuz is ELF or not on other platforms, so I make this as "RFC".
+So you define XILINX_NUM_MSI_IRQS to mean the number of interrupts
+that the xilinx_pcie_port can handle itself, but then pick a number
+outside of this range by making the hwirq number something between
+XILINX_NUM_MSI_IRQS and (2*XILINX_NUM_MSI_IRQS - 1), and in the
+end compare it to (NR_IRQS + XILINX_NUM_MSI_IRQS), which is the
+sum of two things that are not related: the total number of interrupts
+including the MSIs and the number of MSI.
 
-Please comment. Thank you!
-
-Cheers,
-Roger
-
- scripts/extract-vmlinux | 14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
-
-diff --git a/scripts/extract-vmlinux b/scripts/extract-vmlinux
-index 5061abcc2540..d569eb8c8efe 100755
---- a/scripts/extract-vmlinux
-+++ b/scripts/extract-vmlinux
-@@ -15,7 +15,15 @@ check_vmlinux()
- 	# Use readelf to check if it's a valid ELF
- 	# TODO: find a better to way to check that it's really vmlinux
- 	#       and not just an elf
--	readelf -h $1 > /dev/null 2>&1 || return 1
-+	case "$2" in
-+	0|"")
-+		readelf -h $1 > /dev/null 2>&1 || return 1
-+		;;
-+	1|*)
-+	# For ARCH like ARM, vmlinux is not ELF, so we only do the check
-+	# when $2 is 0 or NULL
-+		;;
-+	esac
- 
- 	cat $1
- 	exit 0
-@@ -31,7 +39,7 @@ try_decompress()
- 	do
- 		pos=${pos%%:*}
- 		tail -c+$pos "$img" | $3 > $tmp 2> /dev/null
--		check_vmlinux $tmp
-+		test $? -eq 0 && check_vmlinux $tmp 1
- 	done
- }
- 
-@@ -53,7 +61,7 @@ check_vmlinux $img
- 
- # That didn't work, so retry after decompression.
- try_decompress '\037\213\010' xy    gunzip
--try_decompress '\3757zXZ\000' abcde unxz
-+try_decompress '\3757zXZ\000' abcde "unxz --single-stream"
- try_decompress 'BZh'          xy    bunzip2
- try_decompress '\135\0\0\0'   xxx   unlzma
- try_decompress '\211\114\132' xy    'lzop -d'
--- 
-2.1.4
+	Arnd
