@@ -1,66 +1,35 @@
-From: rbthomas@pobox.com (Rick Thomas)
-Date: Mon, 25 Jan 2016 19:50:55 -0800
-Subject: [PATCH 1/2] ARM: DTS: kirkwood-openrd-client: fix audio
-In-Reply-To: <20160125182459.GE15550@darkstar.musicnaut.iki.fi>
-References: <1453588600-14831-1-git-send-email-aaro.koskinen@iki.fi>
- <1453588600-14831-2-git-send-email-aaro.koskinen@iki.fi>
- <20160124173701.GU3880@lunn.ch>
- <411C1DFA-3E76-42B0-866C-7C3C0D990039@pobox.com>
- <20160124214020.GA28667@jirafa.cyrius.com>
- <8E11A1EE-D73B-462E-A493-39571A17F2C3@pobox.com>
- <20160125182459.GE15550@darkstar.musicnaut.iki.fi>
-Message-ID: <B9F504A1-867C-4B99-98CF-8EDE3A0BEB38@pobox.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 26 Jan 2016 13:09:01 +0900
+Subject: [PATCH 2/2] ASoC: s3c24xx: use const snd_soc_component_driver
+ pointer
+In-Reply-To: <1453741678-1988125-2-git-send-email-arnd@arndb.de>
+References: <1453741678-1988125-1-git-send-email-arnd@arndb.de>
+ <1453741678-1988125-2-git-send-email-arnd@arndb.de>
+Message-ID: <56A6F15D.3040504@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Jan 25, 2016, at 10:24 AM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-
+On 26.01.2016 02:07, Arnd Bergmann wrote:
+> An older patch to convert the API in the s3c i2s driver
+> ended up passing a const pointer into a function that takes
+> a non-const pointer, so we now get a warning:
 > 
-> On my board I need to say "amixer set PCM on". Can you post the full
-> output from "amixer" without any parameters?
+> sound/soc/samsung/s3c2412-i2s.c: In function 's3c2412_iis_dev_probe':
+> sound/soc/samsung/s3c2412-i2s.c:172:9: error: passing argument 3 of 's3c_i2sv2_register_component' discards 'const' qualifier from pointer target type [-Werror=discarded-qualifiers]
 > 
-> Also check if you have this line in dmesg:
+> However, the s3c_i2sv2_register_component() function again
+> passes the pointer into another function taking a const, so
+> we just need to change its prototype.
 > 
-> 	asoc-simple-card sound: cs42l51-hifi <-> i2s mapping ok
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: eca3b01d0885 ("ASoC: switch over to use snd_soc_register_component() on s3c i2s")
+> ---
+>  sound/soc/samsung/s3c-i2s-v2.c | 2 +-
+>  sound/soc/samsung/s3c-i2s-v2.h | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> If it says "spdif" the player runs but is silent.
-> 
-> A.
-> 
 
-Here's the output of "amixer"
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: amixer.out
-Type: application/octet-stream
-Size: 2059 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160125/825c4c7d/attachment.obj>
--------------- next part --------------
-
-
-This is after having run alsamixer (per Martin's suggestion) and un-mute-ing everything I could find.
-
-And here's the output of "dmesg"
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: dmesg.out
-Type: application/octet-stream
-Size: 18738 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160125/825c4c7d/attachment-0001.obj>
--------------- next part --------------
-
-
-In particular
-
-> rbthomas at base:~$ dmesg | grep sound    
-> [   11.777850] asoc-simple-card sound: cs42l51-hifi <-> i2s mapping ok
-
-Everything is working fine now.
-
-Thanks for all the help!
-Rick
+Best regards,
+Krzysztof
