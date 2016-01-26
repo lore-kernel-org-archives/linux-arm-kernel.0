@@ -1,45 +1,67 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 26 Jan 2016 11:19:27 +0100
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160126060322.GJ4503@linux.vnet.ibm.com>
-References: <20160114203430.GC3818@linux.vnet.ibm.com>
- <56980C91.1010403@imgtec.com>
- <20160114212913.GF3818@linux.vnet.ibm.com>
- <20160115085554.GF3421@worktop> <20160115091348.GA27936@worktop>
- <20160115174612.GV3818@linux.vnet.ibm.com>
- <20160115212714.GM3421@worktop>
- <20160115215853.GC3818@linux.vnet.ibm.com>
- <20160125164242.GF22927@arm.com>
- <20160126060322.GJ4503@linux.vnet.ibm.com>
-Message-ID: <20160126101927.GD6357@twins.programming.kicks-ass.net>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 26 Jan 2016 18:15:40 +0800
+Subject: [PATCH v4 00/13] mmc: use sdhci_pltfm_init for private allocation and
+ clean up
+Message-ID: <1453803353-6266-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 10:03:22PM -0800, Paul E. McKenney wrote:
-> On Mon, Jan 25, 2016 at 04:42:43PM +0000, Will Deacon wrote:
-> > On Fri, Jan 15, 2016 at 01:58:53PM -0800, Paul E. McKenney wrote:
-> > > On Fri, Jan 15, 2016 at 10:27:14PM +0100, Peter Zijlstra wrote:
+These patches are to complete the TODOs in Commit 0e748234293f ("mmc:
+sdhci: Add size for caller in init+register"), I.E:
 
-> > > > Yes, that seems a good start. But yesterday you raised the 'fun' point
-> > > > of two globally ordered sequences connected by a single local link.
-> > > 
-> > > The conclusion that I am slowly coming to is that litmus tests should
-> > > not be thought of as linear chains, but rather as cycles.  If you think
-> > > of it as a cycle, then it doesn't matter where the local link is, just
-> > > how many of them and how they are connected.
-> > 
-> > Do you have some examples of this? I'm struggling to make it work in my
-> > mind, or are you talking specifically in the context of the kernel
-> > memory model?
-> 
-> Now that you mention it, maybe it would be best to keep the transitive
-> and non-transitive separate for the time being anyway.  Just because it
-> might be possible to deal with does not necessarily mean that we should
-> be encouraging it.  ;-)
+- todo: migrate clients to using allocation this way
+- todo: remove priv variable once migration is complete
 
-So isn't smp_mb__after_unlock_lock() exactly such a scenario? And would
-not someone trying to implement RCsc locks using locally transitive
-RELEASE/ACQUIRE operations need exactly this stuff?
+Since v3:
+ - based on v4.5-rc1
+ - add Ludovic's ack for sdhci-of-at91 changes
+ - fix use-after-free in some drivers: some host drivers still needs to
+   access sdhci_pltfm_host->private after sdhci_pltfm_unregister(), but
+   the private should be already freed by sdhci_pltfm_unregister.
+ - add patch5 to fix one clk bug in sdhci_arasan_remove(). IMHO, It's
+   better to add this patch to fixes rather than waiting for next merge
+   window
 
-That is, I am afraid we need to cover the mix of local and global
-transitive operations at least in overview.
+Since v2:
+ - based on mmc next tree and remove all priv usage introduced in newly
+   commits in this tree
+ - don't break two lines if sdhci_pltfm_init() call could be put into
+   one line. Thank Ludovic Desroches.
+
+Since v1:
+ - add new patch03 to factorise sdhci_msm_pdata outisde of sdhci_msm_host.
+   This is to fix drivers/mmc/host/sdhci-msm.c:440:32: warning: 'msm_host'
+   is used uninitialized in this function [-Wuninitialized]
+ - Add Arnd's Ack for all patches except patch3 which is new in v2
+
+
+Jisheng Zhang (13):
+  mmc: sdhci-bcm2835: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-esdhc-imx: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-msm: factorise sdhci_msm_pdata outisde of sdhci_msm_host
+  mmc: sdhci-msm: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-of-arasan: fix clk issue in sdhci_arasan_remove()
+  mmc: sdhci-of-arasan: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-of-at91: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-of-esdhc: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-pxav3: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-st: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-tegra: use sdhci_pltfm_init for private allocation
+  mmc: sdhci-pxav2: remove unnecessary assignment of pltfm_host->priv
+  mmc: sdhci-pltfm: remove priv variable from sdhci_pltfm_host
+
+ drivers/mmc/host/sdhci-bcm2835.c   | 14 +++----------
+ drivers/mmc/host/sdhci-esdhc-imx.c | 38 ++++++++++++++++--------------------
+ drivers/mmc/host/sdhci-msm.c       | 25 +++++++++++-------------
+ drivers/mmc/host/sdhci-of-arasan.c | 33 +++++++++++++++----------------
+ drivers/mmc/host/sdhci-of-at91.c   | 33 ++++++++++++++-----------------
+ drivers/mmc/host/sdhci-of-esdhc.c  | 19 +++++++++---------
+ drivers/mmc/host/sdhci-pltfm.h     |  1 -
+ drivers/mmc/host/sdhci-pxav2.c     |  1 -
+ drivers/mmc/host/sdhci-pxav3.c     | 20 ++++++++-----------
+ drivers/mmc/host/sdhci-st.c        | 40 +++++++++++++++++++-------------------
+ drivers/mmc/host/sdhci-tegra.c     | 21 +++++++-------------
+ 11 files changed, 106 insertions(+), 139 deletions(-)
+
+-- 
+2.7.0
