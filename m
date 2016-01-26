@@ -1,77 +1,34 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Tue, 26 Jan 2016 21:18:03 +0800
-Subject: Unhandled level 2 translation fault on A72 board.
-In-Reply-To: <20160126114445.GD23579@localhost.localdomain>
-References: <56A72246.4050105@huawei.com>
- <20160126110358.GA23579@localhost.localdomain> <56A7597D.6020609@huawei.com>
- <20160126114445.GD23579@localhost.localdomain>
-Message-ID: <56A7720B.3020505@huawei.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 26 Jan 2016 14:34:01 +0100
+Subject: [PATCH] ARM: dts: at91: sama5d4: fix instance id of DBGU
+Message-ID: <1453815259-22299-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/1/26 19:44, Catalin Marinas wrote:
-> On Tue, Jan 26, 2016 at 07:33:17PM +0800, Ding Tianhong wrote:
->> On 2016/1/26 19:03, Catalin Marinas wrote:
->>> On Tue, Jan 26, 2016 at 03:37:42PM +0800, Ding Tianhong wrote:
->>>> I met this problem when running the hackbench test on A72 chip board:
->>>>
->>>> sh[4779]: unhandled level 2 translation fault (11) at 0x7f96be0c80, esr 0x83000006 
->>>> pgd = ffffffc01a1f0000 
->>>> [7f96be0c80] *pgd=0000000084a20003, *pud=0000000084a20003, *pmd=0000000000000000
-> [...]
->>> I can't tell for sure it's a TLB issue. The kernel page table dump shows
->>> *pmd being 0, so the fault is correctly called "level 2 translation
->>> fault". It also seems that there is no vma at this address, hence the
->>> kernel reports it as unhandled. It looks like data corruption which
->>> could be caused by cache or TLB incoherence. Just make sure the
->>> interconnect linking the two clusters is configured correctly by
->>> _firmware_ before Linux starts.
->>
->> Thanks for the apply, I have try to apply this patch to test:
->>
->> --- arch/arm64/kernel/process.c | 9 +++++++++
->> 1 file changed, 9 insertions(+)
->>  
->> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
->> index 6391485..d7d8439 100644
->> --- a/arch/arm64/kernel/process.c
->> +++ b/arch/arm64/kernel/process.c
->> @@ -283,6 +283,13 @@ static void tls_thread_switch(struct task_struct *next)
->> : : "r" (tpidr), "r" (tpidrro));
->> }
->> +static void tlb_flush_thread(struct task_struct *prev)
->> +{
->> +/* Flush the prev task&apos;s TLB entries */
->> +if (prev->mm)
->> +flush_tlb_mm(prev->mm);
->> +}
->> +
->> /*
->>   * Thread switching.
->>   */
->> @@ -296,6 +303,8 @@ struct task_struct *__switch_to(struct task_struct *prev,
->> hw_breakpoint_thread_switch(next);
->> contextidr_thread_switch(next);
->> +tlb_flush_thread(prev);
->> +
->> /*
->> * Complete any pending TLB or cache maintenance on this CPU in case
->> * the thread migrates to a different CPU.
->>
->> The hackbench would work fine after this patch, so I guess that the old thread tlb may not be
->> invalidate as soon as possible, but I don't know why, everything is fine on A57,
->> Does I miss something?
-> 
-> It looks like the TLB invalidation messages may not get across the CCI
-> between clusters. I don't have the TRMs at hand but make sure all the
-> relevant bits in the CPUs and CCI are enabled.
-> 
-Indeed check them several times, and need more information, check it again.
+From: Mohamed Jamsheeth Hajanajubudeen <mohamedjamsheeth.hajanajubudeen@atmel.com>
 
+Change instance id of DBGU to 45.
 
-> BTW, which kernel version are you running? Is the firmware your own or
-> built around ARM Trusted Firmware?
-I use 4.1 kernel version, and the firmware is our own.
+Signed-off-by: Mohamed Jamsheeth Hajanajubudeen <mohamedjamsheeth.hajanajubudeen@atmel.com>
+Fixes: 7c661394c56c ("ARM: at91: dt: add device tree file for SAMA5D4 SoC")
+Cc: stable at vger.kernel.org   # 3.18+
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/sama5d4.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Ding
- 
+diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+index b8032bca4621..db1151c18466 100644
+--- a/arch/arm/boot/dts/sama5d4.dtsi
++++ b/arch/arm/boot/dts/sama5d4.dtsi
+@@ -1342,7 +1342,7 @@
+ 			dbgu: serial at fc069000 {
+ 				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
+ 				reg = <0xfc069000 0x200>;
+-				interrupts = <2 IRQ_TYPE_LEVEL_HIGH 7>;
++				interrupts = <45 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_dbgu>;
+ 				clocks = <&dbgu_clk>;
+-- 
+2.1.3
