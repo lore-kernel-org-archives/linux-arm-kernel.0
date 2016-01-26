@@ -1,60 +1,61 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 26 Jan 2016 19:51:29 +0800
-Subject: [PATCH v2] serial: atmel: Use atmel_port consistently
-In-Reply-To: <1453806246-13405-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <201601261915.44rKN7M2%fengguang.wu@intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 26 Jan 2016 11:54:35 +0000
+Subject: iommu/arm-smmu-v2 ASID/VMID calculation
+In-Reply-To: <6F24A28A-6302-4C48-A933-B47A9735808C@caviumnetworks.com>
+References: <198F501C-8D30-4EB5-BC40-4F40BB75D40B@caviumnetworks.com>
+ <20160125170312.GJ22927@arm.com>
+ <E978AB4F-5CB0-42D8-8152-04C77DB664A1@caviumnetworks.com>
+ <6F24A28A-6302-4C48-A933-B47A9735808C@caviumnetworks.com>
+Message-ID: <20160126115435.GB21553@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaeden,
+On Tue, Jan 26, 2016 at 03:11:27AM +0000, Chalamarla, Tirumalesh wrote:
+> one my colleague points out, ASIDPNE also implementation defined. 
 
-[auto build test ERROR on usb/usb-testing]
-[also build test ERROR on v4.5-rc1 next-20160125]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+It looks pretty well defined to me, despite being a hint:
 
-url:    https://github.com/0day-ci/linux/commits/Nicolas-Ferre/serial-atmel-Use-atmel_port-consistently/20160126-190554
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git usb-testing
-config: xtensa-allyesconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=xtensa 
+  This ASIDPNE indication is only a hint, and an SMMU can ignore it. In
+  particular, if the SMMU implementation does not support the ASIDPNE
+  feature, broadcast TLB invalidate operations ignore this hint and
+  invalidate matching TLB entries when broadcast TLB invalidation is
+  enabled.
 
-All errors (new ones prefixed by >>):
+But what does this have to do with the problem at hand?
 
-   drivers/tty/serial/atmel_serial.c: In function 'atmel_serial_probe':
->> drivers/tty/serial/atmel_serial.c:2688:2: error: 'port' undeclared (first use in this function)
-     port->gpios = mctrl_gpio_init(&port->uart, 0);
-     ^
-   drivers/tty/serial/atmel_serial.c:2688:2: note: each undeclared identifier is reported only once for each function it appears in
+> >I don?t think it followed spec.
+> >
+> >The SMMU spec (IHI0062C) says (section 2.2):
+> >
+> >   - The exact behavior of any TLB functionality is IMPLEMENTATION DEFINED
 
-vim +/port +2688 drivers/tty/serial/atmel_serial.c
+... and immediately qualifies that with:
 
-f1d867e0 drivers/tty/serial/atmel_serial.c Jaeden Amero     2016-01-26  2682  	spin_lock_init(&atmel_port->lock_suspended);
-2c7af5ba drivers/tty/serial/atmel_serial.c Boris BREZILLON  2015-03-02  2683  
-f1d867e0 drivers/tty/serial/atmel_serial.c Jaeden Amero     2016-01-26  2684  	ret = atmel_init_port(atmel_port, pdev);
-91f8c2d8 drivers/tty/serial/atmel_serial.c Boris BREZILLON  2013-06-19  2685  	if (ret)
-6fbb9bdf drivers/tty/serial/atmel_serial.c Cyrille Pitchen  2014-12-09  2686  		goto err_clear_bit;
-afefc415 drivers/serial/at91_serial.c      Andrew Victor    2006-06-19  2687  
-18dfef9c drivers/tty/serial/atmel_serial.c Uwe Kleine-K?nig 2015-10-18 @2688  	port->gpios = mctrl_gpio_init(&port->uart, 0);
-18dfef9c drivers/tty/serial/atmel_serial.c Uwe Kleine-K?nig 2015-10-18  2689  	if (IS_ERR(port->gpios)) {
-18dfef9c drivers/tty/serial/atmel_serial.c Uwe Kleine-K?nig 2015-10-18  2690  		ret = PTR_ERR(port->gpios);
-18dfef9c drivers/tty/serial/atmel_serial.c Uwe Kleine-K?nig 2015-10-18  2691  		goto err_clear_bit;
+  The SMMU architecture does not limit how a TLB is implemented, provided
+  it obeys the TLB Invalidate operations.
 
-:::::: The code at line 2688 was first introduced by commit
-:::::: 18dfef9c7f87b75bbb0fb66a634f7c13a45b9f8d serial: atmel: convert to irq handling provided mctrl-gpio
+which is to say, you can build the TLB how you like, providing that it
+follows the programmers model for invalidation. Otherwise portable
+software will break and people will send patches to "fix" it.
 
-:::::: TO: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-:::::: CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> >Section 2.2 describes the constraints on sharing (e.g. multiple contexts
+> >using the same ASID says):
+> >
+> >      "If multiple context banks have hte same attributes but describe
+> >       different translations, the results of a TLB lookup are UNPREDICTABLE".
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 44066 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160126/acf9cafa/attachment-0001.obj>
+That's describing a TLB conflict. These don't occur, because we ensure
+each of your 128 context banks has different attributes (i.e. ASID/VMID).
+
+The problem is that you have shared state between multiple SMMU instances,
+which I don't think is correct. I'm fine with a workaround, but I don't
+want this logic to be used on other implementations where it is not
+needed.
+
+> >The present smmu driver assumes ASID should only be unique per SMMU, this
+> >might not be true for all Implementations. 
+
+So far, it appears to be true for all Implementations apart from yours
+and therefore needs to be quirked.
+
+Will
