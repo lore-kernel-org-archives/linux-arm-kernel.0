@@ -1,52 +1,84 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 26 Jan 2016 16:21:43 +0000
-Subject: [PATCH] arm64: Add support for Half precision floating point
-In-Reply-To: <20160126160257.GB28238@arm.com>
-References: <1453823566-26742-1-git-send-email-suzuki.poulose@arm.com>
- <20160126160257.GB28238@arm.com>
-Message-ID: <56A79D17.2000009@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 26 Jan 2016 17:23:17 +0100
+Subject: [PATCH 3/4] irqchip: irq-armada-370-xp: use shorter names for
+ irq_chip
+In-Reply-To: <20160126170739.5e8321a0@free-electrons.com> (Thomas Petazzoni's
+ message of "Tue, 26 Jan 2016 17:07:39 +0100")
+References: <1450707546-15060-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1450707546-15060-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <871tadfly0.fsf@free-electrons.com>
+ <20160126170739.5e8321a0@free-electrons.com>
+Message-ID: <87k2mwb98q.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/16 16:02, Will Deacon wrote:
-> Hi Suzuki,
+Hi Thomas,
+ 
+ On mar., janv. 26 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+
+> Gregory,
 >
-> On Tue, Jan 26, 2016 at 03:52:46PM +0000, Suzuki K Poulose wrote:
->> ARMv8.2 extensions [1] include an optional feature, which supports
->> half precision(16bit) floating point/asimd data processing
->> instructions. This patch adds support for detecting and exposing
->> the same to the userspace via HWCAPs
-
-
->> +#define HWCAP_FPHP		(1 << 9)
->> +#define HWCAP_ASIMDHP		(1 << 10)
+> Thanks for your feedback!
 >
-> Where did we get to with the mrs trapping you proposed here?
+> On Wed, 23 Dec 2015 12:23:19 +0100, Gregory CLEMENT wrote:
 >
->    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/374609.html
-
-We are yet to get some feedback from glibc/gcc folks. Siddhesh was looking
-to make use of it [2]. But haven't heard anything back. Ramana mentioned
-(in private) that they had some plans to take a look at it.
-
+>> >  static struct irq_chip armada_370_xp_irq_chip = {
+>> > -	.name		= "armada_370_xp_irq",
+>> > +	.name		= "MPIC",
+>> 
+>> MPIC is the name also used by the power PC interrupt controller, so it
+>> would be confusing to use exactly the same name.
 >
-> At some point, we need to consider whether or not we want to continue
-> adding new HWCAPs or whether your suggestion above is actually useful
-> to userspace.
+> Not really: on a given system, you won't have the PowerPC interrupt
+> controller and the Marvell interrupt controller. For example, for the
 
-Definitely.
+Do not underestimate the creativity of the hardware designers :)
+But I agree that it is very unlikely.
 
+> ARM GIC, /proc/interrupts only shows GIC-0, not "ARM GIC-0".
+>
+>> What about calling it "MRVL MPIC" or "MVEBU MPIC"?
+>> the name remains short but it won't be confused with the power PC ones.
+>
+> Those names are still too long for a nice /proc/interrupts output:
+>
+> # cat /proc/interrupts 
+>            CPU0       CPU1       
+>  17:       2878       2726     GIC-0  29 Edge      twd
+>  18:          0          0  MRVL MPIC   5 Level     armada_370_xp_per_cpu_tick
+>  21:        142          0     GIC-0  34 Level     mv64xxx_i2c
+>  22:        235          0     GIC-0  44 Level     serial
+>  37:          0          0     GIC-0  50 Level     ehci_hcd:usb1
+>  41:          0          0     GIC-0  53 Level     f10a3800.rtc
+>  42:          0          0     GIC-0  58 Level     ahci-mvebu[f10a8000.sata]
+>  43:          0          0     GIC-0  60 Level     ahci-mvebu[f10e0000.sata]
+>  44:       1040          0     GIC-0  57 Level     mmc0
+>  45:          0          0     GIC-0  48 Level     xhci-hcd:usb2
+>  46:          0          0     GIC-0  49 Level     xhci-hcd:usb4
+> 108:          2          0     GIC-0  54 Level     f1060800.xor
+> 109:          2          0     GIC-0  97 Level     f1060900.xor
+> 110:          2          0  MRVL MSI MPIC 524288 Edge      eth0
+>
 
-> Did the libc guys get anywhere with a prototype? What do we need to do
-> to make progress with it?
+OK with this output I see your point, so let's move to MPIC.
 
-I am not sure.
+Thanks,
 
-Siddesh, Ramana,
+Gregory
 
-Could you please let us know your plans ?
+> Of course that's really a minor detail, but I don't think it's worth
+> making those names longer than "MSI MPIC" and "MPIC".
+>
+> Thanks!
+>
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
 
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/381422.html
-
-Thanks
-Suzuki
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
