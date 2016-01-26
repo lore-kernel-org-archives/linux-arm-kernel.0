@@ -1,218 +1,135 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 26 Jan 2016 12:12:03 +0100
-Subject: [PATCH 4/6] ARM: integrator: move flash registration to device tree
+Date: Tue, 26 Jan 2016 12:12:02 +0100
+Subject: [PATCH 3/6] ARM: versatile: move flash registration to the device tree
 In-Reply-To: <1453806725-4880-1-git-send-email-linus.walleij@linaro.org>
 References: <1453806725-4880-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1453806725-4880-5-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1453806725-4880-4-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flash on the Integrator was already defined by the device
-tree, but VPP control and flash protection was in the
-boardfiles. Simply add the compatible string
-"arm,versatile-flash" and the special add-on code for flash
-programming voltage and protection kicks in in the MTD
-layer.
+This moves the boardfile definition of the flash memory in the
+Versatile board into the device tree. The flash was already
+defined with the property "arm,versatile-flash" which was
+not handled by the kernel: instead define it as compatible
+also with "cfi-flash" so it detects properly, and delete the
+corresponding boardfile code so we get a smooth transition.
 
-Remove the board file code and augment the device tree in
-one go for seamless transition.
+The old compatible string "arm,versatile-flash" is reused to
+indicate to the MTD physmap subsystem that this flash requires
+special VPP handling. (See separate patch.)
 
 Cc: Grant Likely <grant.likely@linaro.org>
 Cc: Rob Herring <robh@kernel.org>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/integrator.dtsi        |  3 +-
- arch/arm/mach-integrator/integrator_ap.c | 62 --------------------------------
- arch/arm/mach-integrator/integrator_cp.c | 51 --------------------------
- 3 files changed, 2 insertions(+), 114 deletions(-)
+ arch/arm/boot/dts/versatile-ab.dts     |  5 ++--
+ arch/arm/mach-versatile/versatile_dt.c | 47 ----------------------------------
+ 2 files changed, 3 insertions(+), 49 deletions(-)
 
-diff --git a/arch/arm/boot/dts/integrator.dtsi b/arch/arm/boot/dts/integrator.dtsi
-index 3807d4f46ef7..adc4befea46d 100644
---- a/arch/arm/boot/dts/integrator.dtsi
-+++ b/arch/arm/boot/dts/integrator.dtsi
-@@ -52,8 +52,9 @@
+diff --git a/arch/arm/boot/dts/versatile-ab.dts b/arch/arm/boot/dts/versatile-ab.dts
+index 6fd7efbead34..28253ee84404 100644
+--- a/arch/arm/boot/dts/versatile-ab.dts
++++ b/arch/arm/boot/dts/versatile-ab.dts
+@@ -119,8 +119,9 @@
  	};
  
- 	flash at 24000000 {
--		compatible = "cfi-flash";
+ 	flash at 34000000 {
+-		compatible = "arm,versatile-flash";
+-		reg = <0x34000000 0x4000000>;
++		/* 64 MiB NOR flash in non-interleaved chips */
 +		compatible = "arm,versatile-flash", "cfi-flash";
- 		reg = <0x24000000 0x02000000>;
-+		bank-width = <4>;
++		reg = <0x34000000 0x04000000>;
+ 		bank-width = <4>;
  	};
  
- 	fpga {
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index 5b0e363fe5ba..2b118f20c62c 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -29,7 +29,6 @@
- #include <linux/amba/kmi.h>
- #include <linux/io.h>
- #include <linux/irqchip.h>
+diff --git a/arch/arm/mach-versatile/versatile_dt.c b/arch/arm/mach-versatile/versatile_dt.c
+index dff1c0595b67..d643b9210dbd 100644
+--- a/arch/arm/mach-versatile/versatile_dt.c
++++ b/arch/arm/mach-versatile/versatile_dt.c
+@@ -32,7 +32,6 @@
+ #include <linux/amba/clcd.h>
+ #include <linux/platform_data/video-clcd-versatile.h>
+ #include <linux/amba/mmci.h>
 -#include <linux/mtd/physmap.h>
- #include <linux/platform_data/clk-integrator.h>
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
-@@ -147,65 +146,6 @@ static int __init irq_syscore_init(void)
- device_initcall(irq_syscore_init);
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -42,27 +41,15 @@
+ #define __io_address(n)		((void __iomem __force *)IO_ADDRESS(n))
  
  /*
-- * Flash handling.
+- * Memory definitions
 - */
--static int ap_flash_init(struct platform_device *dev)
--{
--	u32 tmp;
--
--	writel(INTEGRATOR_SC_CTRL_nFLVPPEN | INTEGRATOR_SC_CTRL_nFLWP,
--	       ap_syscon_base + INTEGRATOR_SC_CTRLC_OFFSET);
--
--	tmp = readl(ebi_base + INTEGRATOR_EBI_CSR1_OFFSET) |
--		INTEGRATOR_EBI_WRITE_ENABLE;
--	writel(tmp, ebi_base + INTEGRATOR_EBI_CSR1_OFFSET);
--
--	if (!(readl(ebi_base + INTEGRATOR_EBI_CSR1_OFFSET)
--	      & INTEGRATOR_EBI_WRITE_ENABLE)) {
--		writel(0xa05f, ebi_base + INTEGRATOR_EBI_LOCK_OFFSET);
--		writel(tmp, ebi_base + INTEGRATOR_EBI_CSR1_OFFSET);
--		writel(0, ebi_base + INTEGRATOR_EBI_LOCK_OFFSET);
--	}
--	return 0;
--}
--
--static void ap_flash_exit(struct platform_device *dev)
--{
--	u32 tmp;
--
--	writel(INTEGRATOR_SC_CTRL_nFLVPPEN | INTEGRATOR_SC_CTRL_nFLWP,
--	       ap_syscon_base + INTEGRATOR_SC_CTRLC_OFFSET);
--
--	tmp = readl(ebi_base + INTEGRATOR_EBI_CSR1_OFFSET) &
--		~INTEGRATOR_EBI_WRITE_ENABLE;
--	writel(tmp, ebi_base + INTEGRATOR_EBI_CSR1_OFFSET);
--
--	if (readl(ebi_base + INTEGRATOR_EBI_CSR1_OFFSET) &
--	    INTEGRATOR_EBI_WRITE_ENABLE) {
--		writel(0xa05f, ebi_base + INTEGRATOR_EBI_LOCK_OFFSET);
--		writel(tmp, ebi_base + INTEGRATOR_EBI_CSR1_OFFSET);
--		writel(0, ebi_base + INTEGRATOR_EBI_LOCK_OFFSET);
--	}
--}
--
--static void ap_flash_set_vpp(struct platform_device *pdev, int on)
--{
--	if (on)
--		writel(INTEGRATOR_SC_CTRL_nFLVPPEN,
--		       ap_syscon_base + INTEGRATOR_SC_CTRLS_OFFSET);
--	else
--		writel(INTEGRATOR_SC_CTRL_nFLVPPEN,
--		       ap_syscon_base + INTEGRATOR_SC_CTRLC_OFFSET);
--}
--
--static struct physmap_flash_data ap_flash_data = {
--	.width		= 4,
--	.init		= ap_flash_init,
--	.exit		= ap_flash_exit,
--	.set_vpp	= ap_flash_set_vpp,
--};
+-#define VERSATILE_FLASH_BASE           0x34000000
+-#define VERSATILE_FLASH_SIZE           SZ_64M
 -
 -/*
-  * For the PL010 found in the Integrator/AP some of the UART control is
-  * implemented in the system controller and accessed using a callback
-  * from the driver.
-@@ -266,8 +206,6 @@ static struct of_dev_auxdata ap_auxdata_lookup[] __initdata = {
- 		"kmi0", NULL),
- 	OF_DEV_AUXDATA("arm,primecell", KMI1_BASE,
- 		"kmi1", NULL),
--	OF_DEV_AUXDATA("cfi-flash", INTEGRATOR_FLASH_BASE,
--		"physmap-flash", &ap_flash_data),
- 	{ /* sentinel */ },
- };
+  * ------------------------------------------------------------------------
+  *  Versatile Registers
+  * ------------------------------------------------------------------------
+  */
+ #define VERSATILE_SYS_PCICTL_OFFSET           0x44
+ #define VERSATILE_SYS_MCI_OFFSET              0x48
+-#define VERSATILE_SYS_FLASH_OFFSET            0x4C
+ #define VERSATILE_SYS_CLCD_OFFSET             0x50
  
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index b5fb71a36ee6..6f6b051e81e0 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -23,7 +23,6 @@
- #include <linux/io.h>
- #include <linux/irqchip.h>
- #include <linux/gfp.h>
--#include <linux/mtd/physmap.h>
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
-@@ -43,14 +42,8 @@
- /* Base address to the CP controller */
- static void __iomem *intcp_con_base;
- 
--#define INTCP_PA_FLASH_BASE		0x24000000
--
- #define INTCP_PA_CLCD_BASE		0xc0000000
- 
--#define INTCP_FLASHPROG			0x04
--#define CINTEGRATOR_FLASHPROG_FLVPPEN	(1 << 0)
--#define CINTEGRATOR_FLASHPROG_FLWREN	(1 << 1)
--
  /*
-  * Logical      Physical
-  * f1000000	10000000	Core module registers
-@@ -108,48 +101,6 @@ static void __init intcp_map_io(void)
+- * VERSATILE_SYS_FLASH
+- */
+-#define VERSATILE_FLASHPROG_FLVPPEN	(1 << 0)	/* Enable writing to flash */
+-
+-/*
+  * VERSATILE peripheral addresses
+  */
+ #define VERSATILE_MMCI0_BASE           0x10005000	/* MMC interface */
+@@ -86,39 +73,6 @@
+ static void __iomem *versatile_sys_base;
+ static void __iomem *versatile_ib2_ctrl;
+ 
+-static void versatile_flash_set_vpp(struct platform_device *pdev, int on)
+-{
+-	u32 val;
+-
+-	val = readl(versatile_sys_base + VERSATILE_SYS_FLASH_OFFSET);
+-	if (on)
+-		val |= VERSATILE_FLASHPROG_FLVPPEN;
+-	else
+-		val &= ~VERSATILE_FLASHPROG_FLVPPEN;
+-	writel(val, versatile_sys_base + VERSATILE_SYS_FLASH_OFFSET);
+-}
+-
+-static struct physmap_flash_data versatile_flash_data = {
+-	.width			= 4,
+-	.set_vpp		= versatile_flash_set_vpp,
+-};
+-
+-static struct resource versatile_flash_resource = {
+-	.start			= VERSATILE_FLASH_BASE,
+-	.end			= VERSATILE_FLASH_BASE + VERSATILE_FLASH_SIZE - 1,
+-	.flags			= IORESOURCE_MEM,
+-};
+-
+-struct platform_device versatile_flash_device = {
+-	.name			= "physmap-flash",
+-	.id			= 0,
+-	.dev			= {
+-		.platform_data	= &versatile_flash_data,
+-	},
+-	.num_resources		= 1,
+-	.resource		= &versatile_flash_resource,
+-};
+-
+ unsigned int mmc_status(struct device *dev)
+ {
+ 	struct amba_device *adev = container_of(dev, struct amba_device, dev);
+@@ -390,7 +344,6 @@ static void __init versatile_dt_init(void)
+ 
+ 	versatile_dt_pci_init();
+ 
+-	platform_device_register(&versatile_flash_device);
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+ 			     versatile_auxdata_lookup, NULL);
  }
- 
- /*
-- * Flash handling.
-- */
--static int intcp_flash_init(struct platform_device *dev)
--{
--	u32 val;
--
--	val = readl(intcp_con_base + INTCP_FLASHPROG);
--	val |= CINTEGRATOR_FLASHPROG_FLWREN;
--	writel(val, intcp_con_base + INTCP_FLASHPROG);
--
--	return 0;
--}
--
--static void intcp_flash_exit(struct platform_device *dev)
--{
--	u32 val;
--
--	val = readl(intcp_con_base + INTCP_FLASHPROG);
--	val &= ~(CINTEGRATOR_FLASHPROG_FLVPPEN|CINTEGRATOR_FLASHPROG_FLWREN);
--	writel(val, intcp_con_base + INTCP_FLASHPROG);
--}
--
--static void intcp_flash_set_vpp(struct platform_device *pdev, int on)
--{
--	u32 val;
--
--	val = readl(intcp_con_base + INTCP_FLASHPROG);
--	if (on)
--		val |= CINTEGRATOR_FLASHPROG_FLVPPEN;
--	else
--		val &= ~CINTEGRATOR_FLASHPROG_FLVPPEN;
--	writel(val, intcp_con_base + INTCP_FLASHPROG);
--}
--
--static struct physmap_flash_data intcp_flash_data = {
--	.width		= 4,
--	.init		= intcp_flash_init,
--	.exit		= intcp_flash_exit,
--	.set_vpp	= intcp_flash_set_vpp,
--};
--
--/*
-  * It seems that the card insertion interrupt remains active after
-  * we've acknowledged it.  We therefore ignore the interrupt, and
-  * rely on reading it from the SIC.  This also means that we must
-@@ -260,8 +211,6 @@ static struct of_dev_auxdata intcp_auxdata_lookup[] __initdata = {
- 		"aaci", &mmc_data),
- 	OF_DEV_AUXDATA("arm,primecell", INTCP_PA_CLCD_BASE,
- 		"clcd", &clcd_data),
--	OF_DEV_AUXDATA("cfi-flash", INTCP_PA_FLASH_BASE,
--		"physmap-flash", &intcp_flash_data),
- 	{ /* sentinel */ },
- };
- 
 -- 
 2.4.3
