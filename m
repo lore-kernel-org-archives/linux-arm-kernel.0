@@ -1,101 +1,120 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 26 Jan 2016 18:06:35 +0000
-Subject: [PATCH 2/4] iommu/arm-smmu: Allow disabling unmatched stream bypass
-In-Reply-To: <cover.1453830752.git.robin.murphy@arm.com>
-References: <cover.1453830752.git.robin.murphy@arm.com>
-Message-ID: <10ebf5a136a787da54ffd1d6167953f82f01a834.1453830752.git.robin.murphy@arm.com>
+From: dave.jiang@intel.com (Jiang, Dave)
+Date: Tue, 26 Jan 2016 18:20:12 +0000
+Subject: [PATCH] ntb: perf test: fix address space confusion
+In-Reply-To: <1453800729-2501235-1-git-send-email-arnd@arndb.de>
+References: <1453800729-2501235-1-git-send-email-arnd@arndb.de>
+Message-ID: <1453832409.3824.59.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Borrow the disable_bypass parameter from the SMMUv3 driver as a handy
-debugging/security feature so that unmatched stream IDs (i.e. devices
-not attached to an IOMMU domain) may be configured to fault.
+On Tue, 2016-01-26 at 10:31 +0100, Arnd Bergmann wrote:
+> The ntb driver assigns between pointers an __iomem tokens, and
+> also casts them to 64-bit integers, which results in compiler
+> warnings on 32-bit systems:
+> 
+> drivers/ntb/test/ntb_perf.c: In function 'perf_copy':
+> drivers/ntb/test/ntb_perf.c:213:10: error: cast from pointer to
+> integer of different size [-Werror=pointer-to-int-cast]
+> ? vbase = (u64)(u64 *)mw->vbase;
+> ??????????^
+> drivers/ntb/test/ntb_perf.c:214:14: error: cast from pointer to
+> integer of different size [-Werror=pointer-to-int-cast]
+> ? dst_vaddr = (u64)(u64 *)dst;
+> ??????????????^
+> 
+> This adds __iomem annotations where needed and changes the temporary
+> variables to iomem pointers to avoid casting them to u64. I did not
+> see the problem in linux-next earlier, but it show showed up in
+> 4.5-rc1.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/arm-smmu.c | 32 +++++++++++++++++++++++---------
- 1 file changed, 23 insertions(+), 9 deletions(-)
+Acked-by: Dave Jiang <dave.jiang@intel.com>
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 1f9093d..d1b7dc1 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -141,6 +141,8 @@
- #define ID2_PTFS_16K			(1 << 13)
- #define ID2_PTFS_64K			(1 << 14)
- 
-+#define sGFSR_USF			(1 << 1)
-+
- /* Global TLB invalidation */
- #define ARM_SMMU_GR0_TLBIVMID		0x64
- #define ARM_SMMU_GR0_TLBIALLNSNH	0x68
-@@ -263,6 +265,10 @@ static int force_stage;
- module_param_named(force_stage, force_stage, int, S_IRUGO);
- MODULE_PARM_DESC(force_stage,
- 	"Force SMMU mappings to be installed@a particular stage of translation. A value of '1' or '2' forces the corresponding stage. All other values are ignored (i.e. no stage is forced). Note that selecting a specific stage will disable support for nested translation.");
-+static bool disable_bypass;
-+module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
-+MODULE_PARM_DESC(disable_bypass,
-+	"Disable bypass streams such that incoming transactions from devices that are not attached to an iommu domain will report an abort back to the device and will not be allowed to pass through the SMMU.");
- 
- enum arm_smmu_arch_version {
- 	ARM_SMMU_V1 = 1,
-@@ -704,8 +710,12 @@ static irqreturn_t arm_smmu_global_fault(int irq, void *dev)
- 	if (!gfsr)
- 		return IRQ_NONE;
- 
--	dev_err_ratelimited(smmu->dev,
--		"Unexpected global fault, this could be serious\n");
-+	if (gfsr & sGFSR_USF)
-+		dev_err_ratelimited(smmu->dev, "Unmatched stream fault: ID 0x%x\n",
-+				    gfsynr1 & SMR_ID_MASK);
-+	else
-+		dev_err_ratelimited(smmu->dev,
-+			"Unexpected global fault, this could be serious\n");
- 	dev_err_ratelimited(smmu->dev,
- 		"\tGFSR 0x%08x, GFSYNR0 0x%08x, GFSYNR1 0x%08x, GFSYNR2 0x%08x\n",
- 		gfsr, gfsynr0, gfsynr1, gfsynr2);
-@@ -1111,9 +1121,9 @@ static void arm_smmu_domain_remove_master(struct arm_smmu_domain *smmu_domain,
- 	 */
- 	for (i = 0; i < cfg->num_streamids; ++i) {
- 		u32 idx = cfg->smrs ? cfg->smrs[i].idx : cfg->streamids[i];
-+		u32 reg = disable_bypass ? S2CR_TYPE_FAULT : S2CR_TYPE_BYPASS;
- 
--		writel_relaxed(S2CR_TYPE_BYPASS,
--			       gr0_base + ARM_SMMU_GR0_S2CR(idx));
-+		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_S2CR(idx));
- 	}
- 
- 	arm_smmu_master_free_smrs(smmu, cfg);
-@@ -1476,11 +1486,11 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
- 	reg = readl_relaxed(ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sGFSR);
- 	writel(reg, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sGFSR);
- 
--	/* Mark all SMRn as invalid and all S2CRn as bypass */
-+	/* Mark all SMRn as invalid and all S2CRn as bypass unless overridden */
-+	reg = disable_bypass ? S2CR_TYPE_FAULT : S2CR_TYPE_BYPASS;
- 	for (i = 0; i < smmu->num_mapping_groups; ++i) {
- 		writel_relaxed(0, gr0_base + ARM_SMMU_GR0_SMR(i));
--		writel_relaxed(S2CR_TYPE_BYPASS,
--			gr0_base + ARM_SMMU_GR0_S2CR(i));
-+		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_S2CR(i));
- 	}
- 
- 	/* Make sure all context banks are disabled and clear CB_FSR  */
-@@ -1502,8 +1512,12 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
- 	/* Disable TLB broadcasting. */
- 	reg |= (sCR0_VMIDPNE | sCR0_PTM);
- 
--	/* Enable client access, but bypass when no mapping is found */
--	reg &= ~(sCR0_CLIENTPD | sCR0_USFCFG);
-+	/* Enable client access, handling unmatched streams as appropriate */
-+	reg &= ~sCR0_CLIENTPD;
-+	if (disable_bypass)
-+		reg |= sCR0_USFCFG;
-+	else
-+		reg &= ~sCR0_USFCFG;
- 
- 	/* Disable forced broadcasting */
- 	reg &= ~sCR0_FB;
--- 
-2.7.0.25.gfc10eb5.dirty
+> Fixes: 8a7b6a778a85 ("ntb: ntb perf tool")
+> ---
+> ?drivers/ntb/test/ntb_perf.c | 21 +++++++++++----------
+> ?1 file changed, 11 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/ntb/test/ntb_perf.c
+> b/drivers/ntb/test/ntb_perf.c
+> index c8a37ba4b4f9..6bdc1e7b7503 100644
+> --- a/drivers/ntb/test/ntb_perf.c
+> +++ b/drivers/ntb/test/ntb_perf.c
+> @@ -178,7 +178,7 @@ static void perf_copy_callback(void *data)
+> ?	atomic_dec(&pctx->dma_sync);
+> ?}
+> ?
+> -static ssize_t perf_copy(struct pthr_ctx *pctx, char *dst,
+> +static ssize_t perf_copy(struct pthr_ctx *pctx, char __iomem *dst,
+> ?			?char *src, size_t size)
+> ?{
+> ?	struct perf_ctx *perf = pctx->perf;
+> @@ -189,7 +189,8 @@ static ssize_t perf_copy(struct pthr_ctx *pctx,
+> char *dst,
+> ?	dma_cookie_t cookie;
+> ?	size_t src_off, dst_off;
+> ?	struct perf_mw *mw = &perf->mw;
+> -	u64 vbase, dst_vaddr;
+> +	void __iomem *vbase;
+> +	void __iomem *dst_vaddr;
+> ?	dma_addr_t dst_phys;
+> ?	int retries = 0;
+> ?
+> @@ -204,14 +205,14 @@ static ssize_t perf_copy(struct pthr_ctx *pctx,
+> char *dst,
+> ?	}
+> ?
+> ?	device = chan->device;
+> -	src_off = (size_t)src & ~PAGE_MASK;
+> -	dst_off = (size_t)dst & ~PAGE_MASK;
+> +	src_off = (uintptr_t)src & ~PAGE_MASK;
+> +	dst_off = (uintptr_t __force)dst & ~PAGE_MASK;
+> ?
+> ?	if (!is_dma_copy_aligned(device, src_off, dst_off, size))
+> ?		return -ENODEV;
+> ?
+> -	vbase = (u64)(u64 *)mw->vbase;
+> -	dst_vaddr = (u64)(u64 *)dst;
+> +	vbase = mw->vbase;
+> +	dst_vaddr = dst;
+> ?	dst_phys = mw->phys_addr + (dst_vaddr - vbase);
+> ?
+> ?	unmap = dmaengine_get_unmap_data(device->dev, 1,
+> GFP_NOWAIT);
+> @@ -261,13 +262,13 @@ err_get_unmap:
+> ?	return 0;
+> ?}
+> ?
+> -static int perf_move_data(struct pthr_ctx *pctx, char *dst, char
+> *src,
+> +static int perf_move_data(struct pthr_ctx *pctx, char __iomem *dst,
+> char *src,
+> ?			??u64 buf_size, u64 win_size, u64 total)
+> ?{
+> ?	int chunks, total_chunks, i;
+> ?	int copied_chunks = 0;
+> ?	u64 copied = 0, result;
+> -	char *tmp = dst;
+> +	char __iomem *tmp = dst;
+> ?	u64 perf, diff_us;
+> ?	ktime_t kstart, kstop, kdiff;
+> ?
+> @@ -324,7 +325,7 @@ static int ntb_perf_thread(void *data)
+> ?	struct perf_ctx *perf = pctx->perf;
+> ?	struct pci_dev *pdev = perf->ntb->pdev;
+> ?	struct perf_mw *mw = &perf->mw;
+> -	char *dst;
+> +	char __iomem *dst;
+> ?	u64 win_size, buf_size, total;
+> ?	void *src;
+> ?	int rc, node, i;
+> @@ -364,7 +365,7 @@ static int ntb_perf_thread(void *data)
+> ?	if (buf_size > MAX_TEST_SIZE)
+> ?		buf_size = MAX_TEST_SIZE;
+> ?
+> -	dst = (char *)mw->vbase;
+> +	dst = (char __iomem *)mw->vbase;
+> ?
+> ?	atomic_inc(&perf->tsync);
+> ?	while (atomic_read(&perf->tsync) != perf->perf_threads)
