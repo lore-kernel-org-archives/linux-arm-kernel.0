@@ -1,417 +1,144 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 26 Jan 2016 21:57:22 +0100
-Subject: [PATCH 06/17] arch: Set IORESOURCE_SYSTEM_RAM flag for System RAM
-In-Reply-To: <1453841853-11383-1-git-send-email-bp@alien8.de>
-References: <1453841853-11383-1-git-send-email-bp@alien8.de>
-Message-ID: <1453841853-11383-7-git-send-email-bp@alien8.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 26 Jan 2016 21:58:52 +0100
+Subject: [PATCH] clk: sunxi: Fix mod0 clock calculation to return stable
+ results and check divisor size limits
+In-Reply-To: <CAGNoLaMan-qS0Xzz=442gmj_TYBS=Q0tYg=-sdZaYSBbF+5=wg@mail.gmail.com>
+References: <1451323892-13060-1-git-send-email-mweseloh42@gmail.com>
+ <20160113111809.GA9905@lukather>
+ <CAGNoLaMan-qS0Xzz=442gmj_TYBS=Q0tYg=-sdZaYSBbF+5=wg@mail.gmail.com>
+Message-ID: <20160126205852.GT7908@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Toshi Kani <toshi.kani@hpe.com>
+Hi,
 
-Set IORESOURCE_SYSTEM_RAM in flags of resource ranges with "System RAM",
-"Kernel code", "Kernel data", and "Kernel bss".
+On Thu, Jan 14, 2016 at 11:40:15AM +0100, Marcus Weseloh wrote:
+> > On Mon, Dec 28, 2015 at 06:31:32PM +0100, Marcus Weseloh wrote:
+> >> This patch fixes some problems in the mod0 clock calculation. It has
+> >> the potential to break stuff, as the issues explained below had the
+> >> effect that clk_set_rate would always return successfully, sometimes
+> >> setting a frequency that is higher than the requested value.
+> >
+> > That's actually the expected behaviour of clk_set_rate.
+> >
+> > clk_set_rate is supposed to adjust the given clock rate to something
+> > that the clock drivers seems fit. It should only return an error in a
+> > case where you can't change the rate at all (because you didn't pass a
+> > valid struct clk pointer, because changing the rate would violate some
+> > clock flags, etc.). Otherwise, clk_set_rate should succeed.
+> >
+> > By returning an error code the clock is higher than the one passed,
+> > you violate that expectation, especially since that is relative to the
+> > clock you passed.
+> >
+> > It makes sense in your case to never exceed the given rate, it might
+> > not for a different clock in the tree, or even for a different
+> > instance of the same clock. For example, you could very well have
+> > another case in your system where you should not have rates set that
+> > are below the one given because that would prevent the consumer
+> > device to be usable.
+> >
+> > This is why the adjustment is left to the clock driver, and is not
+> > enforced by the framework itself, simply because the framework has no
+> > idea how you want to round your clock rate on that particular clock in
+> > your system.
+> 
+> I understand now, thanks a lot for the good explanation! So my
+> thinking is wrong for the general case of the clock framework itself,
+> and that actually makes a lot of sense.
+> 
+> But the clk_factors_determine_rate function in
+> drivers/clk/sunxi/clk-factors.c works on the assumption that the
+> returned rate must be less or equal to the requested rate. At least
+> that is what the code in that function tries to do. That the mod0
+> factor calculation doesn't check the m and div variables for overflow
+> undermines the intended behaviour, as it "lies" about the frequencies
+> that the hardware can support.
 
-Note that:
+Yeah, that's totally something that needs fixing.
 
- - IORESOURCE_SYSRAM (i.e. modifier bit) is set in flags when
-   IORESOURCE_MEM is already set. IORESOURCE_SYSTEM_RAM is defined
-   as (IORESOURCE_MEM|IORESOURCE_SYSRAM).
+> And for very low frequencies below 80kHz, clk_set_rate does
+> currently return -EINVAL. There are even cases when it results in a
+> division by zero error, for example if you request a rate of 94kHz
+> from a 24Mhz parent (24000000 / 94000 = 255,32, rounded up to 256 =
+> 0 on the u8 variable).
 
- - Some archs do not set 'flags' for children nodes, such as
-   "Kernel code".  This patch does not change 'flags' in this
-   case.
+Yeah, the division by 0 is bad... However, can you even generate 80kHz
+frequencies using a module clock? The lowest I can see here is 180kHz
+(24M / 8 / 16).
 
-Signed-off-by: Toshi Kani <toshi.kani@hpe.com>
-Cc: linux-arch at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-mips at linux-mips.org
-Cc: linux-mm <linux-mm@kvack.org>
-Cc: linux-parisc at vger.kernel.org
-Cc: linuxppc-dev at lists.ozlabs.org
-Cc: linux-s390 at vger.kernel.org
-Cc: linux-sh at vger.kernel.org
-Cc: sparclinux at vger.kernel.org
-Link: http://lkml.kernel.org/r/1452020081-26534-6-git-send-email-toshi.kani at hpe.com
-Signed-off-by: Borislav Petkov <bp@suse.de>
----
- arch/arm/kernel/setup.c       |  6 +++---
- arch/arm64/kernel/setup.c     |  6 +++---
- arch/avr32/kernel/setup.c     |  6 +++---
- arch/m32r/kernel/setup.c      |  4 ++--
- arch/mips/kernel/setup.c      | 10 ++++++----
- arch/parisc/mm/init.c         |  6 +++---
- arch/powerpc/mm/mem.c         |  2 +-
- arch/s390/kernel/setup.c      |  8 ++++----
- arch/score/kernel/setup.c     |  2 +-
- arch/sh/kernel/setup.c        |  8 ++++----
- arch/sparc/mm/init_64.c       |  8 ++++----
- arch/tile/kernel/setup.c      | 11 ++++++++---
- arch/unicore32/kernel/setup.c |  6 +++---
- 13 files changed, 45 insertions(+), 38 deletions(-)
+> Now I'm unsure what to do here... If the clock driver should only
+> return an error in real error cases and not when the requested
+> frequency isn't reachable, then clk_factors_determine_rate needs to
+> be changed as well?
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 7d0cba6f1cc5..139791ed473d 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -176,13 +176,13 @@ static struct resource mem_res[] = {
- 		.name = "Kernel code",
- 		.start = 0,
- 		.end = 0,
--		.flags = IORESOURCE_MEM
-+		.flags = IORESOURCE_SYSTEM_RAM
- 	},
- 	{
- 		.name = "Kernel data",
- 		.start = 0,
- 		.end = 0,
--		.flags = IORESOURCE_MEM
-+		.flags = IORESOURCE_SYSTEM_RAM
- 	}
- };
- 
-@@ -851,7 +851,7 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
- 		res->name  = "System RAM";
- 		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
- 		res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
--		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-+		res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
- 
- 		request_resource(&iomem_resource, res);
- 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 8119479147db..450987d99b9b 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -73,13 +73,13 @@ static struct resource mem_res[] = {
- 		.name = "Kernel code",
- 		.start = 0,
- 		.end = 0,
--		.flags = IORESOURCE_MEM
-+		.flags = IORESOURCE_SYSTEM_RAM
- 	},
- 	{
- 		.name = "Kernel data",
- 		.start = 0,
- 		.end = 0,
--		.flags = IORESOURCE_MEM
-+		.flags = IORESOURCE_SYSTEM_RAM
- 	}
- };
- 
-@@ -210,7 +210,7 @@ static void __init request_standard_resources(void)
- 		res->name  = "System RAM";
- 		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
- 		res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
--		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-+		res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
- 
- 		request_resource(&iomem_resource, res);
- 
-diff --git a/arch/avr32/kernel/setup.c b/arch/avr32/kernel/setup.c
-index 209ae5ad3495..e6928896da2a 100644
---- a/arch/avr32/kernel/setup.c
-+++ b/arch/avr32/kernel/setup.c
-@@ -49,13 +49,13 @@ static struct resource __initdata kernel_data = {
- 	.name	= "Kernel data",
- 	.start	= 0,
- 	.end	= 0,
--	.flags	= IORESOURCE_MEM,
-+	.flags	= IORESOURCE_SYSTEM_RAM,
- };
- static struct resource __initdata kernel_code = {
- 	.name	= "Kernel code",
- 	.start	= 0,
- 	.end	= 0,
--	.flags	= IORESOURCE_MEM,
-+	.flags	= IORESOURCE_SYSTEM_RAM,
- 	.sibling = &kernel_data,
- };
- 
-@@ -134,7 +134,7 @@ add_physical_memory(resource_size_t start, resource_size_t end)
- 	new->start = start;
- 	new->end = end;
- 	new->name = "System RAM";
--	new->flags = IORESOURCE_MEM;
-+	new->flags = IORESOURCE_SYSTEM_RAM;
- 
- 	*pprev = new;
- }
-diff --git a/arch/m32r/kernel/setup.c b/arch/m32r/kernel/setup.c
-index a5ecef7188ba..136c69f1fb8a 100644
---- a/arch/m32r/kernel/setup.c
-+++ b/arch/m32r/kernel/setup.c
-@@ -70,14 +70,14 @@ static struct resource data_resource = {
- 	.name   = "Kernel data",
- 	.start  = 0,
- 	.end    = 0,
--	.flags  = IORESOURCE_BUSY | IORESOURCE_MEM
-+	.flags  = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM
- };
- 
- static struct resource code_resource = {
- 	.name   = "Kernel code",
- 	.start  = 0,
- 	.end    = 0,
--	.flags  = IORESOURCE_BUSY | IORESOURCE_MEM
-+	.flags  = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM
- };
- 
- unsigned long memory_start;
-diff --git a/arch/mips/kernel/setup.c b/arch/mips/kernel/setup.c
-index 569a7d5242dd..c745f0ea2577 100644
---- a/arch/mips/kernel/setup.c
-+++ b/arch/mips/kernel/setup.c
-@@ -732,21 +732,23 @@ static void __init resource_init(void)
- 			end = HIGHMEM_START - 1;
- 
- 		res = alloc_bootmem(sizeof(struct resource));
-+
-+		res->start = start;
-+		res->end = end;
-+		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-+
- 		switch (boot_mem_map.map[i].type) {
- 		case BOOT_MEM_RAM:
- 		case BOOT_MEM_INIT_RAM:
- 		case BOOT_MEM_ROM_DATA:
- 			res->name = "System RAM";
-+			res->flags |= IORESOURCE_SYSRAM;
- 			break;
- 		case BOOT_MEM_RESERVED:
- 		default:
- 			res->name = "reserved";
- 		}
- 
--		res->start = start;
--		res->end = end;
--
--		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
- 		request_resource(&iomem_resource, res);
- 
- 		/*
-diff --git a/arch/parisc/mm/init.c b/arch/parisc/mm/init.c
-index 1b366c477687..3c07d6b96877 100644
---- a/arch/parisc/mm/init.c
-+++ b/arch/parisc/mm/init.c
-@@ -55,12 +55,12 @@ signed char pfnnid_map[PFNNID_MAP_MAX] __read_mostly;
- 
- static struct resource data_resource = {
- 	.name	= "Kernel data",
--	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM,
-+	.flags	= IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM,
- };
- 
- static struct resource code_resource = {
- 	.name	= "Kernel code",
--	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM,
-+	.flags	= IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM,
- };
- 
- static struct resource pdcdata_resource = {
-@@ -201,7 +201,7 @@ static void __init setup_bootmem(void)
- 		res->name = "System RAM";
- 		res->start = pmem_ranges[i].start_pfn << PAGE_SHIFT;
- 		res->end = res->start + (pmem_ranges[i].pages << PAGE_SHIFT)-1;
--		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-+		res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
- 		request_resource(&iomem_resource, res);
- 	}
- 
-diff --git a/arch/powerpc/mm/mem.c b/arch/powerpc/mm/mem.c
-index 22d94c3e6fc4..e78a2b73aa5d 100644
---- a/arch/powerpc/mm/mem.c
-+++ b/arch/powerpc/mm/mem.c
-@@ -541,7 +541,7 @@ static int __init add_system_ram_resources(void)
- 			res->name = "System RAM";
- 			res->start = base;
- 			res->end = base + size - 1;
--			res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-+			res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
- 			WARN_ON(request_resource(&iomem_resource, res) < 0);
- 		}
- 	}
-diff --git a/arch/s390/kernel/setup.c b/arch/s390/kernel/setup.c
-index c6878fbbcf13..47dc0c011c6d 100644
---- a/arch/s390/kernel/setup.c
-+++ b/arch/s390/kernel/setup.c
-@@ -378,17 +378,17 @@ static void __init setup_lowcore(void)
- 
- static struct resource code_resource = {
- 	.name  = "Kernel code",
--	.flags = IORESOURCE_BUSY | IORESOURCE_MEM,
-+	.flags = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM,
- };
- 
- static struct resource data_resource = {
- 	.name = "Kernel data",
--	.flags = IORESOURCE_BUSY | IORESOURCE_MEM,
-+	.flags = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM,
- };
- 
- static struct resource bss_resource = {
- 	.name = "Kernel bss",
--	.flags = IORESOURCE_BUSY | IORESOURCE_MEM,
-+	.flags = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM,
- };
- 
- static struct resource __initdata *standard_resources[] = {
-@@ -412,7 +412,7 @@ static void __init setup_resources(void)
- 
- 	for_each_memblock(memory, reg) {
- 		res = alloc_bootmem_low(sizeof(*res));
--		res->flags = IORESOURCE_BUSY | IORESOURCE_MEM;
-+		res->flags = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM;
- 
- 		res->name = "System RAM";
- 		res->start = reg->base;
-diff --git a/arch/score/kernel/setup.c b/arch/score/kernel/setup.c
-index b48459afefdd..f3a0649ab521 100644
---- a/arch/score/kernel/setup.c
-+++ b/arch/score/kernel/setup.c
-@@ -101,7 +101,7 @@ static void __init resource_init(void)
- 	res->name = "System RAM";
- 	res->start = MEMORY_START;
- 	res->end = MEMORY_START + MEMORY_SIZE - 1;
--	res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-+	res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
- 	request_resource(&iomem_resource, res);
- 
- 	request_resource(res, &code_resource);
-diff --git a/arch/sh/kernel/setup.c b/arch/sh/kernel/setup.c
-index de19cfa768f2..3f1c18b28e8a 100644
---- a/arch/sh/kernel/setup.c
-+++ b/arch/sh/kernel/setup.c
-@@ -78,17 +78,17 @@ static char __initdata command_line[COMMAND_LINE_SIZE] = { 0, };
- 
- static struct resource code_resource = {
- 	.name = "Kernel code",
--	.flags = IORESOURCE_BUSY | IORESOURCE_MEM,
-+	.flags = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM,
- };
- 
- static struct resource data_resource = {
- 	.name = "Kernel data",
--	.flags = IORESOURCE_BUSY | IORESOURCE_MEM,
-+	.flags = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM,
- };
- 
- static struct resource bss_resource = {
- 	.name	= "Kernel bss",
--	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM,
-+	.flags	= IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM,
- };
- 
- unsigned long memory_start;
-@@ -202,7 +202,7 @@ void __init __add_active_range(unsigned int nid, unsigned long start_pfn,
- 	res->name = "System RAM";
- 	res->start = start;
- 	res->end = end - 1;
--	res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-+	res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
- 
- 	if (request_resource(&iomem_resource, res)) {
- 		pr_err("unable to request memory_resource 0x%lx 0x%lx\n",
-diff --git a/arch/sparc/mm/init_64.c b/arch/sparc/mm/init_64.c
-index 6f216853f272..1cfe6aab7a11 100644
---- a/arch/sparc/mm/init_64.c
-+++ b/arch/sparc/mm/init_64.c
-@@ -2863,17 +2863,17 @@ void hugetlb_setup(struct pt_regs *regs)
- 
- static struct resource code_resource = {
- 	.name	= "Kernel code",
--	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM
-+	.flags	= IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM
- };
- 
- static struct resource data_resource = {
- 	.name	= "Kernel data",
--	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM
-+	.flags	= IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM
- };
- 
- static struct resource bss_resource = {
- 	.name	= "Kernel bss",
--	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM
-+	.flags	= IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM
- };
- 
- static inline resource_size_t compute_kern_paddr(void *addr)
-@@ -2909,7 +2909,7 @@ static int __init report_memory(void)
- 		res->name = "System RAM";
- 		res->start = pavail[i].phys_addr;
- 		res->end = pavail[i].phys_addr + pavail[i].reg_size - 1;
--		res->flags = IORESOURCE_BUSY | IORESOURCE_MEM;
-+		res->flags = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM;
- 
- 		if (insert_resource(&iomem_resource, res) < 0) {
- 			pr_warn("Resource insertion failed.\n");
-diff --git a/arch/tile/kernel/setup.c b/arch/tile/kernel/setup.c
-index bbb855de6569..a992238e9b58 100644
---- a/arch/tile/kernel/setup.c
-+++ b/arch/tile/kernel/setup.c
-@@ -1632,14 +1632,14 @@ static struct resource data_resource = {
- 	.name	= "Kernel data",
- 	.start	= 0,
- 	.end	= 0,
--	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM
-+	.flags	= IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM
- };
- 
- static struct resource code_resource = {
- 	.name	= "Kernel code",
- 	.start	= 0,
- 	.end	= 0,
--	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM
-+	.flags	= IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM
- };
- 
- /*
-@@ -1673,10 +1673,15 @@ insert_ram_resource(u64 start_pfn, u64 end_pfn, bool reserved)
- 		kzalloc(sizeof(struct resource), GFP_ATOMIC);
- 	if (!res)
- 		return NULL;
--	res->name = reserved ? "Reserved" : "System RAM";
- 	res->start = start_pfn << PAGE_SHIFT;
- 	res->end = (end_pfn << PAGE_SHIFT) - 1;
- 	res->flags = IORESOURCE_BUSY | IORESOURCE_MEM;
-+	if (reserved) {
-+		res->name = "Reserved";
-+	} else {
-+		res->name = "System RAM";
-+		res->flags |= IORESOURCE_SYSRAM;
-+	}
- 	if (insert_resource(&iomem_resource, res)) {
- 		kfree(res);
- 		return NULL;
-diff --git a/arch/unicore32/kernel/setup.c b/arch/unicore32/kernel/setup.c
-index 3fa317f96122..c2bffa5614a4 100644
---- a/arch/unicore32/kernel/setup.c
-+++ b/arch/unicore32/kernel/setup.c
-@@ -72,13 +72,13 @@ static struct resource mem_res[] = {
- 		.name = "Kernel code",
- 		.start = 0,
- 		.end = 0,
--		.flags = IORESOURCE_MEM
-+		.flags = IORESOURCE_SYSTEM_RAM
- 	},
- 	{
- 		.name = "Kernel data",
- 		.start = 0,
- 		.end = 0,
--		.flags = IORESOURCE_MEM
-+		.flags = IORESOURCE_SYSTEM_RAM
- 	}
- };
- 
-@@ -211,7 +211,7 @@ request_standard_resources(struct meminfo *mi)
- 		res->name  = "System RAM";
- 		res->start = mi->bank[i].start;
- 		res->end   = mi->bank[i].start + mi->bank[i].size - 1;
--		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-+		res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
- 
- 		request_resource(&iomem_resource, res);
- 
+If it returns an error in such a case, yeah. Also, I think in such a
+case, we can simply round to the minimal frequency we can reach
+(without an error or a kernel panic, that would be ideal ;))
+
+> >> An example:
+> >> parent_rate = 24Mhz, freq = 1.4Mhz results in p=1, m=9, freq=1333333,3333
+> >> (which gets rounded down to 1333333).
+> >> Calling the function again with parent_rate = 24Mhz and freq = 1333333
+> >> results in p=1, m=10, freq=1200000.
+> >>
+> >> Rounding up the returned frequency removes this problem.
+> >>
+> >> Signed-off-by: Marcus Weseloh <mweseloh42@gmail.com>
+> >> ---
+> >>  drivers/clk/sunxi/clk-mod0.c | 7 +++++--
+> >>  1 file changed, 5 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
+> >> index d167e1e..d03f099 100644
+> >> --- a/drivers/clk/sunxi/clk-mod0.c
+> >> +++ b/drivers/clk/sunxi/clk-mod0.c
+> >> @@ -31,7 +31,8 @@
+> >>  static void sun4i_a10_get_mod0_factors(u32 *freq, u32 parent_rate,
+> >>                                      u8 *n, u8 *k, u8 *m, u8 *p)
+> >>  {
+> >> -     u8 div, calcm, calcp;
+> >> +     unsigned int div, calcm;
+> >> +     u8 calcp;
+> >>
+> >>       /* These clocks can only divide, so we will never be able to achieve
+> >>        * frequencies higher than the parent frequency */
+> >> @@ -50,8 +51,10 @@ static void sun4i_a10_get_mod0_factors(u32 *freq, u32 parent_rate,
+> >>               calcp = 3;
+> >>
+> >>       calcm = DIV_ROUND_UP(div, 1 << calcp);
+> >> +     if (calcm > 16)
+> >> +             calcm = 16;
+> >>
+> >> -     *freq = (parent_rate >> calcp) / calcm;
+> >> +     *freq = DIV_ROUND_UP(parent_rate >> calcp, calcm);
+> >
+> > While the two above seems harmless, this one concerns me a bit. Did
+> > you test the various mod0 clock users and made sure that they were
+> > still working as they used to?
+> 
+> No, I didn't do a thorough test, only booted the board with some mod0
+> users (mmc, spi, ss) and watched them request their frequencies
+> successfully. But this is an edge case, only affecting certain "weird"
+> frequencies. And the only effect is that the chosen frequency is not
+> the optimal one. So maybe I should drop it because it looks too
+> disruptive for too little gain?
+
+I'm guessing the other changes are fine. I'm a bit worried about this
+one, but we still have quite some time before the 4.6 release. We can
+always merge it, and deal with the fallout.
+
+Thanks!
+Maxime
+
 -- 
-2.3.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160126/0d623998/attachment.sig>
