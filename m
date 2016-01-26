@@ -1,47 +1,84 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Jan 2016 14:34:31 +0000
-Subject: [PATCH v2 21/21] arm64: Panic when VHE and non VHE CPUs coexist
-In-Reply-To: <56A781E7.2050408@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <1453737235-16522-22-git-send-email-marc.zyngier@arm.com>
- <56A781E7.2050408@arm.com>
-Message-ID: <56A783F7.7050301@arm.com>
+From: boqun.feng@gmail.com (Boqun Feng)
+Date: Tue, 26 Jan 2016 22:35:33 +0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160126121608.GE21553@arm.com>
+References: <56980C91.1010403@imgtec.com>
+ <20160114212913.GF3818@linux.vnet.ibm.com>
+ <20160115085554.GF3421@worktop> <20160115091348.GA27936@worktop>
+ <20160115174612.GV3818@linux.vnet.ibm.com>
+ <20160115212714.GM3421@worktop>
+ <20160115215853.GC3818@linux.vnet.ibm.com>
+ <20160125164242.GF22927@arm.com>
+ <20160126060322.GJ4503@linux.vnet.ibm.com>
+ <20160126121608.GE21553@arm.com>
+Message-ID: <20160126143533.GA6029@fixme-laptop.cn.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/16 14:25, Suzuki K. Poulose wrote:
-> On 25/01/16 15:53, Marc Zyngier wrote:
->> Having both VHE and non-VHE capable CPUs in the same system
->> is likely to be a recipe for disaster.
-> 
-> 
->> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
->> index b1adc51..bc7650a 100644
->> --- a/arch/arm64/kernel/smp.c
->> +++ b/arch/arm64/kernel/smp.c
->> @@ -113,6 +113,9 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
->>   			pr_crit("CPU%u: failed to come online\n", cpu);
->>   			ret = -EIO;
->>   		}
->> +
->> +		if (is_kernel_mode_mismatched())
->> +			panic("CPU%u: incompatible execution level", cpu);
-> 
-> 
-> fyi,
-> 
-> I have a series which tries to perform some checks for early CPU features,
-> like this at [1] and adds support for early CPU boot failures, passing the error
-> status back to the master. May be we could move this check there(once it settles),
-> and fail the CPU boot with CPU_PANIC_KERNEL status.
-> 
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/401727.html
+Hi Will,
 
-Definitely, there is room for consolidation in this area...
+On Tue, Jan 26, 2016 at 12:16:09PM +0000, Will Deacon wrote:
+> On Mon, Jan 25, 2016 at 10:03:22PM -0800, Paul E. McKenney wrote:
+> > On Mon, Jan 25, 2016 at 04:42:43PM +0000, Will Deacon wrote:
+> > > On Fri, Jan 15, 2016 at 01:58:53PM -0800, Paul E. McKenney wrote:
+> > > > PPC Overlapping Group-B sets version 4
+> > > > ""
+> > > > (* When the Group-B sets from two different barriers involve instructions in
+> > > >    the same thread, within that thread one set must contain the other.
+> > > > 
+> > > > 	P0	P1	P2
+> > > > 	Rx=1	Wy=1	Wz=2
+> > > > 	dep.	lwsync	lwsync
+> > > > 	Ry=0	Wz=1	Wx=1
+> > > > 	Rz=1
+> > > > 
+> > > > 	assert(!(z=2))
+> > > > 
+> > > >    Forbidden by ppcmem, allowed by herd.
+> > > > *)
+> > > > {
+> > > > 0:r1=x; 0:r2=y; 0:r3=z;
+> > > > 1:r1=x; 1:r2=y; 1:r3=z; 1:r4=1;
+> > > > 2:r1=x; 2:r2=y; 2:r3=z; 2:r4=1; 2:r5=2;
+> > > > }
+> > > >  P0		| P1		| P2		;
+> > > >  lwz r6,0(r1)	| stw r4,0(r2)	| stw r5,0(r3)	;
+> > > >  xor r7,r6,r6	| lwsync	| lwsync	;
+> > > >  lwzx r7,r7,r2	| stw r4,0(r3)	| stw r4,0(r1)	;
+> > > >  lwz r8,0(r3)	|		|		;
+> > > > 
+> > > > exists
+> > > > (z=2 /\ 0:r6=1 /\ 0:r7=0 /\ 0:r8=1)
+> > > 
+> > > That really hurts. Assuming that the "assert(!(z=2))" is actually there
+> > > to constrain the coherence order of z to be {0->1->2}, then I think that
+> > > this test is forbidden on arm using dmb instead of lwsync. That said, I
+> > > also don't think the Rz=1 in P0 changes anything.
+> > 
+> > What about the smp_wmb() variant of dmb that orders only stores?
+> 
+> Tricky, but I think it still works out if the coherence order of z is as
+> I described above. The line of reasoning is weird though -- I ended up
+> considering the two cases where P0 reads z before and after it reads x
+                                             ^^^^^^^^^^^^^^^
+Because of the fact that two reads on the same processors can't be
+executed simultaneously? I feel like this is exactly something herd
+missed.
 
-Thanks,
+> and what that means for the read of y.
+> 
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+And the reasoning on PPC is similar, so looks like the read of z on P0
+is a necessary condition for the exists clause to be forbidden.
+
+Regards,
+Boqun
+
+> Will
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160126/233e96e6/attachment.sig>
