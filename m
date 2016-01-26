@@ -1,390 +1,553 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 26 Jan 2016 18:10:43 +0100
-Subject: [PATCH v4 16/22] kallsyms: add support for relative offsets in
- kallsyms address table
+Date: Tue, 26 Jan 2016 18:10:45 +0100
+Subject: [PATCH v4 18/22] arm64: add support for kernel ASLR
 In-Reply-To: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1453828249-14467-17-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1453828249-14467-19-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similar to how relative extables are implemented, it is possible to emit
-the kallsyms table in such a way that it contains offsets relative to some
-anchor point in the kernel image rather than absolute addresses.
+This adds support for KASLR is implemented, based on entropy provided by
+the bootloader in the /chosen/kaslr-seed DT property. Depending on the size
+of the address space (VA_BITS) and the page size, the entropy in the
+virtual displacement is up to 13 bits (16k/2 levels) and up to 25 bits (all
+4 levels), with the sidenote that displacements that result in the kernel
+image straddling a 1GB/32MB/512MB alignment boundary (for 4KB/16KB/64KB
+granule kernels, respectively) are not allowed, and will be rounded up to
+an acceptable value.
 
-On 64-bit architectures, it cuts the size of the kallsyms address table in
-half, since offsets between kernel symbols can typically be expressed in
-32 bits.  This saves several hundreds of kilobytes of permanent .rodata on
-average.  In addition, the kallsyms address table is no longer subject to
-dynamic relocation when CONFIG_RELOCATABLE is in effect, so the relocation
-work done after decompression now doesn't have to do relocation updates
-for all these values.  This saves up to 24 bytes (i.e., the size of a
-ELF64 RELA relocation table entry) per value, which easily adds up to a
-couple of megabytes of uncompressed __init data on ppc64 or arm64.  Even
-if these relocation entries typically compress well, the combined size
-reduction of 2.8 MB uncompressed for a ppc64_defconfig build (of which 2.4
-MB is __init data) results in a ~500 KB space saving in the compressed
-image.
-
-Since it is useful for some architectures (like x86) to retain the ability
-to emit absolute values as well, this patch adds support for both, by
-emitting absolute addresses as positive 32-bit values, and addresses
-relative to the lowest encountered relative symbol as negative values,
-which are subtracted from the runtime address of this base symbol to
-produce the actual address.
-
-Support for the above is enabled by default for all architectures except
-IA-64, whose symbols are too far apart to capture in this manner.
+The module region is randomized by choosing a page aligned 128 MB region
+inside the interval [_etext - 128 MB, _stext + 128 MB). This gives between
+10 and 14 bits of entropy (depending on page size), independently of the
+kernel randomization, but still guarantees that modules are within the
+range of relative branch and jump instructions (with the caveat that, since
+the module region is shared with other uses of the vmalloc area, modules
+may need to be loaded further away if the module region is exhausted)
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Tested-by: Guenter Roeck <linux@roeck-us.net>
-Reviewed-by: Kees Cook <keescook@chromium.org>
-Tested-by: Kees Cook <keescook@chromium.org>
-Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-Cc: Michael Ellerman <mpe@ellerman.id.au>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: H. Peter Anvin <hpa@zytor.com>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Michal Marek <mmarek@suse.cz>
-Cc: Rusty Russell <rusty@rustcorp.com.au>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
 ---
- init/Kconfig            | 16 ++++
- kernel/kallsyms.c       | 38 +++++++--
- scripts/kallsyms.c      | 88 +++++++++++++++++---
- scripts/link-vmlinux.sh |  4 +
- scripts/namespace.pl    |  2 +
- 5 files changed, 129 insertions(+), 19 deletions(-)
+ arch/arm64/Kconfig              |  14 ++
+ arch/arm64/include/asm/memory.h |   5 +-
+ arch/arm64/kernel/Makefile      |   1 +
+ arch/arm64/kernel/head.S        |  59 ++++++-
+ arch/arm64/kernel/kaslr.c       | 169 ++++++++++++++++++++
+ arch/arm64/kernel/module.c      |   8 +-
+ arch/arm64/kernel/setup.c       |  29 ++++
+ arch/arm64/mm/mmu.c             |  33 ++--
+ 8 files changed, 298 insertions(+), 20 deletions(-)
 
-diff --git a/init/Kconfig b/init/Kconfig
-index 22320804fbaf..1cc72a068afc 100644
---- a/init/Kconfig
-+++ b/init/Kconfig
-@@ -1420,6 +1420,22 @@ config KALLSYMS_ALL
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 6aa86f86fd10..d7e31454d421 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -774,6 +774,20 @@ config RELOCATABLE
+ 	  relocation pass at runtime even if the kernel is loaded at the
+ 	  same address it was linked at.
  
- 	   Say N unless you really need all symbols.
- 
-+config KALLSYMS_BASE_RELATIVE
-+	bool
-+	depends on KALLSYMS
-+	default !IA64
++config RANDOMIZE_BASE
++	bool "Randomize the address of the kernel image"
++	select ARM64_MODULE_PLTS
++	select RELOCATABLE
 +	help
-+	  Instead of emitting them as absolute values in the native word size,
-+	  emit the symbol references in the kallsyms table as 32-bit entries,
-+	  each containing either an absolute value in the range [0, S32_MAX] or
-+	  a relative value in the range [base, base + S32_MAX], where base is
-+	  the lowest relative symbol address encountered in the image.
++	  Randomizes the virtual address at which the kernel image is
++	  loaded, as a security feature that deters exploit attempts
++	  relying on knowledge of the location of kernel internals.
 +
-+	  On 64-bit builds, this reduces the size of the address table by 50%,
-+	  but more importantly, it results in entries whose values are build
-+	  time constants, and no relocation pass is required at runtime to fix
-+	  up the entries based on the runtime load address of the kernel.
++	  It is the bootloader's job to provide entropy, by passing a
++	  random u64 value in /chosen/kaslr-seed at kernel entry.
 +
- config PRINTK
- 	default y
- 	bool "Enable support for printk" if EXPERT
-diff --git a/kernel/kallsyms.c b/kernel/kallsyms.c
-index 5c5987f10819..10a8af9d5744 100644
---- a/kernel/kallsyms.c
-+++ b/kernel/kallsyms.c
-@@ -38,6 +38,7 @@
-  * during the second link stage.
++	  If unsure, say N.
++
+ endmenu
+ 
+ menu "Boot options"
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 61005e7dd6cb..083361531a61 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -52,7 +52,7 @@
+ #define KIMAGE_VADDR		(MODULES_END)
+ #define MODULES_END		(MODULES_VADDR + MODULES_VSIZE)
+ #define MODULES_VADDR		(VA_START + KASAN_SHADOW_SIZE)
+-#define MODULES_VSIZE		(SZ_64M)
++#define MODULES_VSIZE		(SZ_128M)
+ #define PCI_IO_END		(PAGE_OFFSET - SZ_2M)
+ #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
+ #define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
+@@ -127,6 +127,9 @@ extern phys_addr_t		memstart_addr;
+ /* PHYS_OFFSET - the physical address of the start of memory. */
+ #define PHYS_OFFSET		({ memstart_addr; })
+ 
++/* the virtual base of the kernel image (minus TEXT_OFFSET) */
++extern u64			kimage_vaddr;
++
+ /* the offset between the kernel virtual and physical mappings */
+ extern u64			kimage_voffset;
+ 
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index e2f0a755beaa..c9aaecddb941 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -43,6 +43,7 @@ arm64-obj-$(CONFIG_PCI)			+= pci.o
+ arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+ arm64-obj-$(CONFIG_ACPI)		+= acpi.o
+ arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
++arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 92f9c26632f3..8712a38c3de7 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -210,6 +210,7 @@ section_table:
+ ENTRY(stext)
+ 	bl	preserve_boot_args
+ 	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
++	mov	x23, xzr			// KASLR offset, defaults to 0
+ 	adrp	x24, __PHYS_OFFSET
+ 	bl	set_cpu_boot_mode_flag
+ 	bl	__create_page_tables		// x25=TTBR0, x26=TTBR1
+@@ -313,7 +314,7 @@ ENDPROC(preserve_boot_args)
+ __create_page_tables:
+ 	adrp	x25, idmap_pg_dir
+ 	adrp	x26, swapper_pg_dir
+-	mov	x27, lr
++	mov	x28, lr
+ 
+ 	/*
+ 	 * Invalidate the idmap and swapper page tables to avoid potential
+@@ -392,6 +393,7 @@ __create_page_tables:
+ 	 */
+ 	mov	x0, x26				// swapper_pg_dir
+ 	ldr	x5, =KIMAGE_VADDR
++	add	x5, x5, x23			// add KASLR displacement
+ 	create_pgd_entry x0, x5, x3, x6
+ 	ldr	w6, kernel_img_size
+ 	add	x6, x6, x5
+@@ -408,8 +410,7 @@ __create_page_tables:
+ 	dmb	sy
+ 	bl	__inval_cache_range
+ 
+-	mov	lr, x27
+-	ret
++	ret	x28
+ ENDPROC(__create_page_tables)
+ 
+ kernel_img_size:
+@@ -421,6 +422,7 @@ kernel_img_size:
   */
- extern const unsigned long kallsyms_addresses[] __weak;
-+extern const int kallsyms_offsets[] __weak;
- extern const u8 kallsyms_names[] __weak;
+ 	.set	initial_sp, init_thread_union + THREAD_START_SP
+ __mmap_switched:
++	mov	x28, lr				// preserve LR
+ 	adr_l	x8, vectors			// load VBAR_EL1 with virtual
+ 	msr	vbar_el1, x8			// vector table address
+ 	isb
+@@ -449,19 +451,26 @@ __mmap_switched:
+ 	ldr	x13, [x9, #-8]
+ 	cmp	w12, #R_AARCH64_RELATIVE
+ 	b.ne	1f
+-	str	x13, [x11]
++	add	x13, x13, x23			// relocate
++	str	x13, [x11, x23]
+ 	b	0b
  
+ 1:	cmp	w12, #R_AARCH64_ABS64
+ 	b.ne	0b
+ 	add	x12, x12, x12, lsl #1		// symtab offset: 24x top word
+ 	add	x12, x8, x12, lsr #(32 - 3)	// ... shifted into bottom word
++	ldrsh	w14, [x12, #6]			// Elf64_Sym::st_shndx
+ 	ldr	x15, [x12, #8]			// Elf64_Sym::st_value
++	cmp	w14, #-0xf			// SHN_ABS (0xfff1) ?
++	add	x14, x15, x23			// relocate
++	csel	x15, x14, x15, ne
+ 	add	x15, x13, x15
+-	str	x15, [x11]
++	str	x15, [x11, x23]
+ 	b	0b
+ 
+-2:
++2:	adr_l	x8, kimage_vaddr		// make relocated kimage_vaddr
++	dc	cvac, x8			// value visible to secondaries
++	dsb	sy				// with MMU off
+ #endif
+ 
+ 	adr_l	sp, initial_sp, x4
+@@ -470,7 +479,7 @@ __mmap_switched:
+ 	msr	sp_el0, x4			// Save thread_info
+ 	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
+ 
+-	ldr	x4, =KIMAGE_VADDR		// Save the offset between
++	ldr_l	x4, kimage_vaddr		// Save the offset between
+ 	sub	x4, x4, x24			// the kernel virtual and
+ 	str_l	x4, kimage_voffset, x5		// physical mappings
+ 
+@@ -478,6 +487,15 @@ __mmap_switched:
+ #ifdef CONFIG_KASAN
+ 	bl	kasan_early_init
+ #endif
++#ifdef CONFIG_RANDOMIZE_BASE
++	cbnz	x23, 0f				// already running randomized?
++	mov	x0, x21				// pass FDT address in x0
++	bl	kaslr_early_init		// parse FDT for KASLR options
++	cbz	x0, 0f				// KASLR disabled? just proceed
++	ret	x28				// we must enable KASLR, return
++						// to __enable_mmu()
++0:
++#endif
+ 	b	start_kernel
+ ENDPROC(__mmap_switched)
+ 
+@@ -486,6 +504,10 @@ ENDPROC(__mmap_switched)
+  * hotplug and needs to have the same protections as the text region
+  */
+ 	.section ".text","ax"
++
++ENTRY(kimage_vaddr)
++	.quad		_text - TEXT_OFFSET
++
  /*
-@@ -47,6 +48,9 @@ extern const u8 kallsyms_names[] __weak;
- extern const unsigned long kallsyms_num_syms
- __attribute__((weak, section(".rodata")));
+  * If we're fortunate enough to boot at EL2, ensure that the world is
+  * sane before dropping to EL1.
+@@ -646,7 +668,7 @@ ENTRY(secondary_startup)
+ 	adrp	x26, swapper_pg_dir
+ 	bl	__cpu_setup			// initialise processor
  
-+extern const unsigned long kallsyms_relative_base
-+__attribute__((weak, section(".rodata")));
+-	ldr	x8, =KIMAGE_VADDR
++	ldr	x8, kimage_vaddr
+ 	ldr	w9, 0f
+ 	sub	x27, x8, w9, sxtw		// address to jump to after enabling the MMU
+ 	b	__enable_mmu
+@@ -679,6 +701,7 @@ ENDPROC(__secondary_switched)
+  */
+ 	.section	".idmap.text", "ax"
+ __enable_mmu:
++	mrs	x18, sctlr_el1			// preserve old SCTLR_EL1 value
+ 	mrs	x1, ID_AA64MMFR0_EL1
+ 	ubfx	x2, x1, #ID_AA64MMFR0_TGRAN_SHIFT, 4
+ 	cmp	x2, #ID_AA64MMFR0_TGRAN_SUPPORTED
+@@ -696,6 +719,26 @@ __enable_mmu:
+ 	ic	iallu
+ 	dsb	nsh
+ 	isb
++#ifdef CONFIG_RANDOMIZE_BASE
++	mov	x19, x0				// preserve new SCTLR_EL1 value
++	blr	x27
 +
- extern const u8 kallsyms_token_table[] __weak;
- extern const u16 kallsyms_token_index[] __weak;
++	/*
++	 * If we return here, we have a KASLR displacement in x0 which we need
++	 * to record and take into account by discarding the current kernel
++	 * mapping and creating a new one.
++	 */
++	mov	x23, x0				// record the KASLR offset
++	msr	sctlr_el1, x18			// disable the MMU
++	isb
++	bl	__create_page_tables		// recreate kernel mapping
++
++	msr	sctlr_el1, x19			// re-enable the MMU
++	isb
++	ic	ialluis				// flush instructions fetched
++	isb					// via old mapping
++	add	x27, x27, x23			// relocated __mmap_switched
++#endif
+ 	br	x27
+ ENDPROC(__enable_mmu)
  
-@@ -176,6 +180,19 @@ static unsigned int get_symbol_offset(unsigned long pos)
- 	return name - kallsyms_names;
- }
- 
-+static unsigned long kallsyms_sym_address(int idx)
+diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
+new file mode 100644
+index 000000000000..9ddb01f65a1a
+--- /dev/null
++++ b/arch/arm64/kernel/kaslr.c
+@@ -0,0 +1,169 @@
++/*
++ * Copyright (C) 2016 Linaro Ltd <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/crc32.h>
++#include <linux/init.h>
++#include <linux/libfdt.h>
++#include <linux/mm_types.h>
++#include <linux/sched.h>
++#include <linux/types.h>
++
++#include <asm/fixmap.h>
++#include <asm/kernel-pgtable.h>
++#include <asm/memory.h>
++#include <asm/mmu.h>
++#include <asm/pgtable.h>
++#include <asm/sections.h>
++
++u32 module_load_offset;
++
++static __init u64 get_kaslr_seed(void *fdt)
 +{
-+	if (!IS_ENABLED(CONFIG_KALLSYMS_BASE_RELATIVE))
-+		return kallsyms_addresses[idx];
++	int node, len;
++	u64 *prop;
++	u64 ret;
 +
-+	/* positive offsets are absolute values */
-+	if (kallsyms_offsets[idx] >= 0)
-+		return kallsyms_offsets[idx];
++	node = fdt_path_offset(fdt, "/chosen");
++	if (node < 0)
++		return 0;
 +
-+	/* negative offsets are relative to kallsyms_relative_base - 1 */
-+	return kallsyms_relative_base - 1 - kallsyms_offsets[idx];
++	prop = fdt_getprop_w(fdt, node, "kaslr-seed", &len);
++	if (!prop || len != sizeof(u64))
++		return 0;
++
++	ret = fdt64_to_cpu(*prop);
++	*prop = 0;
++	return ret;
 +}
 +
- /* Lookup the address for this symbol. Returns 0 if not found. */
- unsigned long kallsyms_lookup_name(const char *name)
++static __init const u8 *get_cmdline(void *fdt)
++{
++	static const u8 default_cmdline[] = CONFIG_CMDLINE;
++
++	if (!IS_ENABLED(CONFIG_CMDLINE_FORCE)) {
++		int node;
++		const u8 *prop;
++
++		node = fdt_path_offset(fdt, "/chosen");
++		if (node < 0)
++			goto out;
++
++		prop = fdt_getprop(fdt, node, "bootargs", NULL);
++		if (!prop)
++			goto out;
++		return prop;
++	}
++out:
++	return default_cmdline;
++}
++
++static u32 get_kernel_crc(void)
++{
++	u64 stack_start = (u64)&init_thread_union.stack;
++	u64 stack_end = stack_start + sizeof(init_thread_union.stack);
++	u32 crc;
++
++	crc = crc32_le(~0, _text, stack_start - (u64)_text);
++	crc = crc32_le(crc, (void *)stack_end, (u64)_edata - stack_end);
++
++	return crc;
++}
++
++extern void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size,
++				       pgprot_t prot);
++
++/*
++ * This routine will be executed with the kernel mapped at its default virtual
++ * address, and if it returns successfully, the kernel will be remapped, and
++ * start_kernel() will be executed from a randomized virtual offset. The
++ * relocation will result in all absolute references (e.g., static variables
++ * containing function pointers) to be reinitialized, and zero-initialized
++ * .bss variables will be reset to 0. However, other .data manipulations will
++ * persist across the change from the default mapping to the randomized mapping,
++ * and thus should not be performed before we have moved the kernel to its final
++ * address. This will be caught by the CRC check, and KASLR will be disabled if
++ * we catch any inadvertent modifications.
++ */
++u64 __init kaslr_early_init(u64 dt_phys)
++{
++	void *fdt;
++	u64 seed, offset, mask, module_range;
++	const u8 *cmdline, *str;
++	int size;
++	u32 crc;
++
++	/*
++	 * Record the CRC of the entire [_text, _edata] interval, except the
++	 * region we are using for the stack. If we detect any changes made
++	 * during the course of this function, we bail. This may seem a bit
++	 * drastic, but in this case , we have no way of guaranteeing we won't
++	 * corrupt anything by moving the kernel image before reentering it.
++	 */
++	crc = get_kernel_crc();
++
++	/*
++	 * Try to map the FDT early. If this fails, we simply bail,
++	 * and proceed with KASLR disabled. We will make another
++	 * attempt@mapping the FDT in setup_machine()
++	 */
++	early_fixmap_init();
++	fdt = __fixmap_remap_fdt(dt_phys, &size, PAGE_KERNEL);
++	if (!fdt)
++		return 0;
++
++	/*
++	 * Retrieve (and wipe) the seed from the FDT
++	 */
++	seed = get_kaslr_seed(fdt);
++	if (!seed)
++		return 0;
++
++	/*
++	 * Check if 'nokaslr' appears on the command line, and
++	 * return 0 if that is the case.
++	 */
++	cmdline = get_cmdline(fdt);
++	str = strstr(cmdline, "nokaslr");
++	if (str == cmdline || (str > cmdline && *(str - 1) == ' '))
++		return 0;
++
++	/* check if we made any inadvertent changes to the kernel text */
++	if (crc != get_kernel_crc())
++		return 0;
++
++	/*
++	 * OK, so we are proceeding with KASLR enabled. Calculate a suitable
++	 * kernel image offset from the seed. Let's place the kernel in the
++	 * lower half of the VMALLOC area (VA_BITS - 2).
++	 * Even if we could randomize at page granularity for 16k and 64k pages,
++	 * let's always round to 2 MB so we don't interfere with the ability to
++	 * map using contiguous PTEs
++	 */
++	mask = ((1UL << (VA_BITS - 2)) - 1) & ~(SZ_2M - 1);
++	offset = seed & mask;
++
++	/*
++	 * The kernel Image should not extend across a 1GB/32MB/512MB alignment
++	 * boundary (for 4KB/16KB/64KB granule kernels, respectively). If this
++	 * happens, increase the KASLR offset by the size of the kernel image.
++	 */
++	if ((((u64)_text + offset) >> SWAPPER_TABLE_SHIFT) !=
++	    (((u64)_end + offset) >> SWAPPER_TABLE_SHIFT))
++		offset = (offset + (u64)(_end - _text)) & mask;
++
++	/*
++	 * Randomize the module region, by setting module_load_offset to
++	 * a PAGE_SIZE multiple in the interval [0, module_range). This
++	 * ensures that the resulting region still covers [_stext, _etext],
++	 * and that all relative branches can be resolved without veneers.
++	 */
++	module_range = MODULES_VSIZE - (u64)(_etext - _stext);
++	module_load_offset = ((module_range * (u16)seed) >> 16) & PAGE_MASK;
++
++	return offset;
++}
+diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+index 84113d3e1df1..54702d456680 100644
+--- a/arch/arm64/kernel/module.c
++++ b/arch/arm64/kernel/module.c
+@@ -33,8 +33,14 @@
+ void *module_alloc(unsigned long size)
  {
-@@ -187,7 +204,7 @@ unsigned long kallsyms_lookup_name(const char *name)
- 		off = kallsyms_expand_symbol(off, namebuf, ARRAY_SIZE(namebuf));
+ 	void *p;
++	u64 base = (u64)_etext - MODULES_VSIZE;
  
- 		if (strcmp(namebuf, name) == 0)
--			return kallsyms_addresses[i];
-+			return kallsyms_sym_address(i);
- 	}
- 	return module_kallsyms_lookup_name(name);
- }
-@@ -204,7 +221,7 @@ int kallsyms_on_each_symbol(int (*fn)(void *, const char *, struct module *,
- 
- 	for (i = 0, off = 0; i < kallsyms_num_syms; i++) {
- 		off = kallsyms_expand_symbol(off, namebuf, ARRAY_SIZE(namebuf));
--		ret = fn(data, namebuf, NULL, kallsyms_addresses[i]);
-+		ret = fn(data, namebuf, NULL, kallsyms_sym_address(i));
- 		if (ret != 0)
- 			return ret;
- 	}
-@@ -220,7 +237,10 @@ static unsigned long get_symbol_pos(unsigned long addr,
- 	unsigned long i, low, high, mid;
- 
- 	/* This kernel should never had been booted. */
--	BUG_ON(!kallsyms_addresses);
-+	if (!IS_ENABLED(CONFIG_KALLSYMS_BASE_RELATIVE))
-+		BUG_ON(!kallsyms_addresses);
-+	else
-+		BUG_ON(!kallsyms_offsets);
- 
- 	/* Do a binary search on the sorted kallsyms_addresses array. */
- 	low = 0;
-@@ -228,7 +248,7 @@ static unsigned long get_symbol_pos(unsigned long addr,
- 
- 	while (high - low > 1) {
- 		mid = low + (high - low) / 2;
--		if (kallsyms_addresses[mid] <= addr)
-+		if (kallsyms_sym_address(mid) <= addr)
- 			low = mid;
- 		else
- 			high = mid;
-@@ -238,15 +258,15 @@ static unsigned long get_symbol_pos(unsigned long addr,
- 	 * Search for the first aliased symbol. Aliased
- 	 * symbols are symbols with the same address.
- 	 */
--	while (low && kallsyms_addresses[low-1] == kallsyms_addresses[low])
-+	while (low && kallsyms_sym_address(low-1) == kallsyms_sym_address(low))
- 		--low;
- 
--	symbol_start = kallsyms_addresses[low];
-+	symbol_start = kallsyms_sym_address(low);
- 
- 	/* Search for next non-aliased symbol. */
- 	for (i = low + 1; i < kallsyms_num_syms; i++) {
--		if (kallsyms_addresses[i] > symbol_start) {
--			symbol_end = kallsyms_addresses[i];
-+		if (kallsyms_sym_address(i) > symbol_start) {
-+			symbol_end = kallsyms_sym_address(i);
- 			break;
- 		}
- 	}
-@@ -470,7 +490,7 @@ static unsigned long get_ksymbol_core(struct kallsym_iter *iter)
- 	unsigned off = iter->nameoff;
- 
- 	iter->module_name[0] = '\0';
--	iter->value = kallsyms_addresses[iter->pos];
-+	iter->value = kallsyms_sym_address(iter->pos);
- 
- 	iter->type = kallsyms_get_symbol_type(off);
- 
-diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
-index d39a1eeb080e..02473b71643b 100644
---- a/scripts/kallsyms.c
-+++ b/scripts/kallsyms.c
-@@ -22,6 +22,7 @@
- #include <stdlib.h>
- #include <string.h>
- #include <ctype.h>
-+#include <limits.h>
- 
- #ifndef ARRAY_SIZE
- #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(arr[0]))
-@@ -43,6 +44,7 @@ struct addr_range {
- };
- 
- static unsigned long long _text;
-+static unsigned long long relative_base;
- static struct addr_range text_ranges[] = {
- 	{ "_stext",     "_etext"     },
- 	{ "_sinittext", "_einittext" },
-@@ -62,6 +64,7 @@ static int all_symbols = 0;
- static int absolute_percpu = 0;
- static char symbol_prefix_char = '\0';
- static unsigned long long kernel_start_addr = 0;
-+static int base_relative = 0;
- 
- int token_profit[0x10000];
- 
-@@ -75,7 +78,7 @@ static void usage(void)
- 	fprintf(stderr, "Usage: kallsyms [--all-symbols] "
- 			"[--symbol-prefix=<prefix char>] "
- 			"[--page-offset=<CONFIG_PAGE_OFFSET>] "
--			"< in.map > out.S\n");
-+			"[--base-relative] < in.map > out.S\n");
- 	exit(1);
- }
- 
-@@ -205,6 +208,8 @@ static int symbol_valid(struct sym_entry *s)
- 	 */
- 	static char *special_symbols[] = {
- 		"kallsyms_addresses",
-+		"kallsyms_offsets",
-+		"kallsyms_relative_base",
- 		"kallsyms_num_syms",
- 		"kallsyms_names",
- 		"kallsyms_markers",
-@@ -349,16 +354,47 @@ static void write_src(void)
- 
- 	printf("\t.section .rodata, \"a\"\n");
- 
--	/* Provide proper symbols relocatability by their '_text'
--	 * relativeness.  The symbol names cannot be used to construct
--	 * normal symbol references as the list of symbols contains
--	 * symbols that are declared static and are private to their
--	 * .o files.  This prevents .tmp_kallsyms.o or any other
--	 * object from referencing them.
-+	/* Provide proper symbols relocatability by their relativeness
-+	 * to a fixed anchor point in the runtime image, either '_text'
-+	 * for absolute address tables, in which case the linker will
-+	 * emit the final addresses at build time. Otherwise, use the
-+	 * offset relative to the lowest value encountered of all relative
-+	 * symbols, and emit non-relocatable fixed offsets that will be fixed
-+	 * up at runtime.
-+	 *
-+	 * The symbol names cannot be used to construct normal symbol
-+	 * references as the list of symbols contains symbols that are
-+	 * declared static and are private to their .o files.  This prevents
-+	 * .tmp_kallsyms.o or any other object from referencing them.
- 	 */
--	output_label("kallsyms_addresses");
-+	if (!base_relative)
-+		output_label("kallsyms_addresses");
-+	else
-+		output_label("kallsyms_offsets");
-+
- 	for (i = 0; i < table_cnt; i++) {
--		if (!symbol_absolute(&table[i])) {
-+		if (base_relative) {
-+			long long offset;
-+
-+			if (symbol_absolute(&table[i])) {
-+				offset = table[i].addr;
-+				if (offset < 0 || offset > INT_MAX) {
-+					fprintf(stderr, "kallsyms failure: "
-+						"absolute symbol value %#llx out of range in relative mode\n",
-+						table[i].addr);
-+					exit(EXIT_FAILURE);
-+				}
-+			} else {
-+				offset = relative_base - table[i].addr - 1;
-+				if (offset < INT_MIN || offset >= 0) {
-+					fprintf(stderr, "kallsyms failure: "
-+						"relative symbol value %#llx out of range in relative mode\n",
-+						table[i].addr);
-+					exit(EXIT_FAILURE);
-+				}
-+			}
-+			printf("\t.long\t%#x\n", (int)offset);
-+		} else if (!symbol_absolute(&table[i])) {
- 			if (_text <= table[i].addr)
- 				printf("\tPTR\t_text + %#llx\n",
- 					table[i].addr - _text);
-@@ -371,6 +407,12 @@ static void write_src(void)
- 	}
- 	printf("\n");
- 
-+	if (base_relative) {
-+		output_label("kallsyms_relative_base");
-+		printf("\tPTR\t_text - %#llx\n", _text - relative_base);
-+		printf("\n");
+-	p = __vmalloc_node_range(size, MODULE_ALIGN, MODULES_VADDR, MODULES_END,
++	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
++		extern u32 module_load_offset;
++		base += module_load_offset;
 +	}
 +
- 	output_label("kallsyms_num_syms");
- 	printf("\tPTR\t%d\n", table_cnt);
- 	printf("\n");
-@@ -695,6 +737,28 @@ static void make_percpus_absolute(void)
- 		}
- }
++	p = __vmalloc_node_range(size, MODULE_ALIGN, base, base + MODULES_VSIZE,
+ 				GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
+ 				NUMA_NO_NODE, __builtin_return_address(0));
  
-+/* find the minimum non-absolute symbol address */
-+static void record_relative_base(void)
-+{
-+	unsigned int i;
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index cfed56f0ad26..42371f69def3 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -388,3 +388,32 @@ static int __init topology_init(void)
+ 	return 0;
+ }
+ subsys_initcall(topology_init);
 +
-+	if (kernel_start_addr > 0) {
-+		/*
-+		 * If the kernel start address was specified, use that as
-+		 * the relative base rather than going through the table,
-+		 * since it should be a reasonable default, and values below
-+		 * it will be ignored anyway.
-+		 */
-+		relative_base = kernel_start_addr;
++/*
++ * Dump out kernel offset information on panic.
++ */
++static int dump_kernel_offset(struct notifier_block *self, unsigned long v,
++			      void *p)
++{
++	u64 const kaslr_offset = kimage_vaddr - KIMAGE_VADDR;
++
++	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE) && kaslr_offset > 0) {
++		pr_emerg("Kernel Offset: 0x%llx from 0x%lx\n",
++			 kaslr_offset, KIMAGE_VADDR);
 +	} else {
-+		relative_base = -1ULL;
-+		for (i = 0; i < table_cnt; i++)
-+			if (!symbol_absolute(&table[i]) &&
-+			    table[i].addr < relative_base)
-+				relative_base = table[i].addr;
++		pr_emerg("Kernel Offset: disabled\n");
 +	}
++	return 0;
 +}
 +
- int main(int argc, char **argv)
- {
- 	if (argc >= 2) {
-@@ -713,7 +777,9 @@ int main(int argc, char **argv)
- 			} else if (strncmp(argv[i], "--page-offset=", 14) == 0) {
- 				const char *p = &argv[i][14];
- 				kernel_start_addr = strtoull(p, NULL, 16);
--			} else
-+			} else if (strcmp(argv[i], "--base-relative") == 0)
-+				base_relative = 1;
-+			else
- 				usage();
- 		}
- 	} else if (argc != 1)
-@@ -722,6 +788,8 @@ int main(int argc, char **argv)
- 	read_map(stdin);
- 	if (absolute_percpu)
- 		make_percpus_absolute();
-+	if (base_relative)
-+		record_relative_base();
- 	sort_symbols();
- 	optimize_token_table();
- 	write_src();
-diff --git a/scripts/link-vmlinux.sh b/scripts/link-vmlinux.sh
-index ba6c34ea5429..b58bf908b153 100755
---- a/scripts/link-vmlinux.sh
-+++ b/scripts/link-vmlinux.sh
-@@ -90,6 +90,10 @@ kallsyms()
- 		kallsymopt="${kallsymopt} --absolute-percpu"
- 	fi
- 
-+	if [ -n "${CONFIG_KALLSYMS_BASE_RELATIVE}" ]; then
-+		kallsymopt="${kallsymopt} --base-relative"
-+	fi
++static struct notifier_block kernel_offset_notifier = {
++	.notifier_call = dump_kernel_offset
++};
 +
- 	local aflags="${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL}               \
- 		      ${NOSTDINC_FLAGS} ${LINUXINCLUDE} ${KBUILD_CPPFLAGS}"
++static int __init register_kernel_offset_dumper(void)
++{
++	atomic_notifier_chain_register(&panic_notifier_list,
++				       &kernel_offset_notifier);
++	return 0;
++}
++__initcall(register_kernel_offset_dumper);
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 8dda38378959..5d7e0b801ab7 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -636,7 +636,8 @@ void __init early_fixmap_init(void)
+ 	unsigned long addr = FIXADDR_START;
  
-diff --git a/scripts/namespace.pl b/scripts/namespace.pl
-index a71be6b7cdec..9f3c9d47a4a5 100755
---- a/scripts/namespace.pl
-+++ b/scripts/namespace.pl
-@@ -117,6 +117,8 @@ my %nameexception = (
-     'kallsyms_names'	=> 1,
-     'kallsyms_num_syms'	=> 1,
-     'kallsyms_addresses'=> 1,
-+    'kallsyms_offsets'	=> 1,
-+    'kallsyms_relative_base'=> 1,
-     '__this_module'	=> 1,
-     '_etext'		=> 1,
-     '_edata'		=> 1,
+ 	pgd = pgd_offset_k(addr);
+-	if (CONFIG_PGTABLE_LEVELS > 3 && !pgd_none(*pgd)) {
++	if (CONFIG_PGTABLE_LEVELS > 3 &&
++	    !(pgd_none(*pgd) || pgd_page_paddr(*pgd) == __pa(bm_pud))) {
+ 		/*
+ 		 * We only end up here if the kernel mapping and the fixmap
+ 		 * share the top level pgd entry, which should only happen on
+@@ -693,11 +694,10 @@ void __set_fixmap(enum fixed_addresses idx,
+ 	}
+ }
+ 
+-void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
++void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
+ {
+ 	const u64 dt_virt_base = __fix_to_virt(FIX_FDT);
+-	pgprot_t prot = PAGE_KERNEL_RO;
+-	int size, offset;
++	int offset;
+ 	void *dt_virt;
+ 
+ 	/*
+@@ -736,16 +736,29 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
+ 	if (fdt_check_header(dt_virt) != 0)
+ 		return NULL;
+ 
+-	size = fdt_totalsize(dt_virt);
+-	if (size > MAX_FDT_SIZE)
++	*size = fdt_totalsize(dt_virt);
++	if (*size > MAX_FDT_SIZE)
+ 		return NULL;
+ 
+-	if (offset + size > SWAPPER_BLOCK_SIZE)
+-		create_mapping(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
+-			       round_up(offset + size, SWAPPER_BLOCK_SIZE), prot);
++	if (offset + *size > SWAPPER_BLOCK_SIZE)
++		create_mapping(round_down(dt_phys, SWAPPER_BLOCK_SIZE),
++			       dt_virt_base,
++			       round_up(offset + *size, SWAPPER_BLOCK_SIZE),
++			       prot);
+ 
+-	memblock_reserve(dt_phys, size);
++	return dt_virt;
++}
+ 
++void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
++{
++	void *dt_virt;
++	int size;
++
++	dt_virt = __fixmap_remap_fdt(dt_phys, &size, PAGE_KERNEL_RO);
++	if (!dt_virt)
++		return NULL;
++
++	memblock_reserve(dt_phys, size);
+ 	return dt_virt;
+ }
+ 
 -- 
 2.5.0
