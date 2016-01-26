@@ -1,77 +1,67 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Tue, 26 Jan 2016 10:03:57 -0300
-Subject: mtd: pxa3xx_nand: issue with command time out
-In-Reply-To: <87fuxl9yil.fsf@belgarion.home>
-References: <5695CEF0.1080100@alliedtelesis.co.nz>
- <87a8o9ex9r.fsf@belgarion.home>
- <569827BC.10601@alliedtelesis.co.nz>
- <874meddqu5.fsf@belgarion.home> <20160125183022.GA41251@google.com>
- <87fuxl9yil.fsf@belgarion.home>
-Message-ID: <CAAEAJfCNzh9+zRq_Yb=hFyLfP8RFoX+LUsDL4dVwUenVc_gVOA@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 26 Jan 2016 14:04:58 +0100
+Subject: [PATCH] clk: rockchip: Reparent hclk_rom,
+ hclk_i2s0 and hclk_spdif to hclk_cpubus on RK3066/RK3188
+In-Reply-To: <1453812250-11819-1-git-send-email-al.kochet@gmail.com>
+References: <1453812250-11819-1-git-send-email-al.kochet@gmail.com>
+Message-ID: <18195479.b78tX8z5U3@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 January 2016 at 17:48, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Brian Norris <computersforpeace@gmail.com> writes:
->
->> Hi Robert,
->>
->> On Sun, Jan 17, 2016 at 12:53:06AM +0100, Robert Jarzmik wrote:
->> commit 24542257a3b987025d4b998ec2d15e556c98ad3f
->> Author: Robert Jarzmik <robert.jarzmik@free.fr>
->> Date:   Fri Feb 20 19:36:43 2015 +0100
->>
->>     mtd: pxa3xx-nand: handle PIO in threaded interrupt
->>
->>
->> And now I'm wondering: when does the completion get triggered? i.e.:
->>
->>       complete(&info->cmd_complete);
->
->> It seems to me like you've short-circuited some of the IRQ handling
->> code, so that the threaded handler is buggy. AIUI, if the completion
->> event ever happens, it's actually happening *before* the full (threaded)
->> handler is actually finished, since it occurs in pxa3xx_nand_irq(),
->> before pxa3xx_nand_irq_thread() ever runs. Now, I'm not sure if that
->> causes a real problem in practice, since you used IRQF_ONESHOT, but I
->> would think that's also suspect.
->
-> I think you're very right, this "goto NORMAL_IRQ_EXIT" creates a
-> short-cirtcuit. That makes me think that I should :
->  - add
-> static void pxa3xx_nand_data_finished(struct pxa3xx_nand_info *info)
-> {
->         unsigned int done;
->
->         cmd_done = info->cs ? NDSR_CS1_CMDD : NDSR_CS0_CMDD;
->         nand_writel(info, NDSR, cmd_done);
->         complete(&inf0->cmd_complete);
-> }
->
->  - in pxa3xx_nand_irq_thread(), I should add at the end:
->         pxa3xx_nand_data_finished(info);
->
->  - in pxa3xx_nand_data_dma_irq(), I should add at the end:
->         pxa3xx_nand_data_finished(info);
->
-> Ezequiel, would you have a look at that code snippet and tell me if I'm missing
-> something in the driver's structure ?
->
+Hi Alexander,
 
-Although it seems Brian is right, I'm not so sure about it. As far as
-I can recall, the IRQ sequence is (please correct me if I'm wrong!):
+Am Dienstag, 26. Januar 2016, 15:44:10 schrieb Alexander Kochetkov:
+> In order to make peripherals (rom, i2s0 or spdif) accessible via cpu,
+> hclk_cpubus gate must be opened. Without that all accesses (readl/writel)
+> return wrong data.
 
-1. Write command request (WRCMDREQ), the IRQ handler writes the command.
-2. Read/write data request (RDDREQ | WRDREQ). The IRQ handler fires
-the threaded handler, which does data transfer.
-3. Command done IRQ (CMDD), the IRQ handler completes the completion.
+The clock hierarchy does reflect the hardware structure. What you're 
+introducing are software constraints. Meaning hclk_cpubus is most likely part 
+of the interconnect allowing these peripherals to talk to other parts of the 
+system, but the relevant clocks are _not_ children of hclk_cpubus.
 
-I don't think data request and command done can be found
-simultaneously, so I don't think this is a real issue. Ideas?
+Can you instead try to add hclk_cpubus to the critical clock list please?
 
-Regarding the fixed proposed up there, it seems wrong: the completion
-should be completed only after a command done IRQ is found, and not as
-the result of data transfer being finished.
--- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+
+Thanks
+Heiko
+
+
+> 
+> The patch fixes regression introduced by recent clock code.
+> 
+> Fixes: 78eaf6095cc763c ("clk: rockchip: disable unused clocks")
+> 
+> Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+> 
+> CC: linux-clk at vger.kernel.org
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: linux-rockchip at lists.infradead.org
+> CC: linux-kernel at vger.kernel.org
+> CC: stable at vger.kernel.org # 4.1.x-
+> ---
+>  drivers/clk/rockchip/clk-rk3188.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/clk/rockchip/clk-rk3188.c
+> b/drivers/clk/rockchip/clk-rk3188.c index abb4760..54b88a6 100644
+> --- a/drivers/clk/rockchip/clk-rk3188.c
+> +++ b/drivers/clk/rockchip/clk-rk3188.c
+> @@ -429,10 +429,10 @@ static struct rockchip_clk_branch
+> common_clk_branches[] __initdata = { GATE(0, "aclk_strc_sys", "aclk_cpu",
+> CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(4), 10, GFLAGS),
+> 
+>  	/* hclk_cpu gates */
+> -	GATE(HCLK_ROM, "hclk_rom", "hclk_cpu", 0, RK2928_CLKGATE_CON(5), 6,
+> GFLAGS), -	GATE(HCLK_I2S0, "hclk_i2s0", "hclk_cpu", 0,
+> RK2928_CLKGATE_CON(7), 2, GFLAGS), -	GATE(HCLK_SPDIF, "hclk_spdif",
+> "hclk_cpu", 0, RK2928_CLKGATE_CON(7), 1, GFLAGS), GATE(0, "hclk_cpubus",
+> "hclk_cpu", 0, RK2928_CLKGATE_CON(4), 8, GFLAGS), +	GATE(HCLK_ROM,
+> "hclk_rom", "hclk_cpubus", 0, RK2928_CLKGATE_CON(5), 6, GFLAGS),
+> +	GATE(HCLK_I2S0, "hclk_i2s0", "hclk_cpubus", 0, RK2928_CLKGATE_CON(7), 2,
+> GFLAGS), +	GATE(HCLK_SPDIF, "hclk_spdif", "hclk_cpubus", 0,
+> RK2928_CLKGATE_CON(7), 1, GFLAGS), /* hclk_ahb2apb is part of a clk branch
+> */
+>  	GATE(0, "hclk_vio_bus", "hclk_cpu", 0, RK2928_CLKGATE_CON(6), 12, GFLAGS),
+> GATE(HCLK_LCDC0, "hclk_lcdc0", "hclk_cpu", 0, RK2928_CLKGATE_CON(6), 1,
+> GFLAGS),
