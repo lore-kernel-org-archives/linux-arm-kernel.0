@@ -1,130 +1,70 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 26 Jan 2016 13:12:41 +0000
-Subject: [PATCH 03/10] vfio_iommu_type1: add reserved binding RB tree
- management
+Date: Tue, 26 Jan 2016 13:12:42 +0000
+Subject: [PATCH 04/10] vfio: introduce VFIO_IOVA_RESERVED vfio_dma type
 In-Reply-To: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
 References: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1453813968-2024-4-git-send-email-eric.auger@linaro.org>
+Message-ID: <1453813968-2024-5-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Legacy dma_list is just used to insert the reserved iova region and
-check mapping of reserved iova happens in this window. As opposed to
-other vfio_dma slots, the reserved one is not necessarily mapped.
-
-We will need to track which host physical addresses are mapped to
-reserved IOVA. In that prospect we introduce a new RB tree indexed
-by physical address. This reverse RB tree only is used for reserved
-IOVA bindings. It belongs to a given iommu domain.
-
-It is expected this RB tree will contain very few bindings. Those
-generally correspond to single page mapping one MSI frame (at least
-for ARM, containing the GICv2m frame or ITS GITS_TRANSLATER frame.
+We introduce a vfio_dma type since we will need to discriminate
+legacy vfio_dma's from new reserved ones. Since those latter are
+not mapped at registration, some handlings must be unplugged:
+removal, replay. They will be enhanced later on.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 ---
- drivers/vfio/vfio_iommu_type1.c | 63 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+ drivers/vfio/vfio_iommu_type1.c | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index c5b57e1..32438d9 100644
+index 32438d9..33a9ce4 100644
 --- a/drivers/vfio/vfio_iommu_type1.c
 +++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -56,6 +56,7 @@ MODULE_PARM_DESC(disable_hugepages,
+@@ -53,6 +53,15 @@ module_param_named(disable_hugepages,
+ MODULE_PARM_DESC(disable_hugepages,
+ 		 "Disable VFIO IOMMU support for IOMMU hugepages.");
+ 
++enum vfio_iova_type {
++	VFIO_IOVA_USER = 0, /* standard IOVA used to map user vaddr */
++	/*
++	 * IOVA reserved to map special host physical addresses,
++	 * MSI frames for instance
++	 */
++	VFIO_IOVA_RESERVED,
++};
++
  struct vfio_iommu {
  	struct list_head	domain_list;
  	struct mutex		lock;
-+	/* rb tree indexed by IOVA */
- 	struct rb_root		dma_list;
- 	bool			v2;
- 	bool			nesting;
-@@ -65,6 +66,8 @@ struct vfio_domain {
- 	struct iommu_domain	*domain;
- 	struct list_head	next;
- 	struct list_head	group_list;
-+	/* rb tree indexed by PA, for reserved bindings only */
-+	struct rb_root		reserved_binding_list;
- 	int			prot;		/* IOMMU_CACHE */
- 	bool			fgsp;		/* Fine-grained super pages */
- };
-@@ -77,11 +80,70 @@ struct vfio_dma {
+@@ -78,6 +87,7 @@ struct vfio_dma {
+ 	unsigned long		vaddr;		/* Process virtual addr */
+ 	size_t			size;		/* Map size (bytes) */
  	int			prot;		/* IOMMU_READ/WRITE */
++	enum vfio_iova_type	type;		/* type of IOVA */
  };
  
-+struct vfio_reserved_binding {
-+	struct kref 		kref;
-+	struct rb_node		node;
-+	struct vfio_domain	*domain;
-+	phys_addr_t		addr;
-+	dma_addr_t		iova;
-+	size_t			size;
-+};
-+
- struct vfio_group {
- 	struct iommu_group	*iommu_group;
- 	struct list_head	next;
- };
+ struct vfio_reserved_binding {
+@@ -480,7 +490,8 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
  
-+/* Reserved binding RB-tree manipulation */
-+
-+static struct vfio_reserved_binding *vfio_find_reserved_binding(
-+				    struct vfio_domain *d,
-+				    phys_addr_t start, size_t size)
-+{
-+	struct rb_node *node = d->reserved_binding_list.rb_node;
-+
-+	while (node) {
-+		struct vfio_reserved_binding *binding =
-+			rb_entry(node, struct vfio_reserved_binding, node);
-+
-+		if (start + size <= binding->addr)
-+			node = node->rb_left;
-+		else if (start >= binding->addr + binding->size)
-+			node = node->rb_right;
-+		else
-+			return binding;
-+	}
-+
-+	return NULL;
-+}
-+
-+static void vfio_link_reserved_binding(struct vfio_domain *d,
-+				       struct vfio_reserved_binding *new)
-+{
-+	struct rb_node **link = &d->reserved_binding_list.rb_node;
-+	struct rb_node *parent = NULL;
-+	struct vfio_reserved_binding *binding;
-+
-+	while (*link) {
-+		parent = *link;
-+		binding = rb_entry(parent, struct vfio_reserved_binding, node);
-+
-+		if (new->addr + new->size <= binding->addr)
-+			link = &(*link)->rb_left;
-+		else
-+			link = &(*link)->rb_right;
-+	}
-+
-+	rb_link_node(&new->node, parent, link);
-+	rb_insert_color(&new->node, &d->reserved_binding_list);
-+}
-+
-+static void vfio_unlink_reserved_binding(struct vfio_domain *d,
-+					 struct vfio_reserved_binding *old)
-+{
-+	rb_erase(&old->node, &d->reserved_binding_list);
-+}
-+
- /*
-  * This code handles mapping and unmapping of user data buffers
-  * into DMA'ble space using the IOMMU
-@@ -784,6 +846,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
- 		ret = -ENOMEM;
- 		goto out_free;
- 	}
-+	domain->reserved_binding_list = RB_ROOT;
+ static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
+ {
+-	vfio_unmap_unpin(iommu, dma);
++	if (likely(dma->type != VFIO_IOVA_RESERVED))
++		vfio_unmap_unpin(iommu, dma);
+ 	vfio_unlink_dma(iommu, dma);
+ 	kfree(dma);
+ }
+@@ -756,6 +767,10 @@ static int vfio_iommu_replay(struct vfio_iommu *iommu,
+ 		dma_addr_t iova;
  
- 	group->iommu_group = iommu_group;
+ 		dma = rb_entry(n, struct vfio_dma, node);
++
++		if (unlikely(dma->type == VFIO_IOVA_RESERVED))
++			continue;
++
+ 		iova = dma->iova;
  
+ 		while (iova < dma->iova + dma->size) {
 -- 
 1.9.1
