@@ -1,40 +1,37 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Tue, 26 Jan 2016 16:34:00 +0300
-Subject: [PATCH] clk: rockchip: add hclk_cpubus to the list of rk3188 critical
- clocks
-Message-ID: <1453815240-15354-1-git-send-email-al.kochet@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 26 Jan 2016 13:42:14 +0000
+Subject: [RFC] scripts: make extract-vmlinux support ARM vmlinuz
+In-Reply-To: <1453810236-2082-1-git-send-email-rogershimizu@gmail.com>
+References: <1453810236-2082-1-git-send-email-rogershimizu@gmail.com>
+Message-ID: <20160126134214.GN10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hclk_cpubus needs to keep running because it is needed for devices like
-the rom, i2s0 or spdif to be accessible via cpu. Without that all
-accesses to devices (readl/writel) return wrong data. So add it
-to the list of critical clocks.
+On Tue, Jan 26, 2016 at 09:10:36PM +0900, Roger Shimizu wrote:
+> vmlinuz on ARM seems is not an ELF, so scripts/extract-vmlinux
+> diff --git a/scripts/extract-vmlinux b/scripts/extract-vmlinux
+> index 5061abcc2540..d569eb8c8efe 100755
+> --- a/scripts/extract-vmlinux
+> +++ b/scripts/extract-vmlinux
+> @@ -15,7 +15,15 @@ check_vmlinux()
+>  	# Use readelf to check if it's a valid ELF
+>  	# TODO: find a better to way to check that it's really vmlinux
+>  	#       and not just an elf
+> -	readelf -h $1 > /dev/null 2>&1 || return 1
+> +	case "$2" in
+> +	0|"")
+> +		readelf -h $1 > /dev/null 2>&1 || return 1
+> +		;;
+> +	1|*)
+> +	# For ARCH like ARM, vmlinux is not ELF, so we only do the check
+> +	# when $2 is 0 or NULL
 
-Fixes: 78eaf6095cc763c ("clk: rockchip: disable unused clocks")
+This comment seems to be misleading - I think you mean "vmlinuz" there,
+or maybe "zImage" as the file is named in the kernel build tree to make
+it clear what you're referring to.  "vmlinuz" is the name chosen by
+distro installers.
 
-Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
-
-CC: linux-clk at vger.kernel.org
-CC: linux-arm-kernel at lists.infradead.org
-CC: linux-rockchip at lists.infradead.org
-CC: linux-kernel at vger.kernel.org
-CC: stable at vger.kernel.org # 4.1.x-
----
- drivers/clk/rockchip/clk-rk3188.c |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index abb4760..fe728f8 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -718,6 +718,7 @@ static const char *const rk3188_critical_clocks[] __initconst = {
- 	"hclk_peri",
- 	"pclk_cpu",
- 	"pclk_peri",
-+	"hclk_cpubus"
- };
- 
- static void __init rk3188_common_clk_init(struct device_node *np)
 -- 
-1.7.9.5
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
