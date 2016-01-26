@@ -1,125 +1,121 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 26 Jan 2016 18:10:36 +0100
-Subject: [PATCH v4 09/22] extable: add support for relative extables to search
- and sort routines
+Date: Tue, 26 Jan 2016 18:10:38 +0100
+Subject: [PATCH v4 11/22] arm64: avoid R_AARCH64_ABS64 relocations for Image
+ header fields
 In-Reply-To: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1453828249-14467-10-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1453828249-14467-12-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support to the generic search_extable() and sort_extable()
-implementations for dealing with exception table entries whose fields
-contain relative offsets rather than absolute addresses.
+Unfortunately, the current way of using the linker to emit build time
+constants into the Image header will no longer work once we switch to
+the use of PIE executables. The reason is that such constants are emitted
+into the binary using R_AARCH64_ABS64 relocations, which are resolved at
+runtime, not at build time, and the places targeted by those relocations
+will contain zeroes before that.
 
-Acked-by: Helge Deller <deller@gmx.de>
-Acked-by: Heiko Carstens <heiko.carstens@de.ibm.com>
-Acked-by: H. Peter Anvin <hpa@linux.intel.com>
-Acked-by: Tony Luck <tony.luck@intel.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
+So refactor the endian swapping linker script constant generation code so
+that it emits the upper and lower 32-bit words separately.
+
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- lib/extable.c | 50 ++++++++++++++++----
- 1 file changed, 41 insertions(+), 9 deletions(-)
+ arch/arm64/include/asm/assembler.h | 11 +++++++
+ arch/arm64/kernel/head.S           |  6 ++--
+ arch/arm64/kernel/image.h          | 32 ++++++++++++--------
+ 3 files changed, 33 insertions(+), 16 deletions(-)
 
-diff --git a/lib/extable.c b/lib/extable.c
-index 4cac81ec225e..0be02ad561e9 100644
---- a/lib/extable.c
-+++ b/lib/extable.c
-@@ -14,7 +14,37 @@
- #include <linux/sort.h>
- #include <asm/uaccess.h>
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index d8bfcc1ce923..70f7b9e04598 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -222,4 +222,15 @@ lr	.req	x30		// link register
+ 	.size	__pi_##x, . - x;	\
+ 	ENDPROC(x)
  
-+#ifndef ARCH_HAS_RELATIVE_EXTABLE
-+#define ex_to_insn(x)	((x)->insn)
-+#else
-+static inline unsigned long ex_to_insn(const struct exception_table_entry *x)
-+{
-+	return (unsigned long)&x->insn + x->insn;
-+}
-+#endif
++	/*
++	 * Emit a 64-bit absolute little endian symbol reference in a way that
++	 * ensures that it will be resolved at build time, even when building a
++	 * PIE binary. This requires cooperation from the linker script, which
++	 * must emit the lo32/hi32 halves individually.
++	 */
++	.macro	le64sym, sym
++	.long	\sym\()_lo32
++	.long	\sym\()_hi32
++	.endm
 +
- #ifndef ARCH_HAS_SORT_EXTABLE
-+#ifndef ARCH_HAS_RELATIVE_EXTABLE
-+#define swap_ex		NULL
-+#else
-+static void swap_ex(void *a, void *b, int size)
-+{
-+	struct exception_table_entry *x = a, *y = b, tmp;
-+	int delta = b - a;
-+
-+	tmp = *x;
-+	x->insn = y->insn + delta;
-+	y->insn = tmp.insn - delta;
-+
-+#ifdef swap_ex_entry_fixup
-+	swap_ex_entry_fixup(x, y, tmp, delta);
-+#else
-+	x->fixup = y->fixup + delta;
-+	y->fixup = tmp.fixup - delta;
-+#endif
-+}
-+#endif /* ARCH_HAS_RELATIVE_EXTABLE */
-+
- /*
-  * The exception table needs to be sorted so that the binary
-  * search that we use to find entries in it works properly.
-@@ -26,9 +56,9 @@ static int cmp_ex(const void *a, const void *b)
- 	const struct exception_table_entry *x = a, *y = b;
- 
- 	/* avoid overflow */
--	if (x->insn > y->insn)
-+	if (ex_to_insn(x) > ex_to_insn(y))
- 		return 1;
--	if (x->insn < y->insn)
-+	if (ex_to_insn(x) < ex_to_insn(y))
- 		return -1;
- 	return 0;
- }
-@@ -37,7 +67,7 @@ void sort_extable(struct exception_table_entry *start,
- 		  struct exception_table_entry *finish)
- {
- 	sort(start, finish - start, sizeof(struct exception_table_entry),
--	     cmp_ex, NULL);
-+	     cmp_ex, swap_ex);
- }
- 
- #ifdef CONFIG_MODULES
-@@ -48,13 +78,15 @@ void sort_extable(struct exception_table_entry *start,
- void trim_init_extable(struct module *m)
- {
- 	/*trim the beginning*/
--	while (m->num_exentries && within_module_init(m->extable[0].insn, m)) {
-+	while (m->num_exentries &&
-+	       within_module_init(ex_to_insn(&m->extable[0]), m)) {
- 		m->extable++;
- 		m->num_exentries--;
- 	}
- 	/*trim the end*/
- 	while (m->num_exentries &&
--		within_module_init(m->extable[m->num_exentries-1].insn, m))
-+	       within_module_init(ex_to_insn(&m->extable[m->num_exentries - 1]),
-+				  m))
- 		m->num_exentries--;
- }
- #endif /* CONFIG_MODULES */
-@@ -81,13 +113,13 @@ search_extable(const struct exception_table_entry *first,
- 		 * careful, the distance between value and insn
- 		 * can be larger than MAX_LONG:
- 		 */
--		if (mid->insn < value)
-+		if (ex_to_insn(mid) < value)
- 			first = mid + 1;
--		else if (mid->insn > value)
-+		else if (ex_to_insn(mid) > value)
- 			last = mid - 1;
- 		else
- 			return mid;
--        }
--        return NULL;
-+	}
-+	return NULL;
- }
+ #endif	/* __ASM_ASSEMBLER_H */
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 85181cb60f46..2a39d4ab02bf 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -83,9 +83,9 @@ efi_head:
+ 	b	stext				// branch to kernel start, magic
+ 	.long	0				// reserved
  #endif
+-	.quad	_kernel_offset_le		// Image load offset from start of RAM, little-endian
+-	.quad	_kernel_size_le			// Effective size of kernel image, little-endian
+-	.quad	_kernel_flags_le		// Informative flags, little-endian
++	le64sym	_kernel_offset_le		// Image load offset from start of RAM, little-endian
++	le64sym	_kernel_size_le			// Effective size of kernel image, little-endian
++	le64sym	_kernel_flags_le		// Informative flags, little-endian
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
+diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+index bc2abb8b1599..b64c9b0a4492 100644
+--- a/arch/arm64/kernel/image.h
++++ b/arch/arm64/kernel/image.h
+@@ -26,21 +26,27 @@
+  * There aren't any ELF relocations we can use to endian-swap values known only
+  * at link time (e.g. the subtraction of two symbol addresses), so we must get
+  * the linker to endian-swap certain values before emitting them.
++ *
++ * Note that, in order for this to work when building the ELF64 PIE executable
++ * (for KASLR), these values should not be referenced via R_AARCH64_ABS64
++ * relocations, since these are fixed up at runtime rather than at build time
++ * when PIE is in effect. So we need to split them up in 32-bit high and low
++ * words.
+  */
+ #ifdef CONFIG_CPU_BIG_ENDIAN
+-#define DATA_LE64(data)					\
+-	((((data) & 0x00000000000000ff) << 56) |	\
+-	 (((data) & 0x000000000000ff00) << 40) |	\
+-	 (((data) & 0x0000000000ff0000) << 24) |	\
+-	 (((data) & 0x00000000ff000000) << 8)  |	\
+-	 (((data) & 0x000000ff00000000) >> 8)  |	\
+-	 (((data) & 0x0000ff0000000000) >> 24) |	\
+-	 (((data) & 0x00ff000000000000) >> 40) |	\
+-	 (((data) & 0xff00000000000000) >> 56))
++#define DATA_LE32(data)				\
++	((((data) & 0x000000ff) << 24) |	\
++	 (((data) & 0x0000ff00) << 8)  |	\
++	 (((data) & 0x00ff0000) >> 8)  |	\
++	 (((data) & 0xff000000) >> 24))
+ #else
+-#define DATA_LE64(data) ((data) & 0xffffffffffffffff)
++#define DATA_LE32(data) ((data) & 0xffffffff)
+ #endif
+ 
++#define DEFINE_IMAGE_LE64(sym, data)				\
++	sym##_lo32 = DATA_LE32((data) & 0xffffffff);		\
++	sym##_hi32 = DATA_LE32((data) >> 32)
++
+ #ifdef CONFIG_CPU_BIG_ENDIAN
+ #define __HEAD_FLAG_BE	1
+ #else
+@@ -58,9 +64,9 @@
+  * endian swapped in head.S, all are done here for consistency.
+  */
+ #define HEAD_SYMBOLS						\
+-	_kernel_size_le		= DATA_LE64(_end - _text);	\
+-	_kernel_offset_le	= DATA_LE64(TEXT_OFFSET);	\
+-	_kernel_flags_le	= DATA_LE64(__HEAD_FLAGS);
++	DEFINE_IMAGE_LE64(_kernel_size_le, _end - _text);	\
++	DEFINE_IMAGE_LE64(_kernel_offset_le, TEXT_OFFSET);	\
++	DEFINE_IMAGE_LE64(_kernel_flags_le, __HEAD_FLAGS);
+ 
+ #ifdef CONFIG_EFI
+ 
 -- 
 2.5.0
