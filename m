@@ -1,43 +1,103 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Jan 2016 09:25:28 -0800
-Subject: N900 sleep mode (in 4.5-rc0, if that matters)
-In-Reply-To: <20160126140010.GA29723@amd>
-References: <20160123121022.GB12497@amd> <20160125163332.GT19432@atomide.com>
- <20160126140010.GA29723@amd>
-Message-ID: <20160126172527.GY3500@atomide.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 26 Jan 2016 18:30:01 +0100
+Subject: [PATCH V4 16/16] ARM64: tegra: select PM_GENERIC_DOMAINS
+In-Reply-To: <4244898.5om31fQ1mz@wuerfel>
+References: <1449241037-22193-1-git-send-email-jonathanh@nvidia.com>
+ <11122786.kKumQ3Dhls@wuerfel> <20160114102924.GA22340@ulmo>
+ <4244898.5om31fQ1mz@wuerfel>
+Message-ID: <20160126173001.GA11062@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [160126 06:01]:
+On Thu, Jan 14, 2016 at 12:11:39PM +0100, Arnd Bergmann wrote:
+> On Thursday 14 January 2016 11:29:24 Thierry Reding wrote:
+> > 
+> > It just occurred to me that none of these options really make much of a
+> > difference. As Jon mentioned once we merge this series a lot of features
+> > on Tegra will start to rely on PM_GENERIC_DOMAINS and hence PM. So if we
+> > do want to build a kernel with a maximum of Tegra features enabled (and
+> > I think a multi_v7_defconfig should include that) we'll end up with a PM
+> > dependency anyway, whether forced via select or implied via depends on.
+> > 
+> > I'm beginning to wonder if PM really should be an option these days. The
+> > disadvantages of making it optional do outweigh the advantages in my
+> > opinion. I'm not saying that, in general, it's totally useless to build
+> > a kernel that has no PM support, but for the more specific case where
+> > you would want to enable multi-platform support I don't think there's
+> > much practical advantage in allowing !PM. One of the most common build
+> > warnings are triggered because of this option. Also multi-platform
+> > kernels are really big already, so much so that I doubt it would make a
+> > significant difference if we unconditionally built PM support. Also the
+> > chances are that we'll be seeing more and more SoCs support PM and rely
+> > on it, much like Tegra would with the addition of this series.
+> > 
+> > I imagine that we could save ourselves a lot of headaches by simply
+> > enabling PM by default, whether that be via the PM Kconfig option or by
+> > selecting it from ARCH_TEGRA and any other architectures that may come
+> > to rely on it. Doing so would also reduce the amount of test coverage
+> > that we need to do, both at compile- and runtime.
 > 
-> It seems like I have rather lot of blocking bits:
+> I think this needs some investigation. As a general policy, we should
+> not grow the kernel image size when moving from a traditional ARM
+> platform to an ARCH_MULTIPLATFORM one.
+
+If we make ARCH_TEGRA select PM, then moving to a multi-platform kernel
+isn't automatically going to increase the image size. The image size is
+only going to increase if you select ARCH_TEGRA to be part of the multi
+platform image.
+
+> This is somewhat contradicted by how we already require CONFIG_OF
+> to be set for multiplatform kernels, and that adds around 80kb
+> to the image size.
+
+Yeah, there's also a fair amount of per-SoC code that can't be built as
+a module and which will be included in multi-platform images when the
+corresponding ARCH_* symbol is enabled. But I think that's inevitable
+given the purpose of multi-platform images.
+
+> Looking at just the defconfig files, these are the ones that currently
+> do not set CONFIG_PM:
 > 
-> 00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
-
-Looks like most of these are for GPIO banks, that's OK those get saved
-and restored in the idle loop.
-
-Here bit 18 UART4 is a mystery though.. It's uart4 on 36xx but reserved
-on 34xx. I do have that too on my n900, but it's hitting off mode with
-v4.4.
-
-> ffdffe8d 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00200072
-> 0000000d 48004a28 (fa004a28) cm_idlest3_core
+> build/acs5k_defconfig/.config:# CONFIG_PM is not set
+> build/acs5k_tiny_defconfig/.config:# CONFIG_PM is not set
+> build/axm55xx_defconfig/.config:# CONFIG_PM is not set
+> build/bcm2835_defconfig/.config:# CONFIG_PM is not set
+> build/clps711x_defconfig/.config:# CONFIG_PM is not set
+> build/ebsa110_defconfig/.config:# CONFIG_PM is not set
+> build/footbridge_defconfig/.config:# CONFIG_PM is not set
+> build/ks8695_defconfig/.config:# CONFIG_PM is not set
+> build/netwinder_defconfig/.config:# CONFIG_PM is not set
+> build/rpc_defconfig/.config:# CONFIG_PM is not set
+> build/u300_defconfig/.config:# CONFIG_PM is not set
+> build/vf610m4_defconfig/.config:# CONFIG_PM is not set
 > 
-> cm_idlest1_core changes periodicall often, to 00218072. The rest seems
-> constant.
+> The only ones among these are are actually multiplatform are axm55xx,
+> bcm2835, and u300. I see no downsides of force-enabling PM for
+> any of those, so we could decide to 'select PM' from
+> CONFIG_ARCH_MULTIPLATFORM.
 
-For cm_idlest1_core 42 is the answer.. Here you have bits 4 and 5
-blocking which is for OTG and it's PHY. That's a known issue with
-musb and setting pm_runtime_irq_safe() on the MUSB parent.
+ARCH_MULTIPLATFORM selecting PM would include PM unconditionally, even
+if none of the selected platforms require it. In my opinion an explicit
+select from platforms that require PM would be cleaner. It could be that
+once we start doing that for a single platform others might follow. When
+this becomes common place it might be worth moving it up a level, but I
+think explicit dependencies would be better for starters.
 
-If you do rmmod omap2430 and phy-twl4030usb chances are the LEDs will
-start going off assuming the McSPI bit goes low with WLAN idling.
+> The one usecase where we may want to have a modern machine without
+> CONFIG_PM is a minimal MACH_VIRT kernel for running in a virtual
+> machine or QEMU with minimal memory requirements, e.g. trying to
+> squeeze a large number of guests on a single host system.
 
-Looks like we have some regression with v4.5-rc1 where n900 is not
-hitting deeper idle states though. I'll run git bisect between
-v4.4..v4.5-rc1.
+Right, but those won't be multi-platform kernels, right? If you know
+exactly that the kernel will run in a virtual machine and that you want
+to run lots of virtual machines, you probably want to build a custom
+kernel.
 
-Regards,
-
-Tony
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160126/121b8c7c/attachment-0001.sig>
