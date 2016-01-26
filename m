@@ -1,106 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Jan 2016 17:51:11 +0100
-Subject: [PATCH 6/7] [media] em28xx: add MEDIA_TUNER dependency
-In-Reply-To: <20160126143644.1d104040@recife.lan>
-References: <1453817424-3080054-1-git-send-email-arnd@arndb.de>
- <6929423.KuNZKsBgHV@wuerfel> <20160126143644.1d104040@recife.lan>
-Message-ID: <5775609.WPlM7VCgVr@wuerfel>
+From: boqun.feng@gmail.com (Boqun Feng)
+Date: Wed, 27 Jan 2016 00:52:07 +0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160118154629.GB3818@linux.vnet.ibm.com>
+References: <20160114204827.GE3818@linux.vnet.ibm.com>
+ <20160118081929.GA30420@gondor.apana.org.au>
+ <20160118154629.GB3818@linux.vnet.ibm.com>
+Message-ID: <20160126165207.GB6029@fixme-laptop.cn.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 January 2016 14:36:44 Mauro Carvalho Chehab wrote:
-> Em Tue, 26 Jan 2016 16:53:38 +0100
-> Arnd Bergmann <arnd@arndb.de> escreveu:
-> > On Tuesday 26 January 2016 12:33:08 Mauro Carvalho Chehab wrote:
-> > > Em Tue, 26 Jan 2016 15:10:00 +0100
-> > > Advanced users may, instead, manually select the media tuner that his
-> > > hardware needs. In such case, it doesn't matter if MEDIA_TUNER
-> > > is enabled or not.
+Hi Paul,
+
+On Mon, Jan 18, 2016 at 07:46:29AM -0800, Paul E. McKenney wrote:
+> On Mon, Jan 18, 2016 at 04:19:29PM +0800, Herbert Xu wrote:
+> > Paul E. McKenney <paulmck@linux.vnet.ibm.com> wrote:
+> > >
+> > > You could use SYNC_ACQUIRE() to implement read_barrier_depends() and
+> > > smp_read_barrier_depends(), but SYNC_RMB probably does not suffice.
+> > > The reason for this is that smp_read_barrier_depends() must order the
+> > > pointer load against any subsequent read or write through a dereference
+> > > of that pointer.  For example:
 > > > 
-> > > As this is due to a Kconfig limitation, I've no idea how to fix or get
-> > > hid of it, but making em28xx dependent of MEDIA_TUNER is wrong.  
+> > >        p = READ_ONCE(gp);
+> > >        smp_rmb();
+> > >        r1 = p->a; /* ordered by smp_rmb(). */
+> > >        p->b = 42; /* NOT ordered by smp_rmb(), BUG!!! */
+> > >        r2 = x; /* ordered by smp_rmb(), but doesn't need to be. */
+> > > 
+> > > In contrast:
+> > > 
+> > >        p = READ_ONCE(gp);
+> > >        smp_read_barrier_depends();
+> > >        r1 = p->a; /* ordered by smp_read_barrier_depends(). */
+> > >        p->b = 42; /* ordered by smp_read_barrier_depends(). */
+> > >        r2 = x; /* not ordered by smp_read_barrier_depends(), which is OK. */
+> > > 
+> > > Again, if your hardware maintains local ordering for address
+> > > and data dependencies, you can have read_barrier_depends() and
+> > > smp_read_barrier_depends() be no-ops like they are for most
+> > > architectures.
+> > > 
+> > > Does that help?
 > > 
-> > I don't understand what limitation you see here. 
+> > This is crazy! smp_rmb started out being strictly stronger than
+> > smp_read_barrier_depends, when did this stop being the case?
 > 
-> Before MEDIA_TUNER, what we had was something like:
+> Hello, Herbert!
 > 
-> 	config MEDIA_driver_foo
-> 	select VIDEO_tuner_bar if MEDIA_SUBDRV_AUTOSELECT
-> 	select MEDIA_frontend_foobar if MEDIA_SUBDRV_AUTOSELECT
-> 	...
+> It is true that most Linux kernel code relies only on the read-read
+> properties of dependencies, but the read-write properties are useful.
+> Admittedly relatively rarely, but useful.
 > 
-> However, as different I2C drivers had different dependencies, this
-> used to cause lots of troubles. So, one of the Kbuild maintainers
-> came out with the idea of converting from select into depends on.
-> The MEDIA_TUNER is just an ancillary invisible option to make it
-> work at the tuner's side, as usually what we want is to have all
-> tuners selected, as we don't have a one to one mapping about what
-> driver supports what tuner (nor we wanted to do it, as this would
-> mean lots of work for not much gain).
-
-Ok
-
-> > The definition
-> > of the VIDEO_TUNER symbol is an empty 'tristate' symbol with a
-> > dependency on MEDIA_TUNER to ensure we get a warning if MEDIA_TUNER
-> > is not enabled, and to ensure it is set to 'm' if MEDIA_TUNER=m and
-> > a "bool" driver selects VIDEO_TUNER.
-> 
-> No, VIDEO_TUNER is there because we wanted to be able to use select
-> to enable V4L2 tuner core support and let people to manually select
-> the needed I2C devices with MEDIA_SUBDRV_AUTOSELECT unselected.
-
-I meant what the dependency is there for, not the symbol itself.
-It's clear what the symbol does.
-
-> > diff --git a/drivers/media/v4l2-core/Kconfig b/drivers/media/v4l2-core/Kconfig
-> > index 9beece00869b..1050bdf1848f 100644
-> > --- a/drivers/media/v4l2-core/Kconfig
-> > +++ b/drivers/media/v4l2-core/Kconfig
-> > @@ -37,7 +37,11 @@ config VIDEO_PCI_SKELETON
-> >  # Used by drivers that need tuner.ko
-> >  config VIDEO_TUNER
-> >  	tristate
-> > -	depends on MEDIA_TUNER
-> > +
-> > +config VIDEO_TUNER_MODULE
-> > +	tristate # must not be built-in if MEDIA_TUNER=m because of I2C
-> > +	default y if VIDEO_TUNER=y || MEDIA_TUNER=y
-> > +	default m if VIDEO_TUNER=m
-> 
-> Doesn't need to worry about that, because all drivers that select VIDEO_TUNER
-> depend on I2C:
+> The better comparison for smp_read_barrier_depends(), especially in
+> its rcu_dereference*() form, is smp_load_acquire().
 > 
 
-Ok, then the dependency does not do anything other than generate a
-warning.
+Confused..
 
-> diff --git a/drivers/media/v4l2-core/Kconfig b/drivers/media/v4l2-core/Kconfig
-> index 9beece00869b..b30e1c879a57 100644
-> --- a/drivers/media/v4l2-core/Kconfig
-> +++ b/drivers/media/v4l2-core/Kconfig
-> @@ -37,7 +37,7 @@ config VIDEO_PCI_SKELETON
->  # Used by drivers that need tuner.ko
->  config VIDEO_TUNER
->  	tristate
-> -	depends on MEDIA_TUNER
-> +	default MEDIA_TUNER
->  
->  # Used by drivers that need v4l2-mem2mem.ko
->  config V4L2_MEM2MEM_DEV
+I recall that last time you and Linus came into a conclusion that even
+on Alpha, a barrier for read->write with data dependency is unnecessary:
 
-So this means it's now enabled if MEDIA_TUNER is enabled, whereas
-before it was only enabled when explicitly selected. That sounds
-like a useful change, but it also seems unrelated to the warning
-fix, and should probably be a separate change, while for now
-we can simply remove the 'depends on' line without any replacement.
+http://article.gmane.org/gmane.linux.kernel/2077661
 
-> Ok, if we'll have platform drivers for analog TV using the I2C bus
-> at directly in SoC, then your solution is better, but the tuner core
-> driver may not be the best way of doing it. So, for now, I would use
-> the simpler version.
+And in an earlier mail of that thread, Linus made his point that
+smp_read_barrier_depends() should only be used to order read->read.
 
-Ok. Do you want me to submit a new version or do you prefer to write
-one yourself? With or without the 'default'?
+So right now, are we going to extend the semantics of
+smp_read_barrier_depends()? Can we just make smp_read_barrier_depends()
+still only work for read->read, and assume all the architectures won't
+reorder read->write with data dependency, so that the code above having
+a smp_rmb() also works?
 
-	Arnd
+Regards,
+Boqun
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/a33a9dab/attachment.sig>
