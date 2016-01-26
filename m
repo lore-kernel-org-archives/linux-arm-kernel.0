@@ -1,252 +1,47 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 26 Jan 2016 14:38:25 +0200
-Subject: [PATCH] acpi: implement Generic Event Device
-In-Reply-To: <1453757387-28154-1-git-send-email-okaya@codeaurora.org>
-References: <1453757387-28154-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <CAHp75Ve98Z3xOxSQMG5ncpGggj+jmBmnWvw0ROXwK=s6X9N_QQ@mail.gmail.com>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Tue, 26 Jan 2016 15:44:10 +0300
+Subject: [PATCH] clk: rockchip: Reparent hclk_rom,
+ hclk_i2s0 and hclk_spdif to hclk_cpubus on RK3066/RK3188
+Message-ID: <1453812250-11819-1-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 11:29 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+In order to make peripherals (rom, i2s0 or spdif) accessible via cpu,
+hclk_cpubus gate must be opened. Without that all accesses (readl/writel)
+return wrong data.
 
-Few comments below.
+The patch fixes regression introduced by recent clock code.
 
-> Generic Event Device described in ACPI 6.1 allows platforms to handle
-> platform interrupts in ACPI ASL statements. It borrows constructs like
-> _EVT from GPIO events.
+Fixes: 78eaf6095cc763c ("clk: rockchip: disable unused clocks")
 
-Can it share code with gpiolib-acpi.c ? I see some duplication.
+Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
 
-> All interrupts are listed in _CRS and the handler
-> is written in _EVT method. Here is an example.
+CC: linux-clk at vger.kernel.org
+CC: linux-arm-kernel at lists.infradead.org
+CC: linux-rockchip at lists.infradead.org
+CC: linux-kernel at vger.kernel.org
+CC: stable at vger.kernel.org # 4.1.x-
+---
+ drivers/clk/rockchip/clk-rk3188.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-
->
-> Device (GED0)
-> {
->
->         Name (_HID, "ACPI0013")
->         Name (_UID, 0)
->         Name(_CRS, ResourceTemplate ()
->         {
->                 Interrupt(ResourceConsumer, Edge, ActiveHigh, Shared, , , )
->                  {123}
->         })
->
->         Method (_EVT, 1) {
->                 if (Lequal(123, Arg0))
->                 {
->                 }
->         }
-> }
->
-> Wake capability has not been implemented yet.
->
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/acpi/Makefile |   1 +
->  drivers/acpi/evged.c  | 162 ++++++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 163 insertions(+)
->  create mode 100644 drivers/acpi/evged.c
->
-> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> index b5e7cd8..4dbb732 100644
-> --- a/drivers/acpi/Makefile
-> +++ b/drivers/acpi/Makefile
-> @@ -46,6 +46,7 @@ acpi-y                                += acpi_pnp.o
->  acpi-y                         += int340x_thermal.o
->  acpi-y                         += power.o
->  acpi-y                         += event.o
-> +acpi-$(CONFIG_ACPI_REDUCED_HARDWARE_ONLY) += evged.o
->  acpi-y                         += sysfs.o
->  acpi-y                         += property.o
->  acpi-$(CONFIG_X86)             += acpi_cmos_rtc.o
-> diff --git a/drivers/acpi/evged.c b/drivers/acpi/evged.c
-> new file mode 100644
-> index 0000000..a904676
-> --- /dev/null
-> +++ b/drivers/acpi/evged.c
-> @@ -0,0 +1,162 @@
-> +/*
-> + * Generic Event Device for ACPI.
-> + *
-> + * Copyright (c) 2016, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * Generic Event Device allows platforms to handle
-> + * interrupts in ACPI ASL statements. It follows very similar
-> + * _EVT method approach from GPIO events.
-> + * All interrupts are listed in _CRS and the handler
-> + * is written in _EVT method. Here is an example.
-
-Can it be wider on screen?
-
-> + *
-> + * Device (GED0)
-> + * {
-> + *
-> + *     Name (_HID, "ACPI0013")
-> + *     Name (_UID, 0)
-> + *     Method (_CRS, 0x0, Serialized)
-> + *     {
-> + *             Name (RBUF, ResourceTemplate ()
-> + *             {
-> + *             Interrupt(ResourceConsumer, Edge, ActiveHigh, Shared, , , )
-> + *             {123}
-> + *             }
-> + *     })
-> + *
-> + *     Method (_EVT, 1) {
-> + *             if (Lequal(123, Arg0))
-> + *             {
-> + *             }
-> + *     }
-> + * }
-> + *
-> + */
-> +
-> +#include <linux/err.h>
-> +#include <linux/init.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/list.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/acpi.h>
-> +
-> +#define MODULE_NAME    "acpi-ged"
-> +
-> +struct acpi_ged_event {
-> +       struct list_head node;
-> +       struct device *dev;
-> +       unsigned int gsi;
-> +       unsigned int irq;
-> +       acpi_handle handle;
-> +};
-> +
-> +static irqreturn_t acpi_ged_irq_handler(int irq, void *data)
-> +{
-> +       struct acpi_ged_event *event = data;
-> +       acpi_status acpi_ret;
-> +
-> +       acpi_ret = acpi_execute_simple_method(event->handle, NULL, event->gsi);
-> +       if (ACPI_FAILURE(acpi_ret))
-> +               dev_err_once(event->dev, "IRQ method execution failed\n");
-> +
-> +       return IRQ_HANDLED;
-> +}
-> +
-> +static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
-> +                                             void *context)
-> +{
-> +       struct acpi_ged_event *event;
-> +       unsigned int irq;
-> +       unsigned int gsi;
-> +       unsigned int irqflags = IRQF_ONESHOT;
-> +       struct device *dev = context;
-> +       acpi_handle handle = ACPI_HANDLE(dev);
-> +       acpi_handle evt_handle;
-> +       struct resource r;
-> +       struct acpi_resource_irq *p = &ares->data.irq;
-> +       struct acpi_resource_extended_irq *pext = &ares->data.extended_irq;
-> +
-> +       if (ares->type == ACPI_RESOURCE_TYPE_END_TAG)
-> +               return AE_OK;
-> +
-> +       if (!acpi_dev_resource_interrupt(ares, 0, &r)) {
-> +               dev_err(dev, "unable to parse IRQ resource\n");
-> +               return AE_ERROR;
-> +       }
-> +       if (ares->type == ACPI_RESOURCE_TYPE_IRQ)
-> +               gsi = p->interrupts[0];
-> +       else
-> +               gsi = pext->interrupts[0];
-> +
-> +       irq = r.start;
-> +
-> +       if (ACPI_FAILURE(acpi_get_handle(handle, "_EVT", &evt_handle))) {
-> +               dev_err(dev, "cannot locate _EVT method\n");
-> +               return AE_ERROR;
-> +       }
-> +
-> +       dev_info(dev, "GED listening GSI %u @ IRQ %u\n", gsi, irq);
-
-
-
-> +
-> +       event = devm_kzalloc(dev, sizeof(*event), GFP_KERNEL);
-> +       if (!event)
-> +               return AE_ERROR;
-> +
-> +       event->gsi = gsi;
-> +       event->dev = dev;
-> +       event->irq = irq;
-> +       event->handle = evt_handle;
-> +
-> +       if (r.flags & IORESOURCE_IRQ_SHAREABLE)
-> +               irqflags |= IRQF_SHARED;
-> +
-> +       if (devm_request_threaded_irq(dev, irq, NULL, acpi_ged_irq_handler,
-> +                                     irqflags, "ACPI:Ged", event)) {
-> +               dev_err(dev, "failed to setup event handler for irq %u\n", irq);
-> +               return AE_ERROR;
-> +       }
-
-The above part is clearly belongs to ged_probe().
-
-> +
-> +       return AE_OK;
-> +}
-> +
-> +static int ged_probe(struct platform_device *pdev)
-> +{
-> +       acpi_status acpi_ret;
-> +
-> +       acpi_ret = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), "_CRS",
-> +                                      acpi_ged_request_interrupt, &pdev->dev);
-> +       if (ACPI_FAILURE(acpi_ret)) {
-> +               dev_err(&pdev->dev, "unable to parse the _CRS record\n");
-> +               return -EINVAL;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct acpi_device_id ged_acpi_ids[] = {
-> +       {"ACPI0013"},
-> +       {},
-> +};
-> +
-> +static struct platform_driver ged_driver = {
-> +       .probe = ged_probe,
-> +       .driver = {
-> +               .name = MODULE_NAME,
-
-> +               .owner = THIS_MODULE,
-
-Do you need this one?
-
-
-> +               .acpi_match_table = ACPI_PTR(ged_acpi_ids),
-> +       },
-> +};
-> +
-> +static int __init ged_init(void)
-> +{
-> +       return platform_driver_register(&ged_driver);
-> +}
-> +
-
-> +subsys_initcall(ged_init);
-
-Any specific reason to have on that level?
-
+diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
+index abb4760..54b88a6 100644
+--- a/drivers/clk/rockchip/clk-rk3188.c
++++ b/drivers/clk/rockchip/clk-rk3188.c
+@@ -429,10 +429,10 @@ static struct rockchip_clk_branch common_clk_branches[] __initdata = {
+ 	GATE(0, "aclk_strc_sys", "aclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(4), 10, GFLAGS),
+ 
+ 	/* hclk_cpu gates */
+-	GATE(HCLK_ROM, "hclk_rom", "hclk_cpu", 0, RK2928_CLKGATE_CON(5), 6, GFLAGS),
+-	GATE(HCLK_I2S0, "hclk_i2s0", "hclk_cpu", 0, RK2928_CLKGATE_CON(7), 2, GFLAGS),
+-	GATE(HCLK_SPDIF, "hclk_spdif", "hclk_cpu", 0, RK2928_CLKGATE_CON(7), 1, GFLAGS),
+ 	GATE(0, "hclk_cpubus", "hclk_cpu", 0, RK2928_CLKGATE_CON(4), 8, GFLAGS),
++	GATE(HCLK_ROM, "hclk_rom", "hclk_cpubus", 0, RK2928_CLKGATE_CON(5), 6, GFLAGS),
++	GATE(HCLK_I2S0, "hclk_i2s0", "hclk_cpubus", 0, RK2928_CLKGATE_CON(7), 2, GFLAGS),
++	GATE(HCLK_SPDIF, "hclk_spdif", "hclk_cpubus", 0, RK2928_CLKGATE_CON(7), 1, GFLAGS),
+ 	/* hclk_ahb2apb is part of a clk branch */
+ 	GATE(0, "hclk_vio_bus", "hclk_cpu", 0, RK2928_CLKGATE_CON(6), 12, GFLAGS),
+ 	GATE(HCLK_LCDC0, "hclk_lcdc0", "hclk_cpu", 0, RK2928_CLKGATE_CON(6), 1, GFLAGS),
 -- 
-With Best Regards,
-Andy Shevchenko
+1.7.9.5
