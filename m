@@ -1,81 +1,31 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 26 Jan 2016 11:15:15 +0100
-Subject: [PATCH v3] ARM: dts: kirkwood: add device tree for buffalo
- linkstation ls-qvl
-In-Reply-To: <CAEQ9gEk0Z-Zgm1aqVQaYRpWVp35VcC2sVAH9Qz+1kCMHHYLWkw@mail.gmail.com>
- (Roger Shimizu's message of "Tue, 26 Jan 2016 19:06:16 +0900")
-References: <1453652964-21489-1-git-send-email-rogershimizu@gmail.com>
- <1453740250-16765-1-git-send-email-rogershimizu@gmail.com>
- <87zivtd21i.fsf@free-electrons.com>
- <CAEQ9gEnqgi01E0nE3Yw_8gTGe-_1+T3=HgPKNAcjDD+c2AP=bw@mail.gmail.com>
- <87vb6hd0hh.fsf@free-electrons.com>
- <CAEQ9gEk0Z-Zgm1aqVQaYRpWVp35VcC2sVAH9Qz+1kCMHHYLWkw@mail.gmail.com>
-Message-ID: <87a8nsd4uk.fsf@free-electrons.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 26 Jan 2016 11:15:43 +0100
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160126061211.GK4503@linux.vnet.ibm.com>
+References: <5696CF08.8080700@imgtec.com> <20160114121449.GC15828@arm.com>
+ <5697F6D2.60409@imgtec.com>
+ <20160114203430.GC3818@linux.vnet.ibm.com>
+ <56980C91.1010403@imgtec.com>
+ <20160114212913.GF3818@linux.vnet.ibm.com>
+ <20160115085554.GF3421@worktop>
+ <20160115173912.GU3818@linux.vnet.ibm.com>
+ <20160125180234.GA26732@arm.com>
+ <20160126061211.GK4503@linux.vnet.ibm.com>
+Message-ID: <20160126101543.GC6357@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
- 
- On mar., janv. 26 2016, Roger Shimizu <rogershimizu@gmail.com> wrote:
+On Mon, Jan 25, 2016 at 10:12:11PM -0800, Paul E. McKenney wrote:
+> On Mon, Jan 25, 2016 at 06:02:34PM +0000, Will Deacon wrote:
 
-> [lists seems rejected my previous email, so re-send]
-I think tt was rejected because you changed the topic
+> > Thanks for having a go at this. I tried defining something axiomatically,
+> > but got stuck pretty quickly. In my scheme, I used "data-directed
+> > transitivity" instead of "local transitivity", since the latter seems to
+> > be a bit of a misnomer.
+> 
+> I figured that "local" meant local to the CPUs participating in the
+> release-acquire chain.  As opposed to smp_mb() chains where the ordering
+> is "global" as in visible to all CPUs, whether on the chain or not.
+> Does that help?
 
->
-> Dear Gregory,
->
-> On Tue, Jan 26, 2016 at 2:37 AM, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
->> Hi Roger,
->>
->>  On lun., janv. 25 2016, Roger Shimizu <rogershimizu@gmail.com> wrote:
->>
->>> On Tue, Jan 26, 2016 at 2:03 AM, Gregory CLEMENT
->>> <gregory.clement@free-electrons.com> wrote:
->>>>
->>>> Thanks for all your work, I was about to apply it but as I already
->>>> applied your previous patches I didn't manage to do it.
->>>>
->>>>
->>>> Would you mind rebasing your patch on the mvebu/dt branch that I have
->>>> just push on git://git.infradead.org/linux-mvebu.git ?
->
-> I find you missed one of my patches on "mvebu/dt" branch:
->
->>   - [patch 7/7] split dts for lswvl [0]
-
-Indeed I didn't applied it.
-
->
-> [0]: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/400937.html
->
-> For that ls-wvl patch, "git am <patch 07>" would fail,
-> but after "patch -p1 < .git/rebase-apply/patch", and then "git add -A;
-> git am --continue", that patch can be applied.
-> After that, I can successfully apply this ls-qvl patch.
->
-> I'm not sure whether you use "git am" to apply patches.
-> Maybe you use other similar ways. Please try and let me know if still
-> need my rebase.
-
-Usually I applied the patch directly from emacs, which call a kind of
-git am. However your patches did not apply directly, I had to reduce the
-context by using git am -C2. I did it for the patch 5 and 6, and I
-forgot ot do it for patch 7. Now it is done and indeed this patch
-applied well ontop of it.
-
-Thanks!
-
-> Thank you!
->
-> Cheers,
-> Roger
-> -- 
-> Roger Shimizu, GMT +9 Tokyo
-> PGP/GPG: 17B3ACB1
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+That is in fact how I read and understood it.
