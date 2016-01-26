@@ -1,56 +1,94 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Wed, 27 Jan 2016 08:28:36 +0900
-Subject: [RFC] scripts: make extract-vmlinux support ARM vmlinuz
-In-Reply-To: <20160126134214.GN10826@n2100.arm.linux.org.uk>
-References: <1453810236-2082-1-git-send-email-rogershimizu@gmail.com>
- <20160126134214.GN10826@n2100.arm.linux.org.uk>
-Message-ID: <CAEQ9gEmKO9wvp8DMBO8f4dLtxz2DQU-K-am5o0kcYn6uTKF0qw@mail.gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 26 Jan 2016 15:29:21 -0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <CA+55aFwxTJd+uibcxtZD3tGnj_n=LMwyAa0s8qyx_OF0OMWQkA@mail.gmail.com>
+References: <20160114204827.GE3818@linux.vnet.ibm.com>
+ <20160118081929.GA30420@gondor.apana.org.au>
+ <20160118154629.GB3818@linux.vnet.ibm.com>
+ <20160126165207.GB6029@fixme-laptop.cn.ibm.com>
+ <20160126172227.GG6357@twins.programming.kicks-ass.net>
+ <CA+55aFzcC6C8imPs5vk4yH1Y2YHjnAdFM9HCkVs04COxuDQH6w@mail.gmail.com>
+ <20160126201037.GU4503@linux.vnet.ibm.com>
+ <CA+55aFxjb+2rs2wVHtiSCcOzgMrE8H=yDeNcjyujPQudDCtLgw@mail.gmail.com>
+ <CA+55aFwxTJd+uibcxtZD3tGnj_n=LMwyAa0s8qyx_OF0OMWQkA@mail.gmail.com>
+Message-ID: <20160126232921.GY4503@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 10:42 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jan 26, 2016 at 09:10:36PM +0900, Roger Shimizu wrote:
->> vmlinuz on ARM seems is not an ELF, so scripts/extract-vmlinux
->> diff --git a/scripts/extract-vmlinux b/scripts/extract-vmlinux
->> index 5061abcc2540..d569eb8c8efe 100755
->> --- a/scripts/extract-vmlinux
->> +++ b/scripts/extract-vmlinux
->> @@ -15,7 +15,15 @@ check_vmlinux()
->>       # Use readelf to check if it's a valid ELF
->>       # TODO: find a better to way to check that it's really vmlinux
->>       #       and not just an elf
->> -     readelf -h $1 > /dev/null 2>&1 || return 1
->> +     case "$2" in
->> +     0|"")
->> +             readelf -h $1 > /dev/null 2>&1 || return 1
->> +             ;;
->> +     1|*)
->> +     # For ARCH like ARM, vmlinux is not ELF, so we only do the check
->> +     # when $2 is 0 or NULL
->
-> This comment seems to be misleading - I think you mean "vmlinuz" there,
-> or maybe "zImage" as the file is named in the kernel build tree to make
-> it clear what you're referring to.  "vmlinuz" is the name chosen by
-> distro installers.
+On Tue, Jan 26, 2016 at 02:33:40PM -0800, Linus Torvalds wrote:
+> On Tue, Jan 26, 2016 at 2:15 PM, Linus Torvalds
+> <torvalds@linux-foundation.org> wrote:
+> >
+> > You might as well just write it as
+> >
+> >     struct foo x = READ_ONCE(*ptr);
+> >     x->bar = 5;
+> >
+> > because that "smp_read_barrier_depends()" does NOTHING wrt the second write.
+> 
+> Just to clarify: on alpha it adds a memory barrier, but that memory
+> barrier is useless.
 
-I just add these comment following original comment above.
-And even the script name is "extract-vmlinux".
+No trailing data-dependent read, so agreed, no smp_read_barrier_depends()
+needed.  That said, I believe that we should encourage rcu_dereference*()
+or lockless_dereference() instead of READ_ONCE() for documentation
+reasons, though.
 
-In the check_vmlinux() routine, the target of the check is
-decompressed result of
-parsed part zImage file.
-I guess the original comment is true, it's called vmlinux in kernel build tree.
+> On non-alpha, it is a no-op, and obviously does nothing simply because
+> it generates no code.
+> 
+> So if anybody believes that the "smp_read_barrier_depends()" does
+> something, they are *wrong*.
 
-I hope you can comment:
-- whether my hack work for all ARMs (armel/armhf/arm64 etc). I only
-tested armel.
-- whether there's better way to check ARM's vmlinux
+The other problem with smp_read_barrier_depends() is that it is often
+a pain figuring out which prior load it is supposed to apply to.
+Hence my preference for rcu_dereference*() and lockless_dereference().
 
-Thank you!
+> And if anybody sends out an email with that smp_read_barrier_depends()
+> in an example, they are actively just confusing other people, which is
+> even worse than just being wrong. Which is why I jumped in.
+> 
+> So stop perpetuating the myth that smp_read_barrier_depends() does
+> something here. It does not. It's a bug, and it has become this "mind
+> virus" for some people that seem to believe that it does something.
 
-Cheers,
-Roger
--- 
-Roger Shimizu, GMT +9 Tokyo
-PGP/GPG: 17B3ACB1
+It looks like I should add words to memory-barriers.txt de-emphasizing
+smp_read_barrier_depends().  I will take a look at that.
+
+> I had to remove this crap once from the kernel already, see commit
+> 105ff3cbf225 ("atomic: remove all traces of READ_ONCE_CTRL() and
+> atomic*_read_ctrl()").
+> 
+> I don't want to ever see that broken construct again. And I want to
+> make sure that everybody is educated about how broken it was. I'm
+> extremely unhappy that it came up again.
+
+Well, if it makes you feel better, that was control dependencies and this
+was data dependencies.  So it was not -exactly- the same.  ;-)
+
+(Sorry, couldn't resist...)
+
+> If it turns out that some architecture does actually need a barrier
+> between a read and a dependent write, then that will mean that
+> 
+>  (a) we'll have to make up a _new_ barrier, because
+> "smp_read_barrier_depends()" is not that barrier. We'll presumably
+> then have to make that new barrier part of "rcu_derefence()" and
+> friends.
+
+Agreed.  We can worry about whether or not we replace the current
+smp_read_barrier_depends() with that new barrier when and if such
+hardware appears.
+
+>  (b) we will have found an architecture with even worse memory
+> ordering semantics than alpha, and we'll have to stop castigating
+> alpha for being the worst memory ordering ever.
+
+;-) ;-) ;-)
+
+> but I sincerely hope that we'll never find that kind of broken architecture.
+
+Apparently at least some hardware vendors are reading memory-barriers.txt,
+so perhaps the odds of that kind of breakage have reduced.
+
+								Thanx, Paul
