@@ -1,45 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Jan 2016 16:26:31 +0100
-Subject: [PATCH v2] mmc: omap_hsmmc: don't print uninitialized variables
-Message-ID: <3411189.gO0215GrNM@wuerfel>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Tue, 26 Jan 2016 17:27:16 +0200
+Subject: [PATCH V8 18/23] coresight: etm-perf: new PMU driver for ETM
+ tracers
+In-Reply-To: <1452807977-8069-19-git-send-email-mathieu.poirier@linaro.org>
+References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
+ <1452807977-8069-19-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <878u3c744r.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When DT based probing is used but the DMA request fails, the
-driver will print uninitialized stack data from the rx_req
-and tx_req variables, as indicated by this warning:
+Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 
-drivers/mmc/host/omap_hsmmc.c: In function 'omap_hsmmc_probe':
-drivers/mmc/host/omap_hsmmc.c:2162:3: warning: 'rx_req' may be used uninitialized in this function [-Wmaybe-uninitialized]
-   dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
+> +static int etm_event_init(struct perf_event *event)
+> +{
+> +	if (event->attr.type != etm_pmu.type)
+> +		return -ENOENT;
+> +
+> +	if (event->cpu >= nr_cpu_ids)
+> +		return -EINVAL;
 
-This removes the DMA request line number from the warning, which
-is the easiest solution and won't hurt us any more as we are
-planning to remove the legacy code path anyway.
+perf_event_alloc() already does this. Except for this one doesn't cover
+the negative space.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-A simpler patch as v1 with the same result, as suggested by Peter Ujfalusi.
+[snip]
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index b6639ea0bf18..87f0d840a166 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -2159,7 +2159,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
- 						 &rx_req, &pdev->dev, "rx");
- 
- 	if (!host->rx_chan) {
--		dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
-+		dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel\n");
- 		ret = -ENXIO;
- 		goto err_irq;
- 	}
-@@ -2169,7 +2169,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
- 						 &tx_req, &pdev->dev, "tx");
- 
- 	if (!host->tx_chan) {
--		dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", tx_req);
-+		dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel\n");
- 		ret = -ENXIO;
- 		goto err_irq;
- 	}
+> +static void etm_free_aux(void *data)
+> +{
+> +	struct etm_event_data *event_data = data;
+> +
+> +	pr_err("Queing work\n");
+
+Probably not pr_err().
+
+> +	schedule_work(&event_data->work);
+> +}
+
+[snip]
+
+> +static void etm_event_start(struct perf_event *event, int flags)
+> +{
+> +	int cpu = smp_processor_id();
+> +	struct etm_event_data *event_data;
+> +	struct perf_output_handle *handle = this_cpu_ptr(&ctx_handle);
+> +	struct coresight_device *sink, *csdev = per_cpu(csdev_src, cpu);
+> +
+> +	if (!csdev)
+> +		goto fail;
+> +
+> +	/*
+> +	 * Deal with the ring buffer API and get a handle on the
+> +	 * session's information.
+> +	 */
+> +	event_data = perf_aux_output_begin(handle, event);
+> +	if (WARN_ON_ONCE(!event_data))
+> +		goto fail;
+
+There really shouldn't be a warning here. I understand that the 'no
+buffer' case is taped over by the !csdev check above, but there are
+other ligitimate reasons for perf_aux_output_begin() to return NULL,
+like no-space-left.
+
+> +
+> +	/* We need a sink, no need to continue without one */
+> +	sink = coresight_get_sink(event_data->path[cpu]);
+> +	if (!sink || !sink_ops(sink)->set_buffer)
+> +		goto fail_end_stop;
+
+Is this possible after the coresight_build_path() things in setup_aux?
+Might be a better candidate for WARN_*ONCE().
+
+> +
+> +	/* Configure the sink */
+> +	if (sink_ops(sink)->set_buffer(sink, handle,
+> +				       event_data->snk_config))
+> +		goto fail_end_stop;
+> +
+> +	/* Nothing will happen without a path */
+> +	if (coresight_enable_path(event_data->path[cpu], CS_MODE_PERF))
+> +		goto fail_end_stop;
+
+I'd like to understand all the potential failures here, because it's
+really a good idea to keep those to a minimum for the sake of
+consistency. That is, if the user succeeded in creating an event, about
+the only good reason for the event not starting is a filled up buffer.
+
+This is why it makes a lot of sense to keep all the
+coresight_build_path()/coresight_enable_path() to the .event_init()
+phase and let them fail early, if they should fail.
+
+Regards,
+--
+Alex
