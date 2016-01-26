@@ -1,69 +1,87 @@
 From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 26 Jan 2016 11:58:20 -0800
+Date: Tue, 26 Jan 2016 11:51:04 -0800
 Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160126121608.GE21553@arm.com>
-References: <56980C91.1010403@imgtec.com>
- <20160114212913.GF3818@linux.vnet.ibm.com>
- <20160115085554.GF3421@worktop> <20160115091348.GA27936@worktop>
- <20160115174612.GV3818@linux.vnet.ibm.com>
- <20160115212714.GM3421@worktop>
- <20160115215853.GC3818@linux.vnet.ibm.com>
- <20160125164242.GF22927@arm.com>
- <20160126060322.GJ4503@linux.vnet.ibm.com>
- <20160126121608.GE21553@arm.com>
-Message-ID: <20160126195820.GS4503@linux.vnet.ibm.com>
+In-Reply-To: <20160126165207.GB6029@fixme-laptop.cn.ibm.com>
+References: <20160114204827.GE3818@linux.vnet.ibm.com>
+ <20160118081929.GA30420@gondor.apana.org.au>
+ <20160118154629.GB3818@linux.vnet.ibm.com>
+ <20160126165207.GB6029@fixme-laptop.cn.ibm.com>
+Message-ID: <20160126195104.GR4503@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 12:16:09PM +0000, Will Deacon wrote:
-> On Mon, Jan 25, 2016 at 10:03:22PM -0800, Paul E. McKenney wrote:
-> > On Mon, Jan 25, 2016 at 04:42:43PM +0000, Will Deacon wrote:
-> > > On Fri, Jan 15, 2016 at 01:58:53PM -0800, Paul E. McKenney wrote:
-> > > > PPC Overlapping Group-B sets version 4
-> > > > ""
-> > > > (* When the Group-B sets from two different barriers involve instructions in
-> > > >    the same thread, within that thread one set must contain the other.
-> > > > 
-> > > > 	P0	P1	P2
-> > > > 	Rx=1	Wy=1	Wz=2
-> > > > 	dep.	lwsync	lwsync
-> > > > 	Ry=0	Wz=1	Wx=1
-> > > > 	Rz=1
-> > > > 
-> > > > 	assert(!(z=2))
-> > > > 
-> > > >    Forbidden by ppcmem, allowed by herd.
-> > > > *)
-> > > > {
-> > > > 0:r1=x; 0:r2=y; 0:r3=z;
-> > > > 1:r1=x; 1:r2=y; 1:r3=z; 1:r4=1;
-> > > > 2:r1=x; 2:r2=y; 2:r3=z; 2:r4=1; 2:r5=2;
-> > > > }
-> > > >  P0		| P1		| P2		;
-> > > >  lwz r6,0(r1)	| stw r4,0(r2)	| stw r5,0(r3)	;
-> > > >  xor r7,r6,r6	| lwsync	| lwsync	;
-> > > >  lwzx r7,r7,r2	| stw r4,0(r3)	| stw r4,0(r1)	;
-> > > >  lwz r8,0(r3)	|		|		;
-> > > > 
-> > > > exists
-> > > > (z=2 /\ 0:r6=1 /\ 0:r7=0 /\ 0:r8=1)
-> > > 
-> > > That really hurts. Assuming that the "assert(!(z=2))" is actually there
-> > > to constrain the coherence order of z to be {0->1->2}, then I think that
-> > > this test is forbidden on arm using dmb instead of lwsync. That said, I
-> > > also don't think the Rz=1 in P0 changes anything.
-> > 
-> > What about the smp_wmb() variant of dmb that orders only stores?
+On Wed, Jan 27, 2016 at 12:52:07AM +0800, Boqun Feng wrote:
+> Hi Paul,
 > 
-> Tricky, but I think it still works out if the coherence order of z is as
-> I described above. The line of reasoning is weird though -- I ended up
-> considering the two cases where P0 reads z before and after it reads x
-> and what that means for the read of y.
+> On Mon, Jan 18, 2016 at 07:46:29AM -0800, Paul E. McKenney wrote:
+> > On Mon, Jan 18, 2016 at 04:19:29PM +0800, Herbert Xu wrote:
+> > > Paul E. McKenney <paulmck@linux.vnet.ibm.com> wrote:
+> > > >
+> > > > You could use SYNC_ACQUIRE() to implement read_barrier_depends() and
+> > > > smp_read_barrier_depends(), but SYNC_RMB probably does not suffice.
+> > > > The reason for this is that smp_read_barrier_depends() must order the
+> > > > pointer load against any subsequent read or write through a dereference
+> > > > of that pointer.  For example:
+> > > > 
+> > > >        p = READ_ONCE(gp);
+> > > >        smp_rmb();
+> > > >        r1 = p->a; /* ordered by smp_rmb(). */
+> > > >        p->b = 42; /* NOT ordered by smp_rmb(), BUG!!! */
+> > > >        r2 = x; /* ordered by smp_rmb(), but doesn't need to be. */
+> > > > 
+> > > > In contrast:
+> > > > 
+> > > >        p = READ_ONCE(gp);
+> > > >        smp_read_barrier_depends();
+> > > >        r1 = p->a; /* ordered by smp_read_barrier_depends(). */
+> > > >        p->b = 42; /* ordered by smp_read_barrier_depends(). */
+> > > >        r2 = x; /* not ordered by smp_read_barrier_depends(), which is OK. */
+> > > > 
+> > > > Again, if your hardware maintains local ordering for address
+> > > > and data dependencies, you can have read_barrier_depends() and
+> > > > smp_read_barrier_depends() be no-ops like they are for most
+> > > > architectures.
+> > > > 
+> > > > Does that help?
+> > > 
+> > > This is crazy! smp_rmb started out being strictly stronger than
+> > > smp_read_barrier_depends, when did this stop being the case?
+> > 
+> > Hello, Herbert!
+> > 
+> > It is true that most Linux kernel code relies only on the read-read
+> > properties of dependencies, but the read-write properties are useful.
+> > Admittedly relatively rarely, but useful.
+> > 
+> > The better comparison for smp_read_barrier_depends(), especially in
+> > its rcu_dereference*() form, is smp_load_acquire().
+> 
+> Confused..
+> 
+> I recall that last time you and Linus came into a conclusion that even
+> on Alpha, a barrier for read->write with data dependency is unnecessary:
+> 
+> http://article.gmane.org/gmane.linux.kernel/2077661
+> 
+> And in an earlier mail of that thread, Linus made his point that
+> smp_read_barrier_depends() should only be used to order read->read.
 
-By "works out" you mean that ARM prohibits the outcome?
+Those examples involved read-to-write with conditionals, as in:
 
-BTW, I never have seen a real-world use for this case.  At the moment
-it is mostly a cautionary tale about memory-model corner cases and
-tools.
+	if (READ_ONCE(a))
+		WRITE_ONCE(b, 1);
+
+Without the "if", no ordering is guaranteed on weakly ordered CPUs.
+(The volatile accesses keep ordering within the compiler for once...
+
+> So right now, are we going to extend the semantics of
+> smp_read_barrier_depends()? Can we just make smp_read_barrier_depends()
+> still only work for read->read, and assume all the architectures won't
+> reorder read->write with data dependency, so that the code above having
+> a smp_rmb() also works?
+
+The semantics of smp_read_barrier_depends() has been both read-to-write
+and read-to-read for some time now, this patch just catches the
+documentation up with reality.
 
 							Thanx, Paul
