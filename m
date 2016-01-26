@@ -1,46 +1,64 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 26 Jan 2016 12:11:59 +0100
-Subject: [PATCH 0/6] Versatile flash protection in DT
-Message-ID: <1453806725-4880-1-git-send-email-linus.walleij@linaro.org>
+Date: Tue, 26 Jan 2016 12:12:00 +0100
+Subject: [PATCH 1/6] mtd: augment the "arm,versatile-flash" bindings
+In-Reply-To: <1453806725-4880-1-git-send-email-linus.walleij@linaro.org>
+References: <1453806725-4880-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1453806725-4880-2-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set augments the physmap driver to react to the
-"arm,versatile-flash" compatible string by installing special
-VPP/writeprotect handling so that the corresponding boardfile
-code can be removed from the ARM boardfiles.
+The bindings for the "arm,versatile-flash" device was merged in
+commit 3ba7222ac992d24d09ccd0b55940b54849eef752
+"arm/versatile: Add device tree support" but was never used
+for anything.
 
-The patches pretty much speak for themselves, I would eventually
-like to have the two mtd patches merged into the MTD tree
-by themselves, and the rest of the patches merged into the
-ARM SoC tree, as there is no compile-time dependency between
-them and we can do a smooth transition along with other
-cleanup patches in the ARM SoC tree.
+Versatile flash chips are actually just standard CFI chips,
+but they have one or two bits in a system controller to control
+VPP and write protection. Let's use this compatible string in
+conjunction with "cfi-flash" to indicate that we have a
+normal CFI flash with some extra Versatile-specific protection.
 
-Linus Walleij (6):
-  mtd: augment the "arm,versatile-flash" bindings
-  mtd: physmap_of: add a hook for Versatile write protection
-  ARM: versatile: move flash registration to the device tree
-  ARM: integrator: move flash registration to device tree
-  ARM: realview: add flash devices to the PB1176 DTS
-  ARM: realview: fix up PB11MP flash compat strings
+Cc: devicetree at vger.kernel.org
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <robh@kernel.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ .../devicetree/bindings/mtd/arm-versatile.txt        | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
- .../devicetree/bindings/mtd/arm-versatile.txt      |  20 +-
- arch/arm/boot/dts/arm-realview-pb1176.dts          |  32 +++
- arch/arm/boot/dts/arm-realview-pb11mp.dts          |   4 +-
- arch/arm/boot/dts/integrator.dtsi                  |   3 +-
- arch/arm/boot/dts/versatile-ab.dts                 |   5 +-
- arch/arm/mach-integrator/integrator_ap.c           |  62 -----
- arch/arm/mach-integrator/integrator_cp.c           |  51 -----
- arch/arm/mach-versatile/versatile_dt.c             |  47 ----
- drivers/mtd/maps/Kconfig                           |  10 +
- drivers/mtd/maps/Makefile                          |   1 +
- drivers/mtd/maps/physmap_of.c                      |   6 +
- drivers/mtd/maps/physmap_of_versatile.c            | 253 +++++++++++++++++++++
- drivers/mtd/maps/physmap_of_versatile.h            |  16 ++
- 13 files changed, 344 insertions(+), 166 deletions(-)
- create mode 100644 drivers/mtd/maps/physmap_of_versatile.c
- create mode 100644 drivers/mtd/maps/physmap_of_versatile.h
-
+diff --git a/Documentation/devicetree/bindings/mtd/arm-versatile.txt b/Documentation/devicetree/bindings/mtd/arm-versatile.txt
+index beace4b89daa..4ec28796a3c0 100644
+--- a/Documentation/devicetree/bindings/mtd/arm-versatile.txt
++++ b/Documentation/devicetree/bindings/mtd/arm-versatile.txt
+@@ -1,8 +1,26 @@
+ Flash device on ARM Versatile board
+ 
++These flash chips are found in the ARM reference designs like Integrator,
++Versatile, RealView, Versatile Express etc.
++
++They are regular CFI compatible (Intel or AMD extended) flash chips with
++some special write protect/VPP bits that can be controlled by the machine's
++system controller.
++
+ Required properties:
+-- compatible : must be "arm,versatile-flash";
++- compatible : must be "arm,versatile-flash", "cfi-flash";
++- reg : memory address for the flash chip
+ - bank-width : width in bytes of flash interface.
+ 
++For the rest of the properties, see mtd-physmap.txt.
++
+ The device tree may optionally contain sub-nodes describing partitions of the
+ address space. See partition.txt for more detail.
++
++Example:
++
++flash at 34000000 {
++	compatible = "arm,versatile-flash", "cfi-flash";
++	reg = <0x34000000 0x4000000>;
++	bank-width = <4>;
++};
 -- 
 2.4.3
