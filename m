@@ -1,169 +1,149 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 26 Jan 2016 18:10:44 +0100
-Subject: [PATCH v4 17/22] arm64: add support for building the kernel as a
- relocate PIE binary
+Date: Tue, 26 Jan 2016 18:10:47 +0100
+Subject: [PATCH v4 20/22] efi: stub: add implementation of efi_random_alloc()
 In-Reply-To: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1453828249-14467-18-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1453828249-14467-21-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This implements CONFIG_RELOCATABLE, which links the final vmlinux image
-with a dynamic relocation section, which allows the early boot code to
-perform a relocation to a different virtual address at runtime.
+This implements efi_random_alloc(), which allocates a chunk of memory of
+a certain size at a certain alignment, and uses the random_seed argument
+it receives to randomize the address of the allocation.
 
-This is a prerequisite for KASLR (CONFIG_RANDOMIZE_BASE).
+This is implemented by iterating over the UEFI memory map, counting the
+number of suitable slots (aligned offsets) within each region, and picking
+a random number between 0 and 'number of slots - 1' to select the slot,
+This should guarantee that each possible offset is chosen equally likely.
 
+Suggested-by: Kees Cook <keescook@chromium.org>
+Cc: Matt Fleming <matt@codeblueprint.co.uk>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/Kconfig              | 12 ++++++++
- arch/arm64/Makefile             |  4 +++
- arch/arm64/include/asm/elf.h    |  2 ++
- arch/arm64/kernel/head.S        | 32 ++++++++++++++++++++
- arch/arm64/kernel/vmlinux.lds.S | 16 ++++++++++
- 5 files changed, 66 insertions(+)
+ drivers/firmware/efi/libstub/efistub.h |   4 +
+ drivers/firmware/efi/libstub/random.c  | 100 ++++++++++++++++++++
+ 2 files changed, 104 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 141f65ab0ed5..6aa86f86fd10 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -84,6 +84,7 @@ config ARM64
- 	select IOMMU_DMA if IOMMU_SUPPORT
- 	select IRQ_DOMAIN
- 	select IRQ_FORCED_THREADING
-+	select KALLSYMS_TEXT_RELATIVE
- 	select MODULES_USE_ELF_RELA
- 	select NO_BOOTMEM
- 	select OF
-@@ -762,6 +763,17 @@ config ARM64_MODULE_PLTS
- 	select ARM64_MODULE_CMODEL_LARGE
- 	select HAVE_MOD_ARCH_SPECIFIC
+diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
+index 206b7252b9d1..5ed3d3f38166 100644
+--- a/drivers/firmware/efi/libstub/efistub.h
++++ b/drivers/firmware/efi/libstub/efistub.h
+@@ -46,4 +46,8 @@ void efi_get_virtmap(efi_memory_desc_t *memory_map, unsigned long map_size,
+ efi_status_t efi_get_random_bytes(efi_system_table_t *sys_table,
+ 				  unsigned long size, u8 *out);
  
-+config RELOCATABLE
-+	bool
-+	help
-+	  This builds the kernel as a Position Independent Executable (PIE),
-+	  which retains all relocation metadata required to relocate the
-+	  kernel binary at runtime to a different virtual address than the
-+	  address it was linked at.
-+	  Since AArch64 uses the RELA relocation format, this requires a
-+	  relocation pass at runtime even if the kernel is loaded at the
-+	  same address it was linked at.
++efi_status_t efi_random_alloc(efi_system_table_t *sys_table_arg,
++			      unsigned long size, unsigned long align,
++			      unsigned long *addr, unsigned long random_seed);
 +
- endmenu
+ #endif
+diff --git a/drivers/firmware/efi/libstub/random.c b/drivers/firmware/efi/libstub/random.c
+index 97941ee5954f..b98346350230 100644
+--- a/drivers/firmware/efi/libstub/random.c
++++ b/drivers/firmware/efi/libstub/random.c
+@@ -33,3 +33,103 @@ efi_status_t efi_get_random_bytes(efi_system_table_t *sys_table_arg,
  
- menu "Boot options"
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index db462980c6be..c3eaa03f9020 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -15,6 +15,10 @@ CPPFLAGS_vmlinux.lds = -DTEXT_OFFSET=$(TEXT_OFFSET)
- OBJCOPYFLAGS	:=-O binary -R .note -R .note.gnu.build-id -R .comment -S
- GZFLAGS		:=-9
- 
-+ifneq ($(CONFIG_RELOCATABLE),)
-+LDFLAGS_vmlinux		+= -pie
-+endif
+ 	return rng->get_rng(rng, NULL, size, out);
+ }
 +
- KBUILD_DEFCONFIG := defconfig
- 
- # Check for binutils support for specific extensions
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index 435f55952e1f..24ed037f09fd 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -77,6 +77,8 @@
- #define R_AARCH64_MOVW_PREL_G2_NC	292
- #define R_AARCH64_MOVW_PREL_G3		293
- 
-+#define R_AARCH64_RELATIVE		1027
++/*
++ * Return the number of slots covered by this entry, i.e., the number of
++ * addresses it covers that are suitably aligned and supply enough room
++ * for the allocation.
++ */
++static unsigned long get_entry_num_slots(efi_memory_desc_t *md,
++					 unsigned long size,
++					 unsigned long align)
++{
++	u64 start, end;
 +
- /*
-  * These are used to set parameters in the core dumps.
-  */
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index b4be53923942..92f9c26632f3 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -29,6 +29,7 @@
- #include <asm/asm-offsets.h>
- #include <asm/cache.h>
- #include <asm/cputype.h>
-+#include <asm/elf.h>
- #include <asm/kernel-pgtable.h>
- #include <asm/memory.h>
- #include <asm/pgtable-hwdef.h>
-@@ -432,6 +433,37 @@ __mmap_switched:
- 	bl	__pi_memset
- 	dsb	ishst				// Make zero page visible to PTW
- 
-+#ifdef CONFIG_RELOCATABLE
++	if (md->type != EFI_CONVENTIONAL_MEMORY)
++		return 0;
++
++	start = round_up(md->phys_addr, align);
++	end = round_down(md->phys_addr + md->num_pages * EFI_PAGE_SIZE - size,
++			 align);
++
++	if (start > end)
++		return 0;
++
++	return (end - start + 1) / align;
++}
++
++/*
++ * The UEFI memory descriptors have a virtual address field that is only used
++ * when installing the virtual mapping using SetVirtualAddressMap(). Since it
++ * is unused here, we can reuse it to keep track of each descriptor's slot
++ * count.
++ */
++#define MD_NUM_SLOTS(md)	((md)->virt_addr)
++
++efi_status_t efi_random_alloc(efi_system_table_t *sys_table_arg,
++			      unsigned long size,
++			      unsigned long align,
++			      unsigned long *addr,
++			      unsigned long random_seed)
++{
++	unsigned long map_size, desc_size, total_slots = 0, target_slot;
++	efi_status_t status = EFI_NOT_FOUND;
++	efi_memory_desc_t *memory_map;
++	int map_offset;
++
++	status = efi_get_memory_map(sys_table_arg, &memory_map, &map_size,
++				    &desc_size, NULL, NULL);
++	if (status != EFI_SUCCESS)
++		return status;
++
++	if (align < EFI_ALLOC_ALIGN)
++		align = EFI_ALLOC_ALIGN;
++
++	/* count the suitable slots in each memory map entry */
++	for (map_offset = 0; map_offset < map_size; map_offset += desc_size) {
++		efi_memory_desc_t *md = (void *)memory_map + map_offset;
++		unsigned long slots;
++
++		slots = get_entry_num_slots(md, size, align);
++		MD_NUM_SLOTS(md) = slots;
++		total_slots += slots;
++	}
++
++	/* find a random number between 0 and total_slots */
++	target_slot = (total_slots * (u16)random_seed) >> 16;
 +
 +	/*
-+	 * Iterate over each entry in the relocation table, and apply the
-+	 * relocations in place.
++	 * target_slot is now a value in the range [0, total_slots), and so
++	 * it corresponds with exactly one of the suitable slots we recorded
++	 * when iterating over the memory map the first time around.
++	 *
++	 * So iterate over the memory map again, subtracting the number of
++	 * slots of each entry at each iteration, until we have found the entry
++	 * that covers our chosen slot. Use the residual value of target_slot
++	 * to calculate the randomly chosen address, and allocate it directly
++	 * using EFI_ALLOCATE_ADDRESS.
 +	 */
-+	adr_l	x8, __dynsym_start		// start of symbol table
-+	adr_l	x9, __reloc_start		// start of reloc table
-+	adr_l	x10, __reloc_end		// end of reloc table
++	for (map_offset = 0; map_offset < map_size; map_offset += desc_size) {
++		efi_memory_desc_t *md = (void *)memory_map + map_offset;
++		efi_physical_addr_t target;
++		unsigned long pages;
 +
-+0:	cmp	x9, x10
-+	b.hs	2f
-+	ldp	x11, x12, [x9], #24
-+	ldr	x13, [x9, #-8]
-+	cmp	w12, #R_AARCH64_RELATIVE
-+	b.ne	1f
-+	str	x13, [x11]
-+	b	0b
++		if (target_slot >= MD_NUM_SLOTS(md)) {
++			target_slot -= MD_NUM_SLOTS(md);
++			continue;
++		}
 +
-+1:	cmp	w12, #R_AARCH64_ABS64
-+	b.ne	0b
-+	add	x12, x12, x12, lsl #1		// symtab offset: 24x top word
-+	add	x12, x8, x12, lsr #(32 - 3)	// ... shifted into bottom word
-+	ldr	x15, [x12, #8]			// Elf64_Sym::st_value
-+	add	x15, x13, x15
-+	str	x15, [x11]
-+	b	0b
++		target = round_up(md->phys_addr, align) + target_slot * align;
++		pages = round_up(size, EFI_PAGE_SIZE) / EFI_PAGE_SIZE;
 +
-+2:
-+#endif
++		status = efi_call_early(allocate_pages, EFI_ALLOCATE_ADDRESS,
++					EFI_LOADER_DATA, pages, &target);
++		if (status == EFI_SUCCESS)
++			*addr = target;
++		break;
++	}
 +
- 	adr_l	sp, initial_sp, x4
- 	mov	x4, sp
- 	and	x4, x4, #~(THREAD_SIZE - 1)
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 282e3e64a17e..e3f6cd740ea3 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -87,6 +87,7 @@ SECTIONS
- 		EXIT_CALL
- 		*(.discard)
- 		*(.discard.*)
-+		*(.interp .dynamic)
- 	}
- 
- 	. = KIMAGE_VADDR + TEXT_OFFSET;
-@@ -149,6 +150,21 @@ SECTIONS
- 	.altinstr_replacement : {
- 		*(.altinstr_replacement)
- 	}
-+	.rela : ALIGN(8) {
-+		__reloc_start = .;
-+		*(.rela .rela*)
-+		__reloc_end = .;
-+	}
-+	.dynsym : ALIGN(8) {
-+		__dynsym_start = .;
-+		*(.dynsym)
-+	}
-+	.dynstr : {
-+		*(.dynstr)
-+	}
-+	.hash : {
-+		*(.hash)
-+	}
- 
- 	. = ALIGN(PAGE_SIZE);
- 	__init_end = .;
++	efi_call_early(free_pool, memory_map);
++
++	return status;
++}
 -- 
 2.5.0
