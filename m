@@ -1,90 +1,82 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Tue, 26 Jan 2016 13:41:53 -0200
-Subject: [PATCH 7/7] [media] go7007: add MEDIA_CAMERA_SUPPORT dependency
-In-Reply-To: <20160126130403.768e9af4@recife.lan>
-References: <1453817424-3080054-1-git-send-email-arnd@arndb.de>
- <1453817424-3080054-7-git-send-email-arnd@arndb.de>
- <20160126130403.768e9af4@recife.lan>
-Message-ID: <20160126134153.2273c1a1@recife.lan>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 26 Jan 2016 09:47:04 -0600
+Subject: [PATCH 1/3] ti-st: use device handles and add device tree binding
+In-Reply-To: <8665E2433BC68541A24DFFCA87B70F5B2376B680@DFRE01.ent.ti.com>
+References: <1450870253-8694-1-git-send-email-eyalr@ti.com>
+ <8665E2433BC68541A24DFFCA87B70F5B23759A5B@DFRE01.ent.ti.com>
+ <20151229183534.GM12450@rob-hp-laptop>
+ <8665E2433BC68541A24DFFCA87B70F5B2376B680@DFRE01.ent.ti.com>
+Message-ID: <CAL_JsqLpU_5EKQyALMvfBFQL52ncFx+LvdTibLb2AUtVuTn=vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Tue, 26 Jan 2016 13:04:03 -0200
-Mauro Carvalho Chehab <mchehab@osg.samsung.com> escreveu:
+On Sun, Jan 17, 2016 at 1:57 AM, Reizer, Eyal <eyalr@ti.com> wrote:
+> Sorry for the delayed response.
+>
+>> -----Original Message-----
+>> From: Rob Herring [mailto:robh at kernel.org]
+>> Sent: Tuesday, December 29, 2015 8:36 PM
+>> To: Reizer, Eyal
+>> Cc: devicetree at vger.kernel.org; linux-omap at vger.kernel.org; linux-arm-
+>> kernel at lists.infradead.org; pawel.moll at arm.com; mark.rutland at arm.com;
+>> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; tony at atomide.com;
+>> linux at arm.linux.org.uk
+>> Subject: Re: [PATCH 1/3] ti-st: use device handles and add device tree binding
+>>
+>> On Wed, Dec 23, 2015 at 11:38:29AM +0000, Reizer, Eyal wrote:
+>> > - Add support for getting the platform data which includes the uart
+>> >   used and gpio pin used for enable from device tree.
+>> >
+>> > - Fix the implementation for using device handle for the uart and
+>> >   gpiod for the enable pin, instead of device name (as string) used
+>> >   for the uart and pio number which are both bad practice.
+>> >
+>> > Signed-off-by: Eyal Reizer <eyalr@ti.com>
 
-> Em Tue, 26 Jan 2016 15:10:01 +0100
-> Arnd Bergmann <arnd@arndb.de> escreveu:
-> 
-> > If MEDIA_SUBDRV_AUTOSELECT and VIDEO_GO7007 are both set, we
-> > automatically select VIDEO_OV7640, but that depends on MEDIA_CAMERA_SUPPORT,
-> > so we get a Kconfig warning if that is disabled:
-> > 
-> > warning: (VIDEO_GO7007) selects VIDEO_OV7640 which has unmet direct dependencies (MEDIA_SUPPORT && I2C && VIDEO_V4L2 && MEDIA_CAMERA_SUPPORT)
-> > 
-> > This adds another dependency so we don't accidentally select
-> > it when it is unavailable.  
-> 
-> This is another bogus warning.
-> 
-> The MEDIA_foo_SUPPORT actually controls what drivers are visible,
-> but it doesn't enable any driver. They just control the visibility
-> of the drivers, and the APIs that will be enabled (V4L2 and/or DVB).
-> 
-> The aim of MEDIA_foo_SUPPORT is to make life easier to end users,
-> making easier for them to filter the drivers that they may need.
-> 
-> If one selects MEDIA_VIDEO_SUPPORT, the V4L2 API (and V4L core) will be 
-> enabled, and all drivers that support a camera should appear at the 
-> menu, including drivers that *also* support other features (like TV
-> and/or stream support).
-> 
-> That's the case of go7007.
-> 
-> That has nothing to do with the features selection for such driver.
-> 
-> Once go7007 driver is selected, if MEDIA_SUBDRV_AUTOSELECT, all
-> i2c drivers that cope together with go7007 are selected, making the
-> driver to fully support all devices it knows.
-> 
-> Advanced users may unselect MEDIA_SUBDRV_AUTOSELECT and add there just
-> the I2C driver(s) it needs for his specific hardware.
-> 
-> Despite the warning, the Kconfig will do the right thing, not
-> allowing invalid configurations.
-> 
-> Regards,
-> Mauro
-> 
-> 
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> >  drivers/media/usb/go7007/Kconfig | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/media/usb/go7007/Kconfig b/drivers/media/usb/go7007/Kconfig
-> > index 95a3af644a92..af1d02430931 100644
-> > --- a/drivers/media/usb/go7007/Kconfig
-> > +++ b/drivers/media/usb/go7007/Kconfig
-> > @@ -11,7 +11,7 @@ config VIDEO_GO7007
-> >  	select VIDEO_TW2804 if MEDIA_SUBDRV_AUTOSELECT
-> >  	select VIDEO_TW9903 if MEDIA_SUBDRV_AUTOSELECT
-> >  	select VIDEO_TW9906 if MEDIA_SUBDRV_AUTOSELECT
-> > -	select VIDEO_OV7640 if MEDIA_SUBDRV_AUTOSELECT
-> > +	select VIDEO_OV7640 if MEDIA_SUBDRV_AUTOSELECT && MEDIA_CAMERA_SUPPORT
+[...]
 
-Hmm... on a second thought, it could make sense to only auto-select
-the sensor drivers if MEDIA_CAMERA_SUPPORT, and to only auto-select
-tuners if MEDIA_*_TV_SUPPORT is selected.
+>> > +Optional properties:
+>> > + - nshutdown-gpios : specifies attributes for gpio ping used for enabling
+>> > +   the bluetooth,gps and FM sub systems
+>> > + - serial-device : the phandle for the phisical uart used for interacting
+>> > +   with the wilink device
+>>
+>> There have been multiple discussions on serial slave devices recently.
+>> I'm not going to accept any device binding without a common uart slave
+>> device binding first.
+>>
+>
+> Perhaps I am reading it wrong but I think this is a different discussion.
+> The shared transport driver is already in the kernel for pretty long time.
+> AFAIK the original author is not around to maintain it.
+> Currently it is useless  as no bindings exist for it and all customers I have seen using ti_st that upgrade
+> to newer kernels have broken support and have to manually patch the kernel for adding bindings for it.
 
-However, in this case, we'll need to dig into all Kconfig autoselect
-options in order to make it right.
+If should not be required to have a binding. You could still enumerate
+it the old way even for DT platforms. It should not have been broken
+if an upstream platform supported it.
 
-I guess we should also likely need to document to the user that the
-driver won't be fully supported, as we'll be changing the behavior
-of the menus.
+> Having a new uart slave device that may provide similar functionality is a different discussion as it would
+> require a total different implementation.
+> But what do we do now with the implementation that is already there.
+> Don't we want it to work and at least have working bindings for it?
 
-Comments?
+For the kernel yes, the implementation would certainly be different,
+but that is not what I'm saying. The bindings should be unaffected by
+kernel implementation. You can't do it one way for what you need now
+and then change the DT binding when the kernel changes. It is an API.
+We should be able to reach conclusion on binding side. The kernel side
+can move to a uart device subsystem if/when that exists.
 
-Regards,
-Mauro
+Essentially, we need a common binding doc that defines:
+
+- location of uart slave nodes
+- common properties (baudrate, flow-control, etc.
+
+That's not very much. We (DT maintainers) have been clear that we want
+to see devices as child nodes of the UART they are attached to.
+There's mainly been debate about using a phandle instead. I'll be fine
+with using a phandle instead of a child node, but only after we have
+some clear need for it.
+
+Rob
