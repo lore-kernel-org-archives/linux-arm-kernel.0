@@ -1,106 +1,57 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 26 Jan 2016 09:58:57 +0100
-Subject: [PATCH 1/2] ARM: DTS: kirkwood-openrd-client: fix audio
-In-Reply-To: <1453588600-14831-2-git-send-email-aaro.koskinen@iki.fi> (Aaro
- Koskinen's message of "Sun, 24 Jan 2016 00:36:39 +0200")
-References: <1453588600-14831-1-git-send-email-aaro.koskinen@iki.fi>
- <1453588600-14831-2-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <87egd4d8dq.fsf@free-electrons.com>
+From: jung.zhao@rock-chips.com (Jung Zhao)
+Date: Tue, 26 Jan 2016 17:04:03 +0800
+Subject: [PATCH v1 0/3] Add VP8 deocder for rk3229 & rk3288
+Message-ID: <1453799046-307-1-git-send-email-jung.zhao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Aaro,
- 
- On sam., janv. 23 2016, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
+From: zhaojun <jung.zhao@rock-chips.com>
 
-> Fix audio on kirkwood-openrd-client:
->
-> 1) The audio-controller was left disabled.
->
-> 2) The probe fails because cs42l51 is missing #sound-dai-cells.
->
-> 	/sound/simple-audio-card,codec: could not get #sound-dai-cells for /ocp at f1000000/i2c at 11000/cs42l51 at 4a
-> 	asoc-simple-card sound: parse error -22
-> 	asoc-simple-card: probe of sound failed with error -22
->
-> 3) The mapping is incorrect:
->
-> 	asoc-simple-card sound: cs42l51-hifi <-> spdif mapping ok
->
->    should be:
->
-> 	asoc-simple-card sound: cs42l51-hifi <-> i2s mapping ok
->
-> Reported-by: Rick Thomas <rbthomas@pobox.com>
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
 
-Applied on mvebu/dt with Reviewed-by tag from Andrew Lunn and Tested-by
-tag from Rick Thomas.
+====================
+Introduction
+====================
 
-Thanks,
+The purpose of this series is to add the driver for vp8
+decoder on rk3229 & rk3288 platform, and will support
+more formats in the future.
 
-Gregory
+The driver uses v4l2 framework and RK IOMMU.
+RK IOMMU has not yet been merged.
 
-> ---
->  arch/arm/boot/dts/kirkwood-openrd-client.dts | 6 +++++-
->  arch/arm/boot/dts/kirkwood.dtsi              | 2 +-
->  2 files changed, 6 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/kirkwood-openrd-client.dts b/arch/arm/boot/dts/kirkwood-openrd-client.dts
-> index 887b9c1..96ff59d 100644
-> --- a/arch/arm/boot/dts/kirkwood-openrd-client.dts
-> +++ b/arch/arm/boot/dts/kirkwood-openrd-client.dts
-> @@ -20,6 +20,9 @@
->  	compatible = "marvell,openrd-client", "marvell,openrd", "marvell,kirkwood-88f6281", "marvell,kirkwood";
->  
->  	ocp at f1000000 {
-> +		audio-controller at a0000 {
-> +			status = "okay";
-> +		};
->  		i2c at 11000 {
->  			status = "okay";
->  			clock-frequency = <400000>;
-> @@ -27,6 +30,7 @@
->  			cs42l51: cs42l51 at 4a {
->  				compatible = "cirrus,cs42l51";
->  				reg = <0x4a>;
-> +				#sound-dai-cells = <0>;
->  			};
->  		};
->  	};
-> @@ -37,7 +41,7 @@
->  		simple-audio-card,mclk-fs = <256>;
->  
->  		simple-audio-card,cpu {
-> -			sound-dai = <&audio0>;
-> +			sound-dai = <&audio0 0>;
->  		};
->  
->  		simple-audio-card,codec {
-> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-> index 7b5a4a1..7445a15 100644
-> --- a/arch/arm/boot/dts/kirkwood.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood.dtsi
-> @@ -381,7 +381,7 @@
->  
->  		audio0: audio-controller at a0000 {
->  			compatible = "marvell,kirkwood-audio";
-> -			#sound-dai-cells = <0>;
-> +			#sound-dai-cells = <1>;
->  			reg = <0xa0000 0x2210>;
->  			interrupts = <24>;
->  			clocks = <&gate_clk 9>;
-> -- 
-> 2.4.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+zhaojun (3):
+  media: v4l: Add VP8 format support in V4L2 framework
+  media: VPU: support Rockchip VPU
+  media: vcodec: rockchip: Add Rockchip VP8 decoder driver
+
+ drivers/media/platform/rockchip-vpu/Makefile       |    7 +
+ .../media/platform/rockchip-vpu/rkvpu_hw_vp8d.c    |  798 ++++++++++
+ .../platform/rockchip-vpu/rockchip_vp8d_regs.h     | 1594 ++++++++++++++++++++
+ drivers/media/platform/rockchip-vpu/rockchip_vpu.c |  799 ++++++++++
+ .../platform/rockchip-vpu/rockchip_vpu_common.h    |  439 ++++++
+ .../media/platform/rockchip-vpu/rockchip_vpu_dec.c | 1007 +++++++++++++
+ .../media/platform/rockchip-vpu/rockchip_vpu_dec.h |   33 +
+ .../media/platform/rockchip-vpu/rockchip_vpu_hw.c  |  295 ++++
+ .../media/platform/rockchip-vpu/rockchip_vpu_hw.h  |  100 ++
+ drivers/media/v4l2-core/v4l2-ctrls.c               |   17 +-
+ drivers/media/v4l2-core/v4l2-ioctl.c               |    3 +
+ drivers/media/v4l2-core/videobuf2-dma-contig.c     |   51 +-
+ include/media/v4l2-ctrls.h                         |    2 +
+ include/media/videobuf2-dma-contig.h               |   11 +-
+ include/uapi/linux/v4l2-controls.h                 |   98 ++
+ include/uapi/linux/videodev2.h                     |    5 +
+ 16 files changed, 5238 insertions(+), 21 deletions(-)
+ create mode 100644 drivers/media/platform/rockchip-vpu/Makefile
+ create mode 100644 drivers/media/platform/rockchip-vpu/rkvpu_hw_vp8d.c
+ create mode 100644 drivers/media/platform/rockchip-vpu/rockchip_vp8d_regs.h
+ create mode 100644 drivers/media/platform/rockchip-vpu/rockchip_vpu.c
+ create mode 100644 drivers/media/platform/rockchip-vpu/rockchip_vpu_common.h
+ create mode 100644 drivers/media/platform/rockchip-vpu/rockchip_vpu_dec.c
+ create mode 100644 drivers/media/platform/rockchip-vpu/rockchip_vpu_dec.h
+ create mode 100644 drivers/media/platform/rockchip-vpu/rockchip_vpu_hw.c
+ create mode 100644 drivers/media/platform/rockchip-vpu/rockchip_vpu_hw.h
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.9.1
