@@ -1,71 +1,63 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 26 Jan 2016 10:52:25 +0100
-Subject: [PATCH v3 3/9] ASoC: rockchip: i2s: add support for grabbing
- output clock to codec
-In-Reply-To: <56A57733.8020200@rock-chips.com>
-References: <1452865796-23527-1-git-send-email-wxt@rock-chips.com>
- <20160122171815.GD6588@sirena.org.uk> <56A57733.8020200@rock-chips.com>
-Message-ID: <2073307.S3XLZp3hP0@diego>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 26 Jan 2016 10:59:12 +0100
+Subject: [PATCH V2 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge driver
+ to work on both Zynq and Microblaze
+In-Reply-To: <4734542.KZZp0TeeeM@wuerfel>
+References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
+ <1452620173-4905-4-git-send-email-bharatku@xilinx.com>
+ <4734542.KZZp0TeeeM@wuerfel>
+Message-ID: <56A74370.4090000@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jay,
-
-Am Montag, 25. Januar 2016, 09:15:31 schrieb Jianqun Xu:
-> ? 23/01/2016 01:18, Mark Brown ??:
-> > On Fri, Jan 15, 2016 at 01:48:04PM -0800, Sonny Rao wrote:
-> >> On Fri, Jan 15, 2016 at 9:46 AM, Mark Brown <broonie@kernel.org> wrote:
-> >>> If the I2S block is providing a clock to the CODEC then that's what the
-> >>> software should do so that the CODEC can gate and ungate the clock as
-> >>> required.  This patch has the I2S block using a clock, not providing
-> >>> one.
-> >>> 
-> >>  From my read of the clock diagram for RK3288  there is a single clock
-> >> 
-> >> signal (labeled "clk_i2s0") that comes out of a fractional divider,
-> >> and it is split such that one path gets sent to the I2S block and the
-> >> second path is sent to a mux after which that signal is sent to an
-> >> external pin that goes to the codec.
-> >> 
-> >> There are separate clock gates for the two paths: one for the I2S
-> >> block and one after that mux before the external pin.
-> >> 
-> >> I'm not sure if it's being modeled that way in the Linux code or not,
-> >> but at least physically I don't think this clock signal actually goes
-> >> through the I2S block before being sent to the codec.
-> > 
-> > That's not really the issue here, the issue is that it's not the I2S
-> > controller that is consuming the clock so it should not be the I2S
-> > controller driver that ensures that the clock is enabled.  The driver
-> > that manages the clock should be the one that uses it, like I say this
-> > means you should add the code to enable the clock to the CODEC driver if
-> > the CODEC driver needs the clock enabled.
+On 12.1.2016 23:27, Arnd Bergmann wrote:
+> On Tuesday 12 January 2016 23:06:11 Bharat Kumar Gogada wrote:
+>> Modifying Xilinx AXI PCIe Host Bridge Soft IP driver to work on both
+>> Zynq and Microblaze Architectures.
+>> With these modifications drivers/pci/host/pcie-xilinx.c, will
+>> work on both Zynq and Microblaze Architectures.
+>>
+>> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+>> Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
 > 
-> Agree, now we almost use the simple-card for the CODEC driver, so I
-> think we should enable the mclk(i2s-outclk) in the simple-card driver,
-> is it ?
+> I think this patch should be split into three, as you are doing three
+> unrelated things here.
 > 
-> I found a subnode property from simple-card document:
-> - mclk-fs                               : Multiplication factor between
-> stream
->                                            rate and codec mclk, applied
-> only for
->                                            the dai-link.
-> But the property responsible to the factor, not care if the mclk source
-> clock is enabled or not. So does the simple-card driver can add support
-> to enable/disable mclk ?
+>> ---
+>> Changes:
+>> Changed Total number of MSI IRQ count logic according to both architectures.
+>> Updated MSI assigning functions accordingly to new count.
+>> Modified irq_domain_add_linear with new MSI IRQ count.
+>> Added #ifdef to pci_fixup_irqs which is ARM specific API.
+>> ---
+>>  drivers/pci/host/pcie-xilinx.c | 22 +++++++++++++++++-----
+>>  1 file changed, 17 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+>> index 3e3757f..1981948 100644
+>> --- a/drivers/pci/host/pcie-xilinx.c
+>> +++ b/drivers/pci/host/pcie-xilinx.c
+>> @@ -92,7 +92,12 @@
+>>  #define ECAM_DEV_NUM_SHIFT		12
+>>  
+>>  /* Number of MSI IRQs */
+>> -#define XILINX_NUM_MSI_IRQS		128
+>> +#define XILINX_NUM_MSI_IRQS	128
+>> +#ifdef CONFIG_ARM
+>> +#define TOT_NR_IRQS		XILINX_NUM_MSI_IRQS
+>> +#else
+>> +#define TOT_NR_IRQS		(NR_IRQS + XILINX_NUM_MSI_IRQS)
+>> +#endif
+> 
+> Something looks wrong here in the microblaze variant. What does NR_IRQS
+> have to do with it?
 
-The mclk-input is part of the codec I'd think. So you'd want the clocks-
-property in the i2c entry describing the codec itself and implement the clk 
-operations in the codec driver as well.
+Arnd: What was the story regarding NR_IRQS?
+I remember some discussion about it but just forget.
 
-See codec-drivers for da7213, da7218,max98090 and many more for reference.
+Default value in include/asm-generic/irq.h is 64.
+Current value is 32 because microblaze primary interrupt controller is
+axi_intc core which has up to 32 input lines.
 
-
-Heiko
-
-
-
-> >> Does that help clarify?
-> > 
-> > The problem here isn't a lack of clarity in the situation.
+Thanks,
+Michal
