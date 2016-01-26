@@ -1,48 +1,31 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 26 Jan 2016 01:45:19 +0100
-Subject: [PATCH v6] drm/rockchip: hdmi: add Innosilicon HDMI support
-In-Reply-To: <1453686430-21470-1-git-send-email-ykk@rock-chips.com>
-References: <1453686197-20975-1-git-send-email-ykk@rock-chips.com>
- <1453686430-21470-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1453769119.17181.37.camel@tiscali.nl>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 26 Jan 2016 09:46:26 +0900
+Subject: [PATCH] fbdev: s6e8ax0: avoid unused function warnings
+In-Reply-To: <1453734300-1958304-1-git-send-email-arnd@arndb.de>
+References: <1453734300-1958304-1-git-send-email-arnd@arndb.de>
+Message-ID: <56A6C1E2.7060804@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ma, 2016-01-25 at 09:47 +0800, Yakir Yang wrote:
-> --- a/drivers/gpu/drm/rockchip/Kconfig
-> +++ b/drivers/gpu/drm/rockchip/Kconfig
+On 26.01.2016 00:04, Arnd Bergmann wrote:
+> The s6e8ax0 suspend/resume functions are hidden inside of an #ifdef
+> when CONFIG_PM is set to avoid unused function warnings, but they
+> call some other functions that nothing else calls, and we get warnings
+> about those:
+> 
+> drivers/video/fbdev/exynos/s6e8ax0.c:449:13: error: 's6e8ax0_sleep_in' defined but not used [-Werror=unused-function]
+> drivers/video/fbdev/exynos/s6e8ax0.c:485:13: error: 's6e8ax0_display_off' defined but not used [-Werror=unused-function]
+> 
+> This marks the PM functions as __maybe_unused so the compiler can
+> silently drop them when they are not referenced.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/video/fbdev/exynos/s6e8ax0.c | 13 ++++---------
+>  1 file changed, 4 insertions(+), 9 deletions(-)
+> 
 
-> +config ROCKCHIP_INNO_HDMI
-> +	tristate "Rockchip specific extensions for Innosilicon HDMI"
-> +        depends on DRM_ROCKCHIP
-> +        help
-> +	  This selects support for Rockchip SoC specific extensions
-> +	  for the Innosilicon HDMI driver. If you want to enable
-> +	  HDMI on RK3036 based SoC, you should selet this option.
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-(Really trivial: start indentation with tabs only, please. And
-s/selet/select/.)
-
-> --- /dev/null
-> +++ b/drivers/gpu/drm/rockchip/inno_hdmi.c
-
-> + * This software is licensed under the terms of the GNU General
-> Public
-> + * License version 2, as published by the Free Software Foundation,
-> and
-> + * may be copied, distributed, and modified under those terms.
-
-This states this file is licensed GPL v2 only.
-
-> +MODULE_LICENSE("GPL");
-
-And, according to include/linux/module.h, this means "GNU Public License
-v2 or later".
-
-So I think there's a (subtle) mismatch between the license ident used
-for this driver and the comment above.
-
-Thanks,
-
-
-Paul Bolle
+Best regards,
+Krzysztof
