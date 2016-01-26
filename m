@@ -1,154 +1,91 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 26 Jan 2016 21:08:07 +0800
-Subject: [PATCH v4] phy: rockchip-usb: add handler for usb-uart
- functionality
-In-Reply-To: <2609586.28qbVUeppF@diego>
-Message-ID: <201601262116.ol4BKdgo%fengguang.wu@intel.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue, 26 Jan 2016 13:12:38 +0000
+Subject: [PATCH 00/10] KVM PCIe/MSI passthrough on ARM/ARM64
+Message-ID: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+This series addresses KVM PCIe passthrough with MSI enabled on ARM/ARM64.
+It pursues the efforts done on [1], [2], [3]. It also aims at covering the
+same need on some PowerPC platforms.
 
-[auto build test ERROR on rockchip/for-next]
-[also build test ERROR on v4.5-rc1 next-20160125]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+On x86 all accesses to the 1MB PA region [FEE0_0000h - FEF0_000h] are directed
+as interrupt messages: accesses to this special PA window directly target the
+APIC configuration space and not DRAM, meaning the downstream IOMMU is bypassed.
 
-url:    https://github.com/0day-ci/linux/commits/Heiko-St-bner/phy-rockchip-usb-add-handler-for-usb-uart-functionality/20160126-082429
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
-config: arm-defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+This is not the case on above mentionned platforms where MSI messages emitted
+by devices are conveyed through the IOMMU. This means an IOVA/host PA mapping
+must exist for the MSI to reach the MSI controller. Normal way to create
+IOVA bindings consists in using VFIO DMA MAP API. However in this case
+the MSI IOVA is not mapped onto guest RAM but on host physical page (the MSI
+controller frame).
 
-All error/warnings (new ones prefixed by >>):
+Following first comments, the spirit of [2] is kept: the guest registers
+an IOVA range reserved for MSI mapping. When the VFIO-PCIe driver allocates
+its MSI vectors, it overwrites the MSI controller physical address with an IOVA,
+allocated within the window provided by the userspace. This IOVA is mapped
+onto the MSI controller frame physical page.
 
-   In file included from drivers/phy/phy-rockchip-usb.c:21:0:
-   include/linux/module.h:128:27: error: redefinition of '__inittest'
-     static inline initcall_t __inittest(void)  \
-                              ^
-   include/linux/module.h:107:29: note: in expansion of macro 'module_init'
-    #define early_initcall(fn)  module_init(fn)
-                                ^
->> drivers/phy/phy-rockchip-usb.c:481:1: note: in expansion of macro 'early_initcall'
-    early_initcall(rockchip_init_usb_uart);
-    ^
-   include/linux/module.h:128:27: note: previous definition of '__inittest' was here
-     static inline initcall_t __inittest(void)  \
-                              ^
->> include/linux/device.h:1332:1: note: in expansion of macro 'module_init'
-    module_init(__driver##_init); \
-    ^
-   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^
->> drivers/phy/phy-rockchip-usb.c:436:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(rockchip_usb_driver);
-    ^
-   include/linux/module.h:130:6: error: redefinition of 'init_module'
-     int init_module(void) __attribute__((alias(#initfn)));
-         ^
-   include/linux/module.h:107:29: note: in expansion of macro 'module_init'
-    #define early_initcall(fn)  module_init(fn)
-                                ^
->> drivers/phy/phy-rockchip-usb.c:481:1: note: in expansion of macro 'early_initcall'
-    early_initcall(rockchip_init_usb_uart);
-    ^
-   include/linux/module.h:130:6: note: previous definition of 'init_module' was here
-     int init_module(void) __attribute__((alias(#initfn)));
-         ^
->> include/linux/device.h:1332:1: note: in expansion of macro 'module_init'
-    module_init(__driver##_init); \
-    ^
-   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^
->> drivers/phy/phy-rockchip-usb.c:436:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(rockchip_usb_driver);
-    ^
->> drivers/phy/phy-rockchip-usb.c:488:13: error: expected declaration specifiers or '...' before string constant
-    early_param("rockchip.usb_uart", rockchip_usb_uart);
-                ^
->> drivers/phy/phy-rockchip-usb.c:488:34: error: expected declaration specifiers or '...' before 'rockchip_usb_uart'
-    early_param("rockchip.usb_uart", rockchip_usb_uart);
-                                     ^
-   drivers/phy/phy-rockchip-usb.c:483:19: warning: 'rockchip_usb_uart' defined but not used [-Wunused-function]
-    static int __init rockchip_usb_uart(char *buf)
-                      ^
+The series does not address yet the problematic of telling the userspace how
+much IOVA he should provision.
 
-vim +488 drivers/phy/phy-rockchip-usb.c
+Best Regards
 
-   430		.driver		= {
-   431			.name	= "rockchip-usb-phy",
-   432			.of_match_table = rockchip_usb_phy_dt_ids,
-   433		},
-   434	};
-   435	
- > 436	module_platform_driver(rockchip_usb_driver);
-   437	
-   438	static int __init rockchip_init_usb_uart(void)
-   439	{
-   440		const struct of_device_id *match;
-   441		const struct rockchip_usb_phy_pdata *data;
-   442		struct device_node *np;
-   443		struct regmap *grf;
-   444		int ret;
-   445	
-   446		if (!enable_usb_uart)
-   447			return 0;
-   448	
-   449		np = of_find_matching_node_and_match(NULL, rockchip_usb_phy_dt_ids,
-   450						     &match);
-   451		if (!np) {
-   452			pr_err("%s: failed to find usbphy node\n", __func__);
-   453			return -ENOTSUPP;
-   454		}
-   455	
-   456		pr_debug("%s: using settings for %s\n", __func__, match->compatible);
-   457		data = match->data;
-   458	
-   459		if (!data->init_usb_uart) {
-   460			pr_err("%s: usb-uart not available on %s\n",
-   461			       __func__, match->compatible);
-   462			return -ENOTSUPP;
-   463		}
-   464	
-   465		grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
-   466		if (IS_ERR(grf)) {
-   467			pr_err("%s: Missing rockchip,grf property, %lu\n",
-   468			       __func__, PTR_ERR(grf));
-   469			return PTR_ERR(grf);
-   470		}
-   471	
-   472		ret = data->init_usb_uart(grf);
-   473		if (ret) {
-   474			pr_err("%s: could not init usb_uart, %d\n", __func__, ret);
-   475			enable_usb_uart = 0;
-   476			return ret;
-   477		}
-   478	
-   479		return 0;
-   480	}
- > 481	early_initcall(rockchip_init_usb_uart);
-   482	
-   483	static int __init rockchip_usb_uart(char *buf)
-   484	{
-   485		enable_usb_uart = true;
-   486		return 0;
-   487	}
- > 488	early_param("rockchip.usb_uart", rockchip_usb_uart);
-   489	
-   490	MODULE_AUTHOR("Yunzhi Li <lyz@rock-chips.com>");
-   491	MODULE_DESCRIPTION("Rockchip USB 2.0 PHY driver");
+Eric
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 36561 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160126/e4aba1f0/attachment-0001.obj>
+Testing:
+This is currently tested on ARM64 AMD Overdrive HW (single GICv2m frame)
+with an e1000e PCIe card. This is not tested on PPC.
+
+References:
+[1] [RFC 0/2] VFIO: Add virtual MSI doorbell support
+    (https://lkml.org/lkml/2015/7/24/135)
+[2] [RFC PATCH 0/6] vfio: Add interface to map MSI pages
+    (https://lists.cs.columbia.edu/pipermail/kvmarm/2015-September/016607.html)
+[3] [PATCH v2 0/3] Introduce MSI hardware mapping for VFIO
+    (http://permalink.gmane.org/gmane.comp.emulators.kvm.arm.devel/3858)
+
+Git:
+https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.5-rc1-pcie-passthrough-v1
+
+History:
+
+RFC v1 [2] -> PATCH v1:
+- use the existing dma map/unmap ioctl interface with a flag to register a
+  reserved IOVA range. Use the legacy Rb to store this special vfio_dma.
+- a single reserved IOVA contiguous region now is allowed
+- use of an RB tree indexed by PA to store allocated reserved slots
+- use of a vfio_domain iova_domain to manage iova allocation within the
+  window provided by the userspace
+- vfio alloc_map/unmap_free take a vfio_group handle
+- vfio_group handle is cached in vfio_pci_device
+- add ref counting to bindings
+- user modality enabled at the end of the series
+
+
+Eric Auger (10):
+  iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute
+  vfio: expose MSI mapping requirement through VFIO_IOMMU_GET_INFO
+  vfio_iommu_type1: add reserved binding RB tree management
+  vfio: introduce VFIO_IOVA_RESERVED vfio_dma type
+  vfio/type1: attach a reserved iova domain to vfio_domain
+  vfio: introduce vfio_group_alloc_map_/unmap_free_reserved_iova
+  vfio: pci: cache the vfio_group in vfio_pci_device
+  vfio: introduce vfio_group_require_msi_mapping
+  vfio-pci: create an iommu mapping for msi address
+  vfio: allow the user to register reserved iova range for MSI mapping
+
+ drivers/iommu/arm-smmu.c            |   2 +
+ drivers/iommu/fsl_pamu_domain.c     |   3 +
+ drivers/vfio/pci/vfio_pci.c         |   8 +
+ drivers/vfio/pci/vfio_pci_intrs.c   |  73 ++++++-
+ drivers/vfio/pci/vfio_pci_private.h |   1 +
+ drivers/vfio/vfio.c                 |  64 ++++++
+ drivers/vfio/vfio_iommu_type1.c     | 412 +++++++++++++++++++++++++++++++++++-
+ include/linux/iommu.h               |   1 +
+ include/linux/vfio.h                |  39 +++-
+ include/uapi/linux/vfio.h           |  10 +
+ 10 files changed, 598 insertions(+), 15 deletions(-)
+
+-- 
+1.9.1
