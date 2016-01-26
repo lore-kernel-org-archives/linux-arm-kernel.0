@@ -1,40 +1,111 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 26 Jan 2016 12:04:32 +0000
-Subject: [PATCH] regulator: return NULL for dummy bulk_get operation
-In-Reply-To: <1453737537-1960121-1-git-send-email-arnd@arndb.de>
-References: <1453737537-1960121-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160126120432.GF6588@sirena.org.uk>
+From: blogic@openwrt.org (John Crispin)
+Date: Tue, 26 Jan 2016 13:05:20 +0100
+Subject: [PATCH V2 4/4] mfd: mediatek: add MT6323 support to MT6397 driver
+In-Reply-To: <20160126083433.GX3368@x1>
+References: <1453716887-38442-1-git-send-email-blogic@openwrt.org>
+ <20160125124112.GG3368@x1> <56A64108.7020807@openwrt.org>
+ <3476571.0yU9yvPsKF@linux-gy6r.site> <56A670A3.5030100@openwrt.org>
+ <1453777643.26374.11.camel@mtksdaap41> <56A71CE5.4080201@openwrt.org>
+ <20160126083433.GX3368@x1>
+Message-ID: <56A76100.1020307@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 04:58:50PM +0100, Arnd Bergmann wrote:
-> Drivers that call regulator_bulk_get or devm_regulator_bulk_get when
-> CONFIG_REGULATOR is disabled see the function return successfully, but
-> cannot use the "consumer" pointers that are meant to be returned from
-> the functions, as the values are uninitialized. Gcc warns about this:
 
-> drivers/usb/phy/phy-qcom-8x16-usb.c: In function 'phy_8x16_probe':
-> drivers/usb/phy/phy-qcom-8x16-usb.c:284:13: error: 'regs[0].consumer' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> drivers/usb/phy/phy-qcom-8x16-usb.c:285:13: error: 'regs[1].consumer' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> drivers/usb/phy/phy-qcom-8x16-usb.c:286:12: error: 'regs[2].consumer' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 
-The usage in that driver looks a bit dodgy - the disable function is
-just an open coding of regulator_bulk_disable() with no error checking
-while the enable function is doing a series of set_voltage() calls on
-every enable which look a lot like values that I'd expect to come from
-constraints rather than being set explicitly (the VDD values are an API
-abuse we know about in the Qualcomm drivers).  The fact that it never
-varies the voltage is a warning sign that the driver might not want to
-be using set_voltage() at all, and it should at least do that once on
-init if there's a use case.  A quick glance at in tree DTs suggests that
-there's no actual runtime variation.
+On 26/01/2016 09:34, Lee Jones wrote:
+> On Tue, 26 Jan 2016, John Crispin wrote:
+>> On 26/01/2016 04:07, Henry Chen wrote:
+>>> On Mon, 2016-01-25 at 19:59 +0100, John Crispin wrote:
+>>>>
+>>>> On 25/01/2016 19:44, Matthias Brugger wrote:
+>>>>> On Monday 25 Jan 2016 16:36:40 John Crispin wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> On 25/01/2016 13:41, Lee Jones wrote:
+>>>>>>> Please honour the subject format of the subsystem you are contributing
+>>>>>>> to.
+>>>>>>>
+>>>>>>> `git log --oneline -- $subsystem` gives you this.
+>>>>>>>
+>>>>>>> On Mon, 25 Jan 2016, John Crispin wrote:
+>>>>>>>> Signed-off-by: John Crispin <blogic@openwrt.org>
+>>>>>>>> ---
+>>>>>>
+>>>>>> [...]
+>>>>>>
+>>>>>>>> @@ -261,6 +271,15 @@ static int mt6397_probe(struct platform_device
+>>>>>>>> *pdev)
+>>>>>>>>
+>>>>>>>>  	}
+>>>>>>>>  	
+>>>>>>>>  	switch (id & 0xff) {
+>>>>>>>>
+>>>>>>>> +	case MT6323_CID_CODE:
+>>>>>>>> +		mt6397->int_con[0] = MT6323_INT_CON0;
+>>>>>>>
+>>>>>>> This is confusing.  You're still using memory allocated for a mt6397
+>>>>>>> device.
+>>>>>>
+>>>>>> the variable is currently defined as struct mt6397_chip *mt6397;
+>>>>>> shall i only change the name or also create a patch to rename the struct ?
+>>>>>>
+>>>>>
+>>>>> I think we should rename the struct and the file as well.
+>>>>>
+>>>>> Cheers,
+>>>>> Matthias
+>>>>
+>>>> Hi,
+>>>>
+>>>> that would have been my next question. renaming the struct would imply
+>>>> renaming the driver and the whole namespace contained within. We would
+>>>> then also need to change the Kconfig and Makefile. I am happy to do this
+>>>> but want to be sure that is is actually wanted.
+>>>>
+>>>> 	John
+>>> Hi,
+>>>
+>>> Since mt6323 was similar with mt6397, I think we can reuse the
+>>> mt6397_chip without duplicate code.
+>>>
+>>> Maybe we can rename the local variable name to avoid confusing.
+>>>
+>>> struct mt6397_chip *mt_pmic;
+>>> ...
+>>> ...
+>>> switch (id & 0xff) {
+>>> 	case MT6323_CID_CODE:
+>>> 		mt_pmic->int_con[0] = MT6323_INT_CON0;
+>>> 		mt_pmic->int_con[1] = MT6323_INT_CON1;
+>>> ...
+>>> ...
+>>>
+>>> Henry
+>>
+>> Hi,
+>>
+>> IMHO we should either rename the namespace or not. renaming some
+>> variables seems weird as that will just move the confusion/inconsistency
+>> to another place in the code. I am however rather indifferent on this
+>> matter.
+> 
+> It's common to name a driver after the device which was enabled first,
+> so no need to rename the files or CONFIGs; however, it does seem
+> prudent to generify the struct (both parts).
+> 
 
-I'm not 100% convinced this didn't actually warn us about a real
-problem.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160126/192be020/attachment.sig>
+Hi,
+
+renaming struct mt6397_chip is not as straightforward as it seems as
+other drivers such as pinctrl and rtc share the data structure with the
+mfd driver.
+
+i have kept the structs name as is for now and only renamed the instance.
+
+If you want i can create a separate series that addresses only the
+renaming of the structure. The "rename struct mt6397" patch would need
+to do a change to drivers from 3 subsystems in 1 single commit as not to
+break compile and merge order.
+
+	John
