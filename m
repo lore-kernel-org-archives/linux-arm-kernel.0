@@ -1,92 +1,91 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 26 Jan 2016 17:30:18 +0100
-Subject: [PATCH] ARM: dts: at91: sama5d2: add dma properties to UART nodes
-Message-ID: <1453825818-25217-1-git-send-email-nicolas.ferre@atmel.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 26 Jan 2016 08:32:07 -0800
+Subject: [PATCH 0/5] clk: rockchip: add full support for HDMI clock on
+ rk3288
+In-Reply-To: <CAAObsKBS45kbvdmdvFxwSo=B9GXRLoX2g7WQYVmZJ0KFnwSejw@mail.gmail.com>
+References: <1415087559-19444-1-git-send-email-kever.yang@rock-chips.com>
+ <48806799.thBSifdUp8@diego> <54647142.4080800@rock-chips.com>
+ <CAD=FV=Vzec3Qm-kc6zZ4VxSREoZbzVkWbzp-noHYdcEVrLYYSw@mail.gmail.com>
+ <CAAObsKChYN5nmcm5OWnAzNRGDi_QGSoKvN+0FizhjeT-3mmeXQ@mail.gmail.com>
+ <CAD=FV=Wgu=xQ9PcVqfzcedXVU3Rh-HKbBVxHuqgV9OZJEYhYvg@mail.gmail.com>
+ <CAAObsKC1v--mZwkiG-c7P2Bwi2-_txbeqaW4Vd5h-noAVNbhjA@mail.gmail.com>
+ <CAD=FV=VB93wYigRJ8wa8YL6P+Q+-fRokPiCB-Fo1pC_zAdh2oA@mail.gmail.com>
+ <CAAObsKCMh3Bk_oNJdLbU2F9b7jrnFZOp2uFR_oPqUoJ3W1gfaQ@mail.gmail.com>
+ <CAD=FV=W=LCJk4m049hBnm7BOYudnVe=oa3jdcSrrZZUU9rFtog@mail.gmail.com>
+ <CAAObsKBS45kbvdmdvFxwSo=B9GXRLoX2g7WQYVmZJ0KFnwSejw@mail.gmail.com>
+Message-ID: <CAD=FV=Une-DJ+0zV6Hmx5EmKXCEApb2Zx1FuJaUQf7MT9OPsug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dmas/dma-names properties are added to the UART nodes. Note that additional
-properties are needed to enable them at the board level: check bindings for
-details.
+Tomeu,
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/sama5d2.dtsi | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+On Tue, Jan 26, 2016 at 12:28 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
+> On 22 January 2016 at 18:07, Doug Anderson <dianders@chromium.org> wrote:
+>> Tomeu,
+>>
+>> On Fri, Jan 22, 2016 at 6:00 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
+>>> On 21 January 2016 at 21:11, Doug Anderson <dianders@chromium.org> wrote:
+>>>> Hi,
+>>>>
+>>>> On Thu, Jan 21, 2016 at 1:03 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
+>>>>> So we have a mechanism for detecting a conflict in the clock
+>>>>> hierarchy, and a mechanism to solve it, but we are missing a way for
+>>>>> userspace to communicate policy regarding which clocks should be given
+>>>>> priority when solving such a conflict?
+>>>>
+>>>> Hrmmm, I guess it could be userspace that makes the decision.  It does
+>>>> seem a little odd to force it to userspace in all cases, though.  For
+>>>> a particular laptop that is designed with a specific panel connected
+>>>> up eDP it seems less than ideal to push this into userspace.  If the
+>>>> kernel could just work in the expected sane way (or at least work that
+>>>> way by default) it would be ideal.
+>>>
+>>> Ah, I was wrongly assuming that the kernel didn't have enough
+>>> information to make an informed decision in this case, sorry.
+>>>
+>>> Guess the per-user rate limits don't help here because the consumer
+>>> with higher priority could work with frequencies other than the ideal.
+>>>
+>>> And we cannot have a consumer listening for PRE_RATE_CHANGE and
+>>> aborting unwanted changes or rerouting the ancestors of the clocks of
+>>> other consumers because that would be a massive violation of
+>>> separation of concerns.
+>>>
+>>> If we were to rearrange the clock topology from within the CCF, then
+>>> consumers need to have a way to communicate to the core that they are
+>>> more important than other consumers. clk_set_important(clk, true)
+>>> could be enough in this case, but would be insufficient in more
+>>> complex cases where more than two clocks could use the same PLL.
+>>
+>> With something like the above I'd still expect some complexity
+>> depending on the probe order.  If a less important device grabs the
+>> clock first, it might be forced to re-think its clocks later.  That
+>> might be disconcerting.
+>
+> How much disconcerting do you think this could be? Hopefully those
+> devices should probe quite close to each other, right?
 
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index 3f750f6170f2..82d0c19e9720 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -880,6 +880,13 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xf801c000 0x100>;
- 				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 7>;
-+				dmas = <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(35))>,
-+				       <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(36))>;
-+				dma-names = "tx", "rx";
- 				clocks = <&uart0_clk>;
- 				clock-names = "usart";
- 				status = "disabled";
-@@ -889,6 +896,13 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xf8020000 0x100>;
- 				interrupts = <25 IRQ_TYPE_LEVEL_HIGH 7>;
-+				dmas = <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(37))>,
-+				       <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(38))>;
-+				dma-names = "tx", "rx";
- 				clocks = <&uart1_clk>;
- 				clock-names = "usart";
- 				status = "disabled";
-@@ -898,6 +912,13 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xf8024000 0x100>;
- 				interrupts = <26 IRQ_TYPE_LEVEL_HIGH 7>;
-+				dmas = <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(39))>,
-+				       <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(40))>;
-+				dma-names = "tx", "rx";
- 				clocks = <&uart2_clk>;
- 				clock-names = "usart";
- 				status = "disabled";
-@@ -1016,6 +1037,13 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfc008000 0x100>;
- 				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 7>;
-+				dmas = <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(41))>,
-+				       <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(42))>;
-+				dma-names = "tx", "rx";
- 				clocks = <&uart3_clk>;
- 				clock-names = "usart";
- 				status = "disabled";
-@@ -1024,6 +1052,13 @@
- 			uart4: serial at fc00c000 {
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfc00c000 0x100>;
-+				dmas = <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(43))>,
-+				       <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(44))>;
-+				dma-names = "tx", "rx";
- 				interrupts = <28 IRQ_TYPE_LEVEL_HIGH 7>;
- 				clocks = <&uart4_clk>;
- 				clock-names = "usart";
--- 
-2.1.3
+Probe: probably, though with defers it could be several seconds.
+
+...but remember that display interfaces tend to be hotplug.  That
+might mean that the HDMI interface won't try to set the clock until
+much, much later.
+
+
+>> OK, so I was just involved in a change recently that made me realize
+>> that maybe our original problems were tied to the fact that our
+>> builtin panels were trying to specify a clock that was impossible to
+>> achieve with CPLL / GPLL.  It was a known problem that the request
+>> would be denied and the CCF would just pick the closest rate it could.
+>> Probably the right thing is to solve _that_ problem first.  If using
+>> simple panel you could do a change like
+>> <https://chromium-review.googlesource.com/#/c/323211/> (though
+>> presumably you'd have to handle people using the same panel in other
+>> laptops).  You might also be able to do funny things to fixup the mode
+>> like dbehr tried to do in
+>> <https://chromium-review.googlesource.com/#/c/270017/>.  By doing this
+>> and making sure that
+>
+> Are we missing something here?
+
+Eh?
