@@ -1,35 +1,31 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 26 Jan 2016 18:42:34 +0800
-Subject: [PATCH] mmc: sdhci-of-at91: fix pm runtime unbalanced issue in error
- path
-Message-ID: <1453804954-3490-1-git-send-email-jszhang@marvell.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 26 Jan 2016 10:58:12 +0000
+Subject: [PATCH 0/4] arm64: cpufeature: Fix sign of feature bits
+Message-ID: <1453805896-4397-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device power usage counter is increased by pm_runtime_get_noresume
-but isn't decreased in err_add_host error path.
+ARM ARM is getting updated with the guidelines on how to treat the
+feature values for their sign. This series fixes the handling of sign
+based on the new update. Also make the capabilities aware of the sign
+of the feature to use the appropriate helper for extracting the values.
 
-Fix this issue by calling pm_runtime_put_noidle() in the error path to
-restore the device's power usage counter.
+See Patch2 for more details on the rules.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-Fixes: f5f17813ae9b ("mmc: sdhci-of-at91: add PM support)
----
- drivers/mmc/host/sdhci-of-at91.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
-index 7db7163..3bf6f31 100644
---- a/drivers/mmc/host/sdhci-of-at91.c
-+++ b/drivers/mmc/host/sdhci-of-at91.c
-@@ -210,7 +210,7 @@ static int sdhci_at91_probe(struct platform_device *pdev)
- 
- pm_runtime_disable:
- 	pm_runtime_disable(&pdev->dev);
--	pm_runtime_set_suspended(&pdev->dev);
-+	pm_runtime_put_noidle(&pdev->dev);
- clocks_disable_unprepare:
- 	clk_disable_unprepare(priv->gck);
- 	clk_disable_unprepare(priv->mainck);
+Suzuki K. Poulose (4):
+  arm64: cpufeature: Correct feature register tables
+  arm64: cpufeature: Fix the sign of feature bits
+  arm64: capabilities: Handle sign of the feature bit
+  arm64: Rename cpuid_feature field extract routines
+
+ arch/arm64/include/asm/cpufeature.h |   29 +++++++----
+ arch/arm64/include/asm/kvm_mmu.h    |    2 +-
+ arch/arm64/kernel/cpufeature.c      |   96 ++++++++++++++++++++---------------
+ arch/arm64/kernel/debug-monitors.c  |    2 +-
+ arch/arm64/kvm/sys_regs.c           |    2 +-
+ arch/arm64/mm/context.c             |    2 +-
+ 6 files changed, 78 insertions(+), 55 deletions(-)
+
 -- 
-2.7.0
+1.7.9.5
