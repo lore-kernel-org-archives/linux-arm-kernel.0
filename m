@@ -1,66 +1,157 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Tue, 26 Jan 2016 14:33:40 -0800
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <CA+55aFxjb+2rs2wVHtiSCcOzgMrE8H=yDeNcjyujPQudDCtLgw@mail.gmail.com>
-References: <20160114204827.GE3818@linux.vnet.ibm.com>
- <20160118081929.GA30420@gondor.apana.org.au>
- <20160118154629.GB3818@linux.vnet.ibm.com>
- <20160126165207.GB6029@fixme-laptop.cn.ibm.com>
- <20160126172227.GG6357@twins.programming.kicks-ass.net>
- <CA+55aFzcC6C8imPs5vk4yH1Y2YHjnAdFM9HCkVs04COxuDQH6w@mail.gmail.com>
- <20160126201037.GU4503@linux.vnet.ibm.com>
- <CA+55aFxjb+2rs2wVHtiSCcOzgMrE8H=yDeNcjyujPQudDCtLgw@mail.gmail.com>
-Message-ID: <CA+55aFwxTJd+uibcxtZD3tGnj_n=LMwyAa0s8qyx_OF0OMWQkA@mail.gmail.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Tue, 26 Jan 2016 23:35:16 +0100
+Subject: [PATCH V3] ARM: BCM5301X: Add DT for D-Link DIR-885L
+In-Reply-To: <1453845752-8174-1-git-send-email-zajec5@gmail.com>
+References: <1453845752-8174-1-git-send-email-zajec5@gmail.com>
+Message-ID: <1453847716-9406-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 2:15 PM, Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
->
-> You might as well just write it as
->
->     struct foo x = READ_ONCE(*ptr);
->     x->bar = 5;
->
-> because that "smp_read_barrier_depends()" does NOTHING wrt the second write.
+It's device based on BCM47094 which is quite similar to BCM4709 except
+for higher CPU frequency. This device has 2 flash memories, it boots
+from serial one and stores firmware on NAND. Other than that we define
+standard stuff like LEDs, buttons and UART.
 
-Just to clarify: on alpha it adds a memory barrier, but that memory
-barrier is useless.
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+---
+V2: Include "dir-" in filename.
+V3: Commit message
+    Drop "earlyprintk" (which is unwanted, we should switch to earlycon)
+    Define lowmem only (like on all other devices), we still miss swiotlb
+---
+ arch/arm/boot/dts/Makefile                    |   1 +
+ arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts | 111 ++++++++++++++++++++++++++
+ 2 files changed, 112 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
 
-On non-alpha, it is a no-op, and obviously does nothing simply because
-it generates no code.
-
-So if anybody believes that the "smp_read_barrier_depends()" does
-something, they are *wrong*.
-
-And if anybody sends out an email with that smp_read_barrier_depends()
-in an example, they are actively just confusing other people, which is
-even worse than just being wrong. Which is why I jumped in.
-
-So stop perpetuating the myth that smp_read_barrier_depends() does
-something here. It does not. It's a bug, and it has become this "mind
-virus" for some people that seem to believe that it does something.
-
-I had to remove this crap once from the kernel already, see commit
-105ff3cbf225 ("atomic: remove all traces of READ_ONCE_CTRL() and
-atomic*_read_ctrl()").
-
-I don't want to ever see that broken construct again. And I want to
-make sure that everybody is educated about how broken it was. I'm
-extremely unhappy that it came up again.
-
-If it turns out that some architecture does actually need a barrier
-between a read and a dependent write, then that will mean that
-
- (a) we'll have to make up a _new_ barrier, because
-"smp_read_barrier_depends()" is not that barrier. We'll presumably
-then have to make that new barrier part of "rcu_derefence()" and
-friends.
-
- (b) we will have found an architecture with even worse memory
-ordering semantics than alpha, and we'll have to stop castigating
-alpha for being the worst memory ordering ever.
-
-but I sincerely hope that we'll never find that kind of broken architecture.
-
-               Linus
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index eab8a7f..d7fcd46 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -76,6 +76,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm4709-buffalo-wxr-1900dhp.dtb \
+ 	bcm4709-netgear-r7000.dtb \
+ 	bcm4709-netgear-r8000.dtb \
++	bcm47094-dlink-dir-885l.dtb \
+ 	bcm94708.dtb \
+ 	bcm94709.dtb \
+ 	bcm953012k.dtb
+diff --git a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+new file mode 100644
+index 0000000..6c83538
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+@@ -0,0 +1,111 @@
++/*
++ * Broadcom BCM470X / BCM5301X ARM platform code.
++ * DTS for D-Link DIR-885L
++ *
++ * Copyright (C) 2016 Rafa? Mi?ecki <zajec5@gmail.com>
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++/dts-v1/;
++
++#include "bcm4708.dtsi"
++#include "bcm5301x-nand-cs0-bch8.dtsi"
++
++/ {
++	compatible = "dlink,dir-885l", "brcm,bcm47094", "brcm,bcm4708";
++	model = "D-Link DIR-885L";
++
++	chosen {
++		bootargs = "console=ttyS0,115200";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000>;
++	};
++
++	nand: nand at 18028000 {
++		nandcs at 0 {
++			partition at 0 {
++				label = "firmware";
++				reg = <0x00000000 0x08000000>;
++			};
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		power-white {
++			label = "bcm53xx:white:power";
++			gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-on";
++		};
++
++		wan-white {
++			label = "bcm53xx:white:wan";
++			gpios = <&chipcommon 1 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++
++		power-amber {
++			label = "bcm53xx:amber:power";
++			gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++
++		wan-amber {
++			label = "bcm53xx:amber:wan";
++			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++
++		usb3-white {
++			label = "bcm53xx:white:usb3";
++			gpios = <&chipcommon 8 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++
++		2ghz {
++			label = "bcm53xx:white:2ghz";
++			gpios = <&chipcommon 13 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++
++		5ghz {
++			label = "bcm53xx:white:5ghz";
++			gpios = <&chipcommon 14 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		wps {
++			label = "WPS";
++			linux,code = <KEY_WPS_BUTTON>;
++			gpios = <&chipcommon 7 GPIO_ACTIVE_LOW>;
++		};
++
++		/* Switch: router / extender */
++		extender {
++			label = "Extender";
++			linux,code = <BTN_0>;
++			gpios = <&chipcommon 10 GPIO_ACTIVE_LOW>;
++		};
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 17 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&uart0 {
++	status = "okay";
++	clock-frequency = <125000000>;
++};
+-- 
+1.8.4.5
