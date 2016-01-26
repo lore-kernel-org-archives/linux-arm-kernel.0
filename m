@@ -1,45 +1,125 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 27 Jan 2016 00:37:24 +0100
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <20160126232212.GE19432@atomide.com>
-References: <20160126224804.GB19432@atomide.com>
- <CAJZ5v0i79X5JjOZiu4cOZ0Esd5BxAvutF8d17asDzq9ECcML-g@mail.gmail.com>
- <20160126232212.GE19432@atomide.com>
-Message-ID: <CAJZ5v0gTRvyWHVmYNb8Q1QZzhVhokXo541+48mFyDRYv7Hi-Uw@mail.gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 26 Jan 2016 15:37:33 -0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160126121010.GD21553@arm.com>
+References: <56980C91.1010403@imgtec.com>
+ <20160114212913.GF3818@linux.vnet.ibm.com>
+ <569814F2.50801@imgtec.com>
+ <20160114225510.GJ3818@linux.vnet.ibm.com>
+ <20160115102431.GB2131@arm.com>
+ <20160115175401.GW3818@linux.vnet.ibm.com>
+ <20160115192845.GA12510@linux.vnet.ibm.com>
+ <20160125144133.GB22927@arm.com>
+ <20160126010646.GH4503@linux.vnet.ibm.com>
+ <20160126121010.GD21553@arm.com>
+Message-ID: <20160126233733.GZ4503@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 12:22 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Rafael J. Wysocki <rafael@kernel.org> [160126 15:15]:
->> On Tue, Jan 26, 2016 at 11:48 PM, Tony Lindgren <tony@atomide.com> wrote:
->> > Hi,
->> >
->> > Looks like commit 5de85b9d57ab ("PM / runtime: Re-init runtime
->> > PM states at probe error and driver unbind") broke PM on at least
->> > omap3. It seems we now need to additionally also call
->> > pm_runtime_dont_use_autosuspend() to get things working again?
->> >
->> > The following fixes idling on omap3, but I'm wondering if we
->> > should do something in pm_runtime_reinit() instead?
->>
->> Well, does it actually help if you add
->> pm_runtime_dont_use_autosuspend(dev) to pm_runtime_reinit()?
->
-> No adding it to pm_runtime_reinit() does not help.
+On Tue, Jan 26, 2016 at 12:10:10PM +0000, Will Deacon wrote:
+> On Mon, Jan 25, 2016 at 05:06:46PM -0800, Paul E. McKenney wrote:
+> > On Mon, Jan 25, 2016 at 02:41:34PM +0000, Will Deacon wrote:
+> > > On Fri, Jan 15, 2016 at 11:28:45AM -0800, Paul E. McKenney wrote:
+> > > > On Fri, Jan 15, 2016 at 09:54:01AM -0800, Paul E. McKenney wrote:
+> > > > > On Fri, Jan 15, 2016 at 10:24:32AM +0000, Will Deacon wrote:
+> > > > > > See my earlier reply [1] (but also, your WRC Linux example looks more
+> > > > > > like a variant on WWC and I couldn't really follow it).
+> > > > > 
+> > > > > I will revisit my WRC Linux example.  And yes, creating litmus tests
+> > > > > that use non-fake dependencies is still a bit of an undertaking.  :-/
+> > > > > I am sure that it will seem more natural with time and experience...
+> > > > 
+> > > > Hmmm...  You are quite right, I did do WWC.  I need to change cpu2()'s
+> > > > last access from a store to a load to get WRC.  Plus the levels of
+> > > > indirection definitely didn't match up, did they?
+> > > 
+> > > Nope, it was pretty baffling!
+> > 
+> > "It is a service that I provide."  ;-)
+> > 
+> > > > 	struct foo {
+> > > > 		struct foo *next;
+> > > > 	};
+> > > > 	struct foo a;
+> > > > 	struct foo b;
+> > > > 	struct foo c = { &a };
+> > > > 	struct foo d = { &b };
+> > > > 	struct foo x = { &c };
+> > > > 	struct foo y = { &d };
+> > > > 	struct foo *r1, *r2, *r3;
+> > > > 
+> > > > 	void cpu0(void)
+> > > > 	{
+> > > > 		WRITE_ONCE(x.next, &y);
+> > > > 	}
+> > > > 
+> > > > 	void cpu1(void)
+> > > > 	{
+> > > > 		r1 = lockless_dereference(x.next);
+> > > > 		WRITE_ONCE(r1->next, &x);
+> > > > 	}
+> > > > 
+> > > > 	void cpu2(void)
+> > > > 	{
+> > > > 		r2 = lockless_dereference(y.next);
+> > > > 		r3 = READ_ONCE(r2->next);
+> > > > 	}
+> > > > 
+> > > > In this case, it is legal to end the run with:
+> > > > 
+> > > > 	r1 == &y && r2 == &x && r3 == &c
+> > > > 
+> > > > Please see below for a ppcmem litmus test.
+> > > > 
+> > > > So, did I get it right this time?  ;-)
+> > > 
+> > > The code above looks correct to me (in that it matches WRC+addrs),
+> > > but your litmus test:
+> > > 
+> > > > PPC WRCnf+addrs
+> > > > ""
+> > > > {
+> > > > 0:r2=x; 0:r3=y;
+> > > > 1:r2=x; 1:r3=y;
+> > > > 2:r2=x; 2:r3=y;
+> > > > c=a; d=b; x=c; y=d;
+> > > > }
+> > > >  P0           | P1            | P2            ;
+> > > >  stw r3,0(r2) | lwz r8,0(r2)  | lwz r8,0(r3)  ;
+> > > >               | stw r2,0(r3)  | lwz r9,0(r8)  ;
+> > > > exists
+> > > > (1:r8=y /\ 2:r8=x /\ 2:r9=c)
+> > > 
+> > > Seems to be missing the address dependency on P1.
+> > 
+> > You are quite correct!  How about the following?
+> 
+> I think that's it!
+> 
+> > As before, both herd and ppcmem say that the cycle is allowed, as
+> > expected, given non-transitive ordering.  To prohibit the cycle, P1
+> > needs a suitable memory-barrier instruction.
+> > 
+> > ------------------------------------------------------------------------
+> > 
+> > PPC WRCnf+addrs
+> > ""
+> > {
+> > 0:r2=x; 0:r3=y;
+> > 1:r2=x; 1:r3=y;
+> > 2:r2=x; 2:r3=y;
+> > c=a; d=b; x=c; y=d;
+> > }
+> >  P0           | P1            | P2            ;
+> >  stw r3,0(r2) | lwz r8,0(r2)  | lwz r8,0(r3)  ;
+> >               | stw r2,0(r8)  | lwz r9,0(r8)  ;
+> > exists
+> > (1:r8=y /\ 2:r8=x /\ 2:r9=c)
+> 
+> Agreed.
 
-Yes, I realized that it wouldn't help only after sending the previous
-message, sorry about that.
+OK, thank you!  Would you agree that it would be good to replace the
+current xor-based fake-dependency litmus tests with tests having real
+dependencies?
 
-The reason why it helps in the driver code seems to be that
-autosuspend_delay happens to be negative, so update_autosuspend()
-decrements the usage counter that would have stayed incremented
-otherwise.  Or at least that's the only way it can help I see ATM.
-
-> Looks like we have RPM_ACTIVE set in pm_runtime_reinit() if that
-> gives any clues.
-
-It looks like pm_runtime_reinit() should clear the usage counter too.
-
-Thanks,
-Rafael
+							Thanx, Paul
