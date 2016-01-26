@@ -1,34 +1,40 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 26 Jan 2016 14:34:01 +0100
-Subject: [PATCH] ARM: dts: at91: sama5d4: fix instance id of DBGU
-Message-ID: <1453815259-22299-1-git-send-email-nicolas.ferre@atmel.com>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Tue, 26 Jan 2016 16:34:00 +0300
+Subject: [PATCH] clk: rockchip: add hclk_cpubus to the list of rk3188 critical
+ clocks
+Message-ID: <1453815240-15354-1-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mohamed Jamsheeth Hajanajubudeen <mohamedjamsheeth.hajanajubudeen@atmel.com>
+hclk_cpubus needs to keep running because it is needed for devices like
+the rom, i2s0 or spdif to be accessible via cpu. Without that all
+accesses to devices (readl/writel) return wrong data. So add it
+to the list of critical clocks.
 
-Change instance id of DBGU to 45.
+Fixes: 78eaf6095cc763c ("clk: rockchip: disable unused clocks")
 
-Signed-off-by: Mohamed Jamsheeth Hajanajubudeen <mohamedjamsheeth.hajanajubudeen@atmel.com>
-Fixes: 7c661394c56c ("ARM: at91: dt: add device tree file for SAMA5D4 SoC")
-Cc: stable at vger.kernel.org   # 3.18+
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+
+CC: linux-clk at vger.kernel.org
+CC: linux-arm-kernel at lists.infradead.org
+CC: linux-rockchip at lists.infradead.org
+CC: linux-kernel at vger.kernel.org
+CC: stable at vger.kernel.org # 4.1.x-
 ---
- arch/arm/boot/dts/sama5d4.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/rockchip/clk-rk3188.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index b8032bca4621..db1151c18466 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -1342,7 +1342,7 @@
- 			dbgu: serial at fc069000 {
- 				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
- 				reg = <0xfc069000 0x200>;
--				interrupts = <2 IRQ_TYPE_LEVEL_HIGH 7>;
-+				interrupts = <45 IRQ_TYPE_LEVEL_HIGH 7>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_dbgu>;
- 				clocks = <&dbgu_clk>;
+diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
+index abb4760..fe728f8 100644
+--- a/drivers/clk/rockchip/clk-rk3188.c
++++ b/drivers/clk/rockchip/clk-rk3188.c
+@@ -718,6 +718,7 @@ static const char *const rk3188_critical_clocks[] __initconst = {
+ 	"hclk_peri",
+ 	"pclk_cpu",
+ 	"pclk_peri",
++	"hclk_cpubus"
+ };
+ 
+ static void __init rk3188_common_clk_init(struct device_node *np)
 -- 
-2.1.3
+1.7.9.5
