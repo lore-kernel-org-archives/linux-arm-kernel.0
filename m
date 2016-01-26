@@ -1,28 +1,27 @@
-From: incoming@interfax.net (Interfax)
-Date: Tue, 26 Jan 2016 00:08:11 +0000
-Subject: You have received fax, document 000243631
-Message-ID: <9d62e5ce8779e969643f56604545b0f1@interfax.net>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 26 Jan 2016 01:13:39 +0100
+Subject: [PATCH 0/3] Add rk3066 tsadc device tree bindings
+In-Reply-To: <1453205361-27267-1-git-send-email-paweljarosz3691@gmail.com>
+References: <1453205361-27267-1-git-send-email-paweljarosz3691@gmail.com>
+Message-ID: <4176431.EN0Q2CUI1l@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-You have received a new fax.
+Hi,
 
-Please, download fax document attached to this email.
+Am Dienstag, 19. Januar 2016, 13:09:18 schrieb Pawe? Jarosz:
+> This patchset adds devicetree bindings for rockchip rk3066 tsadc with needed
+> dependencies.
+> 
+> Pawe? Jarosz (3):
+>   clk: rockchip: Add new id for rk3066 tsadc clock
+>   clk: rockchip: add tsadc clock on rk3066
+>   ARM: dts: rockchip: add tsadc node
 
-Filename:            scanned-000243631.doc
-Scanned in:          23 seconds
-Pages:               10
-Scanned at:          Mon, 25 Jan 2016 07:46:02 +0300
-Author:              Claude Randolph
-Resolution:          300 DPI
-Filesize:            154 Kb
+applied all three to appropriate branches for 4.6
 
-Thanks for choosing Interfax!
+I've removed the vref-supply from the dtsi and moved some properties around a 
+bit.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: scanned-000243631.zip
-Type: application/zip
-Size: 1540 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160126/863e9b78/attachment.zip>
+
+Heiko
