@@ -1,69 +1,102 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Jan 2016 13:11:20 +0100
-Subject: [PATCH V2 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge driver
- to work on both Zynq and Microblaze
-In-Reply-To: <56A74370.4090000@xilinx.com>
-References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
- <4734542.KZZp0TeeeM@wuerfel> <56A74370.4090000@xilinx.com>
-Message-ID: <2270955.TlqP7HlQk4@wuerfel>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 26 Jan 2016 12:11:24 +0000
+Subject: [PATCH v3 16/17] FDT: Add a helper to get specified name subnode
+In-Reply-To: <1453519184-11908-17-git-send-email-zhaoshenglong@huawei.com>
+References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453519184-11908-17-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <alpine.DEB.2.02.1601261156340.3619@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 January 2016 10:59:12 Michal Simek wrote:
-> >> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-> >> index 3e3757f..1981948 100644
-> >> --- a/drivers/pci/host/pcie-xilinx.c
-> >> +++ b/drivers/pci/host/pcie-xilinx.c
-> >> @@ -92,7 +92,12 @@
-> >>  #define ECAM_DEV_NUM_SHIFT          12
-> >>  
-> >>  /* Number of MSI IRQs */
-> >> -#define XILINX_NUM_MSI_IRQS         128
-> >> +#define XILINX_NUM_MSI_IRQS 128
-> >> +#ifdef CONFIG_ARM
-> >> +#define TOT_NR_IRQS         XILINX_NUM_MSI_IRQS
-> >> +#else
-> >> +#define TOT_NR_IRQS         (NR_IRQS + XILINX_NUM_MSI_IRQS)
-> >> +#endif
-> > 
-> > Something looks wrong here in the microblaze variant. What does NR_IRQS
-> > have to do with it?
+On Sat, 23 Jan 2016, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> Arnd: What was the story regarding NR_IRQS?
-> I remember some discussion about it but just forget.
+> Sometimes it needs to check if there is a node in FDT by full path.
+> Introduce this helper to get the specified name subnode if it exists.
 > 
-> Default value in include/asm-generic/irq.h is 64.
-> Current value is 32 because microblaze primary interrupt controller is
-> axi_intc core which has up to 32 input lines.
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+> CC: Rob Herring <robh@kernel.org>
+> ---
+>  drivers/of/fdt.c       | 35 +++++++++++++++++++++++++++++++++++
+>  include/linux/of_fdt.h |  2 ++
+>  2 files changed, 37 insertions(+)
+> 
+> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> index 655f79d..112ec16 100644
+> --- a/drivers/of/fdt.c
+> +++ b/drivers/of/fdt.c
+> @@ -645,6 +645,41 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
+>  }
+>  
+>  /**
+> + * of_get_flat_dt_subnode_by_name - get subnode of specified node by name
+> + *
+> + * @node: the parent node
+> + * @uname: the name of subnode
+> + * @return offset of the subnode, or -FDT_ERR_NOTFOUND if there is none
+> + */
+> +
+> +int of_get_flat_dt_subnode_by_name(unsigned long node, const char *uname)
+> +{
+> +	const void *blob = initial_boot_params;
+> +	int offset;
+> +	const char *pathp;
+> +
+> +	/* Find first subnode if it exists */
+> +	offset = fdt_first_subnode(blob, node);
+> +	if (offset < 0)
+> +		return -FDT_ERR_NOTFOUND;
+> +	pathp = fdt_get_name(blob, offset, NULL);
+> +	if (strncmp(pathp, uname, strlen(uname)) == 0)
+> +		return offset;
 
-The value in asm-generic is completely arbitrary, it's just something
-that happens to work for a number of the simpler architectures.
+Wouldn't this check succeed even if uname is "uefi" and the node
+name is actually "uefiiiii"?  You might have to use strcmp.
 
-Traditionally, there is a a fixed NR_IRQS which defines the maximum
-number of interrupts that can be used, and each irqchip has a fixed
-start offset below that number.
 
-On modern systems, you have CONFIG_SPARSE_IRQ, which lets an irqchip
-allocate its own interrupts, without an upper limit. This is more
-flexible and avoids preallocating space for all irq_desc instances,
-so it saves memory.
+> +	/* Find other subnodes */
+> +	do {
+> +		offset = fdt_next_subnode(blob, offset);
+> +		if (offset < 0)
+> +			return -FDT_ERR_NOTFOUND;
+> +		pathp = fdt_get_name(blob, offset, NULL);
+> +		if (strncmp(pathp, uname, strlen(uname)) == 0)
+> +			return offset;
+> +	} while (offset >= 0);
 
-This code however doesn't do either of the two on microblaze:
+Rather than writing the name check twice, I think it would be best to
+code this loop as:
 
-+       irq = pos;
-+#ifdef CONFIG_MICROBLAZE
-+#define TOT_NR_IRQS            (NR_IRQS + XILINX_NUM_MSI_IRQS)
-+       irq = XILINX_NUM_MSI_IRQS + pos;
-+#endif
-+       if (irq < TOT_NR_IRQS)
-                set_bit(pos, msi_irq_in_use);
+    for (offset = fdt_first_subnode(blob, offset);
+         offset >= 0;
+         offset = fdt_next_subnode(blob, offset)) {
 
-So you define XILINX_NUM_MSI_IRQS to mean the number of interrupts
-that the xilinx_pcie_port can handle itself, but then pick a number
-outside of this range by making the hwirq number something between
-XILINX_NUM_MSI_IRQS and (2*XILINX_NUM_MSI_IRQS - 1), and in the
-end compare it to (NR_IRQS + XILINX_NUM_MSI_IRQS), which is the
-sum of two things that are not related: the total number of interrupts
-including the MSIs and the number of MSI.
+         /* do name check */
 
-	Arnd
+
+
+> +	return -FDT_ERR_NOTFOUND;
+> +}
+> +
+> +/**
+>   * of_get_flat_dt_root - find the root node in the flat blob
+>   */
+>  unsigned long __init of_get_flat_dt_root(void)
+> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+> index df9ef38..fc28162 100644
+> --- a/include/linux/of_fdt.h
+> +++ b/include/linux/of_fdt.h
+> @@ -52,6 +52,8 @@ extern char __dtb_end[];
+>  extern int of_scan_flat_dt(int (*it)(unsigned long node, const char *uname,
+>  				     int depth, void *data),
+>  			   void *data);
+> +extern int of_get_flat_dt_subnode_by_name(unsigned long node,
+> +					  const char *uname);
+>  extern const void *of_get_flat_dt_prop(unsigned long node, const char *name,
+>  				       int *size);
+>  extern int of_flat_dt_is_compatible(unsigned long node, const char *name);
+> -- 
+> 2.0.4
+> 
+> 
