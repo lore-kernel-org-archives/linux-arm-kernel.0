@@ -1,34 +1,72 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Jan 2016 15:22:12 -0800
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <CAJZ5v0i79X5JjOZiu4cOZ0Esd5BxAvutF8d17asDzq9ECcML-g@mail.gmail.com>
-References: <20160126224804.GB19432@atomide.com>
- <CAJZ5v0i79X5JjOZiu4cOZ0Esd5BxAvutF8d17asDzq9ECcML-g@mail.gmail.com>
-Message-ID: <20160126232212.GE19432@atomide.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 26 Jan 2016 15:25:50 -0800
+Subject: [PATCH v4 15/22] scripts/sortextable: add support for ET_DYN
+ binaries
+In-Reply-To: <1453828249-14467-16-git-send-email-ard.biesheuvel@linaro.org>
+References: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1453828249-14467-16-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAGXu5j+MvpWAsm3S75DDbKNyEcLd=qNXzhAYjAyWy-1K_c+RcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rafael J. Wysocki <rafael@kernel.org> [160126 15:15]:
-> On Tue, Jan 26, 2016 at 11:48 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > Hi,
-> >
-> > Looks like commit 5de85b9d57ab ("PM / runtime: Re-init runtime
-> > PM states at probe error and driver unbind") broke PM on at least
-> > omap3. It seems we now need to additionally also call
-> > pm_runtime_dont_use_autosuspend() to get things working again?
-> >
-> > The following fixes idling on omap3, but I'm wondering if we
-> > should do something in pm_runtime_reinit() instead?
-> 
-> Well, does it actually help if you add
-> pm_runtime_dont_use_autosuspend(dev) to pm_runtime_reinit()?
+On Tue, Jan 26, 2016 at 9:10 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> Add support to scripts/sortextable for handling relocatable (PIE)
+> executables, whose ELF type is ET_DYN, not ET_EXEC. Other than adding
+> support for the new type, no changes are needed.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-No adding it to pm_runtime_reinit() does not help.
+Reviewed-by: Kees Cook <keescook@chromium.org>
 
-Looks like we have RPM_ACTIVE set in pm_runtime_reinit() if that
-gives any clues.
+Something I can actually test! :)
 
-Regards,
+-Kees
 
-Tony
+> ---
+>  scripts/sortextable.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/scripts/sortextable.c b/scripts/sortextable.c
+> index af247c70fb66..19d83647846c 100644
+> --- a/scripts/sortextable.c
+> +++ b/scripts/sortextable.c
+> @@ -266,9 +266,9 @@ do_file(char const *const fname)
+>                 break;
+>         }  /* end switch */
+>         if (memcmp(ELFMAG, ehdr->e_ident, SELFMAG) != 0
+> -       ||  r2(&ehdr->e_type) != ET_EXEC
+> +       ||  (r2(&ehdr->e_type) != ET_EXEC && r2(&ehdr->e_type) != ET_DYN)
+>         ||  ehdr->e_ident[EI_VERSION] != EV_CURRENT) {
+> -               fprintf(stderr, "unrecognized ET_EXEC file %s\n", fname);
+> +               fprintf(stderr, "unrecognized ET_EXEC/ET_DYN file %s\n", fname);
+>                 fail_file();
+>         }
+>
+> @@ -304,7 +304,7 @@ do_file(char const *const fname)
+>                 if (r2(&ehdr->e_ehsize) != sizeof(Elf32_Ehdr)
+>                 ||  r2(&ehdr->e_shentsize) != sizeof(Elf32_Shdr)) {
+>                         fprintf(stderr,
+> -                               "unrecognized ET_EXEC file: %s\n", fname);
+> +                               "unrecognized ET_EXEC/ET_DYN file: %s\n", fname);
+>                         fail_file();
+>                 }
+>                 do32(ehdr, fname, custom_sort);
+> @@ -314,7 +314,7 @@ do_file(char const *const fname)
+>                 if (r2(&ghdr->e_ehsize) != sizeof(Elf64_Ehdr)
+>                 ||  r2(&ghdr->e_shentsize) != sizeof(Elf64_Shdr)) {
+>                         fprintf(stderr,
+> -                               "unrecognized ET_EXEC file: %s\n", fname);
+> +                               "unrecognized ET_EXEC/ET_DYN file: %s\n", fname);
+>                         fail_file();
+>                 }
+>                 do64(ghdr, fname, custom_sort);
+> --
+> 2.5.0
+>
+
+
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
