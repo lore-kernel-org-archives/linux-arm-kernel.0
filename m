@@ -1,92 +1,69 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 26 Jan 2016 12:52:38 -0600
-Subject: [PATCH v9 1/6] arm64, numa: adding numa support for arm64
- platforms.
-In-Reply-To: <1453134965-6125-2-git-send-email-gkulkarni@caviumnetworks.com>
-References: <1453134965-6125-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1453134965-6125-2-git-send-email-gkulkarni@caviumnetworks.com>
-Message-ID: <20160126185238.GB17600@localhost>
+From: rpeterso@redhat.com (Bob Peterson)
+Date: Tue, 26 Jan 2016 14:08:13 -0500 (EST)
+Subject: [PATCH] gfs2: avoid uninitialized variable warning
+In-Reply-To: <1453735996-1958733-2-git-send-email-arnd@arndb.de>
+References: <1453735996-1958733-1-git-send-email-arnd@arndb.de>
+ <1453735996-1958733-2-git-send-email-arnd@arndb.de>
+Message-ID: <1232643434.15889153.1453835293754.JavaMail.zimbra@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 18, 2016 at 10:06:00PM +0530, Ganapatrao Kulkarni wrote:
-> Adding numa support for arm64 based platforms.
-> This patch adds by default the dummy numa node and
-> maps all memory and cpus to node 0.
-> using this patch, numa can be simulated on single node arm64 platforms.
+----- Original Message -----
+> We get a bogus warning about a potential uninitialized variable
+> use in gfs2, because the compiler does not figure out that we
+> never use the leaf number if get_leaf_nr() returns an error:
+> 
+> fs/gfs2/dir.c: In function 'get_first_leaf':
+> fs/gfs2/dir.c:802:9: warning: 'leaf_no' may be used uninitialized in this
+> function [-Wmaybe-uninitialized]
+> fs/gfs2/dir.c: In function 'dir_split_leaf':
+> fs/gfs2/dir.c:1021:8: warning: 'leaf_no' may be used uninitialized in this
+> function [-Wmaybe-uninitialized]
+> 
+> Changing the 'if (!error)' to 'if (!IS_ERR_VALUE(error))' is
+> sufficient to let gcc understand that this is exactly the same
+> condition as in IS_ERR() so it can optimize the code path enough
+> to understand it.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  fs/gfs2/dir.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/fs/gfs2/dir.c b/fs/gfs2/dir.c
+> index 6a92592304fb..d4014af4f064 100644
+> --- a/fs/gfs2/dir.c
+> +++ b/fs/gfs2/dir.c
+> @@ -798,7 +798,7 @@ static int get_first_leaf(struct gfs2_inode *dip, u32
+> index,
+>  	int error;
+>  
+>  	error = get_leaf_nr(dip, index, &leaf_no);
+> -	if (!error)
+> +	if (!IS_ERR_VALUE(error))
+>  		error = get_leaf(dip, leaf_no, bh_out);
+>  
+>  	return error;
+> @@ -1014,7 +1014,7 @@ static int dir_split_leaf(struct inode *inode, const
+> struct qstr *name)
+>  
+>  	index = name->hash >> (32 - dip->i_depth);
+>  	error = get_leaf_nr(dip, index, &leaf_no);
+> -	if (error)
+> +	if (IS_ERR_VALUE(error))
+>  		return error;
+>  
+>  	/*  Get the old leaf block  */
+> --
+> 2.7.0
+> 
+> 
+Hi,
 
-> diff --git a/arch/arm64/include/asm/mmzone.h b/arch/arm64/include/asm/mmzone.h
-> new file mode 100644
-> index 0000000..2cd804d
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/mmzone.h
-> @@ -0,0 +1,18 @@
-> +#ifndef __ASM_MMZONE_H
-> +#define __ASM_MMZONE_H
-> +
-> +#ifdef CONFIG_NUMA
-> +
-> +#include <linux/mmdebug.h>
-> +#include <linux/types.h>
-> +
-> +#include <asm/smp.h>
-> +#include <asm/numa.h>
+Thanks. This is now applied to the for-next branch of the linux-gfs2 tree:
+https://git.kernel.org/cgit/linux/kernel/git/gfs2/linux-gfs2.git/commit/fs/gfs2?h=for-next&id=07cfdc3071432a07713e4d007c2811e0224490b0
 
-Are all these #includes really necessary?  s390 looks very similar and
-doesn't need the #includes.
+Regards,
 
-> +extern struct pglist_data *node_data[];
-> +
-> +#define NODE_DATA(nid)		(node_data[(nid)])
-> +
-> +#endif /* CONFIG_NUMA */
-> +
-> +#endif /* __ASM_MMZONE_H */
-
-> diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
-> new file mode 100644
-> index 0000000..f28f15b0
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/numa.h
-> @@ -0,0 +1,40 @@
-> +#ifndef __ASM_NUMA_H
-> +#define __ASM_NUMA_H
-> +
-> +#include <linux/nodemask.h>
-> +#include <asm/topology.h>
-> +
-> +#ifdef CONFIG_NUMA
-> +
-> +/* currently, arm64 implements flat NUMA topology */
-> +#define parent_node(node)	(node)
-> +
-> +extern int __node_distance(int from, int to);
-
-Below you add some extern function declarations without the "extern"
-keyword.  I don't know what the convention is for arm64 (I omit the
-"extern" for PCI), but it seems like you should at least be
-consistent.
-
-> +#define node_distance(a, b) __node_distance(a, b)
-> +
-> +extern int cpu_to_node_map[NR_CPUS];
-> +extern nodemask_t numa_nodes_parsed __initdata;
-> +
-> +/* Mappings between node number and cpus on that node. */
-> +extern cpumask_var_t node_to_cpumask_map[MAX_NUMNODES];
-> +extern void numa_clear_node(unsigned int cpu);
-> +#ifdef CONFIG_DEBUG_PER_CPU_MAPS
-> +extern const struct cpumask *cpumask_of_node(int node);
-> +#else
-> +/* Returns a pointer to the cpumask of CPUs on Node 'node'. */
-> +static inline const struct cpumask *cpumask_of_node(int node)
-> +{
-> +	return node_to_cpumask_map[node];
-> +}
-> +#endif
-> +
-> +void __init arm64_numa_init(void);
-> +int __init numa_add_memblk(int nodeid, u64 start, u64 end);
-> +void __init numa_set_distance(int from, int to, int distance);
-> +void __init numa_reset_distance(void);
-> +void numa_store_cpu_info(unsigned int cpu);
+Bob Peterson
+Red Hat File Systems
