@@ -1,24 +1,64 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 26 Jan 2016 16:00:19 -0600
-Subject: [PATCH v8 2/5] dt-bindings: mediatek: Add smi dts binding
-In-Reply-To: <1453781562-23556-3-git-send-email-yong.wu@mediatek.com>
-References: <1453781562-23556-1-git-send-email-yong.wu@mediatek.com>
- <1453781562-23556-3-git-send-email-yong.wu@mediatek.com>
-Message-ID: <20160126220019.GA23765@rob-hp-laptop>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 26 Jan 2016 11:44:10 -0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160126102402.GE6357@twins.programming.kicks-ass.net>
+References: <20160113104516.GE25458@arm.com> <56969F4B.7070001@imgtec.com>
+ <20160113204844.GV6357@twins.programming.kicks-ass.net>
+ <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
+ <56980145.5030901@imgtec.com>
+ <20160114204827.GE3818@linux.vnet.ibm.com>
+ <56981212.7050301@imgtec.com>
+ <20160114222046.GH3818@linux.vnet.ibm.com>
+ <20160126102402.GE6357@twins.programming.kicks-ass.net>
+Message-ID: <20160126194410.GQ4503@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 12:12:39PM +0800, Yong Wu wrote:
-> This patch add smi binding document and smi local arbiter header file.
+On Tue, Jan 26, 2016 at 11:24:02AM +0100, Peter Zijlstra wrote:
+> On Thu, Jan 14, 2016 at 02:20:46PM -0800, Paul E. McKenney wrote:
+> > On Thu, Jan 14, 2016 at 01:24:34PM -0800, Leonid Yegoshin wrote:
+> > > On 01/14/2016 12:48 PM, Paul E. McKenney wrote:
+> > > >
+> > > >So SYNC_RMB is intended to implement smp_rmb(), correct?
+> > > Yes.
+> > > >
+> > > >You could use SYNC_ACQUIRE() to implement read_barrier_depends() and
+> > > >smp_read_barrier_depends(), but SYNC_RMB probably does not suffice.
+> > > 
+> > > If smp_read_barrier_depends() is used to separate not only two reads
+> > > but read pointer and WRITE basing on that pointer (example below) -
+> > > yes. I just doesn't see any example of this in famous
+> > > Documentation/memory-barriers.txt and had no chance to know what you
+> > > use it in this way too.
+> > 
+> > Well, Documentation/memory-barriers.txt was intended as a guide for Linux
+> > kernel hackers, and not for hardware architects.
 > 
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> ---
->  .../memory-controllers/mediatek,smi-common.txt     |  24 +++++
->  .../memory-controllers/mediatek,smi-larb.txt       |  25 +++++
->  include/dt-bindings/memory/mt8173-larb-port.h      | 111 +++++++++++++++++++++
->  3 files changed, 160 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/memory-controllers/mediatek,smi-common.txt
->  create mode 100644 Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
->  create mode 100644 include/dt-bindings/memory/mt8173-larb-port.h
+> Yeah, this goes under the header: memory-barriers.txt is _NOT_ a
+> specification (I seem to keep repeating this).
+> 
+> > ------------------------------------------------------------------------
+> > 
+> > commit 955720966e216b00613fcf60188d507c103f0e80
+> > Author: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> > Date:   Thu Jan 14 14:17:04 2016 -0800
+> > 
+> >     documentation: Subsequent writes ordered by rcu_dereference()
+> >     
+> >     The current memory-barriers.txt does not address the possibility of
+> >     a write to a dereferenced pointer.  This should be rare, 
+> 
+> How are these rare? Isn't:
+> 
+> 	rcu_read_lock()
+> 	obj = rcu_dereference(ptr);
+> 	if (!atomic_inc_not_zero(&obj->ref))
+> 		obj = NULL;
+> 	rcu_read_unlock();
+> 
+> a _very_ common thing to do?
 
-Acked-by: Rob Herring <robh@kernel.org>
+It is, but it provides its own barriers, so does not need to rely on
+dependency ordering.
+
+							Thanx, Paul
