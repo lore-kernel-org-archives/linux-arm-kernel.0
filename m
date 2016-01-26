@@ -1,63 +1,53 @@
-From: ralf@ramses-pyramidenbau.de (Ralf Ramsauer)
-Date: Tue, 26 Jan 2016 20:35:38 +0100
-Subject: [PATCH v2 2/2] ARM: tegra: Add high speed UARTs to Jetson TK1
- device tree
-In-Reply-To: <56A7C8B6.6090405@wwwdotorg.org>
-References: <1453827558-10954-1-git-send-email-ralf@ramses-pyramidenbau.de>
- <1453827558-10954-3-git-send-email-ralf@ramses-pyramidenbau.de>
- <56A7C8B6.6090405@wwwdotorg.org>
-Message-ID: <56A7CA8A.5030109@ramses-pyramidenbau.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Jan 2016 11:37:15 -0800
+Subject: [PATCH v2] mmc: omap_hsmmc: don't print uninitialized variables
+In-Reply-To: <3411189.gO0215GrNM@wuerfel>
+References: <3411189.gO0215GrNM@wuerfel>
+Message-ID: <20160126193714.GA19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Arnd Bergmann <arnd@arndb.de> [160126 07:28]:
+> When DT based probing is used but the DMA request fails, the
+> driver will print uninitialized stack data from the rx_req
+> and tx_req variables, as indicated by this warning:
+> 
+> drivers/mmc/host/omap_hsmmc.c: In function 'omap_hsmmc_probe':
+> drivers/mmc/host/omap_hsmmc.c:2162:3: warning: 'rx_req' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>    dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
+> 
+> This removes the DMA request line number from the warning, which
+> is the easiest solution and won't hurt us any more as we are
+> planning to remove the legacy code path anyway.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> A simpler patch as v1 with the same result, as suggested by Peter Ujfalusi.
 
+Looks OK to me:
 
-On 01/26/16 20:27, Stephen Warren wrote:
-> On 01/26/2016 09:59 AM, Ralf Ramsauer wrote:
->> This patch enables the APB DMA high speed UARTs of the Jetson TK1. So
->> far, they were only enabled in NVidia's official BSP.
->>
->> Those additional UARTs are exposed on the expansion connector J3A2:
->>
->>   UART1:
->>    Pin 41: BR_UART1_TXD
->>    Pin 44: BR_UART1_RXD
->>
->>   UART2:
->>    Pin 65: UART2_RXD
->>    Pin 68: UART2_TXD
->>    Pin 71: UART2_CTS_L
->>    Pin 74: UART2_RTS_L
->
-> The series,
-> Acked-by: Stephen Warren <swarren@nvidia.com>
->
->
-> As an aside, this is perfectly OK, but I wonder why you chose to use
-> compatible=nvidia,tegra124-hsuart rather than
-> compatible=nvidia,tegra124-uart. The -hsuart driver has had less
-> testing upstream, whereas the regular -uart driver is heavily used for
-> the main serial console. I assume you tested the new driver when
-> enabling the ports:-)
-Let me explain it, this is how I found the typos :-)
+Acked-by: Tony Lindgren <tony@atomide.com>
 
-tegra124.dtsi states:
-    /*
-     * There are two serial driver i.e. 8250 based simple serial
-     * driver and APB DMA based serial driver for higher baudrate
-     * and performace. To enable the 8250 based driver, the compatible
-     * is "nvidia,tegra124-uart", "nvidia,tegra20-uart" and to enable
-     * the APB DMA based serial driver, the compatible is
-     * "nvidia,tegra124-hsuart", "nvidia,tegra30-hsuart".
-     */
-
-There's nothing written about the upstream stability of the hsuart
-driver. So I didn't even try to use the non-hs uart driver. Nevertheless
-I successfully tested both additional uarts using the hsuart driver
-against 4.5-rc1 and some uart-speaking device.
-
-  Ralf
-
--- 
-Ralf Ramsauer
-GPG: 0x8F10049B
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index b6639ea0bf18..87f0d840a166 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -2159,7 +2159,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+>  						 &rx_req, &pdev->dev, "rx");
+>  
+>  	if (!host->rx_chan) {
+> -		dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
+> +		dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel\n");
+>  		ret = -ENXIO;
+>  		goto err_irq;
+>  	}
+> @@ -2169,7 +2169,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+>  						 &tx_req, &pdev->dev, "tx");
+>  
+>  	if (!host->tx_chan) {
+> -		dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", tx_req);
+> +		dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel\n");
+>  		ret = -ENXIO;
+>  		goto err_irq;
+>  	}
+> 
