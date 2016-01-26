@@ -1,72 +1,56 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 26 Jan 2016 15:25:50 -0800
-Subject: [PATCH v4 15/22] scripts/sortextable: add support for ET_DYN
- binaries
-In-Reply-To: <1453828249-14467-16-git-send-email-ard.biesheuvel@linaro.org>
-References: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
- <1453828249-14467-16-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAGXu5j+MvpWAsm3S75DDbKNyEcLd=qNXzhAYjAyWy-1K_c+RcA@mail.gmail.com>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Wed, 27 Jan 2016 08:28:36 +0900
+Subject: [RFC] scripts: make extract-vmlinux support ARM vmlinuz
+In-Reply-To: <20160126134214.GN10826@n2100.arm.linux.org.uk>
+References: <1453810236-2082-1-git-send-email-rogershimizu@gmail.com>
+ <20160126134214.GN10826@n2100.arm.linux.org.uk>
+Message-ID: <CAEQ9gEmKO9wvp8DMBO8f4dLtxz2DQU-K-am5o0kcYn6uTKF0qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 9:10 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> Add support to scripts/sortextable for handling relocatable (PIE)
-> executables, whose ELF type is ET_DYN, not ET_EXEC. Other than adding
-> support for the new type, no changes are needed.
+On Tue, Jan 26, 2016 at 10:42 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jan 26, 2016 at 09:10:36PM +0900, Roger Shimizu wrote:
+>> vmlinuz on ARM seems is not an ELF, so scripts/extract-vmlinux
+>> diff --git a/scripts/extract-vmlinux b/scripts/extract-vmlinux
+>> index 5061abcc2540..d569eb8c8efe 100755
+>> --- a/scripts/extract-vmlinux
+>> +++ b/scripts/extract-vmlinux
+>> @@ -15,7 +15,15 @@ check_vmlinux()
+>>       # Use readelf to check if it's a valid ELF
+>>       # TODO: find a better to way to check that it's really vmlinux
+>>       #       and not just an elf
+>> -     readelf -h $1 > /dev/null 2>&1 || return 1
+>> +     case "$2" in
+>> +     0|"")
+>> +             readelf -h $1 > /dev/null 2>&1 || return 1
+>> +             ;;
+>> +     1|*)
+>> +     # For ARCH like ARM, vmlinux is not ELF, so we only do the check
+>> +     # when $2 is 0 or NULL
 >
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> This comment seems to be misleading - I think you mean "vmlinuz" there,
+> or maybe "zImage" as the file is named in the kernel build tree to make
+> it clear what you're referring to.  "vmlinuz" is the name chosen by
+> distro installers.
 
-Reviewed-by: Kees Cook <keescook@chromium.org>
+I just add these comment following original comment above.
+And even the script name is "extract-vmlinux".
 
-Something I can actually test! :)
+In the check_vmlinux() routine, the target of the check is
+decompressed result of
+parsed part zImage file.
+I guess the original comment is true, it's called vmlinux in kernel build tree.
 
--Kees
+I hope you can comment:
+- whether my hack work for all ARMs (armel/armhf/arm64 etc). I only
+tested armel.
+- whether there's better way to check ARM's vmlinux
 
-> ---
->  scripts/sortextable.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/scripts/sortextable.c b/scripts/sortextable.c
-> index af247c70fb66..19d83647846c 100644
-> --- a/scripts/sortextable.c
-> +++ b/scripts/sortextable.c
-> @@ -266,9 +266,9 @@ do_file(char const *const fname)
->                 break;
->         }  /* end switch */
->         if (memcmp(ELFMAG, ehdr->e_ident, SELFMAG) != 0
-> -       ||  r2(&ehdr->e_type) != ET_EXEC
-> +       ||  (r2(&ehdr->e_type) != ET_EXEC && r2(&ehdr->e_type) != ET_DYN)
->         ||  ehdr->e_ident[EI_VERSION] != EV_CURRENT) {
-> -               fprintf(stderr, "unrecognized ET_EXEC file %s\n", fname);
-> +               fprintf(stderr, "unrecognized ET_EXEC/ET_DYN file %s\n", fname);
->                 fail_file();
->         }
->
-> @@ -304,7 +304,7 @@ do_file(char const *const fname)
->                 if (r2(&ehdr->e_ehsize) != sizeof(Elf32_Ehdr)
->                 ||  r2(&ehdr->e_shentsize) != sizeof(Elf32_Shdr)) {
->                         fprintf(stderr,
-> -                               "unrecognized ET_EXEC file: %s\n", fname);
-> +                               "unrecognized ET_EXEC/ET_DYN file: %s\n", fname);
->                         fail_file();
->                 }
->                 do32(ehdr, fname, custom_sort);
-> @@ -314,7 +314,7 @@ do_file(char const *const fname)
->                 if (r2(&ghdr->e_ehsize) != sizeof(Elf64_Ehdr)
->                 ||  r2(&ghdr->e_shentsize) != sizeof(Elf64_Shdr)) {
->                         fprintf(stderr,
-> -                               "unrecognized ET_EXEC file: %s\n", fname);
-> +                               "unrecognized ET_EXEC/ET_DYN file: %s\n", fname);
->                         fail_file();
->                 }
->                 do64(ghdr, fname, custom_sort);
-> --
-> 2.5.0
->
+Thank you!
 
-
-
+Cheers,
+Roger
 -- 
-Kees Cook
-Chrome OS & Brillo Security
+Roger Shimizu, GMT +9 Tokyo
+PGP/GPG: 17B3ACB1
