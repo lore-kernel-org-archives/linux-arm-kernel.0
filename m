@@ -1,91 +1,100 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 26 Jan 2016 08:32:07 -0800
-Subject: [PATCH 0/5] clk: rockchip: add full support for HDMI clock on
- rk3288
-In-Reply-To: <CAAObsKBS45kbvdmdvFxwSo=B9GXRLoX2g7WQYVmZJ0KFnwSejw@mail.gmail.com>
-References: <1415087559-19444-1-git-send-email-kever.yang@rock-chips.com>
- <48806799.thBSifdUp8@diego> <54647142.4080800@rock-chips.com>
- <CAD=FV=Vzec3Qm-kc6zZ4VxSREoZbzVkWbzp-noHYdcEVrLYYSw@mail.gmail.com>
- <CAAObsKChYN5nmcm5OWnAzNRGDi_QGSoKvN+0FizhjeT-3mmeXQ@mail.gmail.com>
- <CAD=FV=Wgu=xQ9PcVqfzcedXVU3Rh-HKbBVxHuqgV9OZJEYhYvg@mail.gmail.com>
- <CAAObsKC1v--mZwkiG-c7P2Bwi2-_txbeqaW4Vd5h-noAVNbhjA@mail.gmail.com>
- <CAD=FV=VB93wYigRJ8wa8YL6P+Q+-fRokPiCB-Fo1pC_zAdh2oA@mail.gmail.com>
- <CAAObsKCMh3Bk_oNJdLbU2F9b7jrnFZOp2uFR_oPqUoJ3W1gfaQ@mail.gmail.com>
- <CAD=FV=W=LCJk4m049hBnm7BOYudnVe=oa3jdcSrrZZUU9rFtog@mail.gmail.com>
- <CAAObsKBS45kbvdmdvFxwSo=B9GXRLoX2g7WQYVmZJ0KFnwSejw@mail.gmail.com>
-Message-ID: <CAD=FV=Une-DJ+0zV6Hmx5EmKXCEApb2Zx1FuJaUQf7MT9OPsug@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 26 Jan 2016 16:33:24 +0000
+Subject: [PATCH 2/4] irqchip: irq-armada-370-xp: use the generic MSI
+ infrastructure
+In-Reply-To: <20160126165240.5436c514@free-electrons.com>
+References: <1450707546-15060-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1450707546-15060-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <56A77EB6.3030907@arm.com> <20160126165240.5436c514@free-electrons.com>
+Message-ID: <56A79FD4.4070800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomeu,
-
-On Tue, Jan 26, 2016 at 12:28 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
-> On 22 January 2016 at 18:07, Doug Anderson <dianders@chromium.org> wrote:
->> Tomeu,
+On 26/01/16 15:52, Thomas Petazzoni wrote:
+> Marc,
+> 
+> On Tue, 26 Jan 2016 14:12:06 +0000, Marc Zyngier wrote:
+> 
+>> I finally found some bandwidth to have a look at this. A few comments below:
+> 
+> Great, thanks! Since 4.5-rc1 is out, I was about to resend this patch
+> series, so your review comes exactly at the right time. Some comments
+> below.
+> 
+>>> +static struct irq_chip armada_370_xp_msi_irq_chip = {
+>>> +	.name = "armada_370_xp_msi_irq",
+>>> +	.irq_enable = pci_msi_unmask_irq,
+>>> +	.irq_disable = pci_msi_mask_irq,
+>>> +	.irq_mask = pci_msi_mask_irq,
+>>> +	.irq_unmask = pci_msi_unmask_irq,
 >>
->> On Fri, Jan 22, 2016 at 6:00 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->>> On 21 January 2016 at 21:11, Doug Anderson <dianders@chromium.org> wrote:
->>>> Hi,
->>>>
->>>> On Thu, Jan 21, 2016 at 1:03 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->>>>> So we have a mechanism for detecting a conflict in the clock
->>>>> hierarchy, and a mechanism to solve it, but we are missing a way for
->>>>> userspace to communicate policy regarding which clocks should be given
->>>>> priority when solving such a conflict?
->>>>
->>>> Hrmmm, I guess it could be userspace that makes the decision.  It does
->>>> seem a little odd to force it to userspace in all cases, though.  For
->>>> a particular laptop that is designed with a specific panel connected
->>>> up eDP it seems less than ideal to push this into userspace.  If the
->>>> kernel could just work in the expected sane way (or at least work that
->>>> way by default) it would be ideal.
->>>
->>> Ah, I was wrongly assuming that the kernel didn't have enough
->>> information to make an informed decision in this case, sorry.
->>>
->>> Guess the per-user rate limits don't help here because the consumer
->>> with higher priority could work with frequencies other than the ideal.
->>>
->>> And we cannot have a consumer listening for PRE_RATE_CHANGE and
->>> aborting unwanted changes or rerouting the ancestors of the clocks of
->>> other consumers because that would be a massive violation of
->>> separation of concerns.
->>>
->>> If we were to rearrange the clock topology from within the CCF, then
->>> consumers need to have a way to communicate to the core that they are
->>> more important than other consumers. clk_set_important(clk, true)
->>> could be enough in this case, but would be insufficient in more
->>> complex cases where more than two clocks could use the same PLL.
+>> Having only mask/unmask ought to be enough.
+> 
+> OK, will fix.
+> 
+>>> -	return hwirq;
+>>> -}
+>>> +static struct msi_domain_info armada_370_xp_msi_domain_info = {
+>>> +	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+>>> +		   MSI_FLAG_MULTI_PCI_MSI),
 >>
->> With something like the above I'd still expect some complexity
->> depending on the probe order.  If a less important device grabs the
->> clock first, it might be forced to re-think its clocks later.  That
->> might be disconcerting.
->
-> How much disconcerting do you think this could be? Hopefully those
-> devices should probe quite close to each other, right?
+>> And not MSI-X? That seems rather strange (I'm pretty sure it just works).
+> 
+> See commit 830cbe4b7a918613276aa3d3b28d24410623f92c ("irqchip:
+> armada-370-xp: implement the ->check_device() msi_chip operation") in
+> which we changed the driver to explicitly disable MSI-X support. The HW
+> does support it, but we haven't enabled it yet in the irqchip driver,
+> and we a PCI device driver tries to use MSI-X, it fails badly.
+> 
+> So, I'd like to keep the enabling of MSI-X as a separate exercise, if
+> you don't mind :-)
 
-Probe: probably, though with defers it could be several seconds.
+Sure. It would be interesting to find out what is triggering the issue,
+so having that as a separate patch is fine.
 
-...but remember that display interfaces tend to be hotplug.  That
-might mean that the HDMI interface won't try to set the clock until
-much, much later.
+> 
+>>> -	msg.address_lo = msi_doorbell_addr;
+>>> -	msg.address_hi = 0;
+>>> -	msg.data = 0xf00 | (hwirq + 16);
+>>> +	irq_domain_set_info(domain, virq, hwirq, &armada_370_xp_msi_bottom_irq_chip,
+>>> +			    domain->host_data, handle_simple_irq,
+>>> +			    NULL, NULL);
+>>>  
+>>> -	pci_write_msi_msg(virq, &msg);
+>>> -	return 0;
+>>> +	return hwirq;
+>>
+>> So you are allocating one bit at a time, irrespective of nr_irqs. This
+>> implies that you can't support MULTI_MSI here (you'd need to guarantee a
+>> contiguous allocation of nr_irqs bits). So either you amend your
+>> allocator to deal with those (pretty easy), or you drop MULTI_MSI from
+>> your msi_domain_info.
+> 
+> Correct. Since the patch is already a bit complicated, I'm going to
+> drop MULTI_MSI from this patch, and then add another patch which adds
+> MULTI_MSI support (after adapting the alloc/free functions accordingly).
 
+OK.
 
->> OK, so I was just involved in a change recently that made me realize
->> that maybe our original problems were tied to the fact that our
->> builtin panels were trying to specify a clock that was impossible to
->> achieve with CPLL / GPLL.  It was a known problem that the request
->> would be denied and the CCF would just pick the closest rate it could.
->> Probably the right thing is to solve _that_ problem first.  If using
->> simple panel you could do a change like
->> <https://chromium-review.googlesource.com/#/c/323211/> (though
->> presumably you'd have to handle people using the same panel in other
->> laptops).  You might also be able to do funny things to fixup the mode
->> like dbehr tried to do in
->> <https://chromium-review.googlesource.com/#/c/270017/>.  By doing this
->> and making sure that
->
-> Are we missing something here?
+> 
+>>> +	armada_370_xp_msi_inner_domain =
+>>> +		irq_domain_add_linear(NULL, PCI_MSI_DOORBELL_NR,
+>>> +				      &armada_370_xp_msi_domain_ops, NULL);
+>>
+>> nit: Please keep the assignment on a single line.
+> 
+> Unfortunately, due to the long name of the variable and the function,
+> keeping the assignment on a single line quickly reaches the 80 columns
+> limit, and each argument has to be put on its own line, making the
+> thing even less pretty. I tend to prefer splitting the assignment on
+> several lines like done here in such cases, but if you really don't
+> like, then I don't mind changing that.
 
-Eh?
+I definitely don't mind having lines larger than 80 chars (I've retired
+my vt100 a while ago), but that's your call in the end.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
