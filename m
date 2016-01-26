@@ -1,35 +1,53 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Tue, 26 Jan 2016 15:45:23 -0800
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160126232921.GY4503@linux.vnet.ibm.com>
-References: <20160114204827.GE3818@linux.vnet.ibm.com>
- <20160118081929.GA30420@gondor.apana.org.au>
- <20160118154629.GB3818@linux.vnet.ibm.com>
- <20160126165207.GB6029@fixme-laptop.cn.ibm.com>
- <20160126172227.GG6357@twins.programming.kicks-ass.net>
- <CA+55aFzcC6C8imPs5vk4yH1Y2YHjnAdFM9HCkVs04COxuDQH6w@mail.gmail.com>
- <20160126201037.GU4503@linux.vnet.ibm.com>
- <CA+55aFxjb+2rs2wVHtiSCcOzgMrE8H=yDeNcjyujPQudDCtLgw@mail.gmail.com>
- <CA+55aFwxTJd+uibcxtZD3tGnj_n=LMwyAa0s8qyx_OF0OMWQkA@mail.gmail.com>
- <20160126232921.GY4503@linux.vnet.ibm.com>
-Message-ID: <CA+55aFyD94yaA1QzXgfeO18T-czY3TVUi5n6r-9jOUObDeR-zQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 26 Jan 2016 15:52:23 -0800
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <CAJZ5v0gTRvyWHVmYNb8Q1QZzhVhokXo541+48mFyDRYv7Hi-Uw@mail.gmail.com>
+References: <20160126224804.GB19432@atomide.com>
+ <CAJZ5v0i79X5JjOZiu4cOZ0Esd5BxAvutF8d17asDzq9ECcML-g@mail.gmail.com>
+ <20160126232212.GE19432@atomide.com>
+ <CAJZ5v0gTRvyWHVmYNb8Q1QZzhVhokXo541+48mFyDRYv7Hi-Uw@mail.gmail.com>
+Message-ID: <20160126235222.GF19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 3:29 PM, Paul E. McKenney
-<paulmck@linux.vnet.ibm.com> wrote:
+* Rafael J. Wysocki <rafael@kernel.org> [160126 15:38]:
+> On Wed, Jan 27, 2016 at 12:22 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Rafael J. Wysocki <rafael@kernel.org> [160126 15:15]:
+> >> On Tue, Jan 26, 2016 at 11:48 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >> > Hi,
+> >> >
+> >> > Looks like commit 5de85b9d57ab ("PM / runtime: Re-init runtime
+> >> > PM states at probe error and driver unbind") broke PM on at least
+> >> > omap3. It seems we now need to additionally also call
+> >> > pm_runtime_dont_use_autosuspend() to get things working again?
+> >> >
+> >> > The following fixes idling on omap3, but I'm wondering if we
+> >> > should do something in pm_runtime_reinit() instead?
+> >>
+> >> Well, does it actually help if you add
+> >> pm_runtime_dont_use_autosuspend(dev) to pm_runtime_reinit()?
+> >
+> > No adding it to pm_runtime_reinit() does not help.
+> 
+> Yes, I realized that it wouldn't help only after sending the previous
+> message, sorry about that.
 >
-> No trailing data-dependent read, so agreed, no smp_read_barrier_depends()
-> needed.  That said, I believe that we should encourage rcu_dereference*()
-> or lockless_dereference() instead of READ_ONCE() for documentation
-> reasons, though.
+> The reason why it helps in the driver code seems to be that
+> autosuspend_delay happens to be negative, so update_autosuspend()
+> decrements the usage counter that would have stayed incremented
+> otherwise.  Or at least that's the only way it can help I see ATM.
 
-I agree that that is likely the right thing to do in pretty much all situations.
+Oh OK.
 
-In theory, there might be performance situations where we'd want to
-actively avoid the smp_read_barrier_depends() inherent in those, but
-considering that it's only a performance issue on alpha, and we
-probably have all of two or three people using Linux on alpha, it's a
-pretty theoretical performance worry.
+> > Looks like we have RPM_ACTIVE set in pm_runtime_reinit() if that
+> > gives any clues.
+> 
+> It looks like pm_runtime_reinit() should clear the usage counter too.
 
-                  Linus
+Yeah if we do this when !pm_runtime_enabled(dev) it seems it's
+safe to pretty much reset everything?
+
+Regards,
+
+Tony
