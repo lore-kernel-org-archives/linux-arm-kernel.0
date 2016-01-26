@@ -1,84 +1,147 @@
-From: rbthomas@pobox.com (Rick Thomas)
-Date: Mon, 25 Jan 2016 17:55:17 -0800
-Subject: [PATCH 1/2] ARM: DTS: kirkwood-openrd-client: fix audio
-In-Reply-To: <20160125182459.GE15550@darkstar.musicnaut.iki.fi>
-References: <1453588600-14831-1-git-send-email-aaro.koskinen@iki.fi>
- <1453588600-14831-2-git-send-email-aaro.koskinen@iki.fi>
- <20160124173701.GU3880@lunn.ch>
- <411C1DFA-3E76-42B0-866C-7C3C0D990039@pobox.com>
- <20160124214020.GA28667@jirafa.cyrius.com>
- <8E11A1EE-D73B-462E-A493-39571A17F2C3@pobox.com>
- <20160125182459.GE15550@darkstar.musicnaut.iki.fi>
-Message-ID: <E4776C8C-158A-4A3D-B6D8-A6D347CE94B1@pobox.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Tue, 26 Jan 2016 10:06:43 +0800
+Subject: [PATCH] arm: dts: rockchip: remove broken-cd from emmc and sdio
+Message-ID: <1453774003-10184-1-git-send-email-shawn.lin@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Only one of "broken-cd" and "non-removable" should be supplied
+according to Documentation/devicetree/bindings/mmc/mmc.txt.
+Obviously emmc and sdio-wifi are non-removable devices, while
+broken-cd is for removable device whose card detect pin is broken.
 
-On Jan 25, 2016, at 10:24 AM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+---
 
-> Hi,
-> 
-> On Sun, Jan 24, 2016 at 07:26:43PM -0800, Rick Thomas wrote:
->>> root at base:~# cat /proc/asound/devices 
->>>  2: [ 0]   : control
->>>  3: [ 0- 0]: digital audio playback
->>>  4: [ 0- 0]: digital audio capture
->>> 33:        : timer
->>> root at base:~# cat /proc/asound/cards   
->>> 0 [i2scs42l51hifi ]: i2s-cs42l51-hif - i2s-cs42l51-hifi
->>>                      i2s-cs42l51-hifi
->> 
->> Full of hope, I did "aptitude install mp321" which went without any visible problems.
->> 
->> Then hooked up a pair of earphones to the "speaker" plug on the Client and ran
->> 
->>> root at base:~# mpg321 -v /tmp/Jersey.mp3 
->>> High Performance MPEG 1.0/2.0/2.5 Audio Player for Layer 1, 2, and 3.
->>> Version 0.3.2-1 (2012/03/25). Written and copyrights by Joe Drew,
->>> now maintained by Nanakos Chrysostomos and others.
->>> Uses code from various people. See 'README' for more!
->>> THIS SOFTWARE COMES WITH ABSOLUTELY NO WARRANTY! USE AT YOUR OWN RISK!
->>> Title	: The Jersey Bounce              Artist : Zazuzaz                       
->>> Album	: An Evening with ZaZuZaz        Year	 : 2000
->>> Comment : Amazon.com Song ID: 201809221  Genre : Jazz                          
->>> 
->>> Directory: /tmp
->>> Playing MPEG stream from Jersey.mp3 ...
->>> MPEG 1.0, Layer: III, Freq: 44100, mode: Joint-Stereo, modext: 0, BPF : 2560
->>> Channels: 2, copyright: No, original: Yes, CRC: No, emphasis: 0.
->>> Bitrate: 128 Kbits/s, Extension value: 0
->>> Audio: 1:1 conversion, rate: 44100, encoding: signed 16 bit, channels: 2
->>> ALSA lib pcm.c:2267:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.front
->>> ^C                                                                            
->>> [0:20] Decoding of Jersey.mp3 finished.
->> 
->> So it seemed to be running OK...  But there was no sound in the
->> earphones. I also tried adding option "-g 50" to set the gain explicitly.
->> Still no sound.
->> 
->> Is there a hardware jumper I need to set to activate sound on the
->> OpenRD Client board?
-> 
-> On my board I need to say "amixer set PCM on". Can you post the full
-> output from "amixer" without any parameters?
-> 
-> Also check if you have this line in dmesg:
-> 
-> 	asoc-simple-card sound: cs42l51-hifi <-> i2s mapping ok
-> 
-> If it says "spdif" the player runs but is silent.
-> 
-> A.
+ arch/arm/boot/dts/rk3036-kylin.dts     | 1 -
+ arch/arm/boot/dts/rk3036.dtsi          | 1 -
+ arch/arm/boot/dts/rk3066a-rayeager.dts | 2 --
+ arch/arm/boot/dts/rk3228-evb.dts       | 1 -
+ arch/arm/boot/dts/rk3288-evb.dtsi      | 1 -
+ arch/arm/boot/dts/rk3288-firefly.dtsi  | 2 --
+ arch/arm/boot/dts/rk3288-popmetal.dts  | 1 -
+ arch/arm/boot/dts/rk3288-veyron.dtsi   | 2 --
+ 8 files changed, 11 deletions(-)
 
-Martin suggested that I install alsa-utils and run alsamixer in order to remove any extraneous "mute" setting.  I did that (I didn't realize alsamixer was runnable from the command line -- good to know!)
-
-I did that and it worked!  "The Jersey Bounce" never sounded so good!
-
-I'll do the tests that Aaro suggest, just for completeness, but it will have to wait til later tonight.
-
-So we can add -- 
-
-Tested-by: Rick Thomas <rbthomas@pobox.com>
-
-Enjoy!
-Rick
+diff --git a/arch/arm/boot/dts/rk3036-kylin.dts b/arch/arm/boot/dts/rk3036-kylin.dts
+index 992f9ca..023153a 100644
+--- a/arch/arm/boot/dts/rk3036-kylin.dts
++++ b/arch/arm/boot/dts/rk3036-kylin.dts
+@@ -262,7 +262,6 @@
+ &sdio {
+ 	status = "okay";
+ 
+-	broken-cd;
+ 	bus-width = <4>;
+ 	cap-sdio-irq;
+ 	default-sample-phase = <90>;
+diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+index b9567c1..cf54066 100644
+--- a/arch/arm/boot/dts/rk3036.dtsi
++++ b/arch/arm/boot/dts/rk3036.dtsi
+@@ -214,7 +214,6 @@
+ 		compatible = "rockchip,rk3288-dw-mshc";
+ 		reg = <0x1021c000 0x4000>;
+ 		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+-		broken-cd;
+ 		bus-width = <8>;
+ 		cap-mmc-highspeed;
+ 		clock-frequency = <37500000>;
+diff --git a/arch/arm/boot/dts/rk3066a-rayeager.dts b/arch/arm/boot/dts/rk3066a-rayeager.dts
+index 341c1f8..e9db017 100644
+--- a/arch/arm/boot/dts/rk3066a-rayeager.dts
++++ b/arch/arm/boot/dts/rk3066a-rayeager.dts
+@@ -170,7 +170,6 @@
+ };
+ 
+ &emmc {
+-	broken-cd;
+ 	bus-width = <8>;
+ 	cap-mmc-highspeed;
+ 	disable-wp;
+@@ -336,7 +335,6 @@
+ };
+ 
+ &mmc1 {
+-	broken-cd;
+ 	bus-width = <4>;
+ 	disable-wp;
+ 	non-removable;
+diff --git a/arch/arm/boot/dts/rk3228-evb.dts b/arch/arm/boot/dts/rk3228-evb.dts
+index e3898b8..a6d6a7b 100644
+--- a/arch/arm/boot/dts/rk3228-evb.dts
++++ b/arch/arm/boot/dts/rk3228-evb.dts
+@@ -53,7 +53,6 @@
+ };
+ 
+ &emmc {
+-	broken-cd;
+ 	cap-mmc-highspeed;
+ 	mmc-ddr-1_8v;
+ 	disable-wp;
+diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
+index 4faabdb..f90e408 100644
+--- a/arch/arm/boot/dts/rk3288-evb.dtsi
++++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+@@ -172,7 +172,6 @@
+ };
+ 
+ &emmc {
+-	broken-cd;
+ 	bus-width = <8>;
+ 	cap-mmc-highspeed;
+ 	disable-wp;
+diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
+index 4e3fd9a..3f36af7 100644
+--- a/arch/arm/boot/dts/rk3288-firefly.dtsi
++++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
+@@ -208,7 +208,6 @@
+ };
+ 
+ &emmc {
+-	broken-cd;
+ 	bus-width = <8>;
+ 	cap-mmc-highspeed;
+ 	disable-wp;
+@@ -485,7 +484,6 @@
+ };
+ 
+ &sdio0 {
+-	broken-cd;
+ 	bus-width = <4>;
+ 	disable-wp;
+ 	non-removable;
+diff --git a/arch/arm/boot/dts/rk3288-popmetal.dts b/arch/arm/boot/dts/rk3288-popmetal.dts
+index 65c4756..cc2be77 100644
+--- a/arch/arm/boot/dts/rk3288-popmetal.dts
++++ b/arch/arm/boot/dts/rk3288-popmetal.dts
+@@ -162,7 +162,6 @@
+ };
+ 
+ &emmc {
+-	broken-cd;
+ 	bus-width = <8>;
+ 	cap-mmc-highspeed;
+ 	disable-wp;
+diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
+index 9fce91f..725e08b 100644
+--- a/arch/arm/boot/dts/rk3288-veyron.dtsi
++++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
+@@ -146,7 +146,6 @@
+ &emmc {
+ 	status = "okay";
+ 
+-	broken-cd;
+ 	bus-width = <8>;
+ 	cap-mmc-highspeed;
+ 	rockchip,default-sample-phase = <158>;
+@@ -352,7 +351,6 @@
+ &sdio0 {
+ 	status = "okay";
+ 
+-	broken-cd;
+ 	bus-width = <4>;
+ 	cap-sd-highspeed;
+ 	cap-sdio-irq;
+-- 
+2.3.7
