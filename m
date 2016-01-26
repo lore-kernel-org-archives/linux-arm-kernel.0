@@ -1,77 +1,87 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 26 Jan 2016 18:10:31 +0100
-Subject: [PATCH v4 04/22] arm64: decouple early fixmap init from linear mapping
+Date: Tue, 26 Jan 2016 18:10:29 +0100
+Subject: [PATCH v4 02/22] arm64: introduce KIMAGE_VADDR as the virtual base of
+ the kernel region
 In-Reply-To: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1453828249-14467-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1453828249-14467-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the early fixmap page tables are populated using pages that are
-part of the static footprint of the kernel, they are covered by the
-initial kernel mapping, and we can refer to them without using __va/__pa
-translations, which are tied to the linear mapping.
-
-Since the fixmap page tables are disjoint from the kernel mapping up
-to the top level pgd entry, we can refer to bm_pte[] directly, and there
-is no need to walk the page tables and perform __pa()/__va() translations
-at each step.
+This introduces the preprocessor symbol KIMAGE_VADDR which will serve as
+the symbolic virtual base of the kernel region, i.e., the kernel's virtual
+offset will be KIMAGE_VADDR + TEXT_OFFSET. For now, we define it as being
+equal to PAGE_OFFSET, but in the future, it will be moved below it once
+we move the kernel virtual mapping out of the linear mapping.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/mm/mmu.c | 16 ++++++----------
- 1 file changed, 6 insertions(+), 10 deletions(-)
+ arch/arm64/include/asm/memory.h | 10 ++++++++--
+ arch/arm64/kernel/head.S        |  2 +-
+ arch/arm64/kernel/vmlinux.lds.S |  4 ++--
+ 3 files changed, 11 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 7711554a94f4..cb3a7bdb4e23 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -583,7 +583,7 @@ static inline pud_t * fixmap_pud(unsigned long addr)
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 853953cd1f08..bea9631b34a8 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -51,7 +51,8 @@
+ #define VA_BITS			(CONFIG_ARM64_VA_BITS)
+ #define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
+ #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
+-#define MODULES_END		(PAGE_OFFSET)
++#define KIMAGE_VADDR		(PAGE_OFFSET)
++#define MODULES_END		(KIMAGE_VADDR)
+ #define MODULES_VADDR		(MODULES_END - SZ_64M)
+ #define PCI_IO_END		(MODULES_VADDR - SZ_2M)
+ #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
+@@ -75,8 +76,13 @@
+  * private definitions which should NOT be used outside memory.h
+  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+  */
+-#define __virt_to_phys(x)	(((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
++#define __virt_to_phys(x) ({						\
++	phys_addr_t __x = (phys_addr_t)(x);				\
++	__x >= PAGE_OFFSET ? (__x - PAGE_OFFSET + PHYS_OFFSET) :	\
++			     (__x - KIMAGE_VADDR + PHYS_OFFSET); })
++
+ #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
++#define __phys_to_kimg(x)	((unsigned long)((x) - PHYS_OFFSET + KIMAGE_VADDR))
  
- 	BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
- 
--	return pud_offset(pgd, addr);
-+	return pud_offset_kimg(pgd, addr);
- }
- 
- static inline pmd_t * fixmap_pmd(unsigned long addr)
-@@ -592,16 +592,12 @@ static inline pmd_t * fixmap_pmd(unsigned long addr)
- 
- 	BUG_ON(pud_none(*pud) || pud_bad(*pud));
- 
--	return pmd_offset(pud, addr);
-+	return pmd_offset_kimg(pud, addr);
- }
- 
- static inline pte_t * fixmap_pte(unsigned long addr)
- {
--	pmd_t *pmd = fixmap_pmd(addr);
--
--	BUG_ON(pmd_none(*pmd) || pmd_bad(*pmd));
--
--	return pte_offset_kernel(pmd, addr);
-+	return &bm_pte[pte_index(addr)];
- }
- 
- void __init early_fixmap_init(void)
-@@ -613,14 +609,14 @@ void __init early_fixmap_init(void)
- 
- 	pgd = pgd_offset_k(addr);
- 	pgd_populate(&init_mm, pgd, bm_pud);
--	pud = pud_offset(pgd, addr);
-+	pud = fixmap_pud(addr);
- 	pud_populate(&init_mm, pud, bm_pmd);
--	pmd = pmd_offset(pud, addr);
-+	pmd = fixmap_pmd(addr);
- 	pmd_populate_kernel(&init_mm, pmd, bm_pte);
- 
- 	/*
- 	 * The boot-ioremap range spans multiple pmds, for which
--	 * we are not preparted:
-+	 * we are not prepared:
+ /*
+  * Convert a page to/from a physical address
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 51370f8808bc..85181cb60f46 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -389,7 +389,7 @@ __create_page_tables:
+ 	 * Map the kernel image (starting with PHYS_OFFSET).
  	 */
- 	BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
- 		     != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
+ 	mov	x0, x26				// swapper_pg_dir
+-	mov	x5, #PAGE_OFFSET
++	ldr	x5, =KIMAGE_VADDR
+ 	create_pgd_entry x0, x5, x3, x6
+ 	ldr	x6, =KERNEL_END			// __va(KERNEL_END)
+ 	mov	x3, x24				// phys offset
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index b78a3c772294..282e3e64a17e 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -89,7 +89,7 @@ SECTIONS
+ 		*(.discard.*)
+ 	}
+ 
+-	. = PAGE_OFFSET + TEXT_OFFSET;
++	. = KIMAGE_VADDR + TEXT_OFFSET;
+ 
+ 	.head.text : {
+ 		_text = .;
+@@ -186,4 +186,4 @@ ASSERT(__idmap_text_end - (__idmap_text_start & ~(SZ_4K - 1)) <= SZ_4K,
+ /*
+  * If padding is applied before .head.text, virt<->phys conversions will fail.
+  */
+-ASSERT(_text == (PAGE_OFFSET + TEXT_OFFSET), "HEAD is misaligned")
++ASSERT(_text == (KIMAGE_VADDR + TEXT_OFFSET), "HEAD is misaligned")
 -- 
 2.5.0
