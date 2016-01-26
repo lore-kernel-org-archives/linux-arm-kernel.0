@@ -1,88 +1,101 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 26 Jan 2016 15:00:10 +0100
-Subject: N900 sleep mode (in 4.5-rc0, if that matters)
-In-Reply-To: <20160125163332.GT19432@atomide.com>
-References: <20160123121022.GB12497@amd> <20160125163332.GT19432@atomide.com>
-Message-ID: <20160126140010.GA29723@amd>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Tue, 26 Jan 2016 15:00:56 +0100
+Subject: [PATCH v1 0/3] Add VP8 deocder for rk3229 & rk3288
+In-Reply-To: <56A73CB9.2040802@rock-chips.com>
+References: <1453799046-307-1-git-send-email-jung.zhao@rock-chips.com>
+ <56A73CB9.2040802@rock-chips.com>
+Message-ID: <CAFqH_52UbNW86Bx3Zo9rxPWjx_018j+BBy55ZwzNs9Kf2X7v7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Jung,
 
-> > Power consumption seems to be in 500mA range, regardless of
-> > off_mode. That would mean about 2 hours of battery life, AFAICT.
-> 
-> Sounds like you have USB connected and charging? You can
-> get into just few mW range with the mainline kernel for sure
-> on omap3. It's just a quetion of fixing whatever few drivers
-> that are still causing issues on n900.
-> 
-> Typically you need at least USB disconnected and LCD blanked
-> to start hitting the deeper idle states :)
+2016-01-26 10:30 GMT+01:00 Shawn Lin <shawn.lin@rock-chips.com>:
+> Hi jun,
+>
+> Where is the dt-bingding documentation about your VP8 controller?
+>
+> And would you please share some info about rk3229? I can just find
+> rk3228 in mainline, otherwise may someone think it's a misspell.
+>
+> Thanks.
+>
+>
+> On 2016/1/26 17:04, Jung Zhao wrote:
+>>
+>> From: zhaojun <jung.zhao@rock-chips.com>
+>>
+>>
+>> ====================
+>> Introduction
+>> ====================
+>>
+>> The purpose of this series is to add the driver for vp8
+>> decoder on rk3229 & rk3288 platform, and will support
+>> more formats in the future.
+>>
+>> The driver uses v4l2 framework and RK IOMMU.
+>> RK IOMMU has not yet been merged.
+>>
 
-Ok, no 4.4 kernel + your patch this time, USB disconnected, LCD
-blanked, but wifi connected and X session running on inactive vt. GSM
-connected to network.
+Can you share or specify what patches are needed, are they already
+send to upstream ? So people that want to test your series knows what
+they need to apply
 
-It seems like I have rather lot of blocking bits:
+I think that, at least, this patch is required:
 
-usbhost_pwrdm
-(ON),OFF:3321,RET:37501,INA:0,ON:40823,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-sgx_pwrdm
-(OFF),OFF:1,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-core_pwrdm
-(ON),OFF:0,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
-per_pwrdm
-(ON),OFF:3321,RET:33,INA:0,ON:3355,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-dss_pwrdm
-(ON),OFF:3321,RET:19014,INA:0,ON:22336,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-cam_pwrdm
-(ON),OFF:3321,RET:37500,INA:2,ON:40824,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-neon_pwrdm (ON),OFF:3321,RET:37501,INA:0,ON:40823,RET-LOGIC-OFF:0
-mpu_pwrdm
-(ON),OFF:3321,RET:37501,INA:0,ON:40823,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-iva2_pwrdm
-(OFF),OFF:1,RET:1,INA:0,ON:2,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0,RE
-T-MEMBANK3-OFF:0,RET-MEMBANK4-OFF:0
-usbhost_clkdm->usbhost_pwrdm (1)
-sgx_clkdm->sgx_pwrdm (0)
-per_clkdm->per_pwrdm (19)
-cam_clkdm->cam_pwrdm (1)
-dss_clkdm->dss_pwrdm (1)
-d2d_clkdm->core_pwrdm (0)
-iva2_clkdm->iva2_pwrdm (0)
-mpu_clkdm->mpu_pwrdm (0)
-core_l4_clkdm->core_pwrdm (20)
-core_l3_clkdm->core_pwrdm (2)
-neon_clkdm->neon_pwrdm (0)
-00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
-ffdffe8d 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00200072
-0000000d 48004a28 (fa004a28) cm_idlest3_core
+iommu/rockchip: reconstruct to support multi slaves [1]
 
-cm_idlest1_core changes periodicall often, to 00218072. The rest seems
-constant.
+If this is not already accepted, maybe is a good idea include this
+patch in the patch series
 
-I'm using script below:
+[1] http://www.gossamer-threads.com/lists/linux/kernel/2347458
 
-#!/bin/bash
-uarts=$(find /sys/class/tty/ttyO*/device/power/ -type d)
-for uart in $uarts; do
-    echo 3000 > $uart/autosuspend_delay_ms
-    done
-    uarts=$(find /sys/class/tty/ttyO*/power/ -type d)
-    for uart in $uarts; do
-        echo enabled > $uart/wakeup
-	    echo auto > $uart/control
-	    done
-	    sudo mount /dev/zero -t debugfs /sys/kernel/debug/
-	    echo 1 > /sys/kernel/debug/pm_debug/enable_off_mode
+>>
+>>
+>> zhaojun (3):
+>>    media: v4l: Add VP8 format support in V4L2 framework
+>>    media: VPU: support Rockchip VPU
+>>    media: vcodec: rockchip: Add Rockchip VP8 decoder driver
+>>
+>>   drivers/media/platform/rockchip-vpu/Makefile       |    7 +
+>>   .../media/platform/rockchip-vpu/rkvpu_hw_vp8d.c    |  798 ++++++++++
+>>   .../platform/rockchip-vpu/rockchip_vp8d_regs.h     | 1594
+>> ++++++++++++++++++++
+>>   drivers/media/platform/rockchip-vpu/rockchip_vpu.c |  799 ++++++++++
+>>   .../platform/rockchip-vpu/rockchip_vpu_common.h    |  439 ++++++
+>>   .../media/platform/rockchip-vpu/rockchip_vpu_dec.c | 1007 +++++++++++++
+>>   .../media/platform/rockchip-vpu/rockchip_vpu_dec.h |   33 +
+>>   .../media/platform/rockchip-vpu/rockchip_vpu_hw.c  |  295 ++++
+>>   .../media/platform/rockchip-vpu/rockchip_vpu_hw.h  |  100 ++
+>>   drivers/media/v4l2-core/v4l2-ctrls.c               |   17 +-
+>>   drivers/media/v4l2-core/v4l2-ioctl.c               |    3 +
+>>   drivers/media/v4l2-core/videobuf2-dma-contig.c     |   51 +-
+>>   include/media/v4l2-ctrls.h                         |    2 +
+>>   include/media/videobuf2-dma-contig.h               |   11 +-
+>>   include/uapi/linux/v4l2-controls.h                 |   98 ++
+>>   include/uapi/linux/videodev2.h                     |    5 +
+>>   16 files changed, 5238 insertions(+), 21 deletions(-)
+>>   create mode 100644 drivers/media/platform/rockchip-vpu/Makefile
+>>   create mode 100644 drivers/media/platform/rockchip-vpu/rkvpu_hw_vp8d.c
+>>   create mode 100644
+>> drivers/media/platform/rockchip-vpu/rockchip_vp8d_regs.h
+>>   create mode 100644 drivers/media/platform/rockchip-vpu/rockchip_vpu.c
+>>   create mode 100644
+>> drivers/media/platform/rockchip-vpu/rockchip_vpu_common.h
+>>   create mode 100644
+>> drivers/media/platform/rockchip-vpu/rockchip_vpu_dec.c
+>>   create mode 100644
+>> drivers/media/platform/rockchip-vpu/rockchip_vpu_dec.h
+>>   create mode 100644 drivers/media/platform/rockchip-vpu/rockchip_vpu_hw.c
+>>   create mode 100644 drivers/media/platform/rockchip-vpu/rockchip_vpu_hw.h
+>>
+>
+>
+> --
+> Best Regards
+> Shawn Lin
+>
 
-sudo cat /sys/kernel/debug/pm_debug/count
-
-. Does it mean that more than 5 devices block the suspend?
-
-Best regards,
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Best Regards,
+Enric
