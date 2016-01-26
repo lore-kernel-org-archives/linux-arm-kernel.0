@@ -1,269 +1,51 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 26 Jan 2016 18:10:49 +0100
-Subject: [PATCH v4 22/22] arm64: efi: invoke EFI_RNG_PROTOCOL to supply KASLR
- randomness
-In-Reply-To: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1453828249-14467-23-git-send-email-ard.biesheuvel@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 26 Jan 2016 17:13:12 +0000
+Subject: [PATCH v3 0/3] io-pgtable ARM short descriptor format
+Message-ID: <cover.1453723096.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since arm64 does not use a decompressor that supplies an execution
-environment where it is feasible to some extent to provide a source of
-randomness, the arm64 KASLR kernel depends on the bootloader to supply
-some random bits in the /chosen/kaslr-seed DT property upon kernel entry.
+Hi all,
 
-On UEFI systems, we can use the EFI_RNG_PROTOCOL, if supplied, to obtain
-some random bits. At the same time, use it to randomize the offset of the
-kernel Image in physical memory.
+As promised, here's v3 based on 4.5-rc1, with all the previous comments
+addressed other than the logic of split_blk_unmap() - having looked into
+it, trying to simplify that essentially just pushes the complexity out
+into map() and complicates the general case. Ultimately it's an awkward
+edge case to handle however it's implemented, and keeping it as close as
+possible to the LPAE version makes it somewhat easier to reason about.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/Kconfig                        |  5 ++
- drivers/firmware/efi/libstub/arm-stub.c   | 40 ++++++----
- drivers/firmware/efi/libstub/arm64-stub.c | 78 ++++++++++++++------
- drivers/firmware/efi/libstub/fdt.c        |  9 +++
- 4 files changed, 97 insertions(+), 35 deletions(-)
+This is currently just a dependency for the Mediatek IOMMU series[1] -
+the ARM SMMU driver support I've been testing with is now much closer to
+"proper patch" than "horrible development hack", but still depends on a
+bunch of other work in that driver I need to post first.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index d7e31454d421..c6b5f71996e0 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -786,6 +786,11 @@ config RANDOMIZE_BASE
- 	  It is the bootloader's job to provide entropy, by passing a
- 	  random u64 value in /chosen/kaslr-seed at kernel entry.
- 
-+	  When booting via the UEFI stub, it will invoke the firmware's
-+	  EFI_RNG_PROTOCOL implementation (if available) to supply entropy
-+	  to the kernel proper. In addition, it will randomise the physical
-+	  location of the kernel Image as well.
-+
- 	  If unsure, say N.
- 
- endmenu
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index 3397902e4040..4deb3e7faa0e 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -18,6 +18,8 @@
- 
- #include "efistub.h"
- 
-+bool __nokaslr;
-+
- static int efi_secureboot_enabled(efi_system_table_t *sys_table_arg)
- {
- 	static efi_guid_t const var_guid = EFI_GLOBAL_VARIABLE_GUID;
-@@ -207,14 +209,6 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 		pr_efi_err(sys_table, "Failed to find DRAM base\n");
- 		goto fail;
- 	}
--	status = handle_kernel_image(sys_table, image_addr, &image_size,
--				     &reserve_addr,
--				     &reserve_size,
--				     dram_base, image);
--	if (status != EFI_SUCCESS) {
--		pr_efi_err(sys_table, "Failed to relocate kernel\n");
--		goto fail;
--	}
- 
- 	/*
- 	 * Get the command line from EFI, using the LOADED_IMAGE
-@@ -224,7 +218,28 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 	cmdline_ptr = efi_convert_cmdline(sys_table, image, &cmdline_size);
- 	if (!cmdline_ptr) {
- 		pr_efi_err(sys_table, "getting command line via LOADED_IMAGE_PROTOCOL\n");
--		goto fail_free_image;
-+		goto fail;
-+	}
-+
-+	/* check whether 'nokaslr' was passed on the command line */
-+	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
-+		static const u8 default_cmdline[] = CONFIG_CMDLINE;
-+		const u8 *str, *cmdline = cmdline_ptr;
-+
-+		if (IS_ENABLED(CONFIG_CMDLINE_FORCE))
-+			cmdline = default_cmdline;
-+		str = strstr(cmdline, "nokaslr");
-+		if (str == cmdline || (str > cmdline && *(str - 1) == ' '))
-+			__nokaslr = true;
-+	}
-+
-+	status = handle_kernel_image(sys_table, image_addr, &image_size,
-+				     &reserve_addr,
-+				     &reserve_size,
-+				     dram_base, image);
-+	if (status != EFI_SUCCESS) {
-+		pr_efi_err(sys_table, "Failed to relocate kernel\n");
-+		goto fail_free_cmdline;
- 	}
- 
- 	status = efi_parse_options(cmdline_ptr);
-@@ -244,7 +259,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 
- 		if (status != EFI_SUCCESS) {
- 			pr_efi_err(sys_table, "Failed to load device tree!\n");
--			goto fail_free_cmdline;
-+			goto fail_free_image;
- 		}
- 	}
- 
-@@ -286,12 +301,11 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 	efi_free(sys_table, initrd_size, initrd_addr);
- 	efi_free(sys_table, fdt_size, fdt_addr);
- 
--fail_free_cmdline:
--	efi_free(sys_table, cmdline_size, (unsigned long)cmdline_ptr);
--
- fail_free_image:
- 	efi_free(sys_table, image_size, *image_addr);
- 	efi_free(sys_table, reserve_size, reserve_addr);
-+fail_free_cmdline:
-+	efi_free(sys_table, cmdline_size, (unsigned long)cmdline_ptr);
- fail:
- 	return EFI_ERROR;
- }
-diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
-index 78dfbd34b6bf..e0e6b74fef8f 100644
---- a/drivers/firmware/efi/libstub/arm64-stub.c
-+++ b/drivers/firmware/efi/libstub/arm64-stub.c
-@@ -13,6 +13,10 @@
- #include <asm/efi.h>
- #include <asm/sections.h>
- 
-+#include "efistub.h"
-+
-+extern bool __nokaslr;
-+
- efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
- 					unsigned long *image_addr,
- 					unsigned long *image_size,
-@@ -23,26 +27,52 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
- {
- 	efi_status_t status;
- 	unsigned long kernel_size, kernel_memsize = 0;
--	unsigned long nr_pages;
- 	void *old_image_addr = (void *)*image_addr;
- 	unsigned long preferred_offset;
-+	u64 phys_seed = 0;
-+
-+	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
-+		if (!__nokaslr) {
-+			status = efi_get_random_bytes(sys_table_arg,
-+						      sizeof(phys_seed),
-+						      (u8 *)&phys_seed);
-+			if (status == EFI_NOT_FOUND) {
-+				pr_efi(sys_table_arg, "EFI_RNG_PROTOCOL unavailable, no randomness supplied\n");
-+			} else if (status != EFI_SUCCESS) {
-+				pr_efi_err(sys_table_arg, "efi_get_random_bytes() failed\n");
-+				return status;
-+			}
-+		} else {
-+			pr_efi(sys_table_arg, "KASLR disabled on kernel command line\n");
-+		}
-+	}
- 
- 	/*
- 	 * The preferred offset of the kernel Image is TEXT_OFFSET bytes beyond
- 	 * a 2 MB aligned base, which itself may be lower than dram_base, as
- 	 * long as the resulting offset equals or exceeds it.
- 	 */
--	preferred_offset = round_down(dram_base, SZ_2M) + TEXT_OFFSET;
-+	preferred_offset = round_down(dram_base, MIN_KIMG_ALIGN) + TEXT_OFFSET;
- 	if (preferred_offset < dram_base)
--		preferred_offset += SZ_2M;
-+		preferred_offset += MIN_KIMG_ALIGN;
- 
--	/* Relocate the image, if required. */
- 	kernel_size = _edata - _text;
--	if (*image_addr != preferred_offset) {
--		kernel_memsize = kernel_size + (_end - _edata);
-+	kernel_memsize = kernel_size + (_end - _edata);
-+
-+	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE) && phys_seed != 0) {
-+		/*
-+		 * If KASLR is enabled, and we have some randomness available,
-+		 * locate the kernel at a randomized offset in physical memory.
-+		 */
-+		*reserve_size = kernel_memsize + TEXT_OFFSET;
-+		status = efi_random_alloc(sys_table_arg, *reserve_size,
-+					  MIN_KIMG_ALIGN, reserve_addr,
-+					  phys_seed);
- 
-+		*image_addr = *reserve_addr + TEXT_OFFSET;
-+	} else {
- 		/*
--		 * First, try a straight allocation at the preferred offset.
-+		 * Else, try a straight allocation at the preferred offset.
- 		 * This will work around the issue where, if dram_base == 0x0,
- 		 * efi_low_alloc() refuses to allocate at 0x0 (to prevent the
- 		 * address of the allocation to be mistaken for a FAIL return
-@@ -52,27 +82,31 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
- 		 * Mustang), we can still place the kernel@the address
- 		 * 'dram_base + TEXT_OFFSET'.
- 		 */
-+		if (*image_addr == preferred_offset)
-+			return EFI_SUCCESS;
-+
- 		*image_addr = *reserve_addr = preferred_offset;
--		nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
--			   EFI_PAGE_SIZE;
-+		*reserve_size = round_up(kernel_memsize, EFI_ALLOC_ALIGN);
-+
- 		status = efi_call_early(allocate_pages, EFI_ALLOCATE_ADDRESS,
--					EFI_LOADER_DATA, nr_pages,
-+					EFI_LOADER_DATA,
-+					*reserve_size / EFI_PAGE_SIZE,
- 					(efi_physical_addr_t *)reserve_addr);
--		if (status != EFI_SUCCESS) {
--			kernel_memsize += TEXT_OFFSET;
--			status = efi_low_alloc(sys_table_arg, kernel_memsize,
--					       SZ_2M, reserve_addr);
-+	}
- 
--			if (status != EFI_SUCCESS) {
--				pr_efi_err(sys_table_arg, "Failed to relocate kernel\n");
--				return status;
--			}
--			*image_addr = *reserve_addr + TEXT_OFFSET;
-+	if (status != EFI_SUCCESS) {
-+		*reserve_size = kernel_memsize + TEXT_OFFSET;
-+		status = efi_low_alloc(sys_table_arg, *reserve_size,
-+				       MIN_KIMG_ALIGN, reserve_addr);
-+
-+		if (status != EFI_SUCCESS) {
-+			pr_efi_err(sys_table_arg, "Failed to relocate kernel\n");
-+			*reserve_size = 0;
-+			return status;
- 		}
--		memcpy((void *)*image_addr, old_image_addr, kernel_size);
--		*reserve_size = kernel_memsize;
-+		*image_addr = *reserve_addr + TEXT_OFFSET;
- 	}
--
-+	memcpy((void *)*image_addr, old_image_addr, kernel_size);
- 
- 	return EFI_SUCCESS;
- }
-diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-index cf7b7d46302a..04c9302b0ef1 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -147,6 +147,15 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 	if (status)
- 		goto fdt_set_fail;
- 
-+	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
-+		status = efi_get_random_bytes(sys_table, sizeof(fdt_val64),
-+					      (u8 *)&fdt_val64);
-+		if (status == EFI_SUCCESS)
-+			status = fdt_setprop(fdt, node, "kaslr-seed",
-+					     &fdt_val64, sizeof(fdt_val64));
-+		else if (status != EFI_NOT_FOUND)
-+			goto fdt_set_fail;
-+	}
- 	return EFI_SUCCESS;
- 
- fdt_set_fail:
+Thanks,
+Robin.
+
+Changes since v2[2]:
+- #include dma-mapping.h before I break ARC again...
+- Fix PTE type bit swizzling to not collide with XN bit in cont_to_pte().
+- Correct init_pte to increment the IOVA, rather than the table pointer,
+  when freeing L2 tables being replaced by a supersection entry.
+- Rename sync_flag to the much better tlb_sync_pending.
+- Acks on patches 2 and 3.
+
+[1]:http://thread.gmane.org/gmane.linux.kernel.iommu/11974
+[2]:http://thread.gmane.org/gmane.linux.kernel.iommu/11752
+
+Robin Murphy (3):
+  iommu/io-pgtable: Add ARMv7 short descriptor support
+  iommu/io-pgtable: Add helper functions for TLB ops
+  iommu/io-pgtable: Avoid redundant TLB syncs
+
+ drivers/iommu/Kconfig              |  19 +
+ drivers/iommu/Makefile             |   1 +
+ drivers/iommu/io-pgtable-arm-v7s.c | 841 +++++++++++++++++++++++++++++++++++++
+ drivers/iommu/io-pgtable-arm.c     |  21 +-
+ drivers/iommu/io-pgtable.c         |   5 +-
+ drivers/iommu/io-pgtable.h         |  37 +-
+ 6 files changed, 910 insertions(+), 14 deletions(-)
+ create mode 100644 drivers/iommu/io-pgtable-arm-v7s.c
+
 -- 
-2.5.0
+2.7.0.25.gfc10eb5
