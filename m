@@ -1,39 +1,37 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 26 Jan 2016 11:41:30 +0100
-Subject: [PATCH V3 2/2] regulator: mt6323: Add support for MT6323 regulator
-In-Reply-To: <1453722989-41622-2-git-send-email-blogic@openwrt.org>
-References: <1453722989-41622-1-git-send-email-blogic@openwrt.org>
- <1453722989-41622-2-git-send-email-blogic@openwrt.org>
-Message-ID: <1453804890.17181.93.camel@tiscali.nl>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Tue, 26 Jan 2016 18:44:27 +0800
+Subject: [PATCH 1/4] crypto: sunxi - don't print uninitialized data
+In-Reply-To: <1453740845-1980433-1-git-send-email-arnd@arndb.de>
+References: <1453740845-1980433-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160126104427.GA19583@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-John,
+On Mon, Jan 25, 2016 at 05:53:48PM +0100, Arnd Bergmann wrote:
+> gcc correctly warns that the printk output contains a variable that
+> is not initialized in some cases:
+> 
+> drivers/crypto/sunxi-ss/sun4i-ss-cipher.c: In function 'sun4i_ss_cipher_poll':
+> drivers/crypto/sunxi-ss/sun4i-ss-cipher.c:254:76: warning: 'todo' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> drivers/crypto/sunxi-ss/sun4i-ss-cipher.c:144:15: note: 'todo' was declared here
+> 
+> This adds an explicit initialization to zero in the exact case where it
+> was missing, to avoid leaking stack data to the console and to shut up
+> that warning.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-On ma, 2016-01-25 at 12:56 +0100, John Crispin wrote:
-> --- /dev/null
-> +++ b/drivers/regulator/mt6323-regulator.c
+This is actually a bogus warning because todo is always initialised
+but gcc can't see that because it's behind multiple conditionals.
 
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
+It would be great if we can restructure the code so that gcc can see
+this while at the same time also improving the readability of the
+loop.
 
-This states this file is licensed GPL v2 only.
-
-> +MODULE_LICENSE("GPL");
-
-And, according to include/linux/module.h, this means "GNU Public License
-v2 or later".
-
-So I think there's a (subtle) mismatch between the license ident used
-for this driver and the comment above.
+Otherwise just initialise it at the top or use uninitialised_var.
 
 Thanks,
-
-
-Paul Bolle
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
