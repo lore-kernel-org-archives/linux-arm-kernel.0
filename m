@@ -1,135 +1,79 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 27 Jan 2016 17:11:00 +0100
-Subject: [PATCH v4 01/13] clk: at91: make use of syscon to share PMC registers
- in several drivers
+Date: Wed, 27 Jan 2016 17:11:10 +0100
+Subject: [PATCH v4 11/13] clk: at91: pmc: drop at91_pmc_base
 In-Reply-To: <1453911072-23608-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1453911072-23608-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1453911072-23608-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1453911072-23608-12-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris Brezillon <boris.brezillon@free-electrons.com>
+at91_pmc_base is not used anymore, remove it along with at91_pmc_read and
+at91_pmc_write.
 
-The PMC block is providing several functionnalities:
- - system clk management
- - cpuidle
- - platform suspend
-
-Replace the void __iomem *regs field by a regmap (retrieved using syscon)
-so that we can later share the regmap across several drivers without
-exporting a new specific API or a global void __iomem * variable.
-
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-at91/Kconfig |  1 +
- drivers/clk/at91/pmc.c     | 12 ++++++++----
- drivers/clk/at91/pmc.h     | 11 ++++++++---
- 3 files changed, 17 insertions(+), 7 deletions(-)
+ drivers/clk/at91/pmc.c       |  7 -------
+ include/linux/clk/at91_pmc.h | 12 ------------
+ 2 files changed, 19 deletions(-)
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 23be2e433097..08047afdf38e 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -104,6 +104,7 @@ config HAVE_AT91_USB_CLK
- config COMMON_CLK_AT91
- 	bool
- 	select COMMON_CLK
-+	select MFD_SYSCON
- 
- config HAVE_AT91_SMD
- 	bool
 diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index 8476b570779b..481146029b2e 100644
+index 361ea0c1d3c9..dce285549de2 100644
 --- a/drivers/clk/at91/pmc.c
 +++ b/drivers/clk/at91/pmc.c
-@@ -19,6 +19,7 @@
- #include <linux/irqchip/chained_irq.h>
- #include <linux/irqdomain.h>
- #include <linux/of_irq.h>
-+#include <linux/mfd/syscon.h>
+@@ -12,7 +12,6 @@
+ #include <linux/clkdev.h>
+ #include <linux/clk/at91_pmc.h>
+ #include <linux/of.h>
+-#include <linux/of_address.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
  
- #include <asm/proc-fns.h>
- 
-@@ -223,6 +224,7 @@ static const struct at91_pmc_caps sama5d3_caps = {
- };
- 
- static struct at91_pmc *__init at91_pmc_init(struct device_node *np,
-+					     struct regmap *regmap,
- 					     void __iomem *regbase, int virq,
- 					     const struct at91_pmc_caps *caps)
- {
-@@ -238,7 +240,7 @@ static struct at91_pmc *__init at91_pmc_init(struct device_node *np,
- 		return NULL;
- 
- 	spin_lock_init(&pmc->lock);
--	pmc->regbase = regbase;
-+	pmc->regmap = regmap;
- 	pmc->virq = virq;
- 	pmc->caps = caps;
- 
-@@ -394,16 +396,18 @@ static void __init of_at91_pmc_setup(struct device_node *np,
- 	void (*clk_setup)(struct device_node *, struct at91_pmc *);
- 	const struct of_device_id *clk_id;
- 	void __iomem *regbase = of_iomap(np, 0);
-+	struct regmap *regmap;
- 	int virq;
- 
--	if (!regbase)
--		return;
-+	regmap = syscon_node_to_regmap(np);
-+	if (IS_ERR(regmap))
-+		panic("Could not retrieve syscon regmap");
- 
- 	virq = irq_of_parse_and_map(np, 0);
- 	if (!virq)
- 		return;
- 
--	pmc = at91_pmc_init(np, regbase, virq, caps);
-+	pmc = at91_pmc_init(np, regmap, regbase, virq, caps);
- 	if (!pmc)
- 		return;
- 	for_each_child_of_node(np, childnp) {
-diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-index f65739272779..e1fc0b0e1d8c 100644
---- a/drivers/clk/at91/pmc.h
-+++ b/drivers/clk/at91/pmc.h
-@@ -14,6 +14,7 @@
- 
- #include <linux/io.h>
- #include <linux/irqdomain.h>
-+#include <linux/regmap.h>
- #include <linux/spinlock.h>
- 
- struct clk_range {
-@@ -28,7 +29,7 @@ struct at91_pmc_caps {
- };
- 
- struct at91_pmc {
--	void __iomem *regbase;
-+	struct regmap *regmap;
- 	int virq;
- 	spinlock_t lock;
+@@ -29,9 +28,6 @@ struct at91_pmc {
  	const struct at91_pmc_caps *caps;
-@@ -48,12 +49,16 @@ static inline void pmc_unlock(struct at91_pmc *pmc)
+ };
  
- static inline u32 pmc_read(struct at91_pmc *pmc, int offset)
- {
--	return readl(pmc->regbase + offset);
-+	unsigned int ret = 0;
-+
-+	regmap_read(pmc->regmap, offset, &ret);
-+
-+	return ret;
- }
- 
- static inline void pmc_write(struct at91_pmc *pmc, int offset, u32 value)
- {
--	writel(value, pmc->regbase + offset);
-+	regmap_write(pmc->regmap, offset, value);
- }
- 
+-void __iomem *at91_pmc_base;
+-EXPORT_SYMBOL_GPL(at91_pmc_base);
+-
  int of_at91_get_clk_range(struct device_node *np, const char *propname,
+ 			  struct clk_range *range)
+ {
+@@ -108,11 +104,8 @@ static void __init of_at91_pmc_setup(struct device_node *np,
+ 				     const struct at91_pmc_caps *caps)
+ {
+ 	struct at91_pmc *pmc;
+-	void __iomem *regbase = of_iomap(np, 0);
+ 	struct regmap *regmap;
+ 
+-	at91_pmc_base = regbase;
+-
+ 	regmap = syscon_node_to_regmap(np);
+ 	if (IS_ERR(regmap))
+ 		panic("Could not retrieve syscon regmap");
+diff --git a/include/linux/clk/at91_pmc.h b/include/linux/clk/at91_pmc.h
+index 1e6932222e11..17f413bbbedf 100644
+--- a/include/linux/clk/at91_pmc.h
++++ b/include/linux/clk/at91_pmc.h
+@@ -16,18 +16,6 @@
+ #ifndef AT91_PMC_H
+ #define AT91_PMC_H
+ 
+-#ifndef __ASSEMBLY__
+-extern void __iomem *at91_pmc_base;
+-
+-#define at91_pmc_read(field) \
+-	readl_relaxed(at91_pmc_base + field)
+-
+-#define at91_pmc_write(field, value) \
+-	writel_relaxed(value, at91_pmc_base + field)
+-#else
+-.extern at91_pmc_base
+-#endif
+-
+ #define	AT91_PMC_SCER		0x00			/* System Clock Enable Register */
+ #define	AT91_PMC_SCDR		0x04			/* System Clock Disable Register */
+ 
 -- 
 2.5.0
