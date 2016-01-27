@@ -1,75 +1,46 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 27 Jan 2016 17:04:47 +0100
-Subject: [PATCH 7/9] net: macb: avoid uninitialized variables
-In-Reply-To: <56A8E788.5020802@atmel.com>
-References: <1453903507-3427225-1-git-send-email-arnd@arndb.de>
- <1453903507-3427225-8-git-send-email-arnd@arndb.de>
- <56A8E788.5020802@atmel.com>
-Message-ID: <56A8EA9F.6070404@atmel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Jan 2016 16:06:30 +0000
+Subject: Speeding up dma_unmap
+In-Reply-To: <3526786.axKPs51069@wuerfel>
+References: <CAJFSRaCRvx=+_fEYAr8OeWGHnnz+rOWjLzLcm+wZiEstbHwxAw@mail.gmail.com>
+ <3526786.axKPs51069@wuerfel>
+Message-ID: <20160127160630.GQ14823@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 27/01/2016 16:51, Nicolas Ferre a ?crit :
-> Le 27/01/2016 15:04, Arnd Bergmann a ?crit :
->> The macb_clk_init function returns three clock pointers, unless
->> the it fails to get the first ones. We correctly handle the
->> failure case by propagating the error from macb_probe, but
->> gcc does not realize this and incorrectly warns about a later
->> use of those:
->>
->> In file included from /git/arm-soc/drivers/net/ethernet/cadence/macb.c:12:0:
->> drivers/net/ethernet/cadence/macb.c: In function 'macb_probe':
->> include/linux/clk.h:484:2: error: 'tx_clk' may be used uninitialized in this function [-Werror=maybe-uninitialized]
->>   clk_disable(clk);
->>   ^
->> drivers/net/ethernet/cadence/macb.c:2822:28: note: 'tx_clk' was declared here
->>   struct clk *pclk, *hclk, *tx_clk;
->>                             ^
->> In file included from /git/arm-soc/drivers/net/ethernet/cadence/macb.c:12:0:
->> include/linux/clk.h:484:2: error: 'hclk' may be used uninitialized in this function [-Werror=maybe-uninitialized]
->>   clk_disable(clk);
->>   ^
->> drivers/net/ethernet/cadence/macb.c:2822:21: note: 'hclk' was declared here
->>   struct clk *pclk, *hclk, *tx_clk;
->>                      ^
->>
->> This shuts up the misleading warnings by ensuring that the
->> macb_clk_init() always stores something into all three pointers.
->>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On Wed, Jan 27, 2016 at 01:23:27PM +0100, Arnd Bergmann wrote:
+> On Wednesday 27 January 2016 00:32:56 Jason Holt wrote:
+> > 
+> > Failing that, I suppose a very dirty hack would be to
+> > data_cache_clean_and_invalidate if the only thing I cared about was
+> > getting data from my DMA peripheral as fast as possible.  (I'm on
+> > AM335X and seeing no more than 200MB/s from device to CPU with
+> > dma_unmap_single, whereas the PRUs can write to main memory at
+> > 600MB/s.)
 > 
-> Okay Arnd, thanks!
+> On your Cortex-A8, we could come up with a way to not invalidate
+> the cache at all on unmap, as the comment in __dma_page_dev_to_cpu()
+> says:
 > 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Oh, crap: actually this warning has just been fixed by Sudip Mukherjee
-and is already queued by David here:
-https://patchwork.ozlabs.org/patch/572610/
-
-So, sorry, I've shot too fast: NACK...
-
-Bye,
-
->> ---
->>  drivers/net/ethernet/cadence/macb.c | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
->> index 9d9984a87d42..d3aa74f9db79 100644
->> --- a/drivers/net/ethernet/cadence/macb.c
->> +++ b/drivers/net/ethernet/cadence/macb.c
->> @@ -2268,6 +2268,7 @@ static int macb_clk_init(struct platform_device *pdev, struct clk **pclk,
->>  {
->>  	int err;
->>  
->> +	*tx_clk = *hclk = NULL;
->>  	*pclk = devm_clk_get(&pdev->dev, "pclk");
->>  	if (IS_ERR(*pclk)) {
->>  		err = PTR_ERR(*pclk);
->>
+>         /* FIXME: non-speculating: not required */
+>         /* in any case, don't bother invalidating if DMA to device */
+>         if (dir != DMA_TO_DEVICE) {
+>                 outer_inv_range(paddr, paddr + size);
 > 
+>                 dma_cache_maint_page(page, off, size, dir, dmac_unmap_area);
+>         }
 > 
+> We already do a cache-invalidate operation on dma_map(), and the kernel
+> is not allowed to access the memory in the meantime. On CPU cores
+> that do speculative prefetching (Cortex-A9 and higher), we may end
+                                   ^^^^^^^^^^^^^^^^^^^^
+I would say "Cortex-A9 and newer".
 
+> up reading cache lines back in randomly on a speculative prefetch,
+> but as far as I can tell, the Cortex-A8 (or A5/A7) won't do that.
+
+Are you sure about A5 and A7? I'm not even sure about the A8 but there
+are good chances that A7 and A5 do speculative prefetches.
 
 -- 
-Nicolas Ferre
+Catalin
