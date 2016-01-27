@@ -1,38 +1,60 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 27 Jan 2016 14:20:11 +0800
-Subject: [PATCH v3 08/12] arm64, numa: rework numa_add_memblk()
-In-Reply-To: <20160125093429.GD24726@rric.localdomain>
-References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
- <1453541967-3744-9-git-send-email-guohanjun@huawei.com>
- <20160125093429.GD24726@rric.localdomain>
-Message-ID: <56A8619B.9010602@huawei.com>
+From: bhupesh.sharma@nxp.com (Bhupesh Sharma)
+Date: Wed, 27 Jan 2016 06:27:03 +0000
+Subject: 4.5-rc1 kernel is failed to bootup on FSL LS2080 RDB board
+In-Reply-To: <56A80920.8030504@linaro.org>
+References: <56A80920.8030504@linaro.org>
+Message-ID: <VI1PR04MB123006EC1EECE3A064BDE40C88D90@VI1PR04MB1230.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/1/25 17:34, Robert Richter wrote:
-> On 23.01.16 17:39:23, Hanjun Guo wrote:
->> Rework numa_add_memblk() to update the parameter "u64 size"
->> to "u64 end", this will make it consistent with x86 and
->> can simplify the code later.
->> --- a/arch/arm64/kernel/of_numa.c
->> +++ b/arch/arm64/kernel/of_numa.c
->> @@ -168,7 +168,7 @@ static int __init early_init_parse_memory_node(unsigned long node)
->>  		pr_debug("NUMA-DT:  base = %llx , node = %u\n",
->>  				base, nid);
->>  
->> -		if (numa_add_memblk(nid, base, size) < 0)
->> +		if (numa_add_memblk(nid, base, base + size) < 0)
-> The overall function usage looks more like as it should use size
-> instead of end. Even in the x86 implementation end is calculated from
-> base + size. So better change x86 code to use size instead.
->
-> Though this might involve to change the interface for
-> numa_add_memblk_to() for unifcation too.
->
+Hi,
 
-This should be a minor one, I'm fine with both directions, I will
-stay for a few days to get more review comments, if no objections,
-I will update.
+> From: Shi, Yang
+> Sent: Wednesday, January 27, 2016 5:33 AM
 
-Thanks
-Hanjun
+> Hi folks,
+> 
+> I tried to boot 4.5-rc1 kernel on my FSL LS2080 RDB (aka LS2085 RDB), but
+> it is failed silently. If I use the dtb file shipped with the SDK with
+> 4.5-rc1 kernel, I can get the serial console output, but it is failed to
+> detect PCI bus.
+> 
+> If I use both kernel and dtb from the SDK, it works well.
+> 
+> The bootloader information:
+> 
+> U-Boot 2015.07-rc1Layerscape2-SDK+g7e8bad0 (Aug 27 2015 - 14:31:42)
+> 
+> SoC:  LS2085E (0x87010010)
+> Clock Configuration:
+>         CPU0(A57):1600 MHz  CPU1(A57):1600 MHz  CPU2(A57):1600 MHz
+>         CPU3(A57):1600 MHz  CPU4(A57):1600 MHz  CPU5(A57):1600 MHz
+>         CPU6(A57):1600 MHz  CPU7(A57):1600 MHz
+>         Bus:      600  MHz  DDR:      1333.333 MT/s     DP-DDR:
+> 1333.333 MT/s
+> Reset Configuration Word (RCW):
+>         00: 40282830 40400040 00000000 00000000
+>         10: 00000000 00200000 00200000 00000000
+>         20: 00c12980 00002580 00000000 00000000
+>         30: 00000e0b 00000000 00000000 00000000
+>         40: 00000000 00000000 00000000 00000000
+>         50: 00000000 00000000 00000000 00000000
+>         60: 00000000 00000000 00027000 00000000
+>         70: 412a0000 00000000 00000000 00000000
+> Model: Freescale Layerscape 2085a RDB Board
+> Board: LS2085E-RDB, Board Arch: V1, Board version: D, boot from vBank: 4
+> FPGA: v1.18
+> 
+> And, I have ARCH_LAYERSCAPE, CONFIG_PCIE_DW and CONFIG_PCI_LAYERSCAPE
+> enabled.
+> 
+> Any hint is appreciated.
+> 
+
+As Minghuan (our PCI developer, added in CC) suggested the reason is that uboot is for
+LS2085a but kernel dtb is for ls2080.
+
+Please apply the patch https://patchwork.kernel.org/patch/7767061/ and try again.
+
+Regards,
+Bhupesh
