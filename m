@@ -1,51 +1,58 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 27 Jan 2016 18:13:35 +0100
-Subject: [PATCH v2 1/2] ARM: mvebu: use armada-370-sata for SATA on
- Armada 375
-In-Reply-To: <1453908287-29557-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 27 Jan 2016 18:16:48 +0100
+Subject: [PATCH v2 2/2] ARM: mvebu: add NAND description to Armada 370 DB
+ and Armada XP DB
+In-Reply-To: <1453908287-29557-3-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1453908287-29557-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1453908287-29557-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20160127171335.GF20194@lunn.ch>
+ <1453908287-29557-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20160127171648.GG20194@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 04:24:46PM +0100, Thomas Petazzoni wrote:
-> From: Lior Amsalem <alior@marvell.com>
+On Wed, Jan 27, 2016 at 04:24:47PM +0100, Thomas Petazzoni wrote:
+> This commit adds the Device Tree description for the 1GB NAND flash
+> present in the Armada 370 DB and Armada XP DB evaluation boards from
+> Marvell.
 > 
-> The Armada 375 has the same SATA IP as Armada 370 and Armada XP, which
-> requires the PHY speed to be set in the LP_PHY_CTL register for SATA
-> hotplug to work.
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-370-db.dts | 21 +++++++++++++++++++++
+>  arch/arm/boot/dts/armada-xp-db.dts  | 21 +++++++++++++++++++++
+>  2 files changed, 42 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+> index bb280de..e7763b6 100644
+> --- a/arch/arm/boot/dts/armada-370-db.dts
+> +++ b/arch/arm/boot/dts/armada-370-db.dts
+> @@ -168,6 +168,27 @@
+>  					spi-max-frequency = <50000000>;
+>  				};
+>  			};
+> +
+> +			nand at d0000 {
+> +				status = "okay";
+> +				num-cs = <1>;
+> +				marvell,nand-keep-config;
+> +				marvell,nand-enable-arbiter;
+> +				nand-on-flash-bbt;
+> +
+> +				partition at 0 {
+> +					label = "U-Boot";
+> +					reg = <0 0x800000>;
+> +				};
 
 Hi Thomas
 
-Should this have a fixes: tag?
+Documentation/devicetree/bindings/mtd/partition.txt:
 
-       Andrew
+The partition table should be a subnode of the mtd node and should be named
+'partitions'. This node should have the following property:
+- compatible : (required) must be "fixed-partitions"
+Partitions are then defined in subnodes of the partitions node.
 
-> 
-> Therefore, this commit updates the compatible string used to describe
-> the SATA IP in Armada 375 from marvell,orion-sata to
-> marvell,armada-370-sata.
-> 
-> Signed-off-by: Lior Amsalem <alior@marvell.com>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-375.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-> index 7ccce75..cc952cf 100644
-> --- a/arch/arm/boot/dts/armada-375.dtsi
-> +++ b/arch/arm/boot/dts/armada-375.dtsi
-> @@ -529,7 +529,7 @@
->  			};
->  
->  			sata at a0000 {
-> -				compatible = "marvell,orion-sata";
-> +				compatible = "marvell,armada-370-sata";
->  				reg = <0xa0000 0x5000>;
->  				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
->  				clocks = <&gateclk 14>, <&gateclk 20>;
-> -- 
-> 2.6.4
-> 
+For backwards compatibility partitions as direct subnodes of the mtd device are
+supported. This use is discouraged.
+
+We should try to get this right when adding new DT nodes.
+
+   Andrew
