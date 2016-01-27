@@ -1,79 +1,34 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 27 Jan 2016 18:32:31 +0100
-Subject: [PATCH] ARM: dts: orion5x: add mtd flash support to linkstation
- lswtgl
-In-Reply-To: <1453907405-30434-1-git-send-email-rogershimizu@gmail.com>
-References: <1453907405-30434-1-git-send-email-rogershimizu@gmail.com>
-Message-ID: <20160127173231.GI20194@lunn.ch>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 27 Jan 2016 18:32:46 +0100
+Subject: [PATCH RFC 07/11] clk: sunxi: factors: Support custom formulas
+In-Reply-To: <1453727747-23307-8-git-send-email-wens@csie.org>
+References: <1453727747-23307-1-git-send-email-wens@csie.org>
+ <1453727747-23307-8-git-send-email-wens@csie.org>
+Message-ID: <20160127173246.GL4317@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 12:10:05AM +0900, Roger Shimizu wrote:
-> MTD flash stores u-boot and u-boot environment on linkstation lswtgl.
-> The latter one can be easily read/write by u-boot-tools package in Debian.
+On Mon, Jan 25, 2016 at 09:15:43PM +0800, Chen-Yu Tsai wrote:
+> Some clocks cannot be modelled using the standard factors clk formula,
+> such as clocks with special pre-dividers on one parent, or clocks
+> with all power-of-two dividers.
 > 
-> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
-> ---
->  arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts | 30 ++++++++++++++++++++++++
->  1 file changed, 30 insertions(+)
+> Add support for a custom .recalc callback for factors clk. Also pass
+> the current parent index to the .get_factor and .recalc callbacks.
 > 
-> diff --git a/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts b/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
-> index 420788229e6f..16eabc524b27 100644
-> --- a/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
-> +++ b/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
-> @@ -228,6 +228,36 @@
->  	};
->  };
->  
-> +&devbus_bootcs {
-> +	status = "okay";
-> +	devbus,keep-config;
-> +
-> +	flash at 0 {
-> +		compatible = "jedec-flash";
-> +		reg = <0 0x40000>;
-> +		bank-width = <1>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Hi Roger
+Applied, thanks!
+Maxime
 
-Same comment i just sent to Thomas:
-
-The partition table should be a subnode of the mtd node and should be named
-'partitions'. This node should have the following property:
-- compatible : (required) must be "fixed-partitions"
-Partitions are then defined in subnodes of the partitions node.
-
-For backwards compatibility partitions as direct subnodes of the mtd device are
-supported. This use is discouraged.
-
-	   Andrew
-
-
-> +		partition at 0 {
-> +			label = "header";
-> +			reg = <0 0x30000>;
-> +			read-only;
-> +		};
-> +
-> +		partition at 30000 {
-> +			label = "uboot";
-> +			reg = <0x30000 0xF000>;
-> +			read-only;
-> +		};
-> +
-> +		partition at 3F000 {
-> +			label = "uboot_env";
-> +			reg = <0x3F000 0x1000>;
-> +		};
-> +	};
-> +};
-> +
->  &mdio {
->  	status = "okay";
->  
-> -- 
-> 2.1.4
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/5b2622d0/attachment.sig>
