@@ -1,34 +1,69 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 27 Jan 2016 14:41:05 +0000
-Subject: [PATCH V4 2/2] regulator: mt6323: Add support for MT6323 regulator
-In-Reply-To: <1453896059-44589-2-git-send-email-blogic@openwrt.org>
-References: <1453896059-44589-1-git-send-email-blogic@openwrt.org>
- <1453896059-44589-2-git-send-email-blogic@openwrt.org>
-Message-ID: <20160127144105.GQ6042@sirena.org.uk>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Wed, 27 Jan 2016 14:41:27 +0000
+Subject: [PATCH V2 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge
+ driver to work on both Zynq and Microblaze
+In-Reply-To: <2270955.TlqP7HlQk4@wuerfel>
+References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
+ <4734542.KZZp0TeeeM@wuerfel> <56A74370.4090000@xilinx.com>
+ <2270955.TlqP7HlQk4@wuerfel>
+Message-ID: <8520D5D51A55D047800579B09414719825873DCF@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 01:00:59PM +0100, John Crispin wrote:
-
-> +		/* Constrain board-specific capabilities according to what
-> +		 * this driver and the chip itself can actually do.
-> +		 */
-> +		c = rdev->constraints;
-> +		c->valid_modes_mask |= REGULATOR_MODE_NORMAL |
-> +				       REGULATOR_MODE_STANDBY;
-> +		c->valid_ops_mask |= REGULATOR_CHANGE_MODE;
-
-No, drivers should *never* enable things that weren't explictly enabled
-by the machine constraints.  This misses the whole point of having
-constraints.  They are there so that the system integrator can enable
-the functionality that is safe on a given board.  
-
-The comment is also inaccurate, it claims it's imposing constraints but
-in fact it's adding additional permissions.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/b6e35868/attachment.sig>
+> 
+> On Tuesday 26 January 2016 10:59:12 Michal Simek wrote:
+> > >> diff --git a/drivers/pci/host/pcie-xilinx.c
+> > >> b/drivers/pci/host/pcie-xilinx.c index 3e3757f..1981948 100644
+> > >> --- a/drivers/pci/host/pcie-xilinx.c
+> > >> +++ b/drivers/pci/host/pcie-xilinx.c
+> > >> @@ -92,7 +92,12 @@
+> > >>  #define ECAM_DEV_NUM_SHIFT          12
+> > >>
+> > >>  /* Number of MSI IRQs */
+> > >> -#define XILINX_NUM_MSI_IRQS         128
+> > >> +#define XILINX_NUM_MSI_IRQS 128
+> > >> +#ifdef CONFIG_ARM
+> > >> +#define TOT_NR_IRQS         XILINX_NUM_MSI_IRQS
+> > >> +#else
+> > >> +#define TOT_NR_IRQS         (NR_IRQS + XILINX_NUM_MSI_IRQS)
+> > >> +#endif
+> > >
+> > > Something looks wrong here in the microblaze variant. What does
+> > > NR_IRQS have to do with it?
+> >
+> > Arnd: What was the story regarding NR_IRQS?
+> > I remember some discussion about it but just forget.
+> >
+> > Default value in include/asm-generic/irq.h is 64.
+> > Current value is 32 because microblaze primary interrupt controller is
+> > axi_intc core which has up to 32 input lines.
+> 
+> The value in asm-generic is completely arbitrary, it's just something that
+> happens to work for a number of the simpler architectures.
+> 
+> Traditionally, there is a a fixed NR_IRQS which defines the maximum number
+> of interrupts that can be used, and each irqchip has a fixed start offset below
+> that number.
+> 
+> On modern systems, you have CONFIG_SPARSE_IRQ, which lets an irqchip
+> allocate its own interrupts, without an upper limit. This is more flexible and
+> avoids preallocating space for all irq_desc instances, so it saves memory.
+> 
+> This code however doesn't do either of the two on microblaze:
+> 
+> +       irq = pos;
+> +#ifdef CONFIG_MICROBLAZE
+> +#define TOT_NR_IRQS            (NR_IRQS + XILINX_NUM_MSI_IRQS)
+> +       irq = XILINX_NUM_MSI_IRQS + pos; #endif
+> +       if (irq < TOT_NR_IRQS)
+>                 set_bit(pos, msi_irq_in_use);
+> 
+> So you define XILINX_NUM_MSI_IRQS to mean the number of interrupts
+> that the xilinx_pcie_port can handle itself, but then pick a number
+> outside of this range by making the hwirq number something between
+> XILINX_NUM_MSI_IRQS and (2*XILINX_NUM_MSI_IRQS - 1), and in the
+> end compare it to (NR_IRQS + XILINX_NUM_MSI_IRQS), which is the
+> sum of two things that are not related: the total number of interrupts
+> including the MSIs and the number of MSI.
+> 
+Agreed, I have crosschecked something's which I missed previously, NR_IRQS have nothing to do with the count, and also no need to add, irq = XILINX_NUM_MSI_IRQS + pos; in microblaze, I will remove these checks in next patch series.
