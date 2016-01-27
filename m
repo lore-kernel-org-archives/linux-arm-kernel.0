@@ -1,56 +1,61 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 27 Jan 2016 10:14:44 +0200
-Subject: [PATCH v2] mmc: omap_hsmmc: don't print uninitialized variables
-In-Reply-To: <3411189.gO0215GrNM@wuerfel>
-References: <3411189.gO0215GrNM@wuerfel>
-Message-ID: <56A87C74.2010905@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 27 Jan 2016 09:17:45 +0100
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <2779316.34ov6YOQgv@vostro.rjw.lan>
+References: <20160126224804.GB19432@atomide.com>
+ <CAJZ5v0gTRvyWHVmYNb8Q1QZzhVhokXo541+48mFyDRYv7Hi-Uw@mail.gmail.com>
+ <20160126235222.GF19432@atomide.com>
+ <2779316.34ov6YOQgv@vostro.rjw.lan>
+Message-ID: <CAPDyKFo-itpp1JUVANSFNiyhKcv1XLUqx1GwRk532LaT+ija0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/26/2016 05:26 PM, Arnd Bergmann wrote:
-> When DT based probing is used but the DMA request fails, the
-> driver will print uninitialized stack data from the rx_req
-> and tx_req variables, as indicated by this warning:
-> 
-> drivers/mmc/host/omap_hsmmc.c: In function 'omap_hsmmc_probe':
-> drivers/mmc/host/omap_hsmmc.c:2162:3: warning: 'rx_req' may be used uninitialized in this function [-Wmaybe-uninitialized]
->    dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
-> 
-> This removes the DMA request line number from the warning, which
-> is the easiest solution and won't hurt us any more as we are
-> planning to remove the legacy code path anyway.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> A simpler patch as v1 with the same result, as suggested by Peter Ujfalusi.
+On 27 January 2016 at 08:54, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Tuesday, January 26, 2016 03:52:23 PM Tony Lindgren wrote:
+>> * Rafael J. Wysocki <rafael@kernel.org> [160126 15:38]:
+>> > On Wed, Jan 27, 2016 at 12:22 AM, Tony Lindgren <tony@atomide.com> wrote:
+>> > > * Rafael J. Wysocki <rafael@kernel.org> [160126 15:15]:
+>> > >> On Tue, Jan 26, 2016 at 11:48 PM, Tony Lindgren <tony@atomide.com> wrote:
+>> > >> > Hi,
+>> > >> >
+>> > >> > Looks like commit 5de85b9d57ab ("PM / runtime: Re-init runtime
+>> > >> > PM states at probe error and driver unbind") broke PM on at least
+>> > >> > omap3. It seems we now need to additionally also call
+>> > >> > pm_runtime_dont_use_autosuspend() to get things working again?
+>> > >> >
+>> > >> > The following fixes idling on omap3, but I'm wondering if we
+>> > >> > should do something in pm_runtime_reinit() instead?
+>> > >>
+>> > >> Well, does it actually help if you add
+>> > >> pm_runtime_dont_use_autosuspend(dev) to pm_runtime_reinit()?
+>> > >
+>> > > No adding it to pm_runtime_reinit() does not help.
+>> >
+>> > Yes, I realized that it wouldn't help only after sending the previous
+>> > message, sorry about that.
+>> >
+>> > The reason why it helps in the driver code seems to be that
+>> > autosuspend_delay happens to be negative, so update_autosuspend()
+>> > decrements the usage counter that would have stayed incremented
+>> > otherwise.  Or at least that's the only way it can help I see ATM.
+>>
+>> Oh OK.
+>>
+>> > > Looks like we have RPM_ACTIVE set in pm_runtime_reinit() if that
+>> > > gives any clues.
+>> >
+>> > It looks like pm_runtime_reinit() should clear the usage counter too.
+>>
+>> Yeah if we do this when !pm_runtime_enabled(dev) it seems it's
+>> safe to pretty much reset everything?
+>
+> Not only safe, but also a good idea apparently. :-)
 
-Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+I happy to send a patch, extending pm_runtime_reinit() with some more
+data to be reset.
 
-> 
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index b6639ea0bf18..87f0d840a166 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -2159,7 +2159,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
->  						 &rx_req, &pdev->dev, "rx");
->  
->  	if (!host->rx_chan) {
-> -		dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
-> +		dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel\n");
->  		ret = -ENXIO;
->  		goto err_irq;
->  	}
-> @@ -2169,7 +2169,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
->  						 &tx_req, &pdev->dev, "tx");
->  
->  	if (!host->tx_chan) {
-> -		dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", tx_req);
-> +		dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel\n");
->  		ret = -ENXIO;
->  		goto err_irq;
->  	}
-> 
+Or, you or Tony intend to send a patch?
 
-
--- 
-P?ter
+Kind regards
+Uffe
