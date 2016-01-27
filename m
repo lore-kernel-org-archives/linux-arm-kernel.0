@@ -1,36 +1,37 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Wed, 27 Jan 2016 12:27:44 +0800
-Subject: [PATCH 07/15] cris: use of_platform_default_populate() to populate
- default bus
+Date: Wed, 27 Jan 2016 12:27:51 +0800
+Subject: [PATCH 14/15] Revert "bus: uniphier: allow only built-in driver"
 In-Reply-To: <1453868872-26300-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1453868872-26300-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1453868872-26300-8-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1453868872-26300-15-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use helper of_platform_default_populate() in linux/of_platform
-when possible, instead of calling of_platform_populate() with
-the default match table.
+This reverts commit 326ea45aa827da6686c78b5907f9839f91ef5782.
 
-Cc: Mikael Starvik <starvik@axis.com>
-Cc: Jesper Nilsson <jesper.nilsson@axis.com>
+After covering to use helper of_platform_default_populate() to
+populate the default bus, no error in build uniphier driver as
+a module.
+
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- arch/cris/kernel/setup.c | 2 +-
+ drivers/bus/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/cris/kernel/setup.c b/arch/cris/kernel/setup.c
-index bb12aa9..5ee5dfc 100644
---- a/arch/cris/kernel/setup.c
-+++ b/arch/cris/kernel/setup.c
-@@ -215,7 +215,7 @@ subsys_initcall(topology_init);
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index 129d47b..9a92c07 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -132,7 +132,7 @@ config SUNXI_RSB
+ 	  and AC100/AC200 ICs.
  
- static int __init cris_of_init(void)
- {
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	of_platform_default_populate(NULL, NULL, NULL);
- 	return 0;
- }
- core_initcall(cris_of_init);
+ config UNIPHIER_SYSTEM_BUS
+-	bool "UniPhier System Bus driver"
++	tristate "UniPhier System Bus driver"
+ 	depends on ARCH_UNIPHIER && OF
+ 	default y
+ 	help
 -- 
 2.6.0.GIT
