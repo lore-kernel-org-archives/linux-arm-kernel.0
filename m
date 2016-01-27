@@ -1,29 +1,77 @@
-From: dann.frazier@canonical.com (dann frazier)
-Date: Wed, 27 Jan 2016 16:10:30 -0700
-Subject: [PATCH] arm64: Disallow combination of ARCH_XGENE and 16K page size
-Message-ID: <1453936230-7305-1-git-send-email-dann.frazier@canonical.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 27 Jan 2016 17:16:07 -0600
+Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
+In-Reply-To: <20160127185649.GV19432@atomide.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <1452780672-14339-4-git-send-email-kishon@ti.com>
+ <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
+ <20160127185649.GV19432@atomide.com>
+Message-ID: <56A94FB7.6020903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-16K page size is an optional feature of the architecture, and is not
-supported by the X-Gene SoC family.
+On 01/27/2016 12:56 PM, Tony Lindgren wrote:
+> * Suman Anna <s-anna@ti.com> [160127 10:17]:
+>> On 01/27/2016 11:31 AM, Tony Lindgren wrote:
+>>> Why do you need another reset here? Can't you just implement PM runtime
+>>> in the driver and do the usual pm_runtime_put_sync followed by
+>>> pm_runtime_disable?
+>>
+>> The omap_hwmod_enable/disable code does not deal with hardresets (PRCM
+>> reset lines) and so the pm_runtime_get_sync/put_sync only end up dealing
+>> with clocks, and we need to invoke the reset functions separately.
+>> Modules with softresets in SYSCONFIG are ok, as they are dealt with
+>> properly.
+> 
+> Hmm _reset() in omap_hwmod.c has this to call _assert_hardreset:
+> 
+> 	if (oh->class->reset) {
+> 		r = oh->class->reset(oh);
+> 	} else {
+> 		if (oh->rst_lines_cnt > 0) {
+> 			for (i = 0; i < oh->rst_lines_cnt; i++)
+> 				_assert_hardreset(oh, oh->rst_lines[i].name);
+> 			return 0;
+> 		} else {
+> 			r = _ocp_softreset(oh);
+> 			if (r == -ENOENT)
+> 				r = 0;
+> 		}
+> 	}
 
-Signed-off-by: dann frazier <dann.frazier@canonical.com>
----
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+Right, hwmod code does the initial reset.
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 21074f6..b241290 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -133,6 +133,7 @@ config ARCH_VEXPRESS
- 
- config ARCH_XGENE
- 	bool "AppliedMicro X-Gene SOC Family"
-+	depends on !ARM64_16K_PAGES
- 	help
- 	  This enables support for AppliedMicro X-Gene SOC Family
- 
--- 
-2.7.0
+> Care to explain what exactly the problem with the hwmod code not doing
+> the reset on init?
+
+And we only need to deassert the reset in probe. Technically, we don't
+need to assert first and deassert in probe, and that was a design choice
+made by Kishon.
+
+> And why do you need to do another reset in dra7xx_pcie_remove()?
+
+Primarily to restore the reset state back to what it was after the
+driver remove gets called. We cannot call deassert twice without calling
+a assert in between. Kishon had originally added the assert and deassert
+only in probe, but nothing in remove, they ought to be deassert in probe
+and assert in remove to match initial hardware state, and to also make
+it work across multiple probe/remove.
+
+>>> Basically I'm wondering how come we need these platform data callbacks
+>>> at all.
+>>
+>> The hardresets are controlled through the
+>> omap_device_assert(deassert)_hardreset functions, and since these are
+>> limited to mach-omap2, we are invoking them through platform data callbacks.
+> 
+> Right.. But I'm wondering about the why you need to do this in the
+> driver at all part :)
+
+The initial reset at init time is okay, but hwmod _enable() bails out if
+the resets lines are asserted. This was a change made long time back, I
+believe to deal with the problems around the DSP enabling sequences. As
+such, pm_runtime_get_sync() and put_sync() do not deassert and assert
+the resets.
+
+regards
+Suman
