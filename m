@@ -1,72 +1,36 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 27 Jan 2016 10:50:19 +0100
-Subject: [PATCH v2] arm64: allow vmalloc regions to be set with set_memory_*
-Message-ID: <1453888219-17695-1-git-send-email-ard.biesheuvel@linaro.org>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 27 Jan 2016 09:50:27 +0000
+Subject: Problem with component helpers and probe deferral in 4.5-rc1
+In-Reply-To: <1453886324.2847.12.camel@linaro.org>
+References: <1453831153.2850.107.camel@linaro.org>
+ <20160126223551.GU10826@n2100.arm.linux.org.uk>
+ <1453886324.2847.12.camel@linaro.org>
+Message-ID: <1453888227.2847.19.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The range of set_memory_* is currently restricted to the module address
-range because of difficulties in breaking down larger block sizes.
-vmalloc maps PAGE_SIZE pages so it is safe to use as well. Update the
-function ranges and add a comment explaining why the range is restricted
-the way it is.
+On Wed, 2016-01-27 at 09:18 +0000, Jon Medhurst (Tixy) wrote:
+> On Tue, 2016-01-26 at 22:35 +0000, Russell King - ARM Linux wrote:
+> > On Tue, Jan 26, 2016 at 05:59:13PM +0000, Jon Medhurst (Tixy) wrote:
+> > > I believe I've found a problem with the component helpers and/or how
+> > > drivers use them. I discovered this whilst trying to get ARM's HDLCD
+> > > driver [1] working on 4.5-rc1, however I believe that code is following
+> > > a pattern used by drivers already in 4.5 and the problem isn't specific
+> > > to it. This is what I have observed...
+> > 
+> > Hmm, it all looks plausible, and I'm again left wondering how the code
+> > passed testing over the last year (I've been running this code for
+> > ages both on iMX6 and Dove, where deferred probing does happen.)
+> 
+> It depends on the order of things. To go wrong, components must already
+> be there before the master is added, then the master needs to defer
+> probing from it's bind callback. So, components deferring won't trigger
+> the issue,
 
-Suggested-by: Laura Abbott <labbott@fedoraproject.org>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v2: reorder #includes, add Mark's ack
+Actually, looks like drm drivers for armada and imx will end up calling
+component_bind_all from their bind callpath, so if components return
+-EPROBE_DEFER from their bind function, then the master will bail out
+with that, triggering my failure scenario. Hmmm...
 
- arch/arm64/mm/pageattr.c | 23 ++++++++++++++++----
- 1 file changed, 19 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-index cf6240741134..0795c3a36d8f 100644
---- a/arch/arm64/mm/pageattr.c
-+++ b/arch/arm64/mm/pageattr.c
-@@ -14,6 +14,7 @@
- #include <linux/mm.h>
- #include <linux/module.h>
- #include <linux/sched.h>
-+#include <linux/vmalloc.h>
- 
- #include <asm/pgtable.h>
- #include <asm/tlbflush.h>
-@@ -44,6 +45,7 @@ static int change_memory_common(unsigned long addr, int numpages,
- 	unsigned long end = start + size;
- 	int ret;
- 	struct page_change_data data;
-+	struct vm_struct *area;
- 
- 	if (!PAGE_ALIGNED(addr)) {
- 		start &= PAGE_MASK;
-@@ -51,10 +53,23 @@ static int change_memory_common(unsigned long addr, int numpages,
- 		WARN_ON_ONCE(1);
- 	}
- 
--	if (start < MODULES_VADDR || start >= MODULES_END)
--		return -EINVAL;
--
--	if (end < MODULES_VADDR || end >= MODULES_END)
-+	/*
-+	 * Kernel VA mappings are always live, and splitting live section
-+	 * mappings into page mappings may cause TLB conflicts. This means
-+	 * we have to ensure that changing the permission bits of the range
-+	 * we are operating on does not result in such splitting.
-+	 *
-+	 * Let's restrict ourselves to mappings created by vmalloc (or vmap).
-+	 * Those are guaranteed to consist entirely of page mappings, and
-+	 * splitting is never needed.
-+	 *
-+	 * So check whether the [addr, addr + size) interval is entirely
-+	 * covered by precisely one VM area that has the VM_ALLOC flag set.
-+	 */
-+	area = find_vm_area((void *)addr);
-+	if (!area ||
-+	    end > (unsigned long)area->addr + area->size ||
-+	    !(area->flags & VM_ALLOC))
- 		return -EINVAL;
- 
- 	if (!numpages)
 -- 
-2.5.0
+Tixy
