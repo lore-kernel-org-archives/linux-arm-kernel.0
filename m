@@ -1,36 +1,40 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Wed, 27 Jan 2016 20:45:12 +0100
-Subject: [PATCH 1/2] ARM: mvebu: change order of ethernet DT nodes on
- Armada 38x
-In-Reply-To: <20160127193143.GF10826@n2100.arm.linux.org.uk>
-References: <1453907300-28283-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1453907300-28283-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160127193143.GF10826@n2100.arm.linux.org.uk>
-Message-ID: <20160127194512.GA16638@1wt.eu>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 27 Jan 2016 11:46:11 -0800
+Subject: [PATCH v2 resend 6/6] arm64: switch to relative exception tables
+In-Reply-To: <CAKv+Gu8hvxcc6Tiu0q7=HWqkEf4ZLfOvyoLGkp2mEgjz_1R9ew@mail.gmail.com>
+References: <1453892123-17973-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1453892123-17973-7-git-send-email-ard.biesheuvel@linaro.org>
+ <20160127113548.d4f2f2a7029b3b89f0e596da@linux-foundation.org>
+ <CAKv+Gu8hvxcc6Tiu0q7=HWqkEf4ZLfOvyoLGkp2mEgjz_1R9ew@mail.gmail.com>
+Message-ID: <20160127114611.25531afcfabf03febc134b48@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 07:31:44PM +0000, Russell King - ARM Linux wrote:
-(...)
-> > For example, on the Armada 388 GP, the board has two ports, labelled
-> > GE0 and GE1. One has to know that GE0 is eth1 and GE1 is eth0, which
-> > isn't really obvious.
-> > 
-> > In order to solve this, this patch proposes to exceptionaly violate
-> > the rule of "order DT nodes by register address", and put the 0x70000
-> > node before the 0x30000 node, so that network interfaces get named in
-> > a more natural way.
-> 
-> The danger is that this will completely mess up people's existing
-> scripts/distro configuration which are now used to the current
-> labelling of the network ports.
-> 
-> Not every distro provides a sane way to deal with this...
+On Wed, 27 Jan 2016 20:39:23 +0100 Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 
-Well, may be that's one more reason for fixing it before boards start to
-ship and run distro kernels. If some boards are already in the wild running
-on a BSP kernel, people will complain that mainline reorders their network
-ports and will stick to the BSP kernel instead.
+> On 27 January 2016 at 20:35, Andrew Morton <akpm@linux-foundation.org> wrote:
+> > On Wed, 27 Jan 2016 11:55:23 +0100 Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> >
+> >> Instead of using absolute addresses for both the exception location
+> >> and the fixup, use offsets relative to the exception table entry values.
+> >> Not only does this cut the size of the exception table in half, it is
+> >> also a prerequisite for KASLR, since absolute exception table entries
+> >> are subject to dynamic relocation, which is incompatible with the sorting
+> >> of the exception table that occurs at build time.
+> >>
+> >> This patch also introduces the _ASM_EXTABLE preprocessor macro (which
+> >> exists on x86 as well) and its _asm_extable assembly counterpart, as
+> >> shorthands to emit exception table entries.
+> >
+> > checkpatch speaketh truth:
+> >
+> > ERROR: #define of 'ARCH_HAS_RELATIVE_EXTABLE' is wrong - use Kconfig variables or standard guards instead
+> > #113: FILE: arch/arm64/include/asm/uaccess.h:56:
+> 
+> That may be true, but it extends an established pattern of #defines in
+> the various uaccess.h versions, i.e., ARCH_HAS_SORT_EXTABLE, and
+> ARCH_HAS_SEARCH_EXTABLE
 
-Just my two cents,
-Willy
+True.  But now we have two things to fix, not one ;)
+
+Whatever.  Later.
