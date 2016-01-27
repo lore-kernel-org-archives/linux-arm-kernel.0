@@ -1,44 +1,30 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 27 Jan 2016 19:08:22 +0100
-Subject: [PATCH RFC 04/11] clk: sunxi: factors: Add unregister function
-In-Reply-To: <20160127155210.GH4317@lukather>
-References: <1453727747-23307-1-git-send-email-wens@csie.org>
- <1453727747-23307-5-git-send-email-wens@csie.org>
- <20160127155210.GH4317@lukather>
-Message-ID: <20160127180822.GQ4317@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Jan 2016 18:09:45 +0000
+Subject: Speeding up dma_unmap
+In-Reply-To: <20160127160630.GQ14823@e104818-lin.cambridge.arm.com>
+References: <CAJFSRaCRvx=+_fEYAr8OeWGHnnz+rOWjLzLcm+wZiEstbHwxAw@mail.gmail.com>
+ <3526786.axKPs51069@wuerfel>
+ <20160127160630.GQ14823@e104818-lin.cambridge.arm.com>
+Message-ID: <20160127180944.GZ10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 04:52:10PM +0100, Maxime Ripard wrote:
-> On Mon, Jan 25, 2016 at 09:15:40PM +0800, Chen-Yu Tsai wrote:
-> > sunxi's factors clk did not have an unregister function. This means
-> > multiple structs were leaked whenever a factors clk was unregistered.
-> > 
-> > Add an unregister function for it. Also keep pointers to the mux and
-> > gate structs so they can be freed.
-> > 
-> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On Wed, Jan 27, 2016 at 04:06:30PM +0000, Catalin Marinas wrote:
+> On Wed, Jan 27, 2016 at 01:23:27PM +0100, Arnd Bergmann wrote:
+> > up reading cache lines back in randomly on a speculative prefetch,
+> > but as far as I can tell, the Cortex-A8 (or A5/A7) won't do that.
 > 
-> Applied, thanks!
-> Maxime
+> Are you sure about A5 and A7? I'm not even sure about the A8 but there
+> are good chances that A7 and A5 do speculative prefetches.
 
-So, yeah, that obviously didn't work, since clk_unregister_composite
-wasn't in.
+I thought when I was re-implementing the DMA API on ARM (which was
+around early v7 times) that there were CPUs that did speculative
+prefetching, which included the A8.  I seem to remember it was pretty
+urgent to have the DMA API fixed for _any_ ARMv7 CPU because of the
+speculative prefetching.
 
-I want to give that as much linux-next coverage as possible, so I
-still pulled 3, 5 and 11, replacing the call to
-clk_unregister_composite by clk_unregister, adding a todo note on top.
-
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/119c44cc/attachment.sig>
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
