@@ -1,77 +1,76 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 27 Jan 2016 17:16:07 -0600
-Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
-In-Reply-To: <20160127185649.GV19432@atomide.com>
-References: <1452780672-14339-1-git-send-email-kishon@ti.com>
- <1452780672-14339-4-git-send-email-kishon@ti.com>
- <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
- <20160127185649.GV19432@atomide.com>
-Message-ID: <56A94FB7.6020903@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 28 Jan 2016 08:39:14 +0900
+Subject: [PATCH 2/2] netfilter: ipvs/SIP: handle ip_vs_fill_iph_skb_off
+ failure
+In-Reply-To: <alpine.LFD.2.11.1601272241530.2353@ja.home.ssi.bg>
+References: <1453902749-3422685-1-git-send-email-arnd@arndb.de>
+ <1453902749-3422685-2-git-send-email-arnd@arndb.de>
+ <alpine.LFD.2.11.1601272241530.2353@ja.home.ssi.bg>
+Message-ID: <20160127233914.GA5183@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2016 12:56 PM, Tony Lindgren wrote:
-> * Suman Anna <s-anna@ti.com> [160127 10:17]:
->> On 01/27/2016 11:31 AM, Tony Lindgren wrote:
->>> Why do you need another reset here? Can't you just implement PM runtime
->>> in the driver and do the usual pm_runtime_put_sync followed by
->>> pm_runtime_disable?
->>
->> The omap_hwmod_enable/disable code does not deal with hardresets (PRCM
->> reset lines) and so the pm_runtime_get_sync/put_sync only end up dealing
->> with clocks, and we need to invoke the reset functions separately.
->> Modules with softresets in SYSCONFIG are ok, as they are dealt with
->> properly.
+On Wed, Jan 27, 2016 at 10:56:08PM +0200, Julian Anastasov wrote:
 > 
-> Hmm _reset() in omap_hwmod.c has this to call _assert_hardreset:
+> 	Hello,
 > 
-> 	if (oh->class->reset) {
-> 		r = oh->class->reset(oh);
-> 	} else {
-> 		if (oh->rst_lines_cnt > 0) {
-> 			for (i = 0; i < oh->rst_lines_cnt; i++)
-> 				_assert_hardreset(oh, oh->rst_lines[i].name);
-> 			return 0;
-> 		} else {
-> 			r = _ocp_softreset(oh);
-> 			if (r == -ENOENT)
-> 				r = 0;
-> 		}
-> 	}
-
-Right, hwmod code does the initial reset.
-
-> Care to explain what exactly the problem with the hwmod code not doing
-> the reset on init?
-
-And we only need to deassert the reset in probe. Technically, we don't
-need to assert first and deassert in probe, and that was a design choice
-made by Kishon.
-
-> And why do you need to do another reset in dra7xx_pcie_remove()?
-
-Primarily to restore the reset state back to what it was after the
-driver remove gets called. We cannot call deassert twice without calling
-a assert in between. Kishon had originally added the assert and deassert
-only in probe, but nothing in remove, they ought to be deassert in probe
-and assert in remove to match initial hardware state, and to also make
-it work across multiple probe/remove.
-
->>> Basically I'm wondering how come we need these platform data callbacks
->>> at all.
->>
->> The hardresets are controlled through the
->> omap_device_assert(deassert)_hardreset functions, and since these are
->> limited to mach-omap2, we are invoking them through platform data callbacks.
+> On Wed, 27 Jan 2016, Arnd Bergmann wrote:
 > 
-> Right.. But I'm wondering about the why you need to do this in the
-> driver at all part :)
+> > ip_vs_fill_iph_skb_off() may not find an IP header, and gcc has
+> > determined that ip_vs_sip_fill_param() then incorrectly accesses
+> > the protocol fields:
+> > 
+> > net/netfilter/ipvs/ip_vs_pe_sip.c: In function 'ip_vs_sip_fill_param':
+> > net/netfilter/ipvs/ip_vs_pe_sip.c:76:5: error: 'iph.protocol' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> >   if (iph.protocol != IPPROTO_UDP)
+> >      ^
+> > net/netfilter/ipvs/ip_vs_pe_sip.c:81:10: error: 'iph.len' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> >   dataoff = iph.len + sizeof(struct udphdr);
+> >           ^
+> > 
+> > This adds a check for the ip_vs_fill_iph_skb_off() return code
+> > before looking at the ip header data returned from it.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Fixes: b0e010c527de ("ipvs: replace ip_vs_fill_ip4hdr with ip_vs_fill_iph_skb_off")
+> 
+> 	Looks ok to me,
+> 
+> Acked-by: Julian Anastasov <ja@ssi.bg>
 
-The initial reset at init time is okay, but hwmod _enable() bails out if
-the resets lines are asserted. This was a change made long time back, I
-believe to deal with the problems around the DSP enabling sequences. As
-such, pm_runtime_get_sync() and put_sync() do not deassert and assert
-the resets.
+Thanks, I have queued this up.
 
-regards
-Suman
+> 	but see below...
+> 
+> > ---
+> >  net/netfilter/ipvs/ip_vs_pe_sip.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/net/netfilter/ipvs/ip_vs_pe_sip.c b/net/netfilter/ipvs/ip_vs_pe_sip.c
+> > index 1b8d594e493a..c4e9ca016a88 100644
+> > --- a/net/netfilter/ipvs/ip_vs_pe_sip.c
+> > +++ b/net/netfilter/ipvs/ip_vs_pe_sip.c
+> > @@ -70,10 +70,10 @@ ip_vs_sip_fill_param(struct ip_vs_conn_param *p, struct sk_buff *skb)
+> >  	const char *dptr;
+> >  	int retc;
+> >  
+> > -	ip_vs_fill_iph_skb(p->af, skb, false, &iph);
+> > +	retc = ip_vs_fill_iph_skb(p->af, skb, false, &iph);
+> >  
+> >  	/* Only useful with UDP */
+> > -	if (iph.protocol != IPPROTO_UDP)
+> > +	if (!retc || iph.protocol != IPPROTO_UDP)
+> >  		return -EINVAL;
+> >  	/* todo: IPv6 fragments:
+> >  	 *       I think this only should be done for the first fragment. /HS
+> 
+> 	There are other places like this where result is not
+> checked because there is always a guarding skb_header_pointer
+> check, i.e. ip_vs_fill_iph_skb* should not fail at such point.
+> 
+> 	Let us know you want to extend this patch with other such
+> calls (including ip_vs_fill_iph_skb_icmp)? May be they will
+> need return NF_ACCEPT. I guess, all such changes should be
+> for the ipvs-next/net-next tree when it opens.
+
+I would suggest making such changes incrementally on top of this one.
