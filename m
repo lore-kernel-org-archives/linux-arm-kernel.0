@@ -1,32 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 27 Jan 2016 15:02:18 +0100
-Subject: [PATCH v2] pinctrl: rockchip: add support for the rk3399
-In-Reply-To: <1452152498-21780-1-git-send-email-wdc@rock-chips.com>
-References: <1451997055-47655-1-git-send-email-wdc@rock-chips.com>
- <1452152498-21780-1-git-send-email-wdc@rock-chips.com>
-Message-ID: <CACRpkdb6Cooo-_eBKJn-SdFkGPg2hR9nud7Tq6aa+bmkDuOEmg@mail.gmail.com>
+Date: Wed, 27 Jan 2016 15:04:56 +0100
+Subject: [PATCH] pinctrl: freescale: imx: implement gpio_disable_free for
+ Vybrid
+In-Reply-To: <1452279030-5459-1-git-send-email-stefan@agner.ch>
+References: <1452279030-5459-1-git-send-email-stefan@agner.ch>
+Message-ID: <CACRpkdZ0oneKhFmug9k+zGP2Y0dncwHTEoQ35-ccQ=3MqQzSqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 7, 2016 at 8:41 AM, David Wu <wdc@rock-chips.com> wrote:
+On Fri, Jan 8, 2016 at 7:50 PM, Stefan Agner <stefan@agner.ch> wrote:
 
-> From: David Wu <david.wu@rock-chips.com>
+> The Freescale Vybrid SoC has GPIO capabilities as part of the
+> IOMUXC. To enable GPIO's, the gpio_request_enable callback has
+> been implemented, however the corsponding gpio_disable_free
+> callback is missing. So far, disabling (unexporting) a GPIO left
+> the pin in its last state.
 >
-> The pinctrl of rk3399 is much different from other's,
-> especially the 3bits of drive strength.
+> Implement a proper gpio_disable_free function which clears the
+> three enable bits which influence the state (IBE, OBE and PUE).
 >
-> Signed-off-by: David Wu <david.wu@rock-chips.com>
-> ---
-> change from v1:
-> - need spin_unlock_irqrestore for set drive default case
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-Heiko can you please look at this patch?
-
-> +       { .compatible = "rockchip,rk3399-pinctrl",
-> +               .data = (void *)&rk3399_pin_ctrl },
-
-I guess this requires a small patch to some binding file.
-It's OK to fold that into this patch.
+Patch applied.
 
 Yours,
 Linus Walleij
