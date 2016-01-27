@@ -1,25 +1,32 @@
-From: lho@apm.com (Loc Ho)
-Date: Wed, 27 Jan 2016 09:41:56 -0800
-Subject: [PATCH v3] ARM64: kernel: implement ACPI parking protocol
-In-Reply-To: <20160127115126.GB9522@red-moon>
-References: <1453806638-23167-1-git-send-email-lorenzo.pieralisi@arm.com>
- <CAPw-ZTk=BbXAPgWAV=3Np0qvLA+i+U5eh+nxHS=2uMjKohdUfA@mail.gmail.com>
- <20160127115126.GB9522@red-moon>
-Message-ID: <CAPw-ZTnj10eP+NDzYxbc4mJG5tG1dC3pr8VOOh5uJckJO8kS7A@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 27 Jan 2016 18:47:42 +0100
+Subject: [PATCH RFC 10/11] clk: sunxi: rewrite sun6i-ar100 using factors
+ clk
+In-Reply-To: <1453727747-23307-11-git-send-email-wens@csie.org>
+References: <1453727747-23307-1-git-send-email-wens@csie.org>
+ <1453727747-23307-11-git-send-email-wens@csie.org>
+Message-ID: <20160127174742.GO4317@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jan 25, 2016 at 09:15:46PM +0800, Chen-Yu Tsai wrote:
+> sun6i's AR100 clock is a classic factors clk case:
+> 
+> AR100 = ((parent mux) >> p) / (m + 1)
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-> >
-> > I had tested this with X-Gene Mustang board. It applies cleanly
-> > against 4.5.0-rc1 and detected all CPU's. For those of you want to try
-> > this, you need an FW update if you are using APM Tianocore. Otherwise,
-> > it will stuck in very early booting stage.
->
-> We can take this as a Tested-by, right ?
+Applied, thanks!
+Maxime
 
-
-Yes... if you want one.
-
--Loc
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/ab856279/attachment.sig>
