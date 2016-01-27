@@ -1,75 +1,24 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 27 Jan 2016 14:20:45 +0100
-Subject: [PATCH v2 4/6] irqchip: irq-armada-370-xp: use shorter names for
- irq_chip
-In-Reply-To: <1453899395-3532-5-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Wed, 27 Jan 2016 13:56:33 +0100")
-References: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1453899395-3532-5-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <87pown9n0y.fsf@free-electrons.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 27 Jan 2016 13:21:40 +0000
+Subject: Problem with commit 924eb47512 ("ASoC: dwc: fix dma stop
+ transferring issue")
+In-Reply-To: <1453386247.2858.58.camel@linaro.org>
+References: <1453386247.2858.58.camel@linaro.org>
+Message-ID: <20160127132140.GN6042@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On mer., janv. 27 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+On Thu, Jan 21, 2016 at 02:24:07PM +0000, Jon Medhurst (Tixy) wrote:
 
-> In order to make the output of /proc/interrupts, use shorter names for
-> the irq_chip registered by the irq-armada-370-xp driver. Using capital
-> letters also matches better what is done for the GIC driver, which
-> uses just "GIC" as the irq_chip->name.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> In trying to work out why audio stopped working on ARM's Juno board I
+> bisected the problem to $subject commit and reverting this fixed things.
 
-As you managed to convince me:
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks,
-
-Gregory
-
-> ---
->  drivers/irqchip/irq-armada-370-xp.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-> index f53eb71..c99ae5f 100644
-> --- a/drivers/irqchip/irq-armada-370-xp.c
-> +++ b/drivers/irqchip/irq-armada-370-xp.c
-> @@ -117,7 +117,7 @@ static void armada_370_xp_irq_unmask(struct irq_data *d)
->  #ifdef CONFIG_PCI_MSI
->  
->  static struct irq_chip armada_370_xp_msi_irq_chip = {
-> -	.name = "armada_370_xp_msi_irq",
-> +	.name = "MPIC MSI",
->  	.irq_mask = pci_msi_mask_irq,
->  	.irq_unmask = pci_msi_unmask_irq,
->  };
-> @@ -141,7 +141,7 @@ static int armada_370_xp_msi_set_affinity(struct irq_data *irq_data,
->  }
->  
->  static struct irq_chip armada_370_xp_msi_bottom_irq_chip = {
-> -	.name			= "armada_370_xp_msi_irq",
-> +	.name			= "MPIC MSI",
->  	.irq_compose_msi_msg	= armada_370_xp_compose_msi_msg,
->  	.irq_set_affinity	= armada_370_xp_msi_set_affinity,
->  };
-> @@ -253,7 +253,7 @@ static int armada_xp_set_affinity(struct irq_data *d,
->  #endif
->  
->  static struct irq_chip armada_370_xp_irq_chip = {
-> -	.name		= "armada_370_xp_irq",
-> +	.name		= "MPIC",
->  	.irq_mask       = armada_370_xp_irq_mask,
->  	.irq_mask_ack   = armada_370_xp_irq_mask,
->  	.irq_unmask     = armada_370_xp_irq_unmask,
-> -- 
-> 2.6.4
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Yitian?  Tixy's analysis looks good, in the absence of further feedback
+I intend to revert your change.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/c4ca0747/attachment.sig>
