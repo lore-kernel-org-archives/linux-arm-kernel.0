@@ -1,75 +1,38 @@
-From: ja@ssi.bg (Julian Anastasov)
-Date: Wed, 27 Jan 2016 22:56:08 +0200 (EET)
-Subject: [PATCH 2/2] netfilter: ipvs/SIP: handle ip_vs_fill_iph_skb_off
- failure
-In-Reply-To: <1453902749-3422685-2-git-send-email-arnd@arndb.de>
-References: <1453902749-3422685-1-git-send-email-arnd@arndb.de>
- <1453902749-3422685-2-git-send-email-arnd@arndb.de>
-Message-ID: <alpine.LFD.2.11.1601272241530.2353@ja.home.ssi.bg>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Wed, 27 Jan 2016 21:59:28 +0100
+Subject: [PATCH v4 0/9] Add STM32 pinctrl/GPIO driver
+In-Reply-To: <CACRpkdYGQ1xObWfka2CN9au6YMGhpu4qcTZpu72bzuJjO38tog@mail.gmail.com>
+References: <1452773795-24216-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <CACRpkdYGQ1xObWfka2CN9au6YMGhpu4qcTZpu72bzuJjO38tog@mail.gmail.com>
+Message-ID: <56A92FB0.7080907@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 01/27/2016 02:20 PM, Linus Walleij wrote:
+> On Thu, Jan 14, 2016 at 1:16 PM, Maxime Coquelin
+> <mcoquelin.stm32@gmail.com>  wrote:
+>
+>> >This is the fourth round of STM32 pinctrl series, which takes into
+>> >account comments made by Patrice on patch 4.
+> I have applied patch 2 and 4 to the pinctrl tree.
 
-	Hello,
+Just tried to compile your devel branch, and it breaks:
 
-On Wed, 27 Jan 2016, Arnd Bergmann wrote:
+   CC      drivers/pinctrl/stm32/pinctrl-stm32f429.o
+drivers/pinctrl/stm32/pinctrl-stm32.c: In function 
+'stm32_gpiolib_register_bank':
+drivers/pinctrl/stm32/pinctrl-stm32.c:692:17: error: 'struct gpio_chip' 
+has no member named 'dev'
+   bank->gpio_chip.dev = dev;
+                  ^
+make[3]: *** [drivers/pinctrl/stm32/pinctrl-stm32.o] Error 1
 
-> ip_vs_fill_iph_skb_off() may not find an IP header, and gcc has
-> determined that ip_vs_sip_fill_param() then incorrectly accesses
-> the protocol fields:
-> 
-> net/netfilter/ipvs/ip_vs_pe_sip.c: In function 'ip_vs_sip_fill_param':
-> net/netfilter/ipvs/ip_vs_pe_sip.c:76:5: error: 'iph.protocol' may be used uninitialized in this function [-Werror=maybe-uninitialized]
->   if (iph.protocol != IPPROTO_UDP)
->      ^
-> net/netfilter/ipvs/ip_vs_pe_sip.c:81:10: error: 'iph.len' may be used uninitialized in this function [-Werror=maybe-uninitialized]
->   dataoff = iph.len + sizeof(struct udphdr);
->           ^
-> 
-> This adds a check for the ip_vs_fill_iph_skb_off() return code
-> before looking at the ip header data returned from it.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: b0e010c527de ("ipvs: replace ip_vs_fill_ip4hdr with ip_vs_fill_iph_skb_off")
+This is due to the field renaming you did in gpio_chip struct:
+58383c7 gpio: change member .dev to .parent
 
-	Looks ok to me,
+How do you prefer to proceed?
+Should I send a fix on top of your devel branch, or you will fix it 
+directly?
 
-Acked-by: Julian Anastasov <ja@ssi.bg>
-
-	but see below...
-
-> ---
->  net/netfilter/ipvs/ip_vs_pe_sip.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/net/netfilter/ipvs/ip_vs_pe_sip.c b/net/netfilter/ipvs/ip_vs_pe_sip.c
-> index 1b8d594e493a..c4e9ca016a88 100644
-> --- a/net/netfilter/ipvs/ip_vs_pe_sip.c
-> +++ b/net/netfilter/ipvs/ip_vs_pe_sip.c
-> @@ -70,10 +70,10 @@ ip_vs_sip_fill_param(struct ip_vs_conn_param *p, struct sk_buff *skb)
->  	const char *dptr;
->  	int retc;
->  
-> -	ip_vs_fill_iph_skb(p->af, skb, false, &iph);
-> +	retc = ip_vs_fill_iph_skb(p->af, skb, false, &iph);
->  
->  	/* Only useful with UDP */
-> -	if (iph.protocol != IPPROTO_UDP)
-> +	if (!retc || iph.protocol != IPPROTO_UDP)
->  		return -EINVAL;
->  	/* todo: IPv6 fragments:
->  	 *       I think this only should be done for the first fragment. /HS
-
-	There are other places like this where result is not
-checked because there is always a guarding skb_header_pointer
-check, i.e. ip_vs_fill_iph_skb* should not fail at such point.
-
-	Let us know you want to extend this patch with other such
-calls (including ip_vs_fill_iph_skb_icmp)? May be they will
-need return NF_ACCEPT. I guess, all such changes should be
-for the ipvs-next/net-next tree when it opens.
-
-Regards
-
---
-Julian Anastasov <ja@ssi.bg>
+Thanks,
+Maxime
