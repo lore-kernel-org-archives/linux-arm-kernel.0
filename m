@@ -1,112 +1,29 @@
-From: ja@ssi.bg (Julian Anastasov)
-Date: Wed, 27 Jan 2016 22:01:42 +0200 (EET)
-Subject: [PATCH 1/2] netfilter: ipvs: avoid unused variable warnings
-In-Reply-To: <1453902749-3422685-1-git-send-email-arnd@arndb.de>
-References: <1453902749-3422685-1-git-send-email-arnd@arndb.de>
-Message-ID: <alpine.LFD.2.11.1601272156590.2353@ja.home.ssi.bg>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 27 Jan 2016 21:20:27 +0100
+Subject: [PATCH] pinctrl: pxa: export pxa2xx_pinctrl_init()
+In-Reply-To: <CACRpkdai_HysVqroBz-NcupxRF_2PPyHQnj8e8Ani6+04xre0A@mail.gmail.com>
+ (Linus Walleij's message of "Wed, 27 Jan 2016 13:33:23 +0100")
+References: <1453577113-14423-1-git-send-email-yamada.masahiro@socionext.com>
+ <CACRpkdai_HysVqroBz-NcupxRF_2PPyHQnj8e8Ani6+04xre0A@mail.gmail.com>
+Message-ID: <87powm93lg.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-	Hello,
+> On Sat, Jan 23, 2016 at 8:25 PM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>
+>> Building pinctrl-pxa27x.c as a module causes a link error:
+>>
+>> ERROR: "pxa2xx_pinctrl_init" [drivers/pinctrl/pxa/pinctrl-pxa27x.ko] undefined!
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>
+> Patch applied with Robert's ACK.
+Thanks Linus.
 
-On Wed, 27 Jan 2016, Arnd Bergmann wrote:
+Cheers.
 
-> The proc_create() and remove_proc_entry() functions do not reference
-> their arguments when CONFIG_PROC_FS is disabled, so we get a couple
-> of warnings about unused variables in IPVS:
-> 
-> ipvs/ip_vs_app.c:608:14: warning: unused variable 'net' [-Wunused-variable]
-> ipvs/ip_vs_ctl.c:3950:14: warning: unused variable 'net' [-Wunused-variable]
-> ipvs/ip_vs_ctl.c:3994:14: warning: unused variable 'net' [-Wunused-variable]
-> 
-> This removes the local variables and instead looks them up separately
-> for each use, which obviously avoids the warning.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 4c50a8ce2b63 ("netfilter: ipvs: avoid unused variable warning")
-
-	Looks like your previous patch for ip_vs_app_net_cleanup
-was delayed in ipvs-next tree. I guess, Simon should drop it and
-use this one instead when net-next opens:
-
-Acked-by: Julian Anastasov <ja@ssi.bg>
-
-> ---
->  net/netfilter/ipvs/ip_vs_app.c |  8 ++------
->  net/netfilter/ipvs/ip_vs_ctl.c | 15 ++++++---------
->  2 files changed, 8 insertions(+), 15 deletions(-)
-> 
-> diff --git a/net/netfilter/ipvs/ip_vs_app.c b/net/netfilter/ipvs/ip_vs_app.c
-> index 0328f7250693..299edc6add5a 100644
-> --- a/net/netfilter/ipvs/ip_vs_app.c
-> +++ b/net/netfilter/ipvs/ip_vs_app.c
-> @@ -605,17 +605,13 @@ static const struct file_operations ip_vs_app_fops = {
->  
->  int __net_init ip_vs_app_net_init(struct netns_ipvs *ipvs)
->  {
-> -	struct net *net = ipvs->net;
-> -
->  	INIT_LIST_HEAD(&ipvs->app_list);
-> -	proc_create("ip_vs_app", 0, net->proc_net, &ip_vs_app_fops);
-> +	proc_create("ip_vs_app", 0, ipvs->net->proc_net, &ip_vs_app_fops);
->  	return 0;
->  }
->  
->  void __net_exit ip_vs_app_net_cleanup(struct netns_ipvs *ipvs)
->  {
-> -	struct net *net = ipvs->net;
-> -
->  	unregister_ip_vs_app(ipvs, NULL /* all */);
-> -	remove_proc_entry("ip_vs_app", net->proc_net);
-> +	remove_proc_entry("ip_vs_app", ipvs->net->proc_net);
->  }
-> diff --git a/net/netfilter/ipvs/ip_vs_ctl.c b/net/netfilter/ipvs/ip_vs_ctl.c
-> index e7c1b052c2a3..bfb4f8372b83 100644
-> --- a/net/netfilter/ipvs/ip_vs_ctl.c
-> +++ b/net/netfilter/ipvs/ip_vs_ctl.c
-> @@ -3947,7 +3947,6 @@ static struct notifier_block ip_vs_dst_notifier = {
->  
->  int __net_init ip_vs_control_net_init(struct netns_ipvs *ipvs)
->  {
-> -	struct net *net = ipvs->net;
->  	int i, idx;
->  
->  	/* Initialize rs_table */
-> @@ -3974,9 +3973,9 @@ int __net_init ip_vs_control_net_init(struct netns_ipvs *ipvs)
->  
->  	spin_lock_init(&ipvs->tot_stats.lock);
->  
-> -	proc_create("ip_vs", 0, net->proc_net, &ip_vs_info_fops);
-> -	proc_create("ip_vs_stats", 0, net->proc_net, &ip_vs_stats_fops);
-> -	proc_create("ip_vs_stats_percpu", 0, net->proc_net,
-> +	proc_create("ip_vs", 0, ipvs->net->proc_net, &ip_vs_info_fops);
-> +	proc_create("ip_vs_stats", 0, ipvs->net->proc_net, &ip_vs_stats_fops);
-> +	proc_create("ip_vs_stats_percpu", 0, ipvs->net->proc_net,
->  		    &ip_vs_stats_percpu_fops);
->  
->  	if (ip_vs_control_net_init_sysctl(ipvs))
-> @@ -3991,13 +3990,11 @@ err:
->  
->  void __net_exit ip_vs_control_net_cleanup(struct netns_ipvs *ipvs)
->  {
-> -	struct net *net = ipvs->net;
-> -
->  	ip_vs_trash_cleanup(ipvs);
->  	ip_vs_control_net_cleanup_sysctl(ipvs);
-> -	remove_proc_entry("ip_vs_stats_percpu", net->proc_net);
-> -	remove_proc_entry("ip_vs_stats", net->proc_net);
-> -	remove_proc_entry("ip_vs", net->proc_net);
-> +	remove_proc_entry("ip_vs_stats_percpu", ipvs->net->proc_net);
-> +	remove_proc_entry("ip_vs_stats", ipvs->net->proc_net);
-> +	remove_proc_entry("ip_vs", ipvs->net->proc_net);
->  	free_percpu(ipvs->tot_stats.cpustats);
->  }
->  
-> -- 
-> 2.7.0
-
-Regards
-
---
-Julian Anastasov <ja@ssi.bg>
+-- 
+Robert
