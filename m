@@ -1,201 +1,61 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 27 Jan 2016 14:45:59 -0800
-Subject: [PATCH resend 1/4] of_touchscreen-helpers: Add support for
- inverted / swapped axis
-In-Reply-To: <1453919124-3840-2-git-send-email-hdegoede@redhat.com>
-References: <1453919124-3840-1-git-send-email-hdegoede@redhat.com>
- <1453919124-3840-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160127224559.GB3482@dtor-ws>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 27 Jan 2016 23:51:32 +0100
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <CAPDyKFo-itpp1JUVANSFNiyhKcv1XLUqx1GwRk532LaT+ija0g@mail.gmail.com>
+References: <20160126224804.GB19432@atomide.com>
+ <2779316.34ov6YOQgv@vostro.rjw.lan>
+ <CAPDyKFo-itpp1JUVANSFNiyhKcv1XLUqx1GwRk532LaT+ija0g@mail.gmail.com>
+Message-ID: <1490733.Lnn2KRpEYo@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-On Wed, Jan 27, 2016 at 07:25:21PM +0100, Hans de Goede wrote:
-> Extend touchscreen_parse_properties() with support for the
-> touchscreen-inverted-x/y and touchscreen-swapped-x-y properties and
-> add a touchscreen_apply_prop_to_x_y() helper function for adjusting
-> x and y coordinates to take these properties into account.
+On Wednesday, January 27, 2016 09:17:45 AM Ulf Hansson wrote:
+> On 27 January 2016 at 08:54, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Tuesday, January 26, 2016 03:52:23 PM Tony Lindgren wrote:
+> >> * Rafael J. Wysocki <rafael@kernel.org> [160126 15:38]:
+> >> > On Wed, Jan 27, 2016 at 12:22 AM, Tony Lindgren <tony@atomide.com> wrote:
+> >> > > * Rafael J. Wysocki <rafael@kernel.org> [160126 15:15]:
+> >> > >> On Tue, Jan 26, 2016 at 11:48 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >> > >> > Hi,
+> >> > >> >
+> >> > >> > Looks like commit 5de85b9d57ab ("PM / runtime: Re-init runtime
+> >> > >> > PM states at probe error and driver unbind") broke PM on at least
+> >> > >> > omap3. It seems we now need to additionally also call
+> >> > >> > pm_runtime_dont_use_autosuspend() to get things working again?
+> >> > >> >
+> >> > >> > The following fixes idling on omap3, but I'm wondering if we
+> >> > >> > should do something in pm_runtime_reinit() instead?
+> >> > >>
+> >> > >> Well, does it actually help if you add
+> >> > >> pm_runtime_dont_use_autosuspend(dev) to pm_runtime_reinit()?
+> >> > >
+> >> > > No adding it to pm_runtime_reinit() does not help.
+> >> >
+> >> > Yes, I realized that it wouldn't help only after sending the previous
+> >> > message, sorry about that.
+> >> >
+> >> > The reason why it helps in the driver code seems to be that
+> >> > autosuspend_delay happens to be negative, so update_autosuspend()
+> >> > decrements the usage counter that would have stayed incremented
+> >> > otherwise.  Or at least that's the only way it can help I see ATM.
+> >>
+> >> Oh OK.
+> >>
+> >> > > Looks like we have RPM_ACTIVE set in pm_runtime_reinit() if that
+> >> > > gives any clues.
+> >> >
+> >> > It looks like pm_runtime_reinit() should clear the usage counter too.
+> >>
+> >> Yeah if we do this when !pm_runtime_enabled(dev) it seems it's
+> >> safe to pretty much reset everything?
+> >
+> > Not only safe, but also a good idea apparently. :-)
 > 
-> This commit also modifies the existing callers of
-> touchscreen_parse_properties() to pass in NULL for the new third
-> argument, keeping the existing behavior.
+> I happy to send a patch, extending pm_runtime_reinit() with some more
+> data to be reset.
 
-Thank you for re-sending the patches. I was wondering if we should add
-the transformation flags directly to the input devices and perform
-transformation in input core... Probably won't going to work well unless
-we start defining order in which we send events to the core.
+Please do.
 
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  drivers/input/touchscreen/edt-ft5x06.c     |  2 +-
->  drivers/input/touchscreen/of_touchscreen.c | 56 +++++++++++++++++++++++++++++-
->  drivers/input/touchscreen/pixcir_i2c_ts.c  |  2 +-
->  drivers/input/touchscreen/tsc200x-core.c   |  2 +-
->  include/linux/input/touchscreen.h          | 16 ++++++++-
->  5 files changed, 73 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
-> index 0b0f8c1..a97b54a 100644
-> --- a/drivers/input/touchscreen/edt-ft5x06.c
-> +++ b/drivers/input/touchscreen/edt-ft5x06.c
-> @@ -966,7 +966,7 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
->  	input_set_abs_params(input, ABS_MT_POSITION_Y,
->  			     0, tsdata->num_y * 64 - 1, 0, 0);
->  
-> -	touchscreen_parse_properties(input, true);
-> +	touchscreen_parse_properties(input, true, NULL);
->  
->  	error = input_mt_init_slots(input, tsdata->max_support_points,
->  				INPUT_MT_DIRECT);
-> diff --git a/drivers/input/touchscreen/of_touchscreen.c b/drivers/input/touchscreen/of_touchscreen.c
-> index bb6f2fe..6fd9872 100644
-> --- a/drivers/input/touchscreen/of_touchscreen.c
-> +++ b/drivers/input/touchscreen/of_touchscreen.c
-> @@ -55,12 +55,16 @@ static void touchscreen_set_params(struct input_dev *dev,
->   * @input: input device that should be parsed
->   * @multitouch: specifies whether parsed properties should be applied to
->   *	single-touch or multi-touch axes
-> + * @prop: pointer to a struct touchscreen_properties into which to store
-> + *	axis swap and invert info for use with touchscreen_report_x_y();
-> + *	or NULL
->   *
->   * This function parses common DT properties for touchscreens and setups the
->   * input device accordingly. The function keeps previously set up default
->   * values if no value is specified via DT.
->   */
-> -void touchscreen_parse_properties(struct input_dev *input, bool multitouch)
-> +void touchscreen_parse_properties(struct input_dev *input, bool multitouch,
-> +				  struct touchscreen_properties *prop)
->  {
->  	struct device *dev = input->dev.parent;
->  	unsigned int axis;
-> @@ -104,5 +108,55 @@ void touchscreen_parse_properties(struct input_dev *input, bool multitouch)
->  						&fuzz);
->  	if (data_present)
->  		touchscreen_set_params(input, axis, maximum, fuzz);
-> +
-> +	if (!prop)
-> +		return;
-> +
-> +	axis = multitouch ? ABS_MT_POSITION_X : ABS_X;
-> +
-> +	prop->max_x = input_abs_get_max(input, axis);
-> +	prop->max_y = input_abs_get_max(input, axis + 1);
-> +	prop->invert_x =
-> +		device_property_read_bool(dev, "touchscreen-inverted-x");
-> +	prop->invert_y =
-> +		device_property_read_bool(dev, "touchscreen-inverted-y");
-> +	prop->swap_x_y =
-> +		device_property_read_bool(dev, "touchscreen-swapped-x-y");
-> +
-> +	if (prop->swap_x_y) {
-> +		struct input_absinfo tmp_absinfo;
-> +
-> +		tmp_absinfo = input->absinfo[axis];
-> +		input->absinfo[axis] = input->absinfo[axis + 1];
-> +		input->absinfo[axis + 1] = tmp_absinfo;
-> +	}
->  }
->  EXPORT_SYMBOL(touchscreen_parse_properties);
-> +
-> +/**
-> + * touchscreen_apply_prop_to_x_y - Adjust abs x and y coordinates
-> + * @prop: pointer to a struct touchscreen_properties
-> + * @x: X coordinate to apply inversion and swapping to
-> + * @y: Y coordinate to apply inversion and swapping to
-> + *
-> + * Adjust the passed in x and y values applying any axis inversion and
-> + * swapping requested in the passed in touchscreen_properties.
-> + */
-> +void touchscreen_apply_prop_to_x_y(struct touchscreen_properties *prop,
-> +				   s16 *x, s16 *y)
-
-why s16?
-
-> +{
-> +	if (prop->invert_x)
-> +		*x = prop->max_x - *x;
-> +
-> +	if (prop->invert_y)
-> +		*y = prop->max_y - *y;
-> +
-> +	if (prop->swap_x_y) {
-> +		s16 tmp;
-> +
-> +		tmp = *x;
-> +		*x = *y;
-> +		*y = tmp;
-
-		swap(*x, *y);
-
-> +	}
-> +}
-> +EXPORT_SYMBOL(touchscreen_apply_prop_to_x_y);
-> diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
-> index 09523a3..f58784d 100644
-> --- a/drivers/input/touchscreen/pixcir_i2c_ts.c
-> +++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
-> @@ -515,7 +515,7 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
->  	} else {
->  		input_set_capability(input, EV_ABS, ABS_MT_POSITION_X);
->  		input_set_capability(input, EV_ABS, ABS_MT_POSITION_Y);
-> -		touchscreen_parse_properties(input, true);
-> +		touchscreen_parse_properties(input, true, NULL);
->  		if (!input_abs_get_max(input, ABS_MT_POSITION_X) ||
->  		    !input_abs_get_max(input, ABS_MT_POSITION_Y)) {
->  			dev_err(dev, "Touchscreen size is not specified\n");
-> diff --git a/drivers/input/touchscreen/tsc200x-core.c b/drivers/input/touchscreen/tsc200x-core.c
-> index 15240c1..26e81d1 100644
-> --- a/drivers/input/touchscreen/tsc200x-core.c
-> +++ b/drivers/input/touchscreen/tsc200x-core.c
-> @@ -559,7 +559,7 @@ int tsc200x_probe(struct device *dev, int irq, __u16 bustype,
->  	input_set_abs_params(input_dev, ABS_PRESSURE, 0, max_p, fudge_p, 0);
->  
->  	if (np)
-> -		touchscreen_parse_properties(input_dev, false);
-> +		touchscreen_parse_properties(input_dev, false, NULL);
->  
->  	input_dev->open = tsc200x_open;
->  	input_dev->close = tsc200x_close;
-> diff --git a/include/linux/input/touchscreen.h b/include/linux/input/touchscreen.h
-> index c91e137..9e6ba20 100644
-> --- a/include/linux/input/touchscreen.h
-> +++ b/include/linux/input/touchscreen.h
-> @@ -9,8 +9,22 @@
->  #ifndef _TOUCHSCREEN_H
->  #define _TOUCHSCREEN_H
->  
-> +#include <asm/types.h>
-
-If you are trying to add this to have s32 typedefs then I think it is
-wrong one.
-
-> +
->  struct input_dev;
->  
-> -void touchscreen_parse_properties(struct input_dev *dev, bool multitouch);
-> +struct touchscreen_properties {
-> +	s32 max_x;
-> +	s32 max_y;
-> +	bool invert_x;
-> +	bool invert_y;
-> +	bool swap_x_y;
-> +};
-> +
-> +void touchscreen_parse_properties(struct input_dev *input, bool multitouch,
-> +				  struct touchscreen_properties *prop);
-> +
-> +void touchscreen_apply_prop_to_x_y(struct touchscreen_properties *prop,
-> +				   s16 *x, s16 *y);
->  
->  #endif
-> -- 
-> 2.5.0
-> 
-
-Thanks.
-
--- 
-Dmitry
+Thanks,
+Rafael
