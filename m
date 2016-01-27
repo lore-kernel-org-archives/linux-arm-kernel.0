@@ -1,34 +1,30 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 27 Jan 2016 18:49:32 +0100
-Subject: [PATCH RFC 11/11] clk: sunxi: rewrite sun8i-a23-mbus-clk using
- the simpler composite clk
-In-Reply-To: <1453727747-23307-12-git-send-email-wens@csie.org>
-References: <1453727747-23307-1-git-send-email-wens@csie.org>
- <1453727747-23307-12-git-send-email-wens@csie.org>
-Message-ID: <20160127174932.GP4317@lukather>
+From: yang.shi@linaro.org (Yang Shi)
+Date: Wed, 27 Jan 2016 09:32:05 -0800
+Subject: [PATCH] PCI: layerscape: add ls2085a compatible
+Message-ID: <1453915925-19198-1-git-send-email-yang.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 09:15:47PM +0800, Chen-Yu Tsai wrote:
-> sun8i-a23-mbus-clk used sunxi's factors clk, which is nice for very
-> complicated clocks, but is not really needed here.
-> 
-> Convert sun8i-a23-mbus-clk to use clk_composite, as it is a gate + mux
-> + divider. This makes the code easier to understand.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+The layerscape PCI host driver needs recognize ls2085a compatible when using
+firmware with ls2085a compatible property, otherwise the PCI bus won't be
+detected even though ls2085a compatible is included by the dts.
 
-Applied, thanks!
-Maxime
+Signed-off-by: Yang Shi <yang.shi@linaro.org>
+---
+ drivers/pci/host/pci-layerscape.c | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
+index 3923bed..c40d8b2 100644
+--- a/drivers/pci/host/pci-layerscape.c
++++ b/drivers/pci/host/pci-layerscape.c
+@@ -203,6 +203,7 @@ static const struct of_device_id ls_pcie_of_match[] = {
+ 	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata },
+ 	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata },
+ 	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata },
++	{ .compatible = "fsl,ls2085a-pcie", .data = &ls2080_drvdata },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, ls_pcie_of_match);
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/bbe0d487/attachment-0001.sig>
+2.0.2
