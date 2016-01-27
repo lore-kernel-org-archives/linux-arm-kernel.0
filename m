@@ -1,132 +1,88 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 27 Jan 2016 11:51:47 +0800
-Subject: [PATCH v10 19/21] KVM: ARM64: Add a new feature bit for PMUv3
+Date: Wed, 27 Jan 2016 11:51:46 +0800
+Subject: [PATCH v10 18/21] KVM: ARM64: Free perf event of PMU when destroying
+ vcpu
 In-Reply-To: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1453866709-20324-20-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1453866709-20324-19-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-To support guest PMUv3, use one bit of the VCPU INIT feature array.
-Initialize the PMU when initialzing the vcpu with that bit and PMU
-overflow interrupt set.
+When KVM frees VCPU, it needs to free the perf_event of PMU.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Acked-by: Peter Maydell <peter.maydell@linaro.org>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
-CC: Peter Maydell <peter.maydell@linaro.org>
----
- Documentation/virtual/kvm/api.txt | 2 ++
- arch/arm64/include/asm/kvm_host.h | 2 +-
- arch/arm64/include/uapi/asm/kvm.h | 1 +
- arch/arm64/kvm/reset.c            | 3 +++
- include/kvm/arm_pmu.h             | 2 ++
- include/uapi/linux/kvm.h          | 1 +
- virt/kvm/arm/pmu.c                | 9 +++++++++
- 7 files changed, 19 insertions(+), 1 deletion(-)
+ arch/arm/kvm/arm.c    |  1 +
+ include/kvm/arm_pmu.h |  2 ++
+ virt/kvm/arm/pmu.c    | 21 +++++++++++++++++++++
+ 3 files changed, 24 insertions(+)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 053f613..e51fa04 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2577,6 +2577,8 @@ Possible features:
- 	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
- 	- KVM_ARM_VCPU_PSCI_0_2: Emulate PSCI v0.2 for the CPU.
- 	  Depends on KVM_CAP_ARM_PSCI_0_2.
-+	- KVM_ARM_VCPU_PMU_V3: Emulate PMUv3 for the CPU.
-+	  Depends on KVM_CAP_ARM_PMU_V3.
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index f54264c..d2c2cc3 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -266,6 +266,7 @@ void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
+ 	kvm_mmu_free_memory_caches(vcpu);
+ 	kvm_timer_vcpu_terminate(vcpu);
+ 	kvm_vgic_vcpu_destroy(vcpu);
++	kvm_pmu_vcpu_destroy(vcpu);
+ 	kmem_cache_free(kvm_vcpu_cache, vcpu);
+ }
  
- 
- 4.83 KVM_ARM_PREFERRED_TARGET
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 6bab7fb..cb220b7 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -40,7 +40,7 @@
- 
- #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
- 
--#define KVM_VCPU_MAX_FEATURES 3
-+#define KVM_VCPU_MAX_FEATURES 4
- 
- int __attribute_const__ kvm_target_cpu(void);
- int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 2d4ca4b..6aedbe3 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -94,6 +94,7 @@ struct kvm_regs {
- #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
- #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
- #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
-+#define KVM_ARM_VCPU_PMU_V3		3 /* Support guest PMUv3 */
- 
- struct kvm_vcpu_init {
- 	__u32 target;
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index dfbce78..cf4f28a 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -77,6 +77,9 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
- 	case KVM_CAP_GUEST_DEBUG_HW_WPS:
- 		r = get_num_wrps();
- 		break;
-+	case KVM_CAP_ARM_PMU_V3:
-+		r = kvm_arm_support_pmu_v3();
-+		break;
- 	case KVM_CAP_SET_GUEST_DEBUG:
- 		r = 1;
- 		break;
 diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index d90fc65..fee86eb 100644
+index 4394e0c..d90fc65 100644
 --- a/include/kvm/arm_pmu.h
 +++ b/include/kvm/arm_pmu.h
-@@ -48,6 +48,7 @@ void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
- 				    u64 select_idx);
-+bool kvm_arm_support_pmu_v3(void);
- #else
- struct kvm_pmu {
- };
-@@ -72,6 +73,7 @@ static inline void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
- 						  u64 data, u64 select_idx) {}
-+static inline bool kvm_arm_support_pmu_v3(void) { return false; }
- #endif
- 
- #endif
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 9da9051..dc16d30 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -850,6 +850,7 @@ struct kvm_ppc_smmu_info {
- #define KVM_CAP_IOEVENTFD_ANY_LENGTH 122
- #define KVM_CAP_HYPERV_SYNIC 123
- #define KVM_CAP_S390_RI 124
-+#define KVM_CAP_ARM_PMU_V3 125
- 
- #ifdef KVM_CAP_IRQ_ROUTING
- 
+@@ -39,6 +39,7 @@ struct kvm_pmu {
+ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
+ u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu);
+ void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu);
++void kvm_pmu_vcpu_destroy(struct kvm_vcpu *vcpu);
+ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
+@@ -62,6 +63,7 @@ static inline u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
+ 	return 0;
+ }
+ static inline void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu) {}
++static inline void kvm_pmu_vcpu_destroy(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+ static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+ static inline void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
 diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 45d4d91..05e9d7e 100644
+index 8142921..45d4d91 100644
 --- a/virt/kvm/arm/pmu.c
 +++ b/virt/kvm/arm/pmu.c
-@@ -374,3 +374,12 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
- 
- 	pmc->perf_event = event;
+@@ -86,6 +86,27 @@ void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu)
+ 	}
  }
-+
-+bool kvm_arm_support_pmu_v3(void)
+ 
++/**
++ * kvm_pmu_vcpu_destroy - free perf event of PMU for cpu
++ * @vcpu: The vcpu pointer
++ *
++ */
++void kvm_pmu_vcpu_destroy(struct kvm_vcpu *vcpu)
 +{
-+	/* Check if HW_PERF_EVENTS are supported by checking the number of
-+	 * hardware performance counters. This could ensure physical PMU and
-+	 * PERF_EVENT driver existing.
-+	 */
-+	return (perf_num_counters() > 0);
++	int i;
++	struct kvm_pmu *pmu = &vcpu->arch.pmu;
++
++	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
++		struct kvm_pmc *pmc = &pmu->pmc[i];
++
++		if (pmc->perf_event) {
++			perf_event_disable(pmc->perf_event);
++			perf_event_release_kernel(pmc->perf_event);
++			pmc->perf_event = NULL;
++		}
++	}
 +}
++
+ u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
+ {
+ 	u64 val = vcpu_sys_reg(vcpu, PMCR_EL0) >> ARMV8_PMCR_N_SHIFT;
 -- 
 2.0.4
