@@ -1,10 +1,10 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Wed, 27 Jan 2016 12:27:48 +0800
-Subject: [PATCH 11/15] bus: uniphier-system-bus: use
- of_platform_default_populate() to populate default bus
+Date: Wed, 27 Jan 2016 12:27:49 +0800
+Subject: [PATCH 12/15] memory: omap-gpmc: use of_platform_default_populate()
+ to populate default bus
 In-Reply-To: <1453868872-26300-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1453868872-26300-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1453868872-26300-12-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1453868872-26300-13-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,25 +12,26 @@ Use helper of_platform_default_populate() in linux/of_platform
 when possible, instead of calling of_platform_populate() with
 the default match table.
 
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Roger Quadros <rogerq@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- drivers/bus/uniphier-system-bus.c | 3 +--
+ drivers/memory/omap-gpmc.c | 3 +--
  1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/bus/uniphier-system-bus.c b/drivers/bus/uniphier-system-bus.c
-index 834a2ae..f50bd6d 100644
---- a/drivers/bus/uniphier-system-bus.c
-+++ b/drivers/bus/uniphier-system-bus.c
-@@ -257,8 +257,7 @@ static int uniphier_system_bus_probe(struct platform_device *pdev)
- 	uniphier_system_bus_set_reg(priv);
+diff --git a/drivers/memory/omap-gpmc.c b/drivers/memory/omap-gpmc.c
+index 6515dfc..455fc73 100644
+--- a/drivers/memory/omap-gpmc.c
++++ b/drivers/memory/omap-gpmc.c
+@@ -2016,8 +2016,7 @@ no_timings:
+ 	/* is child a common bus? */
+ 	if (of_match_node(of_default_bus_match_table, child))
+ 		/* create children and other common bus children */
+-		if (of_platform_populate(child, of_default_bus_match_table,
+-					 NULL, &pdev->dev))
++		if (of_platform_default_populate(child, NULL, &pdev->dev))
+ 			goto err_child_fail;
  
- 	/* Now, the bus is configured.  Populate platform_devices below it */
--	return of_platform_populate(dev->of_node, of_default_bus_match_table,
--				    NULL, dev);
-+	return of_platform_default_populate(dev->of_node, NULL, dev);
- }
- 
- static const struct of_device_id uniphier_system_bus_match[] = {
+ 	return 0;
 -- 
 2.6.0.GIT
