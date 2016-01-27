@@ -1,65 +1,45 @@
-From: macro@imgtec.com (Maciej W. Rozycki)
-Date: Wed, 27 Jan 2016 12:09:32 +0000
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160127104032.GB2939@linux-mips.org>
-References: <5696CF08.8080700@imgtec.com> <20160114121449.GC15828@arm.com>
- <5697F6D2.60409@imgtec.com> <20160114203430.GC3818@linux.vnet.ibm.com>
- <56980C91.1010403@imgtec.com> <20160114212913.GF3818@linux.vnet.ibm.com>
- <569814F2.50801@imgtec.com>
- <20160114225510.GJ3818@linux.vnet.ibm.com> <56983054.4070807@imgtec.com>
- <20160115004753.GN3818@linux.vnet.ibm.com>
- <20160127104032.GB2939@linux-mips.org>
-Message-ID: <alpine.DEB.2.00.1601271126350.5958@tp.orcam.me.uk>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Wed, 27 Jan 2016 15:17:52 +0300
+Subject: [PATCH 0/3] ACPI: parse the SPCR table
+In-Reply-To: <56A6494E.3090303@hurleysoftware.com>
+References: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>
+ <56A6494E.3090303@hurleysoftware.com>
+Message-ID: <56A8B570.2060501@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Jan 2016, Ralf Baechle wrote:
 
-> > So you need to build a different kernel for some types of MIPS systems?
+
+On 01/25/2016 07:11 PM, Peter Hurley wrote:
+> On 01/25/2016 03:45 AM, Aleksey Makarov wrote:
+>> This patchset is based on the patchset by Leif Lindholm [1]
+>>
+>> 'ARM Server Base Boot Requirements' [2] mention SPCR 
+>> (Serial Port Console Redirection Table) [3] as a mandatory
+>> ACPI table that specifies the configuration of serial console.
+>>
+>> Licensing concerns have prevented implementing it in the past, but as of
+>> 10 August 2015, these tables have both been released also under 
+>> OWF 1.0 [4].
 > 
-> Yes.  We can't really do without.  Classic MIPS code is not relocatable
-> without the complexity of PIC code as used by ELF DSOs - and their
-> performanc penalty.  Plus we have a number of architecture revisions
-> ovr the decades, big and little endian, 32 and 64 bit as the major
-> stumbling stones.  There however are groups of similar systems that
-> can share kernel binaries.
+> This license has a patent retaliation provision, which makes it
+> incompatible with GPLv2.
+> 
+> *If the license applies to this code*, then this patch set does not
+> meet the criteria for submission.
 
- Matt (cc-ed) has recently posted patches to add support for a relocatable 
-kernel, implemented without the usual overhead of PIC code.  It works by 
-retaining relocations in a fully-linked binary and then simply replaying 
-the work the static linker does when assigning addresses, as the image 
-loaded is copied to its intended destination at an early bootstrap stage.  
-See: 
-<http://www.linux-mips.org/cgi-bin/mesg.cgi?a=linux-mips&i=1449137297-30464-1-git-send-email-matt.redfearn%40imgtec.com> 
-for details.
+The license applies not to this code but to the document describing the tables.
 
- I think this framework can be reused by carefully choosing instructions 
-used in early bootstrap code, up to the relocation stage, so that it is 
-runnable anywhere (not the same as PIC!) like early ld.so initialisation 
-and then loading the whole attached image starting from an address where 
-RAM does exist on target hardware.
+Here is an excerpt from it:
 
- Endianness is a different matter, obviously we can't build a single image 
-for both, although for distributions' sake an approach similar to one used 
-with bi-endian firmware (for hardware which has an easy way to switch the 
-endianness, e.g. a physical jumper or a configuration bit stored in flash 
-memory; not to be confused with the reverse user endianness mode) might be 
-feasible, by glueing two kernel images together and then selecting the 
-right one early in bootstrap, perhaps again reusing Matt's framework.  
-I'm not sure if this is worth the effort though, I suspect the usage level 
-of this feature would be minimal.
+  Patent Notice:
+  Microsoft is making certain patent rights available for implementations of this specification under two options:
+  1)  Microsoft?s Community Promise, available at
+  http://www.microsoft.com/openspecifications/en/us/programs/community-promise/default.aspx; or
+  2)  The Open Web Foundation Final Specification Agreement Version 1.0 ("OWF 1.0")
+  as of October 1, 2012, available at http://www.openwebfoundation.org/legal/the-owf-1-0-agreements/owfa-1-0. 
 
- All in all I think making a generic MIPS kernel just might be feasible, 
-but with the diversity of options available the effort required would be 
-enormous.  NetBSD for example I believe supports building a kernel that 
-correctly runs on both R3000 (MIPS I, 32-bit) and R4000 (MIPS III, 64-bit) 
-DEC hardware (as did DEC Ultrix, the vendor OS for these systems).  These 
-processors are different enough from each other that you cannot use the 
-same code for cache, memory and exception management in an OS kernel -- 
-backward compatibility is only provided for user software.  That proves 
-the concept, however in a very limited way only, not even covering SMP, 
-and their R4000 kernel does not support 64-bit userland I believe.  They 
-still have completely separate ports for other MIPS hardware, such as for 
-Broadcom SiByte SB-1 (MIPS64r1) processors.
+I believe that it means that the patch set meets the criteria for submission.  Am I right?
 
-  Maciej
+Thank you
+Aleksey Makarov
