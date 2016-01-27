@@ -1,79 +1,79 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 27 Jan 2016 07:31:24 +0000
-Subject: [PATCH v5 0/7] remoteproc: Add driver for STMicroelectronics
- platforms
-In-Reply-To: <1452602781-22424-1-git-send-email-lee.jones@linaro.org>
-References: <1452602781-22424-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20160127073124.GI3368@x1>
+Date: Wed, 27 Jan 2016 07:33:00 +0000
+Subject: [PATCH 3/3] thermal: allow u8500-thermal driver to be a module
+In-Reply-To: <1453740264-1972562-4-git-send-email-arnd@arndb.de>
+References: <1453740264-1972562-1-git-send-email-arnd@arndb.de>
+ <1453740264-1972562-4-git-send-email-arnd@arndb.de>
+Message-ID: <20160127073300.GJ3368@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apologies for ping (I hate doing that), but I haven't heard anything
-from you.  Do you want me to re-submit this set, or are you willing to
-take this and apply the relevant Acks?
+On Mon, 25 Jan 2016, Arnd Bergmann wrote:
 
-> ST's platforms often have multiple co-processors (usually ST40s or ST231s)
-> on-board.  This provides the Linux-side infrastructure to flash and boot
-> them successfully.
->   
-> This set has been tested on an STiH410-B2120.
+> When the thermal subsystem is a loadable module, the u8500 driver
+> fails to build:
 > 
-> v4 => v5:
->  - Check for invalid 'count' (command read length) in write fn()s
->   
-> v3 => v4:
->  Suggested-by: Suman Anna <s-anna@ti.com>
->  - Move to using 'reserved-memory' API
->    - New 'reserved-memory' nodes
->    - Remove memory locations from RemoteProc's DT node's reg properties
->    - Remove C code obtaining/allocating DMA memory
->  - Re-order .start() and .stop() ops
->  - Add protection around Reset API in error path
->  - Explicitly set .has_iommu to false
->   
-> v2 => v3:
->  - Generify syscon property (st,syscfg-boot => st,syscfg)
->  - Rename IP in DT bindings doc (Remote Processor => Co-Processor)
->  - Remove superfluous 'clock-names' property
->  - Remove superfluous 'reg-names' property
->  - Populate MAINTAINERS
->  - Clean-up DTS formatting
->  - Use strings in debugfs to control procs ('1|0' => 'start|stop')
->  - Align copyright statement with MODULE() macros
->  - Rename driver data structure ('st_rproc' => 'ddata')
->  - Addition of a full error path in .start()
+> drivers/thermal/built-in.o: In function `db8500_thermal_probe':
+> db8500_thermal.c:(.text+0x96c): undefined reference to `thermal_zone_device_register'
+> drivers/thermal/built-in.o: In function `db8500_thermal_work':
+> db8500_thermal.c:(.text+0xab4): undefined reference to `thermal_zone_device_update'
 > 
-> v1 => v2:
->  - Remove Linux implementation specific comment from binding document
->  - Force debugfs '0' to shutdown co-processor - rather than !1
->  - Supply more detailed commit message
->  - Propagate errors back from .stop()
->  - Review GPL wording
->  - Supply original author's SoBs
+> This changes the symbol to a tristate, so Kconfig can track the
+> dependency correctly.
 > 
-> Lee Jones (7):
->   remoteproc: debugfs: Check of invalid 'count' value
->   remoteproc: dt: Provide bindings for ST's Remote Processor Controller
->     driver
->   remoteproc: debugfs: Add ability to boot remote processor using
->     debugfs
->   remoteproc: Supply controller driver for ST's Remote Processors
->   MAINTAINERS: Add ST's Remote Processor Driver to ARM/STI ARCHITECTURE
->   ARM: STiH407: Add nodes for RemoteProc
->   ARM: STiH407: Move over to using the 'reserved-memory' API for
->     obtaining DMA memory
-> 
->  .../devicetree/bindings/remoteproc/st-rproc.txt    |  41 +++
->  MAINTAINERS                                        |   1 +
->  arch/arm/boot/dts/stih407-family.dtsi              |  70 +++++
->  drivers/remoteproc/Kconfig                         |   9 +
->  drivers/remoteproc/Makefile                        |   1 +
->  drivers/remoteproc/remoteproc_debugfs.c            |  38 ++-
->  drivers/remoteproc/st_remoteproc.c                 | 297 +++++++++++++++++++++
->  7 files changed, 455 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/remoteproc/st-rproc.txt
->  create mode 100644 drivers/remoteproc/st_remoteproc.c
-> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/mfd/db8500-prcmu.c | 3 +++
+>  drivers/thermal/Kconfig    | 4 ++--
+>  2 files changed, 5 insertions(+), 2 deletions(-)
+
+As this touches a core Thermal file, I think it's better off going in
+via that tree.  If that's a problem, I can take it with the relevant
+Acks.
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+> index 2f4a1279b094..c0a86aeb1733 100644
+> --- a/drivers/mfd/db8500-prcmu.c
+> +++ b/drivers/mfd/db8500-prcmu.c
+> @@ -2045,6 +2045,7 @@ int db8500_prcmu_config_hotmon(u8 low, u8 high)
+>  
+>  	return 0;
+>  }
+> +EXPORT_SYMBOL_GPL(db8500_prcmu_config_hotmon);
+>  
+>  static int config_hot_period(u16 val)
+>  {
+> @@ -2071,11 +2072,13 @@ int db8500_prcmu_start_temp_sense(u16 cycles32k)
+>  
+>  	return config_hot_period(cycles32k);
+>  }
+> +EXPORT_SYMBOL_GPL(db8500_prcmu_start_temp_sense);
+>  
+>  int db8500_prcmu_stop_temp_sense(void)
+>  {
+>  	return config_hot_period(0xFFFF);
+>  }
+> +EXPORT_SYMBOL_GPL(db8500_prcmu_stop_temp_sense);
+>  
+>  static int prcmu_a9wdog(u8 cmd, u8 d0, u8 d1, u8 d2, u8 d3)
+>  {
+> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+> index 0852fd028dc9..7c92c09be213 100644
+> --- a/drivers/thermal/Kconfig
+> +++ b/drivers/thermal/Kconfig
+> @@ -237,8 +237,8 @@ config DOVE_THERMAL
+>  	  framework.
+>  
+>  config DB8500_THERMAL
+> -	bool "DB8500 thermal management"
+> -	depends on ARCH_U8500
+> +	tristate "DB8500 thermal management"
+> +	depends on MFD_DB8500_PRCMU
+>  	default y
+>  	help
+>  	  Adds DB8500 thermal management implementation according to the thermal
 
 -- 
 Lee Jones
