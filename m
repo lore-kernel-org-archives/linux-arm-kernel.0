@@ -1,128 +1,71 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 27 Jan 2016 10:13:20 -0800
-Subject: [PATCH 4.3 133/157] arm64: bpf: fix div-by-zero case
-In-Reply-To: <20160127180932.533735338@linuxfoundation.org>
-References: <20160127180932.533735338@linuxfoundation.org>
-Message-ID: <20160127180939.823021039@linuxfoundation.org>
+From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
+Date: Wed, 27 Jan 2016 19:06:48 +0000
+Subject: iommu/arm-smmu-v2 ASID/VMID calculation
+In-Reply-To: <20160126115435.GB21553@arm.com>
+References: <198F501C-8D30-4EB5-BC40-4F40BB75D40B@caviumnetworks.com>
+ <20160125170312.GJ22927@arm.com>
+ <E978AB4F-5CB0-42D8-8152-04C77DB664A1@caviumnetworks.com>
+ <6F24A28A-6302-4C48-A933-B47A9735808C@caviumnetworks.com>
+ <20160126115435.GB21553@arm.com>
+Message-ID: <E0484253-BE37-476A-9F4A-ABE6B74EC174@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.3-stable review patch.  If anyone has any objections, please let me know.
 
-------------------
 
-From: Zi Shen Lim <zlim.lnx@gmail.com>
 
-commit 251599e1d6906621f49218d7b474ddd159e58f3b upstream.
 
-In the case of division by zero in a BPF program:
-	A = A / X;  (X == 0)
-the expected behavior is to terminate with return value 0.
 
-This is confirmed by the test case introduced in commit 86bf1721b226
-("test_bpf: add tests checking that JIT/interpreter sets A and X to 0.").
+On 1/26/16, 3:54 AM, "Will Deacon" <will.deacon@arm.com> wrote:
 
-Reported-by: Yang Shi <yang.shi@linaro.org>
-Tested-by: Yang Shi <yang.shi@linaro.org>
-CC: Xi Wang <xi.wang@gmail.com>
-CC: Alexei Starovoitov <ast@plumgrid.com>
-CC: linux-arm-kernel at lists.infradead.org
-CC: linux-kernel at vger.kernel.org
-Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
-Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>On Tue, Jan 26, 2016 at 03:11:27AM +0000, Chalamarla, Tirumalesh wrote:
+>> one my colleague points out, ASIDPNE also implementation defined. 
+>
+>It looks pretty well defined to me, despite being a hint:
+>
+>  This ASIDPNE indication is only a hint, and an SMMU can ignore it. In
+>  particular, if the SMMU implementation does not support the ASIDPNE
+>  feature, broadcast TLB invalidate operations ignore this hint and
+>  invalidate matching TLB entries when broadcast TLB invalidation is
+>  enabled.
+>
+>But what does this have to do with the problem at hand?
+>
+>> >I don?t think it followed spec.
+>> >
+>> >The SMMU spec (IHI0062C) says (section 2.2):
+>> >
+>> >   - The exact behavior of any TLB functionality is IMPLEMENTATION DEFINED
+>
+>... and immediately qualifies that with:
+>
+>  The SMMU architecture does not limit how a TLB is implemented, provided
+>  it obeys the TLB Invalidate operations.
+>
+>which is to say, you can build the TLB how you like, providing that it
+>follows the programmers model for invalidation. Otherwise portable
+>software will break and people will send patches to "fix" it.
+>
+>> >Section 2.2 describes the constraints on sharing (e.g. multiple contexts
+>> >using the same ASID says):
+>> >
+>> >      "If multiple context banks have hte same attributes but describe
+>> >       different translations, the results of a TLB lookup are UNPREDICTABLE".
+>
+>That's describing a TLB conflict. These don't occur, because we ensure
+>each of your 128 context banks has different attributes (i.e. ASID/VMID).
+>
+>The problem is that you have shared state between multiple SMMU instances,
+>which I don't think is correct. I'm fine with a workaround, but I don't
+>want this logic to be used on other implementations where it is not
+>needed.
 
----
- arch/arm64/net/bpf_jit.h      |    3 ++-
- arch/arm64/net/bpf_jit_comp.c |   37 +++++++++++++++++++++++++------------
- 2 files changed, 27 insertions(+), 13 deletions(-)
-
---- a/arch/arm64/net/bpf_jit.h
-+++ b/arch/arm64/net/bpf_jit.h
-@@ -1,7 +1,7 @@
- /*
-  * BPF JIT compiler for ARM64
-  *
-- * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
-+ * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -35,6 +35,7 @@
- 	aarch64_insn_gen_comp_branch_imm(0, offset, Rt, A64_VARIANT(sf), \
- 		AARCH64_INSN_BRANCH_COMP_##type)
- #define A64_CBZ(sf, Rt, imm19) A64_COMP_BRANCH(sf, Rt, (imm19) << 2, ZERO)
-+#define A64_CBNZ(sf, Rt, imm19) A64_COMP_BRANCH(sf, Rt, (imm19) << 2, NONZERO)
- 
- /* Conditional branch (immediate) */
- #define A64_COND_BRANCH(cond, offset) \
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -1,7 +1,7 @@
- /*
-  * BPF JIT compiler for ARM64
-  *
-- * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
-+ * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -225,6 +225,17 @@ static int build_insn(const struct bpf_i
- 	u8 jmp_cond;
- 	s32 jmp_offset;
- 
-+#define check_imm(bits, imm) do {				\
-+	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
-+	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
-+		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
-+			i, imm, imm);				\
-+		return -EINVAL;					\
-+	}							\
-+} while (0)
-+#define check_imm19(imm) check_imm(19, imm)
-+#define check_imm26(imm) check_imm(26, imm)
-+
- 	switch (code) {
- 	/* dst = src */
- 	case BPF_ALU | BPF_MOV | BPF_X:
-@@ -258,8 +269,21 @@ static int build_insn(const struct bpf_i
- 		break;
- 	case BPF_ALU | BPF_DIV | BPF_X:
- 	case BPF_ALU64 | BPF_DIV | BPF_X:
-+	{
-+		const u8 r0 = bpf2a64[BPF_REG_0];
-+
-+		/* if (src == 0) return 0 */
-+		jmp_offset = 3; /* skip ahead to else path */
-+		check_imm19(jmp_offset);
-+		emit(A64_CBNZ(is64, src, jmp_offset), ctx);
-+		emit(A64_MOVZ(1, r0, 0, 0), ctx);
-+		jmp_offset = epilogue_offset(ctx);
-+		check_imm26(jmp_offset);
-+		emit(A64_B(jmp_offset), ctx);
-+		/* else */
- 		emit(A64_UDIV(is64, dst, dst, src), ctx);
- 		break;
-+	}
- 	case BPF_ALU | BPF_MOD | BPF_X:
- 	case BPF_ALU64 | BPF_MOD | BPF_X:
- 		ctx->tmp_used = 1;
-@@ -393,17 +417,6 @@ emit_bswap_uxt:
- 		emit(A64_ASR(is64, dst, dst, imm), ctx);
- 		break;
- 
--#define check_imm(bits, imm) do {				\
--	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
--	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
--		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
--			i, imm, imm);				\
--		return -EINVAL;					\
--	}							\
--} while (0)
--#define check_imm19(imm) check_imm(19, imm)
--#define check_imm26(imm) check_imm(26, imm)
--
- 	/* JUMP off */
- 	case BPF_JMP | BPF_JA:
- 		jmp_offset = bpf2a64_offset(i + off, i, ctx);
+Ok, I will treat it as Errata and provide a patch for workaround this. 
+>
+>> >The present smmu driver assumes ASID should only be unique per SMMU, this
+>> >might not be true for all Implementations. 
+>
+>So far, it appears to be true for all Implementations apart from yours
+>and therefore needs to be quirked.
+>
+>Will
