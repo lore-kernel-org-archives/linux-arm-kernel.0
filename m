@@ -1,33 +1,82 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 27 Jan 2016 16:52:10 +0100
-Subject: [PATCH RFC 04/11] clk: sunxi: factors: Add unregister function
-In-Reply-To: <1453727747-23307-5-git-send-email-wens@csie.org>
-References: <1453727747-23307-1-git-send-email-wens@csie.org>
- <1453727747-23307-5-git-send-email-wens@csie.org>
-Message-ID: <20160127155210.GH4317@lukather>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Wed, 27 Jan 2016 15:53:22 +0000
+Subject: [PATCH v3 1/3] spi: atmel: add support for the internal
+ chip-select of the spi controller
+In-Reply-To: <56A8E66B.208@atmel.com> (Nicolas Ferre's message of "Wed, 27 Jan
+ 2016 16:46:51 +0100")
+References: <cover.1433850255.git.cyrille.pitchen@atmel.com>
+ <c05f4d9abfdabb62b3b3cfeb57a3f9c138b4e45d.1433850255.git.cyrille.pitchen@atmel.com>
+ <yw1xvb771yrl.fsf@unicorn.mansr.com> <56A8E66B.208@atmel.com>
+Message-ID: <yw1xk2mvj9xp.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 09:15:40PM +0800, Chen-Yu Tsai wrote:
-> sunxi's factors clk did not have an unregister function. This means
-> multiple structs were leaked whenever a factors clk was unregistered.
-> 
-> Add an unregister function for it. Also keep pointers to the mux and
-> gate structs so they can be freed.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Nicolas Ferre <nicolas.ferre@atmel.com> writes:
 
-Applied, thanks!
-Maxime
+> Le 05/01/2016 22:50, M?ns Rullg?rd a ?crit :
+>> Cyrille Pitchen <cyrille.pitchen@atmel.com> writes:
+>> 
+>>> This patch relies on the CSAAT (Chip Select Active After Transfer) feature
+>>> introduced by the version 2 of the spi controller. This new mode allows to
+>>> use properly the internal chip-select output pin of the spi controller
+>>> instead of using external gpios. Consequently, the "cs-gpios" device-tree
+>>> property becomes optional.
+>>>
+>>> When the new CSAAT bit is set into the Chip Select Register, the internal
+>>> chip-select output pin remains asserted till both the following conditions
+>>> become true:
+>>> - the LASTXFER bit is set into the Control Register (or the Transmit Data
+>>>   Register)
+>>> - the Transmit Data Register and its shift register are empty.
+>>>
+>>> WARNING: if the LASTXFER bit is set into the Control Register then new
+>>> data are written into the Transmit Data Register fast enough to keep its
+>>> shifter not empty, the chip-select output pin remains asserted. Only when
+>>> the shifter becomes empty, the chip-select output pin is unasserted.
+>>>
+>>> When the CSAAT bit is clear in the Chip Select Register, the LASTXFER bit
+>>> is ignored in both the Control Register and the Transmit Data Register.
+>>> The internal chip-select output pin remains active as long as the Transmit
+>>> Data Register or its shift register are not empty.
+>>>
+>>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+>>> ---
+>>>  drivers/spi/spi-atmel.c | 37 ++++++++++++++++++++++++++++---------
+>>>  1 file changed, 28 insertions(+), 9 deletions(-)
+>> 
+>> [...]
+>> 
+>>> @@ -1338,6 +1350,13 @@ static int atmel_spi_probe(struct platform_device *pdev)
+>>>
+>>>  	atmel_get_caps(as);
+>>>
+>>> +	as->use_cs_gpios = true;
+>>> +	if (atmel_spi_is_v2(as) &&
+>>> +	    !of_get_property(pdev->dev.of_node, "cs-gpios", NULL)) {
+>>> +		as->use_cs_gpios = false;
+>>> +		master->num_chipselect = 4;
+>>> +	}
+>> 
+>> This part breaks the AVR32 boards and probably anything else that
+>> doesn't use devicetree but does use GPIOs for chip select.
+>
+> Hi Mans,
+>
+> I have difficulties finding why you may enter this test. So, maybe you
+> can give me a clue by reading for me the value that resides in the SPI
+> version register: you can have it by reading at 0xFFE000FC for instance
+> (actually the atmel_get_caps() dev_info() call gives it as well in the
+> boot log which is somewhat easier: I tried to find one on the Internet
+> without success...).
+>
+> So I think that just fixing the logic in atmel_get_caps() introduced by
+> d4820b7496219edd9a7055022681364d304525f7 can make it come back to a
+> situation where the ARV32 was more tested than nowadays.
+
+atmel_spi atmel_spi.0: version: 0x171
+atmel_spi atmel_spi.0: Atmel SPI Controller at 0xffe00000 (irq 3)
+
+atmel_spi_is_v2() returns true for version > 0x121.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/8e5a0488/attachment-0001.sig>
+M?ns Rullg?rd
