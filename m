@@ -1,133 +1,66 @@
-From: boqun.feng@gmail.com (Boqun Feng)
-Date: Wed, 27 Jan 2016 10:04:47 +0800
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160126232921.GY4503@linux.vnet.ibm.com>
-References: <20160114204827.GE3818@linux.vnet.ibm.com>
- <20160118081929.GA30420@gondor.apana.org.au>
- <20160118154629.GB3818@linux.vnet.ibm.com>
- <20160126165207.GB6029@fixme-laptop.cn.ibm.com>
- <20160126172227.GG6357@twins.programming.kicks-ass.net>
- <CA+55aFzcC6C8imPs5vk4yH1Y2YHjnAdFM9HCkVs04COxuDQH6w@mail.gmail.com>
- <20160126201037.GU4503@linux.vnet.ibm.com>
- <CA+55aFxjb+2rs2wVHtiSCcOzgMrE8H=yDeNcjyujPQudDCtLgw@mail.gmail.com>
- <CA+55aFwxTJd+uibcxtZD3tGnj_n=LMwyAa0s8qyx_OF0OMWQkA@mail.gmail.com>
- <20160126232921.GY4503@linux.vnet.ibm.com>
-Message-ID: <20160127020447.GA1293@fixme-laptop.cn.ibm.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Wed, 27 Jan 2016 10:28:03 +0800
+Subject: [PATCH v8 0/2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD driver
+Message-ID: <1453861685-30924-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 03:29:21PM -0800, Paul E. McKenney wrote:
-> On Tue, Jan 26, 2016 at 02:33:40PM -0800, Linus Torvalds wrote:
-> > On Tue, Jan 26, 2016 at 2:15 PM, Linus Torvalds
-> > <torvalds@linux-foundation.org> wrote:
-> > >
-> > > You might as well just write it as
-> > >
-> > >     struct foo x = READ_ONCE(*ptr);
-> > >     x->bar = 5;
-> > >
-> > > because that "smp_read_barrier_depends()" does NOTHING wrt the second write.
-> > 
-> > Just to clarify: on alpha it adds a memory barrier, but that memory
-> > barrier is useless.
-> 
-> No trailing data-dependent read, so agreed, no smp_read_barrier_depends()
-> needed.  That said, I believe that we should encourage rcu_dereference*()
-> or lockless_dereference() instead of READ_ONCE() for documentation
-> reasons, though.
-> 
-> > On non-alpha, it is a no-op, and obviously does nothing simply because
-> > it generates no code.
-> > 
-> > So if anybody believes that the "smp_read_barrier_depends()" does
-> > something, they are *wrong*.
-> 
-> The other problem with smp_read_barrier_depends() is that it is often
-> a pain figuring out which prior load it is supposed to apply to.
-> Hence my preference for rcu_dereference*() and lockless_dereference().
-> 
+This patch set adds support for the Active-semi ACT8945A PMIC
+MFD driver. It is a Multi Function Device with the following
+subdevices:
+ - Regulator
+ - Charger
 
-Because semantically speaking, rcu_derefence*() and
-lockless_dereference() are CONSUME(i.e. data/address dependent
-read->read and read->write pairs are ordered), whereas
-smp_read_barrier_depends() only guarantees read->read pairs with data
-dependency are ordered, right?
+It is interfaced to the host controller using I2C interface,
+ACT8945A is a child device of the I2C.
 
-If so, maybe we need to call it out in memory-barriers.txt, for example:
+Changes in v8:
+ - change the subdevice's name "act8945a-pmic" to "act8945a-regulator".
 
-diff --git a/Documentation/memory-barriers.txt b/Documentation/memory-barriers.txt
-index 904ee42..6b262c2 100644
---- a/Documentation/memory-barriers.txt
-+++ b/Documentation/memory-barriers.txt
-@@ -1703,8 +1703,8 @@ There are some more advanced barrier functions:
- 
- 
-  (*) lockless_dereference();
--     This can be thought of as a pointer-fetch wrapper around the
--     smp_read_barrier_depends() data-dependency barrier.
-+     This is a load, and any load or store that has a data dependency on the
-+     value returned by this load won't be reordered before this load.
- 
-      This is also similar to rcu_dereference(), but in cases where
-      object lifetime is handled by some mechanism other than RCU, for
+Changes in v7:
+ - remove struct act8945a_dev to .c file.
+ - remove unused .h file.
+ - collect Acked-by from Lee Jones
 
+Changes in v6:
+ - change MFD_ACT8945A type from bool to tristate.
+ - revert depends on to 'I2C'.
+ - change the regulator name.
 
-Regards,
-Boqun
+Changes in v5:
+ - change depends on to 'I2C=y'.
 
-> > And if anybody sends out an email with that smp_read_barrier_depends()
-> > in an example, they are actively just confusing other people, which is
-> > even worse than just being wrong. Which is why I jumped in.
-> > 
-> > So stop perpetuating the myth that smp_read_barrier_depends() does
-> > something here. It does not. It's a bug, and it has become this "mind
-> > virus" for some people that seem to believe that it does something.
-> 
-> It looks like I should add words to memory-barriers.txt de-emphasizing
-> smp_read_barrier_depends().  I will take a look at that.
-> 
-> > I had to remove this crap once from the kernel already, see commit
-> > 105ff3cbf225 ("atomic: remove all traces of READ_ONCE_CTRL() and
-> > atomic*_read_ctrl()").
-> > 
-> > I don't want to ever see that broken construct again. And I want to
-> > make sure that everybody is educated about how broken it was. I'm
-> > extremely unhappy that it came up again.
-> 
-> Well, if it makes you feel better, that was control dependencies and this
-> was data dependencies.  So it was not -exactly- the same.  ;-)
-> 
-> (Sorry, couldn't resist...)
-> 
-> > If it turns out that some architecture does actually need a barrier
-> > between a read and a dependent write, then that will mean that
-> > 
-> >  (a) we'll have to make up a _new_ barrier, because
-> > "smp_read_barrier_depends()" is not that barrier. We'll presumably
-> > then have to make that new barrier part of "rcu_derefence()" and
-> > friends.
-> 
-> Agreed.  We can worry about whether or not we replace the current
-> smp_read_barrier_depends() with that new barrier when and if such
-> hardware appears.
-> 
-> >  (b) we will have found an architecture with even worse memory
-> > ordering semantics than alpha, and we'll have to stop castigating
-> > alpha for being the worst memory ordering ever.
-> 
-> ;-) ;-) ;-)
-> 
-> > but I sincerely hope that we'll never find that kind of broken architecture.
-> 
-> Apparently at least some hardware vendors are reading memory-barriers.txt,
-> so perhaps the odds of that kind of breakage have reduced.
-> 
-> 								Thanx, Paul
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/e2ee2923/attachment.sig>
+Changes in v4:
+ - add a space before .compatible.
+ - collect Reviewed-by from Krzysztof Kozlowski.
+
+Changes in v3:
+ - fix the tabbing errors in Example.
+ - use "pmic at 5b" label, not "act8945a at 5b" in Example.
+ - collect Acked-by from Rob.
+
+Changes in v2:
+ - add more help information in Kconfig.
+ - update the file header with short version license and author line.
+ - remove unused structure members (dev, i2c_client) of stuct act8945a_dev.
+ - use define "PLATFORM_DEVID_NONE" for mfd_add_devices(), instead of '-1'.
+ - use more explicit info to indicate the failure to add sub devices.
+ - remove the unnecessary print out.
+ - substitute MODULE_LICENSE("GPL") for MODULE_LICENSE("GPL v2").
+ - use more specific label in Example.
+ - add pmic and charger nodes in Example.
+
+Wenyou Yang (2):
+  mfd: act8945a: add Active-semi ACT8945A PMIC MFD driver
+  mfd: add documentation for ACT8945A DT bindings
+
+ Documentation/devicetree/bindings/mfd/act8945a.txt |   82 ++++++++++++++
+ drivers/mfd/Kconfig                                |   11 ++
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/act8945a.c                             |  112 ++++++++++++++++++++
+ 4 files changed, 206 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/act8945a.txt
+ create mode 100644 drivers/mfd/act8945a.c
+
+-- 
+1.7.9.5
