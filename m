@@ -1,87 +1,134 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Wed, 27 Jan 2016 16:59:11 +0900
-Subject: [PATCH v2 1/2] ARM: tegra: Fixed typo
-In-Reply-To: <1453827558-10954-2-git-send-email-ralf@ramses-pyramidenbau.de>
-References: <1453827558-10954-1-git-send-email-ralf@ramses-pyramidenbau.de>
- <1453827558-10954-2-git-send-email-ralf@ramses-pyramidenbau.de>
-Message-ID: <CAAVeFuKiaSZH5RF=zEnYVoRU_rtVvONRYdtGbK=fgV_icO8tDw@mail.gmail.com>
+From: peter@korsgaard.com (Peter Korsgaard)
+Date: Wed, 27 Jan 2016 09:05:26 +0100
+Subject: [PATCH v8 1/2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD
+ driver
+In-Reply-To: <1453861685-30924-2-git-send-email-wenyou.yang@atmel.com> (Wenyou
+ Yang's message of "Wed, 27 Jan 2016 10:28:04 +0800")
+References: <1453861685-30924-1-git-send-email-wenyou.yang@atmel.com>
+ <1453861685-30924-2-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <87pownphvd.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Ralf, thanks for following up with patches as we discussed in private!
+>>>>> "Wenyou" == Wenyou Yang <wenyou.yang@atmel.com> writes:
 
-Small nit: you will want to use the active form ("Fix typo" instead of
-"Fixed typo") in your commit messages.
+ > This patch adds support for the Active-semi ACT8945A PMIC.
+ > It is a Multi Function Device with the following subdevices:
+ >  - Regulator
+ >  - Charger
 
-It would also be nice if the commit title was a little more precise
-about where the typo has been corrected.
+ > It is interfaced to the host controller using I2C interface,
+ > ACT8945A is a child device of the I2C.
 
-On Wed, Jan 27, 2016 at 1:59 AM, Ralf Ramsauer
-<ralf@ramses-pyramidenbau.de> wrote:
-> Signed-off-by: Ralf Ramsauer <ralf@ramses-pyramidenbau.de>
-> ---
->  arch/arm/boot/dts/tegra114.dtsi | 2 +-
->  arch/arm/boot/dts/tegra124.dtsi | 2 +-
->  arch/arm/boot/dts/tegra20.dtsi  | 2 +-
->  arch/arm/boot/dts/tegra30.dtsi  | 2 +-
->  4 files changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-> index d845bd1..5017ed8 100644
-> --- a/arch/arm/boot/dts/tegra114.dtsi
-> +++ b/arch/arm/boot/dts/tegra114.dtsi
-> @@ -256,7 +256,7 @@
->          * driver and APB DMA based serial driver for higher baudrate
->          * and performace. To enable the 8250 based driver, the compatible
->          * is "nvidia,tegra114-uart", "nvidia,tegra20-uart" and to enable
-> -        * the APB DMA based serial driver, the comptible is
-> +        * the APB DMA based serial driver, the compatible is
->          * "nvidia,tegra114-hsuart", "nvidia,tegra30-hsuart".
->          */
->         uarta: serial at 70006000 {
-> diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-> index 68669f7..995289b 100644
-> --- a/arch/arm/boot/dts/tegra124.dtsi
-> +++ b/arch/arm/boot/dts/tegra124.dtsi
-> @@ -322,7 +322,7 @@
->          * driver and APB DMA based serial driver for higher baudrate
->          * and performace. To enable the 8250 based driver, the compatible
->          * is "nvidia,tegra124-uart", "nvidia,tegra20-uart" and to enable
-> -        * the APB DMA based serial driver, the comptible is
-> +        * the APB DMA based serial driver, the compatible is
->          * "nvidia,tegra124-hsuart", "nvidia,tegra30-hsuart".
->          */
->         uarta: serial at 0,70006000 {
-> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-> index 33173e1..8fb61b9 100644
-> --- a/arch/arm/boot/dts/tegra20.dtsi
-> +++ b/arch/arm/boot/dts/tegra20.dtsi
-> @@ -309,7 +309,7 @@
->          * driver and APB DMA based serial driver for higher baudrate
->          * and performace. To enable the 8250 based driver, the compatible
->          * is "nvidia,tegra20-uart" and to enable the APB DMA based serial
-> -        * driver, the comptible is "nvidia,tegra20-hsuart".
-> +        * driver, the compatible is "nvidia,tegra20-hsuart".
->          */
->         uarta: serial at 70006000 {
->                 compatible = "nvidia,tegra20-uart";
-> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-> index 313e260..c6edc8c 100644
-> --- a/arch/arm/boot/dts/tegra30.dtsi
-> +++ b/arch/arm/boot/dts/tegra30.dtsi
-> @@ -371,7 +371,7 @@
->          * driver and APB DMA based serial driver for higher baudrate
->          * and performace. To enable the 8250 based driver, the compatible
->          * is "nvidia,tegra30-uart", "nvidia,tegra20-uart" and to enable
-> -        * the APB DMA based serial driver, the comptible is
-> +        * the APB DMA based serial driver, the compatible is
->          * "nvidia,tegra30-hsuart", "nvidia,tegra20-hsuart".
->          */
->         uarta: serial at 70006000 {
-> --
-> 2.4.10
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+ > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+ > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Thanks, looks good - One more thing though:
+
+ > +
+ > +struct act8945a_dev {
+ > +	struct regmap *regmap;
+ > +};
+
+You don't need this structure as you used devm. With that removed (and
+the logic to devm_kzalloc it) you can add my:
+
+Acked-by: Peter Korsgaard <peter@korsgaard.com>
+
+
+ > +static const struct mfd_cell act8945a_devs[] = {
+ > +	{
+ > +		.name = "act8945a-regulator",
+ > +		.of_compatible = "active-semi,act8945a-regulator",
+ > +	},
+ > +	{
+ > +		.name = "act8945a-charger",
+ > +		.of_compatible = "active-semi,act8945a-charger",
+ > +	},
+ > +};
+ > +
+ > +static const struct regmap_config act8945a_regmap_config = {
+ > +	.reg_bits = 8,
+ > +	.val_bits = 8,
+ > +};
+ > +
+ > +static int act8945a_i2c_probe(struct i2c_client *i2c,
+ > +			      const struct i2c_device_id *id)
+ > +{
+ > +	struct act8945a_dev *act8945a;
+ > +	int ret;
+ > +
+ > +	act8945a = devm_kzalloc(&i2c->dev, sizeof(*act8945a), GFP_KERNEL);
+ > +	if (!act8945a)
+ > +		return -ENOMEM;
+ > +
+ > +	i2c_set_clientdata(i2c, act8945a);
+ > +
+ > +	act8945a->regmap = devm_regmap_init_i2c(i2c, &act8945a_regmap_config);
+ > +	if (IS_ERR(act8945a->regmap)) {
+ > +		ret = PTR_ERR(act8945a->regmap);
+ > +		dev_err(&i2c->dev, "regmap init failed: %d\n", ret);
+ > +		return ret;
+ > +	}
+ > +
+ > +	ret = mfd_add_devices(&i2c->dev, PLATFORM_DEVID_NONE, act8945a_devs,
+ > +			      ARRAY_SIZE(act8945a_devs), NULL, 0, NULL);
+ > +	if (ret) {
+ > +		dev_err(&i2c->dev, "Failed to add sub devices\n");
+ > +		return ret;
+ > +	}
+ > +
+ > +	return 0;
+ > +}
+ > +
+ > +static int act8945a_i2c_remove(struct i2c_client *i2c)
+ > +{
+ > +	mfd_remove_devices(&i2c->dev);
+ > +
+ > +	return 0;
+ > +}
+ > +
+ > +static const struct i2c_device_id act8945a_i2c_id[] = {
+ > +	{ "act8945a", 0 },
+ > +	{}
+ > +};
+ > +MODULE_DEVICE_TABLE(i2c, act8945a_i2c_id);
+ > +
+ > +static const struct of_device_id act8945a_of_match[] = {
+ > +	{ .compatible = "active-semi,act8945a", },
+ > +	{},
+ > +};
+ > +MODULE_DEVICE_TABLE(of, act8945a_of_match);
+ > +
+ > +static struct i2c_driver act8945a_i2c_driver = {
+ > +	.driver = {
+ > +		   .name = "act8945a",
+ > +		   .of_match_table = of_match_ptr(act8945a_of_match),
+ > +	},
+ > +	.probe = act8945a_i2c_probe,
+ > +	.remove = act8945a_i2c_remove,
+ > +	.id_table = act8945a_i2c_id,
+ > +};
+ > +
+ > +static int __init act8945a_i2c_init(void)
+ > +{
+ > +	return i2c_add_driver(&act8945a_i2c_driver);
+ > +}
+ > +subsys_initcall(act8945a_i2c_init);
+ > +
+ > +static void __exit act8945a_i2c_exit(void)
+ > +{
+ > +	i2c_del_driver(&act8945a_i2c_driver);
+ > +}
+ > +module_exit(act8945a_i2c_exit);
+ > +
+ > +MODULE_DESCRIPTION("ACT8945A PMIC multi-function driver");
+ > +MODULE_AUTHOR("Wenyou Yang <wenyou.yang@atmel.com>");
+ > +MODULE_LICENSE("GPL");
+ > -- 
+ > 1.7.9.5
+
+
+
+-- 
+Bye, Peter Korsgaard
