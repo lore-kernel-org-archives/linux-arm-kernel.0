@@ -1,115 +1,85 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 27 Jan 2016 11:51:32 +0800
-Subject: [PATCH v10 04/21] KVM: ARM64: Add access handler for PMCR register
+Date: Wed, 27 Jan 2016 11:51:45 +0800
+Subject: [PATCH v10 17/21] KVM: ARM64: Reset PMU state when resetting vcpu
 In-Reply-To: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1453866709-20324-5-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1453866709-20324-18-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add reset handler which gets host value of PMCR_EL0 and make writable
-bits architecturally UNKNOWN except PMCR.E which is zero. Add an access
-handler for PMCR.
+When resetting vcpu, it needs to reset the PMU state to initial status.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/sys_regs.c | 42 ++++++++++++++++++++++++++++++++++++++++--
- include/kvm/arm_pmu.h     |  4 ++++
- 2 files changed, 44 insertions(+), 2 deletions(-)
+ arch/arm64/kvm/reset.c |  3 +++
+ include/kvm/arm_pmu.h  |  2 ++
+ virt/kvm/arm/pmu.c     | 17 +++++++++++++++++
+ 3 files changed, 22 insertions(+)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index eec3598..97fea84 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -34,6 +34,7 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_host.h>
- #include <asm/kvm_mmu.h>
-+#include <asm/pmu.h>
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index f34745c..dfbce78 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -120,6 +120,9 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	/* Reset system registers */
+ 	kvm_reset_sys_regs(vcpu);
  
- #include <trace/events/kvm.h>
- 
-@@ -439,6 +440,43 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
- 	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
++	/* Reset PMU */
++	kvm_pmu_vcpu_reset(vcpu);
++
+ 	/* Reset timer */
+ 	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
  }
- 
-+static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
-+{
-+	u64 pmcr, val;
-+
-+	asm volatile("mrs %0, pmcr_el0\n" : "=r" (pmcr));
-+	/* Writable bits of PMCR_EL0 (ARMV8_PMCR_MASK) is reset to UNKNOWN
-+	 * except PMCR.E resetting to zero.
-+	 */
-+	val = ((pmcr & ~ARMV8_PMCR_MASK) | (ARMV8_PMCR_MASK & 0xdecafbad))
-+	      & (~ARMV8_PMCR_E);
-+	vcpu_sys_reg(vcpu, PMCR_EL0) = val;
-+}
-+
-+static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-+			const struct sys_reg_desc *r)
-+{
-+	u64 val;
-+
-+	if (!kvm_arm_pmu_v3_ready(vcpu))
-+		return trap_raz_wi(vcpu, p, r);
-+
-+	if (p->is_write) {
-+		/* Only update writeable bits of PMCR */
-+		val = vcpu_sys_reg(vcpu, PMCR_EL0);
-+		val &= ~ARMV8_PMCR_MASK;
-+		val |= p->regval & ARMV8_PMCR_MASK;
-+		vcpu_sys_reg(vcpu, PMCR_EL0) = val;
-+	} else {
-+		/* PMCR.P & PMCR.C are RAZ */
-+		val = vcpu_sys_reg(vcpu, PMCR_EL0)
-+		      & ~(ARMV8_PMCR_P | ARMV8_PMCR_C);
-+		p->regval = val;
-+	}
-+
-+	return true;
-+}
-+
- /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
- #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
- 	/* DBGBVRn_EL1 */						\
-@@ -623,7 +661,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 
- 	/* PMCR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b000),
--	  trap_raz_wi },
-+	  access_pmcr, reset_pmcr, },
- 	/* PMCNTENSET_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b001),
- 	  trap_raz_wi },
-@@ -885,7 +923,7 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
- 
- 	/* PMU */
--	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmcr },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
 diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index be220ee..32fee2d 100644
+index fbc42fd..4394e0c 100644
 --- a/include/kvm/arm_pmu.h
 +++ b/include/kvm/arm_pmu.h
-@@ -34,9 +34,13 @@ struct kvm_pmu {
- 	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
- 	bool ready;
- };
-+
-+#define kvm_arm_pmu_v3_ready(v)		((v)->arch.pmu.ready)
- #else
- struct kvm_pmu {
- };
-+
-+#define kvm_arm_pmu_v3_ready(v)		(false)
- #endif
+@@ -38,6 +38,7 @@ struct kvm_pmu {
+ #define kvm_arm_pmu_v3_ready(v)		((v)->arch.pmu.ready)
+ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
+ u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu);
++void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu);
+ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
+@@ -60,6 +61,7 @@ static inline u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
+ {
+ 	return 0;
+ }
++static inline void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+ static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+ static inline void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 644f2dc..8142921 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -69,6 +69,23 @@ static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc)
+ 	}
+ }
  
- #endif
++/**
++ * kvm_pmu_vcpu_reset - reset pmu state for cpu
++ * @vcpu: The vcpu pointer
++ *
++ */
++void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu)
++{
++	int i;
++	struct kvm_pmu *pmu = &vcpu->arch.pmu;
++
++	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
++		kvm_pmu_stop_counter(vcpu, &pmu->pmc[i]);
++		pmu->pmc[i].idx = i;
++		pmu->pmc[i].bitmask = 0xffffffffUL;
++	}
++}
++
+ u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
+ {
+ 	u64 val = vcpu_sys_reg(vcpu, PMCR_EL0) >> ARMV8_PMCR_N_SHIFT;
 -- 
 2.0.4
