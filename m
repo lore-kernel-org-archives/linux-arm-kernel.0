@@ -1,33 +1,63 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 27 Jan 2016 16:50:54 +0100
-Subject: [PATCH RFC 02/11] clk: sunxi: factors: Make struct
- clk_factors_config table const
-In-Reply-To: <1453727747-23307-3-git-send-email-wens@csie.org>
-References: <1453727747-23307-1-git-send-email-wens@csie.org>
- <1453727747-23307-3-git-send-email-wens@csie.org>
-Message-ID: <20160127155054.GF4317@lukather>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 27 Jan 2016 16:51:36 +0100
+Subject: [PATCH 7/9] net: macb: avoid uninitialized variables
+In-Reply-To: <1453903507-3427225-8-git-send-email-arnd@arndb.de>
+References: <1453903507-3427225-1-git-send-email-arnd@arndb.de>
+ <1453903507-3427225-8-git-send-email-arnd@arndb.de>
+Message-ID: <56A8E788.5020802@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 09:15:38PM +0800, Chen-Yu Tsai wrote:
-> struct clk_factors_config contains shifts/widths for the factors of
-> the factors clk. This is used to read out the factors from the register
-> value. In no case is it written to, so make it const.
+Le 27/01/2016 15:04, Arnd Bergmann a ?crit :
+> The macb_clk_init function returns three clock pointers, unless
+> the it fails to get the first ones. We correctly handle the
+> failure case by propagating the error from macb_probe, but
+> gcc does not realize this and incorrectly warns about a later
+> use of those:
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> In file included from /git/arm-soc/drivers/net/ethernet/cadence/macb.c:12:0:
+> drivers/net/ethernet/cadence/macb.c: In function 'macb_probe':
+> include/linux/clk.h:484:2: error: 'tx_clk' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+>   clk_disable(clk);
+>   ^
+> drivers/net/ethernet/cadence/macb.c:2822:28: note: 'tx_clk' was declared here
+>   struct clk *pclk, *hclk, *tx_clk;
+>                             ^
+> In file included from /git/arm-soc/drivers/net/ethernet/cadence/macb.c:12:0:
+> include/linux/clk.h:484:2: error: 'hclk' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+>   clk_disable(clk);
+>   ^
+> drivers/net/ethernet/cadence/macb.c:2822:21: note: 'hclk' was declared here
+>   struct clk *pclk, *hclk, *tx_clk;
+>                      ^
+> 
+> This shuts up the misleading warnings by ensuring that the
+> macb_clk_init() always stores something into all three pointers.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Applied, thanks!
+Okay Arnd, thanks!
 
-Maxime
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+> ---
+>  drivers/net/ethernet/cadence/macb.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+> index 9d9984a87d42..d3aa74f9db79 100644
+> --- a/drivers/net/ethernet/cadence/macb.c
+> +++ b/drivers/net/ethernet/cadence/macb.c
+> @@ -2268,6 +2268,7 @@ static int macb_clk_init(struct platform_device *pdev, struct clk **pclk,
+>  {
+>  	int err;
+>  
+> +	*tx_clk = *hclk = NULL;
+>  	*pclk = devm_clk_get(&pdev->dev, "pclk");
+>  	if (IS_ERR(*pclk)) {
+>  		err = PTR_ERR(*pclk);
+> 
+
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/971e5d64/attachment.sig>
+Nicolas Ferre
