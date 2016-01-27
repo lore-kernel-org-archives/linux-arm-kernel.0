@@ -1,33 +1,56 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 27 Jan 2016 20:39:23 +0100
-Subject: [PATCH v2 resend 6/6] arm64: switch to relative exception tables
-In-Reply-To: <20160127113548.d4f2f2a7029b3b89f0e596da@linux-foundation.org>
-References: <1453892123-17973-1-git-send-email-ard.biesheuvel@linaro.org>
- <1453892123-17973-7-git-send-email-ard.biesheuvel@linaro.org>
- <20160127113548.d4f2f2a7029b3b89f0e596da@linux-foundation.org>
-Message-ID: <CAKv+Gu8hvxcc6Tiu0q7=HWqkEf4ZLfOvyoLGkp2mEgjz_1R9ew@mail.gmail.com>
+From: clabbe.montjoie@gmail.com (Corentin LABBE)
+Date: Wed, 27 Jan 2016 20:42:26 +0100
+Subject: [PATCH v2 1/2] crypto: sunxi - don't print confusing data
+In-Reply-To: <1453815902-3070323-1-git-send-email-arnd@arndb.de>
+References: <1453815902-3070323-1-git-send-email-arnd@arndb.de>
+Message-ID: <56A91DA2.5040608@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 January 2016 at 20:35, Andrew Morton <akpm@linux-foundation.org> wrote:
-> On Wed, 27 Jan 2016 11:55:23 +0100 Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->
->> Instead of using absolute addresses for both the exception location
->> and the fixup, use offsets relative to the exception table entry values.
->> Not only does this cut the size of the exception table in half, it is
->> also a prerequisite for KASLR, since absolute exception table entries
->> are subject to dynamic relocation, which is incompatible with the sorting
->> of the exception table that occurs at build time.
->>
->> This patch also introduces the _ASM_EXTABLE preprocessor macro (which
->> exists on x86 as well) and its _asm_extable assembly counterpart, as
->> shorthands to emit exception table entries.
->
-> checkpatch speaketh truth:
->
-> ERROR: #define of 'ARCH_HAS_RELATIVE_EXTABLE' is wrong - use Kconfig variables or standard guards instead
-> #113: FILE: arch/arm64/include/asm/uaccess.h:56:
+Le 26/01/2016 14:44, Arnd Bergmann a ?crit :
+> gcc correctly warns that the printk output contains a variable that
+> it thinks is not initialized in some cases:
+> 
+> drivers/crypto/sunxi-ss/sun4i-ss-cipher.c: In function 'sun4i_ss_cipher_poll':
+> drivers/crypto/sunxi-ss/sun4i-ss-cipher.c:254:76: warning: 'todo' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> drivers/crypto/sunxi-ss/sun4i-ss-cipher.c:144:15: note: 'todo' was declared here
+> 
+> A closer look at the function reveals that the variable is always
+> initialized at this point (ileft is guaranteed to be positive at the
+> start), but its contents are not well-defined:
+> Depending on some other variables, it might be either a count in
+> words or bytes, and it could refer to either input or output.
+> 
+> The easiest solution apparently is to remove the confusing output
+> and let the reader figure out the state from the other variables.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/crypto/sunxi-ss/sun4i-ss-cipher.c | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
+> index a19ee127edca..7be3fbcd8d78 100644
+> --- a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
+> +++ b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
+> @@ -251,11 +251,10 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
+>  		spaces = readl(ss->base + SS_FCSR);
+>  		rx_cnt = SS_RXFIFO_SPACES(spaces);
+>  		tx_cnt = SS_TXFIFO_SPACES(spaces);
+> -		dev_dbg(ss->dev, "%x %u/%u %u/%u cnt=%u %u/%u %u/%u cnt=%u %u %u\n",
+> +		dev_dbg(ss->dev, "%x %u/%u %u/%u cnt=%u %u/%u %u/%u cnt=%u %u\n",
+>  			mode,
+>  			oi, mi.length, ileft, areq->nbytes, rx_cnt,
+> -			oo, mo.length, oleft, areq->nbytes, tx_cnt,
+> -			todo, ob);
+> +			oo, mo.length, oleft, areq->nbytes, tx_cnt, ob);
+>  
+>  		if (tx_cnt == 0)
+>  			continue;
+> 
 
-That may be true, but it extends an established pattern of #defines in
-the various uaccess.h versions, i.e., ARCH_HAS_SORT_EXTABLE, and
-ARCH_HAS_SEARCH_EXTABLE
+Hello
+
+A bit late but Acked-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+
+Thanks
