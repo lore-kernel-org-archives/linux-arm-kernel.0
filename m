@@ -1,31 +1,56 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 27 Jan 2016 22:17:46 +0800
-Subject: [PATCH v2 2/2] crypto: jitterentropy - always select CRYPTO_RNG
-In-Reply-To: <1453816035-3070440-1-git-send-email-arnd@arndb.de>
-References: <1453815902-3070323-1-git-send-email-arnd@arndb.de>
- <1453816035-3070440-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160127141746.GC1601@gondor.apana.org.au>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Wed, 27 Jan 2016 15:18:47 +0100
+Subject: [PATCH v3 12/12] acpi, numa: reuse
+ acpi_numa_memory_affinity_init()
+In-Reply-To: <56A8606A.8080407@huawei.com>
+References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
+ <1453541967-3744-13-git-send-email-guohanjun@huawei.com>
+ <20160125102643.GF24726@rric.localdomain>
+ <56A8606A.8080407@huawei.com>
+Message-ID: <20160127141847.GR24726@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 02:47:10PM +0100, Arnd Bergmann wrote:
-> When building the jitterentropy driver by itself, we get a link error
-> when CRYPTO_RNG is not enabled as well:
+On 27.01.16 14:15:06, Hanjun Guo wrote:
+> Hi Robert,
 > 
-> crypto/built-in.o: In function `jent_mod_init':
-> jitterentropy-kcapi.c:(.init.text+0x98): undefined reference to `crypto_register_rng'
-> crypto/built-in.o: In function `jent_mod_exit':
-> jitterentropy-kcapi.c:(.exit.text+0x60): undefined reference to `crypto_unregister_rng'
+> On 2016/1/25 18:26, Robert Richter wrote:
+> > On 23.01.16 17:39:27, Hanjun Guo wrote:
+> >> From: Hanjun Guo <hanjun.guo@linaro.org>
+> >>
+> >> After the cleanup for acpi_numa_memory_affinity_init(),
+> >> it can be used for architetures both x86 and arm64, since
+> >> CONFIG_MEMORY_HOTPLUG is not enabled for arm64, so no
+> >> worry about that.
+> >>
+> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >> ---
+> >>  arch/arm64/kernel/acpi_numa.c | 42 -------------------------------
+> >>  arch/x86/mm/srat.c            | 54 ----------------------------------------
+> >>  drivers/acpi/numa.c           | 57 +++++++++++++++++++++++++++++++++++++++++++
+> >>  3 files changed, 57 insertions(+), 96 deletions(-)
+> > This one reverts acpi_numa_memory_affinity_init() to the x86 version.
+> > I rather would prefer the arm64 version for the generic code. We could
+> > keep the x86 implementation until x86 maintainers agree to remove them
+> > and use the generic one (implemented in a separate patch).
+> >
+> > Doing so we can move acpi_numa_memory_affinity_init() from the
+> > beginning to generic code (used for arm64) and have this last patch to
+> > remove the x86 version.
 > 
-> This adds a 'select CRYPTO_RNG' to CRYPTO_JITTERENTROPY to ensure the API
-> is always there when it's used, not just when DRBG is also enabled.
-> CRYPTO_DRBG would set it implicitly through CRYPTO_JITTERENTROPY now,
-> but this leaves it in place to make it explicit what the driver does.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> I think the x86 version is the generic one, all the flags (ACPI_SRAT_MEM_HOT_PLUGGABLE and
+> etc) are defined in the ACPI spec, x86 just use all the flags because it support such features.
+> For ARM64, firmware should be careful and represent the true platform configuration to
+> OS, such as on ARM64, we can't set hotpluggable flag as the ARM64 arch don't support
+> memory hot-plug yet (also the firmware don't support it too), if firmware do things right,
+> it will be not worries for the kernel.
 
-Applied.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+But you are removing all arm64 from your first patches. Why do you
+introduce acpi_numa_memory_affinity_init() in the beginning to remove
+it in the end again? I esp. like the arm64 version because of its
+direct returns. So I still would like to see generic code for arm64
+from the beginning. Maybe have a copy of x86 initially and make
+modifications for arm64 to it, or move missing code (hotplug, etc.)
+from x86 to generic and remove x86 arch code with the last patch.
+
+-Robert
