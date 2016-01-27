@@ -1,91 +1,71 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 27 Jan 2016 16:36:58 -0800
-Subject: [PATCH v2 3/4] ARM: dts: vf610-cosmic: relicense vf610-cosmic.dts
- under GPLv2/X11
-In-Reply-To: <1449525076-23569-4-git-send-email-stefan@agner.ch>
-References: <1449525076-23569-1-git-send-email-stefan@agner.ch>
- <1449525076-23569-4-git-send-email-stefan@agner.ch>
-Message-ID: <ee1d1f87155171130707caea41de549d@agner.ch>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Wed, 27 Jan 2016 15:32:10 -0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160127102546.GD2390@arm.com>
+References: <20160115085554.GF3421@worktop> <20160115091348.GA27936@worktop>
+ <20160115174612.GV3818@linux.vnet.ibm.com>
+ <20160115212714.GM3421@worktop>
+ <20160115215853.GC3818@linux.vnet.ibm.com>
+ <20160125164242.GF22927@arm.com>
+ <20160126060322.GJ4503@linux.vnet.ibm.com>
+ <20160126121608.GE21553@arm.com>
+ <20160126195820.GS4503@linux.vnet.ibm.com>
+ <20160127102546.GD2390@arm.com>
+Message-ID: <20160127233210.GO4503@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt,
-
-On 2015-12-07 13:51, Stefan Agner wrote:
-> GPLv2-only devicetrees make reuse difficult for software components
-> licensed under a different license.
+On Wed, Jan 27, 2016 at 10:25:46AM +0000, Will Deacon wrote:
+> On Tue, Jan 26, 2016 at 11:58:20AM -0800, Paul E. McKenney wrote:
+> > On Tue, Jan 26, 2016 at 12:16:09PM +0000, Will Deacon wrote:
+> > > On Mon, Jan 25, 2016 at 10:03:22PM -0800, Paul E. McKenney wrote:
+> > > > On Mon, Jan 25, 2016 at 04:42:43PM +0000, Will Deacon wrote:
+> > > > > On Fri, Jan 15, 2016 at 01:58:53PM -0800, Paul E. McKenney wrote:
+> > > > > > PPC Overlapping Group-B sets version 4
+> > > > > > ""
+> > > > > > (* When the Group-B sets from two different barriers involve instructions in
+> > > > > >    the same thread, within that thread one set must contain the other.
+> > > > > > 
+> > > > > > 	P0	P1	P2
+> > > > > > 	Rx=1	Wy=1	Wz=2
+> > > > > > 	dep.	lwsync	lwsync
+> > > > > > 	Ry=0	Wz=1	Wx=1
+> > > > > > 	Rz=1
+> > > > > > 
+> > > > > > 	assert(!(z=2))
+> > > > > > 
+> > > > > >    Forbidden by ppcmem, allowed by herd.
+> > > > > > *)
+> > > > > > {
+> > > > > > 0:r1=x; 0:r2=y; 0:r3=z;
+> > > > > > 1:r1=x; 1:r2=y; 1:r3=z; 1:r4=1;
+> > > > > > 2:r1=x; 2:r2=y; 2:r3=z; 2:r4=1; 2:r5=2;
+> > > > > > }
+> > > > > >  P0		| P1		| P2		;
+> > > > > >  lwz r6,0(r1)	| stw r4,0(r2)	| stw r5,0(r3)	;
+> > > > > >  xor r7,r6,r6	| lwsync	| lwsync	;
+> > > > > >  lwzx r7,r7,r2	| stw r4,0(r3)	| stw r4,0(r1)	;
+> > > > > >  lwz r8,0(r3)	|		|		;
+> > > > > > 
+> > > > > > exists
+> > > > > > (z=2 /\ 0:r6=1 /\ 0:r7=0 /\ 0:r8=1)
+> > > > > 
+> > > > > That really hurts. Assuming that the "assert(!(z=2))" is actually there
+> > > > > to constrain the coherence order of z to be {0->1->2}, then I think that
+> > > > > this test is forbidden on arm using dmb instead of lwsync. That said, I
+> > > > > also don't think the Rz=1 in P0 changes anything.
+> > > > 
+> > > > What about the smp_wmb() variant of dmb that orders only stores?
+> > > 
+> > > Tricky, but I think it still works out if the coherence order of z is as
+> > > I described above. The line of reasoning is weird though -- I ended up
+> > > considering the two cases where P0 reads z before and after it reads x
+> > > and what that means for the read of y.
+> > 
+> > By "works out" you mean that ARM prohibits the outcome?
 > 
-> The consensus is that a GPL/X11 dual-license should allow all necessary
-> uses, so relicense the vf610-twr.dts file to this combination.
-> 
-> CCs were acquired using (updated some email addresses):
-> git shortlog -sne --no-merges arch/arm/boot/dts/vf610-cosmic.dts
-> 
-> CC: Matt Porter <mporter@kernel.crashing.org>
+> Yes, that's my understanding.
 
-Your Ack is the only one missing here, any chance to get an Ack from
-you?
+Very good, we have agreement between the two architectures, then.  ;-)
 
---
-Stefan
-
-> Acked-by: Shawn Guo <shawnguo@kernel.org>
-> Acked-by: Cory Tusar <cory.tusar@pid1solutions.com>
-> Acked-by: Olof Johansson <olof@lixom.net>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  arch/arm/boot/dts/vf610-cosmic.dts | 40 ++++++++++++++++++++++++++++++++++----
->  1 file changed, 36 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/vf610-cosmic.dts
-> b/arch/arm/boot/dts/vf610-cosmic.dts
-> index 5447f25..d0559c1 100644
-> --- a/arch/arm/boot/dts/vf610-cosmic.dts
-> +++ b/arch/arm/boot/dts/vf610-cosmic.dts
-> @@ -2,10 +2,42 @@
->   * Copyright 2013 Freescale Semiconductor, Inc.
->   * Copyright 2013 Linaro Limited
->   *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License as published by
-> - * the Free Software Foundation; either version 2 of the License, or
-> - * (at your option) any later version.
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License
-> + *     version 2 as published by the Free Software Foundation.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->  
->  /dts-v1/;
+							Thanx, Paul
