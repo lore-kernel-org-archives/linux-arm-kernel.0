@@ -1,60 +1,54 @@
-From: bhupesh.sharma@nxp.com (Bhupesh Sharma)
-Date: Wed, 27 Jan 2016 06:27:03 +0000
-Subject: 4.5-rc1 kernel is failed to bootup on FSL LS2080 RDB board
-In-Reply-To: <56A80920.8030504@linaro.org>
-References: <56A80920.8030504@linaro.org>
-Message-ID: <VI1PR04MB123006EC1EECE3A064BDE40C88D90@VI1PR04MB1230.eurprd04.prod.outlook.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 27 Jan 2016 15:08:12 +0800
+Subject: [PATCH 01/15] arm: use of_platform_default_populate() to
+ populate default bus
+In-Reply-To: <1453868872-26300-2-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <201601271506.AiWVACC3%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Kefeng,
 
-> From: Shi, Yang
-> Sent: Wednesday, January 27, 2016 5:33 AM
+[auto build test ERROR on v4.5-rc1]
+[cannot apply to arm-soc/for-next next-20160127]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-> Hi folks,
-> 
-> I tried to boot 4.5-rc1 kernel on my FSL LS2080 RDB (aka LS2085 RDB), but
-> it is failed silently. If I use the dtb file shipped with the SDK with
-> 4.5-rc1 kernel, I can get the serial console output, but it is failed to
-> detect PCI bus.
-> 
-> If I use both kernel and dtb from the SDK, it works well.
-> 
-> The bootloader information:
-> 
-> U-Boot 2015.07-rc1Layerscape2-SDK+g7e8bad0 (Aug 27 2015 - 14:31:42)
-> 
-> SoC:  LS2085E (0x87010010)
-> Clock Configuration:
->         CPU0(A57):1600 MHz  CPU1(A57):1600 MHz  CPU2(A57):1600 MHz
->         CPU3(A57):1600 MHz  CPU4(A57):1600 MHz  CPU5(A57):1600 MHz
->         CPU6(A57):1600 MHz  CPU7(A57):1600 MHz
->         Bus:      600  MHz  DDR:      1333.333 MT/s     DP-DDR:
-> 1333.333 MT/s
-> Reset Configuration Word (RCW):
->         00: 40282830 40400040 00000000 00000000
->         10: 00000000 00200000 00200000 00000000
->         20: 00c12980 00002580 00000000 00000000
->         30: 00000e0b 00000000 00000000 00000000
->         40: 00000000 00000000 00000000 00000000
->         50: 00000000 00000000 00000000 00000000
->         60: 00000000 00000000 00027000 00000000
->         70: 412a0000 00000000 00000000 00000000
-> Model: Freescale Layerscape 2085a RDB Board
-> Board: LS2085E-RDB, Board Arch: V1, Board version: D, boot from vBank: 4
-> FPGA: v1.18
-> 
-> And, I have ARCH_LAYERSCAPE, CONFIG_PCIE_DW and CONFIG_PCI_LAYERSCAPE
-> enabled.
-> 
-> Any hint is appreciated.
-> 
+url:    https://github.com/0day-ci/linux/commits/Kefeng-Wang/use-of_platform_default_populate-to-populate-default-bus/20160127-123512
+config: arm-at91_dt_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-As Minghuan (our PCI developer, added in CC) suggested the reason is that uboot is for
-LS2085a but kernel dtb is for ls2080.
+All errors (new ones prefixed by >>):
 
-Please apply the patch https://patchwork.kernel.org/patch/7767061/ and try again.
+   arch/arm/mach-at91/at91rm9200.c: In function 'at91rm9200_dt_device_init':
+>> arch/arm/mach-at91/at91rm9200.c:34:2: error: implicit declaration of function 'of_platform__default_populate' [-Werror=implicit-function-declaration]
+     of_platform__default_populate(NULL, NULL, soc_dev);
+     ^
+   cc1: some warnings being treated as errors
 
-Regards,
-Bhupesh
+vim +/of_platform__default_populate +34 arch/arm/mach-at91/at91rm9200.c
+
+    28		struct device *soc_dev = NULL;
+    29	
+    30		soc = at91_soc_init(rm9200_socs);
+    31		if (soc != NULL)
+    32			soc_dev = soc_device_to_device(soc);
+    33	
+  > 34		of_platform__default_populate(NULL, NULL, soc_dev);
+    35	
+    36		arm_pm_idle = at91rm9200_idle;
+    37		at91rm9200_pm_init();
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 20787 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/15792d42/attachment-0001.obj>
