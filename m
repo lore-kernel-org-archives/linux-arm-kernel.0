@@ -1,45 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Jan 2016 16:57:18 +0100
-Subject: [PATCH 2/7] mptfusion: hide unused seq_mpt_print_ioc_summary function
+Date: Wed, 27 Jan 2016 16:57:20 +0100
+Subject: [PATCH 4/7] scsi: fas216: avoid fas216_log_setup for loadable module
 In-Reply-To: <1453910247-3447628-1-git-send-email-arnd@arndb.de>
 References: <1453910247-3447628-1-git-send-email-arnd@arndb.de>
-Message-ID: <1453910247-3447628-3-git-send-email-arnd@arndb.de>
+Message-ID: <1453910247-3447628-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The seq_mpt_print_ioc_summary function is used for the /proc/mpt/iocN/summary
-implementation and never gets called when CONFIG_PROC_FS is disabled:
+We get a warning for the fas216 driver when it is compiled as
+a loadable module, as the __setup() functions are never called
+then:
 
-drivers/message/fusion/mptbase.c:6851:13: warning: 'seq_mpt_print_ioc_summary' defined but not used [-Wunused-function]
- static void seq_mpt_print_ioc_summary(MPT_ADAPTER *ioc, struct seq_file *m, int showlan)
+scsi/arm/fas216.c:101:19: warning: 'fas216_log_setup' defined but not used [-Wunused-function]
+ static int __init fas216_log_setup(char *str)
 
-This adds an #ifdef to hide the function definition in that case
-and avoid the warning.
+This adds an #ifndef MODULE around the definition to shut up
+the warning and clarify for the reader when it is used or not.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/message/fusion/mptbase.c | 2 ++
+ drivers/scsi/arm/fas216.c | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/drivers/message/fusion/mptbase.c b/drivers/message/fusion/mptbase.c
-index 5dcc0313c38a..207370d68c17 100644
---- a/drivers/message/fusion/mptbase.c
-+++ b/drivers/message/fusion/mptbase.c
-@@ -6848,6 +6848,7 @@ mpt_print_ioc_summary(MPT_ADAPTER *ioc, char *buffer, int *size, int len, int sh
- 	*size = y;
- }
+diff --git a/drivers/scsi/arm/fas216.c b/drivers/scsi/arm/fas216.c
+index decdc71b6b86..24388795ee9a 100644
+--- a/drivers/scsi/arm/fas216.c
++++ b/drivers/scsi/arm/fas216.c
+@@ -98,6 +98,7 @@ static int level_mask = LOG_ERROR;
  
-+#ifdef CONFIG_PROC_FS
- static void seq_mpt_print_ioc_summary(MPT_ADAPTER *ioc, struct seq_file *m, int showlan)
+ module_param(level_mask, int, 0644);
+ 
++#ifndef MODULE
+ static int __init fas216_log_setup(char *str)
  {
- 	char expVer[32];
-@@ -6879,6 +6880,7 @@ static void seq_mpt_print_ioc_summary(MPT_ADAPTER *ioc, struct seq_file *m, int
- 
- 	seq_putc(m, '\n');
+ 	char *s;
+@@ -138,6 +139,7 @@ static int __init fas216_log_setup(char *str)
  }
+ 
+ __setup("fas216_logging=", fas216_log_setup);
 +#endif
  
- /**
-  *	mpt_set_taskmgmt_in_progress_flag - set flags associated with task management
+ static inline unsigned char fas216_readb(FAS216_Info *info, unsigned int reg)
+ {
 -- 
 2.7.0
