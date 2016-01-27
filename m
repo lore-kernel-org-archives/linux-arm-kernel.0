@@ -1,60 +1,53 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 27 Jan 2016 14:39:23 +0100
-Subject: [PATCH v2 3/6] irqchip: irq-armada-370-xp: use
- PCI_MSI_DOORBELL_START where appropriate
-In-Reply-To: <1453899395-3532-4-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Wed, 27 Jan 2016 13:56:32 +0100")
-References: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1453899395-3532-4-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <87h9hz9m5w.fsf@free-electrons.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 27 Jan 2016 22:40:19 +0900
+Subject: [PATCH 11/15] bus: uniphier-system-bus: use
+ of_platform_default_populate() to populate default bus
+In-Reply-To: <1453868872-26300-12-git-send-email-wangkefeng.wang@huawei.com>
+References: <1453868872-26300-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1453868872-26300-12-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <CAK7LNAQWd3fchwtyE8hAC=ZZ+mk4gyqReJ9SSxvaY0u1SoSkvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On mer., janv. 27 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+Hi Kefeng,
 
-> As suggested by Gregory Clement, this commit adjusts the
-> irq-armada-370-xp driver to use the PCI_MSI_DOORBELL_START define in
-> the armada_370_xp_handle_msi_irq() function, rather than hardcoding
-> its value.
+2016-01-27 13:27 GMT+09:00 Kefeng Wang <wangkefeng.wang@huawei.com>:
+> Use helper of_platform_default_populate() in linux/of_platform
+> when possible, instead of calling of_platform_populate() with
+> the default match table.
 >
-> Suggested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks,
-
-Gregory
-
+> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 > ---
->  drivers/irqchip/irq-armada-370-xp.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  drivers/bus/uniphier-system-bus.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 >
-> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-> index e5738c5..f53eb71 100644
-> --- a/drivers/irqchip/irq-armada-370-xp.c
-> +++ b/drivers/irqchip/irq-armada-370-xp.c
-> @@ -401,10 +401,10 @@ static void armada_370_xp_handle_msi_irq(struct pt_regs *regs, bool is_chained)
->  
->  		if (is_chained) {
->  			irq = irq_find_mapping(armada_370_xp_msi_inner_domain,
-> -					       msinr - 16);
-> +					       msinr - PCI_MSI_DOORBELL_START);
->  			generic_handle_irq(irq);
->  		} else {
-> -			irq = msinr - 16;
-> +			irq = msinr - PCI_MSI_DOORBELL_START;
->  			handle_domain_irq(armada_370_xp_msi_inner_domain,
->  					  irq, regs);
->  		}
-> -- 
-> 2.6.4
+> diff --git a/drivers/bus/uniphier-system-bus.c b/drivers/bus/uniphier-system-bus.c
+> index 834a2ae..f50bd6d 100644
+> --- a/drivers/bus/uniphier-system-bus.c
+> +++ b/drivers/bus/uniphier-system-bus.c
+> @@ -257,8 +257,7 @@ static int uniphier_system_bus_probe(struct platform_device *pdev)
+>         uniphier_system_bus_set_reg(priv);
 >
+>         /* Now, the bus is configured.  Populate platform_devices below it */
+> -       return of_platform_populate(dev->of_node, of_default_bus_match_table,
+> -                                   NULL, dev);
+> +       return of_platform_default_populate(dev->of_node, NULL, dev);
+>  }
+>
+>  static const struct of_device_id uniphier_system_bus_match[] = {
+
+
+I did not notice the existence of of_platform_default_populate().
+
+If I had used this function, commit b80443cc22 would have not been
+needed in the first place...
+
+Thanks for cleaning this!
+
+Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Best Regards
+Masahiro Yamada
