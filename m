@@ -1,61 +1,57 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 27 Jan 2016 15:11:59 -0600
-Subject: [PATCH 11/13] dtb: amd: Add PCIe SMMU device tree node
-In-Reply-To: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1453929121-12171-12-git-send-email-Suravee.Suthikulpanit@amd.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 27 Jan 2016 22:38:30 +0100
+Subject: [PATCH] pinctrl: nomadik: stn8815 CLCD alternate functions
+Message-ID: <1453930710-19163-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+The STn8815 has 22 dedicated pins for CLCD with up to 16 bits
+in parallel, but pins 32 thru 39 can be used for an additional
+CLCD signal lines 16 thru 23.
 
-Add PCIe SMMU device tree node for AMD Seattle SOC.
-
-Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-index a7fc059..bfccfea 100644
---- a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-+++ b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-@@ -210,6 +210,7 @@
- 			device_type = "pci";
- 			bus-range = <0 0x7f>;
- 			msi-parent = <&v2m0>;
-+			#stream-id-cells = <16>;
- 			reg = <0 0xf0000000 0 0x10000000>;
- 
- 			interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
-@@ -230,6 +231,28 @@
- 				<0x03000000 0x01 0x00000000 0x01 0x00000000 0x7f 0x00000000>;
- 		};
- 
-+		pcie0_smmu: smmu at e0a00000 {
-+			 compatible = "arm,mmu-401";
-+			 reg = <0 0xe0a00000 0 0x10000>;
-+			 #global-interrupts = <1>;
-+			 interrupts = /* Uses combined intr for both
-+				       * global and context
-+				       */
-+				      <0 333 4>,
-+				      <0 333 4>;
-+			/* Note:
-+			 * SID[2:0]  = PCIe function number
-+			 * SID[7:3]  = PCIe device number
-+			 * SID[14:8] = PCIe bus number
-+			 */
-+			 mmu-masters = <&pcie0
-+				/* 1:00:[0,3] */ 256 257 258 259
-+				/* 2:00:[0,3] */ 512 513 514 515
-+				/* 3:00:[0,3] */ 768 769 770 771
-+				/* 4:00:[0,3] */ 1024 1025 1026 1027
-+			 >;
-+		 };
+diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c b/drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c
+index 587b222f12f3..e852048c4c04 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c
++++ b/drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c
+@@ -287,6 +287,10 @@ static const unsigned i2c0_a_1_pins[] = { STN8815_PIN_D3, STN8815_PIN_D2 };
+ /* Altfunction B */
+ static const unsigned u1_b_1_pins[] = { STN8815_PIN_B16, STN8815_PIN_A16 };
+ static const unsigned i2cusb_b_1_pins[] = { STN8815_PIN_C21, STN8815_PIN_C20 };
++static const unsigned clcd_16_23_b_1_pins[] = { STN8815_PIN_AB6,
++	STN8815_PIN_AA6, STN8815_PIN_Y6, STN8815_PIN_Y5, STN8815_PIN_AA5,
++	STN8815_PIN_AB5, STN8815_PIN_AB4, STN8815_PIN_Y4 };
 +
- 		/* Perf CCN504 PMU */
- 		ccn: ccn at 0xe8000000 {
- 			compatible = "arm,ccn-504";
+ 
+ #define STN8815_PIN_GROUP(a, b) { .name = #a, .pins = a##_pins,		\
+ 			.npins = ARRAY_SIZE(a##_pins), .altsetting = b }
+@@ -302,6 +306,7 @@ static const struct nmk_pingroup nmk_stn8815_groups[] = {
+ 	STN8815_PIN_GROUP(i2c0_a_1, NMK_GPIO_ALT_A),
+ 	STN8815_PIN_GROUP(u1_b_1, NMK_GPIO_ALT_B),
+ 	STN8815_PIN_GROUP(i2cusb_b_1, NMK_GPIO_ALT_B),
++	STN8815_PIN_GROUP(clcd_16_23_b_1, NMK_GPIO_ALT_B),
+ };
+ 
+ /* We use this macro to define the groups applicable to a function */
+@@ -314,6 +319,7 @@ STN8815_FUNC_GROUPS(u1, "u1_a_1", "u1_b_1");
+ STN8815_FUNC_GROUPS(i2c1, "i2c1_a_1");
+ STN8815_FUNC_GROUPS(i2c0, "i2c0_a_1");
+ STN8815_FUNC_GROUPS(i2cusb, "i2cusb_b_1");
++STN8815_FUNC_GROUPS(clcd, "clcd_16_23_b_1");
+ 
+ #define FUNCTION(fname)					\
+ 	{						\
+@@ -329,6 +335,7 @@ static const struct nmk_function nmk_stn8815_functions[] = {
+ 	FUNCTION(i2c1),
+ 	FUNCTION(i2c0),
+ 	FUNCTION(i2cusb),
++	FUNCTION(clcd),
+ };
+ 
+ static const struct nmk_pinctrl_soc_data nmk_stn8815_soc = {
 -- 
-2.5.0
+2.4.3
