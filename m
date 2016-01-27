@@ -1,91 +1,49 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Wed, 27 Jan 2016 11:31:59 -0500
-Subject: [PATCH v6 0/7] ARM: dts: Add Advantech board support
-In-Reply-To: <CACrMeVC+-D3a4pUccQMb0BXwcTts9EAagC4EDcvb=HYMhuD03w@mail.gmail.com>
-References: <1450908016-17384-1-git-send-email-akshay.bhat@timesys.com>
- <CACrMeVC+-D3a4pUccQMb0BXwcTts9EAagC4EDcvb=HYMhuD03w@mail.gmail.com>
-Message-ID: <56A8F0FF.7020308@timesys.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 27 Jan 2016 09:24:53 -0700
+Subject: [PATCH V8 20/23] perf tools: making function set_max_cpu_num()
+ non static
+In-Reply-To: <20160126185116.GA11676@kernel.org>
+References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
+ <1452807977-8069-21-git-send-email-mathieu.poirier@linaro.org>
+ <CANLsYkzmTMi3jmVjwNiNsw6P5pPkZEz6zYWFsVzayy+r2ojTTA@mail.gmail.com>
+ <20160125211242.GF22501@kernel.org>
+ <20160125212955.GG22501@kernel.org>
+ <CANLsYkwbBCwT0B4NV0pGo+avyyX9kiPzYZK5WtmfHaqnW8Q6uA@mail.gmail.com>
+ <20160126185116.GA11676@kernel.org>
+Message-ID: <CANLsYkwFLn7sH25TAG4qmaEL314c-0Ndiv37p+-xULumPwVHhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
-
-
-On 01/09/2016 05:32 AM, Akshay Bhat wrote:
-> Shawn,
+On 26 January 2016 at 11:51, Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+> Em Tue, Jan 26, 2016 at 10:08:21AM -0700, Mathieu Poirier escreveu:
+>> On 25 January 2016 at 14:29, Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+>> > Em Mon, Jan 25, 2016 at 06:12:42PM -0300, Arnaldo Carvalho de Melo escreveu:
+>> >> Em Mon, Jan 25, 2016 at 01:46:22PM -0700, Mathieu Poirier escreveu:
+>> >> > On 14 January 2016 at 14:46, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+>> >> > I can't queue this patch for 4.6 without at least a reviewed by from you.
+>> >>
+>> >> This one I remember, looks ugly, the name set_max_cpu_num() looks
+>> >> strange, when that was restricted (static) to that cpumap.c file, it
+>> >> wasn't a problem, exporting it for wider usage looks bad.
+>> >>
+>> >> You've been waiting for this for quite a while, it seems, lemme stop
+>> >> what I am doing to check this...
+>> >
+>> > So, please check the patch below, what you need then is just to use
+>> > cpu__max_cpu().
+>>
+>> I like your approach - thanks for the review.  I will spin V9 when I
+>> have received Adrian's comments.
 >
-> Did you have any further feedback on this patch set? If not can it be applied?
+> I'll take that as an Acked-by: and since this improves the current
+> situation by hiding needlessly exported global variables, I'll get it in
+> now, thanks.
 
-I haven't seen any response from Shawn and seems like there has been no 
-activity in his git tree for the last 5 weeks. Was wondering if you 
-would be able to provide further feedback (if any) and/or apply the 
-patches. Appreciate your help.
+I would have added this code in my patchset with the right authorship
+- whatever works best for you.
 
 Thanks,
-Akshay
+Mathieu
 
 >
-> Thanks,
-> Akshay
->
-> On Thu, Dec 24, 2015 at 3:30 AM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
->> This series aims to add Advantech BA-16 module (iMX6 based) and GE board support.
->>
->> This series has been tested against linux-next tag next-20151223.
->>
->> Modifications:
->> v5->v6:
->> - BA16:
->> Add missing dlg,da9063-onkey compatibility
->> Revert partitions container for spi-nor flash
->> Address below comments from Shawn:
->> Update to GPL/X11 dual license
->> Add new line between properties and sub-nodes; between nodes
->> Consistently use lowercase for hex values
->> Move iomux node to bottom of dts file for easier readability
->> Get rid of imx6q-ba16 container to save on indentation
->> Reduce the number of entries in hog group
->> Sort pinctrl nodes alphabetically
->> Explicitly call out pad configuration value instead of 0x80000000
->> - Bx50v3:
->> Update to GPL/X11 dual license
->> Remove @unit-address for regulators as per Shawn's suggestion
->> - B450v3, B650v3 and B850v3:
->> Update to GPL/X11 dual license
->>
->> History:
->> --------
->> [v1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/381872.html
->> [v2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/383276.html
->> [v3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/384202.html
->> [v4]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390373.html
->> [v5]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390788.html
->>
->> Akshay Bhat (5):
->>    of: Add vendor prefix for Advantech Corporation
->>    of: Add vendor prefix for General Electric Company
->>    ARM: dts: imx: Add support for Advantech/GE B450v3
->>    ARM: dts: imx: Add support for Advantech/GE B650v3
->>    ARM: dts: imx: Add support for Advantech/GE B850v3
->>
->> Justin Waters (2):
->>    ARM: dts: imx: Add Advantech BA-16 Qseven module
->>    ARM: dts: imx: Add support for Advantech/GE Bx50v3
->>
->>   .../devicetree/bindings/vendor-prefixes.txt        |   2 +
->>   arch/arm/boot/dts/Makefile                         |   3 +
->>   arch/arm/boot/dts/imx6q-b450v3.dts                 | 114 ++++
->>   arch/arm/boot/dts/imx6q-b650v3.dts                 | 114 ++++
->>   arch/arm/boot/dts/imx6q-b850v3.dts                 | 157 +++++
->>   arch/arm/boot/dts/imx6q-ba16.dtsi                  | 641 +++++++++++++++++++++
->>   arch/arm/boot/dts/imx6q-bx50v3.dtsi                | 237 ++++++++
->>   7 files changed, 1268 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/imx6q-b450v3.dts
->>   create mode 100644 arch/arm/boot/dts/imx6q-b650v3.dts
->>   create mode 100644 arch/arm/boot/dts/imx6q-b850v3.dts
->>   create mode 100644 arch/arm/boot/dts/imx6q-ba16.dtsi
->>   create mode 100644 arch/arm/boot/dts/imx6q-bx50v3.dtsi
->>
->> --
->> 2.6.3
->>
+> - Arnaldo
