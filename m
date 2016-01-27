@@ -1,37 +1,64 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 27 Jan 2016 18:29:55 +0100
-Subject: [PATCH RFC 06/11] clk: sunxi: factors: Consolidate get_factors
- parameters into a struct
-In-Reply-To: <1453727747-23307-7-git-send-email-wens@csie.org>
-References: <1453727747-23307-1-git-send-email-wens@csie.org>
- <1453727747-23307-7-git-send-email-wens@csie.org>
-Message-ID: <20160127172955.GK4317@lukather>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 27 Jan 2016 09:31:04 -0800
+Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
+In-Reply-To: <1452780672-14339-4-git-send-email-kishon@ti.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <1452780672-14339-4-git-send-email-kishon@ti.com>
+Message-ID: <20160127173104.GQ19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 09:15:42PM +0800, Chen-Yu Tsai wrote:
-> The .get_factors callback of factors_clk has 6 parameters. To extend
-> factors_clk in any way that requires adding parameters to .get_factors
-> would make that list even longer, not to mention changing all the
-> function declarations.
+* Kishon Vijay Abraham I <kishon@ti.com> [160114 06:12]:
+> Use assert/deassert callbacks populated in the platform data to
+> to perform reset of PCIe.
 > 
-> Do this once now and consolidate all the parameters into a struct.
-> Also drop the space before function pointer arguments, since checkpatch
-> complains.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Use these callbacks until a reset controller driver is
+> is available in the kernel to reset PCIe.
+...
 
-Applied, thanks!
-Maxime
+> --- a/drivers/pci/host/pci-dra7xx.c
+> +++ b/drivers/pci/host/pci-dra7xx.c
+> @@ -347,6 +404,10 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
+>  	enum of_gpio_flags flags;
+>  	unsigned long gpio_flags;
+>  
+> +	ret = dra7xx_pcie_reset(pdev);
+> +	if (ret)
+> +		return ret;
+> +
+>  	dra7xx = devm_kzalloc(dev, sizeof(*dra7xx), GFP_KERNEL);
+>  	if (!dra7xx)
+>  		return -ENOMEM;
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/08905639/attachment.sig>
+With the hwmod data properly configured the reset already happens
+for the device by the bus driver, the hwmod code in this case?
+
+> @@ -457,6 +518,7 @@ static int __exit dra7xx_pcie_remove(struct platform_device *pdev)
+>  	struct pcie_port *pp = &dra7xx->pp;
+>  	struct device *dev = &pdev->dev;
+>  	int count = dra7xx->phy_count;
+> +	int ret;
+>  
+>  	if (pp->irq_domain)
+>  		irq_domain_remove(pp->irq_domain);
+> @@ -467,6 +529,10 @@ static int __exit dra7xx_pcie_remove(struct platform_device *pdev)
+>  		phy_exit(dra7xx->phy[count]);
+>  	}
+>  
+> +	ret = dra7xx_pcie_assert_reset(pdev);
+> +	if (ret < 0)
+> +		return ret;
+> +
+>  	return 0;
+>  }
+
+Why do you need another reset here? Can't you just implement PM runtime
+in the driver and do the usual pm_runtime_put_sync followed by
+pm_runtime_disable?
+
+Basically I'm wondering how come we need these platform data callbacks
+at all.
+
+Regards,
+
+Tony
