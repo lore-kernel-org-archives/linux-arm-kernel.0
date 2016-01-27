@@ -1,106 +1,68 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 27 Jan 2016 18:25:16 +0800
-Subject: [PATCH] clk: Move vendor's Kconfig into CCF menu section
-In-Reply-To: <1453879563-39500-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <201601271842.u96zDj37%fengguang.wu@intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 27 Jan 2016 10:25:46 +0000
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <20160126195820.GS4503@linux.vnet.ibm.com>
+References: <20160114212913.GF3818@linux.vnet.ibm.com>
+ <20160115085554.GF3421@worktop> <20160115091348.GA27936@worktop>
+ <20160115174612.GV3818@linux.vnet.ibm.com>
+ <20160115212714.GM3421@worktop>
+ <20160115215853.GC3818@linux.vnet.ibm.com>
+ <20160125164242.GF22927@arm.com>
+ <20160126060322.GJ4503@linux.vnet.ibm.com>
+ <20160126121608.GE21553@arm.com>
+ <20160126195820.GS4503@linux.vnet.ibm.com>
+Message-ID: <20160127102546.GD2390@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+On Tue, Jan 26, 2016 at 11:58:20AM -0800, Paul E. McKenney wrote:
+> On Tue, Jan 26, 2016 at 12:16:09PM +0000, Will Deacon wrote:
+> > On Mon, Jan 25, 2016 at 10:03:22PM -0800, Paul E. McKenney wrote:
+> > > On Mon, Jan 25, 2016 at 04:42:43PM +0000, Will Deacon wrote:
+> > > > On Fri, Jan 15, 2016 at 01:58:53PM -0800, Paul E. McKenney wrote:
+> > > > > PPC Overlapping Group-B sets version 4
+> > > > > ""
+> > > > > (* When the Group-B sets from two different barriers involve instructions in
+> > > > >    the same thread, within that thread one set must contain the other.
+> > > > > 
+> > > > > 	P0	P1	P2
+> > > > > 	Rx=1	Wy=1	Wz=2
+> > > > > 	dep.	lwsync	lwsync
+> > > > > 	Ry=0	Wz=1	Wx=1
+> > > > > 	Rz=1
+> > > > > 
+> > > > > 	assert(!(z=2))
+> > > > > 
+> > > > >    Forbidden by ppcmem, allowed by herd.
+> > > > > *)
+> > > > > {
+> > > > > 0:r1=x; 0:r2=y; 0:r3=z;
+> > > > > 1:r1=x; 1:r2=y; 1:r3=z; 1:r4=1;
+> > > > > 2:r1=x; 2:r2=y; 2:r3=z; 2:r4=1; 2:r5=2;
+> > > > > }
+> > > > >  P0		| P1		| P2		;
+> > > > >  lwz r6,0(r1)	| stw r4,0(r2)	| stw r5,0(r3)	;
+> > > > >  xor r7,r6,r6	| lwsync	| lwsync	;
+> > > > >  lwzx r7,r7,r2	| stw r4,0(r3)	| stw r4,0(r1)	;
+> > > > >  lwz r8,0(r3)	|		|		;
+> > > > > 
+> > > > > exists
+> > > > > (z=2 /\ 0:r6=1 /\ 0:r7=0 /\ 0:r8=1)
+> > > > 
+> > > > That really hurts. Assuming that the "assert(!(z=2))" is actually there
+> > > > to constrain the coherence order of z to be {0->1->2}, then I think that
+> > > > this test is forbidden on arm using dmb instead of lwsync. That said, I
+> > > > also don't think the Rz=1 in P0 changes anything.
+> > > 
+> > > What about the smp_wmb() variant of dmb that orders only stores?
+> > 
+> > Tricky, but I think it still works out if the coherence order of z is as
+> > I described above. The line of reasoning is weird though -- I ended up
+> > considering the two cases where P0 reads z before and after it reads x
+> > and what that means for the read of y.
+> 
+> By "works out" you mean that ARM prohibits the outcome?
 
-[auto build test ERROR on clk/clk-next]
-[also build test ERROR on v4.5-rc1 next-20160127]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Yes, that's my understanding.
 
-url:    https://github.com/0day-ci/linux/commits/James-Liao/clk-Move-vendor-s-Kconfig-into-CCF-menu-section/20160127-152850
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: arm-s3c2410_defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
-   drivers/built-in.o: In function `clk_disable_unprepare':
->> include/linux/clk.h:484: undefined reference to `clk_disable'
-   drivers/built-in.o: In function `pwm_samsung_calc_tin':
->> drivers/pwm/pwm-samsung.c:179: undefined reference to `clk_get_rate'
-   drivers/built-in.o: In function `pwm_samsung_get_tin_rate':
-   drivers/pwm/pwm-samsung.c:158: undefined reference to `clk_get_rate'
-   drivers/built-in.o: In function `clk_prepare_enable':
->> include/linux/clk.h:474: undefined reference to `clk_enable'
-   drivers/built-in.o: In function `clk_disable_unprepare':
->> include/linux/clk.h:484: undefined reference to `clk_disable'
-   drivers/built-in.o: In function `clk_prepare_enable':
->> include/linux/clk.h:474: undefined reference to `clk_enable'
-   drivers/built-in.o: In function `clk_disable_unprepare':
->> include/linux/clk.h:484: undefined reference to `clk_disable'
->> include/linux/clk.h:484: undefined reference to `clk_disable'
-   drivers/built-in.o: In function `clk_prepare_enable':
->> include/linux/clk.h:474: undefined reference to `clk_enable'
-   drivers/built-in.o: In function `s3c24xxfb_probe':
->> drivers/video/fbdev/s3c2410fb.c:940: undefined reference to `clk_get_rate'
-   drivers/built-in.o: In function `clk_disable_unprepare':
->> include/linux/clk.h:484: undefined reference to `clk_disable'
-   drivers/built-in.o: In function `s3c24xx_serial_getclk':
->> drivers/tty/serial/samsung.c:1171: undefined reference to `clk_get_rate'
-   drivers/built-in.o: In function `clk_disable_unprepare':
->> include/linux/clk.h:484: undefined reference to `clk_disable'
-   drivers/built-in.o: In function `clk_prepare_enable':
->> include/linux/clk.h:474: undefined reference to `clk_enable'
-   drivers/built-in.o: In function `s3c24xx_serial_set_termios':
-   drivers/tty/serial/samsung.c:1276: undefined reference to `clk_get_rate'
-   drivers/built-in.o: In function `clk_prepare_enable':
->> include/linux/clk.h:474: undefined reference to `clk_enable'
-   drivers/built-in.o: In function `clk_disable_unprepare':
->> include/linux/clk.h:484: undefined reference to `clk_disable'
-   drivers/built-in.o: In function `clk_prepare_enable':
->> include/linux/clk.h:474: undefined reference to `clk_enable'
-   drivers/built-in.o: In function `clk_disable_unprepare':
->> include/linux/clk.h:484: undefined reference to `clk_disable'
->> include/linux/clk.h:484: undefined reference to `clk_disable'
->> include/linux/clk.h:484: undefined reference to `clk_disable'
-   drivers/built-in.o: In function `clk_prepare_enable':
->> include/linux/clk.h:474: undefined reference to `clk_enable'
-
-vim +484 include/linux/clk.h
-
-93abe8e4 Viresh Kumar 2012-07-30  468  {
-93abe8e4 Viresh Kumar 2012-07-30  469  	int ret;
-93abe8e4 Viresh Kumar 2012-07-30  470  
-93abe8e4 Viresh Kumar 2012-07-30  471  	ret = clk_prepare(clk);
-93abe8e4 Viresh Kumar 2012-07-30  472  	if (ret)
-93abe8e4 Viresh Kumar 2012-07-30  473  		return ret;
-93abe8e4 Viresh Kumar 2012-07-30 @474  	ret = clk_enable(clk);
-93abe8e4 Viresh Kumar 2012-07-30  475  	if (ret)
-93abe8e4 Viresh Kumar 2012-07-30  476  		clk_unprepare(clk);
-93abe8e4 Viresh Kumar 2012-07-30  477  
-93abe8e4 Viresh Kumar 2012-07-30  478  	return ret;
-93abe8e4 Viresh Kumar 2012-07-30  479  }
-93abe8e4 Viresh Kumar 2012-07-30  480  
-93abe8e4 Viresh Kumar 2012-07-30  481  /* clk_disable_unprepare helps cases using clk_disable in non-atomic context. */
-93abe8e4 Viresh Kumar 2012-07-30  482  static inline void clk_disable_unprepare(struct clk *clk)
-93abe8e4 Viresh Kumar 2012-07-30  483  {
-93abe8e4 Viresh Kumar 2012-07-30 @484  	clk_disable(clk);
-93abe8e4 Viresh Kumar 2012-07-30  485  	clk_unprepare(clk);
-93abe8e4 Viresh Kumar 2012-07-30  486  }
-93abe8e4 Viresh Kumar 2012-07-30  487  
-
-:::::: The code at line 484 was first introduced by commit
-:::::: 93abe8e4b13ae9a0428ce940a8a03ac72a7626f1 clk: add non CONFIG_HAVE_CLK routines
-
-:::::: TO: Viresh Kumar <viresh.kumar@st.com>
-:::::: CC: Linus Torvalds <torvalds@linux-foundation.org>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 21249 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/64f5aa6b/attachment-0001.obj>
+Will
