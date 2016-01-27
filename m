@@ -1,67 +1,29 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 27 Jan 2016 16:27:35 +0800
-Subject: [PATCH v3 12/17] ARM64: ACPI: Check if it runs on Xen to enable
- or disable ACPI
-In-Reply-To: <1453519184-11908-13-git-send-email-zhaoshenglong@huawei.com>
-References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
- <1453519184-11908-13-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <56A87F77.8070506@linaro.org>
+From: jholt@google.com (Jason Holt)
+Date: Wed, 27 Jan 2016 00:32:56 -0800
+Subject: Speeding up dma_unmap
+Message-ID: <CAJFSRaCRvx=+_fEYAr8OeWGHnnz+rOWjLzLcm+wZiEstbHwxAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shannon,
+I'm new to the DMA API and looking for a sanity check.
 
-On 2016/1/23 11:19, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
->
-> When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
-> a /hypervisor node in DT. So check if it needs to enable ACPI.
->
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
-> CC: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->   arch/arm64/kernel/acpi.c | 12 ++++++++----
->   1 file changed, 8 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index d1ce8e2..4e92be0 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
->   {
->   	/*
->   	 * Return 1 as soon as we encounter a node at depth 1 that is
-> -	 * not the /chosen node.
-> +	 * not the /chosen node, or /hypervisor node when running on Xen.
+As I understand it, dma_unmap_* is slow (for data coming from a device
+to the CPU) on some ARM CPUs because the *_inv_range() functions have
+to iterate in cache line sized steps through the entire buffer,
+telling the cache controller "invalidate this if you have it".
 
-The comment is bit misleading, we need to specify two mode, running on
-Xen or not, if not on xen, then /chosen node is enough.
+For buffers larger than the size of the data cache, might it be faster
+to go the other direction and check each line of the cache to see if
+it's inside the buffer, then invalidate it if it is?  (I believe the
+buffer must be contiguous in physical memory, so I assume that'd be a
+simple bottom < x < top check).
 
->   	 */
-> -	if (depth == 1 && (strcmp(uname, "chosen") != 0))
-> -		return 1;
-> +	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
-> +		if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
-> +			return 1;
-> +	}
-> +
->   	return 0;
->   }
->
-> @@ -184,7 +187,8 @@ void __init acpi_boot_table_init(void)
->   	/*
->   	 * Enable ACPI instead of device tree unless
->   	 * - ACPI has been disabled explicitly (acpi=off), or
-> -	 * - the device tree is not empty (it has more than just a /chosen node)
-> +	 * - the device tree is not empty (it has more than just a /chosen node,
-> +	 *   and a /hypervisor node when running on Xen)
+So for a 256K L2 cache and 4MB buffer, we'd only have to check 256K
+worth of cache lines instead of 4MB when we unmap.
 
-and here too.
-
-if that is addressed,
-
-Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-
-Thanks
-Hanjun
+Failing that, I suppose a very dirty hack would be to
+data_cache_clean_and_invalidate if the only thing I cared about was
+getting data from my DMA peripheral as fast as possible.  (I'm on
+AM335X and seeing no more than 200MB/s from device to CPU with
+dma_unmap_single, whereas the PRUs can write to main memory at
+600MB/s.)
