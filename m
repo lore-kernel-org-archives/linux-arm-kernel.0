@@ -1,40 +1,155 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 27 Jan 2016 09:39:05 +0100
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160126201339.GW4503@linux.vnet.ibm.com>
-References: <20160114212913.GF3818@linux.vnet.ibm.com>
- <20160115085554.GF3421@worktop> <20160115091348.GA27936@worktop>
- <20160115174612.GV3818@linux.vnet.ibm.com>
- <20160115212714.GM3421@worktop>
- <20160115215853.GC3818@linux.vnet.ibm.com>
- <20160125164242.GF22927@arm.com>
- <20160126060322.GJ4503@linux.vnet.ibm.com>
- <20160126101927.GD6357@twins.programming.kicks-ass.net>
- <20160126201339.GW4503@linux.vnet.ibm.com>
-Message-ID: <20160127083905.GK6357@twins.programming.kicks-ass.net>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Wed, 27 Jan 2016 08:40:16 +0000
+Subject: [PATCH v8 1/2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD
+ driver
+In-Reply-To: <87pownphvd.fsf@dell.be.48ers.dk>
+References: <1453861685-30924-1-git-send-email-wenyou.yang@atmel.com>
+ <1453861685-30924-2-git-send-email-wenyou.yang@atmel.com>
+ <87pownphvd.fsf@dell.be.48ers.dk>
+Message-ID: <B256D81BAE5131468A838E5D7A243641D63FA932@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 12:13:39PM -0800, Paul E. McKenney wrote:
-> On Tue, Jan 26, 2016 at 11:19:27AM +0100, Peter Zijlstra wrote:
+Hi Peter,
 
-> > So isn't smp_mb__after_unlock_lock() exactly such a scenario? And would
-> > not someone trying to implement RCsc locks using locally transitive
-> > RELEASE/ACQUIRE operations need exactly this stuff?
-> > 
-> > That is, I am afraid we need to cover the mix of local and global
-> > transitive operations at least in overview.
+> -----Original Message-----
+> From: Peter Korsgaard [mailto:jacmet at gmail.com] On Behalf Of Peter Korsgaard
+> Sent: 2016?1?27? 16:05
+> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
+> Cc: Lee Jones <lee.jones@linaro.org>; Rob Herring <robh+dt@kernel.org>;
+> Pawel Moll <pawel.moll@arm.com>; Mark Rutland <mark.rutland@arm.com>; Ian
+> Campbell <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>;
+> Javier Martinez Canillas <javier@dowhile0.org>; Krzysztof Kozlowski
+> <k.kozlowski@samsung.com>; Peter Korsgaard <jacmet@gmail.com>; Ferre,
+> Nicolas <Nicolas.FERRE@atmel.com>; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; devicetree at vger.kernel.org
+> Subject: Re: [PATCH v8 1/2] mfd: act8945a: add Active-semi ACT8945A PMIC
+> MFD driver
 > 
-> True, but we haven't gotten to locking yet.
+> >>>>> "Wenyou" == Wenyou Yang <wenyou.yang@atmel.com> writes:
+> 
+>  > This patch adds support for the Active-semi ACT8945A PMIC.
+>  > It is a Multi Function Device with the following subdevices:
+>  >  - Regulator
+>  >  - Charger
+> 
+>  > It is interfaced to the host controller using I2C interface,  > ACT8945A is a child
+> device of the I2C.
+> 
+>  > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>  > Reviewed-by:
+> Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> Thanks, looks good - One more thing though:
+> 
+>  > +
+>  > +struct act8945a_dev {
+>  > +	struct regmap *regmap;
+>  > +};
+> 
+> You don't need this structure as you used devm. With that removed (and the logic
+> to devm_kzalloc it) you can add my:
 
-The mythical smp_mb__after_release_acquire() then ;-)
+Yes, it can be removed.
 
-(and yes, I know you're going to say we don't have that)
+> 
+> Acked-by: Peter Korsgaard <peter@korsgaard.com>
+> 
 
-> That said, I would argue
-> that smp_mb__after_unlock_lock() upgrades locks to transitive, and
-> thus would not be an exception to the "no combining transitive and
-> non-transitive steps in cycles" rule.
+Thank you for you Acked.
 
-But But But ;-) It does that exactly by combining. I suspect this is
-(partly) the source of your SC chains with one PC link example.
+> 
+>  > +static const struct mfd_cell act8945a_devs[] = {
+>  > +	{
+>  > +		.name = "act8945a-regulator",
+>  > +		.of_compatible = "active-semi,act8945a-regulator",
+>  > +	},
+>  > +	{
+>  > +		.name = "act8945a-charger",
+>  > +		.of_compatible = "active-semi,act8945a-charger",
+>  > +	},
+>  > +};
+>  > +
+>  > +static const struct regmap_config act8945a_regmap_config = {
+>  > +	.reg_bits = 8,
+>  > +	.val_bits = 8,
+>  > +};
+>  > +
+>  > +static int act8945a_i2c_probe(struct i2c_client *i2c,
+>  > +			      const struct i2c_device_id *id)
+>  > +{
+>  > +	struct act8945a_dev *act8945a;
+>  > +	int ret;
+>  > +
+>  > +	act8945a = devm_kzalloc(&i2c->dev, sizeof(*act8945a), GFP_KERNEL);
+>  > +	if (!act8945a)
+>  > +		return -ENOMEM;
+>  > +
+>  > +	i2c_set_clientdata(i2c, act8945a);
+>  > +
+>  > +	act8945a->regmap = devm_regmap_init_i2c(i2c,
+> &act8945a_regmap_config);
+>  > +	if (IS_ERR(act8945a->regmap)) {
+>  > +		ret = PTR_ERR(act8945a->regmap);
+>  > +		dev_err(&i2c->dev, "regmap init failed: %d\n", ret);
+>  > +		return ret;
+>  > +	}
+>  > +
+>  > +	ret = mfd_add_devices(&i2c->dev, PLATFORM_DEVID_NONE,
+> act8945a_devs,
+>  > +			      ARRAY_SIZE(act8945a_devs), NULL, 0, NULL);
+>  > +	if (ret) {
+>  > +		dev_err(&i2c->dev, "Failed to add sub devices\n");
+>  > +		return ret;
+>  > +	}
+>  > +
+>  > +	return 0;
+>  > +}
+>  > +
+>  > +static int act8945a_i2c_remove(struct i2c_client *i2c)  > +{
+>  > +	mfd_remove_devices(&i2c->dev);
+>  > +
+>  > +	return 0;
+>  > +}
+>  > +
+>  > +static const struct i2c_device_id act8945a_i2c_id[] = {
+>  > +	{ "act8945a", 0 },
+>  > +	{}
+>  > +};
+>  > +MODULE_DEVICE_TABLE(i2c, act8945a_i2c_id);  > +  > +static const struct
+> of_device_id act8945a_of_match[] = {
+>  > +	{ .compatible = "active-semi,act8945a", },
+>  > +	{},
+>  > +};
+>  > +MODULE_DEVICE_TABLE(of, act8945a_of_match);  > +  > +static struct
+> i2c_driver act8945a_i2c_driver = {
+>  > +	.driver = {
+>  > +		   .name = "act8945a",
+>  > +		   .of_match_table = of_match_ptr(act8945a_of_match),
+>  > +	},
+>  > +	.probe = act8945a_i2c_probe,
+>  > +	.remove = act8945a_i2c_remove,
+>  > +	.id_table = act8945a_i2c_id,
+>  > +};
+>  > +
+>  > +static int __init act8945a_i2c_init(void)  > +{
+>  > +	return i2c_add_driver(&act8945a_i2c_driver);
+>  > +}
+>  > +subsys_initcall(act8945a_i2c_init);
+>  > +
+>  > +static void __exit act8945a_i2c_exit(void)  > +{
+>  > +	i2c_del_driver(&act8945a_i2c_driver);
+>  > +}
+>  > +module_exit(act8945a_i2c_exit);
+>  > +
+>  > +MODULE_DESCRIPTION("ACT8945A PMIC multi-function driver");  >
+> +MODULE_AUTHOR("Wenyou Yang <wenyou.yang@atmel.com>");  >
+> +MODULE_LICENSE("GPL");  > --  > 1.7.9.5
+> 
+> 
+> 
+> --
+> Bye, Peter Korsgaard
+
+
+Best regards,
+Wenyou Yang
