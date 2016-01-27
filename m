@@ -1,101 +1,72 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Wed, 27 Jan 2016 11:19:29 -0800
-Subject: [PATCH v5 0/7] remoteproc: Add driver for STMicroelectronics
- platforms
-In-Reply-To: <20160127073124.GI3368@x1>
-References: <1452602781-22424-1-git-send-email-lee.jones@linaro.org>
- <20160127073124.GI3368@x1>
-Message-ID: <CAJAp7OhYQVkq4LrTdiO-5mTreaY4ZhiiQkRKN_cAS36huwyhQA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Jan 2016 19:26:13 +0000
+Subject: [PATCH] hostap: avoid uninitialized variable use in
+ hfa384x_get_rid
+In-Reply-To: <1453902342-3420391-1-git-send-email-arnd@arndb.de>
+References: <1453902342-3420391-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160127192612.GD10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 11:31 PM, Lee Jones <lee.jones@linaro.org> wrote:
->
-> Apologies for ping (I hate doing that), but I haven't heard anything
-> from you.  Do you want me to re-submit this set, or are you willing to
-> take this and apply the relevant Acks?
->
+On Wed, Jan 27, 2016 at 02:45:26PM +0100, Arnd Bergmann wrote:
+> To ensure we get consistent error handling here, this changes the code
+> to only set rlen if we actually read data correctly, which also takes
+> care of the warning.
 
-I had a chat with Ohad and offered my assistance with his work. So I
-will pick up the role as co-maintainer of his subsystems.
+It may be a good idea to do the job better.  Looking at the code:
 
-I will pick up patch 1-4 of your v5 as soon as I've sorted out the
-practicalities around this, no need to resubmit them.
+        struct hfa384x_rid_hdr rec;
 
-Sorry for the delay!
+        spin_lock_bh(&local->baplock);
 
-Regards,
-Bjorn
+        res = hfa384x_setup_bap(dev, BAP0, rid, 0);
+        if (!res)
+                res = hfa384x_from_bap(dev, BAP0, &rec, sizeof(rec));
 
-> > ST's platforms often have multiple co-processors (usually ST40s or ST231s)
-> > on-board.  This provides the Linux-side infrastructure to flash and boot
-> > them successfully.
-> >
-> > This set has been tested on an STiH410-B2120.
-> >
-> > v4 => v5:
-> >  - Check for invalid 'count' (command read length) in write fn()s
-> >
-> > v3 => v4:
-> >  Suggested-by: Suman Anna <s-anna@ti.com>
-> >  - Move to using 'reserved-memory' API
-> >    - New 'reserved-memory' nodes
-> >    - Remove memory locations from RemoteProc's DT node's reg properties
-> >    - Remove C code obtaining/allocating DMA memory
-> >  - Re-order .start() and .stop() ops
-> >  - Add protection around Reset API in error path
-> >  - Explicitly set .has_iommu to false
-> >
-> > v2 => v3:
-> >  - Generify syscon property (st,syscfg-boot => st,syscfg)
-> >  - Rename IP in DT bindings doc (Remote Processor => Co-Processor)
-> >  - Remove superfluous 'clock-names' property
-> >  - Remove superfluous 'reg-names' property
-> >  - Populate MAINTAINERS
-> >  - Clean-up DTS formatting
-> >  - Use strings in debugfs to control procs ('1|0' => 'start|stop')
-> >  - Align copyright statement with MODULE() macros
-> >  - Rename driver data structure ('st_rproc' => 'ddata')
-> >  - Addition of a full error path in .start()
-> >
-> > v1 => v2:
-> >  - Remove Linux implementation specific comment from binding document
-> >  - Force debugfs '0' to shutdown co-processor - rather than !1
-> >  - Supply more detailed commit message
-> >  - Propagate errors back from .stop()
-> >  - Review GPL wording
-> >  - Supply original author's SoBs
-> >
-> > Lee Jones (7):
-> >   remoteproc: debugfs: Check of invalid 'count' value
-> >   remoteproc: dt: Provide bindings for ST's Remote Processor Controller
-> >     driver
-> >   remoteproc: debugfs: Add ability to boot remote processor using
-> >     debugfs
-> >   remoteproc: Supply controller driver for ST's Remote Processors
-> >   MAINTAINERS: Add ST's Remote Processor Driver to ARM/STI ARCHITECTURE
-> >   ARM: STiH407: Add nodes for RemoteProc
-> >   ARM: STiH407: Move over to using the 'reserved-memory' API for
-> >     obtaining DMA memory
-> >
-> >  .../devicetree/bindings/remoteproc/st-rproc.txt    |  41 +++
-> >  MAINTAINERS                                        |   1 +
-> >  arch/arm/boot/dts/stih407-family.dtsi              |  70 +++++
-> >  drivers/remoteproc/Kconfig                         |   9 +
-> >  drivers/remoteproc/Makefile                        |   1 +
-> >  drivers/remoteproc/remoteproc_debugfs.c            |  38 ++-
-> >  drivers/remoteproc/st_remoteproc.c                 | 297 +++++++++++++++++++++
-> >  7 files changed, 455 insertions(+), 2 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/remoteproc/st-rproc.txt
-> >  create mode 100644 drivers/remoteproc/st_remoteproc.c
-> >
->
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+The only thing which initialises any of "rec" is that function call.
+The following lines are:
+
+        if (le16_to_cpu(rec.len) == 0) {
+                /* RID not available */
+                res = -ENODATA;
+        }
+
+        rlen = (le16_to_cpu(rec.len) - 1) * 2;
+
+So, why give the compiler a hard time as you're doing, why make the code
+harder to read.  What's wrong with:
+
+	spin_lock_bh(&local->baplock);
+
+	res = hfa384x_setup_bap(dev, BAP0, rid, 0);
+	if (res)
+		goto unlock;
+
+	res = hfa384x_from_bap(dev, BAP0, &rec, sizeof(rec));
+	if (res)
+		goto unlock;
+
+	if (le16_to_cpu(rec.len) == 0) {
+		/* RID not available */
+		res = -ENODATA;
+		goto unlock;
+	}
+
+	rlen = (le16_to_cpu(rec.len) - 1) * 2;
+	if (exact_len && rlen != len) {
+		printk(KERN_DEBUG "%s: hfa384x_get_rid - RID len mismatch: rid=0x%04x, len=%d (expected %d)\n",
+		       dev->name, rid, rlen, len);
+		res = -ENODATA;
+		goto unlock;
+	}
+
+	res = hfa384x_from_bap(dev, BAP0, buf, len);
+unlock:
+	spin_unlock_bh(&local->baplock);
+
+?
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
