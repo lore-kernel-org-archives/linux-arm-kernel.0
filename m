@@ -1,49 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Jan 2016 10:44:01 +0100
-Subject: [linux-review:James-Hogan/kbuild-Remove-stale-asm-generic-wrappers/20160119-183642]
- d979f99e9cc14e2667e9b6e268db695977e4197a BUILD DONE
-In-Reply-To: <20160127093018.GA21190@wfg-t540p.sh.intel.com>
-References: <569e1dbb.MgLv8OaZwklOxxtU%fengguang.wu@intel.com>
- <1947556.38OyJnvGS5@wuerfel> <20160127093018.GA21190@wfg-t540p.sh.intel.com>
-Message-ID: <3596300.IYfzmako0c@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Jan 2016 09:45:33 +0000
+Subject: [PATCH CFT] ARM: orion: implement ARM delay timer
+In-Reply-To: <8737tjbghx.fsf@free-electrons.com>
+References: <E1ZoD3b-0006UD-Rp@rmk-PC.arm.linux.org.uk>
+ <8737tjbghx.fsf@free-electrons.com>
+Message-ID: <20160127094533.GW10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 January 2016 17:30:18 Fengguang Wu wrote:
-
-> > Looks good, I'm just unsure about "multi_v8_defconfig", this does not
-> > exist. Do you mean multi_v5_defconfig?
-
-> Ah yes, multi_v8_defconfig does not exist actually.
-
-Ok, can you include multi_v5_defconfig than?
-
-I see you have one named "arm-arm5", which may be the same.
-
-> > I also wonder if you include 'randconfig' builds for some architectures.
-> > I have patches for all remaining errors and warnings that I see with
-> > ARM randconfig builds today. Not all of them are merged yet, but I could
-> > probably come up with a file to be used as input to KCONFIG_ALLCONFIG
-> > to eliminate the known-broken configurations, if you are interested.
+On Wed, Jan 27, 2016 at 08:58:50AM +0100, Gregory CLEMENT wrote:
+> Hi Russell,
+>  
+>  On lun., oct. 19 2015, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
 > 
-> If the are mostly ready for upstream, it may be easier to wait until
-> upstream randconfig works just fine for ARM.
+> > Implement an ARM delay timer to be used for udelay() on orion legacy
+> > platforms.  This allows us to skip the delay loop calibration at boot.
+> >
+> > It also means that udelay() will be unaffected by CPU frequency changes
+> > when cpufreq is enabled on these platforms.
+> >
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> Applied on mvebu/drivers with Acked-by tag from  Andrew Lunn
 
-I have around 130 patches for warnings that I'm submitting at the moment, but
-there are a couple of really tricky ones that I don't currently have
-a good plan for:
+And, I hope, my tested-by which delayed Andrew's ack until December,
+despite the patch being marked as CFT because I wanted _others_ to
+test it (which never happened.)
 
-- in some configurations, you end up without any boards selected, hitting
-  an #error in the final link
-- ARMv3 support in gcc is rather broken and causes internal compiler errors
-  among other things
-- the old ELF format (OABI) doesn't work in some cases
-- GCOV_PROFILE_ALL causes problems that need to be debugged
-- XIP_KERNEL sometimes causes kallsyms to fail
-- not all platforms implement the complete clk API, if they don't
-  use CONFIG_COMMON_CLK (I have patch for that we can probably merge)
-- CONFIG_PHYS_OFFSET needs to be entered manually to be a number
-  in 'make config'
-- same for DEBUG_LL
-
-	Arnd
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
