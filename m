@@ -1,72 +1,53 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 27 Jan 2016 13:56:29 +0100
-Subject: [PATCH v2 0/6] irqchip: irq-armada-370-xp: generic MSI infrastructure
- and assorted fixes
-Message-ID: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 27 Jan 2016 13:56:33 +0100
+Subject: [PATCH v2 4/6] irqchip: irq-armada-370-xp: use shorter names for
+ irq_chip
+In-Reply-To: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1453899395-3532-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+In order to make the output of /proc/interrupts, use shorter names for
+the irq_chip registered by the irq-armada-370-xp driver. Using capital
+letters also matches better what is done for the GIC driver, which
+uses just "GIC" as the irq_chip->name.
 
-This patch series converts the Armada 370/XP irqchip driver (also used
-on Armada 375, 38x and 39x) to the new MSI infrastructure put in place
-by Marc. It doesn't bring any functional difference other than using
-the right, modern, MSI mechanism, which might ultimately allows Marc to
-remove the old way of implementing MSI support.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/irqchip/irq-armada-370-xp.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-It has been tested on Armada 38x and Armada XP with an Intel e1000e
-NIC and an Intel IGB NIC, both of which use MSI interrupts.
-
-Note that this patch series depends on the patch series from Marc
-Zyngier for proper operation (however there is no build dependency) :
-
-  https://lkml.org/lkml/2016/1/26/405
-
-Changes since v1:
-
- - Rebased on top of v4.5-rc1, and the latest version of Marc Zyngier
-   irqchip core fixes, which are needed for this series to work.
-
- - Added Acked-by from Gregory Clement on patch "irqchip:
-   irq-armada-370-xp: add Kconfig option for the driver"
-
- - Add a new patch that changes hardcoded "16" values by the
-   appropriate PCI_MSI_DOORBELL_START definition. Noticed by Gregory
-   Clement.
-
- - Drop the ->irq_enable() and ->irq_disable() callbacks from struct
-   irq_chip armada_370_xp_msi_irq_chip, as they are not needed, since
-   we already provide the same callbacks for ->irq_mask() and
-   ->irq_unmask(). Noticed by Marc Zyngier.
-
- - Drop the MSI_FLAG_MULTI_PCI_MSI, since we don't (yet) support
-   allocating multiple MSIs as once. Noticed by Marc Zyngier.
-
- - Added a separate commit actually implementing the allocation of
-   multiple MSIs at once, and therefore adds the
-   MSI_FLAG_MULTI_PCI_MSI.
-
- - Reorder code in armada_370_xp_mpic_of_init() to make a BUG_ON()
-   really useful. Noticed by Marc Zyngier.
-
-Thanks!
-
-Thomas
-
-Thomas Petazzoni (6):
-  irqchip: irq-armada-370-xp: add Kconfig option for the driver
-  irqchip: irq-armada-370-xp: use the generic MSI infrastructure
-  irqchip: irq-armada-370-xp: use PCI_MSI_DOORBELL_START where
-    appropriate
-  irqchip: irq-armada-370-xp: use shorter names for irq_chip
-  irqchip: irq-armada-370-xp: allow allocation of multiple MSIs
-  ARM: mvebu: use the ARMADA_370_XP_IRQ option
-
- arch/arm/mach-mvebu/Kconfig         |   6 +-
- drivers/irqchip/Kconfig             |   6 ++
- drivers/irqchip/Makefile            |   2 +-
- drivers/irqchip/irq-armada-370-xp.c | 156 +++++++++++++++---------------------
- 4 files changed, 78 insertions(+), 92 deletions(-)
-
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index f53eb71..c99ae5f 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -117,7 +117,7 @@ static void armada_370_xp_irq_unmask(struct irq_data *d)
+ #ifdef CONFIG_PCI_MSI
+ 
+ static struct irq_chip armada_370_xp_msi_irq_chip = {
+-	.name = "armada_370_xp_msi_irq",
++	.name = "MPIC MSI",
+ 	.irq_mask = pci_msi_mask_irq,
+ 	.irq_unmask = pci_msi_unmask_irq,
+ };
+@@ -141,7 +141,7 @@ static int armada_370_xp_msi_set_affinity(struct irq_data *irq_data,
+ }
+ 
+ static struct irq_chip armada_370_xp_msi_bottom_irq_chip = {
+-	.name			= "armada_370_xp_msi_irq",
++	.name			= "MPIC MSI",
+ 	.irq_compose_msi_msg	= armada_370_xp_compose_msi_msg,
+ 	.irq_set_affinity	= armada_370_xp_msi_set_affinity,
+ };
+@@ -253,7 +253,7 @@ static int armada_xp_set_affinity(struct irq_data *d,
+ #endif
+ 
+ static struct irq_chip armada_370_xp_irq_chip = {
+-	.name		= "armada_370_xp_irq",
++	.name		= "MPIC",
+ 	.irq_mask       = armada_370_xp_irq_mask,
+ 	.irq_mask_ack   = armada_370_xp_irq_mask,
+ 	.irq_unmask     = armada_370_xp_irq_unmask,
 -- 
 2.6.4
