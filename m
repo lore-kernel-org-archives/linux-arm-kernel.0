@@ -1,47 +1,96 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 27 Jan 2016 16:08:20 +0100
-Subject: [PATCH 2/2] ARM: mvebu: add reference to ETH connectors for A385-AP
+Date: Wed, 27 Jan 2016 16:08:19 +0100
+Subject: [PATCH 1/2] ARM: mvebu: change order of ethernet DT nodes on Armada
+ 38x
 In-Reply-To: <1453907300-28283-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1453907300-28283-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1453907300-28283-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1453907300-28283-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds some comments to the Armada 385 AP Device Tree
-description to indicate which Ethernet interface matches which
-physical connector on the board.
+On Armada 38x, the available network interfaces are:
+
+ - port 0, at 0x70000
+ - port 1, at 0x30000
+ - port 2, at 0x34000
+
+Due to the rule saying that DT nodes should be ordered by register
+addresses, the network interfaces are probed in this order:
+
+ - port 1, at 0x30000, which gets named eth0
+ - port 2, at 0x34000, which gets named eth1
+ - port 0, at 0x70000, which gets named eth2
+
+(if all three ports are enabled at the board level)
+
+Unfortunately, the network subsystem doesn't provide any way to rename
+network interfaces from the kernel (it can only be done from
+userspace). So, the default naming of the network interfaces is very
+confusing as it doesn't match the datasheet, nor the naming of the
+interfaces in the bootloader, nor the naming of the interfaces on
+labels printed on the board.
+
+For example, on the Armada 388 GP, the board has two ports, labelled
+GE0 and GE1. One has to know that GE0 is eth1 and GE1 is eth0, which
+isn't really obvious.
+
+In order to solve this, this patch proposes to exceptionaly violate
+the rule of "order DT nodes by register address", and put the 0x70000
+node before the 0x30000 node, so that network interfaces get named in
+a more natural way.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-385-db-ap.dts | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/armada-38x.dtsi | 30 +++++++++++++++++++++---------
+ 1 file changed, 21 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
-index acd5b15..86fde0b 100644
---- a/arch/arm/boot/dts/armada-385-db-ap.dts
-+++ b/arch/arm/boot/dts/armada-385-db-ap.dts
-@@ -134,18 +134,21 @@
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index e8b7f67..b50784d 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -429,6 +429,27 @@
+ 				reg = <0x22000 0x1000>;
+ 			};
+ 
++			/*
++			 * As a special exception to the "order by
++			 * register address" rule, the eth0 node is
++			 * placed here to ensure that it gets
++			 * registered as the first interface, since
++			 * the network subsystem doesn't allow naming
++			 * interfaces using DT aliases. Without this,
++			 * the ordering of interfaces is different
++			 * from the one used in U-Boot and the
++			 * labeling of interfaces on the boards, which
++			 * is very confusing for users.
++			 */
++			eth0: ethernet at 70000 {
++				compatible = "marvell,armada-370-neta";
++				reg = <0x70000 0x4000>;
++				interrupts-extended = <&mpic 8>;
++				clocks = <&gateclk 4>;
++				tx-csum-limit = <9800>;
++				status = "disabled";
++			};
++
+ 			eth1: ethernet at 30000 {
+ 				compatible = "marvell,armada-370-neta";
+ 				reg = <0x30000 0x4000>;
+@@ -493,15 +514,6 @@
  				};
  			};
  
-+			/* CON3 */
- 			ethernet at 30000 {
- 				status = "okay";
- 				phy = <&phy2>;
- 				phy-mode = "sgmii";
- 			};
- 
-+			/* CON2 */
- 			ethernet at 34000 {
- 				status = "okay";
- 				phy = <&phy1>;
- 				phy-mode = "sgmii";
- 			};
- 
-+			/* CON4 */
- 			ethernet at 70000 {
- 				pinctrl-names = "default";
- 
+-			eth0: ethernet at 70000 {
+-				compatible = "marvell,armada-370-neta";
+-				reg = <0x70000 0x4000>;
+-				interrupts-extended = <&mpic 8>;
+-				clocks = <&gateclk 4>;
+-				tx-csum-limit = <9800>;
+-				status = "disabled";
+-			};
+-
+ 			mdio: mdio at 72004 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
 -- 
 2.6.4
