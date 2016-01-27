@@ -1,56 +1,65 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Wed, 27 Jan 2016 15:18:47 +0100
-Subject: [PATCH v3 12/12] acpi, numa: reuse
- acpi_numa_memory_affinity_init()
-In-Reply-To: <56A8606A.8080407@huawei.com>
-References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
- <1453541967-3744-13-git-send-email-guohanjun@huawei.com>
- <20160125102643.GF24726@rric.localdomain>
- <56A8606A.8080407@huawei.com>
-Message-ID: <20160127141847.GR24726@rric.localdomain>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Wed, 27 Jan 2016 14:22:23 +0000
+Subject: [RFC PATCH 6/6] iommu/arm-smmu: Update bindings document for
+ smmu-inst-as-data DT option
+In-Reply-To: <20160127122842.GA21064@leverpostej>
+References: <1453872079-27140-1-git-send-email-anup.patel@broadcom.com>
+ <1453872079-27140-7-git-send-email-anup.patel@broadcom.com>
+ <20160127122842.GA21064@leverpostej>
+Message-ID: <39063E8F96E11742B35A201CC5D095B7BAEAEE@SJEXCHMB10.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.01.16 14:15:06, Hanjun Guo wrote:
-> Hi Robert,
+
+
+> -----Original Message-----
+> From: Mark Rutland [mailto:mark.rutland at arm.com]
+> Sent: 27 January 2016 17:59
+> To: Anup Patel
+> Cc: Catalin Marinas; Joerg Roedel; Will Deacon; Robin Murphy; Sricharan R;
+> Linux IOMMU; Linux ARM Kernel; Rob Herring; Pawel Moll; Ian Campbell; Kumar
+> Gala; Device Tree; Ray Jui; Scott Branden; Vikram Prakash; Linux Kernel; bcm-
+> kernel-feedback-list
+> Subject: Re: [RFC PATCH 6/6] iommu/arm-smmu: Update bindings document for
+> smmu-inst-as-data DT option
 > 
-> On 2016/1/25 18:26, Robert Richter wrote:
-> > On 23.01.16 17:39:27, Hanjun Guo wrote:
-> >> From: Hanjun Guo <hanjun.guo@linaro.org>
-> >>
-> >> After the cleanup for acpi_numa_memory_affinity_init(),
-> >> it can be used for architetures both x86 and arm64, since
-> >> CONFIG_MEMORY_HOTPLUG is not enabled for arm64, so no
-> >> worry about that.
-> >>
-> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >> ---
-> >>  arch/arm64/kernel/acpi_numa.c | 42 -------------------------------
-> >>  arch/x86/mm/srat.c            | 54 ----------------------------------------
-> >>  drivers/acpi/numa.c           | 57 +++++++++++++++++++++++++++++++++++++++++++
-> >>  3 files changed, 57 insertions(+), 96 deletions(-)
-> > This one reverts acpi_numa_memory_affinity_init() to the x86 version.
-> > I rather would prefer the arm64 version for the generic code. We could
-> > keep the x86 implementation until x86 maintainers agree to remove them
-> > and use the generic one (implemented in a separate patch).
+> On Wed, Jan 27, 2016 at 10:51:19AM +0530, Anup Patel wrote:
+> > This patch adds info about 'smmu-inst-as-data' DT option in ARM
+> > SMMUv1/SMMUv2 driver bindings document.
 > >
-> > Doing so we can move acpi_numa_memory_affinity_init() from the
-> > beginning to generic code (used for arm64) and have this last patch to
-> > remove the x86 version.
+> > Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> > Reviewed-by: Ray Jui <rjui@broadcom.com>
+> > Reviewed-by: Vikram Prakash <vikramp@broadcom.com>
+> > Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> > ---
+> >  Documentation/devicetree/bindings/iommu/arm,smmu.txt | 8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> >
+> > diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> > b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> > index 7180745..4c4d03e 100644
+> > --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> > +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> > @@ -49,6 +49,14 @@ conditions.
+> >                    NOTE: this only applies to the SMMU itself, not
+> >                    masters connected upstream of the SMMU.
+> >
+> > +- smmu-inst-as-data : Treat privilege/unprivilege instruction fetch as
+> > +                  data read for SMMUv2. The SMMU driver by default provides
+> > +                  unprivilege read-write permission in page table entries.
+> > +                  For SMMUv2, privilege instruction fetch from MMU masters
+> > +                  will cause a context fault for unprivilege read-write
+> > +                  pages. To allow both privilege and unprivilege instruction
+> > +                  fetch, we have to forcefully treat it as data read.
 > 
-> I think the x86 version is the generic one, all the flags (ACPI_SRAT_MEM_HOT_PLUGGABLE and
-> etc) are defined in the ACPI spec, x86 just use all the flags because it support such features.
-> For ARM64, firmware should be careful and represent the true platform configuration to
-> OS, such as on ARM64, we can't set hotpluggable flag as the ARM64 arch don't support
-> memory hot-plug yet (also the firmware don't support it too), if firmware do things right,
-> it will be not worries for the kernel.
+> What is this needed for? Which masters do instruction fetches through the
+> SMMU, and when?
+> 
+> Surely this should only need to aplly to a subset of transactions?
 
-But you are removing all arm64 from your first patches. Why do you
-introduce acpi_numa_memory_affinity_init() in the beginning to remove
-it in the end again? I esp. like the arm64 version because of its
-direct returns. So I still would like to see generic code for arm64
-from the beginning. Maybe have a copy of x86 initially and make
-modifications for arm64 to it, or move missing code (hotplug, etc.)
-from x86 to generic and remove x86 arch code with the last patch.
+The boot_manager of PL330 does privileged instruction fetches which
+cause privilege-level context fault in SMMU because current SMMU
+driver provides unprivileged read-write permissions.
 
--Robert
+Regards,
+Anup
