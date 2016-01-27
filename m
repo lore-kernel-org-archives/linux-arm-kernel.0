@@ -1,58 +1,32 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Thu, 28 Jan 2016 00:10:05 +0900
-Subject: [PATCH] ARM: dts: orion5x: add mtd flash support to linkstation lswtgl
-Message-ID: <1453907405-30434-1-git-send-email-rogershimizu@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 27 Jan 2016 16:14:38 +0100
+Subject: [PATCH v4 11/13] mmc: sdhci-tegra: use sdhci_pltfm_init for
+ private allocation
+In-Reply-To: <1453803353-6266-12-git-send-email-jszhang@marvell.com>
+References: <1453803353-6266-1-git-send-email-jszhang@marvell.com>
+ <1453803353-6266-12-git-send-email-jszhang@marvell.com>
+Message-ID: <20160127151438.GA28536@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MTD flash stores u-boot and u-boot environment on linkstation lswtgl.
-The latter one can be easily read/write by u-boot-tools package in Debian.
+On Tue, Jan 26, 2016 at 06:15:51PM +0800, Jisheng Zhang wrote:
+> Commit 0e748234293f ("mmc: sdhci: Add size for caller in init+register")
+> allows users of sdhci_pltfm to allocate private space in calls to
+> sdhci_pltfm_init+sdhci_pltfm_register. This patch migrates sdhci-tegra
+> to this allocation.
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/mmc/host/sdhci-tegra.c | 21 +++++++--------------
+>  1 file changed, 7 insertions(+), 14 deletions(-)
 
-Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
----
- arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts | 30 ++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
-
-diff --git a/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts b/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
-index 420788229e6f..16eabc524b27 100644
---- a/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
-+++ b/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
-@@ -228,6 +228,36 @@
- 	};
- };
- 
-+&devbus_bootcs {
-+	status = "okay";
-+	devbus,keep-config;
-+
-+	flash at 0 {
-+		compatible = "jedec-flash";
-+		reg = <0 0x40000>;
-+		bank-width = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		partition at 0 {
-+			label = "header";
-+			reg = <0 0x30000>;
-+			read-only;
-+		};
-+
-+		partition at 30000 {
-+			label = "uboot";
-+			reg = <0x30000 0xF000>;
-+			read-only;
-+		};
-+
-+		partition at 3F000 {
-+			label = "uboot_env";
-+			reg = <0x3F000 0x1000>;
-+		};
-+	};
-+};
-+
- &mdio {
- 	status = "okay";
- 
--- 
-2.1.4
+Tested-by: Thierry Reding <treding@nvidia.com>
+Acked-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/e192d26f/attachment-0001.sig>
