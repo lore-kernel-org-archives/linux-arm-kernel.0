@@ -1,150 +1,219 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 27 Jan 2016 17:11:12 +0100
-Subject: [PATCH v4 13/13] clk: at91: remove useless includes
+Date: Wed, 27 Jan 2016 17:11:07 +0100
+Subject: [PATCH v4 08/13] ARM: at91: pm: move idle functions to pm.c
 In-Reply-To: <1453911072-23608-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1453911072-23608-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1453911072-23608-14-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1453911072-23608-9-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Over time, some includes were copy pasted from other clocks drivers but are
-not necessary.
+Avoid using code from clk/at91 for PM.
+This also has the bonus effect of setting arm_pm_idle for sama5 platforms.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/clk/at91/clk-generated.c    | 2 --
- drivers/clk/at91/clk-h32mx.c        | 8 --------
- drivers/clk/at91/clk-peripheral.c   | 2 --
- drivers/clk/at91/clk-plldiv.c       | 2 --
- drivers/clk/at91/clk-programmable.c | 4 ----
- drivers/clk/at91/clk-slow.c         | 8 --------
- drivers/clk/at91/clk-smd.c          | 2 --
- drivers/clk/at91/clk-usb.c          | 2 --
- 8 files changed, 30 deletions(-)
+ arch/arm/mach-at91/at91rm9200.c |  2 --
+ arch/arm/mach-at91/at91sam9.c   |  2 --
+ arch/arm/mach-at91/generic.h    |  6 ++----
+ arch/arm/mach-at91/pm.c         | 37 ++++++++++++++++++++++++++++++++-----
+ arch/arm/mach-at91/sama5.c      |  2 +-
+ drivers/clk/at91/pmc.c          | 15 ---------------
+ 6 files changed, 35 insertions(+), 29 deletions(-)
 
-diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
-index 5866684a6657..4ad3298eb372 100644
---- a/drivers/clk/at91/clk-generated.c
-+++ b/drivers/clk/at91/clk-generated.c
-@@ -15,8 +15,6 @@
- #include <linux/clkdev.h>
- #include <linux/clk/at91_pmc.h>
- #include <linux/of.h>
--#include <linux/of_address.h>
--#include <linux/io.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
+diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+index c1a7c6cc00e1..63b4fa25b48a 100644
+--- a/arch/arm/mach-at91/at91rm9200.c
++++ b/arch/arm/mach-at91/at91rm9200.c
+@@ -12,7 +12,6 @@
+ #include <linux/of_platform.h>
  
-diff --git a/drivers/clk/at91/clk-h32mx.c b/drivers/clk/at91/clk-h32mx.c
-index 3fd59b129f92..819f5842fa66 100644
---- a/drivers/clk/at91/clk-h32mx.c
-+++ b/drivers/clk/at91/clk-h32mx.c
-@@ -15,15 +15,7 @@
- #include <linux/clk-provider.h>
- #include <linux/clkdev.h>
- #include <linux/clk/at91_pmc.h>
--#include <linux/delay.h>
- #include <linux/of.h>
--#include <linux/of_address.h>
--#include <linux/of_irq.h>
--#include <linux/io.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
--#include <linux/sched.h>
--#include <linux/wait.h>
- #include <linux/regmap.h>
- #include <linux/mfd/syscon.h>
+ #include <asm/mach/arch.h>
+-#include <asm/system_misc.h>
  
-diff --git a/drivers/clk/at91/clk-peripheral.c b/drivers/clk/at91/clk-peripheral.c
-index 33c31d43dd8d..fd160728e990 100644
---- a/drivers/clk/at91/clk-peripheral.c
-+++ b/drivers/clk/at91/clk-peripheral.c
-@@ -12,8 +12,6 @@
- #include <linux/clkdev.h>
- #include <linux/clk/at91_pmc.h>
- #include <linux/of.h>
--#include <linux/of_address.h>
--#include <linux/io.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
+ #include "generic.h"
+ #include "soc.h"
+@@ -33,7 +32,6 @@ static void __init at91rm9200_dt_device_init(void)
  
-diff --git a/drivers/clk/at91/clk-plldiv.c b/drivers/clk/at91/clk-plldiv.c
-index f43e93738a99..2bed26481027 100644
---- a/drivers/clk/at91/clk-plldiv.c
-+++ b/drivers/clk/at91/clk-plldiv.c
-@@ -12,8 +12,6 @@
- #include <linux/clkdev.h>
- #include <linux/clk/at91_pmc.h>
- #include <linux/of.h>
--#include <linux/of_address.h>
--#include <linux/io.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, soc_dev);
  
-diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
-index 78814ba448c4..bc0be629671b 100644
---- a/drivers/clk/at91/clk-programmable.c
-+++ b/drivers/clk/at91/clk-programmable.c
-@@ -12,10 +12,6 @@
- #include <linux/clkdev.h>
- #include <linux/clk/at91_pmc.h>
- #include <linux/of.h>
--#include <linux/of_address.h>
--#include <linux/io.h>
--#include <linux/wait.h>
--#include <linux/sched.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
+-	arm_pm_idle = at91rm9200_idle;
+ 	at91rm9200_pm_init();
+ }
  
-diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
-index 1f76113db889..911e941f8318 100644
---- a/drivers/clk/at91/clk-slow.c
-+++ b/drivers/clk/at91/clk-slow.c
-@@ -12,19 +12,11 @@
+diff --git a/arch/arm/mach-at91/at91sam9.c b/arch/arm/mach-at91/at91sam9.c
+index 7eb64f763034..cada2a6412b3 100644
+--- a/arch/arm/mach-at91/at91sam9.c
++++ b/arch/arm/mach-at91/at91sam9.c
+@@ -62,8 +62,6 @@ static void __init at91sam9_common_init(void)
+ 		soc_dev = soc_device_to_device(soc);
  
- #include <linux/clk-provider.h>
- #include <linux/clkdev.h>
--#include <linux/slab.h>
- #include <linux/clk/at91_pmc.h>
- #include <linux/delay.h>
- #include <linux/of.h>
--#include <linux/of_address.h>
--#include <linux/of_irq.h>
--#include <linux/io.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
--#include <linux/sched.h>
--#include <linux/wait.h>
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, soc_dev);
+-
+-	arm_pm_idle = at91sam9_idle;
+ }
  
- #include "pmc.h"
- #include "sckc.h"
-diff --git a/drivers/clk/at91/clk-smd.c b/drivers/clk/at91/clk-smd.c
-index 0f6e8d67e630..e6948a52005a 100644
---- a/drivers/clk/at91/clk-smd.c
-+++ b/drivers/clk/at91/clk-smd.c
-@@ -12,8 +12,6 @@
- #include <linux/clkdev.h>
- #include <linux/clk/at91_pmc.h>
- #include <linux/of.h>
--#include <linux/of_address.h>
--#include <linux/io.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
+ static void __init at91sam9_dt_device_init(void)
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index b0fa7dc7286d..d224e195706a 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -18,20 +18,18 @@
+ extern void __init at91_map_io(void);
+ extern void __init at91_alt_map_io(void);
  
-diff --git a/drivers/clk/at91/clk-usb.c b/drivers/clk/at91/clk-usb.c
-index 617e24f6ef76..650ca45892c0 100644
---- a/drivers/clk/at91/clk-usb.c
-+++ b/drivers/clk/at91/clk-usb.c
-@@ -12,8 +12,6 @@
- #include <linux/clkdev.h>
- #include <linux/clk/at91_pmc.h>
- #include <linux/of.h>
--#include <linux/of_address.h>
--#include <linux/io.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
+-/* idle */
+-extern void at91rm9200_idle(void);
+-extern void at91sam9_idle(void);
+-
+ #ifdef CONFIG_PM
+ extern void __init at91rm9200_pm_init(void);
+ extern void __init at91sam9260_pm_init(void);
+ extern void __init at91sam9g45_pm_init(void);
+ extern void __init at91sam9x5_pm_init(void);
++extern void __init sama5_pm_init(void);
+ #else
+ static inline void __init at91rm9200_pm_init(void) { }
+ static inline void __init at91sam9260_pm_init(void) { }
+ static inline void __init at91sam9g45_pm_init(void) { }
+ static inline void __init at91sam9x5_pm_init(void) { }
++static inline void __init sama5_pm_init(void) { }
+ #endif
  
+ #endif /* _AT91_GENERIC_H */
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 0a87c98337a9..1c86cbcb57f6 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -31,6 +31,7 @@
+ #include <asm/mach/irq.h>
+ #include <asm/fncpy.h>
+ #include <asm/cacheflush.h>
++#include <asm/system_misc.h>
+ 
+ #include "generic.h"
+ #include "pm.h"
+@@ -354,6 +355,21 @@ static __init void at91_dt_ramc(void)
+ 	at91_pm_set_standby(standby);
+ }
+ 
++void at91rm9200_idle(void)
++{
++	/*
++	 * Disable the processor clock.  The processor will be automatically
++	 * re-enabled by an interrupt or by a reset.
++	 */
++	writel(AT91_PMC_PCK, pmc + AT91_PMC_SCDR);
++}
++
++void at91sam9_idle(void)
++{
++	writel(AT91_PMC_PCK, pmc + AT91_PMC_SCDR);
++	cpu_do_idle();
++}
++
+ static void __init at91_pm_sram_init(void)
+ {
+ 	struct gen_pool *sram_pool;
+@@ -411,7 +427,7 @@ static __initconst struct of_device_id atmel_pmc_ids[] = {
+ 	{ /* sentinel */ },
+ };
+ 
+-static void __init at91_pm_init(void)
++static void __init at91_pm_init(void (*pm_idle)(void))
+ {
+ 	struct device_node *pmc_np;
+ 
+@@ -425,6 +441,9 @@ static void __init at91_pm_init(void)
+ 		return;
+ 	}
+ 
++	if (pm_idle)
++		arm_pm_idle = pm_idle;
++
+ 	at91_pm_sram_init();
+ 
+ 	if (at91_suspend_sram_fn)
+@@ -445,7 +464,7 @@ void __init at91rm9200_pm_init(void)
+ 	at91_pm_data.uhp_udp_mask = AT91RM9200_PMC_UHP | AT91RM9200_PMC_UDP;
+ 	at91_pm_data.memctrl = AT91_MEMCTRL_MC;
+ 
+-	at91_pm_init();
++	at91_pm_init(at91rm9200_idle);
+ }
+ 
+ void __init at91sam9260_pm_init(void)
+@@ -453,7 +472,7 @@ void __init at91sam9260_pm_init(void)
+ 	at91_dt_ramc();
+ 	at91_pm_data.memctrl = AT91_MEMCTRL_SDRAMC;
+ 	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
+-	at91_pm_init();
++	at91_pm_init(at91sam9_idle);
+ }
+ 
+ void __init at91sam9g45_pm_init(void)
+@@ -461,7 +480,7 @@ void __init at91sam9g45_pm_init(void)
+ 	at91_dt_ramc();
+ 	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP;
+ 	at91_pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
+-	at91_pm_init();
++	at91_pm_init(at91sam9_idle);
+ }
+ 
+ void __init at91sam9x5_pm_init(void)
+@@ -469,5 +488,13 @@ void __init at91sam9x5_pm_init(void)
+ 	at91_dt_ramc();
+ 	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
+ 	at91_pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
+-	at91_pm_init();
++	at91_pm_init(at91sam9_idle);
++}
++
++void __init sama5_pm_init(void)
++{
++	at91_dt_ramc();
++	at91_pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
++	at91_pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
++	at91_pm_init(NULL);
+ }
+diff --git a/arch/arm/mach-at91/sama5.c b/arch/arm/mach-at91/sama5.c
+index d9cf6799aec0..df8fdf1cf66d 100644
+--- a/arch/arm/mach-at91/sama5.c
++++ b/arch/arm/mach-at91/sama5.c
+@@ -51,7 +51,7 @@ static void __init sama5_dt_device_init(void)
+ 		soc_dev = soc_device_to_device(soc);
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, soc_dev);
+-	at91sam9x5_pm_init();
++	sama5_pm_init();
+ }
+ 
+ static const char *const sama5_dt_board_compat[] __initconst = {
+diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+index 0b255e7fc718..361ea0c1d3c9 100644
+--- a/drivers/clk/at91/pmc.c
++++ b/drivers/clk/at91/pmc.c
+@@ -32,21 +32,6 @@ struct at91_pmc {
+ void __iomem *at91_pmc_base;
+ EXPORT_SYMBOL_GPL(at91_pmc_base);
+ 
+-void at91rm9200_idle(void)
+-{
+-	/*
+-	 * Disable the processor clock.  The processor will be automatically
+-	 * re-enabled by an interrupt or by a reset.
+-	 */
+-	at91_pmc_write(AT91_PMC_SCDR, AT91_PMC_PCK);
+-}
+-
+-void at91sam9_idle(void)
+-{
+-	at91_pmc_write(AT91_PMC_SCDR, AT91_PMC_PCK);
+-	cpu_do_idle();
+-}
+-
+ int of_at91_get_clk_range(struct device_node *np, const char *propname,
+ 			  struct clk_range *range)
+ {
 -- 
 2.5.0
