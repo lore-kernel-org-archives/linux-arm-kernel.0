@@ -1,24 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 27 Jan 2016 08:47:37 -0800
-Subject: [PATCH] ARM: dts: am4372: fix irq type for arm twd and global
- timer
-In-Reply-To: <1451310724-29454-1-git-send-email-grygorii.strashko@ti.com>
-References: <1451310724-29454-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <20160127164737.GK19432@atomide.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 27 Jan 2016 17:48:32 +0100
+Subject: [PATCH] spi: atmel: fix gpio chip-select in case of non-DT platform
+Message-ID: <1453913312-18108-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [151228 05:52]:
-> As per ARM documentation
-> PPI(0) ID27 - global timer interrupt is rising-edge sensitive.
-> PPI(2) ID29 - twd interrupt is rising-edge sensitive.
-> 
-> and the same is proved by GIC distributor register value
-> GIC_DIST_CONFIG(0xC04) = 0x7DC00000.
-> 
-> Hence, set IRQ triggering type to IRQ_TYPE_EDGE_RISING
-> for ARM TWD and Global timers.
+From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 
-Applying into omap-for-v4.5/fixes thanks.
+The non-DT platform that uses this driver (actually the AVR32) was taking a bad
+branch for determining if the IP would use gpio for CS.
+Adding the presence of DT as a condition fixes this issue.
 
-Tony
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+[nicolas.ferre at atmel.com: extract from ml discussion]
+Reported-by: Mans Rullgard <mans@mansr.com>
+Fixes: 4820303480a1 ("spi: atmel: add support for the internal chip-select of the spi controller")
+Cc: <stable@vger.kernel.org> # 4.2+
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/spi/spi-atmel.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index aebad36391c9..8feac599e9ab 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -1571,6 +1571,7 @@ static int atmel_spi_probe(struct platform_device *pdev)
+ 
+ 	as->use_cs_gpios = true;
+ 	if (atmel_spi_is_v2(as) &&
++	    pdev->dev.of_node &&
+ 	    !of_get_property(pdev->dev.of_node, "cs-gpios", NULL)) {
+ 		as->use_cs_gpios = false;
+ 		master->num_chipselect = 4;
+-- 
+2.1.3
