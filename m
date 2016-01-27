@@ -1,41 +1,49 @@
-From: jenskuske@gmail.com (Jens Kuske)
-Date: Wed, 27 Jan 2016 14:51:13 +0100
-Subject: [PATCH] drivers: soc: sunxi: Fix mask generation for SRAM mapping
-Message-ID: <1453902673-10734-1-git-send-email-jenskuske@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Jan 2016 14:52:02 +0100
+Subject: [PATCH 2/2] netfilter: ipvs/SIP: handle ip_vs_fill_iph_skb_off failure
+In-Reply-To: <1453902749-3422685-1-git-send-email-arnd@arndb.de>
+References: <1453902749-3422685-1-git-send-email-arnd@arndb.de>
+Message-ID: <1453902749-3422685-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GENMASK is inclusive on both ends, therefor one has to be
-subtracted from the width.
-Also fixes the mask for debug output.
+ip_vs_fill_iph_skb_off() may not find an IP header, and gcc has
+determined that ip_vs_sip_fill_param() then incorrectly accesses
+the protocol fields:
 
-Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+net/netfilter/ipvs/ip_vs_pe_sip.c: In function 'ip_vs_sip_fill_param':
+net/netfilter/ipvs/ip_vs_pe_sip.c:76:5: error: 'iph.protocol' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+  if (iph.protocol != IPPROTO_UDP)
+     ^
+net/netfilter/ipvs/ip_vs_pe_sip.c:81:10: error: 'iph.len' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+  dataoff = iph.len + sizeof(struct udphdr);
+          ^
+
+This adds a check for the ip_vs_fill_iph_skb_off() return code
+before looking at the ip header data returned from it.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: b0e010c527de ("ipvs: replace ip_vs_fill_ip4hdr with ip_vs_fill_iph_skb_off")
 ---
- drivers/soc/sunxi/sunxi_sram.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ net/netfilter/ipvs/ip_vs_pe_sip.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/soc/sunxi/sunxi_sram.c b/drivers/soc/sunxi/sunxi_sram.c
-index bc52670..99e354c 100644
---- a/drivers/soc/sunxi/sunxi_sram.c
-+++ b/drivers/soc/sunxi/sunxi_sram.c
-@@ -117,7 +117,7 @@ static int sunxi_sram_show(struct seq_file *s, void *data)
+diff --git a/net/netfilter/ipvs/ip_vs_pe_sip.c b/net/netfilter/ipvs/ip_vs_pe_sip.c
+index 1b8d594e493a..c4e9ca016a88 100644
+--- a/net/netfilter/ipvs/ip_vs_pe_sip.c
++++ b/net/netfilter/ipvs/ip_vs_pe_sip.c
+@@ -70,10 +70,10 @@ ip_vs_sip_fill_param(struct ip_vs_conn_param *p, struct sk_buff *skb)
+ 	const char *dptr;
+ 	int retc;
  
- 			val = readl(base + sram_data->reg);
- 			val >>= sram_data->offset;
--			val &= sram_data->width;
-+			val &= GENMASK(sram_data->width - 1, 0);
+-	ip_vs_fill_iph_skb(p->af, skb, false, &iph);
++	retc = ip_vs_fill_iph_skb(p->af, skb, false, &iph);
  
- 			for (func = sram_data->func; func->func; func++) {
- 				seq_printf(s, "\t\t%s%c\n", func->func,
-@@ -208,7 +208,8 @@ int sunxi_sram_claim(struct device *dev)
- 		return -EBUSY;
- 	}
- 
--	mask = GENMASK(sram_data->offset + sram_data->width, sram_data->offset);
-+	mask = GENMASK(sram_data->offset + sram_data->width - 1,
-+		       sram_data->offset);
- 	val = readl(base + sram_data->reg);
- 	val &= ~mask;
- 	writel(val | ((device << sram_data->offset) & mask),
+ 	/* Only useful with UDP */
+-	if (iph.protocol != IPPROTO_UDP)
++	if (!retc || iph.protocol != IPPROTO_UDP)
+ 		return -EINVAL;
+ 	/* todo: IPv6 fragments:
+ 	 *       I think this only should be done for the first fragment. /HS
 -- 
 2.7.0
