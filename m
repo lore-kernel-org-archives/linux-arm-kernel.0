@@ -1,123 +1,72 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Wed, 27 Jan 2016 15:19:57 +0530
-Subject: [PATCH v2 3/3] ahci_xgene: Implement the workaround to fix the
- missing of edge interrupt for HOST_IRQ_STAT.
-In-Reply-To: <1453888197-11368-1-git-send-email-stripathi@apm.com>
-References: <1453888197-11368-1-git-send-email-stripathi@apm.com>
-Message-ID: <1453888197-11368-4-git-send-email-stripathi@apm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 27 Jan 2016 10:50:19 +0100
+Subject: [PATCH v2] arm64: allow vmalloc regions to be set with set_memory_*
+Message-ID: <1453888219-17695-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to H/W errata, the HOST_IRQ_STAT register misses the edge interrupt
-when clearing the HOST_IRQ_STAT register and hardware reporting the
-PORT_IRQ_STAT register at the same clock cycle.
+The range of set_memory_* is currently restricted to the module address
+range because of difficulties in breaking down larger block sizes.
+vmalloc maps PAGE_SIZE pages so it is safe to use as well. Update the
+function ranges and add a comment explaining why the range is restricted
+the way it is.
 
-Signed-off-by: Suman Tripathi <stripathi@apm.com>
+Suggested-by: Laura Abbott <labbott@fedoraproject.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/ata/ahci_xgene.c |   84 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 84 insertions(+), 0 deletions(-)
+v2: reorder #includes, add Mark's ack
 
-diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
-index 892ec74..60076a3 100644
---- a/drivers/ata/ahci_xgene.c
-+++ b/drivers/ata/ahci_xgene.c
-@@ -548,6 +548,89 @@ softreset_retry:
- 	return rc;
- }
+ arch/arm64/mm/pageattr.c | 23 ++++++++++++++++----
+ 1 file changed, 19 insertions(+), 4 deletions(-)
 
-+/**
-+ * xgene_ahci_handle_broken_edge_irq - Handle the broken irq.
-+ * @ata_host: Host that recieved the irq
-+ * @irq_masked: HOST_IRQ_STAT value
-+ *
-+ * For hardware with broken edge trigger latch
-+ * the HOST_IRQ_STAT register misses the edge interrupt
-+ * when clearing of HOST_IRQ_STAT register and hardware
-+ * reporting the PORT_IRQ_STAT register at the
-+ * same clock cycle.
-+ * As such, the algorithm below outlines the workaround.
-+ *
-+ * 1. Read HOST_IRQ_STAT register and save the state.
-+ * 2. Clear the HOST_IRQ_STAT register.
-+ * 3. Read back the HOST_IRQ_STAT register.
-+ * 4. If HOST_IRQ_STAT register equals to zero, then
-+ *    traverse the rest of port's PORT_IRQ_STAT register
-+ *    to check if an interrupt is triggered at that point else
-+ *    go to step 6.
-+ * 5. If PORT_IRQ_STAT register of rest ports is not equal to zero
-+ *    then update the state of HOST_IRQ_STAT saved in step 1.
-+ * 6. Handle port interrupts.
-+ * 7. Exit
-+ */
-+static int xgene_ahci_handle_broken_edge_irq(struct ata_host *host,
-+					     u32 irq_masked)
-+{
-+	struct ahci_host_priv *hpriv = host->private_data;
-+	void __iomem *port_mmio;
-+	int i;
-+
-+	if (!readl(hpriv->mmio + HOST_IRQ_STAT)) {
-+		for (i = 0; i < host->n_ports; i++) {
-+			if (irq_masked & (1 << i))
-+				continue;
-+
-+			port_mmio = ahci_port_base(host->ports[i]);
-+			if (readl(port_mmio + PORT_IRQ_STAT))
-+				irq_masked |= (1 << i);
-+		}
-+	}
-+
-+	return ahci_handle_port_intr(host, irq_masked);
-+}
-+
-+static irqreturn_t xgene_ahci_irq_intr(int irq, void *dev_instance)
-+{
-+	struct ata_host *host = dev_instance;
-+	struct ahci_host_priv *hpriv;
-+	unsigned int rc = 0;
-+	void __iomem *mmio;
-+	u32 irq_stat, irq_masked;
-+
-+	VPRINTK("ENTER\n");
-+
-+	hpriv = host->private_data;
-+	mmio = hpriv->mmio;
-+
-+	/* sigh.  0xffffffff is a valid return from h/w */
-+	irq_stat = readl(mmio + HOST_IRQ_STAT);
-+	if (!irq_stat)
-+		return IRQ_NONE;
-+
-+	irq_masked = irq_stat & hpriv->port_map;
-+
-+	spin_lock(&host->lock);
-+
+diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+index cf6240741134..0795c3a36d8f 100644
+--- a/arch/arm64/mm/pageattr.c
++++ b/arch/arm64/mm/pageattr.c
+@@ -14,6 +14,7 @@
+ #include <linux/mm.h>
+ #include <linux/module.h>
+ #include <linux/sched.h>
++#include <linux/vmalloc.h>
+ 
+ #include <asm/pgtable.h>
+ #include <asm/tlbflush.h>
+@@ -44,6 +45,7 @@ static int change_memory_common(unsigned long addr, int numpages,
+ 	unsigned long end = start + size;
+ 	int ret;
+ 	struct page_change_data data;
++	struct vm_struct *area;
+ 
+ 	if (!PAGE_ALIGNED(addr)) {
+ 		start &= PAGE_MASK;
+@@ -51,10 +53,23 @@ static int change_memory_common(unsigned long addr, int numpages,
+ 		WARN_ON_ONCE(1);
+ 	}
+ 
+-	if (start < MODULES_VADDR || start >= MODULES_END)
+-		return -EINVAL;
+-
+-	if (end < MODULES_VADDR || end >= MODULES_END)
 +	/*
-+	 * HOST_IRQ_STAT behaves as edge triggered latch meaning that
-+	 * it should be cleared before all the port events are cleared.
++	 * Kernel VA mappings are always live, and splitting live section
++	 * mappings into page mappings may cause TLB conflicts. This means
++	 * we have to ensure that changing the permission bits of the range
++	 * we are operating on does not result in such splitting.
++	 *
++	 * Let's restrict ourselves to mappings created by vmalloc (or vmap).
++	 * Those are guaranteed to consist entirely of page mappings, and
++	 * splitting is never needed.
++	 *
++	 * So check whether the [addr, addr + size) interval is entirely
++	 * covered by precisely one VM area that has the VM_ALLOC flag set.
 +	 */
-+	writel(irq_stat, mmio + HOST_IRQ_STAT);
-+
-+	rc = xgene_ahci_handle_broken_edge_irq(host, irq_masked);
-+
-+	spin_unlock(&host->lock);
-+
-+	VPRINTK("EXIT\n");
-+
-+	return IRQ_RETVAL(rc);
-+
-+}
-+
- static struct ata_port_operations xgene_ahci_v1_ops = {
- 	.inherits = &ahci_ops,
- 	.host_stop = xgene_ahci_host_stop,
-@@ -780,6 +863,7 @@ skip_clk_phy:
- 		break;
- 	case XGENE_AHCI_V2:
- 		hpriv->flags |= AHCI_HFLAG_YES_FBS;
-+		hpriv->ahci_irq_intr = xgene_ahci_irq_intr;
- 		break;
- 	default:
- 		break;
---
-1.7.1
++	area = find_vm_area((void *)addr);
++	if (!area ||
++	    end > (unsigned long)area->addr + area->size ||
++	    !(area->flags & VM_ALLOC))
+ 		return -EINVAL;
+ 
+ 	if (!numpages)
+-- 
+2.5.0
