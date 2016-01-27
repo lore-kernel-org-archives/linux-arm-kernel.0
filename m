@@ -1,53 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 27 Jan 2016 09:23:24 -0800
-Subject: [PATCH v3 2/3] ARM: DRA7: add pdata-quirks to do reset of PCIe
-In-Reply-To: <569CAC97.3030703@ti.com>
-References: <1452780672-14339-1-git-send-email-kishon@ti.com>
- <1452780672-14339-3-git-send-email-kishon@ti.com>
- <56994640.3090704@ti.com> <20160115192224.GD3904@atomide.com>
- <56994B72.2@ti.com> <569CAC97.3030703@ti.com>
-Message-ID: <20160127172323.GP19432@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 27 Jan 2016 18:29:55 +0100
+Subject: [PATCH RFC 06/11] clk: sunxi: factors: Consolidate get_factors
+ parameters into a struct
+In-Reply-To: <1453727747-23307-7-git-send-email-wens@csie.org>
+References: <1453727747-23307-1-git-send-email-wens@csie.org>
+ <1453727747-23307-7-git-send-email-wens@csie.org>
+Message-ID: <20160127172955.GK4317@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sekhar Nori <nsekhar@ti.com> [160118 01:13]:
-> On Saturday 16 January 2016 01:11 AM, Suman Anna wrote:
-> > On 01/15/2016 01:22 PM, Tony Lindgren wrote:
-> >> I doubt this platform_data is dra7 specific. I believe it's
-> >> the same PCI controller that has been in the omap variants for
-> >> years?
-> > 
-> > AFAIK, this only applies to DRA7. Sekhar/Kishon can confirm. I did take
-> > a quick look at OMAP3/4/5 TRMs, and didn't find any. Neither did a grep
-> > on current hwmod files other than DRA7. There's a DM81xx related PCI
-> > clock domain, but don't see any corresponding driver/device for the same.
+On Mon, Jan 25, 2016 at 09:15:42PM +0800, Chen-Yu Tsai wrote:
+> The .get_factors callback of factors_clk has 6 parameters. To extend
+> factors_clk in any way that requires adding parameters to .get_factors
+> would make that list even longer, not to mention changing all the
+> function declarations.
 > 
-> Like Suman, I do not know of any TI SoC that came off the OMAP mobile
-> business that has PCIe.
+> Do this once now and consolidate all the parameters into a struct.
+> Also drop the space before function pointer arguments, since checkpatch
+> complains.
 > 
-> DM81xx has a PCIe (but no mainline driver). Both DM81xx and DRA7x use a
-> designware core. But, the glue layer (which is the subject of interest
-> here), is completely different. I looked at the DM81xx driver in TI
-> kernel[1] to confirm this.
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-OK thanks for checking.
+Applied, thanks!
+Maxime
 
-> I remember talking to Kishon about similarities between the DM81xx and
-> DRA7x PCIe subsystem and remember that he too mentioned that they are
-> quite different.
-
-OK
-
-> For an IP like PCIeSS, its quite difficult to come-up with unique names
-> without using the name of the platform they first appeared in. Anyway,
-> the driver is already called "pci-dra7xx", so I guess there is no harm
-> in having that name in platform data as well. That in itself should not
-> preclude its use on other platforms later (although I agree having a
-> generic name would be ideal).
-
-Yeah seems OK to me. I still have some PM runtime related questions
-though.. Will reply to the related patch chunk though.
-
-Regards,
-
-Tony
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/08905639/attachment.sig>
