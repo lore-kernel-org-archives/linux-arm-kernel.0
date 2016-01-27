@@ -1,68 +1,274 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Wed, 27 Jan 2016 00:44:44 +0000
-Subject: [RESEND PATCH v2] ARM: debug: add support for Palmchip BK-310x
- UART
-In-Reply-To: <7h60yfn9c6.fsf@baylibre.com> (Kevin Hilman's message of "Tue, 26
- Jan 2016 16:40:25 -0800")
-References: <569CA203.6050001@sigmadesigns.com> <7h60yfn9c6.fsf@baylibre.com>
-Message-ID: <yw1x1t93lukj.fsf@unicorn.mansr.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Tue, 26 Jan 2016 18:50:51 -0600
+Subject: [PATCH 1/1] [V2] irqchip: gicv3-its: Introduce indirect
+ device-ITT table support
+In-Reply-To: <56A758F4.4010001@arm.com>
+References: <1453762723-19477-1-git-send-email-shankerd@codeaurora.org>
+ <56A758F4.4010001@arm.com>
+Message-ID: <56A8146B.4070601@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@baylibre.com> writes:
 
-> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+Hi Marc,
+
+On 01/26/2016 05:31 AM, Marc Zyngier wrote:
+> Shanker,
 >
->> From: Mans Rullgard <mans@mansr.com>
+> On 25/01/16 22:58, Shanker Donthineni wrote:
+>> Current ITS driver implementation limits the device ID to a few
+>> number of bits depending on memory that has been allocated to a
+>> flat DEV-ITT table. Some of the devices are not usable when device
+>> ID is spread out across a large range of 32 bit values.
+> That's not really it. Indirect tables allow the system not to waste
+> memory on very sparse tables (you could implement flat 32bit device ID
+> tables by carving out memory out of the Linux managed memory).
+I agree, I will change the commit text to reflect your comments in V3 patch.
+>> This patch covers more DEVID bits by implementing the GIC-ITS indirect
+>> device table. This feature is enabled automatically during driver
+>> probe if the flat table is not adequate to hold all DEVID bits.
 >>
->> Some SoCs use a Palmchip BK-310x UART which is mostly 16550 compatible
->> but with a different register layout.
->
-> ... because UART register layout is where we really need innovation. ;)
->
->> While this UART has previously
->> only been supported in MIPS based chips (Alchemy, Ralink), the ARM based
->> SMP87xx series from Sigma Designs also uses it.
->>
->> This patch allows the debug console to work with this type of UART.
->>
->> Signed-off-by: Mans Rullgard <mans@mansr.com>
->> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->
-> It appears this was previously acked by Arnd also?
-> https://lkml.org/lkml/2015/11/9/116
->
+>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 >> ---
->> Peter, this is the patch I've been using on Tango for earlyprintk support.
->> arm-soc, this is just the Nov 8 patch with my Signed-off-by tag.
->> ---
->>  arch/arm/Kconfig.debug            |  9 +++++++++
->>  arch/arm/include/debug/palmchip.S | 11 +++++++++++
->>  2 files changed, 20 insertions(+)
->>  create mode 100644 arch/arm/include/debug/palmchip.S
+>> [v1]->[v2]:
+>>    -Removed the line "Change-Id: I9c6d005dexxx" from commit message.
+>>    -Fixed the its->max_devid field initialization.
 >>
->> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->> index 259c0ca9c99a..708aa9150c00 100644
->> --- a/arch/arm/Kconfig.debug
->> +++ b/arch/arm/Kconfig.debug
->> @@ -1304,6 +1304,7 @@ config DEBUG_SIRFSOC_UART
->>  config DEBUG_LL_INCLUDE
->>  	string
->>  	default "debug/sa1100.S" if DEBUG_SA1100
->> +	default "debug/palmchip.S" if DEBUG_UART_8250_PALMCHIP
->
-> minor nit: We're trying (not always with great success) to keep various
-> parts of this file sorted alphanumerically.  Can you please insert the
-> new entries accordingly?
+>>   drivers/irqchip/irq-gic-v3-its.c   | 79 +++++++++++++++++++++++++++++++++++---
+>>   include/linux/irqchip/arm-gic-v3.h |  1 +
+>>   2 files changed, 75 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index e23d1d1..408a358 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -41,6 +41,8 @@
+>>   
+>>   #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
+>>   #define ITS_FLAGS_WORKAROUND_CAVIUM_22375	(1ULL << 1)
+>> +#define ITS_FLAGS_DEVICE_NEEDS_FLUSHING		(1ULL << 2)
+>> +#define ITS_FLAGS_INDIRECT_DEVICE_TABLE		(1ULL << 3)
+>>   
+>>   #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
+>>   
+>> @@ -71,6 +73,10 @@ struct its_node {
+>>   	struct list_head	its_device_list;
+>>   	u64			flags;
+>>   	u32			ite_size;
+>> +	u32			dev_table_idx;
+>> +	u32			dev_table_shift;
+>> +	u32			max_devid;
+>> +	u32			order;
+> What are these new fields for?
+These four fields are used for handling level-2 device table memory 
+allocation.
 
-It has to precede the regular 8250 entry so as to take precedence over
-that.
+     dev_table_idx - which array index in itx->tables[] holds level-one 
+device table.
+                  order - page order of level-2 device table, reflects 
+size field (7..0) of GITS_BASER_DEVICE register.
+   dev_table_shift - contains the number of DEVID bits occupied by 
+level-2 device table.
+         max_devid  - highest device id that can be supported by ITS 
+driver (will refactor to reflect your other comments below) .
 
-> Otherwise looks good to me,
->
-> Acked-by: Kevin Hilman <khilman@baylibre.com>
->
-> Kevin
+>>   };
+>>   
+>>   #define ITS_ITT_ALIGN		SZ_256
+>> @@ -824,6 +830,8 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+>>   	u64 typer;
+>>   	u32 ids;
+>>   
+>> +#define ITS_DEVICE_MAX_ORDER	min(MAX_ORDER, get_order(SZ_8M))
+> Where is this 8MB value coming from?
+Chose 8MB because It is an optimal value, It covers complete 32bit DEVID 
+space, with assumption device
+  table entry size is 8bytes and ITS hardware support 64K page size.
 
--- 
-M?ns Rullg?rd
+
+Example1 with ITS page size 64K + device table entry size 8bytes:
+
+Level-1:  ((page_order(8MB) ? 1 ) * PAGE_SIZE) /level-one entry size  =  
+4M/8  = 19bits
+Level-2: 64K / 8 (device table entry size)  = 13bits. (64K came from 
+default ITS page size)
+
+   with 8-Bytes device entry size = handles 32bit DEVID
+with 16-Bytes device entry size = handles 31bit DEVID
+with 32-Bytes device entry size = handles 30bit DEVID
+
+Example2 with ITS page size 16K + device table entry size 8bytes:
+
+Level-1:  ((page_order(8MB) ? 1 ) * PAGE_SIZE) /level-one entry size  =  
+4M/8  = 19bits
+Level-2: 16K / 8 (device table entry size)  = 11bits. (for ITS hardware 
+that doesn't support 64K page size)
+
+   with 8-Bytes device entry size = handles 30bit DEVID
+with 16-Bytes device entry size = handles 29bit DEVID
+with 32-Bytes device entry size = handles 28bit DEVID
+
+>> +
+>>   	if (its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_22375) {
+>>   		/*
+>>   		 * erratum 22375: only alloc 8MB table size
+>> @@ -867,11 +875,12 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+>>   			 */
+>>   			order = max(get_order((1UL << ids) * entry_size),
+>>   				    order);
+>> -			if (order >= MAX_ORDER) {
+>> -				order = MAX_ORDER - 1;
+>> -				pr_warn("%s: Device Table too large, reduce its page order to %u\n",
+>> -					node_name, order);
+>> -			}
+>> +			if (order >= ITS_DEVICE_MAX_ORDER) {
+>> +				/* Update flags for two-level setup */
+>> +				its->flags |= ITS_FLAGS_INDIRECT_DEVICE_TABLE;
+>> +				order = ITS_DEVICE_MAX_ORDER - 1;
+>> +			} else
+>> +				its->max_devid =  (1 << ids) - 1;
+> We deal with the ID space in number of bits, not in number of devices we
+> can represent. Yes, there is a direct relationship between the two, but
+> I'd like to keep it consistent with the architecture specification.
+I agree, will stick to ID space and add macro for conversion if need 
+after refactoring code.
+>>   		}
+>>   
+>>   		alloc_size = (1 << order) * PAGE_SIZE;
+>> @@ -911,6 +920,26 @@ retry_baser:
+>>   			break;
+>>   		}
+>>   
+>> +		/* Enable two-level (indirect) device table if it is required */
+>> +		if ((type == GITS_BASER_TYPE_DEVICE) &&
+>> +		    (its->flags & ITS_FLAGS_INDIRECT_DEVICE_TABLE)) {
+>> +			u32 shift = ilog2(psz / entry_size);
+>> +			u32 max_ids = ilog2(alloc_size >> 3) + shift;
+> Please explain this calculation.
+         shift  = number of LSB DEVID bits that are covered by level-2 
+page table.
+                     i.e.  (Level-2 device table size ) / (device table 
+entry size)
+
+max_ids  = level-1 device table size + shift (level-2 device table size)
+                     i.e. (level-1 size) / level_1_entry_size (8) + shift
+>> +
+>> +			if (ids > max_ids) {
+>> +				pr_warn(
+>> +					"ITS: @%pa DEVID too large reduce %u->%u\n",
+>> +					&its->phys_base, ids, max_ids);
+>> +			}
+>> +			its->max_devid =  (1UL << max_ids) - 1;
+>> +			its->order = get_order(psz);
+>> +			its->dev_table_idx = i;
+>> +			its->dev_table_shift = shift;
+>> +			if (!(val & GITS_BASER_SHAREABILITY_MASK))
+>> +				its->flags |= ITS_FLAGS_DEVICE_NEEDS_FLUSHING;
+> You can only evaluate the shareability after having written something,
+> and read it back. Also, the name of the flag is a bit wrong: it is not
+> the device that needs flushing, bit the ITS Device table.
+  there is a ?goto retry_baser? statement at the end of ?for loop? that 
+triggers above code logic that is repeated
+  whenever the ITS hardware doesn?t stick shareability bit.
+>> +			val |= GITS_BASER_INDIRECT;
+> Erm... Do you realize that this is an optional feature? What happens if
+> the HW doesn't support it?
+I will refactor code to fix the issue in V3 patch.
+>> +		}
+>> +
+>>   		val |= alloc_pages - 1;
+>>   
+>>   		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
+>> @@ -1134,6 +1163,32 @@ static struct its_device *its_find_device(struct its_node *its, u32 dev_id)
+>>   	return its_dev;
+>>   }
+>>   
+>> +static int its_alloc_device_table(struct its_node *its, u32 dev_id)
+>> +{
+>> +	u64 *devtbl = its->tables[its->dev_table_idx];
+>> +	u32 alloc_size = (1 << its->order) * PAGE_SIZE;
+>> +	u32 idx = dev_id >> its->dev_table_shift;
+> All this should be explained. I don't want to have to refer to the spec
+> to understand how you're computing things. It also means that you need
+> to define some helpers.
+I will add helper functions/macros for handy conversion.
+>> +	struct page *page;
+>> +
+>> +	/* Do nothing if the level-2 DEV-ITT entry was mapped earlier */
+> There is no such thing as a DEV-ITT. There is a Device table (what you
+> are allocating here), and a per-device ITT, which is not dealt with here
+> at all.
+I will rename all references of DEV-ITT to device table.
+>> +	if (devtbl[idx])
+>> +		return 0;
+>> +
+>> +	/* Allocate memory for level-2 device table & map to level-1 table */
+>> +	page = alloc_pages(GFP_KERNEL | __GFP_ZERO, its->order);
+>> +	if (!page)
+>> +		return -ENOMEM;
+>> +
+>> +	devtbl[idx] = page_to_phys(page) | GITS_BASER_VALID;
+>> +
+>> +	if (its->flags & ITS_FLAGS_DEVICE_NEEDS_FLUSHING) {
+>> +		__flush_dcache_area(page_address(page), alloc_size);
+>> +		__flush_dcache_area(devtbl + idx, sizeof(*devtbl));
+>> +	}
+>> +
+>> +	return 0;
+> It really time we convert this driver to use dma_alloc_coherent. This is
+> getting out of control...
+dma_alloc_coherent() API operates on ?struct device?.  We don?t have 
+such device object available in current ITS driver to call DMA API.
+>> +}
+>> +
+>>   static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+>>   					    int nvecs)
+>>   {
+>> @@ -1147,6 +1202,20 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+>>   	int nr_ites;
+>>   	int sz;
+>>   
+>> +	if (dev_id > its->max_devid) {
+>> +		pr_err("ITS: dev_id too large %d\n", dev_id);
+>> +		return NULL;
+>> +	}
+> Under which circumstances can this actually happen?
+Current driver assumes the device memory has been allocated  to cover 
+all possible DEVIDs but is not always true.
+This is perfect as long as sparse DEVID is small and if we don?t see the 
+message ?Device Table too large, reduce its page order to?
+in its_alloc_tables() .
+
+As per GICv3-ITS spec, the MAPD command with DEV ID exceeding maximum 
+value supported is an error. The current driver logic
+doesn't protect against this error.
+
+>> +
+>> +	/* Ensure memory for level-2 table is allocated for dev_id */
+>> +	if (its->flags & ITS_FLAGS_INDIRECT_DEVICE_TABLE) {
+>> +		int ret;
+>> +
+>> +		ret = its_alloc_device_table(its, dev_id);
+>> +		if (ret)
+>> +			return NULL;
+>> +	}
+>> +
+>>   	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+>>   	/*
+>>   	 * At least one bit of EventID is being used, hence a minimum
+>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>> index d5d798b..04dfe09 100644
+>> --- a/include/linux/irqchip/arm-gic-v3.h
+>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>> @@ -206,6 +206,7 @@
+>>   #define GITS_BASER_NR_REGS		8
+>>   
+>>   #define GITS_BASER_VALID		(1UL << 63)
+>> +#define GITS_BASER_INDIRECT		(1UL << 62)
+>>   #define GITS_BASER_nCnB			(0UL << 59)
+>>   #define GITS_BASER_nC			(1UL << 59)
+>>   #define GITS_BASER_RaWt			(2UL << 59)
+>>
+> Thanks,
+>
+> 	M.
