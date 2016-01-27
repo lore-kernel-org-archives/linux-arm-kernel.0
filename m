@@ -1,63 +1,113 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Jan 2016 15:04:55 +0100
-Subject: [PATCH 5/9] net: fddi/defxx: avoid warning about uninitialized
- variable use
+Date: Wed, 27 Jan 2016 15:04:56 +0100
+Subject: [PATCH 6/9] net: vxge: avoid unused function warnings
 In-Reply-To: <1453903507-3427225-1-git-send-email-arnd@arndb.de>
 References: <1453903507-3427225-1-git-send-email-arnd@arndb.de>
-Message-ID: <1453903507-3427225-6-git-send-email-arnd@arndb.de>
+Message-ID: <1453903507-3427225-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The defxx driver can be configured for different kinds of buses,
-and appears to be handling this correctly, but the compiler cannot
-see how it always initializes the bar_start and bar_length
-fields it uses depending on the configured bus, so we get a warning
-with recent gcc versions:
+When CONFIG_PCI_MSI is disabled, we get warnings about unused functions
+in the vxge driver:
 
-fddi/defxx.c: In function 'dfx_pci_unregister':
-fddi/defxx.c:3726:3: warning: 'bar_len' may be used uninitialized in this function [-Wmaybe-uninitialized]
-   release_mem_region(bar_start[0], bar_len[0]);
-fddi/defxx.c:3701:18: note: 'bar_len' was declared here
-  resource_size_t bar_len[3];  /* resource lengths */
-fddi/defxx.c:3726:3: warning: 'bar_start' may be used uninitialized in this function [-Wmaybe-uninitialized]
-   release_mem_region(bar_start[0], bar_len[0]);
-fddi/defxx.c:3700:18: note: 'bar_start' was declared here
-  resource_size_t bar_start[3];  /* pointers to ports */
-                  ^
-fddi/defxx.c: In function 'dfx_pci_register':
-fddi/defxx.c:617:18: warning: 'bar_len' may be used uninitialized in this function [-Wmaybe-uninitialized]
-   bp->base.mem = ioremap_nocache(bar_start[0], bar_len[0]);
-fddi/defxx.c:537:18: note: 'bar_len' was declared here
-  resource_size_t bar_len[3];  /* resource length */
-fddi/defxx.c:1125:2: warning: 'bar_start' may be used uninitialized in this function [-Wmaybe-uninitialized]
-  pr_info("%s: %s at %s addr = 0x%llx, IRQ = %d, Hardware addr = %pMF\n",
-fddi/defxx.c:536:18: note: 'bar_start' was declared here
-  resource_size_t bar_start[3];  /* pointers to ports */
+drivers/net/ethernet/neterion/vxge/vxge-main.c:2121:13: warning: 'adaptive_coalesce_tx_interrupts' defined but not used [-Wunused-function]
+drivers/net/ethernet/neterion/vxge/vxge-main.c:2149:13: warning: 'adaptive_coalesce_rx_interrupts' defined but not used [-Wunused-function]
 
-This adds code to ensure that the BAR values are initialized
-even in the impossible case when a device gets probed that
-does not belong to any bus. This shuts up the warning.
+We could add another #ifdef here, but it's nicer to avoid those warnings
+for good by converting the existing #ifdef to if(IS_ENABLED()), which has
+the same effect but provides better compile-time coverage in general,
+and lets the compiler understand better when the function is intentionally
+unused.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/net/fddi/defxx.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/net/ethernet/neterion/vxge/vxge-main.c | 31 ++++++++++----------------
+ 1 file changed, 12 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/net/fddi/defxx.c b/drivers/net/fddi/defxx.c
-index 7f975a2c8990..e7cdd1226d39 100644
---- a/drivers/net/fddi/defxx.c
-+++ b/drivers/net/fddi/defxx.c
-@@ -484,6 +484,11 @@ static void dfx_get_bars(struct device *bdev,
- 		bar_start[2] = bar_start[1] = 0;
- 		bar_len[2] = bar_len[1] = 0;
- 	}
-+	if (!(dfx_bus_pci || dfx_bus_eisa || dfx_bus_tc)) {
-+		dev_err(bdev, "invalid bus configuration\n");
-+		bar_start[2] = bar_start[1] = bar_start[0] = 0;
-+		bar_len[2] = bar_len[1] = bar_len[0] = 0;
-+	}
+diff --git a/drivers/net/ethernet/neterion/vxge/vxge-main.c b/drivers/net/ethernet/neterion/vxge/vxge-main.c
+index 50d5604833ed..e0993eba5df3 100644
+--- a/drivers/net/ethernet/neterion/vxge/vxge-main.c
++++ b/drivers/net/ethernet/neterion/vxge/vxge-main.c
+@@ -2223,8 +2223,6 @@ static irqreturn_t vxge_isr_napi(int irq, void *dev_id)
+ 	return IRQ_NONE;
  }
  
- static const struct net_device_ops dfx_netdev_ops = {
+-#ifdef CONFIG_PCI_MSI
+-
+ static irqreturn_t vxge_tx_msix_handle(int irq, void *dev_id)
+ {
+ 	struct vxge_fifo *fifo = (struct vxge_fifo *)dev_id;
+@@ -2442,16 +2440,13 @@ static void vxge_rem_msix_isr(struct vxgedev *vdev)
+ 	if (vdev->config.intr_type == MSI_X)
+ 		pci_disable_msix(vdev->pdev);
+ }
+-#endif
+ 
+ static void vxge_rem_isr(struct vxgedev *vdev)
+ {
+-#ifdef CONFIG_PCI_MSI
+-	if (vdev->config.intr_type == MSI_X) {
++	if (IS_ENABLED(CONFIG_PCI_MSI) &&
++	    vdev->config.intr_type == MSI_X) {
+ 		vxge_rem_msix_isr(vdev);
+-	} else
+-#endif
+-	if (vdev->config.intr_type == INTA) {
++	} else if (vdev->config.intr_type == INTA) {
+ 			synchronize_irq(vdev->pdev->irq);
+ 			free_irq(vdev->pdev->irq, vdev);
+ 	}
+@@ -2460,11 +2455,10 @@ static void vxge_rem_isr(struct vxgedev *vdev)
+ static int vxge_add_isr(struct vxgedev *vdev)
+ {
+ 	int ret = 0;
+-#ifdef CONFIG_PCI_MSI
+ 	int vp_idx = 0, intr_idx = 0, intr_cnt = 0, msix_idx = 0, irq_req = 0;
+ 	int pci_fun = PCI_FUNC(vdev->pdev->devfn);
+ 
+-	if (vdev->config.intr_type == MSI_X)
++	if (IS_ENABLED(CONFIG_PCI_MSI) && vdev->config.intr_type == MSI_X)
+ 		ret = vxge_enable_msix(vdev);
+ 
+ 	if (ret) {
+@@ -2475,7 +2469,7 @@ static int vxge_add_isr(struct vxgedev *vdev)
+ 		vdev->config.intr_type = INTA;
+ 	}
+ 
+-	if (vdev->config.intr_type == MSI_X) {
++	if (IS_ENABLED(CONFIG_PCI_MSI) && vdev->config.intr_type == MSI_X) {
+ 		for (intr_idx = 0;
+ 		     intr_idx < (vdev->no_of_vpath *
+ 			VXGE_HW_VPATH_MSIX_ACTIVE); intr_idx++) {
+@@ -2576,9 +2570,8 @@ static int vxge_add_isr(struct vxgedev *vdev)
+ 		vdev->vxge_entries[intr_cnt].in_use = 1;
+ 		vdev->vxge_entries[intr_cnt].arg = &vdev->vpaths[0];
+ 	}
+-INTA_MODE:
+-#endif
+ 
++INTA_MODE:
+ 	if (vdev->config.intr_type == INTA) {
+ 		snprintf(vdev->desc[0], VXGE_INTR_STRLEN,
+ 			"%s:vxge:INTA", vdev->ndev->name);
+@@ -3889,12 +3882,12 @@ static void vxge_device_config_init(struct vxge_hw_device_config *device_config,
+ 	if (max_mac_vpath > VXGE_MAX_MAC_ADDR_COUNT)
+ 		max_mac_vpath = VXGE_MAX_MAC_ADDR_COUNT;
+ 
+-#ifndef CONFIG_PCI_MSI
+-	vxge_debug_init(VXGE_ERR,
+-		"%s: This Kernel does not support "
+-		"MSI-X. Defaulting to INTA", VXGE_DRIVER_NAME);
+-	*intr_type = INTA;
+-#endif
++	if (!IS_ENABLED(CONFIG_PCI_MSI)) {
++		vxge_debug_init(VXGE_ERR,
++			"%s: This Kernel does not support "
++			"MSI-X. Defaulting to INTA", VXGE_DRIVER_NAME);
++		*intr_type = INTA;
++	}
+ 
+ 	/* Configure whether MSI-X or IRQL. */
+ 	switch (*intr_type) {
 -- 
 2.7.0
