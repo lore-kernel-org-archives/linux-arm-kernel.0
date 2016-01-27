@@ -1,68 +1,39 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 27 Jan 2016 13:06:44 +0800
-Subject: [RESEND PATCH] ARM: dts: rockchip: add the leds control for kylin
- board
-Message-ID: <1453871204-7312-1-git-send-email-wxt@rock-chips.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Wed, 27 Jan 2016 10:51:13 +0530
+Subject: [RFC PATCH 0/6] iommu/arm-smmu: Add support for DMA domains and
+ instruction fetch
+Message-ID: <1453872079-27140-1-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the kylin schematic drawing, add the needed work led for
-kylin board.
+This patchset adds following to SMMUv1/SMMUv2 driver:
+1. Support for domain type IOMMU_DOMAIN_DMA
+2. Allow privilege instruction fetchs from MMU masters by having
+a DT option to treat instruction fetch as data read
 
-Run:
-echo 0 > /sys/class/leds/kylin:red:led/brightness
-echo 1 > /sys/class/leds/kylin:red:led/brightness
+The patchset is based on '4.5-rc1' tag of linux mainline tree
+and is available in smmu_v1 branch of
+https://github.com/Broadcom/arm64-linux.git
 
-The led can be normall on/off on kylin board.
+All patches have been tested on Broadcom SoCs having SMMU-500.
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Anup Patel (5):
+  iommu/arm-smmu: Invoke DT probe from arm_smmu_of_setup()
+  of: iommu: Increment DT node refcount in of_iommu_set_ops()
+  iommu/arm-smmu: Add support for IOMMU_DOMAIN_DMA in SMMUv1/SMMUv2
+    driver
+  iommu/arm-smmu: Option to treat instruction fetch as data read for
+    SMMUv2
+  iommu/arm-smmu: Update bindings document for smmu-inst-as-data DT
+    option
 
----
+Sricharan R (1):
+  iommu/arm-smmu: Init driver using IOMMU_OF_DECLARE
 
-Hi Heiko,
+ .../devicetree/bindings/iommu/arm,smmu.txt         |  8 +++
+ drivers/iommu/arm-smmu.c                           | 70 +++++++++++++++++-----
+ drivers/iommu/of_iommu.c                           |  1 +
+ 3 files changed, 65 insertions(+), 14 deletions(-)
 
-Describing the content:
-- This patch is based on your for-next branch.
-- Verified on
-  https://github.com/Caesar-github/rockchip/commits/kylin/next.
-
- arch/arm/boot/dts/rk3036-kylin.dts | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3036-kylin.dts b/arch/arm/boot/dts/rk3036-kylin.dts
-index 190f22c..3332a7f 100644
---- a/arch/arm/boot/dts/rk3036-kylin.dts
-+++ b/arch/arm/boot/dts/rk3036-kylin.dts
-@@ -46,6 +46,17 @@
- 	model = "Rockchip RK3036 KylinBoard";
- 	compatible = "rockchip,rk3036-kylin", "rockchip,rk3036";
- 
-+	leds: gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		work {
-+			gpios = <&gpio2 30 GPIO_ACTIVE_HIGH>;
-+			label = "kylin:red:led";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&led_ctl>;
-+		};
-+	};
-+
- 	sdio_pwrseq: sdio-pwrseq {
- 		compatible = "mmc-pwrseq-simple";
- 		pinctrl-names = "default";
-@@ -359,6 +370,12 @@
- };
- 
- &pinctrl {
-+	leds {
-+		led_ctl: led-ctl {
-+			rockchip,pins = <2 30 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
- 	pmic {
- 		pmic_int: pmic-int {
- 			rockchip,pins = <2 2 RK_FUNC_GPIO &pcfg_pull_default>;
 -- 
 1.9.1
