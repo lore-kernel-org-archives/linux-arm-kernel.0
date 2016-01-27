@@ -1,86 +1,40 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 27 Jan 2016 16:24:47 +0100
-Subject: [PATCH v2 2/2] ARM: mvebu: add NAND description to Armada 370 DB and
- Armada XP DB
+Date: Wed, 27 Jan 2016 16:24:46 +0100
+Subject: [PATCH v2 1/2] ARM: mvebu: use armada-370-sata for SATA on Armada 375
 In-Reply-To: <1453908287-29557-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1453908287-29557-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1453908287-29557-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1453908287-29557-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the Device Tree description for the 1GB NAND flash
-present in the Armada 370 DB and Armada XP DB evaluation boards from
-Marvell.
+From: Lior Amsalem <alior@marvell.com>
 
+The Armada 375 has the same SATA IP as Armada 370 and Armada XP, which
+requires the PHY speed to be set in the LP_PHY_CTL register for SATA
+hotplug to work.
+
+Therefore, this commit updates the compatible string used to describe
+the SATA IP in Armada 375 from marvell,orion-sata to
+marvell,armada-370-sata.
+
+Signed-off-by: Lior Amsalem <alior@marvell.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-db.dts | 21 +++++++++++++++++++++
- arch/arm/boot/dts/armada-xp-db.dts  | 21 +++++++++++++++++++++
- 2 files changed, 42 insertions(+)
+ arch/arm/boot/dts/armada-375.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index bb280de..e7763b6 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -168,6 +168,27 @@
- 					spi-max-frequency = <50000000>;
- 				};
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index 7ccce75..cc952cf 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -529,7 +529,7 @@
  			};
-+
-+			nand at d0000 {
-+				status = "okay";
-+				num-cs = <1>;
-+				marvell,nand-keep-config;
-+				marvell,nand-enable-arbiter;
-+				nand-on-flash-bbt;
-+
-+				partition at 0 {
-+					label = "U-Boot";
-+					reg = <0 0x800000>;
-+				};
-+				partition at 800000 {
-+					label = "Linux";
-+					reg = <0x800000 0x800000>;
-+				};
-+				partition at 1000000 {
-+					label = "Filesystem";
-+					reg = <0x1000000 0x3f000000>;
-+				};
-+			};
- 		};
  
- 		pcie-controller {
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index f774101..9fc5f08 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -229,6 +229,27 @@
- 					spi-max-frequency = <20000000>;
- 				};
- 			};
-+
-+			nand at d0000 {
-+				status = "okay";
-+				num-cs = <1>;
-+				marvell,nand-keep-config;
-+				marvell,nand-enable-arbiter;
-+				nand-on-flash-bbt;
-+
-+				partition at 0 {
-+					label = "U-Boot";
-+					reg = <0 0x800000>;
-+				};
-+				partition at 800000 {
-+					label = "Linux";
-+					reg = <0x800000 0x800000>;
-+				};
-+				partition at 1000000 {
-+					label = "Filesystem";
-+					reg = <0x1000000 0x3f000000>;
-+				};
-+			};
- 		};
- 	};
- };
+ 			sata at a0000 {
+-				compatible = "marvell,orion-sata";
++				compatible = "marvell,armada-370-sata";
+ 				reg = <0xa0000 0x5000>;
+ 				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&gateclk 14>, <&gateclk 20>;
 -- 
 2.6.4
