@@ -1,49 +1,48 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 27 Jan 2016 15:15:52 +0100
-Subject: [PATCH] mmc: host: arasan: sdhci-of-arasan: Remove no-hispd and
- no-cmd23 quirks for sdhci-arasan4.9a
-In-Reply-To: <1450877391-3029-1-git-send-email-rsahu@apm.com>
-References: <1450877391-3029-1-git-send-email-rsahu@apm.com>
-Message-ID: <CAPDyKFoHrzJVPDR+tz8vrF50yvyxgnFes7tRDe1S6+TV8yVj3Q@mail.gmail.com>
+Date: Wed, 27 Jan 2016 15:15:47 +0100
+Subject: [PATCH] mmc: host: omap_hsmmc: add a verbose print to enable
+ CONFIG_REGULATOR_PBIAS
+In-Reply-To: <1452762920-2588-1-git-send-email-kishon@ti.com>
+References: <1452762920-2588-1-git-send-email-kishon@ti.com>
+Message-ID: <CAPDyKFohvK3B0jF+SU-MLpiJ-DwJqW1pRtayK3nyKwVQkR1nUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 December 2015 at 14:29, Rameshswar Prasad Sahu <rsahu@apm.com> wrote:
-> From: Rameshwar Prasad Sahu <rsahu@apm.com>
+On 14 January 2016 at 10:15, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Since v4.3+, CONFIG_REGULATOR_PBIAS should be enabled (for platforms that
+> have PBIAS regulator) in order for MMC1 to work.
 >
-> The Arason SD host controller supports set block count command (cmd23)
-> and high speed mode. This patch re-enable both of these features that
-> was disabled. For device that doesn't support high speed, it should
-> configure its capability register accordingly instead disables it
-> explicitly.
+> Add a more verbose print to help enable CONFIG_REGULATOR_PBIAS for users
+> using a olddefconfig or a custom .config.
 >
-> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-Thanks, applied for next!
+Thanks,applied for next!
 
 Kind regards
 Uffe
 
 > ---
->  drivers/mmc/host/sdhci-of-arasan.c |    5 -----
->  1 files changed, 0 insertions(+), 5 deletions(-)
+>  drivers/mmc/host/omap_hsmmc.c |    5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 >
-> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> index 75379cb..5d9fdb3 100644
-> --- a/drivers/mmc/host/sdhci-of-arasan.c
-> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> @@ -172,11 +172,6 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->                 goto clk_disable_all;
->         }
->
-> -       if (of_device_is_compatible(pdev->dev.of_node, "arasan,sdhci-4.9a")) {
-> -               host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
-> -               host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
-> -       }
-> -
->         sdhci_get_of_property(pdev);
->         pltfm_host = sdhci_priv(host);
->         pltfm_host->priv = sdhci_arasan;
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index 7fb0753..7086bd6 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -503,8 +503,11 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+>         host->pbias = devm_regulator_get_optional(host->dev, "pbias");
+>         if (IS_ERR(host->pbias)) {
+>                 ret = PTR_ERR(host->pbias);
+> -               if ((ret != -ENODEV) && host->dev->of_node)
+> +               if ((ret != -ENODEV) && host->dev->of_node) {
+> +                       dev_err(host->dev,
+> +                       "SD card detect fail? enable CONFIG_REGULATOR_PBIAS\n");
+>                         return ret;
+> +               }
+>                 dev_dbg(host->dev, "unable to get pbias regulator %ld\n",
+>                         PTR_ERR(host->pbias));
+>                 host->pbias = NULL;
 > --
-> 1.7.1
+> 1.7.9.5
 >
