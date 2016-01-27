@@ -1,37 +1,56 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 27 Jan 2016 22:48:17 +0800
-Subject: [PATCH] clk: Move vendor's Kconfig into CCF menu section
-In-Reply-To: <1453879563-39500-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <201601272222.hUOd7aUE%fengguang.wu@intel.com>
+From: dhowells@redhat.com (David Howells)
+Date: Wed, 27 Jan 2016 14:57:07 +0000
+Subject: [PATCH] documentation: Add disclaimer
+In-Reply-To: <20160127083546.GJ6357@twins.programming.kicks-ass.net>
+References: <20160127083546.GJ6357@twins.programming.kicks-ass.net>
+ <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
+ <56980145.5030901@imgtec.com> <20160114204827.GE3818@linux.vnet.ibm.com>
+ <56981212.7050301@imgtec.com> <20160114222046.GH3818@linux.vnet.ibm.com>
+ <20160126102402.GE6357@twins.programming.kicks-ass.net>
+ <20160126103200.GI6375@twins.programming.kicks-ass.net>
+ <20160126110053.GA21553@arm.com> <20160126201143.GV4503@linux.vnet.ibm.com>
+Message-ID: <15882.1453906627@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Peter Zijlstra <peterz@infradead.org> wrote:
 
-[auto build test WARNING on clk/clk-next]
-[also build test WARNING on v4.5-rc1 next-20160127]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+> +==========
+> +DISCLAIMER
+> +==========
+> +
+> +This document is not a specification; it is intentionally (for the sake of
+> +brevity) and unintentionally (due to being human) incomplete. This document is
+> +meant as a guide to using the various memory barriers provided by Linux, but
+> +in case of any doubt (and there are many) please ask.
+> +
+> +I repeat, this document is not a specification of what Linux expects from
+> +hardware.
 
-url:    https://github.com/0day-ci/linux/commits/James-Liao/clk-Move-vendor-s-Kconfig-into-CCF-menu-section/20160127-152850
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: arm64-allmodconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+The purpose of this document is twofold:
 
-All warnings (new ones prefixed by >>):
+ (1) to specify the minimum functionality that one can rely on for any
+     particular barrier, and
 
-warning: (ARCH_EXYNOS7) selects COMMON_CLK_SAMSUNG which has unmet direct dependencies (COMMON_CLK)
+ (2) to provide a guide as to how to use the barriers that are available.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 46703 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/6190b6e1/attachment-0001.obj>
+Note that an architecture can provide more than the minimum requirement for
+any particular barrier, but if the barrier provides less than that, it is
+incorrect.
+
+Note also that it is possible that a barrier may be a no-op for an
+architecture because the way that arch works renders an explicit barrier
+unnecessary in that case.
+
+> +
+
+Can you bung an extra blank line in here if you have to redo this at all?
+
+> +========
+> +CONTENTS
+> +========
+>  
+>   (*) Abstract memory access model.
+>  
+
+David
