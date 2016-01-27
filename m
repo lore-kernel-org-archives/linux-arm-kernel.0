@@ -1,48 +1,33 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 27 Jan 2016 15:15:47 +0100
-Subject: [PATCH] mmc: host: omap_hsmmc: add a verbose print to enable
- CONFIG_REGULATOR_PBIAS
-In-Reply-To: <1452762920-2588-1-git-send-email-kishon@ti.com>
-References: <1452762920-2588-1-git-send-email-kishon@ti.com>
-Message-ID: <CAPDyKFohvK3B0jF+SU-MLpiJ-DwJqW1pRtayK3nyKwVQkR1nUw@mail.gmail.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 27 Jan 2016 22:17:26 +0800
+Subject: [PATCH v2 1/2] crypto: sunxi - don't print confusing data
+In-Reply-To: <1453815902-3070323-1-git-send-email-arnd@arndb.de>
+References: <1453815902-3070323-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160127141726.GB1601@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 January 2016 at 10:15, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Since v4.3+, CONFIG_REGULATOR_PBIAS should be enabled (for platforms that
-> have PBIAS regulator) in order for MMC1 to work.
->
-> Add a more verbose print to help enable CONFIG_REGULATOR_PBIAS for users
-> using a olddefconfig or a custom .config.
->
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+On Tue, Jan 26, 2016 at 02:44:50PM +0100, Arnd Bergmann wrote:
+> gcc correctly warns that the printk output contains a variable that
+> it thinks is not initialized in some cases:
+> 
+> drivers/crypto/sunxi-ss/sun4i-ss-cipher.c: In function 'sun4i_ss_cipher_poll':
+> drivers/crypto/sunxi-ss/sun4i-ss-cipher.c:254:76: warning: 'todo' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> drivers/crypto/sunxi-ss/sun4i-ss-cipher.c:144:15: note: 'todo' was declared here
+> 
+> A closer look at the function reveals that the variable is always
+> initialized at this point (ileft is guaranteed to be positive at the
+> start), but its contents are not well-defined:
+> Depending on some other variables, it might be either a count in
+> words or bytes, and it could refer to either input or output.
+> 
+> The easiest solution apparently is to remove the confusing output
+> and let the reader figure out the state from the other variables.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Thanks,applied for next!
-
-Kind regards
-Uffe
-
-> ---
->  drivers/mmc/host/omap_hsmmc.c |    5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index 7fb0753..7086bd6 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -503,8 +503,11 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
->         host->pbias = devm_regulator_get_optional(host->dev, "pbias");
->         if (IS_ERR(host->pbias)) {
->                 ret = PTR_ERR(host->pbias);
-> -               if ((ret != -ENODEV) && host->dev->of_node)
-> +               if ((ret != -ENODEV) && host->dev->of_node) {
-> +                       dev_err(host->dev,
-> +                       "SD card detect fail? enable CONFIG_REGULATOR_PBIAS\n");
->                         return ret;
-> +               }
->                 dev_dbg(host->dev, "unable to get pbias regulator %ld\n",
->                         PTR_ERR(host->pbias));
->                 host->pbias = NULL;
-> --
-> 1.7.9.5
->
+Applied.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
