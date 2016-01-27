@@ -1,85 +1,31 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 27 Jan 2016 17:11:09 +0100
-Subject: [PATCH v4 10/13] usb: gadget: atmel: access the PMC using regmap
-In-Reply-To: <1453911072-23608-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1453911072-23608-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1453911072-23608-11-git-send-email-alexandre.belloni@free-electrons.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 27 Jan 2016 17:14:17 +0100
+Subject: [PATCH 1/2] clk: sunxi: delay protected clocks until arch initcall
+In-Reply-To: <20160127153722.GC4317@lukather>
+References: <1453385439-10154-1-git-send-email-emilio.lopez@collabora.co.uk>
+ <1453385439-10154-2-git-send-email-emilio.lopez@collabora.co.uk>
+ <20160127153722.GC4317@lukather>
+Message-ID: <7334994.mKnQpNNMP2@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use regmap to access the PMC to avoid using at91_pmc_read and
-at91_pmc_write.
+Hi,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
----
- drivers/usb/gadget/udc/atmel_usba_udc.c | 20 ++++++++++----------
- drivers/usb/gadget/udc/atmel_usba_udc.h |  2 ++
- 2 files changed, 12 insertions(+), 10 deletions(-)
+Am Mittwoch, 27. Januar 2016, 16:37:22 schrieb Maxime Ripard:
+> I thought the patches were simply dropped and the
+> rockchip people just took another approach.
 
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index 8755b2c2aada..04265de885a9 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -17,7 +17,9 @@
- #include <linux/device.h>
- #include <linux/dma-mapping.h>
- #include <linux/list.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/platform_device.h>
-+#include <linux/regmap.h>
- #include <linux/usb/ch9.h>
- #include <linux/usb/gadget.h>
- #include <linux/usb/atmel_usba_udc.h>
-@@ -1888,20 +1890,15 @@ static int atmel_usba_stop(struct usb_gadget *gadget)
- #ifdef CONFIG_OF
- static void at91sam9rl_toggle_bias(struct usba_udc *udc, int is_on)
- {
--	unsigned int uckr = at91_pmc_read(AT91_CKGR_UCKR);
--
--	if (is_on)
--		at91_pmc_write(AT91_CKGR_UCKR, uckr | AT91_PMC_BIASEN);
--	else
--		at91_pmc_write(AT91_CKGR_UCKR, uckr & ~(AT91_PMC_BIASEN));
-+	regmap_update_bits(udc->pmc, AT91_CKGR_UCKR, AT91_PMC_BIASEN,
-+			   is_on ? AT91_PMC_BIASEN : 0);
- }
- 
- static void at91sam9g45_pulse_bias(struct usba_udc *udc)
- {
--	unsigned int uckr = at91_pmc_read(AT91_CKGR_UCKR);
--
--	at91_pmc_write(AT91_CKGR_UCKR, uckr & ~(AT91_PMC_BIASEN));
--	at91_pmc_write(AT91_CKGR_UCKR, uckr | AT91_PMC_BIASEN);
-+	regmap_update_bits(udc->pmc, AT91_CKGR_UCKR, AT91_PMC_BIASEN, 0);
-+	regmap_update_bits(udc->pmc, AT91_CKGR_UCKR, AT91_PMC_BIASEN,
-+			   AT91_PMC_BIASEN);
- }
- 
- static const struct usba_udc_errata at91sam9rl_errata = {
-@@ -1938,6 +1935,9 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
- 		return ERR_PTR(-EINVAL);
- 
- 	udc->errata = match->data;
-+	udc->pmc = syscon_regmap_lookup_by_compatible("atmel,at91sam9g45-pmc");
-+	if (udc->errata && IS_ERR(udc->pmc))
-+		return ERR_CAST(udc->pmc);
- 
- 	udc->num_ep = 0;
- 
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.h b/drivers/usb/gadget/udc/atmel_usba_udc.h
-index ea448a344767..3e1c9d589dfa 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.h
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.h
-@@ -354,6 +354,8 @@ struct usba_udc {
- 	struct dentry *debugfs_root;
- 	struct dentry *debugfs_regs;
- #endif
-+
-+	struct regmap *pmc;
- };
- 
- static inline struct usba_ep *to_usba_ep(struct usb_ep *ep)
--- 
-2.5.0
+nope still on track ... especially as it was Stephen's believe that orphans 
+shouldn't even be usable to general clock users :-).
+
+I just remember that the proposed general solution was based on Mike's 
+upcoming generic critical clock handling (the handoff thingy), which would 
+move critical clock handling out of architecture-specific code, so I've been 
+prodding Mike mainly.
+
+Another option might be to allow clock-controllers to handle orphans and only 
+deny orphan usage to outside clock users, maybe expanding on what I did with 
+the clock-conf part in patch2.
+
+
+Heiko
