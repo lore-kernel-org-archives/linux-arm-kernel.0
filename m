@@ -1,7 +1,8 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 27 Jan 2016 13:03:09 +0800
-Subject: [PATCH] ARM: dts: rockchip: add the leds control for kylin board
-Message-ID: <1453870989-6999-1-git-send-email-wxt@rock-chips.com>
+Date: Wed, 27 Jan 2016 13:06:44 +0800
+Subject: [RESEND PATCH] ARM: dts: rockchip: add the leds control for kylin
+ board
+Message-ID: <1453871204-7312-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,7 +10,7 @@ As the kylin schematic drawing, add the needed work led for
 kylin board.
 
 Run:
-ucho 0 > /sys/class/leds/kylin:red:led/brightness
+echo 0 > /sys/class/leds/kylin:red:led/brightness
 echo 1 > /sys/class/leds/kylin:red:led/brightness
 
 The led can be normall on/off on kylin board.
@@ -21,7 +22,7 @@ Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 Hi Heiko,
 
 Describing the content:
-- This patch is based on your v4.6-clk/next branch.
+- This patch is based on your for-next branch.
 - Verified on
   https://github.com/Caesar-github/rockchip/commits/kylin/next.
 
