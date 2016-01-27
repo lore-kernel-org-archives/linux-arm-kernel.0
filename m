@@ -1,32 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Jan 2016 16:14:32 +0100
-Subject: [PATCH V2 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge driver
- to work on both Zynq and Microblaze
-In-Reply-To: <8520D5D51A55D047800579B09414719825873DA8@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
- <4734542.KZZp0TeeeM@wuerfel>
- <8520D5D51A55D047800579B09414719825873DA8@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <5255218.OREPu5Af3W@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 27 Jan 2016 07:19:22 -0800
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <CAPDyKFo-itpp1JUVANSFNiyhKcv1XLUqx1GwRk532LaT+ija0g@mail.gmail.com>
+References: <20160126224804.GB19432@atomide.com>
+ <CAJZ5v0gTRvyWHVmYNb8Q1QZzhVhokXo541+48mFyDRYv7Hi-Uw@mail.gmail.com>
+ <20160126235222.GF19432@atomide.com>
+ <2779316.34ov6YOQgv@vostro.rjw.lan>
+ <CAPDyKFo-itpp1JUVANSFNiyhKcv1XLUqx1GwRk532LaT+ija0g@mail.gmail.com>
+Message-ID: <20160127151921.GG19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 January 2016 14:33:45 Bharat Kumar Gogada wrote:
-> > > @@ -705,7 +715,9 @@ static int xilinx_pcie_probe(struct
-> > > platform_device *pdev)  #endif
-> > >     pci_scan_child_bus(bus);
-> > >     pci_assign_unassigned_bus_resources(bus);
-> > > +#ifdef CONFIG_ARM
-> > >     pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
-> > > +#endif
-> > >     pci_bus_add_devices(bus);
-> > >     platform_set_drvdata(pdev, port);
-> > 
-> > Here it looks like microblaze gets it right. I'm not sure why we still need the
-> > pci_fixup_irqs() on ARM, but my feeling is that this should be fixed in
-> > common code.
-> In arm pci_fixup_irqs is called by pci_common_init_dev (arch/arm/kernel/bios32.c), since this API is removed now, I was calling it separately.
+* Ulf Hansson <ulf.hansson@linaro.org> [160127 00:18]:
+> On 27 January 2016 at 08:54, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Tuesday, January 26, 2016 03:52:23 PM Tony Lindgren wrote:
+> >> Yeah if we do this when !pm_runtime_enabled(dev) it seems it's
+> >> safe to pretty much reset everything?
+> >
+> > Not only safe, but also a good idea apparently. :-)
+> 
+> I happy to send a patch, extending pm_runtime_reinit() with some more
+> data to be reset.
+> 
+> Or, you or Tony intend to send a patch?
 
-But who calls it in microblaze? If it works without the extra call there,
-can we make it work the same way for ARM?
+Please do, I'll be glad to test it!
 
-	Arnd
+Regards,
+
+Tony
