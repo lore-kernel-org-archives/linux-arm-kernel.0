@@ -1,60 +1,71 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 27 Jan 2016 10:37:14 +0100
-Subject: [linux-sunxi] Problem with Allwinner H3 clocks
-In-Reply-To: <CAGb2v65FUhNC-d-YT=-2adNHHT6b1JvGoNTFLfBX_xBSnuOsTg@mail.gmail.com>
-References: <20160127084607.665fb8c38eeb5733ce4232da@free.fr>
- <CAGb2v65FUhNC-d-YT=-2adNHHT6b1JvGoNTFLfBX_xBSnuOsTg@mail.gmail.com>
-Message-ID: <20160127103714.58312b152adb4148bae2f93b@free.fr>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Wed, 27 Jan 2016 17:38:48 +0800
+Subject: [PATCH v9 0/2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD driver
+Message-ID: <1453887530-22490-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Jan 2016 16:18:53 +0800
-Chen-Yu Tsai <wens@csie.org> wrote:
+This patch set adds support for the Active-semi ACT8945A PMIC
+MFD driver. It is a Multi Function Device with the following
+subdevices:
+ - Regulator
+ - Charger
 
-> Hi,
+It is interfaced to the host controller using I2C interface,
+ACT8945A is a child device of the I2C.
 
-Hi ChenYu,
+Changes in v9:
+ - remove unneeded struct act8945a_dev structure.
+ - collect Acked from Lee.
+ - collect Acked from Peter.
 
-> On Wed, Jan 27, 2016 at 3:46 PM, Jean-Francois Moine <moinejf@free.fr> wrote:
-> > Hi Jens,
-> >
-> > My H3 machine (OPI2) cannot boot with the PLL6 (periph0) as defined
-> > in the kernel 4.5-rc1. As there is no UART, I don't know what is wrong.
-> >
-> > But, applying your old patch
-> >
-> > [PATCH v4 1/6] clk: sunxi: Let divs clocks read the base factor clock name from devicetree
-> > (https://lkml.org/lkml/2015/10/27/532)
-> >
-> > makes everything work correctly again (thanks to other patches, I have
-> > 4 CPUs, USB, thermal sensor and video).
-> >
-> > Any idea?
-> 
-> What kernel and DTS are you using? What other patches have you applied?
+Changes in v8:
+ - change the subdevice's name "act8945a-pmic" to "act8945a-regulator".
 
-About the clock problem, I tried the 4.5-rc1 kernel with its included DTs
-(sun8i-h3-orangepi-plus.dts) without patch. No UART.
-Changing the PLL6 (and the phandles in the DT) makes the UART work.
+Changes in v7:
+ - remove struct act8945a_dev to .c file.
+ - remove unused .h file.
+ - collect Acked-by from Lee Jones
 
-> Patches for H3 USB, thermal sensor and video have not been merged, so it's
-> likely to have some integration problems. FYI you should always check the
-> result after self-applying or rebasing DT patches, as there isn't enough
-> context for git to know if a patch has been applied or not.
+Changes in v6:
+ - change MFD_ACT8945A type from bool to tristate.
+ - revert depends on to 'I2C'.
+ - change the regulator name.
 
-Many patches (USB) are available in Hans de Goede's repository.
-Some other ones either work fine directly from their submission
-(thermal sensor) or ask for few changes (PRCM).
-Video is my development. I will submit a new patch series as soon as
-the hardware cursor works.
+Changes in v5:
+ - change depends on to 'I2C=y'.
 
-> 4.5-rc1 + sunxi-next boots fine on my Orange PI PC, using the Orange PI Plus
-> DTS for now.
+Changes in v4:
+ - add a space before .compatible.
+ - collect Reviewed-by from Krzysztof Kozlowski.
 
-Strange! I already had this problem when Jens removed his work about
-PLL6 in his H3 patch series. At this time, I was thinking about a merge
-error of mine...
+Changes in v3:
+ - fix the tabbing errors in Example.
+ - use "pmic at 5b" label, not "act8945a at 5b" in Example.
+ - collect Acked-by from Rob.
+
+Changes in v2:
+ - add more help information in Kconfig.
+ - update the file header with short version license and author line.
+ - remove unused structure members (dev, i2c_client) of stuct act8945a_dev.
+ - use define "PLATFORM_DEVID_NONE" for mfd_add_devices(), instead of '-1'.
+ - use more explicit info to indicate the failure to add sub devices.
+ - remove the unnecessary print out.
+ - substitute MODULE_LICENSE("GPL") for MODULE_LICENSE("GPL v2").
+ - use more specific label in Example.
+ - add pmic and charger nodes in Example.
+
+Wenyou Yang (2):
+  mfd: act8945a: add Active-semi ACT8945A PMIC MFD driver
+  mfd: add documentation for ACT8945A DT bindings
+
+ Documentation/devicetree/bindings/mfd/act8945a.txt |   82 +++++++++++++++
+ drivers/mfd/Kconfig                                |   11 +++
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/act8945a.c                             |  104 ++++++++++++++++++++
+ 4 files changed, 198 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/act8945a.txt
+ create mode 100644 drivers/mfd/act8945a.c
 
 -- 
-A galon		|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.7.9.5
