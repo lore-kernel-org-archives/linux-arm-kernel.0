@@ -1,40 +1,67 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 27 Jan 2016 16:18:53 +0800
-Subject: [linux-sunxi] Problem with Allwinner H3 clocks
-In-Reply-To: <20160127084607.665fb8c38eeb5733ce4232da@free.fr>
-References: <20160127084607.665fb8c38eeb5733ce4232da@free.fr>
-Message-ID: <CAGb2v65FUhNC-d-YT=-2adNHHT6b1JvGoNTFLfBX_xBSnuOsTg@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 27 Jan 2016 16:27:35 +0800
+Subject: [PATCH v3 12/17] ARM64: ACPI: Check if it runs on Xen to enable
+ or disable ACPI
+In-Reply-To: <1453519184-11908-13-git-send-email-zhaoshenglong@huawei.com>
+References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453519184-11908-13-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <56A87F77.8070506@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Shannon,
 
-On Wed, Jan 27, 2016 at 3:46 PM, Jean-Francois Moine <moinejf@free.fr> wrote:
-> Hi Jens,
+On 2016/1/23 11:19, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 >
-> My H3 machine (OPI2) cannot boot with the PLL6 (periph0) as defined
-> in the kernel 4.5-rc1. As there is no UART, I don't know what is wrong.
+> When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
+> a /hypervisor node in DT. So check if it needs to enable ACPI.
 >
-> But, applying your old patch
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+> CC: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>   arch/arm64/kernel/acpi.c | 12 ++++++++----
+>   1 file changed, 8 insertions(+), 4 deletions(-)
 >
-> [PATCH v4 1/6] clk: sunxi: Let divs clocks read the base factor clock name from devicetree
-> (https://lkml.org/lkml/2015/10/27/532)
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index d1ce8e2..4e92be0 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
+>   {
+>   	/*
+>   	 * Return 1 as soon as we encounter a node at depth 1 that is
+> -	 * not the /chosen node.
+> +	 * not the /chosen node, or /hypervisor node when running on Xen.
+
+The comment is bit misleading, we need to specify two mode, running on
+Xen or not, if not on xen, then /chosen node is enough.
+
+>   	 */
+> -	if (depth == 1 && (strcmp(uname, "chosen") != 0))
+> -		return 1;
+> +	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
+> +		if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
+> +			return 1;
+> +	}
+> +
+>   	return 0;
+>   }
 >
-> makes everything work correctly again (thanks to other patches, I have
-> 4 CPUs, USB, thermal sensor and video).
->
-> Any idea?
+> @@ -184,7 +187,8 @@ void __init acpi_boot_table_init(void)
+>   	/*
+>   	 * Enable ACPI instead of device tree unless
+>   	 * - ACPI has been disabled explicitly (acpi=off), or
+> -	 * - the device tree is not empty (it has more than just a /chosen node)
+> +	 * - the device tree is not empty (it has more than just a /chosen node,
+> +	 *   and a /hypervisor node when running on Xen)
 
-What kernel and DTS are you using? What other patches have you applied?
+and here too.
 
-Patches for H3 USB, thermal sensor and video have not been merged, so it's
-likely to have some integration problems. FYI you should always check the
-result after self-applying or rebasing DT patches, as there isn't enough
-context for git to know if a patch has been applied or not.
+if that is addressed,
 
-4.5-rc1 + sunxi-next boots fine on my Orange PI PC, using the Orange PI Plus
-DTS for now.
+Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-
-Regards
-ChenYu
+Thanks
+Hanjun
