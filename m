@@ -1,56 +1,74 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 28 Jan 2016 01:55:07 +0800
-Subject: [PATCH v4 07/13] ARM: at91: pm: find and remap the pmc
-In-Reply-To: <1453911072-23608-8-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <201601280150.dFQRALYG%fengguang.wu@intel.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 27 Jan 2016 19:01:27 +0100
+Subject: [PATCH] arm64: use local label prefixes for __reg_num symbols
+Message-ID: <1453917687-2494-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+The __reg_num_xNN symbols that are used to implement the msr_s and
+mrs_s macros are recorded in the ELF metadata of each object file.
+This is not a problem in terms of code size, but it does clobber
+the output of tools like readelf, i.e.,
 
-[auto build test ERROR on clk/clk-next]
-[also build test ERROR on v4.5-rc1 next-20160127]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+  $ readelf -a vmlinux |grep __reg_num_x | wc -l
+  50976
 
-url:    https://github.com/0day-ci/linux/commits/Alexandre-Belloni/ARM-at91-PMC-driver-rework/20160128-002052
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: arm-at91_dt_defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+So let's use symbols with the .L prefix, these are strictly local,
+and don't end up in the object files.
 
-All errors (new ones prefixed by >>):
+  $ readelf -a vmlinux |grep __reg_num_x | wc -l
+  0
 
-   include/linux/of.h: In function 'at91_pm_init':
->> arch/arm/mach-at91/pm.c:403:40: error: atmel_pmc_ids causes a section type conflict with ramc_ids
-    static __initconst struct of_device_id atmel_pmc_ids[] = {
-                                           ^
-   arch/arm/mach-at91/pm.c:320:40: note: 'ramc_ids' was declared here
-    static const struct of_device_id const ramc_ids[] __initconst = {
-                                           ^
-
-vim +403 arch/arm/mach-at91/pm.c
-
-   397	
-   398		/* Copy the pm suspend handler to SRAM */
-   399		at91_suspend_sram_fn = fncpy(at91_suspend_sram_fn,
-   400				&at91_pm_suspend_in_sram, at91_pm_suspend_in_sram_sz);
-   401	}
-   402	
- > 403	static __initconst struct of_device_id atmel_pmc_ids[] = {
-   404		{ .compatible = "atmel,at91rm9200-pmc"  },
-   405		{ .compatible = "atmel,at91sam9260-pmc" },
-   406		{ .compatible = "atmel,at91sam9g45-pmc" },
-
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 20315 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160128/29789832/attachment-0001.obj>
+ arch/arm64/include/asm/sysreg.h | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 4aeebec3d882..7d771ac01289 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -196,16 +196,16 @@
+ #ifdef __ASSEMBLY__
+ 
+ 	.irp	num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30
+-	.equ	__reg_num_x\num, \num
++	.equ	.L__reg_num_x\num, \num
+ 	.endr
+-	.equ	__reg_num_xzr, 31
++	.equ	.L__reg_num_xzr, 31
+ 
+ 	.macro	mrs_s, rt, sreg
+-	.inst	0xd5200000|(\sreg)|(__reg_num_\rt)
++	.inst	0xd5200000|(\sreg)|(.L__reg_num_\rt)
+ 	.endm
+ 
+ 	.macro	msr_s, sreg, rt
+-	.inst	0xd5000000|(\sreg)|(__reg_num_\rt)
++	.inst	0xd5000000|(\sreg)|(.L__reg_num_\rt)
+ 	.endm
+ 
+ #else
+@@ -214,16 +214,16 @@
+ 
+ asm(
+ "	.irp	num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30\n"
+-"	.equ	__reg_num_x\\num, \\num\n"
++"	.equ	.L__reg_num_x\\num, \\num\n"
+ "	.endr\n"
+-"	.equ	__reg_num_xzr, 31\n"
++"	.equ	.L__reg_num_xzr, 31\n"
+ "\n"
+ "	.macro	mrs_s, rt, sreg\n"
+-"	.inst	0xd5200000|(\\sreg)|(__reg_num_\\rt)\n"
++"	.inst	0xd5200000|(\\sreg)|(.L__reg_num_\\rt)\n"
+ "	.endm\n"
+ "\n"
+ "	.macro	msr_s, sreg, rt\n"
+-"	.inst	0xd5000000|(\\sreg)|(__reg_num_\\rt)\n"
++"	.inst	0xd5000000|(\\sreg)|(.L__reg_num_\\rt)\n"
+ "	.endm\n"
+ );
+ 
+-- 
+2.5.0
