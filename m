@@ -1,371 +1,78 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 27 Jan 2016 19:15:16 +0100
-Subject: [PATCH v3 3/3] reset: Add support for shared reset controls
-In-Reply-To: <1453918516-3078-1-git-send-email-hdegoede@redhat.com>
-References: <1453918516-3078-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1453918516-3078-4-git-send-email-hdegoede@redhat.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 27 Jan 2016 12:16:17 -0600
+Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
+In-Reply-To: <20160127173104.GQ19432@atomide.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <1452780672-14339-4-git-send-email-kishon@ti.com>
+ <20160127173104.GQ19432@atomide.com>
+Message-ID: <56A90971.4020409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some SoCs some hw-blocks share a reset control. Add support for this
-setup by adding new:
+Hi Tony,
 
-reset_control_get_shared()
-devm_reset_control_get_shared()
-devm_reset_control_get_shared_by_index()
+On 01/27/2016 11:31 AM, Tony Lindgren wrote:
+> * Kishon Vijay Abraham I <kishon@ti.com> [160114 06:12]:
+>> Use assert/deassert callbacks populated in the platform data to
+>> to perform reset of PCIe.
+>>
+>> Use these callbacks until a reset controller driver is
+>> is available in the kernel to reset PCIe.
+> ...
+> 
+>> --- a/drivers/pci/host/pci-dra7xx.c
+>> +++ b/drivers/pci/host/pci-dra7xx.c
+>> @@ -347,6 +404,10 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
+>>  	enum of_gpio_flags flags;
+>>  	unsigned long gpio_flags;
+>>  
+>> +	ret = dra7xx_pcie_reset(pdev);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>>  	dra7xx = devm_kzalloc(dev, sizeof(*dra7xx), GFP_KERNEL);
+>>  	if (!dra7xx)
+>>  		return -ENOMEM;
+> 
+> With the hwmod data properly configured the reset already happens
+> for the device by the bus driver, the hwmod code in this case?
+> 
+>> @@ -457,6 +518,7 @@ static int __exit dra7xx_pcie_remove(struct platform_device *pdev)
+>>  	struct pcie_port *pp = &dra7xx->pp;
+>>  	struct device *dev = &pdev->dev;
+>>  	int count = dra7xx->phy_count;
+>> +	int ret;
+>>  
+>>  	if (pp->irq_domain)
+>>  		irq_domain_remove(pp->irq_domain);
+>> @@ -467,6 +529,10 @@ static int __exit dra7xx_pcie_remove(struct platform_device *pdev)
+>>  		phy_exit(dra7xx->phy[count]);
+>>  	}
+>>  
+>> +	ret = dra7xx_pcie_assert_reset(pdev);
+>> +	if (ret < 0)
+>> +		return ret;
+>> +
+>>  	return 0;
+>>  }
+> 
+> Why do you need another reset here? Can't you just implement PM runtime
+> in the driver and do the usual pm_runtime_put_sync followed by
+> pm_runtime_disable?
 
-methods to get a reset_control. Note that this patch omits adding of_
-variants, if these are needed later they can be easily added.
+The omap_hwmod_enable/disable code does not deal with hardresets (PRCM
+reset lines) and so the pm_runtime_get_sync/put_sync only end up dealing
+with clocks, and we need to invoke the reset functions separately.
+Modules with softresets in SYSCONFIG are ok, as they are dealt with
+properly.
 
-This patch also changes the behavior of the existing exclusive
-reset_control_get() variants, if these are now called more then once
-for the same reset_control they will return -EBUSY. To catch existing
-drivers triggering this error (there should not be any) a WARN_ON(1)
-is added in this path.
+> Basically I'm wondering how come we need these platform data callbacks
+> at all.
 
-When a reset_control is shared, the behavior of reset_control_assert /
-deassert is changed, for shared reset_controls these will work like the
-clock-enable/disable and regulator-on/off functions. They will keep a
-deassert_count, and only (re-)assert the reset after reset_control_assert
-has been called as many times as reset_control_deassert was called.
+The hardresets are controlled through the
+omap_device_assert(deassert)_hardreset functions, and since these are
+limited to mach-omap2, we are invoking them through platform data callbacks.
 
-Calling reset_control_assert without first calling reset_control_deassert
-is not allowed on a shared reset control. Calling reset_control_reset is
-also not allowed on a shared reset control.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/reset/core.c  | 61 ++++++++++++++++++++++++++++++++-------
- include/linux/reset.h | 79 +++++++++++++++++++++++++++++++++++++++++----------
- 2 files changed, 114 insertions(+), 26 deletions(-)
-
-diff --git a/drivers/reset/core.c b/drivers/reset/core.c
-index e439ae2..5554585 100644
---- a/drivers/reset/core.c
-+++ b/drivers/reset/core.c
-@@ -8,6 +8,7 @@
-  * the Free Software Foundation; either version 2 of the License, or
-  * (at your option) any later version.
-  */
-+#include <linux/atomic.h>
- #include <linux/device.h>
- #include <linux/err.h>
- #include <linux/export.h>
-@@ -29,12 +30,16 @@ static LIST_HEAD(reset_controller_list);
-  * @id: ID of the reset controller in the reset
-  *      controller device
-  * @refcnt: Number of gets of this reset_control
-+ * @shared: Is this a shared (1), or an exclusive (0) reset_control?
-+ * @deassert_cnt: Number of times this reset line has been deasserted
-  */
- struct reset_control {
- 	struct reset_controller_dev *rcdev;
- 	struct list_head list;
- 	unsigned int id;
- 	unsigned int refcnt;
-+	int shared;
-+	atomic_t deassert_count;
- };
- 
- /**
-@@ -94,9 +99,16 @@ EXPORT_SYMBOL_GPL(reset_controller_unregister);
- /**
-  * reset_control_reset - reset the controlled device
-  * @rstc: reset controller
-+ *
-+ * Calling this on a shared reset controller is an error.
-  */
- int reset_control_reset(struct reset_control *rstc)
- {
-+	if (rstc->shared) {
-+		WARN_ON(1);
-+		return -EINVAL;
-+	}
-+
- 	if (rstc->rcdev->ops->reset)
- 		return rstc->rcdev->ops->reset(rstc->rcdev, rstc->id);
- 
-@@ -107,26 +119,47 @@ EXPORT_SYMBOL_GPL(reset_control_reset);
- /**
-  * reset_control_assert - asserts the reset line
-  * @rstc: reset controller
-+ *
-+ * Calling this on an exclusive reset controller guarantees that the reset
-+ * will be asserted. When called on a shared reset controller the line may
-+ * still be deasserted, as long as other users keep it so.
-  */
- int reset_control_assert(struct reset_control *rstc)
- {
--	if (rstc->rcdev->ops->assert)
--		return rstc->rcdev->ops->assert(rstc->rcdev, rstc->id);
-+	if (!rstc->rcdev->ops->assert)
-+		return -ENOTSUPP;
- 
--	return -ENOTSUPP;
-+	if (rstc->shared) {
-+		if (atomic_read(&rstc->deassert_count) == 0) {
-+			WARN_ON(1);
-+			return -EINVAL;
-+		}
-+
-+		if (atomic_dec_return(&rstc->deassert_count) != 0)
-+			return 0;
-+	}
-+
-+	return rstc->rcdev->ops->assert(rstc->rcdev, rstc->id);
- }
- EXPORT_SYMBOL_GPL(reset_control_assert);
- 
- /**
-  * reset_control_deassert - deasserts the reset line
-  * @rstc: reset controller
-+ *
-+ * After calling this function, the reset is guaranteed to be deasserted.
-  */
- int reset_control_deassert(struct reset_control *rstc)
- {
--	if (rstc->rcdev->ops->deassert)
--		return rstc->rcdev->ops->deassert(rstc->rcdev, rstc->id);
-+	if (!rstc->rcdev->ops->deassert)
-+		return -ENOTSUPP;
- 
--	return -ENOTSUPP;
-+	if (rstc->shared) {
-+		if (atomic_inc_return(&rstc->deassert_count) != 1)
-+			return 0;
-+	}
-+
-+	return rstc->rcdev->ops->deassert(rstc->rcdev, rstc->id);
- }
- EXPORT_SYMBOL_GPL(reset_control_deassert);
- 
-@@ -147,7 +180,7 @@ EXPORT_SYMBOL_GPL(reset_control_status);
- 
- static struct reset_control *__reset_control_get(
- 				struct reset_controller_dev *rcdev,
--				unsigned int index)
-+				unsigned int index, int shared)
- {
- 	struct reset_control *rstc;
- 
-@@ -155,6 +188,10 @@ static struct reset_control *__reset_control_get(
- 
- 	list_for_each_entry(rstc, &rcdev->reset_control_head, list) {
- 		if (rstc->id == index) {
-+			if (!rstc->shared || !shared) {
-+				WARN_ON(1);
-+				return ERR_PTR(-EBUSY);
-+			}
- 			rstc->refcnt++;
- 			return rstc;
- 		}
-@@ -170,6 +207,7 @@ static struct reset_control *__reset_control_get(
- 	list_add(&rstc->list, &rcdev->reset_control_head);
- 	rstc->id = index;
- 	rstc->refcnt = 1;
-+	rstc->shared = shared;
- 
- 	return rstc;
- }
-@@ -188,7 +226,7 @@ static void __reset_control_put(struct reset_control *rstc)
- }
- 
- struct reset_control *__of_reset_control_get(struct device_node *node,
--					     const char *id, int index)
-+				     const char *id, int index, int shared)
- {
- 	struct reset_control *rstc = ERR_PTR(-EPROBE_DEFER);
- 	struct reset_controller_dev *r, *rcdev;
-@@ -233,7 +271,7 @@ struct reset_control *__of_reset_control_get(struct device_node *node,
- 	}
- 
- 	/* reset_list_mutex also protects the rcdev's reset_control list */
--	rstc = __reset_control_get(rcdev, rstc_id);
-+	rstc = __reset_control_get(rcdev, rstc_id, shared);
- 
- 	mutex_unlock(&reset_list_mutex);
- 
-@@ -263,7 +301,7 @@ static void devm_reset_control_release(struct device *dev, void *res)
- }
- 
- struct reset_control *__devm_reset_control_get(struct device *dev,
--					       const char *id, int index)
-+				     const char *id, int index, int shared)
- {
- 	struct reset_control **ptr, *rstc;
- 
-@@ -272,7 +310,8 @@ struct reset_control *__devm_reset_control_get(struct device *dev,
- 	if (!ptr)
- 		return ERR_PTR(-ENOMEM);
- 
--	rstc = __of_reset_control_get(dev ? dev->of_node : NULL, id, index);
-+	rstc = __of_reset_control_get(dev ? dev->of_node : NULL,
-+				      id, index, shared);
- 	if (!IS_ERR(rstc)) {
- 		*ptr = rstc;
- 		devres_add(dev, ptr);
-diff --git a/include/linux/reset.h b/include/linux/reset.h
-index 1bb69a2..cb35e83 100644
---- a/include/linux/reset.h
-+++ b/include/linux/reset.h
-@@ -13,10 +13,10 @@ int reset_control_deassert(struct reset_control *rstc);
- int reset_control_status(struct reset_control *rstc);
- 
- struct reset_control *__of_reset_control_get(struct device_node *node,
--					     const char *id, int index);
-+				     const char *id, int index, int shared);
- void reset_control_put(struct reset_control *rstc);
- struct reset_control *__devm_reset_control_get(struct device *dev,
--					       const char *id, int index);
-+				     const char *id, int index, int shared);
- 
- int __must_check device_reset(struct device *dev);
- 
-@@ -63,14 +63,14 @@ static inline int device_reset_optional(struct device *dev)
- 
- static inline struct reset_control *__of_reset_control_get(
- 					struct device_node *node,
--					const char *id, int index)
-+					const char *id, int index, int shared)
- {
- 	return ERR_PTR(-EINVAL);
- }
- 
- static inline struct reset_control *__devm_reset_control_get(
- 					struct device *dev,
--					const char *id, int index)
-+					const char *id, int index, int shared)
- {
- 	return ERR_PTR(-EINVAL);
- }
-@@ -78,7 +78,8 @@ static inline struct reset_control *__devm_reset_control_get(
- #endif /* CONFIG_RESET_CONTROLLER */
- 
- /**
-- * reset_control_get - Lookup and obtain a reference to a reset controller.
-+ * reset_control_get - Lookup and obtain an exclusive reference to a
-+ *                     reset controller.
-  * @dev: device to be reset by the controller
-  * @id: reset line name
-  *
-@@ -92,17 +93,34 @@ static inline struct reset_control *__must_check reset_control_get(
- #ifndef CONFIG_RESET_CONTROLLER
- 	WARN_ON(1);
- #endif
--	return __of_reset_control_get(dev ? dev->of_node : NULL, id, 0);
-+	return __of_reset_control_get(dev ? dev->of_node : NULL, id, 0, 0);
- }
- 
- static inline struct reset_control *reset_control_get_optional(
- 					struct device *dev, const char *id)
- {
--	return __of_reset_control_get(dev ? dev->of_node : NULL, id, 0);
-+	return __of_reset_control_get(dev ? dev->of_node : NULL, id, 0, 0);
- }
- 
- /**
-- * of_reset_control_get - Lookup and obtain a reference to a reset controller.
-+ * reset_control_get_shared - Lookup and obtain a shared reference to a
-+ *                            reset controller.
-+ * @dev: device to be reset by the controller
-+ * @id: reset line name
-+ *
-+ * Returns a struct reset_control or IS_ERR() condition containing errno.
-+ *
-+ * Use of id names is optional.
-+ */
-+static inline struct reset_control *reset_control_get_shared(
-+					struct device *dev, const char *id)
-+{
-+	return __of_reset_control_get(dev ? dev->of_node : NULL, id, 0, 1);
-+}
-+
-+/**
-+ * of_reset_control_get - Lookup and obtain an exclusive reference to a
-+ *                        reset controller.
-  * @node: device to be reset by the controller
-  * @id: reset line name
-  *
-@@ -113,12 +131,12 @@ static inline struct reset_control *reset_control_get_optional(
- static inline struct reset_control *of_reset_control_get(
- 				struct device_node *node, const char *id)
- {
--	return __of_reset_control_get(node, id, 0);
-+	return __of_reset_control_get(node, id, 0, 0);
- }
- 
- /**
-- * of_reset_control_get_by_index - Lookup and obtain a reference to a reset
-- * controller by index.
-+ * of_reset_control_get_by_index - Lookup and obtain an exclusive reference to
-+ *                                 a reset controller by index.
-  * @node: device to be reset by the controller
-  * @index: index of the reset controller
-  *
-@@ -129,7 +147,7 @@ static inline struct reset_control *of_reset_control_get(
- static inline struct reset_control *of_reset_control_get_by_index(
- 					struct device_node *node, int index)
- {
--	return __of_reset_control_get(node, NULL, index);
-+	return __of_reset_control_get(node, NULL, index, 0);
- }
- 
- /**
-@@ -147,13 +165,13 @@ static inline struct reset_control *__must_check devm_reset_control_get(
- #ifndef CONFIG_RESET_CONTROLLER
- 	WARN_ON(1);
- #endif
--	return __devm_reset_control_get(dev, id, 0);
-+	return __devm_reset_control_get(dev, id, 0, 0);
- }
- 
- static inline struct reset_control *devm_reset_control_get_optional(
- 					struct device *dev, const char *id)
- {
--	return __devm_reset_control_get(dev, id, 0);
-+	return __devm_reset_control_get(dev, id, 0, 0);
- }
- 
- /**
-@@ -168,7 +186,38 @@ static inline struct reset_control *devm_reset_control_get_optional(
- static inline struct reset_control *devm_reset_control_get_by_index(
- 					struct device *dev, int index)
- {
--	return __devm_reset_control_get(dev, NULL, index);
-+	return __devm_reset_control_get(dev, NULL, index, 0);
-+}
-+
-+/**
-+ * devm_reset_control_get_shared - resource managed reset_control_get_shared()
-+ * @dev: device to be reset by the controller
-+ * @id: reset line name
-+ *
-+ * Managed reset_control_get_shared(). For reset controllers returned from
-+ * this function, reset_control_put() is called automatically on driver detach.
-+ * See reset_control_get_shared() for more information.
-+ */
-+static inline struct reset_control *devm_reset_control_get_shared(
-+					struct device *dev, const char *id)
-+{
-+	return __devm_reset_control_get(dev, id, 0, 1);
-+}
-+
-+/**
-+ * devm_reset_control_get_shared_by_index - resource managed
-+ * reset_control_get_shared
-+ * @dev: device to be reset by the controller
-+ * @index: index of the reset controller
-+ *
-+ * Managed reset_control_get_shared(). For reset controllers returned from
-+ * this function, reset_control_put() is called automatically on driver detach.
-+ * See reset_control_get_shared() for more information.
-+ */
-+static inline struct reset_control *devm_reset_control_get_shared_by_index(
-+					struct device *dev, int index)
-+{
-+	return __devm_reset_control_get(dev, NULL, index, 1);
- }
- 
- #endif
--- 
-2.5.0
+regards
+Suman
