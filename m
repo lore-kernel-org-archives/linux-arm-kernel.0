@@ -1,96 +1,58 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 27 Jan 2016 16:08:19 +0100
-Subject: [PATCH 1/2] ARM: mvebu: change order of ethernet DT nodes on Armada
- 38x
-In-Reply-To: <1453907300-28283-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1453907300-28283-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1453907300-28283-2-git-send-email-thomas.petazzoni@free-electrons.com>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Thu, 28 Jan 2016 00:10:05 +0900
+Subject: [PATCH] ARM: dts: orion5x: add mtd flash support to linkstation lswtgl
+Message-ID: <1453907405-30434-1-git-send-email-rogershimizu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Armada 38x, the available network interfaces are:
+MTD flash stores u-boot and u-boot environment on linkstation lswtgl.
+The latter one can be easily read/write by u-boot-tools package in Debian.
 
- - port 0, at 0x70000
- - port 1, at 0x30000
- - port 2, at 0x34000
-
-Due to the rule saying that DT nodes should be ordered by register
-addresses, the network interfaces are probed in this order:
-
- - port 1, at 0x30000, which gets named eth0
- - port 2, at 0x34000, which gets named eth1
- - port 0, at 0x70000, which gets named eth2
-
-(if all three ports are enabled at the board level)
-
-Unfortunately, the network subsystem doesn't provide any way to rename
-network interfaces from the kernel (it can only be done from
-userspace). So, the default naming of the network interfaces is very
-confusing as it doesn't match the datasheet, nor the naming of the
-interfaces in the bootloader, nor the naming of the interfaces on
-labels printed on the board.
-
-For example, on the Armada 388 GP, the board has two ports, labelled
-GE0 and GE1. One has to know that GE0 is eth1 and GE1 is eth0, which
-isn't really obvious.
-
-In order to solve this, this patch proposes to exceptionaly violate
-the rule of "order DT nodes by register address", and put the 0x70000
-node before the 0x30000 node, so that network interfaces get named in
-a more natural way.
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
 ---
- arch/arm/boot/dts/armada-38x.dtsi | 30 +++++++++++++++++++++---------
- 1 file changed, 21 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts | 30 ++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index e8b7f67..b50784d 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -429,6 +429,27 @@
- 				reg = <0x22000 0x1000>;
- 			};
+diff --git a/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts b/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
+index 420788229e6f..16eabc524b27 100644
+--- a/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
++++ b/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
+@@ -228,6 +228,36 @@
+ 	};
+ };
  
-+			/*
-+			 * As a special exception to the "order by
-+			 * register address" rule, the eth0 node is
-+			 * placed here to ensure that it gets
-+			 * registered as the first interface, since
-+			 * the network subsystem doesn't allow naming
-+			 * interfaces using DT aliases. Without this,
-+			 * the ordering of interfaces is different
-+			 * from the one used in U-Boot and the
-+			 * labeling of interfaces on the boards, which
-+			 * is very confusing for users.
-+			 */
-+			eth0: ethernet at 70000 {
-+				compatible = "marvell,armada-370-neta";
-+				reg = <0x70000 0x4000>;
-+				interrupts-extended = <&mpic 8>;
-+				clocks = <&gateclk 4>;
-+				tx-csum-limit = <9800>;
-+				status = "disabled";
-+			};
++&devbus_bootcs {
++	status = "okay";
++	devbus,keep-config;
 +
- 			eth1: ethernet at 30000 {
- 				compatible = "marvell,armada-370-neta";
- 				reg = <0x30000 0x4000>;
-@@ -493,15 +514,6 @@
- 				};
- 			};
++	flash at 0 {
++		compatible = "jedec-flash";
++		reg = <0 0x40000>;
++		bank-width = <1>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		partition at 0 {
++			label = "header";
++			reg = <0 0x30000>;
++			read-only;
++		};
++
++		partition at 30000 {
++			label = "uboot";
++			reg = <0x30000 0xF000>;
++			read-only;
++		};
++
++		partition at 3F000 {
++			label = "uboot_env";
++			reg = <0x3F000 0x1000>;
++		};
++	};
++};
++
+ &mdio {
+ 	status = "okay";
  
--			eth0: ethernet at 70000 {
--				compatible = "marvell,armada-370-neta";
--				reg = <0x70000 0x4000>;
--				interrupts-extended = <&mpic 8>;
--				clocks = <&gateclk 4>;
--				tx-csum-limit = <9800>;
--				status = "disabled";
--			};
--
- 			mdio: mdio at 72004 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
 -- 
-2.6.4
+2.1.4
