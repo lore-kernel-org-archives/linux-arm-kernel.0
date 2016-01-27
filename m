@@ -1,33 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Jan 2016 16:57:16 +0100
-Subject: [PATCH 0/7] SCSI bug fixes for 4.6
-Message-ID: <1453910247-3447628-1-git-send-email-arnd@arndb.de>
+Date: Wed, 27 Jan 2016 16:57:17 +0100
+Subject: [PATCH 1/7] scsi: fdomain: drop fdomain_pci_tbl when built-in
+In-Reply-To: <1453910247-3447628-1-git-send-email-arnd@arndb.de>
+References: <1453910247-3447628-1-git-send-email-arnd@arndb.de>
+Message-ID: <1453910247-3447628-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are a bunch of fixes for harmless bugs I found during ARM
-randconfig testing. It would be nice to get them mered in 4.6,
-but there is no need to have them in 4.5 as no incorrect behavior
-results from the current code, and the warnings are all hard
-to trigger.
+The fdomain SCSI host driver is one of the last remaining
+drivers that manually search the PCI bus using pci_get_device
+rather than registering a pci_driver instance.
 
-Arnd Bergmann (7):
-  scsi: fdomain: drop fdomain_pci_tbl when built-in
-  mptfusion: hide unused seq_mpt_print_ioc_summary function
-  scsi: acornscsi: mark calc_sync_xfer as __maybe_unused
-  scsi: fas216: avoid fas216_log_setup for loadable module
-  scsi: qla4xxx: shut up warning for rd_reg_indirect
-  scsi: aha1542: avoid uninitialized variable warnings
-  scsi_dh: force modular build if SCSI is a module
+This means the module device table is unused when the driver is
+built-in, and we get a warning about it:
 
- drivers/message/fusion/mptbase.c    | 2 ++
- drivers/scsi/aha1542.c              | 3 +++
- drivers/scsi/arm/acornscsi.c        | 3 ++-
- drivers/scsi/arm/fas216.c           | 2 ++
- drivers/scsi/device_handler/Kconfig | 8 ++++----
- drivers/scsi/fdomain.c              | 2 +-
- drivers/scsi/qla4xxx/ql4_83xx.c     | 6 ++++--
- 7 files changed, 18 insertions(+), 8 deletions(-)
+drivers/scsi/fdomain.c:1773:29: warning: 'fdomain_pci_tbl' defined but not used [-Wunused-variable]
 
+To avoid the warning, this adds another #ifdef around the table
+definition.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/scsi/fdomain.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/scsi/fdomain.c b/drivers/scsi/fdomain.c
+index eefe14d453db..b87ab38a4530 100644
+--- a/drivers/scsi/fdomain.c
++++ b/drivers/scsi/fdomain.c
+@@ -1768,7 +1768,7 @@ struct scsi_host_template fdomain_driver_template = {
+ };
+ 
+ #ifndef PCMCIA
+-#ifdef CONFIG_PCI
++#if defined(CONFIG_PCI) && defined(MODULE)
+ 
+ static struct pci_device_id fdomain_pci_tbl[] = {
+ 	{ PCI_VENDOR_ID_FD, PCI_DEVICE_ID_FD_36C70,
 -- 
 2.7.0
