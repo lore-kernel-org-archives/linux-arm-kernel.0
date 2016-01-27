@@ -1,82 +1,73 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 27 Jan 2016 19:02:37 +0100
-Subject: [PATCH] arm64: use local label prefixes for __reg_num symbols
-In-Reply-To: <1453917687-2494-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1453917687-2494-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu8BA9W8JBtMisV67aUVii=pgP=V6Lq=43wev_c0CAQMOw@mail.gmail.com>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Wed, 27 Jan 2016 10:04:18 -0800
+Subject: 4.5-rc1 kernel is failed to bootup on FSL LS2080 RDB board
+In-Reply-To: <VI1PR04MB123006EC1EECE3A064BDE40C88D90@VI1PR04MB1230.eurprd04.prod.outlook.com>
+References: <56A80920.8030504@linaro.org>
+ <VI1PR04MB123006EC1EECE3A064BDE40C88D90@VI1PR04MB1230.eurprd04.prod.outlook.com>
+Message-ID: <56A906A2.7070504@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 January 2016 at 19:01, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> The __reg_num_xNN symbols that are used to implement the msr_s and
-> mrs_s macros are recorded in the ELF metadata of each object file.
-> This is not a problem in terms of code size, but it does clobber
+On 1/26/2016 10:27 PM, Bhupesh Sharma wrote:
+> Hi,
+>
+>> From: Shi, Yang
+>> Sent: Wednesday, January 27, 2016 5:33 AM
+>
+>> Hi folks,
+>>
+>> I tried to boot 4.5-rc1 kernel on my FSL LS2080 RDB (aka LS2085 RDB), but
+>> it is failed silently. If I use the dtb file shipped with the SDK with
+>> 4.5-rc1 kernel, I can get the serial console output, but it is failed to
+>> detect PCI bus.
+>>
+>> If I use both kernel and dtb from the SDK, it works well.
+>>
+>> The bootloader information:
+>>
+>> U-Boot 2015.07-rc1Layerscape2-SDK+g7e8bad0 (Aug 27 2015 - 14:31:42)
+>>
+>> SoC:  LS2085E (0x87010010)
+>> Clock Configuration:
+>>          CPU0(A57):1600 MHz  CPU1(A57):1600 MHz  CPU2(A57):1600 MHz
+>>          CPU3(A57):1600 MHz  CPU4(A57):1600 MHz  CPU5(A57):1600 MHz
+>>          CPU6(A57):1600 MHz  CPU7(A57):1600 MHz
+>>          Bus:      600  MHz  DDR:      1333.333 MT/s     DP-DDR:
+>> 1333.333 MT/s
+>> Reset Configuration Word (RCW):
+>>          00: 40282830 40400040 00000000 00000000
+>>          10: 00000000 00200000 00200000 00000000
+>>          20: 00c12980 00002580 00000000 00000000
+>>          30: 00000e0b 00000000 00000000 00000000
+>>          40: 00000000 00000000 00000000 00000000
+>>          50: 00000000 00000000 00000000 00000000
+>>          60: 00000000 00000000 00027000 00000000
+>>          70: 412a0000 00000000 00000000 00000000
+>> Model: Freescale Layerscape 2085a RDB Board
+>> Board: LS2085E-RDB, Board Arch: V1, Board version: D, boot from vBank: 4
+>> FPGA: v1.18
+>>
+>> And, I have ARCH_LAYERSCAPE, CONFIG_PCIE_DW and CONFIG_PCI_LAYERSCAPE
+>> enabled.
+>>
+>> Any hint is appreciated.
+>>
+>
+> As Minghuan (our PCI developer, added in CC) suggested the reason is that uboot is for
+> LS2085a but kernel dtb is for ls2080.
+>
+> Please apply the patch https://patchwork.kernel.org/patch/7767061/ and try again.
 
-s/clobber/clutter/
+Thanks so much. That patch just solves the problem partially, I just 
+found the layerscape pci host driver need recognize ls2085a compatible 
+too. With the both fix, I can get the PCI work.
 
+I already sent the patch to the mailing list.
 
-> the output of tools like readelf, i.e.,
+Regards,
+Yang
+
 >
->   $ readelf -a vmlinux |grep __reg_num_x | wc -l
->   50976
->
-> So let's use symbols with the .L prefix, these are strictly local,
-> and don't end up in the object files.
->
->   $ readelf -a vmlinux |grep __reg_num_x | wc -l
->   0
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/sysreg.h | 16 ++++++++--------
->  1 file changed, 8 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 4aeebec3d882..7d771ac01289 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -196,16 +196,16 @@
->  #ifdef __ASSEMBLY__
->
->         .irp    num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30
-> -       .equ    __reg_num_x\num, \num
-> +       .equ    .L__reg_num_x\num, \num
->         .endr
-> -       .equ    __reg_num_xzr, 31
-> +       .equ    .L__reg_num_xzr, 31
->
->         .macro  mrs_s, rt, sreg
-> -       .inst   0xd5200000|(\sreg)|(__reg_num_\rt)
-> +       .inst   0xd5200000|(\sreg)|(.L__reg_num_\rt)
->         .endm
->
->         .macro  msr_s, sreg, rt
-> -       .inst   0xd5000000|(\sreg)|(__reg_num_\rt)
-> +       .inst   0xd5000000|(\sreg)|(.L__reg_num_\rt)
->         .endm
->
->  #else
-> @@ -214,16 +214,16 @@
->
->  asm(
->  "      .irp    num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30\n"
-> -"      .equ    __reg_num_x\\num, \\num\n"
-> +"      .equ    .L__reg_num_x\\num, \\num\n"
->  "      .endr\n"
-> -"      .equ    __reg_num_xzr, 31\n"
-> +"      .equ    .L__reg_num_xzr, 31\n"
->  "\n"
->  "      .macro  mrs_s, rt, sreg\n"
-> -"      .inst   0xd5200000|(\\sreg)|(__reg_num_\\rt)\n"
-> +"      .inst   0xd5200000|(\\sreg)|(.L__reg_num_\\rt)\n"
->  "      .endm\n"
->  "\n"
->  "      .macro  msr_s, sreg, rt\n"
-> -"      .inst   0xd5000000|(\\sreg)|(__reg_num_\\rt)\n"
-> +"      .inst   0xd5000000|(\\sreg)|(.L__reg_num_\\rt)\n"
->  "      .endm\n"
->  );
->
-> --
-> 2.5.0
+> Regards,
+> Bhupesh
 >
