@@ -1,48 +1,102 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 27 Jan 2016 21:38:16 +0100
-Subject: [PATCH 1/2] clk: sunxi: delay protected clocks until arch initcall
-In-Reply-To: <7334994.mKnQpNNMP2@diego>
-References: <1453385439-10154-1-git-send-email-emilio.lopez@collabora.co.uk>
- <1453385439-10154-2-git-send-email-emilio.lopez@collabora.co.uk>
- <20160127153722.GC4317@lukather> <7334994.mKnQpNNMP2@diego>
-Message-ID: <20160127203816.GU4317@lukather>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 27 Jan 2016 13:55:43 -0700
+Subject: [PATCH V8 16/23] coresight: etb10: implementing AUX API
+In-Reply-To: <8760yg72wb.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
+ <1452807977-8069-17-git-send-email-mathieu.poirier@linaro.org>
+ <8760yg72wb.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <CANLsYkyUD6AgnN81Kui4bV+iNFr4YEkY0B-qE3MtJ9X7yyry7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 26 January 2016 at 08:53, Alexander Shishkin
+<alexander.shishkin@linux.intel.com> wrote:
+> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+>
+>> Adding an ETB10 specific AUX area operations to be used
+>> by the perf framework when events are initialised.
+>>
+>> Part of this operation involves modeling the mmap'ed area
+>> based on the specific ways a sink buffer gathers information.
+>
+> I don't mind being CC'd on the rest of the patches too, btw. :)
 
-On Wed, Jan 27, 2016 at 05:14:17PM +0100, Heiko St?bner wrote:
-> Hi,
-> 
-> Am Mittwoch, 27. Januar 2016, 16:37:22 schrieb Maxime Ripard:
-> > I thought the patches were simply dropped and the
-> > rockchip people just took another approach.
-> 
-> nope still on track ... especially as it was Stephen's believe that orphans 
-> shouldn't even be usable to general clock users :-).
-> 
-> I just remember that the proposed general solution was based on Mike's 
-> upcoming generic critical clock handling (the handoff thingy), which would 
-> move critical clock handling out of architecture-specific code, so I've been 
-> prodding Mike mainly.
-> 
-> Another option might be to allow clock-controllers to handle orphans and only 
-> deny orphan usage to outside clock users, maybe expanding on what I did with 
-> the clock-conf part in patch2.
+Most definitely.
 
-I'm not sure that would solve anything in our case. All our clocks
-drivers are different ones, so I'm not sure how we could handle that.
+>
+>> +static unsigned long etb_reset_buffer(struct coresight_device *csdev,
+>> +                                   struct perf_output_handle *handle,
+>> +                                   void *sink_config, bool *lost)
+>> +{
+>> +     unsigned long size = 0;
+>> +     struct cs_buffers *buf = sink_config;
+>> +
+>> +     if (buf) {
+>> +             /*
+>> +              * In snapshot mode ->data_size holds the new address of the
+>> +              * ring buffer's head.  The size itself is the whole address
+>> +              * range since we want the latest information.
+>> +              */
+>> +             if (buf->snapshot)
+>> +                     handle->head = local_xchg(&buf->data_size,
+>> +                                               buf->nr_pages << PAGE_SHIFT);
+>> +
+>> +             /*
+>> +              * Tell the tracer PMU how much we got in this run and if
+>> +              * something went wrong along the way.  Nobody else can use
+>> +              * this cs_buffers instance until we are done.  As such
+>> +              * resetting parameters here and squaring off with the ring
+>> +              * buffer API in the tracer PMU is fine.
+>> +              */
+>> +             *lost = local_xchg(&buf->lost, 0);
+>
+> This is a thin ice, you can't really make assumptions about bool's
+> storage size or even type, afaict.
 
-Maxime
+You are theoretically correct but I wonder if the value of &buf->lost
+can get to a size where it won't fit in *lost... Nevertheless I'll fix
+it with:
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/01f08228/attachment.sig>
+*lost = !!local_xchg(&buf->lost, 0);
+
+>
+>> +             size = local_xchg(&buf->data_size, 0);
+>> +     }
+>> +
+>> +     return size;
+>> +}
+>> +
+>> +static void etb_update_buffer(struct coresight_device *csdev,
+>> +                           struct perf_output_handle *handle,
+>> +                           void *sink_config)
+>> +{
+>> +     int i, cur;
+>> +     u8 *buf_ptr;
+>> +     u32 read_ptr, write_ptr, capacity;
+>> +     u32 status, read_data, to_read;
+>> +     unsigned long flags, offset;
+>> +     struct cs_buffers *buf = sink_config;
+>> +     struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>> +
+>> +     if (!buf)
+>> +             return;
+>> +
+>> +     capacity = drvdata->buffer_depth * ETB_FRAME_SIZE_WORDS;
+>> +
+>> +     spin_lock_irqsave(&drvdata->spinlock, flags);
+>
+> This spinlock seems to be held over the entire readout operation,
+> however, I can't find clear rules wrt what structures etc are serialized
+> on it. Instead, the comment says "only one at a time pls". Same for
+> etm's big drvdata spinlock.
+
+That spinlock is there to serialise actions coming from sysFS.  I
+originally added the spinlock to 'etb_update_buffer()' to guard
+against reading the internal RAM buffer from sysfs while a perf
+session is active.  But after supplementing 'etb_dump()' with 'mode'
+awareness this spinlock it is no longer required.
+
+>
+> Regards,
+> --
+> Alex
