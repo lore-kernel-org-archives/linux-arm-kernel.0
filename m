@@ -1,77 +1,78 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 27 Jan 2016 16:57:19 +0800
-Subject: [PATCH v3 12/17] ARM64: ACPI: Check if it runs on Xen to enable
- or disable ACPI
-In-Reply-To: <56A87F77.8070506@linaro.org>
-References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
- <1453519184-11908-13-git-send-email-zhaoshenglong@huawei.com>
- <56A87F77.8070506@linaro.org>
-Message-ID: <56A8866F.5060302@huawei.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 27 Jan 2016 18:10:48 +0900
+Subject: [PATCH v3 0/3] arm64/clk: EXYNOS: Consolidate Exynos7 symbol
+In-Reply-To: <1453795504-12302-1-git-send-email-k.kozlowski@samsung.com>
+References: <1453795504-12302-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <56A88998.5040602@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 26.01.2016 17:05, Krzysztof Kozlowski wrote:
+> Hi,
+> 
+> Third attempt to remove ARCH_EXYNOS7 symbol.
+> 
+> Patches cannot be cherry-picked. I was thinking about merging this
+> through arm-soc tree after getting needed acks (clk, arm-soc?).
+
+The patchset was rebased on quite old linux-next. Rebasing on current
+code makes only one difference - the s3c64xx gained multiplatform support.
+
+I don't want to spam the lists so, I'll respin everything tomorrow after
+proper rebasing.
+
+Best regards,
+Krzysztof
 
 
-On 2016/1/27 16:27, Hanjun Guo wrote:
-> Hi Shannon,
 > 
-> On 2016/1/23 11:19, Shannon Zhao wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
->>
->> When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
->> a /hypervisor node in DT. So check if it needs to enable ACPI.
->>
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> ---
->> CC: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>   arch/arm64/kernel/acpi.c | 12 ++++++++----
->>   1 file changed, 8 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index d1ce8e2..4e92be0 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned
->> long node,
->>   {
->>       /*
->>        * Return 1 as soon as we encounter a node at depth 1 that is
->> -     * not the /chosen node.
->> +     * not the /chosen node, or /hypervisor node when running on Xen.
+> Changes since v2:
+> =================
+> 1. Follow Arnd's advice about not enabling silently the newly added
+>    EXYNOS_ARM64_COMMON_CLK, when COMPILE_TEST is enabled. This was
+>    also a trigger for some changes in placement of Samsung clocks
+>    Kconfig entries...
+> 2. ... which lead to introducing patch 1.
 > 
-> The comment is bit misleading, we need to specify two mode, running on
-> Xen or not, if not on xen, then /chosen node is enough.
 > 
-Ok, will rephrase it.
-
->>        */
->> -    if (depth == 1 && (strcmp(uname, "chosen") != 0))
->> -        return 1;
->> +    if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
->> +        if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
->> +            return 1;
->> +    }
->> +
->>       return 0;
->>   }
->>
->> @@ -184,7 +187,8 @@ void __init acpi_boot_table_init(void)
->>       /*
->>        * Enable ACPI instead of device tree unless
->>        * - ACPI has been disabled explicitly (acpi=off), or
->> -     * - the device tree is not empty (it has more than just a
->> /chosen node)
->> +     * - the device tree is not empty (it has more than just a
->> /chosen node,
->> +     *   and a /hypervisor node when running on Xen)
+> Logic:
+> ======
+> Now the clock selection algorithm works like:
+> 1. For Exynos ARMv7 and ARMv8 the platforms select COMMON_CLK
+>    and COMMON_CLK_SAMSUNG.
+> 2. As before: clock drivers for Exynos ARMv7 will be selected by
+>    respective SOC/ARCH_EXYNOS_XXX symbol.
+> 3. For Exynos ARMv8 the clock drivers will be enabled by default
+>    by EXYNOS_ARM64_COMMON_CLK symbol.
 > 
-> and here too.
+> Rationale:
+> ==========
+> We don't need ARCH_EXYNOS7 symbol because all ARMv8 platforms should
+> fall under generic ARCH_EXYNOS. In the same time there is no sense
+> in building clocks for these ARMv8 SoCs on ARMv7 builds. In future
+> this will also influence PMU [1] driver.
 > 
-> if that is addressed,
 > 
-> Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-Thanks!
-
--- 
-Shannon
+> Best regards,
+> Krzysztof
+> 
+> [1] https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg48090.html
+> 
+> 
+> Krzysztof Kozlowski (3):
+>   clk: samsung: Enable COMPILE_TEST for Samsung clocks
+>   clk: samsung: Don't build ARMv8 clock drivers on ARMv7
+>   arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS
+> 
+>  arch/arm/Kconfig                    |  1 +
+>  arch/arm/mach-exynos/Kconfig        |  1 +
+>  arch/arm/mach-s3c24xx/Kconfig       |  8 ++++++++
+>  arch/arm/mach-s5pv210/Kconfig       |  1 +
+>  arch/arm64/Kconfig.platforms        | 12 +++---------
+>  arch/arm64/boot/dts/exynos/Makefile |  2 +-
+>  arch/arm64/configs/defconfig        |  2 +-
+>  drivers/clk/Kconfig                 |  2 +-
+>  drivers/clk/samsung/Kconfig         | 14 +++++++++-----
+>  drivers/clk/samsung/Makefile        |  4 ++--
+>  10 files changed, 28 insertions(+), 19 deletions(-)
+> 
