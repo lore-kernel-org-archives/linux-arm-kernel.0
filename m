@@ -1,27 +1,32 @@
-From: macro@linux-mips.org (Maciej W. Rozycki)
-Date: Wed, 27 Jan 2016 15:15:26 +0000 (GMT)
-Subject: [PATCH 5/9] net: fddi/defxx: avoid warning about uninitialized
- variable use
-In-Reply-To: <1453903507-3427225-6-git-send-email-arnd@arndb.de>
-References: <1453903507-3427225-1-git-send-email-arnd@arndb.de>
- <1453903507-3427225-6-git-send-email-arnd@arndb.de>
-Message-ID: <alpine.LFD.2.20.1601271513480.7055@eddie.linux-mips.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Jan 2016 16:14:32 +0100
+Subject: [PATCH V2 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge driver
+ to work on both Zynq and Microblaze
+In-Reply-To: <8520D5D51A55D047800579B09414719825873DA8@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
+ <4734542.KZZp0TeeeM@wuerfel>
+ <8520D5D51A55D047800579B09414719825873DA8@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <5255218.OREPu5Af3W@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Jan 2016, Arnd Bergmann wrote:
+On Wednesday 27 January 2016 14:33:45 Bharat Kumar Gogada wrote:
+> > > @@ -705,7 +715,9 @@ static int xilinx_pcie_probe(struct
+> > > platform_device *pdev)  #endif
+> > >     pci_scan_child_bus(bus);
+> > >     pci_assign_unassigned_bus_resources(bus);
+> > > +#ifdef CONFIG_ARM
+> > >     pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+> > > +#endif
+> > >     pci_bus_add_devices(bus);
+> > >     platform_set_drvdata(pdev, port);
+> > 
+> > Here it looks like microblaze gets it right. I'm not sure why we still need the
+> > pci_fixup_irqs() on ARM, but my feeling is that this should be fixed in
+> > common code.
+> In arm pci_fixup_irqs is called by pci_common_init_dev (arch/arm/kernel/bios32.c), since this API is removed now, I was calling it separately.
 
-> This adds code to ensure that the BAR values are initialized
-> even in the impossible case when a device gets probed that
-> does not belong to any bus. This shuts up the warning.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/net/fddi/defxx.c | 5 +++++
->  1 file changed, 5 insertions(+)
+But who calls it in microblaze? If it works without the extra call there,
+can we make it work the same way for ARM?
 
- NAK, fixed already, commit 62f2aaabcf41 ("defxx: fix build warning").
-
- Thanks for looking into this problem though, always welcome!
-
-  Maciej
+	Arnd
