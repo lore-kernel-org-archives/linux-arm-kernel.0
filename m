@@ -1,11 +1,12 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 27 Jan 2016 14:28:52 +0100
-Subject: [PATCH v2 6/6] ARM: mvebu: use the ARMADA_370_XP_IRQ option
-In-Reply-To: <1453899395-3532-7-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Wed, 27 Jan 2016 13:56:35 +0100")
+Date: Wed, 27 Jan 2016 14:39:23 +0100
+Subject: [PATCH v2 3/6] irqchip: irq-armada-370-xp: use
+ PCI_MSI_DOORBELL_START where appropriate
+In-Reply-To: <1453899395-3532-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Wed, 27 Jan 2016 13:56:32 +0100")
 References: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1453899395-3532-7-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <87lh7b9mnf.fsf@free-electrons.com>
+ <1453899395-3532-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <87h9hz9m5w.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,84 +14,41 @@ Hi Thomas,
  
  On mer., janv. 27 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-> Now that there is a ARMADA_370_XP_IRQ option to enable the irqchip
-> driver for Armada 370, XP, 375, 38x and 39x, let's select this option
-> when needed. Note that this selection is currently not mandatory
-> because ARMADA_370_XP_IRQ is for now always enabled when ARCH_MVEBU=y,
-> but this is something that we will change in the future, and therefore
-> we should make the relevant platforms select ARMADA_370_XP_IRQ when
-> needed.
+> As suggested by Gregory Clement, this commit adjusts the
+> irq-armada-370-xp driver to use the PCI_MSI_DOORBELL_START define in
+> the armada_370_xp_handle_msi_irq() function, rather than hardcoding
+> its value.
 >
-> Due to this, selecting GENERIC_IRQ_CHIP is no longer needed.
->
+> Suggested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
 Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-This patch can also be merged through the irqchip tree to be sure that
-will be merged after the 2st patch whiwh select GENERIC_IRQ_CHIP when
-ARMADA_370_XP_IRQ is selected.
 
 Thanks,
 
 Gregory
 
 > ---
->  arch/arm/mach-mvebu/Kconfig | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+>  drivers/irqchip/irq-armada-370-xp.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 >
-> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-> index 64e3d2c..b003e3a 100644
-> --- a/arch/arm/mach-mvebu/Kconfig
-> +++ b/arch/arm/mach-mvebu/Kconfig
-> @@ -3,7 +3,6 @@ menuconfig ARCH_MVEBU
->  	depends on ARCH_MULTI_V7 || ARCH_MULTI_V5
->  	select ARCH_SUPPORTS_BIG_ENDIAN
->  	select CLKSRC_MMIO
-> -	select GENERIC_IRQ_CHIP
->  	select PINCTRL
->  	select PLAT_ORION
->  	select SOC_BUS
-> @@ -29,6 +28,7 @@ config MACH_ARMADA_370
->  	bool "Marvell Armada 370 boards"
->  	depends on ARCH_MULTI_V7
->  	select ARMADA_370_CLK
-> +	select ARMADA_370_XP_IRQ
->  	select CPU_PJ4B
->  	select MACH_MVEBU_V7
->  	select PINCTRL_ARMADA_370
-> @@ -39,6 +39,7 @@ config MACH_ARMADA_370
->  config MACH_ARMADA_375
->  	bool "Marvell Armada 375 boards"
->  	depends on ARCH_MULTI_V7
-> +	select ARMADA_370_XP_IRQ
->  	select ARM_ERRATA_720789
->  	select ARM_ERRATA_753970
->  	select ARM_GIC
-> @@ -58,6 +59,7 @@ config MACH_ARMADA_38X
->  	select ARM_ERRATA_720789
->  	select ARM_ERRATA_753970
->  	select ARM_GIC
-> +	select ARMADA_370_XP_IRQ
->  	select ARMADA_38X_CLK
->  	select HAVE_ARM_SCU
->  	select HAVE_ARM_TWD if SMP
-> @@ -72,6 +74,7 @@ config MACH_ARMADA_39X
->  	bool "Marvell Armada 39x boards"
->  	depends on ARCH_MULTI_V7
->  	select ARM_GIC
-> +	select ARMADA_370_XP_IRQ
->  	select ARMADA_39X_CLK
->  	select CACHE_L2X0
->  	select HAVE_ARM_SCU
-> @@ -86,6 +89,7 @@ config MACH_ARMADA_39X
->  config MACH_ARMADA_XP
->  	bool "Marvell Armada XP boards"
->  	depends on ARCH_MULTI_V7
-> +	select ARMADA_370_XP_IRQ
->  	select ARMADA_XP_CLK
->  	select CPU_PJ4B
->  	select MACH_MVEBU_V7
+> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+> index e5738c5..f53eb71 100644
+> --- a/drivers/irqchip/irq-armada-370-xp.c
+> +++ b/drivers/irqchip/irq-armada-370-xp.c
+> @@ -401,10 +401,10 @@ static void armada_370_xp_handle_msi_irq(struct pt_regs *regs, bool is_chained)
+>  
+>  		if (is_chained) {
+>  			irq = irq_find_mapping(armada_370_xp_msi_inner_domain,
+> -					       msinr - 16);
+> +					       msinr - PCI_MSI_DOORBELL_START);
+>  			generic_handle_irq(irq);
+>  		} else {
+> -			irq = msinr - 16;
+> +			irq = msinr - PCI_MSI_DOORBELL_START;
+>  			handle_domain_irq(armada_370_xp_msi_inner_domain,
+>  					  irq, regs);
+>  		}
 > -- 
 > 2.6.4
 >
