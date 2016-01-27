@@ -1,132 +1,128 @@
-From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
-Date: Wed, 27 Jan 2016 19:05:41 +0000
-Subject: iommu/arm-smmu-v2 ASID/VMID calculation
-In-Reply-To: <56A75D0A.7000806@arm.com>
-References: <198F501C-8D30-4EB5-BC40-4F40BB75D40B@caviumnetworks.com>
- <20160125170312.GJ22927@arm.com>
- <E978AB4F-5CB0-42D8-8152-04C77DB664A1@caviumnetworks.com>
- <6F24A28A-6302-4C48-A933-B47A9735808C@caviumnetworks.com>
- <56A75D0A.7000806@arm.com>
-Message-ID: <4074E06E-82EE-45D5-A817-26462CBAADDA@caviumnetworks.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 27 Jan 2016 10:13:20 -0800
+Subject: [PATCH 4.3 133/157] arm64: bpf: fix div-by-zero case
+In-Reply-To: <20160127180932.533735338@linuxfoundation.org>
+References: <20160127180932.533735338@linuxfoundation.org>
+Message-ID: <20160127180939.823021039@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+4.3-stable review patch.  If anyone has any objections, please let me know.
 
+------------------
 
+From: Zi Shen Lim <zlim.lnx@gmail.com>
 
+commit 251599e1d6906621f49218d7b474ddd159e58f3b upstream.
 
+In the case of division by zero in a BPF program:
+	A = A / X;  (X == 0)
+the expected behavior is to terminate with return value 0.
 
-On 1/26/16, 3:48 AM, "Robin Murphy" <robin.murphy@arm.com> wrote:
+This is confirmed by the test case introduced in commit 86bf1721b226
+("test_bpf: add tests checking that JIT/interpreter sets A and X to 0.").
 
->On 26/01/16 03:11, Chalamarla, Tirumalesh wrote:
->> one my colleague points out, ASIDPNE also implementation defined.
->
->ASIDPNE only covers whether the SMMU's TLBs may ignore broadcast 
->_invalidation_ or not, not lookups. Broadcast TLB lookups are not a thing.
-Agreed.
->
->> Thanks,
->> Tirumalesh.
->>
->>
->>
->> On 1/25/16, 4:48 PM, "linux-arm-kernel on behalf of Chalamarla, Tirumalesh" <linux-arm-kernel-bounces at lists.infradead.org on behalf of Tirumalesh.Chalamarla@caviumnetworks.com> wrote:
->>
->>> I don?t think it followed spec.
->>>
->>> The SMMU spec (IHI0062C) says (section 2.2):
->>>
->>>    - The exact behavior of any TLB functionality is IMPLEMENTATION DEFINED
->>>
->>> Section 2.2 describes the constraints on sharing (e.g. multiple contexts
->>> using the same ASID says):
->>>
->>>       "If multiple context banks have hte same attributes but describe
->>>        different translations, the results of a TLB lookup are UNPREDICTABLE".
->
->Multiple context banks within the same SMMU, that is.
->
->>> The present smmu driver assumes ASID should only be unique per SMMU, this might not be true for all
->>> Implementations.
->
->Where "SMMU" implies "set of context banks behind a single programming 
->interface", i.e. it should be true for all architecturally-compliant 
->implementations.
->
->What if you take your system, fire up two cores with SMP disabled, and 
->run an independent instance of Linux on each, with all the system 
->resources divided up equally between them and no communication? If one 
->OS using one SMMU can make the other OS using a different SMMU go wrong, 
->then the hardware is simply broken. Sure, we can probably quirk ASID 
->allocation in the driver, but it raises the question of what else we 
->would need to do to keep SMMUs which believe they're supposed to be 
->independent from DoS'ing each other..
+Reported-by: Yang Shi <yang.shi@linaro.org>
+Tested-by: Yang Shi <yang.shi@linaro.org>
+CC: Xi Wang <xi.wang@gmail.com>
+CC: Alexei Starovoitov <ast@plumgrid.com>
+CC: linux-arm-kernel at lists.infradead.org
+CC: linux-kernel at vger.kernel.org
+Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
+Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-This analogy is wrong, if 2 different entities running on two cores, SMMU is the least thing that needs to be worried.
-Rest aside they must cooperate with each other to coexists. that?s why we needed all the glory Virtualization.  
->
->Robin.
->
->>> On 1/25/16, 9:03 AM, "Will Deacon" <will.deacon@arm.com> wrote:
->>>
->>>> On Thu, Jan 21, 2016 at 06:52:34PM +0000, Chalamarla, Tirumalesh wrote:
->>>>> Hi Will,
->>>>
->>>> Hello,
->>>>
->>>>> Current ASID/VMID calculation logic makes lot of assumption about internal TLB
->>>>> implementation of SMMU,
->>>>
->>>> Not really. It makes assumptions that the hardware follows the architecture,
->>>> which is hardly unreasonable as a starting point.
->>>>
->>>>> Systems like ThunderX have more than one smmu in the system and it can use same
->>>>> TLBs with more than one of them and expects ASID to be unique
->>>>
->>>> ... but that's broken. If you built a system where the CPUs shared a TLB,
->>>> you would run into issues as well.
->>>>
->>>> How does this work with things like arm_smmu_tlb_sync and the TLBGSTATUS
->>>> register?
->>>>
->>>>> Current logic
->>>>>
->>>>> #define ARM_SMMU_CB_ASID(cfg)           ((cfg)->cbndx)
->>>>> #define ARM_SMMU_CB_VMID(cfg)           ((cfg)->cbndx + 1)
->>>>>
->>>>>
->>>>> Can this be replaced by something like
->>>>>
->>>>>
->>>>> #define ARM_SMMU_CB_ASID(cfg, smmu)             (((smmu)->idx << (smmu)->asid_shift) | (cfg)->cbndx)
->>>>> #define ARM_SMMU_CB_VMID(cfg, smmu)             (((smmu)->idx << (smmu)->vmid_shift) | (cfg)->cbndx + 1)
->>>>>
->>>>>
->>>>> Idx and shift can be passed from device-tree.
->>>>>
->>>>>
->>>>> Please let me know if this is acceptable, I will prepare a proper patch
->>>>> and send to list.
->>>>>
->>>>>
->>>>> If this is not acceptable through an alternative suggestion.
->>>>
->>>> If we're going to put something into the device-tree, then it should be
->>>> an erratum property describing the offset to be applied to ASID/VMIDs.
->>>> You also need to take care not to describe overlapping numberspaces.
->>> I don?t think that is an errata.
->>>>
->>>> How many context banks do you implement in each SMMU?
->>> 128.
->>>>
->>>> Will
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->> _______________________________________________
->> iommu mailing list
->> iommu at lists.linux-foundation.org
->> https://lists.linuxfoundation.org/mailman/listinfo/iommu
->>
->
+---
+ arch/arm64/net/bpf_jit.h      |    3 ++-
+ arch/arm64/net/bpf_jit_comp.c |   37 +++++++++++++++++++++++++------------
+ 2 files changed, 27 insertions(+), 13 deletions(-)
+
+--- a/arch/arm64/net/bpf_jit.h
++++ b/arch/arm64/net/bpf_jit.h
+@@ -1,7 +1,7 @@
+ /*
+  * BPF JIT compiler for ARM64
+  *
+- * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
++ * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -35,6 +35,7 @@
+ 	aarch64_insn_gen_comp_branch_imm(0, offset, Rt, A64_VARIANT(sf), \
+ 		AARCH64_INSN_BRANCH_COMP_##type)
+ #define A64_CBZ(sf, Rt, imm19) A64_COMP_BRANCH(sf, Rt, (imm19) << 2, ZERO)
++#define A64_CBNZ(sf, Rt, imm19) A64_COMP_BRANCH(sf, Rt, (imm19) << 2, NONZERO)
+ 
+ /* Conditional branch (immediate) */
+ #define A64_COND_BRANCH(cond, offset) \
+--- a/arch/arm64/net/bpf_jit_comp.c
++++ b/arch/arm64/net/bpf_jit_comp.c
+@@ -1,7 +1,7 @@
+ /*
+  * BPF JIT compiler for ARM64
+  *
+- * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
++ * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -225,6 +225,17 @@ static int build_insn(const struct bpf_i
+ 	u8 jmp_cond;
+ 	s32 jmp_offset;
+ 
++#define check_imm(bits, imm) do {				\
++	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
++	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
++		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
++			i, imm, imm);				\
++		return -EINVAL;					\
++	}							\
++} while (0)
++#define check_imm19(imm) check_imm(19, imm)
++#define check_imm26(imm) check_imm(26, imm)
++
+ 	switch (code) {
+ 	/* dst = src */
+ 	case BPF_ALU | BPF_MOV | BPF_X:
+@@ -258,8 +269,21 @@ static int build_insn(const struct bpf_i
+ 		break;
+ 	case BPF_ALU | BPF_DIV | BPF_X:
+ 	case BPF_ALU64 | BPF_DIV | BPF_X:
++	{
++		const u8 r0 = bpf2a64[BPF_REG_0];
++
++		/* if (src == 0) return 0 */
++		jmp_offset = 3; /* skip ahead to else path */
++		check_imm19(jmp_offset);
++		emit(A64_CBNZ(is64, src, jmp_offset), ctx);
++		emit(A64_MOVZ(1, r0, 0, 0), ctx);
++		jmp_offset = epilogue_offset(ctx);
++		check_imm26(jmp_offset);
++		emit(A64_B(jmp_offset), ctx);
++		/* else */
+ 		emit(A64_UDIV(is64, dst, dst, src), ctx);
+ 		break;
++	}
+ 	case BPF_ALU | BPF_MOD | BPF_X:
+ 	case BPF_ALU64 | BPF_MOD | BPF_X:
+ 		ctx->tmp_used = 1;
+@@ -393,17 +417,6 @@ emit_bswap_uxt:
+ 		emit(A64_ASR(is64, dst, dst, imm), ctx);
+ 		break;
+ 
+-#define check_imm(bits, imm) do {				\
+-	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
+-	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
+-		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
+-			i, imm, imm);				\
+-		return -EINVAL;					\
+-	}							\
+-} while (0)
+-#define check_imm19(imm) check_imm(19, imm)
+-#define check_imm26(imm) check_imm(26, imm)
+-
+ 	/* JUMP off */
+ 	case BPF_JMP | BPF_JA:
+ 		jmp_offset = bpf2a64_offset(i + off, i, ctx);
