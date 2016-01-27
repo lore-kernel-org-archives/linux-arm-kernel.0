@@ -1,40 +1,73 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 27 Jan 2016 13:56:32 +0100
-Subject: [PATCH v2 3/6] irqchip: irq-armada-370-xp: use PCI_MSI_DOORBELL_START
- where appropriate
-In-Reply-To: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1453899395-3532-4-git-send-email-thomas.petazzoni@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 27 Jan 2016 13:10:51 +0000
+Subject: [PATCH v4 1/3] gpio: xgene: Enable X-Gene standby GPIO as
+ interrupt controller
+In-Reply-To: <CAFopSPR1ZKinH=N29gaAu3M8oc-vfKUnPsFpAu3EUNb3Doi68w@mail.gmail.com>
+References: <1453792935-19916-1-git-send-email-qnguyen@apm.com>
+ <1453792935-19916-2-git-send-email-qnguyen@apm.com> <56A74BD3.40801@arm.com>
+ <CAFopSPTz=sdZs_WZrU8ryTRXNtb4GPOMA_sj8HMPMxWBxV2w4A@mail.gmail.com>
+ <56A7AF48.8020605@arm.com>
+ <CAFopSPR1ZKinH=N29gaAu3M8oc-vfKUnPsFpAu3EUNb3Doi68w@mail.gmail.com>
+Message-ID: <56A8C1DB.5040606@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As suggested by Gregory Clement, this commit adjusts the
-irq-armada-370-xp driver to use the PCI_MSI_DOORBELL_START define in
-the armada_370_xp_handle_msi_irq() function, rather than hardcoding
-its value.
+Quan,
 
-Suggested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/irqchip/irq-armada-370-xp.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On 27/01/16 12:48, Quan Nguyen wrote:
+> On Wed, Jan 27, 2016 at 12:39 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 26/01/16 16:27, Quan Nguyen wrote:
+>>> On Tue, Jan 26, 2016 at 5:34 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>>
+>>>> On 26/01/16 07:22, Quan Nguyen wrote:
+>>>>> Enable X-Gene standby GPIO controller as interrupt controller to provide
+>>>>> its own resources. This avoids ambiguity where GIC interrupt resource is
+>>>>> use as X-Gene standby GPIO interrupt resource in user driver.
+>>>>>
+>>>>> Signed-off-by: Y Vo <yvo@apm.com>
+>>>>> Signed-off-by: Quan Nguyen <qnguyen@apm.com>
+>>>>> ---
+>>>>>  drivers/gpio/gpio-xgene-sb.c | 331 ++++++++++++++++++++++++++++++++++++-------
+>>>>>  1 file changed, 276 insertions(+), 55 deletions(-)
+>>
+>> [...]
+>>>>> @@ -90,6 +301,32 @@ static int xgene_gpio_sb_probe(struct platform_device *pdev)
+>>>>>       if (IS_ERR(regs))
+>>>>>               return PTR_ERR(regs);
+>>>>>
+>>>>> +     priv->regs = regs;
+>>>>> +
+>>>>> +     of_id = of_match_device(xgene_gpio_sb_of_match, &pdev->dev);
+>>>>> +     if (of_id)
+>>>>> +             priv->flags = (uintptr_t)of_id->data;
+>>>>
+>>>> Wait. Everything is hardcoded? So why do we have to deal with looking
+>>>> into that structure if nothing is actually parametrized?
+>>>
+>>> There will be other instances with difference number of irq pins /gpio
+>>> /start_irq_base etc.
+>>
+>> Then it has to be described in DT right now.
+>>
+> 
+> What I was thinking is to have other id to match with difference
+> instances and these code can be use for ACPI also. Let say
+> "apm,xgene2-gpio-sb"
+> Please help correcting me if it is not right.
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index e5738c5..f53eb71 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -401,10 +401,10 @@ static void armada_370_xp_handle_msi_irq(struct pt_regs *regs, bool is_chained)
- 
- 		if (is_chained) {
- 			irq = irq_find_mapping(armada_370_xp_msi_inner_domain,
--					       msinr - 16);
-+					       msinr - PCI_MSI_DOORBELL_START);
- 			generic_handle_irq(irq);
- 		} else {
--			irq = msinr - 16;
-+			irq = msinr - PCI_MSI_DOORBELL_START;
- 			handle_domain_irq(armada_370_xp_msi_inner_domain,
- 					  irq, regs);
- 		}
+I still think this is the wrong thing to do. You are hiding magic values
+in the driver, for no good reason. If ACPI has such a broken model that
+it cannot give you the various parameters you need, then this is an ACPI
+problem you can solve in the ACPI-specific code. Alternatively, you
+could also fix your ACPI tables to be less braindead.
+
+But please do not turn the DT code into the same mess for the sake of
+using the lowest common denominator. Have a set of properties describing
+the HW, a compatibility string to nicely identify the revision, and use
+that. You can still hardcode things for ACPI if you desperately need it.
+
+Thanks,
+
+	M.
 -- 
-2.6.4
+Jazz is not dead. It just smells funny...
