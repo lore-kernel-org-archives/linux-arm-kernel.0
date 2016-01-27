@@ -1,48 +1,49 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 27 Jan 2016 15:11:51 -0600
-Subject: [PATCH 03/13] dtb: amd: Fix DMA ranges in device tree
+Date: Wed, 27 Jan 2016 15:11:54 -0600
+Subject: [PATCH 06/13] dtb: amd: Misc changes for SATA device tree nodes
 In-Reply-To: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1453929121-12171-4-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1453929121-12171-7-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 
-Fix DMA ranges of smb0 and pcie0 nodes in AMD Seattle SOC.
+Add new SATA1 device node, and fix the register range size of SATA0.
 
+Signed-off-by: Tom Lendacky <thomas.lendacky@amd.com>
 Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 ---
- arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-index fdd0c96..5c73117 100644
+index 4be36fd..9f59381 100644
 --- a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
 +++ b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-@@ -55,8 +55,12 @@
- 		#size-cells = <2>;
- 		ranges;
+@@ -66,12 +66,22 @@
  
--		/* DDR range is 40-bit addressing */
--		dma-ranges = <0x80 0x0 0x80 0x0 0x7f 0xffffffff>;
-+		/*
-+		 * dma-ranges is 40-bit address space containing:
-+		 * - GICv2m MSI register is at 0xe0080000
-+		 * - DRAM range [0x8000000000 to 0xffffffffff]
-+		 */
-+		dma-ranges = <0x0 0x0 0x0 0x0 0x100 0x0>;
- 
- 		/include/ "amd-seattle-clks.dtsi"
- 
-@@ -159,7 +163,7 @@
- 				<0x1000 0x0 0x0 0x4 &gic0 0x0 0x0 0x0 0x123 0x1>;
- 
+ 		sata0: sata at e0300000 {
+ 			compatible = "snps,dwc-ahci";
+-			reg = <0 0xe0300000 0 0x800>;
++			reg = <0 0xe0300000 0 0xf0000>;
+ 			interrupts = <0 355 4>;
+ 			clocks = <&sataclk_333mhz>;
  			dma-coherent;
--			dma-ranges = <0x43000000 0x80 0x0 0x80 0x0 0x7f 0xffffffff>;
-+			dma-ranges = <0x43000000 0x0 0x0 0x0 0x0 0x100 0x0>;
- 			ranges =
- 				/* I/O Memory (size=64K) */
- 				<0x01000000 0x00 0x00000000 0x00 0xefff0000 0x00 0x00010000>,
+ 		};
+ 
++		/* This is for Rev B only */
++		sata1: sata at e0d00000 {
++			status = "disabled";
++			compatible = "snps,dwc-ahci";
++			reg = <0 0xe0d00000 0 0xf0000>;
++			interrupts = <0 354 4>;
++			clocks = <&sataclk_333mhz>;
++			dma-coherent;
++		};
++
+ 		i2c0: i2c at e1000000 {
+ 			status = "disabled";
+ 			compatible = "snps,designware-i2c";
 -- 
 2.5.0
