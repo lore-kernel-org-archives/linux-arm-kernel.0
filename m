@@ -1,50 +1,59 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Wed, 27 Jan 2016 13:45:59 +0000
-Subject: [PATCH 0/3] ACPI: parse the SPCR table
-In-Reply-To: <56A8B570.2060501@linaro.org>
-References: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>
- <56A6494E.3090303@hurleysoftware.com> <56A8B570.2060501@linaro.org>
-Message-ID: <20160127134559.1065a45f@lxorguk.ukuu.org.uk>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 27 Jan 2016 22:48:55 +0900
+Subject: [PATCH 14/15] Revert "bus: uniphier: allow only built-in driver"
+In-Reply-To: <1453868872-26300-15-git-send-email-wangkefeng.wang@huawei.com>
+References: <1453868872-26300-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1453868872-26300-15-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <CAK7LNAR=E5kYzsO9=YDeAVzp9cLWd9C8ANeVGJOvM=BSM4aTjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Jan 2016 15:17:52 +0300
-Aleksey Makarov <aleksey.makarov@linaro.org> wrote:
+2016-01-27 13:27 GMT+09:00 Kefeng Wang <wangkefeng.wang@huawei.com>:
+> This reverts commit 326ea45aa827da6686c78b5907f9839f91ef5782.
+>
+> After covering to use helper of_platform_default_populate() to
+> populate the default bus, no error in build uniphier driver as
+> a module.
 
-> On 01/25/2016 07:11 PM, Peter Hurley wrote:
-> > On 01/25/2016 03:45 AM, Aleksey Makarov wrote:  
-> >> This patchset is based on the patchset by Leif Lindholm [1]
-> >>
-> >> 'ARM Server Base Boot Requirements' [2] mention SPCR 
-> >> (Serial Port Console Redirection Table) [3] as a mandatory
-> >> ACPI table that specifies the configuration of serial console.
-> >>
-> >> Licensing concerns have prevented implementing it in the past, but as of
-> >> 10 August 2015, these tables have both been released also under 
-> >> OWF 1.0 [4].  
-> > 
-> > This license has a patent retaliation provision, which makes it
-> > incompatible with GPLv2.
-> > 
-> > *If the license applies to this code*, then this patch set does not
-> > meet the criteria for submission.  
-> 
-> The license applies not to this code but to the document describing the tables.
-> 
-> Here is an excerpt from it:
-> 
->   Patent Notice:
->   Microsoft is making certain patent rights available for implementations of this specification under two options:
->   1)  Microsoft?s Community Promise, available at
->   http://www.microsoft.com/openspecifications/en/us/programs/community-promise/default.aspx; or
->   2)  The Open Web Foundation Final Specification Agreement Version 1.0 ("OWF 1.0")
->   as of October 1, 2012, available at http://www.openwebfoundation.org/legal/the-owf-1-0-agreements/owfa-1-0. 
-> 
-> I believe that it means that the patch set meets the criteria for submission.  Am I right?
+This statement is weird.
+There is no error for building this driver as a module
+at the point of v4.5-rc1.
 
-This is not a forum for legal advice. I would suggest that Linaro
-discusses it privately with the Linux Foundation and Linus and does so
-under attorney-client privilege. The Linux Foundation does have some
-reasons to exist.
+The of_platform_default_populate() conversion (11/15) is unrelated
+to fixing the build error.
 
-Alan
+BTW, I had already posted an equivalent patch a few days before:
+
+https://patchwork.kernel.org/patch/8096991/
+
+
+
+
+> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
+>  drivers/bus/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+> index 129d47b..9a92c07 100644
+> --- a/drivers/bus/Kconfig
+> +++ b/drivers/bus/Kconfig
+> @@ -132,7 +132,7 @@ config SUNXI_RSB
+>           and AC100/AC200 ICs.
+>
+>  config UNIPHIER_SYSTEM_BUS
+> -       bool "UniPhier System Bus driver"
+> +       tristate "UniPhier System Bus driver"
+>         depends on ARCH_UNIPHIER && OF
+>         default y
+>         help
+> --
+> 2.6.0.GIT
+>
+
+
+-- 
+Best Regards
+Masahiro Yamada
