@@ -1,50 +1,66 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 27 Jan 2016 10:25:39 +0100
-Subject: [PATCH 2/6] mtd: physmap_of: add a hook for Versatile write
- protection
-In-Reply-To: <20160126113707.GL10826@n2100.arm.linux.org.uk>
-References: <1453806725-4880-1-git-send-email-linus.walleij@linaro.org>
- <1453806725-4880-3-git-send-email-linus.walleij@linaro.org>
- <20160126113707.GL10826@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdYnWiARgFACZ0P_m+awTPbUf5yoQSawphRiKkWRV8ZD1Q@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 27 Jan 2016 18:25:43 +0900
+Subject: [PATCH 1/2] ARM: dts: r8a7793: add CAN clocks
+In-Reply-To: <CAMuHMdXDrFFhsTQ_2arc4rq-NiX-pg_a60YbJZE352Tg856-yw@mail.gmail.com>
+References: <1453352981-16104-1-git-send-email-horms+renesas@verge.net.au>
+ <1453352981-16104-2-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdX5sZ7yNjgu8Ns26+91+ui2YuVfGavJi_XRa6Kd-yzoBQ@mail.gmail.com>
+ <20160121121525.GA6833@verge.net.au>
+ <20160122004823.GA15068@verge.net.au>
+ <CAMuHMdXDrFFhsTQ_2arc4rq-NiX-pg_a60YbJZE352Tg856-yw@mail.gmail.com>
+Message-ID: <20160127092536.GA24261@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 12:37 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jan 26, 2016 at 12:12:01PM +0100, Linus Walleij wrote:
->> Solve this by looking for the arm,versatile-flash compatible
->> string in the flash device tree node. In the driver,
->> add a special hook to check for the various Versatile syscons and
->> register a callback for .set_vpp() if this compatible is present.
->
-> You are aware that the "write enable" applies to all flash devices
-> on the board, and not just NOR flash.  What that means is if you
-> have drivers for the other flash devices, you need to have a way
-> to enable writes when _any_ driver wants write access.
->
-> So, it shouldn't be part of the flash driver at all.
+On Fri, Jan 22, 2016 at 08:46:37AM +0100, Geert Uytterhoeven wrote:
+> On Fri, Jan 22, 2016 at 1:48 AM, Simon Horman <horms@verge.net.au> wrote:
+> >> > > --- a/arch/arm/boot/dts/r8a7793.dtsi
+> >> > > +++ b/arch/arm/boot/dts/r8a7793.dtsi
+> >> > > @@ -706,12 +706,30 @@
+> >> > >                         clock-output-names = "extal";
+> >> > >                 };
+> >> > >
+> >> > > +               /* External USB clock - can be overridden by the board */
+> >> > > +               usb_extal_clk: usb_extal_clk {
+> >> > > +                       compatible = "fixed-clock";
+> >> > > +                       #clock-cells = <0>;
+> >> > > +                       clock-frequency = <48000000>;
+> >> > > +                       clock-output-names = "usb_extal";
+> >> > > +               };
+> >> > > +
+> >> > > +               /* External CAN clock */
+> >> > > +               can_clk: can_clk {
+> >> > > +                       compatible = "fixed-clock";
+> >> > > +                       #clock-cells = <0>;
+> >> > > +                       /* This value must be overridden by the board. */
+> >> > > +                       clock-frequency = <0>;
+> >> > > +                       clock-output-names = "can_clk";
+> >> > > +                       status = "disabled";
+> >> > > +               };
+> >> > > +
+> >> > >                 /* Special CPG clocks */
+> >> > >                 cpg_clocks: cpg_clocks at e6150000 {
+> >> > >                         compatible = "renesas,r8a7793-cpg-clocks",
+> >> > >                                      "renesas,rcar-gen2-cpg-clocks";
+> >> > >                         reg = <0 0xe6150000 0 0x1000>;
+> >> > > -                       clocks = <&extal_clk>;
+> >> > > +                       clocks = <&extal_clk &usb_extal_clk>;
+> >> > >                         #clock-cells = <1>;
+> >> > >                         clock-output-names = "main", "pll0", "pll1", "pll3",
+> >> > >                                              "lb", "qspi", "sdh", "sd0", "z",
+> >> >
+> >> > To create the "rcan" clock, it should be listed in clock-output-names.
+> >
+> > Checking this morning I see that it is already there.
+> > The next line of the file is:
+> >
+> >                                              "rcan", "adsp";
+> 
+> I stand corrected.
+> 
+> BTW, that means you saw "failed to register ... rcan" messages
+> before?
 
-Yes this is correct ... I put in the current code to be able to
-test writes on the hardware. As to actually write to flash on
-the Integrator both flags must be set to 1.
+Yes, I checked and I see:
 
-I don't see why it would just be a problem just for write
-enable though, as I guess the VPP bit is *also* shared by all
-devices?
-
-After
-commit 876fe76d793d03077
-"mtd: maps: physmap: Add reference counter to set_vpp()"
-
-As long as the flash devices are all physmap this reference
-counter should hold VPP+WP enabled with this code as
-long as any flash device has called .set_vpp().
-
-It is a bit unintuitive that .set_vpp() is named like that though.
-.enable_write() or something would be better I guess.
-(The reference count also makes it start to reimplement
-the regulator infrastructure.)
-
-Yours,
-Linus Walleij
+rcar_gen2_cpg_clocks_init: failed to register cpg_clocks rcan clock (-12)
