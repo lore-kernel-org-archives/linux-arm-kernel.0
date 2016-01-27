@@ -1,207 +1,49 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 27 Jan 2016 10:44:20 +0100
-Subject: [PATCH 4/4] ARM: use proper helper while extracting cpu features
-In-Reply-To: <1453800223-18590-5-git-send-email-vladimir.murzin@arm.com>
-References: <1453800223-18590-1-git-send-email-vladimir.murzin@arm.com>
- <1453800223-18590-5-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <CAKv+Gu-97u3xFA6k7tTXD4=9tEBr+kvVvD-D5FYANt0PL5erOg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Jan 2016 10:44:01 +0100
+Subject: [linux-review:James-Hogan/kbuild-Remove-stale-asm-generic-wrappers/20160119-183642]
+ d979f99e9cc14e2667e9b6e268db695977e4197a BUILD DONE
+In-Reply-To: <20160127093018.GA21190@wfg-t540p.sh.intel.com>
+References: <569e1dbb.MgLv8OaZwklOxxtU%fengguang.wu@intel.com>
+ <1947556.38OyJnvGS5@wuerfel> <20160127093018.GA21190@wfg-t540p.sh.intel.com>
+Message-ID: <3596300.IYfzmako0c@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 January 2016 at 10:23, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
-> Update current users of cpu feature helpers to use the proper helper
-> depends on how feature bits should be handled. We follow the arm64
-> scheme [1] (slightly rephrased):
->
-> We have three types of fields:
->
-> a) A precise value or a value from which you derive some precise
->    value.
-> b) Fields defining the presence of a feature (1, 2, 3). These would
->    always be positive since the absence of such feature would mean a
->    value of 0
-> c) Fields defining the absence of a feature by setting 0xf. These are
->    usually fields that were initial RAZ and turned to -1.
->
-> So we can treat (a) and (b) as unsigned permanently and (c) as as
-> signed,
->
-> [1] https://lkml.org/lkml/2015/11/19/549
->
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+On Wednesday 27 January 2016 17:30:18 Fengguang Wu wrote:
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Looks good, I'm just unsure about "multi_v8_defconfig", this does not
+> > exist. Do you mean multi_v5_defconfig?
 
-I do feel that it would be very useful to document that nature of
-those fields in the ARM ARM. If it is the intention to expose
-incremental functionality, the values should be documented as such,
-e.g., AES[7:4] >= 1 means AES instructions supported, >= 2 means AES
-and PMULL instructions supported. Without classifying the fields in
-such a way, there is no way to be compatible with future extensions.
-In this example, it would perhaps be safer to assume no such
-instructions are supported for values outside of the documented range.
+> Ah yes, multi_v8_defconfig does not exist actually.
 
--- 
-Ard.
+Ok, can you include multi_v5_defconfig than?
 
+I see you have one named "arm-arm5", which may be the same.
 
-> ---
->  arch/arm/include/asm/smp_plat.h |    4 ++--
->  arch/arm/kernel/setup.c         |   34 ++++++++++++++++++++--------------
->  arch/arm/kernel/thumbee.c       |    4 +---
->  arch/arm/mm/mmu.c               |    2 +-
->  4 files changed, 24 insertions(+), 20 deletions(-)
->
-> diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-> index f908071..03bbe02 100644
-> --- a/arch/arm/include/asm/smp_plat.h
-> +++ b/arch/arm/include/asm/smp_plat.h
-> @@ -49,7 +49,7 @@ static inline int tlb_ops_need_broadcast(void)
->         if (!is_smp())
->                 return 0;
->
-> -       return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 2;
-> +       return cpuid_feature_extract_unsigned(CPUID_EXT_MMFR3, 12) < 2;
->  }
->  #endif
->
-> @@ -61,7 +61,7 @@ static inline int cache_ops_need_broadcast(void)
->         if (!is_smp())
->                 return 0;
->
-> -       return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 1;
-> +       return cpuid_feature_extract_unsigned(CPUID_EXT_MMFR3, 12) < 1;
->  }
->  #endif
->
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index fde041b..e696553 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -257,11 +257,15 @@ static int __get_cpu_architecture(void)
->                 /* Revised CPUID format. Read the Memory Model Feature
->                  * Register 0 and check for VMSAv7 or PMSAv7 */
->                 unsigned int mmfr0 = read_cpuid_ext(CPUID_EXT_MMFR0);
-> -               if ((mmfr0 & 0x0000000f) >= 0x00000003 ||
-> -                   (mmfr0 & 0x000000f0) >= 0x00000030)
-> +               unsigned int block;
-> +#ifdef CONFIG_MMU
-> +               block = cpuid_feature_extract_unsigned_field(mmfr0, 0);
-> +#else
-> +               block = cpuid_feature_extract_unsigned_field(mmfr0, 4);
-> +#endif
-> +               if (mmfr0 >= 3)
->                         cpu_arch = CPU_ARCH_ARMv7;
-> -               else if ((mmfr0 & 0x0000000f) == 0x00000002 ||
-> -                        (mmfr0 & 0x000000f0) == 0x00000020)
-> +               else if (mmfr0 == 2)
->                         cpu_arch = CPU_ARCH_ARMv6;
->                 else
->                         cpu_arch = CPU_ARCH_UNKNOWN;
-> @@ -446,41 +450,41 @@ static inline void patch_aeabi_idiv(void) { }
->
->  static void __init cpuid_init_hwcaps(void)
->  {
-> -       int block;
-> +       unsigned int block;
->         u32 isar5;
->
->         if (cpu_architecture() < CPU_ARCH_ARMv7)
->                 return;
->
-> -       block = cpuid_feature_extract(CPUID_EXT_ISAR0, 24);
-> +       block = cpuid_feature_extract_unsigned(CPUID_EXT_ISAR0, 24);
->         if (block >= 2)
->                 elf_hwcap |= HWCAP_IDIVA;
->         if (block >= 1)
->                 elf_hwcap |= HWCAP_IDIVT;
->
->         /* LPAE implies atomic ldrd/strd instructions */
-> -       block = cpuid_feature_extract(CPUID_EXT_MMFR0, 0);
-> +       block = cpuid_feature_extract_unsigned(CPUID_EXT_MMFR0, 0);
->         if (block >= 5)
->                 elf_hwcap |= HWCAP_LPAE;
->
->         /* check for supported v8 Crypto instructions */
->         isar5 = read_cpuid_ext(CPUID_EXT_ISAR5);
->
-> -       block = cpuid_feature_extract_field(isar5, 4);
-> +       block = cpuid_feature_extract_unsigned_field(isar5, 4);
->         if (block >= 2)
->                 elf_hwcap2 |= HWCAP2_PMULL;
->         if (block >= 1)
->                 elf_hwcap2 |= HWCAP2_AES;
->
-> -       block = cpuid_feature_extract_field(isar5, 8);
-> +       block = cpuid_feature_extract_unsigned_field(isar5, 8);
->         if (block >= 1)
->                 elf_hwcap2 |= HWCAP2_SHA1;
->
-> -       block = cpuid_feature_extract_field(isar5, 12);
-> +       block = cpuid_feature_extract_unsigned_field(isar5, 12);
->         if (block >= 1)
->                 elf_hwcap2 |= HWCAP2_SHA2;
->
-> -       block = cpuid_feature_extract_field(isar5, 16);
-> +       block = cpuid_feature_extract_unsigned_field(isar5, 16);
->         if (block >= 1)
->                 elf_hwcap2 |= HWCAP2_CRC32;
->  }
-> @@ -488,6 +492,7 @@ static void __init cpuid_init_hwcaps(void)
->  static void __init elf_hwcap_fixup(void)
->  {
->         unsigned id = read_cpuid_id();
-> +       unsigned int block;
->
->         /*
->          * HWCAP_TLS is available only on 1136 r1p0 and later,
-> @@ -508,9 +513,10 @@ static void __init elf_hwcap_fixup(void)
->          * avoid advertising SWP; it may not be atomic with
->          * multiprocessing cores.
->          */
-> -       if (cpuid_feature_extract(CPUID_EXT_ISAR3, 12) > 1 ||
-> -           (cpuid_feature_extract(CPUID_EXT_ISAR3, 12) == 1 &&
-> -            cpuid_feature_extract(CPUID_EXT_ISAR4, 20) >= 3))
-> +       block = cpuid_feature_extract_unsigned(CPUID_EXT_ISAR3, 12);
-> +
-> +       if (block > 1 || (block == 1 &&
-> +           cpuid_feature_extract_unsigned(CPUID_EXT_ISAR4, 20) >= 3))
->                 elf_hwcap &= ~HWCAP_SWP;
->  }
->
-> diff --git a/arch/arm/kernel/thumbee.c b/arch/arm/kernel/thumbee.c
-> index 8ff8dbf..b5cac80 100644
-> --- a/arch/arm/kernel/thumbee.c
-> +++ b/arch/arm/kernel/thumbee.c
-> @@ -62,14 +62,12 @@ static struct notifier_block thumbee_notifier_block = {
->
->  static int __init thumbee_init(void)
->  {
-> -       unsigned long pfr0;
->         unsigned int cpu_arch = cpu_architecture();
->
->         if (cpu_arch < CPU_ARCH_ARMv7)
->                 return 0;
->
-> -       pfr0 = read_cpuid_ext(CPUID_EXT_PFR0);
-> -       if ((pfr0 & 0x0000f000) != 0x00001000)
-> +       if (cpuid_feature_extract_unsigned(CPUID_EXT_PFR0, 12) != 1)
->                 return 0;
->
->         pr_info("ThumbEE CPU extension supported.\n");
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index 434d76f..06723a9 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -572,7 +572,7 @@ static void __init build_mem_type_table(void)
->          * in the Short-descriptor translation table format descriptors.
->          */
->         if (cpu_arch == CPU_ARCH_ARMv7 &&
-> -               (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xF) >= 4) {
-> +               (cpuid_feature_extract_unsigned(CPUID_EXT_MMFR0, 0) >= 4)) {
->                 user_pmd_table |= PMD_PXNTABLE;
->         }
->  #endif
-> --
-> 1.7.9.5
->
+> > I also wonder if you include 'randconfig' builds for some architectures.
+> > I have patches for all remaining errors and warnings that I see with
+> > ARM randconfig builds today. Not all of them are merged yet, but I could
+> > probably come up with a file to be used as input to KCONFIG_ALLCONFIG
+> > to eliminate the known-broken configurations, if you are interested.
+> 
+> If the are mostly ready for upstream, it may be easier to wait until
+> upstream randconfig works just fine for ARM.
+
+I have around 130 patches for warnings that I'm submitting at the moment, but
+there are a couple of really tricky ones that I don't currently have
+a good plan for:
+
+- in some configurations, you end up without any boards selected, hitting
+  an #error in the final link
+- ARMv3 support in gcc is rather broken and causes internal compiler errors
+  among other things
+- the old ELF format (OABI) doesn't work in some cases
+- GCOV_PROFILE_ALL causes problems that need to be debugged
+- XIP_KERNEL sometimes causes kallsyms to fail
+- not all platforms implement the complete clk API, if they don't
+  use CONFIG_COMMON_CLK (I have patch for that we can probably merge)
+- CONFIG_PHYS_OFFSET needs to be entered manually to be a number
+  in 'make config'
+- same for DEBUG_LL
+
+	Arnd
