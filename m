@@ -1,36 +1,37 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Wed, 27 Jan 2016 09:16:26 +0800
-Subject: [PATCH v3 1/3] iommu/io-pgtable: Add ARMv7 short descriptor
- support
-In-Reply-To: <066c4af0e29c9cc658bd5e48edc5e2d7ba7140a1.1453723096.git.robin.murphy@arm.com>
-References: <cover.1453723096.git.robin.murphy@arm.com>
- <066c4af0e29c9cc658bd5e48edc5e2d7ba7140a1.1453723096.git.robin.murphy@arm.com>
-Message-ID: <1453857386.28284.4.camel@mhfsdcap03>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 27 Jan 2016 09:18:44 +0000
+Subject: Problem with component helpers and probe deferral in 4.5-rc1
+In-Reply-To: <20160126223551.GU10826@n2100.arm.linux.org.uk>
+References: <1453831153.2850.107.camel@linaro.org>
+ <20160126223551.GU10826@n2100.arm.linux.org.uk>
+Message-ID: <1453886324.2847.12.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-01-26 at 17:13 +0000, Robin Murphy wrote:
-> Add a nearly-complete ARMv7 short descriptor implementation, omitting
-> only a few legacy and CPU-centric aspects which shouldn't be necessary
-> for IOMMU API use anyway.
+On Tue, 2016-01-26 at 22:35 +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 26, 2016 at 05:59:13PM +0000, Jon Medhurst (Tixy) wrote:
+> > I believe I've found a problem with the component helpers and/or how
+> > drivers use them. I discovered this whilst trying to get ARM's HDLCD
+> > driver [1] working on 4.5-rc1, however I believe that code is following
+> > a pattern used by drivers already in 4.5 and the problem isn't specific
+> > to it. This is what I have observed...
 > 
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Hmm, it all looks plausible, and I'm again left wondering how the code
+> passed testing over the last year (I've been running this code for
+> ages both on iMX6 and Dove, where deferred probing does happen.)
 
-This looks good to me.
-And actually our disp/vdec/venc works well on your v2.
+It depends on the order of things. To go wrong, components must already
+be there before the master is added, then the master needs to defer
+probing from it's bind callback. So, components deferring won't trigger
+the issue, neither will master deferring before any components have been
+added.
 
-You could choose the two below,
-Reviewed-by: Yong Wu <yong.wu@mediatek.com>
-Tested-by: Yong Wu <yong.wu@mediatek.com>
+> Your patch looks like the right thing to do, so I'll add it to the
+> component tree shortly - it should end up in linux-next in a few days
+> time.
 
-Thanks.
+Thanks. I wasn't sure if that patch was correct as I hadn't looked at
+any of this code before this week.
 
-> ---
->  drivers/iommu/Kconfig              |  19 +
->  drivers/iommu/Makefile             |   1 +
->  drivers/iommu/io-pgtable-arm-v7s.c | 849 +++++++++++++++++++++++++++++++++++++
->  drivers/iommu/io-pgtable.c         |   3 +
->  drivers/iommu/io-pgtable.h         |  14 +-
->  5 files changed, 885 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/iommu/io-pgtable-arm-v7s.c
+-- 
+Tixy
