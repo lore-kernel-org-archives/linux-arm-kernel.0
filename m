@@ -1,102 +1,79 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 27 Jan 2016 17:17:05 +0100
-Subject: [PATCH v5 07/13] ARM: at91: pm: find and remap the pmc
-In-Reply-To: <1453911072-23608-8-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1453911072-23608-8-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1453911425-30090-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Wed, 27 Jan 2016 17:11:03 +0100
+Subject: [PATCH v4 04/13] clk: at91: pmc: merge at91_pmc_init in
+ atmel_pmc_probe
+In-Reply-To: <1453911072-23608-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1453911072-23608-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1453911072-23608-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid relying on at91_pmc_read(), find the pmc node and remap it
-locally.
+at91_pmc_init() doesn't do much anymore, merge it in atmel_pmc_probe().
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
+ drivers/clk/at91/pmc.c | 34 +++++++++-------------------------
+ 1 file changed, 9 insertions(+), 25 deletions(-)
 
-Changes in v5:
- - properly use __initconst
-
- arch/arm/mach-at91/pm.c | 33 +++++++++++++++++++++++++++------
- 1 file changed, 27 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index db32bf846cef..8923efbfa7fa 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -35,6 +35,8 @@
- #include "generic.h"
- #include "pm.h"
+diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+index f17a2a1f1e85..01d049d4248a 100644
+--- a/drivers/clk/at91/pmc.c
++++ b/drivers/clk/at91/pmc.c
+@@ -110,30 +110,6 @@ static const struct at91_pmc_caps sama5d3_caps = {
+ 			  AT91_PMC_CFDEV,
+ };
  
-+static void __iomem *pmc;
-+
- /*
-  * FIXME: this is needed to communicate between the pinctrl driver and
-  * the PM implementation in the machine. Possibly part of the PM
-@@ -87,7 +89,7 @@ static int at91_pm_verify_clocks(void)
- 	unsigned long scsr;
- 	int i;
- 
--	scsr = at91_pmc_read(AT91_PMC_SCSR);
-+	scsr = readl(pmc + AT91_PMC_SCSR);
- 
- 	/* USB must not be using PLLB */
- 	if ((scsr & at91_pm_data.uhp_udp_mask) != 0) {
-@@ -101,8 +103,7 @@ static int at91_pm_verify_clocks(void)
- 
- 		if ((scsr & (AT91_PMC_PCK0 << i)) == 0)
- 			continue;
+-static struct at91_pmc *__init at91_pmc_init(struct device_node *np,
+-					     struct regmap *regmap,
+-					     void __iomem *regbase,
+-					     const struct at91_pmc_caps *caps)
+-{
+-	struct at91_pmc *pmc;
 -
--		css = at91_pmc_read(AT91_PMC_PCKR(i)) & AT91_PMC_CSS;
-+		css = readl(pmc + AT91_PMC_PCKR(i)) & AT91_PMC_CSS;
- 		if (css != AT91_PMC_CSS_SLOW) {
- 			pr_err("AT91: PM - Suspend-to-RAM with PCK%d src %d\n", i, css);
- 			return 0;
-@@ -145,8 +146,8 @@ static void at91_pm_suspend(suspend_state_t state)
- 	flush_cache_all();
- 	outer_disable();
- 
--	at91_suspend_sram_fn(at91_pmc_base, at91_ramc_base[0],
--				at91_ramc_base[1], pm_data);
-+	at91_suspend_sram_fn(pmc, at91_ramc_base[0],
-+			     at91_ramc_base[1], pm_data);
- 
- 	outer_resume();
- }
-@@ -399,13 +400,33 @@ static void __init at91_pm_sram_init(void)
- 			&at91_pm_suspend_in_sram, at91_pm_suspend_in_sram_sz);
- }
- 
-+static const struct of_device_id atmel_pmc_ids[] __initconst = {
-+	{ .compatible = "atmel,at91rm9200-pmc"  },
-+	{ .compatible = "atmel,at91sam9260-pmc" },
-+	{ .compatible = "atmel,at91sam9g45-pmc" },
-+	{ .compatible = "atmel,at91sam9n12-pmc" },
-+	{ .compatible = "atmel,at91sam9x5-pmc" },
-+	{ .compatible = "atmel,sama5d3-pmc" },
-+	{ .compatible = "atmel,sama5d2-pmc" },
-+	{ /* sentinel */ },
-+};
-+
- static void __init at91_pm_init(void)
+-	if (!regbase || !caps)
+-		return NULL;
+-
+-	at91_pmc_base = regbase;
+-
+-	pmc = kzalloc(sizeof(*pmc), GFP_KERNEL);
+-	if (!pmc)
+-		return NULL;
+-
+-	pmc->regmap = regmap;
+-	pmc->caps = caps;
+-
+-	regmap_write(pmc->regmap, AT91_PMC_IDR, 0xffffffff);
+-
+-	return pmc;
+-}
+-
+ static void __init of_at91_pmc_setup(struct device_node *np,
+ 				     const struct at91_pmc_caps *caps)
  {
--	at91_pm_sram_init();
-+	struct device_node *pmc_np;
+@@ -141,13 +117,21 @@ static void __init of_at91_pmc_setup(struct device_node *np,
+ 	void __iomem *regbase = of_iomap(np, 0);
+ 	struct regmap *regmap;
  
- 	if (at91_cpuidle_device.dev.platform_data)
- 		platform_device_register(&at91_cpuidle_device);
++	at91_pmc_base = regbase;
++
+ 	regmap = syscon_node_to_regmap(np);
+ 	if (IS_ERR(regmap))
+ 		panic("Could not retrieve syscon regmap");
  
-+	pmc_np = of_find_matching_node(NULL, atmel_pmc_ids);
-+	pmc = of_iomap(pmc_np, 0);
-+	if (!pmc) {
-+		pr_err("AT91: PM not supported, PMC not found\n");
-+		return;
-+	}
+-	pmc = at91_pmc_init(np, regmap, regbase, caps);
++	pmc = kzalloc(sizeof(*pmc), GFP_KERNEL);
+ 	if (!pmc)
+ 		return;
 +
-+	at91_pm_sram_init();
++	pmc->regmap = regmap;
++	pmc->caps = caps;
 +
- 	if (at91_suspend_sram_fn)
- 		suspend_set_ops(&at91_pm_ops);
- 	else
++	regmap_write(pmc->regmap, AT91_PMC_IDR, 0xffffffff);
++
+ }
+ 
+ static void __init of_at91rm9200_pmc_setup(struct device_node *np)
 -- 
 2.5.0
