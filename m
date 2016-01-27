@@ -1,343 +1,88 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 27 Jan 2016 19:41:45 +0100
-Subject: [PATCH resend] ARM: dts: sun7i: Add dts file for the lamobo-r1 board
-In-Reply-To: <1453920105-7093-1-git-send-email-hdegoede@redhat.com>
-References: <1453920105-7093-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1453920105-7093-2-git-send-email-hdegoede@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 27 Jan 2016 18:45:12 +0000
+Subject: [GIT PULL] arm64: fixes for -rc2
+Message-ID: <20160127184511.GE25545@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jelle de Jong <jelledejong@powercraft.nl>
+Hi Linus,
 
-The lamobo-r1 board, sometimes called the BPI-R1 but not labelled as such
-on the PCB, is meant as a A20 based router board. As such the board comes
-with a built-in switch chip giving it 5 gigabit ethernet boards, and it
-has a large empty area on the pcb with mounting holes which will fit a
-2.5 inch harddisk. To complete its networking features it has a
-Realtek RTL8192CU for WiFi 802.11 b/g/n.
+Please pull these arm64 fixes for -rc2. Details in the tag, but the main
+thing here is to get us booting under qemu again after it turned out
+that not all of the PMU registers are emulated there, causing us to
+die early in boot.
 
-Signed-off-by: Jelle de Jong <jelledejong@powercraft.nl>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/Makefile                |   1 +
- arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts | 297 ++++++++++++++++++++++++++++++
- 2 files changed, 298 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
+Cheers,
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index e062fb3..8954ef9 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -668,6 +668,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-hummingbird.dtb \
- 	sun7i-a20-i12-tvbox.dtb \
- 	sun7i-a20-icnova-swac.dtb \
-+	sun7i-a20-lamobo-r1.dtb \
- 	sun7i-a20-m3.dtb \
- 	sun7i-a20-mk808c.dtb \
- 	sun7i-a20-olimex-som-evb.dtb \
-diff --git a/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
-new file mode 100644
-index 0000000..975b0b2
---- /dev/null
-+++ b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
-@@ -0,0 +1,297 @@
-+/*
-+ * Copyright 2015 Jelle de Jong <jelledejong@powercraft.nl>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun7i-a20.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Lamobo R1";
-+	compatible = "lamobo,lamobo-r1", "allwinner,sun7i-a20";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart3;
-+		serial2 = &uart7;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_lamobo_r1>;
-+
-+		green {
-+			label = "lamobo_r1:green:usr";
-+			gpios = <&pio 7 24 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	reg_gmac_3v3: gmac-3v3 {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&gmac_power_pin_lamobo_r1>;
-+		regulator-name = "gmac-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <100000>;
-+		enable-active-high;
-+		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>; /* PH23 */
-+	};
-+};
-+
-+&ahci_pwr_pin_a {
-+	allwinner,pins = "PB3";
-+};
-+
-+&ahci {
-+	target-supply = <&reg_ahci_5v>;
-+	status = "okay";
-+};
-+
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
-+	operating-points = <
-+		/* kHz	  uV */
-+		960000	1400000
-+		912000	1400000
-+		864000	1350000
-+		720000	1250000
-+		528000	1150000
-+		312000	1100000
-+		144000	1050000
-+		>;
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&gmac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gmac_pins_rgmii_a>;
-+	phy = <&phy1>;
-+	phy-mode = "rgmii";
-+	phy-supply = <&reg_gmac_3v3>;
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	axp209: pmic at 34 {
-+		reg = <0x34>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+};
-+
-+&ir0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir0_rx_pins_a>;
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_lamobo_r1>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 10 GPIO_ACTIVE_HIGH>; /* PH10 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&otg_sram {
-+	status = "okay";
-+};
-+
-+&pio {
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PH4";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+
-+	mmc0_cd_pin_lamobo_r1: mmc0_cd_pin at 0 {
-+		allwinner,pins = "PH10";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+
-+	gmac_power_pin_lamobo_r1: gmac_power_pin at 0 {
-+		allwinner,pins = "PH23";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	led_pins_lamobo_r1: led_pins at 0 {
-+		allwinner,pins = "PH24";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+#include "axp209.dtsi"
-+
-+&reg_ahci_5v {
-+	gpio = <&pio 1 3 0>; /* PB3 */
-+	status = "okay";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-int-dll";
-+};
-+
-+&reg_ldo1 {
-+	regulator-name = "vdd-rtc";
-+};
-+
-+&reg_ldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "avcc";
-+};
-+
-+&reg_usb0_vbus {
-+	status = "okay";
-+};
-+
-+&reg_usb1_vbus {
-+	status = "okay";
-+};
-+
-+&reg_usb2_vbus {
-+	status = "okay";
-+};
-+
-+&spi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pins_a>,
-+		    <&spi0_cs0_pins_a>,
-+		    <&spi0_cs1_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins_b>;
-+	status = "okay";
-+};
-+
-+&uart7 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart7_pins_a>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usb_power_supply {
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>;
-+	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
-+	usb0_vbus_power-supply = <&usb_power_supply>;
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
-+	status = "okay";
-+};
--- 
-2.5.0
+Will
+
+--->8
+
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+
+for you to fetch changes up to 57adec866c0440976c96a4b8f5b59fb411b1cacb:
+
+  arm64: mm: avoid calling apply_to_page_range on empty range (2016-01-26 15:56:44 +0000)
+
+----------------------------------------------------------------
+arm64 fixes:
+
+- Ensure we don't access PMU registers of the PMU is not implemented
+  (fixes booting under QEMU)
+
+- Fix BUG_ON triggered during module loading with DEBUG_SET_MODULE_RONX
+
+- Ensure the kasan zero page is read-only
+
+- Hide __efistub_ symbol aliases from kallsyms, since they otherwise
+  confuse the backtrace code
+
+- Ensure !PTE_WRITE kernel ptes are marked as read-only
+
+- defconfig updates based on requests and patches on the list
+
+- Other minor fixes (typos, build system)
+
+----------------------------------------------------------------
+Ard Biesheuvel (2):
+      arm64: hide __efistub_ aliases from kallsyms
+      arm64: kasan: ensure that the KASAN zero page is mapped read-only
+
+Catalin Marinas (1):
+      arm64: Honour !PTE_WRITE in set_pte_at() for kernel mappings
+
+Lorenzo Pieralisi (1):
+      arm64: kernel: fix architected PMU registers unconditional access
+
+Masanari Iida (1):
+      arm64: Fix an enum typo in mm/dump.c
+
+Mika Penttil? (1):
+      arm64: mm: avoid calling apply_to_page_range on empty range
+
+Will Deacon (1):
+      arm64: defconfig: updates for 4.5
+
+William Cohen (1):
+      Eliminate the .eh_frame sections from the aarch64 vmlinux and kernel modules
+
+dann frazier (1):
+      arm64: errata: Add -mpc-relative-literal-loads to build flags
+
+ arch/arm64/Makefile              |  2 ++
+ arch/arm64/configs/defconfig     | 42 ++++++++++++++++++++++++----------------
+ arch/arm64/include/asm/pgtable.h | 21 ++++++++++----------
+ arch/arm64/kernel/head.S         |  5 +++++
+ arch/arm64/kernel/image.h        | 40 ++++++++++++++++++++++++--------------
+ arch/arm64/mm/dump.c             |  2 +-
+ arch/arm64/mm/kasan_init.c       |  9 +++++++++
+ arch/arm64/mm/pageattr.c         |  3 +++
+ arch/arm64/mm/proc-macros.S      | 12 ++++++++++++
+ arch/arm64/mm/proc.S             |  4 ++--
+ 10 files changed, 94 insertions(+), 46 deletions(-)
