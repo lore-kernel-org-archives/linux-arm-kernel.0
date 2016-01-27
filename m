@@ -1,43 +1,41 @@
-From: ao2@ao2.it (Antonio Ospite)
-Date: Wed, 27 Jan 2016 14:51:10 +0100
-Subject: [PATCH] ARM: lib/lib1funcs.S: fix typo s/substractions/subtractions/
-Message-ID: <1453902670-32294-1-git-send-email-ao2@ao2.it>
+From: jenskuske@gmail.com (Jens Kuske)
+Date: Wed, 27 Jan 2016 14:51:13 +0100
+Subject: [PATCH] drivers: soc: sunxi: Fix mask generation for SRAM mapping
+Message-ID: <1453902673-10734-1-git-send-email-jenskuske@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While at it also fix some other typos in the affected lines:
-  s/reminder/remainder/
-  s/comparison/comparisons/
+GENMASK is inclusive on both ends, therefor one has to be
+subtracted from the width.
+Also fixes the mask for debug output.
 
-Signed-off-by: Antonio Ospite <ao2@ao2.it>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Jens Kuske <jenskuske@gmail.com>
 ---
- arch/arm/lib/lib1funcs.S | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/soc/sunxi/sunxi_sram.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/lib/lib1funcs.S b/arch/arm/lib/lib1funcs.S
-index 9397b2e..8e89c20 100644
---- a/arch/arm/lib/lib1funcs.S
-+++ b/arch/arm/lib/lib1funcs.S
-@@ -167,7 +167,7 @@ Boston, MA 02111-1307, USA.  */
+diff --git a/drivers/soc/sunxi/sunxi_sram.c b/drivers/soc/sunxi/sunxi_sram.c
+index bc52670..99e354c 100644
+--- a/drivers/soc/sunxi/sunxi_sram.c
++++ b/drivers/soc/sunxi/sunxi_sram.c
+@@ -117,7 +117,7 @@ static int sunxi_sram_show(struct seq_file *s, void *data)
  
- #endif
+ 			val = readl(base + sram_data->reg);
+ 			val >>= sram_data->offset;
+-			val &= sram_data->width;
++			val &= GENMASK(sram_data->width - 1, 0);
  
--	@ Perform all needed subtractions to keep only the reminder.
-+	@ Perform all needed subtractions to keep only the remainder.
- 	@ Do comparisons in batch of 4 first.
- 	subs	\order, \order, #3		@ yes, 3 is intended here
- 	blt	2f
-@@ -189,7 +189,7 @@ Boston, MA 02111-1307, USA.  */
- 	teqne	\dividend, #0
- 	beq	5f
+ 			for (func = sram_data->func; func->func; func++) {
+ 				seq_printf(s, "\t\t%s%c\n", func->func,
+@@ -208,7 +208,8 @@ int sunxi_sram_claim(struct device *dev)
+ 		return -EBUSY;
+ 	}
  
--	@ Either 1, 2 or 3 comparison/subtractions are left.
-+	@ Either 1, 2 or 3 comparisons/subtractions are left.
- 2:	cmn	\order, #2
- 	blt	4f
- 	beq	3f
+-	mask = GENMASK(sram_data->offset + sram_data->width, sram_data->offset);
++	mask = GENMASK(sram_data->offset + sram_data->width - 1,
++		       sram_data->offset);
+ 	val = readl(base + sram_data->reg);
+ 	val &= ~mask;
+ 	writel(val | ((device << sram_data->offset) & mask),
 -- 
 2.7.0
