@@ -1,40 +1,69 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Jan 2016 16:57:19 +0100
-Subject: [PATCH 3/7] scsi: acornscsi: mark calc_sync_xfer as __maybe_unused
+Date: Wed, 27 Jan 2016 16:57:21 +0100
+Subject: [PATCH 5/7] scsi: qla4xxx: shut up warning for rd_reg_indirect
 In-Reply-To: <1453910247-3447628-1-git-send-email-arnd@arndb.de>
 References: <1453910247-3447628-1-git-send-email-arnd@arndb.de>
-Message-ID: <1453910247-3447628-4-git-send-email-arnd@arndb.de>
+Message-ID: <1453910247-3447628-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The calc_sync_xfer function is only used if CONFIG_SCSI_ACORNSCSI_SYNC
-is set, otherwise we get a compiler warning:
+The qla4_83xx_rd_reg_indirect() function can fail when it is unable
+to read a register, but not all callers check its return value before
+using the register data, and gcc correctly warns about this:
 
-scsi/arm/acornscsi.c:680:15: warning: 'calc_sync_xfer' defined but not used [-Wunused-function]
- unsigned char calc_sync_xfer(unsigned int period, unsigned int offset)
+qla4xxx/ql4_83xx.c: In function 'qla4_83xx_process_reset_template':
+qla4xxx/ql4_83xx.c:1073:36: warning: 'value' may be used uninitialized in this function
+     ha->reset_tmplt.array[index++] = value;
+                                    ^
+qla4xxx/ql4_83xx.c:1050:11: note: 'value' was declared here
+  uint32_t value;
+           ^
+qla4xxx/ql4_83xx.c:902:8: warning: 'value' may be used uninitialized in this function
+  value &= p_rmw_hdr->test_mask;
+        ^
+qla4xxx/ql4_83xx.c:895:11: note: 'value' was declared here
+  uint32_t value;
+           ^
+In file included from ../include/linux/io.h:25:0,
+                 from ../include/linux/pci.h:31,
+                 from ../drivers/scsi/qla4xxx/ql4_def.h:16,
+                 from ../drivers/scsi/qla4xxx/ql4_83xx.c:10:
+asm/io.h:101:2: warning: 'value' may be used uninitialized in this function
+  asm volatile("str %1, %0"
+  ^
+qla4xxx/ql4_83xx.c:874:11: note: 'value' was declared here
+  uint32_t value;
+           ^
 
-This marks the function as __maybe_unused to shut up the
-warning and silently drop the function in the object code
-when there is no caller.
+Unfortunately, I don't see any helpful way to add proper error handling
+for this case, and the failure scenario for rd_reg seems rather obscure,
+so this bails out and makes the rd_reg accessor set the result to 0xffffffff
+so we at least get a predictable value.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/scsi/arm/acornscsi.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/scsi/qla4xxx/ql4_83xx.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/scsi/arm/acornscsi.c b/drivers/scsi/arm/acornscsi.c
-index deaaf84989cd..12b88294d667 100644
---- a/drivers/scsi/arm/acornscsi.c
-+++ b/drivers/scsi/arm/acornscsi.c
-@@ -677,7 +677,8 @@ int round_period(unsigned int period)
-  * Copyright: Copyright (c) 1996 John Shifflett, GeoLog Consulting
-  */
- static
--unsigned char calc_sync_xfer(unsigned int period, unsigned int offset)
-+unsigned char __maybe_unused calc_sync_xfer(unsigned int period,
-+					    unsigned int offset)
- {
-     return sync_xfer_table[round_period(period)].reg_value |
- 		((offset < SDTR_SIZE) ? offset : SDTR_SIZE);
+diff --git a/drivers/scsi/qla4xxx/ql4_83xx.c b/drivers/scsi/qla4xxx/ql4_83xx.c
+index 5d4f8e67fb25..638f72c5ab05 100644
+--- a/drivers/scsi/qla4xxx/ql4_83xx.c
++++ b/drivers/scsi/qla4xxx/ql4_83xx.c
+@@ -46,11 +46,13 @@ int qla4_83xx_rd_reg_indirect(struct scsi_qla_host *ha, uint32_t addr,
+ 
+ 	ret_val = qla4_83xx_set_win_base(ha, addr);
+ 
+-	if (ret_val == QLA_SUCCESS)
++	if (ret_val == QLA_SUCCESS) {
+ 		*data = qla4_83xx_rd_reg(ha, QLA83XX_WILDCARD);
+-	else
++	} else {
++		*data = 0xffffffff;
+ 		ql4_printk(KERN_ERR, ha, "%s: failed read of addr 0x%x!\n",
+ 			   __func__, addr);
++	}
+ 
+ 	return ret_val;
+ }
 -- 
 2.7.0
