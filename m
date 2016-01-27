@@ -1,61 +1,52 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 27 Jan 2016 11:51:26 +0000
-Subject: [PATCH v3] ARM64: kernel: implement ACPI parking protocol
-In-Reply-To: <CAPw-ZTk=BbXAPgWAV=3Np0qvLA+i+U5eh+nxHS=2uMjKohdUfA@mail.gmail.com>
-References: <1453806638-23167-1-git-send-email-lorenzo.pieralisi@arm.com>
- <CAPw-ZTk=BbXAPgWAV=3Np0qvLA+i+U5eh+nxHS=2uMjKohdUfA@mail.gmail.com>
-Message-ID: <20160127115126.GB9522@red-moon>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Wed, 27 Jan 2016 11:34:58 +0000
+Subject: [PATCH 06/15] metag: use of_platform_default_populate() to
+ populate default bus
+In-Reply-To: <1453868872-26300-7-git-send-email-wangkefeng.wang@huawei.com>
+References: <1453868872-26300-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1453868872-26300-7-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <20160127113458.GA20777@jhogan-linux.le.imgtec.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 03:13:30PM -0800, Loc Ho wrote:
-> Hi Lorenzo,
+On Wed, Jan 27, 2016 at 12:27:43PM +0800, Kefeng Wang wrote:
+> Use helper of_platform_default_populate() in linux/of_platform
+> when possible, instead of calling of_platform_populate() with
+> the default match table.
 > 
-> On Tue, Jan 26, 2016 at 3:10 AM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> > The SBBR and ACPI specifications allow ACPI based systems that do not
-> > implement PSCI (eg systems with no EL3) to boot through the ACPI parking
-> > protocol specification[1].
-> >
-> > This patch implements the ACPI parking protocol CPU operations, and adds
-> > code that eases parsing the parking protocol data structures to the
-> > ARM64 SMP initializion carried out at the same time as cpus enumeration.
-> >
-> > To wake-up the CPUs from the parked state, this patch implements a
-> > wakeup IPI for ARM64 (ie arch_send_wakeup_ipi_mask()) that mirrors the
-> > ARM one, so that a specific IPI is sent for wake-up purpose in order
-> > to distinguish it from other IPI sources.
-> >
-> > Given the current ACPI MADT parsing API, the patch implements a glue
-> > layer that helps passing MADT GICC data structure from SMP initialization
-> > code to the parking protocol implementation somewhat overriding the CPU
-> > operations interfaces. This to avoid creating a completely trasparent
-> > DT/ACPI CPU operations layer that would require creating opaque
-> > structure handling for CPUs data (DT represents CPU through DT nodes, ACPI
-> > through static MADT table entries), which seems overkill given that ACPI
-> > on ARM64 mandates only two booting protocols (PSCI and parking protocol),
-> > so there is no need for further protocol additions.
-> >
-> > Based on the original work by Mark Salter <msalter@redhat.com>
-> >
-> > [1] https://acpica.org/sites/acpica/files/MP%20Startup%20for%20ARM%20platforms.docx
-> >
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> > Cc: Loc Ho <lho@apm.com>
-> > Cc: Sudeep Holla <sudeep.holla@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Mark Salter <msalter@redhat.com>
-> > Cc: Al Stone <ahs3@redhat.com>
+> Cc: James Hogan <james.hogan@imgtec.com>
+
+Acked-by: James Hogan <james.hogan@imgtec.com>
+
+Cheers
+James
+
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
+>  arch/metag/kernel/setup.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 > 
-> I had tested this with X-Gene Mustang board. It applies cleanly
-> against 4.5.0-rc1 and detected all CPU's. For those of you want to try
-> this, you need an FW update if you are using APM Tianocore. Otherwise,
-> it will stuck in very early booting stage.
-
-We can take this as a Tested-by, right ?
-
-Thanks,
-Lorenzo
+> diff --git a/arch/metag/kernel/setup.c b/arch/metag/kernel/setup.c
+> index 31cf53d..c88f937 100644
+> --- a/arch/metag/kernel/setup.c
+> +++ b/arch/metag/kernel/setup.c
+> @@ -415,8 +415,7 @@ static int __init customize_machine(void)
+>  	if (machine_desc->init_machine)
+>  		machine_desc->init_machine();
+>  	else
+> -		of_platform_populate(NULL, of_default_bus_match_table, NULL,
+> -				     NULL);
+> +		of_platform_default_populate(NULL, NULL, NULL);
+>  	return 0;
+>  }
+>  arch_initcall(customize_machine);
+> -- 
+> 2.6.0.GIT
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/b572df4b/attachment.sig>
