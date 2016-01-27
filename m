@@ -1,51 +1,61 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 27 Jan 2016 15:11:48 -0600
-Subject: [PATCH 00/13] dtb: amd: Miscelleneous Updates for AMD Seattle DTS
-Message-ID: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+Date: Wed, 27 Jan 2016 15:11:59 -0600
+Subject: [PATCH 11/13] dtb: amd: Add PCIe SMMU device tree node
+In-Reply-To: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1453929121-12171-12-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 
-This patch series contains several updates for the AMD Seattle SOC DTS files.
-It also adds new board files for newer Overdrive and Linaro 96boards (Husky)
-platforms.
+Add PCIe SMMU device tree node for AMD Seattle SOC.
 
-Thanks,
-Suravee
+Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+---
+ arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-Brijesh Singh (2):
-  dtb: amd: Fix GICv2 hypervisor and virtual interface sizes
-  dtb: amd: Add KCS device tree node
-
-Suravee Suthikulpanit (10):
-  MAINTAINERS: Adding Maintainers for AMD Seattle Device Tree
-  dtb: amd: Fix DMA ranges in device tree
-  dtb: amd: Fix typo in SPI device nodes
-  dtb: amd: Misc changes for I2C device nodes
-  dtb: amd: Misc changes for SATA device tree nodes
-  dtb: amd: Misc changes for GPIO devices
-  dtb: amd: Add PERF CCN-504 device tree node
-  dtb: amd: Add PCIe SMMU device tree node
-  dtb: amd: Add support for new AMD Overdrive boards
-  dtb: amd: Add support for AMD/Linaro 96Boards Enterprise Edition
-    Server board
-
-Tom Lendacky (1):
-  dtb: amd: Add AMD XGBE device tree file
-
- MAINTAINERS                                      |   9 ++
- arch/arm64/boot/dts/amd/Makefile                 |   4 +-
- arch/arm64/boot/dts/amd/amd-overdrive-rev-b0.dts |  87 +++++++++++++++
- arch/arm64/boot/dts/amd/amd-overdrive-rev-b1.dts |  91 ++++++++++++++++
- arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi     | 128 ++++++++++++++++++++---
- arch/arm64/boot/dts/amd/amd-seattle-xgbe-b.dtsi  | 117 +++++++++++++++++++++
- arch/arm64/boot/dts/amd/husky.dts                |  83 +++++++++++++++
- 7 files changed, 505 insertions(+), 14 deletions(-)
- create mode 100644 arch/arm64/boot/dts/amd/amd-overdrive-rev-b0.dts
- create mode 100644 arch/arm64/boot/dts/amd/amd-overdrive-rev-b1.dts
- create mode 100644 arch/arm64/boot/dts/amd/amd-seattle-xgbe-b.dtsi
- create mode 100644 arch/arm64/boot/dts/amd/husky.dts
-
+diff --git a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
+index a7fc059..bfccfea 100644
+--- a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
++++ b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
+@@ -210,6 +210,7 @@
+ 			device_type = "pci";
+ 			bus-range = <0 0x7f>;
+ 			msi-parent = <&v2m0>;
++			#stream-id-cells = <16>;
+ 			reg = <0 0xf0000000 0 0x10000000>;
+ 
+ 			interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
+@@ -230,6 +231,28 @@
+ 				<0x03000000 0x01 0x00000000 0x01 0x00000000 0x7f 0x00000000>;
+ 		};
+ 
++		pcie0_smmu: smmu at e0a00000 {
++			 compatible = "arm,mmu-401";
++			 reg = <0 0xe0a00000 0 0x10000>;
++			 #global-interrupts = <1>;
++			 interrupts = /* Uses combined intr for both
++				       * global and context
++				       */
++				      <0 333 4>,
++				      <0 333 4>;
++			/* Note:
++			 * SID[2:0]  = PCIe function number
++			 * SID[7:3]  = PCIe device number
++			 * SID[14:8] = PCIe bus number
++			 */
++			 mmu-masters = <&pcie0
++				/* 1:00:[0,3] */ 256 257 258 259
++				/* 2:00:[0,3] */ 512 513 514 515
++				/* 3:00:[0,3] */ 768 769 770 771
++				/* 4:00:[0,3] */ 1024 1025 1026 1027
++			 >;
++		 };
++
+ 		/* Perf CCN504 PMU */
+ 		ccn: ccn at 0xe8000000 {
+ 			compatible = "arm,ccn-504";
 -- 
 2.5.0
