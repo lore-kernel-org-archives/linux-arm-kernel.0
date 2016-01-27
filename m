@@ -1,98 +1,255 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 27 Jan 2016 17:18:03 +0800
-Subject: [PATCH] clk: Move vendor's Kconfig into CCF menu section
-In-Reply-To: <1453879563-39500-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <201601271708.gQUxXACW%fengguang.wu@intel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 27 Jan 2016 09:20:00 +0000
+Subject: [PATCH v8 1/2] mfd: act8945a: add Active-semi ACT8945A PMIC MFD
+ driver
+In-Reply-To: <B256D81BAE5131468A838E5D7A243641D63FA896@penmbx01>
+References: <1453861685-30924-1-git-send-email-wenyou.yang@atmel.com>
+ <1453861685-30924-2-git-send-email-wenyou.yang@atmel.com>
+ <20160127072732.GE3368@x1>
+ <B256D81BAE5131468A838E5D7A243641D63FA896@penmbx01>
+Message-ID: <20160127092000.GK3368@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+On Wed, 27 Jan 2016, Yang, Wenyou wrote:
 
-[auto build test ERROR on clk/clk-next]
-[also build test ERROR on v4.5-rc1 next-20160127]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+> Hi Lee,
+> 
+> > -----Original Message-----
+> > From: Lee Jones [mailto:lee.jones at linaro.org]
+> > Sent: 2016?1?27? 15:28
+> > To: Yang, Wenyou <Wenyou.Yang@atmel.com>
+> > Cc: Rob Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>;
+> > Mark Rutland <mark.rutland@arm.com>; Ian Campbell
+> > <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>; Javier
+> > Martinez Canillas <javier@dowhile0.org>; Krzysztof Kozlowski
+> > <k.kozlowski@samsung.com>; Peter Korsgaard <jacmet@gmail.com>; Ferre,
+> > Nicolas <Nicolas.FERRE@atmel.com>; linux-arm-kernel at lists.infradead.org;
+> > linux-kernel at vger.kernel.org; devicetree at vger.kernel.org
+> > Subject: Re: [PATCH v8 1/2] mfd: act8945a: add Active-semi ACT8945A PMIC
+> > MFD driver
+> > 
+> > On Wed, 27 Jan 2016, Wenyou Yang wrote:
+> > 
+> > > This patch adds support for the Active-semi ACT8945A PMIC.
+> > > It is a Multi Function Device with the following subdevices:
+> > >  - Regulator
+> > >  - Charger
+> > >
+> > > It is interfaced to the host controller using I2C interface, ACT8945A
+> > > is a child device of the I2C.
+> > >
+> > > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > 
+> > Can I take the MFD patches in separately?
+> 
+> Yes, you can, I think.
+> 
+> > 
+> > For my own reference:
+> >   Acked-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Thank you for your Acked.
 
-url:    https://github.com/0day-ci/linux/commits/James-Liao/clk-Move-vendor-s-Kconfig-into-CCF-menu-section/20160127-152850
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: arm-samsung (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Please re-submit with the changes Peter suggested and I'll apply.
 
-All error/warnings (new ones prefixed by >>):
+> > > ---
+> > >
+> > > Changes in v8:
+> > >  - change the subdevice's name "act8945a-pmic" to "act8945a-regulator".
+> > >
+> > > Changes in v7:
+> > >  - remove struct act8945a_dev to .c file.
+> > >  - remove unused .h file.
+> > >
+> > > Changes in v6:
+> > >  - change MFD_ACT8945A type from bool to tristate.
+> > >  - revert depends on to 'I2C'.
+> > >
+> > > Changes in v5:
+> > >  - change depends on to 'I2C=y'.
+> > >
+> > > Changes in v4:
+> > >  - add a space before .compatible.
+> > >  - collect Reviewed-by from Krzysztof Kozlowski.
+> > >
+> > > Changes in v3: None
+> > > Changes in v2:
+> > >  - add more help information in Kconfig.
+> > >  - update the file header with short version license and author line.
+> > >  - remove unused structure members (dev, i2c_client) of stuct act8945a_dev.
+> > >  - use define "PLATFORM_DEVID_NONE" for mfd_add_devices(), instead of '-1'.
+> > >  - use more explicit info to indicate the failure to add sub devices.
+> > >  - remove the unnecessary print out.
+> > >  - substitute MODULE_LICENSE("GPL") for MODULE_LICENSE("GPL v2").
+> > >
+> > >  drivers/mfd/Kconfig    |   11 +++++
+> > >  drivers/mfd/Makefile   |    1 +
+> > >  drivers/mfd/act8945a.c |  112
+> > > ++++++++++++++++++++++++++++++++++++++++++++++++
+> > >  3 files changed, 124 insertions(+)
+> > >  create mode 100644 drivers/mfd/act8945a.c
+> > >
+> > > diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig index
+> > > 6c4ebd9..38994bb 100644
+> > > --- a/drivers/mfd/Kconfig
+> > > +++ b/drivers/mfd/Kconfig
+> > > @@ -18,6 +18,17 @@ config MFD_CS5535
+> > >  	  This is the core driver for CS5535/CS5536 MFD functions.  This is
+> > >            necessary for using the board's GPIO and MFGPT functionality.
+> > >
+> > > +config MFD_ACT8945A
+> > > +	tristate "Active-semi ACT8945A"
+> > > +	select MFD_CORE
+> > > +	select REGMAP_I2C
+> > > +	depends on I2C && OF
+> > > +	help
+> > > +	  Support for the ACT8945A PMIC from Active-semi. This device
+> > > +	  features three step-down DC/DC converters and four low-dropout
+> > > +	  linear regulators, along with a complete ActivePath battery
+> > > +	  charger.
+> > > +
+> > >  config MFD_AS3711
+> > >  	bool "AMS AS3711"
+> > >  	select MFD_CORE
+> > > diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile index
+> > > 0f230a6..2f1ca82 100644
+> > > --- a/drivers/mfd/Makefile
+> > > +++ b/drivers/mfd/Makefile
+> > > @@ -6,6 +6,7 @@
+> > >  obj-$(CONFIG_MFD_88PM860X)	+= 88pm860x.o
+> > >  obj-$(CONFIG_MFD_88PM800)	+= 88pm800.o 88pm80x.o
+> > >  obj-$(CONFIG_MFD_88PM805)	+= 88pm805.o 88pm80x.o
+> > > +obj-$(CONFIG_MFD_ACT8945A)	+= act8945a.o
+> > >  obj-$(CONFIG_MFD_SM501)		+= sm501.o
+> > >  obj-$(CONFIG_MFD_ASIC3)		+= asic3.o tmio_core.o
+> > >  obj-$(CONFIG_MFD_BCM590XX)	+= bcm590xx.o
+> > > diff --git a/drivers/mfd/act8945a.c b/drivers/mfd/act8945a.c new file
+> > > mode 100644 index 0000000..3a37611
+> > > --- /dev/null
+> > > +++ b/drivers/mfd/act8945a.c
+> > > @@ -0,0 +1,112 @@
+> > > +/*
+> > > + * MFD driver for Active-semi ACT8945a PMIC
+> > > + *
+> > > + * Copyright (C) 2015 Atmel Corporation.
+> > > + *
+> > > + * Author: Wenyou Yang <wenyou.yang@atmel.com>
+> > > + *
+> > > + * This program is free software; you can redistribute it and/or
+> > > +modify it
+> > > + * under  the terms of the GNU General  Public License as published
+> > > +by the
+> > > + * Free Software Foundation;  either version 2 of the License, or (at
+> > > +your
+> > > + * option) any later version.
+> > > + */
+> > > +
+> > > +#include <linux/i2c.h>
+> > > +#include <linux/mfd/core.h>
+> > > +#include <linux/module.h>
+> > > +#include <linux/of_device.h>
+> > > +#include <linux/regmap.h>
+> > > +
+> > > +struct act8945a_dev {
+> > > +	struct regmap *regmap;
+> > > +};
+> > > +
+> > > +static const struct mfd_cell act8945a_devs[] = {
+> > > +	{
+> > > +		.name = "act8945a-regulator",
+> > > +		.of_compatible = "active-semi,act8945a-regulator",
+> > > +	},
+> > > +	{
+> > > +		.name = "act8945a-charger",
+> > > +		.of_compatible = "active-semi,act8945a-charger",
+> > > +	},
+> > > +};
+> > > +
+> > > +static const struct regmap_config act8945a_regmap_config = {
+> > > +	.reg_bits = 8,
+> > > +	.val_bits = 8,
+> > > +};
+> > > +
+> > > +static int act8945a_i2c_probe(struct i2c_client *i2c,
+> > > +			      const struct i2c_device_id *id) {
+> > > +	struct act8945a_dev *act8945a;
+> > > +	int ret;
+> > > +
+> > > +	act8945a = devm_kzalloc(&i2c->dev, sizeof(*act8945a), GFP_KERNEL);
+> > > +	if (!act8945a)
+> > > +		return -ENOMEM;
+> > > +
+> > > +	i2c_set_clientdata(i2c, act8945a);
+> > > +
+> > > +	act8945a->regmap = devm_regmap_init_i2c(i2c,
+> > &act8945a_regmap_config);
+> > > +	if (IS_ERR(act8945a->regmap)) {
+> > > +		ret = PTR_ERR(act8945a->regmap);
+> > > +		dev_err(&i2c->dev, "regmap init failed: %d\n", ret);
+> > > +		return ret;
+> > > +	}
+> > > +
+> > > +	ret = mfd_add_devices(&i2c->dev, PLATFORM_DEVID_NONE,
+> > act8945a_devs,
+> > > +			      ARRAY_SIZE(act8945a_devs), NULL, 0, NULL);
+> > > +	if (ret) {
+> > > +		dev_err(&i2c->dev, "Failed to add sub devices\n");
+> > > +		return ret;
+> > > +	}
+> > > +
+> > > +	return 0;
+> > > +}
+> > > +
+> > > +static int act8945a_i2c_remove(struct i2c_client *i2c) {
+> > > +	mfd_remove_devices(&i2c->dev);
+> > > +
+> > > +	return 0;
+> > > +}
+> > > +
+> > > +static const struct i2c_device_id act8945a_i2c_id[] = {
+> > > +	{ "act8945a", 0 },
+> > > +	{}
+> > > +};
+> > > +MODULE_DEVICE_TABLE(i2c, act8945a_i2c_id);
+> > > +
+> > > +static const struct of_device_id act8945a_of_match[] = {
+> > > +	{ .compatible = "active-semi,act8945a", },
+> > > +	{},
+> > > +};
+> > > +MODULE_DEVICE_TABLE(of, act8945a_of_match);
+> > > +
+> > > +static struct i2c_driver act8945a_i2c_driver = {
+> > > +	.driver = {
+> > > +		   .name = "act8945a",
+> > > +		   .of_match_table = of_match_ptr(act8945a_of_match),
+> > > +	},
+> > > +	.probe = act8945a_i2c_probe,
+> > > +	.remove = act8945a_i2c_remove,
+> > > +	.id_table = act8945a_i2c_id,
+> > > +};
+> > > +
+> > > +static int __init act8945a_i2c_init(void) {
+> > > +	return i2c_add_driver(&act8945a_i2c_driver);
+> > > +}
+> > > +subsys_initcall(act8945a_i2c_init);
+> > > +
+> > > +static void __exit act8945a_i2c_exit(void) {
+> > > +	i2c_del_driver(&act8945a_i2c_driver);
+> > > +}
+> > > +module_exit(act8945a_i2c_exit);
+> > > +
+> > > +MODULE_DESCRIPTION("ACT8945A PMIC multi-function driver");
+> > > +MODULE_AUTHOR("Wenyou Yang <wenyou.yang@atmel.com>");
+> > > +MODULE_LICENSE("GPL");
+> > 
+> 
+> Best Regards,
+> Wenyou Yang
 
-warning: (ARCH_BAST && MACH_VR1000 && MACH_ANUBIS && MACH_OSIRIS && MACH_RX1950) selects S3C2410_COMMON_DCLK which has unmet direct dependencies (COMMON_CLK)
-warning: (CPU_S3C2410 && CPU_S3C2440 && CPU_S3C2442) selects S3C2410_COMMON_CLK which has unmet direct dependencies (COMMON_CLK)
-warning: (CPU_S3C2412) selects S3C2412_COMMON_CLK which has unmet direct dependencies (COMMON_CLK)
-warning: (CPU_S3C2416 && CPU_S3C2443) selects S3C2443_COMMON_CLK which has unmet direct dependencies (COMMON_CLK)
-   drivers/built-in.o: In function `pwm_samsung_remove':
->> :(.text+0xba68): undefined reference to `clk_disable'
-   drivers/built-in.o: In function `pwm_samsung_config':
->> :(.text+0xbc18): undefined reference to `clk_get_rate'
-   :(.text+0xbc30): undefined reference to `clk_get_rate'
-   drivers/built-in.o: In function `pwm_samsung_probe':
->> :(.text+0xbf68): undefined reference to `clk_enable'
-   :(.text+0xc00c): undefined reference to `clk_disable'
-   drivers/built-in.o: In function `__pm_clk_remove':
-   :(.text+0x83518): undefined reference to `clk_disable'
-   drivers/built-in.o: In function `pm_clk_suspend':
-   :(.text+0x83834): undefined reference to `clk_disable'
-   drivers/built-in.o: In function `pm_clk_resume':
-   :(.text+0x8389c): undefined reference to `clk_enable'
-   drivers/built-in.o: In function `s3c2410_start_hc':
-   :(.text+0xffc84): undefined reference to `clk_enable'
-   :(.text+0xffcac): undefined reference to `clk_enable'
-   drivers/built-in.o: In function `s3c2410_stop_hc':
-   :(.text+0xffd68): undefined reference to `clk_disable'
-   :(.text+0xffd74): undefined reference to `clk_disable'
-   drivers/built-in.o: In function `_samsung_pwm_clocksource_init':
->> :(.init.text+0x6f88): undefined reference to `clk_enable'
->> :(.init.text+0x6fcc): undefined reference to `clk_get_rate'
-   :(.init.text+0x7070): undefined reference to `clk_get_rate'
-   arch/arm/mach-s3c24xx/built-in.o: In function `s3c2412_init_clocks':
->> :(.init.text+0x13c): undefined reference to `s3c2412_common_clk_init'
-   arch/arm/mach-s3c24xx/built-in.o: In function `s3c2416_init_clocks':
->> :(.init.text+0x164): undefined reference to `s3c2443_common_clk_init'
-   arch/arm/mach-s3c24xx/built-in.o: In function `s3c2443_init_clocks':
-   :(.init.text+0x18c): undefined reference to `s3c2443_common_clk_init'
-   arch/arm/mach-s3c24xx/built-in.o: In function `amlm5900_init_time':
->> :(.init.text+0xa24): undefined reference to `s3c2410_init_clocks'
-   arch/arm/mach-s3c24xx/built-in.o: In function `bast_init_time':
-   :(.init.text+0xa80): undefined reference to `s3c2410_init_clocks'
-   arch/arm/mach-s3c24xx/built-in.o: In function `h1940_init_time':
-   :(.init.text+0xed0): undefined reference to `s3c2410_init_clocks'
-   arch/arm/mach-s3c24xx/built-in.o: In function `n30_init_time':
-   :(.init.text+0xfb0): undefined reference to `s3c2410_init_clocks'
-   arch/arm/mach-s3c24xx/built-in.o: In function `otom11_init_time':
-   :(.init.text+0x11f4): undefined reference to `s3c2410_init_clocks'
-   arch/arm/mach-s3c24xx/built-in.o::(.init.text+0x1350): more undefined references to `s3c2410_init_clocks' follow
-   arch/arm/mach-s3c24xx/built-in.o: In function `anubis_init_time':
->> :(.init.text+0x1b30): undefined reference to `s3c2440_init_clocks'
-   arch/arm/mach-s3c24xx/built-in.o: In function `at2440evb_init_time':
-   :(.init.text+0x1c28): undefined reference to `s3c2440_init_clocks'
-   arch/arm/mach-s3c24xx/built-in.o: In function `mini2440_init_time':
-   :(.init.text+0x1cac): undefined reference to `s3c2440_init_clocks'
-   arch/arm/mach-s3c24xx/built-in.o: In function `nexcoder_init_time':
-   :(.init.text+0x204c): undefined reference to `s3c2440_init_clocks'
-   arch/arm/mach-s3c24xx/built-in.o: In function `osiris_init_time':
-   :(.init.text+0x2158): undefined reference to `s3c2440_init_clocks'
-   arch/arm/mach-s3c24xx/built-in.o::(.init.text+0x228c): more undefined references to `s3c2440_init_clocks' follow
-   arch/arm/mach-s3c24xx/built-in.o: In function `gta02_init_time':
->> :(.init.text+0x2438): undefined reference to `s3c2442_init_clocks'
-   arch/arm/mach-s3c24xx/built-in.o: In function `rx1950_init_time':
-   :(.init.text+0x26e4): undefined reference to `s3c2442_init_clocks'
-   lib/lib.a(vsprintf.o): In function `clock':
->> vsprintf.c:(.text+0x2414): undefined reference to `clk_get_rate'
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 20185 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/a6d16192/attachment-0001.obj>
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
