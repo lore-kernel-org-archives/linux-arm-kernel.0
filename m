@@ -1,128 +1,101 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 27 Jan 2016 10:14:33 -0800
-Subject: [PATCH 4.1 109/127] arm64: bpf: fix div-by-zero case
-In-Reply-To: <20160127180805.624425994@linuxfoundation.org>
-References: <20160127180805.624425994@linuxfoundation.org>
-Message-ID: <20160127180811.170841988@linuxfoundation.org>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Wed, 27 Jan 2016 11:19:29 -0800
+Subject: [PATCH v5 0/7] remoteproc: Add driver for STMicroelectronics
+ platforms
+In-Reply-To: <20160127073124.GI3368@x1>
+References: <1452602781-22424-1-git-send-email-lee.jones@linaro.org>
+ <20160127073124.GI3368@x1>
+Message-ID: <CAJAp7OhYQVkq4LrTdiO-5mTreaY4ZhiiQkRKN_cAS36huwyhQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.1-stable review patch.  If anyone has any objections, please let me know.
+On Tue, Jan 26, 2016 at 11:31 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>
+> Apologies for ping (I hate doing that), but I haven't heard anything
+> from you.  Do you want me to re-submit this set, or are you willing to
+> take this and apply the relevant Acks?
+>
 
-------------------
+I had a chat with Ohad and offered my assistance with his work. So I
+will pick up the role as co-maintainer of his subsystems.
 
-From: Zi Shen Lim <zlim.lnx@gmail.com>
+I will pick up patch 1-4 of your v5 as soon as I've sorted out the
+practicalities around this, no need to resubmit them.
 
-commit 251599e1d6906621f49218d7b474ddd159e58f3b upstream.
+Sorry for the delay!
 
-In the case of division by zero in a BPF program:
-	A = A / X;  (X == 0)
-the expected behavior is to terminate with return value 0.
+Regards,
+Bjorn
 
-This is confirmed by the test case introduced in commit 86bf1721b226
-("test_bpf: add tests checking that JIT/interpreter sets A and X to 0.").
-
-Reported-by: Yang Shi <yang.shi@linaro.org>
-Tested-by: Yang Shi <yang.shi@linaro.org>
-CC: Xi Wang <xi.wang@gmail.com>
-CC: Alexei Starovoitov <ast@plumgrid.com>
-CC: linux-arm-kernel at lists.infradead.org
-CC: linux-kernel at vger.kernel.org
-Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
-Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- arch/arm64/net/bpf_jit.h      |    3 ++-
- arch/arm64/net/bpf_jit_comp.c |   37 +++++++++++++++++++++++++------------
- 2 files changed, 27 insertions(+), 13 deletions(-)
-
---- a/arch/arm64/net/bpf_jit.h
-+++ b/arch/arm64/net/bpf_jit.h
-@@ -1,7 +1,7 @@
- /*
-  * BPF JIT compiler for ARM64
-  *
-- * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
-+ * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -35,6 +35,7 @@
- 	aarch64_insn_gen_comp_branch_imm(0, offset, Rt, A64_VARIANT(sf), \
- 		AARCH64_INSN_BRANCH_COMP_##type)
- #define A64_CBZ(sf, Rt, imm19) A64_COMP_BRANCH(sf, Rt, (imm19) << 2, ZERO)
-+#define A64_CBNZ(sf, Rt, imm19) A64_COMP_BRANCH(sf, Rt, (imm19) << 2, NONZERO)
- 
- /* Conditional branch (immediate) */
- #define A64_COND_BRANCH(cond, offset) \
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -1,7 +1,7 @@
- /*
-  * BPF JIT compiler for ARM64
-  *
-- * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
-+ * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -225,6 +225,17 @@ static int build_insn(const struct bpf_i
- 	u8 jmp_cond;
- 	s32 jmp_offset;
- 
-+#define check_imm(bits, imm) do {				\
-+	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
-+	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
-+		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
-+			i, imm, imm);				\
-+		return -EINVAL;					\
-+	}							\
-+} while (0)
-+#define check_imm19(imm) check_imm(19, imm)
-+#define check_imm26(imm) check_imm(26, imm)
-+
- 	switch (code) {
- 	/* dst = src */
- 	case BPF_ALU | BPF_MOV | BPF_X:
-@@ -258,8 +269,21 @@ static int build_insn(const struct bpf_i
- 		break;
- 	case BPF_ALU | BPF_DIV | BPF_X:
- 	case BPF_ALU64 | BPF_DIV | BPF_X:
-+	{
-+		const u8 r0 = bpf2a64[BPF_REG_0];
-+
-+		/* if (src == 0) return 0 */
-+		jmp_offset = 3; /* skip ahead to else path */
-+		check_imm19(jmp_offset);
-+		emit(A64_CBNZ(is64, src, jmp_offset), ctx);
-+		emit(A64_MOVZ(1, r0, 0, 0), ctx);
-+		jmp_offset = epilogue_offset(ctx);
-+		check_imm26(jmp_offset);
-+		emit(A64_B(jmp_offset), ctx);
-+		/* else */
- 		emit(A64_UDIV(is64, dst, dst, src), ctx);
- 		break;
-+	}
- 	case BPF_ALU | BPF_MOD | BPF_X:
- 	case BPF_ALU64 | BPF_MOD | BPF_X:
- 		ctx->tmp_used = 1;
-@@ -393,17 +417,6 @@ emit_bswap_uxt:
- 		emit(A64_ASR(is64, dst, dst, imm), ctx);
- 		break;
- 
--#define check_imm(bits, imm) do {				\
--	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
--	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
--		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
--			i, imm, imm);				\
--		return -EINVAL;					\
--	}							\
--} while (0)
--#define check_imm19(imm) check_imm(19, imm)
--#define check_imm26(imm) check_imm(26, imm)
--
- 	/* JUMP off */
- 	case BPF_JMP | BPF_JA:
- 		jmp_offset = bpf2a64_offset(i + off, i, ctx);
+> > ST's platforms often have multiple co-processors (usually ST40s or ST231s)
+> > on-board.  This provides the Linux-side infrastructure to flash and boot
+> > them successfully.
+> >
+> > This set has been tested on an STiH410-B2120.
+> >
+> > v4 => v5:
+> >  - Check for invalid 'count' (command read length) in write fn()s
+> >
+> > v3 => v4:
+> >  Suggested-by: Suman Anna <s-anna@ti.com>
+> >  - Move to using 'reserved-memory' API
+> >    - New 'reserved-memory' nodes
+> >    - Remove memory locations from RemoteProc's DT node's reg properties
+> >    - Remove C code obtaining/allocating DMA memory
+> >  - Re-order .start() and .stop() ops
+> >  - Add protection around Reset API in error path
+> >  - Explicitly set .has_iommu to false
+> >
+> > v2 => v3:
+> >  - Generify syscon property (st,syscfg-boot => st,syscfg)
+> >  - Rename IP in DT bindings doc (Remote Processor => Co-Processor)
+> >  - Remove superfluous 'clock-names' property
+> >  - Remove superfluous 'reg-names' property
+> >  - Populate MAINTAINERS
+> >  - Clean-up DTS formatting
+> >  - Use strings in debugfs to control procs ('1|0' => 'start|stop')
+> >  - Align copyright statement with MODULE() macros
+> >  - Rename driver data structure ('st_rproc' => 'ddata')
+> >  - Addition of a full error path in .start()
+> >
+> > v1 => v2:
+> >  - Remove Linux implementation specific comment from binding document
+> >  - Force debugfs '0' to shutdown co-processor - rather than !1
+> >  - Supply more detailed commit message
+> >  - Propagate errors back from .stop()
+> >  - Review GPL wording
+> >  - Supply original author's SoBs
+> >
+> > Lee Jones (7):
+> >   remoteproc: debugfs: Check of invalid 'count' value
+> >   remoteproc: dt: Provide bindings for ST's Remote Processor Controller
+> >     driver
+> >   remoteproc: debugfs: Add ability to boot remote processor using
+> >     debugfs
+> >   remoteproc: Supply controller driver for ST's Remote Processors
+> >   MAINTAINERS: Add ST's Remote Processor Driver to ARM/STI ARCHITECTURE
+> >   ARM: STiH407: Add nodes for RemoteProc
+> >   ARM: STiH407: Move over to using the 'reserved-memory' API for
+> >     obtaining DMA memory
+> >
+> >  .../devicetree/bindings/remoteproc/st-rproc.txt    |  41 +++
+> >  MAINTAINERS                                        |   1 +
+> >  arch/arm/boot/dts/stih407-family.dtsi              |  70 +++++
+> >  drivers/remoteproc/Kconfig                         |   9 +
+> >  drivers/remoteproc/Makefile                        |   1 +
+> >  drivers/remoteproc/remoteproc_debugfs.c            |  38 ++-
+> >  drivers/remoteproc/st_remoteproc.c                 | 297 +++++++++++++++++++++
+> >  7 files changed, 455 insertions(+), 2 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+> >  create mode 100644 drivers/remoteproc/st_remoteproc.c
+> >
+>
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
