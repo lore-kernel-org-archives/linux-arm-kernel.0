@@ -1,177 +1,192 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 27 Jan 2016 11:51:48 +0800
-Subject: [PATCH v10 20/21] KVM: ARM: Introduce per-vcpu kvm device controls
+Date: Wed, 27 Jan 2016 11:51:38 +0800
+Subject: [PATCH v10 10/21] KVM: ARM64: Add access handler for PMCNTENSET and
+ PMCNTENCLR register
 In-Reply-To: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1453866709-20324-21-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1453866709-20324-11-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-In some cases it needs to get/set attributes specific to a vcpu and so
-needs something else than ONE_REG.
+Since the reset value of PMCNTENSET and PMCNTENCLR is UNKNOWN, use
+reset_unknown for its reset handler. Add a handler to emulate writing
+PMCNTENSET or PMCNTENCLR register.
 
-Let's copy the KVM_DEVICE approach, and define the respective ioctls
-for the vcpu file descriptor.
+When writing to PMCNTENSET, call perf_event_enable to enable the perf
+event. When writing to PMCNTENCLR, call perf_event_disable to disable
+the perf event.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Andrew Jones <drjones@redhat.com>
-Acked-by: Peter Maydell <peter.maydell@linaro.org>
 ---
-CC: Peter Maydell <peter.maydell@linaro.org>
----
- Documentation/virtual/kvm/api.txt          | 10 +++---
- Documentation/virtual/kvm/devices/vcpu.txt |  8 +++++
- arch/arm/kvm/arm.c                         | 55 ++++++++++++++++++++++++++++++
- arch/arm64/kvm/reset.c                     |  1 +
- include/uapi/linux/kvm.h                   |  1 +
- 5 files changed, 71 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/virtual/kvm/devices/vcpu.txt
+ arch/arm64/kvm/sys_regs.c | 35 +++++++++++++++++++++++---
+ include/kvm/arm_pmu.h     |  9 +++++++
+ virt/kvm/arm/pmu.c        | 63 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 103 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index e51fa04..3976645 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2507,8 +2507,9 @@ struct kvm_create_device {
- 
- 4.80 KVM_SET_DEVICE_ATTR/KVM_GET_DEVICE_ATTR
- 
--Capability: KVM_CAP_DEVICE_CTRL, KVM_CAP_VM_ATTRIBUTES for vm device
--Type: device ioctl, vm ioctl
-+Capability: KVM_CAP_DEVICE_CTRL, KVM_CAP_VM_ATTRIBUTES for vm device,
-+  KVM_CAP_VCPU_ATTRIBUTES for vcpu device
-+Type: device ioctl, vm ioctl, vcpu ioctl
- Parameters: struct kvm_device_attr
- Returns: 0 on success, -1 on error
- Errors:
-@@ -2533,8 +2534,9 @@ struct kvm_device_attr {
- 
- 4.81 KVM_HAS_DEVICE_ATTR
- 
--Capability: KVM_CAP_DEVICE_CTRL, KVM_CAP_VM_ATTRIBUTES for vm device
--Type: device ioctl, vm ioctl
-+Capability: KVM_CAP_DEVICE_CTRL, KVM_CAP_VM_ATTRIBUTES for vm device,
-+  KVM_CAP_VCPU_ATTRIBUTES for vcpu device
-+Type: device ioctl, vm ioctl, vcpu ioctl
- Parameters: struct kvm_device_attr
- Returns: 0 on success, -1 on error
- Errors:
-diff --git a/Documentation/virtual/kvm/devices/vcpu.txt b/Documentation/virtual/kvm/devices/vcpu.txt
-new file mode 100644
-index 0000000..3cc59c5
---- /dev/null
-+++ b/Documentation/virtual/kvm/devices/vcpu.txt
-@@ -0,0 +1,8 @@
-+Generic vcpu interface
-+====================================
-+
-+The virtual cpu "device" also accepts the ioctls KVM_SET_DEVICE_ATTR,
-+KVM_GET_DEVICE_ATTR, and KVM_HAS_DEVICE_ATTR. The interface uses the same struct
-+kvm_device_attr as other devices, but targets VCPU-wide settings and controls.
-+
-+The groups and attributes per virtual cpu, if any, are architecture specific.
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index d2c2cc3..34d7395 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -826,11 +826,51 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
- 	return 0;
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 6a50262..d43a9a4 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -603,6 +603,33 @@ static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
+ 	return true;
  }
  
-+static int kvm_arm_vcpu_set_attr(struct kvm_vcpu *vcpu,
-+				 struct kvm_device_attr *attr)
++static bool access_pmcnten(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			   const struct sys_reg_desc *r)
 +{
-+	int ret = -ENXIO;
++	u64 val, mask;
 +
-+	switch (attr->group) {
-+	default:
-+		break;
++	if (!kvm_arm_pmu_v3_ready(vcpu))
++		return trap_raz_wi(vcpu, p, r);
++
++	mask = kvm_pmu_valid_counter_mask(vcpu);
++	if (p->is_write) {
++		val = p->regval & mask;
++		if (r->Op2 & 0x1) {
++			/* accessing PMCNTENSET_EL0 */
++			vcpu_sys_reg(vcpu, PMCNTENSET_EL0) |= val;
++			kvm_pmu_enable_counter(vcpu, val);
++		} else {
++			/* accessing PMCNTENCLR_EL0 */
++			vcpu_sys_reg(vcpu, PMCNTENSET_EL0) &= ~val;
++			kvm_pmu_disable_counter(vcpu, val);
++		}
++	} else {
++		p->regval = vcpu_sys_reg(vcpu, PMCNTENSET_EL0) & mask;
 +	}
 +
-+	return ret;
++	return true;
 +}
 +
-+static int kvm_arm_vcpu_get_attr(struct kvm_vcpu *vcpu,
-+				 struct kvm_device_attr *attr)
-+{
-+	int ret = -ENXIO;
-+
-+	switch (attr->group) {
-+	default:
-+		break;
-+	}
-+
-+	return ret;
-+}
-+
-+static int kvm_arm_vcpu_has_attr(struct kvm_vcpu *vcpu,
-+				 struct kvm_device_attr *attr)
-+{
-+	int ret = -ENXIO;
-+
-+	switch (attr->group) {
-+	default:
-+		break;
-+	}
-+
-+	return ret;
-+}
-+
- long kvm_arch_vcpu_ioctl(struct file *filp,
- 			 unsigned int ioctl, unsigned long arg)
+ /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+ #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+ 	/* DBGBVRn_EL1 */						\
+@@ -804,10 +831,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	  access_pmcr, reset_pmcr, },
+ 	/* PMCNTENSET_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b001),
+-	  trap_raz_wi },
++	  access_pmcnten, reset_unknown, PMCNTENSET_EL0 },
+ 	/* PMCNTENCLR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b010),
+-	  trap_raz_wi },
++	  access_pmcnten, NULL, PMCNTENSET_EL0 },
+ 	/* PMOVSCLR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b011),
+ 	  trap_raz_wi },
+@@ -1149,8 +1176,8 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 
+ 	/* PMU */
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmcr },
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), access_pmcnten },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), access_pmcnten },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmceid },
+diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+index ee4b15c..a7e5485 100644
+--- a/include/kvm/arm_pmu.h
++++ b/include/kvm/arm_pmu.h
+@@ -37,6 +37,9 @@ struct kvm_pmu {
+ 
+ #define kvm_arm_pmu_v3_ready(v)		((v)->arch.pmu.ready)
+ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx);
++u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu);
++void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
++void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
+ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+ 				    u64 select_idx);
+ #else
+@@ -49,6 +52,12 @@ static inline u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu,
  {
- 	struct kvm_vcpu *vcpu = filp->private_data;
- 	void __user *argp = (void __user *)arg;
-+	struct kvm_device_attr attr;
- 
- 	switch (ioctl) {
- 	case KVM_ARM_VCPU_INIT: {
-@@ -873,6 +913,21 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 			return -E2BIG;
- 		return kvm_arm_copy_reg_indices(vcpu, user_list->reg);
+ 	return 0;
+ }
++static inline u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
++{
++	return 0;
++}
++static inline void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
++static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+ static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
+ 						  u64 data, u64 select_idx) {}
+ #endif
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 673ec55..0873977 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -68,6 +68,69 @@ static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc)
  	}
-+	case KVM_SET_DEVICE_ATTR: {
-+		if (copy_from_user(&attr, argp, sizeof(attr)))
-+			return -EFAULT;
-+		return kvm_arm_vcpu_set_attr(vcpu, &attr);
-+	}
-+	case KVM_GET_DEVICE_ATTR: {
-+		if (copy_from_user(&attr, argp, sizeof(attr)))
-+			return -EFAULT;
-+		return kvm_arm_vcpu_get_attr(vcpu, &attr);
-+	}
-+	case KVM_HAS_DEVICE_ATTR: {
-+		if (copy_from_user(&attr, argp, sizeof(attr)))
-+			return -EFAULT;
-+		return kvm_arm_vcpu_has_attr(vcpu, &attr);
-+	}
- 	default:
- 		return -EINVAL;
- 	}
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index cf4f28a..9677bf0 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -81,6 +81,7 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
- 		r = kvm_arm_support_pmu_v3();
- 		break;
- 	case KVM_CAP_SET_GUEST_DEBUG:
-+	case KVM_CAP_VCPU_ATTRIBUTES:
- 		r = 1;
- 		break;
- 	default:
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index dc16d30..50f44a2 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -851,6 +851,7 @@ struct kvm_ppc_smmu_info {
- #define KVM_CAP_HYPERV_SYNIC 123
- #define KVM_CAP_S390_RI 124
- #define KVM_CAP_ARM_PMU_V3 125
-+#define KVM_CAP_VCPU_ATTRIBUTES 126
+ }
  
- #ifdef KVM_CAP_IRQ_ROUTING
- 
++u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
++{
++	u64 val = vcpu_sys_reg(vcpu, PMCR_EL0) >> ARMV8_PMCR_N_SHIFT;
++
++	val &= ARMV8_PMCR_N_MASK;
++	return GENMASK(val - 1, 0) | BIT(ARMV8_CYCLE_IDX);
++}
++
++/**
++ * kvm_pmu_enable_counter - enable selected PMU counter
++ * @vcpu: The vcpu pointer
++ * @val: the value guest writes to PMCNTENSET register
++ *
++ * Call perf_event_enable to start counting the perf event
++ */
++void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val)
++{
++	int i;
++	struct kvm_pmu *pmu = &vcpu->arch.pmu;
++	struct kvm_pmc *pmc;
++
++	if (!(vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E) || !val)
++		return;
++
++	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
++		if (!(val & BIT(i)))
++			continue;
++
++		pmc = &pmu->pmc[i];
++		if (pmc->perf_event) {
++			perf_event_enable(pmc->perf_event);
++			if (pmc->perf_event->state != PERF_EVENT_STATE_ACTIVE)
++				kvm_debug("fail to enable perf event\n");
++		}
++	}
++}
++
++/**
++ * kvm_pmu_disable_counter - disable selected PMU counter
++ * @vcpu: The vcpu pointer
++ * @val: the value guest writes to PMCNTENCLR register
++ *
++ * Call perf_event_disable to stop counting the perf event
++ */
++void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val)
++{
++	int i;
++	struct kvm_pmu *pmu = &vcpu->arch.pmu;
++	struct kvm_pmc *pmc;
++
++	if (!val)
++		return;
++
++	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
++		if (!(val & BIT(i)))
++			continue;
++
++		pmc = &pmu->pmc[i];
++		if (pmc->perf_event)
++			perf_event_disable(pmc->perf_event);
++	}
++}
++
+ static bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu, u64 select_idx)
+ {
+ 	return (vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E) &&
 -- 
 2.0.4
