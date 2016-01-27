@@ -1,27 +1,75 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 27 Jan 2016 14:20:38 +0100
-Subject: [PATCH v4 0/9] Add STM32 pinctrl/GPIO driver
-In-Reply-To: <1452773795-24216-1-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1452773795-24216-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <CACRpkdYGQ1xObWfka2CN9au6YMGhpu4qcTZpu72bzuJjO38tog@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 27 Jan 2016 14:20:45 +0100
+Subject: [PATCH v2 4/6] irqchip: irq-armada-370-xp: use shorter names for
+ irq_chip
+In-Reply-To: <1453899395-3532-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Wed, 27 Jan 2016 13:56:33 +0100")
+References: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1453899395-3532-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <87pown9n0y.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 14, 2016 at 1:16 PM, Maxime Coquelin
-<mcoquelin.stm32@gmail.com> wrote:
+Hi Thomas,
+ 
+ On mer., janv. 27 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-> This is the fourth round of STM32 pinctrl series, which takes into
-> account comments made by Patrice on patch 4.
+> In order to make the output of /proc/interrupts, use shorter names for
+> the irq_chip registered by the irq-armada-370-xp driver. Using capital
+> letters also matches better what is done for the GIC driver, which
+> uses just "GIC" as the irq_chip->name.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-I have applied patch 2 and 4 to the pinctrl tree.
+As you managed to convince me:
 
-Please put the rest of the patches in through ARM SoC, you can
-add my
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-to them.
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-AFAICT there is no compile-time dependency between these two
-patches and the rest, so it should merge just fine.
+Thanks,
 
-Yours,
-Linus Walleij
+Gregory
+
+> ---
+>  drivers/irqchip/irq-armada-370-xp.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+> index f53eb71..c99ae5f 100644
+> --- a/drivers/irqchip/irq-armada-370-xp.c
+> +++ b/drivers/irqchip/irq-armada-370-xp.c
+> @@ -117,7 +117,7 @@ static void armada_370_xp_irq_unmask(struct irq_data *d)
+>  #ifdef CONFIG_PCI_MSI
+>  
+>  static struct irq_chip armada_370_xp_msi_irq_chip = {
+> -	.name = "armada_370_xp_msi_irq",
+> +	.name = "MPIC MSI",
+>  	.irq_mask = pci_msi_mask_irq,
+>  	.irq_unmask = pci_msi_unmask_irq,
+>  };
+> @@ -141,7 +141,7 @@ static int armada_370_xp_msi_set_affinity(struct irq_data *irq_data,
+>  }
+>  
+>  static struct irq_chip armada_370_xp_msi_bottom_irq_chip = {
+> -	.name			= "armada_370_xp_msi_irq",
+> +	.name			= "MPIC MSI",
+>  	.irq_compose_msi_msg	= armada_370_xp_compose_msi_msg,
+>  	.irq_set_affinity	= armada_370_xp_msi_set_affinity,
+>  };
+> @@ -253,7 +253,7 @@ static int armada_xp_set_affinity(struct irq_data *d,
+>  #endif
+>  
+>  static struct irq_chip armada_370_xp_irq_chip = {
+> -	.name		= "armada_370_xp_irq",
+> +	.name		= "MPIC",
+>  	.irq_mask       = armada_370_xp_irq_mask,
+>  	.irq_mask_ack   = armada_370_xp_irq_mask,
+>  	.irq_unmask     = armada_370_xp_irq_unmask,
+> -- 
+> 2.6.4
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
