@@ -1,85 +1,95 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Wed, 27 Jan 2016 15:01:09 +0100
-Subject: [PATCH v3 05/12] arm64, acpi, numa: NUMA support based on SRAT
- and SLIT
-In-Reply-To: <56A86DCF.1020205@huawei.com>
-References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
- <1453541967-3744-6-git-send-email-guohanjun@huawei.com>
- <20160125102148.GE24726@rric.localdomain>
- <56A86DCF.1020205@huawei.com>
-Message-ID: <20160127140109.GQ24726@rric.localdomain>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Wed, 27 Jan 2016 16:57:34 +0300
+Subject: [PATCH 2/3] ACPI: parse SPCR and enable matching console
+In-Reply-To: <56A64E07.10106@hurleysoftware.com>
+References: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>
+ <1453722324-22407-3-git-send-email-aleksey.makarov@linaro.org>
+ <56A64E07.10106@hurleysoftware.com>
+Message-ID: <56A8CCCE.2080509@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.01.16 15:12:15, Hanjun Guo wrote:
-> On 2016/1/25 18:21, Robert Richter wrote:
-> > On 23.01.16 17:39:20, Hanjun Guo wrote:
-> >> diff --git a/arch/arm64/kernel/acpi_numa.c b/arch/arm64/kernel/acpi_numa.c
-> >> new file mode 100644
-> >> index 0000000..f7f7533
-> >> --- /dev/null
-> >> +++ b/arch/arm64/kernel/acpi_numa.c
-> >> +/* Callback for parsing of the Proximity Domain <-> Memory Area mappings */
-> >> +int __init acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
-> >> +{
-> >> +	u64 start, end;
-> >> +	int node, pxm;
-> >> +
-> >> +	if (srat_disabled())
-> >> +		return -EINVAL;
-> >> +
-> >> +	if (ma->header.length != sizeof(struct acpi_srat_mem_affinity)) {
-> > Must be:
-> >
-> > 	ma->header.length < sizeof(struct acpi_srat_mem_affinity)) {
-> >
-> > Allow extensions to struct acpi_srat_mem_affinity in newer versions.
+
+
+On 01/25/2016 07:32 PM, Peter Hurley wrote:
+> On 01/25/2016 03:45 AM, Aleksey Makarov wrote:
+>> 'ARM Server Base Boot Requiremets' [1] mention SPCR (Serial Port
+>> Console Redirection Table) [2] as a mandatory ACPI table that
+>> specifies the configuration of serial console.
+>> 
+>> Parse this table and check if any registered console match the
+>> description.  If it does, enable that console.
+>> 
+>> To implement that, introduce a new member int (*acpi_match)(struct
+>> console *, struct acpi_table_spcr *) of struct console.  It allows
+>> drivers to check if they provide a matching console device.
 > 
-> Hmm, I think we need to remove the check here now.
+> Many, many platform proms with all sorts of binary table layout are
+> already supported by the existing console infrastructure. Why is ACPI
+> different, that requires extensive (and messy) changes to console
+> initialization?
 
-No, we might have an out-of-bound access then.
+Without this patch, when linux calls register_console(), that function
+checks if any console has been enabled so far. 1) If not, it enables the
+console being registered. 2) If there exists any enabled console, it
+looks at the console_cmdline array. That array holds a list of
+consoles that user wishes to enable. There are two ways to append
+an item to that list: first is to pass "console=..." option in command
+line and second is to call add_preferred_console(char *name, int idx,
+char *options). As it is clear from the signature, the function
+requires the name of the driver (like "ttyS") and the line id. On the
+other hand, the SPCR ACPI table describes console by specifying the
+address of it's registers or PCI Device ID / PCI Vendor ID or PCI Bus
+Number / PCI Device Number. So to use this function we would need to
+have a method to translate this info to the name of terminal and line
+index. I could not figure out any way to do that.
 
-> 
-> There are three cases:
-> 
->  - firmware ACPI version is consistent with the ACPICA one, then
->    ma->header.length == sizeof(struct acpi_srat_mem_affinity )
-> 
->  - firmware ACPI version is not consistent with the ACPICA one,
->    for example, struct acpi_srat_mem_affinity is extended in
->    new ACI version, but the formware is using the older one,
->   then it's ok to use
->   ma->header.length < sizeof(struct acpi_srat_mem_affinity )
+In the initial version of the patch after getting the reference to the
+SPCR ACPI table the full tree of ACPI devices was searched to find any
+device with the same address.  When uart_add_one_port() was called
+to register a new serial port, the ACPI companion of this port was
+compared to the found device. If it was the same device, the code
+called add_preferred_console() (the terminal name and line index are
+known in uart_add_one_port()).
 
-The check above is ok as we need@least struct
-acpi_srat_mem_affinity as it is now.
+This original approach had two problems: 
 
-If we later change the kernel to support multiple versions of struct
-acpi_srat_mem_affinity, i.e. use data from an extended section, we
-will need to add code to handle that. This will include support of
-data with length < acpi_srat_mem_affinity, in this case we may not use
-extended data.
+    1) It works with the SPCR tables that describe consoles only by
+the address of the registers. I do not think that consoles that are
+described by PCI info will appear in the near future, but decided to
+implement this in a generic way. I would like to discuss if this
+decision was good.
 
-> 
->  - but if we use the older kernel + updated new firmware,
->    then
->    ma->header.length > sizeof(struct acpi_srat_mem_affinity )
->   will be the case, right?
+    2) Wrong order of initialization.  Many console drivers have already
+been registered by the time uart_add_one_port() adds an item to the
+console_cmdline array.  There is a similar problem with my
+implementation,  but having a dedicated acpi_match() callback I
+believe made it simpler to circumwent.
 
-Right, and this is a valid case not resulting in an error with my
-suggestion above.
+That's why I believe we need to add a new funcion pointer to struct
+console. On the other hand, I do not understand which existing
+structure you are referring.
 
-> 
-> >
-> >> +		bad_srat();
-> >> +		return -EINVAL;
-> > We need a pr_err() here to avoid that numa setup fails silently due to
-> > bad fw. This applies to all error paths.
-> >
-> > See my delta patch below. You can merge it with your patch.
-> 
-> Thanks! I wil merge it into next version.
+> How is this going to work with earlycon?
 
-Thanks,
+If an earlycon that matches SPCR is being registered, the code will enable it.
+While it is harmless. Even so I will check for earlycon in the next version
+of the patch set, thank you.
 
--Robert
+> This commit log is missing the reasoning behind adding locks,
+> refactoring into delete_from_console_list(), and retry loops.
+
+I will add this to the next verion of the series.
+
+Thank you
+Aleksey Makarov
+
+
+>> [1]
+>> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
+>>
+>> [2] http://msdn.microsoft.com/en-us/library/windows/hardware/dn639131(v=vs.85).aspx
+>> 
+>> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+
+[ .. ]
