@@ -1,39 +1,54 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 27 Jan 2016 13:40:24 +1100
-Subject: linux-next: build failure after merge of the aio tree
-In-Reply-To: <20160112163835.GD347@kvack.org>
-References: <20160112164034.0fe945a7@canb.auug.org.au>
- <20160112163835.GD347@kvack.org>
-Message-ID: <20160127134024.0fababf6@canb.auug.org.au>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Wed, 27 Jan 2016 10:57:41 +0800
+Subject: [PATCH v4 0/2] regulator: act8945a: add regulator driver for the
+ sub-device of ACT8945A MFD
+Message-ID: <1453863463-30515-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benjamin,
+The ACT8945A is a Multi Function Device with the following subdevices:
+ - Regulator
+ - Charger
 
-On Tue, 12 Jan 2016 11:38:35 -0500 Benjamin LaHaise <bcrl@kvack.org> wrote:
->
-> On Tue, Jan 12, 2016 at 04:40:34PM +1100, Stephen Rothwell wrote:
-> > 
-> > After merging the aio tree, today's linux-next build (arm
-> > multi_v7_defconfig) failed like this:
-> > 
-> > fs/built-in.o: In function `aio_thread_op_foo_at':
-> > file.c:(.text+0x43808): undefined reference to `__get_user_bad'
-> > file.c:(.text+0x43838): undefined reference to `__get_user_bad'  
-> 
-> This is very strange.  It seems to imply that __get_user() doesn't 
-> handle 64 bit values, which is completely broken behaviour on the 
-> architecture's part if true.  Can any ARM folks comment on the right 
-> fix here?
+This patch set is to add regulator driver for ACT8945A.
+It is based on the patch set:
+	http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/402199.html
 
-Well, probably only if you cc them :-)
+Changes in v4:
+ - change the name "act8945a-pmic" to "act8945a-regulator"
+   to align mfd subdevice's name.
 
-Indeed, __get_user on arm does not handle 64 bit objects, where as
-get_user does ...
+Changes in v3:
+ - use the core regulators_node and of_match implementation,
+   remove the redundant code.
+ - use the core dev_get_regmap(dev->parent) code, remove
+   the redundant code.
+ - change the regulator name to easily implement macro.
+ - use a space after #define, not tabs.
+ - add OF match table.
 
-Background: new aio code is adding __get_user() calls referencing 64
-bit quantities (__u64 and __s64).
+Changes in v2:
+ - add more help information in Kconfig.
+ - update the file header with short version license and author line.
+ - remove unused structure, struct act8945a_pmic.
+ - substitute of_property_read_bool() for of_get_property().
+ - due to removing the member of stuct act8945a_dev, dev.
+ - remove the unnecessary print out.
+ - use module_platform_driver(), instead of subsys_initcall().
+ - substitute MODULE_LICENSE("GPL") for MODULE_LICENSE("GPL v2").
+ - add Acked-by Rob Herring.
+
+Wenyou Yang (2):
+  regulator: act8945a: add regulator driver for ACT8945A
+  regulator: add documentation for ACT8945A's regulator DT bindings
+
+ .../bindings/regulator/act8945a-regulator.txt      |   78 +++++++++
+ drivers/regulator/Kconfig                          |    9 +
+ drivers/regulator/Makefile                         |    1 +
+ drivers/regulator/act8945a-regulator.c             |  172 ++++++++++++++++++++
+ 4 files changed, 260 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
+ create mode 100644 drivers/regulator/act8945a-regulator.c
 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+1.7.9.5
