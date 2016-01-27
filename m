@@ -1,50 +1,27 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 27 Jan 2016 17:11:04 +0100
-Subject: [PATCH v4 05/13] clk: at91: pmc: move pmc structures to C file
+Date: Wed, 27 Jan 2016 17:11:11 +0100
+Subject: [PATCH v4 12/13] clk: at91: pmc: remove useless capacities handling
 In-Reply-To: <1453911072-23608-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1453911072-23608-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1453911072-23608-6-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1453911072-23608-13-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pmc.c is now the only user of struct at91_pmc*, move their definition in
-the C file.
+Capacities only handles interrupts and they are not use anymore. Remove the
+whole initialisation.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/at91/pmc.c | 9 +++++++++
- drivers/clk/at91/pmc.h | 9 ---------
- 2 files changed, 9 insertions(+), 9 deletions(-)
+ drivers/clk/at91/pmc.c | 128 -------------------------------------------------
+ 1 file changed, 128 deletions(-)
 
 diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index 01d049d4248a..0b255e7fc718 100644
+index dce285549de2..526df5ba042d 100644
 --- a/drivers/clk/at91/pmc.c
 +++ b/drivers/clk/at91/pmc.c
-@@ -20,6 +20,15 @@
+@@ -19,15 +19,6 @@
  
  #include "pmc.h"
- 
-+struct at91_pmc_caps {
-+	u32 available_irqs;
-+};
-+
-+struct at91_pmc {
-+	struct regmap *regmap;
-+	const struct at91_pmc_caps *caps;
-+};
-+
- void __iomem *at91_pmc_base;
- EXPORT_SYMBOL_GPL(at91_pmc_base);
- 
-diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-index b06a332b056a..5771fff0ee3f 100644
---- a/drivers/clk/at91/pmc.h
-+++ b/drivers/clk/at91/pmc.h
-@@ -26,15 +26,6 @@ struct clk_range {
- 
- #define CLK_RANGE(MIN, MAX) {.min = MIN, .max = MAX,}
  
 -struct at91_pmc_caps {
 -	u32 available_irqs;
@@ -56,7 +33,130 @@ index b06a332b056a..5771fff0ee3f 100644
 -};
 -
  int of_at91_get_clk_range(struct device_node *np, const char *propname,
- 			  struct clk_range *range);
- 
+ 			  struct clk_range *range)
+ {
+@@ -50,122 +41,3 @@ int of_at91_get_clk_range(struct device_node *np, const char *propname,
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(of_at91_get_clk_range);
+-
+-static const struct at91_pmc_caps at91rm9200_caps = {
+-	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_LOCKB |
+-			  AT91_PMC_MCKRDY | AT91_PMC_PCK0RDY |
+-			  AT91_PMC_PCK1RDY | AT91_PMC_PCK2RDY |
+-			  AT91_PMC_PCK3RDY,
+-};
+-
+-static const struct at91_pmc_caps at91sam9260_caps = {
+-	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_LOCKB |
+-			  AT91_PMC_MCKRDY | AT91_PMC_PCK0RDY |
+-			  AT91_PMC_PCK1RDY,
+-};
+-
+-static const struct at91_pmc_caps at91sam9g45_caps = {
+-	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_MCKRDY |
+-			  AT91_PMC_LOCKU | AT91_PMC_PCK0RDY |
+-			  AT91_PMC_PCK1RDY,
+-};
+-
+-static const struct at91_pmc_caps at91sam9n12_caps = {
+-	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_LOCKB |
+-			  AT91_PMC_MCKRDY | AT91_PMC_PCK0RDY |
+-			  AT91_PMC_PCK1RDY | AT91_PMC_MOSCSELS |
+-			  AT91_PMC_MOSCRCS | AT91_PMC_CFDEV,
+-};
+-
+-static const struct at91_pmc_caps at91sam9x5_caps = {
+-	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_MCKRDY |
+-			  AT91_PMC_LOCKU | AT91_PMC_PCK0RDY |
+-			  AT91_PMC_PCK1RDY | AT91_PMC_MOSCSELS |
+-			  AT91_PMC_MOSCRCS | AT91_PMC_CFDEV,
+-};
+-
+-static const struct at91_pmc_caps sama5d2_caps = {
+-	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_MCKRDY |
+-			  AT91_PMC_LOCKU | AT91_PMC_PCK0RDY |
+-			  AT91_PMC_PCK1RDY | AT91_PMC_PCK2RDY |
+-			  AT91_PMC_MOSCSELS | AT91_PMC_MOSCRCS |
+-			  AT91_PMC_CFDEV | AT91_PMC_GCKRDY,
+-};
+-
+-static const struct at91_pmc_caps sama5d3_caps = {
+-	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_MCKRDY |
+-			  AT91_PMC_LOCKU | AT91_PMC_PCK0RDY |
+-			  AT91_PMC_PCK1RDY | AT91_PMC_PCK2RDY |
+-			  AT91_PMC_MOSCSELS | AT91_PMC_MOSCRCS |
+-			  AT91_PMC_CFDEV,
+-};
+-
+-static void __init of_at91_pmc_setup(struct device_node *np,
+-				     const struct at91_pmc_caps *caps)
+-{
+-	struct at91_pmc *pmc;
+-	struct regmap *regmap;
+-
+-	regmap = syscon_node_to_regmap(np);
+-	if (IS_ERR(regmap))
+-		panic("Could not retrieve syscon regmap");
+-
+-	pmc = kzalloc(sizeof(*pmc), GFP_KERNEL);
+-	if (!pmc)
+-		return;
+-
+-	pmc->regmap = regmap;
+-	pmc->caps = caps;
+-
+-	regmap_write(pmc->regmap, AT91_PMC_IDR, 0xffffffff);
+-
+-}
+-
+-static void __init of_at91rm9200_pmc_setup(struct device_node *np)
+-{
+-	of_at91_pmc_setup(np, &at91rm9200_caps);
+-}
+-CLK_OF_DECLARE(at91rm9200_clk_pmc, "atmel,at91rm9200-pmc",
+-	       of_at91rm9200_pmc_setup);
+-
+-static void __init of_at91sam9260_pmc_setup(struct device_node *np)
+-{
+-	of_at91_pmc_setup(np, &at91sam9260_caps);
+-}
+-CLK_OF_DECLARE(at91sam9260_clk_pmc, "atmel,at91sam9260-pmc",
+-	       of_at91sam9260_pmc_setup);
+-
+-static void __init of_at91sam9g45_pmc_setup(struct device_node *np)
+-{
+-	of_at91_pmc_setup(np, &at91sam9g45_caps);
+-}
+-CLK_OF_DECLARE(at91sam9g45_clk_pmc, "atmel,at91sam9g45-pmc",
+-	       of_at91sam9g45_pmc_setup);
+-
+-static void __init of_at91sam9n12_pmc_setup(struct device_node *np)
+-{
+-	of_at91_pmc_setup(np, &at91sam9n12_caps);
+-}
+-CLK_OF_DECLARE(at91sam9n12_clk_pmc, "atmel,at91sam9n12-pmc",
+-	       of_at91sam9n12_pmc_setup);
+-
+-static void __init of_at91sam9x5_pmc_setup(struct device_node *np)
+-{
+-	of_at91_pmc_setup(np, &at91sam9x5_caps);
+-}
+-CLK_OF_DECLARE(at91sam9x5_clk_pmc, "atmel,at91sam9x5-pmc",
+-	       of_at91sam9x5_pmc_setup);
+-
+-static void __init of_sama5d2_pmc_setup(struct device_node *np)
+-{
+-	of_at91_pmc_setup(np, &sama5d2_caps);
+-}
+-CLK_OF_DECLARE(sama5d2_clk_pmc, "atmel,sama5d2-pmc",
+-	       of_sama5d2_pmc_setup);
+-
+-static void __init of_sama5d3_pmc_setup(struct device_node *np)
+-{
+-	of_at91_pmc_setup(np, &sama5d3_caps);
+-}
+-CLK_OF_DECLARE(sama5d3_clk_pmc, "atmel,sama5d3-pmc",
+-	       of_sama5d3_pmc_setup);
 -- 
 2.5.0
