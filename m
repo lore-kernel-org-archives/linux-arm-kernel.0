@@ -1,162 +1,150 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 27 Jan 2016 17:11:11 +0100
-Subject: [PATCH v4 12/13] clk: at91: pmc: remove useless capacities handling
+Date: Wed, 27 Jan 2016 17:11:12 +0100
+Subject: [PATCH v4 13/13] clk: at91: remove useless includes
 In-Reply-To: <1453911072-23608-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1453911072-23608-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1453911072-23608-13-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1453911072-23608-14-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Capacities only handles interrupts and they are not use anymore. Remove the
-whole initialisation.
+Over time, some includes were copy pasted from other clocks drivers but are
+not necessary.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/clk/at91/pmc.c | 128 -------------------------------------------------
- 1 file changed, 128 deletions(-)
+ drivers/clk/at91/clk-generated.c    | 2 --
+ drivers/clk/at91/clk-h32mx.c        | 8 --------
+ drivers/clk/at91/clk-peripheral.c   | 2 --
+ drivers/clk/at91/clk-plldiv.c       | 2 --
+ drivers/clk/at91/clk-programmable.c | 4 ----
+ drivers/clk/at91/clk-slow.c         | 8 --------
+ drivers/clk/at91/clk-smd.c          | 2 --
+ drivers/clk/at91/clk-usb.c          | 2 --
+ 8 files changed, 30 deletions(-)
 
-diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index dce285549de2..526df5ba042d 100644
---- a/drivers/clk/at91/pmc.c
-+++ b/drivers/clk/at91/pmc.c
-@@ -19,15 +19,6 @@
+diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
+index 5866684a6657..4ad3298eb372 100644
+--- a/drivers/clk/at91/clk-generated.c
++++ b/drivers/clk/at91/clk-generated.c
+@@ -15,8 +15,6 @@
+ #include <linux/clkdev.h>
+ #include <linux/clk/at91_pmc.h>
+ #include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/io.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
+ 
+diff --git a/drivers/clk/at91/clk-h32mx.c b/drivers/clk/at91/clk-h32mx.c
+index 3fd59b129f92..819f5842fa66 100644
+--- a/drivers/clk/at91/clk-h32mx.c
++++ b/drivers/clk/at91/clk-h32mx.c
+@@ -15,15 +15,7 @@
+ #include <linux/clk-provider.h>
+ #include <linux/clkdev.h>
+ #include <linux/clk/at91_pmc.h>
+-#include <linux/delay.h>
+ #include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/of_irq.h>
+-#include <linux/io.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/sched.h>
+-#include <linux/wait.h>
+ #include <linux/regmap.h>
+ #include <linux/mfd/syscon.h>
+ 
+diff --git a/drivers/clk/at91/clk-peripheral.c b/drivers/clk/at91/clk-peripheral.c
+index 33c31d43dd8d..fd160728e990 100644
+--- a/drivers/clk/at91/clk-peripheral.c
++++ b/drivers/clk/at91/clk-peripheral.c
+@@ -12,8 +12,6 @@
+ #include <linux/clkdev.h>
+ #include <linux/clk/at91_pmc.h>
+ #include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/io.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
+ 
+diff --git a/drivers/clk/at91/clk-plldiv.c b/drivers/clk/at91/clk-plldiv.c
+index f43e93738a99..2bed26481027 100644
+--- a/drivers/clk/at91/clk-plldiv.c
++++ b/drivers/clk/at91/clk-plldiv.c
+@@ -12,8 +12,6 @@
+ #include <linux/clkdev.h>
+ #include <linux/clk/at91_pmc.h>
+ #include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/io.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
+ 
+diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
+index 78814ba448c4..bc0be629671b 100644
+--- a/drivers/clk/at91/clk-programmable.c
++++ b/drivers/clk/at91/clk-programmable.c
+@@ -12,10 +12,6 @@
+ #include <linux/clkdev.h>
+ #include <linux/clk/at91_pmc.h>
+ #include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/io.h>
+-#include <linux/wait.h>
+-#include <linux/sched.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
+ 
+diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
+index 1f76113db889..911e941f8318 100644
+--- a/drivers/clk/at91/clk-slow.c
++++ b/drivers/clk/at91/clk-slow.c
+@@ -12,19 +12,11 @@
+ 
+ #include <linux/clk-provider.h>
+ #include <linux/clkdev.h>
+-#include <linux/slab.h>
+ #include <linux/clk/at91_pmc.h>
+ #include <linux/delay.h>
+ #include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/of_irq.h>
+-#include <linux/io.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
+-#include <linux/sched.h>
+-#include <linux/wait.h>
  
  #include "pmc.h"
+ #include "sckc.h"
+diff --git a/drivers/clk/at91/clk-smd.c b/drivers/clk/at91/clk-smd.c
+index 0f6e8d67e630..e6948a52005a 100644
+--- a/drivers/clk/at91/clk-smd.c
++++ b/drivers/clk/at91/clk-smd.c
+@@ -12,8 +12,6 @@
+ #include <linux/clkdev.h>
+ #include <linux/clk/at91_pmc.h>
+ #include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/io.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
  
--struct at91_pmc_caps {
--	u32 available_irqs;
--};
--
--struct at91_pmc {
--	struct regmap *regmap;
--	const struct at91_pmc_caps *caps;
--};
--
- int of_at91_get_clk_range(struct device_node *np, const char *propname,
- 			  struct clk_range *range)
- {
-@@ -50,122 +41,3 @@ int of_at91_get_clk_range(struct device_node *np, const char *propname,
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(of_at91_get_clk_range);
--
--static const struct at91_pmc_caps at91rm9200_caps = {
--	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_LOCKB |
--			  AT91_PMC_MCKRDY | AT91_PMC_PCK0RDY |
--			  AT91_PMC_PCK1RDY | AT91_PMC_PCK2RDY |
--			  AT91_PMC_PCK3RDY,
--};
--
--static const struct at91_pmc_caps at91sam9260_caps = {
--	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_LOCKB |
--			  AT91_PMC_MCKRDY | AT91_PMC_PCK0RDY |
--			  AT91_PMC_PCK1RDY,
--};
--
--static const struct at91_pmc_caps at91sam9g45_caps = {
--	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_MCKRDY |
--			  AT91_PMC_LOCKU | AT91_PMC_PCK0RDY |
--			  AT91_PMC_PCK1RDY,
--};
--
--static const struct at91_pmc_caps at91sam9n12_caps = {
--	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_LOCKB |
--			  AT91_PMC_MCKRDY | AT91_PMC_PCK0RDY |
--			  AT91_PMC_PCK1RDY | AT91_PMC_MOSCSELS |
--			  AT91_PMC_MOSCRCS | AT91_PMC_CFDEV,
--};
--
--static const struct at91_pmc_caps at91sam9x5_caps = {
--	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_MCKRDY |
--			  AT91_PMC_LOCKU | AT91_PMC_PCK0RDY |
--			  AT91_PMC_PCK1RDY | AT91_PMC_MOSCSELS |
--			  AT91_PMC_MOSCRCS | AT91_PMC_CFDEV,
--};
--
--static const struct at91_pmc_caps sama5d2_caps = {
--	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_MCKRDY |
--			  AT91_PMC_LOCKU | AT91_PMC_PCK0RDY |
--			  AT91_PMC_PCK1RDY | AT91_PMC_PCK2RDY |
--			  AT91_PMC_MOSCSELS | AT91_PMC_MOSCRCS |
--			  AT91_PMC_CFDEV | AT91_PMC_GCKRDY,
--};
--
--static const struct at91_pmc_caps sama5d3_caps = {
--	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_MCKRDY |
--			  AT91_PMC_LOCKU | AT91_PMC_PCK0RDY |
--			  AT91_PMC_PCK1RDY | AT91_PMC_PCK2RDY |
--			  AT91_PMC_MOSCSELS | AT91_PMC_MOSCRCS |
--			  AT91_PMC_CFDEV,
--};
--
--static void __init of_at91_pmc_setup(struct device_node *np,
--				     const struct at91_pmc_caps *caps)
--{
--	struct at91_pmc *pmc;
--	struct regmap *regmap;
--
--	regmap = syscon_node_to_regmap(np);
--	if (IS_ERR(regmap))
--		panic("Could not retrieve syscon regmap");
--
--	pmc = kzalloc(sizeof(*pmc), GFP_KERNEL);
--	if (!pmc)
--		return;
--
--	pmc->regmap = regmap;
--	pmc->caps = caps;
--
--	regmap_write(pmc->regmap, AT91_PMC_IDR, 0xffffffff);
--
--}
--
--static void __init of_at91rm9200_pmc_setup(struct device_node *np)
--{
--	of_at91_pmc_setup(np, &at91rm9200_caps);
--}
--CLK_OF_DECLARE(at91rm9200_clk_pmc, "atmel,at91rm9200-pmc",
--	       of_at91rm9200_pmc_setup);
--
--static void __init of_at91sam9260_pmc_setup(struct device_node *np)
--{
--	of_at91_pmc_setup(np, &at91sam9260_caps);
--}
--CLK_OF_DECLARE(at91sam9260_clk_pmc, "atmel,at91sam9260-pmc",
--	       of_at91sam9260_pmc_setup);
--
--static void __init of_at91sam9g45_pmc_setup(struct device_node *np)
--{
--	of_at91_pmc_setup(np, &at91sam9g45_caps);
--}
--CLK_OF_DECLARE(at91sam9g45_clk_pmc, "atmel,at91sam9g45-pmc",
--	       of_at91sam9g45_pmc_setup);
--
--static void __init of_at91sam9n12_pmc_setup(struct device_node *np)
--{
--	of_at91_pmc_setup(np, &at91sam9n12_caps);
--}
--CLK_OF_DECLARE(at91sam9n12_clk_pmc, "atmel,at91sam9n12-pmc",
--	       of_at91sam9n12_pmc_setup);
--
--static void __init of_at91sam9x5_pmc_setup(struct device_node *np)
--{
--	of_at91_pmc_setup(np, &at91sam9x5_caps);
--}
--CLK_OF_DECLARE(at91sam9x5_clk_pmc, "atmel,at91sam9x5-pmc",
--	       of_at91sam9x5_pmc_setup);
--
--static void __init of_sama5d2_pmc_setup(struct device_node *np)
--{
--	of_at91_pmc_setup(np, &sama5d2_caps);
--}
--CLK_OF_DECLARE(sama5d2_clk_pmc, "atmel,sama5d2-pmc",
--	       of_sama5d2_pmc_setup);
--
--static void __init of_sama5d3_pmc_setup(struct device_node *np)
--{
--	of_at91_pmc_setup(np, &sama5d3_caps);
--}
--CLK_OF_DECLARE(sama5d3_clk_pmc, "atmel,sama5d3-pmc",
--	       of_sama5d3_pmc_setup);
+diff --git a/drivers/clk/at91/clk-usb.c b/drivers/clk/at91/clk-usb.c
+index 617e24f6ef76..650ca45892c0 100644
+--- a/drivers/clk/at91/clk-usb.c
++++ b/drivers/clk/at91/clk-usb.c
+@@ -12,8 +12,6 @@
+ #include <linux/clkdev.h>
+ #include <linux/clk/at91_pmc.h>
+ #include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/io.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
+ 
 -- 
 2.5.0
