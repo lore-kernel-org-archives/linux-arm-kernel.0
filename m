@@ -1,79 +1,21 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Wed, 27 Jan 2016 06:00:11 +0000
-Subject: [PATCH 1/4] iommu/arm-smmu: Treat all device transactions as
- unprivileged
-In-Reply-To: <6c5730256333b8d941f2c0371c1ab709a454938c.1453830752.git.robin.murphy@arm.com>
-References: <cover.1453830752.git.robin.murphy@arm.com>
- <6c5730256333b8d941f2c0371c1ab709a454938c.1453830752.git.robin.murphy@arm.com>
-Message-ID: <39063E8F96E11742B35A201CC5D095B7BAE0C0@SJEXCHMB10.corp.ad.broadcom.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 27 Jan 2016 15:11:17 +0900
+Subject: [PATCH 0/2] ARM: shmobile, multi_v7_defconfig, Enable XHCI_RCAR
+ in defconfig
+In-Reply-To: <1452484800-7470-1-git-send-email-horms+renesas@verge.net.au>
+References: <1452484800-7470-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20160127061117.GA4398@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Mon, Jan 11, 2016 at 12:59:58PM +0900, Simon Horman wrote:
+> Hi,
+> 
+> this short series enables XHCI_RCAR, which is used by Renesas R-Car SoCs,
+> in the relevant defconfigs.
+> 
+> Simon Horman (2):
+>   ARM: shmobile: enable XHCI_RCAR in defconfig
+>   ARM: multi_v7_defconfig: Enable XHCI_RCAR
 
-> -----Original Message-----
-> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
-> bounces at lists.linux-foundation.org] On Behalf Of Robin Murphy
-> Sent: 26 January 2016 23:37
-> To: will.deacon at arm.com
-> Cc: iommu at lists.linux-foundation.org; linux-arm-kernel at lists.infradead.org;
-> tchalamarla at caviumnetworks.com
-> Subject: [PATCH 1/4] iommu/arm-smmu: Treat all device transactions as
-> unprivileged
-> 
-> The IOMMU API has no concept of privilege so assumes all devices and
-> mappings are equal, and indeed most non-CPU master devices on an AMBA
-> interconnect make little use of the attribute bits on the bus thus by default
-> perform unprivileged data accesses.
-> 
-> Some devices, however, believe themselves more equal than others, such as
-> programmable DMA controllers whose 'master' thread issues bus transactions
-> marked as privileged instruction fetches, while the data accesses of its channel
-> threads (under the control of Linux, at least) are marked as unprivileged. This
-> poses a problem for implementing the DMA API on an IOMMU conforming to
-> ARM VMSAv8, under which a page that is unprivileged-writeable is also implicitly
-> privileged-execute-never.
-> Given that, there is no one set of attributes with which iommu_map() can
-> implement, say, dma_alloc_coherent() that will allow every possible type of
-> access without something running into unexecepted permission faults.
-> 
-> Fortunately the SMMU architecture provides a means to mitigate such issues by
-> overriding the incoming attributes of a transaction; make use of that to strip the
-> privileged/unprivileged status off incoming transactions, leaving just the
-> instruction/data dichotomy which the IOMMU API does at least understand;
-> Four states good, two states better.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/iommu/arm-smmu.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c index
-> 59ee4b8..1f9093d 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -167,6 +167,9 @@
->  #define S2CR_TYPE_BYPASS		(1 << S2CR_TYPE_SHIFT)
->  #define S2CR_TYPE_FAULT			(2 << S2CR_TYPE_SHIFT)
-> 
-> +#define S2CR_PRIVCFG_SHIFT		24
-> +#define S2CR_PRIVCFG_UNPRIV		(2 << S2CR_PRIVCFG_SHIFT)
-> +
->  /* Context bank attribute registers */
->  #define ARM_SMMU_GR1_CBAR(n)		(0x0 + ((n) << 2))
->  #define CBAR_VMID_SHIFT			0
-> @@ -1083,7 +1086,7 @@ static int arm_smmu_domain_add_master(struct
-> arm_smmu_domain *smmu_domain,
->  		u32 idx, s2cr;
-> 
->  		idx = cfg->smrs ? cfg->smrs[i].idx : cfg->streamids[i];
-> -		s2cr = S2CR_TYPE_TRANS |
-> +		s2cr = S2CR_TYPE_TRANS | S2CR_PRIVCFG_UNPRIV |
->  		       (smmu_domain->cfg.cbndx << S2CR_CBNDX_SHIFT);
-
-Treating all MMU master access as unprivileged sounds more
-conservative. Alternate approach would be to treat instruction
-fetches as data reads.
-
-Regards,
-Anup
+I have queued these up.
