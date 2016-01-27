@@ -1,68 +1,77 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 27 Jan 2016 09:52:31 +0100
-Subject: [PATCH 00/10] KVM PCIe/MSI passthrough on ARM/ARM64
-In-Reply-To: <000001d1585e$8097d7e0$81c787a0$@samsung.com>
-References: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
- <000001d1585e$8097d7e0$81c787a0$@samsung.com>
-Message-ID: <56A8854F.3030209@linaro.org>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Wed, 27 Jan 2016 16:57:19 +0800
+Subject: [PATCH v3 12/17] ARM64: ACPI: Check if it runs on Xen to enable
+ or disable ACPI
+In-Reply-To: <56A87F77.8070506@linaro.org>
+References: <1453519184-11908-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453519184-11908-13-git-send-email-zhaoshenglong@huawei.com>
+ <56A87F77.8070506@linaro.org>
+Message-ID: <56A8866F.5060302@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
-On 01/26/2016 06:25 PM, Pavel Fedin wrote:
->  Hello!
->  I'd like just to clarify some things for myself and better wrap my head around it...
+
+
+On 2016/1/27 16:27, Hanjun Guo wrote:
+> Hi Shannon,
 > 
->> On x86 all accesses to the 1MB PA region [FEE0_0000h - FEF0_000h] are directed
->> as interrupt messages: accesses to this special PA window directly target the
->> APIC configuration space and not DRAM, meaning the downstream IOMMU is bypassed.
+> On 2016/1/23 11:19, Shannon Zhao wrote:
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>
+>> When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
+>> a /hypervisor node in DT. So check if it needs to enable ACPI.
+>>
+>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> ---
+>> CC: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>   arch/arm64/kernel/acpi.c | 12 ++++++++----
+>>   1 file changed, 8 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> index d1ce8e2..4e92be0 100644
+>> --- a/arch/arm64/kernel/acpi.c
+>> +++ b/arch/arm64/kernel/acpi.c
+>> @@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned
+>> long node,
+>>   {
+>>       /*
+>>        * Return 1 as soon as we encounter a node at depth 1 that is
+>> -     * not the /chosen node.
+>> +     * not the /chosen node, or /hypervisor node when running on Xen.
 > 
->  So, this is effectively the same as always having hardwired 1:1 mappings on all IOMMUs, isn't it ?
->  If so, then we can't we just do the same, just by forcing similar 1:1 mapping? This is what i tried to do in my patchset. All of
-> you are talking about a situation which arises when we are emulating different machine with different physical addresses layout. And
-> e. g. if our host has MSI at 0xABADCAFE, our target could have valid RAM at the same location, and we need to handle it somehow,
-> therefore we have to move our MSI window out of target's RAM. But how does this work on a PC then? What if our host is PC, and we
-> want to emulate some ARM board, which has RAM at FE00 0000 ? Or does it mean that PC architecture is flawed and can reliably handle
-> PCI passthrough only for itself ?
-Alex answered to this I think:
-"
-x86 isn't problem-free in this space.  An x86 VM is going to know that
-the 0xfee00000 address range is special, it won't be backed by RAM and
-won't be a DMA target, thus we'll never attempt to map it for an iova
-address.  However, if we run a non-x86 VM or a userspace driver, it
-doesn't necessarily know that there's anything special about that range
-of iovas.  I intend to resolve this with an extension to the iommu info
-ioctl that describes the available iova space for the iommu.  The
-interrupt region would simply be excluded.
-"
-
-I am not sure I've addressed this requirement yet but it seems more
-future proof to have an IOMMU mapping for those addresses.
-
-For the ARM use case I think Marc gave guidance:
-"
-We want userspace to be in control of the memory map, and it
-is the kernel's job to tell us whether or not this matches the HW
-capabilities or not. A fixed mapping may completely clash with the
-memory map I want (think emulating HW x on platform y), and there is no
-reason why we should have the restrictions x86 has.
-"
-
-That's the rationale behind respining that way.
-
-Waiting for other comments & discussions, I am going to address the iova
-and dma_addr_t kbuilt reported compilation issues. Please apologize for
-those.
-
-Best Regards
-
-Eric
-
-
+> The comment is bit misleading, we need to specify two mode, running on
+> Xen or not, if not on xen, then /chosen node is enough.
 > 
-> Kind regards,
-> Pavel Fedin
-> Senior Engineer
-> Samsung Electronics Research center Russia
+Ok, will rephrase it.
+
+>>        */
+>> -    if (depth == 1 && (strcmp(uname, "chosen") != 0))
+>> -        return 1;
+>> +    if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
+>> +        if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
+>> +            return 1;
+>> +    }
+>> +
+>>       return 0;
+>>   }
+>>
+>> @@ -184,7 +187,8 @@ void __init acpi_boot_table_init(void)
+>>       /*
+>>        * Enable ACPI instead of device tree unless
+>>        * - ACPI has been disabled explicitly (acpi=off), or
+>> -     * - the device tree is not empty (it has more than just a
+>> /chosen node)
+>> +     * - the device tree is not empty (it has more than just a
+>> /chosen node,
+>> +     *   and a /hypervisor node when running on Xen)
 > 
+> and here too.
 > 
+> if that is addressed,
+> 
+> Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+Thanks!
+
+-- 
+Shannon
