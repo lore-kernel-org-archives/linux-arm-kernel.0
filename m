@@ -1,71 +1,77 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 27 Jan 2016 14:11:42 -0800
-Subject: [PATCH] ARM: Use generic clkdev.h header
-Message-ID: <1453932702-6930-1-git-send-email-sboyd@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 27 Jan 2016 23:23:57 +0100
+Subject: [PATCH 1/2] ARM: l2x0: add three special L210 aux control flags
+Message-ID: <1453933437-6666-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get rid of the clkdev.h file in the ARM port and use the generic
-one because we've gotten rid of all the machine specific
-mach/clkdev.h files.
+This adds support for setting the flag bits "wrap access disable",
+"write allocate override" and "exclusive abort disable" to the L210
+variant from the device tree.
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+The "write allocate override" bit was used on the Nomadik and
+necessary to properly make use of the L210 cache on that machine
+without sporadic crashes.
+
+I took this oppportunity to add all three flags so we avoid excess
+patching for each one.
+
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/include/asm/Kbuild   |  1 +
- arch/arm/include/asm/clkdev.h | 31 -------------------------------
- 2 files changed, 1 insertion(+), 31 deletions(-)
- delete mode 100644 arch/arm/include/asm/clkdev.h
+ Documentation/devicetree/bindings/arm/l2c2x0.txt | 10 ++++++++++
+ arch/arm/mm/cache-l2x0.c                         | 18 ++++++++++++++++++
+ 2 files changed, 28 insertions(+)
 
-diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
-index 16da6380eb85..43cd07708cf9 100644
---- a/arch/arm/include/asm/Kbuild
-+++ b/arch/arm/include/asm/Kbuild
-@@ -1,6 +1,7 @@
+diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+index fe0398c5c77b..975d1ae304d4 100644
+--- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
++++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+@@ -74,6 +74,16 @@ Optional properties:
+   or "write through no write allocate" (for writes).
+   On systems where this may cause DMA buffer corruption, this property must be
+   specified to indicate that such transforms are precluded.
++- arm,wrap-access-disable : (L210 only) if this flag is set, wrap accesses
++  requested on slave ports are converted to linear acesses on master ports.
++- arm,write-allocate-override : (L210 only) normally the L210 will use HPROT
++  attributes, setting this bit overrides that behaviour and cause the cache
++  to make all write-through and write-back accesses into read-write-allocate
++  accesses.
++- arm,exclusive-abort-disable : (L210 only) normally the cache controller sends
++  an ERROR response back to exclusive access in a cacheable, shared memory
++  region with the shared override bit set, but setting this flag disables the
++  abort generation and the access is instead treated as cacheable, non-shared.
+ - arm,parity-enable : enable parity checking on the L2 cache (L220 or PL310).
+ - arm,parity-disable : disable parity checking on the L2 cache (L220 or PL310).
+ - arm,outer-sync-disable : disable the outer sync operation on the L2 cache.
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 9f9d54271aad..301c3c2dc09f 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1076,6 +1076,24 @@ static void __init l2x0_of_parse(const struct device_node *np,
+ 		val |= L2C_AUX_CTRL_SHARED_OVERRIDE;
+ 	}
  
- 
- generic-y += bitsperlong.h
-+generic-y += clkdev.h
- generic-y += cputime.h
- generic-y += current.h
- generic-y += early_ioremap.h
-diff --git a/arch/arm/include/asm/clkdev.h b/arch/arm/include/asm/clkdev.h
-deleted file mode 100644
-index 4e8a4b27d7c7..000000000000
---- a/arch/arm/include/asm/clkdev.h
-+++ /dev/null
-@@ -1,31 +0,0 @@
--/*
-- *  arch/arm/include/asm/clkdev.h
-- *
-- *  Copyright (C) 2008 Russell King.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * Helper for the clk API to assist looking up a struct clk.
-- */
--#ifndef __ASM_CLKDEV_H
--#define __ASM_CLKDEV_H
--
--#include <linux/slab.h>
--
--#ifndef CONFIG_COMMON_CLK
--#ifdef CONFIG_HAVE_MACH_CLKDEV
--#include <mach/clkdev.h>
--#else
--#define __clk_get(clk)	({ 1; })
--#define __clk_put(clk)	do { } while (0)
--#endif
--#endif
--
--static inline struct clk_lookup_alloc *__clkdev_alloc(size_t size)
--{
--	return kzalloc(size, GFP_KERNEL);
--}
--
--#endif
++	/* L210-specific aux control flags */
++	if (of_device_is_compatible(np, "arm,l210-cache")) {
++		if (of_property_read_bool(np, "arm,wrap-access-disable")) {
++			mask &= ~L210_AUX_CTRL_WRAP_DISABLE;
++			val |= L210_AUX_CTRL_WRAP_DISABLE;
++		}
++
++		if (of_property_read_bool(np, "arm,write-allocate-override")) {
++			mask &= ~L210_AUX_CTRL_WA_OVERRIDE;
++			val |= L210_AUX_CTRL_WA_OVERRIDE;
++		}
++
++		if (of_property_read_bool(np, "arm,exclusive-abort-disable")) {
++			mask &= ~L210_AUX_CTRL_EXCLUSIVE_ABORT;
++			val |= L210_AUX_CTRL_EXCLUSIVE_ABORT;
++		}
++	}
++
+ 	ret = l2x0_cache_size_of_parse(np, aux_val, aux_mask, &assoc, SZ_256K);
+ 	if (ret)
+ 		return;
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.4.3
