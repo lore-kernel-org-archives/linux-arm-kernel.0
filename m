@@ -1,38 +1,45 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 28 Jan 2016 08:39:53 +0900
-Subject: [PATCH 1/2] netfilter: ipvs: avoid unused variable warnings
-In-Reply-To: <alpine.LFD.2.11.1601272156590.2353@ja.home.ssi.bg>
-References: <1453902749-3422685-1-git-send-email-arnd@arndb.de>
- <alpine.LFD.2.11.1601272156590.2353@ja.home.ssi.bg>
-Message-ID: <20160127233953.GB5183@verge.net.au>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 27 Jan 2016 15:43:03 -0800
+Subject: [PATCH] input: xpad: remove unused function
+In-Reply-To: <1453735884-1958624-1-git-send-email-arnd@arndb.de>
+References: <1453735884-1958624-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160127234303.GG28687@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 10:01:42PM +0200, Julian Anastasov wrote:
+On Mon, Jan 25, 2016 at 04:30:41PM +0100, Arnd Bergmann wrote:
+> There are two definitions of xpad_identify_controller(), one is used
+> when CONFIG_JOYSTICK_XPAD_LEDS is set, but the other one is empty
+> and never used, and we get a gcc warning about it:
 > 
-> 	Hello,
+> drivers/input/joystick/xpad.c:1210:13: warning: 'xpad_identify_controller' defined but not used [-Wunused-function]
 > 
-> On Wed, 27 Jan 2016, Arnd Bergmann wrote:
+> This removes the second definition.
 > 
-> > The proc_create() and remove_proc_entry() functions do not reference
-> > their arguments when CONFIG_PROC_FS is disabled, so we get a couple
-> > of warnings about unused variables in IPVS:
-> > 
-> > ipvs/ip_vs_app.c:608:14: warning: unused variable 'net' [-Wunused-variable]
-> > ipvs/ip_vs_ctl.c:3950:14: warning: unused variable 'net' [-Wunused-variable]
-> > ipvs/ip_vs_ctl.c:3994:14: warning: unused variable 'net' [-Wunused-variable]
-> > 
-> > This removes the local variables and instead looks them up separately
-> > for each use, which obviously avoids the warning.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: 4c50a8ce2b63 ("netfilter: ipvs: avoid unused variable warning")
-> 
-> 	Looks like your previous patch for ip_vs_app_net_cleanup
-> was delayed in ipvs-next tree. I guess, Simon should drop it and
-> use this one instead when net-next opens:
-> 
-> Acked-by: Julian Anastasov <ja@ssi.bg>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: cae705baa40b ("Input: xpad - re-send LED command on present event")
 
-Thanks, and sorry about not pushing the other patch to net-next.
-I have dropped it and queued up this one in its place.
+Applied, thank you.
+
+> ---
+>  drivers/input/joystick/xpad.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/input/joystick/xpad.c b/drivers/input/joystick/xpad.c
+> index 6727954ab74b..e8a84d12b7ff 100644
+> --- a/drivers/input/joystick/xpad.c
+> +++ b/drivers/input/joystick/xpad.c
+> @@ -1207,7 +1207,6 @@ static void xpad_led_disconnect(struct usb_xpad *xpad)
+>  #else
+>  static int xpad_led_probe(struct usb_xpad *xpad) { return 0; }
+>  static void xpad_led_disconnect(struct usb_xpad *xpad) { }
+> -static void xpad_identify_controller(struct usb_xpad *xpad) { }
+>  #endif
+>  
+>  static int xpad_start_input(struct usb_xpad *xpad)
+> -- 
+> 2.7.0
+> 
+
+-- 
+Dmitry
