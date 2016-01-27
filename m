@@ -1,61 +1,40 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 27 Jan 2016 09:17:45 +0100
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <2779316.34ov6YOQgv@vostro.rjw.lan>
-References: <20160126224804.GB19432@atomide.com>
- <CAJZ5v0gTRvyWHVmYNb8Q1QZzhVhokXo541+48mFyDRYv7Hi-Uw@mail.gmail.com>
- <20160126235222.GF19432@atomide.com>
- <2779316.34ov6YOQgv@vostro.rjw.lan>
-Message-ID: <CAPDyKFo-itpp1JUVANSFNiyhKcv1XLUqx1GwRk532LaT+ija0g@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 27 Jan 2016 16:18:53 +0800
+Subject: [linux-sunxi] Problem with Allwinner H3 clocks
+In-Reply-To: <20160127084607.665fb8c38eeb5733ce4232da@free.fr>
+References: <20160127084607.665fb8c38eeb5733ce4232da@free.fr>
+Message-ID: <CAGb2v65FUhNC-d-YT=-2adNHHT6b1JvGoNTFLfBX_xBSnuOsTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 January 2016 at 08:54, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Tuesday, January 26, 2016 03:52:23 PM Tony Lindgren wrote:
->> * Rafael J. Wysocki <rafael@kernel.org> [160126 15:38]:
->> > On Wed, Jan 27, 2016 at 12:22 AM, Tony Lindgren <tony@atomide.com> wrote:
->> > > * Rafael J. Wysocki <rafael@kernel.org> [160126 15:15]:
->> > >> On Tue, Jan 26, 2016 at 11:48 PM, Tony Lindgren <tony@atomide.com> wrote:
->> > >> > Hi,
->> > >> >
->> > >> > Looks like commit 5de85b9d57ab ("PM / runtime: Re-init runtime
->> > >> > PM states at probe error and driver unbind") broke PM on at least
->> > >> > omap3. It seems we now need to additionally also call
->> > >> > pm_runtime_dont_use_autosuspend() to get things working again?
->> > >> >
->> > >> > The following fixes idling on omap3, but I'm wondering if we
->> > >> > should do something in pm_runtime_reinit() instead?
->> > >>
->> > >> Well, does it actually help if you add
->> > >> pm_runtime_dont_use_autosuspend(dev) to pm_runtime_reinit()?
->> > >
->> > > No adding it to pm_runtime_reinit() does not help.
->> >
->> > Yes, I realized that it wouldn't help only after sending the previous
->> > message, sorry about that.
->> >
->> > The reason why it helps in the driver code seems to be that
->> > autosuspend_delay happens to be negative, so update_autosuspend()
->> > decrements the usage counter that would have stayed incremented
->> > otherwise.  Or at least that's the only way it can help I see ATM.
->>
->> Oh OK.
->>
->> > > Looks like we have RPM_ACTIVE set in pm_runtime_reinit() if that
->> > > gives any clues.
->> >
->> > It looks like pm_runtime_reinit() should clear the usage counter too.
->>
->> Yeah if we do this when !pm_runtime_enabled(dev) it seems it's
->> safe to pretty much reset everything?
+Hi,
+
+On Wed, Jan 27, 2016 at 3:46 PM, Jean-Francois Moine <moinejf@free.fr> wrote:
+> Hi Jens,
 >
-> Not only safe, but also a good idea apparently. :-)
+> My H3 machine (OPI2) cannot boot with the PLL6 (periph0) as defined
+> in the kernel 4.5-rc1. As there is no UART, I don't know what is wrong.
+>
+> But, applying your old patch
+>
+> [PATCH v4 1/6] clk: sunxi: Let divs clocks read the base factor clock name from devicetree
+> (https://lkml.org/lkml/2015/10/27/532)
+>
+> makes everything work correctly again (thanks to other patches, I have
+> 4 CPUs, USB, thermal sensor and video).
+>
+> Any idea?
 
-I happy to send a patch, extending pm_runtime_reinit() with some more
-data to be reset.
+What kernel and DTS are you using? What other patches have you applied?
 
-Or, you or Tony intend to send a patch?
+Patches for H3 USB, thermal sensor and video have not been merged, so it's
+likely to have some integration problems. FYI you should always check the
+result after self-applying or rebasing DT patches, as there isn't enough
+context for git to know if a patch has been applied or not.
 
-Kind regards
-Uffe
+4.5-rc1 + sunxi-next boots fine on my Orange PI PC, using the Orange PI Plus
+DTS for now.
+
+
+Regards
+ChenYu
