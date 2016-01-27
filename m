@@ -1,273 +1,108 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Wed, 27 Jan 2016 13:00:58 +0100
-Subject: [PATCH V4 1/2] regulator: Add document for MT6323 regulator
-Message-ID: <1453896059-44589-1-git-send-email-blogic@openwrt.org>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 27 Jan 2016 13:04:23 +0100
+Subject: Unhandled fault: page domain fault (0x81b) at 0x00e41008
+In-Reply-To: <20160127104811.GX10826@n2100.arm.linux.org.uk>
+References: <56A27C00.5060004@free.fr>
+ <20160122193408.GE19062@n2100.arm.linux.org.uk> <56A2B811.8010306@free.fr>
+ <20160122235704.GF19062@n2100.arm.linux.org.uk> <56A3609E.3000400@free.fr>
+ <20160123113438.GG19062@n2100.arm.linux.org.uk> <56A3E84A.1000604@free.fr>
+ <20160123235905.GE10826@n2100.arm.linux.org.uk> <56A4D13D.3030906@free.fr>
+ <56A89DC3.8010309@free.fr> <20160127104811.GX10826@n2100.arm.linux.org.uk>
+Message-ID: <56A8B247.50002@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: John Crispin <blogic@openwrt.org>
-Cc: devicetree at vger.kernel.org
+On 27/01/2016 11:48, Russell King - ARM Linux wrote:
 
----
-Changes in V4
-* regulator is a subnode and not a property
+> Mason wrote:
+> 
+>> IIUC, Arnd mentioned that there might be an issue using readl_relaxed
+>> on a memory region with a big-endian kernel.
+> 
+> I think you're confused there, or Arnd's comment was incorrect.
 
-Changes in V3
-* fix the subject prefix
+I have certainly misunderstood Arnd's comment.
 
- .../bindings/regulator/mt6323-regulator.txt        |  244 ++++++++++++++++++++
- 1 file changed, 244 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+> In any case, I'm even more pissed off with you.  Let me quote from
+> your earlier emails:
+> 
+>> The problem is that the kernel module's API is already set
+>> in stone, and it requires block copies with specific access
+>> sizes, e.g. block_copy8, block_copy16, block_copy32.
+> 
+> and:
+> 
+>> So, a little over a decade ago, someone decided that these
+>> functions would have the following prototype:
+>>
+>> int read_data8  (u8  *user_addr, u8  *phys_addr, int count)
+>> int read_data16 (u16 *user_addr, u16 *phys_addr, int count)
+>> int read_data32 (u32 *user_addr, u32 *phys_addr, int count)
+>>
+>> int write_data8 (u8  *user_addr, u8  *phys_addr, int count)
+>> int write_data16(u16 *user_addr, u16 *phys_addr, int count)
+>> int write_data32(u32 *user_addr, u32 *phys_addr, int count)
+> 
+> However, you've done away with those prototypes, and instead come up
+> with something that looks like:
+> 
+> int block_copy(void __user *ua, phys_addr_t pa, size_t bytes, fun_t *fun)
+> 
+> ?
+> 
+> So, let me get this straight.  You demand that the API can't be changed,
+> and I provide you with a solution which results in very little change to
+> the API.
 
-diff --git a/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
-new file mode 100644
-index 0000000..1ee3dd4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
-@@ -0,0 +1,244 @@
-+Mediatek MT6323 Regulator Driver
-+
-+Required properties:
-+- compatible: "mediatek,mt6323-regulator"
-+
-+All voltage regulators are defined as subnodes of the regulator drivers node.
-+A list of regulators provided by this controller are defined as subnodes of
-+the drivers node. Each regulator is named according to its regulator type,
-+buck_<name> and ldo_<name>. The definition for each of these nodes is defined
-+using the standard binding for regulators at
-+Documentation/devicetree/bindings/regulator/regulator.txt.
-+
-+The valid names for regulators are::
-+BUCK:
-+  buck_vproc, buck_vsys, buck_vpa
-+LDO:
-+  ldo_vtcxo, ldo_vcn28, ldo_vcn33_bt, ldo_vcn33_wifi, ldo_va, ldo_vcama,
-+  ldo_vio28, ldo_vusb, ldo_vmc, ldo_vmch, ldo_vemc3v3, ldo_vgp1, ldo_vgp2,
-+  ldo_vgp3, ldo_vcn18, ldo_vsim1, ldo_vsim2, ldo_vrtc, ldo_vcamaf, ldo_vibr,
-+  ldo_vrf18, ldo_vm, ldo_vio18, ldo_vcamd, ldo_vcamio
-+
-+Example:
-+
-+	pmic: mt6323 {
-+		compatible = "mediatek,mt6323";
-+
-+		mt6323regulator: regulator{
-+			compatible = "mediatek,mt6323-regulator";
-+
-+			mt6323_vproc_reg: buck_vproc{
-+				regulator-name = "vproc";
-+				regulator-min-microvolt = < 700000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-ramp-delay = <12500>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vsys_reg: buck_vsys{
-+				regulator-name = "vsys";
-+				regulator-min-microvolt = <1400000>;
-+				regulator-max-microvolt = <2987500>;
-+				regulator-ramp-delay = <25000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vpa_reg: buck_vpa{
-+				regulator-name = "vpa";
-+				regulator-min-microvolt = < 500000>;
-+				regulator-max-microvolt = <3650000>;
-+			};
-+
-+			mt6323_vtcxo_reg: ldo_vtcxo{
-+				regulator-name = "vtcxo";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <90>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vcn28_reg: ldo_vcn28{
-+				regulator-name = "vcn28";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <185>;
-+			};
-+
-+			mt6323_vcn33_bt_reg: ldo_vcn33_bt{
-+				regulator-name = "vcn33_bt";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3600000>;
-+				regulator-enable-ramp-delay = <185>;
-+			};
-+
-+			mt6323_vcn33_wifi_reg: ldo_vcn33_wifi{
-+				regulator-name = "vcn33_wifi";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3600000>;
-+				regulator-enable-ramp-delay = <185>;
-+			};
-+
-+			mt6323_va_reg: ldo_va{
-+				regulator-name = "va";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vcama_reg: ldo_vcama{
-+				regulator-name = "vcama";
-+				regulator-min-microvolt = <1500000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vio28_reg: ldo_vio28{
-+				regulator-name = "vio28";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vusb_reg: ldo_vusb{
-+				regulator-name = "vusb";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vmc_reg: ldo_vmc{
-+				regulator-name = "vmc";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <36>;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vmch_reg: ldo_vmch{
-+				regulator-name = "vmch";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <36>;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vemc3v3_reg: ldo_vemc3v3{
-+				regulator-name = "vemc3v3";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <36>;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vgp1_reg: ldo_vgp1{
-+				regulator-name = "vgp1";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vgp2_reg: ldo_vgp2{
-+				regulator-name = "vgp2";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vgp3_reg: ldo_vgp3{
-+				regulator-name = "vgp3";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vcn18_reg: ldo_vcn18{
-+				regulator-name = "vcn18";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vsim1_reg: ldo_vsim1{
-+				regulator-name = "vsim1";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vsim2_reg: ldo_vsim2{
-+				regulator-name = "vsim2";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vrtc_reg: ldo_vrtc{
-+				regulator-name = "vrtc";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vcamaf_reg: ldo_vcamaf{
-+				regulator-name = "vcamaf";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vibr_reg: ldo_vibr{
-+				regulator-name = "vibr";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <36>;
-+			};
-+
-+			mt6323_vrf18_reg: ldo_vrf18{
-+				regulator-name = "vrf18";
-+				regulator-min-microvolt = <1825000>;
-+				regulator-max-microvolt = <1825000>;
-+				regulator-enable-ramp-delay = <187>;
-+			};
-+
-+			mt6323_vm_reg: ldo_vm{
-+				regulator-name = "vm";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vio18_reg: ldo_vio18{
-+				regulator-name = "vio18";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vcamd_reg: ldo_vcamd{
-+				regulator-name = "vcamd";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vcamio_reg: ldo_vcamio{
-+				regulator-name = "vcamio";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+		};
-+	};
--- 
-1.7.10.4
+I don't understand what is unclear in my description.
+
+The user-space API to call into the kernel module is, and has always been:
+
+	int read_data8  (u8 *user_addr,  u32 phys_addr, int count)
+	int read_data16 (u16 *user_addr, u32 phys_addr, int count)
+	int read_data32 (u32 *user_addr, u32 phys_addr, int count)
+
+	int write_data8 (u8 *user_addr,  u32 phys_addr, int count)
+	int write_data16(u16 *user_addr, u32 phys_addr, int count)
+	int write_data32(u32 *user_addr, u32 phys_addr, int count)
+
+A user-space shim shoves the parameters inside a struct and calls into
+the kernel module via ioctl. The ioctl dispatcher then unpacks the
+parameters and calls block_copy:
+
+	case DIRECT_IOCTL_READ_DATA32:
+	{
+		struct data32 s;
+		if (copy_from_user(&s, (void *)arg, sizeof s)) break;
+		rc = block_copy(s.data, s.byte_address, s.count*4, read32);
+		break;
+	}
+
+> However, rather than testing the version I carefully created for you,
+> you've decided that you're not going to, instead coming up with your
+> own solution which breaks all your previous demands.
+
+Why do you say that my solution breaks my previous demands?
+
+Note that block_copy is directly inspired from your read_data8 example.
+The prototypes are nearly identical:
+
+int block_copy(void __user *ua, phys_addr_t pa, size_t bytes, fun_t *fun)
+int read_data8(u8 __user *user_addr, phys_addr_t phys_addr, size_t bytes)
+
+I just added the function pointer to be able to generalize the function
+for 16-bit and 32-bit accesses.
+
+By the way, thanks again for providing read_data8, it really helped me
+get a better grasp of the process.
+
+I don't understand what it is you found so blatantly outrageous in my
+message? Perhaps I need to improve my writing skills.
+
+> This is totally rediculous.  Why should I waste any more time with _any_
+> of your questions?
+
+All I can say is that I am grateful for the help you've provided so far,
+and I will try to be clearer in my problem descriptions in the future.
+
+Regards.
