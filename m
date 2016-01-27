@@ -1,100 +1,52 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 27 Jan 2016 14:40:29 +0100
-Subject: [PATCH v2 5/6] irqchip: irq-armada-370-xp: allow allocation of
- multiple MSIs
-In-Reply-To: <1453899395-3532-6-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Wed, 27 Jan 2016 13:56:34 +0100")
-References: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1453899395-3532-6-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <87d1sn9m42.fsf@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Jan 2016 14:45:26 +0100
+Subject: [PATCH] hostap: avoid uninitialized variable use in hfa384x_get_rid
+Message-ID: <1453902342-3420391-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+The driver reads a value from hfa384x_from_bap(), which may fail,
+and then assigns the value to a local variable. gcc detects that
+in in the failure case, the 'rlen' variable now contains
+uninitialized data:
+
+In file included from ../drivers/net/wireless/intersil/hostap/hostap_pci.c:220:0:
+drivers/net/wireless/intersil/hostap/hostap_hw.c: In function 'hfa384x_get_rid':
+drivers/net/wireless/intersil/hostap/hostap_hw.c:842:5: warning: 'rec' may be used uninitialized in this function [-Wmaybe-uninitialized]
+  if (le16_to_cpu(rec.len) == 0) {
+
+To ensure we get consistent error handling here, this changes the code
+to only set rlen if we actually read data correctly, which also takes
+care of the warning.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/net/wireless/intersil/hostap/hostap_hw.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/net/wireless/intersil/hostap/hostap_hw.c b/drivers/net/wireless/intersil/hostap/hostap_hw.c
+index 6df3ee561d52..6dbf8ee9490a 100644
+--- a/drivers/net/wireless/intersil/hostap/hostap_hw.c
++++ b/drivers/net/wireless/intersil/hostap/hostap_hw.c
+@@ -839,12 +839,15 @@ static int hfa384x_get_rid(struct net_device *dev, u16 rid, void *buf, int len,
+ 	if (!res)
+ 		res = hfa384x_from_bap(dev, BAP0, &rec, sizeof(rec));
  
- On mer., janv. 27 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
-
-> Add support for allocating multiple MSIs at the same time, so that the
-> MSI_FLAG_MULTI_PCI_MSI flag can be added to the msi_domain_info
-> structure.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks,
-
-Gregory
-
-> ---
->  drivers/irqchip/irq-armada-370-xp.c | 25 ++++++++++++++-----------
->  1 file changed, 14 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-> index c99ae5f..e7dc6cb 100644
-> --- a/drivers/irqchip/irq-armada-370-xp.c
-> +++ b/drivers/irqchip/irq-armada-370-xp.c
-> @@ -123,7 +123,8 @@ static struct irq_chip armada_370_xp_msi_irq_chip = {
->  };
->  
->  static struct msi_domain_info armada_370_xp_msi_domain_info = {
-> -	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS),
-> +	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
-> +		   MSI_FLAG_MULTI_PCI_MSI),
->  	.chip	= &armada_370_xp_msi_irq_chip,
->  };
->  
-> @@ -149,21 +150,26 @@ static struct irq_chip armada_370_xp_msi_bottom_irq_chip = {
->  static int armada_370_xp_msi_alloc(struct irq_domain *domain, unsigned int virq,
->  				   unsigned int nr_irqs, void *args)
->  {
-> -	int hwirq;
-> +	int hwirq, i;
->  
->  	mutex_lock(&msi_used_lock);
-> -	hwirq = find_first_zero_bit(&msi_used, PCI_MSI_DOORBELL_NR);
-> +
-> +	hwirq = bitmap_find_next_zero_area(msi_used, PCI_MSI_DOORBELL_NR,
-> +					   0, nr_irqs, 0);
->  	if (hwirq >= PCI_MSI_DOORBELL_NR) {
->  		mutex_unlock(&msi_used_lock);
->  		return -ENOSPC;
->  	}
->  
-> -	set_bit(hwirq, msi_used);
-> +	bitmap_set(msi_used, hwirq, nr_irqs);
->  	mutex_unlock(&msi_used_lock);
->  
-> -	irq_domain_set_info(domain, virq, hwirq, &armada_370_xp_msi_bottom_irq_chip,
-> -			    domain->host_data, handle_simple_irq,
-> -			    NULL, NULL);
-> +	for (i = 0; i < nr_irqs; i++) {
-> +		irq_domain_set_info(domain, virq + i, hwirq + i,
-> +				    &armada_370_xp_msi_bottom_irq_chip,
-> +				    domain->host_data, handle_simple_irq,
-> +				    NULL, NULL);
-> +	}
->  
->  	return hwirq;
->  }
-> @@ -174,10 +180,7 @@ static void armada_370_xp_msi_free(struct irq_domain *domain,
->  	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
->  
->  	mutex_lock(&msi_used_lock);
-> -	if (!test_bit(d->hwirq, msi_used))
-> -		pr_err("trying to free unused MSI#%lu\n", d->hwirq);
-> -	else
-> -		clear_bit(d->hwirq, msi_used);
-> +	bitmap_clear(msi_used, d->hwirq, nr_irqs);
->  	mutex_unlock(&msi_used_lock);
->  }
->  
-> -- 
-> 2.6.4
->
-
+-	if (le16_to_cpu(rec.len) == 0) {
+-		/* RID not available */
+-		res = -ENODATA;
++	if (!res) {
++		if (le16_to_cpu(rec.len) == 0) {
++			/* RID not available */
++			res = -ENODATA;
++		}
++
++		rlen = (le16_to_cpu(rec.len) - 1) * 2;
+ 	}
+ 
+-	rlen = (le16_to_cpu(rec.len) - 1) * 2;
+ 	if (!res && exact_len && rlen != len) {
+ 		printk(KERN_DEBUG "%s: hfa384x_get_rid - RID len mismatch: "
+ 		       "rid=0x%04x, len=%d (expected %d)\n",
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.7.0
