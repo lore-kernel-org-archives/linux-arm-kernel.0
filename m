@@ -1,42 +1,60 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 27 Jan 2016 15:15:22 +0100
-Subject: [PATCH v2 2/2] ARM: tegra: Add high speed UARTs to Jetson TK1
- device tree
-In-Reply-To: <1453827558-10954-3-git-send-email-ralf@ramses-pyramidenbau.de>
-References: <1453827558-10954-1-git-send-email-ralf@ramses-pyramidenbau.de>
- <1453827558-10954-3-git-send-email-ralf@ramses-pyramidenbau.de>
-Message-ID: <20160127141522.GB21779@ulmo>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 27 Jan 2016 15:15:42 +0100
+Subject: [PATCH] mmc: pwrseq_simple: Support assigned-clocks
+In-Reply-To: <20160108095917.32335.11094.stgit@localhost>
+References: <20160108095917.32335.11094.stgit@localhost>
+Message-ID: <CAPDyKFrdraY1hXfikELMr5V7hJRcQP7nOUaOjzKiGUGDSecp6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 05:59:18PM +0100, Ralf Ramsauer wrote:
-> This patch enables the APB DMA high speed UARTs of the Jetson TK1. So
-> far, they were only enabled in NVidia's official BSP.
-> 
-> Those additional UARTs are exposed on the expansion connector J3A2:
-> 
->  UART1:
->   Pin 41: BR_UART1_TXD
->   Pin 44: BR_UART1_RXD
-> 
->  UART2:
->   Pin 65: UART2_RXD
->   Pin 68: UART2_TXD
->   Pin 71: UART2_CTS_L
->   Pin 74: UART2_RTS_L
-> 
-> Signed-off-by: Ralf Ramsauer <ralf@ramses-pyramidenbau.de>
++ Srini
+
+On 8 January 2016 at 10:59, Martin Fuzzey <mfuzzey@parkeon.com> wrote:
+> The clock subsystem now allows clock rates and parents to be configured
+> in the device tree.
+>
+> This requires calling of_clk_set_defaults() which is done automatically
+> for platform, i2c, spi devices. Since pwrseq_simple does not fit into
+> those catagories we must do it ourself.
+>
+> With this patch the standard assigned-clocks, assigned-clock-rates,
+> assigned-clock-parents DT properties to be used in pwrseq_simple nodes.
+
+I believe this should be solved when we have converted the each pwrseq
+method to become a platform driver. This is being worked on by
+Srinivas Kandagatla.
+http://www.spinics.net/lists/arm-kernel/msg475605.html
+
+Kind regards
+Ulf Hansson
+
+>
+> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
 > ---
->  arch/arm/boot/dts/tegra124-jetson-tk1.dts | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
-
-Applied, thanks.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/a428cfe9/attachment-0001.sig>
+>  drivers/mmc/core/pwrseq_simple.c |    5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
+> index 4d2962b..fd8f38e 100644
+> --- a/drivers/mmc/core/pwrseq_simple.c
+> +++ b/drivers/mmc/core/pwrseq_simple.c
+> @@ -8,6 +8,7 @@
+>   *  Simple MMC power sequence management
+>   */
+>  #include <linux/clk.h>
+> +#include <linux/clk/clk-conf.h>
+>  #include <linux/kernel.h>
+>  #include <linux/slab.h>
+>  #include <linux/device.h>
+> @@ -108,6 +109,10 @@ struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
+>         if (!pwrseq)
+>                 return ERR_PTR(-ENOMEM);
+>
+> +       ret = of_clk_set_defaults(dev->of_node, false);
+> +       if (ret)
+> +               goto free;
+> +
+>         pwrseq->ext_clk = clk_get(dev, "ext_clock");
+>         if (IS_ERR(pwrseq->ext_clk) &&
+>             PTR_ERR(pwrseq->ext_clk) != -ENOENT) {
+>
