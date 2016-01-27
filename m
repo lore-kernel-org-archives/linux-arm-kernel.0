@@ -1,42 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 27 Jan 2016 09:01:00 -0800
-Subject: [PATCH v2 0/3] arm: beaglex15: fix USB Gadget
-In-Reply-To: <1451436947-22163-1-git-send-email-cw00.choi@samsung.com>
-References: <1451436947-22163-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20160127170059.GM19432@atomide.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 27 Jan 2016 18:13:35 +0100
+Subject: [PATCH v2 1/2] ARM: mvebu: use armada-370-sata for SATA on
+ Armada 375
+In-Reply-To: <1453908287-29557-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1453908287-29557-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1453908287-29557-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20160127171335.GF20194@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Chanwoo Choi <cw00.choi@samsung.com> [151229 16:56]:
-> This patchset make the extcon-palmas.c more generic style and then send v2
-> patchset. I add the Felipe comment of v1 patchset as following:
-> But, I have not test on real board because I don't have it.
-> Just, I modify this patchset based on v1 patchset[1] from Felipe Balbi.
+On Wed, Jan 27, 2016 at 04:24:46PM +0100, Thomas Petazzoni wrote:
+> From: Lior Amsalem <alior@marvell.com>
 > 
-> - Felipe comment of this patchset:
-> "Hi,
-> 
-> with the following patches I can get USB Gadget working
-> with my beagle x15 with today's Linus' tree.
-> 
-> regards".
-> 
-> [1] https://lkml.org/lkml/2015/11/12/508
-> 
-> Changes from v1:
-> (https://lkml.org/lkml/2015/11/12/508)
-> - Refactoring the extcon-palmas.c driver with more generic style to support
->   the VBUS gpio pin.
-> - Use the 'vbus-gpio' property instead of 'interrupts-extended']
-> 
-> Felipe Balbi (3):
->   extcon: palmas: Add the support for VBUS detection by using GPIO
->   arm: boot: dts: beaglex15: Remove ID GPIO
->   arm: boot: beaglex15: pass correct interrupt
+> The Armada 375 has the same SATA IP as Armada 370 and Armada XP, which
+> requires the PHY speed to be set in the LP_PHY_CTL register for SATA
+> hotplug to work.
 
-Please feel free to queue these minor dts changes along with the
-extcon changes. Usually the subject starts with "ARM: dts:" though.
+Hi Thomas
 
-Anyways for the last two patches in the series:
+Should this have a fixes: tag?
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+       Andrew
+
+> 
+> Therefore, this commit updates the compatible string used to describe
+> the SATA IP in Armada 375 from marvell,orion-sata to
+> marvell,armada-370-sata.
+> 
+> Signed-off-by: Lior Amsalem <alior@marvell.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-375.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+> index 7ccce75..cc952cf 100644
+> --- a/arch/arm/boot/dts/armada-375.dtsi
+> +++ b/arch/arm/boot/dts/armada-375.dtsi
+> @@ -529,7 +529,7 @@
+>  			};
+>  
+>  			sata at a0000 {
+> -				compatible = "marvell,orion-sata";
+> +				compatible = "marvell,armada-370-sata";
+>  				reg = <0xa0000 0x5000>;
+>  				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&gateclk 14>, <&gateclk 20>;
+> -- 
+> 2.6.4
+> 
