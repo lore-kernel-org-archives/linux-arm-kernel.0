@@ -1,79 +1,45 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 27 Jan 2016 17:11:03 +0100
-Subject: [PATCH v4 04/13] clk: at91: pmc: merge at91_pmc_init in
- atmel_pmc_probe
-In-Reply-To: <1453911072-23608-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1453911072-23608-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1453911072-23608-5-git-send-email-alexandre.belloni@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 27 Jan 2016 08:24:53 -0800
+Subject: [PATCH] ARM: dts: n900: Include adp1653 device
+In-Reply-To: <20160127111828.GK5783@n2100.arm.linux.org.uk>
+References: <1451086812-3729-1-git-send-email-pali.rohar@gmail.com>
+ <20160121091241.GS7192@pali>
+ <20160121092909.GH5783@n2100.arm.linux.org.uk>
+ <20160121101828.GA7411@amd> <20160121163857.GH19432@atomide.com>
+ <20160121165408.GJ5783@n2100.arm.linux.org.uk>
+ <20160127100237.GH25796@pali>
+ <20160127111828.GK5783@n2100.arm.linux.org.uk>
+Message-ID: <20160127162452.GJ19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-at91_pmc_init() doesn't do much anymore, merge it in atmel_pmc_probe().
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [160127 03:19]:
+> On Wed, Jan 27, 2016 at 11:02:37AM +0100, Pali Roh?r wrote:
+> > In my opinion this patch is not support for new hardware. It just add
+> > missing DT definition for one specific board for HW which was added to
+> > linux kernel in v4.2-rc1 version. For me it looks like that needed DT
+> > definition was forgotten...
+> 
+> Opinions differ, but ultimately it's up to whoever is responsible for
+> accepting the patch, and in the case of ARM SoC based patches, the
+> arm-soc maintainers.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/at91/pmc.c | 34 +++++++++-------------------------
- 1 file changed, 9 insertions(+), 25 deletions(-)
+Yeah. Sorry for long delay as discussed. I'm applying the $subject
+patch finally into omap-for-v4.6/dt today.
 
-diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index f17a2a1f1e85..01d049d4248a 100644
---- a/drivers/clk/at91/pmc.c
-+++ b/drivers/clk/at91/pmc.c
-@@ -110,30 +110,6 @@ static const struct at91_pmc_caps sama5d3_caps = {
- 			  AT91_PMC_CFDEV,
- };
- 
--static struct at91_pmc *__init at91_pmc_init(struct device_node *np,
--					     struct regmap *regmap,
--					     void __iomem *regbase,
--					     const struct at91_pmc_caps *caps)
--{
--	struct at91_pmc *pmc;
--
--	if (!regbase || !caps)
--		return NULL;
--
--	at91_pmc_base = regbase;
--
--	pmc = kzalloc(sizeof(*pmc), GFP_KERNEL);
--	if (!pmc)
--		return NULL;
--
--	pmc->regmap = regmap;
--	pmc->caps = caps;
--
--	regmap_write(pmc->regmap, AT91_PMC_IDR, 0xffffffff);
--
--	return pmc;
--}
--
- static void __init of_at91_pmc_setup(struct device_node *np,
- 				     const struct at91_pmc_caps *caps)
- {
-@@ -141,13 +117,21 @@ static void __init of_at91_pmc_setup(struct device_node *np,
- 	void __iomem *regbase = of_iomap(np, 0);
- 	struct regmap *regmap;
- 
-+	at91_pmc_base = regbase;
-+
- 	regmap = syscon_node_to_regmap(np);
- 	if (IS_ERR(regmap))
- 		panic("Could not retrieve syscon regmap");
- 
--	pmc = at91_pmc_init(np, regmap, regbase, caps);
-+	pmc = kzalloc(sizeof(*pmc), GFP_KERNEL);
- 	if (!pmc)
- 		return;
-+
-+	pmc->regmap = regmap;
-+	pmc->caps = caps;
-+
-+	regmap_write(pmc->regmap, AT91_PMC_IDR, 0xffffffff);
-+
- }
- 
- static void __init of_at91rm9200_pmc_setup(struct device_node *np)
--- 
-2.5.0
+We still have at least two fixes left to go that both affect also
+n900. But at least I can now sanely test adding new stuff with a WIP
+fix for the PM runtime regression.
+
+> The arm-soc maintainers close their trees for development changes a
+> few weeks before hand (a patch of mine which was acked etc by 7th
+> December never made the 4.5 merge window either, and the alleged
+> reason I've been told is because arm-soc was already closed by then).
+
+Heh I too have some pending clock framework patches from December
+that I did not repost yet as the maintainers notified that they
+rather not take new stuff any longer for v4.5 before the holidays.
+
+Regards,
+
+Tony
