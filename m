@@ -1,56 +1,51 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 27 Jan 2016 15:10:26 +0100
-Subject: [PATCH v2 1/2] ARM: tegra: Fixed typo
-In-Reply-To: <56A88AC6.4090105@nvidia.com>
-References: <1453827558-10954-1-git-send-email-ralf@ramses-pyramidenbau.de>
- <1453827558-10954-2-git-send-email-ralf@ramses-pyramidenbau.de>
- <CAAVeFuKiaSZH5RF=zEnYVoRU_rtVvONRYdtGbK=fgV_icO8tDw@mail.gmail.com>
- <56A883C7.9000007@ramses-pyramidenbau.de>
- <56A88AC6.4090105@nvidia.com>
-Message-ID: <20160127141026.GA21779@ulmo>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 27 Jan 2016 15:10:19 +0100
+Subject: [PATCH v2] pinctrl: rockchip: add support for the rk3399
+In-Reply-To: <CACRpkdb6Cooo-_eBKJn-SdFkGPg2hR9nud7Tq6aa+bmkDuOEmg@mail.gmail.com>
+References: <1451997055-47655-1-git-send-email-wdc@rock-chips.com>
+ <1452152498-21780-1-git-send-email-wdc@rock-chips.com>
+ <CACRpkdb6Cooo-_eBKJn-SdFkGPg2hR9nud7Tq6aa+bmkDuOEmg@mail.gmail.com>
+Message-ID: <1664345.86tvmnNB3Q@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 06:15:50PM +0900, Alexandre Courbot wrote:
-> On 01/27/16 17:45, Ralf Ramsauer wrote:
-> >On 01/27/2016 08:59 AM, Alexandre Courbot wrote:
-> >>Hey Ralf, thanks for following up with patches as we discussed in private!
-> >>
-> >>Small nit: you will want to use the active form ("Fix typo" instead of
-> >>"Fixed typo") in your commit messages.
-> >So even my language skills got improved ;-)
+Am Mittwoch, 27. Januar 2016, 15:02:18 schrieb Linus Walleij:
+> On Thu, Jan 7, 2016 at 8:41 AM, David Wu <wdc@rock-chips.com> wrote:
+> > From: David Wu <david.wu@rock-chips.com>
+> > 
+> > The pinctrl of rk3399 is much different from other's,
+> > especially the 3bits of drive strength.
+> > 
+> > Signed-off-by: David Wu <david.wu@rock-chips.com>
+> > ---
+> > change from v1:
+> > - need spin_unlock_irqrestore for set drive default case
 > 
-> This is grammatically correct, but using imperative form is the convention
-> in the kernel. As per Documentation/SubmittingPatches:
-> 
-> Describe your changes in imperative mood, e.g. "make xyzzy do frotz"
-> instead of "[This patch] makes xyzzy do frotz" or "[I] changed xyzzy
-> to do frotz", as if you are giving orders to the codebase to change
-> its behaviour.
-> 
-> >>It would also be nice if the commit title was a little more precise
-> >>about where the typo has been corrected.
-> >Uhm - as this is be pretty small non-diff-related change... Is it
-> >necessary to send a v3 or would it also be okay to let the maintainer
-> >amend the subject?
-> >(to sth.: like "ARM: tegra: Fix the same C&P typo in several dts includes")
-> 
-> Let's see what Thierry says about this.
+> Heiko can you please look at this patch?
 
-I've changed this when applying and also added a full commit message.
-Doing so might arguably be a little overkill, but in doing so I realized
-that the same typo was there in the Tegra132 and Tegra210 DTS includes,
-so I fixed those up in a separate patch while at it. I made it a
-separate patch because the arm-soc maintainers want arch/arm and
-arch/arm64 changes to come in via separate branches. I did add a
-Suggested-by for Ralf since he spotted the original typo, I hope that's
-okay with everyone.
+sorry, about that falling so far down my inbox. I'll try to look at it today 
+or tomorrow.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/24bc8ead/attachment-0001.sig>
+But overall it looks good.
+
+@David: if you wake up before I manage to review more in-depth, the
+"reading register twice" (+writing counterpart)
++                       /* need to read regs twice */
++                       ret = regmap_read(regmap, reg, &temp);
++                       if (ret)
++                               return ret;
+
+should definitly get more explanation on how that access scheme works. Seems to 
+be some special register access method with the register returning different 
+values each time? As I don't have a manual for the soc yet this is definitly 
+curious for me :-)
+
+> 
+> > +       { .compatible = "rockchip,rk3399-pinctrl",
+> > +               .data = (void *)&rk3399_pin_ctrl },
+> 
+> I guess this requires a small patch to some binding file.
+> It's OK to fold that into this patch.
+
+@David:
+Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
