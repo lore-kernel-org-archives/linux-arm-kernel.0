@@ -1,54 +1,50 @@
-From: qiuxishi@huawei.com (Xishi Qiu)
-Date: Wed, 27 Jan 2016 09:18:57 +0800
-Subject: Have any influence on set_memory_** about below patch ??
-In-Reply-To: <20160113112813.GE23370@leverpostej>
-References: <5693A740.7070408@huawei.com> <20160111133145.GM6499@leverpostej>
- <569454F6.1060207@huawei.com> <20160112111531.GA4858@leverpostej>
- <5695DA67.5080201@huawei.com> <20160113112813.GE23370@leverpostej>
-Message-ID: <56A81B01.7010104@huawei.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Tue, 26 Jan 2016 18:00:31 -0800
+Subject: [PATCH] mmc: sdhci-iproc: use sdhci_pltfm_unregister directly
+In-Reply-To: <1453803963-6385-1-git-send-email-jszhang@marvell.com>
+References: <1453803963-6385-1-git-send-email-jszhang@marvell.com>
+Message-ID: <56A824BF.3030202@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/1/13 19:28, Mark Rutland wrote:
+Hi Jisheng,
 
-> On Wed, Jan 13, 2016 at 01:02:31PM +0800, Xishi Qiu wrote:
->> Hi Mark,
->>
->> If I do like this, does it have the problem too?
->>
->> kmalloc a size
->> no access
->> flush tlb
->> call set_memory_ro to change the page table flag
->> flush tlb
->> start access
-> 
-> This is broken.
-> 
-> The kmalloc will give you memory form the linear mapping. Even if you
-> allocate a page, that page could have been mapped with a section at the
-> PMD/PUD/PGD level.
-> 
-> Other data could fall within that section (e.g. a kernel stack,
-> perhaps).
+Looks good.
 
-Hi Mark,
+Acked-by: Scott Branden <sbranden@broadcom.com>
 
-If nobody use that whole section before(however it is almost impossible),
-flush tlb is safe, right?
-
-Thanks,
-Xishi Qiu
-
-> 
-> Additional TLB flushees do not help. There's still a race against the
-> asynchronous TLB logic. The TLB can allocate or destroy entries at any
-> tim. If there were no page table changes prior to the invalidate, the
-> TLB could re-allocate all existing entries immediately after the TLB
-> invalidate, leaving you in the same state as before.
-> 
-> Thanks,
-> Mark.
-> 
-> .
-> 
+On 16-01-26 02:26 AM, Jisheng Zhang wrote:
+> The sdhci_iproc_remove() is jsut a wrapper to sdhci_pltfm_unregister.
+> So use the sdhci_pltfm_unregister() for the .remove hook directly.
+>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>   drivers/mmc/host/sdhci-iproc.c | 7 +------
+>   1 file changed, 1 insertion(+), 6 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-iproc.c b/drivers/mmc/host/sdhci-iproc.c
+> index 3b423b0..24c5546 100644
+> --- a/drivers/mmc/host/sdhci-iproc.c
+> +++ b/drivers/mmc/host/sdhci-iproc.c
+> @@ -220,11 +220,6 @@ err:
+>   	return ret;
+>   }
+>
+> -static int sdhci_iproc_remove(struct platform_device *pdev)
+> -{
+> -	return sdhci_pltfm_unregister(pdev);
+> -}
+> -
+>   static struct platform_driver sdhci_iproc_driver = {
+>   	.driver = {
+>   		.name = "sdhci-iproc",
+> @@ -232,7 +227,7 @@ static struct platform_driver sdhci_iproc_driver = {
+>   		.pm = SDHCI_PLTFM_PMOPS,
+>   	},
+>   	.probe = sdhci_iproc_probe,
+> -	.remove = sdhci_iproc_remove,
+> +	.remove = sdhci_pltfm_unregister,
+>   };
+>   module_platform_driver(sdhci_iproc_driver);
+>
+>
