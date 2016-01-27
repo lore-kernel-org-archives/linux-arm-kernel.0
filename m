@@ -1,133 +1,39 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 27 Jan 2016 10:28:05 +0800
-Subject: [PATCH v8 2/2] mfd: add documentation for ACT8945A DT bindings
-In-Reply-To: <1453861685-30924-1-git-send-email-wenyou.yang@atmel.com>
-References: <1453861685-30924-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1453861685-30924-3-git-send-email-wenyou.yang@atmel.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 27 Jan 2016 13:40:24 +1100
+Subject: linux-next: build failure after merge of the aio tree
+In-Reply-To: <20160112163835.GD347@kvack.org>
+References: <20160112164034.0fe945a7@canb.auug.org.au>
+ <20160112163835.GD347@kvack.org>
+Message-ID: <20160127134024.0fababf6@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Active-semi ACT8945A PMIC is a Multi-Function Device, it has
-two subdevices:
- - Regulator
- - Charger
+Hi Benjamin,
 
-This patch adds documentation for ACT8945A DT bindings.
+On Tue, 12 Jan 2016 11:38:35 -0500 Benjamin LaHaise <bcrl@kvack.org> wrote:
+>
+> On Tue, Jan 12, 2016 at 04:40:34PM +1100, Stephen Rothwell wrote:
+> > 
+> > After merging the aio tree, today's linux-next build (arm
+> > multi_v7_defconfig) failed like this:
+> > 
+> > fs/built-in.o: In function `aio_thread_op_foo_at':
+> > file.c:(.text+0x43808): undefined reference to `__get_user_bad'
+> > file.c:(.text+0x43838): undefined reference to `__get_user_bad'  
+> 
+> This is very strange.  It seems to imply that __get_user() doesn't 
+> handle 64 bit values, which is completely broken behaviour on the 
+> architecture's part if true.  Can any ARM folks comment on the right 
+> fix here?
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
----
+Well, probably only if you cc them :-)
 
-Changes in v8: None
-Changes in v7:
- - collect Acked-by from Lee Jones
+Indeed, __get_user on arm does not handle 64 bit objects, where as
+get_user does ...
 
-Changes in v6:
- - change the regulator name.
+Background: new aio code is adding __get_user() calls referencing 64
+bit quantities (__u64 and __s64).
 
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
- - fix the tabbing errors in Example.
- - use "pmic at 5b" label, not "act8945a at 5b" in Example.
- - collect Acked-by from Rob.
-
-Changes in v2:
- - use more specific label in Example.
- - add pmic and charger nodes in Example.
-
- Documentation/devicetree/bindings/mfd/act8945a.txt |   82 ++++++++++++++++++++
- 1 file changed, 82 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/act8945a.txt
-
-diff --git a/Documentation/devicetree/bindings/mfd/act8945a.txt b/Documentation/devicetree/bindings/mfd/act8945a.txt
-new file mode 100644
-index 0000000..f2a8387
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/act8945a.txt
-@@ -0,0 +1,82 @@
-+Device-Tree bindings for Active-semi ACT8945A MFD driver
-+
-+Required properties:
-+ - compatible: "active-semi,act8945a".
-+ - reg: the I2C slave address for the ACT8945A chip
-+
-+The chip exposes two subdevices:
-+ - a regulators: see ../regulator/act8945a-regulator.txt
-+ - a charger: see ../power/act8945a-charger.txt
-+
-+Example:
-+	pmic at 5b {
-+		compatible = "active-semi,act8945a";
-+		reg = <0x5b>;
-+		status = "okay";
-+
-+		pmic {
-+			compatible = "active-semi,act8945a-regulator";
-+			active-semi,vsel-high;
-+
-+			regulators {
-+				vdd_1v35_reg: REG_DCDC1 {
-+					regulator-name = "VDD_1V35";
-+					regulator-min-microvolt = <1350000>;
-+					regulator-max-microvolt = <1350000>;
-+					regulator-always-on;
-+				};
-+
-+				vdd_1v2_reg: REG_DCDC2 {
-+					regulator-name = "VDD_1V2";
-+					regulator-min-microvolt = <1100000>;
-+					regulator-max-microvolt = <1300000>;
-+					regulator-always-on;
-+				};
-+
-+				vdd_3v3_reg: REG_DCDC3 {
-+					regulator-name = "VDD_3V3";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-always-on;
-+				};
-+
-+				vdd_fuse_reg: REG_LDO1 {
-+					regulator-name = "VDD_FUSE";
-+					regulator-min-microvolt = <2500000>;
-+					regulator-max-microvolt = <2500000>;
-+					regulator-always-on;
-+				};
-+
-+				vdd_3v3_lp_reg: REG_LDO2 {
-+					regulator-name = "VDD_3V3_LP";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-always-on;
-+				};
-+
-+				vdd_led_reg: REG_LDO3 {
-+					regulator-name = "VDD_LED";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-always-on;
-+				};
-+
-+				vdd_sdhc_1v8_reg: REG_LDO4 {
-+					regulator-name = "VDD_SDHC_1V8";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+			};
-+		};
-+
-+		charger {
-+			compatible = "active-semi,act8945a-charger";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_charger_chglev>;
-+			active-semi,chglev-gpio = <&pioA 12 GPIO_ACTIVE_HIGH>;
-+			active-semi,input_voltage_threshold = <6600>;
-+			active-semi,precondition_timeout = <40>;
-+			active-semi,total_timeout = <3>;
-+		};
-+	};
 -- 
-1.7.9.5
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
