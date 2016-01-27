@@ -1,112 +1,158 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 27 Jan 2016 10:57:43 +0800
-Subject: [PATCH v4 2/2] regulator: add documentation for ACT8945A's regulator
- DT bindings
-In-Reply-To: <1453863463-30515-1-git-send-email-wenyou.yang@atmel.com>
-References: <1453863463-30515-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1453863463-30515-3-git-send-email-wenyou.yang@atmel.com>
+From: xuejiancheng@huawei.com (xuejiancheng)
+Date: Wed, 27 Jan 2016 11:28:14 +0800
+Subject: [PATCH v7 1/6] clk: hisilicon: add CRG driver for hi3519 soc
+In-Reply-To: <1453771063.17181.56.camel@tiscali.nl>
+References: <1453690883-31220-1-git-send-email-xuejiancheng@huawei.com>
+ <1453690883-31220-2-git-send-email-xuejiancheng@huawei.com>
+ <1453771063.17181.56.camel@tiscali.nl>
+Message-ID: <56A8394E.2040207@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for the DT bindings of the regulator
-subdevice of ACT8945A MFD.
+Hi Paul Bolle?
+   Thank you for your reply.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
+On 2016/1/26 9:17, Paul Bolle wrote:
+> On ma, 2016-01-25 at 11:01 +0800, Jiancheng Xue wrote:
+>> --- a/drivers/clk/hisilicon/Kconfig
+>> +++ b/drivers/clk/hisilicon/Kconfig
+> 
+>> +config COMMON_CLK_HI3519
+>> +	bool "Hi3519 Clock Driver"
+>> +	depends on ARCH_HISI
+>> +	default y
+>> +	help
+>> +	  Build the clock driver for hi3519.
+> 
+>> --- a/drivers/clk/hisilicon/Makefile
+>> +++ b/drivers/clk/hisilicon/Makefile
+> 
+>> +obj-$(CONFIG_COMMON_CLK_HI3519)	+= clk-hi3519.o
+> 
+> If I parsed the above correctly clk-hi3519.o can only be built-in,
+> right?
+> 
+Yes. You are right.
 
-Changes in v4: None
-Changes in v3: None
-Changes in v2:
- - add Acked-by Rob Herring.
+But this clock driver should be able to be compiled as a module.
+Even though it is preferred to be built-in.
 
- .../bindings/regulator/act8945a-regulator.txt      |   78 ++++++++++++++++++++
- 1 file changed, 78 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
+I'll fix it in next version. Thank you.
 
-diff --git a/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt b/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
-new file mode 100644
-index 0000000..0e08a3e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
-@@ -0,0 +1,78 @@
-+Device-Tree bindings for regulators of Active-semi ACT8945A Multi-Function Device
-+
-+Required properties:
-+ - compatible: "active-semi,act8945a-regulator"
-+
-+Optional properties:
-+- active-semi,vsel-high: Indicates if the VSEL pin is set to logic-high.
-+  If this property is missing, assume the VSEL pin is set to logic-low.
-+
-+Optional input supply properties:
-+  - vp1-supply: The input supply for REG_DCDC1
-+  - vp2-supply: The input supply for REG_DCDC2
-+  - vp3-supply: The input supply for REG_DCDC3
-+  - inl45-supply: The input supply for REG_LDO1 and REG_LDO2
-+  - inl67-supply: The input supply for REG_LDO3 and REG_LDO4
-+
-+Any standard regulator properties can be used to configure the single regulator.
-+
-+The valid names for regulators are:
-+	REG_DCDC1, REG_DCDC2, REG_DCDC3, REG_LDO1, REG_LDO2, REG_LDO3, REG_LDO4.
-+
-+Example:
-+
-+	pmic {
-+		compatible = "active-semi,act8945a-regulator";
-+		active-semi,vsel-high;
-+
-+		regulators {
-+			vdd_1v35_reg: REG_DCDC1 {
-+				regulator-name = "VDD_1V35";
-+				regulator-min-microvolt = <1350000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_1v2_reg: REG_DCDC2 {
-+				regulator-name = "VDD_1V2";
-+				regulator-min-microvolt = <1100000>;
-+				regulator-max-microvolt = <1300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_3v3_reg: REG_DCDC3 {
-+				regulator-name = "VDD_3V3";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_fuse_reg: REG_LDO1 {
-+				regulator-name = "VDD_FUSE";
-+				regulator-min-microvolt = <2500000>;
-+				regulator-max-microvolt = <2500000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_3v3_lp_reg: REG_LDO2 {
-+				regulator-name = "VDD_3V3_LP";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_led_reg: REG_LDO3 {
-+				regulator-name = "VDD_LED";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_sdhc_1v8_reg: REG_LDO4 {
-+				regulator-name = "VDD_SDHC_1V8";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
--- 
-1.7.9.5
+Regards,
+
+Jiancheng
+
+>> --- /dev/null
+>> +++ b/drivers/clk/hisilicon/clk-hi3519.c
+> 
+>> +#include <linux/module.h>
+> 
+> So is this include actually needed?
+> 
+>> +static int hi3519_clk_probe(struct platform_device *pdev)
+>> +{
+>> +       struct device_node *np = pdev->dev.of_node;
+>> +       struct hisi_clock_data *clk_data;
+>> +
+>> +       clk_data = hisi_clk_init(np, HI3519_NR_CLKS);
+>> +       if (!clk_data)
+>> +               return -ENODEV;
+>> +
+>> +       hisi_clk_register_fixed_rate(hi3519_fixed_rate_clks,
+>> +                                   
+>> ARRAY_SIZE(hi3519_fixed_rate_clks),
+>> +                                    clk_data);
+>> +       hisi_clk_register_mux(hi3519_mux_clks,
+>> ARRAY_SIZE(hi3519_mux_clks),
+>> +                                       clk_data);
+>> +       hisi_clk_register_gate(hi3519_gate_clks,
+>> +                       ARRAY_SIZE(hi3519_gate_clks), clk_data);
+>> +
+>> +       return hisi_reset_init(np);
+>> +}
+> 
+> (evolution 3.16.5 makes replying to code quite a challenge.)
+> 
+>> +static const struct of_device_id hi3519_clk_match_table[] = {
+>> +	{ .compatible = "hisilicon,hi3519-crg" },
+>> +	{ }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, hi3519_clk_match_table);
+> 
+> Last time I checked MODULE_DEVICE_TABLE is preprocessed away for built
+> -in code.
+> 
+>> +static void __exit hi3519_clk_exit(void)
+>> +{
+>> +	platform_driver_unregister(&hi3519_clk_driver);
+>> +}
+>> +module_exit(hi3519_clk_exit);
+> 
+> Not needed for built-in only code.
+> 
+>> +MODULE_DESCRIPTION("HiSilicon Hi3519 Clock Driver");
+> 
+> Ditto.
+> 
+>> --- a/drivers/clk/hisilicon/clk.c
+>> +++ b/drivers/clk/hisilicon/clk.c
+> 
+>> +EXPORT_SYMBOL(hisi_clk_init);
+> 
+> What module uses this export?
+>  
+>> +EXPORT_SYMBOL(hisi_clk_register_fixed_rate);
+> 
+> Ditto.
+> 
+>> +EXPORT_SYMBOL(hisi_clk_register_fixed_factor);
+> 
+> Ditto.
+>  
+>> +EXPORT_SYMBOL(hisi_clk_register_mux);
+> 
+> Ditto.
+> 
+>> +EXPORT_SYMBOL(hisi_clk_register_divider);
+> 
+> Ditto.
+> 
+>> +EXPORT_SYMBOL(hisi_clk_register_gate);
+> 
+> Ditto.
+> 
+>> +EXPORT_SYMBOL(hisi_clk_register_gate_sep);
+> 
+> Ditto.
+> 
+>> --- /dev/null
+>> +++ b/drivers/clk/hisilicon/reset.c
+> 
+>> +int hisi_reset_init(struct device_node *np)
+>> +{
+>> +	[...]
+>> +}
+>> +EXPORT_SYMBOL(hisi_reset_init);
+> 
+> Ditto.
+> 
+>> --- /dev/null
+>> +++ b/drivers/clk/hisilicon/reset.h
+> 
+>> +#ifdef CONFIG_RESET_CONTROLLER
+>> +int hisi_reset_init(struct device_node *np);
+>> +#else
+>> +static inline int hisi_reset_init(struct device_node *np)
+>> +{
+>> +	return 0;
+>> +}
+>> +#endif
+> 
+> Thanks,
+> 
+> 
+> Paul Bolle
+> 
+> .
+> 
