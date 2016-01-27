@@ -1,62 +1,33 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Wed, 27 Jan 2016 11:58:17 +0100
-Subject: Serial ports with non connected RTS/CTS
-In-Reply-To: <56A89C48.1040604@parkeon.com>
-References: <56A89C48.1040604@parkeon.com>
-Message-ID: <20160127115817.79e384b1@ipc1.ka-ro>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Jan 2016 11:18:28 +0000
+Subject: [PATCH] ARM: dts: n900: Include adp1653 device
+In-Reply-To: <20160127100237.GH25796@pali>
+References: <1451086812-3729-1-git-send-email-pali.rohar@gmail.com>
+ <20160121091241.GS7192@pali>
+ <20160121092909.GH5783@n2100.arm.linux.org.uk>
+ <20160121101828.GA7411@amd> <20160121163857.GH19432@atomide.com>
+ <20160121165408.GJ5783@n2100.arm.linux.org.uk>
+ <20160127100237.GH25796@pali>
+Message-ID: <20160127111828.GK5783@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jan 27, 2016 at 11:02:37AM +0100, Pali Roh?r wrote:
+> In my opinion this patch is not support for new hardware. It just add
+> missing DT definition for one specific board for HW which was added to
+> linux kernel in v4.2-rc1 version. For me it looks like that needed DT
+> definition was forgotten...
 
-On Wed, 27 Jan 2016 11:30:32 +0100 Martin Fuzzey wrote:
-> Hi all,
-> 
-> currently, at least for 8250 based serial ports using of_serial, there 
-> is no way of indicating that the RTS / CTS lines, although supported by 
-> the UART, are not actually connected on the board.
-> 
-> This means that userspace needs to know about this and not use the 
-> CRTSCTS termios flag (otherwise no data is sent).
-> 
-> This is currently the case for Debian stattach for example (nettools 
-> 1.60) which unconditionally uses CRTSCTS (but the busybox version of 
-> slattach has a "-F" option that can be used to disable CRTSCTS).
-> 
-> Would it not be better to allow this situation to be described in the 
-> device tree?
-> 
-> Such an option already exists for the imx UART (""fsl,uart-has-rtscts")
-> 
-> of_serial already has the "auto-flow-control" DT property but, as stated 
-> in the documentation:
->      "The  driver is allowed to detect support for the capability even 
-> without this  property."
-> 
-> In the past there was a (since reverted) property "has-hw-flow-control"
-> See
->      06aa82e "serial: uart: add hw flow control support configuration"
->      a6eec92 " Revert "serial: uart: add hw flow control support 
-> configuration"
-> 
-> However that just provided another (redundant) way of *activating* 
-> hardware flow control and did not allow it to be disactivated.
-> 
-> Would a new DT property "no-rtscts" to do this be acceptable?
-> 
-> I think it would have to be a negative property to avoid breaking old 
-> device trees.
-> 
-> Since there seems to have been some to and fro on this issue I thought 
-> it would be a good idea to discuss before writing the patch...
-> 
-If a driver has no support for RTS/CTS (e.g. due to the missing
-fsl,uart-has-rtscts property for i.MX UARTs) then trying to enable HW
-flowcontrol via the TCETS ioctl should fail (as is the case with the
-i.MX serial driver).
-Thus it should be impossible to enable crtscts if the serial driver has
-no RTC/CTS support without any need for userspace to know about the
-HW details.
+Opinions differ, but ultimately it's up to whoever is responsible for
+accepting the patch, and in the case of ARM SoC based patches, the
+arm-soc maintainers.
 
+The arm-soc maintainers close their trees for development changes a
+few weeks before hand (a patch of mine which was acked etc by 7th
+December never made the 4.5 merge window either, and the alleged
+reason I've been told is because arm-soc was already closed by then).
 
-Lothar Wa?mann
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
