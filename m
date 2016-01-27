@@ -1,53 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Jan 2016 15:04:57 +0100
-Subject: [PATCH 7/9] net: macb: avoid uninitialized variables
+Date: Wed, 27 Jan 2016 15:04:58 +0100
+Subject: [PATCH 8/9] net: nb8800: avoid uninitialized variable warning
 In-Reply-To: <1453903507-3427225-1-git-send-email-arnd@arndb.de>
 References: <1453903507-3427225-1-git-send-email-arnd@arndb.de>
-Message-ID: <1453903507-3427225-8-git-send-email-arnd@arndb.de>
+Message-ID: <1453903507-3427225-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The macb_clk_init function returns three clock pointers, unless
-the it fails to get the first ones. We correctly handle the
-failure case by propagating the error from macb_probe, but
-gcc does not realize this and incorrectly warns about a later
-use of those:
+The nb8800_poll() function initializes the 'next' variable in the
+loop looking for new input data. We know this will be called at
+least once because 'budget' is a guaranteed to be a positive number
+when we enter the function, but the compiler doesn't know that
+and warns when the variable is used later:
 
-In file included from /git/arm-soc/drivers/net/ethernet/cadence/macb.c:12:0:
-drivers/net/ethernet/cadence/macb.c: In function 'macb_probe':
-include/linux/clk.h:484:2: error: 'tx_clk' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-  clk_disable(clk);
-  ^
-drivers/net/ethernet/cadence/macb.c:2822:28: note: 'tx_clk' was declared here
-  struct clk *pclk, *hclk, *tx_clk;
-                            ^
-In file included from /git/arm-soc/drivers/net/ethernet/cadence/macb.c:12:0:
-include/linux/clk.h:484:2: error: 'hclk' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-  clk_disable(clk);
-  ^
-drivers/net/ethernet/cadence/macb.c:2822:21: note: 'hclk' was declared here
-  struct clk *pclk, *hclk, *tx_clk;
-                     ^
+drivers/net/ethernet/aurora/nb8800.c: In function 'nb8800_poll':
+drivers/net/ethernet/aurora/nb8800.c:350:21: warning: 'next' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
-This shuts up the misleading warnings by ensuring that the
-macb_clk_init() always stores something into all three pointers.
+Changing the 'while() {}' loop to 'do {} while()' makes it obvious
+to the compiler what is going on so it no longer warns.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/net/ethernet/cadence/macb.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/net/ethernet/aurora/nb8800.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 9d9984a87d42..d3aa74f9db79 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -2268,6 +2268,7 @@ static int macb_clk_init(struct platform_device *pdev, struct clk **pclk,
- {
- 	int err;
+diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
+index ecc4a334c507..f71ab2647a3b 100644
+--- a/drivers/net/ethernet/aurora/nb8800.c
++++ b/drivers/net/ethernet/aurora/nb8800.c
+@@ -302,7 +302,7 @@ static int nb8800_poll(struct napi_struct *napi, int budget)
+ 	nb8800_tx_done(dev);
  
-+	*tx_clk = *hclk = NULL;
- 	*pclk = devm_clk_get(&pdev->dev, "pclk");
- 	if (IS_ERR(*pclk)) {
- 		err = PTR_ERR(*pclk);
+ again:
+-	while (work < budget) {
++	do {
+ 		struct nb8800_rx_buf *rxb;
+ 		unsigned int len;
+ 
+@@ -330,7 +330,7 @@ again:
+ 		rxd->report = 0;
+ 		last = next;
+ 		work++;
+-	}
++	} while (work < budget);
+ 
+ 	if (work) {
+ 		priv->rx_descs[last].desc.config |= DESC_EOC;
 -- 
 2.7.0
