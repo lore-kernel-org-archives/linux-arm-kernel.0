@@ -1,95 +1,32 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Wed, 27 Jan 2016 16:57:34 +0300
-Subject: [PATCH 2/3] ACPI: parse SPCR and enable matching console
-In-Reply-To: <56A64E07.10106@hurleysoftware.com>
-References: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>
- <1453722324-22407-3-git-send-email-aleksey.makarov@linaro.org>
- <56A64E07.10106@hurleysoftware.com>
-Message-ID: <56A8CCCE.2080509@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 27 Jan 2016 15:02:18 +0100
+Subject: [PATCH v2] pinctrl: rockchip: add support for the rk3399
+In-Reply-To: <1452152498-21780-1-git-send-email-wdc@rock-chips.com>
+References: <1451997055-47655-1-git-send-email-wdc@rock-chips.com>
+ <1452152498-21780-1-git-send-email-wdc@rock-chips.com>
+Message-ID: <CACRpkdb6Cooo-_eBKJn-SdFkGPg2hR9nud7Tq6aa+bmkDuOEmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jan 7, 2016 at 8:41 AM, David Wu <wdc@rock-chips.com> wrote:
 
+> From: David Wu <david.wu@rock-chips.com>
+>
+> The pinctrl of rk3399 is much different from other's,
+> especially the 3bits of drive strength.
+>
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> ---
+> change from v1:
+> - need spin_unlock_irqrestore for set drive default case
 
-On 01/25/2016 07:32 PM, Peter Hurley wrote:
-> On 01/25/2016 03:45 AM, Aleksey Makarov wrote:
->> 'ARM Server Base Boot Requiremets' [1] mention SPCR (Serial Port
->> Console Redirection Table) [2] as a mandatory ACPI table that
->> specifies the configuration of serial console.
->> 
->> Parse this table and check if any registered console match the
->> description.  If it does, enable that console.
->> 
->> To implement that, introduce a new member int (*acpi_match)(struct
->> console *, struct acpi_table_spcr *) of struct console.  It allows
->> drivers to check if they provide a matching console device.
-> 
-> Many, many platform proms with all sorts of binary table layout are
-> already supported by the existing console infrastructure. Why is ACPI
-> different, that requires extensive (and messy) changes to console
-> initialization?
+Heiko can you please look at this patch?
 
-Without this patch, when linux calls register_console(), that function
-checks if any console has been enabled so far. 1) If not, it enables the
-console being registered. 2) If there exists any enabled console, it
-looks at the console_cmdline array. That array holds a list of
-consoles that user wishes to enable. There are two ways to append
-an item to that list: first is to pass "console=..." option in command
-line and second is to call add_preferred_console(char *name, int idx,
-char *options). As it is clear from the signature, the function
-requires the name of the driver (like "ttyS") and the line id. On the
-other hand, the SPCR ACPI table describes console by specifying the
-address of it's registers or PCI Device ID / PCI Vendor ID or PCI Bus
-Number / PCI Device Number. So to use this function we would need to
-have a method to translate this info to the name of terminal and line
-index. I could not figure out any way to do that.
+> +       { .compatible = "rockchip,rk3399-pinctrl",
+> +               .data = (void *)&rk3399_pin_ctrl },
 
-In the initial version of the patch after getting the reference to the
-SPCR ACPI table the full tree of ACPI devices was searched to find any
-device with the same address.  When uart_add_one_port() was called
-to register a new serial port, the ACPI companion of this port was
-compared to the found device. If it was the same device, the code
-called add_preferred_console() (the terminal name and line index are
-known in uart_add_one_port()).
+I guess this requires a small patch to some binding file.
+It's OK to fold that into this patch.
 
-This original approach had two problems: 
-
-    1) It works with the SPCR tables that describe consoles only by
-the address of the registers. I do not think that consoles that are
-described by PCI info will appear in the near future, but decided to
-implement this in a generic way. I would like to discuss if this
-decision was good.
-
-    2) Wrong order of initialization.  Many console drivers have already
-been registered by the time uart_add_one_port() adds an item to the
-console_cmdline array.  There is a similar problem with my
-implementation,  but having a dedicated acpi_match() callback I
-believe made it simpler to circumwent.
-
-That's why I believe we need to add a new funcion pointer to struct
-console. On the other hand, I do not understand which existing
-structure you are referring.
-
-> How is this going to work with earlycon?
-
-If an earlycon that matches SPCR is being registered, the code will enable it.
-While it is harmless. Even so I will check for earlycon in the next version
-of the patch set, thank you.
-
-> This commit log is missing the reasoning behind adding locks,
-> refactoring into delete_from_console_list(), and retry loops.
-
-I will add this to the next verion of the series.
-
-Thank you
-Aleksey Makarov
-
-
->> [1]
->> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
->>
->> [2] http://msdn.microsoft.com/en-us/library/windows/hardware/dn639131(v=vs.85).aspx
->> 
->> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-
-[ .. ]
+Yours,
+Linus Walleij
