@@ -1,56 +1,37 @@
-From: dhowells@redhat.com (David Howells)
-Date: Wed, 27 Jan 2016 14:57:07 +0000
-Subject: [PATCH] documentation: Add disclaimer
-In-Reply-To: <20160127083546.GJ6357@twins.programming.kicks-ass.net>
-References: <20160127083546.GJ6357@twins.programming.kicks-ass.net>
- <5696BA6E.4070508@imgtec.com> <20160114120445.GB15828@arm.com>
- <56980145.5030901@imgtec.com> <20160114204827.GE3818@linux.vnet.ibm.com>
- <56981212.7050301@imgtec.com> <20160114222046.GH3818@linux.vnet.ibm.com>
- <20160126102402.GE6357@twins.programming.kicks-ass.net>
- <20160126103200.GI6375@twins.programming.kicks-ass.net>
- <20160126110053.GA21553@arm.com> <20160126201143.GV4503@linux.vnet.ibm.com>
-Message-ID: <15882.1453906627@warthog.procyon.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 27 Jan 2016 16:08:18 +0100
+Subject: [PATCH 0/2] ARM: mvebu: network interface naming
+Message-ID: <1453907300-28283-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Zijlstra <peterz@infradead.org> wrote:
+Dear mvebu maintainers,
 
-> +==========
-> +DISCLAIMER
-> +==========
-> +
-> +This document is not a specification; it is intentionally (for the sake of
-> +brevity) and unintentionally (due to being human) incomplete. This document is
-> +meant as a guide to using the various memory barriers provided by Linux, but
-> +in case of any doubt (and there are many) please ask.
-> +
-> +I repeat, this document is not a specification of what Linux expects from
-> +hardware.
+As was discussed back in November last year, the naming of network
+interfaces on Armada 38x is very confusing. Gregory Clement suggested
+to exceptionally violate the rule of "DT nodes should be ordered by
+register address" in order to reduce the confusion.
 
-The purpose of this document is twofold:
+The first patch implements this proposal.
 
- (1) to specify the minimum functionality that one can rely on for any
-     particular barrier, and
+The second patch is a new iteration of the patch that adds comments to
+the Armada 385 DB AP Device Tree file. The contents of the patch is
+the same (add indications of which physical connector corresponds each
+port), only the commit log is adjusted to take into account the fact
+that thanks to the first patch, the naming of the network interfaces
+visible from Linux is now a lot more sane.
 
- (2) to provide a guide as to how to use the barriers that are available.
+Thanks!
 
-Note that an architecture can provide more than the minimum requirement for
-any particular barrier, but if the barrier provides less than that, it is
-incorrect.
+Thomas
 
-Note also that it is possible that a barrier may be a no-op for an
-architecture because the way that arch works renders an explicit barrier
-unnecessary in that case.
+Thomas Petazzoni (2):
+  ARM: mvebu: change order of ethernet DT nodes on Armada 38x
+  ARM: mvebu: add reference to ETH connectors for A385-AP
 
-> +
+ arch/arm/boot/dts/armada-385-db-ap.dts |  3 +++
+ arch/arm/boot/dts/armada-38x.dtsi      | 30 +++++++++++++++++++++---------
+ 2 files changed, 24 insertions(+), 9 deletions(-)
 
-Can you bung an extra blank line in here if you have to redo this at all?
-
-> +========
-> +CONTENTS
-> +========
->  
->   (*) Abstract memory access model.
->  
-
-David
+-- 
+2.6.4
