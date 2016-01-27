@@ -1,22 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 27 Jan 2016 19:07:38 -0200
-Subject: [PATCH 3/3] ARM: dts: imx6*-hummingboard: fix pcie reset GPIO
- specification
-In-Reply-To: <E1aOWdF-00058a-0X@rmk-PC.arm.linux.org.uk>
-References: <E1aOWdF-00058a-0X@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAOMZO5Ciq-kq4xQm4TH+dF3cdYxFfWUmvuykvorZ-oaEoyBWFQ@mail.gmail.com>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Wed, 27 Jan 2016 15:11:49 -0600
+Subject: [PATCH 01/13] MAINTAINERS: Adding Maintainers for AMD Seattle Device
+ Tree
+In-Reply-To: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1453929121-12171-2-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 6:24 PM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> PCIe reset signals are active low, and our GPIO for this is directly
-> connected to the PCIe reset.  However, as the PCIe driver does not use
-> the flag, the specification of '0' flags (which means active high) has
-> not been noticed.  Correct this oversight, and switch to using the
+From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 
-Yes, the mx6 pci driver did not use the flag, but it does now since 5c5fb40de8f1
-("PCI: imx6: Add support for active-low reset GPIO"), so it would be
-better to adjust the commit log.
+Adding maintainers for AMD Seattle device tree.
 
-Apart from that, patch looks good.
+Signed-off-by: Brijesh Singh <brijeshkumar.singh@amd.com>
+Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+Signed-off-by: Tom Lendacky <thomas.lendacky@amd.com>
+---
+ MAINTAINERS | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index a2956eb..8179121 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -669,6 +669,14 @@ F:	drivers/gpu/drm/radeon/radeon_kfd.c
+ F:	drivers/gpu/drm/radeon/radeon_kfd.h
+ F:	include/uapi/linux/kfd_ioctl.h
+ 
++AMD SEATTLE DEVICE TREE SUPPORT
++M:	Brijesh Singh <brijeshkumar.singh@amd.com>
++M:	Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
++S:	Supported
++M:	Tom Lendacky <thomas.lendacky@amd.com>
++S:	Supported
++F:	arch/arm64/boot/dts/amd/
++
+ AMD XGBE DRIVER
+ M:	Tom Lendacky <thomas.lendacky@amd.com>
+ L:	netdev at vger.kernel.org
+-- 
+2.5.0
