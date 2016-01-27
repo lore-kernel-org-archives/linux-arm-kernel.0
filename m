@@ -1,47 +1,54 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Tue, 26 Jan 2016 16:02:40 -0800
-Subject: 4.5-rc1 kernel is failed to bootup on FSL LS2080 RDB board
-Message-ID: <56A80920.8030504@linaro.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 26 Jan 2016 19:39:20 -0500
+Subject: [PATCH v6 0/5] dma-mapping: Patches for speeding up allocation
+In-Reply-To: <20160126155937.6a4e4165d1cf4e513d62e942@linux-foundation.org>
+References: <1452533428-12762-1-git-send-email-dianders@chromium.org>
+ <20160126155937.6a4e4165d1cf4e513d62e942@linux-foundation.org>
+Message-ID: <CAD=FV=V9ZJrmD=F8363mhg8+JQiTRg=g6DuZR2KJRbfU=K455w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi folks,
+Hi,
 
-I tried to boot 4.5-rc1 kernel on my FSL LS2080 RDB (aka LS2085 RDB), 
-but it is failed silently. If I use the dtb file shipped with the SDK 
-with 4.5-rc1 kernel, I can get the serial console output, but it is 
-failed to detect PCI bus.
+On Tue, Jan 26, 2016 at 3:59 PM, Andrew Morton
+<akpm@linux-foundation.org> wrote:
+> On Mon, 11 Jan 2016 09:30:22 -0800 Douglas Anderson <dianders@chromium.org> wrote:
+>
+>> This series of patches will speed up memory allocation in dma-mapping
+>> quite a bit.
+>
+> This is pretty much all ARM and driver stuff so I think I'll duck it.
+> But I can merge it if nobody else feels a need to.
 
-If I use both kernel and dtb from the SDK, it works well.
+I was going to ask what the next steps were for this series.
+Presumably I could post the patch to Russell's patch tracker if folks
+want me to do that.  Alternatively it could go through the ARM-SOC
+tree?
 
-The bootloader information:
 
-U-Boot 2015.07-rc1Layerscape2-SDK+g7e8bad0 (Aug 27 2015 - 14:31:42)
+> I saw a few acked-by/tested-by/etc from the v5 posting which weren't
+> carried over into v6 (might have been a timing race), so please fix
+> that up if there's an opportunity.
 
-SoC:  LS2085E (0x87010010)
-Clock Configuration:
-        CPU0(A57):1600 MHz  CPU1(A57):1600 MHz  CPU2(A57):1600 MHz
-        CPU3(A57):1600 MHz  CPU4(A57):1600 MHz  CPU5(A57):1600 MHz
-        CPU6(A57):1600 MHz  CPU7(A57):1600 MHz
-        Bus:      600  MHz  DDR:      1333.333 MT/s     DP-DDR: 
-1333.333 MT/s
-Reset Configuration Word (RCW):
-        00: 40282830 40400040 00000000 00000000
-        10: 00000000 00200000 00200000 00000000
-        20: 00c12980 00002580 00000000 00000000
-        30: 00000e0b 00000000 00000000 00000000
-        40: 00000000 00000000 00000000 00000000
-        50: 00000000 00000000 00000000 00000000
-        60: 00000000 00000000 00027000 00000000
-        70: 412a0000 00000000 00000000 00000000
-Model: Freescale Layerscape 2085a RDB Board
-Board: LS2085E-RDB, Board Arch: V1, Board version: D, boot from vBank: 4
-FPGA: v1.18
+Right.  Both Robin and Tomasz gave their Reviewed-by to Patch #1 in v5
+even after v6 was posted.
 
-And, I have ARCH_LAYERSCAPE, CONFIG_PCIE_DW and CONFIG_PCI_LAYERSCAPE 
-enabled.
 
-Any hint is appreciated.
+> Regarding the new DMA_ATTR_ALLOC_SINGLE_PAGES hint: I suggest adding
+> "DMA_ATTR_ALLOC_SINGLE_PAGES is presently implemented only on ARM" to
+> the docs.  Or perhaps have a shot at implementing it elsewhere.
 
-Thanks,
-Yang
+Warning sounds good.
+
+
+> Typo in 4/5 changelog: "reqiurements"
+
+Thanks for catching!
+
+
+I'm happy to post up a v6 with these things fixed or I'm happy for
+whoever is applying it to make these small fixes themselves.  Any
+volunteers?  Olof, Arnd, or Russell: any of you want these patches?
+
+
+-Doug
