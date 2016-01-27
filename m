@@ -1,75 +1,43 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 27 Jan 2016 16:46:51 +0100
-Subject: [PATCH v3 1/3] spi: atmel: add support for the internal
- chip-select of the spi controller
-In-Reply-To: <yw1xvb771yrl.fsf@unicorn.mansr.com>
-References: <cover.1433850255.git.cyrille.pitchen@atmel.com>
- <c05f4d9abfdabb62b3b3cfeb57a3f9c138b4e45d.1433850255.git.cyrille.pitchen@atmel.com>
- <yw1xvb771yrl.fsf@unicorn.mansr.com>
-Message-ID: <56A8E66B.208@atmel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 27 Jan 2016 16:46:49 +0100
+Subject: [linux-sunxi][PATCH v4 0/3] ARM: dt: sunxi: Add Itead Ibox support
+In-Reply-To: <1453562299-18495-1-git-send-email-codekipper@gmail.com>
+References: <1453562299-18495-1-git-send-email-codekipper@gmail.com>
+Message-ID: <20160127154649.GE4317@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/01/2016 22:50, M?ns Rullg?rd a ?crit :
-> Cyrille Pitchen <cyrille.pitchen@atmel.com> writes:
+On Sat, Jan 23, 2016 at 04:18:16PM +0100, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
 > 
->> This patch relies on the CSAAT (Chip Select Active After Transfer) feature
->> introduced by the version 2 of the spi controller. This new mode allows to
->> use properly the internal chip-select output pin of the spi controller
->> instead of using external gpios. Consequently, the "cs-gpios" device-tree
->> property becomes optional.
->>
->> When the new CSAAT bit is set into the Chip Select Register, the internal
->> chip-select output pin remains asserted till both the following conditions
->> become true:
->> - the LASTXFER bit is set into the Control Register (or the Transmit Data
->>   Register)
->> - the Transmit Data Register and its shift register are empty.
->>
->> WARNING: if the LASTXFER bit is set into the Control Register then new
->> data are written into the Transmit Data Register fast enough to keep its
->> shifter not empty, the chip-select output pin remains asserted. Only when
->> the shifter becomes empty, the chip-select output pin is unasserted.
->>
->> When the CSAAT bit is clear in the Chip Select Register, the LASTXFER bit
->> is ignored in both the Control Register and the Transmit Data Register.
->> The internal chip-select output pin remains active as long as the Transmit
->> Data Register or its shift register are not empty.
->>
->> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
->> ---
->>  drivers/spi/spi-atmel.c | 37 ++++++++++++++++++++++++++++---------
->>  1 file changed, 28 insertions(+), 9 deletions(-)
+> Hi All,
 > 
-> [...]
+> this patch series is an extension of the initial patch delivery for the
+> Itead Ibox as found here
+> https://groups.google.com/d/msg/linux-sunxi/GR_co3ObW8s/0BTPQljmAAAJ.
 > 
->> @@ -1338,6 +1350,13 @@ static int atmel_spi_probe(struct platform_device *pdev)
->>
->>  	atmel_get_caps(as);
->>
->> +	as->use_cs_gpios = true;
->> +	if (atmel_spi_is_v2(as) &&
->> +	    !of_get_property(pdev->dev.of_node, "cs-gpios", NULL)) {
->> +		as->use_cs_gpios = false;
->> +		master->num_chipselect = 4;
->> +	}
+> There seems to be a few Itead variants out there based on their A10/A20
+> core module and this patch series attempts to organise the device tree
+> files with some consideration that these variants may be added later.
 > 
-> This part breaks the AVR32 boards and probably anything else that
-> doesn't use devicetree but does use GPIOs for chip select.
+> I've also converted the A10 Itead Iteaduino dts to use this common file.
+> As I don't have this board to verify the changes I simply compared the
+> output of the fdtdump before and after applying these patches. The only
+> difference was the reduction to the dcdc2 max voltage.
+> 
 
-Hi Mans,
+Applied all three, thanks!
 
-I have difficulties finding why you may enter this test. So, maybe you
-can give me a clue by reading for me the value that resides in the SPI
-version register: you can have it by reading at 0xFFE000FC for instance
-(actually the atmel_get_caps() dev_info() call gives it as well in the
-boot log which is somewhat easier: I tried to find one on the Internet
-without success...).
+Maxime
 
-So I think that just fixing the logic in atmel_get_caps() introduced by
-d4820b7496219edd9a7055022681364d304525f7 can make it come back to a
-situation where the ARV32 was more tested than nowadays.
-
-Bye,
 -- 
-Nicolas Ferre
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/65a374a4/attachment.sig>
