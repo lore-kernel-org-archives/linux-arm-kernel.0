@@ -1,122 +1,60 @@
-From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Wed, 27 Jan 2016 10:13:21 -0600
-Subject: [PATCHv9 2/4] ARM: dts: Add Altera L2 Cache and OCRAM EDAC entries
-In-Reply-To: <1453911203-30202-1-git-send-email-tthayer@opensource.altera.com>
-References: <1453911203-30202-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1453911203-30202-2-git-send-email-tthayer@opensource.altera.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 27 Jan 2016 11:11:10 -0500
+Subject: [PATCH 3/9] net: bgmac: clarify CONFIG_BCMA dependency
+In-Reply-To: <1453903507-3427225-4-git-send-email-arnd@arndb.de>
+References: <1453903507-3427225-1-git-send-email-arnd@arndb.de>
+ <1453903507-3427225-4-git-send-email-arnd@arndb.de>
+Message-ID: <20160127161110.GL8889@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <tthayer@opensource.altera.com>
+[[PATCH 3/9] net: bgmac: clarify CONFIG_BCMA dependency] On 27/01/2016 (Wed 15:04) Arnd Bergmann wrote:
 
-Adding the device tree entries and bindings needed to support
-the Altera L2 cache and On-Chip RAM EDAC. This patch relies upon
-an earlier patch to declare and setup On-chip RAM properly.
-http://www.spinics.net/lists/devicetree/msg51117.html
+> The bgmac driver depends on BCMA_HOST_SOC, which is only used
+> when CONFIG_BCMA is enabled. However, it is a bool option and can
+> be set when CONFIG_BCMA=m, and then bgmac can be built-in, leading
+> to an obvious link error:
+> 
+> drivers/built-in.o: In function `bgmac_init':
+> :(.init.text+0x7f2c): undefined reference to `__bcma_driver_register'
+> drivers/built-in.o: In function `bgmac_exit':
+> :(.exit.text+0x110a): undefined reference to `bcma_driver_unregister'
+> 
+> To avoid this case, we need to depend on both BCMA and BCMA_SOC,
+> as this patch does. I'm also trying to make the dependency more
+> readable by splitting it into three lines, and adding a COMPILE_TEST
+> alternative so we can test-build it in all configurations that
+> support BCMA.
 
-Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
-v9: Remove 0x from ecc-manager in bindings and dts.
-v8: Fix node names to include chip family and use ecc manager
-    to better describe the driver. Rename socfpga-edac.txt to
-    socfpga-eccmgr.txt.
-v7: No Change
-v6: Change to nested EDAC device nodes based on community
-    feedback. Remove L2 syscon. Use consolidated binding.
-v3-5: No Change
-v2: Remove OCRAM declaration and reference prior patch.
----
- .../bindings/arm/altera/socfpga-eccmgr.txt         |   49 ++++++++++++++++++++
- arch/arm/boot/dts/socfpga.dtsi                     |   20 ++++++++
- 2 files changed, 69 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+It wasn't immediately clear to me from the above why you added the
+select on FIXED_PHY.
 
-diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
-new file mode 100644
-index 0000000..885f93d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
-@@ -0,0 +1,49 @@
-+Altera SoCFPGA ECC Manager
-+This driver uses the EDAC framework to implement the SOCFPGA ECC Manager.
-+The ECC Manager counts and corrects single bit errors and counts/handles
-+double bit errors which are uncorrectable.
-+
-+Required Properties:
-+- compatible : Should be "altr,socfpga-ecc-manager"
-+- #address-cells: must be 1
-+- #size-cells: must be 1
-+- ranges : standard definition, should translate from local addresses
-+
-+Subcomponents:
-+
-+L2 Cache ECC
-+Required Properties:
-+- compatible : Should be "altr,socfpga-l2-ecc"
-+- reg : Address and size for ECC error interrupt clear registers.
-+- interrupts : Should be single bit error interrupt, then double bit error
-+	interrupt. Note the rising edge type.
-+
-+On Chip RAM ECC
-+Required Properties:
-+- compatible : Should be "altr,socfpga-ocram-ecc"
-+- reg : Address and size for ECC error interrupt clear registers.
-+- iram : phandle to On-Chip RAM definition.
-+- interrupts : Should be single bit error interrupt, then double bit error
-+	interrupt. Note the rising edge type.
-+
-+Example:
-+
-+	eccmgr: eccmgr at ffd08140 {
-+		compatible = "altr,socfpga-ecc-manager";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		l2-ecc at ffd08140 {
-+			compatible = "altr,socfpga-l2-ecc";
-+			reg = <0xffd08140 0x4>;
-+			interrupts = <0 36 1>, <0 37 1>;
-+		};
-+
-+		ocram-ecc at ffd08144 {
-+			compatible = "altr,socfpga-ocram-ecc";
-+			reg = <0xffd08144 0x4>;
-+			iram = <&ocram>;
-+			interrupts = <0 178 1>, <0 179 1>;
-+		};
-+	};
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 39c470e..14ac766 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -656,6 +656,26 @@
- 			status = "disabled";
- 		};
- 
-+		eccmgr: eccmgr at ffd08140 {
-+			compatible = "altr,socfpga-ecc-manager";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			l2-ecc at ffd08140 {
-+				compatible = "altr,socfpga-l2-ecc";
-+				reg = <0xffd08140 0x4>;
-+				interrupts = <0 36 1>, <0 37 1>;
-+			};
-+
-+			ocram-ecc at ffd08144 {
-+				compatible = "altr,socfpga-ocram-ecc";
-+				reg = <0xffd08144 0x4>;
-+				iram = <&ocram>;
-+				interrupts = <0 178 1>, <0 179 1>;
-+			};
-+		};
-+
- 		L2: l2-cache at fffef000 {
- 			compatible = "arm,pl310-cache";
- 			reg = <0xfffef000 0x1000>;
--- 
-1.7.9.5
+P.
+--
+
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/net/ethernet/broadcom/Kconfig | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/ethernet/broadcom/Kconfig b/drivers/net/ethernet/broadcom/Kconfig
+> index 8550df189ceb..19f7cd02e085 100644
+> --- a/drivers/net/ethernet/broadcom/Kconfig
+> +++ b/drivers/net/ethernet/broadcom/Kconfig
+> @@ -151,8 +151,11 @@ config BNX2X_VXLAN
+>  
+>  config BGMAC
+>  	tristate "BCMA bus GBit core support"
+> -	depends on BCMA_HOST_SOC && HAS_DMA && (BCM47XX || ARCH_BCM_5301X)
+> +	depends on BCMA && BCMA_HOST_SOC
+> +	depends on HAS_DMA
+> +	depends on BCM47XX || ARCH_BCM_5301X || COMPILE_TEST
+>  	select PHYLIB
+> +	select FIXED_PHY
+>  	---help---
+>  	  This driver supports GBit MAC and BCM4706 GBit MAC cores on BCMA bus.
+>  	  They can be found on BCM47xx SoCs and provide gigabit ethernet.
+> -- 
+> 2.7.0
+> 
