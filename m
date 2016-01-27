@@ -1,147 +1,128 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 27 Jan 2016 20:13:25 +0100
-Subject: [PATCH RFC 00/11] clk: sunxi: factors clk clean up and refactor
-In-Reply-To: <1453727747-23307-1-git-send-email-wens@csie.org>
-References: <1453727747-23307-1-git-send-email-wens@csie.org>
-Message-ID: <20160127191325.GR4317@lukather>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 27 Jan 2016 10:14:33 -0800
+Subject: [PATCH 4.1 109/127] arm64: bpf: fix div-by-zero case
+In-Reply-To: <20160127180805.624425994@linuxfoundation.org>
+References: <20160127180805.624425994@linuxfoundation.org>
+Message-ID: <20160127180811.170841988@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+4.1-stable review patch.  If anyone has any objections, please let me know.
 
-On Mon, Jan 25, 2016 at 09:15:36PM +0800, Chen-Yu Tsai wrote:
-> Hi everyone,
-> 
-> This series cleans up and reworks parts of sunxi's factors clk. The goal
-> is to support non-standard formulas for clock rate calculation, such as
-> pre-dividers on some parents, or all power-of-2 dividers. One such clock
-> is the AHB1 clock on A31/A31s.
-> 
-> Patch 1 is Maxime's patch adding an unregister function for composite
-> clocks. Patches 3 and 4 use this, so it is included for completeness.
-> 
-> Patch 2 makes the config tables for factors clk constant. These contain
-> the shift and width for the factors. They are used to manipulate the
-> clk register values. There should be no reason to change them in-flight.
-> 
-> Patch 3 adds a proper error path for the factors clk register function(),
-> so we don't leak memory when a call fails.
-> 
-> Patch 4 adds an unregister function for factors clks.
-> 
-> Patch 5 adds an error patch to sunxi_factors_clk_setup()
-> 
-> Patch 6 packs the parameters passed to get_factors callbacks in a struct.
-> This makes it easier to extend factors clk without having to edit all
-> the function definitions, and also makes the lines shorter.
-> 
-> Patch 7 makes factors clk support custom formulas for calculating clock
-> rates. On the clock rounding/setting side, we only need to teach
-> get_factors about different parent clocks. On the recalc side, we add
-> support for custom .recalc callbacks for clocks that need them.
-> 
-> Patch 8 drops .round_rate from factors clk ops. Since only one of
-> .round_rate and .determine_rate is needed, and the clk core prefers the
-> latter, remove .round_rate.
-> 
-> Patch 9 rewrites sun6i-a31-ahb1-clk using factors clk with the new custom
-> formula support. sun6i-a31-ahb1 has a pre-divider on one of its parents.
-> 
-> Patch 10 rewrite sun6i-ar100 using factors clk.
-> 
-> Patch 11 rewrites sun8i-a23-mbus-clk using the simpler composite clk.
-> While this patch is doing the reverse, i.e. rewriting a factors clk into
-> a composite clk, it is included because some changes overlap. I'm not
-> sure whether this approach is worthwhile, as it actually adds more code,
-> though it might make it easier to understand.
+------------------
 
-Thanks a lot for working on this.
+From: Zi Shen Lim <zlim.lnx@gmail.com>
 
-I'm guessing we could even take a step further, since most of the
-clocks are re-using a variation of the factor calculation code. We
-roughly end up in a handful of cases (the clocks are just from a quick
-look at the A10 and A31 datasheet and the source code, which might
-leave a few clocks that we don't support yet in the newer SoCs)
+commit 251599e1d6906621f49218d7b474ddd159e58f3b upstream.
 
-  * A single factor:
-    + These ones are trivial to handle, a simple division gives us
-      directly the divisor to use.
-    + Clocks in this case:
-      - A13 AHB (p)
-      - A80 AHB (p)
-      - A10 PLL3 (m)
-      - A31 AHB (m)
-      - A80 GT (m)
+In the case of division by zero in a BPF program:
+	A = A / X;  (X == 0)
+the expected behavior is to terminate with return value 0.
 
-  * Two factors:
-    + These ones might be a bit more difficult to handle. One case is
-      quite trivial too, it's the n and m case, where we can use
-      directly rational_best_approximation() that handles this just
-      fine.
-      The other cases are a bit more tricky, but we can always brute
-      force it, it shouldn't be very difficult to implement or very
-      long to run.
+This is confirmed by the test case introduced in commit 86bf1721b226
+("test_bpf: add tests checking that JIT/interpreter sets A and X to 0.").
 
-    + Clocks in the (p + m) case
-      - A10 APB1
-      - A20 CLK OUT
-      - A10 MOD0
-      - A31 AR100
-      - A80 APB1
+Reported-by: Yang Shi <yang.shi@linaro.org>
+Tested-by: Yang Shi <yang.shi@linaro.org>
+CC: Xi Wang <xi.wang@gmail.com>
+CC: Alexei Starovoitov <ast@plumgrid.com>
+CC: linux-arm-kernel at lists.infradead.org
+CC: linux-kernel at vger.kernel.org
+Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
+Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-    + Clocks in the (n + k) case
-      - A10 PLL5
-      - A31 PLL6
+---
+ arch/arm64/net/bpf_jit.h      |    3 ++-
+ arch/arm64/net/bpf_jit_comp.c |   37 +++++++++++++++++++++++++------------
+ 2 files changed, 27 insertions(+), 13 deletions(-)
 
-    + Clocks in the (n + m) case
-      - A10 PLL2
-      - A31 PLL3
-      - A31 PLL4
-      - A31 PLL8
-      - A31 PLL9
-      - A31 PLL10
-
-  * Three factors
-    + There's probably some consolidation that can be done here too,
-      or to consider brute-forcing the whole thing again. The number
-      of combinations would probably rise quite a lot, which might
-      have a quite significant performance hit. I'm not really sure we
-      care though.
-
-    + Clocks in the (n, k and m) case
-      - A31 PLL1
-      - A31 PLL5
-      - A31 MIPI PLL
-
-    + Clocks in the (n, p and m) case
-      - A31 pll2
-      - A80 pll4
-
-  * All factors (n, k, p and m)
-    + I'm not sure it's worth it in this case. I'd expect the code to
-      be quite complex and slow to evaluate all the cases.
-    + Clocks
-      - A10 PLL1
-      - A10 PLL4
-      - A23 PLL1
-    
-
-So, I guess we could have a default (and overridable) function that
-would cover at least the cases where we have a single or two
-factors. I think we already have everything we need in the clk_factors
-structure, so we shouldn't need to modify each and every clocks.
-
-What do you think about it?
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/af0e51c3/attachment.sig>
+--- a/arch/arm64/net/bpf_jit.h
++++ b/arch/arm64/net/bpf_jit.h
+@@ -1,7 +1,7 @@
+ /*
+  * BPF JIT compiler for ARM64
+  *
+- * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
++ * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -35,6 +35,7 @@
+ 	aarch64_insn_gen_comp_branch_imm(0, offset, Rt, A64_VARIANT(sf), \
+ 		AARCH64_INSN_BRANCH_COMP_##type)
+ #define A64_CBZ(sf, Rt, imm19) A64_COMP_BRANCH(sf, Rt, (imm19) << 2, ZERO)
++#define A64_CBNZ(sf, Rt, imm19) A64_COMP_BRANCH(sf, Rt, (imm19) << 2, NONZERO)
+ 
+ /* Conditional branch (immediate) */
+ #define A64_COND_BRANCH(cond, offset) \
+--- a/arch/arm64/net/bpf_jit_comp.c
++++ b/arch/arm64/net/bpf_jit_comp.c
+@@ -1,7 +1,7 @@
+ /*
+  * BPF JIT compiler for ARM64
+  *
+- * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
++ * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -225,6 +225,17 @@ static int build_insn(const struct bpf_i
+ 	u8 jmp_cond;
+ 	s32 jmp_offset;
+ 
++#define check_imm(bits, imm) do {				\
++	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
++	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
++		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
++			i, imm, imm);				\
++		return -EINVAL;					\
++	}							\
++} while (0)
++#define check_imm19(imm) check_imm(19, imm)
++#define check_imm26(imm) check_imm(26, imm)
++
+ 	switch (code) {
+ 	/* dst = src */
+ 	case BPF_ALU | BPF_MOV | BPF_X:
+@@ -258,8 +269,21 @@ static int build_insn(const struct bpf_i
+ 		break;
+ 	case BPF_ALU | BPF_DIV | BPF_X:
+ 	case BPF_ALU64 | BPF_DIV | BPF_X:
++	{
++		const u8 r0 = bpf2a64[BPF_REG_0];
++
++		/* if (src == 0) return 0 */
++		jmp_offset = 3; /* skip ahead to else path */
++		check_imm19(jmp_offset);
++		emit(A64_CBNZ(is64, src, jmp_offset), ctx);
++		emit(A64_MOVZ(1, r0, 0, 0), ctx);
++		jmp_offset = epilogue_offset(ctx);
++		check_imm26(jmp_offset);
++		emit(A64_B(jmp_offset), ctx);
++		/* else */
+ 		emit(A64_UDIV(is64, dst, dst, src), ctx);
+ 		break;
++	}
+ 	case BPF_ALU | BPF_MOD | BPF_X:
+ 	case BPF_ALU64 | BPF_MOD | BPF_X:
+ 		ctx->tmp_used = 1;
+@@ -393,17 +417,6 @@ emit_bswap_uxt:
+ 		emit(A64_ASR(is64, dst, dst, imm), ctx);
+ 		break;
+ 
+-#define check_imm(bits, imm) do {				\
+-	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
+-	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
+-		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
+-			i, imm, imm);				\
+-		return -EINVAL;					\
+-	}							\
+-} while (0)
+-#define check_imm19(imm) check_imm(19, imm)
+-#define check_imm26(imm) check_imm(26, imm)
+-
+ 	/* JUMP off */
+ 	case BPF_JMP | BPF_JA:
+ 		jmp_offset = bpf2a64_offset(i + off, i, ctx);
