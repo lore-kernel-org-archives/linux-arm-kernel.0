@@ -1,78 +1,108 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 27 Jan 2016 18:10:48 +0900
-Subject: [PATCH v3 0/3] arm64/clk: EXYNOS: Consolidate Exynos7 symbol
-In-Reply-To: <1453795504-12302-1-git-send-email-k.kozlowski@samsung.com>
-References: <1453795504-12302-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <56A88998.5040602@samsung.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 27 Jan 2016 11:11:46 +0200
+Subject: [PATCH] dmaengine: edma: Remove dynamic TPTC power management feature
+Message-ID: <1453885906-17652-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.01.2016 17:05, Krzysztof Kozlowski wrote:
-> Hi,
-> 
-> Third attempt to remove ARCH_EXYNOS7 symbol.
-> 
-> Patches cannot be cherry-picked. I was thinking about merging this
-> through arm-soc tree after getting needed acks (clk, arm-soc?).
+The dynamic or on demand pm_runtime does not work correctly on am335x and
+am437x due to interference with hwmod.
+Fall back using the pm_runtime usage as it was in the old driver stack,
+meaning that at probe time call pm_runtime_enable() and
+pm_runtime_get_sync() for the TPTCs as well.
 
-The patchset was rebased on quite old linux-next. Rebasing on current
-code makes only one difference - the s3c64xx gained multiplatform support.
+Fixes: 1be5336bc7ba ("dmaengine: edma: New device tree binding")
 
-I don't want to spam the lists so, I'll respin everything tomorrow after
-proper rebasing.
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Reported-by: Tero Kristo <t-kristo@ti.com>
+---
+ drivers/dma/edma.c | 38 +++-----------------------------------
+ 1 file changed, 3 insertions(+), 35 deletions(-)
 
-Best regards,
-Krzysztof
-
-
-> 
-> Changes since v2:
-> =================
-> 1. Follow Arnd's advice about not enabling silently the newly added
->    EXYNOS_ARM64_COMMON_CLK, when COMPILE_TEST is enabled. This was
->    also a trigger for some changes in placement of Samsung clocks
->    Kconfig entries...
-> 2. ... which lead to introducing patch 1.
-> 
-> 
-> Logic:
-> ======
-> Now the clock selection algorithm works like:
-> 1. For Exynos ARMv7 and ARMv8 the platforms select COMMON_CLK
->    and COMMON_CLK_SAMSUNG.
-> 2. As before: clock drivers for Exynos ARMv7 will be selected by
->    respective SOC/ARCH_EXYNOS_XXX symbol.
-> 3. For Exynos ARMv8 the clock drivers will be enabled by default
->    by EXYNOS_ARM64_COMMON_CLK symbol.
-> 
-> Rationale:
-> ==========
-> We don't need ARCH_EXYNOS7 symbol because all ARMv8 platforms should
-> fall under generic ARCH_EXYNOS. In the same time there is no sense
-> in building clocks for these ARMv8 SoCs on ARMv7 builds. In future
-> this will also influence PMU [1] driver.
-> 
-> 
-> Best regards,
-> Krzysztof
-> 
-> [1] https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg48090.html
-> 
-> 
-> Krzysztof Kozlowski (3):
->   clk: samsung: Enable COMPILE_TEST for Samsung clocks
->   clk: samsung: Don't build ARMv8 clock drivers on ARMv7
->   arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS
-> 
->  arch/arm/Kconfig                    |  1 +
->  arch/arm/mach-exynos/Kconfig        |  1 +
->  arch/arm/mach-s3c24xx/Kconfig       |  8 ++++++++
->  arch/arm/mach-s5pv210/Kconfig       |  1 +
->  arch/arm64/Kconfig.platforms        | 12 +++---------
->  arch/arm64/boot/dts/exynos/Makefile |  2 +-
->  arch/arm64/configs/defconfig        |  2 +-
->  drivers/clk/Kconfig                 |  2 +-
->  drivers/clk/samsung/Kconfig         | 14 +++++++++-----
->  drivers/clk/samsung/Makefile        |  4 ++--
->  10 files changed, 28 insertions(+), 19 deletions(-)
-> 
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index d92d65549406..c1b052f7b68c 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -1560,32 +1560,6 @@ static irqreturn_t dma_ccerr_handler(int irq, void *data)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static void edma_tc_set_pm_state(struct edma_tc *tc, bool enable)
+-{
+-	struct platform_device *tc_pdev;
+-	int ret;
+-
+-	if (!IS_ENABLED(CONFIG_OF) || !tc)
+-		return;
+-
+-	tc_pdev = of_find_device_by_node(tc->node);
+-	if (!tc_pdev) {
+-		pr_err("%s: TPTC device is not found\n", __func__);
+-		return;
+-	}
+-	if (!pm_runtime_enabled(&tc_pdev->dev))
+-		pm_runtime_enable(&tc_pdev->dev);
+-
+-	if (enable)
+-		ret = pm_runtime_get_sync(&tc_pdev->dev);
+-	else
+-		ret = pm_runtime_put_sync(&tc_pdev->dev);
+-
+-	if (ret < 0)
+-		pr_err("%s: pm_runtime_%s_sync() failed for %s\n", __func__,
+-		       enable ? "get" : "put", dev_name(&tc_pdev->dev));
+-}
+-
+ /* Alloc channel resources */
+ static int edma_alloc_chan_resources(struct dma_chan *chan)
+ {
+@@ -1622,8 +1596,6 @@ static int edma_alloc_chan_resources(struct dma_chan *chan)
+ 		EDMA_CHAN_SLOT(echan->ch_num), chan->chan_id,
+ 		echan->hw_triggered ? "HW" : "SW");
+ 
+-	edma_tc_set_pm_state(echan->tc, true);
+-
+ 	return 0;
+ 
+ err_slot:
+@@ -1660,7 +1632,6 @@ static void edma_free_chan_resources(struct dma_chan *chan)
+ 		echan->alloced = false;
+ 	}
+ 
+-	edma_tc_set_pm_state(echan->tc, false);
+ 	echan->tc = NULL;
+ 	echan->hw_triggered = false;
+ 
+@@ -2369,10 +2340,8 @@ static int edma_pm_suspend(struct device *dev)
+ 	int i;
+ 
+ 	for (i = 0; i < ecc->num_channels; i++) {
+-		if (echan[i].alloced) {
++		if (echan[i].alloced)
+ 			edma_setup_interrupt(&echan[i], false);
+-			edma_tc_set_pm_state(echan[i].tc, false);
+-		}
+ 	}
+ 
+ 	return 0;
+@@ -2402,8 +2371,6 @@ static int edma_pm_resume(struct device *dev)
+ 
+ 			/* Set up channel -> slot mapping for the entry slot */
+ 			edma_set_chmap(&echan[i], echan[i].slot[0]);
+-
+-			edma_tc_set_pm_state(echan[i].tc, true);
+ 		}
+ 	}
+ 
+@@ -2427,7 +2394,8 @@ static struct platform_driver edma_driver = {
+ 
+ static int edma_tptc_probe(struct platform_device *pdev)
+ {
+-	return 0;
++	pm_runtime_enable(&pdev->dev);
++	return pm_runtime_get_sync(&pdev->dev);
+ }
+ 
+ static struct platform_driver edma_tptc_driver = {
+-- 
+2.7.0
