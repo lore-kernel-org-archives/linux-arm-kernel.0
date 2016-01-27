@@ -1,158 +1,111 @@
-From: xuejiancheng@huawei.com (xuejiancheng)
-Date: Wed, 27 Jan 2016 11:28:14 +0800
-Subject: [PATCH v7 1/6] clk: hisilicon: add CRG driver for hi3519 soc
-In-Reply-To: <1453771063.17181.56.camel@tiscali.nl>
-References: <1453690883-31220-1-git-send-email-xuejiancheng@huawei.com>
- <1453690883-31220-2-git-send-email-xuejiancheng@huawei.com>
- <1453771063.17181.56.camel@tiscali.nl>
-Message-ID: <56A8394E.2040207@huawei.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 27 Jan 2016 00:36:36 -0300
+Subject: [PATCH v4 00/10] rtc: max77686: Extend driver and add max77802 support
+Message-ID: <1453865806-4661-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul Bolle?
-   Thank you for your reply.
+Hello,
 
-On 2016/1/26 9:17, Paul Bolle wrote:
-> On ma, 2016-01-25 at 11:01 +0800, Jiancheng Xue wrote:
->> --- a/drivers/clk/hisilicon/Kconfig
->> +++ b/drivers/clk/hisilicon/Kconfig
-> 
->> +config COMMON_CLK_HI3519
->> +	bool "Hi3519 Clock Driver"
->> +	depends on ARCH_HISI
->> +	default y
->> +	help
->> +	  Build the clock driver for hi3519.
-> 
->> --- a/drivers/clk/hisilicon/Makefile
->> +++ b/drivers/clk/hisilicon/Makefile
-> 
->> +obj-$(CONFIG_COMMON_CLK_HI3519)	+= clk-hi3519.o
-> 
-> If I parsed the above correctly clk-hi3519.o can only be built-in,
-> right?
-> 
-Yes. You are right.
+On a recent disussion [0] with Krzysztof Kozlowski and Laxman Dewangan,
+we came to the conclusion that the max77686 and max77802 RTC are almost
+the same with only a few differences so there shouldn't be two separate
+drivers and is better to extend max77686 driver and delete rtc-max77802.
 
-But this clock driver should be able to be compiled as a module.
-Even though it is preferred to be built-in.
+By making the driver more generic, other RTC IP blocks from Maxim PMICs
+could be supported as well like the max77620.
 
-I'll fix it in next version. Thank you.
+This is a v4 of a series that do this, that address issues pointed out
+in the latest version. The v1, v2 and v3 can be found at [1], [2], [3].
 
-Regards,
+I've tested this patch-set on an Exynos5800 Peach Pi Chromebook that has
+a max77802 PMIC and the RTC was working correctly. Krzysztof Kozlowski
+tested v3 on an max77686 but this version only has cosmetic changes so
+it should not cause any functionality changes.
 
-Jiancheng
+[0]: http://www.spinics.net/lists/devicetree/msg110348.html
+[1]: https://lwn.net/Articles/672568/
+[2]: https://lkml.org/lkml/2016/1/25/767
+[3]: https://lkml.org/lkml/2016/1/26/787
 
->> --- /dev/null
->> +++ b/drivers/clk/hisilicon/clk-hi3519.c
-> 
->> +#include <linux/module.h>
-> 
-> So is this include actually needed?
-> 
->> +static int hi3519_clk_probe(struct platform_device *pdev)
->> +{
->> +       struct device_node *np = pdev->dev.of_node;
->> +       struct hisi_clock_data *clk_data;
->> +
->> +       clk_data = hisi_clk_init(np, HI3519_NR_CLKS);
->> +       if (!clk_data)
->> +               return -ENODEV;
->> +
->> +       hisi_clk_register_fixed_rate(hi3519_fixed_rate_clks,
->> +                                   
->> ARRAY_SIZE(hi3519_fixed_rate_clks),
->> +                                    clk_data);
->> +       hisi_clk_register_mux(hi3519_mux_clks,
->> ARRAY_SIZE(hi3519_mux_clks),
->> +                                       clk_data);
->> +       hisi_clk_register_gate(hi3519_gate_clks,
->> +                       ARRAY_SIZE(hi3519_gate_clks), clk_data);
->> +
->> +       return hisi_reset_init(np);
->> +}
-> 
-> (evolution 3.16.5 makes replying to code quite a challenge.)
-> 
->> +static const struct of_device_id hi3519_clk_match_table[] = {
->> +	{ .compatible = "hisilicon,hi3519-crg" },
->> +	{ }
->> +};
->> +MODULE_DEVICE_TABLE(of, hi3519_clk_match_table);
-> 
-> Last time I checked MODULE_DEVICE_TABLE is preprocessed away for built
-> -in code.
-> 
->> +static void __exit hi3519_clk_exit(void)
->> +{
->> +	platform_driver_unregister(&hi3519_clk_driver);
->> +}
->> +module_exit(hi3519_clk_exit);
-> 
-> Not needed for built-in only code.
-> 
->> +MODULE_DESCRIPTION("HiSilicon Hi3519 Clock Driver");
-> 
-> Ditto.
-> 
->> --- a/drivers/clk/hisilicon/clk.c
->> +++ b/drivers/clk/hisilicon/clk.c
-> 
->> +EXPORT_SYMBOL(hisi_clk_init);
-> 
-> What module uses this export?
->  
->> +EXPORT_SYMBOL(hisi_clk_register_fixed_rate);
-> 
-> Ditto.
-> 
->> +EXPORT_SYMBOL(hisi_clk_register_fixed_factor);
-> 
-> Ditto.
->  
->> +EXPORT_SYMBOL(hisi_clk_register_mux);
-> 
-> Ditto.
-> 
->> +EXPORT_SYMBOL(hisi_clk_register_divider);
-> 
-> Ditto.
-> 
->> +EXPORT_SYMBOL(hisi_clk_register_gate);
-> 
-> Ditto.
-> 
->> +EXPORT_SYMBOL(hisi_clk_register_gate_sep);
-> 
-> Ditto.
-> 
->> --- /dev/null
->> +++ b/drivers/clk/hisilicon/reset.c
-> 
->> +int hisi_reset_init(struct device_node *np)
->> +{
->> +	[...]
->> +}
->> +EXPORT_SYMBOL(hisi_reset_init);
-> 
-> Ditto.
-> 
->> --- /dev/null
->> +++ b/drivers/clk/hisilicon/reset.h
-> 
->> +#ifdef CONFIG_RESET_CONTROLLER
->> +int hisi_reset_init(struct device_node *np);
->> +#else
->> +static inline int hisi_reset_init(struct device_node *np)
->> +{
->> +	return 0;
->> +}
->> +#endif
-> 
-> Thanks,
-> 
-> 
-> Paul Bolle
-> 
-> .
-> 
+Changes in v4:
+- Add Andi Shyti's Reviewed-by to patch #1.
+- Add Andi Shyti's Reviewed-by to patch #2.
+- Add Andi Shyti's Reviewed-by to patch #3.
+- Add Andi Shyti's Reviewed-by to patch #4.
+- Add Krzysztof Kozlowski's Reviewed-by and Tested-by tags to patch #4.
+- Add Krzysztof Kozlowski's Reviewed-by and Tested-by tags to patch #5.
+- Add Krzysztof Kozlowski's Tested-by tag to patch #6.
+- Add Andi Shyti's Reviewed-by tag to patch #6.
+- Reverse alarm enable reg check logic. Suggeted by Krzysztof Kozlowski.
+- Return early to avoid an else statement. Suggested by Andi Shyti.
+- Use dev_err() instead of dev_warn() and change message.
+  Suggested by Krzysztof Kozlowski and Andi Shyti.
+- Change subject line and commit message of patch #7.
+- Removed Laxman Dewangan's Acked-by tag since the patch changed.
+- Add Krzysztof Kozlowski's Tested-by tag to patch #8.
+- Add Andi Shyti's Reviewed-by tag to patch #8.
+
+Changes in v3:
+- Add Krzysztof Kozlowski's Reviewed-by and Tested-by to patch #1.
+- Add Laxman Dewangan's Acked-by tag to patch #1.
+- Add Krzysztof Kozlowski's Tested-by tag to patch #2.
+- Add Laxman Dewangan's Acked-by tag to patch #2.
+- Use ARRAY_SIZE() in all places. Suggested by Laxman Dewangan.
+- Add Krzysztof Kozlowski's Tested-by tag to patch #3.
+- Add Laxman Dewangan's Acked-by tag to patch #3.
+- Fix max77686 delay. Suggested by Krzysztof Kozlowski.
+- Assign mask to u8 instead of int. Suggested by Krzysztof Kozlowski.
+- Add Laxman Dewangan's Acked-by tag to patch #4.
+- Add Laxman Dewangan's Acked-by tag to patch #5.
+- Add Laxman Dewangan's Acked-by tag to patch #6.
+- Add Laxman Dewangan's Acked-by tag to patch #7.
+- Add Laxman Dewangan's Acked-by tag to patch #8.
+
+Changes in v2:
+- Add Krzysztof Kozlowski's Reviewed-by tag to patch #2.
+- Add Krzysztof Kozlowski's Reviewed-by tag to patch #3.
+- Fix typo error in changelog. Suggested by Krzysztof Kozlowski.
+- Add a max77686 prefix to rtc_driver_data. Suggested by Krzysztof Kozlowski.
+- Comment about the .delay and .mask fields. Suggested by Krzysztof Kozlowski.
+- Change .mask type to u8. Suggested by Krzysztof Kozlowski.
+- Make .drv_data field const. Suggested by Krzysztof Kozlowski.
+- Don't cast to drop const on .drv_data asign. Suggested by Krzysztof Kozlowski.
+- Use platform_get_device_id() macro. Suggested by Krzysztof Kozlowski.
+- Rename rtc_reg to max77686_rtc_reg_offset. Suggested by Krzysztof Kozlowski.
+- Comment what's mapped by max77686_map. Suggested by Krzysztof Kozlowski.
+- Use max77686_map array indexes in init. Suggested by Krzysztof Kozlowski.
+- Remove REG_RTC_UPDATE1 since is not used by neither max77686 nor max77802.
+- Add a MAX77802 prefix to ALARM_ENABLE_VALUE. Suggested by Krzysztof Kozlowski.
+- Rename .rtcae to .alarm_enable_reg and .rtcrm to .separate_i2c_addr.
+  Suggested by Krzysztof Kozlowski.
+- Don't use func and LINE in error messages. Suggested by Krzysztof Kozlowski.
+- Remove REG_RTC_AE2 since is not used by neither max77686 nor max77802.
+- Check if REG_RTC_AE1 has a valid address before accessing it.
+- Add Krzysztof Kozlowski's Reviewed-by tag to patch #8.
+- Add Krzysztof Kozlowski's Reviewed-by tag to patch #9.
+- Add Krzysztof Kozlowski's Reviewed-by tag to patch #10.
+
+Javier Martinez Canillas (10):
+  rtc: max77686: Fix max77686_rtc_read_alarm() return value
+  rtc: max77686: Use ARRAY_SIZE() instead of current array length
+  rtc: max77686: Use usleep_range() instead of msleep()
+  rtc: max77686: Use a driver data struct instead hard-coded values
+  rtc: max77686: Add an indirection level to access RTC registers
+  rtc: max77686: Add max77802 support
+  rtc: max77686: Fix unsupported year message
+  rtc: Remove Maxim 77802 driver
+  ARM: exynos_defconfig: Remove MAX77802 RTC Kconfig symbol
+  ARM: multi_v7_defconfig: Remove MAX77802 RTC Kconfig symbol
+
+ arch/arm/configs/exynos_defconfig   |   1 -
+ arch/arm/configs/multi_v7_defconfig |   1 -
+ drivers/rtc/Kconfig                 |  10 -
+ drivers/rtc/Makefile                |   1 -
+ drivers/rtc/rtc-max77686.c          | 325 ++++++++++++++++++-----
+ drivers/rtc/rtc-max77802.c          | 502 ------------------------------------
+ 6 files changed, 264 insertions(+), 576 deletions(-)
+ delete mode 100644 drivers/rtc/rtc-max77802.c
+
+-- 
+2.5.0
