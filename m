@@ -1,39 +1,62 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 27 Jan 2016 11:56:13 +0100
-Subject: noise issues when recording sound on i.MX28
-Message-ID: <20160127105613.GC13664@pengutronix.de>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 27 Jan 2016 11:58:17 +0100
+Subject: Serial ports with non connected RTS/CTS
+In-Reply-To: <56A89C48.1040604@parkeon.com>
+References: <56A89C48.1040604@parkeon.com>
+Message-ID: <20160127115817.79e384b1@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-I currently work with an i.MX28 based machine and occasionally when
-recording sound with arecord but no microphone connected the result
-contains much noise.
+On Wed, 27 Jan 2016 11:30:32 +0100 Martin Fuzzey wrote:
+> Hi all,
+> 
+> currently, at least for 8250 based serial ports using of_serial, there 
+> is no way of indicating that the RTS / CTS lines, although supported by 
+> the UART, are not actually connected on the board.
+> 
+> This means that userspace needs to know about this and not use the 
+> CRTSCTS termios flag (otherwise no data is sent).
+> 
+> This is currently the case for Debian stattach for example (nettools 
+> 1.60) which unconditionally uses CRTSCTS (but the busybox version of 
+> slattach has a "-F" option that can be used to disable CRTSCTS).
+> 
+> Would it not be better to allow this situation to be described in the 
+> device tree?
+> 
+> Such an option already exists for the imx UART (""fsl,uart-has-rtscts")
+> 
+> of_serial already has the "auto-flow-control" DT property but, as stated 
+> in the documentation:
+>      "The  driver is allowed to detect support for the capability even 
+> without this  property."
+> 
+> In the past there was a (since reverted) property "has-hw-flow-control"
+> See
+>      06aa82e "serial: uart: add hw flow control support configuration"
+>      a6eec92 " Revert "serial: uart: add hw flow control support 
+> configuration"
+> 
+> However that just provided another (redundant) way of *activating* 
+> hardware flow control and did not allow it to be disactivated.
+> 
+> Would a new DT property "no-rtscts" to do this be acceptable?
+> 
+> I think it would have to be a negative property to avoid breaking old 
+> device trees.
+> 
+> Since there seems to have been some to and fro on this issue I thought 
+> it would be a good idea to discuss before writing the patch...
+> 
+If a driver has no support for RTS/CTS (e.g. due to the missing
+fsl,uart-has-rtscts property for i.MX UARTs) then trying to enable HW
+flowcontrol via the TCETS ioctl should fail (as is the case with the
+i.MX serial driver).
+Thus it should be impossible to enable crtscts if the serial driver has
+no RTC/CTS support without any need for userspace to know about the
+HW details.
 
-I found commits
 
-	90ce77d4468e ENGR00285446-3 [MX28] SAIF: Bit Shift in SAIF RX Data
-	1ea685a12f19 ENGR00285446-2 [MX28] SAIF: Bit Shift in SAIF RX Data
-	1ca899221d8b ENGR00285446-1 [MX28] SAIF: Bit Shift in SAIF RX Data
-
-in the Freescale vendor kernel (branch imx_2.6.35_maintain at
-git://git.freescale.com/imx/linux-2.6-imx.git). The kernel running on
-the machine in question is based on 3.10 with an impressive (that's
-negative) patch stack on top. I think patches -2 and -3 are not relevant
-for my setup because the two saif clocks are configured identically if
-I'm not mistaken. However implementing the soft reset as is done in
-patch -1 doesn't work here. When resetting saif1 (that is used for
-recording with saif0 being it's master) the CLKGATE bit gets never set
-and when breaking out of the loop the noise issue happend 5 out of 5
-test runs in the first iteration.
-
-Does this ring a bell for you? Even if there is something bad hidden in
-the patch stack (or 3.10?) a reset should never fail, right?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Lothar Wa?mann
