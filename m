@@ -1,45 +1,41 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Wed, 27 Jan 2016 15:17:52 +0300
-Subject: [PATCH 0/3] ACPI: parse the SPCR table
-In-Reply-To: <56A6494E.3090303@hurleysoftware.com>
-References: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>
- <56A6494E.3090303@hurleysoftware.com>
-Message-ID: <56A8B570.2060501@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Jan 2016 13:23:27 +0100
+Subject: Speeding up dma_unmap
+In-Reply-To: <CAJFSRaCRvx=+_fEYAr8OeWGHnnz+rOWjLzLcm+wZiEstbHwxAw@mail.gmail.com>
+References: <CAJFSRaCRvx=+_fEYAr8OeWGHnnz+rOWjLzLcm+wZiEstbHwxAw@mail.gmail.com>
+Message-ID: <3526786.axKPs51069@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 01/25/2016 07:11 PM, Peter Hurley wrote:
-> On 01/25/2016 03:45 AM, Aleksey Makarov wrote:
->> This patchset is based on the patchset by Leif Lindholm [1]
->>
->> 'ARM Server Base Boot Requirements' [2] mention SPCR 
->> (Serial Port Console Redirection Table) [3] as a mandatory
->> ACPI table that specifies the configuration of serial console.
->>
->> Licensing concerns have prevented implementing it in the past, but as of
->> 10 August 2015, these tables have both been released also under 
->> OWF 1.0 [4].
+On Wednesday 27 January 2016 00:32:56 Jason Holt wrote:
 > 
-> This license has a patent retaliation provision, which makes it
-> incompatible with GPLv2.
-> 
-> *If the license applies to this code*, then this patch set does not
-> meet the criteria for submission.
+> Failing that, I suppose a very dirty hack would be to
+> data_cache_clean_and_invalidate if the only thing I cared about was
+> getting data from my DMA peripheral as fast as possible.  (I'm on
+> AM335X and seeing no more than 200MB/s from device to CPU with
+> dma_unmap_single, whereas the PRUs can write to main memory at
+> 600MB/s.)
 
-The license applies not to this code but to the document describing the tables.
+On your Cortex-A8, we could come up with a way to not invalidate
+the cache at all on unmap, as the comment in __dma_page_dev_to_cpu()
+says:
 
-Here is an excerpt from it:
+        /* FIXME: non-speculating: not required */
+        /* in any case, don't bother invalidating if DMA to device */
+        if (dir != DMA_TO_DEVICE) {
+                outer_inv_range(paddr, paddr + size);
 
-  Patent Notice:
-  Microsoft is making certain patent rights available for implementations of this specification under two options:
-  1)  Microsoft?s Community Promise, available at
-  http://www.microsoft.com/openspecifications/en/us/programs/community-promise/default.aspx; or
-  2)  The Open Web Foundation Final Specification Agreement Version 1.0 ("OWF 1.0")
-  as of October 1, 2012, available at http://www.openwebfoundation.org/legal/the-owf-1-0-agreements/owfa-1-0. 
+                dma_cache_maint_page(page, off, size, dir, dmac_unmap_area);
+        }
 
-I believe that it means that the patch set meets the criteria for submission.  Am I right?
 
-Thank you
-Aleksey Makarov
+We already do a cache-invalidate operation on dma_map(), and the kernel
+is not allowed to access the memory in the meantime. On CPU cores
+that do speculative prefetching (Cortex-A9 and higher), we may end
+up reading cache lines back in randomly on a speculative prefetch,
+but as far as I can tell, the Cortex-A8 (or A5/A7) won't do that.
+
+How does the performance change if you hack that file to simply not
+do the invalidate?
+
+	Arnd
