@@ -1,54 +1,59 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 26 Jan 2016 19:39:20 -0500
-Subject: [PATCH v6 0/5] dma-mapping: Patches for speeding up allocation
-In-Reply-To: <20160126155937.6a4e4165d1cf4e513d62e942@linux-foundation.org>
-References: <1452533428-12762-1-git-send-email-dianders@chromium.org>
- <20160126155937.6a4e4165d1cf4e513d62e942@linux-foundation.org>
-Message-ID: <CAD=FV=V9ZJrmD=F8363mhg8+JQiTRg=g6DuZR2KJRbfU=K455w@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 26 Jan 2016 16:40:25 -0800
+Subject: [RESEND PATCH v2] ARM: debug: add support for Palmchip BK-310x
+ UART
+In-Reply-To: <569CA203.6050001@sigmadesigns.com> (Marc Gonzalez's message of
+ "Mon, 18 Jan 2016 09:27:47 +0100")
+References: <569CA203.6050001@sigmadesigns.com>
+Message-ID: <7h60yfn9c6.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 
-On Tue, Jan 26, 2016 at 3:59 PM, Andrew Morton
-<akpm@linux-foundation.org> wrote:
-> On Mon, 11 Jan 2016 09:30:22 -0800 Douglas Anderson <dianders@chromium.org> wrote:
+> From: Mans Rullgard <mans@mansr.com>
 >
->> This series of patches will speed up memory allocation in dma-mapping
->> quite a bit.
+> Some SoCs use a Palmchip BK-310x UART which is mostly 16550 compatible
+> but with a different register layout.
+
+... because UART register layout is where we really need innovation. ;)
+
+> While this UART has previously
+> only been supported in MIPS based chips (Alchemy, Ralink), the ARM based
+> SMP87xx series from Sigma Designs also uses it.
 >
-> This is pretty much all ARM and driver stuff so I think I'll duck it.
-> But I can merge it if nobody else feels a need to.
+> This patch allows the debug console to work with this type of UART.
+>
+> Signed-off-by: Mans Rullgard <mans@mansr.com>
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 
-I was going to ask what the next steps were for this series.
-Presumably I could post the patch to Russell's patch tracker if folks
-want me to do that.  Alternatively it could go through the ARM-SOC
-tree?
+It appears this was previously acked by Arnd also?  https://lkml.org/lkml/2015/11/9/116
 
+> ---
+> Peter, this is the patch I've been using on Tango for earlyprintk support.
+> arm-soc, this is just the Nov 8 patch with my Signed-off-by tag.
+> ---
+>  arch/arm/Kconfig.debug            |  9 +++++++++
+>  arch/arm/include/debug/palmchip.S | 11 +++++++++++
+>  2 files changed, 20 insertions(+)
+>  create mode 100644 arch/arm/include/debug/palmchip.S
+>
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 259c0ca9c99a..708aa9150c00 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -1304,6 +1304,7 @@ config DEBUG_SIRFSOC_UART
+>  config DEBUG_LL_INCLUDE
+>  	string
+>  	default "debug/sa1100.S" if DEBUG_SA1100
+> +	default "debug/palmchip.S" if DEBUG_UART_8250_PALMCHIP
 
-> I saw a few acked-by/tested-by/etc from the v5 posting which weren't
-> carried over into v6 (might have been a timing race), so please fix
-> that up if there's an opportunity.
+minor nit: We're trying (not always with great success) to keep various
+parts of this file sorted alphanumerically.  Can you please insert the
+new entries accordingly?
 
-Right.  Both Robin and Tomasz gave their Reviewed-by to Patch #1 in v5
-even after v6 was posted.
+Otherwise looks good to me,
 
+Acked-by: Kevin Hilman <khilman@baylibre.com>
 
-> Regarding the new DMA_ATTR_ALLOC_SINGLE_PAGES hint: I suggest adding
-> "DMA_ATTR_ALLOC_SINGLE_PAGES is presently implemented only on ARM" to
-> the docs.  Or perhaps have a shot at implementing it elsewhere.
-
-Warning sounds good.
-
-
-> Typo in 4/5 changelog: "reqiurements"
-
-Thanks for catching!
-
-
-I'm happy to post up a v6 with these things fixed or I'm happy for
-whoever is applying it to make these small fixes themselves.  Any
-volunteers?  Olof, Arnd, or Russell: any of you want these patches?
-
-
--Doug
+Kevin
