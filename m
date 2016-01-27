@@ -1,28 +1,67 @@
-From: jcmvbkbc@gmail.com (Max Filippov)
-Date: Wed, 27 Jan 2016 07:33:30 +0300
-Subject: [PATCH 09/15] xtensa: use of_platform_default_populate() to
- populate default bus
-In-Reply-To: <1453868872-26300-10-git-send-email-wangkefeng.wang@huawei.com>
-References: <1453868872-26300-1-git-send-email-wangkefeng.wang@huawei.com>
- <1453868872-26300-10-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <CAMo8Bf+KhgFEGuF3+9+_KbF=FM+SRFRojLowLXVhEeoXZHpXnQ@mail.gmail.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Wed, 27 Jan 2016 13:03:09 +0800
+Subject: [PATCH] ARM: dts: rockchip: add the leds control for kylin board
+Message-ID: <1453870989-6999-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 7:27 AM, Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
-> Use helper of_platform_default_populate() in linux/of_platform
-> when possible, instead of calling of_platform_populate() with
-> the default match table.
->
-> Cc: Chris Zankel <chris@zankel.net>
-> Cc: Max Filippov <jcmvbkbc@gmail.com>
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> ---
->  arch/xtensa/kernel/setup.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+As the kylin schematic drawing, add the needed work led for
+kylin board.
 
-Acked-by: Max Filippov <jcmvbkbc@gmail.com>
+Run:
+ucho 0 > /sys/class/leds/kylin:red:led/brightness
+echo 1 > /sys/class/leds/kylin:red:led/brightness
 
+The led can be normall on/off on kylin board.
+
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+
+---
+
+Hi Heiko,
+
+Describing the content:
+- This patch is based on your v4.6-clk/next branch.
+- Verified on
+  https://github.com/Caesar-github/rockchip/commits/kylin/next.
+
+ arch/arm/boot/dts/rk3036-kylin.dts | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rk3036-kylin.dts b/arch/arm/boot/dts/rk3036-kylin.dts
+index 190f22c..3332a7f 100644
+--- a/arch/arm/boot/dts/rk3036-kylin.dts
++++ b/arch/arm/boot/dts/rk3036-kylin.dts
+@@ -46,6 +46,17 @@
+ 	model = "Rockchip RK3036 KylinBoard";
+ 	compatible = "rockchip,rk3036-kylin", "rockchip,rk3036";
+ 
++	leds: gpio-leds {
++		compatible = "gpio-leds";
++
++		work {
++			gpios = <&gpio2 30 GPIO_ACTIVE_HIGH>;
++			label = "kylin:red:led";
++			pinctrl-names = "default";
++			pinctrl-0 = <&led_ctl>;
++		};
++	};
++
+ 	sdio_pwrseq: sdio-pwrseq {
+ 		compatible = "mmc-pwrseq-simple";
+ 		pinctrl-names = "default";
+@@ -359,6 +370,12 @@
+ };
+ 
+ &pinctrl {
++	leds {
++		led_ctl: led-ctl {
++			rockchip,pins = <2 30 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
+ 	pmic {
+ 		pmic_int: pmic-int {
+ 			rockchip,pins = <2 2 RK_FUNC_GPIO &pcfg_pull_default>;
 -- 
-Thanks.
--- Max
+1.9.1
