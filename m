@@ -1,67 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Jan 2016 16:57:23 +0100
-Subject: [PATCH 7/7] scsi_dh: force modular build if SCSI is a module
-In-Reply-To: <1453910247-3447628-1-git-send-email-arnd@arndb.de>
-References: <1453910247-3447628-1-git-send-email-arnd@arndb.de>
-Message-ID: <1453910247-3447628-8-git-send-email-arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 27 Jan 2016 17:04:47 +0100
+Subject: [PATCH 7/9] net: macb: avoid uninitialized variables
+In-Reply-To: <56A8E788.5020802@atmel.com>
+References: <1453903507-3427225-1-git-send-email-arnd@arndb.de>
+ <1453903507-3427225-8-git-send-email-arnd@arndb.de>
+ <56A8E788.5020802@atmel.com>
+Message-ID: <56A8EA9F.6070404@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the scsi_dh core was moved into the scsi core module,
-CONFIG_SCSI_DH became a 'bool' option, and now anything depending
-on it can be built-in even when CONFIG_SCSI=m. This of course
-cannot link successfully:
+Le 27/01/2016 16:51, Nicolas Ferre a ?crit :
+> Le 27/01/2016 15:04, Arnd Bergmann a ?crit :
+>> The macb_clk_init function returns three clock pointers, unless
+>> the it fails to get the first ones. We correctly handle the
+>> failure case by propagating the error from macb_probe, but
+>> gcc does not realize this and incorrectly warns about a later
+>> use of those:
+>>
+>> In file included from /git/arm-soc/drivers/net/ethernet/cadence/macb.c:12:0:
+>> drivers/net/ethernet/cadence/macb.c: In function 'macb_probe':
+>> include/linux/clk.h:484:2: error: 'tx_clk' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+>>   clk_disable(clk);
+>>   ^
+>> drivers/net/ethernet/cadence/macb.c:2822:28: note: 'tx_clk' was declared here
+>>   struct clk *pclk, *hclk, *tx_clk;
+>>                             ^
+>> In file included from /git/arm-soc/drivers/net/ethernet/cadence/macb.c:12:0:
+>> include/linux/clk.h:484:2: error: 'hclk' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+>>   clk_disable(clk);
+>>   ^
+>> drivers/net/ethernet/cadence/macb.c:2822:21: note: 'hclk' was declared here
+>>   struct clk *pclk, *hclk, *tx_clk;
+>>                      ^
+>>
+>> This shuts up the misleading warnings by ensuring that the
+>> macb_clk_init() always stores something into all three pointers.
+>>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Okay Arnd, thanks!
+> 
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-drivers/scsi/built-in.o: In function `rdac_init':
-scsi_dh_alua.c:(.init.text+0x14): undefined reference to `scsi_register_device_handler'
-scsi_dh_alua.c:(.init.text+0x64): undefined reference to `scsi_unregister_device_handler'
-drivers/scsi/built-in.o: In function `alua_init':
-scsi_dh_alua.c:(.init.text+0xb0): undefined reference to `scsi_register_device_handler'
+Oh, crap: actually this warning has just been fixed by Sudip Mukherjee
+and is already queued by David here:
+https://patchwork.ozlabs.org/patch/572610/
 
-As a workaround, this adds an extra dependency on CONFIG_SCSI,
-so Kconfig can figure out whether built-in is allowed or not.
+So, sorry, I've shot too fast: NACK...
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 086b91d052eb ("scsi_dh: integrate into the core SCSI code")
----
- drivers/scsi/device_handler/Kconfig | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Bye,
 
-diff --git a/drivers/scsi/device_handler/Kconfig b/drivers/scsi/device_handler/Kconfig
-index e5647d59224f..0b331c9c0a8f 100644
---- a/drivers/scsi/device_handler/Kconfig
-+++ b/drivers/scsi/device_handler/Kconfig
-@@ -13,13 +13,13 @@ menuconfig SCSI_DH
- 
- config SCSI_DH_RDAC
- 	tristate "LSI RDAC Device Handler"
--	depends on SCSI_DH
-+	depends on SCSI_DH && SCSI
- 	help
- 	If you have a LSI RDAC select y. Otherwise, say N.
- 
- config SCSI_DH_HP_SW
- 	tristate "HP/COMPAQ MSA Device Handler"
--	depends on SCSI_DH
-+	depends on SCSI_DH && SCSI
- 	help
- 	If you have a HP/COMPAQ MSA device that requires START_STOP to
- 	be sent to start it and cannot upgrade the firmware then select y.
-@@ -27,13 +27,13 @@ config SCSI_DH_HP_SW
- 
- config SCSI_DH_EMC
- 	tristate "EMC CLARiiON Device Handler"
--	depends on SCSI_DH
-+	depends on SCSI_DH && SCSI
- 	help
- 	If you have a EMC CLARiiON select y. Otherwise, say N.
- 
- config SCSI_DH_ALUA
- 	tristate "SPC-3 ALUA Device Handler"
--	depends on SCSI_DH
-+	depends on SCSI_DH && SCSI
- 	help
- 	  SCSI Device handler for generic SPC-3 Asymmetric Logical Unit
- 	  Access (ALUA).
+>> ---
+>>  drivers/net/ethernet/cadence/macb.c | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+>> index 9d9984a87d42..d3aa74f9db79 100644
+>> --- a/drivers/net/ethernet/cadence/macb.c
+>> +++ b/drivers/net/ethernet/cadence/macb.c
+>> @@ -2268,6 +2268,7 @@ static int macb_clk_init(struct platform_device *pdev, struct clk **pclk,
+>>  {
+>>  	int err;
+>>  
+>> +	*tx_clk = *hclk = NULL;
+>>  	*pclk = devm_clk_get(&pdev->dev, "pclk");
+>>  	if (IS_ERR(*pclk)) {
+>>  		err = PTR_ERR(*pclk);
+>>
+> 
+> 
+
+
 -- 
-2.7.0
+Nicolas Ferre
