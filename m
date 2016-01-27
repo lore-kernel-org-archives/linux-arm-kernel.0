@@ -1,54 +1,64 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 27 Jan 2016 15:08:12 +0800
-Subject: [PATCH 01/15] arm: use of_platform_default_populate() to
- populate default bus
-In-Reply-To: <1453868872-26300-2-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <201601271506.AiWVACC3%fengguang.wu@intel.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Wed, 27 Jan 2016 15:12:15 +0800
+Subject: [PATCH v3 05/12] arm64, acpi, numa: NUMA support based on SRAT
+ and SLIT
+In-Reply-To: <20160125102148.GE24726@rric.localdomain>
+References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
+ <1453541967-3744-6-git-send-email-guohanjun@huawei.com>
+ <20160125102148.GE24726@rric.localdomain>
+Message-ID: <56A86DCF.1020205@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kefeng,
+On 2016/1/25 18:21, Robert Richter wrote:
+> On 23.01.16 17:39:20, Hanjun Guo wrote:
+>> diff --git a/arch/arm64/kernel/acpi_numa.c b/arch/arm64/kernel/acpi_numa.c
+>> new file mode 100644
+>> index 0000000..f7f7533
+>> --- /dev/null
+>> +++ b/arch/arm64/kernel/acpi_numa.c
+>> +/* Callback for parsing of the Proximity Domain <-> Memory Area mappings */
+>> +int __init acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
+>> +{
+>> +	u64 start, end;
+>> +	int node, pxm;
+>> +
+>> +	if (srat_disabled())
+>> +		return -EINVAL;
+>> +
+>> +	if (ma->header.length != sizeof(struct acpi_srat_mem_affinity)) {
+> Must be:
+>
+> 	ma->header.length < sizeof(struct acpi_srat_mem_affinity)) {
+>
+> Allow extensions to struct acpi_srat_mem_affinity in newer versions.
 
-[auto build test ERROR on v4.5-rc1]
-[cannot apply to arm-soc/for-next next-20160127]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Hmm, I think we need to remove the check here now.
 
-url:    https://github.com/0day-ci/linux/commits/Kefeng-Wang/use-of_platform_default_populate-to-populate-default-bus/20160127-123512
-config: arm-at91_dt_defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+There are three cases:
 
-All errors (new ones prefixed by >>):
+ - firmware ACPI version is consistent with the ACPICA one, then
+   ma->header.length == sizeof(struct acpi_srat_mem_affinity )
 
-   arch/arm/mach-at91/at91rm9200.c: In function 'at91rm9200_dt_device_init':
->> arch/arm/mach-at91/at91rm9200.c:34:2: error: implicit declaration of function 'of_platform__default_populate' [-Werror=implicit-function-declaration]
-     of_platform__default_populate(NULL, NULL, soc_dev);
-     ^
-   cc1: some warnings being treated as errors
+ - firmware ACPI version is not consistent with the ACPICA one,
+   for example, struct acpi_srat_mem_affinity is extended in
+   new ACI version, but the formware is using the older one,
+  then it's ok to use
+  ma->header.length < sizeof(struct acpi_srat_mem_affinity )
 
-vim +/of_platform__default_populate +34 arch/arm/mach-at91/at91rm9200.c
+ - but if we use the older kernel + updated new firmware,
+   then
+   ma->header.length > sizeof(struct acpi_srat_mem_affinity )
+  will be the case, right?
 
-    28		struct device *soc_dev = NULL;
-    29	
-    30		soc = at91_soc_init(rm9200_socs);
-    31		if (soc != NULL)
-    32			soc_dev = soc_device_to_device(soc);
-    33	
-  > 34		of_platform__default_populate(NULL, NULL, soc_dev);
-    35	
-    36		arm_pm_idle = at91rm9200_idle;
-    37		at91rm9200_pm_init();
+>
+>> +		bad_srat();
+>> +		return -EINVAL;
+> We need a pr_err() here to avoid that numa setup fails silently due to
+> bad fw. This applies to all error paths.
+>
+> See my delta patch below. You can merge it with your patch.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 20787 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/15792d42/attachment-0001.obj>
+Thanks! I wil merge it into next version.
+
+Hanjun
