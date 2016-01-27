@@ -1,36 +1,79 @@
-From: macro@imgtec.com (Maciej W. Rozycki)
-Date: Wed, 27 Jan 2016 11:26:20 +0000
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <56984642.3090106@imgtec.com>
-References: <20160113104516.GE25458@arm.com> <5696CF08.8080700@imgtec.com>
- <20160114121449.GC15828@arm.com> <5697F6D2.60409@imgtec.com>
- <20160114203430.GC3818@linux.vnet.ibm.com> <56980C91.1010403@imgtec.com>
- <20160114212913.GF3818@linux.vnet.ibm.com>
- <569814F2.50801@imgtec.com> <20160114225510.GJ3818@linux.vnet.ibm.com>
- <56983054.4070807@imgtec.com> <20160115004753.GN3818@linux.vnet.ibm.com>
- <56984642.3090106@imgtec.com>
-Message-ID: <alpine.DEB.2.00.1601271116520.5958@tp.orcam.me.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 27 Jan 2016 11:25:21 +0000
+Subject: Have any influence on set_memory_** about below patch ??
+In-Reply-To: <56A81B01.7010104@huawei.com>
+References: <5693A740.7070408@huawei.com> <20160111133145.GM6499@leverpostej>
+ <569454F6.1060207@huawei.com> <20160112111531.GA4858@leverpostej>
+ <5695DA67.5080201@huawei.com> <20160113112813.GE23370@leverpostej>
+ <56A81B01.7010104@huawei.com>
+Message-ID: <20160127112520.GA20103@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Jan 2016, Leonid Yegoshin wrote:
-
-> > So you need to build a different kernel for some types of MIPS systems?
-> > Or do you do boot-time rewriting, like a number of other arches do?
+On Wed, Jan 27, 2016 at 09:18:57AM +0800, Xishi Qiu wrote:
+> On 2016/1/13 19:28, Mark Rutland wrote:
 > 
-> I don't know. I would like to have responses. Ralf asked Maciej about old
-> systems and that came nowhere. Even rewrite - don't know what to do with that:
-> no lightweight SYNC or no SYNC at all - yes, it is still possible that SYNC on
-> some systems can be too heavy or even harmful, nobody tested that.
+> > On Wed, Jan 13, 2016 at 01:02:31PM +0800, Xishi Qiu wrote:
+> >> Hi Mark,
+> >>
+> >> If I do like this, does it have the problem too?
+> >>
+> >> kmalloc a size
+> >> no access
+> >> flush tlb
+> >> call set_memory_ro to change the page table flag
+> >> flush tlb
+> >> start access
+> > 
+> > This is broken.
+> > 
+> > The kmalloc will give you memory form the linear mapping. Even if you
+> > allocate a page, that page could have been mapped with a section at the
+> > PMD/PUD/PGD level.
+> > 
+> > Other data could fall within that section (e.g. a kernel stack,
+> > perhaps).
+> 
+> Hi Mark,
+> 
+> If nobody use that whole section before(however it is almost impossible),
+> flush tlb is safe, right?
 
- I don't recall being asked; mind that I might not get to messages I have 
-not been cc-ed in a timely manner and I may miss some altogether.  With 
-the amount of mailing list traffic that passes by me my scanner may fail 
-to trigger.  Sorry if this causes anybody trouble, but such is life.
+No, it is not safe.
 
- Coincidentally, I have just posted some notes on SYNC in a different 
-thread, see <http://lkml.iu.edu/hypermail/linux/kernel/1601.3/03080.html>.  
-There's a reference to an older message of mine there too.  I hope this 
-answers your questions.
+As I mentioned before, there is a race against the hardware that you
+cannot win:
 
-  Maciej
+> > Additional TLB flushees do not help. There's still a race against the
+> > asynchronous TLB logic. The TLB can allocate or destroy entries at any
+> > tim. If there were no page table changes prior to the invalidate, the
+> > TLB could re-allocate all existing entries immediately after the TLB
+> > invalidate, leaving you in the same state as before.
+
+It doesn't matter whether code hasn't accessed a portion of the VA
+space. You cannot guarantee that a valid entry will not be allocated
+into the TLB at any time.
+
+See the ARM ARM (ARM DDI 0487A.h), D4.6.1, About ARMv8 Translation
+Lookaside Buffers (TLBs):
+
+    Any translation table entry that does not generate a Translation
+    fault, an Address size fault, or an Access flag fault and is not
+    from a translation regime for an Exception level that is lower than
+    the current Exception level might be allocated to an enabled TLB at
+    any time.
+
+You must either use a Break-Before-Make approach, or ensure that the
+page tables are not live (i.e. not reachable by one of the TTBRs, and
+not having any partial walks cached in TLBs) at the time they are
+modified. In practice, both of these require an approach like [1] and
+are incredibly expensive.
+
+The only other option is to not use sections at all [2], though this
+incurs other costs.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/401434.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/401690.html
