@@ -1,49 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Jan 2016 15:04:53 +0100
-Subject: [PATCH 3/9] net: bgmac: clarify CONFIG_BCMA dependency
-In-Reply-To: <1453903507-3427225-1-git-send-email-arnd@arndb.de>
-References: <1453903507-3427225-1-git-send-email-arnd@arndb.de>
-Message-ID: <1453903507-3427225-4-git-send-email-arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 27 Jan 2016 15:07:10 +0100
+Subject: [PATCH] pinctrl: qcom: spmi-mpp: Skip pullup on ULT type MPPs
+In-Reply-To: <1452284753-5450-1-git-send-email-sboyd@codeaurora.org>
+References: <1452284753-5450-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CACRpkdY-X3QsQcoDJdLbZCK6keYXWS8GYo47Zu1vY4btAMdU0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bgmac driver depends on BCMA_HOST_SOC, which is only used
-when CONFIG_BCMA is enabled. However, it is a bool option and can
-be set when CONFIG_BCMA=m, and then bgmac can be built-in, leading
-to an obvious link error:
+On Fri, Jan 8, 2016 at 9:25 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-drivers/built-in.o: In function `bgmac_init':
-:(.init.text+0x7f2c): undefined reference to `__bcma_driver_register'
-drivers/built-in.o: In function `bgmac_exit':
-:(.exit.text+0x110a): undefined reference to `bcma_driver_unregister'
+> The ULT type of MPPs don't have a pullup. Skip configuring the
+> pullup on these types of pins.
+>
+> Cc: Andy Gross <andy.gross@linaro.org>
+> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-To avoid this case, we need to depend on both BCMA and BCMA_SOC,
-as this patch does. I'm also trying to make the dependency more
-readable by splitting it into three lines, and adding a COMPILE_TEST
-alternative so we can test-build it in all configurations that
-support BCMA.
+Patch applied with Andy's review tag.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/net/ethernet/broadcom/Kconfig | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/net/ethernet/broadcom/Kconfig b/drivers/net/ethernet/broadcom/Kconfig
-index 8550df189ceb..19f7cd02e085 100644
---- a/drivers/net/ethernet/broadcom/Kconfig
-+++ b/drivers/net/ethernet/broadcom/Kconfig
-@@ -151,8 +151,11 @@ config BNX2X_VXLAN
- 
- config BGMAC
- 	tristate "BCMA bus GBit core support"
--	depends on BCMA_HOST_SOC && HAS_DMA && (BCM47XX || ARCH_BCM_5301X)
-+	depends on BCMA && BCMA_HOST_SOC
-+	depends on HAS_DMA
-+	depends on BCM47XX || ARCH_BCM_5301X || COMPILE_TEST
- 	select PHYLIB
-+	select FIXED_PHY
- 	---help---
- 	  This driver supports GBit MAC and BCM4706 GBit MAC cores on BCMA bus.
- 	  They can be found on BCM47xx SoCs and provide gigabit ethernet.
--- 
-2.7.0
+Yours,
+Linus Walleij
