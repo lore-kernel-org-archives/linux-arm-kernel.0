@@ -1,60 +1,49 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 27 Jan 2016 15:15:42 +0100
-Subject: [PATCH] mmc: pwrseq_simple: Support assigned-clocks
-In-Reply-To: <20160108095917.32335.11094.stgit@localhost>
-References: <20160108095917.32335.11094.stgit@localhost>
-Message-ID: <CAPDyKFrdraY1hXfikELMr5V7hJRcQP7nOUaOjzKiGUGDSecp6A@mail.gmail.com>
+Date: Wed, 27 Jan 2016 15:15:52 +0100
+Subject: [PATCH] mmc: host: arasan: sdhci-of-arasan: Remove no-hispd and
+ no-cmd23 quirks for sdhci-arasan4.9a
+In-Reply-To: <1450877391-3029-1-git-send-email-rsahu@apm.com>
+References: <1450877391-3029-1-git-send-email-rsahu@apm.com>
+Message-ID: <CAPDyKFoHrzJVPDR+tz8vrF50yvyxgnFes7tRDe1S6+TV8yVj3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Srini
-
-On 8 January 2016 at 10:59, Martin Fuzzey <mfuzzey@parkeon.com> wrote:
-> The clock subsystem now allows clock rates and parents to be configured
-> in the device tree.
+On 23 December 2015 at 14:29, Rameshswar Prasad Sahu <rsahu@apm.com> wrote:
+> From: Rameshwar Prasad Sahu <rsahu@apm.com>
 >
-> This requires calling of_clk_set_defaults() which is done automatically
-> for platform, i2c, spi devices. Since pwrseq_simple does not fit into
-> those catagories we must do it ourself.
+> The Arason SD host controller supports set block count command (cmd23)
+> and high speed mode. This patch re-enable both of these features that
+> was disabled. For device that doesn't support high speed, it should
+> configure its capability register accordingly instead disables it
+> explicitly.
 >
-> With this patch the standard assigned-clocks, assigned-clock-rates,
-> assigned-clock-parents DT properties to be used in pwrseq_simple nodes.
+> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
 
-I believe this should be solved when we have converted the each pwrseq
-method to become a platform driver. This is being worked on by
-Srinivas Kandagatla.
-http://www.spinics.net/lists/arm-kernel/msg475605.html
+Thanks, applied for next!
 
 Kind regards
-Ulf Hansson
+Uffe
 
->
-> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
 > ---
->  drivers/mmc/core/pwrseq_simple.c |    5 +++++
->  1 file changed, 5 insertions(+)
+>  drivers/mmc/host/sdhci-of-arasan.c |    5 -----
+>  1 files changed, 0 insertions(+), 5 deletions(-)
 >
-> diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
-> index 4d2962b..fd8f38e 100644
-> --- a/drivers/mmc/core/pwrseq_simple.c
-> +++ b/drivers/mmc/core/pwrseq_simple.c
-> @@ -8,6 +8,7 @@
->   *  Simple MMC power sequence management
->   */
->  #include <linux/clk.h>
-> +#include <linux/clk/clk-conf.h>
->  #include <linux/kernel.h>
->  #include <linux/slab.h>
->  #include <linux/device.h>
-> @@ -108,6 +109,10 @@ struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
->         if (!pwrseq)
->                 return ERR_PTR(-ENOMEM);
+> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+> index 75379cb..5d9fdb3 100644
+> --- a/drivers/mmc/host/sdhci-of-arasan.c
+> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> @@ -172,11 +172,6 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>                 goto clk_disable_all;
+>         }
 >
-> +       ret = of_clk_set_defaults(dev->of_node, false);
-> +       if (ret)
-> +               goto free;
-> +
->         pwrseq->ext_clk = clk_get(dev, "ext_clock");
->         if (IS_ERR(pwrseq->ext_clk) &&
->             PTR_ERR(pwrseq->ext_clk) != -ENOENT) {
+> -       if (of_device_is_compatible(pdev->dev.of_node, "arasan,sdhci-4.9a")) {
+> -               host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
+> -               host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
+> -       }
+> -
+>         sdhci_get_of_property(pdev);
+>         pltfm_host = sdhci_priv(host);
+>         pltfm_host->priv = sdhci_arasan;
+> --
+> 1.7.1
 >
