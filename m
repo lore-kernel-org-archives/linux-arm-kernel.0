@@ -1,29 +1,36 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 27 Jan 2016 20:24:03 +0900
-Subject: [PATCH v4 00/14] r8a7793, gose: Add audio support to device tree
-In-Reply-To: <1453094889-25204-1-git-send-email-horms+renesas@verge.net.au>
-References: <1453094889-25204-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20160127112403.GB26357@verge.net.au>
+From: macro@imgtec.com (Maciej W. Rozycki)
+Date: Wed, 27 Jan 2016 11:26:20 +0000
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <56984642.3090106@imgtec.com>
+References: <20160113104516.GE25458@arm.com> <5696CF08.8080700@imgtec.com>
+ <20160114121449.GC15828@arm.com> <5697F6D2.60409@imgtec.com>
+ <20160114203430.GC3818@linux.vnet.ibm.com> <56980C91.1010403@imgtec.com>
+ <20160114212913.GF3818@linux.vnet.ibm.com>
+ <569814F2.50801@imgtec.com> <20160114225510.GJ3818@linux.vnet.ibm.com>
+ <56983054.4070807@imgtec.com> <20160115004753.GN3818@linux.vnet.ibm.com>
+ <56984642.3090106@imgtec.com>
+Message-ID: <alpine.DEB.2.00.1601271116520.5958@tp.orcam.me.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 18, 2016 at 02:27:55PM +0900, Simon Horman wrote:
-> Hi,
-> 
-> this series adds support to r8a7793 and gose device trees for
-> rcar sound: first in PIO mode then using DMA
-> 
-> I have been unable to test if audio works (in PIO mode) as I
-> do not have physical access to a gose board. I would appreciate
-> some assistance there.
+On Fri, 15 Jan 2016, Leonid Yegoshin wrote:
 
-I have been able to perform some basic testing and have queued up this
-series.
-
-> This work is based heavily on the work of others for the r8a7791 and
-> koelsch as noted in the changelogs of individual patches.
+> > So you need to build a different kernel for some types of MIPS systems?
+> > Or do you do boot-time rewriting, like a number of other arches do?
 > 
-> This series is based on renesas-devel-20160111-v4.4 and
-> has no other dependencies that I am aware of.
+> I don't know. I would like to have responses. Ralf asked Maciej about old
+> systems and that came nowhere. Even rewrite - don't know what to do with that:
+> no lightweight SYNC or no SYNC at all - yes, it is still possible that SYNC on
+> some systems can be too heavy or even harmful, nobody tested that.
 
-[snip]
+ I don't recall being asked; mind that I might not get to messages I have 
+not been cc-ed in a timely manner and I may miss some altogether.  With 
+the amount of mailing list traffic that passes by me my scanner may fail 
+to trigger.  Sorry if this causes anybody trouble, but such is life.
+
+ Coincidentally, I have just posted some notes on SYNC in a different 
+thread, see <http://lkml.iu.edu/hypermail/linux/kernel/1601.3/03080.html>.  
+There's a reference to an older message of mine there too.  I hope this 
+answers your questions.
+
+  Maciej
