@@ -1,44 +1,207 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 27 Jan 2016 10:43:10 +0100
-Subject: [PATCH V4 16/16] ARM64: tegra: select PM_GENERIC_DOMAINS
-In-Reply-To: <56A7A662.4090203@nvidia.com>
-References: <1449241037-22193-1-git-send-email-jonathanh@nvidia.com>
- <8579242.omBpg1aLr2@wuerfel>
- <CAPDyKFrewx5CbS9QKZAxqq0Gu+TywQ3nkDGZFURR=PJLtkDuyQ@mail.gmail.com>
- <11122786.kKumQ3Dhls@wuerfel> <5697D7E2.3030209@nvidia.com>
- <56A7A662.4090203@nvidia.com>
-Message-ID: <CAPDyKFqmWRY4vb=JAqwBmGqRhpq0MrdiAt4jCt5tdhYsxz0ziw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 27 Jan 2016 10:44:20 +0100
+Subject: [PATCH 4/4] ARM: use proper helper while extracting cpu features
+In-Reply-To: <1453800223-18590-5-git-send-email-vladimir.murzin@arm.com>
+References: <1453800223-18590-1-git-send-email-vladimir.murzin@arm.com>
+ <1453800223-18590-5-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <CAKv+Gu-97u3xFA6k7tTXD4=9tEBr+kvVvD-D5FYANt0PL5erOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
-
+On 26 January 2016 at 10:23, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
+> Update current users of cpu feature helpers to use the proper helper
+> depends on how feature bits should be handled. We follow the arm64
+> scheme [1] (slightly rephrased):
 >
-> Any more thoughts on this?
+> We have three types of fields:
 >
-> I have been discussing with Thierry and we think that selecting PM for
-> tegra still makes the most sense. The question is, is this ok for
-> multi-configs?
-
-Yes, this is too me the best option.
-
-Additionally, for those tegra SoCs/platforms that needs
-PM_GENERIC_DOMAINS, it can safely select that as well.
-
+> a) A precise value or a value from which you derive some precise
+>    value.
+> b) Fields defining the presence of a feature (1, 2, 3). These would
+>    always be positive since the absence of such feature would mean a
+>    value of 0
+> c) Fields defining the absence of a feature by setting 0xf. These are
+>    usually fields that were initial RAZ and turned to -1.
 >
-> The only other suggestion/thought I have is to allow
-> PM_GENERIC_DOMAINS_OF to be selected independently of PM so that we can
-> have minimal support for PM domains that allows you to register PM
-> domains with the kernel and their current state, but does not allow you
-> to control them, etc. This way tegra could always select
-> PM_GENERIC_DOMAINS_OF regardless of PM, and we would be able to
-> determine if we can probe a device safely.
+> So we can treat (a) and (b) as unsigned permanently and (c) as as
+> signed,
 >
-> I am not sure that Rafael is too keen on this approach but that is the
-> only alternative I have come up with.
+> [1] https://lkml.org/lkml/2015/11/19/549
+>
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 
-I think Rafael already made his point around this approach, which is a
-clear no. And I fully agree with it.
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Kind regards
-Uffe
+I do feel that it would be very useful to document that nature of
+those fields in the ARM ARM. If it is the intention to expose
+incremental functionality, the values should be documented as such,
+e.g., AES[7:4] >= 1 means AES instructions supported, >= 2 means AES
+and PMULL instructions supported. Without classifying the fields in
+such a way, there is no way to be compatible with future extensions.
+In this example, it would perhaps be safer to assume no such
+instructions are supported for values outside of the documented range.
+
+-- 
+Ard.
+
+
+> ---
+>  arch/arm/include/asm/smp_plat.h |    4 ++--
+>  arch/arm/kernel/setup.c         |   34 ++++++++++++++++++++--------------
+>  arch/arm/kernel/thumbee.c       |    4 +---
+>  arch/arm/mm/mmu.c               |    2 +-
+>  4 files changed, 24 insertions(+), 20 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+> index f908071..03bbe02 100644
+> --- a/arch/arm/include/asm/smp_plat.h
+> +++ b/arch/arm/include/asm/smp_plat.h
+> @@ -49,7 +49,7 @@ static inline int tlb_ops_need_broadcast(void)
+>         if (!is_smp())
+>                 return 0;
+>
+> -       return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 2;
+> +       return cpuid_feature_extract_unsigned(CPUID_EXT_MMFR3, 12) < 2;
+>  }
+>  #endif
+>
+> @@ -61,7 +61,7 @@ static inline int cache_ops_need_broadcast(void)
+>         if (!is_smp())
+>                 return 0;
+>
+> -       return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 1;
+> +       return cpuid_feature_extract_unsigned(CPUID_EXT_MMFR3, 12) < 1;
+>  }
+>  #endif
+>
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index fde041b..e696553 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -257,11 +257,15 @@ static int __get_cpu_architecture(void)
+>                 /* Revised CPUID format. Read the Memory Model Feature
+>                  * Register 0 and check for VMSAv7 or PMSAv7 */
+>                 unsigned int mmfr0 = read_cpuid_ext(CPUID_EXT_MMFR0);
+> -               if ((mmfr0 & 0x0000000f) >= 0x00000003 ||
+> -                   (mmfr0 & 0x000000f0) >= 0x00000030)
+> +               unsigned int block;
+> +#ifdef CONFIG_MMU
+> +               block = cpuid_feature_extract_unsigned_field(mmfr0, 0);
+> +#else
+> +               block = cpuid_feature_extract_unsigned_field(mmfr0, 4);
+> +#endif
+> +               if (mmfr0 >= 3)
+>                         cpu_arch = CPU_ARCH_ARMv7;
+> -               else if ((mmfr0 & 0x0000000f) == 0x00000002 ||
+> -                        (mmfr0 & 0x000000f0) == 0x00000020)
+> +               else if (mmfr0 == 2)
+>                         cpu_arch = CPU_ARCH_ARMv6;
+>                 else
+>                         cpu_arch = CPU_ARCH_UNKNOWN;
+> @@ -446,41 +450,41 @@ static inline void patch_aeabi_idiv(void) { }
+>
+>  static void __init cpuid_init_hwcaps(void)
+>  {
+> -       int block;
+> +       unsigned int block;
+>         u32 isar5;
+>
+>         if (cpu_architecture() < CPU_ARCH_ARMv7)
+>                 return;
+>
+> -       block = cpuid_feature_extract(CPUID_EXT_ISAR0, 24);
+> +       block = cpuid_feature_extract_unsigned(CPUID_EXT_ISAR0, 24);
+>         if (block >= 2)
+>                 elf_hwcap |= HWCAP_IDIVA;
+>         if (block >= 1)
+>                 elf_hwcap |= HWCAP_IDIVT;
+>
+>         /* LPAE implies atomic ldrd/strd instructions */
+> -       block = cpuid_feature_extract(CPUID_EXT_MMFR0, 0);
+> +       block = cpuid_feature_extract_unsigned(CPUID_EXT_MMFR0, 0);
+>         if (block >= 5)
+>                 elf_hwcap |= HWCAP_LPAE;
+>
+>         /* check for supported v8 Crypto instructions */
+>         isar5 = read_cpuid_ext(CPUID_EXT_ISAR5);
+>
+> -       block = cpuid_feature_extract_field(isar5, 4);
+> +       block = cpuid_feature_extract_unsigned_field(isar5, 4);
+>         if (block >= 2)
+>                 elf_hwcap2 |= HWCAP2_PMULL;
+>         if (block >= 1)
+>                 elf_hwcap2 |= HWCAP2_AES;
+>
+> -       block = cpuid_feature_extract_field(isar5, 8);
+> +       block = cpuid_feature_extract_unsigned_field(isar5, 8);
+>         if (block >= 1)
+>                 elf_hwcap2 |= HWCAP2_SHA1;
+>
+> -       block = cpuid_feature_extract_field(isar5, 12);
+> +       block = cpuid_feature_extract_unsigned_field(isar5, 12);
+>         if (block >= 1)
+>                 elf_hwcap2 |= HWCAP2_SHA2;
+>
+> -       block = cpuid_feature_extract_field(isar5, 16);
+> +       block = cpuid_feature_extract_unsigned_field(isar5, 16);
+>         if (block >= 1)
+>                 elf_hwcap2 |= HWCAP2_CRC32;
+>  }
+> @@ -488,6 +492,7 @@ static void __init cpuid_init_hwcaps(void)
+>  static void __init elf_hwcap_fixup(void)
+>  {
+>         unsigned id = read_cpuid_id();
+> +       unsigned int block;
+>
+>         /*
+>          * HWCAP_TLS is available only on 1136 r1p0 and later,
+> @@ -508,9 +513,10 @@ static void __init elf_hwcap_fixup(void)
+>          * avoid advertising SWP; it may not be atomic with
+>          * multiprocessing cores.
+>          */
+> -       if (cpuid_feature_extract(CPUID_EXT_ISAR3, 12) > 1 ||
+> -           (cpuid_feature_extract(CPUID_EXT_ISAR3, 12) == 1 &&
+> -            cpuid_feature_extract(CPUID_EXT_ISAR4, 20) >= 3))
+> +       block = cpuid_feature_extract_unsigned(CPUID_EXT_ISAR3, 12);
+> +
+> +       if (block > 1 || (block == 1 &&
+> +           cpuid_feature_extract_unsigned(CPUID_EXT_ISAR4, 20) >= 3))
+>                 elf_hwcap &= ~HWCAP_SWP;
+>  }
+>
+> diff --git a/arch/arm/kernel/thumbee.c b/arch/arm/kernel/thumbee.c
+> index 8ff8dbf..b5cac80 100644
+> --- a/arch/arm/kernel/thumbee.c
+> +++ b/arch/arm/kernel/thumbee.c
+> @@ -62,14 +62,12 @@ static struct notifier_block thumbee_notifier_block = {
+>
+>  static int __init thumbee_init(void)
+>  {
+> -       unsigned long pfr0;
+>         unsigned int cpu_arch = cpu_architecture();
+>
+>         if (cpu_arch < CPU_ARCH_ARMv7)
+>                 return 0;
+>
+> -       pfr0 = read_cpuid_ext(CPUID_EXT_PFR0);
+> -       if ((pfr0 & 0x0000f000) != 0x00001000)
+> +       if (cpuid_feature_extract_unsigned(CPUID_EXT_PFR0, 12) != 1)
+>                 return 0;
+>
+>         pr_info("ThumbEE CPU extension supported.\n");
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 434d76f..06723a9 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -572,7 +572,7 @@ static void __init build_mem_type_table(void)
+>          * in the Short-descriptor translation table format descriptors.
+>          */
+>         if (cpu_arch == CPU_ARCH_ARMv7 &&
+> -               (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xF) >= 4) {
+> +               (cpuid_feature_extract_unsigned(CPUID_EXT_MMFR0, 0) >= 4)) {
+>                 user_pmd_table |= PMD_PXNTABLE;
+>         }
+>  #endif
+> --
+> 1.7.9.5
+>
