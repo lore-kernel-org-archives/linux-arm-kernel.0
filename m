@@ -1,41 +1,38 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 27 Jan 2016 10:35:10 +0100
-Subject: [PATCH 2/4] ARM: fix cpu feature extracting helper
-In-Reply-To: <1453800223-18590-3-git-send-email-vladimir.murzin@arm.com>
-References: <1453800223-18590-1-git-send-email-vladimir.murzin@arm.com>
- <1453800223-18590-3-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <CAKv+Gu_DyTkb01yYAzXuhiVVXB_Ued_eqbsygc1sbv7rH0i5Cw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 27 Jan 2016 09:36:10 +0000
+Subject: [PATCH v4 0/2] pci: Add host controller driver for Cavium
+ ThunderX PCIe
+In-Reply-To: <1453844781-24380-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1453844781-24380-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20160127093609.GA2390@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 January 2016 at 10:23, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
-> Commit b8c9592 "ARM: 8318/1: treat CPU feature register fields as signed
-> quantities" introduced helper to extract signed quantities of 4-bit
-> blocks. However, with a current code feature with value 0b1000 isn't
-> rejected as negative. So fix the "if" condition.
->
-> Reported-by: Jonathan Brawn <Jon.Brawn@arm.com>
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+On Tue, Jan 26, 2016 at 01:46:19PM -0800, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> Some Cavium ThunderX processors require quirky access methods for the
+> config space of the PCIe bridge.
+> 
+> There are two patches:
+> 
+> 1) Refactor code in pci-host-generic so that it can more easily be
+>    used by other drivers.  This splits the driver for CAM and ECAM
+>    access methods to a separate file from the common host driver code.
+> 
+> 2) Add the ThunderX PCIe driver, which leverages the code in
+>    pci-host-generic
+> 
+> Changes from v3: Add some Acked-by, rebased to v4.5.0-rc1
+> 
+> Changes from v2: Improve device tree binding example as noted by Rob
+> Herring.  Rename pcie-thunder-pem.* to pci-thunder-pem.* for better
+> consistency.  Update MAINTAINERS to reflect the changes.
+> 
+> Changes from v1: Split CAM and ECAM code from common driver code as
+> suggested by Arnd Bergmann.  Fix spelling errors in
+> pcie-thunder-pem.txt
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Bjorn -- I guess you'll pick these up directly?
 
-> ---
->  arch/arm/include/asm/cputype.h |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-> index b23c6c8..1ee94c7 100644
-> --- a/arch/arm/include/asm/cputype.h
-> +++ b/arch/arm/include/asm/cputype.h
-> @@ -276,7 +276,7 @@ static inline int __attribute_const__ cpuid_feature_extract_field(u32 features,
->         int feature = (features >> field) & 15;
->
->         /* feature registers are signed values */
-> -       if (feature > 8)
-> +       if (feature > 7)
->                 feature -= 16;
->
->         return feature;
-> --
-> 1.7.9.5
->
+Will
