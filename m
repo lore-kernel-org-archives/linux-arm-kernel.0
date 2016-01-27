@@ -1,121 +1,42 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 27 Jan 2016 16:14:34 +0200
-Subject: [PATCH v3] ARM: edma: fix residue race for cyclic
-In-Reply-To: <87oacesxzy.fsf@linutronix.de>
-References: <87oacesxzy.fsf@linutronix.de>
-Message-ID: <56A8D0CA.9060307@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 27 Jan 2016 15:15:22 +0100
+Subject: [PATCH v2 2/2] ARM: tegra: Add high speed UARTs to Jetson TK1
+ device tree
+In-Reply-To: <1453827558-10954-3-git-send-email-ralf@ramses-pyramidenbau.de>
+References: <1453827558-10954-1-git-send-email-ralf@ramses-pyramidenbau.de>
+ <1453827558-10954-3-git-send-email-ralf@ramses-pyramidenbau.de>
+Message-ID: <20160127141522.GB21779@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One nitpick
-
-On 01/21/2016 06:22 PM, John Ogness wrote:
-> When retrieving the residue value for cyclic transfers, the
-> SRC/DST fields of the active PaRAM are read. However, the AM335x
-> Technical Reference Manual states:
+On Tue, Jan 26, 2016 at 05:59:18PM +0100, Ralf Ramsauer wrote:
+> This patch enables the APB DMA high speed UARTs of the Jetson TK1. So
+> far, they were only enabled in NVidia's official BSP.
 > 
->   11.3.3.6 Parameter Set Updates
+> Those additional UARTs are exposed on the expansion connector J3A2:
 > 
->   After the TR is read from the PaRAM (and is in the process
->   of being submitted to the EDMA3TC), the following fields are
->   updated as needed: ... SRC DST
+>  UART1:
+>   Pin 41: BR_UART1_TXD
+>   Pin 44: BR_UART1_RXD
 > 
-> This means SRC/DST is incremented even though the DMA transfer
-> may not have started yet or is in progress. Thus if the reader
-> of the residue accesses the DMA buffer too quickly, the CPU is
-> misinformed about the data that has been successfully processed.
+>  UART2:
+>   Pin 65: UART2_RXD
+>   Pin 68: UART2_TXD
+>   Pin 71: UART2_CTS_L
+>   Pin 74: UART2_RTS_L
 > 
-> The CCSTAT.ACTV register is a boolean that is set if any TR is
-> being processed by either the EMDA3CC or EDMA3TC. By polling
-> this register it is possible to ensure that the residue value
-> returned is valid for immediate processing. However, since the
-> DMA engine may be active, polling may never hit a moment where
-> no TR is being processed. To handle this, the SRC/DST is also
-> polled to see if it changes. And as a last resort, a max loop
-> count for the busy waiting exists to avoid an infinite loop.
-> 
-> Signed-off-by: John Ogness <john.ogness@linutronix.de>
+> Signed-off-by: Ralf Ramsauer <ralf@ramses-pyramidenbau.de>
 > ---
->  v1-v2 changes
->  . rebased for next-20151016
->  . added multiple exit conditions for busy wait loop
-> 
->  v2-v3 changes
->  . rebased for next-20160121
->  . reduced max loops from 10000 to 1000
->  . loop countdown instead of count
->  . change debug print function and message
->  . fine-tune comments
-> 
->  drivers/dma/edma.c |   40 +++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 39 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-> index d92d655..20cf643 100644
-> --- a/drivers/dma/edma.c
-> +++ b/drivers/dma/edma.c
-> @@ -1680,9 +1680,22 @@ static void edma_issue_pending(struct dma_chan *chan)
->  	spin_unlock_irqrestore(&echan->vchan.lock, flags);
->  }
->  
-> +#define EDMA_CCSTAT_ACTV (1 << 4)
+>  arch/arm/boot/dts/tegra124-jetson-tk1.dts | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
 
-Can you move this to the define section of the file on top?
+Applied, thanks.
 
-> +
-> +/*
-> + * This limit exists to avoid a possible infinite loop when waiting for proof
-> + * that a particular transfer is completed. This limit can be hit if there
-> + * are large bursts to/from slow devices or the CPU is never able to catch
-> + * the DMA hardware idle. On an AM335x transfering 48 bytes from the UART
-> + * RX-FIFO, as many as 55 loops have been seen.
-> + */
-> +#define EDMA_MAX_TR_WAIT_LOOPS 1000
-> +
->  static u32 edma_residue(struct edma_desc *edesc)
->  {
->  	bool dst = edesc->direction == DMA_DEV_TO_MEM;
-> +	int loop_count = EDMA_MAX_TR_WAIT_LOOPS;
-> +	struct edma_chan *echan = edesc->echan;
->  	struct edma_pset *pset = edesc->pset;
->  	dma_addr_t done, pos;
->  	int i;
-> @@ -1691,7 +1704,32 @@ static u32 edma_residue(struct edma_desc *edesc)
->  	 * We always read the dst/src position from the first RamPar
->  	 * pset. That's the one which is active now.
->  	 */
-> -	pos = edma_get_position(edesc->echan->ecc, edesc->echan->slot[0], dst);
-> +	pos = edma_get_position(echan->ecc, echan->slot[0], dst);
-> +
-> +	/*
-> +	 * "pos" may represent a transfer request that is still being
-> +	 * processed by the EDMACC or EDMATC. We will busy wait until
-> +	 * any one of the situations occurs:
-> +	 *   1. the DMA hardware is idle
-> +	 *   2. a new transfer request is setup
-> +	 *   3. we hit the loop limit
-> +	 */
-> +	while (edma_read(echan->ecc, EDMA_CCSTAT) & EDMA_CCSTAT_ACTV) {
-> +		/* check if a new transfer request is setup */
-> +		if (edma_get_position(echan->ecc,
-> +				      echan->slot[0], dst) != pos) {
-> +			break;
-> +		}
-> +
-> +		if (!--loop_count) {
-> +			dev_dbg_ratelimited(echan->vchan.chan.device->dev,
-> +				"%s: timeout waiting for PaRAM update\n",
-> +				__func__);
-> +			break;
-> +		}
-> +
-> +		cpu_relax();
-> +	}
->  
->  	/*
->  	 * Cyclic is simple. Just subtract pset[0].addr from pos.
-> 
-
-
--- 
-P?ter
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/a428cfe9/attachment-0001.sig>
