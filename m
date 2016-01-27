@@ -1,57 +1,79 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 27 Jan 2016 22:38:30 +0100
-Subject: [PATCH] pinctrl: nomadik: stn8815 CLCD alternate functions
-Message-ID: <1453930710-19163-1-git-send-email-linus.walleij@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 27 Jan 2016 22:50:51 +0100
+Subject: [PATCH RFC 1/2] clk: sunxi: Add sun8i display support
+In-Reply-To: <20160119090901.17c64bc4afb7095bb8bd291c@free.fr>
+References: <cover.1452021349.git.moinejf@free.fr>
+ <9cc33c3701844a07c43ee6c0c1072be4e2073cc1.1452021349.git.moinejf@free.fr>
+ <20160118190904.GP4581@lukather>
+ <20160119090901.17c64bc4afb7095bb8bd291c@free.fr>
+Message-ID: <20160127215051.GW4317@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The STn8815 has 22 dedicated pins for CLCD with up to 16 bits
-in parallel, but pins 32 thru 39 can be used for an additional
-CLCD signal lines 16 thru 23.
+Hi,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+On Tue, Jan 19, 2016 at 09:09:01AM +0100, Jean-Francois Moine wrote:
+> On Mon, 18 Jan 2016 20:09:04 +0100
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > > +static const struct clk_ops clk_sun8i_pll3_fact_ops = {
+> > > +	.recalc_rate = sun8i_pll3_recalc_rate,
+> > > +	.round_rate = sun8i_pll3_round_rate,
+> > > +	.set_rate = sun8i_pll3_set_rate,
+> > > +};
+> > 
+> > We have the clk-factors stuff to handle this easily, could you use
+> > that instead ?
+> 
+> No, the sun6i/8i pll3 offers direct 297MHz and 270MHz.
 
-diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c b/drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c
-index 587b222f12f3..e852048c4c04 100644
---- a/drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c
-+++ b/drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c
-@@ -287,6 +287,10 @@ static const unsigned i2c0_a_1_pins[] = { STN8815_PIN_D3, STN8815_PIN_D2 };
- /* Altfunction B */
- static const unsigned u1_b_1_pins[] = { STN8815_PIN_B16, STN8815_PIN_A16 };
- static const unsigned i2cusb_b_1_pins[] = { STN8815_PIN_C21, STN8815_PIN_C20 };
-+static const unsigned clcd_16_23_b_1_pins[] = { STN8815_PIN_AB6,
-+	STN8815_PIN_AA6, STN8815_PIN_Y6, STN8815_PIN_Y5, STN8815_PIN_AA5,
-+	STN8815_PIN_AB5, STN8815_PIN_AB4, STN8815_PIN_Y4 };
-+
- 
- #define STN8815_PIN_GROUP(a, b) { .name = #a, .pins = a##_pins,		\
- 			.npins = ARRAY_SIZE(a##_pins), .altsetting = b }
-@@ -302,6 +306,7 @@ static const struct nmk_pingroup nmk_stn8815_groups[] = {
- 	STN8815_PIN_GROUP(i2c0_a_1, NMK_GPIO_ALT_A),
- 	STN8815_PIN_GROUP(u1_b_1, NMK_GPIO_ALT_B),
- 	STN8815_PIN_GROUP(i2cusb_b_1, NMK_GPIO_ALT_B),
-+	STN8815_PIN_GROUP(clcd_16_23_b_1, NMK_GPIO_ALT_B),
- };
- 
- /* We use this macro to define the groups applicable to a function */
-@@ -314,6 +319,7 @@ STN8815_FUNC_GROUPS(u1, "u1_a_1", "u1_b_1");
- STN8815_FUNC_GROUPS(i2c1, "i2c1_a_1");
- STN8815_FUNC_GROUPS(i2c0, "i2c0_a_1");
- STN8815_FUNC_GROUPS(i2cusb, "i2cusb_b_1");
-+STN8815_FUNC_GROUPS(clcd, "clcd_16_23_b_1");
- 
- #define FUNCTION(fname)					\
- 	{						\
-@@ -329,6 +335,7 @@ static const struct nmk_function nmk_stn8815_functions[] = {
- 	FUNCTION(i2c1),
- 	FUNCTION(i2c0),
- 	FUNCTION(i2cusb),
-+	FUNCTION(clcd),
- };
- 
- static const struct nmk_pinctrl_soc_data nmk_stn8815_soc = {
+That's true, but so far it's something that never has been really
+needed. This PLL is not the same one using the fractional mode, so I
+guess we could extend the clk-factors to be able to deal with
+that. The video pll in the A10 (pll3) is also in this case, so does
+the A31 PLL3 and PLL4.
+
+Also note that all these clocks can reach those frequencies through
+what allwinner calls the integer mode, so apart from the hardware
+readout, we don't really need it anyway.
+
+> > As part of my DRM patches, I've added a clk-display clock that can
+> > handle that easily.
+> > 
+> > And actually, as part of bringing up the display engine on the A33, I
+> > already did it:
+> > https://github.com/mripard/linux/commit/92b6843b5ee5b70cb2be3638df31d3eca28a4dba
+> > https://github.com/mripard/linux/commit/81e8ea74be5e72124eb584432bb79ff75f90d9ed
+> 
+> I don't remember any patch request from yours in the Linux
+> mailing-lists about these developments.
+
+Indeed, I was waiting for the first DRM developments to get in before
+sending those for review.
+
+> 
+> Otherwise, about this old RFC, Chen-Yu Tsai replied:
+> 
+> > > Add the clock types which are used by the sun8i family for video.
+> > 
+> > These clocks first appeared in the A31.
+
+The video PLL is, the display engine and tcon clocks are a bit
+different (mostly because of their weird parent configuration that
+need a muxing table). Note that I'm talking about the A23 / A33. I
+haven't checked for the H3.
+
+Thanks!
+Maxime
+
 -- 
-2.4.3
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/0cf1a529/attachment.sig>
