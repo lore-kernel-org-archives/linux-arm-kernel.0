@@ -1,34 +1,54 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 28 Jan 2016 18:02:26 +0100
-Subject: [PATCH 0/3] UEFI stub pre-boot compat checks
-Message-ID: <1454000549-9189-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Thu, 28 Jan 2016 18:02:27 +0100
+Subject: [PATCH 1/3] ARM: efistub: check for LPAE support before booting a
+ LPAE kernel
+In-Reply-To: <1454000549-9189-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1454000549-9189-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1454000549-9189-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As discussed earlier today [1], and last year [2], it makes sense for the
-UEFI stub to perform some basic checks on the hardware for missing features
-that would prevent the kernel from booting to a state where it can even
-complain about this.
+A kernel built with support for LPAE cannot boot to a state where it
+can inform the user about it if it fails due to missing LPAE support
+in the hardware.
 
-So implements this for ARM, to check on LPAE builds whether the CPU supports
-it (patch #1), and for arm64, to check whether the build time granule is
-implemented by the CPU (patch #2). Patch #3 wires it up into the shared init
-code.
+If we happen to be booting via UEFI, we can fail gracefully so check
+for LPAE support in the hardware on CONFIG_ARM_LPAE builds before
+entering the kernel proper.
 
-[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/472880
-[2] http://thread.gmane.org/gmane.linux.ports.arm.kernel/447370
-
-Ard Biesheuvel (3):
-  ARM: efistub: check for LPAE support before booting a LPAE kernel
-  arm64: efistub: check for h/w support before booting a >4 KB granule
-    kernel
-  ARM/arm64: efistub: perform hardware compatibility check
-
- drivers/firmware/efi/libstub/arm-stub.c   |  4 ++++
+Suggested-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
  drivers/firmware/efi/libstub/arm32-stub.c | 17 +++++++++++++++++
- drivers/firmware/efi/libstub/arm64-stub.c | 20 ++++++++++++++++++++
- drivers/firmware/efi/libstub/efistub.h    |  2 ++
- 4 files changed, 43 insertions(+)
+ 1 file changed, 17 insertions(+)
 
+diff --git a/drivers/firmware/efi/libstub/arm32-stub.c b/drivers/firmware/efi/libstub/arm32-stub.c
+index 495ebd657e38..6f42be4d0084 100644
+--- a/drivers/firmware/efi/libstub/arm32-stub.c
++++ b/drivers/firmware/efi/libstub/arm32-stub.c
+@@ -9,6 +9,23 @@
+ #include <linux/efi.h>
+ #include <asm/efi.h>
+ 
++efi_status_t check_platform_features(efi_system_table_t *sys_table_arg)
++{
++	int block;
++
++	/* non-LPAE kernels can run anywhere */
++	if (!IS_ENABLED(CONFIG_ARM_LPAE))
++		return EFI_SUCCESS;
++
++	/* LPAE kernels need compatible hardware */
++	block = cpuid_feature_extract(CPUID_EXT_MMFR0, 0);
++	if (block < 5) {
++		pr_efi_err(sys_table_arg, "This LPAE kernel is not supported by your CPU\n");
++		return EFI_UNSUPPORTED;
++	}
++	return EFI_SUCCESS;
++}
++
+ efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
+ 				 unsigned long *image_addr,
+ 				 unsigned long *image_size,
 -- 
 2.5.0
