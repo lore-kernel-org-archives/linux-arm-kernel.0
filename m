@@ -1,25 +1,80 @@
-From: dhowells@redhat.com (David Howells)
-Date: Thu, 28 Jan 2016 20:02:14 +0000
-Subject: [PATCH] documentation: Add disclaimer
-In-Reply-To: <20160127233504.GP4503@linux.vnet.ibm.com>
-References: <20160127233504.GP4503@linux.vnet.ibm.com>
- <20160114120445.GB15828@arm.com> <56980145.5030901@imgtec.com>
- <20160114204827.GE3818@linux.vnet.ibm.com> <56981212.7050301@imgtec.com>
- <20160114222046.GH3818@linux.vnet.ibm.com>
- <20160126102402.GE6357@twins.programming.kicks-ass.net>
- <20160126103200.GI6375@twins.programming.kicks-ass.net>
- <20160126110053.GA21553@arm.com> <20160126201143.GV4503@linux.vnet.ibm.com>
- <15882.1453906627@warthog.procyon.org.uk>
-Message-ID: <17497.1454011334@warthog.procyon.org.uk>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 28 Jan 2016 21:10:20 +0100
+Subject: [PATCH v10 05/21] KVM: ARM64: Add access handler for PMSELR
+ register
+In-Reply-To: <1453866709-20324-6-git-send-email-zhaoshenglong@huawei.com>
+References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453866709-20324-6-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20160128201020.GG16453@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul E. McKenney <paulmck@linux.vnet.ibm.com> wrote:
+On Wed, Jan 27, 2016 at 11:51:33AM +0800, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Since the reset value of PMSELR_EL0 is UNKNOWN, use reset_unknown for
+> its reset handler. When reading PMSELR, return the PMSELR.SEL field to
+> guest.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 19 +++++++++++++++++--
+>  1 file changed, 17 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 97fea84..fc60041 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -477,6 +477,21 @@ static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>  	return true;
+>  }
+>  
+> +static bool access_pmselr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+> +			  const struct sys_reg_desc *r)
+> +{
+> +	if (!kvm_arm_pmu_v3_ready(vcpu))
+> +		return trap_raz_wi(vcpu, p, r);
+> +
+> +	if (p->is_write)
+> +		vcpu_sys_reg(vcpu, PMSELR_EL0) = p->regval;
 
-> Good point!  Would you be willing to add a Signed-off-by so I
-> can take the combined change, assuming Peter and Will are good
-> with it?
+why don't we mask p->regval here when we write vcpu_sys_reg, and then
+not need to mask it every time we use it, like below and in later
+patches?
 
-Sure!
-
-David
+> +	else
+> +		/* return PMSELR.SEL field */
+> +		p->regval = vcpu_sys_reg(vcpu, PMSELR_EL0) & ARMV8_COUNTER_MASK;
+> +
+> +	return true;
+> +}
+> +
+>  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+>  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+>  	/* DBGBVRn_EL1 */						\
+> @@ -676,7 +691,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	  trap_raz_wi },
+>  	/* PMSELR_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b101),
+> -	  trap_raz_wi },
+> +	  access_pmselr, reset_unknown, PMSELR_EL0 },
+>  	/* PMCEID0_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b110),
+>  	  trap_raz_wi },
+> @@ -927,7 +942,7 @@ static const struct sys_reg_desc cp15_regs[] = {
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
+> -	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), trap_raz_wi },
+> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
+> -- 
+> 2.0.4
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
