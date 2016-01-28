@@ -1,357 +1,366 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 28 Jan 2016 10:42:39 +0000
-Subject: [PATCH v4 06/13] arm64: kernel: Rework finisher callback out of
- __cpu_suspend_enter().
+Date: Thu, 28 Jan 2016 10:42:40 +0000
+Subject: [PATCH v4 07/13] arm64: Change cpu_resume() to enable mmu early then
+ access sleep_sp by va
 In-Reply-To: <1453977766-20907-1-git-send-email-james.morse@arm.com>
 References: <1453977766-20907-1-git-send-email-james.morse@arm.com>
-Message-ID: <1453977766-20907-7-git-send-email-james.morse@arm.com>
+Message-ID: <1453977766-20907-8-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hibernate could make use of the cpu_suspend() code to save/restore cpu
-state, however it needs to be able to return '0' from the 'finisher'.
+By enabling the MMU early in cpu_resume(), the sleep_save_sp and stack can
+be accessed by VA, which avoids the need to convert-addresses and clean to
+PoC on the suspend path.
 
-Rework cpu_suspend() so that the finisher is called from C code,
-independently from the save/restore of cpu state. Space to save the context
-in is allocated in the caller's stack frame, and passed into
-__cpu_suspend_enter().
+MMU setup is shared with the boot path, meaning the swapper_pg_dir is
+restored directly: ttbr1_el1 is no longer saved/restored.
 
-Hibernate's use of this API will look like a copy of the cpu_suspend()
-function.
+struct sleep_save_sp is removed, replacing it with a single array of
+pointers.
+
+cpu_do_{suspend,resume} could be further reduced to not restore: cpacr_el1,
+mdscr_el1, tcr_el1, vbar_el1 and sctlr_el1, all of which are set by
+__cpu_setup(). However these values all contain res0 bits that may be used
+to enable future features.
 
 Signed-off-by: James Morse <james.morse@arm.com>
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm64/include/asm/suspend.h | 20 +++++++++
- arch/arm64/kernel/asm-offsets.c  |  2 +
- arch/arm64/kernel/sleep.S        | 93 ++++++++++++++--------------------------
- arch/arm64/kernel/suspend.c      | 90 ++++++++++++++++++++++----------------
- 4 files changed, 109 insertions(+), 96 deletions(-)
+ arch/arm64/include/asm/suspend.h |  7 +-----
+ arch/arm64/kernel/asm-offsets.c  |  3 ---
+ arch/arm64/kernel/head.S         |  2 +-
+ arch/arm64/kernel/setup.c        |  1 -
+ arch/arm64/kernel/sleep.S        | 54 ++++++++++++++--------------------------
+ arch/arm64/kernel/suspend.c      | 52 +++++---------------------------------
+ arch/arm64/mm/proc.S             | 35 +++++++-------------------
+ 7 files changed, 36 insertions(+), 118 deletions(-)
 
 diff --git a/arch/arm64/include/asm/suspend.h b/arch/arm64/include/asm/suspend.h
-index 59a5b0f1e81c..ccd26da93d03 100644
+index ccd26da93d03..5faa3ce1fa3a 100644
 --- a/arch/arm64/include/asm/suspend.h
 +++ b/arch/arm64/include/asm/suspend.h
-@@ -2,6 +2,7 @@
+@@ -1,7 +1,7 @@
+ #ifndef __ASM_SUSPEND_H
  #define __ASM_SUSPEND_H
  
- #define NR_CTX_REGS 11
-+#define NR_CALLEE_SAVED_REGS 12
+-#define NR_CTX_REGS 11
++#define NR_CTX_REGS 10
+ #define NR_CALLEE_SAVED_REGS 12
  
  /*
-  * struct cpu_suspend_ctx must be 16-byte aligned since it is allocated on
-@@ -21,6 +22,25 @@ struct sleep_save_sp {
- 	phys_addr_t save_ptr_stash_phys;
- };
+@@ -17,11 +17,6 @@ struct cpu_suspend_ctx {
+ 	u64 sp;
+ } __aligned(16);
  
-+/*
-+ * Memory to save the cpu state is allocated on the stack by
-+ * __cpu_suspend_enter()'s caller, and populated by __cpu_suspend_enter().
-+ * This data must survive until cpu_resume() is called.
-+ *
-+ * This struct desribes the size and the layout of the saved cpu state.
-+ * The layout of the callee_saved_regs is defined by the implementation
-+ * of __cpu_suspend_enter(), and cpu_resume(). This struct must be passed
-+ * in by the caller as __cpu_suspend_enter()'s stack-frame is gone once it
-+ * returns, and the data would be subsequently corrupted by the call to the
-+ * finisher.
-+ */
-+struct sleep_stack_data {
-+	struct cpu_suspend_ctx	system_regs;
-+	unsigned long		callee_saved_regs[NR_CALLEE_SAVED_REGS];
-+};
-+
- extern int cpu_suspend(unsigned long arg, int (*fn)(unsigned long));
- extern void cpu_resume(void);
-+int __cpu_suspend_enter(struct sleep_stack_data *state);
-+void __cpu_suspend_exit(struct mm_struct *mm);
- #endif
+-struct sleep_save_sp {
+-	phys_addr_t *save_ptr_stash;
+-	phys_addr_t save_ptr_stash_phys;
+-};
+-
+ /*
+  * Memory to save the cpu state is allocated on the stack by
+  * __cpu_suspend_enter()'s caller, and populated by __cpu_suspend_enter().
 diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index fffa4ac6c25a..7d7994774e82 100644
+index 7d7994774e82..d6119c57f28a 100644
 --- a/arch/arm64/kernel/asm-offsets.c
 +++ b/arch/arm64/kernel/asm-offsets.c
-@@ -123,6 +123,8 @@ int main(void)
-   DEFINE(SLEEP_SAVE_SP_SZ,	sizeof(struct sleep_save_sp));
-   DEFINE(SLEEP_SAVE_SP_PHYS,	offsetof(struct sleep_save_sp, save_ptr_stash_phys));
-   DEFINE(SLEEP_SAVE_SP_VIRT,	offsetof(struct sleep_save_sp, save_ptr_stash));
-+  DEFINE(SLEEP_STACK_DATA_SYSTEM_REGS,	offsetof(struct sleep_stack_data, system_regs));
-+  DEFINE(SLEEP_STACK_DATA_CALLEE_REGS,	offsetof(struct sleep_stack_data, callee_saved_regs));
+@@ -120,9 +120,6 @@ int main(void)
+   DEFINE(CPU_CTX_SP,		offsetof(struct cpu_suspend_ctx, sp));
+   DEFINE(MPIDR_HASH_MASK,	offsetof(struct mpidr_hash, mask));
+   DEFINE(MPIDR_HASH_SHIFTS,	offsetof(struct mpidr_hash, shift_aff));
+-  DEFINE(SLEEP_SAVE_SP_SZ,	sizeof(struct sleep_save_sp));
+-  DEFINE(SLEEP_SAVE_SP_PHYS,	offsetof(struct sleep_save_sp, save_ptr_stash_phys));
+-  DEFINE(SLEEP_SAVE_SP_VIRT,	offsetof(struct sleep_save_sp, save_ptr_stash));
+   DEFINE(SLEEP_STACK_DATA_SYSTEM_REGS,	offsetof(struct sleep_stack_data, system_regs));
+   DEFINE(SLEEP_STACK_DATA_CALLEE_REGS,	offsetof(struct sleep_stack_data, callee_saved_regs));
  #endif
-   DEFINE(ARM_SMCCC_RES_X0_OFFS,	offsetof(struct arm_smccc_res, a0));
-   DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index ffe9c2b6431b..85db49d3b191 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -626,7 +626,7 @@ ENDPROC(__secondary_switched)
+  * If it isn't, park the CPU
+  */
+ 	.section	".idmap.text", "ax"
+-__enable_mmu:
++ENTRY(__enable_mmu)
+ 	mrs	x1, ID_AA64MMFR0_EL1
+ 	ubfx	x2, x1, #ID_AA64MMFR0_TGRAN_SHIFT, 4
+ 	cmp	x2, #ID_AA64MMFR0_TGRAN_SUPPORTED
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 8119479147db..1c4bc180efbe 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -174,7 +174,6 @@ static void __init smp_build_mpidr_hash(void)
+ 	 */
+ 	if (mpidr_hash_size() > 4 * num_possible_cpus())
+ 		pr_warn("Large number of MPIDR hash buckets detected\n");
+-	__flush_dcache_area(&mpidr_hash, sizeof(struct mpidr_hash));
+ }
+ 
+ static void __init setup_machine_fdt(phys_addr_t dt_phys)
 diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index e33fe33876ab..dca81612fe90 100644
+index dca81612fe90..0e2b36f1fb44 100644
 --- a/arch/arm64/kernel/sleep.S
 +++ b/arch/arm64/kernel/sleep.S
-@@ -49,37 +49,30 @@
- 	orr	\dst, \dst, \mask		// dst|=(aff3>>rs3)
- 	.endm
- /*
-- * Save CPU state for a suspend and execute the suspend finisher.
-- * On success it will return 0 through cpu_resume - ie through a CPU
-- * soft/hard reboot from the reset vector.
-- * On failure it returns the suspend finisher return value or force
-- * -EOPNOTSUPP if the finisher erroneously returns 0 (the suspend finisher
-- * is not allowed to return, if it does this must be considered failure).
-- * It saves callee registers, and allocates space on the kernel stack
-- * to save the CPU specific registers + some other data for resume.
-+ * Save CPU state in the provided sleep_stack_data area, and publish its
-+ * location for cpu_resume()'s use in sleep_save_stash.
-  *
-- *  x0 = suspend finisher argument
-- *  x1 = suspend finisher function pointer
-+ * cpu_resume() will restore this saved state, and return. Because the
-+ * link-register is saved and restored, it will appear to return from this
-+ * function. So that the caller can tell the suspend/resume paths apart,
-+ * __cpu_suspend_enter() will always return a non-zero value, whereas the
-+ * path through cpu_resume() will return 0.
-+ *
-+ *  x0 = struct sleep_stack_data area
-  */
- ENTRY(__cpu_suspend_enter)
--	stp	x29, lr, [sp, #-96]!
--	stp	x19, x20, [sp,#16]
--	stp	x21, x22, [sp,#32]
--	stp	x23, x24, [sp,#48]
--	stp	x25, x26, [sp,#64]
--	stp	x27, x28, [sp,#80]
--	/*
--	 * Stash suspend finisher and its argument in x20 and x19
--	 */
--	mov	x19, x0
--	mov	x20, x1
-+	stp	x29, lr, [x0, #SLEEP_STACK_DATA_CALLEE_REGS]
-+	stp	x19, x20, [x0,#SLEEP_STACK_DATA_CALLEE_REGS+16]
-+	stp	x21, x22, [x0,#SLEEP_STACK_DATA_CALLEE_REGS+32]
-+	stp	x23, x24, [x0,#SLEEP_STACK_DATA_CALLEE_REGS+48]
-+	stp	x25, x26, [x0,#SLEEP_STACK_DATA_CALLEE_REGS+64]
-+	stp	x27, x28, [x0,#SLEEP_STACK_DATA_CALLEE_REGS+80]
-+
-+	/* save the sp in cpu_suspend_ctx */
- 	mov	x2, sp
--	sub	sp, sp, #CPU_SUSPEND_SZ	// allocate cpu_suspend_ctx
--	mov	x0, sp
--	/*
--	 * x0 now points to struct cpu_suspend_ctx allocated on the stack
--	 */
--	str	x2, [x0, #CPU_CTX_SP]
-+	str	x2, [x0, #SLEEP_STACK_DATA_SYSTEM_REGS + CPU_CTX_SP]
-+
-+	/* find the mpidr_hash */
- 	ldr	x1, =sleep_save_sp
- 	ldr	x1, [x1, #SLEEP_SAVE_SP_VIRT]
+@@ -73,8 +73,8 @@ ENTRY(__cpu_suspend_enter)
+ 	str	x2, [x0, #SLEEP_STACK_DATA_SYSTEM_REGS + CPU_CTX_SP]
+ 
+ 	/* find the mpidr_hash */
+-	ldr	x1, =sleep_save_sp
+-	ldr	x1, [x1, #SLEEP_SAVE_SP_VIRT]
++	ldr	x1, =sleep_save_stash
++	ldr	x1, [x1]
  	mrs	x7, mpidr_el1
-@@ -93,34 +86,11 @@ ENTRY(__cpu_suspend_enter)
- 	ldp	w5, w6, [x9, #(MPIDR_HASH_SHIFTS + 8)]
+ 	ldr	x9, =mpidr_hash
+ 	ldr	x10, [x9, #MPIDR_HASH_MASK]
+@@ -87,40 +87,26 @@ ENTRY(__cpu_suspend_enter)
  	compute_mpidr_hash x8, x3, x4, x5, x6, x7, x10
  	add	x1, x1, x8, lsl #3
-+
-+	push	x29, lr
- 	bl	__cpu_suspend_save
--	/*
--	 * Grab suspend finisher in x20 and its argument in x19
--	 */
--	mov	x0, x19
--	mov	x1, x20
--	/*
--	 * We are ready for power down, fire off the suspend finisher
--	 * in x1, with argument in x0
--	 */
--	blr	x1
--        /*
--	 * Never gets here, unless suspend finisher fails.
--	 * Successful cpu_suspend should return from cpu_resume, returning
--	 * through this code path is considered an error
--	 * If the return value is set to 0 force x0 = -EOPNOTSUPP
--	 * to make sure a proper error condition is propagated
--	 */
--	cmp	x0, #0
--	mov	x3, #-EOPNOTSUPP
--	csel	x0, x3, x0, eq
--	add	sp, sp, #CPU_SUSPEND_SZ	// rewind stack pointer
--	ldp	x19, x20, [sp, #16]
--	ldp	x21, x22, [sp, #32]
--	ldp	x23, x24, [sp, #48]
--	ldp	x25, x26, [sp, #64]
--	ldp	x27, x28, [sp, #80]
--	ldp	x29, lr, [sp], #96
-+	pop	x29, lr
-+	mov	x0, #1
+ 
++	str	x0, [x1]
++	add	x0, x0, #SLEEP_STACK_DATA_SYSTEM_REGS
+ 	push	x29, lr
+-	bl	__cpu_suspend_save
++	bl	cpu_do_suspend
+ 	pop	x29, lr
+ 	mov	x0, #1
  	ret
  ENDPROC(__cpu_suspend_enter)
  	.ltorg
-@@ -146,12 +116,6 @@ ENDPROC(cpu_resume_mmu)
- 	.popsection
- cpu_resume_after_mmu:
- 	mov	x0, #0			// return zero on success
--	ldp	x19, x20, [sp, #16]
--	ldp	x21, x22, [sp, #32]
--	ldp	x23, x24, [sp, #48]
--	ldp	x25, x26, [sp, #64]
--	ldp	x27, x28, [sp, #80]
--	ldp	x29, lr, [sp], #96
- 	ret
- ENDPROC(cpu_resume_after_mmu)
  
-@@ -168,6 +132,8 @@ ENTRY(cpu_resume)
+-/*
+- * x0 must contain the sctlr value retrieved from restored context
+- */
+-	.pushsection	".idmap.text", "ax"
+-ENTRY(cpu_resume_mmu)
+-	ldr	x3, =cpu_resume_after_mmu
+-	msr	sctlr_el1, x0		// restore sctlr_el1
+-	isb
+-	/*
+-	 * Invalidate the local I-cache so that any instructions fetched
+-	 * speculatively from the PoC are discarded, since they may have
+-	 * been dynamically patched at the PoU.
+-	 */
+-	ic	iallu
+-	dsb	nsh
+-	isb
+-	br	x3			// global jump to virtual address
+-ENDPROC(cpu_resume_mmu)
+-	.popsection
+-cpu_resume_after_mmu:
+-	mov	x0, #0			// return zero on success
+-	ret
+-ENDPROC(cpu_resume_after_mmu)
+-
+ ENTRY(cpu_resume)
+ 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
++	/* enable the MMU early - so we can access sleep_save_stash by va */
++	adr_l	lr, __enable_mmu	/* __cpu_setup will return here */
++	ldr	x27, =_cpu_resume	/* __enable_mmu will branch here */
++	adrp	x25, idmap_pg_dir
++	adrp	x26, swapper_pg_dir
++	b	__cpu_setup
++
++ENTRY(_cpu_resume)
+ 	mrs	x1, mpidr_el1
+ 	adrp	x8, mpidr_hash
+ 	add x8, x8, #:lo12:mpidr_hash // x8 = struct mpidr_hash phys address
+@@ -130,29 +116,27 @@ ENTRY(cpu_resume)
+ 	ldp	w5, w6, [x8, #(MPIDR_HASH_SHIFTS + 8)]
+ 	compute_mpidr_hash x7, x3, x4, x5, x6, x1, x2
          /* x7 contains hash index, let's use it to grab context pointer */
- 	ldr_l	x0, sleep_save_sp + SLEEP_SAVE_SP_PHYS
+-	ldr_l	x0, sleep_save_sp + SLEEP_SAVE_SP_PHYS
++	ldr_l	x0, sleep_save_stash
  	ldr	x0, [x0, x7, lsl #3]
-+	add	x29, x0, #SLEEP_STACK_DATA_CALLEE_REGS
-+	add	x0, x0, #SLEEP_STACK_DATA_SYSTEM_REGS
+ 	add	x29, x0, #SLEEP_STACK_DATA_CALLEE_REGS
+ 	add	x0, x0, #SLEEP_STACK_DATA_SYSTEM_REGS
  	/* load sp from context */
  	ldr	x2, [x0, #CPU_CTX_SP]
- 	/* load physical address of identity map page table in x1 */
-@@ -181,5 +147,12 @@ ENTRY(cpu_resume)
- 	 * pointer and x1 to contain physical address of 1:1 page tables
+-	/* load physical address of identity map page table in x1 */
+-	adrp	x1, idmap_pg_dir
+ 	mov	sp, x2
+ 	/* save thread_info */
+ 	and	x2, x2, #~(THREAD_SIZE - 1)
+ 	msr	sp_el0, x2
+ 	/*
+-	 * cpu_do_resume expects x0 to contain context physical address
+-	 * pointer and x1 to contain physical address of 1:1 page tables
++	 * cpu_do_resume expects x0 to contain context address pointer
  	 */
- 	bl	cpu_do_resume		// PC relative jump, MMU off
-+	/* Can't access these by physical address once the MMU is on */
-+	ldp	x19, x20, [x29, #16]
-+	ldp	x21, x22, [x29, #32]
-+	ldp	x23, x24, [x29, #48]
-+	ldp	x25, x26, [x29, #64]
-+	ldp	x27, x28, [x29, #80]
-+	ldp	x29, lr, [x29]
- 	b	cpu_resume_mmu		// Resume MMU, never returns
+-	bl	cpu_do_resume		// PC relative jump, MMU off
+-	/* Can't access these by physical address once the MMU is on */
++	bl	cpu_do_resume
++
+ 	ldp	x19, x20, [x29, #16]
+ 	ldp	x21, x22, [x29, #32]
+ 	ldp	x23, x24, [x29, #48]
+ 	ldp	x25, x26, [x29, #64]
+ 	ldp	x27, x28, [x29, #80]
+ 	ldp	x29, lr, [x29]
+-	b	cpu_resume_mmu		// Resume MMU, never returns
++	mov	x0, #0
++	ret
  ENDPROC(cpu_resume)
 diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
-index 1095aa483a1c..fbc14774af6f 100644
+index fbc14774af6f..800fde85cd75 100644
 --- a/arch/arm64/kernel/suspend.c
 +++ b/arch/arm64/kernel/suspend.c
-@@ -10,22 +10,22 @@
- #include <asm/suspend.h>
- #include <asm/tlbflush.h>
+@@ -12,30 +12,6 @@
  
--extern int __cpu_suspend_enter(unsigned long arg, int (*fn)(unsigned long));
-+
+ 
  /*
-  * This is called by __cpu_suspend_enter() to save the state, and do whatever
-  * flushing is required to ensure that when the CPU goes to sleep we have
-  * the necessary data available when the caches are not searched.
-  *
-- * ptr: CPU context virtual address
-+ * ptr: sleep_stack_data containing cpu state virtual address.
-  * save_ptr: address of the location where the context physical address
-  *           must be saved
-  */
--void notrace __cpu_suspend_save(struct cpu_suspend_ctx *ptr,
-+void notrace __cpu_suspend_save(struct sleep_stack_data *ptr,
- 				phys_addr_t *save_ptr)
+- * This is called by __cpu_suspend_enter() to save the state, and do whatever
+- * flushing is required to ensure that when the CPU goes to sleep we have
+- * the necessary data available when the caches are not searched.
+- *
+- * ptr: sleep_stack_data containing cpu state virtual address.
+- * save_ptr: address of the location where the context physical address
+- *           must be saved
+- */
+-void notrace __cpu_suspend_save(struct sleep_stack_data *ptr,
+-				phys_addr_t *save_ptr)
+-{
+-	*save_ptr = virt_to_phys(ptr);
+-
+-	cpu_do_suspend(&ptr->system_regs);
+-	/*
+-	 * Only flush the context that must be retrieved with the MMU
+-	 * off. VA primitives ensure the flush is applied to all
+-	 * cache levels so context is pushed to DRAM.
+-	 */
+-	__flush_dcache_area(ptr, sizeof(*ptr));
+-	__flush_dcache_area(save_ptr, sizeof(*save_ptr));
+-}
+-
+-/*
+  * This hook is provided so that cpu_suspend code can restore HW
+  * breakpoints as early as possible in the resume path, before reenabling
+  * debug exceptions. Code cannot be run from a CPU PM notifier since by the
+@@ -54,20 +30,9 @@ void __init cpu_suspend_set_dbg_restorer(void (*hw_bp_restore)(void *))
+ void notrace __cpu_suspend_exit(struct mm_struct *mm)
  {
- 	*save_ptr = virt_to_phys(ptr);
- 
--	cpu_do_suspend(ptr);
-+	cpu_do_suspend(&ptr->system_regs);
  	/*
- 	 * Only flush the context that must be retrieved with the MMU
- 	 * off. VA primitives ensure the flush is applied to all
-@@ -51,6 +51,41 @@ void __init cpu_suspend_set_dbg_restorer(void (*hw_bp_restore)(void *))
- 	hw_breakpoint_restore = hw_bp_restore;
+-	 * We are resuming from reset with TTBR0_EL1 set to the
+-	 * idmap to enable the MMU; set the TTBR0 to the reserved
+-	 * page tables to prevent speculative TLB allocations, flush
+-	 * the local tlb and set the default tcr_el1.t0sz so that
+-	 * the TTBR0 address space set-up is properly restored.
+-	 * If the current active_mm != &init_mm we entered cpu_suspend
+-	 * with mappings in TTBR0 that must be restored, so we switch
+-	 * them back to complete the address space configuration
+-	 * restoration before returning.
++	 * We resume from suspend directly into the swapper_pg_dir. We may
++	 * also need to load user-space page tables.
+ 	 */
+-	cpu_set_reserved_ttbr0();
+-	local_flush_tlb_all();
+-	cpu_set_default_tcr_t0sz();
+-
+ 	if (mm != &init_mm)
+ 		cpu_switch_mm(mm->pgd, mm);
+ 
+@@ -149,22 +114,17 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ 	return ret;
  }
  
-+void notrace __cpu_suspend_exit(struct mm_struct *mm)
-+{
-+	/*
-+	 * We are resuming from reset with TTBR0_EL1 set to the
-+	 * idmap to enable the MMU; set the TTBR0 to the reserved
-+	 * page tables to prevent speculative TLB allocations, flush
-+	 * the local tlb and set the default tcr_el1.t0sz so that
-+	 * the TTBR0 address space set-up is properly restored.
-+	 * If the current active_mm != &init_mm we entered cpu_suspend
-+	 * with mappings in TTBR0 that must be restored, so we switch
-+	 * them back to complete the address space configuration
-+	 * restoration before returning.
-+	 */
-+	cpu_set_reserved_ttbr0();
-+	local_flush_tlb_all();
-+	cpu_set_default_tcr_t0sz();
-+
-+	if (mm != &init_mm)
-+		cpu_switch_mm(mm->pgd, mm);
-+
-+	/*
-+	 * Restore per-cpu offset before any kernel
-+	 * subsystem relying on it has a chance to run.
-+	 */
-+	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
-+
-+	/*
-+	 * Restore HW breakpoint registers to sane values
-+	 * before debug exceptions are possibly reenabled
-+	 * through local_dbg_restore.
-+	 */
-+	if (hw_breakpoint_restore)
-+		hw_breakpoint_restore(NULL);
-+}
-+
- /*
-  * cpu_suspend
-  *
-@@ -60,9 +95,10 @@ void __init cpu_suspend_set_dbg_restorer(void (*hw_bp_restore)(void *))
-  */
- int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+-struct sleep_save_sp sleep_save_sp;
++unsigned long *sleep_save_stash;
+ 
+ static int __init cpu_suspend_init(void)
  {
--	struct mm_struct *mm = current->active_mm;
--	int ret;
-+	int ret = 0;
- 	unsigned long flags;
-+	struct sleep_stack_data state;
-+	struct mm_struct *mm = current->active_mm;
+-	void *ctx_ptr;
+-
+ 	/* ctx_ptr is an array of physical addresses */
+-	ctx_ptr = kcalloc(mpidr_hash_size(), sizeof(phys_addr_t), GFP_KERNEL);
++	sleep_save_stash = kcalloc(mpidr_hash_size(), sizeof(*sleep_save_stash),
++				   GFP_KERNEL);
  
+-	if (WARN_ON(!ctx_ptr))
++	if (WARN_ON(!sleep_save_stash))
+ 		return -ENOMEM;
+ 
+-	sleep_save_sp.save_ptr_stash = ctx_ptr;
+-	sleep_save_sp.save_ptr_stash_phys = virt_to_phys(ctx_ptr);
+-	__flush_dcache_area(&sleep_save_sp, sizeof(struct sleep_save_sp));
+-
+ 	return 0;
+ }
+ early_initcall(cpu_suspend_init);
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 3c7d170de822..a755108aaa75 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -61,62 +61,45 @@ ENTRY(cpu_do_suspend)
+ 	mrs	x2, tpidr_el0
+ 	mrs	x3, tpidrro_el0
+ 	mrs	x4, contextidr_el1
+-	mrs	x5, mair_el1
+ 	mrs	x6, cpacr_el1
+-	mrs	x7, ttbr1_el1
+ 	mrs	x8, tcr_el1
+ 	mrs	x9, vbar_el1
+ 	mrs	x10, mdscr_el1
+ 	mrs	x11, oslsr_el1
+ 	mrs	x12, sctlr_el1
+ 	stp	x2, x3, [x0]
+-	stp	x4, x5, [x0, #16]
+-	stp	x6, x7, [x0, #32]
+-	stp	x8, x9, [x0, #48]
+-	stp	x10, x11, [x0, #64]
+-	str	x12, [x0, #80]
++	stp	x4, xzr, [x0, #16]
++	stp	x6, x8, [x0, #32]
++	stp	x9, x10, [x0, #48]
++	stp	x11, x12, [x0, #64]
+ 	ret
+ ENDPROC(cpu_do_suspend)
+ 
+ /**
+  * cpu_do_resume - restore CPU register context
+  *
+- * x0: Physical address of context pointer
+- * x1: ttbr0_el1 to be restored
+- *
+- * Returns:
+- *	sctlr_el1 value in x0
++ * x0: Address of context pointer
+  */
+ ENTRY(cpu_do_resume)
+-	/*
+-	 * Invalidate local tlb entries before turning on MMU
+-	 */
+-	tlbi	vmalle1
+ 	ldp	x2, x3, [x0]
+ 	ldp	x4, x5, [x0, #16]
+-	ldp	x6, x7, [x0, #32]
+-	ldp	x8, x9, [x0, #48]
+-	ldp	x10, x11, [x0, #64]
+-	ldr	x12, [x0, #80]
++	ldp	x6, x8, [x0, #32]
++	ldp	x9, x10, [x0, #48]
++	ldp	x11, x12, [x0, #64]
+ 	msr	tpidr_el0, x2
+ 	msr	tpidrro_el0, x3
+ 	msr	contextidr_el1, x4
+-	msr	mair_el1, x5
+ 	msr	cpacr_el1, x6
+-	msr	ttbr0_el1, x1
+-	msr	ttbr1_el1, x7
+-	tcr_set_idmap_t0sz x8, x7
+ 	msr	tcr_el1, x8
+ 	msr	vbar_el1, x9
+ 	msr	mdscr_el1, x10
++	msr	sctlr_el1, x12
  	/*
- 	 * From this point debug exceptions are disabled to prevent
-@@ -84,39 +120,21 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
- 	 * page tables, so that the thread address space is properly
- 	 * set-up on function return.
+ 	 * Restore oslsr_el1 by writing oslar_el1
  	 */
--	ret = __cpu_suspend_enter(arg, fn);
--	if (ret == 0) {
--		/*
--		 * We are resuming from reset with TTBR0_EL1 set to the
--		 * idmap to enable the MMU; set the TTBR0 to the reserved
--		 * page tables to prevent speculative TLB allocations, flush
--		 * the local tlb and set the default tcr_el1.t0sz so that
--		 * the TTBR0 address space set-up is properly restored.
--		 * If the current active_mm != &init_mm we entered cpu_suspend
--		 * with mappings in TTBR0 that must be restored, so we switch
--		 * them back to complete the address space configuration
--		 * restoration before returning.
--		 */
--		cpu_set_reserved_ttbr0();
--		local_flush_tlb_all();
--		cpu_set_default_tcr_t0sz();
--
--		if (mm != &init_mm)
--			cpu_switch_mm(mm->pgd, mm);
--
--		/*
--		 * Restore per-cpu offset before any kernel
--		 * subsystem relying on it has a chance to run.
--		 */
--		set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
-+	if (__cpu_suspend_enter(&state)) {
-+		/* Call the suspend finisher */
-+		ret = fn(arg);
- 
- 		/*
--		 * Restore HW breakpoint registers to sane values
--		 * before debug exceptions are possibly reenabled
--		 * through local_dbg_restore.
-+		 * Never gets here, unless the suspend finisher fails.
-+		 * Successful cpu_suspend() should return from cpu_resume(),
-+		 * returning through this code path is considered an error
-+		 * If the return value is set to 0 force ret = -EOPNOTSUPP
-+		 * to make sure a proper error condition is propagated
- 		 */
--		if (hw_breakpoint_restore)
--			hw_breakpoint_restore(NULL);
-+		if (!ret)
-+			ret = -EOPNOTSUPP;
-+	} else {
-+		__cpu_suspend_exit(mm);
- 	}
- 
- 	unpause_graph_tracing();
+ 	ubfx	x11, x11, #1, #1
+ 	msr	oslar_el1, x11
+ 	msr	pmuserenr_el0, xzr		// Disable PMU access from EL0
+-	mov	x0, x12
+-	dsb	nsh		// Make sure local tlb invalidation completed
+ 	isb
+ 	ret
+ ENDPROC(cpu_do_resume)
 -- 
 2.6.2
