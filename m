@@ -1,59 +1,38 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 28 Jan 2016 14:28:56 -0800
-Subject: [PATCH] ARM: dts: vf-colibri-eval-v3: Use enable-gpios for BL_ON
-In-Reply-To: <20160128083914.GQ9070@tiger>
-References: <1452322793-26020-1-git-send-email-bhuvanchandra.dv@toradex.com>
- <20160128083914.GQ9070@tiger>
-Message-ID: <7d06b5e8724a165758f8f7f906504e31@agner.ch>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 28 Jan 2016 14:34:14 -0800
+Subject: [PATCH V3 3/4] serial: bcm2835: add driver for bcm2835-aux-uart
+In-Reply-To: <1453032932-2512-4-git-send-email-kernel@martin.sperl.org>
+References: <1453032932-2512-1-git-send-email-kernel@martin.sperl.org>
+ <1453032932-2512-4-git-send-email-kernel@martin.sperl.org>
+Message-ID: <87h9hxfi55.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-01-28 00:39, Shawn Guo wrote:
-> On Sat, Jan 09, 2016 at 12:29:53PM +0530, Bhuvanchandra DV wrote:
->> Use pwm-backlight driver 'enable-gpios' property for backlight on/off
->> control.
->>
->> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
->> ---
->>  arch/arm/boot/dts/vf-colibri.dtsi | 9 +++++++++
->>  1 file changed, 9 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
->> index e5949b9..1c0da05 100644
->> --- a/arch/arm/boot/dts/vf-colibri.dtsi
->> +++ b/arch/arm/boot/dts/vf-colibri.dtsi
->> @@ -10,7 +10,10 @@
->>  / {
->>  	bl: backlight {
->>  		compatible = "pwm-backlight";
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&pinctrl_gpio_bl_on>;
->>  		pwms = <&pwm0 0 5000000 0>;
->> +		enable-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
->>  		status = "disabled";
->>  	};
->>  };
->> @@ -169,6 +172,12 @@
->>  			>;
->>  		};
->>
->> +		pinctrl_gpio_bl_on: gpio_bl_on {
->> +			fsl,pins = <
->> +				VF610_PAD_PTC0__GPIO_45		0x22ef
->> +			>;
->> +		};
->> +
-> 
-> @Stefan,
-> 
-> Do we need this?  My understanding is that on Vybrid, when gpio is
-> requested, the pinctrl will set it up automatically.
+kernel at martin.sperl.org writes:
 
-Yes this is required. The GPIO driver asks the pinctrl driver to enable
-the GPIO, and the pinctrl driver requires a "valid" pinmux configuration
-to be able to find the IOMUXC register at all.
+> From: Martin Sperl <kernel@martin.sperl.org>
+>
+> The bcm2835 SOC contains an auxiliary uart, which is very close
+> to the ns16550 with some differences.
+>
+> The big difference is that the uart HW is not using an internal divider
+> of 16 but 8, which results in an effictive baud-rate being twice
+> the requested baud-rate.
+>
+> This driver handles this device correctly and handles the difference in
+> the HW divider by scaling up the clock by a factor of 2.
+>
+> The approach to write a separate (wrapper) driver instead of using a
+> multiplying clock and "ns16550" as compatibility in the device-tree
+> has been recommended by Stephen Warren.
+>
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 
-Acked-by: Stefan Agner <stefan@agner.ch>
-
---
-Stefan
+Acked-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160128/7a9e510a/attachment.sig>
