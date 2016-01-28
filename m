@@ -1,31 +1,62 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 28 Jan 2016 19:00:30 +0100
-Subject: [linux-review:James-Hogan/kbuild-Remove-stale-asm-generic-wrappers/20160119-183642]
- d979f99e9cc14e2667e9b6e268db695977e4197a BUILD DONE
-In-Reply-To: <3596300.IYfzmako0c@wuerfel>
-References: <569e1dbb.MgLv8OaZwklOxxtU%fengguang.wu@intel.com>
- <1947556.38OyJnvGS5@wuerfel>
- <20160127093018.GA21190@wfg-t540p.sh.intel.com>
- <3596300.IYfzmako0c@wuerfel>
-Message-ID: <CAMuHMdWCwP8Hkn+tGEoG-FxUnjAq8uExcPhmXASh_ErU8DDN2w@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 28 Jan 2016 18:06:39 +0000
+Subject: [PATCH v10 07/21] KVM: ARM64: PMU: Add perf event map and
+ introduce perf event creating function
+In-Reply-To: <56AA45B0.3060205@arm.com>
+References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453866709-20324-8-git-send-email-zhaoshenglong@huawei.com>
+ <20160128163115.GC3807@hawk.localdomain> <56AA45B0.3060205@arm.com>
+Message-ID: <20160128180638.GO775@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Thu, Jan 28, 2016 at 04:45:36PM +0000, Marc Zyngier wrote:
+> On 28/01/16 16:31, Andrew Jones wrote:
+> > On Wed, Jan 27, 2016 at 11:51:35AM +0800, Shannon Zhao wrote:
+> >> From: Shannon Zhao <shannon.zhao@linaro.org>
+> >>
+> >> When we use tools like perf on host, perf passes the event type and the
+> >> id of this event type category to kernel, then kernel will map them to
+> >> hardware event number and write this number to PMU PMEVTYPER<n>_EL0
+> >> register. When getting the event number in KVM, directly use raw event
+> >> type to create a perf_event for it.
+> >>
+> >> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> >> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  arch/arm64/include/asm/pmu.h |   3 ++
+> >>  arch/arm64/kvm/Makefile      |   1 +
+> >>  include/kvm/arm_pmu.h        |  10 ++++
+> >>  virt/kvm/arm/pmu.c           | 122 +++++++++++++++++++++++++++++++++++++++++++
+> >>  4 files changed, 136 insertions(+)
+> >>  create mode 100644 virt/kvm/arm/pmu.c
+> >>
+> >> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
+> >> index 4406184..2588f9c 100644
+> >> --- a/arch/arm64/include/asm/pmu.h
+> >> +++ b/arch/arm64/include/asm/pmu.h
+> >> @@ -21,6 +21,7 @@
+> >>  
+> >>  #define ARMV8_MAX_COUNTERS      32
+> >>  #define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
+> >> +#define ARMV8_CYCLE_IDX         (ARMV8_MAX_COUNTERS - 1)
+> > 
+> > I'm not sure we want to add this. It's name is wrong, as it's really
+> > PMCNTENSET_EL0.C, and just a few lines above we have the idx defined
+> > already (ARMV8_IDX_CYCLE_COUNTER), but as zero, because
+> > arch/arm64/kernel/perf_event.c maps it that way.
+> > 
+> > I think we should do the same with the pmc array, i.e. map the cycle
+> > counter to idx zero.
+> 
+> I tend to have the opposite view. Not for the sake of it, but because I
+> find it helpful to directly map the code to the architecture
+> documentation without having to bend another handful of neurons.
+> 
+> Will probably had some good reasons to structure it that way, but I
+> don't know the rational. Will?
 
-On Wed, Jan 27, 2016 at 10:44 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> - in some configurations, you end up without any boards selected, hitting
->   an #error in the final link
+It was years ago, but I suspect that the cycle counter is index zero
+because its mandated, whilst the number of event counters is IMPDEF.
 
-FWIW, I have a similar problem with m68k+MMU=y randconfig...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Will
