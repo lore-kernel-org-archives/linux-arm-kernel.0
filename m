@@ -1,63 +1,49 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Jan 2016 22:58:28 +0100
-Subject: [PATCH v2] hostap: avoid uninitialized variable use in hfa384x_get_rid
-Message-ID: <18181682.hKPVvnQWXk@wuerfel>
+Date: Thu, 28 Jan 2016 23:02:19 +0100
+Subject: [PATCH net-next 08/40] net: fec: move cbd_bufaddr assignment
+ closer to the mapping function
+In-Reply-To: <1454016364-30985-9-git-send-email-troy.kisky@boundarydevices.com>
+References: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1454016364-30985-9-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1725152.bhtFKTSjnb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver reads a value from hfa384x_from_bap(), which may fail,
-and then assigns the value to a local variable. gcc detects that
-in in the failure case, the 'rlen' variable now contains
-uninitialized data:
+On Thursday 28 January 2016 14:25:32 Troy Kisky wrote:
+> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> ---
+>  drivers/net/ethernet/freescale/fec_main.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-In file included from ../drivers/net/wireless/intersil/hostap/hostap_pci.c:220:0:
-drivers/net/wireless/intersil/hostap/hostap_hw.c: In function 'hfa384x_get_rid':
-drivers/net/wireless/intersil/hostap/hostap_hw.c:842:5: warning: 'rec' may be used uninitialized in this function [-Wmaybe-uninitialized]
-  if (le16_to_cpu(rec.len) == 0) {
+[note: missing changelog?]
 
-This restructures the function as suggested by Russell King, to
-make it more readable and get more reliable error handling, by
-handling each failure mode using a goto.
+> diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+> index b87f80d..15a93f90 100644
+> --- a/drivers/net/ethernet/freescale/fec_main.c
+> +++ b/drivers/net/ethernet/freescale/fec_main.c
+> @@ -476,6 +476,8 @@ static int fec_enet_txq_submit_skb(struct fec_enet_priv_tx_q *txq,
+>  				estatus |= BD_ENET_TX_TS;
+>  		}
+>  	}
+> +	bdp->cbd_bufaddr = addr;
+> +	bdp->cbd_datlen = buflen;
+>  
+>  	if (fep->bufdesc_ex) {
+>  
+> @@ -499,8 +501,6 @@ static int fec_enet_txq_submit_skb(struct fec_enet_priv_tx_q *txq,
+>  	/* Save skb pointer */
+>  	txq->tx_skbuff[index] = skb;
+>  
+> -	bdp->cbd_datlen = buflen;
+> -	bdp->cbd_bufaddr = addr;
+>  	/* Make sure the updates to rest of the descriptor are performed before
+>  	 * transferring ownership.
+>  	 */
+> 
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+This patch and others in the series conflicts with the bugfix "net: fec: make
+driver endian-safe" that Johannes sent this week. Can you include his fix
+in your series and ensure that all descriptor accesses are done in
+an endian-safe way?
 
-diff --git a/drivers/net/wireless/intersil/hostap/hostap_hw.c b/drivers/net/wireless/intersil/hostap/hostap_hw.c
-index 6df3ee561d52..515aa3f993f3 100644
---- a/drivers/net/wireless/intersil/hostap/hostap_hw.c
-+++ b/drivers/net/wireless/intersil/hostap/hostap_hw.c
-@@ -836,25 +836,30 @@ static int hfa384x_get_rid(struct net_device *dev, u16 rid, void *buf, int len,
- 	spin_lock_bh(&local->baplock);
- 
- 	res = hfa384x_setup_bap(dev, BAP0, rid, 0);
--	if (!res)
--		res = hfa384x_from_bap(dev, BAP0, &rec, sizeof(rec));
-+	if (res)
-+		goto unlock;
-+
-+	res = hfa384x_from_bap(dev, BAP0, &rec, sizeof(rec));
-+	if (res)
-+		goto unlock;
- 
- 	if (le16_to_cpu(rec.len) == 0) {
- 		/* RID not available */
- 		res = -ENODATA;
-+		goto unlock;
- 	}
- 
- 	rlen = (le16_to_cpu(rec.len) - 1) * 2;
--	if (!res && exact_len && rlen != len) {
-+	if (exact_len && rlen != len) {
- 		printk(KERN_DEBUG "%s: hfa384x_get_rid - RID len mismatch: "
- 		       "rid=0x%04x, len=%d (expected %d)\n",
- 		       dev->name, rid, rlen, len);
- 		res = -ENODATA;
- 	}
- 
--	if (!res)
--		res = hfa384x_from_bap(dev, BAP0, buf, len);
-+	res = hfa384x_from_bap(dev, BAP0, buf, len);
- 
-+unlock:
- 	spin_unlock_bh(&local->baplock);
- 	mutex_unlock(&local->rid_bap_mtx);
- 
+	Arnd
