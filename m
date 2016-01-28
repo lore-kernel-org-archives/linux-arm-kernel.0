@@ -1,165 +1,59 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 28 Jan 2016 19:37:52 +0100
-Subject: [PATCH v10 13/21] KVM: ARM64: Add access handler for PMSWINC
- register
-In-Reply-To: <1453866709-20324-14-git-send-email-zhaoshenglong@huawei.com>
-References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
- <1453866709-20324-14-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <20160128183752.GD16453@hawk.localdomain>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 28 Jan 2016 20:48:01 +0200
+Subject: [PATCH] clk: ti: omap3+: dpll: use non-locking version of
+ clk_get_rate
+In-Reply-To: <20160128172215.GD19432@atomide.com>
+References: <1453981067-8618-1-git-send-email-t-kristo@ti.com>
+ <56A9FED1.3090903@ti.com> <20160128172215.GD19432@atomide.com>
+Message-ID: <56AA6261.7030503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 11:51:41AM +0800, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Add access handler which emulates writing and reading PMSWINC
-> register and add support for creating software increment event.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/include/asm/pmu.h |  2 ++
->  arch/arm64/kvm/sys_regs.c    | 20 +++++++++++++++++++-
->  include/kvm/arm_pmu.h        |  2 ++
->  virt/kvm/arm/pmu.c           | 33 +++++++++++++++++++++++++++++++++
->  4 files changed, 56 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
-> index 2588f9c..6f14a01 100644
-> --- a/arch/arm64/include/asm/pmu.h
-> +++ b/arch/arm64/include/asm/pmu.h
-> @@ -60,6 +60,8 @@
->  #define	ARMV8_EVTYPE_MASK	0xc80003ff	/* Mask for writable bits */
->  #define	ARMV8_EVTYPE_EVENT	0x3ff		/* Mask for EVENT bits */
->  
-> +#define ARMV8_EVTYPE_EVENT_SW_INCR	0	/* Software increment event */
-> +
->  /*
->   * Event filters for PMUv3
->   */
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 60b24ea..f45c227 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -676,6 +676,23 @@ static bool access_pmovs(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
->  	return true;
->  }
->  
-> +static bool access_pmswinc(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-> +			   const struct sys_reg_desc *r)
-> +{
-> +	u64 mask;
-> +
-> +	if (!kvm_arm_pmu_v3_ready(vcpu))
-> +		return trap_raz_wi(vcpu, p, r);
-> +
-> +	if (p->is_write) {
-> +		mask = kvm_pmu_valid_counter_mask(vcpu);
-> +		kvm_pmu_software_increment(vcpu, p->regval & mask);
-> +		return true;
-> +	}
-> +
-> +	return false;
-> +}
-> +
->  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
->  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
->  	/* DBGBVRn_EL1 */						\
-> @@ -886,7 +903,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  	  access_pmovs, NULL, PMOVSSET_EL0 },
->  	/* PMSWINC_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b100),
-> -	  trap_raz_wi },
-> +	  access_pmswinc, reset_unknown, PMSWINC_EL0 },
->  	/* PMSELR_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b101),
->  	  access_pmselr, reset_unknown, PMSELR_EL0 },
-> @@ -1225,6 +1242,7 @@ static const struct sys_reg_desc cp15_regs[] = {
->  	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), access_pmcnten },
->  	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), access_pmcnten },
->  	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), access_pmovs },
-> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 4), access_pmswinc },
->  	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
->  	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmceid },
->  	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmceid },
-> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-> index 4f8409d..caa706e 100644
-> --- a/include/kvm/arm_pmu.h
-> +++ b/include/kvm/arm_pmu.h
-> @@ -41,6 +41,7 @@ u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu);
->  void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
->  void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
->  void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
-> +void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val);
->  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
->  				    u64 select_idx);
->  #else
-> @@ -60,6 +61,7 @@ static inline u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
->  static inline void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
->  static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
->  static inline void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
-> +static inline void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val) {}
->  static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
->  						  u64 data, u64 select_idx) {}
->  #endif
-> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-> index ee75fac..706c935 100644
-> --- a/virt/kvm/arm/pmu.c
-> +++ b/virt/kvm/arm/pmu.c
-> @@ -161,6 +161,35 @@ void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val)
->  		kvm_vcpu_kick(vcpu);
->  }
->  
-> +/**
-> + * kvm_pmu_software_increment - do software increment
-> + * @vcpu: The vcpu pointer
-> + * @val: the value guest writes to PMSWINC register
-> + */
-> +void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val)
-> +{
-> +	int i;
-> +	u64 type, enable, reg;
-> +
-> +	if (val == 0)
-> +		return;
-> +
-> +	for (i = 0; i < ARMV8_CYCLE_IDX; i++) {
-> +		if (!(val & BIT(i)))
-> +			continue;
-> +		type = vcpu_sys_reg(vcpu, PMEVTYPER0_EL0 + i)
-> +		       & ARMV8_EVTYPE_EVENT;
-> +		enable = vcpu_sys_reg(vcpu, PMCNTENSET_EL0);
+On 01/28/2016 07:22 PM, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [160128 03:44]:
+>> On 01/28/2016 01:37 PM, Tero Kristo wrote:
+>>> As the code in this file is being executed within irq context in some
+>>> cases, we must avoid the clk_get_rate which uses mutex internally.
+>>> Switch the code to use clk_hw_get_rate instead which is non-locking.
+>>>
+>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>>
+>> Ooops, sorry. Sent wrong version (read: old) of this patch, please ignore
+>> this one. Will re-send the correct version in a bit.
+>
+> I think this is still needed as a fix for -rc cycle with cc: stable
+> as otherwise we have omap4 and 5 hang if PM runtime is enabled before
+> a suspend/resume cycle?
 
-The PMCNTENSET_EL0 read can be moved outside the loop.
+Look at the other patch I sent, it should accomplish the same thing, and 
+more.
 
-> +		if ((type == ARMV8_EVTYPE_EVENT_SW_INCR) && (enable & BIT(i))) {
-> +			reg = vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + i) + 1;
-> +			reg = lower_32_bits(reg);
-> +			vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + i) = reg;
-> +			if (!reg)
-> +				kvm_pmu_overflow_set(vcpu, BIT(i));
-> +		}
-> +	}
-> +}
-> +
->  static bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu, u64 select_idx)
->  {
->  	return (vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E) &&
-> @@ -189,6 +218,10 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
->  	kvm_pmu_stop_counter(vcpu, pmc);
->  	eventsel = data & ARMV8_EVTYPE_EVENT;
->  
-> +	/* Software increment event does't need to be backed by a perf event */
-> +	if (eventsel == ARMV8_EVTYPE_EVENT_SW_INCR)
-> +		return;
-> +
->  	memset(&attr, 0, sizeof(struct perf_event_attr));
->  	attr.type = PERF_TYPE_RAW;
->  	attr.size = sizeof(attr);
-> -- 
-> 2.0.4
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+https://www.spinics.net/lists/linux-clk/msg06094.html
+
+-Tero
+
+>
+> Regards,
+>
+> Tony
+>
+>
+>>>   drivers/clk/ti/dpll3xxx.c |    3 ++-
+>>>   1 file changed, 2 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/clk/ti/dpll3xxx.c b/drivers/clk/ti/dpll3xxx.c
+>>> index f4dec00..7ed24bc 100644
+>>> --- a/drivers/clk/ti/dpll3xxx.c
+>>> +++ b/drivers/clk/ti/dpll3xxx.c
+>>> @@ -437,7 +437,8 @@ int omap3_noncore_dpll_enable(struct clk_hw *hw)
+>>>
+>>>   	parent = clk_hw_get_parent(hw);
+>>>
+>>> -	if (clk_hw_get_rate(hw) == clk_get_rate(dd->clk_bypass)) {
+>>> +	if (clk_hw_get_rate(hw) ==
+>>> +	    clk_hw_get_rate(__clk_get_hw(dd->clk_bypass))) {
+>>>   		WARN_ON(parent != __clk_get_hw(dd->clk_bypass));
+>>>   		r = _omap3_noncore_dpll_bypass(clk);
+>>>   	} else {
+>>>
+>>
