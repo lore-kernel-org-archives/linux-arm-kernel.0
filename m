@@ -1,46 +1,60 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 28 Jan 2016 14:11:04 -0800
-Subject: [PATCH V2 3/3] dt-bindings: bsm2835: fix bindings documentation
- to use new clock framework
-In-Reply-To: <2EC555E0-91B9-45AA-8804-848C445E052E@martin.sperl.org>
-References: <1452602149-5875-1-git-send-email-kernel@martin.sperl.org>
- <1452602149-5875-4-git-send-email-kernel@martin.sperl.org>
- <20160112143601.GA29373@rob-hp-laptop>
- <2EC555E0-91B9-45AA-8804-848C445E052E@martin.sperl.org>
-Message-ID: <87si1hfj7r.fsf@eliezer.anholt.net>
+From: johannes@sipsolutions.net (Johannes Berg)
+Date: Thu, 28 Jan 2016 23:14:19 +0100
+Subject: [PATCH net-next 08/40] net: fec: move cbd_bufaddr assignment
+ closer to the mapping function
+In-Reply-To: <1725152.bhtFKTSjnb@wuerfel>
+References: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1454016364-30985-9-git-send-email-troy.kisky@boundarydevices.com>
+ <1725152.bhtFKTSjnb@wuerfel>
+Message-ID: <1454019259.2332.17.camel@sipsolutions.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Sperl <kernel@martin.sperl.org> writes:
+On Thu, 2016-01-28 at 23:02 +0100, Arnd Bergmann wrote:
+> On Thursday 28 January 2016 14:25:32 Troy Kisky wrote:
+> > Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> > ---
+> > ?drivers/net/ethernet/freescale/fec_main.c | 4 ++--
+> > ?1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> [note: missing changelog?]
+> 
+> > diff --git a/drivers/net/ethernet/freescale/fec_main.c
+> > b/drivers/net/ethernet/freescale/fec_main.c
+> > index b87f80d..15a93f90 100644
+> > --- a/drivers/net/ethernet/freescale/fec_main.c
+> > +++ b/drivers/net/ethernet/freescale/fec_main.c
+> > @@ -476,6 +476,8 @@ static int fec_enet_txq_submit_skb(struct
+> > fec_enet_priv_tx_q *txq,
+> > ?				estatus |= BD_ENET_TX_TS;
+> > ?		}
+> > ?	}
+> > +	bdp->cbd_bufaddr = addr;
+> > +	bdp->cbd_datlen = buflen;
+> > ?
+> > ?	if (fep->bufdesc_ex) {
+> > ?
+> > @@ -499,8 +501,6 @@ static int fec_enet_txq_submit_skb(struct
+> > fec_enet_priv_tx_q *txq,
+> > ?	/* Save skb pointer */
+> > ?	txq->tx_skbuff[index] = skb;
+> > ?
+> > -	bdp->cbd_datlen = buflen;
+> > -	bdp->cbd_bufaddr = addr;
+> > ?	/* Make sure the updates to rest of the descriptor are
+> > performed before
+> > ?	?* transferring ownership.
+> > ?	?*/
+> > 
+> 
+> This patch and others in the series conflicts with the bugfix "net:
+> fec: make driver endian-safe" that Johannes sent this week. Can you
+> include his fix in your series and ensure that all descriptor
+> accesses are done in an endian-safe way?
+> 
 
->> On 12.01.2016, at 15:36, Rob Herring <robh@kernel.org> wrote:
->> 
->> On Tue, Jan 12, 2016 at 12:35:48PM +0000, kernel at martin.sperl.org wrote:
->>> From: Martin Sperl <kernel@martin.sperl.org>
->> 
->> Typo in the subject (bsm).
->> 
->>> 
->>> The bcm2835-i2s driver has been updated to use the new clock framework
->>> for the bcm2835 SOC.
->>> 
->>> This patch documents the required changes to the bindings.
->>> 
->>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
->> 
->> Please add acks when you post new versions.
->> 
->
-> You want it resent with the typo fixed and signed-off?
+My fixes are already in net.git, so you should base on a current
+net.git or on net-next.git after net.git is merged there (which davem
+usually does after Linus merges from him, IIRC)
 
-Generally, make sure you apply acks as you get them, so that they don't
-get lost.  If you fix the subject and add Rob's ack, it's also:
-
-Acked-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160128/a64ac35d/attachment.sig>
+johannes
