@@ -1,31 +1,48 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 28 Jan 2016 16:11:44 +0300
-Subject: [PATCH] ipv4: ipconfig: avoid unused ic_proto_used symbol
-In-Reply-To: <1453902853-3424272-1-git-send-email-arnd@arndb.de>
-References: <1453902853-3424272-1-git-send-email-arnd@arndb.de>
-Message-ID: <56AA1390.6000503@cogentembedded.com>
+From: jenskuske@gmail.com (Jens Kuske)
+Date: Thu, 28 Jan 2016 14:16:26 +0100
+Subject: [linux-sunxi] Problem with Allwinner H3 clocks
+In-Reply-To: <56A9CE3D.4020906@redhat.com>
+References: <20160127084607.665fb8c38eeb5733ce4232da@free.fr>
+ <CAGb2v65FUhNC-d-YT=-2adNHHT6b1JvGoNTFLfBX_xBSnuOsTg@mail.gmail.com>
+ <20160127103714.58312b152adb4148bae2f93b@free.fr> <56A8D5E5.30701@gmail.com>
+ <20160127175512.87caf31b5e21a1fec91507f2@free.fr>
+ <56A9098A.5010107@redhat.com>
+ <20160127200217.14dce96ade71cf81bc82e6f6@free.fr>
+ <56A9CE3D.4020906@redhat.com>
+Message-ID: <56AA14AA.4070502@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 28/01/16 09:15, Hans de Goede wrote:
+> Hi,
+> 
+> On 27-01-16 20:02, Jean-Francois Moine wrote:
+>> On Wed, 27 Jan 2016 19:16:42 +0100
+>> Hans de Goede <hdegoede@redhat.com> wrote:
+>>
+>>>> To be sure, I generated a pure 4.5-rc1 kernel. Same result: no UART.
+>>>> Maybe... one more information: I am using Allwinner's u-boot.
+>>>
+>>> Could be that that is the culprit, why are you not using upstream u-boot?
+>>> upstream u-boot has H3 and orangepi-pc support now.
+>>
+>> Yes, but using the upstream u-boot may hide the clock problem.
+> 
+> I agree that that could be the case. Would be interesting to figure out
+> what exactly is needed to get the upstream kernel to work properly
+> with allwinner's u-boot.
 
-On 1/27/2016 4:53 PM, Arnd Bergmann wrote:
+Hi,
 
-> When CONFIG_PROC_FS, CONFIG_IP_PNP_BOOTP, CONFIG_IP_PNP_DHCP and
-> CONFIG_IP_PNP_RARP are all disabled, we get a warning about the
-> ic_proto_used variable being unused:
->
-> net/ipv4/ipconfig.c:146:12: error: 'ic_proto_used' defined but not used [-Werror=unused-variable]
->
-> This avoids the warning, but making the definition conditional on
+after figuring out how to boot a devicetree kernel with allwinner's
+u-boot I only had to add the mandatory
+	
+	clock-frequency = <24000000>;
+	arm,cpu-registers-not-fw-configured;
 
-    s/but/by/?
+to the timer node and v4.5-rc1 booted successfully. They are
+intentionally left out in the official dt, because documentation says
+one should prefer to fix the firmware -> mainline u-boot
+No problems with clocks or uart here.
 
-> whether a dynamic IP configuration protocol is configured. If not,
-> we know that the value is always zero, so we can optimize away the
-> variable and all code that depends on it.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-[...]
-
-MBR, Sergei
+Jens
