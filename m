@@ -1,121 +1,55 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 28 Jan 2016 17:11:06 +0900
-Subject: [PATCH 12/19] ARM: dts: exynos: replace legacy *, wakeup property
- with wakeup-source
-In-Reply-To: <5671F88F.7050802@samsung.com>
-References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
- <1445422216-29375-13-git-send-email-sudeep.holla@arm.com>
- <5671F88F.7050802@samsung.com>
-Message-ID: <56A9CD1A.8010800@samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 28 Jan 2016 09:15:50 +0100
+Subject: [PATCH] ARM: dts: emev2:use GIC_* defines
+In-Reply-To: <1453944594-24757-1-git-send-email-horms+renesas@verge.net.au>
+References: <1453944594-24757-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVBK1nGiYucbDA8SKTLtVd7yC6v1oq==fnzP9Fq2cWhfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.12.2015 08:49, Krzysztof Kozlowski wrote:
-> On 21.10.2015 19:10, Sudeep Holla wrote:
->> Though the keyboard and other driver will continue to support the legacy
->> "gpio-key,wakeup", "linux-keypad,wakeup" boolean property to enable the
->> wakeup source, "wakeup-source" is the new standard binding.
->>
->> This patch replaces all the legacy wakeup properties with the unified
->> "wakeup-source" property in order to avoid any futher copy-paste
->> duplication.
->>
->> Cc: Kukjin Kim <kgene@kernel.org>
->> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Cc: linux-samsung-soc at vger.kernel.org
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>  arch/arm/boot/dts/exynos3250-monk.dts           |  6 +++---
->>  arch/arm/boot/dts/exynos3250-rinato.dts         |  6 +++---
->>  arch/arm/boot/dts/exynos4210-origen.dts         | 10 +++++-----
->>  arch/arm/boot/dts/exynos4210-smdkv310.dts       |  2 +-
->>  arch/arm/boot/dts/exynos4210-trats.dts          |  2 +-
->>  arch/arm/boot/dts/exynos4210-universal_c210.dts |  4 ++--
->>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  2 +-
->>  arch/arm/boot/dts/exynos4412-odroidx.dts        |  2 +-
->>  arch/arm/boot/dts/exynos4412-origen.dts         |  2 +-
->>  arch/arm/boot/dts/exynos4412-smdk4412.dts       |  2 +-
->>  arch/arm/boot/dts/exynos4412-trats2.dts         |  4 ++--
->>  arch/arm/boot/dts/exynos5250-arndale.dts        | 12 ++++++------
->>  arch/arm/boot/dts/exynos5250-snow.dts           |  4 ++--
->>  arch/arm/boot/dts/exynos5250-spring.dts         |  4 ++--
->>  arch/arm/boot/dts/exynos5420-arndale-octa.dts   |  2 +-
->>  arch/arm/boot/dts/exynos5420-peach-pit.dts      |  4 ++--
->>  arch/arm/boot/dts/exynos5800-peach-pi.dts       |  4 ++--
->>  17 files changed, 36 insertions(+), 36 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
->> index 540a0adf2be6..b77ea2163a0a 100644
->> --- a/arch/arm/boot/dts/exynos3250-monk.dts
->> +++ b/arch/arm/boot/dts/exynos3250-monk.dts
->> @@ -43,7 +43,7 @@
->>  			linux,code = <KEY_POWER>;
->>  			label = "power key";
->>  			debounce-interval = <10>;
->> -			gpio-key,wakeup;
->> +			wakeup-source;
->>  		};
->>  	};
->>  
->> @@ -67,7 +67,7 @@
->>  			interrupt-parent = <&gpx1>;
->>  			interrupts = <5 0>;
->>  			reg = <0x25>;
->> -			wakeup;
->> +			wakeup-source;
->>  
->>  			muic: max77836-muic {
->>  				compatible = "maxim,max77836-muic";
->> @@ -184,7 +184,7 @@
->>  		interrupt-parent = <&gpx0>;
->>  		interrupts = <7 0>;
->>  		reg = <0x66>;
->> -		wakeup;
->> +		wakeup-source;
->>  
->>  		s2mps14_osc: clocks {
->>  			compatible = "samsung,s2mps14-clk";
->> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
->> index 41a5fafb9aa9..7acd11d2d957 100644
->> --- a/arch/arm/boot/dts/exynos3250-rinato.dts
->> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
->> @@ -43,7 +43,7 @@
->>  			linux,code = <KEY_POWER>;
->>  			label = "power key";
->>  			debounce-interval = <10>;
->> -			gpio-key,wakeup;
->> +			wakeup-source;
->>  		};
->>  	};
->>  
->> @@ -58,7 +58,7 @@
->>  			interrupt-parent = <&gpx1>;
->>  			interrupts = <5 0>;
->>  			reg = <0x25>;
->> -			wakeup;
->> +			wakeup-source;
->>  
->>  			muic: max77836-muic {
->>  				compatible = "maxim,max77836-muic";
->> @@ -245,7 +245,7 @@
->>  		interrupt-parent = <&gpx0>;
->>  		interrupts = <7 0>;
->>  		reg = <0x66>;
->> -		wakeup;
->> +		wakeup-source;
-> 
-> I think here and in Monk board these four "wakeup" properties are bogus,
-> not parsed by driver. Instead wakeup is always initialized to true.
-> 
-> Anyway fixing this is not part of this patch but instead this should be
-> fixed in separate commit. Here everything looks good:
-> 
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Hi Simon,
 
-This patch does not apply. Can you rebase it on linux-next or my next/dt
-branch (git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git)?
+On Thu, Jan 28, 2016 at 2:29 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Use GIC_* defines for GIC interrupt cells in emev2 device tree.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+> Based on renesas-devel-20160127-v4.5-rc1
+> ---
+>  arch/arm/boot/dts/emev2.dtsi | 37 +++++++++++++++++++------------------
+>  1 file changed, 19 insertions(+), 18 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/emev2.dtsi b/arch/arm/boot/dts/emev2.dtsi
+> index 57795da616cb..366e822367c7 100644
+> --- a/arch/arm/boot/dts/emev2.dtsi
+> +++ b/arch/arm/boot/dts/emev2.dtsi
+> @@ -9,6 +9,7 @@
+>   */
+>
+>  #include "skeleton.dtsi"
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+>
+>  / {
+> @@ -53,7 +54,7 @@
+>
+>         pmu {
+>                 compatible = "arm,cortex-a9-pmu";
+> -               interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>,
+> +               interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
+>                              <0 121 IRQ_TYPE_LEVEL_HIGH>;
 
-I applied the 16/19 (s5pv210).
+If you convert the above line, too, you can add my
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Best regards,
-Krzysztof
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
