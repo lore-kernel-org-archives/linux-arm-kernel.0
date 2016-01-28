@@ -1,65 +1,62 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 28 Jan 2016 17:43:41 +0100
-Subject: [PATCH] arm64: allow vmalloc regions to be set with set_memory_*
-In-Reply-To: <20160128150815.GG775@arm.com>
-References: <1453125665-26627-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160128150815.GG775@arm.com>
-Message-ID: <CAKv+Gu-GxicSKDq+Nm9H+dWrSVOhupozu4pZ=Pk7CzC_VrW=2Q@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 28 Jan 2016 16:45:36 +0000
+Subject: [PATCH v10 07/21] KVM: ARM64: PMU: Add perf event map and
+ introduce perf event creating function
+In-Reply-To: <20160128163115.GC3807@hawk.localdomain>
+References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453866709-20324-8-git-send-email-zhaoshenglong@huawei.com>
+ <20160128163115.GC3807@hawk.localdomain>
+Message-ID: <56AA45B0.3060205@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 January 2016 at 16:08, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Jan 18, 2016 at 03:01:05PM +0100, Ard Biesheuvel wrote:
->> The range of set_memory_* is currently restricted to the module address
->> range because of difficulties in breaking down larger block sizes.
->> vmalloc maps PAGE_SIZE pages so it is safe to use as well. Update the
->> function ranges and add a comment explaining why the range is restricted
->> the way it is.
+On 28/01/16 16:31, Andrew Jones wrote:
+> On Wed, Jan 27, 2016 at 11:51:35AM +0800, Shannon Zhao wrote:
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
 >>
->> Suggested-by: Laura Abbott <labbott@fedoraproject.org>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> When we use tools like perf on host, perf passes the event type and the
+>> id of this event type category to kernel, then kernel will map them to
+>> hardware event number and write this number to PMU PMEVTYPER<n>_EL0
+>> register. When getting the event number in KVM, directly use raw event
+>> type to create a perf_event for it.
+>>
+>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 >> ---
->>  arch/arm64/mm/pageattr.c | 23 +++++++++++++++++++----
->>  1 file changed, 19 insertions(+), 4 deletions(-)
->
-> What's the user for this? It would be better to apply along with something
-> that actually needs to change permission for arbitrary vmalloc mappings.
->
+>>  arch/arm64/include/asm/pmu.h |   3 ++
+>>  arch/arm64/kvm/Makefile      |   1 +
+>>  include/kvm/arm_pmu.h        |  10 ++++
+>>  virt/kvm/arm/pmu.c           | 122 +++++++++++++++++++++++++++++++++++++++++++
+>>  4 files changed, 136 insertions(+)
+>>  create mode 100644 virt/kvm/arm/pmu.c
+>>
+>> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
+>> index 4406184..2588f9c 100644
+>> --- a/arch/arm64/include/asm/pmu.h
+>> +++ b/arch/arm64/include/asm/pmu.h
+>> @@ -21,6 +21,7 @@
+>>  
+>>  #define ARMV8_MAX_COUNTERS      32
+>>  #define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
+>> +#define ARMV8_CYCLE_IDX         (ARMV8_MAX_COUNTERS - 1)
+> 
+> I'm not sure we want to add this. It's name is wrong, as it's really
+> PMCNTENSET_EL0.C, and just a few lines above we have the idx defined
+> already (ARMV8_IDX_CYCLE_COUNTER), but as zero, because
+> arch/arm64/kernel/perf_event.c maps it that way.
+> 
+> I think we should do the same with the pmc array, i.e. map the cycle
+> counter to idx zero.
 
-BPF already uses set_memory_ro() but doesn't bother to check the return value.
+I tend to have the opposite view. Not for the sake of it, but because I
+find it helpful to directly map the code to the architecture
+documentation without having to bend another handful of neurons.
 
-Without the patch, I get:
+Will probably had some good reasons to structure it that way, but I
+don't know the rational. Will?
 
-root at ubuntu-arm64:~# grep bpf /proc/vmallocinfo
-0xffff000000014000-0xffff000000016000    8192 bpf_prog_alloc+0x3c/0xb8
-pages=1 vmalloc
-0xffff00000017a000-0xffff00000017c000    8192 bpf_prog_alloc+0x3c/0xb8
-pages=1 vmalloc
-root at ubuntu-arm64:~# grep -E 0xffff000000014000\|0xffff00000017a000
-/sys/kernel/debug/kernel_page_tables
-0xffff000000014000-0xffff000000015000           4K     RW NX SHD AF
-        UXN MEM/NORMAL
-0xffff00000017a000-0xffff00000017b000           4K     RW NX SHD AF
-        UXN MEM/NORMAL
+Thanks,
 
-and with:
-
-root at ubuntu-arm64:~# grep bpf /proc/vmallocinfo
-0xffff000000014000-0xffff000000016000    8192 bpf_prog_alloc+0x3c/0xb8
-pages=1 vmalloc
-0xffff00000017a000-0xffff00000017c000    8192 bpf_prog_alloc+0x3c/0xb8
-pages=1 vmalloc
-root at ubuntu-arm64:~# grep -E 0xffff000000014000\|0xffff00000017a000
-/sys/kernel/debug/kernel_page_tables
-0xffff000000014000-0xffff000000015000           4K     ro NX SHD AF
-        UXN MEM/NORMAL
-0xffff00000017a000-0xffff00000017b000           4K     ro NX SHD AF
-        UXN MEM/NORMAL
-
-
-> Anyway, with that (and a rebase to -rc2):
->
-> Acked-by: Will Deacon <will.deacon@arm.com>
->
-
-Thanks
+	M.
+-- 
+Jazz is not dead. It just smells funny...
