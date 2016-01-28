@@ -1,38 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Jan 2016 17:39:24 +0100
-Subject: [PATCHv2] ipv4: ipconfig: avoid unused ic_proto_used symbol
-Message-ID: <2132183.67sfLfLqZb@wuerfel>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 28 Jan 2016 16:33:46 +0000
+Subject: [PATCH V5 08/14] PM / Domains: Add function to remove a pm-domain
+In-Reply-To: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
+References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <1453998832-27383-9-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_PROC_FS, CONFIG_IP_PNP_BOOTP, CONFIG_IP_PNP_DHCP and
-CONFIG_IP_PNP_RARP are all disabled, we get a warning about the
-ic_proto_used variable being unused:
+The genpd framework allows users to add power-domains via the
+pm_genpd_init() function, however, there is no corresponding function
+to remove a power-domain. For most devices this may be fine as the power
+domains are never removed, however, for devices that wish to populate
+the power-domains from within a driver, having the ability to remove a
+power domain if the probing of the device fails or the driver is unloaded
+is necessary. Therefore, add a function to remove a power-domain. Please
+note that the power domain can only be removed if there are no devices
+using the power-domain and it is not linked to another domain.
 
-net/ipv4/ipconfig.c:146:12: error: 'ic_proto_used' defined but not used [-Werror=unused-variable]
-
-This avoids the warning, by making the definition conditional on
-whether a dynamic IP configuration protocol is configured. If not,
-we know that the value is always zero, so we can optimize away the
-variable and all code that depends on it.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 ---
-v2: fix typo in changelog
+ drivers/base/power/domain.c | 26 ++++++++++++++++++++++++++
+ include/linux/pm_domain.h   |  5 +++++
+ 2 files changed, 31 insertions(+)
 
-diff --git a/net/ipv4/ipconfig.c b/net/ipv4/ipconfig.c
-index 67f7c9de0b16..2ed9dd2b5f2f 100644
---- a/net/ipv4/ipconfig.c
-+++ b/net/ipv4/ipconfig.c
-@@ -143,7 +143,11 @@ static char dhcp_client_identifier[253] __initdata;
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 45e3641b427d..b4120121bcac 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1529,6 +1529,32 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
+ }
+ EXPORT_SYMBOL_GPL(pm_genpd_init);
  
- /* Persistent data: */
++/**
++ * pm_genpd_remove - Remove a generic I/O PM domain object.
++ * @genpd: PM domain object to remove.
++ */
++int pm_genpd_remove(struct generic_pm_domain *genpd)
++{
++	if (IS_ERR_OR_NULL(genpd))
++		return -EINVAL;
++
++	mutex_lock(&genpd->lock);
++
++	if (!list_empty(&genpd->master_links)
++	    || !list_empty(&genpd->slave_links) || genpd->device_count) {
++		mutex_unlock(&genpd->lock);
++		return -EBUSY;
++	}
++
++	mutex_lock_nested(&gpd_list_lock, SINGLE_DEPTH_NESTING);
++	list_del(&genpd->gpd_list_node);
++	mutex_unlock(&gpd_list_lock);
++	mutex_unlock(&genpd->lock);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(pm_genpd_remove);
++
+ #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
+ /*
+  * Device Tree based PM domain providers.
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index db21d3995f7e..0d661998fa74 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -123,6 +123,7 @@ extern int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
+ 				     struct generic_pm_domain *target);
+ extern void pm_genpd_init(struct generic_pm_domain *genpd,
+ 			  struct dev_power_governor *gov, bool is_off);
++extern int pm_genpd_remove(struct generic_pm_domain *genpd);
  
-+#ifdef IPCONFIG_DYNAMIC
- static int ic_proto_used;			/* Protocol used, if any */
-+#else
-+#define ic_proto_used 0
-+#endif
- static __be32 ic_nameservers[CONF_NAMESERVERS_MAX]; /* DNS Server IP addresses */
- static u8 ic_domain[64];		/* DNS (not NIS) domain name */
+ extern struct dev_power_governor simple_qos_governor;
+ extern struct dev_power_governor pm_domain_always_on_gov;
+@@ -161,6 +162,10 @@ static inline void pm_genpd_init(struct generic_pm_domain *genpd,
+ 				 struct dev_power_governor *gov, bool is_off)
+ {
+ }
++static inline int pm_genpd_remove(struct generic_pm_domain *genpd)
++{
++	return -ENOTSUPP;
++}
+ #endif
  
+ static inline int pm_genpd_add_device(struct generic_pm_domain *genpd,
+-- 
+2.1.4
