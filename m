@@ -1,91 +1,69 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 27 Jan 2016 16:31:48 -0800
-Subject: [PATCH 3/3] ARM: dts: vf610: add remaining SAI instaces
-In-Reply-To: <1445141122-14183-3-git-send-email-stefan@agner.ch>
-References: <1445141122-14183-1-git-send-email-stefan@agner.ch>
- <1445141122-14183-3-git-send-email-stefan@agner.ch>
-Message-ID: <7c3b0b28706f2bf1cf656c7dc2daf31d@agner.ch>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 28 Jan 2016 09:35:21 +0900
+Subject: [PATCH v4 0/3] arm64/clk: EXYNOS: Consolidate Exynos7 symbol
+Message-ID: <1453941324-15742-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi,
 
-The rest of the patchset has been applied during rc phase of v4.4, I
-guess this one was scheduled for the next release (v4.5). However, I
-just realized that this seemed to have slipped through...
+Patchset attempts to remove the ARCH_EXYNOS7 symbol.
 
---
-Stefan
+All patches depend on previous ones so no cherry-picked.
+I was thinking about merging this through arm-soc tree after getting
+needed acks (clk, arm-soc?).
 
-On 2015-10-17 21:05, Stefan Agner wrote:
-> This adds the remaining SAI instances SAI0, SAI1 and SAI3. All
-> instances are very similar, except that the DMA channel of SAI3
-> is available on MUX1 (compared to MUX0 for SAI0-SAI2). Also,
-> SAI3 has a slightly different memory map due to a deeper FIFO,
-> however in practice the current driver works for SAI3 fine.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  arch/arm/boot/dts/vfxxx.dtsi | 42 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-> index c2a4d1c..b45bc81 100644
-> --- a/arch/arm/boot/dts/vfxxx.dtsi
-> +++ b/arch/arm/boot/dts/vfxxx.dtsi
-> @@ -174,6 +174,34 @@
->  				status = "disabled";
->  			};
->  
-> +			sai0: sai at 4002f000 {
-> +				compatible = "fsl,vf610-sai";
-> +				reg = <0x4002f000 0x1000>;
-> +				interrupts = <84 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks VF610_CLK_SAI0>,
-> +					<&clks VF610_CLK_SAI0_DIV>,
-> +					<&clks 0>, <&clks 0>;
-> +				clock-names = "bus", "mclk1", "mclk2", "mclk3";
-> +				dma-names = "tx", "rx";
-> +				dmas = <&edma0 0 17>,
-> +					<&edma0 0 16>;
-> +				status = "disabled";
-> +			};
-> +
-> +			sai1: sai at 40030000 {
-> +				compatible = "fsl,vf610-sai";
-> +				reg = <0x40030000 0x1000>;
-> +				interrupts = <85 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks VF610_CLK_SAI1>,
-> +					<&clks VF610_CLK_SAI1_DIV>,
-> +					<&clks 0>, <&clks 0>;
-> +				clock-names = "bus", "mclk1", "mclk2", "mclk3";
-> +				dma-names = "tx", "rx";
-> +				dmas = <&edma0 0 19>,
-> +					<&edma0 0 18>;
-> +				status = "disabled";
-> +			};
-> +
->  			sai2: sai at 40031000 {
->  				compatible = "fsl,vf610-sai";
->  				reg = <0x40031000 0x1000>;
-> @@ -188,6 +216,20 @@
->  				status = "disabled";
->  			};
->  
-> +			sai3: sai at 40032000 {
-> +				compatible = "fsl,vf610-sai";
-> +				reg = <0x40032000 0x1000>;
-> +				interrupts = <87 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks VF610_CLK_SAI3>,
-> +					<&clks VF610_CLK_SAI3_DIV>,
-> +					<&clks 0>, <&clks 0>;
-> +				clock-names = "bus", "mclk1", "mclk2", "mclk3";
-> +				dma-names = "tx", "rx";
-> +				dmas = <&edma0 1 9>,
-> +					<&edma0 1 8>;
-> +				status = "disabled";
-> +			};
-> +
->  			pit: pit at 40037000 {
->  				compatible = "fsl,vf610-pit";
->  				reg = <0x40037000 0x1000>;
+
+Changes since v3:
+=================
+1. Rebase on next-20160127 (s3c64xx became multiplatform).
+
+Changes since v2:
+=================
+1. Follow Arnd's advice about not enabling silently the newly added
+   EXYNOS_ARM64_COMMON_CLK, when COMPILE_TEST is enabled. This was
+   also a trigger for some changes in placement of Samsung clocks
+   Kconfig entries...
+2. ... which lead to introducing patch 1.
+
+
+Logic:
+======
+Now the clock selection algorithm works like:
+1. For Exynos ARMv7 and ARMv8 the platforms select COMMON_CLK
+   and COMMON_CLK_SAMSUNG.
+2. As before: clock drivers for Exynos ARMv7 will be selected by
+   respective SOC/ARCH_EXYNOS_XXX symbol.
+3. For Exynos ARMv8 the clock drivers will be enabled by default
+   by EXYNOS_ARM64_COMMON_CLK symbol.
+
+Rationale:
+==========
+We don't need ARCH_EXYNOS7 symbol because all ARMv8 platforms should
+fall under generic ARCH_EXYNOS. In the same time there is no sense
+in building clocks for these ARMv8 SoCs on ARMv7 builds.
+
+
+Best regards,
+Krzysztof
+
+
+Krzysztof Kozlowski (3):
+  clk: samsung: Enable COMPILE_TEST for Samsung clocks
+  clk: samsung: Don't build ARMv8 clock drivers on ARMv7
+  arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS
+
+ arch/arm/mach-exynos/Kconfig        |  1 +
+ arch/arm/mach-s3c24xx/Kconfig       |  8 ++++++++
+ arch/arm/mach-s3c64xx/Kconfig       |  1 +
+ arch/arm/mach-s5pv210/Kconfig       |  1 +
+ arch/arm64/Kconfig.platforms        | 12 +++---------
+ arch/arm64/boot/dts/exynos/Makefile |  2 +-
+ arch/arm64/configs/defconfig        |  2 +-
+ drivers/clk/Kconfig                 |  2 +-
+ drivers/clk/samsung/Kconfig         | 14 +++++++++-----
+ drivers/clk/samsung/Makefile        |  4 ++--
+ 10 files changed, 28 insertions(+), 19 deletions(-)
+
+-- 
+1.9.1
