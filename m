@@ -1,64 +1,103 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 28 Jan 2016 18:23:24 +0800
-Subject: [PATCH V3 18/21] ACPI, PCI: Refine the way to handle
- translation_offset for ACPI resources
-In-Reply-To: <20160119122026.GA5185@red-moon>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
- <1452691267-32240-19-git-send-email-tn@semihalf.com>
- <20160119122026.GA5185@red-moon>
-Message-ID: <56A9EC1C.4080806@linaro.org>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Thu, 28 Jan 2016 18:19:16 +0800
+Subject: [PATCH 4/4] Documentation: atmel-at91: add DT bindings for fast
+ startup
+In-Reply-To: <1453976356-24391-1-git-send-email-wenyou.yang@atmel.com>
+References: <1453976356-24391-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1453976356-24391-5-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+Add DT bindings to configurate the PMC_FSMR and PMC_FSPR registers
+to trigger a fast restart signal to PMC.
 
-On 2016/1/19 20:20, Lorenzo Pieralisi wrote:
-> Gerry,
->
-> On Wed, Jan 13, 2016 at 02:21:04PM +0100, Tomasz Nowicki wrote:
->> From: Liu Jiang <jiang.liu@linux.intel.com>
->>
->> Some architectures, such as IA64 and ARM64, have no instructions to
->> directly access PCI IO ports, so they map PCI IO ports into PCI MMIO
->> address space. Typically PCI host bridges on those architectures take
->> the responsibility to map (translate) PCI IO port transactions into
->> Memory-Mapped IO transactions. ACPI specification provides support
->> of such a usage case by using resource translation_offset.
->>
->> But current ACPI resource parsing interface isn't neutral enough,
->> it still has some special logic for IA64. So refine the ACPI resource
->> parsing interface and IA64 code to neutrally handle translation_offset
->> by:
->> 1) ACPI resource parsing interface doesn't do any translation, it just
->>     save the translation_offset to be used by arch code.
->> 2) Arch code will do the mapping(translation) based on arch specific
->>     information. Typically it does:
->> 2.a) Translate per PCI domain IO port address space into system global
->>     IO port address space.
->> 2.b) Setup MMIO address mapping for IO ports.
->
-> This patch fixes IO space handling on IA64 and should go in as a fix.
->
-> IA64 PCI IO space is currently broken (Hanjun tested this on an IA64 box).
->
-> The first broken commit is:
->
-> 3772aea7d6f3 ("ia64/PCI/ACPI: Use common ACPI resource parsing interface for host bridge")
->
-> because acpi core code checks (in acpi_dev_ioresource_flags()) the
-> resource.end>=0x10003, which fails on ia64 - currently resource.end is
-> set in acpi_decode_space() to:
->
-> AddressMaximum + AddressTranslation
->
-> where AddressTranslation is the CPU physical address mapping IO space
-> on IA64, the >=0x10003 check in acpi_dev_ioresource_flags always
-> triggers and the IO resource is then disabled.
->
-> Do you want me to re-send this patch as a fix, with updated commit log ?
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
 
-I talked to Gerry offline, he is busy these days, he said it's pretty
-OK for you to resend this patch and fix the problem.
+ .../devicetree/bindings/arm/atmel-pmc.txt          |   74 ++++++++++++++++++++
+ 1 file changed, 74 insertions(+)
 
-Thanks
-Hanjun
+diff --git a/Documentation/devicetree/bindings/arm/atmel-pmc.txt b/Documentation/devicetree/bindings/arm/atmel-pmc.txt
+index 795cc78..8d45ff9f 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-pmc.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-pmc.txt
+@@ -12,3 +12,77 @@ Examples:
+ 		compatible = "atmel,at91rm9200-pmc";
+ 		reg = <0xfffffc00 0x100>;
+ 	};
++
++PMC Fast Startup Signals
++
++The PMC Fast Start Signals are used as the wake up source to trigger the PMC
++to wake up the system from the ULP1 mode.
++
++required properties:
++- compatible: Should be "atmel,sama5d2-pmc-fast-startup".
++
++optional properties:
++- atmel,fast-startup-wake-up: boolean to enable the WKUP pin to trigger
++  a fast restart signal to the PMC.
++- atmel,fast-startup-secumod: boolean to enable the Security Mode to trigger
++  a fast restart signal to the PMC.
++- atmel,fast-startup-piobu0: boolean to enable the PIOBU0 Input to trigger
++  a fast restart signal to the PMC.
++- atmel,fast-startup-piobu1: boolean to enable the PIOBU1 Input to trigger
++  a fast restart signal to the PMC.
++- atmel,fast-startup-piobu2: boolean to enable the PIOBU2 Input to trigger
++  a fast restart signal to the PMC.
++- atmel,fast-startup-piobu3: boolean to enable the PIOBU3 Input to trigger
++  a fast restart signal to the PMC.
++- atmel,fast-startup-piobu4: boolean to enable the PIOBU4 Input to trigger
++  a fast restart signal to the PMC.
++- atmel,fast-startup-piobu5: boolean to enable the PIOBU5 Input to trigger
++  a fast restart signal to the PMC.
++- atmel,fast-startup-piobu6: boolean to enable the PIOBU6 Input to trigger
++  a fast restart signal to the PMC.
++- atmel,fast-startup-piobu7: boolean to enable the PIOBU7 Input to trigger
++  a fast restart signal to the PMC.
++- atmel,fast-startup-gmac-wol: boolean to enable the GMAC Wake-up On LAN
++  to trigger a fast restart signal to the PMC.
++- atmel,fast-startup-rtc-alarm: boolean to enable the RTC Alarm to trigger
++  a fast restart signal to the PMC.
++- atmel,fast-startup-usb-resume: boolean to enable the USB Resume to trigger
++  a fast restart signal to the PMC.
++- atmel,fast-startup-sdmmc-cd: boolean to enable the SDMMC Card Detect
++  to trigger a fast restart signal to the PMC.
++- atmel,fast-startup-rxlp-match: boolean to enable the Backuo UART Receive
++  Match Condition to trigger a fast restart signal to the PMC.
++- atmel,fast-startup-acc-comparison: boolean to enable the Analog Comparator
++  Controller (ACC) Comparison to to trigger a fast restart signal to the PMC.
++
++- atmel,fast-startup-wkup-pin-high: boolean to indicate if the WKUP Pin is
++  in the high level to trigger fast restart signal, otherwise low level.
++- atmel,fast-startup-piobu0-high: boolean to indicate if the PIOBU0 Pin is
++  in the high level to trigger fast restart signal, otherwise low level.
++- atmel,fast-startup-piobu1-high: boolean to indicate if the PIOBU1 Pin is
++  in the high level to trigger fast restart signal, otherwise low level.
++- atmel,fast-startup-piobu2-high: boolean to indicate if the PIOBU2 Pin is
++  in the high level to trigger fast restart signal, otherwise low level.
++- atmel,fast-startup-piobu3-high: boolean to indicate if the PIOBU3 Pin is
++  in the high level to trigger fast restart signal, otherwise low level.
++- atmel,fast-startup-piobu4-high: boolean to indicate if the PIOBU4 Pin is
++  in the high level to trigger fast restart signal, otherwise low level.
++- atmel,fast-startup-piobu5-high: boolean to indicate if the PIOBU5 Pin is
++  in the high level to trigger fast restart signal, otherwise low level.
++- atmel,fast-startup-piobu6-high: boolean to indicate if the PIOBU6 Pin is
++  in the high level to trigger fast restart signal, otherwise low level.
++- atmel,fast-startup-piobu7-high: boolean to indicate if the PIOBU7 Pin is
++  in the high level to trigger fast restart signal, otherwise low level.
++
++Example:
++
++	pmc: pmc at f0014000 {
++		compatible = "atmel,sama5d2-pmc";
++		reg = <0xf0014000 0x160>;
++
++		pmc_fast_restart {
++			compatible = "atmel,sama5d2-pmc-fast-startup";
++			atmel,fast-startup-wake-up;
++			atmel,fast-startup-rtc-alarm;
++		};
++	};
+-- 
+1.7.9.5
