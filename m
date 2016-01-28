@@ -1,71 +1,29 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Thu, 28 Jan 2016 14:56:20 +0800
-Subject: MTK mt8173-evb: mainline unstable, and big-endian boot failures
-In-Reply-To: <CAF-23O3ps0Wt_UCmJbArpc5iJJryJKA0k_2qAyNb7op8O=UnAg@mail.gmail.com>
-References: <CAOi56cVDbkAJEDWy3+DV63a=UuD7nqpUu8X7e-OjtWM-4dj_-w@mail.gmail.com>
- <7hsi1ilczm.fsf@baylibre.com>
- <CAF-23O3ps0Wt_UCmJbArpc5iJJryJKA0k_2qAyNb7op8O=UnAg@mail.gmail.com>
-Message-ID: <1453964180.26397.8.camel@mtksdaap41>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 28 Jan 2016 10:13:21 +0300
+Subject: [PATCH 00/10] KVM PCIe/MSI passthrough on ARM/ARM64
+In-Reply-To: <56A8854F.3030209@linaro.org>
+References: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
+ <000001d1585e$8097d7e0$81c787a0$@samsung.com> <56A8854F.3030209@linaro.org>
+Message-ID: <00aa01d1599b$5fd3bd10$1f7b3730$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-01-28 at 13:41 +0800, Koan-Sin Tan wrote:
-> Hi Kevin, 
-> 
-> On Thu, Jan 28, 2016 at 9:16 AM, Kevin Hilman <khilman@baylibre.com>
-> wrote:
->         Kevin Hilman <khilman@baylibre.com> writes:
->         
->         [...]
->         
->         > It seems to be pretty stable up through v4.4 but
->         > unreliable/unpredictable in v4.5-rc1 and lots of places in
->         between.
->         > It's hard to bisect because it doesn't reliably fail, but
->         when it does
->         > fail to finish booting, it's typically after it reaches a
->         shell, and
->         > trying to run various simple shell commands fails to
->         complete, like
->         > this example from next-20160125[2].
->         >
->         > To me this suggests possibly an issue with the idle driver
->         where
->         > characters might be getting lost on the serial console,
->         which causes
->         > the automated boot scripts to fail because the shell is
->         still waiting
->         > for the command to be finished.
->         
->         FWIW, I think I confirmed my suspicion that it's an idle
->         driver issue
->         because adding 'nohlt' on the cmdline, which forces
->         cpuidle_poll mode
->         (essentially disabling cpuidle) makes mainline boot quite
->         reliably on my
->         mt8173-evb board now.
-> 
-> 
->    Thanks for the information. I'll try to reproduce it. The problem
-> is that I have been using 4.5-rc1 based kernel for several days, but
-> didn't run into such problem. Can tell me which version of firmware
-> you are using? 
+ Hello!
 
-Hi Kevin,
+> x86 isn't problem-free in this space.  An x86 VM is going to know that
+> the 0xfee00000 address range is special, it won't be backed by RAM and
+> won't be a DMA target, thus we'll never attempt to map it for an iova
+> address.  However, if we run a non-x86 VM or a userspace driver, it
+> doesn't necessarily know that there's anything special about that range
+> of iovas.  I intend to resolve this with an extension to the iommu info
+> ioctl that describes the available iova space for the iommu.  The
+> interrupt region would simply be excluded.
 
-I use firmware [0] to run kernel v4.5-rc1 on my MT8173-evb, both branch
-v20150716 (psci-0.2 atf) and v20150902 (psci-1.0 atf) can't reproduce
-this problem.
+ I see now, but i still don't understand how it would work. How can we tell the guest OS that we cannot do DMA to this particular
+area? Just exclude it from RAM at all? But this means we would have to modify machine's model...
+ I know that this is a bit different story from what we are implementing now. Just curious.
 
-[0]: https://github.com/ibanezchen/evb-utils
-
-Eddie
-
->   
->    And, YES, I can reproduce the CONFIG_CPU_BIG_ENDIAN=y problem. The
-> 'nohlt' command line option didn't stop the problem. We'll investigate
-> it.
-> 
-> 
-> -- 
-> // freedom
+Kind regards,
+Pavel Fedin
+Senior Engineer
+Samsung Electronics Research center Russia
