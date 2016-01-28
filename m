@@ -1,257 +1,129 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 28 Jan 2016 13:44:11 +0200
-Subject: [PATCH] clk: ti: dpll: convert DPLL support code to use clk_hw
- instead of clk ptrs
-Message-ID: <1453981451-9054-1-git-send-email-t-kristo@ti.com>
+From: qiuxishi@huawei.com (Xishi Qiu)
+Date: Thu, 28 Jan 2016 19:47:09 +0800
+Subject: [PATCH] arm64: Allow vmalloc regions to be set with set_memory_*
+In-Reply-To: <20160128105138.GE17123@leverpostej>
+References: <1452635187-8057-1-git-send-email-labbott@fedoraproject.org>
+ <CAKv+Gu_A1C9hXgqrYDekoy1YHaRXi_mUF-kYx-TqsOBkWMVjmQ@mail.gmail.com>
+ <CAKv+Gu-73QKAsFQCa=yO5+=DihLXp_AKYyY6QRTVM4nuDH=-8g@mail.gmail.com>
+ <20160118115640.GK21067@leverpostej> <56A97328.9070003@huawei.com>
+ <20160128105138.GE17123@leverpostej>
+Message-ID: <56A9FFBD.8030303@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert DPLL support code to use clk_hw pointers for reference and bypass
-clocks. This allows us to use clk_hw_* APIs for accessing any required
-parameters for these clocks, avoiding some locking problems at least with
-DPLL enable code; this used clk_get_rate which uses mutex but isn't
-good under clk_enable / clk_disable.
+On 2016/1/28 18:51, Mark Rutland wrote:
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- drivers/clk/ti/apll.c      |   20 ++++++++++++++++----
- drivers/clk/ti/clkt_dpll.c |    6 +++---
- drivers/clk/ti/dpll.c      |   26 ++++++++++++++++++++------
- drivers/clk/ti/dpll3xxx.c  |   16 ++++++++--------
- drivers/clk/ti/dpll44xx.c  |    8 ++++----
- include/linux/clk/ti.h     |    8 ++++----
- 6 files changed, 55 insertions(+), 29 deletions(-)
+> On Thu, Jan 28, 2016 at 09:47:20AM +0800, Xishi Qiu wrote:
+>> On 2016/1/18 19:56, Mark Rutland wrote:
+>>> On Wed, Jan 13, 2016 at 05:10:31PM +0100, Ard Biesheuvel wrote:
+>>>> Something along these lines, perhaps?
+>>>>
+>>>> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+>>>> index 3571c7309c5e..bda0a776c58e 100644
+>>>> --- a/arch/arm64/mm/pageattr.c
+>>>> +++ b/arch/arm64/mm/pageattr.c
+>>>> @@ -13,6 +13,7 @@
+>>>>  #include <linux/kernel.h>
+>>>>  #include <linux/mm.h>
+>>>>  #include <linux/module.h>
+>>>> +#include <linux/vmalloc.h>
+>>>>  #include <linux/sched.h>
+>>>>
+>>>>  #include <asm/pgtable.h>
+>>>> @@ -44,6 +45,7 @@ static int change_memory_common(unsigned long addr
+>>>>         unsigned long end = start + size;
+>>>>         int ret;
+>>>>         struct page_change_data data;
+>>>> +       struct vm_struct *area;
+>>>>
+>>>>         if (!PAGE_ALIGNED(addr)) {
+>>>>                 start &= PAGE_MASK;
+>>>> @@ -51,10 +53,14 @@ static int change_memory_common(unsigned long addr,
+>>>>                 WARN_ON_ONCE(1);
+>>>>         }
+>>>>
+>>>> -       if (start < MODULES_VADDR || start >= MODULES_END)
+>>>> -               return -EINVAL;
+>>>> -
+>>>> -       if (end < MODULES_VADDR || end >= MODULES_END)
+>>>> +       /*
+>>>> +        * Check whether the [addr, addr + size) interval is entirely
+>>>> +        * covered by precisely one VM area that has the VM_ALLOC flag set
+>>>> +        */
+>>>> +       area = find_vm_area((void *)addr);
+>>>> +       if (!area ||
+>>>> +           end > (unsigned long)area->addr + area->size ||
+>>>> +           !(area->flags & VM_ALLOC))
+>>>>                 return -EINVAL;
+>>>>
+>>>>         data.set_mask = set_mask;
+>>>
+>>> Neat. That fixes the fencepost bug too.
+>>>
+>>> Looks good to me, though as Laura suggested we should have a comment as
+>>> to why we limit changes to such regions. Fancy taking her wording below
+>>> and spinning this as a patch?
+>>>
+>>>>>> +       /*
+>>>>>> +        * This check explicitly excludes most kernel memory. Most kernel
+>>>>>> +        * memory is mapped with a larger page size and breaking down the
+>>>>>> +        * larger page size without causing TLB conflicts is very difficult.
+>>>>>> +        *
+>>>>>> +        * If you need to call set_memory_* on a range, the recommendation is
+>>>>>> +        * to use vmalloc since that range is mapped with pages.
+>>>>>> +        */
+>>>
+>>> Thanks,
+>>> Mark.
+>>>
+>>
+>> Hi Mark,
+>>
+>> After change the flag, it calls only flush_tlb_kernel_range(), so why not use 
+>> cpu_replace_ttbr1(swapper_pg_dir)? 
+> 
+> We cannot use cpu_replace_ttbr1 here. Other CPUs may be online, and we
+> have no mechanism to place them in a safe set of page tables while
+> swapping TTBR1, we'd have to perform a deep copy of tables, and this
+> would be horrendously expensive.
+> 
+> Using flush_tlb_kernel_range() is sufficient. As modules don't share a
+> page or section mapping with other users, we can follow a
+> Break-Before-Make approach. Additionally, they're mapped at page
+> granularity so we never split or fuse sections anyway. We only modify
+> the permission bits.
+> 
 
-diff --git a/drivers/clk/ti/apll.c b/drivers/clk/ti/apll.c
-index b336a8c..6411e13 100644
---- a/drivers/clk/ti/apll.c
-+++ b/drivers/clk/ti/apll.c
-@@ -140,11 +140,21 @@ static void __init omap_clk_register_apll(struct clk_hw *hw,
- 	struct dpll_data *ad = clk_hw->dpll_data;
- 	struct clk *clk;
- 
--	ad->clk_ref = of_clk_get(node, 0);
--	ad->clk_bypass = of_clk_get(node, 1);
-+	clk = of_clk_get(node, 0);
-+	if (IS_ERR(clk)) {
-+		pr_debug("clk-ref for %s not ready, retry\n",
-+			 node->name);
-+		if (!ti_clk_retry_init(node, hw, omap_clk_register_apll))
-+			return;
-+
-+		goto cleanup;
-+	}
- 
--	if (IS_ERR(ad->clk_ref) || IS_ERR(ad->clk_bypass)) {
--		pr_debug("clk-ref or clk-bypass for %s not ready, retry\n",
-+	ad->clk_ref = __clk_get_hw(clk);
-+
-+	clk = of_clk_get(node, 1);
-+	if (IS_ERR(clk)) {
-+		pr_debug("clk-bypass for %s not ready, retry\n",
- 			 node->name);
- 		if (!ti_clk_retry_init(node, hw, omap_clk_register_apll))
- 			return;
-@@ -152,6 +162,8 @@ static void __init omap_clk_register_apll(struct clk_hw *hw,
- 		goto cleanup;
- 	}
- 
-+	ad->clk_bypass = __clk_get_hw(clk);
-+
- 	clk = clk_register(NULL, &clk_hw->hw);
- 	if (!IS_ERR(clk)) {
- 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-diff --git a/drivers/clk/ti/clkt_dpll.c b/drivers/clk/ti/clkt_dpll.c
-index b5cc6f6..032c658 100644
---- a/drivers/clk/ti/clkt_dpll.c
-+++ b/drivers/clk/ti/clkt_dpll.c
-@@ -254,7 +254,7 @@ unsigned long omap2_get_dpll_rate(struct clk_hw_omap *clk)
- 	v >>= __ffs(dd->enable_mask);
- 
- 	if (_omap2_dpll_is_in_bypass(v))
--		return clk_get_rate(dd->clk_bypass);
-+		return clk_hw_get_rate(dd->clk_bypass);
- 
- 	v = ti_clk_ll_ops->clk_readl(dd->mult_div1_reg);
- 	dpll_mult = v & dd->mult_mask;
-@@ -262,7 +262,7 @@ unsigned long omap2_get_dpll_rate(struct clk_hw_omap *clk)
- 	dpll_div = v & dd->div1_mask;
- 	dpll_div >>= __ffs(dd->div1_mask);
- 
--	dpll_clk = (u64)clk_get_rate(dd->clk_ref) * dpll_mult;
-+	dpll_clk = (u64)clk_hw_get_rate(dd->clk_ref) * dpll_mult;
- 	do_div(dpll_clk, dpll_div + 1);
- 
- 	return dpll_clk;
-@@ -301,7 +301,7 @@ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
- 
- 	dd = clk->dpll_data;
- 
--	ref_rate = clk_get_rate(dd->clk_ref);
-+	ref_rate = clk_hw_get_rate(dd->clk_ref);
- 	clk_name = clk_hw_get_name(hw);
- 	pr_debug("clock: %s: starting DPLL round_rate, target rate %lu\n",
- 		 clk_name, target_rate);
-diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
-index 5519b38..cd99962 100644
---- a/drivers/clk/ti/dpll.c
-+++ b/drivers/clk/ti/dpll.c
-@@ -147,11 +147,22 @@ static void __init _register_dpll(struct clk_hw *hw,
- 	struct dpll_data *dd = clk_hw->dpll_data;
- 	struct clk *clk;
- 
--	dd->clk_ref = of_clk_get(node, 0);
--	dd->clk_bypass = of_clk_get(node, 1);
-+	clk = of_clk_get(node, 0);
-+	if (IS_ERR(clk)) {
-+		pr_debug("clk-ref missing for %s, retry later\n",
-+			 node->name);
-+		if (!ti_clk_retry_init(node, hw, _register_dpll))
-+			return;
- 
--	if (IS_ERR(dd->clk_ref) || IS_ERR(dd->clk_bypass)) {
--		pr_debug("clk-ref or clk-bypass missing for %s, retry later\n",
-+		goto cleanup;
-+	}
-+
-+	dd->clk_ref = __clk_get_hw(clk);
-+
-+	clk = of_clk_get(node, 1);
-+
-+	if (IS_ERR(clk)) {
-+		pr_debug("clk-bypass missing for %s, retry later\n",
- 			 node->name);
- 		if (!ti_clk_retry_init(node, hw, _register_dpll))
- 			return;
-@@ -159,6 +171,8 @@ static void __init _register_dpll(struct clk_hw *hw,
- 		goto cleanup;
- 	}
- 
-+	dd->clk_bypass = __clk_get_hw(clk);
-+
- 	/* register the clock */
- 	clk = clk_register(NULL, &clk_hw->hw);
- 
-@@ -251,8 +265,8 @@ struct clk *ti_clk_register_dpll(struct ti_clk *setup)
- 	dd->recal_en_bit = dpll->recal_en_bit;
- 	dd->recal_st_bit = dpll->recal_st_bit;
- 
--	dd->clk_ref = clk_ref;
--	dd->clk_bypass = clk_bypass;
-+	dd->clk_ref = __clk_get_hw(clk_ref);
-+	dd->clk_bypass = __clk_get_hw(clk_bypass);
- 
- 	if (dpll->flags & CLKF_CORE)
- 		ops = &omap3_dpll_core_ck_ops;
-diff --git a/drivers/clk/ti/dpll3xxx.c b/drivers/clk/ti/dpll3xxx.c
-index 1c30038..88f2ce8 100644
---- a/drivers/clk/ti/dpll3xxx.c
-+++ b/drivers/clk/ti/dpll3xxx.c
-@@ -98,7 +98,7 @@ static u16 _omap3_dpll_compute_freqsel(struct clk_hw_omap *clk, u8 n)
- 	unsigned long fint;
- 	u16 f = 0;
- 
--	fint = clk_get_rate(clk->dpll_data->clk_ref) / n;
-+	fint = clk_hw_get_rate(clk->dpll_data->clk_ref) / n;
- 
- 	pr_debug("clock: fint is %lu\n", fint);
- 
-@@ -460,11 +460,11 @@ int omap3_noncore_dpll_enable(struct clk_hw *hw)
- 
- 	parent = clk_hw_get_parent(hw);
- 
--	if (clk_hw_get_rate(hw) == clk_get_rate(dd->clk_bypass)) {
--		WARN_ON(parent != __clk_get_hw(dd->clk_bypass));
-+	if (clk_hw_get_rate(hw) == clk_hw_get_rate(dd->clk_bypass)) {
-+		WARN_ON(parent != dd->clk_bypass);
- 		r = _omap3_noncore_dpll_bypass(clk);
- 	} else {
--		WARN_ON(parent != __clk_get_hw(dd->clk_ref));
-+		WARN_ON(parent != dd->clk_ref);
- 		r = _omap3_noncore_dpll_lock(clk);
- 	}
- 
-@@ -512,13 +512,13 @@ int omap3_noncore_dpll_determine_rate(struct clk_hw *hw,
- 	if (!dd)
- 		return -EINVAL;
- 
--	if (clk_get_rate(dd->clk_bypass) == req->rate &&
-+	if (clk_hw_get_rate(dd->clk_bypass) == req->rate &&
- 	    (dd->modes & (1 << DPLL_LOW_POWER_BYPASS))) {
--		req->best_parent_hw = __clk_get_hw(dd->clk_bypass);
-+		req->best_parent_hw = dd->clk_bypass;
- 	} else {
- 		req->rate = omap2_dpll_round_rate(hw, req->rate,
- 					  &req->best_parent_rate);
--		req->best_parent_hw = __clk_get_hw(dd->clk_ref);
-+		req->best_parent_hw = dd->clk_ref;
- 	}
- 
- 	req->best_parent_rate = req->rate;
-@@ -576,7 +576,7 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
- 	if (!dd)
- 		return -EINVAL;
- 
--	if (clk_hw_get_parent(hw) != __clk_get_hw(dd->clk_ref))
-+	if (clk_hw_get_parent(hw) != dd->clk_ref)
- 		return -EINVAL;
- 
- 	if (dd->last_rounded_rate == 0)
-diff --git a/drivers/clk/ti/dpll44xx.c b/drivers/clk/ti/dpll44xx.c
-index 660d743..82c05b5 100644
---- a/drivers/clk/ti/dpll44xx.c
-+++ b/drivers/clk/ti/dpll44xx.c
-@@ -94,7 +94,7 @@ static void omap4_dpll_lpmode_recalc(struct dpll_data *dd)
- {
- 	long fint, fout;
- 
--	fint = clk_get_rate(dd->clk_ref) / (dd->last_rounded_n + 1);
-+	fint = clk_hw_get_rate(dd->clk_ref) / (dd->last_rounded_n + 1);
- 	fout = fint * dd->last_rounded_m;
- 
- 	if ((fint < OMAP4_DPLL_LP_FINT_MAX) && (fout < OMAP4_DPLL_LP_FOUT_MAX))
-@@ -212,13 +212,13 @@ int omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw,
- 	if (!dd)
- 		return -EINVAL;
- 
--	if (clk_get_rate(dd->clk_bypass) == req->rate &&
-+	if (clk_hw_get_rate(dd->clk_bypass) == req->rate &&
- 	    (dd->modes & (1 << DPLL_LOW_POWER_BYPASS))) {
--		req->best_parent_hw = __clk_get_hw(dd->clk_bypass);
-+		req->best_parent_hw = dd->clk_bypass;
- 	} else {
- 		req->rate = omap4_dpll_regm4xen_round_rate(hw, req->rate,
- 						&req->best_parent_rate);
--		req->best_parent_hw = __clk_get_hw(dd->clk_ref);
-+		req->best_parent_hw = dd->clk_ref;
- 	}
- 
- 	req->best_parent_rate = req->rate;
-diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
-index 75205df..751b772 100644
---- a/include/linux/clk/ti.h
-+++ b/include/linux/clk/ti.h
-@@ -23,8 +23,8 @@
-  * @mult_div1_reg: register containing the DPLL M and N bitfields
-  * @mult_mask: mask of the DPLL M bitfield in @mult_div1_reg
-  * @div1_mask: mask of the DPLL N bitfield in @mult_div1_reg
-- * @clk_bypass: struct clk pointer to the clock's bypass clock input
-- * @clk_ref: struct clk pointer to the clock's reference clock input
-+ * @clk_bypass: struct clk_hw pointer to the clock's bypass clock input
-+ * @clk_ref: struct clk_hw pointer to the clock's reference clock input
-  * @control_reg: register containing the DPLL mode bitfield
-  * @enable_mask: mask of the DPLL mode bitfield in @control_reg
-  * @last_rounded_rate: cache of the last rate result of omap2_dpll_round_rate()
-@@ -69,8 +69,8 @@ struct dpll_data {
- 	void __iomem		*mult_div1_reg;
- 	u32			mult_mask;
- 	u32			div1_mask;
--	struct clk		*clk_bypass;
--	struct clk		*clk_ref;
-+	struct clk_hw		*clk_bypass;
-+	struct clk_hw		*clk_ref;
- 	void __iomem		*control_reg;
- 	u32			enable_mask;
- 	unsigned long		last_rounded_rate;
--- 
-1.7.9.5
+Hi Mark,
+
+Is it safe in the following path?
+
+alloc the whole linear map section
+cpu A write something on it
+cpu B write something on it
+cpu C set read only flag and call flush_tlb_kernel_range()
+
+Thanks,
+Xishi Qiu
+
+>> One more question, does TLB conflict only affect kernel page talbe?
+> 
+> It's harder to solve for the text/linear map as we can't do
+> Break-Before-Make without potentially unmapping something in active use
+> (e.g. the code used to implement Break-Before-Make).
+> 
+>> There is no problem when spliting the transparent hugepage, right?
+> 
+> There was a potential problem with huge pages causing TLB conflicts,
+> which didn't always seem to follow a Break-Before-Make approach.
+> 
+> I believe that Kirill Shutemov's recent THP rework means that
+> section->table and table->section conversions always go via an invalid
+> entry, with appropriate TLB invalidation, making that safe. I have not
+> yet had the chance to verify that yet, however.
+> 
+> Thanks,
+> Mark.
+> 
+> .
+> 
