@@ -1,69 +1,73 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 28 Jan 2016 09:35:21 +0900
-Subject: [PATCH v4 0/3] arm64/clk: EXYNOS: Consolidate Exynos7 symbol
-Message-ID: <1453941324-15742-1-git-send-email-k.kozlowski@samsung.com>
+Date: Thu, 28 Jan 2016 09:35:23 +0900
+Subject: [PATCH v4 2/3] clk: samsung: Don't build ARMv8 clock drivers on ARMv7
+In-Reply-To: <1453941324-15742-1-git-send-email-k.kozlowski@samsung.com>
+References: <1453941324-15742-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1453941324-15742-3-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Currently the Exynos5433 (ARMv8 SoC) clock driver depends on ARCH_EXYNOS
+so it is built also on ARMv7. This does not bring any kind of benefit.
+There won't be a single kernel image for ARMv7 and ARMv8 SoCs (like
+multi_v7 for ARMv7).
 
-Patchset attempts to remove the ARCH_EXYNOS7 symbol.
+Instead build clock drivers only for respective SoC's architecture.
 
-All patches depend on previous ones so no cherry-picked.
-I was thinking about merging this through arm-soc tree after getting
-needed acks (clk, arm-soc?).
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
+---
 
 Changes since v3:
-=================
-1. Rebase on next-20160127 (s3c64xx became multiplatform).
+1. Rebase on next-20160127.
 
 Changes since v2:
-=================
-1. Follow Arnd's advice about not enabling silently the newly added
-   EXYNOS_ARM64_COMMON_CLK, when COMPILE_TEST is enabled. This was
-   also a trigger for some changes in placement of Samsung clocks
-   Kconfig entries...
-2. ... which lead to introducing patch 1.
+1. Follow Arnd's advice making EXYNOS_ARM64_COMMON_CLK user-visible when
+   COMPILE_TEST is enabled.
+2. Dropped accumulated tags because the logic is now different.
 
+Changes since v1:
+1. Use one Kconfig symbol for clocks of all ARM64 SoCs (after
+   discussion): EXYNOS_ARM64_COMMON_CLK.
+2. Minor cleanups after Tomasz's comments.
+3. Added tags: Chanwoo's, Sylwester's, Alim's and Tomasz's (the tags
+   were given for v1 but assuming that change from 1. is not major
+   enough to require re-tagging).
+---
+ drivers/clk/samsung/Kconfig  | 5 +++++
+ drivers/clk/samsung/Makefile | 4 ++--
+ 2 files changed, 7 insertions(+), 2 deletions(-)
 
-Logic:
-======
-Now the clock selection algorithm works like:
-1. For Exynos ARMv7 and ARMv8 the platforms select COMMON_CLK
-   and COMMON_CLK_SAMSUNG.
-2. As before: clock drivers for Exynos ARMv7 will be selected by
-   respective SOC/ARCH_EXYNOS_XXX symbol.
-3. For Exynos ARMv8 the clock drivers will be enabled by default
-   by EXYNOS_ARM64_COMMON_CLK symbol.
-
-Rationale:
-==========
-We don't need ARCH_EXYNOS7 symbol because all ARMv8 platforms should
-fall under generic ARCH_EXYNOS. In the same time there is no sense
-in building clocks for these ARMv8 SoCs on ARMv7 builds.
-
-
-Best regards,
-Krzysztof
-
-
-Krzysztof Kozlowski (3):
-  clk: samsung: Enable COMPILE_TEST for Samsung clocks
-  clk: samsung: Don't build ARMv8 clock drivers on ARMv7
-  arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS
-
- arch/arm/mach-exynos/Kconfig        |  1 +
- arch/arm/mach-s3c24xx/Kconfig       |  8 ++++++++
- arch/arm/mach-s3c64xx/Kconfig       |  1 +
- arch/arm/mach-s5pv210/Kconfig       |  1 +
- arch/arm64/Kconfig.platforms        | 12 +++---------
- arch/arm64/boot/dts/exynos/Makefile |  2 +-
- arch/arm64/configs/defconfig        |  2 +-
- drivers/clk/Kconfig                 |  2 +-
- drivers/clk/samsung/Kconfig         | 14 +++++++++-----
- drivers/clk/samsung/Makefile        |  4 ++--
- 10 files changed, 28 insertions(+), 19 deletions(-)
-
+diff --git a/drivers/clk/samsung/Kconfig b/drivers/clk/samsung/Kconfig
+index dd6093a33f84..5fd982d9f4d9 100644
+--- a/drivers/clk/samsung/Kconfig
++++ b/drivers/clk/samsung/Kconfig
+@@ -23,3 +23,8 @@ config S3C2443_COMMON_CLK
+ 	bool "Samsung S3C2443 clock controller support" if COMPILE_TEST
+ 	select COMMON_CLK_SAMSUNG
+ 
++# ARM64 SoCs (e.g. Exynos5433, Exynos7):
++config EXYNOS_ARM64_COMMON_CLK
++	bool "Samsung Exynos ARMv8-family clock controller support" if COMPILE_TEST
++	default ARM64 && COMMON_CLK_SAMSUNG
++	depends on (ARM64 && COMMON_CLK_SAMSUNG) || COMPILE_TEST
+diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
+index 5f6833ea355d..fc367d4b2902 100644
+--- a/drivers/clk/samsung/Makefile
++++ b/drivers/clk/samsung/Makefile
+@@ -10,11 +10,11 @@ obj-$(CONFIG_SOC_EXYNOS5250)	+= clk-exynos5250.o
+ obj-$(CONFIG_SOC_EXYNOS5260)	+= clk-exynos5260.o
+ obj-$(CONFIG_SOC_EXYNOS5410)	+= clk-exynos5410.o
+ obj-$(CONFIG_SOC_EXYNOS5420)	+= clk-exynos5420.o
+-obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos5433.o
++obj-$(CONFIG_EXYNOS_ARM64_COMMON_CLK)	+= clk-exynos5433.o
+ obj-$(CONFIG_SOC_EXYNOS5440)	+= clk-exynos5440.o
+ obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-audss.o
+ obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-clkout.o
+-obj-$(CONFIG_ARCH_EXYNOS7)	+= clk-exynos7.o
++obj-$(CONFIG_EXYNOS_ARM64_COMMON_CLK)	+= clk-exynos7.o
+ obj-$(CONFIG_S3C2410_COMMON_CLK)+= clk-s3c2410.o
+ obj-$(CONFIG_S3C2410_COMMON_DCLK)+= clk-s3c2410-dclk.o
+ obj-$(CONFIG_S3C2412_COMMON_CLK)+= clk-s3c2412.o
 -- 
 1.9.1
