@@ -1,89 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 28 Jan 2016 10:40:12 +0100
-Subject: [PATCH 2/2 V3] drivers/gpio: Switch gpio-mpc8xxx to use
- gpio-generic
-In-Reply-To: <1452600610-17400-2-git-send-email-Gang.Liu@nxp.com>
-References: <1452600610-17400-1-git-send-email-Gang.Liu@nxp.com>
- <1452600610-17400-2-git-send-email-Gang.Liu@nxp.com>
-Message-ID: <CACRpkdZMPho0=1-S9=E+2Q8moccegfupXJEbnpfxRe-+W=3uGQ@mail.gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 28 Jan 2016 10:50:00 +0100
+Subject: [PATCH 00/10] KVM PCIe/MSI passthrough on ARM/ARM64
+In-Reply-To: <00aa01d1599b$5fd3bd10$1f7b3730$@samsung.com>
+References: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
+ <000001d1585e$8097d7e0$81c787a0$@samsung.com> <56A8854F.3030209@linaro.org>
+ <00aa01d1599b$5fd3bd10$1f7b3730$@samsung.com>
+Message-ID: <56A9E448.6010308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 1:10 PM, Liu Gang <Gang.Liu@nxp.com> wrote:
+Hi Pavel,
+On 01/28/2016 08:13 AM, Pavel Fedin wrote:
+>  Hello!
+> 
+>> x86 isn't problem-free in this space.  An x86 VM is going to know that
+>> the 0xfee00000 address range is special, it won't be backed by RAM and
+>> won't be a DMA target, thus we'll never attempt to map it for an iova
+>> address.  However, if we run a non-x86 VM or a userspace driver, it
+>> doesn't necessarily know that there's anything special about that range
+>> of iovas.  I intend to resolve this with an extension to the iommu info
+>> ioctl that describes the available iova space for the iommu.  The
+>> interrupt region would simply be excluded.
+> 
+>  I see now, but i still don't understand how it would work. How can we tell the guest OS that we cannot do DMA to this particular
+> area? Just exclude it from RAM at all? But this means we would have to modify machine's model...
+>  I know that this is a bit different story from what we are implementing now. Just curious.
 
-> The new Layerscape platforms has the same ip block/controller
-> as GPIO on PowerPC platforms(MPC8XXX), but the GPIO registers
-> may be big or little endian. So the code needs to get the
-> endian property from DTB, then make additional functions to
-> fit all the PowerPC/Layerscape GPIO register read/write
-> operations.
->
-> gpio-generic.c provides an universal infrastructure for both
-> big and little endian register operations. So switch the
-> gpio-mpc8xxx to use gpio-generic can simplify the driver and
-> reduce a lot of code.
->
-> The IRQ and some workaround parts in gpio-mpc8xxx.c will be
-> updated with the new API interfaces but following the
-> original functionalities.
->
-> Signed-off-by: Liu Gang <Gang.Liu@nxp.com>
-> ---
-> -V3: Switch gpio-mpc8xxx to use gpio-generic for both
->      little, big endian kinds of GPIO register following
->      Linus Walleij comments.
+Well in QEMU mach-virt we have a static guest PA memory map. Maybe in
+some other virt machines this is different and it is possible to take
+into account the fact an IOVA range cannot be used?
 
-This is starting to look good :)
+Regards
 
-Just a few minor tweaks left.
-
-First rebase onto linux v4.5-rc1 unless you've already done
-this. Unfortunately you're hitting the window when I've been
-refactoring generic GPIO...
-
->  #include <linux/io.h>
->  #include <linux/of.h>
->  #include <linux/of_gpio.h>
-> +#include <linux/of_address.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
->  #include <linux/gpio.h>
->  #include <linux/slab.h>
->  #include <linux/irq.h>
-> +#include <linux/basic_mmio_gpio.h>
-
-You should remove #include <linux/gpioh.h> and
-#include <linux/basic_mmio_gpio.h> as I have moved
-all of that into #include <linux/gpio/driver.h> so include
-that instead.
-
->  struct mpc8xxx_gpio_chip {
-> -       struct of_mm_gpio_chip mm_gc;
-> +       struct bgpio_chip       bgc;
-
-Just use struct gpio_chip *gc
-
-as I merged strict bgpio_chip into struct gpio_chip,
-see commit 0f4630f3720e7e6e921bf525c8357fea7ef3dbab
-"gpio: generic: factor into gpio_chip struct"
-
-If you look at this commit, you will see what changes
-are needed for your driver.
-
->  static inline struct mpc8xxx_gpio_chip *
-> -to_mpc8xxx_gpio_chip(struct of_mm_gpio_chip *mm)
-> +to_mpc8xxx_gpio_chip(struct bgpio_chip *bg_c)
->  {
-> -       return container_of(mm, struct mpc8xxx_gpio_chip, mm_gc);
-> -}
-
-You should be able to use gpio_add_chip_data() and then
-get the pointer to your struct mpc8xxx_gpio_chip *
-from gpiochip_get_data() instead, like that:
-
-struct mpc8xxx_gpio_chip *mpc = gpiochip_get_data(gc);
-
-Just search and replace everywhere.
-
-Yours,
-Linus Walleij
+Eric
+> 
+> Kind regards,
+> Pavel Fedin
+> Senior Engineer
+> Samsung Electronics Research center Russia
+> 
+> 
