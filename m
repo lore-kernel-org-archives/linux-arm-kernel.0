@@ -1,87 +1,37 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 28 Jan 2016 16:33:46 +0000
-Subject: [PATCH V5 08/14] PM / Domains: Add function to remove a pm-domain
-In-Reply-To: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
-References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1453998832-27383-9-git-send-email-jonathanh@nvidia.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 28 Jan 2016 17:40:23 +0100
+Subject: [PATCH] arm64: allow vmalloc regions to be set with set_memory_*
+In-Reply-To: <20160128150815.GG775@arm.com>
+References: <1453125665-26627-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160128150815.GG775@arm.com>
+Message-ID: <CAKv+Gu9quaR2wtSbOqSMrG8_3XyyrMoqG8wFiCrA3SS+ZRUY8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The genpd framework allows users to add power-domains via the
-pm_genpd_init() function, however, there is no corresponding function
-to remove a power-domain. For most devices this may be fine as the power
-domains are never removed, however, for devices that wish to populate
-the power-domains from within a driver, having the ability to remove a
-power domain if the probing of the device fails or the driver is unloaded
-is necessary. Therefore, add a function to remove a power-domain. Please
-note that the power domain can only be removed if there are no devices
-using the power-domain and it is not linked to another domain.
+On 28 January 2016 at 16:08, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Jan 18, 2016 at 03:01:05PM +0100, Ard Biesheuvel wrote:
+>> The range of set_memory_* is currently restricted to the module address
+>> range because of difficulties in breaking down larger block sizes.
+>> vmalloc maps PAGE_SIZE pages so it is safe to use as well. Update the
+>> function ranges and add a comment explaining why the range is restricted
+>> the way it is.
+>>
+>> Suggested-by: Laura Abbott <labbott@fedoraproject.org>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/mm/pageattr.c | 23 +++++++++++++++++++----
+>>  1 file changed, 19 insertions(+), 4 deletions(-)
+>
+> What's the user for this? It would be better to apply along with something
+> that actually needs to change permission for arbitrary vmalloc mappings.
+>
 
-Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
----
- drivers/base/power/domain.c | 26 ++++++++++++++++++++++++++
- include/linux/pm_domain.h   |  5 +++++
- 2 files changed, 31 insertions(+)
+BPF already uses set_memory_ro() but doesn't bother to check the return value.
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 45e3641b427d..b4120121bcac 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -1529,6 +1529,32 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
- }
- EXPORT_SYMBOL_GPL(pm_genpd_init);
- 
-+/**
-+ * pm_genpd_remove - Remove a generic I/O PM domain object.
-+ * @genpd: PM domain object to remove.
-+ */
-+int pm_genpd_remove(struct generic_pm_domain *genpd)
-+{
-+	if (IS_ERR_OR_NULL(genpd))
-+		return -EINVAL;
-+
-+	mutex_lock(&genpd->lock);
-+
-+	if (!list_empty(&genpd->master_links)
-+	    || !list_empty(&genpd->slave_links) || genpd->device_count) {
-+		mutex_unlock(&genpd->lock);
-+		return -EBUSY;
-+	}
-+
-+	mutex_lock_nested(&gpd_list_lock, SINGLE_DEPTH_NESTING);
-+	list_del(&genpd->gpd_list_node);
-+	mutex_unlock(&gpd_list_lock);
-+	mutex_unlock(&genpd->lock);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(pm_genpd_remove);
-+
- #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
- /*
-  * Device Tree based PM domain providers.
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index db21d3995f7e..0d661998fa74 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -123,6 +123,7 @@ extern int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
- 				     struct generic_pm_domain *target);
- extern void pm_genpd_init(struct generic_pm_domain *genpd,
- 			  struct dev_power_governor *gov, bool is_off);
-+extern int pm_genpd_remove(struct generic_pm_domain *genpd);
- 
- extern struct dev_power_governor simple_qos_governor;
- extern struct dev_power_governor pm_domain_always_on_gov;
-@@ -161,6 +162,10 @@ static inline void pm_genpd_init(struct generic_pm_domain *genpd,
- 				 struct dev_power_governor *gov, bool is_off)
- {
- }
-+static inline int pm_genpd_remove(struct generic_pm_domain *genpd)
-+{
-+	return -ENOTSUPP;
-+}
- #endif
- 
- static inline int pm_genpd_add_device(struct generic_pm_domain *genpd,
--- 
-2.1.4
+Before the patch, I get:
+
+> Anyway, with that (and a rebase to -rc2):
+>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+>
+> Will
