@@ -1,40 +1,48 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 28 Jan 2016 14:14:55 +0800
-Subject: [PATCH v6 5/7] ARM: dts: imx: Add support for Advantech/GE B450v3
-In-Reply-To: <1450908016-17384-6-git-send-email-akshay.bhat@timesys.com>
+Date: Thu, 28 Jan 2016 14:19:19 +0800
+Subject: [PATCH v6 6/7] ARM: dts: imx: Add support for Advantech/GE B650v3
+In-Reply-To: <1450908016-17384-7-git-send-email-akshay.bhat@timesys.com>
 References: <1450908016-17384-1-git-send-email-akshay.bhat@timesys.com>
- <1450908016-17384-6-git-send-email-akshay.bhat@timesys.com>
-Message-ID: <20160128061454.GF9070@tiger>
+ <1450908016-17384-7-git-send-email-akshay.bhat@timesys.com>
+Message-ID: <20160128061919.GG9070@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 23, 2015 at 05:00:14PM -0500, Akshay Bhat wrote:
-> Add support for Advantech/GE B450v3 board.
+On Wed, Dec 23, 2015 at 05:00:15PM -0500, Akshay Bhat wrote:
+> Add support for Advantech/GE B650v3 board.
 > 
 > Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
 > ---
 >  arch/arm/boot/dts/Makefile         |   1 +
->  arch/arm/boot/dts/imx6q-b450v3.dts | 114 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/imx6q-b650v3.dts | 114 +++++++++++++++++++++++++++++++++++++
+
+I compare it with imx6q-b450v3.dts.  They are basically identical except
+model name and compatible string.  What are the differences between
+these two boards from hardware POV?  Can we support them with one
+dts/dtb, so that we can save one duplicated dts?
+
+Shawn
+
 >  2 files changed, 115 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6q-b450v3.dts
+>  create mode 100644 arch/arm/boot/dts/imx6q-b650v3.dts
 > 
 > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 44508dc..0e029fc 100644
+> index 0e029fc..684a504 100644
 > --- a/arch/arm/boot/dts/Makefile
 > +++ b/arch/arm/boot/dts/Makefile
-> @@ -317,6 +317,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->  	imx6dl-wandboard-revb1.dtb \
+> @@ -318,6 +318,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
 >  	imx6q-apf6dev.dtb \
 >  	imx6q-arm2.dtb \
-> +	imx6q-b450v3.dtb \
+>  	imx6q-b450v3.dtb \
+> +	imx6q-b650v3.dtb \
 >  	imx6q-cm-fx6.dtb \
 >  	imx6q-cubox-i.dtb \
 >  	imx6q-dfi-fs700-m60.dtb \
-> diff --git a/arch/arm/boot/dts/imx6q-b450v3.dts b/arch/arm/boot/dts/imx6q-b450v3.dts
+> diff --git a/arch/arm/boot/dts/imx6q-b650v3.dts b/arch/arm/boot/dts/imx6q-b650v3.dts
 > new file mode 100644
-> index 0000000..fce23a2
+> index 0000000..0e6b775
 > --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-b450v3.dts
+> +++ b/arch/arm/boot/dts/imx6q-b650v3.dts
 > @@ -0,0 +1,114 @@
 > +/*
 > + * Copyright 2015 Timesys Corporation.
@@ -83,17 +91,14 @@ On Wed, Dec 23, 2015 at 05:00:14PM -0500, Akshay Bhat wrote:
 > +#include "imx6q-bx50v3.dtsi"
 > +
 > +/ {
-> +	model = "General Electric B450v3";
-> +	compatible = "ge,imx6q-b450v3", "advantech,imx6q-ba16", "fsl,imx6q";
+> +	model = "General Electric B650v3";
+> +	compatible = "ge,imx6q-b650v3", "advantech,imx6q-ba16", "fsl,imx6q";
 > +
 > +	chosen {
 > +		stdout-path = &uart3;
 > +	};
 > +
 > +	panel_lvds0 {
-
-Use hyphen in node name.
-
 > +		compatible = "innolux,g121x1-l03";
 > +		backlight = <&backlight_lvds>;
 > +		power-supply = <&reg_lvds>;
@@ -106,11 +111,6 @@ Use hyphen in node name.
 > +	};
 > +
 > +	panel_lvds1 {
-
-Ditto
-
-Shawn
-
 > +		compatible = "innolux,g121x1-l03";
 > +		backlight = <&backlight_lvds>;
 > +		power-supply = <&reg_lvds>;
