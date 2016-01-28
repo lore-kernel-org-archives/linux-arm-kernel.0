@@ -1,23 +1,23 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 28 Jan 2016 14:26:03 -0700
-Subject: [PATCH net-next 39/40] ARM: dts: imx6qdl-nitrogen6x: add phy
+Date: Thu, 28 Jan 2016 14:26:04 -0700
+Subject: [PATCH net-next 40/40] ARM: dts: imx6qdl-nitrogen6_max: add phy
  interrupt to eliminate polling
 In-Reply-To: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1454016364-30985-40-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1454016364-30985-41-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 ---
- arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-index caeed56..1d42331 100644
---- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-@@ -288,6 +288,15 @@
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
+index a35d54f..771f650 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
+@@ -386,6 +386,15 @@
  	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
  			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
  	status = "okay";
@@ -33,14 +33,5 @@ index caeed56..1d42331 100644
  };
  
  &hdmi {
-@@ -409,6 +418,8 @@
- 				/* Phy reset */
- 				MX6QDL_PAD_ENET_RXD0__GPIO1_IO27	0x000b0
- 				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
-+				/* ethernet phy interrupt */
-+				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28	0x1b0b0
- 			>;
- 		};
- 
 -- 
 2.5.0
