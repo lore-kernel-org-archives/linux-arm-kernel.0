@@ -1,77 +1,41 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Thu, 28 Jan 2016 22:42:58 -0600
-Subject: [PATCH v2] irqchip: gicv3-its: Fix memory leak in its_free_tables()
-Message-ID: <1454042578-13933-1-git-send-email-shankerd@codeaurora.org>
+From: biao.huang@mediatek.com (biao huang)
+Date: Fri, 29 Jan 2016 06:08:40 +0800
+Subject: [PATCH v4 0/5] pinctrl: mediatek: add pinctrl/GPIO/EINT driver
+ for mt2701
+In-Reply-To: <CACRpkdbxpc19bdzGDUDoqseTA-TW3V8dAA4Oe+G860qTsHd-dQ@mail.gmail.com>
+References: <1453857883-28436-1-git-send-email-biao.huang@mediatek.com>
+ <CACRpkdbxpc19bdzGDUDoqseTA-TW3V8dAA4Oe+G860qTsHd-dQ@mail.gmail.com>
+Message-ID: <1454018920.14802.41.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current ITS driver has a memory leak in its_free_tables(). It
-happens on tear down path of the driver when its_probe() call fails.
-its_free_tables() should free the exact number of pages that have
-been allocated, not just a single page as current code does.
+Hi Linus,
+	[PATCH v4 1/5] pinctrl: mediatek: fix direction control issue
+	this patch is also a pinctrl patch, and it seems not merged in
+devel-mt2701 branch.
 
-This patch records the memory size for each ITS_BASERn at the time of
-page allocation and uses the same size information when freeing pages
-to fix the issue.
+Best Regards!
+Yours,
+Biao Huang
 
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
----
- [v1]->[v2]: 
-    -rebase on tip of https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/its-fixes-4.5&id=25ffe003bdc24492204e099fca0a467641d0fe1a
-    -refresh alloc_size value whenever page order changes.     
-
- drivers/irqchip/irq-gic-v3-its.c | 16 +++++++++++-----
- 1 file changed, 11 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 3447549..fc1a34f 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -66,7 +66,10 @@ struct its_node {
- 	unsigned long		phys_base;
- 	struct its_cmd_block	*cmd_base;
- 	struct its_cmd_block	*cmd_write;
--	void			*tables[GITS_BASER_NR_REGS];
-+	struct {
-+		void		*base;
-+		u32		size;
-+	} tables[GITS_BASER_NR_REGS];
- 	struct its_collection	*collections;
- 	struct list_head	its_device_list;
- 	u64			flags;
-@@ -807,9 +810,10 @@ static void its_free_tables(struct its_node *its)
- 	int i;
- 
- 	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
--		if (its->tables[i]) {
--			free_page((unsigned long)its->tables[i]);
--			its->tables[i] = NULL;
-+		if (its->tables[i].base) {
-+			free_pages((unsigned long)its->tables[i].base,
-+				   get_order(its->tables[i].size));
-+			its->tables[i].base = NULL;
- 		}
- 	}
- }
-@@ -880,6 +884,7 @@ retry_alloc_baser:
- 		if (alloc_pages > GITS_BASER_PAGES_MAX) {
- 			alloc_pages = GITS_BASER_PAGES_MAX;
- 			order = get_order(GITS_BASER_PAGES_MAX * psz);
-+			alloc_size = (1 << order) * PAGE_SIZE;
- 			pr_warn("%s: Device Table too large, reduce its page order to %u (%u pages)\n",
- 				node_name, order, alloc_pages);
- 		}
-@@ -890,7 +895,8 @@ retry_alloc_baser:
- 			goto out_free;
- 		}
- 
--		its->tables[i] = base;
-+		its->tables[i].base = base;
-+		its->tables[i].size = alloc_size;
- 
- retry_baser:
- 		val = (virt_to_phys(base) 				 |
--- 
-Qualcomm Technologies, Inc. on behalf
-of the Qualcomm Innovation Center, Inc.  The Qualcomm Innovation Center, Inc. 
-is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+On Thu, 2016-01-28 at 11:20 +0100, Linus Walleij wrote:
+> On Wed, Jan 27, 2016 at 2:24 AM, Biao Huang <biao.huang@mediatek.com> wrote:
+> 
+> > Change in v4:
+> > 1. create a sperate patch for direction setting of input-enable/disalbe and input-schmitt-enable/disable.
+> 
+> So I've merged the patches affecting drivers/pinctrl on the special
+> devel-mt2701 branch, so the ARM SoC people can pull this into
+> their tree to resolve dependencies on the pinctrl include
+> in include/dt-bindings.
+> https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-pinctrl.git/log/?h=devel-mt2701
+> 
+> The rest of the patches should go into ARM SoC, so they can
+> just pull this branch in and apply that stuff on top.
+> 
+> Allow this a few days, I am also waiting for the add-on patches
+> from John Crispin to come in, please include John in the
+> feedback loop.
+> 
+> Yours,
+> Linus Walleij
