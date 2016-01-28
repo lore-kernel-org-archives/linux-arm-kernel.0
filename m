@@ -1,34 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 28 Jan 2016 11:38:40 +0000
-Subject: [PATCH V4 2/2] regulator: mt6323: Add support for MT6323 regulator
-In-Reply-To: <1453965401.19407.18.camel@mtksdaap41>
-References: <1453896059-44589-1-git-send-email-blogic@openwrt.org>
- <1453896059-44589-2-git-send-email-blogic@openwrt.org>
- <20160127144105.GQ6042@sirena.org.uk>
- <1453965401.19407.18.camel@mtksdaap41>
-Message-ID: <20160128113840.GA6078@sirena.org.uk>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 28 Jan 2016 13:43:13 +0200
+Subject: [PATCH] clk: ti: omap3+: dpll: use non-locking version of
+ clk_get_rate
+In-Reply-To: <1453981067-8618-1-git-send-email-t-kristo@ti.com>
+References: <1453981067-8618-1-git-send-email-t-kristo@ti.com>
+Message-ID: <56A9FED1.3090903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 03:16:41PM +0800, Henry Chen wrote:
-> On Wed, 2016-01-27 at 14:41 +0000, Mark Brown wrote:
+On 01/28/2016 01:37 PM, Tero Kristo wrote:
+> As the code in this file is being executed within irq context in some
+> cases, we must avoid the clk_get_rate which uses mutex internally.
+> Switch the code to use clk_hw_get_rate instead which is non-locking.
+>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 
-> > No, drivers should *never* enable things that weren't explictly enabled
-> > by the machine constraints.  This misses the whole point of having
-> > constraints.  They are there so that the system integrator can enable
-> > the functionality that is safe on a given board.  
+Ooops, sorry. Sent wrong version (read: old) of this patch, please 
+ignore this one. Will re-send the correct version in a bit.
 
-> Okay..the constrains should be define on device tree.
-> But which optional properties was suitable to fill on device tree if consumers want to call
-> regulator_set_mode directly ?
-> I have check the of_regulator.c and not found the suitable property name which can set valid_modes_mask & valid_ops_mask.
+-Tero
 
-If you need to change the mode at runtime you will need to develop a
-binding for that, there isn't one at present.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160128/21ff91c9/attachment-0001.sig>
+> ---
+>   drivers/clk/ti/dpll3xxx.c |    3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/ti/dpll3xxx.c b/drivers/clk/ti/dpll3xxx.c
+> index f4dec00..7ed24bc 100644
+> --- a/drivers/clk/ti/dpll3xxx.c
+> +++ b/drivers/clk/ti/dpll3xxx.c
+> @@ -437,7 +437,8 @@ int omap3_noncore_dpll_enable(struct clk_hw *hw)
+>
+>   	parent = clk_hw_get_parent(hw);
+>
+> -	if (clk_hw_get_rate(hw) == clk_get_rate(dd->clk_bypass)) {
+> +	if (clk_hw_get_rate(hw) ==
+> +	    clk_hw_get_rate(__clk_get_hw(dd->clk_bypass))) {
+>   		WARN_ON(parent != __clk_get_hw(dd->clk_bypass));
+>   		r = _omap3_noncore_dpll_bypass(clk);
+>   	} else {
+>
