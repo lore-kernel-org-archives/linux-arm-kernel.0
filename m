@@ -1,48 +1,66 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 28 Jan 2016 12:07:32 +0100
-Subject: [PATCH 1/3] arm64: efistub: drop __init annotation from
- handle_kernel_image()
+Date: Thu, 28 Jan 2016 12:07:34 +0100
+Subject: [PATCH 3/3] efi: arm-init: use read-only early mappings
 In-Reply-To: <1453979254-25374-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1453979254-25374-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1453979254-25374-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1453979254-25374-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After moving arm64-stub.c to libstub/, all of its sections are emitted
-as .init.xxx sections automatically, and the __init annotation of
-handle_kernel_image() causes it to end up in .init.init.text, which is
-not recognized as an __init section by the linker scripts. So drop the
-annotation.
+The early mappings of the EFI system table contents and the UEFI memory
+map are read-only from the OS point of view. So map them read-only to
+protect them from inadvertent modification.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/firmware/efi/libstub/arm64-stub.c | 14 +++++++-------
+ drivers/firmware/efi/arm-init.c | 14 +++++++-------
  1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
-index 78dfbd34b6bf..9e0342745e4f 100644
---- a/drivers/firmware/efi/libstub/arm64-stub.c
-+++ b/drivers/firmware/efi/libstub/arm64-stub.c
-@@ -13,13 +13,13 @@
- #include <asm/efi.h>
- #include <asm/sections.h>
+diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+index 9e15d571b53c..aa1f743152a2 100644
+--- a/drivers/firmware/efi/arm-init.c
++++ b/drivers/firmware/efi/arm-init.c
+@@ -61,8 +61,8 @@ static int __init uefi_init(void)
+ 	char vendor[100] = "unknown";
+ 	int i, retval;
  
--efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
--					unsigned long *image_addr,
--					unsigned long *image_size,
--					unsigned long *reserve_addr,
--					unsigned long *reserve_size,
--					unsigned long dram_base,
--					efi_loaded_image_t *image)
-+efi_status_t handle_kernel_image(efi_system_table_t *sys_table_arg,
-+				 unsigned long *image_addr,
-+				 unsigned long *image_size,
-+				 unsigned long *reserve_addr,
-+				 unsigned long *reserve_size,
-+				 unsigned long dram_base,
-+				 efi_loaded_image_t *image)
- {
- 	efi_status_t status;
- 	unsigned long kernel_size, kernel_memsize = 0;
+-	efi.systab = early_memremap(efi_system_table,
+-				    sizeof(efi_system_table_t));
++	efi.systab = early_memremap_ro(efi_system_table,
++				       sizeof(efi_system_table_t));
+ 	if (efi.systab == NULL) {
+ 		pr_warn("Unable to map EFI system table.\n");
+ 		return -ENOMEM;
+@@ -86,8 +86,8 @@ static int __init uefi_init(void)
+ 			efi.systab->hdr.revision & 0xffff);
+ 
+ 	/* Show what we know for posterity */
+-	c16 = early_memremap(efi_to_phys(efi.systab->fw_vendor),
+-			     sizeof(vendor) * sizeof(efi_char16_t));
++	c16 = early_memremap_ro(efi_to_phys(efi.systab->fw_vendor),
++				sizeof(vendor) * sizeof(efi_char16_t));
+ 	if (c16) {
+ 		for (i = 0; i < (int) sizeof(vendor) - 1 && *c16; ++i)
+ 			vendor[i] = c16[i];
+@@ -100,8 +100,8 @@ static int __init uefi_init(void)
+ 		efi.systab->hdr.revision & 0xffff, vendor);
+ 
+ 	table_size = sizeof(efi_config_table_64_t) * efi.systab->nr_tables;
+-	config_tables = early_memremap(efi_to_phys(efi.systab->tables),
+-				       table_size);
++	config_tables = early_memremap_ro(efi_to_phys(efi.systab->tables),
++					  table_size);
+ 	if (config_tables == NULL) {
+ 		pr_warn("Unable to map EFI config table array.\n");
+ 		retval = -ENOMEM;
+@@ -185,7 +185,7 @@ void __init efi_init(void)
+ 	efi_system_table = params.system_table;
+ 
+ 	memmap.phys_map = params.mmap;
+-	memmap.map = early_memremap(params.mmap, params.mmap_size);
++	memmap.map = early_memremap_ro(params.mmap, params.mmap_size);
+ 	if (memmap.map == NULL) {
+ 		/*
+ 		* If we are booting via UEFI, the UEFI memory map is the only
 -- 
 2.5.0
