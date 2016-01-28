@@ -1,44 +1,64 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 28 Jan 2016 11:49:25 +0000
-Subject: Speeding up dma_unmap
-In-Reply-To: <24650183.WoXLVmr0Vj@wuerfel>
-References: <CAJFSRaCRvx=+_fEYAr8OeWGHnnz+rOWjLzLcm+wZiEstbHwxAw@mail.gmail.com>
- <20160127180944.GZ10826@n2100.arm.linux.org.uk>
- <20160128103105.GR14823@e104818-lin.cambridge.arm.com>
- <24650183.WoXLVmr0Vj@wuerfel>
-Message-ID: <20160128114925.GU14823@e104818-lin.cambridge.arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 28 Jan 2016 11:54:28 +0000
+Subject: Tegra baseline test results for v4.5-rc1
+Message-ID: <56AA0174.5030608@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 12:20:55PM +0100, Arnd Bergmann wrote:
-> On Thursday 28 January 2016 10:31:06 Catalin Marinas wrote:
-> > On Wed, Jan 27, 2016 at 06:09:45PM +0000, Russell King - ARM Linux wrote:
-> > > On Wed, Jan 27, 2016 at 04:06:30PM +0000, Catalin Marinas wrote:
-> > > > On Wed, Jan 27, 2016 at 01:23:27PM +0100, Arnd Bergmann wrote:
-> > > > > up reading cache lines back in randomly on a speculative prefetch,
-> > > > > but as far as I can tell, the Cortex-A8 (or A5/A7) won't do that.
-> > > > 
-> > > > Are you sure about A5 and A7? I'm not even sure about the A8 but there
-> > > > are good chances that A7 and A5 do speculative prefetches.
-> > > 
-> > > I thought when I was re-implementing the DMA API on ARM (which was
-> > > around early v7 times) that there were CPUs that did speculative
-> > > prefetching, which included the A8.  I seem to remember it was pretty
-> > > urgent to have the DMA API fixed for _any_ ARMv7 CPU because of the
-> > > speculative prefetching.
-> > 
-> > Indeed, it's a safe assumption to say that any ARMv7 CPU perform
-> > speculative accesses. Even if some of them may only do I-cache
-> > prefetching (just guessing), in the presence of a unified L2 this
-> > distinction no longer matters.
-[...]
-> This means that there are still some cores on which one could try
-> if disabling the prefetching and the flushes in DMA unmap provides
-> any serious performance boost.
+Here are some basic Tegra test results for Linux v4.5-rc1.
+Logs and other details at:
 
-I think we need to look at the original use-case. There seems to be a
-4MB buffer, how often is this mapped/unmapped? Would it be better off
-with the coherent API than the streaming one?
+    https://nvtb.github.io//linux/test_v4.5-rc1/20160128033104/
 
--- 
-Catalin
+
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    FAIL: ( 1/ 2): qemu-vexpress64
+    Pass: ( 1/ 2): tegra210-p2371-0000
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.4 (afd2ff9b7e1b367172f18ba7f693dfb62bdcb2dc)):
+   text     data      bss    total  kernel
++878334  +129752   +13056  +1021142  defconfig
++590446  +106192    +4536  +701174  multi_v7_defconfig
++122632   +21736    +3320  +147688  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.4 (afd2ff9b7e1b367172f18ba7f693dfb62bdcb2dc))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+    -684k     684k        .      52k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+    -136k     136k        .       8k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+    -684k     684k        .      52k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+    -136k     136k        .       8k  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+    -684k     684k        .      52k    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+    -136k     136k        .       8k    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+    -684k     684k        .      52k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+    -136k     136k        .       8k       tegra30-beaver      tegra_defconfig       tegra30-beaver
