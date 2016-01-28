@@ -1,34 +1,25 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Jan 2016 15:04:41 +0000
-Subject: [PATCH] arm64: use local label prefixes for __reg_num symbols
-In-Reply-To: <1453917687-2494-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1453917687-2494-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160128150441.GF775@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 28 Jan 2016 15:07:38 +0000
+Subject: [PATCHv3 00/18] arm64: mm: rework page table creation
+In-Reply-To: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
+References: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20160128150737.GB20099@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 07:01:27PM +0100, Ard Biesheuvel wrote:
-> The __reg_num_xNN symbols that are used to implement the msr_s and
-> mrs_s macros are recorded in the ELF metadata of each object file.
-> This is not a problem in terms of code size, but it does clobber
-> the output of tools like readelf, i.e.,
-> 
->   $ readelf -a vmlinux |grep __reg_num_x | wc -l
->   50976
-> 
-> So let's use symbols with the .L prefix, these are strictly local,
-> and don't end up in the object files.
-> 
->   $ readelf -a vmlinux |grep __reg_num_x | wc -l
->   0
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/sysreg.h | 16 ++++++++--------
->  1 file changed, 8 insertions(+), 8 deletions(-)
+On Mon, Jan 25, 2016 at 11:44:54AM +0000, Mark Rutland wrote:
+> Catalin, how do you want to take this? Are you happy to merge my
+> arm64/pagetable-rework branch, or would you prefer to pick the patches? Arnd
+> has acked the asm-generic patch [4] and is happy for it to go via the arm64
+> tree, and everything else is your domain.
 
-Looks harmless enough:
+I picked them from the list and added Jeremy's Tested-by. I pushed the
+branch here in case anyone wants to base their patches on top (I don't
+plan to rebase it):
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux for-next/pgtable
 
-Will
+Thanks.
+
+-- 
+Catalin
