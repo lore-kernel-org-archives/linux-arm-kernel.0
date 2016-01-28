@@ -1,42 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Jan 2016 17:42:41 +0000
-Subject: [linux-review:James-Hogan/kbuild-Remove-stale-asm-generic-wrappers/20160119-183642]
- d979f99e9cc14e2667e9b6e268db695977e4197a BUILD DONE
-In-Reply-To: <20160128031435.GA25625@wfg-t540p.sh.intel.com>
-References: <569e1dbb.MgLv8OaZwklOxxtU%fengguang.wu@intel.com>
- <1947556.38OyJnvGS5@wuerfel>
- <20160127093018.GA21190@wfg-t540p.sh.intel.com>
- <3596300.IYfzmako0c@wuerfel>
- <20160128031435.GA25625@wfg-t540p.sh.intel.com>
-Message-ID: <20160128174241.GN10826@n2100.arm.linux.org.uk>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 28 Jan 2016 17:42:40 +0000
+Subject: [PATCH v2 0/9] arm64: apq8016: dt patches.
+Message-ID: <1454002960-3106-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 11:14:35AM +0800, Fengguang Wu wrote:
-> On Wed, Jan 27, 2016 at 10:44:01AM +0100, Arnd Bergmann wrote:
-> > - CONFIG_PHYS_OFFSET needs to be entered manually to be a number
-> >   in 'make config'
-> 
-> That's a problem for auto tests.
+Hi Andy,
 
-I'm really against the idea of providing some kind of "default" to it.
-Not providing a default means that people _have_ to do some research
-for their particular system in order to provide a value, and they're
-more likely to get the right value.  Providing a default will lead to
-the assumption that the value is okay, and then we'll end up with
-people complaining that their kernel doesn't boot, and is totally
-silent.
+Here are the reworked regulator patches with some additional dt patches
+for spi.
 
-The only default I'd accept is one based on the rest of the config -
-in other words, re-introducing all the physical address of RAM that
-we used to have in the mach/memory.h files...
+Changes since v1:
+	- Moved regulators under smd_rpm_regulators label.
+	- Added few spi related fixes
 
-There's other ways around these kinds of things, the Kconfig system
-does allow a Kconfig fragment which can be used to pre-set some
-configuration options to particular values - and so which can be used
-to set CONFIG_PHYS_OFFSET prior to an allrandconfig or similar.
+thanks,
+srini
+
+Srinivas Kandagatla (9):
+  arm64: dts: qcom: remove redundant spi cs pins from pinconf
+  arm64: dts: qcom: add correct drive strenght on cs pins
+  arm64: dts: apq8016-sbc: Add aliases to spi device.
+  arm64: dts: remove s2 regulator from smd regulators.
+  arm64: dts: qcom: add lable for smd rpm regulators
+  arm64: dts: apq8016-sbc: add regulators support
+  arm64: dts: apq8016-sbc: make 1.8v available on LS expansion
+  arm64: dts: apq8016-sbc: move sdhci node under soc node
+  arm64: dts: apq8016-sbc: Add real regulators and pinctrl for sdhc
+
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi  | 132 ++++++++++++++++++++++++++++-
+ arch/arm64/boot/dts/qcom/msm8916-pins.dtsi |  24 +++---
+ arch/arm64/boot/dts/qcom/msm8916.dtsi      |   3 +-
+ 3 files changed, 143 insertions(+), 16 deletions(-)
 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
