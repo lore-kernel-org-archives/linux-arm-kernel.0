@@ -1,53 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 28 Jan 2016 14:59:01 +0000
-Subject: [PATCH] arm64: make CONFIG_DEBUG_RODATA non-optional
-In-Reply-To: <CAGXu5jLy3cpLzU1MSQhS6q=5rMu2Mdp9pXncoFapPqUyQ1fO0A@mail.gmail.com>
-References: <1453226922-16831-1-git-send-email-keescook@chromium.org>
- <1453226922-16831-4-git-send-email-keescook@chromium.org>
- <20160127211105.GA41450@davidb.org>
- <CAGXu5j+DLRoVE88a9++jVfEkN90HDiAaDAMnT2TrKqtMZ_yOww@mail.gmail.com>
- <20160128000906.GA42530@davidb.org>
- <20160128110622.GF17123@leverpostej>
- <CAGXu5jLy3cpLzU1MSQhS6q=5rMu2Mdp9pXncoFapPqUyQ1fO0A@mail.gmail.com>
-Message-ID: <20160128145900.GN17123@leverpostej>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu, 28 Jan 2016 16:04:20 +0100
+Subject: [PATCH 0/2] ARM: shmobile: Move written variables from .text to .data
+Message-ID: <1453993462-12210-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 06:06:53AM -0800, Kees Cook wrote:
-> On Thu, Jan 28, 2016 at 3:06 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > One thing I would like to do is to avoid the need for fixup_executable
-> > entirely, by mapping the kernel text RO from the outset. However, that
-> > requires rework of the alternatives patching (to use a temporary RW
-> > alias), and I haven't had the time to look into that yet.
-> 
-> This makes perfect sense for the rodata section, but the (future)
-> postinit_rodata section we'll still want to mark RO after init
-> finishes. x86 and ARM cheat by marking both RO after init, and they
-> don't have to pad sections. parisc will need to solve this too.
+	Hi Simon, Magnus,
 
-Depending on how many postinit_rodata variables there are, we might be
-able to drop those in .rodata, have them RO always, and initialise them
-via a temporary RW alias (e.g. something in the vmalloc area).
+When CONFIG_ARM_KERNMEM_PERMS=y and CONFIG_DEBUG_RODATA=y, the kernel
+crashes during system suspend:
+    
+    Freezing user space processes ... (elapsed 0.004 seconds) done.
+    Freezing remaining freezable tasks ... (elapsed 0.002 seconds)
+    done.
+    PM: suspend of devices complete after 111.948 msecs
+    PM: late suspend of devices complete after 1.086 msecs
+    PM: noirq suspend of devices complete after 11.576 msecs
+    Disabling non-boot CPUs ...
+    Kernel panic - not syncing: Attempted to kill the idle task!
+    1014ec ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
+    CPU0: stopping
 
-The only requirement for that is that we use a helper to initialise any
-__postinit_ro variables via a temporary RW alias, e.g.
+This happens because the shmobile assembler sources have several
+variables that are written to in the .text section, while .text is
+mapped read-only after kernel bootup if CONFIG_DEBUG_RODATA=y.
 
-#define SET_POST_INIT_RO(ptr, v) ({ 		\\
-	typeof(ptr) __ptr_rw = (ptr)		\\
-	BUG_ON(initcalls_done);			\\
-	__ptr_rw = create_rw_alias(__ptr);	\\
-	__ptr_rw = v;				\\
-	destroy_rw_alias(__ptr_rw);		\\
-})
+This series fixes this by moving variables from .text to .data.
+Note that there's still an issue with shmobile_boot_fn and
+shmobile_boot_arg in arch/arm/mach-shmobile/headsmp.S.
+So far I didn't manage to fix this (the code and data are copied to
+SRAM on some SoCs).  However, currently this are harmless, as these are
+written during early kernel boot up only, before .text is marked
+read-only.
 
-...
+These issues were uncovered by "[PATCH v2] ARM: mm: flip priority of
+CONFIG_DEBUG_RODATA". As that patch is planned for queue up (again)
+soon, it may be a good idea to queue these fixes for v4.5, to avoid a
+dependency with the arm tree.
 
-__postinit_ro void *thing;
+Tested hard on sh73a0/kzm9g, r8a7791/koelsch.
+Tested lighter on emev2/kzm9d[*], r8a73a4/ape6evm, r8a7740/armadillo, and
+r8a7779/marzen[*] ([*] = no remote resume).
 
-void __init some_init_func(void) {
-	void *__thing = some_ranodomized_allocator();
-	SET_POSTINIT_RO(thing, thing);
-}
+Thanks!
 
+Geert Uytterhoeven (2):
+  ARM: shmobile: Move shmobile_scu_base from .text to .data
+  ARM: shmobile: Move shmobile_smp_{mpidr,fn,arg}[] from .text to .data
 
-Mark.
+ arch/arm/mach-shmobile/headsmp-scu.S |  6 ------
+ arch/arm/mach-shmobile/headsmp.S     | 22 ++++++++++++++++------
+ arch/arm/mach-shmobile/platsmp-scu.c |  3 +++
+ 3 files changed, 19 insertions(+), 12 deletions(-)
+
+-- 
+1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
