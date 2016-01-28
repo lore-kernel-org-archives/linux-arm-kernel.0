@@ -1,67 +1,104 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 28 Jan 2016 17:27:05 +0000
-Subject: [PATCH] arm64: Add support for Half precision floating point
-In-Reply-To: <20160128164631.GC17552@devel.intra.reserved-bit.com>
-References: <1453823566-26742-1-git-send-email-suzuki.poulose@arm.com>
- <20160126160257.GB28238@arm.com> <56A79D17.2000009@arm.com>
- <20160126165538.GC22776@devel.intra.reserved-bit.com>
- <20160128160747.GN775@arm.com>
- <20160128164631.GC17552@devel.intra.reserved-bit.com>
-Message-ID: <20160128172705.GC20099@e104818-lin.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 28 Jan 2016 17:28:30 +0000
+Subject: [RFC PATCH 4/6] iommu/arm-smmu: Add support for IOMMU_DOMAIN_DMA
+ in SMMUv1/SMMUv2 driver
+In-Reply-To: <1453872079-27140-5-git-send-email-anup.patel@broadcom.com>
+References: <1453872079-27140-1-git-send-email-anup.patel@broadcom.com>
+ <1453872079-27140-5-git-send-email-anup.patel@broadcom.com>
+Message-ID: <56AA4FBE.6090702@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 10:16:31PM +0530, Siddhesh Poyarekar wrote:
-> On Thu, Jan 28, 2016 at 04:07:48PM +0000, Will Deacon wrote:
-> > My understanding was that libc needed this information extremely early
-> > on (i.e. before it could even issue system calls), and therefore such
-> > an approach would be in addition to the proposal here. Am I mistaken?
-> 
-> Not really, glibc will need this information before it can call any of
-> the ifunc-selected functions, i.e. typically string and some math
-> functions.  System calls are not an issue since we don't have
-> microarchitecture-specific system calls.  Suzuki's patch works just
-> fine, just that to make sure that we're selecting the correct routine,
-> we may (in the worst case) have to traverse the /sysfs directories to
-> get information from all of the cpu files.  A single file with all
-> that information would be much better performance-wise.
+On 27/01/16 05:21, Anup Patel wrote:
+> To allow use of large memory (> 4Gb) with 32bit devices we need to use
+> some kind of iommu for such 32bit devices.
+>
+> This patch extends SMMUv1/SMMUv2 driver to support DMA domains which
+> in-turn will allows us to use iommu based DMA mappings for 32bit devices.
+>
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> ---
+>   drivers/iommu/arm-smmu.c | 21 ++++++++++++++++++++-
+>   1 file changed, 20 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 9bdf6b2..43424fe 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -29,6 +29,7 @@
+>   #define pr_fmt(fmt) "arm-smmu: " fmt
+>
+>   #include <linux/delay.h>
+> +#include <linux/dma-iommu.h>
+>   #include <linux/dma-mapping.h>
+>   #include <linux/err.h>
+>   #include <linux/interrupt.h>
+> @@ -967,7 +968,7 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+>   {
+>   	struct arm_smmu_domain *smmu_domain;
+>
+> -	if (type != IOMMU_DOMAIN_UNMANAGED)
+> +	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
+>   		return NULL;
+>   	/*
+>   	 * Allocate the domain and initialise some of its data structures.
+> @@ -978,6 +979,12 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+>   	if (!smmu_domain)
+>   		return NULL;
+>
+> +	if (type == IOMMU_DOMAIN_DMA &&
+> +	    iommu_get_dma_cookie(&smmu_domain->domain)) {
+> +		kfree(smmu_domain);
+> +		return NULL;
+> +	}
+> +
+>   	mutex_init(&smmu_domain->init_mutex);
+>   	spin_lock_init(&smmu_domain->pgtbl_lock);
+>
+> @@ -992,6 +999,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
+>   	 * Free the domain resources. We assume that all devices have
+>   	 * already been detached.
+>   	 */
+> +	iommu_put_dma_cookie(domain);
+>   	arm_smmu_destroy_domain_context(domain);
+>   	kfree(smmu_domain);
+>   }
+> @@ -1361,6 +1369,16 @@ static int arm_smmu_init_platform_device(struct device *dev,
+>   	return 0;
+>   }
+>
+> +int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+> +{
+> +	/*
+> +	 * Nothing to do here because SMMU is already aware of all
+> +	 * MMU masters and their stream IDs using mmu-master attibute
+> +	 * SMMU DT node.
+> +	 */
 
-Suzuki's MRS emulation only exposes the CPU feature registers and not
-the MIDR. So this would help with choosing implementation based on
-features (e.g. crypto) but not for micro-architecture tuning.
+...but on the same hand this will also never get called if there's no 
+"iommus" property on the master. Maintaining support for existing users 
+of the "mmu-masters" binding is one thing (namely the thing that's been 
+slowing down my efforts to clean up the really hacky generic binding 
+support I did all the DMA stuff with), but having _both_ bindings in a 
+single DT is something I don't think anybody wants to see - is that how 
+you've tested this?
 
-> > The architecture makes no guarantees about what will and won't be used
-> > in different configurations, so we shouldn't try to derive this from the
-> > MIDR. Even if you figure out a heuristic for today's platforms, it won't
-> > necessarily hold true in the future.
-> 
-> Another approach could be vendor confirmation that they would never
-> release cores with the same MIDR value in different configurations.
-> That is to say, a PE with a specific MIDR value will always be in a
-> homogenous system and will never be part of a big.little
-> configuration.  The microarchitecture routines are essentially
-> vendor-specific, so getting this assurance from them should be
-> sufficient, shouldn't it?
+Robin.
 
-I don't think you would get such assurance. Basically how the CPUs are
-connected on a system is the property of a SoC and not of the CPU (nor
-MIDR). I know it's not helpful but we don't really have an option (other
-than using made-up MIDR values with some reserved vendor id field and a
-central, OS-agnostic database to describe the real MIDRs).
-
-> > As for big/little, the kernel view has been pretty consistent on that:
-> > we will expose a "sanitised" view of the registers (as described in the
-> > Documentation along with the patch) where we can, and for the per-CPU
-> > registers such as MIDR, you will read the current CPU register (which
-> > is why those registers are also exposed in sysfs).
-> 
-> That's a reasonable approach, my only point of contention was to find
-> a faster alternative to the directory traversal.
-
-So are you only interested in MIDR for microarchitecture tuning? Would
-glibc make any use of the feature registers exposed via MRS emulation
-(and so far mirrored by HWCAP bits, well, as long as we can still do
-this sanely)?
-
--- 
-Catalin
+> +	return 0;
+> +}
+> +
+>   static int arm_smmu_add_device(struct device *dev)
+>   {
+>   	struct iommu_group *group;
+> @@ -1458,6 +1476,7 @@ static struct iommu_ops arm_smmu_ops = {
+>   	.unmap			= arm_smmu_unmap,
+>   	.map_sg			= default_iommu_map_sg,
+>   	.iova_to_phys		= arm_smmu_iova_to_phys,
+> +	.of_xlate		= arm_smmu_of_xlate,
+>   	.add_device		= arm_smmu_add_device,
+>   	.remove_device		= arm_smmu_remove_device,
+>   	.device_group		= arm_smmu_device_group,
+>
