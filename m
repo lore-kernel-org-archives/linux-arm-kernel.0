@@ -1,62 +1,39 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Jan 2016 18:06:39 +0000
-Subject: [PATCH v10 07/21] KVM: ARM64: PMU: Add perf event map and
- introduce perf event creating function
-In-Reply-To: <56AA45B0.3060205@arm.com>
-References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
- <1453866709-20324-8-git-send-email-zhaoshenglong@huawei.com>
- <20160128163115.GC3807@hawk.localdomain> <56AA45B0.3060205@arm.com>
-Message-ID: <20160128180638.GO775@arm.com>
+Date: Thu, 28 Jan 2016 18:08:24 +0000
+Subject: [PATCH v9 3/6] arm64/arm, numa, dt: adding numa dt binding
+ implementation for arm64 platforms.
+In-Reply-To: <CAFpQJXVhEVw7vSq233wfkOGkTanf-msO+PEcWJ2OVAFUhn7n+w@mail.gmail.com>
+References: <1453134965-6125-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1453134965-6125-4-git-send-email-gkulkarni@caviumnetworks.com>
+ <20160126203603.GC17600@localhost> <20160128143925.GC775@arm.com>
+ <CAFpQJXVhEVw7vSq233wfkOGkTanf-msO+PEcWJ2OVAFUhn7n+w@mail.gmail.com>
+Message-ID: <20160128180824.GP775@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 04:45:36PM +0000, Marc Zyngier wrote:
-> On 28/01/16 16:31, Andrew Jones wrote:
-> > On Wed, Jan 27, 2016 at 11:51:35AM +0800, Shannon Zhao wrote:
-> >> From: Shannon Zhao <shannon.zhao@linaro.org>
+On Thu, Jan 28, 2016 at 10:42:17PM +0530, Ganapatrao Kulkarni wrote:
+> On Thu, Jan 28, 2016 at 8:09 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Jan 26, 2016 at 02:36:04PM -0600, Bjorn Helgaas wrote:
+> >> Subject is "arm64/arm, numa, dt: adding ..."  What is the significance
+> >> of the "arm" part?  The other patches only mention "arm64".
 > >>
-> >> When we use tools like perf on host, perf passes the event type and the
-> >> id of this event type category to kernel, then kernel will map them to
-> >> hardware event number and write this number to PMU PMEVTYPER<n>_EL0
-> >> register. When getting the event number in KVM, directly use raw event
-> >> type to create a perf_event for it.
-> >>
-> >> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> >> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  arch/arm64/include/asm/pmu.h |   3 ++
-> >>  arch/arm64/kvm/Makefile      |   1 +
-> >>  include/kvm/arm_pmu.h        |  10 ++++
-> >>  virt/kvm/arm/pmu.c           | 122 +++++++++++++++++++++++++++++++++++++++++++
-> >>  4 files changed, 136 insertions(+)
-> >>  create mode 100644 virt/kvm/arm/pmu.c
-> >>
-> >> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
-> >> index 4406184..2588f9c 100644
-> >> --- a/arch/arm64/include/asm/pmu.h
-> >> +++ b/arch/arm64/include/asm/pmu.h
-> >> @@ -21,6 +21,7 @@
-> >>  
-> >>  #define ARMV8_MAX_COUNTERS      32
-> >>  #define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
-> >> +#define ARMV8_CYCLE_IDX         (ARMV8_MAX_COUNTERS - 1)
-> > 
-> > I'm not sure we want to add this. It's name is wrong, as it's really
-> > PMCNTENSET_EL0.C, and just a few lines above we have the idx defined
-> > already (ARMV8_IDX_CYCLE_COUNTER), but as zero, because
-> > arch/arm64/kernel/perf_event.c maps it that way.
-> > 
-> > I think we should do the same with the pmc array, i.e. map the cycle
-> > counter to idx zero.
-> 
-> I tend to have the opposite view. Not for the sake of it, but because I
-> find it helpful to directly map the code to the architecture
-> documentation without having to bend another handful of neurons.
-> 
-> Will probably had some good reasons to structure it that way, but I
-> don't know the rational. Will?
+> >> General comment: the code below has little, if anything, that is
+> >> actually arm64-specific.  Maybe this is the first DT-based NUMA
+> >> platform?  I don't see other similar code for other arches, so maybe
+> >> it's too early to try to generalize it, but we should try to avoid
+> >> adding duplicates of this code if/when other arches do show up.
+> >
+> > Having it in the core code would allow us to share it with arch/arm/
+> > fairly straightforwardly.
+> This binding can be used for arm too.
+> however at this moment it is the need of arm64 platforms.
+> can we please keep this to arm64 as it's too early to try to
+> generalize it(as Bjorn suggested)
+> I prefer to keep it as it is, otherwise ok.
+> Please suggest.
 
-It was years ago, but I suspect that the cycle counter is index zero
-because its mandated, whilst the number of event counters is IMPDEF.
+My suggestions time and time again on the NUMA patches from you have
+consistently been around consolidation of existing code, or moving things
+that aren't architecture-specific out of the architecture code.
 
 Will
