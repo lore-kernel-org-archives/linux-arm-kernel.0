@@ -1,34 +1,33 @@
-From: jeffmerkey@gmail.com (Jeffrey Merkey)
-Date: Thu, 28 Jan 2016 12:47:52 -0700
-Subject: [PATCH 31/31] Add debugger entry points for ARM64
-Message-ID: <1454010472-29693-1-git-send-email-jeffmerkey@gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 28 Jan 2016 11:53:00 -0800
+Subject: [PATCH V2 1/8] dmaengine: bcm2835: set residue_granularity field
+In-Reply-To: <1452187987-2605-2-git-send-email-kernel@martin.sperl.org>
+References: <1452187987-2605-1-git-send-email-kernel@martin.sperl.org>
+ <1452187987-2605-2-git-send-email-kernel@martin.sperl.org>
+Message-ID: <8760ydlbvn.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds an export which can be set by system debuggers to
-direct the hard lockup and soft lockup detector to trigger a breakpoint
-exception and enter a debugger if one is active.  It is assumed that if
-someone sets this variable, then an breakpoint handler of some sort will
-be actively loaded or registered via the notify die handler chain.
+kernel at martin.sperl.org writes:
 
-This addition is extremely useful for debugging hard and soft lockups
-real time and quickly from a console debugger.
+> From: Martin Sperl <kernel@martin.sperl.org>
+>
+> bcm2835-dma supports residue reporting at burst level but didn't report
+> this via the residue_granularity field.
+>
+> See also:
+> https://github.com/raspberrypi/linux/commit/b015555327afa402f70ddc86e3632f59df1cd9d7
+> for the downstream patch.
+>
+> Signed-off-by: Matthias Reichl <hias@horus.com>
+> Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 
-Signed-off-by: Jeffrey Merkey <jeffmerkey@gmail.com>
----
- arch/arm64/include/asm/kdebug.h | 4 ++++
- 1 file changed, 4 insertions(+)
- create mode 100644 arch/arm64/include/asm/kdebug.h
-
-diff --git a/arch/arm64/include/asm/kdebug.h b/arch/arm64/include/asm/kdebug.h
-new file mode 100644
-index 0000000..5d09de1
---- /dev/null
-+++ b/arch/arm64/include/asm/kdebug.h
-@@ -0,0 +1,4 @@
-+
-+static inline void arch_breakpoint(void)
-+{
-+}
--- 
-1.8.3.1
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160128/05eaaaa4/attachment.sig>
