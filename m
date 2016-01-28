@@ -1,43 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Jan 2016 15:23:37 +0100
-Subject: [PATCH V2 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge driver
- to work on both Zynq and Microblaze
-In-Reply-To: <8520D5D51A55D047800579B094147198258741F5@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
- <1917083.LB4Ng3Y2yP@wuerfel>
- <8520D5D51A55D047800579B094147198258741F5@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <3706176.5tvYx0gSBz@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 28 Jan 2016 14:27:52 +0000
+Subject: [PATCH 11/13] dtb: amd: Add PCIe SMMU device tree node
+In-Reply-To: <6645680.g0j8d12m6d@wuerfel>
+References: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <20160128111453.GG17123@leverpostej> <56AA07AA.7050701@arm.com>
+ <6645680.g0j8d12m6d@wuerfel>
+Message-ID: <20160128142751.GA775@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 January 2016 14:18:15 Bharat Kumar Gogada wrote:
+On Thu, Jan 28, 2016 at 03:17:33PM +0100, Arnd Bergmann wrote:
+> On Thursday 28 January 2016 12:20:58 Robin Murphy wrote:
+> > >
+> > > Will, Robin, thoughts?
 > > 
-> > I see. In the upstream code you seem to do it in
-> > pcibios_setup_bus_devices(), while arm64 and powerpc do it in
-> > pcibios_add_device().
-> > 
-> No that function is not getting called with generic API's, its getting called with pcibios_init flow which is tightly bound with struct pci_controller microblaze specific structure. So I added pcibios_add_device in pci-common.c.
+> > Any IDs specified here would only apply to DMA by the "platform device" 
+> > side of the host controller itself (as would an equivalent "iommus" 
+> > property on pcie0 once I finish the SMMUv2 generic binding support I'm 
+> > working on). In terms of PCI devices, the "mmu-masters" property is 
+> > overloaded such that only its existence matters, to identify that there 
+> > _is_ a relationship between the SMMU and the PCI bus(es) behind that 
+> > host controller.
+> 
+> I wasn't aware that this was actually still specified. I had hoped
+> we were getting rid of mmu-masters before anyone actually started
+> using it, but now I see it in ns2.dtsi and fsl-ls2080a.dtsi.
+> 
+> Does anyone know what happened to the plan to use the iommu DT binding
+> for the ARM SMMU instead? Do we now have to support both ways indefinitely?
 
-Ok
+We always did -- Seattle used the mmu-masters binding before the generic
+binding even existed. Robin has been working on patches to get of_xlate
+up and running, but it got held up by Laurent's series which didn't end
+up going anywhere.
 
-> > > May be we can add similar on arm and test out, but we might need some
-> > > cleanup in arch/arm/kernel/bios32.c
-> > 
-> > I think that would still just be a half-baked solution. This should really be fully
-> > automatic. We could do it in the __weak
-> > pcibios_add_device() for all architectures that don't override it when the bus
-> > was probed from DT, or we could do it in pci_read_irq().
-> When will pci_read_irq() call get invoked ?
-
-This is called early on when a device gets created in pci_setup_device(),
-so platforms can still override the value later.
-
-The idea here is that normally a BIOS stores the interrupt number in
-the PCI_INTERRUPT_LINE config space byte, and we just read it from
-there. Generally speaking though, for non-PC systems we tend to not
-have a BIOS that writes these values to start with, and any values
-stored in here have no meaning in combination with SPARSE_IRQ
-and/or IRQ_DOMAINS because the bootloader or BIOS doesn't know
-what IRQ number will refer to hardware IRQ line in Linux.
-
-	Arnd
+Will
