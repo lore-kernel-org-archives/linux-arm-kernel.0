@@ -1,198 +1,44 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 28 Jan 2016 11:32:15 +0000
-Subject: [PATCH 4/6] arm64: cpufeature: Check availability of AArch32
-In-Reply-To: <1453980737-6126-1-git-send-email-suzuki.poulose@arm.com>
-References: <1453980737-6126-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1453980737-6126-5-git-send-email-suzuki.poulose@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Jan 2016 12:31:59 +0100
+Subject: [PATCH] clk: Move vendor's Kconfig into CCF menu section
+In-Reply-To: <20160128083656.GM12841@codeaurora.org>
+References: <201601271708.gQUxXACW%fengguang.wu@intel.com>
+ <6167008.u8jfFpmfhy@wuerfel> <20160128083656.GM12841@codeaurora.org>
+Message-ID: <1505403.Puq3Qui8Zr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARMv8 support for AArch32 state is optional. Hence it is
-not safe to check the AArch32 ID registers for sanity, which
-could lead to false warnings. This patch makes sure that the
-AArch32 state is implemented before we keep track of the 32bit
-ID registers.
+On Thursday 28 January 2016 00:36:56 Stephen Boyd wrote:
+> On 01/27, Arnd Bergmann wrote:
+> > On Wednesday 27 January 2016 17:56:18 James Liao wrote:
+> > > > 
+> > > > I think you should include this change in your patch, or as a preparation.
+> > > > All other samsung platforms already select COMMON_CLK through ARCH_MULTIPLATFORM,
+> > > > and all SoCs that are part of ARCH_S3C24XX individually select a symbol that
+> > > > selects COMMON_CLK.
+> > > 
+> > > Oops, I didn't notice there are warnings after moving these Kconfigs
+> > > into menu section.
+> > > 
+> > > The original motivation of this patch is preventing new clk drivers
+> > > include their Kconfig in a wrong place, so it's not critical. Do you
+> > > think we should apply this patch (with your changes below) or drop this
+> > > patch directly?
+> > 
+> > 
+> > I think your patch is good, we just need to fix S3C24xx, which is doing
+> > things in a strange way for historic reasons.
+> 
+> So far we've taken the approach of not caring if they include
+> their Kconfig outside the common clk menu when all the configs
+> inside the Kconfig file are hidden. Of course, when they aren't
+> hidden this becomes a problem, but that isn't the case unless
+> something changed recently.
 
-As per ARM ARM (D.1.21.2 - Support for Exception Levels and
-Execution States, DDI0487A.h), checking the support for AArch32
-at EL0 is good enough to check the support for AArch32 (i.e,
-AArch32 at EL1 => AArch32 at EL0, but not vice versa).
+They are all hidden, but there is no real reason for that I think
+(other than the samsung glitch).
 
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/kernel/cpufeature.c |   86 ++++++++++++++++++++++------------------
- arch/arm64/kernel/cpuinfo.c    |   37 +++++++++--------
- 2 files changed, 67 insertions(+), 56 deletions(-)
+Having them inside the menu makes it possible to add '|| COMPILE_TEST'
+as a follow-up, and makes it more consistent overall.
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index b88cbef..853e575 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -423,22 +423,26 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
- 	init_cpu_ftr_reg(SYS_ID_AA64MMFR1_EL1, info->reg_id_aa64mmfr1);
- 	init_cpu_ftr_reg(SYS_ID_AA64PFR0_EL1, info->reg_id_aa64pfr0);
- 	init_cpu_ftr_reg(SYS_ID_AA64PFR1_EL1, info->reg_id_aa64pfr1);
--	init_cpu_ftr_reg(SYS_ID_DFR0_EL1, info->reg_id_dfr0);
--	init_cpu_ftr_reg(SYS_ID_ISAR0_EL1, info->reg_id_isar0);
--	init_cpu_ftr_reg(SYS_ID_ISAR1_EL1, info->reg_id_isar1);
--	init_cpu_ftr_reg(SYS_ID_ISAR2_EL1, info->reg_id_isar2);
--	init_cpu_ftr_reg(SYS_ID_ISAR3_EL1, info->reg_id_isar3);
--	init_cpu_ftr_reg(SYS_ID_ISAR4_EL1, info->reg_id_isar4);
--	init_cpu_ftr_reg(SYS_ID_ISAR5_EL1, info->reg_id_isar5);
--	init_cpu_ftr_reg(SYS_ID_MMFR0_EL1, info->reg_id_mmfr0);
--	init_cpu_ftr_reg(SYS_ID_MMFR1_EL1, info->reg_id_mmfr1);
--	init_cpu_ftr_reg(SYS_ID_MMFR2_EL1, info->reg_id_mmfr2);
--	init_cpu_ftr_reg(SYS_ID_MMFR3_EL1, info->reg_id_mmfr3);
--	init_cpu_ftr_reg(SYS_ID_PFR0_EL1, info->reg_id_pfr0);
--	init_cpu_ftr_reg(SYS_ID_PFR1_EL1, info->reg_id_pfr1);
--	init_cpu_ftr_reg(SYS_MVFR0_EL1, info->reg_mvfr0);
--	init_cpu_ftr_reg(SYS_MVFR1_EL1, info->reg_mvfr1);
--	init_cpu_ftr_reg(SYS_MVFR2_EL1, info->reg_mvfr2);
-+
-+	if (id_aa64pfr0_32bit_el0(info->reg_id_aa64pfr0)) {
-+		init_cpu_ftr_reg(SYS_ID_DFR0_EL1, info->reg_id_dfr0);
-+		init_cpu_ftr_reg(SYS_ID_ISAR0_EL1, info->reg_id_isar0);
-+		init_cpu_ftr_reg(SYS_ID_ISAR1_EL1, info->reg_id_isar1);
-+		init_cpu_ftr_reg(SYS_ID_ISAR2_EL1, info->reg_id_isar2);
-+		init_cpu_ftr_reg(SYS_ID_ISAR3_EL1, info->reg_id_isar3);
-+		init_cpu_ftr_reg(SYS_ID_ISAR4_EL1, info->reg_id_isar4);
-+		init_cpu_ftr_reg(SYS_ID_ISAR5_EL1, info->reg_id_isar5);
-+		init_cpu_ftr_reg(SYS_ID_MMFR0_EL1, info->reg_id_mmfr0);
-+		init_cpu_ftr_reg(SYS_ID_MMFR1_EL1, info->reg_id_mmfr1);
-+		init_cpu_ftr_reg(SYS_ID_MMFR2_EL1, info->reg_id_mmfr2);
-+		init_cpu_ftr_reg(SYS_ID_MMFR3_EL1, info->reg_id_mmfr3);
-+		init_cpu_ftr_reg(SYS_ID_PFR0_EL1, info->reg_id_pfr0);
-+		init_cpu_ftr_reg(SYS_ID_PFR1_EL1, info->reg_id_pfr1);
-+		init_cpu_ftr_reg(SYS_MVFR0_EL1, info->reg_mvfr0);
-+		init_cpu_ftr_reg(SYS_MVFR1_EL1, info->reg_mvfr1);
-+		init_cpu_ftr_reg(SYS_MVFR2_EL1, info->reg_mvfr2);
-+	}
-+
- }
- 
- static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
-@@ -541,47 +545,51 @@ void update_cpu_features(int cpu,
- 				      info->reg_id_aa64pfr1, boot->reg_id_aa64pfr1);
- 
- 	/*
--	 * If we have AArch32, we care about 32-bit features for compat. These
--	 * registers should be RES0 otherwise.
-+	 * If we have AArch32, we care about 32-bit features for compat.
-+	 * If the system doesn't support AArch32, don't update them.
- 	 */
--	taint |= check_update_ftr_reg(SYS_ID_DFR0_EL1, cpu,
-+	if (id_aa64pfr0_32bit_el0(read_system_reg(SYS_ID_AA64PFR0_EL1)) &&
-+		id_aa64pfr0_32bit_el0(info->reg_id_aa64pfr0)) {
-+
-+		taint |= check_update_ftr_reg(SYS_ID_DFR0_EL1, cpu,
- 					info->reg_id_dfr0, boot->reg_id_dfr0);
--	taint |= check_update_ftr_reg(SYS_ID_ISAR0_EL1, cpu,
-+		taint |= check_update_ftr_reg(SYS_ID_ISAR0_EL1, cpu,
- 					info->reg_id_isar0, boot->reg_id_isar0);
--	taint |= check_update_ftr_reg(SYS_ID_ISAR1_EL1, cpu,
-+		taint |= check_update_ftr_reg(SYS_ID_ISAR1_EL1, cpu,
- 					info->reg_id_isar1, boot->reg_id_isar1);
--	taint |= check_update_ftr_reg(SYS_ID_ISAR2_EL1, cpu,
-+		taint |= check_update_ftr_reg(SYS_ID_ISAR2_EL1, cpu,
- 					info->reg_id_isar2, boot->reg_id_isar2);
--	taint |= check_update_ftr_reg(SYS_ID_ISAR3_EL1, cpu,
-+		taint |= check_update_ftr_reg(SYS_ID_ISAR3_EL1, cpu,
- 					info->reg_id_isar3, boot->reg_id_isar3);
--	taint |= check_update_ftr_reg(SYS_ID_ISAR4_EL1, cpu,
-+		taint |= check_update_ftr_reg(SYS_ID_ISAR4_EL1, cpu,
- 					info->reg_id_isar4, boot->reg_id_isar4);
--	taint |= check_update_ftr_reg(SYS_ID_ISAR5_EL1, cpu,
-+		taint |= check_update_ftr_reg(SYS_ID_ISAR5_EL1, cpu,
- 					info->reg_id_isar5, boot->reg_id_isar5);
- 
--	/*
--	 * Regardless of the value of the AuxReg field, the AIFSR, ADFSR, and
--	 * ACTLR formats could differ across CPUs and therefore would have to
--	 * be trapped for virtualization anyway.
--	 */
--	taint |= check_update_ftr_reg(SYS_ID_MMFR0_EL1, cpu,
-+		/*
-+		 * Regardless of the value of the AuxReg field, the AIFSR, ADFSR, and
-+		 * ACTLR formats could differ across CPUs and therefore would have to
-+		 * be trapped for virtualization anyway.
-+		 */
-+		taint |= check_update_ftr_reg(SYS_ID_MMFR0_EL1, cpu,
- 					info->reg_id_mmfr0, boot->reg_id_mmfr0);
--	taint |= check_update_ftr_reg(SYS_ID_MMFR1_EL1, cpu,
-+		taint |= check_update_ftr_reg(SYS_ID_MMFR1_EL1, cpu,
- 					info->reg_id_mmfr1, boot->reg_id_mmfr1);
--	taint |= check_update_ftr_reg(SYS_ID_MMFR2_EL1, cpu,
-+		taint |= check_update_ftr_reg(SYS_ID_MMFR2_EL1, cpu,
- 					info->reg_id_mmfr2, boot->reg_id_mmfr2);
--	taint |= check_update_ftr_reg(SYS_ID_MMFR3_EL1, cpu,
-+		taint |= check_update_ftr_reg(SYS_ID_MMFR3_EL1, cpu,
- 					info->reg_id_mmfr3, boot->reg_id_mmfr3);
--	taint |= check_update_ftr_reg(SYS_ID_PFR0_EL1, cpu,
-+		taint |= check_update_ftr_reg(SYS_ID_PFR0_EL1, cpu,
- 					info->reg_id_pfr0, boot->reg_id_pfr0);
--	taint |= check_update_ftr_reg(SYS_ID_PFR1_EL1, cpu,
-+		taint |= check_update_ftr_reg(SYS_ID_PFR1_EL1, cpu,
- 					info->reg_id_pfr1, boot->reg_id_pfr1);
--	taint |= check_update_ftr_reg(SYS_MVFR0_EL1, cpu,
-+		taint |= check_update_ftr_reg(SYS_MVFR0_EL1, cpu,
- 					info->reg_mvfr0, boot->reg_mvfr0);
--	taint |= check_update_ftr_reg(SYS_MVFR1_EL1, cpu,
-+		taint |= check_update_ftr_reg(SYS_MVFR1_EL1, cpu,
- 					info->reg_mvfr1, boot->reg_mvfr1);
--	taint |= check_update_ftr_reg(SYS_MVFR2_EL1, cpu,
-+		taint |= check_update_ftr_reg(SYS_MVFR2_EL1, cpu,
- 					info->reg_mvfr2, boot->reg_mvfr2);
-+	}
- 
- 	/*
- 	 * Mismatched CPU features are a recipe for disaster. Don't even
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 212ae63..8cc2a86 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -213,23 +213,26 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
- 	info->reg_id_aa64pfr0 = read_cpuid(ID_AA64PFR0_EL1);
- 	info->reg_id_aa64pfr1 = read_cpuid(ID_AA64PFR1_EL1);
- 
--	info->reg_id_dfr0 = read_cpuid(ID_DFR0_EL1);
--	info->reg_id_isar0 = read_cpuid(ID_ISAR0_EL1);
--	info->reg_id_isar1 = read_cpuid(ID_ISAR1_EL1);
--	info->reg_id_isar2 = read_cpuid(ID_ISAR2_EL1);
--	info->reg_id_isar3 = read_cpuid(ID_ISAR3_EL1);
--	info->reg_id_isar4 = read_cpuid(ID_ISAR4_EL1);
--	info->reg_id_isar5 = read_cpuid(ID_ISAR5_EL1);
--	info->reg_id_mmfr0 = read_cpuid(ID_MMFR0_EL1);
--	info->reg_id_mmfr1 = read_cpuid(ID_MMFR1_EL1);
--	info->reg_id_mmfr2 = read_cpuid(ID_MMFR2_EL1);
--	info->reg_id_mmfr3 = read_cpuid(ID_MMFR3_EL1);
--	info->reg_id_pfr0 = read_cpuid(ID_PFR0_EL1);
--	info->reg_id_pfr1 = read_cpuid(ID_PFR1_EL1);
--
--	info->reg_mvfr0 = read_cpuid(MVFR0_EL1);
--	info->reg_mvfr1 = read_cpuid(MVFR1_EL1);
--	info->reg_mvfr2 = read_cpuid(MVFR2_EL1);
-+	/* Update the 32bit ID registers only if AArch32 is implemented */
-+	if (id_aa64pfr0_32bit_el0(info->reg_id_aa64pfr0)) {
-+		info->reg_id_dfr0 = read_cpuid(ID_DFR0_EL1);
-+		info->reg_id_isar0 = read_cpuid(ID_ISAR0_EL1);
-+		info->reg_id_isar1 = read_cpuid(ID_ISAR1_EL1);
-+		info->reg_id_isar2 = read_cpuid(ID_ISAR2_EL1);
-+		info->reg_id_isar3 = read_cpuid(ID_ISAR3_EL1);
-+		info->reg_id_isar4 = read_cpuid(ID_ISAR4_EL1);
-+		info->reg_id_isar5 = read_cpuid(ID_ISAR5_EL1);
-+		info->reg_id_mmfr0 = read_cpuid(ID_MMFR0_EL1);
-+		info->reg_id_mmfr1 = read_cpuid(ID_MMFR1_EL1);
-+		info->reg_id_mmfr2 = read_cpuid(ID_MMFR2_EL1);
-+		info->reg_id_mmfr3 = read_cpuid(ID_MMFR3_EL1);
-+		info->reg_id_pfr0 = read_cpuid(ID_PFR0_EL1);
-+		info->reg_id_pfr1 = read_cpuid(ID_PFR1_EL1);
-+
-+		info->reg_mvfr0 = read_cpuid(MVFR0_EL1);
-+		info->reg_mvfr1 = read_cpuid(MVFR1_EL1);
-+		info->reg_mvfr2 = read_cpuid(MVFR2_EL1);
-+	}
- 
- 	cpuinfo_detect_icache_policy(info);
- 
--- 
-1.7.9.5
+	Arnd
