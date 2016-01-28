@@ -1,45 +1,45 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 28 Jan 2016 14:25:25 -0700
-Subject: [PATCH net-next 01/40] net: fec: stop the "rcv is not +last,
- " error messages
+Date: Thu, 28 Jan 2016 14:25:30 -0700
+Subject: [PATCH net-next 06/40] net: fec: don't disable FEC_ENET_TS_TIMER
+ interrupt
 In-Reply-To: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1454016364-30985-2-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1454016364-30985-7-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setting the FTRL register will stop the fec from
-trying to use multiple receive buffers.
+Only the interrupt routine processes this condition.
 
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 ---
  drivers/net/ethernet/freescale/fec.h      | 1 +
- drivers/net/ethernet/freescale/fec_main.c | 1 +
- 2 files changed, 2 insertions(+)
+ drivers/net/ethernet/freescale/fec_main.c | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
-index 99d33e2..5144e73 100644
+index f8d7fdb..684fe91f 100644
 --- a/drivers/net/ethernet/freescale/fec.h
 +++ b/drivers/net/ethernet/freescale/fec.h
-@@ -65,6 +65,7 @@
- #define FEC_R_FIFO_RSEM		0x194 /* Receive FIFO section empty threshold */
- #define FEC_R_FIFO_RAEM		0x198 /* Receive FIFO almost empty threshold */
- #define FEC_R_FIFO_RAFL		0x19c /* Receive FIFO almost full threshold */
-+#define FEC_FTRL		0x1b0 /* Frame truncation receive length*/
- #define FEC_RACC		0x1c4 /* Receive Accelerator function */
- #define FEC_RCMR_1		0x1c8 /* Receive classification match ring 1 */
- #define FEC_RCMR_2		0x1cc /* Receive classification match ring 2 */
+@@ -359,6 +359,7 @@ struct bufdesc_ex {
+ #define FEC_ENET_TS_TIMER       ((uint)0x00008000)
+ 
+ #define FEC_DEFAULT_IMASK (FEC_ENET_TXF | FEC_ENET_RXF | FEC_ENET_MII | FEC_ENET_TS_TIMER)
++#define FEC_NAPI_IMASK	(FEC_ENET_MII | FEC_ENET_TS_TIMER)
+ #define FEC_RX_DISABLED_IMASK (FEC_DEFAULT_IMASK & (~FEC_ENET_RXF))
+ 
+ /* ENET interrupt coalescing macro define */
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 502da6f..2c7c845 100644
+index 0e8c8b6..e8f35fb 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -984,6 +984,7 @@ fec_restart(struct net_device *ndev)
- 			val &= ~FEC_RACC_OPTIONS;
- 		writel(val, fep->hwp + FEC_RACC);
- 	}
-+	writel(PKT_MAXBUF_SIZE, fep->hwp + FEC_FTRL);
- #endif
+@@ -1545,7 +1545,7 @@ fec_enet_interrupt(int irq, void *dev_id)
  
- 	/*
+ 		if (napi_schedule_prep(&fep->napi)) {
+ 			/* Disable the NAPI interrupts */
+-			writel(FEC_ENET_MII, fep->hwp + FEC_IMASK);
++			writel(FEC_NAPI_IMASK, fep->hwp + FEC_IMASK);
+ 			__napi_schedule(&fep->napi);
+ 		}
+ 	}
 -- 
 2.5.0
