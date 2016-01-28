@@ -1,179 +1,91 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 27 Jan 2016 16:14:19 -0800
-Subject: [PATCH] arm64: make CONFIG_DEBUG_RODATA non-optional
-In-Reply-To: <20160128000906.GA42530@davidb.org>
-References: <1453226922-16831-1-git-send-email-keescook@chromium.org>
- <1453226922-16831-4-git-send-email-keescook@chromium.org>
- <20160127211105.GA41450@davidb.org>
- <CAGXu5j+DLRoVE88a9++jVfEkN90HDiAaDAMnT2TrKqtMZ_yOww@mail.gmail.com>
- <20160128000906.GA42530@davidb.org>
-Message-ID: <CAGXu5jLj0mvUUSmXoBzuJkRWYP0C7ybb9S4gVp5PUjhYyWP16Q@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 27 Jan 2016 16:31:48 -0800
+Subject: [PATCH 3/3] ARM: dts: vf610: add remaining SAI instaces
+In-Reply-To: <1445141122-14183-3-git-send-email-stefan@agner.ch>
+References: <1445141122-14183-1-git-send-email-stefan@agner.ch>
+ <1445141122-14183-3-git-send-email-stefan@agner.ch>
+Message-ID: <7c3b0b28706f2bf1cf656c7dc2daf31d@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 4:09 PM, David Brown <david.brown@linaro.org> wrote:
-> From 2efef8aa0f8f7f6277ffebe4ea6744fc93d54644 Mon Sep 17 00:00:00 2001
-> From: David Brown <david.brown@linaro.org>
-> Date: Wed, 27 Jan 2016 13:58:44 -0800
->
-> This removes the CONFIG_DEBUG_RODATA option and makes it always
-> enabled.
->
-> Signed-off-by: David Brown <david.brown@linaro.org>
+Hi Shawn,
 
-I'm all for this!
+The rest of the patchset has been applied during rc phase of v4.4, I
+guess this one was scheduled for the next release (v4.5). However, I
+just realized that this seemed to have slipped through...
 
-Reviewed-by: Kees Cook <keescook@chromium.org>
+--
+Stefan
 
--Kees
-
+On 2015-10-17 21:05, Stefan Agner wrote:
+> This adds the remaining SAI instances SAI0, SAI1 and SAI3. All
+> instances are very similar, except that the DMA channel of SAI3
+> is available on MUX1 (compared to MUX0 for SAI0-SAI2). Also,
+> SAI3 has a slightly different memory map due to a deeper FIFO,
+> however in practice the current driver works for SAI3 fine.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 > ---
-> v1: This is in the same spirit as the x86 patch, removing allowing
-> this option to be config selected.  The associated patch series adds a
-> runtime option for the same thing.  However, it does affect the way
-> some things are mapped, and could possibly result in either increased
-> memory usage, or a performance hit (due to TLB misses from 4K pages).
->
-> I've tested this on a Hikey 96board (hi6220-hikey.dtb), both with and
-> without 'rodata=off' on the command line.
->
-> arch/arm64/Kconfig              |  3 +++
-> arch/arm64/Kconfig.debug        | 10 ----------
-> arch/arm64/kernel/insn.c        |  2 +-
-> arch/arm64/kernel/vmlinux.lds.S |  5 +----
-> arch/arm64/mm/mmu.c             | 12 ------------
-> 5 files changed, 5 insertions(+), 27 deletions(-)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 8cc6228..ffa617a 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -201,6 +201,9 @@ config KERNEL_MODE_NEON
-> config FIX_EARLYCON_MEM
->         def_bool y
->
-> +config DEBUG_RODATA
-> +       def_bool y
+>  arch/arm/boot/dts/vfxxx.dtsi | 42 ++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+> index c2a4d1c..b45bc81 100644
+> --- a/arch/arm/boot/dts/vfxxx.dtsi
+> +++ b/arch/arm/boot/dts/vfxxx.dtsi
+> @@ -174,6 +174,34 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			sai0: sai at 4002f000 {
+> +				compatible = "fsl,vf610-sai";
+> +				reg = <0x4002f000 0x1000>;
+> +				interrupts = <84 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks VF610_CLK_SAI0>,
+> +					<&clks VF610_CLK_SAI0_DIV>,
+> +					<&clks 0>, <&clks 0>;
+> +				clock-names = "bus", "mclk1", "mclk2", "mclk3";
+> +				dma-names = "tx", "rx";
+> +				dmas = <&edma0 0 17>,
+> +					<&edma0 0 16>;
+> +				status = "disabled";
+> +			};
 > +
-> config PGTABLE_LEVELS
->         int
->         default 2 if ARM64_16K_PAGES && ARM64_VA_BITS_36
-> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-> index e13c4bf..db994ec 100644
-> --- a/arch/arm64/Kconfig.debug
-> +++ b/arch/arm64/Kconfig.debug
-> @@ -48,16 +48,6 @@ config DEBUG_SET_MODULE_RONX
->           against certain classes of kernel exploits.
->           If in doubt, say "N".
->
-> -config DEBUG_RODATA
-> -       bool "Make kernel text and rodata read-only"
-> -       help
-> -         If this is set, kernel text and rodata will be made read-only.
-> This
-> -         is to help catch accidental or malicious attempts to change the
-> -         kernel's executable code. Additionally splits rodata from kernel
-> -         text so it can be made explicitly non-executable.
-> -
-> -          If in doubt, say Y
-> -
-> config DEBUG_ALIGN_RODATA
->         depends on DEBUG_RODATA && ARM64_4K_PAGES
->         bool "Align linker sections up to SECTION_SIZE"
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index 7371455..a04bdef 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -95,7 +95,7 @@ static void __kprobes *patch_map(void *addr, int fixmap)
->
->         if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
->                 page = vmalloc_to_page(addr);
-> -       else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
-> +       else if (!module)
->                 page = virt_to_page(addr);
->         else
->                 return addr;
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S
-> b/arch/arm64/kernel/vmlinux.lds.S
-> index e3928f5..f80903c 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -65,12 +65,9 @@ PECOFF_FILE_ALIGNMENT = 0x200;
-> #if defined(CONFIG_DEBUG_ALIGN_RODATA)
-> #define ALIGN_DEBUG_RO                  . = ALIGN(1<<SECTION_SHIFT);
-> #define ALIGN_DEBUG_RO_MIN(min)         ALIGN_DEBUG_RO
-> -#elif defined(CONFIG_DEBUG_RODATA)
-> +#else
-> #define ALIGN_DEBUG_RO                  . = ALIGN(1<<PAGE_SHIFT);
-> #define ALIGN_DEBUG_RO_MIN(min)         ALIGN_DEBUG_RO
-> -#else
-> -#define ALIGN_DEBUG_RO
-> -#define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(min);
-> #endif
->
-> SECTIONS
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 58faeaa..3b411b7 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -313,7 +313,6 @@ static void create_mapping_late(phys_addr_t phys,
-> unsigned long virt,
->                                 phys, virt, size, prot, late_alloc);
-> }
->
-> -#ifdef CONFIG_DEBUG_RODATA
-> static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
-> {
->         /*
-> @@ -347,13 +346,6 @@ static void __init __map_memblock(phys_addr_t start,
-> phys_addr_t end)
->         }
->
-> }
-> -#else
-> -static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
-> -{
-> -       create_mapping(start, __phys_to_virt(start), end - start,
-> -                       PAGE_KERNEL_EXEC);
-> -}
-> -#endif
->
-> static void __init map_mem(void)
-> {
-> @@ -410,7 +402,6 @@ static void __init map_mem(void)
->
-> static void __init fixup_executable(void)
-> {
-> -#ifdef CONFIG_DEBUG_RODATA
->         /* now that we are actually fully mapped, make the start/end more
-> fine grained */
->         if (!IS_ALIGNED((unsigned long)_stext, SWAPPER_BLOCK_SIZE)) {
->                 unsigned long aligned_start = round_down(__pa(_stext),
-> @@ -428,10 +419,8 @@ static void __init fixup_executable(void)
->                                 aligned_end - __pa(__init_end),
->                                 PAGE_KERNEL);
->         }
-> -#endif
-> }
->
-> -#ifdef CONFIG_DEBUG_RODATA
-> void mark_rodata_ro(void)
-> {
->         create_mapping_late(__pa(_stext), (unsigned long)_stext,
-> @@ -439,7 +428,6 @@ void mark_rodata_ro(void)
->                                 PAGE_KERNEL_ROX);
->
-> }
-> -#endif
->
-> void fixup_init(void)
-> {
-> --
-> 2.7.0
->
-
-
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+> +			sai1: sai at 40030000 {
+> +				compatible = "fsl,vf610-sai";
+> +				reg = <0x40030000 0x1000>;
+> +				interrupts = <85 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks VF610_CLK_SAI1>,
+> +					<&clks VF610_CLK_SAI1_DIV>,
+> +					<&clks 0>, <&clks 0>;
+> +				clock-names = "bus", "mclk1", "mclk2", "mclk3";
+> +				dma-names = "tx", "rx";
+> +				dmas = <&edma0 0 19>,
+> +					<&edma0 0 18>;
+> +				status = "disabled";
+> +			};
+> +
+>  			sai2: sai at 40031000 {
+>  				compatible = "fsl,vf610-sai";
+>  				reg = <0x40031000 0x1000>;
+> @@ -188,6 +216,20 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			sai3: sai at 40032000 {
+> +				compatible = "fsl,vf610-sai";
+> +				reg = <0x40032000 0x1000>;
+> +				interrupts = <87 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks VF610_CLK_SAI3>,
+> +					<&clks VF610_CLK_SAI3_DIV>,
+> +					<&clks 0>, <&clks 0>;
+> +				clock-names = "bus", "mclk1", "mclk2", "mclk3";
+> +				dma-names = "tx", "rx";
+> +				dmas = <&edma0 1 9>,
+> +					<&edma0 1 8>;
+> +				status = "disabled";
+> +			};
+> +
+>  			pit: pit at 40037000 {
+>  				compatible = "fsl,vf610-pit";
+>  				reg = <0x40037000 0x1000>;
