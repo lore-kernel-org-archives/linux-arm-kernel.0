@@ -1,39 +1,50 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 28 Jan 2016 17:15:23 +0000
-Subject: [RFC PATCH 3/6] of: iommu: Increment DT node refcount in
- of_iommu_set_ops()
-In-Reply-To: <1453872079-27140-4-git-send-email-anup.patel@broadcom.com>
-References: <1453872079-27140-1-git-send-email-anup.patel@broadcom.com>
- <1453872079-27140-4-git-send-email-anup.patel@broadcom.com>
-Message-ID: <56AA4CAB.6000708@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 28 Jan 2016 09:22:16 -0800
+Subject: [PATCH] clk: ti: omap3+: dpll: use non-locking version of
+ clk_get_rate
+In-Reply-To: <56A9FED1.3090903@ti.com>
+References: <1453981067-8618-1-git-send-email-t-kristo@ti.com>
+ <56A9FED1.3090903@ti.com>
+Message-ID: <20160128172215.GD19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/01/16 05:21, Anup Patel wrote:
-> We are saving pointer to iommu DT node in of_iommu_set_ops()
-> hence we should increment DT node ref count.
+* Tero Kristo <t-kristo@ti.com> [160128 03:44]:
+> On 01/28/2016 01:37 PM, Tero Kristo wrote:
+> >As the code in this file is being executed within irq context in some
+> >cases, we must avoid the clk_get_rate which uses mutex internally.
+> >Switch the code to use clk_hw_get_rate instead which is non-locking.
+> >
+> >Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> 
+> Ooops, sorry. Sent wrong version (read: old) of this patch, please ignore
+> this one. Will re-send the correct version in a bit.
 
-Oh man, shame on whoever wrote that code! :P
+I think this is still needed as a fix for -rc cycle with cc: stable
+as otherwise we have omap4 and 5 hang if PM runtime is enabled before
+a suspend/resume cycle?
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Regards,
 
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> Reviewed-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> ---
->   drivers/iommu/of_iommu.c | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> index 60ba238..5fea665 100644
-> --- a/drivers/iommu/of_iommu.c
-> +++ b/drivers/iommu/of_iommu.c
-> @@ -110,6 +110,7 @@ void of_iommu_set_ops(struct device_node *np, struct iommu_ops *ops)
->   	if (WARN_ON(!iommu))
->   		return;
->
-> +	of_node_get(np);
->   	INIT_LIST_HEAD(&iommu->list);
->   	iommu->np = np;
->   	iommu->ops = ops;
->
+Tony
+
+
+> >  drivers/clk/ti/dpll3xxx.c |    3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> >
+> >diff --git a/drivers/clk/ti/dpll3xxx.c b/drivers/clk/ti/dpll3xxx.c
+> >index f4dec00..7ed24bc 100644
+> >--- a/drivers/clk/ti/dpll3xxx.c
+> >+++ b/drivers/clk/ti/dpll3xxx.c
+> >@@ -437,7 +437,8 @@ int omap3_noncore_dpll_enable(struct clk_hw *hw)
+> >
+> >  	parent = clk_hw_get_parent(hw);
+> >
+> >-	if (clk_hw_get_rate(hw) == clk_get_rate(dd->clk_bypass)) {
+> >+	if (clk_hw_get_rate(hw) ==
+> >+	    clk_hw_get_rate(__clk_get_hw(dd->clk_bypass))) {
+> >  		WARN_ON(parent != __clk_get_hw(dd->clk_bypass));
+> >  		r = _omap3_noncore_dpll_bypass(clk);
+> >  	} else {
+> >
+> 
