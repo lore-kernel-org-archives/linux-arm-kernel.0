@@ -1,29 +1,43 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Thu, 28 Jan 2016 10:13:21 +0300
-Subject: [PATCH 00/10] KVM PCIe/MSI passthrough on ARM/ARM64
-In-Reply-To: <56A8854F.3030209@linaro.org>
-References: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
- <000001d1585e$8097d7e0$81c787a0$@samsung.com> <56A8854F.3030209@linaro.org>
-Message-ID: <00aa01d1599b$5fd3bd10$1f7b3730$@samsung.com>
+From: henryc.chen@mediatek.com (Henry Chen)
+Date: Thu, 28 Jan 2016 15:16:41 +0800
+Subject: [PATCH V4 2/2] regulator: mt6323: Add support for MT6323 regulator
+In-Reply-To: <20160127144105.GQ6042@sirena.org.uk>
+References: <1453896059-44589-1-git-send-email-blogic@openwrt.org>
+ <1453896059-44589-2-git-send-email-blogic@openwrt.org>
+ <20160127144105.GQ6042@sirena.org.uk>
+Message-ID: <1453965401.19407.18.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+Hi Mark,
 
-> x86 isn't problem-free in this space.  An x86 VM is going to know that
-> the 0xfee00000 address range is special, it won't be backed by RAM and
-> won't be a DMA target, thus we'll never attempt to map it for an iova
-> address.  However, if we run a non-x86 VM or a userspace driver, it
-> doesn't necessarily know that there's anything special about that range
-> of iovas.  I intend to resolve this with an extension to the iommu info
-> ioctl that describes the available iova space for the iommu.  The
-> interrupt region would simply be excluded.
+On Wed, 2016-01-27 at 14:41 +0000, Mark Brown wrote:
+> On Wed, Jan 27, 2016 at 01:00:59PM +0100, John Crispin wrote:
+> 
+> > +		/* Constrain board-specific capabilities according to what
+> > +		 * this driver and the chip itself can actually do.
+> > +		 */
+> > +		c = rdev->constraints;
+> > +		c->valid_modes_mask |= REGULATOR_MODE_NORMAL |
+> > +				       REGULATOR_MODE_STANDBY;
+> > +		c->valid_ops_mask |= REGULATOR_CHANGE_MODE;
+> 
+> No, drivers should *never* enable things that weren't explictly enabled
+> by the machine constraints.  This misses the whole point of having
+> constraints.  They are there so that the system integrator can enable
+> the functionality that is safe on a given board.  
 
- I see now, but i still don't understand how it would work. How can we tell the guest OS that we cannot do DMA to this particular
-area? Just exclude it from RAM at all? But this means we would have to modify machine's model...
- I know that this is a bit different story from what we are implementing now. Just curious.
+Okay..the constrains should be define on device tree.
+But which optional properties was suitable to fill on device tree if consumers want to call
+regulator_set_mode directly ?
+I have check the of_regulator.c and not found the suitable property name which can set valid_modes_mask & valid_ops_mask.
 
-Kind regards,
-Pavel Fedin
-Senior Engineer
-Samsung Electronics Research center Russia
+Thanks,
+Henry 
+> 
+> The comment is also inaccurate, it claims it's imposing constraints but
+> in fact it's adding additional permissions.
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
