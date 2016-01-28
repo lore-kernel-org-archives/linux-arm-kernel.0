@@ -1,59 +1,46 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 28 Jan 2016 20:48:01 +0200
-Subject: [PATCH] clk: ti: omap3+: dpll: use non-locking version of
- clk_get_rate
-In-Reply-To: <20160128172215.GD19432@atomide.com>
-References: <1453981067-8618-1-git-send-email-t-kristo@ti.com>
- <56A9FED1.3090903@ti.com> <20160128172215.GD19432@atomide.com>
-Message-ID: <56AA6261.7030503@ti.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Fri, 29 Jan 2016 00:18:34 +0530
+Subject: [PATCH v9 3/6] arm64/arm, numa, dt: adding numa dt binding
+ implementation for arm64 platforms.
+In-Reply-To: <20160128180824.GP775@arm.com>
+References: <1453134965-6125-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1453134965-6125-4-git-send-email-gkulkarni@caviumnetworks.com>
+ <20160126203603.GC17600@localhost> <20160128143925.GC775@arm.com>
+ <CAFpQJXVhEVw7vSq233wfkOGkTanf-msO+PEcWJ2OVAFUhn7n+w@mail.gmail.com>
+ <20160128180824.GP775@arm.com>
+Message-ID: <CAFpQJXWm4n3S70C9rU2Xip-n4xGEsEE=K3ptdDyzxjQMz9kX8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2016 07:22 PM, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [160128 03:44]:
->> On 01/28/2016 01:37 PM, Tero Kristo wrote:
->>> As the code in this file is being executed within irq context in some
->>> cases, we must avoid the clk_get_rate which uses mutex internally.
->>> Switch the code to use clk_hw_get_rate instead which is non-locking.
->>>
->>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>
->> Ooops, sorry. Sent wrong version (read: old) of this patch, please ignore
->> this one. Will re-send the correct version in a bit.
+On Thu, Jan 28, 2016 at 11:38 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Jan 28, 2016 at 10:42:17PM +0530, Ganapatrao Kulkarni wrote:
+>> On Thu, Jan 28, 2016 at 8:09 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Tue, Jan 26, 2016 at 02:36:04PM -0600, Bjorn Helgaas wrote:
+>> >> Subject is "arm64/arm, numa, dt: adding ..."  What is the significance
+>> >> of the "arm" part?  The other patches only mention "arm64".
+>> >>
+>> >> General comment: the code below has little, if anything, that is
+>> >> actually arm64-specific.  Maybe this is the first DT-based NUMA
+>> >> platform?  I don't see other similar code for other arches, so maybe
+>> >> it's too early to try to generalize it, but we should try to avoid
+>> >> adding duplicates of this code if/when other arches do show up.
+>> >
+>> > Having it in the core code would allow us to share it with arch/arm/
+>> > fairly straightforwardly.
+>> This binding can be used for arm too.
+>> however at this moment it is the need of arm64 platforms.
+>> can we please keep this to arm64 as it's too early to try to
+>> generalize it(as Bjorn suggested)
+>> I prefer to keep it as it is, otherwise ok.
+>> Please suggest.
 >
-> I think this is still needed as a fix for -rc cycle with cc: stable
-> as otherwise we have omap4 and 5 hang if PM runtime is enabled before
-> a suspend/resume cycle?
+> My suggestions time and time again on the NUMA patches from you have
+> consistently been around consolidation of existing code, or moving things
+> that aren't architecture-specific out of the architecture code.
 
-Look at the other patch I sent, it should accomplish the same thing, and 
-more.
+thanks, i shall move this out to drivers/of
+>
+> Will
 
-https://www.spinics.net/lists/linux-clk/msg06094.html
-
--Tero
-
->
-> Regards,
->
-> Tony
->
->
->>>   drivers/clk/ti/dpll3xxx.c |    3 ++-
->>>   1 file changed, 2 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/clk/ti/dpll3xxx.c b/drivers/clk/ti/dpll3xxx.c
->>> index f4dec00..7ed24bc 100644
->>> --- a/drivers/clk/ti/dpll3xxx.c
->>> +++ b/drivers/clk/ti/dpll3xxx.c
->>> @@ -437,7 +437,8 @@ int omap3_noncore_dpll_enable(struct clk_hw *hw)
->>>
->>>   	parent = clk_hw_get_parent(hw);
->>>
->>> -	if (clk_hw_get_rate(hw) == clk_get_rate(dd->clk_bypass)) {
->>> +	if (clk_hw_get_rate(hw) ==
->>> +	    clk_hw_get_rate(__clk_get_hw(dd->clk_bypass))) {
->>>   		WARN_ON(parent != __clk_get_hw(dd->clk_bypass));
->>>   		r = _omap3_noncore_dpll_bypass(clk);
->>>   	} else {
->>>
->>
+thanks
+Ganapat
