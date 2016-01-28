@@ -1,38 +1,44 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 28 Jan 2016 12:07:33 +0100
-Subject: [PATCH 2/3] arm64: vmlinux.lds.S: handle .init.rodata.xxx and
- .init.bss sections
-In-Reply-To: <1453979254-25374-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1453979254-25374-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1453979254-25374-3-git-send-email-ard.biesheuvel@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 28 Jan 2016 11:08:20 +0000
+Subject: [PATCH] arm64: Disallow combination of ARCH_XGENE and 16K page
+ size
+In-Reply-To: <20160128103441.GS14823@e104818-lin.cambridge.arm.com>
+References: <1453936230-7305-1-git-send-email-dann.frazier@canonical.com>
+ <20160128103441.GS14823@e104818-lin.cambridge.arm.com>
+Message-ID: <20160128110820.GE30928@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EFI stub is typically built into the decompressor (x86, ARM) so none
-of its symbols are annotated as __init. However, on arm64, the stub is
-linked into the kernel proper, and the code is __init annotated at the
-section level by prepending all names of SHF_ALLOC sections with '.init'.
+On Thu, Jan 28, 2016 at 10:34:41AM +0000, Catalin Marinas wrote:
+> On Wed, Jan 27, 2016 at 04:10:30PM -0700, dann frazier wrote:
+> > 16K page size is an optional feature of the architecture, and is not
+> > supported by the X-Gene SoC family.
+> > 
+> > Signed-off-by: dann frazier <dann.frazier@canonical.com>
+> > ---
+> >  arch/arm64/Kconfig.platforms | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> > index 21074f6..b241290 100644
+> > --- a/arch/arm64/Kconfig.platforms
+> > +++ b/arch/arm64/Kconfig.platforms
+> > @@ -133,6 +133,7 @@ config ARCH_VEXPRESS
+> >  
+> >  config ARCH_XGENE
+> >  	bool "AppliedMicro X-Gene SOC Family"
+> > +	depends on !ARM64_16K_PAGES
+> >  	help
+> >  	  This enables support for AppliedMicro X-Gene SOC Family
+> 
+> This would be the case on Juno as well. But maybe at some point the
+> X-Gene family would gain a CPU with such support.
+> 
+> Anyway, I would rather make 16K pages depend on EXPERT, make it a bit
+> harder to enable. We've had a few questions recently about enabling it
+> on CPUs that don't have such feature.
 
-This results in section names like .init.rodata.str1.8 (for string literals)
-and .init.bss (which is tiny), both of which can be moved into the .init.data
-output section.
+I thought there was also a suggestion that we could fail gracefully in
+the EFI stub if we detected an unsupported page size?
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/vmlinux.lds.S | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index e3928f578891..cbf4db440e9c 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -134,6 +134,7 @@ SECTIONS
- 		CON_INITCALL
- 		SECURITY_INITCALL
- 		INIT_RAM_FS
-+		*(.init.rodata.* .init.bss)	/* from the EFI stub */
- 	}
- 	.exit.data : {
- 		ARM_EXIT_KEEP(EXIT_DATA)
--- 
-2.5.0
+Will
