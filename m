@@ -1,10 +1,10 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 28 Jan 2016 17:40:23 +0100
+Date: Thu, 28 Jan 2016 17:43:41 +0100
 Subject: [PATCH] arm64: allow vmalloc regions to be set with set_memory_*
 In-Reply-To: <20160128150815.GG775@arm.com>
 References: <1453125665-26627-1-git-send-email-ard.biesheuvel@linaro.org>
  <20160128150815.GG775@arm.com>
-Message-ID: <CAKv+Gu9quaR2wtSbOqSMrG8_3XyyrMoqG8wFiCrA3SS+ZRUY8A@mail.gmail.com>
+Message-ID: <CAKv+Gu-GxicSKDq+Nm9H+dWrSVOhupozu4pZ=Pk7CzC_VrW=2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,10 +28,38 @@ On 28 January 2016 at 16:08, Will Deacon <will.deacon@arm.com> wrote:
 
 BPF already uses set_memory_ro() but doesn't bother to check the return value.
 
-Before the patch, I get:
+Without the patch, I get:
+
+root at ubuntu-arm64:~# grep bpf /proc/vmallocinfo
+0xffff000000014000-0xffff000000016000    8192 bpf_prog_alloc+0x3c/0xb8
+pages=1 vmalloc
+0xffff00000017a000-0xffff00000017c000    8192 bpf_prog_alloc+0x3c/0xb8
+pages=1 vmalloc
+root at ubuntu-arm64:~# grep -E 0xffff000000014000\|0xffff00000017a000
+/sys/kernel/debug/kernel_page_tables
+0xffff000000014000-0xffff000000015000           4K     RW NX SHD AF
+        UXN MEM/NORMAL
+0xffff00000017a000-0xffff00000017b000           4K     RW NX SHD AF
+        UXN MEM/NORMAL
+
+and with:
+
+root at ubuntu-arm64:~# grep bpf /proc/vmallocinfo
+0xffff000000014000-0xffff000000016000    8192 bpf_prog_alloc+0x3c/0xb8
+pages=1 vmalloc
+0xffff00000017a000-0xffff00000017c000    8192 bpf_prog_alloc+0x3c/0xb8
+pages=1 vmalloc
+root at ubuntu-arm64:~# grep -E 0xffff000000014000\|0xffff00000017a000
+/sys/kernel/debug/kernel_page_tables
+0xffff000000014000-0xffff000000015000           4K     ro NX SHD AF
+        UXN MEM/NORMAL
+0xffff00000017a000-0xffff00000017b000           4K     ro NX SHD AF
+        UXN MEM/NORMAL
+
 
 > Anyway, with that (and a rebase to -rc2):
 >
 > Acked-by: Will Deacon <will.deacon@arm.com>
 >
-> Will
+
+Thanks
