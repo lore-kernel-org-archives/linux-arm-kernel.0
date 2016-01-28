@@ -1,45 +1,42 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 28 Jan 2016 10:30:36 +0000
-Subject: [PATCH 3/5] arm64: KVM: Fix wrong use of the CPSR MODE mask for 32bit
- guests
+Date: Thu, 28 Jan 2016 10:30:38 +0000
+Subject: [PATCH 5/5] arm64: KVM: Fix guest dead loop when register accessor
+ returns false
 In-Reply-To: <1453977038-13516-1-git-send-email-marc.zyngier@arm.com>
 References: <1453977038-13516-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453977038-13516-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453977038-13516-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-The values of CPSR MODE mask are different between aarch32 and aarch64.
-It should use the right one according to the execution state.
+Currently emulate_cp will return 0 (Handled) no matter what the accessor
+returns. If register accessor returns false, it will not skip current PC
+while emulate_cp return handled. Then guest will stuck in a dead loop.
 
 Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_emulate.h | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 3066328..779a587 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -127,10 +127,14 @@ static inline unsigned long *vcpu_spsr(const struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 4048934..2e90371 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -1007,10 +1007,9 @@ static int emulate_cp(struct kvm_vcpu *vcpu,
+ 		if (likely(r->access(vcpu, params, r))) {
+ 			/* Skip instruction, since it was emulated */
+ 			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
++			/* Handled */
++			return 0;
+ 		}
+-
+-		/* Handled */
+-		return 0;
+ 	}
  
- static inline bool vcpu_mode_priv(const struct kvm_vcpu *vcpu)
- {
--	u32 mode = *vcpu_cpsr(vcpu) & PSR_MODE_MASK;
-+	u32 mode;
- 
--	if (vcpu_mode_is_32bit(vcpu))
-+	if (vcpu_mode_is_32bit(vcpu)) {
-+		mode = *vcpu_cpsr(vcpu) & COMPAT_PSR_MODE_MASK;
- 		return mode > COMPAT_PSR_MODE_USR;
-+	}
-+
-+	mode = *vcpu_cpsr(vcpu) & PSR_MODE_MASK;
- 
- 	return mode != PSR_MODE_EL0t;
- }
+ 	/* Not handled */
 -- 
 2.1.4
