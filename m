@@ -1,48 +1,41 @@
-From: jenskuske@gmail.com (Jens Kuske)
-Date: Thu, 28 Jan 2016 14:16:26 +0100
-Subject: [linux-sunxi] Problem with Allwinner H3 clocks
-In-Reply-To: <56A9CE3D.4020906@redhat.com>
-References: <20160127084607.665fb8c38eeb5733ce4232da@free.fr>
- <CAGb2v65FUhNC-d-YT=-2adNHHT6b1JvGoNTFLfBX_xBSnuOsTg@mail.gmail.com>
- <20160127103714.58312b152adb4148bae2f93b@free.fr> <56A8D5E5.30701@gmail.com>
- <20160127175512.87caf31b5e21a1fec91507f2@free.fr>
- <56A9098A.5010107@redhat.com>
- <20160127200217.14dce96ade71cf81bc82e6f6@free.fr>
- <56A9CE3D.4020906@redhat.com>
-Message-ID: <56AA14AA.4070502@gmail.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Thu, 28 Jan 2016 13:20:56 +0000
+Subject: [PATCH V2 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge
+ driver to  work on both  Zynq and Microblaze
+In-Reply-To: <5255218.OREPu5Af3W@wuerfel>
+References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
+ <4734542.KZZp0TeeeM@wuerfel>
+ <8520D5D51A55D047800579B09414719825873DA8@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <5255218.OREPu5Af3W@wuerfel>
+Message-ID: <8520D5D51A55D047800579B09414719825874148@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/01/16 09:15, Hans de Goede wrote:
-> Hi,
+> Subject: Re: [PATCH V2 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge driver
+> to work on both Zynq and Microblaze
 > 
-> On 27-01-16 20:02, Jean-Francois Moine wrote:
->> On Wed, 27 Jan 2016 19:16:42 +0100
->> Hans de Goede <hdegoede@redhat.com> wrote:
->>
->>>> To be sure, I generated a pure 4.5-rc1 kernel. Same result: no UART.
->>>> Maybe... one more information: I am using Allwinner's u-boot.
->>>
->>> Could be that that is the culprit, why are you not using upstream u-boot?
->>> upstream u-boot has H3 and orangepi-pc support now.
->>
->> Yes, but using the upstream u-boot may hide the clock problem.
+> On Wednesday 27 January 2016 14:33:45 Bharat Kumar Gogada wrote:
+> > > > @@ -705,7 +715,9 @@ static int xilinx_pcie_probe(struct
+> > > > platform_device *pdev)  #endif
+> > > >     pci_scan_child_bus(bus);
+> > > >     pci_assign_unassigned_bus_resources(bus);
+> > > > +#ifdef CONFIG_ARM
+> > > >     pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+> > > > +#endif
+> > > >     pci_bus_add_devices(bus);
+> > > >     platform_set_drvdata(pdev, port);
+> > >
+> > > Here it looks like microblaze gets it right. I'm not sure why we
+> > > still need the
+> > > pci_fixup_irqs() on ARM, but my feeling is that this should be fixed
+> > > in common code.
+> > In arm pci_fixup_irqs is called by pci_common_init_dev
+> (arch/arm/kernel/bios32.c), since this API is removed now, I was calling it
+> separately.
 > 
-> I agree that that could be the case. Would be interesting to figure out
-> what exactly is needed to get the upstream kernel to work properly
-> with allwinner's u-boot.
+> But who calls it in microblaze? If it works without the extra call there, can we
+> make it work the same way for ARM?
+> 
+In microblaze I have added pcibios_add_device call (similar to call in arch/arm64/kernel/pci.c ) in pci-common.c, which is being invoked by kernel core itself. May be we can add similar on arm and test out, but we might need some cleanup in arch/arm/kernel/bios32.c
 
-Hi,
-
-after figuring out how to boot a devicetree kernel with allwinner's
-u-boot I only had to add the mandatory
-	
-	clock-frequency = <24000000>;
-	arm,cpu-registers-not-fw-configured;
-
-to the timer node and v4.5-rc1 booted successfully. They are
-intentionally left out in the official dt, because documentation says
-one should prefer to fix the firmware -> mainline u-boot
-No problems with clocks or uart here.
-
-Jens
+Bharat
