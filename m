@@ -1,97 +1,287 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 28 Jan 2016 19:18:23 +0100
-Subject: [PATCH v10 11/21] KVM: ARM64: Add access handler for PMINTENSET
- and PMINTENCLR register
-In-Reply-To: <1453866709-20324-12-git-send-email-zhaoshenglong@huawei.com>
-References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
- <1453866709-20324-12-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <20160128181823.GC16453@hawk.localdomain>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Thu, 28 Jan 2016 13:26:28 -0500
+Subject: [PATCH v6 4/7] ARM: dts: imx: Add support for Advantech/GE Bx50v3
+In-Reply-To: <20160128061202.GE9070@tiger>
+References: <1450908016-17384-1-git-send-email-akshay.bhat@timesys.com>
+ <1450908016-17384-5-git-send-email-akshay.bhat@timesys.com>
+ <20160128061202.GE9070@tiger>
+Message-ID: <56AA5D54.7090709@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 11:51:39AM +0800, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Since the reset value of PMINTENSET and PMINTENCLR is UNKNOWN, use
-> reset_unknown for its reset handler. Add a handler to emulate writing
-> PMINTENSET or PMINTENCLR register.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 32 ++++++++++++++++++++++++++++----
->  1 file changed, 28 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index d43a9a4..41d4bcd 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -630,6 +630,30 @@ static bool access_pmcnten(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
->  	return true;
->  }
->  
-> +static bool access_pminten(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-> +			   const struct sys_reg_desc *r)
-> +{
-> +	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
-> +
-> +	if (!kvm_arm_pmu_v3_ready(vcpu))
-> +		return trap_raz_wi(vcpu, p, r);
-> +
-> +	if (p->is_write) {
 
-The two '& mask' line wrappings are kinda gross. How about doing
 
-                u64 val = p->regval & mask;
+On 01/28/2016 01:12 AM, Shawn Guo wrote:
+> On Wed, Dec 23, 2015 at 05:00:13PM -0500, Akshay Bhat wrote:
+>> From: Justin Waters <justin.waters@timesys.com>
+>>
+>> Advantech has 3 carrier boards (B450v3, B650v3, B850v3) which use
+>> the Advantech BA-16 module (based on iMX6D). This file has the
+>> devicetree entries that are common to all 3 boards.
+>>
+>> Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
+>> ---
+>>   arch/arm/boot/dts/imx6q-bx50v3.dtsi | 237 ++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 237 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/imx6q-bx50v3.dtsi
+>>
+>> diff --git a/arch/arm/boot/dts/imx6q-bx50v3.dtsi b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
+>> new file mode 100644
+>> index 0000000..1eaf0ce
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
+>> @@ -0,0 +1,237 @@
+>> +/*
+>> + * Copyright 2015 Timesys Corporation.
+>> + * Copyright 2015 General Electric Company
+>> + *
+>> + * This file is dual-licensed: you can use it either under the terms
+>> + * of the GPL or the X11 license, at your option. Note that this dual
+>> + * licensing only applies to this file, and not this project as a
+>> + * whole.
+>> + *
+>> + *  a) This file is free software; you can redistribute it and/or
+>> + *     modify it under the terms of the GNU General Public License
+>> + *     version 2 as published by the Free Software Foundation.
+>> + *
+>> + *     This file is distributed in the hope that it will be useful
+>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + *     GNU General Public License for more details.
+>> + *
+>> + * Or, alternatively
+>> + *
+>> + *  b) Permission is hereby granted, free of charge, to any person
+>> + *     obtaining a copy of this software and associated documentation
+>> + *     files (the "Software"), to deal in the Software without
+>> + *     restriction, including without limitation the rights to use
+>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>> + *     sell copies of the Software, and to permit persons to whom the
+>> + *     Software is furnished to do so, subject to the following
+>> + *     conditions:
+>> + *
+>> + *     The above copyright notice and this permission notice shall be
+>> + *     included in all copies or substantial portions of the Software.
+>> + *
+>> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>> + *     OTHER DEALINGS IN THE SOFTWARE.
+>> + */
+>> +
+>> +#include "imx6q-ba16.dtsi"
+>> +
+>> +/ {
+>> +	clocks {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>
+> Have a new line between properties and sub-node.
 
-here, and then not needing to wrap?
+Will fix this.
 
-> +		if (r->Op2 & 0x1)
-> +			/* accessing PMINTENSET_EL1 */
-> +			vcpu_sys_reg(vcpu, PMINTENSET_EL1) |= (p->regval
-> +							       & mask);
-> +		else
-> +			/* accessing PMINTENCLR_EL1 */
-> +			vcpu_sys_reg(vcpu, PMINTENSET_EL1) &= ~(p->regval
-> +								& mask);
-> +	} else {
-> +		p->regval = vcpu_sys_reg(vcpu, PMINTENSET_EL1) & mask;
-> +	}
-> +
-> +	return true;
-> +}
-> +
->  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
->  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
->  	/* DBGBVRn_EL1 */						\
-> @@ -788,10 +812,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  
->  	/* PMINTENSET_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b001),
-> -	  trap_raz_wi },
-> +	  access_pminten, reset_unknown, PMINTENSET_EL1 },
->  	/* PMINTENCLR_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b010),
-> -	  trap_raz_wi },
-> +	  access_pminten, NULL, PMINTENSET_EL1 },
->  
->  	/* MAIR_EL1 */
->  	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0010), Op2(0b000),
-> @@ -1186,8 +1210,8 @@ static const struct sys_reg_desc cp15_regs[] = {
->  	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), access_pmu_evtyper },
->  	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_evcntr },
->  	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
-> -	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), trap_raz_wi },
-> -	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), trap_raz_wi },
-> +	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), access_pminten },
-> +	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), access_pminten },
->  
->  	{ Op1( 0), CRn(10), CRm( 2), Op2( 0), access_vm_reg, NULL, c10_PRRR },
->  	{ Op1( 0), CRn(10), CRm( 2), Op2( 1), access_vm_reg, NULL, c10_NMRR },
-> -- 
-> 2.0.4
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>> +		mclk: clock at 0 {
+>> +			compatible = "fixed-clock";
+>> +			reg = <0>;
+>> +			#clock-cells = <0>;
+>> +			clock-frequency = <22000000>;
+>> +		};
+>
+> So it's using a different clock naming schema from clk24m in
+> imx6q-ba16.dtsi.  In any case, they should be consistent.
+>
+>> +	};
+>> +
+>> +	reg_wl18xx_vmmc: regulator-wl18xx_vmmc {
+>
+> As a convention, hyphen instead of underscore should be used in node
+> name.  Actually less hyphen form like regulator-wl18xxvmmc or
+> regulator-wl18xx looks better to me.
+>
+Will fix this.
+
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "vwl1807";
+>> +		regulator-min-microvolt = <3300000>;
+>> +		regulator-max-microvolt = <3300000>;
+>> +		gpio = <&pca9539 3 GPIO_ACTIVE_HIGH>;
+>> +		startup-delay-us = <70000>;
+>> +		enable-active-high;
+>> +	};
+>> +
+>> +	reg_wlan: regulator-wlan {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "3P3V_wlan";
+>> +		regulator-min-microvolt = <3300000>;
+>> +		regulator-max-microvolt = <3300000>;
+>> +		regulator-always-on;
+>> +		regulator-boot-on;
+>> +		gpio = <&gpio6 14 GPIO_ACTIVE_HIGH>;
+>> +	};
+>> +
+>> +	sound {
+>> +		compatible = "fsl,imx6q-ba16-sgtl5000",
+>> +			     "fsl,imx-audio-sgtl5000";
+>> +		model = "imx6q-ba16-sgtl5000";
+>> +		ssi-controller = <&ssi1>;
+>> +		audio-codec = <&codec>;
+>> +		audio-routing =
+>> +			"MIC_IN", "Mic Jack",
+>> +			"Mic Jack", "Mic Bias",
+>> +			"LINE_IN", "Line In Jack",
+>> +			"Headphone Jack", "HP_OUT";
+>> +		mux-int-port = <1>;
+>> +		mux-ext-port = <4>;
+>> +	};
+>> +};
+>> +
+>> +&ecspi5 {
+>> +	fsl,spi-num-chipselects = <1>;
+>> +	cs-gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_ecspi5>;
+>> +	status = "okay";
+>> +
+>> +	m25_eeprom: m25p80 at 0 {
+>> +		compatible = "atmel,at25";
+>> +		spi-max-frequency = <20000000>;
+>> +		size = <0x8000>;
+>> +		pagesize = <64>;
+>> +		reg = <0>;
+>> +		address-width = <16>;
+>> +	};
+>> +};
+>> +
+>> +&i2c1 {
+>> +	pca9547: mux at 70 {
+>> +		compatible = "nxp,pca9547";
+>> +		reg = <0x70>;
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +
+>> +		mux_i2c3: i2c at 0 {
+>
+> How are these mux_i2c labels named?  Where are mux_i2c1 and mux_i2c2?
+>
+Agree that the naming is confusing. Since i2c0/i2c1/i2c2 maps to the 
+processor, idea was to continue the naming convention starting at 
+mux_i2c3. I will change it in the next version of patch: mux1_i2c1 to 
+mux1_i2c8 in imx6q-bx50v3.dtsi and mux2_i2c1 to mux2_i2c8 in 
+imx6q-b850v3.dts.
+
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			reg = <0x0>;
+>> +
+>> +			ads7830: ads7830 at 48 {
+>> +				compatible = "ti,ads7830";
+>> +				reg = <0x48>;
+>> +			};
+>> +
+>> +			mma8453: mma8453 at 1c {
+>> +				compatible = "fsl,mma8453";
+>> +				reg = <0x1c>;
+>> +			};
+>> +		};
+>> +
+>> +		mux_i2c4: i2c at 1 {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			reg = <0x1>;
+>> +
+>> +			eeprom: eeprom at 50 {
+>> +				compatible = "atmel,24c08";
+>> +				reg = <0x50>;
+>> +			};
+>> +
+>> +			mpl3115: mpl3115 at 60 {
+>> +				compatible = "fsl,mpl3115";
+>> +				reg = <0x60>;
+>> +			};
+>> +		};
+>> +
+>> +		mux_i2c5: i2c at 2 {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			reg = <0x2>;
+>> +		};
+>> +
+>> +		mux_i2c6: i2c at 3 {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			reg = <0x3>;
+>> +
+>> +			codec: sgtl5000 at 0a {
+>> +				compatible = "fsl,sgtl5000";
+>> +				reg = <0x0a>;
+>> +				clocks = <&mclk>;
+>> +				VDDA-supply = <&reg_1p8v>;
+>> +				VDDIO-supply = <&reg_3p3v>;
+>> +			};
+>> +		};
+>> +
+>> +		mux_i2c7: i2c at 4 {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			reg = <0x4>;
+>> +
+>> +			pca9539: pca9539 at 74 {
+>> +				compatible = "nxp,pca9539";
+>> +				reg = <0x74>;
+>> +				gpio-controller;
+>> +				#gpio-cells = <2>;
+>> +				interrupt-controller;
+>> +				interrupt-parent = <&gpio2>;
+>> +				interrupts = <3 IRQ_TYPE_LEVEL_LOW>;
+>> +			};
+>> +		};
+>> +
+>> +		mux_i2c8: i2c at 5 {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			reg = <0x5>;
+>> +
+>> +			igb at 49 {
+>> +				compatible = "intel,igb";
+>> +				reg = <0x49>;
+>> +			};
+>> +
+>> +			igb at 61 {
+>> +				compatible = "intel,igb";
+>> +				reg = <0x61>;
+>> +			};
+>> +		};
+>> +
+>> +		mux_i2c9: i2c at 6 {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			reg = <0x6>;
+>> +		};
+>> +
+>> +		mux_i2c10: i2c at 7 {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			reg = <0x7>;
+>> +		};
+>> +	};
+>> +};
+>> +
+>> +&usdhc4 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_usdhc4>;
+>> +	bus-width = <4>;
+>> +	vmmc-supply = <&reg_wl18xx_vmmc>;
+>> +	no-1-8-v;
+>> +	non-removable;
+>> +	enable-sdio-wakeup;
+>
+> wakeup-source
+>
+> Shawn
+>
+Will fix this
