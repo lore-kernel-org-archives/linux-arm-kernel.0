@@ -1,80 +1,125 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 28 Jan 2016 16:33:38 +0000
-Subject: [PATCH V5 00/14] Add generic PM domain support for Tegra
-Message-ID: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
+Date: Thu, 28 Jan 2016 16:33:44 +0000
+Subject: [PATCH V5 06/14] soc: tegra: pmc: Fix checking of valid partitions
+In-Reply-To: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
+References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <1453998832-27383-7-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds generic PM domain support for Tegra SoCs but this series only
-enables support for it on Tegra 64-bit devices. There is no reason why
-this cannot be enable for Tegra 32-bit devices, but to keep the patch
-series to a minimum only 64-bit devices are enabled so far.
+The tegra power partitions are referenced by a numerical ID which are
+the same values programmed into the PMC registers for controlling the
+partition. For a given device, the valid partition IDs may not be
+contiguous and so simply checking that an ID is not greater than the
+maximum ID supported may not mean it is valid. Fix this by adding a
+bitmap for representing the valid partitions of a device and add a
+helper function will test if the partition is valid.
 
-This series has been boot tested on Tegra210 as well as various 32-bit
-Tegra platforms.
+Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+---
+ drivers/soc/tegra/pmc.c | 21 +++++++++++++++++----
+ include/soc/tegra/pmc.h |  1 +
+ 2 files changed, 18 insertions(+), 4 deletions(-)
 
-Summary of changes since V4 [1]:
-- Re-worked fix to handle base address on probe failure
-- Added patch to lock around simultaneuous accesses to PMC registers
-- Added patch to change powergate and rail IDs to unsigned type
-- Added patch to fix testing of powergate state
-- Updated patch to check for valid powergates to use a bitmap
-- Updated Tegra DT PMC bindings per Rob H's feedback
-- Updated Tegra power domains binding per Thierry's feedback
-- Updated Tegra generic power domain support per Thierry's feedback
-
-Summary of changes since V3 [0]:
-- Dropped tegra124 support for now
-- Removed MC flush support per feedback from Thierry
-- Cleaned up the PMC changes per feedback from Thierry
-- Added support for tegra210
-
-Series Summary:
-Patch 1-7:  PMC clean-up and fixes
-Patch 8:    Adds function to remove a generic PM domain
-Patch 9:    Updates DT documentation for tegra PMC
-Patch 10:   Adds DT documentation for tegra generic PM domains
-Patch 11:   Adds PMC generic DM domains support
-Patch 12:   Adds audio clock for Tegra210 audio power-domain
-Patch 13:   Adds DT bindings for Tegra210 audio power-domain
-Patch 14:   Enable generic PM domains for tegra64
-
-[0] http://comments.gmane.org/gmane.linux.ports.tegra/22944
-[1] http://marc.info/?l=linux-tegra&m=144924153600529&w=2
-
-Jon Hunter (14):
-  soc: tegra: pmc: Restore base address on probe failure
-  soc: tegra: pmc: Protect public functions from potential race
-    conditions
-  soc: tegra: pmc: Change powergate and rail IDs to be an unsigned type
-  soc: tegra: pmc: Fix testing of powergate state
-  soc: tegra: pmc: Wait for powergate state to change
-  soc: tegra: pmc: Fix checking of valid partitions
-  soc: tegra: pmc: Ensure partitions can be toggled on/off by PMC
-  PM / Domains: Add function to remove a pm-domain
-  Documentation: DT: bindings: Update NVIDIA PMC for Tegra
-  Documentation: DT: bindings: Add power domain info for NVIDIA PMC
-  soc: tegra: pmc: Add generic PM domain support
-  clk: tegra210: Add the APB2APE audio clock
-  ARM64: tegra: Add audio PM domain device node for Tegra210
-  ARM64: tegra: select PM_GENERIC_DOMAINS
-
- .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      |  67 ++-
- arch/arm/mach-tegra/platsmp.c                      |  16 +-
- arch/arm64/Kconfig.platforms                       |   2 +
- arch/arm64/boot/dts/nvidia/tegra210.dtsi           |  11 +-
- drivers/base/power/domain.c                        |  26 +
- drivers/clk/tegra/clk-id.h                         |   1 +
- drivers/clk/tegra/clk-tegra-periph.c               |   1 +
- drivers/clk/tegra/clk-tegra210.c                   |   1 +
- drivers/gpu/drm/tegra/drm.h                        |   2 +-
- drivers/soc/tegra/pmc.c                            | 603 ++++++++++++++++++---
- include/dt-bindings/clock/tegra210-car.h           |   2 +-
- include/dt-bindings/power/tegra-powergate.h        |  36 ++
- include/linux/pm_domain.h                          |   5 +
- include/soc/tegra/pmc.h                            |  73 +--
- 14 files changed, 709 insertions(+), 137 deletions(-)
- create mode 100644 include/dt-bindings/power/tegra-powergate.h
-
+diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
+index 35ee60fd17be..032dd5c17130 100644
+--- a/drivers/soc/tegra/pmc.c
++++ b/drivers/soc/tegra/pmc.c
+@@ -132,6 +132,7 @@ struct tegra_pmc_soc {
+  * @cpu_pwr_good_en: CPU power good signal is enabled
+  * @lp0_vec_phys: physical base address of the LP0 warm boot code
+  * @lp0_vec_size: size of the LP0 warm boot code
++ * @powergates_valid: Bitmap of valid power gates
+  * @powergates_lock: mutex for power gate register access
+  */
+ struct tegra_pmc {
+@@ -156,6 +157,7 @@ struct tegra_pmc {
+ 	bool cpu_pwr_good_en;
+ 	u32 lp0_vec_phys;
+ 	u32 lp0_vec_size;
++	DECLARE_BITMAP(powergates_valid, TEGRA_POWERGATE_MAX);
+ 
+ 	struct mutex powergates_lock;
+ };
+@@ -180,6 +182,11 @@ static inline bool tegra_powergate_state(int id)
+ 	return (tegra_pmc_readl(PWRGATE_STATUS) & BIT(id)) != 0;
+ }
+ 
++static inline bool tegra_powergate_is_valid(int id)
++{
++	return test_bit(id, pmc->powergates_valid);
++}
++
+ /**
+  * tegra_powergate_set() - set the state of a partition
+  * @id: partition ID
+@@ -213,7 +220,7 @@ static int tegra_powergate_set(unsigned int id, bool new_state)
+  */
+ int tegra_powergate_power_on(unsigned int id)
+ {
+-	if (!pmc->soc || id >= pmc->soc->num_powergates)
++	if (!tegra_powergate_is_valid(id))
+ 		return -EINVAL;
+ 
+ 	return tegra_powergate_set(id, true);
+@@ -225,7 +232,7 @@ int tegra_powergate_power_on(unsigned int id)
+  */
+ int tegra_powergate_power_off(unsigned int id)
+ {
+-	if (!pmc->soc || id >= pmc->soc->num_powergates)
++	if (!tegra_powergate_is_valid(id))
+ 		return -EINVAL;
+ 
+ 	return tegra_powergate_set(id, false);
+@@ -240,7 +247,7 @@ int tegra_powergate_is_powered(unsigned int id)
+ {
+ 	int status;
+ 
+-	if (!pmc->soc || id >= pmc->soc->num_powergates)
++	if (!tegra_powergate_is_valid(id))
+ 		return -EINVAL;
+ 
+ 	mutex_lock(&pmc->powergates_lock);
+@@ -258,7 +265,7 @@ int tegra_powergate_remove_clamping(unsigned int id)
+ {
+ 	u32 mask;
+ 
+-	if (!pmc->soc || id >= pmc->soc->num_powergates)
++	if (!tegra_powergate_is_valid(id))
+ 		return -EINVAL;
+ 
+ 	mutex_lock(&pmc->powergates_lock);
+@@ -1118,6 +1125,7 @@ static int __init tegra_pmc_early_init(void)
+ 	const struct of_device_id *match;
+ 	struct device_node *np;
+ 	struct resource regs;
++	unsigned int i;
+ 	bool invert;
+ 	u32 value;
+ 
+@@ -1167,6 +1175,11 @@ static int __init tegra_pmc_early_init(void)
+ 		return -ENXIO;
+ 	}
+ 
++	/* Create a bit-mask of the valid partitions */
++	for (i = 0; i < pmc->soc->num_powergates; i++)
++		if (pmc->soc->powergates[i])
++			set_bit(i, pmc->powergates_valid);
++
+ 	mutex_init(&pmc->powergates_lock);
+ 
+ 	/*
+diff --git a/include/soc/tegra/pmc.h b/include/soc/tegra/pmc.h
+index 07e332dd44fb..e9e53473a63e 100644
+--- a/include/soc/tegra/pmc.h
++++ b/include/soc/tegra/pmc.h
+@@ -72,6 +72,7 @@ int tegra_pmc_cpu_remove_clamping(unsigned int cpuid);
+ #define TEGRA_POWERGATE_AUD	27
+ #define TEGRA_POWERGATE_DFD	28
+ #define TEGRA_POWERGATE_VE2	29
++#define TEGRA_POWERGATE_MAX	TEGRA_POWERGATE_VE2
+ 
+ #define TEGRA_POWERGATE_3D0	TEGRA_POWERGATE_3D
+ 
 -- 
 2.1.4
