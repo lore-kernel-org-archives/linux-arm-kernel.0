@@ -1,60 +1,62 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 27 Jan 2016 16:55:25 -0800
-Subject: MTK mt8173-evb: mainline unstable, and big-endian boot failures
-Message-ID: <CAOi56cVDbkAJEDWy3+DV63a=UuD7nqpUu8X7e-OjtWM-4dj_-w@mail.gmail.com>
+From: Leonid.Yegoshin@imgtec.com (Leonid Yegoshin)
+Date: Wed, 27 Jan 2016 16:58:39 -0800
+Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
+In-Reply-To: <alpine.DEB.2.00.1601271116520.5958@tp.orcam.me.uk>
+References: <20160113104516.GE25458@arm.com> <5696CF08.8080700@imgtec.com>
+ <20160114121449.GC15828@arm.com> <5697F6D2.60409@imgtec.com>
+ <20160114203430.GC3818@linux.vnet.ibm.com> <56980C91.1010403@imgtec.com>
+ <20160114212913.GF3818@linux.vnet.ibm.com> <569814F2.50801@imgtec.com>
+ <20160114225510.GJ3818@linux.vnet.ibm.com> <56983054.4070807@imgtec.com>
+ <20160115004753.GN3818@linux.vnet.ibm.com> <56984642.3090106@imgtec.com>
+ <alpine.DEB.2.00.1601271116520.5958@tp.orcam.me.uk>
+Message-ID: <56A967BF.70200@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 01/27/2016 03:26 AM, Maciej W. Rozycki wrote:
+> On Fri, 15 Jan 2016, Leonid Yegoshin wrote:
+>
+>>> So you need to build a different kernel for some types of MIPS systems?
+>>> Or do you do boot-time rewriting, like a number of other arches do?
+>> I don't know. I would like to have responses. Ralf asked Maciej about old
+>> systems and that came nowhere. Even rewrite - don't know what to do with that:
+>> no lightweight SYNC or no SYNC at all - yes, it is still possible that SYNC on
+>> some systems can be too heavy or even harmful, nobody tested that.
+>   I don't recall being asked; mind that I might not get to messages I have
+> not been cc-ed in a timely manner and I may miss some altogether.  With
+> the amount of mailing list traffic that passes by me my scanner may fail
+> to trigger.  Sorry if this causes anybody trouble, but such is life.
+>
+>   Coincidentally, I have just posted some notes on SYNC in a different
+> thread, see <http://lkml.iu.edu/hypermail/linux/kernel/1601.3/03080.html>.
+> There's a reference to an older message of mine there too.  I hope this
+> answers your questions.
+>
+>    Maciej
+In http://patchwork.linux-mips.org/patch/10505/the very last mesg 
+exchange is:
 
-I've been meaning to report this for awhile, but finally getting around to it.
+Maciej,
 
-In kernelci.org, the mt8173-evb board has been rather unstable with
-mainline and linux-next lately.  A look a the history of boots in
-kernelci.org with various trees[1] shows that it's failing to boot
-quite a lot.
+do you have an R4000 / R4600 / R5000 / R7000 / SiByte system at hand to
+test this?
+...
+   Ralf
 
-It seems to be pretty stable up through v4.4 but
-unreliable/unpredictable in v4.5-rc1 and lots of places in between.
-It's hard to bisect because it doesn't reliably fail, but when it does
-fail to finish booting, it's typically after it reaches a shell, and
-trying to run various simple shell commands fails to complete, like
-this example from next-20160125[2].
+Maciej W. Rozycki- June 5, 2015, 9:18 p.m.
 
-To me this suggests possibly an issue with the idle driver where
-characters might be getting lost on the serial console, which causes
-the automated boot scripts to fail because the shell is still waiting
-for the command to be finished.
+On Fri, 5 Jun 2015, Ralf Baechle wrote:
 
-Also, a separate issue, I've also noticed that builds with
-CONFIG_CPU_BIG_ENDIAN=y have been failing to boot since early in the
-merge window[3].  For the big-endian failures, the last lines in the
-boot log are always:
+> do you have an R4000 / R4600 / R5000 / R7000 / SiByte system at hand to
+> test this?
 
-[...]
-[    0.518078] usbcore: registered new interface driver usbhid
-[    0.518780] usbhid: USB HID core driver
-[    0.520295] NET: Registered protocol family 17
-[    0.520934] 9pnet: Installing 9P2000 support
-[    0.521549] Key type dns_resolver registered
-[    0.524558] registered taskstats version 1
+  I should be able to check R4400 (that is virtually the same as R4000)
+next week or so.  As to SiByte -- not before next month I'm afraid.  I
+don't have access to any of the other processors you named.  You may
+want to find a better person if you want to accept this change soon.
 
-and in a successfull boot (e.g. little-endian) this is the followed by:
+   Maciej
 
-[    0.525458] hctosys: unable to open rtc device (rtc0)
-[    0.533128] usb_vbus: disabling
-[    0.534117] ALSA device list:
-[    0.534497]   No soundcards found.
-[    0.535423] Freeing unused kernel memory: 696K (ffffffc0008fa000 -
-ffffffc0009a8000)
+... and that stops forever...
 
-I have yet to debug this any further, but still wanted to report it in
-case anyone else has the time to debug it further.
-
-Thanks,
-
-Kevin
-
-[1] http://kernelci.org/boot/mt8173-evb/
-[2] http://storage.kernelci.org/next/next-20160125/arm64-defconfig/lab-khilman/boot-mt8173-evb.html
-[3] http://kernelci.org/boot/mt8173-evb/job/mainline/kernel/v4.5-rc1/defconfig/defconfig+CONFIG_CPU_BIG_ENDIAN=y/lab/lab-khilman/?_id=56a5812b59b514bed8fa5dc0
+- Leonid.
