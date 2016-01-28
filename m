@@ -1,50 +1,27 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Thu, 28 Jan 2016 16:20:38 -0600
-Subject: [PATCH 00/13] dtb: amd: Miscelleneous Updates for AMD Seattle DTS
-In-Reply-To: <CAOesGMgRC2vTVdmY6kKYonM1JkWD=-3k_EQ4hGvyrm-vNZczrQ@mail.gmail.com>
-References: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <CAOesGMgRC2vTVdmY6kKYonM1JkWD=-3k_EQ4hGvyrm-vNZczrQ@mail.gmail.com>
-Message-ID: <56AA9436.60800@amd.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 28 Jan 2016 14:25:43 -0800
+Subject: [PATCH V3 2/4] dt/bindings: serial: bcm2835: add binding
+ documentation for bcm2835-aux-uart
+In-Reply-To: <1453032932-2512-3-git-send-email-kernel@martin.sperl.org>
+References: <1453032932-2512-1-git-send-email-kernel@martin.sperl.org>
+ <1453032932-2512-3-git-send-email-kernel@martin.sperl.org>
+Message-ID: <87k2mtfijc.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+kernel at martin.sperl.org writes:
 
-On 1/28/2016 3:39 PM, Olof Johansson wrote:
-> Hi Suravee,
+> From: Martin Sperl <kernel@martin.sperl.org>
 >
-> On Wed, Jan 27, 2016 at 1:11 PM, Suravee Suthikulpanit
-> <Suravee.Suthikulpanit@amd.com> wrote:
->> From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
->>
->> This patch series contains several updates for the AMD Seattle SOC DTS files.
->> It also adds new board files for newer Overdrive and Linaro 96boards (Husky)
->> platforms.
+> Add binding documentation for the bcm2835-aux-uart driver.
 >
-> My Overdrive comes with DT provided by firmware, so there's no need to
-> have a in-kernel-tree DT source.
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 
-You are correct that the FW comes with DT, and in typical case, you 
-wouldn't need this.
-
-> Are you aware of other reasons to have it here? I just foresee
-> divergence and conflicts between the two. It was quite obvious before
-> this update when the FW-provided DT was a lot more complete than what
-> we had in the kernel tree.
-
-However, there are still new/updated drivers being developed, and 
-sometimes requires new/changes in DT binding. So, the DT that comes with 
-the FW can get out of date, and will lack the support for new drivers.
-
-Certain version of the FW allows overriding the DT that comes with the 
-FW. So, we are providing the in-kernel DT to allow developers to provide 
-the updated device tree for newer kernels. This patch series is bringing 
-the in-kernel DT closer to what the latest FW is providing to avoid 
-potential conflicts.
-
-Regards,
-Suravee
-
->
-> -Olof
->
+Acked-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160128/f3b737d0/attachment.sig>
