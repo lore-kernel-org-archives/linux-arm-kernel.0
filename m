@@ -1,57 +1,138 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 28 Jan 2016 08:49:24 +0100
-Subject: [PATCH resend] ARM: dts: sun7i: Add dts file for the lamobo-r1
- board
-In-Reply-To: <20160127194735.GT4317@lukather>
-References: <1453920105-7093-1-git-send-email-hdegoede@redhat.com>
- <1453920105-7093-2-git-send-email-hdegoede@redhat.com>
- <20160127194735.GT4317@lukather>
-Message-ID: <56A9C804.9080503@redhat.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 28 Jan 2016 15:54:08 +0800
+Subject: [PATCH v2 2/5] ARM: dts: imx: Add basic dts support for
+ imx6qp-sabresd
+In-Reply-To: <1450159673-27314-3-git-send-email-b51503@freescale.com>
+References: <1450159673-27314-1-git-send-email-b51503@freescale.com>
+ <1450159673-27314-3-git-send-email-b51503@freescale.com>
+Message-ID: <20160128075408.GM9070@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Dec 15, 2015 at 02:07:50PM +0800, Bai Ping wrote:
+> The patch adds dts file for imx6qp-sabresd board.
+> 
+> Signed-off-by: Bai Ping <b51503@freescale.com>
+> ---
+>  arch/arm/boot/dts/Makefile             |  1 +
+>  arch/arm/boot/dts/imx6qdl-sabresd.dtsi |  1 +
+>  arch/arm/boot/dts/imx6qp-sabresd.dts   | 59 ++++++++++++++++++++++++++++++++++
+>  3 files changed, 61 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6qp-sabresd.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 36d8133..dfba765 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -302,6 +302,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+>  	imx6dl-sabreauto.dtb \
+>  	imx6dl-sabrelite.dtb \
+>  	imx6dl-sabresd.dtb \
+> +	imx6qp-sabresd.dtb \
 
-On 27-01-16 20:47, Maxime Ripard wrote:
-> Hi Hans,
->
-> On Wed, Jan 27, 2016 at 07:41:45PM +0100, Hans de Goede wrote:
->> From: Jelle de Jong <jelledejong@powercraft.nl>
->>
->> The lamobo-r1 board, sometimes called the BPI-R1 but not labelled as such
->> on the PCB, is meant as a A20 based router board. As such the board comes
->> with a built-in switch chip giving it 5 gigabit ethernet boards, and it
->> has a large empty area on the pcb with mounting holes which will fit a
->> 2.5 inch harddisk. To complete its networking features it has a
->> Realtek RTL8192CU for WiFi 802.11 b/g/n.
->>
->> Signed-off-by: Jelle de Jong <jelledejong@powercraft.nl>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->
-> Sorry that I missed it :/
->
-> It looks mostly fine, I just have a minor question / comment below.
->
->> +&cpu0 {
->> +	cpu-supply = <&reg_dcdc2>;
->> +	operating-points = <
->> +		/* kHz	  uV */
->> +		960000	1400000
->> +		912000	1400000
->> +		864000	1350000
->> +		720000	1250000
->> +		528000	1150000
->> +		312000	1100000
->> +		144000	1050000
->> +		>;
->> +};
->
-> Have you used the default OPPs and it turned out to be unstable, or is
-> it just some copy / paste from the FEX file?
+Please keep the list sort alphabetically.  That said,
+imx6qp-sabresd.dtb should be added after imx6q-* ones.
 
-Just copy paste from the fex file, let me know if you want a new version with
-the opp-s removed.
+>  	imx6dl-tx6dl-comtft.dtb \
+>  	imx6dl-tx6u-801x.dtb \
+>  	imx6dl-tx6u-811x.dtb \
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> index a6d445c..f65f57b 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> @@ -238,6 +238,7 @@
+>  				regulator-max-microvolt = <3300000>;
+>  				regulator-boot-on;
+>  				regulator-always-on;
+> +				regulator-ramp-delay = <6250>;
 
-Regards,
+So this change applies to imx6q and imx6dl sabresd as well?
 
-Hans
+>  			};
+>  
+>  			sw3a_reg: sw3a {
+> diff --git a/arch/arm/boot/dts/imx6qp-sabresd.dts b/arch/arm/boot/dts/imx6qp-sabresd.dts
+> new file mode 100644
+> index 0000000..c3ab2b6
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6qp-sabresd.dts
+> @@ -0,0 +1,59 @@
+> +/*
+> + * Copyright (C) 2015 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include "imx6q-sabresd.dts"
+> +#include "imx6qp.dtsi"
+
+Ah, that's why you do not include "imx6qdl.dtsi" in imx6qp.dtsi.  I have
+a question with this approach.  How people should write his imx6qp board
+dts file, if his board never has an imx6q version?
+
+> +
+> +/ {
+> +	model = "Freescale i.MX6 Quad Plus SABRE Smart Device Board";
+> +	compatible = "fsl,imx6qp-sabresd", "fsl,imx6qp";
+> +};
+> +
+> +&cpu0 {
+> +	arm-supply = <&sw2_reg>;
+> +};
+> +
+> +&iomuxc {
+> +	imx6qdl-sabresd {
+
+Since commit 5fcdf6a7ed95 (pinctrl: imx: Allow parsing DT without
+function nodes), this additional container node can just be saved.
+
+Shawn
+
+> +		pinctrl_usdhc2: usdhc2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD2_CMD__SD2_CMD		0x17059
+> +				MX6QDL_PAD_SD2_CLK__SD2_CLK		0x10071
+> +				MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x17059
+> +				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
+> +				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
+> +				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
+> +				MX6QDL_PAD_NANDF_D4__SD2_DATA4		0x17059
+> +				MX6QDL_PAD_NANDF_D5__SD2_DATA5		0x17059
+> +				MX6QDL_PAD_NANDF_D6__SD2_DATA6		0x17059
+> +				MX6QDL_PAD_NANDF_D7__SD2_DATA7		0x17059
+> +			>;
+> +		};
+> +
+> +		pinctrl_usdhc3: usdhc3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17059
+> +				MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10071
+> +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17059
+> +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
+> +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
+> +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
+> +				MX6QDL_PAD_SD3_DAT4__SD3_DATA4		0x17059
+> +				MX6QDL_PAD_SD3_DAT5__SD3_DATA5		0x17059
+> +				MX6QDL_PAD_SD3_DAT6__SD3_DATA6		0x17059
+> +				MX6QDL_PAD_SD3_DAT7__SD3_DATA7		0x17059
+> +			>;
+> +		};
+> +	};
+> +};
+> +
+> +&pcie {
+> +	power-on-gpio = <&gpio3 19 0>;
+> +	reset-gpio = <&gpio7 12 0>;
+> +	status = "okay";
+> +};
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
