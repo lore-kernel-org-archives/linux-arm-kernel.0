@@ -1,59 +1,136 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 28 Jan 2016 15:56:00 +0000
-Subject: [RFC PATCH 0/5] arm/arm64: Making HYP vgic/timer save/restore common
-Message-ID: <1453996565-19666-1-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 28 Jan 2016 15:56:01 +0000
+Subject: [RFC PATCH 1/5] arm64: KVM: Move kvm/hyp/hyp.h to
+ include/asm/kvm_hyp.h
+In-Reply-To: <1453996565-19666-1-git-send-email-marc.zyngier@arm.com>
+References: <1453996565-19666-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453996565-19666-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the current state of the C conversion of arm and arm64 world
-switches, we are still unable to share some of the most obvious
-candidates (GIC and timer save/restore). In order to reduce the bloat,
-let's move these files to a common location (virt/kvm/arm/hyp).
+In order to be able to move code outside of kvm/hyp, we need to make
+the global hyp.h file accessible from a standard location.
 
-The changes are extremely mechanical, with a small hack to deal with
-system register names on the 32bit side (I've decided to align on the
-64bit names).
+include/asm/kvm_hyp.h seems good enough.
 
-I'd like to know what people think of the common location. Does it
-makes sense to have a "hyp" subdirectory to indicate that this is not
-"normal" kernel code?
-
-These patches are on top of 4.5-rc1, plus the VHE and 32bit WS rewrite
-patches, and I've pushed out a branch at
-
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/mov-hyp
-
-Marc Zyngier (5):
-  arm64: KVM: Move kvm/hyp/hyp.h to include/asm/kvm_hyp.h
-  arm64: KVM: Move vgic-v2 and timer save/restore to virt/kvm/arm/hyp
-  ARM: KVM: Move kvm/hyp/hyp.h to include/asm/kvm_hyp.h
-  ARM: KVM: Use common version of vgic-v2-sr.c
-  ARM: KVM: Use common version of timer-sr.c
-
- arch/arm/{kvm/hyp/hyp.h => include/asm/kvm_hyp.h}  |  9 +++
- arch/arm/kvm/hyp/Makefile                          |  7 +-
- arch/arm/kvm/hyp/banked-sr.c                       |  2 +-
- arch/arm/kvm/hyp/cp15-sr.c                         |  2 +-
- arch/arm/kvm/hyp/switch.c                          |  2 +-
- arch/arm/kvm/hyp/timer-sr.c                        | 71 ------------------
- arch/arm/kvm/hyp/tlb.c                             |  2 +-
- arch/arm/kvm/hyp/vgic-v2-sr.c                      | 84 ----------------------
- .../arm64/{kvm/hyp/hyp.h => include/asm/kvm_hyp.h} |  0
- arch/arm64/kvm/hyp/Makefile                        |  7 +-
- arch/arm64/kvm/hyp/debug-sr.c                      |  4 +-
- arch/arm64/kvm/hyp/switch.c                        |  3 +-
- arch/arm64/kvm/hyp/sysreg-sr.c                     |  4 +-
- arch/arm64/kvm/hyp/tlb.c                           |  2 +-
- arch/arm64/kvm/hyp/vgic-v3-sr.c                    |  4 +-
- {arch/arm64/kvm => virt/kvm/arm}/hyp/timer-sr.c    |  4 +-
- {arch/arm64/kvm => virt/kvm/arm}/hyp/vgic-v2-sr.c  |  4 +-
- 17 files changed, 30 insertions(+), 181 deletions(-)
- rename arch/arm/{kvm/hyp/hyp.h => include/asm/kvm_hyp.h} (93%)
- delete mode 100644 arch/arm/kvm/hyp/timer-sr.c
- delete mode 100644 arch/arm/kvm/hyp/vgic-v2-sr.c
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/{kvm/hyp/hyp.h => include/asm/kvm_hyp.h} | 0
+ arch/arm64/kvm/hyp/debug-sr.c                       | 4 +---
+ arch/arm64/kvm/hyp/switch.c                         | 3 +--
+ arch/arm64/kvm/hyp/sysreg-sr.c                      | 4 +---
+ arch/arm64/kvm/hyp/timer-sr.c                       | 4 +---
+ arch/arm64/kvm/hyp/tlb.c                            | 2 +-
+ arch/arm64/kvm/hyp/vgic-v2-sr.c                     | 4 +---
+ arch/arm64/kvm/hyp/vgic-v3-sr.c                     | 4 +---
+ 8 files changed, 7 insertions(+), 18 deletions(-)
  rename arch/arm64/{kvm/hyp/hyp.h => include/asm/kvm_hyp.h} (100%)
- rename {arch/arm64/kvm => virt/kvm/arm}/hyp/timer-sr.c (97%)
- rename {arch/arm64/kvm => virt/kvm/arm}/hyp/vgic-v2-sr.c (98%)
 
+diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+similarity index 100%
+rename from arch/arm64/kvm/hyp/hyp.h
+rename to arch/arm64/include/asm/kvm_hyp.h
+diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+index c9c1e97..053cf8b 100644
+--- a/arch/arm64/kvm/hyp/debug-sr.c
++++ b/arch/arm64/kvm/hyp/debug-sr.c
+@@ -19,9 +19,7 @@
+ #include <linux/kvm_host.h>
+ 
+ #include <asm/kvm_asm.h>
+-#include <asm/kvm_mmu.h>
+-
+-#include "hyp.h"
++#include <asm/kvm_hyp.h>
+ 
+ #define read_debug(r,n)		read_sysreg(r##n##_el1)
+ #define write_debug(v,r,n)	write_sysreg(v, r##n##_el1)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index df2cce9..c5222da 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -17,8 +17,7 @@
+ 
+ #include <linux/types.h>
+ #include <asm/kvm_asm.h>
+-
+-#include "hyp.h"
++#include <asm/kvm_hyp.h>
+ 
+ static bool __hyp_text __fpsimd_enabled_nvhe(void)
+ {
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+index 36bbdec..8cc3872 100644
+--- a/arch/arm64/kvm/hyp/sysreg-sr.c
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -19,9 +19,7 @@
+ #include <linux/kvm_host.h>
+ 
+ #include <asm/kvm_asm.h>
+-#include <asm/kvm_mmu.h>
+-
+-#include "hyp.h"
++#include <asm/kvm_hyp.h>
+ 
+ /* Yes, this does nothing, on purpose */
+ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
+diff --git a/arch/arm64/kvm/hyp/timer-sr.c b/arch/arm64/kvm/hyp/timer-sr.c
+index f276d9e..ea00d69 100644
+--- a/arch/arm64/kvm/hyp/timer-sr.c
++++ b/arch/arm64/kvm/hyp/timer-sr.c
+@@ -19,9 +19,7 @@
+ #include <linux/compiler.h>
+ #include <linux/kvm_host.h>
+ 
+-#include <asm/kvm_mmu.h>
+-
+-#include "hyp.h"
++#include <asm/kvm_hyp.h>
+ 
+ /* vcpu is already in the HYP VA space */
+ void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+index 2a7e0d8..be8177c 100644
+--- a/arch/arm64/kvm/hyp/tlb.c
++++ b/arch/arm64/kvm/hyp/tlb.c
+@@ -15,7 +15,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+-#include "hyp.h"
++#include <asm/kvm_hyp.h>
+ 
+ static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ {
+diff --git a/arch/arm64/kvm/hyp/vgic-v2-sr.c b/arch/arm64/kvm/hyp/vgic-v2-sr.c
+index e717612..9514a7d 100644
+--- a/arch/arm64/kvm/hyp/vgic-v2-sr.c
++++ b/arch/arm64/kvm/hyp/vgic-v2-sr.c
+@@ -19,9 +19,7 @@
+ #include <linux/irqchip/arm-gic.h>
+ #include <linux/kvm_host.h>
+ 
+-#include <asm/kvm_mmu.h>
+-
+-#include "hyp.h"
++#include <asm/kvm_hyp.h>
+ 
+ /* vcpu is already in the HYP VA space */
+ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+index 9142e082..3a26799 100644
+--- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
++++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+@@ -19,9 +19,7 @@
+ #include <linux/irqchip/arm-gic-v3.h>
+ #include <linux/kvm_host.h>
+ 
+-#include <asm/kvm_mmu.h>
+-
+-#include "hyp.h"
++#include <asm/kvm_hyp.h>
+ 
+ #define vtr_to_max_lr_idx(v)		((v) & 0xf)
+ #define vtr_to_nr_pri_bits(v)		(((u32)(v) >> 29) + 1)
 -- 
 2.1.4
