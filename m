@@ -1,75 +1,121 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 28 Jan 2016 16:10:40 +0800
-Subject: [PATCH v2 5/5] ARM: imx: Add msl code support for imx6qp
-In-Reply-To: <1450159673-27314-6-git-send-email-b51503@freescale.com>
-References: <1450159673-27314-1-git-send-email-b51503@freescale.com>
- <1450159673-27314-6-git-send-email-b51503@freescale.com>
-Message-ID: <20160128081040.GO9070@tiger>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 28 Jan 2016 17:11:06 +0900
+Subject: [PATCH 12/19] ARM: dts: exynos: replace legacy *, wakeup property
+ with wakeup-source
+In-Reply-To: <5671F88F.7050802@samsung.com>
+References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
+ <1445422216-29375-13-git-send-email-sudeep.holla@arm.com>
+ <5671F88F.7050802@samsung.com>
+Message-ID: <56A9CD1A.8010800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 02:07:53PM +0800, Bai Ping wrote:
-> The i.MX6QP is a different SOC, but internally we treate
-> it as i.MX6Q Rev_2.0 to maximum the code reusability. The chip
-> silicon number we read from the ANADIG_DIGPROG is 0x630100. This
-> patch add code to identify it as i.MX6QP Rev_1.0 when print out the
-> silicon version.
+On 17.12.2015 08:49, Krzysztof Kozlowski wrote:
+> On 21.10.2015 19:10, Sudeep Holla wrote:
+>> Though the keyboard and other driver will continue to support the legacy
+>> "gpio-key,wakeup", "linux-keypad,wakeup" boolean property to enable the
+>> wakeup source, "wakeup-source" is the new standard binding.
+>>
+>> This patch replaces all the legacy wakeup properties with the unified
+>> "wakeup-source" property in order to avoid any futher copy-paste
+>> duplication.
+>>
+>> Cc: Kukjin Kim <kgene@kernel.org>
+>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Cc: linux-samsung-soc at vger.kernel.org
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>  arch/arm/boot/dts/exynos3250-monk.dts           |  6 +++---
+>>  arch/arm/boot/dts/exynos3250-rinato.dts         |  6 +++---
+>>  arch/arm/boot/dts/exynos4210-origen.dts         | 10 +++++-----
+>>  arch/arm/boot/dts/exynos4210-smdkv310.dts       |  2 +-
+>>  arch/arm/boot/dts/exynos4210-trats.dts          |  2 +-
+>>  arch/arm/boot/dts/exynos4210-universal_c210.dts |  4 ++--
+>>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  2 +-
+>>  arch/arm/boot/dts/exynos4412-odroidx.dts        |  2 +-
+>>  arch/arm/boot/dts/exynos4412-origen.dts         |  2 +-
+>>  arch/arm/boot/dts/exynos4412-smdk4412.dts       |  2 +-
+>>  arch/arm/boot/dts/exynos4412-trats2.dts         |  4 ++--
+>>  arch/arm/boot/dts/exynos5250-arndale.dts        | 12 ++++++------
+>>  arch/arm/boot/dts/exynos5250-snow.dts           |  4 ++--
+>>  arch/arm/boot/dts/exynos5250-spring.dts         |  4 ++--
+>>  arch/arm/boot/dts/exynos5420-arndale-octa.dts   |  2 +-
+>>  arch/arm/boot/dts/exynos5420-peach-pit.dts      |  4 ++--
+>>  arch/arm/boot/dts/exynos5800-peach-pi.dts       |  4 ++--
+>>  17 files changed, 36 insertions(+), 36 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
+>> index 540a0adf2be6..b77ea2163a0a 100644
+>> --- a/arch/arm/boot/dts/exynos3250-monk.dts
+>> +++ b/arch/arm/boot/dts/exynos3250-monk.dts
+>> @@ -43,7 +43,7 @@
+>>  			linux,code = <KEY_POWER>;
+>>  			label = "power key";
+>>  			debounce-interval = <10>;
+>> -			gpio-key,wakeup;
+>> +			wakeup-source;
+>>  		};
+>>  	};
+>>  
+>> @@ -67,7 +67,7 @@
+>>  			interrupt-parent = <&gpx1>;
+>>  			interrupts = <5 0>;
+>>  			reg = <0x25>;
+>> -			wakeup;
+>> +			wakeup-source;
+>>  
+>>  			muic: max77836-muic {
+>>  				compatible = "maxim,max77836-muic";
+>> @@ -184,7 +184,7 @@
+>>  		interrupt-parent = <&gpx0>;
+>>  		interrupts = <7 0>;
+>>  		reg = <0x66>;
+>> -		wakeup;
+>> +		wakeup-source;
+>>  
+>>  		s2mps14_osc: clocks {
+>>  			compatible = "samsung,s2mps14-clk";
+>> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+>> index 41a5fafb9aa9..7acd11d2d957 100644
+>> --- a/arch/arm/boot/dts/exynos3250-rinato.dts
+>> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+>> @@ -43,7 +43,7 @@
+>>  			linux,code = <KEY_POWER>;
+>>  			label = "power key";
+>>  			debounce-interval = <10>;
+>> -			gpio-key,wakeup;
+>> +			wakeup-source;
+>>  		};
+>>  	};
+>>  
+>> @@ -58,7 +58,7 @@
+>>  			interrupt-parent = <&gpx1>;
+>>  			interrupts = <5 0>;
+>>  			reg = <0x25>;
+>> -			wakeup;
+>> +			wakeup-source;
+>>  
+>>  			muic: max77836-muic {
+>>  				compatible = "maxim,max77836-muic";
+>> @@ -245,7 +245,7 @@
+>>  		interrupt-parent = <&gpx0>;
+>>  		interrupts = <7 0>;
+>>  		reg = <0x66>;
+>> -		wakeup;
+>> +		wakeup-source;
 > 
-> Signed-off-by: Bai Ping <b51503@freescale.com>
-> ---
->  arch/arm/mach-imx/anatop.c     | 5 ++++-
->  arch/arm/mach-imx/mach-imx6q.c | 8 ++++++--
->  2 files changed, 10 insertions(+), 3 deletions(-)
+> I think here and in Monk board these four "wakeup" properties are bogus,
+> not parsed by driver. Instead wakeup is always initialized to true.
 > 
-> diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
-> index 231bb25..9622763 100644
-> --- a/arch/arm/mach-imx/anatop.c
-> +++ b/arch/arm/mach-imx/anatop.c
-> @@ -129,7 +129,10 @@ void __init imx_init_revision_from_anatop(void)
->  
->  	switch (digprog & 0xff) {
->  	case 0:
-> -		revision = IMX_CHIP_REVISION_1_0;
-> +		if (digprog >> 8 & 0x01)
-> +			revision = IMX_CHIP_REVISION_2_0;
-> +		else
-> +			revision = IMX_CHIP_REVISION_1_0;
+> Anyway fixing this is not part of this patch but instead this should be
+> fixed in separate commit. Here everything looks good:
+> 
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Please at least add some comment here to help us remember that this is
-a trick we play for i.MX6QP.
+This patch does not apply. Can you rebase it on linux-next or my next/dt
+branch (git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git)?
 
-Shawn
+I applied the 16/19 (s5pv210).
 
->  		break;
->  	case 1:
->  		revision = IMX_CHIP_REVISION_1_1;
-> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> index 3878494b..cb27d56 100644
-> --- a/arch/arm/mach-imx/mach-imx6q.c
-> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> @@ -266,8 +266,11 @@ static void __init imx6q_init_machine(void)
->  {
->  	struct device *parent;
->  
-> -	imx_print_silicon_rev(cpu_is_imx6dl() ? "i.MX6DL" : "i.MX6Q",
-> -			      imx_get_soc_revision());
-> +	if (cpu_is_imx6q() && imx_get_soc_revision() == IMX_CHIP_REVISION_2_0)
-> +		imx_print_silicon_rev("i.MX6QP", IMX_CHIP_REVISION_1_0);
-> +	else
-> +		imx_print_silicon_rev(cpu_is_imx6dl() ? "i.MX6DL" : "i.MX6Q",
-> +				imx_get_soc_revision());
->  
->  	parent = imx_soc_device_init();
->  	if (parent == NULL)
-> @@ -399,6 +402,7 @@ static void __init imx6q_init_irq(void)
->  static const char * const imx6q_dt_compat[] __initconst = {
->  	"fsl,imx6dl",
->  	"fsl,imx6q",
-> +	"fsl,imx6qp",
->  	NULL,
->  };
->  
-> -- 
-> 1.9.1
-> 
-> 
+Best regards,
+Krzysztof
