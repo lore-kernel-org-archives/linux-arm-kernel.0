@@ -1,106 +1,55 @@
-From: adhemerval.zanella@linaro.org (Adhemerval Zanella)
-Date: Thu, 28 Jan 2016 14:51:26 -0200
-Subject: [PATCH] arm64: Add support for Half precision floating point
-In-Reply-To: <20160128160747.GN775@arm.com>
-References: <1453823566-26742-1-git-send-email-suzuki.poulose@arm.com>
- <20160126160257.GB28238@arm.com> <56A79D17.2000009@arm.com>
- <20160126165538.GC22776@devel.intra.reserved-bit.com>
- <20160128160747.GN775@arm.com>
-Message-ID: <56AA470E.1020606@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Jan 2016 17:53:43 +0100
+Subject: [PATCH 4/9] net: moxart: use correct accessors for DMA memory
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1CCCEDCE@AcuExch.aculab.com>
+References: <1453903507-3427225-1-git-send-email-arnd@arndb.de>
+ <1453903507-3427225-5-git-send-email-arnd@arndb.de>
+ <063D6719AE5E284EB5DD2968C1650D6D1CCCEDCE@AcuExch.aculab.com>
+Message-ID: <3468358.kXWNPLZEG9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thursday 28 January 2016 12:36:19 David Laight wrote:
+> From: Arnd Bergmann
+> > Sent: 27 January 2016 14:05
+> > The moxart ethernet driver confuses coherent DMA buffers with
+> > MMIO registers.
+> > 
+> > moxart_ether.c: In function 'moxart_mac_setup_desc_ring':
+> > moxart_ether.c:146:428: error: passing argument 1 of '__fswab32' makes integer from pointer without a
+> > cast [-Werror=int-conversion]
+> > moxart_ether.c:74:39: warning: incorrect type in argument 3 (different address spaces)
+> > moxart_ether.c:74:39:    expected void *cpu_addr
+> > moxart_ether.c:74:39:    got void [noderef] <asn:2>*tx_desc_base
+> > 
+> > This leaves the basic logic alone and uses normal pointers for
+> > the virtual address of the descriptor. As we cannot use readl/writel
+> > to access them, we also introduce our own moxart_desc_read
+> > moxart_desc_write helpers that perform the same endianess swap
+> > as the original code, but without the extra barriers and address
+> > space conversion.
+> 
+> I'm pretty sure you need to add some explicit barriers:
+> 
+> > @@ -354,8 +364,8 @@ static int moxart_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+> >       txdes1 = TX_DESC1_LTS | TX_DESC1_FTS | (len & TX_DESC1_BUF_SIZE_MASK);
+> >       if (tx_head == TX_DESC_NUM_MASK)
+> >               txdes1 |= TX_DESC1_END;
+> > -     writel(txdes1, desc + TX_REG_OFFSET_DESC1);
+> > -     writel(TX_DESC0_DMA_OWN, desc + TX_REG_OFFSET_DESC0);
+> > +     moxart_desc_write(txdes1, desc + TX_REG_OFFSET_DESC1);
+> > +     moxart_desc_write(TX_DESC0_DMA_OWN, desc + TX_REG_OFFSET_DESC0);
+> 
+> Those last two writes must happen in that order.
+> There may be others.
 
+Makes sense. I looked at the ftmac100 driver, which is another driver
+for the same hardware, and it's also missing barriers. We should
+probably add them for both then.
 
-On 28-01-2016 14:07, Will Deacon wrote:
-> On Tue, Jan 26, 2016 at 10:25:38PM +0530, Siddhesh Poyarekar wrote:
->> Adding Adhemerval to cc since he had volunteered to follow up on this,
->> mainly because he had a couple of additional ideas on the kernel
->> front.
->>
->> On Tue, Jan 26, 2016 at 04:21:43PM +0000, Suzuki K. Poulose wrote:
->>> On 26/01/16 16:02, Will Deacon wrote:
->>>> Hi Suzuki,
->>>>
->>>> On Tue, Jan 26, 2016 at 03:52:46PM +0000, Suzuki K Poulose wrote:
->>>>> ARMv8.2 extensions [1] include an optional feature, which supports
->>>>> half precision(16bit) floating point/asimd data processing
->>>>> instructions. This patch adds support for detecting and exposing
->>>>> the same to the userspace via HWCAPs
->>>
->>>
->>>>> +#define HWCAP_FPHP		(1 << 9)
->>>>> +#define HWCAP_ASIMDHP		(1 << 10)
->>>>
->>>> Where did we get to with the mrs trapping you proposed here?
->>>>
->>>>   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/374609.html
->>>
->>> We are yet to get some feedback from glibc/gcc folks. Siddhesh was looking
->>> to make use of it [2]. But haven't heard anything back. Ramana mentioned
->>> (in private) that they had some plans to take a look at it.
->>
->> I believe one of Adhemerval's ideas was similar to what I had
->> mentioned back then, which was to provide all of the CPU information
->> in a single file instead of having to traverse a directory structure.
-> 
-> My understanding was that libc needed this information extremely early
-> on (i.e. before it could even issue system calls), and therefore such
-> an approach would be in addition to the proposal here. Am I mistaken?
+I think for the SoC that uses this, a barrier() would be sufficient
+because of the page flags that dma_alloc_coherent() uses on ARM for
+non-coherent platforms, but to be on the safe side we need a full
+rmb()/wmb(). Sending a version 2 now.
 
-If the idea is to use these instruction for function implementation selection
-(iFUNC) the idea is to have on PLT resolution either by accessing it directly
-or using a caching mechanism. x86_64 does something similar with cacheline
-information: it issues a single cpuid and create processor information table
-based on its information (it is also what the __builtin_supports() also
-does).
-
-> 
->> The other idea was to add a vDSO function that returns this data so as
->> to avoid (or at least reduce) the context switch latency.
-> 
-> I'm not at all keen on adding a data ABI to the vDSO. I think people tried
-> similar things in the past (something on PPC?) and have horror stories
-> from that.
-
-In fact ppc still exports it in vDSO (include/asm/vdso_datapage.h), with
-information like the LPAR cfg, platform, processor, {d,i}cache, etc.
-I recall that I have see some code back at IBM that tried to use these
-fields directly, but indeed it is not recommended.
-
-What I have in mind is something what ppc does with __kernel_get_syscall_map.
-It is vDSO function that returns a vDSO internal data related to which
-syscalls are implemented in the running kernel (through a bitmap field).
-
-> 
->> The other aspect that I am waiting for feedback from ARM for is about
->> the property of the MIDR value.  If it can be ascertained that a core
->> with a specific MIDR value will always only be in a homogeneous
->> configuration, we could bypass the directory traversal and just stick
->> to the value returned from midr_el1.  This is likely vendor-specific
->> and I'm waiting to know if the ARM toolchain hackers would be
->> comfortable with baking in such assumptions into glibc.  Extra marks
->> for making such a requirement explicit in future specifications.
-> 
-> The architecture makes no guarantees about what will and won't be used
-> in different configurations, so we shouldn't try to derive this from the
-> MIDR. Even if you figure out a heuristic for today's platforms, it won't
-> necessarily hold true in the future.
-> 
->> I had hacked at some code with directory traversal on top of your
->> patch and it works fine as far as doing a PoC, but until we get
->> consensus on how we want to handle things like BIG.little, there can't
->> be much progress.
-> 
-> By "directory traversal" are you only referring to the /sys portions
-> of this? I'm *much* more interested in the utility of the MRS emulation
-> part, since that's what could effectively replace HWCAPs in the future.
-> 
-> As for big/little, the kernel view has been pretty consistent on that:
-> we will expose a "sanitised" view of the registers (as described in the
-> Documentation along with the patch) where we can, and for the per-CPU
-> registers such as MIDR, you will read the current CPU register (which
-> is why those registers are also exposed in sysfs).
-> 
-> Will
-> 
+	Arnd
