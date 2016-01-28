@@ -1,41 +1,190 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 28 Jan 2016 11:03:28 +0000
-Subject: [PATCH] ARM: dts: imx: replace legacy wakeup property with
- 'wakeup-source'
-In-Reply-To: <1453951773-22507-1-git-send-email-shawnguo@kernel.org>
-References: <1453951773-22507-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <56A9F580.8000809@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 28 Jan 2016 11:06:22 +0000
+Subject: [PATCH] arm64: make CONFIG_DEBUG_RODATA non-optional
+In-Reply-To: <20160128000906.GA42530@davidb.org>
+References: <1453226922-16831-1-git-send-email-keescook@chromium.org>
+ <1453226922-16831-4-git-send-email-keescook@chromium.org>
+ <20160127211105.GA41450@davidb.org>
+ <CAGXu5j+DLRoVE88a9++jVfEkN90HDiAaDAMnT2TrKqtMZ_yOww@mail.gmail.com>
+ <20160128000906.GA42530@davidb.org>
+Message-ID: <20160128110622.GF17123@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Wed, Jan 27, 2016 at 05:09:06PM -0700, David Brown wrote:
+> From 2efef8aa0f8f7f6277ffebe4ea6744fc93d54644 Mon Sep 17 00:00:00 2001
+> From: David Brown <david.brown@linaro.org>
+> Date: Wed, 27 Jan 2016 13:58:44 -0800
+> 
+> This removes the CONFIG_DEBUG_RODATA option and makes it always
+> enabled.
+> 
+> Signed-off-by: David Brown <david.brown@linaro.org>
 
-On 28/01/16 03:29, Shawn Guo wrote:
-> From: Sudeep Holla <sudeep.holla@arm.com>
->
-> Though the keyboard and other driver will continue to support the legacy
-> "gpio-key,wakeup", "linux,wakeup" and "enable-sdio-wakeup" boolean
-> property to enable the wakeup source, "wakeup-source" is the new
-> standard binding.
->
-> This patch replaces all the legacy wakeup properties with the unified
-> "wakeup-source" property in order to avoid any futher copy-paste
-> duplication.
->
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+As Ard notes, my pagetable rework series [1] changes this code quite
+significantly, and this will need to be rebased atop of that (and
+possibly Ard's kASLR changes [2]).
+
+I certainly want to always have the kernel text RO. I was waiting for
+those two series to settle first.
+
 > ---
-> This is a resend of Sudeep's patch with following updates:
->
->   - Revise patch subject and commit log a bit to cover enable-sdio-wakeup
->   - Rebase it onto v4.5-rc1 and have the following two instances updated
->     > imx6qdl-nitrogen6_max.dtsi:141: gpio-key,wakeup;
->     > imx7d-sbc-imx7.dts:25: enable-sdio-wakeup;
->
+> v1: This is in the same spirit as the x86 patch, removing allowing
+> this option to be config selected.  The associated patch series adds a
+> runtime option for the same thing.  However, it does affect the way
+> some things are mapped, and could possibly result in either increased
+> memory usage, or a performance hit (due to TLB misses from 4K pages).
 
-Thanks for picking up and rebasing it.
+With my series [1] the text/rodata "chunk" of the kernel is always
+mapped with page-granular boundaries (using sections internally).
+Previously we always carved out the init area, so the kernel mapping was
+always split.
 
--- 
-Regards,
-Sudeep
+Atop of my series this change should not increase memory usage or TLB
+pressure given that it should only change the permissions.
+
+One thing I would like to do is to avoid the need for fixup_executable
+entirely, by mapping the kernel text RO from the outset. However, that
+requires rework of the alternatives patching (to use a temporary RW
+alias), and I haven't had the time to look into that yet.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/397095.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/402066.html
+
+> I've tested this on a Hikey 96board (hi6220-hikey.dtb), both with and
+> without 'rodata=off' on the command line.
+> 
+> arch/arm64/Kconfig              |  3 +++
+> arch/arm64/Kconfig.debug        | 10 ----------
+> arch/arm64/kernel/insn.c        |  2 +-
+> arch/arm64/kernel/vmlinux.lds.S |  5 +----
+> arch/arm64/mm/mmu.c             | 12 ------------
+> 5 files changed, 5 insertions(+), 27 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 8cc6228..ffa617a 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -201,6 +201,9 @@ config KERNEL_MODE_NEON
+> config FIX_EARLYCON_MEM
+> 	def_bool y
+> 
+> +config DEBUG_RODATA
+> +	def_bool y
+> +
+> config PGTABLE_LEVELS
+> 	int
+> 	default 2 if ARM64_16K_PAGES && ARM64_VA_BITS_36
+> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+> index e13c4bf..db994ec 100644
+> --- a/arch/arm64/Kconfig.debug
+> +++ b/arch/arm64/Kconfig.debug
+> @@ -48,16 +48,6 @@ config DEBUG_SET_MODULE_RONX
+>           against certain classes of kernel exploits.
+>           If in doubt, say "N".
+> 
+> -config DEBUG_RODATA
+> -	bool "Make kernel text and rodata read-only"
+> -	help
+> -	  If this is set, kernel text and rodata will be made read-only. This
+> -	  is to help catch accidental or malicious attempts to change the
+> -	  kernel's executable code. Additionally splits rodata from kernel
+> -	  text so it can be made explicitly non-executable.
+> -
+> -          If in doubt, say Y
+> -
+> config DEBUG_ALIGN_RODATA
+> 	depends on DEBUG_RODATA && ARM64_4K_PAGES
+> 	bool "Align linker sections up to SECTION_SIZE"
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index 7371455..a04bdef 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -95,7 +95,7 @@ static void __kprobes *patch_map(void *addr, int fixmap)
+> 
+> 	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
+> 		page = vmalloc_to_page(addr);
+> -	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
+> +	else if (!module)
+> 		page = virt_to_page(addr);
+> 	else
+> 		return addr;
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index e3928f5..f80903c 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -65,12 +65,9 @@ PECOFF_FILE_ALIGNMENT = 0x200;
+> #if defined(CONFIG_DEBUG_ALIGN_RODATA)
+> #define ALIGN_DEBUG_RO			. = ALIGN(1<<SECTION_SHIFT);
+> #define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
+> -#elif defined(CONFIG_DEBUG_RODATA)
+> +#else
+> #define ALIGN_DEBUG_RO			. = ALIGN(1<<PAGE_SHIFT);
+> #define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
+> -#else
+> -#define ALIGN_DEBUG_RO
+> -#define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(min);
+> #endif
+> 
+> SECTIONS
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 58faeaa..3b411b7 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -313,7 +313,6 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+> 				phys, virt, size, prot, late_alloc);
+> }
+> 
+> -#ifdef CONFIG_DEBUG_RODATA
+> static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
+> {
+> 	/*
+> @@ -347,13 +346,6 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
+> 	}
+> 
+> }
+> -#else
+> -static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
+> -{
+> -	create_mapping(start, __phys_to_virt(start), end - start,
+> -			PAGE_KERNEL_EXEC);
+> -}
+> -#endif
+> 
+> static void __init map_mem(void)
+> {
+> @@ -410,7 +402,6 @@ static void __init map_mem(void)
+> 
+> static void __init fixup_executable(void)
+> {
+> -#ifdef CONFIG_DEBUG_RODATA
+> 	/* now that we are actually fully mapped, make the start/end more fine grained */
+> 	if (!IS_ALIGNED((unsigned long)_stext, SWAPPER_BLOCK_SIZE)) {
+> 		unsigned long aligned_start = round_down(__pa(_stext),
+> @@ -428,10 +419,8 @@ static void __init fixup_executable(void)
+> 				aligned_end - __pa(__init_end),
+> 				PAGE_KERNEL);
+> 	}
+> -#endif
+> }
+> 
+> -#ifdef CONFIG_DEBUG_RODATA
+> void mark_rodata_ro(void)
+> {
+> 	create_mapping_late(__pa(_stext), (unsigned long)_stext,
+> @@ -439,7 +428,6 @@ void mark_rodata_ro(void)
+> 				PAGE_KERNEL_ROX);
+> 
+> }
+> -#endif
+> 
+> void fixup_init(void)
+> {
+> -- 
+> 2.7.0
+> 
