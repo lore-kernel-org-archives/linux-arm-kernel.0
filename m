@@ -1,148 +1,100 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Thu, 28 Jan 2016 15:28:10 -0500
-Subject: [PATCH v4 1/2] watchdog: imx2_wdt: add external reset support via
- 'ext-reset-output' dt prop
-In-Reply-To: <20151228162923.GA31680@spo001.leaseweb.nl>
-References: <1446758362-11702-1-git-send-email-akshay.bhat@timesys.com>
- <1446758362-11702-2-git-send-email-akshay.bhat@timesys.com>
- <20151105222325.GA26159@roeck-us.net>
- <CAJ+vNU2fSxRJ7YvxOfNzoEoiKgzv-dHj=+eksKxH48ekHiUw2Q@mail.gmail.com>
- <20151106220249.GA19791@roeck-us.net> <565F4244.7090502@timesys.com>
- <CAJ+vNU00Bf97HUqkkW9KqOUzHXh482R9O1gasz6ju3Pn-_5chA@mail.gmail.com>
- <CAJ+vNU2qHQPSJ1KWp_3f3vAdeuOcF0ooZHmHsdafabZLXJv=Bw@mail.gmail.com>
- <20151228162923.GA31680@spo001.leaseweb.nl>
-Message-ID: <56AA79DA.2010305@timesys.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 28 Jan 2016 21:34:06 +0100
+Subject: [PATCH v10 06/21] KVM: ARM64: Add access handler for PMCEID0 and
+ PMCEID1 register
+In-Reply-To: <1453866709-20324-7-git-send-email-zhaoshenglong@huawei.com>
+References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453866709-20324-7-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20160128203406.GI16453@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
+On Wed, Jan 27, 2016 at 11:51:34AM +0800, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Add access handler which gets host value of PMCEID0 or PMCEID1 when
+> guest access these registers. Writing action to PMCEID0 or PMCEID1 is
+> UNDEFINED.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 29 +++++++++++++++++++++++++----
+>  1 file changed, 25 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index fc60041..06257e2 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -492,6 +492,27 @@ static bool access_pmselr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>  	return true;
+>  }
+>  
+> +static bool access_pmceid(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+> +			  const struct sys_reg_desc *r)
+> +{
+> +	u64 pmceid;
+> +
+> +	if (!kvm_arm_pmu_v3_ready(vcpu))
+> +		return trap_raz_wi(vcpu, p, r);
+> +
+> +	if (p->is_write)
+> +		return false;
+> +
+> +	if (!(p->Op2 & 1))
+> +		asm volatile("mrs %0, pmceid0_el0\n" : "=r" (pmceid));
+> +	else
+> +		asm volatile("mrs %0, pmceid1_el0\n" : "=r" (pmceid));
 
-On 12/28/2015 11:29 AM, Wim Van Sebroeck wrote:
-> Hi Tim,
->
->> On Wed, Dec 2, 2015 at 12:54 PM, Tim Harvey <tharvey@gateworks.com> wrote:
->>>
->>> On Wed, Dec 2, 2015 at 11:11 AM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
->>>>
->>>>
->>>> On 11/06/2015 05:02 PM, Guenter Roeck wrote:
->>>>>
->>>>> On Fri, Nov 06, 2015 at 11:53:42AM -0800, Tim Harvey wrote:
->>>>>>
->>>>>> On Thu, Nov 5, 2015 at 2:23 PM, Guenter Roeck <linux@roeck-us.net> wrote:
->>>>>>>
->>>>>>> On Thu, Nov 05, 2015 at 04:19:21PM -0500, Akshay Bhat wrote:
->>>>>>>>
->>>>>>>> From: Tim Harvey <tharvey@gateworks.com>
->>>>>>>>
->>>>>>>> The IMX6 watchdog supports assertion of a signal (WDOG_B) which
->>>>>>>> can be pinmux'd to an external pin. This is typically used for boards
->>>>>>>> that
->>>>>>>> have PMIC's in control of the IMX6 power rails. In fact, failure to use
->>>>>>>> such an external reset on boards with external PMIC's can result in
->>>>>>>> various
->>>>>>>> hangs due to the IMX6 not being fully reset [1] as well as the board
->>>>>>>> failing
->>>>>>>> to reset because its PMIC has not been reset to provide adequate
->>>>>>>> voltage for
->>>>>>>> the CPU when coming out of reset at 800Mhz.
->>>>>>>>
->>>>>>>> This uses a new device-tree property 'ext-reset-output' to indicate the
->>>>>>>> board has such a reset and to cause the watchdog to be configured to
->>>>>>>> assert
->>>>>>>> WDOG_B instead of an internal reset both on a watchdog timeout and in
->>>>>>>> system_restart.
->>>>>>>>
->>>>>>>> [1]
->>>>>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333689.html
->>>>>>>>
->>>>>>>> Cc: Lucas Stach <l.stach@pengutronix.de>
->>>>>>>> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
->>>>>>>> ---
->>>>>>>>    .../devicetree/bindings/watchdog/fsl-imx-wdt.txt     |  2 ++
->>>>>>>>    drivers/watchdog/imx2_wdt.c                          | 20
->>>>>>>> ++++++++++++++++++--
->>>>>>>>    2 files changed, 20 insertions(+), 2 deletions(-)
->>>>>>>>
->>>>>>>> diff --git a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
->>>>>>>> b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
->>>>>>>> index 8dab6fd..9b89b3a 100644
->>>>>>>> --- a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
->>>>>>>> +++ b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
->>>>>>>> @@ -9,6 +9,8 @@ Optional property:
->>>>>>>
->>>>>>>
->>>>>>> properties ?
->>>>>>>
->>>>>>>>    - big-endian: If present the watchdog device's registers are
->>>>>>>> implemented
->>>>>>>>      in big endian mode, otherwise in native mode(same with CPU), for
->>>>>>>> more
->>>>>>>>      detail please see:
->>>>>>>> Documentation/devicetree/bindings/regmap/regmap.txt.
->>>>>>>> +- ext-reset-output: If present the watchdog device is configured to
->>>>>>>> assert its
->>>>>>>
->>>>>>>
->>>>>>> Should that have a vendor prefix ? Also, not sure if "-output"
->>>>>>> has any real value in the property name. "fsl,external-reset", maybe ?
->>>>>>
->>>>>>
->>>>>> Hi Guenter,
->>>>>>
->>>>>> I don't see why a vendor prefix is necessary - its a feature of the
->>>>>> IMX6 watchdog supported by this driver to be able to trigger an
->>>>>> internal chip-level reset and/or an external signal that can be hooked
->>>>>> to additional hardware.
->>>>>>
->>>>> Sounded like vendor specific to me, but then I am not a devicetree
->>>>> maintainer,
->>>>> so I am not an authority on the subject.
->>>>
->>>>
->>>> Devicetree maintainers,
->>>>
->>>> Any thoughts?
->>>>
->>>> Tim,
->>>>
->>>> After looking at all the other watchdog drivers, it does not appear that
->>>> there is any other processor which uses a similar feature. Since imx is the
->>>> only processor that appears to support this feature, it might make sense in
->>>> making this vendor specific. If in the future it is found more processors
->>>> support a similar functionality, it can be revisited and moved out from
->>>> being vendor specific?
->>>>
->>>
->>> I'm certainly no expert on device-tree policy. I understand your
->>> point, but realize that the driver in question is imx2_wdt.c
->>> (compatible = "fsl,imx21-wdt"). This is an IP block inside the silicon
->>> of only Freescale chips, so its not like a future omap chip would be
->>> using this driver - only fsl devices. So why would it need a 'vendor'
->>> property any more than its other properties?
->>>
->>> Regards,
->>>
->>> Tim
->>
->> Wim,
->>
->> Does the lack of response mean overwhelming approval?
->>
->> I haven't heard any valid complaints - what does it take to get this approved?
->>
->> Regards,
->>
->> Tim
->
-> I have no objections against the idea and the code itself.
-> But as Guenter pointed out: it would be handy to get feedback from the devicetree maintainers on the above discussion.
->
-> Kind regards,
-> Wim.
->
+For migratibility concerns we may want to filter some of these events.
+With that in mind the answer to my question in 4/21 is 'no'. Instead we
+should pick an IMP,IDCODE,N,PMCEID0_EL0,PMCEID1_EL0 that we expect to
+represent the least common denominator of all the platforms available
+now, and then only expose that view to the guest. If we want to support
+more events, and userspace requests it for the guest, then we can relax
+the filtering (at the expense of migratibility), when the host has the
+support.
 
-Any suggestions on whether a vendor specific prefix is necessary?
+I don't know what a reasonable first filter is. Maybe D5.10.6 "Required
+events" is enough for the base?
 
-Thanks,
-Akshay
+> +
+> +	p->regval = pmceid;
+> +
+> +	return true;
+> +}
+> +
+>  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+>  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+>  	/* DBGBVRn_EL1 */						\
+> @@ -694,10 +715,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	  access_pmselr, reset_unknown, PMSELR_EL0 },
+>  	/* PMCEID0_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b110),
+> -	  trap_raz_wi },
+> +	  access_pmceid },
+>  	/* PMCEID1_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b111),
+> -	  trap_raz_wi },
+> +	  access_pmceid },
+>  	/* PMCCNTR_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
+>  	  trap_raz_wi },
+> @@ -943,8 +964,8 @@ static const struct sys_reg_desc cp15_regs[] = {
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
+> -	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), trap_raz_wi },
+> -	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), trap_raz_wi },
+> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmceid },
+> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmceid },
+>  	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), trap_raz_wi },
+> -- 
+> 2.0.4
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
