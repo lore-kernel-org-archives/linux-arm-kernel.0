@@ -1,37 +1,64 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 28 Jan 2016 16:13:31 +0100
-Subject: [PATCH 2/3] ARM: shmobile: r8a7779: Remove remainings of removed SCU
- boot setup code
-In-Reply-To: <1453994012-12696-1-git-send-email-geert+renesas@glider.be>
-References: <1453994012-12696-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1453994012-12696-3-git-send-email-geert+renesas@glider.be>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 28 Jan 2016 07:17:04 -0800
+Subject: [PATCH] arm64: make CONFIG_DEBUG_RODATA non-optional
+In-Reply-To: <20160128145900.GN17123@leverpostej>
+References: <1453226922-16831-1-git-send-email-keescook@chromium.org>
+ <1453226922-16831-4-git-send-email-keescook@chromium.org>
+ <20160127211105.GA41450@davidb.org>
+ <CAGXu5j+DLRoVE88a9++jVfEkN90HDiAaDAMnT2TrKqtMZ_yOww@mail.gmail.com>
+ <20160128000906.GA42530@davidb.org>
+ <20160128110622.GF17123@leverpostej>
+ <CAGXu5jLy3cpLzU1MSQhS6q=5rMu2Mdp9pXncoFapPqUyQ1fO0A@mail.gmail.com>
+ <20160128145900.GN17123@leverpostej>
+Message-ID: <CAGXu5j+94QqiZC-qbuHPTX-ERWG0-rSEEsP9g-b9wtQQE=E_Wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 0ca2894b5a900709 ("ARM: shmobile: Use shared SCU SMP boot code on
-r8a7779") obsoleted the r8a7779-specific SCU boot code, but forgot to
-remove the setup of shmobile_boot_fn and shmobile_boot_arg, which is
-overwritten by shmobile_smp_scu_prepare_cpus().
+On Thu, Jan 28, 2016 at 6:59 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Jan 28, 2016 at 06:06:53AM -0800, Kees Cook wrote:
+>> On Thu, Jan 28, 2016 at 3:06 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > One thing I would like to do is to avoid the need for fixup_executable
+>> > entirely, by mapping the kernel text RO from the outset. However, that
+>> > requires rework of the alternatives patching (to use a temporary RW
+>> > alias), and I haven't had the time to look into that yet.
+>>
+>> This makes perfect sense for the rodata section, but the (future)
+>> postinit_rodata section we'll still want to mark RO after init
+>> finishes. x86 and ARM cheat y marking both RO after init, and they
+>> don't have to pad sections. parisc will need to solve this too.
+>
+> Depending on how many postinit_rodata variables there are, we might be
+> able to drop those in .rodata, have them RO always, and initialise them
+> via a temporary RW alias (e.g. something in the vmalloc area).
+>
+> The only requirement for that is that we use a helper to initialise any
+> __postinit_ro variables via a temporary RW alias, e.g.
+>
+> #define SET_POST_INIT_RO(ptr, v) ({             \\
+>         typeof(ptr) __ptr_rw = (ptr)            \\
+>         BUG_ON(initcalls_done);                 \\
+>         __ptr_rw = create_rw_alias(__ptr);      \\
+>         __ptr_rw = v;                           \\
+>         destroy_rw_alias(__ptr_rw);             \\
+> })
+>
+> ...
+>
+> __postinit_ro void *thing;
+>
+> void __init some_init_func(void) {
+>         void *__thing = some_ranodomized_allocator();
+>         SET_POSTINIT_RO(thing, thing);
+> }
 
-Note that shmobile_scu_base wasn't initialized at that point yet anyway.
+Well, that certainly would make their usage explicit, but I'd really
+like to avoid that, especially in the face of trying to const-ify as
+much of the kernel as possible to reduce attack surface. I don't want
+to have to both mark the variable and its writes, since that would
+make the constification gcc plugin a bit more complex.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/mach-shmobile/smp-r8a7779.c | 2 --
- 1 file changed, 2 deletions(-)
+-Kees
 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index b854fe2095ad1461..0b024a9dbd4397e7 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -92,8 +92,6 @@ static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	/* Map the reset vector (in headsmp-scu.S, headsmp.S) */
- 	__raw_writel(__pa(shmobile_boot_vector), AVECR);
--	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
--	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
- 
- 	/* setup r8a7779 specific SCU bits */
- 	shmobile_scu_base = IOMEM(R8A7779_SCU_BASE);
 -- 
-1.9.1
+Kees Cook
+Chrome OS & Brillo Security
