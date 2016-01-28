@@ -1,187 +1,96 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Jan 2016 17:17:04 +0100
-Subject: [PATCH 3/7] usb: gadget: pxa25x_udc: use readl/writel for mmio
-In-Reply-To: <1453997843-3489728-1-git-send-email-arnd@arndb.de>
+Date: Thu, 28 Jan 2016 17:20:54 +0100
+Subject: [PATCH 4/7] usb: fsl: drop USB_FSL_MPH_DR_OF Kconfig symbol
+In-Reply-To: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
 References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
- <1453997843-3489728-1-git-send-email-arnd@arndb.de>
-Message-ID: <1453997843-3489728-3-git-send-email-arnd@arndb.de>
+Message-ID: <1453998087-3489894-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This converts the pxa25x udc driver to use readl/writel as normal
-driver should do, rather than dereferencing __iomem pointers
-themselves.
+The USB_FSL_MPH_DR_OF symbol is used to ensure the code that interprets
+the DR device node is built whenever one of the two drivers (EHCI or
+UDC) for the platform is enabled. However, if CONFIG_USB is disabled
+and we only support gadget mode, this causes a Kconfig warning:
 
-Based on the earlier preparation work, we can now also pass
-the register start in the device pointer so we no longer need
-the global variable.
+warning: (USB_FSL_USB2) selects USB_FSL_MPH_DR_OF which has unmet direct dependencies (USB_SUPPORT && USB)
 
-The unclear part here is for IXP4xx, which supports both big-endian
-and little-endian configurations. So far, the driver has done
-no byteswap in either case. I suspect that is wrong and it would
-actually need to swap in one or the other case, but I don't know
-which. It's also possible that there is some magic setting in
-the chip that makes the endianess of the MMIO register match the
-CPU, and in that case, the code actually does the right thing
-for all configurations, both before and after this patch.
+We can avoid this warning by simply no longer using the symbol,
+and making sure we enter the drivers/usb/host/ directory when
+the UDC driver is enabled that needs the file, and then we use
+Makefile syntax to ensure the file is built-in if needed.
+
+There is currently a dependency on CONFIG_OF, but this is redundant,
+as we already know that this is set unconditionally for the platforms
+that use this driver.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/usb/gadget/udc/pxa25x_udc.c | 61 ++++++++++++++++++++++++-------------
- drivers/usb/gadget/udc/pxa25x_udc.h |  1 +
- 2 files changed, 40 insertions(+), 22 deletions(-)
+ drivers/usb/Makefile           | 2 +-
+ drivers/usb/gadget/udc/Kconfig | 1 -
+ drivers/usb/host/Kconfig       | 4 ----
+ drivers/usb/host/Makefile      | 3 ++-
+ 4 files changed, 3 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/usb/gadget/udc/pxa25x_udc.c b/drivers/usb/gadget/udc/pxa25x_udc.c
-index 5db429f3cfb2..6d3acbf3b311 100644
---- a/drivers/usb/gadget/udc/pxa25x_udc.c
-+++ b/drivers/usb/gadget/udc/pxa25x_udc.c
-@@ -52,9 +52,6 @@
- #include <mach/lubbock.h>
- #endif
+diff --git a/drivers/usb/Makefile b/drivers/usb/Makefile
+index d5c57f1e98fd..dca78565eb55 100644
+--- a/drivers/usb/Makefile
++++ b/drivers/usb/Makefile
+@@ -26,7 +26,7 @@ obj-$(CONFIG_USB_U132_HCD)	+= host/
+ obj-$(CONFIG_USB_R8A66597_HCD)	+= host/
+ obj-$(CONFIG_USB_HWA_HCD)	+= host/
+ obj-$(CONFIG_USB_IMX21_HCD)	+= host/
+-obj-$(CONFIG_USB_FSL_MPH_DR_OF)	+= host/
++obj-$(CONFIG_USB_FSL_USB2)	+= host/
+ obj-$(CONFIG_USB_FOTG210_HCD)	+= host/
+ obj-$(CONFIG_USB_MAX3421_HCD)	+= host/
  
--static void __iomem *pxa25x_udc_reg_base;
--#define __UDC_REG(x) (*((volatile u32 *)(pxa25x_udc_reg_base + (x))))
+diff --git a/drivers/usb/gadget/udc/Kconfig b/drivers/usb/gadget/udc/Kconfig
+index 753c29bd11ad..d38cd69b470e 100644
+--- a/drivers/usb/gadget/udc/Kconfig
++++ b/drivers/usb/gadget/udc/Kconfig
+@@ -74,7 +74,6 @@ config USB_BCM63XX_UDC
+ config USB_FSL_USB2
+ 	tristate "Freescale Highspeed USB DR Peripheral Controller"
+ 	depends on FSL_SOC || ARCH_MXC
+-	select USB_FSL_MPH_DR_OF if OF
+ 	help
+ 	   Some of Freescale PowerPC and i.MX processors have a High Speed
+ 	   Dual-Role(DR) USB controller, which supports device mode.
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index 1f117c360ebb..2f73cc5fab71 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -121,9 +121,6 @@ config USB_EHCI_TT_NEWSCHED
+ 
+ 	  If unsure, say Y.
+ 
+-config USB_FSL_MPH_DR_OF
+-	tristate
 -
- #define UDCCR	 0x0000 /* UDC Control Register */
- #define UDC_RES1 0x0004 /* UDC Undocumented - Reserved1 */
- #define UDC_RES2 0x0008 /* UDC Undocumented - Reserved2 */
-@@ -292,16 +289,36 @@ static void pullup_on(void)
- 		mach->udc_command(PXA2XX_UDC_CMD_CONNECT);
- }
+ if USB_EHCI_HCD
  
--static inline void udc_set_reg(struct pxa25x_udc *dev, u32 reg, u32 uicr)
-+#if defined(CONFIG_ARCH_IXP4XX) && defined(CONFIG_CPU_BIG_ENDIAN)
-+/*
-+ * not sure if this is the correct behavior on ixp4xx in both
-+ * bit-endian and little-endian modes, but it's what the driver
-+ * has always done using direct pointer dereferences:
-+ * We assume that there is a byteswap done in hardware at the
-+ * MMIO register that matches what the CPU setting is, so we
-+ * never swap in software.
-+ */
-+static inline void udc_set_reg(struct pxa25x_udc *dev, u32 reg, u32 val)
- {
--	__UDC_REG(reg) = uicr;
-+	iowrite32be(val, dev->regs + reg);
- }
+ config USB_EHCI_PCI
+@@ -156,7 +153,6 @@ config USB_EHCI_FSL
+ 	tristate "Support for Freescale PPC on-chip EHCI USB controller"
+ 	depends on FSL_SOC
+ 	select USB_EHCI_ROOT_HUB_TT
+-	select USB_FSL_MPH_DR_OF if OF
+ 	---help---
+ 	  Variation of ARC USB block used in some Freescale chips.
  
- static inline u32 udc_get_reg(struct pxa25x_udc *dev, u32 reg)
- {
--	return __UDC_REG(reg);
-+	return ioread32be(dev->regs + reg);
-+}
-+#else
-+static inline void udc_set_reg(struct pxa25x_udc *dev, u32 reg, u32 val)
-+{
-+	writel(val, dev->regs + reg);
- }
- 
-+static inline u32 udc_get_reg(struct pxa25x_udc *dev, u32 reg)
-+{
-+	return readl(dev->regs + reg);
-+}
-+#endif
-+
- static void pio_irq_enable(struct pxa25x_ep *ep)
- {
- 	u32 bEndpointAddress = ep->bEndpointAddress & 0xf;
-@@ -337,59 +354,59 @@ static void pio_irq_disable(struct pxa25x_ep *ep)
- 
- static inline void udc_set_mask_UDCCR(struct pxa25x_udc *dev, int mask)
- {
--	u32 udccr = __UDC_REG(UDCCR);
-+	u32 udccr = udc_get_reg(dev, UDCCR);
- 
--	__UDC_REG(UDCCR) = (udccr & UDCCR_MASK_BITS) | (mask & UDCCR_MASK_BITS);
-+	udc_set_reg(dev, (udccr & UDCCR_MASK_BITS) | (mask & UDCCR_MASK_BITS), UDCCR);
- }
- 
- static inline void udc_clear_mask_UDCCR(struct pxa25x_udc *dev, int mask)
- {
--	u32 udccr = __UDC_REG(UDCCR);
-+	u32 udccr = udc_get_reg(dev, UDCCR);
- 
--	__UDC_REG(UDCCR) = (udccr & UDCCR_MASK_BITS) & ~(mask & UDCCR_MASK_BITS);
-+	udc_set_reg(dev, (udccr & UDCCR_MASK_BITS) & ~(mask & UDCCR_MASK_BITS), UDCCR);
- }
- 
- static inline void udc_ack_int_UDCCR(struct pxa25x_udc *dev, int mask)
- {
- 	/* udccr contains the bits we dont want to change */
--	u32 udccr = __UDC_REG(UDCCR) & UDCCR_MASK_BITS;
-+	u32 udccr = udc_get_reg(dev, UDCCR) & UDCCR_MASK_BITS;
- 
--	__UDC_REG(UDCCR) = udccr | (mask & ~UDCCR_MASK_BITS);
-+	udc_set_reg(dev, udccr | (mask & ~UDCCR_MASK_BITS), UDCCR);
- }
- 
- static inline u32 udc_ep_get_UDCCS(struct pxa25x_ep *ep)
- {
--	return __UDC_REG(ep->regoff_udccs);
-+	return udc_get_reg(ep->dev, ep->regoff_udccs);
- }
- 
- static inline void udc_ep_set_UDCCS(struct pxa25x_ep *ep, u32 data)
- {
--	__UDC_REG(ep->regoff_udccs) = data;
-+	udc_set_reg(ep->dev, data, ep->regoff_udccs);
- }
- 
- static inline u32 udc_ep0_get_UDCCS(struct pxa25x_udc *dev)
- {
--	return __UDC_REG(UDCCS0);
-+	return udc_get_reg(dev, UDCCS0);
- }
- 
- static inline void udc_ep0_set_UDCCS(struct pxa25x_udc *dev, u32 data)
- {
--	__UDC_REG(UDCCS0) = data;
-+	udc_set_reg(dev, data, UDCCS0);
- }
- 
- static inline u32 udc_ep_get_UDDR(struct pxa25x_ep *ep)
- {
--	return __UDC_REG(ep->regoff_uddr);
-+	return udc_get_reg(ep->dev, ep->regoff_uddr);
- }
- 
- static inline void udc_ep_set_UDDR(struct pxa25x_ep *ep, u32 data)
- {
--	__UDC_REG(ep->regoff_uddr) = data;
-+	udc_set_reg(ep->dev, data, ep->regoff_uddr);
- }
- 
- static inline u32 udc_ep_get_UBCR(struct pxa25x_ep *ep)
- {
--	return __UDC_REG(ep->regoff_ubcr);
-+	return udc_get_reg(ep->dev, ep->regoff_ubcr);
- }
- 
- /*
-@@ -2369,9 +2386,9 @@ static int pxa25x_udc_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	pxa25x_udc_reg_base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(pxa25x_udc_reg_base))
--		return PTR_ERR(pxa25x_udc_reg_base);
-+	dev->regs = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(dev->regs))
-+		return PTR_ERR(dev->regs);
- 
- 	dev->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(dev->clk))
-diff --git a/drivers/usb/gadget/udc/pxa25x_udc.h b/drivers/usb/gadget/udc/pxa25x_udc.h
-index f884513f7390..4b8b72d7ab37 100644
---- a/drivers/usb/gadget/udc/pxa25x_udc.h
-+++ b/drivers/usb/gadget/udc/pxa25x_udc.h
-@@ -125,6 +125,7 @@ struct pxa25x_udc {
- #ifdef CONFIG_USB_GADGET_DEBUG_FS
- 	struct dentry				*debugfs_udc;
- #endif
-+	void __iomem				*regs;
- };
- #define to_pxa25x(g)	(container_of((g), struct pxa25x_udc, gadget))
- 
+diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
+index 65a06b4382bf..a9ddd3c9ec94 100644
+--- a/drivers/usb/host/Makefile
++++ b/drivers/usb/host/Makefile
+@@ -74,7 +74,8 @@ obj-$(CONFIG_USB_U132_HCD)	+= u132-hcd.o
+ obj-$(CONFIG_USB_R8A66597_HCD)	+= r8a66597-hcd.o
+ obj-$(CONFIG_USB_HWA_HCD)	+= hwa-hc.o
+ obj-$(CONFIG_USB_IMX21_HCD)	+= imx21-hcd.o
+-obj-$(CONFIG_USB_FSL_MPH_DR_OF)	+= fsl-mph-dr-of.o
++obj-$(CONFIG_USB_FSL_USB2)	+= fsl-mph-dr-of.o
++obj-$(CONFIG_USB_EHCI_FSL)	+= fsl-mph-dr-of.o
+ obj-$(CONFIG_USB_EHCI_FSL)	+= ehci-fsl.o
+ obj-$(CONFIG_USB_HCD_BCMA)	+= bcma-hcd.o
+ obj-$(CONFIG_USB_HCD_SSB)	+= ssb-hcd.o
 -- 
 2.7.0
