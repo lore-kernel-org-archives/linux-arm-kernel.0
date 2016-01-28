@@ -1,40 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 28 Jan 2016 10:34:41 +0000
-Subject: [PATCH] arm64: Disallow combination of ARCH_XGENE and 16K page
- size
-In-Reply-To: <1453936230-7305-1-git-send-email-dann.frazier@canonical.com>
-References: <1453936230-7305-1-git-send-email-dann.frazier@canonical.com>
-Message-ID: <20160128103441.GS14823@e104818-lin.cambridge.arm.com>
+From: biao.huang@mediatek.com (biao huang)
+Date: Thu, 28 Jan 2016 10:35:41 +0800
+Subject: pinctrl: mediatek: questions about gpio/pinctrl/eint
+Message-ID: <1453948541.14802.38.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 04:10:30PM -0700, dann frazier wrote:
-> 16K page size is an optional feature of the architecture, and is not
-> supported by the X-Gene SoC family.
-> 
-> Signed-off-by: dann frazier <dann.frazier@canonical.com>
-> ---
->  arch/arm64/Kconfig.platforms | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index 21074f6..b241290 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -133,6 +133,7 @@ config ARCH_VEXPRESS
->  
->  config ARCH_XGENE
->  	bool "AppliedMicro X-Gene SOC Family"
-> +	depends on !ARM64_16K_PAGES
->  	help
->  	  This enables support for AppliedMicro X-Gene SOC Family
+Hi Linus,
 
-This would be the case on Juno as well. But maybe at some point the
-X-Gene family would gain a CPU with such support.
+	We have two questions associate with mediatek pinctrl/gpio in linux
+kernel to asking for your help.
 
-Anyway, I would rather make 16K pages depend on EXPERT, make it a bit
-harder to enable. We've had a few questions recently about enabling it
-on CPUs that don't have such feature.
+	First, when user call GPIO API to control medaitek gpio, they should
+call pinctrl API to set pinmux to mode 0 ahead, so this pin is function
+as gpio. And this makes things a little complicated. Is there any simple
+API can solve this problem? How about add pinmux setting in
+gpio_request?
 
--- 
-Catalin
+	Second, here is our request_irq flow in mkd eint driver:
+request_irq --> mtk_pinctrl_irq_request_resources--> mtk_pmx_set_mode,
+Normally, it'll set pinmux to eint mode (usually is mode 0) in
+mtk_pmx_set_mode function. But for special case, such as iddig (connect
+to usb), when iddig request_irq, it should set pinmux to iddig mode
+(mode 2 in mt8163).
+	Is there a better way than changing
+        MTK_PIN(
+                PINCTRL_PIN(16, "IDDIG"),
+                NULL, "mt8173",
+                MTK_EINT_FUNCTION(0, 16),
+                MTK_FUNCTION(0, "GPIO16"),
+                MTK_FUNCTION(1, "IDDIG"),
+                MTK_FUNCTION(2, "CMFLASH"),
+                MTK_FUNCTION(4, "PWM5")
+        ),
+	to
+        MTK_PIN(
+                PINCTRL_PIN(16, "IDDIG"),
+                NULL, "mt8173",
+                MTK_EINT_FUNCTION(2, 16),
+                MTK_FUNCTION(0, "GPIO16"),
+                MTK_FUNCTION(1, "IDDIG"),
+                MTK_FUNCTION(2, "CMFLASH"),
+                MTK_FUNCTION(4, "PWM5")
+        ),
+	in drivers/pinctrl/mediatek/pinctrl-mtk-mt8163.h?
+
+	We are looking forward for your help, thanks very much!
+
+Best Regards!
+Yours,
+Biao Huang
