@@ -1,96 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 28 Jan 2016 12:22:14 +0100
-Subject: pinctrl: mediatek: questions about gpio/pinctrl/eint
-In-Reply-To: <1453948541.14802.38.camel@mhfsdcap03>
-References: <1453948541.14802.38.camel@mhfsdcap03>
-Message-ID: <CACRpkdbhY9Rt-DD3BgiG8u5JrW+6XcZn0JWWE2Q39wQp38GjXA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 28 Jan 2016 12:23:47 +0100
+Subject: [PATCH v2 0/2] Misc ARM optimizations
+Message-ID: <1453980229-5678-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 3:35 AM, biao huang <biao.huang@mediatek.com> wrote:
+Hello,
 
->         First, when user call GPIO API to control medaitek gpio, they should
-> call pinctrl API to set pinmux to mode 0 ahead, so this pin is function
-> as gpio. And this makes things a little complicated. Is there any simple
-> API can solve this problem? How about add pinmux setting in
-> gpio_request?
+Here is a set of two patches that I already sent on March 2015 (first
+patch) and June 2015 (second patch).
 
-This is what the
-pinctrl_request_gpio, pinctrl_free_gpio, pinctrl_gpio_direction_input
-andpinctrl_gpio_direction_output calls are for.
+The first patch hasn't gotten any feedback.
 
-Look for example in drivers/gpio/gpio-pl061.c:
+The second patch received some feedback: Russell said he would like
+this to be merged at the beginning of a cycle, to give it enough time
+for testing. And we are precisely at the beginning of a cycle :-) Rob
+Herring had some comments, which I also addressed in a reply.
 
-      if (of_property_read_bool(dev->of_node, "gpio-ranges")) {
-                chip->gc.request = gpiochip_generic_request;
-                chip->gc.free = gpiochip_generic_free;
-        }
+Would it be possible to either get those patches merged, or a decision
+be taken that they are not acceptable, so that I can stop worrying
+about them ? :-)
 
-What does that do:
+Thanks,
 
-/**
- * gpiochip_generic_request() - request the gpio function for a pin
- * @chip: the gpiochip owning the GPIO
- * @offset: the offset of the GPIO to request for GPIO function
- */
-int gpiochip_generic_request(struct gpio_chip *chip, unsigned offset)
-{
-        return pinctrl_request_gpio(chip->base + offset);
-}
-EXPORT_SYMBOL_GPL(gpiochip_generic_request);
+Thomas
 
-/**
- * gpiochip_generic_free() - free the gpio function from a pin
- * @chip: the gpiochip to request the gpio function for
- * @offset: the offset of the GPIO to free from GPIO function
- */
-void gpiochip_generic_free(struct gpio_chip *chip, unsigned offset)
-{
-        pinctrl_free_gpio(chip->base + offset);
-}
-EXPORT_SYMBOL_GPL(gpiochip_generic_free);
+Thomas Petazzoni (2):
+  ARM: smp_scu: enable coherent speculative linefills
+  ARM: mm: enable L1 prefetch on Cortex-A9
 
-Yes....
+ arch/arm/kernel/smp_scu.c | 8 ++++++--
+ arch/arm/mm/proc-v7.S     | 5 ++++-
+ 2 files changed, 10 insertions(+), 3 deletions(-)
 
-Your pinctrl driver needs to implement the
-.gpio_request_enable()
-.gpio_disable_free()
-.gpio_set_direction()
-callbacks in struct pinmux_ops.
-
-Also read in Documentation/pinctrl.txt about pinctrl/GPIO interaction.
-
->         Second, here is our request_irq flow in mkd eint driver:
-> request_irq --> mtk_pinctrl_irq_request_resources--> mtk_pmx_set_mode,
-> Normally, it'll set pinmux to eint mode (usually is mode 0) in
-> mtk_pmx_set_mode function. But for special case, such as iddig (connect
-> to usb), when iddig request_irq, it should set pinmux to iddig mode
-> (mode 2 in mt8163).
->         Is there a better way than changing
->         MTK_PIN(
->                 PINCTRL_PIN(16, "IDDIG"),
->                 NULL, "mt8173",
->                 MTK_EINT_FUNCTION(0, 16),
->                 MTK_FUNCTION(0, "GPIO16"),
->                 MTK_FUNCTION(1, "IDDIG"),
->                 MTK_FUNCTION(2, "CMFLASH"),
->                 MTK_FUNCTION(4, "PWM5")
->         ),
->         to
->         MTK_PIN(
->                 PINCTRL_PIN(16, "IDDIG"),
->                 NULL, "mt8173",
->                 MTK_EINT_FUNCTION(2, 16),
->                 MTK_FUNCTION(0, "GPIO16"),
->                 MTK_FUNCTION(1, "IDDIG"),
->                 MTK_FUNCTION(2, "CMFLASH"),
->                 MTK_FUNCTION(4, "PWM5")
->         ),
->         in drivers/pinctrl/mediatek/pinctrl-mtk-mt8163.h?
-
-This is the mediatek driver internals, I don't understand that.
-Your guess is as good as mine, ask help from the other
-driver authors is my hint, I can only help with the framework...
-
-Yours,
-Linus Walleij
+-- 
+2.6.4
