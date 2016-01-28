@@ -1,60 +1,48 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 28 Jan 2016 12:23:48 +0100
-Subject: [PATCH v2 1/2] ARM: smp_scu: enable coherent speculative linefills
+Date: Thu, 28 Jan 2016 12:23:49 +0100
+Subject: [PATCH v2 2/2] ARM: mm: enable L1 prefetch on Cortex-A9
 In-Reply-To: <1453980229-5678-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1453980229-5678-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1453980229-5678-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1453980229-5678-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the ARM TRM, about the SCU Control Register, bit 3
-(Speculative linefills enable) :
+The Cortex-A9 has a L1 prefetch capability documented at
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388e/Chdejhgd.html:
 
-  When set, coherent linefill requests are sent speculatively to the
-  PL310 in parallel with the tag lookup. If the tag lookup misses, the
-  confirmed linefill is sent to the PL310 and gets Rdata earlier
-  because the data request was already initiated by the speculative
-  request. This feature works only if the PL310 is present in the
-  design.
+  The Cortex-A9 data cache implements an automatic prefetcher that
+  monitors cache misses done by the processor. This unit can monitor
+  and prefetch two independent data streams. It can be activated in
+  software using a CP15 Auxiliary Control Register bit. See Auxiliary
+  Control Register.
 
-This feature may improve the overall system performance.
-
-Since the public ARM web site only documents Cortex-A9 revisions r2p0
-and later, we err on the safe side and only enable this bit on >= r2p0
-platforms, like the standby bit.
+This commit enables this L1 prefetch feature unconditionally on all
+Cortex-A9 by setting bit 2 in the Auxiliary Control CP15
+register. Note that since this bit only exists on Cortex-A9 but not on
+Cortex-A5 or Cortex-R7, we separate the handling of Cortex-A9 from the
+one of those two other cores.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/kernel/smp_scu.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/mm/proc-v7.S | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-index 72f9241..227bb86 100644
---- a/arch/arm/kernel/smp_scu.c
-+++ b/arch/arm/kernel/smp_scu.c
-@@ -18,6 +18,7 @@
- 
- #define SCU_CTRL		0x00
- #define SCU_ENABLE		(1 << 0)
-+#define SCU_SPEC_LINEFILL	(1 << 3)
- #define SCU_STANDBY_ENABLE	(1 << 5)
- #define SCU_CONFIG		0x04
- #define SCU_CPU_STATUS		0x08
-@@ -57,10 +58,13 @@ void scu_enable(void __iomem *scu_base)
- 
- 	scu_ctrl |= SCU_ENABLE;
- 
--	/* Cortex-A9 earlier than r2p0 has no standby bit in SCU */
-+	/*
-+	 * Cortex-A9 earlier than r2p0 has no standby / speculative
-+	 * line fills bits in SCU
-+	 */
- 	if ((read_cpuid_id() & 0xff0ffff0) == 0x410fc090 &&
- 	    (read_cpuid_id() & 0x00f0000f) >= 0x00200000)
--		scu_ctrl |= SCU_STANDBY_ENABLE;
-+		scu_ctrl |= SCU_STANDBY_ENABLE | SCU_SPEC_LINEFILL;
- 
- 	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
- 
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 0f92d57..415c0cb 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -263,8 +263,11 @@ ENDPROC(cpu_pj4b_do_resume)
+  *	It is assumed that:
+  *	- cache type register is implemented
+  */
+-__v7_ca5mp_setup:
+ __v7_ca9mp_setup:
++	mov	r10, #(1 << 0)			@ Cache/TLB ops broadcasting
++	orr	r10, r10, #(1 << 2)		@ L1 prefetch
++	b	1f
++__v7_ca5mp_setup:
+ __v7_cr7mp_setup:
+ 	mov	r10, #(1 << 0)			@ Cache/TLB ops broadcasting
+ 	b	1f
 -- 
 2.6.4
