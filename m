@@ -1,149 +1,50 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 28 Jan 2016 12:12:38 -0800
-Subject: [PATCH] ARM: Use generic clkdev.h header
-In-Reply-To: <6141409.WI4q6BtOxa@wuerfel>
-References: <1453932702-6930-1-git-send-email-sboyd@codeaurora.org>
- <6141409.WI4q6BtOxa@wuerfel>
-Message-ID: <20160128201238.GN12841@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 28 Jan 2016 13:20:35 -0700
+Subject: [PATCH v3 3/3] reset: Add support for shared reset controls
+In-Reply-To: <1453918516-3078-4-git-send-email-hdegoede@redhat.com>
+References: <1453918516-3078-1-git-send-email-hdegoede@redhat.com>
+ <1453918516-3078-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <56AA7813.7080907@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28, Arnd Bergmann wrote:
-> On Wednesday 27 January 2016 14:11:42 Stephen Boyd wrote:
-> > Get rid of the clkdev.h file in the ARM port and use the generic
-> > one because we've gotten rid of all the machine specific
-> > mach/clkdev.h files.
-> > 
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > 
-> 
-> Ah, nice! I had not even noticed it was the last one.
-> 
-> The file is still also referenced by arch/arm/plat-versatile/clock.c,
-> but we don't build that file any more and should remove it as well.
-> 
 
-Good catch. Here's that patch too.
+On 01/27/2016 11:15 AM, Hans de Goede wrote:
+> In some SoCs some hw-blocks share a reset control. Add support for this
+> setup by adding new:
+>
+> reset_control_get_shared()
+> devm_reset_control_get_shared()
+> devm_reset_control_get_shared_by_index()
+>
+> methods to get a reset_control. Note that this patch omits adding of_
+> variants, if these are needed later they can be easily added.
+>
+> This patch also changes the behavior of the existing exclusive
+> reset_control_get() variants, if these are now called more then once
+> for the same reset_control they will return -EBUSY. To catch existing
+> drivers triggering this error (there should not be any) a WARN_ON(1)
+> is added in this path.
+>
+> When a reset_control is shared, the behavior of reset_control_assert /
+> deassert is changed, for shared reset_controls these will work like the
+> clock-enable/disable and regulator-on/off functions. They will keep a
+> deassert_count, and only (re-)assert the reset after reset_control_assert
+> has been called as many times as reset_control_deassert was called.
+>
+> Calling reset_control_assert without first calling reset_control_deassert
+> is not allowed on a shared reset control. Calling reset_control_reset is
+> also not allowed on a shared reset control.
 
----8<----
-From: Stephen Boyd <sboyd@codeaurora.org>
-Subject: [PATCH] ARM: plat-versatile: Remove unused clock.c file
+Hmmm. Do you have some examples of how drivers are supposed to 
+co-ordinate use of the shared reset? Reference counting implies all the 
+drivers need to get together and all assert and de-assert the reset in 
+unison when some event happens. That seems difficult to co-ordinate.
 
-This file isn't compiled anymore because PLAT_VERSATILE_CLOCK is
-never selected. Remove the file and the config.
-
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/plat-versatile/Kconfig  |  3 --
- arch/arm/plat-versatile/Makefile |  1 -
- arch/arm/plat-versatile/clock.c  | 74 ----------------------------------------
- 3 files changed, 78 deletions(-)
- delete mode 100644 arch/arm/plat-versatile/clock.c
-
-diff --git a/arch/arm/plat-versatile/Kconfig b/arch/arm/plat-versatile/Kconfig
-index 49b8ef91584a..98b9b8e9f698 100644
---- a/arch/arm/plat-versatile/Kconfig
-+++ b/arch/arm/plat-versatile/Kconfig
-@@ -1,8 +1,5 @@
- if PLAT_VERSATILE
- 
--config PLAT_VERSATILE_CLOCK
--	bool
--
- config PLAT_VERSATILE_SCHED_CLOCK
- 	bool
- 
-diff --git a/arch/arm/plat-versatile/Makefile b/arch/arm/plat-versatile/Makefile
-index 03c4900ac3f4..bff3ba889882 100644
---- a/arch/arm/plat-versatile/Makefile
-+++ b/arch/arm/plat-versatile/Makefile
-@@ -1,5 +1,4 @@
- ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
- 
--obj-$(CONFIG_PLAT_VERSATILE_CLOCK) += clock.o
- obj-$(CONFIG_PLAT_VERSATILE_SCHED_CLOCK) += sched-clock.o
- obj-$(CONFIG_SMP) += headsmp.o platsmp.o
-diff --git a/arch/arm/plat-versatile/clock.c b/arch/arm/plat-versatile/clock.c
-deleted file mode 100644
-index 5c8b6564fdc2..000000000000
---- a/arch/arm/plat-versatile/clock.c
-+++ /dev/null
-@@ -1,74 +0,0 @@
--/*
-- *  linux/arch/arm/plat-versatile/clock.c
-- *
-- *  Copyright (C) 2004 ARM Limited.
-- *  Written by Deep Blue Solutions Limited.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/module.h>
--#include <linux/kernel.h>
--#include <linux/errno.h>
--#include <linux/clk.h>
--#include <linux/mutex.h>
--
--#include <asm/hardware/icst.h>
--
--#include <mach/clkdev.h>
--
--int clk_enable(struct clk *clk)
--{
--	return 0;
--}
--EXPORT_SYMBOL(clk_enable);
--
--void clk_disable(struct clk *clk)
--{
--}
--EXPORT_SYMBOL(clk_disable);
--
--unsigned long clk_get_rate(struct clk *clk)
--{
--	return clk->rate;
--}
--EXPORT_SYMBOL(clk_get_rate);
--
--long clk_round_rate(struct clk *clk, unsigned long rate)
--{
--	long ret = -EIO;
--	if (clk->ops && clk->ops->round)
--		ret = clk->ops->round(clk, rate);
--	return ret;
--}
--EXPORT_SYMBOL(clk_round_rate);
--
--int clk_set_rate(struct clk *clk, unsigned long rate)
--{
--	int ret = -EIO;
--	if (clk->ops && clk->ops->set)
--		ret = clk->ops->set(clk, rate);
--	return ret;
--}
--EXPORT_SYMBOL(clk_set_rate);
--
--long icst_clk_round(struct clk *clk, unsigned long rate)
--{
--	struct icst_vco vco;
--	vco = icst_hz_to_vco(clk->params, rate);
--	return icst_hz(clk->params, vco);
--}
--EXPORT_SYMBOL(icst_clk_round);
--
--int icst_clk_set(struct clk *clk, unsigned long rate)
--{
--	struct icst_vco vco;
--
--	vco = icst_hz_to_vco(clk->params, rate);
--	clk->rate = icst_hz(clk->params, vco);
--	clk->ops->setvco(clk, vco);
--
--	return 0;
--}
--EXPORT_SYMBOL(icst_clk_set);
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Instead, would it be better to require some central device to 
+exclusively get the reset, and manage it. That device could then react 
+to appropriate events to manage the reset. In this scheme, we wouldn't 
+need the concept of shared resets at all. However, depending on why/when 
+the reset needed to be re-asserted at run-time, this scheme wouldn't 
+eliminate the co-ordination issue, but equally I don't believe it makes 
+it any worse.
