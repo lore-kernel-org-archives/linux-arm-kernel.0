@@ -1,44 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 28 Jan 2016 10:30:37 +0000
-Subject: [PATCH 4/5] arm64: KVM: Fix comments of the CP handler
-In-Reply-To: <1453977038-13516-1-git-send-email-marc.zyngier@arm.com>
-References: <1453977038-13516-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453977038-13516-5-git-send-email-marc.zyngier@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 28 Jan 2016 10:31:06 +0000
+Subject: Speeding up dma_unmap
+In-Reply-To: <20160127180944.GZ10826@n2100.arm.linux.org.uk>
+References: <CAJFSRaCRvx=+_fEYAr8OeWGHnnz+rOWjLzLcm+wZiEstbHwxAw@mail.gmail.com>
+ <3526786.axKPs51069@wuerfel>
+ <20160127160630.GQ14823@e104818-lin.cambridge.arm.com>
+ <20160127180944.GZ10826@n2100.arm.linux.org.uk>
+Message-ID: <20160128103105.GR14823@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+On Wed, Jan 27, 2016 at 06:09:45PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Jan 27, 2016 at 04:06:30PM +0000, Catalin Marinas wrote:
+> > On Wed, Jan 27, 2016 at 01:23:27PM +0100, Arnd Bergmann wrote:
+> > > up reading cache lines back in randomly on a speculative prefetch,
+> > > but as far as I can tell, the Cortex-A8 (or A5/A7) won't do that.
+> > 
+> > Are you sure about A5 and A7? I'm not even sure about the A8 but there
+> > are good chances that A7 and A5 do speculative prefetches.
+> 
+> I thought when I was re-implementing the DMA API on ARM (which was
+> around early v7 times) that there were CPUs that did speculative
+> prefetching, which included the A8.  I seem to remember it was pretty
+> urgent to have the DMA API fixed for _any_ ARMv7 CPU because of the
+> speculative prefetching.
 
-Make sure the documentation reflects the actual name of the functions.
+Indeed, it's a safe assumption to say that any ARMv7 CPU perform
+speculative accesses. Even if some of them may only do I-cache
+prefetching (just guessing), in the presence of a unified L2 this
+distinction no longer matters.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kvm/sys_regs.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index eec3598..4048934 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -1043,7 +1043,7 @@ static void unhandled_cp_access(struct kvm_vcpu *vcpu,
- }
- 
- /**
-- * kvm_handle_cp_64 -- handles a mrrc/mcrr trap on a guest CP15 access
-+ * kvm_handle_cp_64 -- handles a mrrc/mcrr trap on a guest CP14/CP15 access
-  * @vcpu: The VCPU pointer
-  * @run:  The kvm_run struct
-  */
-@@ -1095,7 +1095,7 @@ out:
- }
- 
- /**
-- * kvm_handle_cp15_32 -- handles a mrc/mcr trap on a guest CP15 access
-+ * kvm_handle_cp_32 -- handles a mrc/mcr trap on a guest CP14/CP15 access
-  * @vcpu: The VCPU pointer
-  * @run:  The kvm_run struct
-  */
 -- 
-2.1.4
+Catalin
