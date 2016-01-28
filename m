@@ -1,72 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 28 Jan 2016 11:14:53 +0000
-Subject: [PATCH 11/13] dtb: amd: Add PCIe SMMU device tree node
-In-Reply-To: <1453929121-12171-12-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1453929121-12171-12-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <20160128111453.GG17123@leverpostej>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 28 Jan 2016 11:15:53 +0000
+Subject: [PATCH] mfd: db8500: avoid uninitialized variable reference
+In-Reply-To: <1453737752-1960326-1-git-send-email-arnd@arndb.de>
+References: <1453737752-1960326-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160128111553.GN3368@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 03:11:59PM -0600, Suravee Suthikulpanit wrote:
-> From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+On Mon, 25 Jan 2016, Arnd Bergmann wrote:
+
+> The prcmu_config_clkout() function ensures that the 'clkout' argument
+> can only be '0' or '1' using an appropriate BUG_ON(), so the compiler
+> should know that the div_mask, mask, and bits variables are always
+> initialized later on. However, it doesn't understand this in gcc-5.2
+> and produces a false positive warning instead:
 > 
-> Add PCIe SMMU device tree node for AMD Seattle SOC.
+> drivers/mfd/db8500-prcmu.c: In function 'prcmu_config_clkout':
+> drivers/mfd/db8500-prcmu.c:762:10: error: 'div_mask' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+>   if (val & div_mask) {
+>           ^
+> drivers/mfd/db8500-prcmu.c:769:13: error: 'mask' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+>     if ((val & mask & ~div_mask) != bits) {
+>              ^
+> drivers/mfd/db8500-prcmu.c:757:7: error: 'bits' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 > 
-> Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+> Replacing the switch() statement with an equivalent if() lets
+> gcc figure this out reliably and avoids the warnings.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-> index a7fc059..bfccfea 100644
-> --- a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-> +++ b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-> @@ -210,6 +210,7 @@
->  			device_type = "pci";
->  			bus-range = <0 0x7f>;
->  			msi-parent = <&v2m0>;
-> +			#stream-id-cells = <16>;
->  			reg = <0 0xf0000000 0 0x10000000>;
+>  drivers/mfd/db8500-prcmu.c | 7 ++-----
+>  1 file changed, 2 insertions(+), 5 deletions(-)
+
+Applied, thanks.
+
+> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+> index 12099b09a9a7..c0a86aeb1733 100644
+> --- a/drivers/mfd/db8500-prcmu.c
+> +++ b/drivers/mfd/db8500-prcmu.c
+> @@ -739,20 +739,17 @@ int prcmu_config_clkout(u8 clkout, u8 source, u8 div)
+>  	if (!div && !requests[clkout])
+>  		return -EINVAL;
 >  
->  			interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
-> @@ -230,6 +231,28 @@
->  				<0x03000000 0x01 0x00000000 0x01 0x00000000 0x7f 0x00000000>;
->  		};
+> -	switch (clkout) {
+> -	case 0:
+> +	if (clkout == 0) {
+>  		div_mask = PRCM_CLKOCR_CLKODIV0_MASK;
+>  		mask = (PRCM_CLKOCR_CLKODIV0_MASK | PRCM_CLKOCR_CLKOSEL0_MASK);
+>  		bits = ((source << PRCM_CLKOCR_CLKOSEL0_SHIFT) |
+>  			(div << PRCM_CLKOCR_CLKODIV0_SHIFT));
+> -		break;
+> -	case 1:
+> +	} else {
+>  		div_mask = PRCM_CLKOCR_CLKODIV1_MASK;
+>  		mask = (PRCM_CLKOCR_CLKODIV1_MASK | PRCM_CLKOCR_CLKOSEL1_MASK |
+>  			PRCM_CLKOCR_CLK1TYPE);
+>  		bits = ((source << PRCM_CLKOCR_CLKOSEL1_SHIFT) |
+>  			(div << PRCM_CLKOCR_CLKODIV1_SHIFT));
+> -		break;
+>  	}
+>  	bits &= mask;
 >  
-> +		pcie0_smmu: smmu at e0a00000 {
-> +			 compatible = "arm,mmu-401";
-> +			 reg = <0 0xe0a00000 0 0x10000>;
-> +			 #global-interrupts = <1>;
-> +			 interrupts = /* Uses combined intr for both
-> +				       * global and context
-> +				       */
-> +				      <0 333 4>,
-> +				      <0 333 4>;
-> +			/* Note:
-> +			 * SID[2:0]  = PCIe function number
-> +			 * SID[7:3]  = PCIe device number
-> +			 * SID[14:8] = PCIe bus number
-> +			 */
-> +			 mmu-masters = <&pcie0
-> +				/* 1:00:[0,3] */ 256 257 258 259
-> +				/* 2:00:[0,3] */ 512 513 514 515
-> +				/* 3:00:[0,3] */ 768 769 770 771
-> +				/* 4:00:[0,3] */ 1024 1025 1026 1027
-> +			 >;
-> +		 };
 
-This doesn't look right to me.
-
-I didn't think that RID->SID mapping was actually defined by any
-binding, so (how) are these numbers used?
-
-I'm uncomfortable with this, given we should be moving towards the
-generic IOMMU binding (and then we'd use the iommu-map binding [1] for
-this).
-
-Will, Robin, thoughts?
-
-Mark.
-
-[1] https://lkml.org/lkml/2015/7/23/561
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
