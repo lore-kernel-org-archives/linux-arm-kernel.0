@@ -1,38 +1,29 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 28 Jan 2016 22:30:44 +0100
-Subject: [PATCH v10 00/21] KVM: ARM64: Add guest PMU support
-In-Reply-To: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <20160128213044.GM16453@hawk.localdomain>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 28 Jan 2016 13:39:23 -0800
+Subject: [PATCH 00/13] dtb: amd: Miscelleneous Updates for AMD Seattle DTS
+In-Reply-To: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <CAOesGMgRC2vTVdmY6kKYonM1JkWD=-3k_EQ4hGvyrm-vNZczrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 11:51:28AM +0800, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> This patchset adds guest PMU support for KVM on ARM64. It takes
-> trap-and-emulate approach. When guest wants to monitor one event, it
-> will be trapped by KVM and KVM will call perf_event API to create a perf
-> event and call relevant perf_event APIs to get the count value of event.
-> 
-> Use perf to test this patchset in guest. When using "perf list", it
-> shows the list of the hardware events and hardware cache events perf
-> supports. Then use "perf stat -e EVENT" to monitor some event. For
-> example, use "perf stat -e cycles" to count cpu cycles and
-> "perf stat -e cache-misses" to count cache misses.
+Hi Suravee,
+
+On Wed, Jan 27, 2016 at 1:11 PM, Suravee Suthikulpanit
+<Suravee.Suthikulpanit@amd.com> wrote:
+> From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 >
+> This patch series contains several updates for the AMD Seattle SOC DTS files.
+> It also adds new board files for newer Overdrive and Linaro 96boards (Husky)
+> platforms.
 
-Hi Shannon,
+My Overdrive comes with DT provided by firmware, so there's no need to
+have a in-kernel-tree DT source.
 
-I just completed my first full review of the series. I'm sorry I didn't
-have time to do a full review on an earlier version. I have a few comments,
-but most of them are minor. If you'd like to add some r-b's from me, then
-here are the patches I can offer them for
+Are you aware of other reasons to have it here? I just foresee
+divergence and conflicts between the two. It was quite obvious before
+this update when the FW-provided DT was a lot more complete than what
+we had in the kernel tree.
 
-1-5,8,9,11-13,16-21
 
-5,8,9,12 had some extra masking on input/outputs that I'm not sure is
-necessary.
-
-Thanks,
-drew
+-Olof
