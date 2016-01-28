@@ -1,80 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Jan 2016 17:01:41 +0000
-Subject: [PATCH 0/4] Update cpu feature extraction
-In-Reply-To: <56A9F7C6.2060109@arm.com>
-References: <1453800223-18590-1-git-send-email-vladimir.murzin@arm.com>
- <56A9F7C6.2060109@arm.com>
-Message-ID: <20160128170141.GM10826@n2100.arm.linux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 28 Jan 2016 18:02:26 +0100
+Subject: [PATCH 0/3] UEFI stub pre-boot compat checks
+Message-ID: <1454000549-9189-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 11:13:10AM +0000, Vladimir Murzin wrote:
-> On 26/01/16 09:23, Vladimir Murzin wrote:
-> > Hi,
-> > 
-> > This has been started as a fix in cpu feature extractor, but Suzuki suggested
-> > syncing-up the whole cpu feature handling with the recent updates on arm64
-> > side [1,2].
-> > 
-> > I've kept fixes separately, so they can go as the are in case there is concern
-> > on updating cpu feature handling.
-> > 
-> > [1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/455568
-> > [2] https://lkml.org/lkml/2015/11/18/570
-> > 
-> 
-> Russell, is it OK for patch tracker?
+As discussed earlier today [1], and last year [2], it makes sense for the
+UEFI stub to perform some basic checks on the hardware for missing features
+that would prevent the kernel from booting to a state where it can even
+complain about this.
 
-I'd really like to hear that someone has validated these changes or at
-least someone in ARM Ltd such as Will or Catalin has reviewed them; I
-remember the subject of whether certain fields are signed or unsigned
-being almost a personal opinion - we used to treat all fields as
-unsigned, but that was declared to be wrong, so we then went to treating
-them all as signed fields... See:
+So implements this for ARM, to check on LPAE builds whether the CPU supports
+it (patch #1), and for arm64, to check whether the build time granule is
+implemented by the CPU (patch #2). Patch #3 wires it up into the shared init
+code.
 
-commit b8c9592b4a6c93211c8163888a97880d608503b5
-Author: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date:   Thu Mar 19 19:03:25 2015 +0100
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/472880
+[2] http://thread.gmane.org/gmane.linux.ports.arm.kernel/447370
 
-    ARM: 8318/1: treat CPU feature register fields as signed quantities
+Ard Biesheuvel (3):
+  ARM: efistub: check for LPAE support before booting a LPAE kernel
+  arm64: efistub: check for h/w support before booting a >4 KB granule
+    kernel
+  ARM/arm64: efistub: perform hardware compatibility check
 
-    The various CPU feature registers consist of 4-bit blocks that
-    represent signed quantities, whose positive values represent
-    incremental features, and whose negative values are reserved.
-
-    To improve forward compatibility, update the feature detection
-    code to take possible future higher values into account, but
-    ignore negative values.
-
-    Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-For instance:
-
--       sync_prim = ((read_cpuid_ext(CPUID_EXT_ISAR3) >> 8) & 0xf0) |
--                   ((read_cpuid_ext(CPUID_EXT_ISAR4) >> 20) & 0x0f);
--       if (sync_prim >= 0x13)
-+       if (cpuid_feature_extract(CPUID_EXT_ISAR3, 12) > 1 ||
-+           (cpuid_feature_extract(CPUID_EXT_ISAR3, 12) == 1 &&
-+            cpuid_feature_extract(CPUID_EXT_ISAR3, 20) >= 3))
-                elf_hwcap &= ~HWCAP_SWP;
-
-(let's ignore the ISAR4 vs ISAR3 problem).  What if ISAR4 20:23 have
-bit 23 set?  In the original code, that would be treated as being ">= 3"
-but in the new code, that's less than zero, so would fail the test.
-
-I think we had much the same questions back in March 2015 when this was
-last discussed, when I raised the issue of there being a documentation
-bug in that the documentation doesn't make it clear how reserved 4-bit
-CPU ID fields should be intepreted.
-
-What I'd like to see is some kind of positive concensus on this (and
-a doc update); what I don't want to do is to apply these patches and
-then get another round of patches converting some of them back to
-signed tests, and then later another set of patches doing the reverse,
-because that seems to be what's now happening.
+ drivers/firmware/efi/libstub/arm-stub.c   |  4 ++++
+ drivers/firmware/efi/libstub/arm32-stub.c | 17 +++++++++++++++++
+ drivers/firmware/efi/libstub/arm64-stub.c | 20 ++++++++++++++++++++
+ drivers/firmware/efi/libstub/efistub.h    |  2 ++
+ 4 files changed, 43 insertions(+)
 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.5.0
