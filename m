@@ -1,32 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 28 Jan 2016 11:07:48 -0800
-Subject: [PATCH 0/2] ARM: shmobile: Move written variables from .text to
- .data
-In-Reply-To: <20160128174848.GO10826@n2100.arm.linux.org.uk>
-References: <1453993462-12210-1-git-send-email-geert+renesas@glider.be>
- <CAGXu5jL7ebTXtPu5_9U4duju2qiWFEYVQmSSgpdMDkWr8tQCvw@mail.gmail.com>
- <20160128174848.GO10826@n2100.arm.linux.org.uk>
-Message-ID: <20160128190748.GJ19432@atomide.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 28 Jan 2016 21:09:41 +0200
+Subject: [PATCH] clk: ti: omap3+: dpll: use non-locking version of
+ clk_get_rate
+In-Reply-To: <20160128190026.GI19432@atomide.com>
+References: <1453981067-8618-1-git-send-email-t-kristo@ti.com>
+ <56A9FED1.3090903@ti.com> <20160128172215.GD19432@atomide.com>
+ <56AA6261.7030503@ti.com> <20160128190026.GI19432@atomide.com>
+Message-ID: <56AA6775.5090302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [160128 09:50]:
-> On Thu, Jan 28, 2016 at 07:19:34AM -0800, Kees Cook wrote:
-> > 
-> > And FWIW, I've now got the RODATA patch back in the patch queue, since
-> > we're at -rc1:
-> > http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8501/1
-> 
-> And I'll be dropping it into linux-next for next week (iow, I'll commit
-> it tomorrow.)
-> 
-> Unfortunately, -rc1 broke some platforms, so Olof's builder isn't going
-> to get full coverage of it while building only my tree.
+On 01/28/2016 09:00 PM, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [160128 10:48]:
+>> On 01/28/2016 07:22 PM, Tony Lindgren wrote:
+>>> * Tero Kristo <t-kristo@ti.com> [160128 03:44]:
+>>>> On 01/28/2016 01:37 PM, Tero Kristo wrote:
+>>>>> As the code in this file is being executed within irq context in some
+>>>>> cases, we must avoid the clk_get_rate which uses mutex internally.
+>>>>> Switch the code to use clk_hw_get_rate instead which is non-locking.
+>>>>>
+>>>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>>>>
+>>>> Ooops, sorry. Sent wrong version (read: old) of this patch, please ignore
+>>>> this one. Will re-send the correct version in a bit.
+>>>
+>>> I think this is still needed as a fix for -rc cycle with cc: stable
+>>> as otherwise we have omap4 and 5 hang if PM runtime is enabled before
+>>> a suspend/resume cycle?
+>>
+>> Look at the other patch I sent, it should accomplish the same thing, and
+>> more.
+>>
+>> https://www.spinics.net/lists/linux-clk/msg06094.html
+>
+> Right.. But is that suitable for the -rc cycle with cc stable?
 
-FYI I sent a pull request for the omap related fixes earlier today. So
-we should be good to go from that point of view for enabling rodata by
-default for v4.6.
+Hmm yea, thats a good question, we may need to resurrect this patch 
+after all.
 
-Regards,
+> You should also describe the bug it causes in the change log.
+> Something like:
+>
+> This fixes an issue where PM runtime will hang the system if
+> enabled with a serial console before a suspend-resume cycle.
 
-Tony
+Yea I can add this to the desc if we want to keep this version of the patch.
+
+-Tero
