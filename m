@@ -1,37 +1,121 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Jan 2016 14:27:52 +0000
-Subject: [PATCH 11/13] dtb: amd: Add PCIe SMMU device tree node
-In-Reply-To: <6645680.g0j8d12m6d@wuerfel>
-References: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <20160128111453.GG17123@leverpostej> <56AA07AA.7050701@arm.com>
- <6645680.g0j8d12m6d@wuerfel>
-Message-ID: <20160128142751.GA775@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 28 Jan 2016 14:27:47 +0000
+Subject: [PATCH] arm64: Allow vmalloc regions to be set with set_memory_*
+In-Reply-To: <56A9FFBD.8030303@huawei.com>
+References: <1452635187-8057-1-git-send-email-labbott@fedoraproject.org>
+ <CAKv+Gu_A1C9hXgqrYDekoy1YHaRXi_mUF-kYx-TqsOBkWMVjmQ@mail.gmail.com>
+ <CAKv+Gu-73QKAsFQCa=yO5+=DihLXp_AKYyY6QRTVM4nuDH=-8g@mail.gmail.com>
+ <20160118115640.GK21067@leverpostej> <56A97328.9070003@huawei.com>
+ <20160128105138.GE17123@leverpostej> <56A9FFBD.8030303@huawei.com>
+Message-ID: <20160128142746.GL17123@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 03:17:33PM +0100, Arnd Bergmann wrote:
-> On Thursday 28 January 2016 12:20:58 Robin Murphy wrote:
-> > >
-> > > Will, Robin, thoughts?
+On Thu, Jan 28, 2016 at 07:47:09PM +0800, Xishi Qiu wrote:
+> On 2016/1/28 18:51, Mark Rutland wrote:
+> 
+> > On Thu, Jan 28, 2016 at 09:47:20AM +0800, Xishi Qiu wrote:
+> >> On 2016/1/18 19:56, Mark Rutland wrote:
+> >>> On Wed, Jan 13, 2016 at 05:10:31PM +0100, Ard Biesheuvel wrote:
+> >>>> Something along these lines, perhaps?
+> >>>>
+> >>>> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+> >>>> index 3571c7309c5e..bda0a776c58e 100644
+> >>>> --- a/arch/arm64/mm/pageattr.c
+> >>>> +++ b/arch/arm64/mm/pageattr.c
+> >>>> @@ -13,6 +13,7 @@
+> >>>>  #include <linux/kernel.h>
+> >>>>  #include <linux/mm.h>
+> >>>>  #include <linux/module.h>
+> >>>> +#include <linux/vmalloc.h>
+> >>>>  #include <linux/sched.h>
+> >>>>
+> >>>>  #include <asm/pgtable.h>
+> >>>> @@ -44,6 +45,7 @@ static int change_memory_common(unsigned long addr
+> >>>>         unsigned long end = start + size;
+> >>>>         int ret;
+> >>>>         struct page_change_data data;
+> >>>> +       struct vm_struct *area;
+> >>>>
+> >>>>         if (!PAGE_ALIGNED(addr)) {
+> >>>>                 start &= PAGE_MASK;
+> >>>> @@ -51,10 +53,14 @@ static int change_memory_common(unsigned long addr,
+> >>>>                 WARN_ON_ONCE(1);
+> >>>>         }
+> >>>>
+> >>>> -       if (start < MODULES_VADDR || start >= MODULES_END)
+> >>>> -               return -EINVAL;
+> >>>> -
+> >>>> -       if (end < MODULES_VADDR || end >= MODULES_END)
+> >>>> +       /*
+> >>>> +        * Check whether the [addr, addr + size) interval is entirely
+> >>>> +        * covered by precisely one VM area that has the VM_ALLOC flag set
+> >>>> +        */
+> >>>> +       area = find_vm_area((void *)addr);
+> >>>> +       if (!area ||
+> >>>> +           end > (unsigned long)area->addr + area->size ||
+> >>>> +           !(area->flags & VM_ALLOC))
+> >>>>                 return -EINVAL;
+> >>>>
+> >>>>         data.set_mask = set_mask;
+> >>>
+> >>> Neat. That fixes the fencepost bug too.
+> >>>
+> >>> Looks good to me, though as Laura suggested we should have a comment as
+> >>> to why we limit changes to such regions. Fancy taking her wording below
+> >>> and spinning this as a patch?
+> >>>
+> >>>>>> +       /*
+> >>>>>> +        * This check explicitly excludes most kernel memory. Most kernel
+> >>>>>> +        * memory is mapped with a larger page size and breaking down the
+> >>>>>> +        * larger page size without causing TLB conflicts is very difficult.
+> >>>>>> +        *
+> >>>>>> +        * If you need to call set_memory_* on a range, the recommendation is
+> >>>>>> +        * to use vmalloc since that range is mapped with pages.
+> >>>>>> +        */
+> >>>
+> >>> Thanks,
+> >>> Mark.
+> >>>
+> >>
+> >> Hi Mark,
+> >>
+> >> After change the flag, it calls only flush_tlb_kernel_range(), so why not use 
+> >> cpu_replace_ttbr1(swapper_pg_dir)? 
 > > 
-> > Any IDs specified here would only apply to DMA by the "platform device" 
-> > side of the host controller itself (as would an equivalent "iommus" 
-> > property on pcie0 once I finish the SMMUv2 generic binding support I'm 
-> > working on). In terms of PCI devices, the "mmu-masters" property is 
-> > overloaded such that only its existence matters, to identify that there 
-> > _is_ a relationship between the SMMU and the PCI bus(es) behind that 
-> > host controller.
+> > We cannot use cpu_replace_ttbr1 here. Other CPUs may be online, and we
+> > have no mechanism to place them in a safe set of page tables while
+> > swapping TTBR1, we'd have to perform a deep copy of tables, and this
+> > would be horrendously expensive.
+> > 
+> > Using flush_tlb_kernel_range() is sufficient. As modules don't share a
+> > page or section mapping with other users, we can follow a
+> > Break-Before-Make approach. Additionally, they're mapped at page
+> > granularity so we never split or fuse sections anyway. We only modify
+> > the permission bits.
+> > 
 > 
-> I wasn't aware that this was actually still specified. I had hoped
-> we were getting rid of mmu-masters before anyone actually started
-> using it, but now I see it in ns2.dtsi and fsl-ls2080a.dtsi.
+> Hi Mark,
 > 
-> Does anyone know what happened to the plan to use the iommu DT binding
-> for the ARM SMMU instead? Do we now have to support both ways indefinitely?
+> Is it safe in the following path?
+> 
+> alloc the whole linear map section
 
-We always did -- Seattle used the mmu-masters binding before the generic
-binding even existed. Robin has been working on patches to get of_xlate
-up and running, but it got held up by Laurent's series which didn't end
-up going anywhere.
+I don't understand what you mean by this, you will need to elaborate.
+The terms "alloc" and "section" can mean a number of different things in
+this context.
 
-Will
+> cpu A write something on it
+> cpu B write something on it
+> cpu C set read only flag and call flush_tlb_kernel_range()
+
+If you want to modify a portion of the linear map, this will not work.
+Modfiying the linear map in this manner is not safe.
+
+If you want an alias of the linear map which was mapped using pages, and
+you wanted to change that alias, that could work.
+
+It depends on what precisely you are trying to do.
+
+Thanks,
+Mark.
