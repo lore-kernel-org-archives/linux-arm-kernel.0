@@ -1,49 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Jan 2016 23:02:19 +0100
-Subject: [PATCH net-next 08/40] net: fec: move cbd_bufaddr assignment
- closer to the mapping function
-In-Reply-To: <1454016364-30985-9-git-send-email-troy.kisky@boundarydevices.com>
-References: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
- <1454016364-30985-9-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1725152.bhtFKTSjnb@wuerfel>
+Date: Thu, 28 Jan 2016 23:07:58 +0100
+Subject: [PATCH] ARM: Use generic clkdev.h header
+In-Reply-To: <20160128201238.GN12841@codeaurora.org>
+References: <1453932702-6930-1-git-send-email-sboyd@codeaurora.org>
+ <6141409.WI4q6BtOxa@wuerfel> <20160128201238.GN12841@codeaurora.org>
+Message-ID: <7387260.8XnD1ditcY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 January 2016 14:25:32 Troy Kisky wrote:
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+On Thursday 28 January 2016 12:12:38 Stephen Boyd wrote:
+> From: Stephen Boyd <sboyd@codeaurora.org>
+> Subject: [PATCH] ARM: plat-versatile: Remove unused clock.c file
+> 
+> This file isn't compiled anymore because PLAT_VERSATILE_CLOCK is
+> never selected. Remove the file and the config.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->  drivers/net/ethernet/freescale/fec_main.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-
-[note: missing changelog?]
-
-> diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-> index b87f80d..15a93f90 100644
-> --- a/drivers/net/ethernet/freescale/fec_main.c
-> +++ b/drivers/net/ethernet/freescale/fec_main.c
-> @@ -476,6 +476,8 @@ static int fec_enet_txq_submit_skb(struct fec_enet_priv_tx_q *txq,
->  				estatus |= BD_ENET_TX_TS;
->  		}
->  	}
-> +	bdp->cbd_bufaddr = addr;
-> +	bdp->cbd_datlen = buflen;
->  
->  	if (fep->bufdesc_ex) {
->  
-> @@ -499,8 +501,6 @@ static int fec_enet_txq_submit_skb(struct fec_enet_priv_tx_q *txq,
->  	/* Save skb pointer */
->  	txq->tx_skbuff[index] = skb;
->  
-> -	bdp->cbd_datlen = buflen;
-> -	bdp->cbd_bufaddr = addr;
->  	/* Make sure the updates to rest of the descriptor are performed before
->  	 * transferring ownership.
->  	 */
+>  arch/arm/plat-versatile/Kconfig  |  3 --
+>  arch/arm/plat-versatile/Makefile |  1 -
+>  arch/arm/plat-versatile/clock.c  | 74 ----------------------------------------
+>  3 files changed, 78 deletions(-)
+>  delete mode 100644 arch/arm/plat-versatile/clock.c
 > 
 
-This patch and others in the series conflicts with the bugfix "net: fec: make
-driver endian-safe" that Johannes sent this week. Can you include his fix
-in your series and ensure that all descriptor accesses are done in
-an endian-safe way?
+Looks good, I've added it to my todo list for arm-soc in 4.6.
+
+I think Linus Walleij has some related work pending, so I'll 
+let him Ack this patch or pick it up in his tree if he prefers.
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
 	Arnd
