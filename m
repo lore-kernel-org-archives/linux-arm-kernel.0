@@ -1,79 +1,89 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 28 Jan 2016 16:33:42 +0000
-Subject: [PATCH V5 04/14] soc: tegra: pmc: Fix testing of powergate state
+Date: Thu, 28 Jan 2016 16:33:45 +0000
+Subject: [PATCH V5 07/14] soc: tegra: pmc: Ensure partitions can be toggled
+ on/off by PMC
 In-Reply-To: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
 References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1453998832-27383-5-git-send-email-jonathanh@nvidia.com>
+Message-ID: <1453998832-27383-8-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In tegra_powergate_set() the state of the powergates is read and OR'ed
-with the bit for the powergate of interest. This unsigned 32-bit value
-is then compared with a boolean value to test if the powergate is
-already in the desired state. When turning on a powergate, apart from
-the powergate that is represented by bit 0, this test will always
-return false and so we may attempt to turn on the powergate when it is
-already on.
-
-After OR'ing the bit for the powergate, check if the result is not equal
-to zero before comparing with the boolean value. Add a helper function
-to return the current state of a powergate.
+For Tegra124 and Tegra210, the GPU partition cannot be toggled on and off
+via the APBDEV_PMC_PWRGATE_TOGGLE_0 register. For these devices, the
+partition is simply powered up and down via an external regulator.
+Describe in the PMC SoC data in which devices the GPU partition can be
+controlled via the APBDEV_PMC_PWRGATE_TOGGLE_0 register and ensure that
+no one can incorrectly try to toggle the GPU partition via the
+APBDEV_PMC_PWRGATE_TOGGLE_0 register.
 
 Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 ---
- drivers/soc/tegra/pmc.c | 17 +++++++++--------
- 1 file changed, 9 insertions(+), 8 deletions(-)
+ drivers/soc/tegra/pmc.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
-index 1dbdcf06a9ad..99cb2fdd29e1 100644
+index 032dd5c17130..ecb4f66819fd 100644
 --- a/drivers/soc/tegra/pmc.c
 +++ b/drivers/soc/tegra/pmc.c
-@@ -174,6 +174,11 @@ static void tegra_pmc_writel(u32 value, unsigned long offset)
- 	writel(value, pmc->base + offset);
- }
+@@ -110,6 +110,7 @@ struct tegra_pmc_soc {
  
-+static inline bool tegra_powergate_state(int id)
-+{
-+	return (tegra_pmc_readl(PWRGATE_STATUS) & BIT(id)) != 0;
-+}
-+
+ 	bool has_tsense_reset;
+ 	bool has_gpu_clamps;
++	bool has_gpu_toggle;
+ };
+ 
  /**
-  * tegra_powergate_set() - set the state of a partition
-  * @id: partition ID
-@@ -181,13 +186,9 @@ static void tegra_pmc_writel(u32 value, unsigned long offset)
-  */
- static int tegra_powergate_set(unsigned int id, bool new_state)
- {
--	bool status;
--
+@@ -197,6 +198,9 @@ static int tegra_powergate_set(unsigned int id, bool new_state)
+ 	bool status;
+ 	int err;
+ 
++	if (id == TEGRA_POWERGATE_3D && !pmc->soc->has_gpu_toggle)
++		return -EINVAL;
++
  	mutex_lock(&pmc->powergates_lock);
  
--	status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
--
--	if (status == new_state) {
-+	if (tegra_powergate_state(id) == new_state) {
- 		mutex_unlock(&pmc->powergates_lock);
- 		return 0;
- 	}
-@@ -230,16 +231,16 @@ EXPORT_SYMBOL(tegra_powergate_power_off);
-  */
- int tegra_powergate_is_powered(unsigned int id)
- {
--	u32 status;
-+	int status;
- 
- 	if (!pmc->soc || id >= pmc->soc->num_powergates)
+ 	if (tegra_powergate_state(id) == new_state) {
+@@ -250,6 +254,9 @@ int tegra_powergate_is_powered(unsigned int id)
+ 	if (!tegra_powergate_is_valid(id))
  		return -EINVAL;
  
++	if (id == TEGRA_POWERGATE_3D && !pmc->soc->has_gpu_toggle)
++		return -EINVAL;
++
  	mutex_lock(&pmc->powergates_lock);
--	status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
-+	status = tegra_powergate_state(id);
+ 	status = tegra_powergate_state(id);
  	mutex_unlock(&pmc->powergates_lock);
+@@ -968,6 +975,7 @@ static const struct tegra_pmc_soc tegra30_pmc_soc = {
+ 	.cpu_powergates = tegra30_cpu_powergates,
+ 	.has_tsense_reset = true,
+ 	.has_gpu_clamps = false,
++	.has_gpu_toggle = true,
+ };
  
--	return !!status;
-+	return status;
- }
+ static const char * const tegra114_powergates[] = {
+@@ -1005,6 +1013,7 @@ static const struct tegra_pmc_soc tegra114_pmc_soc = {
+ 	.cpu_powergates = tegra114_cpu_powergates,
+ 	.has_tsense_reset = true,
+ 	.has_gpu_clamps = false,
++	.has_gpu_toggle = true,
+ };
  
- /**
+ static const char * const tegra124_powergates[] = {
+@@ -1048,6 +1057,7 @@ static const struct tegra_pmc_soc tegra124_pmc_soc = {
+ 	.cpu_powergates = tegra124_cpu_powergates,
+ 	.has_tsense_reset = true,
+ 	.has_gpu_clamps = true,
++	.has_gpu_toggle = false,
+ };
+ 
+ static const char * const tegra210_powergates[] = {
+@@ -1091,6 +1101,7 @@ static const struct tegra_pmc_soc tegra210_pmc_soc = {
+ 	.cpu_powergates = tegra210_cpu_powergates,
+ 	.has_tsense_reset = true,
+ 	.has_gpu_clamps = true,
++	.has_gpu_toggle = false,
+ };
+ 
+ static const struct of_device_id tegra_pmc_match[] = {
 -- 
 2.1.4
