@@ -1,49 +1,32 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 28 Jan 2016 11:32:14 +0000
-Subject: [PATCH 3/6] arm64: Add helpers for detecting AArch32 support at EL0
-In-Reply-To: <1453980737-6126-1-git-send-email-suzuki.poulose@arm.com>
-References: <1453980737-6126-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1453980737-6126-4-git-send-email-suzuki.poulose@arm.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 28 Jan 2016 13:37:47 +0200
+Subject: [PATCH] clk: ti: omap3+: dpll: use non-locking version of clk_get_rate
+Message-ID: <1453981067-8618-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds a helper to extract the support for AArch32 at EL0
+As the code in this file is being executed within irq context in some
+cases, we must avoid the clk_get_rate which uses mutex internally.
+Switch the code to use clk_hw_get_rate instead which is non-locking.
 
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm64/include/asm/cpufeature.h |    7 +++++++
- arch/arm64/include/asm/sysreg.h     |    1 +
- 2 files changed, 8 insertions(+)
+ drivers/clk/ti/dpll3xxx.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 5444a77..98f83d7 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -165,6 +165,13 @@ static inline bool id_aa64mmfr0_mixed_endian_el0(u64 mmfr0)
- 		cpuid_feature_extract_unsigned_field(mmfr0, ID_AA64MMFR0_BIGENDEL0_SHIFT) == 0x1;
- }
+diff --git a/drivers/clk/ti/dpll3xxx.c b/drivers/clk/ti/dpll3xxx.c
+index f4dec00..7ed24bc 100644
+--- a/drivers/clk/ti/dpll3xxx.c
++++ b/drivers/clk/ti/dpll3xxx.c
+@@ -437,7 +437,8 @@ int omap3_noncore_dpll_enable(struct clk_hw *hw)
  
-+static inline bool id_aa64pfr0_32bit_el0(u64 pfr0)
-+{
-+	u32 val = cpuid_feature_extract_unsigned_field(pfr0, ID_AA64PFR0_EL0_SHIFT);
-+
-+	return val == ID_AA64PFR0_EL0_32BIT_64BIT;
-+}
-+
- void __init setup_cpu_features(void);
+ 	parent = clk_hw_get_parent(hw);
  
- void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 4aeebec..76d2f3e 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -111,6 +111,7 @@
- #define ID_AA64PFR0_ASIMD_SUPPORTED	0x0
- #define ID_AA64PFR0_EL1_64BIT_ONLY	0x1
- #define ID_AA64PFR0_EL0_64BIT_ONLY	0x1
-+#define ID_AA64PFR0_EL0_32BIT_64BIT	0x2
- 
- /* id_aa64mmfr0 */
- #define ID_AA64MMFR0_TGRAN4_SHIFT	28
+-	if (clk_hw_get_rate(hw) == clk_get_rate(dd->clk_bypass)) {
++	if (clk_hw_get_rate(hw) ==
++	    clk_hw_get_rate(__clk_get_hw(dd->clk_bypass))) {
+ 		WARN_ON(parent != __clk_get_hw(dd->clk_bypass));
+ 		r = _omap3_noncore_dpll_bypass(clk);
+ 	} else {
 -- 
 1.7.9.5
