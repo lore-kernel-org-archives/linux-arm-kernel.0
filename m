@@ -1,64 +1,39 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 28 Jan 2016 07:17:04 -0800
-Subject: [PATCH] arm64: make CONFIG_DEBUG_RODATA non-optional
-In-Reply-To: <20160128145900.GN17123@leverpostej>
-References: <1453226922-16831-1-git-send-email-keescook@chromium.org>
- <1453226922-16831-4-git-send-email-keescook@chromium.org>
- <20160127211105.GA41450@davidb.org>
- <CAGXu5j+DLRoVE88a9++jVfEkN90HDiAaDAMnT2TrKqtMZ_yOww@mail.gmail.com>
- <20160128000906.GA42530@davidb.org>
- <20160128110622.GF17123@leverpostej>
- <CAGXu5jLy3cpLzU1MSQhS6q=5rMu2Mdp9pXncoFapPqUyQ1fO0A@mail.gmail.com>
- <20160128145900.GN17123@leverpostej>
-Message-ID: <CAGXu5j+94QqiZC-qbuHPTX-ERWG0-rSEEsP9g-b9wtQQE=E_Wg@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu, 28 Jan 2016 16:17:24 +0100
+Subject: [PATCH 0/2] ARM: shmobile: Remove legacy machine_desc.map_io()
+ callbacks
+Message-ID: <1453994246-12886-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 6:59 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Jan 28, 2016 at 06:06:53AM -0800, Kees Cook wrote:
->> On Thu, Jan 28, 2016 at 3:06 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > One thing I would like to do is to avoid the need for fixup_executable
->> > entirely, by mapping the kernel text RO from the outset. However, that
->> > requires rework of the alternatives patching (to use a temporary RW
->> > alias), and I haven't had the time to look into that yet.
->>
->> This makes perfect sense for the rodata section, but the (future)
->> postinit_rodata section we'll still want to mark RO after init
->> finishes. x86 and ARM cheat y marking both RO after init, and they
->> don't have to pad sections. parisc will need to solve this too.
->
-> Depending on how many postinit_rodata variables there are, we might be
-> able to drop those in .rodata, have them RO always, and initialise them
-> via a temporary RW alias (e.g. something in the vmalloc area).
->
-> The only requirement for that is that we use a helper to initialise any
-> __postinit_ro variables via a temporary RW alias, e.g.
->
-> #define SET_POST_INIT_RO(ptr, v) ({             \\
->         typeof(ptr) __ptr_rw = (ptr)            \\
->         BUG_ON(initcalls_done);                 \\
->         __ptr_rw = create_rw_alias(__ptr);      \\
->         __ptr_rw = v;                           \\
->         destroy_rw_alias(__ptr_rw);             \\
-> })
->
-> ...
->
-> __postinit_ro void *thing;
->
-> void __init some_init_func(void) {
->         void *__thing = some_ranodomized_allocator();
->         SET_POSTINIT_RO(thing, thing);
-> }
+	Hi Simon, Magnus,
 
-Well, that certainly would make their usage explicit, but I'd really
-like to avoid that, especially in the face of trying to const-ify as
-much of the kernel as possible to reduce attack surface. I don't want
-to have to both mark the variable and its writes, since that would
-make the constification gcc plugin a bit more complex.
+This patch series removes the legacy machine_desc.map_io() callback for
+SoCs that no longer rely on it, but use ioremap() instead.
 
--Kees
+The patch for emev2 depends on "ARM: shmobile: Consolidate SCU mapping
+code" ("FIXME" commit ID reference to be updated).
+
+Thanks!
+
+Geert Uytterhoeven (2):
+  ARM: shmobile: r8a7740: Remove legacy machine_desc.map_io() callback
+  ARM: shmobile: emev2: Remove legacy machine_desc.map_io() callback
+
+ arch/arm/mach-shmobile/setup-emev2.c   | 18 ------------------
+ arch/arm/mach-shmobile/setup-r8a7740.c | 20 --------------------
+ 2 files changed, 38 deletions(-)
 
 -- 
-Kees Cook
-Chrome OS & Brillo Security
+1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
