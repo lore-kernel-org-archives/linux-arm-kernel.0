@@ -1,181 +1,129 @@
-From: ping.bai@nxp.com (Ping Bai)
-Date: Thu, 28 Jan 2016 10:43:01 +0000
-Subject: [PATCH v2 2/5] ARM: dts: imx: Add basic dts support for
- imx6qp-sabresd
-In-Reply-To: <20160128075408.GM9070@tiger>
-References: <1450159673-27314-1-git-send-email-b51503@freescale.com>
- <1450159673-27314-3-git-send-email-b51503@freescale.com>
- <20160128075408.GM9070@tiger>
-Message-ID: <DB4PR04MB53807A99AAED4F18A6B383987DA0@DB4PR04MB538.eurprd04.prod.outlook.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 28 Jan 2016 10:42:33 +0000
+Subject: [PATCH v4 00/13] arm64: kernel: Add support for
+ hibernate/suspend-to-disk
+Message-ID: <1453977766-20907-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi all,
+
+This version of hibernate is rebased onto v4.5-rc1, including updated patches
+shared with kexec v13 [0] (1-5, 10).
+
+I've also tested it with Ard's KASLR series [1].
+The most significant change is the use of the arch-header to store the
+location of the page tables and resume code when it has been moved by KASLR.
+
+This implicitly allows resuming with a different kernel version, (and the work
+needed to do this is the same). Patch 12 restricts resume to kernels with the
+same MMU configuration, (page size, number of page levels etc).
+Patch 13 forbids restoring with a different kernel version altogether - do
+we want to support this?
+
+Due to the arch-header changes, I dropped Pavel's Ack on patch 12.
+
+Parts of patch 5 were reworked from Akashi Takahiro's original version, to
+avoid another round of changes to hyp-entry.S:el1_sync.
+
+This series can be retrieved from:
+git://linux-arm.org/linux-jm.git -b hibernate/v4
+
+Changes since v3:
+ * To work with kaslr:
+   * hibernate now uses the arch-header to store the address of the page
+     tables, and the point to re-enter the resumed kernel.
+   * The el2 vectors are reloaded to point to the 'safe' page, then back to the
+     resumed kernel.
+   * PoC cleaning is done after the jump to the resumed kernel, as we don't
+     know the restored kernel's boundaries in advance.
+   * Some variables are accessed via aliases in the linear map, as the kernel
+     text is not mapped during resume. restore_pblist is one example.
+   * Execute the safe page from the bottom of memory, not the top, so that we
+     can restore the resumed kernel's page tables directly.
+
+ * Rebased the common patches onto v13 of kexec
+ * Changed hibernate-asm.S to use the new copy_page macro.
+ * Changed copy_p?d()s to use the do { } while(); pattern.
+ * Added some missing barriers. (dsb after ic ialluis).
+
+Changes from v2:
+ * Rewrote restore in-place patch - we can't clean pages in copy_page(), we
+   need to publish a list for the architecture to clean
+ * Added missing pgprot_val() in hibernate.c, spotted by STRICT_MM_TYPECHECKS
+ * Removed 'tcr_set_idmap_t0sz' from proc.S - I missed this when rebase-ing
+ * Re-imported the first four patches from kexec v12
+ * Rebased onto v4.4-rc2
+ * Changes from Pavel Machek's comments
+
+Changes from v1:
+ * Removed for_each_process(){ for_each_vma() { } }; cache cleaning, replaced
+   with icache_flush_range() call in core hibernate code
+ * Rebased onto conflicting tcr_ek1.t0sz bug-fix patch
 
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: 2016?1?28? 15:54
-> To: b51503 at freescale.com
-> Cc: kernel at pengutronix.de; devicetree at vger.kernel.org;
-> pawel.moll at arm.com; mturquette at baylibre.com; sboyd at codeaurora.org;
-> robh+dt at kernel.org; linux-clk at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v2 2/5] ARM: dts: imx: Add basic dts support for imx6qp-
-> sabresd
-> 
-> On Tue, Dec 15, 2015 at 02:07:50PM +0800, Bai Ping wrote:
-> > The patch adds dts file for imx6qp-sabresd board.
-> >
-> > Signed-off-by: Bai Ping <b51503@freescale.com>
-> > ---
-> >  arch/arm/boot/dts/Makefile             |  1 +
-> >  arch/arm/boot/dts/imx6qdl-sabresd.dtsi |  1 +
-> >  arch/arm/boot/dts/imx6qp-sabresd.dts   | 59
-> ++++++++++++++++++++++++++++++++++
-> >  3 files changed, 61 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/imx6qp-sabresd.dts
-> >
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index 36d8133..dfba765 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -302,6 +302,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
-> >  	imx6dl-sabreauto.dtb \
-> >  	imx6dl-sabrelite.dtb \
-> >  	imx6dl-sabresd.dtb \
-> > +	imx6qp-sabresd.dtb \
-> 
-> Please keep the list sort alphabetically.  That said, imx6qp-sabresd.dtb should
-> be added after imx6q-* ones.
-> 
-> >  	imx6dl-tx6dl-comtft.dtb \
-> >  	imx6dl-tx6u-801x.dtb \
-> >  	imx6dl-tx6u-811x.dtb \
-> > diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> > b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> > index a6d445c..f65f57b 100644
-> > --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> > +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> > @@ -238,6 +238,7 @@
-> >  				regulator-max-microvolt = <3300000>;
-> >  				regulator-boot-on;
-> >  				regulator-always-on;
-> > +				regulator-ramp-delay = <6250>;
-> 
-> So this change applies to imx6q and imx6dl sabresd as well?
-> 
+[v3] http://www.spinics.net/lists/arm-kernel/msg463590.html
+[v2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/376450.html
+[v1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/376450.html
 
-Yes, this change applies to imx6q and imx6dl sabresd.
+[0] http://www.spinics.net/lists/arm-kernel/msg474889.html
+[1] http://permalink.gmane.org/gmane.linux.kernel/2116531
 
-> >  			};
-> >
-> >  			sw3a_reg: sw3a {
-> > diff --git a/arch/arm/boot/dts/imx6qp-sabresd.dts
-> > b/arch/arm/boot/dts/imx6qp-sabresd.dts
-> > new file mode 100644
-> > index 0000000..c3ab2b6
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/imx6qp-sabresd.dts
-> > @@ -0,0 +1,59 @@
-> > +/*
-> > + * Copyright (C) 2015 Freescale Semiconductor, Inc.
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > +modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#include "imx6q-sabresd.dts"
-> > +#include "imx6qp.dtsi"
-> 
-> Ah, that's why you do not include "imx6qdl.dtsi" in imx6qp.dtsi.  I have a
-> question with this approach.  How people should write his imx6qp board dts file,
-> if his board never has an imx6q version?
-> 
- 
-Sure, it is a problem, include the imx6qdl.dtsi in imx6qp.dtsi is more reasonable.
+AKASHI Takahiro (1):
+  arm64: kvm: allows kvm cpu hotplug
 
-> > +
-> > +/ {
-> > +	model = "Freescale i.MX6 Quad Plus SABRE Smart Device Board";
-> > +	compatible = "fsl,imx6qp-sabresd", "fsl,imx6qp"; };
-> > +
-> > +&cpu0 {
-> > +	arm-supply = <&sw2_reg>;
-> > +};
-> > +
-> > +&iomuxc {
-> > +	imx6qdl-sabresd {
-> 
-> Since commit 5fcdf6a7ed95 (pinctrl: imx: Allow parsing DT without function
-> nodes), this additional container node can just be saved.
-> 
-> Shawn
-> 
-> > +		pinctrl_usdhc2: usdhc2grp {
-> > +			fsl,pins = <
-> > +				MX6QDL_PAD_SD2_CMD__SD2_CMD
-> 	0x17059
-> > +				MX6QDL_PAD_SD2_CLK__SD2_CLK
-> 	0x10071
-> > +				MX6QDL_PAD_SD2_DAT0__SD2_DATA0
-> 	0x17059
-> > +				MX6QDL_PAD_SD2_DAT1__SD2_DATA1
-> 	0x17059
-> > +				MX6QDL_PAD_SD2_DAT2__SD2_DATA2
-> 	0x17059
-> > +				MX6QDL_PAD_SD2_DAT3__SD2_DATA3
-> 	0x17059
-> > +				MX6QDL_PAD_NANDF_D4__SD2_DATA4
-> 	0x17059
-> > +				MX6QDL_PAD_NANDF_D5__SD2_DATA5
-> 	0x17059
-> > +				MX6QDL_PAD_NANDF_D6__SD2_DATA6
-> 	0x17059
-> > +				MX6QDL_PAD_NANDF_D7__SD2_DATA7
-> 	0x17059
-> > +			>;
-> > +		};
-> > +
-> > +		pinctrl_usdhc3: usdhc3grp {
-> > +			fsl,pins = <
-> > +				MX6QDL_PAD_SD3_CMD__SD3_CMD
-> 	0x17059
-> > +				MX6QDL_PAD_SD3_CLK__SD3_CLK
-> 	0x10071
-> > +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0
-> 	0x17059
-> > +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1
-> 	0x17059
-> > +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2
-> 	0x17059
-> > +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3
-> 	0x17059
-> > +				MX6QDL_PAD_SD3_DAT4__SD3_DATA4
-> 	0x17059
-> > +				MX6QDL_PAD_SD3_DAT5__SD3_DATA5
-> 	0x17059
-> > +				MX6QDL_PAD_SD3_DAT6__SD3_DATA6
-> 	0x17059
-> > +				MX6QDL_PAD_SD3_DAT7__SD3_DATA7
-> 	0x17059
-> > +			>;
-> > +		};
-> > +	};
-> > +};
-> > +
-> > +&pcie {
-> > +	power-on-gpio = <&gpio3 19 0>;
-> > +	reset-gpio = <&gpio7 12 0>;
-> > +	status = "okay";
-> > +};
-> > --
-> > 1.9.1
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
+Geoff Levand (5):
+  arm64: Fold proc-macros.S into assembler.h
+  arm64: Cleanup SCTLR flags
+  arm64: Convert hcalls to use HVC immediate value
+  arm64: Add new hcall HVC_CALL_FUNC
+  arm64: Add new asm macro copy_page
+
+James Morse (7):
+  arm64: kernel: Rework finisher callback out of __cpu_suspend_enter().
+  arm64: Change cpu_resume() to enable mmu early then access sleep_sp by
+    va
+  arm64: kernel: Include _AC definition in page.h
+  arm64: Promote KERNEL_START/KERNEL_END definitions to a header file
+  PM / Hibernate: Call flush_icache_range() on pages restored in-place
+  arm64: kernel: Add support for hibernate/suspend-to-disk
+  arm64: hibernate: Prevent resume from a different kernel version
+
+ arch/arm/include/asm/kvm_host.h    |  10 +-
+ arch/arm/include/asm/kvm_mmu.h     |   1 +
+ arch/arm/kvm/arm.c                 |  98 +++++---
+ arch/arm/kvm/mmu.c                 |   5 +
+ arch/arm64/Kconfig                 |   7 +
+ arch/arm64/include/asm/assembler.h |  89 ++++++-
+ arch/arm64/include/asm/kvm_arm.h   |  11 -
+ arch/arm64/include/asm/kvm_host.h  |   1 -
+ arch/arm64/include/asm/kvm_mmu.h   |  19 ++
+ arch/arm64/include/asm/memory.h    |   3 +
+ arch/arm64/include/asm/page.h      |   2 +
+ arch/arm64/include/asm/suspend.h   |  30 ++-
+ arch/arm64/include/asm/sysreg.h    |  19 +-
+ arch/arm64/include/asm/virt.h      |  40 ++++
+ arch/arm64/kernel/Makefile         |   1 +
+ arch/arm64/kernel/asm-offsets.c    |  10 +-
+ arch/arm64/kernel/head.S           |   5 +-
+ arch/arm64/kernel/hibernate-asm.S  | 137 +++++++++++
+ arch/arm64/kernel/hibernate.c      | 472 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/hyp-stub.S       |  43 +++-
+ arch/arm64/kernel/setup.c          |   1 -
+ arch/arm64/kernel/sleep.S          | 145 ++++--------
+ arch/arm64/kernel/suspend.c        | 108 ++++-----
+ arch/arm64/kernel/vmlinux.lds.S    |  15 ++
+ arch/arm64/kvm/hyp-init.S          |  47 +++-
+ arch/arm64/kvm/hyp.S               |   3 +-
+ arch/arm64/kvm/hyp/hyp-entry.S     |   9 +-
+ arch/arm64/mm/cache.S              |   2 -
+ arch/arm64/mm/proc-macros.S        |  86 -------
+ arch/arm64/mm/proc.S               |  38 +--
+ kernel/power/swap.c                |  18 ++
+ 31 files changed, 1114 insertions(+), 361 deletions(-)
+ create mode 100644 arch/arm64/kernel/hibernate-asm.S
+ create mode 100644 arch/arm64/kernel/hibernate.c
+ delete mode 100644 arch/arm64/mm/proc-macros.S
+
+-- 
+2.6.2
