@@ -1,49 +1,35 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 28 Jan 2016 12:30:44 +0100
-Subject: [PATCH] arm64: Disallow combination of ARCH_XGENE and 16K page
- size
-In-Reply-To: <56A9FB15.1080203@arm.com>
-References: <1453936230-7305-1-git-send-email-dann.frazier@canonical.com>
- <20160128103441.GS14823@e104818-lin.cambridge.arm.com>
- <20160128110820.GE30928@arm.com> <56A9FB15.1080203@arm.com>
-Message-ID: <CAKv+Gu_v4x8U=2enO03QPLacYZG5Gk1HE8kBy8Qf2boeNtKbRw@mail.gmail.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 28 Jan 2016 11:32:11 +0000
+Subject: [PATCH 0/6] Support for systems without AArch32 state
+Message-ID: <1453980737-6126-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 January 2016 at 12:27, Suzuki K. Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 28/01/16 11:08, Will Deacon wrote:
->>
->> On Thu, Jan 28, 2016 at 10:34:41AM +0000, Catalin Marinas wrote:
->>>
->>> On Wed, Jan 27, 2016 at 04:10:30PM -0700, dann frazier wrote:
->>>>
->>>> 16K page size is an optional feature of the architecture, and is not
->>>> supported by the X-Gene SoC family.
->
->
->   This enables support for AppliedMicro X-Gene SOC Family
->>>
->>>
->>> This would be the case on Juno as well. But maybe at some point the
->>> X-Gene family would gain a CPU with such support.
->>>
->>> Anyway, I would rather make 16K pages depend on EXPERT, make it a bit
->>> harder to enable. We've had a few questions recently about enabling it
->>> on CPUs that don't have such feature.
->>
->>
->> I thought there was also a suggestion that we could fail gracefully in
->> the EFI stub if we detected an unsupported page size?
->
->
-> Yes, there was. But then it was also recommended [1] to add a new stubbed
-> function
-> for both arm & arm64, where it got lost. May be we should revive it.
->
-> https://lkml.org/lkml/2015/10/15/489
->
+This series add checks to make sure that the AArch32 state is
+supported before we process the 32bit ID registers. Also
+checks the same for COMPAT binary execution.
 
-I can pick this up
+This series applies on top of 4.5-rc1 + Early CPU feature verification [1] +
+Handle sign bit for CPU Features [2], even though review
+doesn't require going through [1] & [2].
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/401727.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/401913.html
+
+Suzuki K Poulose (6):
+  arm64: hwcaps: Cleanup naming
+  arm64: HWCAP: Split COMPAT HWCAP table entries
+  arm64: Add helpers for detecting AArch32 support at EL0
+  arm64: cpufeature: Check availability of AArch32
+  arm64: cpufeature: Track 32bit EL0 support
+  arm64: compat: Check for AArch32 state
+
+ arch/arm64/include/asm/cpufeature.h |   15 ++-
+ arch/arm64/include/asm/elf.h        |    3 +-
+ arch/arm64/include/asm/sysreg.h     |    1 +
+ arch/arm64/kernel/cpufeature.c      |  186 +++++++++++++++++++++--------------
+ arch/arm64/kernel/cpuinfo.c         |   40 ++++----
+ 5 files changed, 151 insertions(+), 94 deletions(-)
 
 -- 
-Ard.
+1.7.9.5
