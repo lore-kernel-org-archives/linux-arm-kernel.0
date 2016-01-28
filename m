@@ -1,65 +1,90 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 28 Jan 2016 10:42:43 +0000
-Subject: [PATCH v4 10/13] arm64: Add new asm macro copy_page
-In-Reply-To: <1453977766-20907-1-git-send-email-james.morse@arm.com>
-References: <1453977766-20907-1-git-send-email-james.morse@arm.com>
-Message-ID: <1453977766-20907-11-git-send-email-james.morse@arm.com>
+From: ping.bai@nxp.com (Ping Bai)
+Date: Thu, 28 Jan 2016 10:45:09 +0000
+Subject: [PATCH v2 5/5] ARM: imx: Add msl code support for imx6qp
+In-Reply-To: <20160128081040.GO9070@tiger>
+References: <1450159673-27314-1-git-send-email-b51503@freescale.com>
+ <1450159673-27314-6-git-send-email-b51503@freescale.com>
+ <20160128081040.GO9070@tiger>
+Message-ID: <DB4PR04MB538330DB5505E84CA55A91187DA0@DB4PR04MB538.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geoff Levand <geoff@infradead.org>
 
-Kexec and hibernate need to copy pages of memory, but may not have all
-of the kernel mapped, and are unable to call copy_page().
 
-Convert copy_page() to a macro, so that it can be inlined in these
-situations.
-
-Signed-off-by: Geoff Levand <geoff@infradead.org>
-[Changed asm label to 9998, added commit message]
-Signed-off-by: James Morse <james.morse@arm.com>
----
-This patch is from v13 of kexec, see my [changes] above.
-
- arch/arm64/include/asm/assembler.h | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
-
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 137ee5b11eb7..13d8b46bd0bb 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -24,6 +24,7 @@
- #define __ASM_ASSEMBLER_H
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: 2016?1?28? 16:11
+> To: b51503 at freescale.com
+> Cc: kernel at pengutronix.de; pawel.moll at arm.com; robh+dt at kernel.org;
+> mturquette at baylibre.com; sboyd at codeaurora.org; linux-arm-
+> kernel at lists.infradead.org; linux-clk at vger.kernel.org;
+> devicetree at vger.kernel.org
+> Subject: Re: [PATCH v2 5/5] ARM: imx: Add msl code support for imx6qp
+> 
+> On Tue, Dec 15, 2015 at 02:07:53PM +0800, Bai Ping wrote:
+> > The i.MX6QP is a different SOC, but internally we treate it as i.MX6Q
+> > Rev_2.0 to maximum the code reusability. The chip silicon number we
+> > read from the ANADIG_DIGPROG is 0x630100. This patch add code to
+> > identify it as i.MX6QP Rev_1.0 when print out the silicon version.
+> >
+> > Signed-off-by: Bai Ping <b51503@freescale.com>
+> > ---
+> >  arch/arm/mach-imx/anatop.c     | 5 ++++-
+> >  arch/arm/mach-imx/mach-imx6q.c | 8 ++++++--
+> >  2 files changed, 10 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
+> > index 231bb25..9622763 100644
+> > --- a/arch/arm/mach-imx/anatop.c
+> > +++ b/arch/arm/mach-imx/anatop.c
+> > @@ -129,7 +129,10 @@ void __init imx_init_revision_from_anatop(void)
+> >
+> >  	switch (digprog & 0xff) {
+> >  	case 0:
+> > -		revision = IMX_CHIP_REVISION_1_0;
+> > +		if (digprog >> 8 & 0x01)
+> > +			revision = IMX_CHIP_REVISION_2_0;
+> > +		else
+> > +			revision = IMX_CHIP_REVISION_1_0;
+> 
+> Please at least add some comment here to help us remember that this is a trick
+> we play for i.MX6QP.
+> 
  
- #include <asm/asm-offsets.h>
-+#include <asm/page.h>
- #include <asm/pgtable-hwdef.h>
- #include <asm/ptrace.h>
- #include <asm/thread_info.h>
-@@ -273,6 +274,24 @@ lr	.req	x30		// link register
- 	.endm
- 
- /*
-+ * copy_page - copy src to dest using temp registers t1-t8
-+ */
-+	.macro copy_page dest:req src:req t1:req t2:req t3:req t4:req t5:req t6:req t7:req t8:req
-+9998:	ldp	\t1, \t2, [\src]
-+	ldp	\t3, \t4, [\src, #16]
-+	ldp	\t5, \t6, [\src, #32]
-+	ldp	\t7, \t8, [\src, #48]
-+	add	\src, \src, #64
-+	stnp	\t1, \t2, [\dest]
-+	stnp	\t3, \t4, [\dest, #16]
-+	stnp	\t5, \t6, [\dest, #32]
-+	stnp	\t7, \t8, [\dest, #48]
-+	add	\dest, \dest, #64
-+	tst	\src, #(PAGE_SIZE - 1)
-+	b.ne	9998b
-+	.endm
-+
-+/*
-  * Annotate a function as position independent, i.e., safe to be called before
-  * the kernel virtual mapping is activated.
-  */
--- 
-2.6.2
+Will address this in patch V3. Thanks for your review.
+
+> Shawn
+> 
+> >  		break;
+> >  	case 1:
+> >  		revision = IMX_CHIP_REVISION_1_1;
+> > diff --git a/arch/arm/mach-imx/mach-imx6q.c
+> > b/arch/arm/mach-imx/mach-imx6q.c index 3878494b..cb27d56 100644
+> > --- a/arch/arm/mach-imx/mach-imx6q.c
+> > +++ b/arch/arm/mach-imx/mach-imx6q.c
+> > @@ -266,8 +266,11 @@ static void __init imx6q_init_machine(void)  {
+> >  	struct device *parent;
+> >
+> > -	imx_print_silicon_rev(cpu_is_imx6dl() ? "i.MX6DL" : "i.MX6Q",
+> > -			      imx_get_soc_revision());
+> > +	if (cpu_is_imx6q() && imx_get_soc_revision() ==
+> IMX_CHIP_REVISION_2_0)
+> > +		imx_print_silicon_rev("i.MX6QP", IMX_CHIP_REVISION_1_0);
+> > +	else
+> > +		imx_print_silicon_rev(cpu_is_imx6dl() ? "i.MX6DL" : "i.MX6Q",
+> > +				imx_get_soc_revision());
+> >
+> >  	parent = imx_soc_device_init();
+> >  	if (parent == NULL)
+> > @@ -399,6 +402,7 @@ static void __init imx6q_init_irq(void)  static
+> > const char * const imx6q_dt_compat[] __initconst = {
+> >  	"fsl,imx6dl",
+> >  	"fsl,imx6q",
+> > +	"fsl,imx6qp",
+> >  	NULL,
+> >  };
+> >
+> > --
+> > 1.9.1
+> >
+> >
