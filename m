@@ -1,45 +1,50 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 28 Jan 2016 14:25:48 -0700
-Subject: [PATCH net-next 24/40] net: fec: return NETDEV_TX_BUSY,
- when not enough space in ring
-In-Reply-To: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
-References: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1454016364-30985-25-git-send-email-troy.kisky@boundarydevices.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Jan 2016 22:57:07 +0100
+Subject: [PATCH] hostap: avoid uninitialized variable use in
+ hfa384x_get_rid
+In-Reply-To: <20160127192612.GD10826@n2100.arm.linux.org.uk>
+References: <1453902342-3420391-1-git-send-email-arnd@arndb.de>
+ <20160127192612.GD10826@n2100.arm.linux.org.uk>
+Message-ID: <2640544.07pTZp3kGe@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
----
- drivers/net/ethernet/freescale/fec_main.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+On Wednesday 27 January 2016 19:26:13 Russell King - ARM Linux wrote:
+> On Wed, Jan 27, 2016 at 02:45:26PM +0100, Arnd Bergmann wrote:
+> So, why give the compiler a hard time as you're doing, why make the code
+> harder to read.  What's wrong with:
+> 
+>         spin_lock_bh(&local->baplock);
+> 
+>         res = hfa384x_setup_bap(dev, BAP0, rid, 0);
+>         if (res)
+>                 goto unlock;
+> 
+>         res = hfa384x_from_bap(dev, BAP0, &rec, sizeof(rec));
+>         if (res)
+>                 goto unlock;
+> 
+>         if (le16_to_cpu(rec.len) == 0) {
+>                 /* RID not available */
+>                 res = -ENODATA;
+>                 goto unlock;
+>         }
+> 
+>         rlen = (le16_to_cpu(rec.len) - 1) * 2;
+>         if (exact_len && rlen != len) {
+>                 printk(KERN_DEBUG "%s: hfa384x_get_rid - RID len mismatch: rid=0x%04x, len=%d (expected %d)\n",
+>                        dev->name, rid, rlen, len);
+>                 res = -ENODATA;
+>                 goto unlock;
+>         }
+> 
+>         res = hfa384x_from_bap(dev, BAP0, buf, len);
+> unlock:
+>         spin_unlock_bh(&local->baplock);
+> 
+> ?
+> 
 
-diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 29c5781..98b9be2 100644
---- a/drivers/net/ethernet/freescale/fec_main.c
-+++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -424,10 +424,9 @@ static int fec_enet_txq_submit_skb(struct fec_enet_priv_tx_q *txq,
- 
- 	entries_free = fec_enet_get_free_txdesc_num(txq);
- 	if (entries_free < MAX_SKB_FRAGS + 1) {
--		dev_kfree_skb_any(skb);
- 		if (net_ratelimit())
- 			netdev_err(ndev, "NOT enough BD for SG!\n");
--		return NETDEV_TX_OK;
-+		return NETDEV_TX_BUSY;
- 	}
- 
- 	/* Protocol checksum off-load for TCP and UDP. */
-@@ -653,10 +652,9 @@ static int fec_enet_txq_submit_tso(struct fec_enet_priv_tx_q *txq,
- 	int ret;
- 
- 	if (tso_count_descs(skb) >= fec_enet_get_free_txdesc_num(txq)) {
--		dev_kfree_skb_any(skb);
- 		if (net_ratelimit())
- 			netdev_err(ndev, "NOT enough BD for TSO!\n");
--		return NETDEV_TX_OK;
-+		return NETDEV_TX_BUSY;
- 	}
- 
- 	/* Protocol checksum off-load for TCP and UDP. */
--- 
-2.5.0
+Good idea, I'll send a new version.
+
+	Arnd
