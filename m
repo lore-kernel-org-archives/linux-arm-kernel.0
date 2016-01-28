@@ -1,29 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 28 Jan 2016 13:39:23 -0800
-Subject: [PATCH 00/13] dtb: amd: Miscelleneous Updates for AMD Seattle DTS
-In-Reply-To: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <CAOesGMgRC2vTVdmY6kKYonM1JkWD=-3k_EQ4hGvyrm-vNZczrQ@mail.gmail.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Thu, 28 Jan 2016 14:25:33 -0700
+Subject: [PATCH net-next 09/40] net: fec: only check queue 0 if RXF_0/TXF_0
+ interrupt is set
+In-Reply-To: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
+References: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1454016364-30985-10-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suravee,
+Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+---
+ drivers/net/ethernet/freescale/fec_main.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-On Wed, Jan 27, 2016 at 1:11 PM, Suravee Suthikulpanit
-<Suravee.Suthikulpanit@amd.com> wrote:
-> From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
->
-> This patch series contains several updates for the AMD Seattle SOC DTS files.
-> It also adds new board files for newer Overdrive and Linaro 96boards (Husky)
-> platforms.
-
-My Overdrive comes with DT provided by firmware, so there's no need to
-have a in-kernel-tree DT source.
-
-Are you aware of other reasons to have it here? I just foresee
-divergence and conflicts between the two. It was quite obvious before
-this update when the FW-provided DT was a lot more complete than what
-we had in the kernel tree.
-
-
--Olof
+diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+index 15a93f90..3ed79fd 100644
+--- a/drivers/net/ethernet/freescale/fec_main.c
++++ b/drivers/net/ethernet/freescale/fec_main.c
+@@ -1523,14 +1523,14 @@ fec_enet_collect_events(struct fec_enet_private *fep, uint int_events)
+ 	if (int_events == 0)
+ 		return false;
+ 
+-	if (int_events & FEC_ENET_RXF)
++	if (int_events & FEC_ENET_RXF_0)
+ 		fep->work_rx |= (1 << 2);
+ 	if (int_events & FEC_ENET_RXF_1)
+ 		fep->work_rx |= (1 << 0);
+ 	if (int_events & FEC_ENET_RXF_2)
+ 		fep->work_rx |= (1 << 1);
+ 
+-	if (int_events & FEC_ENET_TXF)
++	if (int_events & FEC_ENET_TXF_0)
+ 		fep->work_tx |= (1 << 2);
+ 	if (int_events & FEC_ENET_TXF_1)
+ 		fep->work_tx |= (1 << 0);
+-- 
+2.5.0
