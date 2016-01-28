@@ -1,50 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Jan 2016 17:23:15 +0100
-Subject: [PATCH 7/7] usb: musb/ux500: remove duplicate check for
- dma_is_compatible
-In-Reply-To: <1453998206-3490016-1-git-send-email-arnd@arndb.de>
-References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
- <1453998206-3490016-1-git-send-email-arnd@arndb.de>
-Message-ID: <1453998206-3490016-3-git-send-email-arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 28 Jan 2016 16:24:28 +0000
+Subject: [PATCH v2 2/6] irqchip: irq-armada-370-xp: use the generic MSI
+ infrastructure
+In-Reply-To: <1453899395-3532-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1453899395-3532-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1453899395-3532-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <56AA40BC.3060300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When dma_addr_t is 64-bit, we get a warning about an invalid cast
-in the call to ux500_dma_is_compatible() from ux500_dma_channel_program():
+On 27/01/16 12:56, Thomas Petazzoni wrote:
+> This commit moves the irq-armada-370-xp driver from using the
+> PCI-specific MSI infrastructure to the generic MSI infrastructure, to
+> which drivers are progressively converted.
+> 
+> In this hardware, the MSI controller is directly bundled inside the
+> interrupt controller, so we have a single Device Tree node to which
+> multiple IRQ domaines are attached: the wired interrupt domain and the
+> MSI interrupt domain. In order to ensure that they can be
+> differentiated, we have to force the bus_token of the wired interrupt
+> domain to be DOMAIN_BUS_WIRED. The MSI domain bus_token is
+> automatically set to the appropriate value by
+> pci_msi_create_irq_domain().
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
 
-drivers/usb/musb/ux500_dma.c: In function 'ux500_dma_channel_program':
-drivers/usb/musb/ux500_dma.c:210:51: error: cast to pointer from integer of different size [-Werror=int-to-pointer-cast]
-  if (!ux500_dma_is_compatible(channel, packet_sz, (void *)dma_addr, len))
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-The problem is that ux500_dma_is_compatible() is called from the
-main musb driver on the virtual address, but here we pass in a
-DMA address, so the types are fundamentally different but it works
-because the function only checks the alignment of the buffer and
-that is the same.
-
-We could work around this by adding another cast, but I have checked
-that the buffer we get passed here is already checked before it
-gets mapped, so the second check seems completely unnecessary
-and removing it must be the cleanest solution.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/usb/musb/ux500_dma.c | 3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/drivers/usb/musb/ux500_dma.c b/drivers/usb/musb/ux500_dma.c
-index d0b6a1cd7f62..c92a295049ad 100644
---- a/drivers/usb/musb/ux500_dma.c
-+++ b/drivers/usb/musb/ux500_dma.c
-@@ -207,9 +207,6 @@ static int ux500_dma_channel_program(struct dma_channel *channel,
- 	BUG_ON(channel->status == MUSB_DMA_STATUS_UNKNOWN ||
- 		channel->status == MUSB_DMA_STATUS_BUSY);
- 
--	if (!ux500_dma_is_compatible(channel, packet_sz, (void *)dma_addr, len))
--		return false;
--
- 	channel->status = MUSB_DMA_STATUS_BUSY;
- 	channel->actual_len = 0;
- 	ret = ux500_configure_channel(channel, packet_sz, mode, dma_addr, len);
+	M.
 -- 
-2.7.0
+Jazz is not dead. It just smells funny...
