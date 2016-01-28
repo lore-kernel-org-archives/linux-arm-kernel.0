@@ -1,42 +1,50 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 28 Jan 2016 14:25:52 -0700
-Subject: [PATCH net-next 28/40] net: fec: unmap initial buffer on error
+Date: Thu, 28 Jan 2016 14:26:02 -0700
+Subject: [PATCH net-next 38/40] net: fec: recover from lost rxf_0 interrupt
 In-Reply-To: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1454016364-30985-29-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1454016364-30985-39-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The following is true of linux-3.14. I have not been able
+to verify on mainline, because I cannot get the cpuidle
+driver to work.
+
+If gpio6 workaround is not used for interrupts, then
+it is possible for the entire receive queue to become
+full without an interrupt. If that happens, and the last
+rxf_0 interrupt is lost, then the FEC can no longer receive
+packets. However packet transmission is still fine, so the tx
+watchdog will never fire. The only way to recover before this
+is a ifconfig down/up. Skipping the FEC_ENET_RXF_0 check
+will allow the rx queue to recover from the condition when
+the next packet is transmitted.
+
+This patch also has the advantage of increasing iperf speed.
+
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/freescale/fec_main.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 7258051..e141f6f 100644
+index 00c9b7e..8372d9b 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -404,7 +404,6 @@ dma_mapping_error:
- 				bdp->cbd_datlen, DMA_TO_DEVICE);
- 		bdp->cbd_bufaddr = 0;
- 	}
--	dev_kfree_skb_any(skb);
- 	return ERR_PTR(-ENOMEM);
- }
+@@ -1608,9 +1608,10 @@ static int fec_enet_napi_q1(struct napi_struct *napi, int budget)
+ 		}
  
-@@ -466,8 +465,12 @@ static int fec_enet_txq_submit_skb(struct fec_enet_priv_tx_q *txq,
- 			((bdp == txq->bd.last) ? BD_SC_WRAP : 0);
- 	if (nr_frags) {
- 		last_bdp = fec_enet_txq_submit_frag_skb(txq, skb, ndev);
--		if (IS_ERR(last_bdp))
-+		if (IS_ERR(last_bdp)) {
-+			dma_unmap_single(&fep->pdev->dev, addr,
-+					 buflen, DMA_TO_DEVICE);
-+			dev_kfree_skb_any(skb);
- 			return NETDEV_TX_OK;
-+		}
- 	} else {
- 		status |= (BD_ENET_TX_INTR | BD_ENET_TX_LAST);
- 		if (fep->bufdesc_ex) {
+ 		writel(events, fep->hwp + FEC_IEVENT);
+-		if (events & FEC_ENET_RXF_0)
+-			pkts += fec_rxq(ndev, fep, fep->rx_queue[0],
+-					budget - pkts);
++		/* don't check FEC_ENET_RXF_0, to recover from a full queue
++		 * but bit clear condition
++		 */
++		pkts += fec_rxq(ndev, fep, fep->rx_queue[0], budget - pkts);
+ 		if (events & FEC_ENET_TXF_0)
+ 			fec_txq(ndev, fep, fep->tx_queue[0]);
+ 	} while (pkts < budget);
 -- 
 2.5.0
