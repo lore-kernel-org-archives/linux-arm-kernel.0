@@ -1,37 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Jan 2016 18:10:58 +0000
-Subject: [PATCH] arm64: allow vmalloc regions to be set with set_memory_*
-In-Reply-To: <CAKv+Gu-GxicSKDq+Nm9H+dWrSVOhupozu4pZ=Pk7CzC_VrW=2Q@mail.gmail.com>
-References: <1453125665-26627-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160128150815.GG775@arm.com>
- <CAKv+Gu-GxicSKDq+Nm9H+dWrSVOhupozu4pZ=Pk7CzC_VrW=2Q@mail.gmail.com>
-Message-ID: <20160128181058.GQ775@arm.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 28 Jan 2016 19:12:25 +0100
+Subject: [PATCH v10 10/21] KVM: ARM64: Add access handler for PMCNTENSET
+ and PMCNTENCLR register
+In-Reply-To: <20160128180856.GA16453@hawk.localdomain>
+References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453866709-20324-11-git-send-email-zhaoshenglong@huawei.com>
+ <20160128180856.GA16453@hawk.localdomain>
+Message-ID: <20160128181225.GB16453@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 05:43:41PM +0100, Ard Biesheuvel wrote:
-> On 28 January 2016 at 16:08, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Jan 18, 2016 at 03:01:05PM +0100, Ard Biesheuvel wrote:
-> >> The range of set_memory_* is currently restricted to the module address
-> >> range because of difficulties in breaking down larger block sizes.
-> >> vmalloc maps PAGE_SIZE pages so it is safe to use as well. Update the
-> >> function ranges and add a comment explaining why the range is restricted
-> >> the way it is.
-> >>
-> >> Suggested-by: Laura Abbott <labbott@fedoraproject.org>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  arch/arm64/mm/pageattr.c | 23 +++++++++++++++++++----
-> >>  1 file changed, 19 insertions(+), 4 deletions(-)
-> >
-> > What's the user for this? It would be better to apply along with something
-> > that actually needs to change permission for arbitrary vmalloc mappings.
-> >
+On Thu, Jan 28, 2016 at 07:08:56PM +0100, Andrew Jones wrote:
+> On Wed, Jan 27, 2016 at 11:51:38AM +0800, Shannon Zhao wrote:
+> > @@ -804,10 +831,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+> >  	  access_pmcr, reset_pmcr, },
+> >  	/* PMCNTENSET_EL0 */
+> >  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b001),
+> > -	  trap_raz_wi },
+> > +	  access_pmcnten, reset_unknown, PMCNTENSET_EL0 },
+> >  	/* PMCNTENCLR_EL0 */
+> >  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b010),
+> > -	  trap_raz_wi },
+> > +	  access_pmcnten, NULL, PMCNTENSET_EL0 },
 > 
-> BPF already uses set_memory_ro() but doesn't bother to check the return value.
+> I don't think the reg field is needed, as the reset handler isn't
+> defined and the access handler doesn't use it. Oh, and shouldn't it be
+> PMCNTENCLR_EL0 anyway?
 
-Urgh :(
-
-Then I can take it as a fix, if you like.
-
-Will
+eh.. nevermind. Of course we just have the one sys_reg for both set/clr...
