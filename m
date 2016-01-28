@@ -1,59 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 28 Jan 2016 11:19:49 -0800
-Subject: [PATCH] clk: ti: omap3+: dpll: use non-locking version of
- clk_get_rate
-In-Reply-To: <56AA6775.5090302@ti.com>
-References: <1453981067-8618-1-git-send-email-t-kristo@ti.com>
- <56A9FED1.3090903@ti.com> <20160128172215.GD19432@atomide.com>
- <56AA6261.7030503@ti.com> <20160128190026.GI19432@atomide.com>
- <56AA6775.5090302@ti.com>
-Message-ID: <20160128191949.GK19432@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 28 Jan 2016 20:22:37 +0100
+Subject: [PATCH v3 1/2] clk: sunxi: factors: Add missing recalc pointer copy
+Message-ID: <1454008958-12655-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [160128 11:10]:
-> On 01/28/2016 09:00 PM, Tony Lindgren wrote:
-> >* Tero Kristo <t-kristo@ti.com> [160128 10:48]:
-> >>On 01/28/2016 07:22 PM, Tony Lindgren wrote:
-> >>>* Tero Kristo <t-kristo@ti.com> [160128 03:44]:
-> >>>>On 01/28/2016 01:37 PM, Tero Kristo wrote:
-> >>>>>As the code in this file is being executed within irq context in some
-> >>>>>cases, we must avoid the clk_get_rate which uses mutex internally.
-> >>>>>Switch the code to use clk_hw_get_rate instead which is non-locking.
-> >>>>>
-> >>>>>Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> >>>>
-> >>>>Ooops, sorry. Sent wrong version (read: old) of this patch, please ignore
-> >>>>this one. Will re-send the correct version in a bit.
-> >>>
-> >>>I think this is still needed as a fix for -rc cycle with cc: stable
-> >>>as otherwise we have omap4 and 5 hang if PM runtime is enabled before
-> >>>a suspend/resume cycle?
-> >>
-> >>Look at the other patch I sent, it should accomplish the same thing, and
-> >>more.
-> >>
-> >>https://www.spinics.net/lists/linux-clk/msg06094.html
-> >
-> >Right.. But is that suitable for the -rc cycle with cc stable?
-> 
-> Hmm yea, thats a good question, we may need to resurrect this patch after
-> all.
+Commit 4a9b2abc213e ("clk: sunxi: factors: Support custom formulas") was
+introducing a custom recalc function. However, the pointer was never
+filled, which was making the whole thing unused.
 
-Yes a minimal fix first with cc stable, then the rest of the changes
-can be done for v4.6?
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/clk/sunxi/clk-factors.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-> >You should also describe the bug it causes in the change log.
-> >Something like:
-> >
-> >This fixes an issue where PM runtime will hang the system if
-> >enabled with a serial console before a suspend-resume cycle.
-> 
-> Yea I can add this to the desc if we want to keep this version of the patch.
-
-Yes please. It seems the fix should be cc stable for several merge
-windows.
-
-Regards,
-
-Tony
+diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+index e480a6bcf1f6..6e97f46c0c37 100644
+--- a/drivers/clk/sunxi/clk-factors.c
++++ b/drivers/clk/sunxi/clk-factors.c
+@@ -212,6 +212,7 @@ struct clk *sunxi_factors_register(struct device_node *node,
+ 	factors->reg = reg;
+ 	factors->config = data->table;
+ 	factors->get_factors = data->getter;
++	factors->recalc = data->recalc;
+ 	factors->lock = lock;
+ 
+ 	/* Add a gate if this factor clock can be gated */
+-- 
+2.6.4
