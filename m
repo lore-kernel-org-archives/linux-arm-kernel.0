@@ -1,55 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Jan 2016 14:49:45 +0100
-Subject: [PATCH V2 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge driver
- to work on both Zynq and Microblaze
-In-Reply-To: <8520D5D51A55D047800579B09414719825874148@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
- <5255218.OREPu5Af3W@wuerfel>
- <8520D5D51A55D047800579B09414719825874148@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <1917083.LB4Ng3Y2yP@wuerfel>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 28 Jan 2016 06:06:53 -0800
+Subject: [PATCH] arm64: make CONFIG_DEBUG_RODATA non-optional
+In-Reply-To: <20160128110622.GF17123@leverpostej>
+References: <1453226922-16831-1-git-send-email-keescook@chromium.org>
+ <1453226922-16831-4-git-send-email-keescook@chromium.org>
+ <20160127211105.GA41450@davidb.org>
+ <CAGXu5j+DLRoVE88a9++jVfEkN90HDiAaDAMnT2TrKqtMZ_yOww@mail.gmail.com>
+ <20160128000906.GA42530@davidb.org>
+ <20160128110622.GF17123@leverpostej>
+Message-ID: <CAGXu5jLy3cpLzU1MSQhS6q=5rMu2Mdp9pXncoFapPqUyQ1fO0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 January 2016 13:20:56 Bharat Kumar Gogada wrote:
-> > Subject: Re: [PATCH V2 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge driver
-> > to work on both Zynq and Microblaze
-> > 
-> > On Wednesday 27 January 2016 14:33:45 Bharat Kumar Gogada wrote:
-> > > > > @@ -705,7 +715,9 @@ static int xilinx_pcie_probe(struct
-> > > > > platform_device *pdev)  #endif
-> > > > >     pci_scan_child_bus(bus);
-> > > > >     pci_assign_unassigned_bus_resources(bus);
-> > > > > +#ifdef CONFIG_ARM
-> > > > >     pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
-> > > > > +#endif
-> > > > >     pci_bus_add_devices(bus);
-> > > > >     platform_set_drvdata(pdev, port);
-> > > >
-> > > > Here it looks like microblaze gets it right. I'm not sure why we
-> > > > still need the
-> > > > pci_fixup_irqs() on ARM, but my feeling is that this should be fixed
-> > > > in common code.
-> > > In arm pci_fixup_irqs is called by pci_common_init_dev
-> > (arch/arm/kernel/bios32.c), since this API is removed now, I was calling it
-> > separately.
-> > 
-> > But who calls it in microblaze? If it works without the extra call there, can we
-> > make it work the same way for ARM?
-> > 
-> In microblaze I have added pcibios_add_device call (similar to call in
-> arch/arm64/kernel/pci.c ) in pci-common.c, which is being invoked by
-> kernel core itself.
+On Thu, Jan 28, 2016 at 3:06 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> One thing I would like to do is to avoid the need for fixup_executable
+> entirely, by mapping the kernel text RO from the outset. However, that
+> requires rework of the alternatives patching (to use a temporary RW
+> alias), and I haven't had the time to look into that yet.
 
-I see. In the upstream code you seem to do it in pcibios_setup_bus_devices(),
-while arm64 and powerpc do it in pcibios_add_device().
+This makes perfect sense for the rodata section, but the (future)
+postinit_rodata section we'll still want to mark RO after init
+finishes. x86 and ARM cheat by marking both RO after init, and they
+don't have to pad sections. parisc will need to solve this too.
 
-> May be we can add similar on arm and test out, but
-> we might need some cleanup in arch/arm/kernel/bios32.c
+-Kees
 
-I think that would still just be a half-baked solution. This should
-really be fully automatic. We could do it in the __weak
-pcibios_add_device() for all architectures that don't override
-it when the bus was probed from DT, or we could do it in
-pci_read_irq().
-
-	Arnd
+-- 
+Kees Cook
+Chrome OS & Brillo Security
