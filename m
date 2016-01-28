@@ -1,36 +1,31 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 28 Jan 2016 16:12:41 -0300
-Subject: [PATCH v4 1/3] clk: samsung: Enable COMPILE_TEST for Samsung
- clocks
-In-Reply-To: <1453941324-15742-2-git-send-email-k.kozlowski@samsung.com>
+Date: Thu, 28 Jan 2016 16:15:34 -0300
+Subject: [PATCH v4 2/3] clk: samsung: Don't build ARMv8 clock drivers on
+ ARMv7
+In-Reply-To: <1453941324-15742-3-git-send-email-k.kozlowski@samsung.com>
 References: <1453941324-15742-1-git-send-email-k.kozlowski@samsung.com>
- <1453941324-15742-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <56AA6829.8050900@osg.samsung.com>
+ <1453941324-15742-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <56AA68D6.50500@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello Krzysztof,
 
 On 01/27/2016 09:35 PM, Krzysztof Kozlowski wrote:
-> Enable the COMPILE_TEST to get build coverage of some of Samsung clock
-> controller drivers. Still some of them will be built only if
-> appropriate SoC is chosen (like SOC_EXYNOS4415 or ARCH_S3C64XX).
+> Currently the Exynos5433 (ARMv8 SoC) clock driver depends on ARCH_EXYNOS
+> so it is built also on ARMv7. This does not bring any kind of benefit.
+> There won't be a single kernel image for ARMv7 and ARMv8 SoCs (like
+> multi_v7 for ARMv7).
 >
-> Anyway in case of COMPILE_TEST the Samsung clocks would show up in main
-> drivers section because they are not inside the "Common Clock Framework"
-> menu item. Move them under the "Common Clock Framework".
->
-> This changes the logic of selecting Samsung clocks from specific
-> architectures. Now the COMMON_CLK should be selected before selecting
-> specific clock (like S3C2410_COMMON_CLK or COMMON_CLK_SAMSUNG).
+> Instead build clock drivers only for respective SoC's architecture.
 >
 > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 >
 
 Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-I have also verified that more samsung clocks drivers are built for
-allyesconfig (where COMPILE_TEST is enabled) when make M=drivers/clk
+Also checked that for example clk-exynos5433 is not built anymore for
+exynos_defconfig but it is built for allyesconfig.
 
 Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
