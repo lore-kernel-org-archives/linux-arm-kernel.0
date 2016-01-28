@@ -1,129 +1,247 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 28 Jan 2016 10:42:33 +0000
-Subject: [PATCH v4 00/13] arm64: kernel: Add support for
- hibernate/suspend-to-disk
-Message-ID: <1453977766-20907-1-git-send-email-james.morse@arm.com>
+Date: Thu, 28 Jan 2016 10:42:34 +0000
+Subject: [PATCH v4 01/13] arm64: Fold proc-macros.S into assembler.h
+In-Reply-To: <1453977766-20907-1-git-send-email-james.morse@arm.com>
+References: <1453977766-20907-1-git-send-email-james.morse@arm.com>
+Message-ID: <1453977766-20907-2-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+From: Geoff Levand <geoff@infradead.org>
 
-This version of hibernate is rebased onto v4.5-rc1, including updated patches
-shared with kexec v13 [0] (1-5, 10).
+To allow the assembler macros defined in arch/arm64/mm/proc-macros.S to
+be used outside the mm code move the contents of proc-macros.S to
+asm/assembler.h.  Also, delete proc-macros.S, and fix up all references
+to proc-macros.S.
 
-I've also tested it with Ard's KASLR series [1].
-The most significant change is the use of the arch-header to store the
-location of the page tables and resume code when it has been moved by KASLR.
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+Acked-by: Pavel Machek <pavel@ucw.cz>
+[rebased, included dcache_by_line_op]
+Signed-off-by: James Morse <james.morse@arm.com>
+---
 
-This implicitly allows resuming with a different kernel version, (and the work
-needed to do this is the same). Patch 12 restricts resume to kernels with the
-same MMU configuration, (page size, number of page levels etc).
-Patch 13 forbids restoring with a different kernel version altogether - do
-we want to support this?
+This patch is from v13 of kexec
 
-Due to the arch-header changes, I dropped Pavel's Ack on patch 12.
-
-Parts of patch 5 were reworked from Akashi Takahiro's original version, to
-avoid another round of changes to hyp-entry.S:el1_sync.
-
-This series can be retrieved from:
-git://linux-arm.org/linux-jm.git -b hibernate/v4
-
-Changes since v3:
- * To work with kaslr:
-   * hibernate now uses the arch-header to store the address of the page
-     tables, and the point to re-enter the resumed kernel.
-   * The el2 vectors are reloaded to point to the 'safe' page, then back to the
-     resumed kernel.
-   * PoC cleaning is done after the jump to the resumed kernel, as we don't
-     know the restored kernel's boundaries in advance.
-   * Some variables are accessed via aliases in the linear map, as the kernel
-     text is not mapped during resume. restore_pblist is one example.
-   * Execute the safe page from the bottom of memory, not the top, so that we
-     can restore the resumed kernel's page tables directly.
-
- * Rebased the common patches onto v13 of kexec
- * Changed hibernate-asm.S to use the new copy_page macro.
- * Changed copy_p?d()s to use the do { } while(); pattern.
- * Added some missing barriers. (dsb after ic ialluis).
-
-Changes from v2:
- * Rewrote restore in-place patch - we can't clean pages in copy_page(), we
-   need to publish a list for the architecture to clean
- * Added missing pgprot_val() in hibernate.c, spotted by STRICT_MM_TYPECHECKS
- * Removed 'tcr_set_idmap_t0sz' from proc.S - I missed this when rebase-ing
- * Re-imported the first four patches from kexec v12
- * Rebased onto v4.4-rc2
- * Changes from Pavel Machek's comments
-
-Changes from v1:
- * Removed for_each_process(){ for_each_vma() { } }; cache cleaning, replaced
-   with icache_flush_range() call in core hibernate code
- * Rebased onto conflicting tcr_ek1.t0sz bug-fix patch
-
-
-[v3] http://www.spinics.net/lists/arm-kernel/msg463590.html
-[v2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/376450.html
-[v1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/376450.html
-
-[0] http://www.spinics.net/lists/arm-kernel/msg474889.html
-[1] http://permalink.gmane.org/gmane.linux.kernel/2116531
-
-AKASHI Takahiro (1):
-  arm64: kvm: allows kvm cpu hotplug
-
-Geoff Levand (5):
-  arm64: Fold proc-macros.S into assembler.h
-  arm64: Cleanup SCTLR flags
-  arm64: Convert hcalls to use HVC immediate value
-  arm64: Add new hcall HVC_CALL_FUNC
-  arm64: Add new asm macro copy_page
-
-James Morse (7):
-  arm64: kernel: Rework finisher callback out of __cpu_suspend_enter().
-  arm64: Change cpu_resume() to enable mmu early then access sleep_sp by
-    va
-  arm64: kernel: Include _AC definition in page.h
-  arm64: Promote KERNEL_START/KERNEL_END definitions to a header file
-  PM / Hibernate: Call flush_icache_range() on pages restored in-place
-  arm64: kernel: Add support for hibernate/suspend-to-disk
-  arm64: hibernate: Prevent resume from a different kernel version
-
- arch/arm/include/asm/kvm_host.h    |  10 +-
- arch/arm/include/asm/kvm_mmu.h     |   1 +
- arch/arm/kvm/arm.c                 |  98 +++++---
- arch/arm/kvm/mmu.c                 |   5 +
- arch/arm64/Kconfig                 |   7 +
- arch/arm64/include/asm/assembler.h |  89 ++++++-
- arch/arm64/include/asm/kvm_arm.h   |  11 -
- arch/arm64/include/asm/kvm_host.h  |   1 -
- arch/arm64/include/asm/kvm_mmu.h   |  19 ++
- arch/arm64/include/asm/memory.h    |   3 +
- arch/arm64/include/asm/page.h      |   2 +
- arch/arm64/include/asm/suspend.h   |  30 ++-
- arch/arm64/include/asm/sysreg.h    |  19 +-
- arch/arm64/include/asm/virt.h      |  40 ++++
- arch/arm64/kernel/Makefile         |   1 +
- arch/arm64/kernel/asm-offsets.c    |  10 +-
- arch/arm64/kernel/head.S           |   5 +-
- arch/arm64/kernel/hibernate-asm.S  | 137 +++++++++++
- arch/arm64/kernel/hibernate.c      | 472 +++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/hyp-stub.S       |  43 +++-
- arch/arm64/kernel/setup.c          |   1 -
- arch/arm64/kernel/sleep.S          | 145 ++++--------
- arch/arm64/kernel/suspend.c        | 108 ++++-----
- arch/arm64/kernel/vmlinux.lds.S    |  15 ++
- arch/arm64/kvm/hyp-init.S          |  47 +++-
- arch/arm64/kvm/hyp.S               |   3 +-
- arch/arm64/kvm/hyp/hyp-entry.S     |   9 +-
- arch/arm64/mm/cache.S              |   2 -
- arch/arm64/mm/proc-macros.S        |  86 -------
- arch/arm64/mm/proc.S               |  38 +--
- kernel/power/swap.c                |  18 ++
- 31 files changed, 1114 insertions(+), 361 deletions(-)
- create mode 100644 arch/arm64/kernel/hibernate-asm.S
- create mode 100644 arch/arm64/kernel/hibernate.c
+ arch/arm64/include/asm/assembler.h | 70 ++++++++++++++++++++++++++++++-
+ arch/arm64/mm/cache.S              |  2 -
+ arch/arm64/mm/proc-macros.S        | 86 --------------------------------------
+ arch/arm64/mm/proc.S               |  3 --
+ 4 files changed, 69 insertions(+), 92 deletions(-)
  delete mode 100644 arch/arm64/mm/proc-macros.S
 
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index bb7b72734c24..137ee5b11eb7 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -1,5 +1,5 @@
+ /*
+- * Based on arch/arm/include/asm/assembler.h
++ * Based on arch/arm/include/asm/assembler.h, arch/arm/mm/proc-macros.S
+  *
+  * Copyright (C) 1996-2000 Russell King
+  * Copyright (C) 2012 ARM Ltd.
+@@ -23,6 +23,8 @@
+ #ifndef __ASM_ASSEMBLER_H
+ #define __ASM_ASSEMBLER_H
+ 
++#include <asm/asm-offsets.h>
++#include <asm/pgtable-hwdef.h>
+ #include <asm/ptrace.h>
+ #include <asm/thread_info.h>
+ 
+@@ -205,6 +207,72 @@ lr	.req	x30		// link register
+ 	.endm
+ 
+ /*
++ * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
++ */
++	.macro	vma_vm_mm, rd, rn
++	ldr	\rd, [\rn, #VMA_VM_MM]
++	.endm
++
++/*
++ * mmid - get context id from mm pointer (mm->context.id)
++ */
++	.macro	mmid, rd, rn
++	ldr	\rd, [\rn, #MM_CONTEXT_ID]
++	.endm
++
++/*
++ * dcache_line_size - get the minimum D-cache line size from the CTR register.
++ */
++	.macro	dcache_line_size, reg, tmp
++	mrs	\tmp, ctr_el0			// read CTR
++	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
++	mov	\reg, #4			// bytes per word
++	lsl	\reg, \reg, \tmp		// actual cache line size
++	.endm
++
++/*
++ * icache_line_size - get the minimum I-cache line size from the CTR register.
++ */
++	.macro	icache_line_size, reg, tmp
++	mrs	\tmp, ctr_el0			// read CTR
++	and	\tmp, \tmp, #0xf		// cache line size encoding
++	mov	\reg, #4			// bytes per word
++	lsl	\reg, \reg, \tmp		// actual cache line size
++	.endm
++
++/*
++ * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
++ */
++	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
++#ifndef CONFIG_ARM64_VA_BITS_48
++	ldr_l	\tmpreg, idmap_t0sz
++	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
++#endif
++	.endm
++
++/*
++ * Macro to perform a data cache maintenance for the interval
++ * [kaddr, kaddr + size)
++ *
++ * 	op:		operation passed to dc instruction
++ * 	domain:		domain used in dsb instruciton
++ * 	kaddr:		starting virtual address of the region
++ * 	size:		size of the region
++ * 	Corrupts:	kaddr, size, tmp1, tmp2
++ */
++	.macro dcache_by_line_op op, domain, kaddr, size, tmp1, tmp2
++	dcache_line_size \tmp1, \tmp2
++	add	\size, \kaddr, \size
++	sub	\tmp2, \tmp1, #1
++	bic	\kaddr, \kaddr, \tmp2
++9998:	dc	\op, \kaddr
++	add	\kaddr, \kaddr, \tmp1
++	cmp	\kaddr, \size
++	b.lo	9998b
++	dsb	\domain
++	.endm
++
++/*
+  * Annotate a function as position independent, i.e., safe to be called before
+  * the kernel virtual mapping is activated.
+  */
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 6df07069a025..50ff9ba3a236 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -24,8 +24,6 @@
+ #include <asm/cpufeature.h>
+ #include <asm/alternative.h>
+ 
+-#include "proc-macros.S"
+-
+ /*
+  *	flush_icache_range(start,end)
+  *
+diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
+deleted file mode 100644
+index 146bd99a7532..000000000000
+--- a/arch/arm64/mm/proc-macros.S
++++ /dev/null
+@@ -1,86 +0,0 @@
+-/*
+- * Based on arch/arm/mm/proc-macros.S
+- *
+- * Copyright (C) 2012 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-
+-#include <asm/asm-offsets.h>
+-#include <asm/thread_info.h>
+-
+-/*
+- * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
+- */
+-	.macro	vma_vm_mm, rd, rn
+-	ldr	\rd, [\rn, #VMA_VM_MM]
+-	.endm
+-
+-/*
+- * mmid - get context id from mm pointer (mm->context.id)
+- */
+-	.macro	mmid, rd, rn
+-	ldr	\rd, [\rn, #MM_CONTEXT_ID]
+-	.endm
+-
+-/*
+- * dcache_line_size - get the minimum D-cache line size from the CTR register.
+- */
+-	.macro	dcache_line_size, reg, tmp
+-	mrs	\tmp, ctr_el0			// read CTR
+-	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
+-	mov	\reg, #4			// bytes per word
+-	lsl	\reg, \reg, \tmp		// actual cache line size
+-	.endm
+-
+-/*
+- * icache_line_size - get the minimum I-cache line size from the CTR register.
+- */
+-	.macro	icache_line_size, reg, tmp
+-	mrs	\tmp, ctr_el0			// read CTR
+-	and	\tmp, \tmp, #0xf		// cache line size encoding
+-	mov	\reg, #4			// bytes per word
+-	lsl	\reg, \reg, \tmp		// actual cache line size
+-	.endm
+-
+-/*
+- * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
+- */
+-	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
+-#ifndef CONFIG_ARM64_VA_BITS_48
+-	ldr_l	\tmpreg, idmap_t0sz
+-	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
+-#endif
+-	.endm
+-
+-/*
+- * Macro to perform a data cache maintenance for the interval
+- * [kaddr, kaddr + size)
+- *
+- * 	op:		operation passed to dc instruction
+- * 	domain:		domain used in dsb instruciton
+- * 	kaddr:		starting virtual address of the region
+- * 	size:		size of the region
+- * 	Corrupts: 	kaddr, size, tmp1, tmp2
+- */
+-	.macro dcache_by_line_op op, domain, kaddr, size, tmp1, tmp2
+-	dcache_line_size \tmp1, \tmp2
+-	add	\size, \kaddr, \size
+-	sub	\tmp2, \tmp1, #1
+-	bic	\kaddr, \kaddr, \tmp2
+-9998:	dc	\op, \kaddr
+-	add	\kaddr, \kaddr, \tmp1
+-	cmp	\kaddr, \size
+-	b.lo	9998b
+-	dsb	\domain
+-	.endm
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index a3d867e723b4..3c7d170de822 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -23,11 +23,8 @@
+ #include <asm/assembler.h>
+ #include <asm/asm-offsets.h>
+ #include <asm/hwcap.h>
+-#include <asm/pgtable-hwdef.h>
+ #include <asm/pgtable.h>
+ 
+-#include "proc-macros.S"
+-
+ #ifdef CONFIG_ARM64_64K_PAGES
+ #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
+ #elif defined(CONFIG_ARM64_16K_PAGES)
 -- 
 2.6.2
