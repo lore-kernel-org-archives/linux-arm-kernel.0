@@ -1,49 +1,71 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 27 Jan 2016 22:39:54 -0800
-Subject: [PATCH V2 1/2] dt/bindings: serial: bcm2835: add binding
- documentation for bcm2835-aux-uart
-In-Reply-To: <4799423.86Gz9JKjiK@wuerfel>
-References: <1452344854-2576-1-git-send-email-kernel@martin.sperl.org>
- <4288762.bCLxQBDvy4@wuerfel>
- <6035A0DD-AD61-48F7-B641-272BB23F3CD8@martin.sperl.org>
- <4799423.86Gz9JKjiK@wuerfel>
-Message-ID: <87y4bacimd.fsf@eliezer.anholt.net>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Thu, 28 Jan 2016 14:56:20 +0800
+Subject: MTK mt8173-evb: mainline unstable, and big-endian boot failures
+In-Reply-To: <CAF-23O3ps0Wt_UCmJbArpc5iJJryJKA0k_2qAyNb7op8O=UnAg@mail.gmail.com>
+References: <CAOi56cVDbkAJEDWy3+DV63a=UuD7nqpUu8X7e-OjtWM-4dj_-w@mail.gmail.com>
+ <7hsi1ilczm.fsf@baylibre.com>
+ <CAF-23O3ps0Wt_UCmJbArpc5iJJryJKA0k_2qAyNb7op8O=UnAg@mail.gmail.com>
+Message-ID: <1453964180.26397.8.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Thu, 2016-01-28 at 13:41 +0800, Koan-Sin Tan wrote:
+> Hi Kevin, 
+> 
+> On Thu, Jan 28, 2016 at 9:16 AM, Kevin Hilman <khilman@baylibre.com>
+> wrote:
+>         Kevin Hilman <khilman@baylibre.com> writes:
+>         
+>         [...]
+>         
+>         > It seems to be pretty stable up through v4.4 but
+>         > unreliable/unpredictable in v4.5-rc1 and lots of places in
+>         between.
+>         > It's hard to bisect because it doesn't reliably fail, but
+>         when it does
+>         > fail to finish booting, it's typically after it reaches a
+>         shell, and
+>         > trying to run various simple shell commands fails to
+>         complete, like
+>         > this example from next-20160125[2].
+>         >
+>         > To me this suggests possibly an issue with the idle driver
+>         where
+>         > characters might be getting lost on the serial console,
+>         which causes
+>         > the automated boot scripts to fail because the shell is
+>         still waiting
+>         > for the command to be finished.
+>         
+>         FWIW, I think I confirmed my suspicion that it's an idle
+>         driver issue
+>         because adding 'nohlt' on the cmdline, which forces
+>         cpuidle_poll mode
+>         (essentially disabling cpuidle) makes mainline boot quite
+>         reliably on my
+>         mt8173-evb board now.
+> 
+> 
+>    Thanks for the information. I'll try to reproduce it. The problem
+> is that I have been using 4.5-rc1 based kernel for several days, but
+> didn't run into such problem. Can tell me which version of firmware
+> you are using? 
 
-> On Monday 11 January 2016 14:57:46 Martin Sperl wrote:
->> > On 11.01.2016, at 13:21, Arnd Bergmann <arnd@arndb.de> wrote:
->> > 
->> > Please just add another patch to rename the existing uarts appropriately
->> > first, then add this one on top with the correct name.
->> 
->> I can do that with the next incarnation of the patch.
->> 
->> But would that not break dt-source files, that refer to uart0?
->> Is this not considered an API change as well or does this only apply
->> to the binary files?
->
-> To clarify: I meant you should change the node name, not the label.
->
-> The label is not part of the dtb data that gets passed to the kernel
-> and can have any value, including "uart0".
->
-> The node name is part of the dtb and should follow common naming
-> conventions (per ePAPR), but the kernel doesn't actually care, so
-> it won't break anything.
->
-> There are cases where a bootloader relies on a particular node name
-> in order to find a device node and patch its properties, but I don't
-> think this is the case here.
+Hi Kevin,
 
-Confirmed, the booloader source I have doesn't do anything with uart
-nodes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160127/797abe9b/attachment.sig>
+I use firmware [0] to run kernel v4.5-rc1 on my MT8173-evb, both branch
+v20150716 (psci-0.2 atf) and v20150902 (psci-1.0 atf) can't reproduce
+this problem.
+
+[0]: https://github.com/ibanezchen/evb-utils
+
+Eddie
+
+>   
+>    And, YES, I can reproduce the CONFIG_CPU_BIG_ENDIAN=y problem. The
+> 'nohlt' command line option didn't stop the problem. We'll investigate
+> it.
+> 
+> 
+> -- 
+> // freedom
