@@ -1,123 +1,70 @@
-From: john.ogness@linutronix.de (John Ogness)
-Date: Thu, 28 Jan 2016 11:29:08 +0100
-Subject: [PATCH v4] dmaengine: edma: fix residue race for cyclic
-Message-ID: <87k2mu2e16.fsf@linutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 28 Jan 2016 10:30:35 +0000
+Subject: [PATCH 2/5] arm64: KVM: Obey RES0/1 reserved bits when setting
+ CPTR_EL2
+In-Reply-To: <1453977038-13516-1-git-send-email-marc.zyngier@arm.com>
+References: <1453977038-13516-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453977038-13516-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When retrieving the residue value, the SRC/DST fields of the
-active PaRAM are read to determine the current position of
-the DMA engine. However, the AM335x Technical Reference Manual
-states:
+From: Dave Martin <Dave.Martin@arm.com>
 
-  11.3.3.6 Parameter Set Updates
+Some bits in CPTR are defined as RES1 in the architecture.  Setting
+these bits to zero may unintentionally enable future architecture
+extensions, allowing guests to use them without supervision by the host.
 
-  After the TR is read from the PaRAM (and is in the process
-  of being submitted to the EDMA3TC), the following fields are
-  updated as needed: ... SRC DST
+This would be bad: for forwards compatibility, this patch makes
+sure the affected bits are always written with 1, not 0.
 
-This means SRC/DST is incremented even though the DMA transfer
-may not have started yet or is in progress. Thus if the reader
-of the residue accesses the DMA buffer too quickly, the CPU is
-misinformed about the data that has been successfully processed.
+This patch only addresses CPTR_EL2.  Initialisation of other system
+registers may still need review.
 
-The CCSTAT.ACTV register is a boolean that is set if any TR is
-being processed by either the EMDA3CC or EDMA3TC. By polling
-this register it is possible to ensure that the residue value
-returned is valid for immediate processing. However, since the
-DMA engine may be active, polling may never hit a moment where
-no TR is being processed. To handle this, the SRC/DST is also
-polled to see if it changes. And as a last resort, a max loop
-count for the busy waiting exists to avoid an infinite loop.
-
-Signed-off-by: John Ogness <john.ogness@linutronix.de>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- v1-v2 changes
- . rebased for next-20151016
- . added multiple exit conditions for busy wait loop
+ arch/arm64/include/asm/kvm_arm.h | 1 +
+ arch/arm64/kvm/hyp/switch.c      | 8 ++++++--
+ 2 files changed, 7 insertions(+), 2 deletions(-)
 
- v2-v3 changes
- . rebased for next-20160121
- . reduced max loops from 10000 to 1000
- . loop countdown instead of count
- . change debug print function and message
- . fine-tune comments
-
- v3-v4 changes
- . rebased for next-20160128
- . moved register bit definition
-
- drivers/dma/edma.c |   41 ++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 40 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index d92d655..e3d7fcb 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -113,6 +113,9 @@
- #define GET_NUM_REGN(x)		((x & 0x300000) >> 20) /* bits 20-21 */
- #define CHMAP_EXIST		BIT(24)
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 738a95f..bef6e92 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -182,6 +182,7 @@
+ #define CPTR_EL2_TCPAC	(1 << 31)
+ #define CPTR_EL2_TTA	(1 << 20)
+ #define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
++#define CPTR_EL2_DEFAULT	0x000033ff
  
-+/* CCSTAT register */
-+#define EDMA_CCSTAT_ACTV	BIT(4)
+ /* Hyp Debug Configuration Register bits */
+ #define MDCR_EL2_TDRA		(1 << 11)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index ca8f5a5..f0e7bdf 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -36,7 +36,11 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ 	write_sysreg(val, hcr_el2);
+ 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+ 	write_sysreg(1 << 15, hstr_el2);
+-	write_sysreg(CPTR_EL2_TTA | CPTR_EL2_TFP, cptr_el2);
 +
- /*
-  * Max of 20 segments per channel to conserve PaRAM slots
-  * Also note that MAX_NR_SG should be atleast the no.of periods
-@@ -1680,9 +1683,20 @@ static void edma_issue_pending(struct dma_chan *chan)
- 	spin_unlock_irqrestore(&echan->vchan.lock, flags);
++	val = CPTR_EL2_DEFAULT;
++	val |= CPTR_EL2_TTA | CPTR_EL2_TFP;
++	write_sysreg(val, cptr_el2);
++
+ 	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
  }
  
-+/*
-+ * This limit exists to avoid a possible infinite loop when waiting for proof
-+ * that a particular transfer is completed. This limit can be hit if there
-+ * are large bursts to/from slow devices or the CPU is never able to catch
-+ * the DMA hardware idle. On an AM335x transfering 48 bytes from the UART
-+ * RX-FIFO, as many as 55 loops have been seen.
-+ */
-+#define EDMA_MAX_TR_WAIT_LOOPS 1000
-+
- static u32 edma_residue(struct edma_desc *edesc)
- {
- 	bool dst = edesc->direction == DMA_DEV_TO_MEM;
-+	int loop_count = EDMA_MAX_TR_WAIT_LOOPS;
-+	struct edma_chan *echan = edesc->echan;
- 	struct edma_pset *pset = edesc->pset;
- 	dma_addr_t done, pos;
- 	int i;
-@@ -1691,7 +1705,32 @@ static u32 edma_residue(struct edma_desc *edesc)
- 	 * We always read the dst/src position from the first RamPar
- 	 * pset. That's the one which is active now.
- 	 */
--	pos = edma_get_position(edesc->echan->ecc, edesc->echan->slot[0], dst);
-+	pos = edma_get_position(echan->ecc, echan->slot[0], dst);
-+
-+	/*
-+	 * "pos" may represent a transfer request that is still being
-+	 * processed by the EDMACC or EDMATC. We will busy wait until
-+	 * any one of the situations occurs:
-+	 *   1. the DMA hardware is idle
-+	 *   2. a new transfer request is setup
-+	 *   3. we hit the loop limit
-+	 */
-+	while (edma_read(echan->ecc, EDMA_CCSTAT) & EDMA_CCSTAT_ACTV) {
-+		/* check if a new transfer request is setup */
-+		if (edma_get_position(echan->ecc,
-+				      echan->slot[0], dst) != pos) {
-+			break;
-+		}
-+
-+		if (!--loop_count) {
-+			dev_dbg_ratelimited(echan->vchan.chan.device->dev,
-+				"%s: timeout waiting for PaRAM update\n",
-+				__func__);
-+			break;
-+		}
-+
-+		cpu_relax();
-+	}
+@@ -45,7 +49,7 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+ 	write_sysreg(HCR_RW, hcr_el2);
+ 	write_sysreg(0, hstr_el2);
+ 	write_sysreg(read_sysreg(mdcr_el2) & MDCR_EL2_HPMN_MASK, mdcr_el2);
+-	write_sysreg(0, cptr_el2);
++	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
+ }
  
- 	/*
- 	 * Cyclic is simple. Just subtract pset[0].addr from pos.
+ static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
 -- 
-1.7.10.4
+2.1.4
