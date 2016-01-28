@@ -1,91 +1,43 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 28 Jan 2016 14:25:55 -0700
-Subject: [PATCH net-next 31/40] net: fec: don't transfer ownership until
- entire tso is queued
+Date: Thu, 28 Jan 2016 14:25:50 -0700
+Subject: [PATCH net-next 26/40] net: fec: set cbd_esc only once
 In-Reply-To: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1454016364-30985-32-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1454016364-30985-27-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise, we cannot undo our work if an error condition arises
-later.
-
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 26 ++++++++++++++++++++------
- 1 file changed, 20 insertions(+), 6 deletions(-)
+ drivers/net/ethernet/freescale/fec_main.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index b829c29..ee6cd69 100644
+index 380c8e2..cf53e21 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -590,7 +590,8 @@ fec_enet_txq_put_data_tso(struct fec_enet_priv_tx_q *txq, struct sk_buff *skb,
- static int
- fec_enet_txq_put_hdr_tso(struct fec_enet_priv_tx_q *txq,
- 			 struct sk_buff *skb, struct net_device *ndev,
--			 struct bufdesc *bdp, int index)
-+			 struct bufdesc *bdp, int index,
-+			 unsigned short *pstatus)
- {
- 	struct fec_enet_private *fep = netdev_priv(ndev);
- 	int hdr_len = skb_transport_offset(skb) + tcp_hdrlen(skb);
-@@ -632,9 +633,7 @@ fec_enet_txq_put_hdr_tso(struct fec_enet_priv_tx_q *txq,
+@@ -569,6 +569,8 @@ fec_enet_txq_put_data_tso(struct fec_enet_priv_tx_q *txq, struct sk_buff *skb,
+ 			estatus |= FEC_TX_BD_FTYPE(txq->bd.qid);
+ 		if (skb->ip_summed == CHECKSUM_PARTIAL)
+ 			estatus |= BD_ENET_TX_PINS | BD_ENET_TX_IINS;
++		if (is_last)
++			estatus |= BD_ENET_TX_INT;
  		ebdp->cbd_bdu = 0;
  		ebdp->cbd_esc = estatus;
  	}
+@@ -576,12 +578,8 @@ fec_enet_txq_put_data_tso(struct fec_enet_priv_tx_q *txq, struct sk_buff *skb,
+ 	/* Handle the last BD specially */
+ 	if (last_tcp)
+ 		status |= (BD_ENET_TX_LAST | BD_ENET_TX_TC);
+-	if (is_last) {
++	if (is_last)
+ 		status |= BD_ENET_TX_INTR;
+-		if (fep->bufdesc_ex)
+-			ebdp->cbd_esc |= BD_ENET_TX_INT;
+-	}
 -
--	bdp->cbd_sc = status;
--
-+	*pstatus = status;
+ 	bdp->cbd_sc = status;
+ 
  	return 0;
- }
- 
-@@ -646,7 +645,10 @@ static int fec_enet_txq_submit_tso(struct fec_enet_priv_tx_q *txq,
- 	int hdr_len = skb_transport_offset(skb) + tcp_hdrlen(skb);
- 	int total_len, data_left;
- 	struct bufdesc *bdp = txq->bd.cur;
-+	struct bufdesc *first_bdp = bdp;
- 	struct tso_t tso;
-+	unsigned short status = 0;
-+	unsigned short *pstatus = &status;
- 	unsigned int index = 0;
- 	int ret;
- 
-@@ -676,7 +678,8 @@ static int fec_enet_txq_submit_tso(struct fec_enet_priv_tx_q *txq,
- 		/* prepare packet headers: MAC + IP + TCP */
- 		hdr = txq->tso_hdrs + index * TSO_HEADER_SIZE;
- 		tso_build_hdr(skb, hdr, &tso, data_left, total_len == 0);
--		ret = fec_enet_txq_put_hdr_tso(txq, skb, ndev, bdp, index);
-+		ret = fec_enet_txq_put_hdr_tso(txq, skb, ndev, bdp, index,
-+					       pstatus);
- 		if (ret)
- 			goto err_release;
- 
-@@ -700,12 +703,23 @@ static int fec_enet_txq_submit_tso(struct fec_enet_priv_tx_q *txq,
- 		}
- 
- 		bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
-+		pstatus = &bdp->cbd_sc;
- 	}
- 
- 	/* Save skb pointer */
- 	txq->tx_skbuff[index] = skb;
--
- 	skb_tx_timestamp(skb);
-+	/* Make sure the updates to rest of the descriptor are performed before
-+	 * transferring ownership.
-+	 */
-+	wmb();
-+	/* Send it on its way.  Tell FEC it's ready, interrupt when done,
-+	 */
-+	first_bdp->cbd_sc = status;
-+	/* Make sure ownership is transferred before the
-+	 * update to txq->bd.cur.
-+	 */
-+	wmb();
- 	txq->bd.cur = bdp;
- 
- 	/* Trigger transmission start */
 -- 
 2.5.0
