@@ -1,60 +1,72 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 28 Jan 2016 15:55:14 +0100
-Subject: [PATCH RFC 1/2] clk: sunxi: Add sun8i display support
-In-Reply-To: <20160127215051.GW4317@lukather>
-References: <cover.1452021349.git.moinejf@free.fr>
- <9cc33c3701844a07c43ee6c0c1072be4e2073cc1.1452021349.git.moinejf@free.fr>
- <20160118190904.GP4581@lukather>
- <20160119090901.17c64bc4afb7095bb8bd291c@free.fr>
- <20160127215051.GW4317@lukather>
-Message-ID: <20160128155514.41dbf9cbf37d5e25775c51a2@free.fr>
+From: jglauber@cavium.com (Jan Glauber)
+Date: Thu, 28 Jan 2016 15:55:02 +0100
+Subject: [PATCH v2 4/5] arm64/perf: Enable PMCR long cycle counter bit
+In-Reply-To: <cover.1453992560.git.jglauber@cavium.com>
+References: <cover.1453992560.git.jglauber@cavium.com>
+Message-ID: <5632ade9c6893a63ca5cb34bf1b0e9a44cbd2ab1.1453992560.git.jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Jan 2016 22:50:51 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+With the long cycle counter bit (LC) disabled the cycle counter is not
+working on ThunderX SOC (ThunderX only implements Aarch64).
+Also, according to documentation LC == 0 is deprecated.
 
-> Hi,
-> 
-> On Tue, Jan 19, 2016 at 09:09:01AM +0100, Jean-Francois Moine wrote:
-> > On Mon, 18 Jan 2016 20:09:04 +0100
-> > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-	[snip]
-> > > We have the clk-factors stuff to handle this easily, could you use
-> > > that instead ?
-> > 
-> > No, the sun6i/8i pll3 offers direct 297MHz and 270MHz.
-> 
-> That's true, but so far it's something that never has been really
-> needed. This PLL is not the same one using the fractional mode, so I
-> guess we could extend the clk-factors to be able to deal with
-> that. The video pll in the A10 (pll3) is also in this case, so does
-> the A31 PLL3 and PLL4.
-> 
-> Also note that all these clocks can reach those frequencies through
-> what allwinner calls the integer mode, so apart from the hardware
-> readout, we don't really need it anyway.
+To keep the code simple the patch does not introduce 64 bit wide counter
+functions. Instead writing the cycle counter always sets the upper
+32 bits so overflow interrupts are generated as before.
 
-Maybe it is too simple! 297MHz is the PLL3 frequency which can be used
-for most video modes. And, so, as it is the default value, in my tests,
-I never saw the PLL3 set_rate function being called.
+Original patch from Andrew Pinksi <Andrew.Pinksi@caviumnetworks.com>
 
-	[snip]
-> > Otherwise, about this old RFC, Chen-Yu Tsai replied:
-> > 
-> > > > Add the clock types which are used by the sun8i family for video.
-> > > 
-> > > These clocks first appeared in the A31.
-> 
-> The video PLL is, the display engine and tcon clocks are a bit
-> different (mostly because of their weird parent configuration that
-> need a muxing table). Note that I'm talking about the A23 / A33. I
-> haven't checked for the H3.
+Signed-off-by: Jan Glauber <jglauber@cavium.com>
+---
+ arch/arm64/kernel/perf_event.c | 21 ++++++++++++++++-----
+ 1 file changed, 16 insertions(+), 5 deletions(-)
 
-The TCONs of the A23/A33 and H3 SoCs are quite the same.
-The display engines 2 of the H3/A64/A83T are the same and they ask for
-a fixed clock (432MHz).
-
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index c038e4e..5e4275e 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -405,6 +405,7 @@ static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
+ #define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
+ #define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
+ #define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
++#define ARMV8_PMCR_LC		(1 << 6) /* Overflow on 64 bit cycle counter */
+ #define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
+ #define	ARMV8_PMCR_N_MASK	0x1f
+ #define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
+@@ -494,9 +495,16 @@ static inline void armv8pmu_write_counter(struct perf_event *event, u32 value)
+ 	if (!armv8pmu_counter_valid(cpu_pmu, idx))
+ 		pr_err("CPU%u writing wrong counter %d\n",
+ 			smp_processor_id(), idx);
+-	else if (idx == ARMV8_IDX_CYCLE_COUNTER)
+-		asm volatile("msr pmccntr_el0, %0" :: "r" (value));
+-	else if (armv8pmu_select_counter(idx) == idx)
++	else if (idx == ARMV8_IDX_CYCLE_COUNTER) {
++		/*
++		 * Set the upper 32bits as this is a 64bit counter but we only
++		 * count using the lower 32bits and we want an interrupt when
++		 * it overflows.
++		 */
++		u64 value64 = 0xffffffff00000000ULL | value;
++
++		asm volatile("msr pmccntr_el0, %0" :: "r" (value64));
++	} else if (armv8pmu_select_counter(idx) == idx)
+ 		asm volatile("msr pmxevcntr_el0, %0" :: "r" (value));
+ }
+ 
+@@ -768,8 +776,11 @@ static void armv8pmu_reset(void *info)
+ 		armv8pmu_disable_intens(idx);
+ 	}
+ 
+-	/* Initialize & Reset PMNC: C and P bits. */
+-	armv8pmu_pmcr_write(ARMV8_PMCR_P | ARMV8_PMCR_C);
++	/*
++	 * Initialize & Reset PMNC. Request overflow on 64 bit but
++	 * cheat in armv8pmu_write_counter().
++	 */
++	armv8pmu_pmcr_write(ARMV8_PMCR_P | ARMV8_PMCR_C | ARMV8_PMCR_LC);
+ }
+ 
+ static int armv8_pmuv3_map_event(struct perf_event *event)
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.9.1
