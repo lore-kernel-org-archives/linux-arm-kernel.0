@@ -1,51 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 28 Jan 2016 11:20:33 +0000
-Subject: [PATCH] arm64: Disallow combination of ARCH_XGENE and 16K page
- size
-In-Reply-To: <20160128110820.GE30928@arm.com>
-References: <1453936230-7305-1-git-send-email-dann.frazier@canonical.com>
- <20160128103441.GS14823@e104818-lin.cambridge.arm.com>
- <20160128110820.GE30928@arm.com>
-Message-ID: <20160128112033.GI17123@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Jan 2016 12:20:55 +0100
+Subject: Speeding up dma_unmap
+In-Reply-To: <20160128103105.GR14823@e104818-lin.cambridge.arm.com>
+References: <CAJFSRaCRvx=+_fEYAr8OeWGHnnz+rOWjLzLcm+wZiEstbHwxAw@mail.gmail.com>
+ <20160127180944.GZ10826@n2100.arm.linux.org.uk>
+ <20160128103105.GR14823@e104818-lin.cambridge.arm.com>
+Message-ID: <24650183.WoXLVmr0Vj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 11:08:20AM +0000, Will Deacon wrote:
-> On Thu, Jan 28, 2016 at 10:34:41AM +0000, Catalin Marinas wrote:
-> > On Wed, Jan 27, 2016 at 04:10:30PM -0700, dann frazier wrote:
-> > > 16K page size is an optional feature of the architecture, and is not
-> > > supported by the X-Gene SoC family.
+On Thursday 28 January 2016 10:31:06 Catalin Marinas wrote:
+> On Wed, Jan 27, 2016 at 06:09:45PM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Jan 27, 2016 at 04:06:30PM +0000, Catalin Marinas wrote:
+> > > On Wed, Jan 27, 2016 at 01:23:27PM +0100, Arnd Bergmann wrote:
+> > > > up reading cache lines back in randomly on a speculative prefetch,
+> > > > but as far as I can tell, the Cortex-A8 (or A5/A7) won't do that.
 > > > 
-> > > Signed-off-by: dann frazier <dann.frazier@canonical.com>
-> > > ---
-> > >  arch/arm64/Kconfig.platforms | 1 +
-> > >  1 file changed, 1 insertion(+)
-> > > 
-> > > diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> > > index 21074f6..b241290 100644
-> > > --- a/arch/arm64/Kconfig.platforms
-> > > +++ b/arch/arm64/Kconfig.platforms
-> > > @@ -133,6 +133,7 @@ config ARCH_VEXPRESS
-> > >  
-> > >  config ARCH_XGENE
-> > >  	bool "AppliedMicro X-Gene SOC Family"
-> > > +	depends on !ARM64_16K_PAGES
-> > >  	help
-> > >  	  This enables support for AppliedMicro X-Gene SOC Family
+> > > Are you sure about A5 and A7? I'm not even sure about the A8 but there
+> > > are good chances that A7 and A5 do speculative prefetches.
 > > 
-> > This would be the case on Juno as well. But maybe at some point the
-> > X-Gene family would gain a CPU with such support.
-> > 
-> > Anyway, I would rather make 16K pages depend on EXPERT, make it a bit
-> > harder to enable. We've had a few questions recently about enabling it
-> > on CPUs that don't have such feature.
+> > I thought when I was re-implementing the DMA API on ARM (which was
+> > around early v7 times) that there were CPUs that did speculative
+> > prefetching, which included the A8.  I seem to remember it was pretty
+> > urgent to have the DMA API fixed for _any_ ARMv7 CPU because of the
+> > speculative prefetching.
 > 
-> I thought there was also a suggestion that we could fail gracefully in
-> the EFI stub if we detected an unsupported page size?
+> Indeed, it's a safe assumption to say that any ARMv7 CPU perform
+> speculative accesses. Even if some of them may only do I-cache
+> prefetching (just guessing), in the presence of a unified L2 this
+> distinction no longer matters.
 
-Yup. There are other things we could/should test, too.
+Ok, I was thrown off by the code comment then, and by my incorrect
+assumption that only the out-of-order cores were doing any speculative
+execution (prefetch or not). According to the Cortex-A5 TRM, "The
+Cortex-A5 MPCore data cache implements an automatic prefetcher that
+monitors cache misses done by the processor. When a pattern is detected,
+the automatic prefetcher starts linefills in the background."
 
-I believe Jeremy had a patch, but due to churn in that area it didn't
-get picked up.
+I have looked at the documentation for a couple of cores and found that:
 
-Mark.
+* Cortex-A9 always does speculative prefetching
+* Cortex-A8 does not have this mentioned in the manual, which would
+  be a hint that it indeed does not do it at all, but that could be
+  wrong. It does explicitly mention prefetching into icache, and
+  mentions prefetching using the PLD instruction and the L2 PLE.
+* A5/A7/A15/A17 all do prefetching unless disabled in the ACTLR
+  register. CPUs that have L2 caches can control this separately
+  for L1 and L2 as needed.
+
+This means that there are still some cores on which one could try
+if disabling the prefetching and the flushes in DMA unmap provides
+any serious performance boost.
+
+	Arnd
