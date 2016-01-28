@@ -1,41 +1,40 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 28 Jan 2016 13:22:35 +0900
-Subject: [PATCH] pinctrl: mediatek: guard sub-directory with
- CONFIG_PINCTRL_MTK
-In-Reply-To: <CACRpkdbrJ5P8Ro4RQUquMOTuXhN+54ZHYGbLqrbwW6tbwCC7Mg@mail.gmail.com>
-References: <1453563204-30407-1-git-send-email-yamada.masahiro@socionext.com>
- <CACRpkdbrJ5P8Ro4RQUquMOTuXhN+54ZHYGbLqrbwW6tbwCC7Mg@mail.gmail.com>
-Message-ID: <CAK7LNAQ_8o0FiRpb7D6RBmA+7WxRMFhWJjo2f4E_NH5qAGYb4A@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 28 Jan 2016 09:54:16 +0530
+Subject: [PATCH 1/4] mailbox: mailbox-test: Use more consistent format for
+ calling copy_from_user()
+In-Reply-To: <1452755489-18736-2-git-send-email-lee.jones@linaro.org>
+References: <1452755489-18736-1-git-send-email-lee.jones@linaro.org>
+ <1452755489-18736-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <CABb+yY3jG7XLf-+C5_pK_v7AoKYC2iskpL2=XpkvjPVZZcdCTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus
-
-2016-01-27 23:11 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Sat, Jan 23, 2016 at 4:33 PM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
+On Thu, Jan 14, 2016 at 12:41 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> While we're at it, ensure copy-to location is NULL'ed in the error path.
 >
->> CONFIG_PINCTRL_MTK is more suitable than CONFIG_ARCH_MEDIATEK
->> to guard the drivers/pinctrl/mediatek/ directory.
->> (I renamed CONFIG_PINCTRL_MTK_COMMON to CONFIG_PINCTRL_MTK.)
->>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Suggested-by: Dan Carpenter <dan.carpenter@oracle.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mailbox/mailbox-test.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 >
-> This patch does not apply to linux v4.5-rc1, please rebase the
-> patch and resend.
+> diff --git a/drivers/mailbox/mailbox-test.c b/drivers/mailbox/mailbox-test.c
+> index 684ae17..7d9b915 100644
+> --- a/drivers/mailbox/mailbox-test.c
+> +++ b/drivers/mailbox/mailbox-test.c
+> @@ -63,9 +63,9 @@ static ssize_t mbox_test_signal_write(struct file *filp,
+>         if (!tdev->signal)
+>                 return -ENOMEM;
+>
+> -       ret = copy_from_user(tdev->signal, userbuf, count);
+> -       if (ret) {
+> +       if (copy_from_user(tdev->signal, userbuf, count)) {
+>                 kfree(tdev->signal);
+> +               tdev->signal = NULL;
+>                 return -EFAULT;
+>         }
+>
+The function is left to return based on an uninitialized variable
+('ret' on stack), so please merge this and the patch 2/4.
 
-
-These two patches can be applied in this order:
-https://patchwork.kernel.org/patch/8097541/
-https://patchwork.kernel.org/patch/8097551/
-
-(Sorry, I should have sent them as a series.)
-
-
-If you want to apply only the latter onto v4.5-rc1,
-"git am -C2" can apply it.
-
-
--- 
-Best Regards
-Masahiro Yamada
+Thanks.
