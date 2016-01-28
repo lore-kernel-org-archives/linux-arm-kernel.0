@@ -1,82 +1,80 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 28 Jan 2016 16:33:39 +0000
-Subject: [PATCH V5 01/14] soc: tegra: pmc: Restore base address on probe
- failure
-In-Reply-To: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
-References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1453998832-27383-2-git-send-email-jonathanh@nvidia.com>
+Date: Thu, 28 Jan 2016 16:33:38 +0000
+Subject: [PATCH V5 00/14] Add generic PM domain support for Tegra
+Message-ID: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During early initialisation, the PMC registers are mapped and the PMC SoC
-data is populated in the PMC data structure. This allows other drivers
-access the PMC register space, via the public tegra PMC APIs, prior to
-probing the PMC device.
+Adds generic PM domain support for Tegra SoCs but this series only
+enables support for it on Tegra 64-bit devices. There is no reason why
+this cannot be enable for Tegra 32-bit devices, but to keep the patch
+series to a minimum only 64-bit devices are enabled so far.
 
-When the PMC device is probed, the PMC registers are mapped again and if
-successful the initial mapping is freed. If the probing of the PMC device
-fails after the registers are remapped, then the registers will be
-unmapped and hence the pointer to the PMC registers will be invalid. This
-could lead to a potential crash, because once the PMC SoC data pointer is
-populated, the driver assumes that the PMC register mapping is also valid
-and a user calling any of the public tegra PMC APIs could trigger an
-exception because these APIs don't check that the mapping is still valid.
+This series has been boot tested on Tegra210 as well as various 32-bit
+Tegra platforms.
 
-Fix this by restoring the original mapping for the PMC registers if the
-probe on the PMC device fails and only unmapping the original mapping if
-the probe succeeds.
+Summary of changes since V4 [1]:
+- Re-worked fix to handle base address on probe failure
+- Added patch to lock around simultaneuous accesses to PMC registers
+- Added patch to change powergate and rail IDs to unsigned type
+- Added patch to fix testing of powergate state
+- Updated patch to check for valid powergates to use a bitmap
+- Updated Tegra DT PMC bindings per Rob H's feedback
+- Updated Tegra power domains binding per Thierry's feedback
+- Updated Tegra generic power domain support per Thierry's feedback
 
-Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
----
- drivers/soc/tegra/pmc.c | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+Summary of changes since V3 [0]:
+- Dropped tegra124 support for now
+- Removed MC flush support per feedback from Thierry
+- Cleaned up the PMC changes per feedback from Thierry
+- Added support for tegra210
 
-diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
-index 88c7e506177e..85b4e166273a 100644
---- a/drivers/soc/tegra/pmc.c
-+++ b/drivers/soc/tegra/pmc.c
-@@ -821,13 +821,11 @@ static int tegra_pmc_probe(struct platform_device *pdev)
- 	if (IS_ERR(pmc->base))
- 		return PTR_ERR(pmc->base);
- 
--	iounmap(base);
--
- 	pmc->clk = devm_clk_get(&pdev->dev, "pclk");
- 	if (IS_ERR(pmc->clk)) {
- 		err = PTR_ERR(pmc->clk);
- 		dev_err(&pdev->dev, "failed to get pclk: %d\n", err);
--		return err;
-+		goto error;
- 	}
- 
- 	pmc->dev = &pdev->dev;
-@@ -839,7 +837,7 @@ static int tegra_pmc_probe(struct platform_device *pdev)
- 	if (IS_ENABLED(CONFIG_DEBUG_FS)) {
- 		err = tegra_powergate_debugfs_init();
- 		if (err < 0)
--			return err;
-+			goto error;
- 	}
- 
- 	err = register_restart_handler(&tegra_pmc_restart_handler);
-@@ -847,10 +845,17 @@ static int tegra_pmc_probe(struct platform_device *pdev)
- 		debugfs_remove(pmc->debugfs);
- 		dev_err(&pdev->dev, "unable to register restart handler, %d\n",
- 			err);
--		return err;
-+		goto error;
- 	}
- 
-+	iounmap(base);
-+
- 	return 0;
-+
-+error:
-+	pmc->base = base;
-+
-+	return err;
- }
- 
- #if defined(CONFIG_PM_SLEEP) && defined(CONFIG_ARM)
+Series Summary:
+Patch 1-7:  PMC clean-up and fixes
+Patch 8:    Adds function to remove a generic PM domain
+Patch 9:    Updates DT documentation for tegra PMC
+Patch 10:   Adds DT documentation for tegra generic PM domains
+Patch 11:   Adds PMC generic DM domains support
+Patch 12:   Adds audio clock for Tegra210 audio power-domain
+Patch 13:   Adds DT bindings for Tegra210 audio power-domain
+Patch 14:   Enable generic PM domains for tegra64
+
+[0] http://comments.gmane.org/gmane.linux.ports.tegra/22944
+[1] http://marc.info/?l=linux-tegra&m=144924153600529&w=2
+
+Jon Hunter (14):
+  soc: tegra: pmc: Restore base address on probe failure
+  soc: tegra: pmc: Protect public functions from potential race
+    conditions
+  soc: tegra: pmc: Change powergate and rail IDs to be an unsigned type
+  soc: tegra: pmc: Fix testing of powergate state
+  soc: tegra: pmc: Wait for powergate state to change
+  soc: tegra: pmc: Fix checking of valid partitions
+  soc: tegra: pmc: Ensure partitions can be toggled on/off by PMC
+  PM / Domains: Add function to remove a pm-domain
+  Documentation: DT: bindings: Update NVIDIA PMC for Tegra
+  Documentation: DT: bindings: Add power domain info for NVIDIA PMC
+  soc: tegra: pmc: Add generic PM domain support
+  clk: tegra210: Add the APB2APE audio clock
+  ARM64: tegra: Add audio PM domain device node for Tegra210
+  ARM64: tegra: select PM_GENERIC_DOMAINS
+
+ .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      |  67 ++-
+ arch/arm/mach-tegra/platsmp.c                      |  16 +-
+ arch/arm64/Kconfig.platforms                       |   2 +
+ arch/arm64/boot/dts/nvidia/tegra210.dtsi           |  11 +-
+ drivers/base/power/domain.c                        |  26 +
+ drivers/clk/tegra/clk-id.h                         |   1 +
+ drivers/clk/tegra/clk-tegra-periph.c               |   1 +
+ drivers/clk/tegra/clk-tegra210.c                   |   1 +
+ drivers/gpu/drm/tegra/drm.h                        |   2 +-
+ drivers/soc/tegra/pmc.c                            | 603 ++++++++++++++++++---
+ include/dt-bindings/clock/tegra210-car.h           |   2 +-
+ include/dt-bindings/power/tegra-powergate.h        |  36 ++
+ include/linux/pm_domain.h                          |   5 +
+ include/soc/tegra/pmc.h                            |  73 +--
+ 14 files changed, 709 insertions(+), 137 deletions(-)
+ create mode 100644 include/dt-bindings/power/tegra-powergate.h
+
 -- 
 2.1.4
