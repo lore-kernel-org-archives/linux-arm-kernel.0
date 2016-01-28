@@ -1,21 +1,44 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 28 Jan 2016 16:50:40 +0800
-Subject: [PATCH] ARM: dts: imx6: remove bogus interrupt-parent from CAAM
- node
-In-Reply-To: <1452607470-12526-1-git-send-email-l.stach@pengutronix.de>
-References: <1452607470-12526-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20160128085039.GT9070@tiger>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Jan 2016 09:49:15 +0100
+Subject: [PATCH 3/9] net: bgmac: clarify CONFIG_BCMA dependency
+In-Reply-To: <20160127161110.GL8889@windriver.com>
+References: <1453903507-3427225-1-git-send-email-arnd@arndb.de>
+ <1453903507-3427225-4-git-send-email-arnd@arndb.de>
+ <20160127161110.GL8889@windriver.com>
+Message-ID: <2754981.4bUSE7NdJb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 12, 2016 at 03:04:30PM +0100, Lucas Stach wrote:
-> The interrupt-parent property is not needed as it is inherited from
-> the parent bus and in the case of the CAAM node actively points to
-> the wrong interrupt controller (GIC instead of GPC). This leads to
-> the CAAM IRQs not getting unmasked at the GPC level, leaving them
-> unable to wake the CPU from wait mode, potentially impacting
-> performance of the CAAM unit when CPUidle is enabled.
+On Wednesday 27 January 2016 11:11:10 Paul Gortmaker wrote:
+> [[PATCH 3/9] net: bgmac: clarify CONFIG_BCMA dependency] On 27/01/2016 (Wed 15:04) Arnd Bergmann wrote:
 > 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > The bgmac driver depends on BCMA_HOST_SOC, which is only used
+> > when CONFIG_BCMA is enabled. However, it is a bool option and can
+> > be set when CONFIG_BCMA=m, and then bgmac can be built-in, leading
+> > to an obvious link error:
+> > 
+> > drivers/built-in.o: In function `bgmac_init':
+> > :(.init.text+0x7f2c): undefined reference to `__bcma_driver_register'
+> > drivers/built-in.o: In function `bgmac_exit':
+> > :(.exit.text+0x110a): undefined reference to `bcma_driver_unregister'
+> > 
+> > To avoid this case, we need to depend on both BCMA and BCMA_SOC,
+> > as this patch does. I'm also trying to make the dependency more
+> > readable by splitting it into three lines, and adding a COMPILE_TEST
+> > alternative so we can test-build it in all configurations that
+> > support BCMA.
+> 
+> It wasn't immediately clear to me from the above why you added the
+> select on FIXED_PHY.
+> 
 
-Applied, thanks.
+Right, I'll resend the patch with improved changelog. This series
+is mostly patches for old and rare randconfig bugs, so I had built
+thousands of configurations and fixed up everything until new warnings
+or errors kept coming up. The FIXED_PHY error came up in the same
+driver so I merged the two patches but did not notice how the changelog
+failed to explain it.
+
+Thanks,
+
+	Arnd
