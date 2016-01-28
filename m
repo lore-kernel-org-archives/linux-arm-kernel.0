@@ -1,52 +1,32 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 28 Jan 2016 14:49:45 +0000
-Subject: [PATCH V2 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge
- driver to  work on both  Zynq and Microblaze
-In-Reply-To: <3706176.5tvYx0gSBz@wuerfel>
-References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
- <1917083.LB4Ng3Y2yP@wuerfel>
- <8520D5D51A55D047800579B094147198258741F5@XAP-PVEXMBX01.xlnx.xilinx.com>
- <3706176.5tvYx0gSBz@wuerfel>
-Message-ID: <20160128144944.GA12690@red-moon>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Thu, 28 Jan 2016 08:50:04 -0600
+Subject: [PATCH] arm64: Disallow combination of ARCH_XGENE and 16K page
+ size
+In-Reply-To: <20160128112033.GI17123@leverpostej>
+References: <1453936230-7305-1-git-send-email-dann.frazier@canonical.com>
+ <20160128103441.GS14823@e104818-lin.cambridge.arm.com>
+ <20160128110820.GE30928@arm.com> <20160128112033.GI17123@leverpostej>
+Message-ID: <56AA2A9C.5080602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 03:23:37PM +0100, Arnd Bergmann wrote:
-> On Thursday 28 January 2016 14:18:15 Bharat Kumar Gogada wrote:
-> > > 
-> > > I see. In the upstream code you seem to do it in
-> > > pcibios_setup_bus_devices(), while arm64 and powerpc do it in
-> > > pcibios_add_device().
-> > > 
-> > No that function is not getting called with generic API's, its getting called with pcibios_init flow which is tightly bound with struct pci_controller microblaze specific structure. So I added pcibios_add_device in pci-common.c.
-> 
-> Ok
-> 
-> > > > May be we can add similar on arm and test out, but we might need some
-> > > > cleanup in arch/arm/kernel/bios32.c
-> > > 
-> > > I think that would still just be a half-baked solution. This should really be fully
-> > > automatic. We could do it in the __weak
-> > > pcibios_add_device() for all architectures that don't override it when the bus
-> > > was probed from DT, or we could do it in pci_read_irq().
-> > When will pci_read_irq() call get invoked ?
-> 
-> This is called early on when a device gets created in pci_setup_device(),
-> so platforms can still override the value later.
-> 
-> The idea here is that normally a BIOS stores the interrupt number in
-> the PCI_INTERRUPT_LINE config space byte, and we just read it from
-> there. Generally speaking though, for non-PC systems we tend to not
-> have a BIOS that writes these values to start with, and any values
-> stored in here have no meaning in combination with SPARSE_IRQ
-> and/or IRQ_DOMAINS because the bootloader or BIOS doesn't know
-> what IRQ number will refer to hardware IRQ line in Linux.
+On 01/28/2016 05:20 AM, Mark Rutland wrote:
+> On Thu, Jan 28, 2016 at 11:08:20AM +0000, Will Deacon wrote:
+>> On Thu, Jan 28, 2016 at 10:34:41AM +0000, Catalin Marinas wrote:
 
-I think the best way to handle this is through Matthew's series (below),
-in the interim a callback in arch code would do, we will clean it up when
-Matthew's series goes upstream, it should not take too long.
+>> I thought there was also a suggestion that we could fail gracefully in
+>> the EFI stub if we detected an unsupported page size?
+>
+> Yup. There are other things we could/should test, too.
+>
+> I believe Jeremy had a patch, but due to churn in that area it didn't
+> get picked up.
 
-http://www.spinics.net/lists/linux-pci/msg45950.html
+I will clean-up and re-post that patch in the future too. It was fairly 
+trivial so if someone feels the need for immediately...
 
-Thanks,
-Lorenzo
+https://lkml.org/lkml/2015/10/14/948
+
+IMHO, The main sticking point initially was that the correct place for 
+the check was a moving target. That problem has been fixed, so it should 
+be easy to move it.
