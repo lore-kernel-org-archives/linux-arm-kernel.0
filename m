@@ -1,50 +1,84 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 28 Jan 2016 14:26:02 -0700
-Subject: [PATCH net-next 38/40] net: fec: recover from lost rxf_0 interrupt
+Date: Thu, 28 Jan 2016 14:26:00 -0700
+Subject: [PATCH net-next 36/40] net: fec: use mac set by bootloader before
+ fuses
 In-Reply-To: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1454016364-30985-39-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1454016364-30985-37-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following is true of linux-3.14. I have not been able
-to verify on mainline, because I cannot get the cpuidle
-driver to work.
-
-If gpio6 workaround is not used for interrupts, then
-it is possible for the entire receive queue to become
-full without an interrupt. If that happens, and the last
-rxf_0 interrupt is lost, then the FEC can no longer receive
-packets. However packet transmission is still fine, so the tx
-watchdog will never fire. The only way to recover before this
-is a ifconfig down/up. Skipping the FEC_ENET_RXF_0 check
-will allow the rx queue to recover from the condition when
-the next packet is transmitted.
-
-This patch also has the advantage of increasing iperf speed.
+If a bootloader initializes the mac, prefer that
+to device tree or fuses.
 
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/net/ethernet/freescale/fec_main.c | 33 +++++++++++++------------------
+ 1 file changed, 14 insertions(+), 19 deletions(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 00c9b7e..8372d9b 100644
+index 9db645d..11968a9 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -1608,9 +1608,10 @@ static int fec_enet_napi_q1(struct napi_struct *napi, int budget)
- 		}
+@@ -1625,16 +1625,24 @@ static void fec_get_mac(struct net_device *ndev)
+ 	struct fec_platform_data *pdata = dev_get_platdata(&fep->pdev->dev);
+ 	unsigned char *iap, tmpaddr[ETH_ALEN];
  
- 		writel(events, fep->hwp + FEC_IEVENT);
--		if (events & FEC_ENET_RXF_0)
--			pkts += fec_rxq(ndev, fep, fep->rx_queue[0],
--					budget - pkts);
-+		/* don't check FEC_ENET_RXF_0, to recover from a full queue
-+		 * but bit clear condition
-+		 */
-+		pkts += fec_rxq(ndev, fep, fep->rx_queue[0], budget - pkts);
- 		if (events & FEC_ENET_TXF_0)
- 			fec_txq(ndev, fep, fep->tx_queue[0]);
- 	} while (pkts < budget);
+-	/*
+-	 * try to get mac address in following order:
++	/* try to get mac address in following order:
+ 	 *
+ 	 * 1) module parameter via kernel command line in form
+ 	 *    fec.macaddr=0x00,0x04,0x9f,0x01,0x30,0xe0
+ 	 */
+ 	iap = macaddr;
+ 
+-	/*
+-	 * 2) from device tree data
++	/* 2) FEC mac registers set by bootloader
++	 */
++	if (!is_valid_ether_addr(iap)) {
++		*((__be32 *)&tmpaddr[0]) =
++			cpu_to_be32(readl(fep->hwp + FEC_ADDR_LOW));
++		*((__be16 *)&tmpaddr[4]) =
++			cpu_to_be16(readl(fep->hwp + FEC_ADDR_HIGH) >> 16);
++		iap = &tmpaddr[0];
++	}
++
++	/* 3) from device tree data
+ 	 */
+ 	if (!is_valid_ether_addr(iap)) {
+ 		struct device_node *np = fep->pdev->dev.of_node;
+@@ -1645,8 +1653,7 @@ static void fec_get_mac(struct net_device *ndev)
+ 		}
+ 	}
+ 
+-	/*
+-	 * 3) from flash or fuse (via platform data)
++	/* 4) from flash or fuse (via platform data)
+ 	 */
+ 	if (!is_valid_ether_addr(iap)) {
+ #ifdef CONFIG_M5272
+@@ -1658,19 +1665,7 @@ static void fec_get_mac(struct net_device *ndev)
+ #endif
+ 	}
+ 
+-	/*
+-	 * 4) FEC mac registers set by bootloader
+-	 */
+-	if (!is_valid_ether_addr(iap)) {
+-		*((__be32 *) &tmpaddr[0]) =
+-			cpu_to_be32(readl(fep->hwp + FEC_ADDR_LOW));
+-		*((__be16 *) &tmpaddr[4]) =
+-			cpu_to_be16(readl(fep->hwp + FEC_ADDR_HIGH) >> 16);
+-		iap = &tmpaddr[0];
+-	}
+-
+-	/*
+-	 * 5) random mac address
++	/* 5) random mac address
+ 	 */
+ 	if (!is_valid_ether_addr(iap)) {
+ 		/* Report it and use a random ethernet address instead */
 -- 
 2.5.0
