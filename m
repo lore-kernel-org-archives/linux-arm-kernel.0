@@ -1,40 +1,59 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 28 Jan 2016 16:16:21 -0300
-Subject: [PATCH v4 3/3] arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol
- into ARCH_EXYNOS
-In-Reply-To: <1453941324-15742-4-git-send-email-k.kozlowski@samsung.com>
-References: <1453941324-15742-1-git-send-email-k.kozlowski@samsung.com>
- <1453941324-15742-4-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <56AA6905.10807@osg.samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 28 Jan 2016 11:19:49 -0800
+Subject: [PATCH] clk: ti: omap3+: dpll: use non-locking version of
+ clk_get_rate
+In-Reply-To: <56AA6775.5090302@ti.com>
+References: <1453981067-8618-1-git-send-email-t-kristo@ti.com>
+ <56A9FED1.3090903@ti.com> <20160128172215.GD19432@atomide.com>
+ <56AA6261.7030503@ti.com> <20160128190026.GI19432@atomide.com>
+ <56AA6775.5090302@ti.com>
+Message-ID: <20160128191949.GK19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+* Tero Kristo <t-kristo@ti.com> [160128 11:10]:
+> On 01/28/2016 09:00 PM, Tony Lindgren wrote:
+> >* Tero Kristo <t-kristo@ti.com> [160128 10:48]:
+> >>On 01/28/2016 07:22 PM, Tony Lindgren wrote:
+> >>>* Tero Kristo <t-kristo@ti.com> [160128 03:44]:
+> >>>>On 01/28/2016 01:37 PM, Tero Kristo wrote:
+> >>>>>As the code in this file is being executed within irq context in some
+> >>>>>cases, we must avoid the clk_get_rate which uses mutex internally.
+> >>>>>Switch the code to use clk_hw_get_rate instead which is non-locking.
+> >>>>>
+> >>>>>Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> >>>>
+> >>>>Ooops, sorry. Sent wrong version (read: old) of this patch, please ignore
+> >>>>this one. Will re-send the correct version in a bit.
+> >>>
+> >>>I think this is still needed as a fix for -rc cycle with cc: stable
+> >>>as otherwise we have omap4 and 5 hang if PM runtime is enabled before
+> >>>a suspend/resume cycle?
+> >>
+> >>Look at the other patch I sent, it should accomplish the same thing, and
+> >>more.
+> >>
+> >>https://www.spinics.net/lists/linux-clk/msg06094.html
+> >
+> >Right.. But is that suitable for the -rc cycle with cc stable?
+> 
+> Hmm yea, thats a good question, we may need to resurrect this patch after
+> all.
 
-On 01/27/2016 09:35 PM, Krzysztof Kozlowski wrote:
-> The ARMv8 Exynos family SoCs in Linux kernel are currently:
->   - Exynos5433 (controlled by ARCH_EXYNOS),
->   - Exynos7 (controlled by ARCH_EXYNOS7).
->
-> It duplicates Kconfig symbols unnecessarily, so consolidate them into
-> one ARCH_EXYNOS. Future SoCs could fall also under the ARCH_EXYNOS
-> symbol.
->
-> The commit should not bring any visible functional change.
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Reviewed-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Tested-by: Alim Akhtar <alim.akhtar@samsung.com>
-> Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
->
+Yes a minimal fix first with cc stable, then the rest of the changes
+can be done for v4.6?
 
-Patch looks good to me.
+> >You should also describe the bug it causes in the change log.
+> >Something like:
+> >
+> >This fixes an issue where PM runtime will hang the system if
+> >enabled with a serial console before a suspend-resume cycle.
+> 
+> Yea I can add this to the desc if we want to keep this version of the patch.
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Yes please. It seems the fix should be cc stable for several merge
+windows.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Regards,
+
+Tony
