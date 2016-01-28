@@ -1,49 +1,41 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 28 Jan 2016 21:09:41 +0200
-Subject: [PATCH] clk: ti: omap3+: dpll: use non-locking version of
- clk_get_rate
-In-Reply-To: <20160128190026.GI19432@atomide.com>
-References: <1453981067-8618-1-git-send-email-t-kristo@ti.com>
- <56A9FED1.3090903@ti.com> <20160128172215.GD19432@atomide.com>
- <56AA6261.7030503@ti.com> <20160128190026.GI19432@atomide.com>
-Message-ID: <56AA6775.5090302@ti.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 28 Jan 2016 16:12:41 -0300
+Subject: [PATCH v4 1/3] clk: samsung: Enable COMPILE_TEST for Samsung
+ clocks
+In-Reply-To: <1453941324-15742-2-git-send-email-k.kozlowski@samsung.com>
+References: <1453941324-15742-1-git-send-email-k.kozlowski@samsung.com>
+ <1453941324-15742-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <56AA6829.8050900@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2016 09:00 PM, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [160128 10:48]:
->> On 01/28/2016 07:22 PM, Tony Lindgren wrote:
->>> * Tero Kristo <t-kristo@ti.com> [160128 03:44]:
->>>> On 01/28/2016 01:37 PM, Tero Kristo wrote:
->>>>> As the code in this file is being executed within irq context in some
->>>>> cases, we must avoid the clk_get_rate which uses mutex internally.
->>>>> Switch the code to use clk_hw_get_rate instead which is non-locking.
->>>>>
->>>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>>>
->>>> Ooops, sorry. Sent wrong version (read: old) of this patch, please ignore
->>>> this one. Will re-send the correct version in a bit.
->>>
->>> I think this is still needed as a fix for -rc cycle with cc: stable
->>> as otherwise we have omap4 and 5 hang if PM runtime is enabled before
->>> a suspend/resume cycle?
->>
->> Look at the other patch I sent, it should accomplish the same thing, and
->> more.
->>
->> https://www.spinics.net/lists/linux-clk/msg06094.html
+Hello Krzysztof,
+
+On 01/27/2016 09:35 PM, Krzysztof Kozlowski wrote:
+> Enable the COMPILE_TEST to get build coverage of some of Samsung clock
+> controller drivers. Still some of them will be built only if
+> appropriate SoC is chosen (like SOC_EXYNOS4415 or ARCH_S3C64XX).
 >
-> Right.. But is that suitable for the -rc cycle with cc stable?
-
-Hmm yea, thats a good question, we may need to resurrect this patch 
-after all.
-
-> You should also describe the bug it causes in the change log.
-> Something like:
+> Anyway in case of COMPILE_TEST the Samsung clocks would show up in main
+> drivers section because they are not inside the "Common Clock Framework"
+> menu item. Move them under the "Common Clock Framework".
 >
-> This fixes an issue where PM runtime will hang the system if
-> enabled with a serial console before a suspend-resume cycle.
+> This changes the logic of selecting Samsung clocks from specific
+> architectures. Now the COMMON_CLK should be selected before selecting
+> specific clock (like S3C2410_COMMON_CLK or COMMON_CLK_SAMSUNG).
+>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>
 
-Yea I can add this to the desc if we want to keep this version of the patch.
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
--Tero
+I have also verified that more samsung clocks drivers are built for
+allyesconfig (where COMPILE_TEST is enabled) when make M=drivers/clk
+
+Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
