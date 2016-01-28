@@ -1,7 +1,7 @@
 From: jeffmerkey@gmail.com (Jeffrey Merkey)
-Date: Thu, 28 Jan 2016 12:47:04 -0700
-Subject: [PATCH 17/31] Add debugger entry points for ARM
-Message-ID: <1454010424-29097-1-git-send-email-jeffmerkey@gmail.com>
+Date: Thu, 28 Jan 2016 12:47:52 -0700
+Subject: [PATCH 31/31] Add debugger entry points for ARM64
+Message-ID: <1454010472-29693-1-git-send-email-jeffmerkey@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,20 +16,19 @@ real time and quickly from a console debugger.
 
 Signed-off-by: Jeffrey Merkey <jeffmerkey@gmail.com>
 ---
- arch/arm/include/asm/kdebug.h | 5 +++++
- 1 file changed, 5 insertions(+)
- create mode 100644 arch/arm/include/asm/kdebug.h
+ arch/arm64/include/asm/kdebug.h | 4 ++++
+ 1 file changed, 4 insertions(+)
+ create mode 100644 arch/arm64/include/asm/kdebug.h
 
-diff --git a/arch/arm/include/asm/kdebug.h b/arch/arm/include/asm/kdebug.h
+diff --git a/arch/arm64/include/asm/kdebug.h b/arch/arm64/include/asm/kdebug.h
 new file mode 100644
-index 0000000..c60dad1
+index 0000000..5d09de1
 --- /dev/null
-+++ b/arch/arm/include/asm/kdebug.h
-@@ -0,0 +1,5 @@
++++ b/arch/arm64/include/asm/kdebug.h
+@@ -0,0 +1,4 @@
 +
 +static inline void arch_breakpoint(void)
 +{
-+	asm(__inst_arm(0xe7ffdeff));
 +}
 -- 
 1.8.3.1
