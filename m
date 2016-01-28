@@ -1,84 +1,440 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 28 Jan 2016 05:35:07 +0000
-Subject: [PATCH/RFC] ARM: shmobile: r8a7794: Add thermal device to DT
-In-Reply-To: <1453955575-32008-1-git-send-email-horms+renesas@verge.net.au>
-References: <1453955575-32008-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <87si1i1d91.wl%kuninori.morimoto.gx@renesas.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 28 Jan 2016 13:41:25 +0800
+Subject: [PATCH v6 3/7] ARM: dts: imx: Add Advantech BA-16 Qseven module
+In-Reply-To: <1450908016-17384-4-git-send-email-akshay.bhat@timesys.com>
+References: <1450908016-17384-1-git-send-email-akshay.bhat@timesys.com>
+ <1450908016-17384-4-git-send-email-akshay.bhat@timesys.com>
+Message-ID: <20160128054124.GD9070@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Simon
-
-> as discussed briefly last week I am having some trouble enabling thermal
-> for the r8a7794/alt. With this patch applied on top of
-> renesas-devel-20160127-v4.5-rc1 I see:
+On Wed, Dec 23, 2015 at 05:00:12PM -0500, Akshay Bhat wrote:
+> From: Justin Waters <justin.waters@timesys.com>
 > 
-> # dmesg | grep thermal
-> [    1.089897] rcar_thermal e61f0000.thermal: thermal sensor was broken
-> [    1.101225] rcar_thermal: probe of e61f0000.thermal failed with error -22
-
-Hmm... strange
-It can happen if thermal didn't work.
-It seems driver can't read data from register.
-
-> I also see this with "[PATCH] thermal: core: don't call unsupported trip on
-> thermal_tripped_notify()" applied.
-
-Oops, really ?
-I think you can't apply it on renesas-devel-20160127-v4.5-rc1
-
-# I'm not sure why, but latest thermal branch, linus/master, linux-next/master
-# doesn't have problem patch 850ddee1144("thermal: improve hot trip handling")
-# So above patch is not needed
-
-> IS this a kernel issue that you are aware of?
-> Is there a possibility that there is a problem with my hardware?
-
-I think this is r8a7794 specific issue, but your patch looks sane for me...
-
-> Any insight would be greatly appreciated.
+> Add support for Advantech BA-16 module based on iMX6D processor
 > 
-> AFIK this is not urgent.
-> 
+> http://www2.advantech.com/products/medical_computing_system/dms-ba16/mod_64aa1566-169c-483d-97c8-c2c22c163fc3.aspx
+> Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
 > ---
->  arch/arm/boot/dts/r8a7794.dtsi | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
+>  arch/arm/boot/dts/imx6q-ba16.dtsi | 641 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 641 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6q-ba16.dtsi
 > 
-> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-> index 5d5d8cb41191..3b84bf3c1124 100644
-> --- a/arch/arm/boot/dts/r8a7794.dtsi
-> +++ b/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -187,6 +187,14 @@
->  		status = "disabled";
->  	};
->  
-> +	thermal at e61f0000 {
-> +		compatible = "renesas,thermal-r8a7794", "renesas,rcar-thermal";
-> +		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>;
-> +		interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp5_clks R8A7794_CLK_THERMAL>;
-> +		power-domains = <&cpg_clocks>;
+> diff --git a/arch/arm/boot/dts/imx6q-ba16.dtsi b/arch/arm/boot/dts/imx6q-ba16.dtsi
+> new file mode 100644
+> index 0000000..f130037
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6q-ba16.dtsi
+> @@ -0,0 +1,641 @@
+> +/*
+> + * Support for imx6 based Advantech DMS-BA16 Qseven module
+> + *
+> + * Copyright 2015 Timesys Corporation.
+> + * Copyright 2015 General Electric Company
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +#include "imx6q.dtsi"
+> +#include <dt-bindings/gpio/gpio.h>
+> +
+> +/ {
+> +	memory {
+> +		reg = <0x10000000 0x40000000>;
 > +	};
 > +
->  	timer {
->  		compatible = "arm,armv7-timer";
->  		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-> @@ -1045,6 +1053,14 @@
->  			clock-indices = <R8A7794_CLK_IRQC>;
->  			clock-output-names = "irqc";
->  		};
-> +		mstp5_clks: mstp5_clks at e6150144 {
-> +			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
-> +			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
-> +			clocks = <&extal_clk>;
-> +			#clock-cells = <1>;
-> +			clock-indices = <R8A7794_CLK_THERMAL>;
-> +			clock-output-names = "thermal";
+> +	clocks {
+> +		clk24m: clk24m {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <24000000>;
 > +		};
->  		mstp7_clks: mstp7_clks at e615014c {
->  			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
->  			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
+
+How is this clock used on the board?
+
+> +	};
+> +
+> +	backlight_lvds: backlight {
+> +		compatible = "pwm-backlight";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_display>;
+> +		pwms = <&pwm1 0 5000000>;
+> +		brightness-levels = <  0   1   2   3   4   5   6   7   8   9
+> +				      10  11  12  13  14  15  16  17  18  19
+> +				      20  21  22  23  24  25  26  27  28  29
+> +				      30  31  32  33  34  35  36  37  38  39
+> +				      40  41  42  43  44  45  46  47  48  49
+> +				      50  51  52  53  54  55  56  57  58  59
+> +				      60  61  62  63  64  65  66  67  68  69
+> +				      70  71  72  73  74  75  76  77  78  79
+> +				      80  81  82  83  84  85  86  87  88  89
+> +				      90  91  92  93  94  95  96  97  98  99
+> +				     100 101 102 103 104 105 106 107 108 109
+> +				     110 111 112 113 114 115 116 117 118 119
+> +				     120 121 122 123 124 125 126 127 128 129
+> +				     130 131 132 133 134 135 136 137 138 139
+> +				     140 141 142 143 144 145 146 147 148 149
+> +				     150 151 152 153 154 155 156 157 158 159
+> +				     160 161 162 163 164 165 166 167 168 169
+> +				     170 171 172 173 174 175 176 177 178 179
+> +				     180 181 182 183 184 185 186 187 188 189
+> +				     190 191 192 193 194 195 196 197 198 199
+> +				     200 201 202 203 204 205 206 207 208 209
+> +				     210 211 212 213 214 215 216 217 218 219
+> +				     220 221 222 223 224 225 226 227 228 229
+> +				     230 231 232 233 234 235 236 237 238 239
+> +				     240 241 242 243 244 245 246 247 248 249
+> +				     250 251 252 253 254 255>;
+> +		default-brightness-level = <255>;
+> +		enable-gpios = <&gpio4 15 GPIO_ACTIVE_HIGH>;
+> +	};
+> +
+> +	reg_1p8v: regulator-1p8v {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "1P8V";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <1800000>;
+> +		regulator-always-on;
+> +	};
+> +
+> +	reg_3p3v: regulator-3p3v {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "3P3V";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		regulator-always-on;
+> +	};
+> +
+> +	reg_lvds: regulator-lvds {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "lvds_ppen";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		regulator-boot-on;
+> +		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+> +		enable-active-high;
+> +	};
+> +
+> +	reg_usb_h1_vbus: regulator-usb_h1_vbus {
+
+As a convention, hyphen instead of underscore should be used in node
+name.  I would suggest to simply name it like regulator-usbh1vbus to
+save additional hyphens.
+
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "usb_h1_vbus";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +	};
+> +
+> +	reg_usb_otg_vbus: regulator-usb_otg_vbus {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "usb_otg_vbus";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +	};
+> +};
+
+<snip>
+
+> +&usdhc2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc2>;
+> +	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
+> +	no-1-8-v;
+> +	keep-power-in-suspend;
+> +	enable-sdio-wakeup;
+
+Since commit 0dbcdc0622ea (mmc: core: enable support for the standard
+"wakeup-source" property), enable-sdio-wakeup becomes a legacy property.
+Please use the new standard one.
+
+Shawn
+
+> +	status = "okay";
+> +};
+> +
+> +&usdhc3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc3 &pinctrl_usdhc3_reset>;
+> +	bus-width = <8>;
+> +	vmmc-supply = <&vdd_bperi>;
+> +	vqmmc-supply = <&vdd_bio>;
+> +	non-removable;
+> +	keep-power-in-suspend;
+> +	status = "okay";
+> +};
+> +
+> +&wdog1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_wdog>;
+> +};
+> +
+> +&iomuxc {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hog>;
+> +
+> +	pinctrl_audmux: audmuxgrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_DISP0_DAT20__AUD4_TXC  0x130b0
+> +			MX6QDL_PAD_DISP0_DAT21__AUD4_TXD  0x130b0
+> +			MX6QDL_PAD_DISP0_DAT22__AUD4_TXFS 0x130b0
+> +			MX6QDL_PAD_DISP0_DAT23__AUD4_RXD  0x130b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_display: dispgrp {
+> +		fsl,pins = <
+> +			/* BLEN_OUT */
+> +			MX6QDL_PAD_KEY_ROW4__GPIO4_IO15  0x1b0b0
+> +			/* LVDS_PPEN_OUT */
+> +			MX6QDL_PAD_EIM_D22__GPIO3_IO22   0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_ecspi1: ecspi1grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_EIM_D17__ECSPI1_MISO	0x100b1
+> +			MX6QDL_PAD_EIM_D18__ECSPI1_MOSI	0x100b1
+> +			MX6QDL_PAD_EIM_D16__ECSPI1_SCLK	0x100b1
+> +			/* SPI1 CS */
+> +			MX6QDL_PAD_EIM_EB2__GPIO2_IO30	0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_ecspi5: ecspi5grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_SD1_DAT0__ECSPI5_MISO	0x1b0b0
+> +			MX6QDL_PAD_SD1_CMD__ECSPI5_MOSI		0x1b0b0
+> +			MX6QDL_PAD_SD1_CLK__ECSPI5_SCLK		0x1b0b0
+> +			MX6QDL_PAD_SD1_DAT1__GPIO1_IO17		0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_enet: enetgrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_ENET_MDIO__ENET_MDIO       0x100b0
+> +			MX6QDL_PAD_ENET_MDC__ENET_MDC         0x100b0
+> +			MX6QDL_PAD_RGMII_TXC__RGMII_TXC       0x100b0
+> +			MX6QDL_PAD_RGMII_TD0__RGMII_TD0       0x100b0
+> +			MX6QDL_PAD_RGMII_TD1__RGMII_TD1       0x100b0
+> +			MX6QDL_PAD_RGMII_TD2__RGMII_TD2       0x100b0
+> +			MX6QDL_PAD_RGMII_TD3__RGMII_TD3       0x100b0
+> +			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL 0x100b0
+> +			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK  0x100b0
+> +			MX6QDL_PAD_RGMII_RXC__RGMII_RXC       0x1b0b0
+> +			MX6QDL_PAD_RGMII_RD0__RGMII_RD0       0x1b0b0
+> +			MX6QDL_PAD_RGMII_RD1__RGMII_RD1       0x1b0b0
+> +			MX6QDL_PAD_RGMII_RD2__RGMII_RD2       0x1b0b0
+> +			MX6QDL_PAD_RGMII_RD3__RGMII_RD3       0x1b0b0
+> +			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
+> +			/* FEC Reset */
+> +			MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28     0x1b0b0
+> +			/* AR8033 Interrupt */
+> +			MX6QDL_PAD_GPIO_19__GPIO4_IO05        0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_hog: hoggrp {
+> +		fsl,pins = <
+> +			/* GPIO 0-7 */
+> +			MX6QDL_PAD_NANDF_D0__GPIO2_IO00  0x1b0b0
+> +			MX6QDL_PAD_NANDF_D1__GPIO2_IO01  0x1b0b0
+> +			MX6QDL_PAD_NANDF_D2__GPIO2_IO02  0x1b0b0
+> +			MX6QDL_PAD_NANDF_D3__GPIO2_IO03  0x1b0b0
+> +			MX6QDL_PAD_NANDF_D4__GPIO2_IO04  0x1b0b0
+> +			MX6QDL_PAD_NANDF_D5__GPIO2_IO05  0x1b0b0
+> +			MX6QDL_PAD_NANDF_D6__GPIO2_IO06  0x1b0b0
+> +			MX6QDL_PAD_NANDF_D7__GPIO2_IO07  0x1b0b0
+> +			/* SUS_S3_OUT to CPLD */
+> +			MX6QDL_PAD_KEY_ROW2__GPIO4_IO11  0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_i2c1: i2c1grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_CSI0_DAT8__I2C1_SDA	0x4001b8b1
+> +			MX6QDL_PAD_CSI0_DAT9__I2C1_SCL	0x4001b8b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_i2c2: i2c2grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_KEY_COL3__I2C2_SCL	0x4001b8b1
+> +			MX6QDL_PAD_KEY_ROW3__I2C2_SDA	0x4001b8b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_i2c3: i2c3grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_GPIO_3__I2C3_SCL	0x4001b8b1
+> +			MX6QDL_PAD_GPIO_6__I2C3_SDA	0x4001b8b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_pcie: pciegrp {
+> +		fsl,pins = <
+> +			/* PCIe Reset */
+> +			MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x1b0b0
+> +			/* PCIe Wake */
+> +			MX6QDL_PAD_GPIO_5__GPIO1_IO05	0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_pmic: pmicgrp {
+> +		fsl,pins = <
+> +			/* PMIC Interrupt */
+> +			MX6QDL_PAD_GPIO_18__GPIO7_IO13	0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_pwm1: pwm1grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_SD1_DAT3__PWM1_OUT	0x1b0b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_pwm2: pwm2grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_GPIO_1__PWM2_OUT	0x1b0b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_rtc: rtcgrp {
+> +		fsl,pins = <
+> +			/* RTC_INT */
+> +			MX6QDL_PAD_KEY_COL2__GPIO4_IO10	0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_uart3: uart3grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_EIM_D25__UART3_RX_DATA 0x1b0b1
+> +			MX6QDL_PAD_EIM_D24__UART3_TX_DATA 0x1b0b1
+> +			MX6QDL_PAD_EIM_D23__UART3_CTS_B   0x1b0b1
+> +			MX6QDL_PAD_EIM_D31__UART3_RTS_B   0x1b0b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_uart4: uart4grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_KEY_COL0__UART4_TX_DATA 0x1b0b1
+> +			MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA 0x1b0b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_usbhub: usbhubgrp {
+> +		fsl,pins = <
+> +			/* HUB_RESET */
+> +			MX6QDL_PAD_GPIO_16__GPIO7_IO11	0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_usbotg: usbotggrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID 0x17059
+> +		>;
+> +	};
+> +
+> +	pinctrl_usdhc2: usdhc2grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_SD2_CMD__SD2_CMD	0x17059
+> +			MX6QDL_PAD_SD2_CLK__SD2_CLK	0x10059
+> +			MX6QDL_PAD_SD2_DAT0__SD2_DATA0	0x17059
+> +			MX6QDL_PAD_SD2_DAT1__SD2_DATA1	0x17059
+> +			MX6QDL_PAD_SD2_DAT2__SD2_DATA2	0x17059
+> +			MX6QDL_PAD_SD2_DAT3__SD2_DATA3	0x17059
+> +			/* uSDHC2 CD */
+> +			MX6QDL_PAD_GPIO_4__GPIO1_IO04	0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_usdhc3: usdhc3grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x17059
+> +			MX6QDL_PAD_SD3_CLK__SD3_CLK	0x10059
+> +			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x17059
+> +			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x17059
+> +			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x17059
+> +			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x17059
+> +			MX6QDL_PAD_SD3_DAT4__SD3_DATA4	0x17059
+> +			MX6QDL_PAD_SD3_DAT5__SD3_DATA5	0x17059
+> +			MX6QDL_PAD_SD3_DAT6__SD3_DATA6	0x17059
+> +			MX6QDL_PAD_SD3_DAT7__SD3_DATA7	0x17059
+> +		>;
+> +	};
+> +
+> +	pinctrl_usdhc3_reset: usdhc3grp-reset {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_SD3_RST__SD3_RESET   0x170F9
+> +		>;
+> +	};
+> +
+> +	pinctrl_usdhc4: usdhc4grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_SD4_CMD__SD4_CMD	0x17059
+> +			MX6QDL_PAD_SD4_CLK__SD4_CLK	0x17059
+> +			MX6QDL_PAD_SD4_DAT0__SD4_DATA0	0x17059
+> +			MX6QDL_PAD_SD4_DAT1__SD4_DATA1	0x17059
+> +			MX6QDL_PAD_SD4_DAT2__SD4_DATA2	0x17059
+> +			MX6QDL_PAD_SD4_DAT3__SD4_DATA3	0x17059
+> +			MX6QDL_PAD_SD4_DAT4__SD4_DATA4	0x17059
+> +			MX6QDL_PAD_SD4_DAT5__SD4_DATA5	0x17059
+> +			MX6QDL_PAD_SD4_DAT6__SD4_DATA6	0x17059
+> +			MX6QDL_PAD_SD4_DAT7__SD4_DATA7	0x17059
+> +			/* uSDHC4 CD */
+> +			MX6QDL_PAD_NANDF_CS0__GPIO6_IO11 0x1b0b0
+> +			/* uSDHC4 SDIO PWR */
+> +			MX6QDL_PAD_NANDF_CS1__GPIO6_IO14 0x1b0b0
+> +			/* uSDHC4 SDIO WP */
+> +			MX6QDL_PAD_NANDF_CS2__GPIO6_IO15 0x1b0b0
+> +			/* uSDHC4 SDIO LED */
+> +			MX6QDL_PAD_NANDF_CS3__GPIO6_IO16 0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_wdog: wdoggrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_GPIO_9__WDOG1_B	0x1b0b0
+> +		>;
+> +	};
+> +};
 > -- 
-> 2.1.4
+> 2.6.3
+> 
 > 
