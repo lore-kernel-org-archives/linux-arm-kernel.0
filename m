@@ -1,287 +1,93 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Thu, 28 Jan 2016 13:26:28 -0500
-Subject: [PATCH v6 4/7] ARM: dts: imx: Add support for Advantech/GE Bx50v3
-In-Reply-To: <20160128061202.GE9070@tiger>
-References: <1450908016-17384-1-git-send-email-akshay.bhat@timesys.com>
- <1450908016-17384-5-git-send-email-akshay.bhat@timesys.com>
- <20160128061202.GE9070@tiger>
-Message-ID: <56AA5D54.7090709@timesys.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 28 Jan 2016 10:31:56 -0800
+Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
+In-Reply-To: <56A94FB7.6020903@ti.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <1452780672-14339-4-git-send-email-kishon@ti.com>
+ <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
+ <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
+Message-ID: <20160128183156.GH19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Suman Anna <s-anna@ti.com> [160127 15:17]:
+> On 01/27/2016 12:56 PM, Tony Lindgren wrote:
+> > * Suman Anna <s-anna@ti.com> [160127 10:17]:
+> >> On 01/27/2016 11:31 AM, Tony Lindgren wrote:
+> >>> Why do you need another reset here? Can't you just implement PM runtime
+> >>> in the driver and do the usual pm_runtime_put_sync followed by
+> >>> pm_runtime_disable?
+> >>
+> >> The omap_hwmod_enable/disable code does not deal with hardresets (PRCM
+> >> reset lines) and so the pm_runtime_get_sync/put_sync only end up dealing
+> >> with clocks, and we need to invoke the reset functions separately.
+> >> Modules with softresets in SYSCONFIG are ok, as they are dealt with
+> >> properly.
+> > 
+> > Hmm _reset() in omap_hwmod.c has this to call _assert_hardreset:
+> > 
+> > 	if (oh->class->reset) {
+> > 		r = oh->class->reset(oh);
+> > 	} else {
+> > 		if (oh->rst_lines_cnt > 0) {
+> > 			for (i = 0; i < oh->rst_lines_cnt; i++)
+> > 				_assert_hardreset(oh, oh->rst_lines[i].name);
+> > 			return 0;
+> > 		} else {
+> > 			r = _ocp_softreset(oh);
+> > 			if (r == -ENOENT)
+> > 				r = 0;
+> > 		}
+> > 	}
+> 
+> Right, hwmod code does the initial reset.
+> 
+> > Care to explain what exactly the problem with the hwmod code not doing
+> > the reset on init?
+> 
+> And we only need to deassert the reset in probe. Technically, we don't
+> need to assert first and deassert in probe, and that was a design choice
+> made by Kishon.
 
+OK so if hwmod code has already done the reset, then why would you need
+to deassert reset in the device driver probe?
 
-On 01/28/2016 01:12 AM, Shawn Guo wrote:
-> On Wed, Dec 23, 2015 at 05:00:13PM -0500, Akshay Bhat wrote:
->> From: Justin Waters <justin.waters@timesys.com>
->>
->> Advantech has 3 carrier boards (B450v3, B650v3, B850v3) which use
->> the Advantech BA-16 module (based on iMX6D). This file has the
->> devicetree entries that are common to all 3 boards.
->>
->> Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
->> ---
->>   arch/arm/boot/dts/imx6q-bx50v3.dtsi | 237 ++++++++++++++++++++++++++++++++++++
->>   1 file changed, 237 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/imx6q-bx50v3.dtsi
->>
->> diff --git a/arch/arm/boot/dts/imx6q-bx50v3.dtsi b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
->> new file mode 100644
->> index 0000000..1eaf0ce
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
->> @@ -0,0 +1,237 @@
->> +/*
->> + * Copyright 2015 Timesys Corporation.
->> + * Copyright 2015 General Electric Company
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License
->> + *     version 2 as published by the Free Software Foundation.
->> + *
->> + *     This file is distributed in the hope that it will be useful
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
->> +
->> +#include "imx6q-ba16.dtsi"
->> +
->> +/ {
->> +	clocks {
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->
-> Have a new line between properties and sub-node.
+> > And why do you need to do another reset in dra7xx_pcie_remove()?
+> 
+> Primarily to restore the reset state back to what it was after the
+> driver remove gets called. We cannot call deassert twice without calling
+> a assert in between. Kishon had originally added the assert and deassert
+> only in probe, but nothing in remove, they ought to be deassert in probe
+> and assert in remove to match initial hardware state, and to also make
+> it work across multiple probe/remove.
 
-Will fix this.
+I don't understand this part either.. Usually you just power up and init
+the registers to a sane state in a device driver probe and on exit just
+power down the device.
 
->
->> +		mclk: clock at 0 {
->> +			compatible = "fixed-clock";
->> +			reg = <0>;
->> +			#clock-cells = <0>;
->> +			clock-frequency = <22000000>;
->> +		};
->
-> So it's using a different clock naming schema from clk24m in
-> imx6q-ba16.dtsi.  In any case, they should be consistent.
->
->> +	};
->> +
->> +	reg_wl18xx_vmmc: regulator-wl18xx_vmmc {
->
-> As a convention, hyphen instead of underscore should be used in node
-> name.  Actually less hyphen form like regulator-wl18xxvmmc or
-> regulator-wl18xx looks better to me.
->
-Will fix this.
+> >>> Basically I'm wondering how come we need these platform data callbacks
+> >>> at all.
+> >>
+> >> The hardresets are controlled through the
+> >> omap_device_assert(deassert)_hardreset functions, and since these are
+> >> limited to mach-omap2, we are invoking them through platform data callbacks.
+> > 
+> > Right.. But I'm wondering about the why you need to do this in the
+> > driver at all part :)
+> 
+> The initial reset at init time is okay, but hwmod _enable() bails out if
+> the resets lines are asserted. This was a change made long time back, I
+> believe to deal with the problems around the DSP enabling sequences. As
+> such, pm_runtime_get_sync() and put_sync() do not deassert and assert
+> the resets.
 
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "vwl1807";
->> +		regulator-min-microvolt = <3300000>;
->> +		regulator-max-microvolt = <3300000>;
->> +		gpio = <&pca9539 3 GPIO_ACTIVE_HIGH>;
->> +		startup-delay-us = <70000>;
->> +		enable-active-high;
->> +	};
->> +
->> +	reg_wlan: regulator-wlan {
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "3P3V_wlan";
->> +		regulator-min-microvolt = <3300000>;
->> +		regulator-max-microvolt = <3300000>;
->> +		regulator-always-on;
->> +		regulator-boot-on;
->> +		gpio = <&gpio6 14 GPIO_ACTIVE_HIGH>;
->> +	};
->> +
->> +	sound {
->> +		compatible = "fsl,imx6q-ba16-sgtl5000",
->> +			     "fsl,imx-audio-sgtl5000";
->> +		model = "imx6q-ba16-sgtl5000";
->> +		ssi-controller = <&ssi1>;
->> +		audio-codec = <&codec>;
->> +		audio-routing =
->> +			"MIC_IN", "Mic Jack",
->> +			"Mic Jack", "Mic Bias",
->> +			"LINE_IN", "Line In Jack",
->> +			"Headphone Jack", "HP_OUT";
->> +		mux-int-port = <1>;
->> +		mux-ext-port = <4>;
->> +	};
->> +};
->> +
->> +&ecspi5 {
->> +	fsl,spi-num-chipselects = <1>;
->> +	cs-gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_ecspi5>;
->> +	status = "okay";
->> +
->> +	m25_eeprom: m25p80 at 0 {
->> +		compatible = "atmel,at25";
->> +		spi-max-frequency = <20000000>;
->> +		size = <0x8000>;
->> +		pagesize = <64>;
->> +		reg = <0>;
->> +		address-width = <16>;
->> +	};
->> +};
->> +
->> +&i2c1 {
->> +	pca9547: mux at 70 {
->> +		compatible = "nxp,pca9547";
->> +		reg = <0x70>;
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		mux_i2c3: i2c at 0 {
->
-> How are these mux_i2c labels named?  Where are mux_i2c1 and mux_i2c2?
->
-Agree that the naming is confusing. Since i2c0/i2c1/i2c2 maps to the 
-processor, idea was to continue the naming convention starting at 
-mux_i2c3. I will change it in the next version of patch: mux1_i2c1 to 
-mux1_i2c8 in imx6q-bx50v3.dtsi and mux2_i2c1 to mux2_i2c8 in 
-imx6q-b850v3.dts.
+OK if the hwmod code does not deassert reset lines properly on enable,
+then that sounds like a bug that should be fixed instead of adding
+device specific work arounds.
 
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x0>;
->> +
->> +			ads7830: ads7830 at 48 {
->> +				compatible = "ti,ads7830";
->> +				reg = <0x48>;
->> +			};
->> +
->> +			mma8453: mma8453 at 1c {
->> +				compatible = "fsl,mma8453";
->> +				reg = <0x1c>;
->> +			};
->> +		};
->> +
->> +		mux_i2c4: i2c at 1 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x1>;
->> +
->> +			eeprom: eeprom at 50 {
->> +				compatible = "atmel,24c08";
->> +				reg = <0x50>;
->> +			};
->> +
->> +			mpl3115: mpl3115 at 60 {
->> +				compatible = "fsl,mpl3115";
->> +				reg = <0x60>;
->> +			};
->> +		};
->> +
->> +		mux_i2c5: i2c at 2 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x2>;
->> +		};
->> +
->> +		mux_i2c6: i2c at 3 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x3>;
->> +
->> +			codec: sgtl5000 at 0a {
->> +				compatible = "fsl,sgtl5000";
->> +				reg = <0x0a>;
->> +				clocks = <&mclk>;
->> +				VDDA-supply = <&reg_1p8v>;
->> +				VDDIO-supply = <&reg_3p3v>;
->> +			};
->> +		};
->> +
->> +		mux_i2c7: i2c at 4 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x4>;
->> +
->> +			pca9539: pca9539 at 74 {
->> +				compatible = "nxp,pca9539";
->> +				reg = <0x74>;
->> +				gpio-controller;
->> +				#gpio-cells = <2>;
->> +				interrupt-controller;
->> +				interrupt-parent = <&gpio2>;
->> +				interrupts = <3 IRQ_TYPE_LEVEL_LOW>;
->> +			};
->> +		};
->> +
->> +		mux_i2c8: i2c at 5 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x5>;
->> +
->> +			igb at 49 {
->> +				compatible = "intel,igb";
->> +				reg = <0x49>;
->> +			};
->> +
->> +			igb at 61 {
->> +				compatible = "intel,igb";
->> +				reg = <0x61>;
->> +			};
->> +		};
->> +
->> +		mux_i2c9: i2c at 6 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x6>;
->> +		};
->> +
->> +		mux_i2c10: i2c at 7 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x7>;
->> +		};
->> +	};
->> +};
->> +
->> +&usdhc4 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_usdhc4>;
->> +	bus-width = <4>;
->> +	vmmc-supply = <&reg_wl18xx_vmmc>;
->> +	no-1-8-v;
->> +	non-removable;
->> +	enable-sdio-wakeup;
->
-> wakeup-source
->
-> Shawn
->
-Will fix this
+Sorry to keep dragging this on a bit longer, but I think we need to
+hear Paul's comments on this one.
+
+Regards,
+
+Tony
