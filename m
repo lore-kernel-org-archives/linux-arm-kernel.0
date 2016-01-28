@@ -1,55 +1,96 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Jan 2016 12:20:55 +0100
-Subject: Speeding up dma_unmap
-In-Reply-To: <20160128103105.GR14823@e104818-lin.cambridge.arm.com>
-References: <CAJFSRaCRvx=+_fEYAr8OeWGHnnz+rOWjLzLcm+wZiEstbHwxAw@mail.gmail.com>
- <20160127180944.GZ10826@n2100.arm.linux.org.uk>
- <20160128103105.GR14823@e104818-lin.cambridge.arm.com>
-Message-ID: <24650183.WoXLVmr0Vj@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 28 Jan 2016 12:22:14 +0100
+Subject: pinctrl: mediatek: questions about gpio/pinctrl/eint
+In-Reply-To: <1453948541.14802.38.camel@mhfsdcap03>
+References: <1453948541.14802.38.camel@mhfsdcap03>
+Message-ID: <CACRpkdbhY9Rt-DD3BgiG8u5JrW+6XcZn0JWWE2Q39wQp38GjXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 January 2016 10:31:06 Catalin Marinas wrote:
-> On Wed, Jan 27, 2016 at 06:09:45PM +0000, Russell King - ARM Linux wrote:
-> > On Wed, Jan 27, 2016 at 04:06:30PM +0000, Catalin Marinas wrote:
-> > > On Wed, Jan 27, 2016 at 01:23:27PM +0100, Arnd Bergmann wrote:
-> > > > up reading cache lines back in randomly on a speculative prefetch,
-> > > > but as far as I can tell, the Cortex-A8 (or A5/A7) won't do that.
-> > > 
-> > > Are you sure about A5 and A7? I'm not even sure about the A8 but there
-> > > are good chances that A7 and A5 do speculative prefetches.
-> > 
-> > I thought when I was re-implementing the DMA API on ARM (which was
-> > around early v7 times) that there were CPUs that did speculative
-> > prefetching, which included the A8.  I seem to remember it was pretty
-> > urgent to have the DMA API fixed for _any_ ARMv7 CPU because of the
-> > speculative prefetching.
-> 
-> Indeed, it's a safe assumption to say that any ARMv7 CPU perform
-> speculative accesses. Even if some of them may only do I-cache
-> prefetching (just guessing), in the presence of a unified L2 this
-> distinction no longer matters.
+On Thu, Jan 28, 2016 at 3:35 AM, biao huang <biao.huang@mediatek.com> wrote:
 
-Ok, I was thrown off by the code comment then, and by my incorrect
-assumption that only the out-of-order cores were doing any speculative
-execution (prefetch or not). According to the Cortex-A5 TRM, "The
-Cortex-A5 MPCore data cache implements an automatic prefetcher that
-monitors cache misses done by the processor. When a pattern is detected,
-the automatic prefetcher starts linefills in the background."
+>         First, when user call GPIO API to control medaitek gpio, they should
+> call pinctrl API to set pinmux to mode 0 ahead, so this pin is function
+> as gpio. And this makes things a little complicated. Is there any simple
+> API can solve this problem? How about add pinmux setting in
+> gpio_request?
 
-I have looked at the documentation for a couple of cores and found that:
+This is what the
+pinctrl_request_gpio, pinctrl_free_gpio, pinctrl_gpio_direction_input
+andpinctrl_gpio_direction_output calls are for.
 
-* Cortex-A9 always does speculative prefetching
-* Cortex-A8 does not have this mentioned in the manual, which would
-  be a hint that it indeed does not do it at all, but that could be
-  wrong. It does explicitly mention prefetching into icache, and
-  mentions prefetching using the PLD instruction and the L2 PLE.
-* A5/A7/A15/A17 all do prefetching unless disabled in the ACTLR
-  register. CPUs that have L2 caches can control this separately
-  for L1 and L2 as needed.
+Look for example in drivers/gpio/gpio-pl061.c:
 
-This means that there are still some cores on which one could try
-if disabling the prefetching and the flushes in DMA unmap provides
-any serious performance boost.
+      if (of_property_read_bool(dev->of_node, "gpio-ranges")) {
+                chip->gc.request = gpiochip_generic_request;
+                chip->gc.free = gpiochip_generic_free;
+        }
 
-	Arnd
+What does that do:
+
+/**
+ * gpiochip_generic_request() - request the gpio function for a pin
+ * @chip: the gpiochip owning the GPIO
+ * @offset: the offset of the GPIO to request for GPIO function
+ */
+int gpiochip_generic_request(struct gpio_chip *chip, unsigned offset)
+{
+        return pinctrl_request_gpio(chip->base + offset);
+}
+EXPORT_SYMBOL_GPL(gpiochip_generic_request);
+
+/**
+ * gpiochip_generic_free() - free the gpio function from a pin
+ * @chip: the gpiochip to request the gpio function for
+ * @offset: the offset of the GPIO to free from GPIO function
+ */
+void gpiochip_generic_free(struct gpio_chip *chip, unsigned offset)
+{
+        pinctrl_free_gpio(chip->base + offset);
+}
+EXPORT_SYMBOL_GPL(gpiochip_generic_free);
+
+Yes....
+
+Your pinctrl driver needs to implement the
+.gpio_request_enable()
+.gpio_disable_free()
+.gpio_set_direction()
+callbacks in struct pinmux_ops.
+
+Also read in Documentation/pinctrl.txt about pinctrl/GPIO interaction.
+
+>         Second, here is our request_irq flow in mkd eint driver:
+> request_irq --> mtk_pinctrl_irq_request_resources--> mtk_pmx_set_mode,
+> Normally, it'll set pinmux to eint mode (usually is mode 0) in
+> mtk_pmx_set_mode function. But for special case, such as iddig (connect
+> to usb), when iddig request_irq, it should set pinmux to iddig mode
+> (mode 2 in mt8163).
+>         Is there a better way than changing
+>         MTK_PIN(
+>                 PINCTRL_PIN(16, "IDDIG"),
+>                 NULL, "mt8173",
+>                 MTK_EINT_FUNCTION(0, 16),
+>                 MTK_FUNCTION(0, "GPIO16"),
+>                 MTK_FUNCTION(1, "IDDIG"),
+>                 MTK_FUNCTION(2, "CMFLASH"),
+>                 MTK_FUNCTION(4, "PWM5")
+>         ),
+>         to
+>         MTK_PIN(
+>                 PINCTRL_PIN(16, "IDDIG"),
+>                 NULL, "mt8173",
+>                 MTK_EINT_FUNCTION(2, 16),
+>                 MTK_FUNCTION(0, "GPIO16"),
+>                 MTK_FUNCTION(1, "IDDIG"),
+>                 MTK_FUNCTION(2, "CMFLASH"),
+>                 MTK_FUNCTION(4, "PWM5")
+>         ),
+>         in drivers/pinctrl/mediatek/pinctrl-mtk-mt8163.h?
+
+This is the mediatek driver internals, I don't understand that.
+Your guess is as good as mine, ask help from the other
+driver authors is my hint, I can only help with the framework...
+
+Yours,
+Linus Walleij
