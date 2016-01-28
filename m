@@ -1,217 +1,65 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Thu, 28 Jan 2016 13:56:11 -0500
-Subject: [PATCH v6 7/7] ARM: dts: imx: Add support for Advantech/GE B850v3
-In-Reply-To: <20160128062639.GH9070@tiger>
-References: <1450908016-17384-1-git-send-email-akshay.bhat@timesys.com>
- <1450908016-17384-8-git-send-email-akshay.bhat@timesys.com>
- <20160128062639.GH9070@tiger>
-Message-ID: <56AA644B.6060500@timesys.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 28 Jan 2016 18:54:11 +0000 (UTC)
+Subject: [PATCH 1/2] ARM: kernel: add support for cpu cache information
+References: <1424716091-22914-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <loom.20160128T191752-889@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Sudeep Holla <sudeep.holla <at> arm.com> writes:
 
+> 
+> This patch adds support for cacheinfo on ARM platforms.
+> 
+> On ARMv7, the cache hierarchy can be identified through Cache Level ID
+> register(CLIDR) while the cache geometry is provided by Cache Size ID
+> register(CCSIDR).
+> 
+> On architecture versions before ARMv7, CLIDR and CCSIDR is not
+> implemented. The cache type register(CTR) provides both cache hierarchy
+> and geometry if implemented. For implementations that doesn't support
+> CTR, we need to list the probable value of CTR if it was implemented
+> along with the cpuid for the sake of simplicity to handle them.
+> 
+> Since the architecture doesn't provide any way of detecting the cpus
+> sharing particular cache, device tree is used fo the same purpose.
+> On non-DT platforms, first level caches are per-cpu while higher level
+> caches are assumed system-wide.
+> 
+> This is based on the newly introduced generic cacheinfo infrastructure
+> through the commit 246246cbde5e ("drivers: base: support cpu cache
+> information interface to userspace via sysfs")
+> 
+> Signed-off-by: Sudeep Holla <sudeep.holla <at> arm.com>
+> Tested-by: Stephen Boyd <sboyd <at> codeaurora.org>
+> Cc: Russell King <linux <at> arm.linux.org.uk>
+> Cc: Will Deacon <will.deacon <at> arm.com>
+> Cc: linux-arm-kernel <at> lists.infradead.org
+> ---
 
-On 01/28/2016 01:26 AM, Shawn Guo wrote:
-> On Wed, Dec 23, 2015 at 05:00:16PM -0500, Akshay Bhat wrote:
->> Add support for Advantech/GE B850v3 board.
->>
->> Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
->> ---
->>   arch/arm/boot/dts/Makefile         |   1 +
->>   arch/arm/boot/dts/imx6q-b850v3.dts | 157 +++++++++++++++++++++++++++++++++++++
->>   2 files changed, 158 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/imx6q-b850v3.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 684a504..b6c6d7a 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -319,6 +319,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->>   	imx6q-arm2.dtb \
->>   	imx6q-b450v3.dtb \
->>   	imx6q-b650v3.dtb \
->> +	imx6q-b850v3.dtb \
->>   	imx6q-cm-fx6.dtb \
->>   	imx6q-cubox-i.dtb \
->>   	imx6q-dfi-fs700-m60.dtb \
->> diff --git a/arch/arm/boot/dts/imx6q-b850v3.dts b/arch/arm/boot/dts/imx6q-b850v3.dts
->> new file mode 100644
->> index 0000000..318ba65
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/imx6q-b850v3.dts
->> @@ -0,0 +1,157 @@
->> +/*
->> + * Copyright 2015 Timesys Corporation.
->> + * Copyright 2015 General Electric Company
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License
->> + *     version 2 as published by the Free Software Foundation.
->> + *
->> + *     This file is distributed in the hope that it will be useful
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
->> +
->> +/dts-v1/;
->> +
->> +#include "imx6q-bx50v3.dtsi"
->> +
->> +/ {
->> +	model = "General Electric B850v3";
->> +	compatible = "ge,imx6q-b850v3", "advantech,imx6q-ba16", "fsl,imx6q";
->> +
->> +	chosen {
->> +		stdout-path = &uart3;
->> +	};
->> +
->> +	panel_lvds0 {
->
-> Hyphen please.
->
-Will fix it.
+It does not appear this patch has been merged yet, I gave it a spin on a
+Brahma-B15 based system which has a similar cache hierarchy to the
+Cortex-A15, and therefore, has no cache properties listed in Device Tree,
+since everything is built-in.
 
->> +		compatible = "auo,b133htn01";
->> +		backlight = <&backlight_lvds>;
->> +		ddc-i2c-bus = <&mux_i2c12>;
->> +
->> +		port {
->> +			panel_in_lvds0: endpoint {
->> +				remote-endpoint = <&lvds0_out>;
->> +			};
->> +		};
->> +	};
->> +};
->> +
->> +&ldb {
->> +	assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
->> +			  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
->> +	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
->> +				 <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
->> +	fsl,dual-channel;
->> +	status = "okay";
->> +
->> +	lvds0: lvds-channel at 0 {
->> +		fsl,data-mapping = "spwg";
->> +		fsl,data-width = <24>;
->> +		status = "okay";
->> +
->> +		port at 4 {
->> +			reg = <4>;
->> +
->> +			lvds0_out: endpoint {
->> +				remote-endpoint = <&panel_in_lvds0>;
->> +			};
->> +		};
->> +	};
->> +};
->> +
->> +&i2c2 {
->> +	pca9547_ddc: mux at 70 {
->> +		compatible = "nxp,pca9547";
->> +		reg = <0x70>;
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		mux_i2c11: i2c at 0 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x0>;
->> +		};
->> +
->> +		mux_i2c12: i2c at 1 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x1>;
->> +		};
->> +
->> +		mux_i2c13: i2c at 2 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x2>;
->> +		};
->> +
->> +		mux_i2c14: i2c at 3 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x3>;
->> +		};
->> +
->> +		mux_i2c15: i2c at 4 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x4>;
->> +		};
->> +
->> +		mux_i2c16: i2c at 5 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x5>;
->> +		};
->> +
->> +		mux_i2c17: i2c at 6 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x6>;
->> +		};
->> +
->> +		mux_i2c18: i2c at 7 {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			reg = <0x7>;
->> +		};
->> +	};
->> +};
->> +
->> +&hdmi {
->> +	ddc-i2c-bus = <&mux_i2c11>;
->> +};
->> +
->> +&mux_i2c3 {
->> +	ads7830_2: ads7830 at 4a {
->
-> What's the point to get this node labelled?  Where is ads7830_1?
->
-> Shawn
+This makes cache_setup_of_node() do the following:
 
-Will remove the unused label "ads7830_2". The first ads7830 is in 
-imx6q-bx50v3.dtsi; however the label is specified as "ads7830".
+[    1.195477] cache_setup_of_node: this_leaf->level = 1
+[    1.200543] cache_setup_of_node: this_leaf->level = 1
+[    1.205656] cache_setup_of_node: this_leaf->level = 2
+[    1.210721] cache_shared_cpu_map_setup: cache_setup_of_node: -2
 
->
->> +		compatible = "ti,ads7830";
->> +		reg = <0x4a>;
->> +	};
->> +};
->> --
->> 2.6.3
->>
->>
+Removing the last hunk which does this:
+
+        if (index != cache_leaves(cpu)) /* not all OF nodes populated */
+                return -ENOENT;
+
+Allows me to browse the cache properties in sysfs, and they seem to be
+consistent with what the hardware features.
+
+Should there be some special casing for CPUs which have a built-in cache?
+Did we reach an agreement as to whether these patches are worthy being
+merged? ARM64 has it now, and at least, for consistency with other
+architectures, it would be nice to have this as well.
+
+Thanks!
