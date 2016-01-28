@@ -1,192 +1,225 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Jan 2016 17:54:33 +0100
-Subject: [PATCHv2] net: moxart: use correct accessors for DMA memory
-Message-ID: <2689110.SEuesVebGN@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 28 Jan 2016 17:56:45 +0100
+Subject: [PATCH v2] pinctrl: rockchip: add support for the rk3399
+In-Reply-To: <1452152498-21780-1-git-send-email-wdc@rock-chips.com>
+References: <1451997055-47655-1-git-send-email-wdc@rock-chips.com>
+ <1452152498-21780-1-git-send-email-wdc@rock-chips.com>
+Message-ID: <7536813.E6m4KCLL9V@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The moxart ethernet driver confuses coherent DMA buffers with
-MMIO registers.
+Hi David,
 
-moxart_ether.c: In function 'moxart_mac_setup_desc_ring':
-moxart_ether.c:146:428: error: passing argument 1 of '__fswab32' makes integer from pointer without a cast [-Werror=int-conversion]
-moxart_ether.c:74:39: warning: incorrect type in argument 3 (different address spaces)
-moxart_ether.c:74:39:    expected void *cpu_addr
-moxart_ether.c:74:39:    got void [noderef] <asn:2>*tx_desc_base
+Am Donnerstag, 7. Januar 2016, 15:41:38 schrieb David Wu:
+> From: David Wu <david.wu@rock-chips.com>
+> 
+> The pinctrl of rk3399 is much different from other's,
+> especially the 3bits of drive strength.
+> 
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> ---
+> change from v1:
+> - need spin_unlock_irqrestore for set drive default case
+> 
+>  .../bindings/pinctrl/rockchip,pinctrl.txt          |   1 +
+>  drivers/pinctrl/pinctrl-rockchip.c                 | 339
+> ++++++++++++++++++++- 2 files changed, 326 insertions(+), 14 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+> b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt index
+> 391ef4b..3bb9456 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+> @@ -22,6 +22,7 @@ Required properties for iomux controller:
+>    - compatible: one of "rockchip,rk2928-pinctrl",
+> "rockchip,rk3066a-pinctrl" "rockchip,rk3066b-pinctrl",
+> "rockchip,rk3188-pinctrl"
+>  		       "rockchip,rk3288-pinctrl", "rockchip,rk3368-pinctrl"
+> +		       "rockchip,rk3399-pinctrl"
+>    - rockchip,grf: phandle referencing a syscon providing the
+>  	 "general register files"
+> 
+> diff --git a/drivers/pinctrl/pinctrl-rockchip.c
+> b/drivers/pinctrl/pinctrl-rockchip.c index a065112..9d61c6e 100644
+> --- a/drivers/pinctrl/pinctrl-rockchip.c
+> +++ b/drivers/pinctrl/pinctrl-rockchip.c
 
-This leaves the basic logic alone and uses normal pointers for
-the virtual address of the descriptor. As we cannot use readl/writel
-to access them, we also introduce our own moxart_desc_read
-moxart_desc_write helpers that perform the same endianess swap
-as the original code, but without the address space conversion.
+[...]
 
-The barriers are made explicit here where needed: Even in the worst-case
-scenario, we just have to use a rmb() after checking ownership so
-we don't read any input data before we are sure it is value, and we
-use wmb() before transferring ownership back to the device.
+> @@ -685,19 +821,60 @@ static int rockchip_get_drive_perpin(struct
+> rockchip_pin_bank *bank, struct rockchip_pin_ctrl *ctrl = info->ctrl;
+>  	struct regmap *regmap;
+>  	int reg, ret;
+> -	u32 data;
+> +	u32 data, temp, rmask_bits;
+>  	u8 bit;
+> +	int drv_type = bank->drv[pin_num / 8].drv_type;
+> 
+>  	ctrl->drv_calc_reg(bank, pin_num, &regmap, &reg, &bit);
+> 
+> +	switch (drv_type) {
+> +	case DRV_TYPE_IO_1V8_3V0_AUTO:
+> +	case DRV_TYPE_IO_3V3_ONLY:
+> +		if (RK3399_DRV_3BITS_PER_PIN + bit >= 16) {
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+According to the doc excerpts, wouldn't the big special handling only be 
+necessary for for gpio3b5 alone (+ other banks) ... i.e. the one setting being 
+split over both registers?
+If so I think doing something like the following might be easier to 
+understand? Same of course for the set-counterpart. [Beware if I missed up the 
+indices somewhere :-) ]
 
-diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
-index a10c928bbd6b..00cfd95ca59d 100644
---- a/drivers/net/ethernet/moxa/moxart_ether.c
-+++ b/drivers/net/ethernet/moxa/moxart_ether.c
-@@ -28,6 +28,16 @@
- 
- #include "moxart_ether.h"
- 
-+static inline void moxart_desc_write(u32 data, u32 *desc)
-+{
-+	*desc = cpu_to_le32(data);
-+}
-+
-+static inline u32 moxart_desc_read(u32 *desc)
-+{
-+	return le32_to_cpu(*desc);
-+}
-+
- static inline void moxart_emac_write(struct net_device *ndev,
- 				     unsigned int reg, unsigned long value)
- {
-@@ -112,7 +122,7 @@ static void moxart_mac_enable(struct net_device *ndev)
- static void moxart_mac_setup_desc_ring(struct net_device *ndev)
- {
- 	struct moxart_mac_priv_t *priv = netdev_priv(ndev);
--	void __iomem *desc;
-+	void *desc;
- 	int i;
- 
- 	for (i = 0; i < TX_DESC_NUM; i++) {
-@@ -121,7 +131,7 @@ static void moxart_mac_setup_desc_ring(struct net_device *ndev)
- 
- 		priv->tx_buf[i] = priv->tx_buf_base + priv->tx_buf_size * i;
- 	}
--	writel(TX_DESC1_END, desc + TX_REG_OFFSET_DESC1);
-+	moxart_desc_write(TX_DESC1_END, desc + TX_REG_OFFSET_DESC1);
- 
- 	priv->tx_head = 0;
- 	priv->tx_tail = 0;
-@@ -129,8 +139,8 @@ static void moxart_mac_setup_desc_ring(struct net_device *ndev)
- 	for (i = 0; i < RX_DESC_NUM; i++) {
- 		desc = priv->rx_desc_base + i * RX_REG_DESC_SIZE;
- 		memset(desc, 0, RX_REG_DESC_SIZE);
--		writel(RX_DESC0_DMA_OWN, desc + RX_REG_OFFSET_DESC0);
--		writel(RX_BUF_SIZE & RX_DESC1_BUF_SIZE_MASK,
-+		moxart_desc_write(RX_DESC0_DMA_OWN, desc + RX_REG_OFFSET_DESC0);
-+		moxart_desc_write(RX_BUF_SIZE & RX_DESC1_BUF_SIZE_MASK,
- 		       desc + RX_REG_OFFSET_DESC1);
- 
- 		priv->rx_buf[i] = priv->rx_buf_base + priv->rx_buf_size * i;
-@@ -141,12 +151,12 @@ static void moxart_mac_setup_desc_ring(struct net_device *ndev)
- 		if (dma_mapping_error(&ndev->dev, priv->rx_mapping[i]))
- 			netdev_err(ndev, "DMA mapping error\n");
- 
--		writel(priv->rx_mapping[i],
-+		moxart_desc_write(priv->rx_mapping[i],
- 		       desc + RX_REG_OFFSET_DESC2 + RX_DESC2_ADDRESS_PHYS);
--		writel(priv->rx_buf[i],
-+		moxart_desc_write((uintptr_t)priv->rx_buf[i],
- 		       desc + RX_REG_OFFSET_DESC2 + RX_DESC2_ADDRESS_VIRT);
- 	}
--	writel(RX_DESC1_END, desc + RX_REG_OFFSET_DESC1);
-+	moxart_desc_write(RX_DESC1_END, desc + RX_REG_OFFSET_DESC1);
- 
- 	priv->rx_head = 0;
- 
-@@ -201,14 +211,15 @@ static int moxart_rx_poll(struct napi_struct *napi, int budget)
- 						      napi);
- 	struct net_device *ndev = priv->ndev;
- 	struct sk_buff *skb;
--	void __iomem *desc;
-+	void *desc;
- 	unsigned int desc0, len;
- 	int rx_head = priv->rx_head;
- 	int rx = 0;
- 
- 	while (rx < budget) {
- 		desc = priv->rx_desc_base + (RX_REG_DESC_SIZE * rx_head);
--		desc0 = readl(desc + RX_REG_OFFSET_DESC0);
-+		desc0 = moxart_desc_read(desc + RX_REG_OFFSET_DESC0);
-+		rmb(); /* ensure desc0 is up to date */
- 
- 		if (desc0 & RX_DESC0_DMA_OWN)
- 			break;
-@@ -250,7 +261,8 @@ static int moxart_rx_poll(struct napi_struct *napi, int budget)
- 			priv->stats.multicast++;
- 
- rx_next:
--		writel(RX_DESC0_DMA_OWN, desc + RX_REG_OFFSET_DESC0);
-+		wmb(); /* prevent setting ownership back too early */
-+		moxart_desc_write(RX_DESC0_DMA_OWN, desc + RX_REG_OFFSET_DESC0);
- 
- 		rx_head = RX_NEXT(rx_head);
- 		priv->rx_head = rx_head;
-@@ -310,7 +322,7 @@ static irqreturn_t moxart_mac_interrupt(int irq, void *dev_id)
- static int moxart_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- {
- 	struct moxart_mac_priv_t *priv = netdev_priv(ndev);
--	void __iomem *desc;
-+	void *desc;
- 	unsigned int len;
- 	unsigned int tx_head = priv->tx_head;
- 	u32 txdes1;
-@@ -319,11 +331,12 @@ static int moxart_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 	desc = priv->tx_desc_base + (TX_REG_DESC_SIZE * tx_head);
- 
- 	spin_lock_irq(&priv->txlock);
--	if (readl(desc + TX_REG_OFFSET_DESC0) & TX_DESC0_DMA_OWN) {
-+	if (moxart_desc_read(desc + TX_REG_OFFSET_DESC0) & TX_DESC0_DMA_OWN) {
- 		net_dbg_ratelimited("no TX space for packet\n");
- 		priv->stats.tx_dropped++;
- 		goto out_unlock;
- 	}
-+	rmb(); /* ensure data is only read that had TX_DESC0_DMA_OWN cleared */
- 
- 	len = skb->len > TX_BUF_SIZE ? TX_BUF_SIZE : skb->len;
- 
-@@ -337,9 +350,9 @@ static int moxart_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 	priv->tx_len[tx_head] = len;
- 	priv->tx_skb[tx_head] = skb;
- 
--	writel(priv->tx_mapping[tx_head],
-+	moxart_desc_write(priv->tx_mapping[tx_head],
- 	       desc + TX_REG_OFFSET_DESC2 + TX_DESC2_ADDRESS_PHYS);
--	writel(skb->data,
-+	moxart_desc_write((uintptr_t)skb->data,
- 	       desc + TX_REG_OFFSET_DESC2 + TX_DESC2_ADDRESS_VIRT);
- 
- 	if (skb->len < ETH_ZLEN) {
-@@ -354,8 +367,9 @@ static int moxart_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 	txdes1 = TX_DESC1_LTS | TX_DESC1_FTS | (len & TX_DESC1_BUF_SIZE_MASK);
- 	if (tx_head == TX_DESC_NUM_MASK)
- 		txdes1 |= TX_DESC1_END;
--	writel(txdes1, desc + TX_REG_OFFSET_DESC1);
--	writel(TX_DESC0_DMA_OWN, desc + TX_REG_OFFSET_DESC0);
-+	moxart_desc_write(txdes1, desc + TX_REG_OFFSET_DESC1);
-+	wmb(); /* flush descriptor before transferring ownership */
-+	moxart_desc_write(TX_DESC0_DMA_OWN, desc + TX_REG_OFFSET_DESC0);
- 
- 	/* start to send packet */
- 	writel(0xffffffff, priv->base + REG_TX_POLL_DEMAND);
-diff --git a/drivers/net/ethernet/moxa/moxart_ether.h b/drivers/net/ethernet/moxa/moxart_ether.h
-index 2be9280d608c..93a9563ac7c6 100644
---- a/drivers/net/ethernet/moxa/moxart_ether.h
-+++ b/drivers/net/ethernet/moxa/moxart_ether.h
-@@ -300,7 +300,7 @@ struct moxart_mac_priv_t {
- 
- 	dma_addr_t rx_base;
- 	dma_addr_t rx_mapping[RX_DESC_NUM];
--	void __iomem *rx_desc_base;
-+	void *rx_desc_base;
- 	unsigned char *rx_buf_base;
- 	unsigned char *rx_buf[RX_DESC_NUM];
- 	unsigned int rx_head;
-@@ -308,7 +308,7 @@ struct moxart_mac_priv_t {
- 
- 	dma_addr_t tx_base;
- 	dma_addr_t tx_mapping[TX_DESC_NUM];
--	void __iomem *tx_desc_base;
-+	void *tx_desc_base;
- 	unsigned char *tx_buf_base;
- 	unsigned char *tx_buf[RX_DESC_NUM];
- 	unsigned int tx_head;
+rmask_bits = RK3399_DRV_3BITS_PER_PIN;
+switch(bit) {
+case 0 ... 12:
+	/* regular case, nothing to do */
+	break;
+case 15:
+	/* drive-strength offset is special, as it is spread over 2 registers */
+	ret = regmap_read(regmap, reg, &data);
+	if (ret)
+		return ret;
+
+	ret = regmap_read(regmap, reg + 0x4, &temp);
+	if (ret)
+		return ret;
+
+	/*
+	 * the bit data[15] contains bit 0 of the value
+	 * while temp[1:0] containts bits 2 and 1
+	 */
+	data >>= 15;
+	temp &= 0x3;
+	temp <<= 1;
+	data |= temp;
+
+	return rockchip_perpin_drv_list[drv_type][data];
+case 18 ... 21:
+	/* setting fully enclosed in the second register */
+	rmask_bits = RK3399_DRV_3BITS_PER_PIN;
+	reg += 4;
+	bit -= 18;
+}
+
+> +			/* need to read regs twice */
+> +			ret = regmap_read(regmap, reg, &temp);
+> +			if (ret)
+> +				return ret;
+> +
+> +			temp >>= bit;
+> +			rmask_bits = 16 - bit;
+> +			temp &= (1 << rmask_bits) - 1;
+> +
+> +			reg = reg + 0x4;
+> +			ret = regmap_read(regmap, reg, &data);
+> +			if (ret)
+> +				return ret;
+> +
+> +			rmask_bits = RK3399_DRV_3BITS_PER_PIN
+> +				+ bit - 16;
+> +			data &= (1 << rmask_bits) - 1;
+> +			data <<= 16 - bit;
+> +			data |= temp;
+> +
+> +			return rockchip_perpin_drv_list[drv_type][data];
+> +		}
+> +
+> +		rmask_bits = RK3399_DRV_3BITS_PER_PIN;
+> +		break;
+> +	case DRV_TYPE_IO_DEFAULT:
+> +	case DRV_TYPE_IO_1V8_OR_3V0:
+> +	case DRV_TYPE_IO_1V8_ONLY:
+> +		rmask_bits = RK3288_DRV_BITS_PER_PIN;
+> +		break;
+> +	default:
+> +		dev_err(info->dev, "unsupported pinctrl drive type: %d\n",
+> +			drv_type);
+> +		return -EINVAL;
+> +	}
+> +
+>  	ret = regmap_read(regmap, reg, &data);
+>  	if (ret)
+>  		return ret;
+> 
+>  	data >>= bit;
+> -	data &= (1 << RK3288_DRV_BITS_PER_PIN) - 1;
+> +	data &= (1 << rmask_bits) - 1;
+> 
+> -	return rockchip_perpin_drv_list[data];
+> +	return rockchip_perpin_drv_list[drv_type][data];
+>  }
+> 
+>  static int rockchip_set_drive_perpin(struct rockchip_pin_bank *bank,
+
+[...]
+
+> @@ -729,8 +913,45 @@ static int rockchip_set_drive_perpin(struct
+> rockchip_pin_bank *bank,
+> 
+>  	spin_lock_irqsave(&bank->slock, flags);
+> 
+> +	switch (drv_type) {
+> +	case DRV_TYPE_IO_1V8_3V0_AUTO:
+> +	case DRV_TYPE_IO_3V3_ONLY:
+> +		if (RK3399_DRV_3BITS_PER_PIN + bit >= 16) {
+> +			/* need to write regs twice */
+> +			rmask_bits = 16 - bit;
+> +			/* enable the write to the equivalent lower bits */
+> +			data = ((1 << rmask_bits) - 1) << (bit + 16);
+> +			rmask = data | (data >> 16);
+> +			ret &= (1 << rmask_bits) - 1;
+> +			data |= (ret << bit);
+> +
+> +			ret = regmap_update_bits(regmap, reg, rmask, data);
+> +			if (ret)
+> +				return ret;
+> +
+> +			ret = i >> rmask_bits;
+> +			rmask_bits = RK3399_DRV_3BITS_PER_PIN + bit - 16;
+> +			reg = reg + 0x4;
+> +			bit = 0;
+
+Apart from a change similar to the above, should the setting maybe also 
+directly return and not depend on the final write?
+
+> +		} else {
+> +			rmask_bits = RK3399_DRV_3BITS_PER_PIN;
+> +		}
+> +		break;
+> +	case DRV_TYPE_IO_DEFAULT:
+> +	case DRV_TYPE_IO_1V8_OR_3V0:
+> +	case DRV_TYPE_IO_1V8_ONLY:
+> +		rmask_bits = RK3288_DRV_BITS_PER_PIN;
+> +		break;
+> +	default:
+> +		spin_unlock_irqrestore(&bank->slock, flags);
+> +		dev_err(info->dev, "unsupported pinctrl drive type: %d\n",
+> +			drv_type);
+> +		return -EINVAL;
+> +
+> +	}
+> +
+>  	/* enable the write to the equivalent lower bits */
+> -	data = ((1 << RK3288_DRV_BITS_PER_PIN) - 1) << (bit + 16);
+> +	data = ((1 << rmask_bits) - 1) << (bit + 16);
+>  	rmask = data | (data >> 16);
+>  	data |= (ret << bit);
+> 
+
+[...]
+
+> @@ -2208,6 +2461,62 @@ static struct rockchip_pin_ctrl rk3368_pin_ctrl = {
+>  		.drv_calc_reg		= rk3368_calc_drv_reg_and_bit,
+>  };
+> 
+> +static struct rockchip_pin_bank rk3399_pin_banks[] = {
+> +	PIN_BANK_IOMUX_DRV_FLAGS_OFFSET(0, 32, "gpio0", IOMUX_SOURCE_PMU,
+> +					IOMUX_SOURCE_PMU,
+> +					IOMUX_SOURCE_PMU,
+> +					IOMUX_SOURCE_PMU,
+> +					DRV_TYPE_IO_1V8_ONLY,
+> +					DRV_TYPE_IO_1V8_ONLY,
+> +					0,
+> +					0,
+
+DRV_TYPE_IO_DEFAULT instead of 0 please.
