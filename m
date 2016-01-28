@@ -1,72 +1,38 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 28 Jan 2016 16:33:50 +0000
-Subject: [PATCH V5 12/14] clk: tegra210: Add the APB2APE audio clock
-In-Reply-To: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
-References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1453998832-27383-13-git-send-email-jonathanh@nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Jan 2016 17:39:24 +0100
+Subject: [PATCHv2] ipv4: ipconfig: avoid unused ic_proto_used symbol
+Message-ID: <2132183.67sfLfLqZb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The APB2APE clock for the audio subsystem is required for powering up the
-audio power domain and accessing the various modules in this subsystem on
-the tegra210 device. Add this clock for tegra210.
+When CONFIG_PROC_FS, CONFIG_IP_PNP_BOOTP, CONFIG_IP_PNP_DHCP and
+CONFIG_IP_PNP_RARP are all disabled, we get a warning about the
+ic_proto_used variable being unused:
 
-Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+net/ipv4/ipconfig.c:146:12: error: 'ic_proto_used' defined but not used [-Werror=unused-variable]
+
+This avoids the warning, by making the definition conditional on
+whether a dynamic IP configuration protocol is configured. If not,
+we know that the value is always zero, so we can optimize away the
+variable and all code that depends on it.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/clk/tegra/clk-id.h               | 1 +
- drivers/clk/tegra/clk-tegra-periph.c     | 1 +
- drivers/clk/tegra/clk-tegra210.c         | 1 +
- include/dt-bindings/clock/tegra210-car.h | 2 +-
- 4 files changed, 4 insertions(+), 1 deletion(-)
+v2: fix typo in changelog
 
-diff --git a/drivers/clk/tegra/clk-id.h b/drivers/clk/tegra/clk-id.h
-index 19ce0738ee76..62ea38187b71 100644
---- a/drivers/clk/tegra/clk-id.h
-+++ b/drivers/clk/tegra/clk-id.h
-@@ -11,6 +11,7 @@ enum clk_id {
- 	tegra_clk_afi,
- 	tegra_clk_amx,
- 	tegra_clk_amx1,
-+	tegra_clk_apb2ape,
- 	tegra_clk_apbdma,
- 	tegra_clk_apbif,
- 	tegra_clk_ape,
-diff --git a/drivers/clk/tegra/clk-tegra-periph.c b/drivers/clk/tegra/clk-tegra-periph.c
-index 1860df1862dd..ea2b9cbf9e70 100644
---- a/drivers/clk/tegra/clk-tegra-periph.c
-+++ b/drivers/clk/tegra/clk-tegra-periph.c
-@@ -829,6 +829,7 @@ static struct tegra_periph_init_data gate_clks[] = {
- 	GATE("xusb_gate", "osc", 143, 0, tegra_clk_xusb_gate, 0),
- 	GATE("pll_p_out_cpu", "pll_p", 223, 0, tegra_clk_pll_p_out_cpu, 0),
- 	GATE("pll_p_out_adsp", "pll_p", 187, 0, tegra_clk_pll_p_out_adsp, 0),
-+	GATE("apb2ape", "clk_m", 107, 0, tegra_clk_apb2ape, 0),
- };
+diff --git a/net/ipv4/ipconfig.c b/net/ipv4/ipconfig.c
+index 67f7c9de0b16..2ed9dd2b5f2f 100644
+--- a/net/ipv4/ipconfig.c
++++ b/net/ipv4/ipconfig.c
+@@ -143,7 +143,11 @@ static char dhcp_client_identifier[253] __initdata;
  
- static struct tegra_periph_init_data div_clks[] = {
-diff --git a/drivers/clk/tegra/clk-tegra210.c b/drivers/clk/tegra/clk-tegra210.c
-index 5d8fac7052f2..ff9741128d53 100644
---- a/drivers/clk/tegra/clk-tegra210.c
-+++ b/drivers/clk/tegra/clk-tegra210.c
-@@ -2204,6 +2204,7 @@ static struct tegra_clk tegra210_clks[tegra_clk_max] __initdata = {
- 	[tegra_clk_pll_c4_out1] = { .dt_id = TEGRA210_CLK_PLL_C4_OUT1, .present = true },
- 	[tegra_clk_pll_c4_out2] = { .dt_id = TEGRA210_CLK_PLL_C4_OUT2, .present = true },
- 	[tegra_clk_pll_c4_out3] = { .dt_id = TEGRA210_CLK_PLL_C4_OUT3, .present = true },
-+	[tegra_clk_apb2ape] = { .dt_id = TEGRA210_CLK_APB2APE, .present = true },
- };
+ /* Persistent data: */
  
- static struct tegra_devclk devclks[] __initdata = {
-diff --git a/include/dt-bindings/clock/tegra210-car.h b/include/dt-bindings/clock/tegra210-car.h
-index 6f45aea49e4f..0a05b0d36ae7 100644
---- a/include/dt-bindings/clock/tegra210-car.h
-+++ b/include/dt-bindings/clock/tegra210-car.h
-@@ -126,7 +126,7 @@
- /* 104 */
- /* 105 */
- #define TEGRA210_CLK_D_AUDIO 106
--/* 107 ( affects abp -> ape) */
-+#define TEGRA210_CLK_APB2APE 107
- /* 108 */
- /* 109 */
- /* 110 */
--- 
-2.1.4
++#ifdef IPCONFIG_DYNAMIC
+ static int ic_proto_used;			/* Protocol used, if any */
++#else
++#define ic_proto_used 0
++#endif
+ static __be32 ic_nameservers[CONF_NAMESERVERS_MAX]; /* DNS Server IP addresses */
+ static u8 ic_domain[64];		/* DNS (not NIS) domain name */
+ 
