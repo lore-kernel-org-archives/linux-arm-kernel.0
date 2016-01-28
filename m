@@ -1,37 +1,121 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Thu, 28 Jan 2016 18:19:12 +0800
-Subject: [PATCH 0/4] ARM: at91: pm: add ULP1 mode support
-Message-ID: <1453976356-24391-1-git-send-email-wenyou.yang@atmel.com>
+Date: Thu, 28 Jan 2016 18:19:13 +0800
+Subject: [PATCH 1/4] ARM: at91: pm: create a separate procedure for the ULP0
+ mode
+In-Reply-To: <1453976356-24391-1-git-send-email-wenyou.yang@atmel.com>
+References: <1453976356-24391-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1453976356-24391-2-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ULP1 (Ultra Low-power mode 1) is introduced by SAMA5D2.
+To make the code more legible and prepare to add the ULP1 mode
+support in the future, create a separate procedure for the ULP0 mode.
 
-In order to achieve the lowest power consumption, in the ULP1 mode,
-all the clocks are shut off, inclusive the embedded 12MHz RC oscillator.
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
 
-The fast startup signal is used as a wake up source for ULP1 mode.
-As soon as the wake up event is asserted, the embedded 12MHz RC
-oscillator restarts automatically, which fast startup signal
-to trigger the PMC to wake up the system from the ULP1 mode can be
-configured via DT.
+ arch/arm/mach-at91/pm_suspend.S |   65 ++++++++++++++++++++++++---------------
+ 1 file changed, 40 insertions(+), 25 deletions(-)
 
-It is based on the following patch set:
-	http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390954.html
-
-
-Wenyou Yang (4):
-  ARM: at91: pm: create a separate procedure for the ULP0 mode
-  ARM: at91: pm: add ULP1 mode support
-  ARM: at91: pm: configure PMC fast startup signals
-  Documentation: atmel-at91: add DT bindings for fast startup
-
- .../devicetree/bindings/arm/atmel-pmc.txt          |   74 +++++++++
- arch/arm/mach-at91/pm.c                            |  112 +++++++++++++-
- arch/arm/mach-at91/pm.h                            |    7 +
- arch/arm/mach-at91/pm_suspend.S                    |  158 +++++++++++++++++---
- include/linux/clk/at91_pmc.h                       |   36 +++++
- 5 files changed, 362 insertions(+), 25 deletions(-)
-
+diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
+index a25defd..5fcffdc 100644
+--- a/arch/arm/mach-at91/pm_suspend.S
++++ b/arch/arm/mach-at91/pm_suspend.S
+@@ -107,7 +107,7 @@ ENTRY(at91_pm_suspend_in_sram)
+ 
+ 	ldr	r0, .pm_mode
+ 	tst	r0, #AT91_PM_SLOW_CLOCK
+-	beq	skip_disable_main_clock
++	beq	standby_mode
+ 
+ 	ldr	pmc, .pmc_base
+ 
+@@ -131,32 +131,13 @@ ENTRY(at91_pm_suspend_in_sram)
+ 	orr	tmp1, tmp1, #(1 << 29)		/* bit 29 always set */
+ 	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
+ 
+-	/* Turn off the main oscillator */
+-	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+-	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
+-	orr	tmp1, tmp1, #AT91_PMC_KEY
+-	str	tmp1, [pmc, #AT91_CKGR_MOR]
+-
+-skip_disable_main_clock:
+-	ldr	pmc, .pmc_base
+-
+-	/* Wait for interrupt */
+-	at91_cpu_idle
+-
+-	ldr	r0, .pm_mode
+-	tst	r0, #AT91_PM_SLOW_CLOCK
+-	beq	skip_enable_main_clock
++ulp0_mode:
++	bl	at91_pm_ulp0_mode
++	b	ulp_exit
+ 
++ulp_exit:
+ 	ldr	pmc, .pmc_base
+ 
+-	/* Turn on the main oscillator */
+-	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+-	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
+-	orr	tmp1, tmp1, #AT91_PMC_KEY
+-	str	tmp1, [pmc, #AT91_CKGR_MOR]
+-
+-	wait_moscrdy
+-
+ 	/* Restore PLLA setting */
+ 	ldr	tmp1, .saved_pllar
+ 	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
+@@ -177,7 +158,15 @@ skip_disable_main_clock:
+ 
+ 	wait_mckrdy
+ 
+-skip_enable_main_clock:
++	b	pm_exit
++
++standby_mode:
++	ldr	pmc, .pmc_base
++
++	/* Wait for interrupt */
++	at91_cpu_idle
++
++pm_exit:
+ 	/* Exit the self-refresh mode */
+ 	mov	r0, #SRAMC_SELF_FRESH_EXIT
+ 	bl	at91_sramc_self_refresh
+@@ -311,6 +300,32 @@ exit_sramc_sf:
+ 	mov	pc, lr
+ ENDPROC(at91_sramc_self_refresh)
+ 
++/*
++ * void at91_pm_ulp0_mode(void)
++ */
++ENTRY(at91_pm_ulp0_mode)
++	ldr	pmc, .pmc_base
++
++	/* Turn off the crystal oscillator */
++	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
++	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
++	orr	tmp1, tmp1, #AT91_PMC_KEY
++	str	tmp1, [pmc, #AT91_CKGR_MOR]
++
++	/* Wait for interrupt */
++	at91_cpu_idle
++
++	/* Turn on the crystal oscillator */
++	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
++	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
++	orr	tmp1, tmp1, #AT91_PMC_KEY
++	str	tmp1, [pmc, #AT91_CKGR_MOR]
++
++	wait_moscrdy
++
++	mov	pc, lr
++ENDPROC(at91_pm_ulp0_mode)
++
+ .pmc_base:
+ 	.word 0
+ .sramc_base:
 -- 
 1.7.9.5
