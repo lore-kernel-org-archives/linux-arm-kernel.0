@@ -1,120 +1,74 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 28 Jan 2016 15:57:21 +0800
-Subject: [PATCH v2 3/5] ARM: dts: imx: Add basic dts support for
- imx6qp-sabreauto
-In-Reply-To: <1450159673-27314-4-git-send-email-b51503@freescale.com>
+Date: Thu, 28 Jan 2016 16:10:40 +0800
+Subject: [PATCH v2 5/5] ARM: imx: Add msl code support for imx6qp
+In-Reply-To: <1450159673-27314-6-git-send-email-b51503@freescale.com>
 References: <1450159673-27314-1-git-send-email-b51503@freescale.com>
- <1450159673-27314-4-git-send-email-b51503@freescale.com>
-Message-ID: <20160128075721.GN9070@tiger>
+ <1450159673-27314-6-git-send-email-b51503@freescale.com>
+Message-ID: <20160128081040.GO9070@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 15, 2015 at 02:07:51PM +0800, Bai Ping wrote:
-> This patch adds basic dts file for imx6qp-sabreauto board.
+On Tue, Dec 15, 2015 at 02:07:53PM +0800, Bai Ping wrote:
+> The i.MX6QP is a different SOC, but internally we treate
+> it as i.MX6Q Rev_2.0 to maximum the code reusability. The chip
+> silicon number we read from the ANADIG_DIGPROG is 0x630100. This
+> patch add code to identify it as i.MX6QP Rev_1.0 when print out the
+> silicon version.
 > 
 > Signed-off-by: Bai Ping <b51503@freescale.com>
 > ---
->  arch/arm/boot/dts/Makefile             |  1 +
->  arch/arm/boot/dts/imx6qp-sabreauto.dts | 67 ++++++++++++++++++++++++++++++++++
->  2 files changed, 68 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6qp-sabreauto.dts
+>  arch/arm/mach-imx/anatop.c     | 5 ++++-
+>  arch/arm/mach-imx/mach-imx6q.c | 8 ++++++--
+>  2 files changed, 10 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index dfba765..7996a51 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -329,6 +329,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->  	imx6q-phytec-pbab01.dtb \
->  	imx6q-rex-pro.dtb \
->  	imx6q-sabreauto.dtb \
-> +	imx6qp-sabreauto.dtb \
+> diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
+> index 231bb25..9622763 100644
+> --- a/arch/arm/mach-imx/anatop.c
+> +++ b/arch/arm/mach-imx/anatop.c
+> @@ -129,7 +129,10 @@ void __init imx_init_revision_from_anatop(void)
+>  
+>  	switch (digprog & 0xff) {
+>  	case 0:
+> -		revision = IMX_CHIP_REVISION_1_0;
+> +		if (digprog >> 8 & 0x01)
+> +			revision = IMX_CHIP_REVISION_2_0;
+> +		else
+> +			revision = IMX_CHIP_REVISION_1_0;
 
-This order is incorrect either.
-
->  	imx6q-sabrelite.dtb \
->  	imx6q-sabresd.dtb \
->  	imx6q-sbc6x.dtb \
-> diff --git a/arch/arm/boot/dts/imx6qp-sabreauto.dts b/arch/arm/boot/dts/imx6qp-sabreauto.dts
-> new file mode 100644
-> index 0000000..b24aae6
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6qp-sabreauto.dts
-> @@ -0,0 +1,67 @@
-> +/*
-> + * Copyright (C) 2015 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-
-GPL/X11 dual license please.
-
-> + */
-> +
-> +#include "imx6q-sabreauto.dts"
-> +#include "imx6qp.dtsi"
-> +
-> +/ {
-> +	model = "Freescale i.MX6 Quad Plus SABRE Automotive Board";
-> +	compatible = "fsl,imx6qp-sabreauto", "fsl,imx6qp";
-> +};
-> +
-> +
-> +&fec {
-> +	pinctrl-assert-gpios = <&max7322 0 GPIO_ACTIVE_HIGH>;
-
-Upstream kernel doesn't have this property.
+Please at least add some comment here to help us remember that this is
+a trick we play for i.MX6QP.
 
 Shawn
 
-> +};
-> +
-> +&i2c2 {
-> +	max7322: gpio at 68 {
-> +		compatible = "maxim,max7322";
-> +		reg = <0x68>;
-> +		gpio-controller;
-> +		#gpio-cells = <2>;
-> +	};
-> +};
-> +
-> +&iomuxc {
-> +	imx6qdl-sabreauto {
-> +		pinctrl_enet: enetgrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_KEY_COL1__ENET_MDIO          0x1b0b0
-> +				MX6QDL_PAD_KEY_COL2__ENET_MDC           0x1b0b0
-> +				MX6QDL_PAD_RGMII_TXC__RGMII_TXC         0x1b018
-> +				MX6QDL_PAD_RGMII_TD0__RGMII_TD0         0x1b018
-> +				MX6QDL_PAD_RGMII_TD1__RGMII_TD1         0x1b018
-> +				MX6QDL_PAD_RGMII_TD2__RGMII_TD2         0x1b018
-> +				MX6QDL_PAD_RGMII_TD3__RGMII_TD3         0x1b018
-> +				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL   0x1b018
-> +				MX6QDL_PAD_RGMII_RXC__RGMII_RXC         0x1b018
-> +				MX6QDL_PAD_RGMII_RD0__RGMII_RD0         0x1b018
-> +				MX6QDL_PAD_RGMII_RD1__RGMII_RD1         0x1b018
-> +				MX6QDL_PAD_RGMII_RD2__RGMII_RD2         0x1b018
-> +				MX6QDL_PAD_RGMII_RD3__RGMII_RD3         0x1b018
-> +				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL   0x1b018
-> +				MX6QDL_PAD_GPIO_16__ENET_REF_CLK        0x4001b0a8
-> +				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
-> +			>;
-> +		};
-> +	};
-> +};
-> +
-> +&pcie {
-> +	reset-gpio = <&max7310_c 5 GPIO_ACTIVE_LOW>;
-> +	status = "okay";
-> +};
-> +
-> +&sata {
-> +	status = "okay";
-> +};
-> +
-> +&vgen3_reg {
-> +	regulator-always-on;
-> +};
+>  		break;
+>  	case 1:
+>  		revision = IMX_CHIP_REVISION_1_1;
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index 3878494b..cb27d56 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -266,8 +266,11 @@ static void __init imx6q_init_machine(void)
+>  {
+>  	struct device *parent;
+>  
+> -	imx_print_silicon_rev(cpu_is_imx6dl() ? "i.MX6DL" : "i.MX6Q",
+> -			      imx_get_soc_revision());
+> +	if (cpu_is_imx6q() && imx_get_soc_revision() == IMX_CHIP_REVISION_2_0)
+> +		imx_print_silicon_rev("i.MX6QP", IMX_CHIP_REVISION_1_0);
+> +	else
+> +		imx_print_silicon_rev(cpu_is_imx6dl() ? "i.MX6DL" : "i.MX6Q",
+> +				imx_get_soc_revision());
+>  
+>  	parent = imx_soc_device_init();
+>  	if (parent == NULL)
+> @@ -399,6 +402,7 @@ static void __init imx6q_init_irq(void)
+>  static const char * const imx6q_dt_compat[] __initconst = {
+>  	"fsl,imx6dl",
+>  	"fsl,imx6q",
+> +	"fsl,imx6qp",
+>  	NULL,
+>  };
+>  
 > -- 
 > 1.9.1
 > 
