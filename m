@@ -1,75 +1,106 @@
-From: sid@reserved-bit.com (Siddhesh Poyarekar)
-Date: Thu, 28 Jan 2016 22:16:31 +0530
+From: adhemerval.zanella@linaro.org (Adhemerval Zanella)
+Date: Thu, 28 Jan 2016 14:51:26 -0200
 Subject: [PATCH] arm64: Add support for Half precision floating point
 In-Reply-To: <20160128160747.GN775@arm.com>
 References: <1453823566-26742-1-git-send-email-suzuki.poulose@arm.com>
  <20160126160257.GB28238@arm.com> <56A79D17.2000009@arm.com>
  <20160126165538.GC22776@devel.intra.reserved-bit.com>
  <20160128160747.GN775@arm.com>
-Message-ID: <20160128164631.GC17552@devel.intra.reserved-bit.com>
+Message-ID: <56AA470E.1020606@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 04:07:48PM +0000, Will Deacon wrote:
+
+
+On 28-01-2016 14:07, Will Deacon wrote:
+> On Tue, Jan 26, 2016 at 10:25:38PM +0530, Siddhesh Poyarekar wrote:
+>> Adding Adhemerval to cc since he had volunteered to follow up on this,
+>> mainly because he had a couple of additional ideas on the kernel
+>> front.
+>>
+>> On Tue, Jan 26, 2016 at 04:21:43PM +0000, Suzuki K. Poulose wrote:
+>>> On 26/01/16 16:02, Will Deacon wrote:
+>>>> Hi Suzuki,
+>>>>
+>>>> On Tue, Jan 26, 2016 at 03:52:46PM +0000, Suzuki K Poulose wrote:
+>>>>> ARMv8.2 extensions [1] include an optional feature, which supports
+>>>>> half precision(16bit) floating point/asimd data processing
+>>>>> instructions. This patch adds support for detecting and exposing
+>>>>> the same to the userspace via HWCAPs
+>>>
+>>>
+>>>>> +#define HWCAP_FPHP		(1 << 9)
+>>>>> +#define HWCAP_ASIMDHP		(1 << 10)
+>>>>
+>>>> Where did we get to with the mrs trapping you proposed here?
+>>>>
+>>>>   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/374609.html
+>>>
+>>> We are yet to get some feedback from glibc/gcc folks. Siddhesh was looking
+>>> to make use of it [2]. But haven't heard anything back. Ramana mentioned
+>>> (in private) that they had some plans to take a look at it.
+>>
+>> I believe one of Adhemerval's ideas was similar to what I had
+>> mentioned back then, which was to provide all of the CPU information
+>> in a single file instead of having to traverse a directory structure.
+> 
 > My understanding was that libc needed this information extremely early
 > on (i.e. before it could even issue system calls), and therefore such
 > an approach would be in addition to the proposal here. Am I mistaken?
 
-Not really, glibc will need this information before it can call any of
-the ifunc-selected functions, i.e. typically string and some math
-functions.  System calls are not an issue since we don't have
-microarchitecture-specific system calls.  Suzuki's patch works just
-fine, just that to make sure that we're selecting the correct routine,
-we may (in the worst case) have to traverse the /sysfs directories to
-get information from all of the cpu files.  A single file with all
-that information would be much better performance-wise.
+If the idea is to use these instruction for function implementation selection
+(iFUNC) the idea is to have on PLT resolution either by accessing it directly
+or using a caching mechanism. x86_64 does something similar with cacheline
+information: it issues a single cpuid and create processor information table
+based on its information (it is also what the __builtin_supports() also
+does).
 
-> I'm not at all keen on adding a data ABI to the vDSO. I think people
-> tried similar things in the past (something on PPC?) and have horror
-> stories from that.
+> 
+>> The other idea was to add a vDSO function that returns this data so as
+>> to avoid (or at least reduce) the context switch latency.
+> 
+> I'm not at all keen on adding a data ABI to the vDSO. I think people tried
+> similar things in the past (something on PPC?) and have horror stories
+> from that.
 
-It does not have to be a data ABI, it could be a set of functions that
-initialize an opaque context and iterate through the cpu data for each
-call, something that would allow me to do this:
+In fact ppc still exports it in vDSO (include/asm/vdso_datapage.h), with
+information like the LPAR cfg, platform, processor, {d,i}cache, etc.
+I recall that I have see some code back at IBM that tried to use these
+fields directly, but indeed it is not recommended.
 
-    cpu_info_context_t *ctx = cpu_info_init_context ();
-    unsigned long midr;
+What I have in mind is something what ppc does with __kernel_get_syscall_map.
+It is vDSO function that returns a vDSO internal data related to which
+syscalls are implemented in the running kernel (through a bitmap field).
 
-    while ((midr = cpu_info_next_midr (ctx)) != 0)
-      {
-        /* Do stuff.  */
-      }
-
+> 
+>> The other aspect that I am waiting for feedback from ARM for is about
+>> the property of the MIDR value.  If it can be ascertained that a core
+>> with a specific MIDR value will always only be in a homogeneous
+>> configuration, we could bypass the directory traversal and just stick
+>> to the value returned from midr_el1.  This is likely vendor-specific
+>> and I'm waiting to know if the ARM toolchain hackers would be
+>> comfortable with baking in such assumptions into glibc.  Extra marks
+>> for making such a requirement explicit in future specifications.
+> 
 > The architecture makes no guarantees about what will and won't be used
 > in different configurations, so we shouldn't try to derive this from the
 > MIDR. Even if you figure out a heuristic for today's platforms, it won't
 > necessarily hold true in the future.
-
-Another approach could be vendor confirmation that they would never
-release cores with the same MIDR value in different configurations.
-That is to say, a PE with a specific MIDR value will always be in a
-homogenous system and will never be part of a big.little
-configuration.  The microarchitecture routines are essentially
-vendor-specific, so getting this assurance from them should be
-sufficient, shouldn't it?
-
+> 
+>> I had hacked at some code with directory traversal on top of your
+>> patch and it works fine as far as doing a PoC, but until we get
+>> consensus on how we want to handle things like BIG.little, there can't
+>> be much progress.
+> 
 > By "directory traversal" are you only referring to the /sys portions
 > of this? I'm *much* more interested in the utility of the MRS emulation
 > part, since that's what could effectively replace HWCAPs in the future.
-
-The MRS emulation may be sufficient for the case where the system is
-homogenous and the vendor states that the midr will never be used in a
-heterogenous configuration.  If not, we will have no choice but to
-traverse the /sys directories to find the midr for all online cpus and
-make that decision.
-
+> 
 > As for big/little, the kernel view has been pretty consistent on that:
 > we will expose a "sanitised" view of the registers (as described in the
 > Documentation along with the patch) where we can, and for the per-CPU
 > registers such as MIDR, you will read the current CPU register (which
 > is why those registers are also exposed in sysfs).
-
-That's a reasonable approach, my only point of contention was to find
-a faster alternative to the directory traversal.
-
-Siddhesh
+> 
+> Will
+> 
