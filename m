@@ -1,67 +1,83 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 28 Jan 2016 14:25:35 -0700
-Subject: [PATCH net-next 11/40] net: fec: pass txq to fec_enet_tx_queue
- instead of queue_id
+Date: Thu, 28 Jan 2016 14:25:37 -0700
+Subject: [PATCH net-next 13/40] net: fec: split off napi routine with 3 queues
 In-Reply-To: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1454016364-30985-12-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1454016364-30985-14-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-queue_id is the qid member of struct bufdesc_prop.
+If we only have 1 tx/rx queue, we need not check
+the other queues.
 
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 17 ++++++-----------
- 1 file changed, 6 insertions(+), 11 deletions(-)
+ drivers/net/ethernet/freescale/fec_main.c | 39 +++++++++++++++++++++++++++++--
+ 1 file changed, 37 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 01b9740..711a8d6 100644
+index 8bebf01..04b1fb7 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -1149,25 +1149,18 @@ fec_enet_hwtstamp(struct fec_enet_private *fep, unsigned ts,
- 	hwtstamps->hwtstamp = ns_to_ktime(ns);
+@@ -1510,7 +1510,7 @@ fec_enet_interrupt(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
  }
  
--static void
--fec_enet_tx_queue(struct net_device *ndev, u16 queue_id)
-+static void fec_txq(struct net_device *ndev, struct fec_enet_private *fep,
-+		    struct fec_enet_priv_tx_q *txq)
+-static int fec_enet_rx_napi(struct napi_struct *napi, int budget)
++static int fec_enet_napi_q3(struct napi_struct *napi, int budget)
  {
--	struct	fec_enet_private *fep;
- 	struct bufdesc *bdp;
- 	unsigned short status;
- 	struct	sk_buff	*skb;
--	struct fec_enet_priv_tx_q *txq;
- 	struct netdev_queue *nq;
- 	int	index = 0;
- 	int	entries_free;
- 
--	fep = netdev_priv(ndev);
--
--	queue_id = FEC_ENET_GET_QUQUE(queue_id);
--
--	txq = fep->tx_queue[queue_id];
- 	/* get next bdp of dirty_tx */
--	nq = netdev_get_tx_queue(ndev, queue_id);
-+	nq = netdev_get_tx_queue(ndev, txq->bd.qid);
- 	bdp = txq->dirty_tx;
- 
- 	/* get next bdp of dirty_tx */
-@@ -1259,11 +1252,13 @@ static void
- fec_enet_tx(struct net_device *ndev)
- {
+ 	struct net_device *ndev = napi->dev;
  	struct fec_enet_private *fep = netdev_priv(ndev);
-+	struct fec_enet_priv_tx_q *txq;
- 	u16 queue_id;
- 	/* First process class A queue, then Class B and Best Effort queue */
- 	for_each_set_bit(queue_id, &fep->work_tx, FEC_ENET_MAX_TX_QS) {
- 		clear_bit(queue_id, &fep->work_tx);
--		fec_enet_tx_queue(ndev, queue_id);
-+		txq = fep->tx_queue[FEC_ENET_GET_QUQUE(queue_id)];
-+		fec_txq(ndev, fep, txq);
- 	}
- 	return;
+@@ -1553,6 +1553,39 @@ static int fec_enet_rx_napi(struct napi_struct *napi, int budget)
+ 	return pkts;
  }
+ 
++static int fec_enet_napi_q1(struct napi_struct *napi, int budget)
++{
++	struct net_device *ndev = napi->dev;
++	struct fec_enet_private *fep = netdev_priv(ndev);
++	int pkts = 0;
++	uint events;
++
++	do {
++		events = readl(fep->hwp + FEC_IEVENT);
++		if (fep->events) {
++			events |= fep->events;
++			fep->events = 0;
++		}
++		events &= FEC_ENET_RXF_0 | FEC_ENET_TXF_0;
++		if (!events) {
++			if (budget) {
++				napi_complete(napi);
++				writel(FEC_DEFAULT_IMASK, fep->hwp + FEC_IMASK);
++			}
++			return pkts;
++		}
++
++		writel(events, fep->hwp + FEC_IEVENT);
++		if (events & FEC_ENET_RXF_0)
++			pkts += fec_rxq(ndev, fep, fep->rx_queue[0],
++					budget - pkts);
++		if (events & FEC_ENET_TXF_0)
++			fec_txq(ndev, fep, fep->tx_queue[0]);
++	} while (pkts < budget);
++	fep->events |= FEC_ENET_RXF_0;	/* save for next callback */
++	return pkts;
++}
++
+ /* ------------------------------------------------------------------------- */
+ static void fec_get_mac(struct net_device *ndev)
+ {
+@@ -3113,7 +3146,9 @@ static int fec_enet_init(struct net_device *ndev)
+ 	ndev->ethtool_ops = &fec_enet_ethtool_ops;
+ 
+ 	writel(FEC_RX_DISABLED_IMASK, fep->hwp + FEC_IMASK);
+-	netif_napi_add(ndev, &fep->napi, fec_enet_rx_napi, NAPI_POLL_WEIGHT);
++	netif_napi_add(ndev, &fep->napi, (fep->num_rx_queues |
++		       fep->num_tx_queues) == 1 ? fec_enet_napi_q1 :
++		       fec_enet_napi_q3, NAPI_POLL_WEIGHT);
+ 
+ 	if (fep->quirks & FEC_QUIRK_HAS_VLAN)
+ 		/* enable hw VLAN support */
 -- 
 2.5.0
