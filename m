@@ -1,132 +1,60 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Wed, 27 Jan 2016 15:30:18 -0800
-Subject: [v3,11/41] mips: reuse asm-generic/barrier.h
-In-Reply-To: <20160127020447.GA1293@fixme-laptop.cn.ibm.com>
-References: <20160118081929.GA30420@gondor.apana.org.au>
- <20160118154629.GB3818@linux.vnet.ibm.com>
- <20160126165207.GB6029@fixme-laptop.cn.ibm.com>
- <20160126172227.GG6357@twins.programming.kicks-ass.net>
- <CA+55aFzcC6C8imPs5vk4yH1Y2YHjnAdFM9HCkVs04COxuDQH6w@mail.gmail.com>
- <20160126201037.GU4503@linux.vnet.ibm.com>
- <CA+55aFxjb+2rs2wVHtiSCcOzgMrE8H=yDeNcjyujPQudDCtLgw@mail.gmail.com>
- <CA+55aFwxTJd+uibcxtZD3tGnj_n=LMwyAa0s8qyx_OF0OMWQkA@mail.gmail.com>
- <20160126232921.GY4503@linux.vnet.ibm.com>
- <20160127020447.GA1293@fixme-laptop.cn.ibm.com>
-Message-ID: <20160127233018.GN4503@linux.vnet.ibm.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 27 Jan 2016 16:55:25 -0800
+Subject: MTK mt8173-evb: mainline unstable, and big-endian boot failures
+Message-ID: <CAOi56cVDbkAJEDWy3+DV63a=UuD7nqpUu8X7e-OjtWM-4dj_-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 10:04:47AM +0800, Boqun Feng wrote:
-> On Tue, Jan 26, 2016 at 03:29:21PM -0800, Paul E. McKenney wrote:
-> > On Tue, Jan 26, 2016 at 02:33:40PM -0800, Linus Torvalds wrote:
-> > > On Tue, Jan 26, 2016 at 2:15 PM, Linus Torvalds
-> > > <torvalds@linux-foundation.org> wrote:
-> > > >
-> > > > You might as well just write it as
-> > > >
-> > > >     struct foo x = READ_ONCE(*ptr);
-> > > >     x->bar = 5;
-> > > >
-> > > > because that "smp_read_barrier_depends()" does NOTHING wrt the second write.
-> > > 
-> > > Just to clarify: on alpha it adds a memory barrier, but that memory
-> > > barrier is useless.
-> > 
-> > No trailing data-dependent read, so agreed, no smp_read_barrier_depends()
-> > needed.  That said, I believe that we should encourage rcu_dereference*()
-> > or lockless_dereference() instead of READ_ONCE() for documentation
-> > reasons, though.
-> > 
-> > > On non-alpha, it is a no-op, and obviously does nothing simply because
-> > > it generates no code.
-> > > 
-> > > So if anybody believes that the "smp_read_barrier_depends()" does
-> > > something, they are *wrong*.
-> > 
-> > The other problem with smp_read_barrier_depends() is that it is often
-> > a pain figuring out which prior load it is supposed to apply to.
-> > Hence my preference for rcu_dereference*() and lockless_dereference().
-> > 
-> 
-> Because semantically speaking, rcu_derefence*() and
-> lockless_dereference() are CONSUME(i.e. data/address dependent
-> read->read and read->write pairs are ordered), whereas
-> smp_read_barrier_depends() only guarantees read->read pairs with data
-> dependency are ordered, right?
-> 
-> If so, maybe we need to call it out in memory-barriers.txt, for example:
-> 
-> diff --git a/Documentation/memory-barriers.txt b/Documentation/memory-barriers.txt
-> index 904ee42..6b262c2 100644
-> --- a/Documentation/memory-barriers.txt
-> +++ b/Documentation/memory-barriers.txt
-> @@ -1703,8 +1703,8 @@ There are some more advanced barrier functions:
->  
->  
->   (*) lockless_dereference();
-> -     This can be thought of as a pointer-fetch wrapper around the
-> -     smp_read_barrier_depends() data-dependency barrier.
-> +     This is a load, and any load or store that has a data dependency on the
-> +     value returned by this load won't be reordered before this load.
+Hello,
 
-This is a good start, but more is needed to warn people off of
-smp_read_barrier_depends().  But yes, better explanation would be good.
+I've been meaning to report this for awhile, but finally getting around to it.
 
-							Thanx, Paul
+In kernelci.org, the mt8173-evb board has been rather unstable with
+mainline and linux-next lately.  A look a the history of boots in
+kernelci.org with various trees[1] shows that it's failing to boot
+quite a lot.
 
->       This is also similar to rcu_dereference(), but in cases where
->       object lifetime is handled by some mechanism other than RCU, for
-> 
-> 
-> Regards,
-> Boqun
-> 
-> > > And if anybody sends out an email with that smp_read_barrier_depends()
-> > > in an example, they are actively just confusing other people, which is
-> > > even worse than just being wrong. Which is why I jumped in.
-> > > 
-> > > So stop perpetuating the myth that smp_read_barrier_depends() does
-> > > something here. It does not. It's a bug, and it has become this "mind
-> > > virus" for some people that seem to believe that it does something.
-> > 
-> > It looks like I should add words to memory-barriers.txt de-emphasizing
-> > smp_read_barrier_depends().  I will take a look at that.
-> > 
-> > > I had to remove this crap once from the kernel already, see commit
-> > > 105ff3cbf225 ("atomic: remove all traces of READ_ONCE_CTRL() and
-> > > atomic*_read_ctrl()").
-> > > 
-> > > I don't want to ever see that broken construct again. And I want to
-> > > make sure that everybody is educated about how broken it was. I'm
-> > > extremely unhappy that it came up again.
-> > 
-> > Well, if it makes you feel better, that was control dependencies and this
-> > was data dependencies.  So it was not -exactly- the same.  ;-)
-> > 
-> > (Sorry, couldn't resist...)
-> > 
-> > > If it turns out that some architecture does actually need a barrier
-> > > between a read and a dependent write, then that will mean that
-> > > 
-> > >  (a) we'll have to make up a _new_ barrier, because
-> > > "smp_read_barrier_depends()" is not that barrier. We'll presumably
-> > > then have to make that new barrier part of "rcu_derefence()" and
-> > > friends.
-> > 
-> > Agreed.  We can worry about whether or not we replace the current
-> > smp_read_barrier_depends() with that new barrier when and if such
-> > hardware appears.
-> > 
-> > >  (b) we will have found an architecture with even worse memory
-> > > ordering semantics than alpha, and we'll have to stop castigating
-> > > alpha for being the worst memory ordering ever.
-> > 
-> > ;-) ;-) ;-)
-> > 
-> > > but I sincerely hope that we'll never find that kind of broken architecture.
-> > 
-> > Apparently at least some hardware vendors are reading memory-barriers.txt,
-> > so perhaps the odds of that kind of breakage have reduced.
-> > 
-> > 								Thanx, Paul
-> > 
+It seems to be pretty stable up through v4.4 but
+unreliable/unpredictable in v4.5-rc1 and lots of places in between.
+It's hard to bisect because it doesn't reliably fail, but when it does
+fail to finish booting, it's typically after it reaches a shell, and
+trying to run various simple shell commands fails to complete, like
+this example from next-20160125[2].
+
+To me this suggests possibly an issue with the idle driver where
+characters might be getting lost on the serial console, which causes
+the automated boot scripts to fail because the shell is still waiting
+for the command to be finished.
+
+Also, a separate issue, I've also noticed that builds with
+CONFIG_CPU_BIG_ENDIAN=y have been failing to boot since early in the
+merge window[3].  For the big-endian failures, the last lines in the
+boot log are always:
+
+[...]
+[    0.518078] usbcore: registered new interface driver usbhid
+[    0.518780] usbhid: USB HID core driver
+[    0.520295] NET: Registered protocol family 17
+[    0.520934] 9pnet: Installing 9P2000 support
+[    0.521549] Key type dns_resolver registered
+[    0.524558] registered taskstats version 1
+
+and in a successfull boot (e.g. little-endian) this is the followed by:
+
+[    0.525458] hctosys: unable to open rtc device (rtc0)
+[    0.533128] usb_vbus: disabling
+[    0.534117] ALSA device list:
+[    0.534497]   No soundcards found.
+[    0.535423] Freeing unused kernel memory: 696K (ffffffc0008fa000 -
+ffffffc0009a8000)
+
+I have yet to debug this any further, but still wanted to report it in
+case anyone else has the time to debug it further.
+
+Thanks,
+
+Kevin
+
+[1] http://kernelci.org/boot/mt8173-evb/
+[2] http://storage.kernelci.org/next/next-20160125/arm64-defconfig/lab-khilman/boot-mt8173-evb.html
+[3] http://kernelci.org/boot/mt8173-evb/job/mainline/kernel/v4.5-rc1/defconfig/defconfig+CONFIG_CPU_BIG_ENDIAN=y/lab/lab-khilman/?_id=56a5812b59b514bed8fa5dc0
