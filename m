@@ -1,72 +1,49 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Thu, 28 Jan 2016 14:31:08 +0100
-Subject: [PATCH v3 12/12] acpi, numa: reuse
- acpi_numa_memory_affinity_init()
-In-Reply-To: <56A98185.4080202@huawei.com>
-References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
- <1453541967-3744-13-git-send-email-guohanjun@huawei.com>
- <20160125102643.GF24726@rric.localdomain>
- <56A8606A.8080407@huawei.com>
- <20160127141847.GR24726@rric.localdomain>
- <56A98185.4080202@huawei.com>
-Message-ID: <20160128133108.GY24726@rric.localdomain>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 28 Jan 2016 13:41:29 +0000
+Subject: [PATCH v3 1/3] iommu/io-pgtable: Add ARMv7 short descriptor
+ support
+In-Reply-To: <1453857386.28284.4.camel@mhfsdcap03>
+References: <cover.1453723096.git.robin.murphy@arm.com>
+ <066c4af0e29c9cc658bd5e48edc5e2d7ba7140a1.1453723096.git.robin.murphy@arm.com>
+ <1453857386.28284.4.camel@mhfsdcap03>
+Message-ID: <56AA1A89.6080706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28.01.16 10:48:37, Hanjun Guo wrote:
-> On 2016/1/27 22:18, Robert Richter wrote:
-> > On 27.01.16 14:15:06, Hanjun Guo wrote:
-> >> Hi Robert,
-> >>
-> >> On 2016/1/25 18:26, Robert Richter wrote:
-> >>> On 23.01.16 17:39:27, Hanjun Guo wrote:
-> >>>> From: Hanjun Guo <hanjun.guo@linaro.org>
-> >>>>
-> >>>> After the cleanup for acpi_numa_memory_affinity_init(),
-> >>>> it can be used for architetures both x86 and arm64, since
-> >>>> CONFIG_MEMORY_HOTPLUG is not enabled for arm64, so no
-> >>>> worry about that.
-> >>>>
-> >>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >>>> ---
-> >>>>  arch/arm64/kernel/acpi_numa.c | 42 -------------------------------
-> >>>>  arch/x86/mm/srat.c            | 54 ----------------------------------------
-> >>>>  drivers/acpi/numa.c           | 57 +++++++++++++++++++++++++++++++++++++++++++
-> >>>>  3 files changed, 57 insertions(+), 96 deletions(-)
-> >>> This one reverts acpi_numa_memory_affinity_init() to the x86 version.
-> >>> I rather would prefer the arm64 version for the generic code. We could
-> >>> keep the x86 implementation until x86 maintainers agree to remove them
-> >>> and use the generic one (implemented in a separate patch).
-> >>>
-> >>> Doing so we can move acpi_numa_memory_affinity_init() from the
-> >>> beginning to generic code (used for arm64) and have this last patch to
-> >>> remove the x86 version.
-> >> I think the x86 version is the generic one, all the flags (ACPI_SRAT_MEM_HOT_PLUGGABLE and
-> >> etc) are defined in the ACPI spec, x86 just use all the flags because it support such features.
-> >> For ARM64, firmware should be careful and represent the true platform configuration to
-> >> OS, such as on ARM64, we can't set hotpluggable flag as the ARM64 arch don't support
-> >> memory hot-plug yet (also the firmware don't support it too), if firmware do things right,
-> >> it will be not worries for the kernel.
-> > But you are removing all arm64 from your first patches. Why do you
-> > introduce acpi_numa_memory_affinity_init() in the beginning to remove
-> > it in the end again? I esp. like the arm64 version because of its
-> > direct returns. So I still would like to see generic code for arm64
-> > from the beginning. Maybe have a copy of x86 initially and make
-> > modifications for arm64 to it, or move missing code (hotplug, etc.)
-> > from x86 to generic and remove x86 arch code with the last patch.
-> 
-> OK, so that's the logic and ordering of formatting the patch set, it's easy
-> to fix :)
-> 
-> I will introduce the generic code for acpi_numa_memory_affinity_init()
-> in drivers/acpi/numa.c and mark it as __weak from the beginning, and
-> move missing code from x86 to generic, then remove x86 one as you
-> suggested, is that OK?
+On 27/01/16 01:16, Yong Wu wrote:
+> On Tue, 2016-01-26 at 17:13 +0000, Robin Murphy wrote:
+>> Add a nearly-complete ARMv7 short descriptor implementation, omitting
+>> only a few legacy and CPU-centric aspects which shouldn't be necessary
+>> for IOMMU API use anyway.
+>>
+>> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>
+> This looks good to me.
+> And actually our disp/vdec/venc works well on your v2.
+>
+> You could choose the two below,
+> Reviewed-by: Yong Wu <yong.wu@mediatek.com>
+> Tested-by: Yong Wu <yong.wu@mediatek.com>
 
-Sounds good to me. Awaiting your updated version. :)
+Great, thanks!
 
-Btw, I tested the whole series, so:
+Will, it seems to make the most sense for Joerg to pick these patches up 
+directly with the MTK series that depends on them - any objections?
 
-Tested-by: Robert Richter <rrichter@cavium.com>
+Robin.
 
--Robert
+>
+> Thanks.
+>
+>> ---
+>>   drivers/iommu/Kconfig              |  19 +
+>>   drivers/iommu/Makefile             |   1 +
+>>   drivers/iommu/io-pgtable-arm-v7s.c | 849 +++++++++++++++++++++++++++++++++++++
+>>   drivers/iommu/io-pgtable.c         |   3 +
+>>   drivers/iommu/io-pgtable.h         |  14 +-
+>>   5 files changed, 885 insertions(+), 1 deletion(-)
+>>   create mode 100644 drivers/iommu/io-pgtable-arm-v7s.c
+>
+>
+>
