@@ -1,26 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 28 Jan 2016 12:44:17 +0000
-Subject: [PATCH] arm64: asm: Explicitly include linux/personality.h in
- asm/page.h
-In-Reply-To: <1453983508-20410-1-git-send-email-broonie@kernel.org>
-References: <1453983508-20410-1-git-send-email-broonie@kernel.org>
-Message-ID: <20160128124417.GE6078@sirena.org.uk>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 28 Jan 2016 13:57:22 +0100
+Subject: [PATCH v2] clk: Move vendor's Kconfig into CCF menu section
+In-Reply-To: <1453971537-5510-1-git-send-email-jamesjj.liao@mediatek.com>
+References: <1453971537-5510-1-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <56AA1032.70001@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 12:18:28PM +0000, Mark Brown wrote:
-> asm/page.h uses READ_IMPLIES_EXEC from linux/personality.h but does not
-> explicitly include it causing build failures in -next where whatever was
-> causing it to be implicitly included has changed to remove that
-> inclusion.  Add an explicit inclusion to fix this.
+On 28/01/16 09:58, James Liao wrote:
+> Move all vendor's Kconfig into CCF menu section to prevent
+> new drivers putting their Kconfig files in a wrong place.
+> 
+> Some Kconigs need to modify at the same time to avoid build
 
-Argh, sorry - this causes problems further down the line with linking
-vdso.lds due to enums getting into the linker script and upsetting the
-linker (there are several compile errors today so it was masked).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160128/30ed13da/attachment.sig>
+"Some Kconfigs need to be modified..." ?
+
+> warnings.
+> 
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> ---
+> This patch is based on v4.5-rc1.
+> 
+> changes since v1:
+> - Modify s3c24xx and samsung's Kconfig to avoid build warngings.
+> 
+>  arch/arm/mach-s3c24xx/Kconfig | 1 +
+>  drivers/clk/Kconfig           | 8 +++-----
+>  drivers/clk/samsung/Kconfig   | 1 -
+>  3 files changed, 4 insertions(+), 6 deletions(-)
+
+For the samsung code changes:
+
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+
+-- 
+Thanks,
+Sylwester
