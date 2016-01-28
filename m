@@ -1,61 +1,55 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Thu, 28 Jan 2016 22:45:06 +0900
-Subject: [PATCH] ARM: dts: orion5x: add mtd flash support to linkstation
- lswtgl
-In-Reply-To: <CAEQ9gEmcss4sb6hE6-w0jVoYfHqnWNf23EVNMefvZ24TYfEk2g@mail.gmail.com>
-References: <1453907405-30434-1-git-send-email-rogershimizu@gmail.com>
- <20160127173231.GI20194@lunn.ch>
- <CAEQ9gEmcss4sb6hE6-w0jVoYfHqnWNf23EVNMefvZ24TYfEk2g@mail.gmail.com>
-Message-ID: <CAEQ9gEkU8x80-S=n+e8NBfN7OTSxHLdBSN_3q6d0JxZDxfs_9g@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Jan 2016 14:49:45 +0100
+Subject: [PATCH V2 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge driver
+ to work on both Zynq and Microblaze
+In-Reply-To: <8520D5D51A55D047800579B09414719825874148@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1452620173-4905-1-git-send-email-bharatku@xilinx.com>
+ <5255218.OREPu5Af3W@wuerfel>
+ <8520D5D51A55D047800579B09414719825874148@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <1917083.LB4Ng3Y2yP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew,
+On Thursday 28 January 2016 13:20:56 Bharat Kumar Gogada wrote:
+> > Subject: Re: [PATCH V2 3/5] PCI: xilinx: Modifying AXI PCIe Host Bridge driver
+> > to work on both Zynq and Microblaze
+> > 
+> > On Wednesday 27 January 2016 14:33:45 Bharat Kumar Gogada wrote:
+> > > > > @@ -705,7 +715,9 @@ static int xilinx_pcie_probe(struct
+> > > > > platform_device *pdev)  #endif
+> > > > >     pci_scan_child_bus(bus);
+> > > > >     pci_assign_unassigned_bus_resources(bus);
+> > > > > +#ifdef CONFIG_ARM
+> > > > >     pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+> > > > > +#endif
+> > > > >     pci_bus_add_devices(bus);
+> > > > >     platform_set_drvdata(pdev, port);
+> > > >
+> > > > Here it looks like microblaze gets it right. I'm not sure why we
+> > > > still need the
+> > > > pci_fixup_irqs() on ARM, but my feeling is that this should be fixed
+> > > > in common code.
+> > > In arm pci_fixup_irqs is called by pci_common_init_dev
+> > (arch/arm/kernel/bios32.c), since this API is removed now, I was calling it
+> > separately.
+> > 
+> > But who calls it in microblaze? If it works without the extra call there, can we
+> > make it work the same way for ARM?
+> > 
+> In microblaze I have added pcibios_add_device call (similar to call in
+> arch/arm64/kernel/pci.c ) in pci-common.c, which is being invoked by
+> kernel core itself.
 
-On Thu, Jan 28, 2016 at 3:22 AM, Roger Shimizu <rogershimizu@gmail.com> wrote:
-> On Thu, Jan 28, 2016 at 2:32 AM, Andrew Lunn <andrew@lunn.ch> wrote:
->> Same comment i just sent to Thomas:
->>
->> The partition table should be a subnode of the mtd node and should be named
->> 'partitions'. This node should have the following property:
->> - compatible : (required) must be "fixed-partitions"
->> Partitions are then defined in subnodes of the partitions node.
->>
->> For backwards compatibility partitions as direct subnodes of the mtd device are
->> supported. This use is discouraged.
->>
->>            Andrew
->
-> Thanks for your comments!
->
-> Using the patch I submitted result in:
->
-> [    1.667440] Found: SST 39LF020
-> [    1.670613] f4000000.flash: Found 1 x8 devices at 0x0 in 8-bit bank
-> [    1.676948] number of JEDEC chips: 1
-> [    1.698943] 3 ofpart partitions found on MTD device f4000000.flash
-> [    1.705222] Creating 3 MTD partitions on "f4000000.flash":
-> [    1.710803] 0x000000000000-0x000000030000 : "header"
-> [    1.719051] 0x000000030000-0x00000003f000 : "uboot"
-> [    1.727182] 0x00000003f000-0x000000040000 : "uboot_env"
->
-> Applying the partition DT proposed in
-> Documentation/devicetree/bindings/mtd/partition.txt, result in:
->
-> [    1.667879] Found: SST 39LF020
-> [    1.671053] f4000000.flash: Found 1 x8 devices at 0x0 in 8-bit bank
-> [    1.677389] number of JEDEC chips: 1
->
-> So the partitions are gone.
+I see. In the upstream code you seem to do it in pcibios_setup_bus_devices(),
+while arm64 and powerpc do it in pcibios_add_device().
 
-Now I'm thinking for my dts's case, which is orion5x, refer
-- Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-- Documentation/devicetree/bindings/mtd/orion-nand.txt
-would be more proper.
-And in the sample of mtd-physmap.txt, the structure described in
-partition.txt is not mentioned.
+> May be we can add similar on arm and test out, but
+> we might need some cleanup in arch/arm/kernel/bios32.c
 
-Could we go as the dts is, like the original patch I submitted?
+I think that would still just be a half-baked solution. This should
+really be fully automatic. We could do it in the __weak
+pcibios_add_device() for all architectures that don't override
+it when the bus was probed from DT, or we could do it in
+pci_read_irq().
 
-Cheers,
-Roger
+	Arnd
