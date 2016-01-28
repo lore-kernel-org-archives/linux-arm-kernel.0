@@ -1,64 +1,77 @@
-From: fengguang.wu@intel.com (Fengguang Wu)
-Date: Thu, 28 Jan 2016 11:14:35 +0800
-Subject: [linux-review:James-Hogan/kbuild-Remove-stale-asm-generic-wrappers/20160119-183642]
- d979f99e9cc14e2667e9b6e268db695977e4197a BUILD DONE
-In-Reply-To: <3596300.IYfzmako0c@wuerfel>
-References: <569e1dbb.MgLv8OaZwklOxxtU%fengguang.wu@intel.com>
- <1947556.38OyJnvGS5@wuerfel>
- <20160127093018.GA21190@wfg-t540p.sh.intel.com>
- <3596300.IYfzmako0c@wuerfel>
-Message-ID: <20160128031435.GA25625@wfg-t540p.sh.intel.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 28 Jan 2016 11:16:34 +0800
+Subject: [PATCH v3 05/12] arm64, acpi, numa: NUMA support based on SRAT
+ and SLIT
+In-Reply-To: <20160127140109.GQ24726@rric.localdomain>
+References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
+ <1453541967-3744-6-git-send-email-guohanjun@huawei.com>
+ <20160125102148.GE24726@rric.localdomain> <56A86DCF.1020205@huawei.com>
+ <20160127140109.GQ24726@rric.localdomain>
+Message-ID: <56A98812.4060506@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 10:44:01AM +0100, Arnd Bergmann wrote:
-> On Wednesday 27 January 2016 17:30:18 Fengguang Wu wrote:
-> 
-> > > Looks good, I'm just unsure about "multi_v8_defconfig", this does not
-> > > exist. Do you mean multi_v5_defconfig?
-> 
-> > Ah yes, multi_v8_defconfig does not exist actually.
-> 
-> Ok, can you include multi_v5_defconfig than?
- 
-OK, done.
+On 2016/1/27 22:01, Robert Richter wrote:
+> On 27.01.16 15:12:15, Hanjun Guo wrote:
+>> On 2016/1/25 18:21, Robert Richter wrote:
+>>> On 23.01.16 17:39:20, Hanjun Guo wrote:
+>>>> diff --git a/arch/arm64/kernel/acpi_numa.c b/arch/arm64/kernel/acpi_numa.c
+>>>> new file mode 100644
+>>>> index 0000000..f7f7533
+>>>> --- /dev/null
+>>>> +++ b/arch/arm64/kernel/acpi_numa.c
+>>>> +/* Callback for parsing of the Proximity Domain <-> Memory Area mappings */
+>>>> +int __init acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
+>>>> +{
+>>>> +	u64 start, end;
+>>>> +	int node, pxm;
+>>>> +
+>>>> +	if (srat_disabled())
+>>>> +		return -EINVAL;
+>>>> +
+>>>> +	if (ma->header.length != sizeof(struct acpi_srat_mem_affinity)) {
+>>> Must be:
+>>>
+>>> 	ma->header.length < sizeof(struct acpi_srat_mem_affinity)) {
+>>>
+>>> Allow extensions to struct acpi_srat_mem_affinity in newer versions.
+>> Hmm, I think we need to remove the check here now.
+> No, we might have an out-of-bound access then.
+>
+>> There are three cases:
+>>
+>>  - firmware ACPI version is consistent with the ACPICA one, then
+>>    ma->header.length == sizeof(struct acpi_srat_mem_affinity )
+>>
+>>  - firmware ACPI version is not consistent with the ACPICA one,
+>>    for example, struct acpi_srat_mem_affinity is extended in
+>>    new ACI version, but the formware is using the older one,
+>>   then it's ok to use
+>>   ma->header.length < sizeof(struct acpi_srat_mem_affinity )
+> The check above is ok as we need at least struct
+> acpi_srat_mem_affinity as it is now.
+>
+> If we later change the kernel to support multiple versions of struct
+> acpi_srat_mem_affinity, i.e. use data from an extended section, we
+> will need to add code to handle that. This will include support of
+> data with length < acpi_srat_mem_affinity, in this case we may not use
+> extended data.
 
-> I see you have one named "arm-arm5", which may be the same.
+I checked the ACPI spec about memory affinity structure, it still have 10 bytes
+reserved for future use, so I think it's safe as you suggested for next few years.
 
-Yes, looks so -- it's provided by someone else long time ago.
+>
+>>  - but if we use the older kernel + updated new firmware,
+>>    then
+>>    ma->header.length > sizeof(struct acpi_srat_mem_affinity )
+>>   will be the case, right?
+> Right, and this is a valid case not resulting in an error with my
+> suggestion above.
 
-> > > I also wonder if you include 'randconfig' builds for some architectures.
-> > > I have patches for all remaining errors and warnings that I see with
-> > > ARM randconfig builds today. Not all of them are merged yet, but I could
-> > > probably come up with a file to be used as input to KCONFIG_ALLCONFIG
-> > > to eliminate the known-broken configurations, if you are interested.
-> > 
-> > If the are mostly ready for upstream, it may be easier to wait until
-> > upstream randconfig works just fine for ARM.
-> 
-> I have around 130 patches for warnings that I'm submitting at the moment, but
-> there are a couple of really tricky ones that I don't currently have
-> a good plan for:
-> 
-> - in some configurations, you end up without any boards selected, hitting
->   an #error in the final link
-> - ARMv3 support in gcc is rather broken and causes internal compiler errors
->   among other things
-> - the old ELF format (OABI) doesn't work in some cases
-> - GCOV_PROFILE_ALL causes problems that need to be debugged
-> - XIP_KERNEL sometimes causes kallsyms to fail
-> - not all platforms implement the complete clk API, if they don't
->   use CONFIG_COMMON_CLK (I have patch for that we can probably merge)
+Yes, I just mixed up those two cases.
 
-The robot may explicitly enable/disable some CONFIG_* after randconfig
-to workaround known problems.
+I will sync with Ganapat to prepare a new version and test it on x86 and
+IA64 to make sure this patch set don't break anything.
 
-> - CONFIG_PHYS_OFFSET needs to be entered manually to be a number
->   in 'make config'
-
-That's a problem for auto tests.
-
-> - same for DEBUG_LL
-
-Thanks,
-Fengguang
+Thanks
+Hanjun
