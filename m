@@ -1,104 +1,53 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 28 Jan 2016 17:28:30 +0000
-Subject: [RFC PATCH 4/6] iommu/arm-smmu: Add support for IOMMU_DOMAIN_DMA
- in SMMUv1/SMMUv2 driver
-In-Reply-To: <1453872079-27140-5-git-send-email-anup.patel@broadcom.com>
-References: <1453872079-27140-1-git-send-email-anup.patel@broadcom.com>
- <1453872079-27140-5-git-send-email-anup.patel@broadcom.com>
-Message-ID: <56AA4FBE.6090702@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 28 Jan 2016 18:31:16 +0100
+Subject: [linux-sunxi] Problem with Allwinner H3 clocks
+In-Reply-To: <56A9CE3D.4020906@redhat.com>
+References: <20160127084607.665fb8c38eeb5733ce4232da@free.fr>
+ <CAGb2v65FUhNC-d-YT=-2adNHHT6b1JvGoNTFLfBX_xBSnuOsTg@mail.gmail.com>
+ <20160127103714.58312b152adb4148bae2f93b@free.fr>
+ <56A8D5E5.30701@gmail.com>
+ <20160127175512.87caf31b5e21a1fec91507f2@free.fr>
+ <56A9098A.5010107@redhat.com>
+ <20160127200217.14dce96ade71cf81bc82e6f6@free.fr>
+ <56A9CE3D.4020906@redhat.com>
+Message-ID: <20160128173116.GA32462@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/01/16 05:21, Anup Patel wrote:
-> To allow use of large memory (> 4Gb) with 32bit devices we need to use
-> some kind of iommu for such 32bit devices.
->
-> This patch extends SMMUv1/SMMUv2 driver to support DMA domains which
-> in-turn will allows us to use iommu based DMA mappings for 32bit devices.
->
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> Reviewed-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> ---
->   drivers/iommu/arm-smmu.c | 21 ++++++++++++++++++++-
->   1 file changed, 20 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 9bdf6b2..43424fe 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -29,6 +29,7 @@
->   #define pr_fmt(fmt) "arm-smmu: " fmt
->
->   #include <linux/delay.h>
-> +#include <linux/dma-iommu.h>
->   #include <linux/dma-mapping.h>
->   #include <linux/err.h>
->   #include <linux/interrupt.h>
-> @@ -967,7 +968,7 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
->   {
->   	struct arm_smmu_domain *smmu_domain;
->
-> -	if (type != IOMMU_DOMAIN_UNMANAGED)
-> +	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
->   		return NULL;
->   	/*
->   	 * Allocate the domain and initialise some of its data structures.
-> @@ -978,6 +979,12 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
->   	if (!smmu_domain)
->   		return NULL;
->
-> +	if (type == IOMMU_DOMAIN_DMA &&
-> +	    iommu_get_dma_cookie(&smmu_domain->domain)) {
-> +		kfree(smmu_domain);
-> +		return NULL;
-> +	}
-> +
->   	mutex_init(&smmu_domain->init_mutex);
->   	spin_lock_init(&smmu_domain->pgtbl_lock);
->
-> @@ -992,6 +999,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
->   	 * Free the domain resources. We assume that all devices have
->   	 * already been detached.
->   	 */
-> +	iommu_put_dma_cookie(domain);
->   	arm_smmu_destroy_domain_context(domain);
->   	kfree(smmu_domain);
->   }
-> @@ -1361,6 +1369,16 @@ static int arm_smmu_init_platform_device(struct device *dev,
->   	return 0;
->   }
->
-> +int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
-> +{
-> +	/*
-> +	 * Nothing to do here because SMMU is already aware of all
-> +	 * MMU masters and their stream IDs using mmu-master attibute
-> +	 * SMMU DT node.
-> +	 */
+On Thu, Jan 28, 2016 at 09:15:57AM +0100, Hans de Goede wrote:
+> Hi,
+> 
+> On 27-01-16 20:02, Jean-Francois Moine wrote:
+> >On Wed, 27 Jan 2016 19:16:42 +0100
+> >Hans de Goede <hdegoede@redhat.com> wrote:
+> >
+> >>>To be sure, I generated a pure 4.5-rc1 kernel. Same result: no UART.
+> >>>Maybe... one more information: I am using Allwinner's u-boot.
+> >>
+> >>Could be that that is the culprit, why are you not using upstream u-boot?
+> >>upstream u-boot has H3 and orangepi-pc support now.
+> >
+> >Yes, but using the upstream u-boot may hide the clock problem.
+> 
+> I agree that that could be the case. Would be interesting to figure out
+> what exactly is needed to get the upstream kernel to work properly
+> with allwinner's u-boot.
 
-...but on the same hand this will also never get called if there's no 
-"iommus" property on the master. Maintaining support for existing users 
-of the "mmu-masters" binding is one thing (namely the thing that's been 
-slowing down my efforts to clean up the really hacky generic binding 
-support I did all the DMA stuff with), but having _both_ bindings in a 
-single DT is something I don't think anybody wants to see - is that how 
-you've tested this?
+I'm guessing it's probably because of the arch timers that have not
+been properly initialized.
 
-Robin.
+Do you have any earlyprintk output?
 
-> +	return 0;
-> +}
-> +
->   static int arm_smmu_add_device(struct device *dev)
->   {
->   	struct iommu_group *group;
-> @@ -1458,6 +1476,7 @@ static struct iommu_ops arm_smmu_ops = {
->   	.unmap			= arm_smmu_unmap,
->   	.map_sg			= default_iommu_map_sg,
->   	.iova_to_phys		= arm_smmu_iova_to_phys,
-> +	.of_xlate		= arm_smmu_of_xlate,
->   	.add_device		= arm_smmu_add_device,
->   	.remove_device		= arm_smmu_remove_device,
->   	.device_group		= arm_smmu_device_group,
->
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160128/b34d32da/attachment-0001.sig>
