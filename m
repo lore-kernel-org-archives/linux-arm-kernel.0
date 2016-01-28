@@ -1,25 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 28 Jan 2016 15:07:38 +0000
-Subject: [PATCHv3 00/18] arm64: mm: rework page table creation
-In-Reply-To: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
-References: <1453722312-23076-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160128150737.GB20099@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 28 Jan 2016 15:08:16 +0000
+Subject: [PATCH] arm64: allow vmalloc regions to be set with set_memory_*
+In-Reply-To: <1453125665-26627-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1453125665-26627-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160128150815.GG775@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 11:44:54AM +0000, Mark Rutland wrote:
-> Catalin, how do you want to take this? Are you happy to merge my
-> arm64/pagetable-rework branch, or would you prefer to pick the patches? Arnd
-> has acked the asm-generic patch [4] and is happy for it to go via the arm64
-> tree, and everything else is your domain.
+On Mon, Jan 18, 2016 at 03:01:05PM +0100, Ard Biesheuvel wrote:
+> The range of set_memory_* is currently restricted to the module address
+> range because of difficulties in breaking down larger block sizes.
+> vmalloc maps PAGE_SIZE pages so it is safe to use as well. Update the
+> function ranges and add a comment explaining why the range is restricted
+> the way it is.
+> 
+> Suggested-by: Laura Abbott <labbott@fedoraproject.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/mm/pageattr.c | 23 +++++++++++++++++++----
+>  1 file changed, 19 insertions(+), 4 deletions(-)
 
-I picked them from the list and added Jeremy's Tested-by. I pushed the
-branch here in case anyone wants to base their patches on top (I don't
-plan to rebase it):
+What's the user for this? It would be better to apply along with something
+that actually needs to change permission for arbitrary vmalloc mappings.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux for-next/pgtable
+Anyway, with that (and a rebase to -rc2):
 
-Thanks.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
--- 
-Catalin
+Will
