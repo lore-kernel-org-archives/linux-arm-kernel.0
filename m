@@ -1,225 +1,118 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 28 Jan 2016 17:56:45 +0100
-Subject: [PATCH v2] pinctrl: rockchip: add support for the rk3399
-In-Reply-To: <1452152498-21780-1-git-send-email-wdc@rock-chips.com>
-References: <1451997055-47655-1-git-send-email-wdc@rock-chips.com>
- <1452152498-21780-1-git-send-email-wdc@rock-chips.com>
-Message-ID: <7536813.E6m4KCLL9V@diego>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 28 Jan 2016 08:58:10 -0800
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <CAPDyKFqD6Y6HcgVds_oWBZ8L7Kdh2VX_WZCGApf-1a_6GHCQ5g@mail.gmail.com>
+References: <20160126224804.GB19432@atomide.com>
+ <CAJZ5v0i79X5JjOZiu4cOZ0Esd5BxAvutF8d17asDzq9ECcML-g@mail.gmail.com>
+ <20160126232212.GE19432@atomide.com>
+ <CAJZ5v0gTRvyWHVmYNb8Q1QZzhVhokXo541+48mFyDRYv7Hi-Uw@mail.gmail.com>
+ <20160126235222.GF19432@atomide.com>
+ <CAPDyKFqD6Y6HcgVds_oWBZ8L7Kdh2VX_WZCGApf-1a_6GHCQ5g@mail.gmail.com>
+Message-ID: <20160128165810.GA19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi,
 
-Am Donnerstag, 7. Januar 2016, 15:41:38 schrieb David Wu:
-> From: David Wu <david.wu@rock-chips.com>
+* Ulf Hansson <ulf.hansson@linaro.org> [160128 06:30]:
+> On 27 January 2016 at 00:52, Tony Lindgren <tony@atomide.com> wrote:
+> > * Rafael J. Wysocki <rafael@kernel.org> [160126 15:38]:
+> >> On Wed, Jan 27, 2016 at 12:22 AM, Tony Lindgren <tony@atomide.com> wrote:
+> >> > * Rafael J. Wysocki <rafael@kernel.org> [160126 15:15]:
+> >> >> On Tue, Jan 26, 2016 at 11:48 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >> >> > Hi,
+> >> >> >
+> >> >> > Looks like commit 5de85b9d57ab ("PM / runtime: Re-init runtime
+> >> >> > PM states at probe error and driver unbind") broke PM on at least
 > 
-> The pinctrl of rk3399 is much different from other's,
-> especially the 3bits of drive strength.
+> I need to understand the issue here in a bit more detail, could you
+> please try to fill out some of my gaps!?
 > 
-> Signed-off-by: David Wu <david.wu@rock-chips.com>
-> ---
-> change from v1:
-> - need spin_unlock_irqrestore for set drive default case
+> In *what way* did it break PM?
+
+The MMC hardware will not get idled properly any longer blocking any
+deeper idle states.
+
+> Did the driver not probe successfully the second try? If so, what happened.
+
+It probes fine after a -EPROBE_DEFER on the vmmc i2c regulator.
+But the PM runtime usecounts are wrong.
+
+> >> >> > omap3. It seems we now need to additionally also call
+> >> >> > pm_runtime_dont_use_autosuspend() to get things working again?
+> >> >> >
+> >> >> > The following fixes idling on omap3, but I'm wondering if we
+> >> >> > should do something in pm_runtime_reinit() instead?
 > 
->  .../bindings/pinctrl/rockchip,pinctrl.txt          |   1 +
->  drivers/pinctrl/pinctrl-rockchip.c                 | 339
-> ++++++++++++++++++++- 2 files changed, 326 insertions(+), 14 deletions(-)
+> I understand this as the second (or third, forth, whatever) probing
+> attempt actually succeeds, right!?
+
+Right.
+
+> Is the issue you are seeing, that the device never becomes runtime
+> suspended due to commit 5de85b9d57ab ("PM / runtime: Re-init runtime
+> PM states at probe error and driver unbind")?
+
+Correct.
+
+> >> > Looks like we have RPM_ACTIVE set in pm_runtime_reinit() if that
+> >> > gives any clues.
 > 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-> b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt index
-> 391ef4b..3bb9456 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-> @@ -22,6 +22,7 @@ Required properties for iomux controller:
->    - compatible: one of "rockchip,rk2928-pinctrl",
-> "rockchip,rk3066a-pinctrl" "rockchip,rk3066b-pinctrl",
-> "rockchip,rk3188-pinctrl"
->  		       "rockchip,rk3288-pinctrl", "rockchip,rk3368-pinctrl"
-> +		       "rockchip,rk3399-pinctrl"
->    - rockchip,grf: phandle referencing a syscon providing the
->  	 "general register files"
+> That's a good clue. Although, there could be several reasons to why.
 > 
-> diff --git a/drivers/pinctrl/pinctrl-rockchip.c
-> b/drivers/pinctrl/pinctrl-rockchip.c index a065112..9d61c6e 100644
-> --- a/drivers/pinctrl/pinctrl-rockchip.c
-> +++ b/drivers/pinctrl/pinctrl-rockchip.c
-
-[...]
-
-> @@ -685,19 +821,60 @@ static int rockchip_get_drive_perpin(struct
-> rockchip_pin_bank *bank, struct rockchip_pin_ctrl *ctrl = info->ctrl;
->  	struct regmap *regmap;
->  	int reg, ret;
-> -	u32 data;
-> +	u32 data, temp, rmask_bits;
->  	u8 bit;
-> +	int drv_type = bank->drv[pin_num / 8].drv_type;
+> Rafael has pointed out one valid potential case, but I want to be sure
+> that's really what happening here.
 > 
->  	ctrl->drv_calc_reg(bank, pin_num, &regmap, &reg, &bit);
-> 
-> +	switch (drv_type) {
-> +	case DRV_TYPE_IO_1V8_3V0_AUTO:
-> +	case DRV_TYPE_IO_3V3_ONLY:
-> +		if (RK3399_DRV_3BITS_PER_PIN + bit >= 16) {
+> *If* the problem is that the device doesn't becomes runtime suspended,
+> that will anyway be prevented as long as the autosuspend_delay has
+> been set to a negative value. That's why I wonder whether this really
+> is the case here.
 
-According to the doc excerpts, wouldn't the big special handling only be 
-necessary for for gpio3b5 alone (+ other banks) ... i.e. the one setting being 
-split over both registers?
-If so I think doing something like the following might be easier to 
-understand? Same of course for the set-counterpart. [Beware if I missed up the 
-indices somewhere :-) ]
+That seems to be the case here. In device driver probe, commenting out
+pm_runtime_set_autosuspend_delay(host->dev, MMC_AUTOSUSPEND_DELAY)
+also makes things work again.
 
-rmask_bits = RK3399_DRV_3BITS_PER_PIN;
-switch(bit) {
-case 0 ... 12:
-	/* regular case, nothing to do */
-	break;
-case 15:
-	/* drive-strength offset is special, as it is spread over 2 registers */
-	ret = regmap_read(regmap, reg, &data);
-	if (ret)
-		return ret;
+So one of the failing cases seems to be:
 
-	ret = regmap_read(regmap, reg + 0x4, &temp);
-	if (ret)
-		return ret;
+1. Device driver probe sets pm_runtime_set_autosuspend_delay()
 
-	/*
-	 * the bit data[15] contains bit 0 of the value
-	 * while temp[1:0] containts bits 2 and 1
-	 */
-	data >>= 15;
-	temp &= 0x3;
-	temp <<= 1;
-	data |= temp;
+2. Device driver probe initially fails with -EPROBE_DEFER
 
-	return rockchip_perpin_drv_list[drv_type][data];
-case 18 ... 21:
-	/* setting fully enclosed in the second register */
-	rmask_bits = RK3399_DRV_3BITS_PER_PIN;
-	reg += 4;
-	bit -= 18;
-}
+3. PM runtime usecounts get messed up
 
-> +			/* need to read regs twice */
-> +			ret = regmap_read(regmap, reg, &temp);
-> +			if (ret)
-> +				return ret;
-> +
-> +			temp >>= bit;
-> +			rmask_bits = 16 - bit;
-> +			temp &= (1 << rmask_bits) - 1;
-> +
-> +			reg = reg + 0x4;
-> +			ret = regmap_read(regmap, reg, &data);
-> +			if (ret)
-> +				return ret;
-> +
-> +			rmask_bits = RK3399_DRV_3BITS_PER_PIN
-> +				+ bit - 16;
-> +			data &= (1 << rmask_bits) - 1;
-> +			data <<= 16 - bit;
-> +			data |= temp;
-> +
-> +			return rockchip_perpin_drv_list[drv_type][data];
-> +		}
-> +
-> +		rmask_bits = RK3399_DRV_3BITS_PER_PIN;
-> +		break;
-> +	case DRV_TYPE_IO_DEFAULT:
-> +	case DRV_TYPE_IO_1V8_OR_3V0:
-> +	case DRV_TYPE_IO_1V8_ONLY:
-> +		rmask_bits = RK3288_DRV_BITS_PER_PIN;
-> +		break;
-> +	default:
-> +		dev_err(info->dev, "unsupported pinctrl drive type: %d\n",
-> +			drv_type);
-> +		return -EINVAL;
-> +	}
-> +
->  	ret = regmap_read(regmap, reg, &data);
->  	if (ret)
->  		return ret;
-> 
->  	data >>= bit;
-> -	data &= (1 << RK3288_DRV_BITS_PER_PIN) - 1;
-> +	data &= (1 << rmask_bits) - 1;
-> 
-> -	return rockchip_perpin_drv_list[data];
-> +	return rockchip_perpin_drv_list[drv_type][data];
->  }
-> 
->  static int rockchip_set_drive_perpin(struct rockchip_pin_bank *bank,
+> For omap3, I assume there's a PM domain (the so called hwmod) being
+> attached to the omap_hsmmc device at device registration point!?
 
-[...]
+Correct. It uses the notifiers like bus code does in general.
 
-> @@ -729,8 +913,45 @@ static int rockchip_set_drive_perpin(struct
-> rockchip_pin_bank *bank,
-> 
->  	spin_lock_irqsave(&bank->slock, flags);
-> 
-> +	switch (drv_type) {
-> +	case DRV_TYPE_IO_1V8_3V0_AUTO:
-> +	case DRV_TYPE_IO_3V3_ONLY:
-> +		if (RK3399_DRV_3BITS_PER_PIN + bit >= 16) {
-> +			/* need to write regs twice */
-> +			rmask_bits = 16 - bit;
-> +			/* enable the write to the equivalent lower bits */
-> +			data = ((1 << rmask_bits) - 1) << (bit + 16);
-> +			rmask = data | (data >> 16);
-> +			ret &= (1 << rmask_bits) - 1;
-> +			data |= (ret << bit);
-> +
-> +			ret = regmap_update_bits(regmap, reg, rmask, data);
-> +			if (ret)
-> +				return ret;
-> +
-> +			ret = i >> rmask_bits;
-> +			rmask_bits = RK3399_DRV_3BITS_PER_PIN + bit - 16;
-> +			reg = reg + 0x4;
-> +			bit = 0;
+FYI, most SoCs don't have hardware based autoidle signaling between
+the interconnect and the interconnect targets. So the hwmod code is
+still needed until we have converted it into a proper interconnect +
+module target drivers.
 
-Apart from a change similar to the above, should the setting maybe also 
-directly return and not depend on the final write?
+> In that path depending on a specific hwmod flag, the device will be
+> given the an initial *active* runtime PM status, via invoking
+> pm_runtime_set_active().
+>
+> *If* that's the case, it affects the probing sequence, as the
+> pm_runtime_get_sync() won't trigger the ->runtime_resume() callbacks
+> to be invoked in the first probe attempt.
 
-> +		} else {
-> +			rmask_bits = RK3399_DRV_3BITS_PER_PIN;
-> +		}
-> +		break;
-> +	case DRV_TYPE_IO_DEFAULT:
-> +	case DRV_TYPE_IO_1V8_OR_3V0:
-> +	case DRV_TYPE_IO_1V8_ONLY:
-> +		rmask_bits = RK3288_DRV_BITS_PER_PIN;
-> +		break;
-> +	default:
-> +		spin_unlock_irqrestore(&bank->slock, flags);
-> +		dev_err(info->dev, "unsupported pinctrl drive type: %d\n",
-> +			drv_type);
-> +		return -EINVAL;
-> +
-> +	}
-> +
->  	/* enable the write to the equivalent lower bits */
-> -	data = ((1 << RK3288_DRV_BITS_PER_PIN) - 1) << (bit + 16);
-> +	data = ((1 << rmask_bits) - 1) << (bit + 16);
->  	rmask = data | (data >> 16);
->  	data |= (ret << bit);
-> 
+It has worked since pm runtime. And it works with MMC as as a loadable
+module just fine when no -EPROBE_DEFER happens.
 
-[...]
+> Moreover, according to the data I received in this regression report
+> so far, it seems like probing the second time has *always* been done
+> with the device in runtime PM active state. Could that be the reason
+> to why it "happens" to work?
 
-> @@ -2208,6 +2461,62 @@ static struct rockchip_pin_ctrl rk3368_pin_ctrl = {
->  		.drv_calc_reg		= rk3368_calc_drv_reg_and_bit,
->  };
-> 
-> +static struct rockchip_pin_bank rk3399_pin_banks[] = {
-> +	PIN_BANK_IOMUX_DRV_FLAGS_OFFSET(0, 32, "gpio0", IOMUX_SOURCE_PMU,
-> +					IOMUX_SOURCE_PMU,
-> +					IOMUX_SOURCE_PMU,
-> +					IOMUX_SOURCE_PMU,
-> +					DRV_TYPE_IO_1V8_ONLY,
-> +					DRV_TYPE_IO_1V8_ONLY,
-> +					0,
-> +					0,
+Not correct. I think that speculation is not related to the $subject
+regression at all.
 
-DRV_TYPE_IO_DEFAULT instead of 0 please.
+BTW, do you have some hardware to test with that has PM runtime
+implemnted and actually working with mainline kernel?
+
+Regards,
+
+Tony
