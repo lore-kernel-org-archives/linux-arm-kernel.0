@@ -1,59 +1,45 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 28 Jan 2016 10:30:33 +0000
-Subject: [GIT PULL] KVM/ARM updates for 4.5-rc2
-Message-ID: <1453977038-13516-1-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 28 Jan 2016 10:30:36 +0000
+Subject: [PATCH 3/5] arm64: KVM: Fix wrong use of the CPSR MODE mask for 32bit
+ guests
+In-Reply-To: <1453977038-13516-1-git-send-email-marc.zyngier@arm.com>
+References: <1453977038-13516-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1453977038-13516-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo,
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Please find below the KVM/ARM updates for 4.5-rc2. Mostly fixes as a
-result of Shannon's work on PMU emulation, which has outlined a few
-nits here and there, plus a correctness fix from Dave.
+The values of CPSR MODE mask are different between aarch32 and aarch64.
+It should use the right one according to the execution state.
 
-Please pull!
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/kvm_emulate.h | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-Thanks,
-
-	M.
-
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.5-rc2
-
-for you to fetch changes up to 6327f35a2010c06a3bc2bfb14202a38764fb9920:
-
-  arm64: KVM: Fix guest dead loop when register accessor returns false (2016-01-24 21:56:01 +0000)
-
-----------------------------------------------------------------
-KVM/ARM fixes for v4.5-rc2
-
-A few random fixes, mostly coming from the PMU work by Shannon:
-
-- fix for injecting faults coming from the guest's userspace
-- cleanup for our CPTR_EL2 accessors (reserved bits)
-- fix for a bug impacting perf (user/kernel discrimination)
-- fix for a 32bit sysreg handling bug
-
-----------------------------------------------------------------
-Dave Martin (1):
-      arm64: KVM: Obey RES0/1 reserved bits when setting CPTR_EL2
-
-Marc Zyngier (1):
-      arm64: KVM: Fix AArch64 guest userspace exception injection
-
-Shannon Zhao (3):
-      arm64: KVM: Fix wrong use of the CPSR MODE mask for 32bit guests
-      arm64: KVM: Fix comments of the CP handler
-      arm64: KVM: Fix guest dead loop when register accessor returns false
-
- arch/arm64/include/asm/kvm_arm.h     |  1 +
- arch/arm64/include/asm/kvm_emulate.h |  8 ++++++--
- arch/arm64/kvm/hyp/switch.c          |  8 ++++++--
- arch/arm64/kvm/inject_fault.c        | 38 +++++++++++++++++++++++++++++++++---
- arch/arm64/kvm/sys_regs.c            |  9 ++++-----
- 5 files changed, 52 insertions(+), 12 deletions(-)
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 3066328..779a587 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -127,10 +127,14 @@ static inline unsigned long *vcpu_spsr(const struct kvm_vcpu *vcpu)
+ 
+ static inline bool vcpu_mode_priv(const struct kvm_vcpu *vcpu)
+ {
+-	u32 mode = *vcpu_cpsr(vcpu) & PSR_MODE_MASK;
++	u32 mode;
+ 
+-	if (vcpu_mode_is_32bit(vcpu))
++	if (vcpu_mode_is_32bit(vcpu)) {
++		mode = *vcpu_cpsr(vcpu) & COMPAT_PSR_MODE_MASK;
+ 		return mode > COMPAT_PSR_MODE_USR;
++	}
++
++	mode = *vcpu_cpsr(vcpu) & PSR_MODE_MASK;
+ 
+ 	return mode != PSR_MODE_EL0t;
+ }
+-- 
+2.1.4
