@@ -1,80 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Jan 2016 17:23:14 +0100
-Subject: [PATCH 6/7] usb: musb: use %pad format string from dma_addr_t
+Date: Thu, 28 Jan 2016 17:23:15 +0100
+Subject: [PATCH 7/7] usb: musb/ux500: remove duplicate check for
+ dma_is_compatible
 In-Reply-To: <1453998206-3490016-1-git-send-email-arnd@arndb.de>
 References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
  <1453998206-3490016-1-git-send-email-arnd@arndb.de>
-Message-ID: <1453998206-3490016-2-git-send-email-arnd@arndb.de>
+Message-ID: <1453998206-3490016-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The musb driver prints DMA addresses in a few places, using the
-0x%x format string. This is wrong on 64-bit architectures (which
-need %lx) and 32-bit ARM with CONFIG_LPAE set (which needs
-%llx), otherwise we print the wrong data, as gcc warns:
+When dma_addr_t is 64-bit, we get a warning about an invalid cast
+in the call to ux500_dma_is_compatible() from ux500_dma_channel_program():
 
-musb/musbhsdma.c: In function 'configure_channel':
-musb/musbhsdma.c:120:53: error: format '%x' expects argument of type 'unsigned int', but argument 6 has type 'dma_addr_t {aka long long unsigned int}' [-Werror=format=]
-  dev_dbg(musb->controller, "%p, pkt_sz %d, addr 0x%x, len %d, mode %d\n",
-musb/musbhsdma.c: In function 'dma_channel_program':
-musb/musbhsdma.c:155:53: error: format '%x' expects argument of type 'unsigned int', but argument 7 has type 'dma_addr_t {aka long long unsigned int}' [-Werror=format=]
-  dev_dbg(musb->controller, "ep%d-%s pkt_sz %d, dma_addr 0x%x length %d, mode %d\n",
-musb/tusb6010_omap.c: In function 'tusb_omap_dma_program':
-musb/tusb6010_omap.c:313:53: error: format '%x' expects argument of type 'unsigned int', but argument 7 has type 'dma_addr_t {aka long long unsigned int}' [-Werror=format=]
-  dev_dbg(musb->controller, "ep%i %s dma ch%i dma: %08x len: %u(%u) packet_sz: %i(%i)\n",
+drivers/usb/musb/ux500_dma.c: In function 'ux500_dma_channel_program':
+drivers/usb/musb/ux500_dma.c:210:51: error: cast to pointer from integer of different size [-Werror=int-to-pointer-cast]
+  if (!ux500_dma_is_compatible(channel, packet_sz, (void *)dma_addr, len))
 
-This uses the %pad format string, which prints a dma_addr_t that
-gets passed by reference, which works for all combinations.
+The problem is that ux500_dma_is_compatible() is called from the
+main musb driver on the virtual address, but here we pass in a
+DMA address, so the types are fundamentally different but it works
+because the function only checks the alignment of the buffer and
+that is the same.
+
+We could work around this by adding another cast, but I have checked
+that the buffer we get passed here is already checked before it
+gets mapped, so the second check seems completely unnecessary
+and removing it must be the cleanest solution.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/usb/musb/musbhsdma.c     | 8 ++++----
- drivers/usb/musb/tusb6010_omap.c | 4 ++--
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/usb/musb/ux500_dma.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/drivers/usb/musb/musbhsdma.c b/drivers/usb/musb/musbhsdma.c
-index 7539c3188ffc..8abfe4ec62fb 100644
---- a/drivers/usb/musb/musbhsdma.c
-+++ b/drivers/usb/musb/musbhsdma.c
-@@ -117,8 +117,8 @@ static void configure_channel(struct dma_channel *channel,
- 	u8 bchannel = musb_channel->idx;
- 	u16 csr = 0;
- 
--	dev_dbg(musb->controller, "%p, pkt_sz %d, addr 0x%x, len %d, mode %d\n",
--			channel, packet_sz, dma_addr, len, mode);
-+	dev_dbg(musb->controller, "%p, pkt_sz %d, addr %pad, len %d, mode %d\n",
-+			channel, packet_sz, &dma_addr, len, mode);
- 
- 	if (mode) {
- 		csr |= 1 << MUSB_HSDMA_MODE1_SHIFT;
-@@ -152,10 +152,10 @@ static int dma_channel_program(struct dma_channel *channel,
- 	struct musb_dma_controller *controller = musb_channel->controller;
- 	struct musb *musb = controller->private_data;
- 
--	dev_dbg(musb->controller, "ep%d-%s pkt_sz %d, dma_addr 0x%x length %d, mode %d\n",
-+	dev_dbg(musb->controller, "ep%d-%s pkt_sz %d, dma_addr %pad length %d, mode %d\n",
- 		musb_channel->epnum,
- 		musb_channel->transmit ? "Tx" : "Rx",
--		packet_sz, dma_addr, len, mode);
-+		packet_sz, &dma_addr, len, mode);
- 
+diff --git a/drivers/usb/musb/ux500_dma.c b/drivers/usb/musb/ux500_dma.c
+index d0b6a1cd7f62..c92a295049ad 100644
+--- a/drivers/usb/musb/ux500_dma.c
++++ b/drivers/usb/musb/ux500_dma.c
+@@ -207,9 +207,6 @@ static int ux500_dma_channel_program(struct dma_channel *channel,
  	BUG_ON(channel->status == MUSB_DMA_STATUS_UNKNOWN ||
  		channel->status == MUSB_DMA_STATUS_BUSY);
-diff --git a/drivers/usb/musb/tusb6010_omap.c b/drivers/usb/musb/tusb6010_omap.c
-index 4c82077da475..e6959ccb4453 100644
---- a/drivers/usb/musb/tusb6010_omap.c
-+++ b/drivers/usb/musb/tusb6010_omap.c
-@@ -310,9 +310,9 @@ static int tusb_omap_dma_program(struct dma_channel *channel, u16 packet_sz,
  
- 	dma_params.frame_count	= chdat->transfer_len / 32; /* Burst sz frame */
- 
--	dev_dbg(musb->controller, "ep%i %s dma ch%i dma: %08x len: %u(%u) packet_sz: %i(%i)\n",
-+	dev_dbg(musb->controller, "ep%i %s dma ch%i dma: %pad len: %u(%u) packet_sz: %i(%i)\n",
- 		chdat->epnum, chdat->tx ? "tx" : "rx",
--		ch, dma_addr, chdat->transfer_len, len,
-+		ch, &dma_addr, chdat->transfer_len, len,
- 		chdat->transfer_packet_sz, packet_sz);
- 
- 	/*
+-	if (!ux500_dma_is_compatible(channel, packet_sz, (void *)dma_addr, len))
+-		return false;
+-
+ 	channel->status = MUSB_DMA_STATUS_BUSY;
+ 	channel->actual_len = 0;
+ 	ret = ux500_configure_channel(channel, packet_sz, mode, dma_addr, len);
 -- 
 2.7.0
