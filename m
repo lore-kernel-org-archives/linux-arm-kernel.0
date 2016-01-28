@@ -1,139 +1,95 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 28 Jan 2016 08:50:40 +0000
-Subject: A problem about SPI Interrupt Configuration
-In-Reply-To: <56A97DB8.2000402@huawei.com>
-References: <569EF315.2060203@huawei.com>
- <20160122075741.6a704855@why.wild-wind.fr.eu.org>
- <56A97DB8.2000402@huawei.com>
-Message-ID: <56A9D660.2060905@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 28 Jan 2016 09:54:09 +0100
+Subject: [PATCH] arm64: mm: use correct mapping granularity under DEBUG_RODATA
+Message-ID: <1453971249-4407-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/01/16 02:32, Yang Yingliang wrote:
-> 
-> 
-> On 2016/1/22 15:57, Marc Zyngier wrote:
->> On Wed, 20 Jan 2016 10:38:13 +0800
->> Yang Yingliang <yangyingliang@huawei.com> wrote:
->>
->> Hi Yang,
->>
->>> Hi, Marc
->>>
->>> I got some error messages "RWP timeout, gone fishing".
->>>
->>> The case is :
->>>
->>> 			CPU0												CPU1
->>> 													acquire desc->lock in __setup_irq()
->>> 															enable irq in __setup_irq()
->>> read iar in gic_handle_irq()
->>> waiting for desc->lock in handle_fasteoi_irq()
->>> 												call gic_set_affinity() from setup_affinity()
->>> 												waiting for the irq deactive in gic_do_wait_for_rwp()
->>>
->>>
->>> The hardware will not clear GICD_CTLR.RWP until the interrupt is not
->>> active. The interrupt is keeping active while it's waiting for
->>> desc->lock on cpu0. But the lock is hold by cpu1 while it's waiting for
->>> the interrupt is not active. It causes a deadlock here in 1s.
->>>
->>>
->>> And the GICv3 SPEC says:
->>>
->>> 4.5.5 SPI Interrupt Configuration
->>> To configure an SPI interrupt, to ensure that interrupts are never
->>> distributed using partially updated configuration
->>> information, software must:
->>> o Ensure the interrupt is not active
->>> o Ensure that the interrupt is disabled
->>> o This might be done either by writing to GICD_CTLR to clear the enables
->>> for a group, or
->>> o By writing to GICD_ICENABLERn to clear the Enable bit of the interrupt
->>> (see section 5.3.11).
->>> o In both cases, software must poll GICD_CTLR.RWP to ensure the effects
->>> are visible (see section
->>> 5.3.20).
->>> o Program the routing (if appropriate), priority and group
->>> o Enable the interrupt (if required)
->>>
->>> Because it says "Ensure the interrupt is not active", so I can not tell
->>> it is a hardware or software problem.
->>>
->>> Can you please give some advice?
->>
->> Thanks for the accurate description of the problem. This looks to be a
->> core issue, or at least a problem between core code and the way the GIC
->> behaves, unfortunately. The architecture expects the interrupt to be
->> fully configured before it is enabled and made active, while the core
->> code does this the other way around.
->>
->> Can you please have a go at the patch below and let me know if it
->> improve things? This is just a test, and definitely not the complete
->> solution, but I'd like to find out if I'm on the right track.
->>
->> Thanks,
->>
->> 	M.
->>
->> diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
->> index 0eebaee..e5802fb 100644
->> --- a/kernel/irq/manage.c
->> +++ b/kernel/irq/manage.c
->> @@ -1303,12 +1303,6 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
->>   		if (new->flags & IRQF_ONESHOT)
->>   			desc->istate |= IRQS_ONESHOT;
->>
->> -		if (irq_settings_can_autoenable(desc))
->> -			irq_startup(desc, true);
->> -		else
->> -			/* Undo nested disables: */
->> -			desc->depth = 1;
->> -
->>   		/* Exclude IRQ from balancing if requested */
->>   		if (new->flags & IRQF_NOBALANCING) {
->>   			irq_settings_set_no_balancing(desc);
->> @@ -1318,6 +1312,12 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
->>   		/* Set default affinity mask once everything is setup */
->>   		setup_affinity(desc, mask);
->>
->> +		if (irq_settings_can_autoenable(desc))
->> +			irq_startup(desc, true);
->> +		else
->> +			/* Undo nested disables: */
->> +			desc->depth = 1;
->> +
->>   	} else if (new->flags & IRQF_TRIGGER_MASK) {
->>   		unsigned int nmsk = new->flags & IRQF_TRIGGER_MASK;
->>   		unsigned int omsk = irq_settings_get_trigger_mask(desc);
->>
-> 
-> This patch can avoid the case I said in this mail.
-> But in other case like set affinity by the /proc/irq/x/smp_affinity,
-> it's will have the same problem _if_ the hardware is waiting for deactive.
+(cherry picked from commit 4fee9f364b9b99f76732f2a6fd6df679a237fa74)
 
-Indeed, and the more I think of it, the more I'm convinced that what you
-are looking at is a hardware bug.
+When booting a 64k pages kernel that is built with CONFIG_DEBUG_RODATA
+and resides at an offset that is not a multiple of 512 MB, the rounding
+that occurs in __map_memblock() and fixup_executable() results in
+incorrect regions being mapped.
 
-If RWP is gated by an interrupt being active, or the disable is gated by
-the interrupt being active, then you will end-up in all kind of horrible
-problems that software *cannot* solve. The text you quoted earlier is
-not something that can be enforced from a software perspective (it
-contains a race condition that cannot be avoided).
+The following snippet from /sys/kernel/debug/kernel_page_tables shows
+how, when the kernel is loaded 2 MB above the base of DRAM at 0x40000000,
+the first 2 MB of memory (which may be inaccessible from non-secure EL1
+or just reserved by the firmware) is inadvertently mapped into the end of
+the module region.
 
-Furthermore, take the example of a VM that has an active interrupt
-linked to a physical interrupt (HW bit set in the List Register) while
-you are changing the affinity on the host. Nothing guarantees that the
-deactivate will *ever* happen (the guest could decide it doesn't need to
-do it, or takes a very long time to do so). In that case, you will
-deadlock the same way, and there is nothing you can do from a SW PoV to
-solve it.
+  ---[ Modules start ]---
+  0xfffffdffffe00000-0xfffffe0000000000     2M RW NX ... UXN MEM/NORMAL
+  ---[ Modules end ]---
+  ---[ Kernel Mapping ]---
+  0xfffffe0000000000-0xfffffe0000090000   576K RW NX ... UXN MEM/NORMAL
+  0xfffffe0000090000-0xfffffe0000200000  1472K ro x  ... UXN MEM/NORMAL
+  0xfffffe0000200000-0xfffffe0000800000     6M ro x  ... UXN MEM/NORMAL
+  0xfffffe0000800000-0xfffffe0000810000    64K ro x  ... UXN MEM/NORMAL
+  0xfffffe0000810000-0xfffffe0000a00000  1984K RW NX ... UXN MEM/NORMAL
+  0xfffffe0000a00000-0xfffffe00ffe00000  4084M RW NX ... UXN MEM/NORMAL
 
-I suggest you get back to your HW folks, and explain that what they have
-here is not a viable design.
+The same issue is likely to occur on 16k pages kernels whose load
+address is not a multiple of 32 MB (i.e., SECTION_SIZE). So round to
+SWAPPER_BLOCK_SIZE instead of SECTION_SIZE.
 
-Thanks,
+Fixes: da141706aea5 ("arm64: add better page protections to arm64")
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Laura Abbott <labbott@redhat.com>
+Cc: <stable@vger.kernel.org> # 4.0+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+[ard.biesheuvel: add #define of SWAPPER_BLOCK_SIZE for -stable version]
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/mm/mmu.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-	M.
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 5b8b664422d3..3b85ced2668a 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -300,6 +300,7 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+ }
+ 
+ #ifdef CONFIG_DEBUG_RODATA
++#define SWAPPER_BLOCK_SIZE	(PAGE_SHIFT == 12 ? SECTION_SIZE : PAGE_SIZE)
+ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
+ {
+ 	/*
+@@ -307,8 +308,8 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
+ 	 * for now. This will get more fine grained later once all memory
+ 	 * is mapped
+ 	 */
+-	unsigned long kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
+-	unsigned long kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
++	unsigned long kernel_x_start = round_down(__pa(_stext), SWAPPER_BLOCK_SIZE);
++	unsigned long kernel_x_end = round_up(__pa(__init_end), SWAPPER_BLOCK_SIZE);
+ 
+ 	if (end < kernel_x_start) {
+ 		create_mapping(start, __phys_to_virt(start),
+@@ -396,18 +397,18 @@ void __init fixup_executable(void)
+ {
+ #ifdef CONFIG_DEBUG_RODATA
+ 	/* now that we are actually fully mapped, make the start/end more fine grained */
+-	if (!IS_ALIGNED((unsigned long)_stext, SECTION_SIZE)) {
++	if (!IS_ALIGNED((unsigned long)_stext, SWAPPER_BLOCK_SIZE)) {
+ 		unsigned long aligned_start = round_down(__pa(_stext),
+-							SECTION_SIZE);
++							 SWAPPER_BLOCK_SIZE);
+ 
+ 		create_mapping(aligned_start, __phys_to_virt(aligned_start),
+ 				__pa(_stext) - aligned_start,
+ 				PAGE_KERNEL);
+ 	}
+ 
+-	if (!IS_ALIGNED((unsigned long)__init_end, SECTION_SIZE)) {
++	if (!IS_ALIGNED((unsigned long)__init_end, SWAPPER_BLOCK_SIZE)) {
+ 		unsigned long aligned_end = round_up(__pa(__init_end),
+-							SECTION_SIZE);
++							  SWAPPER_BLOCK_SIZE);
+ 		create_mapping(__pa(__init_end), (unsigned long)__init_end,
+ 				aligned_end - __pa(__init_end),
+ 				PAGE_KERNEL);
 -- 
-Jazz is not dead. It just smells funny...
+2.5.0
