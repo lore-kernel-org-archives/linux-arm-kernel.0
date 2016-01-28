@@ -1,157 +1,72 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 28 Jan 2016 10:29:54 +0900
-Subject: [PATCH] ARM: dts: emev2:use GIC_* defines
-Message-ID: <1453944594-24757-1-git-send-email-horms+renesas@verge.net.au>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Thu, 28 Jan 2016 09:41:23 +0800
+Subject: [PATCH 14/15] Revert "bus: uniphier: allow only built-in driver"
+In-Reply-To: <CAK7LNAR=E5kYzsO9=YDeAVzp9cLWd9C8ANeVGJOvM=BSM4aTjg@mail.gmail.com>
+References: <1453868872-26300-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1453868872-26300-15-git-send-email-wangkefeng.wang@huawei.com>
+ <CAK7LNAR=E5kYzsO9=YDeAVzp9cLWd9C8ANeVGJOvM=BSM4aTjg@mail.gmail.com>
+Message-ID: <56A971C3.6000608@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use GIC_* defines for GIC interrupt cells in emev2 device tree.
+Hi Masahiro,
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-Based on renesas-devel-20160127-v4.5-rc1
----
- arch/arm/boot/dts/emev2.dtsi | 37 +++++++++++++++++++------------------
- 1 file changed, 19 insertions(+), 18 deletions(-)
+On 2016/1/27 21:48, Masahiro Yamada wrote:
+> 2016-01-27 13:27 GMT+09:00 Kefeng Wang <wangkefeng.wang@huawei.com>:
+>> This reverts commit 326ea45aa827da6686c78b5907f9839f91ef5782.
+>>
+>> After covering to use helper of_platform_default_populate() to
+>> populate the default bus, no error in build uniphier driver as
+>> a module.
+> 
+> This statement is weird.
+> There is no error for building this driver as a module
+> at the point of v4.5-rc1.
 
-diff --git a/arch/arm/boot/dts/emev2.dtsi b/arch/arm/boot/dts/emev2.dtsi
-index 57795da616cb..366e822367c7 100644
---- a/arch/arm/boot/dts/emev2.dtsi
-+++ b/arch/arm/boot/dts/emev2.dtsi
-@@ -9,6 +9,7 @@
-  */
- 
- #include "skeleton.dtsi"
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
-@@ -53,7 +54,7 @@
- 
- 	pmu {
- 		compatible = "arm,cortex-a9-pmu";
--		interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>,
-+		interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 121 IRQ_TYPE_LEVEL_HIGH>;
- 	};
- 
-@@ -158,7 +159,7 @@
- 	timer at e0180000 {
- 		compatible = "renesas,em-sti";
- 		reg = <0xe0180000 0x54>;
--		interrupts = <0 125 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&sti_sclk>;
- 		clock-names = "sclk";
- 	};
-@@ -166,7 +167,7 @@
- 	uart0: serial at e1020000 {
- 		compatible = "renesas,em-uart";
- 		reg = <0xe1020000 0x38>;
--		interrupts = <0 8 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&usia_u0_sclk>;
- 		clock-names = "sclk";
- 	};
-@@ -174,7 +175,7 @@
- 	uart1: serial at e1030000 {
- 		compatible = "renesas,em-uart";
- 		reg = <0xe1030000 0x38>;
--		interrupts = <0 9 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&usib_u1_sclk>;
- 		clock-names = "sclk";
- 	};
-@@ -182,7 +183,7 @@
- 	uart2: serial at e1040000 {
- 		compatible = "renesas,em-uart";
- 		reg = <0xe1040000 0x38>;
--		interrupts = <0 10 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&usib_u2_sclk>;
- 		clock-names = "sclk";
- 	};
-@@ -190,7 +191,7 @@
- 	uart3: serial at e1050000 {
- 		compatible = "renesas,em-uart";
- 		reg = <0xe1050000 0x38>;
--		interrupts = <0 11 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&usib_u3_sclk>;
- 		clock-names = "sclk";
- 	};
-@@ -203,8 +204,8 @@
- 	gpio0: gpio at e0050000 {
- 		compatible = "renesas,em-gio";
- 		reg = <0xe0050000 0x2c>, <0xe0050040 0x20>;
--		interrupts = <0 67 IRQ_TYPE_LEVEL_HIGH>,
--			     <0 68 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
- 		gpio-controller;
- 		gpio-ranges = <&pfc 0 0 32>;
- 		#gpio-cells = <2>;
-@@ -215,8 +216,8 @@
- 	gpio1: gpio at e0050080 {
- 		compatible = "renesas,em-gio";
- 		reg = <0xe0050080 0x2c>, <0xe00500c0 0x20>;
--		interrupts = <0 69 IRQ_TYPE_LEVEL_HIGH>,
--			     <0 70 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
- 		gpio-controller;
- 		gpio-ranges = <&pfc 0 32 32>;
- 		#gpio-cells = <2>;
-@@ -227,8 +228,8 @@
- 	gpio2: gpio at e0050100 {
- 		compatible = "renesas,em-gio";
- 		reg = <0xe0050100 0x2c>, <0xe0050140 0x20>;
--		interrupts = <0 71 IRQ_TYPE_LEVEL_HIGH>,
--			     <0 72 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
- 		gpio-controller;
- 		gpio-ranges = <&pfc 0 64 32>;
- 		#gpio-cells = <2>;
-@@ -239,8 +240,8 @@
- 	gpio3: gpio at e0050180 {
- 		compatible = "renesas,em-gio";
- 		reg = <0xe0050180 0x2c>, <0xe00501c0 0x20>;
--		interrupts = <0 73 IRQ_TYPE_LEVEL_HIGH>,
--			     <0 74 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
- 		gpio-controller;
- 		gpio-ranges = <&pfc 0 96 32>;
- 		#gpio-cells = <2>;
-@@ -251,8 +252,8 @@
- 	gpio4: gpio at e0050200 {
- 		compatible = "renesas,em-gio";
- 		reg = <0xe0050200 0x2c>, <0xe0050240 0x20>;
--		interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>,
--			     <0 76 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
- 		gpio-controller;
- 		gpio-ranges = <&pfc 0 128 31>;
- 		#gpio-cells = <2>;
-@@ -266,7 +267,7 @@
- 		#size-cells = <0>;
- 		compatible = "renesas,iic-emev2";
- 		reg = <0xe0070000 0x28>;
--		interrupts = <0 32 IRQ_TYPE_EDGE_RISING>;
-+		interrupts = <GIC_SPI 32 IRQ_TYPE_EDGE_RISING>;
- 		clocks = <&iic0_sclk>;
- 		clock-names = "sclk";
- 		status = "disabled";
-@@ -277,7 +278,7 @@
- 		#size-cells = <0>;
- 		compatible = "renesas,iic-emev2";
- 		reg = <0xe10a0000 0x28>;
--		interrupts = <0 33 IRQ_TYPE_EDGE_RISING>;
-+		interrupts = <GIC_SPI 33 IRQ_TYPE_EDGE_RISING>;
- 		clocks = <&iic1_sclk>;
- 		clock-names = "sclk";
- 		status = "disabled";
--- 
-2.1.4
+Yes, but after drop export of_default_bus_match_table in patchset(15/15),
+we will meet build issue, so the statement can be changed to
+------------
+After covering to use helper of_platform_default_populate() to
+populate the default bus, this driver can be safely as a tristate
+one, no error in build uniphier driver as a module once we drop
+export of_default_bus_match_table in later patch.
+------------
+> 
+> The of_platform_default_populate() conversion (11/15) is unrelated
+> to fixing the build error.
+> 
+> BTW, I had already posted an equivalent patch a few days before:
+> 
+> https://patchwork.kernel.org/patch/8096991/
+> 
+I didn't notice this before, it is ok for me to use your patch, or I will send
+a new one with update changlog, thanks for your review.
+
+> 
+> 
+> 
+>> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+>> ---
+>>  drivers/bus/Kconfig | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+>> index 129d47b..9a92c07 100644
+>> --- a/drivers/bus/Kconfig
+>> +++ b/drivers/bus/Kconfig
+>> @@ -132,7 +132,7 @@ config SUNXI_RSB
+>>           and AC100/AC200 ICs.
+>>
+>>  config UNIPHIER_SYSTEM_BUS
+>> -       bool "UniPhier System Bus driver"
+>> +       tristate "UniPhier System Bus driver"
+>>         depends on ARCH_UNIPHIER && OF
+>>         default y
+>>         help
+>> --
+>> 2.6.0.GIT
+>>
+> 
+> 
