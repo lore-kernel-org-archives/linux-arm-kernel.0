@@ -1,83 +1,145 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Jan 2016 16:07:48 +0000
-Subject: [PATCH] arm64: Add support for Half precision floating point
-In-Reply-To: <20160126165538.GC22776@devel.intra.reserved-bit.com>
-References: <1453823566-26742-1-git-send-email-suzuki.poulose@arm.com>
- <20160126160257.GB28238@arm.com> <56A79D17.2000009@arm.com>
- <20160126165538.GC22776@devel.intra.reserved-bit.com>
-Message-ID: <20160128160747.GN775@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 29 Jan 2016 00:14:12 +0800
+Subject: [PATCH v2 5/5] arm64/perf: Extend event mask for ARMv8.1
+In-Reply-To: <6251e3377ca5d109c1a38ecc07fed50d6cbf5c61.1453992560.git.jglauber@cavium.com>
+Message-ID: <201601290024.hpLX77Id%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 26, 2016 at 10:25:38PM +0530, Siddhesh Poyarekar wrote:
-> Adding Adhemerval to cc since he had volunteered to follow up on this,
-> mainly because he had a couple of additional ideas on the kernel
-> front.
-> 
-> On Tue, Jan 26, 2016 at 04:21:43PM +0000, Suzuki K. Poulose wrote:
-> > On 26/01/16 16:02, Will Deacon wrote:
-> > >Hi Suzuki,
-> > >
-> > >On Tue, Jan 26, 2016 at 03:52:46PM +0000, Suzuki K Poulose wrote:
-> > >>ARMv8.2 extensions [1] include an optional feature, which supports
-> > >>half precision(16bit) floating point/asimd data processing
-> > >>instructions. This patch adds support for detecting and exposing
-> > >>the same to the userspace via HWCAPs
-> > 
-> > 
-> > >>+#define HWCAP_FPHP		(1 << 9)
-> > >>+#define HWCAP_ASIMDHP		(1 << 10)
-> > >
-> > >Where did we get to with the mrs trapping you proposed here?
-> > >
-> > >   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/374609.html
-> > 
-> > We are yet to get some feedback from glibc/gcc folks. Siddhesh was looking
-> > to make use of it [2]. But haven't heard anything back. Ramana mentioned
-> > (in private) that they had some plans to take a look at it.
-> 
-> I believe one of Adhemerval's ideas was similar to what I had
-> mentioned back then, which was to provide all of the CPU information
-> in a single file instead of having to traverse a directory structure.
+Hi Jan,
 
-My understanding was that libc needed this information extremely early
-on (i.e. before it could even issue system calls), and therefore such
-an approach would be in addition to the proposal here. Am I mistaken?
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.5-rc1 next-20160128]
+[cannot apply to tip/perf/core]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-> The other idea was to add a vDSO function that returns this data so as
-> to avoid (or at least reduce) the context switch latency.
+url:    https://github.com/0day-ci/linux/commits/Jan-Glauber/Cavium-ThunderX-PMU-support/20160128-225855
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
+config: arm-imx_v6_v7_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-I'm not at all keen on adding a data ABI to the vDSO. I think people tried
-similar things in the past (something on PPC?) and have horror stories
-from that.
+All errors (new ones prefixed by >>):
 
-> The other aspect that I am waiting for feedback from ARM for is about
-> the property of the MIDR value.  If it can be ascertained that a core
-> with a specific MIDR value will always only be in a homogeneous
-> configuration, we could bypass the directory traversal and just stick
-> to the value returned from midr_el1.  This is likely vendor-specific
-> and I'm waiting to know if the ARM toolchain hackers would be
-> comfortable with baking in such assumptions into glibc.  Extra marks
-> for making such a requirement explicit in future specifications.
+   arch/arm/kernel/perf_event_v6.c: In function 'armv6_map_event':
+>> arch/arm/kernel/perf_event_v6.c:483:9: error: too many arguments to function 'armpmu_map_event'
+     return armpmu_map_event(event, &armv6_perf_map,
+            ^
+   In file included from arch/arm/kernel/perf_event_v6.c:39:0:
+   include/linux/perf/arm_pmu.h:119:5: note: declared here
+    int armpmu_map_event(struct perf_event *event,
+        ^
+   arch/arm/kernel/perf_event_v6.c: In function 'armv6mpcore_map_event':
+   arch/arm/kernel/perf_event_v6.c:533:9: error: too many arguments to function 'armpmu_map_event'
+     return armpmu_map_event(event, &armv6mpcore_perf_map,
+            ^
+   In file included from arch/arm/kernel/perf_event_v6.c:39:0:
+   include/linux/perf/arm_pmu.h:119:5: note: declared here
+    int armpmu_map_event(struct perf_event *event,
+        ^
+--
+   arch/arm/kernel/perf_event_v7.c: In function 'armv7_a8_map_event':
+>> arch/arm/kernel/perf_event_v7.c:1111:9: error: too many arguments to function 'armpmu_map_event'
+     return armpmu_map_event(event, &armv7_a8_perf_map,
+            ^
+   In file included from arch/arm/kernel/perf_event_v7.c:28:0:
+   include/linux/perf/arm_pmu.h:119:5: note: declared here
+    int armpmu_map_event(struct perf_event *event,
+        ^
+   arch/arm/kernel/perf_event_v7.c: In function 'armv7_a9_map_event':
+   arch/arm/kernel/perf_event_v7.c:1117:9: error: too many arguments to function 'armpmu_map_event'
+     return armpmu_map_event(event, &armv7_a9_perf_map,
+            ^
+   In file included from arch/arm/kernel/perf_event_v7.c:28:0:
+   include/linux/perf/arm_pmu.h:119:5: note: declared here
+    int armpmu_map_event(struct perf_event *event,
+        ^
+   arch/arm/kernel/perf_event_v7.c: In function 'armv7_a5_map_event':
+   arch/arm/kernel/perf_event_v7.c:1123:9: error: too many arguments to function 'armpmu_map_event'
+     return armpmu_map_event(event, &armv7_a5_perf_map,
+            ^
+   In file included from arch/arm/kernel/perf_event_v7.c:28:0:
+   include/linux/perf/arm_pmu.h:119:5: note: declared here
+    int armpmu_map_event(struct perf_event *event,
+        ^
+   arch/arm/kernel/perf_event_v7.c: In function 'armv7_a15_map_event':
+   arch/arm/kernel/perf_event_v7.c:1129:9: error: too many arguments to function 'armpmu_map_event'
+     return armpmu_map_event(event, &armv7_a15_perf_map,
+            ^
+   In file included from arch/arm/kernel/perf_event_v7.c:28:0:
+   include/linux/perf/arm_pmu.h:119:5: note: declared here
+    int armpmu_map_event(struct perf_event *event,
+        ^
+   arch/arm/kernel/perf_event_v7.c: In function 'armv7_a7_map_event':
+   arch/arm/kernel/perf_event_v7.c:1135:9: error: too many arguments to function 'armpmu_map_event'
+     return armpmu_map_event(event, &armv7_a7_perf_map,
+            ^
+   In file included from arch/arm/kernel/perf_event_v7.c:28:0:
+   include/linux/perf/arm_pmu.h:119:5: note: declared here
+    int armpmu_map_event(struct perf_event *event,
+        ^
+   arch/arm/kernel/perf_event_v7.c: In function 'armv7_a12_map_event':
+   arch/arm/kernel/perf_event_v7.c:1141:9: error: too many arguments to function 'armpmu_map_event'
+     return armpmu_map_event(event, &armv7_a12_perf_map,
+            ^
+   In file included from arch/arm/kernel/perf_event_v7.c:28:0:
+   include/linux/perf/arm_pmu.h:119:5: note: declared here
+    int armpmu_map_event(struct perf_event *event,
+        ^
+   arch/arm/kernel/perf_event_v7.c: In function 'krait_map_event':
+   arch/arm/kernel/perf_event_v7.c:1147:9: error: too many arguments to function 'armpmu_map_event'
+     return armpmu_map_event(event, &krait_perf_map,
+            ^
+   In file included from arch/arm/kernel/perf_event_v7.c:28:0:
+   include/linux/perf/arm_pmu.h:119:5: note: declared here
+    int armpmu_map_event(struct perf_event *event,
+        ^
+   arch/arm/kernel/perf_event_v7.c: In function 'krait_map_event_no_branch':
+   arch/arm/kernel/perf_event_v7.c:1153:9: error: too many arguments to function 'armpmu_map_event'
+     return armpmu_map_event(event, &krait_perf_map_no_branch,
+            ^
+   In file included from arch/arm/kernel/perf_event_v7.c:28:0:
+   include/linux/perf/arm_pmu.h:119:5: note: declared here
+    int armpmu_map_event(struct perf_event *event,
+        ^
+   arch/arm/kernel/perf_event_v7.c: In function 'scorpion_map_event':
+   arch/arm/kernel/perf_event_v7.c:1159:9: error: too many arguments to function 'armpmu_map_event'
+     return armpmu_map_event(event, &scorpion_perf_map,
+            ^
+   In file included from arch/arm/kernel/perf_event_v7.c:28:0:
+   include/linux/perf/arm_pmu.h:119:5: note: declared here
+    int armpmu_map_event(struct perf_event *event,
+        ^
 
-The architecture makes no guarantees about what will and won't be used
-in different configurations, so we shouldn't try to derive this from the
-MIDR. Even if you figure out a heuristic for today's platforms, it won't
-necessarily hold true in the future.
+vim +/armpmu_map_event +483 arch/arm/kernel/perf_event_v6.c
 
-> I had hacked at some code with directory traversal on top of your
-> patch and it works fine as far as doing a PoC, but until we get
-> consensus on how we want to handle things like BIG.little, there can't
-> be much progress.
+43eab878 Will Deacon  2010-11-13  477  	armv6_pmcr_write(val);
+0f78d2d5 Mark Rutland 2011-04-28  478  	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+43eab878 Will Deacon  2010-11-13  479  }
+43eab878 Will Deacon  2010-11-13  480  
+e1f431b5 Mark Rutland 2011-04-28  481  static int armv6_map_event(struct perf_event *event)
+e1f431b5 Mark Rutland 2011-04-28  482  {
+6dbc0029 Will Deacon  2012-07-29 @483  	return armpmu_map_event(event, &armv6_perf_map,
+e1f431b5 Mark Rutland 2011-04-28  484  				&armv6_perf_cache_map, 0xFF);
+e1f431b5 Mark Rutland 2011-04-28  485  }
+e1f431b5 Mark Rutland 2011-04-28  486  
 
-By "directory traversal" are you only referring to the /sys portions
-of this? I'm *much* more interested in the utility of the MRS emulation
-part, since that's what could effectively replace HWCAPs in the future.
+:::::: The code at line 483 was first introduced by commit
+:::::: 6dbc00297095122ea89e016ce6affad0b7c0ddac ARM: perf: prepare for moving CPU PMU code into separate file
 
-As for big/little, the kernel view has been pretty consistent on that:
-we will expose a "sanitised" view of the registers (as described in the
-Documentation along with the patch) where we can, and for the per-CPU
-registers such as MIDR, you will read the current CPU register (which
-is why those registers are also exposed in sysfs).
+:::::: TO: Will Deacon <will.deacon@arm.com>
+:::::: CC: Will Deacon <will.deacon@arm.com>
 
-Will
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 29108 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160129/982f6557/attachment-0001.obj>
