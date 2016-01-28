@@ -1,63 +1,76 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 28 Jan 2016 14:25:31 -0700
-Subject: [PATCH net-next 07/40] net: fec: don't transfer ownership until
- descriptor write is complete
+Date: Thu, 28 Jan 2016 14:25:26 -0700
+Subject: [PATCH net-next 02/40] net: fec: fix rx error counts
 In-Reply-To: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1454016364-30985-8-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1454016364-30985-3-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On an overrun, the other flags are not
+valid, so don't check them.
+
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/freescale/fec_main.c | 36 +++++++++++++------------------
+ 1 file changed, 15 insertions(+), 21 deletions(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index e8f35fb..b87f80d 100644
+index 2c7c845..620834f 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -388,6 +388,10 @@ fec_enet_txq_submit_frag_skb(struct fec_enet_priv_tx_q *txq,
+@@ -1403,37 +1403,31 @@ fec_enet_rx_queue(struct net_device *ndev, int budget, u16 queue_id)
+ 			break;
+ 		pkt_received++;
  
- 		bdp->cbd_bufaddr = addr;
- 		bdp->cbd_datlen = frag_len;
-+		/* Make sure the updates to rest of the descriptor are
-+		 * performed before transferring ownership.
-+		 */
-+		wmb();
- 		bdp->cbd_sc = status;
- 	}
+-		/* Since we have allocated space to hold a complete frame,
+-		 * the last indicator should be set.
+-		 */
+-		if ((status & BD_ENET_RX_LAST) == 0)
+-			netdev_err(ndev, "rcv is not +last\n");
+-
+ 		writel(FEC_ENET_RXF, fep->hwp + FEC_IEVENT);
  
-@@ -497,6 +501,10 @@ static int fec_enet_txq_submit_skb(struct fec_enet_priv_tx_q *txq,
- 
- 	bdp->cbd_datlen = buflen;
- 	bdp->cbd_bufaddr = addr;
-+	/* Make sure the updates to rest of the descriptor are performed before
-+	 * transferring ownership.
-+	 */
-+	wmb();
- 
- 	/* Send it on its way.  Tell FEC it's ready, interrupt when done,
- 	 * it's the last BD of the frame, and to put the CRC on the end.
-@@ -1467,7 +1475,6 @@ rx_processing_done:
- 
- 		/* Mark the buffer empty */
- 		status |= BD_ENET_RX_EMPTY;
--		bdp->cbd_sc = status;
- 
- 		if (fep->bufdesc_ex) {
- 			struct bufdesc_ex *ebdp = (struct bufdesc_ex *)bdp;
-@@ -1476,6 +1483,11 @@ rx_processing_done:
- 			ebdp->cbd_prot = 0;
- 			ebdp->cbd_bdu = 0;
+ 		/* Check for errors. */
++		status ^= BD_ENET_RX_LAST;
+ 		if (status & (BD_ENET_RX_LG | BD_ENET_RX_SH | BD_ENET_RX_NO |
+-			   BD_ENET_RX_CR | BD_ENET_RX_OV)) {
++			   BD_ENET_RX_CR | BD_ENET_RX_OV | BD_ENET_RX_LAST |
++			   BD_ENET_RX_CL)) {
+ 			ndev->stats.rx_errors++;
+-			if (status & (BD_ENET_RX_LG | BD_ENET_RX_SH)) {
++			if (status & BD_ENET_RX_OV) {
++				/* FIFO overrun */
++				ndev->stats.rx_fifo_errors++;
++				goto rx_processing_done;
++			}
++			if (status & (BD_ENET_RX_LG | BD_ENET_RX_SH
++						| BD_ENET_RX_LAST)) {
+ 				/* Frame too long or too short. */
+ 				ndev->stats.rx_length_errors++;
++				if (status & BD_ENET_RX_LAST)
++					netdev_err(ndev, "rcv is not +last\n");
+ 			}
+-			if (status & BD_ENET_RX_NO)	/* Frame alignment */
+-				ndev->stats.rx_frame_errors++;
+ 			if (status & BD_ENET_RX_CR)	/* CRC Error */
+ 				ndev->stats.rx_crc_errors++;
+-			if (status & BD_ENET_RX_OV)	/* FIFO overrun */
+-				ndev->stats.rx_fifo_errors++;
+-		}
+-
+-		/* Report late collisions as a frame error.
+-		 * On this error, the BD is closed, but we don't know what we
+-		 * have in the buffer.  So, just drop this frame on the floor.
+-		 */
+-		if (status & BD_ENET_RX_CL) {
+-			ndev->stats.rx_errors++;
+-			ndev->stats.rx_frame_errors++;
++			/* Report late collisions as a frame error. */
++			if (status & (BD_ENET_RX_NO | BD_ENET_RX_CL))
++				ndev->stats.rx_frame_errors++;
+ 			goto rx_processing_done;
  		}
-+		/* Make sure the updates to rest of the descriptor are
-+		 * performed before transferring ownership.
-+		 */
-+		wmb();
-+		bdp->cbd_sc = status;
  
- 		/* Update BD pointer to next entry */
- 		bdp = fec_enet_get_nextdesc(bdp, &rxq->bd);
 -- 
 2.5.0
