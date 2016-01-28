@@ -1,42 +1,38 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 28 Jan 2016 16:51:29 +0100
-Subject: [linux-sunxi] Problem with Allwinner H3 clocks
-In-Reply-To: <56A9CE3D.4020906@redhat.com>
-References: <20160127084607.665fb8c38eeb5733ce4232da@free.fr>
- <CAGb2v65FUhNC-d-YT=-2adNHHT6b1JvGoNTFLfBX_xBSnuOsTg@mail.gmail.com>
- <20160127103714.58312b152adb4148bae2f93b@free.fr>
- <56A8D5E5.30701@gmail.com>
- <20160127175512.87caf31b5e21a1fec91507f2@free.fr>
- <56A9098A.5010107@redhat.com>
- <20160127200217.14dce96ade71cf81bc82e6f6@free.fr>
- <56A9CE3D.4020906@redhat.com>
-Message-ID: <20160128165129.b9ab69d44aa7f32f4dbf5215@free.fr>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 28 Jan 2016 15:53:43 +0000
+Subject: [PATCH 0/3] arm efi minor fixes
+In-Reply-To: <1453979254-25374-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1453979254-25374-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160128155341.GP17123@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Jan 2016 09:15:57 +0100
-Hans de Goede <hdegoede@redhat.com> wrote:
-
-> p.s.
+On Thu, Jan 28, 2016 at 12:07:31PM +0100, Ard Biesheuvel wrote:
+> This fixes two minor issues with the handling of .init data in the stub (#1, #2)
 > 
-> Did I understand correctly that you are working on a kms (or fbdev) driver
-> for the H3? A fellow Dutch hacker (Jelle van der Waa, added to the Cc) is
-> looking into adding H3 video console support to upstream u-boot. If you
-> already have a lit-up display with an upstream kernel it would be great
-> if you could share that, even if it is still wip.
+> Patch #3 replaces some instances of early_memremap() with early_memremap_ro()
+> where the region in question is only accessed in r/o mode.
 
-Hi Hans and Jelle,
+Nice!
 
-I submitted a (second) patch mid-january:
+The series looks sensible to me, and having given it a spin on Juno
+(atop of v4.5-rc1 defconfig) everything seems to work, so FWIW:
 
-	http://www.spinics.net/lists/dri-devel/msg98558.html
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
 
-It has changed a bit since this time (towards simplification).
-I was to submit a new patch, but the hardware cursor refuses to have
-transparent pixels!
-Otherwise, the TCON1 and DE2 are simple enough for the primary plane.
-The problem is the HDMI driver...
+Mark.
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+> Ard Biesheuvel (3):
+>   arm64: efistub: drop __init annotation from handle_kernel_image()
+>   arm64: vmlinux.lds.S: handle .init.rodata.xxx and .init.bss sections
+>   efi: arm-init: use read-only early mappings
+> 
+>  arch/arm64/kernel/vmlinux.lds.S           |  1 +
+>  drivers/firmware/efi/arm-init.c           | 14 +++++++-------
+>  drivers/firmware/efi/libstub/arm64-stub.c | 14 +++++++-------
+>  3 files changed, 15 insertions(+), 14 deletions(-)
+> 
+> -- 
+> 2.5.0
+> 
