@@ -1,103 +1,59 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 28 Jan 2016 10:30:34 +0000
-Subject: [PATCH 1/5] arm64: KVM: Fix AArch64 guest userspace exception
- injection
-In-Reply-To: <1453977038-13516-1-git-send-email-marc.zyngier@arm.com>
-References: <1453977038-13516-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1453977038-13516-2-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 28 Jan 2016 10:30:33 +0000
+Subject: [GIT PULL] KVM/ARM updates for 4.5-rc2
+Message-ID: <1453977038-13516-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the moment, our fault injection is pretty limited. We always
-generate a SYNC exception into EL1, as if the fault was actually
-from EL1h, no matter how it was generated.
+Hi Paolo,
 
-This is obviously wrong, as EL0 can generate faults of its own
-(not to mention the pretty-much unused EL1t mode).
+Please find below the KVM/ARM updates for 4.5-rc2. Mostly fixes as a
+result of Shannon's work on PMU emulation, which has outlined a few
+nits here and there, plus a correctness fix from Dave.
 
-This patch fixes it by implementing section D1.10.2 of the ARMv8 ARM,
-and in particular table D1-7 ("Vector offsets from vector table base
-address"), which describes which vector to use depending on the source
-exception level and type (synchronous, IRQ, FIQ or SError).
+Please pull!
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Tested-by: Shannon Zhao <shannon.zhao@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kvm/inject_fault.c | 38 +++++++++++++++++++++++++++++++++++---
- 1 file changed, 35 insertions(+), 3 deletions(-)
+Thanks,
 
-diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
-index 648112e..4d1ac81 100644
---- a/arch/arm64/kvm/inject_fault.c
-+++ b/arch/arm64/kvm/inject_fault.c
-@@ -27,7 +27,11 @@
- 
- #define PSTATE_FAULT_BITS_64 	(PSR_MODE_EL1h | PSR_A_BIT | PSR_F_BIT | \
- 				 PSR_I_BIT | PSR_D_BIT)
--#define EL1_EXCEPT_SYNC_OFFSET	0x200
-+
-+#define CURRENT_EL_SP_EL0_VECTOR	0x0
-+#define CURRENT_EL_SP_ELx_VECTOR	0x200
-+#define LOWER_EL_AArch64_VECTOR		0x400
-+#define LOWER_EL_AArch32_VECTOR		0x600
- 
- static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
- {
-@@ -97,6 +101,34 @@ static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
- 		*fsr = 0x14;
- }
- 
-+enum exception_type {
-+	except_type_sync	= 0,
-+	except_type_irq		= 0x80,
-+	except_type_fiq		= 0x100,
-+	except_type_serror	= 0x180,
-+};
-+
-+static u64 get_except_vector(struct kvm_vcpu *vcpu, enum exception_type type)
-+{
-+	u64 exc_offset;
-+
-+	switch (*vcpu_cpsr(vcpu) & (PSR_MODE_MASK | PSR_MODE32_BIT)) {
-+	case PSR_MODE_EL1t:
-+		exc_offset = CURRENT_EL_SP_EL0_VECTOR;
-+		break;
-+	case PSR_MODE_EL1h:
-+		exc_offset = CURRENT_EL_SP_ELx_VECTOR;
-+		break;
-+	case PSR_MODE_EL0t:
-+		exc_offset = LOWER_EL_AArch64_VECTOR;
-+		break;
-+	default:
-+		exc_offset = LOWER_EL_AArch32_VECTOR;
-+	}
-+
-+	return vcpu_sys_reg(vcpu, VBAR_EL1) + exc_offset + type;
-+}
-+
- static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr)
- {
- 	unsigned long cpsr = *vcpu_cpsr(vcpu);
-@@ -108,8 +140,8 @@ static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr
- 	*vcpu_spsr(vcpu) = cpsr;
- 	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
- 
-+	*vcpu_pc(vcpu) = get_except_vector(vcpu, except_type_sync);
- 	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
--	*vcpu_pc(vcpu) = vcpu_sys_reg(vcpu, VBAR_EL1) + EL1_EXCEPT_SYNC_OFFSET;
- 
- 	vcpu_sys_reg(vcpu, FAR_EL1) = addr;
- 
-@@ -143,8 +175,8 @@ static void inject_undef64(struct kvm_vcpu *vcpu)
- 	*vcpu_spsr(vcpu) = cpsr;
- 	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
- 
-+	*vcpu_pc(vcpu) = get_except_vector(vcpu, except_type_sync);
- 	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
--	*vcpu_pc(vcpu) = vcpu_sys_reg(vcpu, VBAR_EL1) + EL1_EXCEPT_SYNC_OFFSET;
- 
- 	/*
- 	 * Build an unknown exception, depending on the instruction
--- 
-2.1.4
+	M.
+
+The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+
+  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.5-rc2
+
+for you to fetch changes up to 6327f35a2010c06a3bc2bfb14202a38764fb9920:
+
+  arm64: KVM: Fix guest dead loop when register accessor returns false (2016-01-24 21:56:01 +0000)
+
+----------------------------------------------------------------
+KVM/ARM fixes for v4.5-rc2
+
+A few random fixes, mostly coming from the PMU work by Shannon:
+
+- fix for injecting faults coming from the guest's userspace
+- cleanup for our CPTR_EL2 accessors (reserved bits)
+- fix for a bug impacting perf (user/kernel discrimination)
+- fix for a 32bit sysreg handling bug
+
+----------------------------------------------------------------
+Dave Martin (1):
+      arm64: KVM: Obey RES0/1 reserved bits when setting CPTR_EL2
+
+Marc Zyngier (1):
+      arm64: KVM: Fix AArch64 guest userspace exception injection
+
+Shannon Zhao (3):
+      arm64: KVM: Fix wrong use of the CPSR MODE mask for 32bit guests
+      arm64: KVM: Fix comments of the CP handler
+      arm64: KVM: Fix guest dead loop when register accessor returns false
+
+ arch/arm64/include/asm/kvm_arm.h     |  1 +
+ arch/arm64/include/asm/kvm_emulate.h |  8 ++++++--
+ arch/arm64/kvm/hyp/switch.c          |  8 ++++++--
+ arch/arm64/kvm/inject_fault.c        | 38 +++++++++++++++++++++++++++++++++---
+ arch/arm64/kvm/sys_regs.c            |  9 ++++-----
+ 5 files changed, 52 insertions(+), 12 deletions(-)
