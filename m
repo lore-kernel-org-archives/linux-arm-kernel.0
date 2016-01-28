@@ -1,115 +1,80 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 28 Jan 2016 15:15:42 -0600
-Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
-In-Reply-To: <20160128183156.GH19432@atomide.com>
-References: <1452780672-14339-1-git-send-email-kishon@ti.com>
- <1452780672-14339-4-git-send-email-kishon@ti.com>
- <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
- <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
- <20160128183156.GH19432@atomide.com>
-Message-ID: <56AA84FE.7020001@ti.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 29 Jan 2016 05:23:32 +0800
+Subject: [PATCH 17/31] Add debugger entry points for ARM
+In-Reply-To: <1454010424-29097-1-git-send-email-jeffmerkey@gmail.com>
+Message-ID: <201601290502.dJ4amfJL%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2016 12:31 PM, Tony Lindgren wrote:
-> * Suman Anna <s-anna@ti.com> [160127 15:17]:
->> On 01/27/2016 12:56 PM, Tony Lindgren wrote:
->>> * Suman Anna <s-anna@ti.com> [160127 10:17]:
->>>> On 01/27/2016 11:31 AM, Tony Lindgren wrote:
->>>>> Why do you need another reset here? Can't you just implement PM runtime
->>>>> in the driver and do the usual pm_runtime_put_sync followed by
->>>>> pm_runtime_disable?
->>>>
->>>> The omap_hwmod_enable/disable code does not deal with hardresets (PRCM
->>>> reset lines) and so the pm_runtime_get_sync/put_sync only end up dealing
->>>> with clocks, and we need to invoke the reset functions separately.
->>>> Modules with softresets in SYSCONFIG are ok, as they are dealt with
->>>> properly.
->>>
->>> Hmm _reset() in omap_hwmod.c has this to call _assert_hardreset:
->>>
->>> 	if (oh->class->reset) {
->>> 		r = oh->class->reset(oh);
->>> 	} else {
->>> 		if (oh->rst_lines_cnt > 0) {
->>> 			for (i = 0; i < oh->rst_lines_cnt; i++)
->>> 				_assert_hardreset(oh, oh->rst_lines[i].name);
->>> 			return 0;
->>> 		} else {
->>> 			r = _ocp_softreset(oh);
->>> 			if (r == -ENOENT)
->>> 				r = 0;
->>> 		}
->>> 	}
->>
->> Right, hwmod code does the initial reset.
->>
->>> Care to explain what exactly the problem with the hwmod code not doing
->>> the reset on init?
->>
->> And we only need to deassert the reset in probe. Technically, we don't
->> need to assert first and deassert in probe, and that was a design choice
->> made by Kishon.
-> 
-> OK so if hwmod code has already done the reset, then why would you need
-> to deassert reset in the device driver probe?
+Hi Jeffrey,
 
-So the _reset() above asserts the reset for IPs with PRCM reset lines,
-but module is not enabled (no register accesses even if clocks enabled).
-The _enable() code bails out if there are PRCM reset lines (there are
-varied IPs with resets including processors, and we really cannot enable
-and idle it without loading some code that would have executed WFI).
+[auto build test ERROR on v4.5-rc1]
+[also build test ERROR on next-20160128]
+[cannot apply to tip/x86/core]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-> 
->>> And why do you need to do another reset in dra7xx_pcie_remove()?
->>
->> Primarily to restore the reset state back to what it was after the
->> driver remove gets called. We cannot call deassert twice without calling
->> a assert in between. Kishon had originally added the assert and deassert
->> only in probe, but nothing in remove, they ought to be deassert in probe
->> and assert in remove to match initial hardware state, and to also make
->> it work across multiple probe/remove.
-> 
-> I don't understand this part either.. Usually you just power up and init
-> the registers to a sane state in a device driver probe and on exit just
-> power down the device.
+url:    https://github.com/0day-ci/linux/commits/Jeffrey-Merkey/Add-hard-soft-lockup-debugger-entry-points/20160129-035852
+config: arm-sa1100 (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Yes, in the case of IPs with hard-reset lines, that init is left to the
-drivers.
+All errors (new ones prefixed by >>):
 
-> 
->>>>> Basically I'm wondering how come we need these platform data callbacks
->>>>> at all.
->>>>
->>>> The hardresets are controlled through the
->>>> omap_device_assert(deassert)_hardreset functions, and since these are
->>>> limited to mach-omap2, we are invoking them through platform data callbacks.
->>>
->>> Right.. But I'm wondering about the why you need to do this in the
->>> driver at all part :)
->>
->> The initial reset at init time is okay, but hwmod _enable() bails out if
->> the resets lines are asserted. This was a change made long time back, I
->> believe to deal with the problems around the DSP enabling sequences. As
->> such, pm_runtime_get_sync() and put_sync() do not deassert and assert
->> the resets.
-> 
-> OK if the hwmod code does not deassert reset lines properly on enable,
-> then that sounds like a bug that should be fixed instead of adding
-> device specific work arounds.
+   In file included from arch/arm/kernel/traps.c:21:0:
+   include/linux/kdebug.h:20:16: warning: 'enum die_val' declared inside parameter list
+            struct pt_regs *regs, long err, int trap, int sig);
+                   ^
+   include/linux/kdebug.h:20:16: warning: its scope is only this definition or declaration, which is probably not what you want
+   arch/arm/kernel/traps.c: In function '__die':
+>> arch/arm/kernel/traps.c:247:19: error: 'DIE_OOPS' undeclared (first use in this function)
+     ret = notify_die(DIE_OOPS, str, regs, err, tsk->thread.trap_no, SIGSEGV);
+                      ^
+   arch/arm/kernel/traps.c:247:19: note: each undeclared identifier is reported only once for each function it appears in
+>> arch/arm/kernel/traps.c:247:2: error: type of formal parameter 1 is incomplete
+     ret = notify_die(DIE_OOPS, str, regs, err, tsk->thread.trap_no, SIGSEGV);
+     ^
+--
+   In file included from include/linux/kdebug.h:4:0,
+                    from kernel/notifier.c:1:
+   arch/arm/include/asm/kdebug.h: In function 'arch_breakpoint':
+>> arch/arm/include/asm/kdebug.h:4:6: error: expected string literal before '__inst_arm'
+     asm(__inst_arm(0xe7ffdeff));
+         ^
+   In file included from kernel/notifier.c:1:0:
+   include/linux/kdebug.h: At top level:
+   include/linux/kdebug.h:20:16: warning: 'enum die_val' declared inside parameter list
+            struct pt_regs *regs, long err, int trap, int sig);
+                   ^
+   include/linux/kdebug.h:20:16: warning: its scope is only this definition or declaration, which is probably not what you want
+   kernel/notifier.c:537:16: warning: 'enum die_val' declared inside parameter list
+            struct pt_regs *regs, long err, int trap, int sig)
+                   ^
+   kernel/notifier.c:536:37: error: parameter 1 ('val') has incomplete type
+    int notrace notify_die(enum die_val val, const char *str,
+                                        ^
+   kernel/notifier.c: In function 'notify_die':
+   kernel/notifier.c:550:1: warning: control reaches end of non-void function [-Wreturn-type]
+    }
+    ^
 
-As I said above, not all IPs with hard-reset lines have the same power
-on/power off sequences.. IPs with only SYSCONFIG based soft-reset all
-pretty much follow the PRCM HW_Auto idling, so dealing with them is
-rather straightforward in the common hwmod code. I have had to do rather
-funky stuff in our product kernels when doing suspend/resume on IOMMUs,
-remoteprocs.
+vim +/__inst_arm +4 arch/arm/include/asm/kdebug.h
 
-> Sorry to keep dragging this on a bit longer, but I think we need to
-> hear Paul's comments on this one.
+     1	
+     2	static inline void arch_breakpoint(void)
+     3	{
+   > 4		asm(__inst_arm(0xe7ffdeff));
+     5	}
 
-Yeah, it would be good to restart this discussion, as I will be adding
-the DT support for the remoteproc devices a bit later.
-
-regards
-Suman
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 22240 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160129/b1c44719/attachment-0001.obj>
