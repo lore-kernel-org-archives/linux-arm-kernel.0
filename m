@@ -1,56 +1,45 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 28 Jan 2016 14:25:47 -0700
-Subject: [PATCH net-next 23/40] net: fec: don't set cbd_bufaddr unless no
- mapping error
+Date: Thu, 28 Jan 2016 14:25:48 -0700
+Subject: [PATCH net-next 24/40] net: fec: return NETDEV_TX_BUSY,
+ when not enough space in ring
 In-Reply-To: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1454016364-30985-24-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1454016364-30985-25-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ drivers/net/ethernet/freescale/fec_main.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index da2e3c530..29c5781 100644
+index 29c5781..98b9be2 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -597,7 +597,7 @@ fec_enet_txq_put_hdr_tso(struct fec_enet_priv_tx_q *txq,
- 	int hdr_len = skb_transport_offset(skb) + tcp_hdrlen(skb);
- 	struct bufdesc_ex *ebdp = container_of(bdp, struct bufdesc_ex, desc);
- 	void *bufaddr;
--	unsigned long dmabuf;
-+	dma_addr_t dmabuf;
- 	unsigned short status;
- 	unsigned int estatus = 0;
+@@ -424,10 +424,9 @@ static int fec_enet_txq_submit_skb(struct fec_enet_priv_tx_q *txq,
  
-@@ -1287,19 +1287,21 @@ fec_enet_new_rxbdp(struct net_device *ndev, struct bufdesc *bdp, struct sk_buff
- {
- 	struct  fec_enet_private *fep = netdev_priv(ndev);
- 	int off;
-+	dma_addr_t dmabuf;
- 
- 	off = ((unsigned long)skb->data) & fep->rx_align;
- 	if (off)
- 		skb_reserve(skb, fep->rx_align + 1 - off);
- 
--	bdp->cbd_bufaddr = dma_map_single(&fep->pdev->dev, skb->data,
--					  FEC_ENET_RX_FRSIZE - fep->rx_align,
--					  DMA_FROM_DEVICE);
--	if (dma_mapping_error(&fep->pdev->dev, bdp->cbd_bufaddr)) {
-+	dmabuf = dma_map_single(&fep->pdev->dev, skb->data,
-+				FEC_ENET_RX_FRSIZE - fep->rx_align,
-+				DMA_FROM_DEVICE);
-+	if (dma_mapping_error(&fep->pdev->dev, dmabuf)) {
+ 	entries_free = fec_enet_get_free_txdesc_num(txq);
+ 	if (entries_free < MAX_SKB_FRAGS + 1) {
+-		dev_kfree_skb_any(skb);
  		if (net_ratelimit())
- 			netdev_err(ndev, "Rx DMA memory map failed\n");
- 		return -ENOMEM;
+ 			netdev_err(ndev, "NOT enough BD for SG!\n");
+-		return NETDEV_TX_OK;
++		return NETDEV_TX_BUSY;
  	}
-+	bdp->cbd_bufaddr = dmabuf;
  
- 	return 0;
- }
+ 	/* Protocol checksum off-load for TCP and UDP. */
+@@ -653,10 +652,9 @@ static int fec_enet_txq_submit_tso(struct fec_enet_priv_tx_q *txq,
+ 	int ret;
+ 
+ 	if (tso_count_descs(skb) >= fec_enet_get_free_txdesc_num(txq)) {
+-		dev_kfree_skb_any(skb);
+ 		if (net_ratelimit())
+ 			netdev_err(ndev, "NOT enough BD for TSO!\n");
+-		return NETDEV_TX_OK;
++		return NETDEV_TX_BUSY;
+ 	}
+ 
+ 	/* Protocol checksum off-load for TCP and UDP. */
 -- 
 2.5.0
