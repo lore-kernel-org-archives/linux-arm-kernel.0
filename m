@@ -1,125 +1,79 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 28 Jan 2016 16:33:44 +0000
-Subject: [PATCH V5 06/14] soc: tegra: pmc: Fix checking of valid partitions
+Date: Thu, 28 Jan 2016 16:33:42 +0000
+Subject: [PATCH V5 04/14] soc: tegra: pmc: Fix testing of powergate state
 In-Reply-To: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
 References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1453998832-27383-7-git-send-email-jonathanh@nvidia.com>
+Message-ID: <1453998832-27383-5-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tegra power partitions are referenced by a numerical ID which are
-the same values programmed into the PMC registers for controlling the
-partition. For a given device, the valid partition IDs may not be
-contiguous and so simply checking that an ID is not greater than the
-maximum ID supported may not mean it is valid. Fix this by adding a
-bitmap for representing the valid partitions of a device and add a
-helper function will test if the partition is valid.
+In tegra_powergate_set() the state of the powergates is read and OR'ed
+with the bit for the powergate of interest. This unsigned 32-bit value
+is then compared with a boolean value to test if the powergate is
+already in the desired state. When turning on a powergate, apart from
+the powergate that is represented by bit 0, this test will always
+return false and so we may attempt to turn on the powergate when it is
+already on.
+
+After OR'ing the bit for the powergate, check if the result is not equal
+to zero before comparing with the boolean value. Add a helper function
+to return the current state of a powergate.
 
 Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 ---
- drivers/soc/tegra/pmc.c | 21 +++++++++++++++++----
- include/soc/tegra/pmc.h |  1 +
- 2 files changed, 18 insertions(+), 4 deletions(-)
+ drivers/soc/tegra/pmc.c | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
-index 35ee60fd17be..032dd5c17130 100644
+index 1dbdcf06a9ad..99cb2fdd29e1 100644
 --- a/drivers/soc/tegra/pmc.c
 +++ b/drivers/soc/tegra/pmc.c
-@@ -132,6 +132,7 @@ struct tegra_pmc_soc {
-  * @cpu_pwr_good_en: CPU power good signal is enabled
-  * @lp0_vec_phys: physical base address of the LP0 warm boot code
-  * @lp0_vec_size: size of the LP0 warm boot code
-+ * @powergates_valid: Bitmap of valid power gates
-  * @powergates_lock: mutex for power gate register access
-  */
- struct tegra_pmc {
-@@ -156,6 +157,7 @@ struct tegra_pmc {
- 	bool cpu_pwr_good_en;
- 	u32 lp0_vec_phys;
- 	u32 lp0_vec_size;
-+	DECLARE_BITMAP(powergates_valid, TEGRA_POWERGATE_MAX);
- 
- 	struct mutex powergates_lock;
- };
-@@ -180,6 +182,11 @@ static inline bool tegra_powergate_state(int id)
- 	return (tegra_pmc_readl(PWRGATE_STATUS) & BIT(id)) != 0;
+@@ -174,6 +174,11 @@ static void tegra_pmc_writel(u32 value, unsigned long offset)
+ 	writel(value, pmc->base + offset);
  }
  
-+static inline bool tegra_powergate_is_valid(int id)
++static inline bool tegra_powergate_state(int id)
 +{
-+	return test_bit(id, pmc->powergates_valid);
++	return (tegra_pmc_readl(PWRGATE_STATUS) & BIT(id)) != 0;
 +}
 +
  /**
   * tegra_powergate_set() - set the state of a partition
   * @id: partition ID
-@@ -213,7 +220,7 @@ static int tegra_powergate_set(unsigned int id, bool new_state)
+@@ -181,13 +186,9 @@ static void tegra_pmc_writel(u32 value, unsigned long offset)
   */
- int tegra_powergate_power_on(unsigned int id)
+ static int tegra_powergate_set(unsigned int id, bool new_state)
  {
--	if (!pmc->soc || id >= pmc->soc->num_powergates)
-+	if (!tegra_powergate_is_valid(id))
- 		return -EINVAL;
- 
- 	return tegra_powergate_set(id, true);
-@@ -225,7 +232,7 @@ int tegra_powergate_power_on(unsigned int id)
-  */
- int tegra_powergate_power_off(unsigned int id)
- {
--	if (!pmc->soc || id >= pmc->soc->num_powergates)
-+	if (!tegra_powergate_is_valid(id))
- 		return -EINVAL;
- 
- 	return tegra_powergate_set(id, false);
-@@ -240,7 +247,7 @@ int tegra_powergate_is_powered(unsigned int id)
- {
- 	int status;
- 
--	if (!pmc->soc || id >= pmc->soc->num_powergates)
-+	if (!tegra_powergate_is_valid(id))
- 		return -EINVAL;
- 
+-	bool status;
+-
  	mutex_lock(&pmc->powergates_lock);
-@@ -258,7 +265,7 @@ int tegra_powergate_remove_clamping(unsigned int id)
- {
- 	u32 mask;
  
--	if (!pmc->soc || id >= pmc->soc->num_powergates)
-+	if (!tegra_powergate_is_valid(id))
- 		return -EINVAL;
- 
- 	mutex_lock(&pmc->powergates_lock);
-@@ -1118,6 +1125,7 @@ static int __init tegra_pmc_early_init(void)
- 	const struct of_device_id *match;
- 	struct device_node *np;
- 	struct resource regs;
-+	unsigned int i;
- 	bool invert;
- 	u32 value;
- 
-@@ -1167,6 +1175,11 @@ static int __init tegra_pmc_early_init(void)
- 		return -ENXIO;
+-	status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
+-
+-	if (status == new_state) {
++	if (tegra_powergate_state(id) == new_state) {
+ 		mutex_unlock(&pmc->powergates_lock);
+ 		return 0;
  	}
+@@ -230,16 +231,16 @@ EXPORT_SYMBOL(tegra_powergate_power_off);
+  */
+ int tegra_powergate_is_powered(unsigned int id)
+ {
+-	u32 status;
++	int status;
  
-+	/* Create a bit-mask of the valid partitions */
-+	for (i = 0; i < pmc->soc->num_powergates; i++)
-+		if (pmc->soc->powergates[i])
-+			set_bit(i, pmc->powergates_valid);
-+
- 	mutex_init(&pmc->powergates_lock);
+ 	if (!pmc->soc || id >= pmc->soc->num_powergates)
+ 		return -EINVAL;
  
- 	/*
-diff --git a/include/soc/tegra/pmc.h b/include/soc/tegra/pmc.h
-index 07e332dd44fb..e9e53473a63e 100644
---- a/include/soc/tegra/pmc.h
-+++ b/include/soc/tegra/pmc.h
-@@ -72,6 +72,7 @@ int tegra_pmc_cpu_remove_clamping(unsigned int cpuid);
- #define TEGRA_POWERGATE_AUD	27
- #define TEGRA_POWERGATE_DFD	28
- #define TEGRA_POWERGATE_VE2	29
-+#define TEGRA_POWERGATE_MAX	TEGRA_POWERGATE_VE2
+ 	mutex_lock(&pmc->powergates_lock);
+-	status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
++	status = tegra_powergate_state(id);
+ 	mutex_unlock(&pmc->powergates_lock);
  
- #define TEGRA_POWERGATE_3D0	TEGRA_POWERGATE_3D
+-	return !!status;
++	return status;
+ }
  
+ /**
 -- 
 2.1.4
