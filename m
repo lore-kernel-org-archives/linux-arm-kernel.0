@@ -1,46 +1,46 @@
-From: ao2@ao2.it (Antonio Ospite)
-Date: Thu, 28 Jan 2016 10:58:24 +0100
-Subject: [PATCH] ARM: lib/lib1funcs.S: fix typo
- s/substractions/subtractions/
-In-Reply-To: <20160127192711.GE10826@n2100.arm.linux.org.uk>
-References: <1453902670-32294-1-git-send-email-ao2@ao2.it>
- <20160127192711.GE10826@n2100.arm.linux.org.uk>
-Message-ID: <20160128105824.d04860f1b98afcdca46a29c0@ao2.it>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 28 Jan 2016 10:01:55 +0000
+Subject: [PATCH v2 0/3] mmc: pwrseq: convert to proper driver
+Message-ID: <1453975315-13424-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Jan 2016 19:27:12 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+Hi Ulf, 
 
-> On Wed, Jan 27, 2016 at 02:51:10PM +0100, Antonio Ospite wrote:
-> > While at it also fix some other typos in the affected lines:
-> >   s/reminder/remainder/
-> >   s/comparison/comparisons/
-> > 
-> > Signed-off-by: Antonio Ospite <ao2@ao2.it>
-> 
-> Acked-by: Russell King <rmk+kernel@Arm.linux.org.uk>
-> 
-> Thanks.  I assume the trivial tree will be picking this up?
+This patchset aims at converting the pwrseq devices to proper in drivers,
+The issue is that on Qualcomm based platforms, most of the gpios require
+a pinctrl setup. Existing pwrseq code does not do any kind of pinctrl setup.
+So this makes the pwrseq unusable on those platfroms.
 
-Hi Russel, can't you pick it up in the ARM tree?
+Convert the pwrseq to proper drivers so that they can reuse
+common driver setup like pinctrl from drivers/base/pinctrl.c and clocks.
+This solution works much better and would make pwrseq to reuse 
+all the driver setup done in the common code.
 
-I had sent this change to the trivial tree last April, and you ACKed it
-back then as well, but it was not merged. Maybe Jiri, who maintains the
-trivial tree, thought that you were picking it up.
 
-I have been told, by Mark Brown IIRC, that (I'm paraphrasing) subsystem
-maintainers should be the preferred recipients, and that "all-over"
-maintainers are only for when the same change applies to multiple
-subsystems and it does not make sense to split the patch.
+Changes sinc v1:
+	- Fixed issue while building as module.
+
+Changes since RFC:
+	- Fixed issues reported by kbuild test robot.
+	- return EPROBE_DEFER from *_alloc() suggested by Ulf.
 
 Thanks,
-   Antonio
+srini
+
+Srinivas Kandagatla (3):
+  mmc: pwrseq_simple: add to_pwrseq_simple() macro
+  mmc: pwrseq_emmc: add to_pwrseq_emmc() macro
+  mmc: pwrseq: convert to proper platform device
+
+ drivers/mmc/Kconfig              |   2 +
+ drivers/mmc/core/Kconfig         |   7 +++
+ drivers/mmc/core/Makefile        |   4 +-
+ drivers/mmc/core/pwrseq.c        | 115 +++++++++++++++++++++------------------
+ drivers/mmc/core/pwrseq.h        |  19 +++++--
+ drivers/mmc/core/pwrseq_emmc.c   |  89 +++++++++++++++++++++---------
+ drivers/mmc/core/pwrseq_simple.c |  99 ++++++++++++++++++++++-----------
+ 7 files changed, 217 insertions(+), 118 deletions(-)
 
 -- 
-Antonio Ospite
-http://ao2.it
-
-A: Because it messes up the order in which people normally read text.
-   See http://en.wikipedia.org/wiki/Posting_style
-Q: Why is top-posting such a bad thing?
+1.9.1
