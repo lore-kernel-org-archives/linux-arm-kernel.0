@@ -1,129 +1,149 @@
-From: cmetcalf@ezchip.com (Chris Metcalf)
-Date: Thu, 28 Jan 2016 15:12:08 -0500
-Subject: [PATCH] help guest boot up on AArch64 host with GICv2
-In-Reply-To: <56A88A0E.40002@arm.com>
-References: <56995068.9050207@ezchip.com> <569CB034.1060307@arm.com>
- <56A7DA7C.8090202@ezchip.com> <56A88A0E.40002@arm.com>
-Message-ID: <56AA7618.8030406@ezchip.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 28 Jan 2016 12:12:38 -0800
+Subject: [PATCH] ARM: Use generic clkdev.h header
+In-Reply-To: <6141409.WI4q6BtOxa@wuerfel>
+References: <1453932702-6930-1-git-send-email-sboyd@codeaurora.org>
+ <6141409.WI4q6BtOxa@wuerfel>
+Message-ID: <20160128201238.GN12841@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2016 04:12 AM, Marc Zyngier wrote:
-> On 26/01/16 20:43, Chris Metcalf wrote:
->> On 01/18/2016 04:28 AM, Marc Zyngier wrote:
->>> Hi Chris,
->>>
->>> On 15/01/16 20:02, Chris Metcalf wrote:
->>>> We are using GICv2 compatibility mode in the Fast Models/Foundation
->>>> Models simulations we are running because the boot code (ATF/UEFI)
->>>> doesn't support GICv3 in our system at the moment.
->>>>
->>>> However, starting with kernel 4.2, the guest couldn't boot up because it
->>>> wasn't getting timer interrupts.  I tracked this down to a kernel commit
->>>> that switched to using the "alternatives" mechanism -- rather than
->>>> seeing either a GICv2 or GICv3 and configuring appropriately, the KVM
->>>> code just configured the code that saves/restores the vgic state based
->>>> on the presence of the system register interface to the GIC CPU
->>>> interface.  See the attached patch for a fix that manages this
->>>> differently and allows me to boot up the guest in this configuration.
->>>>
->>>> However, even assuming this patch can be taken into an upstream tree, I
->>>> still have a couple of additional problems:
->>>>
->>>> - I can boot up with the Foundation Models using this change, but not
->>>> with the Fast Models (again, using a v3 GIC but in v2 compatibility mode
->>>> in the device tree).  The Fast Models dts looks like it has the same
->>>> configuration for the GIC and the timers so I'm not sure what's going on
->>>> here.  Any suggestions appreciated.
->>>>
->>>> - Without this change, I could only boot kernels up to 4.1.  With the
->>>> change, I can boot kernels up to 4.3.  But 4.4 won't boot for me either;
->>>> I haven't bisected it down yet.  So any suggestions on what might be
->>>> going wrong here would also be appreciated.
->>>>
->>>> We are planning to eventually use GICv3 mode in our software stack but
->>>> for the time being I assume it is interesting to resolve issues with GIC
->>>> v2 compatibility mode on GIC v3.
->>>>
->>> I'm afraid that this is the wrong approach. Whilst 4.2 was a bit too
->>> eager to use GICv3 (only checking the CPU capability and ignoring the
->>> actual state of the EL2/EL3 SRE bits), the fact that 4.4 doesn't boot is
->>> probably the sign of a broken firmware that enables the system register
->>> interface at EL3, letting the rest of the software stack to use GICv3 in
->>> native mode, and yet providing a GICv2 DT.
->>>
->>> This combination is unpredictable, and is likely to  cause issues on
->>> some HW implementations.
->>>
->>> Could you please point me to the firmware you're using?
->>>
->>> Also, please check the following patches:
->>>
->>> 6d32ab2 arm64: Update booting requirements for GICv3 in GICv2 mode
->>> 76e52dd irqchip/gic: Warn if GICv3 system registers are enabled
->>> 963fcd4 arm64: cpufeatures: Check ICC_EL1_SRE.SRE before enabling
->>> ARM64_HAS_SYSREG_GIC_CPUIF
->>> 7cabd00 irqchip/gic-v3: Make gic_enable_sre an inline function
->>> d271976 arm64: el2_setup: Make sure ICC_SRE_EL2.SRE sticks before using
->>> GICv3 sysregs
->>>
->>> Can you point me to the one that prevents you from booting?
->> The problematic commit is 963fcd4, because it calls gic_enable_sre()
->> in the host kernel even with a GICv2 DT specified, and this seems to
->> put things in a state such that we don't receive virtual timer
->> interrupts in the guest when we boot it up.  (I'm not that familiar with
->> the QEMU DT but it is providing a GIC v2 to the guest.)
->>
->> With a v4.5-rc1 host, if I "return false" before the code in gic_enable_sre()
->> that tries to actually enable the SRE, and then hardcode the
->> __vgic_v2_XXX_state() save/restore calls into the __vgic_XXX_state()
->> routines, then my guest boots up OK.
-> What if you just do the "return false"? I bet that it will work as well...
+On 01/28, Arnd Bergmann wrote:
+> On Wednesday 27 January 2016 14:11:42 Stephen Boyd wrote:
+> > Get rid of the clkdev.h file in the ARM port and use the generic
+> > one because we've gotten rid of all the machine specific
+> > mach/clkdev.h files.
+> > 
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > 
+> 
+> Ah, nice! I had not even noticed it was the last one.
+> 
+> The file is still also referenced by arch/arm/plat-versatile/clock.c,
+> but we don't build that file any more and should remove it as well.
+> 
 
-Yes, that also works for my case.
+Good catch. Here's that patch too.
 
->> We are using a modified ARM version of EDK v3.0-rc0, and a modified
->> ARM Trusted Firmware based on commit 963fcd4 (between v1.1 and 1.2).
-> Are you sure of that commit? It looks suspiciously like the ID ftom the
-> kernel tree...
+---8<----
+From: Stephen Boyd <sboyd@codeaurora.org>
+Subject: [PATCH] ARM: plat-versatile: Remove unused clock.c file
 
-Hah, good catch!  The double-click-to-copy behavior is kind of flakey
-on RHEL 6's default terminal, and I bet that bit me.  It's 41099f4e.
+This file isn't compiled anymore because PLAT_VERSATILE_CLOCK is
+never selected. Remove the file and the config.
 
->> We certainly haven't touched any of the GIC code in either one.
->>
->> I tried to modify the host DT to enable GICv3, but then the host itself
->> hangs on boot, so clearly more is needed.  (To be fair I've only tested
->> v4.4 in that configuration, not v4.5-rc1.)  The firmware isn't yet using
->> GICv3 so perhaps that is part of the problem.
-> That's indeed part of the problem. The firmware running at EL3 insists
-> on using GICv2, but still let EL2 (and EL1) use GICv3 system registers.
-> Could you please dump the content of ICC_SRE_EL3 just before entering
-> the kernel at EL2? If you see ICC_SRE_EL3.SRE being set, then this would
-> indicate a firmware bug (and leave the system in an unpredictable
-> configuration).
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/plat-versatile/Kconfig  |  3 --
+ arch/arm/plat-versatile/Makefile |  1 -
+ arch/arm/plat-versatile/clock.c  | 74 ----------------------------------------
+ 3 files changed, 78 deletions(-)
+ delete mode 100644 arch/arm/plat-versatile/clock.c
 
-Well, the firmware clearly does this intentionally.  In ATF's
-drivers/arm/giv/arm_gic.c, the gicv3_cpuif_setup() function has
-a comment that reads:
-
-/*******************************************************************************
-  * This function does some minimal GICv3 configuration. The Firmware itself does
-  * not fully support GICv3 at this time and relies on GICv2 emulation as
-  * provided by GICv3. This function allows software (like Linux) in later stages
-  * to use full GICv3 features.
-  ******************************************************************************/
-
-and the function ends with:
-
-	val = read_icc_sre_el3();
-	write_icc_sre_el3(val | ICC_SRE_EN | ICC_SRE_SRE);
-
-In our build environment, if I comment out those two lines, that
-fixes the guest boot problem (without any hacking on the Linux side),
-so that's good anyway.  With this change it works for me in the
-Fast Models as well as Foundation Models, too.
-
+diff --git a/arch/arm/plat-versatile/Kconfig b/arch/arm/plat-versatile/Kconfig
+index 49b8ef91584a..98b9b8e9f698 100644
+--- a/arch/arm/plat-versatile/Kconfig
++++ b/arch/arm/plat-versatile/Kconfig
+@@ -1,8 +1,5 @@
+ if PLAT_VERSATILE
+ 
+-config PLAT_VERSATILE_CLOCK
+-	bool
+-
+ config PLAT_VERSATILE_SCHED_CLOCK
+ 	bool
+ 
+diff --git a/arch/arm/plat-versatile/Makefile b/arch/arm/plat-versatile/Makefile
+index 03c4900ac3f4..bff3ba889882 100644
+--- a/arch/arm/plat-versatile/Makefile
++++ b/arch/arm/plat-versatile/Makefile
+@@ -1,5 +1,4 @@
+ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
+ 
+-obj-$(CONFIG_PLAT_VERSATILE_CLOCK) += clock.o
+ obj-$(CONFIG_PLAT_VERSATILE_SCHED_CLOCK) += sched-clock.o
+ obj-$(CONFIG_SMP) += headsmp.o platsmp.o
+diff --git a/arch/arm/plat-versatile/clock.c b/arch/arm/plat-versatile/clock.c
+deleted file mode 100644
+index 5c8b6564fdc2..000000000000
+--- a/arch/arm/plat-versatile/clock.c
++++ /dev/null
+@@ -1,74 +0,0 @@
+-/*
+- *  linux/arch/arm/plat-versatile/clock.c
+- *
+- *  Copyright (C) 2004 ARM Limited.
+- *  Written by Deep Blue Solutions Limited.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/errno.h>
+-#include <linux/clk.h>
+-#include <linux/mutex.h>
+-
+-#include <asm/hardware/icst.h>
+-
+-#include <mach/clkdev.h>
+-
+-int clk_enable(struct clk *clk)
+-{
+-	return 0;
+-}
+-EXPORT_SYMBOL(clk_enable);
+-
+-void clk_disable(struct clk *clk)
+-{
+-}
+-EXPORT_SYMBOL(clk_disable);
+-
+-unsigned long clk_get_rate(struct clk *clk)
+-{
+-	return clk->rate;
+-}
+-EXPORT_SYMBOL(clk_get_rate);
+-
+-long clk_round_rate(struct clk *clk, unsigned long rate)
+-{
+-	long ret = -EIO;
+-	if (clk->ops && clk->ops->round)
+-		ret = clk->ops->round(clk, rate);
+-	return ret;
+-}
+-EXPORT_SYMBOL(clk_round_rate);
+-
+-int clk_set_rate(struct clk *clk, unsigned long rate)
+-{
+-	int ret = -EIO;
+-	if (clk->ops && clk->ops->set)
+-		ret = clk->ops->set(clk, rate);
+-	return ret;
+-}
+-EXPORT_SYMBOL(clk_set_rate);
+-
+-long icst_clk_round(struct clk *clk, unsigned long rate)
+-{
+-	struct icst_vco vco;
+-	vco = icst_hz_to_vco(clk->params, rate);
+-	return icst_hz(clk->params, vco);
+-}
+-EXPORT_SYMBOL(icst_clk_round);
+-
+-int icst_clk_set(struct clk *clk, unsigned long rate)
+-{
+-	struct icst_vco vco;
+-
+-	vco = icst_hz_to_vco(clk->params, rate);
+-	clk->rate = icst_hz(clk->params, vco);
+-	clk->ops->setvco(clk, vco);
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL(icst_clk_set);
 -- 
-Chris Metcalf, EZChip Semiconductor
-http://www.ezchip.com
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
