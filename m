@@ -1,45 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 28 Jan 2016 11:00:27 -0800
-Subject: [PATCH] clk: ti: omap3+: dpll: use non-locking version of
- clk_get_rate
-In-Reply-To: <56AA6261.7030503@ti.com>
-References: <1453981067-8618-1-git-send-email-t-kristo@ti.com>
- <56A9FED1.3090903@ti.com> <20160128172215.GD19432@atomide.com>
- <56AA6261.7030503@ti.com>
-Message-ID: <20160128190026.GI19432@atomide.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 28 Jan 2016 20:07:02 +0100
+Subject: [PATCH] arm64: allow vmalloc regions to be set with set_memory_*
+In-Reply-To: <20160128181058.GQ775@arm.com>
+References: <1453125665-26627-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160128150815.GG775@arm.com>
+ <CAKv+Gu-GxicSKDq+Nm9H+dWrSVOhupozu4pZ=Pk7CzC_VrW=2Q@mail.gmail.com>
+ <20160128181058.GQ775@arm.com>
+Message-ID: <CAKv+Gu87XZLdJpC5BnP9ig-Hq4Ff92pZQgdesmZkLyCtU=iXsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [160128 10:48]:
-> On 01/28/2016 07:22 PM, Tony Lindgren wrote:
-> >* Tero Kristo <t-kristo@ti.com> [160128 03:44]:
-> >>On 01/28/2016 01:37 PM, Tero Kristo wrote:
-> >>>As the code in this file is being executed within irq context in some
-> >>>cases, we must avoid the clk_get_rate which uses mutex internally.
-> >>>Switch the code to use clk_hw_get_rate instead which is non-locking.
-> >>>
-> >>>Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> >>
-> >>Ooops, sorry. Sent wrong version (read: old) of this patch, please ignore
-> >>this one. Will re-send the correct version in a bit.
-> >
-> >I think this is still needed as a fix for -rc cycle with cc: stable
-> >as otherwise we have omap4 and 5 hang if PM runtime is enabled before
-> >a suspend/resume cycle?
-> 
-> Look at the other patch I sent, it should accomplish the same thing, and
-> more.
-> 
-> https://www.spinics.net/lists/linux-clk/msg06094.html
+On 28 January 2016 at 19:10, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Jan 28, 2016 at 05:43:41PM +0100, Ard Biesheuvel wrote:
+>> On 28 January 2016 at 16:08, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Mon, Jan 18, 2016 at 03:01:05PM +0100, Ard Biesheuvel wrote:
+>> >> The range of set_memory_* is currently restricted to the module address
+>> >> range because of difficulties in breaking down larger block sizes.
+>> >> vmalloc maps PAGE_SIZE pages so it is safe to use as well. Update the
+>> >> function ranges and add a comment explaining why the range is restricted
+>> >> the way it is.
+>> >>
+>> >> Suggested-by: Laura Abbott <labbott@fedoraproject.org>
+>> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >> ---
+>> >>  arch/arm64/mm/pageattr.c | 23 +++++++++++++++++++----
+>> >>  1 file changed, 19 insertions(+), 4 deletions(-)
+>> >
+>> > What's the user for this? It would be better to apply along with something
+>> > that actually needs to change permission for arbitrary vmalloc mappings.
+>> >
+>>
+>> BPF already uses set_memory_ro() but doesn't bother to check the return value.
+>
+> Urgh :(
+>
+> Then I can take it as a fix, if you like.
+>
 
-Right.. But is that suitable for the -rc cycle with cc stable?
+I will let you decide whether it should be merged now or in v4.6. I
+don't think there's any urgency here, though.
 
-You should also describe the bug it causes in the change log.
-Something like:
+BTW I already sent a v2 based on -rc2 here
+http://article.gmane.org/gmane.linux.ports.arm.kernel/472555
 
-This fixes an issue where PM runtime will hang the system if
-enabled with a serial console before a suspend-resume cycle.
-
-Regards,
-
-Tony
+Thanks,
+Ard.
