@@ -1,76 +1,223 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 27 Jan 2016 23:56:21 -0800
-Subject: [PATCH v2 03/26] clk: Add regmap support
-In-Reply-To: <1452785109-6172-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1452785109-6172-1-git-send-email-maxime.ripard@free-electrons.com>
- <1452785109-6172-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20160128075621.GF12841@codeaurora.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 28 Jan 2016 08:57:13 +0100
+Subject: [PATCH resend 1/4] of_touchscreen-helpers: Add support for
+ inverted / swapped axis
+In-Reply-To: <20160127224559.GB3482@dtor-ws>
+References: <1453919124-3840-1-git-send-email-hdegoede@redhat.com>
+ <1453919124-3840-2-git-send-email-hdegoede@redhat.com>
+ <20160127224559.GB3482@dtor-ws>
+Message-ID: <56A9C9D9.7050803@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14, Maxime Ripard wrote:
-> From: Matthias Brugger <matthias.bgg@gmail.com>
-> 
-> Some devices like SoCs from Mediatek need to use the clock
-> through a regmap interface.
-> This patch adds regmap support for the simple multiplexer clock,
-> the divider clock and the clock gate code.
-> 
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi,
 
-Nak.
+On 27-01-16 23:45, Dmitry Torokhov wrote:
+> Hi Hans,
+>
+> On Wed, Jan 27, 2016 at 07:25:21PM +0100, Hans de Goede wrote:
+>> Extend touchscreen_parse_properties() with support for the
+>> touchscreen-inverted-x/y and touchscreen-swapped-x-y properties and
+>> add a touchscreen_apply_prop_to_x_y() helper function for adjusting
+>> x and y coordinates to take these properties into account.
+>>
+>> This commit also modifies the existing callers of
+>> touchscreen_parse_properties() to pass in NULL for the new third
+>> argument, keeping the existing behavior.
+>
+> Thank you for re-sending the patches. I was wondering if we should add
+> the transformation flags directly to the input devices and perform
+> transformation in input core... Probably won't going to work well unless
+> we start defining order in which we send events to the core.
 
-The whole anonymous union thing and clk-io.c file is not
-appealing at all. I'd prefer we remove clk_readl/writel, not add
-to it. Plus we're bloating the basic clock types and adding a
-bunch of parallel registration APIs to assign a regmap pointer.
-Really, let's stop adding stuff to the basic clock types, it's
-getting out of hand.
+Interesting that you mention this, I had the same thought. The problem
+with doing this in the core is that we rely on the order of applying
+invert then axis swapping specified in the dt binding, so it seems best
+to keep this in the of helpers.
 
-To move forward on making regmap clks generic for everyone, let's
-make sure that regmap clk code is a library that any driver can
-use. No OF_CLK_DECLARE should exist because it doesn't make any
-sense. No clk_register_regmap_{div,mux,gate}() functions, just a
-clk_register_regmap() function to assign the regmap pointer from
-the device. Drivers that want to use the code should need to
-select a Kconfig symbol, so that we don't compile in support for
-regmap clocks unless we really need them.
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   drivers/input/touchscreen/edt-ft5x06.c     |  2 +-
+>>   drivers/input/touchscreen/of_touchscreen.c | 56 +++++++++++++++++++++++++++++-
+>>   drivers/input/touchscreen/pixcir_i2c_ts.c  |  2 +-
+>>   drivers/input/touchscreen/tsc200x-core.c   |  2 +-
+>>   include/linux/input/touchscreen.h          | 16 ++++++++-
+>>   5 files changed, 73 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
+>> index 0b0f8c1..a97b54a 100644
+>> --- a/drivers/input/touchscreen/edt-ft5x06.c
+>> +++ b/drivers/input/touchscreen/edt-ft5x06.c
+>> @@ -966,7 +966,7 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
+>>   	input_set_abs_params(input, ABS_MT_POSITION_Y,
+>>   			     0, tsdata->num_y * 64 - 1, 0, 0);
+>>
+>> -	touchscreen_parse_properties(input, true);
+>> +	touchscreen_parse_properties(input, true, NULL);
+>>
+>>   	error = input_mt_init_slots(input, tsdata->max_support_points,
+>>   				INPUT_MT_DIRECT);
+>> diff --git a/drivers/input/touchscreen/of_touchscreen.c b/drivers/input/touchscreen/of_touchscreen.c
+>> index bb6f2fe..6fd9872 100644
+>> --- a/drivers/input/touchscreen/of_touchscreen.c
+>> +++ b/drivers/input/touchscreen/of_touchscreen.c
+>> @@ -55,12 +55,16 @@ static void touchscreen_set_params(struct input_dev *dev,
+>>    * @input: input device that should be parsed
+>>    * @multitouch: specifies whether parsed properties should be applied to
+>>    *	single-touch or multi-touch axes
+>> + * @prop: pointer to a struct touchscreen_properties into which to store
+>> + *	axis swap and invert info for use with touchscreen_report_x_y();
+>> + *	or NULL
+>>    *
+>>    * This function parses common DT properties for touchscreens and setups the
+>>    * input device accordingly. The function keeps previously set up default
+>>    * values if no value is specified via DT.
+>>    */
+>> -void touchscreen_parse_properties(struct input_dev *input, bool multitouch)
+>> +void touchscreen_parse_properties(struct input_dev *input, bool multitouch,
+>> +				  struct touchscreen_properties *prop)
+>>   {
+>>   	struct device *dev = input->dev.parent;
+>>   	unsigned int axis;
+>> @@ -104,5 +108,55 @@ void touchscreen_parse_properties(struct input_dev *input, bool multitouch)
+>>   						&fuzz);
+>>   	if (data_present)
+>>   		touchscreen_set_params(input, axis, maximum, fuzz);
+>> +
+>> +	if (!prop)
+>> +		return;
+>> +
+>> +	axis = multitouch ? ABS_MT_POSITION_X : ABS_X;
+>> +
+>> +	prop->max_x = input_abs_get_max(input, axis);
+>> +	prop->max_y = input_abs_get_max(input, axis + 1);
+>> +	prop->invert_x =
+>> +		device_property_read_bool(dev, "touchscreen-inverted-x");
+>> +	prop->invert_y =
+>> +		device_property_read_bool(dev, "touchscreen-inverted-y");
+>> +	prop->swap_x_y =
+>> +		device_property_read_bool(dev, "touchscreen-swapped-x-y");
+>> +
+>> +	if (prop->swap_x_y) {
+>> +		struct input_absinfo tmp_absinfo;
+>> +
+>> +		tmp_absinfo = input->absinfo[axis];
+>> +		input->absinfo[axis] = input->absinfo[axis + 1];
+>> +		input->absinfo[axis + 1] = tmp_absinfo;
+>> +	}
+>>   }
+>>   EXPORT_SYMBOL(touchscreen_parse_properties);
+>> +
+>> +/**
+>> + * touchscreen_apply_prop_to_x_y - Adjust abs x and y coordinates
+>> + * @prop: pointer to a struct touchscreen_properties
+>> + * @x: X coordinate to apply inversion and swapping to
+>> + * @y: Y coordinate to apply inversion and swapping to
+>> + *
+>> + * Adjust the passed in x and y values applying any axis inversion and
+>> + * swapping requested in the passed in touchscreen_properties.
+>> + */
+>> +void touchscreen_apply_prop_to_x_y(struct touchscreen_properties *prop,
+>> +				   s16 *x, s16 *y)
+>
+> why s16?
 
-If we had a clk_regmap structure with a regmap pointer and a
-clk_hw inside it I think that's all we would need. Once we had
-that, we could let driver writers wrap that in their own
-structures for dividers, muxes, gates, etc. and then have them
-call library functions from their clk_ops that takes a regmap (or
-clk_regmap struct), and offset to do the get_div/set_div,
-get_parent/set_parent, enable/disable stuff.
+To match the type used in struct input_mt_pos, so that this can be
+called directly on a struct input_mt_pos (something which I ended
+up not doing in all of the followup patches, but probably still
+useful for the future).
 
-The policy part can be shared with the basic clock types, because
-we've already started libifying them. For example, we can ask the
-divider code what the hardware value should be for a particular
-divider type and it will tell us without writing any registers.
-I had a patch for libifying muxes, not sure where it went. The
-point being to leave the I/O part to the regmap code without
-putting it behind another layer of indirection buried inside the
-basic types. Make things flat and easy to follow.
+>> +{
+>> +	if (prop->invert_x)
+>> +		*x = prop->max_x - *x;
+>> +
+>> +	if (prop->invert_y)
+>> +		*y = prop->max_y - *y;
+>> +
+>> +	if (prop->swap_x_y) {
+>> +		s16 tmp;
+>> +
+>> +		tmp = *x;
+>> +		*x = *y;
+>> +		*y = tmp;
+>
+> 		swap(*x, *y);
+>
+>> +	}
+>> +}
+>> +EXPORT_SYMBOL(touchscreen_apply_prop_to_x_y);
+>> diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
+>> index 09523a3..f58784d 100644
+>> --- a/drivers/input/touchscreen/pixcir_i2c_ts.c
+>> +++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
+>> @@ -515,7 +515,7 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
+>>   	} else {
+>>   		input_set_capability(input, EV_ABS, ABS_MT_POSITION_X);
+>>   		input_set_capability(input, EV_ABS, ABS_MT_POSITION_Y);
+>> -		touchscreen_parse_properties(input, true);
+>> +		touchscreen_parse_properties(input, true, NULL);
+>>   		if (!input_abs_get_max(input, ABS_MT_POSITION_X) ||
+>>   		    !input_abs_get_max(input, ABS_MT_POSITION_Y)) {
+>>   			dev_err(dev, "Touchscreen size is not specified\n");
+>> diff --git a/drivers/input/touchscreen/tsc200x-core.c b/drivers/input/touchscreen/tsc200x-core.c
+>> index 15240c1..26e81d1 100644
+>> --- a/drivers/input/touchscreen/tsc200x-core.c
+>> +++ b/drivers/input/touchscreen/tsc200x-core.c
+>> @@ -559,7 +559,7 @@ int tsc200x_probe(struct device *dev, int irq, __u16 bustype,
+>>   	input_set_abs_params(input_dev, ABS_PRESSURE, 0, max_p, fudge_p, 0);
+>>
+>>   	if (np)
+>> -		touchscreen_parse_properties(input_dev, false);
+>> +		touchscreen_parse_properties(input_dev, false, NULL);
+>>
+>>   	input_dev->open = tsc200x_open;
+>>   	input_dev->close = tsc200x_close;
+>> diff --git a/include/linux/input/touchscreen.h b/include/linux/input/touchscreen.h
+>> index c91e137..9e6ba20 100644
+>> --- a/include/linux/input/touchscreen.h
+>> +++ b/include/linux/input/touchscreen.h
+>> @@ -9,8 +9,22 @@
+>>   #ifndef _TOUCHSCREEN_H
+>>   #define _TOUCHSCREEN_H
+>>
+>> +#include <asm/types.h>
+>
+> If you are trying to add this to have s32 typedefs
 
-I haven't thought through making new structs to hold the data for
-offsets, masks, etc. but I guess we would want those so that we
-could assign functions directly to clk_ops and not require any
-boiler plate clk_ops implementations in drivers. There are a few
-approaches here: different regmap structs for different basic
-types, one mega struct that combines all the needs of the basic
-types, or some private void pointer inside struct clk_regmap that
-points to different basic type structs. Let's see how that goes.
+Yes that is why it is there.
 
-Maybe we can lift drivers/clk/qcom/clk-regmap.c up into the
-drivers/clk/ directory too. In the qcom design I put the
-enable/disable bits (gate functionality) directly into the
-clk_regmap structure. That may need some more thought if it was
-the right idea to force enable/disable on every regmap clock
-though. If we remove that and introduce a clk_regmap_gate things
-should turn out alright.
+> then I think it is
+> wrong one.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Looks like your right, do you know what the right one is ?
+
+>
+>> +
+>>   struct input_dev;
+>>
+>> -void touchscreen_parse_properties(struct input_dev *dev, bool multitouch);
+>> +struct touchscreen_properties {
+>> +	s32 max_x;
+>> +	s32 max_y;
+>> +	bool invert_x;
+>> +	bool invert_y;
+>> +	bool swap_x_y;
+>> +};
+>> +
+>> +void touchscreen_parse_properties(struct input_dev *input, bool multitouch,
+>> +				  struct touchscreen_properties *prop);
+>> +
+>> +void touchscreen_apply_prop_to_x_y(struct touchscreen_properties *prop,
+>> +				   s16 *x, s16 *y);
+>>
+>>   #endif
+>> --
+>> 2.5.0
+>>
+>
+> Thanks.
+>
+
+Regards,
+
+Hans
