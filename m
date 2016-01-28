@@ -1,82 +1,50 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 28 Jan 2016 16:04:22 +0100
-Subject: [PATCH 2/2] ARM: shmobile: Move shmobile_smp_{mpidr, fn,
- arg}[] from .text to .data
+Date: Thu, 28 Jan 2016 16:04:21 +0100
+Subject: [PATCH 1/2] ARM: shmobile: Move shmobile_scu_base from .text to .data
 In-Reply-To: <1453993462-12210-1-git-send-email-geert+renesas@glider.be>
 References: <1453993462-12210-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1453993462-12210-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1453993462-12210-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_ARM_KERNMEM_PERMS=y and CONFIG_DEBUG_RODATA=y, the kernel
-crashes during system suspend:
-
-    Freezing user space processes ... (elapsed 0.004 seconds) done.
-    Freezing remaining freezable tasks ... (elapsed 0.002 seconds)
-    done.
-    PM: suspend of devices complete after 111.948 msecs
-    PM: late suspend of devices complete after 1.086 msecs
-    PM: noirq suspend of devices complete after 11.576 msecs
-    Disabling non-boot CPUs ...
-    Kernel panic - not syncing: Attempted to kill the idle task!
-    1014ec ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
-    CPU0: stopping
-
-This happens because the .text section is marked read-only, while the
-arrays shmobile_smp_mpidr[], shmobile_smp_fn[], and shmobile_smp_arg[]
-are being written to.
-
-Fix this by moving these arrays from the .text to the .data section.
-This requires accessing them through a pointer after virtual to physical
-translation.
+shmobile_scu_base is being written to, so it doesn't belong in the .text
+section. Fix this by moving it from asm .text to C .data, as it's no
+longer used from asm code since commit 4f6da36f7edd5790 ("ARM: shmobile:
+Remove old SCU boot code").
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/headsmp.S | 22 ++++++++++++++++------
- 1 file changed, 16 insertions(+), 6 deletions(-)
+ arch/arm/mach-shmobile/headsmp-scu.S | 6 ------
+ arch/arm/mach-shmobile/platsmp-scu.c | 3 +++
+ 2 files changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
-index 330c1fc63197df89..f924273ceaf476b4 100644
---- a/arch/arm/mach-shmobile/headsmp.S
-+++ b/arch/arm/mach-shmobile/headsmp.S
-@@ -50,9 +50,12 @@ ENTRY(shmobile_smp_boot)
- 	mrc	p15, 0, r1, c0, c0, 5		@ r1 = MPIDR
- 	and	r0, r1, r0			@ r0 = cpu_logical_map() value
- 	mov	r1, #0				@ r1 = CPU index
--	adr	r5, 1f				@ array of per-cpu mpidr values
--	adr	r6, 2f				@ array of per-cpu functions
--	adr	r7, 3f				@ array of per-cpu arguments
-+	adr	r2, 1f
-+	ldmia	r2, {r4, r5, r6, r7}
-+	sub	r2, r2, r4			@ virt->phys offset
-+	add	r5, r5, r2			@ array of per-cpu mpidr values
-+	add	r6, r6, r2			@ array of per-cpu functions
-+	add	r7, r7, r2			@ array of per-cpu arguments
+diff --git a/arch/arm/mach-shmobile/headsmp-scu.S b/arch/arm/mach-shmobile/headsmp-scu.S
+index fa5248c52399c9b5..5e503d91ad70ddf2 100644
+--- a/arch/arm/mach-shmobile/headsmp-scu.S
++++ b/arch/arm/mach-shmobile/headsmp-scu.S
+@@ -38,9 +38,3 @@ ENTRY(shmobile_boot_scu)
  
- shmobile_smp_boot_find_mpidr:
- 	ldr	r8, [r5, r1, lsl #2]
-@@ -80,12 +83,19 @@ ENTRY(shmobile_smp_sleep)
- 	b	shmobile_smp_boot
- ENDPROC(shmobile_smp_sleep)
+ 	b	secondary_startup
+ ENDPROC(shmobile_boot_scu)
+-
+-	.text
+-	.align	2
+-	.globl	shmobile_scu_base
+-shmobile_scu_base:
+-	.space	4
+diff --git a/arch/arm/mach-shmobile/platsmp-scu.c b/arch/arm/mach-shmobile/platsmp-scu.c
+index 64663110ab6ca0e1..f2198c9c74359736 100644
+--- a/arch/arm/mach-shmobile/platsmp-scu.c
++++ b/arch/arm/mach-shmobile/platsmp-scu.c
+@@ -17,6 +17,9 @@
+ #include <asm/smp_scu.h>
+ #include "common.h"
  
-+	.align	2
-+1:	.long	.
-+	.long	shmobile_smp_mpidr
-+	.long	shmobile_smp_fn
-+	.long	shmobile_smp_arg
 +
-+	.data
- 	.globl	shmobile_smp_mpidr
- shmobile_smp_mpidr:
--1:	.space	NR_CPUS * 4
-+	.space	NR_CPUS * 4
- 	.globl	shmobile_smp_fn
- shmobile_smp_fn:
--2:	.space	NR_CPUS * 4
-+	.space	NR_CPUS * 4
- 	.globl	shmobile_smp_arg
- shmobile_smp_arg:
--3:	.space	NR_CPUS * 4
-+	.space	NR_CPUS * 4
++void __iomem *shmobile_scu_base;
++
+ static int shmobile_smp_scu_notifier_call(struct notifier_block *nfb,
+ 					  unsigned long action, void *hcpu)
+ {
 -- 
 1.9.1
