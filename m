@@ -1,30 +1,80 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 28 Jan 2016 18:01:08 +0100
-Subject: [PATCH] clk: rockchip: Allow sclk_i2s0 and i2s0_frac to change
- their parents rate on rk3188
-In-Reply-To: <1453897469-2134-1-git-send-email-al.kochet@gmail.com>
-References: <1453897469-2134-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1687954.9WCMHmWDJQ@diego>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Jan 2016 17:01:41 +0000
+Subject: [PATCH 0/4] Update cpu feature extraction
+In-Reply-To: <56A9F7C6.2060109@arm.com>
+References: <1453800223-18590-1-git-send-email-vladimir.murzin@arm.com>
+ <56A9F7C6.2060109@arm.com>
+Message-ID: <20160128170141.GM10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
-
-Am Mittwoch, 27. Januar 2016, 15:24:29 schrieb Alexander Kochetkov:
-> Allow sclk_i2s0 and i2s0_frac to change their parents rate as
-> that the upstream dividers are purely there to feed sclk_i2s0
+On Thu, Jan 28, 2016 at 11:13:10AM +0000, Vladimir Murzin wrote:
+> On 26/01/16 09:23, Vladimir Murzin wrote:
+> > Hi,
+> > 
+> > This has been started as a fix in cpu feature extractor, but Suzuki suggested
+> > syncing-up the whole cpu feature handling with the recent updates on arm64
+> > side [1,2].
+> > 
+> > I've kept fixes separately, so they can go as the are in case there is concern
+> > on updating cpu feature handling.
+> > 
+> > [1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/455568
+> > [2] https://lkml.org/lkml/2015/11/18/570
+> > 
 > 
-> Tested on radxarock-lite.
-> 
-> Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+> Russell, is it OK for patch tracker?
 
-doesn't apply due to the fractional divider change going into 4.5
+I'd really like to hear that someone has validated these changes or at
+least someone in ARM Ltd such as Will or Catalin has reviewed them; I
+remember the subject of whether certain fields are signed or unsigned
+being almost a personal opinion - we used to treat all fields as
+unsigned, but that was declared to be wrong, so we then went to treating
+them all as signed fields... See:
 
-please respin on top of 4.5-rc1 (or my clock-branch for 4.6 [0],
-but should be the same in that regard).
+commit b8c9592b4a6c93211c8163888a97880d608503b5
+Author: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date:   Thu Mar 19 19:03:25 2015 +0100
 
+    ARM: 8318/1: treat CPU feature register fields as signed quantities
 
-Thanks
-Heiko
+    The various CPU feature registers consist of 4-bit blocks that
+    represent signed quantities, whose positive values represent
+    incremental features, and whose negative values are reserved.
 
-[0] https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/log/?h=v4.6-clk/next
+    To improve forward compatibility, update the feature detection
+    code to take possible future higher values into account, but
+    ignore negative values.
+
+    Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+For instance:
+
+-       sync_prim = ((read_cpuid_ext(CPUID_EXT_ISAR3) >> 8) & 0xf0) |
+-                   ((read_cpuid_ext(CPUID_EXT_ISAR4) >> 20) & 0x0f);
+-       if (sync_prim >= 0x13)
++       if (cpuid_feature_extract(CPUID_EXT_ISAR3, 12) > 1 ||
++           (cpuid_feature_extract(CPUID_EXT_ISAR3, 12) == 1 &&
++            cpuid_feature_extract(CPUID_EXT_ISAR3, 20) >= 3))
+                elf_hwcap &= ~HWCAP_SWP;
+
+(let's ignore the ISAR4 vs ISAR3 problem).  What if ISAR4 20:23 have
+bit 23 set?  In the original code, that would be treated as being ">= 3"
+but in the new code, that's less than zero, so would fail the test.
+
+I think we had much the same questions back in March 2015 when this was
+last discussed, when I raised the issue of there being a documentation
+bug in that the documentation doesn't make it clear how reserved 4-bit
+CPU ID fields should be intepreted.
+
+What I'd like to see is some kind of positive concensus on this (and
+a doc update); what I don't want to do is to apply these patches and
+then get another round of patches converting some of them back to
+signed tests, and then later another set of patches doing the reverse,
+because that seems to be what's now happening.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
