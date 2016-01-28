@@ -1,36 +1,134 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 28 Jan 2016 16:15:34 -0300
-Subject: [PATCH v4 2/3] clk: samsung: Don't build ARMv8 clock drivers on
- ARMv7
-In-Reply-To: <1453941324-15742-3-git-send-email-k.kozlowski@samsung.com>
-References: <1453941324-15742-1-git-send-email-k.kozlowski@samsung.com>
- <1453941324-15742-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <56AA68D6.50500@osg.samsung.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 28 Jan 2016 20:15:40 +0100
+Subject: [PATCH v10 14/21] KVM: ARM64: Add helper to handle PMCR register
+ bits
+In-Reply-To: <1453866709-20324-15-git-send-email-zhaoshenglong@huawei.com>
+References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453866709-20324-15-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20160128191540.GE16453@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On Wed, Jan 27, 2016 at 11:51:42AM +0800, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> According to ARMv8 spec, when writing 1 to PMCR.E, all counters are
+> enabled by PMCNTENSET, while writing 0 to PMCR.E, all counters are
+> disabled. When writing 1 to PMCR.P, reset all event counters, not
+> including PMCCNTR, to zero. When writing 1 to PMCR.C, reset PMCCNTR to
+> zero.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/sys_regs.c |  1 +
+>  include/kvm/arm_pmu.h     |  2 ++
+>  virt/kvm/arm/pmu.c        | 42 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 45 insertions(+)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index f45c227..eefc60a 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -467,6 +467,7 @@ static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>  		val &= ~ARMV8_PMCR_MASK;
+>  		val |= p->regval & ARMV8_PMCR_MASK;
+>  		vcpu_sys_reg(vcpu, PMCR_EL0) = val;
+> +		kvm_pmu_handle_pmcr(vcpu, val);
+>  	} else {
+>  		/* PMCR.P & PMCR.C are RAZ */
+>  		val = vcpu_sys_reg(vcpu, PMCR_EL0)
+> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+> index caa706e..5bed00c 100644
+> --- a/include/kvm/arm_pmu.h
+> +++ b/include/kvm/arm_pmu.h
+> @@ -42,6 +42,7 @@ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
+>  void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
+>  void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
+>  void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val);
+> +void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val);
+>  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+>  				    u64 select_idx);
+>  #else
+> @@ -62,6 +63,7 @@ static inline void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+>  static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+>  static inline void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
+>  static inline void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val) {}
+> +static inline void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val) {}
+>  static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
+>  						  u64 data, u64 select_idx) {}
+>  #endif
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index 706c935..d411f3f 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -190,6 +190,48 @@ void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val)
+>  	}
+>  }
+>  
+> +/**
+> + * kvm_pmu_handle_pmcr - handle PMCR register
+> + * @vcpu: The vcpu pointer
+> + * @val: the value guest writes to PMCR register
+> + */
+> +void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val)
+> +{
+> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +	struct kvm_pmc *pmc;
+> +	u64 mask;
+> +	int i;
+> +
+> +	mask = kvm_pmu_valid_counter_mask(vcpu);
+> +	if (val & ARMV8_PMCR_E) {
+> +		kvm_pmu_enable_counter(vcpu,
+> +				     vcpu_sys_reg(vcpu, PMCNTENSET_EL0) & mask);
 
-On 01/27/2016 09:35 PM, Krzysztof Kozlowski wrote:
-> Currently the Exynos5433 (ARMv8 SoC) clock driver depends on ARCH_EXYNOS
-> so it is built also on ARMv7. This does not bring any kind of benefit.
-> There won't be a single kernel image for ARMv7 and ARMv8 SoCs (like
-> multi_v7 for ARMv7).
->
-> Instead build clock drivers only for respective SoC's architecture.
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->
+nit: sort of an ugly indentation. I don't think the vcpu_sys_reg needs
+to line up with the vcpu.
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> +	} else {
+> +		kvm_pmu_disable_counter(vcpu, mask);
+> +	}
+> +
+> +	if (val & ARMV8_PMCR_C) {
+> +		pmc = &pmu->pmc[ARMV8_CYCLE_IDX];
+> +		if (pmc->perf_event)
+> +			local64_set(&pmc->perf_event->count, 0);
+> +		vcpu_sys_reg(vcpu, PMCCNTR_EL0) = 0;
+> +	}
+> +
+> +	if (val & ARMV8_PMCR_P) {
+> +		for (i = 0; i < ARMV8_CYCLE_IDX; i++) {
+> +			pmc = &pmu->pmc[i];
+> +			if (pmc->perf_event)
+> +				local64_set(&pmc->perf_event->count, 0);
+> +			vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + i) = 0;
+> +		}
+> +	}
 
-Also checked that for example clk-exynos5433 is not built anymore for
-exynos_defconfig but it is built for allyesconfig.
+The local64_set's surprise me. Patch 9/21 seems to go out of its way to
+allow the perf_event count to be whatever it happens to be, but then
+calculate the appropriate base to modify it with when the register is
+written by the guest. Here we're just simply setting both the perf_event
+counter and the register to zero. Shouldn't we be going through some perf
+API for the zeroing of its counter, and then do the same thing as patch
+9/21 does to set the register?
 
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+> +
+> +	if (val & ARMV8_PMCR_LC) {
+> +		pmc = &pmu->pmc[ARMV8_CYCLE_IDX];
+> +		pmc->bitmask = 0xffffffffffffffffUL;
+> +	}
+> +}
+> +
+>  static bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu, u64 select_idx)
+>  {
+>  	return (vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E) &&
+> -- 
+> 2.0.4
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
