@@ -1,59 +1,50 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 28 Jan 2016 10:08:35 +0100
-Subject: [GIT PULL] at91: fixes for 4.5 #1
-Message-ID: <1453972115-25776-1-git-send-email-nicolas.ferre@atmel.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 28 Jan 2016 18:30:01 +0900
+Subject: [PATCH/RFC] ARM: shmobile: r8a7794: Add thermal device to DT
+In-Reply-To: <87si1i1d91.wl%kuninori.morimoto.gx@renesas.com>
+References: <1453955575-32008-1-git-send-email-horms+renesas@verge.net.au>
+ <87si1i1d91.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20160128093001.GA21863@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On Thu, Jan 28, 2016 at 05:35:07AM +0000, Kuninori Morimoto wrote:
+> 
+> Hi Simon
+> 
+> > as discussed briefly last week I am having some trouble enabling thermal
+> > for the r8a7794/alt. With this patch applied on top of
+> > renesas-devel-20160127-v4.5-rc1 I see:
+> > 
+> > # dmesg | grep thermal
+> > [    1.089897] rcar_thermal e61f0000.thermal: thermal sensor was broken
+> > [    1.101225] rcar_thermal: probe of e61f0000.thermal failed with error -22
+> 
+> Hmm... strange
+> It can happen if thermal didn't work.
+> It seems driver can't read data from register.
+> 
+> > I also see this with "[PATCH] thermal: core: don't call unsupported trip on
+> > thermal_tripped_notify()" applied.
+> 
+> Oops, really ?
+> I think you can't apply it on renesas-devel-20160127-v4.5-rc1
 
-First AT91 fixes pull-request for 4.5, all DT modifications. The bulk of the
-changes is about adding the phy specification to Ethernet nodes because of
-recent changes in phy drivers that tend to require a comprehensive description
-of the Ethernet hardware.
-It is based on 4.5-rc1 to prevent merging issues.
+Yes, you are correct. What I did try was:
 
-Thanks, best regards,
+"[PATCH] thermal: of-thermal: return -EAGAIN until thermal_zone_of_sensor_register() was called"
 
-The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
+> # I'm not sure why, but latest thermal branch, linus/master, linux-next/master
+> # doesn't have problem patch 850ddee1144("thermal: improve hot trip handling")
+> # So above patch is not needed
+> 
+> > IS this a kernel issue that you are aware of?
+> > Is there a possibility that there is a problem with my hardware?
+> 
+> I think this is r8a7794 specific issue, but your patch looks sane for me...
+> 
+> > Any insight would be greatly appreciated.
+> > 
+> > AFIK this is not urgent.
 
-  Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-fixes
-
-for you to fetch changes up to e873cc022ce5e2c04bbc53b5874494b657e29d3f:
-
-  ARM: dts: at91: sama5d4 xplained: fix phy0 IRQ type (2016-01-27 11:14:25 +0100)
-
-----------------------------------------------------------------
-First fixes for 4.5. Only DT changes:
-- sama5d4: error in DBGU index
-- addition of phy properties in several boards
-- at91sam9n12ek fix a panel compatible string
-
-----------------------------------------------------------------
-Alexandre Belloni (2):
-      ARM: dts: at91: at91sam9n12ek: fix panel compatible string
-      ARM: dts: at91: sama5d4 xplained: properly mux phy interrupt
-
-Mohamed Jamsheeth Hajanajubudeen (1):
-      ARM: dts: at91: sama5d4: fix instance id of DBGU
-
-Nicolas Ferre (2):
-      ARM: dts: at91: sama5d2 xplained: add phy address and IRQ for macb0
-      ARM: dts: at91: sama5d4 xplained: fix phy0 IRQ type
-
-Wenyou Yang (1):
-      ARM: dts: at91: sama5d4ek: add phy address and IRQ for macb0
-
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 12 +++++++++++-
- arch/arm/boot/dts/at91-sama5d4_xplained.dts |  8 +++++++-
- arch/arm/boot/dts/at91-sama5d4ek.dts        | 11 +++++++++++
- arch/arm/boot/dts/at91sam9n12ek.dts         |  2 +-
- arch/arm/boot/dts/sama5d4.dtsi              |  2 +-
- 5 files changed, 31 insertions(+), 4 deletions(-)
-
--- 
-Nicolas Ferre
+[snip]
