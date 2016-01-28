@@ -1,38 +1,31 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 28 Jan 2016 13:57:22 +0100
-Subject: [PATCH v2] clk: Move vendor's Kconfig into CCF menu section
-In-Reply-To: <1453971537-5510-1-git-send-email-jamesjj.liao@mediatek.com>
-References: <1453971537-5510-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <56AA1032.70001@samsung.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 28 Jan 2016 16:11:44 +0300
+Subject: [PATCH] ipv4: ipconfig: avoid unused ic_proto_used symbol
+In-Reply-To: <1453902853-3424272-1-git-send-email-arnd@arndb.de>
+References: <1453902853-3424272-1-git-send-email-arnd@arndb.de>
+Message-ID: <56AA1390.6000503@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/01/16 09:58, James Liao wrote:
-> Move all vendor's Kconfig into CCF menu section to prevent
-> new drivers putting their Kconfig files in a wrong place.
-> 
-> Some Kconigs need to modify at the same time to avoid build
+Hello.
 
-"Some Kconfigs need to be modified..." ?
+On 1/27/2016 4:53 PM, Arnd Bergmann wrote:
 
-> warnings.
-> 
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> ---
-> This patch is based on v4.5-rc1.
-> 
-> changes since v1:
-> - Modify s3c24xx and samsung's Kconfig to avoid build warngings.
-> 
->  arch/arm/mach-s3c24xx/Kconfig | 1 +
->  drivers/clk/Kconfig           | 8 +++-----
->  drivers/clk/samsung/Kconfig   | 1 -
->  3 files changed, 4 insertions(+), 6 deletions(-)
+> When CONFIG_PROC_FS, CONFIG_IP_PNP_BOOTP, CONFIG_IP_PNP_DHCP and
+> CONFIG_IP_PNP_RARP are all disabled, we get a warning about the
+> ic_proto_used variable being unused:
+>
+> net/ipv4/ipconfig.c:146:12: error: 'ic_proto_used' defined but not used [-Werror=unused-variable]
+>
+> This avoids the warning, but making the definition conditional on
 
-For the samsung code changes:
+    s/but/by/?
 
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> whether a dynamic IP configuration protocol is configured. If not,
+> we know that the value is always zero, so we can optimize away the
+> variable and all code that depends on it.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+[...]
 
--- 
-Thanks,
-Sylwester
+MBR, Sergei
