@@ -1,55 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Jan 2016 15:56:11 +0000
-Subject: [PATCH 1/3] arm64: efistub: drop __init annotation from
- handle_kernel_image()
-In-Reply-To: <1453979254-25374-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1453979254-25374-1-git-send-email-ard.biesheuvel@linaro.org>
- <1453979254-25374-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160128155611.GK775@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 28 Jan 2016 15:56:00 +0000
+Subject: [RFC PATCH 0/5] arm/arm64: Making HYP vgic/timer save/restore common
+Message-ID: <1453996565-19666-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 12:07:32PM +0100, Ard Biesheuvel wrote:
-> After moving arm64-stub.c to libstub/, all of its sections are emitted
-> as .init.xxx sections automatically, and the __init annotation of
-> handle_kernel_image() causes it to end up in .init.init.text, which is
-> not recognized as an __init section by the linker scripts. So drop the
-> annotation.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  drivers/firmware/efi/libstub/arm64-stub.c | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
+With the current state of the C conversion of arm and arm64 world
+switches, we are still unable to share some of the most obvious
+candidates (GIC and timer save/restore). In order to reduce the bloat,
+let's move these files to a common location (virt/kvm/arm/hyp).
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+The changes are extremely mechanical, with a small hack to deal with
+system register names on the 32bit side (I've decided to align on the
+64bit names).
 
-Will
+I'd like to know what people think of the common location. Does it
+makes sense to have a "hyp" subdirectory to indicate that this is not
+"normal" kernel code?
 
-> diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
-> index 78dfbd34b6bf..9e0342745e4f 100644
-> --- a/drivers/firmware/efi/libstub/arm64-stub.c
-> +++ b/drivers/firmware/efi/libstub/arm64-stub.c
-> @@ -13,13 +13,13 @@
->  #include <asm/efi.h>
->  #include <asm/sections.h>
->  
-> -efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
-> -					unsigned long *image_addr,
-> -					unsigned long *image_size,
-> -					unsigned long *reserve_addr,
-> -					unsigned long *reserve_size,
-> -					unsigned long dram_base,
-> -					efi_loaded_image_t *image)
-> +efi_status_t handle_kernel_image(efi_system_table_t *sys_table_arg,
-> +				 unsigned long *image_addr,
-> +				 unsigned long *image_size,
-> +				 unsigned long *reserve_addr,
-> +				 unsigned long *reserve_size,
-> +				 unsigned long dram_base,
-> +				 efi_loaded_image_t *image)
->  {
->  	efi_status_t status;
->  	unsigned long kernel_size, kernel_memsize = 0;
-> -- 
-> 2.5.0
-> 
+These patches are on top of 4.5-rc1, plus the VHE and 32bit WS rewrite
+patches, and I've pushed out a branch at
+
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/mov-hyp
+
+Marc Zyngier (5):
+  arm64: KVM: Move kvm/hyp/hyp.h to include/asm/kvm_hyp.h
+  arm64: KVM: Move vgic-v2 and timer save/restore to virt/kvm/arm/hyp
+  ARM: KVM: Move kvm/hyp/hyp.h to include/asm/kvm_hyp.h
+  ARM: KVM: Use common version of vgic-v2-sr.c
+  ARM: KVM: Use common version of timer-sr.c
+
+ arch/arm/{kvm/hyp/hyp.h => include/asm/kvm_hyp.h}  |  9 +++
+ arch/arm/kvm/hyp/Makefile                          |  7 +-
+ arch/arm/kvm/hyp/banked-sr.c                       |  2 +-
+ arch/arm/kvm/hyp/cp15-sr.c                         |  2 +-
+ arch/arm/kvm/hyp/switch.c                          |  2 +-
+ arch/arm/kvm/hyp/timer-sr.c                        | 71 ------------------
+ arch/arm/kvm/hyp/tlb.c                             |  2 +-
+ arch/arm/kvm/hyp/vgic-v2-sr.c                      | 84 ----------------------
+ .../arm64/{kvm/hyp/hyp.h => include/asm/kvm_hyp.h} |  0
+ arch/arm64/kvm/hyp/Makefile                        |  7 +-
+ arch/arm64/kvm/hyp/debug-sr.c                      |  4 +-
+ arch/arm64/kvm/hyp/switch.c                        |  3 +-
+ arch/arm64/kvm/hyp/sysreg-sr.c                     |  4 +-
+ arch/arm64/kvm/hyp/tlb.c                           |  2 +-
+ arch/arm64/kvm/hyp/vgic-v3-sr.c                    |  4 +-
+ {arch/arm64/kvm => virt/kvm/arm}/hyp/timer-sr.c    |  4 +-
+ {arch/arm64/kvm => virt/kvm/arm}/hyp/vgic-v2-sr.c  |  4 +-
+ 17 files changed, 30 insertions(+), 181 deletions(-)
+ rename arch/arm/{kvm/hyp/hyp.h => include/asm/kvm_hyp.h} (93%)
+ delete mode 100644 arch/arm/kvm/hyp/timer-sr.c
+ delete mode 100644 arch/arm/kvm/hyp/vgic-v2-sr.c
+ rename arch/arm64/{kvm/hyp/hyp.h => include/asm/kvm_hyp.h} (100%)
+ rename {arch/arm64/kvm => virt/kvm/arm}/hyp/timer-sr.c (97%)
+ rename {arch/arm64/kvm => virt/kvm/arm}/hyp/vgic-v2-sr.c (98%)
+
+-- 
+2.1.4
