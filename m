@@ -1,49 +1,61 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 28 Jan 2016 13:41:29 +0000
-Subject: [PATCH v3 1/3] iommu/io-pgtable: Add ARMv7 short descriptor
- support
-In-Reply-To: <1453857386.28284.4.camel@mhfsdcap03>
-References: <cover.1453723096.git.robin.murphy@arm.com>
- <066c4af0e29c9cc658bd5e48edc5e2d7ba7140a1.1453723096.git.robin.murphy@arm.com>
- <1453857386.28284.4.camel@mhfsdcap03>
-Message-ID: <56AA1A89.6080706@arm.com>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Thu, 28 Jan 2016 22:45:06 +0900
+Subject: [PATCH] ARM: dts: orion5x: add mtd flash support to linkstation
+ lswtgl
+In-Reply-To: <CAEQ9gEmcss4sb6hE6-w0jVoYfHqnWNf23EVNMefvZ24TYfEk2g@mail.gmail.com>
+References: <1453907405-30434-1-git-send-email-rogershimizu@gmail.com>
+ <20160127173231.GI20194@lunn.ch>
+ <CAEQ9gEmcss4sb6hE6-w0jVoYfHqnWNf23EVNMefvZ24TYfEk2g@mail.gmail.com>
+Message-ID: <CAEQ9gEkU8x80-S=n+e8NBfN7OTSxHLdBSN_3q6d0JxZDxfs_9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/01/16 01:16, Yong Wu wrote:
-> On Tue, 2016-01-26 at 17:13 +0000, Robin Murphy wrote:
->> Add a nearly-complete ARMv7 short descriptor implementation, omitting
->> only a few legacy and CPU-centric aspects which shouldn't be necessary
->> for IOMMU API use anyway.
+Dear Andrew,
+
+On Thu, Jan 28, 2016 at 3:22 AM, Roger Shimizu <rogershimizu@gmail.com> wrote:
+> On Thu, Jan 28, 2016 at 2:32 AM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> Same comment i just sent to Thomas:
 >>
->> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> The partition table should be a subnode of the mtd node and should be named
+>> 'partitions'. This node should have the following property:
+>> - compatible : (required) must be "fixed-partitions"
+>> Partitions are then defined in subnodes of the partitions node.
+>>
+>> For backwards compatibility partitions as direct subnodes of the mtd device are
+>> supported. This use is discouraged.
+>>
+>>            Andrew
 >
-> This looks good to me.
-> And actually our disp/vdec/venc works well on your v2.
+> Thanks for your comments!
 >
-> You could choose the two below,
-> Reviewed-by: Yong Wu <yong.wu@mediatek.com>
-> Tested-by: Yong Wu <yong.wu@mediatek.com>
+> Using the patch I submitted result in:
+>
+> [    1.667440] Found: SST 39LF020
+> [    1.670613] f4000000.flash: Found 1 x8 devices at 0x0 in 8-bit bank
+> [    1.676948] number of JEDEC chips: 1
+> [    1.698943] 3 ofpart partitions found on MTD device f4000000.flash
+> [    1.705222] Creating 3 MTD partitions on "f4000000.flash":
+> [    1.710803] 0x000000000000-0x000000030000 : "header"
+> [    1.719051] 0x000000030000-0x00000003f000 : "uboot"
+> [    1.727182] 0x00000003f000-0x000000040000 : "uboot_env"
+>
+> Applying the partition DT proposed in
+> Documentation/devicetree/bindings/mtd/partition.txt, result in:
+>
+> [    1.667879] Found: SST 39LF020
+> [    1.671053] f4000000.flash: Found 1 x8 devices at 0x0 in 8-bit bank
+> [    1.677389] number of JEDEC chips: 1
+>
+> So the partitions are gone.
 
-Great, thanks!
+Now I'm thinking for my dts's case, which is orion5x, refer
+- Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+- Documentation/devicetree/bindings/mtd/orion-nand.txt
+would be more proper.
+And in the sample of mtd-physmap.txt, the structure described in
+partition.txt is not mentioned.
 
-Will, it seems to make the most sense for Joerg to pick these patches up 
-directly with the MTK series that depends on them - any objections?
+Could we go as the dts is, like the original patch I submitted?
 
-Robin.
-
->
-> Thanks.
->
->> ---
->>   drivers/iommu/Kconfig              |  19 +
->>   drivers/iommu/Makefile             |   1 +
->>   drivers/iommu/io-pgtable-arm-v7s.c | 849 +++++++++++++++++++++++++++++++++++++
->>   drivers/iommu/io-pgtable.c         |   3 +
->>   drivers/iommu/io-pgtable.h         |  14 +-
->>   5 files changed, 885 insertions(+), 1 deletion(-)
->>   create mode 100644 drivers/iommu/io-pgtable-arm-v7s.c
->
->
->
+Cheers,
+Roger
