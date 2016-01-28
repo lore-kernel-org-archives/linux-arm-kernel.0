@@ -1,90 +1,127 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 28 Jan 2016 07:19:34 -0800
-Subject: [PATCH 0/2] ARM: shmobile: Move written variables from .text to
- .data
-In-Reply-To: <1453993462-12210-1-git-send-email-geert+renesas@glider.be>
-References: <1453993462-12210-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAGXu5jL7ebTXtPu5_9U4duju2qiWFEYVQmSSgpdMDkWr8tQCvw@mail.gmail.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 28 Jan 2016 16:36:35 +0100
+Subject: [PATCH v10 04/21] KVM: ARM64: Add access handler for PMCR register
+In-Reply-To: <1453866709-20324-5-git-send-email-zhaoshenglong@huawei.com>
+References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453866709-20324-5-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20160128153635.GB3807@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 7:04 AM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
->         Hi Simon, Magnus,
->
-> When CONFIG_ARM_KERNMEM_PERMS=y and CONFIG_DEBUG_RODATA=y, the kernel
-> crashes during system suspend:
->
->     Freezing user space processes ... (elapsed 0.004 seconds) done.
->     Freezing remaining freezable tasks ... (elapsed 0.002 seconds)
->     done.
->     PM: suspend of devices complete after 111.948 msecs
->     PM: late suspend of devices complete after 1.086 msecs
->     PM: noirq suspend of devices complete after 11.576 msecs
->     Disabling non-boot CPUs ...
->     Kernel panic - not syncing: Attempted to kill the idle task!
->     1014ec ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
->     CPU0: stopping
->
-> This happens because the shmobile assembler sources have several
-> variables that are written to in the .text section, while .text is
-> mapped read-only after kernel bootup if CONFIG_DEBUG_RODATA=y.
->
-> This series fixes this by moving variables from .text to .data.
-> Note that there's still an issue with shmobile_boot_fn and
-> shmobile_boot_arg in arch/arm/mach-shmobile/headsmp.S.
-> So far I didn't manage to fix this (the code and data are copied to
-> SRAM on some SoCs).  However, currently this are harmless, as these are
-> written during early kernel boot up only, before .text is marked
-> read-only.
->
-> These issues were uncovered by "[PATCH v2] ARM: mm: flip priority of
-> CONFIG_DEBUG_RODATA". As that patch is planned for queue up (again)
-> soon, it may be a good idea to queue these fixes for v4.5, to avoid a
-> dependency with the arm tree.
->
-> Tested hard on sh73a0/kzm9g, r8a7791/koelsch.
-> Tested lighter on emev2/kzm9d[*], r8a73a4/ape6evm, r8a7740/armadillo, and
-> r8a7779/marzen[*] ([*] = no remote resume).
->
-> Thanks!
->
-> Geert Uytterhoeven (2):
->   ARM: shmobile: Move shmobile_scu_base from .text to .data
->   ARM: shmobile: Move shmobile_smp_{mpidr,fn,arg}[] from .text to .data
->
->  arch/arm/mach-shmobile/headsmp-scu.S |  6 ------
->  arch/arm/mach-shmobile/headsmp.S     | 22 ++++++++++++++++------
->  arch/arm/mach-shmobile/platsmp-scu.c |  3 +++
->  3 files changed, 19 insertions(+), 12 deletions(-)
+On Wed, Jan 27, 2016 at 11:51:32AM +0800, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Add reset handler which gets host value of PMCR_EL0 and make writable
+> bits architecturally UNKNOWN except PMCR.E which is zero. Add an access
+> handler for PMCR.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 42 ++++++++++++++++++++++++++++++++++++++++--
+>  include/kvm/arm_pmu.h     |  4 ++++
+>  2 files changed, 44 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index eec3598..97fea84 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -34,6 +34,7 @@
+>  #include <asm/kvm_emulate.h>
+>  #include <asm/kvm_host.h>
+>  #include <asm/kvm_mmu.h>
+> +#include <asm/pmu.h>
+>  
+>  #include <trace/events/kvm.h>
+>  
+> @@ -439,6 +440,43 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>  	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
+>  }
+>  
+> +static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+> +{
+> +	u64 pmcr, val;
+> +
+> +	asm volatile("mrs %0, pmcr_el0\n" : "=r" (pmcr));
+> +	/* Writable bits of PMCR_EL0 (ARMV8_PMCR_MASK) is reset to UNKNOWN
+> +	 * except PMCR.E resetting to zero.
+> +	 */
+> +	val = ((pmcr & ~ARMV8_PMCR_MASK) | (ARMV8_PMCR_MASK & 0xdecafbad))
+> +	      & (~ARMV8_PMCR_E);
+> +	vcpu_sys_reg(vcpu, PMCR_EL0) = val;
+> +}
+> +
+> +static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+> +			const struct sys_reg_desc *r)
+> +{
+> +	u64 val;
+> +
+> +	if (!kvm_arm_pmu_v3_ready(vcpu))
+> +		return trap_raz_wi(vcpu, p, r);
+> +
+> +	if (p->is_write) {
+> +		/* Only update writeable bits of PMCR */
+> +		val = vcpu_sys_reg(vcpu, PMCR_EL0);
+> +		val &= ~ARMV8_PMCR_MASK;
+> +		val |= p->regval & ARMV8_PMCR_MASK;
+> +		vcpu_sys_reg(vcpu, PMCR_EL0) = val;
+> +	} else {
+> +		/* PMCR.P & PMCR.C are RAZ */
+> +		val = vcpu_sys_reg(vcpu, PMCR_EL0)
+> +		      & ~(ARMV8_PMCR_P | ARMV8_PMCR_C);
+> +		p->regval = val;
 
-Thanks!
+Should we also be setting the IMP, IDCODE, and N fields here to the
+values of the host PE?
 
-Reviewed-by: Kees Cook <keescook@chromium.org>
-
-And FWIW, I've now got the RODATA patch back in the patch queue, since
-we're at -rc1:
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8501/1
-
--Kees
-
->
+> +	}
+> +
+> +	return true;
+> +}
+> +
+>  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+>  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+>  	/* DBGBVRn_EL1 */						\
+> @@ -623,7 +661,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  
+>  	/* PMCR_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b000),
+> -	  trap_raz_wi },
+> +	  access_pmcr, reset_pmcr, },
+>  	/* PMCNTENSET_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b001),
+>  	  trap_raz_wi },
+> @@ -885,7 +923,7 @@ static const struct sys_reg_desc cp15_regs[] = {
+>  	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
+>  
+>  	/* PMU */
+> -	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), trap_raz_wi },
+> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmcr },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
+> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+> index be220ee..32fee2d 100644
+> --- a/include/kvm/arm_pmu.h
+> +++ b/include/kvm/arm_pmu.h
+> @@ -34,9 +34,13 @@ struct kvm_pmu {
+>  	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
+>  	bool ready;
+>  };
+> +
+> +#define kvm_arm_pmu_v3_ready(v)		((v)->arch.pmu.ready)
+>  #else
+>  struct kvm_pmu {
+>  };
+> +
+> +#define kvm_arm_pmu_v3_ready(v)		(false)
+>  #endif
+>  
+>  #endif
+> -- 
+> 2.0.4
+> 
+> 
 > --
-> 1.9.1
->
-> Gr{oetje,eeting}s,
->
->                                                 Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                                             -- Linus Torvalds
-
-
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
