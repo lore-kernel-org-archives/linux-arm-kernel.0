@@ -1,79 +1,51 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 28 Jan 2016 11:18:19 +0000
-Subject: [PATCH 11/13] dtb: amd: Add PCIe SMMU device tree node
-In-Reply-To: <20160128111738.GF30928@arm.com>
-References: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1453929121-12171-12-git-send-email-Suravee.Suthikulpanit@amd.com>
- <20160128111453.GG17123@leverpostej>
- <20160128111738.GF30928@arm.com>
-Message-ID: <20160128111818.GH17123@leverpostej>
+Date: Thu, 28 Jan 2016 11:20:33 +0000
+Subject: [PATCH] arm64: Disallow combination of ARCH_XGENE and 16K page
+ size
+In-Reply-To: <20160128110820.GE30928@arm.com>
+References: <1453936230-7305-1-git-send-email-dann.frazier@canonical.com>
+ <20160128103441.GS14823@e104818-lin.cambridge.arm.com>
+ <20160128110820.GE30928@arm.com>
+Message-ID: <20160128112033.GI17123@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 11:17:39AM +0000, Will Deacon wrote:
-> On Thu, Jan 28, 2016 at 11:14:53AM +0000, Mark Rutland wrote:
-> > On Wed, Jan 27, 2016 at 03:11:59PM -0600, Suravee Suthikulpanit wrote:
-> > > From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+On Thu, Jan 28, 2016 at 11:08:20AM +0000, Will Deacon wrote:
+> On Thu, Jan 28, 2016 at 10:34:41AM +0000, Catalin Marinas wrote:
+> > On Wed, Jan 27, 2016 at 04:10:30PM -0700, dann frazier wrote:
+> > > 16K page size is an optional feature of the architecture, and is not
+> > > supported by the X-Gene SoC family.
 > > > 
-> > > Add PCIe SMMU device tree node for AMD Seattle SOC.
-> > > 
-> > > Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+> > > Signed-off-by: dann frazier <dann.frazier@canonical.com>
 > > > ---
-> > >  arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 23 +++++++++++++++++++++++
-> > >  1 file changed, 23 insertions(+)
+> > >  arch/arm64/Kconfig.platforms | 1 +
+> > >  1 file changed, 1 insertion(+)
 > > > 
-> > > diff --git a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-> > > index a7fc059..bfccfea 100644
-> > > --- a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-> > > +++ b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-> > > @@ -210,6 +210,7 @@
-> > >  			device_type = "pci";
-> > >  			bus-range = <0 0x7f>;
-> > >  			msi-parent = <&v2m0>;
-> > > +			#stream-id-cells = <16>;
-> > >  			reg = <0 0xf0000000 0 0x10000000>;
+> > > diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> > > index 21074f6..b241290 100644
+> > > --- a/arch/arm64/Kconfig.platforms
+> > > +++ b/arch/arm64/Kconfig.platforms
+> > > @@ -133,6 +133,7 @@ config ARCH_VEXPRESS
 > > >  
-> > >  			interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
-> > > @@ -230,6 +231,28 @@
-> > >  				<0x03000000 0x01 0x00000000 0x01 0x00000000 0x7f 0x00000000>;
-> > >  		};
-> > >  
-> > > +		pcie0_smmu: smmu at e0a00000 {
-> > > +			 compatible = "arm,mmu-401";
-> > > +			 reg = <0 0xe0a00000 0 0x10000>;
-> > > +			 #global-interrupts = <1>;
-> > > +			 interrupts = /* Uses combined intr for both
-> > > +				       * global and context
-> > > +				       */
-> > > +				      <0 333 4>,
-> > > +				      <0 333 4>;
-> > > +			/* Note:
-> > > +			 * SID[2:0]  = PCIe function number
-> > > +			 * SID[7:3]  = PCIe device number
-> > > +			 * SID[14:8] = PCIe bus number
-> > > +			 */
-> > > +			 mmu-masters = <&pcie0
-> > > +				/* 1:00:[0,3] */ 256 257 258 259
-> > > +				/* 2:00:[0,3] */ 512 513 514 515
-> > > +				/* 3:00:[0,3] */ 768 769 770 771
-> > > +				/* 4:00:[0,3] */ 1024 1025 1026 1027
-> > > +			 >;
-> > > +		 };
+> > >  config ARCH_XGENE
+> > >  	bool "AppliedMicro X-Gene SOC Family"
+> > > +	depends on !ARM64_16K_PAGES
+> > >  	help
+> > >  	  This enables support for AppliedMicro X-Gene SOC Family
 > > 
-> > This doesn't look right to me.
+> > This would be the case on Juno as well. But maybe at some point the
+> > X-Gene family would gain a CPU with such support.
 > > 
-> > I didn't think that RID->SID mapping was actually defined by any
-> > binding, so (how) are these numbers used?
-> > 
-> > I'm uncomfortable with this, given we should be moving towards the
-> > generic IOMMU binding (and then we'd use the iommu-map binding [1] for
-> > this).
-> > 
-> > Will, Robin, thoughts?
+> > Anyway, I would rather make 16K pages depend on EXPERT, make it a bit
+> > harder to enable. We've had a few questions recently about enabling it
+> > on CPUs that don't have such feature.
 > 
-> The driver currently assumes a 1:1 RID:SID mapping when it sees a PCI
-> device, so those numbers should be ignored.
+> I thought there was also a suggestion that we could fail gracefully in
+> the EFI stub if we detected an unsupported page size?
 
-Given that, they shouldn't be in the DT, then?
+Yup. There are other things we could/should test, too.
+
+I believe Jeremy had a patch, but due to churn in that area it didn't
+get picked up.
 
 Mark.
