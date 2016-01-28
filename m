@@ -1,93 +1,165 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 28 Jan 2016 10:31:56 -0800
-Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
-In-Reply-To: <56A94FB7.6020903@ti.com>
-References: <1452780672-14339-1-git-send-email-kishon@ti.com>
- <1452780672-14339-4-git-send-email-kishon@ti.com>
- <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
- <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
-Message-ID: <20160128183156.GH19432@atomide.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 28 Jan 2016 19:37:52 +0100
+Subject: [PATCH v10 13/21] KVM: ARM64: Add access handler for PMSWINC
+ register
+In-Reply-To: <1453866709-20324-14-git-send-email-zhaoshenglong@huawei.com>
+References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453866709-20324-14-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20160128183752.GD16453@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [160127 15:17]:
-> On 01/27/2016 12:56 PM, Tony Lindgren wrote:
-> > * Suman Anna <s-anna@ti.com> [160127 10:17]:
-> >> On 01/27/2016 11:31 AM, Tony Lindgren wrote:
-> >>> Why do you need another reset here? Can't you just implement PM runtime
-> >>> in the driver and do the usual pm_runtime_put_sync followed by
-> >>> pm_runtime_disable?
-> >>
-> >> The omap_hwmod_enable/disable code does not deal with hardresets (PRCM
-> >> reset lines) and so the pm_runtime_get_sync/put_sync only end up dealing
-> >> with clocks, and we need to invoke the reset functions separately.
-> >> Modules with softresets in SYSCONFIG are ok, as they are dealt with
-> >> properly.
-> > 
-> > Hmm _reset() in omap_hwmod.c has this to call _assert_hardreset:
-> > 
-> > 	if (oh->class->reset) {
-> > 		r = oh->class->reset(oh);
-> > 	} else {
-> > 		if (oh->rst_lines_cnt > 0) {
-> > 			for (i = 0; i < oh->rst_lines_cnt; i++)
-> > 				_assert_hardreset(oh, oh->rst_lines[i].name);
-> > 			return 0;
-> > 		} else {
-> > 			r = _ocp_softreset(oh);
-> > 			if (r == -ENOENT)
-> > 				r = 0;
-> > 		}
-> > 	}
+On Wed, Jan 27, 2016 at 11:51:41AM +0800, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> Right, hwmod code does the initial reset.
+> Add access handler which emulates writing and reading PMSWINC
+> register and add support for creating software increment event.
 > 
-> > Care to explain what exactly the problem with the hwmod code not doing
-> > the reset on init?
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/include/asm/pmu.h |  2 ++
+>  arch/arm64/kvm/sys_regs.c    | 20 +++++++++++++++++++-
+>  include/kvm/arm_pmu.h        |  2 ++
+>  virt/kvm/arm/pmu.c           | 33 +++++++++++++++++++++++++++++++++
+>  4 files changed, 56 insertions(+), 1 deletion(-)
 > 
-> And we only need to deassert the reset in probe. Technically, we don't
-> need to assert first and deassert in probe, and that was a design choice
-> made by Kishon.
+> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
+> index 2588f9c..6f14a01 100644
+> --- a/arch/arm64/include/asm/pmu.h
+> +++ b/arch/arm64/include/asm/pmu.h
+> @@ -60,6 +60,8 @@
+>  #define	ARMV8_EVTYPE_MASK	0xc80003ff	/* Mask for writable bits */
+>  #define	ARMV8_EVTYPE_EVENT	0x3ff		/* Mask for EVENT bits */
+>  
+> +#define ARMV8_EVTYPE_EVENT_SW_INCR	0	/* Software increment event */
+> +
+>  /*
+>   * Event filters for PMUv3
+>   */
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 60b24ea..f45c227 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -676,6 +676,23 @@ static bool access_pmovs(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>  	return true;
+>  }
+>  
+> +static bool access_pmswinc(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+> +			   const struct sys_reg_desc *r)
+> +{
+> +	u64 mask;
+> +
+> +	if (!kvm_arm_pmu_v3_ready(vcpu))
+> +		return trap_raz_wi(vcpu, p, r);
+> +
+> +	if (p->is_write) {
+> +		mask = kvm_pmu_valid_counter_mask(vcpu);
+> +		kvm_pmu_software_increment(vcpu, p->regval & mask);
+> +		return true;
+> +	}
+> +
+> +	return false;
+> +}
+> +
+>  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+>  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+>  	/* DBGBVRn_EL1 */						\
+> @@ -886,7 +903,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	  access_pmovs, NULL, PMOVSSET_EL0 },
+>  	/* PMSWINC_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b100),
+> -	  trap_raz_wi },
+> +	  access_pmswinc, reset_unknown, PMSWINC_EL0 },
+>  	/* PMSELR_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b101),
+>  	  access_pmselr, reset_unknown, PMSELR_EL0 },
+> @@ -1225,6 +1242,7 @@ static const struct sys_reg_desc cp15_regs[] = {
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), access_pmcnten },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), access_pmcnten },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), access_pmovs },
+> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 4), access_pmswinc },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmselr },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmceid },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmceid },
+> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+> index 4f8409d..caa706e 100644
+> --- a/include/kvm/arm_pmu.h
+> +++ b/include/kvm/arm_pmu.h
+> @@ -41,6 +41,7 @@ u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu);
+>  void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
+>  void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
+>  void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
+> +void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val);
+>  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+>  				    u64 select_idx);
+>  #else
+> @@ -60,6 +61,7 @@ static inline u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
+>  static inline void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+>  static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+>  static inline void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
+> +static inline void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val) {}
+>  static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
+>  						  u64 data, u64 select_idx) {}
+>  #endif
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index ee75fac..706c935 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -161,6 +161,35 @@ void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val)
+>  		kvm_vcpu_kick(vcpu);
+>  }
+>  
+> +/**
+> + * kvm_pmu_software_increment - do software increment
+> + * @vcpu: The vcpu pointer
+> + * @val: the value guest writes to PMSWINC register
+> + */
+> +void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val)
+> +{
+> +	int i;
+> +	u64 type, enable, reg;
+> +
+> +	if (val == 0)
+> +		return;
+> +
+> +	for (i = 0; i < ARMV8_CYCLE_IDX; i++) {
+> +		if (!(val & BIT(i)))
+> +			continue;
+> +		type = vcpu_sys_reg(vcpu, PMEVTYPER0_EL0 + i)
+> +		       & ARMV8_EVTYPE_EVENT;
+> +		enable = vcpu_sys_reg(vcpu, PMCNTENSET_EL0);
 
-OK so if hwmod code has already done the reset, then why would you need
-to deassert reset in the device driver probe?
+The PMCNTENSET_EL0 read can be moved outside the loop.
 
-> > And why do you need to do another reset in dra7xx_pcie_remove()?
+> +		if ((type == ARMV8_EVTYPE_EVENT_SW_INCR) && (enable & BIT(i))) {
+> +			reg = vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + i) + 1;
+> +			reg = lower_32_bits(reg);
+> +			vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + i) = reg;
+> +			if (!reg)
+> +				kvm_pmu_overflow_set(vcpu, BIT(i));
+> +		}
+> +	}
+> +}
+> +
+>  static bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu, u64 select_idx)
+>  {
+>  	return (vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E) &&
+> @@ -189,6 +218,10 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+>  	kvm_pmu_stop_counter(vcpu, pmc);
+>  	eventsel = data & ARMV8_EVTYPE_EVENT;
+>  
+> +	/* Software increment event does't need to be backed by a perf event */
+> +	if (eventsel == ARMV8_EVTYPE_EVENT_SW_INCR)
+> +		return;
+> +
+>  	memset(&attr, 0, sizeof(struct perf_event_attr));
+>  	attr.type = PERF_TYPE_RAW;
+>  	attr.size = sizeof(attr);
+> -- 
+> 2.0.4
 > 
-> Primarily to restore the reset state back to what it was after the
-> driver remove gets called. We cannot call deassert twice without calling
-> a assert in between. Kishon had originally added the assert and deassert
-> only in probe, but nothing in remove, they ought to be deassert in probe
-> and assert in remove to match initial hardware state, and to also make
-> it work across multiple probe/remove.
-
-I don't understand this part either.. Usually you just power up and init
-the registers to a sane state in a device driver probe and on exit just
-power down the device.
-
-> >>> Basically I'm wondering how come we need these platform data callbacks
-> >>> at all.
-> >>
-> >> The hardresets are controlled through the
-> >> omap_device_assert(deassert)_hardreset functions, and since these are
-> >> limited to mach-omap2, we are invoking them through platform data callbacks.
-> > 
-> > Right.. But I'm wondering about the why you need to do this in the
-> > driver at all part :)
 > 
-> The initial reset at init time is okay, but hwmod _enable() bails out if
-> the resets lines are asserted. This was a change made long time back, I
-> believe to deal with the problems around the DSP enabling sequences. As
-> such, pm_runtime_get_sync() and put_sync() do not deassert and assert
-> the resets.
-
-OK if the hwmod code does not deassert reset lines properly on enable,
-then that sounds like a bug that should be fixed instead of adding
-device specific work arounds.
-
-Sorry to keep dragging this on a bit longer, but I think we need to
-hear Paul's comments on this one.
-
-Regards,
-
-Tony
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
