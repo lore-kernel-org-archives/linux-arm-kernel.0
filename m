@@ -1,70 +1,50 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 28 Jan 2016 10:03:07 +0000
-Subject: [PATCH v2 1/3] mmc: pwrseq_simple: add to_pwrseq_simple() macro
+Date: Thu, 28 Jan 2016 10:03:42 +0000
+Subject: [PATCH v2 2/3] mmc: pwrseq_emmc: add to_pwrseq_emmc() macro
 In-Reply-To: <1453975315-13424-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1453975315-13424-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1453975387-13467-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1453975422-13522-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds to_pwrseq_simple() macro to make the code more readable.
+This patch adds to_pwrseq_emmc() macro to make the code more readable.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/mmc/core/pwrseq_simple.c | 14 ++++++--------
- 1 file changed, 6 insertions(+), 8 deletions(-)
+ drivers/mmc/core/pwrseq_emmc.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
-index aba786d..03573e1 100644
---- a/drivers/mmc/core/pwrseq_simple.c
-+++ b/drivers/mmc/core/pwrseq_simple.c
-@@ -26,6 +26,8 @@ struct mmc_pwrseq_simple {
- 	struct gpio_descs *reset_gpios;
+diff --git a/drivers/mmc/core/pwrseq_emmc.c b/drivers/mmc/core/pwrseq_emmc.c
+index 4a82bc7..c2d732a 100644
+--- a/drivers/mmc/core/pwrseq_emmc.c
++++ b/drivers/mmc/core/pwrseq_emmc.c
+@@ -25,6 +25,8 @@ struct mmc_pwrseq_emmc {
+ 	struct gpio_desc *reset_gpio;
  };
  
-+#define to_pwrseq_simple(p) container_of(p, struct mmc_pwrseq_simple, pwrseq)
++#define to_pwrseq_emmc(p) container_of(p, struct mmc_pwrseq_emmc, pwrseq)
 +
- static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
- 					      int value)
+ static void __mmc_pwrseq_emmc_reset(struct mmc_pwrseq_emmc *pwrseq)
  {
-@@ -45,8 +47,7 @@ static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
+ 	gpiod_set_value(pwrseq->reset_gpio, 1);
+@@ -35,16 +37,14 @@ static void __mmc_pwrseq_emmc_reset(struct mmc_pwrseq_emmc *pwrseq)
  
- static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
+ static void mmc_pwrseq_emmc_reset(struct mmc_host *host)
  {
--	struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
--					struct mmc_pwrseq_simple, pwrseq);
-+	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
+-	struct mmc_pwrseq_emmc *pwrseq = container_of(host->pwrseq,
+-					struct mmc_pwrseq_emmc, pwrseq);
++	struct mmc_pwrseq_emmc *pwrseq =  to_pwrseq_emmc(host->pwrseq);
  
- 	if (!IS_ERR(pwrseq->ext_clk) && !pwrseq->clk_enabled) {
- 		clk_prepare_enable(pwrseq->ext_clk);
-@@ -58,16 +59,14 @@ static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
- 
- static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
- {
--	struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
--					struct mmc_pwrseq_simple, pwrseq);
-+	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
- 
- 	mmc_pwrseq_simple_set_gpios_value(pwrseq, 0);
+ 	__mmc_pwrseq_emmc_reset(pwrseq);
  }
  
- static void mmc_pwrseq_simple_power_off(struct mmc_host *host)
+ static void mmc_pwrseq_emmc_free(struct mmc_host *host)
  {
--	struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
--					struct mmc_pwrseq_simple, pwrseq);
-+	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
+-	struct mmc_pwrseq_emmc *pwrseq = container_of(host->pwrseq,
+-					struct mmc_pwrseq_emmc, pwrseq);
++	struct mmc_pwrseq_emmc *pwrseq =  to_pwrseq_emmc(host->pwrseq);
  
- 	mmc_pwrseq_simple_set_gpios_value(pwrseq, 1);
- 
-@@ -79,8 +78,7 @@ static void mmc_pwrseq_simple_power_off(struct mmc_host *host)
- 
- static void mmc_pwrseq_simple_free(struct mmc_host *host)
- {
--	struct mmc_pwrseq_simple *pwrseq = container_of(host->pwrseq,
--					struct mmc_pwrseq_simple, pwrseq);
-+	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
- 
- 	if (!IS_ERR(pwrseq->reset_gpios))
- 		gpiod_put_array(pwrseq->reset_gpios);
+ 	unregister_restart_handler(&pwrseq->reset_nb);
+ 	gpiod_put(pwrseq->reset_gpio);
 -- 
 1.9.1
