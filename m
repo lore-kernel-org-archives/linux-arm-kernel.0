@@ -1,34 +1,24 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 28 Jan 2016 10:31:06 +0000
-Subject: Speeding up dma_unmap
-In-Reply-To: <20160127180944.GZ10826@n2100.arm.linux.org.uk>
-References: <CAJFSRaCRvx=+_fEYAr8OeWGHnnz+rOWjLzLcm+wZiEstbHwxAw@mail.gmail.com>
- <3526786.axKPs51069@wuerfel>
- <20160127160630.GQ14823@e104818-lin.cambridge.arm.com>
- <20160127180944.GZ10826@n2100.arm.linux.org.uk>
-Message-ID: <20160128103105.GR14823@e104818-lin.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 28 Jan 2016 11:31:34 +0100
+Subject: [PATCH] pinctrl: sunxi: guard sub-directory with
+ CONFIG_PINCTRL_SUNXI
+In-Reply-To: <1453563129-30332-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1453563129-30332-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdad53bcBEOzKK=dTLmDSzr-rZuiFmh6XWnBqzi+NebuHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 06:09:45PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 27, 2016 at 04:06:30PM +0000, Catalin Marinas wrote:
-> > On Wed, Jan 27, 2016 at 01:23:27PM +0100, Arnd Bergmann wrote:
-> > > up reading cache lines back in randomly on a speculative prefetch,
-> > > but as far as I can tell, the Cortex-A8 (or A5/A7) won't do that.
-> > 
-> > Are you sure about A5 and A7? I'm not even sure about the A8 but there
-> > are good chances that A7 and A5 do speculative prefetches.
-> 
-> I thought when I was re-implementing the DMA API on ARM (which was
-> around early v7 times) that there were CPUs that did speculative
-> prefetching, which included the A8.  I seem to remember it was pretty
-> urgent to have the DMA API fixed for _any_ ARMv7 CPU because of the
-> speculative prefetching.
+On Sat, Jan 23, 2016 at 4:32 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 
-Indeed, it's a safe assumption to say that any ARMv7 CPU perform
-speculative accesses. Even if some of them may only do I-cache
-prefetching (just guessing), in the presence of a unified L2 this
-distinction no longer matters.
+> CONFIG_PINCTRL_SUNXI is more suitable than CONFIG_ARCH_SUNXI
+> to guard the drivers/pinctrl/sunxi/ directory.
+> (I renamed CONFIG_PINCTRL_SUNXI_COMMON to CONFIG_PINCTRL_SUNXI.)
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
--- 
-Catalin
+This patch does not apply on linux v4.5-rc1, please rebase, add
+Maxime's ACK and resend.
+
+Yours,
+Linus Walleij
