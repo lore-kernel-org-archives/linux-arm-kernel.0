@@ -1,84 +1,103 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 28 Jan 2016 14:26:00 -0700
-Subject: [PATCH net-next 36/40] net: fec: use mac set by bootloader before
- fuses
+Date: Thu, 28 Jan 2016 14:26:01 -0700
+Subject: [PATCH net-next 37/40] net: fec: add events device file
 In-Reply-To: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1454016364-30985-37-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1454016364-30985-38-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a bootloader initializes the mac, prefer that
-to device tree or fuses.
+This is for debug purposes. If a receive interrupt
+is lost, writing to this file can recover the FEC.
 
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 ---
- drivers/net/ethernet/freescale/fec_main.c | 33 +++++++++++++------------------
- 1 file changed, 14 insertions(+), 19 deletions(-)
+ drivers/net/ethernet/freescale/fec_main.c | 52 +++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 9db645d..11968a9 100644
+index 11968a9..00c9b7e 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -1625,16 +1625,24 @@ static void fec_get_mac(struct net_device *ndev)
- 	struct fec_platform_data *pdata = dev_get_platdata(&fep->pdev->dev);
- 	unsigned char *iap, tmpaddr[ETH_ALEN];
+@@ -3273,6 +3273,53 @@ fec_enet_get_queue_num(struct platform_device *pdev, int *num_tx, int *num_rx)
  
--	/*
--	 * try to get mac address in following order:
-+	/* try to get mac address in following order:
- 	 *
- 	 * 1) module parameter via kernel command line in form
- 	 *    fec.macaddr=0x00,0x04,0x9f,0x01,0x30,0xe0
- 	 */
- 	iap = macaddr;
+ }
  
--	/*
--	 * 2) from device tree data
-+	/* 2) FEC mac registers set by bootloader
-+	 */
-+	if (!is_valid_ether_addr(iap)) {
-+		*((__be32 *)&tmpaddr[0]) =
-+			cpu_to_be32(readl(fep->hwp + FEC_ADDR_LOW));
-+		*((__be16 *)&tmpaddr[4]) =
-+			cpu_to_be16(readl(fep->hwp + FEC_ADDR_HIGH) >> 16);
-+		iap = &tmpaddr[0];
-+	}
++static ssize_t fec_show_events(struct device *dev,
++			       struct device_attribute *attr, char *buf)
++{
++	struct net_device *ndev = dev_get_drvdata(dev);
++	struct fec_enet_private *fep = netdev_priv(ndev);
++	int qid;
++	int complete_cnt[] = {0, 0, 0};
 +
-+	/* 3) from device tree data
- 	 */
- 	if (!is_valid_ether_addr(iap)) {
- 		struct device_node *np = fep->pdev->dev.of_node;
-@@ -1645,8 +1653,7 @@ static void fec_get_mac(struct net_device *ndev)
- 		}
- 	}
++	for (qid = 0; qid < fep->num_rx_queues; qid++) {
++		struct fec_enet_priv_rx_q *rxq = fep->rx_queue[qid];
++		struct bufdesc *bdp = rxq->bd.cur;
++
++		do {
++			unsigned status = bdp->cbd_sc;
++
++			if (status & BD_ENET_RX_EMPTY)
++				break;
++			complete_cnt[qid]++;
++			bdp = fec_enet_get_nextdesc(bdp, &rxq->bd);
++		} while (bdp != rxq->bd.cur);
++	}
++	return sprintf(buf, "%08x %08x %08x %08x %d %d %d\n", fep->events,
++			fep->last_ievents,
++			readl(fep->hwp + FEC_IEVENT),
++			readl(fep->hwp + FEC_IMASK),
++			complete_cnt[0], complete_cnt[1], complete_cnt[2]);
++}
++
++static ssize_t fec_set_events(struct device *dev,
++			      struct device_attribute *attr,
++			      const char *buf, size_t count)
++{
++	struct net_device *ndev = dev_get_drvdata(dev);
++	struct fec_enet_private *fep = netdev_priv(ndev);
++	unsigned long events;
++
++	/* Disable the RX/TX interrupt */
++	writel(FEC_NAPI_IMASK, fep->hwp + FEC_IMASK);
++	if (!kstrtoul(buf, 16, &events))
++		fep->events |= events;
++	napi_schedule(&fep->napi);
++	netif_wake_queue(fep->netdev);
++	return count;
++}
++
++static DEVICE_ATTR(events, 0644, fec_show_events, fec_set_events);
++
+ static int
+ fec_probe(struct platform_device *pdev)
+ {
+@@ -3451,6 +3498,9 @@ fec_probe(struct platform_device *pdev)
+ 	fec_enet_clk_enable(ndev, false);
+ 	pinctrl_pm_select_sleep_state(&pdev->dev);
  
--	/*
--	 * 3) from flash or fuse (via platform data)
-+	/* 4) from flash or fuse (via platform data)
- 	 */
- 	if (!is_valid_ether_addr(iap)) {
- #ifdef CONFIG_M5272
-@@ -1658,19 +1665,7 @@ static void fec_get_mac(struct net_device *ndev)
- #endif
- 	}
++	ret = device_create_file(&pdev->dev, &dev_attr_events);
++	if (ret)
++		dev_err(&pdev->dev, "Error creating fec sysfs file(%d)\n", ret);
+ 	ret = register_netdev(ndev);
+ 	if (ret)
+ 		goto failed_register;
+@@ -3470,6 +3520,7 @@ fec_probe(struct platform_device *pdev)
+ 	return 0;
  
--	/*
--	 * 4) FEC mac registers set by bootloader
--	 */
--	if (!is_valid_ether_addr(iap)) {
--		*((__be32 *) &tmpaddr[0]) =
--			cpu_to_be32(readl(fep->hwp + FEC_ADDR_LOW));
--		*((__be16 *) &tmpaddr[4]) =
--			cpu_to_be16(readl(fep->hwp + FEC_ADDR_HIGH) >> 16);
--		iap = &tmpaddr[0];
--	}
--
--	/*
--	 * 5) random mac address
-+	/* 5) random mac address
- 	 */
- 	if (!is_valid_ether_addr(iap)) {
- 		/* Report it and use a random ethernet address instead */
+ failed_register:
++	device_remove_file(&pdev->dev, &dev_attr_events);
+ 	fec_enet_mii_remove(fep);
+ failed_mii_init:
+ failed_irq:
+@@ -3496,6 +3547,7 @@ fec_drv_remove(struct platform_device *pdev)
+ 	struct net_device *ndev = platform_get_drvdata(pdev);
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+ 
++	device_remove_file(&pdev->dev, &dev_attr_events);
+ 	cancel_work_sync(&fep->tx_timeout_work);
+ 	fec_ptp_stop(pdev);
+ 	unregister_netdev(ndev);
 -- 
 2.5.0
