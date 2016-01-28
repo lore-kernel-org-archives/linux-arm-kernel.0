@@ -1,32 +1,150 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Thu, 28 Jan 2016 15:54:58 +0100
-Subject: [PATCH v2 0/5] Cavium ThunderX PMU support
-Message-ID: <cover.1453992560.git.jglauber@cavium.com>
+Date: Thu, 28 Jan 2016 15:55:00 +0100
+Subject: [PATCH v2 2/5] arm64/perf: Add Cavium ThunderX PMU support
+In-Reply-To: <cover.1453992560.git.jglauber@cavium.com>
+References: <cover.1453992560.git.jglauber@cavium.com>
+Message-ID: <2767dfc5032be07163d6e70a81d7c346f5dc50a2.1453992560.git.jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark & Will,
+Support PMU events on Caviums ThunderX SOC. ThunderX supports
+some additional counters compared to the default ARMv8 PMUv3:
 
-I'm resending the arm64 PMU patches. The only difference to the first
-version is that I dropped the x on thunder in order to be consistent
-with the existing device tree name.
+- branch instructions counter
+- stall frontend & backend counters
+- L1 dcache load & store counters
+- L1 icache counters
+- iTLB & dTLB counters
+- L1 dcache & icache prefetch counters
 
-Thanks,
-Jan
+Signed-off-by: Jan Glauber <jglauber@cavium.com>
+---
+ arch/arm64/kernel/perf_event.c | 69 +++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 68 insertions(+), 1 deletion(-)
 
-Jan Glauber (5):
-  arm64/perf: Rename Cortex A57 events
-  arm64/perf: Add Cavium ThunderX PMU support
-  arm64: dts: Add Cavium ThunderX specific PMU
-  arm64/perf: Enable PMCR long cycle counter bit
-  arm64/perf: Extend event mask for ARMv8.1
-
- Documentation/devicetree/bindings/arm/pmu.txt |   1 +
- arch/arm64/boot/dts/cavium/thunder-88xx.dtsi  |   5 +
- arch/arm64/kernel/perf_event.c                | 145 ++++++++++++++++++++------
- drivers/perf/arm_pmu.c                        |   5 +-
- include/linux/perf/arm_pmu.h                  |   4 +-
- 5 files changed, 125 insertions(+), 35 deletions(-)
-
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 32fe656..c038e4e 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -94,10 +94,19 @@
+ #define ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL_ST			0x43
+ #define ARMV8_PMUV3_PERFCTR_DTLB_REFILL_LD			0x4C
+ #define ARMV8_PMUV3_PERFCTR_DTLB_REFILL_ST			0x4D
++#define ARMV8_PMUV3_PERFCTR_DTLB_ACCESS_LD			0x4E
++#define ARMV8_PMUV3_PERFCTR_DTLB_ACCESS_ST			0x4F
+ 
+ /* ARMv8 Cortex-A53 specific event types. */
+ #define ARMV8_A53_PERFCTR_PREFETCH_LINEFILL			0xC2
+ 
++/* ARMv8 Cavium Thunder specific event types. */
++#define ARMV8_THUNDER_PERFCTR_L1_DCACHE_MISS_ST			0xE9
++#define ARMV8_THUNDER_PERFCTR_L1_DCACHE_PREF_ACCESS		0xEA
++#define ARMV8_THUNDER_PERFCTR_L1_DCACHE_PREF_MISS		0xEB
++#define ARMV8_THUNDER_PERFCTR_L1_ICACHE_PREF_ACCESS		0xEC
++#define ARMV8_THUNDER_PERFCTR_L1_ICACHE_PREF_MISS		0xED
++
+ /* PMUv3 HW events mapping. */
+ static const unsigned armv8_pmuv3_perf_map[PERF_COUNT_HW_MAX] = {
+ 	PERF_MAP_ALL_UNSUPPORTED,
+@@ -131,6 +140,18 @@ static const unsigned armv8_a57_perf_map[PERF_COUNT_HW_MAX] = {
+ 	[PERF_COUNT_HW_BUS_CYCLES]		= ARMV8_PMUV3_PERFCTR_BUS_CYCLES,
+ };
+ 
++static const unsigned armv8_thunder_perf_map[PERF_COUNT_HW_MAX] = {
++	PERF_MAP_ALL_UNSUPPORTED,
++	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV8_PMUV3_PERFCTR_CLOCK_CYCLES,
++	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV8_PMUV3_PERFCTR_INSTR_EXECUTED,
++	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS,
++	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL,
++	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV8_PMUV3_PERFCTR_PC_WRITE,
++	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
++	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND] = ARMV8_PMUV3_PERFCTR_STALL_FRONTEND,
++	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= ARMV8_PMUV3_PERFCTR_STALL_BACKEND,
++};
++
+ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+ 						[PERF_COUNT_HW_CACHE_OP_MAX]
+ 						[PERF_COUNT_HW_CACHE_RESULT_MAX] = {
+@@ -193,6 +214,36 @@ static const unsigned armv8_a57_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+ 	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
+ };
+ 
++static const unsigned armv8_thunder_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
++						   [PERF_COUNT_HW_CACHE_OP_MAX]
++						   [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
++	PERF_CACHE_MAP_ALL_UNSUPPORTED,
++
++	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS_LD,
++	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL_LD,
++	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS_ST,
++	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_THUNDER_PERFCTR_L1_DCACHE_MISS_ST,
++	[C(L1D)][C(OP_PREFETCH)][C(RESULT_ACCESS)] = ARMV8_THUNDER_PERFCTR_L1_DCACHE_PREF_ACCESS,
++	[C(L1D)][C(OP_PREFETCH)][C(RESULT_MISS)] = ARMV8_THUNDER_PERFCTR_L1_DCACHE_PREF_MISS,
++
++	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_ICACHE_ACCESS,
++	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_ICACHE_REFILL,
++	[C(L1I)][C(OP_PREFETCH)][C(RESULT_ACCESS)] = ARMV8_THUNDER_PERFCTR_L1_ICACHE_PREF_ACCESS,
++	[C(L1I)][C(OP_PREFETCH)][C(RESULT_MISS)] = ARMV8_THUNDER_PERFCTR_L1_ICACHE_PREF_MISS,
++
++	[C(DTLB)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_DTLB_ACCESS_LD,
++	[C(DTLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_DTLB_REFILL_LD,
++	[C(DTLB)][C(OP_WRITE)][C(RESULT_ACCESS)] = ARMV8_PMUV3_PERFCTR_DTLB_ACCESS_ST,
++	[C(DTLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_DTLB_REFILL_ST,
++
++	[C(ITLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_ITLB_REFILL,
++
++	[C(BPU)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
++	[C(BPU)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
++	[C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
++	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
++};
++
+ #define ARMV8_EVENT_ATTR_RESOLVE(m) #m
+ #define ARMV8_EVENT_ATTR(name, config) \
+ 	PMU_EVENT_ATTR_STRING(name, armv8_event_attr_##name, \
+@@ -324,7 +375,6 @@ static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
+ 	NULL,
+ };
+ 
+-
+ /*
+  * Perf Events' indices
+  */
+@@ -743,6 +793,13 @@ static int armv8_a57_map_event(struct perf_event *event)
+ 				ARMV8_EVTYPE_EVENT);
+ }
+ 
++static int armv8_thunder_map_event(struct perf_event *event)
++{
++	return armpmu_map_event(event, &armv8_thunder_perf_map,
++				&armv8_thunder_perf_cache_map,
++				ARMV8_EVTYPE_EVENT);
++}
++
+ static void armv8pmu_read_num_pmnc_events(void *info)
+ {
+ 	int *nb_cnt = info;
+@@ -811,11 +868,21 @@ static int armv8_a72_pmu_init(struct arm_pmu *cpu_pmu)
+ 	return armv8pmu_probe_num_events(cpu_pmu);
+ }
+ 
++static int armv8_thunder_pmu_init(struct arm_pmu *cpu_pmu)
++{
++	armv8_pmu_init(cpu_pmu);
++	cpu_pmu->name			= "armv8_cavium_thunder";
++	cpu_pmu->map_event		= armv8_thunder_map_event;
++	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
++	return armv8pmu_probe_num_events(cpu_pmu);
++}
++
+ static const struct of_device_id armv8_pmu_of_device_ids[] = {
+ 	{.compatible = "arm,armv8-pmuv3",	.data = armv8_pmuv3_init},
+ 	{.compatible = "arm,cortex-a53-pmu",	.data = armv8_a53_pmu_init},
+ 	{.compatible = "arm,cortex-a57-pmu",	.data = armv8_a57_pmu_init},
+ 	{.compatible = "arm,cortex-a72-pmu",	.data = armv8_a72_pmu_init},
++	{.compatible = "cavium,thunder-pmu",	.data = armv8_thunder_pmu_init},
+ 	{},
+ };
+ 
 -- 
 1.9.1
