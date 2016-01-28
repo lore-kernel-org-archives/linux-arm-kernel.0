@@ -1,90 +1,82 @@
-From: ping.bai@nxp.com (Ping Bai)
-Date: Thu, 28 Jan 2016 10:45:09 +0000
-Subject: [PATCH v2 5/5] ARM: imx: Add msl code support for imx6qp
-In-Reply-To: <20160128081040.GO9070@tiger>
-References: <1450159673-27314-1-git-send-email-b51503@freescale.com>
- <1450159673-27314-6-git-send-email-b51503@freescale.com>
- <20160128081040.GO9070@tiger>
-Message-ID: <DB4PR04MB538330DB5505E84CA55A91187DA0@DB4PR04MB538.eurprd04.prod.outlook.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 28 Jan 2016 10:42:37 +0000
+Subject: [PATCH v4 04/13] arm64: Add new hcall HVC_CALL_FUNC
+In-Reply-To: <1453977766-20907-1-git-send-email-james.morse@arm.com>
+References: <1453977766-20907-1-git-send-email-james.morse@arm.com>
+Message-ID: <1453977766-20907-5-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Geoff Levand <geoff@infradead.org>
 
+Add the new hcall HVC_CALL_FUNC that allows execution of a function at EL2.
+During CPU reset the CPU must be brought to the exception level it had on
+entry to the kernel.  The HVC_CALL_FUNC hcall will provide the mechanism
+needed for this exception level switch.
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: 2016?1?28? 16:11
-> To: b51503 at freescale.com
-> Cc: kernel at pengutronix.de; pawel.moll at arm.com; robh+dt at kernel.org;
-> mturquette at baylibre.com; sboyd at codeaurora.org; linux-arm-
-> kernel at lists.infradead.org; linux-clk at vger.kernel.org;
-> devicetree at vger.kernel.org
-> Subject: Re: [PATCH v2 5/5] ARM: imx: Add msl code support for imx6qp
-> 
-> On Tue, Dec 15, 2015 at 02:07:53PM +0800, Bai Ping wrote:
-> > The i.MX6QP is a different SOC, but internally we treate it as i.MX6Q
-> > Rev_2.0 to maximum the code reusability. The chip silicon number we
-> > read from the ANADIG_DIGPROG is 0x630100. This patch add code to
-> > identify it as i.MX6QP Rev_1.0 when print out the silicon version.
-> >
-> > Signed-off-by: Bai Ping <b51503@freescale.com>
-> > ---
-> >  arch/arm/mach-imx/anatop.c     | 5 ++++-
-> >  arch/arm/mach-imx/mach-imx6q.c | 8 ++++++--
-> >  2 files changed, 10 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
-> > index 231bb25..9622763 100644
-> > --- a/arch/arm/mach-imx/anatop.c
-> > +++ b/arch/arm/mach-imx/anatop.c
-> > @@ -129,7 +129,10 @@ void __init imx_init_revision_from_anatop(void)
-> >
-> >  	switch (digprog & 0xff) {
-> >  	case 0:
-> > -		revision = IMX_CHIP_REVISION_1_0;
-> > +		if (digprog >> 8 & 0x01)
-> > +			revision = IMX_CHIP_REVISION_2_0;
-> > +		else
-> > +			revision = IMX_CHIP_REVISION_1_0;
-> 
-> Please at least add some comment here to help us remember that this is a trick
-> we play for i.MX6QP.
-> 
+To allow the HVC_CALL_FUNC exception vector to work without a stack, which
+is needed to support an hcall at CPU reset, this implementation uses
+register x18 to store the link register across the caller provided
+function.  This dictates that the caller provided function must preserve
+the contents of register x18.
+
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+This patch is from v13 of kexec
+
+ arch/arm64/include/asm/virt.h | 13 +++++++++++++
+ arch/arm64/kernel/hyp-stub.S  | 13 ++++++++++++-
+ 2 files changed, 25 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index eb10368c329e..30700961f28c 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -45,6 +45,19 @@
  
-Will address this in patch V3. Thanks for your review.
-
-> Shawn
-> 
-> >  		break;
-> >  	case 1:
-> >  		revision = IMX_CHIP_REVISION_1_1;
-> > diff --git a/arch/arm/mach-imx/mach-imx6q.c
-> > b/arch/arm/mach-imx/mach-imx6q.c index 3878494b..cb27d56 100644
-> > --- a/arch/arm/mach-imx/mach-imx6q.c
-> > +++ b/arch/arm/mach-imx/mach-imx6q.c
-> > @@ -266,8 +266,11 @@ static void __init imx6q_init_machine(void)  {
-> >  	struct device *parent;
-> >
-> > -	imx_print_silicon_rev(cpu_is_imx6dl() ? "i.MX6DL" : "i.MX6Q",
-> > -			      imx_get_soc_revision());
-> > +	if (cpu_is_imx6q() && imx_get_soc_revision() ==
-> IMX_CHIP_REVISION_2_0)
-> > +		imx_print_silicon_rev("i.MX6QP", IMX_CHIP_REVISION_1_0);
-> > +	else
-> > +		imx_print_silicon_rev(cpu_is_imx6dl() ? "i.MX6DL" : "i.MX6Q",
-> > +				imx_get_soc_revision());
-> >
-> >  	parent = imx_soc_device_init();
-> >  	if (parent == NULL)
-> > @@ -399,6 +402,7 @@ static void __init imx6q_init_irq(void)  static
-> > const char * const imx6q_dt_compat[] __initconst = {
-> >  	"fsl,imx6dl",
-> >  	"fsl,imx6q",
-> > +	"fsl,imx6qp",
-> >  	NULL,
-> >  };
-> >
-> > --
-> > 1.9.1
-> >
-> >
+ #define HVC_SET_VECTORS 2
+ 
++/*
++ * HVC_CALL_FUNC - Execute a function at EL2.
++ *
++ * @x0: Physical address of the function to be executed.
++ * @x1: Passed as the first argument to the function.
++ * @x2: Passed as the second argument to the function.
++ * @x3: Passed as the third argument to the function.
++ *
++ * The called function must preserve the contents of register x18.
++ */
++
++#define HVC_CALL_FUNC 3
++
+ #define BOOT_CPU_MODE_EL1	(0xe11)
+ #define BOOT_CPU_MODE_EL2	(0xe12)
+ 
+diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+index 017ab519aaf1..e8febe90c036 100644
+--- a/arch/arm64/kernel/hyp-stub.S
++++ b/arch/arm64/kernel/hyp-stub.S
+@@ -67,8 +67,19 @@ el1_sync:
+ 	b	2f
+ 
+ 1:	cmp	x18, #HVC_SET_VECTORS
+-	b.ne	2f
++	b.ne	1f
+ 	msr	vbar_el2, x0
++	b	2f
++
++1:	cmp	x18, #HVC_CALL_FUNC
++	b.ne	2f
++	mov	x18, lr
++	mov	lr, x0
++	mov	x0, x1
++	mov	x1, x2
++	mov	x2, x3
++	blr	lr
++	mov	lr, x18
+ 
+ 2:	eret
+ ENDPROC(el1_sync)
+-- 
+2.6.2
