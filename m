@@ -1,36 +1,94 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Jan 2016 13:56:16 +0100
-Subject: [PATCH 0/9] network driver fixes
-In-Reply-To: <20160128.161413.1463071323452305953.davem@davemloft.net>
-References: <1453903507-3427225-1-git-send-email-arnd@arndb.de>
- <20160128.161413.1463071323452305953.davem@davemloft.net>
-Message-ID: <3029473.9UEV1vNhFu@wuerfel>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Fri, 29 Jan 2016 21:11:10 +0800
+Subject: [PATCH v10 07/21] KVM: ARM64: PMU: Add perf event map and
+ introduce perf event creating function
+In-Reply-To: <20160129101812.GB4541@arm.com>
+References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453866709-20324-8-git-send-email-zhaoshenglong@huawei.com>
+ <20160128163115.GC3807@hawk.localdomain> <56AA45B0.3060205@arm.com>
+ <20160128180638.GO775@arm.com> <56AB0617.5060902@huawei.com>
+ <20160129101812.GB4541@arm.com>
+Message-ID: <56AB64EE.5080305@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 January 2016 16:14:13 David Miller wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
-> Date: Wed, 27 Jan 2016 15:04:50 +0100
-> 
-> > These are all fixes for relatively harmless bugs that showed up
-> > in my randconfig testing, so they should not be needed for v4.5
-> > but get merged into net-next.
-> > 
-> > I've managed to address all 'uninitialized variable' warnings that
-> > I get in ARM randconfig kernels now, this series includes the
-> > last five I got in network drivers. They are often really annoying
-> > warnings but when we get new ones, they often are about actual
-> > bugs in corner cases, so I'm trying hard to eliminate the false
-> > positives here to get people to pay attention to added warnings.
-> > I've recently tried building with an older gcc and found tons more
-> > that are all bogus, this series only addresses the ones that
-> > gcc-5.2 finds.
-> 
-> Arnd I'm expecting a respin of this series to address with the
-> feedback you've been given.
-> 
 
-Done. I wasn't sure if you planned to pick up the patches
-individually, thanks for the clarification.
 
-	Arnd
+On 2016/1/29 18:18, Will Deacon wrote:
+> On Fri, Jan 29, 2016 at 02:26:31PM +0800, Shannon Zhao wrote:
+>> >
+>> >
+>> >On 2016/1/29 2:06, Will Deacon wrote:
+>>> > >On Thu, Jan 28, 2016 at 04:45:36PM +0000, Marc Zyngier wrote:
+>>>>> > >> >On 28/01/16 16:31, Andrew Jones wrote:
+>>>>>>> > >>> > >On Wed, Jan 27, 2016 at 11:51:35AM +0800, Shannon Zhao wrote:
+>>>>>>>>> > >>>> > >>From: Shannon Zhao<shannon.zhao@linaro.org>
+>>>>>>>>> > >>>> > >>
+>>>>>>>>> > >>>> > >>When we use tools like perf on host, perf passes the event type and the
+>>>>>>>>> > >>>> > >>id of this event type category to kernel, then kernel will map them to
+>>>>>>>>> > >>>> > >>hardware event number and write this number to PMU PMEVTYPER<n>_EL0
+>>>>>>>>> > >>>> > >>register. When getting the event number in KVM, directly use raw event
+>>>>>>>>> > >>>> > >>type to create a perf_event for it.
+>>>>>>>>> > >>>> > >>
+>>>>>>>>> > >>>> > >>Signed-off-by: Shannon Zhao<shannon.zhao@linaro.org>
+>>>>>>>>> > >>>> > >>Reviewed-by: Marc Zyngier<marc.zyngier@arm.com>
+>>>>>>>>> > >>>> > >>---
+>>>>>>>>> > >>>> > >>  arch/arm64/include/asm/pmu.h |   3 ++
+>>>>>>>>> > >>>> > >>  arch/arm64/kvm/Makefile      |   1 +
+>>>>>>>>> > >>>> > >>  include/kvm/arm_pmu.h        |  10 ++++
+>>>>>>>>> > >>>> > >>  virt/kvm/arm/pmu.c           | 122 +++++++++++++++++++++++++++++++++++++++++++
+>>>>>>>>> > >>>> > >>  4 files changed, 136 insertions(+)
+>>>>>>>>> > >>>> > >>  create mode 100644 virt/kvm/arm/pmu.c
+>>>>>>>>> > >>>> > >>
+>>>>>>>>> > >>>> > >>diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
+>>>>>>>>> > >>>> > >>index 4406184..2588f9c 100644
+>>>>>>>>> > >>>> > >>--- a/arch/arm64/include/asm/pmu.h
+>>>>>>>>> > >>>> > >>+++ b/arch/arm64/include/asm/pmu.h
+>>>>>>>>> > >>>> > >>@@ -21,6 +21,7 @@
+>>>>>>>>> > >>>> > >>
+>>>>>>>>> > >>>> > >>  #define ARMV8_MAX_COUNTERS      32
+>>>>>>>>> > >>>> > >>  #define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
+>>>>>>>>> > >>>> > >>+#define ARMV8_CYCLE_IDX         (ARMV8_MAX_COUNTERS - 1)
+>>>>>>> > >>> > >
+>>>>>>> > >>> > >I'm not sure we want to add this. It's name is wrong, as it's really
+>>>>>>> > >>> > >PMCNTENSET_EL0.C, and just a few lines above we have the idx defined
+>>>>>>> > >>> > >already (ARMV8_IDX_CYCLE_COUNTER), but as zero, because
+>>>>>>> > >>> > >arch/arm64/kernel/perf_event.c maps it that way.
+>>>>>>> > >>> > >
+>>>>>>> > >>> > >I think we should do the same with the pmc array, i.e. map the cycle
+>>>>>>> > >>> > >counter to idx zero.
+>>>>> > >> >
+>>>>> > >> >I tend to have the opposite view. Not for the sake of it, but because I
+>>>>> > >> >find it helpful to directly map the code to the architecture
+>>>>> > >> >documentation without having to bend another handful of neurons.
+>>>>> > >> >
+>>>>> > >> >Will probably had some good reasons to structure it that way, but I
+>>>>> > >> >don't know the rational. Will?
+>>> > >It was years ago, but I suspect that the cycle counter is index zero
+>>> > >because its mandated, whilst the number of event counters is IMPDEF.
+>> >
+>> >Since PMCNTENSET/CLR, PMINTENSET/CLR, PMOVSSET/CLR and PMSWINC are using
+>> >bit 31 to stands the state of cycle counter, if we make cycle counter
+>> >index to zero, we always need to do translation between the idx and bit
+>> >31 when we access these registers.
+> Conversely, if you stick the cycle counter right at the top, then you'll
+> need to rework a bunch of the perf code that iterates from
+> ARMV7_IDX_COUNTER0 to pmu->num_events.
+
+But actually this doesn't affect the perf code now because it's just a 
+internal PMC array index of kvm arm guest pmu codes.
+And having a look at the ARMv8 SPEC, it says
+"
+PMCCFILTR_EL0 can also be accessed by using PMXEVTYPER_EL0 with 
+PMSELR_EL0.SEL set to 0b11111.
+"
+Apparently it treats the index of cycle counter as 31 not zero. Also 
+regarding the PMCR.N field my understanding is that it just stands the 
+number of counters not the counter's order or index. Looking at the 
+description of PMSEL.SEL field, it says "This field can take any value 
+from 0 (0b00000) to (PMCR.N)-1, or 31 (0b11111)." while it's not "This 
+field can take any value from 1 (0b00001) to (PMCR.N), or 0."
+
+Thanks,
+-- 
+Shannon
