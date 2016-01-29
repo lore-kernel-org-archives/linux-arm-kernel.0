@@ -1,51 +1,23 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 29 Jan 2016 12:58:20 -0800
-Subject: [PATCH v2 2/3] clk: xgene: Add SoC and PMD PLL clocks with v2
+Date: Fri, 29 Jan 2016 12:58:41 -0800
+Subject: [PATCH v2 3/3] arm64: Update Merlin DT PCP PLL clock node for v2
  hardware
-In-Reply-To: <1453256863-15092-3-git-send-email-lho@apm.com>
+In-Reply-To: <1453256863-15092-4-git-send-email-lho@apm.com>
 References: <1453256863-15092-1-git-send-email-lho@apm.com>
- <1453256863-15092-3-git-send-email-lho@apm.com>
-Message-ID: <20160129205820.GU12841@codeaurora.org>
+ <1453256863-15092-4-git-send-email-lho@apm.com>
+Message-ID: <20160129205841.GV12841@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 01/19, Loc Ho wrote:
-> Add X-Gene SoC and PMD PLL clocks support for v2 hardware.
-> X-Gene SoC v2 and above use an slightly different SoC
-> and PMD PLL hardware logic.
+> Update Merlin DT PCP PLL clock node to reflect compatible
+> string change to reflect v2 hardware.
 > 
 > Signed-off-by: Loc Ho <lho@apm.com>
 > ---
 
-It's not from this patch, but I notice that we have a return
-inside a void function in this file...
+Please take this through arm-soc.
 
----8<---
-From: Stephen Boyd <sboyd@codeaurora.org>
-Subject: [PATCH] clk: xgene: Remove return from void function
-
-This function doesn't return anything because it's void. Drop the
-return statement.
-
-Cc: Loc Ho <lho@apm.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/clk-xgene.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/clk-xgene.c b/drivers/clk/clk-xgene.c
-index 266d573b9134..bd7156baa08b 100644
---- a/drivers/clk/clk-xgene.c
-+++ b/drivers/clk/clk-xgene.c
-@@ -50,7 +50,7 @@ static inline u32 xgene_clk_read(void __iomem *csr)
- 
- static inline void xgene_clk_write(u32 data, void __iomem *csr)
- {
--	return writel_relaxed(data, csr);
-+	writel_relaxed(data, csr);
- }
- 
- /* PLL Clock */
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 a Linux Foundation Collaborative Project
