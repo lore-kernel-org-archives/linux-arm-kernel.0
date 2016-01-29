@@ -1,75 +1,111 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 29 Jan 2016 17:26:06 +0100
-Subject: [PATCH net 5/6] net: mvneta: The mvneta_percpu_elect function should
- be atomic
-In-Reply-To: <1454084767-24715-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1454084767-24715-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1454084767-24715-6-git-send-email-gregory.clement@free-electrons.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Fri, 29 Jan 2016 18:35:49 +0200
+Subject: [PATCH v12 2/4] PM / Domains: add setter for dev.pm_domain
+In-Reply-To: <CAHp75VdWPUZ8F5rsGn3M1e5Pgpcg1CErBej9PE_3+ZPke5CDFA@mail.gmail.com>
+References: <1452181575-9206-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1452181575-9206-3-git-send-email-tomeu.vizoso@collabora.com>
+ <CAHp75VdZMtm0_USuX2tiFO+O2QK8Wa+A9FDKZ=JqqGwr0SWi0g@mail.gmail.com>
+ <CAHp75VdWPUZ8F5rsGn3M1e5Pgpcg1CErBej9PE_3+ZPke5CDFA@mail.gmail.com>
+Message-ID: <CAHp75Vf9TS-AxJALQjiwNjMCT8ct5SBanYzrEsV9aj=DsUw-OA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Electing a CPU must be done in an atomic way: it should be done after or
-before the removal/insertion of a CPU and this function is not reentrant.
+On Fri, Jan 29, 2016 at 5:51 PM, Andy Shevchenko
+<andy.shevchenko@gmail.com> wrote:
+> On Fri, Jan 29, 2016 at 5:38 PM, Andy Shevchenko
+> <andy.shevchenko@gmail.com> wrote:
+>> On Thu, Jan 7, 2016 at 5:46 PM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+>>> Adds a function that sets the pointer to dev_pm_domain in struct device
+>>> and that warns if the device has already finished probing. The reason
+>>> why we want to enforce that is because in the general case that can
+>>> cause problems and also that we can simplify code quite a bit if we can
+>>> always assume that.
+>>>
+>>> This patch also changes all current code that directly sets the
+>>> dev.pm_domain pointer.
+>>
+>>
+>>> --- a/drivers/acpi/acpi_lpss.c
+>>> +++ b/drivers/acpi/acpi_lpss.c
+>>
+>>> @@ -875,13 +876,14 @@ static int acpi_lpss_platform_notify(struct notifier_block *nb,
+>>>
+>>>         switch (action) {
+>>>         case BUS_NOTIFY_BIND_DRIVER:
+>>> -               pdev->dev.pm_domain = &acpi_lpss_pm_domain;
+>>> +               dev_pm_domain_set(&pdev->dev, &acpi_lpss_pm_domain);
+>>>                 break;
+>>>         case BUS_NOTIFY_DRIVER_NOT_BOUND:
+>>>         case BUS_NOTIFY_UNBOUND_DRIVER:
+>>>                 pdev->dev.pm_domain = NULL;
+>>
+>> Missed?
+>>
+>>>                 break;
+>>>         case BUS_NOTIFY_ADD_DEVICE:
+>>> +               dev_pm_domain_set(&pdev->dev, &acpi_lpss_pm_domain);
+>>>                 if (pdata->dev_desc->flags & LPSS_LTR)
+>>>                         return sysfs_create_group(&pdev->dev.kobj,
+>>>                                                   &lpss_attr_group);
+>>> @@ -889,6 +891,7 @@ static int acpi_lpss_platform_notify(struct notifier_block *nb,
+>>>         case BUS_NOTIFY_DEL_DEVICE:
+>>>                 if (pdata->dev_desc->flags & LPSS_LTR)
+>>>                         sysfs_remove_group(&pdev->dev.kobj, &lpss_attr_group);
+>>> +               dev_pm_domain_set(&pdev->dev, NULL);
+>>>                 break;
+>>>         default:
+>>>                 break;
+>>
+>> This looks wrong. I didn't test yet, but I have concerns here. Why did
+>> you add those calls?
+>
+>
+> Okay, for first glance it seems working on Intel Braswell.
 
-During the loop of mvneta_percpu_elect we associates the queues to the
-CPUs, if there is a topology change during this loop, then the mapping
-between the CPUs and the queues could be wrong. During this loop the
-interrupt mask is also updating for each CPUs, It should not be changed
-in the same time by other part of the driver.
+One more test unveils this one
 
-This patch adds spinlock to create the needed critical sections.
+# modprobe -r sdhci-acpi
+[ 1289.909441] ------------[ cut here ]------------
+[ 1289.918205] WARNING: CPU: 1 PID: 4374 at
+/home/andy/prj/linux-otc/drivers/base/power/common.c:150
+dev_pm_domain_set+0x51/0x60()
+[ 1289.934681] PM domains can only be changed for unbound devices
+[ 1289.944843] Modules linked in: sdhci_acpi(-) sdhci mmc_core
+led_class [last unloaded: dw_dmac_core]
+[ 1289.958802] CPU: 1 PID: 4374 Comm: modprobe Not tainted 4.5.0-rc1+ #3
+[ 1289.969736]  ffffffff81c38330 ffff88007bb53d18 ffffffff8133162f
+ffff88007bb53d60
+[ 1289.981844]  ffff88007bb53d50 ffffffff8105cd12 ffff88017a007410
+0000000000000000
+[ 1289.993996]  0000000000000001 0000000000000080 0000000000000000
+ffff88007bb53db0
+[ 1290.006123] Call Trace:
+[ 1290.012600]  [<ffffffff8133162f>] dump_stack+0x44/0x55
+[ 1290.022052]  [<ffffffff8105cd12>] warn_slowpath_common+0x82/0xc0
+[ 1290.032462]  [<ffffffff8105cd9c>] warn_slowpath_fmt+0x4c/0x50
+[ 1290.042589]  [<ffffffff814867c1>] dev_pm_domain_set+0x51/0x60
+[ 1290.052695]  [<ffffffff813a62a9>] acpi_dev_pm_detach+0x3f/0x84
+[ 1290.062910]  [<ffffffff81486747>] dev_pm_domain_detach+0x27/0x30
+[ 1290.073294]  [<ffffffff81480188>] platform_drv_remove+0x38/0x40
+[ 1290.083585]  [<ffffffff8147da51>] __device_release_driver+0xa1/0x160
+[ 1290.094335]  [<ffffffff8147e5a6>] driver_detach+0xa6/0xb0
+[ 1290.104009]  [<ffffffff8147d435>] bus_remove_driver+0x55/0xd0
+[ 1290.114053]  [<ffffffff8147eccc>] driver_unregister+0x2c/0x50
+[ 1290.124076]  [<ffffffff81480232>] platform_driver_unregister+0x12/0x20
+[ 1290.134957]  [<ffffffffa003681c>] sdhci_acpi_driver_exit+0x10/0x12
+[sdhci_acpi]
+[ 1290.146730]  [<ffffffff810ce0e9>] SyS_delete_module+0x199/0x240
+[ 1290.156907]  [<ffffffff8100219b>] ? exit_to_usermode_loop+0x8b/0x90
+[ 1290.167478]  [<ffffffff81002b83>] do_syscall_32_irqs_off+0x53/0xa0
+[ 1290.177949]  [<ffffffff818b7f9a>] entry_INT80_compat+0x2a/0x40
+[ 1290.187986] ---[ end trace a8351c0506ee239b ]---
+[ 1290.213855] mmc0: card 0001 removed
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/net/ethernet/marvell/mvneta.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Which function is guilty?
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 1ed813d478e8..3358c9a70467 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -370,6 +370,8 @@ struct mvneta_port {
- 	struct net_device *dev;
- 	struct notifier_block cpu_notifier;
- 	int rxq_def;
-+	/* protect  */
-+	spinlock_t lock;
- 
- 	/* Core clock */
- 	struct clk *clk;
-@@ -2855,6 +2857,11 @@ static void mvneta_percpu_elect(struct mvneta_port *pp)
- {
- 	int online_cpu_idx, max_cpu, cpu, i = 0;
- 
-+	/* Electing a CPU must done in an atomic way: it should be
-+	 * done after or before the removal/insertion of a CPU and
-+	 * this function is not reentrant.
-+	 */
-+	spin_lock(&pp->lock);
- 	online_cpu_idx = pp->rxq_def % num_online_cpus();
- 	max_cpu = num_present_cpus();
- 
-@@ -2893,6 +2900,7 @@ static void mvneta_percpu_elect(struct mvneta_port *pp)
- 		i++;
- 
- 	}
-+	spin_unlock(&pp->lock);
- };
- 
- static int mvneta_percpu_notifier(struct notifier_block *nfb,
-@@ -2947,8 +2955,13 @@ static int mvneta_percpu_notifier(struct notifier_block *nfb,
- 	case CPU_DOWN_PREPARE:
- 	case CPU_DOWN_PREPARE_FROZEN:
- 		netif_tx_stop_all_queues(pp->dev);
-+		/* Thanks to this lock we are sure that any pending
-+		 * cpu election is done
-+		 */
-+		spin_lock(&pp->lock);
- 		/* Mask all ethernet port interrupts */
- 		on_each_cpu(mvneta_percpu_mask_interrupt, pp, true);
-+		spin_unlock(&pp->lock);
- 
- 		napi_synchronize(&port->napi);
- 		napi_disable(&port->napi);
+> But can
+> yoyu point me out what was going on before this patch?
+
 -- 
-2.5.0
+With Best Regards,
+Andy Shevchenko
