@@ -1,91 +1,39 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Fri, 29 Jan 2016 17:58:14 +0100
-Subject: [RESEND PATCH v2] ARM: debug: add support for Palmchip BK-310x
- UART
-In-Reply-To: <yw1xtwlwib2x.fsf@unicorn.mansr.com>
-References: <569CA203.6050001@sigmadesigns.com> <7h60yfn9c6.fsf@baylibre.com>
- <yw1x1t93lukj.fsf@unicorn.mansr.com>
- <56AB96D4.9040202@sigmadesigns.com>
- <yw1xtwlwib2x.fsf@unicorn.mansr.com>
-Message-ID: <56AB9A26.4060007@sigmadesigns.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Fri, 29 Jan 2016 09:01:06 -0800
+Subject: [PATCH v2 5/5] arm64/perf: Extend event mask for ARMv8.1
+In-Reply-To: <7944f006c35daeae9eb94fadb5c2bac1540ae050.1454054112.git.jglauber@cavium.com>
+References: <6251e3377ca5d109c1a38ecc07fed50d6cbf5c61.1453992560.git.jglauber@cavium.com>
+ <7944f006c35daeae9eb94fadb5c2bac1540ae050.1454054112.git.jglauber@cavium.com>
+Message-ID: <56AB9AD2.8080903@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/01/2016 17:50, M?ns Rullg?rd wrote:
+Jan,
 
-> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
-> 
->> On 27/01/2016 01:44, M?ns Rullg?rd wrote:
->>
->>> Kevin Hilman <khilman@baylibre.com> writes:
->>>
->>>> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
->>>>
->>>>> From: Mans Rullgard <mans@mansr.com>
->>>>>
->>>>> Some SoCs use a Palmchip BK-310x UART which is mostly 16550 compatible
->>>>> but with a different register layout.
->>>>
->>>> ... because UART register layout is where we really need innovation. ;)
->>>>
->>>>> While this UART has previously
->>>>> only been supported in MIPS based chips (Alchemy, Ralink), the ARM based
->>>>> SMP87xx series from Sigma Designs also uses it.
->>>>>
->>>>> This patch allows the debug console to work with this type of UART.
->>>>>
->>>>> Signed-off-by: Mans Rullgard <mans@mansr.com>
->>>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->>>>
->>>> It appears this was previously acked by Arnd also?
->>>> https://lkml.org/lkml/2015/11/9/116
->>>>
->>>>> ---
->>>>> Peter, this is the patch I've been using on Tango for earlyprintk support.
->>>>> arm-soc, this is just the Nov 8 patch with my Signed-off-by tag.
->>>>> ---
->>>>>  arch/arm/Kconfig.debug            |  9 +++++++++
->>>>>  arch/arm/include/debug/palmchip.S | 11 +++++++++++
->>>>>  2 files changed, 20 insertions(+)
->>>>>  create mode 100644 arch/arm/include/debug/palmchip.S
->>>>>
->>>>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->>>>> index 259c0ca9c99a..708aa9150c00 100644
->>>>> --- a/arch/arm/Kconfig.debug
->>>>> +++ b/arch/arm/Kconfig.debug
->>>>> @@ -1304,6 +1304,7 @@ config DEBUG_SIRFSOC_UART
->>>>>  config DEBUG_LL_INCLUDE
->>>>>  	string
->>>>>  	default "debug/sa1100.S" if DEBUG_SA1100
->>>>> +	default "debug/palmchip.S" if DEBUG_UART_8250_PALMCHIP
->>>>
->>>> minor nit: We're trying (not always with great success) to keep various
->>>> parts of this file sorted alphanumerically.  Can you please insert the
->>>> new entries accordingly?
->>>
->>> It has to precede the regular 8250 entry so as to take precedence over
->>> that.
->>
->> <confused> Are you all talking about these 2 lines:
->>
->> 	default "debug/palmchip.S" if DEBUG_UART_8250_PALMCHIP
->> 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
->>
->> default "debug/palmchip.S" is supposed to come before default "debug/8250.S" ?
->>
->> Because, in my config, there is no DEBUG_LL_UART_8250 to be seen, and
->> # CONFIG_DEBUG_UART_8250 is not set
-> 
-> CONFIG_DEBUG_LL_UART_8250=y here.  In fact DEBUG_UART_8250_PALMCHIP
-> depends on "DEBUG_LL_UART_8250 || DEBUG_UART_8250" so one of those
-> *must* be set for any of this to matter.
+There was already a "[PATCH v2 5/5]" that differs from this one.
 
-Doh! I was looking at a config where earlyprintk isn't enabled... o_O
+Perhaps you should resend the entire patch set and mark it v3.
 
-config DEBUG_UART_8250_PALMCHIP
-	bool "8250 UART is Palmchip BK-310x"
-	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
+Thanks,
+David Daney
 
-OK, I understand now. Thanks.
 
-Regards.
+On 01/29/2016 12:29 AM, Jan Glauber wrote:
+> ARMv8.1 increases the PMU event number space. Detect the
+> presence of this PMUv3 type and extend the event mask.
+>
+> The event mask is moved to struct arm_pmu so different event masks
+> can exist, depending on the PMU type.
+>
+> Signed-off-by: Jan Glauber <jglauber@cavium.com>
+> ---
+>   arch/arm/kernel/perf_event_v6.c     |  6 ++++--
+>   arch/arm/kernel/perf_event_v7.c     | 29 +++++++++++++++++++----------
+>   arch/arm/kernel/perf_event_xscale.c |  4 +++-
+>   arch/arm64/kernel/perf_event.c      | 33 +++++++++++++++++++--------------
+>   drivers/perf/arm_pmu.c              |  5 +++--
+>   include/linux/perf/arm_pmu.h        |  4 ++--
+>   6 files changed, 50 insertions(+), 31 deletions(-)
+>
+> diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
+> index 09413e7..d6769f5 100644
