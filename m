@@ -1,111 +1,91 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 29 Jan 2016 09:58:03 -0700
-Subject: [PATCH V5 05/14] soc: tegra: pmc: Wait for powergate state to
- change
-In-Reply-To: <1453998832-27383-6-git-send-email-jonathanh@nvidia.com>
-References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
- <1453998832-27383-6-git-send-email-jonathanh@nvidia.com>
-Message-ID: <CANLsYkycbEo+wyMX8RJ9H-S5kDTjQR4nnDZc5gvf2kShOZAv9w@mail.gmail.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Fri, 29 Jan 2016 17:58:14 +0100
+Subject: [RESEND PATCH v2] ARM: debug: add support for Palmchip BK-310x
+ UART
+In-Reply-To: <yw1xtwlwib2x.fsf@unicorn.mansr.com>
+References: <569CA203.6050001@sigmadesigns.com> <7h60yfn9c6.fsf@baylibre.com>
+ <yw1x1t93lukj.fsf@unicorn.mansr.com>
+ <56AB96D4.9040202@sigmadesigns.com>
+ <yw1xtwlwib2x.fsf@unicorn.mansr.com>
+Message-ID: <56AB9A26.4060007@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 January 2016 at 09:33, Jon Hunter <jonathanh@nvidia.com> wrote:
-> Currently, the function tegra_powergate_set() simply sets the desired
-> powergate state but does not wait for the state to change. In most cases
-> we should wait for the state to change before proceeding. Currently, there
-> is a case for tegra114 and tegra124 devices where we do not wait when
-> starting the secondary CPU as this is not necessary. However, this is only
-> done at boot time and so waiting here will only have a small impact on
-> boot time. Therefore, update tegra_powergate_set() to wait when setting
-> the powergate.
->
-> By adding this feature, we can also eliminate the polling loop from
-> tegra30_boot_secondary().
->
-> A function has been added for checking the status of the powergate and
-> so update the tegra_powergate_is_powered() to use this macro as well.
->
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> ---
->  arch/arm/mach-tegra/platsmp.c | 16 +++-------------
->  drivers/soc/tegra/pmc.c       |  9 ++++++++-
->  2 files changed, 11 insertions(+), 14 deletions(-)
->
-> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-> index f3f61dbbda97..75620ae73913 100644
-> --- a/arch/arm/mach-tegra/platsmp.c
-> +++ b/arch/arm/mach-tegra/platsmp.c
-> @@ -108,19 +108,9 @@ static int tegra30_boot_secondary(unsigned int cpu, struct task_struct *idle)
->          * be un-gated by un-toggling the power gate register
->          * manually.
->          */
-> -       if (!tegra_pmc_cpu_is_powered(cpu)) {
-> -               ret = tegra_pmc_cpu_power_on(cpu);
-> -               if (ret)
-> -                       return ret;
-> -
-> -               /* Wait for the power to come up. */
-> -               timeout = jiffies + msecs_to_jiffies(100);
-> -               while (!tegra_pmc_cpu_is_powered(cpu)) {
-> -                       if (time_after(jiffies, timeout))
-> -                               return -ETIMEDOUT;
-> -                       udelay(10);
-> -               }
-> -       }
-> +       ret = tegra_pmc_cpu_power_on(cpu);
-> +       if (ret)
-> +               return ret;
->
->  remove_clamps:
->         /* CPU partition is powered. Enable the CPU clock. */
-> diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
-> index 99cb2fdd29e1..35ee60fd17be 100644
-> --- a/drivers/soc/tegra/pmc.c
-> +++ b/drivers/soc/tegra/pmc.c
-> @@ -28,6 +28,7 @@
->  #include <linux/export.h>
->  #include <linux/init.h>
->  #include <linux/io.h>
-> +#include <linux/iopoll.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
->  #include <linux/platform_device.h>
-> @@ -186,6 +187,9 @@ static inline bool tegra_powergate_state(int id)
->   */
->  static int tegra_powergate_set(unsigned int id, bool new_state)
->  {
-> +       bool status;
-> +       int err;
-> +
->         mutex_lock(&pmc->powergates_lock);
->
->         if (tegra_powergate_state(id) == new_state) {
-> @@ -195,9 +199,12 @@ static int tegra_powergate_set(unsigned int id, bool new_state)
->
->         tegra_pmc_writel(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
->
-> +       err = readx_poll_timeout(tegra_powergate_state, id, status,
-> +                                status == new_state, 10, 100000);
-> +
+On 29/01/2016 17:50, M?ns Rullg?rd wrote:
 
-I understand (and agree) with the goal of this patch but I wonder (and
-I don't know much about the system/context) if holding a mutex while
-sleeping won't incur adverse effect on other parts of the system that
-weren't use to see this wait.  One way to fix this might be to use
-"mutex_trylock()" and let callers retry as they see fit if an
-operation is already in progress.
+> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+> 
+>> On 27/01/2016 01:44, M?ns Rullg?rd wrote:
+>>
+>>> Kevin Hilman <khilman@baylibre.com> writes:
+>>>
+>>>> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+>>>>
+>>>>> From: Mans Rullgard <mans@mansr.com>
+>>>>>
+>>>>> Some SoCs use a Palmchip BK-310x UART which is mostly 16550 compatible
+>>>>> but with a different register layout.
+>>>>
+>>>> ... because UART register layout is where we really need innovation. ;)
+>>>>
+>>>>> While this UART has previously
+>>>>> only been supported in MIPS based chips (Alchemy, Ralink), the ARM based
+>>>>> SMP87xx series from Sigma Designs also uses it.
+>>>>>
+>>>>> This patch allows the debug console to work with this type of UART.
+>>>>>
+>>>>> Signed-off-by: Mans Rullgard <mans@mansr.com>
+>>>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>>>>
+>>>> It appears this was previously acked by Arnd also?
+>>>> https://lkml.org/lkml/2015/11/9/116
+>>>>
+>>>>> ---
+>>>>> Peter, this is the patch I've been using on Tango for earlyprintk support.
+>>>>> arm-soc, this is just the Nov 8 patch with my Signed-off-by tag.
+>>>>> ---
+>>>>>  arch/arm/Kconfig.debug            |  9 +++++++++
+>>>>>  arch/arm/include/debug/palmchip.S | 11 +++++++++++
+>>>>>  2 files changed, 20 insertions(+)
+>>>>>  create mode 100644 arch/arm/include/debug/palmchip.S
+>>>>>
+>>>>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>>>>> index 259c0ca9c99a..708aa9150c00 100644
+>>>>> --- a/arch/arm/Kconfig.debug
+>>>>> +++ b/arch/arm/Kconfig.debug
+>>>>> @@ -1304,6 +1304,7 @@ config DEBUG_SIRFSOC_UART
+>>>>>  config DEBUG_LL_INCLUDE
+>>>>>  	string
+>>>>>  	default "debug/sa1100.S" if DEBUG_SA1100
+>>>>> +	default "debug/palmchip.S" if DEBUG_UART_8250_PALMCHIP
+>>>>
+>>>> minor nit: We're trying (not always with great success) to keep various
+>>>> parts of this file sorted alphanumerically.  Can you please insert the
+>>>> new entries accordingly?
+>>>
+>>> It has to precede the regular 8250 entry so as to take precedence over
+>>> that.
+>>
+>> <confused> Are you all talking about these 2 lines:
+>>
+>> 	default "debug/palmchip.S" if DEBUG_UART_8250_PALMCHIP
+>> 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
+>>
+>> default "debug/palmchip.S" is supposed to come before default "debug/8250.S" ?
+>>
+>> Because, in my config, there is no DEBUG_LL_UART_8250 to be seen, and
+>> # CONFIG_DEBUG_UART_8250 is not set
+> 
+> CONFIG_DEBUG_LL_UART_8250=y here.  In fact DEBUG_UART_8250_PALMCHIP
+> depends on "DEBUG_LL_UART_8250 || DEBUG_UART_8250" so one of those
+> *must* be set for any of this to matter.
 
->         mutex_unlock(&pmc->powergates_lock);
->
-> -       return 0;
-> +       return err;
->  }
->
->  /**
-> --
-> 2.1.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Doh! I was looking at a config where earlyprintk isn't enabled... o_O
+
+config DEBUG_UART_8250_PALMCHIP
+	bool "8250 UART is Palmchip BK-310x"
+	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
+
+OK, I understand now. Thanks.
+
+Regards.
