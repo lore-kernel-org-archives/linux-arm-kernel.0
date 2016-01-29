@@ -1,38 +1,102 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 29 Jan 2016 11:13:41 +0100
-Subject: [PATCH 2/7] usb: gadget: pxa25x_udc cleanup
-In-Reply-To: <1453997843-3489728-2-git-send-email-arnd@arndb.de> (Arnd
- Bergmann's message of "Thu, 28 Jan 2016 17:17:03 +0100")
-References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
- <1453997843-3489728-1-git-send-email-arnd@arndb.de>
- <1453997843-3489728-2-git-send-email-arnd@arndb.de>
-Message-ID: <87r3h07kx6.fsf@belgarion.home>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 29 Jan 2016 18:14:48 +0800
+Subject: [PATCH v3 2/2] clk: sunxi: Refactor A31 PLL6 so that it can be
+ reused
+In-Reply-To: <56AB38C6.2010909@gmail.com>
+References: <1454008958-12655-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1454008958-12655-2-git-send-email-maxime.ripard@free-electrons.com>
+ <56AB38C6.2010909@gmail.com>
+Message-ID: <CAGb2v67v6-BCPp2u7vieCGnCAsHFv4XjnRXvfT1vZNHc_Ok0UA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
-
-> This removes the dependency on the mach/hardware.h header file
-> from the pxa25x_udc driver after the register definitions were
-> already unified in the previous patch.
+On Fri, Jan 29, 2016 at 6:02 PM, Jens Kuske <jenskuske@gmail.com> wrote:
+> Hi,
 >
-> Following the model of pxa27x_udc (and basically all other drivers
-> in the kernel), we define the register numbers as offsets from
-> the register base address and use accessor functions to read/write
-> them.
+> On 28/01/16 20:22, Maxime Ripard wrote:
+>> Remove the fixed dividers from the PLL6 driver to be able to have a
+>> reusable driver that can be used across several SoCs that share the same
+>> controller, but don't have the same set of dividers for this clock, and to
+>> also be reused multiple times in the same SoC, since we're droping the
+>> clock name.
+>>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> ---
+>> Changes from v2
+>>   - Rebased and converted over to the new factors refactoring. Fixed the
+>>     retrieved rate
+>>
+>>  arch/arm/boot/dts/sun6i-a31.dtsi     | 36 ++++++++++++++++++------------------
+>>  arch/arm/boot/dts/sun8i-a23-a33.dtsi | 25 +++++++++++++++++--------
+>>  arch/arm/boot/dts/sun8i-a23.dtsi     |  2 +-
+>>  arch/arm/boot/dts/sun8i-a33.dtsi     |  4 ++--
+>>  arch/arm/boot/dts/sun8i-h3.dtsi      | 36 ++++++++++++++++++------------------
+>>  drivers/clk/sunxi/clk-sunxi.c        | 32 ++++++++++++++++----------------
+>>  6 files changed, 72 insertions(+), 63 deletions(-)
+>>
+> [...]
+>> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> index 1524130e43c9..19aadf47027d 100644
+>> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+>> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> @@ -121,27 +121,27 @@
+>>               };
+>>
+>>               pll6: clk at 01c20028 {
+>> -                     #clock-cells = <1>;
+>> +                     #clock-cells = <0>;
+>>                       compatible = "allwinner,sun6i-a31-pll6-clk";
+>>                       reg = <0x01c20028 0x4>;
+>>                       clocks = <&osc24M>;
+>> -                     clock-output-names = "pll6", "pll6x2";
+>> +                     clock-output-names = "pll6";
+>>               };
+>>
+>> -             pll6d2: pll6d2_clk {
+>> +             pll6x2: pll6x2_clk {
+>>                       #clock-cells = <0>;
+>>                       compatible = "fixed-factor-clock";
+>> -                     clock-div = <2>;
+>> -                     clock-mult = <1>;
+>> -                     clocks = <&pll6 0>;
+>> -                     clock-output-names = "pll6d2";
+>> +                     clock-div = <1>;
+>> +                     clock-mult = <2>;
+>> +                     clocks = <&pll6>;
+>> +                     clock-output-names = "pll6-2x";
+>>               };
+>>
+>> -             /* dummy clock until pll6 can be reused */
+>> -             pll8: pll8_clk {
+>> +             pll8: clk at 01c20044 {
+>>                       #clock-cells = <0>;
+>> -                     compatible = "fixed-clock";
+>> -                     clock-frequency = <1>;
+>> +                     compatible = "allwinner,sun6i-a31-pll6-clk";
+>> +                     reg = <0x01c20044 0x4>;
+>> +                     clocks = <&osc24M>;
+>>                       clock-output-names = "pll8";
+>>               };
+>>
+>> @@ -165,7 +165,7 @@
+>>                       #clock-cells = <0>;
+>>                       compatible = "allwinner,sun6i-a31-ahb1-clk";
+>>                       reg = <0x01c20054 0x4>;
+>> -                     clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6 0>;
+>> +                     clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6>;
+>>                       clock-output-names = "ahb1";
+>>               };
+>>
+>> @@ -173,7 +173,7 @@
+>>                       #clock-cells = <0>;
+>>                       compatible = "allwinner,sun8i-h3-ahb2-clk";
+>>                       reg = <0x01c2005c 0x4>;
+>> -                     clocks = <&ahb1>, <&pll6d2>;
+>> +                     clocks = <&ahb1>, <&pll6>;
 >
-> For the moment, this still leaves the direct pointer dereference
-> in place, instead of using readl/writel, so this patch should
-> not be changing the behavior of the driver, other than using
-> ioremap() on the platform resource to replace the hardcoded
-> virtual address pointers.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> According to the datasheet AHB2 really has PLL6 / 2 as parent, not PLL6
+> directly.
 
-It's too bad coccinelle cannot make that work more automatic, isn't it ? :)
+Thanks for the save. So we should keep pll6d2_clk.
 
-Cheers.
-
---
-Robert
+ChenYu
