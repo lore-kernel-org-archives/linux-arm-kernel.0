@@ -1,119 +1,185 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 29 Jan 2016 10:20:09 -0600
-Subject: [PATCH 4/4] Documentation: atmel-at91: add DT bindings for fast
- startup
-In-Reply-To: <1453976356-24391-5-git-send-email-wenyou.yang@atmel.com>
-References: <1453976356-24391-1-git-send-email-wenyou.yang@atmel.com>
- <1453976356-24391-5-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20160129162009.GA5335@rob-hp-laptop>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 29 Jan 2016 09:20:47 -0700
+Subject: [PATCH V5 02/14] soc: tegra: pmc: Protect public functions from
+ potential race conditions
+In-Reply-To: <1453998832-27383-3-git-send-email-jonathanh@nvidia.com>
+References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
+ <1453998832-27383-3-git-send-email-jonathanh@nvidia.com>
+Message-ID: <CANLsYkwpkDsdZ+6B-N8RWWWLJcJuoMLYmvw-VaCJdma4O6SPhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 06:19:16PM +0800, Wenyou Yang wrote:
-> Add DT bindings to configurate the PMC_FSMR and PMC_FSPR registers
-> to trigger a fast restart signal to PMC.
-> 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+On 28 January 2016 at 09:33, Jon Hunter <jonathanh@nvidia.com> wrote:
+> The PMC base address pointer is initialised during early boot so that
+> early platform code may used the PMC public functions. During the probe
+> of the PMC driver the base address pointer is mapped again and the initial
+> mapping is freed. This exposes a window where a device accessing the PMC
+> registers via one of the public functions, could race with the updating
+> of the pointer and lead to a invalid access. Furthermore, the only
+> protection between multiple devices attempting to access the PMC registers
+> is when setting the powergate state to on or off. None of the other public
+> functions that access the PMC registers are protected.
+>
+> Use the existing mutex to protect paths that may race with regard to
+> accessing the PMC registers.
+>
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 > ---
-> 
->  .../devicetree/bindings/arm/atmel-pmc.txt          |   74 ++++++++++++++++++++
->  1 file changed, 74 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-pmc.txt b/Documentation/devicetree/bindings/arm/atmel-pmc.txt
-> index 795cc78..8d45ff9f 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-pmc.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-pmc.txt
-> @@ -12,3 +12,77 @@ Examples:
->  		compatible = "atmel,at91rm9200-pmc";
->  		reg = <0xfffffc00 0x100>;
->  	};
+>  drivers/soc/tegra/pmc.c | 44 +++++++++++++++++++++++++++++++++++---------
+>  1 file changed, 35 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
+> index 85b4e166273a..f8cdb7ce9755 100644
+> --- a/drivers/soc/tegra/pmc.c
+> +++ b/drivers/soc/tegra/pmc.c
+> @@ -235,7 +235,10 @@ int tegra_powergate_is_powered(int id)
+>         if (!pmc->soc || id < 0 || id >= pmc->soc->num_powergates)
+>                 return -EINVAL;
+>
+> +       mutex_lock(&pmc->powergates_lock);
+>         status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
+> +       mutex_unlock(&pmc->powergates_lock);
 > +
-> +PMC Fast Startup Signals
+>         return !!status;
+>  }
+>
+> @@ -250,6 +253,8 @@ int tegra_powergate_remove_clamping(int id)
+>         if (!pmc->soc || id < 0 || id >= pmc->soc->num_powergates)
+>                 return -EINVAL;
+>
+> +       mutex_lock(&pmc->powergates_lock);
 > +
-> +The PMC Fast Start Signals are used as the wake up source to trigger the PMC
-> +to wake up the system from the ULP1 mode.
+>         /*
+>          * On Tegra124 and later, the clamps for the GPU are controlled by a
+>          * separate register (with different semantics).
+> @@ -257,7 +262,7 @@ int tegra_powergate_remove_clamping(int id)
+>         if (id == TEGRA_POWERGATE_3D) {
+>                 if (pmc->soc->has_gpu_clamps) {
+>                         tegra_pmc_writel(0, GPU_RG_CNTRL);
+> -                       return 0;
+> +                       goto out;
+>                 }
+>         }
+>
+> @@ -274,6 +279,9 @@ int tegra_powergate_remove_clamping(int id)
+>
+>         tegra_pmc_writel(mask, REMOVE_CLAMPING);
+>
+> +out:
+> +       mutex_unlock(&pmc->powergates_lock);
 > +
-> +required properties:
-> +- compatible: Should be "atmel,sama5d2-pmc-fast-startup".
+>         return 0;
+>  }
+>  EXPORT_SYMBOL(tegra_powergate_remove_clamping);
+> @@ -520,9 +528,11 @@ int tegra_io_rail_power_on(int id)
+>         unsigned int bit, mask;
+>         int err;
+>
+> +       mutex_lock(&pmc->powergates_lock);
+> +
+>         err = tegra_io_rail_prepare(id, &request, &status, &bit);
+>         if (err < 0)
+> -               return err;
+> +               goto error;
+>
+>         mask = 1 << bit;
+>
+> @@ -535,12 +545,15 @@ int tegra_io_rail_power_on(int id)
+>         err = tegra_io_rail_poll(status, mask, 0, 250);
+>         if (err < 0) {
+>                 pr_info("tegra_io_rail_poll() failed: %d\n", err);
+> -               return err;
+> +               goto error;
+>         }
+>
+>         tegra_io_rail_unprepare();
+>
+> -       return 0;
+> +error:
+> +       mutex_unlock(&pmc->powergates_lock);
+> +
+> +       return err < 0 ? err : 0;
 
-Why the compatible? Does this correspond to some h/w block rather than 
-features of the PMC? If it is simply because you want to have a separate 
-driver, that is not a good reason.
+Is this necessary?  Why simply not returning 'err'?  From what I see
+'tegra_io_rail_power_on()' can only return a negative value or '0'.
+
+>  }
+>  EXPORT_SYMBOL(tegra_io_rail_power_on);
+>
+> @@ -550,10 +563,12 @@ int tegra_io_rail_power_off(int id)
+>         unsigned int bit, mask;
+>         int err;
+>
+> +       mutex_lock(&pmc->powergates_lock);
+> +
+>         err = tegra_io_rail_prepare(id, &request, &status, &bit);
+>         if (err < 0) {
+>                 pr_info("tegra_io_rail_prepare() failed: %d\n", err);
+> -               return err;
+> +               goto error;
+>         }
+>
+>         mask = 1 << bit;
+> @@ -566,11 +581,14 @@ int tegra_io_rail_power_off(int id)
+>
+>         err = tegra_io_rail_poll(status, mask, mask, 250);
+>         if (err < 0)
+> -               return err;
+> +               goto error;
+>
+>         tegra_io_rail_unprepare();
+>
+> -       return 0;
+> +error:
+> +       mutex_unlock(&pmc->powergates_lock);
+> +
+> +       return err < 0 ? err : 0;
+
+Same comment as above.
+
+>  }
+>  EXPORT_SYMBOL(tegra_io_rail_power_off);
+>
+> @@ -817,9 +835,15 @@ static int tegra_pmc_probe(struct platform_device *pdev)
+>
+>         /* take over the memory region from the early initialization */
+>         res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +
+> +       mutex_lock(&pmc->powergates_lock);
+>         pmc->base = devm_ioremap_resource(&pdev->dev, res);
+> -       if (IS_ERR(pmc->base))
+> -               return PTR_ERR(pmc->base);
+> +       mutex_unlock(&pmc->powergates_lock);
+
+Since the mutex is released there is a window of opportunity for
+devices to access an erroneous pointer.  A better approach might be to
+use a temporary variable, do all the initialisation that is required
+and when things look good set pmc-base to that temporary variable.
+
+Mathieu
 
 > +
-> +optional properties:
-> +- atmel,fast-startup-wake-up: boolean to enable the WKUP pin to trigger
-> +  a fast restart signal to the PMC.
-> +- atmel,fast-startup-secumod: boolean to enable the Security Mode to trigger
-> +  a fast restart signal to the PMC.
-> +- atmel,fast-startup-piobu0: boolean to enable the PIOBU0 Input to trigger
-> +  a fast restart signal to the PMC.
-> +- atmel,fast-startup-piobu1: boolean to enable the PIOBU1 Input to trigger
-> +  a fast restart signal to the PMC.
-> +- atmel,fast-startup-piobu2: boolean to enable the PIOBU2 Input to trigger
-> +  a fast restart signal to the PMC.
-> +- atmel,fast-startup-piobu3: boolean to enable the PIOBU3 Input to trigger
-> +  a fast restart signal to the PMC.
-> +- atmel,fast-startup-piobu4: boolean to enable the PIOBU4 Input to trigger
-> +  a fast restart signal to the PMC.
-> +- atmel,fast-startup-piobu5: boolean to enable the PIOBU5 Input to trigger
-> +  a fast restart signal to the PMC.
-> +- atmel,fast-startup-piobu6: boolean to enable the PIOBU6 Input to trigger
-> +  a fast restart signal to the PMC.
-> +- atmel,fast-startup-piobu7: boolean to enable the PIOBU7 Input to trigger
-> +  a fast restart signal to the PMC.
-> +- atmel,fast-startup-gmac-wol: boolean to enable the GMAC Wake-up On LAN
-> +  to trigger a fast restart signal to the PMC.
-> +- atmel,fast-startup-rtc-alarm: boolean to enable the RTC Alarm to trigger
-> +  a fast restart signal to the PMC.
-> +- atmel,fast-startup-usb-resume: boolean to enable the USB Resume to trigger
-> +  a fast restart signal to the PMC.
-> +- atmel,fast-startup-sdmmc-cd: boolean to enable the SDMMC Card Detect
-> +  to trigger a fast restart signal to the PMC.
-> +- atmel,fast-startup-rxlp-match: boolean to enable the Backuo UART Receive
-> +  Match Condition to trigger a fast restart signal to the PMC.
-> +- atmel,fast-startup-acc-comparison: boolean to enable the Analog Comparator
-> +  Controller (ACC) Comparison to to trigger a fast restart signal to the PMC.
-> +
-> +- atmel,fast-startup-wkup-pin-high: boolean to indicate if the WKUP Pin is
-> +  in the high level to trigger fast restart signal, otherwise low level.
-
-Perhaps just make the above bool properties take a value to indicate 
-high or low triggered.
-
-> +- atmel,fast-startup-piobu0-high: boolean to indicate if the PIOBU0 Pin is
-> +  in the high level to trigger fast restart signal, otherwise low level.
-> +- atmel,fast-startup-piobu1-high: boolean to indicate if the PIOBU1 Pin is
-> +  in the high level to trigger fast restart signal, otherwise low level.
-> +- atmel,fast-startup-piobu2-high: boolean to indicate if the PIOBU2 Pin is
-> +  in the high level to trigger fast restart signal, otherwise low level.
-> +- atmel,fast-startup-piobu3-high: boolean to indicate if the PIOBU3 Pin is
-> +  in the high level to trigger fast restart signal, otherwise low level.
-> +- atmel,fast-startup-piobu4-high: boolean to indicate if the PIOBU4 Pin is
-> +  in the high level to trigger fast restart signal, otherwise low level.
-> +- atmel,fast-startup-piobu5-high: boolean to indicate if the PIOBU5 Pin is
-> +  in the high level to trigger fast restart signal, otherwise low level.
-> +- atmel,fast-startup-piobu6-high: boolean to indicate if the PIOBU6 Pin is
-> +  in the high level to trigger fast restart signal, otherwise low level.
-> +- atmel,fast-startup-piobu7-high: boolean to indicate if the PIOBU7 Pin is
-> +  in the high level to trigger fast restart signal, otherwise low level.
-
-This would be a long list in the DT if you set all these properties. 
-Perhaps this should all be expressed in a more compact form.
-
-> +
-> +Example:
-> +
-> +	pmc: pmc at f0014000 {
-> +		compatible = "atmel,sama5d2-pmc";
-> +		reg = <0xf0014000 0x160>;
-> +
-> +		pmc_fast_restart {
-> +			compatible = "atmel,sama5d2-pmc-fast-startup";
-> +			atmel,fast-startup-wake-up;
-> +			atmel,fast-startup-rtc-alarm;
-> +		};
-> +	};
-> -- 
-> 1.7.9.5
-> 
+> +       if (IS_ERR(pmc->base)) {
+> +               err = PTR_ERR(pmc->base);
+> +               goto error;
+> +       }
+>
+>         pmc->clk = devm_clk_get(&pdev->dev, "pclk");
+>         if (IS_ERR(pmc->clk)) {
+> @@ -853,7 +877,9 @@ static int tegra_pmc_probe(struct platform_device *pdev)
+>         return 0;
+>
+>  error:
+> +       mutex_lock(&pmc->powergates_lock);
+>         pmc->base = base;
+> +       mutex_unlock(&pmc->powergates_lock);
+>
+>         return err;
+>  }
+> --
+> 2.1.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
