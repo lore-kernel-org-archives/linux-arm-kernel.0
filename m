@@ -1,34 +1,31 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 29 Jan 2016 09:34:20 +0100
-Subject: [PATCH 2/2] ARM: dts: r8a7794: use GIC_*defines
-In-Reply-To: <20160129003457.GC26068@verge.net.au>
-References: <1453094324-22404-1-git-send-email-horms+renesas@verge.net.au>
- <1453094324-22404-3-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdWPU0tmMbMw+ygaVd=LpVtNqyFov_7QvVgUA2U4BeTjaA@mail.gmail.com>
- <20160129003457.GC26068@verge.net.au>
-Message-ID: <CAMuHMdWEjdeYi7QN49tSOskV8h9yAMqMqh3p7wMUqm7VCH-RAQ@mail.gmail.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Fri, 29 Jan 2016 16:39:06 +0800
+Subject: [PATCH 6/6] arm64: defconfig: Enable DesignWare APB GPIO controller
+In-Reply-To: <1454056746-5048-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1454056746-5048-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1454056746-5048-7-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+The Synopsys DesignWare APB GPIO controller is used by several vender's socs,
+like apm/marvell/altera/hisilicon, enable it by default.
 
-On Fri, Jan 29, 2016 at 1:34 AM, Simon Horman <horms@verge.net.au> wrote:
-> Your grep shows up some matches in arch/arm64/boot/dts/renesas/.
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-That's correct.
-
-> For some reason that was not on my mental todo list. Should I add it?
-
-IIRC, I reported those a while ago, and you said you were going to tackle
-them? Or perhaps I just assumed that ;-)
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 86581f7..3380a04 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -145,6 +145,7 @@ CONFIG_SPI=y
+ CONFIG_SPI_PL022=y
+ CONFIG_SPI_QUP=y
+ CONFIG_PINCTRL_MSM8916=y
++CONFIG_GPIO_DWAPB=y
+ CONFIG_GPIO_PL061=y
+ CONFIG_GPIO_RCAR=y
+ CONFIG_GPIO_XGENE=y
+-- 
+2.6.0.GIT
