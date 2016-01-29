@@ -1,185 +1,89 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 29 Jan 2016 09:20:47 -0700
-Subject: [PATCH V5 02/14] soc: tegra: pmc: Protect public functions from
- potential race conditions
-In-Reply-To: <1453998832-27383-3-git-send-email-jonathanh@nvidia.com>
-References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
- <1453998832-27383-3-git-send-email-jonathanh@nvidia.com>
-Message-ID: <CANLsYkwpkDsdZ+6B-N8RWWWLJcJuoMLYmvw-VaCJdma4O6SPhg@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 29 Jan 2016 09:21:28 -0700
+Subject: [PATCH v3 3/3] reset: Add support for shared reset controls
+In-Reply-To: <56AB044F.7090102@redhat.com>
+References: <1453918516-3078-1-git-send-email-hdegoede@redhat.com>
+ <1453918516-3078-4-git-send-email-hdegoede@redhat.com>
+ <56AA7813.7080907@wwwdotorg.org> <56AB044F.7090102@redhat.com>
+Message-ID: <56AB9188.9030009@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 January 2016 at 09:33, Jon Hunter <jonathanh@nvidia.com> wrote:
-> The PMC base address pointer is initialised during early boot so that
-> early platform code may used the PMC public functions. During the probe
-> of the PMC driver the base address pointer is mapped again and the initial
-> mapping is freed. This exposes a window where a device accessing the PMC
-> registers via one of the public functions, could race with the updating
-> of the pointer and lead to a invalid access. Furthermore, the only
-> protection between multiple devices attempting to access the PMC registers
-> is when setting the powergate state to on or off. None of the other public
-> functions that access the PMC registers are protected.
+On 01/28/2016 11:18 PM, Hans de Goede wrote:
+> Hi,
 >
-> Use the existing mutex to protect paths that may race with regard to
-> accessing the PMC registers.
+> On 01/28/2016 09:20 PM, Stephen Warren wrote:
+>>
+>> On 01/27/2016 11:15 AM, Hans de Goede wrote:
+>>> In some SoCs some hw-blocks share a reset control. Add support for this
+>>> setup by adding new:
+>>>
+>>> reset_control_get_shared()
+>>> devm_reset_control_get_shared()
+>>> devm_reset_control_get_shared_by_index()
+>>>
+>>> methods to get a reset_control. Note that this patch omits adding of_
+>>> variants, if these are needed later they can be easily added.
+>>>
+>>> This patch also changes the behavior of the existing exclusive
+>>> reset_control_get() variants, if these are now called more then once
+>>> for the same reset_control they will return -EBUSY. To catch existing
+>>> drivers triggering this error (there should not be any) a WARN_ON(1)
+>>> is added in this path.
+>>>
+>>> When a reset_control is shared, the behavior of reset_control_assert /
+>>> deassert is changed, for shared reset_controls these will work like the
+>>> clock-enable/disable and regulator-on/off functions. They will keep a
+>>> deassert_count, and only (re-)assert the reset after
+>>> reset_control_assert
+>>> has been called as many times as reset_control_deassert was called.
+>>>
+>>> Calling reset_control_assert without first calling
+>>> reset_control_deassert
+>>> is not allowed on a shared reset control. Calling reset_control_reset is
+>>> also not allowed on a shared reset control.
+>>
+>> Hmmm. Do you have some examples of how drivers are supposed to
+>> co-ordinate use of the shared reset? Reference counting implies all
+>> the drivers need to get together and all assert and de-assert the
+>> reset in unison when some event happens. That seems difficult to
+>> co-ordinate.
 >
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> ---
->  drivers/soc/tegra/pmc.c | 44 +++++++++++++++++++++++++++++++++++---------
->  1 file changed, 35 insertions(+), 9 deletions(-)
+> Right, for now this is only intended for drivers which need to de-assert
+> the
+> reset and probe time and (re-)assert it when unbound (and maybe for
+> suspend / resume, in which case the driver should be able to handle the
+> reset
+> never heaving been asserted on resume). This is also why
+> reset_control_reset
+> is not supported for shared resets.
 >
-> diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
-> index 85b4e166273a..f8cdb7ce9755 100644
-> --- a/drivers/soc/tegra/pmc.c
-> +++ b/drivers/soc/tegra/pmc.c
-> @@ -235,7 +235,10 @@ int tegra_powergate_is_powered(int id)
->         if (!pmc->soc || id < 0 || id >= pmc->soc->num_powergates)
->                 return -EINVAL;
->
-> +       mutex_lock(&pmc->powergates_lock);
->         status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
-> +       mutex_unlock(&pmc->powergates_lock);
-> +
->         return !!status;
->  }
->
-> @@ -250,6 +253,8 @@ int tegra_powergate_remove_clamping(int id)
->         if (!pmc->soc || id < 0 || id >= pmc->soc->num_powergates)
->                 return -EINVAL;
->
-> +       mutex_lock(&pmc->powergates_lock);
-> +
->         /*
->          * On Tegra124 and later, the clamps for the GPU are controlled by a
->          * separate register (with different semantics).
-> @@ -257,7 +262,7 @@ int tegra_powergate_remove_clamping(int id)
->         if (id == TEGRA_POWERGATE_3D) {
->                 if (pmc->soc->has_gpu_clamps) {
->                         tegra_pmc_writel(0, GPU_RG_CNTRL);
-> -                       return 0;
-> +                       goto out;
->                 }
->         }
->
-> @@ -274,6 +279,9 @@ int tegra_powergate_remove_clamping(int id)
->
->         tegra_pmc_writel(mask, REMOVE_CLAMPING);
->
-> +out:
-> +       mutex_unlock(&pmc->powergates_lock);
-> +
->         return 0;
->  }
->  EXPORT_SYMBOL(tegra_powergate_remove_clamping);
-> @@ -520,9 +528,11 @@ int tegra_io_rail_power_on(int id)
->         unsigned int bit, mask;
->         int err;
->
-> +       mutex_lock(&pmc->powergates_lock);
-> +
->         err = tegra_io_rail_prepare(id, &request, &status, &bit);
->         if (err < 0)
-> -               return err;
-> +               goto error;
->
->         mask = 1 << bit;
->
-> @@ -535,12 +545,15 @@ int tegra_io_rail_power_on(int id)
->         err = tegra_io_rail_poll(status, mask, 0, 250);
->         if (err < 0) {
->                 pr_info("tegra_io_rail_poll() failed: %d\n", err);
-> -               return err;
-> +               goto error;
->         }
->
->         tegra_io_rail_unprepare();
->
-> -       return 0;
-> +error:
-> +       mutex_unlock(&pmc->powergates_lock);
-> +
-> +       return err < 0 ? err : 0;
+> I hope that we will never see a case where a reset is actually needed
+> for error handling (so used outside of probe / suspend cases) and it is
+> shared.
 
-Is this necessary?  Why simply not returning 'err'?  From what I see
-'tegra_io_rail_power_on()' can only return a negative value or '0'.
+OK, that sounds reasonable.
 
->  }
->  EXPORT_SYMBOL(tegra_io_rail_power_on);
->
-> @@ -550,10 +563,12 @@ int tegra_io_rail_power_off(int id)
->         unsigned int bit, mask;
->         int err;
->
-> +       mutex_lock(&pmc->powergates_lock);
-> +
->         err = tegra_io_rail_prepare(id, &request, &status, &bit);
->         if (err < 0) {
->                 pr_info("tegra_io_rail_prepare() failed: %d\n", err);
-> -               return err;
-> +               goto error;
->         }
->
->         mask = 1 << bit;
-> @@ -566,11 +581,14 @@ int tegra_io_rail_power_off(int id)
->
->         err = tegra_io_rail_poll(status, mask, mask, 250);
->         if (err < 0)
-> -               return err;
-> +               goto error;
->
->         tegra_io_rail_unprepare();
->
-> -       return 0;
-> +error:
-> +       mutex_unlock(&pmc->powergates_lock);
-> +
-> +       return err < 0 ? err : 0;
+I guess the assumption is that the reset starts out asserted, and the 
+first de-assert clears the reset signal. What if the default HW state 
+has the reset de-asserted; is there any way for a driver to guarantee 
+that the first deassert call is actually a deassert rather than a no-op? 
+That would be useful so that drivers could assume their module's 
+registers were reset due to the deassert call.
 
-Same comment as above.
+>> Instead, would it be better to require some central device to
+>> exclusively get the reset, and manage it. That device could then react
+>> to appropriate events to manage the reset. In this scheme, we wouldn't
+>> need the concept of shared resets at all. However, depending on
+>> why/when the reset needed to be re-asserted at run-time, this scheme
+>> wouldn't eliminate the co-ordination issue, but equally I don't
+>> believe it makes it any worse.
+>
+> If we ever need this kind of complexity, then yes a central service, with
+> callbacks in to drivers requesting them to prepare for handling
+> reset (like how usb does this) might be the best solution, but lets cross
+> that bridge when we get there.
 
->  }
->  EXPORT_SYMBOL(tegra_io_rail_power_off);
->
-> @@ -817,9 +835,15 @@ static int tegra_pmc_probe(struct platform_device *pdev)
->
->         /* take over the memory region from the early initialization */
->         res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +
-> +       mutex_lock(&pmc->powergates_lock);
->         pmc->base = devm_ioremap_resource(&pdev->dev, res);
-> -       if (IS_ERR(pmc->base))
-> -               return PTR_ERR(pmc->base);
-> +       mutex_unlock(&pmc->powergates_lock);
-
-Since the mutex is released there is a window of opportunity for
-devices to access an erroneous pointer.  A better approach might be to
-use a temporary variable, do all the initialisation that is required
-and when things look good set pmc-base to that temporary variable.
-
-Mathieu
-
-> +
-> +       if (IS_ERR(pmc->base)) {
-> +               err = PTR_ERR(pmc->base);
-> +               goto error;
-> +       }
->
->         pmc->clk = devm_clk_get(&pdev->dev, "pclk");
->         if (IS_ERR(pmc->clk)) {
-> @@ -853,7 +877,9 @@ static int tegra_pmc_probe(struct platform_device *pdev)
->         return 0;
->
->  error:
-> +       mutex_lock(&pmc->powergates_lock);
->         pmc->base = base;
-> +       mutex_unlock(&pmc->powergates_lock);
->
->         return err;
->  }
-> --
-> 2.1.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+OK. Perhaps it's a good idea to spell out this usage model assumption 
+explicitly somewhere? Perhaps it already is and I simply didn't look in 
+enough detail.
