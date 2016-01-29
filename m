@@ -1,53 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Jan 2016 12:39:12 +0100
-Subject: [PATCH v2 4/7] net: bgmac: clarify CONFIG_BCMA dependency
-In-Reply-To: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
-References: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
-Message-ID: <1454067557-3546883-5-git-send-email-arnd@arndb.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 29 Jan 2016 12:40:32 +0100
+Subject: [PATCH v2] mmc: omap_hsmmc: don't print uninitialized variables
+In-Reply-To: <3411189.gO0215GrNM@wuerfel>
+References: <3411189.gO0215GrNM@wuerfel>
+Message-ID: <CAPDyKFoto2BLyxfko6VX8CZC99LBhJiM1POJOC_Sk=UxnrWcLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bgmac driver depends on BCMA_HOST_SOC, which is only used
-when CONFIG_BCMA is enabled. However, it is a bool option and can
-be set when CONFIG_BCMA=m, and then bgmac can be built-in, leading
-to an obvious link error:
+On 26 January 2016 at 16:26, Arnd Bergmann <arnd@arndb.de> wrote:
+> When DT based probing is used but the DMA request fails, the
+> driver will print uninitialized stack data from the rx_req
+> and tx_req variables, as indicated by this warning:
+>
+> drivers/mmc/host/omap_hsmmc.c: In function 'omap_hsmmc_probe':
+> drivers/mmc/host/omap_hsmmc.c:2162:3: warning: 'rx_req' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>    dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
+>
+> This removes the DMA request line number from the warning, which
+> is the easiest solution and won't hurt us any more as we are
+> planning to remove the legacy code path anyway.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-drivers/built-in.o: In function `bgmac_init':
-:(.init.text+0x7f2c): undefined reference to `__bcma_driver_register'
-drivers/built-in.o: In function `bgmac_exit':
-:(.exit.text+0x110a): undefined reference to `bcma_driver_unregister'
+Thanks, applied for next!
 
-To avoid this case, we need to depend on both BCMA and BCMA_SOC,
-as this patch does. I'm also trying to make the dependency more
-readable by splitting it into three lines, and adding a COMPILE_TEST
-alternative so we can test-build it in all configurations that
-support BCMA.
+Kind regards
+Uffe
 
-The added dependency on FIXED_PHY addresses a related issue where
-we cannot call fixed_phy_register() when CONFIG_FIXED_PHY=m and
-CONFIG_BGMAC=y.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/net/ethernet/broadcom/Kconfig | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/net/ethernet/broadcom/Kconfig b/drivers/net/ethernet/broadcom/Kconfig
-index 8550df189ceb..19f7cd02e085 100644
---- a/drivers/net/ethernet/broadcom/Kconfig
-+++ b/drivers/net/ethernet/broadcom/Kconfig
-@@ -151,8 +151,11 @@ config BNX2X_VXLAN
- 
- config BGMAC
- 	tristate "BCMA bus GBit core support"
--	depends on BCMA_HOST_SOC && HAS_DMA && (BCM47XX || ARCH_BCM_5301X)
-+	depends on BCMA && BCMA_HOST_SOC
-+	depends on HAS_DMA
-+	depends on BCM47XX || ARCH_BCM_5301X || COMPILE_TEST
- 	select PHYLIB
-+	select FIXED_PHY
- 	---help---
- 	  This driver supports GBit MAC and BCM4706 GBit MAC cores on BCMA bus.
- 	  They can be found on BCM47xx SoCs and provide gigabit ethernet.
--- 
-2.7.0
+> ---
+> A simpler patch as v1 with the same result, as suggested by Peter Ujfalusi.
+>
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index b6639ea0bf18..87f0d840a166 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -2159,7 +2159,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+>                                                  &rx_req, &pdev->dev, "rx");
+>
+>         if (!host->rx_chan) {
+> -               dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
+> +               dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel\n");
+>                 ret = -ENXIO;
+>                 goto err_irq;
+>         }
+> @@ -2169,7 +2169,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+>                                                  &tx_req, &pdev->dev, "tx");
+>
+>         if (!host->tx_chan) {
+> -               dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", tx_req);
+> +               dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel\n");
+>                 ret = -ENXIO;
+>                 goto err_irq;
+>         }
+>
