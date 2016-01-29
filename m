@@ -1,186 +1,111 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 29 Jan 2016 22:25:52 +0100
-Subject: [PATCH 00/10] KVM PCIe/MSI passthrough on ARM/ARM64
-In-Reply-To: <1454096004.9301.1.camel@redhat.com>
-References: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
- <1454017899.23148.0.camel@redhat.com> <56AB78B1.2030202@linaro.org>
- <1454096004.9301.1.camel@redhat.com>
-Message-ID: <56ABD8E0.6080409@linaro.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 29 Jan 2016 22:35:18 +0100
+Subject: [PATCH v12 2/4] PM / Domains: add setter for dev.pm_domain
+In-Reply-To: <CAHp75Vf9TS-AxJALQjiwNjMCT8ct5SBanYzrEsV9aj=DsUw-OA@mail.gmail.com>
+References: <1452181575-9206-1-git-send-email-tomeu.vizoso@collabora.com>
+ <CAHp75VdWPUZ8F5rsGn3M1e5Pgpcg1CErBej9PE_3+ZPke5CDFA@mail.gmail.com>
+ <CAHp75Vf9TS-AxJALQjiwNjMCT8ct5SBanYzrEsV9aj=DsUw-OA@mail.gmail.com>
+Message-ID: <1783906.XctYjeUNLr@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
-On 01/29/2016 08:33 PM, Alex Williamson wrote:
-> On Fri, 2016-01-29 at 15:35 +0100, Eric Auger wrote:
->> Hi Alex,
->> On 01/28/2016 10:51 PM, Alex Williamson wrote:
->>> On Tue, 2016-01-26 at 13:12 +0000, Eric Auger wrote:
->>>> This series addresses KVM PCIe passthrough with MSI enabled on ARM/ARM64.
->>>> It pursues the efforts done on [1], [2], [3]. It also aims at covering the
->>>> same need on some PowerPC platforms.
->>>>  
->>>> On x86 all accesses to the 1MB PA region [FEE0_0000h - FEF0_000h] are directed
->>>> as interrupt messages: accesses to this special PA window directly target the
->>>> APIC configuration space and not DRAM, meaning the downstream IOMMU is bypassed.
->>>>  
->>>> This is not the case on above mentionned platforms where MSI messages emitted
->>>> by devices are conveyed through the IOMMU. This means an IOVA/host PA mapping
->>>> must exist for the MSI to reach the MSI controller. Normal way to create
->>>> IOVA bindings consists in using VFIO DMA MAP API. However in this case
->>>> the MSI IOVA is not mapped onto guest RAM but on host physical page (the MSI
->>>> controller frame).
->>>>  
->>>> Following first comments, the spirit of [2] is kept: the guest registers
->>>> an IOVA range reserved for MSI mapping. When the VFIO-PCIe driver allocates
->>>> its MSI vectors, it overwrites the MSI controller physical address with an IOVA,
->>>> allocated within the window provided by the userspace. This IOVA is mapped
->>>> onto the MSI controller frame physical page.
->>>>  
->>>> The series does not address yet the problematic of telling the userspace how
->>>> much IOVA he should provision.
->>>  
->>> I'm sort of on a think-different approach today, so bear with me; how is
->>> it that x86 can make interrupt remapping so transparent to drivers like
->>> vfio-pci while for ARM and ppc we seem to be stuck with doing these
->>> fixups of the physical vector ourselves, implying ugly (no offense)
->>> paths bouncing through vfio to connect the driver and iommu backends?
->>>  
->>> We know that x86 handles MSI vectors specially, so there is some
->>> hardware that helps the situation.  It's not just that x86 has a fixed
->>> range for MSI, it's how it manages that range when interrupt remapping
->>> hardware is enabled.  A device table indexed by source-ID references a
->>> per device table indexed by data from the MSI write itself.  So we get
->>> much, much finer granularity,
->> About the granularity, I think ARM GICv3 now provides a similar
->> capability with GICv3 ITS (interrupt translation service). Along with
->> the MSI MSG write transaction, the device outputs a DeviceID conveyed on
->> the bus. This DeviceID (~ your source-ID) enables to index a device
->> table. The entry in the device table points to a DeviceId interrupt
->> translation table indexed by the EventID found in the msi msg. So the
->> entry in the interrupt translation table eventually gives you the
->> eventual interrupt ID targeted by the MSI MSG.
->> This translation capability if not available in GICv2M though, ie. the
->> one I am currently using.
->>  
->> Those tables currently are built by the ITS irqchip (irq-gic-v3-its.c)
+On Friday, January 29, 2016 06:35:49 PM Andy Shevchenko wrote:
+> On Fri, Jan 29, 2016 at 5:51 PM, Andy Shevchenko
+> <andy.shevchenko@gmail.com> wrote:
+> > On Fri, Jan 29, 2016 at 5:38 PM, Andy Shevchenko
+> > <andy.shevchenko@gmail.com> wrote:
+> >> On Thu, Jan 7, 2016 at 5:46 PM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+> >>> Adds a function that sets the pointer to dev_pm_domain in struct device
+> >>> and that warns if the device has already finished probing. The reason
+> >>> why we want to enforce that is because in the general case that can
+> >>> cause problems and also that we can simplify code quite a bit if we can
+> >>> always assume that.
+> >>>
+> >>> This patch also changes all current code that directly sets the
+> >>> dev.pm_domain pointer.
+> >>
+> >>
+> >>> --- a/drivers/acpi/acpi_lpss.c
+> >>> +++ b/drivers/acpi/acpi_lpss.c
+> >>
+> >>> @@ -875,13 +876,14 @@ static int acpi_lpss_platform_notify(struct notifier_block *nb,
+> >>>
+> >>>         switch (action) {
+> >>>         case BUS_NOTIFY_BIND_DRIVER:
+> >>> -               pdev->dev.pm_domain = &acpi_lpss_pm_domain;
+> >>> +               dev_pm_domain_set(&pdev->dev, &acpi_lpss_pm_domain);
+> >>>                 break;
+> >>>         case BUS_NOTIFY_DRIVER_NOT_BOUND:
+> >>>         case BUS_NOTIFY_UNBOUND_DRIVER:
+> >>>                 pdev->dev.pm_domain = NULL;
+> >>
+> >> Missed?
+> >>
+> >>>                 break;
+> >>>         case BUS_NOTIFY_ADD_DEVICE:
+> >>> +               dev_pm_domain_set(&pdev->dev, &acpi_lpss_pm_domain);
+> >>>                 if (pdata->dev_desc->flags & LPSS_LTR)
+> >>>                         return sysfs_create_group(&pdev->dev.kobj,
+> >>>                                                   &lpss_attr_group);
+> >>> @@ -889,6 +891,7 @@ static int acpi_lpss_platform_notify(struct notifier_block *nb,
+> >>>         case BUS_NOTIFY_DEL_DEVICE:
+> >>>                 if (pdata->dev_desc->flags & LPSS_LTR)
+> >>>                         sysfs_remove_group(&pdev->dev.kobj, &lpss_attr_group);
+> >>> +               dev_pm_domain_set(&pdev->dev, NULL);
+> >>>                 break;
+> >>>         default:
+> >>>                 break;
+> >>
+> >> This looks wrong. I didn't test yet, but I have concerns here. Why did
+> >> you add those calls?
+> >
+> >
+> > Okay, for first glance it seems working on Intel Braswell.
 > 
-> So it sounds like the interrupt remapping plumbing needs to be
-> implemented for those chips.  How does ITS identify an MSI versus any
-> other DMA write?  Does it need to be within a preconfigured address
-> space like on x86 or does it know this implicitly by the transaction
-> (which doesn't seem possible on PCIe)?
-
-It seems there is a kind of misunderstanding here. Assuming a "simple"
-system with a single ITS, all devices likely to produce MSI must write
-those messages in a single register, located in the ITS MSI 64kB frame
-(this register is called GITS_TRANSLATER). Then the ITS discriminates
-between senders using the DeviceID conveyed out-of-band on the bus (or
-by other implementation defined means). For those DeviceId, a deviceId
-interrupt translation table is supposed to exist, else it is going to
-fault. If any "undeclared" device is writing into that register, its
-deviceid will be unknown. It looks like on Intel the interrupt remapping
-HW rather is abstracted on the IOMMU side; I did not take time yet to
-carefully read the VT-d spec but maybe the Intel interrupt remapping HW
-rather acts as an IOMMU that takes an input MSI address within the
-famous window and apply a translation scheme based on the MSI address &
-data? On ARM the input MSI address always is the GITS_TRANSLATER and
-then the translation scheme is based on out-of-band info (deviceid) +
-data content(eventid). I Hope this clarifies.
+> One more test unveils this one
 > 
-> Along with this discussion, we should probably be revisiting whether
-> existing ARM SMMUs should be exposing the IOMMU_CAP_INTR_REMAP
-> capability.
-
-so according to the above explanation not sure it is relevant. Will/Marc
-might correct me if I told some wrong things.
-  This capability is meant to indicate interrupt isolation,
-> but if an entire page of IOVA space is mapped through the IOMMU to a
-> range of interrupts and some of those interrupts are shared with host
-> devices or other VMs, then we really don't have that isolation and the
-> system is susceptible to one VM interfering with another or with the
-> host.  If that's the case, the SMMU should not be claiming
-> IOMMU_CAP_INTR_REMAP.
-My understanding is a PCI device working for the host must have its own
-deviceid translation table while another one assigned to a guest needs
-to have another one. Each of those will then trigger different final
-interrupt IDs in separate domains.
-
-To be honest for the time being I was not addressing the ITS case but
-just the simpler GICv2m case where we do not have interrupt translation.
-In GICv2m with a single 4kB MSI frame you still have a single register
-written by devices. The msg data content then induces a given interrupt ID.
-
-My kernel series "just" aimed at allowing the device to reach the
-physical address of the GICv2m MSI frame through the IOMMU.
-
-But you're right here I think I should have a larger vision of what is
-targeted with ITS. In GICv2m with a single MSI frame the discrimination
-only works on the msi data (there is no deviceid). However it is also
-possible to have several GICv2M MSI 4kB frames and in that case you can
-give 1 MSI 4kB frame per VM but it is yet another use case. My AMD
-system currently exposes a single MSI frame - in which case we have poor
-isolation as you say -.
+> # modprobe -r sdhci-acpi
+> [ 1289.909441] ------------[ cut here ]------------
+> [ 1289.918205] WARNING: CPU: 1 PID: 4374 at
+> /home/andy/prj/linux-otc/drivers/base/power/common.c:150
+> dev_pm_domain_set+0x51/0x60()
+> [ 1289.934681] PM domains can only be changed for unbound devices
+> [ 1289.944843] Modules linked in: sdhci_acpi(-) sdhci mmc_core
+> led_class [last unloaded: dw_dmac_core]
+> [ 1289.958802] CPU: 1 PID: 4374 Comm: modprobe Not tainted 4.5.0-rc1+ #3
+> [ 1289.969736]  ffffffff81c38330 ffff88007bb53d18 ffffffff8133162f
+> ffff88007bb53d60
+> [ 1289.981844]  ffff88007bb53d50 ffffffff8105cd12 ffff88017a007410
+> 0000000000000000
+> [ 1289.993996]  0000000000000001 0000000000000080 0000000000000000
+> ffff88007bb53db0
+> [ 1290.006123] Call Trace:
+> [ 1290.012600]  [<ffffffff8133162f>] dump_stack+0x44/0x55
+> [ 1290.022052]  [<ffffffff8105cd12>] warn_slowpath_common+0x82/0xc0
+> [ 1290.032462]  [<ffffffff8105cd9c>] warn_slowpath_fmt+0x4c/0x50
+> [ 1290.042589]  [<ffffffff814867c1>] dev_pm_domain_set+0x51/0x60
+> [ 1290.052695]  [<ffffffff813a62a9>] acpi_dev_pm_detach+0x3f/0x84
+> [ 1290.062910]  [<ffffffff81486747>] dev_pm_domain_detach+0x27/0x30
+> [ 1290.073294]  [<ffffffff81480188>] platform_drv_remove+0x38/0x40
+> [ 1290.083585]  [<ffffffff8147da51>] __device_release_driver+0xa1/0x160
+> [ 1290.094335]  [<ffffffff8147e5a6>] driver_detach+0xa6/0xb0
+> [ 1290.104009]  [<ffffffff8147d435>] bus_remove_driver+0x55/0xd0
+> [ 1290.114053]  [<ffffffff8147eccc>] driver_unregister+0x2c/0x50
+> [ 1290.124076]  [<ffffffff81480232>] platform_driver_unregister+0x12/0x20
+> [ 1290.134957]  [<ffffffffa003681c>] sdhci_acpi_driver_exit+0x10/0x12
+> [sdhci_acpi]
+> [ 1290.146730]  [<ffffffff810ce0e9>] SyS_delete_module+0x199/0x240
+> [ 1290.156907]  [<ffffffff8100219b>] ? exit_to_usermode_loop+0x8b/0x90
+> [ 1290.167478]  [<ffffffff81002b83>] do_syscall_32_irqs_off+0x53/0xa0
+> [ 1290.177949]  [<ffffffff818b7f9a>] entry_INT80_compat+0x2a/0x40
+> [ 1290.187986] ---[ end trace a8351c0506ee239b ]---
+> [ 1290.213855] mmc0: card 0001 removed
 > 
->>  but there's still effectively an interrupt
->>> domain per device that's being transparently managed under the covers
->>> whenever we request an MSI vector for a device.
->>>  
->>> So why can't we do something more like that here?  There's no predefined
->>> MSI vector range, so defining an interface for the user to specify that
->>> is unavoidable.
->> Do you confirm that VFIO user API still still is the good choice to
->> provide that IOVA range?
-> 
-> I don't see that we have an option there unless ARM wants to
-> retroactively reserve a range of IOVA space in the spec, which is
-> certainly not going to happen.  The only other thing that comes to mind
-> would be if there was an existing address space which could never be
-> backed by RAM or other DMA capable targets.  But that seems far fetched
-> as well.
-I don't think there is a plan for such change and I am afraid we need to
-integrate above configurations (GICv2M with a single frame, GICv2M with
-several frames, ITS and there may be others not covered here that I am
-not aware of).
-> 
->>   But why shouldn't everything else be transparent?  We
->>> could add an interface to the IOMMU API that allows us to register that
->>> reserved range for the IOMMU domain.  IOMMU-core (or maybe interrupt
->>> remapping) code might allocate an IOVA domain for this just as you've
->>> done in the type1 code here.
->> I have no objection to move that iova allocation scheme somewhere else.
->> I just need to figure out how to deal with the fact iova.c is not
->> compiled everywhere as I noticed too late ;-)
->>   But rather than having any interaction
->>> with vfio-pci, why not do this at lower levels such that the platform
->>> interrupt vector allocation code automatically uses one of those IOVA
->>> ranges and returns the IOVA rather than the physical address for the PCI
->>> code to program into the device?  I think we know what needs to be done,
->>> but we're taking the approach of managing the space ourselves and doing
->>> a fixup of the device after the core code has done its job when we
->>> really ought to be letting the core code manage a space that we define
->>> and programming the device so that it doesn't need a fixup in the
->>> vfio-pci code.  Wouldn't it be nicer if pci_enable_msix_range() returned
->>> with the device properly programmed or generate an error if there's not
->>> enough reserved mapping space in IOMMU domain?  Can it be done?
->> I agree with you on the fact it would be cleaner to manage that natively
->> at MSI controller level instead of patching the address value in
->> vfio_pci_intrs.c. I will investigate in that direction but I need some
->> more time to understand the links between the MSI controller, the PCI
->> device and the IOMMU.
-> 
-> Since the current interrupt remapping schemes seem to operate in a
-> different address space, I expect there will be work to do to fit the
-> interrupt remapping within a provided address space, but it seems like a
-> very reasonable constraint to add.  Thanks,
+> Which function is guilty?
 
-I hope this discussion will help. Please ARM guys, correct me if there
-are some unclarities or wrong statements.
+acpi_dev_pm_detach() calls dev_pm_domain_set() to clear the pm_domain pointer.
 
-Thank you for reading up to here and have a nice WE!
+One might argue that this is happening too early.
 
-Best Regards
-
-Eric
-> 
-> Alex
-> 
+Thanks,
+Rafael
