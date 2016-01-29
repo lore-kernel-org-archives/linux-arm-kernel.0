@@ -1,41 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 29 Jan 2016 12:35:18 +0100
-Subject: [PATCH v4 1/2] regulator: act8945a: add regulator driver for
- ACT8945A
-In-Reply-To: <B256D81BAE5131468A838E5D7A243641D63FBF8B@penmbx01>
-References: <1453863463-30515-1-git-send-email-wenyou.yang@atmel.com>
- <1453863463-30515-2-git-send-email-wenyou.yang@atmel.com>
- <20160129001603.GM4130@sirena.org.uk>
- <B256D81BAE5131468A838E5D7A243641D63FBF8B@penmbx01>
-Message-ID: <20160129113518.GQ4130@sirena.org.uk>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 29 Jan 2016 13:37:21 +0200
+Subject: [PATCH] fbdev: s6e8ax0: avoid unused function warnings
+In-Reply-To: <1453734300-1958304-1-git-send-email-arnd@arndb.de>
+References: <1453734300-1958304-1-git-send-email-arnd@arndb.de>
+Message-ID: <56AB4EF1.3090404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 29, 2016 at 01:20:08AM +0000, Yang, Wenyou wrote:
 
-> > > +static const struct of_device_id act8945a_pmic_of_match[] = {
-> > > +	{ .compatible = "active-semi,act8945a-regulator" },
-> > > +	{ },
-> > > +};
-> > > +MODULE_DEVICE_TABLE(of, act8945a_pmic_of_match);
 
-> > This seems mostly OK but why do we have a compatible string here - shouldn't
-> > the MFD be able to instantiate the regulator function without needing this?
+On 25/01/16 17:04, Arnd Bergmann wrote:
+> The s6e8ax0 suspend/resume functions are hidden inside of an #ifdef
+> when CONFIG_PM is set to avoid unused function warnings, but they
+> call some other functions that nothing else calls, and we get warnings
+> about those:
+> 
+> drivers/video/fbdev/exynos/s6e8ax0.c:449:13: error: 's6e8ax0_sleep_in' defined but not used [-Werror=unused-function]
+> drivers/video/fbdev/exynos/s6e8ax0.c:485:13: error: 's6e8ax0_display_off' defined but not used [-Werror=unused-function]
+> 
+> This marks the PM functions as __maybe_unused so the compiler can
+> silently drop them when they are not referenced.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/video/fbdev/exynos/s6e8ax0.c | 13 ++++---------
+>  1 file changed, 4 insertions(+), 9 deletions(-)
 
-> Because I got feedback from Javier for the act8945a-charger patches of this MFD series,
-> He said missing the OF match table will cause the module autoloading broken. 
+Thanks, queued for 4.5 fixes.
 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/398113.html
+ Tomi
 
-> What do you think about it?
-
-If then device is not being loaded from the DT (and it shouldn't be, the
-device looks like it should be instantiated directly by the MFD as it
-can't exist separately to that MFD) an OF table will do nothing.  
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160129/04fd078b/attachment.sig>
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160129/476f5a46/attachment.sig>
