@@ -1,38 +1,38 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Fri, 29 Jan 2016 15:39:35 +0000
-Subject: [PATCH v4 20/22] efi: stub: add implementation of
- efi_random_alloc()
-In-Reply-To: <1453828249-14467-21-git-send-email-ard.biesheuvel@linaro.org>
-References: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
- <1453828249-14467-21-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160129153935.GB2611@codeblueprint.co.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 29 Jan 2016 16:48:33 +0100
+Subject: [PATCH 0/9] ARM: pxa/mmp cleanups and warning fixes
+In-Reply-To: <87io2c76hh.fsf@belgarion.home>
+References: <1454076396-3563101-1-git-send-email-arnd@arndb.de>
+ <87io2c76hh.fsf@belgarion.home>
+Message-ID: <24241162.8H4bJ4YIKl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Jan, at 06:10:47PM, Ard Biesheuvel wrote:
-> +
-> +/*
-> + * The UEFI memory descriptors have a virtual address field that is only used
-> + * when installing the virtual mapping using SetVirtualAddressMap(). Since it
-> + * is unused here, we can reuse it to keep track of each descriptor's slot
-> + * count.
-> + */
-> +#define MD_NUM_SLOTS(md)	((md)->virt_addr)
-> +
-> +efi_status_t efi_random_alloc(efi_system_table_t *sys_table_arg,
-> +			      unsigned long size,
-> +			      unsigned long align,
-> +			      unsigned long *addr,
-> +			      unsigned long random_seed)
-> +{
-> +	unsigned long map_size, desc_size, total_slots = 0, target_slot;
-> +	efi_status_t status = EFI_NOT_FOUND;
-> +	efi_memory_desc_t *memory_map;
-> +	int map_offset;
+On Friday 29 January 2016 16:25:30 Robert Jarzmik wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+> > These are all fixes for harmless warnings, aside from the first
+> > patch, which is a cleanup. Please pick them up into the PXA
+> > tree (my preference), or provide an Ack so I can put them
+> > into arm-soc.
+> Hi Arnd,
+> 
+> I'll pick them up, provided the acks (for clock tree for example). The
+> pxa-for-4.6 will happen.
+> 
+> I'll just have a check on 1/9 to verify nobody hides in a corner a direct CKEN
+> access, and try to understand more thoroughly 7/9, all the others look good to
+> me.
 
-The assignment of 'status' is not needed since it gets assigned a new
-value immediately.
+Ok, sounds good. If you are unsure about it, you can also drop that
+one or do a broader version of it that does the other registers as well.
+I don't think it caused any compiler warnings, which is what I'm trying
+to handle right now.
 
-Otherwise looks good.
+> As for the 9th patch, it's in the MMP tree. I can carry it if Haojian wishes,
+> but I need his ack.
+> 
 
-Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
+Makes sense.
+
+	Arnd
