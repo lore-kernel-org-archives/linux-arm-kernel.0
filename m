@@ -1,72 +1,99 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Fri, 29 Jan 2016 09:49:55 +0800
-Subject: [PATCH v7 0/2] Add Rockchip Inno-HDMI driver
-In-Reply-To: <1453777142-30119-1-git-send-email-ykk@rock-chips.com>
-References: <1453777142-30119-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <56AAC543.8080108@rock-chips.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Fri, 29 Jan 2016 10:07:19 +0800
+Subject: [PATCH v10 04/21] KVM: ARM64: Add access handler for PMCR register
+In-Reply-To: <20160128204317.GJ16453@hawk.localdomain>
+References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453866709-20324-5-git-send-email-zhaoshenglong@huawei.com>
+ <20160128153635.GB3807@hawk.localdomain>
+ <20160128204317.GJ16453@hawk.localdomain>
+Message-ID: <56AAC957.5070601@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?01?26? 10:59, Yakir Yang wrote:
-> Here are a brief introduction to Innosilicon HDMI IP:
->    - Support HDMI 1.4a, HDCP 1.2 and DVI 1.0 standard compliant transmitter
->    - Support HDMI1.4 a/b 3D function defined in HDMI 1.4 a/b spec
->    - Digital video interface supports a pixel size of 24, 30, 36, 48bits color depth in RGB
->    - S/PDIF output supports PCM, Dolby Digital, DTS digital audio transmission
->      (32-192kHz Fs) using IEC60958 and IEC 61937
->    - The EDID and CEC function are also supported by Innosilicon HDMI Transmitter Controlle
->
-> Changes in v7:
-> - Correct the module licnese statement (Paul)
->       - MODULE_LICENSE("GPL");
->       + MODULE_LICENSE("GPL v2");
-> - Start indentation with tabs and fix the misspell in Kconfig (Paul)
-> - Carry the lost device-binding document (Heiko)
->
-> Changes in v6:
-> - Rebase the Makefile/Kconfig files which add by Chris's rockchip-mipi driver (Caeser)
->
-> Changes in v5:
-> - Use hdmi_infoframe helper functions to packed the infoframe (Russell)
-> - Remove the unused double wait_for_completion_timeout for ddc transfer (Russell)
-> - Remove the unused local variable in "inno_hdmi_i2c_write()" function (Russell)
->
-> Changes in v4:
-> - Modify the commit title "drm/rockchip: hdmi: ..." (Mark)
-> - Correct the "DKMS" to "DPMS" (Mark)
-> - Fix over 80 characters problems (Mark)
-> - Remove encoder .prepare/.commit helper functions, and move the vop mode
-> configure function into encoder .enable helper functions. (Mark)
->
-> Changes in v3:
-> - Use encoder enable/disable function, and remove the encoder DPMS function
-> - Keep HDMI PLL power on in standby mode
->
-> Changes in v2:
-> - Using DRM atomic helper functions for connector init (Mark)
-> - Remove "hdmi->connector.encoder = encoder;" (Mark)
-> - Add the Acked-by tags from Rob
-> - Correct the misspell "rk3036-dw-hdmi" (Heiko)
->
-> Yakir Yang (2):
->    drm/rockchip: hdmi: add Innosilicon HDMI support
->    dt-bindings: add document for Innosilicon HDMI on Rockchip platform
->
->   .../display/rockchip/inno_hdmi-rockchip.txt        |  50 ++
->   drivers/gpu/drm/rockchip/Kconfig                   |   8 +
->   drivers/gpu/drm/rockchip/Makefile                  |   1 +
->   drivers/gpu/drm/rockchip/inno_hdmi.c               | 941 +++++++++++++++++++++
->   drivers/gpu/drm/rockchip/inno_hdmi.h               | 362 ++++++++
->   5 files changed, 1362 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
->   create mode 100644 drivers/gpu/drm/rockchip/inno_hdmi.c
->   create mode 100644 drivers/gpu/drm/rockchip/inno_hdmi.h
->
 
-Ping, inno HDMI driver looks good for me, and it works, So I'd like to 
-merge it into drm/rockchip if there is no doubt these days.
 
-Thanks.
+On 2016/1/29 4:43, Andrew Jones wrote:
+> On Thu, Jan 28, 2016 at 04:36:35PM +0100, Andrew Jones wrote:
+>> > On Wed, Jan 27, 2016 at 11:51:32AM +0800, Shannon Zhao wrote:
+>>> > > From: Shannon Zhao <shannon.zhao@linaro.org>
+>>> > > 
+>>> > > Add reset handler which gets host value of PMCR_EL0 and make writable
+>>> > > bits architecturally UNKNOWN except PMCR.E which is zero. Add an access
+>>> > > handler for PMCR.
+>>> > > 
+>>> > > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>>> > > ---
+>>> > >  arch/arm64/kvm/sys_regs.c | 42 ++++++++++++++++++++++++++++++++++++++++--
+>>> > >  include/kvm/arm_pmu.h     |  4 ++++
+>>> > >  2 files changed, 44 insertions(+), 2 deletions(-)
+>>> > > 
+>>> > > diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+>>> > > index eec3598..97fea84 100644
+>>> > > --- a/arch/arm64/kvm/sys_regs.c
+>>> > > +++ b/arch/arm64/kvm/sys_regs.c
+>>> > > @@ -34,6 +34,7 @@
+>>> > >  #include <asm/kvm_emulate.h>
+>>> > >  #include <asm/kvm_host.h>
+>>> > >  #include <asm/kvm_mmu.h>
+>>> > > +#include <asm/pmu.h>
+>>> > >  
+>>> > >  #include <trace/events/kvm.h>
+>>> > >  
+>>> > > @@ -439,6 +440,43 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>>> > >  	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
+>>> > >  }
+>>> > >  
+>>> > > +static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>>> > > +{
+>>> > > +	u64 pmcr, val;
+>>> > > +
+>>> > > +	asm volatile("mrs %0, pmcr_el0\n" : "=r" (pmcr));
+>>> > > +	/* Writable bits of PMCR_EL0 (ARMV8_PMCR_MASK) is reset to UNKNOWN
+>>> > > +	 * except PMCR.E resetting to zero.
+>>> > > +	 */
+>>> > > +	val = ((pmcr & ~ARMV8_PMCR_MASK) | (ARMV8_PMCR_MASK & 0xdecafbad))
+>>> > > +	      & (~ARMV8_PMCR_E);
+>>> > > +	vcpu_sys_reg(vcpu, PMCR_EL0) = val;
+>>> > > +}
+>>> > > +
+>>> > > +static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>>> > > +			const struct sys_reg_desc *r)
+>>> > > +{
+>>> > > +	u64 val;
+>>> > > +
+>>> > > +	if (!kvm_arm_pmu_v3_ready(vcpu))
+>>> > > +		return trap_raz_wi(vcpu, p, r);
+>>> > > +
+>>> > > +	if (p->is_write) {
+>>> > > +		/* Only update writeable bits of PMCR */
+>>> > > +		val = vcpu_sys_reg(vcpu, PMCR_EL0);
+>>> > > +		val &= ~ARMV8_PMCR_MASK;
+>>> > > +		val |= p->regval & ARMV8_PMCR_MASK;
+>>> > > +		vcpu_sys_reg(vcpu, PMCR_EL0) = val;
+>>> > > +	} else {
+>>> > > +		/* PMCR.P & PMCR.C are RAZ */
+>>> > > +		val = vcpu_sys_reg(vcpu, PMCR_EL0)
+>>> > > +		      & ~(ARMV8_PMCR_P | ARMV8_PMCR_C);
+>>> > > +		p->regval = val;
+>> > 
+>> > Should we also be setting the IMP, IDCODE, and N fields here to the
+>> > values of the host PE?
+> Not sure how I skimmed over the reset_pmcr doing this when I first
+> read it. I'm now wondering if we want to always expose the host's
+> IMP, IDCODE, N though (migration concerns). Although we have a ton
+> of invariant sys regs already... So I guess this is a bridge to burn
+> another day.
+> 
+There is a discussion about this. For migrating across different CPU
+types, the userspace will set the number of PMU counters and as
+discussed it will add some codes in the reset_pmcr to check if the
+userspace have set the number, if so set N as the value. But these will
+be done after this patch set and by the cross-cpu type support patch
+set[1](currently this patch set doesn't set the PMU counters but I
+discussed this with Tushar before).
 
+[1]https://lists.gnu.org/archive/html/qemu-devel/2015-09/msg02375.html
+
+Thanks,
 -- 
-?ark Yao
+Shannon
