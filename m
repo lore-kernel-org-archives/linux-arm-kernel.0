@@ -1,68 +1,75 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 29 Jan 2016 11:17:18 +0100
-Subject: [PATCH v4 1/9] ARM: dts: alt: Enable SCIF_CLK frequency and pins
-In-Reply-To: <1454062646-4826-1-git-send-email-geert+renesas@glider.be>
-References: <1454062646-4826-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1454062646-4826-2-git-send-email-geert+renesas@glider.be>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 29 Jan 2016 10:18:12 +0000
+Subject: [PATCH v10 07/21] KVM: ARM64: PMU: Add perf event map and
+ introduce perf event creating function
+In-Reply-To: <56AB0617.5060902@huawei.com>
+References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453866709-20324-8-git-send-email-zhaoshenglong@huawei.com>
+ <20160128163115.GC3807@hawk.localdomain> <56AA45B0.3060205@arm.com>
+ <20160128180638.GO775@arm.com> <56AB0617.5060902@huawei.com>
+Message-ID: <20160129101812.GB4541@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add and enable the external crystal for the SCIF_CLK and its pinctrl, to
-be used by the Baud Rate Generator for External Clock (BRG) on (H)SCIF.
+On Fri, Jan 29, 2016 at 02:26:31PM +0800, Shannon Zhao wrote:
+> 
+> 
+> On 2016/1/29 2:06, Will Deacon wrote:
+> > On Thu, Jan 28, 2016 at 04:45:36PM +0000, Marc Zyngier wrote:
+> >> > On 28/01/16 16:31, Andrew Jones wrote:
+> >>> > > On Wed, Jan 27, 2016 at 11:51:35AM +0800, Shannon Zhao wrote:
+> >>>> > >> From: Shannon Zhao <shannon.zhao@linaro.org>
+> >>>> > >>
+> >>>> > >> When we use tools like perf on host, perf passes the event type and the
+> >>>> > >> id of this event type category to kernel, then kernel will map them to
+> >>>> > >> hardware event number and write this number to PMU PMEVTYPER<n>_EL0
+> >>>> > >> register. When getting the event number in KVM, directly use raw event
+> >>>> > >> type to create a perf_event for it.
+> >>>> > >>
+> >>>> > >> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> >>>> > >> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> >>>> > >> ---
+> >>>> > >>  arch/arm64/include/asm/pmu.h |   3 ++
+> >>>> > >>  arch/arm64/kvm/Makefile      |   1 +
+> >>>> > >>  include/kvm/arm_pmu.h        |  10 ++++
+> >>>> > >>  virt/kvm/arm/pmu.c           | 122 +++++++++++++++++++++++++++++++++++++++++++
+> >>>> > >>  4 files changed, 136 insertions(+)
+> >>>> > >>  create mode 100644 virt/kvm/arm/pmu.c
+> >>>> > >>
+> >>>> > >> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
+> >>>> > >> index 4406184..2588f9c 100644
+> >>>> > >> --- a/arch/arm64/include/asm/pmu.h
+> >>>> > >> +++ b/arch/arm64/include/asm/pmu.h
+> >>>> > >> @@ -21,6 +21,7 @@
+> >>>> > >>  
+> >>>> > >>  #define ARMV8_MAX_COUNTERS      32
+> >>>> > >>  #define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
+> >>>> > >> +#define ARMV8_CYCLE_IDX         (ARMV8_MAX_COUNTERS - 1)
+> >>> > > 
+> >>> > > I'm not sure we want to add this. It's name is wrong, as it's really
+> >>> > > PMCNTENSET_EL0.C, and just a few lines above we have the idx defined
+> >>> > > already (ARMV8_IDX_CYCLE_COUNTER), but as zero, because
+> >>> > > arch/arm64/kernel/perf_event.c maps it that way.
+> >>> > > 
+> >>> > > I think we should do the same with the pmc array, i.e. map the cycle
+> >>> > > counter to idx zero.
+> >> > 
+> >> > I tend to have the opposite view. Not for the sake of it, but because I
+> >> > find it helpful to directly map the code to the architecture
+> >> > documentation without having to bend another handful of neurons.
+> >> > 
+> >> > Will probably had some good reasons to structure it that way, but I
+> >> > don't know the rational. Will?
+> > It was years ago, but I suspect that the cycle counter is index zero
+> > because its mandated, whilst the number of event counters is IMPDEF.
+> 
+> Since PMCNTENSET/CLR, PMINTENSET/CLR, PMOVSSET/CLR and PMSWINC are using
+> bit 31 to stands the state of cycle counter, if we make cycle counter
+> index to zero, we always need to do translation between the idx and bit
+> 31 when we access these registers.
 
-This increases the range and accuracy of supported baud rates.
+Conversely, if you stick the cycle counter right at the top, then you'll
+need to rework a bunch of the perf code that iterates from
+ARMV7_IDX_COUNTER0 to pmu->num_events.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-Based on schematics, tested with remote access
-
-v4:
-  - Change one-line summary prefix to match current arm-soc practices,
-  - Rebased,
-
-v3:
-  - New.
----
- arch/arm/boot/dts/r8a7794-alt.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
-index 773f304d1142b585..ca9bc4fff28751ea 100644
---- a/arch/arm/boot/dts/r8a7794-alt.dts
-+++ b/arch/arm/boot/dts/r8a7794-alt.dts
-@@ -103,6 +103,9 @@
- };
- 
- &pfc {
-+	pinctrl-0 = <&scif_clk_pins>;
-+	pinctrl-names = "default";
-+
- 	du_pins: du {
- 		renesas,groups = "du1_rgb666", "du1_sync", "du1_disp", "du1_dotclkout0";
- 		renesas,function = "du";
-@@ -113,6 +116,11 @@
- 		renesas,function = "scif2";
- 	};
- 
-+	scif_clk_pins: scif_clk {
-+		renesas,groups = "scif_clk";
-+		renesas,function = "scif_clk";
-+	};
-+
- 	ether_pins: ether {
- 		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
- 		renesas,function = "eth";
-@@ -205,6 +213,11 @@
- 	status = "okay";
- };
- 
-+&scif_clk {
-+	clock-frequency = <14745600>;
-+	status = "okay";
-+};
-+
- &qspi {
- 	pinctrl-0 = <&qspi_pins>;
- 	pinctrl-names = "default";
--- 
-1.9.1
+Will
