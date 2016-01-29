@@ -1,68 +1,64 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 29 Jan 2016 14:14:25 +0800
-Subject: [PATCH v10 07/21] KVM: ARM64: PMU: Add perf event map and
- introduce perf event creating function
-In-Reply-To: <20160128180638.GO775@arm.com>
-References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
- <1453866709-20324-8-git-send-email-zhaoshenglong@huawei.com>
- <20160128163115.GC3807@hawk.localdomain> <56AA45B0.3060205@arm.com>
- <20160128180638.GO775@arm.com>
-Message-ID: <56AB0341.2000203@huawei.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 29 Jan 2016 07:18:55 +0100
+Subject: [PATCH v3 3/3] reset: Add support for shared reset controls
+In-Reply-To: <56AA7813.7080907@wwwdotorg.org>
+References: <1453918516-3078-1-git-send-email-hdegoede@redhat.com>
+ <1453918516-3078-4-git-send-email-hdegoede@redhat.com>
+ <56AA7813.7080907@wwwdotorg.org>
+Message-ID: <56AB044F.7090102@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On 01/28/2016 09:20 PM, Stephen Warren wrote:
+>
+> On 01/27/2016 11:15 AM, Hans de Goede wrote:
+>> In some SoCs some hw-blocks share a reset control. Add support for this
+>> setup by adding new:
+>>
+>> reset_control_get_shared()
+>> devm_reset_control_get_shared()
+>> devm_reset_control_get_shared_by_index()
+>>
+>> methods to get a reset_control. Note that this patch omits adding of_
+>> variants, if these are needed later they can be easily added.
+>>
+>> This patch also changes the behavior of the existing exclusive
+>> reset_control_get() variants, if these are now called more then once
+>> for the same reset_control they will return -EBUSY. To catch existing
+>> drivers triggering this error (there should not be any) a WARN_ON(1)
+>> is added in this path.
+>>
+>> When a reset_control is shared, the behavior of reset_control_assert /
+>> deassert is changed, for shared reset_controls these will work like the
+>> clock-enable/disable and regulator-on/off functions. They will keep a
+>> deassert_count, and only (re-)assert the reset after reset_control_assert
+>> has been called as many times as reset_control_deassert was called.
+>>
+>> Calling reset_control_assert without first calling reset_control_deassert
+>> is not allowed on a shared reset control. Calling reset_control_reset is
+>> also not allowed on a shared reset control.
+>
+> Hmmm. Do you have some examples of how drivers are supposed to co-ordinate use of the shared reset? Reference counting implies all the drivers need to get together and all assert and de-assert the reset in unison when some event happens. That seems difficult to co-ordinate.
 
-On 2016/1/29 2:06, Will Deacon wrote:
-> On Thu, Jan 28, 2016 at 04:45:36PM +0000, Marc Zyngier wrote:
->> > On 28/01/16 16:31, Andrew Jones wrote:
->>> > > On Wed, Jan 27, 2016 at 11:51:35AM +0800, Shannon Zhao wrote:
->>>> > >> From: Shannon Zhao <shannon.zhao@linaro.org>
->>>> > >>
->>>> > >> When we use tools like perf on host, perf passes the event type and the
->>>> > >> id of this event type category to kernel, then kernel will map them to
->>>> > >> hardware event number and write this number to PMU PMEVTYPER<n>_EL0
->>>> > >> register. When getting the event number in KVM, directly use raw event
->>>> > >> type to create a perf_event for it.
->>>> > >>
->>>> > >> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->>>> > >> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> > >> ---
->>>> > >>  arch/arm64/include/asm/pmu.h |   3 ++
->>>> > >>  arch/arm64/kvm/Makefile      |   1 +
->>>> > >>  include/kvm/arm_pmu.h        |  10 ++++
->>>> > >>  virt/kvm/arm/pmu.c           | 122 +++++++++++++++++++++++++++++++++++++++++++
->>>> > >>  4 files changed, 136 insertions(+)
->>>> > >>  create mode 100644 virt/kvm/arm/pmu.c
->>>> > >>
->>>> > >> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
->>>> > >> index 4406184..2588f9c 100644
->>>> > >> --- a/arch/arm64/include/asm/pmu.h
->>>> > >> +++ b/arch/arm64/include/asm/pmu.h
->>>> > >> @@ -21,6 +21,7 @@
->>>> > >>  
->>>> > >>  #define ARMV8_MAX_COUNTERS      32
->>>> > >>  #define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
->>>> > >> +#define ARMV8_CYCLE_IDX         (ARMV8_MAX_COUNTERS - 1)
->>> > > 
->>> > > I'm not sure we want to add this. It's name is wrong, as it's really
->>> > > PMCNTENSET_EL0.C, and just a few lines above we have the idx defined
->>> > > already (ARMV8_IDX_CYCLE_COUNTER), but as zero, because
->>> > > arch/arm64/kernel/perf_event.c maps it that way.
->>> > > 
->>> > > I think we should do the same with the pmc array, i.e. map the cycle
->>> > > counter to idx zero.
->> > 
->> > I tend to have the opposite view. Not for the sake of it, but because I
->> > find it helpful to directly map the code to the architecture
->> > documentation without having to bend another handful of neurons.
->> > 
->> > Will probably had some good reasons to structure it that way, but I
->> > don't know the rational. Will?
-> It was years ago, but I suspect that the cycle counter is index zero
-> because its mandated, whilst the number of event counters is IMPDEF.
-So does it need to change the cycle counter index to zero in this patch set?
+Right, for now this is only intended for drivers which need to de-assert the
+reset and probe time and (re-)assert it when unbound (and maybe for
+suspend / resume, in which case the driver should be able to handle the reset
+never heaving been asserted on resume). This is also why reset_control_reset
+is not supported for shared resets.
 
-Thanks,
--- 
-Shannon
+I hope that we will never see a case where a reset is actually needed
+for error handling (so used outside of probe / suspend cases) and it is
+shared.
+
+> Instead, would it be better to require some central device to exclusively get the reset, and manage it. That device could then react to appropriate events to manage the reset. In this scheme, we wouldn't need the concept of shared resets at all. However, depending on why/when the reset needed to be re-asserted at run-time, this scheme wouldn't eliminate the co-ordination issue, but equally I don't believe it makes it any worse.
+
+If we ever need this kind of complexity, then yes a central service, with
+callbacks in to drivers requesting them to prepare for handling
+reset (like how usb does this) might be the best solution, but lets cross
+that bridge when we get there.
+
+Regards,
+
+Hans
