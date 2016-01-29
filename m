@@ -1,37 +1,78 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 29 Jan 2016 14:43:06 +0000
-Subject: [PATCH] vfio: pci: fix oops in case of vfio_msi_set_vector_signal
- failure
-Message-ID: <1454078586-5431-1-git-send-email-eric.auger@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 29 Jan 2016 22:44:55 +0800
+Subject: [PATCH RFC 03/15] mmc: sunxi: Block signal voltage switching
+ (CMD11)
+In-Reply-To: <CAPDyKFrG8cXChSRuAx-a++iNHUHU_GuUApDhxfPSJZb1Oo1fsg@mail.gmail.com>
+References: <1453354002-28366-1-git-send-email-wens@csie.org>
+ <1453354002-28366-4-git-send-email-wens@csie.org>
+ <CAPDyKFrG8cXChSRuAx-a++iNHUHU_GuUApDhxfPSJZb1Oo1fsg@mail.gmail.com>
+Message-ID: <CAGb2v65qHXN07Lz+W7rHM6yNc1OJpOj8d=Kgk-Q91fZJ0-eA4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case vfio_msi_set_vector_signal fails we tear down everything.
-In the tear down loop we compare int j against unsigned start. Given
-the arithmetic conversion I think it is converted into an unsigned and
-becomes 0xffffffff, leading to the loop being entered again and things
-turn bad when accessing vdev->msix[vector].vector. So let's use int
-parameters instead.
+On Fri, Jan 29, 2016 at 6:42 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 21 January 2016 at 06:26, Chen-Yu Tsai <wens@csie.org> wrote:
+>> Allwinner's mmc controller supports signal voltage switching. This is
+>> supported in code in Allwinner's kernel. However, publicly available
+>> boards all tie it to a fixed 3.0/3.3V regulator, with options to tie
+>> it to 1.8V for eMMC on some.
+>>
+>> Since Allwinner's kernel is an ancient 3.4, it is hard to say whether
+>> adapting it's code to a modern mainline kernel would work. Block signal
+>> voltage switching until someone has proper hardware to implement and
+>> test this.
+>>
+>> This only affects SD UHS-1 modes, as eMMC switches the voltage directly
+>> without any signaling.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  drivers/mmc/host/sunxi-mmc.c | 14 ++++++++++++++
+>>  1 file changed, 14 insertions(+)
+>>
+>> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+>> index 790f01662b4e..0495ae7da6d6 100644
+>> --- a/drivers/mmc/host/sunxi-mmc.c
+>> +++ b/drivers/mmc/host/sunxi-mmc.c
+>> @@ -816,6 +816,20 @@ static void sunxi_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
+>>                 }
+>>         }
+>>
+>> +       /*
+>> +        * TODO Support signal voltage switching
+>> +        *
+>> +        * Compared to Allwinner's kernel, recent updates in the mmc core
+>> +        * mean this should be as easy as setting the flags in cmd_val and
+>> +        * imask, and waiting for it to finish. However no boards support
+>> +        * this so this cannot be tested. Block it for now.
+>> +        */
+>> +       if (cmd->opcode == SD_SWITCH_VOLTAGE) {
+>> +               mrq->cmd->error = -EPERM;
+>> +               mmc_request_done(mmc, mrq);
+>> +               return;
+>> +       }
+>
+> Unless some of the MMC_CAP_UHS* mode is set, this command shouldn't be sent.
+>
+> So, if you *really* want to protect from this, I think it's better to
+> clear these caps in the ->probe() function, after mmc_of_parse() has
+> been called.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
----
- drivers/vfio/pci/vfio_pci_intrs.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+OK. If we need to block these, then we need to block all the other
+unsupported caps, which seems excessive and unnecessary. I'll drop
+this patch.
 
-diff --git a/drivers/vfio/pci/vfio_pci_intrs.c b/drivers/vfio/pci/vfio_pci_intrs.c
-index 3b3ba15..510c48d 100644
---- a/drivers/vfio/pci/vfio_pci_intrs.c
-+++ b/drivers/vfio/pci/vfio_pci_intrs.c
-@@ -374,8 +374,8 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
- 	return 0;
- }
- 
--static int vfio_msi_set_block(struct vfio_pci_device *vdev, unsigned start,
--			      unsigned count, int32_t *fds, bool msix)
-+static int vfio_msi_set_block(struct vfio_pci_device *vdev, int start,
-+			      int count, int32_t *fds, bool msix)
- {
- 	int i, j, ret = 0;
- 
--- 
-1.9.1
+Thanks
+ChenYu
+
+>
+>> +
+>>         if (cmd->opcode == MMC_GO_IDLE_STATE) {
+>>                 cmd_val |= SDXC_SEND_INIT_SEQUENCE;
+>>                 imask |= SDXC_COMMAND_DONE;
+>> --
+>> 2.7.0.rc3
+>>
+>
+> Kind regards
+> Uffe
