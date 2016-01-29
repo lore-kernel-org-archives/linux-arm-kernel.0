@@ -1,110 +1,32 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 29 Jan 2016 12:09:31 -0300
-Subject: [PATCH] drm/exynos: dp: Fix panel and bridge lookup logic
-Message-ID: <1454080171-23769-1-git-send-email-javier@osg.samsung.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 29 Jan 2016 16:25:30 +0100
+Subject: [PATCH 0/9] ARM: pxa/mmp cleanups and warning fixes
+In-Reply-To: <1454076396-3563101-1-git-send-email-arnd@arndb.de> (Arnd
+ Bergmann's message of "Fri, 29 Jan 2016 15:06:24 +0100")
+References: <1454076396-3563101-1-git-send-email-arnd@arndb.de>
+Message-ID: <87io2c76hh.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a9fa852886fd ("drm/exynos: dp: add of_graph dt binding support
-for panel") made the Exynos DP DT binding more consistent since the OF
-graph could be used to lookup either a panel or a bridge device node.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Before that commit, a panel would be looked up using a phandle and a
-bridge using the OF graph which made the DT binding not consistent.
+> These are all fixes for harmless warnings, aside from the first
+> patch, which is a cleanup. Please pick them up into the PXA
+> tree (my preference), or provide an Ack so I can put them
+> into arm-soc.
+Hi Arnd,
 
-But the patch broke the later case since not finding a panel dev node
-would cause the driver's to do a probe deferral instead of attempting
-to lookup a bridge device node associated with the remote endpoint.
+I'll pick them up, provided the acks (for clock tree for example). The
+pxa-for-4.6 will happen.
 
-So instead of returning a -EPROBE_DEFER if a panel is not found, check
-if there's a bridge and only do a probe deferral if both aren't found.
+I'll just have a check on 1/9 to verify nobody hides in a corner a direct CKEN
+access, and try to understand more thoroughly 7/9, all the others look good to
+me.
 
-Fixes: a9fa852886fd ("drm/exynos: dp: add of_graph dt binding support for panel")
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+As for the 9th patch, it's in the MMP tree. I can carry it if Haojian wishes,
+but I need his ack.
 
----
+Cheers.
 
- drivers/gpu/drm/exynos/exynos_dp_core.c | 55 +++++++++++++++------------------
- 1 file changed, 25 insertions(+), 30 deletions(-)
-
-diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c b/drivers/gpu/drm/exynos/exynos_dp_core.c
-index b79c316c2ad2..673164b331c8 100644
---- a/drivers/gpu/drm/exynos/exynos_dp_core.c
-+++ b/drivers/gpu/drm/exynos/exynos_dp_core.c
-@@ -1392,7 +1392,7 @@ static const struct component_ops exynos_dp_ops = {
- static int exynos_dp_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
--	struct device_node *panel_node = NULL, *bridge_node, *endpoint = NULL;
-+	struct device_node *np = NULL, *endpoint = NULL;
- 	struct exynos_dp_device *dp;
- 	int ret;
- 
-@@ -1404,41 +1404,36 @@ static int exynos_dp_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, dp);
- 
- 	/* This is for the backward compatibility. */
--	panel_node = of_parse_phandle(dev->of_node, "panel", 0);
--	if (panel_node) {
--		dp->panel = of_drm_find_panel(panel_node);
--		of_node_put(panel_node);
-+	np = of_parse_phandle(dev->of_node, "panel", 0);
-+	if (np) {
-+		dp->panel = of_drm_find_panel(np);
-+		of_node_put(np);
- 		if (!dp->panel)
- 			return -EPROBE_DEFER;
--	} else {
--		endpoint = of_graph_get_next_endpoint(dev->of_node, NULL);
--		if (endpoint) {
--			panel_node = of_graph_get_remote_port_parent(endpoint);
--			if (panel_node) {
--				dp->panel = of_drm_find_panel(panel_node);
--				of_node_put(panel_node);
--				if (!dp->panel)
--					return -EPROBE_DEFER;
--			} else {
--				DRM_ERROR("no port node for panel device.\n");
--				return -EINVAL;
--			}
--		}
--	}
--
--	if (endpoint)
- 		goto out;
-+	}
- 
- 	endpoint = of_graph_get_next_endpoint(dev->of_node, NULL);
- 	if (endpoint) {
--		bridge_node = of_graph_get_remote_port_parent(endpoint);
--		if (bridge_node) {
--			dp->ptn_bridge = of_drm_find_bridge(bridge_node);
--			of_node_put(bridge_node);
--			if (!dp->ptn_bridge)
--				return -EPROBE_DEFER;
--		} else
--			return -EPROBE_DEFER;
-+		np = of_graph_get_remote_port_parent(endpoint);
-+		if (np) {
-+			/* The remote port can be either a panel or a bridge */
-+			dp->panel = of_drm_find_panel(np);
-+			if (!dp->panel) {
-+				dp->ptn_bridge = of_drm_find_bridge(np);
-+				if (!dp->ptn_bridge) {
-+					of_node_put(np);
-+					return -EPROBE_DEFER;
-+				}
-+			}
-+			of_node_put(np);
-+		} else {
-+			DRM_ERROR("no remote endpoint device node found.\n");
-+			return -EINVAL;
-+		}
-+	} else {
-+		DRM_ERROR("no port endpoint subnode found.\n");
-+		return -EINVAL;
- 	}
- 
- out:
 -- 
-2.5.0
+Robert
