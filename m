@@ -1,49 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Jan 2016 15:50:34 +0100
-Subject: [PATCH 2/6] ARM: s3c24xx: allow selecting S3C2440_XTAL_16934400 for
- s3c2442
+Date: Fri, 29 Jan 2016 15:50:35 +0100
+Subject: [PATCH 3/6] ARM: s3c24xx: fix unused gta02_configure_pmu_for_charger
+ warning
 In-Reply-To: <1454079040-3567945-1-git-send-email-arnd@arndb.de>
 References: <1454079040-3567945-1-git-send-email-arnd@arndb.de>
-Message-ID: <1454079040-3567945-3-git-send-email-arnd@arndb.de>
+Message-ID: <1454079040-3567945-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The S3C2440_XTAL_16934400 and S3C2440_XTAL_12000000 symbols are used
-for both s3c2442 and s3c2440, but Kconfig only allows it to be selected
-if CPU_S3C2440 is enabled, which can lead to a warning otherwise:
+gta02_configure_pmu_for_charger is only used when CONFIG_PCF50633_ADC
+is set, and otherwise we get a warning about an unused symbol:
 
-warning: (MACH_RX1950) selects S3C2440_XTAL_16934400 which has unmet direct dependencies (ARCH_S3C24XX && CPU_S3C2440)
+arch/arm/mach-s3c24xx/mach-gta02.c:158:1: warning: 'gta02_configure_pmu_for_charger' defined but not used [-Wunused-function]
+ gta02_configure_pmu_for_charger(struct pcf50633 *pcf, void *unused, int res)
 
-This changes the dependencies to make it possible also for CPU_S3C2442-only
-configurations.
+This adds an #ifdef to shut up the warning.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-s3c24xx/Kconfig | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/mach-s3c24xx/mach-gta02.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index c94ef77405ed..5884bbb7952e 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -405,7 +405,7 @@ config MACH_S3C2416_DT
+diff --git a/arch/arm/mach-s3c24xx/mach-gta02.c b/arch/arm/mach-s3c24xx/mach-gta02.c
+index 6d1e0b9c5b27..27ae6877550f 100644
+--- a/arch/arm/mach-s3c24xx/mach-gta02.c
++++ b/arch/arm/mach-s3c24xx/mach-gta02.c
+@@ -154,6 +154,7 @@ static struct s3c2410_uartcfg gta02_uartcfgs[] = {
+ #define ADC_NOM_CHG_DETECT_1A 6
+ #define ADC_NOM_CHG_DETECT_USB 43
  
- endif	# CPU_S3C2416
++#ifdef CONFIG_PCF50633_ADC
+ static void
+ gta02_configure_pmu_for_charger(struct pcf50633 *pcf, void *unused, int res)
+ {
+@@ -174,6 +175,7 @@ gta02_configure_pmu_for_charger(struct pcf50633 *pcf, void *unused, int res)
  
--if CPU_S3C2440
-+if CPU_S3C2440 || CPU_S3C2442
+ 	pcf50633_mbc_usb_curlim_set(pcf, ma);
+ }
++#endif
  
- config S3C2440_XTAL_12000000
- 	bool
-@@ -432,6 +432,9 @@ config S3C2440_PLL_16934400
- 	default y if S3C24XX_PLL
- 	help
- 	  PLL tables for S3C2440 or S3C2442 CPUs with 16.934MHz crystals.
-+endif
-+
-+if CPU_S3C2440
- 
- comment "S3C2440 Boards"
- 
+ static struct delayed_work gta02_charger_work;
+ static int gta02_usb_vbus_draw;
 -- 
 2.7.0
