@@ -1,152 +1,74 @@
-From: liguo.zhang@mediatek.com (Liguo Zhang)
-Date: Fri, 29 Jan 2016 09:35:31 +0800
-Subject: [PATCH v3] i2c: mt8173: add 4GB mode support in i2c driver.
-Message-ID: <1454031331-9107-1-git-send-email-liguo.zhang@mediatek.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 29 Jan 2016 10:36:03 +0100
+Subject: [PATCH 1/3] arm64: efistub: drop __init annotation from
+ handle_kernel_image()
+In-Reply-To: <20160128225809.GF2571@codeblueprint.co.uk>
+References: <1453979254-25374-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1453979254-25374-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160128225809.GF2571@codeblueprint.co.uk>
+Message-ID: <CAKv+Gu9sE4oJrFmSK8sEjTrU8A7k53Hj1S1pTyCqyA5Gsba2Kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If 4GB mode is enable, we should add 4gb mode support in i2c driver.
-Set 4GB mode register to support 4GB mode.
+On 28 January 2016 at 23:58, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> On Thu, 28 Jan, at 12:07:32PM, Ard Biesheuvel wrote:
+>> After moving arm64-stub.c to libstub/, all of its sections are emitted
+>> as .init.xxx sections automatically, and the __init annotation of
+>> handle_kernel_image() causes it to end up in .init.init.text, which is
+>> not recognized as an __init section by the linker scripts. So drop the
+>> annotation.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  drivers/firmware/efi/libstub/arm64-stub.c | 14 +++++++-------
+>>  1 file changed, 7 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
+>> index 78dfbd34b6bf..9e0342745e4f 100644
+>> --- a/drivers/firmware/efi/libstub/arm64-stub.c
+>> +++ b/drivers/firmware/efi/libstub/arm64-stub.c
+>> @@ -13,13 +13,13 @@
+>>  #include <asm/efi.h>
+>>  #include <asm/sections.h>
+>>
+>> -efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
+>> -                                     unsigned long *image_addr,
+>> -                                     unsigned long *image_size,
+>> -                                     unsigned long *reserve_addr,
+>> -                                     unsigned long *reserve_size,
+>> -                                     unsigned long dram_base,
+>> -                                     efi_loaded_image_t *image)
+>> +efi_status_t handle_kernel_image(efi_system_table_t *sys_table_arg,
+>> +                              unsigned long *image_addr,
+>> +                              unsigned long *image_size,
+>> +                              unsigned long *reserve_addr,
+>> +                              unsigned long *reserve_size,
+>> +                              unsigned long dram_base,
+>> +                              efi_loaded_image_t *image)
+>>  {
+>>       efi_status_t status;
+>>       unsigned long kernel_size, kernel_memsize = 0;
+>> --
+>> 2.5.0
+>>
+>
+> Would it make more sense to #undef __init in one of the arm64 efistub
+> header files? I'm thinking of the case where some poor unsuspecting
+> developer writes a new function and marks it as __init, and we miss it
+> during review.
+>
 
-Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
----
-change in v3:
-Only inline the computation of reg_4g_mode in mtk_i2c_set_4g_mode().
-change in v2:
-Define a static inline funtion mtk_i2c_set_4g_mode() for support 4g mode.
----
- drivers/i2c/busses/i2c-mt65xx.c | 42 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+Yes, I can add it to efistub.h, and make sure it gets included in all the files
 
-diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
-index aec8e6c..3c484f0 100644
---- a/drivers/i2c/busses/i2c-mt65xx.c
-+++ b/drivers/i2c/busses/i2c-mt65xx.c
-@@ -60,6 +60,7 @@
- #define I2C_DMA_INT_FLAG_NONE		0x0000
- #define I2C_DMA_CLR_FLAG		0x0000
- #define I2C_DMA_HARD_RST		0x0002
-+#define I2C_DMA_4G_MODE			0x0001
- 
- #define I2C_DEFAULT_SPEED		100000	/* hz */
- #define MAX_FS_MODE_SPEED		400000
-@@ -88,6 +89,8 @@ enum DMA_REGS_OFFSET {
- 	OFFSET_RX_MEM_ADDR = 0x20,
- 	OFFSET_TX_LEN = 0x24,
- 	OFFSET_RX_LEN = 0x28,
-+	OFFSET_TX_4G_MODE = 0x54,
-+	OFFSET_RX_4G_MODE = 0x58,
- };
- 
- enum i2c_trans_st_rs {
-@@ -133,6 +136,7 @@ struct mtk_i2c_compatible {
- 	unsigned char dcm: 1;
- 	unsigned char auto_restart: 1;
- 	unsigned char aux_len_reg: 1;
-+	unsigned char support_33bits: 1;
- };
- 
- struct mtk_i2c {
-@@ -182,6 +186,7 @@ static const struct mtk_i2c_compatible mt6577_compat = {
- 	.dcm = 1,
- 	.auto_restart = 0,
- 	.aux_len_reg = 0,
-+	.support_33bits = 0,
- };
- 
- static const struct mtk_i2c_compatible mt6589_compat = {
-@@ -190,6 +195,7 @@ static const struct mtk_i2c_compatible mt6589_compat = {
- 	.dcm = 0,
- 	.auto_restart = 0,
- 	.aux_len_reg = 0,
-+	.support_33bits = 0,
- };
- 
- static const struct mtk_i2c_compatible mt8173_compat = {
-@@ -198,6 +204,7 @@ static const struct mtk_i2c_compatible mt8173_compat = {
- 	.dcm = 1,
- 	.auto_restart = 1,
- 	.aux_len_reg = 1,
-+	.support_33bits = 1,
- };
- 
- static const struct of_device_id mtk_i2c_of_match[] = {
-@@ -366,6 +373,11 @@ static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk,
- 	return 0;
- }
- 
-+static inline u32 mtk_i2c_set_4g_mode(dma_addr_t addr)
-+{
-+	return (addr & BIT(32)) ? I2C_DMA_4G_MODE : I2C_DMA_CLR_FLAG;
-+}
-+
- static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 			       int num, int left_num)
- {
-@@ -373,6 +385,7 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 	u16 start_reg;
- 	u16 control_reg;
- 	u16 restart_flag = 0;
-+	u32 reg_4g_mode = 0;
- 	dma_addr_t rpaddr = 0;
- 	dma_addr_t wpaddr = 0;
- 	int ret;
-@@ -439,6 +452,12 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 					msgs->len, DMA_FROM_DEVICE);
- 		if (dma_mapping_error(i2c->dev, rpaddr))
- 			return -ENOMEM;
-+
-+		if (i2c->dev_comp->support_33bits) {
-+			reg_4g_mode = mtk_i2c_set_4g_mode(rpaddr);
-+			writel(reg_4g_mode, i2c->pdmabase + OFFSET_RX_4G_MODE);
-+		}
-+
- 		writel((u32)rpaddr, i2c->pdmabase + OFFSET_RX_MEM_ADDR);
- 		writel(msgs->len, i2c->pdmabase + OFFSET_RX_LEN);
- 	} else if (i2c->op == I2C_MASTER_WR) {
-@@ -448,6 +467,12 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 					msgs->len, DMA_TO_DEVICE);
- 		if (dma_mapping_error(i2c->dev, wpaddr))
- 			return -ENOMEM;
-+
-+		if (i2c->dev_comp->support_33bits) {
-+			reg_4g_mode = mtk_i2c_set_4g_mode(wpaddr);
-+			writel(reg_4g_mode, i2c->pdmabase + OFFSET_TX_4G_MODE);
-+		}
-+
- 		writel((u32)wpaddr, i2c->pdmabase + OFFSET_TX_MEM_ADDR);
- 		writel(msgs->len, i2c->pdmabase + OFFSET_TX_LEN);
- 	} else {
-@@ -465,6 +490,15 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 					 msgs->len, DMA_TO_DEVICE);
- 			return -ENOMEM;
- 		}
-+
-+		if (i2c->dev_comp->support_33bits) {
-+			reg_4g_mode = mtk_i2c_set_4g_mode(wpaddr);
-+			writel(reg_4g_mode, i2c->pdmabase + OFFSET_TX_4G_MODE);
-+
-+			reg_4g_mode = mtk_i2c_set_4g_mode(rpaddr);
-+			writel(reg_4g_mode, i2c->pdmabase + OFFSET_RX_4G_MODE);
-+		}
-+
- 		writel((u32)wpaddr, i2c->pdmabase + OFFSET_TX_MEM_ADDR);
- 		writel((u32)rpaddr, i2c->pdmabase + OFFSET_RX_MEM_ADDR);
- 		writel(msgs->len, i2c->pdmabase + OFFSET_TX_LEN);
-@@ -729,6 +763,14 @@ static int mtk_i2c_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
-+	if (i2c->dev_comp->support_33bits) {
-+		ret = dma_set_mask(&pdev->dev, DMA_BIT_MASK(33));
-+		if (ret) {
-+			dev_err(&pdev->dev, "dma_set_mask return error.\n");
-+			return ret;
-+		}
-+	}
-+
- 	ret = mtk_i2c_clock_enable(i2c);
- 	if (ret) {
- 		dev_err(&pdev->dev, "clock enable failed!\n");
--- 
-1.8.1.1.dirty
+Should we #undef it and #define it to a string that is easily grep'ed
+for, so it is easy to find the explanatory comment that goes along
+with it?
+E.g.,
+
+#define __init __init_not_supported_in_efi_stub
+
+> At least if we do the #undef we can document why __init makes no sense
+> in the EFI stub, and at the same time automatically fix things up.
+>
+> An alternative would be to write some Kbuild magic that complains if
+> it sees __init, but that seems like more work than is reasonable.
