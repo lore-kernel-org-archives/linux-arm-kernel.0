@@ -1,39 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Jan 2016 12:39:15 +0100
-Subject: [PATCH v2 7/7] net: tg3: avoid uninitialized variable warning
-In-Reply-To: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
-References: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
-Message-ID: <1454067557-3546883-8-git-send-email-arnd@arndb.de>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 29 Jan 2016 13:42:40 +0200
+Subject: [PATCH] fbdev: da8xx-fb: remove incorrect type cast
+In-Reply-To: <1453734351-1958373-1-git-send-email-arnd@arndb.de>
+References: <1453734351-1958373-1-git-send-email-arnd@arndb.de>
+Message-ID: <56AB5030.5040203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tg3_set_eeprom() function correctly initializes the 'start' variable,
-but gcc generates a false warning:
 
-drivers/net/ethernet/broadcom/tg3.c: In function 'tg3_set_eeprom':
-drivers/net/ethernet/broadcom/tg3.c:12057:4: warning: 'start' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
-I have not come up with a way to restructure the code in a way that
-avoids the warning without making it less readable, so this adds an
-initialization for the declaration to shut up that warning.
+On 25/01/16 17:05, Arnd Bergmann wrote:
+> The probe function correct passes a dma_addr_t pointer into
+> dma_alloc_coherent(), but has a cast to resource_size_t, which
+> might be different from dma_addr_t:
+> 
+> drivers/video/fbdev/da8xx-fb.c: In function 'fb_probe':
+> drivers/video/fbdev/da8xx-fb.c:1431:10: error: passing argument 3 of 'dma_alloc_coherent' from incompatible pointer type [-Werror=incompatible-pointer-types]
+> 
+> This removes the cast, which avoids the warning.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/video/fbdev/da8xx-fb.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/net/ethernet/broadcom/tg3.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks, queued for 4.5 fixes.
 
-diff --git a/drivers/net/ethernet/broadcom/tg3.c b/drivers/net/ethernet/broadcom/tg3.c
-index 9293675df7ba..49eea8981332 100644
---- a/drivers/net/ethernet/broadcom/tg3.c
-+++ b/drivers/net/ethernet/broadcom/tg3.c
-@@ -12016,7 +12016,7 @@ static int tg3_set_eeprom(struct net_device *dev, struct ethtool_eeprom *eeprom,
- 	int ret;
- 	u32 offset, len, b_offset, odd_len;
- 	u8 *buf;
--	__be32 start, end;
-+	__be32 start = 0, end;
- 
- 	if (tg3_flag(tp, NO_NVRAM) ||
- 	    eeprom->magic != TG3_EEPROM_MAGIC)
--- 
-2.7.0
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160129/a67d14d2/attachment-0001.sig>
