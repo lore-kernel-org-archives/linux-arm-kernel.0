@@ -1,111 +1,122 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 29 Jan 2016 12:40:12 +0100
-Subject: [PATCH RFC 04/15] mmc: sunxi: Support vqmmc regulator
-In-Reply-To: <1453354002-28366-5-git-send-email-wens@csie.org>
-References: <1453354002-28366-1-git-send-email-wens@csie.org>
- <1453354002-28366-5-git-send-email-wens@csie.org>
-Message-ID: <CAPDyKFr2PKg83bmewu-iP7HxrUp8QZODBswevpuP3YeX3Mm6tg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 29 Jan 2016 12:39:11 +0100
+Subject: [PATCH v2 3/7] net: hp100: remove unnecessary #ifdefs
+In-Reply-To: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
+References: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
+Message-ID: <1454067557-3546883-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 January 2016 at 06:26, Chen-Yu Tsai <wens@csie.org> wrote:
-> eMMC chips require 2 power supplies, vmmc for internal logic, and vqmmc
-> for driving output buffers. vqmmc also controls signaling voltage. Most
-> boards we've seen use the same regulator for both, nevertheless the 2
-> have different usages, and should be set separately.
->
-> This patch adds support for vqmmc regulator supply, including voltage
-> switching. The MMC core can use this to try different signaling voltages
-> for eMMC.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Building the hp100 ethernet driver causes warnings when both the PCI
+and EISA drivers are disabled:
 
-Thanks, applied for next!
+ethernet/hp/hp100.c: In function 'hp100_module_init':
+ethernet/hp/hp100.c:3047:2: warning: label 'out3' defined but not used [-Wunused-label]
+ethernet/hp/hp100.c: At top level:
+ethernet/hp/hp100.c:2828:13: warning: 'cleanup_dev' defined but not used [-Wunused-function]
 
-Kind regards
-Uffe
+We can easily avoid the warnings and make the driver look slightly
+nicer by removing the #ifdefs that check for the CONFIG_PCI and
+CONFIG_EISA, as all the registration functions are designed to
+have no effect when the buses are disabled.
 
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 31 +++++++++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 0495ae7da6d6..4bec87458317 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -28,6 +28,7 @@
->  #include <linux/dma-mapping.h>
->  #include <linux/slab.h>
->  #include <linux/reset.h>
-> +#include <linux/regulator/consumer.h>
->
->  #include <linux/of_address.h>
->  #include <linux/of_gpio.h>
-> @@ -256,6 +257,9 @@ struct sunxi_mmc_host {
->         struct mmc_request *mrq;
->         struct mmc_request *manual_stop_mrq;
->         int             ferror;
-> +
-> +       /* vqmmc */
-> +       bool            vqmmc_enabled;
->  };
->
->  static int sunxi_mmc_reset_host(struct sunxi_mmc_host *host)
-> @@ -716,6 +720,16 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->                 if (host->ferror)
->                         return;
->
-> +               if (!IS_ERR(mmc->supply.vqmmc)) {
-> +                       host->ferror = regulator_enable(mmc->supply.vqmmc);
-> +                       if (host->ferror) {
-> +                               dev_err(mmc_dev(mmc),
-> +                                       "failed to enable vqmmc\n");
-> +                               return;
-> +                       }
-> +                       host->vqmmc_enabled = true;
-> +               }
-> +
->                 host->ferror = sunxi_mmc_init_host(mmc);
->                 if (host->ferror)
->                         return;
-> @@ -727,6 +741,9 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->                 dev_dbg(mmc_dev(mmc), "power off!\n");
->                 sunxi_mmc_reset_host(host);
->                 mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
-> +               if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled)
-> +                       regulator_disable(mmc->supply.vqmmc);
-> +               host->vqmmc_enabled = false;
->                 break;
->         }
->
-> @@ -758,6 +775,19 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->         }
->  }
->
-> +static int sunxi_mmc_volt_switch(struct mmc_host *mmc, struct mmc_ios *ios)
-> +{
-> +       /* vqmmc regulator is available */
-> +       if (!IS_ERR(mmc->supply.vqmmc))
-> +               return mmc_regulator_set_vqmmc(mmc, ios);
-> +
-> +       /* no vqmmc regulator, assume fixed regulator at 3/3.3V */
-> +       if (mmc->ios.signal_voltage == MMC_SIGNAL_VOLTAGE_330)
-> +               return 0;
-> +
-> +       return -EINVAL;
-> +}
-> +
->  static void sunxi_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
->  {
->         struct sunxi_mmc_host *host = mmc_priv(mmc);
-> @@ -923,6 +953,7 @@ static struct mmc_host_ops sunxi_mmc_ops = {
->         .get_ro          = mmc_gpio_get_ro,
->         .get_cd          = mmc_gpio_get_cd,
->         .enable_sdio_irq = sunxi_mmc_enable_sdio_irq,
-> +       .start_signal_voltage_switch = sunxi_mmc_volt_switch,
->         .hw_reset        = sunxi_mmc_hw_reset,
->         .card_busy       = sunxi_mmc_card_busy,
->  };
-> --
-> 2.7.0.rc3
->
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/net/ethernet/hp/hp100.c | 18 ------------------
+ 1 file changed, 18 deletions(-)
+
+diff --git a/drivers/net/ethernet/hp/hp100.c b/drivers/net/ethernet/hp/hp100.c
+index 1d5c3e16d8f4..3daf2d4a7ca0 100644
+--- a/drivers/net/ethernet/hp/hp100.c
++++ b/drivers/net/ethernet/hp/hp100.c
+@@ -194,7 +194,6 @@ static const char *hp100_isa_tbl[] = {
+ };
+ #endif
+ 
+-#ifdef CONFIG_EISA
+ static struct eisa_device_id hp100_eisa_tbl[] = {
+ 	{ "HWPF180" }, /* HP J2577 rev A */
+ 	{ "HWP1920" }, /* HP 27248B */
+@@ -205,9 +204,7 @@ static struct eisa_device_id hp100_eisa_tbl[] = {
+ 	{ "" }	       /* Mandatory final entry ! */
+ };
+ MODULE_DEVICE_TABLE(eisa, hp100_eisa_tbl);
+-#endif
+ 
+-#ifdef CONFIG_PCI
+ static const struct pci_device_id hp100_pci_tbl[] = {
+ 	{PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_J2585A, PCI_ANY_ID, PCI_ANY_ID,},
+ 	{PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_J2585B, PCI_ANY_ID, PCI_ANY_ID,},
+@@ -219,7 +216,6 @@ static const struct pci_device_id hp100_pci_tbl[] = {
+ 	{}			/* Terminating entry */
+ };
+ MODULE_DEVICE_TABLE(pci, hp100_pci_tbl);
+-#endif
+ 
+ static int hp100_rx_ratio = HP100_DEFAULT_RX_RATIO;
+ static int hp100_priority_tx = HP100_DEFAULT_PRIORITY_TX;
+@@ -2842,7 +2838,6 @@ static void cleanup_dev(struct net_device *d)
+ 	free_netdev(d);
+ }
+ 
+-#ifdef CONFIG_EISA
+ static int hp100_eisa_probe(struct device *gendev)
+ {
+ 	struct net_device *dev = alloc_etherdev(sizeof(struct hp100_private));
+@@ -2884,9 +2879,7 @@ static struct eisa_driver hp100_eisa_driver = {
+ 		.remove  = hp100_eisa_remove,
+         }
+ };
+-#endif
+ 
+-#ifdef CONFIG_PCI
+ static int hp100_pci_probe(struct pci_dev *pdev,
+ 			   const struct pci_device_id *ent)
+ {
+@@ -2955,7 +2948,6 @@ static struct pci_driver hp100_pci_driver = {
+ 	.probe		= hp100_pci_probe,
+ 	.remove		= hp100_pci_remove,
+ };
+-#endif
+ 
+ /*
+  *  module section
+@@ -3032,23 +3024,17 @@ static int __init hp100_module_init(void)
+ 	err = hp100_isa_init();
+ 	if (err && err != -ENODEV)
+ 		goto out;
+-#ifdef CONFIG_EISA
+ 	err = eisa_driver_register(&hp100_eisa_driver);
+ 	if (err && err != -ENODEV)
+ 		goto out2;
+-#endif
+-#ifdef CONFIG_PCI
+ 	err = pci_register_driver(&hp100_pci_driver);
+ 	if (err && err != -ENODEV)
+ 		goto out3;
+-#endif
+  out:
+ 	return err;
+  out3:
+-#ifdef CONFIG_EISA
+ 	eisa_driver_unregister (&hp100_eisa_driver);
+  out2:
+-#endif
+ 	hp100_isa_cleanup();
+ 	goto out;
+ }
+@@ -3057,12 +3043,8 @@ static int __init hp100_module_init(void)
+ static void __exit hp100_module_exit(void)
+ {
+ 	hp100_isa_cleanup();
+-#ifdef CONFIG_EISA
+ 	eisa_driver_unregister (&hp100_eisa_driver);
+-#endif
+-#ifdef CONFIG_PCI
+ 	pci_unregister_driver (&hp100_pci_driver);
+-#endif
+ }
+ 
+ module_init(hp100_module_init)
+-- 
+2.7.0
