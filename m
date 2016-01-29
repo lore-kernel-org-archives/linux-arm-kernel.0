@@ -1,146 +1,86 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Fri, 29 Jan 2016 12:24:45 +0200
-Subject: [PATCH V8 22/23] perf tools: making coresight PMU listable
-In-Reply-To: <20160125211011.GD22501@kernel.org>
-References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
- <1452807977-8069-23-git-send-email-mathieu.poirier@linaro.org>
- <CANLsYkxrRFjaTpYq3+-MnzMe6CenSop9Y0ph-0ZWOZoqNpRPgw@mail.gmail.com>
- <20160125211011.GD22501@kernel.org>
-Message-ID: <56AB3DED.9030700@intel.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri, 29 Jan 2016 10:36:27 +0000
+Subject: [PATCH 0/4] Update cpu feature extraction
+In-Reply-To: <20160128170141.GM10826@n2100.arm.linux.org.uk>
+References: <1453800223-18590-1-git-send-email-vladimir.murzin@arm.com>
+ <56A9F7C6.2060109@arm.com> <20160128170141.GM10826@n2100.arm.linux.org.uk>
+Message-ID: <56AB40AB.8070302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/01/16 23:10, Arnaldo Carvalho de Melo wrote:
-> Em Mon, Jan 25, 2016 at 01:49:47PM -0700, Mathieu Poirier escreveu:
->> On 14 January 2016 at 14:46, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
->>> Adding the required mechanic allowing 'perf list pmu' to
->>> discover coresight ETM/PTM tracers.
+On 28/01/16 17:01, Russell King - ARM Linux wrote:
+> On Thu, Jan 28, 2016 at 11:13:10AM +0000, Vladimir Murzin wrote:
+>> On 26/01/16 09:23, Vladimir Murzin wrote:
+>>> Hi,
 >>>
->>> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
->>> Cc: Ingo Molnar <mingo@redhat.com>
->>> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
->>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->>> ---
->>>  MAINTAINERS                    |  1 +
->>>  tools/perf/arch/arm/util/Build |  2 ++
->>>  tools/perf/arch/arm/util/pmu.c | 34 ++++++++++++++++++++++++++++++++++
->>>  tools/perf/config/Makefile     | 17 ++++++++++++-----
->>>  4 files changed, 49 insertions(+), 5 deletions(-)
->>>  create mode 100644 tools/perf/arch/arm/util/pmu.c
+>>> This has been started as a fix in cpu feature extractor, but Suzuki suggested
+>>> syncing-up the whole cpu feature handling with the recent updates on arm64
+>>> side [1,2].
 >>>
->>> diff --git a/MAINTAINERS b/MAINTAINERS
->>> index 233f83464814..b2a92245eece 100644
->>> --- a/MAINTAINERS
->>> +++ b/MAINTAINERS
->>> @@ -1007,6 +1007,7 @@ F:        drivers/hwtracing/coresight/*
->>>  F:     Documentation/trace/coresight.txt
->>>  F:     Documentation/devicetree/bindings/arm/coresight.txt
->>>  F:     Documentation/ABI/testing/sysfs-bus-coresight-devices-*
->>> +F:     tools/perf/arch/arm/util/pmu.c
+>>> I've kept fixes separately, so they can go as the are in case there is concern
+>>> on updating cpu feature handling.
 >>>
->>>  ARM/CORGI MACHINE SUPPORT
->>>  M:     Richard Purdie <rpurdie@rpsys.net>
->>> diff --git a/tools/perf/arch/arm/util/Build b/tools/perf/arch/arm/util/Build
->>> index d22e3d07de3d..66ab0b05549c 100644
->>> --- a/tools/perf/arch/arm/util/Build
->>> +++ b/tools/perf/arch/arm/util/Build
->>> @@ -2,3 +2,5 @@ libperf-$(CONFIG_DWARF) += dwarf-regs.o
->>>
->>>  libperf-$(CONFIG_LIBUNWIND)          += unwind-libunwind.o
->>>  libperf-$(CONFIG_LIBDW_DWARF_UNWIND) += unwind-libdw.o
->>> +
->>> +libperf-$(CONFIG_AUXTRACE) += pmu.o
->>> diff --git a/tools/perf/arch/arm/util/pmu.c b/tools/perf/arch/arm/util/pmu.c
->>> new file mode 100644
->>> index 000000000000..af9fb666b44f
->>> --- /dev/null
->>> +++ b/tools/perf/arch/arm/util/pmu.c
->>> @@ -0,0 +1,34 @@
->>> +/*
->>> + * Copyright(C) 2015 Linaro Limited. All rights reserved.
->>> + * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify it
->>> + * under the terms of the GNU General Public License version 2 as published by
->>> + * the Free Software Foundation.
->>> + *
->>> + * This program is distributed in the hope that it will be useful, but WITHOUT
->>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->>> + * more details.
->>> + *
->>> + * You should have received a copy of the GNU General Public License along with
->>> + * this program.  If not, see <http://www.gnu.org/licenses/>.
->>> + */
->>> +
->>> +#include <string.h>
->>> +#include <linux/coresight-pmu.h>
-
-Probably need to add include/linux/coresight-pmu.h it to tools/perf/MANIFEST
-
->>> +#include <linux/perf_event.h>
->>> +
->>> +#include "../../util/pmu.h"
->>> +
->>> +struct perf_event_attr
->>> +*perf_pmu__get_default_config(struct perf_pmu *pmu __maybe_unused)
->>> +{
->>> +#ifdef HAVE_AUXTRACE_SUPPORT
->>> +       if (!strcmp(pmu->name, CORESIGHT_ETM_PMU_NAME)) {
->>> +               /* add ETM default config here */
->>> +               pmu->selectable = true;
->>> +       }
->>> +#endif
->>> +       return NULL;
->>> +}
->>> diff --git a/tools/perf/config/Makefile b/tools/perf/config/Makefile
->>> index de89ec574361..905faabff8b1 100644
->>> --- a/tools/perf/config/Makefile
->>> +++ b/tools/perf/config/Makefile
->>> @@ -647,12 +647,19 @@ ifdef LIBBABELTRACE
->>>  endif
->>>
->>>  ifndef NO_AUXTRACE
->>> -  ifeq ($(feature-get_cpuid), 0)
->>> -    msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
->>> -    NO_AUXTRACE := 1
->>> +  ifeq ($(ARCH),x86)
->>> +    ifeq ($(feature-get_cpuid), 0)
->>> +      msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
->>> +      NO_AUXTRACE := 1
->>> +    else
->>> +      $(call detected,CONFIG_AUXTRACE)
->>> +      CFLAGS += -DHAVE_AUXTRACE_SUPPORT
->>> +    endif
->>>    else
->>> -    $(call detected,CONFIG_AUXTRACE)
->>> -    CFLAGS += -DHAVE_AUXTRACE_SUPPORT
->>> +    ifeq ($(ARCH),$(filter $(ARCH), arm arm64))
->>> +      $(call detected,CONFIG_AUXTRACE)
->>> +      CFLAGS += -DHAVE_AUXTRACE_SUPPORT
->>> +    endif
-
-We still want AUXTRACE support by default, to support being able to decode a
-trace from one machine on any other machine, so this should not exclude
-HAVE_AUXTRACE_SUPPORT from every arch except x86 and arm.
-
->>>    endif
->>>  endif
->>>
->>> --
->>> 2.1.4
+>>> [1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/455568
+>>> [2] https://lkml.org/lkml/2015/11/18/570
 >>>
 >>
->> Arnaldo,
->>
->> This is the third (of four) patch that I can't queue without a
->> reviewed by from you.
->>
->> It has been rebased to 4.5-rc1 here [1] for your convenience.  I will
->> be happy to use another baseline should that be more adequate for you.
+>> Russell, is it OK for patch tracker?
 > 
-> Adrian,
+> I'd really like to hear that someone has validated these changes or at
+> least someone in ARM Ltd such as Will or Catalin has reviewed them; I
+> remember the subject of whether certain fields are signed or unsigned
+> being almost a personal opinion - we used to treat all fields as
+> unsigned, but that was declared to be wrong, so we then went to treating
+> them all as signed fields... See:
 > 
-> 	Are you ok with this?
+> commit b8c9592b4a6c93211c8163888a97880d608503b5
+> Author: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Date:   Thu Mar 19 19:03:25 2015 +0100
+> 
+>     ARM: 8318/1: treat CPU feature register fields as signed quantities
+> 
+>     The various CPU feature registers consist of 4-bit blocks that
+>     represent signed quantities, whose positive values represent
+>     incremental features, and whose negative values are reserved.
+> 
+>     To improve forward compatibility, update the feature detection
+>     code to take possible future higher values into account, but
+>     ignore negative values.
+> 
+>     Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> For instance:
+> 
+> -       sync_prim = ((read_cpuid_ext(CPUID_EXT_ISAR3) >> 8) & 0xf0) |
+> -                   ((read_cpuid_ext(CPUID_EXT_ISAR4) >> 20) & 0x0f);
+> -       if (sync_prim >= 0x13)
+> +       if (cpuid_feature_extract(CPUID_EXT_ISAR3, 12) > 1 ||
+> +           (cpuid_feature_extract(CPUID_EXT_ISAR3, 12) == 1 &&
+> +            cpuid_feature_extract(CPUID_EXT_ISAR3, 20) >= 3))
+>                 elf_hwcap &= ~HWCAP_SWP;
+> 
+> (let's ignore the ISAR4 vs ISAR3 problem).  What if ISAR4 20:23 have
+> bit 23 set?  In the original code, that would be treated as being ">= 3"
+> but in the new code, that's less than zero, so would fail the test.
+> 
+> I think we had much the same questions back in March 2015 when this was
+> last discussed, when I raised the issue of there being a documentation
+> bug in that the documentation doesn't make it clear how reserved 4-bit
+> CPU ID fields should be intepreted.
+> 
+> What I'd like to see is some kind of positive concensus on this (and
+> a doc update); what I don't want to do is to apply these patches and
+> then get another round of patches converting some of them back to
+> signed tests, and then later another set of patches doing the reverse,
+> because that seems to be what's now happening.
+> 
 
-See comments
+It is fair point. Since this topic is quite fuzzy and discussion can
+take some time I'd be happy if only fixes (the first two patches) can
+find their way to mainline independent of the rest of the series.
+
+Is it OK for patches 1/4 and 2/4 to go in patch tracker?
+
+Thanks
+Vladimir
