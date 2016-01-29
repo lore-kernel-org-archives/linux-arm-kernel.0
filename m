@@ -1,39 +1,39 @@
 From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Fri, 29 Jan 2016 18:19:18 -0500
-Subject: [PATCH v7 7/7] ARM: dts: imx: Add support for Advantech/GE B850v3
+Date: Fri, 29 Jan 2016 18:19:17 -0500
+Subject: [PATCH v7 6/7] ARM: dts: imx: Add support for Advantech/GE B650v3
 In-Reply-To: <1454109558-22800-1-git-send-email-akshay.bhat@timesys.com>
 References: <1454109558-22800-1-git-send-email-akshay.bhat@timesys.com>
-Message-ID: <1454109558-22800-8-git-send-email-akshay.bhat@timesys.com>
+Message-ID: <1454109558-22800-7-git-send-email-akshay.bhat@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Advantech/GE B850v3 board.
+Add support for Advantech/GE B650v3 board.
 
 Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
 ---
- arch/arm/boot/dts/Makefile         |   1 +
- arch/arm/boot/dts/imx6q-b850v3.dts | 157 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 158 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-b850v3.dts
+ arch/arm/boot/dts/Makefile         |  1 +
+ arch/arm/boot/dts/imx6q-b650v3.dts | 88 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 89 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-b650v3.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a3db1a7..fc5d5ea 100644
+index 0c15c0f..a3db1a7 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -324,6 +324,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+@@ -323,6 +323,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-apf6dev.dtb \
  	imx6q-arm2.dtb \
  	imx6q-b450v3.dtb \
- 	imx6q-b650v3.dtb \
-+	imx6q-b850v3.dtb \
++	imx6q-b650v3.dtb \
  	imx6q-cm-fx6.dtb \
  	imx6q-cubox-i.dtb \
  	imx6q-dfi-fs700-m60.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-b850v3.dts b/arch/arm/boot/dts/imx6q-b850v3.dts
+diff --git a/arch/arm/boot/dts/imx6q-b650v3.dts b/arch/arm/boot/dts/imx6q-b650v3.dts
 new file mode 100644
-index 0000000..984d000
+index 0000000..823f55c
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-b850v3.dts
-@@ -0,0 +1,157 @@
++++ b/arch/arm/boot/dts/imx6q-b650v3.dts
+@@ -0,0 +1,88 @@
 +/*
 + * Copyright 2015 Timesys Corporation.
 + * Copyright 2015 General Electric Company
@@ -81,17 +81,17 @@ index 0000000..984d000
 +#include "imx6q-bx50v3.dtsi"
 +
 +/ {
-+	model = "General Electric B850v3";
-+	compatible = "ge,imx6q-b850v3", "advantech,imx6q-ba16", "fsl,imx6q";
++	model = "General Electric B650v3";
++	compatible = "ge,imx6q-b650v3", "advantech,imx6q-ba16", "fsl,imx6q";
 +
 +	chosen {
 +		stdout-path = &uart3;
 +	};
 +
 +	panel-lvds0 {
-+		compatible = "auo,b133htn01";
++		compatible = "innolux,g121x1-l03";
 +		backlight = <&backlight_lvds>;
-+		ddc-i2c-bus = <&mux2_i2c2>;
++		power-supply = <&reg_lvds>;
 +
 +		port {
 +			panel_in_lvds0: endpoint {
@@ -106,7 +106,6 @@ index 0000000..984d000
 +			  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
 +	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
 +				 <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
-+	fsl,dual-channel;
 +	status = "okay";
 +
 +	lvds0: lvds-channel at 0 {
@@ -121,74 +120,6 @@ index 0000000..984d000
 +				remote-endpoint = <&panel_in_lvds0>;
 +			};
 +		};
-+	};
-+};
-+
-+&i2c2 {
-+	pca9547_ddc: mux at 70 {
-+		compatible = "nxp,pca9547";
-+		reg = <0x70>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		mux2_i2c1: i2c at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0>;
-+		};
-+
-+		mux2_i2c2: i2c at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x1>;
-+		};
-+
-+		mux2_i2c3: i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x2>;
-+		};
-+
-+		mux2_i2c4: i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x3>;
-+		};
-+
-+		mux2_i2c5: i2c at 4 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x4>;
-+		};
-+
-+		mux2_i2c6: i2c at 5 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x5>;
-+		};
-+
-+		mux2_i2c7: i2c at 6 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x6>;
-+		};
-+
-+		mux2_i2c8: i2c at 7 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x7>;
-+		};
-+	};
-+};
-+
-+&hdmi {
-+	ddc-i2c-bus = <&mux2_i2c1>;
-+};
-+
-+&mux1_i2c1 {
-+	ads7830 at 4a {
-+		compatible = "ti,ads7830";
-+		reg = <0x4a>;
 +	};
 +};
 -- 
