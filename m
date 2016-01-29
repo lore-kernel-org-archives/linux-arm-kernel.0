@@ -1,67 +1,102 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Jan 2016 18:06:58 +0100
-Subject: [PATCH 3/7] usb: gadget: pxa25x_udc: use readl/writel for mmio
-In-Reply-To: <m3a8nogy0u.fsf@t19.piap.pl>
-References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
- <1453997843-3489728-3-git-send-email-arnd@arndb.de>
- <m3a8nogy0u.fsf@t19.piap.pl>
-Message-ID: <2202960.HHsdV23CYi@wuerfel>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Fri, 29 Jan 2016 18:07:14 +0100
+Subject: Exynos Snow board display regression
+Message-ID: <CAOMqctT2dAQERos8bhrtVirF7ma4onq+UUS2ks-86LJ_mVDU6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 January 2016 17:18:09 Krzysztof Ha?asa wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
-> 
-> > The unclear part here is for IXP4xx, which supports both big-endian
-> > and little-endian configurations. So far, the driver has done
-> > no byteswap in either case. I suspect that is wrong and it would
-> > actually need to swap in one or the other case, but I don't know
-> > which.
-> 
-> If at all, I guess it should swap in LE mode. But it's far from certain.
-> 
-> > It's also possible that there is some magic setting in
-> > the chip that makes the endianess of the MMIO register match the
-> > CPU, and in that case, the code actually does the right thing
-> > for all configurations, both before and after this patch.
-> 
-> This is IMHO most probable.
-> 
-> Actually, the IXP4xx is "natural" in BE mode (except for PCI) and
-> normally in LE mode it's order-coherent, meaning 32-bit "integer"
-> accesses need no swapping, but 8-bit and (mostly unused) 16-bit
-> transfers need swapping.
+Hello,
 
-I see.
+after  commit a9fa852886fd5a7ccec3b7e9eff75f85072f009c
 
-> Anyway, I think readl()/writel() do the right thing: in BE mode they
-> swap PCI accesses and don't swap normal registers, in LE mode nothing is
-> swapped.
+display no longer works on the Snow board. The built-in panel is no
+longer probed.
 
-This seems to be true when CONFIG_IXP4XX_INDIRECT_PCI is set, but
-not otherwise. For the indirect variant, writel() is a __raw_writel()
-without barrier or byteswap on non-PCI memory, while with that
-option disabled, we use the standard implementation that has both
-a byteswap and a barrier.
+The commit *supposedly* provides for backwards compatibility and at
+first glance only new options for probing the panel are added.
 
-According to your description, that would mean the version without
-indirect PCI access is broken and it appears to have been that way
-since before the start of git history in 2.6.12.
+However, reverting the commit on top of 4.5-rc1 gives working display
+again so there is probably some subtle non-obvious catch in the logic.
 
-It's possible that nobody cared because all drivers for non-PCI
-devices on ixp4xx (the on chip ones) just use __raw_readl or
-direct pointer references.
+Any ideas what might go wrong here?
 
-> LE data-coherent mode (which has never landed in the
-> official kernel) is a bit different, but still, readl()/writel() do the
-> right thing.
-> I remember the "string" (block) functions preserve 8-bit ordering, and
-> thus 32-bit values transfered using them may need swapping.
+Thanks
 
-This is the normal behavior, yes: readsl/writesl should not swap data,
-and you should not use them to access registers other than FIFOs
-that contain byte-sequential data. If the bus swaps data, then the
-implementation of the readsl/writesl function has to swap it back,
-as the indirect versions of these do.
+Michal
 
-	Arnd
+Author: Inki Dae <inki.dae@samsung.com>
+Date:   Thu Nov 26 21:34:18 2015 +0900
+
+    drm/exynos: dp: add of_graph dt binding support for panel
+
+    This patch adds of_graph dt binding support for panel device
+    and also keeps the backward compatibility.
+
+    i.e.,
+    The dts file for Exynos5800 based peach pi board
+    has a panel property so we need to keep the backward compatibility.
+
+    Changelog v3:
+    - bind only one of two nodes outbound - panel or bridge.
+
+    Changelog v2:
+    - return -EINVAL if getting a port node failed.
+
+    Signed-off-by: Inki Dae <inki.dae@samsung.com>
+    Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c
+b/drivers/gpu/drm/exynos/exynos_dp_core.c
+index 94f02a0..60260a0 100644
+--- a/drivers/gpu/drm/exynos/exynos_dp_core.c
++++ b/drivers/gpu/drm/exynos/exynos_dp_core.c
+@@ -1392,7 +1392,7 @@ static const struct component_ops exynos_dp_ops = {
+ static int exynos_dp_probe(struct platform_device *pdev)
+ {
+        struct device *dev = &pdev->dev;
+-       struct device_node *panel_node, *bridge_node, *endpoint;
++       struct device_node *panel_node = NULL, *bridge_node, *endpoint = NULL;
+        struct exynos_dp_device *dp;
+        int ret;
+
+@@ -1403,14 +1403,32 @@ static int exynos_dp_probe(struct platform_device *pdev)
+
+        platform_set_drvdata(pdev, dp);
+
++       /* This is for the backward compatibility. */
+        panel_node = of_parse_phandle(dev->of_node, "panel", 0);
+        if (panel_node) {
+                dp->panel = of_drm_find_panel(panel_node);
+                of_node_put(panel_node);
+                if (!dp->panel)
+                        return -EPROBE_DEFER;
++       } else {
++               endpoint = of_graph_get_next_endpoint(dev->of_node, NULL);
++               if (endpoint) {
++                       panel_node = of_graph_get_remote_port_parent(endpoint);
++                       if (panel_node) {
++                               dp->panel = of_drm_find_panel(panel_node);
++                               of_node_put(panel_node);
++                               if (!dp->panel)
++                                       return -EPROBE_DEFER;
++                       } else {
++                               DRM_ERROR("no port node for panel device.\n");
++                               return -EINVAL;
++                       }
++               }
+        }
+
++       if (endpoint)
++               goto out;
++
+        endpoint = of_graph_get_next_endpoint(dev->of_node, NULL);
+        if (endpoint) {
+                bridge_node = of_graph_get_remote_port_parent(endpoint);
+@@ -1423,6 +1441,7 @@ static int exynos_dp_probe(struct platform_device *pdev)
+                        return -EPROBE_DEFER;
+        }
+
++out:
+        pm_runtime_enable(dev);
+
+        ret = component_add(&pdev->dev, &exynos_dp_ops);
