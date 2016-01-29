@@ -1,36 +1,34 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 29 Jan 2016 09:30:41 +0100 (CET)
-Subject: [PATCH v2] irqchip: gicv3-its: Fix memory leak in
- its_free_tables()
-In-Reply-To: <1454042578-13933-1-git-send-email-shankerd@codeaurora.org>
-References: <1454042578-13933-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <alpine.DEB.2.11.1601290930000.3886@nanos>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 29 Jan 2016 09:34:20 +0100
+Subject: [PATCH 2/2] ARM: dts: r8a7794: use GIC_*defines
+In-Reply-To: <20160129003457.GC26068@verge.net.au>
+References: <1453094324-22404-1-git-send-email-horms+renesas@verge.net.au>
+ <1453094324-22404-3-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdWPU0tmMbMw+ygaVd=LpVtNqyFov_7QvVgUA2U4BeTjaA@mail.gmail.com>
+ <20160129003457.GC26068@verge.net.au>
+Message-ID: <CAMuHMdWEjdeYi7QN49tSOskV8h9yAMqMqh3p7wMUqm7VCH-RAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Jan 2016, Shanker Donthineni wrote:
-> @@ -807,9 +810,10 @@ static void its_free_tables(struct its_node *its)
->  	int i;
->  
->  	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
-> -		if (its->tables[i]) {
-> -			free_page((unsigned long)its->tables[i]);
-> -			its->tables[i] = NULL;
-> +		if (its->tables[i].base) {
-> +			free_pages((unsigned long)its->tables[i].base,
-> +				   get_order(its->tables[i].size));
-> +			its->tables[i].base = NULL;
->  		}
->  	}
->  }
-> @@ -880,6 +884,7 @@ retry_alloc_baser:
->  		if (alloc_pages > GITS_BASER_PAGES_MAX) {
->  			alloc_pages = GITS_BASER_PAGES_MAX;
->  			order = get_order(GITS_BASER_PAGES_MAX * psz);
-> +			alloc_size = (1 << order) * PAGE_SIZE;
+Hi Simon,
 
-Why don't you record the order instead of converting back and forth ?
+On Fri, Jan 29, 2016 at 1:34 AM, Simon Horman <horms@verge.net.au> wrote:
+> Your grep shows up some matches in arch/arm64/boot/dts/renesas/.
 
-Thanks,
+That's correct.
 
-	tglx
+> For some reason that was not on my mental todo list. Should I add it?
+
+IIRC, I reported those a while ago, and you said you were going to tackle
+them? Or perhaps I just assumed that ;-)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
