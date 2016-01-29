@@ -1,675 +1,1402 @@
-From: liudongdong3@huawei.com (liudongdong (C))
-Date: Fri, 29 Jan 2016 14:43:30 +0800
-Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <1452691267-32240-1-git-send-email-tn@semihalf.com>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
-Message-ID: <56AB0A12.8080600@huawei.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Fri, 29 Jan 2016 14:47:39 +0800
+Subject: [PATCH v8 1/2] drm/rockchip: hdmi: add Innosilicon HDMI support
+In-Reply-To: <1454049768-30872-1-git-send-email-ykk@rock-chips.com>
+References: <1454049768-30872-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1454050059-31196-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-? 2016/1/13 21:20, Tomasz Nowicki ??:
->>From the functionality point of view this series might be split into the
-> following logic parts:
-> 1. Make MMCONFIG code arch-agnostic which allows all architectures to collect
->     PCI config regions and used when necessary.
-> 2. Move non-arch specific bits to the core code.
-> 3. Use MMCONFIG code and implement generic ACPI based PCI host controller driver.
-> 4. Enable above driver on ARM64
->
-> Patches has been built on top of 4.4 and can be found here:
-> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v3)
->
-> NOTE, this patch set depends on Matthew's patches:
-> http://www.spinics.net/lists/linux-pci/msg45950.html
-> https://github.com/Vality/linux/tree/pci-fixes
->
-> This has been tested on Cavium ThunderX server and QEMU.
-> Any help in reviewing and testing is very appreciated.
->
-> v2 -> v3
-> - fix legacy IRQ assigning and IO ports registration
-> - remove reference to arch specific companion device for ia64
-> - move ACPI PCI host controller driver to pci_root.c
-> - drop generic domain assignment for x86 and ia64 as I am not
->    able to run all necessary test variants
-> - drop patch which cleaned legacy IRQ assignment since it belongs to
->    Mathew's series:
->    https://patchwork.ozlabs.org/patch/557504/
-> - extend MCFG quirk code
-> - rebased to 4.4
-
-Based on the patchset and add the Hip05 ACPI specific quirks.
-Tested on the HiSilicon ARM64 D02 board.
-I made a test based on Intel 82599 networking card,it can work ok.
-this is the bootup log which contains PCIe host and Intel 82599 networking card part.
-
-Tested-by: Dongdong Liu <liudongdong3@huawei.com>
-
-EFI stub: Booting Linux Kernel...
-EFI stub: Using DTB from command line
-EFI stub: Exiting boot services and installing virtual address map...
-GMAC ExitBootServicesEvent
-SMMU ExitBootServicesEvent
-Booting Linux on physical CPU 0x20000
-Initializing cgroup subsys cpu
-Linux version 4.4.0-rc2+ (l00290354 at linux-ioko) (gcc version 4.9.3 20150211 (prerelease) (20150316) ) #194 SMP PREEMPT Thu Jan 28 09:51:15 CST 2016
-Boot CPU: AArch64 Processor [411fd071]
-earlycon: Early serial console at MMIO32 0x80300000 (options '')
-bootconsole [uart0] enabled
-efi: Getting EFI parameters from FDT:
-EFI v2.50 by ARM Versatile Express EFI Jan 13 2016 20:43:10
-efi:  SMBIOS=0x7aae0000  SMBIOS 3.0=0x7aac0000  ACPI=0x7ab20000  ACPI 2.0=0x7ab20014
-cma: Reserved 16 MiB at 0x000000007e800000
-ACPI: Early table checksum verification disabled
-ACPI: RSDP 0x000000007AB20014 000024 (v02 HISI  )
-ACPI: XSDT 0x000000007AB100E8 00006C (v01 HISI   HISI-D02 20140727      01000013)
-ACPI: FACP 0x000000007AA80000 00010C (v05 HISI   HISI-D02 20140727 HISI 00000099)
-ACPI: Override [DSDT-HISI-D02], this is unsafe: tainting kernel
-Disabling lock debugging due to kernel taint
-ACPI: DSDT 0x000000007AA10000 Logical table override, new table: 0xFFFFFFC0009CB8B8
-ACPI: DSDT 0xFFFFFFC0009CB8B8 0015B5 (v01 HISI   HISI-D02 20140727 INTL 20150619)
-ACPI: DBG2 0x000000007AAA0000 00005A (v00 HISI   HISI-D02 20140727 HISI 00000099)
-ACPI: GTDT 0x000000007AA70000 000060 (v02 HISI   HISI-D02 20140727 HISI 00000099)
-ACPI: APIC 0x000000007AA60000 000564 (v01 HISI   HISI-D02 20140727 HISI 00000099)
-ACPI: MCFG 0x000000007AA50000 00004C (v01 HISI   HISI-D02 20140727 HISI 00000099)
-ACPI: SLIT 0x000000007AA40000 0001BC (v01 HISI   HISI-D02 20140727 HISI 00000099)
-ACPI: SPCR 0x000000007AA30000 000050 (v02 HISI   HISI-D02 20140727 HISI 00000099)
-ACPI: SRAT 0x000000007AA20000 0001B0 (v03 HISI   HISI-D02 20140727 HISI 00000099)
-ACPI: IORT 0x000000007AA00000 0001FC (v00 INTEL  TEMPLATE 00000000 INTL 20150619)
-psci: probing for conduit method from ACPI.
-NOTICE:  [psci_smc_handler]:[349L] PSCI_VERSION CALL
-NOTICE:  [psci_version]:[101L] PSCI_MAJOR_VER: 10000: PSCI_MINOR_VER: 0
-
-0008;<54
-psci: PSCIv1.0 detected in firmware.
-psci: Using standard PSCI v0.2 function IDs
-
-0008;<54
-psci: MIGRATE_INFO_TYPE not supported.
-
-0008;<54
-
-0008;<54
-PERCPU: Embedded 15 pages/cpu @ffffffd1ffedb000 s24576 r8192 d28672 u61440
-Detected PIPT I-cache on CPU0
-CPU features: enabling workaround for ARM erratum 832075
-Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 2063376
-Kernel command line: dtb=hip05-d02.dtb console=ttyS0,115200 earlycon=uart8250,mmio32,0x80300000 initrd=filesystem.cpio.gz acpi=force
-log_buf_len individual max cpu contribution: 4096 bytes
-log_buf_len total cpu_extra contributions: 61440 bytes
-log_buf_len min size: 16384 bytes
-log_buf_len: 131072 bytes
-early log buf free: 12732(77%)
-PID hash table entries: 4096 (order: 3, 32768 bytes)
-Dentry cache hash table entries: 1048576 (order: 11, 8388608 bytes)
-Inode-cache hash table entries: 524288 (order: 10, 4194304 bytes)
-software IO TLB [mem 0x76a00000-0x7aa00000] (64MB) mapped at [ffffffc076a00000-ffffffc07a9fffff]
-Memory: 8052312K/8384512K available (6074K kernel code, 519K rwdata, 2556K rodata, 572K init, 212K bss, 315816K reserved, 16384K cma-reserved)
-Virtual kernel memory layout:
-     vmalloc : 0xffffff8000000000 - 0xffffffbdbfff0000   (   246 GB)
-     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
-               0xffffffbdc0000000 - 0xffffffbe08000000   (  1152 MB actual)
-     fixed   : 0xffffffbffa7fd000 - 0xffffffbffac00000   (  4108 KB)
-     PCI I/O : 0xffffffbffae00000 - 0xffffffbffbe00000   (    16 MB)
-     modules : 0xffffffbffc000000 - 0xffffffc000000000   (    64 MB)
-     memory  : 0xffffffc000000000 - 0xffffffd200000000   ( 73728 MB)
-       .init : 0xffffffc0008f0000 - 0xffffffc00097f000   (   572 KB)
-       .text : 0xffffffc000080000 - 0xffffffc0008efa34   (  8639 KB)
-       .data : 0xffffffc000994000 - 0xffffffc000a15c00   (   519 KB)
-SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=16, Nodes=1
-Preemptible hierarchical RCU implementation.
-	Build-time adjustment of leaf fanout to 64.
-	RCU restricting CPUs from NR_CPUS=64 to nr_cpu_ids=16.
-RCU: Adjusting geometry for rcu_fanout_leaf=64, nr_cpu_ids=16
-NR_IRQS:64 nr_irqs:64 0
-GIC: Using split EOI/Deactivate mode
-ITS at 0x8c000000
-ITS: allocated 65536 Devices @11f6c80000 (psz 4K, shr 1)
-ITS: allocated 512 Virtual CPUs @11f6c0d000 (psz 4K, shr 1)
-ITS: allocated 512 Interrupt Collections @11f6c0e000 (psz 4K, shr 1)
-ITS at 0xc6000000
-ITS: allocated 65536 Devices @11f6d00000 (psz 4K, shr 1)
-ITS: allocated 512 Virtual CPUs @11f6c0f000 (psz 4K, shr 1)
-ITS: allocated 512 Interrupt Collections @11f6c30000 (psz 4K, shr 1)
-ITS at 0xa3000000
-ITS: allocated 65536 Devices @11f6d80000 (psz 4K, shr 1)
-ITS: allocated 512 Virtual CPUs @11f6c33000 (psz 4K, shr 1)
-ITS: allocated 512 Interrupt Collections @11f6c34000 (psz 4K, shr 1)
-ITS at 0xb7000000
-ITS: allocated 65536 Devices @11f6e00000 (psz 4K, shr 1)
-ITS: allocated 512 Virtual CPUs @11f6c35000 (psz 4K, shr 1)
-ITS: allocated 512 Interrupt Collections @11f6c36000 (psz 4K, shr 1)
-GIC: using LPI property table @0x00000011f6c60000
-ITS: Allocated 1792 chunks for LPIs
-CPU0: found redistributor 20000 region 0:0x000000008d100000
-CPU0: using LPI pending table @0x00000011f6c70000
-Architected cp15 timer(s) running at 50.00MHz (phys).
-clocksource: arch_sys_counter: mask: 0xffffffffffffff max_cycles: 0xb8812736b, max_idle_ns: 440795202655 ns
-sched_clock: 56 bits@50MHz, resolution 20ns, wraps every 4398046511100ns
-Console: colour dummy device 80x25
-Calibrating delay loop (skipped), value calculated using timer frequency.. 100.00 BogoMIPS (lpj=200000)
-pid_max: default: 32768 minimum: 301
-ACPI: Core revision 20150930
-ACPI: 1 ACPI AML tables successfully acquired and loaded
-Security Framework initialized
-Mount-cache hash table entries: 16384 (order: 5, 131072 bytes)
-Mountpoint-cache hash table entries: 16384 (order: 5, 131072 bytes)
-Initializing cgroup subsys memory
-Initializing cgroup subsys hugetlb
-Remapping and enabling EFI services.
-   EFI remap 0x000000007aab0000 => 0000000040000000
-   EFI remap 0x000000007aaf0000 => 0000000040040000
-   EFI remap 0x000000007ab00000 => 0000000040050000
-   EFI remap 0x000000007ab30000 => 0000000040060000
-   EFI remap 0x000000007ab70000 => 00000000400a0000
-   EFI remap 0x000000007aba0000 => 00000000400c0000
-   EFI remap 0x000000007fb90000 => 00000000400d0000
-   EFI remap 0x000000007fbb0000 => 00000000400e0000
-   EFI remap 0x0000000080300000 => 0000000040110000
-   EFI remap 0x00000000a00f0000 => 0000000040120000
-ASID allocator initialised with 65536 entries
-PCI/MSI: ITS at 0x8c000000 domain created
-PCI/MSI: ITS at 0xc6000000 domain created
-PCI/MSI: ITS at 0xa3000000 domain created
-PCI/MSI: ITS at 0xb7000000 domain created
-Platform MSI: irqchip at 000000008c000000 domain created
-Platform MSI: irqchip at 00000000c6000000 domain created
-Platform MSI: irqchip at 00000000a3000000 domain created
-Platform MSI: irqchip at 00000000b7000000 domain created
-NOTICE:  [psci_smc_handler]:[410L] PSCI_CPU_ON_AARCH64 CALL
-NOTICE:  [psci_smc_handler]:[411L] x1=0x20001 x2=0x827d0 x3=0x0
-NOTICE:  [scpi_set_css_power_state]:[89L] domain_cluster=0x1
-
-NOTICE:  [scpi_set_css_power_state]:[97L] domain_cluster=0x1
-
-
-0008;<AB54
-NOTICE:  [psci_afflvl_power_on_finish]:[508L]
-NOTICE:  [cm_prepare_el3_exit]:[266L] read_tpidr_el3 = 7fc3c080
-NOTICE:  [cm_prepare_el3_exit]:[321L] ctx add = 7fc3d190
-NOTICE:  [psci_afflvl_power_on_finish]:[566L]
-
-000827=0
-NOTICE:  [psci_smc_handler]:[410L] PSCI_CPU_ON_AARCH64 CALL
-NOTICE:  [psci_smc_handler]:[411L] x1=0x20002 x2=0x827d0 x3=0x0
-NOTICE:  [scpi_set_css_power_state]:[89L] domain_cluster=0x1
-
-NOTICE:  [scpi_set_css_power_state]:[97L] domain_cluster=0x1
-
-
-0008;<AB54
-NOTICE:  [psci_afflvl_power_on_finish]:[508L]
-NOTICE:  [cm_prepare_el3_exit]:[266L] read_tpidr_el3 = 7fc3c100
-NOTICE:  [cm_prepare_el3_exit]:[321L] ctx add = 7fc3d3a0
-NOTICE:  [psci_afflvl_power_on_finish]:[566L]
-
-000827=0
-NOTICE:  [psci_smc_handler]:[410L] PSCI_CPU_ON_AARCH64 CALL
-NOTICE:  [psci_smc_handler]:[411L] x1=0x20003 x2=0x827d0 x3=0x0
-NOTICE:  [scpi_set_css_power_state]:[89L] domain_cluster=0x1
-
-NOTICE:  [scpi_set_css_power_state]:[97L] domain_cluster=0x1
-
-
-0008;<AB54
-NOTICE:  [psci_afflvl_power_on_finish]:[508L]
-NOTICE:  [cm_prepare_el3_exit]:[266L] read_tpidr_el3 = 7fc3c180
-NOTICE:  [cm_prepare_el3_exit]:[321L] ctx add = 7fc3d5b0
-NOTICE:  [psci_afflvl_power_on_finish]:[566L]
-
-000827=0
-NOTICE:  [psci_smc_handler]:[410L] PSCI_CPU_ON_AARCH64 CALL
-NOTICE:  [psci_smc_handler]:[411L] x1=0x20100 x2=0x827d0 x3=0x0
-NOTICE:  [scpi_set_css_power_state]:[89L] domain_cluster=0x1
-
-NOTICE:  [scpi_set_css_power_state]:[97L] domain_cluster=0x3
-
-
-0008;<AB54
-NOTICE:  [psci_afflvl_power_on_finish]:[508L]
-NOTICE:  [cm_prepare_el3_exit]:[266L] read_tpidr_el3 = 7fc3c200
-NOTICE:  [cm_prepare_el3_exit]:[321L] ctx add = 7fc3d7c0
-NOTICE:  [psci_afflvl_power_on_finish]:[566L]
-
-000827=0
-NOTICE:  [psci_smc_handler]:[410L] PSCI_CPU_ON_AARCH64 CALL
-NOTICE:  [psci_smc_handler]:[411L] x1=0x20101 x2=0x827d0 x3=0x0
-NOTICE:  [scpi_set_css_power_state]:[89L] domain_cluster=0x3
-
-NOTICE:  [scpi_set_css_power_state]:[97L] domain_cluster=0x3
-
-
-0008;<AB54
-NOTICE:  [psci_afflvl_power_on_finish]:[508L]
-NOTICE:  [cm_prepare_el3_exit]:[266L] read_tpidr_el3 = 7fc3c280
-NOTICE:  [cm_prepare_el3_exit]:[321L] ctx add = 7fc3d9d0
-NOTICE:  [psci_afflvl_power_on_finish]:[566L]
-
-000827=0
-NOTICE:  [psci_smc_handler]:[410L] PSCI_CPU_ON_AARCH64 CALL
-NOTICE:  [psci_smc_handler]:[411L] x1=0x20102 x2=0x827d0 x3=0x0
-NOTICE:  [scpi_set_css_power_state]:[89L] domain_cluster=0x3
-
-NOTICE:  [scpi_set_css_power_state]:[97L] domain_cluster=0x3
-
-
-0008;<AB54
-NOTICE:  [psci_afflvl_power_on_finish]:[508L]
-NOTICE:  [cm_prepare_el3_exit]:[266L] read_tpidr_el3 = 7fc3c300
-NOTICE:  [cm_prepare_el3_exit]:[321L] ctx add = 7fc3dbe0
-NOTICE:  [psci_afflvl_power_on_finish]:[566L]
-
-000827=0
-NOTICE:  [psci_smc_handler]:[410L] PSCI_CPU_ON_AARCH64 CALL
-NOTICE:  [psci_smc_handler]:[411L] x1=0x20103 x2=0x827d0 x3=0x0
-NOTICE:  [scpi_set_css_power_state]:[89L] domain_cluster=0x3
-
-NOTICE:  [scpi_set_css_power_state]:[97L] domain_cluster=0x3
-
-
-0008;<AB54
-NOTICE:  [psci_afflvl_power_on_finish]:[508L]
-NOTICE:  [cm_prepare_el3_exit]:[266L] read_tpidr_el3 = 7fc3c380
-NOTICE:  [cm_prepare_el3_exit]:[321L] ctx add = 7fc3ddf0
-NOTICE:  [psci_afflvl_power_on_finish]:[566L]
-
-000827=0
-NOTICE:  [psci_smc_handler]:[410L] PSCI_CPU_ON_AARCH64 CALL
-NOTICE:  [psci_smc_handler]:[411L] x1=0x20200 x2=0x827d0 x3=0x0
-NOTICE:  [scpi_set_css_power_state]:[89L] domain_cluster=0x3
-
-NOTICE:  [scpi_set_css_power_state]:[97L] domain_cluster=0x7
-
-
-0008;<AB54
-NOTICE:  [psci_afflvl_power_on_finish]:[508L]
-NOTICE:  [cm_prepare_el3_exit]:[266L] read_tpidr_el3 = 7fc3c400
-NOTICE:  [cm_prepare_el3_exit]:[321L] ctx add = 7fc3e000
-NOTICE:  [psci_afflvl_power_on_finish]:[566L]
-
-000827=0
-NOTICE:  [psci_smc_handler]:[410L] PSCI_CPU_ON_AARCH64 CALL
-NOTICE:  [psci_smc_handler]:[411L] x1=0x20201 x2=0x827d0 x3=0x0
-NOTICE:  [scpi_set_css_power_state]:[89L] domain_cluster=0x7
-
-NOTICE:  [scpi_set_css_power_state]:[97L] domain_cluster=0x7
-
-
-0008;<AB54
-NOTICE:  [psci_afflvl_power_on_finish]:[508L]
-NOTICE:  [cm_prepare_el3_exit]:[266L] read_tpidr_el3 = 7fc3c480
-NOTICE:  [cm_prepare_el3_exit]:[321L] ctx add = 7fc3e210
-NOTICE:  [psci_afflvl_power_on_finish]:[566L]
-
-000827=0
-NOTICE:  [psci_smc_handler]:[410L] PSCI_CPU_ON_AARCH64 CALL
-NOTICE:  [psci_smc_handler]:[411L] x1=0x20202 x2=0x827d0 x3=0x0
-NOTICE:  [scpi_set_css_power_state]:[89L] domain_cluster=0x7
-
-NOTICE:  [scpi_set_css_power_state]:[97L] domain_cluster=0x7
-
-
-0008;<AB54
-NOTICE:  [psci_afflvl_power_on_finish]:[508L]
-NOTICE:  [cm_prepare_el3_exit]:[266L] read_tpidr_el3 = 7fc3c500
-NOTICE:  [cm_prepare_el3_exit]:[321L] ctx add = 7fc3e420
-NOTICE:  [psci_afflvl_power_on_finish]:[566L]
-
-000827=0
-NOTICE:  [psci_smc_handler]:[410L] PSCI_CPU_ON_AARCH64 CALL
-NOTICE:  [psci_smc_handler]:[411L] x1=0x20203 x2=0x827d0 x3=0x0
-NOTICE:  [scpi_set_css_power_state]:[89L] domain_cluster=0x7
-
-NOTICE:  [scpi_set_css_power_state]:[97L] domain_cluster=0x7
-
-
-0008;<AB54
-NOTICE:  [psci_afflvl_power_on_finish]:[508L]
-NOTICE:  [cm_prepare_el3_exit]:[266L] read_tpidr_el3 = 7fc3c580
-NOTICE:  [cm_prepare_el3_exit]:[321L] ctx add = 7fc3e630
-NOTICE:  [psci_afflvl_power_on_finish]:[566L]
-
-000827=0
-NOTICE:  [psci_smc_handler]:[410L] PSCI_CPU_ON_AARCH64 CALL
-NOTICE:  [psci_smc_handler]:[411L] x1=0x20300 x2=0x827d0 x3=0x0
-NOTICE:  [scpi_set_css_power_state]:[89L] domain_cluster=0x7
-
-NOTICE:  [scpi_set_css_power_state]:[97L] domain_cluster=0xf
-
-
-0008;<AB54
-NOTICE:  [psci_afflvl_power_on_finish]:[508L]
-NOTICE:  [cm_prepare_el3_exit]:[266L] read_tpidr_el3 = 7fc3c600
-NOTICE:  [cm_prepare_el3_exit]:[321L] ctx add = 7fc3e840
-NOTICE:  [psci_afflvl_power_on_finish]:[566L]
-
-000827=0
-NOTICE:  [psci_smc_handler]:[410L] PSCI_CPU_ON_AARCH64 CALL
-NOTICE:  [psci_smc_handler]:[411L] x1=0x20301 x2=0x827d0 x3=0x0
-NOTICE:  [scpi_set_css_power_state]:[89L] domain_cluster=0xf
-
-NOTICE:  [scpi_set_css_power_state]:[97L] domain_cluster=0xf
-
-
-0008;<AB54
-NOTICE:  [psci_afflvl_power_on_finish]:[508L]
-NOTICE:  [cm_prepare_el3_exit]:[266L] read_tpidr_el3 = 7fc3c680
-NOTICE:  [cm_prepare_el3_exit]:[321L] ctx add = 7fc3ea50
-NOTICE:  [psci_afflvl_power_on_finish]:[566L]
-
-000827=0
-NOTICE:  [psci_smc_handler]:[410L] PSCI_CPU_ON_AARCH64 CALL
-NOTICE:  [psci_smc_handler]:[411L] x1=0x20302 x2=0x827d0 x3=0x0
-NOTICE:  [scpi_set_css_power_state]:[89L] domain_cluster=0xf
-
-NOTICE:  [scpi_set_css_power_state]:[97L] domain_cluster=0xf
-
-
-0008;<AB54
-NOTICE:  [psci_afflvl_power_on_finish]:[508L]
-NOTICE:  [cm_prepare_el3_exit]:[266L] read_tpidr_el3 = 7fc3c700
-NOTICE:  [cm_prepare_el3_exit]:[321L] ctx add = 7fc3ec60
-NOTICE:  [psci_afflvl_power_on_finish]:[566L]
-
-000827=0
-NOTICE:  [psci_smc_handler]:[410L] PSCI_CPU_ON_AARCH64 CALL
-NOTICE:  [psci_smc_handler]:[411L] x1=0x20303 x2=0x827d0 x3=0x0
-NOTICE:  [scpi_set_css_power_state]:[89L] domain_cluster=0xf
-
-NOTICE:  [scpi_set_css_power_state]:[97L] domain_cluster=0xf
-
-
-0008;<AB54
-NOTICE:  [psci_afflvl_power_on_finish]:[508L]
-NOTICE:  [cm_prepare_el3_exit]:[266L] read_tpidr_el3 = 7fc3c780
-NOTICE:  [cm_prepare_el3_exit]:[321L] ctx add = 7fc3ee70
-NOTICE:  [psci_afflvl_power_on_finish]:[566L]
-
-000827=0
-Detected PIPT I-cache on CPU1
-CPU1: found redistributor 20001 region 0:0x000000008d130000
-CPU1: using LPI pending table @0x00000011f6400000
-CPU1: Booted secondary processor [411fd071]
-Detected PIPT I-cache on CPU2
-CPU2: found redistributor 20002 region 0:0x000000008d160000
-CPU2: using LPI pending table @0x00000011f6430000
-CPU2: Booted secondary processor [411fd071]
-Detected PIPT I-cache on CPU3
-CPU3: found redistributor 20003 region 0:0x000000008d190000
-CPU3: using LPI pending table @0x00000011f6460000
-CPU3: Booted secondary processor [411fd071]
-Detected PIPT I-cache on CPU4
-CPU4: found redistributor 20100 region 0:0x000000008d1c0000
-CPU4: using LPI pending table @0x00000011f64a0000
-CPU4: Booted secondary processor [411fd071]
-Detected PIPT I-cache on CPU5
-CPU5: found redistributor 20101 region 0:0x000000008d1f0000
-CPU5: using LPI pending table @0x00000011f64d0000
-CPU5: Booted secondary processor [411fd071]
-Detected PIPT I-cache on CPU6
-CPU6: found redistributor 20102 region 0:0x000000008d220000
-CPU6: using LPI pending table @0x00000011f6500000
-CPU6: Booted secondary processor [411fd071]
-Detected PIPT I-cache on CPU7
-CPU7: found redistributor 20103 region 0:0x000000008d250000
-CPU7: using LPI pending table @0x00000011f6540000
-CPU7: Booted secondary processor [411fd071]
-Detected PIPT I-cache on CPU8
-CPU8: found redistributor 20200 region 0:0x000000008d280000
-CPU8: using LPI pending table @0x00000011f6560000
-CPU8: Booted secondary processor [411fd071]
-Detected PIPT I-cache on CPU9
-CPU9: found redistributor 20201 region 0:0x000000008d2b0000
-CPU9: using LPI pending table @0x00000011f65a0000
-CPU9: Booted secondary processor [411fd071]
-Detected PIPT I-cache on CPU10
-CPU10: found redistributor 20202 region 0:0x000000008d2e0000
-CPU10: using LPI pending table @0x00000011f65d0000
-CPU10: Booted secondary processor [411fd071]
-Detected PIPT I-cache on CPU11
-CPU11: found redistributor 20203 region 0:0x000000008d310000
-CPU11: using LPI pending table @0x00000011f6600000
-CPU11: Booted secondary processor [411fd071]
-Detected PIPT I-cache on CPU12
-CPU12: found redistributor 20300 region 0:0x000000008d340000
-CPU12: using LPI pending table @0x00000011f6630000
-CPU12: Booted secondary processor [411fd071]
-Detected PIPT I-cache on CPU13
-CPU13: found redistributor 20301 region 0:0x000000008d370000
-CPU13: using LPI pending table @0x00000011f6670000
-CPU13: Booted secondary processor [411fd071]
-Detected PIPT I-cache on CPU14
-CPU14: found redistributor 20302 region 0:0x000000008d3a0000
-CPU14: using LPI pending table @0x00000011f66a0000
-CPU14: Booted secondary processor [411fd071]
-Detected PIPT I-cache on CPU15
-CPU15: found redistributor 20303 region 0:0x000000008d3d0000
-CPU15: using LPI pending table @0x00000011f66d0000
-CPU15: Booted secondary processor [411fd071]
-Brought up 16 CPUs
-SMP: Total of 16 processors activated.
-CPU features: detected feature: GIC system register CPU interface
-CPU: All CPU(s) started at EL2
-alternatives: patching kernel code
-devtmpfs: initialized
-SMBIOS 3.0.0 present.
-clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
-pinctrl core: initialized pinctrl subsystem
-NET: Registered protocol family 16
-cpuidle: using governor ladder
-cpuidle: using governor menu
-vdso: 2 pages (1 code @ ffffffc000999000, 1 data @ ffffffc000998000)
-hw-breakpoint: found 6 breakpoint and 4 watchpoint registers.
-DMA: preallocated 256 KiB pool for atomic allocations
-ACPI: bus type PCI registered
-Serial: AMBA PL011 UART driver
-ACPI: Added _OSI(Module Device)
-ACPI: Added _OSI(Processor Device)
-ACPI: Added _OSI(3.0 _SCP Extensions)
-ACPI: Added _OSI(Processor Aggregator Device)
-ACPI: Interpreter enabled
-ACPI: Using GIC for interrupt routing
-PCI: MMCONFIG for domain 0001 [bus 00-3f] at [mem 0x22000000000-0x22003ffffff] (base 0x22000000000)
-PCI: MMCONFIG for domain 0002 [bus 40-7f] at [mem 0x24004000000-0x24007ffffff] (base 0x24000000000)
-ACPI: IORT: can't find node related to (null) device
-ACPI: IORT: can't find node related to (null) device
-ACPI: IORT: can't find node related to (null) device
-ACPI: IORT: can't find node related to (null) device
-ACPI: IORT: can't find node related to (null) device
-ACPI: IORT: can't find node related to (null) device
-ACPI: IORT: can't find node related to (null) device
-ACPI: IORT: can't find node related to (null) device
-ACPI: IORT: can't find node related to (null) device
-ACPI: IORT: can't find node related to (null) device
-ACPI: IORT: can't find node related to (null) device
-ACPI: IORT: can't find node related to (null) device
-ACPI: IORT: can't find node related to (null) device
-ACPI: PCI Root Bridge [PCI1] (domain 0001 [bus 00-3f])
-acpi HISI0080:00: _OSC: OS supports [ExtendedConfig ASPM ClockPM Segments MSI]
-acpi HISI0080:00: _OSC failed (AE_NOT_FOUND); disabling ASPM
-acpi HISI0080:00: PCI host bridge to bus 0001:00
-pci_bus 0001:00: root bus resource [mem 0x22004000000-0x2200ffeffff window] (bus address [0xb0000000-0xbbfeffff])
-pci_bus 0001:00: root bus resource [io  0x0000-0xffff window]
-pci_bus 0001:00: root bus resource [bus 00-3f]
-pci 0001:00:00.0: of_irq_parse_pci() failed with rc=-22
-pci 0001:00:00.0: of_irq_parse_pci() failed with rc=-22
-pci 0001:00:00.0: BAR 8: assigned [mem 0x22004000000-0x220041fffff]
-pci 0001:00:00.0: BAR 7: assigned [io  0x1000-0x1fff]
-pci 0001:01:00.0: BAR 6: assigned [mem 0x22004000000-0x220040fffff pref]
-pci 0001:01:00.0: BAR 1: assigned [mem 0x22004100000-0x2200410ffff 64bit]
-pci 0001:01:00.0: BAR 0: assigned [io  0x1000-0x10ff]
-pci 0001:00:00.0: PCI bridge to [bus 01]
-pci 0001:00:00.0:   bridge window [io  0x1000-0x1fff]
-pci 0001:00:00.0:   bridge window [mem 0x22004000000-0x220041fffff]
-ACPI: PCI Root Bridge [PCI2] (domain 0002 [bus 40-7f])
-acpi HISI0080:01: _OSC: OS supports [ExtendedConfig ASPM ClockPM Segments MSI]
-acpi HISI0080:01: _OSC failed (AE_NOT_FOUND); disabling ASPM
-acpi HISI0080:01: PCI host bridge to bus 0002:40
-pci_bus 0002:40: root bus resource [mem 0x24008000000-0x2400ffeffff window] (bus address [0xc0000000-0xc7feffff])
-pci_bus 0002:40: root bus resource [io  0x10000-0x1ffff window] (bus address [0x0000-0xffff])
-pci_bus 0002:40: root bus resource [bus 40-7f]
-pci 0002:40:00.0: of_irq_parse_pci() failed with rc=-22
-pci 0002:40:00.0: Primary bus is hard wired to 0
-pci 0002:40:00.0: bridge configuration invalid ([bus 01-01]), reconfiguring
-pci 0002:40:00.0: of_irq_parse_pci() failed with rc=-22
-pci 0002:40:00.0: of_irq_parse_pci() failed with rc=-22
-pci 0002:40:00.0: BAR 8: assigned [mem 0x24008000000-0x240087fffff]
-pci 0002:40:00.0: BAR 9: assigned [mem 0x24008800000-0x240091fffff 64bit pref]
-pci 0002:40:00.0: BAR 7: assigned [io  0x10000-0x10fff]
-pci 0002:41:00.0: BAR 0: assigned [mem 0x24008800000-0x24008bfffff 64bit pref]
-pci 0002:41:00.0: BAR 6: assigned [mem 0x24008000000-0x240083fffff pref]
-pci 0002:41:00.1: BAR 0: assigned [mem 0x24008c00000-0x24008ffffff 64bit pref]
-pci 0002:41:00.1: BAR 6: assigned [mem 0x24008400000-0x240087fffff pref]
-pci 0002:41:00.0: BAR 4: assigned [mem 0x24009000000-0x24009003fff 64bit pref]
-pci 0002:41:00.1: BAR 4: assigned [mem 0x24009004000-0x24009007fff 64bit pref]
-pci 0002:41:00.0: BAR 2: assigned [io  0x10000-0x1001f]
-pci 0002:41:00.1: BAR 2: assigned [io  0x10020-0x1003f]
-pci 0002:40:00.0: PCI bridge to [bus 41]
-pci 0002:40:00.0:   bridge window [io  0x10000-0x10fff]
-pci 0002:40:00.0:   bridge window [mem 0x24008000000-0x240087fffff]
-pci 0002:40:00.0:   bridge window [mem 0x24008800000-0x240091fffff 64bit pref]
-vgaarb: loaded
-SCSI subsystem initialized
-ACPI: bus type USB registered
-usbcore: registered new interface driver usbfs
-usbcore: registered new interface driver hub
-usbcore: registered new device driver usb
-pps_core: LinuxPPS API ver. 1 registered
-pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <giometti@linux.it>
-PTP clock support registered
-clocksource: Switched to clocksource arch_sys_counter
-pnp: PnP ACPI init
-pnp: PnP ACPI: found 0 devices
-NET: Registered protocol family 2
-TCP established hash table entries: 65536 (order: 7, 524288 bytes)
-TCP bind hash table entries: 65536 (order: 8, 1048576 bytes)
-TCP: Hash tables configured (established 65536 bind 65536)
-UDP hash table entries: 4096 (order: 5, 131072 bytes)
-UDP-Lite hash table entries: 4096 (order: 5, 131072 bytes)
-NET: Registered protocol family 1
-RPC: Registered named UNIX socket transport module.
-RPC: Registered udp transport module.
-RPC: Registered tcp transport module.
-RPC: Registered tcp NFSv4.1 backchannel transport module.
-Unpacking initramfs...
-Freeing initrd memory: 27492K (ffffffc01e520000 - ffffffc01fff9000)
-kvm [1]: error: no compatible GIC node found
-kvm [1]: error initializing Hyp mode: -19
-ACPI: IORT: can't find node related to (null) device
-futex hash table entries: 4096 (order: 7, 524288 bytes)
-audit: initializing netlink subsys (disabled)
-audit: type=2000 audit(1.720:1): initialized
-HugeTLB registered 2 MB page size, pre-allocated 0 pages
-VFS: Disk quotas dquot_6.6.0
-VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
-NFS: Registering the id_resolver key type
-Key type id_resolver registered
-Key type id_legacy registered
-fuse init (API version 7.23)
-9p: Installing v9fs 9p2000 file system support
-Block layer SCSI generic (bsg) driver version 0.4 loaded (major 251)
-io scheduler noop registered
-io scheduler cfq registered (default)
-pcieport 0001:00:00.0: can't derive routing for PCI INT A
-pcieport 0001:00:00.0: PCI INT A: no GSI
-pcieport 0002:40:00.0: can't derive routing for PCI INT A
-pcieport 0002:40:00.0: PCI INT A: no GSI
-Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
-console [ttyS0] disabled
-APMC0D08:00: ttyS0 at MMIO 0x80300000 (irq = 5, base_baud = 12500000) is a 16550A
-console [ttyS0] enabled
-console [ttyS0] enabled
-bootconsole [uart0] disabled
-bootconsole [uart0] disabled
-msm_serial: driver initialized
-Failed to find cpu0 device node
-Unable to detect cache hierarchy from DT for CPU 0
-loop: module loaded
-hisi_sas: driver version v1.0
-scsi host0: hisi_sas
-scsi host1: hisi_sas
-tun: Universal TUN/TAP device driver, 1.6
-tun: (C) 1999-2004 Max Krasnyansky <maxk@qualcomm.com>
-libphy: Hisilicon MII Bus: probed
-hisi_sas_v1_hw HISI0161:01: phyup: phy7 link_rate=10
-scsi 1:0:0:0: Direct-Access     SEAGATE  ST9500620SS      AS02 PQ: 0 ANSI: 5
-sd 1:0:0:0: [sda] 976773168 512-byte logical blocks: (500 GB/465 GiB)
-sd 1:0:0:0: [sda] Write Protect is off
-sd 1:0:0:0: [sda] Write cache: disabled, read cache: enabled, supports DPO and FUA
-sd 1:0:0:0: [sda] Attached SCSI disk
-hns-nic HISI00C1:00: No valid mac, use random mac da:3a:ad:09:a3:14
-netif_napi_add() called with weight 256 on device eth%d
-hns-nic HISI00C1:01: No valid mac, use random mac ea:58:90:0b:08:bc
-hns-nic HISI00C1:02: No valid mac, use random mac 2a:ef:14:d5:0f:41
-hns-nic HISI00C1:03: No valid mac, use random mac 7a:77:63:4e:57:89
-ixgbe: Intel(R) 10 Gigabit PCI Express Network Driver - version 4.2.1-k
-ixgbe: Copyright (c) 1999-2015 Intel Corporation.
-pcieport 0002:40:00.0: can't derive routing for PCI INT A
-ixgbe 0002:41:00.0: PCI INT A: no GSI
-ixgbe 0002:41:00.0: enabling device (0000 -> 0002)
-ixgbe 0002:41:00.0: Multiqueue Enabled: Rx Queue count = 16, Tx Queue count = 16
-ixgbe 0002:41:00.0: PCI Express bandwidth of 32GT/s available
-ixgbe 0002:41:00.0: (Speed:5.0GT/s, Width: x8, Encoding Loss:20%)
-ixgbe 0002:41:00.0: MAC: 2, PHY: 17, SFP+: 5, PBA No: FFFFFF-0FF
-ixgbe 0002:41:00.0: 68:a8:28:2e:c9:10
-ixgbe 0002:41:00.0: Intel(R) 10 Gigabit Network Connection
-pcieport 0002:40:00.0: can't derive routing for PCI INT B
-ixgbe 0002:41:00.1: PCI INT B: no GSI
-ixgbe 0002:41:00.1: enabling device (0000 -> 0002)
-ixgbe 0002:41:00.1: Multiqueue Enabled: Rx Queue count = 16, Tx Queue count = 16
-ixgbe 0002:41:00.1: PCI Express bandwidth of 32GT/s available
-ixgbe 0002:41:00.1: (Speed:5.0GT/s, Width: x8, Encoding Loss:20%)
-ixgbe 0002:41:00.1: MAC: 2, PHY: 1, PBA No: FFFFFF-0FF
-ixgbe 0002:41:00.1: 68:a8:28:2e:c9:11
-ixgbe 0002:41:00.1: Intel(R) 10 Gigabit Network Connection
-sky2: driver version 1.30
-ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
-ehci-pci: EHCI PCI platform driver
-ehci-platform: EHCI generic platform driver
-ehci-platform PNP0D20:00: EHCI Host Controller
-ehci-platform PNP0D20:00: new USB bus registered, assigned bus number 1
-ehci-platform PNP0D20:00: irq 6, io mem 0xa1000000
-ehci-platform PNP0D20:00: USB 2.0 started, EHCI 1.00
-hub 1-0:1.0: USB hub found
-hub 1-0:1.0: 1 port detected
-ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
-ohci-pci: OHCI PCI platform driver
-ohci-platform: OHCI generic platform driver
-usbcore: registered new interface driver usb-storage
-mousedev: PS/2 mouse device common for all mice
-rtc-efi rtc-efi: rtc core: registered rtc-efi as rtc0
-sdhci: Secure Digital Host Controller Interface driver
-sdhci: Copyright(c) Pierre Ossman
-Synopsys Designware Multimedia Card Interface Driver
-sdhci-pltfm: SDHCI platform and OF driver helper
-ledtrig-cpu: registered to indicate activity on CPUs
-usbcore: registered new interface driver usbhid
-usbhid: USB HID core driver
-NET: Registered protocol family 17
-9pnet: Installing 9P2000 support
-Key type dns_resolver registered
-registered taskstats version 1
-rtc-efi rtc-efi: setting system clock to 2100-01-01 00:02:52 UTC (4102444972)
-ttyS0 - failed to request DMA
-Freeing unused kernel memory: 572K (ffffffc0008f0000 - ffffffc00097f000)
-Freeing alternatives memory: 60K (ffffffc00097f000 - ffffffc00098e000)
-root@(none)$ ifconfig eth4 192.168.20.188
-ixgbe 0002:41:00.0: registered PHC device on eth4
-root@(none)$ ixgbe 0002:41:00.0 eth4: detected SFP+: 5
-ixgbe 0002:41:00.0 eth4: NIC Link is Up 10 Gbps, Flow Control: RX/TX
-
-root@(none)$ ping 192.168.20.4
-PING 192.168.20.4 (192.168.20.4): 56 data bytes
-64 bytes from 192.168.20.4: seq=21 ttl=128 time=0.368 ms
-64 bytes from 192.168.20.4: seq=22 ttl=128 time=0.257 ms
-64 bytes from 192.168.20.4: seq=23 ttl=128 time=0.316 ms
-64 bytes from 192.168.20.4: seq=24 ttl=128 time=0.355 ms
-64 bytes from 192.168.20.4: seq=25 ttl=128 time=0.257 ms
-64 bytes from 192.168.20.4: seq=26 ttl=128 time=0.305 ms
-64 bytes from 192.168.20.4: seq=27 ttl=128 time=0.290 ms
-64 bytes from 192.168.20.4: seq=28 ttl=128 time=0.227 ms
-64 bytes from 192.168.20.4: seq=29 ttl=128 time=3.865 ms
-64 bytes from 192.168.20.4: seq=30 ttl=128 time=0.297 ms
+The Innosilicon HDMI is a low power HDMI 1.4 transmitter
+IP, and it have been integrated on some rockchip CPUs
+(like RK3036, RK312x).
+
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+---
+Changes in v8:
+- Don't check whether encoder output format is RGB colorspace, cause driver
+  default configure the output colorspace to RGB. (ZhengYang)
+- Correct the check condition in inno_hdmi_config_video_csc() (ZhengYang)
+    - if (data->enc_out_format == data->enc_out_format) {
+    + if (data->enc_in_format == data->enc_out_format) {
+
+Changes in v7:
+- Correct the module licnese statement (Paul)
+     - MODULE_LICENSE("GPL");
+     + MODULE_LICENSE("GPLv2");
+- Start indentation with tabs and fix the misspell in Kconfig (Paul)
+- Carry the lost device-binding document (Heiko)
+
+Changes in v6:
+- Rebase the Makefile/Kconfig files which add by Chris's rockchip-mipi driver (Caeser)
+
+Changes in v5:
+- Use hdmi_infoframe helper functions to packed the infoframe (Russell)
+- Remove the unused double wait_for_completion_timeout for ddc transfer (Russell)
+- Remove the unused local variable in "inno_hdmi_i2c_write()" function (Russell)
+
+Changes in v4:
+- Modify the commit title "drm/rockchip: hdmi: ..." (Mark)
+- Correct the "DKMS" to "DPMS" (Mark)
+- Fix over 80 characters problems (Mark)
+- Remove encoder .prepare/.commit helper functions, and move the vop mode
+configure function into encoder .enable helper functions. (Mark)
+
+Changes in v3:
+- Use encoder enable/disable function, and remove the encoder DPMS function
+- Keep HDMI PLL power on in standby mode
+
+Changes in v2:
+- Using DRM atomic helper functions for connector init (Mark)
+- Remove "hdmi->connector.encoder = encoder;" (Mark)
+
+ drivers/gpu/drm/rockchip/Kconfig     |   8 +
+ drivers/gpu/drm/rockchip/Makefile    |   1 +
+ drivers/gpu/drm/rockchip/inno_hdmi.c | 939 +++++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/rockchip/inno_hdmi.h | 362 ++++++++++++++
+ 4 files changed, 1310 insertions(+)
+ create mode 100644 drivers/gpu/drm/rockchip/inno_hdmi.c
+ create mode 100644 drivers/gpu/drm/rockchip/inno_hdmi.h
+
+diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
+index 8573985..76b3362 100644
+--- a/drivers/gpu/drm/rockchip/Kconfig
++++ b/drivers/gpu/drm/rockchip/Kconfig
+@@ -35,3 +35,11 @@ config ROCKCHIP_DW_MIPI_DSI
+ 	 for the Synopsys DesignWare HDMI driver. If you want to
+ 	 enable MIPI DSI on RK3288 based SoC, you should selet this
+ 	 option.
++
++config ROCKCHIP_INNO_HDMI
++	tristate "Rockchip specific extensions for Innosilicon HDMI"
++	depends on DRM_ROCKCHIP
++	help
++	  This selects support for Rockchip SoC specific extensions
++	  for the Innosilicon HDMI driver. If you want to enable
++	  HDMI on RK3036 based SoC, you should select this option.
+diff --git a/drivers/gpu/drm/rockchip/Makefile b/drivers/gpu/drm/rockchip/Makefile
+index f6a809a..df8fbef 100644
+--- a/drivers/gpu/drm/rockchip/Makefile
++++ b/drivers/gpu/drm/rockchip/Makefile
+@@ -8,5 +8,6 @@ rockchipdrm-$(CONFIG_DRM_FBDEV_EMULATION) += rockchip_drm_fbdev.o
+ 
+ obj-$(CONFIG_ROCKCHIP_DW_HDMI) += dw_hdmi-rockchip.o
+ obj-$(CONFIG_ROCKCHIP_DW_MIPI_DSI) += dw-mipi-dsi.o
++obj-$(CONFIG_ROCKCHIP_INNO_HDMI) += inno_hdmi.o
+ 
+ obj-$(CONFIG_DRM_ROCKCHIP) += rockchipdrm.o rockchip_vop_reg.o
+diff --git a/drivers/gpu/drm/rockchip/inno_hdmi.c b/drivers/gpu/drm/rockchip/inno_hdmi.c
+new file mode 100644
+index 0000000..c99d88d
+--- /dev/null
++++ b/drivers/gpu/drm/rockchip/inno_hdmi.c
+@@ -0,0 +1,939 @@
++/*
++ * Copyright (C) Fuzhou Rockchip Electronics Co.Ltd
++ *    Zheng Yang <zhengyang@rock-chips.com>
++ *    Yakir Yang <ykk@rock-chips.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/irq.h>
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/hdmi.h>
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/of_device.h>
++
++#include <drm/drm_of.h>
++#include <drm/drmP.h>
++#include <drm/drm_atomic_helper.h>
++#include <drm/drm_crtc_helper.h>
++#include <drm/drm_edid.h>
++#include <drm/drm_encoder_slave.h>
++
++#include "rockchip_drm_drv.h"
++#include "rockchip_drm_vop.h"
++
++#include "inno_hdmi.h"
++
++#define to_inno_hdmi(x)	container_of(x, struct inno_hdmi, x)
++
++struct hdmi_data_info {
++	int vic;
++	bool sink_is_hdmi;
++	bool sink_has_audio;
++	unsigned int enc_in_format;
++	unsigned int enc_out_format;
++	unsigned int colorimetry;
++};
++
++struct inno_hdmi_i2c {
++	struct i2c_adapter adap;
++
++	u8 ddc_addr;
++	u8 segment_addr;
++
++	struct mutex lock;
++	struct completion cmp;
++};
++
++struct inno_hdmi {
++	struct device *dev;
++	struct drm_device *drm_dev;
++
++	int irq;
++	struct clk *pclk;
++	void __iomem *regs;
++
++	struct drm_connector	connector;
++	struct drm_encoder	encoder;
++
++	struct inno_hdmi_i2c *i2c;
++	struct i2c_adapter *ddc;
++
++	unsigned int tmds_rate;
++
++	struct hdmi_data_info	hdmi_data;
++	struct drm_display_mode previous_mode;
++};
++
++enum {
++	CSC_ITU601_16_235_TO_RGB_0_255_8BIT,
++	CSC_ITU601_0_255_TO_RGB_0_255_8BIT,
++	CSC_ITU709_16_235_TO_RGB_0_255_8BIT,
++	CSC_RGB_0_255_TO_ITU601_16_235_8BIT,
++	CSC_RGB_0_255_TO_ITU709_16_235_8BIT,
++	CSC_RGB_0_255_TO_RGB_16_235_8BIT,
++};
++
++static const char coeff_csc[][24] = {
++	/*
++	 * YUV2RGB:601 SD mode(Y[16:235], UV[16:240], RGB[0:255]):
++	 *   R = 1.164*Y + 1.596*V - 204
++	 *   G = 1.164*Y - 0.391*U - 0.813*V + 154
++	 *   B = 1.164*Y + 2.018*U - 258
++	 */
++	{
++		0x04, 0xa7, 0x00, 0x00, 0x06, 0x62, 0x02, 0xcc,
++		0x04, 0xa7, 0x11, 0x90, 0x13, 0x40, 0x00, 0x9a,
++		0x04, 0xa7, 0x08, 0x12, 0x00, 0x00, 0x03, 0x02
++	},
++	/*
++	 * YUV2RGB:601 SD mode(YUV[0:255],RGB[0:255]):
++	 *   R = Y + 1.402*V - 248
++	 *   G = Y - 0.344*U - 0.714*V + 135
++	 *   B = Y + 1.772*U - 227
++	 */
++	{
++		0x04, 0x00, 0x00, 0x00, 0x05, 0x9b, 0x02, 0xf8,
++		0x04, 0x00, 0x11, 0x60, 0x12, 0xdb, 0x00, 0x87,
++		0x04, 0x00, 0x07, 0x16, 0x00, 0x00, 0x02, 0xe3
++	},
++	/*
++	 * YUV2RGB:709 HD mode(Y[16:235],UV[16:240],RGB[0:255]):
++	 *   R = 1.164*Y + 1.793*V - 248
++	 *   G = 1.164*Y - 0.213*U - 0.534*V + 77
++	 *   B = 1.164*Y + 2.115*U - 289
++	 */
++	{
++		0x04, 0xa7, 0x00, 0x00, 0x07, 0x2c, 0x02, 0xf8,
++		0x04, 0xa7, 0x10, 0xda, 0x12, 0x22, 0x00, 0x4d,
++		0x04, 0xa7, 0x08, 0x74, 0x00, 0x00, 0x03, 0x21
++	},
++
++	/*
++	 * RGB2YUV:601 SD mode:
++	 *   Cb = -0.291G - 0.148R + 0.439B + 128
++	 *   Y  = 0.504G  + 0.257R + 0.098B + 16
++	 *   Cr = -0.368G + 0.439R - 0.071B + 128
++	 */
++	{
++		0x11, 0x5f, 0x01, 0x82, 0x10, 0x23, 0x00, 0x80,
++		0x02, 0x1c, 0x00, 0xa1, 0x00, 0x36, 0x00, 0x1e,
++		0x11, 0x29, 0x10, 0x59, 0x01, 0x82, 0x00, 0x80
++	},
++	/*
++	 * RGB2YUV:709 HD mode:
++	 *   Cb = - 0.338G - 0.101R + 0.439B + 128
++	 *   Y  = 0.614G   + 0.183R + 0.062B + 16
++	 *   Cr = - 0.399G + 0.439R - 0.040B + 128
++	 */
++	{
++		0x11, 0x98, 0x01, 0xc1, 0x10, 0x28, 0x00, 0x80,
++		0x02, 0x74, 0x00, 0xbb, 0x00, 0x3f, 0x00, 0x10,
++		0x11, 0x5a, 0x10, 0x67, 0x01, 0xc1, 0x00, 0x80
++	},
++	/*
++	 * RGB[0:255]2RGB[16:235]:
++	 *   R' = R x (235-16)/255 + 16;
++	 *   G' = G x (235-16)/255 + 16;
++	 *   B' = B x (235-16)/255 + 16;
++	 */
++	{
++		0x00, 0x00, 0x03, 0x6F, 0x00, 0x00, 0x00, 0x10,
++		0x03, 0x6F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
++		0x00, 0x00, 0x00, 0x00, 0x03, 0x6F, 0x00, 0x10
++	},
++};
++
++static inline u8 hdmi_readb(struct inno_hdmi *hdmi, u16 offset)
++{
++	return readl_relaxed(hdmi->regs + (offset) * 0x04);
++}
++
++static inline void hdmi_writeb(struct inno_hdmi *hdmi, u16 offset, u32 val)
++{
++	writel_relaxed(val, hdmi->regs + (offset) * 0x04);
++}
++
++static inline void hdmi_modb(struct inno_hdmi *hdmi, u16 offset,
++			     u32 msk, u32 val)
++{
++	u8 temp = hdmi_readb(hdmi, offset) & ~msk;
++
++	temp |= val & msk;
++	hdmi_writeb(hdmi, offset, temp);
++}
++
++static void inno_hdmi_i2c_init(struct inno_hdmi *hdmi)
++{
++	int ddc_bus_freq;
++
++	ddc_bus_freq = (hdmi->tmds_rate >> 2) / HDMI_SCL_RATE;
++
++	hdmi_writeb(hdmi, DDC_BUS_FREQ_L, ddc_bus_freq & 0xFF);
++	hdmi_writeb(hdmi, DDC_BUS_FREQ_H, (ddc_bus_freq >> 8) & 0xFF);
++
++	/* Clear the EDID interrupt flag and mute the interrupt */
++	hdmi_writeb(hdmi, HDMI_INTERRUPT_MASK1, 0);
++	hdmi_writeb(hdmi, HDMI_INTERRUPT_STATUS1, m_INT_EDID_READY);
++}
++
++static void inno_hdmi_sys_power(struct inno_hdmi *hdmi, bool enable)
++{
++	if (enable)
++		hdmi_modb(hdmi, HDMI_SYS_CTRL, m_POWER, v_PWR_ON);
++	else
++		hdmi_modb(hdmi, HDMI_SYS_CTRL, m_POWER, v_PWR_OFF);
++}
++
++static void inno_hdmi_set_pwr_mode(struct inno_hdmi *hdmi, int mode)
++{
++	switch (mode) {
++	case NORMAL:
++		inno_hdmi_sys_power(hdmi, false);
++
++		hdmi_writeb(hdmi, HDMI_PHY_PRE_EMPHASIS, 0x6f);
++		hdmi_writeb(hdmi, HDMI_PHY_DRIVER, 0xbb);
++
++		hdmi_writeb(hdmi, HDMI_PHY_SYS_CTL, 0x15);
++		hdmi_writeb(hdmi, HDMI_PHY_SYS_CTL, 0x14);
++		hdmi_writeb(hdmi, HDMI_PHY_SYS_CTL, 0x10);
++		hdmi_writeb(hdmi, HDMI_PHY_CHG_PWR, 0x0f);
++		hdmi_writeb(hdmi, HDMI_PHY_SYNC, 0x00);
++		hdmi_writeb(hdmi, HDMI_PHY_SYNC, 0x01);
++
++		inno_hdmi_sys_power(hdmi, true);
++		break;
++
++	case LOWER_PWR:
++		inno_hdmi_sys_power(hdmi, false);
++		hdmi_writeb(hdmi, HDMI_PHY_DRIVER, 0x00);
++		hdmi_writeb(hdmi, HDMI_PHY_PRE_EMPHASIS, 0x00);
++		hdmi_writeb(hdmi, HDMI_PHY_CHG_PWR, 0x00);
++		hdmi_writeb(hdmi, HDMI_PHY_SYS_CTL, 0x15);
++
++		break;
++
++	default:
++		dev_err(hdmi->dev, "Unknown power mode %d\n", mode);
++	}
++}
++
++static void inno_hdmi_reset(struct inno_hdmi *hdmi)
++{
++	u32 val;
++	u32 msk;
++
++	hdmi_modb(hdmi, HDMI_SYS_CTRL, m_RST_DIGITAL, v_NOT_RST_DIGITAL);
++	udelay(100);
++
++	hdmi_modb(hdmi, HDMI_SYS_CTRL, m_RST_ANALOG, v_NOT_RST_ANALOG);
++	udelay(100);
++
++	msk = m_REG_CLK_INV | m_REG_CLK_SOURCE | m_POWER | m_INT_POL;
++	val = v_REG_CLK_INV | v_REG_CLK_SOURCE_SYS | v_PWR_ON | v_INT_POL_HIGH;
++	hdmi_modb(hdmi, HDMI_SYS_CTRL, msk, val);
++
++	inno_hdmi_set_pwr_mode(hdmi, NORMAL);
++}
++
++static int inno_hdmi_upload_frame(struct inno_hdmi *hdmi, int setup_rc,
++				  union hdmi_infoframe *frame, u32 frame_index,
++				  u32 mask, u32 disable, u32 enable)
++{
++	if (mask)
++		hdmi_modb(hdmi, HDMI_PACKET_SEND_AUTO, mask, disable);
++
++	hdmi_writeb(hdmi, HDMI_CONTROL_PACKET_BUF_INDEX, frame_index);
++
++	if (setup_rc >= 0) {
++		u8 packed_frame[HDMI_MAXIMUM_INFO_FRAME_SIZE];
++		ssize_t rc, i;
++
++		rc = hdmi_infoframe_pack(frame, packed_frame,
++					 sizeof(packed_frame));
++		if (rc < 0)
++			return rc;
++
++		for (i = 0; i < rc; i++)
++			hdmi_writeb(hdmi, HDMI_CONTROL_PACKET_ADDR + i,
++				    packed_frame[i]);
++
++		if (mask)
++			hdmi_modb(hdmi, HDMI_PACKET_SEND_AUTO, mask, enable);
++	}
++
++	return setup_rc;
++}
++
++static int inno_hdmi_config_video_vsi(struct inno_hdmi *hdmi,
++				      struct drm_display_mode *mode)
++{
++	union hdmi_infoframe frame;
++	int rc;
++
++	rc = drm_hdmi_vendor_infoframe_from_display_mode(&frame.vendor.hdmi,
++							 mode);
++
++	return inno_hdmi_upload_frame(hdmi, rc, &frame, INFOFRAME_VSI,
++		m_PACKET_VSI_EN, v_PACKET_VSI_EN(0), v_PACKET_VSI_EN(1));
++}
++
++static int inno_hdmi_config_video_avi(struct inno_hdmi *hdmi,
++				      struct drm_display_mode *mode)
++{
++	union hdmi_infoframe frame;
++	int rc;
++
++	rc = drm_hdmi_avi_infoframe_from_display_mode(&frame.avi, mode);
++
++	if (hdmi->hdmi_data.enc_out_format == HDMI_COLORSPACE_YUV444)
++		frame.avi.colorspace = HDMI_COLORSPACE_YUV444;
++	else if (hdmi->hdmi_data.enc_out_format == HDMI_COLORSPACE_YUV422)
++		frame.avi.colorspace = HDMI_COLORSPACE_YUV422;
++	else
++		frame.avi.colorspace = HDMI_COLORSPACE_RGB;
++
++	return inno_hdmi_upload_frame(hdmi, rc, &frame, INFOFRAME_AVI, 0, 0, 0);
++}
++
++static int inno_hdmi_config_video_csc(struct inno_hdmi *hdmi)
++{
++	struct hdmi_data_info *data = &hdmi->hdmi_data;
++	int c0_c2_change = 0;
++	int csc_enable = 0;
++	int csc_mode = 0;
++	int auto_csc = 0;
++	int value;
++	int i;
++
++	/* Input video mode is SDR RGB24bit, data enable signal from external */
++	hdmi_writeb(hdmi, HDMI_VIDEO_CONTRL1, v_DE_EXTERNAL |
++		    v_VIDEO_INPUT_FORMAT(VIDEO_INPUT_SDR_RGB444));
++
++	/* Input color hardcode to RGB, and output color hardcode to RGB888 */
++	value = v_VIDEO_INPUT_BITS(VIDEO_INPUT_8BITS) |
++		v_VIDEO_OUTPUT_COLOR(0) |
++		v_VIDEO_INPUT_CSP(0);
++	hdmi_writeb(hdmi, HDMI_VIDEO_CONTRL2, value);
++
++	if (data->enc_in_format == data->enc_out_format) {
++		if ((data->enc_in_format == HDMI_COLORSPACE_RGB) ||
++		    (data->enc_in_format >= HDMI_COLORSPACE_YUV444)) {
++			value = v_SOF_DISABLE | v_COLOR_DEPTH_NOT_INDICATED(1);
++			hdmi_writeb(hdmi, HDMI_VIDEO_CONTRL3, value);
++
++			hdmi_modb(hdmi, HDMI_VIDEO_CONTRL,
++				  m_VIDEO_AUTO_CSC | m_VIDEO_C0_C2_SWAP,
++				  v_VIDEO_AUTO_CSC(AUTO_CSC_DISABLE) |
++				  v_VIDEO_C0_C2_SWAP(C0_C2_CHANGE_DISABLE));
++			return 0;
++		}
++	}
++
++	if (data->colorimetry == HDMI_COLORIMETRY_ITU_601) {
++		if ((data->enc_in_format == HDMI_COLORSPACE_RGB) &&
++		    (data->enc_out_format == HDMI_COLORSPACE_YUV444)) {
++			csc_mode = CSC_RGB_0_255_TO_ITU601_16_235_8BIT;
++			auto_csc = AUTO_CSC_DISABLE;
++			c0_c2_change = C0_C2_CHANGE_DISABLE;
++			csc_enable = v_CSC_ENABLE;
++		} else if ((data->enc_in_format == HDMI_COLORSPACE_YUV444) &&
++			   (data->enc_out_format == HDMI_COLORSPACE_RGB)) {
++			csc_mode = CSC_ITU601_16_235_TO_RGB_0_255_8BIT;
++			auto_csc = AUTO_CSC_ENABLE;
++			c0_c2_change = C0_C2_CHANGE_DISABLE;
++			csc_enable = v_CSC_DISABLE;
++		}
++	} else {
++		if ((data->enc_in_format == HDMI_COLORSPACE_RGB) &&
++		    (data->enc_out_format == HDMI_COLORSPACE_YUV444)) {
++			csc_mode = CSC_RGB_0_255_TO_ITU709_16_235_8BIT;
++			auto_csc = AUTO_CSC_DISABLE;
++			c0_c2_change = C0_C2_CHANGE_DISABLE;
++			csc_enable = v_CSC_ENABLE;
++		} else if ((data->enc_in_format == HDMI_COLORSPACE_YUV444) &&
++			   (data->enc_out_format == HDMI_COLORSPACE_RGB)) {
++			csc_mode = CSC_ITU709_16_235_TO_RGB_0_255_8BIT;
++			auto_csc = AUTO_CSC_ENABLE;
++			c0_c2_change = C0_C2_CHANGE_DISABLE;
++			csc_enable = v_CSC_DISABLE;
++		}
++	}
++
++	for (i = 0; i < 24; i++)
++		hdmi_writeb(hdmi, HDMI_VIDEO_CSC_COEF + i,
++			    coeff_csc[csc_mode][i]);
++
++	value = v_SOF_DISABLE | csc_enable | v_COLOR_DEPTH_NOT_INDICATED(1);
++	hdmi_writeb(hdmi, HDMI_VIDEO_CONTRL3, value);
++	hdmi_modb(hdmi, HDMI_VIDEO_CONTRL, m_VIDEO_AUTO_CSC |
++		  m_VIDEO_C0_C2_SWAP, v_VIDEO_AUTO_CSC(auto_csc) |
++		  v_VIDEO_C0_C2_SWAP(c0_c2_change));
++
++	return 0;
++}
++
++static int inno_hdmi_config_video_timing(struct inno_hdmi *hdmi,
++					 struct drm_display_mode *mode)
++{
++	int value;
++
++	/* Set detail external video timing polarity and interlace mode */
++	value = v_EXTERANL_VIDEO(1);
++	value |= mode->flags & DRM_MODE_FLAG_PHSYNC ?
++		 v_HSYNC_POLARITY(1) : v_HSYNC_POLARITY(0);
++	value |= mode->flags & DRM_MODE_FLAG_PVSYNC ?
++		 v_VSYNC_POLARITY(1) : v_VSYNC_POLARITY(0);
++	value |= mode->flags & DRM_MODE_FLAG_INTERLACE ?
++		 v_INETLACE(1) : v_INETLACE(0);
++	hdmi_writeb(hdmi, HDMI_VIDEO_TIMING_CTL, value);
++
++	/* Set detail external video timing */
++	value = mode->htotal;
++	hdmi_writeb(hdmi, HDMI_VIDEO_EXT_HTOTAL_L, value & 0xFF);
++	hdmi_writeb(hdmi, HDMI_VIDEO_EXT_HTOTAL_H, (value >> 8) & 0xFF);
++
++	value = mode->htotal - mode->hdisplay;
++	hdmi_writeb(hdmi, HDMI_VIDEO_EXT_HBLANK_L, value & 0xFF);
++	hdmi_writeb(hdmi, HDMI_VIDEO_EXT_HBLANK_H, (value >> 8) & 0xFF);
++
++	value = mode->hsync_start - mode->hdisplay;
++	hdmi_writeb(hdmi, HDMI_VIDEO_EXT_HDELAY_L, value & 0xFF);
++	hdmi_writeb(hdmi, HDMI_VIDEO_EXT_HDELAY_H, (value >> 8) & 0xFF);
++
++	value = mode->hsync_end - mode->hsync_start;
++	hdmi_writeb(hdmi, HDMI_VIDEO_EXT_HDURATION_L, value & 0xFF);
++	hdmi_writeb(hdmi, HDMI_VIDEO_EXT_HDURATION_H, (value >> 8) & 0xFF);
++
++	value = mode->vtotal;
++	hdmi_writeb(hdmi, HDMI_VIDEO_EXT_VTOTAL_L, value & 0xFF);
++	hdmi_writeb(hdmi, HDMI_VIDEO_EXT_VTOTAL_H, (value >> 8) & 0xFF);
++
++	value = mode->vtotal - mode->vdisplay;
++	hdmi_writeb(hdmi, HDMI_VIDEO_EXT_VBLANK, value & 0xFF);
++
++	value = mode->vsync_start - mode->vdisplay;
++	hdmi_writeb(hdmi, HDMI_VIDEO_EXT_VDELAY, value & 0xFF);
++
++	value = mode->vsync_end - mode->vsync_start;
++	hdmi_writeb(hdmi, HDMI_VIDEO_EXT_VDURATION, value & 0xFF);
++
++	hdmi_writeb(hdmi, HDMI_PHY_PRE_DIV_RATIO, 0x1e);
++	hdmi_writeb(hdmi, HDMI_PHY_FEEDBACK_DIV_RATIO_LOW, 0x2c);
++	hdmi_writeb(hdmi, HDMI_PHY_FEEDBACK_DIV_RATIO_HIGH, 0x01);
++
++	return 0;
++}
++
++static int inno_hdmi_setup(struct inno_hdmi *hdmi,
++			   struct drm_display_mode *mode)
++{
++	hdmi->hdmi_data.vic = drm_match_cea_mode(mode);
++
++	hdmi->hdmi_data.enc_in_format = HDMI_COLORSPACE_RGB;
++	hdmi->hdmi_data.enc_out_format = HDMI_COLORSPACE_RGB;
++
++	if ((hdmi->hdmi_data.vic == 6) || (hdmi->hdmi_data.vic == 7) ||
++	    (hdmi->hdmi_data.vic == 21) || (hdmi->hdmi_data.vic == 22) ||
++	    (hdmi->hdmi_data.vic == 2) || (hdmi->hdmi_data.vic == 3) ||
++	    (hdmi->hdmi_data.vic == 17) || (hdmi->hdmi_data.vic == 18))
++		hdmi->hdmi_data.colorimetry = HDMI_COLORIMETRY_ITU_601;
++	else
++		hdmi->hdmi_data.colorimetry = HDMI_COLORIMETRY_ITU_709;
++
++	/* Mute video and audio output */
++	hdmi_modb(hdmi, HDMI_AV_MUTE, m_AUDIO_MUTE | m_VIDEO_BLACK,
++		  v_AUDIO_MUTE(1) | v_VIDEO_MUTE(1));
++
++	/* Set HDMI Mode */
++	hdmi_writeb(hdmi, HDMI_HDCP_CTRL,
++		    v_HDMI_DVI(hdmi->hdmi_data.sink_is_hdmi));
++
++	inno_hdmi_config_video_timing(hdmi, mode);
++
++	inno_hdmi_config_video_csc(hdmi);
++
++	if (hdmi->hdmi_data.sink_is_hdmi) {
++		inno_hdmi_config_video_avi(hdmi, mode);
++		inno_hdmi_config_video_vsi(hdmi, mode);
++	}
++
++	/*
++	 * When IP controller have configured to an accurate video
++	 * timing, then the TMDS clock source would be switched to
++	 * DCLK_LCDC, so we need to init the TMDS rate to mode pixel
++	 * clock rate, and reconfigure the DDC clock.
++	 */
++	hdmi->tmds_rate = mode->clock * 1000;
++	inno_hdmi_i2c_init(hdmi);
++
++	/* Unmute video and audio output */
++	hdmi_modb(hdmi, HDMI_AV_MUTE, m_AUDIO_MUTE | m_VIDEO_BLACK,
++		  v_AUDIO_MUTE(0) | v_VIDEO_MUTE(0));
++
++	return 0;
++}
++
++static void inno_hdmi_encoder_mode_set(struct drm_encoder *encoder,
++				       struct drm_display_mode *mode,
++				       struct drm_display_mode *adj_mode)
++{
++	struct inno_hdmi *hdmi = to_inno_hdmi(encoder);
++
++	inno_hdmi_setup(hdmi, adj_mode);
++
++	/* Store the display mode for plugin/DPMS poweron events */
++	memcpy(&hdmi->previous_mode, adj_mode, sizeof(hdmi->previous_mode));
++}
++
++static void inno_hdmi_encoder_enable(struct drm_encoder *encoder)
++{
++	struct inno_hdmi *hdmi = to_inno_hdmi(encoder);
++
++	rockchip_drm_crtc_mode_config(encoder->crtc, DRM_MODE_CONNECTOR_HDMIA,
++				      ROCKCHIP_OUT_MODE_P888);
++
++	inno_hdmi_set_pwr_mode(hdmi, NORMAL);
++}
++
++static void inno_hdmi_encoder_disable(struct drm_encoder *encoder)
++{
++	struct inno_hdmi *hdmi = to_inno_hdmi(encoder);
++
++	inno_hdmi_set_pwr_mode(hdmi, LOWER_PWR);
++}
++
++static bool inno_hdmi_encoder_mode_fixup(struct drm_encoder *encoder,
++					 const struct drm_display_mode *mode,
++					 struct drm_display_mode *adj_mode)
++{
++	return true;
++}
++
++static struct drm_encoder_helper_funcs inno_hdmi_encoder_helper_funcs = {
++	.enable     = inno_hdmi_encoder_enable,
++	.disable    = inno_hdmi_encoder_disable,
++	.mode_fixup = inno_hdmi_encoder_mode_fixup,
++	.mode_set   = inno_hdmi_encoder_mode_set,
++};
++
++static struct drm_encoder_funcs inno_hdmi_encoder_funcs = {
++	.destroy = drm_encoder_cleanup,
++};
++
++static enum drm_connector_status
++inno_hdmi_connector_detect(struct drm_connector *connector, bool force)
++{
++	struct inno_hdmi *hdmi = to_inno_hdmi(connector);
++
++	return (hdmi_readb(hdmi, HDMI_STATUS) & m_HOTPLUG) ?
++		connector_status_connected : connector_status_disconnected;
++}
++
++static int inno_hdmi_connector_get_modes(struct drm_connector *connector)
++{
++	struct inno_hdmi *hdmi = to_inno_hdmi(connector);
++	struct edid *edid;
++	int ret = 0;
++
++	if (!hdmi->ddc)
++		return 0;
++
++	edid = drm_get_edid(connector, hdmi->ddc);
++	if (edid) {
++		hdmi->hdmi_data.sink_is_hdmi = drm_detect_hdmi_monitor(edid);
++		hdmi->hdmi_data.sink_has_audio = drm_detect_monitor_audio(edid);
++		drm_mode_connector_update_edid_property(connector, edid);
++		ret = drm_add_edid_modes(connector, edid);
++		kfree(edid);
++	}
++
++	return ret;
++}
++
++static enum drm_mode_status
++inno_hdmi_connector_mode_valid(struct drm_connector *connector,
++			       struct drm_display_mode *mode)
++{
++	return MODE_OK;
++}
++
++static struct drm_encoder *
++inno_hdmi_connector_best_encoder(struct drm_connector *connector)
++{
++	struct inno_hdmi *hdmi = to_inno_hdmi(connector);
++
++	return &hdmi->encoder;
++}
++
++static int
++inno_hdmi_probe_single_connector_modes(struct drm_connector *connector,
++				       uint32_t maxX, uint32_t maxY)
++{
++	return drm_helper_probe_single_connector_modes(connector, 1920, 1080);
++}
++
++static void inno_hdmi_connector_destroy(struct drm_connector *connector)
++{
++	drm_connector_unregister(connector);
++	drm_connector_cleanup(connector);
++}
++
++static struct drm_connector_funcs inno_hdmi_connector_funcs = {
++	.dpms = drm_atomic_helper_connector_dpms,
++	.fill_modes = inno_hdmi_probe_single_connector_modes,
++	.detect = inno_hdmi_connector_detect,
++	.destroy = inno_hdmi_connector_destroy,
++	.reset = drm_atomic_helper_connector_reset,
++	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
++	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
++};
++
++static struct drm_connector_helper_funcs inno_hdmi_connector_helper_funcs = {
++	.get_modes = inno_hdmi_connector_get_modes,
++	.mode_valid = inno_hdmi_connector_mode_valid,
++	.best_encoder = inno_hdmi_connector_best_encoder,
++};
++
++static int inno_hdmi_register(struct drm_device *drm, struct inno_hdmi *hdmi)
++{
++	struct drm_encoder *encoder = &hdmi->encoder;
++	struct device *dev = hdmi->dev;
++
++	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
++
++	/*
++	 * If we failed to find the CRTC(s) which this encoder is
++	 * supposed to be connected to, it's because the CRTC has
++	 * not been registered yet.  Defer probing, and hope that
++	 * the required CRTC is added later.
++	 */
++	if (encoder->possible_crtcs == 0)
++		return -EPROBE_DEFER;
++
++	drm_encoder_helper_add(encoder, &inno_hdmi_encoder_helper_funcs);
++	drm_encoder_init(drm, encoder, &inno_hdmi_encoder_funcs,
++			 DRM_MODE_ENCODER_TMDS, NULL);
++
++	hdmi->connector.polled = DRM_CONNECTOR_POLL_HPD;
++
++	drm_connector_helper_add(&hdmi->connector,
++				 &inno_hdmi_connector_helper_funcs);
++	drm_connector_init(drm, &hdmi->connector, &inno_hdmi_connector_funcs,
++			   DRM_MODE_CONNECTOR_HDMIA);
++
++	drm_mode_connector_attach_encoder(&hdmi->connector, encoder);
++
++	return 0;
++}
++
++static irqreturn_t inno_hdmi_i2c_irq(struct inno_hdmi *hdmi)
++{
++	struct inno_hdmi_i2c *i2c = hdmi->i2c;
++	u8 stat;
++
++	stat = hdmi_readb(hdmi, HDMI_INTERRUPT_STATUS1);
++	if (!(stat & m_INT_EDID_READY))
++		return IRQ_NONE;
++
++	/* Clear HDMI EDID interrupt flag */
++	hdmi_writeb(hdmi, HDMI_INTERRUPT_STATUS1, m_INT_EDID_READY);
++
++	complete(&i2c->cmp);
++
++	return IRQ_HANDLED;
++}
++
++static irqreturn_t inno_hdmi_hardirq(int irq, void *dev_id)
++{
++	struct inno_hdmi *hdmi = dev_id;
++	irqreturn_t ret = IRQ_NONE;
++	u8 interrupt;
++
++	if (hdmi->i2c)
++		ret = inno_hdmi_i2c_irq(hdmi);
++
++	interrupt = hdmi_readb(hdmi, HDMI_STATUS);
++	if (interrupt & m_INT_HOTPLUG) {
++		hdmi_modb(hdmi, HDMI_STATUS, m_INT_HOTPLUG, m_INT_HOTPLUG);
++		ret = IRQ_WAKE_THREAD;
++	}
++
++	return ret;
++}
++
++static irqreturn_t inno_hdmi_irq(int irq, void *dev_id)
++{
++	struct inno_hdmi *hdmi = dev_id;
++
++	drm_helper_hpd_irq_event(hdmi->connector.dev);
++
++	return IRQ_HANDLED;
++}
++
++static int inno_hdmi_i2c_read(struct inno_hdmi *hdmi, struct i2c_msg *msgs)
++{
++	int length = msgs->len;
++	u8 *buf = msgs->buf;
++	int ret;
++
++	ret = wait_for_completion_timeout(&hdmi->i2c->cmp, HZ / 10);
++	if (!ret)
++		return -EAGAIN;
++
++	while (length--)
++		*buf++ = hdmi_readb(hdmi, HDMI_EDID_FIFO_ADDR);
++
++	return 0;
++}
++
++static int inno_hdmi_i2c_write(struct inno_hdmi *hdmi, struct i2c_msg *msgs)
++{
++	/*
++	 * The DDC module only support read EDID message, so
++	 * we assume that each word write to this i2c adapter
++	 * should be the offset of EDID word address.
++	 */
++	if ((msgs->len != 1) ||
++	    ((msgs->addr != DDC_ADDR) && (msgs->addr != DDC_SEGMENT_ADDR)))
++		return -EINVAL;
++
++	reinit_completion(&hdmi->i2c->cmp);
++
++	if (msgs->addr == DDC_SEGMENT_ADDR)
++		hdmi->i2c->segment_addr = msgs->buf[0];
++	if (msgs->addr == DDC_ADDR)
++		hdmi->i2c->ddc_addr = msgs->buf[0];
++
++	/* Set edid fifo first addr */
++	hdmi_writeb(hdmi, HDMI_EDID_FIFO_OFFSET, 0x00);
++
++	/* Set edid word address 0x00/0x80 */
++	hdmi_writeb(hdmi, HDMI_EDID_WORD_ADDR, hdmi->i2c->ddc_addr);
++
++	/* Set edid segment pointer */
++	hdmi_writeb(hdmi, HDMI_EDID_SEGMENT_POINTER, hdmi->i2c->segment_addr);
++
++	return 0;
++}
++
++static int inno_hdmi_i2c_xfer(struct i2c_adapter *adap,
++			      struct i2c_msg *msgs, int num)
++{
++	struct inno_hdmi *hdmi = i2c_get_adapdata(adap);
++	struct inno_hdmi_i2c *i2c = hdmi->i2c;
++	int i, ret = 0;
++
++	mutex_lock(&i2c->lock);
++
++	/* Clear the EDID interrupt flag and unmute the interrupt */
++	hdmi_writeb(hdmi, HDMI_INTERRUPT_MASK1, m_INT_EDID_READY);
++	hdmi_writeb(hdmi, HDMI_INTERRUPT_STATUS1, m_INT_EDID_READY);
++
++	for (i = 0; i < num; i++) {
++		dev_dbg(hdmi->dev, "xfer: num: %d/%d, len: %d, flags: %#x\n",
++			i + 1, num, msgs[i].len, msgs[i].flags);
++
++		if (msgs[i].flags & I2C_M_RD)
++			ret = inno_hdmi_i2c_read(hdmi, &msgs[i]);
++		else
++			ret = inno_hdmi_i2c_write(hdmi, &msgs[i]);
++
++		if (ret < 0)
++			break;
++	}
++
++	if (!ret)
++		ret = num;
++
++	/* Mute HDMI EDID interrupt */
++	hdmi_writeb(hdmi, HDMI_INTERRUPT_MASK1, 0);
++
++	mutex_unlock(&i2c->lock);
++
++	return ret;
++}
++
++static u32 inno_hdmi_i2c_func(struct i2c_adapter *adapter)
++{
++	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
++}
++
++static const struct i2c_algorithm inno_hdmi_algorithm = {
++	.master_xfer	= inno_hdmi_i2c_xfer,
++	.functionality	= inno_hdmi_i2c_func,
++};
++
++static struct i2c_adapter *inno_hdmi_i2c_adapter(struct inno_hdmi *hdmi)
++{
++	struct i2c_adapter *adap;
++	struct inno_hdmi_i2c *i2c;
++	int ret;
++
++	i2c = devm_kzalloc(hdmi->dev, sizeof(*i2c), GFP_KERNEL);
++	if (!i2c)
++		return ERR_PTR(-ENOMEM);
++
++	mutex_init(&i2c->lock);
++	init_completion(&i2c->cmp);
++
++	adap = &i2c->adap;
++	adap->class = I2C_CLASS_DDC;
++	adap->owner = THIS_MODULE;
++	adap->dev.parent = hdmi->dev;
++	adap->dev.of_node = hdmi->dev->of_node;
++	adap->algo = &inno_hdmi_algorithm;
++	strlcpy(adap->name, "Inno HDMI", sizeof(adap->name));
++	i2c_set_adapdata(adap, hdmi);
++
++	ret = i2c_add_adapter(adap);
++	if (ret) {
++		dev_warn(hdmi->dev, "cannot add %s I2C adapter\n", adap->name);
++		devm_kfree(hdmi->dev, i2c);
++		return ERR_PTR(ret);
++	}
++
++	hdmi->i2c = i2c;
++
++	dev_info(hdmi->dev, "registered %s I2C bus driver\n", adap->name);
++
++	return adap;
++}
++
++static int inno_hdmi_bind(struct device *dev, struct device *master,
++				 void *data)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct drm_device *drm = data;
++	struct inno_hdmi *hdmi;
++	struct resource *iores;
++	int irq;
++	int ret;
++
++	hdmi = devm_kzalloc(dev, sizeof(*hdmi), GFP_KERNEL);
++	if (!hdmi)
++		return -ENOMEM;
++
++	hdmi->dev = dev;
++	hdmi->drm_dev = drm;
++
++	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!iores)
++		return -ENXIO;
++
++	hdmi->regs = devm_ioremap_resource(dev, iores);
++	if (IS_ERR(hdmi->regs))
++		return PTR_ERR(hdmi->regs);
++
++	hdmi->pclk = devm_clk_get(hdmi->dev, "pclk");
++	if (IS_ERR(hdmi->pclk)) {
++		dev_err(hdmi->dev, "Unable to get HDMI pclk clk\n");
++		return PTR_ERR(hdmi->pclk);
++	}
++
++	ret = clk_prepare_enable(hdmi->pclk);
++	if (ret) {
++		dev_err(hdmi->dev, "Cannot enable HDMI pclk clock: %d\n", ret);
++		return ret;
++	}
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0)
++		return irq;
++
++	inno_hdmi_reset(hdmi);
++
++	hdmi->ddc = inno_hdmi_i2c_adapter(hdmi);
++	if (IS_ERR(hdmi->ddc)) {
++		hdmi->ddc = NULL;
++		return PTR_ERR(hdmi->ddc);
++	}
++
++	/*
++	 * When IP controller haven't configured to an accurate video
++	 * timing, then the TMDS clock source would be switched to
++	 * PCLK_HDMI, so we need to init the TMDS rate to PCLK rate,
++	 * and reconfigure the DDC clock.
++	 */
++	hdmi->tmds_rate = clk_get_rate(hdmi->pclk);
++	inno_hdmi_i2c_init(hdmi);
++
++	ret = inno_hdmi_register(drm, hdmi);
++	if (ret)
++		return ret;
++
++	dev_set_drvdata(dev, hdmi);
++
++	/* Unmute hotplug interrupt */
++	hdmi_modb(hdmi, HDMI_STATUS, m_MASK_INT_HOTPLUG, v_MASK_INT_HOTPLUG(1));
++
++	ret = devm_request_threaded_irq(dev, irq, inno_hdmi_hardirq,
++					inno_hdmi_irq, IRQF_SHARED,
++					dev_name(dev), hdmi);
++
++	return ret;
++}
++
++static void inno_hdmi_unbind(struct device *dev, struct device *master,
++			     void *data)
++{
++	struct inno_hdmi *hdmi = dev_get_drvdata(dev);
++
++	hdmi->connector.funcs->destroy(&hdmi->connector);
++	hdmi->encoder.funcs->destroy(&hdmi->encoder);
++
++	clk_disable_unprepare(hdmi->pclk);
++	i2c_put_adapter(hdmi->ddc);
++}
++
++static const struct component_ops inno_hdmi_ops = {
++	.bind	= inno_hdmi_bind,
++	.unbind	= inno_hdmi_unbind,
++};
++
++static int inno_hdmi_probe(struct platform_device *pdev)
++{
++	return component_add(&pdev->dev, &inno_hdmi_ops);
++}
++
++static int inno_hdmi_remove(struct platform_device *pdev)
++{
++	component_del(&pdev->dev, &inno_hdmi_ops);
++
++	return 0;
++}
++
++static const struct of_device_id inno_hdmi_dt_ids[] = {
++	{ .compatible = "rockchip,rk3036-inno-hdmi",
++	},
++	{},
++};
++MODULE_DEVICE_TABLE(of, inno_hdmi_dt_ids);
++
++static struct platform_driver inno_hdmi_driver = {
++	.probe  = inno_hdmi_probe,
++	.remove = inno_hdmi_remove,
++	.driver = {
++		.name = "innohdmi-rockchip",
++		.of_match_table = inno_hdmi_dt_ids,
++	},
++};
++
++module_platform_driver(inno_hdmi_driver);
++
++MODULE_AUTHOR("Zheng Yang <zhengyang@rock-chips.com>");
++MODULE_AUTHOR("Yakir Yang <ykk@rock-chips.com>");
++MODULE_DESCRIPTION("Rockchip Specific INNO-HDMI Driver");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:innohdmi-rockchip");
+diff --git a/drivers/gpu/drm/rockchip/inno_hdmi.h b/drivers/gpu/drm/rockchip/inno_hdmi.h
+new file mode 100644
+index 0000000..aa7c415
+--- /dev/null
++++ b/drivers/gpu/drm/rockchip/inno_hdmi.h
+@@ -0,0 +1,362 @@
++/*
++ * Copyright (C) Fuzhou Rockchip Electronics Co.Ltd
++ *    Zheng Yang <zhengyang@rock-chips.com>
++ *    Yakir Yang <ykk@rock-chips.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __INNO_HDMI_H__
++#define __INNO_HDMI_H__
++
++#define DDC_SEGMENT_ADDR		0x30
++
++enum PWR_MODE {
++	NORMAL,
++	LOWER_PWR,
++};
++
++#define HDMI_SCL_RATE			(100*1000)
++#define DDC_BUS_FREQ_L			0x4b
++#define DDC_BUS_FREQ_H			0x4c
++
++#define HDMI_SYS_CTRL			0x00
++#define m_RST_ANALOG			(1 << 6)
++#define v_RST_ANALOG			(0 << 6)
++#define v_NOT_RST_ANALOG		(1 << 6)
++#define m_RST_DIGITAL			(1 << 5)
++#define v_RST_DIGITAL			(0 << 5)
++#define v_NOT_RST_DIGITAL		(1 << 5)
++#define m_REG_CLK_INV			(1 << 4)
++#define v_REG_CLK_NOT_INV		(0 << 4)
++#define v_REG_CLK_INV			(1 << 4)
++#define m_VCLK_INV			(1 << 3)
++#define v_VCLK_NOT_INV			(0 << 3)
++#define v_VCLK_INV			(1 << 3)
++#define m_REG_CLK_SOURCE		(1 << 2)
++#define v_REG_CLK_SOURCE_TMDS		(0 << 2)
++#define v_REG_CLK_SOURCE_SYS		(1 << 2)
++#define m_POWER				(1 << 1)
++#define v_PWR_ON			(0 << 1)
++#define v_PWR_OFF			(1 << 1)
++#define m_INT_POL			(1 << 0)
++#define v_INT_POL_HIGH			1
++#define v_INT_POL_LOW			0
++
++#define HDMI_VIDEO_CONTRL1		0x01
++#define m_VIDEO_INPUT_FORMAT		(7 << 1)
++#define m_DE_SOURCE			(1 << 0)
++#define v_VIDEO_INPUT_FORMAT(n)		(n << 1)
++#define v_DE_EXTERNAL			1
++#define v_DE_INTERNAL			0
++enum {
++	VIDEO_INPUT_SDR_RGB444 = 0,
++	VIDEO_INPUT_DDR_RGB444 = 5,
++	VIDEO_INPUT_DDR_YCBCR422 = 6
++};
++
++#define HDMI_VIDEO_CONTRL2		0x02
++#define m_VIDEO_OUTPUT_COLOR		(3 << 6)
++#define m_VIDEO_INPUT_BITS		(3 << 4)
++#define m_VIDEO_INPUT_CSP		(1 << 0)
++#define v_VIDEO_OUTPUT_COLOR(n)		(((n) & 0x3) << 6)
++#define v_VIDEO_INPUT_BITS(n)		(n << 4)
++#define v_VIDEO_INPUT_CSP(n)		(n << 0)
++enum {
++	VIDEO_INPUT_12BITS = 0,
++	VIDEO_INPUT_10BITS = 1,
++	VIDEO_INPUT_REVERT = 2,
++	VIDEO_INPUT_8BITS = 3,
++};
++
++#define HDMI_VIDEO_CONTRL		0x03
++#define m_VIDEO_AUTO_CSC		(1 << 7)
++#define v_VIDEO_AUTO_CSC(n)		(n << 7)
++#define m_VIDEO_C0_C2_SWAP		(1 << 0)
++#define v_VIDEO_C0_C2_SWAP(n)		(n << 0)
++enum {
++	C0_C2_CHANGE_ENABLE = 0,
++	C0_C2_CHANGE_DISABLE = 1,
++	AUTO_CSC_DISABLE = 0,
++	AUTO_CSC_ENABLE = 1,
++};
++
++#define HDMI_VIDEO_CONTRL3		0x04
++#define m_COLOR_DEPTH_NOT_INDICATED	(1 << 4)
++#define m_SOF				(1 << 3)
++#define m_COLOR_RANGE			(1 << 2)
++#define m_CSC				(1 << 0)
++#define v_COLOR_DEPTH_NOT_INDICATED(n)	((n) << 4)
++#define v_SOF_ENABLE			(0 << 3)
++#define v_SOF_DISABLE			(1 << 3)
++#define v_COLOR_RANGE_FULL		(1 << 2)
++#define v_COLOR_RANGE_LIMITED		(0 << 2)
++#define v_CSC_ENABLE			1
++#define v_CSC_DISABLE			0
++
++#define HDMI_AV_MUTE			0x05
++#define m_AVMUTE_CLEAR			(1 << 7)
++#define m_AVMUTE_ENABLE			(1 << 6)
++#define m_AUDIO_MUTE			(1 << 1)
++#define m_VIDEO_BLACK			(1 << 0)
++#define v_AVMUTE_CLEAR(n)		(n << 7)
++#define v_AVMUTE_ENABLE(n)		(n << 6)
++#define v_AUDIO_MUTE(n)			(n << 1)
++#define v_VIDEO_MUTE(n)			(n << 0)
++
++#define HDMI_VIDEO_TIMING_CTL		0x08
++#define v_HSYNC_POLARITY(n)		(n << 3)
++#define v_VSYNC_POLARITY(n)		(n << 2)
++#define v_INETLACE(n)			(n << 1)
++#define v_EXTERANL_VIDEO(n)		(n << 0)
++
++#define HDMI_VIDEO_EXT_HTOTAL_L		0x09
++#define HDMI_VIDEO_EXT_HTOTAL_H		0x0a
++#define HDMI_VIDEO_EXT_HBLANK_L		0x0b
++#define HDMI_VIDEO_EXT_HBLANK_H		0x0c
++#define HDMI_VIDEO_EXT_HDELAY_L		0x0d
++#define HDMI_VIDEO_EXT_HDELAY_H		0x0e
++#define HDMI_VIDEO_EXT_HDURATION_L	0x0f
++#define HDMI_VIDEO_EXT_HDURATION_H	0x10
++#define HDMI_VIDEO_EXT_VTOTAL_L		0x11
++#define HDMI_VIDEO_EXT_VTOTAL_H		0x12
++#define HDMI_VIDEO_EXT_VBLANK		0x13
++#define HDMI_VIDEO_EXT_VDELAY		0x14
++#define HDMI_VIDEO_EXT_VDURATION	0x15
++
++#define HDMI_VIDEO_CSC_COEF		0x18
++
++#define HDMI_AUDIO_CTRL1		0x35
++enum {
++	CTS_SOURCE_INTERNAL = 0,
++	CTS_SOURCE_EXTERNAL = 1,
++};
++#define v_CTS_SOURCE(n)			(n << 7)
++
++enum {
++	DOWNSAMPLE_DISABLE = 0,
++	DOWNSAMPLE_1_2 = 1,
++	DOWNSAMPLE_1_4 = 2,
++};
++#define v_DOWN_SAMPLE(n)		(n << 5)
++
++enum {
++	AUDIO_SOURCE_IIS = 0,
++	AUDIO_SOURCE_SPDIF = 1,
++};
++#define v_AUDIO_SOURCE(n)		(n << 3)
++
++#define v_MCLK_ENABLE(n)		(n << 2)
++enum {
++	MCLK_128FS = 0,
++	MCLK_256FS = 1,
++	MCLK_384FS = 2,
++	MCLK_512FS = 3,
++};
++#define v_MCLK_RATIO(n)			(n)
++
++#define AUDIO_SAMPLE_RATE		0x37
++enum {
++	AUDIO_32K = 0x3,
++	AUDIO_441K = 0x0,
++	AUDIO_48K = 0x2,
++	AUDIO_882K = 0x8,
++	AUDIO_96K = 0xa,
++	AUDIO_1764K = 0xc,
++	AUDIO_192K = 0xe,
++};
++
++#define AUDIO_I2S_MODE			0x38
++enum {
++	I2S_CHANNEL_1_2 = 1,
++	I2S_CHANNEL_3_4 = 3,
++	I2S_CHANNEL_5_6 = 7,
++	I2S_CHANNEL_7_8 = 0xf
++};
++#define v_I2S_CHANNEL(n)		((n) << 2)
++enum {
++	I2S_STANDARD = 0,
++	I2S_LEFT_JUSTIFIED = 1,
++	I2S_RIGHT_JUSTIFIED = 2,
++};
++#define v_I2S_MODE(n)			(n)
++
++#define AUDIO_I2S_MAP			0x39
++#define AUDIO_I2S_SWAPS_SPDIF		0x3a
++#define v_SPIDF_FREQ(n)			(n)
++
++#define N_32K				0x1000
++#define N_441K				0x1880
++#define N_882K				0x3100
++#define N_1764K				0x6200
++#define N_48K				0x1800
++#define N_96K				0x3000
++#define N_192K				0x6000
++
++#define HDMI_AUDIO_CHANNEL_STATUS	0x3e
++#define m_AUDIO_STATUS_NLPCM		(1 << 7)
++#define m_AUDIO_STATUS_USE		(1 << 6)
++#define m_AUDIO_STATUS_COPYRIGHT	(1 << 5)
++#define m_AUDIO_STATUS_ADDITION		(3 << 2)
++#define m_AUDIO_STATUS_CLK_ACCURACY	(2 << 0)
++#define v_AUDIO_STATUS_NLPCM(n)		((n & 1) << 7)
++#define AUDIO_N_H			0x3f
++#define AUDIO_N_M			0x40
++#define AUDIO_N_L			0x41
++
++#define HDMI_AUDIO_CTS_H		0x45
++#define HDMI_AUDIO_CTS_M		0x46
++#define HDMI_AUDIO_CTS_L		0x47
++
++#define HDMI_DDC_CLK_L			0x4b
++#define HDMI_DDC_CLK_H			0x4c
++
++#define HDMI_EDID_SEGMENT_POINTER	0x4d
++#define HDMI_EDID_WORD_ADDR		0x4e
++#define HDMI_EDID_FIFO_OFFSET		0x4f
++#define HDMI_EDID_FIFO_ADDR		0x50
++
++#define HDMI_PACKET_SEND_MANUAL		0x9c
++#define HDMI_PACKET_SEND_AUTO		0x9d
++#define m_PACKET_GCP_EN			(1 << 7)
++#define m_PACKET_MSI_EN			(1 << 6)
++#define m_PACKET_SDI_EN			(1 << 5)
++#define m_PACKET_VSI_EN			(1 << 4)
++#define v_PACKET_GCP_EN(n)		((n & 1) << 7)
++#define v_PACKET_MSI_EN(n)		((n & 1) << 6)
++#define v_PACKET_SDI_EN(n)		((n & 1) << 5)
++#define v_PACKET_VSI_EN(n)		((n & 1) << 4)
++
++#define HDMI_CONTROL_PACKET_BUF_INDEX	0x9f
++enum {
++	INFOFRAME_VSI = 0x05,
++	INFOFRAME_AVI = 0x06,
++	INFOFRAME_AAI = 0x08,
++};
++
++#define HDMI_CONTROL_PACKET_ADDR	0xa0
++#define HDMI_MAXIMUM_INFO_FRAME_SIZE	0x11
++enum {
++	AVI_COLOR_MODE_RGB = 0,
++	AVI_COLOR_MODE_YCBCR422 = 1,
++	AVI_COLOR_MODE_YCBCR444 = 2,
++	AVI_COLORIMETRY_NO_DATA = 0,
++
++	AVI_COLORIMETRY_SMPTE_170M = 1,
++	AVI_COLORIMETRY_ITU709 = 2,
++	AVI_COLORIMETRY_EXTENDED = 3,
++
++	AVI_CODED_FRAME_ASPECT_NO_DATA = 0,
++	AVI_CODED_FRAME_ASPECT_4_3 = 1,
++	AVI_CODED_FRAME_ASPECT_16_9 = 2,
++
++	ACTIVE_ASPECT_RATE_SAME_AS_CODED_FRAME = 0x08,
++	ACTIVE_ASPECT_RATE_4_3 = 0x09,
++	ACTIVE_ASPECT_RATE_16_9 = 0x0A,
++	ACTIVE_ASPECT_RATE_14_9 = 0x0B,
++};
++
++#define HDMI_HDCP_CTRL			0x52
++#define m_HDMI_DVI			(1 << 1)
++#define v_HDMI_DVI(n)			(n << 1)
++
++#define HDMI_INTERRUPT_MASK1		0xc0
++#define HDMI_INTERRUPT_STATUS1		0xc1
++#define	m_INT_ACTIVE_VSYNC		(1 << 5)
++#define m_INT_EDID_READY		(1 << 2)
++
++#define HDMI_INTERRUPT_MASK2		0xc2
++#define HDMI_INTERRUPT_STATUS2		0xc3
++#define m_INT_HDCP_ERR			(1 << 7)
++#define m_INT_BKSV_FLAG			(1 << 6)
++#define m_INT_HDCP_OK			(1 << 4)
++
++#define HDMI_STATUS			0xc8
++#define m_HOTPLUG			(1 << 7)
++#define m_MASK_INT_HOTPLUG		(1 << 5)
++#define m_INT_HOTPLUG			(1 << 1)
++#define v_MASK_INT_HOTPLUG(n)		((n & 0x1) << 5)
++
++#define HDMI_COLORBAR                   0xc9
++
++#define HDMI_PHY_SYNC			0xce
++#define HDMI_PHY_SYS_CTL		0xe0
++#define m_TMDS_CLK_SOURCE		(1 << 5)
++#define v_TMDS_FROM_PLL			(0 << 5)
++#define v_TMDS_FROM_GEN			(1 << 5)
++#define m_PHASE_CLK			(1 << 4)
++#define v_DEFAULT_PHASE			(0 << 4)
++#define v_SYNC_PHASE			(1 << 4)
++#define m_TMDS_CURRENT_PWR		(1 << 3)
++#define v_TURN_ON_CURRENT		(0 << 3)
++#define v_CAT_OFF_CURRENT		(1 << 3)
++#define m_BANDGAP_PWR			(1 << 2)
++#define v_BANDGAP_PWR_UP		(0 << 2)
++#define v_BANDGAP_PWR_DOWN		(1 << 2)
++#define m_PLL_PWR			(1 << 1)
++#define v_PLL_PWR_UP			(0 << 1)
++#define v_PLL_PWR_DOWN			(1 << 1)
++#define m_TMDS_CHG_PWR			(1 << 0)
++#define v_TMDS_CHG_PWR_UP		(0 << 0)
++#define v_TMDS_CHG_PWR_DOWN		(1 << 0)
++
++#define HDMI_PHY_CHG_PWR		0xe1
++#define v_CLK_CHG_PWR(n)		((n & 1) << 3)
++#define v_DATA_CHG_PWR(n)		((n & 7) << 0)
++
++#define HDMI_PHY_DRIVER			0xe2
++#define v_CLK_MAIN_DRIVER(n)		(n << 4)
++#define v_DATA_MAIN_DRIVER(n)		(n << 0)
++
++#define HDMI_PHY_PRE_EMPHASIS		0xe3
++#define v_PRE_EMPHASIS(n)		((n & 7) << 4)
++#define v_CLK_PRE_DRIVER(n)		((n & 3) << 2)
++#define v_DATA_PRE_DRIVER(n)		((n & 3) << 0)
++
++#define HDMI_PHY_FEEDBACK_DIV_RATIO_LOW		0xe7
++#define v_FEEDBACK_DIV_LOW(n)			(n & 0xff)
++#define HDMI_PHY_FEEDBACK_DIV_RATIO_HIGH	0xe8
++#define v_FEEDBACK_DIV_HIGH(n)			(n & 1)
++
++#define HDMI_PHY_PRE_DIV_RATIO		0xed
++#define v_PRE_DIV_RATIO(n)		(n & 0x1f)
++
++#define HDMI_CEC_CTRL			0xd0
++#define m_ADJUST_FOR_HISENSE		(1 << 6)
++#define m_REJECT_RX_BROADCAST		(1 << 5)
++#define m_BUSFREETIME_ENABLE		(1 << 2)
++#define m_REJECT_RX			(1 << 1)
++#define m_START_TX			(1 << 0)
++
++#define HDMI_CEC_DATA			0xd1
++#define HDMI_CEC_TX_OFFSET		0xd2
++#define HDMI_CEC_RX_OFFSET		0xd3
++#define HDMI_CEC_CLK_H			0xd4
++#define HDMI_CEC_CLK_L			0xd5
++#define HDMI_CEC_TX_LENGTH		0xd6
++#define HDMI_CEC_RX_LENGTH		0xd7
++#define HDMI_CEC_TX_INT_MASK		0xd8
++#define m_TX_DONE			(1 << 3)
++#define m_TX_NOACK			(1 << 2)
++#define m_TX_BROADCAST_REJ		(1 << 1)
++#define m_TX_BUSNOTFREE			(1 << 0)
++
++#define HDMI_CEC_RX_INT_MASK		0xd9
++#define m_RX_LA_ERR			(1 << 4)
++#define m_RX_GLITCH			(1 << 3)
++#define m_RX_DONE			(1 << 0)
++
++#define HDMI_CEC_TX_INT			0xda
++#define HDMI_CEC_RX_INT			0xdb
++#define HDMI_CEC_BUSFREETIME_L		0xdc
++#define HDMI_CEC_BUSFREETIME_H		0xdd
++#define HDMI_CEC_LOGICADDR		0xde
++
++#endif /* __INNO_HDMI_H__ */
+-- 
+1.9.1
