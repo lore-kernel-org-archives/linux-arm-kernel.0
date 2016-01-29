@@ -1,124 +1,114 @@
 From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Fri, 29 Jan 2016 18:17:43 -0300
-Subject: [PATCH 06/16] perf auxtrace: Add perf_evlist pointer to
- *info_priv_size()
-In-Reply-To: <1454102273-16431-1-git-send-email-acme@kernel.org>
-References: <1454102273-16431-1-git-send-email-acme@kernel.org>
-Message-ID: <1454102273-16431-7-git-send-email-acme@kernel.org>
+Date: Fri, 29 Jan 2016 18:17:37 -0300
+Subject: [GIT PULL 00/16] perf/core improvements and fixes
+Message-ID: <1454102273-16431-1-git-send-email-acme@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 See http://www.infradead.org/rpr.html
 
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
+Hi Ingo,
 
-On some architecture the size of the private header may be dependent on
-the number of tracers used in the session.  As such adding a "struct
-perf_evlist *" parameter, which should contain all the required
-information.
+	This is on top of the previously submitted perf-core-for-mingo tag,
+please consider applying,
 
-Also adjusting the existing client of the interface to take the new
-parameter into account.
+- Arnaldo
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
-Cc: Al Grant <al.grant@arm.com>
-Cc: Chunyan Zhang <zhang.chunyan@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-doc at vger.kernel.org
-Cc: Mike Leach <mike.leach@arm.com>
-Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Cc: Rabin Vincent <rabin@rab.in>
-Cc: Tor Jeremiassen <tor@ti.com>
-Link: http://lkml.kernel.org/r/1452807977-8069-22-git-send-email-mathieu.poirier at linaro.org
+The following changes since commit 5ac76283b32b116c58e362e99542182ddcfc8262:
+
+  perf cpumap: Auto initialize cpu__max_{node,cpu} (2016-01-26 16:08:36 -0300)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git tags/perf-core-for-mingo-2
+
+for you to fetch changes up to 814568db641f6587c1e98a3a85f214cb6a30fe10:
+
+  perf build: Align the names of the build tests: (2016-01-29 17:51:04 -0300)
+
+----------------------------------------------------------------
+New features:
+
+- Port 'perf kvm stat' to PowerPC (Hemant Kumar)
+
+Infrastructure:
+
+- Use the 'feature-dump' target to do the feature checks just once and then
+  add code to reuse that in the tests/make makefile, speeding up the
+  'make -C tools/perf build-test' target (Wang Nan)
+
+- Reduce the number of tests the 'build-test' target do to those that don't
+  pollute the source tree (Arnaldo Carvalho de Melo)
+
+- Improve the output of the build tests a bit by aligning the name of the
+  tests, more can be done to filter out uninteresting info in the output
+  (Arnaldo Carvalho de Melo)
+
+- Add perf_evlist pointer to *info_priv_size(), more prep work for
+  supporting the coresight architecture (Mathieu Poirier)
+
+- Improve the 'perf test bp_signal' test (Wang Nan)
+
+- Check environment before starting the BPF 'perf test', so that we can just
+  'Skip' older kernels instead of 'FAIL'ing them (Wang Nan)
+
+- Fix cpumode of synthesized buildid event (Wang Nan)
+
 Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
----
- tools/perf/arch/x86/util/intel-bts.c | 4 +++-
- tools/perf/arch/x86/util/intel-pt.c  | 4 +++-
- tools/perf/util/auxtrace.c           | 7 ++++---
- tools/perf/util/auxtrace.h           | 6 ++++--
- 4 files changed, 14 insertions(+), 7 deletions(-)
 
-diff --git a/tools/perf/arch/x86/util/intel-bts.c b/tools/perf/arch/x86/util/intel-bts.c
-index 8d8150f1cf9b..d66f9ad4df2e 100644
---- a/tools/perf/arch/x86/util/intel-bts.c
-+++ b/tools/perf/arch/x86/util/intel-bts.c
-@@ -60,7 +60,9 @@ struct branch {
- 	u64 misc;
- };
- 
--static size_t intel_bts_info_priv_size(struct auxtrace_record *itr __maybe_unused)
-+static size_t
-+intel_bts_info_priv_size(struct auxtrace_record *itr __maybe_unused,
-+			 struct perf_evlist *evlist __maybe_unused)
- {
- 	return INTEL_BTS_AUXTRACE_PRIV_SIZE;
- }
-diff --git a/tools/perf/arch/x86/util/intel-pt.c b/tools/perf/arch/x86/util/intel-pt.c
-index f05daacc9e78..6f7d453b0e32 100644
---- a/tools/perf/arch/x86/util/intel-pt.c
-+++ b/tools/perf/arch/x86/util/intel-pt.c
-@@ -273,7 +273,9 @@ intel_pt_pmu_default_config(struct perf_pmu *intel_pt_pmu)
- 	return attr;
- }
- 
--static size_t intel_pt_info_priv_size(struct auxtrace_record *itr __maybe_unused)
-+static size_t
-+intel_pt_info_priv_size(struct auxtrace_record *itr __maybe_unused,
-+			struct perf_evlist *evlist __maybe_unused)
- {
- 	return INTEL_PT_AUXTRACE_PRIV_SIZE;
- }
-diff --git a/tools/perf/util/auxtrace.c b/tools/perf/util/auxtrace.c
-index 360fda01f3b0..ec164fe70718 100644
---- a/tools/perf/util/auxtrace.c
-+++ b/tools/perf/util/auxtrace.c
-@@ -478,10 +478,11 @@ void auxtrace_heap__pop(struct auxtrace_heap *heap)
- 			 heap_array[last].ordinal);
- }
- 
--size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr)
-+size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr,
-+				       struct perf_evlist *evlist)
- {
- 	if (itr)
--		return itr->info_priv_size(itr);
-+		return itr->info_priv_size(itr, evlist);
- 	return 0;
- }
- 
-@@ -852,7 +853,7 @@ int perf_event__synthesize_auxtrace_info(struct auxtrace_record *itr,
- 	int err;
- 
- 	pr_debug2("Synthesizing auxtrace information\n");
--	priv_size = auxtrace_record__info_priv_size(itr);
-+	priv_size = auxtrace_record__info_priv_size(itr, session->evlist);
- 	ev = zalloc(sizeof(struct auxtrace_info_event) + priv_size);
- 	if (!ev)
- 		return -ENOMEM;
-diff --git a/tools/perf/util/auxtrace.h b/tools/perf/util/auxtrace.h
-index b86f90db1352..e5a8e2d4f2af 100644
---- a/tools/perf/util/auxtrace.h
-+++ b/tools/perf/util/auxtrace.h
-@@ -293,7 +293,8 @@ struct auxtrace_record {
- 	int (*recording_options)(struct auxtrace_record *itr,
- 				 struct perf_evlist *evlist,
- 				 struct record_opts *opts);
--	size_t (*info_priv_size)(struct auxtrace_record *itr);
-+	size_t (*info_priv_size)(struct auxtrace_record *itr,
-+				 struct perf_evlist *evlist);
- 	int (*info_fill)(struct auxtrace_record *itr,
- 			 struct perf_session *session,
- 			 struct auxtrace_info_event *auxtrace_info,
-@@ -429,7 +430,8 @@ int auxtrace_parse_snapshot_options(struct auxtrace_record *itr,
- int auxtrace_record__options(struct auxtrace_record *itr,
- 			     struct perf_evlist *evlist,
- 			     struct record_opts *opts);
--size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr);
-+size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr,
-+				       struct perf_evlist *evlist);
- int auxtrace_record__info_fill(struct auxtrace_record *itr,
- 			       struct perf_session *session,
- 			       struct auxtrace_info_event *auxtrace_info,
--- 
-2.5.0
+----------------------------------------------------------------
+Arnaldo Carvalho de Melo (2):
+      perf tools: Speed up build-tests by reducing the number of builds tested
+      perf build: Align the names of the build tests:
+
+Hemant Kumar (4):
+      perf kvm/{x86,s390}: Remove dependency on uapi/kvm_perf.h
+      perf kvm/{x86,s390}: Remove const from kvm_events_tp
+      perf kvm/powerpc: Port perf kvm stat to powerpc
+      perf kvm/powerpc: Add support for HCALL reasons
+
+Jiri Olsa (1):
+      perf build: Fix feature-dump checks, we need to test all features
+
+Mathieu Poirier (1):
+      perf auxtrace: Add perf_evlist pointer to *info_priv_size()
+
+Wang Nan (8):
+      tools build: Check basic headers for test-compile feature checker
+      perf build: Remove all condition feature check {C,LD}FLAGS
+      perf build: Use feature dump file for build-test
+      perf buildid: Fix cpumode of buildid event
+      perf test: Check environment before start real BPF test
+      perf test: Improve bp_signal
+      perf tools: Move timestamp creation to util
+      perf record: Use OPT_BOOLEAN_SET for buildid cache related options
+
+ tools/build/Makefile.feature                   |   8 ++
+ tools/build/feature/test-compile.c             |   2 +
+ tools/perf/Makefile                            |  11 +-
+ tools/perf/arch/powerpc/Makefile               |   2 +
+ tools/perf/arch/powerpc/util/Build             |   1 +
+ tools/perf/arch/powerpc/util/book3s_hcalls.h   | 123 ++++++++++++++++++
+ tools/perf/arch/powerpc/util/book3s_hv_exits.h |  33 +++++
+ tools/perf/arch/powerpc/util/kvm-stat.c        | 170 +++++++++++++++++++++++++
+ tools/perf/arch/s390/util/kvm-stat.c           |  10 +-
+ tools/perf/arch/x86/util/intel-bts.c           |   4 +-
+ tools/perf/arch/x86/util/intel-pt.c            |   4 +-
+ tools/perf/arch/x86/util/kvm-stat.c            |  16 ++-
+ tools/perf/builtin-buildid-cache.c             |  14 +-
+ tools/perf/builtin-kvm.c                       |  38 ++++--
+ tools/perf/builtin-record.c                    |  12 +-
+ tools/perf/config/Makefile                     | 101 +++++++--------
+ tools/perf/tests/bp_signal.c                   | 140 ++++++++++++++++----
+ tools/perf/tests/bpf.c                         |  37 ++++++
+ tools/perf/tests/make                          |  39 +++++-
+ tools/perf/util/auxtrace.c                     |   7 +-
+ tools/perf/util/auxtrace.h                     |   6 +-
+ tools/perf/util/build-id.c                     |   6 +-
+ tools/perf/util/kvm-stat.h                     |   8 +-
+ tools/perf/util/util.c                         |  17 +++
+ tools/perf/util/util.h                         |   1 +
+ 25 files changed, 688 insertions(+), 122 deletions(-)
+ create mode 100644 tools/perf/arch/powerpc/util/book3s_hcalls.h
+ create mode 100644 tools/perf/arch/powerpc/util/book3s_hv_exits.h
+ create mode 100644 tools/perf/arch/powerpc/util/kvm-stat.c
