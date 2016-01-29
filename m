@@ -1,46 +1,55 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 29 Jan 2016 11:17:22 +0100
-Subject: [PATCH v4 5/9] ARM: dts: lager: Enable SCIF_CLK frequency and pins
+Date: Fri, 29 Jan 2016 11:17:21 +0100
+Subject: [PATCH v4 4/9] ARM: dts: koelsch: Enable SCIF_CLK frequency and pins
 In-Reply-To: <1454062646-4826-1-git-send-email-geert+renesas@glider.be>
 References: <1454062646-4826-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1454062646-4826-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <1454062646-4826-5-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Add and enable the external crystal for the SCIF_CLK and its pinctrl, to
 be used by the Baud Rate Generator for External Clock (BRG) on (H)SCIF.
 
-This increases the range and accuracy of supported baud rates.
+This increases the range and accuracy of supported baud rates:
+  - SCIF:
+      - Supports now 50, 75, 110, 1152000, 1500000, 2000000, and
+        4000000 bps,
+      - Perfect match for standard 50-460800, and 9216000 bps.
+      - More accurate 576000 bps.
+  - HSCIF:
+      - Supports now 50, 75, 110, 134, 150, and 200 bps,
+      - Perfect match for standard 50-460800, and 9216000 bps.
+      - More accurate 576000, 1152000, 3000000, 3500000, and 4000000
+	bps.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
-Untested, based on schematics.
-
 v4:
   - Change one-line summary prefix to match current arm-soc practices,
 
 v3:
-  - New.
+  - Add Reviewed-by.
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 13 +++++++++++++
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 13 +++++++++++++
  1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 052dcee4790dd298..cdc0414f5f0716dd 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -291,6 +291,9 @@
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 45256f3cc83560a8..0ad71b81d3a25f59 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -320,6 +320,9 @@
  };
  
  &pfc {
 +	pinctrl-0 = <&scif_clk_pins>;
 +	pinctrl-names = "default";
 +
- 	du_pins: du {
- 		renesas,groups = "du_rgb666", "du_sync_1", "du_clk_out_0";
- 		renesas,function = "du";
-@@ -301,6 +304,11 @@
- 		renesas,function = "scif0";
+ 	i2c2_pins: i2c2 {
+ 		renesas,groups = "i2c2";
+ 		renesas,function = "i2c2";
+@@ -340,6 +343,11 @@
+ 		renesas,function = "scif1";
  	};
  
 +	scif_clk_pins: scif_clk {
@@ -51,7 +60,7 @@ index 052dcee4790dd298..cdc0414f5f0716dd 100644
  	ether_pins: ether {
  		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
  		renesas,function = "eth";
-@@ -485,6 +493,11 @@
+@@ -440,6 +448,11 @@
  	status = "okay";
  };
  
@@ -60,8 +69,8 @@ index 052dcee4790dd298..cdc0414f5f0716dd 100644
 +	status = "okay";
 +};
 +
- &msiof1 {
- 	pinctrl-0 = <&msiof1_pins>;
+ &sdhi0 {
+ 	pinctrl-0 = <&sdhi0_pins>;
  	pinctrl-names = "default";
 -- 
 1.9.1
