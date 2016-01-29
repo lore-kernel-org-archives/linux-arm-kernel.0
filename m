@@ -1,113 +1,49 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Fri, 29 Jan 2016 17:50:53 +0800
-Subject: [PATCH v3] i2c: mt8173: add 4GB mode support in i2c driver.
-In-Reply-To: <1454031331-9107-1-git-send-email-liguo.zhang@mediatek.com>
-References: <1454031331-9107-1-git-send-email-liguo.zhang@mediatek.com>
-Message-ID: <1454061053.17366.4.camel@mtksdaap41>
+From: menghui.lin@mediatek.com (menghui lin)
+Date: Fri, 29 Jan 2016 17:52:14 +0800
+Subject: [PATCH V4 2/2] regulator: mt6323: Add support for MT6323 regulator
+In-Reply-To: <20160128231306.GD4130@sirena.org.uk>
+References: <1453896059-44589-1-git-send-email-blogic@openwrt.org>
+ <1453896059-44589-2-git-send-email-blogic@openwrt.org>
+ <20160127144105.GQ6042@sirena.org.uk> <56AA5A5C.9080402@openwrt.org>
+ <20160128231306.GD4130@sirena.org.uk>
+Message-ID: <1454061134.10861.14.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-01-29 at 09:35 +0800, Liguo Zhang wrote:
-> If 4GB mode is enable, we should add 4gb mode support in i2c driver.
-
-nit: enabled
-However, after looking at it longer, the commit message doesn't make
-much sense to me.
-
-> Set 4GB mode register to support 4GB mode.
+On Fri, 2016-01-29 at 00:13 +0100, Mark Brown wrote:
+> On Thu, Jan 28, 2016 at 07:13:48PM +0100, John Crispin wrote:
 > 
-> Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
-> ---
-> change in v3:
-> Only inline the computation of reg_4g_mode in mtk_i2c_set_4g_mode().
-> change in v2:
-> Define a static inline funtion mtk_i2c_set_4g_mode() for support 4g mode.
-> ---
->  drivers/i2c/busses/i2c-mt65xx.c | 42 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
+> > would the following two bindings be ok ? I would create patches to add them.
 > 
-> diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
-> index aec8e6c..3c484f0 100644
-> --- a/drivers/i2c/busses/i2c-mt65xx.c
-> +++ b/drivers/i2c/busses/i2c-mt65xx.c
-> @@ -60,6 +60,7 @@
->  #define I2C_DMA_INT_FLAG_NONE		0x0000
->  #define I2C_DMA_CLR_FLAG		0x0000
->  #define I2C_DMA_HARD_RST		0x0002
-> +#define I2C_DMA_4G_MODE			0x0001
->  
->  #define I2C_DEFAULT_SPEED		100000	/* hz */
->  #define MAX_FS_MODE_SPEED		400000
-> @@ -88,6 +89,8 @@ enum DMA_REGS_OFFSET {
->  	OFFSET_RX_MEM_ADDR = 0x20,
->  	OFFSET_TX_LEN = 0x24,
->  	OFFSET_RX_LEN = 0x28,
-> +	OFFSET_TX_4G_MODE = 0x54,
-> +	OFFSET_RX_4G_MODE = 0x58,
->  };
->  
->  enum i2c_trans_st_rs {
-> @@ -133,6 +136,7 @@ struct mtk_i2c_compatible {
->  	unsigned char dcm: 1;
->  	unsigned char auto_restart: 1;
->  	unsigned char aux_len_reg: 1;
-> +	unsigned char support_33bits: 1;
->  };
->  
->  struct mtk_i2c {
-> @@ -182,6 +186,7 @@ static const struct mtk_i2c_compatible mt6577_compat = {
->  	.dcm = 1,
->  	.auto_restart = 0,
->  	.aux_len_reg = 0,
-> +	.support_33bits = 0,
->  };
->  
->  static const struct mtk_i2c_compatible mt6589_compat = {
-> @@ -190,6 +195,7 @@ static const struct mtk_i2c_compatible mt6589_compat = {
->  	.dcm = 0,
->  	.auto_restart = 0,
->  	.aux_len_reg = 0,
-> +	.support_33bits = 0,
->  };
->  
->  static const struct mtk_i2c_compatible mt8173_compat = {
-> @@ -198,6 +204,7 @@ static const struct mtk_i2c_compatible mt8173_compat = {
->  	.dcm = 1,
->  	.auto_restart = 1,
->  	.aux_len_reg = 1,
-> +	.support_33bits = 1,
->  };
->  
->  static const struct of_device_id mtk_i2c_of_match[] = {
-> @@ -366,6 +373,11 @@ static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk,
->  	return 0;
->  }
->  
-> +static inline u32 mtk_i2c_set_4g_mode(dma_addr_t addr)
-> +{
-> +	return (addr & BIT(32)) ? I2C_DMA_4G_MODE : I2C_DMA_CLR_FLAG;
-> +}
-> +
+> > * regulator-allow-mode; or regulator-allow-change-mode;
+> 
+> This seems redundant, if we have a list of valid modes presumably they
+> can be used - same idea as with voltage setting.
+> 
+> > * regulator-modes = <REGULATOR_MODE_NORMAL REGULATOR_MODE_STANDBY>;
+> 
+> I'm not convinced this binding makes sense, how would a user of the API
+> (currently there are none in tree) know what the modes mean?  It's a bit
+> different when the user is supplying configuration for a specific
+> regulator but this needs to be something that can be used by consumers.
+> 
+> What are you actually trying to do with this?
 
-#define BIT(nr)			(1UL << (nr))
-#define BIT_ULL(nr)		(1ULL << (nr))
+Hi Mark,
 
-#define DMA_BIT_MASK(n)	(((n) == 64) ? ~0ULL : ((1ULL<<(n))-1))
+Per documentation in regulator/consumer.h, I think user should be able
+to know the behavior of each mode(fast, normal, idle, standby).
 
+In this patch, we want to support both normal/standby modes for mt6323
+regulators due to mt6323 regulators support low power mode which
+provides better power efficiency for standby case.
 
-I think you should use BIT_ULL.
+We expect user of mt6323 regulators could dynamically change power mode
+by regulator_set_mode(). -EINVAL is returned if the given mode is not
+supported.
 
+The regulator_set_mode() API looks very straightforward and possible
+modes are already defined in consumer.h. It looks like we don't have to
+list possible modes for mt6323 additionally in binding document.
 
->  static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
->  			       int num, int left_num)
->  {
-> @@ -373,6 +385,7 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
->  	u16 start_reg;
->  	u16 control_reg;
->  	u16 restart_flag = 0;
-> +	u32 reg_4g_mode = 0;
-
-
-unnecessary init.
-
-Joe.C
+MengHui
