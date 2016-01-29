@@ -1,30 +1,38 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 29 Jan 2016 16:25:30 +0100
-Subject: [PATCH 0/9] ARM: pxa/mmp cleanups and warning fixes
-In-Reply-To: <1454076396-3563101-1-git-send-email-arnd@arndb.de> (Arnd
- Bergmann's message of "Fri, 29 Jan 2016 15:06:24 +0100")
-References: <1454076396-3563101-1-git-send-email-arnd@arndb.de>
-Message-ID: <87io2c76hh.fsf@belgarion.home>
+Date: Fri, 29 Jan 2016 16:26:03 +0100
+Subject: [PATCH 1/7] usb: gadget: pxa25x_udc: move register definitions
+ from arch
+In-Reply-To: <2664702.bXd9nOWVFO@wuerfel> (Arnd Bergmann's message of "Fri, 29
+ Jan 2016 11:07:18 +0100")
+References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
+ <1453997843-3489728-1-git-send-email-arnd@arndb.de>
+ <87vb6c7mug.fsf@belgarion.home> <2664702.bXd9nOWVFO@wuerfel>
+Message-ID: <87egd076gk.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Arnd Bergmann <arnd@arndb.de> writes:
 
-> These are all fixes for harmless warnings, aside from the first
-> patch, which is a cleanup. Please pick them up into the PXA
-> tree (my preference), or provide an Ack so I can put them
-> into arm-soc.
-Hi Arnd,
+> On Friday 29 January 2016 10:32:07 Robert Jarzmik wrote:
+>> > This addresses both issues by moving all the definitions into the
+>> > pxa25x_udc driver itself. It turns out the only difference between
+>> > them was 'UDCCS_IO_ROF', and that could well be a mistake when it
+>> > was incorrectly copied from pxa25x to ixp4xx.
+>> Hi Arnd,
+>> 
+>> Is there a reason to have chosen to move into pxa25_udc.c instead of
+>> drivers/usb/gadget/udc/pxa25x_udc.h ? pxa27x_udc has a .h in the same directory
+>> with register definitions, hence the question.
+>
+> Yes: The register definitions are only used in a single .c file and
+> are not an interface between files, so it's better to have them in
+> the file that uses them.
+>
+> I could have continued the cleanup and moved the two headers into the
+> respective drivers as well, but I had to stop somewhere ;-)
+Fair enough.
 
-I'll pick them up, provided the acks (for clock tree for example). The
-pxa-for-4.6 will happen.
-
-I'll just have a check on 1/9 to verify nobody hides in a corner a direct CKEN
-access, and try to understand more thoroughly 7/9, all the others look good to
-me.
-
-As for the 9th patch, it's in the MMP tree. I can carry it if Haojian wishes,
-but I need his ack.
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
 Cheers.
 
