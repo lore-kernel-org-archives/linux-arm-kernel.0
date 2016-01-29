@@ -1,37 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Jan 2016 15:06:33 +0100
-Subject: [PATCH 9/9] ARM: mmp: mark usb_dma_mask as __maybe_unused
-In-Reply-To: <1454076396-3563101-1-git-send-email-arnd@arndb.de>
-References: <1454076396-3563101-1-git-send-email-arnd@arndb.de>
-Message-ID: <1454076396-3563101-10-git-send-email-arnd@arndb.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 29 Jan 2016 15:17:15 +0100
+Subject: [PATCH] PCI: generic: map config window in one go
+Message-ID: <1454077035-23872-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This variable may be used by some devices that each have their
-on Kconfig symbol, or by none of them, and that causes a build
-warning:
+Instead of iterating over the PCI config window and performing individual
+ioremap() calls on all the adjacent slices, perform a single ioremap() to
+map the entire region, and divvy it up later. This not only prevents
+leaving some of it mapped if we fail half way through, it also ensures that
+archs that support huge-vmap can use section mappings to perform the
+mapping.
 
-arch/arm/mach-mmp/devices.c:241:12: error: 'usb_dma_mask' defined but not used [-Werror=unused-variable]
+On my Seattle A0 box, this transforms 128 separate 1 MB mappings that are
+mapped down to 4 KB pages into a single 128 MB mapping using 2 MB sections,
+saving 512 KB worth of page tables.
 
-Marking it __maybe_unused avoids the warning.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/mach-mmp/devices.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mmp/devices.c b/arch/arm/mach-mmp/devices.c
-index 3330ac7cfbef..671c7a09ab3d 100644
---- a/arch/arm/mach-mmp/devices.c
-+++ b/arch/arm/mach-mmp/devices.c
-@@ -238,7 +238,7 @@ void pxa_usb_phy_deinit(void __iomem *phy_reg)
- #endif
+huge-vmap for arm64 proposed here:
+http://article.gmane.org/gmane.linux.kernel.hardened.devel/1661
  
- #if IS_ENABLED(CONFIG_USB_SUPPORT)
--static u64 usb_dma_mask = ~(u32)0;
-+static u64 __maybe_unused usb_dma_mask = ~(u32)0;
+ drivers/pci/host/pci-host-generic.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+index 1652bc70b145..3251cd779278 100644
+--- a/drivers/pci/host/pci-host-generic.c
++++ b/drivers/pci/host/pci-host-generic.c
+@@ -161,6 +161,7 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+ 	struct device *dev = pci->host.dev.parent;
+ 	struct device_node *np = dev->of_node;
+ 	u32 sz = 1 << pci->cfg.ops->bus_shift;
++	void *window;
  
- #if IS_ENABLED(CONFIG_USB_MV_UDC)
- struct resource pxa168_u2o_resources[] = {
+ 	err = of_address_to_resource(np, 0, &pci->cfg.res);
+ 	if (err) {
+@@ -186,14 +187,15 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+ 		return -ENOMEM;
+ 
+ 	bus_range = pci->cfg.bus_range;
++	window = devm_ioremap(dev, pci->cfg.res.start,
++			      (bus_range->end - bus_range->start + 1) * sz);
++	if (!window)
++		return -ENOMEM;
++
+ 	for (busn = bus_range->start; busn <= bus_range->end; ++busn) {
+ 		u32 idx = busn - bus_range->start;
+ 
+-		pci->cfg.win[idx] = devm_ioremap(dev,
+-						 pci->cfg.res.start + idx * sz,
+-						 sz);
+-		if (!pci->cfg.win[idx])
+-			return -ENOMEM;
++		pci->cfg.win[idx] = window + idx * sz;
+ 	}
+ 
+ 	return 0;
 -- 
-2.7.0
+2.5.0
