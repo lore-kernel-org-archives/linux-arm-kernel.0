@@ -1,55 +1,33 @@
 From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Fri, 29 Jan 2016 15:57:01 +0000
-Subject: [PATCH v4 22/22] arm64: efi: invoke EFI_RNG_PROTOCOL to supply
- KASLR randomness
-In-Reply-To: <1453828249-14467-23-git-send-email-ard.biesheuvel@linaro.org>
-References: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
- <1453828249-14467-23-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160129155701.GC2611@codeblueprint.co.uk>
+Date: Fri, 29 Jan 2016 16:00:06 +0000
+Subject: [PATCH 1/3] arm64: efistub: drop __init annotation from
+ handle_kernel_image()
+In-Reply-To: <CAKv+Gu9sE4oJrFmSK8sEjTrU8A7k53Hj1S1pTyCqyA5Gsba2Kw@mail.gmail.com>
+References: <1453979254-25374-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1453979254-25374-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160128225809.GF2571@codeblueprint.co.uk>
+ <CAKv+Gu9sE4oJrFmSK8sEjTrU8A7k53Hj1S1pTyCqyA5Gsba2Kw@mail.gmail.com>
+Message-ID: <20160129160006.GD2611@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Jan, at 06:10:49PM, Ard Biesheuvel wrote:
-> Since arm64 does not use a decompressor that supplies an execution
-> environment where it is feasible to some extent to provide a source of
-> randomness, the arm64 KASLR kernel depends on the bootloader to supply
-> some random bits in the /chosen/kaslr-seed DT property upon kernel entry.
+On Fri, 29 Jan, at 10:36:03AM, Ard Biesheuvel wrote:
+> On 28 January 2016 at 23:58, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> >
+> > Would it make more sense to #undef __init in one of the arm64 efistub
+> > header files? I'm thinking of the case where some poor unsuspecting
+> > developer writes a new function and marks it as __init, and we miss it
+> > during review.
+> >
 > 
-> On UEFI systems, we can use the EFI_RNG_PROTOCOL, if supplied, to obtain
-> some random bits. At the same time, use it to randomize the offset of the
-> kernel Image in physical memory.
+> Yes, I can add it to efistub.h, and make sure it gets included in all the files
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/Kconfig                        |  5 ++
->  drivers/firmware/efi/libstub/arm-stub.c   | 40 ++++++----
->  drivers/firmware/efi/libstub/arm64-stub.c | 78 ++++++++++++++------
->  drivers/firmware/efi/libstub/fdt.c        |  9 +++
->  4 files changed, 97 insertions(+), 35 deletions(-)
- 
-[...]
+> Should we #undef it and #define it to a string that is easily grep'ed
+> for, so it is easy to find the explanatory comment that goes along
+> with it?
+> E.g.,
+> 
+> #define __init __init_not_supported_in_efi_stub
 
-> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-> index cf7b7d46302a..04c9302b0ef1 100644
-> --- a/drivers/firmware/efi/libstub/fdt.c
-> +++ b/drivers/firmware/efi/libstub/fdt.c
-> @@ -147,6 +147,15 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
->  	if (status)
->  		goto fdt_set_fail;
->  
-> +	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
-> +		status = efi_get_random_bytes(sys_table, sizeof(fdt_val64),
-> +					      (u8 *)&fdt_val64);
-> +		if (status == EFI_SUCCESS)
-> +			status = fdt_setprop(fdt, node, "kaslr-seed",
-> +					     &fdt_val64, sizeof(fdt_val64));
-> +		else if (status != EFI_NOT_FOUND)
-> +			goto fdt_set_fail;
-> +	}
->  	return EFI_SUCCESS;
->  
->  fdt_set_fail:
-
-I think you want to handle the case where fdt_setprop() fails. With
-this new code you'll silently return EFI_SUCCESS even if you fail to
-set "kaslr-seed".
+This would produce a compilation failure if someone tags something as
+__init right? Looks fine to me.
