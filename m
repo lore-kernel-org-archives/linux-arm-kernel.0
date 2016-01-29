@@ -1,141 +1,170 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 29 Jan 2016 08:20:00 +0100
-Subject: [PATCH v8 1/2] drm/rockchip: hdmi: add Innosilicon HDMI support
-In-Reply-To: <1454050059-31196-1-git-send-email-ykk@rock-chips.com>
-References: <1454049768-30872-1-git-send-email-ykk@rock-chips.com>
- <1454050059-31196-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <20160129082000.b25fd19cea94c4f3ec45e17f@free.fr>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 29 Jan 2016 08:24:36 +0100
+Subject: [PATCH] help guest boot up on AArch64 host with GICv2
+In-Reply-To: <56AA7618.8030406@ezchip.com>
+References: <56995068.9050207@ezchip.com> <569CB034.1060307@arm.com>
+ <56A7DA7C.8090202@ezchip.com> <56A88A0E.40002@arm.com>
+ <56AA7618.8030406@ezchip.com>
+Message-ID: <CAKv+Gu-FpPfGg7mdGy6w00CcMiqVo1K84R1ayxMp6W_1rROfMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Jan 2016 14:47:39 +0800
-Yakir Yang <ykk@rock-chips.com> wrote:
+On 28 January 2016 at 21:12, Chris Metcalf <cmetcalf@ezchip.com> wrote:
+> On 01/27/2016 04:12 AM, Marc Zyngier wrote:
+>>
+>> On 26/01/16 20:43, Chris Metcalf wrote:
+>>>
+>>> On 01/18/2016 04:28 AM, Marc Zyngier wrote:
+>>>>
+>>>> Hi Chris,
+>>>>
+>>>> On 15/01/16 20:02, Chris Metcalf wrote:
+>>>>>
+>>>>> We are using GICv2 compatibility mode in the Fast Models/Foundation
+>>>>> Models simulations we are running because the boot code (ATF/UEFI)
+>>>>> doesn't support GICv3 in our system at the moment.
+>>>>>
+>>>>> However, starting with kernel 4.2, the guest couldn't boot up because
+>>>>> it
+>>>>> wasn't getting timer interrupts.  I tracked this down to a kernel
+>>>>> commit
+>>>>> that switched to using the "alternatives" mechanism -- rather than
+>>>>> seeing either a GICv2 or GICv3 and configuring appropriately, the KVM
+>>>>> code just configured the code that saves/restores the vgic state based
+>>>>> on the presence of the system register interface to the GIC CPU
+>>>>> interface.  See the attached patch for a fix that manages this
+>>>>> differently and allows me to boot up the guest in this configuration.
+>>>>>
+>>>>> However, even assuming this patch can be taken into an upstream tree, I
+>>>>> still have a couple of additional problems:
+>>>>>
+>>>>> - I can boot up with the Foundation Models using this change, but not
+>>>>> with the Fast Models (again, using a v3 GIC but in v2 compatibility
+>>>>> mode
+>>>>> in the device tree).  The Fast Models dts looks like it has the same
+>>>>> configuration for the GIC and the timers so I'm not sure what's going
+>>>>> on
+>>>>> here.  Any suggestions appreciated.
+>>>>>
+>>>>> - Without this change, I could only boot kernels up to 4.1.  With the
+>>>>> change, I can boot kernels up to 4.3.  But 4.4 won't boot for me
+>>>>> either;
+>>>>> I haven't bisected it down yet.  So any suggestions on what might be
+>>>>> going wrong here would also be appreciated.
+>>>>>
+>>>>> We are planning to eventually use GICv3 mode in our software stack but
+>>>>> for the time being I assume it is interesting to resolve issues with
+>>>>> GIC
+>>>>> v2 compatibility mode on GIC v3.
+>>>>>
+>>>> I'm afraid that this is the wrong approach. Whilst 4.2 was a bit too
+>>>> eager to use GICv3 (only checking the CPU capability and ignoring the
+>>>> actual state of the EL2/EL3 SRE bits), the fact that 4.4 doesn't boot is
+>>>> probably the sign of a broken firmware that enables the system register
+>>>> interface at EL3, letting the rest of the software stack to use GICv3 in
+>>>> native mode, and yet providing a GICv2 DT.
+>>>>
+>>>> This combination is unpredictable, and is likely to  cause issues on
+>>>> some HW implementations.
+>>>>
+>>>> Could you please point me to the firmware you're using?
+>>>>
+>>>> Also, please check the following patches:
+>>>>
+>>>> 6d32ab2 arm64: Update booting requirements for GICv3 in GICv2 mode
+>>>> 76e52dd irqchip/gic: Warn if GICv3 system registers are enabled
+>>>> 963fcd4 arm64: cpufeatures: Check ICC_EL1_SRE.SRE before enabling
+>>>> ARM64_HAS_SYSREG_GIC_CPUIF
+>>>> 7cabd00 irqchip/gic-v3: Make gic_enable_sre an inline function
+>>>> d271976 arm64: el2_setup: Make sure ICC_SRE_EL2.SRE sticks before using
+>>>> GICv3 sysregs
+>>>>
+>>>> Can you point me to the one that prevents you from booting?
+>>>
+>>> The problematic commit is 963fcd4, because it calls gic_enable_sre()
+>>> in the host kernel even with a GICv2 DT specified, and this seems to
+>>> put things in a state such that we don't receive virtual timer
+>>> interrupts in the guest when we boot it up.  (I'm not that familiar with
+>>> the QEMU DT but it is providing a GIC v2 to the guest.)
+>>>
+>>> With a v4.5-rc1 host, if I "return false" before the code in
+>>> gic_enable_sre()
+>>> that tries to actually enable the SRE, and then hardcode the
+>>> __vgic_v2_XXX_state() save/restore calls into the __vgic_XXX_state()
+>>> routines, then my guest boots up OK.
+>>
+>> What if you just do the "return false"? I bet that it will work as well...
+>
+>
+> Yes, that also works for my case.
+>
+>>> We are using a modified ARM version of EDK v3.0-rc0, and a modified
+>>> ARM Trusted Firmware based on commit 963fcd4 (between v1.1 and 1.2).
+>>
 
-> The Innosilicon HDMI is a low power HDMI 1.4 transmitter
-> IP, and it have been integrated on some rockchip CPUs
-> (like RK3036, RK312x).
-> 
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> ---
-> Changes in v8:
-> - Don't check whether encoder output format is RGB colorspace, cause driver
->   default configure the output colorspace to RGB. (ZhengYang)
-> - Correct the check condition in inno_hdmi_config_video_csc() (ZhengYang)
->     - if (data->enc_out_format == data->enc_out_format) {
->     + if (data->enc_in_format == data->enc_out_format) {
-> 
-> Changes in v7:
-> - Correct the module licnese statement (Paul)
->      - MODULE_LICENSE("GPL");
->      + MODULE_LICENSE("GPLv2");
-> - Start indentation with tabs and fix the misspell in Kconfig (Paul)
-> - Carry the lost device-binding document (Heiko)
-> 
-> Changes in v6:
-> - Rebase the Makefile/Kconfig files which add by Chris's rockchip-mipi driver (Caeser)
-> 
-> Changes in v5:
-> - Use hdmi_infoframe helper functions to packed the infoframe (Russell)
-> - Remove the unused double wait_for_completion_timeout for ddc transfer (Russell)
-> - Remove the unused local variable in "inno_hdmi_i2c_write()" function (Russell)
-> 
-> Changes in v4:
-> - Modify the commit title "drm/rockchip: hdmi: ..." (Mark)
-> - Correct the "DKMS" to "DPMS" (Mark)
-> - Fix over 80 characters problems (Mark)
-> - Remove encoder .prepare/.commit helper functions, and move the vop mode
-> configure function into encoder .enable helper functions. (Mark)
-> 
-> Changes in v3:
-> - Use encoder enable/disable function, and remove the encoder DPMS function
-> - Keep HDMI PLL power on in standby mode
-> 
-> Changes in v2:
-> - Using DRM atomic helper functions for connector init (Mark)
-> - Remove "hdmi->connector.encoder = encoder;" (Mark)
-> 
->  drivers/gpu/drm/rockchip/Kconfig     |   8 +
->  drivers/gpu/drm/rockchip/Makefile    |   1 +
->  drivers/gpu/drm/rockchip/inno_hdmi.c | 939 +++++++++++++++++++++++++++++++++++
->  drivers/gpu/drm/rockchip/inno_hdmi.h | 362 ++++++++++++++
->  4 files changed, 1310 insertions(+)
->  create mode 100644 drivers/gpu/drm/rockchip/inno_hdmi.c
->  create mode 100644 drivers/gpu/drm/rockchip/inno_hdmi.h
-> 
-> diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
-> index 8573985..76b3362 100644
-> --- a/drivers/gpu/drm/rockchip/Kconfig
-> +++ b/drivers/gpu/drm/rockchip/Kconfig
-> @@ -35,3 +35,11 @@ config ROCKCHIP_DW_MIPI_DSI
->  	 for the Synopsys DesignWare HDMI driver. If you want to
->  	 enable MIPI DSI on RK3288 based SoC, you should selet this
->  	 option.
-> +
-> +config ROCKCHIP_INNO_HDMI
-> +	tristate "Rockchip specific extensions for Innosilicon HDMI"
-> +	depends on DRM_ROCKCHIP
-> +	help
-> +	  This selects support for Rockchip SoC specific extensions
-> +	  for the Innosilicon HDMI driver. If you want to enable
-> +	  HDMI on RK3036 based SoC, you should select this option.
-> diff --git a/drivers/gpu/drm/rockchip/Makefile b/drivers/gpu/drm/rockchip/Makefile
-> index f6a809a..df8fbef 100644
-> --- a/drivers/gpu/drm/rockchip/Makefile
-> +++ b/drivers/gpu/drm/rockchip/Makefile
-> @@ -8,5 +8,6 @@ rockchipdrm-$(CONFIG_DRM_FBDEV_EMULATION) += rockchip_drm_fbdev.o
->  
->  obj-$(CONFIG_ROCKCHIP_DW_HDMI) += dw_hdmi-rockchip.o
->  obj-$(CONFIG_ROCKCHIP_DW_MIPI_DSI) += dw-mipi-dsi.o
-> +obj-$(CONFIG_ROCKCHIP_INNO_HDMI) += inno_hdmi.o
->  
->  obj-$(CONFIG_DRM_ROCKCHIP) += rockchipdrm.o rockchip_vop_reg.o
-> diff --git a/drivers/gpu/drm/rockchip/inno_hdmi.c b/drivers/gpu/drm/rockchip/inno_hdmi.c
-> new file mode 100644
-> index 0000000..c99d88d
-> --- /dev/null
-> +++ b/drivers/gpu/drm/rockchip/inno_hdmi.c
-> @@ -0,0 +1,939 @@
-> +/*
-> + * Copyright (C) Fuzhou Rockchip Electronics Co.Ltd
-> + *    Zheng Yang <zhengyang@rock-chips.com>
-> + *    Yakir Yang <ykk@rock-chips.com>
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/irq.h>
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
-> +#include <linux/hdmi.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/module.h>
-> +#include <linux/mutex.h>
-> +#include <linux/of_device.h>
-> +
-> +#include <drm/drm_of.h>
-> +#include <drm/drmP.h>
-> +#include <drm/drm_atomic_helper.h>
-> +#include <drm/drm_crtc_helper.h>
-> +#include <drm/drm_edid.h>
-> +#include <drm/drm_encoder_slave.h>
 
-This is not needed.
+What does 'EDK v3.0-rc0' mean? We don't do any versioned releases afaik,
 
-> +
-> +#include "rockchip_drm_drv.h"
-> +#include "rockchip_drm_vop.h"
-> +
-> +#include "inno_hdmi.h"
-	[snip]
+I recently fixed a GIC issue in the FVP EDK2 code, which prevented it
+from running the GICv3 in native mode rather than in GICv2
+compatibility mode.
+
+33ed33f ArmPkg/ArmGic: fix bug in GICv3 distributor configuration
+
+
+>>> We certainly haven't touched any of the GIC code in either one.
+>>>
+>>> I tried to modify the host DT to enable GICv3, but then the host itself
+>>> hangs on boot, so clearly more is needed.  (To be fair I've only tested
+>>> v4.4 in that configuration, not v4.5-rc1.)  The firmware isn't yet using
+>>> GICv3 so perhaps that is part of the problem.
+>>
+>> That's indeed part of the problem. The firmware running at EL3 insists
+>> on using GICv2, but still let EL2 (and EL1) use GICv3 system registers.
+>> Could you please dump the content of ICC_SRE_EL3 just before entering
+>> the kernel at EL2? If you see ICC_SRE_EL3.SRE being set, then this would
+>> indicate a firmware bug (and leave the system in an unpredictable
+>> configuration).
+>
+>
+> Well, the firmware clearly does this intentionally.  In ATF's
+> drivers/arm/giv/arm_gic.c, the gicv3_cpuif_setup() function has
+> a comment that reads:
+>
+> /*******************************************************************************
+>  * This function does some minimal GICv3 configuration. The Firmware itself
+> does
+>  * not fully support GICv3 at this time and relies on GICv2 emulation as
+>  * provided by GICv3. This function allows software (like Linux) in later
+> stages
+>  * to use full GICv3 features.
+>
+> ******************************************************************************/
+>
+
+This is deliberate, since running the GIC in v3 mode on the secure
+side would remove the ability on the non-secure side to use the v2
+legacy mode. It does not limit the utility of the GICv3 on the
+non-secure side
+
+> and the function ends with:
+>
+>         val = read_icc_sre_el3();
+>         write_icc_sre_el3(val | ICC_SRE_EN | ICC_SRE_SRE);
+>
+> In our build environment, if I comment out those two lines, that
+> fixes the guest boot problem (without any hacking on the Linux side),
+> so that's good anyway.  With this change it works for me in the
+> Fast Models as well as Foundation Models, too.
+>
+
+For historical reasons, the EDK2 GIC driver infers the presence of a
+GICv3 from the ability to use the system register interface, and
+ignores the ID registers completely. Without the patch above, or the
+PcdArmGicV3WithV2Legacy set, the symptoms you are seeing on the
+firmware side are not entirely unexpected. Also note that, on the
+Foundation model, the GICv2 and the GICv3 live at different memory
+addresses.
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Ard.
