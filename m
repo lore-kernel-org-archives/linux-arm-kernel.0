@@ -1,150 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Jan 2016 21:44:13 +0100
-Subject: [linux-review:James-Hogan/kbuild-Remove-stale-asm-generic-wrappers/20160119-183642]
- d979f99e9cc14e2667e9b6e268db695977e4197a BUILD DONE
-In-Reply-To: <CAMuHMdX33SQe8n7SRda0TjQV05yP1zbuw129Jqjknt8=CY=LjA@mail.gmail.com>
-References: <569e1dbb.MgLv8OaZwklOxxtU%fengguang.wu@intel.com>
- <7619136.niuXthzi6R@wuerfel>
- <CAMuHMdX33SQe8n7SRda0TjQV05yP1zbuw129Jqjknt8=CY=LjA@mail.gmail.com>
-Message-ID: <19656457.qoKNGRmV4Q@wuerfel>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 29 Jan 2016 23:49:42 +0300
+Subject: [PATCH] ARM: dts: porter: add MAX3355 support
+In-Reply-To: <56ABCB69.1070800@cogentembedded.com>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+ <4506196.xOgpYRO52t@wasted.cogentembedded.com>
+ <SG2PR06MB0919D09C1146EAC0681EE109D8DA0@SG2PR06MB0919.apcprd06.prod.outlook.com>
+ <56ABCB69.1070800@cogentembedded.com>
+Message-ID: <56ABD066.7020804@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 January 2016 09:01:31 Geert Uytterhoeven wrote:
-> Hi Arnd,
-> 
-> On Fri, Jan 29, 2016 at 12:07 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > The other related issue is the DEBUG_UART_{VIRT,PHYS} setting,
-> > where there is no safe platform-specific default. I have two
-> > ideas for working around that, maybe one of them sounds ok to
-> > you:
-> >
-> > a) find a way to warn and/or disable DEBUG_LL when no address
-> >    is set, rather than failing the build
-> >
-> > b) add 'default 0 if COMPILE_TEST' to make it harder to get this
-> >    wrong by accident (hopefully nobody tries to run a COMPILE_TEST
-> >    kernel). Also maybe add a #warning if DEBUG_UART_VIRT is
-> 
-> Make sure to add it at the end of the list, so enabling COMPILE_TEST in a
-> working .config should give another working .config.
+On 01/29/2016 11:28 PM, Sergei Shtylyov wrote:
 
-Sure, I've just done a largish series of patches in 4.5 to fix that
-bug where we had it already.
+>>> From: linux-renesas-soc-owner at vger.kernel.org
+>>> [mailto:linux-renesas-soc-owner at vger.kernel.org] On Behalf Of Sergei
+>>> Shtylyov
+>>> Sent: Wednesday, January 27, 2016 7:14 AM
+>>>
+>>> Now that Maxim Integrated MAX3355 'extcon' driver and device tree bindings
+>>> are upstream along with the 'extcon' hook  in the Renesas USBHS driver, we
+>>> can add  MAX3355 device node to  the Porter device tree and properly refer
+>>> to it from the USBHS node instead of using  "renesas,enable-gpio" property
+>>> which only allowed checking the USB ID pin  at the driver probe time;  now
+>>> this  pin's  state can be monitored dynamically!
+>>>
+>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>
+>> I tested this patch on Porter, but interrupt of "usb-otg" didn't happened
+>> even if I connected/disconnected a usb convert cable (usb micro-ab to A).
+>> Remarks: I confirmed that the usb convert cable worked correctly on other
+>> board.
+>
+>     I guess I have the same cable
 
-> Perhaps you can use 0xdeadbeef instead of 0, and add
-> 
->     #if DEBUG_UART_PHYS == 0xdeadbeed
->     #warning Broken value of DEBUG_UART_PHYS.
->     #endif
-> 
-> somewhere?
+    No, I have mini-AB connector here and hence my cable is mini-AB to A.
 
-I can do that, though I don't see much of an advantage, as zero
-is no more likely to be a real address than 0xdeadbeed.
+> and IRQs do happen for me when I connect and
+> disconnect it (as it should be).
 
-How about the version below?
+>> Best regards,
+>> Yoshihiro Shimoda
 
-	Arnd
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index c6b6175d0203..6cc09cf8618f 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1526,6 +1526,7 @@ config DEBUG_UART_PHYS
- 	default 0xfffb9800 if DEBUG_OMAP1UART3 || DEBUG_OMAP7XXUART3
- 	default 0xfffe8600 if DEBUG_BCM63XX_UART
- 	default 0xfffff700 if ARCH_IOP33X
-+	default 0xdeadbeef if DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || DEBUG_LL_UART_EFM32
- 	depends on ARCH_EP93XX || \
- 	        DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
- 		DEBUG_LL_UART_EFM32 || \
-@@ -1628,6 +1629,7 @@ config DEBUG_UART_VIRT
- 	default 0xff003000 if DEBUG_U300_UART
- 	default 0xffd01000 if DEBUG_HIP01_UART
- 	default DEBUG_UART_PHYS if !MMU
-+	default 0xdeadbeef if DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || DEBUG_LL_UART_EFM32
- 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
- 		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_MESON_UARTAO || \
- 		DEBUG_NETX_UART || \
-diff --git a/arch/arm/include/debug/8250.S b/arch/arm/include/debug/8250.S
-index 7f7446f6f806..1191b1458586 100644
---- a/arch/arm/include/debug/8250.S
-+++ b/arch/arm/include/debug/8250.S
-@@ -9,6 +9,9 @@
-  */
- #include <linux/serial_reg.h>
- 
-+#if CONFIG_DEBUG_UART_PHYS == 0xdeadbeef || CONFIG_DEBUG_UART_VIRT < 0xe0000000
-+#include "none.S"
-+#else
- 		.macro	addruart, rp, rv, tmp
- 		ldr	\rp, =CONFIG_DEBUG_UART_PHYS
- 		ldr	\rv, =CONFIG_DEBUG_UART_VIRT
-@@ -55,3 +58,5 @@
- 		beq	1001b
- #endif
- 		.endm
-+
-+#endif
-diff --git a/arch/arm/include/debug/efm32.S b/arch/arm/include/debug/efm32.S
-index 660fa1e4b77b..537021761e4a 100644
---- a/arch/arm/include/debug/efm32.S
-+++ b/arch/arm/include/debug/efm32.S
-@@ -6,6 +6,9 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+#if CONFIG_DEBUG_UART_PHYS == 0xdeadbeef || CONFIG_DEBUG_UART_VIRT < 0xf0000000
-+#include "none.S"
-+#else
- 
- #define UARTn_CMD		0x000c
- #define UARTn_CMD_TXEN			0x0004
-@@ -43,3 +46,5 @@
- 		tst	\rd, #UARTn_STATUS_TXC
- 		bne	1001b
- 		.endm
-+
-+#endif
-diff --git a/arch/arm/include/debug/none.S b/arch/arm/include/debug/none.S
-new file mode 100644
-index 000000000000..75cd1bbee5c4
---- /dev/null
-+++ b/arch/arm/include/debug/none.S
-@@ -0,0 +1,16 @@
-+
-+#warning DEBUG_LL not configured, disabling
-+
-+		.macro	addruart, rp, rv, tmp
-+		ldr	\rp, =0
-+		ldr	\rv, =0
-+		.endm
-+
-+		.macro	senduart,rd,rx
-+		.endm
-+
-+		.macro	busyuart,rd,rx
-+		.endm
-+
-+		.macro	waituart,rd,rx
-+		.endm
-diff --git a/arch/arm/include/debug/pl01x.S b/arch/arm/include/debug/pl01x.S
-index f7d8323cefcc..fbe0cad32be0 100644
---- a/arch/arm/include/debug/pl01x.S
-+++ b/arch/arm/include/debug/pl01x.S
-@@ -10,6 +10,9 @@
-  * published by the Free Software Foundation.
-  *
- */
-+#if CONFIG_DEBUG_UART_PHYS == 0xdeadbeef || CONFIG_DEBUG_UART_VIRT < 0xf0000000
-+#include "none.S"
-+#else
- #include <linux/amba/serial.h>
- 
- #ifdef CONFIG_DEBUG_ZTE_ZX
-@@ -43,3 +46,4 @@
- 		tst	\rd, #UART01x_FR_BUSY
- 		bne	1001b
- 		.endm
-+#endif
+MBR, Sergei
