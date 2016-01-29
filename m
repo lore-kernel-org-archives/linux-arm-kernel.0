@@ -1,39 +1,67 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Fri, 29 Jan 2016 09:01:06 -0800
-Subject: [PATCH v2 5/5] arm64/perf: Extend event mask for ARMv8.1
-In-Reply-To: <7944f006c35daeae9eb94fadb5c2bac1540ae050.1454054112.git.jglauber@cavium.com>
-References: <6251e3377ca5d109c1a38ecc07fed50d6cbf5c61.1453992560.git.jglauber@cavium.com>
- <7944f006c35daeae9eb94fadb5c2bac1540ae050.1454054112.git.jglauber@cavium.com>
-Message-ID: <56AB9AD2.8080903@caviumnetworks.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 29 Jan 2016 18:06:58 +0100
+Subject: [PATCH 3/7] usb: gadget: pxa25x_udc: use readl/writel for mmio
+In-Reply-To: <m3a8nogy0u.fsf@t19.piap.pl>
+References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
+ <1453997843-3489728-3-git-send-email-arnd@arndb.de>
+ <m3a8nogy0u.fsf@t19.piap.pl>
+Message-ID: <2202960.HHsdV23CYi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jan,
+On Friday 29 January 2016 17:18:09 Krzysztof Ha?asa wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+> > The unclear part here is for IXP4xx, which supports both big-endian
+> > and little-endian configurations. So far, the driver has done
+> > no byteswap in either case. I suspect that is wrong and it would
+> > actually need to swap in one or the other case, but I don't know
+> > which.
+> 
+> If at all, I guess it should swap in LE mode. But it's far from certain.
+> 
+> > It's also possible that there is some magic setting in
+> > the chip that makes the endianess of the MMIO register match the
+> > CPU, and in that case, the code actually does the right thing
+> > for all configurations, both before and after this patch.
+> 
+> This is IMHO most probable.
+> 
+> Actually, the IXP4xx is "natural" in BE mode (except for PCI) and
+> normally in LE mode it's order-coherent, meaning 32-bit "integer"
+> accesses need no swapping, but 8-bit and (mostly unused) 16-bit
+> transfers need swapping.
 
-There was already a "[PATCH v2 5/5]" that differs from this one.
+I see.
 
-Perhaps you should resend the entire patch set and mark it v3.
+> Anyway, I think readl()/writel() do the right thing: in BE mode they
+> swap PCI accesses and don't swap normal registers, in LE mode nothing is
+> swapped.
 
-Thanks,
-David Daney
+This seems to be true when CONFIG_IXP4XX_INDIRECT_PCI is set, but
+not otherwise. For the indirect variant, writel() is a __raw_writel()
+without barrier or byteswap on non-PCI memory, while with that
+option disabled, we use the standard implementation that has both
+a byteswap and a barrier.
 
+According to your description, that would mean the version without
+indirect PCI access is broken and it appears to have been that way
+since before the start of git history in 2.6.12.
 
-On 01/29/2016 12:29 AM, Jan Glauber wrote:
-> ARMv8.1 increases the PMU event number space. Detect the
-> presence of this PMUv3 type and extend the event mask.
->
-> The event mask is moved to struct arm_pmu so different event masks
-> can exist, depending on the PMU type.
->
-> Signed-off-by: Jan Glauber <jglauber@cavium.com>
-> ---
->   arch/arm/kernel/perf_event_v6.c     |  6 ++++--
->   arch/arm/kernel/perf_event_v7.c     | 29 +++++++++++++++++++----------
->   arch/arm/kernel/perf_event_xscale.c |  4 +++-
->   arch/arm64/kernel/perf_event.c      | 33 +++++++++++++++++++--------------
->   drivers/perf/arm_pmu.c              |  5 +++--
->   include/linux/perf/arm_pmu.h        |  4 ++--
->   6 files changed, 50 insertions(+), 31 deletions(-)
->
-> diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
-> index 09413e7..d6769f5 100644
+It's possible that nobody cared because all drivers for non-PCI
+devices on ixp4xx (the on chip ones) just use __raw_readl or
+direct pointer references.
+
+> LE data-coherent mode (which has never landed in the
+> official kernel) is a bit different, but still, readl()/writel() do the
+> right thing.
+> I remember the "string" (block) functions preserve 8-bit ordering, and
+> thus 32-bit values transfered using them may need swapping.
+
+This is the normal behavior, yes: readsl/writesl should not swap data,
+and you should not use them to access registers other than FIFOs
+that contain byte-sequential data. If the bus swaps data, then the
+implementation of the readsl/writesl function has to swap it back,
+as the indirect versions of these do.
+
+	Arnd
