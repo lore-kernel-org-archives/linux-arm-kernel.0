@@ -1,48 +1,51 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Jan 2016 15:06:27 +0100
-Subject: [PATCH 3/9] ARM: pxa: mark unused eseries code as __maybe_unused
+Date: Fri, 29 Jan 2016 15:06:28 +0100
+Subject: [PATCH 4/9] ARM: pxa: don't select GPIO_SYSFS for MIOA701
 In-Reply-To: <1454076396-3563101-1-git-send-email-arnd@arndb.de>
 References: <1454076396-3563101-1-git-send-email-arnd@arndb.de>
-Message-ID: <1454076396-3563101-4-git-send-email-arnd@arndb.de>
+Message-ID: <1454076396-3563101-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two variables in eseries.c are used on multiple platforms,
-but are not referenced when those are all disabled:
+GPIO_SYSFS is a common kernel functionality, not something
+that a board specific Kconfig should have to worry about.
+In MIOA701, we get a warning about the select when CONFIG_SYSFS
+is disabled:
 
-eseries.c:60:31: warning: 'e7xx_gpio_vbus' defined but not used [-Wunused-variable]
-eseries.c:129:20: warning: 'eseries_register_clks' defined but not used [-Wunused-function]
+warning: (MACH_MIOA701) selects GPIO_SYSFS which has unmet direct dependencies (GPIOLIB && SYSFS)
 
-Marking them __maybe_unused is the nicest way to ensure
-that we never get the warning or end up with missing symbols
-if we get it wrong.
+This just removes the select and instead enables the symbol in
+the defconfig file.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-pxa/eseries.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/configs/pxa_defconfig | 1 +
+ arch/arm/mach-pxa/Kconfig      | 1 -
+ 2 files changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-pxa/eseries.c b/arch/arm/mach-pxa/eseries.c
-index 0b00b226f54b..e838b11fb8c7 100644
---- a/arch/arm/mach-pxa/eseries.c
-+++ b/arch/arm/mach-pxa/eseries.c
-@@ -57,7 +57,7 @@ struct gpio_vbus_mach_info e7xx_udc_info = {
- 	.gpio_pullup_inverted = 1
- };
+diff --git a/arch/arm/configs/pxa_defconfig b/arch/arm/configs/pxa_defconfig
+index 0cb724b5c639..dc5517eaf09f 100644
+--- a/arch/arm/configs/pxa_defconfig
++++ b/arch/arm/configs/pxa_defconfig
+@@ -378,6 +378,7 @@ CONFIG_GPIO_PALMAS=y
+ CONFIG_GPIO_TPS6586X=y
+ CONFIG_GPIO_TPS65910=y
+ CONFIG_GPIO_MAX7301=m
++CONFIG_GPIO_SYSFS=y
+ CONFIG_POWER_SUPPLY_DEBUG=y
+ CONFIG_PDA_POWER=m
+ CONFIG_BATTERY_SBS=m
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index f09683687963..01066cff16e4 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -297,7 +297,6 @@ config MACH_MAGICIAN
  
--static struct platform_device e7xx_gpio_vbus = {
-+static struct platform_device e7xx_gpio_vbus __maybe_unused = {
- 	.name	= "gpio-vbus",
- 	.id	= -1,
- 	.dev	= {
-@@ -126,7 +126,7 @@ struct resource eseries_tmio_resources[] = {
- };
- 
- /* Some e-series hardware cannot control the 32K clock */
--static void __init eseries_register_clks(void)
-+static void __init __maybe_unused eseries_register_clks(void)
- {
- 	clk_register_fixed_rate(NULL, "CLK_CK32K", NULL, CLK_IS_ROOT, 32768);
- }
+ config MACH_MIOA701
+ 	bool "Mitac Mio A701 Support"
+-	select GPIO_SYSFS
+ 	select IWMMXT
+ 	select PXA27x
+ 	help
 -- 
 2.7.0
