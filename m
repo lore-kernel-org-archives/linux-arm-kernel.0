@@ -1,35 +1,34 @@
-From: qnguyen@apm.com (Quan Nguyen)
-Date: Fri, 29 Jan 2016 11:28:55 +0700
-Subject: [PATCH v5 3/3] arm64: dts: Update X-Gene standby GPIO controller DTS
- entries
-In-Reply-To: <1454041735-8434-1-git-send-email-qnguyen@apm.com>
-References: <1454041735-8434-1-git-send-email-qnguyen@apm.com>
-Message-ID: <1454041735-8434-4-git-send-email-qnguyen@apm.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 28 Jan 2016 22:38:55 -0600
+Subject: [PATCH 3/4] dmaengine: qcom_bam_dma: use correct pipe FIFO size
+In-Reply-To: <56697BA9.5050805@linaro.org>
+References: <1448961299-15161-1-git-send-email-stanimir.varbanov@linaro.org>
+ <1448961299-15161-4-git-send-email-stanimir.varbanov@linaro.org>
+ <20151201172307.GA26687@Agamemnon.attlocal.net>
+ <565F1FDB.4020106@linaro.org>
+ <20151202172255.GA9599@Agamemnon.attlocal.net>
+ <56697BA9.5050805@linaro.org>
+Message-ID: <20160129043855.GA4608@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update APM X-Gene standby GPIO controller DTS entries to enable it
-as interrupt controller.
+On Thu, Dec 10, 2015 at 03:18:33PM +0200, Stanimir Varbanov wrote:
 
-Signed-off-by: Y Vo <yvo@apm.com>
-Signed-off-by: Quan Nguyen <qnguyen@apm.com>
----
- arch/arm64/boot/dts/apm/apm-storm.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+<snip>
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index fe30f76..0f733da 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -883,6 +883,9 @@
- 					<0x0 0x2b 0x1>,
- 					<0x0 0x2c 0x1>,
- 					<0x0 0x2d 0x1>;
-+			interrupt-parent = <&gic>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
- 		};
- 
- 		rtc: rtc at 10510000 {
--- 
-1.7.12.4
+> >>> This is just using the #define.  That is ok, but if you use this instead of the
+> >>> BAM_P_FIFO_SIZES then you need to fix your comment.  Or actually use the
+> >>> register value.... otherwise looks fine.
+> >>
+> >> I did not follow your comment, but the intension of the patch is to set
+> >> the proper FIFO size in BAM_P_FIFO_SIZES register, i.e. 32K - 8.
+> > 
+> > Sorry, I mixed up the usage and was thinking there was something you read out
+> > that told you the size.  That's not how it works, unfortunately.  The
+> > MAX_DATA_SIZE is fine, but the name is a little misleading.  Perhaps just
+> > BAM_FIFO_SIZE?
+> 
+> OK I can rename BAM_MAX_DATA_SIZE to BAM_FIFO_SIZE, and use it when
+> setting BAM_P_FIFO_SIZES register. Is that fine to you?
+
+Yes that's fine with me.
