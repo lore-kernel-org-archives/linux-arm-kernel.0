@@ -1,38 +1,55 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Fri, 29 Jan 2016 16:55:08 +0100
-Subject: [PATCH 1/7] usb: gadget: pxa25x_udc: move register definitions
- from arch
-In-Reply-To: <1453997843-3489728-1-git-send-email-arnd@arndb.de> (Arnd
- Bergmann's message of "Thu, 28 Jan 2016 17:17:02 +0100")
-References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
- <1453997843-3489728-1-git-send-email-arnd@arndb.de>
-Message-ID: <m3h9hwgz37.fsf@t19.piap.pl>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Fri, 29 Jan 2016 15:57:01 +0000
+Subject: [PATCH v4 22/22] arm64: efi: invoke EFI_RNG_PROTOCOL to supply
+ KASLR randomness
+In-Reply-To: <1453828249-14467-23-git-send-email-ard.biesheuvel@linaro.org>
+References: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1453828249-14467-23-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160129155701.GC2611@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Tue, 26 Jan, at 06:10:49PM, Ard Biesheuvel wrote:
+> Since arm64 does not use a decompressor that supplies an execution
+> environment where it is feasible to some extent to provide a source of
+> randomness, the arm64 KASLR kernel depends on the bootloader to supply
+> some random bits in the /chosen/kaslr-seed DT property upon kernel entry.
+> 
+> On UEFI systems, we can use the EFI_RNG_PROTOCOL, if supplied, to obtain
+> some random bits. At the same time, use it to randomize the offset of the
+> kernel Image in physical memory.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/Kconfig                        |  5 ++
+>  drivers/firmware/efi/libstub/arm-stub.c   | 40 ++++++----
+>  drivers/firmware/efi/libstub/arm64-stub.c | 78 ++++++++++++++------
+>  drivers/firmware/efi/libstub/fdt.c        |  9 +++
+>  4 files changed, 97 insertions(+), 35 deletions(-)
+ 
+[...]
 
-> This addresses both issues by moving all the definitions into the
-> pxa25x_udc driver itself. It turns out the only difference between
-> them was 'UDCCS_IO_ROF', and that could well be a mistake when it
-> was incorrectly copied from pxa25x to ixp4xx.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
+> index cf7b7d46302a..04c9302b0ef1 100644
+> --- a/drivers/firmware/efi/libstub/fdt.c
+> +++ b/drivers/firmware/efi/libstub/fdt.c
+> @@ -147,6 +147,15 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+>  	if (status)
+>  		goto fdt_set_fail;
+>  
+> +	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
+> +		status = efi_get_random_bytes(sys_table, sizeof(fdt_val64),
+> +					      (u8 *)&fdt_val64);
+> +		if (status == EFI_SUCCESS)
+> +			status = fdt_setprop(fdt, node, "kaslr-seed",
+> +					     &fdt_val64, sizeof(fdt_val64));
+> +		else if (status != EFI_NOT_FOUND)
+> +			goto fdt_set_fail;
+> +	}
+>  	return EFI_SUCCESS;
+>  
+>  fdt_set_fail:
 
-Both the programming manual and the Intel's library code say it's
-bit 2. Must be a mistake in the old code. Unfortunately I think we
-won't be able to check it on real hardware, the UDC on IXP4xx boards
-isn't usually connected. Also, this bug wouldn't likely affect
-operation (unless there is an overflow event, which would be
-currently undetected).
-
-I guess we as well very safely change it to 1 << 2.
-
-
-For the IXP4xx part,
-Acked-by: Krzysztof Halasa <khalasa@piap.pl>
--- 
-Krzysztof Halasa
-
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+I think you want to handle the case where fdt_setprop() fails. With
+this new code you'll silently return EFI_SUCCESS even if you fail to
+set "kaslr-seed".
