@@ -1,72 +1,61 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 29 Jan 2016 18:23:58 +0800
-Subject: [PATCH v3] i2c: mt8173: add 4GB mode support in i2c driver.
-In-Reply-To: <1454031331-9107-1-git-send-email-liguo.zhang@mediatek.com>
-Message-ID: <201601291845.qFl2f6RN%fengguang.wu@intel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 29 Jan 2016 11:23:39 +0100
+Subject: [PATCH] mmc: mediatek: make sure clock is enabled when executing
+ ops->card_busy()
+In-Reply-To: <1454009514-6474-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1454009514-6474-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <CAPDyKFrv2dVarscYz79svnhBGMy2TYbgePKYyKw_dMJiWmLrUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liguo,
+On 28 January 2016 at 20:31, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> add pm_runtime_get_sync() before access MSDC_PS register
 
-[auto build test WARNING on wsa/i2c/for-next]
-[also build test WARNING on v4.5-rc1 next-20160129]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+This isn't need as the mmc core does that when claiming the host, see
+below commit.
 
-url:    https://github.com/0day-ci/linux/commits/Liguo-Zhang/i2c-mt8173-add-4GB-mode-support-in-i2c-driver/20160129-174005
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux i2c/for-next
-config: i386-allmodconfig (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+>From that point there have been some additional fixup, as there were
+actually some paths when to core invoked some of the host_ops
+callbacks, without claiming the host. Although that should also have
+been fixed now.
 
-All warnings (new ones prefixed by >>):
+commit 9250aea76bfcbf4c2a7868e5566281bf2bb7af27
+mmc: core: Enable runtime PM management of host devices
 
-   In file included from include/linux/kernel.h:10:0,
-                    from include/linux/clk.h:16,
-                    from drivers/i2c/busses/i2c-mt65xx.c:15:
-   drivers/i2c/busses/i2c-mt65xx.c: In function 'mtk_i2c_set_4g_mode':
-   include/linux/bitops.h:6:24: warning: left shift count >= width of type [-Wshift-count-overflow]
-    #define BIT(nr)   (1UL << (nr))
-                           ^
->> drivers/i2c/busses/i2c-mt65xx.c:378:17: note: in expansion of macro 'BIT'
-     return (addr & BIT(32)) ? I2C_DMA_4G_MODE : I2C_DMA_CLR_FLAG;
-                    ^
+Kind regards
+Uffe
 
-vim +/BIT +378 drivers/i2c/busses/i2c-mt65xx.c
-
-   362		if (target_speed > MAX_FS_MODE_SPEED) {
-   363			/* Set the high speed mode register */
-   364			i2c->timing_reg = I2C_FS_TIME_INIT_VALUE;
-   365			i2c->high_speed_reg = I2C_TIME_DEFAULT_VALUE |
-   366				(sample_cnt << 12) | (step_cnt << 8);
-   367		} else {
-   368			i2c->timing_reg = (sample_cnt << 8) | (step_cnt << 0);
-   369			/* Disable the high speed transaction */
-   370			i2c->high_speed_reg = I2C_TIME_CLR_VALUE;
-   371		}
-   372	
-   373		return 0;
-   374	}
-   375	
-   376	static inline u32 mtk_i2c_set_4g_mode(dma_addr_t addr)
-   377	{
- > 378		return (addr & BIT(32)) ? I2C_DMA_4G_MODE : I2C_DMA_CLR_FLAG;
-   379	}
-   380	
-   381	static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
-   382				       int num, int left_num)
-   383	{
-   384		u16 addr_reg;
-   385		u16 start_reg;
-   386		u16 control_reg;
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 53452 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160129/8f3b484e/attachment-0001.obj>
+>
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> ---
+>  drivers/mmc/host/mtk-sd.c | 12 +++++++-----
+>  1 file changed, 7 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+> index 82a97ac..a56b16d 100644
+> --- a/drivers/mmc/host/mtk-sd.c
+> +++ b/drivers/mmc/host/mtk-sd.c
+> @@ -1054,13 +1054,15 @@ static int msdc_ops_switch_volt(struct mmc_host *mmc, struct mmc_ios *ios)
+>  static int msdc_card_busy(struct mmc_host *mmc)
+>  {
+>         struct msdc_host *host = mmc_priv(mmc);
+> -       u32 status = readl(host->base + MSDC_PS);
+> +       u32 status;
+>
+> -       /* check if any pin between dat[0:3] is low */
+> -       if (((status >> 16) & 0xf) != 0xf)
+> -               return 1;
+> +       pm_runtime_get_sync(host->dev);
+> +       status = readl(host->base + MSDC_PS);
+> +       pm_runtime_mark_last_busy(host->dev);
+> +       pm_runtime_put_autosuspend(host->dev);
+>
+> -       return 0;
+> +       /* check if any pin between dat[0:3] is low */
+> +       return !!(((status >> 16) & 0xf) != 0xf);
+>  }
+>
+>  static void msdc_request_timeout(struct work_struct *work)
+> --
+> 1.8.1.1.dirty
+>
