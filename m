@@ -1,41 +1,68 @@
-From: biao.huang@mediatek.com (biao huang)
-Date: Fri, 29 Jan 2016 06:08:40 +0800
-Subject: [PATCH v4 0/5] pinctrl: mediatek: add pinctrl/GPIO/EINT driver
- for mt2701
-In-Reply-To: <CACRpkdbxpc19bdzGDUDoqseTA-TW3V8dAA4Oe+G860qTsHd-dQ@mail.gmail.com>
-References: <1453857883-28436-1-git-send-email-biao.huang@mediatek.com>
- <CACRpkdbxpc19bdzGDUDoqseTA-TW3V8dAA4Oe+G860qTsHd-dQ@mail.gmail.com>
-Message-ID: <1454018920.14802.41.camel@mhfsdcap03>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Fri, 29 Jan 2016 14:14:25 +0800
+Subject: [PATCH v10 07/21] KVM: ARM64: PMU: Add perf event map and
+ introduce perf event creating function
+In-Reply-To: <20160128180638.GO775@arm.com>
+References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453866709-20324-8-git-send-email-zhaoshenglong@huawei.com>
+ <20160128163115.GC3807@hawk.localdomain> <56AA45B0.3060205@arm.com>
+ <20160128180638.GO775@arm.com>
+Message-ID: <56AB0341.2000203@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-	[PATCH v4 1/5] pinctrl: mediatek: fix direction control issue
-	this patch is also a pinctrl patch, and it seems not merged in
-devel-mt2701 branch.
 
-Best Regards!
-Yours,
-Biao Huang
 
-On Thu, 2016-01-28 at 11:20 +0100, Linus Walleij wrote:
-> On Wed, Jan 27, 2016 at 2:24 AM, Biao Huang <biao.huang@mediatek.com> wrote:
-> 
-> > Change in v4:
-> > 1. create a sperate patch for direction setting of input-enable/disalbe and input-schmitt-enable/disable.
-> 
-> So I've merged the patches affecting drivers/pinctrl on the special
-> devel-mt2701 branch, so the ARM SoC people can pull this into
-> their tree to resolve dependencies on the pinctrl include
-> in include/dt-bindings.
-> https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-pinctrl.git/log/?h=devel-mt2701
-> 
-> The rest of the patches should go into ARM SoC, so they can
-> just pull this branch in and apply that stuff on top.
-> 
-> Allow this a few days, I am also waiting for the add-on patches
-> from John Crispin to come in, please include John in the
-> feedback loop.
-> 
-> Yours,
-> Linus Walleij
+On 2016/1/29 2:06, Will Deacon wrote:
+> On Thu, Jan 28, 2016 at 04:45:36PM +0000, Marc Zyngier wrote:
+>> > On 28/01/16 16:31, Andrew Jones wrote:
+>>> > > On Wed, Jan 27, 2016 at 11:51:35AM +0800, Shannon Zhao wrote:
+>>>> > >> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>>> > >>
+>>>> > >> When we use tools like perf on host, perf passes the event type and the
+>>>> > >> id of this event type category to kernel, then kernel will map them to
+>>>> > >> hardware event number and write this number to PMU PMEVTYPER<n>_EL0
+>>>> > >> register. When getting the event number in KVM, directly use raw event
+>>>> > >> type to create a perf_event for it.
+>>>> > >>
+>>>> > >> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>>>> > >> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> > >> ---
+>>>> > >>  arch/arm64/include/asm/pmu.h |   3 ++
+>>>> > >>  arch/arm64/kvm/Makefile      |   1 +
+>>>> > >>  include/kvm/arm_pmu.h        |  10 ++++
+>>>> > >>  virt/kvm/arm/pmu.c           | 122 +++++++++++++++++++++++++++++++++++++++++++
+>>>> > >>  4 files changed, 136 insertions(+)
+>>>> > >>  create mode 100644 virt/kvm/arm/pmu.c
+>>>> > >>
+>>>> > >> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
+>>>> > >> index 4406184..2588f9c 100644
+>>>> > >> --- a/arch/arm64/include/asm/pmu.h
+>>>> > >> +++ b/arch/arm64/include/asm/pmu.h
+>>>> > >> @@ -21,6 +21,7 @@
+>>>> > >>  
+>>>> > >>  #define ARMV8_MAX_COUNTERS      32
+>>>> > >>  #define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
+>>>> > >> +#define ARMV8_CYCLE_IDX         (ARMV8_MAX_COUNTERS - 1)
+>>> > > 
+>>> > > I'm not sure we want to add this. It's name is wrong, as it's really
+>>> > > PMCNTENSET_EL0.C, and just a few lines above we have the idx defined
+>>> > > already (ARMV8_IDX_CYCLE_COUNTER), but as zero, because
+>>> > > arch/arm64/kernel/perf_event.c maps it that way.
+>>> > > 
+>>> > > I think we should do the same with the pmc array, i.e. map the cycle
+>>> > > counter to idx zero.
+>> > 
+>> > I tend to have the opposite view. Not for the sake of it, but because I
+>> > find it helpful to directly map the code to the architecture
+>> > documentation without having to bend another handful of neurons.
+>> > 
+>> > Will probably had some good reasons to structure it that way, but I
+>> > don't know the rational. Will?
+> It was years ago, but I suspect that the cycle counter is index zero
+> because its mandated, whilst the number of event counters is IMPDEF.
+So does it need to change the cycle counter index to zero in this patch set?
+
+Thanks,
+-- 
+Shannon
