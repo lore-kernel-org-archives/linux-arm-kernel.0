@@ -1,51 +1,49 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 29 Jan 2016 15:59:45 +0800
-Subject: [linux-sunxi] Problem with Allwinner H3 clocks
-In-Reply-To: <56AB05EF.2090604@redhat.com>
-References: <20160127084607.665fb8c38eeb5733ce4232da@free.fr>
- <CAGb2v65FUhNC-d-YT=-2adNHHT6b1JvGoNTFLfBX_xBSnuOsTg@mail.gmail.com>
- <20160127103714.58312b152adb4148bae2f93b@free.fr> <56A8D5E5.30701@gmail.com>
- <20160127175512.87caf31b5e21a1fec91507f2@free.fr>
- <56A9098A.5010107@redhat.com>
- <20160127200217.14dce96ade71cf81bc82e6f6@free.fr>
- <56A9CE3D.4020906@redhat.com>
- <56AA14AA.4070502@gmail.com> <20160128175918.78a916a8cd7bf4c0b2f2814f@free.fr>
- <20160128192931.GB32462@lukather> <56AB05EF.2090604@redhat.com>
-Message-ID: <CAGb2v65VfPuxVeH9eWEXJLp-10LyLxSaYXwaWTH-K5=cHKBXsg@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 29 Jan 2016 09:01:31 +0100
+Subject: [linux-review:James-Hogan/kbuild-Remove-stale-asm-generic-wrappers/20160119-183642]
+ d979f99e9cc14e2667e9b6e268db695977e4197a BUILD DONE
+In-Reply-To: <7619136.niuXthzi6R@wuerfel>
+References: <569e1dbb.MgLv8OaZwklOxxtU%fengguang.wu@intel.com>
+ <20160128031435.GA25625@wfg-t540p.sh.intel.com>
+ <20160128174241.GN10826@n2100.arm.linux.org.uk>
+ <7619136.niuXthzi6R@wuerfel>
+Message-ID: <CAMuHMdX33SQe8n7SRda0TjQV05yP1zbuw129Jqjknt8=CY=LjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 29, 2016 at 2:25 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
-> On 01/28/2016 08:29 PM, Maxime Ripard wrote:
->>
->> On Thu, Jan 28, 2016 at 05:59:18PM +0100, Jean-Francois Moine wrote:
->
->
-> <snip>
->
->>> The A23/A33/H3 (and surely some other SoCs) documentations about
->>> the peripheral/periph/periph0/periph1 PLLs say:
->>>
->>>         Note: The PLL Output should be fixed to 600MHz, it is not
->>>         recommended to vary this value arbitrarily.
->>
->>
->> I don't know if it's worth it at this point. The pll6 seems to work
->> fine at other rates. Have you experienced any breakage when running at
->> another frequency?
->
->
-> Hmm, are we actually changing the freq of pll6 on any SoCs? I know we've
-> the code to it, but given that it is shared between many pheripherals,
-> I assume we end up never changing it. I assume / hope that the clock
-> framework protects against reclocking a clock with multiple users ...
+Hi Arnd,
 
-No we're not. And none of the children of pll6 have CLK_SET_RATE_PARENT
-set, so they won't change pll6. I think the point is pll6 itself _can_
-be changed, but that would screw up all the peripherals depending on it.
+On Fri, Jan 29, 2016 at 12:07 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The other related issue is the DEBUG_UART_{VIRT,PHYS} setting,
+> where there is no safe platform-specific default. I have two
+> ideas for working around that, maybe one of them sounds ok to
+> you:
+>
+> a) find a way to warn and/or disable DEBUG_LL when no address
+>    is set, rather than failing the build
+>
+> b) add 'default 0 if COMPILE_TEST' to make it harder to get this
+>    wrong by accident (hopefully nobody tries to run a COMPILE_TEST
+>    kernel). Also maybe add a #warning if DEBUG_UART_VIRT is
 
-There's also SATA and USB that might be driven by it.
+Make sure to add it at the end of the list, so enabling COMPILE_TEST in a
+working .config should give another working .config.
 
-ChenYu
+Perhaps you can use 0xdeadbeef instead of 0, and add
+
+    #if DEBUG_UART_PHYS == 0xdeadbeed
+    #warning Broken value of DEBUG_UART_PHYS.
+    #endif
+
+somewhere?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
