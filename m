@@ -1,49 +1,39 @@
-From: menghui.lin@mediatek.com (menghui lin)
-Date: Fri, 29 Jan 2016 17:52:14 +0800
-Subject: [PATCH V4 2/2] regulator: mt6323: Add support for MT6323 regulator
-In-Reply-To: <20160128231306.GD4130@sirena.org.uk>
-References: <1453896059-44589-1-git-send-email-blogic@openwrt.org>
- <1453896059-44589-2-git-send-email-blogic@openwrt.org>
- <20160127144105.GQ6042@sirena.org.uk> <56AA5A5C.9080402@openwrt.org>
- <20160128231306.GD4130@sirena.org.uk>
-Message-ID: <1454061134.10861.14.camel@mtksdaap41>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 29 Jan 2016 17:56:09 +0800
+Subject: [PATCH v3 2/2] clk: sunxi: Refactor A31 PLL6 so that it can be
+ reused
+In-Reply-To: <1454008958-12655-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1454008958-12655-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1454008958-12655-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v677CEsr49P0xC_3hQYNfMoxRS-B7ptL8_dWsAUX-wPsUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-01-29 at 00:13 +0100, Mark Brown wrote:
-> On Thu, Jan 28, 2016 at 07:13:48PM +0100, John Crispin wrote:
-> 
-> > would the following two bindings be ok ? I would create patches to add them.
-> 
-> > * regulator-allow-mode; or regulator-allow-change-mode;
-> 
-> This seems redundant, if we have a list of valid modes presumably they
-> can be used - same idea as with voltage setting.
-> 
-> > * regulator-modes = <REGULATOR_MODE_NORMAL REGULATOR_MODE_STANDBY>;
-> 
-> I'm not convinced this binding makes sense, how would a user of the API
-> (currently there are none in tree) know what the modes mean?  It's a bit
-> different when the user is supplying configuration for a specific
-> regulator but this needs to be something that can be used by consumers.
-> 
-> What are you actually trying to do with this?
+On Fri, Jan 29, 2016 at 3:22 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Remove the fixed dividers from the PLL6 driver to be able to have a
+> reusable driver that can be used across several SoCs that share the same
+> controller, but don't have the same set of dividers for this clock, and to
+> also be reused multiple times in the same SoC, since we're droping the
+> clock name.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+> Changes from v2
+>   - Rebased and converted over to the new factors refactoring. Fixed the
+>     retrieved rate
+>
+>  arch/arm/boot/dts/sun6i-a31.dtsi     | 36 ++++++++++++++++++------------------
+>  arch/arm/boot/dts/sun8i-a23-a33.dtsi | 25 +++++++++++++++++--------
+>  arch/arm/boot/dts/sun8i-a23.dtsi     |  2 +-
+>  arch/arm/boot/dts/sun8i-a33.dtsi     |  4 ++--
+>  arch/arm/boot/dts/sun8i-h3.dtsi      | 36 ++++++++++++++++++------------------
+>  drivers/clk/sunxi/clk-sunxi.c        | 32 ++++++++++++++++----------------
+>  6 files changed, 72 insertions(+), 63 deletions(-)
 
-Hi Mark,
+Please also update the #clock-cells section of
+Documentation/devicetree/bindings/clock/sunxi.txt
 
-Per documentation in regulator/consumer.h, I think user should be able
-to know the behavior of each mode(fast, normal, idle, standby).
+Otherwise,
 
-In this patch, we want to support both normal/standby modes for mt6323
-regulators due to mt6323 regulators support low power mode which
-provides better power efficiency for standby case.
-
-We expect user of mt6323 regulators could dynamically change power mode
-by regulator_set_mode(). -EINVAL is returned if the given mode is not
-supported.
-
-The regulator_set_mode() API looks very straightforward and possible
-modes are already defined in consumer.h. It looks like we don't have to
-list possible modes for mt6323 additionally in binding document.
-
-MengHui
+Acked-by: Chen-Yu Tsai <wens@csie.org>
