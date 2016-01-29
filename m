@@ -1,48 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 29 Jan 2016 12:27:17 +0100
-Subject: [PATCH V4 2/2] regulator: mt6323: Add support for MT6323 regulator
-In-Reply-To: <1454061134.10861.14.camel@mtksdaap41>
-References: <1453896059-44589-1-git-send-email-blogic@openwrt.org>
- <1453896059-44589-2-git-send-email-blogic@openwrt.org>
- <20160127144105.GQ6042@sirena.org.uk>
- <56AA5A5C.9080402@openwrt.org>
- <20160128231306.GD4130@sirena.org.uk>
- <1454061134.10861.14.camel@mtksdaap41>
-Message-ID: <20160129112717.GP4130@sirena.org.uk>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 29 Jan 2016 13:30:42 +0200
+Subject: [PATCH] drm: omap dss: add missing includes
+In-Reply-To: <6010313.rYeAixWRHJ@wuerfel>
+References: <6010313.rYeAixWRHJ@wuerfel>
+Message-ID: <56AB4D62.8030906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 29, 2016 at 05:52:14PM +0800, menghui lin wrote:
-> On Fri, 2016-01-29 at 00:13 +0100, Mark Brown wrote:
 
-> > I'm not convinced this binding makes sense, how would a user of the API
-> > (currently there are none in tree) know what the modes mean?  It's a bit
-> > different when the user is supplying configuration for a specific
-> > regulator but this needs to be something that can be used by consumers.
 
-> > What are you actually trying to do with this?
+On 15/01/16 12:52, Arnd Bergmann wrote:
+> The omapdrm dss driver currently fails to build in some configurations when
+> the pinctrl and seq_print declarations are not visible:
+> 
+> omapdrm/dss/dss.c:1268:2: error: implicit declaration of function 'pinctrl_pm_select_sleep_state' [-Werror=implicit-function-declaration]
+> omapdrm/dss/dss.c:1277:2: error: implicit declaration of function 'pinctrl_pm_select_default_state' [-Werror=implicit-function-declaration]
+> omapdrm/dss/hdmi_wp.c:26:2: error: implicit declaration of function 'seq_printf' [-Werror=implicit-function-declaration]
+> omapdrm/dss/hdmi_pll.c:30:2: error: implicit declaration of function 'seq_printf' [-Werror=implicit-function-declaration]
+> omapdrm/dss/hdmi_phy.c:34:2: error: implicit declaration of function 'seq_printf' [-Werror=implicit-function-declaration]
+> 
+> This adds the appropriate include statements.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 9960aa7cb58c ("drm/omap: move omapdss & displays under omapdrm")
 
-> In this patch, we want to support both normal/standby modes for mt6323
-> regulators due to mt6323 regulators support low power mode which
-> provides better power efficiency for standby case.
+Thanks, I've picked this up for 4.5.
 
-> We expect user of mt6323 regulators could dynamically change power mode
-> by regulator_set_mode(). -EINVAL is returned if the given mode is not
-> supported.
+ Tomi
 
-> The regulator_set_mode() API looks very straightforward and possible
-> modes are already defined in consumer.h. It looks like we don't have to
-> list possible modes for mt6323 additionally in binding document.
-
-None of this is answering my question - I know what the current API is,
-describing it doesn't tell me about actual users or how they are able to
-sensibly use the interface.  Bear in mind that the definitions of the
-various modes are all relative and what one device thinks is high usage
-may be low usage for another device.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160129/db1a930d/attachment.sig>
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160129/0615a463/attachment.sig>
