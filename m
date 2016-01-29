@@ -1,98 +1,72 @@
-From: jenskuske@gmail.com (Jens Kuske)
-Date: Fri, 29 Jan 2016 11:02:46 +0100
-Subject: [PATCH v3 2/2] clk: sunxi: Refactor A31 PLL6 so that it can be
- reused
-In-Reply-To: <1454008958-12655-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1454008958-12655-1-git-send-email-maxime.ripard@free-electrons.com>
- <1454008958-12655-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <56AB38C6.2010909@gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri, 29 Jan 2016 11:04:36 +0100
+Subject: [PATCH v4 0/7] ARM: dts: r-car: Add BRG support for (H)SCIF
+Message-ID: <1454061883-4043-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+	Hi Simon, Magnus,
 
-On 28/01/16 20:22, Maxime Ripard wrote:
-> Remove the fixed dividers from the PLL6 driver to be able to have a
-> reusable driver that can be used across several SoCs that share the same
-> controller, but don't have the same set of dividers for this clock, and to
-> also be reused multiple times in the same SoC, since we're droping the
-> clock name.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
-> Changes from v2
->   - Rebased and converted over to the new factors refactoring. Fixed the
->     retrieved rate
-> 
->  arch/arm/boot/dts/sun6i-a31.dtsi     | 36 ++++++++++++++++++------------------
->  arch/arm/boot/dts/sun8i-a23-a33.dtsi | 25 +++++++++++++++++--------
->  arch/arm/boot/dts/sun8i-a23.dtsi     |  2 +-
->  arch/arm/boot/dts/sun8i-a33.dtsi     |  4 ++--
->  arch/arm/boot/dts/sun8i-h3.dtsi      | 36 ++++++++++++++++++------------------
->  drivers/clk/sunxi/clk-sunxi.c        | 32 ++++++++++++++++----------------
->  6 files changed, 72 insertions(+), 63 deletions(-)
-> 
-[...]
-> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> index 1524130e43c9..19aadf47027d 100644
-> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> @@ -121,27 +121,27 @@
->  		};
->  
->  		pll6: clk at 01c20028 {
-> -			#clock-cells = <1>;
-> +			#clock-cells = <0>;
->  			compatible = "allwinner,sun6i-a31-pll6-clk";
->  			reg = <0x01c20028 0x4>;
->  			clocks = <&osc24M>;
-> -			clock-output-names = "pll6", "pll6x2";
-> +			clock-output-names = "pll6";
->  		};
->  
-> -		pll6d2: pll6d2_clk {
-> +		pll6x2: pll6x2_clk {
->  			#clock-cells = <0>;
->  			compatible = "fixed-factor-clock";
-> -			clock-div = <2>;
-> -			clock-mult = <1>;
-> -			clocks = <&pll6 0>;
-> -			clock-output-names = "pll6d2";
-> +			clock-div = <1>;
-> +			clock-mult = <2>;
-> +			clocks = <&pll6>;
-> +			clock-output-names = "pll6-2x";
->  		};
->  
-> -		/* dummy clock until pll6 can be reused */
-> -		pll8: pll8_clk {
-> +		pll8: clk at 01c20044 {
->  			#clock-cells = <0>;
-> -			compatible = "fixed-clock";
-> -			clock-frequency = <1>;
-> +			compatible = "allwinner,sun6i-a31-pll6-clk";
-> +			reg = <0x01c20044 0x4>;
-> +			clocks = <&osc24M>;
->  			clock-output-names = "pll8";
->  		};
->  
-> @@ -165,7 +165,7 @@
->  			#clock-cells = <0>;
->  			compatible = "allwinner,sun6i-a31-ahb1-clk";
->  			reg = <0x01c20054 0x4>;
-> -			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6 0>;
-> +			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6>;
->  			clock-output-names = "ahb1";
->  		};
->  
-> @@ -173,7 +173,7 @@
->  			#clock-cells = <0>;
->  			compatible = "allwinner,sun8i-h3-ahb2-clk";
->  			reg = <0x01c2005c 0x4>;
-> -			clocks = <&ahb1>, <&pll6d2>;
-> +			clocks = <&ahb1>, <&pll6>;
+This patch series adds support for the Baud Rate Generator for External
+Clock (BRG), as found on SCIF and HSCIF, to the DTS files for all R-Car
+Gen1, Gen2, and Gen3 SoCs. This increases the range and accuracy of
+supported baud rates on (H)SCIF.
 
-According to the datasheet AHB2 really has PLL6 / 2 as parent, not PLL6
-directly.
+Support for the extra clocks in the DT bindings and in the driver has
+been accepted in v4.5-rc1.  
 
-Jens
+Changes compared to v3:
+  - Change one-line summary prefix to match current arm-soc practices,
+  - Rebased,
+
+Changes compared to v2:
+  - Rename "int_clk" to "brg_int",
+  - Add support for R-Car M1A (r8a7778) and R-Car H1 (r8a7779),
+  - Add support for R-Car H2 (r8a7790), R-Car M2-N (r8a7793), and R-Car
+    E2 (r8a7794),
+  - Correct internal clock source ZS_CLK to S3D1 in patch description
+    for r8a7795, 
+
+This has been tested on r8a7778/bockw, r8a7779/marzen, r8a7791/koelsch,
+r8a7794/alt, and r8a7795/salvator-x.
+
+Dependencies:
+  - renesas-devel-20160129-v4.5-rc1,
+  - series "[PATCH v4 0/7] ARM: dts: R-Car: Add SCIF fallback
+    compatibility strings",
+  - series "[PATCH v4 00/11] ARM: dts: shmobile: Rename the serial port
+    clock to fck",
+
+Thanks for applying!
+
+Geert Uytterhoeven (7):
+  ARM: dts: r8a7778: Add BRG support for SCIF
+  ARM: dts: r8a7779: Add BRG support for SCIF
+  ARM: dts: r8a7790: Add BRG support for (H)SCIF
+  ARM: dts: r8a7791: Add BRG support for (H)SCIF
+  ARM: dts: r8a7793: Add BRG support for SCIF
+  ARM: dts: r8a7794: Add BRG support for (H)SCIF
+  arm64: dts: r8a7795: Add BRG support for (H)SCIF
+
+ arch/arm/boot/dts/r8a7778.dtsi           | 39 +++++++++++------
+ arch/arm/boot/dts/r8a7779.dtsi           | 39 +++++++++++------
+ arch/arm/boot/dts/r8a7790.dtsi           | 29 +++++++++----
+ arch/arm/boot/dts/r8a7791.dtsi           | 54 +++++++++++++++--------
+ arch/arm/boot/dts/r8a7793.dtsi           | 54 +++++++++++++++--------
+ arch/arm/boot/dts/r8a7794.dtsi           | 54 +++++++++++++++--------
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 74 ++++++++++++++++++++++----------
+ 7 files changed, 235 insertions(+), 108 deletions(-)
+
+-- 
+1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
