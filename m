@@ -1,32 +1,27 @@
-From: chanho.min@lge.com (Chanho Min)
-Date: Fri, 29 Jan 2016 18:14:55 +0900
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 29 Jan 2016 10:21:24 +0100
 Subject: [PATCH] arm64: add Kconfig entry for LG1K SoC family
-Message-ID: <1454058895-4884-1-git-send-email-chanho.min@lge.com>
+In-Reply-To: <1454058895-4884-1-git-send-email-chanho.min@lge.com>
+References: <1454058895-4884-1-git-send-email-chanho.min@lge.com>
+Message-ID: <3614541.oUWpW74d41@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces ARCH_LG1K to enable LG Electronics's LG1K SoC
-family in Kconfig.
+On Friday 29 January 2016 18:14:55 Chanho Min wrote:
+> This patch introduces ARCH_LG1K to enable LG Electronics's LG1K SoC
+> family in Kconfig.
+> 
+> The dts and defconfig will be submitted soon in another series.
+> 
+> Signed-off-by: Chanho Min <chanho.min@lge.com>
 
-The dts and defconfig will be submitted soon in another series.
+Please keep this together with the defconfig change for now if you want
+to send a git pull request. If you send separate patches, just keep it
+all together as a series. Also add a patch to list an entry in the
+MAINTAINERS file.
 
-Signed-off-by: Chanho Min <chanho.min@lge.com>
----
- arch/arm64/Kconfig.platforms |    4 ++++
- 1 file changed, 4 insertions(+)
+In either case, submit it to the mailing lists for review first, but
+once the patches are ready to be applied, send them "To: arm at kernel.org"
+with everyone else on Cc.
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 21074f6..b002bba 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -141,4 +141,8 @@ config ARCH_ZYNQMP
- 	help
- 	  This enables support for Xilinx ZynqMP Family
- 
-+config ARCH_LG1K
-+	bool "LG Electronics LG1K SoC Family"
-+	help
-+	  This enables support for LG Electronics LG1K SoC Family
- endmenu
--- 
-1.7.9.5
+	Arnd
