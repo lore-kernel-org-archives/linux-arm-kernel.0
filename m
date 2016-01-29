@@ -1,134 +1,72 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Fri, 29 Jan 2016 12:14:19 +0200
-Subject: [PATCH V8 21/23] perf tools: adding perf_evlist to
- *info_priv_size()
-In-Reply-To: <56A78268.7020102@intel.com>
-References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
- <1452807977-8069-22-git-send-email-mathieu.poirier@linaro.org>
- <CANLsYkyc85famRPpfZk+O3iHXdbULV8-a=izUq=GbgMeiGw=Og@mail.gmail.com>
- <20160125210858.GC22501@kernel.org> <56A78268.7020102@intel.com>
-Message-ID: <56AB3B7B.7050906@intel.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 29 Jan 2016 18:23:58 +0800
+Subject: [PATCH v3] i2c: mt8173: add 4GB mode support in i2c driver.
+In-Reply-To: <1454031331-9107-1-git-send-email-liguo.zhang@mediatek.com>
+Message-ID: <201601291845.qFl2f6RN%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/16 16:27, Adrian Hunter wrote:
-> On 25/01/16 23:08, Arnaldo Carvalho de Melo wrote:
->> Em Mon, Jan 25, 2016 at 01:48:28PM -0700, Mathieu Poirier escreveu:
->>> On 14 January 2016 at 14:46, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
->>>> On some architecture the size of the private header may
->>>> be dependent on the number of tracers used in the session.  As
->>>> such adding a "struct perf_evlist *" parameter, which should
->>>> contain all the required information.
->>>>
->>>> Also adjusting the existing client of the interface to take
->>>> the new parameter into account.
->>>>
->>>> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
->>>> Cc: Ingo Molnar <mingo@redhat.com>
->>>> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
->>>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->>>> ---
->>>>  tools/perf/arch/x86/util/intel-bts.c | 4 +++-
->>>>  tools/perf/arch/x86/util/intel-pt.c  | 4 +++-
->>>>  tools/perf/util/auxtrace.c           | 7 ++++---
->>>>  tools/perf/util/auxtrace.h           | 6 ++++--
->>>>  4 files changed, 14 insertions(+), 7 deletions(-)
->>>>
->>>> diff --git a/tools/perf/arch/x86/util/intel-bts.c b/tools/perf/arch/x86/util/intel-bts.c
->>>> index 9b94ce520917..4685a40777cc 100644
->>>> --- a/tools/perf/arch/x86/util/intel-bts.c
->>>> +++ b/tools/perf/arch/x86/util/intel-bts.c
->>>> @@ -60,7 +60,9 @@ struct branch {
->>>>         u64 misc;
->>>>  };
->>>>
->>>> -static size_t intel_bts_info_priv_size(struct auxtrace_record *itr __maybe_unused)
->>>> +static size_t
->>>> +intel_bts_info_priv_size(struct auxtrace_record *itr __maybe_unused,
->>>> +                        struct perf_evlist *evlist __maybe_unused)
->>>>  {
->>>>         return INTEL_BTS_AUXTRACE_PRIV_SIZE;
->>>>  }
->>>> diff --git a/tools/perf/arch/x86/util/intel-pt.c b/tools/perf/arch/x86/util/intel-pt.c
->>>> index b02af064f0f9..e5c1f2e21f87 100644
->>>> --- a/tools/perf/arch/x86/util/intel-pt.c
->>>> +++ b/tools/perf/arch/x86/util/intel-pt.c
->>>> @@ -273,7 +273,9 @@ intel_pt_pmu_default_config(struct perf_pmu *intel_pt_pmu)
->>>>         return attr;
->>>>  }
->>>>
->>>> -static size_t intel_pt_info_priv_size(struct auxtrace_record *itr __maybe_unused)
->>>> +static size_t
->>>> +intel_pt_info_priv_size(struct auxtrace_record *itr __maybe_unused,
->>>> +                       struct perf_evlist *evlist __maybe_unused)
->>>>  {
->>>>         return INTEL_PT_AUXTRACE_PRIV_SIZE;
->>>>  }
->>>> diff --git a/tools/perf/util/auxtrace.c b/tools/perf/util/auxtrace.c
->>>> index 7f10430af39c..cc1c9ce5cc56 100644
->>>> --- a/tools/perf/util/auxtrace.c
->>>> +++ b/tools/perf/util/auxtrace.c
->>>> @@ -478,10 +478,11 @@ void auxtrace_heap__pop(struct auxtrace_heap *heap)
->>>>                          heap_array[last].ordinal);
->>>>  }
->>>>
->>>> -size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr)
->>>> +size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr,
->>>> +                                      struct perf_evlist *evlist)
->>>>  {
->>>>         if (itr)
->>>> -               return itr->info_priv_size(itr);
->>>> +               return itr->info_priv_size(itr, evlist);
->>>>         return 0;
->>>>  }
->>>>
->>>> @@ -852,7 +853,7 @@ int perf_event__synthesize_auxtrace_info(struct auxtrace_record *itr,
->>>>         int err;
->>>>
->>>>         pr_debug2("Synthesizing auxtrace information\n");
->>>> -       priv_size = auxtrace_record__info_priv_size(itr);
->>>> +       priv_size = auxtrace_record__info_priv_size(itr, session->evlist);
->>>>         ev = zalloc(sizeof(struct auxtrace_info_event) + priv_size);
->>>>         if (!ev)
->>>>                 return -ENOMEM;
->>>> diff --git a/tools/perf/util/auxtrace.h b/tools/perf/util/auxtrace.h
->>>> index b86f90db1352..e5a8e2d4f2af 100644
->>>> --- a/tools/perf/util/auxtrace.h
->>>> +++ b/tools/perf/util/auxtrace.h
->>>> @@ -293,7 +293,8 @@ struct auxtrace_record {
->>>>         int (*recording_options)(struct auxtrace_record *itr,
->>>>                                  struct perf_evlist *evlist,
->>>>                                  struct record_opts *opts);
->>>> -       size_t (*info_priv_size)(struct auxtrace_record *itr);
->>>> +       size_t (*info_priv_size)(struct auxtrace_record *itr,
->>>> +                                struct perf_evlist *evlist);
->>>>         int (*info_fill)(struct auxtrace_record *itr,
->>>>                          struct perf_session *session,
->>>>                          struct auxtrace_info_event *auxtrace_info,
->>>> @@ -429,7 +430,8 @@ int auxtrace_parse_snapshot_options(struct auxtrace_record *itr,
->>>>  int auxtrace_record__options(struct auxtrace_record *itr,
->>>>                              struct perf_evlist *evlist,
->>>>                              struct record_opts *opts);
->>>> -size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr);
->>>> +size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr,
->>>> +                                      struct perf_evlist *evlist);
->>>>  int auxtrace_record__info_fill(struct auxtrace_record *itr,
->>>>                                struct perf_session *session,
->>>>                                struct auxtrace_info_event *auxtrace_info,
->>>> --
->>>> 2.1.4
->>>>
->>>
->>> Arnaldo,
->>>
->>> As with my previous email, I can't queue this patch for 4.6 without at
->>> least a reviewed by from you.
->>>
->>> It has been rebased to 4.5-rc1 here [1] for your convenience.  I will
->>> be happy to use another baseline should that be more adequate for you.
->>
->> Adrian, are you ok with this?
-> 
-> I will try to look at this and the others in the next day or two.
+Hi Liguo,
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+[auto build test WARNING on wsa/i2c/for-next]
+[also build test WARNING on v4.5-rc1 next-20160129]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+
+url:    https://github.com/0day-ci/linux/commits/Liguo-Zhang/i2c-mt8173-add-4GB-mode-support-in-i2c-driver/20160129-174005
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux i2c/for-next
+config: i386-allmodconfig (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All warnings (new ones prefixed by >>):
+
+   In file included from include/linux/kernel.h:10:0,
+                    from include/linux/clk.h:16,
+                    from drivers/i2c/busses/i2c-mt65xx.c:15:
+   drivers/i2c/busses/i2c-mt65xx.c: In function 'mtk_i2c_set_4g_mode':
+   include/linux/bitops.h:6:24: warning: left shift count >= width of type [-Wshift-count-overflow]
+    #define BIT(nr)   (1UL << (nr))
+                           ^
+>> drivers/i2c/busses/i2c-mt65xx.c:378:17: note: in expansion of macro 'BIT'
+     return (addr & BIT(32)) ? I2C_DMA_4G_MODE : I2C_DMA_CLR_FLAG;
+                    ^
+
+vim +/BIT +378 drivers/i2c/busses/i2c-mt65xx.c
+
+   362		if (target_speed > MAX_FS_MODE_SPEED) {
+   363			/* Set the high speed mode register */
+   364			i2c->timing_reg = I2C_FS_TIME_INIT_VALUE;
+   365			i2c->high_speed_reg = I2C_TIME_DEFAULT_VALUE |
+   366				(sample_cnt << 12) | (step_cnt << 8);
+   367		} else {
+   368			i2c->timing_reg = (sample_cnt << 8) | (step_cnt << 0);
+   369			/* Disable the high speed transaction */
+   370			i2c->high_speed_reg = I2C_TIME_CLR_VALUE;
+   371		}
+   372	
+   373		return 0;
+   374	}
+   375	
+   376	static inline u32 mtk_i2c_set_4g_mode(dma_addr_t addr)
+   377	{
+ > 378		return (addr & BIT(32)) ? I2C_DMA_4G_MODE : I2C_DMA_CLR_FLAG;
+   379	}
+   380	
+   381	static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+   382				       int num, int left_num)
+   383	{
+   384		u16 addr_reg;
+   385		u16 start_reg;
+   386		u16 control_reg;
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 53452 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160129/8f3b484e/attachment-0001.obj>
