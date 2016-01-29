@@ -1,37 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Jan 2016 15:06:32 +0100
-Subject: [PATCH 8/9] ARM: pxa: don't select RFKILL if CONFIG_NET is disabled
+Date: Fri, 29 Jan 2016 15:06:33 +0100
+Subject: [PATCH 9/9] ARM: mmp: mark usb_dma_mask as __maybe_unused
 In-Reply-To: <1454076396-3563101-1-git-send-email-arnd@arndb.de>
 References: <1454076396-3563101-1-git-send-email-arnd@arndb.de>
-Message-ID: <1454076396-3563101-9-git-send-email-arnd@arndb.de>
+Message-ID: <1454076396-3563101-10-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bluetooth is only supported when network support is part of the kernel,
-so it is a bit pointless to build the tosa-bt support without networking.
-If we try anyway, we get a Kconfig warning:
+This variable may be used by some devices that each have their
+on Kconfig symbol, or by none of them, and that causes a build
+warning:
 
-warning: (TOSA_BT && H1940BT) selects RFKILL which has unmet direct dependencies (NET)
+arch/arm/mach-mmp/devices.c:241:12: error: 'usb_dma_mask' defined but not used [-Werror=unused-variable]
 
-This adds a dependency on CONFIG_NET to avoid that case.
+Marking it __maybe_unused avoids the warning.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-pxa/Kconfig | 2 +-
+ arch/arm/mach-mmp/devices.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-index 01066cff16e4..7ee4652b4c61 100644
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -528,7 +528,7 @@ config MACH_TOSA
+diff --git a/arch/arm/mach-mmp/devices.c b/arch/arm/mach-mmp/devices.c
+index 3330ac7cfbef..671c7a09ab3d 100644
+--- a/arch/arm/mach-mmp/devices.c
++++ b/arch/arm/mach-mmp/devices.c
+@@ -238,7 +238,7 @@ void pxa_usb_phy_deinit(void __iomem *phy_reg)
+ #endif
  
- config TOSA_BT
- 	tristate "Control the state of built-in bluetooth chip on Sharp SL-6000"
--	depends on MACH_TOSA
-+	depends on MACH_TOSA && NET
- 	select RFKILL
- 	help
- 	  This is a simple driver that is able to control
+ #if IS_ENABLED(CONFIG_USB_SUPPORT)
+-static u64 usb_dma_mask = ~(u32)0;
++static u64 __maybe_unused usb_dma_mask = ~(u32)0;
+ 
+ #if IS_ENABLED(CONFIG_USB_MV_UDC)
+ struct resource pxa168_u2o_resources[] = {
 -- 
 2.7.0
