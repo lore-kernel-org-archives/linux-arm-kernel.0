@@ -1,40 +1,63 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 29 Jan 2016 16:26:03 +0100
-Subject: [PATCH 1/7] usb: gadget: pxa25x_udc: move register definitions
- from arch
-In-Reply-To: <2664702.bXd9nOWVFO@wuerfel> (Arnd Bergmann's message of "Fri, 29
- Jan 2016 11:07:18 +0100")
-References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
- <1453997843-3489728-1-git-send-email-arnd@arndb.de>
- <87vb6c7mug.fsf@belgarion.home> <2664702.bXd9nOWVFO@wuerfel>
-Message-ID: <87egd076gk.fsf@belgarion.home>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Fri, 29 Jan 2016 17:38:12 +0200
+Subject: [PATCH v12 2/4] PM / Domains: add setter for dev.pm_domain
+In-Reply-To: <1452181575-9206-3-git-send-email-tomeu.vizoso@collabora.com>
+References: <1452181575-9206-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1452181575-9206-3-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <CAHp75VdZMtm0_USuX2tiFO+O2QK8Wa+A9FDKZ=JqqGwr0SWi0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
-
-> On Friday 29 January 2016 10:32:07 Robert Jarzmik wrote:
->> > This addresses both issues by moving all the definitions into the
->> > pxa25x_udc driver itself. It turns out the only difference between
->> > them was 'UDCCS_IO_ROF', and that could well be a mistake when it
->> > was incorrectly copied from pxa25x to ixp4xx.
->> Hi Arnd,
->> 
->> Is there a reason to have chosen to move into pxa25_udc.c instead of
->> drivers/usb/gadget/udc/pxa25x_udc.h ? pxa27x_udc has a .h in the same directory
->> with register definitions, hence the question.
+On Thu, Jan 7, 2016 at 5:46 PM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+> Adds a function that sets the pointer to dev_pm_domain in struct device
+> and that warns if the device has already finished probing. The reason
+> why we want to enforce that is because in the general case that can
+> cause problems and also that we can simplify code quite a bit if we can
+> always assume that.
 >
-> Yes: The register definitions are only used in a single .c file and
-> are not an interface between files, so it's better to have them in
-> the file that uses them.
+> This patch also changes all current code that directly sets the
+> dev.pm_domain pointer.
+
+
+> --- a/drivers/acpi/acpi_lpss.c
+> +++ b/drivers/acpi/acpi_lpss.c
+
+> @@ -875,13 +876,14 @@ static int acpi_lpss_platform_notify(struct notifier_block *nb,
 >
-> I could have continued the cleanup and moved the two headers into the
-> respective drivers as well, but I had to stop somewhere ;-)
-Fair enough.
+>         switch (action) {
+>         case BUS_NOTIFY_BIND_DRIVER:
+> -               pdev->dev.pm_domain = &acpi_lpss_pm_domain;
+> +               dev_pm_domain_set(&pdev->dev, &acpi_lpss_pm_domain);
+>                 break;
+>         case BUS_NOTIFY_DRIVER_NOT_BOUND:
+>         case BUS_NOTIFY_UNBOUND_DRIVER:
+>                 pdev->dev.pm_domain = NULL;
 
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Missed?
 
-Cheers.
+>                 break;
+>         case BUS_NOTIFY_ADD_DEVICE:
+> +               dev_pm_domain_set(&pdev->dev, &acpi_lpss_pm_domain);
+>                 if (pdata->dev_desc->flags & LPSS_LTR)
+>                         return sysfs_create_group(&pdev->dev.kobj,
+>                                                   &lpss_attr_group);
+> @@ -889,6 +891,7 @@ static int acpi_lpss_platform_notify(struct notifier_block *nb,
+>         case BUS_NOTIFY_DEL_DEVICE:
+>                 if (pdata->dev_desc->flags & LPSS_LTR)
+>                         sysfs_remove_group(&pdev->dev.kobj, &lpss_attr_group);
+> +               dev_pm_domain_set(&pdev->dev, NULL);
+>                 break;
+>         default:
+>                 break;
+
+This looks wrong. I didn't test yet, but I have concerns here. Why did
+you add those calls?
+
+Have you been aware about the commit b5f88dd1d6ef ("Revert "ACPI /
+LPSS: allow to use specific PM domain during ->probe()") ?
+
+Sorry for being too late with this.
 
 -- 
-Robert
+With Best Regards,
+Andy Shevchenko
