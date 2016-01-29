@@ -1,119 +1,114 @@
 From: jchandra@broadcom.com (Jayachandran C)
-Date: Fri, 29 Jan 2016 14:35:39 +0530
-Subject: [PATCH v7 4/5] arm64: pci: Add ACPI support
+Date: Fri, 29 Jan 2016 14:35:38 +0530
+Subject: [PATCH v7 3/5] PCI: Handle ACPI companion and domain number
 In-Reply-To: <1454058340-7904-1-git-send-email-jchandra@broadcom.com>
 References: <1454058340-7904-1-git-send-email-jchandra@broadcom.com>
-Message-ID: <1454058340-7904-5-git-send-email-jchandra@broadcom.com>
+Message-ID: <1454058340-7904-4-git-send-email-jchandra@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add functions needed for ACPI support and prepare arm64 for using
-CONFIG_ACPI_PCI_HOST_GENERIC for the ACPI based PCI controller.
+pci_create_root_bus is called with NULL as parent in ACPI. This
+ends up calling pci_bus_assign_domain_nr with a NULL parent, which
+crashes when dereferencing parent.
 
-pci_acpi_scan_root(), raw_pci_read() and raw_pci_write() are marked
-as weak so that they can be implemented by the generic ACPI PCI
-driver.
+Fix this by providing a way to set the ACPI domain number and ACPI
+companion in PCI code. We define pci_acpi_set_companion() to set
+the ACPI companion pointer and acpi_pci_get_segment() and to get
+the PCI domain number. These functions are stubs for now, the
+implementation will be done when the ACPI generic PCI controller
+is added.
 
-pcibios_enable_device() and pcibios_disable_device() have been added
-to handle acpi irq enable and disable. pcibios_add_bus() and
-pcibios_remove_bus() have been added call the corresponding ACPI
-functions.
+pci_bus_assign_domain_nr is updated to call acpi_pci_get_segment()
+to get the domain number to set on the root bus, in case of ACPI.
 
 Signed-off-by: Jayachandran C <jchandra@broadcom.com>
 ---
- arch/arm64/Kconfig      |  3 +++
- arch/arm64/kernel/pci.c | 34 +++++++++++++++++++++++++++++-----
- 2 files changed, 32 insertions(+), 5 deletions(-)
+ drivers/pci/pci.c        | 15 ++++++++++++++-
+ drivers/pci/probe.c      |  2 ++
+ include/linux/pci-acpi.h | 11 ++++++++++-
+ 3 files changed, 26 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 8cc6228..6bb21d8 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -234,6 +234,9 @@ config PCI_DOMAINS_GENERIC
- config PCI_SYSCALL
- 	def_bool PCI
- 
-+config PCI_MMCONFIG
-+	def_bool PCI && ACPI
-+
- source "drivers/pci/Kconfig"
- source "drivers/pci/pcie/Kconfig"
- source "drivers/pci/hotplug/Kconfig"
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index b3d098b..db0a6a9 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -17,6 +17,7 @@
- #include <linux/mm.h>
- #include <linux/of_pci.h>
- #include <linux/of_platform.h>
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 602eb42..5a3222d 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -20,6 +20,7 @@
+ #include <linux/string.h>
+ #include <linux/log2.h>
+ #include <linux/pci-aspm.h>
 +#include <linux/pci-acpi.h>
- #include <linux/slab.h>
+ #include <linux/pm_wakeup.h>
+ #include <linux/interrupt.h>
+ #include <linux/device.h>
+@@ -4772,9 +4773,21 @@ int pci_get_new_domain_nr(void)
+ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+ {
+ 	static int use_dt_domains = -1;
+-	int domain = of_get_pci_domain_nr(parent->of_node);
++	int domain;
  
- #include <asm/pci-bridge.h>
-@@ -48,9 +49,22 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
- 	if (pci_has_flag(PCI_PROBE_ONLY))
- 		return 0;
- 
-+#ifdef CONFIG_ACPI
-+	if (acpi_find_root_bridge_handle(dev))
-+		acpi_pci_irq_enable(dev);
-+#endif
+ 	/*
++	 * Handle ACPI early
++	 *
++	 * The companion is not set at this point, and ACPI sets parent to
++	 * NULL, we have to try to get the segment from acpi root info.
++	 */
++	if (!parent || !parent->of_node) {
++		bus->domain_nr = acpi_pci_get_segment(bus->sysdata);
++		return;
++	}
 +
- 	return pci_enable_resources(dev, mask);
- }
++	domain = of_get_pci_domain_nr(parent->of_node);
++	/*
+ 	 * Check DT domain and use_dt_domains values.
+ 	 *
+ 	 * If DT domain property is valid (domain >= 0) and
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 6d7ab9b..f1faede 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -13,6 +13,7 @@
+ #include <linux/module.h>
+ #include <linux/cpumask.h>
+ #include <linux/pci-aspm.h>
++#include <linux/pci-acpi.h>
+ #include <linux/aer.h>
+ #include <linux/acpi.h>
+ #include <asm-generic/pci-bridge.h>
+@@ -2100,6 +2101,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 	bridge->dev.parent = parent;
+ 	bridge->dev.release = pci_release_host_bridge_dev;
+ 	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
++	pci_acpi_set_companion(bridge);
+ 	error = pcibios_root_bridge_prepare(bridge);
+ 	if (error) {
+ 		kfree(bridge);
+diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+index e9450ef..d410885 100644
+--- a/include/linux/pci-acpi.h
++++ b/include/linux/pci-acpi.h
+@@ -138,12 +138,21 @@ extern struct list_head pci_mmcfg_list;
  
-+void pcibios_disable_device(struct pci_dev *dev)
+ #define PCI_MMCFG_BUS_OFFSET(bus)      ((bus) << 20)
+ #define PCI_MMCFG_OFFSET(bus, devfn)   ((bus) << 20 | (devfn) << 12)
+-
+ #else	/* CONFIG_ACPI */
+ static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
+ static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
+ #endif	/* CONFIG_ACPI */
+ 
++static inline void pci_acpi_set_companion(struct pci_host_bridge *bridge)
 +{
-+#ifdef CONFIG_ACPI
-+	if (acpi_find_root_bridge_handle(dev))
-+		acpi_pci_irq_disable(dev);
-+#endif
++	/* leave it to the platform for now */
 +}
 +
- /*
-  * Try to assign the IRQ number from DT when adding a new device
-  */
-@@ -62,15 +76,15 @@ int pcibios_add_device(struct pci_dev *dev)
- }
- 
- /*
-- * raw_pci_read/write - Platform-specific PCI config space access.
-+ * ACPI uses these - leave it to the generic ACPI PCI driver
-  */
--int raw_pci_read(unsigned int domain, unsigned int bus,
-+int __weak raw_pci_read(unsigned int domain, unsigned int bus,
- 		  unsigned int devfn, int reg, int len, u32 *val)
- {
- 	return -ENXIO;
- }
- 
--int raw_pci_write(unsigned int domain, unsigned int bus,
-+int __weak raw_pci_write(unsigned int domain, unsigned int bus,
- 		unsigned int devfn, int reg, int len, u32 val)
- {
- 	return -ENXIO;
-@@ -78,9 +92,19 @@ int raw_pci_write(unsigned int domain, unsigned int bus,
- 
- #ifdef CONFIG_ACPI
- /* Root bridge scanning */
--struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
-+struct pci_bus * __weak pci_acpi_scan_root(struct acpi_pci_root *root)
- {
--	/* TODO: Should be revisited when implementing PCI on ACPI */
- 	return NULL;
- }
-+
-+void pcibios_add_bus(struct pci_bus *bus)
++static inline u16 acpi_pci_get_segment(void *sysdata)
 +{
-+	acpi_pci_add_bus(bus);
++	return 0;
 +}
 +
-+void pcibios_remove_bus(struct pci_bus *bus)
-+{
-+	acpi_pci_remove_bus(bus);
-+}
-+
- #endif
+ #ifdef CONFIG_ACPI_APEI
+ extern bool aer_acpi_firmware_first(void);
+ #else
 -- 
 1.9.1
