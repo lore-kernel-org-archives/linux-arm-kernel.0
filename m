@@ -1,145 +1,182 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Fri, 29 Jan 2016 21:15:32 +0800
-Subject: [RFC 3/3] CMDQ: Mediatek CMDQ driver
-In-Reply-To: <1454070262.7401.21.camel@mtksdaap41>
-References: <1453266881-16849-1-git-send-email-hs.liao@mediatek.com>
- <1453266881-16849-4-git-send-email-hs.liao@mediatek.com>
- <CAGS+omBjD1pXKY_6bFbiGxa5bttvqg5zEvKevzSfoiMOy7ys6Q@mail.gmail.com>
- <1454053150.32413.52.camel@mtksdaap41>
- <CAGS+omBrEE21Xxh8hjcf32qfHJE0jJYvxGP6L1ihS6jcNbLvLQ@mail.gmail.com>
- <1454070262.7401.21.camel@mtksdaap41>
-Message-ID: <CAGS+omBhs7Ks7MVDsxHBBUdgF+0fmAa465HwvNiCzEe97Knt3Q@mail.gmail.com>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Fri, 29 Jan 2016 21:17:33 +0800
+Subject: [PATCH v10 15/21] KVM: ARM64: Add access handler for PMUSERENR
+ register
+In-Reply-To: <20160129110840.GA4340@hawk.localdomain>
+References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
+ <1453866709-20324-16-git-send-email-zhaoshenglong@huawei.com>
+ <20160128195814.GF16453@hawk.localdomain> <56AB16B6.8060208@huawei.com>
+ <20160129110840.GA4340@hawk.localdomain>
+Message-ID: <56AB666D.6090200@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 29, 2016 at 8:24 PM, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
-> On Fri, 2016-01-29 at 16:42 +0800, Daniel Kurtz wrote:
->> On Fri, Jan 29, 2016 at 3:39 PM, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
->> > Hi Dan,
->> >
->> > Many thanks for your comments and time.
->> > I reply my plan inline.
->> >
->> >
->> > On Thu, 2016-01-28 at 12:49 +0800, Daniel Kurtz wrote:
->> >> Hi HS,
->> >>
->> >> Sorry for the delay.  It is hard to find time to review a >3700 line
->> >> driver :-o in detail....
->> >>
->> >> Some review comments inline, although I still do not completely
->> >> understand how all that this driver does and how it works.
->> >> I'll try to find time to go through this driver in detail again next
->> >> time you post it for review.
->> >>
->> >> On Tue, Jan 19, 2016 at 9:14 PM,  <hs.liao@mediatek.com> wrote:
->> >> > From: HS Liao <hs.liao@mediatek.com>
->> >> >
->> >> > This patch is first version of Mediatek Command Queue(CMDQ) driver. The
->> >> > CMDQ is used to help read/write registers with critical time limitation,
->> >> > such as updating display configuration during the vblank. It controls
->> >> > Global Command Engine (GCE) hardware to achieve this requirement.
->> >> > Currently, CMDQ only supports display related hardwares, but we expect
->> >> > it can be extended to other hardwares for future requirements.
->> >> >
->> >> > Signed-off-by: HS Liao <hs.liao@mediatek.com>
->> >>
->> >> [snip]
->> >>
->> >> > diff --git a/drivers/soc/mediatek/mtk-cmdq.c b/drivers/soc/mediatek/mtk-cmdq.c
->> >> > new file mode 100644
->> >> > index 0000000..7570f00
->> >> > --- /dev/null
->> >> > +++ b/drivers/soc/mediatek/mtk-cmdq.c
->
-> [snip]
->
->> >> > +static const struct cmdq_subsys g_subsys[] = {
->> >> > +       {0x1400, 1, "MMSYS"},
->> >> > +       {0x1401, 2, "DISP"},
->> >> > +       {0x1402, 3, "DISP"},
->> >>
->> >> This isn't going to scale.  These addresses could be different on
->> >> different chips.
->> >> Instead of a static table like this, we probably need specify to the
->> >> connection between gce and other devices via devicetree phandles, and
->> >> then use the phandles to lookup the corresponding device address
->> >> range.
->> >
->> > I will define them in device tree.
->> > E.g.
->> > cmdq {
->> >   reg_domain = 0x14000000, 0x14010000, 0x14020000
->> > }
->>
->> The devicetree should only model hardware relationships, not software
->> considerations.
->>
->> Is the hardware constraint here for using gce with various other
->> hardware blocks?  I think we already model this by only providing a
->> gce phandle in the device tree nodes for those devices that can use
->> gce.
->>
->> Looking at the driver closer, as far as I can tell, the whole subsys
->> concept is a purely software abstraction, and only used to debug the
->> CMDQ_CODE_WRITE command.  In fact, AFAICT, everything would work fine
->> if we just completely removed the 'subsys' concept, and just passed
->> through the raw address provided by the driver.
->>
->> So, I recommend just removing 'subsys' completely from the driver -
->> from this array, and in the masks.
->>
->> Instead, if there is an error on the write command, just print the
->> address that fails.  There are other ways to deduce the subsystem from
->> a physical address.
->>
->> Thanks,
->>
->> -Dan
->
-> Hi Dan,
->
-> Subsys is not just for debug.
-> Its main purpose is to transfer CPU address to GCE address.
-> Let me explain it by "write" op,
-> I list a code segment from cmdq_rec_append_command().
->
->         case CMDQ_CODE_WRITE:
->                 subsys = cmdq_subsys_from_phys_addr(cqctx, arg_a);
->                 if (subsys < 0) {
->                         dev_err(dev,
->                                 "unsupported memory base address 0x%08x\n",
->                                 arg_a);
->                         return -EFAULT;
->                 }
->
->                 *cmd_ptr++ = arg_b;
->                 *cmd_ptr++ = (CMDQ_CODE_WRITE << CMDQ_OP_CODE_SHIFT) |
->                              (arg_a & CMDQ_ARG_A_WRITE_MASK) |
->                              ((subsys & CMDQ_SUBSYS_MASK) << CMDQ_SUBSYS_SHIFT);
->                 break;
->
-> Subsys is mapped from physical address via cmdq_subsys_from_phys_addr(),
-> and then it becomes part of GCE command via ((subsys & CMDQ_SUBSYS_MASK)
-> << CMDQ_SUBSYS_SHIFT) .
-> Only low bits of physical address are the same as GCE address.
-> We can get it by (arg_a & CMDQ_ARG_A_WRITE_MASK).
-> MASK is used to define how many bits are valid for this op.
-> So, GCE address = subsys + valid low bits.
 
-How are these upper bits of the "GCE address" defined?
-In other words, for a given SoC, how is the mapping between physical
-io addresses to GCE addresses defined?
-Is this mapping fixed by hardware?
-Does it vary for different SoCs?
 
--Dan
+On 2016/1/29 19:08, Andrew Jones wrote:
+> On Fri, Jan 29, 2016 at 03:37:26PM +0800, Shannon Zhao wrote:
+>> >
+>> >
+>> >On 2016/1/29 3:58, Andrew Jones wrote:
+>>> > >On Wed, Jan 27, 2016 at 11:51:43AM +0800, Shannon Zhao wrote:
+>>>>> > >> >From: Shannon Zhao<shannon.zhao@linaro.org>
+>>>>> > >> >
+>>>>> > >> >This register resets as unknown in 64bit mode while it resets as zero
+>>>>> > >> >in 32bit mode. Here we choose to reset it as zero for consistency.
+>>>>> > >> >
+>>>>> > >> >PMUSERENR_EL0 holds some bits which decide whether PMU registers can be
+>>>>> > >> >accessed from EL0. Add some check helpers to handle the access from EL0.
+>>>>> > >> >
+>>>>> > >> >When these bits are zero, only reading PMUSERENR will trap to EL2 and
+>>>>> > >> >writing PMUSERENR or reading/writing other PMU registers will trap to
+>>>>> > >> >EL1 other than EL2 when HCR.TGE==0. To current KVM configuration
+>>>>> > >> >(HCR.TGE==0) there is no way to get these traps. Here we write 0xf to
+>>>>> > >> >physical PMUSERENR register on VM entry, so that it will trap PMU access
+>>>>> > >> >from EL0 to EL2. Within the register access handler we check the real
+>>>>> > >> >value of guest PMUSERENR register to decide whether this access is
+>>>>> > >> >allowed. If not allowed, return false to inject UND to guest.
+>>>>> > >> >
+>>>>> > >> >Signed-off-by: Shannon Zhao<shannon.zhao@linaro.org>
+>>>>> > >> >---
+>>>>> > >> >  arch/arm64/include/asm/pmu.h |   9 ++++
+>>>>> > >> >  arch/arm64/kvm/hyp/hyp.h     |   1 +
+>>>>> > >> >  arch/arm64/kvm/hyp/switch.c  |   3 ++
+>>>>> > >> >  arch/arm64/kvm/sys_regs.c    | 100 ++++++++++++++++++++++++++++++++++++++++---
+>>>>> > >> >  4 files changed, 107 insertions(+), 6 deletions(-)
+>>>>> > >> >
+>>>>> > >> >diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
+>>>>> > >> >index 6f14a01..eb3dc88 100644
+>>>>> > >> >--- a/arch/arm64/include/asm/pmu.h
+>>>>> > >> >+++ b/arch/arm64/include/asm/pmu.h
+>>>>> > >> >@@ -69,4 +69,13 @@
+>>>>> > >> >  #define	ARMV8_EXCLUDE_EL0	(1 << 30)
+>>>>> > >> >  #define	ARMV8_INCLUDE_EL2	(1 << 27)
+>>>>> > >> >
+>>>>> > >> >+/*
+>>>>> > >> >+ * PMUSERENR: user enable reg
+>>>>> > >> >+ */
+>>>>> > >> >+#define ARMV8_USERENR_MASK	0xf		/* Mask for writable bits */
+>>>>> > >> >+#define ARMV8_USERENR_EN	(1 << 0) /* PMU regs can be accessed@EL0 */
+>>>>> > >> >+#define ARMV8_USERENR_SW	(1 << 1) /* PMSWINC can be written@EL0 */
+>>>>> > >> >+#define ARMV8_USERENR_CR	(1 << 2) /* Cycle counter can be read@EL0 */
+>>>>> > >> >+#define ARMV8_USERENR_ER	(1 << 3) /* Event counter can be read@EL0 */
+>>>>> > >> >+
+>>>>> > >> >  #endif /* __ASM_PMU_H */
+>>>>> > >> >diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+>>>>> > >> >index fb27517..9a28b7bd8 100644
+>>>>> > >> >--- a/arch/arm64/kvm/hyp/hyp.h
+>>>>> > >> >+++ b/arch/arm64/kvm/hyp/hyp.h
+>>>>> > >> >@@ -22,6 +22,7 @@
+>>>>> > >> >  #include <linux/kvm_host.h>
+>>>>> > >> >  #include <asm/kvm_mmu.h>
+>>>>> > >> >  #include <asm/sysreg.h>
+>>>>> > >> >+#include <asm/pmu.h>
+>>>>> > >> >
+>>>>> > >> >  #define __hyp_text __section(.hyp.text) notrace
+>>>>> > >> >
+>>>>> > >> >diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+>>>>> > >> >index ca8f5a5..1a7d679 100644
+>>>>> > >> >--- a/arch/arm64/kvm/hyp/switch.c
+>>>>> > >> >+++ b/arch/arm64/kvm/hyp/switch.c
+>>>>> > >> >@@ -37,6 +37,8 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+>>>>> > >> >  	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+>>>>> > >> >  	write_sysreg(1 << 15, hstr_el2);
+>>>>> > >> >  	write_sysreg(CPTR_EL2_TTA | CPTR_EL2_TFP, cptr_el2);
+>>>>> > >> >+	/* Make sure we trap PMU access from EL0 to EL2 */
+>>>>> > >> >+	write_sysreg(ARMV8_USERENR_MASK, pmuserenr_el0);
+>>>>> > >> >  	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
+>>>>> > >> >  }
+>>>>> > >> >
+>>>>> > >> >@@ -45,6 +47,7 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+>>>>> > >> >  	write_sysreg(HCR_RW, hcr_el2);
+>>>>> > >> >  	write_sysreg(0, hstr_el2);
+>>>>> > >> >  	write_sysreg(read_sysreg(mdcr_el2) & MDCR_EL2_HPMN_MASK, mdcr_el2);
+>>>>> > >> >+	write_sysreg(0, pmuserenr_el0);
+>>>>> > >> >  	write_sysreg(0, cptr_el2);
+>>>>> > >> >  }
+>>>>> > >> >
+>>>>> > >> >diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+>>>>> > >> >index eefc60a..084e527 100644
+>>>>> > >> >--- a/arch/arm64/kvm/sys_regs.c
+>>>>> > >> >+++ b/arch/arm64/kvm/sys_regs.c
+>>>>> > >> >@@ -453,6 +453,37 @@ static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>>>>> > >> >  	vcpu_sys_reg(vcpu, PMCR_EL0) = val;
+>>>>> > >> >  }
+>>>>> > >> >
+>>>>> > >> >+static bool pmu_access_el0_disabled(struct kvm_vcpu *vcpu)
+>>>>> > >> >+{
+>>>>> > >> >+	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+>>>>> > >> >+
+>>>>> > >> >+	return !((reg & ARMV8_USERENR_EN) || vcpu_mode_priv(vcpu));
+>>>>> > >> >+}
+>>>>> > >> >+
+>>>>> > >> >+static bool pmu_write_swinc_el0_disabled(struct kvm_vcpu *vcpu)
+>>>>> > >> >+{
+>>>>> > >> >+	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+>>>>> > >> >+
+>>>>> > >> >+	return !((reg & (ARMV8_USERENR_SW | ARMV8_USERENR_EN))
+>>>>> > >> >+		 || vcpu_mode_priv(vcpu));
+>>>>> > >> >+}
+>>>>> > >> >+
+>>>>> > >> >+static bool pmu_access_cycle_counter_el0_disabled(struct kvm_vcpu *vcpu)
+>>>>> > >> >+{
+>>>>> > >> >+	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+>>>>> > >> >+
+>>>>> > >> >+	return !((reg & (ARMV8_USERENR_CR | ARMV8_USERENR_EN))
+>>>>> > >> >+		 || vcpu_mode_priv(vcpu));
+>>>>> > >> >+}
+>>>>> > >> >+
+>>>>> > >> >+static bool pmu_access_event_counter_el0_disabled(struct kvm_vcpu *vcpu)
+>>>>> > >> >+{
+>>>>> > >> >+	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+>>>>> > >> >+
+>>>>> > >> >+	return !((reg & (ARMV8_USERENR_ER | ARMV8_USERENR_EN))
+>>>>> > >> >+		 || vcpu_mode_priv(vcpu));
+>>>>> > >> >+}
+>>>>> > >> >+
+>>>>> > >> >  static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>>>>> > >> >  			const struct sys_reg_desc *r)
+>>>>> > >> >  {
+>>>>> > >> >@@ -461,6 +492,9 @@ static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>>>>> > >> >  	if (!kvm_arm_pmu_v3_ready(vcpu))
+>>>>> > >> >  		return trap_raz_wi(vcpu, p, r);
+>>>>> > >> >
+>>>>> > >> >+	if (pmu_access_el0_disabled(vcpu))
+>>>>> > >> >+		return false;
+>>> > >Based on the function name I'm not sure I like embedding vcpu_mode_priv.
+>>> > >It seems a condition like
+>>> > >
+>>> > >   if (!vcpu_mode_priv(vcpu) && !pmu_access_el0_enabled(vcpu))
+>>> > >       return false;
+>>> > >
+>> >
+>> >I don't think so. The return vlaue of pmu_access_el0_enabled doesn't
+>> >make sense if it doesn't check vcpu mode and it doesn't reflect the
+>> >meaning of the function name because if pmu_access_el0_enabled returns
+>> >false which should mean the EL0 access is disabled but actually the vcpu
+>> >mode might not be EL0.
+> I think it always makes sense to simply check if some bit or bits are
+> set in some register, without having the answer mixed up with other
+> state.
+But the final result is what we want.
 
-> That's why we need to know the mapping between the range of physical
-> address and subsys.
-> Please guide us a better way to code such requirement.
-> Thanks for your help.
+> Actually, maybe we should just drop these helpers and check the
+> register for the appropriate bits directly whenever needed,
 >
-> Thanks,
-> HS Liao
+>    pmuserenr_el0 = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+>    restricted = !vcpu_mode_priv(vcpu) && !(pmuserenr_el0 & ARMV8_USERENR_EN);
+>    ...
 >
+>    if (restricted && !(pmuserenr_el0 & ARMV8_USERENR_CR))
+>       return false;
+>
+>
+I would say no. Since this will add a lot of duplicated codes that's why 
+we add helpers to factor them out.
+
+> Or whatever... I won't complain about this anymore.
+>
+
+Thanks,
+-- 
+Shannon
