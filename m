@@ -1,118 +1,119 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 29 Jan 2016 17:35:05 -0500
-Subject: [PATCH V13 02/10] dma: hidma: Add Device Tree binding
+Date: Fri, 29 Jan 2016 17:35:11 -0500
+Subject: [PATCH V13 08/10] dma: qcom_hidma: read the channel id from HW
 In-Reply-To: <1454106914-15857-1-git-send-email-okaya@codeaurora.org>
 References: <1454106914-15857-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1454106914-15857-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <1454106914-15857-9-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation for the Qualcomm Technologies HIDMA binding.
+Removing the flexibility to choose the event channel as there is no real
+use case right now. We have been using the values in ACPI that match the HW
+defaults. OS is reading the event-channel from the HW register now.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    | 92 ++++++++++++++++++++++
- 1 file changed, 92 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+ .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  3 --
+ drivers/dma/qcom/hidma.c                           | 39 +---------------------
+ 2 files changed, 1 insertion(+), 41 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-new file mode 100644
-index 0000000..e3677a5
---- /dev/null
+index e3677a5..fd5618b 100644
+--- a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
 +++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-@@ -0,0 +1,92 @@
-+Qualcomm Technologies HIDMA Management interface
-+
-+Qualcomm Technologies HIDMA is a high speed DMA device. It only supports
-+memcpy and memset capabilities. It has been designed for virtualized
-+environments.
-+
-+Each HIDMA HW instance consists of multiple DMA channels. These channels
-+share the same bandwidth. The bandwidth utilization can be parititioned
-+among channels based on the priority and weight assignments.
-+
-+There are only two priority levels and 15 weigh assignments possible.
-+
-+Other parameters here determine how much of the system bus this HIDMA
-+instance can use like maximum read/write request and and number of bytes to
-+read/write in a single burst.
-+
-+Main node required properties:
-+- compatible: "qcom,hidma-mgmt-1.0";
-+- reg: Address range for DMA device
-+- dma-channels: Number of channels supported by this DMA controller.
-+- max-write-burst-bytes: Maximum write burst in bytes that HIDMA can
-+  occupy the bus for in a single transaction. A memcpy requested is
-+  fragmented to multiples of this amount. This parameter is used while
-+  writing into destination memory. Setting this value incorrectly can
-+  starve other peripherals in the system.
-+- max-read-burst-bytes: Maximum read burst in bytes that HIDMA can
-+  occupy the bus for in a single transaction. A memcpy request is
-+  fragmented to multiples of this amount. This parameter is used while
-+  reading the source memory. Setting this value incorrectly can starve
-+  other peripherals in the system.
-+- max-write-transactions: This value is how many times a write burst is
-+  applied back to back while writing to the destination before yielding
-+  the bus.
-+- max-read-transactions: This value is how many times a read burst is
-+  applied back to back while reading the source before yielding the bus.
-+- channel-reset-timeout-cycles: Channel reset timeout in cycles for this SOC.
-+  Once a reset is applied to the HW, HW starts a timer for reset operation
-+  to confirm. If reset is not completed within this time, HW reports reset
-+  failure.
-+
-+Sub-nodes:
-+
-+HIDMA has one or more DMA channels that are used to move data from one
-+memory location to another.
-+
-+When the OS is not in control of the management interface (i.e. it's a guest),
-+the channel nodes appear on their own, not under a management node.
-+
-+Required properties:
-+- compatible: must contain "qcom,hidma-1.0"
-+- reg: Addresses for the transfer and event channel
-+- interrupts: Should contain the event interrupt
-+- desc-count: Number of asynchronous requests this channel can handle
-+- channel-index: The HW event channel completions will be delivered.
-+- iommus: required a iommu node
-+
-+Example:
-+
-+Hypervisor OS configuration:
-+
-+	hidma-mgmt at f9984000 = {
-+		compatible = "qcom,hidma-mgmt-1.0";
-+		reg = <0xf9984000 0x15000>;
-+		dma-channels = <6>;
-+		max-write-burst-bytes = <1024>;
-+		max-read-burst-bytes = <1024>;
-+		max-write-transactions = <31>;
-+		max-read-transactions = <31>;
-+		channel-reset-timeout-cycles = <0x500>;
-+
-+		hidma_24: dma-controller at 0x5c050000 {
-+			compatible = "qcom,hidma-1.0";
-+			reg = <0 0x5c050000 0x0 0x1000>,
-+			      <0 0x5c0b0000 0x0 0x1000>;
-+			interrupts = <0 389 0>;
-+			desc-count = <10>;
-+			iommus = <&system_mmu>;
-+			channel-index = <4>;
-+		};
-+	};
-+
-+Guest OS configuration:
-+
-+	hidma_24: dma-controller at 0x5c050000 {
-+		compatible = "qcom,hidma-1.0";
-+		reg = <0 0x5c050000 0x0 0x1000>,
-+		      <0 0x5c0b0000 0x0 0x1000>;
-+		interrupts = <0 389 0>;
-+		desc-count = <10>;
-+		channel-index = <4>;
-+		iommus = <&system_mmu>;
-+	};
+@@ -51,7 +51,6 @@ Required properties:
+ - reg: Addresses for the transfer and event channel
+ - interrupts: Should contain the event interrupt
+ - desc-count: Number of asynchronous requests this channel can handle
+-- channel-index: The HW event channel completions will be delivered.
+ - iommus: required a iommu node
+ 
+ Example:
+@@ -75,7 +74,6 @@ Hypervisor OS configuration:
+ 			interrupts = <0 389 0>;
+ 			desc-count = <10>;
+ 			iommus = <&system_mmu>;
+-			channel-index = <4>;
+ 		};
+ 	};
+ 
+@@ -87,6 +85,5 @@ Guest OS configuration:
+ 		      <0 0x5c0b0000 0x0 0x1000>;
+ 		interrupts = <0 389 0>;
+ 		desc-count = <10>;
+-		channel-index = <4>;
+ 		iommus = <&system_mmu>;
+ 	};
+diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
+index ac20bdb..7180367 100644
+--- a/drivers/dma/qcom/hidma.c
++++ b/drivers/dma/qcom/hidma.c
+@@ -101,26 +101,6 @@ static unsigned int nr_desc_prm;
+ module_param(nr_desc_prm, uint, 0644);
+ MODULE_PARM_DESC(nr_desc_prm, "number of descriptors (default: 0)");
+ 
+-#define HIDMA_MAX_CHANNELS	64
+-static int channel_idx[HIDMA_MAX_CHANNELS] = {
+-	[0 ... (HIDMA_MAX_CHANNELS - 1)] = -1
+-};
+-
+-/*
+- * Each DMA channel is associated with an event channel for interrupt
+- * delivery. The event channel index usually comes from the firmware through
+- * ACPI/DT. When a HIDMA channel is executed in the guest machine context (QEMU)
+- * the device tree gets auto-generated based on the memory and IRQ resources
+- * this driver uses on the host machine. Any device specific paraemeter such as
+- * channel-index gets ignored by the QEMU.
+- * We are using this command line parameter to pass the event channel index to
+- * the guest machine.
+- */
+-static unsigned int num_channel_idx;
+-module_param_array_named(channel_idx, channel_idx, int, &num_channel_idx,
+-			 0644);
+-MODULE_PARM_DESC(channel_idx, "channel index array for the notifications");
+-static atomic_t channel_ref_count;
+ 
+ /* process completed descriptors */
+ static void hidma_process_completed(struct hidma_chan *mchan)
+@@ -592,7 +572,6 @@ static int hidma_probe(struct platform_device *pdev)
+ 	struct resource *trca_resource;
+ 	struct resource *evca_resource;
+ 	int chirq;
+-	int current_channel_index = atomic_read(&channel_ref_count);
+ 	void __iomem *evca;
+ 	void __iomem *trca;
+ 	int rc;
+@@ -668,22 +647,7 @@ static int hidma_probe(struct platform_device *pdev)
+ 		goto dmafree;
+ 	}
+ 
+-	if (current_channel_index > HIDMA_MAX_CHANNELS) {
+-		rc = -EINVAL;
+-		goto dmafree;
+-	}
+-
+-	dmadev->chidx = -1;
+-	device_property_read_u32(&pdev->dev, "channel-index", &dmadev->chidx);
+-
+-	/* kernel command line override for the guest machine */
+-	if (channel_idx[current_channel_index] != -1)
+-		dmadev->chidx = channel_idx[current_channel_index];
+-
+-	if (dmadev->chidx == -1) {
+-		rc = -EINVAL;
+-		goto dmafree;
+-	}
++	dmadev->chidx = readl(dmadev->dev_trca + 0x28);
+ 
+ 	/* Set DMA mask to 64 bits. */
+ 	rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+@@ -724,7 +688,6 @@ static int hidma_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, dmadev);
+ 	pm_runtime_mark_last_busy(dmadev->ddev.dev);
+ 	pm_runtime_put_autosuspend(dmadev->ddev.dev);
+-	atomic_inc(&channel_ref_count);
+ 	return 0;
+ 
+ uninit:
 -- 
 1.8.2.1
