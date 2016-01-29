@@ -1,37 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Jan 2016 21:46:22 +0000
-Subject: [linux-review:James-Hogan/kbuild-Remove-stale-asm-generic-wrappers/20160119-183642]
- d979f99e9cc14e2667e9b6e268db695977e4197a BUILD DONE
-In-Reply-To: <7619136.niuXthzi6R@wuerfel>
-References: <569e1dbb.MgLv8OaZwklOxxtU%fengguang.wu@intel.com>
- <20160128031435.GA25625@wfg-t540p.sh.intel.com>
- <20160128174241.GN10826@n2100.arm.linux.org.uk>
- <7619136.niuXthzi6R@wuerfel>
-Message-ID: <20160129214622.GS10826@n2100.arm.linux.org.uk>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sat, 30 Jan 2016 05:50:39 +0800
+Subject: [arm-platforms:kvm-arm64/cm 32/33]
+ arch/arm/include/asm/kvm_emulate.h:143:12: warning: passing argument 1 of
+ 'kvm_vcpu_get_hsr' discards 'const' qualifier from pointer target type
+Message-ID: <201601300537.WmSq8zAH%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 29, 2016 at 12:07:21AM +0100, Arnd Bergmann wrote:
-> This doesn't sound too hard. I've picked the defaults out of the
-> git history in the patch below. The only tricky part was davinci,
-> which has two different addresses and requires a little rework
-> to avoid circular dependencies.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/cm
+head:   70921d5e6dc76d6a99550578aad5c058297379b2
+commit: 9ef2321d71367574320c68dcd9ad827eae7b05e3 [32/33] arm/arm64: KVM: Handle out-of-RAM cache maintenance as a NOP
+config: arm-axm55xx_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 9ef2321d71367574320c68dcd9ad827eae7b05e3
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-I think there's a much better way to solve this.
+All warnings (new ones prefixed by >>):
 
-How about we have an architecture-defined way to provide all*config
-with a set of settings to be used with Kconfig to define these
-integer settings, rather than papering over the problem making up
-random addresses (like you're doing for the debug stuff.)  Eg,
-a default architecture-provided setting for KCONFIG_ALLCONFIG
-that defines things such as the physical offset and the debug
-addresses to be used for all*config targets?
+   In file included from arch/arm/kvm/arm.c:44:0:
+   arch/arm/include/asm/kvm_emulate.h: In function 'kvm_vcpu_dabt_iscm':
+>> arch/arm/include/asm/kvm_emulate.h:143:12: warning: passing argument 1 of 'kvm_vcpu_get_hsr' discards 'const' qualifier from pointer target type
+     return !!(kvm_vcpu_get_hsr(vcpu) & HSR_DABT_CM);
+               ^
+   arch/arm/include/asm/kvm_emulate.h:96:19: note: expected 'struct kvm_vcpu *' but argument is of type 'const struct kvm_vcpu *'
+    static inline u32 kvm_vcpu_get_hsr(struct kvm_vcpu *vcpu)
+                      ^
 
-Surely that's better than hacking around with the Kconfig files
-trying to frig something into working, which can potentially confuse
-people.
+vim +143 arch/arm/include/asm/kvm_emulate.h
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+   127	{
+   128		return (kvm_vcpu_get_hsr(vcpu) & HSR_SRT_MASK) >> HSR_SRT_SHIFT;
+   129	}
+   130	
+   131	static inline bool kvm_vcpu_dabt_isextabt(struct kvm_vcpu *vcpu)
+   132	{
+   133		return kvm_vcpu_get_hsr(vcpu) & HSR_DABT_EA;
+   134	}
+   135	
+   136	static inline bool kvm_vcpu_dabt_iss1tw(struct kvm_vcpu *vcpu)
+   137	{
+   138		return kvm_vcpu_get_hsr(vcpu) & HSR_DABT_S1PTW;
+   139	}
+   140	
+   141	static inline bool kvm_vcpu_dabt_iscm(const struct kvm_vcpu *vcpu)
+   142	{
+ > 143		return !!(kvm_vcpu_get_hsr(vcpu) & HSR_DABT_CM);
+   144	}
+   145	
+   146	/* Get Access Size from a data abort */
+   147	static inline int kvm_vcpu_dabt_get_as(struct kvm_vcpu *vcpu)
+   148	{
+   149		switch ((kvm_vcpu_get_hsr(vcpu) >> 22) & 0x3) {
+   150		case 0:
+   151			return 1;
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 18683 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160130/8499eeb9/attachment-0001.obj>
