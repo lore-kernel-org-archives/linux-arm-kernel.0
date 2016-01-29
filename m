@@ -1,128 +1,139 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Fri, 29 Jan 2016 12:33:24 -0700
-Subject: [PATCH 00/10] KVM PCIe/MSI passthrough on ARM/ARM64
-In-Reply-To: <56AB78B1.2030202@linaro.org>
-References: <1453813968-2024-1-git-send-email-eric.auger@linaro.org>
- <1454017899.23148.0.camel@redhat.com> <56AB78B1.2030202@linaro.org>
-Message-ID: <1454096004.9301.1.camel@redhat.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 29 Jan 2016 19:44:59 +0000
+Subject: [PATCH] clocksource/arm_arch_timer: Enable and verify MMIO access
+In-Reply-To: <20160129183051.GO12841@codeaurora.org>
+References: <b4ccba950f8fe0433b8e258a1fc0b8977bbe82d5.1454079150.git.robin.murphy@arm.com>
+ <20160129183051.GO12841@codeaurora.org>
+Message-ID: <56ABC13B.9080500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-01-29 at 15:35 +0100, Eric Auger wrote:
-> Hi Alex,
-> On 01/28/2016 10:51 PM, Alex Williamson wrote:
-> > On Tue, 2016-01-26 at 13:12 +0000, Eric Auger wrote:
-> > > This series addresses KVM PCIe passthrough with MSI enabled on ARM/ARM64.
-> > > It pursues the efforts done on [1], [2], [3]. It also aims at covering the
-> > > same need on some PowerPC platforms.
-> > > ?
-> > > On x86 all accesses to the 1MB PA region [FEE0_0000h - FEF0_000h] are directed
-> > > as interrupt messages: accesses to this special PA window directly target the
-> > > APIC configuration space and not DRAM, meaning the downstream IOMMU is bypassed.
-> > > ?
-> > > This is not the case on above mentionned platforms where MSI messages emitted
-> > > by devices are conveyed through the IOMMU. This means an IOVA/host PA mapping
-> > > must exist for the MSI to reach the MSI controller. Normal way to create
-> > > IOVA bindings consists in using VFIO DMA MAP API. However in this case
-> > > the MSI IOVA is not mapped onto guest RAM but on host physical page (the MSI
-> > > controller frame).
-> > > ?
-> > > Following first comments, the spirit of [2] is kept: the guest registers
-> > > an IOVA range reserved for MSI mapping. When the VFIO-PCIe driver allocates
-> > > its MSI vectors, it overwrites the MSI controller physical address with an IOVA,
-> > > allocated within the window provided by the userspace. This IOVA is mapped
-> > > onto the MSI controller frame physical page.
-> > > ?
-> > > The series does not address yet the problematic of telling the userspace how
-> > > much IOVA he should provision.
-> >?
-> > I'm sort of on a think-different approach today, so bear with me; how is
-> > it that x86 can make interrupt remapping so transparent to drivers like
-> > vfio-pci while for ARM and ppc we seem to be stuck with doing these
-> > fixups of the physical vector ourselves, implying ugly (no offense)
-> > paths bouncing through vfio to connect the driver and iommu backends?
-> >?
-> > We know that x86 handles MSI vectors specially, so there is some
-> > hardware that helps the situation.??It's not just that x86 has a fixed
-> > range for MSI, it's how it manages that range when interrupt remapping
-> > hardware is enabled.??A device table indexed by source-ID references a
-> > per device table indexed by data from the MSI write itself.??So we get
-> > much, much finer granularity,
-> About the granularity, I think ARM GICv3 now provides a similar
-> capability with GICv3 ITS (interrupt translation service). Along with
-> the MSI MSG write transaction, the device outputs a DeviceID conveyed on
-> the bus. This DeviceID (~ your source-ID) enables to index a device
-> table. The entry in the device table points to a DeviceId interrupt
-> translation table indexed by the EventID found in the msi msg. So the
-> entry in the interrupt translation table eventually gives you the
-> eventual interrupt ID targeted by the MSI MSG.
-> This translation capability if not available in GICv2M though, ie. the
-> one I am currently using.
->?
-> Those tables currently are built by the ITS irqchip (irq-gic-v3-its.c)
+On 29/01/16 18:30, Stephen Boyd wrote:
+> On 01/29, Robin Murphy wrote:
+>> So far, we have been blindly assuming that if a memory-mapped timer
+>> frame exists, then we have access to it. Whilst it's the firmware's
+>> job to give us non-secure access to frames in the first place, we
+>> should not rely on it always being generous enough to also configure
+>> CNTACR if it's not even using those frames itself.
+>
+> Hm, that first sentence is sort of misleading. We've been blindly
+> assuming that the firmware has configured CNTACR to have the
+> correct bits set for virtual/physical access. We've always relied
+> on status = "disabled" to figure out if we can access an entire
+> frame or not.
 
-So it sounds like the interrupt remapping plumbing needs to be
-implemented for those chips.??How does ITS identify an MSI versus any
-other DMA write???Does it need to be within a preconfigured address
-space like on x86 or does it know this implicitly by the transaction
-(which doesn't seem possible on PCIe)?
+Yeah, now that I read it back that sentence is nonsense for anything 
+other than the very specific ideas of "frame" and "exists" that were 
+passing through my head at some point last week - how about this instead?
 
-Along with this discussion, we should probably be revisiting whether
-existing ARM SMMUs should be exposing the IOMMU_CAP_INTR_REMAP
-capability.??This capability is meant to indicate interrupt isolation,
-but if an entire page of IOVA space is mapped through the IOMMU to a
-range of interrupts and some of those interrupts are shared with host
-devices or other VMs, then we really don't have that isolation and the
-system is susceptible to one VM interfering with another or with the
-host.??If that's the case, the SMMU should not be claiming
-IOMMU_CAP_INTR_REMAP.
+"So far, we have been blindly assuming that having access to a 
+memory-mapped timer frame implies that the individual elements of that 
+frame are already enabled."
 
-> ?but there's still effectively an interrupt
-> > domain per device that's being transparently managed under the covers
-> > whenever we request an MSI vector for a device.
-> >?
-> > So why can't we do something more like that here???There's no predefined
-> > MSI vector range, so defining an interface for the user to specify that
-> > is unavoidable.
-> Do you confirm that VFIO user API still still is the good choice to
-> provide that IOVA range?
+>>
+>> Explicitly enable feature-level access per-frame, and verify that the
+>> access we want is really implemented before trying to make use of it.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>   drivers/clocksource/arm_arch_timer.c | 39 ++++++++++++++++++++++++++++--------
+>>   1 file changed, 31 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>> index c64d543..c88485d 100644
+>> --- a/drivers/clocksource/arm_arch_timer.c
+>> +++ b/drivers/clocksource/arm_arch_timer.c
+>> @@ -765,20 +772,34 @@ static void __init arch_timer_mem_init(struct device_node *np)
+>>   	 */
+>>   	for_each_available_child_of_node(np, frame) {
+>>   		int n;
+>> +		u32 cntacr;
+>>
+>>   		if (of_property_read_u32(frame, "frame-number", &n)) {
+>>   			pr_err("arch_timer: Missing frame-number\n");
+>> -			of_node_put(best_frame);
+>>   			of_node_put(frame);
+>> -			return;
+>> +			goto out;
+>>   		}
+>>
+>> -		if (cnttidr & CNTTIDR_VIRT(n)) {
+>> +		/* Try enabling everything, and see what sticks */
+>> +		cntacr = CNTACR_RFRQ | CNTACR_RWPT | CNTACR_RPCT |
+>> +			 CNTACR_RWVT | CNTACR_RVOFF | CNTACR_RVCT;
+>> +		writel_relaxed(cntacr, cntctlbase + CNTACR(n));
+>> +		cntacr = readl_relaxed(cntctlbase + CNTACR(n));
+>> +
+>> +		if (~cntacr & CNTACR_RFRQ)
+>> +			continue;
+>
+> Do we need this check? If we can't read the frequency we fall
+> back to looking for the DT property, so it shouldn't matter if we
+> can't read the hardware there.
 
-I don't see that we have an option there unless ARM wants to
-retroactively reserve a range of IOVA space in the spec, which is
-certainly not going to happen.??The only other thing that comes to mind
-would be if there was an existing address space which could never be
-backed by RAM or other DMA capable targets.??But that seems far fetched
-as well.
+I was really just playing safe to start with. If we don't have cause to 
+care about the difference between not having access vs. not having a 
+frequency programmed then I'd agree it can probably go.
 
-> ? But why shouldn't everything else be transparent???We
-> > could add an interface to the IOMMU API that allows us to register that
-> > reserved range for the IOMMU domain.??IOMMU-core (or maybe interrupt
-> > remapping) code might allocate an IOVA domain for this just as you've
-> > done in the type1 code here.
-> I have no objection to move that iova allocation scheme somewhere else.
-> I just need to figure out how to deal with the fact iova.c is not
-> compiled everywhere as I noticed too late ;-)
-> ? But rather than having any interaction
-> > with vfio-pci, why not do this at lower levels such that the platform
-> > interrupt vector allocation code automatically uses one of those IOVA
-> > ranges and returns the IOVA rather than the physical address for the PCI
-> > code to program into the device???I think we know what needs to be done,
-> > but we're taking the approach of managing the space ourselves and doing
-> > a fixup of the device after the core code has done its job when we
-> > really ought to be letting the core code manage a space that we define
-> > and programming the device so that it doesn't need a fixup in the
-> > vfio-pci code.??Wouldn't it be nicer if pci_enable_msix_range() returned
-> > with the device properly programmed or generate an error if there's not
-> > enough reserved mapping space in IOMMU domain???Can it be done?
-> I agree with you on the fact it would be cleaner to manage that natively
-> at MSI controller level instead of patching the address value in
-> vfio_pci_intrs.c. I will investigate in that direction but I need some
-> more time to understand the links between the MSI controller, the PCI
-> device and the IOMMU.
+>> +
+>> +		if ((cnttidr & CNTTIDR_VIRT(n)) &&
+>> +		    !(~cntacr & (CNTACR_RWVT | CNTACR_RVCT))) {
+>>   			of_node_put(best_frame);
+>>   			best_frame = frame;
+>>   			arch_timer_mem_use_virtual = true;
+>>   			break;
+>>   		}
+>> +
+>> +		if (~cntacr & (CNTACR_RWPT | CNTACR_RPCT))
+>> +			continue;
+>> +
+>>   		of_node_put(best_frame);
+>>   		best_frame = of_node_get(frame);
+>>   	}
+>
+> Otherwise the patch looks fine and passes some light testing on
+> qcom devices.
 
-Since the current interrupt remapping schemes seem to operate in a
-different address space, I expect there will be work to do to fit the
-interrupt remapping within a provided address space, but it seems like a
-very reasonable constraint to add.??Thanks,
+Great, thanks. The Trusted Firmware guys' warning shot has gone upstream 
+already, if it helps:
 
-Alex
+https://github.com/ARM-software/arm-trusted-firmware/commit/01fc3f7300e86b0b672977133c3028d638d0c672
+
+> BTW, I'd like to add this patch on top so that we get some info
+> in /proc/iomem about which frame region is in use.
+
+It's about time I educated myself on what all the resource stuff really 
+means, but superficially it seems reasonable, and it certainly makes the 
+expected "2a830000-2a83ffff : arch_mem_timer" show up on my Juno.
+
+Thanks,
+Robin.
+
+> ---8<---
+> From: Stephen Boyd <sboyd@codeaurora.org>
+> Subject: [PATCH] clocksource/arm_arch_timer: Map frame with
+>   of_io_request_and_map()
+>
+> Let's use the of_io_request_and_map() API so that the frame
+> region is protected and shows up in /proc/iomem.
+>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>   drivers/clocksource/arm_arch_timer.c | 3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index c88485d489bf..59a08fd4f76a 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -804,7 +804,8 @@ static void __init arch_timer_mem_init(struct device_node *np)
+>   		best_frame = of_node_get(frame);
+>   	}
+>
+> -	base = arch_counter_base = of_iomap(best_frame, 0);
+> +	base = arch_counter_base = of_io_request_and_map(best_frame, 0,
+> +							 "arch_mem_timer");
+>   	if (!base) {
+>   		pr_err("arch_timer: Can't map frame's registers\n");
+>   		goto out;
+>
