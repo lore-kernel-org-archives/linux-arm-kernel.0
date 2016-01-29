@@ -1,93 +1,127 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 29 Jan 2016 14:34:53 -0800
-Subject: [PATCH v4 00/13] arm64: kernel: Add support for
- hibernate/suspend-to-disk
-In-Reply-To: <1453977766-20907-1-git-send-email-james.morse@arm.com> (James
- Morse's message of "Thu, 28 Jan 2016 10:42:33 +0000")
-References: <1453977766-20907-1-git-send-email-james.morse@arm.com>
-Message-ID: <7hvb6chv5e.fsf@baylibre.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 29 Jan 2016 17:35:03 -0500
+Subject: [PATCH V13 00/10] dma: add Qualcomm Technologies HIDMA driver
+Message-ID: <1454106914-15857-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+The Qualcomm Technologies HIDMA device has been designed
+to support virtualization technology. The driver has been
+divided into two to follow the hardware design.
 
-James Morse <james.morse@arm.com> writes:
+1. HIDMA Management driver
+2. HIDMA Channel driver
 
-> This version of hibernate is rebased onto v4.5-rc1, including updated patches
-> shared with kexec v13 [0] (1-5, 10).
+Each HIDMA HW consists of multiple channels. These channels
+share some set of common parameters. These parameters are
+initialized by the management driver during power up.
+Same management driver is used for monitoring the execution
+of the channels. Management driver can change the performance
+behavior dynamically such as bandwidth allocation and
+prioritization in the future.
 
-Thanks for this series!
+The management driver is executed in host context and
+is the main management entity for all channels provided by
+the device.
 
-I'd like to help in testing this so I'm just curious which platforms
-you've been testing this on.  I'm assuming a Juno (r2?), anything else?
+------------------------
+What's new
+------------------------
+- VFIO Reset driver
+- More documentation in device-tree binding.
+- Removed event-channel parameter
 
-Are you testing the resume from cold boot, or just from kexec?
+------------------------
+Git repos
+------------------------
+QEMU Support
+https://www.codeaurora.org/cgit/quic/qemu/qemu/log/?h=v2.5.0-sriov
 
-For cold boot on Juno, I'm assuming there would be some
-booloader/firmware changes needed to find and boot from the hibernation
-image?  Is that being worked on?  If not Juno, are you aware of any
-other platforms that could be tested with resume from cold boot?
+------------------------
+History of Changes
+------------------------
+Creating a QCOM directory for all QCOM DMA source files.
+Changes from V12: (https://lkml.org/lkml/2016/1/11/525)
+* none
 
-Not knowing the answers to the above, I tested your branch using arm64
-defconfig + CONFIG_HIBERNATION=y on my Juno and noticed that it didn't
-stay suspended (full suspend log below) so I'm looking for
-ideas/recommenations on how to test this.
+dma: hidma: Add Device Tree Binding
+Changes from V12: (https://lkml.org/lkml/2016/1/11/522)
+* s/driver/binding/
+* s/hypervisor/host/
+* add iommu node required.
+* removed the flexibility to choose event channel. Will use HW defaults
+* instead.
+  channel-index parameter is removed.
 
-FWIW, my Juno is running the latest ATF + u-boot firmware from the
-Linaro ARM landing team.
+dma: add Qualcomm Technologies HIDMA management driver
+Changes from V12: (https://lkml.org/lkml/2016/1/11/518)
+* s/hypervisor/host/
 
-Kevin
+dma: add Qualcomm Technologies HIDMA channel driver
+Changes from V12: (https://lkml.org/lkml/2016/1/11/523)
+* none
 
-/ # echo disk > /sys/power/state
-[   29.563430] PM: Syncing filesystems ... done.
-[   29.567901] Freezing user space processes ... (elapsed 0.001 seconds) done.
-[   29.576989] PM: Preallocating image memory... done (allocated 65512 pages)
-[   31.969977] PM: Allocated 262048 kbytes in 2.38 seconds (110.10 MB/s)
-[   31.976362] Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
-[   31.985303] Suspending console(s) (use no_console_suspend to debug)
-[   31.992900] PM: freeze of devices complete after 1.370 msecs
-[   31.993877] PM: late freeze of devices complete after 0.960 msecs
-[   31.995109] PM: noirq freeze of devices complete after 1.225 msecs
-[   31.995112] Disabling non-boot CPUs ...
-[   32.012751] CPU1: shutdown
-[   32.028584] psci: Retrying again to check for CPU kill
-[   32.028587] psci: CPU1 killed.
-[   32.060689] CPU2: shutdown
-[   32.076579] psci: Retrying again to check for CPU kill
-[   32.076583] psci: CPU2 killed.
-[   32.108734] CPU3: shutdown
-[   32.124579] psci: Retrying again to check for CPU kill
-[   32.124582] psci: CPU3 killed.
-[   32.160690] CPU4: shutdown
-[   32.176578] psci: Retrying again to check for CPU kill
-[   32.176581] psci: CPU4 killed.
-[   32.212685] CPU5: shutdown
-[   32.228580] psci: Retrying again to check for CPU kill
-[   32.228584] psci: CPU5 killed.
-[   32.241393] PM: Creating hibernation image:
-[   32.241393] PM: Need to copy 63772 pages
-[   32.241393] PM: Hibernation image created (63772 pages copied)
-[   32.241440] Enabling non-boot CPUs ...
-[   32.274634] Detected PIPT I-cache on CPU1
-[   32.274680] CPU1: Booted secondary processor [410fd080]
-[   32.274896]  cache: parent cpu1 should not be sleeping
-[   32.275095] CPU1 is up
-[   32.306712] Detected PIPT I-cache on CPU2
-[   32.306738] CPU2: Booted secondary processor [410fd080]
-[   32.306922]  cache: parent cpu2 should not be sleeping
-[   32.307120] CPU2 is up
-[   32.338913] Detected VIPT I-cache on CPU3
-[   32.338959] CPU3: Booted secondary processor [410fd033]
-[   32.339184]  cache: parent cpu3 should not be sleeping
-[   32.339378] CPU3 is up
-[   32.371098] Detected VIPT I-cache on CPU4
-[   32.371125] CPU4: Booted secondary processor [410fd033]
-[   32.371341]  cache: parent cpu4 should not be sleeping
-[   32.371536] CPU4 is up
-[   32.403281] Detected VIPT I-cache on CPU5
-[   32.403309] CPU5: Booted secondary processor [410fd033]
-[   32.403531]  cache: parent cpu5 should not be sleeping
-[   32.403741] CPU5 is up
-[   32.404202] PM: noirq thaw of devices complete after 0.454 msecs
-[   32.404979] PM: early thaw of devices complete after 0.723 msecs
-[...]
+dma: qcom_hidma: implement lower level hardware interface
+Changes from V12: (https://lkml.org/lkml/2016/1/11/519)
+* none
+
+dma: qcom_hidma: add debugfs hooks
+Changes from V12: (https://lkml.org/lkml/2016/1/11/521)
+* none
+
+dma: qcom_hidma: add support for object hierarchy
+Changes from V12: (https://lkml.org/lkml/2016/1/11/520)
+* none
+
+Sinan Kaya (10):
+  dma: qcom_bam_dma: move to qcom directory
+  dma: hidma: Add Device Tree binding
+  dma: add Qualcomm Technologies HIDMA management driver
+  dma: add Qualcomm Technologies HIDMA channel driver
+  dma: qcom_hidma: implement lower level hardware interface
+  dma: qcom_hidma: add debugfs hooks
+  dma: qcom_hidma: add support for object hierarchy
+  dma: qcom_hidma: read the channel id from HW
+  vfio, platform: add support for ACPI while detecting the reset driver
+  vfio, platform: add QTI HIDMA reset driver
+
+ Documentation/ABI/testing/sysfs-platform-hidma     |   9 +
+ .../ABI/testing/sysfs-platform-hidma-mgmt          |  97 +++
+ .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  89 ++
+ drivers/dma/Kconfig                                |  11 +-
+ drivers/dma/Makefile                               |   2 +-
+ drivers/dma/qcom/Kconfig                           |  29 +
+ drivers/dma/qcom/Makefile                          |   5 +
+ drivers/dma/{qcom_bam_dma.c => qcom/bam_dma.c}     |   4 +-
+ drivers/dma/qcom/hidma.c                           | 747 +++++++++++++++++
+ drivers/dma/qcom/hidma.h                           | 162 ++++
+ drivers/dma/qcom/hidma_dbg.c                       | 219 +++++
+ drivers/dma/qcom/hidma_ll.c                        | 927 +++++++++++++++++++++
+ drivers/dma/qcom/hidma_mgmt.c                      | 400 +++++++++
+ drivers/dma/qcom/hidma_mgmt.h                      |  39 +
+ drivers/dma/qcom/hidma_mgmt_sys.c                  | 295 +++++++
+ drivers/vfio/platform/reset/Kconfig                |   9 +
+ drivers/vfio/platform/reset/Makefile               |   2 +
+ .../vfio/platform/reset/vfio_platform_amdxgbe.c    |   3 +-
+ .../platform/reset/vfio_platform_calxedaxgmac.c    |   3 +-
+ .../vfio/platform/reset/vfio_platform_qcomhidma.c  |  99 +++
+ drivers/vfio/platform/vfio_platform_common.c       |  80 +-
+ drivers/vfio/platform/vfio_platform_private.h      |  41 +-
+ 22 files changed, 3229 insertions(+), 43 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-platform-hidma
+ create mode 100644 Documentation/ABI/testing/sysfs-platform-hidma-mgmt
+ create mode 100644 Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+ create mode 100644 drivers/dma/qcom/Kconfig
+ create mode 100644 drivers/dma/qcom/Makefile
+ rename drivers/dma/{qcom_bam_dma.c => qcom/bam_dma.c} (99%)
+ create mode 100644 drivers/dma/qcom/hidma.c
+ create mode 100644 drivers/dma/qcom/hidma.h
+ create mode 100644 drivers/dma/qcom/hidma_dbg.c
+ create mode 100644 drivers/dma/qcom/hidma_ll.c
+ create mode 100644 drivers/dma/qcom/hidma_mgmt.c
+ create mode 100644 drivers/dma/qcom/hidma_mgmt.h
+ create mode 100644 drivers/dma/qcom/hidma_mgmt_sys.c
+ create mode 100644 drivers/vfio/platform/reset/vfio_platform_qcomhidma.c
+
+-- 
+1.8.2.1
