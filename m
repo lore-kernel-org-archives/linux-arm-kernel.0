@@ -1,206 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Jan 2016 15:50:37 +0100
-Subject: [PATCH 5/6] ARM: s3c64xx: mark regulator init data as unused
-In-Reply-To: <1454079040-3567945-1-git-send-email-arnd@arndb.de>
-References: <1454079040-3567945-1-git-send-email-arnd@arndb.de>
-Message-ID: <1454079040-3567945-6-git-send-email-arnd@arndb.de>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Fri, 29 Jan 2016 15:51:26 +0100
+Subject: [PATCH 3/3] mtd:spi-nor:fsl-quadspi:Add fast-read mode support
+In-Reply-To: <1454067669-35274-4-git-send-email-B56489@freescale.com>
+References: <1454067669-35274-1-git-send-email-B56489@freescale.com>
+ <1454067669-35274-4-git-send-email-B56489@freescale.com>
+Message-ID: <56AB7C6E.2050300@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The smdk6410 board defines lots of regulator settings, but uses
-most of them only in certain configurations, and otherwise leaves
-them without any references, so we get lots of randconfig warnings
-about them:
+Hi Yunhui,
 
-mach-s3c64xx/mach-smdk6410.c:303:35: error: 'smdk6410_vddarm' defined but not used [-Werror=unused-variable]
-mach-s3c64xx/mach-smdk6410.c:316:35: error: 'smdk6410_vddint' defined but not used [-Werror=unused-variable]
-mach-s3c64xx/mach-smdk6410.c:327:35: error: 'smdk6410_vddhi' defined but not used [-Werror=unused-variable]
-mach-s3c64xx/mach-smdk6410.c:335:35: error: 'smdk6410_vddpll' defined but not used [-Werror=unused-variable]
-mach-s3c64xx/mach-smdk6410.c:343:35: error: 'smdk6410_vdduh_mmc' defined but not used [-Werror=unused-variable]
+Le 29/01/2016 12:41, Yunhui Cui a ?crit :
+> The qspi driver add generic fast-read mode for different
+> flash venders, including Micron family. Also add some special
+> operations for Micron flash read/write in spi-nor.c.
+> 
+> Signed-off-by: Yunhui Cui <B56489@freescale.com>
+> ---
+>  drivers/mtd/spi-nor/fsl-quadspi.c | 27 +++++++++++++++++++++------
+>  drivers/mtd/spi-nor/spi-nor.c     |  6 +++++-
+>  2 files changed, 26 insertions(+), 7 deletions(-)
+> 
+[...]
+> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+> index ed0c19c..79a025c 100644
+> --- a/drivers/mtd/spi-nor/spi-nor.c
+> +++ b/drivers/mtd/spi-nor/spi-nor.c
+> @@ -763,7 +763,8 @@ static const struct flash_info spi_nor_ids[] = {
+>  	{ "n25q064",     INFO(0x20ba17, 0, 64 * 1024,  128, SECT_4K | SPI_NOR_QUAD_READ) },
+>  	{ "n25q064a",    INFO(0x20bb17, 0, 64 * 1024,  128, SECT_4K | SPI_NOR_QUAD_READ) },
+>  	{ "n25q128a11",  INFO(0x20bb18, 0, 64 * 1024,  256, SPI_NOR_QUAD_READ) },
+> -	{ "n25q128a13",  INFO(0x20ba18, 0, 64 * 1024,  256, SPI_NOR_QUAD_READ) },
+> +	{ "n25q128a13",  INFO(0x20ba18, 0, 64 * 1024,  256, SPI_NOR_FAST |
+> +			SPI_NOR_QUAD_READ) },
+>  	{ "n25q256a",    INFO(0x20ba19, 0, 64 * 1024,  512, SECT_4K | SPI_NOR_QUAD_READ) },
+>  	{ "n25q512a",    INFO(0x20bb20, 0, 64 * 1024, 1024, SECT_4K | USE_FSR | SPI_NOR_QUAD_READ) },
+>  	{ "n25q512ax3",  INFO(0x20ba20, 0, 64 * 1024, 1024, SECT_4K | USE_FSR | SPI_NOR_QUAD_READ) },
+This modification looks wrong.
 
-This marks all regulator_init_data structures in this file as
-__maybe_unused, indicating that we don't care whether there
-are any references or not in a given configuration.
+First SPI_NOR_FAST is part of enum read_mode (from spi-nor.h) and is not
+intended to be used as a flag, unlike SPI_NOR_QUAD_READ (defined in spi-nor.c
+just below the flags field of struct flash_info).
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-s3c64xx/mach-smdk6410.c | 38 +++++++++++++++++------------------
- 1 file changed, 19 insertions(+), 19 deletions(-)
+Also, creating a new flag to choose between the Read and the Fast Read commands
+is not needed: see my last comment below.
 
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-index 8a894ee3ee76..92ec8c3b42b9 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-@@ -216,7 +216,7 @@ static struct regulator_consumer_supply smdk6410_b_pwr_5v_consumers[] = {
- 	REGULATOR_SUPPLY("AVDD", "0-001b"),
- };
- 
--static struct regulator_init_data smdk6410_b_pwr_5v_data = {
-+static struct regulator_init_data __maybe_unused smdk6410_b_pwr_5v_data = {
- 	.constraints = {
- 		.always_on = 1,
- 	},
-@@ -300,7 +300,7 @@ static struct regulator_consumer_supply smdk6410_vddarm_consumers[] = {
- };
- 
- /* VDDARM, BUCK1 on J5 */
--static struct regulator_init_data smdk6410_vddarm = {
-+static struct regulator_init_data __maybe_unused smdk6410_vddarm = {
- 	.constraints = {
- 		.name = "PVDD_ARM",
- 		.min_uV = 1000000,
-@@ -313,7 +313,7 @@ static struct regulator_init_data smdk6410_vddarm = {
- };
- 
- /* VDD_INT, BUCK2 on J5 */
--static struct regulator_init_data smdk6410_vddint = {
-+static struct regulator_init_data __maybe_unused smdk6410_vddint = {
- 	.constraints = {
- 		.name = "PVDD_INT",
- 		.min_uV = 1000000,
-@@ -324,7 +324,7 @@ static struct regulator_init_data smdk6410_vddint = {
- };
- 
- /* VDD_HI, LDO3 on J5 */
--static struct regulator_init_data smdk6410_vddhi = {
-+static struct regulator_init_data __maybe_unused smdk6410_vddhi = {
- 	.constraints = {
- 		.name = "PVDD_HI",
- 		.always_on = 1,
-@@ -332,7 +332,7 @@ static struct regulator_init_data smdk6410_vddhi = {
- };
- 
- /* VDD_PLL, LDO2 on J5 */
--static struct regulator_init_data smdk6410_vddpll = {
-+static struct regulator_init_data __maybe_unused smdk6410_vddpll = {
- 	.constraints = {
- 		.name = "PVDD_PLL",
- 		.always_on = 1,
-@@ -340,7 +340,7 @@ static struct regulator_init_data smdk6410_vddpll = {
- };
- 
- /* VDD_UH_MMC, LDO5 on J5 */
--static struct regulator_init_data smdk6410_vdduh_mmc = {
-+static struct regulator_init_data __maybe_unused smdk6410_vdduh_mmc = {
- 	.constraints = {
- 		.name = "PVDD_UH+PVDD_MMC",
- 		.always_on = 1,
-@@ -348,7 +348,7 @@ static struct regulator_init_data smdk6410_vdduh_mmc = {
- };
- 
- /* VCCM3BT, LDO8 on J5 */
--static struct regulator_init_data smdk6410_vccmc3bt = {
-+static struct regulator_init_data __maybe_unused smdk6410_vccmc3bt = {
- 	.constraints = {
- 		.name = "PVCCM3BT",
- 		.always_on = 1,
-@@ -356,7 +356,7 @@ static struct regulator_init_data smdk6410_vccmc3bt = {
- };
- 
- /* VCCM2MTV, LDO11 on J5 */
--static struct regulator_init_data smdk6410_vccm2mtv = {
-+static struct regulator_init_data __maybe_unused smdk6410_vccm2mtv = {
- 	.constraints = {
- 		.name = "PVCCM2MTV",
- 		.always_on = 1,
-@@ -364,7 +364,7 @@ static struct regulator_init_data smdk6410_vccm2mtv = {
- };
- 
- /* VDD_LCD, LDO12 on J5 */
--static struct regulator_init_data smdk6410_vddlcd = {
-+static struct regulator_init_data __maybe_unused smdk6410_vddlcd = {
- 	.constraints = {
- 		.name = "PVDD_LCD",
- 		.always_on = 1,
-@@ -372,7 +372,7 @@ static struct regulator_init_data smdk6410_vddlcd = {
- };
- 
- /* VDD_OTGI, LDO9 on J5 */
--static struct regulator_init_data smdk6410_vddotgi = {
-+static struct regulator_init_data __maybe_unused smdk6410_vddotgi = {
- 	.constraints = {
- 		.name = "PVDD_OTGI",
- 		.always_on = 1,
-@@ -380,7 +380,7 @@ static struct regulator_init_data smdk6410_vddotgi = {
- };
- 
- /* VDD_OTG, LDO14 on J5 */
--static struct regulator_init_data smdk6410_vddotg = {
-+static struct regulator_init_data __maybe_unused smdk6410_vddotg = {
- 	.constraints = {
- 		.name = "PVDD_OTG",
- 		.always_on = 1,
-@@ -388,7 +388,7 @@ static struct regulator_init_data smdk6410_vddotg = {
- };
- 
- /* VDD_ALIVE, LDO15 on J5 */
--static struct regulator_init_data smdk6410_vddalive = {
-+static struct regulator_init_data __maybe_unused smdk6410_vddalive = {
- 	.constraints = {
- 		.name = "PVDD_ALIVE",
- 		.always_on = 1,
-@@ -396,7 +396,7 @@ static struct regulator_init_data smdk6410_vddalive = {
- };
- 
- /* VDD_AUDIO, VLDO_AUDIO on J5 */
--static struct regulator_init_data smdk6410_vddaudio = {
-+static struct regulator_init_data __maybe_unused smdk6410_vddaudio = {
- 	.constraints = {
- 		.name = "PVDD_AUDIO",
- 		.always_on = 1,
-@@ -406,7 +406,7 @@ static struct regulator_init_data smdk6410_vddaudio = {
- 
- #ifdef CONFIG_SMDK6410_WM1190_EV1
- /* S3C64xx internal logic & PLL */
--static struct regulator_init_data wm8350_dcdc1_data = {
-+static struct regulator_init_data __maybe_unused wm8350_dcdc1_data = {
- 	.constraints = {
- 		.name = "PVDD_INT+PVDD_PLL",
- 		.min_uV = 1200000,
-@@ -417,7 +417,7 @@ static struct regulator_init_data wm8350_dcdc1_data = {
- };
- 
- /* Memory */
--static struct regulator_init_data wm8350_dcdc3_data = {
-+static struct regulator_init_data __maybe_unused wm8350_dcdc3_data = {
- 	.constraints = {
- 		.name = "PVDD_MEM",
- 		.min_uV = 1800000,
-@@ -437,7 +437,7 @@ static struct regulator_consumer_supply wm8350_dcdc4_consumers[] = {
- 	REGULATOR_SUPPLY("DVDD", "0-001b"),
- };
- 
--static struct regulator_init_data wm8350_dcdc4_data = {
-+static struct regulator_init_data __maybe_unused wm8350_dcdc4_data = {
- 	.constraints = {
- 		.name = "PVDD_HI+PVDD_EXT+PVDD_SYS+PVCCM2MTV",
- 		.min_uV = 3000000,
-@@ -449,7 +449,7 @@ static struct regulator_init_data wm8350_dcdc4_data = {
- };
- 
- /* OTGi/1190-EV1 HPVDD & AVDD */
--static struct regulator_init_data wm8350_ldo4_data = {
-+static struct regulator_init_data __maybe_unused wm8350_ldo4_data = {
- 	.constraints = {
- 		.name = "PVDD_OTGI+HPVDD+AVDD",
- 		.min_uV = 1200000,
-@@ -537,7 +537,7 @@ static struct wm831x_backlight_pdata wm1192_backlight_pdata = {
- 	.max_uA = 27554,
- };
- 
--static struct regulator_init_data wm1192_dcdc3 = {
-+static struct regulator_init_data __maybe_unused wm1192_dcdc3 = {
- 	.constraints = {
- 		.name = "PVDD_MEM+PVDD_GPS",
- 		.always_on = 1,
-@@ -548,7 +548,7 @@ static struct regulator_consumer_supply wm1192_ldo1_consumers[] = {
- 	REGULATOR_SUPPLY("DVDD", "0-001b"),   /* WM8580 */
- };
- 
--static struct regulator_init_data wm1192_ldo1 = {
-+static struct regulator_init_data __maybe_unused wm1192_ldo1 = {
- 	.constraints = {
- 		.name = "PVDD_LCD+PVDD_EXT",
- 		.always_on = 1,
--- 
-2.7.0
+
+> @@ -1233,6 +1234,7 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
+>  
+>  	if (JEDEC_MFR(info) == SNOR_MFR_ATMEL ||
+>  	    JEDEC_MFR(info) == SNOR_MFR_INTEL ||
+> +	    JEDEC_MFR(info) == SNOR_MFR_MICRON ||
+>  	    JEDEC_MFR(info) == SNOR_MFR_SST) {
+>  		write_enable(nor);
+>  		write_sr(nor, 0);
+This update is not related with the support of fast-read mode, it deals with
+the write protection. Hence it should be moved into a dedicated patch.
+
+Also be careful as some bits of the Status Register are non-volatile on Micron
+memories. This modification may change their values but I guess you only want
+to clear the write enable/disable (7) bit.
+
+
+> @@ -1317,6 +1319,8 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
+>  		nor->flash_read = SPI_NOR_QUAD;
+>  	} else if (mode == SPI_NOR_DUAL && info->flags & SPI_NOR_DUAL_READ) {
+>  		nor->flash_read = SPI_NOR_DUAL;
+> +	} else if (mode == SPI_NOR_FAST && info->flags & SPI_NOR_FAST) {
+> +		nor->flash_read = SPI_NOR_FAST;
+>  	}
+>  
+>  	/* Default commands */
+> 
+The spi-nor framework already checks the "m25p,fast-read" DT property to choose
+between the Read (0x03) and Fast Read (0x0b) command.
+
+So the fsl-quadspi.c driver should rely on this existing property to choose
+which of SPI_NOR_FAST or SPI_NOR_QUAD is used as the mode argument of
+spi_nor_scan(). As long as mode is neither SPI_NOR_QUAD nor SPI_NOR_DUAL, the
+choice of the read op code is done according to whether the "m25p,fast-read" DT
+property is set or not.
+
+
+Best regards,
+
+Cyrille
