@@ -1,56 +1,67 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Fri, 29 Jan 2016 16:39:03 +0800
-Subject: [PATCH 3/6] arm64: dts: hip05: Append all gicv3 ITS entries
+Date: Fri, 29 Jan 2016 16:39:04 +0800
+Subject: [PATCH 4/6] arm64: dts: hip05: Append gpio nodes
 In-Reply-To: <1454056746-5048-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1454056746-5048-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1454056746-5048-4-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1454056746-5048-5-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are four subsystems in hip05 soc, peri/m3/pcie/dsa,
-each subsystem has one its, append them under gicv3 node.
-
-They will be used by hisilicon mbigen.
+There are two dw GPIO controllers in hip05 peri sub, this patch
+adds the corresponding device tree nodes.
 
 Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- arch/arm64/boot/dts/hisilicon/hip05.dtsi | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/hisilicon/hip05.dtsi | 38 ++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-index ed31f19..c1b1a32 100644
+index c1b1a32..6319ff3 100644
 --- a/arch/arm64/boot/dts/hisilicon/hip05.dtsi
 +++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-@@ -246,11 +246,29 @@
- 		      <0x0 0xfe020000 0 0x10000>;       /* GICV */
- 		interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
- 
--		its_totems: interrupt-controller at 8c000000 {
-+		its_peri: interrupt-controller at 8c000000 {
- 			compatible = "arm,gic-v3-its";
- 			msi-controller;
- 			reg = <0x0 0x8c000000 0x0 0x40000>;
+@@ -322,5 +322,43 @@
+ 			reg-io-width = <4>;
+ 			status = "disabled";
  		};
 +
-+		its_m3: interrupt-controller at a3000000 {
-+			compatible = "arm,gic-v3-its";
-+			msi-controller;
-+			reg = <0x0 0xa3000000 0x0 0x40000>;
++		peri_gpio0: gpio at 802e0000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "snps,dw-apb-gpio";
++			reg = <0x0 0x802e0000 0x0 0x10000>;
++			status = "disabled";
++
++			porta: gpio-controller at 0 {
++				compatible = "snps,dw-apb-gpio-port";
++				gpio-controller;
++				#gpio-cells = <2>;
++				snps,nr-gpios = <32>;
++				reg = <0>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				interrupts = <GIC_SPI 312 IRQ_TYPE_LEVEL_HIGH>;
++			};
 +		};
 +
-+		its_pcie: interrupt-controller at b7000000 {
-+			compatible = "arm,gic-v3-its";
-+			msi-controller;
-+			reg = <0x0 0xb7000000 0x0 0x40000>;
-+		};
++		peri_gpio1: gpio at 802f0000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "snps,dw-apb-gpio";
++			reg = <0x0 0x802f0000 0x0 0x10000>;
++			status = "disabled";
 +
-+		its_dsa: interrupt-controller at c6000000 {
-+			compatible = "arm,gic-v3-its";
-+			msi-controller;
-+			reg = <0x0 0xc6000000 0x0 0x40000>;
++			portb: gpio-controller at 0 {
++				compatible = "snps,dw-apb-gpio-port";
++				gpio-controller;
++				#gpio-cells = <2>;
++				snps,nr-gpios = <32>;
++				reg = <0>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				interrupts = <GIC_SPI 313 IRQ_TYPE_LEVEL_HIGH>;
++			};
 +		};
  	};
- 
- 	timer {
+ };
 -- 
 2.6.0.GIT
