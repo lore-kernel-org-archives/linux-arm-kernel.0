@@ -1,64 +1,45 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 29 Jan 2016 07:18:55 +0100
-Subject: [PATCH v3 3/3] reset: Add support for shared reset controls
-In-Reply-To: <56AA7813.7080907@wwwdotorg.org>
-References: <1453918516-3078-1-git-send-email-hdegoede@redhat.com>
- <1453918516-3078-4-git-send-email-hdegoede@redhat.com>
- <56AA7813.7080907@wwwdotorg.org>
-Message-ID: <56AB044F.7090102@redhat.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 29 Jan 2016 14:18:34 +0800
+Subject: [PATCH v3 1/2] clk: sunxi: factors: Add missing recalc pointer
+ copy
+In-Reply-To: <1454008958-12655-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1454008958-12655-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v66dbtBPwRQzA3rtP5hu-0rvfaX2ac7KWRiF42wtEiafwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 01/28/2016 09:20 PM, Stephen Warren wrote:
+On Fri, Jan 29, 2016 at 3:22 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Commit 4a9b2abc213e ("clk: sunxi: factors: Support custom formulas") was
+> introducing a custom recalc function. However, the pointer was never
+> filled, which was making the whole thing unused.
 >
-> On 01/27/2016 11:15 AM, Hans de Goede wrote:
->> In some SoCs some hw-blocks share a reset control. Add support for this
->> setup by adding new:
->>
->> reset_control_get_shared()
->> devm_reset_control_get_shared()
->> devm_reset_control_get_shared_by_index()
->>
->> methods to get a reset_control. Note that this patch omits adding of_
->> variants, if these are needed later they can be easily added.
->>
->> This patch also changes the behavior of the existing exclusive
->> reset_control_get() variants, if these are now called more then once
->> for the same reset_control they will return -EBUSY. To catch existing
->> drivers triggering this error (there should not be any) a WARN_ON(1)
->> is added in this path.
->>
->> When a reset_control is shared, the behavior of reset_control_assert /
->> deassert is changed, for shared reset_controls these will work like the
->> clock-enable/disable and regulator-on/off functions. They will keep a
->> deassert_count, and only (re-)assert the reset after reset_control_assert
->> has been called as many times as reset_control_deassert was called.
->>
->> Calling reset_control_assert without first calling reset_control_deassert
->> is not allowed on a shared reset control. Calling reset_control_reset is
->> also not allowed on a shared reset control.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+(facepalm)
+
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+
+Can you squash it into the original?
+Thanks
+
+
+> ---
+>  drivers/clk/sunxi/clk-factors.c | 1 +
+>  1 file changed, 1 insertion(+)
 >
-> Hmmm. Do you have some examples of how drivers are supposed to co-ordinate use of the shared reset? Reference counting implies all the drivers need to get together and all assert and de-assert the reset in unison when some event happens. That seems difficult to co-ordinate.
-
-Right, for now this is only intended for drivers which need to de-assert the
-reset and probe time and (re-)assert it when unbound (and maybe for
-suspend / resume, in which case the driver should be able to handle the reset
-never heaving been asserted on resume). This is also why reset_control_reset
-is not supported for shared resets.
-
-I hope that we will never see a case where a reset is actually needed
-for error handling (so used outside of probe / suspend cases) and it is
-shared.
-
-> Instead, would it be better to require some central device to exclusively get the reset, and manage it. That device could then react to appropriate events to manage the reset. In this scheme, we wouldn't need the concept of shared resets at all. However, depending on why/when the reset needed to be re-asserted at run-time, this scheme wouldn't eliminate the co-ordination issue, but equally I don't believe it makes it any worse.
-
-If we ever need this kind of complexity, then yes a central service, with
-callbacks in to drivers requesting them to prepare for handling
-reset (like how usb does this) might be the best solution, but lets cross
-that bridge when we get there.
-
-Regards,
-
-Hans
+> diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+> index e480a6bcf1f6..6e97f46c0c37 100644
+> --- a/drivers/clk/sunxi/clk-factors.c
+> +++ b/drivers/clk/sunxi/clk-factors.c
+> @@ -212,6 +212,7 @@ struct clk *sunxi_factors_register(struct device_node *node,
+>         factors->reg = reg;
+>         factors->config = data->table;
+>         factors->get_factors = data->getter;
+> +       factors->recalc = data->recalc;
+>         factors->lock = lock;
+>
+>         /* Add a gate if this factor clock can be gated */
+> --
+> 2.6.4
+>
