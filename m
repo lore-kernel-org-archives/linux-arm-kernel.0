@@ -1,91 +1,50 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 29 Jan 2016 16:52:06 +0100
-Subject: [PATCH v2 2/3] ASoC: sh: fsi: Fix clock inversion
-In-Reply-To: <1421847492-8857-2-git-send-email-lars@metafoo.de>
-References: <1421847492-8857-1-git-send-email-lars@metafoo.de>
- <1421847492-8857-2-git-send-email-lars@metafoo.de>
-Message-ID: <CAMuHMdU0d83hvMhr1KyQfdms636qph4mYZ7Q+v3r7d35FHzw1A@mail.gmail.com>
+From: joshua.henderson@microchip.com (Joshua Henderson)
+Date: Fri, 29 Jan 2016 09:00:36 -0700
+Subject: [PATCH 03/15] mips: use of_platform_default_populate() to
+ populate default bus
+In-Reply-To: <1453868872-26300-4-git-send-email-wangkefeng.wang@huawei.com>
+References: <1453868872-26300-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1453868872-26300-4-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <56AB8CA4.7070803@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 21, 2015 at 2:38 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
-> According to the sh7724 hardware user manual (Rev.2.00 Jan 2013) page 1851
-> to 1856 the FSI bit-clock is inverted to the bit-clock as specified by the
-> I2S standard. This means the bit clock inversion bit should be set for a
-> normal I2S clock and should not be set for an inverted I2S clock.
->
-> Similarly when operating in left-justfied mode both the frame-clock and the
-> bit-clock need to be inverted to be standards compliant.
->
-> This means also that the exta clock inversion setting in the armadillo800eva
-> machine driver for CPU component should now be removed.
->
-> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+On 01/26/2016 09:27 PM, Kefeng Wang wrote:
+> Use helper of_platform_default_populate() in linux/of_platform
+> when possible, instead of calling of_platform_populate() with
+> the default match table.
+> 
+> Cc: Ralf Baechle <ralf@linux-mips.org>
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 > ---
-> I don't have the hardware but I'd like to get rid of the extra
-> SND_SOC_DAIFMT_IB_NF in simple-card platform data, so we can remove the fmt
-> field. Kuninori can you check if this works?
->
-> Changes since v1:
->         * Fix whitespace
-> ---
->  arch/arm/mach-shmobile/board-armadillo800eva.c | 1 -
+>  arch/mips/ath79/setup.c           | 2 +-
+>  arch/mips/jz4740/setup.c          | 2 +-
+>  arch/mips/mti-sead3/sead3-setup.c | 2 +-
+>  arch/mips/pic32/pic32mzda/init.c  | 3 +--
+>  arch/mips/pistachio/init.c        | 2 +-
+>  arch/mips/xilfpga/init.c          | 2 +-
+>  6 files changed, 6 insertions(+), 7 deletions(-)
+> 
 
-The board files are gone by now.
+[...]
 
->  sound/soc/sh/fsi.c                             | 7 +++++++
+> diff --git a/arch/mips/pic32/pic32mzda/init.c b/arch/mips/pic32/pic32mzda/init.c
+> index 775ff90..77ecf32 100644
+> --- a/arch/mips/pic32/pic32mzda/init.c
+> +++ b/arch/mips/pic32/pic32mzda/init.c
+> @@ -147,8 +147,7 @@ static int __init plat_of_setup(void)
+>  		panic("Device tree not present");
+>  
+>  	pic32_of_prepare_platform_data(pic32_auxdata_lookup);
+> -	if (of_platform_populate(NULL, of_default_bus_match_table,
+> -				 pic32_auxdata_lookup, NULL))
+> +	if (of_platform_default_populate(NULL, pic32_auxdata_lookup, NULL))
+>  		panic("Failed to populate DT");
+>  
+>  	return 0;
 
-Is this part still applicable?
+I'll one-up just compile-testing for this.
 
->  2 files changed, 7 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-> index 75de26c..36aaeb1 100644
-> --- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-> +++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-> @@ -1015,7 +1015,6 @@ static struct asoc_simple_card_info fsi_wm8978_info = {
->         .platform       = "sh_fsi2",
->         .daifmt         = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM,
->         .cpu_dai = {
-> -               .fmt    = SND_SOC_DAIFMT_IB_NF,
->                 .name   = "fsia-dai",
->         },
->         .codec_dai = {
-> diff --git a/sound/soc/sh/fsi.c b/sound/soc/sh/fsi.c
-> index b87b22e..6783d3f 100644
-> --- a/sound/soc/sh/fsi.c
-> +++ b/sound/soc/sh/fsi.c
-> @@ -1594,6 +1594,12 @@ static int fsi_dai_trigger(struct snd_pcm_substream *substream, int cmd,
->
->  static int fsi_set_fmt_dai(struct fsi_priv *fsi, unsigned int fmt)
->  {
-> +       /*
-> +        * FSI bit clock is inverted to the I2S specification, so we invert it
-> +        * when a non-inverted I2S clock was requested and vice versa.
-> +        */
-> +       fsi->bit_clk_inv = !fsi->bit_clk_inv;
-> +
->         switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
->         case SND_SOC_DAIFMT_I2S:
->                 fsi->fmt = CR_I2S;
-> @@ -1602,6 +1608,7 @@ static int fsi_set_fmt_dai(struct fsi_priv *fsi, unsigned int fmt)
->         case SND_SOC_DAIFMT_LEFT_J:
->                 fsi->fmt = CR_PCM;
->                 fsi->chan_num = 2;
-> +               fsi->lr_clk_inv = !fsi->lr_clk_inv;
->                 break;
->         default:
->                 return -EINVAL;
-> --
-> 1.8.0
+Tested-by: Joshua Henderson <joshua.henderson@microchip.com>
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+[...]
