@@ -1,111 +1,107 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 29 Jan 2016 22:35:18 +0100
-Subject: [PATCH v12 2/4] PM / Domains: add setter for dev.pm_domain
-In-Reply-To: <CAHp75Vf9TS-AxJALQjiwNjMCT8ct5SBanYzrEsV9aj=DsUw-OA@mail.gmail.com>
-References: <1452181575-9206-1-git-send-email-tomeu.vizoso@collabora.com>
- <CAHp75VdWPUZ8F5rsGn3M1e5Pgpcg1CErBej9PE_3+ZPke5CDFA@mail.gmail.com>
- <CAHp75Vf9TS-AxJALQjiwNjMCT8ct5SBanYzrEsV9aj=DsUw-OA@mail.gmail.com>
-Message-ID: <1783906.XctYjeUNLr@vostro.rjw.lan>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Fri, 29 Jan 2016 14:41:16 -0700
+Subject: [PATCH] vfio: pci: fix oops in case of
+ vfio_msi_set_vector_signal failure
+In-Reply-To: <1454078586-5431-1-git-send-email-eric.auger@linaro.org>
+References: <1454078586-5431-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <1454103676.9301.3.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 29, 2016 06:35:49 PM Andy Shevchenko wrote:
-> On Fri, Jan 29, 2016 at 5:51 PM, Andy Shevchenko
-> <andy.shevchenko@gmail.com> wrote:
-> > On Fri, Jan 29, 2016 at 5:38 PM, Andy Shevchenko
-> > <andy.shevchenko@gmail.com> wrote:
-> >> On Thu, Jan 7, 2016 at 5:46 PM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
-> >>> Adds a function that sets the pointer to dev_pm_domain in struct device
-> >>> and that warns if the device has already finished probing. The reason
-> >>> why we want to enforce that is because in the general case that can
-> >>> cause problems and also that we can simplify code quite a bit if we can
-> >>> always assume that.
-> >>>
-> >>> This patch also changes all current code that directly sets the
-> >>> dev.pm_domain pointer.
-> >>
-> >>
-> >>> --- a/drivers/acpi/acpi_lpss.c
-> >>> +++ b/drivers/acpi/acpi_lpss.c
-> >>
-> >>> @@ -875,13 +876,14 @@ static int acpi_lpss_platform_notify(struct notifier_block *nb,
-> >>>
-> >>>         switch (action) {
-> >>>         case BUS_NOTIFY_BIND_DRIVER:
-> >>> -               pdev->dev.pm_domain = &acpi_lpss_pm_domain;
-> >>> +               dev_pm_domain_set(&pdev->dev, &acpi_lpss_pm_domain);
-> >>>                 break;
-> >>>         case BUS_NOTIFY_DRIVER_NOT_BOUND:
-> >>>         case BUS_NOTIFY_UNBOUND_DRIVER:
-> >>>                 pdev->dev.pm_domain = NULL;
-> >>
-> >> Missed?
-> >>
-> >>>                 break;
-> >>>         case BUS_NOTIFY_ADD_DEVICE:
-> >>> +               dev_pm_domain_set(&pdev->dev, &acpi_lpss_pm_domain);
-> >>>                 if (pdata->dev_desc->flags & LPSS_LTR)
-> >>>                         return sysfs_create_group(&pdev->dev.kobj,
-> >>>                                                   &lpss_attr_group);
-> >>> @@ -889,6 +891,7 @@ static int acpi_lpss_platform_notify(struct notifier_block *nb,
-> >>>         case BUS_NOTIFY_DEL_DEVICE:
-> >>>                 if (pdata->dev_desc->flags & LPSS_LTR)
-> >>>                         sysfs_remove_group(&pdev->dev.kobj, &lpss_attr_group);
-> >>> +               dev_pm_domain_set(&pdev->dev, NULL);
-> >>>                 break;
-> >>>         default:
-> >>>                 break;
-> >>
-> >> This looks wrong. I didn't test yet, but I have concerns here. Why did
-> >> you add those calls?
-> >
-> >
-> > Okay, for first glance it seems working on Intel Braswell.
-> 
-> One more test unveils this one
-> 
-> # modprobe -r sdhci-acpi
-> [ 1289.909441] ------------[ cut here ]------------
-> [ 1289.918205] WARNING: CPU: 1 PID: 4374 at
-> /home/andy/prj/linux-otc/drivers/base/power/common.c:150
-> dev_pm_domain_set+0x51/0x60()
-> [ 1289.934681] PM domains can only be changed for unbound devices
-> [ 1289.944843] Modules linked in: sdhci_acpi(-) sdhci mmc_core
-> led_class [last unloaded: dw_dmac_core]
-> [ 1289.958802] CPU: 1 PID: 4374 Comm: modprobe Not tainted 4.5.0-rc1+ #3
-> [ 1289.969736]  ffffffff81c38330 ffff88007bb53d18 ffffffff8133162f
-> ffff88007bb53d60
-> [ 1289.981844]  ffff88007bb53d50 ffffffff8105cd12 ffff88017a007410
-> 0000000000000000
-> [ 1289.993996]  0000000000000001 0000000000000080 0000000000000000
-> ffff88007bb53db0
-> [ 1290.006123] Call Trace:
-> [ 1290.012600]  [<ffffffff8133162f>] dump_stack+0x44/0x55
-> [ 1290.022052]  [<ffffffff8105cd12>] warn_slowpath_common+0x82/0xc0
-> [ 1290.032462]  [<ffffffff8105cd9c>] warn_slowpath_fmt+0x4c/0x50
-> [ 1290.042589]  [<ffffffff814867c1>] dev_pm_domain_set+0x51/0x60
-> [ 1290.052695]  [<ffffffff813a62a9>] acpi_dev_pm_detach+0x3f/0x84
-> [ 1290.062910]  [<ffffffff81486747>] dev_pm_domain_detach+0x27/0x30
-> [ 1290.073294]  [<ffffffff81480188>] platform_drv_remove+0x38/0x40
-> [ 1290.083585]  [<ffffffff8147da51>] __device_release_driver+0xa1/0x160
-> [ 1290.094335]  [<ffffffff8147e5a6>] driver_detach+0xa6/0xb0
-> [ 1290.104009]  [<ffffffff8147d435>] bus_remove_driver+0x55/0xd0
-> [ 1290.114053]  [<ffffffff8147eccc>] driver_unregister+0x2c/0x50
-> [ 1290.124076]  [<ffffffff81480232>] platform_driver_unregister+0x12/0x20
-> [ 1290.134957]  [<ffffffffa003681c>] sdhci_acpi_driver_exit+0x10/0x12
-> [sdhci_acpi]
-> [ 1290.146730]  [<ffffffff810ce0e9>] SyS_delete_module+0x199/0x240
-> [ 1290.156907]  [<ffffffff8100219b>] ? exit_to_usermode_loop+0x8b/0x90
-> [ 1290.167478]  [<ffffffff81002b83>] do_syscall_32_irqs_off+0x53/0xa0
-> [ 1290.177949]  [<ffffffff818b7f9a>] entry_INT80_compat+0x2a/0x40
-> [ 1290.187986] ---[ end trace a8351c0506ee239b ]---
-> [ 1290.213855] mmc0: card 0001 removed
-> 
-> Which function is guilty?
+On Fri, 2016-01-29 at 14:43 +0000, Eric Auger wrote:
+> In case vfio_msi_set_vector_signal fails we tear down everything.
+> In the tear down loop we compare int j against unsigned start. Given
+> the arithmetic conversion I think it is converted into an unsigned and
+> becomes 0xffffffff, leading to the loop being entered again and things
+> turn bad when accessing vdev->msix[vector].vector. So let's use int
+> parameters instead.
+>?
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> ---
+> ?drivers/vfio/pci/vfio_pci_intrs.c | 4 ++--
+> ?1 file changed, 2 insertions(+), 2 deletions(-)
+>?
+> diff --git a/drivers/vfio/pci/vfio_pci_intrs.c b/drivers/vfio/pci/vfio_pci_intrs.c
+> index 3b3ba15..510c48d 100644
+> --- a/drivers/vfio/pci/vfio_pci_intrs.c
+> +++ b/drivers/vfio/pci/vfio_pci_intrs.c
+> @@ -374,8 +374,8 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
+> ?	return 0;
+> ?}
+> ?
+> -static int vfio_msi_set_block(struct vfio_pci_device *vdev, unsigned start,
+> -			??????unsigned count, int32_t *fds, bool msix)
+> +static int vfio_msi_set_block(struct vfio_pci_device *vdev, int start,
+> +			??????int count, int32_t *fds, bool msix)
+> ?{
+> ?	int i, j, ret = 0;
+> ?
 
-acpi_dev_pm_detach() calls dev_pm_domain_set() to clear the pm_domain pointer.
+Nice find, I don't think that's the only bug there though.??If @start is
+-1 (UINT32_MAX) and @count is 1, then @j gets set to -1 in the setup and
+we hit the same index dereference problem.??What if we did this instead:
 
-One might argue that this is happening too early.
+diff --git a/drivers/vfio/pci/vfio_pci_intrs.c b/drivers/vfio/pci/vfio_pci_intrs.c
+index 3b3ba15..2ae84ad 100644
+--- a/drivers/vfio/pci/vfio_pci_intrs.c
++++ b/drivers/vfio/pci/vfio_pci_intrs.c
+@@ -309,14 +309,14 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
+?				??????int vector, int fd, bool msix)
+?{
+?	struct pci_dev *pdev = vdev->pdev;
+-	int irq = msix ? vdev->msix[vector].vector : pdev->irq + vector;
+-	char *name = msix ? "vfio-msix" : "vfio-msi";
+?	struct eventfd_ctx *trigger;
+-	int ret;
++	int irq, ret;
+?
+-	if (vector >= vdev->num_ctx)
++	if (vector < 0 || vector >= vdev->num_ctx)
+?		return -EINVAL;
+?
++	irq = msix ? vdev->msix[vector].vector : pdev->irq + vector;
++
+?	if (vdev->ctx[vector].trigger) {
+?		free_irq(irq, vdev->ctx[vector].trigger);
+?		irq_bypass_unregister_producer(&vdev->ctx[vector].producer);
+@@ -328,8 +328,9 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
+?	if (fd < 0)
+?		return 0;
+?
+-	vdev->ctx[vector].name = kasprintf(GFP_KERNEL, "%s[%d](%s)",
+-					???name, vector, pci_name(pdev));
++	vdev->ctx[vector].name = kasprintf(GFP_KERNEL, "vfio-msi%s[%d](%s)",
++					???msix ? "x" : "", vector,
++					???pci_name(pdev));
+?	if (!vdev->ctx[vector].name)
+?		return -ENOMEM;
+?
+@@ -379,7 +380,7 @@ static int vfio_msi_set_block(struct vfio_pci_device *vdev, unsigned start,
+?{
+?	int i, j, ret = 0;
+?
+-	if (start + count > vdev->num_ctx)
++	if (start >= vdev->num_ctx || start + count > vdev->num_ctx)
+?		return -EINVAL;
+?
+?	for (i = 0, j = start; i < count && !ret; i++, j++) {
+@@ -388,7 +389,7 @@ static int vfio_msi_set_block(struct vfio_pci_device *vdev, unsigned start,
+?	}
+?
+?	if (ret) {
+-		for (--j; j >= start; j--)
++		for (--j; j >= 0 && j >= start; j--)
+?			vfio_msi_set_vector_signal(vdev, j, -1, msix);
+?	}
+?
 
+So we fix the problem with vfio_msi_set_vector_signal() dereferencing
+the array before it validates the index (even though it shouldn't be
+able to get there anymore), and then we do a better job of verifying
+start and count (comparing to num_ctx will use unsigned even though
+num_ctx itself is signed) and finally explicitly test the <0 case, which
+I suppose we could also do by casting start@that point (we know it's
+within the bounds of a signed integer given the previous tests).
 Thanks,
-Rafael
+
+Alex
