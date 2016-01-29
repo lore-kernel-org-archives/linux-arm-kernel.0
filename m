@@ -1,65 +1,137 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 29 Jan 2016 11:47:27 +0800
-Subject: [PATCH v10 06/21] KVM: ARM64: Add access handler for PMCEID0
- and PMCEID1 register
-In-Reply-To: <20160128203406.GI16453@hawk.localdomain>
-References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
- <1453866709-20324-7-git-send-email-zhaoshenglong@huawei.com>
- <20160128203406.GI16453@hawk.localdomain>
-Message-ID: <56AAE0CF.3050009@huawei.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Fri, 29 Jan 2016 03:58:46 +0000
+Subject: [RFC PATCH 4/6] iommu/arm-smmu: Add support for
+ IOMMU_DOMAIN_DMA in SMMUv1/SMMUv2 driver
+In-Reply-To: <56AA4FBE.6090702@arm.com>
+References: <1453872079-27140-1-git-send-email-anup.patel@broadcom.com>
+ <1453872079-27140-5-git-send-email-anup.patel@broadcom.com>
+ <56AA4FBE.6090702@arm.com>
+Message-ID: <39063E8F96E11742B35A201CC5D095B7BB2297@SJEXCHMB10.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 2016/1/29 4:34, Andrew Jones wrote:
-> On Wed, Jan 27, 2016 at 11:51:34AM +0800, Shannon Zhao wrote:
->> > From: Shannon Zhao <shannon.zhao@linaro.org>
->> > 
->> > Add access handler which gets host value of PMCEID0 or PMCEID1 when
->> > guest access these registers. Writing action to PMCEID0 or PMCEID1 is
->> > UNDEFINED.
->> > 
->> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> > ---
->> >  arch/arm64/kvm/sys_regs.c | 29 +++++++++++++++++++++++++----
->> >  1 file changed, 25 insertions(+), 4 deletions(-)
->> > 
->> > diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->> > index fc60041..06257e2 100644
->> > --- a/arch/arm64/kvm/sys_regs.c
->> > +++ b/arch/arm64/kvm/sys_regs.c
->> > @@ -492,6 +492,27 @@ static bool access_pmselr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
->> >  	return true;
->> >  }
->> >  
->> > +static bool access_pmceid(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
->> > +			  const struct sys_reg_desc *r)
->> > +{
->> > +	u64 pmceid;
->> > +
->> > +	if (!kvm_arm_pmu_v3_ready(vcpu))
->> > +		return trap_raz_wi(vcpu, p, r);
->> > +
->> > +	if (p->is_write)
->> > +		return false;
->> > +
->> > +	if (!(p->Op2 & 1))
->> > +		asm volatile("mrs %0, pmceid0_el0\n" : "=r" (pmceid));
->> > +	else
->> > +		asm volatile("mrs %0, pmceid1_el0\n" : "=r" (pmceid));
-> For migratibility concerns we may want to filter some of these events.
-> With that in mind the answer to my question in 4/21 is 'no'. Instead we
-> should pick an IMP,IDCODE,N,PMCEID0_EL0,PMCEID1_EL0 that we expect to
-> represent the least common denominator of all the platforms available
-> now, and then only expose that view to the guest. If we want to support
-> more events, and userspace requests it for the guest, then we can relax
-> the filtering (at the expense of migratibility), when the host has the
-> support.
+> -----Original Message-----
+> From: Robin Murphy [mailto:robin.murphy at arm.com]
+> Sent: 28 January 2016 22:59
+> To: Anup Patel; Catalin Marinas; Joerg Roedel; Will Deacon; Sricharan R; Linux
+> IOMMU; Linux ARM Kernel
+> Cc: Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell; Kumar Gala; Device
+> Tree; Ray Jui; Scott Branden; Vikram Prakash; Linux Kernel; bcm-kernel-
+> feedback-list
+> Subject: Re: [RFC PATCH 4/6] iommu/arm-smmu: Add support for
+> IOMMU_DOMAIN_DMA in SMMUv1/SMMUv2 driver
 > 
-As replied at patch 4, I think this could be done by the cross-cpu type
-support patches.
+> On 27/01/16 05:21, Anup Patel wrote:
+> > To allow use of large memory (> 4Gb) with 32bit devices we need to use
+> > some kind of iommu for such 32bit devices.
+> >
+> > This patch extends SMMUv1/SMMUv2 driver to support DMA domains which
+> > in-turn will allows us to use iommu based DMA mappings for 32bit devices.
+> >
+> > Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> > Reviewed-by: Ray Jui <rjui@broadcom.com>
+> > Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> > ---
+> >   drivers/iommu/arm-smmu.c | 21 ++++++++++++++++++++-
+> >   1 file changed, 20 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c index
+> > 9bdf6b2..43424fe 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -29,6 +29,7 @@
+> >   #define pr_fmt(fmt) "arm-smmu: " fmt
+> >
+> >   #include <linux/delay.h>
+> > +#include <linux/dma-iommu.h>
+> >   #include <linux/dma-mapping.h>
+> >   #include <linux/err.h>
+> >   #include <linux/interrupt.h>
+> > @@ -967,7 +968,7 @@ static struct iommu_domain
+> *arm_smmu_domain_alloc(unsigned type)
+> >   {
+> >   	struct arm_smmu_domain *smmu_domain;
+> >
+> > -	if (type != IOMMU_DOMAIN_UNMANAGED)
+> > +	if (type != IOMMU_DOMAIN_UNMANAGED && type !=
+> IOMMU_DOMAIN_DMA)
+> >   		return NULL;
+> >   	/*
+> >   	 * Allocate the domain and initialise some of its data structures.
+> > @@ -978,6 +979,12 @@ static struct iommu_domain
+> *arm_smmu_domain_alloc(unsigned type)
+> >   	if (!smmu_domain)
+> >   		return NULL;
+> >
+> > +	if (type == IOMMU_DOMAIN_DMA &&
+> > +	    iommu_get_dma_cookie(&smmu_domain->domain)) {
+> > +		kfree(smmu_domain);
+> > +		return NULL;
+> > +	}
+> > +
+> >   	mutex_init(&smmu_domain->init_mutex);
+> >   	spin_lock_init(&smmu_domain->pgtbl_lock);
+> >
+> > @@ -992,6 +999,7 @@ static void arm_smmu_domain_free(struct
+> iommu_domain *domain)
+> >   	 * Free the domain resources. We assume that all devices have
+> >   	 * already been detached.
+> >   	 */
+> > +	iommu_put_dma_cookie(domain);
+> >   	arm_smmu_destroy_domain_context(domain);
+> >   	kfree(smmu_domain);
+> >   }
+> > @@ -1361,6 +1369,16 @@ static int arm_smmu_init_platform_device(struct
+> device *dev,
+> >   	return 0;
+> >   }
+> >
+> > +int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args
+> > +*args) {
+> > +	/*
+> > +	 * Nothing to do here because SMMU is already aware of all
+> > +	 * MMU masters and their stream IDs using mmu-master attibute
+> > +	 * SMMU DT node.
+> > +	 */
+> 
+> ...but on the same hand this will also never get called if there's no "iommus"
+> property on the master. Maintaining support for existing users of the "mmu-
+> masters" binding is one thing (namely the thing that's been slowing down my
+> efforts to clean up the really hacky generic binding support I did all the DMA
+> stuff with), but having _both_ bindings in a single DT is something I don't think
+> anybody wants to see - is that how you've tested this?
 
-Thanks,
--- 
-Shannon
+We want to use iommu aware DMA mapping APIs for certain 32bit devices
+in our SoC without changing device driver of these 32bit devices
+(such as PL330). Currently, to this we have to specifiy "iommus" attribute in
+32bit device DT node. If we specify  "iommus" attribute in device DT node then
+of_iommu_configure() expects "of_xlate" callback and it will fail if this
+callback is not available.
+
+If there is a way use DMA mappings APIs for 32bit devices without having
+"of_xlate" in SMMU driver then I would prefer that approach. Suggestions??
+
+> 
+> Robin.
+> 
+> > +	return 0;
+> > +}
+> > +
+> >   static int arm_smmu_add_device(struct device *dev)
+> >   {
+> >   	struct iommu_group *group;
+> > @@ -1458,6 +1476,7 @@ static struct iommu_ops arm_smmu_ops = {
+> >   	.unmap			= arm_smmu_unmap,
+> >   	.map_sg			= default_iommu_map_sg,
+> >   	.iova_to_phys		= arm_smmu_iova_to_phys,
+> > +	.of_xlate		= arm_smmu_of_xlate,
+> >   	.add_device		= arm_smmu_add_device,
+> >   	.remove_device		= arm_smmu_remove_device,
+> >   	.device_group		= arm_smmu_device_group,
+> >
+> 
+
+Regards,
+Anup
