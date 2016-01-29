@@ -1,65 +1,91 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 29 Jan 2016 17:51:49 +0200
-Subject: [PATCH v12 2/4] PM / Domains: add setter for dev.pm_domain
-In-Reply-To: <CAHp75VdZMtm0_USuX2tiFO+O2QK8Wa+A9FDKZ=JqqGwr0SWi0g@mail.gmail.com>
-References: <1452181575-9206-1-git-send-email-tomeu.vizoso@collabora.com>
- <1452181575-9206-3-git-send-email-tomeu.vizoso@collabora.com>
- <CAHp75VdZMtm0_USuX2tiFO+O2QK8Wa+A9FDKZ=JqqGwr0SWi0g@mail.gmail.com>
-Message-ID: <CAHp75VdWPUZ8F5rsGn3M1e5Pgpcg1CErBej9PE_3+ZPke5CDFA@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 29 Jan 2016 16:52:06 +0100
+Subject: [PATCH v2 2/3] ASoC: sh: fsi: Fix clock inversion
+In-Reply-To: <1421847492-8857-2-git-send-email-lars@metafoo.de>
+References: <1421847492-8857-1-git-send-email-lars@metafoo.de>
+ <1421847492-8857-2-git-send-email-lars@metafoo.de>
+Message-ID: <CAMuHMdU0d83hvMhr1KyQfdms636qph4mYZ7Q+v3r7d35FHzw1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 29, 2016 at 5:38 PM, Andy Shevchenko
-<andy.shevchenko@gmail.com> wrote:
-> On Thu, Jan 7, 2016 at 5:46 PM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
->> Adds a function that sets the pointer to dev_pm_domain in struct device
->> and that warns if the device has already finished probing. The reason
->> why we want to enforce that is because in the general case that can
->> cause problems and also that we can simplify code quite a bit if we can
->> always assume that.
->>
->> This patch also changes all current code that directly sets the
->> dev.pm_domain pointer.
+On Wed, Jan 21, 2015 at 2:38 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
+> According to the sh7724 hardware user manual (Rev.2.00 Jan 2013) page 1851
+> to 1856 the FSI bit-clock is inverted to the bit-clock as specified by the
+> I2S standard. This means the bit clock inversion bit should be set for a
+> normal I2S clock and should not be set for an inverted I2S clock.
 >
+> Similarly when operating in left-justfied mode both the frame-clock and the
+> bit-clock need to be inverted to be standards compliant.
 >
->> --- a/drivers/acpi/acpi_lpss.c
->> +++ b/drivers/acpi/acpi_lpss.c
+> This means also that the exta clock inversion setting in the armadillo800eva
+> machine driver for CPU component should now be removed.
 >
->> @@ -875,13 +876,14 @@ static int acpi_lpss_platform_notify(struct notifier_block *nb,
->>
->>         switch (action) {
->>         case BUS_NOTIFY_BIND_DRIVER:
->> -               pdev->dev.pm_domain = &acpi_lpss_pm_domain;
->> +               dev_pm_domain_set(&pdev->dev, &acpi_lpss_pm_domain);
->>                 break;
->>         case BUS_NOTIFY_DRIVER_NOT_BOUND:
->>         case BUS_NOTIFY_UNBOUND_DRIVER:
->>                 pdev->dev.pm_domain = NULL;
+> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+> ---
+> I don't have the hardware but I'd like to get rid of the extra
+> SND_SOC_DAIFMT_IB_NF in simple-card platform data, so we can remove the fmt
+> field. Kuninori can you check if this works?
 >
-> Missed?
->
->>                 break;
->>         case BUS_NOTIFY_ADD_DEVICE:
->> +               dev_pm_domain_set(&pdev->dev, &acpi_lpss_pm_domain);
->>                 if (pdata->dev_desc->flags & LPSS_LTR)
->>                         return sysfs_create_group(&pdev->dev.kobj,
->>                                                   &lpss_attr_group);
->> @@ -889,6 +891,7 @@ static int acpi_lpss_platform_notify(struct notifier_block *nb,
->>         case BUS_NOTIFY_DEL_DEVICE:
->>                 if (pdata->dev_desc->flags & LPSS_LTR)
->>                         sysfs_remove_group(&pdev->dev.kobj, &lpss_attr_group);
->> +               dev_pm_domain_set(&pdev->dev, NULL);
->>                 break;
->>         default:
->>                 break;
->
-> This looks wrong. I didn't test yet, but I have concerns here. Why did
-> you add those calls?
+> Changes since v1:
+>         * Fix whitespace
+> ---
+>  arch/arm/mach-shmobile/board-armadillo800eva.c | 1 -
 
+The board files are gone by now.
 
-Okay, for first glance it seems working on Intel Braswell. But can
-yoyu point me out what was going on before this patch?
+>  sound/soc/sh/fsi.c                             | 7 +++++++
 
--- 
-With Best Regards,
-Andy Shevchenko
+Is this part still applicable?
+
+>  2 files changed, 7 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+> index 75de26c..36aaeb1 100644
+> --- a/arch/arm/mach-shmobile/board-armadillo800eva.c
+> +++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+> @@ -1015,7 +1015,6 @@ static struct asoc_simple_card_info fsi_wm8978_info = {
+>         .platform       = "sh_fsi2",
+>         .daifmt         = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM,
+>         .cpu_dai = {
+> -               .fmt    = SND_SOC_DAIFMT_IB_NF,
+>                 .name   = "fsia-dai",
+>         },
+>         .codec_dai = {
+> diff --git a/sound/soc/sh/fsi.c b/sound/soc/sh/fsi.c
+> index b87b22e..6783d3f 100644
+> --- a/sound/soc/sh/fsi.c
+> +++ b/sound/soc/sh/fsi.c
+> @@ -1594,6 +1594,12 @@ static int fsi_dai_trigger(struct snd_pcm_substream *substream, int cmd,
+>
+>  static int fsi_set_fmt_dai(struct fsi_priv *fsi, unsigned int fmt)
+>  {
+> +       /*
+> +        * FSI bit clock is inverted to the I2S specification, so we invert it
+> +        * when a non-inverted I2S clock was requested and vice versa.
+> +        */
+> +       fsi->bit_clk_inv = !fsi->bit_clk_inv;
+> +
+>         switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
+>         case SND_SOC_DAIFMT_I2S:
+>                 fsi->fmt = CR_I2S;
+> @@ -1602,6 +1608,7 @@ static int fsi_set_fmt_dai(struct fsi_priv *fsi, unsigned int fmt)
+>         case SND_SOC_DAIFMT_LEFT_J:
+>                 fsi->fmt = CR_PCM;
+>                 fsi->chan_num = 2;
+> +               fsi->lr_clk_inv = !fsi->lr_clk_inv;
+>                 break;
+>         default:
+>                 return -EINVAL;
+> --
+> 1.8.0
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
