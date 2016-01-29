@@ -1,82 +1,89 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 29 Jan 2016 16:50:46 +0000
-Subject: [RESEND PATCH v2] ARM: debug: add support for Palmchip BK-310x
- UART
-In-Reply-To: <56AB96D4.9040202@sigmadesigns.com> (Marc Gonzalez's message of
- "Fri, 29 Jan 2016 17:44:04 +0100")
-References: <569CA203.6050001@sigmadesigns.com> <7h60yfn9c6.fsf@baylibre.com>
- <yw1x1t93lukj.fsf@unicorn.mansr.com>
- <56AB96D4.9040202@sigmadesigns.com>
-Message-ID: <yw1xtwlwib2x.fsf@unicorn.mansr.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Fri, 29 Jan 2016 17:53:33 +0100
+Subject: [PATCH] crypto: atmel-aes - remove calls of clk_prepare() from atomic
+ contexts
+Message-ID: <f8f0ac52fcfbbef5cbddb2a189128b253df7d678.1454086302.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+clk_prepare()/clk_unprepare() must not be called within atomic context.
 
-> On 27/01/2016 01:44, M?ns Rullg?rd wrote:
->
->> Kevin Hilman <khilman@baylibre.com> writes:
->> 
->>> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
->>>
->>>> From: Mans Rullgard <mans@mansr.com>
->>>>
->>>> Some SoCs use a Palmchip BK-310x UART which is mostly 16550 compatible
->>>> but with a different register layout.
->>>
->>> ... because UART register layout is where we really need innovation. ;)
->>>
->>>> While this UART has previously
->>>> only been supported in MIPS based chips (Alchemy, Ralink), the ARM based
->>>> SMP87xx series from Sigma Designs also uses it.
->>>>
->>>> This patch allows the debug console to work with this type of UART.
->>>>
->>>> Signed-off-by: Mans Rullgard <mans@mansr.com>
->>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->>>
->>> It appears this was previously acked by Arnd also?
->>> https://lkml.org/lkml/2015/11/9/116
->>>
->>>> ---
->>>> Peter, this is the patch I've been using on Tango for earlyprintk support.
->>>> arm-soc, this is just the Nov 8 patch with my Signed-off-by tag.
->>>> ---
->>>>  arch/arm/Kconfig.debug            |  9 +++++++++
->>>>  arch/arm/include/debug/palmchip.S | 11 +++++++++++
->>>>  2 files changed, 20 insertions(+)
->>>>  create mode 100644 arch/arm/include/debug/palmchip.S
->>>>
->>>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->>>> index 259c0ca9c99a..708aa9150c00 100644
->>>> --- a/arch/arm/Kconfig.debug
->>>> +++ b/arch/arm/Kconfig.debug
->>>> @@ -1304,6 +1304,7 @@ config DEBUG_SIRFSOC_UART
->>>>  config DEBUG_LL_INCLUDE
->>>>  	string
->>>>  	default "debug/sa1100.S" if DEBUG_SA1100
->>>> +	default "debug/palmchip.S" if DEBUG_UART_8250_PALMCHIP
->>>
->>> minor nit: We're trying (not always with great success) to keep various
->>> parts of this file sorted alphanumerically.  Can you please insert the
->>> new entries accordingly?
->> 
->> It has to precede the regular 8250 entry so as to take precedence over
->> that.
->
-> <confused> Are you all talking about these 2 lines:
->
-> 	default "debug/palmchip.S" if DEBUG_UART_8250_PALMCHIP
-> 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
->
-> default "debug/palmchip.S" is supposed to come before default "debug/8250.S" ?
->
-> Because, in my config, there is no DEBUG_LL_UART_8250 to be seen, and
-> # CONFIG_DEBUG_UART_8250 is not set
+This patch calls clk_prepare() once for all from atmel_aes_probe() and
+clk_unprepare() from atmel_aes_remove().
 
-CONFIG_DEBUG_LL_UART_8250=y here.  In fact DEBUG_UART_8250_PALMCHIP
-depends on "DEBUG_LL_UART_8250 || DEBUG_UART_8250" so one of those
-*must* be set for any of this to matter.
+Then calls of clk_prepare_enable()/clk_disable_unprepare() were replaced
+by calls of clk_enable()/clk_disable().
 
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Reported-by: Matthias Mayr <matthias.mayr@student.kit.edu>
+---
+ drivers/crypto/atmel-aes.c | 16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
+index 6dd3317ca365..3eb3f1279fb7 100644
+--- a/drivers/crypto/atmel-aes.c
++++ b/drivers/crypto/atmel-aes.c
+@@ -400,7 +400,7 @@ static int atmel_aes_hw_init(struct atmel_aes_dev *dd)
+ {
+ 	int err;
+ 
+-	err = clk_prepare_enable(dd->iclk);
++	err = clk_enable(dd->iclk);
+ 	if (err)
+ 		return err;
+ 
+@@ -430,7 +430,7 @@ static int atmel_aes_hw_version_init(struct atmel_aes_dev *dd)
+ 
+ 	dev_info(dd->dev, "version: 0x%x\n", dd->hw_version);
+ 
+-	clk_disable_unprepare(dd->iclk);
++	clk_disable(dd->iclk);
+ 	return 0;
+ }
+ 
+@@ -448,7 +448,7 @@ static inline bool atmel_aes_is_encrypt(const struct atmel_aes_dev *dd)
+ 
+ static inline int atmel_aes_complete(struct atmel_aes_dev *dd, int err)
+ {
+-	clk_disable_unprepare(dd->iclk);
++	clk_disable(dd->iclk);
+ 	dd->flags &= ~AES_FLAGS_BUSY;
+ 
+ 	if (dd->is_async)
+@@ -2091,10 +2091,14 @@ static int atmel_aes_probe(struct platform_device *pdev)
+ 		goto res_err;
+ 	}
+ 
+-	err = atmel_aes_hw_version_init(aes_dd);
++	err = clk_prepare(aes_dd->iclk);
+ 	if (err)
+ 		goto res_err;
+ 
++	err = atmel_aes_hw_version_init(aes_dd);
++	if (err)
++		goto iclk_unprepare;
++
+ 	atmel_aes_get_cap(aes_dd);
+ 
+ 	err = atmel_aes_buff_init(aes_dd);
+@@ -2127,6 +2131,8 @@ err_algs:
+ err_aes_dma:
+ 	atmel_aes_buff_cleanup(aes_dd);
+ err_aes_buff:
++iclk_unprepare:
++	clk_unprepare(aes_dd->iclk);
+ res_err:
+ 	tasklet_kill(&aes_dd->done_task);
+ 	tasklet_kill(&aes_dd->queue_task);
+@@ -2155,6 +2161,8 @@ static int atmel_aes_remove(struct platform_device *pdev)
+ 	atmel_aes_dma_cleanup(aes_dd);
+ 	atmel_aes_buff_cleanup(aes_dd);
+ 
++	clk_unprepare(aes_dd->iclk);
++
+ 	return 0;
+ }
+ 
 -- 
-M?ns Rullg?rd
+1.8.2.2
