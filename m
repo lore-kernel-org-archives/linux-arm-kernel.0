@@ -1,122 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Jan 2016 12:39:11 +0100
-Subject: [PATCH v2 3/7] net: hp100: remove unnecessary #ifdefs
+Date: Fri, 29 Jan 2016 12:39:15 +0100
+Subject: [PATCH v2 7/7] net: tg3: avoid uninitialized variable warning
 In-Reply-To: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
 References: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
-Message-ID: <1454067557-3546883-4-git-send-email-arnd@arndb.de>
+Message-ID: <1454067557-3546883-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building the hp100 ethernet driver causes warnings when both the PCI
-and EISA drivers are disabled:
+The tg3_set_eeprom() function correctly initializes the 'start' variable,
+but gcc generates a false warning:
 
-ethernet/hp/hp100.c: In function 'hp100_module_init':
-ethernet/hp/hp100.c:3047:2: warning: label 'out3' defined but not used [-Wunused-label]
-ethernet/hp/hp100.c: At top level:
-ethernet/hp/hp100.c:2828:13: warning: 'cleanup_dev' defined but not used [-Wunused-function]
+drivers/net/ethernet/broadcom/tg3.c: In function 'tg3_set_eeprom':
+drivers/net/ethernet/broadcom/tg3.c:12057:4: warning: 'start' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
-We can easily avoid the warnings and make the driver look slightly
-nicer by removing the #ifdefs that check for the CONFIG_PCI and
-CONFIG_EISA, as all the registration functions are designed to
-have no effect when the buses are disabled.
+I have not come up with a way to restructure the code in a way that
+avoids the warning without making it less readable, so this adds an
+initialization for the declaration to shut up that warning.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/net/ethernet/hp/hp100.c | 18 ------------------
- 1 file changed, 18 deletions(-)
+ drivers/net/ethernet/broadcom/tg3.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/hp/hp100.c b/drivers/net/ethernet/hp/hp100.c
-index 1d5c3e16d8f4..3daf2d4a7ca0 100644
---- a/drivers/net/ethernet/hp/hp100.c
-+++ b/drivers/net/ethernet/hp/hp100.c
-@@ -194,7 +194,6 @@ static const char *hp100_isa_tbl[] = {
- };
- #endif
+diff --git a/drivers/net/ethernet/broadcom/tg3.c b/drivers/net/ethernet/broadcom/tg3.c
+index 9293675df7ba..49eea8981332 100644
+--- a/drivers/net/ethernet/broadcom/tg3.c
++++ b/drivers/net/ethernet/broadcom/tg3.c
+@@ -12016,7 +12016,7 @@ static int tg3_set_eeprom(struct net_device *dev, struct ethtool_eeprom *eeprom,
+ 	int ret;
+ 	u32 offset, len, b_offset, odd_len;
+ 	u8 *buf;
+-	__be32 start, end;
++	__be32 start = 0, end;
  
--#ifdef CONFIG_EISA
- static struct eisa_device_id hp100_eisa_tbl[] = {
- 	{ "HWPF180" }, /* HP J2577 rev A */
- 	{ "HWP1920" }, /* HP 27248B */
-@@ -205,9 +204,7 @@ static struct eisa_device_id hp100_eisa_tbl[] = {
- 	{ "" }	       /* Mandatory final entry ! */
- };
- MODULE_DEVICE_TABLE(eisa, hp100_eisa_tbl);
--#endif
- 
--#ifdef CONFIG_PCI
- static const struct pci_device_id hp100_pci_tbl[] = {
- 	{PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_J2585A, PCI_ANY_ID, PCI_ANY_ID,},
- 	{PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_J2585B, PCI_ANY_ID, PCI_ANY_ID,},
-@@ -219,7 +216,6 @@ static const struct pci_device_id hp100_pci_tbl[] = {
- 	{}			/* Terminating entry */
- };
- MODULE_DEVICE_TABLE(pci, hp100_pci_tbl);
--#endif
- 
- static int hp100_rx_ratio = HP100_DEFAULT_RX_RATIO;
- static int hp100_priority_tx = HP100_DEFAULT_PRIORITY_TX;
-@@ -2842,7 +2838,6 @@ static void cleanup_dev(struct net_device *d)
- 	free_netdev(d);
- }
- 
--#ifdef CONFIG_EISA
- static int hp100_eisa_probe(struct device *gendev)
- {
- 	struct net_device *dev = alloc_etherdev(sizeof(struct hp100_private));
-@@ -2884,9 +2879,7 @@ static struct eisa_driver hp100_eisa_driver = {
- 		.remove  = hp100_eisa_remove,
-         }
- };
--#endif
- 
--#ifdef CONFIG_PCI
- static int hp100_pci_probe(struct pci_dev *pdev,
- 			   const struct pci_device_id *ent)
- {
-@@ -2955,7 +2948,6 @@ static struct pci_driver hp100_pci_driver = {
- 	.probe		= hp100_pci_probe,
- 	.remove		= hp100_pci_remove,
- };
--#endif
- 
- /*
-  *  module section
-@@ -3032,23 +3024,17 @@ static int __init hp100_module_init(void)
- 	err = hp100_isa_init();
- 	if (err && err != -ENODEV)
- 		goto out;
--#ifdef CONFIG_EISA
- 	err = eisa_driver_register(&hp100_eisa_driver);
- 	if (err && err != -ENODEV)
- 		goto out2;
--#endif
--#ifdef CONFIG_PCI
- 	err = pci_register_driver(&hp100_pci_driver);
- 	if (err && err != -ENODEV)
- 		goto out3;
--#endif
-  out:
- 	return err;
-  out3:
--#ifdef CONFIG_EISA
- 	eisa_driver_unregister (&hp100_eisa_driver);
-  out2:
--#endif
- 	hp100_isa_cleanup();
- 	goto out;
- }
-@@ -3057,12 +3043,8 @@ static int __init hp100_module_init(void)
- static void __exit hp100_module_exit(void)
- {
- 	hp100_isa_cleanup();
--#ifdef CONFIG_EISA
- 	eisa_driver_unregister (&hp100_eisa_driver);
--#endif
--#ifdef CONFIG_PCI
- 	pci_unregister_driver (&hp100_pci_driver);
--#endif
- }
- 
- module_init(hp100_module_init)
+ 	if (tg3_flag(tp, NO_NVRAM) ||
+ 	    eeprom->magic != TG3_EEPROM_MAGIC)
 -- 
 2.7.0
