@@ -1,44 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Jan 2016 23:15:34 +0000
-Subject: [linux-review:James-Hogan/kbuild-Remove-stale-asm-generic-wrappers/20160119-183642]
- d979f99e9cc14e2667e9b6e268db695977e4197a BUILD DONE
-In-Reply-To: <4727572.ddrMioV3Fi@wuerfel>
-References: <569e1dbb.MgLv8OaZwklOxxtU%fengguang.wu@intel.com>
- <19656457.qoKNGRmV4Q@wuerfel>
- <CAMuHMdW1_of2Dw29=8VdhD0hstgvTh-CfATdLAiu5ZrwRRP77Q@mail.gmail.com>
- <4727572.ddrMioV3Fi@wuerfel>
-Message-ID: <20160129231534.GT10826@n2100.arm.linux.org.uk>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Fri, 29 Jan 2016 18:19:11 -0500
+Subject: [PATCH v7 0/7] ARM: dts: Add Advantech board support
+Message-ID: <1454109558-22800-1-git-send-email-akshay.bhat@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 29, 2016 at 10:54:02PM +0100, Arnd Bergmann wrote:
-> Now that I think about it, I guess platforms that use values above
-> 0xfee00000 can also easily get into trouble as that conflicts with the
-> PCI I/O space, the fixmap or other special areas documented in
-> Documentation/arm/memory.txt. We have a bunch of those:
-> 
->         default 0xfee003f8 if DEBUG_FOOTBRIDGE_COM1
->         default 0xfee20000 if DEBUG_NSPIRE_CLASSIC_UART || DEBUG_NSPIRE_CX_UART
->         default 0xfee82340 if ARCH_IOP13XX
->         default 0xfef00000 if ARCH_IXP4XX && !CPU_BIG_ENDIAN
->         default 0xfef00003 if ARCH_IXP4XX && CPU_BIG_ENDIAN
->         default 0xfef36000 if DEBUG_HIGHBANK_UART
->         default 0xfefb0000 if DEBUG_OMAP1UART1 || DEBUG_OMAP7XXUART1
->         default 0xfefb0800 if DEBUG_OMAP1UART2 || DEBUG_OMAP7XXUART2
->         default 0xfefb9800 if DEBUG_OMAP1UART3 || DEBUG_OMAP7XXUART3
->         default 0xfefff700 if ARCH_IOP33X
->         default 0xff003000 if DEBUG_U300_UART
->         default 0xffd01000 if DEBUG_HIP01_UART
-> 
-> The HIP01 is the only one that looks actively dangerous here (clashes with
-> fixmap), the others are probably all fine but it would be nice to stay out
-> of that area completely.
+This series aims to add Advantech BA-16 module (iMX6 based) and GE board support.
 
-That's wrong.  Given it's PCI bus architecture and it's IO space, at least
-one of those above is perfectly valid.  0x3f8 into IO space might ring a
-bell... if not the COM1 certainly should. :)
+This series has been tested against linux-next tag next-20160128.
+
+Modifications:
+v6->v7:
+- BA16:
+Use hypen instead of underscore in node names
+Update backlight control pin as per final schematics
+Remove unused clk24m node
+Use wakeup-source instead of enable-sdio-wakeup
+- Bx50v3:
+Use hypen instead of underscore in node names
+Use newline between node property and sub-node
+Update i2c mux labels to make naming more explicit
+Use wakeup-source instead of enable-sdio-wakeup
+- B450v3, B650v3
+Use hypen instead of underscore in node names
+Remove panel_lvds1 as per final schematics 
+- B850v3:
+Use hypen instead of underscore in node names
+Update i2c mux labels to make naming more explicit
+Remove unused ads7830_2 label
+
+History:
+--------
+[v1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/381872.html
+[v2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/383276.html
+[v3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/384202.html
+[v4]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390373.html
+[v5]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390788.html
+[v6]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/396131.html
+
+Akshay Bhat (5):
+  of: Add vendor prefix for Advantech Corporation
+  of: Add vendor prefix for General Electric Company
+  ARM: dts: imx: Add support for Advantech/GE B450v3
+  ARM: dts: imx: Add support for Advantech/GE B650v3
+  ARM: dts: imx: Add support for Advantech/GE B850v3
+
+Justin Waters (2):
+  ARM: dts: imx: Add Advantech BA-16 Qseven module
+  ARM: dts: imx: Add support for Advantech/GE Bx50v3
+
+ .../devicetree/bindings/vendor-prefixes.txt        |   2 +
+ arch/arm/boot/dts/Makefile                         |   3 +
+ arch/arm/boot/dts/imx6q-b450v3.dts                 |  88 +++
+ arch/arm/boot/dts/imx6q-b650v3.dts                 |  88 +++
+ arch/arm/boot/dts/imx6q-b850v3.dts                 | 157 +++++
+ arch/arm/boot/dts/imx6q-ba16.dtsi                  | 633 +++++++++++++++++++++
+ arch/arm/boot/dts/imx6q-bx50v3.dtsi                | 239 ++++++++
+ 7 files changed, 1210 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-b450v3.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-b650v3.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-b850v3.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-ba16.dtsi
+ create mode 100644 arch/arm/boot/dts/imx6q-bx50v3.dtsi
 
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.0
