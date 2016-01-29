@@ -1,94 +1,145 @@
-From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Fri, 29 Jan 2016 21:11:10 +0800
-Subject: [PATCH v10 07/21] KVM: ARM64: PMU: Add perf event map and
- introduce perf event creating function
-In-Reply-To: <20160129101812.GB4541@arm.com>
-References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
- <1453866709-20324-8-git-send-email-zhaoshenglong@huawei.com>
- <20160128163115.GC3807@hawk.localdomain> <56AA45B0.3060205@arm.com>
- <20160128180638.GO775@arm.com> <56AB0617.5060902@huawei.com>
- <20160129101812.GB4541@arm.com>
-Message-ID: <56AB64EE.5080305@linaro.org>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Fri, 29 Jan 2016 21:15:32 +0800
+Subject: [RFC 3/3] CMDQ: Mediatek CMDQ driver
+In-Reply-To: <1454070262.7401.21.camel@mtksdaap41>
+References: <1453266881-16849-1-git-send-email-hs.liao@mediatek.com>
+ <1453266881-16849-4-git-send-email-hs.liao@mediatek.com>
+ <CAGS+omBjD1pXKY_6bFbiGxa5bttvqg5zEvKevzSfoiMOy7ys6Q@mail.gmail.com>
+ <1454053150.32413.52.camel@mtksdaap41>
+ <CAGS+omBrEE21Xxh8hjcf32qfHJE0jJYvxGP6L1ihS6jcNbLvLQ@mail.gmail.com>
+ <1454070262.7401.21.camel@mtksdaap41>
+Message-ID: <CAGS+omBhs7Ks7MVDsxHBBUdgF+0fmAa465HwvNiCzEe97Knt3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2016/1/29 18:18, Will Deacon wrote:
-> On Fri, Jan 29, 2016 at 02:26:31PM +0800, Shannon Zhao wrote:
+On Fri, Jan 29, 2016 at 8:24 PM, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
+> On Fri, 2016-01-29 at 16:42 +0800, Daniel Kurtz wrote:
+>> On Fri, Jan 29, 2016 at 3:39 PM, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
+>> > Hi Dan,
+>> >
+>> > Many thanks for your comments and time.
+>> > I reply my plan inline.
 >> >
 >> >
->> >On 2016/1/29 2:06, Will Deacon wrote:
->>> > >On Thu, Jan 28, 2016 at 04:45:36PM +0000, Marc Zyngier wrote:
->>>>> > >> >On 28/01/16 16:31, Andrew Jones wrote:
->>>>>>> > >>> > >On Wed, Jan 27, 2016 at 11:51:35AM +0800, Shannon Zhao wrote:
->>>>>>>>> > >>>> > >>From: Shannon Zhao<shannon.zhao@linaro.org>
->>>>>>>>> > >>>> > >>
->>>>>>>>> > >>>> > >>When we use tools like perf on host, perf passes the event type and the
->>>>>>>>> > >>>> > >>id of this event type category to kernel, then kernel will map them to
->>>>>>>>> > >>>> > >>hardware event number and write this number to PMU PMEVTYPER<n>_EL0
->>>>>>>>> > >>>> > >>register. When getting the event number in KVM, directly use raw event
->>>>>>>>> > >>>> > >>type to create a perf_event for it.
->>>>>>>>> > >>>> > >>
->>>>>>>>> > >>>> > >>Signed-off-by: Shannon Zhao<shannon.zhao@linaro.org>
->>>>>>>>> > >>>> > >>Reviewed-by: Marc Zyngier<marc.zyngier@arm.com>
->>>>>>>>> > >>>> > >>---
->>>>>>>>> > >>>> > >>  arch/arm64/include/asm/pmu.h |   3 ++
->>>>>>>>> > >>>> > >>  arch/arm64/kvm/Makefile      |   1 +
->>>>>>>>> > >>>> > >>  include/kvm/arm_pmu.h        |  10 ++++
->>>>>>>>> > >>>> > >>  virt/kvm/arm/pmu.c           | 122 +++++++++++++++++++++++++++++++++++++++++++
->>>>>>>>> > >>>> > >>  4 files changed, 136 insertions(+)
->>>>>>>>> > >>>> > >>  create mode 100644 virt/kvm/arm/pmu.c
->>>>>>>>> > >>>> > >>
->>>>>>>>> > >>>> > >>diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
->>>>>>>>> > >>>> > >>index 4406184..2588f9c 100644
->>>>>>>>> > >>>> > >>--- a/arch/arm64/include/asm/pmu.h
->>>>>>>>> > >>>> > >>+++ b/arch/arm64/include/asm/pmu.h
->>>>>>>>> > >>>> > >>@@ -21,6 +21,7 @@
->>>>>>>>> > >>>> > >>
->>>>>>>>> > >>>> > >>  #define ARMV8_MAX_COUNTERS      32
->>>>>>>>> > >>>> > >>  #define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
->>>>>>>>> > >>>> > >>+#define ARMV8_CYCLE_IDX         (ARMV8_MAX_COUNTERS - 1)
->>>>>>> > >>> > >
->>>>>>> > >>> > >I'm not sure we want to add this. It's name is wrong, as it's really
->>>>>>> > >>> > >PMCNTENSET_EL0.C, and just a few lines above we have the idx defined
->>>>>>> > >>> > >already (ARMV8_IDX_CYCLE_COUNTER), but as zero, because
->>>>>>> > >>> > >arch/arm64/kernel/perf_event.c maps it that way.
->>>>>>> > >>> > >
->>>>>>> > >>> > >I think we should do the same with the pmc array, i.e. map the cycle
->>>>>>> > >>> > >counter to idx zero.
->>>>> > >> >
->>>>> > >> >I tend to have the opposite view. Not for the sake of it, but because I
->>>>> > >> >find it helpful to directly map the code to the architecture
->>>>> > >> >documentation without having to bend another handful of neurons.
->>>>> > >> >
->>>>> > >> >Will probably had some good reasons to structure it that way, but I
->>>>> > >> >don't know the rational. Will?
->>> > >It was years ago, but I suspect that the cycle counter is index zero
->>> > >because its mandated, whilst the number of event counters is IMPDEF.
+>> > On Thu, 2016-01-28 at 12:49 +0800, Daniel Kurtz wrote:
+>> >> Hi HS,
+>> >>
+>> >> Sorry for the delay.  It is hard to find time to review a >3700 line
+>> >> driver :-o in detail....
+>> >>
+>> >> Some review comments inline, although I still do not completely
+>> >> understand how all that this driver does and how it works.
+>> >> I'll try to find time to go through this driver in detail again next
+>> >> time you post it for review.
+>> >>
+>> >> On Tue, Jan 19, 2016 at 9:14 PM,  <hs.liao@mediatek.com> wrote:
+>> >> > From: HS Liao <hs.liao@mediatek.com>
+>> >> >
+>> >> > This patch is first version of Mediatek Command Queue(CMDQ) driver. The
+>> >> > CMDQ is used to help read/write registers with critical time limitation,
+>> >> > such as updating display configuration during the vblank. It controls
+>> >> > Global Command Engine (GCE) hardware to achieve this requirement.
+>> >> > Currently, CMDQ only supports display related hardwares, but we expect
+>> >> > it can be extended to other hardwares for future requirements.
+>> >> >
+>> >> > Signed-off-by: HS Liao <hs.liao@mediatek.com>
+>> >>
+>> >> [snip]
+>> >>
+>> >> > diff --git a/drivers/soc/mediatek/mtk-cmdq.c b/drivers/soc/mediatek/mtk-cmdq.c
+>> >> > new file mode 100644
+>> >> > index 0000000..7570f00
+>> >> > --- /dev/null
+>> >> > +++ b/drivers/soc/mediatek/mtk-cmdq.c
+>
+> [snip]
+>
+>> >> > +static const struct cmdq_subsys g_subsys[] = {
+>> >> > +       {0x1400, 1, "MMSYS"},
+>> >> > +       {0x1401, 2, "DISP"},
+>> >> > +       {0x1402, 3, "DISP"},
+>> >>
+>> >> This isn't going to scale.  These addresses could be different on
+>> >> different chips.
+>> >> Instead of a static table like this, we probably need specify to the
+>> >> connection between gce and other devices via devicetree phandles, and
+>> >> then use the phandles to lookup the corresponding device address
+>> >> range.
 >> >
->> >Since PMCNTENSET/CLR, PMINTENSET/CLR, PMOVSSET/CLR and PMSWINC are using
->> >bit 31 to stands the state of cycle counter, if we make cycle counter
->> >index to zero, we always need to do translation between the idx and bit
->> >31 when we access these registers.
-> Conversely, if you stick the cycle counter right at the top, then you'll
-> need to rework a bunch of the perf code that iterates from
-> ARMV7_IDX_COUNTER0 to pmu->num_events.
+>> > I will define them in device tree.
+>> > E.g.
+>> > cmdq {
+>> >   reg_domain = 0x14000000, 0x14010000, 0x14020000
+>> > }
+>>
+>> The devicetree should only model hardware relationships, not software
+>> considerations.
+>>
+>> Is the hardware constraint here for using gce with various other
+>> hardware blocks?  I think we already model this by only providing a
+>> gce phandle in the device tree nodes for those devices that can use
+>> gce.
+>>
+>> Looking at the driver closer, as far as I can tell, the whole subsys
+>> concept is a purely software abstraction, and only used to debug the
+>> CMDQ_CODE_WRITE command.  In fact, AFAICT, everything would work fine
+>> if we just completely removed the 'subsys' concept, and just passed
+>> through the raw address provided by the driver.
+>>
+>> So, I recommend just removing 'subsys' completely from the driver -
+>> from this array, and in the masks.
+>>
+>> Instead, if there is an error on the write command, just print the
+>> address that fails.  There are other ways to deduce the subsystem from
+>> a physical address.
+>>
+>> Thanks,
+>>
+>> -Dan
+>
+> Hi Dan,
+>
+> Subsys is not just for debug.
+> Its main purpose is to transfer CPU address to GCE address.
+> Let me explain it by "write" op,
+> I list a code segment from cmdq_rec_append_command().
+>
+>         case CMDQ_CODE_WRITE:
+>                 subsys = cmdq_subsys_from_phys_addr(cqctx, arg_a);
+>                 if (subsys < 0) {
+>                         dev_err(dev,
+>                                 "unsupported memory base address 0x%08x\n",
+>                                 arg_a);
+>                         return -EFAULT;
+>                 }
+>
+>                 *cmd_ptr++ = arg_b;
+>                 *cmd_ptr++ = (CMDQ_CODE_WRITE << CMDQ_OP_CODE_SHIFT) |
+>                              (arg_a & CMDQ_ARG_A_WRITE_MASK) |
+>                              ((subsys & CMDQ_SUBSYS_MASK) << CMDQ_SUBSYS_SHIFT);
+>                 break;
+>
+> Subsys is mapped from physical address via cmdq_subsys_from_phys_addr(),
+> and then it becomes part of GCE command via ((subsys & CMDQ_SUBSYS_MASK)
+> << CMDQ_SUBSYS_SHIFT) .
+> Only low bits of physical address are the same as GCE address.
+> We can get it by (arg_a & CMDQ_ARG_A_WRITE_MASK).
+> MASK is used to define how many bits are valid for this op.
+> So, GCE address = subsys + valid low bits.
 
-But actually this doesn't affect the perf code now because it's just a 
-internal PMC array index of kvm arm guest pmu codes.
-And having a look at the ARMv8 SPEC, it says
-"
-PMCCFILTR_EL0 can also be accessed by using PMXEVTYPER_EL0 with 
-PMSELR_EL0.SEL set to 0b11111.
-"
-Apparently it treats the index of cycle counter as 31 not zero. Also 
-regarding the PMCR.N field my understanding is that it just stands the 
-number of counters not the counter's order or index. Looking at the 
-description of PMSEL.SEL field, it says "This field can take any value 
-from 0 (0b00000) to (PMCR.N)-1, or 31 (0b11111)." while it's not "This 
-field can take any value from 1 (0b00001) to (PMCR.N), or 0."
+How are these upper bits of the "GCE address" defined?
+In other words, for a given SoC, how is the mapping between physical
+io addresses to GCE addresses defined?
+Is this mapping fixed by hardware?
+Does it vary for different SoCs?
 
-Thanks,
--- 
-Shannon
+-Dan
+
+> That's why we need to know the mapping between the range of physical
+> address and subsys.
+> Please guide us a better way to code such requirement.
+> Thanks for your help.
+>
+> Thanks,
+> HS Liao
+>
