@@ -1,89 +1,111 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Fri, 29 Jan 2016 17:53:33 +0100
-Subject: [PATCH] crypto: atmel-aes - remove calls of clk_prepare() from atomic
- contexts
-Message-ID: <f8f0ac52fcfbbef5cbddb2a189128b253df7d678.1454086302.git.cyrille.pitchen@atmel.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 29 Jan 2016 09:58:03 -0700
+Subject: [PATCH V5 05/14] soc: tegra: pmc: Wait for powergate state to
+ change
+In-Reply-To: <1453998832-27383-6-git-send-email-jonathanh@nvidia.com>
+References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
+ <1453998832-27383-6-git-send-email-jonathanh@nvidia.com>
+Message-ID: <CANLsYkycbEo+wyMX8RJ9H-S5kDTjQR4nnDZc5gvf2kShOZAv9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_prepare()/clk_unprepare() must not be called within atomic context.
+On 28 January 2016 at 09:33, Jon Hunter <jonathanh@nvidia.com> wrote:
+> Currently, the function tegra_powergate_set() simply sets the desired
+> powergate state but does not wait for the state to change. In most cases
+> we should wait for the state to change before proceeding. Currently, there
+> is a case for tegra114 and tegra124 devices where we do not wait when
+> starting the secondary CPU as this is not necessary. However, this is only
+> done at boot time and so waiting here will only have a small impact on
+> boot time. Therefore, update tegra_powergate_set() to wait when setting
+> the powergate.
+>
+> By adding this feature, we can also eliminate the polling loop from
+> tegra30_boot_secondary().
+>
+> A function has been added for checking the status of the powergate and
+> so update the tegra_powergate_is_powered() to use this macro as well.
+>
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> ---
+>  arch/arm/mach-tegra/platsmp.c | 16 +++-------------
+>  drivers/soc/tegra/pmc.c       |  9 ++++++++-
+>  2 files changed, 11 insertions(+), 14 deletions(-)
+>
+> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+> index f3f61dbbda97..75620ae73913 100644
+> --- a/arch/arm/mach-tegra/platsmp.c
+> +++ b/arch/arm/mach-tegra/platsmp.c
+> @@ -108,19 +108,9 @@ static int tegra30_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>          * be un-gated by un-toggling the power gate register
+>          * manually.
+>          */
+> -       if (!tegra_pmc_cpu_is_powered(cpu)) {
+> -               ret = tegra_pmc_cpu_power_on(cpu);
+> -               if (ret)
+> -                       return ret;
+> -
+> -               /* Wait for the power to come up. */
+> -               timeout = jiffies + msecs_to_jiffies(100);
+> -               while (!tegra_pmc_cpu_is_powered(cpu)) {
+> -                       if (time_after(jiffies, timeout))
+> -                               return -ETIMEDOUT;
+> -                       udelay(10);
+> -               }
+> -       }
+> +       ret = tegra_pmc_cpu_power_on(cpu);
+> +       if (ret)
+> +               return ret;
+>
+>  remove_clamps:
+>         /* CPU partition is powered. Enable the CPU clock. */
+> diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
+> index 99cb2fdd29e1..35ee60fd17be 100644
+> --- a/drivers/soc/tegra/pmc.c
+> +++ b/drivers/soc/tegra/pmc.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/export.h>
+>  #include <linux/init.h>
+>  #include <linux/io.h>
+> +#include <linux/iopoll.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+>  #include <linux/platform_device.h>
+> @@ -186,6 +187,9 @@ static inline bool tegra_powergate_state(int id)
+>   */
+>  static int tegra_powergate_set(unsigned int id, bool new_state)
+>  {
+> +       bool status;
+> +       int err;
+> +
+>         mutex_lock(&pmc->powergates_lock);
+>
+>         if (tegra_powergate_state(id) == new_state) {
+> @@ -195,9 +199,12 @@ static int tegra_powergate_set(unsigned int id, bool new_state)
+>
+>         tegra_pmc_writel(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
+>
+> +       err = readx_poll_timeout(tegra_powergate_state, id, status,
+> +                                status == new_state, 10, 100000);
+> +
 
-This patch calls clk_prepare() once for all from atmel_aes_probe() and
-clk_unprepare() from atmel_aes_remove().
+I understand (and agree) with the goal of this patch but I wonder (and
+I don't know much about the system/context) if holding a mutex while
+sleeping won't incur adverse effect on other parts of the system that
+weren't use to see this wait.  One way to fix this might be to use
+"mutex_trylock()" and let callers retry as they see fit if an
+operation is already in progress.
 
-Then calls of clk_prepare_enable()/clk_disable_unprepare() were replaced
-by calls of clk_enable()/clk_disable().
-
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-Reported-by: Matthias Mayr <matthias.mayr@student.kit.edu>
----
- drivers/crypto/atmel-aes.c | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
-index 6dd3317ca365..3eb3f1279fb7 100644
---- a/drivers/crypto/atmel-aes.c
-+++ b/drivers/crypto/atmel-aes.c
-@@ -400,7 +400,7 @@ static int atmel_aes_hw_init(struct atmel_aes_dev *dd)
- {
- 	int err;
- 
--	err = clk_prepare_enable(dd->iclk);
-+	err = clk_enable(dd->iclk);
- 	if (err)
- 		return err;
- 
-@@ -430,7 +430,7 @@ static int atmel_aes_hw_version_init(struct atmel_aes_dev *dd)
- 
- 	dev_info(dd->dev, "version: 0x%x\n", dd->hw_version);
- 
--	clk_disable_unprepare(dd->iclk);
-+	clk_disable(dd->iclk);
- 	return 0;
- }
- 
-@@ -448,7 +448,7 @@ static inline bool atmel_aes_is_encrypt(const struct atmel_aes_dev *dd)
- 
- static inline int atmel_aes_complete(struct atmel_aes_dev *dd, int err)
- {
--	clk_disable_unprepare(dd->iclk);
-+	clk_disable(dd->iclk);
- 	dd->flags &= ~AES_FLAGS_BUSY;
- 
- 	if (dd->is_async)
-@@ -2091,10 +2091,14 @@ static int atmel_aes_probe(struct platform_device *pdev)
- 		goto res_err;
- 	}
- 
--	err = atmel_aes_hw_version_init(aes_dd);
-+	err = clk_prepare(aes_dd->iclk);
- 	if (err)
- 		goto res_err;
- 
-+	err = atmel_aes_hw_version_init(aes_dd);
-+	if (err)
-+		goto iclk_unprepare;
-+
- 	atmel_aes_get_cap(aes_dd);
- 
- 	err = atmel_aes_buff_init(aes_dd);
-@@ -2127,6 +2131,8 @@ err_algs:
- err_aes_dma:
- 	atmel_aes_buff_cleanup(aes_dd);
- err_aes_buff:
-+iclk_unprepare:
-+	clk_unprepare(aes_dd->iclk);
- res_err:
- 	tasklet_kill(&aes_dd->done_task);
- 	tasklet_kill(&aes_dd->queue_task);
-@@ -2155,6 +2161,8 @@ static int atmel_aes_remove(struct platform_device *pdev)
- 	atmel_aes_dma_cleanup(aes_dd);
- 	atmel_aes_buff_cleanup(aes_dd);
- 
-+	clk_unprepare(aes_dd->iclk);
-+
- 	return 0;
- }
- 
--- 
-1.8.2.2
+>         mutex_unlock(&pmc->powergates_lock);
+>
+> -       return 0;
+> +       return err;
+>  }
+>
+>  /**
+> --
+> 2.1.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
