@@ -1,68 +1,82 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 29 Jan 2016 11:42:13 +0100
-Subject: [PATCH RFC 03/15] mmc: sunxi: Block signal voltage switching
- (CMD11)
-In-Reply-To: <1453354002-28366-4-git-send-email-wens@csie.org>
-References: <1453354002-28366-1-git-send-email-wens@csie.org>
- <1453354002-28366-4-git-send-email-wens@csie.org>
-Message-ID: <CAPDyKFrG8cXChSRuAx-a++iNHUHU_GuUApDhxfPSJZb1Oo1fsg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 29 Jan 2016 11:02:53 +0000
+Subject: [PATCH] arm64: Allow vmalloc regions to be set with set_memory_*
+In-Reply-To: <56AABEA4.3010301@huawei.com>
+References: <1452635187-8057-1-git-send-email-labbott@fedoraproject.org>
+ <CAKv+Gu_A1C9hXgqrYDekoy1YHaRXi_mUF-kYx-TqsOBkWMVjmQ@mail.gmail.com>
+ <CAKv+Gu-73QKAsFQCa=yO5+=DihLXp_AKYyY6QRTVM4nuDH=-8g@mail.gmail.com>
+ <20160118115640.GK21067@leverpostej> <56A97328.9070003@huawei.com>
+ <20160128105138.GE17123@leverpostej> <56A9FFBD.8030303@huawei.com>
+ <20160128142746.GL17123@leverpostej> <56AABEA4.3010301@huawei.com>
+Message-ID: <20160129110252.GB17038@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 January 2016 at 06:26, Chen-Yu Tsai <wens@csie.org> wrote:
-> Allwinner's mmc controller supports signal voltage switching. This is
-> supported in code in Allwinner's kernel. However, publicly available
-> boards all tie it to a fixed 3.0/3.3V regulator, with options to tie
-> it to 1.8V for eMMC on some.
->
-> Since Allwinner's kernel is an ancient 3.4, it is hard to say whether
-> adapting it's code to a modern mainline kernel would work. Block signal
-> voltage switching until someone has proper hardware to implement and
-> test this.
->
-> This only affects SD UHS-1 modes, as eMMC switches the voltage directly
-> without any signaling.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 790f01662b4e..0495ae7da6d6 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -816,6 +816,20 @@ static void sunxi_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
->                 }
->         }
->
-> +       /*
-> +        * TODO Support signal voltage switching
-> +        *
-> +        * Compared to Allwinner's kernel, recent updates in the mmc core
-> +        * mean this should be as easy as setting the flags in cmd_val and
-> +        * imask, and waiting for it to finish. However no boards support
-> +        * this so this cannot be tested. Block it for now.
-> +        */
-> +       if (cmd->opcode == SD_SWITCH_VOLTAGE) {
-> +               mrq->cmd->error = -EPERM;
-> +               mmc_request_done(mmc, mrq);
-> +               return;
-> +       }
+On Fri, Jan 29, 2016 at 09:21:40AM +0800, Xishi Qiu wrote:
+> On 2016/1/28 22:27, Mark Rutland wrote:
+> > On Thu, Jan 28, 2016 at 07:47:09PM +0800, Xishi Qiu wrote:
+> >> Hi Mark,
+> >>
+> >> Is it safe in the following path?
+> >>
+> >> alloc the whole linear map section
+> > 
+> > I don't understand what you mean by this, you will need to elaborate.
+> > The terms "alloc" and "section" can mean a number of different things in
+> > this context.
+> > 
+> >> cpu A write something on it
+> >> cpu B write something on it
+> >> cpu C set read only flag and call flush_tlb_kernel_range()
+> > 
+> > If you want to modify a portion of the linear map, this will not work.
+> > Modfiying the linear map in this manner is not safe.
+> > 
+> > If you want an alias of the linear map which was mapped using pages, and
+> > you wanted to change that alias, that could work.
+> > 
+> 
+> Hi Mark,
+> 
+> I mean I change the whole section(maybe 1G?) in linear map.
 
-Unless some of the MMC_CAP_UHS* mode is set, this command shouldn't be sent.
+If you mean something that was mapped with a section (i.e. a block entry
+in some level of page table), then no. The linear map is not open to
+this kind of change, as portions of the region may be in use elsewhere
+within Linux.
 
-So, if you *really* want to protect from this, I think it's better to
-clear these caps in the ->probe() function, after mmc_of_parse() has
-been called.
+> In our software, kernel create mapping(linear map) on special memory,
+> and
+> it is separated from buddy system, the service manage the special memory itself.
 
-> +
->         if (cmd->opcode == MMC_GO_IDLE_STATE) {
->                 cmd_val |= SDXC_SEND_INIT_SEQUENCE;
->                 imask |= SDXC_COMMAND_DONE;
-> --
-> 2.7.0.rc3
->
+This is not what the linear map is for. What exactly is this "special
+memory"?
 
-Kind regards
-Uffe
+Is it some persistent memory?
+
+Is it normal memory that you wish to use for some communication with
+other agents and/or DMA?
+
+Is it normal memory that you simply have a special use-case for?
+
+> And the service alloc/free the memory based on the physical address, so if 
+> the service want to change the prot dynamically, vmalloc doesn't work, and
+> fixmap is a little complex.
+
+Without further explanation of your use-case, this doesn't make sense to
+me. I don't understand why the physical address matters -- that implies
+you have other agents accessing this memory. If that's the case, I don't
+see what changing the permissions buys you.
+
+Regardless, it sounds like either we're missing some infrastructure, or
+you are mis-using existing APIs.
+
+> I think if I create the spacial memory in 4kb, then the service could
+> use set_memory_ro() directly, right?
+
+Perhaps. If it's a vmalloc'd area, then yes (once Ard's patch to allow
+that is in). I have more general concerns with your approach, in that I
+still do not understand the problem you are trying to solve.
+
+Thanks,
+Mark.
