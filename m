@@ -1,139 +1,94 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 29 Jan 2016 19:44:59 +0000
-Subject: [PATCH] clocksource/arm_arch_timer: Enable and verify MMIO access
-In-Reply-To: <20160129183051.GO12841@codeaurora.org>
-References: <b4ccba950f8fe0433b8e258a1fc0b8977bbe82d5.1454079150.git.robin.murphy@arm.com>
- <20160129183051.GO12841@codeaurora.org>
-Message-ID: <56ABC13B.9080500@arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 29 Jan 2016 11:54:55 -0800
+Subject: [PATCH 2/2] clk: defer clk_gets on orphan clocks
+In-Reply-To: <7262598.5pX8AAxUPK@diego>
+References: <1453385439-10154-1-git-send-email-emilio.lopez@collabora.co.uk>
+ <1453385958-11366-1-git-send-email-emilio.lopez@collabora.co.uk>
+ <20160128082324.GG12841@codeaurora.org> <7262598.5pX8AAxUPK@diego>
+Message-ID: <20160129195455.GQ12841@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/01/16 18:30, Stephen Boyd wrote:
-> On 01/29, Robin Murphy wrote:
->> So far, we have been blindly assuming that if a memory-mapped timer
->> frame exists, then we have access to it. Whilst it's the firmware's
->> job to give us non-secure access to frames in the first place, we
->> should not rely on it always being generous enough to also configure
->> CNTACR if it's not even using those frames itself.
->
-> Hm, that first sentence is sort of misleading. We've been blindly
-> assuming that the firmware has configured CNTACR to have the
-> correct bits set for virtual/physical access. We've always relied
-> on status = "disabled" to figure out if we can access an entire
-> frame or not.
+On 01/28, Heiko St?bner wrote:
+> Am Donnerstag, 28. Januar 2016, 00:23:24 schrieb Stephen Boyd:
+> > On 01/21, Emilio L?pez wrote:
+> > > @@ -3059,7 +3069,25 @@ struct clk *__of_clk_get_from_provider(struct
+> > > of_phandle_args *clkspec,> 
+> > >   */
+> > >  
+> > >  struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec)
+> > >  {
+> > > 
+> > > -	return __of_clk_get_from_provider(clkspec, NULL, __func__);
+> > > +	return __of_clk_get_from_provider(clkspec, NULL, __func__, false);
+> > > +}
+> > > +
+> > > +/**
+> > > + * of_clk_get_from_provider_with_orphans() - Lookup clock from a clock
+> > > provider + * @clkspec: pointer to a clock specifier data structure
+> > > + *
+> > > + * This function looks up a struct clk from the registered list of clock
+> > > + * providers, an input is a clock specifier data structure as returned
+> > > + * from the of_parse_phandle_with_args() function call.
+> > > + *
+> > > + * The difference to of_clk_get_from_provider() is that this function
+> > > will
+> > > + * also successfully lookup orphan-clocks, as it in some cases may be
+> > > + * necessary to access such orphan-clocks as well.
+> > > + */
+> > > +struct clk *
+> > > +of_clk_get_from_provider_with_orphans(struct of_phandle_args *clkspec)
+> > 
+> > Dislike. In fact, the whole clk conf approach is odd here. When
+> > we're doing of_clk_init() we do a best effort loop around
+> > parent_ready(), waiting for clk providers to register as long as
+> > we have a clocks property in our provider node. We should do
+> > something similar in the non of_clk_init() case too, because
+> > of_clk_init() isn't special.
+> 
+> At least to me being able to reparent orphan clocks when knowing that they 
+> won't ever get supplied is special.
+> 
+> The Rockchip clock controller has quite a number of clocks that can either be 
+> supplied by some external source. xin32k supplied by some i2c chip being the 
+> most prominent. But while this one will get supplied eventually, there are 
+> others who will never get a supply and stay orphans forever.
+> 
+> Example:
+> rk3288 sclk_edp_24m can get supplied by either the general 24MHz oscillator or 
+> some separate clock input connected some chip pin. Reset-default seems to be 
+> the external supply, but on all boards I've seen so far doesn't get connected.
+> 
+> So we know on a per-board level if this is connected and want to move away 
+> from the non-existent source. Which is why the limit of this new function is 
+> limited to be ccf internal and the assigned-clock-parents path.
 
-Yeah, now that I read it back that sentence is nonsense for anything 
-other than the very specific ideas of "frame" and "exists" that were 
-passing through my head at some point last week - how about this instead?
+Right, this problem isn't limited to clk-conf though. If some
+clock is orphaned by its reset default, then consumers that want
+to reparent them to something else will never be able to get the
+clocks without some sort of clk_get_ignore_orphan() API. We can't
+rely on DTS files telling us to do the reparent. This is a whole
+other problem to be dealt with before we can defer clk_get()
+orphans.
 
-"So far, we have been blindly assuming that having access to a 
-memory-mapped timer frame implies that the individual elements of that 
-frame are already enabled."
+In this case, I wonder why we haven't specified some sort of
+"ground" clock that has a rate of 0? In the example above, I
+would imagine that we have our dts file specify a fixed rate
+clock with frequency of 0 that's named whatever the external
+supply clock is named when that pin isn't connected.
 
->>
->> Explicitly enable feature-level access per-frame, and verify that the
->> access we want is really implemented before trying to make use of it.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>   drivers/clocksource/arm_arch_timer.c | 39 ++++++++++++++++++++++++++++--------
->>   1 file changed, 31 insertions(+), 8 deletions(-)
->>
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index c64d543..c88485d 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -765,20 +772,34 @@ static void __init arch_timer_mem_init(struct device_node *np)
->>   	 */
->>   	for_each_available_child_of_node(np, frame) {
->>   		int n;
->> +		u32 cntacr;
->>
->>   		if (of_property_read_u32(frame, "frame-number", &n)) {
->>   			pr_err("arch_timer: Missing frame-number\n");
->> -			of_node_put(best_frame);
->>   			of_node_put(frame);
->> -			return;
->> +			goto out;
->>   		}
->>
->> -		if (cnttidr & CNTTIDR_VIRT(n)) {
->> +		/* Try enabling everything, and see what sticks */
->> +		cntacr = CNTACR_RFRQ | CNTACR_RWPT | CNTACR_RPCT |
->> +			 CNTACR_RWVT | CNTACR_RVOFF | CNTACR_RVCT;
->> +		writel_relaxed(cntacr, cntctlbase + CNTACR(n));
->> +		cntacr = readl_relaxed(cntctlbase + CNTACR(n));
->> +
->> +		if (~cntacr & CNTACR_RFRQ)
->> +			continue;
->
-> Do we need this check? If we can't read the frequency we fall
-> back to looking for the DT property, so it shouldn't matter if we
-> can't read the hardware there.
+> 
+> 
+> I guess if you really dislike that approach the other option would be 
+> reparenting all the time in the clock-controller driver and then let the 
+> board-dts reparent back if needed. Which would also work for that clock, but 
+> may cause other glitches down the road when it affects some pre-setup things.
+> 
+> 
 
-I was really just playing safe to start with. If we don't have cause to 
-care about the difference between not having access vs. not having a 
-frequency programmed then I'd agree it can probably go.
+For all we know that could cause some audio pop on a speaker 
+something. Let's avoid this if we can.
 
->> +
->> +		if ((cnttidr & CNTTIDR_VIRT(n)) &&
->> +		    !(~cntacr & (CNTACR_RWVT | CNTACR_RVCT))) {
->>   			of_node_put(best_frame);
->>   			best_frame = frame;
->>   			arch_timer_mem_use_virtual = true;
->>   			break;
->>   		}
->> +
->> +		if (~cntacr & (CNTACR_RWPT | CNTACR_RPCT))
->> +			continue;
->> +
->>   		of_node_put(best_frame);
->>   		best_frame = of_node_get(frame);
->>   	}
->
-> Otherwise the patch looks fine and passes some light testing on
-> qcom devices.
-
-Great, thanks. The Trusted Firmware guys' warning shot has gone upstream 
-already, if it helps:
-
-https://github.com/ARM-software/arm-trusted-firmware/commit/01fc3f7300e86b0b672977133c3028d638d0c672
-
-> BTW, I'd like to add this patch on top so that we get some info
-> in /proc/iomem about which frame region is in use.
-
-It's about time I educated myself on what all the resource stuff really 
-means, but superficially it seems reasonable, and it certainly makes the 
-expected "2a830000-2a83ffff : arch_mem_timer" show up on my Juno.
-
-Thanks,
-Robin.
-
-> ---8<---
-> From: Stephen Boyd <sboyd@codeaurora.org>
-> Subject: [PATCH] clocksource/arm_arch_timer: Map frame with
->   of_io_request_and_map()
->
-> Let's use the of_io_request_and_map() API so that the frame
-> region is protected and shows up in /proc/iomem.
->
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->   drivers/clocksource/arm_arch_timer.c | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index c88485d489bf..59a08fd4f76a 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -804,7 +804,8 @@ static void __init arch_timer_mem_init(struct device_node *np)
->   		best_frame = of_node_get(frame);
->   	}
->
-> -	base = arch_counter_base = of_iomap(best_frame, 0);
-> +	base = arch_counter_base = of_io_request_and_map(best_frame, 0,
-> +							 "arch_mem_timer");
->   	if (!base) {
->   		pr_err("arch_timer: Can't map frame's registers\n");
->   		goto out;
->
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
