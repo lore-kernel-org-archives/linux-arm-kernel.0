@@ -1,28 +1,37 @@
-From: lho@apm.com (Loc Ho)
-Date: Fri, 29 Jan 2016 13:46:46 -0800
-Subject: [PATCH v2 3/3] arm64: Update Merlin DT PCP PLL clock node for v2
- hardware
-In-Reply-To: <20160129205841.GV12841@codeaurora.org>
-References: <1453256863-15092-1-git-send-email-lho@apm.com>
- <1453256863-15092-4-git-send-email-lho@apm.com>
- <20160129205841.GV12841@codeaurora.org>
-Message-ID: <CAPw-ZTno1FTONDyzRBZS5BRw5sK3OTDib98uJUUi4EOEh8Gxfw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 Jan 2016 21:46:22 +0000
+Subject: [linux-review:James-Hogan/kbuild-Remove-stale-asm-generic-wrappers/20160119-183642]
+ d979f99e9cc14e2667e9b6e268db695977e4197a BUILD DONE
+In-Reply-To: <7619136.niuXthzi6R@wuerfel>
+References: <569e1dbb.MgLv8OaZwklOxxtU%fengguang.wu@intel.com>
+ <20160128031435.GA25625@wfg-t540p.sh.intel.com>
+ <20160128174241.GN10826@n2100.arm.linux.org.uk>
+ <7619136.niuXthzi6R@wuerfel>
+Message-ID: <20160129214622.GS10826@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Fri, Jan 29, 2016 at 12:07:21AM +0100, Arnd Bergmann wrote:
+> This doesn't sound too hard. I've picked the defaults out of the
+> git history in the patch below. The only tricky part was davinci,
+> which has two different addresses and requires a little rework
+> to avoid circular dependencies.
 
-On Fri, Jan 29, 2016 at 12:58 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 01/19, Loc Ho wrote:
->> Update Merlin DT PCP PLL clock node to reflect compatible
->> string change to reflect v2 hardware.
->>
->> Signed-off-by: Loc Ho <lho@apm.com>
->> ---
->
-> Please take this through arm-soc.
+I think there's a much better way to solve this.
 
-I will ask Duc Dang to put this into APM xgene-next GIT for Arnd or
-Olof next pull.
+How about we have an architecture-defined way to provide all*config
+with a set of settings to be used with Kconfig to define these
+integer settings, rather than papering over the problem making up
+random addresses (like you're doing for the debug stuff.)  Eg,
+a default architecture-provided setting for KCONFIG_ALLCONFIG
+that defines things such as the physical offset and the debug
+addresses to be used for all*config targets?
 
--Loc
+Surely that's better than hacking around with the Kconfig files
+trying to frig something into working, which can potentially confuse
+people.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
