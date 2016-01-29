@@ -1,42 +1,50 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 29 Jan 2016 14:18:23 -0300
-Subject: Exynos Snow board display regression
-In-Reply-To: <CAOMqctT2dAQERos8bhrtVirF7ma4onq+UUS2ks-86LJ_mVDU6g@mail.gmail.com>
-References: <CAOMqctT2dAQERos8bhrtVirF7ma4onq+UUS2ks-86LJ_mVDU6g@mail.gmail.com>
-Message-ID: <56AB9EDF.2050401@osg.samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 30 Jan 2016 01:21:45 +0800
+Subject: [PATCH 0/3] mmc: sunxi: Support eMMC DDR modes
+Message-ID: <1454088108-2332-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Michal,
+Hi everyone,
 
-On 01/29/2016 02:07 PM, Michal Suchanek wrote:
-> Hello,
->
-> after  commit a9fa852886fd5a7ccec3b7e9eff75f85072f009c
->
-> display no longer works on the Snow board. The built-in panel is no
-> longer probed.
->
-> The commit *supposedly* provides for backwards compatibility and at
-> first glance only new options for probing the panel are added.
->
-> However, reverting the commit on top of 4.5-rc1 gives working display
-> again so there is probably some subtle non-obvious catch in the logic.
->
-> Any ideas what might go wrong here?
->
+This was "mmc: sunxi: Support vqmmc regulator and eMMC DDR modes". vqmmc
+support and DT patches were merged even though it was an RFC series, to
+my suprise.
 
-Yes, I noticed the same and posted a fix some hours ago:
+These are the remaining patches that add eMMC HS-DDR support to sunxi.
 
-https://lkml.org/lkml/2016/1/29/355
-  
-> Thanks
->
-> Michal
->
+Patch 1 adds timing delays for MMC_DDR52 mode.
 
-Best regards,
+Patch 2 adds support for 8 bit eMMC DDR52 mode. Under this mode, the
+controller must run at twice the card clock, and different timing delays
+are needed.
+
+Patch 3 enables eMMC HS-DDR for sunxi-mmc.
+
+
+Changes since RFC:
+
+  - Dropped patches that are merged
+
+  - Dropped "mmc: sunxi: Block signal voltage switching (CMD11)".
+    According to Ulf, the mmc core won't send this command unless the UHS
+    capabilities are set. We don't.
+
+  - Increased f_max to 52 MHz. Clock rate range for 50 MHz timing delay
+    also increased to match. See patch 1.
+
+
+Regards
+ChenYu
+
+
+Chen-Yu Tsai (3):
+  mmc: sunxi: Support MMC_DDR52 timing modes
+  mmc: sunxi: Support 8 bit eMMC DDR transfer modes
+  mmc: sunxi: Enable eMMC HS-DDR (MMC_CAP_1_8V_DDR) support
+
+ drivers/mmc/host/sunxi-mmc.c | 42 ++++++++++++++++++++++++++++++++----------
+ 1 file changed, 32 insertions(+), 10 deletions(-)
+
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.7.0
