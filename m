@@ -1,23 +1,32 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Fri, 29 Jan 2016 09:11:05 +0000 (UTC)
-Subject: [v4,1/3] wlcore/wl12xx: spi: add power operation function
-In-Reply-To: <1451482533-8624-2-git-send-email-uri.mashiach@compulab.co.il>
-Message-ID: <20160129091105.61DD16049D@smtp.codeaurora.org>
+From: chanho.min@lge.com (Chanho Min)
+Date: Fri, 29 Jan 2016 18:14:55 +0900
+Subject: [PATCH] arm64: add Kconfig entry for LG1K SoC family
+Message-ID: <1454058895-4884-1-git-send-email-chanho.min@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch introduces ARCH_LG1K to enable LG Electronics's LG1K SoC
+family in Kconfig.
 
-> The power function uses a consumer regulator access to update the WiFi
-> enable GPIO value.
-> 
-> Signed-off-by: Uri Mashiach <uri.mashiach@compulab.co.il>
-> Tested-By: Sebastian Reichel <sre@kernel.org>
-> Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+The dts and defconfig will be submitted soon in another series.
 
-Thanks, 2 patches applied to wireless-drivers-next.git:
+Signed-off-by: Chanho Min <chanho.min@lge.com>
+---
+ arch/arm64/Kconfig.platforms |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-4c1ce07bcf62 wlcore/wl12xx: spi: add power operation function
-04654c386145 wlcore/wl12xx: spi: add device tree support
-
-Kalle Valo
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 21074f6..b002bba 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -141,4 +141,8 @@ config ARCH_ZYNQMP
+ 	help
+ 	  This enables support for Xilinx ZynqMP Family
+ 
++config ARCH_LG1K
++	bool "LG Electronics LG1K SoC Family"
++	help
++	  This enables support for LG Electronics LG1K SoC Family
+ endmenu
+-- 
+1.7.9.5
