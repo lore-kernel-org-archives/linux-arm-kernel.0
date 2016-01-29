@@ -1,53 +1,57 @@
 From: xuejiancheng@huawei.com (Jiancheng Xue)
-Date: Fri, 29 Jan 2016 15:42:10 +0800
-Subject: [PATCH v8 4/6] ARM: debug: add hi3519 debug uart
+Date: Fri, 29 Jan 2016 15:42:08 +0800
+Subject: [PATCH v8 2/6] ARM: hisi: add compatible string for Hi3519 soc
 In-Reply-To: <1454053332-3218-1-git-send-email-xuejiancheng@huawei.com>
 References: <1454053332-3218-1-git-send-email-xuejiancheng@huawei.com>
-Message-ID: <1454053332-3218-5-git-send-email-xuejiancheng@huawei.com>
+Message-ID: <1454053332-3218-3-git-send-email-xuejiancheng@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add hi3519 debug uart
+add compatible string for Hi3519 soc.
 
 Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
 ---
- arch/arm/Kconfig.debug | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/mach-hisi/hisilicon.c | 23 ++++-------------------
+ 1 file changed, 4 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index c6b6175..edd3fbe 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -260,6 +260,14 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on Cortina Gemini based platforms.
+diff --git a/arch/arm/mach-hisi/hisilicon.c b/arch/arm/mach-hisi/hisilicon.c
+index 8cc6215..00dae89 100644
+--- a/arch/arm/mach-hisi/hisilicon.c
++++ b/arch/arm/mach-hisi/hisilicon.c
+@@ -54,30 +54,15 @@ DT_MACHINE_START(HI3620, "Hisilicon Hi3620 (Flattened Device Tree)")
+ 	.dt_compat	= hi3xxx_compat,
+ MACHINE_END
  
-+	config DEBUG_HI3519_UART
-+		bool "Hisilicon HI3519 Debug UART"
-+		depends on ARCH_HISI
-+		select DEBUG_UART_PL01X
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on HI3519 UART.
-+
- 	config DEBUG_HI3620_UART
- 		bool "Hisilicon HI3620 Debug UART"
- 		depends on ARCH_HI3xxx
-@@ -1451,6 +1459,7 @@ config DEBUG_UART_PHYS
- 	default 0x11002000 if DEBUG_MT8127_UART0
- 	default 0x11006000 if DEBUG_MT6589_UART0
- 	default 0x11009000 if DEBUG_MT8135_UART3
-+	default 0x12100000 if DEBUG_HI3519_UART
- 	default 0x16000000 if DEBUG_INTEGRATOR
- 	default 0x18000300 if DEBUG_BCM_5301X
- 	default 0x18010000 if DEBUG_SIRFATLAS7_UART0
-@@ -1619,6 +1628,7 @@ config DEBUG_UART_VIRT
- 	default 0xfee20000 if DEBUG_NSPIRE_CLASSIC_UART || DEBUG_NSPIRE_CX_UART
- 	default 0xfee82340 if ARCH_IOP13XX
- 	default 0xfef00000 if ARCH_IXP4XX && !CPU_BIG_ENDIAN
-+	default 0xfef00000 if DEBUG_HI3519_UART
- 	default 0xfef00003 if ARCH_IXP4XX && CPU_BIG_ENDIAN
- 	default 0xfef36000 if DEBUG_HIGHBANK_UART
- 	default 0xfefb0000 if DEBUG_OMAP1UART1 || DEBUG_OMAP7XXUART1
+-static const char *const hix5hd2_compat[] __initconst = {
++static const char *const hisilicon_compat[] __initconst = {
+ 	"hisilicon,hix5hd2",
+-	NULL,
+-};
+-
+-DT_MACHINE_START(HIX5HD2_DT, "Hisilicon HIX5HD2 (Flattened Device Tree)")
+-	.dt_compat	= hix5hd2_compat,
+-MACHINE_END
+-
+-static const char *const hip04_compat[] __initconst = {
+ 	"hisilicon,hip04-d01",
+-	NULL,
+-};
+-
+-DT_MACHINE_START(HIP04, "Hisilicon HiP04 (Flattened Device Tree)")
+-	.dt_compat	= hip04_compat,
+-MACHINE_END
+-
+-static const char *const hip01_compat[] __initconst = {
+ 	"hisilicon,hip01",
+ 	"hisilicon,hip01-ca9x2",
++	"hisilicon,hi3519",
+ 	NULL,
+ };
+ 
+-DT_MACHINE_START(HIP01, "Hisilicon HIP01 (Flattened Device Tree)")
+-	.dt_compat      = hip01_compat,
++DT_MACHINE_START(HISILICON_DT, "HiSilicon Soc")
++	.dt_compat	= hisilicon_compat,
+ MACHINE_END
 -- 
 1.9.1
