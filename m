@@ -1,210 +1,237 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Jan 2016 11:30:57 +0000
-Subject: linux-next: build failure after merge of the aio tree
-In-Reply-To: <20160127134024.0fababf6@canb.auug.org.au>
-References: <20160112164034.0fe945a7@canb.auug.org.au>
- <20160112163835.GD347@kvack.org>
- <20160127134024.0fababf6@canb.auug.org.au>
-Message-ID: <20160129113056.GP10826@n2100.arm.linux.org.uk>
+From: wdc@rock-chips.com (David.Wu)
+Date: Fri, 29 Jan 2016 19:35:23 +0800
+Subject: [PATCH v2] pinctrl: rockchip: add support for the rk3399
+In-Reply-To: <7536813.E6m4KCLL9V@diego>
+References: <1451997055-47655-1-git-send-email-wdc@rock-chips.com>
+ <1452152498-21780-1-git-send-email-wdc@rock-chips.com>
+ <7536813.E6m4KCLL9V@diego>
+Message-ID: <56AB4E7B.2060807@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 01:40:24PM +1100, Stephen Rothwell wrote:
-> Hi Benjamin,
-> 
-> On Tue, 12 Jan 2016 11:38:35 -0500 Benjamin LaHaise <bcrl@kvack.org> wrote:
-> >
-> > On Tue, Jan 12, 2016 at 04:40:34PM +1100, Stephen Rothwell wrote:
-> > > 
-> > > After merging the aio tree, today's linux-next build (arm
-> > > multi_v7_defconfig) failed like this:
-> > > 
-> > > fs/built-in.o: In function `aio_thread_op_foo_at':
-> > > file.c:(.text+0x43808): undefined reference to `__get_user_bad'
-> > > file.c:(.text+0x43838): undefined reference to `__get_user_bad'  
-> > 
-> > This is very strange.  It seems to imply that __get_user() doesn't 
-> > handle 64 bit values, which is completely broken behaviour on the 
-> > architecture's part if true.  Can any ARM folks comment on the right 
-> > fix here?
-> 
-> Well, probably only if you cc them :-)
-> 
-> Indeed, __get_user on arm does not handle 64 bit objects, where as
-> get_user does ...
+Hi Heiko,
 
-I believe adding 64-bit support to __get_user() is going to be a really
-painful exercise.  It took long enough to make get_user() accept it
-without creating any new warnings, and then bug fix it for big endian.
-__get_user() has the added complexity that it's inline assembler, and
-we can't play the same games that we used in __get_user().
+? 2016/1/29 0:56, Heiko St?bner ??:
+> Hi David,
+>
+> Am Donnerstag, 7. Januar 2016, 15:41:38 schrieb David Wu:
+>> From: David Wu <david.wu@rock-chips.com>
+>>
+>> The pinctrl of rk3399 is much different from other's,
+>> especially the 3bits of drive strength.
+>>
+>> Signed-off-by: David Wu <david.wu@rock-chips.com>
+>> ---
+>> change from v1:
+>> - need spin_unlock_irqrestore for set drive default case
+>>
+>>   .../bindings/pinctrl/rockchip,pinctrl.txt          |   1 +
+>>   drivers/pinctrl/pinctrl-rockchip.c                 | 339
+>> ++++++++++++++++++++- 2 files changed, 326 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+>> b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt index
+>> 391ef4b..3bb9456 100644
+>> --- a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+>> +++ b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+>> @@ -22,6 +22,7 @@ Required properties for iomux controller:
+>>     - compatible: one of "rockchip,rk2928-pinctrl",
+>> "rockchip,rk3066a-pinctrl" "rockchip,rk3066b-pinctrl",
+>> "rockchip,rk3188-pinctrl"
+>>   		       "rockchip,rk3288-pinctrl", "rockchip,rk3368-pinctrl"
+>> +		       "rockchip,rk3399-pinctrl"
+>>     - rockchip,grf: phandle referencing a syscon providing the
+>>   	 "general register files"
+>>
+>> diff --git a/drivers/pinctrl/pinctrl-rockchip.c
+>> b/drivers/pinctrl/pinctrl-rockchip.c index a065112..9d61c6e 100644
+>> --- a/drivers/pinctrl/pinctrl-rockchip.c
+>> +++ b/drivers/pinctrl/pinctrl-rockchip.c
+> [...]
+>
+>> @@ -685,19 +821,60 @@ static int rockchip_get_drive_perpin(struct
+>> rockchip_pin_bank *bank, struct rockchip_pin_ctrl *ctrl = info->ctrl;
+>>   	struct regmap *regmap;
+>>   	int reg, ret;
+>> -	u32 data;
+>> +	u32 data, temp, rmask_bits;
+>>   	u8 bit;
+>> +	int drv_type = bank->drv[pin_num / 8].drv_type;
+>>
+>>   	ctrl->drv_calc_reg(bank, pin_num, &regmap, &reg, &bit);
+>>
+>> +	switch (drv_type) {
+>> +	case DRV_TYPE_IO_1V8_3V0_AUTO:
+>> +	case DRV_TYPE_IO_3V3_ONLY:
+>> +		if (RK3399_DRV_3BITS_PER_PIN + bit >= 16) {
+> According to the doc excerpts, wouldn't the big special handling only be
+> necessary for for gpio3b5 alone (+ other banks) ... i.e. the one setting being
+> split over both registers?
 
-It's not a simple case of:
+yes, only the pin5 setting of 3bits width bank is split over two registers.
 
- #define __get_user_err(x, ptr, err)					\
- do {									\
- 	unsigned long __gu_addr = (unsigned long)(ptr); 		\
--	unsigned long __gu_val; 					\
-+	unsigned long long __gu_val; 					\
- 	unsigned int __ua_flags;					\
- 	__chk_user_ptr(ptr);						\
- 	might_fault();							\
- 	__ua_flags = uaccess_save_and_enable(); 			\
- 	switch (sizeof(*(ptr))) {					\
- 	case 1: __get_user_asm_byte(__gu_val, __gu_addr, err);	break;	\
- 	case 2: __get_user_asm_half(__gu_val, __gu_addr, err);	break;	\
- 	case 4: __get_user_asm_word(__gu_val, __gu_addr, err);	break;	\
-+	case 8: __get_user_asm_dword(__gu_val, __gu_addr, err); break;	\
- 	default: (__gu_val) = __get_user_bad(); 			\
- 	}								\
- 	uaccess_restore(__ua_flags);					\
- 	(x) = (__typeof__(*(ptr)))__gu_val;				\
- } while (0)
+> If so I think doing something like the following might be easier to
+> understand? Same of course for the set-counterpart. [Beware if I missed up the
+> indices somewhere :-)
 
-as, while that works for integer 'x', it doesn't work when 'x' is a
-pointer type, as the cast on the last line creates a GCC warning
-about casting to a different size.
+yeap.
+Seemed it is clearer to view by using following code.
+I will have a try, thanks.
 
-You can't move the cast into the switch to eliminate that, because
-GCC still warns even though the code is unreachable.  Same problem
-exists if you move the variable declaration inside the switch.
+>
+> rmask_bits = RK3399_DRV_3BITS_PER_PIN;
+> switch(bit) {
+> case 0 ... 12:
+> 	/* regular case, nothing to do */
+> 	break;
+> case 15:
+> 	/* drive-strength offset is special, as it is spread over 2 registers */
+> 	ret = regmap_read(regmap, reg, &data);
+> 	if (ret)
+> 		return ret;
+>
+> 	ret = regmap_read(regmap, reg + 0x4, &temp);
+> 	if (ret)
+> 		return ret;
+>
+> 	/*
+> 	 * the bit data[15] contains bit 0 of the value
+> 	 * while temp[1:0] containts bits 2 and 1
+> 	 */
+> 	data >>= 15;
+> 	temp &= 0x3;
+> 	temp <<= 1;
+> 	data |= temp;
+>
+> 	return rockchip_perpin_drv_list[drv_type][data];
+> case 18 ... 21:
+> 	/* setting fully enclosed in the second register */
+> 	rmask_bits = RK3399_DRV_3BITS_PER_PIN;
+> 	reg += 4;
+> 	bit -= 18;
+> }
+>
+>> +			/* need to read regs twice */
+>> +			ret = regmap_read(regmap, reg, &temp);
+>> +			if (ret)
+>> +				return ret;
+>> +
+>> +			temp >>= bit;
+>> +			rmask_bits = 16 - bit;
+>> +			temp &= (1 << rmask_bits) - 1;
+>> +
+>> +			reg = reg + 0x4;
+>> +			ret = regmap_read(regmap, reg, &data);
+>> +			if (ret)
+>> +				return ret;
+>> +
+>> +			rmask_bits = RK3399_DRV_3BITS_PER_PIN
+>> +				+ bit - 16;
+>> +			data &= (1 << rmask_bits) - 1;
+>> +			data <<= 16 - bit;
+>> +			data |= temp;
+>> +
+>> +			return rockchip_perpin_drv_list[drv_type][data];
+>> +		}
+>> +
+>> +		rmask_bits = RK3399_DRV_3BITS_PER_PIN;
+>> +		break;
+>> +	case DRV_TYPE_IO_DEFAULT:
+>> +	case DRV_TYPE_IO_1V8_OR_3V0:
+>> +	case DRV_TYPE_IO_1V8_ONLY:
+>> +		rmask_bits = RK3288_DRV_BITS_PER_PIN;
+>> +		break;
+>> +	default:
+>> +		dev_err(info->dev, "unsupported pinctrl drive type: %d\n",
+>> +			drv_type);
+>> +		return -EINVAL;
+>> +	}
+>> +
+>>   	ret = regmap_read(regmap, reg, &data);
+>>   	if (ret)
+>>   		return ret;
+>>
+>>   	data >>= bit;
+>> -	data &= (1 << RK3288_DRV_BITS_PER_PIN) - 1;
+>> +	data &= (1 << rmask_bits) - 1;
+>>
+>> -	return rockchip_perpin_drv_list[data];
+>> +	return rockchip_perpin_drv_list[drv_type][data];
+>>   }
+>>
+>>   static int rockchip_set_drive_perpin(struct rockchip_pin_bank *bank,
+> [...]
+>
+>> @@ -729,8 +913,45 @@ static int rockchip_set_drive_perpin(struct
+>> rockchip_pin_bank *bank,
+>>
+>>   	spin_lock_irqsave(&bank->slock, flags);
+>>
+>> +	switch (drv_type) {
+>> +	case DRV_TYPE_IO_1V8_3V0_AUTO:
+>> +	case DRV_TYPE_IO_3V3_ONLY:
+>> +		if (RK3399_DRV_3BITS_PER_PIN + bit >= 16) {
+>> +			/* need to write regs twice */
+>> +			rmask_bits = 16 - bit;
+>> +			/* enable the write to the equivalent lower bits */
+>> +			data = ((1 << rmask_bits) - 1) << (bit + 16);
+>> +			rmask = data | (data >> 16);
+>> +			ret &= (1 << rmask_bits) - 1;
+>> +			data |= (ret << bit);
+>> +
+>> +			ret = regmap_update_bits(regmap, reg, rmask, data);
+>> +			if (ret)
+>> +				return ret;
+>> +
+>> +			ret = i >> rmask_bits;
+>> +			rmask_bits = RK3399_DRV_3BITS_PER_PIN + bit - 16;
+>> +			reg = reg + 0x4;
+>> +			bit = 0;
+> Apart from a change similar to the above, should the setting maybe also
+> directly return and not depend on the final write?
 
-> Background: new aio code is adding __get_user() calls referencing 64
-> bit quantities (__u64 and __s64).
+okay, i will do the simialr change to the above.
 
-There's lots more architectures which do not support 64-bit get_user()
-_or_ __get_user(): avr32, blackfin, metag for example, and m68k which
-has this interesting thing "/* case 8: disabled because gcc-4.1 has a
-broken typeof \" in its *get_user() implementation.
-
-Even x86-32 doesn't support it:
-
-#define __get_user(x, ptr)                                              \
-        __get_user_nocheck((x), (ptr), sizeof(*(ptr)))
-
-#define __get_user_nocheck(x, ptr, size)                                \
-({                                                                      \
-        int __gu_err;                                                   \
-        unsigned long __gu_val;                                         \
-        __uaccess_begin();                                              \
-        __get_user_size(__gu_val, (ptr), (size), __gu_err, -EFAULT);    \
-        __uaccess_end();                                                \
-        (x) = (__force __typeof__(*(ptr)))__gu_val;                     \
-        __builtin_expect(__gu_err, 0);                                  \
-})
-
-#define __get_user_size(x, ptr, size, retval, errret)                   \
-do {                                                                    \
-        retval = 0;                                                     \
-        __chk_user_ptr(ptr);                                            \
-        switch (size) {                                                 \
-...
-        case 8:                                                         \
-                __get_user_asm_u64(x, ptr, retval, errret);             \
-                break;                                                  \
-        default:                                                        \
-                (x) = __get_user_bad();                                 \
-        }                                                               \
-} while (0)
-
-#ifdef CONFIG_X86_32
-#define __get_user_asm_u64(x, ptr, retval, errret)      (x) = __get_user_bad()
-#define __get_user_asm_ex_u64(x, ptr)                   (x) = __get_user_bad()
-
-Note that __get_user_nocheck() above always uses a 32-bit integer for
-__gu_val, so fixing x86-32 will not be a case of just providing a
-better __get_user_asm_u64() - it's the same problem that I have on ARM.
-
-The problem for 32-bit architectures is being able to cope sanely with:
-* different endians on the same arch
-* gcc warning about casting to different sizes, even when the code is
-  unreachable
-* preserving proper and correct typechecking in get_user() and friends
-
-So, I suspect if AIO were to run a test build on x86-32, they would find
-the same errors.
-
-Anyone working on this needs to ensure that any implementation builds
-without warning on all of these:
-
-int test_8(unsigned char *v, unsigned char *p)
-{
-        return __get_user(*v, p);
-}
-
-int test_8_constp(unsigned char *v, const unsigned char *p)
-{
-        return __get_user(*v, p);
-}
-
-int test_8_volatilep(unsigned char *v, volatile unsigned char *p)
-{
-        return __get_user(*v, p);
-}
-
-int test_16(unsigned short *v, unsigned short *p)
-{
-        return __get_user(*v, p);
-}
-
-int test_16_constp(unsigned short *v, const unsigned short *p)
-{
-        return __get_user(*v, p);
-}
-
-int test_32(unsigned int *v, unsigned int *p)
-{
-        return __get_user(*v, p);
-}
-
-int test_32_constp(unsigned int *v, const unsigned int *p)
-{
-        return __get_user(*v, p);
-}
-
-int test_64(unsigned long long *v, unsigned long long *p)
-{
-        return __get_user(*v, p);
-}
-
-int test_64_constp(unsigned long long *v, const unsigned long long *p)
-{
-        return __get_user(*v, p);
-}
-
-int test_ptr(unsigned int **v, unsigned int **p)
-{
-        return __get_user(*v, p);
-}
-
-int test_const(unsigned int *v, const unsigned int *p)
-{
-        return __get_user(*v, p);
-}
-
-int test_64_narrow(unsigned long *v, unsigned long long *p)
-{
-        return __get_user(*v, p);
-}
-
-int test_32_wide(unsigned long long *v, unsigned long *p)
-{
-        return __get_user(*v, p);
-}
-
-except for this which must warn:
-
-int test_wrong(char **v, const char **p)
-{
-        return __get_user(*v, p);
-}
-
-which comes from my test set for when get_user() was being worked on.
-
-So, in summary, it seems that the 32-bit architectures I've looked at
-so far do not support 64-bit __get_user(), even the popular ones.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>> +		} else {
+>> +			rmask_bits = RK3399_DRV_3BITS_PER_PIN;
+>> +		}
+>> +		break;
+>> +	case DRV_TYPE_IO_DEFAULT:
+>> +	case DRV_TYPE_IO_1V8_OR_3V0:
+>> +	case DRV_TYPE_IO_1V8_ONLY:
+>> +		rmask_bits = RK3288_DRV_BITS_PER_PIN;
+>> +		break;
+>> +	default:
+>> +		spin_unlock_irqrestore(&bank->slock, flags);
+>> +		dev_err(info->dev, "unsupported pinctrl drive type: %d\n",
+>> +			drv_type);
+>> +		return -EINVAL;
+>> +
+>> +	}
+>> +
+>>   	/* enable the write to the equivalent lower bits */
+>> -	data = ((1 << RK3288_DRV_BITS_PER_PIN) - 1) << (bit + 16);
+>> +	data = ((1 << rmask_bits) - 1) << (bit + 16);
+>>   	rmask = data | (data >> 16);
+>>   	data |= (ret << bit);
+>>
+> [...]
+>
+>> @@ -2208,6 +2461,62 @@ static struct rockchip_pin_ctrl rk3368_pin_ctrl = {
+>>   		.drv_calc_reg		= rk3368_calc_drv_reg_and_bit,
+>>   };
+>>
+>> +static struct rockchip_pin_bank rk3399_pin_banks[] = {
+>> +	PIN_BANK_IOMUX_DRV_FLAGS_OFFSET(0, 32, "gpio0", IOMUX_SOURCE_PMU,
+>> +					IOMUX_SOURCE_PMU,
+>> +					IOMUX_SOURCE_PMU,
+>> +					IOMUX_SOURCE_PMU,
+>> +					DRV_TYPE_IO_1V8_ONLY,
+>> +					DRV_TYPE_IO_1V8_ONLY,
+>> +					0,
+>> +					0,
+> DRV_TYPE_IO_DEFAULT instead of 0 please.
+>
+>
+>
+>
