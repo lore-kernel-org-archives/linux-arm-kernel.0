@@ -1,111 +1,53 @@
-From: B56489@freescale.com (Yunhui Cui)
-Date: Fri, 29 Jan 2016 19:41:09 +0800
-Subject: [PATCH 3/3] mtd:spi-nor:fsl-quadspi:Add fast-read mode support
-In-Reply-To: <1454067669-35274-1-git-send-email-B56489@freescale.com>
-References: <1454067669-35274-1-git-send-email-B56489@freescale.com>
-Message-ID: <1454067669-35274-4-git-send-email-B56489@freescale.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 29 Jan 2016 08:50:19 -0300
+Subject: [PATCH v4 1/2] regulator: act8945a: add regulator driver for
+ ACT8945A
+In-Reply-To: <20160129113518.GQ4130@sirena.org.uk>
+References: <1453863463-30515-1-git-send-email-wenyou.yang@atmel.com>
+ <1453863463-30515-2-git-send-email-wenyou.yang@atmel.com>
+ <20160129001603.GM4130@sirena.org.uk>
+ <B256D81BAE5131468A838E5D7A243641D63FBF8B@penmbx01>
+ <20160129113518.GQ4130@sirena.org.uk>
+Message-ID: <CABxcv=kNKmgRytxB5ppawrAvC-GDRhV4T_UUGvpHgKp9+BsUmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The qspi driver add generic fast-read mode for different
-flash venders, including Micron family. Also add some special
-operations for Micron flash read/write in spi-nor.c.
+Hello Mark,
 
-Signed-off-by: Yunhui Cui <B56489@freescale.com>
----
- drivers/mtd/spi-nor/fsl-quadspi.c | 27 +++++++++++++++++++++------
- drivers/mtd/spi-nor/spi-nor.c     |  6 +++++-
- 2 files changed, 26 insertions(+), 7 deletions(-)
+On Fri, Jan 29, 2016 at 8:35 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Fri, Jan 29, 2016 at 01:20:08AM +0000, Yang, Wenyou wrote:
+>
+>> > > +static const struct of_device_id act8945a_pmic_of_match[] = {
+>> > > + { .compatible = "active-semi,act8945a-regulator" },
+>> > > + { },
+>> > > +};
+>> > > +MODULE_DEVICE_TABLE(of, act8945a_pmic_of_match);
+>
+>> > This seems mostly OK but why do we have a compatible string here - shouldn't
+>> > the MFD be able to instantiate the regulator function without needing this?
+>
+>> Because I got feedback from Javier for the act8945a-charger patches of this MFD series,
+>> He said missing the OF match table will cause the module autoloading broken.
+>
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/398113.html
+>
+>> What do you think about it?
+>
+> If then device is not being loaded from the DT (and it shouldn't be, the
+> device looks like it should be instantiated directly by the MFD as it
+> can't exist separately to that MFD) an OF table will do nothing.
 
-diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
-index 9861290..fc4451d 100644
---- a/drivers/mtd/spi-nor/fsl-quadspi.c
-+++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-@@ -389,11 +389,21 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 	/* Read */
- 	lut_base = SEQID_READ * 4;
- 
--	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
--			base + QUADSPI_LUT(lut_base));
--	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
--		    LUT1(FSL_READ, PAD4, rxfifo),
--			base + QUADSPI_LUT(lut_base + 1));
-+	if (nor->flash_read == SPI_NOR_FAST) {
-+		qspi_writel(q, LUT0(CMD, PAD1, read_op) |
-+			    LUT1(ADDR, PAD1, addrlen),
-+				base + QUADSPI_LUT(lut_base));
-+		qspi_writel(q,  LUT0(DUMMY, PAD1, read_dm) |
-+			    LUT1(FSL_READ, PAD1, rxfifo),
-+				base + QUADSPI_LUT(lut_base + 1));
-+	} else if (nor->flash_read == SPI_NOR_QUAD) {
-+		qspi_writel(q, LUT0(CMD, PAD1, read_op) |
-+			    LUT1(ADDR, PAD1, addrlen),
-+				base + QUADSPI_LUT(lut_base));
-+		qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
-+			    LUT1(FSL_READ, PAD4, rxfifo),
-+				base + QUADSPI_LUT(lut_base + 1));
-+	}
- 
- 	/* Write enable */
- 	lut_base = SEQID_WREN * 4;
-@@ -468,6 +478,7 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
- {
- 	switch (cmd) {
- 	case SPINOR_OP_READ_1_1_4:
-+	case SPINOR_OP_READ_FAST:
- 		return SEQID_READ;
- 	case SPINOR_OP_WREN:
- 		return SEQID_WREN;
-@@ -963,6 +974,7 @@ static int fsl_qspi_probe(struct platform_device *pdev)
- 	struct spi_nor *nor;
- 	struct mtd_info *mtd;
- 	int ret, i = 0;
-+	enum read_mode mode = SPI_NOR_QUAD;
- 
- 	q = devm_kzalloc(dev, sizeof(*q), GFP_KERNEL);
- 	if (!q)
-@@ -1064,7 +1076,10 @@ static int fsl_qspi_probe(struct platform_device *pdev)
- 		/* set the chip address for READID */
- 		fsl_qspi_set_base_addr(q, nor);
- 
--		ret = spi_nor_scan(nor, NULL, SPI_NOR_QUAD);
-+		ret = of_property_read_bool(np, "fast-read");
-+		mode = (ret) ? SPI_NOR_FAST : SPI_NOR_QUAD;
-+
-+		ret = spi_nor_scan(nor, NULL, mode);
- 		if (ret)
- 			goto mutex_failed;
- 
-diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-index ed0c19c..79a025c 100644
---- a/drivers/mtd/spi-nor/spi-nor.c
-+++ b/drivers/mtd/spi-nor/spi-nor.c
-@@ -763,7 +763,8 @@ static const struct flash_info spi_nor_ids[] = {
- 	{ "n25q064",     INFO(0x20ba17, 0, 64 * 1024,  128, SECT_4K | SPI_NOR_QUAD_READ) },
- 	{ "n25q064a",    INFO(0x20bb17, 0, 64 * 1024,  128, SECT_4K | SPI_NOR_QUAD_READ) },
- 	{ "n25q128a11",  INFO(0x20bb18, 0, 64 * 1024,  256, SPI_NOR_QUAD_READ) },
--	{ "n25q128a13",  INFO(0x20ba18, 0, 64 * 1024,  256, SPI_NOR_QUAD_READ) },
-+	{ "n25q128a13",  INFO(0x20ba18, 0, 64 * 1024,  256, SPI_NOR_FAST |
-+			SPI_NOR_QUAD_READ) },
- 	{ "n25q256a",    INFO(0x20ba19, 0, 64 * 1024,  512, SECT_4K | SPI_NOR_QUAD_READ) },
- 	{ "n25q512a",    INFO(0x20bb20, 0, 64 * 1024, 1024, SECT_4K | USE_FSR | SPI_NOR_QUAD_READ) },
- 	{ "n25q512ax3",  INFO(0x20ba20, 0, 64 * 1024, 1024, SECT_4K | USE_FSR | SPI_NOR_QUAD_READ) },
-@@ -1233,6 +1234,7 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
- 
- 	if (JEDEC_MFR(info) == SNOR_MFR_ATMEL ||
- 	    JEDEC_MFR(info) == SNOR_MFR_INTEL ||
-+	    JEDEC_MFR(info) == SNOR_MFR_MICRON ||
- 	    JEDEC_MFR(info) == SNOR_MFR_SST) {
- 		write_enable(nor);
- 		write_sr(nor, 0);
-@@ -1317,6 +1319,8 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
- 		nor->flash_read = SPI_NOR_QUAD;
- 	} else if (mode == SPI_NOR_DUAL && info->flags & SPI_NOR_DUAL_READ) {
- 		nor->flash_read = SPI_NOR_DUAL;
-+	} else if (mode == SPI_NOR_FAST && info->flags & SPI_NOR_FAST) {
-+		nor->flash_read = SPI_NOR_FAST;
- 	}
- 
- 	/* Default commands */
--- 
-2.1.0.27.g96db324
+Then he should remove the .of_compatible from the MFD cell definition.
+
+Otherwise the MFD core will assign an of_node to this device in
+mfd_add_device(), making the platform core to believe the device was
+instantiated by OF. So an OF modalias uevent will be reported to load
+the module and the OF table should be used for matching the device
+with the driver.
+
+IOW, the MFD and regulator driver have to agree on this. Either
+everything should have OF or platform information, both work but
+mixing these as it was on a previous version doesn't.
+
+Best regards,
+Javier
