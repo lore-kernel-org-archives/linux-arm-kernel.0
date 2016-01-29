@@ -1,9 +1,9 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 29 Jan 2016 11:04:41 +0100
-Subject: [PATCH v4 5/7] ARM: dts: r8a7793: Add BRG support for SCIF
+Date: Fri, 29 Jan 2016 11:04:42 +0100
+Subject: [PATCH v4 6/7] ARM: dts: r8a7794: Add BRG support for (H)SCIF
 In-Reply-To: <1454061883-4043-1-git-send-email-geert+renesas@glider.be>
 References: <1454061883-4043-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1454061883-4043-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <1454061883-4043-7-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,123 +26,123 @@ v4:
 v3:
   - New.
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 54 ++++++++++++++++++++++++++++--------------
+ arch/arm/boot/dts/r8a7794.dtsi | 54 ++++++++++++++++++++++++++++--------------
  1 file changed, 36 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index 07af584915c6da45..45dba1c79a43c287 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -600,8 +600,9 @@
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index b03a77b3d22f13d2..7d4c5597af5b54bd 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -403,8 +403,9 @@
  			     "renesas,scif";
  		reg = <0 0xe6e60000 0 64>;
  		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&mstp7_clks R8A7793_CLK_SCIF0>;
+-		clocks = <&mstp7_clks R8A7794_CLK_SCIF0>;
 -		clock-names = "fck";
-+		clocks = <&mstp7_clks R8A7793_CLK_SCIF0>, <&zs_clk>,
++		clocks = <&mstp7_clks R8A7794_CLK_SCIF0>, <&zs_clk>,
 +			 <&scif_clk>;
 +		clock-names = "fck", "brg_int", "scif_clk";
  		dmas = <&dmac0 0x29>, <&dmac0 0x2a>;
  		dma-names = "tx", "rx";
  		power-domains = <&cpg_clocks>;
-@@ -613,8 +614,9 @@
+@@ -416,8 +417,9 @@
  			     "renesas,scif";
  		reg = <0 0xe6e68000 0 64>;
  		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&mstp7_clks R8A7793_CLK_SCIF1>;
+-		clocks = <&mstp7_clks R8A7794_CLK_SCIF1>;
 -		clock-names = "fck";
-+		clocks = <&mstp7_clks R8A7793_CLK_SCIF1>, <&zs_clk>,
++		clocks = <&mstp7_clks R8A7794_CLK_SCIF1>, <&zs_clk>,
 +			 <&scif_clk>;
 +		clock-names = "fck", "brg_int", "scif_clk";
  		dmas = <&dmac0 0x2d>, <&dmac0 0x2e>;
  		dma-names = "tx", "rx";
  		power-domains = <&cpg_clocks>;
-@@ -626,8 +628,9 @@
+@@ -429,8 +431,9 @@
  			     "renesas,scif";
  		reg = <0 0xe6e58000 0 64>;
  		interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&mstp7_clks R8A7793_CLK_SCIF2>;
+-		clocks = <&mstp7_clks R8A7794_CLK_SCIF2>;
 -		clock-names = "fck";
-+		clocks = <&mstp7_clks R8A7793_CLK_SCIF2>, <&zs_clk>,
++		clocks = <&mstp7_clks R8A7794_CLK_SCIF2>, <&zs_clk>,
 +			 <&scif_clk>;
 +		clock-names = "fck", "brg_int", "scif_clk";
  		dmas = <&dmac0 0x2b>, <&dmac0 0x2c>;
  		dma-names = "tx", "rx";
  		power-domains = <&cpg_clocks>;
-@@ -639,8 +642,9 @@
+@@ -442,8 +445,9 @@
  			     "renesas,scif";
  		reg = <0 0xe6ea8000 0 64>;
  		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&mstp7_clks R8A7793_CLK_SCIF3>;
+-		clocks = <&mstp7_clks R8A7794_CLK_SCIF3>;
 -		clock-names = "fck";
-+		clocks = <&mstp7_clks R8A7793_CLK_SCIF3>, <&zs_clk>,
++		clocks = <&mstp7_clks R8A7794_CLK_SCIF3>, <&zs_clk>,
 +			 <&scif_clk>;
 +		clock-names = "fck", "brg_int", "scif_clk";
  		dmas = <&dmac0 0x2f>, <&dmac0 0x30>;
  		dma-names = "tx", "rx";
  		power-domains = <&cpg_clocks>;
-@@ -652,8 +656,9 @@
+@@ -455,8 +459,9 @@
  			     "renesas,scif";
  		reg = <0 0xe6ee0000 0 64>;
  		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&mstp7_clks R8A7793_CLK_SCIF4>;
+-		clocks = <&mstp7_clks R8A7794_CLK_SCIF4>;
 -		clock-names = "fck";
-+		clocks = <&mstp7_clks R8A7793_CLK_SCIF4>, <&zs_clk>,
++		clocks = <&mstp7_clks R8A7794_CLK_SCIF4>, <&zs_clk>,
 +			 <&scif_clk>;
 +		clock-names = "fck", "brg_int", "scif_clk";
  		dmas = <&dmac0 0xfb>, <&dmac0 0xfc>;
  		dma-names = "tx", "rx";
  		power-domains = <&cpg_clocks>;
-@@ -665,8 +670,9 @@
+@@ -468,8 +473,9 @@
  			     "renesas,scif";
  		reg = <0 0xe6ee8000 0 64>;
  		interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&mstp7_clks R8A7793_CLK_SCIF5>;
+-		clocks = <&mstp7_clks R8A7794_CLK_SCIF5>;
 -		clock-names = "fck";
-+		clocks = <&mstp7_clks R8A7793_CLK_SCIF5>, <&zs_clk>,
++		clocks = <&mstp7_clks R8A7794_CLK_SCIF5>, <&zs_clk>,
 +			 <&scif_clk>;
 +		clock-names = "fck", "brg_int", "scif_clk";
  		dmas = <&dmac0 0xfd>, <&dmac0 0xfe>;
  		dma-names = "tx", "rx";
  		power-domains = <&cpg_clocks>;
-@@ -678,8 +684,9 @@
+@@ -481,8 +487,9 @@
  			     "renesas,rcar-gen2-hscif", "renesas,hscif";
  		reg = <0 0xe62c0000 0 96>;
  		interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&mstp7_clks R8A7793_CLK_HSCIF0>;
+-		clocks = <&mstp7_clks R8A7794_CLK_HSCIF0>;
 -		clock-names = "fck";
-+		clocks = <&mstp7_clks R8A7793_CLK_HSCIF0>, <&zs_clk>,
++		clocks = <&mstp7_clks R8A7794_CLK_HSCIF0>, <&zs_clk>,
 +			 <&scif_clk>;
 +		clock-names = "fck", "brg_int", "scif_clk";
  		dmas = <&dmac0 0x39>, <&dmac0 0x3a>;
  		dma-names = "tx", "rx";
  		power-domains = <&cpg_clocks>;
-@@ -691,8 +698,9 @@
+@@ -494,8 +501,9 @@
  			     "renesas,rcar-gen2-hscif", "renesas,hscif";
  		reg = <0 0xe62c8000 0 96>;
  		interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&mstp7_clks R8A7793_CLK_HSCIF1>;
+-		clocks = <&mstp7_clks R8A7794_CLK_HSCIF1>;
 -		clock-names = "fck";
-+		clocks = <&mstp7_clks R8A7793_CLK_HSCIF1>, <&zs_clk>,
++		clocks = <&mstp7_clks R8A7794_CLK_HSCIF1>, <&zs_clk>,
 +			 <&scif_clk>;
 +		clock-names = "fck", "brg_int", "scif_clk";
  		dmas = <&dmac0 0x4d>, <&dmac0 0x4e>;
  		dma-names = "tx", "rx";
  		power-domains = <&cpg_clocks>;
-@@ -704,8 +712,9 @@
+@@ -507,8 +515,9 @@
  			     "renesas,rcar-gen2-hscif", "renesas,hscif";
  		reg = <0 0xe62d0000 0 96>;
  		interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&mstp7_clks R8A7793_CLK_HSCIF2>;
+-		clocks = <&mstp7_clks R8A7794_CLK_HSCIF2>;
 -		clock-names = "fck";
-+		clocks = <&mstp7_clks R8A7793_CLK_HSCIF2>, <&zs_clk>,
++		clocks = <&mstp7_clks R8A7794_CLK_HSCIF2>, <&zs_clk>,
 +			 <&scif_clk>;
 +		clock-names = "fck", "brg_int", "scif_clk";
  		dmas = <&dmac0 0x3b>, <&dmac0 0x3c>;
  		dma-names = "tx", "rx";
  		power-domains = <&cpg_clocks>;
-@@ -805,6 +814,15 @@
- 			clock-output-names = "audio_clk_c";
+@@ -815,6 +824,15 @@
+ 			clock-output-names = "extal";
  		};
  
 +		/* External SCIF clock */
@@ -156,6 +156,6 @@ index 07af584915c6da45..45dba1c79a43c287 100644
 +
  		/* Special CPG clocks */
  		cpg_clocks: cpg_clocks at e6150000 {
- 			compatible = "renesas,r8a7793-cpg-clocks",
+ 			compatible = "renesas,r8a7794-cpg-clocks",
 -- 
 1.9.1
