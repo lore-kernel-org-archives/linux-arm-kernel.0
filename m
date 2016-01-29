@@ -1,32 +1,146 @@
-From: chanho.min@lge.com (chanho.min)
-Date: Fri, 29 Jan 2016 19:24:09 +0900
-Subject: [PATCH] arm64: add Kconfig entry for LG1K SoC family
-In-Reply-To: <3614541.oUWpW74d41@wuerfel>
-References: <1454058895-4884-1-git-send-email-chanho.min@lge.com>
- <3614541.oUWpW74d41@wuerfel>
-Message-ID: <01e401d15a7f$31003a60$9300af20$@lge.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Fri, 29 Jan 2016 12:24:45 +0200
+Subject: [PATCH V8 22/23] perf tools: making coresight PMU listable
+In-Reply-To: <20160125211011.GD22501@kernel.org>
+References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
+ <1452807977-8069-23-git-send-email-mathieu.poirier@linaro.org>
+ <CANLsYkxrRFjaTpYq3+-MnzMe6CenSop9Y0ph-0ZWOZoqNpRPgw@mail.gmail.com>
+ <20160125211011.GD22501@kernel.org>
+Message-ID: <56AB3DED.9030700@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Friday 29 January 2016 18:14:55 Chanho Min wrote:
-> > This patch introduces ARCH_LG1K to enable LG Electronics's LG1K SoC
-> > family in Kconfig.
-> >
-> > The dts and defconfig will be submitted soon in another series.
-> >
-> > Signed-off-by: Chanho Min <chanho.min@lge.com>
-> 
-> Please keep this together with the defconfig change for now if you want to
-> send a git pull request. If you send separate patches, just keep it all
-> together as a series. Also add a patch to list an entry in the MAINTAINERS
-> file.
-> 
-> In either case, submit it to the mailing lists for review first, but once the
-> patches are ready to be applied, send them "To: arm at kernel.org"
-> with everyone else on Cc.
-> 
-> 	Arnd
-OK, I will drop this and submit again.
+On 25/01/16 23:10, Arnaldo Carvalho de Melo wrote:
+> Em Mon, Jan 25, 2016 at 01:49:47PM -0700, Mathieu Poirier escreveu:
+>> On 14 January 2016 at 14:46, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+>>> Adding the required mechanic allowing 'perf list pmu' to
+>>> discover coresight ETM/PTM tracers.
+>>>
+>>> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+>>> Cc: Ingo Molnar <mingo@redhat.com>
+>>> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+>>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>> ---
+>>>  MAINTAINERS                    |  1 +
+>>>  tools/perf/arch/arm/util/Build |  2 ++
+>>>  tools/perf/arch/arm/util/pmu.c | 34 ++++++++++++++++++++++++++++++++++
+>>>  tools/perf/config/Makefile     | 17 ++++++++++++-----
+>>>  4 files changed, 49 insertions(+), 5 deletions(-)
+>>>  create mode 100644 tools/perf/arch/arm/util/pmu.c
+>>>
+>>> diff --git a/MAINTAINERS b/MAINTAINERS
+>>> index 233f83464814..b2a92245eece 100644
+>>> --- a/MAINTAINERS
+>>> +++ b/MAINTAINERS
+>>> @@ -1007,6 +1007,7 @@ F:        drivers/hwtracing/coresight/*
+>>>  F:     Documentation/trace/coresight.txt
+>>>  F:     Documentation/devicetree/bindings/arm/coresight.txt
+>>>  F:     Documentation/ABI/testing/sysfs-bus-coresight-devices-*
+>>> +F:     tools/perf/arch/arm/util/pmu.c
+>>>
+>>>  ARM/CORGI MACHINE SUPPORT
+>>>  M:     Richard Purdie <rpurdie@rpsys.net>
+>>> diff --git a/tools/perf/arch/arm/util/Build b/tools/perf/arch/arm/util/Build
+>>> index d22e3d07de3d..66ab0b05549c 100644
+>>> --- a/tools/perf/arch/arm/util/Build
+>>> +++ b/tools/perf/arch/arm/util/Build
+>>> @@ -2,3 +2,5 @@ libperf-$(CONFIG_DWARF) += dwarf-regs.o
+>>>
+>>>  libperf-$(CONFIG_LIBUNWIND)          += unwind-libunwind.o
+>>>  libperf-$(CONFIG_LIBDW_DWARF_UNWIND) += unwind-libdw.o
+>>> +
+>>> +libperf-$(CONFIG_AUXTRACE) += pmu.o
+>>> diff --git a/tools/perf/arch/arm/util/pmu.c b/tools/perf/arch/arm/util/pmu.c
+>>> new file mode 100644
+>>> index 000000000000..af9fb666b44f
+>>> --- /dev/null
+>>> +++ b/tools/perf/arch/arm/util/pmu.c
+>>> @@ -0,0 +1,34 @@
+>>> +/*
+>>> + * Copyright(C) 2015 Linaro Limited. All rights reserved.
+>>> + * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify it
+>>> + * under the terms of the GNU General Public License version 2 as published by
+>>> + * the Free Software Foundation.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful, but WITHOUT
+>>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>>> + * more details.
+>>> + *
+>>> + * You should have received a copy of the GNU General Public License along with
+>>> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+>>> + */
+>>> +
+>>> +#include <string.h>
+>>> +#include <linux/coresight-pmu.h>
 
-Thanks
-Chanho
+Probably need to add include/linux/coresight-pmu.h it to tools/perf/MANIFEST
+
+>>> +#include <linux/perf_event.h>
+>>> +
+>>> +#include "../../util/pmu.h"
+>>> +
+>>> +struct perf_event_attr
+>>> +*perf_pmu__get_default_config(struct perf_pmu *pmu __maybe_unused)
+>>> +{
+>>> +#ifdef HAVE_AUXTRACE_SUPPORT
+>>> +       if (!strcmp(pmu->name, CORESIGHT_ETM_PMU_NAME)) {
+>>> +               /* add ETM default config here */
+>>> +               pmu->selectable = true;
+>>> +       }
+>>> +#endif
+>>> +       return NULL;
+>>> +}
+>>> diff --git a/tools/perf/config/Makefile b/tools/perf/config/Makefile
+>>> index de89ec574361..905faabff8b1 100644
+>>> --- a/tools/perf/config/Makefile
+>>> +++ b/tools/perf/config/Makefile
+>>> @@ -647,12 +647,19 @@ ifdef LIBBABELTRACE
+>>>  endif
+>>>
+>>>  ifndef NO_AUXTRACE
+>>> -  ifeq ($(feature-get_cpuid), 0)
+>>> -    msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
+>>> -    NO_AUXTRACE := 1
+>>> +  ifeq ($(ARCH),x86)
+>>> +    ifeq ($(feature-get_cpuid), 0)
+>>> +      msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
+>>> +      NO_AUXTRACE := 1
+>>> +    else
+>>> +      $(call detected,CONFIG_AUXTRACE)
+>>> +      CFLAGS += -DHAVE_AUXTRACE_SUPPORT
+>>> +    endif
+>>>    else
+>>> -    $(call detected,CONFIG_AUXTRACE)
+>>> -    CFLAGS += -DHAVE_AUXTRACE_SUPPORT
+>>> +    ifeq ($(ARCH),$(filter $(ARCH), arm arm64))
+>>> +      $(call detected,CONFIG_AUXTRACE)
+>>> +      CFLAGS += -DHAVE_AUXTRACE_SUPPORT
+>>> +    endif
+
+We still want AUXTRACE support by default, to support being able to decode a
+trace from one machine on any other machine, so this should not exclude
+HAVE_AUXTRACE_SUPPORT from every arch except x86 and arm.
+
+>>>    endif
+>>>  endif
+>>>
+>>> --
+>>> 2.1.4
+>>>
+>>
+>> Arnaldo,
+>>
+>> This is the third (of four) patch that I can't queue without a
+>> reviewed by from you.
+>>
+>> It has been rebased to 4.5-rc1 here [1] for your convenience.  I will
+>> be happy to use another baseline should that be more adequate for you.
+> 
+> Adrian,
+> 
+> 	Are you ok with this?
+
+See comments
