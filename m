@@ -1,46 +1,81 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 29 Jan 2016 12:40:03 +0100
-Subject: [PATCH RFC 02/15] mmc: sunxi: Return error on
- mmc_regulator_set_ocr() fail in .set_ios op
-In-Reply-To: <1453354002-28366-3-git-send-email-wens@csie.org>
-References: <1453354002-28366-1-git-send-email-wens@csie.org>
- <1453354002-28366-3-git-send-email-wens@csie.org>
-Message-ID: <CAPDyKFo1+c6RXvo=LRT9ofKLRF4-sWyHD2e5DBD1BfvUp7Z8FQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 29 Jan 2016 12:39:10 +0100
+Subject: [PATCH v2 2/7] net: davinci_cpdma: use dma_addr_t for DMA address
+In-Reply-To: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
+References: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
+Message-ID: <1454067557-3546883-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 January 2016 at 06:26, Chen-Yu Tsai <wens@csie.org> wrote:
-> Let .set_ios() fail if mmc_regulator_set_ocr() fails to enable and set a
-> proper voltage for vmmc.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+The davinci_cpdma mixes up physical addresses as seen from the CPU
+and DMA addresses as seen from a DMA master, since it can operate
+on both normal memory or an on-chip buffer. If dma_addr_t is
+different from phys_addr_t, this means we get a compile-time warning
+about the type mismatch:
 
-Thanks, applied for next!
+ethernet/ti/davinci_cpdma.c: In function 'cpdma_desc_pool_create':
+ethernet/ti/davinci_cpdma.c:182:48: error: passing argument 3 of 'dma_alloc_coherent' from incompatible pointer type [-Werror=incompatible-pointer-types]
+   pool->cpumap = dma_alloc_coherent(dev, size, &pool->phys,
+In file included from ethernet/ti/davinci_cpdma.c:21:0:
+dma-mapping.h:398:21: note: expected 'dma_addr_t * {aka long long unsigned int *}' but argument is of type 'phys_addr_t * {aka unsigned int *}'
+ static inline void *dma_alloc_coherent(struct device *dev, size_t size,
 
-Kind regards
-Uffe
+This slightly restructures the code so the address we use for
+mapping RAM into a DMA address is always a dma_addr_t, avoiding
+the warning. The code is correct even if both types are 32-bit
+because the DMA master in this device only supports 32-bit addressing
+anyway, independent of the types that are used.
 
+We still assign this value to pool->phys, and that is wrong if
+the driver is ever used with an IOMMU, but that value appears to
+be never used, so there is no problem really. I've added a couple
+of comments about where we do things that are slightly violating
+the API.
 
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index cce5ca540857..790f01662b4e 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -711,7 +711,10 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->                 break;
->
->         case MMC_POWER_UP:
-> -               mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, ios->vdd);
-> +               host->ferror = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc,
-> +                                                    ios->vdd);
-> +               if (host->ferror)
-> +                       return;
->
->                 host->ferror = sunxi_mmc_init_host(mmc);
->                 if (host->ferror)
-> --
-> 2.7.0.rc3
->
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/net/ethernet/ti/davinci_cpdma.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/net/ethernet/ti/davinci_cpdma.c b/drivers/net/ethernet/ti/davinci_cpdma.c
+index 657b65bf5cac..18bf3a8fdc50 100644
+--- a/drivers/net/ethernet/ti/davinci_cpdma.c
++++ b/drivers/net/ethernet/ti/davinci_cpdma.c
+@@ -82,7 +82,7 @@ struct cpdma_desc {
+ 
+ struct cpdma_desc_pool {
+ 	phys_addr_t		phys;
+-	u32			hw_addr;
++	dma_addr_t		hw_addr;
+ 	void __iomem		*iomap;		/* ioremap map */
+ 	void			*cpumap;	/* dma_alloc map */
+ 	int			desc_size, mem_size;
+@@ -152,7 +152,7 @@ struct cpdma_chan {
+  * abstract out these details
+  */
+ static struct cpdma_desc_pool *
+-cpdma_desc_pool_create(struct device *dev, u32 phys, u32 hw_addr,
++cpdma_desc_pool_create(struct device *dev, u32 phys, dma_addr_t hw_addr,
+ 				int size, int align)
+ {
+ 	int bitmap_size;
+@@ -176,13 +176,13 @@ cpdma_desc_pool_create(struct device *dev, u32 phys, u32 hw_addr,
+ 
+ 	if (phys) {
+ 		pool->phys  = phys;
+-		pool->iomap = ioremap(phys, size);
++		pool->iomap = ioremap(phys, size); /* should be memremap? */
+ 		pool->hw_addr = hw_addr;
+ 	} else {
+-		pool->cpumap = dma_alloc_coherent(dev, size, &pool->phys,
++		pool->cpumap = dma_alloc_coherent(dev, size, &pool->hw_addr,
+ 						  GFP_KERNEL);
+-		pool->iomap = pool->cpumap;
+-		pool->hw_addr = pool->phys;
++		pool->iomap = (void __iomem __force *)pool->cpumap;
++		pool->phys = pool->hw_addr; /* assumes no IOMMU, don't use this value */
+ 	}
+ 
+ 	if (pool->iomap)
+-- 
+2.7.0
