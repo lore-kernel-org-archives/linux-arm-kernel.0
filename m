@@ -1,29 +1,17 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 29 Jan 2016 01:16:03 +0100
-Subject: [PATCH v4 1/2] regulator: act8945a: add regulator driver for
- ACT8945A
-In-Reply-To: <1453863463-30515-2-git-send-email-wenyou.yang@atmel.com>
-References: <1453863463-30515-1-git-send-email-wenyou.yang@atmel.com>
- <1453863463-30515-2-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20160129001603.GM4130@sirena.org.uk>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 28 Jan 2016 16:19:57 -0800 (PST)
+Subject: [PATCH net-next 00/40] net: fec: cleanup/fixes
+In-Reply-To: <CAGB=+3Sip-+2Qf-KTZfoCCBcO9=9tb=pVCaEs=+eNJ1sWSRgXw@mail.gmail.com>
+References: <1454016364-30985-1-git-send-email-troy.kisky@boundarydevices.com>
+ <20160128.143946.1959250656527012570.davem@davemloft.net>
+ <CAGB=+3Sip-+2Qf-KTZfoCCBcO9=9tb=pVCaEs=+eNJ1sWSRgXw@mail.gmail.com>
+Message-ID: <20160128.161957.724013635430166638.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 10:57:42AM +0800, Wenyou Yang wrote:
+From: Laci Tele <laci@boundarydevices.com>
+Date: Thu, 28 Jan 2016 23:57:10 +0100
 
-> +static const struct of_device_id act8945a_pmic_of_match[] = {
-> +	{ .compatible = "active-semi,act8945a-regulator" },
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, act8945a_pmic_of_match);
+> If he divides it, then it will be even more.
 
-This seems mostly OK but why do we have a compatible string here -
-shouldn't the MFD be able to instantiate the regulator function without
-needing this?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160129/cd5f0e17/attachment.sig>
+Do not top-post.
