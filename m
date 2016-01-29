@@ -1,62 +1,30 @@
-From: fthain@telegraphics.com.au (Finn Thain)
-Date: Fri, 29 Jan 2016 11:13:05 +1100 (AEDT)
-Subject: [PATCH] misc: atmel-secumod: Driver for Atmel "security module".
-In-Reply-To: <CALnQHM13cGnoma_3erb0oCnRD0sYGGNF1E1cgzCJHrEXbvJpRQ@mail.gmail.com>
-References: <1453348655-31182-1-git-send-email-davidm@egauge.net>
- <20160125110921.GA4027@piout.net>
- <CALnQHM13cGnoma_3erb0oCnRD0sYGGNF1E1cgzCJHrEXbvJpRQ@mail.gmail.com>
-Message-ID: <alpine.LNX.2.00.1601291055520.23683@nippy.intranet>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 28 Jan 2016 16:14:13 -0800 (PST)
+Subject: [PATCH 0/9] network driver fixes
+In-Reply-To: <1453903507-3427225-1-git-send-email-arnd@arndb.de>
+References: <1453903507-3427225-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160128.161413.1463071323452305953.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 27 Jan 2016 15:04:50 +0100
 
-On Mon, 25 Jan 2016, David Mosberger wrote:
-
-> On Mon, Jan 25, 2016 at 4:09 AM, Alexandre Belloni 
-> <alexandre.belloni@free-electrons.com> wrote:
+> These are all fixes for relatively harmless bugs that showed up
+> in my randconfig testing, so they should not be needed for v4.5
+> but get merged into net-next.
 > 
-> > I know this does more than that but I think those thre sections should 
-> > be registered using the nvmem framework. The sysfs file creation and 
-> > accesses then comes for free.
-> 
-> I think Finn's patches would have to go in for that first, since the 
-> existing nvram code is a mess. Even with Finn's patches in, I think it 
-> could go either way.
+> I've managed to address all 'uninitialized variable' warnings that
+> I get in ARM randconfig kernels now, this series includes the
+> last five I got in network drivers. They are often really annoying
+> warnings but when we get new ones, they often are about actual
+> bugs in corner cases, so I'm trying hard to eliminate the false
+> positives here to get people to pay attention to added warnings.
+> I've recently tried building with an older gcc and found tons more
+> that are all bogus, this series only addresses the ones that
+> gcc-5.2 finds.
 
-I think Alexandre is speaking of the nvmem subsystem (not nvram).
-Documentation/devicetree/bindings/nvmem
-Documentation/nvmem
-drivers/nvmem
+Arnd I'm expecting a respin of this series to address with the
+feedback you've been given.
 
-> I'm not exactly sure how some of the features of the security module 
-> would be used: key management, auto erasing, there is a strange "backup 
-> mode" vs "normal mode" which is not well documented, etc.  So I think it 
-> may well end up being sufficiently different to warrant a separate 
-> driver.
-
-nvmem is not a subsystem I am familiar with, so it's not immediately clear 
-to me what your driver would look like if re-written that way.
-
-Maybe it would become simpler. But if you did end up needing a separate 
-misc driver as well, maybe use of the nvmem framework would actually 
-increase complexity.
-
-It would depend on your requirements. But I would focus on the actual 
-requirement rather than uncertain future possibilities.
-
-> 
-> > Another idea is also to expose it using a genpool so it can be 
-> > accessed as sram from inside the kernel.
-> 
-> That may be a fine idea, but as far as our application is concerned, we 
-> need user-level access to the battery-backed RAM.
-
-Right. I don't see how adding a memory allocator would help either.
-
--- 
-
-> 
-> Best regards,
-> 
->   --david
-> 
+Thanks.
