@@ -1,248 +1,118 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 29 Jan 2016 17:35:10 -0500
-Subject: [PATCH V13 07/10] dma: qcom_hidma: add support for object hierarchy
+Date: Fri, 29 Jan 2016 17:35:05 -0500
+Subject: [PATCH V13 02/10] dma: hidma: Add Device Tree binding
 In-Reply-To: <1454106914-15857-1-git-send-email-okaya@codeaurora.org>
 References: <1454106914-15857-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1454106914-15857-8-git-send-email-okaya@codeaurora.org>
+Message-ID: <1454106914-15857-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to create a relationship model between the channels and the
-management object, we are adding support for object hierarchy to the
-drivers. This patch simplifies the userspace application development.
-We will not have to traverse different firmware paths based on device
-tree or ACPI baed kernels.
-
-No matter what flavor of kernel is used, objects will be represented as
-platform devices.
-
-The new layout is as follows:
-
-hidmam_10: hidma-mgmt at 0x5A000000 {
-	compatible = "qcom,hidma-mgmt-1.0";
-	...
-
-	hidma_10: hidma at 0x5a010000 {
-			compatible = "qcom,hidma-1.0";
-			...
-	}
-}
-
-The hidma_mgmt_init detects each instance of the hidma-mgmt-1.0 objects
-in device tree and calls into the channel driver to create platform devices
-for each child of the management object.
+Add documentation for the Qualcomm Technologies HIDMA binding.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/ABI/testing/sysfs-platform-hidma |   9 +++
- drivers/dma/qcom/hidma.c                       |  39 +++++++++-
- drivers/dma/qcom/hidma_mgmt.c                  | 104 ++++++++++++++++++++++++-
- 3 files changed, 148 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/ABI/testing/sysfs-platform-hidma
+ .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    | 92 ++++++++++++++++++++++
+ 1 file changed, 92 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
 
-diff --git a/Documentation/ABI/testing/sysfs-platform-hidma b/Documentation/ABI/testing/sysfs-platform-hidma
+diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
 new file mode 100644
-index 0000000..d364415
+index 0000000..e3677a5
 --- /dev/null
-+++ b/Documentation/ABI/testing/sysfs-platform-hidma
-@@ -0,0 +1,9 @@
-+What:		/sys/devices/platform/hidma-*/chid
-+		/sys/devices/platform/QCOM8061:*/chid
-+Date:		Dec 2015
-+KernelVersion:	4.4
-+Contact:	"Sinan Kaya <okaya@cudeaurora.org>"
-+Description:
-+		Contains the ID of the channel within the HIDMA instance.
-+		It is used to associate a given HIDMA channel with the
-+		priority and weight calls in the management interface.
-diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
-index 833db9e..ac20bdb 100644
---- a/drivers/dma/qcom/hidma.c
-+++ b/drivers/dma/qcom/hidma.c
-@@ -549,6 +549,43 @@ static irqreturn_t hidma_chirq_handler(int chirq, void *arg)
- 	return hidma_ll_inthandler(chirq, lldev);
- }
- 
-+static ssize_t hidma_show_values(struct device *dev,
-+				 struct device_attribute *attr, char *buf)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct hidma_dev *mdev = platform_get_drvdata(pdev);
++++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+@@ -0,0 +1,92 @@
++Qualcomm Technologies HIDMA Management interface
 +
-+	buf[0] = 0;
++Qualcomm Technologies HIDMA is a high speed DMA device. It only supports
++memcpy and memset capabilities. It has been designed for virtualized
++environments.
 +
-+	if (strcmp(attr->attr.name, "chid") == 0)
-+		sprintf(buf, "%d\n", mdev->chidx);
++Each HIDMA HW instance consists of multiple DMA channels. These channels
++share the same bandwidth. The bandwidth utilization can be parititioned
++among channels based on the priority and weight assignments.
 +
-+	return strlen(buf);
-+}
++There are only two priority levels and 15 weigh assignments possible.
 +
-+static int hidma_create_sysfs_entry(struct hidma_dev *dev, char *name,
-+				    int mode)
-+{
-+	struct device_attribute *attrs;
-+	char *name_copy;
++Other parameters here determine how much of the system bus this HIDMA
++instance can use like maximum read/write request and and number of bytes to
++read/write in a single burst.
 +
-+	attrs = devm_kmalloc(dev->ddev.dev, sizeof(struct device_attribute),
-+			     GFP_KERNEL);
-+	if (!attrs)
-+		return -ENOMEM;
++Main node required properties:
++- compatible: "qcom,hidma-mgmt-1.0";
++- reg: Address range for DMA device
++- dma-channels: Number of channels supported by this DMA controller.
++- max-write-burst-bytes: Maximum write burst in bytes that HIDMA can
++  occupy the bus for in a single transaction. A memcpy requested is
++  fragmented to multiples of this amount. This parameter is used while
++  writing into destination memory. Setting this value incorrectly can
++  starve other peripherals in the system.
++- max-read-burst-bytes: Maximum read burst in bytes that HIDMA can
++  occupy the bus for in a single transaction. A memcpy request is
++  fragmented to multiples of this amount. This parameter is used while
++  reading the source memory. Setting this value incorrectly can starve
++  other peripherals in the system.
++- max-write-transactions: This value is how many times a write burst is
++  applied back to back while writing to the destination before yielding
++  the bus.
++- max-read-transactions: This value is how many times a read burst is
++  applied back to back while reading the source before yielding the bus.
++- channel-reset-timeout-cycles: Channel reset timeout in cycles for this SOC.
++  Once a reset is applied to the HW, HW starts a timer for reset operation
++  to confirm. If reset is not completed within this time, HW reports reset
++  failure.
 +
-+	name_copy = devm_kstrdup(dev->ddev.dev, name, GFP_KERNEL);
-+	if (!name_copy)
-+		return -ENOMEM;
++Sub-nodes:
 +
-+	attrs->attr.name = name_copy;
-+	attrs->attr.mode = mode;
-+	attrs->show = hidma_show_values;
-+	sysfs_attr_init(&attrs->attr);
++HIDMA has one or more DMA channels that are used to move data from one
++memory location to another.
 +
-+	return device_create_file(dev->ddev.dev, attrs);
-+}
++When the OS is not in control of the management interface (i.e. it's a guest),
++the channel nodes appear on their own, not under a management node.
 +
- static int hidma_probe(struct platform_device *pdev)
- {
- 	struct hidma_dev *dmadev;
-@@ -682,6 +719,7 @@ static int hidma_probe(struct platform_device *pdev)
- 	dmadev->irq = chirq;
- 	tasklet_init(&dmadev->task, hidma_issue_task, (unsigned long)dmadev);
- 	hidma_debug_init(dmadev);
-+	hidma_create_sysfs_entry(dmadev, "chid", S_IRUGO);
- 	dev_info(&pdev->dev, "HI-DMA engine driver registration complete\n");
- 	platform_set_drvdata(pdev, dmadev);
- 	pm_runtime_mark_last_busy(dmadev->ddev.dev);
-@@ -730,7 +768,6 @@ static const struct of_device_id hidma_match[] = {
- 	{.compatible = "qcom,hidma-1.0",},
- 	{},
- };
--
- MODULE_DEVICE_TABLE(of, hidma_match);
- 
- static struct platform_driver hidma_driver = {
-diff --git a/drivers/dma/qcom/hidma_mgmt.c b/drivers/dma/qcom/hidma_mgmt.c
-index ef491b8..61fe6b7 100644
---- a/drivers/dma/qcom/hidma_mgmt.c
-+++ b/drivers/dma/qcom/hidma_mgmt.c
-@@ -17,13 +17,14 @@
- #include <linux/acpi.h>
- #include <linux/of.h>
- #include <linux/property.h>
--#include <linux/interrupt.h>
--#include <linux/platform_device.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
- #include <linux/module.h>
- #include <linux/uaccess.h>
- #include <linux/slab.h>
- #include <linux/pm_runtime.h>
- #include <linux/bitops.h>
-+#include <linux/dma-mapping.h>
- 
- #include "hidma_mgmt.h"
- 
-@@ -298,5 +299,102 @@ static struct platform_driver hidma_mgmt_driver = {
- 	},
- };
- 
--module_platform_driver(hidma_mgmt_driver);
-+#if defined(CONFIG_OF) && defined(CONFIG_OF_IRQ)
-+static int object_counter;
++Required properties:
++- compatible: must contain "qcom,hidma-1.0"
++- reg: Addresses for the transfer and event channel
++- interrupts: Should contain the event interrupt
++- desc-count: Number of asynchronous requests this channel can handle
++- channel-index: The HW event channel completions will be delivered.
++- iommus: required a iommu node
 +
-+static int __init hidma_mgmt_of_populate_channels(struct device_node *np)
-+{
-+	struct platform_device *pdev_parent = of_find_device_by_node(np);
-+	struct platform_device_info pdevinfo;
-+	struct of_phandle_args out_irq;
-+	struct device_node *child;
-+	struct resource *res;
-+	const __be32 *cell;
-+	int ret = 0, size, i, num;
-+	u64 addr, addr_size;
++Example:
 +
-+	for_each_available_child_of_node(np, child) {
-+		struct resource *res_iter;
++Hypervisor OS configuration:
 +
-+		cell = of_get_property(child, "reg", &size);
-+		if (!cell) {
-+			ret = -EINVAL;
-+			goto out;
-+		}
++	hidma-mgmt at f9984000 = {
++		compatible = "qcom,hidma-mgmt-1.0";
++		reg = <0xf9984000 0x15000>;
++		dma-channels = <6>;
++		max-write-burst-bytes = <1024>;
++		max-read-burst-bytes = <1024>;
++		max-write-transactions = <31>;
++		max-read-transactions = <31>;
++		channel-reset-timeout-cycles = <0x500>;
 +
-+		size /= sizeof(*cell);
-+		num = size /
-+			(of_n_addr_cells(child) + of_n_size_cells(child)) + 1;
++		hidma_24: dma-controller at 0x5c050000 {
++			compatible = "qcom,hidma-1.0";
++			reg = <0 0x5c050000 0x0 0x1000>,
++			      <0 0x5c0b0000 0x0 0x1000>;
++			interrupts = <0 389 0>;
++			desc-count = <10>;
++			iommus = <&system_mmu>;
++			channel-index = <4>;
++		};
++	};
 +
-+		/* allocate a resource array */
-+		res = kcalloc(num, sizeof(*res), GFP_KERNEL);
-+		if (!res) {
-+			ret = -ENOMEM;
-+			goto out;
-+		}
++Guest OS configuration:
 +
-+		/* read each reg value */
-+		i = 0;
-+		res_iter = res;
-+		while (i < size) {
-+			addr = of_read_number(&cell[i],
-+					      of_n_addr_cells(child));
-+			i += of_n_addr_cells(child);
-+
-+			addr_size = of_read_number(&cell[i],
-+						   of_n_size_cells(child));
-+			i += of_n_size_cells(child);
-+
-+			res_iter->start = addr;
-+			res_iter->end = res_iter->start + addr_size - 1;
-+			res_iter->flags = IORESOURCE_MEM;
-+			res_iter++;
-+		}
-+
-+		ret = of_irq_parse_one(child, 0, &out_irq);
-+		if (ret)
-+			goto out;
-+
-+		res_iter->start = irq_create_of_mapping(&out_irq);
-+		res_iter->name = "hidma event irq";
-+		res_iter->flags = IORESOURCE_IRQ;
-+
-+		pdevinfo.fwnode = &child->fwnode;
-+		pdevinfo.parent = pdev_parent ? &pdev_parent->dev : NULL;
-+		pdevinfo.name = child->name;
-+		pdevinfo.id = object_counter++;
-+		pdevinfo.res = res;
-+		pdevinfo.num_res = num;
-+		pdevinfo.data = NULL;
-+		pdevinfo.size_data = 0;
-+		pdevinfo.dma_mask = DMA_BIT_MASK(64);
-+		platform_device_register_full(&pdevinfo);
-+
-+		kfree(res);
-+		res = NULL;
-+	}
-+out:
-+	kfree(res);
-+
-+	return ret;
-+}
-+#endif
-+
-+static int __init hidma_mgmt_init(void)
-+{
-+#if defined(CONFIG_OF) && defined(CONFIG_OF_IRQ)
-+	struct device_node *child;
-+
-+	for (child = of_find_matching_node(NULL, hidma_mgmt_match); child;
-+	     child = of_find_matching_node(child, hidma_mgmt_match)) {
-+		/* device tree based firmware here */
-+		hidma_mgmt_of_populate_channels(child);
-+		of_node_put(child);
-+	}
-+#endif
-+	platform_driver_register(&hidma_mgmt_driver);
-+
-+	return 0;
-+}
-+module_init(hidma_mgmt_init);
- MODULE_LICENSE("GPL v2");
++	hidma_24: dma-controller at 0x5c050000 {
++		compatible = "qcom,hidma-1.0";
++		reg = <0 0x5c050000 0x0 0x1000>,
++		      <0 0x5c0b0000 0x0 0x1000>;
++		interrupts = <0 389 0>;
++		desc-count = <10>;
++		channel-index = <4>;
++		iommus = <&system_mmu>;
++	};
 -- 
 1.8.2.1
