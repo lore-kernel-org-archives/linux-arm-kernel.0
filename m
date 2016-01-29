@@ -1,58 +1,42 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 29 Jan 2016 19:49:19 +0100
-Subject: [PATCH v4 00/22] arm64: implement support for KASLR
-In-Reply-To: <20160129182657.GI20099@e104818-lin.cambridge.arm.com>
-References: <1453828249-14467-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160129182657.GI20099@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu_ANOm_skhVVBwK-1+yVP614FWeCo87aGN7iFjmUj95Ug@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 29 Jan 2016 18:55:44 +0000
+Subject: [PATCH] help guest boot up on AArch64 host with GICv2
+In-Reply-To: <56ABAF80.4090400@ezchip.com>
+References: <56995068.9050207@ezchip.com> <569CB034.1060307@arm.com>
+ <56A7DA7C.8090202@ezchip.com> <56A88A0E.40002@arm.com>
+ <56AA7618.8030406@ezchip.com> <56ABA74A.3080500@arm.com>
+ <56ABAF80.4090400@ezchip.com>
+Message-ID: <56ABB5B0.4090900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-giOn 29 January 2016 at 19:26, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> Hi Ard,
->
-> On Tue, Jan 26, 2016 at 06:10:27PM +0100, Ard Biesheuvel wrote:
->> Code can be found here:
->> git://git.linaro.org/people/ard.biesheuvel/linux-arm.git arm64-kaslr-v4a
->> https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm64-kaslr-v4a
->
-> The overall series looks fine but I'd like more time to review the KASLR
-> part together with the module PLT stuff.
->
-> So could you please split this series in 2-3 parts for easy merging
-> (possibly without the KASLR part, it depends on how the review goes)?
+On 29/01/16 18:29, Chris Metcalf wrote:
+> On 01/29/2016 12:54 PM, Marc Zyngier wrote:
+>> By the look of it, you're trying to use a GICv3 firmware, and pass a
+>> GICv2 DT to the kernel. Do not do that. Either you use a GICv2 firmware
+>> (having spoken to the ATF guys, there is a GICv2 driver in there that
+>> should work for your case) and pass a GICv2 DT, or you go GICv3 all the way.
+>>
+>> A mix of the two things is completely unsupported on the model, and
+>> solidly places you in the UNPREDICTABLE category when running that on
+>> actual HW...
+> 
+> Once we upgrade to ATF 1.2 we will remove all of our GICv2
+> stuff and see if everything works smoothly; till then, at least, we
+> seem to have a workaround in place for development that will
+> let us keep moving forward.
+> 
+>  From the ATF docs it does seem that using a v3 GIC in v2
+> compatibility mode should be supported, but it's not pressing
+> from our side to drill any deeper to try to see why it's not
+> actually working correctly for us (though I'd be happy to try
+> any further testing in this configuration if that's helpful).
 
-Sure
+That's what I've been told as well - the GICv2 code in ATF 1.2 should do
+the trick out of the box.
 
-> It
-> looks like a mix of features in random order like huge-vmap, relative
-> extable, kernel memory layout changes, kernel load address, PIE and
-> KASLR. So something like:
->
-> 1. relative extable
+Thanks,
 
-This has been picked up by akpm in the mean time
-
-> 2. huge-vmap
-
-This is a single patch which is completely independent. I don't expect
-it to conflict when applied in isolation.
-
-> 3. kernel memory layout changes (moving kernel to the base of vmalloc
-> range)
-> 4. allow kernel loading at different phys offsets
-> 5. module PLTs, relocations, PIE, relative kallsyms, KASLR
-
-Relative kallsyms has also been picked up by akpm
-
-> 6. efi_get_random_bytes
->
-> 1-4 can be in the same branch but I currently find it hard to
-> cherry-pick the non-PIE/non-KASLR patches without conflicts.
->
-
-I think 3 logically coherent series that apply in sequence is
-feasible. I will look into this on Monday
-
+	M.
 -- 
-Ard.
+Jazz is not dead. It just smells funny...
