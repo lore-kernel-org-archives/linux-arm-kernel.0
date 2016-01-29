@@ -1,50 +1,38 @@
-From: joshua.henderson@microchip.com (Joshua Henderson)
-Date: Fri, 29 Jan 2016 09:00:36 -0700
-Subject: [PATCH 03/15] mips: use of_platform_default_populate() to
- populate default bus
-In-Reply-To: <1453868872-26300-4-git-send-email-wangkefeng.wang@huawei.com>
-References: <1453868872-26300-1-git-send-email-wangkefeng.wang@huawei.com>
- <1453868872-26300-4-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <56AB8CA4.7070803@microchip.com>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Fri, 29 Jan 2016 16:55:08 +0100
+Subject: [PATCH 1/7] usb: gadget: pxa25x_udc: move register definitions
+ from arch
+In-Reply-To: <1453997843-3489728-1-git-send-email-arnd@arndb.de> (Arnd
+ Bergmann's message of "Thu, 28 Jan 2016 17:17:02 +0100")
+References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
+ <1453997843-3489728-1-git-send-email-arnd@arndb.de>
+Message-ID: <m3h9hwgz37.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/26/2016 09:27 PM, Kefeng Wang wrote:
-> Use helper of_platform_default_populate() in linux/of_platform
-> when possible, instead of calling of_platform_populate() with
-> the default match table.
-> 
-> Cc: Ralf Baechle <ralf@linux-mips.org>
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> ---
->  arch/mips/ath79/setup.c           | 2 +-
->  arch/mips/jz4740/setup.c          | 2 +-
->  arch/mips/mti-sead3/sead3-setup.c | 2 +-
->  arch/mips/pic32/pic32mzda/init.c  | 3 +--
->  arch/mips/pistachio/init.c        | 2 +-
->  arch/mips/xilfpga/init.c          | 2 +-
->  6 files changed, 6 insertions(+), 7 deletions(-)
-> 
+Arnd Bergmann <arnd@arndb.de> writes:
 
-[...]
+> This addresses both issues by moving all the definitions into the
+> pxa25x_udc driver itself. It turns out the only difference between
+> them was 'UDCCS_IO_ROF', and that could well be a mistake when it
+> was incorrectly copied from pxa25x to ixp4xx.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> diff --git a/arch/mips/pic32/pic32mzda/init.c b/arch/mips/pic32/pic32mzda/init.c
-> index 775ff90..77ecf32 100644
-> --- a/arch/mips/pic32/pic32mzda/init.c
-> +++ b/arch/mips/pic32/pic32mzda/init.c
-> @@ -147,8 +147,7 @@ static int __init plat_of_setup(void)
->  		panic("Device tree not present");
->  
->  	pic32_of_prepare_platform_data(pic32_auxdata_lookup);
-> -	if (of_platform_populate(NULL, of_default_bus_match_table,
-> -				 pic32_auxdata_lookup, NULL))
-> +	if (of_platform_default_populate(NULL, pic32_auxdata_lookup, NULL))
->  		panic("Failed to populate DT");
->  
->  	return 0;
+Both the programming manual and the Intel's library code say it's
+bit 2. Must be a mistake in the old code. Unfortunately I think we
+won't be able to check it on real hardware, the UDC on IXP4xx boards
+isn't usually connected. Also, this bug wouldn't likely affect
+operation (unless there is an overflow event, which would be
+currently undetected).
 
-I'll one-up just compile-testing for this.
+I guess we as well very safely change it to 1 << 2.
 
-Tested-by: Joshua Henderson <joshua.henderson@microchip.com>
 
-[...]
+For the IXP4xx part,
+Acked-by: Krzysztof Halasa <khalasa@piap.pl>
+-- 
+Krzysztof Halasa
+
+Industrial Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
