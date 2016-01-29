@@ -1,34 +1,43 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Fri, 29 Jan 2016 18:58:40 +0100
-Subject: Exynos Snow board display regression
-In-Reply-To: <56AB9EDF.2050401@osg.samsung.com>
-References: <CAOMqctT2dAQERos8bhrtVirF7ma4onq+UUS2ks-86LJ_mVDU6g@mail.gmail.com>
- <56AB9EDF.2050401@osg.samsung.com>
-Message-ID: <CAOMqctRZC4T=wnN3qzZSOk-TP_uyFZNh7mqpfe71j=rOBUFn-A@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 29 Jan 2016 21:03:40 +0300
+Subject: [PATCH 3/7] usb: gadget: pxa25x_udc: use readl/writel for mmio
+In-Reply-To: <m3a8nogy0u.fsf@t19.piap.pl>
+References: <1453997722-3489596-1-git-send-email-arnd@arndb.de>
+ <1453997843-3489728-1-git-send-email-arnd@arndb.de>
+ <1453997843-3489728-3-git-send-email-arnd@arndb.de>
+ <m3a8nogy0u.fsf@t19.piap.pl>
+Message-ID: <56ABA97C.1000501@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 January 2016 at 18:18, Javier Martinez Canillas
-<javier@osg.samsung.com> wrote:
-> Hello Michal,
->
-> On 01/29/2016 02:07 PM, Michal Suchanek wrote:
->>
->> Hello,
->>
->> after  commit a9fa852886fd5a7ccec3b7e9eff75f85072f009c
->>
->> display no longer works on the Snow board. The built-in panel is no
->> longer probed.
->>
-> Yes, I noticed the same and posted a fix some hours ago:
->
-> https://lkml.org/lkml/2016/1/29/355
->
-Tested-by: Michal Suchanek <hramrach@gmail.com>
+Hello.
 
-on that patch.
+On 01/29/2016 07:18 PM, Krzysztof Ha?asa wrote:
 
-Thanks
+>> The unclear part here is for IXP4xx, which supports both big-endian
+>> and little-endian configurations. So far, the driver has done
+>> no byteswap in either case. I suspect that is wrong and it would
+>> actually need to swap in one or the other case, but I don't know
+>> which.
+>
+> If at all, I guess it should swap in LE mode. But it's far from certain.
+>
+>> It's also possible that there is some magic setting in
+>> the chip that makes the endianess of the MMIO register match the
+>> CPU, and in that case, the code actually does the right thing
+>> for all configurations, both before and after this patch.
+>
+> This is IMHO most probable.
+>
+> Actually, the IXP4xx is "natural" in BE mode (except for PCI) and
+> normally in LE mode it's order-coherent, meaning 32-bit "integer"
+> accesses need no swapping, but 8-bit and (mostly unused) 16-bit
+> transfers need swapping.
+>
+> Anyway, I think readl()/writel() do the right thing: in BE mode they
+> swap PCI accesses and don't swap normal registers,
 
-Michal
+    Alas, readl()/writel() don't know what registers you are calling them for, 
+they were designed for PCI which is little-endian, so they will swap in BE mode.
+
+MBR, Sergei
