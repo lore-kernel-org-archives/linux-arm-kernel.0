@@ -1,37 +1,53 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 29 Jan 2016 13:42:40 +0200
-Subject: [PATCH] fbdev: da8xx-fb: remove incorrect type cast
-In-Reply-To: <1453734351-1958373-1-git-send-email-arnd@arndb.de>
-References: <1453734351-1958373-1-git-send-email-arnd@arndb.de>
-Message-ID: <56AB5030.5040203@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 29 Jan 2016 12:39:12 +0100
+Subject: [PATCH v2 4/7] net: bgmac: clarify CONFIG_BCMA dependency
+In-Reply-To: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
+References: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
+Message-ID: <1454067557-3546883-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The bgmac driver depends on BCMA_HOST_SOC, which is only used
+when CONFIG_BCMA is enabled. However, it is a bool option and can
+be set when CONFIG_BCMA=m, and then bgmac can be built-in, leading
+to an obvious link error:
 
+drivers/built-in.o: In function `bgmac_init':
+:(.init.text+0x7f2c): undefined reference to `__bcma_driver_register'
+drivers/built-in.o: In function `bgmac_exit':
+:(.exit.text+0x110a): undefined reference to `bcma_driver_unregister'
 
-On 25/01/16 17:05, Arnd Bergmann wrote:
-> The probe function correct passes a dma_addr_t pointer into
-> dma_alloc_coherent(), but has a cast to resource_size_t, which
-> might be different from dma_addr_t:
-> 
-> drivers/video/fbdev/da8xx-fb.c: In function 'fb_probe':
-> drivers/video/fbdev/da8xx-fb.c:1431:10: error: passing argument 3 of 'dma_alloc_coherent' from incompatible pointer type [-Werror=incompatible-pointer-types]
-> 
-> This removes the cast, which avoids the warning.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/video/fbdev/da8xx-fb.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+To avoid this case, we need to depend on both BCMA and BCMA_SOC,
+as this patch does. I'm also trying to make the dependency more
+readable by splitting it into three lines, and adding a COMPILE_TEST
+alternative so we can test-build it in all configurations that
+support BCMA.
 
-Thanks, queued for 4.5 fixes.
+The added dependency on FIXED_PHY addresses a related issue where
+we cannot call fixed_phy_register() when CONFIG_FIXED_PHY=m and
+CONFIG_BGMAC=y.
 
- Tomi
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/net/ethernet/broadcom/Kconfig | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160129/a67d14d2/attachment-0001.sig>
+diff --git a/drivers/net/ethernet/broadcom/Kconfig b/drivers/net/ethernet/broadcom/Kconfig
+index 8550df189ceb..19f7cd02e085 100644
+--- a/drivers/net/ethernet/broadcom/Kconfig
++++ b/drivers/net/ethernet/broadcom/Kconfig
+@@ -151,8 +151,11 @@ config BNX2X_VXLAN
+ 
+ config BGMAC
+ 	tristate "BCMA bus GBit core support"
+-	depends on BCMA_HOST_SOC && HAS_DMA && (BCM47XX || ARCH_BCM_5301X)
++	depends on BCMA && BCMA_HOST_SOC
++	depends on HAS_DMA
++	depends on BCM47XX || ARCH_BCM_5301X || COMPILE_TEST
+ 	select PHYLIB
++	select FIXED_PHY
+ 	---help---
+ 	  This driver supports GBit MAC and BCM4706 GBit MAC cores on BCMA bus.
+ 	  They can be found on BCM47xx SoCs and provide gigabit ethernet.
+-- 
+2.7.0
