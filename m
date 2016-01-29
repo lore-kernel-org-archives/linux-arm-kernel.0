@@ -1,45 +1,111 @@
 From: labbott@fedoraproject.org (Laura Abbott)
-Date: Fri, 29 Jan 2016 15:46:55 -0800
-Subject: [PATCHv2 0/3] ARCH_SUPPORTS_DEBUG_PAGEALLOC for arm64
-Message-ID: <1454111218-3461-1-git-send-email-labbott@fedoraproject.org>
+Date: Fri, 29 Jan 2016 15:46:56 -0800
+Subject: [PATCHv2 1/3] arm64: Drop alloc function from create_mapping
+In-Reply-To: <1454111218-3461-1-git-send-email-labbott@fedoraproject.org>
+References: <1454111218-3461-1-git-send-email-labbott@fedoraproject.org>
+Message-ID: <1454111218-3461-2-git-send-email-labbott@fedoraproject.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-This is v2 of the series to add proper debug pagealloc support for arm64.
+create_mapping is only used in fixmap_remap_fdt. All the create_mapping
+calls need to happen on existing translation table pages without
+additional allocations. Rather than have an alloc function be called
+and fail, just set it to NULL and catch it's use. Also change
+the name to create_mapping_noalloc to better capture what exactly is
+going on.
 
-Changes since v1:
-- Dropped the config for forcing pages and changed it to runtime detection.
-  This now matches better with how x86 and other arches are being updated.
-  That patch is now dropped completely and folded in to the actual patch
-  for ARCH_SUPPORTS_DEBUG_PAGEALLOC
-- Took Mark's suggestion to rename create_mapping -> create_mapping_noalloc
-- The only way to get all PAGE_SIZE mappings right now is to enable
-  debug_pagealloc. This is the only actual use case right now. It is fairly
-  simple to add the code to let this happen for other uses. If that
-  time comes someone can plead their case to the court of ARM to accept such
-  a patch.
+Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+---
+ arch/arm64/mm/mmu.c | 27 ++++++++++++++++++---------
+ 1 file changed, 18 insertions(+), 9 deletions(-)
 
-This series now depends on the patch to let debug_pagealloc_enabled()
-be used when !CONFIG_DEBUG_PAGEALLOC
-(http://article.gmane.org/gmane.linux.kernel.mm/145208)
-I can either take acks and submit this to the MM tree or we can wait for that
-patch to show up in something I can rebase to.
-
-Thanks,
-Laura
-
-Laura Abbott (3):
-  arm64: Drop alloc function from create_mapping
-  arm64: Add support for ARCH_SUPPORTS_DEBUG_PAGEALLOC
-  arm64: ptdump: Indicate whether memory should be faulting
-
- arch/arm64/Kconfig       |  3 +++
- arch/arm64/mm/dump.c     |  5 +++++
- arch/arm64/mm/mmu.c      | 37 +++++++++++++++++++++++++------------
- arch/arm64/mm/pageattr.c | 40 +++++++++++++++++++++++++++++++++-------
- 4 files changed, 66 insertions(+), 19 deletions(-)
-
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 7711554..103ebc0 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -116,7 +116,9 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 	pte_t *pte;
+ 
+ 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
+-		phys_addr_t pte_phys = pgtable_alloc();
++		phys_addr_t pte_phys;
++		BUG_ON(!pgtable_alloc);
++		pte_phys = pgtable_alloc();
+ 		pte = pte_set_fixmap(pte_phys);
+ 		if (pmd_sect(*pmd))
+ 			split_pmd(pmd, pte);
+@@ -158,7 +160,9 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 	 * Check for initial section mappings in the pgd/pud and remove them.
+ 	 */
+ 	if (pud_none(*pud) || pud_sect(*pud)) {
+-		phys_addr_t pmd_phys = pgtable_alloc();
++		phys_addr_t pmd_phys;
++		BUG_ON(!pgtable_alloc);
++		pmd_phys = pgtable_alloc();
+ 		pmd = pmd_set_fixmap(pmd_phys);
+ 		if (pud_sect(*pud)) {
+ 			/*
+@@ -223,7 +227,9 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+ 	unsigned long next;
+ 
+ 	if (pgd_none(*pgd)) {
+-		phys_addr_t pud_phys = pgtable_alloc();
++		phys_addr_t pud_phys;
++		BUG_ON(!pgtable_alloc);
++		pud_phys = pgtable_alloc();
+ 		__pgd_populate(pgd, pud_phys, PUD_TYPE_TABLE);
+ 	}
+ 	BUG_ON(pgd_bad(*pgd));
+@@ -312,7 +318,10 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
+ 	init_pgd(pgd_offset_raw(pgdir, virt), phys, virt, size, prot, alloc);
+ }
+ 
+-static void __init create_mapping(phys_addr_t phys, unsigned long virt,
++/*
++ * This function is for mapping using existing sections only.
++ */
++static void __init create_mapping_noalloc(phys_addr_t phys, unsigned long virt,
+ 				  phys_addr_t size, pgprot_t prot)
+ {
+ 	if (virt < VMALLOC_START) {
+@@ -321,7 +330,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+ 		return;
+ 	}
+ 	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
+-			     early_pgtable_alloc);
++			     NULL);
+ }
+ 
+ void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+@@ -680,7 +689,7 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
+ 	/*
+ 	 * Make sure that the FDT region can be mapped without the need to
+ 	 * allocate additional translation table pages, so that it is safe
+-	 * to call create_mapping() this early.
++	 * to call create_mapping_noalloc() this early.
+ 	 *
+ 	 * On 64k pages, the FDT will be mapped using PTEs, so we need to
+ 	 * be in the same PMD as the rest of the fixmap.
+@@ -696,8 +705,8 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
+ 	dt_virt = (void *)dt_virt_base + offset;
+ 
+ 	/* map the first chunk so we can read the size from the header */
+-	create_mapping(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
+-		       SWAPPER_BLOCK_SIZE, prot);
++	create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE),
++			dt_virt_base, SWAPPER_BLOCK_SIZE, prot);
+ 
+ 	if (fdt_check_header(dt_virt) != 0)
+ 		return NULL;
+@@ -707,7 +716,7 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
+ 		return NULL;
+ 
+ 	if (offset + size > SWAPPER_BLOCK_SIZE)
+-		create_mapping(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
++		create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
+ 			       round_up(offset + size, SWAPPER_BLOCK_SIZE), prot);
+ 
+ 	memblock_reserve(dt_phys, size);
 -- 
 2.5.0
