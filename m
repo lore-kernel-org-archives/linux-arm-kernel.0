@@ -1,859 +1,297 @@
 From: jchandra@broadcom.com (Jayachandran C)
-Date: Fri, 29 Jan 2016 14:35:36 +0530
-Subject: [PATCH v7 1/5] APCI: MCFG: Move mmcfg_list management to drivers/acpi
+Date: Fri, 29 Jan 2016 14:35:40 +0530
+Subject: [PATCH v7 5/5] PCI: ACPI: Add a generic ACPI based host controller
 In-Reply-To: <1454058340-7904-1-git-send-email-jchandra@broadcom.com>
 References: <1454058340-7904-1-git-send-email-jchandra@broadcom.com>
-Message-ID: <1454058340-7904-2-git-send-email-jchandra@broadcom.com>
+Message-ID: <1454058340-7904-6-git-send-email-jchandra@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move pci_mmcfg_list handling to a drivers/acpi/pci_mcfg.c. This is
-to share the API and code with ARM64 later. The corresponding
-declarations are moved from asm/pci_x86.h to linux/pci-acpi.h
+Add a simple ACPI based PCI host controller under config option
+ACPI_PCI_HOST_GENERIC. This is done by providing an implementation
+of pci_acpi_scan_root().
 
-As a part of this we introduce three functions that can be
-implemented by the arch code: pci_mmconfig_map_resource() to map a
-mcfg entry, pci_mmconfig_unmap_resource to do the corresponding
-unmap and pci_mmconfig_enabled to see if the arch setup of
-mcfg entries was successful. We also provide weak implementations
-of these, which will be used from ARM64. On x86, we retain the
-old logic by providing platform specific implementation.
+The pci_mmcfg_list handling is done by the ACPI code, so we keep a
+reference to the pci_mmcfg_region in sysdata. The ECAM region will
+be already mapped, so map_bus can be implemented by using the
+virt pointer for the pci_mmcfg_region. pci_generic_config_read
+and pci_generic_config_write are used for config space read/write.
 
-This patch is purely rearranging code, it should not have any
-impact on the logic of MCFG parsing or list handling.
+Also, we provide implementations of raw_pci_read and raw_pci_write
+hat are needed by ACPI based on the pci_mmcfg_list.
 
-Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-[Xen parts:]
-Acked-by: David Vrabel <david.vrabel@citrix.com>
+pci_acpi_set_companion() and acpi_pci_get_segment() are defined
+using sysdata of generic ACPI host controller so that PCI domain
+and ACPI companion are set in PCI code rather than platform code.
+
+This code is currently enabled only for ARM64.
 
 Signed-off-by: Jayachandran C <jchandra@broadcom.com>
 ---
- arch/x86/include/asm/pci_x86.h |  24 +---
- arch/x86/pci/mmconfig-shared.c | 269 +++++------------------------------
- arch/x86/pci/mmconfig_32.c     |   1 +
- arch/x86/pci/mmconfig_64.c     |   1 +
- arch/x86/pci/numachip.c        |   1 +
- drivers/acpi/Makefile          |   1 +
- drivers/acpi/pci_mcfg.c        | 312 +++++++++++++++++++++++++++++++++++++++++
- drivers/xen/pci.c              |   5 +-
- include/linux/pci-acpi.h       |  33 +++++
- 9 files changed, 386 insertions(+), 261 deletions(-)
- create mode 100644 drivers/acpi/pci_mcfg.c
+ drivers/acpi/Kconfig         |   8 ++
+ drivers/acpi/Makefile        |   1 +
+ drivers/acpi/pci_host_acpi.c | 186 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/pci-acpi.h     |  17 ++++
+ 4 files changed, 212 insertions(+)
+ create mode 100644 drivers/acpi/pci_host_acpi.c
 
-diff --git a/arch/x86/include/asm/pci_x86.h b/arch/x86/include/asm/pci_x86.h
-index 46873fb..7824626 100644
---- a/arch/x86/include/asm/pci_x86.h
-+++ b/arch/x86/include/asm/pci_x86.h
-@@ -122,33 +122,11 @@ extern int pci_legacy_init(void);
- extern void pcibios_fixup_irqs(void);
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index 82b96ee..65fb483 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -294,6 +294,14 @@ config ACPI_NUMA
+ 	depends on (X86 || IA64)
+ 	default y if IA64_GENERIC || IA64_SGI_SN2
  
- /* pci-mmconfig.c */
--
--/* "PCI MMCONFIG %04x [bus %02x-%02x]" */
--#define PCI_MMCFG_RESOURCE_NAME_LEN (22 + 4 + 2 + 2)
--
--struct pci_mmcfg_region {
--	struct list_head list;
--	struct resource res;
--	u64 address;
--	char __iomem *virt;
--	u16 segment;
--	u8 start_bus;
--	u8 end_bus;
--	char name[PCI_MMCFG_RESOURCE_NAME_LEN];
--};
--
-+struct pci_mmcfg_region;
- extern int __init pci_mmcfg_arch_init(void);
- extern void __init pci_mmcfg_arch_free(void);
- extern int pci_mmcfg_arch_map(struct pci_mmcfg_region *cfg);
- extern void pci_mmcfg_arch_unmap(struct pci_mmcfg_region *cfg);
--extern int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
--			       phys_addr_t addr);
--extern int pci_mmconfig_delete(u16 seg, u8 start, u8 end);
--extern struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus);
--
--extern struct list_head pci_mmcfg_list;
--
--#define PCI_MMCFG_BUS_OFFSET(bus)      ((bus) << 20)
- 
- /*
-  * On AMD Fam10h CPUs, all PCI MMIO configuration space accesses must use
-diff --git a/arch/x86/pci/mmconfig-shared.c b/arch/x86/pci/mmconfig-shared.c
-index dd30b7e..626710b 100644
---- a/arch/x86/pci/mmconfig-shared.c
-+++ b/arch/x86/pci/mmconfig-shared.c
-@@ -12,13 +12,12 @@
- 
- #include <linux/pci.h>
- #include <linux/init.h>
--#include <linux/sfi_acpi.h>
- #include <linux/bitmap.h>
--#include <linux/dmi.h>
- #include <linux/slab.h>
- #include <linux/mutex.h>
- #include <linux/rculist.h>
- #include <asm/e820.h>
-+#include <linux/pci-acpi.h>
- #include <asm/pci_x86.h>
- #include <asm/acpi.h>
- 
-@@ -27,9 +26,6 @@
- /* Indicate if the mmcfg resources have been placed into the resource table. */
- static bool pci_mmcfg_running_state;
- static bool pci_mmcfg_arch_init_failed;
--static DEFINE_MUTEX(pci_mmcfg_lock);
--
--LIST_HEAD(pci_mmcfg_list);
- 
- static void __init pci_mmconfig_remove(struct pci_mmcfg_region *cfg)
- {
-@@ -48,83 +44,6 @@ static void __init free_all_mmcfg(void)
- 		pci_mmconfig_remove(cfg);
- }
- 
--static void list_add_sorted(struct pci_mmcfg_region *new)
--{
--	struct pci_mmcfg_region *cfg;
--
--	/* keep list sorted by segment and starting bus number */
--	list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list) {
--		if (cfg->segment > new->segment ||
--		    (cfg->segment == new->segment &&
--		     cfg->start_bus >= new->start_bus)) {
--			list_add_tail_rcu(&new->list, &cfg->list);
--			return;
--		}
--	}
--	list_add_tail_rcu(&new->list, &pci_mmcfg_list);
--}
--
--static struct pci_mmcfg_region *pci_mmconfig_alloc(int segment, int start,
--						   int end, u64 addr)
--{
--	struct pci_mmcfg_region *new;
--	struct resource *res;
--
--	if (addr == 0)
--		return NULL;
--
--	new = kzalloc(sizeof(*new), GFP_KERNEL);
--	if (!new)
--		return NULL;
--
--	new->address = addr;
--	new->segment = segment;
--	new->start_bus = start;
--	new->end_bus = end;
--
--	res = &new->res;
--	res->start = addr + PCI_MMCFG_BUS_OFFSET(start);
--	res->end = addr + PCI_MMCFG_BUS_OFFSET(end + 1) - 1;
--	res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
--	snprintf(new->name, PCI_MMCFG_RESOURCE_NAME_LEN,
--		 "PCI MMCONFIG %04x [bus %02x-%02x]", segment, start, end);
--	res->name = new->name;
--
--	return new;
--}
--
--static struct pci_mmcfg_region *__init pci_mmconfig_add(int segment, int start,
--							int end, u64 addr)
--{
--	struct pci_mmcfg_region *new;
--
--	new = pci_mmconfig_alloc(segment, start, end, addr);
--	if (new) {
--		mutex_lock(&pci_mmcfg_lock);
--		list_add_sorted(new);
--		mutex_unlock(&pci_mmcfg_lock);
--
--		pr_info(PREFIX
--		       "MMCONFIG for domain %04x [bus %02x-%02x] at %pR "
--		       "(base %#lx)\n",
--		       segment, start, end, &new->res, (unsigned long)addr);
--	}
--
--	return new;
--}
--
--struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus)
--{
--	struct pci_mmcfg_region *cfg;
--
--	list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list)
--		if (cfg->segment == segment &&
--		    cfg->start_bus <= bus && bus <= cfg->end_bus)
--			return cfg;
--
--	return NULL;
--}
--
- static const char *__init pci_mmcfg_e7520(void)
- {
- 	u32 win;
-@@ -543,73 +462,6 @@ static void __init pci_mmcfg_reject_broken(int early)
- 	}
- }
- 
--static int __init acpi_mcfg_check_entry(struct acpi_table_mcfg *mcfg,
--					struct acpi_mcfg_allocation *cfg)
--{
--	int year;
--
--	if (cfg->address < 0xFFFFFFFF)
--		return 0;
--
--	if (!strncmp(mcfg->header.oem_id, "SGI", 3))
--		return 0;
--
--	if (mcfg->header.revision >= 1) {
--		if (dmi_get_date(DMI_BIOS_DATE, &year, NULL, NULL) &&
--		    year >= 2010)
--			return 0;
--	}
--
--	pr_err(PREFIX "MCFG region for %04x [bus %02x-%02x] at %#llx "
--	       "is above 4GB, ignored\n", cfg->pci_segment,
--	       cfg->start_bus_number, cfg->end_bus_number, cfg->address);
--	return -EINVAL;
--}
--
--static int __init pci_parse_mcfg(struct acpi_table_header *header)
--{
--	struct acpi_table_mcfg *mcfg;
--	struct acpi_mcfg_allocation *cfg_table, *cfg;
--	unsigned long i;
--	int entries;
--
--	if (!header)
--		return -EINVAL;
--
--	mcfg = (struct acpi_table_mcfg *)header;
--
--	/* how many config structures do we have */
--	free_all_mmcfg();
--	entries = 0;
--	i = header->length - sizeof(struct acpi_table_mcfg);
--	while (i >= sizeof(struct acpi_mcfg_allocation)) {
--		entries++;
--		i -= sizeof(struct acpi_mcfg_allocation);
--	}
--	if (entries == 0) {
--		pr_err(PREFIX "MMCONFIG has no entries\n");
--		return -ENODEV;
--	}
--
--	cfg_table = (struct acpi_mcfg_allocation *) &mcfg[1];
--	for (i = 0; i < entries; i++) {
--		cfg = &cfg_table[i];
--		if (acpi_mcfg_check_entry(mcfg, cfg)) {
--			free_all_mmcfg();
--			return -ENODEV;
--		}
--
--		if (pci_mmconfig_add(cfg->pci_segment, cfg->start_bus_number,
--				   cfg->end_bus_number, cfg->address) == NULL) {
--			pr_warn(PREFIX "no memory for MCFG entries\n");
--			free_all_mmcfg();
--			return -ENOMEM;
--		}
--	}
--
--	return 0;
--}
--
- #ifdef CONFIG_ACPI_APEI
- extern int (*arch_apei_filter_addr)(int (*func)(__u64 start, __u64 size,
- 				     void *data), void *data);
-@@ -662,13 +514,20 @@ static void __init __pci_mmcfg_init(int early)
- 
- static int __initdata known_bridge;
- 
-+static void __init pci_mmcfg_list_setup(void)
-+{
-+	free_all_mmcfg();
-+	if (pci_mmconfig_parse_table())
-+		free_all_mmcfg();
-+}
++config ACPI_PCI_HOST_GENERIC
++	bool "Generic ACPI PCI host controller"
++	depends on ARM64 && ACPI
++	help
++	  Say Y here if you want to support a simple generic ACPI PCI host
++	  controller.
 +
- void __init pci_mmcfg_early_init(void)
- {
- 	if (pci_probe & PCI_PROBE_MMCONF) {
- 		if (pci_mmcfg_check_hostbridge())
- 			known_bridge = 1;
- 		else
--			acpi_sfi_table_parse(ACPI_SIG_MCFG, pci_parse_mcfg);
-+			pci_mmcfg_list_setup();
- 		__pci_mmcfg_init(1);
- 
- 		set_apei_filter();
-@@ -686,7 +545,7 @@ void __init pci_mmcfg_late_init(void)
- 
- 	/* MMCONFIG hasn't been enabled yet, try again */
- 	if (pci_probe & PCI_PROBE_MASK & ~PCI_PROBE_MMCONF) {
--		acpi_sfi_table_parse(ACPI_SIG_MCFG, pci_parse_mcfg);
-+		pci_mmcfg_list_setup();
- 		__pci_mmcfg_init(0);
- 	}
- }
-@@ -720,99 +579,41 @@ static int __init pci_mmcfg_late_insert_resources(void)
-  */
- late_initcall(pci_mmcfg_late_insert_resources);
- 
--/* Add MMCFG information for host bridges */
--int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
--			phys_addr_t addr)
-+int pci_mmconfig_map_resource(struct device *dev, struct pci_mmcfg_region *cfg)
- {
--	int rc;
--	struct resource *tmp = NULL;
--	struct pci_mmcfg_region *cfg;
-+	struct resource *tmp;
- 
--	if (!(pci_probe & PCI_PROBE_MMCONF) || pci_mmcfg_arch_init_failed)
--		return -ENODEV;
--
--	if (start > end)
--		return -EINVAL;
--
--	mutex_lock(&pci_mmcfg_lock);
--	cfg = pci_mmconfig_lookup(seg, start);
--	if (cfg) {
--		if (cfg->end_bus < end)
--			dev_info(dev, FW_INFO
--				 "MMCONFIG for "
--				 "domain %04x [bus %02x-%02x] "
--				 "only partially covers this bridge\n",
--				  cfg->segment, cfg->start_bus, cfg->end_bus);
--		mutex_unlock(&pci_mmcfg_lock);
--		return -EEXIST;
--	}
--
--	if (!addr) {
--		mutex_unlock(&pci_mmcfg_lock);
--		return -EINVAL;
--	}
--
--	rc = -EBUSY;
--	cfg = pci_mmconfig_alloc(seg, start, end, addr);
--	if (cfg == NULL) {
--		dev_warn(dev, "fail to add MMCONFIG (out of memory)\n");
--		rc = -ENOMEM;
--	} else if (!pci_mmcfg_check_reserved(dev, cfg, 0)) {
-+	if (!pci_mmcfg_check_reserved(dev, cfg, 0)) {
- 		dev_warn(dev, FW_BUG "MMCONFIG %pR isn't reserved\n",
- 			 &cfg->res);
--	} else {
--		/* Insert resource if it's not in boot stage */
--		if (pci_mmcfg_running_state)
--			tmp = insert_resource_conflict(&iomem_resource,
--						       &cfg->res);
--
-+		return -EBUSY;
-+	}
-+	/* Insert resource if it's not in boot stage */
-+	if (pci_mmcfg_running_state) {
-+		tmp = insert_resource_conflict(&iomem_resource,
-+					       &cfg->res);
- 		if (tmp) {
--			dev_warn(dev,
--				 "MMCONFIG %pR conflicts with "
--				 "%s %pR\n",
--				 &cfg->res, tmp->name, tmp);
--		} else if (pci_mmcfg_arch_map(cfg)) {
--			dev_warn(dev, "fail to map MMCONFIG %pR.\n",
--				 &cfg->res);
--		} else {
--			list_add_sorted(cfg);
--			dev_info(dev, "MMCONFIG at %pR (base %#lx)\n",
--				 &cfg->res, (unsigned long)addr);
--			cfg = NULL;
--			rc = 0;
-+			dev_warn(dev, "MMCONFIG %pR conflicts with %s %pR\n",
-+				&cfg->res, tmp->name, tmp);
-+			return -EBUSY;
- 		}
- 	}
--
--	if (cfg) {
--		if (cfg->res.parent)
--			release_resource(&cfg->res);
--		kfree(cfg);
-+	if (pci_mmcfg_arch_map(cfg)) {
-+		dev_warn(dev, "fail to map MMCONFIG %pR.\n", &cfg->res);
-+		return -EBUSY;
- 	}
--
--	mutex_unlock(&pci_mmcfg_lock);
--
--	return rc;
-+	return 0;
- }
- 
--/* Delete MMCFG information for host bridges */
--int pci_mmconfig_delete(u16 seg, u8 start, u8 end)
-+void pci_mmconfig_unmap_resource(struct pci_mmcfg_region *cfg)
- {
--	struct pci_mmcfg_region *cfg;
--
--	mutex_lock(&pci_mmcfg_lock);
--	list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list)
--		if (cfg->segment == seg && cfg->start_bus == start &&
--		    cfg->end_bus == end) {
--			list_del_rcu(&cfg->list);
--			synchronize_rcu();
--			pci_mmcfg_arch_unmap(cfg);
--			if (cfg->res.parent)
--				release_resource(&cfg->res);
--			mutex_unlock(&pci_mmcfg_lock);
--			kfree(cfg);
--			return 0;
--		}
--	mutex_unlock(&pci_mmcfg_lock);
-+	pci_mmcfg_arch_unmap(cfg);
-+	if (cfg->res.parent)
-+		release_resource(&cfg->res);
-+	cfg->res.parent = NULL;
-+}
- 
--	return -ENOENT;
-+int pci_mmconfig_enabled(void)
-+{
-+	return (pci_probe & PCI_PROBE_MMCONF) && !pci_mmcfg_arch_init_failed;
- }
-diff --git a/arch/x86/pci/mmconfig_32.c b/arch/x86/pci/mmconfig_32.c
-index 43984bc..38a37f8 100644
---- a/arch/x86/pci/mmconfig_32.c
-+++ b/arch/x86/pci/mmconfig_32.c
-@@ -12,6 +12,7 @@
- #include <linux/pci.h>
- #include <linux/init.h>
- #include <linux/rcupdate.h>
-+#include <linux/pci-acpi.h>
- #include <asm/e820.h>
- #include <asm/pci_x86.h>
- 
-diff --git a/arch/x86/pci/mmconfig_64.c b/arch/x86/pci/mmconfig_64.c
-index bea5249..29253ec 100644
---- a/arch/x86/pci/mmconfig_64.c
-+++ b/arch/x86/pci/mmconfig_64.c
-@@ -10,6 +10,7 @@
- #include <linux/acpi.h>
- #include <linux/bitmap.h>
- #include <linux/rcupdate.h>
-+#include <linux/pci-acpi.h>
- #include <asm/e820.h>
- #include <asm/pci_x86.h>
- 
-diff --git a/arch/x86/pci/numachip.c b/arch/x86/pci/numachip.c
-index 2e565e6..c181eeb 100644
---- a/arch/x86/pci/numachip.c
-+++ b/arch/x86/pci/numachip.c
-@@ -14,6 +14,7 @@
-  */
- 
- #include <linux/pci.h>
-+#include <linux/pci-acpi.h>
- #include <asm/pci_x86.h>
- 
- static u8 limit __read_mostly;
++
+ config ACPI_CUSTOM_DSDT_FILE
+ 	string "Custom DSDT Table file to include"
+ 	default ""
 diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-index cb648a4..74976f1 100644
+index 74976f1..346101c 100644
 --- a/drivers/acpi/Makefile
 +++ b/drivers/acpi/Makefile
-@@ -40,6 +40,7 @@ acpi-$(CONFIG_ARCH_MIGHT_HAVE_ACPI_PDC) += processor_pdc.o
- acpi-y				+= ec.o
+@@ -41,6 +41,7 @@ acpi-y				+= ec.o
  acpi-$(CONFIG_ACPI_DOCK)	+= dock.o
  acpi-y				+= pci_root.o pci_link.o pci_irq.o
-+acpi-$(CONFIG_PCI_MMCONFIG)	+= pci_mcfg.o
+ acpi-$(CONFIG_PCI_MMCONFIG)	+= pci_mcfg.o
++acpi-$(CONFIG_ACPI_PCI_HOST_GENERIC) += pci_host_acpi.o
  acpi-y				+= acpi_lpss.o acpi_apd.o
  acpi-y				+= acpi_platform.o
  acpi-y				+= acpi_pnp.o
-diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+diff --git a/drivers/acpi/pci_host_acpi.c b/drivers/acpi/pci_host_acpi.c
 new file mode 100644
-index 0000000..ea84365
+index 0000000..9dbdd81
 --- /dev/null
-+++ b/drivers/acpi/pci_mcfg.c
-@@ -0,0 +1,312 @@
++++ b/drivers/acpi/pci_host_acpi.c
+@@ -0,0 +1,186 @@
 +/*
-+ * pci_mcfg.c
++ * Generic PCI host controller driver for ACPI based systems
 + *
-+ * Common code to maintain the MCFG areas and mappings
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + *
-+ * This has been extracted from arch/x86/pci/mmconfig-shared.c
-+ * and moved here so that other architectures can use this code.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Copyright (c) 2015 Broadcom Corporation
++ *
++ * Based on drivers/pci/host/pci-host-generic.c
++ * Copyright (C) 2014 ARM Limited
 + */
 +
++#include <linux/kernel.h>
++#include <linux/module.h>
 +#include <linux/pci.h>
-+#include <linux/init.h>
-+#include <linux/dmi.h>
++#include <linux/acpi.h>
 +#include <linux/pci-acpi.h>
 +#include <linux/sfi_acpi.h>
 +#include <linux/slab.h>
-+#include <linux/mutex.h>
-+#include <linux/rculist.h>
 +
-+#define PREFIX	"ACPI: "
++#define PREFIX			"pci-host-acpi:"
 +
-+static DEFINE_MUTEX(pci_mmcfg_lock);
-+LIST_HEAD(pci_mmcfg_list);
-+
-+static void list_add_sorted(struct pci_mmcfg_region *new)
-+{
-+	struct pci_mmcfg_region *cfg;
-+
-+	/* keep list sorted by segment and starting bus number */
-+	list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list) {
-+		if (cfg->segment > new->segment ||
-+		    (cfg->segment == new->segment &&
-+		     cfg->start_bus >= new->start_bus)) {
-+			list_add_tail_rcu(&new->list, &cfg->list);
-+			return;
-+		}
-+	}
-+	list_add_tail_rcu(&new->list, &pci_mmcfg_list);
-+}
-+
-+static struct pci_mmcfg_region *pci_mmconfig_alloc(int segment, int start,
-+						   int end, u64 addr)
-+{
-+	struct pci_mmcfg_region *new;
-+	struct resource *res;
-+
-+	if (addr == 0)
-+		return NULL;
-+
-+	new = kzalloc(sizeof(*new), GFP_KERNEL);
-+	if (!new)
-+		return NULL;
-+
-+	new->address = addr;
-+	new->segment = segment;
-+	new->start_bus = start;
-+	new->end_bus = end;
-+
-+	res = &new->res;
-+	res->start = addr + PCI_MMCFG_BUS_OFFSET(start);
-+	res->end = addr + PCI_MMCFG_BUS_OFFSET(end + 1) - 1;
-+	res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-+	snprintf(new->name, PCI_MMCFG_RESOURCE_NAME_LEN,
-+		 "PCI MMCONFIG %04x [bus %02x-%02x]", segment, start, end);
-+	res->name = new->name;
-+
-+	return new;
-+}
-+
-+struct pci_mmcfg_region *pci_mmconfig_add(int segment, int start,
-+							int end, u64 addr)
-+{
-+	struct pci_mmcfg_region *new;
-+
-+	new = pci_mmconfig_alloc(segment, start, end, addr);
-+	if (new) {
-+		mutex_lock(&pci_mmcfg_lock);
-+		list_add_sorted(new);
-+		mutex_unlock(&pci_mmcfg_lock);
-+
-+		pr_info(PREFIX
-+		       "MMCONFIG for domain %04x [bus %02x-%02x] at %pR "
-+		       "(base %#lx)\n",
-+		       segment, start, end, &new->res, (unsigned long)addr);
-+	}
-+
-+	return new;
-+}
-+
-+struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus)
-+{
-+	struct pci_mmcfg_region *cfg;
-+
-+	list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list)
-+		if (cfg->segment == segment &&
-+		    cfg->start_bus <= bus && bus <= cfg->end_bus)
-+			return cfg;
-+
-+	return NULL;
-+}
-+
-+/*
-+ * Map a pci_mmcfg_region, can be overrriden by arch
-+ */
-+int __weak pci_mmconfig_map_resource(struct device *dev,
-+	struct pci_mmcfg_region *mcfg)
-+{
-+	struct resource *tmp;
-+	void __iomem *vaddr;
-+
-+	tmp = insert_resource_conflict(&iomem_resource, &mcfg->res);
-+	if (tmp) {
-+		dev_warn(dev, "MMCONFIG %pR conflicts with %s %pR\n",
-+			&mcfg->res, tmp->name, tmp);
-+		return -EBUSY;
-+	}
-+
-+	vaddr =  ioremap(mcfg->res.start, resource_size(&mcfg->res));
-+	if (!vaddr) {
-+		release_resource(&mcfg->res);
-+		return -ENOMEM;
-+	}
-+
-+	mcfg->virt = vaddr;
-+	return 0;
-+}
-+
-+/*
-+ * Unmap a pci_mmcfg_region, can be overrriden by arch
-+ */
-+void __weak pci_mmconfig_unmap_resource(struct pci_mmcfg_region *mcfg)
-+{
-+	if (mcfg->virt) {
-+		iounmap(mcfg->virt);
-+		mcfg->virt = NULL;
-+	}
-+	if (mcfg->res.parent) {
-+		release_resource(&mcfg->res);
-+		mcfg->res.parent = NULL;
-+	}
-+}
-+
-+/*
-+ * check if the mmconfig is enabled and configured
-+ */
-+int __weak pci_mmconfig_enabled(void)
-+{
-+	return 1;
-+}
-+
-+/* Add MMCFG information for host bridges */
-+int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
-+			phys_addr_t addr)
-+{
-+	struct pci_mmcfg_region *cfg;
-+	int rc;
-+
-+	if (!pci_mmconfig_enabled())
-+		return -ENODEV;
-+	if (start > end)
-+		return -EINVAL;
-+
-+	mutex_lock(&pci_mmcfg_lock);
-+	cfg = pci_mmconfig_lookup(seg, start);
-+	if (cfg) {
-+		if (cfg->end_bus < end)
-+			dev_info(dev, FW_INFO
-+				 "MMCONFIG for "
-+				 "domain %04x [bus %02x-%02x] "
-+				 "only partially covers this bridge\n",
-+				  cfg->segment, cfg->start_bus, cfg->end_bus);
-+		rc = -EEXIST;
-+		goto err;
-+	}
-+
-+	if (!addr) {
-+		rc = -EINVAL;
-+		goto err;
-+	}
-+
-+	cfg = pci_mmconfig_alloc(seg, start, end, addr);
-+	if (cfg == NULL) {
-+		dev_warn(dev, "fail to add MMCONFIG (out of memory)\n");
-+		rc = -ENOMEM;
-+		goto err;
-+	}
-+	rc = pci_mmconfig_map_resource(dev, cfg);
-+	if (!rc) {
-+		list_add_sorted(cfg);
-+		dev_info(dev, "MMCONFIG at %pR (base %#lx)\n",
-+				 &cfg->res, (unsigned long)addr);
-+		return 0;
-+	} else {
-+		if (cfg->res.parent)
-+			release_resource(&cfg->res);
-+		kfree(cfg);
-+	}
-+
-+err:
-+	mutex_unlock(&pci_mmcfg_lock);
-+	return rc;
-+}
-+
-+/* Delete MMCFG information for host bridges */
-+int pci_mmconfig_delete(u16 seg, u8 start, u8 end)
-+{
-+	struct pci_mmcfg_region *cfg;
-+
-+	mutex_lock(&pci_mmcfg_lock);
-+	list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list)
-+		if (cfg->segment == seg && cfg->start_bus == start &&
-+		    cfg->end_bus == end) {
-+			list_del_rcu(&cfg->list);
-+			synchronize_rcu();
-+			pci_mmconfig_unmap_resource(cfg);
-+			mutex_unlock(&pci_mmcfg_lock);
-+			kfree(cfg);
-+			return 0;
-+		}
-+	mutex_unlock(&pci_mmcfg_lock);
-+
-+	return -ENOENT;
-+}
-+
-+static int __init acpi_mcfg_check_entry(struct acpi_table_mcfg *mcfg,
-+					struct acpi_mcfg_allocation *cfg)
-+{
-+	int year;
-+
-+	if (!config_enabled(CONFIG_X86))
-+		return 0;
-+
-+	if (cfg->address < 0xFFFFFFFF)
-+		return 0;
-+
-+	if (!strncmp(mcfg->header.oem_id, "SGI", 3))
-+		return 0;
-+
-+	if (mcfg->header.revision >= 1) {
-+		if (dmi_get_date(DMI_BIOS_DATE, &year, NULL, NULL) &&
-+		    year >= 2010)
-+			return 0;
-+	}
-+
-+	pr_err(PREFIX "MCFG region for %04x [bus %02x-%02x] at %#llx "
-+	       "is above 4GB, ignored\n", cfg->pci_segment,
-+	       cfg->start_bus_number, cfg->end_bus_number, cfg->address);
-+	return -EINVAL;
-+}
-+
-+static int __init pci_parse_mcfg(struct acpi_table_header *header)
-+{
-+	struct acpi_table_mcfg *mcfg;
-+	struct acpi_mcfg_allocation *cfg_table, *cfg;
-+	unsigned long i;
-+	int entries;
-+
-+	if (!header)
-+		return -EINVAL;
-+
-+	mcfg = (struct acpi_table_mcfg *)header;
-+
-+	/* how many config structures do we have */
-+	entries = 0;
-+	i = header->length - sizeof(struct acpi_table_mcfg);
-+	while (i >= sizeof(struct acpi_mcfg_allocation)) {
-+		entries++;
-+		i -= sizeof(struct acpi_mcfg_allocation);
-+	}
-+	if (entries == 0) {
-+		pr_err(PREFIX "MMCONFIG has no entries\n");
-+		return -ENODEV;
-+	}
-+
-+	cfg_table = (struct acpi_mcfg_allocation *) &mcfg[1];
-+	for (i = 0; i < entries; i++) {
-+		cfg = &cfg_table[i];
-+		if (acpi_mcfg_check_entry(mcfg, cfg))
-+			return -ENODEV;
-+
-+		if (pci_mmconfig_add(cfg->pci_segment, cfg->start_bus_number,
-+				   cfg->end_bus_number, cfg->address) == NULL) {
-+			pr_warn(PREFIX "no memory for MCFG entries\n");
-+			return -ENOMEM;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+int __init pci_mmconfig_parse_table(void)
-+{
-+	return acpi_sfi_table_parse(ACPI_SIG_MCFG, pci_parse_mcfg);
-+}
-+
-+void __weak __init pci_mmcfg_late_init(void)
-+{
-+	int err, n = 0;
-+	struct pci_mmcfg_region *cfg;
-+
-+	err = pci_mmconfig_parse_table();
-+	if (err) {
-+		pr_err(PREFIX " Failed to parse MCFG (%d)\n", err);
-+		return;
-+	}
-+
-+	list_for_each_entry(cfg, &pci_mmcfg_list, list) {
-+		pci_mmconfig_map_resource(NULL, cfg);
-+		n++;
-+	}
-+
-+	pr_info(PREFIX " MCFG table loaded %d entries\n", n);
-+}
-diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
-index 7494dbe..97aa9d3 100644
---- a/drivers/xen/pci.c
-+++ b/drivers/xen/pci.c
-@@ -27,9 +27,6 @@
- #include <asm/xen/hypervisor.h>
- #include <asm/xen/hypercall.h>
- #include "../pci/pci.h"
--#ifdef CONFIG_PCI_MMCONFIG
--#include <asm/pci_x86.h>
--#endif
- 
- static bool __read_mostly pci_seg_supported = true;
- 
-@@ -221,7 +218,7 @@ static int __init xen_mcfg_late(void)
- 	if (!xen_initial_domain())
- 		return 0;
- 
--	if ((pci_probe & PCI_PROBE_MMCONF) == 0)
-+	if (!pci_mmconfig_enabled())
- 		return 0;
- 
- 	if (list_empty(&pci_mmcfg_list))
-diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-index 89ab057..e9450ef 100644
---- a/include/linux/pci-acpi.h
-+++ b/include/linux/pci-acpi.h
-@@ -106,6 +106,39 @@ extern const u8 pci_acpi_dsm_uuid[];
- #define RESET_DELAY_DSM		0x08
- #define FUNCTION_DELAY_DSM	0x09
- 
-+/* common API to maintain list of MCFG regions */
-+/* "PCI MMCONFIG %04x [bus %02x-%02x]" */
-+#define PCI_MMCFG_RESOURCE_NAME_LEN (22 + 4 + 2 + 2)
-+
-+struct pci_mmcfg_region {
-+	struct list_head list;
-+	struct resource res;
-+	u64 address;
-+	char __iomem *virt;
-+	u16 segment;
-+	u8 start_bus;
-+	u8 end_bus;
-+	char name[PCI_MMCFG_RESOURCE_NAME_LEN];
++/* sysdata pointer is ->root_info */
++struct gen_acpi_root_info {
++	struct acpi_pci_root_info	common;
++	struct pci_mmcfg_region		*mcfg;
++	bool				mcfg_added;
 +};
 +
-+extern int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
-+			       phys_addr_t addr);
-+extern int pci_mmconfig_delete(u16 seg, u8 start, u8 end);
++/* find mapping of a MCFG area */
++static void __iomem *gen_acpi_map_cfg_bus(struct pci_bus *bus,
++			unsigned int devfn, int where)
++{
++	struct gen_acpi_root_info *pci = bus->sysdata;
++	struct pci_mmcfg_region *mcfg = pci->mcfg;
 +
-+extern struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus);
-+extern struct pci_mmcfg_region *pci_mmconfig_add(int segment, int start,
-+							int end, u64 addr);
-+extern int pci_mmconfig_map_resource(struct device *dev,
-+	struct pci_mmcfg_region *mcfg);
-+extern void pci_mmconfig_unmap_resource(struct pci_mmcfg_region *mcfg);
-+extern int pci_mmconfig_enabled(void);
-+extern int __init pci_mmconfig_parse_table(void);
++	if (bus->number < mcfg->start_bus || bus->number > mcfg->end_bus)
++		return NULL;
 +
-+extern struct list_head pci_mmcfg_list;
++	return mcfg->virt +
++		PCI_MMCFG_OFFSET(bus->number - mcfg->start_bus, devfn) +
++		where;
++}
 +
-+#define PCI_MMCFG_BUS_OFFSET(bus)      ((bus) << 20)
-+#define PCI_MMCFG_OFFSET(bus, devfn)   ((bus) << 20 | (devfn) << 12)
++static struct pci_ops gen_acpi_pci_ops = {
++	.map_bus	= gen_acpi_map_cfg_bus,
++	.read		= pci_generic_config_read,
++	.write		= pci_generic_config_write,
++};
 +
- #else	/* CONFIG_ACPI */
- static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
++/* Insert the ECFG area for a root bus */
++static int pci_acpi_root_init_info(struct acpi_pci_root_info *ci)
++{
++	struct gen_acpi_root_info *info;
++	struct acpi_pci_root *root = ci->root;
++	struct device *dev = &ci->bridge->dev;
++	int err;
++
++	info = container_of(ci, struct gen_acpi_root_info, common);
++	err = pci_mmconfig_insert(dev, root->segment, root->secondary.start,
++			root->secondary.end, root->mcfg_addr);
++	if (err && err != -EEXIST)
++		return err;
++
++	info->mcfg = pci_mmconfig_lookup(root->segment, root->secondary.start);
++	WARN_ON(info->mcfg == NULL);
++	info->mcfg_added = (err == -EEXIST);
++	return 0;
++}
++
++static void pci_acpi_root_release_info(struct acpi_pci_root_info *ci)
++{
++	struct gen_acpi_root_info *info;
++	struct acpi_pci_root *root = ci->root;
++
++	info = container_of(ci, struct gen_acpi_root_info, common);
++	if (info->mcfg_added)
++		pci_mmconfig_delete(root->segment, root->secondary.start,
++					root->secondary.end);
++	info->mcfg = NULL;
++}
++
++static struct acpi_pci_root_ops pci_acpi_root_ops = {
++	.pci_ops = &gen_acpi_pci_ops,
++	.init_info = pci_acpi_root_init_info,
++	.release_info = pci_acpi_root_release_info,
++};
++
++struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
++{
++	struct acpi_device *device = root->device;
++	struct gen_acpi_root_info *ri;
++	struct pci_bus *bus, *child;
++
++	/* allocate acpi_info/sysdata */
++	ri = devm_kzalloc(&device->dev, sizeof(*ri), GFP_KERNEL);
++	if (!ri) {
++		dev_err(&device->dev,
++			"pci_bus %04x:%02x: ignored (out of memory)\n",
++			root->segment, (int)root->secondary.start);
++		return NULL;
++	}
++
++	bus =  acpi_pci_root_create(root, &pci_acpi_root_ops,
++					&ri->common, ri);
++	if (!bus) {
++		dev_err(&device->dev, "Scanning rootbus failed");
++		return NULL;
++	}
++
++	pci_bus_size_bridges(bus);
++	pci_bus_assign_resources(bus);
++	list_for_each_entry(child, &bus->children, node)
++		pcie_bus_configure_settings(child);
++
++	return bus;
++}
++
++int raw_pci_read(unsigned int seg, unsigned int bus,
++		  unsigned int devfn, int reg, int len, u32 *val)
++{
++	struct pci_mmcfg_region *mcfg;
++	void __iomem *addr;
++	int err = -EINVAL;
++
++	rcu_read_lock();
++	mcfg = pci_mmconfig_lookup(seg, bus);
++	if (!mcfg || !mcfg->virt)
++		goto err;
++
++	addr = mcfg->virt + PCI_MMCFG_OFFSET(bus, devfn);
++	switch (len) {
++	case 1:
++		*val = readb(addr + reg);
++		break;
++	case 2:
++		*val = readw(addr + reg);
++		break;
++	case 4:
++		*val = readl(addr + reg);
++		break;
++	}
++	err = 0;
++err:
++	rcu_read_unlock();
++	return err;
++}
++
++int raw_pci_write(unsigned int seg, unsigned int bus,
++		unsigned int devfn, int reg, int len, u32 val)
++{
++	struct pci_mmcfg_region *mcfg;
++	void __iomem *addr;
++	int err = -EINVAL;
++
++	rcu_read_lock();
++	mcfg = pci_mmconfig_lookup(seg, bus);
++	if (!mcfg || !mcfg->virt)
++		goto err;
++
++	addr = mcfg->virt + PCI_MMCFG_OFFSET(bus, devfn);
++	switch (len) {
++	case 1:
++		writeb(val, addr + reg);
++		break;
++	case 2:
++		writew(val, addr + reg);
++		break;
++	case 4:
++		writel(val, addr + reg);
++		break;
++	}
++	err = 0;
++err:
++	rcu_read_unlock();
++	return err;
++}
+diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+index d410885..f8d62e3 100644
+--- a/include/linux/pci-acpi.h
++++ b/include/linux/pci-acpi.h
+@@ -143,6 +143,22 @@ static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
  static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
+ #endif	/* CONFIG_ACPI */
+ 
++#if defined(CONFIG_ACPI) && defined(CONFIG_ACPI_PCI_HOST_GENERIC)
++static inline void pci_acpi_set_companion(struct pci_host_bridge *bridge)
++{
++	struct pci_bus *b = bridge->bus;
++	struct acpi_pci_root_info *ci = (struct acpi_pci_root_info *)b->sysdata;
++
++	ACPI_COMPANION_SET(&bridge->dev, ci->bridge);
++}
++
++static inline u16 acpi_pci_get_segment(void *sysdata)
++{
++	struct acpi_pci_root_info *ci = (struct acpi_pci_root_info *)sysdata;
++
++	return ci->root->segment;
++}
++#else
+ static inline void pci_acpi_set_companion(struct pci_host_bridge *bridge)
+ {
+ 	/* leave it to the platform for now */
+@@ -152,6 +168,7 @@ static inline u16 acpi_pci_get_segment(void *sysdata)
+ {
+ 	return 0;
+ }
++#endif
+ 
+ #ifdef CONFIG_ACPI_APEI
+ extern bool aer_acpi_firmware_first(void);
 -- 
 1.9.1
