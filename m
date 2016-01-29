@@ -1,107 +1,57 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Fri, 29 Jan 2016 14:41:16 -0700
-Subject: [PATCH] vfio: pci: fix oops in case of
- vfio_msi_set_vector_signal failure
-In-Reply-To: <1454078586-5431-1-git-send-email-eric.auger@linaro.org>
-References: <1454078586-5431-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1454103676.9301.3.camel@redhat.com>
+From: lho@apm.com (Loc Ho)
+Date: Fri, 29 Jan 2016 13:44:21 -0800
+Subject: [PATCH v2 2/3] clk: xgene: Add SoC and PMD PLL clocks with v2
+ hardware
+In-Reply-To: <20160129205820.GU12841@codeaurora.org>
+References: <1453256863-15092-1-git-send-email-lho@apm.com>
+ <1453256863-15092-3-git-send-email-lho@apm.com>
+ <20160129205820.GU12841@codeaurora.org>
+Message-ID: <CAPw-ZT=mxyGUzvhWBZ8TA32THiQPNoKFwrU4X9J1y2MwzTm-zA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-01-29 at 14:43 +0000, Eric Auger wrote:
-> In case vfio_msi_set_vector_signal fails we tear down everything.
-> In the tear down loop we compare int j against unsigned start. Given
-> the arithmetic conversion I think it is converted into an unsigned and
-> becomes 0xffffffff, leading to the loop being entered again and things
-> turn bad when accessing vdev->msix[vector].vector. So let's use int
-> parameters instead.
->?
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+Hi Stephen & All,
+
+On Fri, Jan 29, 2016 at 12:58 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 01/19, Loc Ho wrote:
+>> Add X-Gene SoC and PMD PLL clocks support for v2 hardware.
+>> X-Gene SoC v2 and above use an slightly different SoC
+>> and PMD PLL hardware logic.
+>>
+>> Signed-off-by: Loc Ho <lho@apm.com>
+>> ---
+>
+> It's not from this patch, but I notice that we have a return
+> inside a void function in this file...
+>
+> ---8<---
+> From: Stephen Boyd <sboyd@codeaurora.org>
+> Subject: [PATCH] clk: xgene: Remove return from void function
+>
+> This function doesn't return anything because it's void. Drop the
+> return statement.
+>
+> Cc: Loc Ho <lho@apm.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
-> ?drivers/vfio/pci/vfio_pci_intrs.c | 4 ++--
-> ?1 file changed, 2 insertions(+), 2 deletions(-)
->?
-> diff --git a/drivers/vfio/pci/vfio_pci_intrs.c b/drivers/vfio/pci/vfio_pci_intrs.c
-> index 3b3ba15..510c48d 100644
-> --- a/drivers/vfio/pci/vfio_pci_intrs.c
-> +++ b/drivers/vfio/pci/vfio_pci_intrs.c
-> @@ -374,8 +374,8 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
-> ?	return 0;
-> ?}
-> ?
-> -static int vfio_msi_set_block(struct vfio_pci_device *vdev, unsigned start,
-> -			??????unsigned count, int32_t *fds, bool msix)
-> +static int vfio_msi_set_block(struct vfio_pci_device *vdev, int start,
-> +			??????int count, int32_t *fds, bool msix)
-> ?{
-> ?	int i, j, ret = 0;
-> ?
+>  drivers/clk/clk-xgene.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/clk-xgene.c b/drivers/clk/clk-xgene.c
+> index 266d573b9134..bd7156baa08b 100644
+> --- a/drivers/clk/clk-xgene.c
+> +++ b/drivers/clk/clk-xgene.c
+> @@ -50,7 +50,7 @@ static inline u32 xgene_clk_read(void __iomem *csr)
+>
+>  static inline void xgene_clk_write(u32 data, void __iomem *csr)
+>  {
+> -       return writel_relaxed(data, csr);
+> +       writel_relaxed(data, csr);
+>  }
+>
+>  /* PLL Clock */
 
-Nice find, I don't think that's the only bug there though.??If @start is
--1 (UINT32_MAX) and @count is 1, then @j gets set to -1 in the setup and
-we hit the same index dereference problem.??What if we did this instead:
+Thanks for spotting this. Was my original patch for v2 X-Gene HW
+pulled in an specify GIT tree? I don't see it in the clk GIT master.
 
-diff --git a/drivers/vfio/pci/vfio_pci_intrs.c b/drivers/vfio/pci/vfio_pci_intrs.c
-index 3b3ba15..2ae84ad 100644
---- a/drivers/vfio/pci/vfio_pci_intrs.c
-+++ b/drivers/vfio/pci/vfio_pci_intrs.c
-@@ -309,14 +309,14 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
-?				??????int vector, int fd, bool msix)
-?{
-?	struct pci_dev *pdev = vdev->pdev;
--	int irq = msix ? vdev->msix[vector].vector : pdev->irq + vector;
--	char *name = msix ? "vfio-msix" : "vfio-msi";
-?	struct eventfd_ctx *trigger;
--	int ret;
-+	int irq, ret;
-?
--	if (vector >= vdev->num_ctx)
-+	if (vector < 0 || vector >= vdev->num_ctx)
-?		return -EINVAL;
-?
-+	irq = msix ? vdev->msix[vector].vector : pdev->irq + vector;
-+
-?	if (vdev->ctx[vector].trigger) {
-?		free_irq(irq, vdev->ctx[vector].trigger);
-?		irq_bypass_unregister_producer(&vdev->ctx[vector].producer);
-@@ -328,8 +328,9 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
-?	if (fd < 0)
-?		return 0;
-?
--	vdev->ctx[vector].name = kasprintf(GFP_KERNEL, "%s[%d](%s)",
--					???name, vector, pci_name(pdev));
-+	vdev->ctx[vector].name = kasprintf(GFP_KERNEL, "vfio-msi%s[%d](%s)",
-+					???msix ? "x" : "", vector,
-+					???pci_name(pdev));
-?	if (!vdev->ctx[vector].name)
-?		return -ENOMEM;
-?
-@@ -379,7 +380,7 @@ static int vfio_msi_set_block(struct vfio_pci_device *vdev, unsigned start,
-?{
-?	int i, j, ret = 0;
-?
--	if (start + count > vdev->num_ctx)
-+	if (start >= vdev->num_ctx || start + count > vdev->num_ctx)
-?		return -EINVAL;
-?
-?	for (i = 0, j = start; i < count && !ret; i++, j++) {
-@@ -388,7 +389,7 @@ static int vfio_msi_set_block(struct vfio_pci_device *vdev, unsigned start,
-?	}
-?
-?	if (ret) {
--		for (--j; j >= start; j--)
-+		for (--j; j >= 0 && j >= start; j--)
-?			vfio_msi_set_vector_signal(vdev, j, -1, msix);
-?	}
-?
-
-So we fix the problem with vfio_msi_set_vector_signal() dereferencing
-the array before it validates the index (even though it shouldn't be
-able to get there anymore), and then we do a better job of verifying
-start and count (comparing to num_ctx will use unsigned even though
-num_ctx itself is signed) and finally explicitly test the <0 case, which
-I suppose we could also do by casting start@that point (we know it's
-within the bounds of a signed integer given the previous tests).
-Thanks,
-
-Alex
+-Loc
