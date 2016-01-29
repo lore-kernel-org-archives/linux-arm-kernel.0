@@ -1,41 +1,68 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 29 Jan 2016 11:37:57 +0100
-Subject: [PATCH v3 1/2] clk: sunxi: factors: Add missing recalc pointer
- copy
-In-Reply-To: <CAGb2v66dbtBPwRQzA3rtP5hu-0rvfaX2ac7KWRiF42wtEiafwg@mail.gmail.com>
-References: <1454008958-12655-1-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v66dbtBPwRQzA3rtP5hu-0rvfaX2ac7KWRiF42wtEiafwg@mail.gmail.com>
-Message-ID: <20160129103756.GC32462@lukather>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 29 Jan 2016 11:42:13 +0100
+Subject: [PATCH RFC 03/15] mmc: sunxi: Block signal voltage switching
+ (CMD11)
+In-Reply-To: <1453354002-28366-4-git-send-email-wens@csie.org>
+References: <1453354002-28366-1-git-send-email-wens@csie.org>
+ <1453354002-28366-4-git-send-email-wens@csie.org>
+Message-ID: <CAPDyKFrG8cXChSRuAx-a++iNHUHU_GuUApDhxfPSJZb1Oo1fsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 29, 2016 at 02:18:34PM +0800, Chen-Yu Tsai wrote:
-> On Fri, Jan 29, 2016 at 3:22 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Commit 4a9b2abc213e ("clk: sunxi: factors: Support custom formulas") was
-> > introducing a custom recalc function. However, the pointer was never
-> > filled, which was making the whole thing unused.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> (facepalm)
-> 
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> 
-> Can you squash it into the original?
+On 21 January 2016 at 06:26, Chen-Yu Tsai <wens@csie.org> wrote:
+> Allwinner's mmc controller supports signal voltage switching. This is
+> supported in code in Allwinner's kernel. However, publicly available
+> boards all tie it to a fixed 3.0/3.3V regulator, with options to tie
+> it to 1.8V for eMMC on some.
+>
+> Since Allwinner's kernel is an ancient 3.4, it is hard to say whether
+> adapting it's code to a modern mainline kernel would work. Block signal
+> voltage switching until someone has proper hardware to implement and
+> test this.
+>
+> This only affects SD UHS-1 modes, as eMMC switches the voltage directly
+> without any signaling.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+>
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index 790f01662b4e..0495ae7da6d6 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -816,6 +816,20 @@ static void sunxi_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
+>                 }
+>         }
+>
+> +       /*
+> +        * TODO Support signal voltage switching
+> +        *
+> +        * Compared to Allwinner's kernel, recent updates in the mmc core
+> +        * mean this should be as easy as setting the flags in cmd_val and
+> +        * imask, and waiting for it to finish. However no boards support
+> +        * this so this cannot be tested. Block it for now.
+> +        */
+> +       if (cmd->opcode == SD_SWITCH_VOLTAGE) {
+> +               mrq->cmd->error = -EPERM;
+> +               mmc_request_done(mmc, mrq);
+> +               return;
+> +       }
 
-I just did, and pushed the updated branches.
+Unless some of the MMC_CAP_UHS* mode is set, this command shouldn't be sent.
 
-Maxime
+So, if you *really* want to protect from this, I think it's better to
+clear these caps in the ->probe() function, after mmc_of_parse() has
+been called.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160129/179815da/attachment.sig>
+> +
+>         if (cmd->opcode == MMC_GO_IDLE_STATE) {
+>                 cmd_val |= SDXC_SEND_INIT_SEQUENCE;
+>                 imask |= SDXC_COMMAND_DONE;
+> --
+> 2.7.0.rc3
+>
+
+Kind regards
+Uffe
