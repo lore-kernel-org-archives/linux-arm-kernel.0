@@ -1,95 +1,63 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 29 Jan 2016 12:04:33 -0800
-Subject: [PATCH] clocksource/arm_arch_timer: Enable and verify MMIO access
-In-Reply-To: <56ABC13B.9080500@arm.com>
-References: <b4ccba950f8fe0433b8e258a1fc0b8977bbe82d5.1454079150.git.robin.murphy@arm.com>
- <20160129183051.GO12841@codeaurora.org> <56ABC13B.9080500@arm.com>
-Message-ID: <20160129200433.GR12841@codeaurora.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 29 Jan 2016 23:28:25 +0300
+Subject: [PATCH] ARM: dts: porter: add MAX3355 support
+In-Reply-To: <SG2PR06MB0919D09C1146EAC0681EE109D8DA0@SG2PR06MB0919.apcprd06.prod.outlook.com>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+ <4506196.xOgpYRO52t@wasted.cogentembedded.com>
+ <SG2PR06MB0919D09C1146EAC0681EE109D8DA0@SG2PR06MB0919.apcprd06.prod.outlook.com>
+Message-ID: <56ABCB69.1070800@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/29, Robin Murphy wrote:
-> On 29/01/16 18:30, Stephen Boyd wrote:
-> >On 01/29, Robin Murphy wrote:
-> >Hm, that first sentence is sort of misleading. We've been blindly
-> >assuming that the firmware has configured CNTACR to have the
-> >correct bits set for virtual/physical access. We've always relied
-> >on status = "disabled" to figure out if we can access an entire
-> >frame or not.
-> 
-> Yeah, now that I read it back that sentence is nonsense for anything
-> other than the very specific ideas of "frame" and "exists" that were
-> passing through my head at some point last week - how about this
-> instead?
-> 
-> "So far, we have been blindly assuming that having access to a
-> memory-mapped timer frame implies that the individual elements of
-> that frame are already enabled."
+Hello.
 
-Sounds good.
+On 01/28/2016 08:49 AM, Yoshihiro Shimoda wrote:
 
-> 
-> >>
-> >>Explicitly enable feature-level access per-frame, and verify that the
-> >>access we want is really implemented before trying to make use of it.
-> >>
-> >>Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> >>---
-> >>  drivers/clocksource/arm_arch_timer.c | 39 ++++++++++++++++++++++++++++--------
-> >>  1 file changed, 31 insertions(+), 8 deletions(-)
-> >>
-> >>diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> >>index c64d543..c88485d 100644
-> >>--- a/drivers/clocksource/arm_arch_timer.c
-> >>+++ b/drivers/clocksource/arm_arch_timer.c
-> >>@@ -765,20 +772,34 @@ static void __init arch_timer_mem_init(struct device_node *np)
-> >>  	 */
-> >>  	for_each_available_child_of_node(np, frame) {
-> >>  		int n;
-> >>+		u32 cntacr;
-> >>
-> >>  		if (of_property_read_u32(frame, "frame-number", &n)) {
-> >>  			pr_err("arch_timer: Missing frame-number\n");
-> >>-			of_node_put(best_frame);
-> >>  			of_node_put(frame);
-> >>-			return;
-> >>+			goto out;
-> >>  		}
-> >>
-> >>-		if (cnttidr & CNTTIDR_VIRT(n)) {
-> >>+		/* Try enabling everything, and see what sticks */
-> >>+		cntacr = CNTACR_RFRQ | CNTACR_RWPT | CNTACR_RPCT |
-> >>+			 CNTACR_RWVT | CNTACR_RVOFF | CNTACR_RVCT;
-> >>+		writel_relaxed(cntacr, cntctlbase + CNTACR(n));
-> >>+		cntacr = readl_relaxed(cntctlbase + CNTACR(n));
-> >>+
-> >>+		if (~cntacr & CNTACR_RFRQ)
-> >>+			continue;
-> >
-> >Do we need this check? If we can't read the frequency we fall
-> >back to looking for the DT property, so it shouldn't matter if we
-> >can't read the hardware there.
-> 
-> I was really just playing safe to start with. If we don't have cause
-> to care about the difference between not having access vs. not
-> having a frequency programmed then I'd agree it can probably go.
-> 
+>> From: linux-renesas-soc-owner at vger.kernel.org [mailto:linux-renesas-soc-owner at vger.kernel.org] On Behalf Of Sergei
+>> Shtylyov
+>> Sent: Wednesday, January 27, 2016 7:14 AM
+>>
+>> Now that Maxim Integrated MAX3355 'extcon' driver and device tree bindings
+>> are upstream along with the 'extcon' hook  in the Renesas USBHS driver, we
+>> can add  MAX3355 device node to  the Porter device tree and properly refer
+>> to it from the USBHS node instead of using  "renesas,enable-gpio" property
+>> which only allowed checking the USB ID pin  at the driver probe time;  now
+>> this  pin's  state can be monitored dynamically!
+>>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>
+> I tested this patch on Porter, but interrupt of "usb-otg" didn't happened
+> even if I connected/disconnected a usb convert cable (usb micro-ab to A).
+> Remarks: I confirmed that the usb convert cable worked correctly on other board.
 
-Yeah I'm mostly worried that we'll break something somewhere
-because that bit doesn't stick and it's the only frame we can
-use. Or we can give it a shot and then remove clock-frequency
-from the dts binding for mmio timers.
+    I guess I have the same cable and IRQs do happen for me when I connect and 
+disconnect it (as it should be).
 
-> 
-> Great, thanks. The Trusted Firmware guys' warning shot has gone
-> upstream already, if it helps:
-> 
-> https://github.com/ARM-software/arm-trusted-firmware/commit/01fc3f7300e86b0b672977133c3028d638d0c672
+> Do I need other settings for this?
 
-Ah I see. It would be nice if that bug gave a reason why it
-should be done, instead of just saying it must be this way. O
-well.
+    No evident answer to that, your logs show that MAX3355 driver was enabled...
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> root at 192:~# cat /proc/interrupts | grep usb
+> 108:          0     GIC-0 139 Level     e6590000.usb
+> 118:          1     GIC-0 140 Level     ehci_hcd:usb1, ohci_hcd:usb3
+> 119:          0     GIC-0 145 Level     ehci_hcd:usb2, ohci_hcd:usb4
+> 308:          0  e6055000.gpio  31 Edge      usb-otg
+> root at 192:~#
+> root at 192:~# cat /proc/interrupts | grep usb
+> 108:          0     GIC-0 139 Level     e6590000.usb
+> 118:          1     GIC-0 140 Level     ehci_hcd:usb1, ohci_hcd:usb3
+> 119:          0     GIC-0 145 Level     ehci_hcd:usb2, ohci_hcd:usb4
+> 308:          0  e6055000.gpio  31 Edge      usb-otg
+> root at 192:~#
+> root at 192:~# cd /sys/class/extcon/extcon0
+> root at 192:/sys/class/extcon/extcon0# cat state
+> USB=1
+> USB-HOST=0
+
+    I guess these states doesn't change even if you insert your cable?
+They also do change for me.
+
+> Best regards,
+> Yoshihiro Shimoda
+
+MBR, Sergei
