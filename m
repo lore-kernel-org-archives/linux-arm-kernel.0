@@ -1,38 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Jan 2016 15:50:36 +0100
-Subject: [PATCH 4/6] ARM: s3c24xx: don't select RFKILL if CONFIG_NET is
- disabled
+Date: Fri, 29 Jan 2016 15:50:38 +0100
+Subject: [PATCH 6/6] ARM: exynos: select THERMAL_OF
 In-Reply-To: <1454079040-3567945-1-git-send-email-arnd@arndb.de>
 References: <1454079040-3567945-1-git-send-email-arnd@arndb.de>
-Message-ID: <1454079040-3567945-5-git-send-email-arnd@arndb.de>
+Message-ID: <1454079040-3567945-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bluetooth is only supported when network support is part of the kernel,
-so it is a bit pointless to build the hi1940-bt support without networking.
-If we try anyway, we get a Kconfig warning:
+We cannot select a symbol that has disabled dependencies, so
+we get a warning if we ever enable EXYNOS_THERMAL without
+also turning on THERMAL_OF:
 
-warning: (TOSA_BT && H1940BT) selects RFKILL which has unmet direct dependencies (NET)
+warning: (ARCH_EXYNOS) selects EXYNOS_THERMAL which has unmet direct dependencies (THERMAL && (ARCH_EXYNOS || COMPILE_TEST) && THERMAL_OF)
 
-This adds a dependency on CONFIG_NET to avoid that case.
+This adds another 'select' in the platform code to avoid that
+case. Alternatively, we could decide to not select EXYNOS_THERMAL
+here and instead make it a user option.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-s3c24xx/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-exynos/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index 5884bbb7952e..bf66c8334822 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -227,7 +227,7 @@ config ARCH_H1940
- 
- config H1940BT
- 	tristate "Control the state of H1940 bluetooth chip"
--	depends on ARCH_H1940
-+	depends on ARCH_H1940 && NET
- 	select RFKILL
- 	help
- 	  This is a simple driver that is able to control
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 652a0bb11578..5189bcecad12 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -27,6 +27,7 @@ menuconfig ARCH_EXYNOS
+ 	select S5P_DEV_MFC
+ 	select SRAM
+ 	select THERMAL
++	select THERMAL_OF
+ 	select MFD_SYSCON
+ 	select CLKSRC_EXYNOS_MCT
+ 	select POWER_RESET
 -- 
 2.7.0
