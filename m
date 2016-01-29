@@ -1,55 +1,113 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 29 Jan 2016 12:40:32 +0100
-Subject: [PATCH v2] mmc: omap_hsmmc: don't print uninitialized variables
-In-Reply-To: <3411189.gO0215GrNM@wuerfel>
-References: <3411189.gO0215GrNM@wuerfel>
-Message-ID: <CAPDyKFoto2BLyxfko6VX8CZC99LBhJiM1POJOC_Sk=UxnrWcLQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 29 Jan 2016 12:39:13 +0100
+Subject: [PATCH v2 5/7] net: vxge: avoid unused function warnings
+In-Reply-To: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
+References: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
+Message-ID: <1454067557-3546883-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 January 2016 at 16:26, Arnd Bergmann <arnd@arndb.de> wrote:
-> When DT based probing is used but the DMA request fails, the
-> driver will print uninitialized stack data from the rx_req
-> and tx_req variables, as indicated by this warning:
->
-> drivers/mmc/host/omap_hsmmc.c: In function 'omap_hsmmc_probe':
-> drivers/mmc/host/omap_hsmmc.c:2162:3: warning: 'rx_req' may be used uninitialized in this function [-Wmaybe-uninitialized]
->    dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
->
-> This removes the DMA request line number from the warning, which
-> is the easiest solution and won't hurt us any more as we are
-> planning to remove the legacy code path anyway.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+When CONFIG_PCI_MSI is disabled, we get warnings about unused functions
+in the vxge driver:
 
-Thanks, applied for next!
+drivers/net/ethernet/neterion/vxge/vxge-main.c:2121:13: warning: 'adaptive_coalesce_tx_interrupts' defined but not used [-Wunused-function]
+drivers/net/ethernet/neterion/vxge/vxge-main.c:2149:13: warning: 'adaptive_coalesce_rx_interrupts' defined but not used [-Wunused-function]
 
-Kind regards
-Uffe
+We could add another #ifdef here, but it's nicer to avoid those warnings
+for good by converting the existing #ifdef to if(IS_ENABLED()), which has
+the same effect but provides better compile-time coverage in general,
+and lets the compiler understand better when the function is intentionally
+unused.
 
-> ---
-> A simpler patch as v1 with the same result, as suggested by Peter Ujfalusi.
->
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index b6639ea0bf18..87f0d840a166 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -2159,7 +2159,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
->                                                  &rx_req, &pdev->dev, "rx");
->
->         if (!host->rx_chan) {
-> -               dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
-> +               dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel\n");
->                 ret = -ENXIO;
->                 goto err_irq;
->         }
-> @@ -2169,7 +2169,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
->                                                  &tx_req, &pdev->dev, "tx");
->
->         if (!host->tx_chan) {
-> -               dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", tx_req);
-> +               dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel\n");
->                 ret = -ENXIO;
->                 goto err_irq;
->         }
->
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/net/ethernet/neterion/vxge/vxge-main.c | 31 ++++++++++----------------
+ 1 file changed, 12 insertions(+), 19 deletions(-)
+
+diff --git a/drivers/net/ethernet/neterion/vxge/vxge-main.c b/drivers/net/ethernet/neterion/vxge/vxge-main.c
+index 50d5604833ed..e0993eba5df3 100644
+--- a/drivers/net/ethernet/neterion/vxge/vxge-main.c
++++ b/drivers/net/ethernet/neterion/vxge/vxge-main.c
+@@ -2223,8 +2223,6 @@ static irqreturn_t vxge_isr_napi(int irq, void *dev_id)
+ 	return IRQ_NONE;
+ }
+ 
+-#ifdef CONFIG_PCI_MSI
+-
+ static irqreturn_t vxge_tx_msix_handle(int irq, void *dev_id)
+ {
+ 	struct vxge_fifo *fifo = (struct vxge_fifo *)dev_id;
+@@ -2442,16 +2440,13 @@ static void vxge_rem_msix_isr(struct vxgedev *vdev)
+ 	if (vdev->config.intr_type == MSI_X)
+ 		pci_disable_msix(vdev->pdev);
+ }
+-#endif
+ 
+ static void vxge_rem_isr(struct vxgedev *vdev)
+ {
+-#ifdef CONFIG_PCI_MSI
+-	if (vdev->config.intr_type == MSI_X) {
++	if (IS_ENABLED(CONFIG_PCI_MSI) &&
++	    vdev->config.intr_type == MSI_X) {
+ 		vxge_rem_msix_isr(vdev);
+-	} else
+-#endif
+-	if (vdev->config.intr_type == INTA) {
++	} else if (vdev->config.intr_type == INTA) {
+ 			synchronize_irq(vdev->pdev->irq);
+ 			free_irq(vdev->pdev->irq, vdev);
+ 	}
+@@ -2460,11 +2455,10 @@ static void vxge_rem_isr(struct vxgedev *vdev)
+ static int vxge_add_isr(struct vxgedev *vdev)
+ {
+ 	int ret = 0;
+-#ifdef CONFIG_PCI_MSI
+ 	int vp_idx = 0, intr_idx = 0, intr_cnt = 0, msix_idx = 0, irq_req = 0;
+ 	int pci_fun = PCI_FUNC(vdev->pdev->devfn);
+ 
+-	if (vdev->config.intr_type == MSI_X)
++	if (IS_ENABLED(CONFIG_PCI_MSI) && vdev->config.intr_type == MSI_X)
+ 		ret = vxge_enable_msix(vdev);
+ 
+ 	if (ret) {
+@@ -2475,7 +2469,7 @@ static int vxge_add_isr(struct vxgedev *vdev)
+ 		vdev->config.intr_type = INTA;
+ 	}
+ 
+-	if (vdev->config.intr_type == MSI_X) {
++	if (IS_ENABLED(CONFIG_PCI_MSI) && vdev->config.intr_type == MSI_X) {
+ 		for (intr_idx = 0;
+ 		     intr_idx < (vdev->no_of_vpath *
+ 			VXGE_HW_VPATH_MSIX_ACTIVE); intr_idx++) {
+@@ -2576,9 +2570,8 @@ static int vxge_add_isr(struct vxgedev *vdev)
+ 		vdev->vxge_entries[intr_cnt].in_use = 1;
+ 		vdev->vxge_entries[intr_cnt].arg = &vdev->vpaths[0];
+ 	}
+-INTA_MODE:
+-#endif
+ 
++INTA_MODE:
+ 	if (vdev->config.intr_type == INTA) {
+ 		snprintf(vdev->desc[0], VXGE_INTR_STRLEN,
+ 			"%s:vxge:INTA", vdev->ndev->name);
+@@ -3889,12 +3882,12 @@ static void vxge_device_config_init(struct vxge_hw_device_config *device_config,
+ 	if (max_mac_vpath > VXGE_MAX_MAC_ADDR_COUNT)
+ 		max_mac_vpath = VXGE_MAX_MAC_ADDR_COUNT;
+ 
+-#ifndef CONFIG_PCI_MSI
+-	vxge_debug_init(VXGE_ERR,
+-		"%s: This Kernel does not support "
+-		"MSI-X. Defaulting to INTA", VXGE_DRIVER_NAME);
+-	*intr_type = INTA;
+-#endif
++	if (!IS_ENABLED(CONFIG_PCI_MSI)) {
++		vxge_debug_init(VXGE_ERR,
++			"%s: This Kernel does not support "
++			"MSI-X. Defaulting to INTA", VXGE_DRIVER_NAME);
++		*intr_type = INTA;
++	}
+ 
+ 	/* Configure whether MSI-X or IRQL. */
+ 	switch (*intr_type) {
+-- 
+2.7.0
