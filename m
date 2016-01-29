@@ -1,102 +1,137 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Fri, 29 Jan 2016 18:07:14 +0100
-Subject: Exynos Snow board display regression
-Message-ID: <CAOMqctT2dAQERos8bhrtVirF7ma4onq+UUS2ks-86LJ_mVDU6g@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 29 Jan 2016 10:08:30 -0700
+Subject: [PATCH V5 06/14] soc: tegra: pmc: Fix checking of valid partitions
+In-Reply-To: <1453998832-27383-7-git-send-email-jonathanh@nvidia.com>
+References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
+ <1453998832-27383-7-git-send-email-jonathanh@nvidia.com>
+Message-ID: <CANLsYkxY5P2wQxGev0veN39nD-1cTVkZCVpX9jca7da39JJpWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 28 January 2016 at 09:33, Jon Hunter <jonathanh@nvidia.com> wrote:
+> The tegra power partitions are referenced by a numerical ID which are
+> the same values programmed into the PMC registers for controlling the
+> partition. For a given device, the valid partition IDs may not be
+> contiguous and so simply checking that an ID is not greater than the
+> maximum ID supported may not mean it is valid. Fix this by adding a
+> bitmap for representing the valid partitions of a device and add a
+> helper function will test if the partition is valid.
+>
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> ---
+>  drivers/soc/tegra/pmc.c | 21 +++++++++++++++++----
+>  include/soc/tegra/pmc.h |  1 +
+>  2 files changed, 18 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
+> index 35ee60fd17be..032dd5c17130 100644
+> --- a/drivers/soc/tegra/pmc.c
+> +++ b/drivers/soc/tegra/pmc.c
+> @@ -132,6 +132,7 @@ struct tegra_pmc_soc {
+>   * @cpu_pwr_good_en: CPU power good signal is enabled
+>   * @lp0_vec_phys: physical base address of the LP0 warm boot code
+>   * @lp0_vec_size: size of the LP0 warm boot code
+> + * @powergates_valid: Bitmap of valid power gates
+>   * @powergates_lock: mutex for power gate register access
+>   */
+>  struct tegra_pmc {
+> @@ -156,6 +157,7 @@ struct tegra_pmc {
+>         bool cpu_pwr_good_en;
+>         u32 lp0_vec_phys;
+>         u32 lp0_vec_size;
+> +       DECLARE_BITMAP(powergates_valid, TEGRA_POWERGATE_MAX);
+>
+>         struct mutex powergates_lock;
+>  };
+> @@ -180,6 +182,11 @@ static inline bool tegra_powergate_state(int id)
+>         return (tegra_pmc_readl(PWRGATE_STATUS) & BIT(id)) != 0;
+>  }
+>
+> +static inline bool tegra_powergate_is_valid(int id)
+> +{
+> +       return test_bit(id, pmc->powergates_valid);
+> +}
+> +
+>  /**
+>   * tegra_powergate_set() - set the state of a partition
+>   * @id: partition ID
+> @@ -213,7 +220,7 @@ static int tegra_powergate_set(unsigned int id, bool new_state)
+>   */
+>  int tegra_powergate_power_on(unsigned int id)
+>  {
+> -       if (!pmc->soc || id >= pmc->soc->num_powergates)
+> +       if (!tegra_powergate_is_valid(id))
+>                 return -EINVAL;
 
-after  commit a9fa852886fd5a7ccec3b7e9eff75f85072f009c
+The "!pmc-soc" condition is no longer needed?  If so the changelog
+should reflect that or a new patch that deals with just that should be
+etched.  The same comment applies for the rest of the patch.
 
-display no longer works on the Snow board. The built-in panel is no
-longer probed.
-
-The commit *supposedly* provides for backwards compatibility and at
-first glance only new options for probing the panel are added.
-
-However, reverting the commit on top of 4.5-rc1 gives working display
-again so there is probably some subtle non-obvious catch in the logic.
-
-Any ideas what might go wrong here?
-
-Thanks
-
-Michal
-
-Author: Inki Dae <inki.dae@samsung.com>
-Date:   Thu Nov 26 21:34:18 2015 +0900
-
-    drm/exynos: dp: add of_graph dt binding support for panel
-
-    This patch adds of_graph dt binding support for panel device
-    and also keeps the backward compatibility.
-
-    i.e.,
-    The dts file for Exynos5800 based peach pi board
-    has a panel property so we need to keep the backward compatibility.
-
-    Changelog v3:
-    - bind only one of two nodes outbound - panel or bridge.
-
-    Changelog v2:
-    - return -EINVAL if getting a port node failed.
-
-    Signed-off-by: Inki Dae <inki.dae@samsung.com>
-    Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c
-b/drivers/gpu/drm/exynos/exynos_dp_core.c
-index 94f02a0..60260a0 100644
---- a/drivers/gpu/drm/exynos/exynos_dp_core.c
-+++ b/drivers/gpu/drm/exynos/exynos_dp_core.c
-@@ -1392,7 +1392,7 @@ static const struct component_ops exynos_dp_ops = {
- static int exynos_dp_probe(struct platform_device *pdev)
- {
-        struct device *dev = &pdev->dev;
--       struct device_node *panel_node, *bridge_node, *endpoint;
-+       struct device_node *panel_node = NULL, *bridge_node, *endpoint = NULL;
-        struct exynos_dp_device *dp;
-        int ret;
-
-@@ -1403,14 +1403,32 @@ static int exynos_dp_probe(struct platform_device *pdev)
-
-        platform_set_drvdata(pdev, dp);
-
-+       /* This is for the backward compatibility. */
-        panel_node = of_parse_phandle(dev->of_node, "panel", 0);
-        if (panel_node) {
-                dp->panel = of_drm_find_panel(panel_node);
-                of_node_put(panel_node);
-                if (!dp->panel)
-                        return -EPROBE_DEFER;
-+       } else {
-+               endpoint = of_graph_get_next_endpoint(dev->of_node, NULL);
-+               if (endpoint) {
-+                       panel_node = of_graph_get_remote_port_parent(endpoint);
-+                       if (panel_node) {
-+                               dp->panel = of_drm_find_panel(panel_node);
-+                               of_node_put(panel_node);
-+                               if (!dp->panel)
-+                                       return -EPROBE_DEFER;
-+                       } else {
-+                               DRM_ERROR("no port node for panel device.\n");
-+                               return -EINVAL;
-+                       }
-+               }
-        }
-
-+       if (endpoint)
-+               goto out;
-+
-        endpoint = of_graph_get_next_endpoint(dev->of_node, NULL);
-        if (endpoint) {
-                bridge_node = of_graph_get_remote_port_parent(endpoint);
-@@ -1423,6 +1441,7 @@ static int exynos_dp_probe(struct platform_device *pdev)
-                        return -EPROBE_DEFER;
-        }
-
-+out:
-        pm_runtime_enable(dev);
-
-        ret = component_add(&pdev->dev, &exynos_dp_ops);
+>
+>         return tegra_powergate_set(id, true);
+> @@ -225,7 +232,7 @@ int tegra_powergate_power_on(unsigned int id)
+>   */
+>  int tegra_powergate_power_off(unsigned int id)
+>  {
+> -       if (!pmc->soc || id >= pmc->soc->num_powergates)
+> +       if (!tegra_powergate_is_valid(id))
+>                 return -EINVAL;
+>
+>         return tegra_powergate_set(id, false);
+> @@ -240,7 +247,7 @@ int tegra_powergate_is_powered(unsigned int id)
+>  {
+>         int status;
+>
+> -       if (!pmc->soc || id >= pmc->soc->num_powergates)
+> +       if (!tegra_powergate_is_valid(id))
+>                 return -EINVAL;
+>
+>         mutex_lock(&pmc->powergates_lock);
+> @@ -258,7 +265,7 @@ int tegra_powergate_remove_clamping(unsigned int id)
+>  {
+>         u32 mask;
+>
+> -       if (!pmc->soc || id >= pmc->soc->num_powergates)
+> +       if (!tegra_powergate_is_valid(id))
+>                 return -EINVAL;
+>
+>         mutex_lock(&pmc->powergates_lock);
+> @@ -1118,6 +1125,7 @@ static int __init tegra_pmc_early_init(void)
+>         const struct of_device_id *match;
+>         struct device_node *np;
+>         struct resource regs;
+> +       unsigned int i;
+>         bool invert;
+>         u32 value;
+>
+> @@ -1167,6 +1175,11 @@ static int __init tegra_pmc_early_init(void)
+>                 return -ENXIO;
+>         }
+>
+> +       /* Create a bit-mask of the valid partitions */
+> +       for (i = 0; i < pmc->soc->num_powergates; i++)
+> +               if (pmc->soc->powergates[i])
+> +                       set_bit(i, pmc->powergates_valid);
+> +
+>         mutex_init(&pmc->powergates_lock);
+>
+>         /*
+> diff --git a/include/soc/tegra/pmc.h b/include/soc/tegra/pmc.h
+> index 07e332dd44fb..e9e53473a63e 100644
+> --- a/include/soc/tegra/pmc.h
+> +++ b/include/soc/tegra/pmc.h
+> @@ -72,6 +72,7 @@ int tegra_pmc_cpu_remove_clamping(unsigned int cpuid);
+>  #define TEGRA_POWERGATE_AUD    27
+>  #define TEGRA_POWERGATE_DFD    28
+>  #define TEGRA_POWERGATE_VE2    29
+> +#define TEGRA_POWERGATE_MAX    TEGRA_POWERGATE_VE2
+>
+>  #define TEGRA_POWERGATE_3D0    TEGRA_POWERGATE_3D
+>
+> --
+> 2.1.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
