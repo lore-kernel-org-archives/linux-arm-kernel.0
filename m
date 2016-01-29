@@ -1,81 +1,111 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Jan 2016 12:39:10 +0100
-Subject: [PATCH v2 2/7] net: davinci_cpdma: use dma_addr_t for DMA address
-In-Reply-To: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
-References: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
-Message-ID: <1454067557-3546883-3-git-send-email-arnd@arndb.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 29 Jan 2016 12:40:12 +0100
+Subject: [PATCH RFC 04/15] mmc: sunxi: Support vqmmc regulator
+In-Reply-To: <1453354002-28366-5-git-send-email-wens@csie.org>
+References: <1453354002-28366-1-git-send-email-wens@csie.org>
+ <1453354002-28366-5-git-send-email-wens@csie.org>
+Message-ID: <CAPDyKFr2PKg83bmewu-iP7HxrUp8QZODBswevpuP3YeX3Mm6tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The davinci_cpdma mixes up physical addresses as seen from the CPU
-and DMA addresses as seen from a DMA master, since it can operate
-on both normal memory or an on-chip buffer. If dma_addr_t is
-different from phys_addr_t, this means we get a compile-time warning
-about the type mismatch:
+On 21 January 2016 at 06:26, Chen-Yu Tsai <wens@csie.org> wrote:
+> eMMC chips require 2 power supplies, vmmc for internal logic, and vqmmc
+> for driving output buffers. vqmmc also controls signaling voltage. Most
+> boards we've seen use the same regulator for both, nevertheless the 2
+> have different usages, and should be set separately.
+>
+> This patch adds support for vqmmc regulator supply, including voltage
+> switching. The MMC core can use this to try different signaling voltages
+> for eMMC.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-ethernet/ti/davinci_cpdma.c: In function 'cpdma_desc_pool_create':
-ethernet/ti/davinci_cpdma.c:182:48: error: passing argument 3 of 'dma_alloc_coherent' from incompatible pointer type [-Werror=incompatible-pointer-types]
-   pool->cpumap = dma_alloc_coherent(dev, size, &pool->phys,
-In file included from ethernet/ti/davinci_cpdma.c:21:0:
-dma-mapping.h:398:21: note: expected 'dma_addr_t * {aka long long unsigned int *}' but argument is of type 'phys_addr_t * {aka unsigned int *}'
- static inline void *dma_alloc_coherent(struct device *dev, size_t size,
+Thanks, applied for next!
 
-This slightly restructures the code so the address we use for
-mapping RAM into a DMA address is always a dma_addr_t, avoiding
-the warning. The code is correct even if both types are 32-bit
-because the DMA master in this device only supports 32-bit addressing
-anyway, independent of the types that are used.
+Kind regards
+Uffe
 
-We still assign this value to pool->phys, and that is wrong if
-the driver is ever used with an IOMMU, but that value appears to
-be never used, so there is no problem really. I've added a couple
-of comments about where we do things that are slightly violating
-the API.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/net/ethernet/ti/davinci_cpdma.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/net/ethernet/ti/davinci_cpdma.c b/drivers/net/ethernet/ti/davinci_cpdma.c
-index 657b65bf5cac..18bf3a8fdc50 100644
---- a/drivers/net/ethernet/ti/davinci_cpdma.c
-+++ b/drivers/net/ethernet/ti/davinci_cpdma.c
-@@ -82,7 +82,7 @@ struct cpdma_desc {
- 
- struct cpdma_desc_pool {
- 	phys_addr_t		phys;
--	u32			hw_addr;
-+	dma_addr_t		hw_addr;
- 	void __iomem		*iomap;		/* ioremap map */
- 	void			*cpumap;	/* dma_alloc map */
- 	int			desc_size, mem_size;
-@@ -152,7 +152,7 @@ struct cpdma_chan {
-  * abstract out these details
-  */
- static struct cpdma_desc_pool *
--cpdma_desc_pool_create(struct device *dev, u32 phys, u32 hw_addr,
-+cpdma_desc_pool_create(struct device *dev, u32 phys, dma_addr_t hw_addr,
- 				int size, int align)
- {
- 	int bitmap_size;
-@@ -176,13 +176,13 @@ cpdma_desc_pool_create(struct device *dev, u32 phys, u32 hw_addr,
- 
- 	if (phys) {
- 		pool->phys  = phys;
--		pool->iomap = ioremap(phys, size);
-+		pool->iomap = ioremap(phys, size); /* should be memremap? */
- 		pool->hw_addr = hw_addr;
- 	} else {
--		pool->cpumap = dma_alloc_coherent(dev, size, &pool->phys,
-+		pool->cpumap = dma_alloc_coherent(dev, size, &pool->hw_addr,
- 						  GFP_KERNEL);
--		pool->iomap = pool->cpumap;
--		pool->hw_addr = pool->phys;
-+		pool->iomap = (void __iomem __force *)pool->cpumap;
-+		pool->phys = pool->hw_addr; /* assumes no IOMMU, don't use this value */
- 	}
- 
- 	if (pool->iomap)
--- 
-2.7.0
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 31 +++++++++++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index 0495ae7da6d6..4bec87458317 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/dma-mapping.h>
+>  #include <linux/slab.h>
+>  #include <linux/reset.h>
+> +#include <linux/regulator/consumer.h>
+>
+>  #include <linux/of_address.h>
+>  #include <linux/of_gpio.h>
+> @@ -256,6 +257,9 @@ struct sunxi_mmc_host {
+>         struct mmc_request *mrq;
+>         struct mmc_request *manual_stop_mrq;
+>         int             ferror;
+> +
+> +       /* vqmmc */
+> +       bool            vqmmc_enabled;
+>  };
+>
+>  static int sunxi_mmc_reset_host(struct sunxi_mmc_host *host)
+> @@ -716,6 +720,16 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>                 if (host->ferror)
+>                         return;
+>
+> +               if (!IS_ERR(mmc->supply.vqmmc)) {
+> +                       host->ferror = regulator_enable(mmc->supply.vqmmc);
+> +                       if (host->ferror) {
+> +                               dev_err(mmc_dev(mmc),
+> +                                       "failed to enable vqmmc\n");
+> +                               return;
+> +                       }
+> +                       host->vqmmc_enabled = true;
+> +               }
+> +
+>                 host->ferror = sunxi_mmc_init_host(mmc);
+>                 if (host->ferror)
+>                         return;
+> @@ -727,6 +741,9 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>                 dev_dbg(mmc_dev(mmc), "power off!\n");
+>                 sunxi_mmc_reset_host(host);
+>                 mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+> +               if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled)
+> +                       regulator_disable(mmc->supply.vqmmc);
+> +               host->vqmmc_enabled = false;
+>                 break;
+>         }
+>
+> @@ -758,6 +775,19 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>         }
+>  }
+>
+> +static int sunxi_mmc_volt_switch(struct mmc_host *mmc, struct mmc_ios *ios)
+> +{
+> +       /* vqmmc regulator is available */
+> +       if (!IS_ERR(mmc->supply.vqmmc))
+> +               return mmc_regulator_set_vqmmc(mmc, ios);
+> +
+> +       /* no vqmmc regulator, assume fixed regulator at 3/3.3V */
+> +       if (mmc->ios.signal_voltage == MMC_SIGNAL_VOLTAGE_330)
+> +               return 0;
+> +
+> +       return -EINVAL;
+> +}
+> +
+>  static void sunxi_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
+>  {
+>         struct sunxi_mmc_host *host = mmc_priv(mmc);
+> @@ -923,6 +953,7 @@ static struct mmc_host_ops sunxi_mmc_ops = {
+>         .get_ro          = mmc_gpio_get_ro,
+>         .get_cd          = mmc_gpio_get_cd,
+>         .enable_sdio_irq = sunxi_mmc_enable_sdio_irq,
+> +       .start_signal_voltage_switch = sunxi_mmc_volt_switch,
+>         .hw_reset        = sunxi_mmc_hw_reset,
+>         .card_busy       = sunxi_mmc_card_busy,
+>  };
+> --
+> 2.7.0.rc3
+>
