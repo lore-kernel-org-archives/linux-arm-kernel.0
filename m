@@ -1,44 +1,51 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 29 Jan 2016 23:49:42 +0300
-Subject: [PATCH] ARM: dts: porter: add MAX3355 support
-In-Reply-To: <56ABCB69.1070800@cogentembedded.com>
-References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
- <4506196.xOgpYRO52t@wasted.cogentembedded.com>
- <SG2PR06MB0919D09C1146EAC0681EE109D8DA0@SG2PR06MB0919.apcprd06.prod.outlook.com>
- <56ABCB69.1070800@cogentembedded.com>
-Message-ID: <56ABD066.7020804@cogentembedded.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 29 Jan 2016 12:58:20 -0800
+Subject: [PATCH v2 2/3] clk: xgene: Add SoC and PMD PLL clocks with v2
+ hardware
+In-Reply-To: <1453256863-15092-3-git-send-email-lho@apm.com>
+References: <1453256863-15092-1-git-send-email-lho@apm.com>
+ <1453256863-15092-3-git-send-email-lho@apm.com>
+Message-ID: <20160129205820.GU12841@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/29/2016 11:28 PM, Sergei Shtylyov wrote:
+On 01/19, Loc Ho wrote:
+> Add X-Gene SoC and PMD PLL clocks support for v2 hardware.
+> X-Gene SoC v2 and above use an slightly different SoC
+> and PMD PLL hardware logic.
+> 
+> Signed-off-by: Loc Ho <lho@apm.com>
+> ---
 
->>> From: linux-renesas-soc-owner at vger.kernel.org
->>> [mailto:linux-renesas-soc-owner at vger.kernel.org] On Behalf Of Sergei
->>> Shtylyov
->>> Sent: Wednesday, January 27, 2016 7:14 AM
->>>
->>> Now that Maxim Integrated MAX3355 'extcon' driver and device tree bindings
->>> are upstream along with the 'extcon' hook  in the Renesas USBHS driver, we
->>> can add  MAX3355 device node to  the Porter device tree and properly refer
->>> to it from the USBHS node instead of using  "renesas,enable-gpio" property
->>> which only allowed checking the USB ID pin  at the driver probe time;  now
->>> this  pin's  state can be monitored dynamically!
->>>
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>
->> I tested this patch on Porter, but interrupt of "usb-otg" didn't happened
->> even if I connected/disconnected a usb convert cable (usb micro-ab to A).
->> Remarks: I confirmed that the usb convert cable worked correctly on other
->> board.
->
->     I guess I have the same cable
+It's not from this patch, but I notice that we have a return
+inside a void function in this file...
 
-    No, I have mini-AB connector here and hence my cable is mini-AB to A.
+---8<---
+From: Stephen Boyd <sboyd@codeaurora.org>
+Subject: [PATCH] clk: xgene: Remove return from void function
 
-> and IRQs do happen for me when I connect and
-> disconnect it (as it should be).
+This function doesn't return anything because it's void. Drop the
+return statement.
 
->> Best regards,
->> Yoshihiro Shimoda
+Cc: Loc Ho <lho@apm.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clk/clk-xgene.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-MBR, Sergei
+diff --git a/drivers/clk/clk-xgene.c b/drivers/clk/clk-xgene.c
+index 266d573b9134..bd7156baa08b 100644
+--- a/drivers/clk/clk-xgene.c
++++ b/drivers/clk/clk-xgene.c
+@@ -50,7 +50,7 @@ static inline u32 xgene_clk_read(void __iomem *csr)
+ 
+ static inline void xgene_clk_write(u32 data, void __iomem *csr)
+ {
+-	return writel_relaxed(data, csr);
++	writel_relaxed(data, csr);
+ }
+ 
+ /* PLL Clock */
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
