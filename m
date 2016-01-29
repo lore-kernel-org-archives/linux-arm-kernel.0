@@ -1,39 +1,44 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 29 Jan 2016 13:37:21 +0200
-Subject: [PATCH] fbdev: s6e8ax0: avoid unused function warnings
-In-Reply-To: <1453734300-1958304-1-git-send-email-arnd@arndb.de>
-References: <1453734300-1958304-1-git-send-email-arnd@arndb.de>
-Message-ID: <56AB4EF1.3090404@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 29 Jan 2016 12:39:08 +0100
+Subject: [PATCH v2 0/7] network driver fixes
+Message-ID: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This is an updated series of fixes for the network device drivers
+that showed warnings in ARM randconfig.
+
+Changes since v1 are:
+
+dropped "net: macb: avoid uninitialized variables", already fixed in net-next
+
+dropped "net: fddi/defxx: avoid warning about uninitialized variable
+	use", already fixed in net-next
+
+added missing barriers in "net: moxart: use correct accessors for
+	DMA memory"
+
+clarified "net: bgmac: clarify CONFIG_BCMA dependency" changelog
 
 
-On 25/01/16 17:04, Arnd Bergmann wrote:
-> The s6e8ax0 suspend/resume functions are hidden inside of an #ifdef
-> when CONFIG_PM is set to avoid unused function warnings, but they
-> call some other functions that nothing else calls, and we get warnings
-> about those:
-> 
-> drivers/video/fbdev/exynos/s6e8ax0.c:449:13: error: 's6e8ax0_sleep_in' defined but not used [-Werror=unused-function]
-> drivers/video/fbdev/exynos/s6e8ax0.c:485:13: error: 's6e8ax0_display_off' defined but not used [-Werror=unused-function]
-> 
-> This marks the PM functions as __maybe_unused so the compiler can
-> silently drop them when they are not referenced.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/video/fbdev/exynos/s6e8ax0.c | 13 ++++---------
->  1 file changed, 4 insertions(+), 9 deletions(-)
+Arnd Bergmann (7):
+  net: moxart: use correct accessors for DMA memory
+  net: davinci_cpdma: use dma_addr_t for DMA address
+  net: hp100: remove unnecessary #ifdefs
+  net: bgmac: clarify CONFIG_BCMA dependency
+  net: vxge: avoid unused function warnings
+  net: nb8800: avoid uninitialized variable warning
+  net: tg3: avoid uninitialized variable warning
 
-Thanks, queued for 4.5 fixes.
+ drivers/net/ethernet/aurora/nb8800.c           |  4 +--
+ drivers/net/ethernet/broadcom/Kconfig          |  5 ++-
+ drivers/net/ethernet/broadcom/tg3.c            |  2 +-
+ drivers/net/ethernet/hp/hp100.c                | 18 ----------
+ drivers/net/ethernet/moxa/moxart_ether.c       | 46 +++++++++++++++++---------
+ drivers/net/ethernet/moxa/moxart_ether.h       |  4 +--
+ drivers/net/ethernet/neterion/vxge/vxge-main.c | 31 +++++++----------
+ drivers/net/ethernet/ti/davinci_cpdma.c        | 12 +++----
+ 8 files changed, 57 insertions(+), 65 deletions(-)
 
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160129/476f5a46/attachment.sig>
+-- 
+2.7.0
