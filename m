@@ -1,72 +1,71 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 29 Jan 2016 14:26:31 +0800
-Subject: [PATCH v10 07/21] KVM: ARM64: PMU: Add perf event map and
- introduce perf event creating function
-In-Reply-To: <20160128180638.GO775@arm.com>
-References: <1453866709-20324-1-git-send-email-zhaoshenglong@huawei.com>
- <1453866709-20324-8-git-send-email-zhaoshenglong@huawei.com>
- <20160128163115.GC3807@hawk.localdomain> <56AA45B0.3060205@arm.com>
- <20160128180638.GO775@arm.com>
-Message-ID: <56AB0617.5060902@huawei.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Fri, 29 Jan 2016 14:42:48 +0800
+Subject: [PATCH v8 0/2] Add Rockchip Inno-HDMI driver
+Message-ID: <1454049768-30872-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Here are a brief introduction to Innosilicon HDMI IP:
+  - Support HDMI 1.4a, HDCP 1.2 and DVI 1.0 standard compliant transmitter
+  - Support HDMI1.4 a/b 3D function defined in HDMI 1.4 a/b spec
+  - Digital video interface supports a pixel size of 24, 30, 36, 48bits color depth in RGB
+  - S/PDIF output supports PCM, Dolby Digital, DTS digital audio transmission
+    (32-192kHz Fs) using IEC60958 and IEC 61937
+  - The EDID and CEC function are also supported by Innosilicon HDMI Transmitter Controlle
 
-On 2016/1/29 2:06, Will Deacon wrote:
-> On Thu, Jan 28, 2016 at 04:45:36PM +0000, Marc Zyngier wrote:
->> > On 28/01/16 16:31, Andrew Jones wrote:
->>> > > On Wed, Jan 27, 2016 at 11:51:35AM +0800, Shannon Zhao wrote:
->>>> > >> From: Shannon Zhao <shannon.zhao@linaro.org>
->>>> > >>
->>>> > >> When we use tools like perf on host, perf passes the event type and the
->>>> > >> id of this event type category to kernel, then kernel will map them to
->>>> > >> hardware event number and write this number to PMU PMEVTYPER<n>_EL0
->>>> > >> register. When getting the event number in KVM, directly use raw event
->>>> > >> type to create a perf_event for it.
->>>> > >>
->>>> > >> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->>>> > >> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> > >> ---
->>>> > >>  arch/arm64/include/asm/pmu.h |   3 ++
->>>> > >>  arch/arm64/kvm/Makefile      |   1 +
->>>> > >>  include/kvm/arm_pmu.h        |  10 ++++
->>>> > >>  virt/kvm/arm/pmu.c           | 122 +++++++++++++++++++++++++++++++++++++++++++
->>>> > >>  4 files changed, 136 insertions(+)
->>>> > >>  create mode 100644 virt/kvm/arm/pmu.c
->>>> > >>
->>>> > >> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
->>>> > >> index 4406184..2588f9c 100644
->>>> > >> --- a/arch/arm64/include/asm/pmu.h
->>>> > >> +++ b/arch/arm64/include/asm/pmu.h
->>>> > >> @@ -21,6 +21,7 @@
->>>> > >>  
->>>> > >>  #define ARMV8_MAX_COUNTERS      32
->>>> > >>  #define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
->>>> > >> +#define ARMV8_CYCLE_IDX         (ARMV8_MAX_COUNTERS - 1)
->>> > > 
->>> > > I'm not sure we want to add this. It's name is wrong, as it's really
->>> > > PMCNTENSET_EL0.C, and just a few lines above we have the idx defined
->>> > > already (ARMV8_IDX_CYCLE_COUNTER), but as zero, because
->>> > > arch/arm64/kernel/perf_event.c maps it that way.
->>> > > 
->>> > > I think we should do the same with the pmc array, i.e. map the cycle
->>> > > counter to idx zero.
->> > 
->> > I tend to have the opposite view. Not for the sake of it, but because I
->> > find it helpful to directly map the code to the architecture
->> > documentation without having to bend another handful of neurons.
->> > 
->> > Will probably had some good reasons to structure it that way, but I
->> > don't know the rational. Will?
-> It was years ago, but I suspect that the cycle counter is index zero
-> because its mandated, whilst the number of event counters is IMPDEF.
+Changes in v8:
+- Don't check whether encoder output format is RGB colorspace, cause driver
+  default configure the output colorspace to RGB. (ZhengYang)
+- Correct the check condition in inno_hdmi_config_video_csc() (ZhengYang)
+    - if (data->enc_out_format == data->enc_out_format) {
+    + if (data->enc_in_format == data->enc_out_format) {
 
-Since PMCNTENSET/CLR, PMINTENSET/CLR, PMOVSSET/CLR and PMSWINC are using
-bit 31 to stands the state of cycle counter, if we make cycle counter
-index to zero, we always need to do translation between the idx and bit
-31 when we access these registers.
+Changes in v7:
+- Correct the module licnese statement (Paul)
+     - MODULE_LICENSE("GPL");
+     + MODULE_LICENSE("GPLv2");
+- Start indentation with tabs and fix the misspell in Kconfig (Paul)
+- Carry the lost device-binding document (Heiko)
 
-Thanks,
+Changes in v6:
+- Rebase the Makefile/Kconfig files which add by Chris's rockchip-mipi driver (Caeser)
+
+Changes in v5:
+- Use hdmi_infoframe helper functions to packed the infoframe (Russell)
+- Remove the unused double wait_for_completion_timeout for ddc transfer (Russell)
+- Remove the unused local variable in "inno_hdmi_i2c_write()" function (Russell)
+
+Changes in v4:
+- Modify the commit title "drm/rockchip: hdmi: ..." (Mark)
+- Correct the "DKMS" to "DPMS" (Mark)
+- Fix over 80 characters problems (Mark)
+- Remove encoder .prepare/.commit helper functions, and move the vop mode
+configure function into encoder .enable helper functions. (Mark)
+
+Changes in v3:
+- Use encoder enable/disable function, and remove the encoder DPMS function
+- Keep HDMI PLL power on in standby mode
+
+Changes in v2:
+- Using DRM atomic helper functions for connector init (Mark)
+- Remove "hdmi->connector.encoder = encoder;" (Mark)
+- Add the Acked-by tags from Rob
+- Correct the misspell "rk3036-dw-hdmi" (Heiko)
+
+Yakir Yang (2):
+  drm/rockchip: hdmi: add Innosilicon HDMI support
+  dt-bindings: add document for Innosilicon HDMI on Rockchip platform
+
+ .../display/rockchip/inno_hdmi-rockchip.txt        |  50 ++
+ drivers/gpu/drm/rockchip/Kconfig                   |   8 +
+ drivers/gpu/drm/rockchip/Makefile                  |   1 +
+ drivers/gpu/drm/rockchip/inno_hdmi.c               | 939 +++++++++++++++++++++
+ drivers/gpu/drm/rockchip/inno_hdmi.h               | 362 ++++++++
+ 5 files changed, 1360 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
+ create mode 100644 drivers/gpu/drm/rockchip/inno_hdmi.c
+ create mode 100644 drivers/gpu/drm/rockchip/inno_hdmi.h
+
 -- 
-Shannon
+1.9.1
