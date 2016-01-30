@@ -1,70 +1,115 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 30 Jan 2016 20:52:17 +0800
-Subject: [PATCH V13 09/10] vfio, platform: add support for ACPI while
- detecting the reset driver
-In-Reply-To: <1454106914-15857-10-git-send-email-okaya@codeaurora.org>
-Message-ID: <201601302013.VQW0NZ88%fengguang.wu@intel.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 30 Jan 2016 14:48:15 +0100
+Subject: [PATCH v4 1/2] pinctrl: rockchip: add support for the rk3399
+In-Reply-To: <1454156413-56148-2-git-send-email-david.wu@rock-chips.com>
+References: <1454156413-56148-1-git-send-email-david.wu@rock-chips.com>
+ <1454156413-56148-2-git-send-email-david.wu@rock-chips.com>
+Message-ID: <2864405.Bm4XacGINh@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
+Hi David,
 
-[auto build test ERROR on vfio/next]
-[also build test ERROR on v4.5-rc1 next-20160129]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Am Samstag, 30. Januar 2016, 20:20:12 schrieb David Wu:
+> The pinctrl of rk3399 is much different from other's,
+> especially the 3bits of drive strength.
+> 
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> ---
+> Change in v4: None
 
-url:    https://github.com/0day-ci/linux/commits/Sinan-Kaya/dma-add-Qualcomm-Technologies-HIDMA-driver/20160130-064551
-base:   https://github.com/awilliam/linux-vfio.git next
-config: arm64-allmodconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+you're to fast for me ;-)
 
-All errors (new ones prefixed by >>):
+[...]
 
-   drivers/vfio/platform/vfio_platform_common.c: In function 'vfio_platform_probe_acpi':
->> drivers/vfio/platform/vfio_platform_common.c:558:9: error: invalid initializer
-     struct acpi_device adev = ACPI_COMPANION(dev);
-            ^
->> drivers/vfio/platform/vfio_platform_common.c:560:6: error: wrong type argument to unary exclamation mark
-     if (!adev)
-         ^
->> drivers/vfio/platform/vfio_platform_common.c:563:18: error: incompatible type for argument 1 of 'acpi_device_hid'
-     vdev->acpihid = acpi_device_hid(adev);
-                     ^
-   In file included from include/linux/acpi.h:41:0,
-                    from drivers/vfio/platform/vfio_platform_common.c:16:
-   include/acpi/acpi_bus.h:253:13: note: expected 'struct acpi_device *' but argument is of type 'struct acpi_device'
-    const char *acpi_device_hid(struct acpi_device *device);
-                ^
+> @@ -729,8 +924,67 @@ static int rockchip_set_drive_perpin(struct
+> rockchip_pin_bank *bank,
+> 
+>  	spin_lock_irqsave(&bank->slock, flags);
+> 
+> +	switch (drv_type) {
+> +	case DRV_TYPE_IO_1V8_3V0_AUTO:
+> +	case DRV_TYPE_IO_3V3_ONLY:
+> +		rmask_bits = RK3399_DRV_3BITS_PER_PIN;
+> +		switch (bit) {
+> +		case 0 ... 12:
+> +			/* regular case, nothing to do */
+> +			break;
+> +		case 15:
+> +			/*
+> +			 * the bit data[15] contains bit 0 of the value
+> +			 * while temp[1:0] contains bits 2 and 1
+> +			 */
 
-vim +558 drivers/vfio/platform/vfio_platform_common.c
+I'd think the introductory comment should mode here, so like:
+			/*
+			 * drive-strength offset is special, as it is
+			 * spread over 2 registers, the bit data[15] contains bit 0
+			 * of the value while temp[1:0] contains bits 2 and 1
+			 */
 
-   552	};
-   553	
-   554	#ifdef CONFIG_ACPI
-   555	int vfio_platform_probe_acpi(struct vfio_platform_device *vdev,
-   556				     struct device *dev)
-   557	{
- > 558		struct acpi_device adev = ACPI_COMPANION(dev);
-   559	
- > 560		if (!adev)
-   561			return -EINVAL;
-   562	
- > 563		vdev->acpihid = acpi_device_hid(adev);
-   564		if (!vdev->acpihid) {
-   565			pr_err("VFIO: cannot find ACPI HID for %s\n",
-   566			       vdev->name);
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 46685 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160130/b58da2c8/attachment-0001.obj>
+> +			data = (ret & 0x1) << 15;
+> +			temp = (ret >> 0x1) & 0x3;
+> +
+> +			rmask = BIT(15) | BIT(31);
+> +			data |= BIT(31);
+> +			ret = regmap_update_bits(regmap, reg, rmask, data);
+> +			if (ret) {
+> +				spin_unlock_irqrestore(&bank->slock, flags);
+> +				return ret;
+> +			}
+> +
+> +			/*
+> +			 * drive-strength offset is special, as it is
+> +			 * spread over 2 registers
+> +			 */
+
+as I wrote, this should probably move a bit higher
+
+
+> +			rmask = 0x3 | (0x3 << 16);
+> +			temp |= (0x3 << 16);
+> +			reg += 0x4;
+> +			ret = regmap_update_bits(regmap, reg, rmask, temp);
+> +
+> +			spin_unlock_irqrestore(&bank->slock, flags);
+> +			return ret;
+> +		case 18 ... 21:
+> +			/* setting fully enclosed in the second register */
+> +			reg += 4;
+> +			bit -= 16;
+> +			break;
+> +		default:
+> +			spin_unlock_irqrestore(&bank->slock, flags);
+> +			dev_err(info->dev, "unsupported bit: %d for pinctrl drive type: 
+%d\n",
+> +				bit, drv_type);
+> +			return -EINVAL;
+> +		}
+> +		break;
+> +	case DRV_TYPE_IO_DEFAULT:
+> +	case DRV_TYPE_IO_1V8_OR_3V0:
+> +	case DRV_TYPE_IO_1V8_ONLY:
+> +		rmask_bits = RK3288_DRV_BITS_PER_PIN;
+> +		break;
+> +	default:
+> +		spin_unlock_irqrestore(&bank->slock, flags);
+> +		dev_err(info->dev, "unsupported pinctrl drive type: %d\n",
+> +			drv_type);
+> +		return -EINVAL;
+> +	}
+> +
+>  	/* enable the write to the equivalent lower bits */
+> -	data = ((1 << RK3288_DRV_BITS_PER_PIN) - 1) << (bit + 16);
+> +	data = ((1 << rmask_bits) - 1) << (bit + 16);
+>  	rmask = data | (data >> 16);
+>  	data |= (ret << bit);
+> 
+
+Otherwise this looks nice to me, so with the comment fixed
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
+
+Thanks
+Heiko
