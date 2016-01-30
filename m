@@ -1,31 +1,46 @@
 From: ayaka@soulik.info (ayaka)
-Date: Sun, 31 Jan 2016 02:53:37 +0800
-Subject: [PATCH 4/4] [media] s5p-mfc: fix a typo in s5p_mfc_dec
+Date: Sun, 31 Jan 2016 02:53:35 +0800
+Subject: [PATCH 2/4] [media] s5p-mfc: remove unnecessary check in try_fmt
 In-Reply-To: <1454180017-29071-1-git-send-email-ayaka@soulik.info>
 References: <1454180017-29071-1-git-send-email-ayaka@soulik.info>
-Message-ID: <1454180017-29071-5-git-send-email-ayaka@soulik.info>
+Message-ID: <1454180017-29071-3-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is a cosmetic commit.
+We don't need to request the sizeimage or num_planes
+in try_fmt.
 
 Signed-off-by: ayaka <ayaka@soulik.info>
 ---
- drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 9 ---------
+ 1 file changed, 9 deletions(-)
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-index 609b17b..cfedf89 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-@@ -572,7 +572,7 @@ static int vidioc_reqbufs(struct file *file, void *priv,
- 	struct s5p_mfc_ctx *ctx = fh_to_ctx(priv);
- 
- 	if (reqbufs->memory != V4L2_MEMORY_MMAP) {
--		mfc_err("Only V4L2_MEMORY_MAP is supported\n");
-+		mfc_err("Only V4L2_MEMORY_MMAP is supported\n");
- 		return -EINVAL;
- 	}
- 
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+index 7c9e5f5..64b92eb 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+@@ -1043,10 +1043,6 @@ static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ 			mfc_err("failed to try output format\n");
+ 			return -EINVAL;
+ 		}
+-		if (pix_fmt_mp->plane_fmt[0].sizeimage == 0) {
+-			mfc_err("must be set encoding output size\n");
+-			return -EINVAL;
+-		}
+ 		if ((dev->variant->version_bit & fmt->versions) == 0) {
+ 			mfc_err("Unsupported format by this MFC version.\n");
+ 			return -EINVAL;
+@@ -1060,11 +1056,6 @@ static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ 			mfc_err("failed to try output format\n");
+ 			return -EINVAL;
+ 		}
+-
+-		if (fmt->num_planes != pix_fmt_mp->num_planes) {
+-			mfc_err("failed to try output format\n");
+-			return -EINVAL;
+-		}
+ 		if ((dev->variant->version_bit & fmt->versions) == 0) {
+ 			mfc_err("Unsupported format by this MFC version.\n");
+ 			return -EINVAL;
 -- 
 2.5.0
