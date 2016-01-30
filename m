@@ -1,20 +1,16 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 29 Jan 2016 16:33:51 -0800
-Subject: [PATCH v2 2/3] clk: xgene: Add SoC and PMD PLL clocks with v2
- hardware
-In-Reply-To: <1453256863-15092-3-git-send-email-lho@apm.com>
-References: <1453256863-15092-1-git-send-email-lho@apm.com>
- <1453256863-15092-3-git-send-email-lho@apm.com>
-Message-ID: <20160130003351.GG12841@codeaurora.org>
+Date: Fri, 29 Jan 2016 16:35:30 -0800
+Subject: [PATCH v2] clk:gcc-msm8916: add missing mss_q6_bimc_axi clock
+In-Reply-To: <1451905313-6461-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1451905313-6461-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20160130003530.GL12841@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19, Loc Ho wrote:
-> Add X-Gene SoC and PMD PLL clocks support for v2 hardware.
-> X-Gene SoC v2 and above use an slightly different SoC
-> and PMD PLL hardware logic.
+On 01/04, Srinivas Kandagatla wrote:
+> This clock is required for loading the qdsp firmware.
 > 
-> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 > ---
 
 Applied to clk-next
