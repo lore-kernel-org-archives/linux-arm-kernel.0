@@ -1,55 +1,28 @@
-From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
-Date: Fri, 29 Jan 2016 23:26:54 -0500
-Subject: [PATCH 4/4] pwm: omap-dmtimer: add dev_dbg() message for effective
- period and duty cycle
-In-Reply-To: <1454128014-22866-1-git-send-email-drivshin.allworx@gmail.com>
-References: <1454128014-22866-1-git-send-email-drivshin.allworx@gmail.com>
-Message-ID: <1454128014-22866-5-git-send-email-drivshin.allworx@gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 29 Jan 2016 20:34:16 -0800 (PST)
+Subject: [PATCH v2 0/7] network driver fixes
+In-Reply-To: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
+References: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160129.203416.1451706111708529250.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Rivshin <drivshin@allworx.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 29 Jan 2016 12:39:08 +0100
 
-After going through the math and constraints checking to compute load and
-match values, it is helpful to know what the resultant period and duty
-cycle are.
+> This is an updated series of fixes for the network device drivers
+> that showed warnings in ARM randconfig.
+> 
+> Changes since v1 are:
+> 
+> dropped "net: macb: avoid uninitialized variables", already fixed in net-next
+> 
+> dropped "net: fddi/defxx: avoid warning about uninitialized variable
+> 	use", already fixed in net-next
+> 
+> added missing barriers in "net: moxart: use correct accessors for
+> 	DMA memory"
+> 
+> clarified "net: bgmac: clarify CONFIG_BCMA dependency" changelog
 
-Signed-off-by: David Rivshin <drivshin@allworx.com>
----
-
-I found this helpful while testing the other changes, so I included it in
-case it may be of use to someone in the future. I would have no issues with
-dropping this if it's not considered worthwhile.
-
- drivers/pwm/pwm-omap-dmtimer.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
-index 8c9953c..44e3dca 100644
---- a/drivers/pwm/pwm-omap-dmtimer.c
-+++ b/drivers/pwm/pwm-omap-dmtimer.c
-@@ -102,7 +102,8 @@ static int pwm_omap_dmtimer_config(struct pwm_chip *chip,
- 	unsigned long clk_rate;
- 	bool timer_active;
- 
--	dev_dbg(chip->dev, "duty cycle: %d, period %d\n", duty_ns, period_ns);
-+	dev_dbg(chip->dev, "requested duty cycle: %dns, period: %dns\n",
-+		duty_ns, period_ns);
- 
- 	mutex_lock(&omap->mutex);
- 	if (duty_ns == pwm_get_duty_cycle(pwm) &&
-@@ -163,6 +164,12 @@ static int pwm_omap_dmtimer_config(struct pwm_chip *chip,
- 		duty_cycles = period_cycles - 1;
- 	}
- 
-+	dev_dbg(chip->dev, "effective duty cycle: %lldns, period: %lldns\n",
-+		DIV_ROUND_CLOSEST_ULL((u64)NSEC_PER_SEC * duty_cycles,
-+				      clk_rate),
-+		DIV_ROUND_CLOSEST_ULL((u64)NSEC_PER_SEC * period_cycles,
-+				      clk_rate));
-+
- 	load_value = (DM_TIMER_MAX - period_cycles) + 1;
- 	match_value = load_value + duty_cycles - 1;
- 
--- 
-2.5.0
+Series applied, thanks.
