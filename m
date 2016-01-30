@@ -1,36 +1,31 @@
 From: ayaka@soulik.info (ayaka)
-Date: Sun, 31 Jan 2016 02:53:34 +0800
-Subject: [PATCH 1/4] [media] s5p-mfc: Add handling of buffer freeing reqbufs
- request
+Date: Sun, 31 Jan 2016 02:53:37 +0800
+Subject: [PATCH 4/4] [media] s5p-mfc: fix a typo in s5p_mfc_dec
 In-Reply-To: <1454180017-29071-1-git-send-email-ayaka@soulik.info>
 References: <1454180017-29071-1-git-send-email-ayaka@soulik.info>
-Message-ID: <1454180017-29071-2-git-send-email-ayaka@soulik.info>
+Message-ID: <1454180017-29071-5-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The encoder forget the work to call hardware to release its buffers.
-This patch comes from chromium project. I just change its code
-style.
+It is a cosmetic commit.
 
 Signed-off-by: ayaka <ayaka@soulik.info>
 ---
- drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-index e65993f..7c9e5f5 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-@@ -1144,7 +1144,10 @@ static int vidioc_reqbufs(struct file *file, void *priv,
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+index 609b17b..cfedf89 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+@@ -572,7 +572,7 @@ static int vidioc_reqbufs(struct file *file, void *priv,
+ 	struct s5p_mfc_ctx *ctx = fh_to_ctx(priv);
+ 
+ 	if (reqbufs->memory != V4L2_MEMORY_MMAP) {
+-		mfc_err("Only V4L2_MEMORY_MAP is supported\n");
++		mfc_err("Only V4L2_MEMORY_MMAP is supported\n");
  		return -EINVAL;
- 	if (reqbufs->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
- 		if (reqbufs->count == 0) {
-+			mfc_debug(2, "Freeing buffers\n");
- 			ret = vb2_reqbufs(&ctx->vq_dst, reqbufs);
-+			s5p_mfc_hw_call_void(dev->mfc_ops, release_codec_buffers,
-+					ctx);
- 			ctx->capture_state = QUEUE_FREE;
- 			return ret;
- 		}
+ 	}
+ 
 -- 
 2.5.0
