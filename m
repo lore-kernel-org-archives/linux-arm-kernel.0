@@ -1,46 +1,33 @@
 From: ayaka@soulik.info (ayaka)
-Date: Sun, 31 Jan 2016 02:53:35 +0800
-Subject: [PATCH 2/4] [media] s5p-mfc: remove unnecessary check in try_fmt
+Date: Sun, 31 Jan 2016 02:53:36 +0800
+Subject: [PATCH 3/4] [media] s5p-mfc: don't close instance after free OUTPUT
+ buffers
 In-Reply-To: <1454180017-29071-1-git-send-email-ayaka@soulik.info>
 References: <1454180017-29071-1-git-send-email-ayaka@soulik.info>
-Message-ID: <1454180017-29071-3-git-send-email-ayaka@soulik.info>
+Message-ID: <1454180017-29071-4-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't need to request the sizeimage or num_planes
-in try_fmt.
+Free buffers in OUTPUT is quite normal to detect the driver's
+buffer capacity, it doesn't mean the application want to close
+that mfc instance.
 
 Signed-off-by: ayaka <ayaka@soulik.info>
 ---
- drivers/media/platform/s5p-mfc/s5p_mfc_enc.c | 9 ---------
- 1 file changed, 9 deletions(-)
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-index 7c9e5f5..64b92eb 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-@@ -1043,10 +1043,6 @@ static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
- 			mfc_err("failed to try output format\n");
- 			return -EINVAL;
- 		}
--		if (pix_fmt_mp->plane_fmt[0].sizeimage == 0) {
--			mfc_err("must be set encoding output size\n");
--			return -EINVAL;
--		}
- 		if ((dev->variant->version_bit & fmt->versions) == 0) {
- 			mfc_err("Unsupported format by this MFC version.\n");
- 			return -EINVAL;
-@@ -1060,11 +1056,6 @@ static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
- 			mfc_err("failed to try output format\n");
- 			return -EINVAL;
- 		}
--
--		if (fmt->num_planes != pix_fmt_mp->num_planes) {
--			mfc_err("failed to try output format\n");
--			return -EINVAL;
--		}
- 		if ((dev->variant->version_bit & fmt->versions) == 0) {
- 			mfc_err("Unsupported format by this MFC version.\n");
- 			return -EINVAL;
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+index aebe4fd..609b17b 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+@@ -474,7 +474,6 @@ static int reqbufs_output(struct s5p_mfc_dev *dev, struct s5p_mfc_ctx *ctx,
+ 		ret = vb2_reqbufs(&ctx->vq_src, reqbufs);
+ 		if (ret)
+ 			goto out;
+-		s5p_mfc_close_mfc_inst(dev, ctx);
+ 		ctx->src_bufs_cnt = 0;
+ 		ctx->output_state = QUEUE_FREE;
+ 	} else if (ctx->output_state == QUEUE_FREE) {
 -- 
 2.5.0
