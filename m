@@ -1,59 +1,134 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 31 Jan 2016 03:27:07 +0800
-Subject: [PATCH 1/4] [media] s5p-mfc: Add handling of buffer freeing
- reqbufs request
-In-Reply-To: <1454180017-29071-2-git-send-email-ayaka@soulik.info>
-Message-ID: <201601310345.Cap6NnJl%fengguang.wu@intel.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sat, 30 Jan 2016 20:39:53 +0100
+Subject: [PATCH 1/2] clocksource/drivers/lpc32xx: Support periodic mode
+In-Reply-To: <1454136379-7517-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+References: <1454136379-7517-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+Message-ID: <CAGhQ9VxO7Rsus8Js_oZDBxWzEHuUHnRyoVTVmawbtXmK7tNMcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ayaka,
+Hi Ezequiel,
 
-[auto build test ERROR on linuxtv-media/master]
-[also build test ERROR on v4.5-rc1 next-20160129]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+On 30 January 2016 at 07:46, Ezequiel Garcia
+<ezequiel@vanguardiasur.com.ar> wrote:
+> This commit adds the support for periodic mode. This is done by not
+> setting the MR0S (Stop on TnMR0) bit on MCR, thus allowing
+> interrupts to be periodically generated on MR0 matches.
+>
+> In order to do this, move the initial configuration that is specific to
+> the one shot mode to clock_event_device.set_state_oneshot.
+>
+> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+> ---
+>  drivers/clocksource/time-lpc32xx.c | 48 ++++++++++++++++++++++++++++++++------
+>  1 file changed, 41 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/clocksource/time-lpc32xx.c b/drivers/clocksource/time-lpc32xx.c
+> index 1316876b487a..9b3d4a38c716 100644
+> --- a/drivers/clocksource/time-lpc32xx.c
+> +++ b/drivers/clocksource/time-lpc32xx.c
+> @@ -47,6 +47,8 @@ struct lpc32xx_clock_event_ddata {
+>
+>  /* Needed for the sched clock */
+>  static void __iomem *clocksource_timer_counter;
+> +/* Needed for clockevents periodic mode */
+> +static u32 ticks_per_jiffy;
 
-url:    https://github.com/0day-ci/linux/commits/ayaka/s5p-mfc-Add-handling-of-buffer-freeing-reqbufs-request/20160131-030651
-base:   git://linuxtv.org/media_tree.git master
-config: xtensa-allyesconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=xtensa 
+Could you avoid this global variable by sticking it to the
+lpc32xx_clock_event_ddata struct?
 
-All errors (new ones prefixed by >>):
 
-   drivers/media/platform/s5p-mfc/s5p_mfc_enc.c: In function 'vidioc_reqbufs':
->> drivers/media/platform/s5p-mfc/s5p_mfc_enc.c:1141:4: error: implicit declaration of function 's5p_mfc_hw_call_void' [-Werror=implicit-function-declaration]
-       s5p_mfc_hw_call_void(dev->mfc_ops, release_codec_buffers,
-       ^
->> drivers/media/platform/s5p-mfc/s5p_mfc_enc.c:1141:39: error: 'release_codec_buffers' undeclared (first use in this function)
-       s5p_mfc_hw_call_void(dev->mfc_ops, release_codec_buffers,
-                                          ^
-   drivers/media/platform/s5p-mfc/s5p_mfc_enc.c:1141:39: note: each undeclared identifier is reported only once for each function it appears in
-   cc1: some warnings being treated as errors
+>  static u64 notrace lpc32xx_read_sched_clock(void)
+>  {
+> @@ -86,11 +88,42 @@ static int lpc32xx_clkevt_shutdown(struct clock_event_device *evtdev)
+>
+>  static int lpc32xx_clkevt_oneshot(struct clock_event_device *evtdev)
+>  {
+> +       struct lpc32xx_clock_event_ddata *ddata =
+> +               container_of(evtdev, struct lpc32xx_clock_event_ddata, evtdev);
+> +
+>         /*
+>          * When using oneshot, we must also disable the timer
+>          * to wait for the first call to set_next_event().
+>          */
+> -       return lpc32xx_clkevt_shutdown(evtdev);
+> +       writel_relaxed(0, ddata->base + LPC32XX_TIMER_TCR);
+> +
+> +       /* Enable interrupt, reset on match and stop on match (MCR). */
+> +       writel_relaxed(LPC32XX_TIMER_MCR_MR0I | LPC32XX_TIMER_MCR_MR0R |
+> +                      LPC32XX_TIMER_MCR_MR0S, ddata->base + LPC32XX_TIMER_MCR);
+> +       /* Configure a compare match value of 1 on MR0. */
+> +       writel_relaxed(1, ddata->base + LPC32XX_TIMER_MR0);
+> +
+> +       return 0;
+> +}
+> +
+> +static int lpc32xx_clkevt_periodic(struct clock_event_device *evtdev)
+> +{
+> +       struct lpc32xx_clock_event_ddata *ddata =
+> +               container_of(evtdev, struct lpc32xx_clock_event_ddata, evtdev);
+> +
+> +       /* Enable interrupt and reset on match. */
+> +       writel_relaxed(LPC32XX_TIMER_MCR_MR0I | LPC32XX_TIMER_MCR_MR0R,
+> +                      ddata->base + LPC32XX_TIMER_MCR);
+> +       /*
+> +        * Place timer in reset and set a match value on MR0. An interrupt will
+> +        * be generated each time the counter matches MR0. After setup the
+> +        * timer is released from reset and enabled.
+> +        */
+> +       writel_relaxed(LPC32XX_TIMER_TCR_CRST, ddata->base + LPC32XX_TIMER_TCR);
+> +       writel_relaxed(ticks_per_jiffy, ddata->base + LPC32XX_TIMER_MR0);
+> +       writel_relaxed(LPC32XX_TIMER_TCR_CEN, ddata->base + LPC32XX_TIMER_TCR);
+> +
+> +       return 0;
+>  }
+>
+>  static irqreturn_t lpc32xx_clock_event_handler(int irq, void *dev_id)
+> @@ -108,11 +141,14 @@ static irqreturn_t lpc32xx_clock_event_handler(int irq, void *dev_id)
+>  static struct lpc32xx_clock_event_ddata lpc32xx_clk_event_ddata = {
+>         .evtdev = {
+>                 .name                   = "lpc3220 clockevent",
+> -               .features               = CLOCK_EVT_FEAT_ONESHOT,
+> +               .features               = CLOCK_EVT_FEAT_ONESHOT |
+> +                                         CLOCK_EVT_FEAT_PERIODIC,
+>                 .rating                 = 300,
+>                 .set_next_event         = lpc32xx_clkevt_next_event,
+>                 .set_state_shutdown     = lpc32xx_clkevt_shutdown,
+>                 .set_state_oneshot      = lpc32xx_clkevt_oneshot,
+> +               .set_state_periodic     = lpc32xx_clkevt_periodic,
+> +               .tick_resume            = lpc32xx_clkevt_shutdown,
+>         },
+>  };
+>
+> @@ -210,17 +246,15 @@ static int __init lpc32xx_clockevent_init(struct device_node *np)
+>
+>         /*
+>          * Disable timer and clear any pending interrupt (IR) on match
+> -        * channel 0 (MR0). Configure a compare match value of 1 on MR0
+> -        * and enable interrupt, reset on match and stop on match (MCR).
+> +        * channel 0 (MR0). Enable interrupt, reset on match and stop
+> +        * on match (MCR).
+>          */
+>         writel_relaxed(0, base + LPC32XX_TIMER_TCR);
+>         writel_relaxed(0, base + LPC32XX_TIMER_CTCR);
+>         writel_relaxed(LPC32XX_TIMER_IR_MR0INT, base + LPC32XX_TIMER_IR);
+> -       writel_relaxed(1, base + LPC32XX_TIMER_MR0);
+> -       writel_relaxed(LPC32XX_TIMER_MCR_MR0I | LPC32XX_TIMER_MCR_MR0R |
+> -                      LPC32XX_TIMER_MCR_MR0S, base + LPC32XX_TIMER_MCR);
+>
+>         rate = clk_get_rate(clk);
+> +       ticks_per_jiffy = (rate + HZ/2) / HZ;
 
-vim +/s5p_mfc_hw_call_void +1141 drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+Use a rounding macro?
 
-  1135			(reqbufs->memory != V4L2_MEMORY_USERPTR))
-  1136			return -EINVAL;
-  1137		if (reqbufs->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
-  1138			if (reqbufs->count == 0) {
-  1139				mfc_debug(2, "Freeing buffers\n");
-  1140				ret = vb2_reqbufs(&ctx->vq_dst, reqbufs);
-> 1141				s5p_mfc_hw_call_void(dev->mfc_ops, release_codec_buffers,
-  1142						ctx);
-  1143				ctx->capture_state = QUEUE_FREE;
-  1144				return ret;
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 44066 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160131/7271d1c6/attachment-0001.obj>
+I will look more closely at the new timer setup later.
+
+btw, didn't I look through a version of this you sent me privately
+quite some time ago?
+I think I had a comment about using TIMER_PR instead of TIMER_MR0
+then. Unsure if that is still valid, though.
+
+
+regards,
+Joachim Eastwood
