@@ -1,61 +1,45 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Sat, 30 Jan 2016 10:52:28 +0800
-Subject: [PATCH 03/15] mips: use of_platform_default_populate() to
- populate default bus
-In-Reply-To: <56AB8CA4.7070803@microchip.com>
-References: <1453868872-26300-1-git-send-email-wangkefeng.wang@huawei.com>
- <1453868872-26300-4-git-send-email-wangkefeng.wang@huawei.com>
- <56AB8CA4.7070803@microchip.com>
-Message-ID: <56AC256C.2050304@huawei.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 29 Jan 2016 19:08:45 -0800
+Subject: [PATCH V2 2/8] dmaengine: bcm2835: remove unnecessary masking of
+ dma channels
+In-Reply-To: <1452187987-2605-3-git-send-email-kernel@martin.sperl.org>
+References: <1452187987-2605-1-git-send-email-kernel@martin.sperl.org>
+ <1452187987-2605-3-git-send-email-kernel@martin.sperl.org>
+Message-ID: <8737tflq6a.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+kernel at martin.sperl.org writes:
 
+> From: Martin Sperl <kernel@martin.sperl.org>
+>
+> The original patch contained 3 dma channels that were masked out.
+>
+> These - as far as research and discussions show - are a
+> artefacts remaining from the downstream legacy dma-api.
+>
+> Right now down-stream still includes a legacy api used only
+> in a single (downstream only) driver (bcm2708_fb) that requires
+> 2D DMA for speedup (DMA-channel 0).
+> Formerly the sd-card support driver also was using this legacy
+> api (DMA-channel 2), but since has been moved over to use
+> dmaengine directly.
+>
+> The DMA-channel 3 is already masked out in the devicetree in
+> the default property "brcm,dma-channel-mask = <0x7f35>;"
 
-On 2016/1/30 0:00, Joshua Henderson wrote:
-> On 01/26/2016 09:27 PM, Kefeng Wang wrote:
->> Use helper of_platform_default_populate() in linux/of_platform
->> when possible, instead of calling of_platform_populate() with
->> the default match table.
->>
->> Cc: Ralf Baechle <ralf@linux-mips.org>
->> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
->> ---
->>  arch/mips/ath79/setup.c           | 2 +-
->>  arch/mips/jz4740/setup.c          | 2 +-
->>  arch/mips/mti-sead3/sead3-setup.c | 2 +-
->>  arch/mips/pic32/pic32mzda/init.c  | 3 +--
->>  arch/mips/pistachio/init.c        | 2 +-
->>  arch/mips/xilfpga/init.c          | 2 +-
->>  6 files changed, 6 insertions(+), 7 deletions(-)
->>
-> 
-> [...]
-> 
->> diff --git a/arch/mips/pic32/pic32mzda/init.c b/arch/mips/pic32/pic32mzda/init.c
->> index 775ff90..77ecf32 100644
->> --- a/arch/mips/pic32/pic32mzda/init.c
->> +++ b/arch/mips/pic32/pic32mzda/init.c
->> @@ -147,8 +147,7 @@ static int __init plat_of_setup(void)
->>  		panic("Device tree not present");
->>  
->>  	pic32_of_prepare_platform_data(pic32_auxdata_lookup);
->> -	if (of_platform_populate(NULL, of_default_bus_match_table,
->> -				 pic32_auxdata_lookup, NULL))
->> +	if (of_platform_default_populate(NULL, pic32_auxdata_lookup, NULL))
->>  		panic("Failed to populate DT");
->>  
->>  	return 0;
-> 
-> I'll one-up just compile-testing for this.
+Delayed the rest of the review, because I went digging around in the
+firmware, and missed the ifdef mess in it that produced 0x7f35.  As far
+as I can tell, though, we should be using just that value to control
+which channels we expose (other than the shared-irq issue).  If the
+firmware wants to use a different set of channels some day, they'll have
+to edit our DT.
 
-Hi Joshua, Many thanks.
-
-> 
-> Tested-by: Joshua Henderson <joshua.henderson@microchip.com>
-> 
-> [...]
-> 
-> 
-> .
-> 
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160129/8188ea20/attachment-0001.sig>
