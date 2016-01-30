@@ -1,124 +1,168 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 30 Jan 2016 11:34:50 +0100
-Subject: [PATCHv2 1/3] arm64: Drop alloc function from create_mapping
-In-Reply-To: <1454111218-3461-2-git-send-email-labbott@fedoraproject.org>
-References: <1454111218-3461-1-git-send-email-labbott@fedoraproject.org>
- <1454111218-3461-2-git-send-email-labbott@fedoraproject.org>
-Message-ID: <CAKv+Gu-VTg6m9PNRCEDm07nwku3YVmYkMSs-08p_SigqOdabhQ@mail.gmail.com>
+From: oded.gabbay@gmail.com (Oded Gabbay)
+Date: Sat, 30 Jan 2016 13:11:01 +0200
+Subject: [RESEND PATCH v1] drm: Clean up drm Makefile
+In-Reply-To: <1454147777-77577-1-git-send-email-xinliang.liu@linaro.org>
+References: <1454147777-77577-1-git-send-email-xinliang.liu@linaro.org>
+Message-ID: <CAFCwf120-19JKDGGPOBQ4ALg=f5ESG4pVhMeN1s=0uz3OpoFpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 January 2016 at 00:46, Laura Abbott <labbott@fedoraproject.org> wrote:
+On Sat, Jan 30, 2016 at 11:56 AM, Xinliang Liu <xinliang.liu@linaro.org> wrote:
+> This patch cleans up the Makefile of drm root directory.
+> Make core and device drivers configuration list sorted Alphabetically.
 >
-> create_mapping is only used in fixmap_remap_fdt. All the create_mapping
-> calls need to happen on existing translation table pages without
-> additional allocations. Rather than have an alloc function be called
-> and fail, just set it to NULL and catch it's use. Also change
-
-s/it's/its/
-
-> the name to create_mapping_noalloc to better capture what exactly is
-> going on.
->
-> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
-
-With one nit below:
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
+> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+> Reviewed-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+> Reviewed-by: Yifan Liu <liu_fanyi@163.com>
 > ---
->  arch/arm64/mm/mmu.c | 27 ++++++++++++++++++---------
->  1 file changed, 18 insertions(+), 9 deletions(-)
+>  drivers/gpu/drm/Makefile | 102 ++++++++++++++++++++++++-----------------------
+>  1 file changed, 52 insertions(+), 50 deletions(-)
 >
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 7711554..103ebc0 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -116,7 +116,9 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
->         pte_t *pte;
+> diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+> index 61766dec6a8d..77000717305b 100644
+> --- a/drivers/gpu/drm/Makefile
+> +++ b/drivers/gpu/drm/Makefile
+> @@ -2,6 +2,9 @@
+>  # Makefile for the drm device driver.  This driver provides support for the
+>  # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
 >
->         if (pmd_none(*pmd) || pmd_sect(*pmd)) {
-> -               phys_addr_t pte_phys = pgtable_alloc();
-> +               phys_addr_t pte_phys;
-> +               BUG_ON(!pgtable_alloc);
-> +               pte_phys = pgtable_alloc();
->                 pte = pte_set_fixmap(pte_phys);
->                 if (pmd_sect(*pmd))
->                         split_pmd(pmd, pte);
-> @@ -158,7 +160,9 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
->          * Check for initial section mappings in the pgd/pud and remove them.
->          */
->         if (pud_none(*pud) || pud_sect(*pud)) {
-> -               phys_addr_t pmd_phys = pgtable_alloc();
-> +               phys_addr_t pmd_phys;
-> +               BUG_ON(!pgtable_alloc);
-> +               pmd_phys = pgtable_alloc();
->                 pmd = pmd_set_fixmap(pmd_phys);
->                 if (pud_sect(*pud)) {
->                         /*
-> @@ -223,7 +227,9 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
->         unsigned long next;
+> +CFLAGS_drm_trace_points.o := -I$(src)
+> +
+> +# core. Please keep this list sorted alphabetically
+>  drm-y       := drm_auth.o drm_bufs.o drm_cache.o \
+>                 drm_context.o drm_dma.o \
+>                 drm_fops.o drm_gem.o drm_ioctl.o drm_irq.o \
+> @@ -13,64 +16,63 @@ drm-y       :=      drm_auth.o drm_bufs.o drm_cache.o \
+>                 drm_trace_points.o drm_global.o drm_prime.o \
+>                 drm_rect.o drm_vma_manager.o drm_flip_work.o \
+>                 drm_modeset_lock.o drm_atomic.o drm_bridge.o
+> -
+> -drm-$(CONFIG_COMPAT) += drm_ioc32.o
+> -drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
+>  drm-$(CONFIG_PCI) += ati_pcigart.o
+> -drm-$(CONFIG_DRM_PANEL) += drm_panel.o
+> -drm-$(CONFIG_OF) += drm_of.o
+>  drm-$(CONFIG_AGP) += drm_agpsupport.o
+> +drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
+> +drm-$(CONFIG_COMPAT) += drm_ioc32.o
+> +drm-$(CONFIG_OF) += drm_of.o
+> +drm-$(CONFIG_DRM_PANEL) += drm_panel.o
+> +obj-$(CONFIG_DRM)      += drm.o
+> +
+> +obj-$(CONFIG_DRM_MIPI_DSI) += drm_mipi_dsi.o
 >
->         if (pgd_none(*pgd)) {
-> -               phys_addr_t pud_phys = pgtable_alloc();
-> +               phys_addr_t pud_phys;
-> +               BUG_ON(!pgtable_alloc);
-> +               pud_phys = pgtable_alloc();
->                 __pgd_populate(pgd, pud_phys, PUD_TYPE_TABLE);
->         }
->         BUG_ON(pgd_bad(*pgd));
-> @@ -312,7 +318,10 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
->         init_pgd(pgd_offset_raw(pgdir, virt), phys, virt, size, prot, alloc);
->  }
+>  drm_kms_helper-y := drm_crtc_helper.o drm_dp_helper.o drm_probe_helper.o \
+>                 drm_plane_helper.o drm_dp_mst_topology.o drm_atomic_helper.o
+>  drm_kms_helper-$(CONFIG_DRM_LOAD_EDID_FIRMWARE) += drm_edid_load.o
+> -drm_kms_helper-$(CONFIG_DRM_FBDEV_EMULATION) += drm_fb_helper.o
+>  drm_kms_helper-$(CONFIG_DRM_KMS_CMA_HELPER) += drm_fb_cma_helper.o
+> -
+> +drm_kms_helper-$(CONFIG_DRM_FBDEV_EMULATION) += drm_fb_helper.o
+>  obj-$(CONFIG_DRM_KMS_HELPER) += drm_kms_helper.o
 >
-> -static void __init create_mapping(phys_addr_t phys, unsigned long virt,
-> +/*
-> + * This function is for mapping using existing sections only.
-
-Could you improve this comment? 'existing sections' does not quite
-cover what we expect to deal with imo
-> + */
-> +static void __init create_mapping_noalloc(phys_addr_t phys, unsigned long virt,
->                                   phys_addr_t size, pgprot_t prot)
->  {
->         if (virt < VMALLOC_START) {
-> @@ -321,7 +330,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
->                 return;
->         }
->         __create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
-> -                            early_pgtable_alloc);
-> +                            NULL);
->  }
+> -CFLAGS_drm_trace_points.o := -I$(src)
+> +obj-$(CONFIG_DRM_TTM) += ttm/
 >
->  void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-> @@ -680,7 +689,7 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
->         /*
->          * Make sure that the FDT region can be mapped without the need to
->          * allocate additional translation table pages, so that it is safe
-> -        * to call create_mapping() this early.
-> +        * to call create_mapping_noalloc() this early.
->          *
->          * On 64k pages, the FDT will be mapped using PTEs, so we need to
->          * be in the same PMD as the rest of the fixmap.
-> @@ -696,8 +705,8 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
->         dt_virt = (void *)dt_virt_base + offset;
->
->         /* map the first chunk so we can read the size from the header */
-> -       create_mapping(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
-> -                      SWAPPER_BLOCK_SIZE, prot);
-> +       create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE),
-> +                       dt_virt_base, SWAPPER_BLOCK_SIZE, prot);
->
->         if (fdt_check_header(dt_virt) != 0)
->                 return NULL;
-> @@ -707,7 +716,7 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
->                 return NULL;
->
->         if (offset + size > SWAPPER_BLOCK_SIZE)
-> -               create_mapping(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
-> +               create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
->                                round_up(offset + size, SWAPPER_BLOCK_SIZE), prot);
->
->         memblock_reserve(dt_phys, size);
+> -obj-$(CONFIG_DRM)      += drm.o
+> -obj-$(CONFIG_DRM_MIPI_DSI) += drm_mipi_dsi.o
+> -obj-$(CONFIG_DRM_TTM)  += ttm/
+> -obj-$(CONFIG_DRM_TDFX) += tdfx/
+> -obj-$(CONFIG_DRM_R128) += r128/
+> -obj-$(CONFIG_HSA_AMD) += amd/amdkfd/
+> -obj-$(CONFIG_DRM_RADEON)+= radeon/
+> -obj-$(CONFIG_DRM_AMDGPU)+= amd/amdgpu/
+> -obj-$(CONFIG_DRM_MGA)  += mga/
+> -obj-$(CONFIG_DRM_I810) += i810/
+> -obj-$(CONFIG_DRM_I915)  += i915/
+> -obj-$(CONFIG_DRM_MGAG200) += mgag200/
+> -obj-$(CONFIG_DRM_VC4)  += vc4/
+> -obj-$(CONFIG_DRM_CIRRUS_QEMU) += cirrus/
+> -obj-$(CONFIG_DRM_SIS)   += sis/
+> -obj-$(CONFIG_DRM_SAVAGE)+= savage/
+> -obj-$(CONFIG_DRM_VMWGFX)+= vmwgfx/
+> -obj-$(CONFIG_DRM_VIA)  +=via/
+> -obj-$(CONFIG_DRM_VGEM) += vgem/
+> -obj-$(CONFIG_DRM_NOUVEAU) +=nouveau/
+> -obj-$(CONFIG_DRM_EXYNOS) +=exynos/
+> -obj-$(CONFIG_DRM_ROCKCHIP) +=rockchip/
+> -obj-$(CONFIG_DRM_GMA500) += gma500/
+> -obj-$(CONFIG_DRM_UDL) += udl/
+> -obj-$(CONFIG_DRM_AST) += ast/
+> -obj-$(CONFIG_DRM_ARMADA) += armada/
+> +# device drivers. Please keep this list sorted alphabetically
+> +obj-$(CONFIG_DRM_AMDGPU)       += amd/amdgpu/
+> +obj-$(CONFIG_HSA_AMD)          += amd/amdkfd/
+> +obj-$(CONFIG_DRM_ARMADA)       += armada/
+> +obj-$(CONFIG_DRM_AST)          += ast/
+>  obj-$(CONFIG_DRM_ATMEL_HLCDC)  += atmel-hlcdc/
+> -obj-$(CONFIG_DRM_RCAR_DU) += rcar-du/
+> -obj-$(CONFIG_DRM_SHMOBILE) +=shmobile/
+> -obj-y                  += omapdrm/
+> -obj-y                  += tilcdc/
+> -obj-$(CONFIG_DRM_QXL) += qxl/
+> -obj-$(CONFIG_DRM_BOCHS) += bochs/
+> -obj-$(CONFIG_DRM_VIRTIO_GPU) += virtio/
+> -obj-$(CONFIG_DRM_MSM) += msm/
+> -obj-$(CONFIG_DRM_TEGRA) += tegra/
+> -obj-$(CONFIG_DRM_STI) += sti/
+> -obj-$(CONFIG_DRM_IMX) += imx/
+> -obj-y                  += i2c/
+> -obj-y                  += panel/
+> -obj-y                  += bridge/
+> -obj-$(CONFIG_DRM_FSL_DCU) += fsl-dcu/
+> -obj-$(CONFIG_DRM_ETNAVIV) += etnaviv/
+> +obj-$(CONFIG_DRM_BOCHS)                += bochs/
+> +obj-y                          += bridge/
+> +obj-$(CONFIG_DRM_CIRRUS_QEMU)  += cirrus/
+> +obj-$(CONFIG_DRM_ETNAVIV)      += etnaviv/
+> +obj-$(CONFIG_DRM_EXYNOS)       += exynos/
+> +obj-$(CONFIG_DRM_FSL_DCU)      += fsl-dcu/
+> +obj-$(CONFIG_DRM_GMA500)       += gma500/
+> +obj-y                          += i2c/
+> +obj-$(CONFIG_DRM_I810)         += i810/
+> +obj-$(CONFIG_DRM_I915)         += i915/
+> +obj-$(CONFIG_DRM_IMX)          += imx/
+> +obj-$(CONFIG_DRM_MGA)          += mga/
+> +obj-$(CONFIG_DRM_MGAG200)      += mgag200/
+> +obj-$(CONFIG_DRM_MSM)          += msm/
+> +obj-$(CONFIG_DRM_NOUVEAU)      += nouveau/
+> +obj-y                          += omapdrm/
+> +obj-y                          += panel/
+> +obj-$(CONFIG_DRM_QXL)          += qxl/
+> +obj-$(CONFIG_DRM_R128)         += r128/
+> +obj-$(CONFIG_DRM_RADEON)       += radeon/
+> +obj-$(CONFIG_DRM_RCAR_DU)      += rcar-du/
+> +obj-$(CONFIG_DRM_ROCKCHIP)     += rockchip/
+> +obj-$(CONFIG_DRM_SAVAGE)       += savage/
+> +obj-$(CONFIG_DRM_SHMOBILE)     += shmobile/
+> +obj-$(CONFIG_DRM_SIS)          += sis/
+> +obj-$(CONFIG_DRM_STI)          += sti/
+> +obj-$(CONFIG_DRM_TDFX)         += tdfx/
+> +obj-$(CONFIG_DRM_TEGRA)                += tegra/
+> +obj-y                          += tilcdc/
+> +obj-$(CONFIG_DRM_UDL)          += udl/
+> +obj-$(CONFIG_DRM_VC4)          += vc4/
+> +obj-$(CONFIG_DRM_VGEM)         += vgem/
+> +obj-$(CONFIG_DRM_VIA)          += via/
+> +obj-$(CONFIG_DRM_VIRTIO_GPU)   += virtio/
+> +obj-$(CONFIG_DRM_VMWGFX)       += vmwgfx/
 > --
-> 2.5.0
+> 1.9.1
 >
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+NACK, amdkfd *must* be before amdgpu *and* radeon, because it needs to
+be already loaded when amdgpu/radeon get loaded, and when all these
+drivers are compiled inside the kernel, the order is maintained by the
+linkage order in the makefile.
+
+See:
+http://lists.freedesktop.org/archives/dri-devel/2014-December/074452.html
+
+
+Thanks,
+
+    Oded
