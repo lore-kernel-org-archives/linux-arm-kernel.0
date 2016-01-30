@@ -1,34 +1,29 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 30 Jan 2016 12:35:08 -0200
-Subject: [PATCH 2/2] ARM: mxs_defconfig: Select CONFIG_NVMEM_MXS_OCOTP
-In-Reply-To: <1454164508-10831-1-git-send-email-festevam@gmail.com>
-References: <1454164508-10831-1-git-send-email-festevam@gmail.com>
-Message-ID: <1454164508-10831-2-git-send-email-festevam@gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Sat, 30 Jan 2016 15:51:06 +0100
+Subject: [PATCH 4/4] pwm: omap-dmtimer: add dev_dbg() message for
+ effective period and duty cycle
+In-Reply-To: <1454128014-22866-5-git-send-email-drivshin.allworx@gmail.com>
+References: <1454128014-22866-1-git-send-email-drivshin.allworx@gmail.com>
+ <1454128014-22866-5-git-send-email-drivshin.allworx@gmail.com>
+Message-ID: <CAA3gFWvSsctXtds6_SEtYY1yUdWJDR1XjznGS6qjdrGW5Dbw=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+2016-01-30 5:26 GMT+01:00 David Rivshin (Allworx) <drivshin.allworx@gmail.com>:
+> From: David Rivshin <drivshin@allworx.com>
+>
+> After going through the math and constraints checking to compute load and
+> match values, it is helpful to know what the resultant period and duty
+> cycle are.
+>
+> Signed-off-by: David Rivshin <drivshin@allworx.com>
+> ---
+>
+> I found this helpful while testing the other changes, so I included it in
+> case it may be of use to someone in the future. I would have no issues with
+> dropping this if it's not considered worthwhile.
 
-Select the mxs ocotp driver.
+It's useful, but converting it as a sysfs attribute would be great !
 
-Cc: Stefan Wahren <stefan.wahren@i2se.com>
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/configs/mxs_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index b47e7c6..1b2d9b3 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -141,6 +141,8 @@ CONFIG_IIO=y
- CONFIG_IIO_SYSFS_TRIGGER=y
- CONFIG_PWM=y
- CONFIG_PWM_MXS=y
-+CONFIG_NVMEM=y
-+CONFIG_NVMEM_MXS_OCOTP=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT3_FS=y
--- 
-1.9.1
+Neil
