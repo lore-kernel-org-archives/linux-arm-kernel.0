@@ -1,45 +1,166 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 30 Jan 2016 13:16:13 +0100
-Subject: [PATCH v3 2/2] dt-bindings: rockchip-pinctrl: Support the RK3399
- SoCs compatible
-In-Reply-To: <1454153517-52969-3-git-send-email-david.wu@rock-chips.com>
-References: <1451997055-47655-1-git-send-email-wdc@rock-chips.com>
- <1454153517-52969-1-git-send-email-david.wu@rock-chips.com>
- <1454153517-52969-3-git-send-email-david.wu@rock-chips.com>
-Message-ID: <14543443.RsRWh5K5Uv@phil>
+Date: Sat, 30 Jan 2016 13:39:11 +0100
+Subject: [PATCH] PM / AVS: rockchip-io: add GRF and PMUGRF types to
+ distinguish
+In-Reply-To: <1454155305-55516-1-git-send-email-david.wu@rock-chips.com>
+References: <1454155305-55516-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <5387650.lAgTxexlF2@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi David,
 
-Am Samstag, 30. Januar 2016, 19:31:57 schrieb David Wu:
-> Change-Id: Ic1bdb3dc358837e97d7b48dd58be2f8d9d08d766
+Am Samstag, 30. Januar 2016, 20:01:45 schrieb David Wu:
+> As rk3368 contained two separated iodomain areas, this was
+> determined to use which regmap base address.
+> 
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
 
-please no Change-Id, it's missing the Signed-off, and as Linus Walleij said, 
-the compatible addition to the documentation can maybe stay in the pinctrl-
-patch itself.
+I don't think we need to specify this on a driver level. Both GRF areas are 
+"General register files" only located in two separate power-domains.
+So the rockchip,grf property should work for both. Especially as nothing 
+keeps designers from introducing yet another GRF-area somewhere else ;-)
 
-I think both Linus and me overlooked that the binding-doc-addition was 
-already correctly included in your v2 patch at the top :-)
+>From when I started working on the rk3368, I still have a preliminary 
+patches for that sitting here, so I've attached on how I envisoned that to 
+work.
 
 
 Heiko
 
 > ---
->  Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt | 1 +
->  1 file changed, 1 insertion(+)
+>  drivers/power/avs/rockchip-io-domain.c | 32
+> ++++++++++++++++++++++++-------- 1 file changed, 24 insertions(+), 8
+> deletions(-)
 > 
-> diff --git
-> a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-> b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt index
-> 391ef4b..3bb9456 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-> @@ -22,6 +22,7 @@ Required properties for iomux controller:
->    - compatible: one of "rockchip,rk2928-pinctrl",
-> "rockchip,rk3066a-pinctrl" "rockchip,rk3066b-pinctrl",
-> "rockchip,rk3188-pinctrl"
->  		       "rockchip,rk3288-pinctrl", "rockchip,rk3368-pinctrl"
-> +		       "rockchip,rk3399-pinctrl"
->    - rockchip,grf: phandle referencing a syscon providing the
->  	 "general register files"
+> diff --git a/drivers/power/avs/rockchip-io-domain.c
+> b/drivers/power/avs/rockchip-io-domain.c index 8099456..b17aeb7 100644
+> --- a/drivers/power/avs/rockchip-io-domain.c
+> +++ b/drivers/power/avs/rockchip-io-domain.c
+> @@ -47,6 +47,11 @@
+>  #define RK3368_SOC_CON15_FLASH0		BIT(14)
+>  #define RK3368_SOC_FLASH_SUPPLY_NUM	2
+> 
+> +enum rockchip_iodomain_grf_type {
+> +	GRF,
+> +	PMUGRF
+> +};
+> +
+>  struct rockchip_iodomain;
+> 
+>  /**
+> @@ -54,6 +59,7 @@ struct rockchip_iodomain;
+>   */
+>  struct rockchip_iodomain_soc_data {
+>  	int grf_offset;
+> +	enum rockchip_iodomain_grf_type type;
+>  	const char *supply_names[MAX_SUPPLIES];
+>  	void (*init)(struct rockchip_iodomain *iod);
+>  };
+> @@ -67,7 +73,7 @@ struct rockchip_iodomain_supply {
+> 
+>  struct rockchip_iodomain {
+>  	struct device *dev;
+> -	struct regmap *grf;
+> +	struct regmap *base;
+>  	struct rockchip_iodomain_soc_data *soc_data;
+>  	struct rockchip_iodomain_supply supplies[MAX_SUPPLIES];
+>  };
+> @@ -86,7 +92,7 @@ static int rockchip_iodomain_write(struct
+> rockchip_iodomain_supply *supply, /* apply hiword-mask */
+>  	val |= (BIT(supply->idx) << 16);
+> 
+> -	ret = regmap_write(iod->grf, iod->soc_data->grf_offset, val);
+> +	ret = regmap_write(iod->base, iod->soc_data->grf_offset, val);
+>  	if (ret)
+>  		dev_err(iod->dev, "Couldn't write to GRF\n");
+> 
+> @@ -157,7 +163,7 @@ static void rk3288_iodomain_init(struct
+> rockchip_iodomain *iod) * instead of a special gpio.
+>  	 */
+>  	val = RK3288_SOC_CON2_FLASH0 | (RK3288_SOC_CON2_FLASH0 << 16);
+> -	ret = regmap_write(iod->grf, RK3288_SOC_CON2, val);
+> +	ret = regmap_write(iod->base, RK3288_SOC_CON2, val);
+>  	if (ret < 0)
+>  		dev_warn(iod->dev, "couldn't update flash0 ctrl\n");
+>  }
+> @@ -176,7 +182,7 @@ static void rk3368_iodomain_init(struct
+> rockchip_iodomain *iod) * instead of a special gpio.
+>  	 */
+>  	val = RK3368_SOC_CON15_FLASH0 | (RK3368_SOC_CON15_FLASH0 << 16);
+> -	ret = regmap_write(iod->grf, RK3368_SOC_CON15, val);
+> +	ret = regmap_write(iod->base, RK3368_SOC_CON15, val);
+>  	if (ret < 0)
+>  		dev_warn(iod->dev, "couldn't update flash0 ctrl\n");
+>  }
+> @@ -187,6 +193,7 @@ static void rk3368_iodomain_init(struct
+> rockchip_iodomain *iod) */
+>  static const struct rockchip_iodomain_soc_data soc_data_rk3188 = {
+>  	.grf_offset = 0x104,
+> +	.type = GRF,
+>  	.supply_names = {
+>  		NULL,
+>  		NULL,
+> @@ -209,6 +216,7 @@ static const struct rockchip_iodomain_soc_data
+> soc_data_rk3188 = {
+> 
+>  static const struct rockchip_iodomain_soc_data soc_data_rk3288 = {
+>  	.grf_offset = 0x380,
+> +	.type = GRF,
+>  	.supply_names = {
+>  		"lcdc",		/* LCDC_VDD */
+>  		"dvp",		/* DVPIO_VDD */
+> @@ -226,6 +234,7 @@ static const struct rockchip_iodomain_soc_data
+> soc_data_rk3288 = {
+> 
+>  static const struct rockchip_iodomain_soc_data soc_data_rk3368 = {
+>  	.grf_offset = 0x900,
+> +	.type = GRF,
+>  	.supply_names = {
+>  		NULL,		/* reserved */
+>  		"dvp",		/* DVPIO_VDD */
+> @@ -242,6 +251,7 @@ static const struct rockchip_iodomain_soc_data
+> soc_data_rk3368 = {
+> 
+>  static const struct rockchip_iodomain_soc_data soc_data_rk3368_pmu = {
+>  	.grf_offset = 0x100,
+> +	.type = PMUGRF,
+>  	.supply_names = {
+>  		NULL,
+>  		NULL,
+> @@ -293,10 +303,16 @@ static int rockchip_iodomain_probe(struct
+> platform_device *pdev) match = of_match_node(rockchip_iodomain_match,
+> np);
+>  	iod->soc_data = (struct rockchip_iodomain_soc_data *)match->data;
+> 
+> -	iod->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
+> -	if (IS_ERR(iod->grf)) {
+> -		dev_err(&pdev->dev, "couldn't find grf regmap\n");
+> -		return PTR_ERR(iod->grf);
+> +	if (iod->soc_data->type == PMUGRF)
+> +		iod->base = syscon_regmap_lookup_by_phandle(
+> +				np, "rockchip,pmugrf");
+> +	else
+> +		iod->base = syscon_regmap_lookup_by_phandle(
+> +				np, "rockchip,grf");
+> +	if (IS_ERR(iod->base)) {
+> +		dev_err(&pdev->dev, "couldn't find %s regmap\n",
+> +			(iod->soc_data->type == PMUGRF) ? "pmugrf" : "grf");
+> +		return PTR_ERR(iod->base);
+>  	}
+> 
+>  	for (i = 0; i < MAX_SUPPLIES; i++) {
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-PM-AVS-rockchip-io-add-io-selectors-and-supplies-for.patch
+Type: text/x-patch
+Size: 4768 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160130/a4868cb1/attachment.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0002-ARM64-dts-rockchip-add-iodomains-and-stuff.patch
+Type: text/x-patch
+Size: 1036 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160130/a4868cb1/attachment-0001.bin>
