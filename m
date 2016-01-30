@@ -1,27 +1,33 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 29 Jan 2016 17:41:43 -0800
-Subject: [PATCH] clk: ti: dpll: convert DPLL support code to use clk_hw
- instead of clk ptrs
-In-Reply-To: <1453981451-9054-1-git-send-email-t-kristo@ti.com>
-References: <1453981451-9054-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20160130014143.GH4848@codeaurora.org>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Sat, 30 Jan 2016 10:38:24 +0800
+Subject: [PATCH] ARM: dts: cros-ec-keyboard: Add LOCK key to keyboard matrix
+Message-ID: <1454121504-12683-1-git-send-email-djkurtz@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28, Tero Kristo wrote:
-> Convert DPLL support code to use clk_hw pointers for reference and bypass
-> clocks. This allows us to use clk_hw_* APIs for accessing any required
-> parameters for these clocks, avoiding some locking problems at least with
-> DPLL enable code; this used clk_get_rate which uses mutex but isn't
-> good under clk_enable / clk_disable.
-> 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
+From: James Chao <james_chao@asus.com>
 
-Looks good.
+The LOCK key is at KSO9/KSI3 for Chromebook Flip and other devices
+that use the Chrome OS EC keyboard matrix.
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: James Chao <james_chao@asus.com>
+Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+Signed-off-by: YH Huang <yh.huang@mediatek.com>
+---
+ arch/arm/boot/dts/cros-ec-keyboard.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/arch/arm/boot/dts/cros-ec-keyboard.dtsi b/arch/arm/boot/dts/cros-ec-keyboard.dtsi
+index 4e42f30c..c045105 100644
+--- a/arch/arm/boot/dts/cros-ec-keyboard.dtsi
++++ b/arch/arm/boot/dts/cros-ec-keyboard.dtsi
+@@ -55,6 +55,7 @@
+ 			MATRIX_KEY(0x03, 0x04, KEY_F5)
+ 			MATRIX_KEY(0x03, 0x06, KEY_6)
+ 			MATRIX_KEY(0x03, 0x08, KEY_MINUS)
++			MATRIX_KEY(0x03, 0x09, KEY_F13)
+ 			MATRIX_KEY(0x03, 0x0b, KEY_BACKSLASH)
+ 			MATRIX_KEY(0x03, 0x0c, KEY_MUHENKAN)
+ 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.7.0.rc3.207.g0ac5344
