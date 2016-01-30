@@ -1,99 +1,72 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Fri, 29 Jan 2016 17:02:37 -0800
-Subject: [PATCH 00/13] dtb: amd: Miscelleneous Updates for AMD Seattle DTS
-In-Reply-To: <CAOesGMhG-dy9CJ+hLr_OV73BnKo-mstDjfDyhQhjvUnZ8pCAYA@mail.gmail.com>
-References: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <CAOesGMgRC2vTVdmY6kKYonM1JkWD=-3k_EQ4hGvyrm-vNZczrQ@mail.gmail.com>
- <56AA9436.60800@amd.com>
- <CAOesGMhG-dy9CJ+hLr_OV73BnKo-mstDjfDyhQhjvUnZ8pCAYA@mail.gmail.com>
-Message-ID: <56AC0BAD.1020105@gmail.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Fri, 29 Jan 2016 19:13:14 -0600
+Subject: [PATCH v2] irqchip: gicv3-its: Fix memory leak in
+ its_free_tables()
+In-Reply-To: <alpine.DEB.2.11.1601290930000.3886@nanos>
+References: <1454042578-13933-1-git-send-email-shankerd@codeaurora.org>
+ <alpine.DEB.2.11.1601290930000.3886@nanos>
+Message-ID: <56AC0E2A.1090402@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/28/2016 6:43 PM, Olof Johansson wrote:
-> On Thu, Jan 28, 2016 at 2:20 PM, Suravee Suthikulanit
-> <suravee.suthikulpanit@amd.com> wrote:
->> Hi Olof,
->>
->> On 1/28/2016 3:39 PM, Olof Johansson wrote:
->>>
->>> Hi Suravee,
->>>
->>> On Wed, Jan 27, 2016 at 1:11 PM, Suravee Suthikulpanit
->>> <Suravee.Suthikulpanit@amd.com> wrote:
->>>>
->>>> From: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
->>>>
->>>> This patch series contains several updates for the AMD Seattle SOC DTS
->>>> files.
->>>> It also adds new board files for newer Overdrive and Linaro 96boards
->>>> (Husky)
->>>> platforms.
->>>
->>>
->>> My Overdrive comes with DT provided by firmware, so there's no need to
->>> have a in-kernel-tree DT source.
->>
->>
->> You are correct that the FW comes with DT, and in typical case, you wouldn't
->> need this.
->>
->>> Are you aware of other reasons to have it here? I just foresee
->>> divergence and conflicts between the two. It was quite obvious before
->>> this update when the FW-provided DT was a lot more complete than what
->>> we had in the kernel tree.
->>
->>
->> However, there are still new/updated drivers being developed, and sometimes
->> requires new/changes in DT binding. So, the DT that comes with the FW can
->> get out of date, and will lack the support for new drivers.
-> 
-> Note that it's expected that the driver will cope with the old DT
-> contents, i.e. it needs to go with defaults that made sense before the
-> binding was updated.
-> 
-> It, however, doesn't have to enable new features. In other words,
-> booting with an old DT needs to continue working. You can't require a
-> user to update DT to avoid getting driver breakage.
-> 
-> (The opposite is not enforced: Booting with a DT that is newer than
-> the kernel isn't guaranteed to always work).
-> 
->> Certain version of the FW allows overriding the DT that comes with the FW.
->> So, we are providing the in-kernel DT to allow developers to provide the
->> updated device tree for newer kernels. This patch series is bringing the
->> in-kernel DT closer to what the latest FW is providing to avoid potential
->> conflicts.
-> 
-> I do appreciate keeping the kernel one up to date with what firmware
-> provides if it's truly needed, but I'd even more prefer that it
-> wasn't. After all, it's how the ACPI-based booting works (no
-> overriding table provided with the kernel), so it's a model you should
-> already be somewhat familiar with. :)
-> 
-> I'm not doing a hard NAK on this, but I would like to get a bit more
-> understanding of why it's considered needed.
-> 
-> 
-> -Olof
 
-I would strongly encourage the inclusion of the dts file in the kernel
-source tree, even if the dtb is delivered with the firmware for several
-reasons.
 
-The dts provides a reference for other developers who are supporting new
-boards that are similar.
+On 01/29/2016 02:30 AM, Thomas Gleixner wrote:
+> On Thu, 28 Jan 2016, Shanker Donthineni wrote:
+>> @@ -807,9 +810,10 @@ static void its_free_tables(struct its_node *its)
+>>   	int i;
+>>   
+>>   	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
+>> -		if (its->tables[i]) {
+>> -			free_page((unsigned long)its->tables[i]);
+>> -			its->tables[i] = NULL;
+>> +		if (its->tables[i].base) {
+>> +			free_pages((unsigned long)its->tables[i].base,
+>> +				   get_order(its->tables[i].size));
+>> +			its->tables[i].base = NULL;
+>>   		}
+>>   	}
+>>   }
+>> @@ -880,6 +884,7 @@ retry_alloc_baser:
+>>   		if (alloc_pages > GITS_BASER_PAGES_MAX) {
+>>   			alloc_pages = GITS_BASER_PAGES_MAX;
+>>   			order = get_order(GITS_BASER_PAGES_MAX * psz);
+>> +			alloc_size = (1 << order) * PAGE_SIZE;
+> Why don't you record the order instead of converting back and forth ?
+I can use page order information to fix memory leak and I will post v3 
+patch with your suggestion.
 
-The dts might be reviewed.
 
-We hope to have tools that will validate the dts against the documented
-bindings.  (Yes, this effort has stalled, but I am optimistic that it
-is not dead.)
+We have another coding BUG which is related to not refreshing alloc_size 
+whenever order changes.
+Because we are not updating alloc_size variable here, later part of the 
+code logic uses incorrect
+alloc_size value in two places as shown below.
 
-If someone has the board (any board, not just this one) that the kernel
-does not boot on, then it might not be possible to retrieve the dtb
-from the board (which can then be de-compiled to a dts) for the
-purpose of debugging or properly configuring the kernel.  (The boot
-loader may provide the ability to get the dtb or it might not.)
+Code snippet-1:
 
--Frank
+             if (!shr) {
+                 cache = GITS_BASER_nC;
+                 __flush_dcache_area(base, alloc_size);
+             }
+
+Code snippet-2:
+
+         pr_info("ITS: allocated %d %s @%lx (psz %dK, shr %d)\n",
+             (int)(alloc_size / entry_size),
+             its_base_type_string[type],
+             (unsigned long)virt_to_phys(base),
+             psz / SZ_1K, (int)shr >> GITS_BASER_SHAREABILITY_SHIFT);
+
+
+How do you suggest I fix the second problem? Should I create another 
+patch or include in v3 patch?
+
+> Thanks,
+>
+> 	tglx
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
