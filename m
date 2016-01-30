@@ -1,56 +1,40 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Sat, 30 Jan 2016 03:46:19 -0300
-Subject: [PATCH 2/2] clocksource/drivers/lpc32xx: Support timer-based ARM delay
-In-Reply-To: <1454136379-7517-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-References: <1454136379-7517-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-Message-ID: <1454136379-7517-2-git-send-email-ezequiel@vanguardiasur.com.ar>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Sat, 30 Jan 2016 15:55:21 +0800
+Subject: [PATCH] arm64: mm: dump: Use VA_START directly instead of private
+ LOWEST_ADDR
+Message-ID: <1454140521-741-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit implements the ARM timer-based delay timer for the
-LPC32xx, LPC18xx, LPC43xx family of SoCs.
+Use VA_START macro in asm/memory.h instead of private LOWEST_ADDR
+definition in dump.c.
 
-Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- drivers/clocksource/time-lpc32xx.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm64/mm/dump.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/drivers/clocksource/time-lpc32xx.c b/drivers/clocksource/time-lpc32xx.c
-index 9b3d4a38c716..223bb08720d6 100644
---- a/drivers/clocksource/time-lpc32xx.c
-+++ b/drivers/clocksource/time-lpc32xx.c
-@@ -18,6 +18,7 @@
- #include <linux/clk.h>
- #include <linux/clockchips.h>
- #include <linux/clocksource.h>
-+#include <linux/delay.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/kernel.h>
-@@ -55,6 +56,15 @@ static u64 notrace lpc32xx_read_sched_clock(void)
- 	return readl(clocksource_timer_counter);
- }
+diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+index 0adbebb..b3c62b1 100644
+--- a/arch/arm64/mm/dump.c
++++ b/arch/arm64/mm/dump.c
+@@ -27,8 +27,6 @@
+ #include <asm/pgtable.h>
+ #include <asm/pgtable-hwdef.h>
  
-+static unsigned long lpc32xx_delay_timer_read(void)
-+{
-+	return readl(clocksource_timer_counter);
-+}
-+
-+static struct delay_timer lpc32xx_delay_timer = {
-+	.read_current_timer = lpc32xx_delay_timer_read,
-+};
-+
- static int lpc32xx_clkevt_next_event(unsigned long delta,
- 				     struct clock_event_device *evtdev)
- {
-@@ -198,6 +208,8 @@ static int __init lpc32xx_clocksource_init(struct device_node *np)
- 	}
+-#define LOWEST_ADDR	(UL(0xffffffffffffffff) << VA_BITS)
+-
+ struct addr_marker {
+ 	unsigned long start_address;
+ 	const char *name;
+@@ -316,7 +314,7 @@ static int ptdump_show(struct seq_file *m, void *v)
+ 		.marker = address_markers,
+ 	};
  
- 	clocksource_timer_counter = base + LPC32XX_TIMER_TC;
-+	lpc32xx_delay_timer.freq = rate;
-+	register_current_timer_delay(&lpc32xx_delay_timer);
- 	sched_clock_register(lpc32xx_read_sched_clock, 32, rate);
+-	walk_pgd(&st, &init_mm, LOWEST_ADDR);
++	walk_pgd(&st, &init_mm, VA_START);
  
+ 	note_page(&st, 0, 0, 0);
  	return 0;
 -- 
-2.7.0
+2.6.0.GIT
