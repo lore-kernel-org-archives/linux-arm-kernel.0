@@ -1,166 +1,66 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 30 Jan 2016 13:39:11 +0100
-Subject: [PATCH] PM / AVS: rockchip-io: add GRF and PMUGRF types to
- distinguish
-In-Reply-To: <1454155305-55516-1-git-send-email-david.wu@rock-chips.com>
-References: <1454155305-55516-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <5387650.lAgTxexlF2@phil>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 30 Jan 2016 14:18:10 +0000
+Subject: [PATCH] staging: iio: ad5933: avoid uninitialized variable in
+ error case
+In-Reply-To: <1453737099-1959671-1-git-send-email-arnd@arndb.de>
+References: <1453737099-1959671-1-git-send-email-arnd@arndb.de>
+Message-ID: <56ACC622.8000908@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
-
-Am Samstag, 30. Januar 2016, 20:01:45 schrieb David Wu:
-> As rk3368 contained two separated iodomain areas, this was
-> determined to use which regmap base address.
+On 25/01/16 15:50, Arnd Bergmann wrote:
+> The ad5933_i2c_read function returns an error code to indicate
+> whether it could read data or not. However ad5933_work() ignores
+> this return code and just accesses the data unconditionally,
+> which gets detected by gcc as a possible bug:
 > 
-> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> drivers/staging/iio/impedance-analyzer/ad5933.c: In function 'ad5933_work':
+> drivers/staging/iio/impedance-analyzer/ad5933.c:649:16: warning: 'status' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> 
+> This adds minimal error handling so we only evaluate the
+> data if it was correctly read.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Hi Arnd,
 
-I don't think we need to specify this on a driver level. Both GRF areas are 
-"General register files" only located in two separate power-domains.
-So the rockchip,grf property should work for both. Especially as nothing 
-keeps designers from introducing yet another GRF-area somewhere else ;-)
+Thanks for the patch.   The handling in here is a little fiddly
+by the look of things. Lars can you take a look at this when
+you have a minute?
 
->From when I started working on the rk3368, I still have a preliminary 
-patches for that sitting here, so I've attached on how I envisoned that to 
-work.
-
-
-Heiko
-
+At a very high level, it doesn't make sense to fix this instance and
+not the one in the context of the patch below.
+See below...
 > ---
->  drivers/power/avs/rockchip-io-domain.c | 32
-> ++++++++++++++++++++++++-------- 1 file changed, 24 insertions(+), 8
-> deletions(-)
+>  drivers/staging/iio/impedance-analyzer/ad5933.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/power/avs/rockchip-io-domain.c
-> b/drivers/power/avs/rockchip-io-domain.c index 8099456..b17aeb7 100644
-> --- a/drivers/power/avs/rockchip-io-domain.c
-> +++ b/drivers/power/avs/rockchip-io-domain.c
-> @@ -47,6 +47,11 @@
->  #define RK3368_SOC_CON15_FLASH0		BIT(14)
->  #define RK3368_SOC_FLASH_SUPPLY_NUM	2
-> 
-> +enum rockchip_iodomain_grf_type {
-> +	GRF,
-> +	PMUGRF
-> +};
-> +
->  struct rockchip_iodomain;
-> 
->  /**
-> @@ -54,6 +59,7 @@ struct rockchip_iodomain;
->   */
->  struct rockchip_iodomain_soc_data {
->  	int grf_offset;
-> +	enum rockchip_iodomain_grf_type type;
->  	const char *supply_names[MAX_SUPPLIES];
->  	void (*init)(struct rockchip_iodomain *iod);
->  };
-> @@ -67,7 +73,7 @@ struct rockchip_iodomain_supply {
-> 
->  struct rockchip_iodomain {
->  	struct device *dev;
-> -	struct regmap *grf;
-> +	struct regmap *base;
->  	struct rockchip_iodomain_soc_data *soc_data;
->  	struct rockchip_iodomain_supply supplies[MAX_SUPPLIES];
->  };
-> @@ -86,7 +92,7 @@ static int rockchip_iodomain_write(struct
-> rockchip_iodomain_supply *supply, /* apply hiword-mask */
->  	val |= (BIT(supply->idx) << 16);
-> 
-> -	ret = regmap_write(iod->grf, iod->soc_data->grf_offset, val);
-> +	ret = regmap_write(iod->base, iod->soc_data->grf_offset, val);
->  	if (ret)
->  		dev_err(iod->dev, "Couldn't write to GRF\n");
-> 
-> @@ -157,7 +163,7 @@ static void rk3288_iodomain_init(struct
-> rockchip_iodomain *iod) * instead of a special gpio.
->  	 */
->  	val = RK3288_SOC_CON2_FLASH0 | (RK3288_SOC_CON2_FLASH0 << 16);
-> -	ret = regmap_write(iod->grf, RK3288_SOC_CON2, val);
-> +	ret = regmap_write(iod->base, RK3288_SOC_CON2, val);
->  	if (ret < 0)
->  		dev_warn(iod->dev, "couldn't update flash0 ctrl\n");
->  }
-> @@ -176,7 +182,7 @@ static void rk3368_iodomain_init(struct
-> rockchip_iodomain *iod) * instead of a special gpio.
->  	 */
->  	val = RK3368_SOC_CON15_FLASH0 | (RK3368_SOC_CON15_FLASH0 << 16);
-> -	ret = regmap_write(iod->grf, RK3368_SOC_CON15, val);
-> +	ret = regmap_write(iod->base, RK3368_SOC_CON15, val);
->  	if (ret < 0)
->  		dev_warn(iod->dev, "couldn't update flash0 ctrl\n");
->  }
-> @@ -187,6 +193,7 @@ static void rk3368_iodomain_init(struct
-> rockchip_iodomain *iod) */
->  static const struct rockchip_iodomain_soc_data soc_data_rk3188 = {
->  	.grf_offset = 0x104,
-> +	.type = GRF,
->  	.supply_names = {
->  		NULL,
->  		NULL,
-> @@ -209,6 +216,7 @@ static const struct rockchip_iodomain_soc_data
-> soc_data_rk3188 = {
-> 
->  static const struct rockchip_iodomain_soc_data soc_data_rk3288 = {
->  	.grf_offset = 0x380,
-> +	.type = GRF,
->  	.supply_names = {
->  		"lcdc",		/* LCDC_VDD */
->  		"dvp",		/* DVPIO_VDD */
-> @@ -226,6 +234,7 @@ static const struct rockchip_iodomain_soc_data
-> soc_data_rk3288 = {
-> 
->  static const struct rockchip_iodomain_soc_data soc_data_rk3368 = {
->  	.grf_offset = 0x900,
-> +	.type = GRF,
->  	.supply_names = {
->  		NULL,		/* reserved */
->  		"dvp",		/* DVPIO_VDD */
-> @@ -242,6 +251,7 @@ static const struct rockchip_iodomain_soc_data
-> soc_data_rk3368 = {
-> 
->  static const struct rockchip_iodomain_soc_data soc_data_rk3368_pmu = {
->  	.grf_offset = 0x100,
-> +	.type = PMUGRF,
->  	.supply_names = {
->  		NULL,
->  		NULL,
-> @@ -293,10 +303,16 @@ static int rockchip_iodomain_probe(struct
-> platform_device *pdev) match = of_match_node(rockchip_iodomain_match,
-> np);
->  	iod->soc_data = (struct rockchip_iodomain_soc_data *)match->data;
-> 
-> -	iod->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
-> -	if (IS_ERR(iod->grf)) {
-> -		dev_err(&pdev->dev, "couldn't find grf regmap\n");
-> -		return PTR_ERR(iod->grf);
-> +	if (iod->soc_data->type == PMUGRF)
-> +		iod->base = syscon_regmap_lookup_by_phandle(
-> +				np, "rockchip,pmugrf");
-> +	else
-> +		iod->base = syscon_regmap_lookup_by_phandle(
-> +				np, "rockchip,grf");
-> +	if (IS_ERR(iod->base)) {
-> +		dev_err(&pdev->dev, "couldn't find %s regmap\n",
-> +			(iod->soc_data->type == PMUGRF) ? "pmugrf" : "grf");
-> +		return PTR_ERR(iod->base);
+> diff --git a/drivers/staging/iio/impedance-analyzer/ad5933.c b/drivers/staging/iio/impedance-analyzer/ad5933.c
+> index 10c43dda0f5a..304bb464e478 100644
+> --- a/drivers/staging/iio/impedance-analyzer/ad5933.c
+> +++ b/drivers/staging/iio/impedance-analyzer/ad5933.c
+> @@ -647,6 +647,7 @@ static void ad5933_work(struct work_struct *work)
+>  	__be16 buf[2];
+>  	int val[2];
+>  	unsigned char status;
+> +	int ret;
+>  
+>  	mutex_lock(&indio_dev->mlock);
+>  	if (st->state == AD5933_CTRL_INIT_START_FREQ) {
+> @@ -658,9 +659,9 @@ static void ad5933_work(struct work_struct *work)
+>  		return;
 >  	}
+>  
+> -	ad5933_i2c_read(st->client, AD5933_REG_STATUS, 1, &status);
+> +	ret = ad5933_i2c_read(st->client, AD5933_REG_STATUS, 1, &status);
+>  
+> -	if (status & AD5933_STAT_DATA_VALID) {
+> +	if (!ret && (status & AD5933_STAT_DATA_VALID)) {
+The else is non trivial here as it assumes we will get the data later. If we
+get such a failure, we probably want to drop out completely rather than paper
+over the gaps..
+>  		int scan_count = bitmap_weight(indio_dev->active_scan_mask,
+>  					       indio_dev->masklength);
+Same issue on the next line - this results in known garbage data being spooled
+out.
+>  		ad5933_i2c_read(st->client,
 > 
->  	for (i = 0; i < MAX_SUPPLIES; i++) {
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-PM-AVS-rockchip-io-add-io-selectors-and-supplies-for.patch
-Type: text/x-patch
-Size: 4768 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160130/a4868cb1/attachment.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-ARM64-dts-rockchip-add-iodomains-and-stuff.patch
-Type: text/x-patch
-Size: 1036 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160130/a4868cb1/attachment-0001.bin>
