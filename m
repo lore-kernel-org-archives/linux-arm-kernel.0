@@ -1,28 +1,29 @@
 From: davem@davemloft.net (David Miller)
-Date: Fri, 29 Jan 2016 20:34:16 -0800 (PST)
-Subject: [PATCH v2 0/7] network driver fixes
-In-Reply-To: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
-References: <1454067557-3546883-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160129.203416.1451706111708529250.davem@davemloft.net>
+Date: Fri, 29 Jan 2016 20:38:10 -0800 (PST)
+Subject: [PATCH net 5/6] net: mvneta: The mvneta_percpu_elect function
+ should be atomic
+In-Reply-To: <1454084767-24715-6-git-send-email-gregory.clement@free-electrons.com>
+References: <1454084767-24715-1-git-send-email-gregory.clement@free-electrons.com>
+ <1454084767-24715-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20160129.203810.1601035648854177084.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 29 Jan 2016 12:39:08 +0100
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Date: Fri, 29 Jan 2016 17:26:06 +0100
 
-> This is an updated series of fixes for the network device drivers
-> that showed warnings in ARM randconfig.
-> 
-> Changes since v1 are:
-> 
-> dropped "net: macb: avoid uninitialized variables", already fixed in net-next
-> 
-> dropped "net: fddi/defxx: avoid warning about uninitialized variable
-> 	use", already fixed in net-next
-> 
-> added missing barriers in "net: moxart: use correct accessors for
-> 	DMA memory"
-> 
-> clarified "net: bgmac: clarify CONFIG_BCMA dependency" changelog
+> @@ -370,6 +370,8 @@ struct mvneta_port {
+>  	struct net_device *dev;
+>  	struct notifier_block cpu_notifier;
+>  	int rxq_def;
+> +	/* protect  */
+> +	spinlock_t lock;
+>  
+>  	/* Core clock */
+>  	struct clk *clk;
 
-Series applied, thanks.
+Protect what?  This comment needs a lot of improvement.
+
+Everyone knows a spinlock "protects" things, so if you aren't going
+to actually describe what this lock protects, and in what contexts
+the lock is used, you might as well not say anything at all.
