@@ -1,27 +1,37 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 29 Jan 2016 17:20:43 -0800
-Subject: [PATCH] clk: st: avoid uninitialized variable use
-In-Reply-To: <1453737255-1959849-1-git-send-email-arnd@arndb.de>
-References: <1453737255-1959849-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160130012040.GE4848@codeaurora.org>
+Date: Fri, 29 Jan 2016 17:29:23 -0800
+Subject: [PATCH v3] clk-divider: make sure read-only dividers do not
+ write to their register
+In-Reply-To: <4666170.lmsMJxAogk@phil>
+References: <4666170.lmsMJxAogk@phil>
+Message-ID: <20160130012923.GF4848@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25, Arnd Bergmann wrote:
-> My previous patch fixed some warnings about printing a couple
-> of variables that are always uninitialized in quadfs_pll_fs660c32_set_rate(),
-> but I now got a warning that only shows up in some configurations (i.e.
-> without gcc -Os) about the params.ndiv being used uninitialized in the
-> error case:
+On 01/21, Heiko Stuebner wrote:
+> Commit e6d5e7d90be9 ("clk-divider: Fix READ_ONLY when divider > 1") removed
+> the special ops struct for read-only clocks and instead opted to handle
+> them inside the regular ops.
 > 
-> drivers/clk/st/clkgen-fsyn.c: In function 'quadfs_pll_fs660c32_set_rate':
-> drivers/clk/st/clkgen-fsyn.c:584:75: warning: 'params.ndiv' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> drivers/clk/st/clkgen-fsyn.c:574:16: note: 'params.ndiv' was declared here
+> On the rk3368 this results in breakage as aclkm now gets set a value.
+> While it is the same divider value, the A53 core still doesn't like it,
+> which can result in the cpu ending up in a hang.
+> The reason being that "ACLKENMasserts one clock cycle before the rising
+> edge of ACLKM" and the clock should only be touched when STANDBYWFIL2
+> is asserted.
 > 
-> This changes the error handling so we bail for invalid arguments rather
-> than continuing with uninitialized data.
+> To fix this, reintroduce the read-only ops but do include the round_rate
+> callback. That way no writes that may be unsafe are done to the divider
+> register in any case.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> The Rockchip use of the clk_divider_ops is adapted to this split again,
+> as is the nxp, lpc18xx-ccu driver that was included since the original
+> commit. On lpc18xx-ccu the divider seems to always be read-only
+> so only uses the new ops now.
+> 
+> Fixes: e6d5e7d90be9 ("clk-divider: Fix READ_ONLY when divider > 1")
+> Reported-by: Zhang Qing <zhangqing@rock-chips.com>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > ---
 
 Applied to clk-next
