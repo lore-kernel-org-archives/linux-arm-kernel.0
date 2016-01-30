@@ -1,166 +1,51 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 30 Jan 2016 23:15:09 +0100
-Subject: N900 sleep mode (in 4.5-rc0, if that matters)
-In-Reply-To: <20160130201452.GC30429@amd>
-References: <20160123121022.GB12497@amd> <20160125163332.GT19432@atomide.com>
- <20160126140010.GA29723@amd> <20160126172527.GY3500@atomide.com>
- <20160130200244.GA30429@amd> <20160130201452.GC30429@amd>
-Message-ID: <20160130221509.GA28644@amd>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 30 Jan 2016 23:29:02 +0000
+Subject: Fwd: Marvell Kirkwood TS41x GMAC losing connection
+In-Reply-To: <C9921470-1302-49D7-A97E-2C9008D337EB@schloeter.net>
+References: <44A6A099-58F8-49AF-9827-A4CAD4035E78@schloeter.net>
+ <C9921470-1302-49D7-A97E-2C9008D337EB@schloeter.net>
+Message-ID: <20160130232902.GC25120@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
++ ThomasP, lakml
 
-> > > > ffdffe8d 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00200072
-> > > > 0000000d 48004a28 (fa004a28) cm_idlest3_core
-> > > > 
-> > > > cm_idlest1_core changes periodicall often, to 00218072. The rest seems
-> > > > constant.
-> > > 
-> > > For cm_idlest1_core 42 is the answer.. Here you have bits 4 and 5
-> > > blocking which is for OTG and it's PHY. That's a known issue with
-> > > musb and setting pm_runtime_irq_safe() on the MUSB parent.
-> > > 
-> > > If you do rmmod omap2430 and phy-twl4030usb chances are the LEDs will
-> > > start going off assuming the McSPI bit goes low with WLAN idling.
-> > 
-> > Ok, so I tried to compile kernel without omap2430/phy-twl4030usb
-> > . That did not help. So I thought, ok, maybe rmmod is needed to
-> > trigger some powersaving? But that is not exactly easy to do:
-> > 
-> > pavel at n900:/my/tui/ofone$ sudo insmod /my/modules/omap2430.ko
-> > pavel at n900:/my/tui/ofone$ sudo insmod /my/modules/phy-twl4030-usb.ko
-> > pavel at n900:/my/tui/ofone$ sudo rmmod phy-twl4030-usb.ko
-> > Error: Module phy_twl4030_usb is in use
-> > pavel at n900:/my/tui/ofone$
-> > 
-> > Any ideas what jumps to use the modules? Charger code?
+On Fri, Jan 29, 2016 at 09:07:00PM +0100, Thomas Schl?ter wrote:
+> Dear ARM Kirkwood Maintainers,
 > 
-> I tried a kernel without charger code, and no luck, rmmod fails the
-> same way. dmesg says:
-> [  111.093078] wlan0: authenticated
-> [  111.097442] wlan0: associate with 06:27:22:f9:10:6a (try 1/3)
-> [  111.104553] wlan0: RX AssocResp from 06:27:22:f9:10:6a (capab=0x421
-> status=0 aid=2)
-> [  111.104705] wlan0: AP has invalid WMM params (AIFSN=1 for ACI 2),
-> will use 2
-> [  111.104736] wlan0: AP has invalid WMM params (AIFSN=1 for ACI 3),
-> will use 2
-> [  111.256652] wlan0: associated
-> [  184.681427] HS USB OTG: no transceiver configured
-> [  184.681488] musb-hdrc musb-hdrc.0.auto: musb_init_controller failed
-> with status -517
-> [  184.681976] HS USB OTG: no transceiver configured
-> [  184.682006] musb-hdrc musb-hdrc.0.auto: musb_init_controller failed
-> with status -517
-> [  187.690338] twl4030_usb 48070000.i2c:twl at 48:twl4030-usb:
-> Initialized TWL4030 USB module
-> [  187.698303] musb-hdrc: ConfigData=0xde (UTMI-8, dyn FIFOs, bulk
-> combine, bulk split, HB-ISO Rx, HB-ISO Tx, SoftConn)
-> [  187.698333] musb-hdrc: MHDRC RTL version 1.400
-> [  187.698333] musb-hdrc: setup fifo_mode 4
-> [  187.698394] musb-hdrc: 28/31 max ep, 16384/16384 memory
-> pavel at n900:/my/tui/ofone$
-
-I added following hack to phy-twl4030-usb.c so that I could avoid
-modules and module unloading problem. But still could not get it to
-sleep :-(.
-
-									Pavel
-									
-diff --git a/drivers/phy/phy-twl4030-usb.c b/drivers/phy/phy-twl4030-usb.c
-index 3a707dd..ac3761b 100644
---- a/drivers/phy/phy-twl4030-usb.c
-+++ b/drivers/phy/phy-twl4030-usb.c
-@@ -532,6 +532,43 @@ static ssize_t twl4030_usb_vbus_show(struct device *dev,
- }
- static DEVICE_ATTR(vbus, 0444, twl4030_usb_vbus_show, NULL);
- 
-+static ssize_t twl4030_test_show(struct device *dev,
-+		struct device_attribute *attr, char *buf)
-+{
-+	struct twl4030_usb *twl = dev_get_drvdata(dev);
-+	int ret = -EINVAL;
-+
-+	mutex_lock(&twl->lock);
-+	ret = sprintf(buf, "%s\n", "hello, world");
-+	mutex_unlock(&twl->lock);
-+
-+	return ret;
-+}
-+
-+static int twl4030_shutdown(struct twl4030_usb *twl);
-+
-+static ssize_t twl4030_test_store(struct device *dev,
-+		 struct device_attribute *attr, const char *buf, size_t count)
-+{
-+	unsigned long tmp;
-+
-+	struct twl4030_usb *twl = dev_get_drvdata(dev);
-+
-+	mutex_lock(&twl->lock);
-+	sscanf(buf, "%lX", &tmp);
-+	printk("TWL HACK: tmp = 0x%lX\n", tmp);
-+	mutex_unlock(&twl->lock);
-+
-+	if (tmp == 0xdead) {
-+		printk("TWL HACK: killing hardware\n");
-+		printk("TWL HACK: killing hardware = %d\n", twl4030_shutdown(twl));
-+	}
-+	
-+	return strnlen(buf, count);
-+}
-+
-+static DEVICE_ATTR(test, 0664, twl4030_test_show, twl4030_test_store);
-+
- static irqreturn_t twl4030_usb_irq(int irq, void *_twl)
- {
- 	struct twl4030_usb *twl = _twl;
-@@ -710,6 +747,9 @@ static int twl4030_usb_probe(struct platform_device *pdev)
- 	if (device_create_file(&pdev->dev, &dev_attr_vbus))
- 		dev_warn(&pdev->dev, "could not create sysfs file\n");
- 
-+	if (device_create_file(&pdev->dev, &dev_attr_test))
-+		dev_warn(&pdev->dev, "could not create sysfs file #2\n");
-+	
- 	ATOMIC_INIT_NOTIFIER_HEAD(&twl->phy.notifier);
- 
- 	pm_runtime_use_autosuspend(&pdev->dev);
-@@ -745,14 +785,12 @@ static int twl4030_usb_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int twl4030_usb_remove(struct platform_device *pdev)
-+static int twl4030_shutdown(struct twl4030_usb *twl)
- {
--	struct twl4030_usb *twl = platform_get_drvdata(pdev);
- 	int val;
- 
- 	pm_runtime_get_sync(twl->dev);
- 	cancel_delayed_work(&twl->id_workaround_work);
--	device_remove_file(twl->dev, &dev_attr_vbus);
- 
- 	/* set transceiver mode to power on defaults */
- 	twl4030_usb_set_mode(twl, -1);
-@@ -779,6 +817,17 @@ static int twl4030_usb_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+
-+static int twl4030_usb_remove(struct platform_device *pdev)
-+{
-+	struct twl4030_usb *twl = platform_get_drvdata(pdev);
-+
-+	device_remove_file(twl->dev, &dev_attr_vbus);
-+	device_remove_file(twl->dev, &dev_attr_test);
-+	
-+	return twl4030_shutdown(twl);
-+}
-+
- #ifdef CONFIG_OF
- static const struct of_device_id twl4030_usb_id_table[] = {
- 	{ .compatible = "ti,twl4030-usb" },
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> I tried to post the message below to the linux-arm-kernel mailing list with no success as my mail gets greylisted due to some ?suspicion? I cannot understand. Obviously the list moderator has gone to lunch for a long time, so please excuse that I contact you directly.
+> 
+> 
+> > Anfang der weitergeleiteten Nachricht:
+> > 
+> > Von: Thomas Schl?ter <thomas@schloeter.net>
+> > Betreff: Marvell Kirkwood TS41x GMAC losing connection
+> > Datum: 18. Januar 2016 um 21:22:54 MEZ
+> > An: linux-arm-kernel at lists.infradead.org
+> > 
+> > Hello,
+> > 
+> > I am using a kernel 4.3 on a QNAP TS-412 (Kirkwood/mvebu TS41x 8261).
+> > 
+> > After less than one hour of using the system, I am losing the network connection on the Marvell GMAC interface. In syslog, I can see some services complaining "write: No buffer space available".
+> > When I hook up a USB keyboard and bring the interface down and up again, it works again for some minutes before it crashes again.
+> > 
+> > During bootup, I see the following messages:
+> > 
+> > [    9.183115] mv643xx_eth: MV-643xx 10/100/1000 ethernet driver version 1.4
+> > [    9.190408] kirkwood-pinctrl f1010000.pin-controller: pin PIN20 already requested by f1080000.sata; cannot claim for f1076000.ethernet-controller
+> > [    9.203553] kirkwood-pinctrl f1010000.pin-controller: pin-20 (f1076000.ethernet-controller) status -22
+> > [    9.212920] kirkwood-pinctrl f1010000.pin-controller: could not request pin 20 (PIN20) from group mpp20  on device f1010000.pin-controller
+> > [    9.225419] mv643xx_eth f1076000.ethernet-controller: Error applying setting, reverse things back
+> > [   10.318914] mv643xx_eth_port mv643xx_eth_port.0 eth0: port 0 with MAC address 00:50:89:12:34:56
+> > [   11.434761] mv643xx_eth_port mv643xx_eth_port.1 eth1: port 0 with MAC address 00:00:00:00:00:00
+> > [   40.663969] mv643xx_eth_port mv643xx_eth_port.0 eth0: link up, 1000 Mb/s, full duplex, flow control disabled
+> > 
+> > Is it possible that there is a problem with the device tree resulting in a hardware pin of the GMAC being erroneously routed to the SATA port?
+> > Indeed, the system and network has been stable from flash / initrd until I put it some hard disks.
+> > 
+> > Thanks in advance.
+> > 
+> > Regards,
+> > Thomas
+> 
