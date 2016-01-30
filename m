@@ -1,33 +1,72 @@
-From: ayaka@soulik.info (ayaka)
-Date: Sun, 31 Jan 2016 02:53:36 +0800
-Subject: [PATCH 3/4] [media] s5p-mfc: don't close instance after free OUTPUT
- buffers
-In-Reply-To: <1454180017-29071-1-git-send-email-ayaka@soulik.info>
-References: <1454180017-29071-1-git-send-email-ayaka@soulik.info>
-Message-ID: <1454180017-29071-4-git-send-email-ayaka@soulik.info>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sat, 30 Jan 2016 20:27:33 +0100
+Subject: [PATCH 2/2] clocksource/drivers/lpc32xx: Support timer-based ARM
+ delay
+In-Reply-To: <1454136379-7517-2-git-send-email-ezequiel@vanguardiasur.com.ar>
+References: <1454136379-7517-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <1454136379-7517-2-git-send-email-ezequiel@vanguardiasur.com.ar>
+Message-ID: <CAGhQ9VwQtgCN8wEt1S3Y3Marz6QhZhuncSKtKaMSRgqcMDT=yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Free buffers in OUTPUT is quite normal to detect the driver's
-buffer capacity, it doesn't mean the application want to close
-that mfc instance.
+Hi Ezequiel,
 
-Signed-off-by: ayaka <ayaka@soulik.info>
----
- drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 1 -
- 1 file changed, 1 deletion(-)
+On 30 January 2016 at 07:46, Ezequiel Garcia
+<ezequiel@vanguardiasur.com.ar> wrote:
+> This commit implements the ARM timer-based delay timer for the
+> LPC32xx, LPC18xx, LPC43xx family of SoCs.
+>
+> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+> ---
+>  drivers/clocksource/time-lpc32xx.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>
+> diff --git a/drivers/clocksource/time-lpc32xx.c b/drivers/clocksource/time-lpc32xx.c
+> index 9b3d4a38c716..223bb08720d6 100644
+> --- a/drivers/clocksource/time-lpc32xx.c
+> +++ b/drivers/clocksource/time-lpc32xx.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/clockchips.h>
+>  #include <linux/clocksource.h>
+> +#include <linux/delay.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/irq.h>
+>  #include <linux/kernel.h>
+> @@ -55,6 +56,15 @@ static u64 notrace lpc32xx_read_sched_clock(void)
+>         return readl(clocksource_timer_counter);
+>  }
+>
+> +static unsigned long lpc32xx_delay_timer_read(void)
+> +{
+> +       return readl(clocksource_timer_counter);
+> +}
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-index aebe4fd..609b17b 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-@@ -474,7 +474,6 @@ static int reqbufs_output(struct s5p_mfc_dev *dev, struct s5p_mfc_ctx *ctx,
- 		ret = vb2_reqbufs(&ctx->vq_src, reqbufs);
- 		if (ret)
- 			goto out;
--		s5p_mfc_close_mfc_inst(dev, ctx);
- 		ctx->src_bufs_cnt = 0;
- 		ctx->output_state = QUEUE_FREE;
- 	} else if (ctx->output_state == QUEUE_FREE) {
--- 
-2.5.0
+Could this use the relaxed version?
+
+> +
+> +static struct delay_timer lpc32xx_delay_timer = {
+> +       .read_current_timer = lpc32xx_delay_timer_read,
+> +};
+> +
+>  static int lpc32xx_clkevt_next_event(unsigned long delta,
+>                                      struct clock_event_device *evtdev)
+>  {
+> @@ -198,6 +208,8 @@ static int __init lpc32xx_clocksource_init(struct device_node *np)
+>         }
+>
+>         clocksource_timer_counter = base + LPC32XX_TIMER_TC;
+> +       lpc32xx_delay_timer.freq = rate;
+> +       register_current_timer_delay(&lpc32xx_delay_timer);
+
+As far as I can see 'register_current_timer_delay' is an ARM only function(?).
+Since time-lpc32xx.c can be built on other architectures than ARM
+using COMPILE_TEST should all this be protected under CONFIG_ARM?
+
+
+Could you also CC Vladimir Zapolskiy <vz@mleia.com> on these patches
+since he is working on the lpc32xx platform now?
+
+
+regards,
+Joachim Eastwood
