@@ -1,40 +1,96 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Sat, 30 Jan 2016 15:55:21 +0800
-Subject: [PATCH] arm64: mm: dump: Use VA_START directly instead of private
- LOWEST_ADDR
-Message-ID: <1454140521-741-1-git-send-email-wangkefeng.wang@huawei.com>
+From: xinliang.liu@linaro.org (Xinliang Liu)
+Date: Sat, 30 Jan 2016 16:54:25 +0800
+Subject: [PATCH v3 00/10] Add DRM Driver for HiSilicon Kirin hi6220 SoC
+Message-ID: <1454144075-74361-1-git-send-email-xinliang.liu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use VA_START macro in asm/memory.h instead of private LOWEST_ADDR
-definition in dump.c.
+  This patch set adds a new drm driver for HiSilicon Kirin hi6220 SoC.
+Current testing and support board is Hikey board which is one of Linaro
+96boards. It is an arm64 open source board. For more information about
+this board, please access https://www.96boards.org.
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- arch/arm64/mm/dump.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+Hardware Detail
+---------------
+  The display subsystem of Hi6220 SoC is shown as bellow:
+ +-----+       +----------+     +-----+     +---------+
+ |     |       |          |     |     |     |         |             	
+ | FB  |------>|   ADE    |---->| DSI |---->| External|
+ |     |       |          |     |     |     |  HDMI   |
+ +-----+       +----------+     +-----+     +---------+
 
-diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-index 0adbebb..b3c62b1 100644
---- a/arch/arm64/mm/dump.c
-+++ b/arch/arm64/mm/dump.c
-@@ -27,8 +27,6 @@
- #include <asm/pgtable.h>
- #include <asm/pgtable-hwdef.h>
- 
--#define LOWEST_ADDR	(UL(0xffffffffffffffff) << VA_BITS)
--
- struct addr_marker {
- 	unsigned long start_address;
- 	const char *name;
-@@ -316,7 +314,7 @@ static int ptdump_show(struct seq_file *m, void *v)
- 		.marker = address_markers,
- 	};
- 
--	walk_pgd(&st, &init_mm, LOWEST_ADDR);
-+	walk_pgd(&st, &init_mm, VA_START);
- 
- 	note_page(&st, 0, 0, 0);
- 	return 0;
+- ADE(Advanced Display Engine) is the display controller. It contains 7
+channels, 3 overlay compositors and a LDI.
+  - A channel looks like: DMA-->clip-->scale-->ctrans(or called csc).
+  - Overlay compositor is response to compose planes which come from 7
+  channels and pass composed image to LDI.
+  - LDI is response to generate timings and RGB data stream.
+- DSI converts the RGB data stream from ADE to DSI packets.
+- External HDMI module is connected with DSI bus. Now Hikey use a ADI's
+  ADV7533 external HDMI chip.
+
+Change History
+-------------
+Changes in v3:
+- Move and rename all the files to kirin sub-directory.
+  So that we could separate different seires SoCs' driver.
+- Make ade as the drm master node.
+- Replace drm_platform_init, load, unload implementation.
+- Use assigned-clocks to set clock rate.
+- Use ports to connect display relavant nodes.
+- Rename hisi_drm_dsi.c to dw_drm_dsi.c
+- Make encoder type as DRM_MODE_ENCODER_DSI.
+- A few cleanup on regs and code.
+
+Changes in v2:
+- Remove abtraction layer of plane/crtc/encoder/connector.
+- Refactor atomic implementation according to Daniel Vetter's guides:
+http://blog.ffwll.ch/2014/11/atomic-modeset-support-for-kms-drivers.html
+http://blog.ffwll.ch/2015/09/xdc-2015-atomic-modesetting-for-drivers.html
+http://blog.ffwll.ch/2015/08/atomic-modesetting-design-overview.html
+- Use bridge instead of slave encoder to connect external HDMI.
+- Move dt binding docs to bindings/display/hisilicon directory. 
+
+Xinliang Liu (10):
+  drm/hisilicon: Add device tree binding for hi6220 display subsystem
+  drm/hisilicon: Add hisilicon kirin drm master driver
+  drm/hisilicon: Add crtc driver for ADE
+  drm/hisilicon: Add plane driver for ADE
+  drm/hisilicon: Add vblank driver for ADE
+  drm/hisilicon: Add cma fbdev and hotplug
+  drm/hisilicon: Add designware dsi encoder driver
+  drm/hisilicon: Add designware dsi host driver
+  drm/hisilicon: Add support for external bridge
+  MAINTAINERS: Add maintainer for hisilicon DRM driver
+
+ .../bindings/display/hisilicon/dw-dsi.txt          |   60 ++
+ .../bindings/display/hisilicon/hisi-ade.txt        |   56 ++
+ MAINTAINERS                                        |    9 +
+ drivers/gpu/drm/Kconfig                            |    2 +
+ drivers/gpu/drm/Makefile                           |    1 +
+ drivers/gpu/drm/hisilicon/Kconfig                  |    5 +
+ drivers/gpu/drm/hisilicon/Makefile                 |    5 +
+ drivers/gpu/drm/hisilicon/kirin/Kconfig            |   10 +
+ drivers/gpu/drm/hisilicon/kirin/Makefile           |    5 +
+ drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c       |  845 ++++++++++++++++
+ drivers/gpu/drm/hisilicon/kirin/dw_dsi_reg.h       |   83 ++
+ drivers/gpu/drm/hisilicon/kirin/kirin_ade_reg.h    |  280 ++++++
+ drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c    | 1053 ++++++++++++++++++++
+ drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c    |  382 +++++++
+ drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.h    |   31 +
+ 15 files changed, 2827 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt
+ create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
+ create mode 100644 drivers/gpu/drm/hisilicon/Kconfig
+ create mode 100644 drivers/gpu/drm/hisilicon/Makefile
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/Kconfig
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/Makefile
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/dw_dsi_reg.h
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_ade_reg.h
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.h
+
 -- 
-2.6.0.GIT
+1.9.1
