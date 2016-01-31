@@ -1,22 +1,32 @@
-From: pza@pengutronix.de (Philipp Zabel)
-Date: Sun, 31 Jan 2016 12:15:12 +0100
-Subject: [PATCH 1/2] ARM: imx_v6_v7_defconfig: Select
- CONFIG_NVMEM_IMX_OCOTP
-In-Reply-To: <1454164508-10831-1-git-send-email-festevam@gmail.com>
-References: <1454164508-10831-1-git-send-email-festevam@gmail.com>
-Message-ID: <20160131111512.GA4849@pengutronix.de>
+From: htejun@gmail.com (Tejun Heo)
+Date: Sun, 31 Jan 2016 06:32:49 -0500
+Subject: [PATCH v2 1/3] ata: Remove the AHCI_HFLAG_EDGE_IRQ support from
+ libahci.
+In-Reply-To: <1453888197-11368-2-git-send-email-stripathi@apm.com>
+References: <1453888197-11368-1-git-send-email-stripathi@apm.com>
+ <1453888197-11368-2-git-send-email-stripathi@apm.com>
+Message-ID: <20160131113249.GW32380@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 30, 2016 at 12:35:07PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On Wed, Jan 27, 2016 at 03:19:55PM +0530, Suman Tripathi wrote:
+> This patch removes the AHCI_HFLAG_EDGE_IRQ support from libahci.
+> The upcoming patches will have the flexibility to override
+> irq handlers in the LLD's. Controller's implementing a EDGE trigger
+> latch can implement their own interrupt handler inside the driver.
 > 
-> Select the i.mx ocotp driver.
-> 
-> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Shouldn't this patch come after the irq override is in place?
 
-regards
-Philipp
+1. introduce irq override.
+
+2. remove AHCI_HFLAG_EDGE_IRQ by moving the edge triggered handler to
+   ahci_xgene.
+
+3. Update xgene irq handler to address the erratum.
+
+Thanks.
+
+-- 
+tejun
