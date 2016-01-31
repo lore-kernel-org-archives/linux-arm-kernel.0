@@ -1,49 +1,41 @@
 From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Sun, 31 Jan 2016 09:21:03 +0800
-Subject: [PATCH 11/14] ARM: dts: sun8i-a83t: Add R_PIO controller node to the
- dtsi
+Date: Sun, 31 Jan 2016 09:21:04 +0800
+Subject: [PATCH 12/14] ARM: dts: sun8i-a83t: Add RSB nodes to dtsi
 In-Reply-To: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
 References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <1454203266-4450-12-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <1454203266-4450-13-git-send-email-vishnupatekar0510@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a driver for the R_PIO controller,
-add the corresponding device node to the dtsi.
+This adds support for RSB
+A83T RSB is compatible with A23 rsb.
 
 Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 5ea20ff..11be9e1 100644
+index 11be9e1..8c67c85 100644
 --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
 +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -478,5 +478,26 @@
- 			compatible = "allwinner,sun6i-a31-clock-reset";
- 			#reset-cells = <1>;
+@@ -499,5 +499,19 @@
+ 				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+ 			};
  		};
 +
-+		r_pio: pinctrl at 01f02c00 {
-+			compatible = "allwinner,sun8i-a83t-r-pinctrl";
-+			reg = <0x01f02c00 0x400>;
-+			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&apb0_gates 0>;
-+			resets = <&apb0_reset 0>;
-+			gpio-controller;
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
++		r_rsb: i2c at 01f03400 {
++			compatible = "allwinner,sun8i-a23-rsb";
++			reg = <0x01f03400 0x400>;
++			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&apb0_gates 3>;
++			clock-frequency = <3000000>;
++			resets = <&apb0_reset 3>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&r_rsb_pins>;
++			status = "disabled";
 +			#address-cells = <1>;
 +			#size-cells = <0>;
-+			#gpio-cells = <3>;
-+
-+			r_rsb_pins: r_rsb {
-+				allwinner,pins = "PL0", "PL1";
-+				allwinner,function = "s_rsb";
-+				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+			};
 +		};
  	};
  };
