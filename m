@@ -1,54 +1,34 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 29 Feb 2016 23:14:49 -0800
-Subject: [PATCH 7/8] drivers/pinctrl: make sunxi/pinctrl-sun9i-a80-r.c
- explicitly non-modular
-In-Reply-To: <1456778924-20730-8-git-send-email-paul.gortmaker@windriver.com>
-References: <1456778924-20730-1-git-send-email-paul.gortmaker@windriver.com>
- <1456778924-20730-8-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <20160301071449.GL8418@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Feb 2016 00:20:38 +0100
+Subject: [PATCH] ARM: proc-v7.S: Adjust stack address when XIP_KERNEL
+In-Reply-To: <1454105474-3009-1-git-send-email-chris.brandt@renesas.com>
+References: <1454105474-3009-1-git-send-email-chris.brandt@renesas.com>
+Message-ID: <42779466.8cExHmvANB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 29, 2016 at 03:48:43PM -0500, Paul Gortmaker wrote:
-> The Kconfig currently controlling compilation of this code is:
+On Friday 29 January 2016 17:11:14 Chris Brandt wrote:
+> When XIP_KERNEL is enabled, the virt to phys address translation for RAM
+> is not the same as the virt to phys address translation for .text.
+> The only way to know where physical RAM is located is to use
+> PLAT_PHYS_OFFSET.
+> The MACRO will be useful for other places where there is a similar problem.
 > 
-> drivers/pinctrl/sunxi/Kconfig:config PINCTRL_SUN9I_A80_R
-> drivers/pinctrl/sunxi/Kconfig:  def_bool MACH_SUN9I
+> Written by Nicolas Pitre
 > 
-> ...meaning that it currently is not being built as a module by anyone.
+> Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
 > 
-> Lets remove the modular code that is essentially orphaned, so that
-> when reading the driver there is no doubt it is builtin-only.
-> 
-> Since module_platform_driver() uses the same init level priority as
-> builtin_platform_driver() the init ordering remains unchanged with
-> this commit.
-> 
-> Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
-> 
-> We also delete the MODULE_LICENSE tag etc. since all that information
-> is already contained at the top of the file in the comments.
-> 
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: linux-gpio at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+I have not verified the contents of the patch, but have two comments on the
+submission form:
 
-Thanks!
-Maxime
+- replace the 'Written by Nicolas Pitre' sentence with a 'From: Nicolas
+  Pitre <nico@linaro.org>' line as the first line of the changelog text,
+  followed by an empty line, so that 'git am' can set the correct author
+  field.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160229/26b932e5/attachment.sig>
+- put your Signed-off-by: line after Nico's for correct documentation
+  of who sent what.
+
+	Arnd
