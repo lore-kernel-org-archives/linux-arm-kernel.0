@@ -1,65 +1,32 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sun, 31 Jan 2016 15:26:28 +0100
-Subject: [PATCH v3 2/2] clk: sunxi: Refactor A31 PLL6 so that it can be
- reused
-In-Reply-To: <CAGb2v67S9mhr1hbmM3nuLO+wTGA3ff2vUhBgm+PTnd_5vGS3ng@mail.gmail.com>
-References: <1454008958-12655-1-git-send-email-maxime.ripard@free-electrons.com>
- <1454008958-12655-2-git-send-email-maxime.ripard@free-electrons.com>
- <20160130185714.7abcf1de9ef8108c2f48c7fe@free.fr>
- <CAGb2v67S9mhr1hbmM3nuLO+wTGA3ff2vUhBgm+PTnd_5vGS3ng@mail.gmail.com>
-Message-ID: <20160131152628.aefb1c8f52d789e12f30129d@free.fr>
+From: pza@pengutronix.de (Philipp Zabel)
+Date: Sun, 31 Jan 2016 16:40:12 +0100
+Subject: [PATCH v8 3/5] memory: mediatek: Add SMI driver
+In-Reply-To: <56ADE959.2050309@gmail.com>
+References: <1453781562-23556-1-git-send-email-yong.wu@mediatek.com>
+ <1453781562-23556-4-git-send-email-yong.wu@mediatek.com>
+ <56ADE959.2050309@gmail.com>
+Message-ID: <20160131154012.GA3628@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 31 Jan 2016 20:08:40 +0800
-Chen-Yu Tsai <wens@csie.org> wrote:
-
-> On Sun, Jan 31, 2016 at 1:57 AM, Jean-Francois Moine <moinejf@free.fr> wrote:
-> > On Thu, 28 Jan 2016 20:22:38 +0100
-> > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On Sun, Jan 31, 2016 at 12:00:41PM +0100, Matthias Brugger wrote:
+> 
+> 
+> On 26/01/16 05:12, Yong Wu wrote:
+> >This patch add SMI(Smart Multimedia Interface) driver. This driver
+> >is responsible to enable/disable iommu and control the power domain
+> >and clocks of each local arbiter.
 > >
-> >> Remove the fixed dividers from the PLL6 driver to be able to have a
-> >> reusable driver that can be used across several SoCs that share the same
-> >> controller, but don't have the same set of dividers for this clock, and to
-> >> also be reused multiple times in the same SoC, since we're droping the
-> >> clock name.
-	[snip]
-> > Hi Maxime,
-> >
-> > Do you know that the DT definitions cannot be changed when they are in
-> > the mainline kernel?
+> >Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> >Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
+> >---
 > 
-> This rule varies depending on who you talk to. :)
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 > 
-> > Also, for the H3 PLL periph1 (aka PLL8), why didn't you create a
-> > 'pll8x2' clock with 'pll8' as a divider?
-> 
-> If it's used, it can be added later. No need to bloat the DT.
+> Joerg would you mind to take this through your branch?
 
-In
-	[PATCH v3 2/2] clk: sunxi: Refactor A31 PLL6 so that it can be reused
+Could you put it on a separate branch that I may also merge into the DRM
+driver pull request?
 
-  diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-
-you may see:
-
-> -		/* dummy clock until pll6 can be reused */
-> -		pll8: pll8_clk {
-> +		pll8: clk at 01c20044 {
->  			#clock-cells = <0>;
-> -			compatible = "fixed-clock";
-> -			clock-frequency = <1>;
-> +			compatible = "allwinner,sun6i-a31-pll6-clk";
-> +			reg = <0x01c20044 0x4>;
-> +			clocks = <&osc24M>;
->  			clock-output-names = "pll8";
->  		};
-
-So, the pll periph1 is already there.
-
-I was just saying that adding a pll8x2 would avoid changing the actual
-pll6 and a lot of DT definitions.
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+regards
+Philipp
