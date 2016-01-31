@@ -1,24 +1,27 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 31 Jan 2016 11:46:47 +0100
-Subject: [PATCH v4 1/9] ARM: dts: rockchip: add the leds control for kylin
- board
-In-Reply-To: <1453970618-4383-2-git-send-email-wxt@rock-chips.com>
-References: <1453970618-4383-1-git-send-email-wxt@rock-chips.com>
- <1453970618-4383-2-git-send-email-wxt@rock-chips.com>
-Message-ID: <2785565.JmZWWova7F@phil>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Sun, 31 Jan 2016 12:00:41 +0100
+Subject: [PATCH v8 3/5] memory: mediatek: Add SMI driver
+In-Reply-To: <1453781562-23556-4-git-send-email-yong.wu@mediatek.com>
+References: <1453781562-23556-1-git-send-email-yong.wu@mediatek.com>
+ <1453781562-23556-4-git-send-email-yong.wu@mediatek.com>
+Message-ID: <56ADE959.2050309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 28. Januar 2016, 16:43:30 schrieb Caesar Wang:
-> As the kylin schematic drawing, add the needed work led for
-> kylin board.
-> 
-> Run:
-> echo 0 > /sys/class/leds/kylin:red:led/brightness
-> echo 1 > /sys/class/leds/kylin:red:led/brightness
-> 
-> The led can normal on/off on kylin board.
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
-applied to my dts32-branch for 4.6
+
+On 26/01/16 05:12, Yong Wu wrote:
+> This patch add SMI(Smart Multimedia Interface) driver. This driver
+> is responsible to enable/disable iommu and control the power domain
+> and clocks of each local arbiter.
+>
+> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+
+Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+
+Joerg would you mind to take this through your branch?
+
+Thanks,
+Matthias
