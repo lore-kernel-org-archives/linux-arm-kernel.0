@@ -1,71 +1,42 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 31 Jan 2016 12:34:09 +0100
-Subject: [PATCH] misc: atmel-secumod: Driver for Atmel "security module".
-In-Reply-To: <alpine.LNX.2.00.1601291055520.23683@nippy.intranet>
-References: <1453348655-31182-1-git-send-email-davidm@egauge.net>
- <20160125110921.GA4027@piout.net>
- <CALnQHM13cGnoma_3erb0oCnRD0sYGGNF1E1cgzCJHrEXbvJpRQ@mail.gmail.com>
- <alpine.LNX.2.00.1601291055520.23683@nippy.intranet>
-Message-ID: <20160131113409.GI20165@piout.net>
+From: htejun@gmail.com (Tejun Heo)
+Date: Sun, 31 Jan 2016 06:35:40 -0500
+Subject: [PATCH v2 2/3] libahci: Implement the capability to override the
+ generic ahci interrupt handler.
+In-Reply-To: <1453888197-11368-3-git-send-email-stripathi@apm.com>
+References: <1453888197-11368-1-git-send-email-stripathi@apm.com>
+ <1453888197-11368-3-git-send-email-stripathi@apm.com>
+Message-ID: <20160131113540.GX32380@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/01/2016 at 11:13:05 +1100, Finn Thain wrote :
+On Wed, Jan 27, 2016 at 03:19:56PM +0530, Suman Tripathi wrote:
+> @@ -2466,13 +2467,19 @@ int ahci_host_activate(struct ata_host *host, struct scsi_host_template *sht)
+>  {
+>  	struct ahci_host_priv *hpriv = host->private_data;
+>  	int irq = hpriv->irq;
+> +	irqreturn_t (*ahci_irq_handler)(int irq, void *dev_instance);
+>  	int rc;
 > 
-> On Mon, 25 Jan 2016, David Mosberger wrote:
-> 
-> > On Mon, Jan 25, 2016 at 4:09 AM, Alexandre Belloni 
-> > <alexandre.belloni@free-electrons.com> wrote:
-> > 
-> > > I know this does more than that but I think those thre sections should 
-> > > be registered using the nvmem framework. The sysfs file creation and 
-> > > accesses then comes for free.
-> > 
-> > I think Finn's patches would have to go in for that first, since the 
-> > existing nvram code is a mess. Even with Finn's patches in, I think it 
-> > could go either way.
-> 
-> I think Alexandre is speaking of the nvmem subsystem (not nvram).
-> Documentation/devicetree/bindings/nvmem
-> Documentation/nvmem
-> drivers/nvmem
-> 
+>  	if (hpriv->flags & (AHCI_HFLAG_MULTI_MSI | AHCI_HFLAG_MULTI_MSIX))
+>  		rc = ahci_host_activate_multi_irqs(host, sht);
 
-absolutely.
+You need to add { } to the if body too.  Please read CodingStyle.
 
-> > I'm not exactly sure how some of the features of the security module 
-> > would be used: key management, auto erasing, there is a strange "backup 
-> > mode" vs "normal mode" which is not well documented, etc.  So I think it 
-> > may well end up being sufficiently different to warrant a separate 
-> > driver.
-> 
-> nvmem is not a subsystem I am familiar with, so it's not immediately clear 
-> to me what your driver would look like if re-written that way.
-> 
-> Maybe it would become simpler. But if you did end up needing a separate 
-> misc driver as well, maybe use of the nvmem framework would actually 
-> increase complexity.
-> 
-> It would depend on your requirements. But I would focus on the actual 
-> requirement rather than uncertain future possibilities.
-> 
-> > 
-> > > Another idea is also to expose it using a genpool so it can be 
-> > > accessed as sram from inside the kernel.
-> > 
-> > That may be a fine idea, but as far as our application is concerned, we 
-> > need user-level access to the battery-backed RAM.
-> 
-> Right. I don't see how adding a memory allocator would help either.
-> 
+> -	else
+> -		rc = ata_host_activate(host, irq, ahci_single_level_irq_intr,
+> +	else {
+> +		ahci_irq_handler = hpriv->ahci_irq_intr ? hpriv->ahci_irq_intr :
+> +				   ahci_single_level_irq_intr;
+> +
+> +		rc = ata_host_activate(host, irq, ahci_irq_handler,
+>  				       IRQF_SHARED, sht);
+> +	}
 
-While the immediate need is to use that sram from userspace, I think
-this is valuable to already think that at some point we will need to be
-able to partition and access that sram from the kernel.
+Can you please make this handled the same way as ->start_engine?
+Also, maybe print out a warning message if a driver specifies both
+AHCI_HFLAG_MULTI_MSI[X] and the irq handler override?
 
-
+Thanks.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+tejun
