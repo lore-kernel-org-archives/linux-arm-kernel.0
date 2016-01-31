@@ -1,180 +1,130 @@
 From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Sun, 31 Jan 2016 09:20:59 +0800
-Subject: [PATCH 07/14] ARM: dts: sun8i-a83t: Add basic clocks and resets
+Date: Sun, 31 Jan 2016 09:21:06 +0800
+Subject: [PATCH 14/14] ARM: dts: sun8i: Add A83T based Sinovoip Bpi-M3 Board
 In-Reply-To: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
 References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <1454203266-4450-8-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <1454203266-4450-15-git-send-email-vishnupatekar0510@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds A83T system bus clocks, bus gates, and clock resets.
+This patch adds support for Sinovoip BPI-M3 A83T based board.
 
-For ahb1 and ahb2, it's not clear which reset belongs to ahb1
-or ahb2; so named as ahb_reset0, ahb_reset1, ahb_reset2.
+It has 2G LPDDR3, UART, ethernet, USB, HDMI, USB Sata, MIPI DSI,
+mic, AP6212 Wifi, etc on it.
+It is paired with AXP813 PMIC which is almost same as AXP818.
 
 Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 127 +++++++++++++++++++++++++++++++++++++-
- 1 file changed, 125 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/Makefile                       |  1 +
+ arch/arm/boot/dts/sun8i-a83t-sinovoip-bpi-m3.dts | 88 ++++++++++++++++++++++++
+ 2 files changed, 89 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-a83t-sinovoip-bpi-m3.dts
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 45b725c..568d6fb 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -146,6 +146,98 @@
- 			clocks = <&osc16M>;
- 			clock-output-names = "osc16Md512";
- 		};
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 58e461a..c0dd016 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -694,6 +694,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a33-sinlinx-sina33.dtb \
+ 	sun8i-a83t-allwinner-h8homlet-v2.dtb \
+ 	sun8i-a83t-cubietruck-plus.dtb \
++	sun8i-a83t-sinovoip-bpi-m3.dtb \
+ 	sun8i-h3-orangepi-plus.dtb
+ dtb-$(CONFIG_MACH_SUN9I) += \
+ 	sun9i-a80-optimus.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-a83t-sinovoip-bpi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-sinovoip-bpi-m3.dts
+new file mode 100644
+index 0000000..fecc7dc
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-a83t-sinovoip-bpi-m3.dts
+@@ -0,0 +1,88 @@
++/*
++ * Copyright 2015 Vishnu Patekar
++ * Vishnu Patekar <vishnupatekar0510@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
++/dts-v1/;
++#include "sun8i-a83t.dtsi"
++#include "sunxi-common-regulators.dtsi"
 +
-+		pll6: clk at 01c20028 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun9i-a80-pll4-clk";
-+			reg = <0x01c20028 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "pll6";
-+		};
++/ {
++	model = "Sinovoip BananaPi M3 v1.2";
++	compatible = "sinovoip,bpi-m3", "allwinner,sun8i-a83t";
 +
-+		pll6d2: pll6d2_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clock-div = <2>;
-+			clock-mult = <1>;
-+			clocks = <&pll6>;
-+			clock-output-names = "pll6d2";
-+		};
++	aliases {
++		serial0 = &uart0;
++	};
 +
-+		ahb1: ahb1_clk at 01c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun8i-a83t-ahb1-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&osc16Md512>, <&osc24M>, <&pll6>, <&pll6>;
-+			clock-output-names = "ahb1";
-+		};
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
 +
-+		ahb2: ahb2_clk at 01c2005c {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun8i-h3-ahb2-clk";
-+			reg = <0x01c2005c 0x4>;
-+			clocks = <&ahb1>, <&pll6d2>;
-+			clock-output-names = "ahb2";
-+		};
++&pio {
++	mmc0_cd_pin_bpi_m3: mmc0_cd_pin at 0 {
++		allwinner,pins = "PF6";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++};
 +
-+		apb1: apb1_clk at 01c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun8i-a83t-apb1-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&ahb1>;
-+			clock-output-names = "apb1";
-+		};
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bpi_m3>;
++	vmmc-supply = <&reg_vcc3v0>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
++	bus-width = <4>;
++	cd-inverted;
++	status = "okay";
++};
 +
-+		apb2: clk at 01c20058 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-apb1-clk";
-+			reg = <0x01c20058 0x4>;
-+			clocks = <&osc16Md512>, <&osc24M>, <&pll6>, <&pll6>;
-+			clock-output-names = "apb2";
-+		};
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_b>;
++	status = "okay";
++};
 +
-+		bus_gates: clk at 01c20060 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun8i-a83t-bus-gates-clk";
-+			reg = <0x01c20060 0x10>;
-+			clocks = <&ahb1>, <&ahb2>, <&apb1>, <&apb2>;
-+			clock-names = "ahb1", "ahb2", "apb1", "apb2";
-+			clock-indices = <1>, <5>, <6>,
-+					<8>, <9>, <10>,
-+					<13>, <14>, <17>,
-+					<19>, <20>,
-+					<21>, <24>,
-+					<26>, <27>,
-+					<29>, <32>,
-+					<36>, <37>,
-+					<40>, <43>,
-+					<44>, <52>, <53>,
-+					<54>, <65>,
-+					<69>, <76>, <77>,
-+					<78>, <79>, <96>,
-+					<97>, <98>,
-+					<112>, <113>,
-+					<114>, <115>,
-+					<116>;
-+			clock-output-names = "bus_mipidsi", "bus_ss", "bus_dma",
-+					     "bus_mmc0", "bus_mmc1", "bus_mmc2",
-+					     "bus_nand", "bus_sdram", "bus_emac",
-+					     "bus_hstimer", "bus_spi0",
-+					     "bus_spi1", "bus_usb_drd",
-+					     "bus_ehci0", "bus_ehci1",
-+					     "bus_ohci0", "bus_ve",
-+					     "bus_lcd0", "bus_lcd1",
-+					     "bus_csi", "bus_hdmi",
-+					     "bus_de", "bus_gpu", "bus_msgbox",
-+					     "bus_spinlock", "bus_owa",
-+					     "bus_pio", "bus_i2s0", "bus_i2s1",
-+					     "bus_i2s2", "bus_tdm", "bus_i2c0",
-+					     "bus_i2c1", "bus_i2c2",
-+					     "bus_uart0", "bus_uart1",
-+					     "bus_uart2", "bus_uart3",
-+					     "bus_uart4";
-+		};
- 	};
- 
- 	soc {
-@@ -160,7 +252,7 @@
- 				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
- 			reg = <0x01c20800 0x400>;
--			clocks = <&osc24M>;
-+			clocks = <&bus_gates 69>;
- 			gpio-controller;
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
-@@ -189,6 +281,36 @@
- 			};
- 		};
- 
-+		ahb_reset0: reset at 01c202c0 {
-+			reg = <0x01c202c0 0x4>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			#reset-cells = <1>;
-+		};
-+
-+		ahb_reset1: reset at 01c202c4 {
-+			reg	 = <0x01c202c4 0x4>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			#reset-cells = <1>;
-+		};
-+
-+		ahb_reset2: reset at 01c202c8 {
-+			reg = <0x01c202c8 0x4>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			#reset-cells = <1>;
-+		};
-+
-+		apb1_reset: reset at 01c202d0 {
-+			reg = <0x01c202d0 0x4>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			#reset-cells = <1>;
-+		};
-+
-+		apb2_reset: reset at 01c202d8 {
-+			reg = <0x01c202d8 0x4>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			#reset-cells = <1>;
-+		};
-+
- 		timer at 01c20c00 {
- 			compatible = "allwinner,sun4i-a10-timer";
- 			reg = <0x01c20c00 0xa0>;
-@@ -210,7 +332,8 @@
- 			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc24M>;
-+			clocks = <&bus_gates 112>;
-+			resets = <&apb2_reset 16>;
- 			status = "disabled";
- 		};
- 
++&r_rsb {
++	status = "okay";
++};
 -- 
 1.9.1
