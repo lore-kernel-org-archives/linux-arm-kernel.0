@@ -1,46 +1,51 @@
 From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Sun, 31 Jan 2016 09:20:54 +0800
-Subject: [PATCH 02/14] clk: sunxi: Add apb0 gates for A83T
+Date: Sun, 31 Jan 2016 09:20:55 +0800
+Subject: [PATCH 03/14] clk: sunxi: add bus gates for A83T
 In-Reply-To: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
 References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <1454203266-4450-3-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <1454203266-4450-4-git-send-email-vishnupatekar0510@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-APB0 is part of PRCM, and is compatible with earlier SOCs.
-apb0 gates controls R_PIO, R_UART, R_RSB, etc clocks.
-This patch adds support for APB0 gates for A83T.
+A83T has similar bus gates that of H3, including single gating register has
+different clock parent.
+
+As per H3 and A83T datasheet, usbhost is under AHB2.
+
+However,below shows allwinner source code assignment:
+bits: 26 (ehci0), 27 (ehci1), 29 (ohci0) => AHB1 for A83T.
+bits: 26 (ehci0), 27 (ehci1) => AHB1 for H3
+bits  29, 30, 31(ohci0,1,2) => AHB2 for H3.
+
+until, this confusion is cleared keep it H3 way.
 
 Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
 ---
  Documentation/devicetree/bindings/clock/sunxi.txt | 1 +
- drivers/clk/sunxi/clk-simple-gates.c              | 2 ++
+ drivers/clk/sunxi/clk-sun8i-bus-gates.c           | 2 ++
  2 files changed, 3 insertions(+)
 
 diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index e59f57b..7f19ef5 100644
+index 7f19ef5..4514d77 100644
 --- a/Documentation/devicetree/bindings/clock/sunxi.txt
 +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -39,6 +39,7 @@ Required properties:
- 	"allwinner,sun6i-a31-apb0-clk" - for the APB0 clock on A31
- 	"allwinner,sun8i-a23-apb0-clk" - for the APB0 clock on A23
- 	"allwinner,sun9i-a80-apb0-clk" - for the APB0 bus clock on A80
-+	"allwinner,sun8i-a83t-apb0-gates-clk" - for the APB0 gates on A83T
- 	"allwinner,sun4i-a10-apb0-gates-clk" - for the APB0 gates on A10
- 	"allwinner,sun5i-a13-apb0-gates-clk" - for the APB0 gates on A13
- 	"allwinner,sun5i-a10s-apb0-gates-clk" - for the APB0 gates on A10s
-diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
-index f4da52b..2cfc5a8 100644
---- a/drivers/clk/sunxi/clk-simple-gates.c
-+++ b/drivers/clk/sunxi/clk-simple-gates.c
-@@ -130,6 +130,8 @@ CLK_OF_DECLARE(sun8i_a23_apb2, "allwinner,sun8i-a23-apb2-gates-clk",
- 	       sunxi_simple_gates_init);
- CLK_OF_DECLARE(sun8i_a33_ahb1, "allwinner,sun8i-a33-ahb1-gates-clk",
- 	       sunxi_simple_gates_init);
-+CLK_OF_DECLARE(sun8i_a83t_apb0, "allwinner,sun8i-a83t-apb0-gates-clk",
-+	       sunxi_simple_gates_init);
- CLK_OF_DECLARE(sun9i_a80_ahb0, "allwinner,sun9i-a80-ahb0-gates-clk",
- 	       sunxi_simple_gates_init);
- CLK_OF_DECLARE(sun9i_a80_ahb1, "allwinner,sun9i-a80-ahb1-gates-clk",
+@@ -59,6 +59,7 @@ Required properties:
+ 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+ 	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
+ 	"allwinner,sun8i-h3-bus-gates-clk" - for the bus gates on H3
++	"allwinner,sun8i-a83t-bus-gates-clk" - for the bus gates on A83T
+ 	"allwinner,sun9i-a80-apbs-gates-clk" - for the APBS gates on A80
+ 	"allwinner,sun4i-a10-dram-gates-clk" - for the DRAM gates on A10
+ 	"allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
+diff --git a/drivers/clk/sunxi/clk-sun8i-bus-gates.c b/drivers/clk/sunxi/clk-sun8i-bus-gates.c
+index 1113eb9..63fdb79 100644
+--- a/drivers/clk/sunxi/clk-sun8i-bus-gates.c
++++ b/drivers/clk/sunxi/clk-sun8i-bus-gates.c
+@@ -109,3 +109,5 @@ err_unmap:
+ 
+ CLK_OF_DECLARE(sun8i_h3_bus_gates, "allwinner,sun8i-h3-bus-gates-clk",
+ 	       sun8i_h3_bus_gates_init);
++CLK_OF_DECLARE(sun8i_a83t_bus_gates, "allwinner,sun8i-a83t-bus-gates-clk",
++	       sun8i_h3_bus_gates_init);
 -- 
 1.9.1
