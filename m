@@ -1,32 +1,71 @@
-From: htejun@gmail.com (Tejun Heo)
-Date: Sun, 31 Jan 2016 06:32:49 -0500
-Subject: [PATCH v2 1/3] ata: Remove the AHCI_HFLAG_EDGE_IRQ support from
- libahci.
-In-Reply-To: <1453888197-11368-2-git-send-email-stripathi@apm.com>
-References: <1453888197-11368-1-git-send-email-stripathi@apm.com>
- <1453888197-11368-2-git-send-email-stripathi@apm.com>
-Message-ID: <20160131113249.GW32380@htj.duckdns.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 31 Jan 2016 12:34:09 +0100
+Subject: [PATCH] misc: atmel-secumod: Driver for Atmel "security module".
+In-Reply-To: <alpine.LNX.2.00.1601291055520.23683@nippy.intranet>
+References: <1453348655-31182-1-git-send-email-davidm@egauge.net>
+ <20160125110921.GA4027@piout.net>
+ <CALnQHM13cGnoma_3erb0oCnRD0sYGGNF1E1cgzCJHrEXbvJpRQ@mail.gmail.com>
+ <alpine.LNX.2.00.1601291055520.23683@nippy.intranet>
+Message-ID: <20160131113409.GI20165@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 03:19:55PM +0530, Suman Tripathi wrote:
-> This patch removes the AHCI_HFLAG_EDGE_IRQ support from libahci.
-> The upcoming patches will have the flexibility to override
-> irq handlers in the LLD's. Controller's implementing a EDGE trigger
-> latch can implement their own interrupt handler inside the driver.
+On 29/01/2016 at 11:13:05 +1100, Finn Thain wrote :
 > 
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> On Mon, 25 Jan 2016, David Mosberger wrote:
+> 
+> > On Mon, Jan 25, 2016 at 4:09 AM, Alexandre Belloni 
+> > <alexandre.belloni@free-electrons.com> wrote:
+> > 
+> > > I know this does more than that but I think those thre sections should 
+> > > be registered using the nvmem framework. The sysfs file creation and 
+> > > accesses then comes for free.
+> > 
+> > I think Finn's patches would have to go in for that first, since the 
+> > existing nvram code is a mess. Even with Finn's patches in, I think it 
+> > could go either way.
+> 
+> I think Alexandre is speaking of the nvmem subsystem (not nvram).
+> Documentation/devicetree/bindings/nvmem
+> Documentation/nvmem
+> drivers/nvmem
+> 
 
-Shouldn't this patch come after the irq override is in place?
+absolutely.
 
-1. introduce irq override.
+> > I'm not exactly sure how some of the features of the security module 
+> > would be used: key management, auto erasing, there is a strange "backup 
+> > mode" vs "normal mode" which is not well documented, etc.  So I think it 
+> > may well end up being sufficiently different to warrant a separate 
+> > driver.
+> 
+> nvmem is not a subsystem I am familiar with, so it's not immediately clear 
+> to me what your driver would look like if re-written that way.
+> 
+> Maybe it would become simpler. But if you did end up needing a separate 
+> misc driver as well, maybe use of the nvmem framework would actually 
+> increase complexity.
+> 
+> It would depend on your requirements. But I would focus on the actual 
+> requirement rather than uncertain future possibilities.
+> 
+> > 
+> > > Another idea is also to expose it using a genpool so it can be 
+> > > accessed as sram from inside the kernel.
+> > 
+> > That may be a fine idea, but as far as our application is concerned, we 
+> > need user-level access to the battery-backed RAM.
+> 
+> Right. I don't see how adding a memory allocator would help either.
+> 
 
-2. remove AHCI_HFLAG_EDGE_IRQ by moving the edge triggered handler to
-   ahci_xgene.
+While the immediate need is to use that sram from userspace, I think
+this is valuable to already think that at some point we will need to be
+able to partition and access that sram from the kernel.
 
-3. Update xgene irq handler to address the erratum.
 
-Thanks.
 
 -- 
-tejun
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
