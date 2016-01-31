@@ -1,68 +1,87 @@
 From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Sun, 31 Jan 2016 09:20:57 +0800
-Subject: [PATCH 05/14] clk: sunxi: Add APB1 clock for A83T
+Date: Sun, 31 Jan 2016 09:21:01 +0800
+Subject: [PATCH 09/14] ARM: dts: sun8i-a83t: Add mmc controller nodes
 In-Reply-To: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
 References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <1454203266-4450-6-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <1454203266-4450-10-git-send-email-vishnupatekar0510@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-APB1 is similar to sun4i-a10-apb0-clk, except different dividers.
-
-This adds support for apb1 on A83T.
+A83T mmc is compatible with earliers sunxi socs.
+This adds mmc0, mmc1, and mmc2 controller nodes for A83T.
 
 Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
- drivers/clk/sunxi/clk-sunxi.c                     | 17 +++++++++++++++++
- 2 files changed, 18 insertions(+)
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 57 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index bfd82f1..10637e7 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -49,6 +49,7 @@ Required properties:
- 	"allwinner,sun8i-a23-apb0-gates-clk" - for the APB0 gates on A23
- 	"allwinner,sun9i-a80-apb0-gates-clk" - for the APB0 gates on A80
- 	"allwinner,sun4i-a10-apb1-clk" - for the APB1 clock
-+	"allwinner,sun8i-a83t-apb1-clk" - for the APB1 clock on A83T
- 	"allwinner,sun9i-a80-apb1-clk" - for the APB1 bus clock on A80
- 	"allwinner,sun4i-a10-apb1-gates-clk" - for the APB1 gates on A10
- 	"allwinner,sun5i-a13-apb1-gates-clk" - for the APB1 gates on A13
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 02bbdf6..6510b0e 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -772,6 +772,22 @@ static const struct div_data sun4i_apb0_data __initconst = {
- 	.table	= sun4i_apb0_table,
- };
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index b8c8b60..ac96aa1 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -276,6 +276,63 @@
+ 		#size-cells = <1>;
+ 		ranges;
  
++		mmc0: mmc at 01c0f000 {
++			compatible = "allwinner,sun5i-a13-mmc";
++			reg = <0x01c0f000 0x1000>;
++			clocks = <&bus_gates 8>,
++				 <&mmc0_clk 0>,
++				 <&mmc0_clk 1>,
++				 <&mmc0_clk 2>;
++			clock-names = "ahb",
++				      "mmc",
++				      "output",
++				      "sample";
++			resets = <&ahb_reset0 8>;
++			reset-names = "ahb";
++			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
 +
-+static const struct clk_div_table sun8i_a83t_apb1_table[] __initconst = {
-+	{ .val = 0, .div = 1 },
-+	{ .val = 1, .div = 2 },
-+	{ .val = 2, .div = 3 },
-+	{ .val = 3, .div = 4 },
-+	{ } /* sentinel */
-+};
++		mmc1: mmc at 01c10000 {
++			compatible = "allwinner,sun5i-a13-mmc";
++			reg = <0x01c10000 0x1000>;
++			clocks = <&bus_gates 9>,
++				 <&mmc1_clk 0>,
++				 <&mmc1_clk 1>,
++				 <&mmc1_clk 2>;
++			clock-names = "ahb",
++				      "mmc",
++				      "output",
++				      "sample";
++			resets = <&ahb_reset0 9>;
++			reset-names = "ahb";
++			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
 +
-+static const struct div_data sun8i_a83t_apb1_data __initconst = {
-+	.shift	= 8,
-+	.pow	= 0,
-+	.width	= 2,
-+	.table	= sun8i_a83t_apb1_table,
-+};
++		mmc2: mmc at 01c11000 {
++			compatible = "allwinner,sun5i-a13-mmc";
++			reg = <0x01c11000 0x1000>;
++			clocks = <&bus_gates 10>,
++				 <&mmc2_clk 0>,
++				 <&mmc2_clk 1>,
++				 <&mmc2_clk 2>;
++			clock-names = "ahb",
++				      "mmc",
++				      "output",
++				      "sample";
++			resets = <&ahb_reset0 10>;
++			reset-names = "ahb";
++			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
 +
- static void __init sunxi_divider_clk_setup(struct device_node *node,
- 					   struct div_data *data)
- {
-@@ -1027,6 +1043,7 @@ static const struct of_device_id clk_div_match[] __initconst = {
- 	{.compatible = "allwinner,sun8i-a23-axi-clk", .data = &sun8i_a23_axi_data,},
- 	{.compatible = "allwinner,sun4i-a10-ahb-clk", .data = &sun4i_ahb_data,},
- 	{.compatible = "allwinner,sun4i-a10-apb0-clk", .data = &sun4i_apb0_data,},
-+	{.compatible = "allwinner,sun8i-a83t-apb1-clk", .data = &sun8i_a83t_apb1_data,},
- 	{}
- };
- 
+ 		pio: pinctrl at 01c20800 {
+ 			compatible = "allwinner,sun8i-a83t-pinctrl";
+ 			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
 -- 
 1.9.1
