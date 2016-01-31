@@ -1,57 +1,60 @@
 From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Sun, 31 Jan 2016 09:21:05 +0800
-Subject: [PATCH 13/14] ARM: dts: sun8i: enable mmc for H8Homlet Board.
+Date: Sun, 31 Jan 2016 09:21:00 +0800
+Subject: [PATCH 08/14] ARM: dts: sun8i-a83t: add mmc clock nodes
 In-Reply-To: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
 References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <1454203266-4450-14-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <1454203266-4450-9-git-send-email-vishnupatekar0510@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables mmc0.
+mmc clocks are compatible with that of earlier sun8i socs.
+This adds mmc0, mmc1, and mmc2 clock nodes for A83T.
 
 Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
-Tested-by: LABBE Corentin <clabbe.montjoie@gmail.com>
 ---
- .../boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts    | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts b/arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts
-index 342e1d3..6c1f598 100644
---- a/arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts
-@@ -43,6 +43,7 @@
- 
- /dts-v1/;
- #include "sun8i-a83t.dtsi"
-+#include "sunxi-common-regulators.dtsi"
- 
- / {
- 	model = "Allwinner A83T H8Homlet Proto Dev Board v2.0";
-@@ -57,6 +58,25 @@
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index 568d6fb..b8c8b60 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -238,6 +238,36 @@
+ 					     "bus_uart2", "bus_uart3",
+ 					     "bus_uart4";
+ 		};
++
++		mmc0_clk: clk at 01c20088 {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun4i-a10-mmc-clk";
++			reg = <0x01c20088 0x4>;
++			clocks = <&osc24M>, <&pll6>;
++			clock-output-names = "mmc0",
++					     "mmc0_output",
++					     "mmc0_sample";
++		};
++
++		mmc1_clk: clk at 01c2008c {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun4i-a10-mmc-clk";
++			reg = <0x01c2008c 0x4>;
++			clocks = <&osc24M>, <&pll6>;
++			clock-output-names = "mmc1",
++					     "mmc1_output",
++					     "mmc1_sample";
++		};
++
++		mmc2_clk: clk at 01c20090 {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun4i-a10-mmc-clk";
++			reg = <0x01c20090 0x4>;
++			clocks = <&osc24M>, <&pll6>;
++			clock-output-names = "mmc2",
++					     "mmc2_output",
++					     "mmc2_sample";
++		};
  	};
- };
  
-+&pio {
-+	mmc0_cd_pin_h8homlet: mmc0_cd_pin at 0 {
-+		allwinner,pins = "PF6";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_h8homlet>;
-+	vmmc-supply = <&reg_vcc3v0>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
-+	bus-width = <4>;
-+	cd-inverted;
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_b>;
+ 	soc {
 -- 
 1.9.1
