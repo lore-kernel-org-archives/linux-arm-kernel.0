@@ -1,92 +1,112 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  1 Feb 2016 14:18:57 +0100
-Subject: [PATCH] ARM: nomadik: fix up SD/MMC DT settings
-Message-ID: <1454332737-631-1-git-send-email-linus.walleij@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 1 Feb 2016 14:20:42 +0100
+Subject: [PATCH v2 07/21] arm64: KVM: VHE: Patch out kern_hyp_va
+In-Reply-To: <1453737235-16522-8-git-send-email-marc.zyngier@arm.com>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <1453737235-16522-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160201132042.GJ1478@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DTSI file for the Nomadik does not properly specify how the
-PL180 levelshifter is connected: the Nomadik actually needs all
-the five st,sig-dir-* flags set to properly control all lines out.
+On Mon, Jan 25, 2016 at 03:53:41PM +0000, Marc Zyngier wrote:
+> The kern_hyp_va macro is pretty meaninless with VHE, as there is
+> only one mapping - the kernel one.
+> 
+> In order to keep the code readable and efficient, use runtime
+> patching to replace the 'and' instruction used to compute the VA
+> with a 'nop'.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_mmu.h | 11 ++++++++++-
+>  arch/arm64/kvm/hyp/hyp.h         | 25 ++++++++++++++++++++++---
+>  2 files changed, 32 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index d3e6d7b..62f0d14 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -23,13 +23,16 @@
+>  #include <asm/cpufeature.h>
+>  
+>  /*
+> - * As we only have the TTBR0_EL2 register, we cannot express
+> + * As ARMv8.0 only has the TTBR0_EL2 register, we cannot express
+>   * "negative" addresses. This makes it impossible to directly share
+>   * mappings with the kernel.
+>   *
+>   * Instead, give the HYP mode its own VA region at a fixed offset from
+>   * the kernel by just masking the top bits (which are all ones for a
+>   * kernel address).
+> + *
+> + * ARMv8.1 (using VHE) does have a TTBR1_EL2, and doesn't use these
+> + * macros (the entire kernel runs at EL2).
+>   */
+>  #define HYP_PAGE_OFFSET_SHIFT	VA_BITS
+>  #define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
+> @@ -56,6 +59,8 @@
+>  
+>  #ifdef __ASSEMBLY__
+>  
+> +#include <asm/alternative.h>
+> +#include <asm/cpufeature.h>
+>  #include <asm/kvm_arm.h>
+>  
+>  .macro setup_vtcr tmp1, tmp2
+> @@ -84,7 +89,11 @@
+>   * reg: VA to be converted.
+>   */
+>  .macro kern_hyp_va	reg
+> +alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
+>  	and	\reg, \reg, #HYP_PAGE_OFFSET_MASK
+> +alternative_else
+> +	nop
+> +alternative_endif
+>  .endm
+>  
+>  #else
+> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+> index fb27517..fc502f3 100644
+> --- a/arch/arm64/kvm/hyp/hyp.h
+> +++ b/arch/arm64/kvm/hyp/hyp.h
+> @@ -25,9 +25,28 @@
+>  
+>  #define __hyp_text __section(.hyp.text) notrace
+>  
+> -#define kern_hyp_va(v) (typeof(v))((unsigned long)(v) & HYP_PAGE_OFFSET_MASK)
+> -#define hyp_kern_va(v) (typeof(v))((unsigned long)(v) - HYP_PAGE_OFFSET \
+> -						      + PAGE_OFFSET)
+> +static inline unsigned long __kern_hyp_va(unsigned long v)
+> +{
+> +	asm volatile(ALTERNATIVE("and %0, %0, %1",
+> +				 "nop",
+> +				 ARM64_HAS_VIRT_HOST_EXTN)
+> +		     : "+r" (v) : "i" (HYP_PAGE_OFFSET_MASK));
+> +	return v;
+> +}
+> +
+> +#define kern_hyp_va(v) (typeof(v))(__kern_hyp_va((unsigned long)(v)))
+> +
+> +static inline unsigned long __hyp_kern_va(unsigned long v)
+> +{
+> +	u64 offset = PAGE_OFFSET - HYP_PAGE_OFFSET;
+> +	asm volatile(ALTERNATIVE("add %0, %0, %1",
+> +				 "nop",
+> +				 ARM64_HAS_VIRT_HOST_EXTN)
+> +		     : "+r" (v) : "r" (offset));
+> +	return v;
+> +}
+> +
+> +#define hyp_kern_va(v) (typeof(v))(__hyp_kern_va((unsigned long)(v)))
 
-Further this board supports full power cycling of the card, and
-since this variant has no hardware clock gating, it needs a
-ridiculously low frequency setting to keep up with the ever
-overflowing FIFO.
+why do we need this casting of values instead of just defining these
+inlines and calling them directly with proper typing?
 
-The pin configuration set-up is a bit of a mystery, because of
-course these pins are a mix of inputs and outputs. However the
-reference implementation sets all pins to "output" with
-unspecified initial value, so let's do that here as well.
+-Christoffer
 
-Cc: stable at vger.kernel.org
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC folks: this fixes the non-working SD/MMC card on the
-Nomadik please apply this directly for fixes if Ulf is OK with
-it.
----
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 37 ++++++++++++++++--------------
- 1 file changed, 20 insertions(+), 17 deletions(-)
-
-diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-index 50c256f0fd98..b1707f6217bf 100644
---- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-+++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-@@ -128,22 +128,14 @@
- 			};
- 			mmcsd_default_mode: mmcsd_default {
- 				mmcsd_default_cfg1 {
--					/* MCCLK */
--					pins = "GPIO8_B10";
--					ste,output = <0>;
--				};
--				mmcsd_default_cfg2 {
--					/* MCCMDDIR, MCDAT0DIR, MCDAT31DIR, MCDATDIR2 */
--					pins = "GPIO10_C11", "GPIO15_A12",
--					"GPIO16_C13", "GPIO23_D15";
--					ste,output = <1>;
--				};
--				mmcsd_default_cfg3 {
--					/* MCCMD, MCDAT3-0, MCMSFBCLK */
--					pins = "GPIO9_A10", "GPIO11_B11",
--					"GPIO12_A11", "GPIO13_C12",
--					"GPIO14_B12", "GPIO24_C15";
--					ste,input = <1>;
-+					/*
-+					 * MCCLK, MCCMDDIR, MCDAT0DIR, MCDAT31DIR, MCDATDIR2
-+					 * MCCMD, MCDAT3-0, MCMSFBCLK
-+					 */
-+					pins = "GPIO8_B10", "GPIO9_A10", "GPIO10_C11", "GPIO11_B11",
-+					       "GPIO12_A11", "GPIO13_C12", "GPIO14_B12", "GPIO15_A12",
-+					       "GPIO16_C13", "GPIO23_D15", "GPIO24_C15";
-+					ste,output = <2>;
- 				};
- 			};
- 		};
-@@ -803,10 +795,21 @@
- 			clock-names = "mclk", "apb_pclk";
- 			interrupt-parent = <&vica>;
- 			interrupts = <22>;
--			max-frequency = <48000000>;
-+			max-frequency = <400000>;
- 			bus-width = <4>;
- 			cap-mmc-highspeed;
- 			cap-sd-highspeed;
-+			full-pwr-cycle;
-+			/*
-+			 * The STw4811 circuit used with the Nomadik strictly
-+			 * requires that all of these signal direction pins be
-+			 * routed and used for its 4-bit levelshifter.
-+			 */
-+			st,sig-dir-dat0;
-+			st,sig-dir-dat2;
-+			st,sig-dir-dat31;
-+			st,sig-dir-cmd;
-+			st,sig-pin-fbclk;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&mmcsd_default_mux>, <&mmcsd_default_mode>;
- 			vmmc-supply = <&vmmc_regulator>;
--- 
-2.4.3
+>  
+>  /**
+>   * hyp_alternate_select - Generates patchable code sequences that are
+> -- 
+> 2.1.4
+> 
