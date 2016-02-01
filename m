@@ -1,46 +1,37 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 1 Feb 2016 21:55:07 +0800
-Subject: [PATCH 10/15] bus: imx-weim: use of_platform_default_populate()
- to populate default bus
-In-Reply-To: <1453868872-26300-11-git-send-email-wangkefeng.wang@huawei.com>
-References: <1453868872-26300-1-git-send-email-wangkefeng.wang@huawei.com>
- <1453868872-26300-11-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <20160201135507.GJ10671@tiger>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 1 Feb 2016 14:57:36 +0100
+Subject: [PATCH] PM / Domains: mark genpd_poweron as __maybe_unused
+In-Reply-To: <3864075.BdhPDUQ9fB@wuerfel>
+References: <3864075.BdhPDUQ9fB@wuerfel>
+Message-ID: <CAPDyKFpHBgaQEz6kYvhV=2pLPLAtVxQjbnqL4CPv0vyvHZbHWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 12:27:47PM +0800, Kefeng Wang wrote:
-> Use helper of_platform_default_populate() in linux/of_platform
-> when possible, instead of calling of_platform_populate() with
-> the default match table.
-> 
-> Cc: Signed-off-by: Huang Shijie <b32955@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+On 1 February 2016 at 11:38, Arnd Bergmann <arnd@arndb.de> wrote:
+> The rework of the power domain code has made the genpd_poweron()
+> function local to the file it's defined in, and the only remaining
+> caller is conditionally compiled based on CONFIG_PM_GENERIC_DOMAINS_OF,
+> so we get a warning when that is disabled:
+>
+> drivers/base/power/domain.c:234:12: error: 'genpd_poweron' defined but not used [-Werror=unused-function]
+>
+> This adds a __maybe_unused annotation to the function so gcc can
+> figure out by itself that it should silently remove the definition
+> in this case.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: ea823c7cbffa ("PM / Domains: Remove pm_genpd_poweron() API")
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Arnd,
 
-> ---
->  drivers/bus/imx-weim.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
-> index e98d15e..557a71c 100644
-> --- a/drivers/bus/imx-weim.c
-> +++ b/drivers/bus/imx-weim.c
-> @@ -163,9 +163,8 @@ static int __init weim_parse_dt(struct platform_device *pdev,
->  	}
->  
->  	if (have_child)
-> -		ret = of_platform_populate(pdev->dev.of_node,
-> -				   of_default_bus_match_table,
-> -				   NULL, &pdev->dev);
-> +		ret = of_platform_default_populate(pdev->dev.of_node,
-> +						   NULL, &pdev->dev);
->  	if (ret)
->  		dev_err(&pdev->dev, "%s fail to create devices.\n",
->  			pdev->dev.of_node->full_name);
-> -- 
-> 2.6.0.GIT
-> 
-> 
+Thanks for fixing and reporting!
+
+Looking a bit closer to the genpd code in this reagrds, made me
+realize that I think there's a better approach to fix this.
+Instead of going into the details for how, I decided to send a
+separate patch. You are on cc.
+
+"[PATCH] PM / Domains: Silence compiler warning for an unused function".
+
+Kind regards
+Uffe
