@@ -1,13 +1,11 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon,  1 Feb 2016 18:28:18 +0000
-Subject: [PATCH 2/3] pinctrl: single: remove misuse of IRQF_NO_SUSPEND flag
+Date: Mon,  1 Feb 2016 18:28:19 +0000
+Subject: [PATCH 3/3] ARM: OMAP2+: remove misuse of IRQF_NO_SUSPEND flag
 In-Reply-To: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
 References: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1454351299-27440-3-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1454351299-27440-4-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-From: Sudeep Holla <Sudeep.Holla@arm.com>
 
 The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
 be left enabled so as to allow them to work as expected during the
@@ -16,45 +14,82 @@ from a suspended state, enable_irq_wake is recommended to be used for
 the wakeup.
 
 This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
-irq_set_irq_wake instead.
+enable_irq_wake instead.
 
-Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: linux-gpio at vger.kernel.org
+Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: linux-omap at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/pinctrl/pinctrl-single.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/mux.c        | 4 ++--
+ arch/arm/mach-omap2/pm34xx.c     | 9 ++++-----
+ arch/arm/mach-omap2/prm_common.c | 1 +
+ 3 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-index fb126d56ad40..03977a75a9e2 100644
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -1619,12 +1619,14 @@ static void pcs_irq_unmask(struct irq_data *d)
-  */
- static int pcs_irq_set_wake(struct irq_data *d, unsigned int state)
- {
-+	struct pcs_soc_data *pcs_soc = irq_data_get_irq_chip_data(d);
-+
- 	if (state)
- 		pcs_irq_unmask(d);
- 	else
- 		pcs_irq_mask(d);
+diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+index 176eef6ef338..12012bef8e63 100644
+--- a/arch/arm/mach-omap2/mux.c
++++ b/arch/arm/mach-omap2/mux.c
+@@ -810,13 +810,13 @@ int __init omap_mux_late_init(void)
+ 		return 0;
+ 
+ 	ret = request_irq(omap_prcm_event_to_irq("io"),
+-		omap_hwmod_mux_handle_irq, IRQF_SHARED | IRQF_NO_SUSPEND,
++		omap_hwmod_mux_handle_irq, IRQF_SHARED,
+ 			"hwmod_io", omap_mux_late_init);
+ 
+ 	if (ret)
+ 		pr_warn("mux: Failed to setup hwmod io irq %d\n", ret);
  
 -	return 0;
-+	return irq_set_irq_wake(pcs_soc->irq, state);
++	return enable_irq_wake(omap_prcm_event_to_irq("io"));
  }
  
- /**
-@@ -1760,8 +1762,7 @@ static int pcs_irq_init_chained_handler(struct pcs_device *pcs,
- 		int res;
+ static void __init omap_mux_package_fixup(struct omap_mux *p,
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 2dbd3785ee6f..49604e0023c4 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -472,23 +472,22 @@ int __init omap3_pm_init(void)
+ 	prcm_setup_regs();
  
- 		res = request_irq(pcs_soc->irq, pcs_irq_handler,
--				  IRQF_SHARED | IRQF_NO_SUSPEND |
--				  IRQF_NO_THREAD,
-+				  IRQF_SHARED | IRQF_NO_THREAD,
- 				  name, pcs_soc);
- 		if (res) {
- 			pcs_soc->irq = -1;
+ 	ret = request_irq(omap_prcm_event_to_irq("wkup"),
+-		_prcm_int_handle_wakeup, IRQF_NO_SUSPEND, "pm_wkup", NULL);
++		_prcm_int_handle_wakeup, 0, "pm_wkup", NULL);
+ 
+ 	if (ret) {
+ 		pr_err("pm: Failed to request pm_wkup irq\n");
+ 		goto err1;
+ 	}
++	enable_irq_wake(omap_prcm_event_to_irq("wkup"));
+ 
+ 	/* IO interrupt is shared with mux code */
+ 	ret = request_irq(omap_prcm_event_to_irq("io"),
+-		_prcm_int_handle_io, IRQF_SHARED | IRQF_NO_SUSPEND, "pm_io",
+-		omap3_pm_init);
+-	enable_irq(omap_prcm_event_to_irq("io"));
+-
++		_prcm_int_handle_io, IRQF_SHARED, "pm_io", omap3_pm_init);
+ 	if (ret) {
+ 		pr_err("pm: Failed to request pm_io irq\n");
+ 		goto err2;
+ 	}
++	enable_irq_wake(omap_prcm_event_to_irq("io"));
+ 
+ 	ret = pwrdm_for_each(pwrdms_setup, NULL);
+ 	if (ret) {
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index 5b2f5138d938..7af688273e0d 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -338,6 +338,7 @@ int omap_prcm_register_chain_handler(struct omap_prcm_irq_setup *irq_setup)
+ 		ct->chip.irq_ack = irq_gc_ack_set_bit;
+ 		ct->chip.irq_mask = irq_gc_mask_clr_bit;
+ 		ct->chip.irq_unmask = irq_gc_mask_set_bit;
++		ct->chip.flags = IRQCHIP_SKIP_SET_WAKE;
+ 
+ 		ct->regs.ack = irq_setup->ack + i * 4;
+ 		ct->regs.mask = irq_setup->mask + i * 4;
 -- 
 1.9.1
