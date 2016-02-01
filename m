@@ -1,39 +1,129 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  1 Feb 2016 09:55:45 +0100
-Subject: [PATCH 1/3] ARM: realview: activate SMP on the default defconfig
-Message-ID: <1454316945-4426-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon,  1 Feb 2016 09:55:55 +0100
+Subject: [PATCH 2/3] ARM: realview: delete realview-smp_defconfig
+Message-ID: <1454316955-4474-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The realview has two defconfigs: realview_defconfig and
-realview-smp_defconfig. We now have working SMP_ON_UP so
-make them equal so we can delete the -smp variant. For
-some reason NO_HZ_FULL was missing from the plain
-realview_defconfig.
+We enabled SMP in the realview_defconfig so delete the
+SMP-specific defconfig.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/configs/realview_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/configs/realview-smp_defconfig | 105 --------------------------------
+ 1 file changed, 105 deletions(-)
+ delete mode 100644 arch/arm/configs/realview-smp_defconfig
 
-diff --git a/arch/arm/configs/realview_defconfig b/arch/arm/configs/realview_defconfig
-index 8f56fb3ff51d..9f84c508a5f4 100644
---- a/arch/arm/configs/realview_defconfig
-+++ b/arch/arm/configs/realview_defconfig
-@@ -1,5 +1,6 @@
- # CONFIG_SWAP is not set
- CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ_FULL=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_LOG_BUF_SHIFT=14
- CONFIG_PERF_EVENTS=y
-@@ -21,6 +22,7 @@ CONFIG_MACH_REALVIEW_PB11MP=y
- CONFIG_MACH_REALVIEW_PB1176=y
- CONFIG_MACH_REALVIEW_PBA8=y
- CONFIG_MACH_REALVIEW_PBX=y
-+CONFIG_SMP=y
- CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
+diff --git a/arch/arm/configs/realview-smp_defconfig b/arch/arm/configs/realview-smp_defconfig
+deleted file mode 100644
+index 93efdcfcf98f..000000000000
+--- a/arch/arm/configs/realview-smp_defconfig
++++ /dev/null
+@@ -1,105 +0,0 @@
+-# CONFIG_SWAP is not set
+-CONFIG_SYSVIPC=y
+-CONFIG_NO_HZ_FULL=y
+-CONFIG_NO_HZ=y
+-CONFIG_HIGH_RES_TIMERS=y
+-CONFIG_LOG_BUF_SHIFT=14
+-CONFIG_PERF_EVENTS=y
+-CONFIG_SLAB=y
+-CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
+-# CONFIG_BLK_DEV_BSG is not set
+-# CONFIG_IOSCHED_CFQ is not set
+-CONFIG_ARCH_MULTI_V6=y
+-CONFIG_ARCH_REALVIEW=y
+-CONFIG_REALVIEW_DT=y
+-CONFIG_MACH_REALVIEW_EB=y
+-CONFIG_REALVIEW_EB_ARM1136=y
+-CONFIG_REALVIEW_EB_ARM1176=y
+-CONFIG_REALVIEW_EB_A9MP=y
+-CONFIG_REALVIEW_EB_ARM11MP=y
+-CONFIG_REALVIEW_EB_ARM11MP_REVB=y
+-CONFIG_MACH_REALVIEW_PB11MP=y
+-CONFIG_MACH_REALVIEW_PB1176=y
+-CONFIG_MACH_REALVIEW_PBA8=y
+-CONFIG_MACH_REALVIEW_PBX=y
+-CONFIG_SMP=y
+-CONFIG_AEABI=y
+-CONFIG_ZBOOT_ROM_TEXT=0x0
+-CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_CMDLINE="root=/dev/nfs nfsroot=10.1.69.3:/work/nfsroot ip=dhcp console=ttyAMA0 mem=128M"
+-CONFIG_VFP=y
+-CONFIG_NET=y
+-CONFIG_PACKET=y
+-CONFIG_UNIX=y
+-CONFIG_INET=y
+-CONFIG_IP_PNP=y
+-CONFIG_IP_PNP_DHCP=y
+-CONFIG_IP_PNP_BOOTP=y
+-# CONFIG_INET_LRO is not set
+-# CONFIG_IPV6 is not set
+-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+-CONFIG_MTD=y
+-CONFIG_MTD_CMDLINE_PARTS=y
+-CONFIG_MTD_AFS_PARTS=y
+-CONFIG_MTD_BLOCK=y
+-CONFIG_MTD_CFI=y
+-CONFIG_MTD_CFI_INTELEXT=y
+-CONFIG_MTD_CFI_AMDSTD=y
+-CONFIG_MTD_ROM=y
+-CONFIG_MTD_PHYSMAP=y
+-CONFIG_ARM_CHARLCD=y
+-CONFIG_NETDEVICES=y
+-CONFIG_SMC91X=y
+-CONFIG_SMSC911X=y
+-CONFIG_SMSC_PHY=y
+-# CONFIG_SERIO_SERPORT is not set
+-CONFIG_SERIO_AMBAKMI=y
+-CONFIG_LEGACY_PTY_COUNT=16
+-CONFIG_SERIAL_AMBA_PL011=y
+-CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+-# CONFIG_HW_RANDOM is not set
+-CONFIG_I2C=y
+-CONFIG_I2C_VERSATILE=y
+-CONFIG_SPI=y
+-CONFIG_GPIOLIB=y
+-# CONFIG_HWMON is not set
+-CONFIG_FB=y
+-CONFIG_FB_ARMCLCD=y
+-CONFIG_FRAMEBUFFER_CONSOLE=y
+-CONFIG_LOGO=y
+-# CONFIG_LOGO_LINUX_MONO is not set
+-# CONFIG_LOGO_LINUX_VGA16 is not set
+-CONFIG_SOUND=y
+-CONFIG_SND=y
+-CONFIG_SND_MIXER_OSS=y
+-CONFIG_SND_PCM_OSS=y
+-# CONFIG_SND_DRIVERS is not set
+-CONFIG_SND_ARMAACI=y
+-CONFIG_USB=y
+-CONFIG_USB_ISP1760=y
+-CONFIG_MMC=y
+-CONFIG_MMC_ARMMMCI=y
+-CONFIG_NEW_LEDS=y
+-CONFIG_LEDS_CLASS=y
+-CONFIG_LEDS_VERSATILE=y
+-CONFIG_LEDS_TRIGGERS=y
+-CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+-CONFIG_LEDS_TRIGGER_CPU=y
+-CONFIG_RTC_CLASS=y
+-CONFIG_RTC_DRV_DS1307=y
+-CONFIG_RTC_DRV_PL031=y
+-CONFIG_VFAT_FS=y
+-CONFIG_TMPFS=y
+-CONFIG_CRAMFS=y
+-CONFIG_NFS_FS=y
+-CONFIG_ROOT_NFS=y
+-CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_ISO8859_1=y
+-CONFIG_DEBUG_FS=y
+-CONFIG_MAGIC_SYSRQ=y
+-CONFIG_DEBUG_KERNEL=y
+-# CONFIG_SCHED_DEBUG is not set
+-# CONFIG_FTRACE is not set
+-CONFIG_DEBUG_USER=y
+-# CONFIG_CRYPTO_HW is not set
 -- 
 2.4.3
