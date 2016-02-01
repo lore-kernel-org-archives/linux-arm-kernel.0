@@ -1,55 +1,56 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 1 Feb 2016 13:06:49 +0800
-Subject: [PATCH v8 2/2] drm/bridge: Add I2C based driver for ps8640 bridge
-In-Reply-To: <1454300012-32552-2-git-send-email-jitao.shi@mediatek.com>
-Message-ID: <201602011353.NBSd9H5X%fengguang.wu@intel.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Mon, 01 Feb 2016 00:46:20 -0500
+Subject: [PATCH 0/3] ACPI: parse the SPCR table
+In-Reply-To: <20160127134559.1065a45f@lxorguk.ukuu.org.uk>
+References: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>	<56A6494E.3090303@hurleysoftware.com>	<56A8B570.2060501@linaro.org>
+ <20160127134559.1065a45f@lxorguk.ukuu.org.uk>
+Message-ID: <56AEF12C.7060801@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jitao,
+On 01/27/2016 08:45 AM, One Thousand Gnomes wrote:
+> On Wed, 27 Jan 2016 15:17:52 +0300
+> Aleksey Makarov <aleksey.makarov@linaro.org> wrote:
+> 
+>> On 01/25/2016 07:11 PM, Peter Hurley wrote:
+>>> On 01/25/2016 03:45 AM, Aleksey Makarov wrote:  
+>>>> This patchset is based on the patchset by Leif Lindholm [1]
+>>>>
+>>>> 'ARM Server Base Boot Requirements' [2] mention SPCR 
+>>>> (Serial Port Console Redirection Table) [3] as a mandatory
+>>>> ACPI table that specifies the configuration of serial console.
+>>>>
+>>>> Licensing concerns have prevented implementing it in the past, but as of
+>>>> 10 August 2015, these tables have both been released also under 
+>>>> OWF 1.0 [4].  
+>>>
+>>> This license has a patent retaliation provision, which makes it
+>>> incompatible with GPLv2.
+>>>
+>>> *If the license applies to this code*, then this patch set does not
+>>> meet the criteria for submission.  
+>>
+>> The license applies not to this code but to the document describing the tables.
+>>
+>> Here is an excerpt from it:
+>>
+>>   Patent Notice:
+>>   Microsoft is making certain patent rights available for implementations of this specification under two options:
+>>   1)  Microsoft?s Community Promise, available at
+>>   http://www.microsoft.com/openspecifications/en/us/programs/community-promise/default.aspx; or
+>>   2)  The Open Web Foundation Final Specification Agreement Version 1.0 ("OWF 1.0")
+>>   as of October 1, 2012, available at http://www.openwebfoundation.org/legal/the-owf-1-0-agreements/owfa-1-0. 
+>>
+>> I believe that it means that the patch set meets the criteria for submission.  Am I right?
+> 
+> This is not a forum for legal advice. I would suggest that Linaro
+> discusses it privately with the Linux Foundation and Linus and does so
+> under attorney-client privilege. The Linux Foundation does have some
+> reasons to exist.
 
-[auto build test ERROR on drm/drm-next]
-[also build test ERROR on v4.5-rc2 next-20160129]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Thanks for the reply, Alan. Can folks discuss and let me know off list
+if another license change is subsequently requested for this table? I
+spoke with Microsoft about this and they graciously made the previous
+license change. I am willing to connect additional dots off-list.
 
-url:    https://github.com/0day-ci/linux/commits/Jitao-Shi/Documentation-bridge-Add-documentation-for-ps8640-DT-properties/20160201-121553
-base:   git://people.freedesktop.org/~airlied/linux.git drm-next
-config: x86_64-allmodconfig (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
-
-All error/warnings (new ones prefixed by >>):
-
-   drivers/gpu/drm/bridge/parade-ps8640.c: In function 'ps8640_bridge_attach':
->> drivers/gpu/drm/bridge/parade-ps8640.c:400:10: error: implicit declaration of function 'of_find_mipi_dsi_host_by_node' [-Werror=implicit-function-declaration]
-      host = of_find_mipi_dsi_host_by_node(dsi_node);
-             ^
->> drivers/gpu/drm/bridge/parade-ps8640.c:400:8: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-      host = of_find_mipi_dsi_host_by_node(dsi_node);
-           ^
-   cc1: some warnings being treated as errors
-
-vim +/of_find_mipi_dsi_host_by_node +400 drivers/gpu/drm/bridge/parade-ps8640.c
-
-   394			if (in_ep) {
-   395				dsi_node = of_graph_get_remote_port_parent(in_ep);
-   396				of_node_put(in_ep);
-   397			}
-   398		}
-   399		if (dsi_node) {
- > 400			host = of_find_mipi_dsi_host_by_node(dsi_node);
-   401			of_node_put(dsi_node);
-   402			if (!host)
-   403				return -ENODEV;
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 50940 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160201/840ceb65/attachment-0001.obj>
+Jon.
