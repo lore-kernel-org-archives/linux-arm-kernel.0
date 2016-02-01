@@ -1,143 +1,77 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 1 Feb 2016 14:59:09 +0100
-Subject: [PATCH v2 11/21] arm64: KVM: VHE: Use unified system register
- accessors
-In-Reply-To: <1453737235-16522-12-git-send-email-marc.zyngier@arm.com>
+Date: Mon, 1 Feb 2016 14:59:14 +0100
+Subject: [PATCH v2 01/21] arm/arm64: Add new is_kernel_in_hyp_mode
+ predicate
+In-Reply-To: <1453737235-16522-2-git-send-email-marc.zyngier@arm.com>
 References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <1453737235-16522-12-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160201135909.GM1478@cbox>
+ <1453737235-16522-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160201135914.GN1478@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 03:53:45PM +0000, Marc Zyngier wrote:
-> Use the recently introduced unified system register accessors for
-> those sysregs that behave differently depending on VHE being in
-> use or not.
+On Mon, Jan 25, 2016 at 03:53:35PM +0000, Marc Zyngier wrote:
+> With ARMv8.1 VHE extension, it will be possible to run the kernel
+> at EL2 (aka HYP mode). In order for the kernel to easily find out
+> where it is running, add a new predicate that returns whether or
+> not the kernel is in HYP mode.
+> 
+> For completeness, the 32bit code also get such a predicate (always
+> returning false) so that code common to both architecture (timers,
+> KVM) can use it transparently.
 > 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
 > ---
->  arch/arm64/kvm/hyp/sysreg-sr.c | 84 +++++++++++++++++++++---------------------
->  1 file changed, 42 insertions(+), 42 deletions(-)
+>  arch/arm/include/asm/virt.h   |  5 +++++
+>  arch/arm64/include/asm/virt.h | 10 ++++++++++
+>  2 files changed, 15 insertions(+)
 > 
-> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-> index 61bad17..7d7d757 100644
-> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
-> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-> @@ -37,34 +37,34 @@ static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
->  	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
->  	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
->  	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
-> -	ctxt->gp_regs.regs.pc		= read_sysreg(elr_el2);
-> -	ctxt->gp_regs.regs.pstate	= read_sysreg(spsr_el2);
-> +	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
-> +	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
->  }
->  
->  static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
+> diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
+> index 4371f45..b6a3cef 100644
+> --- a/arch/arm/include/asm/virt.h
+> +++ b/arch/arm/include/asm/virt.h
+> @@ -74,6 +74,11 @@ static inline bool is_hyp_mode_mismatched(void)
 >  {
->  	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
->  	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
-> -	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg(sctlr_el1);
-> -	ctxt->sys_regs[CPACR_EL1]	= read_sysreg(cpacr_el1);
-> -	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg(ttbr0_el1);
-> -	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg(ttbr1_el1);
-> -	ctxt->sys_regs[TCR_EL1]		= read_sysreg(tcr_el1);
-> -	ctxt->sys_regs[ESR_EL1]		= read_sysreg(esr_el1);
-> -	ctxt->sys_regs[AFSR0_EL1]	= read_sysreg(afsr0_el1);
-> -	ctxt->sys_regs[AFSR1_EL1]	= read_sysreg(afsr1_el1);
-> -	ctxt->sys_regs[FAR_EL1]		= read_sysreg(far_el1);
-> -	ctxt->sys_regs[MAIR_EL1]	= read_sysreg(mair_el1);
-> -	ctxt->sys_regs[VBAR_EL1]	= read_sysreg(vbar_el1);
-> -	ctxt->sys_regs[CONTEXTIDR_EL1]	= read_sysreg(contextidr_el1);
-> -	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg(amair_el1);
-> -	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg(cntkctl_el1);
-> +	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg_el1(sctlr);
-> +	ctxt->sys_regs[CPACR_EL1]	= read_sysreg_el1(cpacr);
-> +	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg_el1(ttbr0);
-> +	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg_el1(ttbr1);
-> +	ctxt->sys_regs[TCR_EL1]		= read_sysreg_el1(tcr);
-> +	ctxt->sys_regs[ESR_EL1]		= read_sysreg_el1(esr);
-> +	ctxt->sys_regs[AFSR0_EL1]	= read_sysreg_el1(afsr0);
-> +	ctxt->sys_regs[AFSR1_EL1]	= read_sysreg_el1(afsr1);
-> +	ctxt->sys_regs[FAR_EL1]		= read_sysreg_el1(far);
-> +	ctxt->sys_regs[MAIR_EL1]	= read_sysreg_el1(mair);
-> +	ctxt->sys_regs[VBAR_EL1]	= read_sysreg_el1(vbar);
-> +	ctxt->sys_regs[CONTEXTIDR_EL1]	= read_sysreg_el1(contextidr);
-> +	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg_el1(amair);
-> +	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg_el1(cntkctl);
->  	ctxt->sys_regs[PAR_EL1]		= read_sysreg(par_el1);
->  	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
->  
->  	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
-> -	ctxt->gp_regs.elr_el1		= read_sysreg(elr_el1);
-> -	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg(spsr_el1);
-> +	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
-> +	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg_el1(spsr);
+>  	return !!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH);
 >  }
->  
->  void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
-> @@ -86,34 +86,34 @@ static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctx
->  	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
->  	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
->  	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
-> -	write_sysreg(ctxt->gp_regs.regs.pc,	  elr_el2);
-> -	write_sysreg(ctxt->gp_regs.regs.pstate,	  spsr_el2);
-> +	write_sysreg_el2(ctxt->gp_regs.regs.pc,	  elr);
-> +	write_sysreg_el2(ctxt->gp_regs.regs.pstate, spsr);
->  }
->  
->  static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
->  {
-> -	write_sysreg(ctxt->sys_regs[MPIDR_EL1],	  vmpidr_el2);
-> -	write_sysreg(ctxt->sys_regs[CSSELR_EL1],  csselr_el1);
-> -	write_sysreg(ctxt->sys_regs[SCTLR_EL1],	  sctlr_el1);
-> -	write_sysreg(ctxt->sys_regs[CPACR_EL1],	  cpacr_el1);
-> -	write_sysreg(ctxt->sys_regs[TTBR0_EL1],	  ttbr0_el1);
-> -	write_sysreg(ctxt->sys_regs[TTBR1_EL1],	  ttbr1_el1);
-> -	write_sysreg(ctxt->sys_regs[TCR_EL1],	  tcr_el1);
-> -	write_sysreg(ctxt->sys_regs[ESR_EL1],	  esr_el1);
-> -	write_sysreg(ctxt->sys_regs[AFSR0_EL1],	  afsr0_el1);
-> -	write_sysreg(ctxt->sys_regs[AFSR1_EL1],	  afsr1_el1);
-> -	write_sysreg(ctxt->sys_regs[FAR_EL1],	  far_el1);
-> -	write_sysreg(ctxt->sys_regs[MAIR_EL1],	  mair_el1);
-> -	write_sysreg(ctxt->sys_regs[VBAR_EL1],	  vbar_el1);
-> -	write_sysreg(ctxt->sys_regs[CONTEXTIDR_EL1], contextidr_el1);
-> -	write_sysreg(ctxt->sys_regs[AMAIR_EL1],	  amair_el1);
-> -	write_sysreg(ctxt->sys_regs[CNTKCTL_EL1], cntkctl_el1);
-> -	write_sysreg(ctxt->sys_regs[PAR_EL1],	  par_el1);
-> -	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
-> -
-> -	write_sysreg(ctxt->gp_regs.sp_el1,	sp_el1);
-> -	write_sysreg(ctxt->gp_regs.elr_el1,	elr_el1);
-> -	write_sysreg(ctxt->gp_regs.spsr[KVM_SPSR_EL1], spsr_el1);
-> +	write_sysreg(ctxt->sys_regs[MPIDR_EL1],		vmpidr_el2);
-> +	write_sysreg(ctxt->sys_regs[CSSELR_EL1],	csselr_el1);
-> +	write_sysreg_el1(ctxt->sys_regs[SCTLR_EL1],	sctlr);
-> +	write_sysreg_el1(ctxt->sys_regs[CPACR_EL1],	cpacr);
-> +	write_sysreg_el1(ctxt->sys_regs[TTBR0_EL1],	ttbr0);
-> +	write_sysreg_el1(ctxt->sys_regs[TTBR1_EL1],	ttbr1);
-> +	write_sysreg_el1(ctxt->sys_regs[TCR_EL1],	tcr);
-> +	write_sysreg_el1(ctxt->sys_regs[ESR_EL1],	esr);
-> +	write_sysreg_el1(ctxt->sys_regs[AFSR0_EL1],	afsr0);
-> +	write_sysreg_el1(ctxt->sys_regs[AFSR1_EL1],	afsr1);
-> +	write_sysreg_el1(ctxt->sys_regs[FAR_EL1],	far);
-> +	write_sysreg_el1(ctxt->sys_regs[MAIR_EL1],	mair);
-> +	write_sysreg_el1(ctxt->sys_regs[VBAR_EL1],	vbar);
-> +	write_sysreg_el1(ctxt->sys_regs[CONTEXTIDR_EL1],contextidr);
-> +	write_sysreg_el1(ctxt->sys_regs[AMAIR_EL1],	amair);
-> +	write_sysreg_el1(ctxt->sys_regs[CNTKCTL_EL1], 	cntkctl);
-> +	write_sysreg(ctxt->sys_regs[PAR_EL1],		par_el1);
-> +	write_sysreg(ctxt->sys_regs[MDSCR_EL1],		mdscr_el1);
 > +
-> +	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
-> +	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
-> +	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
+> +static inline bool is_kernel_in_hyp_mode(void)
+> +{
+> +	return false;
+> +}
+>  #endif
+>  
+>  #endif /* __ASSEMBLY__ */
+> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+> index 7a5df52..9f22dd6 100644
+> --- a/arch/arm64/include/asm/virt.h
+> +++ b/arch/arm64/include/asm/virt.h
+> @@ -23,6 +23,8 @@
+>  
+>  #ifndef __ASSEMBLY__
+>  
+> +#include <asm/ptrace.h>
+> +
+>  /*
+>   * __boot_cpu_mode records what mode CPUs were booted in.
+>   * A correctly-implemented bootloader must start all CPUs in the same mode:
+> @@ -50,6 +52,14 @@ static inline bool is_hyp_mode_mismatched(void)
+>  	return __boot_cpu_mode[0] != __boot_cpu_mode[1];
 >  }
 >  
->  void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
+> +static inline bool is_kernel_in_hyp_mode(void)
+> +{
+> +	u64 el;
+> +
+> +	asm("mrs %0, CurrentEL" : "=r" (el));
+> +	return el == CurrentEL_EL2;
+> +}
+> +
+>  /* The section containing the hypervisor text */
+>  extern char __hyp_text_start[];
+>  extern char __hyp_text_end[];
 > -- 
 > 2.1.4
 > 
