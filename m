@@ -1,31 +1,61 @@
-From: swise@opengridcomputing.com (Steve Wise)
-Date: Mon, 1 Feb 2016 10:45:04 -0600
-Subject: [PATCH] infiniband: cxgb4: use %pR format string for printing
- resources
-In-Reply-To: <2278867.O0SM8nbQp0@wuerfel>
-References: <2278867.O0SM8nbQp0@wuerfel>
-Message-ID: <025701d15d0f$e67ed760$b37c8620$@opengridcomputing.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Feb 2016 17:45:39 +0100
+Subject: [PATCH] [media] mx3_camera: use %pad format string for dma_ddr_t
+Message-ID: <1527735.0V0q3NFh2C@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The mx3_camera driver prints DMA addresses using the "%x" format
+string, which is wrong when using a 64-bit dma_addr_t definition:
 
-> Subject: [PATCH] infiniband: cxgb4: use %pR format string for printing resources
-> 
-> The cxgb4 prints an MMIO resource using the "0x%x" and "%p" format
-> strings on the length and start, respective, but that
-> triggers a compiler warning when using a 64-bit resource_size_t
-> on a 32-bit architecture:
-> 
-> drivers/infiniband/hw/cxgb4/device.c: In function 'c4iw_rdev_open':
-> drivers/infiniband/hw/cxgb4/device.c:807:7: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
->        (void *)pci_resource_start(rdev->lldi.pdev, 2),
-> 
-> This changes the format string to use %pR instead, which pretty-prints
-> the resource, avoids the warning and is shorter.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> This is an old warning I see rarely on ARM randconfig builds.
+media/platform/soc_camera/mx3_camera.c: In function 'mx3_cam_dma_done':
+media/platform/soc_camera/mx3_camera.c:149:125: error: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'dma_addr_t {aka long long unsigned int}' [-Werror=format=]
+media/platform/soc_camera/mx3_camera.c: In function 'mx3_videobuf_queue':
+media/platform/soc_camera/mx3_camera.c:317:119: error: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'dma_addr_t {aka long long unsigned int}' [-Werror=format=]
+media/platform/soc_camera/mx3_camera.c: In function 'mx3_videobuf_release':
+media/platform/soc_camera/mx3_camera.c:346:119: error: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'dma_addr_t {aka long long unsigned int}' [-Werror=format=]
 
+This changes the code to use the special %pad format string, which
+always does the right thing.
 
-Acked-by: Steve Wise <swise@opengridcomputing.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+Another old bug that only rarely shows up in ARM randconfigs.
+
+diff --git a/drivers/media/platform/soc_camera/mx3_camera.c b/drivers/media/platform/soc_camera/mx3_camera.c
+index 169ed1150226..aa39e9569b1a 100644
+--- a/drivers/media/platform/soc_camera/mx3_camera.c
++++ b/drivers/media/platform/soc_camera/mx3_camera.c
+@@ -146,8 +146,8 @@ static void mx3_cam_dma_done(void *arg)
+ 	struct idmac_channel *ichannel = to_idmac_chan(chan);
+ 	struct mx3_camera_dev *mx3_cam = ichannel->client;
+ 
+-	dev_dbg(chan->device->dev, "callback cookie %d, active DMA 0x%08x\n",
+-		desc->txd.cookie, mx3_cam->active ? sg_dma_address(&mx3_cam->active->sg) : 0);
++	dev_dbg(chan->device->dev, "callback cookie %d, active DMA %pad\n",
++		desc->txd.cookie, mx3_cam->active ? &sg_dma_address(&mx3_cam->active->sg) : NULL);
+ 
+ 	spin_lock(&mx3_cam->lock);
+ 	if (mx3_cam->active) {
+@@ -314,8 +314,8 @@ static void mx3_videobuf_queue(struct vb2_buffer *vb)
+ 	spin_unlock_irq(&mx3_cam->lock);
+ 
+ 	cookie = txd->tx_submit(txd);
+-	dev_dbg(icd->parent, "Submitted cookie %d DMA 0x%08x\n",
+-		cookie, sg_dma_address(&buf->sg));
++	dev_dbg(icd->parent, "Submitted cookie %d DMA %pad\n",
++		cookie, &sg_dma_address(&buf->sg));
+ 
+ 	if (cookie >= 0)
+ 		return;
+@@ -344,8 +344,8 @@ static void mx3_videobuf_release(struct vb2_buffer *vb)
+ 	unsigned long flags;
+ 
+ 	dev_dbg(icd->parent,
+-		"Release%s DMA 0x%08x, queue %sempty\n",
+-		mx3_cam->active == buf ? " active" : "", sg_dma_address(&buf->sg),
++		"Release%s DMA %pad, queue %sempty\n",
++		mx3_cam->active == buf ? " active" : "", &sg_dma_address(&buf->sg),
+ 		list_empty(&buf->queue) ? "" : "not ");
+ 
+ 	spin_lock_irqsave(&mx3_cam->lock, flags);
