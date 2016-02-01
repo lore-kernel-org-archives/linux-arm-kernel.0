@@ -1,124 +1,345 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 1 Feb 2016 20:32:32 +0100
-Subject: [PATCH 1/2] clk: sunxi: delay protected clocks until arch initcall
-In-Reply-To: <56A91245.3090706@collabora.co.uk>
-References: <1453385439-10154-1-git-send-email-emilio.lopez@collabora.co.uk>
- <1453385439-10154-2-git-send-email-emilio.lopez@collabora.co.uk>
- <20160127153722.GC4317@lukather> <56A91245.3090706@collabora.co.uk>
-Message-ID: <20160201193232.GG4652@lukather>
+From: dhdang@apm.com (Duc Dang)
+Date: Mon, 1 Feb 2016 11:38:08 -0800
+Subject: [PATCH v4 1/3] mailbox: Add support for APM X-Gene platform
+ mailbox driver
+In-Reply-To: <abff73c051fd06a9dd3b04a1e7957ad5a9b69a18.1452912126.git.dhdang@apm.com>
+References: <CABb+yY2zHycEmsVvp8OFwpJ1PZgrEPpV-oOe56wgFJ=EE0nTcg@mail.gmail.com>
+ <cover.1452912126.git.dhdang@apm.com>
+ <abff73c051fd06a9dd3b04a1e7957ad5a9b69a18.1452912126.git.dhdang@apm.com>
+Message-ID: <CADaLNDmSiK27wYBSo8-DsafmG5jUumUR5WYgConeSFXGNjH6+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jassi,
 
-On Wed, Jan 27, 2016 at 03:53:57PM -0300, Emilio L?pez wrote:
-> Hi Maxime,
-> 
-> El 27/01/16 a las 12:37, Maxime Ripard escribi?:
-> >Hi Emilio,
-> >
-> >On Thu, Jan 21, 2016 at 11:10:38AM -0300, Emilio L?pez wrote:
-> >>Clocks are registered early on, and unused clocks get disabled on
-> >>late initcall, so we can delay protecting important clocks a bit.
-> >>If we do this too early, it may happen that some clocks are orphans
-> >>and therefore enabling them may not work as intended. If we do this
-> >>too late, a driver may reparent some clock and cause another important
-> >>clock to be disabled as a byproduct.
-> >>
-> >>arch_initcall should be a good spot to do this, as clock drivers using
-> >>the OF mechanisms will be all registered by then, and drivers won't
-> >>have started probing yet.
-> >>
-> >>Signed-off-by: Emilio L?pez <emilio.lopez@collabora.co.uk>
-> >>---
-> >>  drivers/clk/sunxi/clk-sunxi.c | 22 ++++++++++++++++++----
-> >>  1 file changed, 18 insertions(+), 4 deletions(-)
-> >>
-> >>diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> >>index 5ba2188..285e8ee 100644
-> >>--- a/drivers/clk/sunxi/clk-sunxi.c
-> >>+++ b/drivers/clk/sunxi/clk-sunxi.c
-> >>@@ -1153,10 +1153,12 @@ static void __init of_sunxi_table_clock_setup(const struct of_device_id *clk_mat
-> >>  	}
-> >>  }
-> >>
-> >>+/* By default, don't protect any clocks */
-> >>+static const char **protected_clocks __initdata;
-> >>+static int protected_clocks_nr __initdata;
-> >>+
-> >>  static void __init sunxi_init_clocks(const char *clocks[], int nclocks)
-> >>  {
-> >>-	unsigned int i;
-> >>-
-> >>  	/* Register divided output clocks */
-> >>  	of_sunxi_table_clock_setup(clk_divs_match, sunxi_divs_clk_setup);
-> >>
-> >>@@ -1169,14 +1171,26 @@ static void __init sunxi_init_clocks(const char *clocks[], int nclocks)
-> >>  	/* Register mux clocks */
-> >>  	of_sunxi_table_clock_setup(clk_mux_match, sunxi_mux_clk_setup);
-> >>
-> >>+	/* We shall protect these clocks when everything is ready */
-> >>+	protected_clocks = clocks;
-> >>+	protected_clocks_nr = nclocks;
-> >>+}
-> >>+
-> >>+static int __init sunxi_init_clock_protection(void)
-> >>+{
-> >>+	unsigned int i;
-> >>+
-> >>  	/* Protect the clocks that needs to stay on */
-> >>-	for (i = 0; i < nclocks; i++) {
-> >>-		struct clk *clk = clk_get(NULL, clocks[i]);
-> >>+	for (i = 0; i < protected_clocks_nr; i++) {
-> >>+		struct clk *clk = clk_get(NULL, protected_clocks[i]);
-> >>
-> >>  		if (!IS_ERR(clk))
-> >>  			clk_prepare_enable(clk);
-> >>  	}
-> >>+
-> >>+	return 0;
-> >>  }
-> >>+arch_initcall(sunxi_init_clock_protection);
-> >
-> >You also need to filter that by the machine compatible in case you're
-> >running it on a !sunxi SoC.
-> 
-> protected_clocks_nr will be 0 on a !sunxi machine, so this is effectively a
-> noop there.
+On Fri, Jan 15, 2016 at 6:57 PM, Duc Dang <dhdang@apm.com> wrote:
+> X-Gene mailbox controller provides 8 mailbox channels, with
+> each channel has a dedicated interrupt line.
 
-Ah, yes, good point.
+Did you have a chance to look into this version 4 of my mail-box patch?
 
-> >Overall, I'm a bit skeptical about the approach. It doesn't really fix
-> >everything, just hides it behind a curtain, and I'm pretty sure the
-> >clocks not registered by this code would still be broken (the mod0
-> >clocks for example).
-> 
-> This is only meant to solve the problems observed when trying to grab
-> critical clocks before letting all the basic/OF clock types register. The
-> actual clock trees are complete once all the built-in clock compatibles are
-> probed, so this just pushes the protection after that point in time. The
-> plan on the long term should be to use the CCF-built-in clock protection,
-> once it's finished and merged, but it's not here yet.
-> 
-> Regarding your example, I'm not aware of any critical mod0 clocks (not that
-> it should matter, as they won't be orphans either).
-
-My bad, the A13 mbus clock is one. The A23 is one too.
-
-Both of these are probed through CLK_OF_DECLARE, and use directly
-clk_prepare_enable on the clock given back by clk_register, which
-won't work in your case.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160201/f9b58d28/attachment.sig>
+Regards,
+Duc Dang.
+>
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> Signed-off-by: Duc Dang <dhdang@apm.com>
+> ---
+> Changes since v3:
+>         - Rebase over v4.4
+>         - Remove 'id' in slimpro_mbox_chan structure
+>         - Remove small functions that are only called once
+>         and fold them into the other callers
+>         - Remove void* pointer type cast
+>         - Relax the number of mailbox IRQs condition
+>         - Use subsys_initcall to guarantee mailbox driver
+>         will be registered before any other dependent driver
+>         is loaded.
+>
+>  drivers/mailbox/Kconfig                 |   9 ++
+>  drivers/mailbox/Makefile                |   2 +
+>  drivers/mailbox/mailbox-xgene-slimpro.c | 265 ++++++++++++++++++++++++++++++++
+>  3 files changed, 276 insertions(+)
+>  create mode 100644 drivers/mailbox/mailbox-xgene-slimpro.c
+>
+> diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+> index 546d05f..678e434 100644
+> --- a/drivers/mailbox/Kconfig
+> +++ b/drivers/mailbox/Kconfig
+> @@ -85,4 +85,13 @@ config MAILBOX_TEST
+>           Test client to help with testing new Controller driver
+>           implementations.
+>
+> +config XGENE_SLIMPRO_MBOX
+> +       tristate "APM SoC X-Gene SLIMpro Mailbox Controller"
+> +       depends on ARCH_XGENE
+> +       help
+> +         An implementation of the APM X-Gene Interprocessor Communication
+> +         Mailbox (IPCM) between the ARM 64-bit cores and SLIMpro controller.
+> +         It is used to send short messages between ARM64-bit cores and
+> +         the SLIMpro Management Engine, primarily for PM. Say Y here if you
+> +         want to use the APM X-Gene SLIMpro IPCM support.
+>  endif
+> diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
+> index 92435ef..b602ef8 100644
+> --- a/drivers/mailbox/Makefile
+> +++ b/drivers/mailbox/Makefile
+> @@ -17,3 +17,5 @@ obj-$(CONFIG_ALTERA_MBOX)     += mailbox-altera.o
+>  obj-$(CONFIG_BCM2835_MBOX)     += bcm2835-mailbox.o
+>
+>  obj-$(CONFIG_STI_MBOX)         += mailbox-sti.o
+> +
+> +obj-$(CONFIG_XGENE_SLIMPRO_MBOX) += mailbox-xgene-slimpro.o
+> diff --git a/drivers/mailbox/mailbox-xgene-slimpro.c b/drivers/mailbox/mailbox-xgene-slimpro.c
+> new file mode 100644
+> index 0000000..a7b0c9e
+> --- /dev/null
+> +++ b/drivers/mailbox/mailbox-xgene-slimpro.c
+> @@ -0,0 +1,265 @@
+> +/*
+> + * APM X-Gene SLIMpro MailBox Driver
+> + *
+> + * Copyright (c) 2015, Applied Micro Circuits Corporation
+> + * Author: Feng Kan fkan at apm.com
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
+> + *
+> + */
+> +#include <linux/acpi.h>
+> +#include <linux/delay.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/mailbox_controller.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/spinlock.h>
+> +
+> +#define MBOX_CON_NAME                  "slimpro-mbox"
+> +#define MBOX_REG_SET_OFFSET            0x1000
+> +#define MBOX_CNT                       8
+> +#define MBOX_STATUS_AVAIL_MASK         BIT(16)
+> +#define MBOX_STATUS_ACK_MASK           BIT(0)
+> +
+> +/* Configuration and Status Registers */
+> +#define REG_DB_IN              0x00
+> +#define REG_DB_DIN0            0x04
+> +#define REG_DB_DIN1            0x08
+> +#define REG_DB_OUT             0x10
+> +#define REG_DB_DOUT0           0x14
+> +#define REG_DB_DOUT1           0x18
+> +#define REG_DB_STAT            0x20
+> +#define REG_DB_STATMASK                0x24
+> +
+> +struct slimpro_mbox_chan {
+> +       struct device *dev;
+> +       struct mbox_chan *chan;
+> +       void __iomem *reg;
+> +       int irq;
+> +       u32 rx_msg[3];
+> +};
+> +
+> +struct slimpro_mbox {
+> +       struct mbox_controller mb_ctrl;
+> +       struct slimpro_mbox_chan mc[MBOX_CNT];
+> +       struct mbox_chan chans[MBOX_CNT];
+> +};
+> +
+> +static void mb_chan_send_msg(struct slimpro_mbox_chan *mb_chan, u32 *msg)
+> +{
+> +       writel(msg[1], mb_chan->reg + REG_DB_DOUT0);
+> +       writel(msg[2], mb_chan->reg + REG_DB_DOUT1);
+> +       writel(msg[0], mb_chan->reg + REG_DB_OUT);
+> +}
+> +
+> +static void mb_chan_recv_msg(struct slimpro_mbox_chan *mb_chan)
+> +{
+> +       mb_chan->rx_msg[1] = readl(mb_chan->reg + REG_DB_DIN0);
+> +       mb_chan->rx_msg[2] = readl(mb_chan->reg + REG_DB_DIN1);
+> +       mb_chan->rx_msg[0] = readl(mb_chan->reg + REG_DB_IN);
+> +}
+> +
+> +static int mb_chan_status_ack(struct slimpro_mbox_chan *mb_chan)
+> +{
+> +       u32 val = readl(mb_chan->reg + REG_DB_STAT);
+> +
+> +       if (val & MBOX_STATUS_ACK_MASK) {
+> +               writel(MBOX_STATUS_ACK_MASK, mb_chan->reg + REG_DB_STAT);
+> +               return 1;
+> +       }
+> +       return 0;
+> +}
+> +
+> +static int mb_chan_status_avail(struct slimpro_mbox_chan *mb_chan)
+> +{
+> +       u32 val = readl(mb_chan->reg + REG_DB_STAT);
+> +
+> +       if (val & MBOX_STATUS_AVAIL_MASK) {
+> +               mb_chan_recv_msg(mb_chan);
+> +               writel(MBOX_STATUS_AVAIL_MASK, mb_chan->reg + REG_DB_STAT);
+> +               return 1;
+> +       }
+> +       return 0;
+> +}
+> +
+> +static irqreturn_t slimpro_mbox_irq(int irq, void *id)
+> +{
+> +       struct slimpro_mbox_chan *mb_chan = id;
+> +
+> +       if (mb_chan_status_ack(mb_chan))
+> +               mbox_chan_txdone(mb_chan->chan, 0);
+> +
+> +       if (mb_chan_status_avail(mb_chan))
+> +               mbox_chan_received_data(mb_chan->chan, mb_chan->rx_msg);
+> +
+> +       return IRQ_HANDLED;
+> +}
+> +
+> +static int slimpro_mbox_send_data(struct mbox_chan *chan, void *msg)
+> +{
+> +       struct slimpro_mbox_chan *mb_chan = chan->con_priv;
+> +
+> +       mb_chan_send_msg(mb_chan, msg);
+> +       return 0;
+> +}
+> +
+> +static int slimpro_mbox_startup(struct mbox_chan *chan)
+> +{
+> +       struct slimpro_mbox_chan *mb_chan = chan->con_priv;
+> +       int rc;
+> +       u32 val;
+> +
+> +       rc = devm_request_irq(mb_chan->dev, mb_chan->irq, slimpro_mbox_irq, 0,
+> +                             MBOX_CON_NAME, mb_chan);
+> +       if (unlikely(rc)) {
+> +               dev_err(mb_chan->dev, "failed to register mailbox interrupt %d\n",
+> +                       mb_chan->irq);
+> +               return rc;
+> +       }
+> +
+> +       /* Enable HW interrupt */
+> +       writel(MBOX_STATUS_ACK_MASK | MBOX_STATUS_AVAIL_MASK,
+> +              mb_chan->reg + REG_DB_STAT);
+> +       /* Unmask doorbell status interrupt */
+> +       val = readl(mb_chan->reg + REG_DB_STATMASK);
+> +       val &= ~(MBOX_STATUS_ACK_MASK | MBOX_STATUS_AVAIL_MASK);
+> +       writel(val, mb_chan->reg + REG_DB_STATMASK);
+> +
+> +       return 0;
+> +}
+> +
+> +static void slimpro_mbox_shutdown(struct mbox_chan *chan)
+> +{
+> +       struct slimpro_mbox_chan *mb_chan = chan->con_priv;
+> +       u32 val;
+> +
+> +       /* Mask doorbell status interrupt */
+> +       val = readl(mb_chan->reg + REG_DB_STATMASK);
+> +       val |= (MBOX_STATUS_ACK_MASK | MBOX_STATUS_AVAIL_MASK);
+> +       writel(val, mb_chan->reg + REG_DB_STATMASK);
+> +
+> +       devm_free_irq(mb_chan->dev, mb_chan->irq, mb_chan);
+> +}
+> +
+> +static struct mbox_chan_ops slimpro_mbox_ops = {
+> +       .send_data = slimpro_mbox_send_data,
+> +       .startup = slimpro_mbox_startup,
+> +       .shutdown = slimpro_mbox_shutdown,
+> +};
+> +
+> +static int __init slimpro_mbox_probe(struct platform_device *pdev)
+> +{
+> +       struct slimpro_mbox *ctx;
+> +       struct resource *regs;
+> +       void __iomem *mb_base;
+> +       int rc;
+> +       int i;
+> +
+> +       ctx = devm_kzalloc(&pdev->dev, sizeof(struct slimpro_mbox), GFP_KERNEL);
+> +       if (IS_ERR(ctx))
+> +               return PTR_ERR(ctx);
+> +
+> +       platform_set_drvdata(pdev, ctx);
+> +
+> +       regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       mb_base = devm_ioremap(&pdev->dev, regs->start, resource_size(regs));
+> +       if (IS_ERR(mb_base))
+> +               return PTR_ERR(mb_base);
+> +
+> +       /* Setup mailbox links */
+> +       for (i = 0; i < MBOX_CNT; i++) {
+> +               ctx->mc[i].irq = platform_get_irq(pdev, i);
+> +               if (ctx->mc[i].irq < 0) {
+> +                       if (i == 0) {
+> +                               dev_err(&pdev->dev, "no available IRQ\n");
+> +                               return -EINVAL;
+> +                       }
+> +                       dev_info(&pdev->dev, "no IRQ at index %d\n",
+> +                               ctx->mc[i].irq);
+> +                       break;
+> +               }
+> +
+> +               ctx->mc[i].dev = &pdev->dev;
+> +               ctx->mc[i].reg = mb_base + i * MBOX_REG_SET_OFFSET;
+> +               ctx->mc[i].chan = &ctx->chans[i];
+> +               ctx->chans[i].con_priv = &ctx->mc[i];
+> +       }
+> +
+> +       /* Setup mailbox controller */
+> +       ctx->mb_ctrl.dev = &pdev->dev;
+> +       ctx->mb_ctrl.chans = ctx->chans;
+> +       ctx->mb_ctrl.txdone_irq = true;
+> +       ctx->mb_ctrl.ops = &slimpro_mbox_ops;
+> +       ctx->mb_ctrl.num_chans = i;
+> +
+> +       rc = mbox_controller_register(&ctx->mb_ctrl);
+> +       if (rc) {
+> +               dev_err(&pdev->dev,
+> +                       "APM X-Gene SLIMpro MailBox register failed:%d\n", rc);
+> +               return rc;
+> +       }
+> +
+> +       dev_info(&pdev->dev, "APM X-Gene SLIMpro MailBox registered\n");
+> +       return 0;
+> +}
+> +
+> +static int slimpro_mbox_remove(struct platform_device *pdev)
+> +{
+> +       struct slimpro_mbox *smb = platform_get_drvdata(pdev);
+> +
+> +       mbox_controller_unregister(&smb->mb_ctrl);
+> +       return 0;
+> +}
+> +
+> +static const struct of_device_id slimpro_of_match[] = {
+> +       {.compatible = "apm,xgene-slimpro-mbox" },
+> +       { },
+> +};
+> +MODULE_DEVICE_TABLE(of, slimpro_of_match);
+> +
+> +#ifdef CONFIG_ACPI
+> +static const struct acpi_device_id slimpro_acpi_ids[] = {
+> +       {"APMC0D01", 0},
+> +       {}
+> +};
+> +MODULE_DEVICE_TABLE(acpi, slimpro_acpi_ids);
+> +#endif
+> +
+> +static struct platform_driver slimpro_mbox_driver = {
+> +       .probe  = slimpro_mbox_probe,
+> +       .remove = slimpro_mbox_remove,
+> +       .driver = {
+> +               .name = "xgene-slimpro-mbox",
+> +               .of_match_table = of_match_ptr(slimpro_of_match),
+> +               .acpi_match_table = ACPI_PTR(slimpro_acpi_ids)
+> +       },
+> +};
+> +
+> +static int __init slimpro_mbox_init(void)
+> +{
+> +       return platform_driver_register(&slimpro_mbox_driver);
+> +}
+> +
+> +static void __exit slimpro_mbox_exit(void)
+> +{
+> +       platform_driver_unregister(&slimpro_mbox_driver);
+> +}
+> +
+> +subsys_initcall(slimpro_mbox_init);
+> +module_exit(slimpro_mbox_exit);
+> +
+> +MODULE_DESCRIPTION("APM X-Gene SLIMpro Mailbox Driver");
+> +MODULE_LICENSE("GPL");
+> --
+> 1.9.1
+>
