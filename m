@@ -1,70 +1,125 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Mon, 1 Feb 2016 19:09:44 +0100
-Subject: [PATCH v3 05/12] arm64, acpi, numa: NUMA support based on SRAT
- and SLIT
-In-Reply-To: <1453541967-3744-6-git-send-email-guohanjun@huawei.com>
-References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
- <1453541967-3744-6-git-send-email-guohanjun@huawei.com>
-Message-ID: <20160201180944.GV24726@rric.localdomain>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 1 Feb 2016 10:11:35 -0800
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <CAPDyKFoQHpqdCa4fzHycP0OT2KsNTxWm7JZSe8Mauh+rxqGtGg@mail.gmail.com>
+References: <20160126224804.GB19432@atomide.com>
+ <CAJZ5v0i79X5JjOZiu4cOZ0Esd5BxAvutF8d17asDzq9ECcML-g@mail.gmail.com>
+ <20160126232212.GE19432@atomide.com>
+ <CAJZ5v0gTRvyWHVmYNb8Q1QZzhVhokXo541+48mFyDRYv7Hi-Uw@mail.gmail.com>
+ <20160126235222.GF19432@atomide.com>
+ <CAPDyKFqD6Y6HcgVds_oWBZ8L7Kdh2VX_WZCGApf-1a_6GHCQ5g@mail.gmail.com>
+ <20160128165810.GA19432@atomide.com>
+ <CAPDyKFoQHpqdCa4fzHycP0OT2KsNTxWm7JZSe8Mauh+rxqGtGg@mail.gmail.com>
+Message-ID: <20160201181135.GL19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.01.16 17:39:20, Hanjun Guo wrote:
+* Ulf Hansson <ulf.hansson@linaro.org> [160201 08:45]:
+> On 28 January 2016 at 17:58, Tony Lindgren <tony@atomide.com> wrote:
+> >
+> > The MMC hardware will not get idled properly any longer blocking any
+> > deeper idle states.
+> >
+> >> Did the driver not probe successfully the second try? If so, what happened.
+> >
+> > It probes fine after a -EPROBE_DEFER on the vmmc i2c regulator.
+> > But the PM runtime usecounts are wrong.
+> 
+> Okay. How did you verify this?
 
-> @@ -385,10 +386,8 @@ void __init arm64_numa_init(void)
->  {
->  	int ret = -ENODEV;
->  
-> -#ifdef CONFIG_OF_NUMA
->  	if (!numa_off)
-> -		ret = numa_init(arm64_of_numa_init);
-> -#endif
-> +		ret = numa_init(acpi_disabled ? arm64_of_numa_init : arm64_acpi_numa_init);
->  
->  	if (ret)
->  		numa_init(dummy_numa_init);
+Well that was just based on what I see in the dmesg:
 
-Ok, this style is mostly flavor, some people want #ifdefs (my
-preference), some not. In any case it must build with or without the
-config option set. But first some words why I like #ifdefs:
+omap_device: omap_device_enable() called from invalid state 1
 
- * Code is easier to understand as you don't need to look at any other
-   location whether it is enabled or not.
+> I think the easiest way would be to make sure the usage count is
+> *one*, just before the omap_hsmmc calls mmc_add_host() in its
+> ->probe() function.
+> 
+> If it's *two*, that confirms this theory.
 
- * You can't break the build if the options are not set. Thus, you
-   also don't need to check if the function is implemented for the
-   unset case (valid for the coder and also the reviewer). This makes
-   things a lot easier.
+Here's with use count dumped for one MMC:
 
- * Total number of lines of code that needs to be implement is
-   smaller.
+omap_hsmmc 4809c000.mmc: GPIO lookup for consumer cd
+omap_hsmmc 4809c000.mmc: using device tree for GPIO lookup
+omap_hsmmc 4809c000.mmc: Got CD GPIO
+omap_hsmmc 4809c000.mmc: GPIO lookup for consumer wp
+omap_hsmmc 4809c000.mmc: using device tree for GPIO lookup
+omap_hsmmc 4809c000.mmc: using lookup tables for GPIO lookup
+omap_hsmmc 4809c000.mmc: lookup for GPIO wp failed
+omap_hsmmc 4809c000.mmc: GPIO lookup for consumer cd
+omap_hsmmc 4809c000.mmc: using device tree for GPIO lookup
+omap_hsmmc 4809c000.mmc: Got CD GPIO
+omap_hsmmc 4809c000.mmc: GPIO lookup for consumer wp
+omap_hsmmc 4809c000.mmc: using device tree for GPIO lookup
+omap_hsmmc 4809c000.mmc: using lookup tables for GPIO lookup
+omap_hsmmc 4809c000.mmc: lookup for GPIO wp failed
+omap_hsmmc 4809c000.mmc: omap_device: omap_device_enable() called from invalid state 1
+omap_hsmmc 4809c000.mmc: PM runtime use count: 0
 
-However, if we don't ifdef the code, we need empty functions stubs in
-the header file for them.
+So it seems you're right, it's the state not the count.
 
-Also, the conditional assignment does not reduce the complexity of the
-paths. It just concentrates everything in a single line.
+> > So one of the failing cases seems to be:
+> >
+> > 1. Device driver probe sets pm_runtime_set_autosuspend_delay()
+> 
+> Only when "someone" in-before has set the autosuspend delay to a
+> negative value, this will affect the usage count.
+> 
+> I didn't find any in-kernel user that would set this for the
+> omap_hsmmc device, so it needs to be done from userspace via sysfs. It
+> would be really great if you could help to confirm this.
 
-How about the following (similar to x86)?
+No nothing is setting that from userspace.
 
-----
-	if (!numa_off) {
-#ifdef CONFIG_ACPI_NUMA
-		if (!numa_init(acpi_numa_init))
-			return 0;
-#endif
-#ifdef CONFIG_OF_NUMA
-		if (!numa_init(of_numa_init))
-			return 0;
-#endif
-	}
+> But more importantly, I fail to understand why commit 5de85b9d57ab
+> ("PM / runtime: Re-init runtime PM states at probe error and driver
+> unbind"), is changing the behaviour in this regards.
+> Potentially we might have a different runtime PM status than we had
+> before when probing the second try, but how could that mess up the
+> usage count...?
 
-	return numa_init(dummy_numa_init);
-----
+Yes I think you're right here, it's the state, not the count.
 
-Pretty straight and nice.
+> Although, I wondering whether it could be that it's the PM domain
+> that's preventing the omap_hsmmc device from becoming runtime
+> suspended.
+> 
+> Perhaps the PM domain returns an error code from its
+> ->runtime_suspend() callback?
 
-Note: The !acpi_disabled check needs to be moved to the beginning of
-acpi_numa_init(). Variable ret can be removed.
+We certainly see a warning there.
 
--Robert
+> Okay, so we definitely seem to have an issue with the changed runtime
+> PM status (suspended) the second probe time.
+> 
+> That's indeed caused by 5de85b9d57ab ("PM / runtime: Re-init runtime
+> PM states at probe error and driver unbind").
+
+Yup.
+
+> For example due to commit 5de85b9d57ab ("PM / runtime: Re-init runtime
+> PM states at probe error and driver unbind"), the ->runtime_resume()
+> callback seems now to be called twice in a row, without in-between
+> having the ->runtime_suspend() callback being invoked. Does really the
+> PM domain cope with that correctly?
+
+That might explain the warning above.
+
+> > BTW, do you have some hardware to test with that has PM runtime
+> > implemnted and actually working with mainline kernel?
+> 
+> Oh, yes. Although I don't have an omap3, I wish I had.
+
+OK good to hear. Anyways, getting an omap3 should be in tens of
+whatever units if you need one to test with.
+
+> Also, I have locally a "runtime PM test driver", which helps me to
+> test various runtime PM sequences.
+
+Now that would be good to have in the mainline kernel. Of course it
+still is a very limited test.
+
+Regards,
+
+Tony
