@@ -1,34 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon,  1 Feb 2016 21:35:54 +0100
-Subject: [PATCH 0/4] ARM Davinci warning fixes
-Message-ID: <1454358962-640598-1-git-send-email-arnd@arndb.de>
+Date: Mon,  1 Feb 2016 21:35:55 +0100
+Subject: [PATCH 1/4] ARM: davinci: limit DT support to DA850
+In-Reply-To: <1454358962-640598-1-git-send-email-arnd@arndb.de>
+References: <1454358962-640598-1-git-send-email-arnd@arndb.de>
+Message-ID: <1454358962-640598-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin and Sekhar,
+When da8xx-dt.c is built with onlu DA830 support but not DA850
+support enabled, we get a compiler warning about unused symbols:
 
-Here are a couple of warning fixes for Davinci that I have
-collected while testing randconfig kernels.
+arch/arm/mach-davinci/da8xx-dt.c:28:20: warning: 'da8xx_init_irq' defined but not used [-Wunused-function]
+ static void __init da8xx_init_irq(void)
+arch/arm/mach-davinci/da8xx-dt.c:33:30: warning: 'da850_auxdata_lookup' defined but not used [-Wunused-variable]
+ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
 
-The first three are rather obvious, the last one might
-need some discussion, maybe there is another way to do this.
+Obviously none of the file make sense for DA830, so we should not
+even attempt this, so we can avoid the warning by ensuring it is
+only built for 850, not 830.
 
-Please apply for 4.6, or Ack
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-davinci/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-	Arnd
-
-Arnd Bergmann (4):
-  ARM: davinci: limit DT support to DA850
-  ARM: davinci: avoid unused mityomapl138_pn_info variable
-  ARM: davinci: DA8xx+DMx combined kernels need PATCH_PHYS_VIRT
-  ARM: davinci: make I2C support optional
-
- arch/arm/Kconfig                           |  1 +
- arch/arm/mach-davinci/Kconfig              | 22 ++++------------------
- arch/arm/mach-davinci/board-dm644x-evm.c   |  8 ++++++--
- arch/arm/mach-davinci/board-dm646x-evm.c   |  7 +++++++
- arch/arm/mach-davinci/board-mityomapl138.c |  2 +-
- 5 files changed, 19 insertions(+), 21 deletions(-)
-
+diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+index 83e0f40f9ff1..6124c69154c3 100644
+--- a/arch/arm/mach-davinci/Kconfig
++++ b/arch/arm/mach-davinci/Kconfig
+@@ -68,7 +68,7 @@ comment "DaVinci Board Type"
+ config MACH_DA8XX_DT
+ 	bool "Support DA8XX platforms using device tree"
+ 	default y
+-	depends on ARCH_DAVINCI_DA8XX
++	depends on ARCH_DAVINCI_DA850
+ 	select PINCTRL
+ 	help
+ 	  Say y here to include support for TI DaVinci DA850 based using
 -- 
 2.7.0
