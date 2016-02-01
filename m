@@ -1,29 +1,27 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 01 Feb 2016 09:46:11 +0900
-Subject: [PATCH 2/6] ARM: s3c24xx: allow selecting S3C2440_XTAL_16934400
- for s3c2442
-In-Reply-To: <1454079040-3567945-3-git-send-email-arnd@arndb.de>
+Date: Mon, 01 Feb 2016 09:49:08 +0900
+Subject: [PATCH 3/6] ARM: s3c24xx: fix unused
+ gta02_configure_pmu_for_charger warning
+In-Reply-To: <1454079040-3567945-4-git-send-email-arnd@arndb.de>
 References: <1454079040-3567945-1-git-send-email-arnd@arndb.de>
- <1454079040-3567945-3-git-send-email-arnd@arndb.de>
-Message-ID: <56AEAAD3.1060501@samsung.com>
+ <1454079040-3567945-4-git-send-email-arnd@arndb.de>
+Message-ID: <56AEAB84.8080305@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 29.01.2016 23:50, Arnd Bergmann wrote:
-> The S3C2440_XTAL_16934400 and S3C2440_XTAL_12000000 symbols are used
-> for both s3c2442 and s3c2440, but Kconfig only allows it to be selected
-> if CPU_S3C2440 is enabled, which can lead to a warning otherwise:
+> gta02_configure_pmu_for_charger is only used when CONFIG_PCF50633_ADC
+> is set, and otherwise we get a warning about an unused symbol:
 > 
-> warning: (MACH_RX1950) selects S3C2440_XTAL_16934400 which has unmet direct dependencies (ARCH_S3C24XX && CPU_S3C2440)
+> arch/arm/mach-s3c24xx/mach-gta02.c:158:1: warning: 'gta02_configure_pmu_for_charger' defined but not used [-Wunused-function]
+>  gta02_configure_pmu_for_charger(struct pcf50633 *pcf, void *unused, int res)
 > 
-> This changes the dependencies to make it possible also for CPU_S3C2442-only
-> configurations.
+> This adds an #ifdef to shut up the warning.
 > 
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  arch/arm/mach-s3c24xx/Kconfig | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-
+>  arch/arm/mach-s3c24xx/mach-gta02.c | 2 ++
+>  1 file changed, 2 insertions(+)
 
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
