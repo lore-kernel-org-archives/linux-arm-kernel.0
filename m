@@ -1,213 +1,116 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 1 Feb 2016 13:24:25 -0800
-Subject: [PATCHv2 2/3] arm64: Add support for ARCH_SUPPORTS_DEBUG_PAGEALLOC
-In-Reply-To: <20160201122911.GF674@leverpostej>
-References: <1454111218-3461-1-git-send-email-labbott@fedoraproject.org>
- <1454111218-3461-3-git-send-email-labbott@fedoraproject.org>
- <20160201122911.GF674@leverpostej>
-Message-ID: <56AFCD09.8000807@redhat.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Mon, 01 Feb 2016 14:34:38 -0700
+Subject: [PATCH] vfio: pci: fix oops in case of
+ vfio_msi_set_vector_signal failure
+In-Reply-To: <56AF9585.1000904@linaro.org>
+References: <1454078586-5431-1-git-send-email-eric.auger@linaro.org>
+ <1454103676.9301.3.camel@redhat.com> <56AF9585.1000904@linaro.org>
+Message-ID: <1454362478.10542.8.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2016 04:29 AM, Mark Rutland wrote:
-> Hi,
->
-> On Fri, Jan 29, 2016 at 03:46:57PM -0800, Laura Abbott wrote:
->>
->> ARCH_SUPPORTS_DEBUG_PAGEALLOC provides a hook to map and unmap
->> pages for debugging purposes. This requires memory be mapped
->> with PAGE_SIZE mappings since breaking down larger mappings
->> at runtime will lead to TLB conflicts. Check if debug_pagealloc
->> is enabled at runtime and if so, map everyting with PAGE_SIZE
->> pages. Implement the functions to actually map/unmap the
->> pages at runtime.
->>
->>
->> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
->
-> I tried to apply atop of the arm64 for-next/pgtable branch, but git
-> wasn't very happy about that -- which branch/patches is this based on?
->
-> I'm not sure if I'm missing something, have something I shouldn't, or if
-> my MTA is corrupting patches again...
->
+On Mon, 2016-02-01 at 18:27 +0100, Eric Auger wrote:
+> Hi Alex,
+> On 01/29/2016 10:41 PM, Alex Williamson wrote:
+> > On Fri, 2016-01-29 at 14:43 +0000, Eric Auger wrote:
+> > > In case vfio_msi_set_vector_signal fails we tear down everything.
+> > > In the tear down loop we compare int j against unsigned start. Given
+> > > the arithmetic conversion I think it is converted into an unsigned and
+> > > becomes 0xffffffff, leading to the loop being entered again and things
+> > > turn bad when accessing vdev->msix[vector].vector. So let's use int
+> > > parameters instead.
+> > > ?
+> > > Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> > > ---
+> > > ?drivers/vfio/pci/vfio_pci_intrs.c | 4 ++--
+> > > ?1 file changed, 2 insertions(+), 2 deletions(-)
+> > > ?
+> > > diff --git a/drivers/vfio/pci/vfio_pci_intrs.c b/drivers/vfio/pci/vfio_pci_intrs.c
+> > > index 3b3ba15..510c48d 100644
+> > > --- a/drivers/vfio/pci/vfio_pci_intrs.c
+> > > +++ b/drivers/vfio/pci/vfio_pci_intrs.c
+> > > @@ -374,8 +374,8 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
+> > > ?	return 0;
+> > > ?}
+> > > ?
+> > > -static int vfio_msi_set_block(struct vfio_pci_device *vdev, unsigned start,
+> > > -			??????unsigned count, int32_t *fds, bool msix)
+> > > +static int vfio_msi_set_block(struct vfio_pci_device *vdev, int start,
+> > > +			??????int count, int32_t *fds, bool msix)
+> > > ?{
+> > > ?	int i, j, ret = 0;
+> > > ?
+> >?
+> > Nice find, I don't think that's the only bug there though.??If @start is
+> > -1 (UINT32_MAX) and @count is 1, then @j gets set to -1 in the setup and
+> > we hit the same index dereference problem.??What if we did this instead:
+> >?
+> > diff --git a/drivers/vfio/pci/vfio_pci_intrs.c b/drivers/vfio/pci/vfio_pci_intrs.c
+> > index 3b3ba15..2ae84ad 100644
+> > --- a/drivers/vfio/pci/vfio_pci_intrs.c
+> > +++ b/drivers/vfio/pci/vfio_pci_intrs.c
+> > @@ -309,14 +309,14 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
+> > ?				??????int vector, int fd, bool msix)
+> > ?{
+> > ?	struct pci_dev *pdev = vdev->pdev;
+> > -	int irq = msix ? vdev->msix[vector].vector : pdev->irq + vector;
+> > -	char *name = msix ? "vfio-msix" : "vfio-msi";
+> > ?	struct eventfd_ctx *trigger;
+> > -	int ret;
+> > +	int irq, ret;
+> > ?
+> > -	if (vector >= vdev->num_ctx)
+> > +	if (vector < 0 || vector >= vdev->num_ctx)
+> > ?		return -EINVAL;
+> > ?
+> > +	irq = msix ? vdev->msix[vector].vector : pdev->irq + vector;
+> > +
+> > ?	if (vdev->ctx[vector].trigger) {
+> > ?		free_irq(irq, vdev->ctx[vector].trigger);
+> > ?		irq_bypass_unregister_producer(&vdev->ctx[vector].producer);
+> > @@ -328,8 +328,9 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
+> > ?	if (fd < 0)
+> > ?		return 0;
+> > ?
+> > -	vdev->ctx[vector].name = kasprintf(GFP_KERNEL, "%s[%d](%s)",
+> > -					???name, vector, pci_name(pdev));
+> > +	vdev->ctx[vector].name = kasprintf(GFP_KERNEL, "vfio-msi%s[%d](%s)",
+> > +					???msix ? "x" : "", vector,
+> > +					???pci_name(pdev));
+> > ?	if (!vdev->ctx[vector].name)
+> > ?		return -ENOMEM;
+> > ?
+> > @@ -379,7 +380,7 @@ static int vfio_msi_set_block(struct vfio_pci_device *vdev, unsigned start,
+> > ?{
+> > ?	int i, j, ret = 0;
+> > ?
+> > -	if (start + count > vdev->num_ctx)
+> > +	if (start >= vdev->num_ctx || start + count > vdev->num_ctx)
+> > ?		return -EINVAL;
+> > ?
+> > ?	for (i = 0, j = start; i < count && !ret; i++, j++) {
+> > @@ -388,7 +389,7 @@ static int vfio_msi_set_block(struct vfio_pci_device *vdev, unsigned start,
+> > ?	}
+> > ?
+> > ?	if (ret) {
+> > -		for (--j; j >= start; j--)
+> > +		for (--j; j >= 0 && j >= start; j--)
+> > ?			vfio_msi_set_vector_signal(vdev, j, -1, msix);
+> > ?	}
+> > ?
+> >?
+> > So we fix the problem with vfio_msi_set_vector_signal() dereferencing
+> > the array before it validates the index (even though it shouldn't be
+> > able to get there anymore), and then we do a better job of verifying
+> > start and count (comparing to num_ctx will use unsigned even though
+> > num_ctx itself is signed) and finally explicitly test the <0 case, which
+> > I suppose we could also do by casting start at that point (we know it's
+> > within the bounds of a signed integer given the previous tests).
+>?
+> Yes it looks OK to me.
+>?
+> I guess you submit? I will test it.
 
-Hmmm, I based it off of your arm64-pagetable-rework-20160125 tag and
-Ard's patch for vmalloc and set_memory_* . The patches seem to apply
-on the for-next/pgtable branch as well so I'm guessing you are missing
-Ard's patch.
+Yep, I'll post a real patch.??Thanks,
 
-  
->> ---
->>   arch/arm64/Kconfig       |  3 +++
->>   arch/arm64/mm/mmu.c      | 10 +++++++---
->>   arch/arm64/mm/pageattr.c | 40 +++++++++++++++++++++++++++++++++-------
->>   3 files changed, 43 insertions(+), 10 deletions(-)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 8cc6228..0f33218 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -537,6 +537,9 @@ config HOTPLUG_CPU
->>   source kernel/Kconfig.preempt
->>   source kernel/Kconfig.hz
->>
->> +config ARCH_SUPPORTS_DEBUG_PAGEALLOC
->> +	def_bool y
->> +
->>   config ARCH_HAS_HOLES_MEMORYMODEL
->>   	def_bool y if SPARSEMEM
->>
->> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> index 103ebc0..5abbd30 100644
->> --- a/arch/arm64/mm/mmu.c
->> +++ b/arch/arm64/mm/mmu.c
->> @@ -181,7 +181,8 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
->>   	do {
->>   		next = pmd_addr_end(addr, end);
->>   		/* try section mapping first */
->> -		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
->> +		if (((addr | next | phys) & ~SECTION_MASK) == 0 &&
->> +		      (!debug_pagealloc_enabled() || !pgtable_alloc)) {
->>   			pmd_t old_pmd =*pmd;
->>   			set_pmd(pmd, __pmd(phys |
->>   					   pgprot_val(mk_sect_prot(prot))));
->> @@ -208,8 +209,11 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
->>   }
->>
->>   static inline bool use_1G_block(unsigned long addr, unsigned long next,
->> -			unsigned long phys)
->> +			unsigned long phys, phys_addr_t (*pgtable_alloc)(void))
->>   {
->> +	if (pgtable_alloc && debug_pagealloc_enabled())
->> +		return false;
->> +
->>   	if (PAGE_SHIFT != 12)
->>   		return false;
->>
->> @@ -241,7 +245,7 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
->>   		/*
->>   		 * For 4K granule only, attempt to put down a 1GB block
->>   		 */
->> -		if (use_1G_block(addr, next, phys)) {
->> +		if (use_1G_block(addr, next, phys, pgtable_alloc)) {
->>   			pud_t old_pud = *pud;
->>   			set_pud(pud, __pud(phys |
->>   					   pgprot_val(mk_sect_prot(prot))));
->
-> The checks for pgtable_alloc is to allow create_mapping_noalloc to use
-> sections regardless, right?
->
-> I got a little confused by that initially, but that seems to make sense.
->
-
-Yeah, that was what I was going for. I went for the implication with pgtable_alloc
-over adding a bool variable to create_mapping. I'll see if I can put a comment
-in somewhere to clarify the intentions.
-  
->> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
->> index 1360a02..69a8a7d 100644
->> --- a/arch/arm64/mm/pageattr.c
->> +++ b/arch/arm64/mm/pageattr.c
->> @@ -38,7 +38,8 @@ static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
->>   }
->>
->>   static int change_memory_common(unsigned long addr, int numpages,
->> -				pgprot_t set_mask, pgprot_t clear_mask)
->> +				pgprot_t set_mask, pgprot_t clear_mask,
->> +				bool ignore_vma_check)
->>   {
->>   	unsigned long start = addr;
->>   	unsigned long size = PAGE_SIZE*numpages;
->> @@ -65,11 +66,14 @@ static int change_memory_common(unsigned long addr, int numpages,
->>   	 *
->>   	 * So check whether the [addr, addr + size) interval is entirely
->>   	 * covered by precisely one VM area that has the VM_ALLOC flag set.
->> +	 *
->> +	 * The one exception to this is is we're forcing everything to be
->> +	 * page mapped with DEBUG_PAGEALLOC
->>   	 */
->>   	area = find_vm_area((void *)addr);
->> -	if (!area ||
->> +	if (!ignore_vma_check && (!area ||
->>   	    end > (unsigned long)area->addr + area->size ||
->> -	    !(area->flags & VM_ALLOC))
->> +	    !(area->flags & VM_ALLOC)))
->>   		return -EINVAL;
->
-> Perhaps we could pull out everything but the VMA checks into a static
-> __change_memory_common. Then we can call that directly in
-> __kernel_map_pages, and don't need to pass a confusing boolean
-> parameter.
-
-Sounds fine.
-
->
-> Otherwise, this looks good to me.
->  
-> Mark.
->
-
-Thanks,
-Laura
-  
->>
->>   	data.set_mask = set_mask;
->> @@ -86,21 +90,24 @@ int set_memory_ro(unsigned long addr, int numpages)
->>   {
->>   	return change_memory_common(addr, numpages,
->>   					__pgprot(PTE_RDONLY),
->> -					__pgprot(PTE_WRITE));
->> +					__pgprot(PTE_WRITE),
->> +					false);
->>   }
->>
->>   int set_memory_rw(unsigned long addr, int numpages)
->>   {
->>   	return change_memory_common(addr, numpages,
->>   					__pgprot(PTE_WRITE),
->> -					__pgprot(PTE_RDONLY));
->> +					__pgprot(PTE_RDONLY),
->> +					false);
->>   }
->>
->>   int set_memory_nx(unsigned long addr, int numpages)
->>   {
->>   	return change_memory_common(addr, numpages,
->>   					__pgprot(PTE_PXN),
->> -					__pgprot(0));
->> +					__pgprot(0),
->> +					false);
->>   }
->>   EXPORT_SYMBOL_GPL(set_memory_nx);
->>
->> @@ -108,6 +115,25 @@ int set_memory_x(unsigned long addr, int numpages)
->>   {
->>   	return change_memory_common(addr, numpages,
->>   					__pgprot(0),
->> -					__pgprot(PTE_PXN));
->> +					__pgprot(PTE_PXN),
->> +					false);
->>   }
->>   EXPORT_SYMBOL_GPL(set_memory_x);
->> +
->> +#ifdef CONFIG_DEBUG_PAGEALLOC
->> +void __kernel_map_pages(struct page *page, int numpages, int enable)
->> +{
->> +	unsigned long addr = (unsigned long) page_address(page);
->> +
->> +	if (enable)
->> +		change_memory_common(addr, numpages,
->> +					__pgprot(PTE_VALID),
->> +					__pgprot(0),
->> +					true);
->> +	else
->> +		change_memory_common(addr, numpages,
->> +					__pgprot(0),
->> +					__pgprot(PTE_VALID),
->> +					true);
->> +}
->> +#endif
->> --
->> 2.5.0
->>
+Alex
