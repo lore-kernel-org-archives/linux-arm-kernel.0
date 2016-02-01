@@ -1,26 +1,55 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 1 Feb 2016 08:39:15 -0600
-Subject: [PATCH 1/3] Input: tps6507x-ts - add binding for tps6507x-ts
-In-Reply-To: <1454308130-12452-2-git-send-email-sushaanth.s@ti.com>
-References: <1454308130-12452-1-git-send-email-sushaanth.s@ti.com>
- <1454308130-12452-2-git-send-email-sushaanth.s@ti.com>
-Message-ID: <20160201143915.GA9909@rob-hp-laptop>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 1 Feb 2016 15:41:03 +0100
+Subject: [PATCH v2 18/21] arm64: KVM: Introduce hyp_alternate_value helper
+In-Reply-To: <1453737235-16522-19-git-send-email-marc.zyngier@arm.com>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <1453737235-16522-19-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160201144103.GX1478@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 11:58:47AM +0530, Sushaanth Srirangapathi wrote:
-> add binding information for tps6507x touchscreen input.
+On Mon, Jan 25, 2016 at 03:53:52PM +0000, Marc Zyngier wrote:
+> We already have hyp_alternate_select() to define a function pointer
+> that gets changed by a kernel feature or workaround.
 > 
-> "ti,min-pressure" was added as TI specific binding because it
-> was specific to tps6507x IP and not applicable or relevant for
-> other touchscreen drivers.
+> It would be useful to have a similar feature that resolves in a
+> direct value, without requiring a function call. For this purpose,
+> introduce hyp_alternate_value(), which returns one of two values
+> depending on the state of the alternative.
 > 
-> Signed-off-by: Sushaanth Srirangapathi <sushaanth.s@ti.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  Documentation/devicetree/bindings/mfd/tps6507x.txt |   10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
+>  arch/arm64/kvm/hyp/hyp.h | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+> index 44eaff7..dc75fdb 100644
+> --- a/arch/arm64/kvm/hyp/hyp.h
+> +++ b/arch/arm64/kvm/hyp/hyp.h
+> @@ -144,6 +144,17 @@ typeof(orig) * __hyp_text fname(void)					\
+>  	return val;							\
+>  }
+>  
+> +#define hyp_alternate_value(fname, orig, alt, cond)			\
+> +typeof(orig) __hyp_text fname(void)					\
+> +{									\
+> +	typeof(alt) val = orig;						\
+> +	asm volatile(ALTERNATIVE("nop		\n",			\
+> +				 "mov	%0, %1	\n",			\
+> +				 cond)					\
+> +		     : "+r" (val) : "r" ((typeof(orig))alt));		\
+> +	return val;							\
+> +}
+> +
+>  void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
+>  void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+>  
+> -- 
+> 2.1.4
+> 
+I'm really not convinced that this is more readable than simply defining
+a function where needed.  Perhaps the thing that needs a definition is
+the "asm volatile(ALTERNATIVE(...))" part?  I also don't see why any of
+this is specific to KVM or Hyp ?
 
-Seems like you would need other properties from the common touchscreen 
-binding.
-
-Acked-by: Rob Herring <robh@kernel.org>
+-Christoffer
