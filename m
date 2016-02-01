@@ -1,476 +1,357 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  1 Feb 2016 11:54:52 +0100
-Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc area
+Date: Mon,  1 Feb 2016 11:54:53 +0100
+Subject: [PATCH v5sub1 8/8] arm64: allow kernel Image to be loaded anywhere in
+ physical memory
 In-Reply-To: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1454324093-15998-8-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1454324093-15998-9-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves the module area to right before the vmalloc area, and
-moves the kernel image to the base of the vmalloc area. This is
-an intermediate step towards implementing KASLR, which allows the
-kernel image to be located anywhere in the vmalloc area.
+This relaxes the kernel Image placement requirements, so that it
+may be placed at any 2 MB aligned offset in physical memory.
+
+This is accomplished by ignoring PHYS_OFFSET when installing
+memblocks, and accounting for the apparent virtual offset of
+the kernel Image. As a result, virtual address references
+below PAGE_OFFSET are correctly mapped onto physical references
+into the kernel Image regardless of where it sits in memory.
+
+Note that limiting memory using mem= is not unambiguous anymore after
+this change, considering that the kernel may be at the top of physical
+memory, and clipping from the bottom rather than the top will discard
+any 32-bit DMA addressable memory first. To deal with this, the handling
+of mem= is reimplemented to clip top down, but take special care not to
+clip memory that covers the kernel image.
+
+Since mem= should not be considered a production feature, a panic notifier
+handler is installed that dumps the memory limit at panic time if one was
+set.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/kasan.h   |  2 +-
- arch/arm64/include/asm/memory.h  | 21 +++--
- arch/arm64/include/asm/pgtable.h | 10 +-
- arch/arm64/mm/dump.c             | 12 +--
- arch/arm64/mm/init.c             | 23 ++---
- arch/arm64/mm/kasan_init.c       | 31 ++++++-
- arch/arm64/mm/mmu.c              | 97 +++++++++++++-------
- 7 files changed, 129 insertions(+), 67 deletions(-)
+ Documentation/arm64/booting.txt         |  20 ++--
+ arch/arm64/include/asm/boot.h           |   6 ++
+ arch/arm64/include/asm/kernel-pgtable.h |  12 +++
+ arch/arm64/include/asm/kvm_asm.h        |   2 +-
+ arch/arm64/include/asm/memory.h         |  15 +--
+ arch/arm64/kernel/head.S                |   6 +-
+ arch/arm64/kernel/image.h               |  13 ++-
+ arch/arm64/mm/init.c                    | 100 +++++++++++++++++++-
+ arch/arm64/mm/mmu.c                     |   3 +
+ 9 files changed, 155 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kasan.h b/arch/arm64/include/asm/kasan.h
-index de0d21211c34..71ad0f93eb71 100644
---- a/arch/arm64/include/asm/kasan.h
-+++ b/arch/arm64/include/asm/kasan.h
-@@ -14,7 +14,7 @@
-  * KASAN_SHADOW_END: KASAN_SHADOW_START + 1/8 of kernel virtual addresses.
-  */
- #define KASAN_SHADOW_START      (VA_START)
--#define KASAN_SHADOW_END        (KASAN_SHADOW_START + (1UL << (VA_BITS - 3)))
-+#define KASAN_SHADOW_END        (KASAN_SHADOW_START + KASAN_SHADOW_SIZE)
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index 701d39d3171a..56d6d8b796db 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -109,7 +109,13 @@ Header notes:
+ 			1 - 4K
+ 			2 - 16K
+ 			3 - 64K
+-  Bits 3-63:	Reserved.
++  Bit 3:	Kernel physical placement
++			0 - 2MB aligned base should be as close as possible
++			    to the base of DRAM, since memory below it is not
++			    accessible via the linear mapping
++			1 - 2MB aligned base may be anywhere in physical
++			    memory
++  Bits 4-63:	Reserved.
  
- /*
-  * This value is used to map an address to the corresponding shadow
+ - When image_size is zero, a bootloader should attempt to keep as much
+   memory as possible free for use by the kernel immediately after the
+@@ -117,14 +123,14 @@ Header notes:
+   depending on selected features, and is effectively unbound.
+ 
+ The Image must be placed text_offset bytes from a 2MB aligned base
+-address near the start of usable system RAM and called there. Memory
+-below that base address is currently unusable by Linux, and therefore it
+-is strongly recommended that this location is the start of system RAM.
+-The region between the 2 MB aligned base address and the start of the
+-image has no special significance to the kernel, and may be used for
+-other purposes.
++address anywhere in usable system RAM and called there. The region
++between the 2 MB aligned base address and the start of the image has no
++special significance to the kernel, and may be used for other purposes.
+ At least image_size bytes from the start of the image must be free for
+ use by the kernel.
++NOTE: versions prior to v4.6 cannot make use of memory below the
++physical offset of the Image so it is recommended that the Image be
++placed as close as possible to the start of system RAM.
+ 
+ Any memory described to the kernel (even that below the start of the
+ image) which is not marked as reserved from the kernel (e.g., with a
+diff --git a/arch/arm64/include/asm/boot.h b/arch/arm64/include/asm/boot.h
+index 81151b67b26b..ebf2481889c3 100644
+--- a/arch/arm64/include/asm/boot.h
++++ b/arch/arm64/include/asm/boot.h
+@@ -11,4 +11,10 @@
+ #define MIN_FDT_ALIGN		8
+ #define MAX_FDT_SIZE		SZ_2M
+ 
++/*
++ * arm64 requires the kernel image to placed
++ * TEXT_OFFSET bytes beyond a 2 MB aligned base
++ */
++#define MIN_KIMG_ALIGN		SZ_2M
++
+ #endif
+diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
+index a459714ee29e..5c6375d8528b 100644
+--- a/arch/arm64/include/asm/kernel-pgtable.h
++++ b/arch/arm64/include/asm/kernel-pgtable.h
+@@ -79,5 +79,17 @@
+ #define SWAPPER_MM_MMUFLAGS	(PTE_ATTRINDX(MT_NORMAL) | SWAPPER_PTE_FLAGS)
+ #endif
+ 
++/*
++ * To make optimal use of block mappings when laying out the linear
++ * mapping, round down the base of physical memory to a size that can
++ * be mapped efficiently, i.e., either PUD_SIZE (4k granule) or PMD_SIZE
++ * (64k granule), or a multiple that can be mapped using contiguous bits
++ * in the page tables: 32 * PMD_SIZE (16k granule)
++ */
++#ifdef CONFIG_ARM64_64K_PAGES
++#define ARM64_MEMSTART_ALIGN	SZ_512M
++#else
++#define ARM64_MEMSTART_ALIGN	SZ_1G
++#endif
+ 
+ #endif	/* __ASM_KERNEL_PGTABLE_H */
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index f5aee6e764e6..054ac25e7c2e 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -26,7 +26,7 @@
+ #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
+ #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
+ 
+-#define kvm_ksym_ref(sym)		((void *)&sym - KIMAGE_VADDR + PAGE_OFFSET)
++#define kvm_ksym_ref(sym)		phys_to_virt((u64)&sym - kimage_voffset)
+ 
+ #ifndef __ASSEMBLY__
+ struct kvm;
 diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index aebc739f5a11..4388651d1f0d 100644
+index 4388651d1f0d..61005e7dd6cb 100644
 --- a/arch/arm64/include/asm/memory.h
 +++ b/arch/arm64/include/asm/memory.h
-@@ -45,16 +45,15 @@
-  * VA_START - the first kernel virtual address.
-  * TASK_SIZE - the maximum size of a user space task.
-  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
-- * The module space lives between the addresses given by TASK_SIZE
-- * and PAGE_OFFSET - it must be within 128MB of the kernel text.
-  */
- #define VA_BITS			(CONFIG_ARM64_VA_BITS)
- #define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
- #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
--#define KIMAGE_VADDR		(PAGE_OFFSET)
--#define MODULES_END		(KIMAGE_VADDR)
--#define MODULES_VADDR		(MODULES_END - SZ_64M)
--#define PCI_IO_END		(MODULES_VADDR - SZ_2M)
-+#define KIMAGE_VADDR		(MODULES_END)
-+#define MODULES_END		(MODULES_VADDR + MODULES_VSIZE)
-+#define MODULES_VADDR		(VA_START + KASAN_SHADOW_SIZE)
-+#define MODULES_VSIZE		(SZ_64M)
-+#define PCI_IO_END		(PAGE_OFFSET - SZ_2M)
- #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
- #define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
- #define TASK_SIZE_64		(UL(1) << VA_BITS)
-@@ -72,6 +71,16 @@
- #define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
+@@ -88,10 +88,10 @@
+ #define __virt_to_phys(x) ({						\
+ 	phys_addr_t __x = (phys_addr_t)(x);				\
+ 	__x >= PAGE_OFFSET ? (__x - PAGE_OFFSET + PHYS_OFFSET) :	\
+-			     (__x - KIMAGE_VADDR + PHYS_OFFSET); })
++			     (__x - kimage_voffset); })
+ 
+ #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
+-#define __phys_to_kimg(x)	((unsigned long)((x) - PHYS_OFFSET + KIMAGE_VADDR))
++#define __phys_to_kimg(x)	((unsigned long)((x) + kimage_voffset))
  
  /*
-+ * The size of the KASAN shadow region. This should be 1/8th of the
-+ * size of the entire kernel virtual address space.
-+ */
-+#ifdef CONFIG_KASAN
-+#define KASAN_SHADOW_SIZE	(UL(1) << (VA_BITS - 3))
-+#else
-+#define KASAN_SHADOW_SIZE	(0)
-+#endif
+  * Convert a page to/from a physical address
+@@ -127,13 +127,14 @@ extern phys_addr_t		memstart_addr;
+ /* PHYS_OFFSET - the physical address of the start of memory. */
+ #define PHYS_OFFSET		({ memstart_addr; })
+ 
++/* the offset between the kernel virtual and physical mappings */
++extern u64			kimage_voffset;
 +
-+/*
-  * Physical vs virtual RAM address space conversion.  These are
-  * private definitions which should NOT be used outside memory.h
-  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 87355408d448..a440f5a85d08 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -36,19 +36,13 @@
-  *
-  * VMEMAP_SIZE: allows the whole VA space to be covered by a struct page array
-  *	(rounded up to PUD_SIZE).
-- * VMALLOC_START: beginning of the kernel VA space
-+ * VMALLOC_START: beginning of the kernel vmalloc space
-  * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space,
-  *	fixed mappings and modules
+ /*
+- * The maximum physical address that the linear direct mapping
+- * of system RAM can cover. (PAGE_OFFSET can be interpreted as
+- * a 2's complement signed quantity and negated to derive the
+- * maximum size of the linear mapping.)
++ * Allow all memory at the discovery stage. We will clip it later.
   */
- #define VMEMMAP_SIZE		ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) * sizeof(struct page), PUD_SIZE)
+-#define MAX_MEMBLOCK_ADDR	({ memstart_addr - PAGE_OFFSET - 1; })
++#define MIN_MEMBLOCK_ADDR	0
++#define MAX_MEMBLOCK_ADDR	U64_MAX
  
--#ifndef CONFIG_KASAN
--#define VMALLOC_START		(VA_START)
--#else
--#include <asm/kasan.h>
--#define VMALLOC_START		(KASAN_SHADOW_END + SZ_64K)
--#endif
--
-+#define VMALLOC_START		(MODULES_END)
- #define VMALLOC_END		(PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
+ /*
+  * PFNs are used to describe any physical page; this means
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 04d38a058b19..05b98289093e 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -428,7 +428,11 @@ __mmap_switched:
+ 	and	x4, x4, #~(THREAD_SIZE - 1)
+ 	msr	sp_el0, x4			// Save thread_info
+ 	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
+-	str_l	x24, memstart_addr, x6		// Save PHYS_OFFSET
++
++	ldr	x4, =KIMAGE_VADDR		// Save the offset between
++	sub	x4, x4, x24			// the kernel virtual and
++	str_l	x4, kimage_voffset, x5		// physical mappings
++
+ 	mov	x29, #0
+ #ifdef CONFIG_KASAN
+ 	bl	kasan_early_init
+diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+index 999633bd7294..c9c62cab25a4 100644
+--- a/arch/arm64/kernel/image.h
++++ b/arch/arm64/kernel/image.h
+@@ -42,15 +42,18 @@
+ #endif
  
- #define vmemmap			((struct page *)(VMALLOC_END + SZ_64K))
-diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-index 0adbebbc2803..e83ffb00560c 100644
---- a/arch/arm64/mm/dump.c
-+++ b/arch/arm64/mm/dump.c
-@@ -35,7 +35,9 @@ struct addr_marker {
- };
+ #ifdef CONFIG_CPU_BIG_ENDIAN
+-#define __HEAD_FLAG_BE	1
++#define __HEAD_FLAG_BE		1
+ #else
+-#define __HEAD_FLAG_BE	0
++#define __HEAD_FLAG_BE		0
+ #endif
  
- enum address_markers_idx {
--	VMALLOC_START_NR = 0,
-+	MODULES_START_NR = 0,
-+	MODULES_END_NR,
-+	VMALLOC_START_NR,
- 	VMALLOC_END_NR,
- #ifdef CONFIG_SPARSEMEM_VMEMMAP
- 	VMEMMAP_START_NR,
-@@ -45,12 +47,12 @@ enum address_markers_idx {
- 	FIXADDR_END_NR,
- 	PCI_START_NR,
- 	PCI_END_NR,
--	MODULES_START_NR,
--	MODULES_END_NR,
- 	KERNEL_SPACE_NR,
- };
+-#define __HEAD_FLAG_PAGE_SIZE ((PAGE_SHIFT - 10) / 2)
++#define __HEAD_FLAG_PAGE_SIZE	((PAGE_SHIFT - 10) / 2)
  
- static struct addr_marker address_markers[] = {
-+	{ MODULES_VADDR,	"Modules start" },
-+	{ MODULES_END,		"Modules end" },
- 	{ VMALLOC_START,	"vmalloc() Area" },
- 	{ VMALLOC_END,		"vmalloc() End" },
- #ifdef CONFIG_SPARSEMEM_VMEMMAP
-@@ -61,9 +63,7 @@ static struct addr_marker address_markers[] = {
- 	{ FIXADDR_TOP,		"Fixmap end" },
- 	{ PCI_IO_START,		"PCI I/O start" },
- 	{ PCI_IO_END,		"PCI I/O end" },
--	{ MODULES_VADDR,	"Modules start" },
--	{ MODULES_END,		"Modules end" },
--	{ PAGE_OFFSET,		"Kernel Mapping" },
-+	{ PAGE_OFFSET,		"Linear Mapping" },
- 	{ -1,			NULL },
- };
+-#define __HEAD_FLAGS	((__HEAD_FLAG_BE << 0) |	\
+-			 (__HEAD_FLAG_PAGE_SIZE << 1))
++#define __HEAD_FLAG_PHYS_BASE	1
++
++#define __HEAD_FLAGS		((__HEAD_FLAG_BE << 0) |	\
++				 (__HEAD_FLAG_PAGE_SIZE << 1) |	\
++				 (__HEAD_FLAG_PHYS_BASE << 3))
  
+ /*
+  * These will output as part of the Image header, which should be little-endian
 diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index f3b061e67bfe..1d627cd8121c 100644
+index 1d627cd8121c..e8e853a1024c 100644
 --- a/arch/arm64/mm/init.c
 +++ b/arch/arm64/mm/init.c
-@@ -36,6 +36,7 @@
+@@ -35,8 +35,10 @@
+ #include <linux/efi.h>
  #include <linux/swiotlb.h>
  
++#include <asm/boot.h>
  #include <asm/fixmap.h>
-+#include <asm/kasan.h>
+ #include <asm/kasan.h>
++#include <asm/kernel-pgtable.h>
  #include <asm/memory.h>
  #include <asm/sections.h>
  #include <asm/setup.h>
-@@ -302,22 +303,26 @@ void __init mem_init(void)
- #ifdef CONFIG_KASAN
- 		  "    kasan   : 0x%16lx - 0x%16lx   (%6ld GB)\n"
- #endif
-+		  "    modules : 0x%16lx - 0x%16lx   (%6ld MB)\n"
- 		  "    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n"
-+		  "      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n"
-+		  "      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n"
-+		  "      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n"
- #ifdef CONFIG_SPARSEMEM_VMEMMAP
- 		  "    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n"
- 		  "              0x%16lx - 0x%16lx   (%6ld MB actual)\n"
- #endif
- 		  "    fixed   : 0x%16lx - 0x%16lx   (%6ld KB)\n"
- 		  "    PCI I/O : 0x%16lx - 0x%16lx   (%6ld MB)\n"
--		  "    modules : 0x%16lx - 0x%16lx   (%6ld MB)\n"
--		  "    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n"
--		  "      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n"
--		  "      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n"
--		  "      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-+		  "    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n",
- #ifdef CONFIG_KASAN
- 		  MLG(KASAN_SHADOW_START, KASAN_SHADOW_END),
- #endif
-+		  MLM(MODULES_VADDR, MODULES_END),
- 		  MLG(VMALLOC_START, VMALLOC_END),
-+		  MLK_ROUNDUP(__init_begin, __init_end),
-+		  MLK_ROUNDUP(_text, _etext),
-+		  MLK_ROUNDUP(_sdata, _edata),
- #ifdef CONFIG_SPARSEMEM_VMEMMAP
- 		  MLG((unsigned long)vmemmap,
- 		      (unsigned long)vmemmap + VMEMMAP_SIZE),
-@@ -326,11 +331,7 @@ void __init mem_init(void)
- #endif
- 		  MLK(FIXADDR_START, FIXADDR_TOP),
- 		  MLM(PCI_IO_START, PCI_IO_END),
--		  MLM(MODULES_VADDR, MODULES_END),
--		  MLM(PAGE_OFFSET, (unsigned long)high_memory),
--		  MLK_ROUNDUP(__init_begin, __init_end),
--		  MLK_ROUNDUP(_text, _etext),
--		  MLK_ROUNDUP(_sdata, _edata));
-+		  MLM(PAGE_OFFSET, (unsigned long)high_memory));
- 
- #undef MLK
- #undef MLM
-@@ -358,8 +359,8 @@ void __init mem_init(void)
- 
- void free_initmem(void)
- {
--	fixup_init();
- 	free_initmem_default(0);
-+	fixup_init();
+@@ -158,9 +160,80 @@ static int __init early_mem(char *p)
  }
+ early_param("mem", early_mem);
  
- #ifdef CONFIG_BLK_DEV_INITRD
-diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-index cc569a38bc76..66c246871d2e 100644
---- a/arch/arm64/mm/kasan_init.c
-+++ b/arch/arm64/mm/kasan_init.c
-@@ -17,9 +17,11 @@
- #include <linux/start_kernel.h>
- 
- #include <asm/mmu_context.h>
-+#include <asm/kernel-pgtable.h>
- #include <asm/page.h>
- #include <asm/pgalloc.h>
- #include <asm/pgtable.h>
-+#include <asm/sections.h>
- #include <asm/tlbflush.h>
- 
- static pgd_t tmp_pg_dir[PTRS_PER_PGD] __initdata __aligned(PGD_SIZE);
-@@ -33,7 +35,7 @@ static void __init kasan_early_pte_populate(pmd_t *pmd, unsigned long addr,
- 	if (pmd_none(*pmd))
- 		pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
- 
--	pte = pte_offset_kernel(pmd, addr);
-+	pte = pte_offset_kimg(pmd, addr);
- 	do {
- 		next = addr + PAGE_SIZE;
- 		set_pte(pte, pfn_pte(virt_to_pfn(kasan_zero_page),
-@@ -51,7 +53,7 @@ static void __init kasan_early_pmd_populate(pud_t *pud,
- 	if (pud_none(*pud))
- 		pud_populate(&init_mm, pud, kasan_zero_pmd);
- 
--	pmd = pmd_offset(pud, addr);
-+	pmd = pmd_offset_kimg(pud, addr);
- 	do {
- 		next = pmd_addr_end(addr, end);
- 		kasan_early_pte_populate(pmd, addr, next);
-@@ -68,7 +70,7 @@ static void __init kasan_early_pud_populate(pgd_t *pgd,
- 	if (pgd_none(*pgd))
- 		pgd_populate(&init_mm, pgd, kasan_zero_pud);
- 
--	pud = pud_offset(pgd, addr);
-+	pud = pud_offset_kimg(pgd, addr);
- 	do {
- 		next = pud_addr_end(addr, end);
- 		kasan_early_pmd_populate(pud, addr, next);
-@@ -126,9 +128,13 @@ static void __init clear_pgds(unsigned long start,
- 
- void __init kasan_init(void)
- {
-+	u64 kimg_shadow_start, kimg_shadow_end;
- 	struct memblock_region *reg;
- 	int i;
- 
-+	kimg_shadow_start = (u64)kasan_mem_to_shadow(_text);
-+	kimg_shadow_end = (u64)kasan_mem_to_shadow(_end);
++/*
++ * clip_mem_range() - remove memblock memory between @min and @max until
++ *                    we meet the limit in 'memory_limit'.
++ */
++static void __init clip_mem_range(u64 min, u64 max)
++{
++	u64 mem_size, to_remove;
++	int i;
 +
- 	/*
- 	 * We are going to perform proper setup of shadow memory.
- 	 * At first we should unmap early shadow (clear_pgds() call bellow).
-@@ -142,8 +148,25 @@ void __init kasan_init(void)
- 
- 	clear_pgds(KASAN_SHADOW_START, KASAN_SHADOW_END);
- 
-+	vmemmap_populate(kimg_shadow_start, kimg_shadow_end, NUMA_NO_NODE);
-+
-+	/*
-+	 * vmemmap_populate() has populated the shadow region that covers the
-+	 * kernel image with SWAPPER_BLOCK_SIZE mappings, so we have to round
-+	 * the start and end addresses to SWAPPER_BLOCK_SIZE as well, to prevent
-+	 * kasan_populate_zero_shadow() from replacing the PMD block mappings
-+	 * with PMD table mappings at the edges of the shadow region for the
-+	 * kernel image.
-+	 */
-+	if (ARM64_SWAPPER_USES_SECTION_MAPS) {
-+		kimg_shadow_start = round_down(kimg_shadow_start,
-+					       SWAPPER_BLOCK_SIZE);
-+		kimg_shadow_end = round_up(kimg_shadow_end, SWAPPER_BLOCK_SIZE);
-+	}
- 	kasan_populate_zero_shadow((void *)KASAN_SHADOW_START,
--			kasan_mem_to_shadow((void *)MODULES_VADDR));
-+				   (void *)kimg_shadow_start);
-+	kasan_populate_zero_shadow((void *)kimg_shadow_end,
-+				   kasan_mem_to_shadow((void *)PAGE_OFFSET));
- 
- 	for_each_memblock(memory, reg) {
- 		void *start = (void *)__phys_to_virt(reg->base);
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index b84915723ea0..4c4b15932963 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -53,6 +53,10 @@ u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
- unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)] __page_aligned_bss;
- EXPORT_SYMBOL(empty_zero_page);
- 
-+static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
-+static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
-+static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
-+
- pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- 			      unsigned long size, pgprot_t vma_prot)
- {
-@@ -349,14 +353,14 @@ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end
- {
- 
- 	unsigned long kernel_start = __pa(_stext);
--	unsigned long kernel_end = __pa(_end);
-+	unsigned long kernel_end = __pa(_etext);
- 
- 	/*
--	 * The kernel itself is mapped at page granularity. Map all other
--	 * memory, making sure we don't overwrite the existing kernel mappings.
-+	 * Take care not to create a writable alias for the
-+	 * read-only text and rodata sections of the kernel image.
- 	 */
- 
--	/* No overlap with the kernel. */
-+	/* No overlap with the kernel text */
- 	if (end < kernel_start || start >= kernel_end) {
- 		__create_pgd_mapping(pgd, start, __phys_to_virt(start),
- 				     end - start, PAGE_KERNEL,
-@@ -365,7 +369,7 @@ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end
- 	}
- 
- 	/*
--	 * This block overlaps the kernel mapping. Map the portion(s) which
-+	 * This block overlaps the kernel text mapping. Map the portion(s) which
- 	 * don't overlap.
- 	 */
- 	if (start < kernel_start)
-@@ -398,25 +402,28 @@ static void __init map_mem(pgd_t *pgd)
- 	}
- }
- 
--#ifdef CONFIG_DEBUG_RODATA
- void mark_rodata_ro(void)
- {
-+	if (!IS_ENABLED(CONFIG_DEBUG_RODATA))
++again:
++	mem_size = memblock_phys_mem_size();
++	if (mem_size <= memory_limit || max <= min)
 +		return;
 +
- 	create_mapping_late(__pa(_stext), (unsigned long)_stext,
- 				(unsigned long)_etext - (unsigned long)_stext,
- 				PAGE_KERNEL_ROX);
--
- }
--#endif
- 
- void fixup_init(void)
++	to_remove = mem_size - memory_limit;
++
++	for (i = memblock.memory.cnt - 1; i >= 0; i--) {
++		struct memblock_region *r = memblock.memory.regions + i;
++		u64 start = max(min, r->base);
++		u64 end = min(max, r->base + r->size);
++
++		if (start >= max || end <= min)
++			continue;
++
++		if (end > min) {
++			u64 size = min(to_remove, end - max(start, min));
++
++			memblock_remove(end - size, size);
++		} else {
++			memblock_remove(start, min(max - start, to_remove));
++		}
++		goto again;
++	}
++}
++
+ void __init arm64_memblock_init(void)
  {
--	create_mapping_late(__pa(__init_begin), (unsigned long)__init_begin,
--			(unsigned long)__init_end - (unsigned long)__init_begin,
--			PAGE_KERNEL);
+-	memblock_enforce_memory_limit(memory_limit);
++	const s64 linear_region_size = -(s64)PAGE_OFFSET;
++
 +	/*
-+	 * Unmap the __init region but leave the VM area in place. This
-+	 * prevents the region from being reused for kernel modules, which
-+	 * is not supported by kallsyms.
++	 * Select a suitable value for the base of physical memory.
 +	 */
-+	unmap_kernel_range((u64)__init_begin, (u64)(__init_end - __init_begin));
- }
- 
- static void __init map_kernel_chunk(pgd_t *pgd, void *va_start, void *va_end,
--				    pgprot_t prot)
-+				    pgprot_t prot, struct vm_struct *vma)
- {
- 	phys_addr_t pa_start = __pa(va_start);
- 	unsigned long size = va_end - va_start;
-@@ -426,6 +433,14 @@ static void __init map_kernel_chunk(pgd_t *pgd, void *va_start, void *va_end,
- 
- 	__create_pgd_mapping(pgd, pa_start, (unsigned long)va_start, size, prot,
- 			     early_pgtable_alloc);
++	memstart_addr = round_down(memblock_start_of_DRAM(),
++				   ARM64_MEMSTART_ALIGN);
 +
-+	vma->addr	= va_start;
-+	vma->phys_addr	= pa_start;
-+	vma->size	= size;
-+	vma->flags	= VM_MAP;
-+	vma->caller	= map_kernel_chunk;
++	/*
++	 * Remove the memory that we will not be able to cover with the
++	 * linear mapping. Take care not to clip the kernel which may be
++	 * high in memory.
++	 */
++	memblock_remove(max(memstart_addr + linear_region_size, __pa(_end)),
++			ULLONG_MAX);
++	if (memblock_end_of_DRAM() > linear_region_size)
++		memblock_remove(0, memblock_end_of_DRAM() - linear_region_size);
 +
-+	vm_area_add_early(vma);
- }
++	if (memory_limit != (phys_addr_t)ULLONG_MAX) {
++		u64 kbase = round_down(__pa(_text), MIN_KIMG_ALIGN);
++		u64 kend = PAGE_ALIGN(__pa(_end));
++		u64 const sz_4g = 0x100000000UL;
++
++		/*
++		 * Clip memory in order of preference:
++		 * - above the kernel and above 4 GB
++		 * - between 4 GB and the start of the kernel (if the kernel
++		 *   is loaded high in memory)
++		 * - between the kernel and 4 GB (if the kernel is loaded
++		 *   low in memory)
++		 * - below 4 GB
++		 */
++		clip_mem_range(max(sz_4g, kend), ULLONG_MAX);
++		clip_mem_range(sz_4g, kbase);
++		clip_mem_range(kend, sz_4g);
++		clip_mem_range(0, min(kbase, sz_4g));
++	}
  
+ 	/*
+ 	 * Register the kernel text, kernel data, initrd, and initial
+@@ -381,3 +454,28 @@ static int __init keepinitrd_setup(char *__unused)
+ 
+ __setup("keepinitrd", keepinitrd_setup);
+ #endif
++
++/*
++ * Dump out memory limit information on panic.
++ */
++static int dump_mem_limit(struct notifier_block *self, unsigned long v, void *p)
++{
++	if (memory_limit != (phys_addr_t)ULLONG_MAX) {
++		pr_emerg("Memory Limit: %llu MB\n", memory_limit >> 20);
++	} else {
++		pr_emerg("Memory Limit: none\n");
++	}
++	return 0;
++}
++
++static struct notifier_block mem_limit_notifier = {
++	.notifier_call = dump_mem_limit,
++};
++
++static int __init register_mem_limit_dumper(void)
++{
++	atomic_notifier_chain_register(&panic_notifier_list,
++				       &mem_limit_notifier);
++	return 0;
++}
++__initcall(register_mem_limit_dumper);
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 4c4b15932963..8dda38378959 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -46,6 +46,9 @@
+ 
+ u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
+ 
++u64 kimage_voffset __read_mostly;
++EXPORT_SYMBOL(kimage_voffset);
++
  /*
-@@ -433,17 +448,35 @@ static void __init map_kernel_chunk(pgd_t *pgd, void *va_start, void *va_end,
-  */
- static void __init map_kernel(pgd_t *pgd)
- {
-+	static struct vm_struct vmlinux_text, vmlinux_init, vmlinux_data;
- 
--	map_kernel_chunk(pgd, _stext, _etext, PAGE_KERNEL_EXEC);
--	map_kernel_chunk(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC);
--	map_kernel_chunk(pgd, _data, _end, PAGE_KERNEL);
-+	map_kernel_chunk(pgd, _stext, _etext, PAGE_KERNEL_EXEC, &vmlinux_text);
-+	map_kernel_chunk(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
-+			 &vmlinux_init);
-+	map_kernel_chunk(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
- 
--	/*
--	 * The fixmap falls in a separate pgd to the kernel, and doesn't live
--	 * in the carveout for the swapper_pg_dir. We can simply re-use the
--	 * existing dir for the fixmap.
--	 */
--	set_pgd(pgd_offset_raw(pgd, FIXADDR_START), *pgd_offset_k(FIXADDR_START));
-+	if (!pgd_val(*pgd_offset_raw(pgd, FIXADDR_START))) {
-+		/*
-+		 * The fixmap falls in a separate pgd to the kernel, and doesn't
-+		 * live in the carveout for the swapper_pg_dir. We can simply
-+		 * re-use the existing dir for the fixmap.
-+		 */
-+		set_pgd(pgd_offset_raw(pgd, FIXADDR_START),
-+			*pgd_offset_k(FIXADDR_START));
-+	} else if (CONFIG_PGTABLE_LEVELS > 3) {
-+		/*
-+		 * The fixmap shares its top level pgd entry with the kernel
-+		 * mapping. This can really only occur when we are running
-+		 * with 16k/4 levels, so we can simply reuse the pud level
-+		 * entry instead.
-+		 */
-+		BUG_ON(!IS_ENABLED(CONFIG_ARM64_16K_PAGES));
-+		set_pud(pud_set_fixmap_offset(pgd, FIXADDR_START),
-+			__pud(__pa(bm_pmd) | PUD_TYPE_TABLE));
-+		pud_clear_fixmap();
-+	} else {
-+		BUG();
-+	}
- 
- 	kasan_copy_shadow(pgd);
- }
-@@ -569,14 +602,6 @@ void vmemmap_free(unsigned long start, unsigned long end)
- }
- #endif	/* CONFIG_SPARSEMEM_VMEMMAP */
- 
--static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
--#if CONFIG_PGTABLE_LEVELS > 2
--static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
--#endif
--#if CONFIG_PGTABLE_LEVELS > 3
--static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
--#endif
--
- static inline pud_t * fixmap_pud(unsigned long addr)
- {
- 	pgd_t *pgd = pgd_offset_k(addr);
-@@ -608,8 +633,18 @@ void __init early_fixmap_init(void)
- 	unsigned long addr = FIXADDR_START;
- 
- 	pgd = pgd_offset_k(addr);
--	pgd_populate(&init_mm, pgd, bm_pud);
--	pud = fixmap_pud(addr);
-+	if (CONFIG_PGTABLE_LEVELS > 3 && !pgd_none(*pgd)) {
-+		/*
-+		 * We only end up here if the kernel mapping and the fixmap
-+		 * share the top level pgd entry, which should only happen on
-+		 * 16k/4 levels configurations.
-+		 */
-+		BUG_ON(!IS_ENABLED(CONFIG_ARM64_16K_PAGES));
-+		pud = pud_offset_kimg(pgd, addr);
-+	} else {
-+		pgd_populate(&init_mm, pgd, bm_pud);
-+		pud = fixmap_pud(addr);
-+	}
- 	pud_populate(&init_mm, pud, bm_pmd);
- 	pmd = fixmap_pmd(addr);
- 	pmd_populate_kernel(&init_mm, pmd, bm_pte);
+  * Empty_zero_page is a special page that is used for zero-initialized data
+  * and COW.
 -- 
 2.5.0
