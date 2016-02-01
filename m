@@ -1,22 +1,20 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 1 Feb 2016 08:11:23 -0600
-Subject: [PATCH v7 1/4] dt/bindings: add bindings for optee
-In-Reply-To: <1454318140-7962-2-git-send-email-jens.wiklander@linaro.org>
-References: <1454318140-7962-1-git-send-email-jens.wiklander@linaro.org>
- <1454318140-7962-2-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <20160201141123.GA7792@rob-hp-laptop>
+Date: Mon, 1 Feb 2016 08:12:40 -0600
+Subject: [PATCH 1/2] dt-bindings: add vendor TPO
+In-Reply-To: <1454316537-3840-1-git-send-email-linus.walleij@linaro.org>
+References: <1454316537-3840-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20160201141240.GA9289@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 10:15:37AM +0100, Jens Wiklander wrote:
-> Introduces linaro prefix and adds bindings for ARM TrustZone based OP-TEE
-> implementation.
+On Mon, Feb 01, 2016 at 09:48:57AM +0100, Linus Walleij wrote:
+> TPO was a merger on June 5 2006 of Toppoly Optoelectronics and
+> Philips Mobile Display Systems. They manufactured small and medium
+> mobile displays.
 > 
-> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  .../bindings/arm/firmware/linaro,optee-tz.txt      | 31 ++++++++++++++++++++++
->  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->  2 files changed, 32 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
