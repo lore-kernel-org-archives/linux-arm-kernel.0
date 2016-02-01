@@ -1,58 +1,77 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 1 Feb 2016 14:29:27 -0800
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <CAJZ5v0gOtJE24Hu8R9jx7kBktmd__qFUNF_KnsCDLwgidskUvw@mail.gmail.com>
-References: <CAJZ5v0i79X5JjOZiu4cOZ0Esd5BxAvutF8d17asDzq9ECcML-g@mail.gmail.com>
- <20160126232212.GE19432@atomide.com>
- <CAJZ5v0gTRvyWHVmYNb8Q1QZzhVhokXo541+48mFyDRYv7Hi-Uw@mail.gmail.com>
- <20160126235222.GF19432@atomide.com>
- <CAPDyKFqD6Y6HcgVds_oWBZ8L7Kdh2VX_WZCGApf-1a_6GHCQ5g@mail.gmail.com>
- <20160128165810.GA19432@atomide.com>
- <CAPDyKFoQHpqdCa4fzHycP0OT2KsNTxWm7JZSe8Mauh+rxqGtGg@mail.gmail.com>
- <20160201181135.GL19432@atomide.com>
- <20160201220657.GO19432@atomide.com>
- <CAJZ5v0gOtJE24Hu8R9jx7kBktmd__qFUNF_KnsCDLwgidskUvw@mail.gmail.com>
-Message-ID: <20160201222926.GQ19432@atomide.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon,  1 Feb 2016 23:48:23 +0100
+Subject: [PATCH v2] pinctrl: mvebu: fix num_settings in mpp group assignment
+In-Reply-To: <1453844952-28292-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1453844952-28292-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1454366903-7038-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rafael J. Wysocki <rafael@kernel.org> [160201 14:18]:
-> On Mon, Feb 1, 2016 at 11:06 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > --- a/drivers/base/power/runtime.c
-> > +++ b/drivers/base/power/runtime.c
-> > @@ -1419,17 +1419,25 @@ void pm_runtime_init(struct device *dev)
-> >   */
-> >  void pm_runtime_reinit(struct device *dev)
-> >  {
-> > -       if (!pm_runtime_enabled(dev)) {
-> > -               if (dev->power.runtime_status == RPM_ACTIVE)
-> > +       if (pm_runtime_enabled(dev))
-> > +               return;
-> > +
-> > +       if (dev->power.runtime_status == RPM_ACTIVE) {
-> > +               if (dev->power.use_autosuspend) {
-> > +                       __pm_runtime_use_autosuspend(dev, false);
-> > +                       pm_runtime_suspend(dev);
-> 
-> This won't work, because runtime PM is disabled at this point.
+When assigning mpp settings from static mpp modes to mpp groups,
+we do not want any groups that have no supported setting for a
+specific Kirkwood variant. However, when there is at least a
+single supported setting, we need to assign the number of all
+settings in this mode to grp->num_settings as we are reusing
+the static modes table.
 
-Hmm right OK. It does work from idling the hardware point
-of view though..
+Fixes: 0581b16b1840 ("pinctrl: mvebu: complain about missing group after checking variant")
+Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+--
+Changelog:
+v1->v2:
+- Chose a less intrusive fix by adding supp_settings variable
+  instead of looping over the settings twice.
 
-> What about doing this instead:
-> 
->                if (dev->power.use_autosuspend)
->                        __pm_runtime_use_autosuspend(dev, false);
-> 
->                pm_runtime_set_suspended(dev);
+Aaro, Linus,
 
-..while this does not work. The hardware is never idled
-in this case.
+I prefer this less intrusive fix in favor of v1.
 
-What else does __pm_runtime_use_autosuspend() set initially
-that changes things here?
+@Aaro: Can you please test again?
 
-Regards,
+Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/pinctrl/mvebu/pinctrl-mvebu.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-Tony
+diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+index e4d473811bb3..3ef798fac81b 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
++++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+@@ -666,16 +666,19 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+ 		struct mvebu_mpp_ctrl_setting *set = &mode->settings[0];
+ 		struct mvebu_pinctrl_group *grp;
+ 		unsigned num_settings;
++		unsigned supp_settings;
+ 
+-		for (num_settings = 0; ; set++) {
++		for (num_settings = 0, supp_settings = 0; ; set++) {
+ 			if (!set->name)
+ 				break;
+ 
++			num_settings++;
++
+ 			/* skip unsupported settings for this variant */
+ 			if (pctl->variant && !(pctl->variant & set->variant))
+ 				continue;
+ 
+-			num_settings++;
++			supp_settings++;
+ 
+ 			/* find gpio/gpo/gpi settings */
+ 			if (strcmp(set->name, "gpio") == 0)
+@@ -688,7 +691,7 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+ 		}
+ 
+ 		/* skip modes with no settings for this variant */
+-		if (!num_settings)
++		if (!supp_settings)
+ 			continue;
+ 
+ 		grp = mvebu_pinctrl_find_group_by_pid(pctl, mode->pid);
+-- 
+2.1.4
