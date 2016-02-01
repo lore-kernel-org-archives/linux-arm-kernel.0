@@ -1,57 +1,31 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 1 Feb 2016 11:44:26 -0500
-Subject: [PATCH V13 09/10] vfio, platform: add support for ACPI while
- detecting the reset driver
-In-Reply-To: <56AF87E2.8040201@linaro.org>
-References: <1454106914-15857-1-git-send-email-okaya@codeaurora.org>
- <1454106914-15857-10-git-send-email-okaya@codeaurora.org>
- <56AF82FA.7000303@linaro.org> <56AF84F4.2080809@codeaurora.org>
- <56AF87E2.8040201@linaro.org>
-Message-ID: <56AF8B6A.8040504@codeaurora.org>
+From: swise@opengridcomputing.com (Steve Wise)
+Date: Mon, 1 Feb 2016 10:45:04 -0600
+Subject: [PATCH] infiniband: cxgb4: use %pR format string for printing
+ resources
+In-Reply-To: <2278867.O0SM8nbQp0@wuerfel>
+References: <2278867.O0SM8nbQp0@wuerfel>
+Message-ID: <025701d15d0f$e67ed760$b37c8620$@opengridcomputing.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/1/2016 11:29 AM, Eric Auger wrote:
->> hanks, we should ask Baptiste to get his email into the Maintainer file list.
-> I think it is:
-> ./scripts/get_maintainer.pl
-> 0001-vfio-platform-add-support-for-ACPI-while-detecting-t.patch
+
+> Subject: [PATCH] infiniband: cxgb4: use %pR format string for printing resources
 > 
-> Baptiste Reynal <b.reynal@virtualopensystems.com> (maintainer:VFIO
-> PLATFORM DRIVER,commit_signer:1/5=20%)
-> Alex Williamson <alex.williamson@redhat.com> (maintainer:VFIO
-> DRIVER,commit_signer:2/3=67%,commit_signer:4/5=80%)
-> ../..
-
-Strange, I'll reset my tree. 
-
->> > 
->>> >>
->>> >> On my side I tested with of amd xgbe and I don't observe any regression.
->>> >>
->>> >> Best Regards
->> > 
->> > Can I add your tested by?
-> Well to make things clear I did not test the ACPI part. I just can tell
-> this does not bring any regression on the of part. But I am not against
-> if you don't find anybody else and you tested the ACPI part ;-)
+> The cxgb4 prints an MMIO resource using the "0x%x" and "%p" format
+> strings on the length and start, respective, but that
+> triggers a compiler warning when using a 64-bit resource_size_t
+> on a 32-bit architecture:
 > 
-
-How about?
-
-of-tested-by: ...
-
-Shanker and I tested ACPI before pushing the patches to the list and we also 
-posted the corresponding QEMU patches as well to the qemu-devel maillist.
-
-http://patchwork.ozlabs.org/patch/575878/
-
-I'll ask him to add his acpi-tested-by for the ACPI part.
-
-> Best Regards
+> drivers/infiniband/hw/cxgb4/device.c: In function 'c4iw_rdev_open':
+> drivers/infiniband/hw/cxgb4/device.c:807:7: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+>        (void *)pci_resource_start(rdev->lldi.pdev, 2),
+> 
+> This changes the format string to use %pR instead, which pretty-prints
+> the resource, avoids the warning and is shorter.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> This is an old warning I see rarely on ARM randconfig builds.
 
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Acked-by: Steve Wise <swise@opengridcomputing.com>
