@@ -1,57 +1,29 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 1 Feb 2016 10:23:45 +0000
-Subject: [PATCH] arm64: mm: dump: Use VA_START directly instead of
- private LOWEST_ADDR
-In-Reply-To: <1454140521-741-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1454140521-741-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <20160201102345.GB674@leverpostej>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 1 Feb 2016 11:28:39 +0100
+Subject: [PATCH] soc: mediatek: SCPSYS: Fix double enabling of regulators
+In-Reply-To: <CAGS+omD=ZdLoT8fZ_vq4CvdCvAwsz2tbdEzS5Q8pAL5zAKW5yA@mail.gmail.com>
+References: <1453466365-24406-1-git-send-email-s.hauer@pengutronix.de>
+ <CAGS+omD=ZdLoT8fZ_vq4CvdCvAwsz2tbdEzS5Q8pAL5zAKW5yA@mail.gmail.com>
+Message-ID: <56AF3357.1040707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 30, 2016 at 03:55:21PM +0800, Kefeng Wang wrote:
-> Use VA_START macro in asm/memory.h instead of private LOWEST_ADDR
-> definition in dump.c.
-> 
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 
-FWIW:
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+On 22/01/16 20:26, Daniel Kurtz wrote:
+> On Fri, Jan 22, 2016 at 4:39 AM, Sascha Hauer<s.hauer@pengutronix.de>  wrote:
+>> >
+>> >With CONFIG_PM enabled do not call genpd->power_on manually as this
+>> >will cause the regulators being turned on once in SCPSYS probe and
+>> >then again when the genpd core turns on the domains. Instead, call
+>> >genpd->power_on only with CONFIG_PM disabled and tell the genpd core
+>> >that the domains are disabled when registered.
+>> >
+>> >Signed-off-by: Sascha Hauer<s.hauer@pengutronix.de>
+> Take your pick:
+> Tested-by: Daniel Kurtz<djkurtz@chromium.org>
+> Reviewed-by: Daniel Kurtz<djkurtz@chromium.org>
+>
+>> >---
 
-Mark.
-
-> ---
->  arch/arm64/mm/dump.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-> index 0adbebb..b3c62b1 100644
-> --- a/arch/arm64/mm/dump.c
-> +++ b/arch/arm64/mm/dump.c
-> @@ -27,8 +27,6 @@
->  #include <asm/pgtable.h>
->  #include <asm/pgtable-hwdef.h>
->  
-> -#define LOWEST_ADDR	(UL(0xffffffffffffffff) << VA_BITS)
-> -
->  struct addr_marker {
->  	unsigned long start_address;
->  	const char *name;
-> @@ -316,7 +314,7 @@ static int ptdump_show(struct seq_file *m, void *v)
->  		.marker = address_markers,
->  	};
->  
-> -	walk_pgd(&st, &init_mm, LOWEST_ADDR);
-> +	walk_pgd(&st, &init_mm, VA_START);
->  
->  	note_page(&st, 0, 0, 0);
->  	return 0;
-> -- 
-> 2.6.0.GIT
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Applied, thanks.
