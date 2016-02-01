@@ -1,67 +1,40 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Mon, 1 Feb 2016 22:55:32 +0100
-Subject: [PATCH 1/2] clocksource/drivers/lpc32xx: Support periodic mode
-In-Reply-To: <CAAEAJfD8LUV=t97RN3U4uqgzCLP89AQtHqBccKGd6-EskP9DOQ@mail.gmail.com>
-References: <1454136379-7517-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <CAGhQ9VxO7Rsus8Js_oZDBxWzEHuUHnRyoVTVmawbtXmK7tNMcw@mail.gmail.com>
- <CAAEAJfAVTJm-PzhjkRmkdNG39sH7eHyEXaSX4q0=TCQ0468Heg@mail.gmail.com>
- <CAAEAJfD8LUV=t97RN3U4uqgzCLP89AQtHqBccKGd6-EskP9DOQ@mail.gmail.com>
-Message-ID: <CAGhQ9VxtqkW4PLrpQWsyZu9bgB_98mmO=WZ7gvaeN_DWQ5M3rg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon,  1 Feb 2016 23:02:48 +0100
+Subject: [PATCH] mtd: map: fix .set_vpp() documentation
+Message-ID: <1454364168-1342-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 February 2016 at 16:09, Ezequiel Garcia
-<ezequiel@vanguardiasur.com.ar> wrote:
-> On 31 January 2016 at 17:07, Ezequiel Garcia
-> <ezequiel@vanguardiasur.com.ar> wrote:
->> On 30 January 2016 at 16:39, Joachim  Eastwood <manabian@gmail.com> wrote:
->>> Hi Ezequiel,
->>>
->>> On 30 January 2016 at 07:46, Ezequiel Garcia
->>> <ezequiel@vanguardiasur.com.ar> wrote:
->>>> This commit adds the support for periodic mode. This is done by not
->>>> setting the MR0S (Stop on TnMR0) bit on MCR, thus allowing
->>>> interrupts to be periodically generated on MR0 matches.
->>>>
->>>> In order to do this, move the initial configuration that is specific to
->>>> the one shot mode to clock_event_device.set_state_oneshot.
->>>>
-> [...]
->>
->>>
->>> I will look more closely at the new timer setup later.
->>>
->>> btw, didn't I look through a version of this you sent me privately
->>> quite some time ago?
->>> I think I had a comment about using TIMER_PR instead of TIMER_MR0
->>> then. Unsure if that is still valid, though.
->>>
->>
->> Ah, right. It was ages ago, and forgot your previous review. Sorry about that.
->> Using TIMER_PR looks less invasive so I'll send a v2 using it instead.
->
-> Actually, using the prescale counter and MR0 = 1 resulted in exactly
-> half the number of interrupts that I expected (HZ / 2). Using this
-> patch, with PR=0 and MR0=ticks_per_jiggies, I can see HZ no. of
-> interrupts per sec.
->
-> Why did you choose to use the prescale in your oneshot implementation?
+As of commit 876fe76d793d03077eb61ba3afab4a383f46c554
+"mtd: maps: physmap: Add reference counter to set_vpp()"
+the comment in the header file is incorrect and misleading.
+Fix it up.
 
-The clockevent code was copied from arch/arm/mach-lpc32xx/timer.c so
-it's really old code.
-I think it is a strange way to use the timer, but the logic still
-seems good to me.
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Paul Parsons <lost.distance@yahoo.com>
+Fixes: 876fe76d793d ("mtd: maps: physmap: Add reference counter to set_vpp()")
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ include/linux/mtd/map.h | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-> Did you test or measure the timer expire using the PR and MR0 = 1?
-
-I really can't remember. I do remember going through the timer setup
-and it seemed like a valid, albeit slightly strange, way to use the
-timer.
-
-> To be honest, I'm still trying to make some sense out of my results.
-
-I'll see if can find the time to do some more testing over here as well.
-
-
-regards,
-Joachim Eastwood
+diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
+index 58f3ba709ade..5e0eb7ccabd4 100644
+--- a/include/linux/mtd/map.h
++++ b/include/linux/mtd/map.h
+@@ -240,8 +240,11 @@ struct map_info {
+ 	   If there is no cache to care about this can be set to NULL. */
+ 	void (*inval_cache)(struct map_info *, unsigned long, ssize_t);
+ 
+-	/* set_vpp() must handle being reentered -- enable, enable, disable
+-	   must leave it enabled. */
++	/* This will be called with 1 as parameter when the first map user
++	 * needs VPP, and called with 0 when the last user exits. The map
++	 * core maintains a reference counter, and assumes that VPP is a
++	 * global resource applying to all mapped flash chips on the system.
++	 */
+ 	void (*set_vpp)(struct map_info *, int);
+ 
+ 	unsigned long pfow_base;
+-- 
+2.4.3
