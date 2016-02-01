@@ -1,119 +1,72 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 1 Feb 2016 16:40:52 +0100
-Subject: [PATCH v2 07/21] arm64: KVM: VHE: Patch out kern_hyp_va
-In-Reply-To: <56AF5FF1.4010701@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <1453737235-16522-8-git-send-email-marc.zyngier@arm.com>
- <20160201132042.GJ1478@cbox> <56AF5FF1.4010701@arm.com>
-Message-ID: <20160201154052.GE1478@cbox>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 1 Feb 2016 09:40:43 -0600
+Subject: [PATCH V4 1/2] regulator: Add document for MT6323 regulator
+In-Reply-To: <1453896059-44589-1-git-send-email-blogic@openwrt.org>
+References: <1453896059-44589-1-git-send-email-blogic@openwrt.org>
+Message-ID: <20160201154043.GA24185@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 01:38:57PM +0000, Marc Zyngier wrote:
-> On 01/02/16 13:20, Christoffer Dall wrote:
-> > On Mon, Jan 25, 2016 at 03:53:41PM +0000, Marc Zyngier wrote:
-> >> The kern_hyp_va macro is pretty meaninless with VHE, as there is
-> >> only one mapping - the kernel one.
-> >>
-> >> In order to keep the code readable and efficient, use runtime
-> >> patching to replace the 'and' instruction used to compute the VA
-> >> with a 'nop'.
-> >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  arch/arm64/include/asm/kvm_mmu.h | 11 ++++++++++-
-> >>  arch/arm64/kvm/hyp/hyp.h         | 25 ++++++++++++++++++++++---
-> >>  2 files changed, 32 insertions(+), 4 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> >> index d3e6d7b..62f0d14 100644
-> >> --- a/arch/arm64/include/asm/kvm_mmu.h
-> >> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> >> @@ -23,13 +23,16 @@
-> >>  #include <asm/cpufeature.h>
-> >>  
-> >>  /*
-> >> - * As we only have the TTBR0_EL2 register, we cannot express
-> >> + * As ARMv8.0 only has the TTBR0_EL2 register, we cannot express
-> >>   * "negative" addresses. This makes it impossible to directly share
-> >>   * mappings with the kernel.
-> >>   *
-> >>   * Instead, give the HYP mode its own VA region at a fixed offset from
-> >>   * the kernel by just masking the top bits (which are all ones for a
-> >>   * kernel address).
-> >> + *
-> >> + * ARMv8.1 (using VHE) does have a TTBR1_EL2, and doesn't use these
-> >> + * macros (the entire kernel runs at EL2).
-> >>   */
-> >>  #define HYP_PAGE_OFFSET_SHIFT	VA_BITS
-> >>  #define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
-> >> @@ -56,6 +59,8 @@
-> >>  
-> >>  #ifdef __ASSEMBLY__
-> >>  
-> >> +#include <asm/alternative.h>
-> >> +#include <asm/cpufeature.h>
-> >>  #include <asm/kvm_arm.h>
-> >>  
-> >>  .macro setup_vtcr tmp1, tmp2
-> >> @@ -84,7 +89,11 @@
-> >>   * reg: VA to be converted.
-> >>   */
-> >>  .macro kern_hyp_va	reg
-> >> +alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
-> >>  	and	\reg, \reg, #HYP_PAGE_OFFSET_MASK
-> >> +alternative_else
-> >> +	nop
-> >> +alternative_endif
-> >>  .endm
-> >>  
-> >>  #else
-> >> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-> >> index fb27517..fc502f3 100644
-> >> --- a/arch/arm64/kvm/hyp/hyp.h
-> >> +++ b/arch/arm64/kvm/hyp/hyp.h
-> >> @@ -25,9 +25,28 @@
-> >>  
-> >>  #define __hyp_text __section(.hyp.text) notrace
-> >>  
-> >> -#define kern_hyp_va(v) (typeof(v))((unsigned long)(v) & HYP_PAGE_OFFSET_MASK)
-> >> -#define hyp_kern_va(v) (typeof(v))((unsigned long)(v) - HYP_PAGE_OFFSET \
-> >> -						      + PAGE_OFFSET)
-> >> +static inline unsigned long __kern_hyp_va(unsigned long v)
-> >> +{
-> >> +	asm volatile(ALTERNATIVE("and %0, %0, %1",
-> >> +				 "nop",
-> >> +				 ARM64_HAS_VIRT_HOST_EXTN)
-> >> +		     : "+r" (v) : "i" (HYP_PAGE_OFFSET_MASK));
-> >> +	return v;
-> >> +}
-> >> +
-> >> +#define kern_hyp_va(v) (typeof(v))(__kern_hyp_va((unsigned long)(v)))
-> >> +
-> >> +static inline unsigned long __hyp_kern_va(unsigned long v)
-> >> +{
-> >> +	u64 offset = PAGE_OFFSET - HYP_PAGE_OFFSET;
-> >> +	asm volatile(ALTERNATIVE("add %0, %0, %1",
-> >> +				 "nop",
-> >> +				 ARM64_HAS_VIRT_HOST_EXTN)
-> >> +		     : "+r" (v) : "r" (offset));
-> >> +	return v;
-> >> +}
-> >> +
-> >> +#define hyp_kern_va(v) (typeof(v))(__hyp_kern_va((unsigned long)(v)))
-> > 
-> > why do we need this casting of values instead of just defining these
-> > inlines and calling them directly with proper typing?
+On Wed, Jan 27, 2016 at 01:00:58PM +0100, John Crispin wrote:
+> Signed-off-by: John Crispin <blogic@openwrt.org>
+> Cc: devicetree at vger.kernel.org
 > 
-> We commonly pass both pointers and unsigned long to this helper. Do you
-> really want a separate helper for each type instead of one that does it all?
+> ---
+> Changes in V4
+> * regulator is a subnode and not a property
 > 
+> Changes in V3
+> * fix the subject prefix
+> 
+>  .../bindings/regulator/mt6323-regulator.txt        |  244 ++++++++++++++++++++
+>  1 file changed, 244 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
 
-no, what I was suggesting was to always take a specific type and change
-the callers that don't match to use a specific cast so you give the
-compiler a chance to scream at you when writing new code.
+A few nits, otherwise:
 
-But I don't feel strongly about it.
+Acked-by: Rob Herring <robh@kernel.org>
 
-Thanks,
--Christoffer
+> 
+> diff --git a/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+> new file mode 100644
+> index 0000000..1ee3dd4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+> @@ -0,0 +1,244 @@
+> +Mediatek MT6323 Regulator Driver
+> +
+> +Required properties:
+> +- compatible: "mediatek,mt6323-regulator"
+> +
+> +All voltage regulators are defined as subnodes of the regulator drivers node.
+
+s/drivers//
+
+I believe the standard node name here is "regulators".
+
+> +A list of regulators provided by this controller are defined as subnodes of
+> +the drivers node. Each regulator is named according to its regulator type,
+> +buck_<name> and ldo_<name>. The definition for each of these nodes is defined
+> +using the standard binding for regulators at
+> +Documentation/devicetree/bindings/regulator/regulator.txt.
+> +
+> +The valid names for regulators are::
+> +BUCK:
+> +  buck_vproc, buck_vsys, buck_vpa
+> +LDO:
+> +  ldo_vtcxo, ldo_vcn28, ldo_vcn33_bt, ldo_vcn33_wifi, ldo_va, ldo_vcama,
+> +  ldo_vio28, ldo_vusb, ldo_vmc, ldo_vmch, ldo_vemc3v3, ldo_vgp1, ldo_vgp2,
+> +  ldo_vgp3, ldo_vcn18, ldo_vsim1, ldo_vsim2, ldo_vrtc, ldo_vcamaf, ldo_vibr,
+> +  ldo_vrf18, ldo_vm, ldo_vio18, ldo_vcamd, ldo_vcamio
+> +
+> +Example:
+> +
+> +	pmic: mt6323 {
+> +		compatible = "mediatek,mt6323";
+> +
+> +		mt6323regulator: regulator{
+
+regulators and a space (i.e. "regulators {")
+
+> +			compatible = "mediatek,mt6323-regulator";
+> +
