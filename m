@@ -1,50 +1,43 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 1 Feb 2016 11:16:52 -0500
-Subject: [PATCH V13 09/10] vfio, platform: add support for ACPI while
- detecting the reset driver
-In-Reply-To: <56AF82FA.7000303@linaro.org>
-References: <1454106914-15857-1-git-send-email-okaya@codeaurora.org>
- <1454106914-15857-10-git-send-email-okaya@codeaurora.org>
- <56AF82FA.7000303@linaro.org>
-Message-ID: <56AF84F4.2080809@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Feb 2016 17:18:41 +0100
+Subject: [PATCH] usb: xhci: fix build error for USB_SPEED_SUPER_PLUS
+Message-ID: <1508874.HIZbDSzAVR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/1/2016 11:08 AM, Eric Auger wrote:
->> For ACPI systems, ACPI HID needs to match and compat in the registered
->> > reset
->> > driver needs to match for ACPI reset driver loading to work.
-> Don't really get the sentence. For ACPI systems, a registered reset
-> function is selected if its associated ACPI HID matches the device ACPI HID?
+A recent patch introduced support for superspeed plus (USB3.1), but that
+caused a new gcc warning in the XHCI code:
 
-Old commit message. I did an internal review before posting the patch. The first
-version of the patch was a hack. I simplified the code but forgot to update the 
-commit message.
+usb/host/xhci.c: In function 'xhci_drop_ep_from_interval_table':
+usb/host/xhci.c:2440:2: error: enumeration value 'USB_SPEED_SUPER_PLUS' not handled in switch [-Werror=switch]
 
-Now, the rule is simple.
+This changes the XHCI driver to handle USB_SPEED_SUPER_PLUS the
+same way as USB_SPEED_SUPER in the xhci_drop_ep_from_interval_table
+and xhci_add_ep_to_interval_table functions, explicitly ignoring
+it.
 
-- ACPI HID needs match for ACPI systems
-- DT compat needs to match for OF systems
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 8a1b2725a60d ("usb: define USB_SPEED_SUPER_PLUS speed for SuperSpeedPlus USB3.1 devices")
+---
+Found on ARM randconfig builds last week
 
-as expected. I'll rephrase for the next version.
-
->> > 
->> > For OF based systems, DT compatible string needs to match and compat in the
->> > registered reset driver needs to match for DT reset driver loading to work.
-> same here
-> 
-> I added Baptiste who is vfio platform driver sub-system maintainer.
-
-Thanks, we should ask Baptiste to get his email into the Maintainer file list.
-
-> 
-> On my side I tested with of amd xgbe and I don't observe any regression.
-> 
-> Best Regards
-
-Can I add your tested by?
-
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
+index 26a44c0e969e..a74beec879b4 100644
+--- a/drivers/usb/host/xhci.c
++++ b/drivers/usb/host/xhci.c
+@@ -2448,6 +2448,7 @@ void xhci_drop_ep_from_interval_table(struct xhci_hcd *xhci,
+ 		interval_bw->overhead[HS_OVERHEAD_TYPE] -= 1;
+ 		break;
+ 	case USB_SPEED_SUPER:
++	case USB_SPEED_SUPER_PLUS:
+ 	case USB_SPEED_UNKNOWN:
+ 	case USB_SPEED_WIRELESS:
+ 		/* Should never happen because only LS/FS/HS endpoints will get
+@@ -2507,6 +2508,7 @@ static void xhci_add_ep_to_interval_table(struct xhci_hcd *xhci,
+ 		interval_bw->overhead[HS_OVERHEAD_TYPE] += 1;
+ 		break;
+ 	case USB_SPEED_SUPER:
++	case USB_SPEED_SUPER_PLUS:
+ 	case USB_SPEED_UNKNOWN:
+ 	case USB_SPEED_WIRELESS:
+ 		/* Should never happen because only LS/FS/HS endpoints will get
