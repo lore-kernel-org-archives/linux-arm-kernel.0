@@ -1,101 +1,54 @@
-From: sushaanth.s@ti.com (Sushaanth Srirangapathi)
-Date: Mon, 1 Feb 2016 11:58:49 +0530
-Subject: [PATCH 2/3] Input: tps6507x-ts - Add device tree support
-In-Reply-To: <1454308130-12452-1-git-send-email-sushaanth.s@ti.com>
-References: <1454308130-12452-1-git-send-email-sushaanth.s@ti.com>
-Message-ID: <1454308130-12452-4-git-send-email-sushaanth.s@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 1 Feb 2016 07:32:56 +0100
+Subject: [PATCH 3/3] clk: Provide OF helper to mark clocks as CRITICAL
+In-Reply-To: <56A95811.8010200@arm.com>
+References: <1453127331-20616-1-git-send-email-lee.jones@linaro.org>
+ <1453127331-20616-4-git-send-email-lee.jones@linaro.org>
+ <56A95811.8010200@arm.com>
+Message-ID: <20160201063256.GE32462@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree support for TPS6507x touchscreen input device.
+Hi Andre,
 
-Signed-off-by: Sushaanth Srirangapathi <sushaanth.s@ti.com>
----
- drivers/input/touchscreen/tps6507x-ts.c |   51 ++++++++++++++++++++++++++++---
- 1 file changed, 47 insertions(+), 4 deletions(-)
+On Wed, Jan 27, 2016 at 11:51:45PM +0000, Andr? Przywara wrote:
+> Hi,
+> 
+> On 18/01/16 14:28, Lee Jones wrote:
+> > This call matches clocks which have been marked as critical in DT
+> > and sets the appropriate flag.  These flags can then be used to
+> > mark the clock core flags appropriately prior to registration.
+> 
+> I like the idea of having a generic property very much. Also this solves
+> a problem I have in a very elegant way.
 
-diff --git a/drivers/input/touchscreen/tps6507x-ts.c b/drivers/input/touchscreen/tps6507x-ts.c
-index a340bfc..4c28369 100644
---- a/drivers/input/touchscreen/tps6507x-ts.c
-+++ b/drivers/input/touchscreen/tps6507x-ts.c
-@@ -19,6 +19,7 @@
- #include <linux/input.h>
- #include <linux/input-polldev.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
- #include <linux/mfd/tps6507x.h>
- #include <linux/input/tps6507x-ts.h>
- #include <linux/delay.h>
-@@ -32,6 +33,10 @@
- 					 TPS6507X_ADCONFIG_INPUT_REAL_TSC)
- #define	TPS6507X_ADCONFIG_POWER_DOWN_TS (TPS6507X_ADCONFIG_INPUT_REAL_TSC)
- 
-+#define TPS6507X_VENDOR 0
-+#define TPS6507X_PRODUCT 65070
-+#define TPS6507X_VERSION 0x100
-+
- struct ts_event {
- 	u16	x;
- 	u16	y;
-@@ -199,6 +204,44 @@ done:
- 	tps6507x_adc_standby(tsc);
- }
- 
-+static struct tps6507x_board *tps6507x_ts_parse_dt_reg_data(
-+		struct platform_device *pdev) {
-+	struct tps6507x_board *tps_board;
-+	struct device_node *np = pdev->dev.parent->of_node;
-+	struct touchscreen_init_data *reg_data;
-+	struct device_node *touchscreen;
-+	u32 min_pressure;
-+
-+	tps_board = devm_kzalloc(&pdev->dev, sizeof(*tps_board),
-+				GFP_KERNEL);
-+	if (!tps_board)
-+		return NULL;
-+
-+	touchscreen = of_get_child_by_name(np, "touchscreen");
-+	if (!touchscreen) {
-+		dev_err(&pdev->dev, "touchscreen node not found\n");
-+		return NULL;
-+	}
-+
-+	reg_data = devm_kzalloc(&pdev->dev, sizeof(struct touchscreen_init_data),
-+				GFP_KERNEL);
-+	if (!reg_data)
-+		return NULL;
-+
-+	reg_data->poll_period = TSC_DEFAULT_POLL_PERIOD;
-+	reg_data->vendor = TPS6507X_VENDOR;
-+	reg_data->product = TPS6507X_PRODUCT;
-+	reg_data->version = TPS6507X_VERSION;
-+	if (!of_property_read_u32(touchscreen, "ti,min-pressure",
-+				&min_pressure))
-+		reg_data->min_pressure = min_pressure;
-+	else
-+		reg_data->min_pressure = TPS_DEFAULT_MIN_PRESSURE;
-+	tps_board->tps6507x_ts_init_data = reg_data;
-+
-+	return tps_board;
-+}
-+
- static int tps6507x_ts_probe(struct platform_device *pdev)
- {
- 	struct tps6507x_dev *tps6507x_dev = dev_get_drvdata(pdev->dev.parent);
-@@ -214,10 +257,10 @@ static int tps6507x_ts_probe(struct platform_device *pdev)
- 	 * coming from the board-evm file.
- 	 */
- 	tps_board = dev_get_platdata(tps6507x_dev->dev);
--	if (!tps_board) {
--		dev_err(tps6507x_dev->dev,
--			"Could not find tps6507x platform data\n");
--		return -ENODEV;
-+
-+	if (IS_ENABLED(CONFIG_OF) && !tps_board &&
-+			tps6507x_dev->dev->of_node) {
-+		tps_board = tps6507x_ts_parse_dt_reg_data(pdev);
- 	}
- 
- 	/*
+Not really. It has a significant set of drawbacks that we already
+detailed in the initial thread, which are mostly related to the fact
+that the clocks are to be left on is something that totally depends on
+the software support in the kernel. Some clocks should be reported as
+critical because they are simply missing a driver for it, some should
+be because the driver for it as not been compiled, some should because
+we don't have the proper clocks drivers yet for one of their
+downstream clocks.
+
+Basically, it all boils down to this: some clocks should never ever be
+shutdown because <hardware reason>, and I believe it's the case Lee is
+in. But most of the current code that would use it might, and might
+even need at some point to shut down such a clock.
+
+Mike's solution with the flags + handover was solving all this, I'm
+not sure why he's not pushed it forward.
+
+Maxime
+
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160201/7cc643aa/attachment.sig>
