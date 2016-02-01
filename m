@@ -1,39 +1,117 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon,  1 Feb 2016 22:42:47 +0800
-Subject: [PATCH 0/2] clk: sunxi: Fix APBS clock for Allwinner A80
-Message-ID: <1454337769-4130-1-git-send-email-wens@csie.org>
+Date: Mon,  1 Feb 2016 22:42:48 +0800
+Subject: [PATCH 1/2] clk: sunxi: Add support for A80 APBS clock
+In-Reply-To: <1454337769-4130-1-git-send-email-wens@csie.org>
+References: <1454337769-4130-1-git-send-email-wens@csie.org>
+Message-ID: <1454337769-4130-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+A80's APBS clock is not the same as the APB0 clock on A23. The A80's
+is a zero-based divider, while the A23's is a power-of-two divider.
 
-When I did the A80 PRCM support, I failed to notice the A80's APBS clock
-was not the same as the A23's APB0 clock. The former is a zero-based
-divider, while the latter is a power-of-two divider. But the lowest 2
-dividers are the same.
-
-The hardware defaults to the lowest setting, or a /1 divider. Since the
-child gates do not propagate clk_set_rate up, and no consumers here do
-clk_set_rate, this actually works.
-
-I realized my mistake while reviewing the A83T's PRCM patches. The A83T
-shares the same PRCM clocks as the A80.
-
-
-Regards
-ChenYu
-
-
-Chen-Yu Tsai (2):
-  clk: sunxi: Add support for A80 APBS clock
-  ARM: dts: sun9i: Fix apbs clock compatible
-
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
- arch/arm/boot/dts/sun9i-a80.dtsi                  |  2 +-
  drivers/clk/sunxi/Makefile                        |  2 +-
  drivers/clk/sunxi/clk-sun9i-apbs.c                | 64 +++++++++++++++++++++++
- 4 files changed, 67 insertions(+), 2 deletions(-)
+ 3 files changed, 66 insertions(+), 1 deletion(-)
  create mode 100644 drivers/clk/sunxi/clk-sun9i-apbs.c
 
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index e59f57b24777..fad81157798c 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -58,6 +58,7 @@ Required properties:
+ 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+ 	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
+ 	"allwinner,sun8i-h3-bus-gates-clk" - for the bus gates on H3
++	"allwinner,sun9i-a80-apbs-clk" - for the APBS clock on A80
+ 	"allwinner,sun9i-a80-apbs-gates-clk" - for the APBS gates on A80
+ 	"allwinner,sun4i-a10-dram-gates-clk" - for the DRAM gates on A10
+ 	"allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
+diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+index 3fd7901d48e4..df433b3f789d 100644
+--- a/drivers/clk/sunxi/Makefile
++++ b/drivers/clk/sunxi/Makefile
+@@ -17,7 +17,7 @@ obj-y += clk-sun9i-core.o
+ obj-y += clk-sun9i-mmc.o
+ obj-y += clk-usb.o
+ 
+-obj-$(CONFIG_MACH_SUN9I) += clk-sun8i-apb0.o
++obj-$(CONFIG_MACH_SUN9I) += clk-sun9i-apbs.o
+ obj-$(CONFIG_MACH_SUN9I) += clk-sun9i-cpus.o
+ 
+ obj-$(CONFIG_MFD_SUN6I_PRCM) += \
+diff --git a/drivers/clk/sunxi/clk-sun9i-apbs.c b/drivers/clk/sunxi/clk-sun9i-apbs.c
+new file mode 100644
+index 000000000000..aacb92873621
+--- /dev/null
++++ b/drivers/clk/sunxi/clk-sun9i-apbs.c
+@@ -0,0 +1,64 @@
++/*
++ * Copyright (C) 2016 Chen-Yu Tsai
++ * Author: Chen-Yu Tsai <wens@csie.org>
++ *
++ * Allwinner A80 APBS clock driver
++ *
++ * License Terms: GNU General Public License v2
++ *
++ * Based on clk-sun6i-apbs.c
++ * Allwinner A31 APB0 clock driver
++ *
++ * Copyright (C) 2014 Free Electrons
++ * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
++ *
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++
++static void sun9i_apbs_setup(struct device_node *node)
++{
++	const char *name = node->name;
++	const char *parent;
++	struct resource res;
++	struct clk *clk;
++	void __iomem *reg;
++	int ret;
++
++	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
++	if (IS_ERR(reg)) {
++		pr_err("Could not get registers for a80-apbs-clk\n");
++		return;
++	}
++
++	parent = of_clk_get_parent_name(node, 0);
++	if (!parent)
++		return;
++
++	of_property_read_string(node, "clock-output-names", &name);
++
++	/* The A80 APBS clock is a standard 2 bit wide divider clock */
++	clk = clk_register_divider(NULL, name, parent, 0, reg, 0, 2, 0, NULL);
++	if (IS_ERR(clk)) {
++		pr_err("failed to register a80-apbs-clk: %ld\n", PTR_ERR(clk));
++		goto err_unmap;
++	}
++
++	ret = of_clk_add_provider(node, of_clk_src_simple_get, clk);
++	if (ret)
++		goto err_unregister;
++
++	return;
++
++err_unregister:
++	clk_unregister_divider(clk);
++err_unmap:
++	iounmap(reg);
++	of_address_to_resource(node, 0, &res);
++	release_mem_region(res.start, resource_size(&res));
++}
++CLK_OF_DECLARE(sun9i_apbs, "allwinner,sun9i-a80-apbs-clk", sun9i_apbs_setup);
 -- 
 2.7.0
