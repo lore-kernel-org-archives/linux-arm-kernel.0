@@ -1,380 +1,142 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 1 Feb 2016 21:46:07 +0800
-Subject: [PATCH v4 2/2] ARM: dts: imx6: Add support for Toradex Ixora
- carrier board
-In-Reply-To: <1453675703-31594-3-git-send-email-marcel.ziswiler@toradex.com>
-References: <1453675703-31594-1-git-send-email-marcel.ziswiler@toradex.com>
- <1453675703-31594-3-git-send-email-marcel.ziswiler@toradex.com>
-Message-ID: <20160201134606.GG10671@tiger>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 1 Feb 2016 14:47:32 +0100
+Subject: [PATCH v2 08/21] arm64: KVM: VHE: Introduce unified system
+ register accessors
+In-Reply-To: <1453737235-16522-9-git-send-email-marc.zyngier@arm.com>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <1453737235-16522-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160201134732.GK1478@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 24, 2016 at 11:48:23PM +0100, Marcel Ziswiler wrote:
-> From: Petr ?tetiar <ynezz@true.cz>
+On Mon, Jan 25, 2016 at 03:53:42PM +0000, Marc Zyngier wrote:
+> VHE brings its own bag of new system registers, or rather system
+> register accessors, as it define new ways to access both guest
+> and host system registers. For example, from the host:
 > 
-> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> Signed-off-by: Petr ?tetiar <ynezz@true.cz>
-> Reviewed-by: Stefan Agner <stefan@agner.ch>
+> - The host TCR_EL2 register is accessed using the TCR_EL1 accessor
+> - The guest TCR_EL1 register is accessed using the TCR_EL12 accessor
+> 
+> Obviously, this is confusing. A way to somehow reduce the complexity
+> of writing code for both ARMv8 and ARMv8.1 is to use a set of unified
+> accessors that will generate the right sysreg, depending on the mode
+> the CPU is running in. For example:
+> 
+> - read_sysreg_el1(tcr) will use TCR_EL1 on ARMv8, and TCR_EL12 on
+>   ARMv8.1 with VHE.
+> - read_sysreg_el2(tcr) will use TCR_EL2 on ARMv8, and TCR_EL1 on
+>   ARMv8.1 with VHE.
+> 
+> We end up with three sets of accessors ({read,write}_sysreg_el[012])
+> that can be directly used from C code. We take this opportunity to
+> also add the definition for the new VHE sysregs.(
 
-Copy my Linaro mailbox is unnecessary.  The kernel.org one is good
-enough for me to receive your patch.
+weird closing parenthesis.
 
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
+>  arch/arm64/kvm/hyp/hyp.h | 72 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 72 insertions(+)
 > 
-> Changes in v4: None
-> Changes in v3:
-> - integrated review feedback from Petr
-> - integrated review feedback from Stefan
-> - fix comment concerning Apalis GPIO usage as GPIO7 is only used for PCIe switch reset on Apalis Evaluation board
-> - move I2C DDC handling into carrier board DTS where it belongs
-> - simplify RTC alias
-> 
-> Changes in v2:
-> - clarify exact Apalis iMX6Q/D SoM type in cover letter
-> - clarify exact Apalis iMX6Q/D module type and Ixora carrier board in model
->   node
-> - got rid of obsolete mmc aliases
-> - working SGTL5000 audio/sound integration
-> - working STMPE811 touch screen controller integration
-> - integrated review feedback from Lucas
-> - left and even added some more comments as I don't see why putting any
->   explanatory comments in dts' should be such a bad thing to do
-> - completely got rid of the memory node as that is something typically filled
->   in by the boot loader e.g. U-Boot
-> - without the regulators simple-bus it no longer boots
-> - even though we supposedly shipped a few hundred V1.0a modules drop DCE UART
->   support for now and simplify file layout
-> - replaced obsolete no-1-8-v by mainline supported voltage-ranges = <3300 3300>
->   usdhc property and yes card detects are indeed active low (;-p)
-> - integrated review feedback from Stefan
-> - fixed Ethernet PHY reset & interrupt (requires Micrel PHY driver to be
->   enabled)
-> - fixed HDMI DDC (requires GPIO-based bitbanging I2C to be enabled)
-> - fixed SPDIF
-> 
->  arch/arm/boot/dts/Makefile               |   1 +
->  arch/arm/boot/dts/imx6q-apalis-ixora.dts | 275 +++++++++++++++++++++++++++++++
->  2 files changed, 276 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6q-apalis-ixora.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index a4a6d70..0d5e11b 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -317,6 +317,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->  	imx6dl-udoo.dtb \
->  	imx6dl-wandboard.dtb \
->  	imx6dl-wandboard-revb1.dtb \
-> +	imx6q-apalis-ixora.dtb \
->  	imx6q-apf6dev.dtb \
->  	imx6q-arm2.dtb \
->  	imx6q-cm-fx6.dtb \
-> diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora.dts b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-> new file mode 100644
-> index 0000000..28f3b34
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-> @@ -0,0 +1,275 @@
+> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+> index fc502f3..744c919 100644
+> --- a/arch/arm64/kvm/hyp/hyp.h
+> +++ b/arch/arm64/kvm/hyp/hyp.h
+> @@ -48,6 +48,78 @@ static inline unsigned long __hyp_kern_va(unsigned long v)
+>  
+>  #define hyp_kern_va(v) (typeof(v))(__hyp_kern_va((unsigned long)(v)))
+>  
+> +#define read_sysreg_elx(r,nvh,vh)					\
+> +	({								\
+> +		u64 reg;						\
+> +		asm volatile(ALTERNATIVE("mrs %0, " __stringify(r##nvh),\
+> +					 "mrs_s %0, " __stringify(r##vh),\
+> +					 ARM64_HAS_VIRT_HOST_EXTN)	\
+> +			     : "=r" (reg));				\
+> +		reg;							\
+> +	})
+> +
+> +#define write_sysreg_elx(v,r,nvh,vh)					\
+> +	do {								\
+> +		u64 __val = (u64)(v);					\
+> +		asm volatile(ALTERNATIVE("msr " __stringify(r##nvh) ", %x0",\
+> +					 "msr_s " __stringify(r##vh) ", %x0",\
+> +					 ARM64_HAS_VIRT_HOST_EXTN)	\
+> +					 : : "rZ" (__val));		\
+
+what is rZ ?
+(complete Google-fu failure misery)
+
+> +	} while (0)
+> +
 > +/*
-> + * Copyright 2014-2016 Toradex AG
-> + * Copyright 2012 Freescale Semiconductor, Inc.
-> + * Copyright 2011 Linaro Ltd.
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License
-> + *     version 2 as published by the Free Software Foundation.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + * Unified accessors for registers that have a different encoding
+> + * between VHE and non-VHE. They must be specified without their "ELx"
+> + * encoding.
 > + */
+> +#define read_sysreg_el2(r)						\
+> +	({								\
+> +		u64 reg;						\
+> +		asm volatile(ALTERNATIVE("mrs %0, " __stringify(r##_EL2),\
+> +					 "mrs %0, " __stringify(r##_EL1),\
+> +					 ARM64_HAS_VIRT_HOST_EXTN)	\
+> +			     : "=r" (reg));				\
+> +		reg;							\
+> +	})
 > +
-> +/dts-v1/;
+> +#define write_sysreg_el2(v,r)						\
+> +	do {								\
+> +		u64 __val = (u64)(v);					\
+> +		asm volatile(ALTERNATIVE("msr " __stringify(r##_EL2) ", %x0",\
+> +					 "msr " __stringify(r##_EL1) ", %x0",\
+> +					 ARM64_HAS_VIRT_HOST_EXTN)	\
+> +					 : : "rZ" (__val));		\
+> +	} while (0)
 > +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +#include "imx6q.dtsi"
-> +#include "imx6qdl-apalis.dtsi"
+> +#define read_sysreg_el0(r)	read_sysreg_elx(r, _EL0, _EL02)
+> +#define write_sysreg_el0(v,r)	write_sysreg_elx(v, r, _EL0, _EL02)
+> +#define read_sysreg_el1(r)	read_sysreg_elx(r, _EL1, _EL12)
+> +#define write_sysreg_el1(v,r)	write_sysreg_elx(v, r, _EL1, _EL12)
 > +
-> +/ {
-> +	model = "Toradex Apalis iMX6Q/D Module on Ixora Carrier Board";
-> +	compatible = "toradex,apalis_imx6q-ixora", "toradex,apalis_imx6q",
-> +		     "fsl,imx6q";
-> +
-> +	aliases {
-> +		i2c0 = &i2cddc;
-> +		i2c1 = &i2c1;
-> +		i2c2 = &i2c2;
-> +		i2c3 = &i2c3;
-> +	};
-> +
-> +	aliases {
-> +		rtc0 = &rtc_i2c;
-> +		rtc1 = &snvs_rtc;
-> +	};
-> +
-> +	gpio-keys {
-> +		compatible = "gpio-keys";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_gpio_keys>;
-> +
-> +		wakeup {
-> +			label = "Wake-Up";
-> +			gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
-> +			linux,code = <KEY_WAKEUP>;
-> +			debounce-interval = <10>;
-> +			gpio-key,wakeup;
+> +/* The VHE specific system registers and their encoding */
+> +#define sctlr_EL12              sys_reg(3, 5, 1, 0, 0)
+> +#define cpacr_EL12              sys_reg(3, 5, 1, 0, 2)
+> +#define ttbr0_EL12              sys_reg(3, 5, 2, 0, 0)
+> +#define ttbr1_EL12              sys_reg(3, 5, 2, 0, 1)
+> +#define tcr_EL12                sys_reg(3, 5, 2, 0, 2)
+> +#define afsr0_EL12              sys_reg(3, 5, 5, 1, 0)
+> +#define afsr1_EL12              sys_reg(3, 5, 5, 1, 1)
+> +#define esr_EL12                sys_reg(3, 5, 5, 2, 0)
+> +#define far_EL12                sys_reg(3, 5, 6, 0, 0)
+> +#define mair_EL12               sys_reg(3, 5, 10, 2, 0)
+> +#define amair_EL12              sys_reg(3, 5, 10, 3, 0)
+> +#define vbar_EL12               sys_reg(3, 5, 12, 0, 0)
+> +#define contextidr_EL12         sys_reg(3, 5, 13, 0, 1)
+> +#define cntkctl_EL12            sys_reg(3, 5, 14, 1, 0)
+> +#define cntp_tval_EL02          sys_reg(3, 5, 14, 2, 0)
+> +#define cntp_ctl_EL02           sys_reg(3, 5, 14, 2, 1)
+> +#define cntp_cval_EL02          sys_reg(3, 5, 14, 2, 2)
+> +#define cntv_tval_EL02          sys_reg(3, 5, 14, 3, 0)
+> +#define cntv_ctl_EL02           sys_reg(3, 5, 14, 3, 1)
+> +#define cntv_cval_EL02          sys_reg(3, 5, 14, 3, 2)
 
-Please take a look at the following commit, which converts the legacy
-wakeup properties to the new generic one.
+as always, fun stuff to review.
 
-https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/dt&id=1c49ad21c2cae607193da4495489c751d7147df2
+> +#define spsr_EL12               sys_reg(3, 5, 4, 0, 0)
+> +#define elr_EL12                sys_reg(3, 5, 4, 0, 1)
+> +
 
-> +		};
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_leds_ixora>;
-> +
-> +		led4-green {
-> +			label = "LED_4_GREEN";
-> +			gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
-> +		};
-> +
-> +		led4-red {
-> +			label = "LED_4_RED";
-> +			gpios = <&gpio1 21 GPIO_ACTIVE_HIGH>;
-> +		};
-> +
-> +		led5-green {
-> +			label = "LED_5_GREEN";
-> +			gpios = <&gpio2 1 GPIO_ACTIVE_HIGH>;
-> +		};
-> +
-> +		led5-red {
-> +			label = "LED_5_RED";
-> +			gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;
-> +		};
-> +	};
-> +
-> +	pwmleds {
-> +		compatible = "pwm-leds";
+I couldn't quite decipher the spec as to how these are the right
+instruction encodings, so I'm going to trust the testing that this is
+done right.
 
-Have a new line between properties and sub-node.
-
-> +		ledpwm1 {
-> +			label = "PWM1";
-> +			pwms = <&pwm1 0 50000>;
-> +			max-brightness = <255>;
-> +		};
-> +
-> +		ledpwm2 {
-> +			label = "PWM2";
-> +			pwms = <&pwm2 0 50000>;
-> +			max-brightness = <255>;
-> +		};
-> +
-> +		ledpwm3 {
-> +			label = "PWM3";
-> +			pwms = <&pwm3 0 50000>;
-> +			max-brightness = <255>;
-> +		};
-> +	};
-> +
-> +	regulators {
-> +		reg_usb_otg_vbus: usb_otg_vbus {
-> +			status = "okay";
-> +		};
-
-It can be as simple as the following.
-
-&reg_usb_otg_vbus {
-	status = "okay";
-};
-
-> +
-> +		reg_usb_host_vbus: usb_host_vbus {
-> +			status = "okay";
-> +		};
-> +	};
-> +};
-> +
-> +&backlight {
-> +	brightness-levels = <0 127 191 223 239 247 251 255>;
-> +	default-brightness-level = <1>;
-> +	status = "okay";
-> +};
-> +
-> +&can1 {
-> +	status = "okay";
-> +};
-> +
-> +&can2 {
-> +	status = "okay";
-> +};
-> +
-> +&hdmi {
-> +	ddc-i2c-bus = <&i2cddc>;
-> +	status = "okay";
-> +};
-> +
-> +&i2cddc {
-> +	status = "okay";
-> +};
-> +
-> +/* GEN1_I2C: I2C1_SDA/SCL on MXM3 209/211 (e.g. RTC on carrier board) */
-> +&i2c1 {
-> +	status = "okay";
-> +
-> +	eeprom at 50 {
-> +		compatible = "atmel,24c02";
-> +		reg = <0x50>;
-> +	};
-> +
-> +	/* M41T0M6 real time clock on carrier board */
-> +	rtc_i2c: rtc at 68 {
-> +		compatible = "st,m41t00";
-> +		reg = <0x68>;
-> +	};
-> +};
-> +
-> +&ldb {
-> +	status = "okay";
-> +};
-> +
-> +&pcie {
-> +	/* active-low meaning opposite of regular PERST# active-low polarity */
-> +	reset-gpio = <&gpio1 28 GPIO_ACTIVE_LOW>;
-> +	status = "okay";
-> +};
-> +
-> +&pwm1 {
-> +	status = "okay";
-> +};
-> +
-> +&pwm2 {
-> +	status = "okay";
-> +};
-> +
-> +&pwm3 {
-> +	status = "okay";
-> +};
-> +
-> +&pwm4 {
-> +	status = "okay";
-> +};
-> +
-> +&sata {
-> +	status = "okay";
-> +};
-> +
-> +&sound_spdif {
-> +	status = "okay";
-> +};
-> +
-> +&spdif {
-> +	status = "okay";
-> +};
-> +
-> +&uart1 {
-> +	status = "okay";
-> +};
-> +
-> +&uart2 {
-> +	status = "okay";
-> +};
-> +
-> +&uart4 {
-> +	status = "okay";
-> +};
-> +
-> +&uart5 {
-> +	status = "okay";
-> +};
-> +
-> +&usbh1 {
-> +	vbus-supply = <&reg_usb_host_vbus>;
-> +	status = "okay";
-> +};
-> +
-> +&usbotg {
-> +	vbus-supply = <&reg_usb_otg_vbus>;
-> +	status = "okay";
-> +};
-> +
-> +/* SD1 */
-> +&usdhc2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_sd_cd>;
-> +	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
-> +	status = "okay";
-> +};
-> +
-> +&iomuxc {
-> +	/*
-> +	 * Mux the Apalis GPIOs
-> +	 * GPIO5, 6 used by optional fusion_F0710A kernel module
-> +	 */
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_apalis_gpio1 &pinctrl_apalis_gpio2
-> +		     &pinctrl_apalis_gpio3 &pinctrl_apalis_gpio4
-> +		     &pinctrl_apalis_gpio5 &pinctrl_apalis_gpio6
-> +		     &pinctrl_apalis_gpio7 &pinctrl_apalis_gpio8
-
-We can have a single hog group to contain all these pins, I guess.
-
-> +		    >;
-> +
-> +	leds_ixora {
-
-Drop this container node.
-
-Shawn
-
-> +		pinctrl_leds_ixora: leds-ixora {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD1_DAT1__GPIO1_IO17 0x1b0b0
-> +				MX6QDL_PAD_SD1_DAT3__GPIO1_IO21 0x1b0b0
-> +				MX6QDL_PAD_NANDF_D1__GPIO2_IO01 0x1b0b0
-> +				MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x1b0b0
-> +			>;
-> +		};
-> +	};
-> +};
+>  /**
+>   * hyp_alternate_select - Generates patchable code sequences that are
+>   * used to switch between two implementations of a function, depending
 > -- 
-> 2.5.0
+> 2.1.4
 > 
-> 
+
+Thanks,
+-Christoffer
