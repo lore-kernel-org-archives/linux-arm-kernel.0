@@ -1,37 +1,143 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 1 Feb 2016 14:57:36 +0100
-Subject: [PATCH] PM / Domains: mark genpd_poweron as __maybe_unused
-In-Reply-To: <3864075.BdhPDUQ9fB@wuerfel>
-References: <3864075.BdhPDUQ9fB@wuerfel>
-Message-ID: <CAPDyKFpHBgaQEz6kYvhV=2pLPLAtVxQjbnqL4CPv0vyvHZbHWA@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 1 Feb 2016 14:59:09 +0100
+Subject: [PATCH v2 11/21] arm64: KVM: VHE: Use unified system register
+ accessors
+In-Reply-To: <1453737235-16522-12-git-send-email-marc.zyngier@arm.com>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <1453737235-16522-12-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160201135909.GM1478@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 February 2016 at 11:38, Arnd Bergmann <arnd@arndb.de> wrote:
-> The rework of the power domain code has made the genpd_poweron()
-> function local to the file it's defined in, and the only remaining
-> caller is conditionally compiled based on CONFIG_PM_GENERIC_DOMAINS_OF,
-> so we get a warning when that is disabled:
->
-> drivers/base/power/domain.c:234:12: error: 'genpd_poweron' defined but not used [-Werror=unused-function]
->
-> This adds a __maybe_unused annotation to the function so gcc can
-> figure out by itself that it should silently remove the definition
-> in this case.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: ea823c7cbffa ("PM / Domains: Remove pm_genpd_poweron() API")
+On Mon, Jan 25, 2016 at 03:53:45PM +0000, Marc Zyngier wrote:
+> Use the recently introduced unified system register accessors for
+> those sysregs that behave differently depending on VHE being in
+> use or not.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Arnd,
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Thanks for fixing and reporting!
-
-Looking a bit closer to the genpd code in this reagrds, made me
-realize that I think there's a better approach to fix this.
-Instead of going into the details for how, I decided to send a
-separate patch. You are on cc.
-
-"[PATCH] PM / Domains: Silence compiler warning for an unused function".
-
-Kind regards
-Uffe
+> ---
+>  arch/arm64/kvm/hyp/sysreg-sr.c | 84 +++++++++++++++++++++---------------------
+>  1 file changed, 42 insertions(+), 42 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+> index 61bad17..7d7d757 100644
+> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
+> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+> @@ -37,34 +37,34 @@ static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
+>  	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
+>  	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
+>  	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
+> -	ctxt->gp_regs.regs.pc		= read_sysreg(elr_el2);
+> -	ctxt->gp_regs.regs.pstate	= read_sysreg(spsr_el2);
+> +	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
+> +	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
+>  }
+>  
+>  static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
+>  {
+>  	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
+>  	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
+> -	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg(sctlr_el1);
+> -	ctxt->sys_regs[CPACR_EL1]	= read_sysreg(cpacr_el1);
+> -	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg(ttbr0_el1);
+> -	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg(ttbr1_el1);
+> -	ctxt->sys_regs[TCR_EL1]		= read_sysreg(tcr_el1);
+> -	ctxt->sys_regs[ESR_EL1]		= read_sysreg(esr_el1);
+> -	ctxt->sys_regs[AFSR0_EL1]	= read_sysreg(afsr0_el1);
+> -	ctxt->sys_regs[AFSR1_EL1]	= read_sysreg(afsr1_el1);
+> -	ctxt->sys_regs[FAR_EL1]		= read_sysreg(far_el1);
+> -	ctxt->sys_regs[MAIR_EL1]	= read_sysreg(mair_el1);
+> -	ctxt->sys_regs[VBAR_EL1]	= read_sysreg(vbar_el1);
+> -	ctxt->sys_regs[CONTEXTIDR_EL1]	= read_sysreg(contextidr_el1);
+> -	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg(amair_el1);
+> -	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg(cntkctl_el1);
+> +	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg_el1(sctlr);
+> +	ctxt->sys_regs[CPACR_EL1]	= read_sysreg_el1(cpacr);
+> +	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg_el1(ttbr0);
+> +	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg_el1(ttbr1);
+> +	ctxt->sys_regs[TCR_EL1]		= read_sysreg_el1(tcr);
+> +	ctxt->sys_regs[ESR_EL1]		= read_sysreg_el1(esr);
+> +	ctxt->sys_regs[AFSR0_EL1]	= read_sysreg_el1(afsr0);
+> +	ctxt->sys_regs[AFSR1_EL1]	= read_sysreg_el1(afsr1);
+> +	ctxt->sys_regs[FAR_EL1]		= read_sysreg_el1(far);
+> +	ctxt->sys_regs[MAIR_EL1]	= read_sysreg_el1(mair);
+> +	ctxt->sys_regs[VBAR_EL1]	= read_sysreg_el1(vbar);
+> +	ctxt->sys_regs[CONTEXTIDR_EL1]	= read_sysreg_el1(contextidr);
+> +	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg_el1(amair);
+> +	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg_el1(cntkctl);
+>  	ctxt->sys_regs[PAR_EL1]		= read_sysreg(par_el1);
+>  	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
+>  
+>  	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
+> -	ctxt->gp_regs.elr_el1		= read_sysreg(elr_el1);
+> -	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg(spsr_el1);
+> +	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
+> +	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg_el1(spsr);
+>  }
+>  
+>  void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
+> @@ -86,34 +86,34 @@ static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctx
+>  	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
+>  	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
+>  	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
+> -	write_sysreg(ctxt->gp_regs.regs.pc,	  elr_el2);
+> -	write_sysreg(ctxt->gp_regs.regs.pstate,	  spsr_el2);
+> +	write_sysreg_el2(ctxt->gp_regs.regs.pc,	  elr);
+> +	write_sysreg_el2(ctxt->gp_regs.regs.pstate, spsr);
+>  }
+>  
+>  static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+>  {
+> -	write_sysreg(ctxt->sys_regs[MPIDR_EL1],	  vmpidr_el2);
+> -	write_sysreg(ctxt->sys_regs[CSSELR_EL1],  csselr_el1);
+> -	write_sysreg(ctxt->sys_regs[SCTLR_EL1],	  sctlr_el1);
+> -	write_sysreg(ctxt->sys_regs[CPACR_EL1],	  cpacr_el1);
+> -	write_sysreg(ctxt->sys_regs[TTBR0_EL1],	  ttbr0_el1);
+> -	write_sysreg(ctxt->sys_regs[TTBR1_EL1],	  ttbr1_el1);
+> -	write_sysreg(ctxt->sys_regs[TCR_EL1],	  tcr_el1);
+> -	write_sysreg(ctxt->sys_regs[ESR_EL1],	  esr_el1);
+> -	write_sysreg(ctxt->sys_regs[AFSR0_EL1],	  afsr0_el1);
+> -	write_sysreg(ctxt->sys_regs[AFSR1_EL1],	  afsr1_el1);
+> -	write_sysreg(ctxt->sys_regs[FAR_EL1],	  far_el1);
+> -	write_sysreg(ctxt->sys_regs[MAIR_EL1],	  mair_el1);
+> -	write_sysreg(ctxt->sys_regs[VBAR_EL1],	  vbar_el1);
+> -	write_sysreg(ctxt->sys_regs[CONTEXTIDR_EL1], contextidr_el1);
+> -	write_sysreg(ctxt->sys_regs[AMAIR_EL1],	  amair_el1);
+> -	write_sysreg(ctxt->sys_regs[CNTKCTL_EL1], cntkctl_el1);
+> -	write_sysreg(ctxt->sys_regs[PAR_EL1],	  par_el1);
+> -	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
+> -
+> -	write_sysreg(ctxt->gp_regs.sp_el1,	sp_el1);
+> -	write_sysreg(ctxt->gp_regs.elr_el1,	elr_el1);
+> -	write_sysreg(ctxt->gp_regs.spsr[KVM_SPSR_EL1], spsr_el1);
+> +	write_sysreg(ctxt->sys_regs[MPIDR_EL1],		vmpidr_el2);
+> +	write_sysreg(ctxt->sys_regs[CSSELR_EL1],	csselr_el1);
+> +	write_sysreg_el1(ctxt->sys_regs[SCTLR_EL1],	sctlr);
+> +	write_sysreg_el1(ctxt->sys_regs[CPACR_EL1],	cpacr);
+> +	write_sysreg_el1(ctxt->sys_regs[TTBR0_EL1],	ttbr0);
+> +	write_sysreg_el1(ctxt->sys_regs[TTBR1_EL1],	ttbr1);
+> +	write_sysreg_el1(ctxt->sys_regs[TCR_EL1],	tcr);
+> +	write_sysreg_el1(ctxt->sys_regs[ESR_EL1],	esr);
+> +	write_sysreg_el1(ctxt->sys_regs[AFSR0_EL1],	afsr0);
+> +	write_sysreg_el1(ctxt->sys_regs[AFSR1_EL1],	afsr1);
+> +	write_sysreg_el1(ctxt->sys_regs[FAR_EL1],	far);
+> +	write_sysreg_el1(ctxt->sys_regs[MAIR_EL1],	mair);
+> +	write_sysreg_el1(ctxt->sys_regs[VBAR_EL1],	vbar);
+> +	write_sysreg_el1(ctxt->sys_regs[CONTEXTIDR_EL1],contextidr);
+> +	write_sysreg_el1(ctxt->sys_regs[AMAIR_EL1],	amair);
+> +	write_sysreg_el1(ctxt->sys_regs[CNTKCTL_EL1], 	cntkctl);
+> +	write_sysreg(ctxt->sys_regs[PAR_EL1],		par_el1);
+> +	write_sysreg(ctxt->sys_regs[MDSCR_EL1],		mdscr_el1);
+> +
+> +	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
+> +	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
+> +	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
+>  }
+>  
+>  void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
+> -- 
+> 2.1.4
+> 
