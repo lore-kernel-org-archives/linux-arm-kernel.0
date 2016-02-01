@@ -1,43 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Feb 2016 17:18:41 +0100
-Subject: [PATCH] usb: xhci: fix build error for USB_SPEED_SUPER_PLUS
-Message-ID: <1508874.HIZbDSzAVR@wuerfel>
+From: holgerschurig@gmail.com (Holger Schurig)
+Date: Mon, 01 Feb 2016 17:19:16 +0100
+Subject: weird RCU problem with 4.4.0
+Message-ID: <87d1sgl7y3.fsf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent patch introduced support for superspeed plus (USB3.1), but that
-caused a new gcc warning in the XHCI code:
+Hi,
 
-usb/host/xhci.c: In function 'xhci_drop_ep_from_interval_table':
-usb/host/xhci.c:2440:2: error: enumeration value 'USB_SPEED_SUPER_PLUS' not handled in switch [-Werror=switch]
+in the dmesg log (actually "journalctl -f") of one of my machines I had this:
 
-This changes the XHCI driver to handle USB_SPEED_SUPER_PLUS the
-same way as USB_SPEED_SUPER in the xhci_drop_ep_from_interval_table
-and xhci_add_ep_to_interval_table functions, explicitly ignoring
-it.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 8a1b2725a60d ("usb: define USB_SPEED_SUPER_PLUS speed for SuperSpeedPlus USB3.1 devices")
----
-Found on ARM randconfig builds last week
-
-diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
-index 26a44c0e969e..a74beec879b4 100644
---- a/drivers/usb/host/xhci.c
-+++ b/drivers/usb/host/xhci.c
-@@ -2448,6 +2448,7 @@ void xhci_drop_ep_from_interval_table(struct xhci_hcd *xhci,
- 		interval_bw->overhead[HS_OVERHEAD_TYPE] -= 1;
- 		break;
- 	case USB_SPEED_SUPER:
-+	case USB_SPEED_SUPER_PLUS:
- 	case USB_SPEED_UNKNOWN:
- 	case USB_SPEED_WIRELESS:
- 		/* Should never happen because only LS/FS/HS endpoints will get
-@@ -2507,6 +2508,7 @@ static void xhci_add_ep_to_interval_table(struct xhci_hcd *xhci,
- 		interval_bw->overhead[HS_OVERHEAD_TYPE] += 1;
- 		break;
- 	case USB_SPEED_SUPER:
-+	case USB_SPEED_SUPER_PLUS:
- 	case USB_SPEED_UNKNOWN:
- 	case USB_SPEED_WIRELESS:
- 		/* Should never happen because only LS/FS/HS endpoints will get
+...
+03:25:01 CRON[16607]: pam_unix(cron:session): session closed for user root
+INFO: rcu_preempt detected stalls on CPUs/tasks:
+    1-...: (1 GPs behind) idle=763/140000000000000/0 softirq=6109762/6109762 fqs=301
+    2-...: (1 GPs behind) idle=2f3/140000000000000/0 softirq=5129036/5129037 fqs=301
+    (detected by 0, t=303 jiffies, g=2533688, c=2533687, q=4860)
+INFO: rcu_preempt detected stalls on CPUs/tasks:
+    1-...: (1 GPs behind) idle=763/140000000000000/0 softirq=6109762/6109762 fqs=1204
+    2-...: (1 GPs behind) idle=2f3/140000000000000/0 softirq=5129036/5129037 fqs=1205
+    (detected by 0, t=1208 jiffies, g=2533688, c=2533687, q=19822)
+INFO: rcu_preempt detected stalls on CPUs/tasks:
+    1-...: (1 GPs behind) idle=763/140000000000000/0 softirq=6109762/6109762 fqs=2109
+    2-...: (1 GPs behind) idle=2f3/140000000000000/0 softirq=5129036/5129037 fqs=2109
+    (detected by 0, t=2113 jiffies, g=2533688, c=2533687, q=34248)
+INFO: rcu_preempt detected stalls on CPUs/tasks:
+    1-...: (1 GPs behind) idle=763/140000000000000/0 softirq=6109762/6109762 fqs=3011
+    2-...: (1 GPs behind) idle=2f3/140000000000000/0 softirq=5129036/5129037 fqs=3011
+    (detected by 0, t=3018 jiffies, g=2533688, c=2533687, q=48662)
+INFO: rcu_preempt detected stalls on CPUs/tasks:
+    1-...: (1 GPs behind) idle=763/140000000000000/0 softirq=6109762/6109762 fqs=3912
+    2-...: (1 GPs behind) idle=2f3/140000000000000/0 softirq=5129036/5129037 fqs=3912
+    (detected by 0, t=3923 jiffies, g=2533688, c=2533687, q=63080)
+INFO: rcu_preempt detected stalls on CPUs/tasks:
+    1-...: (1 GPs behind) idle=763/140000000000000/0 softirq=6109762/6109762 fqs=4815
+    2-...: (1 GPs behind) idle=2f3/140000000000000/0 softirq=5129036/5129037 fqs=4815
+    (detected by 0, t=4828 jiffies, g=2533688, c=2533687, q=68037)
+...
+and so on, and so forth ...
+...
+INFO: rcu_preempt detected stalls on CPUs/tasks:
+    1-...: (1 GPs behind) idle=763/140000000000000/0 softirq=6109762/6109762 fqs=137745
+    2-...: (1 GPs behind) idle=2f3/140000000000000/0 softirq=5129036/5129037 fqs=137746
+    (detected by 0, t=137863 jiffies, g=2533688, c=2533687, q=68849)
+INFO: rcu_preempt detected stalls on CPUs/tasks:
+    1-...: (1 GPs behind) idle=763/140000000000000/0 softirq=6109762/6109762 fqs=138651
+    2-...: (1 GPs behind) idle=2f3/140000000000000/0 softirq=5129036/5129037 fqs=138652
