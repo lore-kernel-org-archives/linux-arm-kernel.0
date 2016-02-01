@@ -1,74 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon,  1 Feb 2016 21:35:57 +0100
-Subject: [PATCH 3/4] ARM: davinci: DA8xx+DMx combined kernels need
- PATCH_PHYS_VIRT
-In-Reply-To: <1454358962-640598-1-git-send-email-arnd@arndb.de>
-References: <1454358962-640598-1-git-send-email-arnd@arndb.de>
-Message-ID: <1454358962-640598-4-git-send-email-arnd@arndb.de>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 1 Feb 2016 13:06:45 -0800
+Subject: [PATCH 0/4] nvmem: new drivers for v4.5
+In-Reply-To: <56AF3468.2020806@linaro.org>
+References: <1449485763-391-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <5693AC68.6040802@linaro.org> <20160111183018.GA10243@kroah.com>
+ <56AF3468.2020806@linaro.org>
+Message-ID: <20160201210645.GA10149@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We already forbid that combination when AUTO_ZRELADDR is disabled,
-for the same reason that the two have their RAM at different
-physical addresses as seen from the CPU.
+On Mon, Feb 01, 2016 at 10:33:12AM +0000, Srinivas Kandagatla wrote:
+> Hi Greg,
+> 
+> On 11/01/16 18:30, Greg KH wrote:
+> >On Mon, Jan 11, 2016 at 01:21:44PM +0000, Srinivas Kandagatla wrote:
+> >>
+> >>
+> >>On 07/12/15 10:56, Srinivas Kandagatla wrote:
+> >>>Hi Greg,
+> >>>
+> >>>Here are 2 new nvmem drivers which are in the mailing list for long time
+> >>>and are good to go for some testing and find its way to v4.5-rc*.
+> >>>
+> >>>Could you please take these patches via char-misc tree.
+> >>Hi Greg,
+> >>
+> >>I have not seen these patches or https://lkml.org/lkml/2015/12/14/169 appear
+> >>in your char-misc tree/linux-next.
+> >>
+> >>Just wanted to know whats your plan on these patches?
+> >
+> >To wait until after 4.5-rc1 is out, sorry, my patch backlog got huge
+> >during Nov/Dec due to other external issues, I'll be digging out from
+> >them after 4.5-rc1 is out.
+> 
+> Am not sure if this was forgotten, just wanted know if you still have plans
+> to pick this series for any rc on 4.5?
 
-This does the same change for PATCH_PHYS_VIRT: if you disable
-either of the options, Kconfig now enforces that you have to
-pick one or the other SoC family.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/Kconfig              | 1 +
- arch/arm/mach-davinci/Kconfig | 6 ++----
- 2 files changed, 3 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 21d79b2531cc..8b10ccf4077e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -612,6 +612,7 @@ config ARCH_DAVINCI
- 	select ARCH_HAS_HOLES_MEMORYMODEL
- 	select ARCH_REQUIRE_GPIOLIB
- 	select CLKDEV_LOOKUP
-+	select CPU_ARM926T
- 	select GENERIC_ALLOCATOR
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_IRQ_CHIP
-diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-index 6124c69154c3..8f54be83ec15 100644
---- a/arch/arm/mach-davinci/Kconfig
-+++ b/arch/arm/mach-davinci/Kconfig
-@@ -9,7 +9,6 @@ config CP_INTC
- 
- config ARCH_DAVINCI_DMx
- 	bool
--	select CPU_ARM926T
- 
- menu "TI DaVinci Implementations"
- 
-@@ -32,7 +31,7 @@ config ARCH_DAVINCI_DM646x
- 
- config ARCH_DAVINCI_DA830
- 	bool "DA830/OMAP-L137/AM17x based system"
--	depends on !ARCH_DAVINCI_DMx || AUTO_ZRELADDR
-+	depends on !ARCH_DAVINCI_DMx || (AUTO_ZRELADDR && ARM_PATCH_PHYS_VIRT)
- 	select ARCH_DAVINCI_DA8XX
- 	# needed on silicon revs 1.0, 1.1:
- 	select CPU_DCACHE_WRITETHROUGH if !CPU_DCACHE_DISABLE
-@@ -40,13 +39,12 @@ config ARCH_DAVINCI_DA830
- 
- config ARCH_DAVINCI_DA850
- 	bool "DA850/OMAP-L138/AM18x based system"
--	depends on !ARCH_DAVINCI_DMx || AUTO_ZRELADDR
-+	depends on !ARCH_DAVINCI_DMx || (AUTO_ZRELADDR && ARM_PATCH_PHYS_VIRT)
- 	select ARCH_DAVINCI_DA8XX
- 	select CP_INTC
- 
- config ARCH_DAVINCI_DA8XX
- 	bool
--	select CPU_ARM926T
- 
- config ARCH_DAVINCI_DM365
- 	bool "DaVinci 365 based system"
--- 
-2.7.0
+They are in my queue...
