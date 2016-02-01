@@ -1,53 +1,31 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon,  1 Feb 2016 18:28:17 +0000
-Subject: [PATCH 1/3] pinctrl: single: Use a separate lockdep class
-In-Reply-To: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
-References: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1454351299-27440-2-git-send-email-sudeep.holla@arm.com>
+Date: Mon,  1 Feb 2016 18:28:16 +0000
+Subject: [PATCH 0/3] OMAP/pinmux: remove misuse of IRQF_NO_SUSPEND flag
+Message-ID: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The single pinmux controller can be cascaded to the other interrupt
-controllers. Hence when propagating wake-up settings to its parent
-interrupt controller, there's possiblity of detecting possible recursive
-locking and getting lockdep warning.
+Hi Tony/Grygorii,
 
-This patch avoids this false positive by using a separate lockdep class
-for this single pinctrl interrupts.
+Just revieving the old threads [1][2]. I have put all the necessary
+patches together so that it can tested. Can you give it a go ?
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: linux-gpio at vger.kernel.org
-Suggested-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/pinctrl/pinctrl-single.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Regards,
+Sudeep
 
-diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-index d24e5f1d1525..fb126d56ad40 100644
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -255,6 +255,13 @@ static enum pin_config_param pcs_bias[] = {
- };
- 
- /*
-+ * This lock class tells lockdep that irqchip core that this single
-+ * pinctrl can be in a different category than its parents, so it won't
-+ * report false recursion.
-+ */
-+static struct lock_class_key pcs_lock_class;
-+
-+/*
-  * REVISIT: Reads and writes could eventually use regmap or something
-  * generic. But at least on omaps, some mux registers are performance
-  * critical as they may need to be remuxed every time before and after
-@@ -1713,6 +1720,7 @@ static int pcs_irqdomain_map(struct irq_domain *d, unsigned int irq,
- 	irq_set_chip_data(irq, pcs_soc);
- 	irq_set_chip_and_handler(irq, &pcs->chip,
- 				 handle_level_irq);
-+	irq_set_lockdep_class(irq, &pcs_lock_class);
- 	irq_set_noprobe(irq);
- 
- 	return 0;
+[1] https://www.spinics.net/lists/linux-gpio/msg09879.html
+[2] http://lkml.iu.edu/hypermail/linux/kernel/1509.2/03937.html
+
+Sudeep Holla (3):
+  pinctrl: single: Use a separate lockdep class
+  pinctrl: single: remove misuse of IRQF_NO_SUSPEND flag
+  ARM: OMAP2+: remove misuse of IRQF_NO_SUSPEND flag
+
+ arch/arm/mach-omap2/mux.c        |  4 ++--
+ arch/arm/mach-omap2/pm34xx.c     |  9 ++++-----
+ arch/arm/mach-omap2/prm_common.c |  1 +
+ drivers/pinctrl/pinctrl-single.c | 15 ++++++++++++---
+ 4 files changed, 19 insertions(+), 10 deletions(-)
+
 -- 
 1.9.1
