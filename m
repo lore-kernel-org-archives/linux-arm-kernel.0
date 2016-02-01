@@ -1,116 +1,87 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  1 Feb 2016 11:54:47 +0100
-Subject: [PATCH v5sub1 2/8] arm64: add support for ioremap() block mappings
+Date: Mon,  1 Feb 2016 11:54:48 +0100
+Subject: [PATCH v5sub1 3/8] arm64: introduce KIMAGE_VADDR as the virtual base
+ of the kernel region
 In-Reply-To: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1454324093-15998-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1454324093-15998-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This wires up the existing generic huge-vmap feature, which allows
-ioremap() to use PMD or PUD sized block mappings. It also adds support
-to the unmap path for dealing with block mappings, which will allow us
-to unmap the __init region using unmap_kernel_range() in a subsequent
-patch.
+This introduces the preprocessor symbol KIMAGE_VADDR which will serve as
+the symbolic virtual base of the kernel region, i.e., the kernel's virtual
+offset will be KIMAGE_VADDR + TEXT_OFFSET. For now, we define it as being
+equal to PAGE_OFFSET, but in the future, it will be moved below it once
+we move the kernel virtual mapping out of the linear mapping.
 
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- Documentation/features/vm/huge-vmap/arch-support.txt |  2 +-
- arch/arm64/Kconfig                                   |  1 +
- arch/arm64/include/asm/memory.h                      |  6 +++
- arch/arm64/mm/mmu.c                                  | 41 ++++++++++++++++++++
- 4 files changed, 49 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/memory.h | 10 ++++++++--
+ arch/arm64/kernel/head.S        |  2 +-
+ arch/arm64/kernel/vmlinux.lds.S |  4 ++--
+ 3 files changed, 11 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/features/vm/huge-vmap/arch-support.txt b/Documentation/features/vm/huge-vmap/arch-support.txt
-index af6816bccb43..df1d1f3c9af2 100644
---- a/Documentation/features/vm/huge-vmap/arch-support.txt
-+++ b/Documentation/features/vm/huge-vmap/arch-support.txt
-@@ -9,7 +9,7 @@
-     |       alpha: | TODO |
-     |         arc: | TODO |
-     |         arm: | TODO |
--    |       arm64: | TODO |
-+    |       arm64: |  ok  |
-     |       avr32: | TODO |
-     |    blackfin: | TODO |
-     |         c6x: | TODO |
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 8cc62289a63e..cd767fa3037a 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -49,6 +49,7 @@ config ARM64
- 	select HAVE_ALIGNED_STRUCT_PAGE if SLUB
- 	select HAVE_ARCH_AUDITSYSCALL
- 	select HAVE_ARCH_BITREVERSE
-+	select HAVE_ARCH_HUGE_VMAP
- 	select HAVE_ARCH_JUMP_LABEL
- 	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP && !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
- 	select HAVE_ARCH_KGDB
 diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 853953cd1f08..c65aad7b13dc 100644
+index c65aad7b13dc..aebc739f5a11 100644
 --- a/arch/arm64/include/asm/memory.h
 +++ b/arch/arm64/include/asm/memory.h
-@@ -100,6 +100,12 @@
- #define MT_S2_NORMAL		0xf
- #define MT_S2_DEVICE_nGnRE	0x1
+@@ -51,7 +51,8 @@
+ #define VA_BITS			(CONFIG_ARM64_VA_BITS)
+ #define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
+ #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
+-#define MODULES_END		(PAGE_OFFSET)
++#define KIMAGE_VADDR		(PAGE_OFFSET)
++#define MODULES_END		(KIMAGE_VADDR)
+ #define MODULES_VADDR		(MODULES_END - SZ_64M)
+ #define PCI_IO_END		(MODULES_VADDR - SZ_2M)
+ #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
+@@ -75,8 +76,13 @@
+  * private definitions which should NOT be used outside memory.h
+  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+  */
+-#define __virt_to_phys(x)	(((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
++#define __virt_to_phys(x) ({						\
++	phys_addr_t __x = (phys_addr_t)(x);				\
++	__x >= PAGE_OFFSET ? (__x - PAGE_OFFSET + PHYS_OFFSET) :	\
++			     (__x - KIMAGE_VADDR + PHYS_OFFSET); })
++
+ #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
++#define __phys_to_kimg(x)	((unsigned long)((x) - PHYS_OFFSET + KIMAGE_VADDR))
  
-+#ifdef CONFIG_ARM64_4K_PAGES
-+#define IOREMAP_MAX_ORDER	(PUD_SHIFT)
-+#else
-+#define IOREMAP_MAX_ORDER	(PMD_SHIFT)
-+#endif
-+
- #ifndef __ASSEMBLY__
+ /*
+  * Convert a page to/from a physical address
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 53b9f9f128c2..04d38a058b19 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -389,7 +389,7 @@ __create_page_tables:
+ 	 * Map the kernel image (starting with PHYS_OFFSET).
+ 	 */
+ 	mov	x0, x26				// swapper_pg_dir
+-	mov	x5, #PAGE_OFFSET
++	ldr	x5, =KIMAGE_VADDR
+ 	create_pgd_entry x0, x5, x3, x6
+ 	ldr	x6, =KERNEL_END			// __va(KERNEL_END)
+ 	mov	x3, x24				// phys offset
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index b78a3c772294..282e3e64a17e 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -89,7 +89,7 @@ SECTIONS
+ 		*(.discard.*)
+ 	}
  
- extern phys_addr_t		memstart_addr;
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 7711554a94f4..73383019f212 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -714,3 +714,44 @@ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
+-	. = PAGE_OFFSET + TEXT_OFFSET;
++	. = KIMAGE_VADDR + TEXT_OFFSET;
  
- 	return dt_virt;
- }
-+
-+int __init arch_ioremap_pud_supported(void)
-+{
-+	/* only 4k granule supports level 1 block mappings */
-+	return IS_ENABLED(CONFIG_ARM64_4K_PAGES);
-+}
-+
-+int __init arch_ioremap_pmd_supported(void)
-+{
-+	return 1;
-+}
-+
-+int pud_set_huge(pud_t *pud, phys_addr_t phys, pgprot_t prot)
-+{
-+	BUG_ON(phys & ~PUD_MASK);
-+	set_pud(pud, __pud(phys | PUD_TYPE_SECT | pgprot_val(mk_sect_prot(prot))));
-+	return 1;
-+}
-+
-+int pmd_set_huge(pmd_t *pmd, phys_addr_t phys, pgprot_t prot)
-+{
-+	BUG_ON(phys & ~PMD_MASK);
-+	set_pmd(pmd, __pmd(phys | PMD_TYPE_SECT | pgprot_val(mk_sect_prot(prot))));
-+	return 1;
-+}
-+
-+int pud_clear_huge(pud_t *pud)
-+{
-+	if (!pud_sect(*pud))
-+		return 0;
-+	pud_clear(pud);
-+	return 1;
-+}
-+
-+int pmd_clear_huge(pmd_t *pmd)
-+{
-+	if (!pmd_sect(*pmd))
-+		return 0;
-+	pmd_clear(pmd);
-+	return 1;
-+}
+ 	.head.text : {
+ 		_text = .;
+@@ -186,4 +186,4 @@ ASSERT(__idmap_text_end - (__idmap_text_start & ~(SZ_4K - 1)) <= SZ_4K,
+ /*
+  * If padding is applied before .head.text, virt<->phys conversions will fail.
+  */
+-ASSERT(_text == (PAGE_OFFSET + TEXT_OFFSET), "HEAD is misaligned")
++ASSERT(_text == (KIMAGE_VADDR + TEXT_OFFSET), "HEAD is misaligned")
 -- 
 2.5.0
