@@ -1,116 +1,67 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Mon, 01 Feb 2016 14:34:38 -0700
-Subject: [PATCH] vfio: pci: fix oops in case of
- vfio_msi_set_vector_signal failure
-In-Reply-To: <56AF9585.1000904@linaro.org>
-References: <1454078586-5431-1-git-send-email-eric.auger@linaro.org>
- <1454103676.9301.3.camel@redhat.com> <56AF9585.1000904@linaro.org>
-Message-ID: <1454362478.10542.8.camel@redhat.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Mon, 1 Feb 2016 22:55:32 +0100
+Subject: [PATCH 1/2] clocksource/drivers/lpc32xx: Support periodic mode
+In-Reply-To: <CAAEAJfD8LUV=t97RN3U4uqgzCLP89AQtHqBccKGd6-EskP9DOQ@mail.gmail.com>
+References: <1454136379-7517-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <CAGhQ9VxO7Rsus8Js_oZDBxWzEHuUHnRyoVTVmawbtXmK7tNMcw@mail.gmail.com>
+ <CAAEAJfAVTJm-PzhjkRmkdNG39sH7eHyEXaSX4q0=TCQ0468Heg@mail.gmail.com>
+ <CAAEAJfD8LUV=t97RN3U4uqgzCLP89AQtHqBccKGd6-EskP9DOQ@mail.gmail.com>
+Message-ID: <CAGhQ9VxtqkW4PLrpQWsyZu9bgB_98mmO=WZ7gvaeN_DWQ5M3rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-02-01 at 18:27 +0100, Eric Auger wrote:
-> Hi Alex,
-> On 01/29/2016 10:41 PM, Alex Williamson wrote:
-> > On Fri, 2016-01-29 at 14:43 +0000, Eric Auger wrote:
-> > > In case vfio_msi_set_vector_signal fails we tear down everything.
-> > > In the tear down loop we compare int j against unsigned start. Given
-> > > the arithmetic conversion I think it is converted into an unsigned and
-> > > becomes 0xffffffff, leading to the loop being entered again and things
-> > > turn bad when accessing vdev->msix[vector].vector. So let's use int
-> > > parameters instead.
-> > > ?
-> > > Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> > > ---
-> > > ?drivers/vfio/pci/vfio_pci_intrs.c | 4 ++--
-> > > ?1 file changed, 2 insertions(+), 2 deletions(-)
-> > > ?
-> > > diff --git a/drivers/vfio/pci/vfio_pci_intrs.c b/drivers/vfio/pci/vfio_pci_intrs.c
-> > > index 3b3ba15..510c48d 100644
-> > > --- a/drivers/vfio/pci/vfio_pci_intrs.c
-> > > +++ b/drivers/vfio/pci/vfio_pci_intrs.c
-> > > @@ -374,8 +374,8 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
-> > > ?	return 0;
-> > > ?}
-> > > ?
-> > > -static int vfio_msi_set_block(struct vfio_pci_device *vdev, unsigned start,
-> > > -			??????unsigned count, int32_t *fds, bool msix)
-> > > +static int vfio_msi_set_block(struct vfio_pci_device *vdev, int start,
-> > > +			??????int count, int32_t *fds, bool msix)
-> > > ?{
-> > > ?	int i, j, ret = 0;
-> > > ?
-> >?
-> > Nice find, I don't think that's the only bug there though.??If @start is
-> > -1 (UINT32_MAX) and @count is 1, then @j gets set to -1 in the setup and
-> > we hit the same index dereference problem.??What if we did this instead:
-> >?
-> > diff --git a/drivers/vfio/pci/vfio_pci_intrs.c b/drivers/vfio/pci/vfio_pci_intrs.c
-> > index 3b3ba15..2ae84ad 100644
-> > --- a/drivers/vfio/pci/vfio_pci_intrs.c
-> > +++ b/drivers/vfio/pci/vfio_pci_intrs.c
-> > @@ -309,14 +309,14 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
-> > ?				??????int vector, int fd, bool msix)
-> > ?{
-> > ?	struct pci_dev *pdev = vdev->pdev;
-> > -	int irq = msix ? vdev->msix[vector].vector : pdev->irq + vector;
-> > -	char *name = msix ? "vfio-msix" : "vfio-msi";
-> > ?	struct eventfd_ctx *trigger;
-> > -	int ret;
-> > +	int irq, ret;
-> > ?
-> > -	if (vector >= vdev->num_ctx)
-> > +	if (vector < 0 || vector >= vdev->num_ctx)
-> > ?		return -EINVAL;
-> > ?
-> > +	irq = msix ? vdev->msix[vector].vector : pdev->irq + vector;
-> > +
-> > ?	if (vdev->ctx[vector].trigger) {
-> > ?		free_irq(irq, vdev->ctx[vector].trigger);
-> > ?		irq_bypass_unregister_producer(&vdev->ctx[vector].producer);
-> > @@ -328,8 +328,9 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
-> > ?	if (fd < 0)
-> > ?		return 0;
-> > ?
-> > -	vdev->ctx[vector].name = kasprintf(GFP_KERNEL, "%s[%d](%s)",
-> > -					???name, vector, pci_name(pdev));
-> > +	vdev->ctx[vector].name = kasprintf(GFP_KERNEL, "vfio-msi%s[%d](%s)",
-> > +					???msix ? "x" : "", vector,
-> > +					???pci_name(pdev));
-> > ?	if (!vdev->ctx[vector].name)
-> > ?		return -ENOMEM;
-> > ?
-> > @@ -379,7 +380,7 @@ static int vfio_msi_set_block(struct vfio_pci_device *vdev, unsigned start,
-> > ?{
-> > ?	int i, j, ret = 0;
-> > ?
-> > -	if (start + count > vdev->num_ctx)
-> > +	if (start >= vdev->num_ctx || start + count > vdev->num_ctx)
-> > ?		return -EINVAL;
-> > ?
-> > ?	for (i = 0, j = start; i < count && !ret; i++, j++) {
-> > @@ -388,7 +389,7 @@ static int vfio_msi_set_block(struct vfio_pci_device *vdev, unsigned start,
-> > ?	}
-> > ?
-> > ?	if (ret) {
-> > -		for (--j; j >= start; j--)
-> > +		for (--j; j >= 0 && j >= start; j--)
-> > ?			vfio_msi_set_vector_signal(vdev, j, -1, msix);
-> > ?	}
-> > ?
-> >?
-> > So we fix the problem with vfio_msi_set_vector_signal() dereferencing
-> > the array before it validates the index (even though it shouldn't be
-> > able to get there anymore), and then we do a better job of verifying
-> > start and count (comparing to num_ctx will use unsigned even though
-> > num_ctx itself is signed) and finally explicitly test the <0 case, which
-> > I suppose we could also do by casting start at that point (we know it's
-> > within the bounds of a signed integer given the previous tests).
->?
-> Yes it looks OK to me.
->?
-> I guess you submit? I will test it.
+On 1 February 2016 at 16:09, Ezequiel Garcia
+<ezequiel@vanguardiasur.com.ar> wrote:
+> On 31 January 2016 at 17:07, Ezequiel Garcia
+> <ezequiel@vanguardiasur.com.ar> wrote:
+>> On 30 January 2016 at 16:39, Joachim  Eastwood <manabian@gmail.com> wrote:
+>>> Hi Ezequiel,
+>>>
+>>> On 30 January 2016 at 07:46, Ezequiel Garcia
+>>> <ezequiel@vanguardiasur.com.ar> wrote:
+>>>> This commit adds the support for periodic mode. This is done by not
+>>>> setting the MR0S (Stop on TnMR0) bit on MCR, thus allowing
+>>>> interrupts to be periodically generated on MR0 matches.
+>>>>
+>>>> In order to do this, move the initial configuration that is specific to
+>>>> the one shot mode to clock_event_device.set_state_oneshot.
+>>>>
+> [...]
+>>
+>>>
+>>> I will look more closely at the new timer setup later.
+>>>
+>>> btw, didn't I look through a version of this you sent me privately
+>>> quite some time ago?
+>>> I think I had a comment about using TIMER_PR instead of TIMER_MR0
+>>> then. Unsure if that is still valid, though.
+>>>
+>>
+>> Ah, right. It was ages ago, and forgot your previous review. Sorry about that.
+>> Using TIMER_PR looks less invasive so I'll send a v2 using it instead.
+>
+> Actually, using the prescale counter and MR0 = 1 resulted in exactly
+> half the number of interrupts that I expected (HZ / 2). Using this
+> patch, with PR=0 and MR0=ticks_per_jiggies, I can see HZ no. of
+> interrupts per sec.
+>
+> Why did you choose to use the prescale in your oneshot implementation?
 
-Yep, I'll post a real patch.??Thanks,
+The clockevent code was copied from arch/arm/mach-lpc32xx/timer.c so
+it's really old code.
+I think it is a strange way to use the timer, but the logic still
+seems good to me.
 
-Alex
+> Did you test or measure the timer expire using the PR and MR0 = 1?
+
+I really can't remember. I do remember going through the timer setup
+and it seemed like a valid, albeit slightly strange, way to use the
+timer.
+
+> To be honest, I'm still trying to make some sense out of my results.
+
+I'll see if can find the time to do some more testing over here as well.
+
+
+regards,
+Joachim Eastwood
