@@ -1,103 +1,132 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Mon, 1 Feb 2016 19:42:37 +0800
-Subject: [PATCH v5] i2c: mt8173: add 4GB mode support in i2c driver.
-In-Reply-To: <1454291910-19870-1-git-send-email-liguo.zhang@mediatek.com>
-References: <1454291910-19870-1-git-send-email-liguo.zhang@mediatek.com>
-Message-ID: <CAGS+omAaj6afPrFYyFB3M-g6bpJeVDgJvYJx5rtu5kjCH=Gtzg@mail.gmail.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Mon, 1 Feb 2016 14:42:51 +0300
+Subject: [PATCH 1/5] all: s390: move wrapper infrastructure to generic
+ headers
+In-Reply-To: <20160128163109.GA8529@yury-N73SV>
+References: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
+ <1453741047-5498-2-git-send-email-ynorov@caviumnetworks.com>
+ <20160128121618.GB5418@osiris> <20160128163109.GA8529@yury-N73SV>
+Message-ID: <20160201114251.GB973@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 1, 2016 at 9:58 AM, Liguo Zhang <liguo.zhang@mediatek.com> wrote:
-> If 4GB mode is enable, we should add 4gb mode support in i2c driver.
-> Set 4GB mode register to support 4GB mode.
->
-> Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
-> ---
-> change in v5:
-> Use BIT_ULL() to fix kernel building warning.
-> change in v4:
-> Use BIT_ULL() to fix kernel building warning.
-> change in v3:
-> Only inline the computation of reg_4g_mode in mtk_i2c_set_4g_mode().
-> change in v2:
-> Define a static inline function mtk_i2c_set_4g_mode() for support 4g mode.
-> ---
->  drivers/i2c/busses/i2c-mt65xx.c | 42 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
->
-> diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
-> index aec8e6c..e054205 100644
-> --- a/drivers/i2c/busses/i2c-mt65xx.c
-> +++ b/drivers/i2c/busses/i2c-mt65xx.c
-> @@ -60,6 +60,7 @@
->  #define I2C_DMA_INT_FLAG_NONE          0x0000
->  #define I2C_DMA_CLR_FLAG               0x0000
->  #define I2C_DMA_HARD_RST               0x0002
-> +#define I2C_DMA_4G_MODE                        0x0001
->
->  #define I2C_DEFAULT_SPEED              100000  /* hz */
->  #define MAX_FS_MODE_SPEED              400000
-> @@ -88,6 +89,8 @@ enum DMA_REGS_OFFSET {
->         OFFSET_RX_MEM_ADDR = 0x20,
->         OFFSET_TX_LEN = 0x24,
->         OFFSET_RX_LEN = 0x28,
-> +       OFFSET_TX_4G_MODE = 0x54,
-> +       OFFSET_RX_4G_MODE = 0x58,
->  };
->
->  enum i2c_trans_st_rs {
-> @@ -133,6 +136,7 @@ struct mtk_i2c_compatible {
->         unsigned char dcm: 1;
->         unsigned char auto_restart: 1;
->         unsigned char aux_len_reg: 1;
-> +       unsigned char support_33bits: 1;
->  };
->
->  struct mtk_i2c {
-> @@ -182,6 +186,7 @@ static const struct mtk_i2c_compatible mt6577_compat = {
->         .dcm = 1,
->         .auto_restart = 0,
->         .aux_len_reg = 0,
-> +       .support_33bits = 0,
->  };
->
->  static const struct mtk_i2c_compatible mt6589_compat = {
-> @@ -190,6 +195,7 @@ static const struct mtk_i2c_compatible mt6589_compat = {
->         .dcm = 0,
->         .auto_restart = 0,
->         .aux_len_reg = 0,
-> +       .support_33bits = 0,
->  };
->
->  static const struct mtk_i2c_compatible mt8173_compat = {
-> @@ -198,6 +204,7 @@ static const struct mtk_i2c_compatible mt8173_compat = {
->         .dcm = 1,
->         .auto_restart = 1,
->         .aux_len_reg = 1,
-> +       .support_33bits = 1,
->  };
->
->  static const struct of_device_id mtk_i2c_of_match[] = {
-> @@ -366,6 +373,11 @@ static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk,
->         return 0;
->  }
->
-> +static inline u32 mtk_i2c_set_4g_mode(dma_addr_t addr)
-> +{
-> +       return (addr & BIT_ULL(32)) ? I2C_DMA_4G_MODE : I2C_DMA_CLR_FLAG;
-> +}
-> +
->  static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
->                                int num, int left_num)
->  {
-> @@ -373,6 +385,7 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
->         u16 start_reg;
->         u16 control_reg;
->         u16 restart_flag = 0;
-> +       u32 reg_4g_mode = 0;
+On Thu, Jan 28, 2016 at 07:31:09PM +0300, Yury Norov wrote:
+> On Thu, Jan 28, 2016 at 01:16:18PM +0100, Heiko Carstens wrote:
+> > Hello Yury,
+> > 
+> > On Mon, Jan 25, 2016 at 07:57:23PM +0300, Yury Norov wrote:
+> > > __SC_COMPAT_CAST for s390 is too specific due to 31-bit pointer length, so it's
+> > > moved to arch/s390/include/asm/compat.h. Generic declaration assumes that long,
+> > > unsigned long and pointer types are all 32-bit length.
+> > > 
+> > > linux/syscalls_structs.h header is introduced, because from now (see next patch)
+> > > structure types listed there are needed for both normal and compat mode.
+> > > 
+> > > cond_syscall_wrapped now defined two symbols: sys_foo() and compat_sys_foo(), if
+> > > compat wrappers are enabled.
+> > > 
+> > > Here __SC_WRAP() macro is introduced as well. s390 doesn't need it as it uses
+> > > asm-generated syscall table. But architectures that generate that tables with
+> > > C code (ARM64/ILP32) should redefine it as '#define __SC_WRAP(name) compat_##name'.
+> > > 
+> > > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> > 
+> > ...
+> > 
+> 
+> Hi Heiko,
+> 
+> > How about if you rename SYSCALL_DEFINE_WRAP to SYSCALL_COMPAT_DEFINE which
+> > has the semantics that no dedicated compat system call exists (aka system
+> > call is compat safe).
+> > 
+> > Then convert all existing SYSCALL_DEFINE'd system calls for which no compat
+> > variant exists to SYSCALL_COMPAT_DEFINE.
+> > 
+> > This would allow to specify "compat_sys_<syscallname>" in the compat system
+> > call table for _all_ system calls.
+> > 
+> 
+> We can modify SYSCALL_DEFINEx macro to declare weak "compat_sys_<syscallname>"
+> symbol for each syscall. So if strong compat symbol will be declared
+> somwere else, it will owerride the weak one. Being under COMPAT_WRAPPER
+> config, it will not affect someone else except s390 and aarch64/ilp32.
+> The downside of this approach is that we'll have to move wrapper
+> machinery to 'include/linux/syscalls.h', thought under wrapper config.
+> 
+> > No need to look up if a compat variant (or wrapper) exists or
+> > sys_<syscallname> should be used instead. Also no possibility for security
+> > bugs that could creep in because SYSCALL_DEFINE has been used instead of
+> > SYSCALL_DEFINE_WRAP.
+> 
+> If we'll choose to stay with current approach, we'll definitely need
+> to update documentation.
+> 
+> > 
+> > Ideally the implementation would only generate an alias if no sign/zero
+> > extension is necessary.
+> > 
+> > Trivially this would be true for system calls without arguments like e.g.
+> > sys_fork() which would get a compat_sys_fork alias without any further
+> > code.
+> > 
+> > I'm not sure how difficult it is to implement the same logic for system
+> > calls that have parameters. That is: either generate a
+> > compat_sys_<syscallname> wrapper function, or if the SYSCALL_COMPAT_DEFINE
+> > macro figures out that no zero sign extension is required, only an alias
+> > without any additional code.
+> > 
+> > I think in the long term something like this is much easier to maintain.
+> > 
+> > Does that make sense?
+> 
+> For me, the most important adwantage of this approach is that we don't
+> need the list of 'magic' system calls anymore. It's even more
+> important if we'll face a requirement to support ABI that differs from
+> both natural and ilp32 ABIs. New __SC_COMPAT_CAST will do all the job
+> for us.
+> 
+> The downsides are that we'll have unneeded wrappers for some syscalls,
+> if linker will not clear them, and wasting of space if we'll find no
+> way how to explain compiler to generate simple alias when it's
+> enough... 
+> 
+> I'll play with it and write you what I'll come to.
+> 
+> Yury.
 
-nit: unnecessary init (as Yingjoe mentioned earlier).
+Hi Heiko,
 
-Otherwise, this one is:
+I tried this idea, and I don't like what happened.
+ - Wrappers around safe syscalls does exist. We can remove it by
+   overcomplicating __SC_COMPAT_CAST, but I don't like it.
+ - We still need to declare numerous list of new compat syscalls.
+   And it becomes even bigger, as we need to declare all compat
+   syscall versions not declared in include/linux/compat.h already.
+   (Currently - only for unsafe syscalls.)
+ - 'Weak' trick doesn't work for the whole kernel, so we'd figure out
+   some new prefix for wrapped syscalls. Or declare all non-compat
+   syscalls explicitly with SYSCALL_COMPAT_DEFINE. So the list of
+   replacements grow. And for me, it's harder to explain why we are
+   wrapping safe syscalls. Or we introduce another bunch of useless
+   wrappers (with new prefix), and have to handle it in non-compat code.
+ - With all listed above, we move all wrapper logic to non-compat
+   'include/linux/syscalls.h' header. Which is not a good idea, if it
+   doesn't benefit us much in return.
 
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> > No need to look up if a compat variant (or wrapper) exists or
+> > sys_<syscallname> should be used instead. Also no possibility for security
+> > bugs that could creep in because SYSCALL_DEFINE has been used instead of
+> > SYSCALL_DEFINE_WRAP.
+
+I thought again about it. With current version, it's very easy to
+define whether we have wrapper or not - just by macro we use. Once
+reviewed, this list is hardly to be changed frequently. If someone is
+introducing new syscall, it will attract much attention, so security
+risk is minimal.
+
+Maybe I missed some elegant implementation, and if so  I'll be happy
+if someone'll point me out. But with what I see, I'd vote for what we
+have now. (Plus description in docs, plus renaming new macro.)
+
+Yury.
