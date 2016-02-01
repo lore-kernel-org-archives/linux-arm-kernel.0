@@ -1,24 +1,61 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 1 Feb 2016 08:57:49 -0600
-Subject: [PATCH 1/2] clk: sunxi: Add support for A80 APBS clock
-In-Reply-To: <1454337769-4130-2-git-send-email-wens@csie.org>
-References: <1454337769-4130-1-git-send-email-wens@csie.org>
- <1454337769-4130-2-git-send-email-wens@csie.org>
-Message-ID: <20160201145749.GA31544@rob-hp-laptop>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon,  1 Feb 2016 22:59:58 +0800
+Subject: [PATCH] ARM: dts: sun9i: a80-optimus: Remove i2c3 and uart4
+Message-ID: <1454338798-5929-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 10:42:48PM +0800, Chen-Yu Tsai wrote:
-> A80's APBS clock is not the same as the APB0 clock on A23. The A80's
-> is a zero-based divider, while the A23's is a power-of-two divider.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+i2c3 and uart4 are available on the GPIO header. Though these pins only
+have this one special function, the user may choose to use them as GPIOs
+instead.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Since our policy is not to choose what function to present on the GPIO
+headers of development boards, remove them.
 
->  drivers/clk/sunxi/Makefile                        |  2 +-
->  drivers/clk/sunxi/clk-sun9i-apbs.c                | 64 +++++++++++++++++++++++
->  3 files changed, 66 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/clk/sunxi/clk-sun9i-apbs.c
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun9i-a80-optimus.dts | 22 ----------------------
+ 1 file changed, 22 deletions(-)
+
+diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+index 958160e40fd0..d7a20d92b114 100644
+--- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
++++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+@@ -109,17 +109,6 @@
+ 	status = "okay";
+ };
+ 
+-&i2c3 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&i2c3_pins_a>;
+-	status = "okay";
+-};
+-
+-&i2c3_pins_a {
+-	/* Enable internal pull-up */
+-	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+-};
+-
+ &ohci0 {
+ 	status = "okay";
+ };
+@@ -212,17 +201,6 @@
+ 	status = "okay";
+ };
+ 
+-&uart4 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&uart4_pins_a>;
+-	status = "okay";
+-};
+-
+-&uart4_pins_a {
+-	/* Enable internal pull-up */
+-	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+-};
+-
+ &usbphy1 {
+ 	phy-supply = <&reg_usb1_vbus>;
+ 	status = "okay";
+-- 
+2.7.0
