@@ -1,52 +1,101 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 1 Feb 2016 16:33:44 +0300
-Subject: [PATCH v2 net 5/6] net: mvneta: The mvneta_percpu_elect function
- should be atomic
-In-Reply-To: <1454332067-16378-6-git-send-email-gregory.clement@free-electrons.com>
-References: <1454332067-16378-1-git-send-email-gregory.clement@free-electrons.com>
- <1454332067-16378-6-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <56AF5EB8.8010407@cogentembedded.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 1 Feb 2016 13:34:16 +0000
+Subject: [PATCH v2 06/21] arm64: KVM: VHE: Patch out use of HVC
+In-Reply-To: <20160201131634.GI1478@cbox>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <1453737235-16522-7-git-send-email-marc.zyngier@arm.com>
+ <20160201131634.GI1478@cbox>
+Message-ID: <56AF5ED8.7010303@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/1/2016 4:07 PM, Gregory CLEMENT wrote:
+On 01/02/16 13:16, Christoffer Dall wrote:
+> On Mon, Jan 25, 2016 at 03:53:40PM +0000, Marc Zyngier wrote:
+>> With VHE, the host never issues an HVC instruction to get into the
+>> KVM code, as we can simply branch there.
+>>
+>> Use runtime code patching to simplify things a bit.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/hyp.S           |  7 +++++++
+>>  arch/arm64/kvm/hyp/hyp-entry.S | 38 +++++++++++++++++++++++++++++---------
+>>  2 files changed, 36 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+>> index 0ccdcbb..0689a74 100644
+>> --- a/arch/arm64/kvm/hyp.S
+>> +++ b/arch/arm64/kvm/hyp.S
+>> @@ -17,7 +17,9 @@
+>>  
+>>  #include <linux/linkage.h>
+>>  
+>> +#include <asm/alternative.h>
+>>  #include <asm/assembler.h>
+>> +#include <asm/cpufeature.h>
+>>  
+>>  /*
+>>   * u64 kvm_call_hyp(void *hypfn, ...);
+>> @@ -38,6 +40,11 @@
+>>   * arch/arm64/kernel/hyp_stub.S.
+>>   */
+>>  ENTRY(kvm_call_hyp)
+>> +alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
+>>  	hvc	#0
+>>  	ret
+>> +alternative_else
+>> +	b	__vhe_hyp_call
+>> +	nop
+>> +alternative_endif
+>>  ENDPROC(kvm_call_hyp)
+>> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+>> index 93e8d983..9e0683f 100644
+>> --- a/arch/arm64/kvm/hyp/hyp-entry.S
+>> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
+>> @@ -38,6 +38,32 @@
+>>  	ldp	x0, x1, [sp], #16
+>>  .endm
+>>  
+>> +.macro do_el2_call
+>> +	/*
+>> +	 * Shuffle the parameters before calling the function
+>> +	 * pointed to in x0. Assumes parameters in x[1,2,3].
+>> +	 */
+>> +	stp	lr, xzr, [sp, #-16]!
+> 
+> remind me why this pair isn't just doing "str" instead of "stp" with the
+> xzr ?
 
-> Electing a CPU must be done in an atomic way: it should be done after or
-> before the removal/insertion of a CPU and this function is not reentrant.
->
-> During the loop of mvneta_percpu_elect we associates the queues to the
-> CPUs, if there is a topology change during this loop, then the mapping
-> between the CPUs and the queues could be wrong. During this loop the
-> interrupt mask is also updating for each CPUs, It should not be changed
-> in the same time by other part of the driver.
->
-> This patch adds spinlock to create the needed critical sections.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->   drivers/net/ethernet/marvell/mvneta.c | 15 +++++++++++++++
->   1 file changed, 15 insertions(+)
->
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index 1ed813d478e8..4d40d2fde7ca 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-[...]
-> @@ -2855,6 +2859,11 @@ static void mvneta_percpu_elect(struct mvneta_port *pp)
->   {
->   	int online_cpu_idx, max_cpu, cpu, i = 0;
->
-> +	/* Electing a CPU must done in an atomic way: it should be
+Because SP has to be aligned on a 16 bytes boundary at all times.
 
-    Must be done.
+> 
+>> +	mov	lr, x0
+>> +	mov	x0, x1
+>> +	mov	x1, x2
+>> +	mov	x2, x3
+>> +	blr	lr
+>> +	ldp	lr, xzr, [sp], #16
+>> +.endm
+>> +
+>> +ENTRY(__vhe_hyp_call)
+>> +	do_el2_call
+>> +	/*
+>> +	 * We used to rely on having an exception return to get
+>> +	 * an implicit isb. In the E2H case, we don't have it anymore.
+>> +	 * rather than changing all the leaf functions, just do it here
+>> +	 * before returning to the rest of the kernel.
+>> +	 */
+> 
+> why is this not the case with an ISB before do_el2_call then?
 
-> +	 * done after or before the removal/insertion of a CPU and
-> +	 * this function is not reentrant.
-> +	 */
-> +	spin_lock(&pp->lock);
->   	online_cpu_idx = pp->rxq_def % num_online_cpus();
->   	max_cpu = num_present_cpus();
->
-[...]
+That's a good point. I guess the safest thing to do would be to add one,
+but looking at the various functions we call, I don't see any that could
+go wrong by not having a ISB in their prologue.
 
-MBR, Sergei
+Or maybe you've identified such a case?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
