@@ -1,52 +1,56 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 1 Feb 2016 18:08:31 +0100
-Subject: [PATCH v2 06/21] arm64: KVM: VHE: Patch out use of HVC
-In-Reply-To: <56AF85D8.7080907@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <1453737235-16522-7-git-send-email-marc.zyngier@arm.com>
- <20160201131634.GI1478@cbox> <56AF5ED8.7010303@arm.com>
- <20160201153635.GH15514@e104818-lin.cambridge.arm.com>
- <56AF85D8.7080907@arm.com>
-Message-ID: <CAKv+Gu9_KG7Zss3g1OMzcnRKQFhCcYtbSDEk-gwwgqPP-R6DOA@mail.gmail.com>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Mon, 1 Feb 2016 09:10:23 -0800
+Subject: [PATCH 1/2] ARM: make virt_to_idmap() return unsigned long
+In-Reply-To: <56AF8F54.7030805@ti.com>
+References: <E1aO8F2-00074N-E8@rmk-PC.arm.linux.org.uk>
+ <56A84748.3040108@oracle.com> <20160201152015.GU10826@n2100.arm.linux.org.uk>
+ <56AF8F54.7030805@ti.com>
+Message-ID: <56AF917F.9030505@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 February 2016 at 17:20, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 01/02/16 15:36, Catalin Marinas wrote:
->> On Mon, Feb 01, 2016 at 01:34:16PM +0000, Marc Zyngier wrote:
->>> On 01/02/16 13:16, Christoffer Dall wrote:
->>>> On Mon, Jan 25, 2016 at 03:53:40PM +0000, Marc Zyngier wrote:
->>>>> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
->>>>> index 93e8d983..9e0683f 100644
->>>>> --- a/arch/arm64/kvm/hyp/hyp-entry.S
->>>>> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
->>>>> @@ -38,6 +38,32 @@
->>>>>    ldp     x0, x1, [sp], #16
->>>>>  .endm
->>>>>
->>>>> +.macro do_el2_call
->>>>> +  /*
->>>>> +   * Shuffle the parameters before calling the function
->>>>> +   * pointed to in x0. Assumes parameters in x[1,2,3].
->>>>> +   */
->>>>> +  stp     lr, xzr, [sp, #-16]!
+On 2/1/2016 9:01 AM, Vitaly Andrianov wrote:
+>
+>
+> On 02/01/2016 10:20 AM, Russell King - ARM Linux wrote:
+>> On Tue, Jan 26, 2016 at 08:27:52PM -0800, santosh.shilimkar at oracle.com
+>> wrote:
+>>> On 1/26/16 10:21 AM, Russell King wrote:
+>>>> Make virt_to_idmap() return an unsigned long rather than phys_addr_t.
 >>>>
->>>> remind me why this pair isn't just doing "str" instead of "stp" with the
->>>> xzr ?
+>>>> Returning phys_addr_t here makes no sense, because the definition of
+>>>> virt_to_idmap() is that it shall return a physical address which maps
+>>>> identically with the virtual address.  Since virtual addresses are
+>>>> limited to 32-bit, identity mapped physical addresses are as well.
+>>>>
+>>>> Almost all users already had an implicit narrowing cast to unsigned
+>>>> long
+>>>> so let's make this official and part of this interface.
+>>>>
+>>>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>>>> ---
+>>> Looks correct to me.
 >>>
->>> Because SP has to be aligned on a 16 bytes boundary at all times.
+>>> Vitaly,
+>>> Could you please try out this patch and see everything continue to
+>>> work ?
 >>
->> You could do something like:
+>> I haven't heard anything yet...  Vitaly?
 >>
->>       sub     sp, sp, #16
->>       str     lr, [sp]
->>
+> Russel, Santosh,
 >
-> Ah, fair enough. I'll fold that in.
+> I'm not working with the latest kernel, but with the stable v4.1.y. So I
+> couldn't apply the patch to it. I checked out 4.5.0-rc1 and applied the
+> patch to it. Tried to boot and it crashed. I'm not sure either because
+> of the patch or because of the network driver.
 >
+Thanks for checking.
 
-Since we're micro-reviewing: what's wrong with
+> Here is the log:
+>
+Based on the log, I think the patch seems to work fine since the boot
+reached upto rootfs. The crash seems to be coming from mostky NetCP
+related compents.
 
-str lr, [sp, #-16]!
-
-?
+Regards,
+Santosh
