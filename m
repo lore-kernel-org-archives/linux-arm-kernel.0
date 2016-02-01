@@ -1,72 +1,137 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 1 Feb 2016 09:35:02 -0600
-Subject: [PATCH v5 2/3] Documentation: gpio: Update description for
- X-Gene standby GPIO controller DTS binding
-In-Reply-To: <1454041735-8434-3-git-send-email-qnguyen@apm.com>
-References: <1454041735-8434-1-git-send-email-qnguyen@apm.com>
- <1454041735-8434-3-git-send-email-qnguyen@apm.com>
-Message-ID: <20160201153502.GA19725@rob-hp-laptop>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 1 Feb 2016 16:36:05 +0100
+Subject: [PATCH v2 21/21] arm64: Panic when VHE and non VHE CPUs coexist
+In-Reply-To: <1453737235-16522-22-git-send-email-marc.zyngier@arm.com>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <1453737235-16522-22-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160201153605.GA1478@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 29, 2016 at 11:28:54AM +0700, Quan Nguyen wrote:
-> Update description for X-Gene standby GPIO controller DTS binding to
-> support GPIO line configuration as input, output or external IRQ pin.
+On Mon, Jan 25, 2016 at 03:53:55PM +0000, Marc Zyngier wrote:
+> Having both VHE and non-VHE capable CPUs in the same system
+> is likely to be a recipe for disaster.
 > 
-> Signed-off-by: Y Vo <yvo@apm.com>
-> Signed-off-by: Quan Nguyen <qnguyen@apm.com>
+> If the boot CPU has VHE, but a secondary is not, we won't be
+> able to downgrade and run the kernel at EL1. Add CPU hotplug
+> to the mix, and this produces a terrifying mess.
+> 
+> Let's solve the problem once and for all. If you mix VHE and
+> non-VHE CPUs in the same system, you deserve to loose, and this
+> patch makes sure you don't get a chance.
+> 
+> This is implemented by storing the kernel execution level in
+> a global variable. Secondaries will park themselves in a
+> WFI loop if they observe a mismatch. Also, the primary CPU
+> will detect that the secondary CPU has died on a mismatched
+> execution level. Panic will follow.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  .../devicetree/bindings/gpio/gpio-xgene-sb.txt     | 47 ++++++++++++++++++----
->  1 file changed, 40 insertions(+), 7 deletions(-)
+>  arch/arm64/include/asm/virt.h | 17 +++++++++++++++++
+>  arch/arm64/kernel/head.S      | 19 +++++++++++++++++++
+>  arch/arm64/kernel/smp.c       |  3 +++
+>  3 files changed, 39 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt b/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
-> index dae1300..7b8b4cb 100644
-> --- a/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
-> @@ -1,10 +1,20 @@
->  APM X-Gene Standby GPIO controller bindings
+> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+> index 9f22dd6..f81a345 100644
+> --- a/arch/arm64/include/asm/virt.h
+> +++ b/arch/arm64/include/asm/virt.h
+> @@ -36,6 +36,11 @@
+>   */
+>  extern u32 __boot_cpu_mode[2];
 >  
-> -This is a gpio controller in the standby domain.
-> -
-> -There are 20 GPIO pins from 0..21. There is no GPIO_DS14 or GPIO_DS15,
-> -only GPIO_DS8..GPIO_DS13 support interrupts. The IRQ mapping
-> -is currently 1-to-1 on interrupts 0x28 thru 0x2d.
-> +This is a gpio controller in the standby domain. It also supports interrupt in
-> +some particular pins which are sourced to its parent interrupt controller
-> +as diagram below:
-> +                           +-----------------+
-> +                           | X-Gene standby  |
-> +                           | GPIO controller +--------- GPIO_0
-> ++------------+             |                 | ...
-> +| Parent IRQ |             |                 +--------- GPIO_8/EXT_INT_0
-> +| controller |  EXT_INT_0  |                 | ...
-> +| (GICv2)    +-------------+                 +--------- GPIO_[N+8]/EXT_INT_N
-> +|            |  ...        |                 |
-> +|            |  EXT_INT_N  |                 +--------- GPIO_[N+9]
-> +|            +-------------+                 | ...
-> +|            |             |                 +--------- GPIO_MAX
-> ++------------+             +-----------------+
+> +/*
+> + * __run_cpu_mode records the mode the boot CPU uses for the kernel.
+> + */
+> +extern u32 __run_cpu_mode[2];
+> +
+>  void __hyp_set_vectors(phys_addr_t phys_vector_base);
+>  phys_addr_t __hyp_get_vectors(void);
 >  
->  Required properties:
->  - compatible: "apm,xgene-gpio-sb" for the X-Gene Standby GPIO controller
-> @@ -15,10 +25,18 @@ Required properties:
->  		0 = active high
->  		1 = active low
->  - gpio-controller: Marks the device node as a GPIO controller.
-> -- interrupts: Shall contain exactly 6 interrupts.
-> +- interrupts: The EXT_INT_0 parent interrupt resource must be listed first.
-> +- interrupt-parent: Phandle of the parent interrupt controller.
-> +- interrupt-cells: Should be two.
-> +       - first cell is 0-N coresponding for EXT_INT_0 to EXT_INT_N.
-> +       - second cell is used to specify flags.
-> +- interrupt-controller: Marks the device node as an interrupt controller.
-> +- apm,nr-gpios: Optional, specify number of gpios pin.
-> +- apm,nr-irqs: Optional, specify number of interrupt pins.
+> @@ -60,6 +65,18 @@ static inline bool is_kernel_in_hyp_mode(void)
+>  	return el == CurrentEL_EL2;
+>  }
+>  
+> +static inline bool is_kernel_mode_mismatched(void)
+> +{
+> +	/*
+> +	 * A mismatched CPU will have written its own CurrentEL in
+> +	 * __run_cpu_mode[1] (initially set to zero) after failing to
+> +	 * match the value in __run_cpu_mode[0]. Thus, a non-zero
+> +	 * value in __run_cpu_mode[1] is enough to detect the
+> +	 * pathological case.
+> +	 */
+> +	return !!ACCESS_ONCE(__run_cpu_mode[1]);
+> +}
+> +
+>  /* The section containing the hypervisor text */
+>  extern char __hyp_text_start[];
+>  extern char __hyp_text_end[];
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 2a7134c..bc44cf8 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -577,7 +577,23 @@ ENTRY(set_cpu_boot_mode_flag)
+>  1:	str	w20, [x1]			// This CPU has booted in EL1
+>  	dmb	sy
+>  	dc	ivac, x1			// Invalidate potentially stale cache line
+> +	adr_l	x1, __run_cpu_mode
+> +	ldr	w0, [x1]
+> +	mrs	x20, CurrentEL
+> +	cbz	x0, skip_el_check
+> +	cmp	x0, x20
+> +	bne	mismatched_el
 
-When is this not 6?
+can't you do a ret here instead of writing the same value and flushing
+caches etc.?
 
-> +- apm,irq-start: Optional, specify lowest gpio pin support interrupt.
+> +skip_el_check:			// Only the first CPU gets to set the rule
+> +	str	w20, [x1]
+> +	dmb	sy
+> +	dc	ivac, x1	// Invalidate potentially stale cache line
+>  	ret
+> +mismatched_el:
+> +	str	w20, [x1, #4]
+> +	dmb	sy
+> +	dc	ivac, x1	// Invalidate potentially stale cache line
+> +1:	wfi
 
-What determines this value? What value is assumed if not present?
+I'm no expert on SMP bringup, but doesn't this prevent the CPU from
+signaling completion and thus you'll never actually reach the checking
+code in __cpu_up?
 
-Rob
+Thanks,
+-Christoffer
+
+> +	b	1b
+>  ENDPROC(set_cpu_boot_mode_flag)
+>  
+>  /*
+> @@ -592,6 +608,9 @@ ENDPROC(set_cpu_boot_mode_flag)
+>  ENTRY(__boot_cpu_mode)
+>  	.long	BOOT_CPU_MODE_EL2
+>  	.long	BOOT_CPU_MODE_EL1
+> +ENTRY(__run_cpu_mode)
+> +	.long	0
+> +	.long	0
+>  	.popsection
+>  
+>  	/*
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index b1adc51..bc7650a 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -113,6 +113,9 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+>  			pr_crit("CPU%u: failed to come online\n", cpu);
+>  			ret = -EIO;
+>  		}
+> +
+> +		if (is_kernel_mode_mismatched())
+> +			panic("CPU%u: incompatible execution level", cpu);
+>  	} else {
+>  		pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
+>  	}
+> -- 
+> 2.1.4
+> 
