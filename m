@@ -1,296 +1,1105 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Mon, 1 Feb 2016 20:44:05 +0800
-Subject: [PATCH 6/6] coresight-stm: adding driver for CoreSight STM
- component
-In-Reply-To: <201602011753.FpQPQQPf%fengguang.wu@intel.com>
-References: <1454313529-8860-7-git-send-email-zhang.chunyan@linaro.org>
- <201602011753.FpQPQQPf%fengguang.wu@intel.com>
-Message-ID: <CAG2=9p_vBrgyzZohZ-LK2uoMRYEJFnyBQvUQJEgfTKCk+GvRwA@mail.gmail.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Mon, 1 Feb 2016 20:53:51 +0800
+Subject: [PATCH v8 2/2] drm/bridge: Add I2C based driver for ps8640 bridge
+In-Reply-To: <1454300012-32552-2-git-send-email-jitao.shi@mediatek.com>
+References: <1454300012-32552-1-git-send-email-jitao.shi@mediatek.com>
+ <1454300012-32552-2-git-send-email-jitao.shi@mediatek.com>
+Message-ID: <CAGS+omB7wFBWZQqdD3iOONaVxZXacT0Eq+05f3FAb6YtVABzuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
+On Mon, Feb 1, 2016 at 12:13 PM, Jitao Shi <jitao.shi@mediatek.com> wrote:
+> This patch adds drm_bridge driver for parade DSI to eDP bridge chip.
+>
+> Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+> ---
+> Changes since v7:
+>  - Change ps8640_regw to ps8640_regw_bytes and remove devm_kzalloc
+>  - Fine tune ps8640 power squence
+>  - Add ps8640_pre_enable and ps8640_post_disable in ps8640_get_modes
+>  - Remove unnecessary codes and comments
+>
+> The following patches are needed to support dsi host through none dsi bus:
+>
+> https://patchwork.kernel.org/patch/7818431/ ("drm/dsi: check for CONFIG_OF when defining of_mipi_dsi_device_add")
+> https://patchwork.kernel.org/patch/7818471/ ("drm/dsi: Refactor device creation")
+> https://patchwork.kernel.org/patch/7818501/ ("drm/dsi: Try to match non-DT dsi devices")
+> https://patchwork.kernel.org/patch/7818531/ ("drm/dsi: Check for used channels")
+> https://patchwork.kernel.org/patch/7818561/ ("drm/dsi: Add routine to unregister dsi device")
+> https://patchwork.kernel.org/patch/7818541/ ("drm/dsi: Get DSI host by DT device node")
+> ---
+>  drivers/gpu/drm/bridge/Kconfig         |   10 +
+>  drivers/gpu/drm/bridge/Makefile        |    1 +
+>  drivers/gpu/drm/bridge/parade-ps8640.c | 1084 ++++++++++++++++++++++++++++++++
+>  3 files changed, 1095 insertions(+)
+>  create mode 100644 drivers/gpu/drm/bridge/parade-ps8640.c
+>
+> diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+> index 27e2022..fe8ad50 100644
+> --- a/drivers/gpu/drm/bridge/Kconfig
+> +++ b/drivers/gpu/drm/bridge/Kconfig
+> @@ -40,4 +40,14 @@ config DRM_PARADE_PS8622
+>         ---help---
+>           Parade eDP-LVDS bridge chip driver.
+>
+> +config DRM_PARADE_PS8640
+> +       tristate "Parade PS8640 MIPI DSI to eDP Converter"
+> +       depends on OF && I2C
+> +       select DRM_KMS_HELPER
 
-So sorry that I forgot this patch depends on [1] which hasn't been upstreamed.
-How about adding the definition of coresight_simple_func() like [1]
-does in the STM driver for the time being? It can be simply removed
-once [1] is upstreamed. If you agree with this idea, I'll add the
-definition of coresight_simple_func() in the next version of patches.
+I think this needs:
+
+select DRM_MIPI_DSI
+
+Otherwise:
+drivers/gpu/drm/bridge/parade-ps8640.c:400: undefined reference to
+`of_find_mipi_dsi_host_by_node'
+drivers/gpu/drm/bridge/parade-ps8640.c:411: undefined reference to
+`mipi_dsi_attach'
+
+> +       select DRM_PANEL
+
+> +       ---help---
+> +         Choose this option if you have PS8640 for display
+> +         The PS8640 is a high-performance and low-power
+> +         MIPI DSI to eDP converter
+> +
+>  endmenu
+> diff --git a/drivers/gpu/drm/bridge/Makefile b/drivers/gpu/drm/bridge/Makefile
+> index f13c33d..fbe38dc 100644
+> --- a/drivers/gpu/drm/bridge/Makefile
+> +++ b/drivers/gpu/drm/bridge/Makefile
+> @@ -4,3 +4,4 @@ obj-$(CONFIG_DRM_DW_HDMI) += dw-hdmi.o
+>  obj-$(CONFIG_DRM_DW_HDMI_AHB_AUDIO) += dw-hdmi-ahb-audio.o
+>  obj-$(CONFIG_DRM_NXP_PTN3460) += nxp-ptn3460.o
+>  obj-$(CONFIG_DRM_PARADE_PS8622) += parade-ps8622.o
+> +obj-$(CONFIG_DRM_PARADE_PS8640) += parade-ps8640.o
+> diff --git a/drivers/gpu/drm/bridge/parade-ps8640.c b/drivers/gpu/drm/bridge/parade-ps8640.c
+> new file mode 100644
+> index 0000000..0230ab5
+> --- /dev/null
+> +++ b/drivers/gpu/drm/bridge/parade-ps8640.c
+> @@ -0,0 +1,1084 @@
+> +/*
+> + * Copyright (c) 2014 MediaTek Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/delay.h>
+> +#include <linux/err.h>
+> +#include <linux/firmware.h>
+> +#include <linux/gpio.h>
+> +#include <linux/gpio/consumer.h>
+> +#include <linux/i2c.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/of_graph.h>
+> +#include <linux/regulator/consumer.h>
+> +#include <asm/unaligned.h>
+> +#include <drm/drm_panel.h>
+> +
+> +#include <drmP.h>
+> +#include <drm_atomic_helper.h>
+> +#include <drm_crtc_helper.h>
+> +#include <drm_crtc.h>
+> +#include <drm_mipi_dsi.h>
+> +
+> +#define PAGE2_SPI_CFG3         0x82
+> +#define I2C_TO_SPI_RESET       0x20
+> +#define PAGE2_ROMADD_BYTE1     0x8e
+> +#define PAGE2_ROMADD_BYTE2     0x8f
+> +#define PAGE2_SWSPI_WDATA      0x90
+> +#define PAGE2_SWSPI_RDATA      0x91
+> +#define PAGE2_SWSPI_LEN                0x92
+> +#define PAGE2_SWSPI_CTL                0x93
+> +#define TRIGGER_NO_READBACK    0x05
+> +#define TRIGGER_READBACK       0x01
+> +#define PAGE2_SPI_STATUS       0x9e
+> +#define PAGE2_GPIO_L           0xa6
+> +#define PAGE2_GPIO_H           0xa7
+> +#define PS_GPIO9               BIT(1)
+> +#define PAGE2_IROM_CTRL                0xb0
+> +#define IROM_ENABLE            0xc0
+> +#define IROM_DISABLE           0x80
+> +#define PAGE2_SW_REST          0xbc
+> +#define PAGE2_ENCTLSPI_WR      0xda
+> +#define PAGE2_I2C_BYPASS       0xea
+> +#define I2C_BYPASS_EN          0xd0
+> +
+> +#define PAGE3_SET_ADD          0xfe
+> +#define PAGE3_SET_VAL          0xff
+> +#define VDO_CTL_ADD            0x13
+> +#define VDO_DIS                        0x18
+> +#define VDO_EN                 0x1c
+> +
+> +#define PAGE4_REV_L            0xf0
+> +#define PAGE4_REV_H            0xf1
+> +#define PAGE4_CHIP_L           0xf2
+> +#define PAGE4_CHIP_H           0xf3
+> +
+> +/* Firmware */
+> +#define SPI_MAX_RETRY_CNT      8
+> +#define PS_FW_NAME             "ps864x_fw.bin"
+> +
+> +#define FW_CHIP_ID_OFFSET      0
+> +#define FW_VERSION_OFFSET      2
+> +
+> +#define bridge_to_ps8640(e)    container_of(e, struct ps8640, bridge)
+> +#define connector_to_ps8640(e) container_of(e, struct ps8640, connector)
+> +
+> +struct ps8640_info {
+> +       u8 family_id;
+> +       u8 variant_id;
+> +       u16 version;
+> +};
+> +
+> +struct ps8640 {
+> +       struct drm_connector connector;
+> +       struct drm_bridge bridge;
+> +       struct mipi_dsi_device *dsi;
+> +       struct i2c_client *page[8];
+> +       struct ps8640_driver_data *driver_data;
+> +       struct regulator *pwr_1v2_supply;
+> +       struct regulator *pwr_3v3_supply;
+> +       struct drm_panel *panel;
+> +       struct gpio_desc *gpio_rst_n;
+> +       struct gpio_desc *gpio_slp_n;
+> +       struct gpio_desc *gpio_mode_sel_n;
+> +       bool enabled;
+> +
+> +       /* firmware file name */
+> +       bool in_fw_update;
+> +       char *fw_file;
+> +       struct ps8640_info info;
+> +};
+> +
+> +static const u8 enc_ctrl_code[6] = {0xaa, 0x55, 0x50, 0x41, 0x52, 0x44};
+> +
+> +static int ps8640_regr(struct i2c_client *client, u8 reg, u8 *data,
+> +                      u16 data_len)
+
+IMHO, ps8640_read() and ps8640_write() are clearer than regr and regw.
+
+> +{
+> +       int ret;
+> +       struct i2c_msg msgs[] = {
+> +               {
+> +                .addr = client->addr,
+> +                .flags = 0,
+> +                .len = 1,
+> +                .buf = &reg,
+> +                },
+> +               {
+> +                .addr = client->addr,
+> +                .flags = I2C_M_RD,
+> +                .len = data_len,
+> +                .buf = data,
+> +                }
+> +       };
+> +
+> +       ret = i2c_transfer(client->adapter, msgs, 2);
+> +
+> +       if (ret == 2)
+> +               return 0;
+> +       if (ret < 0)
+> +               return ret;
+> +       else
+> +               return -EIO;
+> +}
+> +
+> +static int ps8640_regw_bytes(struct i2c_client *client, u8 *data,
+> +                            u16 data_len)
+> +{
+> +       int ret;
+> +       struct i2c_msg msg;
+> +
+> +       msg.addr = client->addr;
+> +       msg.flags = 0;
+> +       msg.len = data_len;
+> +       msg.buf = data;
+> +
+> +       ret = i2c_transfer(client->adapter, &msg, 1);
+> +       if (ret == 1)
+> +               return 0;
+> +       if (ret < 0)
+> +               return ret;
+> +       else
+> +               return -EIO;
+> +}
+> +
+> +static int ps8640_regw_byte(struct i2c_client *client, u8 reg,  u8 data)
+> +{
+> +       int ret;
+> +       struct i2c_msg msg;
+> +       u8 buf[] = {reg, data};
+> +
+> +       msg.addr = client->addr;
+> +       msg.flags = 0;
+> +       msg.len = sizeof(buf);
+> +       msg.buf = buf;
+> +
+> +       ret = i2c_transfer(client->adapter, &msg, 1);
+> +       if (ret == 1)
+> +               return 0;
+> +       if (ret < 0)
+> +               return ret;
+> +       else
+> +               return -EIO;
+> +}
+> +
+> +static void ps8640_get_mcu_fw_version(struct ps8640 *ps_bridge)
+> +{
+> +       struct i2c_client *client = ps_bridge->page[5];
+> +       u8 fw_ver[2];
+> +
+> +       ps8640_regr(client, 0x4, fw_ver, 2);
+> +       ps_bridge->info.version = (fw_ver[0] << 8) | fw_ver[1];
+> +
+> +       DRM_INFO_ONCE("ps8640 rom fw version %d.%d\n", fw_ver[0], fw_ver[1]);
+> +}
+> +
+> +static int ps8640_bridge_enable(struct ps8640 *ps_bridge)
+> +{
+> +       struct i2c_client *client = ps_bridge->page[3];
+> +       int ret;
+> +       u8 vdo_ctrl_buf[3] = {PAGE3_SET_ADD, VDO_CTL_ADD, VDO_EN};
+> +
+> +       ret = ps8640_regw_bytes(client, vdo_ctrl_buf, 3);
+> +       return ret;
+
+nit:  Just:
+
+   return ps8640_regw_bytes(client, vdo_ctrl_buf, 3);
+
+> +}
+> +
+> +static void ps8640_pre_enable(struct drm_bridge *bridge)
+> +{
+> +       struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
+> +       struct i2c_client *client = ps_bridge->page[2];
+> +       int err, retry_cnt = 0;
+> +       u8 set_vdo_done;
+> +
+> +       if (ps_bridge->in_fw_update)
+> +               return;
+> +
+> +       if (ps_bridge->enabled)
+> +               return;
+> +
+> +       err = drm_panel_prepare(ps_bridge->panel);
+> +       if (err < 0) {
+> +               DRM_ERROR("failed to prepare panel: %d\n", err);
+> +               return;
+> +       }
+> +
+> +       gpiod_set_value(ps_bridge->gpio_slp_n, 1);
+> +       gpiod_set_value(ps_bridge->gpio_rst_n, 0);
+> +
+> +       err = regulator_enable(ps_bridge->pwr_1v2_supply);
+> +       if (err < 0) {
+> +               DRM_ERROR("failed to enable vdd12-supply: %d\n", err);
+> +               goto err_panel_unprepare;
+> +       }
+> +
+> +       err = regulator_enable(ps_bridge->pwr_3v3_supply);
+> +       if (err < 0) {
+> +               DRM_ERROR("failed to enable vdd33-supply: %d\n", err);
+> +               goto err_regulator_1v2_disable;
+> +       }
+> +
+> +       usleep_range(500, 700);
+> +       gpiod_set_value(ps_bridge->gpio_rst_n, 1);
+> +
+> +       /*
+> +        * Wait for the ps8640 embed mcu ready
+> +        * First wait 200ms and then check the mcu ready flag every 20ms
+> +        */
+> +       msleep(200);
+> +       do {
+> +               err = ps8640_regr(client, PAGE2_GPIO_H, &set_vdo_done, 1);
+> +               if (err < 0) {
+> +                       DRM_ERROR("failed read PAGE2_GPIO_H: %d\n", err);
+> +                       goto err_regulator_1v2_disable;
+> +               }
+> +               msleep(20);
+> +       } while ((retry_cnt++ < 10) && ((set_vdo_done & PS_GPIO9) != PS_GPIO9));
+> +
+> +       if (ps_bridge->info.version == 0)
+> +               ps8640_get_mcu_fw_version(ps_bridge);
+> +       /* Switch access edp panel's edid through i2c */
+> +       ps8640_regw_byte(client, PAGE2_I2C_BYPASS, I2C_BYPASS_EN);
+> +       ps_bridge->enabled = true;
+> +
+> +       return;
+> +
+> +err_regulator_1v2_disable:
+> +       regulator_disable(ps_bridge->pwr_1v2_supply);
+> +err_panel_unprepare:
+> +       drm_panel_unprepare(ps_bridge->panel);
+> +}
+> +
+> +static void ps8640_enable(struct drm_bridge *bridge)
+> +{
+> +       struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
+> +       int err;
+> +
+> +       err = ps8640_bridge_enable(ps_bridge);
+> +       if (err)
+> +               DRM_ERROR("failed to enable unmutevideo: %d\n", err);
+> +
+> +       err = drm_panel_enable(ps_bridge->panel);
+> +       if (err < 0)
+> +               DRM_ERROR("failed to enable panel: %d\n", err);
+> +}
+> +
+> +static void ps8640_disable(struct drm_bridge *bridge)
+> +{
+> +       struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
+> +       int err;
+> +
+> +       err = drm_panel_disable(ps_bridge->panel);
+> +       if (err < 0)
+> +               DRM_ERROR("failed to disable panel: %d\n", err);
+
+Should there be a ps8640_bridge_disable() here, to undo ps8640_bridge_enable()?
+
+> +}
+> +
+> +static void ps8640_post_disable(struct drm_bridge *bridge)
+> +{
+> +       struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
+> +       int err;
+> +
+> +       if (ps_bridge->in_fw_update)
+> +               return;
+> +
+> +       if (!ps_bridge->enabled)
+> +               return;
+> +
+> +       ps_bridge->enabled = false;
+> +
+> +       gpiod_set_value(ps_bridge->gpio_rst_n, 0);
+> +       gpiod_set_value(ps_bridge->gpio_slp_n, 0);
+> +       regulator_disable(ps_bridge->pwr_3v3_supply);
+> +       regulator_disable(ps_bridge->pwr_1v2_supply);
+> +
+> +       err = drm_panel_unprepare(ps_bridge->panel);
+> +       if (err)
+> +               DRM_ERROR("failed to unprepare panel: %d\n", err);
+> +}
+> +
+> +static int ps8640_get_modes(struct drm_connector *connector)
+> +{
+> +       struct ps8640 *ps_bridge = connector_to_ps8640(connector);
+> +       bool power_off;
+> +       int num_modes = 0;
+> +
+> +       power_off = !ps_bridge->enabled;
+> +       ps8640_pre_enable(&ps_bridge->bridge);
+> +
+> +       num_modes = drm_panel_get_modes(ps_bridge->panel);
+> +
+> +       if (power_off)
+> +               ps8640_post_disable(&ps_bridge->bridge);
+> +
+> +       return num_modes;
+> +}
+> +
+> +static struct drm_encoder *ps8640_best_encoder(struct drm_connector *connector)
+> +{
+> +       struct ps8640 *ps_bridge;
+> +
+> +       ps_bridge = connector_to_ps8640(connector);
+> +       return ps_bridge->bridge.encoder;
+> +}
+> +
+> +static const struct drm_connector_helper_funcs ps8640_connector_helper_funcs = {
+> +       .get_modes = ps8640_get_modes,
+> +       .best_encoder = ps8640_best_encoder,
+> +};
+> +
+> +static enum drm_connector_status ps8640_detect(struct drm_connector *connector,
+> +                                              bool force)
+> +{
+> +       return connector_status_connected;
+> +}
+> +
+> +static void ps8640_connector_destroy(struct drm_connector *connector)
+> +{
+> +       drm_connector_unregister(connector);
+> +       drm_connector_cleanup(connector);
+> +}
+> +
+> +static const struct drm_connector_funcs ps8640_connector_funcs = {
+> +       .dpms = drm_atomic_helper_connector_dpms,
+> +       .fill_modes = drm_helper_probe_single_connector_modes,
+> +       .detect = ps8640_detect,
+> +       .destroy = ps8640_connector_destroy,
+> +       .reset = drm_atomic_helper_connector_reset,
+> +       .atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+> +       .atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+> +};
+> +
+> +int ps8640_bridge_attach(struct drm_bridge *bridge)
+> +{
+> +       struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
+> +       struct device *dev = &ps_bridge->page[0]->dev;
+> +       struct device_node *np = dev->of_node;
+> +       struct device_node *port, *in_ep;
+> +       struct device_node *dsi_node = NULL;
+> +       struct mipi_dsi_host *host = ps_bridge->dsi->host;
+> +       int ret;
+> +
+> +       ret = drm_connector_init(bridge->dev, &ps_bridge->connector,
+> +                                &ps8640_connector_funcs,
+> +                                DRM_MODE_CONNECTOR_eDP);
+> +
+> +       if (ret) {
+> +               DRM_ERROR("Failed to initialize connector with drm: %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       drm_connector_helper_add(&ps_bridge->connector,
+> +                                &ps8640_connector_helper_funcs);
+> +       drm_connector_register(&ps_bridge->connector);
+> +
+> +       ps_bridge->connector.dpms = DRM_MODE_DPMS_ON;
+> +       drm_mode_connector_attach_encoder(&ps_bridge->connector,
+> +                                         bridge->encoder);
+> +
+> +       if (ps_bridge->panel)
+> +               drm_panel_attach(ps_bridge->panel, &ps_bridge->connector);
+> +
+> +       /* port at 0 is ps8640 dsi input port */
+> +       port = of_graph_get_port_by_id(np, 0);
+> +       if (port) {
+> +               in_ep = of_get_child_by_name(port, "endpoint");
+> +               of_node_put(port);
+> +               if (in_ep) {
+> +                       dsi_node = of_graph_get_remote_port_parent(in_ep);
+> +                       of_node_put(in_ep);
+> +               }
+> +       }
+> +       if (dsi_node) {
+> +               host = of_find_mipi_dsi_host_by_node(dsi_node);
+> +               of_node_put(dsi_node);
+> +               if (!host)
+> +                       return -ENODEV;
+> +       }
+> +
+> +       ps_bridge->dsi->host = host;
+> +       ps_bridge->dsi->mode_flags = MIPI_DSI_MODE_VIDEO |
+> +                                    MIPI_DSI_MODE_VIDEO_SYNC_PULSE;
+> +       ps_bridge->dsi->format = MIPI_DSI_FMT_RGB888;
+> +       ps_bridge->dsi->lanes = 4;
+> +       ret = mipi_dsi_attach(ps_bridge->dsi);
+> +       if (ret) {
+> +               drm_panel_detach(ps_bridge->panel);
+> +               return ret;
+> +       }
+> +
+> +       return ret;
+> +}
+> +
+> +static const struct drm_bridge_funcs ps8640_bridge_funcs = {
+> +       .attach = ps8640_bridge_attach,
+> +       .disable = ps8640_disable,
+> +       .post_disable = ps8640_post_disable,
+> +       .pre_enable = ps8640_pre_enable,
+> +       .enable = ps8640_enable,
+> +};
+> +
+> +static ssize_t ps8640_fw_file_show(struct device *dev,
+> +                                  struct device_attribute *attr, char *buf)
+> +{
+> +       struct ps8640 *ps_bridge = dev_get_drvdata(dev);
+> +
+> +       return scnprintf(buf, PAGE_SIZE, "%s\n", ps_bridge->fw_file);
+> +}
+> +
+> +static int ps8640_update_file_name(struct device *dev, char **file_name,
+> +                                  const char *buf, size_t count)
+
+Just remove this function now since fw_file is always just PS_FW_NAME.
+
+> +{
+> +       char *new_file_name;
+> +
+> +       /* Simple sanity check */
+> +       if (count > 64) {
+> +               dev_warn(dev, "File name too long\n");
+> +               return -EINVAL;
+> +       }
+> +
+> +       new_file_name = devm_kmalloc(dev, count + 1, GFP_KERNEL);
+> +       if (!new_file_name)
+> +               return -ENOMEM;
+> +
+> +       memcpy(new_file_name, buf, count + 1);
+> +
+> +       /* Echo into the sysfs entry may append newline at the end of buf */
+> +       if (new_file_name[count - 1] == '\n')
+> +               count--;
+> +
+> +       new_file_name[count] = '\0';
+> +
+> +       if (*file_name)
+> +               devm_kfree(dev, *file_name);
+> +
+> +       *file_name = new_file_name;
+> +
+> +       return 0;
+> +}
+> +
+> +/* Firmware Version is returned as Major.Minor.Build */
+> +static ssize_t ps8640_fw_version_show(struct device *dev,
+> +                                     struct device_attribute *attr, char *buf)
+> +{
+> +       struct ps8640 *ps_bridge = dev_get_drvdata(dev);
+> +       struct ps8640_info *info = &ps_bridge->info;
+> +
+> +       return scnprintf(buf, PAGE_SIZE, "%u.%u\n", info->version >> 8,
+> +                        info->version & 0xff);
+
+Just remove this sysfs entry since fw_file is always just PS_FW_NAME.
+
+> +}
+> +
+> +/* Hardware Version is returned as FamilyID.VariantID */
+> +static ssize_t ps8640_hw_version_show(struct device *dev,
+> +                                     struct device_attribute *attr, char *buf)
+> +{
+> +       struct ps8640 *ps_bridge = dev_get_drvdata(dev);
+> +       struct ps8640_info *info = &ps_bridge->info;
+> +
+> +       return scnprintf(buf, PAGE_SIZE, "ps%u.%u\n", info->family_id,
+> +                        info->variant_id);
+> +}
+> +
+> +static int ps8640_spi_send_cmd(struct ps8640 *ps_bridge, u8 *cmd, u8 cmd_len)
+> +{
+> +       struct i2c_client *client = ps_bridge->page[2];
+> +       u8 i;
+> +       int ret;
+> +
+> +       ret = ps8640_regw_byte(client, PAGE2_IROM_CTRL, IROM_ENABLE);
+> +       if (ret)
+> +               goto err;
+> +
+> +       /* write command in write port */
+> +       for (i = 0; i < cmd_len; i++) {
+> +               ret = ps8640_regw_byte(client, PAGE2_SWSPI_WDATA, cmd[i]);
+> +               if (ret)
+> +                       goto err;
+> +       }
+> +       /* command length */
+> +       ret = ps8640_regw_byte(client, PAGE2_SWSPI_LEN, cmd_len - 1);
+> +       if (ret)
+> +               goto err;
+> +       /* trigger read */
+> +       ret = ps8640_regw_byte(client, PAGE2_SWSPI_CTL, TRIGGER_NO_READBACK);
+> +       if (ret)
+> +               goto err;
+
+nit: you can probably combine the write of PAGE2_SWSPI_LEN &
+PAGE2_SWSPI_CTL into a single i2c transaction, here and in
+ps8640_wait_spi_nobusy().
+
+> +
+> +       ret = ps8640_regw_byte(client, PAGE2_IROM_CTRL, IROM_DISABLE);
+> +       if (ret)
+> +               goto err;
+> +
+> +       return 0;
+> +
+> +err:
+> +       dev_err(&client->dev, "send command err: %d\n", ret);
+> +       return ret;
+> +}
+> +
+> +static int ps8640_wait_spi_ready(struct ps8640 *ps_bridge)
+> +{
+> +       struct i2c_client *client = ps_bridge->page[2];
+> +       u8 spi_rdy_st, retry_cnt = 0;
+> +
+> +       do {
+> +               ps8640_regr(client, PAGE2_SPI_STATUS, &spi_rdy_st, 1);
+> +               msleep(20);
+> +               if ((retry_cnt == SPI_MAX_RETRY_CNT) &&
+> +                   ((spi_rdy_st & 0x0c) != 0x0c)) {
+> +                       dev_err(&client->dev, "wait spi ready timeout\n");
+> +                       return -EBUSY;
+> +               }
+> +       } while ((retry_cnt++ < SPI_MAX_RETRY_CNT) &&
+> +                (spi_rdy_st & 0x0c) == 0x0c);
+> +
+> +       return 0;
+> +}
+> +
+> +static int ps8640_wait_spi_nobusy(struct ps8640 *ps_bridge)
+> +{
+> +       struct i2c_client *client = ps_bridge->page[2];
+> +       u8 spi_status, retry_cnt = 0;
+> +       int ret;
+> +
+> +       do {
+> +               /* 0x05 RDSR; Read-Status-Register */
+> +               ret = ps8640_regw_byte(client, PAGE2_SWSPI_WDATA, 0x05);
+
+Please #define this constant 0x05.
+
+
+> +               if (ret)
+> +                       goto err_send_cmd_exit;
+> +
+> +               /* command length */
+> +               ret = ps8640_regw_byte(client, PAGE2_SWSPI_LEN, 0x00);
+> +               if (ret)
+> +                       goto err_send_cmd_exit;
+> +
+> +               /* trigger read */
+> +               ret = ps8640_regw_byte(client, PAGE2_SWSPI_CTL,
+> +                                      TRIGGER_READBACK);
+> +               if (ret)
+> +                       goto err_send_cmd_exit;
+> +
+> +               /* delay for cmd send */
+> +               usleep_range(100, 300);
+> +               /* wait for SPI ROM until not busy */
+> +               ret = ps8640_regr(client, PAGE2_SWSPI_RDATA, &spi_status, 1);
+> +               if (ret)
+> +                       goto err_send_cmd_exit;
+> +       } while ((retry_cnt++ < SPI_MAX_RETRY_CNT) &&
+> +                (spi_status & 0x0c) == 0x0c);
+> +
+> +       if ((retry_cnt > SPI_MAX_RETRY_CNT) && (spi_status & 0x0c) != 0x0c) {
+
+Please #define this constant 0x0c.
+
+
+> +               ret = -EBUSY;
+> +               dev_err(&client->dev, "wait spi no busy timeout: %d\n", ret);
+> +               goto err_timeout;
+> +       }
+> +
+> +       return 0;
+> +
+> +err_send_cmd_exit:
+> +       dev_err(&client->dev, "send command err: %d\n", ret);
+> +
+> +err_timeout:
+> +       return ret;
+> +}
+> +
+> +static int ps8640_wait_rom_idle(struct ps8640 *ps_bridge)
+> +{
+> +       struct i2c_client *client = ps_bridge->page[0];
+> +       int ret;
+> +
+> +       ret = ps8640_regw_byte(client, PAGE2_IROM_CTRL, IROM_ENABLE);
+> +       if (ret)
+> +               goto exit;
+> +
+> +       ret = ps8640_wait_spi_ready(ps_bridge);
+> +       if (ret)
+> +               goto exit;
+> +
+> +       ret = ps8640_wait_spi_nobusy(ps_bridge);
+> +       if (ret)
+> +               goto exit;
+> +
+> +       ret = ps8640_regw_byte(client, PAGE2_IROM_CTRL, IROM_DISABLE);
+> +       if (ret)
+> +               goto exit;
+> +
+> +exit:
+> +       if (ret)
+> +               dev_err(&client->dev, "wait ps8640 rom idle fail: %d\n", ret);
+> +
+> +       return ret;
+> +}
+> +
+> +static int ps8640_spi_dl_mode(struct ps8640 *ps_bridge)
+> +{
+> +       struct i2c_client *client = ps_bridge->page[2];
+> +       int ret;
+> +
+> +       /* switch ps8640 mode to spi dl mode */
+> +       gpiod_set_value(ps_bridge->gpio_mode_sel_n, 0);
+> +
+> +       /* reset spi interface */
+> +       ret = ps8640_regw_byte(client, PAGE2_SW_REST, 0xc0);
+
+Please #define these constants, 0xc0 & 0x40.  Is this a bit field?
+
+> +       if (ret)
+> +               goto exit;
+> +
+> +       ret = ps8640_regw_byte(client, PAGE2_SW_REST, 0x40);
+> +       if (ret)
+> +               goto exit;
+> +
+> +exit:
+> +       if (ret)
+> +               dev_err(&client->dev, "fail reset spi interface: %d\n", ret);
+> +
+> +       return ret;
+> +}
+> +
+> +static int ps8640_rom_prepare(struct ps8640 *ps_bridge)
+> +{
+> +       struct i2c_client *client = ps_bridge->page[2];
+> +       struct device *dev = &client->dev;
+> +       u8 i, cmd[2];
+> +       int ret;
+> +
+> +       /* Enable-Write-Status-Register */
+> +       cmd[0] = 0x06;
+
+Please #define magic numbers / constants in this function.
+
+
+> +       ret = ps8640_spi_send_cmd(ps_bridge, cmd, 1);
+> +       if (ret) {
+> +               dev_err(dev, "failed enable-write-status-register: %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       /* disable all protection */
+> +       cmd[0] = 0x01;
+> +       cmd[1] = 0x00;
+> +       ret = ps8640_spi_send_cmd(ps_bridge, cmd, 2);
+> +       if (ret) {
+> +               dev_err(dev, "fail disable all protection: %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       /* wait for SPI module ready */
+> +       ret = ps8640_wait_rom_idle(ps_bridge);
+> +       if (ret) {
+> +               dev_err(dev, "fail wait rom idle: %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       ps8640_regw_byte(client, PAGE2_IROM_CTRL, IROM_ENABLE);
+> +       for (i = 0; i < 6; i++)
+> +               ps8640_regw_byte(client, PAGE2_ENCTLSPI_WR, enc_ctrl_code[i]);
+> +       ps8640_regw_byte(client, PAGE2_IROM_CTRL, IROM_DISABLE);
+> +
+> +       /* Enable-Write-Status-Register */
+> +       cmd[0] = 0x06;
+> +       ret = ps8640_spi_send_cmd(ps_bridge, cmd, 1);
+> +       if (ret) {
+> +               dev_err(dev, "fail enable-write-status-register: %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       /* chip erase command */
+> +       cmd[0] = 0xc7;
+> +       ret = ps8640_spi_send_cmd(ps_bridge, cmd, 1);
+> +       if (ret) {
+> +               dev_err(dev, "fail disable all protection: %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       ret = ps8640_wait_rom_idle(ps_bridge);
+> +       if (ret) {
+> +               dev_err(dev, "fail wait rom idle: %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int ps8640_validate_firmware(struct ps8640 *ps_bridge,
+> +                                   const struct firmware *fw)
+> +{
+> +       struct i2c_client *client = ps_bridge->page[0];
+> +       struct ps8640_info *info = &ps_bridge->info;
+> +       u16 fw_chip_id, fw_version_id;
+> +
+> +       /*
+> +        * Get the chip_id from the firmware. Make sure that it is the
+> +        * right controller to do the firmware and config update.
+> +        */
+> +       fw_chip_id = get_unaligned_le16(fw->data + FW_CHIP_ID_OFFSET);
+> +
+> +       if (fw_chip_id != 0x8640) {
+> +               dev_err(&client->dev,
+> +                       "chip id mismatch: fw 0x%x vs. chip 0x8640\n",
+> +                       fw_chip_id);
+> +               return -ENODEV;
+> +       }
+> +
+> +       fw_version_id = get_unaligned_le16(fw->data + FW_VERSION_OFFSET);
+> +
+> +       if (fw_chip_id != info->version) {
+> +               dev_err(&client->dev,
+> +                       "fw version mismatch: fw %d.%d vs. chip %d.%d\n",
+> +                       fw_version_id >> 8, fw_version_id & 0xff,
+> +                       info->version >> 8, info->version & 0xff);
+> +               return -ENODEV;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int ps8640_write_rom(struct ps8640 *ps_bridge, const struct firmware *fw)
+> +{
+> +       struct i2c_client *client = ps_bridge->page[0];
+> +       struct device *dev = &client->dev;
+> +       struct i2c_client *client2 = ps_bridge->page[2];
+> +       struct i2c_client *client7 = ps_bridge->page[7];
+> +       unsigned int pos = 0;
+> +       u8 buf[257], rom_page_id_buf[3];
+> +       int ret;
+> +       u16 cpy_len;
+> +
+> +       ps8640_regw_byte(client2, PAGE2_SPI_CFG3, I2C_TO_SPI_RESET);
+> +       msleep(100);
+> +       ps8640_regw_byte(client2, PAGE2_SPI_CFG3, 0x00);
+> +
+> +       while (pos < fw->size) {
+> +               rom_page_id_buf[0] = PAGE2_ROMADD_BYTE1;
+> +               rom_page_id_buf[1] = (pos >> 8) & 0xff;
+> +               rom_page_id_buf[2] = (pos >> 16) & 0xff;
+> +               ret = ps8640_regw_bytes(client2, rom_page_id_buf, 3);
+> +               if (ret)
+> +                       goto error;
+> +               cpy_len = fw->size >= 256 + pos ? 256 : fw->size - pos;
+> +               buf[0] = 0;
+> +               memcpy(buf + 1, fw->data + pos, cpy_len);
+> +               ret = ps8640_regw_bytes(client7, buf, cpy_len + 1);
+> +               if (ret)
+> +                       goto error;
+> +
+> +               pos += cpy_len;
+> +
+> +               dev_dbg(dev, "fw update completed %u / %zu bytes\n", pos,
+> +                       fw->size);
+> +       }
+> +       return 0;
+> +
+> +error:
+> +       dev_err(dev, "failed write extenal flash, %d\n", ret);
+> +       return ret;
+> +}
+> +
+> +static int ps8640_spi_normal_mode(struct ps8640 *ps_bridge)
+> +{
+> +       u8 cmd[2];
+> +       struct i2c_client *client = ps_bridge->page[2];
+
+Please #define magic numbers / constants in this function.
+
+> +
+> +       /* Enable-Write-Status-Register */
+> +       cmd[0] = 0x06;
+> +       ps8640_spi_send_cmd(ps_bridge, cmd, 1);
+> +
+> +       /* protect BPL/BP0/BP1 */
+> +       cmd[0] = 0x01;
+> +       cmd[1] = 0x8c;
+> +       ps8640_spi_send_cmd(ps_bridge, cmd, 2);
+> +
+> +       /* wait for SPI rom ready */
+> +       ps8640_wait_rom_idle(ps_bridge);
+> +
+> +       /* disable PS8640 mapping function */
+> +       ps8640_regw_byte(client, PAGE2_ENCTLSPI_WR, 0x00);
+> +
+> +       gpiod_set_value(ps_bridge->gpio_mode_sel_n, 1);
+> +       return 0;
+> +}
+> +
+> +static int ps8640_enter_bl(struct ps8640 *ps_bridge)
+> +{
+> +       int ret;
+> +
+> +       ret = ps8640_spi_dl_mode(ps_bridge);
+> +       if (ret)
+> +               return ret;
+> +
+> +       ps_bridge->in_fw_update = true;
+
+Set in_fw_update before ps8640_spi_dl_mode() to avoid a race between
+between ps8640_spi_dl_mode() and ps8640_pre_enable / post_disable().
+
+> +       return 0;
+> +}
+> +
+> +static void ps8640_exit_bl(struct ps8640 *ps_bridge, const struct firmware *fw)
+> +{
+> +       ps_bridge->in_fw_update = false;
+> +       ps8640_spi_normal_mode(ps_bridge);
+
+Set in_fw_update after ps8640_spi_normal_mode() to avoid a race
+between between ps8640_spi_normal_mode() and ps8640_pre_enable /
+post_disable().
+
+> +}
+> +
+> +static int ps8640_load_fw(struct ps8640 *ps_bridge, const struct firmware *fw)
+> +{
+> +       struct i2c_client *client = ps_bridge->page[0];
+> +       struct device *dev = &client->dev;
+> +       int ret;
+> +       bool ps8640_status_backup = ps_bridge->enabled;
+> +
+> +       if (!ps_bridge->in_fw_update) {
+> +               if (!ps8640_status_backup)
+> +                       ps8640_pre_enable(&ps_bridge->bridge);
+> +
+> +               ret = ps8640_enter_bl(ps_bridge);
+> +               if (ret)
+> +                       goto exit;
+> +       }
+> +
+> +       ret = ps8640_validate_firmware(ps_bridge, fw);
+> +       if (ret)
+> +               goto exit;
+> +
+> +       ret = ps8640_rom_prepare(ps_bridge);
+> +       if (ret)
+> +               goto exit;
+> +
+> +       ret = ps8640_write_rom(ps_bridge, fw);
+> +
+> +exit:
+> +       if (ret)
+> +               dev_err(dev, "Failed to load firmware, %d\n", ret);
+> +
+> +       ps8640_exit_bl(ps_bridge, fw);
+> +       if (!ps8640_status_backup)
+> +               ps8640_post_disable(&ps_bridge->bridge);
+> +       return ret;
+> +}
+> +
+> +static ssize_t ps8640_update_fw_store(struct device *dev,
+> +                                     struct device_attribute *attr,
+> +                                     const char *buf, size_t count)
+> +{
+> +       struct i2c_client *client = to_i2c_client(dev);
+> +       struct ps8640 *ps_bridge = i2c_get_clientdata(client);
+> +       const struct firmware *fw;
+> +       int error;
+> +
+> +       error = request_firmware(&fw, ps_bridge->fw_file, dev);
+> +       if (error) {
+> +               dev_err(dev, "Unable to open firmware %s: %d\n",
+> +                       ps_bridge->fw_file, error);
+> +               return error;
+> +       }
+> +
+> +       error = ps8640_load_fw(ps_bridge, fw);
+> +       if (error)
+> +               dev_err(dev, "The firmware update failed(%d)\n", error);
+> +       else
+> +               dev_info(dev, "The firmware update succeeded\n");
+> +
+> +       release_firmware(fw);
+> +       return error ? error : count;
+> +}
+> +
+> +static DEVICE_ATTR(fw_file, S_IRUGO, ps8640_fw_file_show, NULL);
+> +static DEVICE_ATTR(fw_version, S_IRUGO, ps8640_fw_version_show, NULL);
+> +static DEVICE_ATTR(hw_version, S_IRUGO, ps8640_hw_version_show, NULL);
+> +static DEVICE_ATTR(update_fw, S_IWUSR, NULL, ps8640_update_fw_store);
+> +
+> +static struct attribute *ps8640_attrs[] = {
+> +       &dev_attr_fw_file.attr,
+> +       &dev_attr_fw_version.attr,
+> +       &dev_attr_hw_version.attr,
+> +       &dev_attr_update_fw.attr,
+> +       NULL
+> +};
+> +
+> +static const struct attribute_group ps8640_attr_group = {
+> +       .attrs = ps8640_attrs,
+> +};
+> +
+> +static void ps8640_remove_sysfs_group(void *data)
+> +{
+> +       struct ps8640 *ps_bridge = data;
+> +
+> +       sysfs_remove_group(&ps_bridge->page[0]->dev.kobj, &ps8640_attr_group);
+> +}
+> +
+> +static int ps8640_probe(struct i2c_client *client,
+> +                       const struct i2c_device_id *id)
+> +{
+> +       struct device *dev = &client->dev;
+> +       struct ps8640 *ps_bridge;
+> +       struct device_node *np = dev->of_node;
+> +       struct device_node *port, *out_ep;
+> +       struct device_node *panel_node = NULL;
+> +       int i, ret;
+> +
+> +       ps_bridge = devm_kzalloc(dev, sizeof(*ps_bridge), GFP_KERNEL);
+> +       ps_bridge->dsi = devm_kzalloc(dev, sizeof(struct mipi_dsi_device),
+> +                                     GFP_KERNEL);
+> +       if (!ps_bridge) {
+> +               ret = -ENOMEM;
+> +               goto exit;
+
+nit: instead of "goto exit", you can just:
+
+  return -ENOMEM; (for all of these "goto exit")
+
+> +       }
+> +       /* port at 1 is ps8640 output port */
+> +       port = of_graph_get_port_by_id(np, 1);
+> +       if (port) {
+> +               out_ep = of_get_child_by_name(port, "endpoint");
+> +               of_node_put(port);
+> +               if (out_ep) {
+> +                       panel_node = of_graph_get_remote_port_parent(out_ep);
+> +                       of_node_put(out_ep);
+> +               }
+> +       }
+> +       if (panel_node) {
+> +               ps_bridge->panel = of_drm_find_panel(panel_node);
+> +               of_node_put(panel_node);
+> +               if (!ps_bridge->panel) {
+> +                       ret = -EPROBE_DEFER;
+> +                       goto exit;
+> +               }
+> +       }
+> +
+> +       ps_bridge->pwr_3v3_supply = devm_regulator_get(dev, "vdd33");
+> +       if (IS_ERR(ps_bridge->pwr_3v3_supply)) {
+> +               ret = PTR_ERR(ps_bridge->pwr_3v3_supply);
+> +               dev_err(dev, "cannot get vdd33 supply: %d\n", ret);
+> +               goto exit;
+> +       }
+> +
+> +       ps_bridge->pwr_1v2_supply = devm_regulator_get(dev, "vdd12");
+> +       if (IS_ERR(ps_bridge->pwr_1v2_supply)) {
+> +               ret = PTR_ERR(ps_bridge->pwr_1v2_supply);
+> +               dev_err(dev, "cannot get vdd12 supply: %d\n", ret);
+> +               goto exit;
+> +       }
+> +
+> +       ps_bridge->gpio_mode_sel_n = devm_gpiod_get(&client->dev, "mode-sel",
+> +                                                   GPIOD_OUT_HIGH);
+> +       if (IS_ERR(ps_bridge->gpio_mode_sel_n)) {
+> +               ret = PTR_ERR(ps_bridge->gpio_mode_sel_n);
+> +               dev_err(dev, "cannot get gpio_mode_sel_n %d\n", ret);
+
+nit: I'd use the gpio's device tree name in the error message here, so
+"mode-sel".
+Same for the others, below.
+
+  dev_err(dev, "cannot get gpio 'mode-sel' %d\n", ret);
 
 Thanks,
-Chunyan
-
-[1] https://git.linaro.org/people/mathieu.poirier/coresight.git/blobdiff/59aadd3319527addcf8dbc6e6064b15f74b244fe..76dda3d0d313a4676d43adef52ad8faec0c61b61:/drivers/hwtracing/coresight/coresight-priv.h
-
-On Mon, Feb 1, 2016 at 6:01 PM, kbuild test robot <lkp@intel.com> wrote:
-> Hi Pratik,
->
-> [auto build test ERROR on robh/for-next]
-> [also build test ERROR on v4.5-rc2 next-20160201]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
->
-> url:    https://github.com/0day-ci/linux/commits/Chunyan-Zhang/Introduce-CoreSight-STM-support/20160201-160437
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
-> config: arm-allmodconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm
->
-> All errors (new ones prefixed by >>):
->
->>> drivers/hwtracing/coresight/coresight-stm.c:671:27: error: unknown type name 'tcsr'
->     coresight_stm_simple_func(tcsr, STMTCSR);
->                               ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                ^
->>> drivers/hwtracing/coresight/coresight-stm.c:57:20: error: expected declaration specifiers or '...' before numeric constant
->     #define STMTCSR    0xe80
->                        ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                      ^
->    drivers/hwtracing/coresight/coresight-stm.c:671:33: note: in expansion of macro 'STMTCSR'
->     coresight_stm_simple_func(tcsr, STMTCSR);
->                                     ^
->>> drivers/hwtracing/coresight/coresight-stm.c:672:27: error: unknown type name 'tsfreqr'
->     coresight_stm_simple_func(tsfreqr, STMTSFREQR);
->                               ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                ^
->    drivers/hwtracing/coresight/coresight-stm.c:59:22: error: expected declaration specifiers or '...' before numeric constant
->     #define STMTSFREQR   0xe8c
->                          ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                      ^
->    drivers/hwtracing/coresight/coresight-stm.c:672:36: note: in expansion of macro 'STMTSFREQR'
->     coresight_stm_simple_func(tsfreqr, STMTSFREQR);
->                                        ^
->>> drivers/hwtracing/coresight/coresight-stm.c:673:27: error: unknown type name 'syncr'
->     coresight_stm_simple_func(syncr, STMSYNCR);
->                               ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                ^
->    drivers/hwtracing/coresight/coresight-stm.c:60:20: error: expected declaration specifiers or '...' before numeric constant
->     #define STMSYNCR   0xe90
->                        ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                      ^
->    drivers/hwtracing/coresight/coresight-stm.c:673:34: note: in expansion of macro 'STMSYNCR'
->     coresight_stm_simple_func(syncr, STMSYNCR);
->                                      ^
->>> drivers/hwtracing/coresight/coresight-stm.c:674:27: error: unknown type name 'sper'
->     coresight_stm_simple_func(sper, STMSPER);
->                               ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                ^
->    drivers/hwtracing/coresight/coresight-stm.c:49:20: error: expected declaration specifiers or '...' before numeric constant
->     #define STMSPER    0xe00
->                        ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                      ^
->    drivers/hwtracing/coresight/coresight-stm.c:674:33: note: in expansion of macro 'STMSPER'
->     coresight_stm_simple_func(sper, STMSPER);
->                                     ^
->>> drivers/hwtracing/coresight/coresight-stm.c:675:27: error: unknown type name 'spter'
->     coresight_stm_simple_func(spter, STMSPTER);
->                               ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                ^
->    drivers/hwtracing/coresight/coresight-stm.c:50:20: error: expected declaration specifiers or '...' before numeric constant
->     #define STMSPTER   0xe20
->                        ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                      ^
->    drivers/hwtracing/coresight/coresight-stm.c:675:34: note: in expansion of macro 'STMSPTER'
->     coresight_stm_simple_func(spter, STMSPTER);
->                                      ^
->>> drivers/hwtracing/coresight/coresight-stm.c:676:27: error: unknown type name 'privmaskr'
->     coresight_stm_simple_func(privmaskr, STMPRIVMASKR);
->                               ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                ^
->    drivers/hwtracing/coresight/coresight-stm.c:51:24: error: expected declaration specifiers or '...' before numeric constant
->     #define STMPRIVMASKR   0xe40
->                            ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                      ^
->    drivers/hwtracing/coresight/coresight-stm.c:676:38: note: in expansion of macro 'STMPRIVMASKR'
->     coresight_stm_simple_func(privmaskr, STMPRIVMASKR);
->                                          ^
->>> drivers/hwtracing/coresight/coresight-stm.c:677:27: error: unknown type name 'spscr'
->     coresight_stm_simple_func(spscr, STMSPSCR);
->                               ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                ^
->    drivers/hwtracing/coresight/coresight-stm.c:52:20: error: expected declaration specifiers or '...' before numeric constant
->     #define STMSPSCR   0xe60
->                        ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                      ^
->    drivers/hwtracing/coresight/coresight-stm.c:677:34: note: in expansion of macro 'STMSPSCR'
->     coresight_stm_simple_func(spscr, STMSPSCR);
->                                      ^
->>> drivers/hwtracing/coresight/coresight-stm.c:678:27: error: unknown type name 'spmscr'
->     coresight_stm_simple_func(spmscr, STMSPMSCR);
->                               ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                ^
->    drivers/hwtracing/coresight/coresight-stm.c:53:21: error: expected declaration specifiers or '...' before numeric constant
->     #define STMSPMSCR   0xe64
->                         ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                      ^
->    drivers/hwtracing/coresight/coresight-stm.c:678:35: note: in expansion of macro 'STMSPMSCR'
->     coresight_stm_simple_func(spmscr, STMSPMSCR);
->                                       ^
->>> drivers/hwtracing/coresight/coresight-stm.c:679:27: error: unknown type name 'spfeat1r'
->     coresight_stm_simple_func(spfeat1r, STMSPFEAT1R);
->                               ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                ^
->    drivers/hwtracing/coresight/coresight-stm.c:62:23: error: expected declaration specifiers or '...' before numeric constant
->     #define STMSPFEAT1R   0xea0
->                           ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                      ^
->    drivers/hwtracing/coresight/coresight-stm.c:679:37: note: in expansion of macro 'STMSPFEAT1R'
->     coresight_stm_simple_func(spfeat1r, STMSPFEAT1R);
->                                         ^
->>> drivers/hwtracing/coresight/coresight-stm.c:680:27: error: unknown type name 'spfeat2r'
->     coresight_stm_simple_func(spfeat2r, STMSPFEAT2R);
->                               ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                ^
->    drivers/hwtracing/coresight/coresight-stm.c:63:23: error: expected declaration specifiers or '...' before numeric constant
->     #define STMSPFEAT2R   0xea4
->                           ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                      ^
->    drivers/hwtracing/coresight/coresight-stm.c:680:37: note: in expansion of macro 'STMSPFEAT2R'
->     coresight_stm_simple_func(spfeat2r, STMSPFEAT2R);
->                                         ^
->>> drivers/hwtracing/coresight/coresight-stm.c:681:27: error: unknown type name 'spfeat3r'
->     coresight_stm_simple_func(spfeat3r, STMSPFEAT3R);
->                               ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                ^
->    drivers/hwtracing/coresight/coresight-stm.c:64:23: error: expected declaration specifiers or '...' before numeric constant
->     #define STMSPFEAT3R   0xea8
->                           ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                      ^
->    drivers/hwtracing/coresight/coresight-stm.c:681:37: note: in expansion of macro 'STMSPFEAT3R'
->     coresight_stm_simple_func(spfeat3r, STMSPFEAT3R);
->                                         ^
->>> drivers/hwtracing/coresight/coresight-stm.c:682:27: error: unknown type name 'devid'
->     coresight_stm_simple_func(devid, CORESIGHT_DEVID);
->                               ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                ^
->    drivers/hwtracing/coresight/coresight-priv.h:31:26: error: expected declaration specifiers or '...' before numeric constant
->     #define CORESIGHT_DEVID  0xfc8
->                              ^
->    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
->      coresight_simple_func(struct stm_drvdata, name, offset)
->                                                      ^
->    drivers/hwtracing/coresight/coresight-stm.c:682:34: note: in expansion of macro 'CORESIGHT_DEVID'
->     coresight_stm_simple_func(devid, CORESIGHT_DEVID);
->                                      ^
->>> drivers/hwtracing/coresight/coresight-stm.c:694:3: error: 'dev_attr_tcsr' undeclared here (not in a function)
->      &dev_attr_tcsr.attr,
->       ^
->>> drivers/hwtracing/coresight/coresight-stm.c:695:3: error: 'dev_attr_tsfreqr' undeclared here (not in a function)
->      &dev_attr_tsfreqr.attr,
->       ^
->>> drivers/hwtracing/coresight/coresight-stm.c:696:3: error: 'dev_attr_syncr' undeclared here (not in a function)
->      &dev_attr_syncr.attr,
->       ^
->>> drivers/hwtracing/coresight/coresight-stm.c:697:3: error: 'dev_attr_sper' undeclared here (not in a function)
->      &dev_attr_sper.attr,
->       ^
->>> drivers/hwtracing/coresight/coresight-stm.c:698:3: error: 'dev_attr_spter' undeclared here (not in a function)
->      &dev_attr_spter.attr,
->       ^
->>> drivers/hwtracing/coresight/coresight-stm.c:699:3: error: 'dev_attr_privmaskr' undeclared here (not in a function)
->      &dev_attr_privmaskr.attr,
->       ^
->>> drivers/hwtracing/coresight/coresight-stm.c:700:3: error: 'dev_attr_spscr' undeclared here (not in a function)
->      &dev_attr_spscr.attr,
->       ^
->
-> vim +/tcsr +671 drivers/hwtracing/coresight/coresight-stm.c
->
->    663          drvdata->traceid = val & 0x7f;
->    664          return size;
->    665  }
->    666  static DEVICE_ATTR_RW(traceid);
->    667
->    668  #define coresight_stm_simple_func(name, offset) \
->  > 669          coresight_simple_func(struct stm_drvdata, name, offset)
->    670
->  > 671  coresight_stm_simple_func(tcsr, STMTCSR);
->  > 672  coresight_stm_simple_func(tsfreqr, STMTSFREQR);
->  > 673  coresight_stm_simple_func(syncr, STMSYNCR);
->  > 674  coresight_stm_simple_func(sper, STMSPER);
->  > 675  coresight_stm_simple_func(spter, STMSPTER);
->  > 676  coresight_stm_simple_func(privmaskr, STMPRIVMASKR);
->  > 677  coresight_stm_simple_func(spscr, STMSPSCR);
->  > 678  coresight_stm_simple_func(spmscr, STMSPMSCR);
->  > 679  coresight_stm_simple_func(spfeat1r, STMSPFEAT1R);
->  > 680  coresight_stm_simple_func(spfeat2r, STMSPFEAT2R);
->  > 681  coresight_stm_simple_func(spfeat3r, STMSPFEAT3R);
->  > 682  coresight_stm_simple_func(devid, CORESIGHT_DEVID);
->    683
->    684  static struct attribute *coresight_stm_attrs[] = {
->    685          &dev_attr_hwevent_enable.attr,
->    686          &dev_attr_hwevent_select.attr,
->    687          &dev_attr_port_enable.attr,
->    688          &dev_attr_port_select.attr,
->    689          &dev_attr_traceid.attr,
->    690          NULL,
->    691  };
->    692
->    693  static struct attribute *coresight_stm_mgmt_attrs[] = {
->  > 694          &dev_attr_tcsr.attr,
->  > 695          &dev_attr_tsfreqr.attr,
->  > 696          &dev_attr_syncr.attr,
->  > 697          &dev_attr_sper.attr,
->  > 698          &dev_attr_spter.attr,
->  > 699          &dev_attr_privmaskr.attr,
->  > 700          &dev_attr_spscr.attr,
->  > 701          &dev_attr_spmscr.attr,
->  > 702          &dev_attr_spfeat1r.attr,
->  > 703          &dev_attr_spfeat2r.attr,
->  > 704          &dev_attr_spfeat3r.attr,
->  > 705          &dev_attr_devid.attr,
->    706          NULL,
->    707  };
->    708
->
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-Dan
