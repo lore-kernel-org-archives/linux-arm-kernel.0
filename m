@@ -1,30 +1,29 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 01 Feb 2016 09:40:31 +0900
-Subject: [PATCH 1/6] ARM: s3c24xx: don't select EEPROM_AT24
-In-Reply-To: <1454079040-3567945-2-git-send-email-arnd@arndb.de>
+Date: Mon, 01 Feb 2016 09:46:11 +0900
+Subject: [PATCH 2/6] ARM: s3c24xx: allow selecting S3C2440_XTAL_16934400
+ for s3c2442
+In-Reply-To: <1454079040-3567945-3-git-send-email-arnd@arndb.de>
 References: <1454079040-3567945-1-git-send-email-arnd@arndb.de>
- <1454079040-3567945-2-git-send-email-arnd@arndb.de>
-Message-ID: <56AEA97F.80206@samsung.com>
+ <1454079040-3567945-3-git-send-email-arnd@arndb.de>
+Message-ID: <56AEAAD3.1060501@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 29.01.2016 23:50, Arnd Bergmann wrote:
-> EEPROM_AT24 depends on both I2C and SYSFS. We have in the past
-> added I2C 'select' statements to avoid build problems with the
-> first, but we still get a warning because of the second:
+> The S3C2440_XTAL_16934400 and S3C2440_XTAL_12000000 symbols are used
+> for both s3c2442 and s3c2440, but Kconfig only allows it to be selected
+> if CPU_S3C2440 is enabled, which can lead to a warning otherwise:
 > 
-> warning: (MACH_DAVINCI_EVM && MACH_SFFSDR && MACH_DAVINCI_DM6467_EVM && MACH_DAVINCI_DM365_EVM && MACH_DAVINCI_DA830_EVM && MACH_MITYOMAPL138 && MACH_MINI2440) selects EEPROM_AT24 which has unmet direct dependencies (I2C && SYSFS)
+> warning: (MACH_RX1950) selects S3C2440_XTAL_16934400 which has unmet direct dependencies (ARCH_S3C24XX && CPU_S3C2440)
 > 
-> This removes the 'select' statements again, and forces users to
-> enable the driver in their configuration files, as we do for
-> most other drivers.
+> This changes the dependencies to make it possible also for CPU_S3C2442-only
+> configurations.
 > 
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  arch/arm/configs/mini2440_defconfig | 1 +
->  arch/arm/configs/s3c2410_defconfig  | 1 +
->  arch/arm/mach-s3c24xx/Kconfig       | 1 -
->  3 files changed, 2 insertions(+), 1 deletion(-)
+>  arch/arm/mach-s3c24xx/Kconfig | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+
 
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
