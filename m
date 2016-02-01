@@ -1,103 +1,115 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 1 Feb 2016 14:35:03 +0100
-Subject: [PATCH v5sub2 0/8] arm64: implement virtual KASLR
-In-Reply-To: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu-AhLcatkDsQVeoFGJ+pTEwaW1Hy9M-fY1-VWvRc_E47w@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon,  1 Feb 2016 21:34:44 +0800
+Subject: [PATCH v5 1/4] dt-bindings: mailbox: Document Hi6220 mailbox driver
+In-Reply-To: <1454333687-20421-1-git-send-email-leo.yan@linaro.org>
+References: <1454333687-20421-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1454333687-20421-2-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 February 2016 at 14:09, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> At the request of Catalin, this series has been split off from my series
-> 'arm64: implement support for KASLR v4' [1]. This sub-series deals with
-> creating a relocatable binary, and randomizing the virtual placement of
-> the kernel itself, the modules and the linear region based on entropy
-> supplied by the bootloader in the /chosen/kaslr-seed DT property.
->
-> Changes since v4:
-> - add randomization of the linear region, i.e., if the linear region is
->   substantially larger than the space spanned by RAM, the mapping of RAM
->   is moved to a random offset inside the linear region.
-> - dropped the CRC check in kaslr_early_init(), since the only code that may
->   modify .data through __fixmap_remap_fdt() is instrumentation that should
->   deal with that correctly (For instance, the branch profiling records taken
->   branches in structs allocated in .data, and these counts will not be reset
->   to 0 between the first and the second call to __mmap_switched())
-> - add Mark's ack to patch #4
->
+Document DT binding for Hisilicon Hi6220 mailbox driver.
 
-NOTE: I have omitted the relative kallsyms and relative extable
-patches, since they already queued in akpm's tree. However, while the
-kallsyms patch is merely an optimization, the extable patches are in
-fact required for correct operation, since the build time sorting does
-not work on absolute extables (this is due to the fact that the
-resolution of the relocations is deferred until runtime, and so the
-extable addresses are all zero at sorting time)
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ .../bindings/mailbox/hisilicon,hi6220-mailbox.txt  | 90 ++++++++++++++++++++++
+ 1 file changed, 90 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
 
-http://ozlabs.org/~akpm/mmotm/broken-out/extable-add-support-for-relative-extables-to-search-and-sort-routines.patch
-http://ozlabs.org/~akpm/mmotm/broken-out/arm64-switch-to-relative-exception-tables.patch
-
-
-
-> Patch #1 adds support for resolving cross-module branches via veneers if the
-> module is located too far from the target. This should not be necessary in the
-> common case even with KASRL enabled, but since the space around the kernel image
-> will no longer be strictly reserved for modules, there is a slight chance that
-> the region may be exhausted, in which case modules will be moved further away
-> from the kernel (and each other)
->
-> Patches #2 and #3 deal with the fact that relocations of 64-bit values are
-> deferred to runtime when building a PIE executable, and some values are required
-> before the relocation routine executes (either in the code, or as an externally
-> visible constant in the Image header)
->
-> Patch #4 rehuffles asm/elf.h so we can use its preprocessor constants in head.S
->
-> Patch #5 and #6 implement building vmlinux as a PIE (Position Independent
-> Executable) binary, which is emitted with relocation information that is
-> processed by the program itself in the early boot code.
->
-> Patch #7 implements KASLR, i.e., CONFIG_RANDOMIZE_BASE for the core kernel and
-> for the module region.
->
-> Patch #8 implements KASLR for the linear region.
->
-> [1] http://thread.gmane.org/gmane.linux.kernel/2135931
->
-> Ard Biesheuvel (8):
->   arm64: add support for module PLTs
->   arm64: avoid R_AARCH64_ABS64 relocations for Image header fields
->   arm64: avoid dynamic relocations in early boot code
->   arm64: make asm/elf.h available to asm files
->   scripts/sortextable: add support for ET_DYN binaries
->   arm64: add support for building vmlinux as a relocatable PIE binary
->   arm64: add support for kernel ASLR
->   arm64: kaslr: randomize the linear region
->
->  arch/arm64/Kconfig                 |  34 ++++
->  arch/arm64/Makefile                |  10 +-
->  arch/arm64/include/asm/assembler.h |  11 ++
->  arch/arm64/include/asm/elf.h       |  24 ++-
->  arch/arm64/include/asm/memory.h    |   5 +-
->  arch/arm64/include/asm/module.h    |  11 ++
->  arch/arm64/kernel/Makefile         |   2 +
->  arch/arm64/kernel/efi-entry.S      |   2 +-
->  arch/arm64/kernel/head.S           | 128 +++++++++++--
->  arch/arm64/kernel/image.h          |  32 ++--
->  arch/arm64/kernel/kaslr.c          | 143 ++++++++++++++
->  arch/arm64/kernel/module-plts.c    | 201 ++++++++++++++++++++
->  arch/arm64/kernel/module.c         |  20 +-
->  arch/arm64/kernel/module.lds       |   3 +
->  arch/arm64/kernel/setup.c          |  29 +++
->  arch/arm64/kernel/vmlinux.lds.S    |  16 ++
->  arch/arm64/mm/init.c               |  22 ++-
->  arch/arm64/mm/mmu.c                |  33 +++-
->  scripts/sortextable.c              |   8 +-
->  19 files changed, 672 insertions(+), 62 deletions(-)
->  create mode 100644 arch/arm64/kernel/kaslr.c
->  create mode 100644 arch/arm64/kernel/module-plts.c
->  create mode 100644 arch/arm64/kernel/module.lds
->
-> --
-> 2.5.0
->
+diff --git a/Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt b/Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
+new file mode 100644
+index 0000000..96e6acc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
+@@ -0,0 +1,90 @@
++Hisilicon Hi6220 Mailbox Driver
++===============================
++
++Hisilicon Hi6220 mailbox supports up to 32 channels. Each channel
++is unidirectional with a maximum message size of 8 words. I/O is
++performed using register access (there is no DMA) and the cell
++raises an interrupt when messages are received.
++
++Mailbox Device Node:
++====================
++
++Required properties:
++--------------------
++- compatible:		Shall be "hisilicon,hi6220-mbox"
++- reg:			Contains the mailbox register address range (base
++			address and length); the first item is for IPC
++			registers, the second item is shared buffer for
++			slots.
++- #mbox-cells		Common mailbox binding property to identify the number
++			of cells required for the mailbox specifier. Should be 1.
++- interrupts:		Contains the interrupt information for the mailbox
++			device. The format is dependent on which interrupt
++			controller the SoCs use.
++
++Optional Properties:
++--------------------
++- hi6220,mbox-tx-noirq: Flag to allow the client user of this mailbox driver
++			to send messages without triggering a TX completion
++			interrupt.
++
++Child Nodes:
++============
++A child node is used for representing the actual sub-mailbox device that is
++used for the communication between the host processor and a remote processor.
++Each child node should have a unique node name across all the different
++mailbox device nodes.
++
++Required properties:
++--------------------
++- hi6220,mbox-tx:	sub-mailbox descriptor property defining Tx channel
++- hi6220,mbox-rx:	sub-mailbox descriptor property defining Rx channel
++
++Sub-mailbox Descriptor Data
++---------------------------
++Each of the above hi6220,mbox-tx and hi6220,mbox-rx properties should have 3
++cells of data that represent the following:
++    Cell #1 (slot_id) - mailbox slot id used either for transmitting
++                        (hi6220,mbox-tx) or for receiving (hi6220,mbox-rx)
++    Cell #2 (dst_irq) - irq identifier index number which used by MCU.
++    Cell #3 (ack_irq) - irq identifier index number with generating a tx/rx
++                        interrupt to application processor, mailbox driver
++                        used this id to acknowledge interrupt.
++
++Example:
++--------
++
++	mailbox: mailbox at F7510000 {
++		#mbox-cells = <1>;
++		compatible = "hisilicon,hi6220-mbox";
++		reg = <0x0 0xF7510000 0x0 0x1000>, /* IPC_S */
++		      <0x0 0x06DFF800 0x0 0x0800>; /* Mailbox */
++		interrupt-parent = <&gic>;
++		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
++		mbox_stub_clock: mbox_stub_clock {
++			hi6220,mbox-rx = <0 1 10>;
++			hi6220,mbox-tx = <1 0 11>;
++		};
++	};
++
++
++Mailbox client
++===============
++
++"mboxes" and the optional "mbox-names" (please see
++Documentation/devicetree/bindings/mailbox/mailbox.txt for details). Each value
++of the mboxes property should contain a phandle to the mailbox controller
++device node and second argument is the channel index. It must be 0 (hardware
++support only one channel). The equivalent "mbox-names" property value can be
++used to give a name to the communication channel to be used by the client user.
++
++Example:
++--------
++
++	stub_clock: stub_clock {
++		compatible = "hisilicon,hi6220-stub-clk";
++		hisilicon,hi6220-clk-sram = <&sram>;
++		#clock-cells = <1>;
++		mbox-names = "mbox-tx";
++		mboxes = <&mailbox 1>;
++	};
+-- 
+1.9.1
