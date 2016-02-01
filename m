@@ -1,10 +1,11 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon, 01 Feb 2016 15:15:32 -0800
-Subject: [PATCH V4 1/7] clk: bcm2835: the minimum clock divider is 2
-In-Reply-To: <1452867667-2447-2-git-send-email-kernel@martin.sperl.org>
+Date: Mon, 01 Feb 2016 15:19:57 -0800
+Subject: [PATCH V4 2/7] clk: bcm2835: clamp clock divider to highest
+ integer only
+In-Reply-To: <1452867667-2447-3-git-send-email-kernel@martin.sperl.org>
 References: <1452867667-2447-1-git-send-email-kernel@martin.sperl.org>
- <1452867667-2447-2-git-send-email-kernel@martin.sperl.org>
-Message-ID: <87oac03tuz.fsf@eliezer.anholt.net>
+ <1452867667-2447-3-git-send-email-kernel@martin.sperl.org>
+Message-ID: <87k2mo3tnm.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,22 +13,30 @@ kernel at martin.sperl.org writes:
 
 > From: Martin Sperl <kernel@martin.sperl.org>
 >
-> Testing with different clock divider values has shown
-> that (at least for the PCM clock) the clock divider
-> has to be at least 2, otherwise the clock will not
-> output a signal.
+> The clock divider calculation right now clamps the
+> divider to the highest possible fractional divider.
+> So typically (BIT(div_int_bits) - 1) + 4095 / 4096.
+>
+> As the fractional clock divider is alterating between
+> (Fosc / div_int) and (Fosc / (div_int + 1))
+> the divider will overflow for the (div_int + 1) case.
+> As with the "underflow" case we have seen for (div < 2),
+> we can assume that the same applies on the upper limit
+> as well.
+>
+> So this patch will instead clamp to the divider to the
+> max of (BIT(div_int_bits) - 1)
 
-For a MASH clock (PWM, PCM, SLIMBUS, but not the others), the minimum
-integer component of the divider is:
+Looks like this restriction might be necessary, though it's not quite
+spelled out in the docs.
 
-mash 0: 1
-mash 1: 2
-mash 2: 3
-mash 3: 5
+This also needs to be conditional on it being a MASH clock, and the
+limit on the divider changes in the same way based on the mash number as
+for the minimum.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 818 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160201/092ef864/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160201/318facdd/attachment-0001.sig>
