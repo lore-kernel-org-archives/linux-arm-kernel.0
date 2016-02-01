@@ -1,105 +1,73 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Mon, 1 Feb 2016 14:32:59 +0800
-Subject: [PATCH v4 9/9] ARM: dts: rockchip: support the spi for rk3036
-In-Reply-To: <3295129.SttO6ack9z@phil>
-References: <1453970618-4383-1-git-send-email-wxt@rock-chips.com>
- <1453970618-4383-10-git-send-email-wxt@rock-chips.com>
- <3295129.SttO6ack9z@phil>
-Message-ID: <56AEFC1B.60407@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 1 Feb 2016 07:33:59 +0100
+Subject: [PATCH resend] ARM: dts: sun7i: Add dts file for the lamobo-r1
+ board
+In-Reply-To: <56A9C804.9080503@redhat.com>
+References: <1453920105-7093-1-git-send-email-hdegoede@redhat.com>
+ <1453920105-7093-2-git-send-email-hdegoede@redhat.com>
+ <20160127194735.GT4317@lukather> <56A9C804.9080503@redhat.com>
+Message-ID: <20160201063359.GF32462@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+Hi,
 
-? 2016?01?31? 19:06, Heiko Stuebner ??:
-> Hi Caesar,
->
-> Am Donnerstag, 28. Januar 2016, 16:43:38 schrieb Caesar Wang:
+On Thu, Jan 28, 2016 at 08:49:24AM +0100, Hans de Goede wrote:
+> Hi,
+> 
+> On 27-01-16 20:47, Maxime Ripard wrote:
+> >Hi Hans,
+> >
+> >On Wed, Jan 27, 2016 at 07:41:45PM +0100, Hans de Goede wrote:
+> >>From: Jelle de Jong <jelledejong@powercraft.nl>
+> >>
+> >>The lamobo-r1 board, sometimes called the BPI-R1 but not labelled as such
+> >>on the PCB, is meant as a A20 based router board. As such the board comes
+> >>with a built-in switch chip giving it 5 gigabit ethernet boards, and it
+> >>has a large empty area on the pcb with mounting holes which will fit a
+> >>2.5 inch harddisk. To complete its networking features it has a
+> >>Realtek RTL8192CU for WiFi 802.11 b/g/n.
+> >>
+> >>Signed-off-by: Jelle de Jong <jelledejong@powercraft.nl>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >
+> >Sorry that I missed it :/
+> >
+> >It looks mostly fine, I just have a minor question / comment below.
+> >
+> >>+&cpu0 {
+> >>+	cpu-supply = <&reg_dcdc2>;
+> >>+	operating-points = <
+> >>+		/* kHz	  uV */
+> >>+		960000	1400000
+> >>+		912000	1400000
+> >>+		864000	1350000
+> >>+		720000	1250000
+> >>+		528000	1150000
+> >>+		312000	1100000
+> >>+		144000	1050000
+> >>+		>;
+> >>+};
+> >
+> >Have you used the default OPPs and it turned out to be unstable, or is
+> >it just some copy / paste from the FEX file?
+> 
+> Just copy paste from the fex file, let me know if you want a new version with
+> the opp-s removed.
 
-[...]
+Yeah, if it works, please do so.
 
->
->   	memory {
-> @@ -485,6 +486,23 @@
->   		status = "disabled";
->   	};
->
-> +	spi: spi at 20074000 {
-> +		compatible = "rockchip,rockchip-spi";
-> +		reg = <0x20074000 0x1000>;
-> +		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&spi_txd &spi_rxd &spi_clk &spi_cs0 &spi_cs1>;
-> Do we really want to enable both chip-selects by default?
->
-> On the rk3288 Lin Huang wrote:
->      * It's assumed that most users of the SPI ports are using chip select
->        0.  Thus the default pinctrl for the ports enables chip select 0
->        (but not chip select 1 on ports that have it).  If a board wants to
->        use chip select 1 or wants a GPIO chip select the board should
->        override the pinctrl (just like boards can override UART pinctrl if
->        they have hardware flow control).
->
-> Do we expect again mostly a use of cs0 or will in the major cases both chip-
-> selects be needed?
-
-Sound resonable.
-In general, every cs and spi devices should be the one match one.
-
-That should be resonable if we want to use chip select 1 or want a GPIO chip select the board should
-override the pinctrl.
-
->> +		num-cs = <2>;
->> +		clocks =<&cru PCLK_SPI>, <&cru SCLK_SPI>;
->> +		clock-names = "apb-pclk","spi_pclk";
->> +		dmas = <&pdma 8>, <&pdma 9>;
->> +		#dma-cells = <2>;
-> What do you need #dma-cells for? This is not a dma-controller :-)
-
-Fixed.
-
->
->
->> +		dma-names = "tx", "rx";
->> +		status = "disabled";
->> +	};
->
-> Also I'd suggest an ordering like:
->
-> +	spi: spi at 20074000 {
-> +		compatible = "rockchip,rockchip-spi";
-> +		reg = <0x20074000 0x1000>;
-> +		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks =<&cru PCLK_SPI>, <&cru SCLK_SPI>;
-> +		clock-names = "apb-pclk","spi_pclk";
-> +		dmas = <&pdma 8>, <&pdma 9>;
-> +		dma-names = "tx", "rx";
-> +		num-cs = <2>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&spi_txd &spi_rxd &spi_clk &spi_cs0 &spi_cs1>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		status = "disabled";
-> +	};
-
-Okay, I will remove the cs1/num-cs in here.
-
-Thanks.
-
--
-Caesar
-
->
-> Heiko
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
-
+Thanks!
+Maxime
 
 -- 
-Thanks,
-Caesar
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160201/cd3d9aa4/attachment.sig>
