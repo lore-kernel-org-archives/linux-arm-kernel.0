@@ -1,43 +1,44 @@
-From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
-Date: Mon, 1 Feb 2016 13:35:03 -0500
-Subject: [PATCH 2/4] pwm: omap-dmtimer: add sanity checking for load and
- match values
-In-Reply-To: <1454128014-22866-3-git-send-email-drivshin.allworx@gmail.com>
-References: <1454128014-22866-1-git-send-email-drivshin.allworx@gmail.com>
- <1454128014-22866-3-git-send-email-drivshin.allworx@gmail.com>
-Message-ID: <20160201133503.53599493.drivshin.allworx@gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 1 Feb 2016 19:40:00 +0100
+Subject: [PATCH 06/11] clk: sunxi: add generic multi-parent bus clock
+ gates driver
+In-Reply-To: <1454348370-3816-7-git-send-email-andre.przywara@arm.com>
+References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
+ <1454348370-3816-7-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160201194000.282a253b14a2ab35df8b8cc7@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Jan 2016 23:26:52 -0500
-"David Rivshin (Allworx)" <drivshin.allworx@gmail.com> wrote:
+On Mon,  1 Feb 2016 17:39:25 +0000
+Andre Przywara <andre.przywara@arm.com> wrote:
 
-> From: David Rivshin <drivshin@allworx.com>
+> The Allwinner H3 SoC introduced bus clock gates with potentially
+> different parents per clock gate. The H3 driver chose to hardcode the
+> actual parent clock relation in the code.
+> Add a new driver (which has the potential to drive the H3 and also
+> the simple clock gates as well) which uses the power of DT to describe
+> this relationship in an elegant and flexible way.
+> Using one subnode for every parent clock we get away with a single
+> DT compatible match, which can be used as a fallback value in the
+> actual DTs without the need to add specific compatible strings to the
+> code.  This avoids adding a new driver or function for every new SoC.
 > 
-> Add sanity checking to ensure that we do not program load or match
-> values that are out of range if a user requests period or duty_cycle
-> values which are not achievable. The match value cannot be less than
-> the load value (but can be equal), and neither can be 0xffffffff.
-> This means that there must be at least one fclk cycle between load
-> and match, and another between match and overflow.
-> 
-> Fixes: 6604c6556db9 ("pwm: Add PWM driver for OMAP using dual-mode
-> timers") Signed-off-by: David Rivshin <drivshin@allworx.com>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > ---
- [...]
-> @@ -149,6 +149,24 @@ static int pwm_omap_dmtimer_config(struct pwm_chip *chip, 
-> period_cycles = pwm_omap_dmtimer_get_clock_cycles(clk_rate, period_ns); 
-> duty_cycles = pwm_omap_dmtimer_get_clock_cycles(clk_rate, duty_ns); 
->
-> +	if (period_cycles < 2) {
-> +		dev_info(chip->dev,
-> +			"period %dns is too short for clock rate %luHz\n",
-> +			period_ns, clk_rate);
-> +		goto err_einval;
-> +	}
- [...]
+> Changelog RFC .. v1:
+> - fix IRQ muxes to cover the three banks of the SoC
+> - amend naming of PCM pins
+> 
+>  drivers/clk/sunxi/Makefile          |   1 +
+>  drivers/clk/sunxi/clk-multi-gates.c | 105 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 106 insertions(+)
+>  create mode 100644 drivers/clk/sunxi/clk-multi-gates.c
+	[snip]
 
-I had some second thoughts on this over the weekend:
-1) Perhaps the return should be -ERANGE instead of -EINVAL for this case?
-2) Is dev_info() too severe for this? Perhaps dev_dbg() would be better?
-Any preferences?
+Glad to see that things are moving to the right way. Thanks.
+
+Acked-by: Jean-Francois Moine <moinejf@free.fr>
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
