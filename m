@@ -1,36 +1,37 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 1 Feb 2016 23:13:10 +0800
-Subject: [PATCH 03/14] clk: sunxi: add bus gates for A83T
-In-Reply-To: <20160201150344.GA4947@rob-hp-laptop>
-References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
- <1454203266-4450-4-git-send-email-vishnupatekar0510@gmail.com>
- <20160201150344.GA4947@rob-hp-laptop>
-Message-ID: <CAGb2v67BcLx8g+MDZnMyrgDpHWmQ-kcxFVqDNpMWzyJ_QoDrQA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 1 Feb 2016 16:13:52 +0100
+Subject: [PATCH v5sub1 8/8] arm64: allow kernel Image to be loaded
+ anywhere in physical memory
+In-Reply-To: <20160201150624.GG15514@e104818-lin.cambridge.arm.com>
+References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1454324093-15998-9-git-send-email-ard.biesheuvel@linaro.org>
+ <20160201150624.GG15514@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu8rgkBWfJXfWzWSkxyKhLOnxirycu-wdcmvRovpDB5hKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 1, 2016 at 11:03 PM, Rob Herring <robh@kernel.org> wrote:
-> On Sun, Jan 31, 2016 at 09:20:55AM +0800, Vishnu Patekar wrote:
->> A83T has similar bus gates that of H3, including single gating register has
->> different clock parent.
->>
->> As per H3 and A83T datasheet, usbhost is under AHB2.
->>
->> However,below shows allwinner source code assignment:
->> bits: 26 (ehci0), 27 (ehci1), 29 (ohci0) => AHB1 for A83T.
->> bits: 26 (ehci0), 27 (ehci1) => AHB1 for H3
->> bits  29, 30, 31(ohci0,1,2) => AHB2 for H3.
->>
->> until, this confusion is cleared keep it H3 way.
->>
->> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
->> ---
->>  Documentation/devicetree/bindings/clock/sunxi.txt | 1 +
->>  drivers/clk/sunxi/clk-sun8i-bus-gates.c           | 2 ++
->>  2 files changed, 3 insertions(+)
+On 1 February 2016 at 16:06, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Mon, Feb 01, 2016 at 11:54:53AM +0100, Ard Biesheuvel wrote:
+>> Note that limiting memory using mem= is not unambiguous anymore after
+>> this change, considering that the kernel may be at the top of physical
+>> memory, and clipping from the bottom rather than the top will discard
+>> any 32-bit DMA addressable memory first. To deal with this, the handling
+>> of mem= is reimplemented to clip top down, but take special care not to
+>> clip memory that covers the kernel image.
 >
-> Acked-by: Rob Herring <robh@kernel.org>
+> I may have forgotten the reason - why do we need to avoid clipping the
+> memory that covers the kernel image? It's already mapped in the vmalloc
+> area, so we wouldn't need it in the linear map as well.
+>
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Good question. Originally, I needed it for swapper_pg_dir, whose
+pud/pmd/pte levels were accessed via __va() translations of the values
+found in the higher-up table entries, but after Mark's patches, only
+the top level pgd of swapper_pg_dir is still used. Similarly, for
+idmap_pg_dir, we don't change any mappings at runtime so the same
+applies there I think.
 
-We should really get the clk parents sorted out though.
+I will try dropping this, and see what happens.
+
+-- 
+Ard.
