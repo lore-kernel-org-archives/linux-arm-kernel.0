@@ -1,132 +1,72 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 1 Feb 2016 16:26:12 +0100
-Subject: [PATCH v2 20/21] arm64: VHE: Add support for running Linux in
- EL2 mode
-In-Reply-To: <1453737235-16522-21-git-send-email-marc.zyngier@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <1453737235-16522-21-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160201152612.GZ1478@cbox>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 1 Feb 2016 09:35:02 -0600
+Subject: [PATCH v5 2/3] Documentation: gpio: Update description for
+ X-Gene standby GPIO controller DTS binding
+In-Reply-To: <1454041735-8434-3-git-send-email-qnguyen@apm.com>
+References: <1454041735-8434-1-git-send-email-qnguyen@apm.com>
+ <1454041735-8434-3-git-send-email-qnguyen@apm.com>
+Message-ID: <20160201153502.GA19725@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 03:53:54PM +0000, Marc Zyngier wrote:
-> With ARMv8.1 VHE, the architecture is able to (almost) transparently
-> run the kernel at EL2, despite being written for EL1.
+On Fri, Jan 29, 2016 at 11:28:54AM +0700, Quan Nguyen wrote:
+> Update description for X-Gene standby GPIO controller DTS binding to
+> support GPIO line configuration as input, output or external IRQ pin.
 > 
-> This patch takes care of the "almost" part, mostly preventing the kernel
-> from dropping from EL2 to EL1, and setting up the HYP configuration.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Y Vo <yvo@apm.com>
+> Signed-off-by: Quan Nguyen <qnguyen@apm.com>
 > ---
->  arch/arm64/Kconfig       | 13 +++++++++++++
->  arch/arm64/kernel/head.S | 32 +++++++++++++++++++++++++++++++-
->  2 files changed, 44 insertions(+), 1 deletion(-)
+>  .../devicetree/bindings/gpio/gpio-xgene-sb.txt     | 47 ++++++++++++++++++----
+>  1 file changed, 40 insertions(+), 7 deletions(-)
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 8cc6228..ada34df 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -750,6 +750,19 @@ config ARM64_LSE_ATOMICS
->  	  not support these instructions and requires the kernel to be
->  	  built with binutils >= 2.25.
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt b/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
+> index dae1300..7b8b4cb 100644
+> --- a/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-xgene-sb.txt
+> @@ -1,10 +1,20 @@
+>  APM X-Gene Standby GPIO controller bindings
 >  
-> +config ARM64_VHE
-> +	bool "Enable support for Virtualization Host Extension (VHE)"
-
-Extensions (plural)
-
-> +	default y
-> +	help
-> +	  Virtualization Host Extension (VHE) allows the kernel to run
-
-same
-
-> +	  directly at EL2 (instead of EL1) on processors that support
-> +	  it. This leads to better performance for KVM, as it reduces
-
-s/it/them/ then?
-
-> +	  the cost of the world switch.
-> +
-> +	  Selecting this option allows the VHE feature to be detected
-> +	  at runtime, and does not affect processors that do not
-> +	  implement this feature.
-> +
->  endmenu
+> -This is a gpio controller in the standby domain.
+> -
+> -There are 20 GPIO pins from 0..21. There is no GPIO_DS14 or GPIO_DS15,
+> -only GPIO_DS8..GPIO_DS13 support interrupts. The IRQ mapping
+> -is currently 1-to-1 on interrupts 0x28 thru 0x2d.
+> +This is a gpio controller in the standby domain. It also supports interrupt in
+> +some particular pins which are sourced to its parent interrupt controller
+> +as diagram below:
+> +                           +-----------------+
+> +                           | X-Gene standby  |
+> +                           | GPIO controller +--------- GPIO_0
+> ++------------+             |                 | ...
+> +| Parent IRQ |             |                 +--------- GPIO_8/EXT_INT_0
+> +| controller |  EXT_INT_0  |                 | ...
+> +| (GICv2)    +-------------+                 +--------- GPIO_[N+8]/EXT_INT_N
+> +|            |  ...        |                 |
+> +|            |  EXT_INT_N  |                 +--------- GPIO_[N+9]
+> +|            +-------------+                 | ...
+> +|            |             |                 +--------- GPIO_MAX
+> ++------------+             +-----------------+
 >  
->  endmenu
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index ffe9c2b..2a7134c 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -30,6 +30,7 @@
->  #include <asm/cache.h>
->  #include <asm/cputype.h>
->  #include <asm/kernel-pgtable.h>
-> +#include <asm/kvm_mmu.h>
->  #include <asm/memory.h>
->  #include <asm/pgtable-hwdef.h>
->  #include <asm/pgtable.h>
-> @@ -464,8 +465,25 @@ CPU_LE(	bic	x0, x0, #(3 << 24)	)	// Clear the EE and E0E bits for EL1
->  	isb
->  	ret
->  
-> +2:
-> +#ifdef CONFIG_ARM64_VHE
-> +	/*
-> +	 * Check for VHE being present. For the rest of the EL2 setup,
-> +	 * x2 being non-zero indicates that we do have VHE, and that the
-> +	 * kernel is intended to run at EL2.
-> +	 */
-> +	mrs	x2, id_aa64mmfr1_el1
-> +	ubfx	x2, x2, #8, #4
-> +#else
-> +	mov	x2, xzr
-> +#endif
-> +
->  	/* Hyp configuration. */
-> -2:	mov	x0, #(1 << 31)			// 64-bit EL1
-> +	mov	x0, #HCR_RW			// 64-bit EL1
-> +	cbz	x2, set_hcr
-> +	orr	x0, x0, #HCR_TGE		// Enable Host Extensions
-> +	orr	x0, x0, #HCR_E2H
-> +set_hcr:
->  	msr	hcr_el2, x0
->  
->  	/* Generic timers. */
-> @@ -507,6 +525,9 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
->  
->  	/* Coprocessor traps. */
->  	mov	x0, #0x33ff
-> +	cbz	x2, set_cptr
-> +	orr	x0, x0, #(3 << 20)		// Don't trap FP
+>  Required properties:
+>  - compatible: "apm,xgene-gpio-sb" for the X-Gene Standby GPIO controller
+> @@ -15,10 +25,18 @@ Required properties:
+>  		0 = active high
+>  		1 = active low
+>  - gpio-controller: Marks the device node as a GPIO controller.
+> -- interrupts: Shall contain exactly 6 interrupts.
+> +- interrupts: The EXT_INT_0 parent interrupt resource must be listed first.
+> +- interrupt-parent: Phandle of the parent interrupt controller.
+> +- interrupt-cells: Should be two.
+> +       - first cell is 0-N coresponding for EXT_INT_0 to EXT_INT_N.
+> +       - second cell is used to specify flags.
+> +- interrupt-controller: Marks the device node as an interrupt controller.
+> +- apm,nr-gpios: Optional, specify number of gpios pin.
+> +- apm,nr-irqs: Optional, specify number of interrupt pins.
 
-nit: If you make that define we discussed earlier you can use it here too
+When is this not 6?
 
-> +set_cptr:
->  	msr	cptr_el2, x0			// Disable copro. traps to EL2
->  
->  #ifdef CONFIG_COMPAT
-> @@ -521,6 +542,15 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
->  	/* Stage-2 translation */
->  	msr	vttbr_el2, xzr
->  
-> +	cbz	x2, install_el2_stub
-> +
-> +	setup_vtcr x4, x5
-> +
-> +	mov	w20, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
-> +	isb
-> +	ret
-> +
-> +install_el2_stub:
->  	/* Hypervisor stub */
->  	adrp	x0, __hyp_stub_vectors
->  	add	x0, x0, #:lo12:__hyp_stub_vectors
-> -- 
-> 2.1.4
-> 
+> +- apm,irq-start: Optional, specify lowest gpio pin support interrupt.
 
-Otherwise:
+What determines this value? What value is assumed if not present?
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Rob
