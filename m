@@ -1,70 +1,64 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 01 Feb 2016 22:17:22 +0100
-Subject: [PATCH] PM / AVS: rockchip-io: add GRF and PMUGRF types to
- distinguish
-In-Reply-To: <56AF1D4E.40307@rock-chips.com>
-References: <1454155305-55516-1-git-send-email-david.wu@rock-chips.com>
- <5387650.lAgTxexlF2@phil> <56AF1D4E.40307@rock-chips.com>
-Message-ID: <5354361.hQXgJ7cEGx@diego>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 1 Feb 2016 22:17:36 +0100
+Subject: N900 sleep mode (in 4.5-rc0, if that matters)
+In-Reply-To: <20160201181316.GM19432@atomide.com>
+References: <20160123121022.GB12497@amd> <20160125163332.GT19432@atomide.com>
+ <20160126140010.GA29723@amd> <20160126172527.GY3500@atomide.com>
+ <20160130200244.GA30429@amd> <20160130201452.GC30429@amd>
+ <20160130221509.GA28644@amd> <20160201181316.GM19432@atomide.com>
+Message-ID: <20160201211736.GA11283@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi!
 
-Am Montag, 1. Februar 2016, 16:54:38 schrieb David.Wu:
-> ? 2016/1/30 20:39, Heiko Stuebner ??:
-> > Am Samstag, 30. Januar 2016, 20:01:45 schrieb David Wu:
-> >> As rk3368 contained two separated iodomain areas, this was
-> >> determined to use which regmap base address.
-> >> 
-> >> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> > > > Any ideas what jumps to use the modules? Charger code?
+> > > 
+> > > I tried a kernel without charger code, and no luck, rmmod fails the
+> > > same way. dmesg says:
+> > > [  111.093078] wlan0: authenticated
+> > > [  111.097442] wlan0: associate with 06:27:22:f9:10:6a (try 1/3)
+> > > [  111.104553] wlan0: RX AssocResp from 06:27:22:f9:10:6a (capab=0x421
+> > > status=0 aid=2)
+> > > [  111.104705] wlan0: AP has invalid WMM params (AIFSN=1 for ACI 2),
+> > > will use 2
+> > > [  111.104736] wlan0: AP has invalid WMM params (AIFSN=1 for ACI 3),
+> > > will use 2
+> > > [  111.256652] wlan0: associated
+> > > [  184.681427] HS USB OTG: no transceiver configured
+> > > [  184.681488] musb-hdrc musb-hdrc.0.auto: musb_init_controller failed
+> > > with status -517
+> > > [  184.681976] HS USB OTG: no transceiver configured
+> > > [  184.682006] musb-hdrc musb-hdrc.0.auto: musb_init_controller failed
+> > > with status -517
+> > > [  187.690338] twl4030_usb 48070000.i2c:twl at 48:twl4030-usb:
+> > > Initialized TWL4030 USB module
+> > > [  187.698303] musb-hdrc: ConfigData=0xde (UTMI-8, dyn FIFOs, bulk
+> > > combine, bulk split, HB-ISO Rx, HB-ISO Tx, SoftConn)
+> > > [  187.698333] musb-hdrc: MHDRC RTL version 1.400
+> > > [  187.698333] musb-hdrc: setup fifo_mode 4
+> > > [  187.698394] musb-hdrc: 28/31 max ep, 16384/16384 memory
+> > > pavel at n900:/my/tui/ofone$
 > > 
-> > I don't think we need to specify this on a driver level. Both GRF areas
-> > are
-> > "General register files" only located in two separate power-domains.
-> > So the rockchip,grf property should work for both. Especially as nothing
-> > keeps designers from introducing yet another GRF-area somewhere else ;-)
-> > 
-> > >From when I started working on the rk3368, I still have a preliminary
-> > 
-> > patches for that sitting here, so I've attached on how I envisoned that to
-> > work.
+> > I added following hack to phy-twl4030-usb.c so that I could avoid
+> > modules and module unloading problem. But still could not get it to
+> > sleep :-(.
 > 
-> Okay, i agree to you, but it make someone a little confused just from
-> the drive code,
-> not DT file,  about  pmugrf regmap base address.:-)
-> 
-> How do you feel about intergating GRF and PMU drivers in one driver?
-> Thanks!
+> Are you sure you're using v4.5-rc? I recently patched away some
+> issues where rmmod of the musb related modules did not work.
 
-I will very strongly disagree here ;-) .
-Similar to the power-domains being part of the pmu, the io-domains are
-part of their individual GRFs. So if you want it really clean and tidy the way 
-to go foward will be the attached patches. Compile-tested only.
+No, sorry, that was with 4.4. As you hit "PM regression with commit
+5de85b9d57ab PM runtime re-init in v4.5-rc1", I thought I'd avoid
+v4.5-rc. 
 
-Other things like the usbphy control should move there as well in the long 
-run. But that's not immediate necessary.
+(I assume I have to insmod and rmmod, right? Because powersave is not
+entered if I simply compile-out usb).
 
+Would you have commit ids for those rmmod fixes? It might be good to
+push them into stable, and I should try again with them applied...
 
-Heiko
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-PM-AVS-rockchip-io-make-io-domains-a-child-of-the-GR.patch
-Type: text/x-patch
-Size: 2790 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160201/56da602b/attachment-0003.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0003-arm64-dts-rockchip-add-rk3368-iodomains.patch
-Type: text/x-patch
-Size: 1174 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160201/56da602b/attachment-0004.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-arm64-dts-rockchip-make-grf-syscons-simple-mfds.patch
-Type: text/x-patch
-Size: 1316 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160201/56da602b/attachment-0005.bin>
+Thanks and best regards,
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
