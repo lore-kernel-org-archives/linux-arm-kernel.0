@@ -1,121 +1,377 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  1 Feb 2016 14:09:32 +0100
-Subject: [PATCH v5sub2 2/8] arm64: avoid R_AARCH64_ABS64 relocations for Image
- header fields
+Date: Mon,  1 Feb 2016 14:09:31 +0100
+Subject: [PATCH v5sub2 1/8] arm64: add support for module PLTs
 In-Reply-To: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1454332178-4414-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1454332178-4414-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unfortunately, the current way of using the linker to emit build time
-constants into the Image header will no longer work once we switch to
-the use of PIE executables. The reason is that such constants are emitted
-into the binary using R_AARCH64_ABS64 relocations, which are resolved at
-runtime, not at build time, and the places targeted by those relocations
-will contain zeroes before that.
-
-So refactor the endian swapping linker script constant generation code so
-that it emits the upper and lower 32-bit words separately.
+This adds support for emitting PLTs at module load time for relative
+branches that are out of range. This is a prerequisite for KASLR, which
+may place the kernel and the modules anywhere in the vmalloc area,
+making it more likely that branch target offsets exceed the maximum
+range of +/- 128 MB.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/assembler.h | 11 +++++++
- arch/arm64/kernel/head.S           |  6 ++--
- arch/arm64/kernel/image.h          | 32 ++++++++++++--------
- 3 files changed, 33 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index d8bfcc1ce923..70f7b9e04598 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -222,4 +222,15 @@ lr	.req	x30		// link register
- 	.size	__pi_##x, . - x;	\
- 	ENDPROC(x)
+In this version, I removed the distinction between relocations against
+.init executable sections and ordinary executable sections. The reason
+is that it is hardly worth the trouble, given that .init.text usually
+does not contain that many far branches, and this version now only
+reserves PLT entry space for jump and call relocations against undefined
+symbols (since symbols defined in the same module can be assumed to be
+within +/- 128 MB)
+
+For example, the mac80211.ko module (which is fairly sizable at ~400 KB)
+built with -mcmodel=large gives the following relocation counts:
+
+                    relocs    branches   unique     !local
+  .text              3925       3347       518        219
+  .init.text           11          8         7          1
+  .exit.text            4          4         4          1
+  .text.unlikely       81         67        36         17
+
+('unique' means branches to unique type/symbol/addend combos, of which
+!local is the subset referring to undefined symbols)
+
+IOW, we are only emitting a single PLT entry for the .init sections, and
+we are better off just adding it to the core PLT section instead.
+---
+ arch/arm64/Kconfig              |   9 +
+ arch/arm64/Makefile             |   6 +-
+ arch/arm64/include/asm/module.h |  11 ++
+ arch/arm64/kernel/Makefile      |   1 +
+ arch/arm64/kernel/module-plts.c | 201 ++++++++++++++++++++
+ arch/arm64/kernel/module.c      |  12 ++
+ arch/arm64/kernel/module.lds    |   3 +
+ 7 files changed, 242 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index cd767fa3037a..141f65ab0ed5 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -394,6 +394,7 @@ config ARM64_ERRATUM_843419
+ 	bool "Cortex-A53: 843419: A load or store might access an incorrect address"
+ 	depends on MODULES
+ 	default y
++	select ARM64_MODULE_CMODEL_LARGE
+ 	help
+ 	  This option builds kernel modules using the large memory model in
+ 	  order to avoid the use of the ADRP instruction, which can cause
+@@ -753,6 +754,14 @@ config ARM64_LSE_ATOMICS
  
-+	/*
-+	 * Emit a 64-bit absolute little endian symbol reference in a way that
-+	 * ensures that it will be resolved at build time, even when building a
-+	 * PIE binary. This requires cooperation from the linker script, which
-+	 * must emit the lo32/hi32 halves individually.
-+	 */
-+	.macro	le64sym, sym
-+	.long	\sym\()_lo32
-+	.long	\sym\()_hi32
-+	.endm
+ endmenu
+ 
++config ARM64_MODULE_CMODEL_LARGE
++	bool
 +
- #endif	/* __ASM_ASSEMBLER_H */
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 05b98289093e..f076debf392d 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -83,9 +83,9 @@ efi_head:
- 	b	stext				// branch to kernel start, magic
- 	.long	0				// reserved
- #endif
--	.quad	_kernel_offset_le		// Image load offset from start of RAM, little-endian
--	.quad	_kernel_size_le			// Effective size of kernel image, little-endian
--	.quad	_kernel_flags_le		// Informative flags, little-endian
-+	le64sym	_kernel_offset_le		// Image load offset from start of RAM, little-endian
-+	le64sym	_kernel_size_le			// Effective size of kernel image, little-endian
-+	le64sym	_kernel_flags_le		// Informative flags, little-endian
- 	.quad	0				// reserved
- 	.quad	0				// reserved
- 	.quad	0				// reserved
-diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
-index c9c62cab25a4..db1bf57948f1 100644
---- a/arch/arm64/kernel/image.h
-+++ b/arch/arm64/kernel/image.h
-@@ -26,21 +26,27 @@
-  * There aren't any ELF relocations we can use to endian-swap values known only
-  * at link time (e.g. the subtraction of two symbol addresses), so we must get
-  * the linker to endian-swap certain values before emitting them.
++config ARM64_MODULE_PLTS
++	bool
++	select ARM64_MODULE_CMODEL_LARGE
++	select HAVE_MOD_ARCH_SPECIFIC
++
+ endmenu
+ 
+ menu "Boot options"
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 307237cfe728..a6bba9623836 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -43,10 +43,14 @@ endif
+ 
+ CHECKFLAGS	+= -D__aarch64__
+ 
+-ifeq ($(CONFIG_ARM64_ERRATUM_843419), y)
++ifeq ($(CONFIG_ARM64_MODULE_CMODEL_LARGE), y)
+ KBUILD_CFLAGS_MODULE	+= -mcmodel=large
+ endif
+ 
++ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
++KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module.lds
++endif
++
+ # Default value
+ head-y		:= arch/arm64/kernel/head.o
+ 
+diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
+index e80e232b730e..8652fb613304 100644
+--- a/arch/arm64/include/asm/module.h
++++ b/arch/arm64/include/asm/module.h
+@@ -20,4 +20,15 @@
+ 
+ #define MODULE_ARCH_VERMAGIC	"aarch64"
+ 
++#ifdef CONFIG_ARM64_MODULE_PLTS
++struct mod_arch_specific {
++	struct elf64_shdr	*plt;
++	int			plt_num_entries;
++	int			plt_max_entries;
++};
++#endif
++
++u64 module_emit_plt_entry(struct module *mod, const Elf64_Rela *rela,
++			  Elf64_Sym *sym);
++
+ #endif /* __ASM_MODULE_H */
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 83cd7e68e83b..e2f0a755beaa 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -30,6 +30,7 @@ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
+ 					   ../../arm/kernel/opcodes.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
++arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+ arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
+ arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+ arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
+diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
+new file mode 100644
+index 000000000000..1ce90d8450ae
+--- /dev/null
++++ b/arch/arm64/kernel/module-plts.c
+@@ -0,0 +1,201 @@
++/*
++ * Copyright (C) 2014-2016 Linaro Ltd. <ard.biesheuvel@linaro.org>
 + *
-+ * Note that, in order for this to work when building the ELF64 PIE executable
-+ * (for KASLR), these values should not be referenced via R_AARCH64_ABS64
-+ * relocations, since these are fixed up at runtime rather than at build time
-+ * when PIE is in effect. So we need to split them up in 32-bit high and low
-+ * words.
-  */
- #ifdef CONFIG_CPU_BIG_ENDIAN
--#define DATA_LE64(data)					\
--	((((data) & 0x00000000000000ff) << 56) |	\
--	 (((data) & 0x000000000000ff00) << 40) |	\
--	 (((data) & 0x0000000000ff0000) << 24) |	\
--	 (((data) & 0x00000000ff000000) << 8)  |	\
--	 (((data) & 0x000000ff00000000) >> 8)  |	\
--	 (((data) & 0x0000ff0000000000) >> 24) |	\
--	 (((data) & 0x00ff000000000000) >> 40) |	\
--	 (((data) & 0xff00000000000000) >> 56))
-+#define DATA_LE32(data)				\
-+	((((data) & 0x000000ff) << 24) |	\
-+	 (((data) & 0x0000ff00) << 8)  |	\
-+	 (((data) & 0x00ff0000) >> 8)  |	\
-+	 (((data) & 0xff000000) >> 24))
- #else
--#define DATA_LE64(data) ((data) & 0xffffffffffffffff)
-+#define DATA_LE32(data) ((data) & 0xffffffff)
- #endif
- 
-+#define DEFINE_IMAGE_LE64(sym, data)				\
-+	sym##_lo32 = DATA_LE32((data) & 0xffffffff);		\
-+	sym##_hi32 = DATA_LE32((data) >> 32)
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
- #ifdef CONFIG_CPU_BIG_ENDIAN
- #define __HEAD_FLAG_BE		1
- #else
-@@ -61,9 +67,9 @@
-  * endian swapped in head.S, all are done here for consistency.
-  */
- #define HEAD_SYMBOLS						\
--	_kernel_size_le		= DATA_LE64(_end - _text);	\
--	_kernel_offset_le	= DATA_LE64(TEXT_OFFSET);	\
--	_kernel_flags_le	= DATA_LE64(__HEAD_FLAGS);
-+	DEFINE_IMAGE_LE64(_kernel_size_le, _end - _text);	\
-+	DEFINE_IMAGE_LE64(_kernel_offset_le, TEXT_OFFSET);	\
-+	DEFINE_IMAGE_LE64(_kernel_flags_le, __HEAD_FLAGS);
++#include <linux/elf.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/sort.h>
++
++struct plt_entry {
++	/*
++	 * A program that conforms to the AArch64 Procedure Call Standard
++	 * (AAPCS64) must assume that a veneer that alters IP0 (x16) and/or
++	 * IP1 (x17) may be inserted at any branch instruction that is
++	 * exposed to a relocation that supports long branches. Since that
++	 * is exactly what we are dealing with here, we are free to use x16
++	 * as a scratch register in the PLT veneers.
++	 */
++	__le32	mov0;	/* movn	x16, #0x....			*/
++	__le32	mov1;	/* movk	x16, #0x...., lsl #16		*/
++	__le32	mov2;	/* movk	x16, #0x...., lsl #32		*/
++	__le32	br;	/* br	x16				*/
++};
++
++u64 module_emit_plt_entry(struct module *mod, const Elf64_Rela *rela,
++			  Elf64_Sym *sym)
++{
++	struct plt_entry *plt = (struct plt_entry *)mod->arch.plt->sh_addr;
++	int i = mod->arch.plt_num_entries;
++	u64 val = sym->st_value + rela->r_addend;
++
++	/*
++	 * We only emit PLT entries against undefined (SHN_UNDEF) symbols,
++	 * which are listed in the ELF symtab section, but without a type
++	 * or a size.
++	 * So, similar to how the module loader uses the Elf64_Sym::st_value
++	 * field to store the resolved addresses of undefined symbols, let's
++	 * borrow the Elf64_Sym::st_size field (whose value is never used by
++	 * the module loader, even for symbols that are defined) to record
++	 * the address of a symbol's associated PLT entry as we emit it for a
++	 * zero addend relocation (which is the only kind we have to deal with
++	 * in practice). This allows us to find duplicates without having to
++	 * go through the table every time.
++	 */
++	if (rela->r_addend == 0 && sym->st_size != 0) {
++		BUG_ON(sym->st_size < (u64)plt || sym->st_size >= (u64)&plt[i]);
++		return sym->st_size;
++	}
++
++	mod->arch.plt_num_entries++;
++	BUG_ON(mod->arch.plt_num_entries > mod->arch.plt_max_entries);
++
++	/*
++	 * MOVK/MOVN/MOVZ opcode:
++	 * +--------+------------+--------+-----------+-------------+---------+
++	 * | sf[31] | opc[30:29] | 100101 | hw[22:21] | imm16[20:5] | Rd[4:0] |
++	 * +--------+------------+--------+-----------+-------------+---------+
++	 *
++	 * Rd     := 0x10 (x16)
++	 * hw     := 0b00 (no shift), 0b01 (lsl #16), 0b10 (lsl #32)
++	 * opc    := 0b11 (MOVK), 0b00 (MOVN), 0b10 (MOVZ)
++	 * sf     := 1 (64-bit variant)
++	 */
++	plt[i] = (struct plt_entry){
++		cpu_to_le32(0x92800010 | (((~val      ) & 0xffff)) << 5),
++		cpu_to_le32(0xf2a00010 | ((( val >> 16) & 0xffff)) << 5),
++		cpu_to_le32(0xf2c00010 | ((( val >> 32) & 0xffff)) << 5),
++		cpu_to_le32(0xd61f0200)
++	};
++
++	if (rela->r_addend == 0)
++		sym->st_size = (u64)&plt[i];
++
++	return (u64)&plt[i];
++}
++
++#define cmp_3way(a,b)	((a) < (b) ? -1 : (a) > (b))
++
++static int cmp_rela(const void *a, const void *b)
++{
++	const Elf64_Rela *x = a, *y = b;
++	int i;
++
++	/* sort by type, symbol index and addend */
++	i = cmp_3way(ELF64_R_TYPE(x->r_info), ELF64_R_TYPE(y->r_info));
++	if (i == 0)
++		i = cmp_3way(ELF64_R_SYM(x->r_info), ELF64_R_SYM(y->r_info));
++	if (i == 0)
++		i = cmp_3way(x->r_addend, y->r_addend);
++	return i;
++}
++
++static bool duplicate_rel(const Elf64_Rela *rela, int num)
++{
++	/*
++	 * Entries are sorted by type, symbol index and addend. That means
++	 * that, if a duplicate entry exists, it must be in the preceding
++	 * slot.
++	 */
++	return num > 0 && cmp_rela(rela + num, rela + num - 1) == 0;
++}
++
++static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num)
++{
++	unsigned int ret = 0;
++	Elf64_Sym *s;
++	int i;
++
++	for (i = 0; i < num; i++) {
++		switch (ELF64_R_TYPE(rela[i].r_info)) {
++		case R_AARCH64_JUMP26:
++		case R_AARCH64_CALL26:
++			/*
++			 * We only have to consider branch targets that resolve
++			 * to undefined symbols. This is not simply a heuristic,
++			 * it is a fundamental limitation, since the PLT itself
++			 * is part of the module, and needs to be within 128 MB
++			 * as well, so modules can never grow beyond that limit.
++			 */
++			s = syms + ELF64_R_SYM(rela[i].r_info);
++			if (s->st_shndx != SHN_UNDEF)
++				break;
++
++			/*
++			 * Jump relocations with non-zero addends against
++			 * undefined symbols are supported by the ELF spec, but
++			 * do not occur in practice (e.g., 'jump n bytes past
++			 * the entry point of undefined function symbol f').
++			 * So we need to support them, but there is no need to
++			 * take them into consideration when trying to optimize
++			 * this code. So let's only check for duplicates when
++			 * the addend is zero: this allows us to record the PLT
++			 * entry address in the symbol table itself, rather than
++			 * having to search the list for duplicates each time we
++			 * emit one.
++			 */
++			if (rela[i].r_addend != 0 || !duplicate_rel(rela, i))
++				ret++;
++			break;
++		}
++	}
++	return ret;
++}
++
++int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
++			      char *secstrings, struct module *mod)
++{
++	unsigned long plt_max_entries = 0;
++	Elf64_Sym *syms = NULL;
++	int i;
++
++	/*
++	 * Find the empty .plt section so we can expand it to store the PLT
++	 * entries. Record the symtab address as well.
++	 */
++	for (i = 0; i < ehdr->e_shnum; i++) {
++		if (strcmp(".plt", secstrings + sechdrs[i].sh_name) == 0)
++			mod->arch.plt = sechdrs + i;
++		else if (sechdrs[i].sh_type == SHT_SYMTAB)
++			syms = (Elf64_Sym *)sechdrs[i].sh_addr;
++	}
++
++	if (!mod->arch.plt) {
++		pr_err("%s: module PLT section missing\n", mod->name);
++		return -ENOEXEC;
++	}
++	if (!syms) {
++		pr_err("%s: module symtab section missing\n", mod->name);
++		return -ENOEXEC;
++	}
++
++	for (i = 0; i < ehdr->e_shnum; i++) {
++		Elf64_Rela *rels = (void *)ehdr + sechdrs[i].sh_offset;
++		int numrels = sechdrs[i].sh_size / sizeof(Elf64_Rela);
++		Elf64_Shdr *dstsec = sechdrs + sechdrs[i].sh_info;
++
++		if (sechdrs[i].sh_type != SHT_RELA)
++			continue;
++
++		/* ignore relocations that operate on non-exec sections */
++		if (!(dstsec->sh_flags & SHF_EXECINSTR))
++			continue;
++
++		/* sort by type, symbol index and addend */
++		sort(rels, numrels, sizeof(Elf64_Rela), cmp_rela, NULL);
++
++		plt_max_entries += count_plts(syms, rels, numrels);
++	}
++
++	mod->arch.plt->sh_type = SHT_NOBITS;
++	mod->arch.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
++	mod->arch.plt->sh_addralign = L1_CACHE_BYTES;
++	mod->arch.plt->sh_size = plt_max_entries * sizeof(struct plt_entry);
++	mod->arch.plt_num_entries = 0;
++	mod->arch.plt_max_entries = plt_max_entries;
++	return 0;
++}
+diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+index 93e970231ca9..84113d3e1df1 100644
+--- a/arch/arm64/kernel/module.c
++++ b/arch/arm64/kernel/module.c
+@@ -38,6 +38,11 @@ void *module_alloc(unsigned long size)
+ 				GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
+ 				NUMA_NO_NODE, __builtin_return_address(0));
  
- #ifdef CONFIG_EFI
++	if (!p && IS_ENABLED(CONFIG_ARM64_MODULE_PLTS))
++		p = __vmalloc_node_range(size, MODULE_ALIGN, VMALLOC_START,
++				VMALLOC_END, GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
++				NUMA_NO_NODE, __builtin_return_address(0));
++
+ 	if (p && (kasan_module_alloc(p, size) < 0)) {
+ 		vfree(p);
+ 		return NULL;
+@@ -361,6 +366,13 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
+ 		case R_AARCH64_CALL26:
+ 			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 26,
+ 					     AARCH64_INSN_IMM_26);
++
++			if (IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) &&
++			    ovf == -ERANGE) {
++				val = module_emit_plt_entry(me, &rel[i], sym);
++				ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2,
++						     26, AARCH64_INSN_IMM_26);
++			}
+ 			break;
  
+ 		default:
+diff --git a/arch/arm64/kernel/module.lds b/arch/arm64/kernel/module.lds
+new file mode 100644
+index 000000000000..8949f6c6f729
+--- /dev/null
++++ b/arch/arm64/kernel/module.lds
+@@ -0,0 +1,3 @@
++SECTIONS {
++	.plt (NOLOAD) : { BYTE(0) }
++}
 -- 
 2.5.0
