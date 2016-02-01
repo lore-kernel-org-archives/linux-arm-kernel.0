@@ -1,263 +1,152 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 1 Feb 2016 16:21:22 +0100
-Subject: [PATCH v2 19/21] arm64: KVM: Move most of the fault decoding to C
-In-Reply-To: <1453737235-16522-20-git-send-email-marc.zyngier@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <1453737235-16522-20-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160201152122.GY1478@cbox>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon, 1 Feb 2016 23:23:33 +0800
+Subject: [PATCH v5 1/4] dt-bindings: mailbox: Document Hi6220 mailbox
+ driver
+In-Reply-To: <20160201140828.GA32412@rob-hp-laptop>
+References: <1454333687-20421-1-git-send-email-leo.yan@linaro.org>
+ <1454333687-20421-2-git-send-email-leo.yan@linaro.org>
+ <20160201140828.GA32412@rob-hp-laptop>
+Message-ID: <20160201152333.GA22872@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 03:53:53PM +0000, Marc Zyngier wrote:
-> The fault decoding process (including computing the IPA in the case
-> of a permission fault) would be much better done in C code, as we
-> have a reasonable infrastructure to deal with the VHE/non-VHE
-> differences.
+Hi Rob,
+
+Thanks for reviewing, please see below inline comments.
+
+On Mon, Feb 01, 2016 at 08:08:28AM -0600, Rob Herring wrote:
+> On Mon, Feb 01, 2016 at 09:34:44PM +0800, Leo Yan wrote:
+> > Document DT binding for Hisilicon Hi6220 mailbox driver.
+> > 
+> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > ---
+> >  .../bindings/mailbox/hisilicon,hi6220-mailbox.txt  | 90 ++++++++++++++++++++++
+> >  1 file changed, 90 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt b/Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
+> > new file mode 100644
+> > index 0000000..96e6acc
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
+> > @@ -0,0 +1,90 @@
+> > +Hisilicon Hi6220 Mailbox Driver
+> > +===============================
+> > +
+> > +Hisilicon Hi6220 mailbox supports up to 32 channels. Each channel
+> > +is unidirectional with a maximum message size of 8 words. I/O is
+> > +performed using register access (there is no DMA) and the cell
+> > +raises an interrupt when messages are received.
+> > +
+> > +Mailbox Device Node:
+> > +====================
+> > +
+> > +Required properties:
+> > +--------------------
+> > +- compatible:		Shall be "hisilicon,hi6220-mbox"
+> > +- reg:			Contains the mailbox register address range (base
+> > +			address and length); the first item is for IPC
+> > +			registers, the second item is shared buffer for
+> > +			slots.
+> > +- #mbox-cells		Common mailbox binding property to identify the number
+> > +			of cells required for the mailbox specifier. Should be 1.
+> > +- interrupts:		Contains the interrupt information for the mailbox
+> > +			device. The format is dependent on which interrupt
+> > +			controller the SoCs use.
+> > +
+> > +Optional Properties:
+> > +--------------------
+> > +- hi6220,mbox-tx-noirq: Flag to allow the client user of this mailbox driver
+> > +			to send messages without triggering a TX completion
+> > +			interrupt.
 > 
-> Let's move the whole thing to C, including the workaround for
-> erratum 834220, and just patch the odd ESR_EL2 access remaining
-> in hyp-entry.S.
+> I don't think this belongs in DT. This should be a flag the client 
+> driver sets when it sends messages.
+
+The client driver can set "tx_block = true" so use this flag indicates
+the client thread should be blocked until data is transmitted.
+
+But low level mailbox driver can use two method to support "tx_block"
+mode:
+- One method is to avoid using interrupt and mailbox framework will
+  poll with mailbox's idle flag which is set by remote processor
+  automatically;
+- Another method is to use interrupt to notify data has been
+  transmitted and interrupt handler will call completion function to
+  wake up blocked client thread;
+
+So this flag is to distinguish these two different hardware mechanism.
+Do you think this is make sense or have other suggestion?
+
+> > +
+> > +Child Nodes:
+> > +============
+> > +A child node is used for representing the actual sub-mailbox device that is
+> > +used for the communication between the host processor and a remote processor.
+> > +Each child node should have a unique node name across all the different
+> > +mailbox device nodes.
+> > +
+> > +Required properties:
+> > +--------------------
+> > +- hi6220,mbox-tx:	sub-mailbox descriptor property defining Tx channel
+> > +- hi6220,mbox-rx:	sub-mailbox descriptor property defining Rx channel
+> > +
+> > +Sub-mailbox Descriptor Data
+> > +---------------------------
+> > +Each of the above hi6220,mbox-tx and hi6220,mbox-rx properties should have 3
+> > +cells of data that represent the following:
+> > +    Cell #1 (slot_id) - mailbox slot id used either for transmitting
+> > +                        (hi6220,mbox-tx) or for receiving (hi6220,mbox-rx)
+> > +    Cell #2 (dst_irq) - irq identifier index number which used by MCU.
+> > +    Cell #3 (ack_irq) - irq identifier index number with generating a tx/rx
+> > +                        interrupt to application processor, mailbox driver
+> > +                        used this id to acknowledge interrupt.
+> > +
+> > +Example:
+> > +--------
+> > +
+> > +	mailbox: mailbox at F7510000 {
+> > +		#mbox-cells = <1>;
+> > +		compatible = "hisilicon,hi6220-mbox";
+> > +		reg = <0x0 0xF7510000 0x0 0x1000>, /* IPC_S */
+> > +		      <0x0 0x06DFF800 0x0 0x0800>; /* Mailbox */
+> > +		interrupt-parent = <&gic>;
+> > +		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
+> > +		mbox_stub_clock: mbox_stub_clock {
+> > +			hi6220,mbox-rx = <0 1 10>;
+> > +			hi6220,mbox-tx = <1 0 11>;
+> > +		};
+> > +	};
+> > +
+> > +
+> > +Mailbox client
+> > +===============
+> > +
+> > +"mboxes" and the optional "mbox-names" (please see
+> > +Documentation/devicetree/bindings/mailbox/mailbox.txt for details). Each value
+> > +of the mboxes property should contain a phandle to the mailbox controller
+> > +device node and second argument is the channel index. It must be 0 (hardware
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kernel/asm-offsets.c |  3 --
->  arch/arm64/kvm/hyp/hyp-entry.S  | 69 +++--------------------------------------
->  arch/arm64/kvm/hyp/switch.c     | 54 ++++++++++++++++++++++++++++++++
->  3 files changed, 59 insertions(+), 67 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> index fffa4ac6..b0ab4e9 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -110,9 +110,6 @@ int main(void)
->    DEFINE(CPU_USER_PT_REGS,	offsetof(struct kvm_regs, regs));
->    DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
->    DEFINE(VCPU_FPEXC32_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.sys_regs[FPEXC32_EL2]));
-> -  DEFINE(VCPU_ESR_EL2,		offsetof(struct kvm_vcpu, arch.fault.esr_el2));
-> -  DEFINE(VCPU_FAR_EL2,		offsetof(struct kvm_vcpu, arch.fault.far_el2));
-> -  DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
->    DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
->  #endif
->  #ifdef CONFIG_CPU_PM
-> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-> index 9e0683f..213de52 100644
-> --- a/arch/arm64/kvm/hyp/hyp-entry.S
-> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
-> @@ -19,7 +19,6 @@
->  
->  #include <asm/alternative.h>
->  #include <asm/assembler.h>
-> -#include <asm/asm-offsets.h>
->  #include <asm/cpufeature.h>
->  #include <asm/kvm_arm.h>
->  #include <asm/kvm_asm.h>
-> @@ -67,7 +66,11 @@ ENDPROC(__vhe_hyp_call)
->  el1_sync:				// Guest trapped into EL2
->  	save_x0_to_x3
->  
-> +alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
->  	mrs	x1, esr_el2
-> +alternative_else
-> +	mrs	x1, esr_el1
-> +alternative_endif
+> 0? But the example has 1.
 
-I suppose this is not technically part of what the patch description
-says it does, but ok...
+Will fix.
 
->  	lsr	x2, x1, #ESR_ELx_EC_SHIFT
->  
->  	cmp	x2, #ESR_ELx_EC_HVC64
-> @@ -103,72 +106,10 @@ el1_trap:
->  	cmp	x2, #ESR_ELx_EC_FP_ASIMD
->  	b.eq	__fpsimd_guest_restore
->  
-> -	cmp	x2, #ESR_ELx_EC_DABT_LOW
-> -	mov	x0, #ESR_ELx_EC_IABT_LOW
-> -	ccmp	x2, x0, #4, ne
-> -	b.ne	1f		// Not an abort we care about
-> -
-> -	/* This is an abort. Check for permission fault */
-> -alternative_if_not ARM64_WORKAROUND_834220
-> -	and	x2, x1, #ESR_ELx_FSC_TYPE
-> -	cmp	x2, #FSC_PERM
-> -	b.ne	1f		// Not a permission fault
-> -alternative_else
-> -	nop			// Use the permission fault path to
-> -	nop			// check for a valid S1 translation,
-> -	nop			// regardless of the ESR value.
-> -alternative_endif
-> -
-> -	/*
-> -	 * Check for Stage-1 page table walk, which is guaranteed
-> -	 * to give a valid HPFAR_EL2.
-> -	 */
-> -	tbnz	x1, #7, 1f	// S1PTW is set
-> -
-> -	/* Preserve PAR_EL1 */
-> -	mrs	x3, par_el1
-> -	stp	x3, xzr, [sp, #-16]!
-> -
-> -	/*
-> -	 * Permission fault, HPFAR_EL2 is invalid.
-> -	 * Resolve the IPA the hard way using the guest VA.
-> -	 * Stage-1 translation already validated the memory access rights.
-> -	 * As such, we can use the EL1 translation regime, and don't have
-> -	 * to distinguish between EL0 and EL1 access.
-> -	 */
-> -	mrs	x2, far_el2
-> -	at	s1e1r, x2
-> -	isb
-> -
-> -	/* Read result */
-> -	mrs	x3, par_el1
-> -	ldp	x0, xzr, [sp], #16	// Restore PAR_EL1 from the stack
-> -	msr	par_el1, x0
-> -	tbnz	x3, #0, 3f		// Bail out if we failed the translation
-> -	ubfx	x3, x3, #12, #36	// Extract IPA
-> -	lsl	x3, x3, #4		// and present it like HPFAR
-> -	b	2f
-> -
-> -1:	mrs	x3, hpfar_el2
-> -	mrs	x2, far_el2
-> -
-> -2:	mrs	x0, tpidr_el2
-> -	str	w1, [x0, #VCPU_ESR_EL2]
-> -	str	x2, [x0, #VCPU_FAR_EL2]
-> -	str	x3, [x0, #VCPU_HPFAR_EL2]
-> -
-> +	mrs	x0, tpidr_el2
->  	mov	x1, #ARM_EXCEPTION_TRAP
->  	b	__guest_exit
->  
-> -	/*
-> -	 * Translation failed. Just return to the guest and
-> -	 * let it fault again. Another CPU is probably playing
-> -	 * behind our back.
-> -	 */
-> -3:	restore_x0_to_x3
-> -
-> -	eret
-> -
->  el1_irq:
->  	save_x0_to_x3
->  	mrs	x0, tpidr_el2
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 0cadb7f..df2cce9 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -15,6 +15,7 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->  
-> +#include <linux/types.h>
->  #include <asm/kvm_asm.h>
->  
->  #include "hyp.h"
-> @@ -150,6 +151,55 @@ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
->  	__vgic_call_restore_state()(vcpu);
->  }
->  
-> +static hyp_alternate_value(__check_arm_834220,
-> +			   false, true,
-> +			   ARM64_WORKAROUND_834220);
-> +
-> +static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
-> +{
-> +	u64 esr = read_sysreg_el2(esr);
-> +	u8 ec = esr >> ESR_ELx_EC_SHIFT;
-> +	u64 hpfar, far;
-> +
-> +	vcpu->arch.fault.esr_el2 = esr;
-> +
-> +	if (ec != ESR_ELx_EC_DABT_LOW && ec != ESR_ELx_EC_IABT_LOW)
-> +		return true;
-> +
-> +	far = read_sysreg_el2(far);
-> +
-> +	if (!(esr & ESR_ELx_S1PTW) &&
-> +	    (__check_arm_834220() || (esr & ESR_ELx_FSC_TYPE) == FSC_PERM)) {
+Thanks,
+Leo Yan
 
-this is really hard to read.  How do you feel about putting the below
-block into its own function and changing to something like this:
-
-/*
- * The HPFAR can be invalid if the stage 2 fault did not happen during a
- * stage 1 page table walk (the ESR_EL2.S1PTW bit is clear) and one of
- * the two following cases are true:
- *   1. The fault was due to a permission fault
- *   2. The processor carries errata 834220
- *
- * Therefore, for all non S1PTW faults where we either have a permission
- * fault or the errata workaround is enabled, we resolve the IPA using
- * the AT instruction.
- */
-if (!(esr & ESR_ELx_S1PTW) &&
-    (__check_arm_834220() || (esr & ESR_ELx_FSC_TYPE) == FSC_PERM)) {
-    	if (!__translate_far_to_ipa(&hpfar))
-		return false; /* Translation failed, back to guest */
-} else {
-	hpfar = read_sysreg(hpfar_el2);
-}
-
-not sure if it helps that much, perhaps it's just complicated by nature.
-
-> +		u64 par, tmp;
-> +
-> +		/*
-> +		 * Permission fault, HPFAR_EL2 is invalid. Resolve the
-> +		 * IPA the hard way using the guest VA.
-> +		 * Stage-1 translation already validated the memory
-> +		 * access rights. As such, we can use the EL1
-> +		 * translation regime, and don't have to distinguish
-> +		 * between EL0 and EL1 access.
-> +		 */
-> +		par = read_sysreg(par_el1);
-
-in any cas I think we also need the comment about preserving par_el1
-here, which is only something we do because we may return early, IIUC.
-
-> +		asm volatile("at s1e1r, %0" : : "r" (far));
-> +		isb();
-> +
-> +		tmp = read_sysreg(par_el1);
-> +		write_sysreg(par, par_el1);
-> +
-> +		if (unlikely(tmp & 1))
-> +			return false; /* Translation failed, back to guest */
-> +
-
-nit: add comment /* Convert PAR to HPFAR format */
-
-> +		hpfar = ((tmp >> 12) & ((1UL << 36) - 1)) << 4;
-> +	} else {
-> +		hpfar = read_sysreg(hpfar_el2);
-> +	}
-> +
-> +	vcpu->arch.fault.far_el2 = far;
-> +	vcpu->arch.fault.hpfar_el2 = hpfar;
-> +	return true;
-> +}
-> +
->  static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
->  {
->  	struct kvm_cpu_context *host_ctxt;
-> @@ -181,9 +231,13 @@ static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
->  	__debug_restore_state(vcpu, kern_hyp_va(vcpu->arch.debug_ptr), guest_ctxt);
->  
->  	/* Jump in the fire! */
-> +again:
->  	exit_code = __guest_enter(vcpu, host_ctxt);
->  	/* And we're baaack! */
->  
-> +	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
-> +		goto again;
-> +
->  	fp_enabled = __fpsimd_enabled();
->  
->  	__sysreg_save_guest_state(guest_ctxt);
-> -- 
-> 2.1.4
-> 
-The good news are that I couldn't find any bugs in the code.
-
--Christoffer
+> > +support only one channel). The equivalent "mbox-names" property value can be
+> > +used to give a name to the communication channel to be used by the client user.
+> > +
+> > +Example:
+> > +--------
+> > +
+> > +	stub_clock: stub_clock {
+> > +		compatible = "hisilicon,hi6220-stub-clk";
+> > +		hisilicon,hi6220-clk-sram = <&sram>;
+> > +		#clock-cells = <1>;
+> > +		mbox-names = "mbox-tx";
+> > +		mboxes = <&mailbox 1>;
+> > +	};
+> > -- 
+> > 1.9.1
+> > 
