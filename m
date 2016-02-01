@@ -1,44 +1,68 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Mon, 01 Feb 2016 03:54:53 -0800
-Subject: [PATCH 1/2] of: add vendor prefix for UniWest
-In-Reply-To: <20160201112153.GD10671@tiger>
-References: <b11bf2208fe30b96c4d82e634e8abe04343754de.1452717014.git.stillcompiling@gmail.com>
- <20160201112153.GD10671@tiger>
-Message-ID: <1558714.BL5qCUPStK@diplodocus>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 1 Feb 2016 11:57:18 +0000
+Subject: [RFC PATCH] irq/mbigen:Fix the problem of IO remap for
+ duplicated physical address in mbigen driver
+In-Reply-To: <1454327094-7848-1-git-send-email-majun258@huawei.com>
+References: <1454327094-7848-1-git-send-email-majun258@huawei.com>
+Message-ID: <20160201115717.GD674@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks, Shawn,
-On Monday, February 01, 2016 07:21:53 PM Shawn Guo wrote:
-> On Wed, Jan 13, 2016 at 12:45:11PM -0800, Joshua Clayton wrote:
-> > United Western Technologies Corp, known primarily as UniWest,
-> > is a manufacturer of eddy current and ultrasonic testing equipment.
-> > 
-> > Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-> > ---
-> >  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > index 55df1d4..7dabdee 100644
-> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > @@ -230,6 +230,7 @@ toradex	Toradex AG
-> >  toshiba	Toshiba Corporation
-> >  toumaz	Toumaz
-> >  tplink	TP-LINK Technologies Co., Ltd.
-> > +uniwest	United Western Technologies Corp (UniWest)
+On Mon, Feb 01, 2016 at 07:44:54PM +0800, MaJun wrote:
+> From: Ma Jun <majun258@huawei.com>
 > 
-> As far as I know, it should be added in alphabetical order.
-There is a V2 of this patch, which is in alphabetical order and got an ack from Rob Herring
-http://lkml.iu.edu/hypermail/linux/kernel/1601.1/05563.html
+> For mbigen module, there is a special case that more than one mbigen 
+> device nodes use the same reg definition in DTS when these devices
+> exist in the same mbigen hardware module. 
+> 
+> mbigen_dev1:intc_dev1 {
+> 	...
+> 	reg = <0x0 0xc0080000 0x0 0x10000>;
+> 	...
+> };
+> 
+> mbigen_dev2:intc_dev2 {
+> 	...
+> 	reg = <0x0 0xc0080000 0x0 0x10000>;
+> 	...
+> };
 
-I have not sent a v2 of the dts, (patch 2/2) as it didn't get any review comments. Should I resend it?
+This doesn't sound right. If they exist in the same place, and have the
+same reg, they _are_ the same device.
 
+You'll need to explain this better.
+
+> On this case, devm_ioremap_resource() returns fail with info
+> "can't request region for resource" because of memory region check.
 > 
-> Shawn
+> Because we only need to program 1 into corresponding bit into status 
+> register of mbigen to clear the interrupt status during runtime,
+> I think we can replace devm_ioremap_resource() by devm_ioremap().
 > 
-> >  tronfy	Tronfy
-> >  truly	Truly Semiconductors Limited
-> >  upisemi	uPI Semiconductor Corp.
+> Signed-off-by: Ma Jun <majun258@huawei.com>
+> ---
+>  drivers/irqchip/irq-mbigen.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+> index 4dd3eb8..b19e528 100644
+> --- a/drivers/irqchip/irq-mbigen.c
+> +++ b/drivers/irqchip/irq-mbigen.c
+> @@ -250,7 +250,7 @@ static int mbigen_device_probe(struct platform_device *pdev)
+>  	mgn_chip->pdev = pdev;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	mgn_chip->base = devm_ioremap_resource(&pdev->dev, res);
+> +	mgn_chip->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+
+These two behaving differently doesn't seem correct either...
+
+Mark.
+
+>  	if (IS_ERR(mgn_chip->base))
+>  		return PTR_ERR(mgn_chip->base);
+>  
+> -- 
+> 1.7.1
+> 
 > 
