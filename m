@@ -1,47 +1,49 @@
-From: holgerschurig@gmail.com (Holger Schurig)
-Date: Mon, 01 Feb 2016 17:19:16 +0100
-Subject: weird RCU problem with 4.4.0
-Message-ID: <87d1sgl7y3.fsf@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 1 Feb 2016 16:20:40 +0000
+Subject: [PATCH v2 06/21] arm64: KVM: VHE: Patch out use of HVC
+In-Reply-To: <20160201153635.GH15514@e104818-lin.cambridge.arm.com>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <1453737235-16522-7-git-send-email-marc.zyngier@arm.com>
+ <20160201131634.GI1478@cbox> <56AF5ED8.7010303@arm.com>
+ <20160201153635.GH15514@e104818-lin.cambridge.arm.com>
+Message-ID: <56AF85D8.7080907@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 01/02/16 15:36, Catalin Marinas wrote:
+> On Mon, Feb 01, 2016 at 01:34:16PM +0000, Marc Zyngier wrote:
+>> On 01/02/16 13:16, Christoffer Dall wrote:
+>>> On Mon, Jan 25, 2016 at 03:53:40PM +0000, Marc Zyngier wrote:
+>>>> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+>>>> index 93e8d983..9e0683f 100644
+>>>> --- a/arch/arm64/kvm/hyp/hyp-entry.S
+>>>> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
+>>>> @@ -38,6 +38,32 @@
+>>>>  	ldp	x0, x1, [sp], #16
+>>>>  .endm
+>>>>  
+>>>> +.macro do_el2_call
+>>>> +	/*
+>>>> +	 * Shuffle the parameters before calling the function
+>>>> +	 * pointed to in x0. Assumes parameters in x[1,2,3].
+>>>> +	 */
+>>>> +	stp	lr, xzr, [sp, #-16]!
+>>>
+>>> remind me why this pair isn't just doing "str" instead of "stp" with the
+>>> xzr ?
+>>
+>> Because SP has to be aligned on a 16 bytes boundary at all times.
+> 
+> You could do something like:
+> 
+> 	sub	sp, sp, #16
+> 	str	lr, [sp]
+> 
 
-in the dmesg log (actually "journalctl -f") of one of my machines I had this:
+Ah, fair enough. I'll fold that in.
 
-...
-03:25:01 CRON[16607]: pam_unix(cron:session): session closed for user root
-INFO: rcu_preempt detected stalls on CPUs/tasks:
-    1-...: (1 GPs behind) idle=763/140000000000000/0 softirq=6109762/6109762 fqs=301
-    2-...: (1 GPs behind) idle=2f3/140000000000000/0 softirq=5129036/5129037 fqs=301
-    (detected by 0, t=303 jiffies, g=2533688, c=2533687, q=4860)
-INFO: rcu_preempt detected stalls on CPUs/tasks:
-    1-...: (1 GPs behind) idle=763/140000000000000/0 softirq=6109762/6109762 fqs=1204
-    2-...: (1 GPs behind) idle=2f3/140000000000000/0 softirq=5129036/5129037 fqs=1205
-    (detected by 0, t=1208 jiffies, g=2533688, c=2533687, q=19822)
-INFO: rcu_preempt detected stalls on CPUs/tasks:
-    1-...: (1 GPs behind) idle=763/140000000000000/0 softirq=6109762/6109762 fqs=2109
-    2-...: (1 GPs behind) idle=2f3/140000000000000/0 softirq=5129036/5129037 fqs=2109
-    (detected by 0, t=2113 jiffies, g=2533688, c=2533687, q=34248)
-INFO: rcu_preempt detected stalls on CPUs/tasks:
-    1-...: (1 GPs behind) idle=763/140000000000000/0 softirq=6109762/6109762 fqs=3011
-    2-...: (1 GPs behind) idle=2f3/140000000000000/0 softirq=5129036/5129037 fqs=3011
-    (detected by 0, t=3018 jiffies, g=2533688, c=2533687, q=48662)
-INFO: rcu_preempt detected stalls on CPUs/tasks:
-    1-...: (1 GPs behind) idle=763/140000000000000/0 softirq=6109762/6109762 fqs=3912
-    2-...: (1 GPs behind) idle=2f3/140000000000000/0 softirq=5129036/5129037 fqs=3912
-    (detected by 0, t=3923 jiffies, g=2533688, c=2533687, q=63080)
-INFO: rcu_preempt detected stalls on CPUs/tasks:
-    1-...: (1 GPs behind) idle=763/140000000000000/0 softirq=6109762/6109762 fqs=4815
-    2-...: (1 GPs behind) idle=2f3/140000000000000/0 softirq=5129036/5129037 fqs=4815
-    (detected by 0, t=4828 jiffies, g=2533688, c=2533687, q=68037)
-...
-and so on, and so forth ...
-...
-INFO: rcu_preempt detected stalls on CPUs/tasks:
-    1-...: (1 GPs behind) idle=763/140000000000000/0 softirq=6109762/6109762 fqs=137745
-    2-...: (1 GPs behind) idle=2f3/140000000000000/0 softirq=5129036/5129037 fqs=137746
-    (detected by 0, t=137863 jiffies, g=2533688, c=2533687, q=68849)
-INFO: rcu_preempt detected stalls on CPUs/tasks:
-    1-...: (1 GPs behind) idle=763/140000000000000/0 softirq=6109762/6109762 fqs=138651
-    2-...: (1 GPs behind) idle=2f3/140000000000000/0 softirq=5129036/5129037 fqs=138652
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
