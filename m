@@ -1,42 +1,70 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 1 Feb 2016 18:02:56 +0000
-Subject: [PATCH v5sub1 8/8] arm64: allow kernel Image to be loaded
- anywhere in physical memory
-In-Reply-To: <CAKv+Gu__yQUPyTKLBGeFYk2ehM8XkOXKXRisMyX1V-iAch5JNw@mail.gmail.com>
-References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
- <1454324093-15998-9-git-send-email-ard.biesheuvel@linaro.org>
- <20160201150624.GG15514@e104818-lin.cambridge.arm.com>
- <CAKv+Gu8rgkBWfJXfWzWSkxyKhLOnxirycu-wdcmvRovpDB5hKw@mail.gmail.com>
- <CAKv+Gu8+DdtGQmZtKsB8YOabH1NfzSJge=w0vQwFZPwbQkgYzA@mail.gmail.com>
- <20160201173120.GI15514@e104818-lin.cambridge.arm.com>
- <CAKv+Gu__yQUPyTKLBGeFYk2ehM8XkOXKXRisMyX1V-iAch5JNw@mail.gmail.com>
-Message-ID: <20160201180256.GJ15514@e104818-lin.cambridge.arm.com>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Mon, 1 Feb 2016 19:09:44 +0100
+Subject: [PATCH v3 05/12] arm64, acpi, numa: NUMA support based on SRAT
+ and SLIT
+In-Reply-To: <1453541967-3744-6-git-send-email-guohanjun@huawei.com>
+References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
+ <1453541967-3744-6-git-send-email-guohanjun@huawei.com>
+Message-ID: <20160201180944.GV24726@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 06:57:05PM +0100, Ard Biesheuvel wrote:
-> On 1 February 2016 at 18:31, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> >> On Mon, Feb 01, 2016 at 11:54:53AM +0100, Ard Biesheuvel wrote:
-> >> >>> Note that limiting memory using mem= is not unambiguous anymore after
-> >> >>> this change, considering that the kernel may be at the top of physical
-> >> >>> memory, and clipping from the bottom rather than the top will discard
-> >> >>> any 32-bit DMA addressable memory first. To deal with this, the handling
-> >> >>> of mem= is reimplemented to clip top down, but take special care not to
-> >> >>> clip memory that covers the kernel image.
-> >> >>
-> >> >> I may have forgotten the reason - why do we need to avoid clipping the
-> >> >> memory that covers the kernel image? It's already mapped in the vmalloc
-> >> >> area, so we wouldn't need it in the linear map as well.
-[...]
-> > I don't care about efficiency, I was hoping to avoid the additional
-> > arm64-specific memory clipping but it seems that it could easily get
-> > more complicated. So let's leave as it is.
-> 
-> Alternatively, we could simply apply the memory limit as before, and
-> add back the [__init_begin, _end] interval right afterwards using
-> memblock_add()
+On 23.01.16 17:39:20, Hanjun Guo wrote:
 
-If the code ends up simpler, yes, I'm fine with it.
+> @@ -385,10 +386,8 @@ void __init arm64_numa_init(void)
+>  {
+>  	int ret = -ENODEV;
+>  
+> -#ifdef CONFIG_OF_NUMA
+>  	if (!numa_off)
+> -		ret = numa_init(arm64_of_numa_init);
+> -#endif
+> +		ret = numa_init(acpi_disabled ? arm64_of_numa_init : arm64_acpi_numa_init);
+>  
+>  	if (ret)
+>  		numa_init(dummy_numa_init);
 
--- 
-Catalin
+Ok, this style is mostly flavor, some people want #ifdefs (my
+preference), some not. In any case it must build with or without the
+config option set. But first some words why I like #ifdefs:
+
+ * Code is easier to understand as you don't need to look at any other
+   location whether it is enabled or not.
+
+ * You can't break the build if the options are not set. Thus, you
+   also don't need to check if the function is implemented for the
+   unset case (valid for the coder and also the reviewer). This makes
+   things a lot easier.
+
+ * Total number of lines of code that needs to be implement is
+   smaller.
+
+However, if we don't ifdef the code, we need empty functions stubs in
+the header file for them.
+
+Also, the conditional assignment does not reduce the complexity of the
+paths. It just concentrates everything in a single line.
+
+How about the following (similar to x86)?
+
+----
+	if (!numa_off) {
+#ifdef CONFIG_ACPI_NUMA
+		if (!numa_init(acpi_numa_init))
+			return 0;
+#endif
+#ifdef CONFIG_OF_NUMA
+		if (!numa_init(of_numa_init))
+			return 0;
+#endif
+	}
+
+	return numa_init(dummy_numa_init);
+----
+
+Pretty straight and nice.
+
+Note: The !acpi_disabled check needs to be moved to the beginning of
+acpi_numa_init(). Variable ret can be removed.
+
+-Robert
