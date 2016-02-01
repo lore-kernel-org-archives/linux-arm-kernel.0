@@ -1,192 +1,296 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 1 Feb 2016 12:29:11 +0000
-Subject: [PATCHv2 2/3] arm64: Add support for ARCH_SUPPORTS_DEBUG_PAGEALLOC
-In-Reply-To: <1454111218-3461-3-git-send-email-labbott@fedoraproject.org>
-References: <1454111218-3461-1-git-send-email-labbott@fedoraproject.org>
- <1454111218-3461-3-git-send-email-labbott@fedoraproject.org>
-Message-ID: <20160201122911.GF674@leverpostej>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Mon, 1 Feb 2016 20:44:05 +0800
+Subject: [PATCH 6/6] coresight-stm: adding driver for CoreSight STM
+ component
+In-Reply-To: <201602011753.FpQPQQPf%fengguang.wu@intel.com>
+References: <1454313529-8860-7-git-send-email-zhang.chunyan@linaro.org>
+ <201602011753.FpQPQQPf%fengguang.wu@intel.com>
+Message-ID: <CAG2=9p_vBrgyzZohZ-LK2uoMRYEJFnyBQvUQJEgfTKCk+GvRwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Mathieu,
 
-On Fri, Jan 29, 2016 at 03:46:57PM -0800, Laura Abbott wrote:
-> 
-> ARCH_SUPPORTS_DEBUG_PAGEALLOC provides a hook to map and unmap
-> pages for debugging purposes. This requires memory be mapped
-> with PAGE_SIZE mappings since breaking down larger mappings
-> at runtime will lead to TLB conflicts. Check if debug_pagealloc
-> is enabled at runtime and if so, map everyting with PAGE_SIZE
-> pages. Implement the functions to actually map/unmap the
-> pages at runtime.
-> 
-> 
-> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+So sorry that I forgot this patch depends on [1] which hasn't been upstreamed.
+How about adding the definition of coresight_simple_func() like [1]
+does in the STM driver for the time being? It can be simply removed
+once [1] is upstreamed. If you agree with this idea, I'll add the
+definition of coresight_simple_func() in the next version of patches.
 
-I tried to apply atop of the arm64 for-next/pgtable branch, but git
-wasn't very happy about that -- which branch/patches is this based on?
+Thanks,
+Chunyan
 
-I'm not sure if I'm missing something, have something I shouldn't, or if
-my MTA is corrupting patches again...
+[1] https://git.linaro.org/people/mathieu.poirier/coresight.git/blobdiff/59aadd3319527addcf8dbc6e6064b15f74b244fe..76dda3d0d313a4676d43adef52ad8faec0c61b61:/drivers/hwtracing/coresight/coresight-priv.h
 
+On Mon, Feb 1, 2016 at 6:01 PM, kbuild test robot <lkp@intel.com> wrote:
+> Hi Pratik,
+>
+> [auto build test ERROR on robh/for-next]
+> [also build test ERROR on v4.5-rc2 next-20160201]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+>
+> url:    https://github.com/0day-ci/linux/commits/Chunyan-Zhang/Introduce-CoreSight-STM-support/20160201-160437
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
+> config: arm-allmodconfig (attached as .config)
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm
+>
+> All errors (new ones prefixed by >>):
+>
+>>> drivers/hwtracing/coresight/coresight-stm.c:671:27: error: unknown type name 'tcsr'
+>     coresight_stm_simple_func(tcsr, STMTCSR);
+>                               ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:57:20: error: expected declaration specifiers or '...' before numeric constant
+>     #define STMTCSR    0xe80
+>                        ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                      ^
+>    drivers/hwtracing/coresight/coresight-stm.c:671:33: note: in expansion of macro 'STMTCSR'
+>     coresight_stm_simple_func(tcsr, STMTCSR);
+>                                     ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:672:27: error: unknown type name 'tsfreqr'
+>     coresight_stm_simple_func(tsfreqr, STMTSFREQR);
+>                               ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                ^
+>    drivers/hwtracing/coresight/coresight-stm.c:59:22: error: expected declaration specifiers or '...' before numeric constant
+>     #define STMTSFREQR   0xe8c
+>                          ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                      ^
+>    drivers/hwtracing/coresight/coresight-stm.c:672:36: note: in expansion of macro 'STMTSFREQR'
+>     coresight_stm_simple_func(tsfreqr, STMTSFREQR);
+>                                        ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:673:27: error: unknown type name 'syncr'
+>     coresight_stm_simple_func(syncr, STMSYNCR);
+>                               ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                ^
+>    drivers/hwtracing/coresight/coresight-stm.c:60:20: error: expected declaration specifiers or '...' before numeric constant
+>     #define STMSYNCR   0xe90
+>                        ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                      ^
+>    drivers/hwtracing/coresight/coresight-stm.c:673:34: note: in expansion of macro 'STMSYNCR'
+>     coresight_stm_simple_func(syncr, STMSYNCR);
+>                                      ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:674:27: error: unknown type name 'sper'
+>     coresight_stm_simple_func(sper, STMSPER);
+>                               ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                ^
+>    drivers/hwtracing/coresight/coresight-stm.c:49:20: error: expected declaration specifiers or '...' before numeric constant
+>     #define STMSPER    0xe00
+>                        ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                      ^
+>    drivers/hwtracing/coresight/coresight-stm.c:674:33: note: in expansion of macro 'STMSPER'
+>     coresight_stm_simple_func(sper, STMSPER);
+>                                     ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:675:27: error: unknown type name 'spter'
+>     coresight_stm_simple_func(spter, STMSPTER);
+>                               ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                ^
+>    drivers/hwtracing/coresight/coresight-stm.c:50:20: error: expected declaration specifiers or '...' before numeric constant
+>     #define STMSPTER   0xe20
+>                        ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                      ^
+>    drivers/hwtracing/coresight/coresight-stm.c:675:34: note: in expansion of macro 'STMSPTER'
+>     coresight_stm_simple_func(spter, STMSPTER);
+>                                      ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:676:27: error: unknown type name 'privmaskr'
+>     coresight_stm_simple_func(privmaskr, STMPRIVMASKR);
+>                               ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                ^
+>    drivers/hwtracing/coresight/coresight-stm.c:51:24: error: expected declaration specifiers or '...' before numeric constant
+>     #define STMPRIVMASKR   0xe40
+>                            ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                      ^
+>    drivers/hwtracing/coresight/coresight-stm.c:676:38: note: in expansion of macro 'STMPRIVMASKR'
+>     coresight_stm_simple_func(privmaskr, STMPRIVMASKR);
+>                                          ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:677:27: error: unknown type name 'spscr'
+>     coresight_stm_simple_func(spscr, STMSPSCR);
+>                               ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                ^
+>    drivers/hwtracing/coresight/coresight-stm.c:52:20: error: expected declaration specifiers or '...' before numeric constant
+>     #define STMSPSCR   0xe60
+>                        ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                      ^
+>    drivers/hwtracing/coresight/coresight-stm.c:677:34: note: in expansion of macro 'STMSPSCR'
+>     coresight_stm_simple_func(spscr, STMSPSCR);
+>                                      ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:678:27: error: unknown type name 'spmscr'
+>     coresight_stm_simple_func(spmscr, STMSPMSCR);
+>                               ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                ^
+>    drivers/hwtracing/coresight/coresight-stm.c:53:21: error: expected declaration specifiers or '...' before numeric constant
+>     #define STMSPMSCR   0xe64
+>                         ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                      ^
+>    drivers/hwtracing/coresight/coresight-stm.c:678:35: note: in expansion of macro 'STMSPMSCR'
+>     coresight_stm_simple_func(spmscr, STMSPMSCR);
+>                                       ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:679:27: error: unknown type name 'spfeat1r'
+>     coresight_stm_simple_func(spfeat1r, STMSPFEAT1R);
+>                               ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                ^
+>    drivers/hwtracing/coresight/coresight-stm.c:62:23: error: expected declaration specifiers or '...' before numeric constant
+>     #define STMSPFEAT1R   0xea0
+>                           ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                      ^
+>    drivers/hwtracing/coresight/coresight-stm.c:679:37: note: in expansion of macro 'STMSPFEAT1R'
+>     coresight_stm_simple_func(spfeat1r, STMSPFEAT1R);
+>                                         ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:680:27: error: unknown type name 'spfeat2r'
+>     coresight_stm_simple_func(spfeat2r, STMSPFEAT2R);
+>                               ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                ^
+>    drivers/hwtracing/coresight/coresight-stm.c:63:23: error: expected declaration specifiers or '...' before numeric constant
+>     #define STMSPFEAT2R   0xea4
+>                           ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                      ^
+>    drivers/hwtracing/coresight/coresight-stm.c:680:37: note: in expansion of macro 'STMSPFEAT2R'
+>     coresight_stm_simple_func(spfeat2r, STMSPFEAT2R);
+>                                         ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:681:27: error: unknown type name 'spfeat3r'
+>     coresight_stm_simple_func(spfeat3r, STMSPFEAT3R);
+>                               ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                ^
+>    drivers/hwtracing/coresight/coresight-stm.c:64:23: error: expected declaration specifiers or '...' before numeric constant
+>     #define STMSPFEAT3R   0xea8
+>                           ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                      ^
+>    drivers/hwtracing/coresight/coresight-stm.c:681:37: note: in expansion of macro 'STMSPFEAT3R'
+>     coresight_stm_simple_func(spfeat3r, STMSPFEAT3R);
+>                                         ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:682:27: error: unknown type name 'devid'
+>     coresight_stm_simple_func(devid, CORESIGHT_DEVID);
+>                               ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:44: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                ^
+>    drivers/hwtracing/coresight/coresight-priv.h:31:26: error: expected declaration specifiers or '...' before numeric constant
+>     #define CORESIGHT_DEVID  0xfc8
+>                              ^
+>    drivers/hwtracing/coresight/coresight-stm.c:669:50: note: in definition of macro 'coresight_stm_simple_func'
+>      coresight_simple_func(struct stm_drvdata, name, offset)
+>                                                      ^
+>    drivers/hwtracing/coresight/coresight-stm.c:682:34: note: in expansion of macro 'CORESIGHT_DEVID'
+>     coresight_stm_simple_func(devid, CORESIGHT_DEVID);
+>                                      ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:694:3: error: 'dev_attr_tcsr' undeclared here (not in a function)
+>      &dev_attr_tcsr.attr,
+>       ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:695:3: error: 'dev_attr_tsfreqr' undeclared here (not in a function)
+>      &dev_attr_tsfreqr.attr,
+>       ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:696:3: error: 'dev_attr_syncr' undeclared here (not in a function)
+>      &dev_attr_syncr.attr,
+>       ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:697:3: error: 'dev_attr_sper' undeclared here (not in a function)
+>      &dev_attr_sper.attr,
+>       ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:698:3: error: 'dev_attr_spter' undeclared here (not in a function)
+>      &dev_attr_spter.attr,
+>       ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:699:3: error: 'dev_attr_privmaskr' undeclared here (not in a function)
+>      &dev_attr_privmaskr.attr,
+>       ^
+>>> drivers/hwtracing/coresight/coresight-stm.c:700:3: error: 'dev_attr_spscr' undeclared here (not in a function)
+>      &dev_attr_spscr.attr,
+>       ^
+>
+> vim +/tcsr +671 drivers/hwtracing/coresight/coresight-stm.c
+>
+>    663          drvdata->traceid = val & 0x7f;
+>    664          return size;
+>    665  }
+>    666  static DEVICE_ATTR_RW(traceid);
+>    667
+>    668  #define coresight_stm_simple_func(name, offset) \
+>  > 669          coresight_simple_func(struct stm_drvdata, name, offset)
+>    670
+>  > 671  coresight_stm_simple_func(tcsr, STMTCSR);
+>  > 672  coresight_stm_simple_func(tsfreqr, STMTSFREQR);
+>  > 673  coresight_stm_simple_func(syncr, STMSYNCR);
+>  > 674  coresight_stm_simple_func(sper, STMSPER);
+>  > 675  coresight_stm_simple_func(spter, STMSPTER);
+>  > 676  coresight_stm_simple_func(privmaskr, STMPRIVMASKR);
+>  > 677  coresight_stm_simple_func(spscr, STMSPSCR);
+>  > 678  coresight_stm_simple_func(spmscr, STMSPMSCR);
+>  > 679  coresight_stm_simple_func(spfeat1r, STMSPFEAT1R);
+>  > 680  coresight_stm_simple_func(spfeat2r, STMSPFEAT2R);
+>  > 681  coresight_stm_simple_func(spfeat3r, STMSPFEAT3R);
+>  > 682  coresight_stm_simple_func(devid, CORESIGHT_DEVID);
+>    683
+>    684  static struct attribute *coresight_stm_attrs[] = {
+>    685          &dev_attr_hwevent_enable.attr,
+>    686          &dev_attr_hwevent_select.attr,
+>    687          &dev_attr_port_enable.attr,
+>    688          &dev_attr_port_select.attr,
+>    689          &dev_attr_traceid.attr,
+>    690          NULL,
+>    691  };
+>    692
+>    693  static struct attribute *coresight_stm_mgmt_attrs[] = {
+>  > 694          &dev_attr_tcsr.attr,
+>  > 695          &dev_attr_tsfreqr.attr,
+>  > 696          &dev_attr_syncr.attr,
+>  > 697          &dev_attr_sper.attr,
+>  > 698          &dev_attr_spter.attr,
+>  > 699          &dev_attr_privmaskr.attr,
+>  > 700          &dev_attr_spscr.attr,
+>  > 701          &dev_attr_spmscr.attr,
+>  > 702          &dev_attr_spfeat1r.attr,
+>  > 703          &dev_attr_spfeat2r.attr,
+>  > 704          &dev_attr_spfeat3r.attr,
+>  > 705          &dev_attr_devid.attr,
+>    706          NULL,
+>    707  };
+>    708
+>
 > ---
->  arch/arm64/Kconfig       |  3 +++
->  arch/arm64/mm/mmu.c      | 10 +++++++---
->  arch/arm64/mm/pageattr.c | 40 +++++++++++++++++++++++++++++++++-------
->  3 files changed, 43 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 8cc6228..0f33218 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -537,6 +537,9 @@ config HOTPLUG_CPU
->  source kernel/Kconfig.preempt
->  source kernel/Kconfig.hz
->  
-> +config ARCH_SUPPORTS_DEBUG_PAGEALLOC
-> +	def_bool y
-> +
->  config ARCH_HAS_HOLES_MEMORYMODEL
->  	def_bool y if SPARSEMEM
->  
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 103ebc0..5abbd30 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -181,7 +181,8 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
->  	do {
->  		next = pmd_addr_end(addr, end);
->  		/* try section mapping first */
-> -		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
-> +		if (((addr | next | phys) & ~SECTION_MASK) == 0 &&
-> +		      (!debug_pagealloc_enabled() || !pgtable_alloc)) {
->  			pmd_t old_pmd =*pmd;
->  			set_pmd(pmd, __pmd(phys |
->  					   pgprot_val(mk_sect_prot(prot))));
-> @@ -208,8 +209,11 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
->  }
->  
->  static inline bool use_1G_block(unsigned long addr, unsigned long next,
-> -			unsigned long phys)
-> +			unsigned long phys, phys_addr_t (*pgtable_alloc)(void))
->  {
-> +	if (pgtable_alloc && debug_pagealloc_enabled())
-> +		return false;
-> +
->  	if (PAGE_SHIFT != 12)
->  		return false;
->  
-> @@ -241,7 +245,7 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
->  		/*
->  		 * For 4K granule only, attempt to put down a 1GB block
->  		 */
-> -		if (use_1G_block(addr, next, phys)) {
-> +		if (use_1G_block(addr, next, phys, pgtable_alloc)) {
->  			pud_t old_pud = *pud;
->  			set_pud(pud, __pud(phys |
->  					   pgprot_val(mk_sect_prot(prot))));
-
-The checks for pgtable_alloc is to allow create_mapping_noalloc to use
-sections regardless, right?
-
-I got a little confused by that initially, but that seems to make sense.
-
-> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-> index 1360a02..69a8a7d 100644
-> --- a/arch/arm64/mm/pageattr.c
-> +++ b/arch/arm64/mm/pageattr.c
-> @@ -38,7 +38,8 @@ static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
->  }
->  
->  static int change_memory_common(unsigned long addr, int numpages,
-> -				pgprot_t set_mask, pgprot_t clear_mask)
-> +				pgprot_t set_mask, pgprot_t clear_mask,
-> +				bool ignore_vma_check)
->  {
->  	unsigned long start = addr;
->  	unsigned long size = PAGE_SIZE*numpages;
-> @@ -65,11 +66,14 @@ static int change_memory_common(unsigned long addr, int numpages,
->  	 *
->  	 * So check whether the [addr, addr + size) interval is entirely
->  	 * covered by precisely one VM area that has the VM_ALLOC flag set.
-> +	 *
-> +	 * The one exception to this is is we're forcing everything to be
-> +	 * page mapped with DEBUG_PAGEALLOC
->  	 */
->  	area = find_vm_area((void *)addr);
-> -	if (!area ||
-> +	if (!ignore_vma_check && (!area ||
->  	    end > (unsigned long)area->addr + area->size ||
-> -	    !(area->flags & VM_ALLOC))
-> +	    !(area->flags & VM_ALLOC)))
->  		return -EINVAL;
-
-Perhaps we could pull out everything but the VMA checks into a static
-__change_memory_common. Then we can call that directly in
-__kernel_map_pages, and don't need to pass a confusing boolean
-parameter.
-
-Otherwise, this looks good to me.
-
-Mark.
-
->  
->  	data.set_mask = set_mask;
-> @@ -86,21 +90,24 @@ int set_memory_ro(unsigned long addr, int numpages)
->  {
->  	return change_memory_common(addr, numpages,
->  					__pgprot(PTE_RDONLY),
-> -					__pgprot(PTE_WRITE));
-> +					__pgprot(PTE_WRITE),
-> +					false);
->  }
->  
->  int set_memory_rw(unsigned long addr, int numpages)
->  {
->  	return change_memory_common(addr, numpages,
->  					__pgprot(PTE_WRITE),
-> -					__pgprot(PTE_RDONLY));
-> +					__pgprot(PTE_RDONLY),
-> +					false);
->  }
->  
->  int set_memory_nx(unsigned long addr, int numpages)
->  {
->  	return change_memory_common(addr, numpages,
->  					__pgprot(PTE_PXN),
-> -					__pgprot(0));
-> +					__pgprot(0),
-> +					false);
->  }
->  EXPORT_SYMBOL_GPL(set_memory_nx);
->  
-> @@ -108,6 +115,25 @@ int set_memory_x(unsigned long addr, int numpages)
->  {
->  	return change_memory_common(addr, numpages,
->  					__pgprot(0),
-> -					__pgprot(PTE_PXN));
-> +					__pgprot(PTE_PXN),
-> +					false);
->  }
->  EXPORT_SYMBOL_GPL(set_memory_x);
-> +
-> +#ifdef CONFIG_DEBUG_PAGEALLOC
-> +void __kernel_map_pages(struct page *page, int numpages, int enable)
-> +{
-> +	unsigned long addr = (unsigned long) page_address(page);
-> +
-> +	if (enable)
-> +		change_memory_common(addr, numpages,
-> +					__pgprot(PTE_VALID),
-> +					__pgprot(0),
-> +					true);
-> +	else
-> +		change_memory_common(addr, numpages,
-> +					__pgprot(0),
-> +					__pgprot(PTE_VALID),
-> +					true);
-> +}
-> +#endif
-> -- 
-> 2.5.0
-> 
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
