@@ -1,245 +1,39 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 1 Feb 2016 12:21:09 +0100
-Subject: [PATCH V4 11/11] soc: mediatek: PMIC wrap: add MT2701/7623 support
-In-Reply-To: <1453894149-44127-11-git-send-email-blogic@openwrt.org>
-References: <1453894149-44127-1-git-send-email-blogic@openwrt.org>
- <1453894149-44127-11-git-send-email-blogic@openwrt.org>
-Message-ID: <56AF3FA5.9060803@gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 1 Feb 2016 19:21:53 +0800
+Subject: [PATCH 1/2] of: add vendor prefix for UniWest
+In-Reply-To: <b11bf2208fe30b96c4d82e634e8abe04343754de.1452717014.git.stillcompiling@gmail.com>
+References: <b11bf2208fe30b96c4d82e634e8abe04343754de.1452717014.git.stillcompiling@gmail.com>
+Message-ID: <20160201112153.GD10671@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 27/01/16 12:29, John Crispin wrote:
-> Add the registers, callbacks and data structures required to make the
-> wrapper work on MT2701 and MT7623.
->
-> Signed-off-by: John Crispin <blogic@openwrt.org>
+On Wed, Jan 13, 2016 at 12:45:11PM -0800, Joshua Clayton wrote:
+> United Western Technologies Corp, known primarily as UniWest,
+> is a manufacturer of eddy current and ultrasonic testing equipment.
+> 
+> Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
 > ---
->   drivers/soc/mediatek/mtk-pmic-wrap.c |  160 ++++++++++++++++++++++++++++++++++
->   1 file changed, 160 insertions(+)
->
-> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> index 793b194..dbb09c6 100644
-> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> @@ -52,6 +52,7 @@
->   #define PWRAP_DEW_WRITE_TEST_VAL	0xa55a
->
->   /* macro for manual command */
-> +#define PWRAP_MAN_CMD_SPI_WRITE_NEW	(1 << 14)
->   #define PWRAP_MAN_CMD_SPI_WRITE		(1 << 13)
->   #define PWRAP_MAN_CMD_OP_CSH		(0x0 << 8)
->   #define PWRAP_MAN_CMD_OP_CSL		(0x1 << 8)
-> @@ -202,6 +203,17 @@ enum pwrap_regs {
->   	PWRAP_DCM_EN,
->   	PWRAP_DCM_DBC_PRD,
->
-> +	/* MT2701 only regs */
-> +	PWRAP_OP_TYPE,
-> +	PWRAP_MSB_FIRST,
-> +	PWRAP_GPS_STA,
-> +	PWRAP_ADC_CMD_ADDR,
-> +	PWRAP_PWRAP_ADC_CMD,
-> +	PWRAP_ADC_RDY_ADDR,
-> +	PWRAP_ADC_RDATA_ADDR1,
-> +	PWRAP_ADC_RDATA_ADDR2,
-> +	PWRAP_ADC_WRAP_SEL,
-> +
->   	/* MT8135 only regs */
->   	PWRAP_CSHEXT,
->   	PWRAP_EVENT_IN_EN,
-> @@ -238,6 +250,96 @@ enum pwrap_regs {
->   	PWRAP_CIPHER_EN,
->   };
->
-> +static int mt2701_regs[] = {
-> +	[PWRAP_MUX_SEL] =		0x0,
-> +	[PWRAP_WRAP_EN] =		0x4,
-> +	[PWRAP_DIO_EN] =		0x8,
-> +	[PWRAP_SIDLY] =			0xc,
-> +	[PWRAP_OP_TYPE] =		0x10,
-> +	[PWRAP_MSB_FIRST] =		0x14,
-> +	[PWRAP_RDDMY] =			0x18,
-> +	[PWRAP_SI_CK_CON] =		0x1c,
-> +	[PWRAP_CSHEXT_WRITE] =		0x20,
-> +	[PWRAP_CSHEXT_READ] =		0x24,
-> +	[PWRAP_CSLEXT_START] =		0x28,
-> +	[PWRAP_CSLEXT_END] =		0x2c,
-> +	[PWRAP_STAUPD_PRD] =		0x30,
-> +	[PWRAP_STAUPD_GRPEN] =		0x34,
-> +	[PWRAP_STAUPD_MAN_TRIG] =	0x38,
-> +	[PWRAP_STAUPD_STA] =		0x3c,
-> +	[PWRAP_GPS_STA] =		0x40,
-> +	[PWRAP_WRAP_STA] =		0x44,
-> +	[PWRAP_HARB_INIT] =		0x48,
-> +	[PWRAP_HARB_HPRIO] =		0x4c,
-> +	[PWRAP_HIPRIO_ARB_EN] =		0x50,
-> +	[PWRAP_HARB_STA0] =		0x54,
-> +	[PWRAP_HARB_STA1] =		0x58,
-> +	[PWRAP_MAN_EN] =		0x5c,
-> +	[PWRAP_MAN_CMD] =		0x60,
-> +	[PWRAP_MAN_RDATA] =		0x64,
-> +	[PWRAP_MAN_VLDCLR] =		0x68,
-> +	[PWRAP_WACS0_EN] =		0x6c,
-> +	[PWRAP_INIT_DONE0] =		0x70,
-> +	[PWRAP_WACS0_CMD] =		0x74,
-> +	[PWRAP_WACS0_RDATA] =		0x78,
-> +	[PWRAP_WACS0_VLDCLR] =		0x7c,
-> +	[PWRAP_WACS1_EN] =		0x80,
-> +	[PWRAP_INIT_DONE1] =		0x84,
-> +	[PWRAP_WACS1_CMD] =		0x88,
-> +	[PWRAP_WACS1_RDATA] =		0x8c,
-> +	[PWRAP_WACS1_VLDCLR] =		0x90,
-> +	[PWRAP_WACS2_EN] =		0x94,
-> +	[PWRAP_INIT_DONE2] =		0x98,
-> +	[PWRAP_WACS2_CMD] =		0x9c,
-> +	[PWRAP_WACS2_RDATA] =		0xa0,
-> +	[PWRAP_WACS2_VLDCLR] =		0xa4,
-> +	[PWRAP_INT_EN] =		0xa8,
-> +	[PWRAP_INT_FLG_RAW] =		0xac,
-> +	[PWRAP_INT_FLG] =		0xb0,
-> +	[PWRAP_INT_CLR] =		0xb4,
-> +	[PWRAP_SIG_ADR] =		0xb8,
-> +	[PWRAP_SIG_MODE] =		0xbc,
-> +	[PWRAP_SIG_VALUE] =		0xc0,
-> +	[PWRAP_SIG_ERRVAL] =		0xc4,
-> +	[PWRAP_CRC_EN] =		0xc8,
-> +	[PWRAP_TIMER_EN] =		0xcc,
-> +	[PWRAP_TIMER_STA] =		0xd0,
-> +	[PWRAP_WDT_UNIT] =		0xd4,
-> +	[PWRAP_WDT_SRC_EN] =		0xd8,
-> +	[PWRAP_WDT_FLG] =		0xdc,
-> +	[PWRAP_DEBUG_INT_SEL] =		0xe0,
-> +	[PWRAP_DVFS_ADR0] =		0xe4,
-> +	[PWRAP_DVFS_WDATA0] =		0xe8,
-> +	[PWRAP_DVFS_ADR1] =		0xec,
-> +	[PWRAP_DVFS_WDATA1] =		0xf0,
-> +	[PWRAP_DVFS_ADR2] =		0xf4,
-> +	[PWRAP_DVFS_WDATA2] =		0xf8,
-> +	[PWRAP_DVFS_ADR3] =		0xfc,
-> +	[PWRAP_DVFS_WDATA3] =		0x100,
-> +	[PWRAP_DVFS_ADR4] =		0x104,
-> +	[PWRAP_DVFS_WDATA4] =		0x108,
-> +	[PWRAP_DVFS_ADR5] =		0x10c,
-> +	[PWRAP_DVFS_WDATA5] =		0x110,
-> +	[PWRAP_DVFS_ADR6] =		0x114,
-> +	[PWRAP_DVFS_WDATA6] =		0x118,
-> +	[PWRAP_DVFS_ADR7] =		0x11c,
-> +	[PWRAP_DVFS_WDATA7] =		0x120,
-> +	[PWRAP_CIPHER_KEY_SEL] =	0x124,
-> +	[PWRAP_CIPHER_IV_SEL] =		0x128,
-> +	[PWRAP_CIPHER_EN] =		0x12c,
-> +	[PWRAP_CIPHER_RDY] =		0x130,
-> +	[PWRAP_CIPHER_MODE] =		0x134,
-> +	[PWRAP_CIPHER_SWRST] =		0x138,
-> +	[PWRAP_DCM_EN] =		0x13c,
-> +	[PWRAP_DCM_DBC_PRD] =		0x140,
-> +	[PWRAP_ADC_CMD_ADDR] =		0x144,
-> +	[PWRAP_PWRAP_ADC_CMD] =		0x148,
-> +	[PWRAP_ADC_RDY_ADDR] =		0x14c,
-> +	[PWRAP_ADC_RDATA_ADDR1] =	0x150,
-> +	[PWRAP_ADC_RDATA_ADDR2] =	0x154,
-> +	[PWRAP_ADC_WRAP_SEL] =		0x184,
-> +};
-> +
->   static int mt8173_regs[] = {
->   	[PWRAP_MUX_SEL] =		0x0,
->   	[PWRAP_WRAP_EN] =		0x4,
-> @@ -399,6 +501,7 @@ enum pmic_type {
->   };
->
->   enum pwrap_type {
-> +	PWRAP_MT2701,
->   	PWRAP_MT8135,
->   	PWRAP_MT8173,
->   };
-> @@ -648,6 +751,30 @@ static int pwrap_mt8173_init_reg_clock(struct pmic_wrapper *wrp)
->   	return 0;
->   }
->
-> +static int pwrap_mt2701_init_reg_clock(struct pmic_wrapper *wrp)
-> +{
-> +	switch (wrp->slave->type) {
-> +	case PMIC_MT6397:
-> +		pwrap_writel(wrp, 0xc, PWRAP_RDDMY);
-> +		pwrap_writel(wrp, 0x4, PWRAP_CSHEXT_WRITE);
-> +		pwrap_writel(wrp, 0x0, PWRAP_CSHEXT_READ);
-> +		pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_START);
-> +		pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_END);
-> +		break;
-> +
-> +	case PMIC_MT6323:
-> +		pwrap_writel(wrp, 0x8, PWRAP_RDDMY);
-> +		pwrap_dew_write(wrp, PWRAP_DEW_RDDMY_NO, 0x8);
-> +		pwrap_writel(wrp, 0x5, PWRAP_CSHEXT_WRITE);
-> +		pwrap_writel(wrp, 0x0, PWRAP_CSHEXT_READ);
-> +		pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_START);
-> +		pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_END);
-> +		break;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->   static bool pwrap_is_cipher_ready(struct pmic_wrapper *wrp)
->   {
->   	return pwrap_readl(wrp, PWRAP_CIPHER_RDY) & 1;
-> @@ -680,6 +807,7 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
->   		pwrap_writel(wrp, 1, PWRAP_CIPHER_LOAD);
->   		pwrap_writel(wrp, 1, PWRAP_CIPHER_START);
->   		break;
-> +	case PWRAP_MT2701:
->   	case PWRAP_MT8173:
->   		pwrap_writel(wrp, 1, PWRAP_CIPHER_EN);
->   		break;
-> @@ -772,6 +900,24 @@ static int pwrap_mt8173_init_special(struct pmic_wrapper *wrp)
->   	return 0;
->   }
->
-> +static int pwrap_mt2701_init_special(struct pmic_wrapper *wrp)
-> +{
-> +	/* GPS_INTF initialization */
-> +	switch (wrp->slave->type) {
-> +	case PMIC_MT6323:
-> +		pwrap_writel(wrp, 0x076c, PWRAP_ADC_CMD_ADDR);
-> +		pwrap_writel(wrp, 0x8000, PWRAP_PWRAP_ADC_CMD);
-> +		pwrap_writel(wrp, 0x072c, PWRAP_ADC_RDY_ADDR);
-> +		pwrap_writel(wrp, 0x072e, PWRAP_ADC_RDATA_ADDR1);
-> +		pwrap_writel(wrp, 0x0730, PWRAP_ADC_RDATA_ADDR2);
-> +		break;
-> +	default:
-> +		break;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->   static int pwrap_init(struct pmic_wrapper *wrp)
->   {
->   	int ret;
-> @@ -915,6 +1061,17 @@ static const struct of_device_id of_slave_match_tbl[] = {
->   };
->   MODULE_DEVICE_TABLE(of, of_slave_match_tbl);
->
-> +static const struct pmic_wrapper_type pwrap_mt2701 = {
-> +	.regs = mt2701_regs,
-> +	.type = PWRAP_MT2701,
-> +	.arb_en_all = 0x3f,
-> +	.int_en_all = BIT(31) | BIT(2),
-> +	.spi_w = PWRAP_MAN_CMD_SPI_WRITE_NEW,
-> +	.wdt_src = PWRAP_WDT_SRC_MASK_ALL,
-> +	.init_reg_clock = pwrap_mt2701_init_reg_clock,
-> +	.init_special = pwrap_mt2701_init_special,
-> +};
-> +
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 55df1d4..7dabdee 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -230,6 +230,7 @@ toradex	Toradex AG
+>  toshiba	Toshiba Corporation
+>  toumaz	Toumaz
+>  tplink	TP-LINK Technologies Co., Ltd.
+> +uniwest	United Western Technologies Corp (UniWest)
 
-.has_bridge = 0,
-is missing.
+As far as I know, it should be added in alphabetical order.
 
-Would it make sense to document the pmic_wrapper_type struct so that in, 
-lets say, half a year it will be easier to remember what every member is 
-used for?
+Shawn
 
-Regards,
-Matthias
+>  tronfy	Tronfy
+>  truly	Truly Semiconductors Limited
+>  upisemi	uPI Semiconductor Corp.
+> -- 
+> 2.5.0
+> 
+> 
