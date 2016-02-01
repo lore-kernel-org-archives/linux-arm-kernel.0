@@ -1,157 +1,280 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon,  1 Feb 2016 17:39:25 +0000
-Subject: [PATCH 06/11] clk: sunxi: add generic multi-parent bus clock gates
- driver
+Date: Mon,  1 Feb 2016 17:39:30 +0000
+Subject: [PATCH 11/11] arm64: dts: add Pine64 support
 In-Reply-To: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
 References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1454348370-3816-7-git-send-email-andre.przywara@arm.com>
+Message-ID: <1454348370-3816-12-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner H3 SoC introduced bus clock gates with potentially
-different parents per clock gate. The H3 driver chose to hardcode the
-actual parent clock relation in the code.
-Add a new driver (which has the potential to drive the H3 and also
-the simple clock gates as well) which uses the power of DT to describe
-this relationship in an elegant and flexible way.
-Using one subnode for every parent clock we get away with a single
-DT compatible match, which can be used as a fallback value in the
-actual DTs without the need to add specific compatible strings to the
-code.  This avoids adding a new driver or function for every new SoC.
+The Pine64 is a cost-efficient development board based on the
+Allwinner A64 SoC.
+There are three models: the basic version with Fast Ethernet and
+512 MB of DRAM (Pine64) and two Pine64+ versions, which both
+feature Gigabit Ethernet and additional connectors for touchscreens
+and a camera. Or as my son put it: "Those are smaller and these are
+missing." ;-)
+The two Pine64+ models just differ in the amount of DRAM
+(1GB vs. 2GB). Since U-Boot will figure out the right size for us and
+patches the DT accordingly we just need to provide one DT for the
+Pine64+.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
-Changelog RFC .. v1:
-- fix IRQ muxes to cover the three banks of the SoC
-- amend naming of PCM pins
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ arch/arm64/boot/dts/Makefile                       |  1 +
+ arch/arm64/boot/dts/allwinner/Makefile             |  5 ++
+ arch/arm64/boot/dts/allwinner/pine64.dts           | 58 +++++++++++++++++
+ arch/arm64/boot/dts/allwinner/pine64_common.dtsi   | 76 ++++++++++++++++++++++
+ arch/arm64/boot/dts/allwinner/pine64_plus.dts      | 59 +++++++++++++++++
+ 6 files changed, 200 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/Makefile
+ create mode 100644 arch/arm64/boot/dts/allwinner/pine64.dts
+ create mode 100644 arch/arm64/boot/dts/allwinner/pine64_common.dtsi
+ create mode 100644 arch/arm64/boot/dts/allwinner/pine64_plus.dts
 
- drivers/clk/sunxi/Makefile          |   1 +
- drivers/clk/sunxi/clk-multi-gates.c | 105 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 106 insertions(+)
- create mode 100644 drivers/clk/sunxi/clk-multi-gates.c
-
-diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index 3fd7901..3a9dc31 100644
---- a/drivers/clk/sunxi/Makefile
-+++ b/drivers/clk/sunxi/Makefile
-@@ -11,6 +11,7 @@ obj-y += clk-a10-ve.o
- obj-y += clk-a20-gmac.o
- obj-y += clk-mod0.o
- obj-y += clk-simple-gates.o
-+obj-y += clk-multi-gates.o
- obj-y += clk-sun8i-bus-gates.o
- obj-y += clk-sun8i-mbus.o
- obj-y += clk-sun9i-core.o
-diff --git a/drivers/clk/sunxi/clk-multi-gates.c b/drivers/clk/sunxi/clk-multi-gates.c
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 72e2c5a..0c22fa9 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -175,6 +175,7 @@ parade	Parade Technologies Inc.
+ pericom	Pericom Technology Inc.
+ phytec	PHYTEC Messtechnik GmbH
+ picochip	Picochip Ltd
++pine64	Pine64
+ plathome	Plat'Home Co., Ltd.
+ plda	PLDA
+ pixcir  PIXCIR MICROELECTRONICS Co., Ltd
+diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+index f832b8a..3b7428a 100644
+--- a/arch/arm64/boot/dts/Makefile
++++ b/arch/arm64/boot/dts/Makefile
+@@ -1,3 +1,4 @@
++dts-dirs += allwinner
+ dts-dirs += altera
+ dts-dirs += amd
+ dts-dirs += apm
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
 new file mode 100644
-index 0000000..76e715a
+index 0000000..65f4e24
 --- /dev/null
-+++ b/drivers/clk/sunxi/clk-multi-gates.c
-@@ -0,0 +1,105 @@
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -0,0 +1,5 @@
++dtb-$(CONFIG_ARCH_SUNXI) += pine64_plus.dtb pine64.dtb
++
++always		:= $(dtb-y)
++subdir-y	:= $(dts-dirs)
++clean-files	:= *.dtb
+diff --git a/arch/arm64/boot/dts/allwinner/pine64.dts b/arch/arm64/boot/dts/allwinner/pine64.dts
+new file mode 100644
+index 0000000..ebea5dd
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/pine64.dts
+@@ -0,0 +1,58 @@
 +/*
-+ * Copyright (C) 2016 ARM Ltd.
++ * Copyright (c) 2016 ARM Ltd.
 + *
-+ * Based on clk-sun8i-bus-gates.c, which is:
-+ *  Copyright (C) 2015 Jens Kuske <jenskuske@gmail.com>
-+ * Based on clk-simple-gates.c, which is:
-+ *  Copyright 2015 Maxime Ripard <maxime.ripard@free-electrons.com>
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
 + *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+#include <linux/clk-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
++/dts-v1/;
 +
-+static DEFINE_SPINLOCK(gates_lock);
++#include "pine64_common.dtsi"
 +
-+static void __init sunxi_parse_parent(struct device_node *node,
-+				      struct clk_onecell_data *clk_data,
-+				      void __iomem *reg)
-+{
-+	const char *parent = of_clk_get_parent_name(node, 0);
-+	const char *clk_name;
-+	struct property *prop;
-+	struct clk *clk;
-+	const __be32 *p;
-+	int index, i = 0;
++/ {
++	model = "Pine64";
++	compatible = "pine64,pine64", "allwinner,a64", "allwinner,sunxi";
 +
-+	of_property_for_each_u32(node, "clock-indices", prop, p, index) {
-+		of_property_read_string_index(node, "clock-output-names",
-+					      i, &clk_name);
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
 +
-+		clk = clk_register_gate(NULL, clk_name, parent, 0,
-+					reg + 4 * (index / 32), index % 32,
-+					0, &gates_lock);
-+		i++;
-+		if (IS_ERR(clk)) {
-+			pr_warn("could not register gate clock \"%s\"\n",
-+				clk_name);
-+			continue;
-+		}
-+		if (clk_data->clks[index])
-+			pr_warn("bus-gate clock %s: index #%d already registered as %s\n",
-+				clk_name, index, "?");
-+		else
-+			clk_data->clks[index] = clk;
-+	}
-+}
++	memory {
++		reg = <0x40000000 0x20000000>;
++	};
++};
+diff --git a/arch/arm64/boot/dts/allwinner/pine64_common.dtsi b/arch/arm64/boot/dts/allwinner/pine64_common.dtsi
+new file mode 100644
+index 0000000..d968d76
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/pine64_common.dtsi
+@@ -0,0 +1,76 @@
++/*
++ * Copyright (c) 2016 ARM Ltd.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+static void __init sunxi_multi_bus_gates_init(struct device_node *node)
-+{
-+	struct clk_onecell_data *clk_data;
-+	struct device_node *child;
-+	struct property *prop;
-+	struct resource res;
-+	void __iomem *reg;
-+	const __be32 *p;
-+	int number = 0;
-+	int index;
++#include "a64.dtsi"
 +
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+	if (IS_ERR(reg))
-+		return;
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>, <&mmc0_default_cd_pin>;
++	vmmc-supply = <&reg_vcc3v3>;
++	cd-gpios = <&pio 5 6 0>;
++	cd-inverted;
++	status = "okay";
++};
 +
-+	clk_data = kmalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
-+	if (!clk_data)
-+		goto err_unmap;
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
 +
-+	for_each_child_of_node(node, child)
-+		of_property_for_each_u32(child, "clock-indices", prop, p, index)
-+			number = max(number, index);
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart2_pins>;
++	status = "okay";
++};
 +
-+	clk_data->clks = kcalloc(number + 1, sizeof(struct clk *), GFP_KERNEL);
-+	if (!clk_data->clks)
-+		goto err_free_data;
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart3_pins_a>;
++	status = "okay";
++};
 +
-+	for_each_child_of_node(node, child)
-+		sunxi_parse_parent(child, clk_data, reg);
++&uart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart4_pins>;
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/allwinner/pine64_plus.dts b/arch/arm64/boot/dts/allwinner/pine64_plus.dts
+new file mode 100644
+index 0000000..344752e
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/pine64_plus.dts
+@@ -0,0 +1,59 @@
++/*
++ * Copyright (c) 2016 ARM Ltd.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+	clk_data->clk_num = number + 1;
-+	if (of_clk_add_provider(node, of_clk_src_onecell_get, clk_data))
-+		pr_err("registering bus-gate clock %s failed\n", node->name);
++/dts-v1/;
 +
-+	return;
++#include "pine64_common.dtsi"
 +
-+err_free_data:
-+	kfree(clk_data);
-+err_unmap:
-+	iounmap(reg);
-+	of_address_to_resource(node, 0, &res);
-+	release_mem_region(res.start, resource_size(&res));
-+}
++/ {
++	model = "Pine64+";
++	compatible = "pine64,pine64_plus", "allwinner,a64", "allwinner,sunxi";
 +
-+CLK_OF_DECLARE(sunxi_multi_bus_gates, "allwinner,sunxi-multi-bus-gates-clk",
-+	       sunxi_multi_bus_gates_init);
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	/* There is a model with 2GB of DRAM, but U-Boot fixes this for us. */
++	memory {
++		reg = <0x40000000 0x40000000>;
++	};
++};
 -- 
 2.6.4
