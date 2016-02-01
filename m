@@ -1,42 +1,129 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 01 Feb 2016 15:19:57 -0800
-Subject: [PATCH V4 2/7] clk: bcm2835: clamp clock divider to highest
- integer only
-In-Reply-To: <1452867667-2447-3-git-send-email-kernel@martin.sperl.org>
-References: <1452867667-2447-1-git-send-email-kernel@martin.sperl.org>
- <1452867667-2447-3-git-send-email-kernel@martin.sperl.org>
-Message-ID: <87k2mo3tnm.fsf@eliezer.anholt.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 1 Feb 2016 15:28:33 -0800
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <CAJZ5v0jN3uK8q46N1Sp6xR2U=MpJZj=PX8uh9Kp+n75J4UZCZQ@mail.gmail.com>
+References: <CAJZ5v0gTRvyWHVmYNb8Q1QZzhVhokXo541+48mFyDRYv7Hi-Uw@mail.gmail.com>
+ <20160126235222.GF19432@atomide.com>
+ <CAPDyKFqD6Y6HcgVds_oWBZ8L7Kdh2VX_WZCGApf-1a_6GHCQ5g@mail.gmail.com>
+ <20160128165810.GA19432@atomide.com>
+ <CAPDyKFoQHpqdCa4fzHycP0OT2KsNTxWm7JZSe8Mauh+rxqGtGg@mail.gmail.com>
+ <20160201181135.GL19432@atomide.com>
+ <20160201220657.GO19432@atomide.com>
+ <CAJZ5v0gOtJE24Hu8R9jx7kBktmd__qFUNF_KnsCDLwgidskUvw@mail.gmail.com>
+ <20160201222926.GQ19432@atomide.com>
+ <CAJZ5v0jN3uK8q46N1Sp6xR2U=MpJZj=PX8uh9Kp+n75J4UZCZQ@mail.gmail.com>
+Message-ID: <20160201232833.GR19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kernel at martin.sperl.org writes:
+* Rafael J. Wysocki <rafael@kernel.org> [160201 15:11]:
+> On Mon, Feb 1, 2016 at 11:29 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Rafael J. Wysocki <rafael@kernel.org> [160201 14:18]:
+> >> On Mon, Feb 1, 2016 at 11:06 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >> > --- a/drivers/base/power/runtime.c
+> >> > +++ b/drivers/base/power/runtime.c
+> >> > @@ -1419,17 +1419,25 @@ void pm_runtime_init(struct device *dev)
+> >> >   */
+> >> >  void pm_runtime_reinit(struct device *dev)
+> >> >  {
+> >> > -       if (!pm_runtime_enabled(dev)) {
+> >> > -               if (dev->power.runtime_status == RPM_ACTIVE)
+> >> > +       if (pm_runtime_enabled(dev))
+> >> > +               return;
+> >> > +
+> >> > +       if (dev->power.runtime_status == RPM_ACTIVE) {
+> >> > +               if (dev->power.use_autosuspend) {
+> >> > +                       __pm_runtime_use_autosuspend(dev, false);
+> >> > +                       pm_runtime_suspend(dev);
+> >>
+> >> This won't work, because runtime PM is disabled at this point.
+> >
+> > Hmm right OK. It does work from idling the hardware point
+> > of view though..
+> 
+> pm_runtime_suspend() with runtime PM disabled is a NOP.  It will do
+> nothing and return -EACCES.
 
-> From: Martin Sperl <kernel@martin.sperl.org>
->
-> The clock divider calculation right now clamps the
-> divider to the highest possible fractional divider.
-> So typically (BIT(div_int_bits) - 1) + 4095 / 4096.
->
-> As the fractional clock divider is alterating between
-> (Fosc / div_int) and (Fosc / (div_int + 1))
-> the divider will overflow for the (div_int + 1) case.
-> As with the "underflow" case we have seen for (div < 2),
-> we can assume that the same applies on the upper limit
-> as well.
->
-> So this patch will instead clamp to the divider to the
-> max of (BIT(div_int_bits) - 1)
+Hmm it  makes a difference here for sure :)
 
-Looks like this restriction might be necessary, though it's not quite
-spelled out in the docs.
+> >> What about doing this instead:
+> >>
+> >>                if (dev->power.use_autosuspend)
+> >>                        __pm_runtime_use_autosuspend(dev, false);
+> >>
+> >>                pm_runtime_set_suspended(dev);
+> >
+> > ..while this does not work. The hardware is never idled
+> > in this case.
+> 
+> I'm not sure what you mean.  pm_runtime_set_suspended() sets the
+> status to RPM_SUSPENDED for devices with runtime PM disabled.  It has
+> nothing to do with "idling" in principle.
 
-This also needs to be conditional on it being a MASH clock, and the
-limit on the divider changes in the same way based on the mash number as
-for the minimum.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160201/318facdd/attachment-0001.sig>
+Well looking at the update_autosuspend(), it seems we're now missing
+rpm_idle() call that now never happens.
+
+Does the patch below make more sense to you where we call rpm_idle?
+That seems to make things behave here also.
+
+> > What else does __pm_runtime_use_autosuspend() set initially
+> > that changes things here?
+> 
+> The usage counter, if the delay is negative.
+
+Yeah I don't see any difference with those.
+
+> I'll look at this in detail, but not right now, sorry.  I'm working on
+> something else ATM and I was hoping that Ulf would be able to figure
+> out what's going on here.
+
+Yeah we need to understand what's going on here. Having the PM runtime
+framework out of sync with the hardare is not good.. If we can't
+figure this out we should probably revert the patch until we understand
+it.
+
+Regards,
+
+Tony
+
+8< ------------
+--- a/drivers/base/power/runtime.c
++++ b/drivers/base/power/runtime.c
+@@ -1419,17 +1419,28 @@ void pm_runtime_init(struct device *dev)
+  */
+ void pm_runtime_reinit(struct device *dev)
+ {
+-	if (!pm_runtime_enabled(dev)) {
+-		if (dev->power.runtime_status == RPM_ACTIVE)
++	int (*callback)(struct device *);
++	int err;
++
++	if (pm_runtime_enabled(dev))
++		return;
++
++	if (dev->power.runtime_status == RPM_ACTIVE) {
++		if (dev->power.use_autosuspend) {
++			__pm_runtime_use_autosuspend(dev, false);
++			rpm_idle(dev, RPM_AUTO);
++		} else {
+ 			pm_runtime_set_suspended(dev);
+-		if (dev->power.irq_safe) {
+-			spin_lock_irq(&dev->power.lock);
+-			dev->power.irq_safe = 0;
+-			spin_unlock_irq(&dev->power.lock);
+-			if (dev->parent)
+-				pm_runtime_put(dev->parent);
+ 		}
+ 	}
++
++	if (dev->power.irq_safe) {
++		spin_lock_irq(&dev->power.lock);
++		dev->power.irq_safe = 0;
++		spin_unlock_irq(&dev->power.lock);
++		if (dev->parent)
++			pm_runtime_put(dev->parent);
++	}
+ }
+ 
+ /**
