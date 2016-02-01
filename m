@@ -1,26 +1,27 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 1 Feb 2016 22:54:16 +0800
-Subject: [PATCH 04/14] clk: sunxi: add ahb1 clock for A83T
-In-Reply-To: <20160201144923.GA29286@rob-hp-laptop>
-References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
- <1454203266-4450-5-git-send-email-vishnupatekar0510@gmail.com>
- <20160201144923.GA29286@rob-hp-laptop>
-Message-ID: <CAGb2v65zMGEagqML+2Y27M1hbdEWpMj96i0Dr5Ak67jnTcwhyw@mail.gmail.com>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Mon, 1 Feb 2016 14:54:57 +0000
+Subject: [PATCH] staging: goldfish: use div64_s64 instead of do_div
+In-Reply-To: <1676170.0qik6mzm6D@wuerfel>
+References: <1676170.0qik6mzm6D@wuerfel>
+Message-ID: <20160201145457.7879d53f@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 1, 2016 at 10:49 PM, Rob Herring <robh@kernel.org> wrote:
-> On Sun, Jan 31, 2016 at 09:20:56AM +0800, Vishnu Patekar wrote:
->> AHB1 on A83T is similar to ahb1 on A31, except parents are different.
->> clock index 0b1x is PLL6.
->>
->> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
->> ---
->>  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
->
-> Acked-by: Rob Herring <robh@kernel.org>
->
->>  drivers/clk/sunxi/clk-sunxi.c                     | 75 +++++++++++++++++++++++
->>  2 files changed, 76 insertions(+)
+On Mon, 01 Feb 2016 11:33 +0100
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+> The goldfish nand driver divides a signed 64-bit number (loff_t)
+> in multiple places using the do_div() function. This has always
+> been unreliable but now produces a compiler warning (since 4.5-rc1):
+> 
+> goldfish/goldfish_nand.c: In function 'goldfish_nand_erase':
+> goldfish/goldfish_nand.c:107:91: error: comparison of distinct pointer types lacks a cast [-Werror]
+> goldfish/goldfish_nand.c: In function 'goldfish_nand_read_oob':
+> goldfish/goldfish_nand.c:145:91: error: comparison of distinct pointer types lacks a cast [-Werror]
+> 
+> This changes the code to the equivalent div_s64{,_rem} that
+> works correctly for negative numbers (which we should never
+> get here).
+
+We can't get negatives as you say so surely the right fix is a cast or to
+fix mtd->writesize ?
