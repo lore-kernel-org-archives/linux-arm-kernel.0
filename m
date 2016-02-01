@@ -1,54 +1,176 @@
-From: wdc@rock-chips.com (David.Wu)
-Date: Mon, 1 Feb 2016 10:35:30 +0800
-Subject: [PATCH v3 2/2] dt-bindings: rockchip-pinctrl: Support the RK3399
- SoCs compatible
-In-Reply-To: <14543443.RsRWh5K5Uv@phil>
-References: <1451997055-47655-1-git-send-email-wdc@rock-chips.com>
- <1454153517-52969-1-git-send-email-david.wu@rock-chips.com>
- <1454153517-52969-3-git-send-email-david.wu@rock-chips.com>
- <14543443.RsRWh5K5Uv@phil>
-Message-ID: <56AEC472.9030909@rock-chips.com>
+From: xinliang.liu@linaro.org (Xinliang Liu)
+Date: Mon, 1 Feb 2016 10:41:24 +0800
+Subject: [RESEND PATCH v1] drm: Clean up drm Makefile
+In-Reply-To: <CAFCwf120-19JKDGGPOBQ4ALg=f5ESG4pVhMeN1s=0uz3OpoFpg@mail.gmail.com>
+References: <1454147777-77577-1-git-send-email-xinliang.liu@linaro.org>
+ <CAFCwf120-19JKDGGPOBQ4ALg=f5ESG4pVhMeN1s=0uz3OpoFpg@mail.gmail.com>
+Message-ID: <CAGd==04_xY8E9NObQEpRraGfUjtsSOZWXGnrW5Krd=2E+WXdYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-
-? 2016/1/30 20:16, Heiko Stuebner ??:
-> Hi David,
->
-> Am Samstag, 30. Januar 2016, 19:31:57 schrieb David Wu:
->> Change-Id: Ic1bdb3dc358837e97d7b48dd58be2f8d9d08d766
-> please no Change-Id, it's missing the Signed-off, and as Linus Walleij said,
-> the compatible addition to the documentation can maybe stay in the pinctrl-
-> patch itself.
->
-> I think both Linus and me overlooked that the binding-doc-addition was
-> already correctly included in your v2 patch at the top :-)
->
-
-Okay, I will merge it in one patch. sorry for my misunderstand.
-
-
-> Heiko
->
->> ---
->>   Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt | 1 +
->>   1 file changed, 1 insertion(+)
+On 30 January 2016 at 19:11, Oded Gabbay <oded.gabbay@gmail.com> wrote:
+> On Sat, Jan 30, 2016 at 11:56 AM, Xinliang Liu <xinliang.liu@linaro.org> wrote:
+>> This patch cleans up the Makefile of drm root directory.
+>> Make core and device drivers configuration list sorted Alphabetically.
 >>
->> diff --git
->> a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
->> b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt index
->> 391ef4b..3bb9456 100644
->> --- a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
->> +++ b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
->> @@ -22,6 +22,7 @@ Required properties for iomux controller:
->>     - compatible: one of "rockchip,rk2928-pinctrl",
->> "rockchip,rk3066a-pinctrl" "rockchip,rk3066b-pinctrl",
->> "rockchip,rk3188-pinctrl"
->>   		       "rockchip,rk3288-pinctrl", "rockchip,rk3368-pinctrl"
->> +		       "rockchip,rk3399-pinctrl"
->>     - rockchip,grf: phandle referencing a syscon providing the
->>   	 "general register files"
+>> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+>> Reviewed-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+>> Reviewed-by: Yifan Liu <liu_fanyi@163.com>
+>> ---
+>>  drivers/gpu/drm/Makefile | 102 ++++++++++++++++++++++++-----------------------
+>>  1 file changed, 52 insertions(+), 50 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+>> index 61766dec6a8d..77000717305b 100644
+>> --- a/drivers/gpu/drm/Makefile
+>> +++ b/drivers/gpu/drm/Makefile
+>> @@ -2,6 +2,9 @@
+>>  # Makefile for the drm device driver.  This driver provides support for the
+>>  # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
+>>
+>> +CFLAGS_drm_trace_points.o := -I$(src)
+>> +
+>> +# core. Please keep this list sorted alphabetically
+>>  drm-y       := drm_auth.o drm_bufs.o drm_cache.o \
+>>                 drm_context.o drm_dma.o \
+>>                 drm_fops.o drm_gem.o drm_ioctl.o drm_irq.o \
+>> @@ -13,64 +16,63 @@ drm-y       :=      drm_auth.o drm_bufs.o drm_cache.o \
+>>                 drm_trace_points.o drm_global.o drm_prime.o \
+>>                 drm_rect.o drm_vma_manager.o drm_flip_work.o \
+>>                 drm_modeset_lock.o drm_atomic.o drm_bridge.o
+>> -
+>> -drm-$(CONFIG_COMPAT) += drm_ioc32.o
+>> -drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
+>>  drm-$(CONFIG_PCI) += ati_pcigart.o
+>> -drm-$(CONFIG_DRM_PANEL) += drm_panel.o
+>> -drm-$(CONFIG_OF) += drm_of.o
+>>  drm-$(CONFIG_AGP) += drm_agpsupport.o
+>> +drm-$(CONFIG_DRM_GEM_CMA_HELPER) += drm_gem_cma_helper.o
+>> +drm-$(CONFIG_COMPAT) += drm_ioc32.o
+>> +drm-$(CONFIG_OF) += drm_of.o
+>> +drm-$(CONFIG_DRM_PANEL) += drm_panel.o
+>> +obj-$(CONFIG_DRM)      += drm.o
+>> +
+>> +obj-$(CONFIG_DRM_MIPI_DSI) += drm_mipi_dsi.o
+>>
+>>  drm_kms_helper-y := drm_crtc_helper.o drm_dp_helper.o drm_probe_helper.o \
+>>                 drm_plane_helper.o drm_dp_mst_topology.o drm_atomic_helper.o
+>>  drm_kms_helper-$(CONFIG_DRM_LOAD_EDID_FIRMWARE) += drm_edid_load.o
+>> -drm_kms_helper-$(CONFIG_DRM_FBDEV_EMULATION) += drm_fb_helper.o
+>>  drm_kms_helper-$(CONFIG_DRM_KMS_CMA_HELPER) += drm_fb_cma_helper.o
+>> -
+>> +drm_kms_helper-$(CONFIG_DRM_FBDEV_EMULATION) += drm_fb_helper.o
+>>  obj-$(CONFIG_DRM_KMS_HELPER) += drm_kms_helper.o
+>>
+>> -CFLAGS_drm_trace_points.o := -I$(src)
+>> +obj-$(CONFIG_DRM_TTM) += ttm/
+>>
+>> -obj-$(CONFIG_DRM)      += drm.o
+>> -obj-$(CONFIG_DRM_MIPI_DSI) += drm_mipi_dsi.o
+>> -obj-$(CONFIG_DRM_TTM)  += ttm/
+>> -obj-$(CONFIG_DRM_TDFX) += tdfx/
+>> -obj-$(CONFIG_DRM_R128) += r128/
+>> -obj-$(CONFIG_HSA_AMD) += amd/amdkfd/
+>> -obj-$(CONFIG_DRM_RADEON)+= radeon/
+>> -obj-$(CONFIG_DRM_AMDGPU)+= amd/amdgpu/
+>> -obj-$(CONFIG_DRM_MGA)  += mga/
+>> -obj-$(CONFIG_DRM_I810) += i810/
+>> -obj-$(CONFIG_DRM_I915)  += i915/
+>> -obj-$(CONFIG_DRM_MGAG200) += mgag200/
+>> -obj-$(CONFIG_DRM_VC4)  += vc4/
+>> -obj-$(CONFIG_DRM_CIRRUS_QEMU) += cirrus/
+>> -obj-$(CONFIG_DRM_SIS)   += sis/
+>> -obj-$(CONFIG_DRM_SAVAGE)+= savage/
+>> -obj-$(CONFIG_DRM_VMWGFX)+= vmwgfx/
+>> -obj-$(CONFIG_DRM_VIA)  +=via/
+>> -obj-$(CONFIG_DRM_VGEM) += vgem/
+>> -obj-$(CONFIG_DRM_NOUVEAU) +=nouveau/
+>> -obj-$(CONFIG_DRM_EXYNOS) +=exynos/
+>> -obj-$(CONFIG_DRM_ROCKCHIP) +=rockchip/
+>> -obj-$(CONFIG_DRM_GMA500) += gma500/
+>> -obj-$(CONFIG_DRM_UDL) += udl/
+>> -obj-$(CONFIG_DRM_AST) += ast/
+>> -obj-$(CONFIG_DRM_ARMADA) += armada/
+>> +# device drivers. Please keep this list sorted alphabetically
+>> +obj-$(CONFIG_DRM_AMDGPU)       += amd/amdgpu/
+>> +obj-$(CONFIG_HSA_AMD)          += amd/amdkfd/
+>> +obj-$(CONFIG_DRM_ARMADA)       += armada/
+>> +obj-$(CONFIG_DRM_AST)          += ast/
+>>  obj-$(CONFIG_DRM_ATMEL_HLCDC)  += atmel-hlcdc/
+>> -obj-$(CONFIG_DRM_RCAR_DU) += rcar-du/
+>> -obj-$(CONFIG_DRM_SHMOBILE) +=shmobile/
+>> -obj-y                  += omapdrm/
+>> -obj-y                  += tilcdc/
+>> -obj-$(CONFIG_DRM_QXL) += qxl/
+>> -obj-$(CONFIG_DRM_BOCHS) += bochs/
+>> -obj-$(CONFIG_DRM_VIRTIO_GPU) += virtio/
+>> -obj-$(CONFIG_DRM_MSM) += msm/
+>> -obj-$(CONFIG_DRM_TEGRA) += tegra/
+>> -obj-$(CONFIG_DRM_STI) += sti/
+>> -obj-$(CONFIG_DRM_IMX) += imx/
+>> -obj-y                  += i2c/
+>> -obj-y                  += panel/
+>> -obj-y                  += bridge/
+>> -obj-$(CONFIG_DRM_FSL_DCU) += fsl-dcu/
+>> -obj-$(CONFIG_DRM_ETNAVIV) += etnaviv/
+>> +obj-$(CONFIG_DRM_BOCHS)                += bochs/
+>> +obj-y                          += bridge/
+>> +obj-$(CONFIG_DRM_CIRRUS_QEMU)  += cirrus/
+>> +obj-$(CONFIG_DRM_ETNAVIV)      += etnaviv/
+>> +obj-$(CONFIG_DRM_EXYNOS)       += exynos/
+>> +obj-$(CONFIG_DRM_FSL_DCU)      += fsl-dcu/
+>> +obj-$(CONFIG_DRM_GMA500)       += gma500/
+>> +obj-y                          += i2c/
+>> +obj-$(CONFIG_DRM_I810)         += i810/
+>> +obj-$(CONFIG_DRM_I915)         += i915/
+>> +obj-$(CONFIG_DRM_IMX)          += imx/
+>> +obj-$(CONFIG_DRM_MGA)          += mga/
+>> +obj-$(CONFIG_DRM_MGAG200)      += mgag200/
+>> +obj-$(CONFIG_DRM_MSM)          += msm/
+>> +obj-$(CONFIG_DRM_NOUVEAU)      += nouveau/
+>> +obj-y                          += omapdrm/
+>> +obj-y                          += panel/
+>> +obj-$(CONFIG_DRM_QXL)          += qxl/
+>> +obj-$(CONFIG_DRM_R128)         += r128/
+>> +obj-$(CONFIG_DRM_RADEON)       += radeon/
+>> +obj-$(CONFIG_DRM_RCAR_DU)      += rcar-du/
+>> +obj-$(CONFIG_DRM_ROCKCHIP)     += rockchip/
+>> +obj-$(CONFIG_DRM_SAVAGE)       += savage/
+>> +obj-$(CONFIG_DRM_SHMOBILE)     += shmobile/
+>> +obj-$(CONFIG_DRM_SIS)          += sis/
+>> +obj-$(CONFIG_DRM_STI)          += sti/
+>> +obj-$(CONFIG_DRM_TDFX)         += tdfx/
+>> +obj-$(CONFIG_DRM_TEGRA)                += tegra/
+>> +obj-y                          += tilcdc/
+>> +obj-$(CONFIG_DRM_UDL)          += udl/
+>> +obj-$(CONFIG_DRM_VC4)          += vc4/
+>> +obj-$(CONFIG_DRM_VGEM)         += vgem/
+>> +obj-$(CONFIG_DRM_VIA)          += via/
+>> +obj-$(CONFIG_DRM_VIRTIO_GPU)   += virtio/
+>> +obj-$(CONFIG_DRM_VMWGFX)       += vmwgfx/
+>> --
+>> 1.9.1
+>>
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> http://lists.freedesktop.org/mailman/listinfo/dri-devel
 >
+> NACK, amdkfd *must* be before amdgpu *and* radeon, because it needs to
+> be already loaded when amdgpu/radeon get loaded, and when all these
+> drivers are compiled inside the kernel, the order is maintained by the
+> linkage order in the makefile.
 >
+> See:
+> http://lists.freedesktop.org/archives/dri-devel/2014-December/074452.html
 >
+
+Hi Oded, thanks for pointing out this. will fixed in v2.
+
+Thanks,
+-xinliang
+
+>
+> Thanks,
+>
+>     Oded
