@@ -1,38 +1,47 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 1 Feb 2016 12:24:51 -0800
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.5 (#1)
-In-Reply-To: <871t908do5.fsf@free-electrons.com>
-References: <871t908do5.fsf@free-electrons.com>
-Message-ID: <20160201202451.GI13508@localhost>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Tue,  2 Feb 2016 04:26:58 +0800
+Subject: [PATCH v3 6/6] kvm: arm64: Add ACPI support for virt arch timer
+In-Reply-To: <1454358418-5157-1-git-send-email-fu.wei@linaro.org>
+References: <1454358418-5157-1-git-send-email-fu.wei@linaro.org>
+Message-ID: <1454358418-5157-7-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 29, 2016 at 07:04:58PM +0100, Gregory CLEMENT wrote:
-> Hi,
-> 
-> Here is the first pull request for mvebu fixes for v4.5.
-> 
-> Gregory
-> 
-> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
-> 
->   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.5-1
-> 
-> for you to fetch changes up to ff61ee84e7aa5842d9e33c0b442f0b43a6a44eaf:
-> 
->   ARM: dts: orion5x: gpio pin fixes for linkstation lswtgl (2016-01-25 16:22:59 +0100)
-> 
-> ----------------------------------------------------------------
-> mvebu fixes for 4.5 (part 1)
-> 
-> - Fix dts on buffalo linksations machines (gpios and leds)
-> - Fix dts partition node according to new binding introduced in v4.5
+From: Fu Wei <fu.wei@linaro.org>
 
-Thanks, merged.
+This patch adds ACPI/GTDT support for virt arch timer
+using the API in GTDT driver.
 
+Signed-off-by: Fu Wei <fu.wei@linaro.org>
+---
+ virt/kvm/arm/arch_timer.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
--Olof
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 0a279d3..4077347 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -385,6 +385,9 @@ static int kvm_timer_get_ppi(unsigned int *ppi)
+ {
+ 	struct device_node *np;
+ 	int ret = -EINVAL;
++#ifdef CONFIG_ACPI_GTDT
++	struct arch_timer_data data;
++#endif
+ 
+ 	np = of_find_matching_node(NULL, arch_timer_of_match);
+ 	if (!np) {
+@@ -397,6 +400,11 @@ static int kvm_timer_get_ppi(unsigned int *ppi)
+ 	of_node_put(np);
+ 
+ skip_of:
++#ifdef CONFIG_ACPI_GTDT
++	if (!*ppi && !gtdt_arch_timer_data_init(NULL, &data))
++		*ppi = data.virt_ppi;
++#endif
++
+ 	if (*ppi)
+ 		return 0;
+ 
+-- 
+2.5.0
