@@ -1,83 +1,62 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 1 Feb 2016 15:26:20 +0100
-Subject: [PATCH v2 17/21] arm64: KVM: VHE: Add alternative panic handling
-In-Reply-To: <1453737235-16522-18-git-send-email-marc.zyngier@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <1453737235-16522-18-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160201142620.GW1478@cbox>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 1 Feb 2016 15:26:43 +0100
+Subject: [linux-sunxi] Problem with Allwinner H3 clocks
+In-Reply-To: <20160201063731.GG32462@lukather>
+References: <20160127103714.58312b152adb4148bae2f93b@free.fr>
+ <56A8D5E5.30701@gmail.com> <20160127175512.87caf31b5e21a1fec91507f2@free.fr>
+ <56A9098A.5010107@redhat.com>
+ <20160127200217.14dce96ade71cf81bc82e6f6@free.fr>
+ <56A9CE3D.4020906@redhat.com> <56AA14AA.4070502@gmail.com>
+ <20160128175918.78a916a8cd7bf4c0b2f2814f@free.fr>
+ <20160128192931.GB32462@lukather> <56AB05EF.2090604@redhat.com>
+ <20160201063731.GG32462@lukather>
+Message-ID: <56AF6B23.1010901@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 03:53:51PM +0000, Marc Zyngier wrote:
-> As the kernel fully runs in HYP when VHE is enabled, we can
-> directly branch to the kernel's panic() implementation, and
-> not perform an exception return.
-> 
-> Add the alternative code to deal with this.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Hi,
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+On 01-02-16 07:37, Maxime Ripard wrote:
+> Hi,
+>
+> On Fri, Jan 29, 2016 at 07:25:51AM +0100, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 01/28/2016 08:29 PM, Maxime Ripard wrote:
+>>> On Thu, Jan 28, 2016 at 05:59:18PM +0100, Jean-Francois Moine wrote:
+>>
+>> <snip>
+>>
+>>>> The A23/A33/H3 (and surely some other SoCs) documentations about
+>>>> the peripheral/periph/periph0/periph1 PLLs say:
+>>>>
+>>>> 	Note: The PLL Output should be fixed to 600MHz, it is not
+>>>> 	recommended to vary this value arbitrarily.
+>>>
+>>> I don't know if it's worth it at this point. The pll6 seems to work
+>>> fine at other rates. Have you experienced any breakage when running at
+>>> another frequency?
+>>
+>> Hmm, are we actually changing the freq of pll6 on any SoCs? I know we've
+>> the code to it, but given that it is shared between many pheripherals,
+>> I assume we end up never changing it.
+>
+> We don't, but it works. Back when I was debugging the A31 DMA
+> controller, I tried to do just that and nothing broke (at least as
+> long as you don't switch halfway through during the boot, but at the
+> time the clock is registered).
+>
+>> I assume / hope that the clock framework protects against reclocking
+>> a clock with multiple users ...
+>
+> There is, but it's opt-in, and we're not using it yet for anything but
+> the hstimers (and in that case, we don't prevent the reclocking, we
+> just take it into account).
 
-> ---
->  arch/arm64/kvm/hyp/switch.c | 35 +++++++++++++++++++++++++++--------
->  1 file changed, 27 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 77f7c94..0cadb7f 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -211,11 +211,34 @@ __alias(__guest_run) int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
->  
->  static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%p\n";
->  
-> -void __hyp_text __noreturn __hyp_panic(void)
-> +static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par)
->  {
->  	unsigned long str_va = (unsigned long)__hyp_panic_string;
-> -	u64 spsr = read_sysreg(spsr_el2);
-> -	u64 elr = read_sysreg(elr_el2);
-> +
-> +	__hyp_do_panic(hyp_kern_va(str_va),
-> +		       spsr,  elr,
-> +		       read_sysreg(esr_el2),   read_sysreg_el2(far),
-> +		       read_sysreg(hpfar_el2), par,
-> +		       (void *)read_sysreg(tpidr_el2));
-> +}
-> +
-> +static void __hyp_text __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par)
-> +{
-> +	panic(__hyp_panic_string,
-> +	      spsr,  elr,
-> +	      read_sysreg_el2(esr),   read_sysreg_el2(far),
-> +	      read_sysreg(hpfar_el2), par,
-> +	      (void *)read_sysreg(tpidr_el2));
-> +}
-> +
-> +static hyp_alternate_select(__hyp_call_panic,
-> +			    __hyp_call_panic_nvhe, __hyp_call_panic_vhe,
-> +			    ARM64_HAS_VIRT_HOST_EXTN);
-> +
-> +void __hyp_text __noreturn __hyp_panic(void)
-> +{
-> +	u64 spsr = read_sysreg_el2(spsr);
-> +	u64 elr = read_sysreg_el2(elr);
->  	u64 par = read_sysreg(par_el1);
->  
->  	if (read_sysreg(vttbr_el2)) {
-> @@ -230,11 +253,7 @@ void __hyp_text __noreturn __hyp_panic(void)
->  	}
->  
->  	/* Call panic for real */
-> -	__hyp_do_panic(hyp_kern_va(str_va),
-> -		       spsr,  elr,
-> -		       read_sysreg(esr_el2),   read_sysreg(far_el2),
-> -		       read_sysreg(hpfar_el2), par,
-> -		       (void *)read_sysreg(tpidr_el2));
-> +	__hyp_call_panic()(spsr, elr, par);
->  
->  	unreachable();
->  }
-> -- 
-> 2.1.4
-> 
+Shouldn't we be opt-ing in then ? At least the mmc driver makes
+clk_set_rate calls, it would be bad if that somehow ends up changing the
+pll6 rate while other peripherals are using it.
+
+Regards,
+
+Hans
