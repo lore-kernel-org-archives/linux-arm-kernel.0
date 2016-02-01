@@ -1,39 +1,37 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon,  1 Feb 2016 17:39:20 +0000
-Subject: [PATCH 01/11] irqchip: sun4i: fix compilation outside of arch/arm
+Date: Mon,  1 Feb 2016 17:39:21 +0000
+Subject: [PATCH 02/11] crypto: sunxi-ss: prevent compilation on 64-bit
 In-Reply-To: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
 References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1454348370-3816-2-git-send-email-andre.przywara@arm.com>
+Message-ID: <1454348370-3816-3-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner sunxi specific interrupt controller cannot be compiled
-for any architecture except arm:
+The driver for the sunxi-ss crypto engine is not entirely 64-bit safe,
+compilation on arm64 spits some warnings.
+The proper fix was deemed to involved [1], so since 64-bit SoCs won't
+have this IP block we just disable this driver for 64-bit.
 
-drivers/irqchip/irq-sun4i.c:25:26: fatal error: asm/mach/irq.h: No such file or directory
-compilation terminated.
-
-It turns out that this header is actually not needed for the driver,
-so remove it and allow compilation for other architectures like
-arm64.
+[1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/399988.html
+     (and the reply)
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/irqchip/irq-sun4i.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/crypto/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
-index 0704362..376b280 100644
---- a/drivers/irqchip/irq-sun4i.c
-+++ b/drivers/irqchip/irq-sun4i.c
-@@ -22,7 +22,6 @@
- #include <linux/of_irq.h>
+diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+index 07d4942..737200f 100644
+--- a/drivers/crypto/Kconfig
++++ b/drivers/crypto/Kconfig
+@@ -487,7 +487,7 @@ config CRYPTO_DEV_IMGTEC_HASH
  
- #include <asm/exception.h>
--#include <asm/mach/irq.h>
- 
- #define SUN4I_IRQ_VECTOR_REG		0x00
- #define SUN4I_IRQ_PROTECTION_REG	0x08
+ config CRYPTO_DEV_SUN4I_SS
+ 	tristate "Support for Allwinner Security System cryptographic accelerator"
+-	depends on ARCH_SUNXI
++	depends on ARCH_SUNXI && !64BIT
+ 	select CRYPTO_MD5
+ 	select CRYPTO_SHA1
+ 	select CRYPTO_AES
 -- 
 2.6.4
