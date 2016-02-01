@@ -1,101 +1,66 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 1 Feb 2016 13:34:16 +0000
-Subject: [PATCH v2 06/21] arm64: KVM: VHE: Patch out use of HVC
-In-Reply-To: <20160201131634.GI1478@cbox>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <1453737235-16522-7-git-send-email-marc.zyngier@arm.com>
- <20160201131634.GI1478@cbox>
-Message-ID: <56AF5ED8.7010303@arm.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon,  1 Feb 2016 21:34:43 +0800
+Subject: [PATCH v5 0/4] mailbox: hisilicon: add Hi6220 mailbox driver
+Message-ID: <1454333687-20421-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/16 13:16, Christoffer Dall wrote:
-> On Mon, Jan 25, 2016 at 03:53:40PM +0000, Marc Zyngier wrote:
->> With VHE, the host never issues an HVC instruction to get into the
->> KVM code, as we can simply branch there.
->>
->> Use runtime code patching to simplify things a bit.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/kvm/hyp.S           |  7 +++++++
->>  arch/arm64/kvm/hyp/hyp-entry.S | 38 +++++++++++++++++++++++++++++---------
->>  2 files changed, 36 insertions(+), 9 deletions(-)
->>
->> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
->> index 0ccdcbb..0689a74 100644
->> --- a/arch/arm64/kvm/hyp.S
->> +++ b/arch/arm64/kvm/hyp.S
->> @@ -17,7 +17,9 @@
->>  
->>  #include <linux/linkage.h>
->>  
->> +#include <asm/alternative.h>
->>  #include <asm/assembler.h>
->> +#include <asm/cpufeature.h>
->>  
->>  /*
->>   * u64 kvm_call_hyp(void *hypfn, ...);
->> @@ -38,6 +40,11 @@
->>   * arch/arm64/kernel/hyp_stub.S.
->>   */
->>  ENTRY(kvm_call_hyp)
->> +alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
->>  	hvc	#0
->>  	ret
->> +alternative_else
->> +	b	__vhe_hyp_call
->> +	nop
->> +alternative_endif
->>  ENDPROC(kvm_call_hyp)
->> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
->> index 93e8d983..9e0683f 100644
->> --- a/arch/arm64/kvm/hyp/hyp-entry.S
->> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
->> @@ -38,6 +38,32 @@
->>  	ldp	x0, x1, [sp], #16
->>  .endm
->>  
->> +.macro do_el2_call
->> +	/*
->> +	 * Shuffle the parameters before calling the function
->> +	 * pointed to in x0. Assumes parameters in x[1,2,3].
->> +	 */
->> +	stp	lr, xzr, [sp, #-16]!
-> 
-> remind me why this pair isn't just doing "str" instead of "stp" with the
-> xzr ?
+Hi6220 mailbox supports up to 32 channels. Each channel is unidirectional
+with a maximum message size of 8 words. I/O is performed using register
+access (there is no DMA) and the cell raises an interrupt when messages
+are received.
 
-Because SP has to be aligned on a 16 bytes boundary at all times.
+This patch series is to implement Hi6220 mailbox driver. It registers
+two channels into framework for communication with MCU, one is tx channel
+and another is rx channel. Now mailbox driver is used to send message to
+MCU to control dynamic voltage and frequency scaling for CPU, GPU and DDR.
 
-> 
->> +	mov	lr, x0
->> +	mov	x0, x1
->> +	mov	x1, x2
->> +	mov	x2, x3
->> +	blr	lr
->> +	ldp	lr, xzr, [sp], #16
->> +.endm
->> +
->> +ENTRY(__vhe_hyp_call)
->> +	do_el2_call
->> +	/*
->> +	 * We used to rely on having an exception return to get
->> +	 * an implicit isb. In the E2H case, we don't have it anymore.
->> +	 * rather than changing all the leaf functions, just do it here
->> +	 * before returning to the rest of the kernel.
->> +	 */
-> 
-> why is this not the case with an ISB before do_el2_call then?
+Changes from v4:
+* According to Jassi's suggestion, using DT binding to register channels
+* Change to use operating-points-v2 to register operating points
 
-That's a good point. I guess the safest thing to do would be to add one,
-but looking at the various functions we call, I don't see any that could
-go wrong by not having a ISB in their prologue.
+Changes from v3:
+* The patch series for enabling idle state for Hi6220 has reserved memory
+  regions, so this series will not include it anymore
+* Refined mailbox driver according to Jassi's suggestion;
+  Removed kfifo from mailbox driver;
+  Removed spinlock for ipc registers accessing, due every channel has its
+  own dedicated bit in ipc register and readl/writel will introduce memory
+  barrier, so don't need spinlock to protect ipc registers accessing
+* After mailbox driver is ready, can use patch 4 to enable CPU's OPPs and
+  stub clock driver; finally can enable CPUFreq driver for CPU frequency
+  scaling
 
-Or maybe you've identified such a case?
+Changes from v2:
+* Get rid of unused memory regions from memory node in DT, and don't use
+  reserved-memory node according to Mark and Leif's suggestion; Haojian also
+  has updated UEFI for efi memory info
 
-Thanks,
+Changes from v1:
+* Correct lock usage for SMP scenario
 
-	M.
+Changes from RFC:
+* According to Jassi's review, totally remove the abstract common driver
+  layer and only commit driver dedicated for Hi6220
+* According to Paul Bolle's review, fix typo issue for Kconfig and remove
+  unnecessary dependency with OF and fix minor for mailbox driver
+* Refine a little for dts nodes
+
+
+Leo Yan (4):
+  dt-bindings: mailbox: Document Hi6220 mailbox driver
+  mailbox: Hi6220: add mailbox driver
+  arm64: dts: add mailbox node for Hi6220
+  arm64: dts: add Hi6220's stub clock node
+
+ .../bindings/mailbox/hisilicon,hi6220-mailbox.txt  |  90 +++++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  67 ++++
+ drivers/mailbox/Kconfig                            |   8 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/hi6220-mailbox.c                   | 407 +++++++++++++++++++++
+ 5 files changed, 574 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
+ create mode 100644 drivers/mailbox/hi6220-mailbox.c
+
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
