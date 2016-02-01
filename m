@@ -1,359 +1,199 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Mon, 1 Feb 2016 09:13:05 +0000
-Subject: [PATCH 2/3] ACPI: parse SPCR and enable matching console
-In-Reply-To: <20160201090126.GA18693@xora-haswell.xora.org.uk>
-References: <1453722324-22407-1-git-send-email-aleksey.makarov@linaro.org>
- <1453722324-22407-3-git-send-email-aleksey.makarov@linaro.org>
- <20160201090126.GA18693@xora-haswell.xora.org.uk>
-Message-ID: <20160201091305.GB18693@xora-haswell.xora.org.uk>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Mon,  1 Feb 2016 10:15:36 +0100
+Subject: [PATCH v7 0/4] generic TEE subsystem
+Message-ID: <1454318140-7962-1-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 09:01:26AM +0000, Graeme Gregory wrote:
-> On Mon, Jan 25, 2016 at 05:45:22PM +0600, Aleksey Makarov wrote:
-> > 'ARM Server Base Boot Requiremets' [1] mention SPCR
-> > (Serial Port Console Redirection Table) [2] as a mandatory ACPI table
-> > that specifies the configuration of serial console.
-> > 
-> > Parse this table and check if any registered console match
-> > the description.  If it does, enable that console.
-> > 
-> > To implement that, introduce a new member
-> > int (*acpi_match)(struct console *, struct acpi_table_spcr *)
-> > of struct console.  It allows drivers to check if they provide
-> > a matching console device.
-> > 
-> 
-> Fails to compile on x86
-> 
-> kernel/built-in.o: In function `register_console':
-> (.text+0x48cba): undefined reference to `console_acpi_match'
-> Makefile:929: recipe for target 'vmlinux' failed
-> make: *** [vmlinux] Error 1
-> 
-> Because CONFIG_ACPI_SPCR_TABLE is never set.
-> 
-> Graeme
-> 
-> 
-> > [1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
-> > [2] http://msdn.microsoft.com/en-us/library/windows/hardware/dn639131(v=vs.85).aspx
-> > 
-> > Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-> > ---
-> >  arch/arm64/Kconfig      |  1 +
-> >  drivers/acpi/Kconfig    |  3 ++
-> >  drivers/acpi/Makefile   |  1 +
-> >  drivers/acpi/spcr.c     | 85 +++++++++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/console.h | 12 +++++++
-> >  kernel/printk/printk.c  | 82 +++++++++++++++++++++++++++++++++++++----------
-> >  6 files changed, 167 insertions(+), 17 deletions(-)
-> >  create mode 100644 drivers/acpi/spcr.c
-> > 
-> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > index 573bebc..bf31e3c 100644
-> > --- a/arch/arm64/Kconfig
-> > +++ b/arch/arm64/Kconfig
-> > @@ -4,6 +4,7 @@ config ARM64
-> >  	select ACPI_GENERIC_GSI if ACPI
-> >  	select ACPI_PCI_HOST_GENERIC if ACPI
-> >  	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
-> > +	select ACPI_SPCR_TABLE if ACPI
-> >  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-> >  	select ARCH_HAS_ELF_RANDOMIZE
-> >  	select ARCH_HAS_GCOV_PROFILE_ALL
-> > diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> > index e315061..142a338 100644
-> > --- a/drivers/acpi/Kconfig
-> > +++ b/drivers/acpi/Kconfig
-> > @@ -60,6 +60,9 @@ config ACPI_CCA_REQUIRED
-> >  config IORT_TABLE
-> >  	bool
-> >  
-> > +config ACPI_SPCR_TABLE
-> > +	bool
-> > +
-> >  config ACPI_DEBUGGER
-> >  	bool "AML debugger interface (EXPERIMENTAL)"
-> >  	select ACPI_DEBUG
-> > diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> > index 265eb90..8316859 100644
-> > --- a/drivers/acpi/Makefile
-> > +++ b/drivers/acpi/Makefile
-> > @@ -81,6 +81,7 @@ obj-$(CONFIG_ACPI_CUSTOM_METHOD)+= custom_method.o
-> >  obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
-> >  obj-$(CONFIG_ACPI_CPPC_LIB)	+= cppc_acpi.o
-> >  obj-$(CONFIG_IORT_TABLE) 	+= iort.o
-> > +obj-$(CONFIG_ACPI_SPCR_TABLE)	+= spcr.o
-> >  
-> >  # processor has its own "processor." module_param namespace
-> >  processor-y			:= processor_driver.o
-> > diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
-> > new file mode 100644
-> > index 0000000..ccb19a0
-> > --- /dev/null
-> > +++ b/drivers/acpi/spcr.c
-> > @@ -0,0 +1,85 @@
-> > +/*
-> > + * Copyright (c) 2012, Intel Corporation
-> > + * Copyright (c) 2015, Red Hat, Inc.
-> > + * Copyright (c) 2015, 2016 Linaro Ltd.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + */
-> > +
-> > +#define pr_fmt(fmt) "ACPI: SPCR: " fmt
-> > +
-> > +#include <linux/acpi.h>
-> > +#include <linux/console.h>
-> > +#include <linux/kernel.h>
-> > +
-> > +static struct acpi_table_spcr *spcr_table;
-> > +
-> > +int console_acpi_match(struct console *c, char **options)
-> > +{
-> > +	int err;
-> > +
-> > +	if (!c->acpi_match)
-> > +		return -ENODEV;
-> > +
-> > +	if (!spcr_table)
-> > +		return -EAGAIN;
-> > +
-> > +	err = c->acpi_match(c, spcr_table);
-> > +	if (err < 0)
-> > +		return err;
-> > +
-> > +	if (options) {
-> > +		switch (spcr_table->baud_rate) {
-> > +		case 3:
-> > +			*options = "9600";
-> > +			break;
-> > +		case 4:
-> > +			*options = "19200";
-> > +			break;
-> > +		case 6:
-> > +			*options = "57600";
-> > +			break;
-> > +		case 7:
-> > +			*options = "115200";
-> > +			break;
-> > +		default:
-> > +			*options = "";
-> > +			break;
-> > +		}
-> > +	}
-> > +
-> > +	return err;
-> > +}
-> > +
-> > +static int __init spcr_table_detect(void)
-> > +{
-> > +	struct acpi_table_header *table;
-> > +	acpi_status status;
-> > +
-> > +	if (acpi_disabled)
-> > +		return -ENODEV;
-> > +
-> > +	status = acpi_get_table(ACPI_SIG_SPCR, 0, &table);
-> > +	if (ACPI_FAILURE(status)) {
-> > +		const char *msg = acpi_format_exception(status);
-> > +
-> > +		pr_err("Failed to get table, %s\n", msg);
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	if (table->revision < 2)
-> > +		return -EOPNOTSUPP;
-> > +
-> > +	spcr_table = (struct acpi_table_spcr *)table;
-> > +
-> > +	pr_info("Console at 0x%016llx\n", spcr_table->serial_port.address);
-> > +
-> > +	acpi_register_consoles_try_again();
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +arch_initcall(spcr_table_detect);
-> > diff --git a/include/linux/console.h b/include/linux/console.h
-> > index bd19434..94d0bd8 100644
-> > --- a/include/linux/console.h
-> > +++ b/include/linux/console.h
-> > @@ -117,6 +117,7 @@ static inline int con_debug_leave(void)
-> >  #define CON_BRL		(32) /* Used for a braille device */
-> >  #define CON_EXTENDED	(64) /* Use the extended output format a la /dev/kmsg */
-> >  
-> > +struct acpi_table_spcr;
-> >  struct console {
-> >  	char	name[16];
-> >  	void	(*write)(struct console *, const char *, unsigned);
-> > @@ -125,6 +126,7 @@ struct console {
-> >  	void	(*unblank)(void);
-> >  	int	(*setup)(struct console *, char *);
-> >  	int	(*match)(struct console *, char *name, int idx, char *options);
-> > +	int	(*acpi_match)(struct console *, struct acpi_table_spcr *);
-> >  	short	flags;
-> >  	short	index;
-> >  	int	cflag;
-> > @@ -132,6 +134,16 @@ struct console {
-> >  	struct	 console *next;
-> >  };
-> >  
-> > +#ifdef CONFIG_ACPI
+Hi,
 
-This should be #ifdef CONFIG_ACPI_SPCR_TABLE
+This patch set introduces a generic TEE subsystem. The TEE subsystem will
+contain drivers for various TEE implementations. A TEE (Trusted Execution
+Environment) is a trusted OS running in some secure environment, for
+example, TrustZone on ARM CPUs, or a separate secure co-processor etc.
 
-> > +int console_acpi_match(struct console *c, char **options);
-> > +#else
-> > +static inline int console_acpi_match(struct console *c, char **options)
-> > +{
-> > +	return -ENODEV;
+Regarding use cases, TrustZone has traditionally been used for
+offloading secure tasks to the secure world. Examples include: 
+- Secure key handling where the OS may or may not have direct access to key
+  material.
+- E-commerce and payment technologies. Credentials, credit card numbers etc
+  could be stored in a more secure environment.
+- Trusted User Interface (TUI) to ensure that no-one can snoop PIN-codes
+  etc.
+- Secure boot to ensure that loaded binaries haven?t been tampered with.
+  It?s not strictly needed for secure boot, but you could enhance security
+  by leveraging a TEE during boot.
+- Digital Rights Management (DRM), the studios provides content with
+  different resolution depending on the security of the device. Higher
+  security means higher resolution.
 
-This requires a #include <linux/errno.h> at the top of the file to work.
+A TEE could also be used in existing and new technologies. For example IMA
+(Integrity Measurement Architecture) which has been in the kernel for quite
+a while. Today you can enhance security by using a TPM-chip to sign the IMA
+measurement list. This is something that you also could do by leveraging a
+TEE.
 
-Graeme
+Another example could be in 2-factor authentication which is becoming
+increasingly more important. FIDO (https://fidoalliance.org) for example
+are using public key cryptography in their 2-factor authentication standard
+(U2F). With FIDO, a private and public key pair will be generated for every
+site you visit and the private key should never leave the local device.
+This is an example where you could use secure storage in a TEE for the
+private key.
 
-> > +}
-> > +#endif
-> > +void acpi_register_consoles_try_again(void);
-> > +
-> >  /*
-> >   * for_each_console() allows you to iterate on each console
-> >   */
-> > diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
-> > index 37e531f..3cf8cba 100644
-> > --- a/kernel/printk/printk.c
-> > +++ b/kernel/printk/printk.c
-> > @@ -2430,6 +2430,25 @@ static int __init keep_bootcon_setup(char *str)
-> >  
-> >  early_param("keep_bootcon", keep_bootcon_setup);
-> >  
-> > +static DEFINE_MUTEX(acpi_consoles_delayed_mutex);
-> > +static struct console *acpi_consoles_delayed;
-> > +
-> > +void acpi_register_consoles_try_again(void)
-> > +{
-> > +	mutex_lock(&acpi_consoles_delayed_mutex);
-> > +	while (acpi_consoles_delayed) {
-> > +
-> > +		struct console *c = acpi_consoles_delayed;
-> > +
-> > +		acpi_consoles_delayed = acpi_consoles_delayed->next;
-> > +
-> > +		mutex_unlock(&acpi_consoles_delayed_mutex);
-> > +		register_console(c);
-> > +		mutex_lock(&acpi_consoles_delayed_mutex);
-> > +	}
-> > +	mutex_unlock(&acpi_consoles_delayed_mutex);
-> > +}
-> > +
-> >  /*
-> >   * The console driver calls this routine during kernel initialization
-> >   * to register the console printing procedure with printk() and to
-> > @@ -2538,8 +2557,30 @@ void register_console(struct console *newcon)
-> >  		break;
-> >  	}
-> >  
-> > -	if (!(newcon->flags & CON_ENABLED))
-> > -		return;
-> > +	if (!(newcon->flags & CON_ENABLED)) {
-> > +		char *opts;
-> > +		int err;
-> > +
-> > +		if (newcon->index < 0)
-> > +			newcon->index = 0;
-> > +
-> > +		err = console_acpi_match(newcon, &opts);
-> > +
-> > +		if (err == -EAGAIN) {
-> > +			mutex_lock(&acpi_consoles_delayed_mutex);
-> > +			newcon->next = acpi_consoles_delayed;
-> > +			acpi_consoles_delayed = newcon;
-> > +			mutex_unlock(&acpi_consoles_delayed_mutex);
-> > +			return;
-> > +		} else if (err < 0) {
-> > +			return;
-> > +		} else {
-> > +			if (newcon->setup && newcon->setup(newcon, opts) != 0)
-> > +				return;
-> > +			newcon->flags |= CON_ENABLED | CON_CONSDEV;
-> > +			preferred_console = true;
-> > +		}
-> > +	}
-> >  
-> >  	/*
-> >  	 * If we have a bootconsole, and are switching to a real console,
-> > @@ -2612,34 +2653,41 @@ void register_console(struct console *newcon)
-> >  }
-> >  EXPORT_SYMBOL(register_console);
-> >  
-> > +static int delete_from_console_list(struct console **list, struct console *c)
-> > +{
-> > +	while (*list) {
-> > +		struct console *cur = *list;
-> > +
-> > +		if (cur == c) {
-> > +			*list = cur->next;
-> > +			return 0;
-> > +		}
-> > +		list = &cur->next;
-> > +	}
-> > +	return 1;
-> > +}
-> > +
-> >  int unregister_console(struct console *console)
-> >  {
-> > -        struct console *a, *b;
-> >  	int res;
-> >  
-> >  	pr_info("%sconsole [%s%d] disabled\n",
-> >  		(console->flags & CON_BOOT) ? "boot" : "" ,
-> >  		console->name, console->index);
-> >  
-> > +	mutex_lock(&acpi_consoles_delayed_mutex);
-> > +	res = delete_from_console_list(&acpi_consoles_delayed, console);
-> > +	mutex_unlock(&acpi_consoles_delayed_mutex);
-> > +	if (res == 0)
-> > +		return res;
-> > +
-> >  	res = _braille_unregister_console(console);
-> >  	if (res)
-> >  		return res;
-> >  
-> > -	res = 1;
-> >  	console_lock();
-> > -	if (console_drivers == console) {
-> > -		console_drivers=console->next;
-> > -		res = 0;
-> > -	} else if (console_drivers) {
-> > -		for (a=console_drivers->next, b=console_drivers ;
-> > -		     a; b=a, a=b->next) {
-> > -			if (a == console) {
-> > -				b->next = a->next;
-> > -				res = 0;
-> > -				break;
-> > -			}
-> > -		}
-> > -	}
-> > +
-> > +	res = delete_from_console_list(&console_drivers, console);
-> >  
-> >  	if (!res && (console->flags & CON_EXTENDED))
-> >  		nr_ext_console_drivers--;
-> > -- 
-> > 2.7.0
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Today you will find a quite a few different out of tree implementations of
+TEE drivers which tends to fragment the TEE ecosystem and development. We
+think it would be a good idea to have a generic TEE driver integrated in
+the kernel which would serve as a base for several different TEE solutions,
+no matter if they are on-chip like TrustZone or if they are on a separate
+crypto co-processor.
+
+To develop this TEE subsystem we have been using the open source TEE called
+OP-TEE (https://github.com/OP-TEE/optee_os) and therefore this would be the
+first TEE solution supported by this new subsystem. OP-TEE is a
+GlobalPlatform compliant TEE, however this TEE subsystem is not limited to
+only GlobalPlatform TEEs, instead we have tried to design it so that it
+should work with other TEE solutions also.
+
+"tee: generic TEE subsystem" brings in the generic TEE subsystem which
+helps when writing a driver for a specific TEE, for example, OP-TEE.
+
+"tee: add OP-TEE driver" is an OP-TEE driver which uses the subsystem to do
+its work.
+
+This patch set has been prepared in cooperation with Javier Gonz?lez who
+proposed "Generic TrustZone Driver in Linux Kernel" patches 28 Nov 2014,
+https://lwn.net/Articles/623380/ . We've since then changed the scope to
+TEE instead of TrustZone.
+
+We have discussed the design on tee-dev at lists.linaro.org (archive at
+https://lists.linaro.org/pipermail/tee-dev/) with people from other
+companies, including Valentin Manea <valentin.manea@huawei.com>,
+Emmanuel MICHEL <emmanuel.michel@st.com>,
+Jean-michel DELORME <jean-michel.delorme@st.com>,
+and Joakim Bech <joakim.bech@linaro.org>. Our main concern has been to
+agree on something that is generic enough to support many different
+TEEs while still keeping the interface together.
+
+v7:
+* Rebased on v4.5-rc2
+* Moved the ARM SMC Calling Convention support into a separate patch
+  set, which is now merged
+
+v6:
+* Rebased on v4.3-rc7
+* Changed smccc interface to let the compiler marshal most of the
+  parameters
+* Added ARCH64 capability for smccc interface
+* Changed the PSCI firmware calls (both arm and arm64) to use the new
+  generic smccc interface instead instead of own assembly functions.
+* Move optee DT bindings to below arm/firmware
+* Defines method for OP-TEE driver to call secure world in DT, smc or hvc
+* Exposes implementation id of a TEE driver in sysfs
+  to easily spawn corresponding tee-supplicant when device is ready
+* Update OP-TEE Message Protocol to better cope with fragmented physical
+  memory
+* Read time directly from OP-TEE driver instead of forwarding the RPC
+  request to tee-supplicant
+
+v5:
+* Replaced kref reference counting for the device with a size_t instead as
+  the counter is always protected by a mutex
+
+v4:
+* Rebased on 4.1
+* Redesigned the synchronization around entry exit of normal SMC
+* Replaced rwsem on the driver instance with kref and completion since
+  rwsem wasn't intended to be used in this way
+* Expanded the TEE_IOCTL_PARAM_ATTR_TYPE_MASK to make room for
+  future additional parameter types
+* Documents TEE subsystem and OP-TEE driver
+* Replaced TEE_IOC_CMD with TEE_IOC_OPEN_SESSION, TEE_IOC_INVOKE,
+  TEE_IOC_CANCEL and TEE_IOC_CLOSE_SESSION
+* DT bindings in a separate patch
+* Assembly parts moved to arch/arm and arch/arm64 respectively, in a
+  separate patch
+* Redefined/clarified the meaning of OPTEE_SMC_SHM_CACHED
+* Removed CMA usage to limit the scope of the patch set
+
+v3:
+* Rebased on 4.1-rc3 (dma_buf_export() API change)
+* A couple of small sparse fixes
+* Documents bindings for OP-TEE driver
+* Updated MAINTAINERS
+
+v2:
+* Replaced the stubbed OP-TEE driver with a real OP-TEE driver
+* Removed most APIs not needed by OP-TEE in current state
+* Update Documentation/ioctl/ioctl-number.txt with correct path to tee.h
+* Rename tee_shm_pool_alloc_cma() to tee_shm_pool_alloc()
+* Moved tee.h into include/uapi/linux/
+* Redefined tee.h IOCTL macros to be directly based on _IOR and friends
+* Removed version info on the API to user space, a data blob which
+  can contain an UUID is left for user space to be able to tell which
+  protocol to use in TEE_IOC_CMD
+* Changed user space exposed structures to only have types with __ prefix
+* Dropped THIS_MODULE from tee_fops
+* Reworked how the driver is registered and ref counted:
+  - moved from using an embedded struct miscdevice to an embedded struct
+    device.
+  - uses an struct rw_semaphore as synchronization for driver detachment
+  - uses alloc/register pattern from TPM
+
+Thanks,
+Jens
+
+Jens Wiklander (4):
+  dt/bindings: add bindings for optee
+  tee: generic TEE subsystem
+  tee: add OP-TEE driver
+  Documentation: tee subsystem and op-tee driver
+
+ Documentation/00-INDEX                             |   2 +
+ .../bindings/arm/firmware/linaro,optee-tz.txt      |  31 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ Documentation/ioctl/ioctl-number.txt               |   1 +
+ Documentation/tee.txt                              | 117 +++
+ MAINTAINERS                                        |  12 +
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   1 +
+ drivers/tee/Kconfig                                |  18 +
+ drivers/tee/Makefile                               |   4 +
+ drivers/tee/optee/Kconfig                          |   8 +
+ drivers/tee/optee/Makefile                         |   5 +
+ drivers/tee/optee/call.c                           | 400 ++++++++++
+ drivers/tee/optee/core.c                           | 522 ++++++++++++
+ drivers/tee/optee/optee_msg.h                      | 423 ++++++++++
+ drivers/tee/optee/optee_private.h                  | 146 ++++
+ drivers/tee/optee/optee_smc.h                      | 418 ++++++++++
+ drivers/tee/optee/rpc.c                            | 322 ++++++++
+ drivers/tee/optee/supp.c                           | 212 +++++
+ drivers/tee/tee.c                                  | 873 +++++++++++++++++++++
+ drivers/tee/tee_private.h                          |  80 ++
+ drivers/tee/tee_shm.c                              | 324 ++++++++
+ drivers/tee/tee_shm_pool.c                         | 133 ++++
+ include/linux/tee_drv.h                            | 299 +++++++
+ include/uapi/linux/tee.h                           | 383 +++++++++
+ 25 files changed, 4737 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt
+ create mode 100644 Documentation/tee.txt
+ create mode 100644 drivers/tee/Kconfig
+ create mode 100644 drivers/tee/Makefile
+ create mode 100644 drivers/tee/optee/Kconfig
+ create mode 100644 drivers/tee/optee/Makefile
+ create mode 100644 drivers/tee/optee/call.c
+ create mode 100644 drivers/tee/optee/core.c
+ create mode 100644 drivers/tee/optee/optee_msg.h
+ create mode 100644 drivers/tee/optee/optee_private.h
+ create mode 100644 drivers/tee/optee/optee_smc.h
+ create mode 100644 drivers/tee/optee/rpc.c
+ create mode 100644 drivers/tee/optee/supp.c
+ create mode 100644 drivers/tee/tee.c
+ create mode 100644 drivers/tee/tee_private.h
+ create mode 100644 drivers/tee/tee_shm.c
+ create mode 100644 drivers/tee/tee_shm_pool.c
+ create mode 100644 include/linux/tee_drv.h
+ create mode 100644 include/uapi/linux/tee.h
+
+-- 
+1.9.1
