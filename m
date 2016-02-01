@@ -1,21 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 1 Feb 2016 12:19:22 -0800
-Subject: [PATCH] ARM: realview: use "depends on" instead of "if" after
- prompt
-In-Reply-To: <1453722164-23198-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1453722164-23198-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20160201201922.GE13508@localhost>
+Date: Mon, 1 Feb 2016 12:24:01 -0800
+Subject: [GIT PULL] omap fixes against v4.5-rc1
+In-Reply-To: <20160128175540.GG19432@atomide.com>
+References: <20160128175540.GG19432@atomide.com>
+Message-ID: <20160201202401.GH13508@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 08:42:44PM +0900, Masahiro Yamada wrote:
-> This platform recently moved to multi-platform, so missed the global
-> fixup by commit e32465429490 ("ARM: use "depends on" for SoC configs
-> instead of "if" after prompt").  Fix it now.
+On Thu, Jan 28, 2016 at 09:55:41AM -0800, Tony Lindgren wrote:
+> The following changes since commit 92e963f50fc74041b5e9e744c330dca48e04f08d:
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>   Linux 4.5-rc1 (2016-01-24 13:06:47 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.5/fixes-rc1
+> 
+> for you to fetch changes up to ab342c77fa60a30fce4d4228f88fd1b7bf566055:
+> 
+>   ARM: dts: am57xx: sbc-am57x: correct Eth PHY settings (2016-01-27 09:19:31 -0800)
 
-Applied to fixes.
+
+Thanks, merged.
 
 
 -Olof
