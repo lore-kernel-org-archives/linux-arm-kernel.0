@@ -1,45 +1,52 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  1 Feb 2016 18:02:34 +0100
-Subject: [PATCH] ARM: vmlinux.lds: assert that ROM and RAM don't overlap when
- XIP_KERNEL=y
-Message-ID: <1454346154-12931-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Mon, 1 Feb 2016 18:08:31 +0100
+Subject: [PATCH v2 06/21] arm64: KVM: VHE: Patch out use of HVC
+In-Reply-To: <56AF85D8.7080907@arm.com>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <1453737235-16522-7-git-send-email-marc.zyngier@arm.com>
+ <20160201131634.GI1478@cbox> <56AF5ED8.7010303@arm.com>
+ <20160201153635.GH15514@e104818-lin.cambridge.arm.com>
+ <56AF85D8.7080907@arm.com>
+Message-ID: <CAKv+Gu9_KG7Zss3g1OMzcnRKQFhCcYtbSDEk-gwwgqPP-R6DOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building an XIP kernel, the linker produces two disjoint VMA regions,
-where the first is mapped onto ROM and the second onto RAM. For this reason,
-the linker output pointer '.' is updated halfway through the linker script,
-and set to a value that corresponds with the start of the RAM region.
+On 1 February 2016 at 17:20, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 01/02/16 15:36, Catalin Marinas wrote:
+>> On Mon, Feb 01, 2016 at 01:34:16PM +0000, Marc Zyngier wrote:
+>>> On 01/02/16 13:16, Christoffer Dall wrote:
+>>>> On Mon, Jan 25, 2016 at 03:53:40PM +0000, Marc Zyngier wrote:
+>>>>> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+>>>>> index 93e8d983..9e0683f 100644
+>>>>> --- a/arch/arm64/kvm/hyp/hyp-entry.S
+>>>>> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
+>>>>> @@ -38,6 +38,32 @@
+>>>>>    ldp     x0, x1, [sp], #16
+>>>>>  .endm
+>>>>>
+>>>>> +.macro do_el2_call
+>>>>> +  /*
+>>>>> +   * Shuffle the parameters before calling the function
+>>>>> +   * pointed to in x0. Assumes parameters in x[1,2,3].
+>>>>> +   */
+>>>>> +  stp     lr, xzr, [sp, #-16]!
+>>>>
+>>>> remind me why this pair isn't just doing "str" instead of "stp" with the
+>>>> xzr ?
+>>>
+>>> Because SP has to be aligned on a 16 bytes boundary at all times.
+>>
+>> You could do something like:
+>>
+>>       sub     sp, sp, #16
+>>       str     lr, [sp]
+>>
+>
+> Ah, fair enough. I'll fold that in.
+>
 
-However, in some cases, the ROM region exceeds the expected size, and the
-assignment of the output pointer results in a decrement rather than an
-increment, causing the virtual addresses of the .data region to clash with
-the .text region. Such a kernel cannot boot normally, but it also confuses
-the hell out of kallsyms, since .data symbols may appear inside the
-[_stext, _etext] or [_sinittext, _einittext] intervals in the first pass,
-but not in the second (or vice versa), resulting in inconsistent kallsyms
-data.
+Since we're micro-reviewing: what's wrong with
 
-So let's make sure that the output pointer only advances, and never jumps
-back into the ROM region.
+str lr, [sp, #-16]!
 
-Cc: arnd at arndb.de
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/kernel/vmlinux.lds.S | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 8b60fde5ce48..950114d533e1 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -229,6 +229,7 @@ SECTIONS
- 
- #ifdef CONFIG_XIP_KERNEL
- 	__data_loc = ALIGN(4);		/* location in binary */
-+	ASSERT(. < PAGE_OFFSET + TEXT_OFFSET, "XIP_KERNEL: ROM and RAM overlap")
- 	. = PAGE_OFFSET + TEXT_OFFSET;
- #else
- #ifdef CONFIG_ARM_KERNMEM_PERMS
--- 
-2.5.0
+?
