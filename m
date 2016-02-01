@@ -1,56 +1,52 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Mon, 1 Feb 2016 09:10:23 -0800
-Subject: [PATCH 1/2] ARM: make virt_to_idmap() return unsigned long
-In-Reply-To: <56AF8F54.7030805@ti.com>
-References: <E1aO8F2-00074N-E8@rmk-PC.arm.linux.org.uk>
- <56A84748.3040108@oracle.com> <20160201152015.GU10826@n2100.arm.linux.org.uk>
- <56AF8F54.7030805@ti.com>
-Message-ID: <56AF917F.9030505@oracle.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 01 Feb 2016 18:16:47 +0100
+Subject: [PATCH] ARM: dts: cros-ec-keyboard: Add LOCK key to keyboard
+ matrix
+In-Reply-To: <1454121504-12683-1-git-send-email-djkurtz@chromium.org>
+References: <1454121504-12683-1-git-send-email-djkurtz@chromium.org>
+Message-ID: <2283417.UbYyfQa1E3@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/1/2016 9:01 AM, Vitaly Andrianov wrote:
->
->
-> On 02/01/2016 10:20 AM, Russell King - ARM Linux wrote:
->> On Tue, Jan 26, 2016 at 08:27:52PM -0800, santosh.shilimkar at oracle.com
->> wrote:
->>> On 1/26/16 10:21 AM, Russell King wrote:
->>>> Make virt_to_idmap() return an unsigned long rather than phys_addr_t.
->>>>
->>>> Returning phys_addr_t here makes no sense, because the definition of
->>>> virt_to_idmap() is that it shall return a physical address which maps
->>>> identically with the virtual address.  Since virtual addresses are
->>>> limited to 32-bit, identity mapped physical addresses are as well.
->>>>
->>>> Almost all users already had an implicit narrowing cast to unsigned
->>>> long
->>>> so let's make this official and part of this interface.
->>>>
->>>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->>>> ---
->>> Looks correct to me.
->>>
->>> Vitaly,
->>> Could you please try out this patch and see everything continue to
->>> work ?
->>
->> I haven't heard anything yet...  Vitaly?
->>
-> Russel, Santosh,
->
-> I'm not working with the latest kernel, but with the stable v4.1.y. So I
-> couldn't apply the patch to it. I checked out 4.5.0-rc1 and applied the
-> patch to it. Tried to boot and it crashed. I'm not sure either because
-> of the patch or because of the network driver.
->
-Thanks for checking.
+Hi Daniel,
 
-> Here is the log:
->
-Based on the log, I think the patch seems to work fine since the boot
-reached upto rootfs. The crash seems to be coming from mostky NetCP
-related compents.
+Am Samstag, 30. Januar 2016, 10:38:24 schrieb Daniel Kurtz:
+> From: James Chao <james_chao@asus.com>
+> 
+> The LOCK key is at KSO9/KSI3 for Chromebook Flip and other devices
+> that use the Chrome OS EC keyboard matrix.
+> 
+> Signed-off-by: James Chao <james_chao@asus.com>
+> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+> Signed-off-by: YH Huang <yh.huang@mediatek.com>
 
-Regards,
-Santosh
+that should probably be a 
+	Reviewed-by: YH Huang <yh.huang@mediatek.com>
+As I don't see any actual patch handling step by him/her.
+
+Also, you might've included Olof as the keeper of all things ChromeOS when 
+sending.
+
+@Olof: this seems to be pretty Veyron-specific for the moment, so I'm inclined 
+to pick that up. Please holler if you disagree and want to pick it up yourself 
+;-)
+
+
+Thanks
+Heiko
+
+> ---
+>  arch/arm/boot/dts/cros-ec-keyboard.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/cros-ec-keyboard.dtsi
+> b/arch/arm/boot/dts/cros-ec-keyboard.dtsi index 4e42f30c..c045105 100644
+> --- a/arch/arm/boot/dts/cros-ec-keyboard.dtsi
+> +++ b/arch/arm/boot/dts/cros-ec-keyboard.dtsi
+> @@ -55,6 +55,7 @@
+>  			MATRIX_KEY(0x03, 0x04, KEY_F5)
+>  			MATRIX_KEY(0x03, 0x06, KEY_6)
+>  			MATRIX_KEY(0x03, 0x08, KEY_MINUS)
+> +			MATRIX_KEY(0x03, 0x09, KEY_F13)
+>  			MATRIX_KEY(0x03, 0x0b, KEY_BACKSLASH)
+>  			MATRIX_KEY(0x03, 0x0c, KEY_MUHENKAN)
