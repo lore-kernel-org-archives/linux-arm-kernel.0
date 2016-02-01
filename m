@@ -1,42 +1,53 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 1 Feb 2016 18:25:48 +0000
-Subject: [GIT PULL] vexpress fixes for v4.5
-Message-ID: <56AFA32C.4000901@arm.com>
+Date: Mon,  1 Feb 2016 18:28:17 +0000
+Subject: [PATCH 1/3] pinctrl: single: Use a separate lockdep class
+In-Reply-To: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
+References: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1454351299-27440-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 36f90b0a2ddd60823fe193a85e60ff1906c2a9b3:
+The single pinmux controller can be cascaded to the other interrupt
+controllers. Hence when propagating wake-up settings to its parent
+interrupt controller, there's possiblity of detecting possible recursive
+locking and getting lockdep warning.
 
-   Linux 4.5-rc2 (2016-01-31 18:12:16 -0800)
+This patch avoids this false positive by using a separate lockdep class
+for this single pinctrl interrupts.
 
-are available in the git repository at:
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-gpio at vger.kernel.org
+Suggested-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ drivers/pinctrl/pinctrl-single.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git 
-tags/vexpress-for-v4.5/fixes-rc2
-
-for you to fetch changes up to aeb2ee5683e51305aff274d8b0a50af69b3ab310:
-
-   arm64: dts: Add missing DMA Abort interrupt to Juno (2016-02-01 
-09:59:59 +0000)
-
-----------------------------------------------------------------
-vexpress fixes for v4.5
-
-Couple of minor fixes for vexpress platforms:
-1. Add missing of_node_put in vexpress config bus
-2. Add missing DMA-330 abort interrupt on Juno platforms
-
-----------------------------------------------------------------
-Amitoj Kaur Chawla (1):
-       bus: vexpress-config: Add missing of_node_put
-
-Robin Murphy (1):
-       arm64: dts: Add missing DMA Abort interrupt to Juno
-
-  arch/arm64/boot/dts/arm/juno-base.dtsi | 1 +
-  drivers/bus/vexpress-config.c          | 4 +++-
-  2 files changed, 4 insertions(+), 1 deletion(-)
-
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index d24e5f1d1525..fb126d56ad40 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -255,6 +255,13 @@ static enum pin_config_param pcs_bias[] = {
+ };
+ 
+ /*
++ * This lock class tells lockdep that irqchip core that this single
++ * pinctrl can be in a different category than its parents, so it won't
++ * report false recursion.
++ */
++static struct lock_class_key pcs_lock_class;
++
++/*
+  * REVISIT: Reads and writes could eventually use regmap or something
+  * generic. But at least on omaps, some mux registers are performance
+  * critical as they may need to be remuxed every time before and after
+@@ -1713,6 +1720,7 @@ static int pcs_irqdomain_map(struct irq_domain *d, unsigned int irq,
+ 	irq_set_chip_data(irq, pcs_soc);
+ 	irq_set_chip_and_handler(irq, &pcs->chip,
+ 				 handle_level_irq);
++	irq_set_lockdep_class(irq, &pcs_lock_class);
+ 	irq_set_noprobe(irq);
+ 
+ 	return 0;
 -- 
-Regards,
-Sudeep
+1.9.1
