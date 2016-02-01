@@ -1,114 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 1 Feb 2016 13:38:57 +0000
-Subject: [PATCH v2 07/21] arm64: KVM: VHE: Patch out kern_hyp_va
-In-Reply-To: <20160201132042.GJ1478@cbox>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <1453737235-16522-8-git-send-email-marc.zyngier@arm.com>
- <20160201132042.GJ1478@cbox>
-Message-ID: <56AF5FF1.4010701@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 1 Feb 2016 13:41:02 +0000
+Subject: [PATCH v5sub1 7/8] arm64: move kernel image to base of vmalloc
+ area
+In-Reply-To: <CAKv+Gu-4FAn-f3dTKPZbiNcs_kCFN+PuxQkHwTdWN24VWhrrOA@mail.gmail.com>
+References: <1454324093-15998-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1454324093-15998-8-git-send-email-ard.biesheuvel@linaro.org>
+ <20160201122444.GD15514@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-4FAn-f3dTKPZbiNcs_kCFN+PuxQkHwTdWN24VWhrrOA@mail.gmail.com>
+Message-ID: <20160201134102.GE15514@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/16 13:20, Christoffer Dall wrote:
-> On Mon, Jan 25, 2016 at 03:53:41PM +0000, Marc Zyngier wrote:
->> The kern_hyp_va macro is pretty meaninless with VHE, as there is
->> only one mapping - the kernel one.
->>
->> In order to keep the code readable and efficient, use runtime
->> patching to replace the 'and' instruction used to compute the VA
->> with a 'nop'.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/include/asm/kvm_mmu.h | 11 ++++++++++-
->>  arch/arm64/kvm/hyp/hyp.h         | 25 ++++++++++++++++++++++---
->>  2 files changed, 32 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
->> index d3e6d7b..62f0d14 100644
->> --- a/arch/arm64/include/asm/kvm_mmu.h
->> +++ b/arch/arm64/include/asm/kvm_mmu.h
->> @@ -23,13 +23,16 @@
->>  #include <asm/cpufeature.h>
->>  
->>  /*
->> - * As we only have the TTBR0_EL2 register, we cannot express
->> + * As ARMv8.0 only has the TTBR0_EL2 register, we cannot express
->>   * "negative" addresses. This makes it impossible to directly share
->>   * mappings with the kernel.
->>   *
->>   * Instead, give the HYP mode its own VA region at a fixed offset from
->>   * the kernel by just masking the top bits (which are all ones for a
->>   * kernel address).
->> + *
->> + * ARMv8.1 (using VHE) does have a TTBR1_EL2, and doesn't use these
->> + * macros (the entire kernel runs at EL2).
->>   */
->>  #define HYP_PAGE_OFFSET_SHIFT	VA_BITS
->>  #define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
->> @@ -56,6 +59,8 @@
->>  
->>  #ifdef __ASSEMBLY__
->>  
->> +#include <asm/alternative.h>
->> +#include <asm/cpufeature.h>
->>  #include <asm/kvm_arm.h>
->>  
->>  .macro setup_vtcr tmp1, tmp2
->> @@ -84,7 +89,11 @@
->>   * reg: VA to be converted.
->>   */
->>  .macro kern_hyp_va	reg
->> +alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
->>  	and	\reg, \reg, #HYP_PAGE_OFFSET_MASK
->> +alternative_else
->> +	nop
->> +alternative_endif
->>  .endm
->>  
->>  #else
->> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
->> index fb27517..fc502f3 100644
->> --- a/arch/arm64/kvm/hyp/hyp.h
->> +++ b/arch/arm64/kvm/hyp/hyp.h
->> @@ -25,9 +25,28 @@
->>  
->>  #define __hyp_text __section(.hyp.text) notrace
->>  
->> -#define kern_hyp_va(v) (typeof(v))((unsigned long)(v) & HYP_PAGE_OFFSET_MASK)
->> -#define hyp_kern_va(v) (typeof(v))((unsigned long)(v) - HYP_PAGE_OFFSET \
->> -						      + PAGE_OFFSET)
->> +static inline unsigned long __kern_hyp_va(unsigned long v)
->> +{
->> +	asm volatile(ALTERNATIVE("and %0, %0, %1",
->> +				 "nop",
->> +				 ARM64_HAS_VIRT_HOST_EXTN)
->> +		     : "+r" (v) : "i" (HYP_PAGE_OFFSET_MASK));
->> +	return v;
->> +}
->> +
->> +#define kern_hyp_va(v) (typeof(v))(__kern_hyp_va((unsigned long)(v)))
->> +
->> +static inline unsigned long __hyp_kern_va(unsigned long v)
->> +{
->> +	u64 offset = PAGE_OFFSET - HYP_PAGE_OFFSET;
->> +	asm volatile(ALTERNATIVE("add %0, %0, %1",
->> +				 "nop",
->> +				 ARM64_HAS_VIRT_HOST_EXTN)
->> +		     : "+r" (v) : "r" (offset));
->> +	return v;
->> +}
->> +
->> +#define hyp_kern_va(v) (typeof(v))(__hyp_kern_va((unsigned long)(v)))
+On Mon, Feb 01, 2016 at 01:27:59PM +0100, Ard Biesheuvel wrote:
+> On 1 February 2016 at 13:24, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Mon, Feb 01, 2016 at 11:54:52AM +0100, Ard Biesheuvel wrote:
+> >> --- a/arch/arm64/mm/mmu.c
+> >> +++ b/arch/arm64/mm/mmu.c
+> >> @@ -53,6 +53,10 @@ u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
+> >>  unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)] __page_aligned_bss;
+> >>  EXPORT_SYMBOL(empty_zero_page);
+> >>
+> >> +static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+> >> +static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
+> >> +static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
+> >
+> > I applied a fixup locally to keep the compiler quiet:
+> >
+> > --- a/arch/arm64/mm/mmu.c
+> > +++ b/arch/arm64/mm/mmu.c
+> > @@ -57,8 +57,8 @@ unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)] __page_aligned_
+> >  EXPORT_SYMBOL(empty_zero_page);
+> >
+> >  static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+> > -static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
+> > -static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
+> > +static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss __maybe_unused;
+> > +static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss __maybe_unused;
 > 
-> why do we need this casting of values instead of just defining these
-> inlines and calling them directly with proper typing?
+> Ah yes, I dropped a memblock_free() against bm_pud in
+> early_fixmap_init(), since it occurred before the actual reservation,
+> so bm_pud may never be referenced. For bm_pmd, it should not be
+> required afaict.
+> 
+> If you prefer, I can keep the original code here:
+> 
+> #if CONFIG_PGTABLE_LEVELS > 2
+> static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
+> #endif
+> #if CONFIG_PGTABLE_LEVELS > 3
+> static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
+> #endif
 
-We commonly pass both pointers and unsigned long to this helper. Do you
-really want a separate helper for each type instead of one that does it all?
+Looking at the CodingStyle doc, __maybe_unused is preferred, so I'll
+just keep the fixup.
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
