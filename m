@@ -1,66 +1,118 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 1 Feb 2016 10:15:25 -0300
-Subject: [PATCH v4 1/2] regulator: act8945a: add regulator driver for
- ACT8945A
-In-Reply-To: <B256D81BAE5131468A838E5D7A243641D63FE2C7@penmbx01>
-References: <1453863463-30515-1-git-send-email-wenyou.yang@atmel.com>
- <1453863463-30515-2-git-send-email-wenyou.yang@atmel.com>
- <20160129001603.GM4130@sirena.org.uk>
- <B256D81BAE5131468A838E5D7A243641D63FBF8B@penmbx01>
- <20160129113518.GQ4130@sirena.org.uk>
- <CABxcv=kNKmgRytxB5ppawrAvC-GDRhV4T_UUGvpHgKp9+BsUmQ@mail.gmail.com>
- <B256D81BAE5131468A838E5D7A243641D63FE2C7@penmbx01>
-Message-ID: <CABxcv=nJsWEv9KW-5iPpUnyN8ZVpx6CV07gBRaLNWqd644YOqQ@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 1 Feb 2016 14:16:34 +0100
+Subject: [PATCH v2 06/21] arm64: KVM: VHE: Patch out use of HVC
+In-Reply-To: <1453737235-16522-7-git-send-email-marc.zyngier@arm.com>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <1453737235-16522-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160201131634.GI1478@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wenyou,
+On Mon, Jan 25, 2016 at 03:53:40PM +0000, Marc Zyngier wrote:
+> With VHE, the host never issues an HVC instruction to get into the
+> KVM code, as we can simply branch there.
+> 
+> Use runtime code patching to simplify things a bit.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/hyp.S           |  7 +++++++
+>  arch/arm64/kvm/hyp/hyp-entry.S | 38 +++++++++++++++++++++++++++++---------
+>  2 files changed, 36 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> index 0ccdcbb..0689a74 100644
+> --- a/arch/arm64/kvm/hyp.S
+> +++ b/arch/arm64/kvm/hyp.S
+> @@ -17,7 +17,9 @@
+>  
+>  #include <linux/linkage.h>
+>  
+> +#include <asm/alternative.h>
+>  #include <asm/assembler.h>
+> +#include <asm/cpufeature.h>
+>  
+>  /*
+>   * u64 kvm_call_hyp(void *hypfn, ...);
+> @@ -38,6 +40,11 @@
+>   * arch/arm64/kernel/hyp_stub.S.
+>   */
+>  ENTRY(kvm_call_hyp)
+> +alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
+>  	hvc	#0
+>  	ret
+> +alternative_else
+> +	b	__vhe_hyp_call
+> +	nop
+> +alternative_endif
+>  ENDPROC(kvm_call_hyp)
+> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+> index 93e8d983..9e0683f 100644
+> --- a/arch/arm64/kvm/hyp/hyp-entry.S
+> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
+> @@ -38,6 +38,32 @@
+>  	ldp	x0, x1, [sp], #16
+>  .endm
+>  
+> +.macro do_el2_call
+> +	/*
+> +	 * Shuffle the parameters before calling the function
+> +	 * pointed to in x0. Assumes parameters in x[1,2,3].
+> +	 */
+> +	stp	lr, xzr, [sp, #-16]!
 
-[snip]
+remind me why this pair isn't just doing "str" instead of "stp" with the
+xzr ?
 
->> >
->> > If then device is not being loaded from the DT (and it shouldn't be,
->> > the device looks like it should be instantiated directly by the MFD as
->> > it can't exist separately to that MFD) an OF table will do nothing.
->>
->> Then he should remove the .of_compatible from the MFD cell definition.
->
-> I tried it,
->
-> But if removed this .of_compatible, and reserved the OF table.
+> +	mov	lr, x0
+> +	mov	x0, x1
+> +	mov	x1, x2
+> +	mov	x2, x3
+> +	blr	lr
+> +	ldp	lr, xzr, [sp], #16
+> +.endm
+> +
+> +ENTRY(__vhe_hyp_call)
+> +	do_el2_call
+> +	/*
+> +	 * We used to rely on having an exception return to get
+> +	 * an implicit isb. In the E2H case, we don't have it anymore.
+> +	 * rather than changing all the leaf functions, just do it here
+> +	 * before returning to the rest of the kernel.
+> +	 */
 
-What we said is that you should remove both the mfd cell
-.of_compatible field and the OF table. Of course removing one but
-leaving the other is not correct.
+why is this not the case with an ISB before do_el2_call then?
 
-> the &pdev->dev->of_node is NULL, the driver fails to get the configuration value from DT,
->
-
-I see, you mean that you are not able to lookup the
-"active-semi,vsel-high" property.
-
-> It seems the OF table still doesn't work. Where is wrong?
->
-
-I think the problem is with your DT binding. You have a PMIC dev node
-with compatible "active-semi,act8945a" that has a child node with
-compatible "active-semi,act8945a-regulator" which in turn has the
-"regulators" node.
-
-I believe what Mark says is that there shouldn't be a compatible and
-node for the regulators IC since is part of the PMIC. IOW, you can't
-have it as a standalone node in the DTS.
-
-> Could you help give some suggestion?
->
-
-I would just remove the "active-semi,act8945a-regulator" node and make
-"active-semi,vsel-high" a property of the "active-semi,act8945a" node.
-That way you can remove the mfd cell .of_compatible and OF table in
-the regulator driver and read the "active-semi,vsel-high" using the
-platform device's parent of_node.
-
-But it's better if you wait for Mark's opinions before re-spining your patches.
-
-Best regards,
-Javier
+> +	isb
+> +	ret
+> +ENDPROC(__vhe_hyp_call)
+> +	
+>  el1_sync:				// Guest trapped into EL2
+>  	save_x0_to_x3
+>  
+> @@ -58,19 +84,13 @@ el1_sync:				// Guest trapped into EL2
+>  	mrs	x0, vbar_el2
+>  	b	2f
+>  
+> -1:	stp	lr, xzr, [sp, #-16]!
+> -
+> +1:
+>  	/*
+> -	 * Compute the function address in EL2, and shuffle the parameters.
+> +	 * Perform the EL2 call
+>  	 */
+>  	kern_hyp_va	x0
+> -	mov	lr, x0
+> -	mov	x0, x1
+> -	mov	x1, x2
+> -	mov	x2, x3
+> -	blr	lr
+> +	do_el2_call
+>  
+> -	ldp	lr, xzr, [sp], #16
+>  2:	eret
+>  
+>  el1_trap:
+> -- 
+> 2.1.4
+> 
