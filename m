@@ -1,41 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Feb 2016 17:42:02 +0100
-Subject: [PATCH] infiniband: cxgb4: use %pR format string for printing
- resources
-Message-ID: <2278867.O0SM8nbQp0@wuerfel>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Mon, 1 Feb 2016 17:43:23 +0100
+Subject: [PATCH] drivers/perf: arm_pmu: make info messages more verbose
+In-Reply-To: <1452586940-20137-1-git-send-email-dirk.behme@de.bosch.com>
+References: <1452586940-20137-1-git-send-email-dirk.behme@de.bosch.com>
+Message-ID: <56AF8B2B.6020705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cxgb4 prints an MMIO resource using the "0x%x" and "%p" format
-strings on the length and start, respective, but that
-triggers a compiler warning when using a 64-bit resource_size_t
-on a 32-bit architecture:
+On 12.01.2016 09:22, Dirk Behme wrote:
+> On a big.LITTLE system e.g. with Cortex A57 and A53 in case not all cores
+> are online at PMU probe time we might get
+>
+> hw perfevents: failed to probe PMU!
+> hw perfevents: failed to register PMU devices!
+>
+> making it unclear which cores failed, here.
+>
+> Add the name of the PMU which failed resulting in a more verbose and
+> helpful message
+>
+> hw perfevents: armv8_cortex_a53: failed to probe PMU!
+> hw perfevents: armv8_cortex_a53: failed to register PMU devices!
+>
+> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+> ---
+>   drivers/perf/arm_pmu.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> index be3755c..fc1f06f 100644
+> --- a/drivers/perf/arm_pmu.c
+> +++ b/drivers/perf/arm_pmu.c
+> @@ -904,7 +904,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+>   	}
+>
+>   	if (ret) {
+> -		pr_info("failed to probe PMU!\n");
+> +		pr_info("%s: failed to probe PMU!\n", pmu->name);
+>   		goto out_free;
+>   	}
+>
+> @@ -921,7 +921,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+>   out_destroy:
+>   	cpu_pmu_destroy(pmu);
+>   out_free:
+> -	pr_info("failed to register PMU devices!\n");
+> +	pr_info("%s: failed to register PMU devices!\n", pmu->name);
+>   	kfree(pmu);
+>   	return ret;
+>   }
 
-drivers/infiniband/hw/cxgb4/device.c: In function 'c4iw_rdev_open':
-drivers/infiniband/hw/cxgb4/device.c:807:7: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-       (void *)pci_resource_start(rdev->lldi.pdev, 2),
 
-This changes the format string to use %pR instead, which pretty-prints
-the resource, avoids the warning and is shorter.
+Any comments on this?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-This is an old warning I see rarely on ARM randconfig builds.
+If not, how to get this applied?
 
-diff --git a/drivers/infiniband/hw/cxgb4/device.c b/drivers/infiniband/hw/cxgb4/device.c
-index 8024ea4417b8..ebd60a20f148 100644
---- a/drivers/infiniband/hw/cxgb4/device.c
-+++ b/drivers/infiniband/hw/cxgb4/device.c
-@@ -801,10 +801,9 @@ static int c4iw_rdev_open(struct c4iw_rdev *rdev)
- 	     rdev->lldi.vr->qp.size,
- 	     rdev->lldi.vr->cq.start,
- 	     rdev->lldi.vr->cq.size);
--	PDBG("udb len 0x%x udb base %p db_reg %p gts_reg %p "
-+	PDBG("udb %pR db_reg %p gts_reg %p "
- 	     "qpmask 0x%x cqmask 0x%x\n",
--	     (unsigned)pci_resource_len(rdev->lldi.pdev, 2),
--	     (void *)pci_resource_start(rdev->lldi.pdev, 2),
-+		&rdev->lldi.pdev->resource[2],
- 	     rdev->lldi.db_reg, rdev->lldi.gts_reg,
- 	     rdev->qpmask, rdev->cqmask);
- 
+Best regards
+
+Dirk
