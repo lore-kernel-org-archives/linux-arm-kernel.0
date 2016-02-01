@@ -1,47 +1,28 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Tue,  2 Feb 2016 04:26:58 +0800
-Subject: [PATCH v3 6/6] kvm: arm64: Add ACPI support for virt arch timer
-In-Reply-To: <1454358418-5157-1-git-send-email-fu.wei@linaro.org>
-References: <1454358418-5157-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1454358418-5157-7-git-send-email-fu.wei@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 1 Feb 2016 12:27:33 -0800
+Subject: [GIT PULL] vexpress fixes for v4.5
+In-Reply-To: <56AFA32C.4000901@arm.com>
+References: <56AFA32C.4000901@arm.com>
+Message-ID: <20160201202733.GA15279@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+On Mon, Feb 01, 2016 at 06:25:48PM +0000, Sudeep Holla wrote:
+> The following changes since commit 36f90b0a2ddd60823fe193a85e60ff1906c2a9b3:
+> 
+>   Linux 4.5-rc2 (2016-01-31 18:12:16 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
+> tags/vexpress-for-v4.5/fixes-rc2
+> 
+> for you to fetch changes up to aeb2ee5683e51305aff274d8b0a50af69b3ab310:
+> 
+>   arm64: dts: Add missing DMA Abort interrupt to Juno (2016-02-01 09:59:59
+> +0000)
 
-This patch adds ACPI/GTDT support for virt arch timer
-using the API in GTDT driver.
+Merged, thanks.
 
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
----
- virt/kvm/arm/arch_timer.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 0a279d3..4077347 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -385,6 +385,9 @@ static int kvm_timer_get_ppi(unsigned int *ppi)
- {
- 	struct device_node *np;
- 	int ret = -EINVAL;
-+#ifdef CONFIG_ACPI_GTDT
-+	struct arch_timer_data data;
-+#endif
- 
- 	np = of_find_matching_node(NULL, arch_timer_of_match);
- 	if (!np) {
-@@ -397,6 +400,11 @@ static int kvm_timer_get_ppi(unsigned int *ppi)
- 	of_node_put(np);
- 
- skip_of:
-+#ifdef CONFIG_ACPI_GTDT
-+	if (!*ppi && !gtdt_arch_timer_data_init(NULL, &data))
-+		*ppi = data.virt_ppi;
-+#endif
-+
- 	if (*ppi)
- 		return 0;
- 
--- 
-2.5.0
+-Olof
