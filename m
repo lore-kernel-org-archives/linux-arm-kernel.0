@@ -1,95 +1,287 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 1 Feb 2016 09:55:53 -0600
-Subject: [PATCH v4 2/6] dt-bindings: ARM: Mediatek: Document bindings for
- MT2701
-In-Reply-To: <1453353537.5384.33.camel@mtksdaap41>
-References: <1453271747-57397-1-git-send-email-jamesjj.liao@mediatek.com>
- <1453271747-57397-3-git-send-email-jamesjj.liao@mediatek.com>
- <20160120163236.GA21035@rob-hp-laptop> <1453353537.5384.33.camel@mtksdaap41>
-Message-ID: <CAL_JsqLJVLDbPqynmD9-Yc=JVGH4iLPfb2keA5G7c2fjitAsSQ@mail.gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 1 Feb 2016 17:08:26 +0100
+Subject: [PATCH V13 09/10] vfio, platform: add support for ACPI while
+ detecting the reset driver
+In-Reply-To: <1454106914-15857-10-git-send-email-okaya@codeaurora.org>
+References: <1454106914-15857-1-git-send-email-okaya@codeaurora.org>
+ <1454106914-15857-10-git-send-email-okaya@codeaurora.org>
+Message-ID: <56AF82FA.7000303@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 20, 2016 at 11:18 PM, James Liao <jamesjj.liao@mediatek.com> wrote:
-> Hi Rob,
->
-> On Wed, 2016-01-20 at 10:32 -0600, Rob Herring wrote:
->> On Wed, Jan 20, 2016 at 02:35:43PM +0800, James Liao wrote:
->> > This patch adds the binding documentation for apmixedsys, bdpsys,
->> > ethsys, hifsys, imgsys, infracfg, mmsys, pericfg, topckgen and
->> > vdecsys for Mediatek MT2701.
->> >
->> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
->> > Tested-by: John Crispin <blogic@openwrt.org>
->> > ---
->> >  .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |  1 +
->> >  .../bindings/arm/mediatek/mediatek,bdpsys.txt      | 22 ++++++++++++++++++++++
->> >  .../bindings/arm/mediatek/mediatek,ethsys.txt      | 22 ++++++++++++++++++++++
->> >  .../bindings/arm/mediatek/mediatek,hifsys.txt      | 22 ++++++++++++++++++++++
->> >  .../bindings/arm/mediatek/mediatek,imgsys.txt      |  1 +
->> >  .../bindings/arm/mediatek/mediatek,infracfg.txt    |  1 +
->> >  .../bindings/arm/mediatek/mediatek,mmsys.txt       |  1 +
->> >  .../bindings/arm/mediatek/mediatek,pericfg.txt     |  1 +
->> >  .../bindings/arm/mediatek/mediatek,topckgen.txt    |  1 +
->> >  .../bindings/arm/mediatek/mediatek,vdecsys.txt     |  1 +
->> >  10 files changed, 73 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
->> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
->> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,hifsys.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
->> > index 936166f..a701e19 100644
->> > --- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
->> > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
->> > @@ -6,6 +6,7 @@ The Mediatek apmixedsys controller provides the PLLs to the system.
->> >  Required Properties:
->> >
->> >  - compatible: Should be:
->> > +   - "mediatek,mt2701-apmixedsys"
->> >     - "mediatek,mt8135-apmixedsys"
->> >     - "mediatek,mt8173-apmixedsys"
->> >  - #clock-cells: Must be 1
->> > diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
->> > new file mode 100644
->> > index 0000000..4137196
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
->> > @@ -0,0 +1,22 @@
->> > +Mediatek bdpsys controller
->> > +============================
->> > +
->> > +The Mediatek bdpsys controller provides various clocks to the system.
->>
->> As you clarified these blocks provide more that just clocks. Please list
->> all the functions here and on the others.
->
-> Some blocks may provide clock and reset controller at the same time. But
+Hi Sinan,
+On 01/29/2016 11:35 PM, Sinan Kaya wrote:
+> The code is using the compatible DT string to associate a reset driver with
+> the actual device itself. The compatible string does not exist on ACPI
+> based systems. HID is the unique identifier for a device driver instead.
+> The change allows a driver to register with DT compatible string or ACPI
+> HID and then match the object with one of these conditions.
+> 
+> For ACPI systems, ACPI HID needs to match and compat in the registered
+> reset
+> driver needs to match for ACPI reset driver loading to work.
 
-Then say the block provides clocks and resets is all I'm asking for.
+Don't really get the sentence. For ACPI systems, a registered reset
+function is selected if its associated ACPI HID matches the device ACPI HID?
+> 
+> For OF based systems, DT compatible string needs to match and compat in the
+> registered reset driver needs to match for DT reset driver loading to work.
+same here
 
-> most of them will not provide functions directly. Instead, some DT
-> blocks which provide specific functions may refer to these controller
-> nodes due to it need to access the same register space.
->
-> For example, scpsys (the power domain provider) refers to infracfg
-> because it need to control infracfg registers when power on/off domains:
->
->         scpsys: scpsys at 10006000 {
->                 compatible = "mediatek,mt2701-scpsys";
->                 #power-domain-cells = <1>;
->                 reg = <0 0x10006000 0 0x1000>;
->                 infracfg = <&infracfg>;
->         };
->
-> So I think it should not need to list all functions for each blocks
-> here.
+I added Baptiste who is vfio platform driver sub-system maintainer.
 
-Sorry, but you do need to describe what functions the blocks provide.
+On my side I tested with of amd xgbe and I don't observe any regression.
 
-Also, if you are accessing the infracfg regs directly to modify clock
-registers outside of the clock driver, that is very bad design. The
-clock driver could assume that register values are not changing behind
-its back and it bypasses any locks around register accesses. I can see
-why it is needed though, but we really need a proper interface.
+Best Regards
 
-Rob
+Eric
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  .../vfio/platform/reset/vfio_platform_amdxgbe.c    |  3 +-
+>  .../platform/reset/vfio_platform_calxedaxgmac.c    |  3 +-
+>  drivers/vfio/platform/vfio_platform_common.c       | 80 +++++++++++++++++++---
+>  drivers/vfio/platform/vfio_platform_private.h      | 41 ++++++-----
+>  4 files changed, 96 insertions(+), 31 deletions(-)
+> 
+> diff --git a/drivers/vfio/platform/reset/vfio_platform_amdxgbe.c b/drivers/vfio/platform/reset/vfio_platform_amdxgbe.c
+> index d4030d0..cc5b4fa 100644
+> --- a/drivers/vfio/platform/reset/vfio_platform_amdxgbe.c
+> +++ b/drivers/vfio/platform/reset/vfio_platform_amdxgbe.c
+> @@ -119,7 +119,8 @@ int vfio_platform_amdxgbe_reset(struct vfio_platform_device *vdev)
+>  	return 0;
+>  }
+>  
+> -module_vfio_reset_handler("amd,xgbe-seattle-v1a", vfio_platform_amdxgbe_reset);
+> +module_vfio_reset_handler("amd,xgbe-seattle-v1a", NULL,
+> +			  vfio_platform_amdxgbe_reset);
+>  
+>  MODULE_VERSION("0.1");
+>  MODULE_LICENSE("GPL v2");
+> diff --git a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+> index e3d3d94..0e57529 100644
+> --- a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+> +++ b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+> @@ -77,7 +77,8 @@ int vfio_platform_calxedaxgmac_reset(struct vfio_platform_device *vdev)
+>  	return 0;
+>  }
+>  
+> -module_vfio_reset_handler("calxeda,hb-xgmac", vfio_platform_calxedaxgmac_reset);
+> +module_vfio_reset_handler("calxeda,hb-xgmac", NULL,
+> +			  vfio_platform_calxedaxgmac_reset);
+>  
+>  MODULE_VERSION(DRIVER_VERSION);
+>  MODULE_LICENSE("GPL v2");
+> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+> index 418cdd9..6927e05 100644
+> --- a/drivers/vfio/platform/vfio_platform_common.c
+> +++ b/drivers/vfio/platform/vfio_platform_common.c
+> @@ -13,6 +13,7 @@
+>   */
+>  
+>  #include <linux/device.h>
+> +#include <linux/acpi.h>
+>  #include <linux/iommu.h>
+>  #include <linux/module.h>
+>  #include <linux/mutex.h>
+> @@ -31,14 +32,22 @@ static LIST_HEAD(reset_list);
+>  static DEFINE_MUTEX(driver_lock);
+>  
+>  static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
+> -					struct module **module)
+> +				  const char *acpihid, struct module **module)
+>  {
+>  	struct vfio_platform_reset_node *iter;
+>  	vfio_platform_reset_fn_t reset_fn = NULL;
+>  
+>  	mutex_lock(&driver_lock);
+>  	list_for_each_entry(iter, &reset_list, link) {
+> -		if (!strcmp(iter->compat, compat) &&
+> +		if (acpihid && iter->acpihid &&
+> +		    !strcmp(iter->acpihid, acpihid) &&
+> +			try_module_get(iter->owner)) {
+> +			*module = iter->owner;
+> +			reset_fn = iter->reset;
+> +			break;
+> +		}
+> +		if (compat && iter->compat &&
+> +		    !strcmp(iter->compat, compat) &&
+>  			try_module_get(iter->owner)) {
+>  			*module = iter->owner;
+>  			reset_fn = iter->reset;
+> @@ -51,11 +60,12 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
+>  
+>  static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
+>  {
+> -	vdev->reset = vfio_platform_lookup_reset(vdev->compat,
+> -						&vdev->reset_module);
+> +	vdev->reset = vfio_platform_lookup_reset(vdev->compat, vdev->acpihid,
+> +						 &vdev->reset_module);
+>  	if (!vdev->reset) {
+>  		request_module("vfio-reset:%s", vdev->compat);
+>  		vdev->reset = vfio_platform_lookup_reset(vdev->compat,
+> +							 vdev->acpihid,
+>  							 &vdev->reset_module);
+>  	}
+>  }
+> @@ -541,6 +551,46 @@ static const struct vfio_device_ops vfio_platform_ops = {
+>  	.mmap		= vfio_platform_mmap,
+>  };
+>  
+> +#ifdef CONFIG_ACPI
+> +int vfio_platform_probe_acpi(struct vfio_platform_device *vdev,
+> +			     struct device *dev)
+> +{
+> +	struct acpi_device adev = ACPI_COMPANION(dev);
+> +
+> +	if (!adev)
+> +		return -EINVAL;
+> +
+> +	vdev->acpihid = acpi_device_hid(adev);
+> +	if (!vdev->acpihid) {
+> +		pr_err("VFIO: cannot find ACPI HID for %s\n",
+> +		       vdev->name);
+> +		return -EINVAL;
+> +	}
+> +	return 0;
+> +}
+> +#else
+> +int vfio_platform_probe_acpi(struct vfio_platform_device *vdev,
+> +			     struct device *dev)
+> +{
+> +	return -EINVAL;
+> +}
+> +#endif
+> +
+> +int vfio_platform_probe_of(struct vfio_platform_device *vdev,
+> +			   struct device *dev)
+> +{
+> +	int ret;
+> +
+> +	ret = device_property_read_string(dev, "compatible",
+> +					  &vdev->compat);
+> +	if (ret) {
+> +		pr_err("VFIO: cannot retrieve compat for %s\n",
+> +			vdev->name);
+> +		return -EINVAL;
+> +	}
+> +	return 0;
+> +}
+> +
+>  int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+>  			       struct device *dev)
+>  {
+> @@ -550,14 +600,14 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+>  	if (!vdev)
+>  		return -EINVAL;
+>  
+> -	ret = device_property_read_string(dev, "compatible", &vdev->compat);
+> -	if (ret) {
+> -		pr_err("VFIO: cannot retrieve compat for %s\n", vdev->name);
+> -		return -EINVAL;
+> -	}
+> +	ret = vfio_platform_probe_acpi(vdev, dev);
+> +	if (ret)
+> +		ret = vfio_platform_probe_of(vdev, dev);
+>  
+> -	vdev->device = dev;
+> +	if (ret)
+> +		return ret;
+>  
+> +	vdev->device = dev;
+>  	group = iommu_group_get(dev);
+>  	if (!group) {
+>  		pr_err("VFIO: No IOMMU group for device %s\n", vdev->name);
+> @@ -602,13 +652,21 @@ void __vfio_platform_register_reset(struct vfio_platform_reset_node *node)
+>  EXPORT_SYMBOL_GPL(__vfio_platform_register_reset);
+>  
+>  void vfio_platform_unregister_reset(const char *compat,
+> +				    const char *acpihid,
+>  				    vfio_platform_reset_fn_t fn)
+>  {
+>  	struct vfio_platform_reset_node *iter, *temp;
+>  
+>  	mutex_lock(&driver_lock);
+>  	list_for_each_entry_safe(iter, temp, &reset_list, link) {
+> -		if (!strcmp(iter->compat, compat) && (iter->reset == fn)) {
+> +		if (acpihid && iter->acpihid &&
+> +		    !strcmp(iter->acpihid, acpihid) && (iter->reset == fn)) {
+> +			list_del(&iter->link);
+> +			break;
+> +		}
+> +
+> +		if (compat && iter->compat &&
+> +		    !strcmp(iter->compat, compat) && (iter->reset == fn)) {
+>  			list_del(&iter->link);
+>  			break;
+>  		}
+> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+> index 42816dd..32feba3 100644
+> --- a/drivers/vfio/platform/vfio_platform_private.h
+> +++ b/drivers/vfio/platform/vfio_platform_private.h
+> @@ -58,6 +58,7 @@ struct vfio_platform_device {
+>  	struct mutex			igate;
+>  	struct module			*parent_module;
+>  	const char			*compat;
+> +	const char			*acpihid;
+>  	struct module			*reset_module;
+>  	struct device			*device;
+>  
+> @@ -79,6 +80,7 @@ typedef int (*vfio_platform_reset_fn_t)(struct vfio_platform_device *vdev);
+>  struct vfio_platform_reset_node {
+>  	struct list_head link;
+>  	char *compat;
+> +	char *acpihid;
+>  	struct module *owner;
+>  	vfio_platform_reset_fn_t reset;
+>  };
+> @@ -98,27 +100,30 @@ extern int vfio_platform_set_irqs_ioctl(struct vfio_platform_device *vdev,
+>  
+>  extern void __vfio_platform_register_reset(struct vfio_platform_reset_node *n);
+>  extern void vfio_platform_unregister_reset(const char *compat,
+> +					   const char *acpihid,
+>  					   vfio_platform_reset_fn_t fn);
+> -#define vfio_platform_register_reset(__compat, __reset)		\
+> -static struct vfio_platform_reset_node __reset ## _node = {	\
+> -	.owner = THIS_MODULE,					\
+> -	.compat = __compat,					\
+> -	.reset = __reset,					\
+> -};								\
+> +
+> +#define vfio_platform_register_reset(__compat, __acpihid, __reset)	\
+> +static struct vfio_platform_reset_node __reset ## _node = {		\
+> +	.owner = THIS_MODULE,						\
+> +	.compat = __compat,						\
+> +	.acpihid = __acpihid,						\
+> +	.reset = __reset,						\
+> +};									\
+>  __vfio_platform_register_reset(&__reset ## _node)
+>  
+> -#define module_vfio_reset_handler(compat, reset)		\
+> -MODULE_ALIAS("vfio-reset:" compat);				\
+> -static int __init reset ## _module_init(void)			\
+> -{								\
+> -	vfio_platform_register_reset(compat, reset);		\
+> -	return 0;						\
+> -};								\
+> -static void __exit reset ## _module_exit(void)			\
+> -{								\
+> -	vfio_platform_unregister_reset(compat, reset);		\
+> -};								\
+> -module_init(reset ## _module_init);				\
+> +#define module_vfio_reset_handler(compat, acpihid, reset)		\
+> +MODULE_ALIAS("vfio-reset:" compat);					\
+> +static int __init reset ## _module_init(void)				\
+> +{									\
+> +	vfio_platform_register_reset(compat, acpihid, reset);		\
+> +	return 0;							\
+> +};									\
+> +static void __exit reset ## _module_exit(void)				\
+> +{									\
+> +	vfio_platform_unregister_reset(compat, acpihid, reset);		\
+> +};									\
+> +module_init(reset ## _module_init);					\
+>  module_exit(reset ## _module_exit)
+>  
+>  #endif /* VFIO_PLATFORM_PRIVATE_H */
+> 
