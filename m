@@ -1,66 +1,103 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Mon,  1 Feb 2016 21:34:43 +0800
-Subject: [PATCH v5 0/4] mailbox: hisilicon: add Hi6220 mailbox driver
-Message-ID: <1454333687-20421-1-git-send-email-leo.yan@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 1 Feb 2016 14:35:03 +0100
+Subject: [PATCH v5sub2 0/8] arm64: implement virtual KASLR
+In-Reply-To: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu-AhLcatkDsQVeoFGJ+pTEwaW1Hy9M-fY1-VWvRc_E47w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi6220 mailbox supports up to 32 channels. Each channel is unidirectional
-with a maximum message size of 8 words. I/O is performed using register
-access (there is no DMA) and the cell raises an interrupt when messages
-are received.
+On 1 February 2016 at 14:09, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> At the request of Catalin, this series has been split off from my series
+> 'arm64: implement support for KASLR v4' [1]. This sub-series deals with
+> creating a relocatable binary, and randomizing the virtual placement of
+> the kernel itself, the modules and the linear region based on entropy
+> supplied by the bootloader in the /chosen/kaslr-seed DT property.
+>
+> Changes since v4:
+> - add randomization of the linear region, i.e., if the linear region is
+>   substantially larger than the space spanned by RAM, the mapping of RAM
+>   is moved to a random offset inside the linear region.
+> - dropped the CRC check in kaslr_early_init(), since the only code that may
+>   modify .data through __fixmap_remap_fdt() is instrumentation that should
+>   deal with that correctly (For instance, the branch profiling records taken
+>   branches in structs allocated in .data, and these counts will not be reset
+>   to 0 between the first and the second call to __mmap_switched())
+> - add Mark's ack to patch #4
+>
 
-This patch series is to implement Hi6220 mailbox driver. It registers
-two channels into framework for communication with MCU, one is tx channel
-and another is rx channel. Now mailbox driver is used to send message to
-MCU to control dynamic voltage and frequency scaling for CPU, GPU and DDR.
+NOTE: I have omitted the relative kallsyms and relative extable
+patches, since they already queued in akpm's tree. However, while the
+kallsyms patch is merely an optimization, the extable patches are in
+fact required for correct operation, since the build time sorting does
+not work on absolute extables (this is due to the fact that the
+resolution of the relocations is deferred until runtime, and so the
+extable addresses are all zero at sorting time)
 
-Changes from v4:
-* According to Jassi's suggestion, using DT binding to register channels
-* Change to use operating-points-v2 to register operating points
-
-Changes from v3:
-* The patch series for enabling idle state for Hi6220 has reserved memory
-  regions, so this series will not include it anymore
-* Refined mailbox driver according to Jassi's suggestion;
-  Removed kfifo from mailbox driver;
-  Removed spinlock for ipc registers accessing, due every channel has its
-  own dedicated bit in ipc register and readl/writel will introduce memory
-  barrier, so don't need spinlock to protect ipc registers accessing
-* After mailbox driver is ready, can use patch 4 to enable CPU's OPPs and
-  stub clock driver; finally can enable CPUFreq driver for CPU frequency
-  scaling
-
-Changes from v2:
-* Get rid of unused memory regions from memory node in DT, and don't use
-  reserved-memory node according to Mark and Leif's suggestion; Haojian also
-  has updated UEFI for efi memory info
-
-Changes from v1:
-* Correct lock usage for SMP scenario
-
-Changes from RFC:
-* According to Jassi's review, totally remove the abstract common driver
-  layer and only commit driver dedicated for Hi6220
-* According to Paul Bolle's review, fix typo issue for Kconfig and remove
-  unnecessary dependency with OF and fix minor for mailbox driver
-* Refine a little for dts nodes
+http://ozlabs.org/~akpm/mmotm/broken-out/extable-add-support-for-relative-extables-to-search-and-sort-routines.patch
+http://ozlabs.org/~akpm/mmotm/broken-out/arm64-switch-to-relative-exception-tables.patch
 
 
-Leo Yan (4):
-  dt-bindings: mailbox: Document Hi6220 mailbox driver
-  mailbox: Hi6220: add mailbox driver
-  arm64: dts: add mailbox node for Hi6220
-  arm64: dts: add Hi6220's stub clock node
 
- .../bindings/mailbox/hisilicon,hi6220-mailbox.txt  |  90 +++++
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  67 ++++
- drivers/mailbox/Kconfig                            |   8 +
- drivers/mailbox/Makefile                           |   2 +
- drivers/mailbox/hi6220-mailbox.c                   | 407 +++++++++++++++++++++
- 5 files changed, 574 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
- create mode 100644 drivers/mailbox/hi6220-mailbox.c
-
--- 
-1.9.1
+> Patch #1 adds support for resolving cross-module branches via veneers if the
+> module is located too far from the target. This should not be necessary in the
+> common case even with KASRL enabled, but since the space around the kernel image
+> will no longer be strictly reserved for modules, there is a slight chance that
+> the region may be exhausted, in which case modules will be moved further away
+> from the kernel (and each other)
+>
+> Patches #2 and #3 deal with the fact that relocations of 64-bit values are
+> deferred to runtime when building a PIE executable, and some values are required
+> before the relocation routine executes (either in the code, or as an externally
+> visible constant in the Image header)
+>
+> Patch #4 rehuffles asm/elf.h so we can use its preprocessor constants in head.S
+>
+> Patch #5 and #6 implement building vmlinux as a PIE (Position Independent
+> Executable) binary, which is emitted with relocation information that is
+> processed by the program itself in the early boot code.
+>
+> Patch #7 implements KASLR, i.e., CONFIG_RANDOMIZE_BASE for the core kernel and
+> for the module region.
+>
+> Patch #8 implements KASLR for the linear region.
+>
+> [1] http://thread.gmane.org/gmane.linux.kernel/2135931
+>
+> Ard Biesheuvel (8):
+>   arm64: add support for module PLTs
+>   arm64: avoid R_AARCH64_ABS64 relocations for Image header fields
+>   arm64: avoid dynamic relocations in early boot code
+>   arm64: make asm/elf.h available to asm files
+>   scripts/sortextable: add support for ET_DYN binaries
+>   arm64: add support for building vmlinux as a relocatable PIE binary
+>   arm64: add support for kernel ASLR
+>   arm64: kaslr: randomize the linear region
+>
+>  arch/arm64/Kconfig                 |  34 ++++
+>  arch/arm64/Makefile                |  10 +-
+>  arch/arm64/include/asm/assembler.h |  11 ++
+>  arch/arm64/include/asm/elf.h       |  24 ++-
+>  arch/arm64/include/asm/memory.h    |   5 +-
+>  arch/arm64/include/asm/module.h    |  11 ++
+>  arch/arm64/kernel/Makefile         |   2 +
+>  arch/arm64/kernel/efi-entry.S      |   2 +-
+>  arch/arm64/kernel/head.S           | 128 +++++++++++--
+>  arch/arm64/kernel/image.h          |  32 ++--
+>  arch/arm64/kernel/kaslr.c          | 143 ++++++++++++++
+>  arch/arm64/kernel/module-plts.c    | 201 ++++++++++++++++++++
+>  arch/arm64/kernel/module.c         |  20 +-
+>  arch/arm64/kernel/module.lds       |   3 +
+>  arch/arm64/kernel/setup.c          |  29 +++
+>  arch/arm64/kernel/vmlinux.lds.S    |  16 ++
+>  arch/arm64/mm/init.c               |  22 ++-
+>  arch/arm64/mm/mmu.c                |  33 +++-
+>  scripts/sortextable.c              |   8 +-
+>  19 files changed, 672 insertions(+), 62 deletions(-)
+>  create mode 100644 arch/arm64/kernel/kaslr.c
+>  create mode 100644 arch/arm64/kernel/module-plts.c
+>  create mode 100644 arch/arm64/kernel/module.lds
+>
+> --
+> 2.5.0
+>
