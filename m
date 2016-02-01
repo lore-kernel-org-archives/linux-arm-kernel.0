@@ -1,53 +1,63 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 1 Feb 2016 21:24:58 +0100
-Subject: [PATCH RFC 11/11] clk: sunxi: rewrite sun8i-a23-mbus-clk using
- the simpler composite clk
-In-Reply-To: <CAGb2v658SFy6SF87=obYLW1YAxvk0T4dRuBU-F1oLT3Yq=PgTQ@mail.gmail.com>
-References: <1453727747-23307-1-git-send-email-wens@csie.org>
- <1453727747-23307-12-git-send-email-wens@csie.org>
- <20160127174932.GP4317@lukather>
- <CAGb2v658SFy6SF87=obYLW1YAxvk0T4dRuBU-F1oLT3Yq=PgTQ@mail.gmail.com>
-Message-ID: <20160201202458.GJ4652@lukather>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Tue,  2 Feb 2016 04:26:52 +0800
+Subject: [PATCH v3 0/6] acpi, clocksource,
+ kvm: add GTDT and ARM memory-mapped timer support
+Message-ID: <1454358418-5157-1-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Fu Wei <fu.wei@linaro.org>
 
-On Thu, Jan 28, 2016 at 10:41:33AM +0800, Chen-Yu Tsai wrote:
-> Hi,
-> 
-> On Thu, Jan 28, 2016 at 1:49 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Mon, Jan 25, 2016 at 09:15:47PM +0800, Chen-Yu Tsai wrote:
-> >> sun8i-a23-mbus-clk used sunxi's factors clk, which is nice for very
-> >> complicated clocks, but is not really needed here.
-> >>
-> >> Convert sun8i-a23-mbus-clk to use clk_composite, as it is a gate + mux
-> >> + divider. This makes the code easier to understand.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >
-> > Applied, thanks!
-> > Maxime
-> 
-> Given your suggestion for extending and generalizing factors clk
-> clock rate calculations, maybe we just leave this one out and use
-> the new stuff later?
+This patchset:
+    (1)Introduce ACPI GTDT parser: drivers/acpi/gtdt.c
+    Parse all kinds of timer in GTDT table of ACPI:arch timer,
+    memory-mapped timer and SBSA Generic Watchdog timer.
+    This driver can help to simplify all the relevant timer drivers,
+    and separate all the ACPI GTDT knowledge from them.
 
-My suggestion was only about the core of the clk-factors, the
-"external" API would not change, so I'm guessing it's still relevant.
+    (2)Simplify ACPI code for arch timer in arm_arch_timer.c
 
-Thanks!
-Maxime
+    (3)Add memory-mapped timer support in arm_arch_timer.c
+
+    (4)Add arm_arch_timer get ppi from DT and GTDT support for kvm
+    in virt/kvm/arm/arch_timer.c
+
+Changelog:
+v3: Improve GTDT driver code:
+      (1)improve pr_* by defining pr_fmt(fmt)
+      (2)simplify gtdt_sbsa_gwdt_init
+      (3)improve gtdt_arch_timer_data_init, if table is NULL, it will try
+      to get GTDT table.
+    Move enum ppi_nr to arm_arch_timer.h, and add enum spi_nr.
+    Add arm_arch_timer get ppi from DT and GTDT support for kvm.
+
+v2: https://lkml.org/lkml/2015/12/2/10
+    Rebase to latest kernel version(4.4-rc3).
+    Fix the bug about the config problem,
+    use CONFIG_ACPI_GTDT instead of CONFIG_ACPI in arm_arch_timer.c
+
+v1: The first upstreaming version: https://lkml.org/lkml/2015/10/28/553
+
+Fu Wei (5):
+  ACPI: add GTDT table parse driver into ACPI driver
+  clocksource: simplify ACPI code in arm_arch_timer.c
+  clocksource: add memory-mapped timer support in arm_arch_timer.c
+  clocksource: move some enums to arm_arch_timer.h
+  kvm: arm64: Add ACPI support for virt arch timer
+
+Wei Huang (1):
+  kvm: arm64: wrapping DT support for virt arch timer
+
+ drivers/acpi/Kconfig                 |   9 +
+ drivers/acpi/Makefile                |   1 +
+ drivers/acpi/gtdt.c                  | 375 +++++++++++++++++++++++++++++++++++
+ drivers/clocksource/Kconfig          |   1 +
+ drivers/clocksource/arm_arch_timer.c | 191 +++++++++++++-----
+ include/clocksource/arm_arch_timer.h |  33 +++
+ include/linux/acpi.h                 |  17 ++
+ virt/kvm/arm/arch_timer.c            |  57 ++++--
+ 8 files changed, 620 insertions(+), 64 deletions(-)
+ create mode 100644 drivers/acpi/gtdt.c
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160201/78d4db1a/attachment.sig>
+2.5.0
