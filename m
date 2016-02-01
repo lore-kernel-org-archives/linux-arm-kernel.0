@@ -1,112 +1,28 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Tue,  2 Feb 2016 04:26:57 +0800
-Subject: [PATCH v3 5/6] kvm: arm64: wrapping DT support for virt arch timer
-In-Reply-To: <1454358418-5157-1-git-send-email-fu.wei@linaro.org>
-References: <1454358418-5157-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1454358418-5157-6-git-send-email-fu.wei@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 1 Feb 2016 12:17:45 -0800
+Subject: [PATCH] bus: uniphier-system-bus: revive tristate prompt
+In-Reply-To: <1453557988-2874-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1453557988-2874-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20160201201745.GA13508@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Huang <wei@redhat.com>
+On Sat, Jan 23, 2016 at 11:06:28PM +0900, Masahiro Yamada wrote:
+> At first, commit 4b7f48d395a7 ("bus: uniphier-system-bus: add UniPhier
+> System Bus driver") introduced this driver as a tristate one.
+> 
+> Then, commit 326ea45aa827 ("bus: uniphier: allow only built-in
+> driver") temporarily made it boolean in order to fix a link error
+> in case it is compiled as a module.
+> 
+> The root cause was fixed by commit b80443c2211c ("of/platform: export
+> of_default_bus_match_table").
+> 
+> Now this driver can really be a module.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-This patches wrapping DT support for virt arch timer into a function.
+Applied to fixes.
 
-[Fu Wei: improve the DT support, and separate ACPI support]
 
-Signed-off-by: Alexander Spyridaki <a.spyridakis@virtualopensystems.com>
-Signed-off-by: Wei Huang <wei@redhat.com>
-Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
----
- virt/kvm/arm/arch_timer.c | 49 +++++++++++++++++++++++++++++++----------------
- 1 file changed, 32 insertions(+), 17 deletions(-)
-
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 69bca185..0a279d3 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -381,9 +381,30 @@ static const struct of_device_id arch_timer_of_match[] = {
- 	{},
- };
- 
--int kvm_timer_hyp_init(void)
-+static int kvm_timer_get_ppi(unsigned int *ppi)
- {
- 	struct device_node *np;
-+	int ret = -EINVAL;
-+
-+	np = of_find_matching_node(NULL, arch_timer_of_match);
-+	if (!np) {
-+		ret = -ENODEV;
-+		*ppi = 0;
-+		goto skip_of;
-+	}
-+
-+	*ppi = irq_of_parse_and_map(np, VIRT_PPI);
-+	of_node_put(np);
-+
-+skip_of:
-+	if (*ppi)
-+		return 0;
-+
-+	return ret;
-+}
-+
-+int kvm_timer_hyp_init(void)
-+{
- 	unsigned int ppi;
- 	int err;
- 
-@@ -391,17 +412,11 @@ int kvm_timer_hyp_init(void)
- 	if (!timecounter)
- 		return -ENODEV;
- 
--	np = of_find_matching_node(NULL, arch_timer_of_match);
--	if (!np) {
--		kvm_err("kvm_arch_timer: can't find DT node\n");
--		return -ENODEV;
--	}
--
--	ppi = irq_of_parse_and_map(np, 2);
--	if (!ppi) {
--		kvm_err("kvm_arch_timer: no virtual timer interrupt\n");
--		err = -EINVAL;
--		goto out;
-+	err = kvm_timer_get_ppi(&ppi);
-+	if (err) {
-+		kvm_err("kvm_arch_timer: can't find virtual timer info or "
-+			"config virtual timer interrupt.\n");
-+		return err;
- 	}
- 
- 	err = request_percpu_irq(ppi, kvm_arch_timer_handler,
-@@ -409,7 +424,7 @@ int kvm_timer_hyp_init(void)
- 	if (err) {
- 		kvm_err("kvm_arch_timer: can't request interrupt %d (%d)\n",
- 			ppi, err);
--		goto out;
-+		return err;
- 	}
- 
- 	host_vtimer_irq = ppi;
-@@ -426,14 +441,14 @@ int kvm_timer_hyp_init(void)
- 		goto out_free;
- 	}
- 
--	kvm_info("%s IRQ%d\n", np->name, ppi);
-+	kvm_info("timer IRQ%d.\n", ppi);
- 	on_each_cpu(kvm_timer_init_interrupt, NULL, 1);
- 
--	goto out;
-+	return 0;
-+
- out_free:
- 	free_percpu_irq(ppi, kvm_get_running_vcpus());
--out:
--	of_node_put(np);
-+
- 	return err;
- }
- 
--- 
-2.5.0
+-Olof
