@@ -1,41 +1,32 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 1 Feb 2016 20:46:26 +0100
-Subject: [PATCH v3 2/2] clk: sunxi: Refactor A31 PLL6 so that it can be
- reused
-In-Reply-To: <CAGb2v67v6-BCPp2u7vieCGnCAsHFv4XjnRXvfT1vZNHc_Ok0UA@mail.gmail.com>
-References: <1454008958-12655-1-git-send-email-maxime.ripard@free-electrons.com>
- <1454008958-12655-2-git-send-email-maxime.ripard@free-electrons.com>
- <56AB38C6.2010909@gmail.com>
- <CAGb2v67v6-BCPp2u7vieCGnCAsHFv4XjnRXvfT1vZNHc_Ok0UA@mail.gmail.com>
-Message-ID: <20160201194626.GH4652@lukather>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 1 Feb 2016 11:58:16 -0800
+Subject: [PATCH v2] clocksource/arm_arch_timer: Enable and verify MMIO
+ access
+In-Reply-To: <71bf617f4083b116b2aeab24f13fc5fed99a816f.1454327031.git.robin.murphy@arm.com>
+References: <71bf617f4083b116b2aeab24f13fc5fed99a816f.1454327031.git.robin.murphy@arm.com>
+Message-ID: <20160201195816.GL4848@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 29, 2016 at 06:14:48PM +0800, Chen-Yu Tsai wrote:
-> >> @@ -173,7 +173,7 @@
-> >>                       #clock-cells = <0>;
-> >>                       compatible = "allwinner,sun8i-h3-ahb2-clk";
-> >>                       reg = <0x01c2005c 0x4>;
-> >> -                     clocks = <&ahb1>, <&pll6d2>;
-> >> +                     clocks = <&ahb1>, <&pll6>;
-> >
-> > According to the datasheet AHB2 really has PLL6 / 2 as parent, not PLL6
-> > directly.
+On 02/01, Robin Murphy wrote:
+> So far, we have been blindly assuming that having access to a
+> memory-mapped timer frame implies that the individual elements of that
+> frame frame are already enabled. Whilst it's the firmware's job to give
+> us non-secure access to frames in the first place, we should not rely
+> on implementations always being generous enough to also configure CNTACR
+> for those non-secure frames (e.g. [1]).
 > 
-> Thanks for the save. So we should keep pll6d2_clk.
+> Explicitly enable feature-level access per-frame, and verify that the
+> access we want is really implemented before trying to make use of it.
+> 
+> [1]:https://github.com/ARM-software/tf-issues/issues/170
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
 
-Indeed thanks for the review. Will fix for v4.
-
-Maxime
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Tested-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160201/48505a6b/attachment.sig>
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
