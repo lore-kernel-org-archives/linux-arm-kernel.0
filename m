@@ -1,193 +1,261 @@
-From: k@japko.eu (Krzysztof Adamski)
-Date: Mon, 1 Feb 2016 11:12:26 +0100
-Subject: [PATCH] pinctrl: sunxi: Add H3 R_PIO controller support
-Message-ID: <20160201101225.GA19687@box2.japko.eu>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Feb 2016 11:19:10 +0100
+Subject: [PATCH] clk: vt8500: don't return possibly uninitialized data
+Message-ID: <4790407.6zgSQCdsSB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H3 has additional PIO controller similar to what we can find on A23.
-It's a 12 pin port, described in H3 Datasheet rev 1.1, pages 345-350.
+The clk-vt8500.c driver would previously enter an endless loop
+when invalid settings got requested, this was now fixed. However,
+the driver will now return uninitialized data for a subset of those
+cases instead, as the gcc correctly warns:
 
-Signed-off-by: Krzysztof Adamski <k@japko.eu>
----
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
- arch/arm/boot/dts/sun8i-h3.dtsi                    |  12 +++
- drivers/pinctrl/sunxi/Kconfig                      |   4 +
- drivers/pinctrl/sunxi/Makefile                     |   1 +
- drivers/pinctrl/sunxi/pinctrl-sun8i-h3-r.c         | 105 +++++++++++++++++++++
- 5 files changed, 123 insertions(+)
- create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun8i-h3-r.c
+clk/clk-vt8500.c: In function 'wm8650_find_pll_bits':
+clk/clk-vt8500.c:423:12: error: 'best_div2' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+  *divisor2 = best_div2;
+            ^
+clk/clk-vt8500.c:422:12: error: 'best_div1' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+  *divisor1 = best_div1;
+            ^
+clk/clk-vt8500.c:421:14: error: 'best_mul' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+  *multiplier = best_mul;
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-index 9213b27..730a917 100644
---- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-@@ -20,6 +20,7 @@ Required properties:
-   "allwinner,sun9i-a80-pinctrl"
-   "allwinner,sun9i-a80-r-pinctrl"
-   "allwinner,sun8i-a83t-pinctrl"
-+  "allwinner,sun8i-h3-r-pinctrl"
-   "allwinner,sun8i-h3-pinctrl"
+This reworks the error handling in the driver so we now return
+-EINVAL from clk_round_rate() and clk_set_rate() when we get
+impossible inputs.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 090341b0a95d ("clk: vt8500: fix sign of possible PLL values")
+
+diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
+index 98c4492d2c0d..b0f76a84f1e9 100644
+--- a/drivers/clk/clk-vt8500.c
++++ b/drivers/clk/clk-vt8500.c
+@@ -355,7 +355,7 @@ CLK_OF_DECLARE(vt8500_device, "via,vt8500-device-clock", vtwm_device_clk_init);
+ #define WM8850_BITS_TO_VAL(m, d1, d2)					\
+ 		((((m / 2) - 1) << 16) | ((d1 - 1) << 8) | d2)
  
- - reg: Should contain the register physical address and length for the
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 1524130e..745f64c 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -493,5 +493,17 @@
- 			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
- 		};
+-static void vt8500_find_pll_bits(unsigned long rate, unsigned long parent_rate,
++static int vt8500_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ 				u32 *multiplier, u32 *prediv)
+ {
+ 	unsigned long tclk;
+@@ -365,7 +365,7 @@ static void vt8500_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ 		pr_err("%s: requested rate out of range\n", __func__);
+ 		*multiplier = 0;
+ 		*prediv = 1;
+-		return;
++		return -EINVAL;
+ 	}
+ 	if (rate <= parent_rate * 31)
+ 		/* use the prediv to double the resolution */
+@@ -379,9 +379,11 @@ static void vt8500_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ 	if (tclk != rate)
+ 		pr_warn("%s: requested rate %lu, found rate %lu\n", __func__,
+ 								rate, tclk);
 +
-+		r_pio: pinctrl at 01f02c00 {
-+			compatible = "allwinner,sun8i-h3-r-pinctrl";
-+			reg = <0x01f02c00 0x400>;
-+			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&bus_gates 69>;
-+			gpio-controller;
-+			#gpio-cells = <3>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
-+
- 	};
- };
-diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
-index f8dbc8b..75a26c9 100644
---- a/drivers/pinctrl/sunxi/Kconfig
-+++ b/drivers/pinctrl/sunxi/Kconfig
-@@ -55,6 +55,10 @@ config PINCTRL_SUN8I_H3
- 	def_bool MACH_SUN8I
- 	select PINCTRL_SUNXI_COMMON
++	return 0;
+ }
  
-+config PINCTRL_SUN8I_H3_R
-+	def_bool MACH_SUN8I
-+	select PINCTRL_SUNXI_COMMON
+-static void wm8650_find_pll_bits(unsigned long rate, unsigned long parent_rate,
++static int wm8650_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ 				u32 *multiplier, u32 *divisor1, u32 *divisor2)
+ {
+ 	u32 mul, div1;
+@@ -404,7 +406,7 @@ static void wm8650_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ 					*multiplier = mul;
+ 					*divisor1 = div1;
+ 					*divisor2 = div2;
+-					return;
++					return 0;
+ 				}
+ 
+ 				if (rate_err < best_err) {
+@@ -415,12 +417,19 @@ static void wm8650_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ 				}
+ 			}
+ 
++	if (best_err == (unsigned long)-1) {
++		pr_warn("%s: impossible rate %lu\n", __func__, rate);
++		return -EINVAL;
++	}
 +
- config PINCTRL_SUN9I_A80
- 	def_bool MACH_SUN9I
- 	select PINCTRL_SUNXI_COMMON
-diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
-index ef82f22..a5d56f1 100644
---- a/drivers/pinctrl/sunxi/Makefile
-+++ b/drivers/pinctrl/sunxi/Makefile
-@@ -14,5 +14,6 @@ obj-$(CONFIG_PINCTRL_SUN8I_A23_R)	+= pinctrl-sun8i-a23-r.o
- obj-$(CONFIG_PINCTRL_SUN8I_A33)		+= pinctrl-sun8i-a33.o
- obj-$(CONFIG_PINCTRL_SUN8I_A83T)	+= pinctrl-sun8i-a83t.o
- obj-$(CONFIG_PINCTRL_SUN8I_H3)		+= pinctrl-sun8i-h3.o
-+obj-$(CONFIG_PINCTRL_SUN8I_H3_R)	+= pinctrl-sun8i-h3-r.o
- obj-$(CONFIG_PINCTRL_SUN9I_A80)		+= pinctrl-sun9i-a80.o
- obj-$(CONFIG_PINCTRL_SUN9I_A80_R)	+= pinctrl-sun9i-a80-r.o
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-h3-r.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-h3-r.c
-new file mode 100644
-index 0000000..6271ceb
---- /dev/null
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-h3-r.c
-@@ -0,0 +1,105 @@
-+/*
-+ * Allwinner H3 SoCs pinctrl driver.
-+ *
-+ * Copyright (C) 2016 Krzysztof Adamski <k@japko.eu>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
+ 	/* if we got here, it wasn't an exact match */
+ 	pr_warn("%s: requested rate %lu, found rate %lu\n", __func__, rate,
+ 							rate - best_err);
+ 	*multiplier = best_mul;
+ 	*divisor1 = best_div1;
+ 	*divisor2 = best_div2;
 +
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/pinctrl/pinctrl.h>
++	return 0;
+ }
+ 
+ static u32 wm8750_get_filter(u32 parent_rate, u32 divisor1)
+@@ -450,7 +459,7 @@ static u32 wm8750_get_filter(u32 parent_rate, u32 divisor1)
+ 	return 0;
+ }
+ 
+-static void wm8750_find_pll_bits(unsigned long rate, unsigned long parent_rate,
++static int wm8750_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ 				u32 *filter, u32 *multiplier, u32 *divisor1, u32 *divisor2)
+ {
+ 	u32 mul;
+@@ -474,7 +483,7 @@ static void wm8750_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ 					*multiplier = mul;
+ 					*divisor1 = div1;
+ 					*divisor2 = div2;
+-					return;
++					return 0;
+ 				}
+ 
+ 				if (rate_err < best_err) {
+@@ -485,6 +494,11 @@ static void wm8750_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ 				}
+ 			}
+ 
++	if (best_err == (unsigned long)-1) {
++		pr_warn("%s: impossible rate %lu\n", __func__, rate);
++		return -EINVAL;
++	}
 +
-+#include "pinctrl-sunxi.h"
+ 	/* if we got here, it wasn't an exact match */
+ 	pr_warn("%s: requested rate %lu, found rate %lu\n", __func__, rate,
+ 							rate - best_err);
+@@ -493,9 +507,11 @@ static void wm8750_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ 	*multiplier = best_mul;
+ 	*divisor1 = best_div1;
+ 	*divisor2 = best_div2;
 +
-+static const struct sunxi_desc_pin sun8i_h3_r_pins[] = {
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 0),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_twi"),         /* SCK */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 0)),	/* PL_EINT0 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 1),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_twi"),         /* SDA */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 1)),	/* PL_EINT1 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 2),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_uart"),        /* TX */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 2)),	/* PL_EINT2 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 3),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_uart"),        /* RX */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 3)),	/* PL_EINT3 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 4),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_jtag"),        /* MS */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 4)),	/* PL_EINT4 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 5),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_jtag"),        /* CK */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 5)),	/* PL_EINT5 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 6),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_jtag"),        /* DO */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 6)),	/* PL_EINT6 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 7),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_jtag"),        /* DI */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 7)),	/* PL_EINT7 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 8),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 8)),	/* PL_EINT8 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 9),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 9)),	/* PL_EINT9 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 10),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_pwn"),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 10)),	/* PL_EINT10 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 11),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_cir_rx"),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 11)),	/* PL_EINT11 */
-+};
++	return 0;
+ }
+ 
+-static void wm8850_find_pll_bits(unsigned long rate, unsigned long parent_rate,
++static int wm8850_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ 				u32 *multiplier, u32 *divisor1, u32 *divisor2)
+ {
+ 	u32 mul;
+@@ -519,7 +535,7 @@ static void wm8850_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ 					*multiplier = mul;
+ 					*divisor1 = div1;
+ 					*divisor2 = div2;
+-					return;
++					return 0;
+ 				}
+ 
+ 				if (rate_err < best_err) {
+@@ -530,6 +546,11 @@ static void wm8850_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ 				}
+ 			}
+ 
++	if (best_err == (unsigned long)-1) {
++		pr_warn("%s: impossible rate %lu\n", __func__, rate);
++		return -EINVAL;
++	}
 +
-+static const struct sunxi_pinctrl_desc sun8i_h3_r_pinctrl_data = {
-+	.pins = sun8i_h3_r_pins,
-+	.npins = ARRAY_SIZE(sun8i_h3_r_pins),
-+	.irq_banks = 1,
-+	.pin_base = PL_BASE,
-+};
+ 	/* if we got here, it wasn't an exact match */
+ 	pr_warn("%s: requested rate %lu, found rate %lu\n", __func__, rate,
+ 							rate - best_err);
+@@ -537,6 +558,8 @@ static void wm8850_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+ 	*multiplier = best_mul;
+ 	*divisor1 = best_div1;
+ 	*divisor2 = best_div2;
 +
-+static int sun8i_h3_r_pinctrl_probe(struct platform_device *pdev)
-+{
-+	return sunxi_pinctrl_init(pdev,
-+				  &sun8i_h3_r_pinctrl_data);
-+}
++	return 0;
+ }
+ 
+ static int vtwm_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+@@ -546,31 +569,39 @@ static int vtwm_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	u32 filter, mul, div1, div2;
+ 	u32 pll_val;
+ 	unsigned long flags = 0;
++	int ret;
+ 
+ 	/* sanity check */
+ 
+ 	switch (pll->type) {
+ 	case PLL_TYPE_VT8500:
+-		vt8500_find_pll_bits(rate, parent_rate, &mul, &div1);
+-		pll_val = VT8500_BITS_TO_VAL(mul, div1);
++		ret = vt8500_find_pll_bits(rate, parent_rate, &mul, &div1);
++		if (!ret)
++			pll_val = VT8500_BITS_TO_VAL(mul, div1);
+ 		break;
+ 	case PLL_TYPE_WM8650:
+-		wm8650_find_pll_bits(rate, parent_rate, &mul, &div1, &div2);
+-		pll_val = WM8650_BITS_TO_VAL(mul, div1, div2);
++		ret = wm8650_find_pll_bits(rate, parent_rate, &mul, &div1, &div2);
++		if (!ret)
++			pll_val = WM8650_BITS_TO_VAL(mul, div1, div2);
+ 		break;
+ 	case PLL_TYPE_WM8750:
+-		wm8750_find_pll_bits(rate, parent_rate, &filter, &mul, &div1, &div2);
+-		pll_val = WM8750_BITS_TO_VAL(filter, mul, div1, div2);
++		ret = wm8750_find_pll_bits(rate, parent_rate, &filter, &mul, &div1, &div2);
++		if (!ret)
++			pll_val = WM8750_BITS_TO_VAL(filter, mul, div1, div2);
+ 		break;
+ 	case PLL_TYPE_WM8850:
+-		wm8850_find_pll_bits(rate, parent_rate, &mul, &div1, &div2);
+-		pll_val = WM8850_BITS_TO_VAL(mul, div1, div2);
++		ret = wm8850_find_pll_bits(rate, parent_rate, &mul, &div1, &div2);
++		if (!ret)
++			pll_val = WM8850_BITS_TO_VAL(mul, div1, div2);
+ 		break;
+ 	default:
+ 		pr_err("%s: invalid pll type\n", __func__);
+-		return 0;
++		ret = -EINVAL;
+ 	}
+ 
++	if (ret)
++		return ret;
 +
-+static const struct of_device_id sun8i_h3_r_pinctrl_match[] = {
-+	{ .compatible = "allwinner,sun8i-h3-r-pinctrl", },
-+	{}
-+};
+ 	spin_lock_irqsave(pll->lock, flags);
+ 
+ 	vt8500_pmc_wait_busy();
+@@ -588,28 +619,36 @@ static long vtwm_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct clk_pll *pll = to_clk_pll(hw);
+ 	u32 filter, mul, div1, div2;
+ 	long round_rate;
++	int ret;
+ 
+ 	switch (pll->type) {
+ 	case PLL_TYPE_VT8500:
+-		vt8500_find_pll_bits(rate, *prate, &mul, &div1);
+-		round_rate = VT8500_BITS_TO_FREQ(*prate, mul, div1);
++		ret = vt8500_find_pll_bits(rate, *prate, &mul, &div1);
++		if (!ret)
++			round_rate = VT8500_BITS_TO_FREQ(*prate, mul, div1);
+ 		break;
+ 	case PLL_TYPE_WM8650:
+-		wm8650_find_pll_bits(rate, *prate, &mul, &div1, &div2);
+-		round_rate = WM8650_BITS_TO_FREQ(*prate, mul, div1, div2);
++		ret = wm8650_find_pll_bits(rate, *prate, &mul, &div1, &div2);
++		if (!ret)
++			round_rate = WM8650_BITS_TO_FREQ(*prate, mul, div1, div2);
+ 		break;
+ 	case PLL_TYPE_WM8750:
+-		wm8750_find_pll_bits(rate, *prate, &filter, &mul, &div1, &div2);
+-		round_rate = WM8750_BITS_TO_FREQ(*prate, mul, div1, div2);
++		ret = wm8750_find_pll_bits(rate, *prate, &filter, &mul, &div1, &div2);
++		if (!ret)
++			round_rate = WM8750_BITS_TO_FREQ(*prate, mul, div1, div2);
+ 		break;
+ 	case PLL_TYPE_WM8850:
+-		wm8850_find_pll_bits(rate, *prate, &mul, &div1, &div2);
+-		round_rate = WM8850_BITS_TO_FREQ(*prate, mul, div1, div2);
++		ret = wm8850_find_pll_bits(rate, *prate, &mul, &div1, &div2);
++		if (!ret)
++			round_rate = WM8850_BITS_TO_FREQ(*prate, mul, div1, div2);
+ 		break;
+ 	default:
+-		round_rate = 0;
++		ret = -EINVAL;
+ 	}
+ 
++	if (ret)
++		return ret;
 +
-+static struct platform_driver sun8i_h3_r_pinctrl_driver = {
-+	.probe	= sun8i_h3_r_pinctrl_probe,
-+	.driver	= {
-+		.name		= "sun8i-h3-r-pinctrl",
-+		.of_match_table	= sun8i_h3_r_pinctrl_match,
-+	},
-+};
-+builtin_platform_driver(sun8i_h3_r_pinctrl_driver);
--- 
-2.4.2
+ 	return round_rate;
+ }
+ 
