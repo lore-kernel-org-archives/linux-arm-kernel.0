@@ -1,61 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Feb 2016 17:45:39 +0100
-Subject: [PATCH] [media] mx3_camera: use %pad format string for dma_ddr_t
-Message-ID: <1527735.0V0q3NFh2C@wuerfel>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon, 1 Feb 2016 10:49:47 -0600
+Subject: [PATCH V13 09/10] vfio, platform: add support for ACPI while
+ detecting the reset driver
+In-Reply-To: <56AF8B6A.8040504@codeaurora.org>
+References: <1454106914-15857-1-git-send-email-okaya@codeaurora.org>
+ <1454106914-15857-10-git-send-email-okaya@codeaurora.org>
+ <56AF82FA.7000303@linaro.org> <56AF84F4.2080809@codeaurora.org>
+ <56AF87E2.8040201@linaro.org> <56AF8B6A.8040504@codeaurora.org>
+Message-ID: <56AF8CAB.3030908@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mx3_camera driver prints DMA addresses using the "%x" format
-string, which is wrong when using a 64-bit dma_addr_t definition:
+Sinan Kaya wrote:
+> of-tested-by: ...
+>
+> Shanker and I tested ACPI before pushing the patches to the list and we also
+> posted the corresponding QEMU patches as well to the qemu-devel maillist.
+>
+> http://patchwork.ozlabs.org/patch/575878/
+>
+> I'll ask him to add his acpi-tested-by for the ACPI part.
 
-media/platform/soc_camera/mx3_camera.c: In function 'mx3_cam_dma_done':
-media/platform/soc_camera/mx3_camera.c:149:125: error: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'dma_addr_t {aka long long unsigned int}' [-Werror=format=]
-media/platform/soc_camera/mx3_camera.c: In function 'mx3_videobuf_queue':
-media/platform/soc_camera/mx3_camera.c:317:119: error: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'dma_addr_t {aka long long unsigned int}' [-Werror=format=]
-media/platform/soc_camera/mx3_camera.c: In function 'mx3_videobuf_release':
-media/platform/soc_camera/mx3_camera.c:346:119: error: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'dma_addr_t {aka long long unsigned int}' [-Werror=format=]
+I would rather not see a tested-by variant, and instead add comments to 
+the line, like this:
 
-This changes the code to use the special %pad format string, which
-always does the right thing.
+	Tested-by: Eric Auger <eric.auger@linaro.org> (device tree only)
+	Tested-by: Shanker Donthineni <shankerd@codeaurora.org> (ACPI only)
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-Another old bug that only rarely shows up in ARM randconfigs.
+That way, people can still grep for "^Tested-by:".
 
-diff --git a/drivers/media/platform/soc_camera/mx3_camera.c b/drivers/media/platform/soc_camera/mx3_camera.c
-index 169ed1150226..aa39e9569b1a 100644
---- a/drivers/media/platform/soc_camera/mx3_camera.c
-+++ b/drivers/media/platform/soc_camera/mx3_camera.c
-@@ -146,8 +146,8 @@ static void mx3_cam_dma_done(void *arg)
- 	struct idmac_channel *ichannel = to_idmac_chan(chan);
- 	struct mx3_camera_dev *mx3_cam = ichannel->client;
- 
--	dev_dbg(chan->device->dev, "callback cookie %d, active DMA 0x%08x\n",
--		desc->txd.cookie, mx3_cam->active ? sg_dma_address(&mx3_cam->active->sg) : 0);
-+	dev_dbg(chan->device->dev, "callback cookie %d, active DMA %pad\n",
-+		desc->txd.cookie, mx3_cam->active ? &sg_dma_address(&mx3_cam->active->sg) : NULL);
- 
- 	spin_lock(&mx3_cam->lock);
- 	if (mx3_cam->active) {
-@@ -314,8 +314,8 @@ static void mx3_videobuf_queue(struct vb2_buffer *vb)
- 	spin_unlock_irq(&mx3_cam->lock);
- 
- 	cookie = txd->tx_submit(txd);
--	dev_dbg(icd->parent, "Submitted cookie %d DMA 0x%08x\n",
--		cookie, sg_dma_address(&buf->sg));
-+	dev_dbg(icd->parent, "Submitted cookie %d DMA %pad\n",
-+		cookie, &sg_dma_address(&buf->sg));
- 
- 	if (cookie >= 0)
- 		return;
-@@ -344,8 +344,8 @@ static void mx3_videobuf_release(struct vb2_buffer *vb)
- 	unsigned long flags;
- 
- 	dev_dbg(icd->parent,
--		"Release%s DMA 0x%08x, queue %sempty\n",
--		mx3_cam->active == buf ? " active" : "", sg_dma_address(&buf->sg),
-+		"Release%s DMA %pad, queue %sempty\n",
-+		mx3_cam->active == buf ? " active" : "", &sg_dma_address(&buf->sg),
- 		list_empty(&buf->queue) ? "" : "not ");
- 
- 	spin_lock_irqsave(&mx3_cam->lock, flags);
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
