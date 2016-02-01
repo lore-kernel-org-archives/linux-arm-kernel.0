@@ -1,334 +1,72 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Mon, 1 Feb 2016 23:04:50 +0000
-Subject: [linux-sunxi] [PATCH 11/11] arm64: dts: add Pine64 support
-In-Reply-To: <20160201192257.GD14737@excalibur.cnev.de>
-References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
- <1454348370-3816-12-git-send-email-andre.przywara@arm.com>
- <20160201192257.GD14737@excalibur.cnev.de>
-Message-ID: <56AFE492.5010703@arm.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Tue, 2 Feb 2016 00:10:43 +0100
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <20160201222926.GQ19432@atomide.com>
+References: <CAJZ5v0i79X5JjOZiu4cOZ0Esd5BxAvutF8d17asDzq9ECcML-g@mail.gmail.com>
+ <20160126232212.GE19432@atomide.com>
+ <CAJZ5v0gTRvyWHVmYNb8Q1QZzhVhokXo541+48mFyDRYv7Hi-Uw@mail.gmail.com>
+ <20160126235222.GF19432@atomide.com>
+ <CAPDyKFqD6Y6HcgVds_oWBZ8L7Kdh2VX_WZCGApf-1a_6GHCQ5g@mail.gmail.com>
+ <20160128165810.GA19432@atomide.com>
+ <CAPDyKFoQHpqdCa4fzHycP0OT2KsNTxWm7JZSe8Mauh+rxqGtGg@mail.gmail.com>
+ <20160201181135.GL19432@atomide.com>
+ <20160201220657.GO19432@atomide.com>
+ <CAJZ5v0gOtJE24Hu8R9jx7kBktmd__qFUNF_KnsCDLwgidskUvw@mail.gmail.com>
+ <20160201222926.GQ19432@atomide.com>
+Message-ID: <CAJZ5v0jN3uK8q46N1Sp6xR2U=MpJZj=PX8uh9Kp+n75J4UZCZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/16 19:22, Karsten Merker wrote:
-
-Hi,
-
-> On Mon, Feb 01, 2016 at 05:39:30PM +0000, Andre Przywara wrote:
->> The Pine64 is a cost-efficient development board based on the
->> Allwinner A64 SoC.
->> There are three models: the basic version with Fast Ethernet and
->> 512 MB of DRAM (Pine64) and two Pine64+ versions, which both
->> feature Gigabit Ethernet and additional connectors for touchscreens
->> and a camera. Or as my son put it: "Those are smaller and these are
->> missing." ;-)
->> The two Pine64+ models just differ in the amount of DRAM
->> (1GB vs. 2GB). Since U-Boot will figure out the right size for us and
->> patches the DT accordingly we just need to provide one DT for the
->> Pine64+.
+On Mon, Feb 1, 2016 at 11:29 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Rafael J. Wysocki <rafael@kernel.org> [160201 14:18]:
+>> On Mon, Feb 1, 2016 at 11:06 PM, Tony Lindgren <tony@atomide.com> wrote:
+>> > --- a/drivers/base/power/runtime.c
+>> > +++ b/drivers/base/power/runtime.c
+>> > @@ -1419,17 +1419,25 @@ void pm_runtime_init(struct device *dev)
+>> >   */
+>> >  void pm_runtime_reinit(struct device *dev)
+>> >  {
+>> > -       if (!pm_runtime_enabled(dev)) {
+>> > -               if (dev->power.runtime_status == RPM_ACTIVE)
+>> > +       if (pm_runtime_enabled(dev))
+>> > +               return;
+>> > +
+>> > +       if (dev->power.runtime_status == RPM_ACTIVE) {
+>> > +               if (dev->power.use_autosuspend) {
+>> > +                       __pm_runtime_use_autosuspend(dev, false);
+>> > +                       pm_runtime_suspend(dev);
 >>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->>  arch/arm64/boot/dts/Makefile                       |  1 +
->>  arch/arm64/boot/dts/allwinner/Makefile             |  5 ++
->>  arch/arm64/boot/dts/allwinner/pine64.dts           | 58 +++++++++++++++++
->>  arch/arm64/boot/dts/allwinner/pine64_common.dtsi   | 76 ++++++++++++++++++++++
->>  arch/arm64/boot/dts/allwinner/pine64_plus.dts      | 59 +++++++++++++++++
->>  6 files changed, 200 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/allwinner/Makefile
->>  create mode 100644 arch/arm64/boot/dts/allwinner/pine64.dts
->>  create mode 100644 arch/arm64/boot/dts/allwinner/pine64_common.dtsi
->>  create mode 100644 arch/arm64/boot/dts/allwinner/pine64_plus.dts
+>> This won't work, because runtime PM is disabled at this point.
+>
+> Hmm right OK. It does work from idling the hardware point
+> of view though..
+
+pm_runtime_suspend() with runtime PM disabled is a NOP.  It will do
+nothing and return -EACCES.
+
+>> What about doing this instead:
 >>
->> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> index 72e2c5a..0c22fa9 100644
->> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> @@ -175,6 +175,7 @@ parade	Parade Technologies Inc.
->>  pericom	Pericom Technology Inc.
->>  phytec	PHYTEC Messtechnik GmbH
->>  picochip	Picochip Ltd
->> +pine64	Pine64
->>  plathome	Plat'Home Co., Ltd.
->>  plda	PLDA
->>  pixcir  PIXCIR MICROELECTRONICS Co., Ltd
->> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
->> index f832b8a..3b7428a 100644
->> --- a/arch/arm64/boot/dts/Makefile
->> +++ b/arch/arm64/boot/dts/Makefile
->> @@ -1,3 +1,4 @@
->> +dts-dirs += allwinner
->>  dts-dirs += altera
->>  dts-dirs += amd
->>  dts-dirs += apm
->> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
->> new file mode 100644
->> index 0000000..65f4e24
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/allwinner/Makefile
->> @@ -0,0 +1,5 @@
->> +dtb-$(CONFIG_ARCH_SUNXI) += pine64_plus.dtb pine64.dtb
->> +
->> +always		:= $(dtb-y)
->> +subdir-y	:= $(dts-dirs)
->> +clean-files	:= *.dtb
->> diff --git a/arch/arm64/boot/dts/allwinner/pine64.dts b/arch/arm64/boot/dts/allwinner/pine64.dts
-> 
-> Please see my followups to patch No. 5 and patch No. 10 in this series.
-> s/pine64.dts/sun50i-pine64.dts/ ?
+>>                if (dev->power.use_autosuspend)
+>>                        __pm_runtime_use_autosuspend(dev, false);
+>>
+>>                pm_runtime_set_suspended(dev);
+>
+> ..while this does not work. The hardware is never idled
+> in this case.
 
-Really? Actually this should be more like pine64-pine64.dts, but since
-the company name is identical to their (first?) product, I found it
-rather weird to have this double naming.
-The ARM DTs for instance are also just "juno.dts" and "juno-r1.dts".
+I'm not sure what you mean.  pm_runtime_set_suspended() sets the
+status to RPM_SUSPENDED for devices with runtime PM disabled.  It has
+nothing to do with "idling" in principle.
 
-> 
->> new file mode 100644
->> index 0000000..ebea5dd
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/allwinner/pine64.dts
->> @@ -0,0 +1,58 @@
->> +/*
->> + * Copyright (c) 2016 ARM Ltd.
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This library is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This library is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
->> +
->> +/dts-v1/;
->> +
->> +#include "pine64_common.dtsi"
-> 
-> see above
-> 
-> Also a minor spelling nitpick: the other *common* dts/dtsi files
-> use dashes instead of underscores, so with regard to naming
-> consistency I would like to propose doing it the same way here.
+> What else does __pm_runtime_use_autosuspend() set initially
+> that changes things here?
 
-Good point, will fix it!
+The usage counter, if the delay is negative.
 
-Repeated rationale for the below comments.
+I'll look at this in detail, but not right now, sorry.  I'm working on
+something else ATM and I was hoping that Ulf would be able to figure
+out what's going on here.
 
-Cheers,
-Andre.
-
-> 
->> +
->> +/ {
->> +	model = "Pine64";
->> +	compatible = "pine64,pine64", "allwinner,a64", "allwinner,sunxi";
-> 
-> see above
-> 
->> +
->> +	chosen {
->> +		stdout-path = "serial0:115200n8";
->> +	};
->> +
->> +	memory {
->> +		reg = <0x40000000 0x20000000>;
->> +	};
->> +};
->> diff --git a/arch/arm64/boot/dts/allwinner/pine64_common.dtsi b/arch/arm64/boot/dts/allwinner/pine64_common.dtsi
-> 
-> see above
-> 
->> new file mode 100644
->> index 0000000..d968d76
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/allwinner/pine64_common.dtsi
->> @@ -0,0 +1,76 @@
->> +/*
->> + * Copyright (c) 2016 ARM Ltd.
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This library is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This library is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
->> +
->> +#include "a64.dtsi"
-> 
-> see above
-> 
->> +
->> +&mmc0 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&mmc0_pins>, <&mmc0_default_cd_pin>;
->> +	vmmc-supply = <&reg_vcc3v3>;
->> +	cd-gpios = <&pio 5 6 0>;
->> +	cd-inverted;
->> +	status = "okay";
->> +};
->> +
->> +&uart0 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&uart0_pins_a>;
->> +	status = "okay";
->> +};
->> +
->> +&uart2 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&uart2_pins>;
->> +	status = "okay";
->> +};
->> +
->> +&uart3 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&uart3_pins_a>;
->> +	status = "okay";
->> +};
->> +
->> +&uart4 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&uart4_pins>;
->> +	status = "okay";
->> +};
->> diff --git a/arch/arm64/boot/dts/allwinner/pine64_plus.dts b/arch/arm64/boot/dts/allwinner/pine64_plus.dts
->> new file mode 100644
->> index 0000000..344752e
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/allwinner/pine64_plus.dts
-> 
-> see above
-> 
->> @@ -0,0 +1,59 @@
->> +/*
->> + * Copyright (c) 2016 ARM Ltd.
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This library is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This library is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
->> +
->> +/dts-v1/;
->> +
->> +#include "pine64_common.dtsi"
-> 
-> see above
-> 
->> +
->> +/ {
->> +	model = "Pine64+";
->> +	compatible = "pine64,pine64_plus", "allwinner,a64", "allwinner,sunxi";
-> 
-> see above
-> 
->> +
->> +	chosen {
->> +		stdout-path = "serial0:115200n8";
->> +	};
->> +
->> +	/* There is a model with 2GB of DRAM, but U-Boot fixes this for us. */
->> +	memory {
->> +		reg = <0x40000000 0x40000000>;
->> +	};
->> +};
->> -- 
->> 2.6.4
-> 
-> Regards,
-> Karsten
-> 
+Thanks,
+Rafael
