@@ -1,40 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  1 Feb 2016 23:02:48 +0100
-Subject: [PATCH] mtd: map: fix .set_vpp() documentation
-Message-ID: <1454364168-1342-1-git-send-email-linus.walleij@linaro.org>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 1 Feb 2016 23:05:31 +0100
+Subject: [PATCH v4] mmc: meson: Add driver for the SD/MMC host found on
+ Amlogic MesonX SoCs
+In-Reply-To: <CAPDyKFpcsKihuOiF5=RwoWrF0Jf7hRsXVSU5uV8qZf1mUsa-iQ@mail.gmail.com>
+References: <1448988109-32630-1-git-send-email-carlo@caione.org>
+ <CAPDyKFp=buvJ8Li3XC8XSUAUO7BsE+U6vEQH2xTrgcHAkdG8bQ@mail.gmail.com>
+ <CAOQ7t2aJAPWd3Xmvu7n0EWL-KC8ZriM3KryfsYEh556uXhuR+g@mail.gmail.com>
+ <CAPDyKFpcsKihuOiF5=RwoWrF0Jf7hRsXVSU5uV8qZf1mUsa-iQ@mail.gmail.com>
+Message-ID: <CAOQ7t2afXxStCsj=M-FX7eMep1gLt4jkyXDiLas_SQ1UwHc0=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As of commit 876fe76d793d03077eb61ba3afab4a383f46c554
-"mtd: maps: physmap: Add reference counter to set_vpp()"
-the comment in the header file is incorrect and misleading.
-Fix it up.
+On Tue, Dec 8, 2015 at 9:35 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Paul Parsons <lost.distance@yahoo.com>
-Fixes: 876fe76d793d ("mtd: maps: physmap: Add reference counter to set_vpp()")
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- include/linux/mtd/map.h | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+Hi Ulf,
+(old thread, I know)
 
-diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
-index 58f3ba709ade..5e0eb7ccabd4 100644
---- a/include/linux/mtd/map.h
-+++ b/include/linux/mtd/map.h
-@@ -240,8 +240,11 @@ struct map_info {
- 	   If there is no cache to care about this can be set to NULL. */
- 	void (*inval_cache)(struct map_info *, unsigned long, ssize_t);
- 
--	/* set_vpp() must handle being reentered -- enable, enable, disable
--	   must leave it enabled. */
-+	/* This will be called with 1 as parameter when the first map user
-+	 * needs VPP, and called with 0 when the last user exits. The map
-+	 * core maintains a reference counter, and assumes that VPP is a
-+	 * global resource applying to all mapped flash chips on the system.
-+	 */
- 	void (*set_vpp)(struct map_info *, int);
- 
- 	unsigned long pfow_base;
+>> I have actually a problem and a question related to this value. On the
+>> boards I'm currently using to test this driver I have no CD GPIO. In
+>> this case do I have to specify the MMC as "non-removable"? Also if I
+>
+> "non-removable" is intended to be used for eMMC or other cards
+> (SD/SDIO) that is not possible to remove/insert at runtime.
+>
+>> try to change an SD card at runtime I have to wait 3 times the timeout
+>> before being able to do it successfully.
+>
+> I guess you are using the "broken-cd" binding, which will enable
+> MMC_CAP_NEEDS_POLL and thus the mmc core will poll to detect cards
+> being inserted or removed.
+
+I still fail to see what the correct behaviour should be.
+Using the v4 of this driver with a "broken-cd" binding and a timeout
+of 10s my SD card takes 30s to be identified as removed after I take
+it out from the SD slot.
+Also, if I take it out and insert it again, I still have to wait 30s
+to be able to access it again. Is this a limitation / bug of my driver
+or is this the expected behaviour when we do not have a dedicated GPIO
+for card detection?
+
+Cheers,
+
 -- 
-2.4.3
+Carlo Caione
