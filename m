@@ -1,63 +1,93 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Mon, 1 Feb 2016 12:29:46 +0100
-Subject: [PATCH V4 11/11] soc: mediatek: PMIC wrap: add MT2701/7623 support
-In-Reply-To: <56AF409A.2040705@gmail.com>
-References: <1453894149-44127-1-git-send-email-blogic@openwrt.org>
- <1453894149-44127-11-git-send-email-blogic@openwrt.org>
- <56AF409A.2040705@gmail.com>
-Message-ID: <56AF41AA.9090204@openwrt.org>
+From: B56489@freescale.com (Yunhui Cui)
+Date: Mon, 1 Feb 2016 19:30:05 +0800
+Subject: [PATCH v2 1/4] mtd:fsl-quadspi:use the property fields of SPI-NOR
+Message-ID: <1454326208-4533-1-git-send-email-B56489@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+We can get the read/write/erase opcode from the spi nor framework
+directly. This patch uses the information stored in the SPI-NOR to
+remove the hardcode in the fsl_qspi_init_lut().
 
+Signed-off-by: Yunhui Cui <B56489@freescale.com>
+---
+ drivers/mtd/spi-nor/fsl-quadspi.c | 40 ++++++++++++---------------------------
+ 1 file changed, 12 insertions(+), 28 deletions(-)
 
-On 01/02/2016 12:25, Matthias Brugger wrote:
-> On 27/01/16 12:29, John Crispin wrote:
-> 
-> [...]
-> 
->>
->> +static int pwrap_mt2701_init_reg_clock(struct pmic_wrapper *wrp)
->> +{
->> +    switch (wrp->slave->type) {
->> +    case PMIC_MT6397:
->> +        pwrap_writel(wrp, 0xc, PWRAP_RDDMY);
->> +        pwrap_writel(wrp, 0x4, PWRAP_CSHEXT_WRITE);
->> +        pwrap_writel(wrp, 0x0, PWRAP_CSHEXT_READ);
->> +        pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_START);
->> +        pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_END);
->> +        break;
->> +
->> +    case PMIC_MT6323:
->> +        pwrap_writel(wrp, 0x8, PWRAP_RDDMY);
->> +        pwrap_dew_write(wrp, PWRAP_DEW_RDDMY_NO, 0x8);
->> +        pwrap_writel(wrp, 0x5, PWRAP_CSHEXT_WRITE);
->> +        pwrap_writel(wrp, 0x0, PWRAP_CSHEXT_READ);
->> +        pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_START);
->> +        pwrap_writel(wrp, 0x2, PWRAP_CSLEXT_END);
->> +        break;
->> +    }
->> +
->> +    return 0;
->> +}
->> +
-> 
-> I forgot this:
-> So mt2701 can be used with both PMICs? Just wondering, as from what I
-> know, SoC and PMIC a tightly coupled.
-
-yes, it can be run with old and new style pmics. this is why the MAN_CMD
-SPI_W bit has changed. the old BIT(13) is used to tell the wrapper what
-slave type it has.
-
-there is a way to runtime set the pmic but there is still a detail i
-need to look at so it is not part of this series
-
-> 
-> In general this series looks quite good to me.
-> 
-
-i'll spin V5 during the day. busy adding dual gmac support to the
-ethernet driver just now.
-
-	John
+diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
+index 9ab2b51..517ffe2 100644
+--- a/drivers/mtd/spi-nor/fsl-quadspi.c
++++ b/drivers/mtd/spi-nor/fsl-quadspi.c
+@@ -373,9 +373,13 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	void __iomem *base = q->iobase;
+ 	int rxfifo = q->devtype_data->rxfifo;
+ 	u32 lut_base;
+-	u8 cmd, addrlen, dummy;
+ 	int i;
+ 
++	struct spi_nor *nor = &q->nor[0];
++	u8 addrlen = (nor->addr_width == 3) ? ADDR24BIT : ADDR32BIT;
++	u8 read_op = nor->read_opcode;
++	u8 read_dm = nor->read_dummy;
++
+ 	fsl_qspi_unlock_lut(q);
+ 
+ 	/* Clear all the LUT table */
+@@ -385,20 +389,10 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	/* Quad Read */
+ 	lut_base = SEQID_QUAD_READ * 4;
+ 
+-	if (q->nor_size <= SZ_16M) {
+-		cmd = SPINOR_OP_READ_1_1_4;
+-		addrlen = ADDR24BIT;
+-		dummy = 8;
+-	} else {
+-		/* use the 4-byte address */
+-		cmd = SPINOR_OP_READ_1_1_4;
+-		addrlen = ADDR32BIT;
+-		dummy = 8;
+-	}
+-
+-	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
+ 			base + QUADSPI_LUT(lut_base));
+-	qspi_writel(q, LUT0(DUMMY, PAD1, dummy) | LUT1(FSL_READ, PAD4, rxfifo),
++	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
++		    LUT1(FSL_READ, PAD4, rxfifo),
+ 			base + QUADSPI_LUT(lut_base + 1));
+ 
+ 	/* Write enable */
+@@ -409,16 +403,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	/* Page Program */
+ 	lut_base = SEQID_PP * 4;
+ 
+-	if (q->nor_size <= SZ_16M) {
+-		cmd = SPINOR_OP_PP;
+-		addrlen = ADDR24BIT;
+-	} else {
+-		/* use the 4-byte address */
+-		cmd = SPINOR_OP_PP;
+-		addrlen = ADDR32BIT;
+-	}
+-
+-	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++	qspi_writel(q, LUT0(CMD, PAD1, nor->program_opcode) |
++		    LUT1(ADDR, PAD1, addrlen),
+ 			base + QUADSPI_LUT(lut_base));
+ 	qspi_writel(q, LUT0(FSL_WRITE, PAD1, 0),
+ 			base + QUADSPI_LUT(lut_base + 1));
+@@ -432,10 +418,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	/* Erase a sector */
+ 	lut_base = SEQID_SE * 4;
+ 
+-	cmd = q->nor[0].erase_opcode;
+-	addrlen = q->nor_size <= SZ_16M ? ADDR24BIT : ADDR32BIT;
+-
+-	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++	qspi_writel(q, LUT0(CMD, PAD1, nor->erase_opcode) |
++		    LUT1(ADDR, PAD1, addrlen),
+ 			base + QUADSPI_LUT(lut_base));
+ 
+ 	/* Erase the whole chip */
+-- 
+2.1.0.27.g96db324
