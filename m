@@ -1,143 +1,76 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 1 Feb 2016 13:44:39 +0000
-Subject: [PATCH v2] clocksource/arm_arch_timer: Enable and verify MMIO
- access
-In-Reply-To: <71bf617f4083b116b2aeab24f13fc5fed99a816f.1454327031.git.robin.murphy@arm.com>
-References: <71bf617f4083b116b2aeab24f13fc5fed99a816f.1454327031.git.robin.murphy@arm.com>
-Message-ID: <20160201134439.GH674@leverpostej>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 1 Feb 2016 13:45:07 +0000
+Subject: [PATCH V5 06/14] soc: tegra: pmc: Fix checking of valid partitions
+In-Reply-To: <CANLsYkxY5P2wQxGev0veN39nD-1cTVkZCVpX9jca7da39JJpWg@mail.gmail.com>
+References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
+ <1453998832-27383-7-git-send-email-jonathanh@nvidia.com>
+ <CANLsYkxY5P2wQxGev0veN39nD-1cTVkZCVpX9jca7da39JJpWg@mail.gmail.com>
+Message-ID: <56AF6163.4070204@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 12:00:48PM +0000, Robin Murphy wrote:
-> So far, we have been blindly assuming that having access to a
-> memory-mapped timer frame implies that the individual elements of that
-> frame frame are already enabled. Whilst it's the firmware's job to give
-> us non-secure access to frames in the first place, we should not rely
-> on implementations always being generous enough to also configure CNTACR
-> for those non-secure frames (e.g. [1]).
-> 
-> Explicitly enable feature-level access per-frame, and verify that the
-> access we want is really implemented before trying to make use of it.
-> 
-> [1]:https://github.com/ARM-software/tf-issues/issues/170
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-FWIW:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-In future, we could probably allow for using frames as counters without
-timer support and vice-versa, but as-is this at leasts validates the
-assumptions we make today.
-
-Thanks,
-Mark.
-
-> ---
+On 29/01/16 17:08, Mathieu Poirier wrote:
+> On 28 January 2016 at 09:33, Jon Hunter <jonathanh@nvidia.com> wrote:
+>> The tegra power partitions are referenced by a numerical ID which are
+>> the same values programmed into the PMC registers for controlling the
+>> partition. For a given device, the valid partition IDs may not be
+>> contiguous and so simply checking that an ID is not greater than the
+>> maximum ID supported may not mean it is valid. Fix this by adding a
+>> bitmap for representing the valid partitions of a device and add a
+>> helper function will test if the partition is valid.
+>>
+>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+>> ---
+>>  drivers/soc/tegra/pmc.c | 21 +++++++++++++++++----
+>>  include/soc/tegra/pmc.h |  1 +
+>>  2 files changed, 18 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
+>> index 35ee60fd17be..032dd5c17130 100644
+>> --- a/drivers/soc/tegra/pmc.c
+>> +++ b/drivers/soc/tegra/pmc.c
+>> @@ -132,6 +132,7 @@ struct tegra_pmc_soc {
+>>   * @cpu_pwr_good_en: CPU power good signal is enabled
+>>   * @lp0_vec_phys: physical base address of the LP0 warm boot code
+>>   * @lp0_vec_size: size of the LP0 warm boot code
+>> + * @powergates_valid: Bitmap of valid power gates
+>>   * @powergates_lock: mutex for power gate register access
+>>   */
+>>  struct tegra_pmc {
+>> @@ -156,6 +157,7 @@ struct tegra_pmc {
+>>         bool cpu_pwr_good_en;
+>>         u32 lp0_vec_phys;
+>>         u32 lp0_vec_size;
+>> +       DECLARE_BITMAP(powergates_valid, TEGRA_POWERGATE_MAX);
+>>
+>>         struct mutex powergates_lock;
+>>  };
+>> @@ -180,6 +182,11 @@ static inline bool tegra_powergate_state(int id)
+>>         return (tegra_pmc_readl(PWRGATE_STATUS) & BIT(id)) != 0;
+>>  }
+>>
+>> +static inline bool tegra_powergate_is_valid(int id)
+>> +{
+>> +       return test_bit(id, pmc->powergates_valid);
+>> +}
+>> +
+>>  /**
+>>   * tegra_powergate_set() - set the state of a partition
+>>   * @id: partition ID
+>> @@ -213,7 +220,7 @@ static int tegra_powergate_set(unsigned int id, bool new_state)
+>>   */
+>>  int tegra_powergate_power_on(unsigned int id)
+>>  {
+>> -       if (!pmc->soc || id >= pmc->soc->num_powergates)
+>> +       if (!tegra_powergate_is_valid(id))
+>>                 return -EINVAL;
 > 
-> Changes from v1:
-> - Remove CNTACR_RFRQ check since the "no access, CNTFRQ reads as zero"
->   case can be handled the same way the driver deals with the "CNTFRQ
->   accessible, but not programmed" case.
-> - Reword the commit message to make more sense.
-> 
->  drivers/clocksource/arm_arch_timer.c | 36 ++++++++++++++++++++++++++++--------
->  1 file changed, 28 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index c64d543..7c567f0 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -32,6 +32,14 @@
->  #define CNTTIDR		0x08
->  #define CNTTIDR_VIRT(n)	(BIT(1) << ((n) * 4))
->  
-> +#define CNTACR(n)	(0x40 + ((n) * 4))
-> +#define CNTACR_RPCT	BIT(0)
-> +#define CNTACR_RVCT	BIT(1)
-> +#define CNTACR_RFRQ	BIT(2)
-> +#define CNTACR_RVOFF	BIT(3)
-> +#define CNTACR_RWVT	BIT(4)
-> +#define CNTACR_RWPT	BIT(5)
-> +
->  #define CNTVCT_LO	0x08
->  #define CNTVCT_HI	0x0c
->  #define CNTFRQ		0x10
-> @@ -757,7 +765,6 @@ static void __init arch_timer_mem_init(struct device_node *np)
->  	}
->  
->  	cnttidr = readl_relaxed(cntctlbase + CNTTIDR);
-> -	iounmap(cntctlbase);
->  
->  	/*
->  	 * Try to find a virtual capable frame. Otherwise fall back to a
-> @@ -765,20 +772,31 @@ static void __init arch_timer_mem_init(struct device_node *np)
->  	 */
->  	for_each_available_child_of_node(np, frame) {
->  		int n;
-> +		u32 cntacr;
->  
->  		if (of_property_read_u32(frame, "frame-number", &n)) {
->  			pr_err("arch_timer: Missing frame-number\n");
-> -			of_node_put(best_frame);
->  			of_node_put(frame);
-> -			return;
-> +			goto out;
->  		}
->  
-> -		if (cnttidr & CNTTIDR_VIRT(n)) {
-> +		/* Try enabling everything, and see what sticks */
-> +		cntacr = CNTACR_RFRQ | CNTACR_RWPT | CNTACR_RPCT |
-> +			 CNTACR_RWVT | CNTACR_RVOFF | CNTACR_RVCT;
-> +		writel_relaxed(cntacr, cntctlbase + CNTACR(n));
-> +		cntacr = readl_relaxed(cntctlbase + CNTACR(n));
-> +
-> +		if ((cnttidr & CNTTIDR_VIRT(n)) &&
-> +		    !(~cntacr & (CNTACR_RWVT | CNTACR_RVCT))) {
->  			of_node_put(best_frame);
->  			best_frame = frame;
->  			arch_timer_mem_use_virtual = true;
->  			break;
->  		}
-> +
-> +		if (~cntacr & (CNTACR_RWPT | CNTACR_RPCT))
-> +			continue;
-> +
->  		of_node_put(best_frame);
->  		best_frame = of_node_get(frame);
->  	}
-> @@ -786,24 +804,26 @@ static void __init arch_timer_mem_init(struct device_node *np)
->  	base = arch_counter_base = of_iomap(best_frame, 0);
->  	if (!base) {
->  		pr_err("arch_timer: Can't map frame's registers\n");
-> -		of_node_put(best_frame);
-> -		return;
-> +		goto out;
->  	}
->  
->  	if (arch_timer_mem_use_virtual)
->  		irq = irq_of_parse_and_map(best_frame, 1);
->  	else
->  		irq = irq_of_parse_and_map(best_frame, 0);
-> -	of_node_put(best_frame);
-> +
->  	if (!irq) {
->  		pr_err("arch_timer: Frame missing %s irq",
->  		       arch_timer_mem_use_virtual ? "virt" : "phys");
-> -		return;
-> +		goto out;
->  	}
->  
->  	arch_timer_detect_rate(base, np);
->  	arch_timer_mem_register(base, irq);
->  	arch_timer_common_init();
-> +out:
-> +	iounmap(cntctlbase);
-> +	of_node_put(best_frame);
->  }
->  CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
->  		       arch_timer_mem_init);
-> -- 
-> 2.7.0.25.gfc10eb5.dirty
-> 
+> The "!pmc-soc" condition is no longer needed?  If so the changelog
+> should reflect that or a new patch that deals with just that should be
+> etched.  The same comment applies for the rest of the patch.
+
+Yes it is not necessary. I will update the changelog.
+
+Cheers
+Jon
