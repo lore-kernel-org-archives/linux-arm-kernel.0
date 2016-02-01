@@ -1,28 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 1 Feb 2016 12:27:33 -0800
-Subject: [GIT PULL] vexpress fixes for v4.5
-In-Reply-To: <56AFA32C.4000901@arm.com>
-References: <56AFA32C.4000901@arm.com>
-Message-ID: <20160201202733.GA15279@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon,  1 Feb 2016 21:35:54 +0100
+Subject: [PATCH 0/4] ARM Davinci warning fixes
+Message-ID: <1454358962-640598-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 06:25:48PM +0000, Sudeep Holla wrote:
-> The following changes since commit 36f90b0a2ddd60823fe193a85e60ff1906c2a9b3:
-> 
->   Linux 4.5-rc2 (2016-01-31 18:12:16 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
-> tags/vexpress-for-v4.5/fixes-rc2
-> 
-> for you to fetch changes up to aeb2ee5683e51305aff274d8b0a50af69b3ab310:
-> 
->   arm64: dts: Add missing DMA Abort interrupt to Juno (2016-02-01 09:59:59
-> +0000)
+Hi Kevin and Sekhar,
 
-Merged, thanks.
+Here are a couple of warning fixes for Davinci that I have
+collected while testing randconfig kernels.
 
+The first three are rather obvious, the last one might
+need some discussion, maybe there is another way to do this.
 
--Olof
+Please apply for 4.6, or Ack
+
+	Arnd
+
+Arnd Bergmann (4):
+  ARM: davinci: limit DT support to DA850
+  ARM: davinci: avoid unused mityomapl138_pn_info variable
+  ARM: davinci: DA8xx+DMx combined kernels need PATCH_PHYS_VIRT
+  ARM: davinci: make I2C support optional
+
+ arch/arm/Kconfig                           |  1 +
+ arch/arm/mach-davinci/Kconfig              | 22 ++++------------------
+ arch/arm/mach-davinci/board-dm644x-evm.c   |  8 ++++++--
+ arch/arm/mach-davinci/board-dm646x-evm.c   |  7 +++++++
+ arch/arm/mach-davinci/board-mityomapl138.c |  2 +-
+ 5 files changed, 19 insertions(+), 21 deletions(-)
+
+-- 
+2.7.0
