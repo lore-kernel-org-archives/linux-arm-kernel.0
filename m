@@ -1,126 +1,49 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon,  1 Feb 2016 12:00:48 +0000
-Subject: [PATCH v2] clocksource/arm_arch_timer: Enable and verify MMIO access
-Message-ID: <71bf617f4083b116b2aeab24f13fc5fed99a816f.1454327031.git.robin.murphy@arm.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Mon, 1 Feb 2016 13:09:15 +0100
+Subject: [PATCH v4 4/9] pinctrl: Add STM32 MCUs support
+In-Reply-To: <CALszF6DTpcU8jFwA0HL8LpkxfO5ZOdFmpHBUxA7WfYgAj_uFhg@mail.gmail.com>
+References: <1452773795-24216-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1452773795-24216-5-git-send-email-mcoquelin.stm32@gmail.com>
+ <CACRpkdaBcP6fC5Oxn+d1WPdHq1FtwMkf8Ap5VDLQFg-5UwEBAw@mail.gmail.com>
+ <2151471.Wut3mQ9SS7@wuerfel>
+ <CALszF6DTpcU8jFwA0HL8LpkxfO5ZOdFmpHBUxA7WfYgAj_uFhg@mail.gmail.com>
+Message-ID: <56AF4AEB.40109@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, we have been blindly assuming that having access to a
-memory-mapped timer frame implies that the individual elements of that
-frame frame are already enabled. Whilst it's the firmware's job to give
-us non-secure access to frames in the first place, we should not rely
-on implementations always being generous enough to also configure CNTACR
-for those non-secure frames (e.g. [1]).
 
-Explicitly enable feature-level access per-frame, and verify that the
-access we want is really implemented before trying to make use of it.
+On 02/01/2016 11:39 AM, Maxime Coquelin wrote:
+> 2016-02-01 11:21 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
+>> On Wednesday 27 January 2016 14:16:32 Linus Walleij wrote:
+>>> On Thu, Jan 14, 2016 at 1:16 PM, Maxime Coquelin
+>>> <mcoquelin.stm32@gmail.com> wrote:
+>>>
+>>>> This patch adds pinctrl and GPIO support to STMicroelectronic's STM32
+>>>> family of MCUs.
+>>>>
+>>>> While it only supports STM32F429 for now, it has been designed to enable
+>>>> support of other MCUs of the family (e.g. STM32F746).
+>>>>
+>>>> Acked-by: Patrice Chotard <patrice.chotard@st.com>
+>>>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>>> This patch applied for kernel v4.6.
+>>>
+>> This breaks the kernel build, please revert:
+>>
+>> drivers/pinctrl/stm32/pinctrl-stm32.c:26:47: fatal error: dt-bindings/pinctrl/pinctrl-stm32.h: No such file or directory
+> Right, I missed to notify this dependency to Linus, sorry about that.
+> This dependency is no more needed, so I could just move the macros to
+> the driver side.
+>
+> Note that I also noticed a breakage at build time due to field
+> renaming in gpio_chip structure (dev -> parent).
+>
+> I propose to rebase the series and move the defines into the driver.
+> Is it ok for you?
+>
+I have rebased the series, taking care to fix the mentioned problems.
 
-[1]:https://github.com/ARM-software/tf-issues/issues/170
+Linus, do you confirm you will revert STM32 pinctrl patches from your tree?
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
-
-Changes from v1:
-- Remove CNTACR_RFRQ check since the "no access, CNTFRQ reads as zero"
-  case can be handled the same way the driver deals with the "CNTFRQ
-  accessible, but not programmed" case.
-- Reword the commit message to make more sense.
-
- drivers/clocksource/arm_arch_timer.c | 36 ++++++++++++++++++++++++++++--------
- 1 file changed, 28 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index c64d543..7c567f0 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -32,6 +32,14 @@
- #define CNTTIDR		0x08
- #define CNTTIDR_VIRT(n)	(BIT(1) << ((n) * 4))
- 
-+#define CNTACR(n)	(0x40 + ((n) * 4))
-+#define CNTACR_RPCT	BIT(0)
-+#define CNTACR_RVCT	BIT(1)
-+#define CNTACR_RFRQ	BIT(2)
-+#define CNTACR_RVOFF	BIT(3)
-+#define CNTACR_RWVT	BIT(4)
-+#define CNTACR_RWPT	BIT(5)
-+
- #define CNTVCT_LO	0x08
- #define CNTVCT_HI	0x0c
- #define CNTFRQ		0x10
-@@ -757,7 +765,6 @@ static void __init arch_timer_mem_init(struct device_node *np)
- 	}
- 
- 	cnttidr = readl_relaxed(cntctlbase + CNTTIDR);
--	iounmap(cntctlbase);
- 
- 	/*
- 	 * Try to find a virtual capable frame. Otherwise fall back to a
-@@ -765,20 +772,31 @@ static void __init arch_timer_mem_init(struct device_node *np)
- 	 */
- 	for_each_available_child_of_node(np, frame) {
- 		int n;
-+		u32 cntacr;
- 
- 		if (of_property_read_u32(frame, "frame-number", &n)) {
- 			pr_err("arch_timer: Missing frame-number\n");
--			of_node_put(best_frame);
- 			of_node_put(frame);
--			return;
-+			goto out;
- 		}
- 
--		if (cnttidr & CNTTIDR_VIRT(n)) {
-+		/* Try enabling everything, and see what sticks */
-+		cntacr = CNTACR_RFRQ | CNTACR_RWPT | CNTACR_RPCT |
-+			 CNTACR_RWVT | CNTACR_RVOFF | CNTACR_RVCT;
-+		writel_relaxed(cntacr, cntctlbase + CNTACR(n));
-+		cntacr = readl_relaxed(cntctlbase + CNTACR(n));
-+
-+		if ((cnttidr & CNTTIDR_VIRT(n)) &&
-+		    !(~cntacr & (CNTACR_RWVT | CNTACR_RVCT))) {
- 			of_node_put(best_frame);
- 			best_frame = frame;
- 			arch_timer_mem_use_virtual = true;
- 			break;
- 		}
-+
-+		if (~cntacr & (CNTACR_RWPT | CNTACR_RPCT))
-+			continue;
-+
- 		of_node_put(best_frame);
- 		best_frame = of_node_get(frame);
- 	}
-@@ -786,24 +804,26 @@ static void __init arch_timer_mem_init(struct device_node *np)
- 	base = arch_counter_base = of_iomap(best_frame, 0);
- 	if (!base) {
- 		pr_err("arch_timer: Can't map frame's registers\n");
--		of_node_put(best_frame);
--		return;
-+		goto out;
- 	}
- 
- 	if (arch_timer_mem_use_virtual)
- 		irq = irq_of_parse_and_map(best_frame, 1);
- 	else
- 		irq = irq_of_parse_and_map(best_frame, 0);
--	of_node_put(best_frame);
-+
- 	if (!irq) {
- 		pr_err("arch_timer: Frame missing %s irq",
- 		       arch_timer_mem_use_virtual ? "virt" : "phys");
--		return;
-+		goto out;
- 	}
- 
- 	arch_timer_detect_rate(base, np);
- 	arch_timer_mem_register(base, irq);
- 	arch_timer_common_init();
-+out:
-+	iounmap(cntctlbase);
-+	of_node_put(best_frame);
- }
- CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
- 		       arch_timer_mem_init);
--- 
-2.7.0.25.gfc10eb5.dirty
+Thanks,
+Maxime
