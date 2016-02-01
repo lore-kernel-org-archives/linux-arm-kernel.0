@@ -1,57 +1,44 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 1 Feb 2016 11:44:32 -0800
-Subject: [PATCH] recordmcount: arm: Implement make_nop
-In-Reply-To: <20160130184005.GA29607@debian>
-References: <1454116686-30190-1-git-send-email-sboyd@codeaurora.org>
- <20160130184005.GA29607@debian>
-Message-ID: <20160201194432.GK4848@codeaurora.org>
+From: stripathi@apm.com (Suman Tripathi)
+Date: Mon, 1 Feb 2016 11:45:00 -0800
+Subject: [PATCH v2 1/3] ata: Remove the AHCI_HFLAG_EDGE_IRQ support from
+ libahci.
+In-Reply-To: <20160131113249.GW32380@htj.duckdns.org>
+References: <1453888197-11368-1-git-send-email-stripathi@apm.com>
+ <1453888197-11368-2-git-send-email-stripathi@apm.com>
+ <20160131113249.GW32380@htj.duckdns.org>
+Message-ID: <CAOHikRBbTafF68qF9n+HNo4p6bwAShZtObw8sPDe45QmG0Xxiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30, Rabin Vincent wrote:
-> On Fri, Jan 29, 2016 at 05:18:06PM -0800, Stephen Boyd wrote:
-> > diff --git a/scripts/recordmcount.c b/scripts/recordmcount.c
-> > index e167592793a7..0b16d14c54fb 100644
-> > --- a/scripts/recordmcount.c
-> > +++ b/scripts/recordmcount.c
-> > @@ -206,6 +206,52 @@ static int make_nop_x86(void *map, size_t const offset)
-> >  	return 0;
-> >  }
-> >  
-> > +/*
-> > + * Indicates if ARM is using __gnu_mcount_nc or mcount style and if
-> > + * we should replace it with a pop or a nop respectively.
-> > + */
-> 
-> For __gnu_mcount_nc, wouldn't it be better to replace both the push {lr}
-> and the bl with nop instructions, instead of keeping a (useless) push +
-> pop sequence?
+On Sun, Jan 31, 2016 at 3:32 AM, Tejun Heo <htejun@gmail.com> wrote:
+> On Wed, Jan 27, 2016 at 03:19:55PM +0530, Suman Tripathi wrote:
+>> This patch removes the AHCI_HFLAG_EDGE_IRQ support from libahci.
+>> The upcoming patches will have the flexibility to override
+>> irq handlers in the LLD's. Controller's implementing a EDGE trigger
+>> latch can implement their own interrupt handler inside the driver.
+>>
+>> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+>
+> Shouldn't this patch come after the irq override is in place?
+>
+> 1. introduce irq override.
+>
+> 2. remove AHCI_HFLAG_EDGE_IRQ by moving the edge triggered handler to
+>    ahci_xgene.
+>
+> 3. Update xgene irq handler to address the erratum.
 
-Agreed. I was trying to do a 1-to-1 copy of the ftrace code on
-ARM.  I was wondering the same thing in that code path while
-doing this though. Can't we replace both instructions instead of
-one instruction when we're patching in nops at runtime?
+Thought of remove the AHCI_HFLAG_EDGE entirely first because we don't
+require it . Then implement the irq override capability.
+>
+> Thanks.
+>
+> --
+> tejun
 
-> 
-> > +static int uses_altmcount;
-> > +
-> > +static unsigned char ideal_nop4_arm_arm[4] = { 0x00, 0x40, 0xbd, 0xe8 };
-> > +static unsigned char ideal_nop4_arm_thumb[4] = { 0x5d, 0xf8, 0x04, 0xeb };
-> > +static unsigned char ideal_nop4_arm_arm_be[4] = { 0xe8, 0xbd, 0x40, 0x00 };
-> > +static unsigned char ideal_nop4_arm_thumb_be[4] = { 0xf8, 0x5d, 0xeb, 0x04 };
-> > +static unsigned char ideal_nop4_arm_old[4] = { 0x00, 0x00, 0xa0, 0xe1 };
-> > +static unsigned char ideal_nop4_arm_old_be[4] = { 0xe1, 0xa0, 0x00, 0x00 };
-> > +
-> > +static unsigned char bl_gnu_mcount_nc_arm[4] = { 0xfe, 0xff, 0xff, 0xeb };
-> > +static unsigned char bl_gnu_mcount_nc_thumb[4] = { 0xff, 0xf7, 0xfe, 0xff };
-> > +static unsigned char bl_gnu_mcount_nc_arm_be[4] = { 0xeb, 0xff, 0xff, 0xfe };
-> > +static unsigned char bl_gnu_mcount_nc_thumb_be[4] = { 0xf7, 0xff, 0xff, 0xfe };
-> 
-> Comments showing what assembly instructions all these correspond to
-> would be helpful.
 
-Sure.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks,
+with regards,
+Suman Tripathi
