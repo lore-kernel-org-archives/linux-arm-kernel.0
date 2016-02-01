@@ -1,85 +1,121 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  1 Feb 2016 14:09:30 +0100
-Subject: [PATCH v5sub2 0/8] arm64: implement virtual KASLR
-Message-ID: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Mon,  1 Feb 2016 14:09:32 +0100
+Subject: [PATCH v5sub2 2/8] arm64: avoid R_AARCH64_ABS64 relocations for Image
+ header fields
+In-Reply-To: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1454332178-4414-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the request of Catalin, this series has been split off from my series
-'arm64: implement support for KASLR v4' [1]. This sub-series deals with
-creating a relocatable binary, and randomizing the virtual placement of
-the kernel itself, the modules and the linear region based on entropy
-supplied by the bootloader in the /chosen/kaslr-seed DT property.
+Unfortunately, the current way of using the linker to emit build time
+constants into the Image header will no longer work once we switch to
+the use of PIE executables. The reason is that such constants are emitted
+into the binary using R_AARCH64_ABS64 relocations, which are resolved at
+runtime, not at build time, and the places targeted by those relocations
+will contain zeroes before that.
 
-Changes since v4:
-- add randomization of the linear region, i.e., if the linear region is
-  substantially larger than the space spanned by RAM, the mapping of RAM
-  is moved to a random offset inside the linear region.
-- dropped the CRC check in kaslr_early_init(), since the only code that may
-  modify .data through __fixmap_remap_fdt() is instrumentation that should
-  deal with that correctly (For instance, the branch profiling records taken
-  branches in structs allocated in .data, and these counts will not be reset
-  to 0 between the first and the second call to __mmap_switched())
-- add Mark's ack to patch #4
+So refactor the endian swapping linker script constant generation code so
+that it emits the upper and lower 32-bit words separately.
 
-Patch #1 adds support for resolving cross-module branches via veneers if the
-module is located too far from the target. This should not be necessary in the
-common case even with KASRL enabled, but since the space around the kernel image
-will no longer be strictly reserved for modules, there is a slight chance that
-the region may be exhausted, in which case modules will be moved further away
-from the kernel (and each other)
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/include/asm/assembler.h | 11 +++++++
+ arch/arm64/kernel/head.S           |  6 ++--
+ arch/arm64/kernel/image.h          | 32 ++++++++++++--------
+ 3 files changed, 33 insertions(+), 16 deletions(-)
 
-Patches #2 and #3 deal with the fact that relocations of 64-bit values are
-deferred to runtime when building a PIE executable, and some values are required
-before the relocation routine executes (either in the code, or as an externally
-visible constant in the Image header)
-
-Patch #4 rehuffles asm/elf.h so we can use its preprocessor constants in head.S
-
-Patch #5 and #6 implement building vmlinux as a PIE (Position Independent
-Executable) binary, which is emitted with relocation information that is
-processed by the program itself in the early boot code.
-
-Patch #7 implements KASLR, i.e., CONFIG_RANDOMIZE_BASE for the core kernel and
-for the module region.
-
-Patch #8 implements KASLR for the linear region.
-
-[1] http://thread.gmane.org/gmane.linux.kernel/2135931
-
-Ard Biesheuvel (8):
-  arm64: add support for module PLTs
-  arm64: avoid R_AARCH64_ABS64 relocations for Image header fields
-  arm64: avoid dynamic relocations in early boot code
-  arm64: make asm/elf.h available to asm files
-  scripts/sortextable: add support for ET_DYN binaries
-  arm64: add support for building vmlinux as a relocatable PIE binary
-  arm64: add support for kernel ASLR
-  arm64: kaslr: randomize the linear region
-
- arch/arm64/Kconfig                 |  34 ++++
- arch/arm64/Makefile                |  10 +-
- arch/arm64/include/asm/assembler.h |  11 ++
- arch/arm64/include/asm/elf.h       |  24 ++-
- arch/arm64/include/asm/memory.h    |   5 +-
- arch/arm64/include/asm/module.h    |  11 ++
- arch/arm64/kernel/Makefile         |   2 +
- arch/arm64/kernel/efi-entry.S      |   2 +-
- arch/arm64/kernel/head.S           | 128 +++++++++++--
- arch/arm64/kernel/image.h          |  32 ++--
- arch/arm64/kernel/kaslr.c          | 143 ++++++++++++++
- arch/arm64/kernel/module-plts.c    | 201 ++++++++++++++++++++
- arch/arm64/kernel/module.c         |  20 +-
- arch/arm64/kernel/module.lds       |   3 +
- arch/arm64/kernel/setup.c          |  29 +++
- arch/arm64/kernel/vmlinux.lds.S    |  16 ++
- arch/arm64/mm/init.c               |  22 ++-
- arch/arm64/mm/mmu.c                |  33 +++-
- scripts/sortextable.c              |   8 +-
- 19 files changed, 672 insertions(+), 62 deletions(-)
- create mode 100644 arch/arm64/kernel/kaslr.c
- create mode 100644 arch/arm64/kernel/module-plts.c
- create mode 100644 arch/arm64/kernel/module.lds
-
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index d8bfcc1ce923..70f7b9e04598 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -222,4 +222,15 @@ lr	.req	x30		// link register
+ 	.size	__pi_##x, . - x;	\
+ 	ENDPROC(x)
+ 
++	/*
++	 * Emit a 64-bit absolute little endian symbol reference in a way that
++	 * ensures that it will be resolved at build time, even when building a
++	 * PIE binary. This requires cooperation from the linker script, which
++	 * must emit the lo32/hi32 halves individually.
++	 */
++	.macro	le64sym, sym
++	.long	\sym\()_lo32
++	.long	\sym\()_hi32
++	.endm
++
+ #endif	/* __ASM_ASSEMBLER_H */
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 05b98289093e..f076debf392d 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -83,9 +83,9 @@ efi_head:
+ 	b	stext				// branch to kernel start, magic
+ 	.long	0				// reserved
+ #endif
+-	.quad	_kernel_offset_le		// Image load offset from start of RAM, little-endian
+-	.quad	_kernel_size_le			// Effective size of kernel image, little-endian
+-	.quad	_kernel_flags_le		// Informative flags, little-endian
++	le64sym	_kernel_offset_le		// Image load offset from start of RAM, little-endian
++	le64sym	_kernel_size_le			// Effective size of kernel image, little-endian
++	le64sym	_kernel_flags_le		// Informative flags, little-endian
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
+diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+index c9c62cab25a4..db1bf57948f1 100644
+--- a/arch/arm64/kernel/image.h
++++ b/arch/arm64/kernel/image.h
+@@ -26,21 +26,27 @@
+  * There aren't any ELF relocations we can use to endian-swap values known only
+  * at link time (e.g. the subtraction of two symbol addresses), so we must get
+  * the linker to endian-swap certain values before emitting them.
++ *
++ * Note that, in order for this to work when building the ELF64 PIE executable
++ * (for KASLR), these values should not be referenced via R_AARCH64_ABS64
++ * relocations, since these are fixed up at runtime rather than at build time
++ * when PIE is in effect. So we need to split them up in 32-bit high and low
++ * words.
+  */
+ #ifdef CONFIG_CPU_BIG_ENDIAN
+-#define DATA_LE64(data)					\
+-	((((data) & 0x00000000000000ff) << 56) |	\
+-	 (((data) & 0x000000000000ff00) << 40) |	\
+-	 (((data) & 0x0000000000ff0000) << 24) |	\
+-	 (((data) & 0x00000000ff000000) << 8)  |	\
+-	 (((data) & 0x000000ff00000000) >> 8)  |	\
+-	 (((data) & 0x0000ff0000000000) >> 24) |	\
+-	 (((data) & 0x00ff000000000000) >> 40) |	\
+-	 (((data) & 0xff00000000000000) >> 56))
++#define DATA_LE32(data)				\
++	((((data) & 0x000000ff) << 24) |	\
++	 (((data) & 0x0000ff00) << 8)  |	\
++	 (((data) & 0x00ff0000) >> 8)  |	\
++	 (((data) & 0xff000000) >> 24))
+ #else
+-#define DATA_LE64(data) ((data) & 0xffffffffffffffff)
++#define DATA_LE32(data) ((data) & 0xffffffff)
+ #endif
+ 
++#define DEFINE_IMAGE_LE64(sym, data)				\
++	sym##_lo32 = DATA_LE32((data) & 0xffffffff);		\
++	sym##_hi32 = DATA_LE32((data) >> 32)
++
+ #ifdef CONFIG_CPU_BIG_ENDIAN
+ #define __HEAD_FLAG_BE		1
+ #else
+@@ -61,9 +67,9 @@
+  * endian swapped in head.S, all are done here for consistency.
+  */
+ #define HEAD_SYMBOLS						\
+-	_kernel_size_le		= DATA_LE64(_end - _text);	\
+-	_kernel_offset_le	= DATA_LE64(TEXT_OFFSET);	\
+-	_kernel_flags_le	= DATA_LE64(__HEAD_FLAGS);
++	DEFINE_IMAGE_LE64(_kernel_size_le, _end - _text);	\
++	DEFINE_IMAGE_LE64(_kernel_offset_le, TEXT_OFFSET);	\
++	DEFINE_IMAGE_LE64(_kernel_flags_le, __HEAD_FLAGS);
+ 
+ #ifdef CONFIG_EFI
+ 
 -- 
 2.5.0
