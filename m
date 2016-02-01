@@ -1,112 +1,84 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 1 Feb 2016 14:20:42 +0100
-Subject: [PATCH v2 07/21] arm64: KVM: VHE: Patch out kern_hyp_va
-In-Reply-To: <1453737235-16522-8-git-send-email-marc.zyngier@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <1453737235-16522-8-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160201132042.GJ1478@cbox>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Mon, 1 Feb 2016 07:22:02 -0600
+Subject: [PATCH 2/2] dt-bindings: Add TPO TPG110 binding
+In-Reply-To: <1454316643-3931-1-git-send-email-linus.walleij@linaro.org>
+References: <1454316643-3931-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAL_JsqJSR_fCnCvUnzJaD3-zA0SPgTxjKtbL=up2NyH0GL_56w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 03:53:41PM +0000, Marc Zyngier wrote:
-> The kern_hyp_va macro is pretty meaninless with VHE, as there is
-> only one mapping - the kernel one.
-> 
-> In order to keep the code readable and efficient, use runtime
-> patching to replace the 'and' instruction used to compute the VA
-> with a 'nop'.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Mon, Feb 1, 2016 at 2:50 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> This adds device tree bindings for the TPO TPG110 panel found
+> mounted in the Nomadik NHK8815.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  arch/arm64/include/asm/kvm_mmu.h | 11 ++++++++++-
->  arch/arm64/kvm/hyp/hyp.h         | 25 ++++++++++++++++++++++---
->  2 files changed, 32 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index d3e6d7b..62f0d14 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -23,13 +23,16 @@
->  #include <asm/cpufeature.h>
->  
->  /*
-> - * As we only have the TTBR0_EL2 register, we cannot express
-> + * As ARMv8.0 only has the TTBR0_EL2 register, we cannot express
->   * "negative" addresses. This makes it impossible to directly share
->   * mappings with the kernel.
->   *
->   * Instead, give the HYP mode its own VA region at a fixed offset from
->   * the kernel by just masking the top bits (which are all ones for a
->   * kernel address).
-> + *
-> + * ARMv8.1 (using VHE) does have a TTBR1_EL2, and doesn't use these
-> + * macros (the entire kernel runs at EL2).
->   */
->  #define HYP_PAGE_OFFSET_SHIFT	VA_BITS
->  #define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
-> @@ -56,6 +59,8 @@
->  
->  #ifdef __ASSEMBLY__
->  
-> +#include <asm/alternative.h>
-> +#include <asm/cpufeature.h>
->  #include <asm/kvm_arm.h>
->  
->  .macro setup_vtcr tmp1, tmp2
-> @@ -84,7 +89,11 @@
->   * reg: VA to be converted.
->   */
->  .macro kern_hyp_va	reg
-> +alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
->  	and	\reg, \reg, #HYP_PAGE_OFFSET_MASK
-> +alternative_else
-> +	nop
-> +alternative_endif
->  .endm
->  
->  #else
-> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-> index fb27517..fc502f3 100644
-> --- a/arch/arm64/kvm/hyp/hyp.h
-> +++ b/arch/arm64/kvm/hyp/hyp.h
-> @@ -25,9 +25,28 @@
->  
->  #define __hyp_text __section(.hyp.text) notrace
->  
-> -#define kern_hyp_va(v) (typeof(v))((unsigned long)(v) & HYP_PAGE_OFFSET_MASK)
-> -#define hyp_kern_va(v) (typeof(v))((unsigned long)(v) - HYP_PAGE_OFFSET \
-> -						      + PAGE_OFFSET)
-> +static inline unsigned long __kern_hyp_va(unsigned long v)
-> +{
-> +	asm volatile(ALTERNATIVE("and %0, %0, %1",
-> +				 "nop",
-> +				 ARM64_HAS_VIRT_HOST_EXTN)
-> +		     : "+r" (v) : "i" (HYP_PAGE_OFFSET_MASK));
-> +	return v;
-> +}
+>  .../bindings/display/panel/tpo,tpg110.txt          | 47 ++++++++++++++++++++++
+>  1 file changed, 47 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/tpo,tpg110.txt
+>
+> diff --git a/Documentation/devicetree/bindings/display/panel/tpo,tpg110.txt b/Documentation/devicetree/bindings/display/panel/tpo,tpg110.txt
+> new file mode 100644
+> index 000000000000..acbc6bef3593
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/panel/tpo,tpg110.txt
+> @@ -0,0 +1,47 @@
+> +TPO TPG110 Panel
+> +================
 > +
-> +#define kern_hyp_va(v) (typeof(v))(__kern_hyp_va((unsigned long)(v)))
+> +This binding builds on the DPI bindings, adding a few properties
+> +as a superset of a DPI. See panel-dpi.txt for the required DPI
+> +bindings.
 > +
-> +static inline unsigned long __hyp_kern_va(unsigned long v)
-> +{
-> +	u64 offset = PAGE_OFFSET - HYP_PAGE_OFFSET;
-> +	asm volatile(ALTERNATIVE("add %0, %0, %1",
-> +				 "nop",
-> +				 ARM64_HAS_VIRT_HOST_EXTN)
-> +		     : "+r" (v) : "r" (offset));
-> +	return v;
-> +}
+> +Required properties:
+> +- compatible : "tpo,tpg110"
+> +- grestb-gpio : panel reset GPIO
+
+-gpios
+
+The example is correct.
+
+Otherwise,
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+> +- scen-gpios : serial control enable GPIO
+> +- scl-gpios : serial control clock line GPIO
+> +- sda-gpios : serial control data line GPIO
 > +
-> +#define hyp_kern_va(v) (typeof(v))(__hyp_kern_va((unsigned long)(v)))
-
-why do we need this casting of values instead of just defining these
-inlines and calling them directly with proper typing?
-
--Christoffer
-
->  
->  /**
->   * hyp_alternate_select - Generates patchable code sequences that are
-> -- 
-> 2.1.4
-> 
+> +Required nodes:
+> +- Video port for DPI input, see panel-dpi.txt
+> +- Panel timing for DPI setup, see panel-dpi.txt
+> +
+> +Example
+> +-------
+> +
+> +panel {
+> +       compatible = "tpo,tpg110", "panel-dpi";
+> +       grestb-gpios = <&stmpe_gpio44 5 GPIO_ACTIVE_LOW>;
+> +       scen-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
+> +       scl-gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;
+> +       sda-gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
+> +       backlight = <&bl>;
+> +
+> +       port {
+> +               nomadik_clcd_panel: endpoint {
+> +                       remote-endpoint = <&nomadik_clcd_pads>;
+> +               };
+> +       };
+> +
+> +       panel-timing {
+> +               clock-frequency = <33200000>;
+> +               hactive = <800>;
+> +               hback-porch = <216>;
+> +               hfront-porch = <40>;
+> +               hsync-len = <1>;
+> +               vactive = <480>;
+> +               vback-porch = <35>;
+> +               vfront-porch = <10>;
+> +               vsync-len = <1>;
+> +       };
+> +};
+> --
+> 2.4.3
+>
