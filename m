@@ -1,187 +1,57 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 1 Feb 2016 17:44:01 +0100
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <20160128165810.GA19432@atomide.com>
-References: <20160126224804.GB19432@atomide.com>
- <CAJZ5v0i79X5JjOZiu4cOZ0Esd5BxAvutF8d17asDzq9ECcML-g@mail.gmail.com>
- <20160126232212.GE19432@atomide.com>
- <CAJZ5v0gTRvyWHVmYNb8Q1QZzhVhokXo541+48mFyDRYv7Hi-Uw@mail.gmail.com>
- <20160126235222.GF19432@atomide.com>
- <CAPDyKFqD6Y6HcgVds_oWBZ8L7Kdh2VX_WZCGApf-1a_6GHCQ5g@mail.gmail.com>
- <20160128165810.GA19432@atomide.com>
-Message-ID: <CAPDyKFoQHpqdCa4fzHycP0OT2KsNTxWm7JZSe8Mauh+rxqGtGg@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 1 Feb 2016 11:44:26 -0500
+Subject: [PATCH V13 09/10] vfio, platform: add support for ACPI while
+ detecting the reset driver
+In-Reply-To: <56AF87E2.8040201@linaro.org>
+References: <1454106914-15857-1-git-send-email-okaya@codeaurora.org>
+ <1454106914-15857-10-git-send-email-okaya@codeaurora.org>
+ <56AF82FA.7000303@linaro.org> <56AF84F4.2080809@codeaurora.org>
+ <56AF87E2.8040201@linaro.org>
+Message-ID: <56AF8B6A.8040504@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 January 2016 at 17:58, Tony Lindgren <tony@atomide.com> wrote:
-> Hi,
->
-> * Ulf Hansson <ulf.hansson@linaro.org> [160128 06:30]:
->> On 27 January 2016 at 00:52, Tony Lindgren <tony@atomide.com> wrote:
->> > * Rafael J. Wysocki <rafael@kernel.org> [160126 15:38]:
->> >> On Wed, Jan 27, 2016 at 12:22 AM, Tony Lindgren <tony@atomide.com> wrote:
->> >> > * Rafael J. Wysocki <rafael@kernel.org> [160126 15:15]:
->> >> >> On Tue, Jan 26, 2016 at 11:48 PM, Tony Lindgren <tony@atomide.com> wrote:
->> >> >> > Hi,
->> >> >> >
->> >> >> > Looks like commit 5de85b9d57ab ("PM / runtime: Re-init runtime
->> >> >> > PM states at probe error and driver unbind") broke PM on at least
->>
->> I need to understand the issue here in a bit more detail, could you
->> please try to fill out some of my gaps!?
->>
->> In *what way* did it break PM?
->
-> The MMC hardware will not get idled properly any longer blocking any
-> deeper idle states.
->
->> Did the driver not probe successfully the second try? If so, what happened.
->
-> It probes fine after a -EPROBE_DEFER on the vmmc i2c regulator.
-> But the PM runtime usecounts are wrong.
+On 2/1/2016 11:29 AM, Eric Auger wrote:
+>> hanks, we should ask Baptiste to get his email into the Maintainer file list.
+> I think it is:
+> ./scripts/get_maintainer.pl
+> 0001-vfio-platform-add-support-for-ACPI-while-detecting-t.patch
+> 
+> Baptiste Reynal <b.reynal@virtualopensystems.com> (maintainer:VFIO
+> PLATFORM DRIVER,commit_signer:1/5=20%)
+> Alex Williamson <alex.williamson@redhat.com> (maintainer:VFIO
+> DRIVER,commit_signer:2/3=67%,commit_signer:4/5=80%)
+> ../..
 
-Okay. How did you verify this?
+Strange, I'll reset my tree. 
 
-I think the easiest way would be to make sure the usage count is
-*one*, just before the omap_hsmmc calls mmc_add_host() in its
-->probe() function.
+>> > 
+>>> >>
+>>> >> On my side I tested with of amd xgbe and I don't observe any regression.
+>>> >>
+>>> >> Best Regards
+>> > 
+>> > Can I add your tested by?
+> Well to make things clear I did not test the ACPI part. I just can tell
+> this does not bring any regression on the of part. But I am not against
+> if you don't find anybody else and you tested the ACPI part ;-)
+> 
 
-If it's *two*, that confirms this theory.
+How about?
 
->
->> >> >> > omap3. It seems we now need to additionally also call
->> >> >> > pm_runtime_dont_use_autosuspend() to get things working again?
->> >> >> >
->> >> >> > The following fixes idling on omap3, but I'm wondering if we
->> >> >> > should do something in pm_runtime_reinit() instead?
->>
->> I understand this as the second (or third, forth, whatever) probing
->> attempt actually succeeds, right!?
->
-> Right.
->
->> Is the issue you are seeing, that the device never becomes runtime
->> suspended due to commit 5de85b9d57ab ("PM / runtime: Re-init runtime
->> PM states at probe error and driver unbind")?
->
-> Correct.
->
->> >> > Looks like we have RPM_ACTIVE set in pm_runtime_reinit() if that
->> >> > gives any clues.
->>
->> That's a good clue. Although, there could be several reasons to why.
->>
->> Rafael has pointed out one valid potential case, but I want to be sure
->> that's really what happening here.
->>
->> *If* the problem is that the device doesn't becomes runtime suspended,
->> that will anyway be prevented as long as the autosuspend_delay has
->> been set to a negative value. That's why I wonder whether this really
->> is the case here.
->
-> That seems to be the case here. In device driver probe, commenting out
-> pm_runtime_set_autosuspend_delay(host->dev, MMC_AUTOSUSPEND_DELAY)
-> also makes things work again.
+of-tested-by: ...
 
-Okay. Interesting. :-)
+Shanker and I tested ACPI before pushing the patches to the list and we also 
+posted the corresponding QEMU patches as well to the qemu-devel maillist.
 
->
-> So one of the failing cases seems to be:
->
-> 1. Device driver probe sets pm_runtime_set_autosuspend_delay()
+http://patchwork.ozlabs.org/patch/575878/
 
-Only when "someone" in-before has set the autosuspend delay to a
-negative value, this will affect the usage count.
+I'll ask him to add his acpi-tested-by for the ACPI part.
 
-I didn't find any in-kernel user that would set this for the
-omap_hsmmc device, so it needs to be done from userspace via sysfs. It
-would be really great if you could help to confirm this.
+> Best Regards
 
-But more importantly, I fail to understand why commit 5de85b9d57ab
-("PM / runtime: Re-init runtime PM states at probe error and driver
-unbind"), is changing the behaviour in this regards.
-Potentially we might have a different runtime PM status than we had
-before when probing the second try, but how could that mess up the
-usage count...?
 
->
-> 2. Device driver probe initially fails with -EPROBE_DEFER
-
-So that happened before as well.
-
-Although, we now get a different runtime PM status (suspended) the
-second probe time.
-
->
-> 3. PM runtime usecounts get messed up
-
-Perhaps, but let's try to validate that as it should be rather easy.
-
->
->> For omap3, I assume there's a PM domain (the so called hwmod) being
->> attached to the omap_hsmmc device at device registration point!?
->
-> Correct. It uses the notifiers like bus code does in general.
-
-Yes, there perfectly okay.
-
-Although, I wondering whether it could be that it's the PM domain
-that's preventing the omap_hsmmc device from becoming runtime
-suspended.
-
-Perhaps the PM domain returns an error code from its
-->runtime_suspend() callback?
-
->
-> FYI, most SoCs don't have hardware based autoidle signaling between
-> the interconnect and the interconnect targets. So the hwmod code is
-> still needed until we have converted it into a proper interconnect +
-> module target drivers.
->
->> In that path depending on a specific hwmod flag, the device will be
->> given the an initial *active* runtime PM status, via invoking
->> pm_runtime_set_active().
->>
->> *If* that's the case, it affects the probing sequence, as the
->> pm_runtime_get_sync() won't trigger the ->runtime_resume() callbacks
->> to be invoked in the first probe attempt.
->
-> It has worked since pm runtime. And it works with MMC as as a loadable
-> module just fine when no -EPROBE_DEFER happens.
-
-Okay, so we definitely seem to have an issue with the changed runtime
-PM status (suspended) the second probe time.
-
-That's indeed caused by 5de85b9d57ab ("PM / runtime: Re-init runtime
-PM states at probe error and driver unbind").
-
->
->> Moreover, according to the data I received in this regression report
->> so far, it seems like probing the second time has *always* been done
->> with the device in runtime PM active state. Could that be the reason
->> to why it "happens" to work?
->
-> Not correct. I think that speculation is not related to the $subject
-> regression at all.
-
-I think it's important in this context, as it could affect how the PM
-domain may treat the device. As I mentioned earlier.
-
-For example due to commit 5de85b9d57ab ("PM / runtime: Re-init runtime
-PM states at probe error and driver unbind"), the ->runtime_resume()
-callback seems now to be called twice in a row, without in-between
-having the ->runtime_suspend() callback being invoked. Does really the
-PM domain cope with that correctly?
-
->
-> BTW, do you have some hardware to test with that has PM runtime
-> implemnted and actually working with mainline kernel?
-
-Oh, yes. Although I don't have an omap3, I wish I had.
-
-Also, I have locally a "runtime PM test driver", which helps me to
-test various runtime PM sequences.
-
-Kind regards
-Uffe
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
