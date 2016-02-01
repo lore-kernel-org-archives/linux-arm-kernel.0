@@ -1,80 +1,49 @@
 From: B56489@freescale.com (Yunhui Cui)
-Date: Mon, 1 Feb 2016 19:30:07 +0800
-Subject: [PATCH v2 3/4] mtd:spi-nor:fsl-quadspi:Add fast-read mode support
+Date: Mon, 1 Feb 2016 19:30:08 +0800
+Subject: [PATCH v2 4/4] mtd:spi_nor: Disable Micron flash HW protection
 In-Reply-To: <1454326208-4533-1-git-send-email-B56489@freescale.com>
 References: <1454326208-4533-1-git-send-email-B56489@freescale.com>
-Message-ID: <1454326208-4533-3-git-send-email-B56489@freescale.com>
+Message-ID: <1454326208-4533-4-git-send-email-B56489@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The qspi driver add generic fast-read mode for different
-flash venders. There are some different board flash work on
-different mode, such fast-read, quad-mode.
-So we have to modify the third entrace parameter of spi_nor_scan().
+For Micron family ,The status register write enable/disable bit,
+provides hardware data protection for the device.
+When the enable/disable bit is set to 1, the status register
+nonvolatile bits become read-only and the WRITE STATUS REGISTER
+operation will not execute.
 
 Signed-off-by: Yunhui Cui <B56489@freescale.com>
 ---
- drivers/mtd/spi-nor/fsl-quadspi.c | 27 +++++++++++++++++++++------
- 1 file changed, 21 insertions(+), 6 deletions(-)
+ drivers/mtd/spi-nor/spi-nor.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
-index 9861290..0a31cb1 100644
---- a/drivers/mtd/spi-nor/fsl-quadspi.c
-+++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-@@ -389,11 +389,21 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 	/* Read */
- 	lut_base = SEQID_READ * 4;
+diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+index ed0c19c..917f814 100644
+--- a/drivers/mtd/spi-nor/spi-nor.c
++++ b/drivers/mtd/spi-nor/spi-nor.c
+@@ -39,6 +39,7 @@
  
--	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
--			base + QUADSPI_LUT(lut_base));
--	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
--		    LUT1(FSL_READ, PAD4, rxfifo),
--			base + QUADSPI_LUT(lut_base + 1));
-+	if (nor->flash_read == SPI_NOR_FAST) {
-+		qspi_writel(q, LUT0(CMD, PAD1, read_op) |
-+			    LUT1(ADDR, PAD1, addrlen),
-+				base + QUADSPI_LUT(lut_base));
-+		qspi_writel(q,  LUT0(DUMMY, PAD1, read_dm) |
-+			    LUT1(FSL_READ, PAD1, rxfifo),
-+				base + QUADSPI_LUT(lut_base + 1));
-+	} else if (nor->flash_read == SPI_NOR_QUAD) {
-+		qspi_writel(q, LUT0(CMD, PAD1, read_op) |
-+			    LUT1(ADDR, PAD1, addrlen),
-+				base + QUADSPI_LUT(lut_base));
-+		qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
-+			    LUT1(FSL_READ, PAD4, rxfifo),
-+				base + QUADSPI_LUT(lut_base + 1));
-+	}
+ #define SPI_NOR_MAX_ID_LEN	6
+ #define SPI_NOR_MAX_ADDR_WIDTH	4
++#define SPI_NOR_MICRON_WRITE_ENABLE	0x7f
  
- 	/* Write enable */
- 	lut_base = SEQID_WREN * 4;
-@@ -468,6 +478,7 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
- {
- 	switch (cmd) {
- 	case SPINOR_OP_READ_1_1_4:
-+	case SPINOR_OP_READ_FAST:
- 		return SEQID_READ;
- 	case SPINOR_OP_WREN:
- 		return SEQID_WREN;
-@@ -963,6 +974,7 @@ static int fsl_qspi_probe(struct platform_device *pdev)
- 	struct spi_nor *nor;
- 	struct mtd_info *mtd;
- 	int ret, i = 0;
-+	enum read_mode mode = SPI_NOR_QUAD;
+ struct flash_info {
+ 	char		*name;
+@@ -1238,6 +1239,14 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
+ 		write_sr(nor, 0);
+ 	}
  
- 	q = devm_kzalloc(dev, sizeof(*q), GFP_KERNEL);
- 	if (!q)
-@@ -1064,7 +1076,10 @@ static int fsl_qspi_probe(struct platform_device *pdev)
- 		/* set the chip address for READID */
- 		fsl_qspi_set_base_addr(q, nor);
- 
--		ret = spi_nor_scan(nor, NULL, SPI_NOR_QUAD);
-+		ret = of_property_read_bool(np, "m25p,fast-read");
-+		mode = (ret) ? SPI_NOR_FAST : SPI_NOR_QUAD;
++	if (JEDEC_MFR(info) == SNOR_MFR_MICRON) {
++		ret = read_sr(nor);
++		ret &= SPI_NOR_MICRON_WRITE_ENABLE;
 +
-+		ret = spi_nor_scan(nor, NULL, mode);
- 		if (ret)
- 			goto mutex_failed;
- 
++		write_enable(nor);
++		write_sr(nor, ret);
++	}
++
+ 	if (!mtd->name)
+ 		mtd->name = dev_name(dev);
+ 	mtd->priv = nor;
 -- 
 2.1.0.27.g96db324
