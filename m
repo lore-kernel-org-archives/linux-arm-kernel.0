@@ -1,41 +1,40 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon,  1 Feb 2016 17:39:22 +0000
-Subject: [PATCH 03/11] drivers: rtc: allow compilation of sun6i RTC for all
- sunxi SoCs
+Date: Mon,  1 Feb 2016 17:39:23 +0000
+Subject: [PATCH 04/11] arm64: Introduce Allwinner SoC config option
 In-Reply-To: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
 References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1454348370-3816-4-git-send-email-andre.przywara@arm.com>
+Message-ID: <1454348370-3816-5-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the moment the "sun6i" RTC drivers depends on having two specific
-SoC families selected.
-The Allwinner A64 SoC has the same RTC, so extend the Kconfig option
-to allow inclusion of the driver for all Allwinner SoCs.
+To prepare for the Allwinner A64 SoC support, introduce a config
+option to allow compiling Allwinner (aka. sunxi) specific drivers
+for the arm64 architecture as well.
+This patch just defines the ARCH_SUNXI symbol to allow Allwinner
+specific drivers to be selected during kernel configuration.
+Since the MMC driver is quite essential for Linux to be useful, select
+it by default.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- drivers/rtc/Kconfig | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ arch/arm64/Kconfig.platforms | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 376322f..526eaf4 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -1360,10 +1360,11 @@ config RTC_DRV_SUN4V
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 21074f6..fc7cf4b 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -1,5 +1,11 @@
+ menu "Platform selection"
  
- config RTC_DRV_SUN6I
- 	tristate "Allwinner A31 RTC"
--	depends on MACH_SUN6I || MACH_SUN8I
-+	default MACH_SUN6I || MACH_SUN8I
-+	depends on ARCH_SUNXI
++config ARCH_SUNXI
++	bool "Allwinner sunxi 64-bit SoC Family"
++	select SUNXI_MMC
++	help
++	  This enables support for Allwinner sunxi based SoCs like the A64.
++
+ config ARCH_BCM_IPROC
+ 	bool "Broadcom iProc SoC Family"
  	help
--	  If you say Y here you will get support for the RTC found on
--	  Allwinner A31.
-+	  If you say Y here you will get support for the RTC found in
-+	  some Allwinner SoCs like the A31 or the A64.
- 
- config RTC_DRV_SUNXI
- 	tristate "Allwinner sun4i/sun7i RTC"
 -- 
 2.6.4
