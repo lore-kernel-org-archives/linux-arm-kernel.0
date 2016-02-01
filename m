@@ -1,24 +1,74 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 01 Feb 2016 13:11:36 -0800
-Subject: [PATCH] ARM: bcm: use const and __initconst for smp_operations
-In-Reply-To: <56A65841.1040100@broadcom.com>
-References: <1453721475-15156-1-git-send-email-yamada.masahiro@socionext.com>
- <56A65841.1040100@broadcom.com>
-Message-ID: <56AFCA08.60903@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 1 Feb 2016 16:15:38 -0500 (EST)
+Subject: [PATCH v2] ARM: proc-v7.S: Adjust stack address when
+ XIP_KERNEL
+In-Reply-To: <1454335736-10084-1-git-send-email-chris.brandt@renesas.com>
+References: <1454105474-3009-1-git-send-email-chris.brandt@renesas.com>
+ <1454335736-10084-1-git-send-email-chris.brandt@renesas.com>
+Message-ID: <alpine.LFD.2.20.1602011613360.32766@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/01/16 09:15, Ray Jui wrote:
-> Hi Masahiro,
-> 
-> On 1/25/2016 3:31 AM, Masahiro Yamada wrote:
->> This newly added code missed the global fixup by commit 75305275a721
->> ("ARM: use const and __initconst for smp_operations").  So fix it now.
->>
->> Also, add missing "static" qualifier.
->>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+On Mon, 1 Feb 2016, Chris Brandt wrote:
 
-Applied, thanks!
--- 
-Florian
+> From: Nicolas Pitre <nico@linaro.org>
+> 
+> When XIP_KERNEL is enabled, the virt to phys address translation for RAM
+> is not the same as the virt to phys address translation for .text.
+> The only way to know where physical RAM is located is to use
+> PLAT_PHYS_OFFSET.
+> The MACRO will be useful for other places where there is a similar problem.
+> 
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+
+Looks fine.  You may submit it here:
+
+http://www.arm.linux.org.uk/developer/patches/
+
+
+> ---
+> v2:
+> * Fixed Signed-off to show correct author
+> ---
+>  arch/arm/include/asm/memory.h | 8 ++++++++
+>  arch/arm/mm/proc-v7.S         | 2 +-
+>  2 files changed, 9 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index c79b57b..7dd2ab5 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -134,6 +134,14 @@
+>   */
+>  #define PLAT_PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
+>  
+> +#ifdef CONFIG_XIP_KERNEL
+> +#define PHYS_OFFSET_FIXUP \
+> +	( XIP_VIRT_ADDR(CONFIG_XIP_PHYS_ADDR) - PAGE_OFFSET + \
+> +	  PLAT_PHYS_OFFSET - CONFIG_XIP_PHYS_ADDR )
+> +#else
+> +#define PHYS_OFFSET_FIXUP 0
+> +#endif
+> +
+>  #ifndef __ASSEMBLY__
+>  
+>  /*
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 0f92d57..1595fb2 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -487,7 +487,7 @@ __errata_finish:
+>  
+>  	.align	2
+>  __v7_setup_stack_ptr:
+> -	.word	__v7_setup_stack - .
+> +	.word	__v7_setup_stack - . + PHYS_OFFSET_FIXUP
+>  ENDPROC(__v7_setup)
+>  
+>  	.bss
+> -- 
+> 1.9.1
+> 
+> 
+> 
