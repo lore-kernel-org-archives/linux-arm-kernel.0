@@ -1,37 +1,42 @@
-From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
-Date: Mon, 1 Feb 2016 13:22:28 -0500
-Subject: [PATCH 4/4] pwm: omap-dmtimer: add dev_dbg() message for
- effective period and duty cycle
-In-Reply-To: <CAA3gFWvSsctXtds6_SEtYY1yUdWJDR1XjznGS6qjdrGW5Dbw=A@mail.gmail.com>
-References: <1454128014-22866-1-git-send-email-drivshin.allworx@gmail.com>
- <1454128014-22866-5-git-send-email-drivshin.allworx@gmail.com>
- <CAA3gFWvSsctXtds6_SEtYY1yUdWJDR1XjznGS6qjdrGW5Dbw=A@mail.gmail.com>
-Message-ID: <20160201132228.2634b72e.drivshin.allworx@gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 1 Feb 2016 18:25:48 +0000
+Subject: [GIT PULL] vexpress fixes for v4.5
+Message-ID: <56AFA32C.4000901@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 30 Jan 2016 15:51:06 +0100
-Neil Armstrong <narmstrong@baylibre.com> wrote:
+The following changes since commit 36f90b0a2ddd60823fe193a85e60ff1906c2a9b3:
 
-> 2016-01-30 5:26 GMT+01:00 David Rivshin (Allworx)
-> <drivshin.allworx@gmail.com>:
-> > From: David Rivshin <drivshin@allworx.com>
-> >
-> > After going through the math and constraints checking to compute
-> > load and match values, it is helpful to know what the resultant
-> > period and duty cycle are.
-> >
-> > Signed-off-by: David Rivshin <drivshin@allworx.com>
-> > ---
-> >
-> > I found this helpful while testing the other changes, so I included
-> > it in case it may be of use to someone in the future. I would have
-> > no issues with dropping this if it's not considered worthwhile.  
-> 
-> It's useful, but converting it as a sysfs attribute would be great !
+   Linux 4.5-rc2 (2016-01-31 18:12:16 -0800)
 
-Hrm, yes that is an interesting thought. I imagine that many PWM 
-devices have similar constraints, so perhaps that would be best 
-handled generically in the pwm core? Maybe as new optional get_*() 
-ops, a modification to the config() op to add output params, or just 
-updating new fields in the struct pwm directly?
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git 
+tags/vexpress-for-v4.5/fixes-rc2
+
+for you to fetch changes up to aeb2ee5683e51305aff274d8b0a50af69b3ab310:
+
+   arm64: dts: Add missing DMA Abort interrupt to Juno (2016-02-01 
+09:59:59 +0000)
+
+----------------------------------------------------------------
+vexpress fixes for v4.5
+
+Couple of minor fixes for vexpress platforms:
+1. Add missing of_node_put in vexpress config bus
+2. Add missing DMA-330 abort interrupt on Juno platforms
+
+----------------------------------------------------------------
+Amitoj Kaur Chawla (1):
+       bus: vexpress-config: Add missing of_node_put
+
+Robin Murphy (1):
+       arm64: dts: Add missing DMA Abort interrupt to Juno
+
+  arch/arm64/boot/dts/arm/juno-base.dtsi | 1 +
+  drivers/bus/vexpress-config.c          | 4 +++-
+  2 files changed, 4 insertions(+), 1 deletion(-)
+
+-- 
+Regards,
+Sudeep
