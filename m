@@ -1,72 +1,33 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 2 Feb 2016 00:10:43 +0100
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <20160201222926.GQ19432@atomide.com>
-References: <CAJZ5v0i79X5JjOZiu4cOZ0Esd5BxAvutF8d17asDzq9ECcML-g@mail.gmail.com>
- <20160126232212.GE19432@atomide.com>
- <CAJZ5v0gTRvyWHVmYNb8Q1QZzhVhokXo541+48mFyDRYv7Hi-Uw@mail.gmail.com>
- <20160126235222.GF19432@atomide.com>
- <CAPDyKFqD6Y6HcgVds_oWBZ8L7Kdh2VX_WZCGApf-1a_6GHCQ5g@mail.gmail.com>
- <20160128165810.GA19432@atomide.com>
- <CAPDyKFoQHpqdCa4fzHycP0OT2KsNTxWm7JZSe8Mauh+rxqGtGg@mail.gmail.com>
- <20160201181135.GL19432@atomide.com>
- <20160201220657.GO19432@atomide.com>
- <CAJZ5v0gOtJE24Hu8R9jx7kBktmd__qFUNF_KnsCDLwgidskUvw@mail.gmail.com>
- <20160201222926.GQ19432@atomide.com>
-Message-ID: <CAJZ5v0jN3uK8q46N1Sp6xR2U=MpJZj=PX8uh9Kp+n75J4UZCZQ@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 01 Feb 2016 15:15:32 -0800
+Subject: [PATCH V4 1/7] clk: bcm2835: the minimum clock divider is 2
+In-Reply-To: <1452867667-2447-2-git-send-email-kernel@martin.sperl.org>
+References: <1452867667-2447-1-git-send-email-kernel@martin.sperl.org>
+ <1452867667-2447-2-git-send-email-kernel@martin.sperl.org>
+Message-ID: <87oac03tuz.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 1, 2016 at 11:29 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Rafael J. Wysocki <rafael@kernel.org> [160201 14:18]:
->> On Mon, Feb 1, 2016 at 11:06 PM, Tony Lindgren <tony@atomide.com> wrote:
->> > --- a/drivers/base/power/runtime.c
->> > +++ b/drivers/base/power/runtime.c
->> > @@ -1419,17 +1419,25 @@ void pm_runtime_init(struct device *dev)
->> >   */
->> >  void pm_runtime_reinit(struct device *dev)
->> >  {
->> > -       if (!pm_runtime_enabled(dev)) {
->> > -               if (dev->power.runtime_status == RPM_ACTIVE)
->> > +       if (pm_runtime_enabled(dev))
->> > +               return;
->> > +
->> > +       if (dev->power.runtime_status == RPM_ACTIVE) {
->> > +               if (dev->power.use_autosuspend) {
->> > +                       __pm_runtime_use_autosuspend(dev, false);
->> > +                       pm_runtime_suspend(dev);
->>
->> This won't work, because runtime PM is disabled at this point.
+kernel at martin.sperl.org writes:
+
+> From: Martin Sperl <kernel@martin.sperl.org>
 >
-> Hmm right OK. It does work from idling the hardware point
-> of view though..
+> Testing with different clock divider values has shown
+> that (at least for the PCM clock) the clock divider
+> has to be at least 2, otherwise the clock will not
+> output a signal.
 
-pm_runtime_suspend() with runtime PM disabled is a NOP.  It will do
-nothing and return -EACCES.
+For a MASH clock (PWM, PCM, SLIMBUS, but not the others), the minimum
+integer component of the divider is:
 
->> What about doing this instead:
->>
->>                if (dev->power.use_autosuspend)
->>                        __pm_runtime_use_autosuspend(dev, false);
->>
->>                pm_runtime_set_suspended(dev);
->
-> ..while this does not work. The hardware is never idled
-> in this case.
-
-I'm not sure what you mean.  pm_runtime_set_suspended() sets the
-status to RPM_SUSPENDED for devices with runtime PM disabled.  It has
-nothing to do with "idling" in principle.
-
-> What else does __pm_runtime_use_autosuspend() set initially
-> that changes things here?
-
-The usage counter, if the delay is negative.
-
-I'll look at this in detail, but not right now, sorry.  I'm working on
-something else ATM and I was hoping that Ulf would be able to figure
-out what's going on here.
-
-Thanks,
-Rafael
+mash 0: 1
+mash 1: 2
+mash 2: 3
+mash 3: 5
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160201/092ef864/attachment.sig>
