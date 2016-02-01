@@ -1,49 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 1 Feb 2016 16:20:40 +0000
-Subject: [PATCH v2 06/21] arm64: KVM: VHE: Patch out use of HVC
-In-Reply-To: <20160201153635.GH15514@e104818-lin.cambridge.arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <1453737235-16522-7-git-send-email-marc.zyngier@arm.com>
- <20160201131634.GI1478@cbox> <56AF5ED8.7010303@arm.com>
- <20160201153635.GH15514@e104818-lin.cambridge.arm.com>
-Message-ID: <56AF85D8.7080907@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Feb 2016 17:23:39 +0100
+Subject: [PATCH] ocfs2: remove unused label
+Message-ID: <3477441.9K8aQAEjZq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/16 15:36, Catalin Marinas wrote:
-> On Mon, Feb 01, 2016 at 01:34:16PM +0000, Marc Zyngier wrote:
->> On 01/02/16 13:16, Christoffer Dall wrote:
->>> On Mon, Jan 25, 2016 at 03:53:40PM +0000, Marc Zyngier wrote:
->>>> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
->>>> index 93e8d983..9e0683f 100644
->>>> --- a/arch/arm64/kvm/hyp/hyp-entry.S
->>>> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
->>>> @@ -38,6 +38,32 @@
->>>>  	ldp	x0, x1, [sp], #16
->>>>  .endm
->>>>  
->>>> +.macro do_el2_call
->>>> +	/*
->>>> +	 * Shuffle the parameters before calling the function
->>>> +	 * pointed to in x0. Assumes parameters in x[1,2,3].
->>>> +	 */
->>>> +	stp	lr, xzr, [sp, #-16]!
->>>
->>> remind me why this pair isn't just doing "str" instead of "stp" with the
->>> xzr ?
->>
->> Because SP has to be aligned on a 16 bytes boundary at all times.
-> 
-> You could do something like:
-> 
-> 	sub	sp, sp, #16
-> 	str	lr, [sp]
-> 
+A recent cleanup modified the ocfs2_file_write_iter function, which
+no longer uses its 'relock' label, as gcc warns:
 
-Ah, fair enough. I'll fold that in.
+fs/ocfs2/file.c: In function 'ocfs2_file_write_iter':
+fs/ocfs2/file.c:2198:1: error: label 'relock' defined but not used [-Werror=unused-label]
 
-Thanks,
+This removes the label as well.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 1a46f12e5071 ("ocfs2: code clean up for direct io")
+---
+Found on ARM randconfig builds on linux-next last week.
+
+diff --git a/fs/ocfs2/file.c b/fs/ocfs2/file.c
+index 41c506e7814e..c18ab45f8d21 100644
+--- a/fs/ocfs2/file.c
++++ b/fs/ocfs2/file.c
+@@ -2195,7 +2195,6 @@ static ssize_t ocfs2_file_write_iter(struct kiocb *iocb,
+ 
+ 	inode_lock(inode);
+ 
+-relock:
+ 	/*
+ 	 * Concurrent O_DIRECT writes are allowed with
+ 	 * mount_option "coherency=buffered".
