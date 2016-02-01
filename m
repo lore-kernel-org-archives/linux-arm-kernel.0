@@ -1,156 +1,74 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Mon,  1 Feb 2016 21:34:47 +0800
-Subject: [PATCH v5 4/4] arm64: dts: add Hi6220's stub clock node
-In-Reply-To: <1454333687-20421-1-git-send-email-leo.yan@linaro.org>
-References: <1454333687-20421-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1454333687-20421-5-git-send-email-leo.yan@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 01 Feb 2016 14:37:03 +0100
+Subject: [PATCH v2 net 3/6] net: mvneta: Remove unused code
+In-Reply-To: <56AF5E55.9030603@cogentembedded.com> (Sergei Shtylyov's message
+ of "Mon, 1 Feb 2016 16:32:05 +0300")
+References: <1454332067-16378-1-git-send-email-gregory.clement@free-electrons.com>
+ <1454332067-16378-4-git-send-email-gregory.clement@free-electrons.com>
+ <56AF5E55.9030603@cogentembedded.com>
+Message-ID: <87d1sg7ds0.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable SRAM node and stub clock node for Hi6220, which will use mailbox
-channel 0 for CPU's frequency change.
+Hi Sergei,
+ 
+ On lun., f?vr. 01 2016, Sergei Shtylyov <sergei.shtylyov@cogentembedded.com> wrote:
 
-Furthermore, add the CPU clock phandle in CPU's node and using
-operating-points-v2 to register operating points. So can be used by
-cpufreq-dt driver.
+> Hello.
+>
+> On 2/1/2016 4:07 PM, Gregory CLEMENT wrote:
+>
+>> Since the commit 2dcf75e2793c ("net: mvneta: Associate RX queues with
+>> each CPU") all the percpu irq are used and unmask at initialization, so
+>
+>    Unmasked, you mean?
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 55 +++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+yes and disabled would be more appropriate actually.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index be3d962..d46820a 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -81,6 +81,11 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x0>;
- 			enable-method = "psci";
-+			clocks = <&stub_clock 0>;
-+			operating-points-v2 = <&cpu_opp_table>;
-+			cooling-min-level = <4>;
-+			cooling-max-level = <0>;
-+			#cooling-cells = <2>; /* min followed by max */
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -89,6 +94,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x1>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -97,6 +103,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x2>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -105,6 +112,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x3>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -113,6 +121,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x100>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -121,6 +130,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x101>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -129,6 +139,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x102>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 
-@@ -137,10 +148,42 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x103>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 		};
- 	};
- 
-+	cpu_opp_table: cpu_opp_table {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp00 {
-+			opp-hz = /bits/ 64 <208000000>;
-+			opp-microvolt = <1040000>;
-+			clock-latency-ns = <500000>;
-+		};
-+		opp01 {
-+			opp-hz = /bits/ 64 <432000000>;
-+			opp-microvolt = <1040000>;
-+			clock-latency-ns = <500000>;
-+		};
-+		opp02 {
-+			opp-hz = /bits/ 64 <729000000>;
-+			opp-microvolt = <1090000>;
-+			clock-latency-ns = <500000>;
-+		};
-+		opp03 {
-+			opp-hz = /bits/ 64 <960000000>;
-+			opp-microvolt = <1180000>;
-+			clock-latency-ns = <500000>;
-+		};
-+		opp04 {
-+			opp-hz = /bits/ 64 <1200000000>;
-+			opp-microvolt = <1330000>;
-+			clock-latency-ns = <500000>;
-+		};
-+	};
-+
- 	gic: interrupt-controller at f6801000 {
- 		compatible = "arm,gic-400";
- 		reg = <0x0 0xf6801000 0 0x1000>, /* GICD */
-@@ -168,6 +211,11 @@
- 		#size-cells = <2>;
- 		ranges;
- 
-+		sram: sram at fff80000 {
-+			compatible = "hisilicon,hi6220-sramctrl", "syscon";
-+			reg = <0x0 0xfff80000 0x0 0x12000>;
-+		};
-+
- 		ao_ctrl: ao_ctrl at f7800000 {
- 			compatible = "hisilicon,hi6220-aoctrl", "syscon";
- 			reg = <0x0 0xf7800000 0x0 0x2000>;
-@@ -193,6 +241,13 @@
- 			#clock-cells = <1>;
- 		};
- 
-+		stub_clock: stub_clock {
-+			compatible = "hisilicon,hi6220-stub-clk";
-+			hisilicon,hi6220-clk-sram = <&sram>;
-+			#clock-cells = <1>;
-+			mboxes = <&mailbox 1>;
-+		};
-+
- 		uart0: uart at f8015000 {	/* console */
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x0 0xf8015000 0x0 0x1000>;
+>
+>> there is no point to unmask them first.
+>
+>    Mask, maybe (looking at the patch)?
+
+not mask, but here again disable would be more appropriate. The code
+removed disables the interrupt.
+
+
+Thanks,
+
+Gregory
+
+>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>   drivers/net/ethernet/marvell/mvneta.c | 8 --------
+>>   1 file changed, 8 deletions(-)
+>>
+>> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+>> index 3d6e3137f305..861b7e0d7d5f 100644
+>> --- a/drivers/net/ethernet/marvell/mvneta.c
+>> +++ b/drivers/net/ethernet/marvell/mvneta.c
+>> @@ -3009,14 +3009,6 @@ static int mvneta_open(struct net_device *dev)
+>>   		goto err_cleanup_txqs;
+>>   	}
+>>
+>> -	/* Even though the documentation says that request_percpu_irq
+>> -	 * doesn't enable the interrupts automatically, it actually
+>> -	 * does so on the local CPU.
+>> -	 *
+>> -	 * Make sure it's disabled.
+>> -	 */
+>> -	mvneta_percpu_disable(pp);
+>> -
+>>   	/* Enable per-CPU interrupt on all the CPU to handle our RX
+>>   	 * queue interrupts
+>>   	 */
+>
+> MBR, Sergei
+>
+
 -- 
-1.9.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
