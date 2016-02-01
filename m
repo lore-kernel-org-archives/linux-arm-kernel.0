@@ -1,45 +1,102 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 1 Feb 2016 23:05:31 +0100
-Subject: [PATCH v4] mmc: meson: Add driver for the SD/MMC host found on
- Amlogic MesonX SoCs
-In-Reply-To: <CAPDyKFpcsKihuOiF5=RwoWrF0Jf7hRsXVSU5uV8qZf1mUsa-iQ@mail.gmail.com>
-References: <1448988109-32630-1-git-send-email-carlo@caione.org>
- <CAPDyKFp=buvJ8Li3XC8XSUAUO7BsE+U6vEQH2xTrgcHAkdG8bQ@mail.gmail.com>
- <CAOQ7t2aJAPWd3Xmvu7n0EWL-KC8ZriM3KryfsYEh556uXhuR+g@mail.gmail.com>
- <CAPDyKFpcsKihuOiF5=RwoWrF0Jf7hRsXVSU5uV8qZf1mUsa-iQ@mail.gmail.com>
-Message-ID: <CAOQ7t2afXxStCsj=M-FX7eMep1gLt4jkyXDiLas_SQ1UwHc0=Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 1 Feb 2016 14:06:58 -0800
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <20160201181135.GL19432@atomide.com>
+References: <20160126224804.GB19432@atomide.com>
+ <CAJZ5v0i79X5JjOZiu4cOZ0Esd5BxAvutF8d17asDzq9ECcML-g@mail.gmail.com>
+ <20160126232212.GE19432@atomide.com>
+ <CAJZ5v0gTRvyWHVmYNb8Q1QZzhVhokXo541+48mFyDRYv7Hi-Uw@mail.gmail.com>
+ <20160126235222.GF19432@atomide.com>
+ <CAPDyKFqD6Y6HcgVds_oWBZ8L7Kdh2VX_WZCGApf-1a_6GHCQ5g@mail.gmail.com>
+ <20160128165810.GA19432@atomide.com>
+ <CAPDyKFoQHpqdCa4fzHycP0OT2KsNTxWm7JZSe8Mauh+rxqGtGg@mail.gmail.com>
+ <20160201181135.GL19432@atomide.com>
+Message-ID: <20160201220657.GO19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 8, 2015 at 9:35 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+* Tony Lindgren <tony@atomide.com> [160201 10:12]:
+> * Ulf Hansson <ulf.hansson@linaro.org> [160201 08:45]:
+> > On 28 January 2016 at 17:58, Tony Lindgren <tony@atomide.com> wrote:
+> > >
+> > > The MMC hardware will not get idled properly any longer blocking any
+> > > deeper idle states.
+> > >
+> > >> Did the driver not probe successfully the second try? If so, what happened.
+> > >
+> > > It probes fine after a -EPROBE_DEFER on the vmmc i2c regulator.
+> > > But the PM runtime usecounts are wrong.
+> > 
+> > Okay. How did you verify this?
+> 
+> Well that was just based on what I see in the dmesg:
+> 
+> omap_device: omap_device_enable() called from invalid state 1
 
-Hi Ulf,
-(old thread, I know)
+So we're now missing the idling of hardare after -EPROBE_DEFER..
+Does the following patch work for you guys?
 
->> I have actually a problem and a question related to this value. On the
->> boards I'm currently using to test this driver I have no CD GPIO. In
->> this case do I have to specify the MMC as "non-removable"? Also if I
->
-> "non-removable" is intended to be used for eMMC or other cards
-> (SD/SDIO) that is not possible to remove/insert at runtime.
->
->> try to change an SD card at runtime I have to wait 3 times the timeout
->> before being able to do it successfully.
->
-> I guess you are using the "broken-cd" binding, which will enable
-> MMC_CAP_NEEDS_POLL and thus the mmc core will poll to detect cards
-> being inserted or removed.
+Regards,
 
-I still fail to see what the correct behaviour should be.
-Using the v4 of this driver with a "broken-cd" binding and a timeout
-of 10s my SD card takes 30s to be identified as removed after I take
-it out from the SD slot.
-Also, if I take it out and insert it again, I still have to wait 30s
-to be able to access it again. Is this a limitation / bug of my driver
-or is this the expected behaviour when we do not have a dedicated GPIO
-for card detection?
+Tony
 
-Cheers,
+8< -----------------------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Mon, 1 Feb 2016 13:40:46 -0800
+Subject: [PATCH] PM / runtime: Fix PM runtime reinit
 
--- 
-Carlo Caione
+Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
+error and driver unbind") added calls to reinit the PM runtime. This
+however broke things for idling the hardware at least if the driver
+probing has pm_runtime_set_autosuspend_delay() and -EPROBE_DEFER
+happens.
+
+Fix the problem by adding a check for configured autosuspend if
+RPM_ACTIVE is set. Then reset the autosuspend, and suspend the
+device to make sure the hardware gets idled.
+
+Let's also cut down one level of nestedness and remove a negative
+test by returning early if pm_runtime_enabled(dev) as there is
+currently nothing for us to do in that case.
+
+Fixes: 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at
+probe error and driver unbind")
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/drivers/base/power/runtime.c
++++ b/drivers/base/power/runtime.c
+@@ -1419,17 +1419,25 @@ void pm_runtime_init(struct device *dev)
+  */
+ void pm_runtime_reinit(struct device *dev)
+ {
+-	if (!pm_runtime_enabled(dev)) {
+-		if (dev->power.runtime_status == RPM_ACTIVE)
++	if (pm_runtime_enabled(dev))
++		return;
++
++	if (dev->power.runtime_status == RPM_ACTIVE) {
++		if (dev->power.use_autosuspend) {
++			__pm_runtime_use_autosuspend(dev, false);
++			pm_runtime_suspend(dev);
++		} else {
+ 			pm_runtime_set_suspended(dev);
+-		if (dev->power.irq_safe) {
+-			spin_lock_irq(&dev->power.lock);
+-			dev->power.irq_safe = 0;
+-			spin_unlock_irq(&dev->power.lock);
+-			if (dev->parent)
+-				pm_runtime_put(dev->parent);
+ 		}
+ 	}
++
++	if (dev->power.irq_safe) {
++		spin_lock_irq(&dev->power.lock);
++		dev->power.irq_safe = 0;
++		spin_unlock_irq(&dev->power.lock);
++		if (dev->parent)
++			pm_runtime_put(dev->parent);
++	}
+ }
+ 
+ /**
