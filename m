@@ -1,56 +1,36 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 1 Feb 2016 15:23:19 +0100
-Subject: [PATCH v2 15/21] arm64: KVM: VHE: Use unified sysreg accessors
- for timer
-In-Reply-To: <1453737235-16522-16-git-send-email-marc.zyngier@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <1453737235-16522-16-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160201142319.GU1478@cbox>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 01 Feb 2016 15:22:44 +0100
+Subject: [PATCH v2 01/15] arm: use of_platform_default_populate() to
+ populate default bus
+In-Reply-To: <1453881180-12296-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1453868872-26300-2-git-send-email-wangkefeng.wang@huawei.com>
+ <1453881180-12296-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1694609.jjsREDbl4R@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 03:53:49PM +0000, Marc Zyngier wrote:
-> Switch the timer code to the unified sysreg accessors.
+Am Mittwoch, 27. Januar 2016, 15:53:00 schrieb Kefeng Wang:
+> Use helper of_platform_default_populate() in linux/of_platform
+> when possible, instead of calling of_platform_populate() with
+> the default match table.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 > ---
->  arch/arm64/kvm/hyp/timer-sr.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp/timer-sr.c b/arch/arm64/kvm/hyp/timer-sr.c
-> index 1051e5d..f276d9e 100644
-> --- a/arch/arm64/kvm/hyp/timer-sr.c
-> +++ b/arch/arm64/kvm/hyp/timer-sr.c
-> @@ -31,12 +31,12 @@ void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
->  	u64 val;
->  
->  	if (kvm->arch.timer.enabled) {
-> -		timer->cntv_ctl = read_sysreg(cntv_ctl_el0);
-> -		timer->cntv_cval = read_sysreg(cntv_cval_el0);
-> +		timer->cntv_ctl = read_sysreg_el0(cntv_ctl);
-> +		timer->cntv_cval = read_sysreg_el0(cntv_cval);
->  	}
->  
->  	/* Disable the virtual timer */
-> -	write_sysreg(0, cntv_ctl_el0);
-> +	write_sysreg_el0(0, cntv_ctl);
->  
->  	/* Allow physical timer/counter access for the host */
->  	val = read_sysreg(cnthctl_el2);
-> @@ -64,8 +64,8 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
->  
->  	if (kvm->arch.timer.enabled) {
->  		write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
-> -		write_sysreg(timer->cntv_cval, cntv_cval_el0);
-> +		write_sysreg_el0(timer->cntv_cval, cntv_cval);
->  		isb();
-> -		write_sysreg(timer->cntv_ctl, cntv_ctl_el0);
-> +		write_sysreg_el0(timer->cntv_ctl, cntv_ctl);
->  	}
+
+
+> diff --git a/arch/arm/mach-rockchip/rockchip.c
+> b/arch/arm/mach-rockchip/rockchip.c index 3f07cc5..07ef8ef 100644
+> --- a/arch/arm/mach-rockchip/rockchip.c
+> +++ b/arch/arm/mach-rockchip/rockchip.c
+> @@ -73,7 +73,7 @@ static void __init rockchip_timer_init(void)
+>  static void __init rockchip_dt_init(void)
+>  {
+>  	rockchip_suspend_init();
+> -	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +	of_platform_default_populate(NULL, NULL, NULL);
+>  	platform_device_register_simple("cpufreq-dt", 0, NULL, 0);
 >  }
-> -- 
-> 2.1.4
-> 
+
+sounds sensible, so
+
+Acked-by: Heiko Stuebner <heiko@sntech.de>
