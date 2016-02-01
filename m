@@ -1,36 +1,50 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 01 Feb 2016 15:22:44 +0100
-Subject: [PATCH v2 01/15] arm: use of_platform_default_populate() to
- populate default bus
-In-Reply-To: <1453881180-12296-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1453868872-26300-2-git-send-email-wangkefeng.wang@huawei.com>
- <1453881180-12296-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1694609.jjsREDbl4R@diego>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 1 Feb 2016 15:24:18 +0100
+Subject: [PATCH v2 16/21] arm64: KVM: VHE: Add fpsimd enabling on guest
+ access
+In-Reply-To: <1453737235-16522-17-git-send-email-marc.zyngier@arm.com>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <1453737235-16522-17-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160201142418.GV1478@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 27. Januar 2016, 15:53:00 schrieb Kefeng Wang:
-> Use helper of_platform_default_populate() in linux/of_platform
-> when possible, instead of calling of_platform_populate() with
-> the default match table.
+On Mon, Jan 25, 2016 at 03:53:50PM +0000, Marc Zyngier wrote:
+> Despite the fact that a VHE enabled kernel runs at EL2, it uses
+> CPACR_EL1 to trap FPSIMD access. Add the required alternative
+> code to re-enable guest FPSIMD access when it has trapped to
+> EL2.
 > 
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
+>  arch/arm64/kvm/hyp/entry.S | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+> index fd0fbe9..759a0ec 100644
+> --- a/arch/arm64/kvm/hyp/entry.S
+> +++ b/arch/arm64/kvm/hyp/entry.S
+> @@ -130,9 +130,15 @@ ENDPROC(__guest_exit)
+>  ENTRY(__fpsimd_guest_restore)
+>  	stp	x4, lr, [sp, #-16]!
+>  
+> +alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+>  	mrs	x2, cptr_el2
+>  	bic	x2, x2, #CPTR_EL2_TFP
+>  	msr	cptr_el2, x2
+> +alternative_else
+> +	mrs	x2, cpacr_el1
+> +	orr	x2, x2, #(3 << 20)
 
+nit: bitfield definition again
 
-> diff --git a/arch/arm/mach-rockchip/rockchip.c
-> b/arch/arm/mach-rockchip/rockchip.c index 3f07cc5..07ef8ef 100644
-> --- a/arch/arm/mach-rockchip/rockchip.c
-> +++ b/arch/arm/mach-rockchip/rockchip.c
-> @@ -73,7 +73,7 @@ static void __init rockchip_timer_init(void)
->  static void __init rockchip_dt_init(void)
->  {
->  	rockchip_suspend_init();
-> -	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> +	of_platform_default_populate(NULL, NULL, NULL);
->  	platform_device_register_simple("cpufreq-dt", 0, NULL, 0);
->  }
+> +	msr	cpacr_el1, x2
+> +alternative_endif
+>  	isb
+>  
+>  	mrs	x3, tpidr_el2
+> -- 
+> 2.1.4
+> 
 
-sounds sensible, so
-
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
