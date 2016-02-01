@@ -1,95 +1,99 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon,  1 Feb 2016 18:28:19 +0000
-Subject: [PATCH 3/3] ARM: OMAP2+: remove misuse of IRQF_NO_SUSPEND flag
-In-Reply-To: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
-References: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1454351299-27440-4-git-send-email-sudeep.holla@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon,  1 Feb 2016 19:30:17 +0100
+Subject: [PATCH] arm64: move back to generic memblock_enforce_memory_limit()
+In-Reply-To: <20160201180256.GJ15514@e104818-lin.cambridge.arm.com>
+References: <20160201180256.GJ15514@e104818-lin.cambridge.arm.com>
+Message-ID: <1454351417-23732-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
-be left enabled so as to allow them to work as expected during the
-suspend-resume cycle, but doesn't guarantee that it will wake the system
-from a suspended state, enable_irq_wake is recommended to be used for
-the wakeup.
+Rather than implementing our own elaborate logic to clip the memory ranges
+in order of preference, use the generic memblock_enforce_memory_limit() as
+before, and explicitly add back that part of the kernel that needs to be
+accessible via the linear mapping as well as via the kernel mapping.
 
-This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
-enable_irq_wake instead.
-
-Cc: Grygorii Strashko <grygorii.strashko@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: linux-omap at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/mach-omap2/mux.c        | 4 ++--
- arch/arm/mach-omap2/pm34xx.c     | 9 ++++-----
- arch/arm/mach-omap2/prm_common.c | 1 +
- 3 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm64/mm/init.c | 59 +++++++---------------------------------------------
+ 1 file changed, 7 insertions(+), 52 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-index 176eef6ef338..12012bef8e63 100644
---- a/arch/arm/mach-omap2/mux.c
-+++ b/arch/arm/mach-omap2/mux.c
-@@ -810,13 +810,13 @@ int __init omap_mux_late_init(void)
- 		return 0;
- 
- 	ret = request_irq(omap_prcm_event_to_irq("io"),
--		omap_hwmod_mux_handle_irq, IRQF_SHARED | IRQF_NO_SUSPEND,
-+		omap_hwmod_mux_handle_irq, IRQF_SHARED,
- 			"hwmod_io", omap_mux_late_init);
- 
- 	if (ret)
- 		pr_warn("mux: Failed to setup hwmod io irq %d\n", ret);
- 
--	return 0;
-+	return enable_irq_wake(omap_prcm_event_to_irq("io"));
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index e8e853a1024c..361c91209031 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -160,41 +160,6 @@ static int __init early_mem(char *p)
  }
+ early_param("mem", early_mem);
  
- static void __init omap_mux_package_fixup(struct omap_mux *p,
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 2dbd3785ee6f..49604e0023c4 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -472,23 +472,22 @@ int __init omap3_pm_init(void)
- 	prcm_setup_regs();
- 
- 	ret = request_irq(omap_prcm_event_to_irq("wkup"),
--		_prcm_int_handle_wakeup, IRQF_NO_SUSPEND, "pm_wkup", NULL);
-+		_prcm_int_handle_wakeup, 0, "pm_wkup", NULL);
- 
- 	if (ret) {
- 		pr_err("pm: Failed to request pm_wkup irq\n");
- 		goto err1;
- 	}
-+	enable_irq_wake(omap_prcm_event_to_irq("wkup"));
- 
- 	/* IO interrupt is shared with mux code */
- 	ret = request_irq(omap_prcm_event_to_irq("io"),
--		_prcm_int_handle_io, IRQF_SHARED | IRQF_NO_SUSPEND, "pm_io",
--		omap3_pm_init);
--	enable_irq(omap_prcm_event_to_irq("io"));
+-/*
+- * clip_mem_range() - remove memblock memory between @min and @max until
+- *                    we meet the limit in 'memory_limit'.
+- */
+-static void __init clip_mem_range(u64 min, u64 max)
+-{
+-	u64 mem_size, to_remove;
+-	int i;
 -
-+		_prcm_int_handle_io, IRQF_SHARED, "pm_io", omap3_pm_init);
- 	if (ret) {
- 		pr_err("pm: Failed to request pm_io irq\n");
- 		goto err2;
+-again:
+-	mem_size = memblock_phys_mem_size();
+-	if (mem_size <= memory_limit || max <= min)
+-		return;
+-
+-	to_remove = mem_size - memory_limit;
+-
+-	for (i = memblock.memory.cnt - 1; i >= 0; i--) {
+-		struct memblock_region *r = memblock.memory.regions + i;
+-		u64 start = max(min, r->base);
+-		u64 end = min(max, r->base + r->size);
+-
+-		if (start >= max || end <= min)
+-			continue;
+-
+-		if (end > min) {
+-			u64 size = min(to_remove, end - max(start, min));
+-
+-			memblock_remove(end - size, size);
+-		} else {
+-			memblock_remove(start, min(max - start, to_remove));
+-		}
+-		goto again;
+-	}
+-}
+-
+ void __init arm64_memblock_init(void)
+ {
+ 	const s64 linear_region_size = -(s64)PAGE_OFFSET;
+@@ -215,24 +180,14 @@ void __init arm64_memblock_init(void)
+ 	if (memblock_end_of_DRAM() > linear_region_size)
+ 		memblock_remove(0, memblock_end_of_DRAM() - linear_region_size);
+ 
++	/*
++	 * Apply the memory limit if it was set. Since the kernel may be loaded
++	 * high up in memory, add back the kernel region that must be accessible
++	 * via the linear mapping.
++	 */
+ 	if (memory_limit != (phys_addr_t)ULLONG_MAX) {
+-		u64 kbase = round_down(__pa(_text), MIN_KIMG_ALIGN);
+-		u64 kend = PAGE_ALIGN(__pa(_end));
+-		u64 const sz_4g = 0x100000000UL;
+-
+-		/*
+-		 * Clip memory in order of preference:
+-		 * - above the kernel and above 4 GB
+-		 * - between 4 GB and the start of the kernel (if the kernel
+-		 *   is loaded high in memory)
+-		 * - between the kernel and 4 GB (if the kernel is loaded
+-		 *   low in memory)
+-		 * - below 4 GB
+-		 */
+-		clip_mem_range(max(sz_4g, kend), ULLONG_MAX);
+-		clip_mem_range(sz_4g, kbase);
+-		clip_mem_range(kend, sz_4g);
+-		clip_mem_range(0, min(kbase, sz_4g));
++		memblock_enforce_memory_limit(memory_limit);
++		memblock_add(__pa(__init_begin), (u64)(_end - __init_begin));
  	}
-+	enable_irq_wake(omap_prcm_event_to_irq("io"));
  
- 	ret = pwrdm_for_each(pwrdms_setup, NULL);
- 	if (ret) {
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index 5b2f5138d938..7af688273e0d 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -338,6 +338,7 @@ int omap_prcm_register_chain_handler(struct omap_prcm_irq_setup *irq_setup)
- 		ct->chip.irq_ack = irq_gc_ack_set_bit;
- 		ct->chip.irq_mask = irq_gc_mask_clr_bit;
- 		ct->chip.irq_unmask = irq_gc_mask_set_bit;
-+		ct->chip.flags = IRQCHIP_SKIP_SET_WAKE;
- 
- 		ct->regs.ack = irq_setup->ack + i * 4;
- 		ct->regs.mask = irq_setup->mask + i * 4;
+ 	/*
 -- 
-1.9.1
+2.5.0
