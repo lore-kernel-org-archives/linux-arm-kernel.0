@@ -1,149 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Feb 2016 11:33 +0100
-Subject: [PATCH] staging: goldfish: use div64_s64 instead of do_div
-Message-ID: <1676170.0qik6mzm6D@wuerfel>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Mon, 1 Feb 2016 11:39:31 +0100
+Subject: [PATCH v4 4/9] pinctrl: Add STM32 MCUs support
+In-Reply-To: <2151471.Wut3mQ9SS7@wuerfel>
+References: <1452773795-24216-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1452773795-24216-5-git-send-email-mcoquelin.stm32@gmail.com>
+ <CACRpkdaBcP6fC5Oxn+d1WPdHq1FtwMkf8Ap5VDLQFg-5UwEBAw@mail.gmail.com>
+ <2151471.Wut3mQ9SS7@wuerfel>
+Message-ID: <CALszF6DTpcU8jFwA0HL8LpkxfO5ZOdFmpHBUxA7WfYgAj_uFhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The goldfish nand driver divides a signed 64-bit number (loff_t)
-in multiple places using the do_div() function. This has always
-been unreliable but now produces a compiler warning (since 4.5-rc1):
+2016-02-01 11:21 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 27 January 2016 14:16:32 Linus Walleij wrote:
+>> On Thu, Jan 14, 2016 at 1:16 PM, Maxime Coquelin
+>> <mcoquelin.stm32@gmail.com> wrote:
+>>
+>> > This patch adds pinctrl and GPIO support to STMicroelectronic's STM32
+>> > family of MCUs.
+>> >
+>> > While it only supports STM32F429 for now, it has been designed to enable
+>> > support of other MCUs of the family (e.g. STM32F746).
+>> >
+>> > Acked-by: Patrice Chotard <patrice.chotard@st.com>
+>> > Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>>
+>> This patch applied for kernel v4.6.
+>>
+>
+> This breaks the kernel build, please revert:
+>
+> drivers/pinctrl/stm32/pinctrl-stm32.c:26:47: fatal error: dt-bindings/pinctrl/pinctrl-stm32.h: No such file or directory
 
-goldfish/goldfish_nand.c: In function 'goldfish_nand_erase':
-goldfish/goldfish_nand.c:107:91: error: comparison of distinct pointer types lacks a cast [-Werror]
-goldfish/goldfish_nand.c: In function 'goldfish_nand_read_oob':
-goldfish/goldfish_nand.c:145:91: error: comparison of distinct pointer types lacks a cast [-Werror]
+Right, I missed to notify this dependency to Linus, sorry about that.
+This dependency is no more needed, so I could just move the macros to
+the driver side.
 
-This changes the code to the equivalent div_s64{,_rem} that
-works correctly for negative numbers (which we should never
-get here).
+Note that I also noticed a breakage at build time due to field
+renaming in gpio_chip structure (dev -> parent).
 
-The warning has shown up on ARM allmodconfig builds after the goldfish
-bus driver has become visible on ARM.
+I propose to rebase the series and move the defines into the driver.
+Is it ok for you?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: bd2f348db503 ("goldfish: refactor goldfish platform configs")
-
-diff --git a/drivers/staging/goldfish/goldfish_nand.c b/drivers/staging/goldfish/goldfish_nand.c
-index f223b3a5a428..76d60eed1490 100644
---- a/drivers/staging/goldfish/goldfish_nand.c
-+++ b/drivers/staging/goldfish/goldfish_nand.c
-@@ -100,11 +100,11 @@ static int goldfish_nand_erase(struct mtd_info *mtd, struct erase_info *instr)
- {
- 	loff_t ofs = instr->addr;
- 	u32 len = instr->len;
--	u32 rem;
-+	s32 rem;
- 
- 	if (ofs + len > mtd->size)
- 		goto invalid_arg;
--	rem = do_div(ofs, mtd->writesize);
-+	ofs = div_s64_rem(ofs, mtd->writesize, &rem);
- 	if (rem)
- 		goto invalid_arg;
- 	ofs *= (mtd->writesize + mtd->oobsize);
-@@ -133,7 +133,7 @@ invalid_arg:
- static int goldfish_nand_read_oob(struct mtd_info *mtd, loff_t ofs,
- 				  struct mtd_oob_ops *ops)
- {
--	u32 rem;
-+	s32 rem;
- 
- 	if (ofs + ops->len > mtd->size)
- 		goto invalid_arg;
-@@ -142,7 +142,7 @@ static int goldfish_nand_read_oob(struct mtd_info *mtd, loff_t ofs,
- 	if (ops->ooblen + ops->ooboffs > mtd->oobsize)
- 		goto invalid_arg;
- 
--	rem = do_div(ofs, mtd->writesize);
-+	ofs = div_s64_rem(ofs, mtd->writesize, &rem);
- 	if (rem)
- 		goto invalid_arg;
- 	ofs *= (mtd->writesize + mtd->oobsize);
-@@ -165,7 +165,7 @@ invalid_arg:
- static int goldfish_nand_write_oob(struct mtd_info *mtd, loff_t ofs,
- 				   struct mtd_oob_ops *ops)
- {
--	u32 rem;
-+	s32 rem;
- 
- 	if (ofs + ops->len > mtd->size)
- 		goto invalid_arg;
-@@ -174,7 +174,7 @@ static int goldfish_nand_write_oob(struct mtd_info *mtd, loff_t ofs,
- 	if (ops->ooblen + ops->ooboffs > mtd->oobsize)
- 		goto invalid_arg;
- 
--	rem = do_div(ofs, mtd->writesize);
-+	ofs = div_s64_rem(ofs, mtd->writesize, &rem);
- 	if (rem)
- 		goto invalid_arg;
- 	ofs *= (mtd->writesize + mtd->oobsize);
-@@ -197,12 +197,12 @@ invalid_arg:
- static int goldfish_nand_read(struct mtd_info *mtd, loff_t from, size_t len,
- 			      size_t *retlen, u_char *buf)
- {
--	u32 rem;
-+	s32 rem;
- 
- 	if (from + len > mtd->size)
- 		goto invalid_arg;
- 
--	rem = do_div(from, mtd->writesize);
-+	from = div_s64_rem(from, mtd->writesize, &rem);
- 	if (rem)
- 		goto invalid_arg;
- 	from *= (mtd->writesize + mtd->oobsize);
-@@ -219,12 +219,12 @@ invalid_arg:
- static int goldfish_nand_write(struct mtd_info *mtd, loff_t to, size_t len,
- 			       size_t *retlen, const u_char *buf)
- {
--	u32 rem;
-+	s32 rem;
- 
- 	if (to + len > mtd->size)
- 		goto invalid_arg;
- 
--	rem = do_div(to, mtd->writesize);
-+	to = div_s64_rem(to, mtd->writesize, &rem);
- 	if (rem)
- 		goto invalid_arg;
- 	to *= (mtd->writesize + mtd->oobsize);
-@@ -240,12 +240,12 @@ invalid_arg:
- 
- static int goldfish_nand_block_isbad(struct mtd_info *mtd, loff_t ofs)
- {
--	u32 rem;
-+	s32 rem;
- 
- 	if (ofs >= mtd->size)
- 		goto invalid_arg;
- 
--	rem = do_div(ofs, mtd->erasesize);
-+	ofs = div_s64_rem(ofs, mtd->writesize, &rem);
- 	if (rem)
- 		goto invalid_arg;
- 	ofs *= mtd->erasesize / mtd->writesize;
-@@ -261,12 +261,12 @@ invalid_arg:
- 
- static int goldfish_nand_block_markbad(struct mtd_info *mtd, loff_t ofs)
- {
--	u32 rem;
-+	s32 rem;
- 
- 	if (ofs >= mtd->size)
- 		goto invalid_arg;
- 
--	rem = do_div(ofs, mtd->erasesize);
-+	ofs = div_s64_rem(ofs, mtd->writesize, &rem);
- 	if (rem)
- 		goto invalid_arg;
- 	ofs *= mtd->erasesize / mtd->writesize;
-@@ -321,7 +321,7 @@ static int goldfish_nand_init_device(struct platform_device *pdev,
- 	mtd->oobavail = mtd->oobsize;
- 	mtd->erasesize = readl(base + NAND_DEV_ERASE_SIZE) /
- 			(mtd->writesize + mtd->oobsize) * mtd->writesize;
--	do_div(mtd->size, mtd->writesize + mtd->oobsize);
-+	mtd->size = div_s64(mtd->size, mtd->writesize + mtd->oobsize);
- 	mtd->size *= mtd->writesize;
- 	dev_dbg(&pdev->dev,
- 		"goldfish nand dev%d: size %llx, page %d, extra %d, erase %d\n",
+Regards,
+Maxime
