@@ -1,77 +1,85 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon,  1 Feb 2016 14:07:46 +0100
-Subject: [PATCH v2 net 5/6] net: mvneta: The mvneta_percpu_elect function
- should be atomic
-In-Reply-To: <1454332067-16378-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1454332067-16378-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1454332067-16378-6-git-send-email-gregory.clement@free-electrons.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon,  1 Feb 2016 14:09:30 +0100
+Subject: [PATCH v5sub2 0/8] arm64: implement virtual KASLR
+Message-ID: <1454332178-4414-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Electing a CPU must be done in an atomic way: it should be done after or
-before the removal/insertion of a CPU and this function is not reentrant.
+At the request of Catalin, this series has been split off from my series
+'arm64: implement support for KASLR v4' [1]. This sub-series deals with
+creating a relocatable binary, and randomizing the virtual placement of
+the kernel itself, the modules and the linear region based on entropy
+supplied by the bootloader in the /chosen/kaslr-seed DT property.
 
-During the loop of mvneta_percpu_elect we associates the queues to the
-CPUs, if there is a topology change during this loop, then the mapping
-between the CPUs and the queues could be wrong. During this loop the
-interrupt mask is also updating for each CPUs, It should not be changed
-in the same time by other part of the driver.
+Changes since v4:
+- add randomization of the linear region, i.e., if the linear region is
+  substantially larger than the space spanned by RAM, the mapping of RAM
+  is moved to a random offset inside the linear region.
+- dropped the CRC check in kaslr_early_init(), since the only code that may
+  modify .data through __fixmap_remap_fdt() is instrumentation that should
+  deal with that correctly (For instance, the branch profiling records taken
+  branches in structs allocated in .data, and these counts will not be reset
+  to 0 between the first and the second call to __mmap_switched())
+- add Mark's ack to patch #4
 
-This patch adds spinlock to create the needed critical sections.
+Patch #1 adds support for resolving cross-module branches via veneers if the
+module is located too far from the target. This should not be necessary in the
+common case even with KASRL enabled, but since the space around the kernel image
+will no longer be strictly reserved for modules, there is a slight chance that
+the region may be exhausted, in which case modules will be moved further away
+from the kernel (and each other)
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/net/ethernet/marvell/mvneta.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+Patches #2 and #3 deal with the fact that relocations of 64-bit values are
+deferred to runtime when building a PIE executable, and some values are required
+before the relocation routine executes (either in the code, or as an externally
+visible constant in the Image header)
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 1ed813d478e8..4d40d2fde7ca 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -370,6 +370,10 @@ struct mvneta_port {
- 	struct net_device *dev;
- 	struct notifier_block cpu_notifier;
- 	int rxq_def;
-+	/* Protect the access to the percpu interrupt registers,
-+	 * ensuring that the configuration remains coherent.
-+	 */
-+	spinlock_t lock;
- 
- 	/* Core clock */
- 	struct clk *clk;
-@@ -2855,6 +2859,11 @@ static void mvneta_percpu_elect(struct mvneta_port *pp)
- {
- 	int online_cpu_idx, max_cpu, cpu, i = 0;
- 
-+	/* Electing a CPU must done in an atomic way: it should be
-+	 * done after or before the removal/insertion of a CPU and
-+	 * this function is not reentrant.
-+	 */
-+	spin_lock(&pp->lock);
- 	online_cpu_idx = pp->rxq_def % num_online_cpus();
- 	max_cpu = num_present_cpus();
- 
-@@ -2893,6 +2902,7 @@ static void mvneta_percpu_elect(struct mvneta_port *pp)
- 		i++;
- 
- 	}
-+	spin_unlock(&pp->lock);
- };
- 
- static int mvneta_percpu_notifier(struct notifier_block *nfb,
-@@ -2947,8 +2957,13 @@ static int mvneta_percpu_notifier(struct notifier_block *nfb,
- 	case CPU_DOWN_PREPARE:
- 	case CPU_DOWN_PREPARE_FROZEN:
- 		netif_tx_stop_all_queues(pp->dev);
-+		/* Thanks to this lock we are sure that any pending
-+		 * cpu election is done
-+		 */
-+		spin_lock(&pp->lock);
- 		/* Mask all ethernet port interrupts */
- 		on_each_cpu(mvneta_percpu_mask_interrupt, pp, true);
-+		spin_unlock(&pp->lock);
- 
- 		napi_synchronize(&port->napi);
- 		napi_disable(&port->napi);
+Patch #4 rehuffles asm/elf.h so we can use its preprocessor constants in head.S
+
+Patch #5 and #6 implement building vmlinux as a PIE (Position Independent
+Executable) binary, which is emitted with relocation information that is
+processed by the program itself in the early boot code.
+
+Patch #7 implements KASLR, i.e., CONFIG_RANDOMIZE_BASE for the core kernel and
+for the module region.
+
+Patch #8 implements KASLR for the linear region.
+
+[1] http://thread.gmane.org/gmane.linux.kernel/2135931
+
+Ard Biesheuvel (8):
+  arm64: add support for module PLTs
+  arm64: avoid R_AARCH64_ABS64 relocations for Image header fields
+  arm64: avoid dynamic relocations in early boot code
+  arm64: make asm/elf.h available to asm files
+  scripts/sortextable: add support for ET_DYN binaries
+  arm64: add support for building vmlinux as a relocatable PIE binary
+  arm64: add support for kernel ASLR
+  arm64: kaslr: randomize the linear region
+
+ arch/arm64/Kconfig                 |  34 ++++
+ arch/arm64/Makefile                |  10 +-
+ arch/arm64/include/asm/assembler.h |  11 ++
+ arch/arm64/include/asm/elf.h       |  24 ++-
+ arch/arm64/include/asm/memory.h    |   5 +-
+ arch/arm64/include/asm/module.h    |  11 ++
+ arch/arm64/kernel/Makefile         |   2 +
+ arch/arm64/kernel/efi-entry.S      |   2 +-
+ arch/arm64/kernel/head.S           | 128 +++++++++++--
+ arch/arm64/kernel/image.h          |  32 ++--
+ arch/arm64/kernel/kaslr.c          | 143 ++++++++++++++
+ arch/arm64/kernel/module-plts.c    | 201 ++++++++++++++++++++
+ arch/arm64/kernel/module.c         |  20 +-
+ arch/arm64/kernel/module.lds       |   3 +
+ arch/arm64/kernel/setup.c          |  29 +++
+ arch/arm64/kernel/vmlinux.lds.S    |  16 ++
+ arch/arm64/mm/init.c               |  22 ++-
+ arch/arm64/mm/mmu.c                |  33 +++-
+ scripts/sortextable.c              |   8 +-
+ 19 files changed, 672 insertions(+), 62 deletions(-)
+ create mode 100644 arch/arm64/kernel/kaslr.c
+ create mode 100644 arch/arm64/kernel/module-plts.c
+ create mode 100644 arch/arm64/kernel/module.lds
+
 -- 
 2.5.0
