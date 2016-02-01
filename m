@@ -1,226 +1,192 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 1 Feb 2016 13:29:07 +0100
-Subject: [PATCH v2 02/21] arm64: Allow the arch timer to use the HYP timer
-In-Reply-To: <1453737235-16522-3-git-send-email-marc.zyngier@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <1453737235-16522-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160201122907.GD1478@cbox>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 1 Feb 2016 12:29:11 +0000
+Subject: [PATCHv2 2/3] arm64: Add support for ARCH_SUPPORTS_DEBUG_PAGEALLOC
+In-Reply-To: <1454111218-3461-3-git-send-email-labbott@fedoraproject.org>
+References: <1454111218-3461-1-git-send-email-labbott@fedoraproject.org>
+ <1454111218-3461-3-git-send-email-labbott@fedoraproject.org>
+Message-ID: <20160201122911.GF674@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 03:53:36PM +0000, Marc Zyngier wrote:
-> With the ARMv8.1 VHE, the kernel can run in HYP mode, and thus
-> use the HYP timer instead of the normal guest timer in a mostly
-> transparent way, except for the interrupt line.
+Hi,
+
+On Fri, Jan 29, 2016 at 03:46:57PM -0800, Laura Abbott wrote:
 > 
-> This patch reworks the arch timer code to allow the selection of
-> the HYP PPI, possibly falling back to the guest timer if not
-> available.
+> ARCH_SUPPORTS_DEBUG_PAGEALLOC provides a hook to map and unmap
+> pages for debugging purposes. This requires memory be mapped
+> with PAGE_SIZE mappings since breaking down larger mappings
+> at runtime will lead to TLB conflicts. Check if debug_pagealloc
+> is enabled at runtime and if so, map everyting with PAGE_SIZE
+> pages. Implement the functions to actually map/unmap the
+> pages at runtime.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+
+I tried to apply atop of the arm64 for-next/pgtable branch, but git
+wasn't very happy about that -- which branch/patches is this based on?
+
+I'm not sure if I'm missing something, have something I shouldn't, or if
+my MTA is corrupting patches again...
+
 > ---
->  drivers/clocksource/arm_arch_timer.c | 96 ++++++++++++++++++++++--------------
->  1 file changed, 59 insertions(+), 37 deletions(-)
+>  arch/arm64/Kconfig       |  3 +++
+>  arch/arm64/mm/mmu.c      | 10 +++++++---
+>  arch/arm64/mm/pageattr.c | 40 +++++++++++++++++++++++++++++++++-------
+>  3 files changed, 43 insertions(+), 10 deletions(-)
 > 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index c64d543..ffe9d1c 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -67,7 +67,7 @@ static int arch_timer_ppi[MAX_TIMER_PPI];
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 8cc6228..0f33218 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -537,6 +537,9 @@ config HOTPLUG_CPU
+>  source kernel/Kconfig.preempt
+>  source kernel/Kconfig.hz
 >  
->  static struct clock_event_device __percpu *arch_timer_evt;
+> +config ARCH_SUPPORTS_DEBUG_PAGEALLOC
+> +	def_bool y
+> +
+>  config ARCH_HAS_HOLES_MEMORYMODEL
+>  	def_bool y if SPARSEMEM
 >  
-> -static bool arch_timer_use_virtual = true;
-> +static enum ppi_nr arch_timer_uses_ppi = VIRT_PPI;
->  static bool arch_timer_c3stop;
->  static bool arch_timer_mem_use_virtual;
->  
-> @@ -263,14 +263,20 @@ static void __arch_timer_setup(unsigned type,
->  		clk->name = "arch_sys_timer";
->  		clk->rating = 450;
->  		clk->cpumask = cpumask_of(smp_processor_id());
-> -		if (arch_timer_use_virtual) {
-> -			clk->irq = arch_timer_ppi[VIRT_PPI];
-> +		clk->irq = arch_timer_ppi[arch_timer_uses_ppi];
-> +		switch (arch_timer_uses_ppi) {
-> +		case VIRT_PPI:
->  			clk->set_state_shutdown = arch_timer_shutdown_virt;
->  			clk->set_next_event = arch_timer_set_next_event_virt;
-> -		} else {
-> -			clk->irq = arch_timer_ppi[PHYS_SECURE_PPI];
-> +			break;
-> +		case PHYS_SECURE_PPI:
-> +		case PHYS_NONSECURE_PPI:
-> +		case HYP_PPI:
->  			clk->set_state_shutdown = arch_timer_shutdown_phys;
->  			clk->set_next_event = arch_timer_set_next_event_phys;
-> +			break;
-> +		default:
-> +			BUG();
->  		}
->  	} else {
->  		clk->features |= CLOCK_EVT_FEAT_DYNIRQ;
-> @@ -338,17 +344,20 @@ static void arch_counter_set_user_access(void)
->  	arch_timer_set_cntkctl(cntkctl);
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 103ebc0..5abbd30 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -181,7 +181,8 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+>  	do {
+>  		next = pmd_addr_end(addr, end);
+>  		/* try section mapping first */
+> -		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
+> +		if (((addr | next | phys) & ~SECTION_MASK) == 0 &&
+> +		      (!debug_pagealloc_enabled() || !pgtable_alloc)) {
+>  			pmd_t old_pmd =*pmd;
+>  			set_pmd(pmd, __pmd(phys |
+>  					   pgprot_val(mk_sect_prot(prot))));
+> @@ -208,8 +209,11 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
 >  }
 >  
-> +static bool arch_timer_has_nonsecure_ppi(void)
-> +{
-> +	return (arch_timer_uses_ppi == PHYS_SECURE_PPI &&
-> +		arch_timer_ppi[PHYS_NONSECURE_PPI]);
-> +}
-> +
->  static int arch_timer_setup(struct clock_event_device *clk)
+>  static inline bool use_1G_block(unsigned long addr, unsigned long next,
+> -			unsigned long phys)
+> +			unsigned long phys, phys_addr_t (*pgtable_alloc)(void))
 >  {
->  	__arch_timer_setup(ARCH_CP15_TIMER, clk);
->  
-> -	if (arch_timer_use_virtual)
-> -		enable_percpu_irq(arch_timer_ppi[VIRT_PPI], 0);
-> -	else {
-> -		enable_percpu_irq(arch_timer_ppi[PHYS_SECURE_PPI], 0);
-> -		if (arch_timer_ppi[PHYS_NONSECURE_PPI])
-> -			enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
-> -	}
-> +	enable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], 0);
+> +	if (pgtable_alloc && debug_pagealloc_enabled())
+> +		return false;
 > +
-> +	if (arch_timer_has_nonsecure_ppi())
-> +		enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
+>  	if (PAGE_SHIFT != 12)
+>  		return false;
 >  
->  	arch_counter_set_user_access();
->  	if (IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM))
-> @@ -390,7 +399,7 @@ static void arch_timer_banner(unsigned type)
->  		     (unsigned long)arch_timer_rate / 1000000,
->  		     (unsigned long)(arch_timer_rate / 10000) % 100,
->  		     type & ARCH_CP15_TIMER ?
-> -			arch_timer_use_virtual ? "virt" : "phys" :
-> +		     (arch_timer_uses_ppi == VIRT_PPI) ? "virt" : "phys" :
->  			"",
->  		     type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  "/" : "",
->  		     type & ARCH_MEM_TIMER ?
-> @@ -460,7 +469,7 @@ static void __init arch_counter_register(unsigned type)
->  
->  	/* Register the CP15 based counter if we have one */
->  	if (type & ARCH_CP15_TIMER) {
-> -		if (IS_ENABLED(CONFIG_ARM64) || arch_timer_use_virtual)
-> +		if (IS_ENABLED(CONFIG_ARM64) || arch_timer_uses_ppi == VIRT_PPI)
->  			arch_timer_read_counter = arch_counter_get_cntvct;
->  		else
->  			arch_timer_read_counter = arch_counter_get_cntpct;
-> @@ -490,13 +499,9 @@ static void arch_timer_stop(struct clock_event_device *clk)
->  	pr_debug("arch_timer_teardown disable IRQ%d cpu #%d\n",
->  		 clk->irq, smp_processor_id());
->  
-> -	if (arch_timer_use_virtual)
-> -		disable_percpu_irq(arch_timer_ppi[VIRT_PPI]);
-> -	else {
-> -		disable_percpu_irq(arch_timer_ppi[PHYS_SECURE_PPI]);
-> -		if (arch_timer_ppi[PHYS_NONSECURE_PPI])
-> -			disable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI]);
-> -	}
-> +	disable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi]);
-> +	if (arch_timer_has_nonsecure_ppi())
-> +		disable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI]);
->  
->  	clk->set_state_shutdown(clk);
+> @@ -241,7 +245,7 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+>  		/*
+>  		 * For 4K granule only, attempt to put down a 1GB block
+>  		 */
+> -		if (use_1G_block(addr, next, phys)) {
+> +		if (use_1G_block(addr, next, phys, pgtable_alloc)) {
+>  			pud_t old_pud = *pud;
+>  			set_pud(pud, __pud(phys |
+>  					   pgprot_val(mk_sect_prot(prot))));
+
+The checks for pgtable_alloc is to allow create_mapping_noalloc to use
+sections regardless, right?
+
+I got a little confused by that initially, but that seems to make sense.
+
+> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+> index 1360a02..69a8a7d 100644
+> --- a/arch/arm64/mm/pageattr.c
+> +++ b/arch/arm64/mm/pageattr.c
+> @@ -38,7 +38,8 @@ static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
 >  }
-> @@ -562,12 +567,14 @@ static int __init arch_timer_register(void)
->  		goto out;
->  	}
 >  
-> -	if (arch_timer_use_virtual) {
-> -		ppi = arch_timer_ppi[VIRT_PPI];
-> +	ppi = arch_timer_ppi[arch_timer_uses_ppi];
-> +	switch (arch_timer_uses_ppi) {
-> +	case VIRT_PPI:
->  		err = request_percpu_irq(ppi, arch_timer_handler_virt,
->  					 "arch_timer", arch_timer_evt);
-> -	} else {
-> -		ppi = arch_timer_ppi[PHYS_SECURE_PPI];
-> +		break;
-> +	case PHYS_SECURE_PPI:
-> +	case PHYS_NONSECURE_PPI:
->  		err = request_percpu_irq(ppi, arch_timer_handler_phys,
->  					 "arch_timer", arch_timer_evt);
->  		if (!err && arch_timer_ppi[PHYS_NONSECURE_PPI]) {
-> @@ -578,6 +585,13 @@ static int __init arch_timer_register(void)
->  				free_percpu_irq(arch_timer_ppi[PHYS_SECURE_PPI],
->  						arch_timer_evt);
->  		}
-> +		break;
-> +	case HYP_PPI:
-> +		err = request_percpu_irq(ppi, arch_timer_handler_phys,
-> +					 "arch_timer", arch_timer_evt);
-> +		break;
-> +	default:
-> +		BUG();
->  	}
->  
->  	if (err) {
-> @@ -602,15 +616,10 @@ static int __init arch_timer_register(void)
->  out_unreg_notify:
->  	unregister_cpu_notifier(&arch_timer_cpu_nb);
->  out_free_irq:
-> -	if (arch_timer_use_virtual)
-> -		free_percpu_irq(arch_timer_ppi[VIRT_PPI], arch_timer_evt);
-> -	else {
-> -		free_percpu_irq(arch_timer_ppi[PHYS_SECURE_PPI],
-> +	free_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], arch_timer_evt);
-> +	if (arch_timer_has_nonsecure_ppi())
-> +		free_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI],
->  				arch_timer_evt);
-> -		if (arch_timer_ppi[PHYS_NONSECURE_PPI])
-> -			free_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI],
-> -					arch_timer_evt);
-> -	}
->  
->  out_free:
->  	free_percpu(arch_timer_evt);
-> @@ -697,12 +706,25 @@ static void __init arch_timer_init(void)
+>  static int change_memory_common(unsigned long addr, int numpages,
+> -				pgprot_t set_mask, pgprot_t clear_mask)
+> +				pgprot_t set_mask, pgprot_t clear_mask,
+> +				bool ignore_vma_check)
+>  {
+>  	unsigned long start = addr;
+>  	unsigned long size = PAGE_SIZE*numpages;
+> @@ -65,11 +66,14 @@ static int change_memory_common(unsigned long addr, int numpages,
 >  	 *
->  	 * If no interrupt provided for virtual timer, we'll have to
->  	 * stick to the physical timer. It'd better be accessible...
+>  	 * So check whether the [addr, addr + size) interval is entirely
+>  	 * covered by precisely one VM area that has the VM_ALLOC flag set.
 > +	 *
-> +	 * On ARMv8.1 with VH extensions, the kernel runs in HYP. VHE
-> +	 * accesses to CNTP_*_EL1 registers are silently redirected to
-> +	 * their CNTHP_*_EL2 counterparts, and use a different PPI
-> +	 * number.
+> +	 * The one exception to this is is we're forcing everything to be
+> +	 * page mapped with DEBUG_PAGEALLOC
 >  	 */
->  	if (is_hyp_mode_available() || !arch_timer_ppi[VIRT_PPI]) {
-> -		arch_timer_use_virtual = false;
-> +		bool has_ppi;
-> +
-> +		if (is_kernel_in_hyp_mode()) {
-> +			arch_timer_uses_ppi = HYP_PPI;
-> +			has_ppi = !!arch_timer_ppi[HYP_PPI];
-> +		} else {
-> +			arch_timer_uses_ppi = PHYS_SECURE_PPI;
-> +			has_ppi = (!!arch_timer_ppi[PHYS_SECURE_PPI] ||
-> +				   !!arch_timer_ppi[PHYS_NONSECURE_PPI]);
+>  	area = find_vm_area((void *)addr);
+> -	if (!area ||
+> +	if (!ignore_vma_check && (!area ||
+>  	    end > (unsigned long)area->addr + area->size ||
+> -	    !(area->flags & VM_ALLOC))
+> +	    !(area->flags & VM_ALLOC)))
+>  		return -EINVAL;
 
-shouldn't this simply test the PHYS_SECURE_PPI since otherwise you could
-potentially have the PHYS_NONSECURE_PPI but not PHYS_SECURE_PPI and
-you'll try to request IRQ 0 for this later... ?
+Perhaps we could pull out everything but the VMA checks into a static
+__change_memory_common. Then we can call that directly in
+__kernel_map_pages, and don't need to pass a confusing boolean
+parameter.
 
-> +		}
+Otherwise, this looks good to me.
+
+Mark.
+
 >  
-> -		if (!arch_timer_ppi[PHYS_SECURE_PPI] ||
-> -		    !arch_timer_ppi[PHYS_NONSECURE_PPI]) {
-> +		if (!has_ppi) {
->  			pr_warn("arch_timer: No interrupt available, giving up\n");
->  			return;
->  		}
-> @@ -735,7 +757,7 @@ static void __init arch_timer_of_init(struct device_node *np)
->  	 */
->  	if (IS_ENABLED(CONFIG_ARM) &&
->  	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
-> -			arch_timer_use_virtual = false;
-> +		arch_timer_uses_ppi = PHYS_SECURE_PPI;
->  
->  	arch_timer_init();
+>  	data.set_mask = set_mask;
+> @@ -86,21 +90,24 @@ int set_memory_ro(unsigned long addr, int numpages)
+>  {
+>  	return change_memory_common(addr, numpages,
+>  					__pgprot(PTE_RDONLY),
+> -					__pgprot(PTE_WRITE));
+> +					__pgprot(PTE_WRITE),
+> +					false);
 >  }
+>  
+>  int set_memory_rw(unsigned long addr, int numpages)
+>  {
+>  	return change_memory_common(addr, numpages,
+>  					__pgprot(PTE_WRITE),
+> -					__pgprot(PTE_RDONLY));
+> +					__pgprot(PTE_RDONLY),
+> +					false);
+>  }
+>  
+>  int set_memory_nx(unsigned long addr, int numpages)
+>  {
+>  	return change_memory_common(addr, numpages,
+>  					__pgprot(PTE_PXN),
+> -					__pgprot(0));
+> +					__pgprot(0),
+> +					false);
+>  }
+>  EXPORT_SYMBOL_GPL(set_memory_nx);
+>  
+> @@ -108,6 +115,25 @@ int set_memory_x(unsigned long addr, int numpages)
+>  {
+>  	return change_memory_common(addr, numpages,
+>  					__pgprot(0),
+> -					__pgprot(PTE_PXN));
+> +					__pgprot(PTE_PXN),
+> +					false);
+>  }
+>  EXPORT_SYMBOL_GPL(set_memory_x);
+> +
+> +#ifdef CONFIG_DEBUG_PAGEALLOC
+> +void __kernel_map_pages(struct page *page, int numpages, int enable)
+> +{
+> +	unsigned long addr = (unsigned long) page_address(page);
+> +
+> +	if (enable)
+> +		change_memory_common(addr, numpages,
+> +					__pgprot(PTE_VALID),
+> +					__pgprot(0),
+> +					true);
+> +	else
+> +		change_memory_common(addr, numpages,
+> +					__pgprot(0),
+> +					__pgprot(PTE_VALID),
+> +					true);
+> +}
+> +#endif
 > -- 
-> 2.1.4
+> 2.5.0
 > 
-
-Thanks,
--Christoffer
