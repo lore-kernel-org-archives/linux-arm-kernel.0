@@ -1,141 +1,56 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Mon, 1 Feb 2016 11:58:53 -0800
-Subject: [PATCH V3 00/21] MMCONFIG refactoring and support for ARM64 PCI
- hostbridge init based on ACPI
-In-Reply-To: <1452691267-32240-1-git-send-email-tn@semihalf.com>
-References: <1452691267-32240-1-git-send-email-tn@semihalf.com>
-Message-ID: <CADaLNDmwLCJhUdVgZRgZyOrwOD_RA1L=_hG+bAHKBoAYRKwCRQ@mail.gmail.com>
+From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
+Date: Mon, 1 Feb 2016 15:14:09 -0500
+Subject: [PATCH 0/4] pwm: omap-dmtimer: fix period/duty_cycle calculation
+In-Reply-To: <CAA3gFWsc6YxEvaFW2MJ2D-xBZqEzLOJne9AHZ6zBK3h3THy0CA@mail.gmail.com>
+References: <1454128014-22866-1-git-send-email-drivshin.allworx@gmail.com>
+ <CAA3gFWsc6YxEvaFW2MJ2D-xBZqEzLOJne9AHZ6zBK3h3THy0CA@mail.gmail.com>
+Message-ID: <20160201151409.24a5957e.drivshin.allworx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 13, 2016 at 5:20 AM, Tomasz Nowicki <tn@semihalf.com> wrote:
-> From the functionality point of view this series might be split into the
-> following logic parts:
-> 1. Make MMCONFIG code arch-agnostic which allows all architectures to collect
->    PCI config regions and used when necessary.
-> 2. Move non-arch specific bits to the core code.
-> 3. Use MMCONFIG code and implement generic ACPI based PCI host controller driver.
-> 4. Enable above driver on ARM64
->
-> Patches has been built on top of 4.4 and can be found here:
-> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v3)
->
-> NOTE, this patch set depends on Matthew's patches:
-> http://www.spinics.net/lists/linux-pci/msg45950.html
-> https://github.com/Vality/linux/tree/pci-fixes
->
-> This has been tested on Cavium ThunderX server and QEMU.
-> Any help in reviewing and testing is very appreciated.
+On Sat, 30 Jan 2016 15:52:12 +0100
+Neil Armstrong <narmstrong@baylibre.com> wrote:
 
-Hi Tomasz,
+> 2016-01-30 5:26 GMT+01:00 David Rivshin (Allworx)
+> <drivshin.allworx@gmail.com>:
+> > From: David Rivshin <drivshin@allworx.com>
+> >
+> > When using a short PWM period (approaching the min of 2/clk_rate),
+> > pwm-omap-dmtimer does not produce accurate results. In the worst
+> > case a requested period of 2/clk_rate would result in a real period
+> > of 4/clk_rate instead. This is a series includes a fix for that
+> > problem, as well as other related improvements, and is based on the
+> > current linux-pwm/for-next tip.
+> >
+> > I have tested on a Sitara AM335x platform, using a scope to verify
+> > the output with a variety of periods and duty cycles. This includes
+> > a PWM rate up clk_rate/2 with 50% duty cycle (e.g. generating
+> > fclk/2) with both 32768Hz and 24MHz fclks. I do not have an OMAP4
+> > board to test with, although appropriate sections in the the
+> > reference manuals appear substantially the same, so I believe the
+> > changes are equally correct there.
+> >
+> > Note that the OMAP4 TRMs do effectively state that the maximum PWM
+> > rate is clk_rate/4, so at very fast PWM rates the behavior may not
+> > be as reliable as I observed with Sitara. Although I suspect that
+> > it's the same module and will also work, at least under some
+> > circumstances. If anyone with OMAP4 hardware and a scope is so
+> > inclined, I would be curious to know the results.  
+> 
+> Hi David,
+> 
+> Thanks for the work, it seems all good, I'll test them on my side the
+> next days, but this work needed to be done for sure !
 
-I tested your tree with APM X-Gene v1 and X-Gene v2 platforms and PCIe
-came up fine on both platforms (with X-Gene ECAM fixup patch that I
-will post separately). Thanks for your work and please feel free to
-add my Tested-by.
+Thanks to you (and everyone else involved) for doing the heavy lifting 
+on the driver to begin with. It came just as I had a need for the PWM 
+output of a dmtimer, and came to the conclusion that just such a
+timer-to-PWM adapter was needed. 
 
-Regards,
-Duc Dang.
+> The only OMAP4 HW I have is a Pandaboard and it's very difficult to
+> get the timer outputs...
 
->
-> v2 -> v3
-> - fix legacy IRQ assigning and IO ports registration
-> - remove reference to arch specific companion device for ia64
-> - move ACPI PCI host controller driver to pci_root.c
-> - drop generic domain assignment for x86 and ia64 as I am not
->   able to run all necessary test variants
-> - drop patch which cleaned legacy IRQ assignment since it belongs to
->   Mathew's series:
->   https://patchwork.ozlabs.org/patch/557504/
-> - extend MCFG quirk code
-> - rebased to 4.4
->
-> v1 -> v2
-> - moved non-arch specific piece of code to dirver/acpi/ directory
-> - fixed IO resource handling
-> - introduced PCI config accessors quirks matching
-> - moved ACPI_COMPANION_SET to generic code
->
-> Liu Jiang (1):
->   ACPI, PCI: Refine the way to handle translation_offset for ACPI
->     resources
->
-> Tomasz Nowicki (20):
->   x86, pci: Reorder logic of pci_mmconfig_insert() function
->   x86, pci, acpi: Move arch-agnostic MMCONFIG (aka ECAM) and ACPI code
->     out of arch/x86/ directory
->   pci, acpi, mcfg: Provide generic implementation of MCFG code
->     initialization.
->   x86, pci: mmconfig_{32,64}.c code refactoring - remove code
->     duplication.
->   x86, pci, ecam: mmconfig_64.c becomes default implementation for ECAM
->     driver.
->   XEN / PCI: Remove the dependence on arch x86 when PCI_MMCONFIG=y
->   pci, acpi, mcfg: Provide default RAW ACPI PCI config space accessors.
->   arm64, acpi: Use empty PCI config space accessors from mcfg.c file.
->   pci, acpi, ecam: Add flag to indicate whether ECAM region was hot
->     added or not.
->   x86, pci: Cleanup platform specific MCFG data using previously added
->     ECAM hot_added flag.
->   pci, acpi: Move ACPI host bridge device companion assignment to core
->     code.
->   x86, ia64, pci: Remove ACPI companion device from platform specific
->     data.
->   pci, acpi: Provide generic way to assign bus domain number.
->   x86, ia64: Include acpi_pci_{add|remove}_bus to the default
->     pcibios_{add|remove}_bus implementation.
->   acpi, mcfg: Implement two calls that might be used to inject/remove
->     MCFG region.
->   x86, acpi, pci: Use equivalent function introduced in previous patch.
->   acpi, mcfg: Add default PCI config accessors implementation and
->     initial support for related quirks.
->   pci, acpi: Support for ACPI based generic PCI host controller init
->   pci, acpi: Match PCI config space accessors against platfrom specific
->     quirks.
->   arm64, pci, acpi: Start using ACPI based PCI host bridge driver for
->     ARM64.
->
->  arch/arm64/Kconfig                 |   7 ++
->  arch/arm64/kernel/pci.c            |  25 ----
->  arch/ia64/hp/common/sba_iommu.c    |   2 +-
->  arch/ia64/include/asm/pci.h        |   1 -
->  arch/ia64/pci/pci.c                |  52 +++-----
->  arch/ia64/sn/kernel/io_acpi_init.c |   4 +-
->  arch/x86/Kconfig                   |   4 +
->  arch/x86/include/asm/pci.h         |   3 -
->  arch/x86/include/asm/pci_x86.h     |  28 +----
->  arch/x86/pci/acpi.c                |  41 ++----
->  arch/x86/pci/common.c              |  10 --
->  arch/x86/pci/irq.c                 |  10 --
->  arch/x86/pci/mmconfig-shared.c     | 250 ++++++-------------------------------
->  arch/x86/pci/mmconfig_32.c         |  11 +-
->  arch/x86/pci/mmconfig_64.c         |  67 +---------
->  arch/x86/pci/numachip.c            |   1 +
->  drivers/acpi/Kconfig               |   5 +
->  drivers/acpi/Makefile              |   1 +
->  drivers/acpi/mcfg.c                | 201 +++++++++++++++++++++++++++++
->  drivers/acpi/pci_root.c            | 136 +++++++++++++++++++-
->  drivers/acpi/resource.c            |  12 +-
->  drivers/pci/Kconfig                |  10 ++
->  drivers/pci/Makefile               |   5 +
->  drivers/pci/ecam.c                 | 234 ++++++++++++++++++++++++++++++++++
->  drivers/pci/pci.c                  |  29 ++++-
->  drivers/pci/probe.c                |   5 +
->  drivers/xen/pci.c                  |   7 +-
->  include/acpi/acpi_bus.h            |   1 +
->  include/asm-generic/vmlinux.lds.h  |   7 ++
->  include/linux/acpi.h               |   2 +
->  include/linux/ecam.h               |  62 +++++++++
->  include/linux/pci-acpi.h           |  17 +++
->  32 files changed, 802 insertions(+), 448 deletions(-)
->  create mode 100644 drivers/acpi/mcfg.c
->  create mode 100644 drivers/pci/ecam.c
->  create mode 100644 include/linux/ecam.h
->
-> --
-> 1.9.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+For what its worth, I took a quick look at the Pandaboard Rev EA1 
+schematic, and I can see how it doesn't make using a timer PWM output 
+easy. Easiest option I found might be to change the pinmux for AG24 
+(h_GPIO_121) to be DMTIMER11_PWM_EVT, and probe it at S2 or J13.
