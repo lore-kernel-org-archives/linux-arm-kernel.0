@@ -1,55 +1,32 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 1 Feb 2016 15:41:03 +0100
-Subject: [PATCH v2 18/21] arm64: KVM: Introduce hyp_alternate_value helper
-In-Reply-To: <1453737235-16522-19-git-send-email-marc.zyngier@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <1453737235-16522-19-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160201144103.GX1478@cbox>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon,  1 Feb 2016 22:42:49 +0800
+Subject: [PATCH 2/2] ARM: dts: sun9i: Fix apbs clock compatible
+In-Reply-To: <1454337769-4130-1-git-send-email-wens@csie.org>
+References: <1454337769-4130-1-git-send-email-wens@csie.org>
+Message-ID: <1454337769-4130-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 25, 2016 at 03:53:52PM +0000, Marc Zyngier wrote:
-> We already have hyp_alternate_select() to define a function pointer
-> that gets changed by a kernel feature or workaround.
-> 
-> It would be useful to have a similar feature that resolves in a
-> direct value, without requiring a function call. For this purpose,
-> introduce hyp_alternate_value(), which returns one of two values
-> depending on the state of the alternative.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/hyp/hyp.h | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-> index 44eaff7..dc75fdb 100644
-> --- a/arch/arm64/kvm/hyp/hyp.h
-> +++ b/arch/arm64/kvm/hyp/hyp.h
-> @@ -144,6 +144,17 @@ typeof(orig) * __hyp_text fname(void)					\
->  	return val;							\
->  }
->  
-> +#define hyp_alternate_value(fname, orig, alt, cond)			\
-> +typeof(orig) __hyp_text fname(void)					\
-> +{									\
-> +	typeof(alt) val = orig;						\
-> +	asm volatile(ALTERNATIVE("nop		\n",			\
-> +				 "mov	%0, %1	\n",			\
-> +				 cond)					\
-> +		     : "+r" (val) : "r" ((typeof(orig))alt));		\
-> +	return val;							\
-> +}
-> +
->  void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
->  void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
->  
-> -- 
-> 2.1.4
-> 
-I'm really not convinced that this is more readable than simply defining
-a function where needed.  Perhaps the thing that needs a definition is
-the "asm volatile(ALTERNATIVE(...))" part?  I also don't see why any of
-this is specific to KVM or Hyp ?
+The APBS clock on A80 is not compatible with A23's APB0 clock. The only
+reason it works is becase the lowest and default divider is the same.
 
--Christoffer
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun9i-a80.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+index f68b3242b33a..2b4ce813b0ad 100644
+--- a/arch/arm/boot/dts/sun9i-a80.dtsi
++++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+@@ -395,7 +395,7 @@
+ 		};
+ 
+ 		apbs: clk at 0800141c {
+-			compatible = "allwinner,sun8i-a23-apb0-clk";
++			compatible = "allwinner,sun9i-a80-apbs-clk";
+ 			reg = <0x0800141c 0x4>;
+ 			#clock-cells = <0>;
+ 			clocks = <&ahbs>;
+-- 
+2.7.0
