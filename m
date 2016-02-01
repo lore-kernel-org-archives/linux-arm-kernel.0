@@ -1,99 +1,43 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  1 Feb 2016 19:30:17 +0100
-Subject: [PATCH] arm64: move back to generic memblock_enforce_memory_limit()
-In-Reply-To: <20160201180256.GJ15514@e104818-lin.cambridge.arm.com>
-References: <20160201180256.GJ15514@e104818-lin.cambridge.arm.com>
-Message-ID: <1454351417-23732-1-git-send-email-ard.biesheuvel@linaro.org>
+From: drivshin.allworx@gmail.com (David Rivshin (Allworx))
+Date: Mon, 1 Feb 2016 13:35:03 -0500
+Subject: [PATCH 2/4] pwm: omap-dmtimer: add sanity checking for load and
+ match values
+In-Reply-To: <1454128014-22866-3-git-send-email-drivshin.allworx@gmail.com>
+References: <1454128014-22866-1-git-send-email-drivshin.allworx@gmail.com>
+ <1454128014-22866-3-git-send-email-drivshin.allworx@gmail.com>
+Message-ID: <20160201133503.53599493.drivshin.allworx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than implementing our own elaborate logic to clip the memory ranges
-in order of preference, use the generic memblock_enforce_memory_limit() as
-before, and explicitly add back that part of the kernel that needs to be
-accessible via the linear mapping as well as via the kernel mapping.
+On Fri, 29 Jan 2016 23:26:52 -0500
+"David Rivshin (Allworx)" <drivshin.allworx@gmail.com> wrote:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/mm/init.c | 59 +++++++---------------------------------------------
- 1 file changed, 7 insertions(+), 52 deletions(-)
+> From: David Rivshin <drivshin@allworx.com>
+> 
+> Add sanity checking to ensure that we do not program load or match
+> values that are out of range if a user requests period or duty_cycle
+> values which are not achievable. The match value cannot be less than
+> the load value (but can be equal), and neither can be 0xffffffff.
+> This means that there must be at least one fclk cycle between load
+> and match, and another between match and overflow.
+> 
+> Fixes: 6604c6556db9 ("pwm: Add PWM driver for OMAP using dual-mode
+> timers") Signed-off-by: David Rivshin <drivshin@allworx.com>
+> ---
+ [...]
+> @@ -149,6 +149,24 @@ static int pwm_omap_dmtimer_config(struct pwm_chip *chip, 
+> period_cycles = pwm_omap_dmtimer_get_clock_cycles(clk_rate, period_ns); 
+> duty_cycles = pwm_omap_dmtimer_get_clock_cycles(clk_rate, duty_ns); 
+>
+> +	if (period_cycles < 2) {
+> +		dev_info(chip->dev,
+> +			"period %dns is too short for clock rate %luHz\n",
+> +			period_ns, clk_rate);
+> +		goto err_einval;
+> +	}
+ [...]
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index e8e853a1024c..361c91209031 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -160,41 +160,6 @@ static int __init early_mem(char *p)
- }
- early_param("mem", early_mem);
- 
--/*
-- * clip_mem_range() - remove memblock memory between @min and @max until
-- *                    we meet the limit in 'memory_limit'.
-- */
--static void __init clip_mem_range(u64 min, u64 max)
--{
--	u64 mem_size, to_remove;
--	int i;
--
--again:
--	mem_size = memblock_phys_mem_size();
--	if (mem_size <= memory_limit || max <= min)
--		return;
--
--	to_remove = mem_size - memory_limit;
--
--	for (i = memblock.memory.cnt - 1; i >= 0; i--) {
--		struct memblock_region *r = memblock.memory.regions + i;
--		u64 start = max(min, r->base);
--		u64 end = min(max, r->base + r->size);
--
--		if (start >= max || end <= min)
--			continue;
--
--		if (end > min) {
--			u64 size = min(to_remove, end - max(start, min));
--
--			memblock_remove(end - size, size);
--		} else {
--			memblock_remove(start, min(max - start, to_remove));
--		}
--		goto again;
--	}
--}
--
- void __init arm64_memblock_init(void)
- {
- 	const s64 linear_region_size = -(s64)PAGE_OFFSET;
-@@ -215,24 +180,14 @@ void __init arm64_memblock_init(void)
- 	if (memblock_end_of_DRAM() > linear_region_size)
- 		memblock_remove(0, memblock_end_of_DRAM() - linear_region_size);
- 
-+	/*
-+	 * Apply the memory limit if it was set. Since the kernel may be loaded
-+	 * high up in memory, add back the kernel region that must be accessible
-+	 * via the linear mapping.
-+	 */
- 	if (memory_limit != (phys_addr_t)ULLONG_MAX) {
--		u64 kbase = round_down(__pa(_text), MIN_KIMG_ALIGN);
--		u64 kend = PAGE_ALIGN(__pa(_end));
--		u64 const sz_4g = 0x100000000UL;
--
--		/*
--		 * Clip memory in order of preference:
--		 * - above the kernel and above 4 GB
--		 * - between 4 GB and the start of the kernel (if the kernel
--		 *   is loaded high in memory)
--		 * - between the kernel and 4 GB (if the kernel is loaded
--		 *   low in memory)
--		 * - below 4 GB
--		 */
--		clip_mem_range(max(sz_4g, kend), ULLONG_MAX);
--		clip_mem_range(sz_4g, kbase);
--		clip_mem_range(kend, sz_4g);
--		clip_mem_range(0, min(kbase, sz_4g));
-+		memblock_enforce_memory_limit(memory_limit);
-+		memblock_add(__pa(__init_begin), (u64)(_end - __init_begin));
- 	}
- 
- 	/*
--- 
-2.5.0
+I had some second thoughts on this over the weekend:
+1) Perhaps the return should be -ERANGE instead of -EINVAL for this case?
+2) Is dev_info() too severe for this? Perhaps dev_dbg() would be better?
+Any preferences?
