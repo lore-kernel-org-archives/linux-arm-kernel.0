@@ -1,7 +1,7 @@
 From: liguo.zhang@mediatek.com (Liguo Zhang)
-Date: Mon, 1 Feb 2016 09:13:12 +0800
-Subject: [PATCH v4] i2c: mt8173: add 4GB mode support in i2c driver.
-Message-ID: <1454289192-19379-1-git-send-email-liguo.zhang@mediatek.com>
+Date: Mon, 1 Feb 2016 09:58:30 +0800
+Subject: [PATCH v5] i2c: mt8173: add 4GB mode support in i2c driver.
+Message-ID: <1454291910-19870-1-git-send-email-liguo.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,6 +10,8 @@ Set 4GB mode register to support 4GB mode.
 
 Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
 ---
+change in v5:
+Use BIT_ULL() to fix kernel building warning.
 change in v4:
 Use BIT_ULL() to fix kernel building warning.
 change in v3:
@@ -21,7 +23,7 @@ Define a static inline function mtk_i2c_set_4g_mode() for support 4g mode.
  1 file changed, 42 insertions(+)
 
 diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
-index aec8e6c..3c484f0 100644
+index aec8e6c..e054205 100644
 --- a/drivers/i2c/busses/i2c-mt65xx.c
 +++ b/drivers/i2c/busses/i2c-mt65xx.c
 @@ -60,6 +60,7 @@
@@ -79,7 +81,7 @@ index aec8e6c..3c484f0 100644
  
 +static inline u32 mtk_i2c_set_4g_mode(dma_addr_t addr)
 +{
-+	return (addr & BIT(32)) ? I2C_DMA_4G_MODE : I2C_DMA_CLR_FLAG;
++	return (addr & BIT_ULL(32)) ? I2C_DMA_4G_MODE : I2C_DMA_CLR_FLAG;
 +}
 +
  static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
