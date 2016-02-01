@@ -1,64 +1,39 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 1 Feb 2016 20:54:48 +0300
-Subject: [PATCH] ARM: dts: porter: add MAX3355 support
-In-Reply-To: <SG2PR06MB0919361DC5805AE3F5B74041D8DE0@SG2PR06MB0919.apcprd06.prod.outlook.com>
-References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
- <4506196.xOgpYRO52t@wasted.cogentembedded.com>
- <SG2PR06MB0919D09C1146EAC0681EE109D8DA0@SG2PR06MB0919.apcprd06.prod.outlook.com>
- <56ABCB69.1070800@cogentembedded.com> <56ABD066.7020804@cogentembedded.com>
- <SG2PR06MB0919361DC5805AE3F5B74041D8DE0@SG2PR06MB0919.apcprd06.prod.outlook.com>
-Message-ID: <56AF9BE8.4020002@cogentembedded.com>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Mon, 1 Feb 2016 09:55:34 -0800
+Subject: [PATCH 1/2] ARM: make virt_to_idmap() return unsigned long
+In-Reply-To: <20160201173137.GV10826@n2100.arm.linux.org.uk>
+References: <E1aO8F2-00074N-E8@rmk-PC.arm.linux.org.uk>
+ <56A84748.3040108@oracle.com> <20160201152015.GU10826@n2100.arm.linux.org.uk>
+ <56AF8F54.7030805@ti.com> <56AF917F.9030505@oracle.com>
+ <20160201173137.GV10826@n2100.arm.linux.org.uk>
+Message-ID: <56AF9C16.3090703@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 02/01/2016 02:17 PM, Yoshihiro Shimoda wrote:
-
->>>>> From: linux-renesas-soc-owner at vger.kernel.org
->>>>> [mailto:linux-renesas-soc-owner at vger.kernel.org] On Behalf Of Sergei
->>>>> Shtylyov
->>>>> Sent: Wednesday, January 27, 2016 7:14 AM
->>>>>
->>>>> Now that Maxim Integrated MAX3355 'extcon' driver and device tree bindings
->>>>> are upstream along with the 'extcon' hook  in the Renesas USBHS driver, we
->>>>> can add  MAX3355 device node to  the Porter device tree and properly refer
->>>>> to it from the USBHS node instead of using  "renesas,enable-gpio" property
->>>>> which only allowed checking the USB ID pin  at the driver probe time;  now
->>>>> this  pin's  state can be monitored dynamically!
->>>>>
->>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>>>
->>>> I tested this patch on Porter, but interrupt of "usb-otg" didn't happened
->>>> even if I connected/disconnected a usb convert cable (usb micro-ab to A).
->>>> Remarks: I confirmed that the usb convert cable worked correctly on other
->>>> board.
->>>
->>>      I guess I have the same cable
->>
->>      No, I have mini-AB connector here and hence my cable is mini-AB to A.
+On 2/1/16 9:31 AM, Russell King - ARM Linux wrote:
+> On Mon, Feb 01, 2016 at 09:10:23AM -0800, santosh shilimkar wrote:
+>> Based on the log, I think the patch seems to work fine since the boot
+>> reached upto rootfs. The crash seems to be coming from mostky NetCP
+>> related compents.
 >
-> I checked Porter specification and then I found 2 specifications exist...
+> I read the boot log slightly differently - I'm assuming that the
+> boot log is from the kernel which _will_ be kexec'd from, so we
+> don't yet know whether the patches work or not.
+>
+I didn't see your [PATCH 2/2] which updates the kexec code with
+idmap API. I see your point now but IIUC, this log isn't from
+kexec kernel based on command line.
 
-    I've looked thru my schematics files and found 3: Rev. 1.1 Update Version 
-2, "PORTER_2" Rev. 3.0 Preliminary, and "PORTER_C" Rev. 3.0 Release version!
-I'm not sure which of the last 2 should be considered final...
+> I looked at the oops, and it's in tasklet_action, but for some
+> reason the unwinder is unable to unwind and provide a backtrace,
+> so it's not very debuggable.
+>
+> However, this is a useful backtrace for me in a different way:
+> to provide to people who want to deprecate the frame-pointer
+> based backtracing to prove why the unwinder based solution still
+> isn't up to the job.
+>
+Indeed. Not having stack trace doesn't help.
 
->   Porter "B" : mini AB connecter and Max3355 is on the board.
->   Porter "C" : micro AB connect and Max3355 is not on the board. (Select host/peripheral by a jumper.)
-
-    Yeah, seeing JP13 in the PORTER_C schematics.
-
-> I guess that your current target is "B".
-
-    If not earlier. It actually has "Henninger B REV2" printed on it and 
-"Porter PCB 1 R3" on a pasted sticker.
-
-> If so, I think this patch is acceptable.
-
-    I'm not so sure now...
-
-> Best regards,
-> Yoshihiro Shimoda
-
-MBR, Sergei
+Regards,
+Santosh
