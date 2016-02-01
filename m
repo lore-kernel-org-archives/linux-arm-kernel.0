@@ -1,45 +1,115 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Mon, 1 Feb 2016 11:39:31 +0100
-Subject: [PATCH v4 4/9] pinctrl: Add STM32 MCUs support
-In-Reply-To: <2151471.Wut3mQ9SS7@wuerfel>
-References: <1452773795-24216-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1452773795-24216-5-git-send-email-mcoquelin.stm32@gmail.com>
- <CACRpkdaBcP6fC5Oxn+d1WPdHq1FtwMkf8Ap5VDLQFg-5UwEBAw@mail.gmail.com>
- <2151471.Wut3mQ9SS7@wuerfel>
-Message-ID: <CALszF6DTpcU8jFwA0HL8LpkxfO5ZOdFmpHBUxA7WfYgAj_uFhg@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 1 Feb 2016 11:43:11 +0100
+Subject: [PATCH V3 04/11] soc: mediatek: PMIC wrap: split SoC specific
+ init into callback
+In-Reply-To: <1453715604-36856-5-git-send-email-blogic@openwrt.org>
+References: <1453715604-36856-1-git-send-email-blogic@openwrt.org>
+ <1453715604-36856-5-git-send-email-blogic@openwrt.org>
+Message-ID: <56AF36BF.2050109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-02-01 11:21 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
-> On Wednesday 27 January 2016 14:16:32 Linus Walleij wrote:
->> On Thu, Jan 14, 2016 at 1:16 PM, Maxime Coquelin
->> <mcoquelin.stm32@gmail.com> wrote:
->>
->> > This patch adds pinctrl and GPIO support to STMicroelectronic's STM32
->> > family of MCUs.
->> >
->> > While it only supports STM32F429 for now, it has been designed to enable
->> > support of other MCUs of the family (e.g. STM32F746).
->> >
->> > Acked-by: Patrice Chotard <patrice.chotard@st.com>
->> > Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>
->> This patch applied for kernel v4.6.
->>
+
+
+On 25/01/16 10:53, John Crispin wrote:
+> This patch moves the SoC specific wrapper init code into separate callback
+> to avoid pwrap_init() getting too large.
 >
-> This breaks the kernel build, please revert:
+> Signed-off-by: John Crispin <blogic@openwrt.org>
+> ---
+>   drivers/soc/mediatek/mtk-pmic-wrap.c |   68 +++++++++++++++++++++-------------
+>   1 file changed, 42 insertions(+), 26 deletions(-)
 >
-> drivers/pinctrl/stm32/pinctrl-stm32.c:26:47: fatal error: dt-bindings/pinctrl/pinctrl-stm32.h: No such file or directory
+> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> index b22b664..ab2202d 100644
+> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> @@ -372,6 +372,7 @@ struct pmic_wrapper_type {
+>   	enum pwrap_type type;
+>   	u32 arb_en_all;
+>   	int (*init_reg_clock)(struct pmic_wrapper *wrp);
+> +	int (*init_special)(struct pmic_wrapper *wrp);
+>   };
+>
+>   static inline int pwrap_is_mt8135(struct pmic_wrapper *wrp)
+> @@ -665,6 +666,41 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
+>   	return 0;
+>   }
+>
+> +static int pwrap_mt8135_init_special(struct pmic_wrapper *wrp)
+> +{
+> +	/* enable pwrap events and pwrap bridge in AP side */
+> +	pwrap_writel(wrp, 0x1, PWRAP_EVENT_IN_EN);
+> +	pwrap_writel(wrp, 0xffff, PWRAP_EVENT_DST_EN);
+> +	writel(0x7f, wrp->bridge_base + PWRAP_MT8135_BRIDGE_IORD_ARB_EN);
+> +	writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WACS3_EN);
+> +	writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WACS4_EN);
+> +	writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WDT_UNIT);
+> +	writel(0xffff, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WDT_SRC_EN);
+> +	writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_TIMER_EN);
+> +	writel(0x7ff, wrp->bridge_base + PWRAP_MT8135_BRIDGE_INT_EN);
+> +
+> +	/* enable PMIC event out and sources */
+> +	if (pwrap_write(wrp, PWRAP_DEW_EVENT_OUT_EN, 0x1) ||
+> +		pwrap_write(wrp, PWRAP_DEW_EVENT_SRC_EN, 0xffff)) {
+> +		dev_err(wrp->dev, "enable dewrap fail\n");
+> +		return -EFAULT;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int pwrap_mt8173_init_special(struct pmic_wrapper *wrp)
+> +{
+> +	/* PMIC_DEWRAP enables */
+> +	if (pwrap_write(wrp, PWRAP_DEW_EVENT_OUT_EN, 0x1) ||
+> +		pwrap_write(wrp, PWRAP_DEW_EVENT_SRC_EN, 0xffff)) {
+> +		dev_err(wrp->dev, "enable dewrap fail\n");
+> +		return -EFAULT;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>   static int pwrap_init(struct pmic_wrapper *wrp)
+>   {
+>   	int ret;
+> @@ -743,32 +779,10 @@ static int pwrap_init(struct pmic_wrapper *wrp)
+>   	pwrap_writel(wrp, 0x5, PWRAP_STAUPD_PRD);
+>   	pwrap_writel(wrp, 0xff, PWRAP_STAUPD_GRPEN);
+>
+> -	if (pwrap_is_mt8135(wrp)) {
+> -		/* enable pwrap events and pwrap bridge in AP side */
+> -		pwrap_writel(wrp, 0x1, PWRAP_EVENT_IN_EN);
+> -		pwrap_writel(wrp, 0xffff, PWRAP_EVENT_DST_EN);
+> -		writel(0x7f, wrp->bridge_base + PWRAP_MT8135_BRIDGE_IORD_ARB_EN);
+> -		writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WACS3_EN);
+> -		writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WACS4_EN);
+> -		writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WDT_UNIT);
+> -		writel(0xffff, wrp->bridge_base + PWRAP_MT8135_BRIDGE_WDT_SRC_EN);
+> -		writel(0x1, wrp->bridge_base + PWRAP_MT8135_BRIDGE_TIMER_EN);
+> -		writel(0x7ff, wrp->bridge_base + PWRAP_MT8135_BRIDGE_INT_EN);
+> -
+> -		/* enable PMIC event out and sources */
+> -		if (pwrap_write(wrp, PWRAP_DEW_EVENT_OUT_EN, 0x1) ||
+> -				pwrap_write(wrp, PWRAP_DEW_EVENT_SRC_EN, 0xffff)) {
+> -			dev_err(wrp->dev, "enable dewrap fail\n");
+> -			return -EFAULT;
+> -		}
+> -	} else {
+> -		/* PMIC_DEWRAP enables */
+> -		if (pwrap_write(wrp, PWRAP_DEW_EVENT_OUT_EN, 0x1) ||
+> -				pwrap_write(wrp, PWRAP_DEW_EVENT_SRC_EN, 0xffff)) {
+> -			dev_err(wrp->dev, "enable dewrap fail\n");
+> -			return -EFAULT;
+> -		}
+> -	}
+> +	if (wrp->master->init_special)
+> +		ret = wrp->master->init_special(wrp);
+> +	if (ret)
+> +		return ret;
+>
 
-Right, I missed to notify this dependency to Linus, sorry about that.
-This dependency is no more needed, so I could just move the macros to
-the driver side.
+Check ret only if you have called init_special before.
 
-Note that I also noticed a breakage at build time due to field
-renaming in gpio_chip structure (dev -> parent).
-
-I propose to rebase the series and move the defines into the driver.
-Is it ok for you?
-
-Regards,
-Maxime
+Apart from that the patch look fine.
