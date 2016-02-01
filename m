@@ -1,31 +1,60 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon,  1 Feb 2016 18:28:16 +0000
-Subject: [PATCH 0/3] OMAP/pinmux: remove misuse of IRQF_NO_SUSPEND flag
-Message-ID: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
+Date: Mon,  1 Feb 2016 18:28:18 +0000
+Subject: [PATCH 2/3] pinctrl: single: remove misuse of IRQF_NO_SUSPEND flag
+In-Reply-To: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
+References: <1454351299-27440-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1454351299-27440-3-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony/Grygorii,
+From: Sudeep Holla <Sudeep.Holla@arm.com>
 
-Just revieving the old threads [1][2]. I have put all the necessary
-patches together so that it can tested. Can you give it a go ?
+The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
+be left enabled so as to allow them to work as expected during the
+suspend-resume cycle, but doesn't guarantee that it will wake the system
+from a suspended state, enable_irq_wake is recommended to be used for
+the wakeup.
 
-Regards,
-Sudeep
+This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
+irq_set_irq_wake instead.
 
-[1] https://www.spinics.net/lists/linux-gpio/msg09879.html
-[2] http://lkml.iu.edu/hypermail/linux/kernel/1509.2/03937.html
+Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-gpio at vger.kernel.org
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ drivers/pinctrl/pinctrl-single.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-Sudeep Holla (3):
-  pinctrl: single: Use a separate lockdep class
-  pinctrl: single: remove misuse of IRQF_NO_SUSPEND flag
-  ARM: OMAP2+: remove misuse of IRQF_NO_SUSPEND flag
-
- arch/arm/mach-omap2/mux.c        |  4 ++--
- arch/arm/mach-omap2/pm34xx.c     |  9 ++++-----
- arch/arm/mach-omap2/prm_common.c |  1 +
- drivers/pinctrl/pinctrl-single.c | 15 ++++++++++++---
- 4 files changed, 19 insertions(+), 10 deletions(-)
-
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index fb126d56ad40..03977a75a9e2 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -1619,12 +1619,14 @@ static void pcs_irq_unmask(struct irq_data *d)
+  */
+ static int pcs_irq_set_wake(struct irq_data *d, unsigned int state)
+ {
++	struct pcs_soc_data *pcs_soc = irq_data_get_irq_chip_data(d);
++
+ 	if (state)
+ 		pcs_irq_unmask(d);
+ 	else
+ 		pcs_irq_mask(d);
+ 
+-	return 0;
++	return irq_set_irq_wake(pcs_soc->irq, state);
+ }
+ 
+ /**
+@@ -1760,8 +1762,7 @@ static int pcs_irq_init_chained_handler(struct pcs_device *pcs,
+ 		int res;
+ 
+ 		res = request_irq(pcs_soc->irq, pcs_irq_handler,
+-				  IRQF_SHARED | IRQF_NO_SUSPEND |
+-				  IRQF_NO_THREAD,
++				  IRQF_SHARED | IRQF_NO_THREAD,
+ 				  name, pcs_soc);
+ 		if (res) {
+ 			pcs_soc->irq = -1;
 -- 
 1.9.1
