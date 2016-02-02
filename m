@@ -1,110 +1,48 @@
-From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Tue, 2 Feb 2016 03:58:52 +0200
-Subject: [linux-sunxi] Re: [PATCH 05/11] drivers: pinctrl: add driver
- for Allwinner A64 SoC
-In-Reply-To: <56AFE0EC.8080207@arm.com>
-References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
- <1454348370-3816-6-git-send-email-andre.przywara@arm.com>
- <20160201182754.GA14737@excalibur.cnev.de>
- <56AFE0EC.8080207@arm.com>
-Message-ID: <20160202035852.6984db63@i7>
+From: fan.chen@mediatek.com (Fan Chen)
+Date: Tue, 2 Feb 2016 10:17:42 +0800
+Subject: MTK mt8173-evb: mainline unstable, and big-endian boot failures
+In-Reply-To: <7hh9hrgbbh.fsf@baylibre.com>
+References: <CAOi56cVDbkAJEDWy3+DV63a=UuD7nqpUu8X7e-OjtWM-4dj_-w@mail.gmail.com>
+ <7hsi1ilczm.fsf@baylibre.com>
+ <CAF-23O3ps0Wt_UCmJbArpc5iJJryJKA0k_2qAyNb7op8O=UnAg@mail.gmail.com>
+ <1453964180.26397.8.camel@mtksdaap41> <7hy4b8gc7q.fsf@baylibre.com>
+ <1454309376.11974.3.camel@mtksdaap41> <7hh9hrgbbh.fsf@baylibre.com>
+Message-ID: <1454379462.27798.11.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 1 Feb 2016 22:49:16 +0000
-Andr? Przywara <andre.przywara@arm.com> wrote:
+Hi Kevin,
 
-> On 01/02/16 18:27, Karsten Merker wrote:
-> 
-> Hi Karsten,
-> 
-> thank you very much for your feedback!
-> 
-> > On Mon, Feb 01, 2016 at 05:39:24PM +0000, Andre Przywara wrote:  
-> >> Based on the Allwinner A64 user manual and on the previous sunxi
-> >> pinctrl drivers this introduces the pin multiplex assignments for
-> >> the ARMv8 Allwinner A64 SoC.
-> >> Port A is apparently used for the fixed function DRAM controller, so
-> >> the ports start at B here (the manual mentions "n from 1 to 7", so
-> >> not starting at 0).
-> >>
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >> ---
-> >>  .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
-> >>  arch/arm64/Kconfig.platforms                       |   1 +
-> >>  drivers/pinctrl/sunxi/Kconfig                      |   4 +
-> >>  drivers/pinctrl/sunxi/Makefile                     |   1 +
-> >>  drivers/pinctrl/sunxi/pinctrl-a64.c                | 606 +++++++++++++++++++++
-> >>  5 files changed, 613 insertions(+)
-> >>  create mode 100644 drivers/pinctrl/sunxi/pinctrl-a64.c
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-> >> index 9213b27..9050002 100644
-> >> --- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-> >> +++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-> >> @@ -21,6 +21,7 @@ Required properties:
-> >>    "allwinner,sun9i-a80-r-pinctrl"
-> >>    "allwinner,sun8i-a83t-pinctrl"
-> >>    "allwinner,sun8i-h3-pinctrl"
-> >> +  "allwinner,a64-pinctrl"  
-> > 
-> > Hello,
-> > 
-> > on all other Allwinner SoCs we use the SoC family as part of the
-> > compatible, as well as in the names of the Kconfig options. To
-> > keep things consistent, I would like to propose doing the same on
-> > Arm64, i.e. using allwinner,sun50i-a64-pinctrl instead of
-> > allwinner,a64-pinctrl.  
-> 
-> Yes, I have been told this already. However I don't like this idea so
-> much, for the following reasons:
-> a) It is mostly redundant. The actual SoC (marketing) name is unique,
-> there is no sun6i-a20 or sun7i-a23.
-> b) It is not even helpful. If I got Maxime correctly, then the newer
-> sunxi generation numbers depend on the ARM _cores_ used in the SoC,
-> which is frankly the least interesting part from a Linux support
-> perspective. I would see some sense if it would reflect the generation
-> of IP blocks used, but so it is even more confusing to see that
-> sun7i-a20 and sun8i-a23 are related, but sun8i-h3 is a completely
-> different beast. The Allwinner marketing name tells you that, but the
-> sunxi one does not.
-> c) It is very confusing for people not dealing with it everyday. Just
-> because I own a BananaPi I know that the A20 is sun7i, but I am totally
-> lost when it comes to all the other names. And even now it took me about
-> a minute to find the appropriate Wiki page which explains part of that
-> story.
-> d) Most importantly ;-): It kills TAB completion, unless you know the
-> sunxi number, which is mostly not true as pointed out in c)
-> 
-> So while I see that just a<somenumber> is not really very specific, I'd
-> rather do away with current naming scheme for the future. In this
-> particular case we have the vendor name as a name space identifier
-> already, so there is no possible confusion with ARM Cortex naming, for
-> instance.
-> 
-> Also as this is now moving into the arm64 world, I'd like to use the
-> opportunity to fix things that are not really optimal, the naming is one
-> of them.
+I just checked that the problem cannot be reproduced (tested 100 times
+with your script) after flashing new firmware which we uploaded to
+github[0] yesterday.
+This latest firmware got many fixes and also supports cluster idle, so
+we prefer testing with this new one
+Would you please test in your side? Thanks for your great help!! 
 
-One of the problems is that A64 name is not unique. We have reasons
-to believe that there are also H64 and R18 out there using exactly
-the same die, but possibly available in different packaging (a different
-ball grid pitch? or maybe a different set of peripherals routed to the
-outside?). Early prototypes of the Pine64 board were using Allwinner R18
-and the Jide Remix Mini HTPC box is using Allwinner H64.
+[0] https://github.com/ibanezchen/evb-utils/tree/master
 
-The bootloader sources from Allwinner are also referring to A64 as
-AW1689, which makes some sense because it is the chip id number that
-is accessible for runtime identification via reading the SRAM_VER_REG
-hardware register:
 
-    http://linux-sunxi.org/SRAM_Controller_Register_Guide#SRAM_VER_REG
-
-So would it be a good idea to use "aw1689" as a compatible property
-in the DT instead of "a64"? Or maybe have "aw1689-a64" and
-"aw1689-h64", which would be similar to the existing "sun5i-a13"
-and "sun5i-a10s" naming convention?
-
--- 
 Best regards,
-Siarhei Siamashka
+Fan
+
+On Mon, 2016-02-01 at 17:17 -0800, Kevin Hilman wrote:
+> Hi Eddie,
+> 
+> Eddie Huang <eddie.huang@mediatek.com> writes:
+> 
+> [...]
+> 
+> > Thanks your patience to provide detail steps, we can reproduce this
+> > problem now. It seems something wrong in ATF, we still investigate how
+> > to fix it. We will provide you new ATF firmware once we have solution
+> 
+> Great, I'm glad you can reproduce it.  I was starting to worry it was
+> only my hardware with the problem.
+> 
+> Please let me know if there are firmware updates you'd like me to test
+> and I'll be happy to.
+> 
+> Thanks,
+> 
+> Kevin
