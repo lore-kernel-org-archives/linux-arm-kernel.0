@@ -1,111 +1,68 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 2 Feb 2016 16:35:37 +0100
-Subject: [PATCH V5 08/14] PM / Domains: Add function to remove a pm-domain
-In-Reply-To: <1453998832-27383-9-git-send-email-jonathanh@nvidia.com>
-References: <1453998832-27383-1-git-send-email-jonathanh@nvidia.com>
- <1453998832-27383-9-git-send-email-jonathanh@nvidia.com>
-Message-ID: <CAPDyKFqJLdoee4a9819XukXTmYyd3pue452K_zbiV6XhfA=fTw@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 2 Feb 2016 16:42:12 +0100
+Subject: [PATCH v2 06/21] arm64: KVM: VHE: Patch out use of HVC
+In-Reply-To: <56AF95C0.3080006@arm.com>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <1453737235-16522-7-git-send-email-marc.zyngier@arm.com>
+ <20160201131634.GI1478@cbox> <56AF5ED8.7010303@arm.com>
+ <20160201153635.GH15514@e104818-lin.cambridge.arm.com>
+ <56AF85D8.7080907@arm.com>
+ <CAKv+Gu9_KG7Zss3g1OMzcnRKQFhCcYtbSDEk-gwwgqPP-R6DOA@mail.gmail.com>
+ <56AF95C0.3080006@arm.com>
+Message-ID: <20160202154212.GD6190@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 January 2016 at 17:33, Jon Hunter <jonathanh@nvidia.com> wrote:
-> The genpd framework allows users to add power-domains via the
-> pm_genpd_init() function, however, there is no corresponding function
-> to remove a power-domain. For most devices this may be fine as the power
-> domains are never removed, however, for devices that wish to populate
-> the power-domains from within a driver, having the ability to remove a
-> power domain if the probing of the device fails or the driver is unloaded
-> is necessary. Therefore, add a function to remove a power-domain. Please
-> note that the power domain can only be removed if there are no devices
-> using the power-domain and it is not linked to another domain.
->
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> ---
->  drivers/base/power/domain.c | 26 ++++++++++++++++++++++++++
->  include/linux/pm_domain.h   |  5 +++++
->  2 files changed, 31 insertions(+)
->
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 45e3641b427d..b4120121bcac 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -1529,6 +1529,32 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
->  }
->  EXPORT_SYMBOL_GPL(pm_genpd_init);
->
-> +/**
-> + * pm_genpd_remove - Remove a generic I/O PM domain object.
-> + * @genpd: PM domain object to remove.
-> + */
-> +int pm_genpd_remove(struct generic_pm_domain *genpd)
-> +{
-> +       if (IS_ERR_OR_NULL(genpd))
-> +               return -EINVAL;
-> +
-> +       mutex_lock(&genpd->lock);
+On Mon, Feb 01, 2016 at 05:28:32PM +0000, Marc Zyngier wrote:
+> On 01/02/16 17:08, Ard Biesheuvel wrote:
+> > On 1 February 2016 at 17:20, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >> On 01/02/16 15:36, Catalin Marinas wrote:
+> >>> On Mon, Feb 01, 2016 at 01:34:16PM +0000, Marc Zyngier wrote:
+> >>>> On 01/02/16 13:16, Christoffer Dall wrote:
+> >>>>> On Mon, Jan 25, 2016 at 03:53:40PM +0000, Marc Zyngier wrote:
+> >>>>>> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+> >>>>>> index 93e8d983..9e0683f 100644
+> >>>>>> --- a/arch/arm64/kvm/hyp/hyp-entry.S
+> >>>>>> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
+> >>>>>> @@ -38,6 +38,32 @@
+> >>>>>>    ldp     x0, x1, [sp], #16
+> >>>>>>  .endm
+> >>>>>>
+> >>>>>> +.macro do_el2_call
+> >>>>>> +  /*
+> >>>>>> +   * Shuffle the parameters before calling the function
+> >>>>>> +   * pointed to in x0. Assumes parameters in x[1,2,3].
+> >>>>>> +   */
+> >>>>>> +  stp     lr, xzr, [sp, #-16]!
+> >>>>>
+> >>>>> remind me why this pair isn't just doing "str" instead of "stp" with the
+> >>>>> xzr ?
+> >>>>
+> >>>> Because SP has to be aligned on a 16 bytes boundary at all times.
+> >>>
+> >>> You could do something like:
+> >>>
+> >>>       sub     sp, sp, #16
+> >>>       str     lr, [sp]
+> >>>
+> >>
+> >> Ah, fair enough. I'll fold that in.
+> >>
+> > 
+> > Since we're micro-reviewing: what's wrong with
+> > 
+> > str lr, [sp, #-16]!
+> > 
+> > ?
+> > 
+> 
+> I suspect that on most micro-architectures, a register writeback is
+> going to be slower than doing the sub independently.
+> 
+> I may be wrong, though.
+> 
+For the record, I don't mind it the way it was in the original patch
+either, I was just curious about the store of xzr and had forgottten the
+stack alignment thing.
 
-pm_genpd_summary_show() first locks the gpd_list_lock, then the genpd lock.
-
-Please preserve that order here as well, to prevent potential deadlocks.
-
-> +
-> +       if (!list_empty(&genpd->master_links)
-> +           || !list_empty(&genpd->slave_links) || genpd->device_count) {
-> +               mutex_unlock(&genpd->lock);
-> +               return -EBUSY;
-> +       }
-> +
-> +       mutex_lock_nested(&gpd_list_lock, SINGLE_DEPTH_NESTING);
-
-Why the nesting, can this really cause lockdep warnings?
-
-> +       list_del(&genpd->gpd_list_node);
-> +       mutex_unlock(&gpd_list_lock);
-> +       mutex_unlock(&genpd->lock);
-
-Before returning, you need to make sure there isn't a scheduled work
-for powering off the genpd.
-That might happen for example happen via genpd_poweroff_unused().
-
-Otherwise, the caller of pm_genpd_remove() might free the memory while
-the genpd struct is still in use...
-
-I assume a cancel_delayed_work_sync() should do the trick here.
-
-> +
-> +       return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(pm_genpd_remove);
-> +
->  #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
->  /*
->   * Device Tree based PM domain providers.
-> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-> index db21d3995f7e..0d661998fa74 100644
-> --- a/include/linux/pm_domain.h
-> +++ b/include/linux/pm_domain.h
-> @@ -123,6 +123,7 @@ extern int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
->                                      struct generic_pm_domain *target);
->  extern void pm_genpd_init(struct generic_pm_domain *genpd,
->                           struct dev_power_governor *gov, bool is_off);
-> +extern int pm_genpd_remove(struct generic_pm_domain *genpd);
->
->  extern struct dev_power_governor simple_qos_governor;
->  extern struct dev_power_governor pm_domain_always_on_gov;
-> @@ -161,6 +162,10 @@ static inline void pm_genpd_init(struct generic_pm_domain *genpd,
->                                  struct dev_power_governor *gov, bool is_off)
->  {
->  }
-> +static inline int pm_genpd_remove(struct generic_pm_domain *genpd)
-> +{
-> +       return -ENOTSUPP;
-> +}
->  #endif
->
->  static inline int pm_genpd_add_device(struct generic_pm_domain *genpd,
-> --
-> 2.1.4
->
-
-Kind regards
-Uffe
+-Christoffer
