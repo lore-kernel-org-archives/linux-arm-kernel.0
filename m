@@ -1,97 +1,46 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Tue, 2 Feb 2016 18:43:31 +0300
-Subject: [PATCH 1/5] all: s390: move wrapper infrastructure to generic
- headers
-In-Reply-To: <20160202073913.GB3990@osiris>
-References: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
- <1453741047-5498-2-git-send-email-ynorov@caviumnetworks.com>
- <20160128121618.GB5418@osiris> <20160128163109.GA8529@yury-N73SV>
- <20160201114251.GB973@yury-N73SV> <20160202073913.GB3990@osiris>
-Message-ID: <20160202154331.GA3003@yury-N73SV>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 2 Feb 2016 16:46:45 +0100
+Subject: [PATCH v2 10/21] arm64: KVM: VHE: Split save/restore of sysregs
+ shared between EL1 and EL2
+In-Reply-To: <56B07ADD.60300@arm.com>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <1453737235-16522-11-git-send-email-marc.zyngier@arm.com>
+ <20160201135438.GL1478@cbox> <56B07ADD.60300@arm.com>
+Message-ID: <20160202154645.GE6190@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 08:39:13AM +0100, Heiko Carstens wrote:
-> On Mon, Feb 01, 2016 at 02:42:51PM +0300, Yury Norov wrote:
-> > Hi Heiko,
+On Tue, Feb 02, 2016 at 09:46:05AM +0000, Marc Zyngier wrote:
+> On 01/02/16 13:54, Christoffer Dall wrote:
+> > On Mon, Jan 25, 2016 at 03:53:44PM +0000, Marc Zyngier wrote:
+> >> A handful of system registers are still shared between EL1 and EL2,
+> >> even while using VHE. These are tpidr*_el[01], actlr_el1, sp0, elr,
+> >> and spsr.
 > > 
-> > I tried this idea, and I don't like what happened.
-> >  - Wrappers around safe syscalls does exist. We can remove it by
-> >    overcomplicating __SC_COMPAT_CAST, but I don't like it.
-> >  - We still need to declare numerous list of new compat syscalls.
-> >    And it becomes even bigger, as we need to declare all compat
-> >    syscall versions not declared in include/linux/compat.h already.
-> >    (Currently - only for unsafe syscalls.)
-> >  - 'Weak' trick doesn't work for the whole kernel, so we'd figure out
-> >    some new prefix for wrapped syscalls. Or declare all non-compat
-> >    syscalls explicitly with SYSCALL_COMPAT_DEFINE. So the list of
-> >    replacements grow. And for me, it's harder to explain why we are
-> >    wrapping safe syscalls. Or we introduce another bunch of useless
-> >    wrappers (with new prefix), and have to handle it in non-compat code.
-> >  - With all listed above, we move all wrapper logic to non-compat
-> >    'include/linux/syscalls.h' header. Which is not a good idea, if it
-> >    doesn't benefit us much in return.
+> > So by shared registers you mean registers that do both have an EL0/1
+> > version as well as an EL2 version, but where accesses aren't rewritten
+> > transparently?
+> 
+> No, I mean that these registers do *not* have a separate banked version.
+> There is only a single set of registers, which have to be save/restored
+> the old way.
+
+huh, ARMv8 clearly specifies the existence of TPIDR_EL0, TPIDR_EL1, and
+TPIDR_EL2, for example.
+
+I cannot seem to find anywhere in the VHE spec that says that the
+TPIDR_EL2 goes away.  I'm confused now.
+
+> 
 > > 
-> > > > No need to look up if a compat variant (or wrapper) exists or
-> > > > sys_<syscallname> should be used instead. Also no possibility for security
-> > > > bugs that could creep in because SYSCALL_DEFINE has been used instead of
-> > > > SYSCALL_DEFINE_WRAP.
-> > 
-> > I thought again about it. With current version, it's very easy to
-> > define whether we have wrapper or not - just by macro we use. Once
-> > reviewed, this list is hardly to be changed frequently. If someone is
-> > introducing new syscall, it will attract much attention, so security
-> > risk is minimal.
-> > 
-> > Maybe I missed some elegant implementation, and if so  I'll be happy
-> > if someone'll point me out. But with what I see, I'd vote for what we
-> > have now. (Plus description in docs, plus renaming new macro.)
+> > also, by sp0 do you mean sp_el0, and by elr you mean elr_el1, and by
+> > spsr you mean spsr_el1 ?
 > 
-> Well, I'd like to have some proof by the compiler or linker that nothing
-> went wrong. Which seems hard if only selected system call defines will be
-> converted to the new defines.
+> sp0 -> sp_el0 indeed. elr and spsr really are the guest PC and PSTATE,
+> so I should really reword this commit message, it is utterly confusing.
 > 
-> How can you tell that nothing has been forgotten?
-> 
-> Also, what happens if the prototype of a system call get's changed shortly
-> after it was merged. We might miss such changes and have bugs.
-> 
+I guess I don't understand the definition of a 'shared' register given
+your comments here...
 
-As for now, there's no such proof, and everything is OK. Syscall ABI
-is extremely conservative, and Greg KH, and other people spent a lot
-of efforts to keep it that way. This is the only reason for me to not
-worry much about it. Modification of syscall ABI is virtually
-impossible now, because it breaks binary compatibility. Even addition
-of new syscall is very difficult procedure.
-(Documentation/adding-syscalls.txt begins with section "System Call
-Alternatives".)
-
-We can invent some protection, but it will cost us in complexity and/or
-runtime delays. Because syscall ABI is so stable, I think it's OK to
-review wrappers carefully once, and they will be fine for long time.
-
-> Therefore, and to get to a solution, I think we should stick with your
-> first idea, which only moves the compat_wrapper.c file.
-> 
-> Before doing that I think you should actually revert this patch: my commit
-> 7681df456f97 ("s390/compat: remove superfluous compat wrappers") probably
-> wasn't a very bright idea :)
-> 
-
-This patch is OK for me. pid_t, uid_t, gid_t, unsigned and signed int
-types are all 32-bit both on LP64 and ILP32. Normally, compiler should
-care about top halves... Did I miss something?
-
-> This again allows me to use only compat system calls in s390's system call
-> table (execpt for system calls without parameters, but that can be easily
-> fixed).
-> 
-> What I still don't like is that you need to add all the protoypes. Why are
-> the system call tables actually written in C and not in asm?
-
-Because generic unistd code is multi-platform by intention.
-
-I don't know much about s390 specifics. Maybe because of that I do not
-understand completely your worries. I'm OK with both 1st and 2nd
-version, but I'd choose 2nd one because it allows inlines, and we
-don't need the compat_wrapper.c. 
+Thanks,
+-Christoffer
