@@ -1,308 +1,95 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue,  2 Feb 2016 14:14:00 -0700
-Subject: [PATCH 6/7] coresight: removing bind/unbind options from sysfs
+Date: Tue,  2 Feb 2016 14:14:01 -0700
+Subject: [PATCH 7/7] coresight: implementing 'cpu_id()' API
 In-Reply-To: <1454447641-29153-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1454447641-29153-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1454447641-29153-7-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1454447641-29153-8-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The coresight drivers have absolutely no control over bind and unbind
-operations triggered from sysfs. The operations simply can't be
-cancelled or denied event when one or several tracing sessions are
-under way.  Since the memory associated to individual device is
-invariably freed, the end result is a kernel crash when the path from
-source to sink is travelled again as demonstrated here[1].
+Other than plainly parsing the device tree there is no way to
+know which CPU a tracer is affined to.  As such adding an
+interface to lookup the CPU field enclosed in the etm_drvdata
+structure that was initialised at boot time.
 
-One solution could be to keep track of all the path (i.e tracing
-session) that get created and iterate through the elements of those path
-looking for the coresight device that is being removed.  This proposition
-doesn't scale well since there is no upper bound on the amount of
-concurrent trace session that can be created.
-
-With the above in mind, this patch prevent devices from being unbounded
-from their driver by using the driver->suppress_bind_attr option.  That way
-trace sessions can be managed without fearing to loose devices.
-
-Since device can't be removed anymore the xyz_remove() functions found in
-each driver is also removed.
-
-[1]. http://www.spinics.net/lists/arm-kernel/msg474952.html
-
-Reported-by: Rabin Vincent <rabin@rab.in>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etb10.c           | 11 +----------
- drivers/hwtracing/coresight/coresight-etm3x.c           | 13 +------------
- drivers/hwtracing/coresight/coresight-etm4x.c           | 13 +------------
- drivers/hwtracing/coresight/coresight-funnel.c          | 10 +---------
- drivers/hwtracing/coresight/coresight-replicator-qcom.c | 11 +----------
- drivers/hwtracing/coresight/coresight-replicator.c      | 16 +---------------
- drivers/hwtracing/coresight/coresight-tmc.c             | 15 +--------------
- drivers/hwtracing/coresight/coresight-tpiu.c            | 10 +---------
- 8 files changed, 8 insertions(+), 91 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm3x.c | 8 ++++++++
+ drivers/hwtracing/coresight/coresight-etm4x.c | 8 ++++++++
+ include/linux/coresight.h                     | 3 +++
+ 3 files changed, 19 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 77d0f9c1118d..92969dae739d 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -489,15 +489,6 @@ err_misc_register:
- 	return ret;
- }
- 
--static int etb_remove(struct amba_device *adev)
--{
--	struct etb_drvdata *drvdata = amba_get_drvdata(adev);
--
--	misc_deregister(&drvdata->miscdev);
--	coresight_unregister(drvdata->csdev);
--	return 0;
--}
--
- #ifdef CONFIG_PM
- static int etb_runtime_suspend(struct device *dev)
- {
-@@ -537,10 +528,10 @@ static struct amba_driver etb_driver = {
- 		.name	= "coresight-etb10",
- 		.owner	= THIS_MODULE,
- 		.pm	= &etb_dev_pm_ops,
-+		.suppress_bind_attrs = true,
- 
- 	},
- 	.probe		= etb_probe,
--	.remove		= etb_remove,
- 	.id_table	= etb_ids,
- };
- 
 diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index d630b7ece735..5981fcc69960 100644
+index 5981fcc69960..aae80e14508d 100644
 --- a/drivers/hwtracing/coresight/coresight-etm3x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -1877,17 +1877,6 @@ err_arch_supported:
- 	return ret;
+@@ -315,6 +315,13 @@ static void etm_enable_hw(void *info)
+ 	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
  }
  
--static int etm_remove(struct amba_device *adev)
--{
--	struct etm_drvdata *drvdata = amba_get_drvdata(adev);
--
--	coresight_unregister(drvdata->csdev);
--	if (--etm_count == 0)
--		unregister_hotcpu_notifier(&etm_cpu_notifier);
--
--	return 0;
--}
--
- #ifdef CONFIG_PM
- static int etm_runtime_suspend(struct device *dev)
++static int etm_cpu_id(struct coresight_device *csdev)
++{
++	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++
++	return drvdata->cpu;
++}
++
+ static int etm_trace_id(struct coresight_device *csdev)
  {
-@@ -1948,9 +1937,9 @@ static struct amba_driver etm_driver = {
- 		.name	= "coresight-etm3x",
- 		.owner	= THIS_MODULE,
- 		.pm	= &etm_dev_pm_ops,
-+		.suppress_bind_attrs = true,
- 	},
- 	.probe		= etm_probe,
--	.remove		= etm_remove,
- 	.id_table	= etm_ids,
- };
+ 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+@@ -421,6 +428,7 @@ static void etm_disable(struct coresight_device *csdev)
+ }
  
+ static const struct coresight_ops_source etm_source_ops = {
++	.cpu_id		= etm_cpu_id,
+ 	.trace_id	= etm_trace_id,
+ 	.enable		= etm_enable,
+ 	.disable	= etm_disable,
 diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 1ec6798b21e8..0edc10b44004 100644
+index 0edc10b44004..d6a92c6d3a66 100644
 --- a/drivers/hwtracing/coresight/coresight-etm4x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -2684,17 +2684,6 @@ err_coresight_register:
- 	return ret;
+@@ -63,6 +63,13 @@ static bool etm4_arch_supported(u8 arch)
+ 	return true;
  }
  
--static int etm4_remove(struct amba_device *adev)
--{
--	struct etmv4_drvdata *drvdata = amba_get_drvdata(adev);
--
--	coresight_unregister(drvdata->csdev);
--	if (--etm4_count == 0)
--		unregister_hotcpu_notifier(&etm4_cpu_notifier);
--
--	return 0;
--}
--
- static struct amba_id etm4_ids[] = {
- 	{       /* ETM 4.0 - Qualcomm */
- 		.id	= 0x0003b95d,
-@@ -2712,9 +2701,9 @@ static struct amba_id etm4_ids[] = {
- static struct amba_driver etm4x_driver = {
- 	.drv = {
- 		.name   = "coresight-etm4x",
-+		.suppress_bind_attrs = true,
- 	},
- 	.probe		= etm4_probe,
--	.remove		= etm4_remove,
- 	.id_table	= etm4_ids,
- };
- 
-diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
-index 2e36bde7fcb4..25e8ea140a09 100644
---- a/drivers/hwtracing/coresight/coresight-funnel.c
-+++ b/drivers/hwtracing/coresight/coresight-funnel.c
-@@ -226,14 +226,6 @@ static int funnel_probe(struct amba_device *adev, const struct amba_id *id)
- 	return 0;
- }
- 
--static int funnel_remove(struct amba_device *adev)
--{
--	struct funnel_drvdata *drvdata = amba_get_drvdata(adev);
--
--	coresight_unregister(drvdata->csdev);
--	return 0;
--}
--
- #ifdef CONFIG_PM
- static int funnel_runtime_suspend(struct device *dev)
++static int etm4_cpu_id(struct coresight_device *csdev)
++{
++	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++
++	return drvdata->cpu;
++}
++
+ static int etm4_trace_id(struct coresight_device *csdev)
  {
-@@ -273,9 +265,9 @@ static struct amba_driver funnel_driver = {
- 		.name	= "coresight-funnel",
- 		.owner	= THIS_MODULE,
- 		.pm	= &funnel_dev_pm_ops,
-+		.suppress_bind_attrs = true,
- 	},
- 	.probe		= funnel_probe,
--	.remove		= funnel_remove,
- 	.id_table	= funnel_ids,
- };
- 
-diff --git a/drivers/hwtracing/coresight/coresight-replicator-qcom.c b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-index 584059e9e866..444815179460 100644
---- a/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-+++ b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-@@ -156,15 +156,6 @@ static int replicator_probe(struct amba_device *adev, const struct amba_id *id)
- 	return 0;
+ 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+@@ -262,6 +269,7 @@ static void etm4_disable(struct coresight_device *csdev)
  }
  
--static int replicator_remove(struct amba_device *adev)
--{
--	struct replicator_state *drvdata = amba_get_drvdata(adev);
--
--	pm_runtime_disable(&adev->dev);
--	coresight_unregister(drvdata->csdev);
--	return 0;
--}
--
- #ifdef CONFIG_PM
- static int replicator_runtime_suspend(struct device *dev)
- {
-@@ -206,9 +197,9 @@ static struct amba_driver replicator_driver = {
- 	.drv = {
- 		.name	= "coresight-replicator-qcom",
- 		.pm	= &replicator_dev_pm_ops,
-+		.suppress_bind_attrs = true,
- 	},
- 	.probe		= replicator_probe,
--	.remove		= replicator_remove,
- 	.id_table	= replicator_ids,
- };
- 
-diff --git a/drivers/hwtracing/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
-index 963ac197c253..b77d700a3f0e 100644
---- a/drivers/hwtracing/coresight/coresight-replicator.c
-+++ b/drivers/hwtracing/coresight/coresight-replicator.c
-@@ -127,20 +127,6 @@ out_disable_pm:
- 	return ret;
- }
- 
--static int replicator_remove(struct platform_device *pdev)
--{
--	struct replicator_drvdata *drvdata = platform_get_drvdata(pdev);
--
--	coresight_unregister(drvdata->csdev);
--	pm_runtime_get_sync(&pdev->dev);
--	if (!IS_ERR(drvdata->atclk))
--		clk_disable_unprepare(drvdata->atclk);
--	pm_runtime_put_noidle(&pdev->dev);
--	pm_runtime_disable(&pdev->dev);
--
--	return 0;
--}
--
- #ifdef CONFIG_PM
- static int replicator_runtime_suspend(struct device *dev)
- {
-@@ -175,11 +161,11 @@ static const struct of_device_id replicator_match[] = {
- 
- static struct platform_driver replicator_driver = {
- 	.probe          = replicator_probe,
--	.remove         = replicator_remove,
- 	.driver         = {
- 		.name   = "coresight-replicator",
- 		.of_match_table = replicator_match,
- 		.pm	= &replicator_dev_pm_ops,
-+		.suppress_bind_attrs = true,
- 	},
- };
- 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 5b052d1e0bc6..c4fa70ed14ce 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -770,19 +770,6 @@ err_devm_kzalloc:
- 	return ret;
- }
- 
--static int tmc_remove(struct amba_device *adev)
--{
--	struct tmc_drvdata *drvdata = amba_get_drvdata(adev);
--
--	misc_deregister(&drvdata->miscdev);
--	coresight_unregister(drvdata->csdev);
--	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR)
--		dma_free_coherent(drvdata->dev, drvdata->size,
--				  drvdata->vaddr, drvdata->paddr);
--
--	return 0;
--}
--
- static struct amba_id tmc_ids[] = {
- 	{
- 		.id     = 0x0003b961,
-@@ -795,9 +782,9 @@ static struct amba_driver tmc_driver = {
- 	.drv = {
- 		.name   = "coresight-tmc",
- 		.owner  = THIS_MODULE,
-+		.suppress_bind_attrs = true,
- 	},
- 	.probe		= tmc_probe,
--	.remove		= tmc_remove,
- 	.id_table	= tmc_ids,
- };
- 
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index 7214efd10db5..ca50e73d9df7 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -172,14 +172,6 @@ static int tpiu_probe(struct amba_device *adev, const struct amba_id *id)
- 	return 0;
- }
- 
--static int tpiu_remove(struct amba_device *adev)
--{
--	struct tpiu_drvdata *drvdata = amba_get_drvdata(adev);
--
--	coresight_unregister(drvdata->csdev);
--	return 0;
--}
--
- #ifdef CONFIG_PM
- static int tpiu_runtime_suspend(struct device *dev)
- {
-@@ -223,9 +215,9 @@ static struct amba_driver tpiu_driver = {
- 		.name	= "coresight-tpiu",
- 		.owner	= THIS_MODULE,
- 		.pm	= &tpiu_dev_pm_ops,
-+		.suppress_bind_attrs = true,
- 	},
- 	.probe		= tpiu_probe,
--	.remove		= tpiu_remove,
- 	.id_table	= tpiu_ids,
- };
- 
+ static const struct coresight_ops_source etm4_source_ops = {
++	.cpu_id		= etm4_cpu_id,
+ 	.trace_id	= etm4_trace_id,
+ 	.enable		= etm4_enable,
+ 	.disable	= etm4_disable,
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index a7cabfa23b55..bf62b265bf52 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -205,12 +205,15 @@ struct coresight_ops_link {
+ /**
+  * struct coresight_ops_source - basic operations for a source
+  * Operations available for sources.
++ * @cpu_id:	returns the value of the CPU number this component
++ *		is associated to.
+  * @trace_id:	returns the value of the component's trace ID as known
+ 		to the HW.
+  * @enable:	enables tracing for a source.
+  * @disable:	disables tracing for a source.
+  */
+ struct coresight_ops_source {
++	int (*cpu_id)(struct coresight_device *csdev);
+ 	int (*trace_id)(struct coresight_device *csdev);
+ 	int (*enable)(struct coresight_device *csdev);
+ 	void (*disable)(struct coresight_device *csdev);
 -- 
 2.1.4
