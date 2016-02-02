@@ -1,85 +1,62 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 2 Feb 2016 11:15:55 -0500 (EST)
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1602021112320.1653-100000@iolanthe.rowland.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 2 Feb 2016 16:19:44 +0000
+Subject: [PATCH v2 10/21] arm64: KVM: VHE: Split save/restore of sysregs
+ shared between EL1 and EL2
+In-Reply-To: <20160202154645.GE6190@cbox>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <1453737235-16522-11-git-send-email-marc.zyngier@arm.com>
+ <20160201135438.GL1478@cbox> <56B07ADD.60300@arm.com>
+ <20160202154645.GE6190@cbox>
+Message-ID: <56B0D720.9000901@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2 Feb 2016, Ulf Hansson wrote:
-
-> On 2 February 2016 at 04:05, Tony Lindgren <tony@atomide.com> wrote:
-> > Hi,
-> >
-> > * Alan Stern <stern@rowland.harvard.edu> [160201 15:50]:
-> >>
-> >> You get here only if runtime PM is disabled, right?  So the rpm_idle
-> >> call won't do anything -- "disabled" means don't make any callbacks.
-> >
-> > Hmm sorry yes I'm confused again. Yeah it looks like calling rpm_idle
-> > just has a side effect that makes a difference here.
-> >
-> >> Tony, exactly what are you trying to do here?  Do you want this to
-> >> invoke a runtime-PM callback in the subsystem, power domain, or driver?
-> >> (Is there even a driver bound to the device when this function runs?)
-> >
-> > I guess I need to add more printks to figure out what's going on here.
-> > But yeah, I'm not seeing the callback happening at the interconnect
-> > level so hardware and PM runtime states won't match on the following
-> > probe after -EPROBE_DEFER.
-> >
-> >> The function's name suggests that it merely resets the data stored in
-> >> dev->power without actually touching the hardware.  Is that what you
-> >> really want?
-> >
-> > I guess you mean pm_runtime_set_suspended() above? I'm seeing a state
-> > where we now set pm_runtime_set_suspended() between failed device
-> > probes and the device is still active in hardware.
-> >
-> > The patch below also helps with the problem and leaves out the
-> > rpm_suspend() call from loop so it might give more hints.
-> >
-> > The difference here from what Rafael suggested earlier is calling
-> > __pm_runtime_use_autosuspend() and then not calling
-> > pm_runtime_set_suspended().
-> >
-> > However, it seems the below patch keeps hardware active in the
-> > autoidle case though, so chances are there is more that needs to
-> > be done here. Anyways, I'll try to debug it more tomorrow.
-> >
+On 02/02/16 15:46, Christoffer Dall wrote:
+> On Tue, Feb 02, 2016 at 09:46:05AM +0000, Marc Zyngier wrote:
+>> On 01/02/16 13:54, Christoffer Dall wrote:
+>>> On Mon, Jan 25, 2016 at 03:53:44PM +0000, Marc Zyngier wrote:
+>>>> A handful of system registers are still shared between EL1 and EL2,
+>>>> even while using VHE. These are tpidr*_el[01], actlr_el1, sp0, elr,
+>>>> and spsr.
+>>>
+>>> So by shared registers you mean registers that do both have an EL0/1
+>>> version as well as an EL2 version, but where accesses aren't rewritten
+>>> transparently?
+>>
+>> No, I mean that these registers do *not* have a separate banked version.
+>> There is only a single set of registers, which have to be save/restored
+>> the old way.
 > 
-> Your observations is correct. The hardware will be kept active
-> in-between the probe attempts (and thus also if probing fails).
-> Although, that's not a regression as that's the behaviour you get from
-> runtime PM, when drivers are implemented like omap_hsmmc.
-
-Perhaps this is what we should do.  If probing gets deferred a few 
-times, doing runtime suspends and resumes in between will be a waste of 
-time.
-
-> Instead of the suggested approaches, I think the regression should be
-> fixed at the PM domain level (omap hwmod). I have attached a patch
-> below, please give it try as it's untested.
+> huh, ARMv8 clearly specifies the existence of TPIDR_EL0, TPIDR_EL1, and
+> TPIDR_EL2, for example.
 > 
-> To solve the other problem (allowing devices to become inactive
-> in-between at probe failures), I see two options (not treated as
-> regressions).
-> 1)
-> Change the behaviour of pm_runtime_put_sync(), to *not* respect the
-> autosuspend mode.
-> I think I prefer this option, as it seems like autosuspend should be
-> respected only via the asynchronous runtime PM APIs.
+> I cannot seem to find anywhere in the VHE spec that says that the
+> TPIDR_EL2 goes away.  I'm confused now.
 
-?  pm_runtime_put_sync() _already_ does not respect the autosuspend 
-mode.  If you want to respect it, you have to call 
-pm_runtime_put_sync_autosuspend() instead.
+Nothing goes away, but these registers do not get renamed either. For
+example, TPIDR_EL1 doesn't magically access TPIDR_EL2 when running at
+EL2+VHE, and there is no TPIDR_EL12 accessor either.
 
-> 2)
-> Change the failing drivers, to before calling pm_runtime_put_sync()
-> also invoke pm_runtime_dont_use_autosusend(). Or other similar
-> approach.
+So TPIDR_EL1 is effectively "shared" between host and guest, and must be
+save/restored (note that the host kernel still uses TIPDR_EL1 even when
+running with VHE, and that KVM still uses TPIDR_EL2 to cache the current
+vcpu).
 
-Given the above, this seems unnecessary.
+>>
+>>>
+>>> also, by sp0 do you mean sp_el0, and by elr you mean elr_el1, and by
+>>> spsr you mean spsr_el1 ?
+>>
+>> sp0 -> sp_el0 indeed. elr and spsr really are the guest PC and PSTATE,
+>> so I should really reword this commit message, it is utterly confusing.
+>>
+> I guess I don't understand the definition of a 'shared' register given
+> your comments here...
 
-Alan Stern
+Does this make it clearer?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
