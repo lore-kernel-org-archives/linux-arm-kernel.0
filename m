@@ -1,29 +1,28 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 2 Feb 2016 14:00:22 +0100
-Subject: [PATCH v2 1/3] Input: rotary-encoder - make use of devm_* to
- simplify .probe and .remove
-In-Reply-To: <56B09968.9050705@zonque.org>
-References: <1454408678-6011-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1454408678-6011-2-git-send-email-u.kleine-koenig@pengutronix.de>
- <56B09968.9050705@zonque.org>
-Message-ID: <20160202130022.GX13664@pengutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 2 Feb 2016 11:00:33 -0200
+Subject: noise issues when recording sound on i.MX28
+In-Reply-To: <20160127144340.GD13664@pengutronix.de>
+References: <20160127105613.GC13664@pengutronix.de>
+ <CAOMZO5BpLen517q2heramSta-R6pdESkjM6w=7FRMZebY6ue-Q@mail.gmail.com>
+ <20160127144340.GD13664@pengutronix.de>
+Message-ID: <CAOMZO5AE6HwBYz7kOFORt0HTojJLSb0MYUbkb_HCshDHy=d27g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 12:56:24PM +0100, Daniel Mack wrote:
-> On 02/02/2016 11:24 AM, Uwe Kleine-K?nig wrote:
-> > For all operations called in .probe there are devm_* variants.
-> > (input_register_device is clever enough to be devm aware on its own.)
-> > This allows to get rid of the error unwind code paths in .probe and the
-> > complete .remove function.
-> 
-> While at it, could you also convert this over to the gpiod_* API?
+Hi Uwe,
 
-This is done in patch 3.
+On Wed, Jan 27, 2016 at 12:43 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
-Best regards
-Uwe
+> So you didn't hit the problem that resetting a saif didn't work, right?
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+No, we haven't seen this reset issue.
+
+> Do you have a few more technical details here? A usecase of my machine
+
+Let me find out as it has been several years I worked on this problem.
+Will let you know.
+
+Regards,
+
+Fabio Estevam
