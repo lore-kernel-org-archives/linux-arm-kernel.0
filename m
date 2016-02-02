@@ -1,68 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 2 Feb 2016 12:09:41 +0100
-Subject: [PATCH 1/3] arm64: efistub: drop __init annotation from
- handle_kernel_image()
-In-Reply-To: <20160202110821.GB2642@codeblueprint.co.uk>
-References: <1453979254-25374-1-git-send-email-ard.biesheuvel@linaro.org>
- <1453979254-25374-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160128225809.GF2571@codeblueprint.co.uk>
- <CAKv+Gu9sE4oJrFmSK8sEjTrU8A7k53Hj1S1pTyCqyA5Gsba2Kw@mail.gmail.com>
- <20160129160006.GD2611@codeblueprint.co.uk>
- <CAKv+Gu96tdf8ZrGHDi_YKacsRF_b336Nu4Anh61j4u3Lg18BHg@mail.gmail.com>
- <20160202110821.GB2642@codeblueprint.co.uk>
-Message-ID: <CAKv+Gu_rvLMFF9ssdY4GCWpdcOwaXVsaCvBTYG30NS0zw5xBWw@mail.gmail.com>
+From: yao.yuan@nxp.com (Yao Yuan)
+Date: Tue, 2 Feb 2016 11:10:41 +0000
+Subject: [PATCH] dts/ls1021a: add the DTS for QSPI support
+In-Reply-To: <20160202074907.GK8307@tiger>
+References: <1453970006-46509-1-git-send-email-yao.yuan@freescale.com>
+ <20160202074907.GK8307@tiger>
+Message-ID: <AM2PR04MB07222EF8C4A2B70D383D621789DF0@AM2PR04MB0722.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 February 2016 at 12:08, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> On Fri, 29 Jan, at 05:03:16PM, Ard Biesheuvel wrote:
->> On 29 January 2016 at 17:00, Matt Fleming <matt@codeblueprint.co.uk> wrote:
->> > On Fri, 29 Jan, at 10:36:03AM, Ard Biesheuvel wrote:
->> >> On 28 January 2016 at 23:58, Matt Fleming <matt@codeblueprint.co.uk> wrote:
->> >> >
->> >> > Would it make more sense to #undef __init in one of the arm64 efistub
->> >> > header files? I'm thinking of the case where some poor unsuspecting
->> >> > developer writes a new function and marks it as __init, and we miss it
->> >> > during review.
->> >> >
->> >>
->> >> Yes, I can add it to efistub.h, and make sure it gets included in all the files
->> >>
->> >> Should we #undef it and #define it to a string that is easily grep'ed
->> >> for, so it is easy to find the explanatory comment that goes along
->> >> with it?
->> >> E.g.,
->> >>
->> >> #define __init __init_not_supported_in_efi_stub
->> >
->> > This would produce a compilation failure if someone tags something as
->> > __init right? Looks fine to me.
->>
->> Yes, but it makes the error message difficult to decipher, since
->> __init is printed and not what it resolves to. Locally, I tried this,
->> which seems to work:
->>
->> #undef __init
->> #define __init __attribute__((__init_not_supported_in_efi_stub))
->> #pragma GCC diagnostic error "-Wattributes"
->>
->> which produces
->>
->>   CC      drivers/firmware/efi/libstub/arm-stub.o
->> /home/ard/linux-2.6/drivers/firmware/efi/libstub/arm-stub.c:24:1:
->> error: ?__init_not_supported_in_efi_stub? attribute directive ignored
->> [-Werror=attributes]
->>  {
->>  ^
->> cc1: some warnings being treated as errors
->>
->> which is slightly dodgy, but at least puts the string right in the error message
->
-> What about,
->
-> #define __init __compiletime_error("__init not supported in EFI boot stub")
->
+On Tue, Feb 02, 2016 at 03:49PM, Shawn Guo wrote:
+> On Thu, Jan 28, 2016 at 04:33:26PM +0800, Yuan Yao wrote:
+> > From: Yuan Yao <yao.yuan@nxp.com>
+> >
+> > Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
+> > ---
+> > Add in v1:
+> > Can merge, but the function depend on the patch:
+> > https://patchwork.kernel.org/patch/8118251/
+> 
+> Please send me dts patch only after the driver part gets applied.
 
-That only works for invocations, i.e., it needs to be used in header
-files, and will trigger the error if a call to the function remains
-after optimization. We want it at function definition time instead.
+Ok, I will resend the patch after the driver part gets applied.
+I just only want to speed up my upstream.
+
+> 
+> >
+> > mtd: spi-nor: fsl-quadspi: add support for ls1021a
+> >
+> > LS1021a also support Freescale Quad SPI controller.
+> > Add fsl-quadspi support for ls1021a chip and make SPI_FSL_QUADSPI
+> > selectable for LS1021A SOC hardwares.
+> >
+> > ---
+> >  arch/arm/boot/dts/ls1021a.dtsi | 15 +++++++++++++++
+> >  1 file changed, 15 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/ls1021a.dtsi
+> > b/arch/arm/boot/dts/ls1021a.dtsi index 9430a99..c764fa5 100644
+> > --- a/arch/arm/boot/dts/ls1021a.dtsi
+> > +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> > @@ -252,6 +252,21 @@
+> >  			status = "disabled";
+> >  		};
+> >
+> > +		qspi: quadspi at 1550000 {
+> > +			compatible = "fsl,ls1021a-qspi";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +			reg = <0x0 0x1550000 0x0 0x10000>,
+> > +				<0x0 0x40000000 0x0 0x4000000>;
+> > +			reg-names = "QuadSPI", "QuadSPI-memory";
+> > +			interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
+> > +			clock-names = "qspi_en", "qspi";
+> > +			clocks = <&platform_clk 1>, <&platform_clk 1>;
+> > +			big-endian;
+> > +			amba-base = <0x40000000>;
+> 
+> What is this property?  I cannot find it in any bindings doc.  Is it added by your
+> patches on driver code?
+
+Sorry, it's the legacy property, after the latest discussion we will remove this property.
+So I will remove it in the next version.
+Thanks for your review.
+
+Yuan Yao.
