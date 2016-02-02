@@ -1,78 +1,22 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 2 Feb 2016 23:31:15 +0100
-Subject: [PATCH v3 1/2] dt-bindings: add sun4i SPDIF transceiver bindings
-In-Reply-To: <1454424594-25208-2-git-send-email-codekipper@gmail.com>
-References: <1454424594-25208-1-git-send-email-codekipper@gmail.com>
- <1454424594-25208-2-git-send-email-codekipper@gmail.com>
-Message-ID: <20160202223115.GE4652@lukather>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 2 Feb 2016 16:43:48 -0600
+Subject: [PATCH 02/11] mfd: axp20x: Add bindings for AXP809 PMIC
+In-Reply-To: <1454408864-24112-3-git-send-email-wens@csie.org>
+References: <1454408864-24112-1-git-send-email-wens@csie.org>
+ <1454408864-24112-3-git-send-email-wens@csie.org>
+Message-ID: <20160202224348.GA15250@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Feb 02, 2016 at 03:49:53PM +0100, codekipper at gmail.com wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
+On Tue, Feb 02, 2016 at 06:27:35PM +0800, Chen-Yu Tsai wrote:
+> This patch adds the basic and regulator bindings for the X-Powers AXP809
+> PMIC.
 > 
-> Add devicetree bindings for the SPDIF transceiver found on
-> found on Allwinners A10 and A20 SoCs.
+> Also update the DC-DC converter operating frequency for AXP22X/AXP80X.
 > 
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  .../devicetree/bindings/sound/sun4i,spdif.txt      | 46 ++++++++++++++++++++++
->  1 file changed, 46 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sound/sun4i,spdif.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/sound/sun4i,spdif.txt b/Documentation/devicetree/bindings/sound/sun4i,spdif.txt
-> new file mode 100644
-> index 0000000..55ed2f6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/sun4i,spdif.txt
-> @@ -0,0 +1,46 @@
-> +Allwinner Sony/Philips Digital Interface Format (S/PDIF) Controller
-> +
-> +The Allwinner S/PDIF audio block is a transceiver that allows the
-> +processor to receive and transmit digital audio via an coaxial cable or
-> +a fibre cable.
-> +
-> +Required properties:
-> +
-> +  - compatible		: should be one of the following:
-> +    - "allwinner,sun4i-a10-spdif": for the Allwinner A10 SoC
-> +
-> +  - reg			: Offset and length of the register set for the device.
-> +
-> +  - interrupts		: Contains the spdif interrupt.
-> +
-> +  - dmas		: Generic dma devicetree binding as described in
-> +			  Documentation/devicetree/bindings/dma/dma.txt.
-> +
-> +  - dma-names		: Two dmas have to be defined, "tx" and "rx".
-> +
-> +  - clocks		: Contains an entry for each entry in clock-names.
-> +
-> +  - clock-names		: Includes the following entries:
-> +	"apb"		  clock for the spdif bus.
-> +	"spdif"		  clock for spdif controller.
-> +
-> +Optional:
-> +
-> +  - spdif-in		: Enable block for capturing an SPDIF signal.
-> +
-> +  - spdif-out		: Enable block for transmitting an SPDIF signal.
+>  Documentation/devicetree/bindings/mfd/axp20x.txt | 31 ++++++++++++++++++++++--
+>  1 file changed, 29 insertions(+), 2 deletions(-)
 
-Is that a generic property? What values can it hold?
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160202/b55261c4/attachment.sig>
+Acked-by: Rob Herring <robh@kernel.org>
