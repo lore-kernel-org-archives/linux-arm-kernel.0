@@ -1,63 +1,66 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 2 Feb 2016 12:51:16 -0500 (EST)
-Subject: [PATCH 0/3] kallsyms: remove special handling for CONFIG_ARM
-In-Reply-To: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <alpine.LFD.2.20.1602021250200.32766@knanqh.ubzr>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 2 Feb 2016 12:51:38 -0500
+Subject: [PATCH] recordmcount: arm: Implement make_nop
+In-Reply-To: <20160202173141.GB9044@debian>
+References: <1454116686-30190-1-git-send-email-sboyd@codeaurora.org>
+ <20160130184005.GA29607@debian>
+ <20160201194432.GK4848@codeaurora.org>
+ <20160202173141.GB9044@debian>
+Message-ID: <20160202125138.71606201@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2 Feb 2016, Ard Biesheuvel wrote:
+On Tue, 2 Feb 2016 18:31:41 +0100
+Rabin Vincent <rabin@rab.in> wrote:
 
-> This series applies on top of today's -next, and addresses an issue with
-> the new kallsyms code that is queued there, that enables base relative
-> kallsyms tables for all architectures (except IA-64)
+> On Mon, Feb 01, 2016 at 11:44:32AM -0800, Stephen Boyd wrote:
+> > On 01/30, Rabin Vincent wrote:  
+> > > For __gnu_mcount_nc, wouldn't it be better to replace both the push {lr}
+> > > and the bl with nop instructions, instead of keeping a (useless) push +
+> > > pop sequence?  
+> > 
+> > Agreed. I was trying to do a 1-to-1 copy of the ftrace code on
+> > ARM.  I was wondering the same thing in that code path while
+> > doing this though. Can't we replace both instructions instead of
+> > one instruction when we're patching in nops at runtime?  
 > 
-> Two issues have surfaced on ARM with the new kallsyms code:
-> a) CONFIG_HAVE_TCM creates a virtual region that is too far away for the
->    relative kallsyms code to reach it;
-> b) CONFIG_XIP_KERNEL=y kernel symbols are not filtered against PAGE_OFFSET,
->    as is the case for kernels that execute from RAM, resulting in symbols
->    that are out of range.
+> As Steven pointed out the last time this came up, we can't do it safely
+> at runtime:
 > 
-> Since the way kallsyms deals with XIP kernels on ARM leaves some room for
-> improvement regardless of the base relative changes, this series proposes
-> a fix that allows the special case to be removed from the kallsyms handling
-> entirely.
-> 
-> Patch #1 moves the .stubs and .vectors section back into the kernel VMA, while
-> preserving the guaranteed virtual offset of 4 KB. This results in all symbols
-> that kallsyms sees to be in a reasonable interval.
-> 
-> Patch #2 removes the special case for CONFIG_ARM && !CONFIG_XIP_KERNEL in the
-> invocation of scripts/kallsyms
-> 
-> Patch #3 removes the now unused --page-offset command line argument handling
-> from scripts/kallsyms.c
-> 
-> Note that we may still need to remove ARM from the list of architectures that
-> support base relative kallsyms tables if we cannot fix issue a) above, but
-> removing this special case seemed like an obvious improvement to me.
+> https://marc.info/?l=linux-arm-kernel&m=132517584531389&w=2
 
-For those 3 patches:
+There is actually a way to do it, but it requires break points.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+	push lr
+	call mcount
 
+Now add a break point:
 
+	brk
+	call mcount
 
-> 
-> Ard Biesheuvel (3):
->   ARM: move .vectors and .stubs sections back into the kernel VMA
->   kallsyms: remove special lower address limit for CONFIG_ARM
->   kallsyms: remove --page-offset command line option
-> 
->  arch/arm/kernel/entry-armv.S  |  7 +++--
->  arch/arm/kernel/vmlinux.lds.S | 15 ++++++-----
->  scripts/kallsyms.c            | 27 ++++----------------
->  scripts/link-vmlinux.sh       |  4 ---
->  4 files changed, 16 insertions(+), 37 deletions(-)
-> 
-> -- 
-> 2.5.0
-> 
-> 
+Anything that hits the breakpoint, have it return after the call to
+mcount.
+
+Sync all CPUs where tasks have either hit the breakpoint and is
+skipping the mcount regardless, or has already done the push lr and
+is calling mcount. To be even more paranoid, you could add a step to:
+
+	brk
+	brk
+
+and if the second brkpoint is hit, then call mcount to make sure it
+does the necessary step with lr. Again sync the CPUS (which is simply
+just sending an IPI to all of them).
+
+Once the breakpoints are in place, you can convert them over to nops.
+
+	brk
+	nop
+
+and then to
+
+	nop
+	nop
+
+-- Steve
