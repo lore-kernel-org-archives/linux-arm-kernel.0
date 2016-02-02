@@ -1,19 +1,35 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 2 Feb 2016 16:14:46 +0800
-Subject: [PATCH 1/2] ARM: imx_v6_v7_defconfig: Select
- CONFIG_NVMEM_IMX_OCOTP
-In-Reply-To: <1454164508-10831-1-git-send-email-festevam@gmail.com>
-References: <1454164508-10831-1-git-send-email-festevam@gmail.com>
-Message-ID: <20160202081446.GN8307@tiger>
+From: johannes@sipsolutions.net (Johannes Berg)
+Date: Tue, 02 Feb 2016 09:16:48 +0100
+Subject: [PATCH v2 2/2] arm/mach-imx: enable big endian mode
+In-Reply-To: <20160202053304.GA8307@tiger>
+References: <1453913976-30619-1-git-send-email-johannes@sipsolutions.net>
+ <1453913976-30619-3-git-send-email-johannes@sipsolutions.net>
+ <20160202053304.GA8307@tiger>
+Message-ID: <1454401008.2926.0.camel@sipsolutions.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 30, 2016 at 12:35:07PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> Select the i.mx ocotp driver.
-> 
-> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+On Tue, 2016-02-02 at 13:33 +0800, Shawn Guo wrote:
+>?
+> We conventionally use "ARM: imx: ..." as the subject for IMX platform
+> patches.
 
-Applied both, thanks.
+Fair enough. I thought I saw this style used in the git log, but I may
+very well be mistaken :)
+
+> > +++ b/arch/arm/mach-imx/Kconfig
+> > @@ -9,6 +9,7 @@ menuconfig ARCH_MXC
+> > ?	select PM_OPP if PM
+> > ?	select SOC_BUS
+> > ?	select SRAM
+> > +	select ARCH_SUPPORTS_BIG_ENDIAN
+> 
+> It should be added in alphabetical order.
+
+Heh, ok.
+
+> I fixed these two minor things and applied both patches.
+
+Great, thanks!
+
+johannes
