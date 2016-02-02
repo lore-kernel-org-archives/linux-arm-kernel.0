@@ -1,37 +1,55 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 2 Feb 2016 11:50:03 +0100
-Subject: [PATCH 1/2] Document: i2c: Add a dt binding for mediatek MT2701
- soc
-In-Reply-To: <20160108074523.GA1523@katana>
-References: <1451888138-11471-1-git-send-email-liguo.zhang@mediatek.com>
- <20160104095511.GB1524@katana> <1452215573.2088.1.camel@mhfsdcap03>
- <20160108074523.GA1523@katana>
-Message-ID: <56B089DB.5060806@gmail.com>
+Date: Tue, 2 Feb 2016 12:06:12 +0100
+Subject: [PATCH v2 3/3] ARM64: dts: mt8173: Add CPU OPP, clock and
+ regulator supply properties
+In-Reply-To: <20160105102455.GA30120@ubuntu>
+References: <1451197318-12418-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1451197318-12418-4-git-send-email-pi-cheng.chen@linaro.org>
+ <20151228031340.GD3598@ubuntu> <3310024.mO5K6yH9vU@wuerfel>
+ <20160105102455.GA30120@ubuntu>
+Message-ID: <56B08DA4.8070207@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 08/01/16 08:45, Wolfram Sang wrote:
-> On Fri, Jan 08, 2016 at 09:12:53AM +0800, liguo zhang wrote:
->> On Mon, 2016-01-04 at 10:55 +0100, Wolfram Sang wrote:
->>> On Mon, Jan 04, 2016 at 02:15:37PM +0800, Liguo Zhang wrote:
->>>> Add a dt binding for the MT2701 soc.
+On 05/01/16 11:24, Viresh Kumar wrote:
+> On 05-01-16, 11:21, Arnd Bergmann wrote:
+>> On Monday 28 December 2015 08:43:40 Viresh Kumar wrote:
+>>> On 27-12-15, 14:21, Pi-Cheng Chen wrote:
+>>>> Add operating-points-v2, clock, and regulator supply properties
+>>>> required by mt8173-cpufreq driver to enable it.
 >>>>
->>>> Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
+>>>> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+>>>> ---
+>>>> This patch is based on the patch[1] that adds underlying clock MUX for
+>>>> MT8173 which is needed by mt8173-cpufreq driver but not yet picked.
+>>>>
+>>>> [1] http://article.gmane.org/gmane.linux.kernel.clk/325
+>>>> ---
+>>>>   arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 18 ++++++
+>>>>   arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 90 +++++++++++++++++++++++++++++
+>>>>   2 files changed, 108 insertions(+)
 >>>
->>> This should probably go with the other patch via arm-soc, or?
+>>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>>
 >>
->> The patch about i2c dts info for MT2701 depends on the MT2701 clock
->> patch. After the MT2701 clock patch is accepted, the i2c patch for
->> MT2701 may be accepted.
+>> This patch is now in linux-next through Rafael's pm tree, and it breaks the
+>> arm64 build:
+>>
+>>          arm64-defconfig
+>> Error: ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:132.24-25 syntax error
+>>
+>>
+>> Please revert.
+>>
+>> In the future, please send all dts changes through the proper maintainer
+>> channels (-> Mattias -> arm-soc), and make sure they actually build.
 >
-> OK. Still, dts changes go via arm-soc 99% of the cases if there is no
-> specific need to go via i2c.
+> Rafael has already reverted that, AFAIK, after Mark Brown reported the
+> build issue.
 >
 
-No specific need here. I will take it through my branch as soon as the 
-clock driver is accepted.
+Applied to v4.5-next/dts
 
-Liguo, please poke me on this, when this has happened and you have the 
-feeling, I forgot about.
+Thanks.
