@@ -1,42 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 02 Feb 2016 22:34:22 +0100
-Subject: [PATCH] ARM: mx25: Add basic suspend/resume support
-In-Reply-To: <1454447886-4045-1-git-send-email-festevam@gmail.com>
-References: <1454447886-4045-1-git-send-email-festevam@gmail.com>
-Message-ID: <4987443.OL55qNe4Wb@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 02 Feb 2016 22:37:52 +0100
+Subject: [PATCH v8 0/2] Add Rockchip Inno-HDMI driver
+In-Reply-To: <1454049768-30872-1-git-send-email-ykk@rock-chips.com>
+References: <1454049768-30872-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <33063104.hTo1MPWOYh@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 February 2016 19:18:06 Fabio Estevam wrote:
-> +#ifdef CONFIG_PM
-> +static int imx25_suspend_enter(suspend_state_t state)
-> +{
-> +       switch (state) {
-> +       case PM_SUSPEND_MEM:
-> +               cpu_do_idle();
-> +               break;
-> +       default:
-> +               return -EINVAL;
-> +       }
-> +
-> +       return 0;
-> +}
-> +#else
-> +static inline int imx25_suspend_enter(suspend_state_t state)
-> +{
-> +       return 0;
-> +}
-> +#endif
-> 
+Hi Mark,
 
-Better remove the #ifdef by doing
+Am Freitag, 29. Januar 2016, 14:42:48 schrieb Yakir Yang:
+> Here are a brief introduction to Innosilicon HDMI IP:
+>   - Support HDMI 1.4a, HDCP 1.2 and DVI 1.0 standard compliant transmitter
+>   - Support HDMI1.4 a/b 3D function defined in HDMI 1.4 a/b spec
+>   - Digital video interface supports a pixel size of 24, 30, 36, 48bits
+> color depth in RGB - S/PDIF output supports PCM, Dolby Digital, DTS digital
+> audio transmission (32-192kHz Fs) using IEC60958 and IEC 61937
+>   - The EDID and CEC function are also supported by Innosilicon HDMI
+> Transmitter Controlle
 
-void __init imx25_pm_init(void)
-{
-	if (IS_ENABLED(CONFIG_PM))
-		suspend_set_ops(&imx25_suspend_ops);
-}
+do you plan on picking up this two patches soon? It seems there were no 
+further objections.
 
-or put the IS_ENABLED() check inside of imx25_suspend_enter().
+Caesar submitted the dts parts but I need to hold off on them until you took 
+the driver part :-) .
 
-	Arnd
+
+Thanks
+Heiko
