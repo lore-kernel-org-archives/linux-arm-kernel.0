@@ -1,47 +1,61 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Tue, 2 Feb 2016 11:33:08 +0200
-Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
-In-Reply-To: <20160121091437.GT7192@pali>
-References: <20160106174713.GL12777@atomide.com> <568D5669.4040801@gmail.com>
- <20160106182650.GM12777@atomide.com> <568D5F54.7040900@gmail.com>
- <20160107180700.GN12777@atomide.com> <568EDC8D.7070205@gmail.com>
- <20160108022619.GS12777@atomide.com> <568F4596.8020206@gmail.com>
- <20160108075913.GN11364@pali> <569052FE.1040008@gmail.com>
- <20160121091437.GT7192@pali>
-Message-ID: <56B077D4.3030902@gmail.com>
+From: wdc@rock-chips.com (David.Wu)
+Date: Tue, 2 Feb 2016 17:38:43 +0800
+Subject: [PATCH] PM / AVS: rockchip-io: add GRF and PMUGRF types to
+ distinguish
+In-Reply-To: <5354361.hQXgJ7cEGx@diego>
+References: <1454155305-55516-1-git-send-email-david.wu@rock-chips.com>
+ <5387650.lAgTxexlF2@phil> <56AF1D4E.40307@rock-chips.com>
+ <5354361.hQXgJ7cEGx@diego>
+Message-ID: <56B07923.9020900@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Heiko,
 
-Hi,
-
-On 21.01.2016 11:14, Pali Roh?r wrote:
-> On Saturday 09 January 2016 02:23:26 Ivaylo Dimitrov wrote:
->> Hi,
->>
->> On  8.01.2016 09:59, Pali Roh?r wrote:
->>> On Friday 08 January 2016 07:13:58 Ivaylo Dimitrov wrote:
->>>> And it looks like the problems happens sometimes on oops too.
->>>
->>> In linux-n900 tree is enabled mtdoops driver which store oops to
->>> specified MTD device. So maybe this access cause it?
->>>
->>
->> The key word here is "sometimes". i.e sometimes it hapens on normal reboot,
->> sometimes it happens on oops.
+? 2016/2/2 5:17, Heiko St?bner ??:
+> Hi David,
 >
-> So where is problem? In omap-gpmc? mtd? onenand? or ubifs? Or in
-> different component? Do we know at least this?
+> Am Montag, 1. Februar 2016, 16:54:38 schrieb David.Wu:
+>> ? 2016/1/30 20:39, Heiko Stuebner ??:
+>>> Am Samstag, 30. Januar 2016, 20:01:45 schrieb David Wu:
+>>>> As rk3368 contained two separated iodomain areas, this was
+>>>> determined to use which regmap base address.
+>>>>
+>>>> Signed-off-by: David Wu <david.wu@rock-chips.com>
+>>> I don't think we need to specify this on a driver level. Both GRF areas
+>>> are
+>>> "General register files" only located in two separate power-domains.
+>>> So the rockchip,grf property should work for both. Especially as nothing
+>>> keeps designers from introducing yet another GRF-area somewhere else ;-)
+>>>
+>>> >From when I started working on the rk3368, I still have a preliminary
+>>>
+>>> patches for that sitting here, so I've attached on how I envisoned that to
+>>> work.
+>> Okay, i agree to you, but it make someone a little confused just from
+>> the drive code,
+>> not DT file,  about  pmugrf regmap base address.:-)
+>>
+>> How do you feel about intergating GRF and PMU drivers in one driver?
+>> Thanks!
+> I will very strongly disagree here ;-) .
+> Similar to the power-domains being part of the pmu, the io-domains are
+> part of their individual GRFs. So if you want it really clean and tidy the way
+> to go foward will be the attached patches. Compile-tested only.
+
+Thanks for your reply, the patchs look better than mine.
+I have tested them on sdk board and i found something may be wrong.
+"parent->of_node" instead of "parent", as the parent is not null if 
+parent-node not used.
+         if (parent->of_node) {
+             iod->grf = syscon_node_to_regmap(parent->of_node);
+         } else {
+             dev_dbg(&pdev->dev, "falling back to old binding\n");
+             iod->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
+         }
+
+> Other things like the usbphy control should move there as well in the long
+> run. But that's not immediate necessary.
 >
-
-I think I made some progress on the issue, it seems I have to have 
-*both* e7b11dc7b77bfce0a351230a5feeadc1d0bba997 
-(e7b11dc7b77bfce0a351230a5feeadc1d0bba997) reverted *and* 
-HWMOD_INIT_NO_RESET restored in omap3xxx_gpmc_hwmod flags to have 
-working onenand.
-
-Tony, shall I hardcode GPMC_CS_CONFIG4 OEONTIME to be the same as NOLO's 
-or it does not make sense?
-
-Regards,
-Ivo
+>
+> Heiko
