@@ -1,61 +1,35 @@
-From: wdc@rock-chips.com (David.Wu)
-Date: Tue, 2 Feb 2016 17:38:43 +0800
-Subject: [PATCH] PM / AVS: rockchip-io: add GRF and PMUGRF types to
- distinguish
-In-Reply-To: <5354361.hQXgJ7cEGx@diego>
-References: <1454155305-55516-1-git-send-email-david.wu@rock-chips.com>
- <5387650.lAgTxexlF2@phil> <56AF1D4E.40307@rock-chips.com>
- <5354361.hQXgJ7cEGx@diego>
-Message-ID: <56B07923.9020900@rock-chips.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Feb 2016 10:44:07 +0100
+Subject: [PATCH 03/11] drivers: rtc: allow compilation of sun6i RTC for
+ all sunxi SoCs
+In-Reply-To: <1454348370-3816-4-git-send-email-andre.przywara@arm.com>
+References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
+ <1454348370-3816-4-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160202094407.GL4652@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Mon, Feb 01, 2016 at 05:39:22PM +0000, Andre Przywara wrote:
+> At the moment the "sun6i" RTC drivers depends on having two specific
+> SoC families selected.
+> The Allwinner A64 SoC has the same RTC, so extend the Kconfig option
+> to allow inclusion of the driver for all Allwinner SoCs.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-? 2016/2/2 5:17, Heiko St?bner ??:
-> Hi David,
->
-> Am Montag, 1. Februar 2016, 16:54:38 schrieb David.Wu:
->> ? 2016/1/30 20:39, Heiko Stuebner ??:
->>> Am Samstag, 30. Januar 2016, 20:01:45 schrieb David Wu:
->>>> As rk3368 contained two separated iodomain areas, this was
->>>> determined to use which regmap base address.
->>>>
->>>> Signed-off-by: David Wu <david.wu@rock-chips.com>
->>> I don't think we need to specify this on a driver level. Both GRF areas
->>> are
->>> "General register files" only located in two separate power-domains.
->>> So the rockchip,grf property should work for both. Especially as nothing
->>> keeps designers from introducing yet another GRF-area somewhere else ;-)
->>>
->>> >From when I started working on the rk3368, I still have a preliminary
->>>
->>> patches for that sitting here, so I've attached on how I envisoned that to
->>> work.
->> Okay, i agree to you, but it make someone a little confused just from
->> the drive code,
->> not DT file,  about  pmugrf regmap base address.:-)
->>
->> How do you feel about intergating GRF and PMU drivers in one driver?
->> Thanks!
-> I will very strongly disagree here ;-) .
-> Similar to the power-domains being part of the pmu, the io-domains are
-> part of their individual GRFs. So if you want it really clean and tidy the way
-> to go foward will be the attached patches. Compile-tested only.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Thanks for your reply, the patchs look better than mine.
-I have tested them on sdk board and i found something may be wrong.
-"parent->of_node" instead of "parent", as the parent is not null if 
-parent-node not used.
-         if (parent->of_node) {
-             iod->grf = syscon_node_to_regmap(parent->of_node);
-         } else {
-             dev_dbg(&pdev->dev, "falling back to old binding\n");
-             iod->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
-         }
+Thanks!
+Maxime
 
-> Other things like the usbphy control should move there as well in the long
-> run. But that's not immediate necessary.
->
->
-> Heiko
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160202/52e72ac3/attachment-0001.sig>
