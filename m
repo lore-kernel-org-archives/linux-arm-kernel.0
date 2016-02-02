@@ -1,98 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  2 Feb 2016 18:56:42 +0100
-Subject: [RFC PATCH 3/3] arm64: remove the now unneeded relocate_initrd()
-In-Reply-To: <1454435802-7604-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1454435802-7604-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1454435802-7604-4-git-send-email-ard.biesheuvel@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Feb 2016 19:02:27 +0100
+Subject: [PATCH 08/11] clk: sunxi: improve error reporting for the mux
+ clock
+In-Reply-To: <1454348370-3816-9-git-send-email-andre.przywara@arm.com>
+References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
+ <1454348370-3816-9-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160202180227.GC4652@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/setup.c | 64 --------------------
- 1 file changed, 64 deletions(-)
+On Mon, Feb 01, 2016 at 05:39:27PM +0000, Andre Przywara wrote:
+> clk_register_mux returns a pointer wrapped error value in case of
+> failure, so a simple NULL check is not sufficient to catch errors.
+> Fix that and elaborate on the failure reason on the way. The whole
+> function does not return any error value, so silently failing may
+> leave users scratching their heads because the kernel does not
+> provide any clues on what's wrong.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 8119479147db..1a8ef35b03d4 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -223,69 +223,6 @@ static void __init request_standard_resources(void)
- 	}
- }
- 
--#ifdef CONFIG_BLK_DEV_INITRD
--/*
-- * Relocate initrd if it is not completely within the linear mapping.
-- * This would be the case if mem= cuts out all or part of it.
-- */
--static void __init relocate_initrd(void)
--{
--	phys_addr_t orig_start = __virt_to_phys(initrd_start);
--	phys_addr_t orig_end = __virt_to_phys(initrd_end);
--	phys_addr_t ram_end = memblock_end_of_DRAM();
--	phys_addr_t new_start;
--	unsigned long size, to_free = 0;
--	void *dest;
--
--	if (orig_end <= ram_end)
--		return;
--
--	/*
--	 * Any of the original initrd which overlaps the linear map should
--	 * be freed after relocating.
--	 */
--	if (orig_start < ram_end)
--		to_free = ram_end - orig_start;
--
--	size = orig_end - orig_start;
--	if (!size)
--		return;
--
--	/* initrd needs to be relocated completely inside linear mapping */
--	new_start = memblock_find_in_range(0, PFN_PHYS(max_pfn),
--					   size, PAGE_SIZE);
--	if (!new_start)
--		panic("Cannot relocate initrd of size %ld\n", size);
--	memblock_reserve(new_start, size);
--
--	initrd_start = __phys_to_virt(new_start);
--	initrd_end   = initrd_start + size;
--
--	pr_info("Moving initrd from [%llx-%llx] to [%llx-%llx]\n",
--		orig_start, orig_start + size - 1,
--		new_start, new_start + size - 1);
--
--	dest = (void *)initrd_start;
--
--	if (to_free) {
--		memcpy(dest, (void *)__phys_to_virt(orig_start), to_free);
--		dest += to_free;
--	}
--
--	copy_from_early_mem(dest, orig_start + to_free, size - to_free);
--
--	if (to_free) {
--		pr_info("Freeing original RAMDISK from [%llx-%llx]\n",
--			orig_start, orig_start + to_free - 1);
--		memblock_free(orig_start, to_free);
--	}
--}
--#else
--static inline void __init relocate_initrd(void)
--{
--}
--#endif
--
- u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
- 
- void __init setup_arch(char **cmdline_p)
-@@ -320,7 +257,6 @@ void __init setup_arch(char **cmdline_p)
- 	acpi_boot_table_init();
- 
- 	paging_init();
--	relocate_initrd();
- 
- 	kasan_init();
- 
+Applied, thanks.
+
+Any chance you do that for the other functions? :)
+
+Thanks!
+Maxime
+
 -- 
-2.5.0
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160202/d0225674/attachment-0001.sig>
