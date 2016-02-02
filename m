@@ -1,63 +1,32 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 2 Feb 2016 12:36:15 +0000
-Subject: Tegra baseline test results for v4.5-rc2
-Message-ID: <56B0A2BF.5050301@nvidia.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 2 Feb 2016 14:43:12 +0200
+Subject: [PATCH 0/5] ARM: davinci: Add dma_slave_map to board files
+Message-ID: <1454416997-14230-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.5-rc2.
-Logs and other details at:
+Hi,
 
-    https://nvtb.github.io//linux/test_v4.5-rc2/20160131183102/
+The following series adds the dma_slave map to the edma driver. The
+dma_slave_map is needed later when we convert drivers to use the new dmaengine
+API for requesting slave channels.
 
+Regards,
+Peter
+---
+Peter Ujfalusi (5):
+  ARM: davinci: devices-da8xx: Add dma_slave_map to edma
+  ARM: davinci: dm355: Add dma_slave_map to edma
+  ARM: davinci: dm365: Add dma_slave_map to edma
+  ARM: davinci: dm644x: Add dma_slave_map to edma
+  ARM: davinci: dm646x: Add dma_slave_map to edma
 
-Test summary
-------------
+ arch/arm/mach-davinci/devices-da8xx.c | 46 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-davinci/dm355.c         | 20 +++++++++++++++
+ arch/arm/mach-davinci/dm365.c         | 22 +++++++++++++++++
+ arch/arm/mach-davinci/dm644x.c        | 12 +++++++++
+ arch/arm/mach-davinci/dm646x.c        | 11 +++++++++
+ 5 files changed, 111 insertions(+)
 
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 2/ 2): qemu-vexpress64, tegra210-p2371-0000
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.5-rc1 (92e963f50fc74041b5e9e744c330dca48e04f08d)):
-   text     data      bss    total  kernel
-+750723   +22368   +19968  +793059  defconfig
-   +640     +128        0     +768  multi_v7_defconfig
-   +475     +120        0     +595  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.5-rc1 (92e963f50fc74041b5e9e744c330dca48e04f08d))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+-- 
+2.7.0
