@@ -1,68 +1,97 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 2 Feb 2016 16:42:12 +0100
-Subject: [PATCH v2 06/21] arm64: KVM: VHE: Patch out use of HVC
-In-Reply-To: <56AF95C0.3080006@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <1453737235-16522-7-git-send-email-marc.zyngier@arm.com>
- <20160201131634.GI1478@cbox> <56AF5ED8.7010303@arm.com>
- <20160201153635.GH15514@e104818-lin.cambridge.arm.com>
- <56AF85D8.7080907@arm.com>
- <CAKv+Gu9_KG7Zss3g1OMzcnRKQFhCcYtbSDEk-gwwgqPP-R6DOA@mail.gmail.com>
- <56AF95C0.3080006@arm.com>
-Message-ID: <20160202154212.GD6190@cbox>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Tue, 2 Feb 2016 18:43:31 +0300
+Subject: [PATCH 1/5] all: s390: move wrapper infrastructure to generic
+ headers
+In-Reply-To: <20160202073913.GB3990@osiris>
+References: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
+ <1453741047-5498-2-git-send-email-ynorov@caviumnetworks.com>
+ <20160128121618.GB5418@osiris> <20160128163109.GA8529@yury-N73SV>
+ <20160201114251.GB973@yury-N73SV> <20160202073913.GB3990@osiris>
+Message-ID: <20160202154331.GA3003@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 05:28:32PM +0000, Marc Zyngier wrote:
-> On 01/02/16 17:08, Ard Biesheuvel wrote:
-> > On 1 February 2016 at 17:20, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >> On 01/02/16 15:36, Catalin Marinas wrote:
-> >>> On Mon, Feb 01, 2016 at 01:34:16PM +0000, Marc Zyngier wrote:
-> >>>> On 01/02/16 13:16, Christoffer Dall wrote:
-> >>>>> On Mon, Jan 25, 2016 at 03:53:40PM +0000, Marc Zyngier wrote:
-> >>>>>> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-> >>>>>> index 93e8d983..9e0683f 100644
-> >>>>>> --- a/arch/arm64/kvm/hyp/hyp-entry.S
-> >>>>>> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
-> >>>>>> @@ -38,6 +38,32 @@
-> >>>>>>    ldp     x0, x1, [sp], #16
-> >>>>>>  .endm
-> >>>>>>
-> >>>>>> +.macro do_el2_call
-> >>>>>> +  /*
-> >>>>>> +   * Shuffle the parameters before calling the function
-> >>>>>> +   * pointed to in x0. Assumes parameters in x[1,2,3].
-> >>>>>> +   */
-> >>>>>> +  stp     lr, xzr, [sp, #-16]!
-> >>>>>
-> >>>>> remind me why this pair isn't just doing "str" instead of "stp" with the
-> >>>>> xzr ?
-> >>>>
-> >>>> Because SP has to be aligned on a 16 bytes boundary at all times.
-> >>>
-> >>> You could do something like:
-> >>>
-> >>>       sub     sp, sp, #16
-> >>>       str     lr, [sp]
-> >>>
-> >>
-> >> Ah, fair enough. I'll fold that in.
-> >>
+On Tue, Feb 02, 2016 at 08:39:13AM +0100, Heiko Carstens wrote:
+> On Mon, Feb 01, 2016 at 02:42:51PM +0300, Yury Norov wrote:
+> > Hi Heiko,
 > > 
-> > Since we're micro-reviewing: what's wrong with
+> > I tried this idea, and I don't like what happened.
+> >  - Wrappers around safe syscalls does exist. We can remove it by
+> >    overcomplicating __SC_COMPAT_CAST, but I don't like it.
+> >  - We still need to declare numerous list of new compat syscalls.
+> >    And it becomes even bigger, as we need to declare all compat
+> >    syscall versions not declared in include/linux/compat.h already.
+> >    (Currently - only for unsafe syscalls.)
+> >  - 'Weak' trick doesn't work for the whole kernel, so we'd figure out
+> >    some new prefix for wrapped syscalls. Or declare all non-compat
+> >    syscalls explicitly with SYSCALL_COMPAT_DEFINE. So the list of
+> >    replacements grow. And for me, it's harder to explain why we are
+> >    wrapping safe syscalls. Or we introduce another bunch of useless
+> >    wrappers (with new prefix), and have to handle it in non-compat code.
+> >  - With all listed above, we move all wrapper logic to non-compat
+> >    'include/linux/syscalls.h' header. Which is not a good idea, if it
+> >    doesn't benefit us much in return.
 > > 
-> > str lr, [sp, #-16]!
+> > > > No need to look up if a compat variant (or wrapper) exists or
+> > > > sys_<syscallname> should be used instead. Also no possibility for security
+> > > > bugs that could creep in because SYSCALL_DEFINE has been used instead of
+> > > > SYSCALL_DEFINE_WRAP.
 > > 
-> > ?
+> > I thought again about it. With current version, it's very easy to
+> > define whether we have wrapper or not - just by macro we use. Once
+> > reviewed, this list is hardly to be changed frequently. If someone is
+> > introducing new syscall, it will attract much attention, so security
+> > risk is minimal.
 > > 
+> > Maybe I missed some elegant implementation, and if so  I'll be happy
+> > if someone'll point me out. But with what I see, I'd vote for what we
+> > have now. (Plus description in docs, plus renaming new macro.)
 > 
-> I suspect that on most micro-architectures, a register writeback is
-> going to be slower than doing the sub independently.
+> Well, I'd like to have some proof by the compiler or linker that nothing
+> went wrong. Which seems hard if only selected system call defines will be
+> converted to the new defines.
 > 
-> I may be wrong, though.
+> How can you tell that nothing has been forgotten?
 > 
-For the record, I don't mind it the way it was in the original patch
-either, I was just curious about the store of xzr and had forgottten the
-stack alignment thing.
+> Also, what happens if the prototype of a system call get's changed shortly
+> after it was merged. We might miss such changes and have bugs.
+> 
 
--Christoffer
+As for now, there's no such proof, and everything is OK. Syscall ABI
+is extremely conservative, and Greg KH, and other people spent a lot
+of efforts to keep it that way. This is the only reason for me to not
+worry much about it. Modification of syscall ABI is virtually
+impossible now, because it breaks binary compatibility. Even addition
+of new syscall is very difficult procedure.
+(Documentation/adding-syscalls.txt begins with section "System Call
+Alternatives".)
+
+We can invent some protection, but it will cost us in complexity and/or
+runtime delays. Because syscall ABI is so stable, I think it's OK to
+review wrappers carefully once, and they will be fine for long time.
+
+> Therefore, and to get to a solution, I think we should stick with your
+> first idea, which only moves the compat_wrapper.c file.
+> 
+> Before doing that I think you should actually revert this patch: my commit
+> 7681df456f97 ("s390/compat: remove superfluous compat wrappers") probably
+> wasn't a very bright idea :)
+> 
+
+This patch is OK for me. pid_t, uid_t, gid_t, unsigned and signed int
+types are all 32-bit both on LP64 and ILP32. Normally, compiler should
+care about top halves... Did I miss something?
+
+> This again allows me to use only compat system calls in s390's system call
+> table (execpt for system calls without parameters, but that can be easily
+> fixed).
+> 
+> What I still don't like is that you need to add all the protoypes. Why are
+> the system call tables actually written in C and not in asm?
+
+Because generic unistd code is multi-platform by intention.
+
+I don't know much about s390 specifics. Maybe because of that I do not
+understand completely your worries. I'm OK with both 1st and 2nd
+version, but I'd choose 2nd one because it allows inlines, and we
+don't need the compat_wrapper.c. 
