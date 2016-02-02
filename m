@@ -1,96 +1,37 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 2 Feb 2016 11:44:42 +0100
-Subject: [PATCH v4 1/4] soc: mediatek: Refine scpsys to support multiple
- platform
-In-Reply-To: <1454396212.2847.15.camel@mtksdaap41>
-References: <1453270097-53853-1-git-send-email-jamesjj.liao@mediatek.com>
- <1453270097-53853-2-git-send-email-jamesjj.liao@mediatek.com>
- <56ADF556.6070402@gmail.com> <1454396212.2847.15.camel@mtksdaap41>
-Message-ID: <56B0889A.1010305@gmail.com>
+Date: Tue, 2 Feb 2016 11:50:03 +0100
+Subject: [PATCH 1/2] Document: i2c: Add a dt binding for mediatek MT2701
+ soc
+In-Reply-To: <20160108074523.GA1523@katana>
+References: <1451888138-11471-1-git-send-email-liguo.zhang@mediatek.com>
+ <20160104095511.GB1524@katana> <1452215573.2088.1.camel@mhfsdcap03>
+ <20160108074523.GA1523@katana>
+Message-ID: <56B089DB.5060806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 02/02/16 07:56, James Liao wrote:
-> Hi Matthias,
+On 08/01/16 08:45, Wolfram Sang wrote:
+> On Fri, Jan 08, 2016 at 09:12:53AM +0800, liguo zhang wrote:
+>> On Mon, 2016-01-04 at 10:55 +0100, Wolfram Sang wrote:
+>>> On Mon, Jan 04, 2016 at 02:15:37PM +0800, Liguo Zhang wrote:
+>>>> Add a dt binding for the MT2701 soc.
+>>>>
+>>>> Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
+>>>
+>>> This should probably go with the other patch via arm-soc, or?
+>>
+>> The patch about i2c dts info for MT2701 depends on the MT2701 clock
+>> patch. After the MT2701 clock patch is accepted, the i2c patch for
+>> MT2701 may be accepted.
 >
-> On Sun, 2016-01-31 at 12:51 +0100, Matthias Brugger wrote:
->> >
->> >On 20/01/16 07:08, James Liao wrote:
->>> > >Refine scpsys driver common code to support multiple SoC / platform.
->>> > >
->>> > >Signed-off-by: James Liao<jamesjj.liao@mediatek.com>
->>> > >---
->>> > >   drivers/soc/mediatek/mtk-scpsys.c | 418 ++++++++++++++++++++------------------
->>> > >   drivers/soc/mediatek/mtk-scpsys.h |  55 +++++
->>> > >   2 files changed, 270 insertions(+), 203 deletions(-)
->>> > >   create mode 100644 drivers/soc/mediatek/mtk-scpsys.h
->> >
->> >In general this approach looks fine to me, comments below.
->> >
->>> > >
->>> > >diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
->>> > >index 0221387..339adfc 100644
->>> > >--- a/drivers/soc/mediatek/mtk-scpsys.c
->>> > >+++ b/drivers/soc/mediatek/mtk-scpsys.c
->>> > >@@ -11,29 +11,17 @@
->>> > >    * GNU General Public License for more details.
->>> > >    */
->>> > >   #include <linux/clk.h>
->>> > >-#include <linux/delay.h>
->>> > >+#include <linux/init.h>
->>> > >   #include <linux/io.h>
->>> > >-#include <linux/kernel.h>
->>> > >   #include <linux/mfd/syscon.h>
->> >
->> >When at it, do we need this include?
-> syscon_regmap_lookup_by_phandle() is declared in this head file.
->
->>> > >-#include <linux/init.h>
->>> > >   #include <linux/of_device.h>
->>> > >   #include <linux/platform_device.h>
->>> > >   #include <linux/pm_domain.h>
->>> > >-#include <linux/regmap.h>
->>> > >-#include <linux/soc/mediatek/infracfg.h>
->>> > >   #include <linux/regulator/consumer.h>
->>> > >-#include <dt-bindings/power/mt8173-power.h>
->>> > >+#include <linux/soc/mediatek/infracfg.h>
->>> > >+
->>> > >+#include "mtk-scpsys.h"
->>> > >
->>> > >-#define SPM_VDE_PWR_CON			0x0210
->>> > >-#define SPM_MFG_PWR_CON			0x0214
->>> > >-#define SPM_VEN_PWR_CON			0x0230
->>> > >-#define SPM_ISP_PWR_CON			0x0238
->>> > >-#define SPM_DIS_PWR_CON			0x023c
->>> > >-#define SPM_VEN2_PWR_CON		0x0298
->>> > >-#define SPM_AUDIO_PWR_CON		0x029c
->>> > >-#define SPM_MFG_2D_PWR_CON		0x02c0
->>> > >-#define SPM_MFG_ASYNC_PWR_CON		0x02c4
->>> > >-#define SPM_USB_PWR_CON			0x02cc
->> >
->> >I would prefer to keep this defines and declare SoC specific ones where
->> >necessary. It makes the code more readable.
-> Some register address may be reused by other modules among SoCs, so it's
-> not easy to maintain the defines when we implement multiple SoC drivers
-> in the same file. For example, offset 0x0298 is VEN2_PWR_CON on MT8173,
-> but it is MJC_PWR_CON on other chips.
+> OK. Still, dts changes go via arm-soc 99% of the cases if there is no
+> specific need to go via i2c.
 >
 
-So that sounds as if 0x0298 offset is MT8173 specific.
-I checked [VDE, MFG, VEN, IFR, ISP, DIS, DPY]_PWR_CON on mt8173, mt8135 
-and mt6589 and they all have the same offset. So it doesn't seem as if 
-the offset randomly changes for every SoC.
+No specific need here. I will take it through my branch as soon as the 
+clock driver is accepted.
 
-> Furthermore, these register offsets are only used in scp_domain_data[],
-> and each element has its own power domain name. So I think it's enough
-> to know which power domain are using these registers and status bits.
->
-
-Yes that's true, but it will make it easier for another person to 
-understand the driver, especially if he want's to implement the driver 
-for a new SoC.
-
-Regards,
-Matthias
+Liguo, please poke me on this, when this has happened and you have the 
+feeling, I forgot about.
