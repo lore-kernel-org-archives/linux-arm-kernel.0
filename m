@@ -1,93 +1,110 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 2 Feb 2016 16:45:22 -0500 (EST)
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <20160202210345.GZ19432@atomide.com>
-Message-ID: <Pine.LNX.4.44L0.1602021626540.1653-100000@iolanthe.rowland.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue,  2 Feb 2016 19:45:38 -0200
+Subject: [PATCH v2] ARM: mx25: Add basic suspend/resume support
+Message-ID: <1454449538-7620-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2 Feb 2016, Tony Lindgren wrote:
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-> > Also, what is autosuspend_delay set to for your device?  And is 
-> > runtime_auto set?
-> 
-> It's 100 at that point, see the commented snippet below from
-> omap_hsmmc_probe():
-> 
-> 	pm_runtime_enable(host->dev);
-> 	pm_runtime_get_sync(host->dev);
-> 	pm_runtime_set_autosuspend_delay(host->dev, MMC_AUTOSUSPEND_DELAY);
-> 	/* NOTE: pm_runtime_dont_use_autosuspend(host->dev) needed here? */
-> 	pm_runtime_use_autosuspend(host->dev);
-> 	...
-> 	/* gets -EPROBE_DEFER */
-> err_irq:
-> 	...
-> 	pm_runtime_put_sync(host->dev);
+Tested basic suspend/resume on a mx25pdk:
 
-You could try changing this to pm_runtime_put_sync_suspend().  But
-putting pm_runtime_dont_use_autosuspend() before the put_sync seems
-like a perfectly reasonable thing to do, especially if you feel you
-should reverse all the changes you made at the start.
+$ echo enabled > /sys/class/tty/ttymxc0/power/wakeup
+$ echo mem > /sys/power/state
 
->         pm_runtime_disable(host->dev);
-> 	/* NOTE: suspend callback never gets called unless
-> 	 * pm_runtime_dont_use_autosuspend() is called
-> 	 * before pm_runtime_put_sync() above.
-> 	 */
-> 	 ...
-> 
-> > > > Does pm_runtime_use_autosuspend() get called by the probe routine?  If 
-> > > > it does, then perhaps you can get what you want by having the probe 
-> > > > routine call pm_runtime_dont_use_autosuspend() whenever it's about to 
-> > > > return an error -- particularly -EDEFER.
-> > > 
-> > > Yes so far that's the only fix that seems to work like I posted
-> > > earlier. But is that the right fix though?
-> > 
-> > No, not really.  Ideally you would leave autosuspend turned on.  The 
-> > delay would be long enough to that after -EDEFER, another probe would 
-> > start before the delay expired.  But shortly after the last probe 
-> > attempt, the delay would expire and the device would then be put in low 
-> > power.
-> 
-> But then what about the new reinit function? To me it seems that
-> we should not attempt to maintain a state from the earlier failed
-> probe. Or are you thinking we just skip the reinit if autosuspend
-> is set?
+Then press any key in the serial console and the system wakes up.
 
-The reinit function gets called too late to do what you want -- namely, 
-put the hardware in a low-power state.
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+Changes since v1:
+- Use IS_ENABLED() instead of ifdef (Arnd).
 
-That _is_ what you want, isn't it?  The alternative is to leave
-dev->power.rpm_status set to RPM_ACTIVE, to match the hardware's actual 
-state.
+ arch/arm/mach-imx/Makefile     |  2 +-
+ arch/arm/mach-imx/common.h     |  1 +
+ arch/arm/mach-imx/mach-imx25.c |  1 +
+ arch/arm/mach-imx/pm-imx25.c   | 37 +++++++++++++++++++++++++++++++++++++
+ 4 files changed, 40 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-imx/pm-imx25.c
 
-Given that the reinit function is supposed to restore the initial 
-settings, it probably ought to call pm_runtime_dont_use_autosuspend().  
-But that won't be enough to fix your problem.
-
-> > > If we wanted to have some generic fix, it seems we would have to pass
-> > > a new flag in pm_runtime_put_sync() to ignore any autosuspend
-> > > configuration. But I don't know if that's what we want to or should
-> > > do though?
-> > 
-> > I don't think so.
-> 
-> So should we just establish a policy that pm_runtime_use_autosuspend()
-> needs to be paired with pm_runtime_dont_use_autosuspend() for
-> pm_runtime_put_sync() to work?
-
-Your understanding is slightly wrong.  pm_runtime_put_sync() _does_
-work -- that is, it does what it's supposed to do.  The difficulty is
-that what it's supposed to do doesn't match what you think.
-
-pm_runtime_put_sync() is supposed to follow the driver's wishes.  It
-invokes the driver's runtime_idle callback if there is one, and the
-callback routine can start a suspend or an autosuspend.  If there is no
-callback, it will use whatever autosuspend setting the driver has set
-up.  If you want to override the autosuspend setting, use
-pm_runtime_put_sync_suspend() instead.
-
-Alan Stern
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index fb689d8..9fbe624 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -3,7 +3,7 @@ obj-y := cpu.o system.o irq-common.o
+ obj-$(CONFIG_SOC_IMX1) += mm-imx1.o
+ obj-$(CONFIG_SOC_IMX21) += mm-imx21.o
+ 
+-obj-$(CONFIG_SOC_IMX25) += cpu-imx25.o mach-imx25.o
++obj-$(CONFIG_SOC_IMX25) += cpu-imx25.o mach-imx25.o pm-imx25.o
+ 
+ obj-$(CONFIG_SOC_IMX27) += cpu-imx27.o pm-imx27.o
+ obj-$(CONFIG_SOC_IMX27) += mm-imx27.o ehci-imx27.o
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 32b83f0..58a3846 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -66,6 +66,7 @@ void imx_gpc_check_dt(void);
+ void imx_gpc_set_arm_power_in_lpm(bool power_off);
+ void imx_gpc_set_arm_power_up_timing(u32 sw2iso, u32 sw);
+ void imx_gpc_set_arm_power_down_timing(u32 sw2iso, u32 sw);
++void imx25_pm_init(void);
+ 
+ enum mxc_cpu_pwr_mode {
+ 	WAIT_CLOCKED,		/* wfi only */
+diff --git a/arch/arm/mach-imx/mach-imx25.c b/arch/arm/mach-imx/mach-imx25.c
+index 9379fd0..32dcb5e 100644
+--- a/arch/arm/mach-imx/mach-imx25.c
++++ b/arch/arm/mach-imx/mach-imx25.c
+@@ -41,6 +41,7 @@ static const char * const imx25_dt_board_compat[] __initconst = {
+ 
+ DT_MACHINE_START(IMX25_DT, "Freescale i.MX25 (Device Tree Support)")
+ 	.init_early	= imx25_init_early,
++	.init_late      = imx25_pm_init,
+ 	.init_irq	= mx25_init_irq,
+ 	.dt_compat	= imx25_dt_board_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-imx/pm-imx25.c b/arch/arm/mach-imx/pm-imx25.c
+new file mode 100644
+index 0000000..8bba9fc
+--- /dev/null
++++ b/arch/arm/mach-imx/pm-imx25.c
+@@ -0,0 +1,37 @@
++/*
++ * Copyright 2016 NXP Semiconductors
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/kernel.h>
++#include <linux/suspend.h>
++#include <linux/io.h>
++
++static int imx25_suspend_enter(suspend_state_t state)
++{
++	if (!IS_ENABLED(CONFIG_PM))
++		return 0;
++
++	switch (state) {
++	case PM_SUSPEND_MEM:
++		cpu_do_idle();
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static const struct platform_suspend_ops imx25_suspend_ops = {
++	.enter = imx25_suspend_enter,
++	.valid = suspend_valid_only_mem,
++};
++
++void __init imx25_pm_init(void)
++{
++	suspend_set_ops(&imx25_suspend_ops);
++}
+-- 
+1.9.1
