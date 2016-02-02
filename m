@@ -1,459 +1,283 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue,  2 Feb 2016 18:09:40 +0800
-Subject: [PATCH v6 2/4] mailbox: Hi6220: add mailbox driver
-In-Reply-To: <1454407782-24674-1-git-send-email-leo.yan@linaro.org>
-References: <1454407782-24674-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1454407782-24674-3-git-send-email-leo.yan@linaro.org>
+From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
+Date: Tue, 2 Feb 2016 15:39:18 +0530
+Subject: [PATCH v10 3/8] dt, numa: adding numa dt binding implementation.
+In-Reply-To: <1454407763-1017-1-git-send-email-gkulkarni@caviumnetworks.com>
+References: <1454407763-1017-1-git-send-email-gkulkarni@caviumnetworks.com>
+Message-ID: <1454407763-1017-4-git-send-email-gkulkarni@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add driver for Hi6220 mailbox, the mailbox communicates with MCU; for
-sending data, it can support two methods for low level implementation:
-one is to use interrupt as acknowledge, another is automatic mode which
-without any acknowledge. These two methods have been supported in the
-driver. For receiving data, it will depend on the interrupt to notify
-the channel has incoming message.
+dt node parsing for numa topology is done using device property
+numa-node-id and device node distance-map.
 
-Now mailbox driver is used to send message to MCU to control dynamic
-voltage and frequency scaling for CPU, GPU and DDR.
-
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
+Reviewed-by: Robert Richter <rrichter@cavium.com>
+Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
 ---
- drivers/mailbox/Kconfig          |   8 +
- drivers/mailbox/Makefile         |   2 +
- drivers/mailbox/hi6220-mailbox.c | 395 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 405 insertions(+)
- create mode 100644 drivers/mailbox/hi6220-mailbox.c
+ drivers/of/Kconfig   |  11 +++
+ drivers/of/Makefile  |   1 +
+ drivers/of/of_numa.c | 207 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of.h   |   4 +
+ 4 files changed, 223 insertions(+)
+ create mode 100644 drivers/of/of_numa.c
 
-diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-index 546d05f..b8bbeb0 100644
---- a/drivers/mailbox/Kconfig
-+++ b/drivers/mailbox/Kconfig
-@@ -78,6 +78,14 @@ config STI_MBOX
- 	  Mailbox implementation for STMicroelectonics family chips with
- 	  hardware for interprocessor communication.
+diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+index e2a4841..8f9cc3a 100644
+--- a/drivers/of/Kconfig
++++ b/drivers/of/Kconfig
+@@ -112,4 +112,15 @@ config OF_OVERLAY
+ 	  While this option is selected automatically when needed, you can
+ 	  enable it manually to improve device tree unit test coverage.
  
-+config HI6220_MBOX
-+	tristate "Hi6220 Mailbox"
-+	depends on ARCH_HISI
++config OF_NUMA
++	bool "Device Tree NUMA support"
++	depends on NUMA
++	depends on OF
++	depends on ARM64
++	default y
 +	help
-+	  An implementation of the hi6220 mailbox. It is used to send message
-+	  between application processors and MCU. Say Y here if you want to
-+	  build Hi6220 mailbox controller driver.
++	  Enable Device Tree NUMA support.
++	  This enables the numa mapping of cpu, memory, io and
++	  inter node distances using dt bindings.
 +
- config MAILBOX_TEST
- 	tristate "Mailbox Test Client"
- 	depends on OF
-diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
-index 92435ef..565adda 100644
---- a/drivers/mailbox/Makefile
-+++ b/drivers/mailbox/Makefile
-@@ -17,3 +17,5 @@ obj-$(CONFIG_ALTERA_MBOX)	+= mailbox-altera.o
- obj-$(CONFIG_BCM2835_MBOX)	+= bcm2835-mailbox.o
+ endif # OF
+diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+index 156c072..bee3fa9 100644
+--- a/drivers/of/Makefile
++++ b/drivers/of/Makefile
+@@ -14,5 +14,6 @@ obj-$(CONFIG_OF_MTD)	+= of_mtd.o
+ obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
+ obj-$(CONFIG_OF_RESOLVE)  += resolver.o
+ obj-$(CONFIG_OF_OVERLAY) += overlay.o
++obj-$(CONFIG_OF_NUMA) += of_numa.o
  
- obj-$(CONFIG_STI_MBOX)		+= mailbox-sti.o
-+
-+obj-$(CONFIG_HI6220_MBOX)	+= hi6220-mailbox.o
-diff --git a/drivers/mailbox/hi6220-mailbox.c b/drivers/mailbox/hi6220-mailbox.c
+ obj-$(CONFIG_OF_UNITTEST) += unittest-data/
+diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
 new file mode 100644
-index 0000000..613722d
+index 0000000..1142cdb
 --- /dev/null
-+++ b/drivers/mailbox/hi6220-mailbox.c
-@@ -0,0 +1,395 @@
++++ b/drivers/of/of_numa.c
+@@ -0,0 +1,207 @@
 +/*
-+ * Hisilicon's Hi6220 mailbox driver
++ * OF NUMA Parsing support.
 + *
-+ * Copyright (c) 2015 Hisilicon Limited.
-+ * Copyright (c) 2015 Linaro Limited.
++ * Copyright (C) 2015 Cavium Inc.
++ * Author: Ganapatrao Kulkarni <gkulkarni@cavium.com>
 + *
-+ * Author: Leo Yan <leo.yan@linaro.org>
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation, version 2 of the License.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + *
 + * This program is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
 + *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/kfifo.h>
-+#include <linux/mailbox_controller.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
++#include <linux/of.h>
++#include <linux/of_fdt.h>
 +
-+#define MBOX_CHAN_MAX			32
++/* define default numa node to 0 */
++#define DEFAULT_NODE 0
 +
-+#define MBOX_TX				0x1
-+
-+/* Mailbox message length: 8 words */
-+#define MBOX_MSG_LEN			8
-+
-+/* Mailbox Registers */
-+#define MBOX_OFF(m)			(0x40 * (m))
-+#define MBOX_MODE_REG(m)		(MBOX_OFF(m) + 0x0)
-+#define MBOX_DATA_REG(m)		(MBOX_OFF(m) + 0x4)
-+
-+#define MBOX_STATE_MASK			(0xF << 4)
-+#define MBOX_STATE_IDLE			(0x1 << 4)
-+#define MBOX_STATE_TX			(0x2 << 4)
-+#define MBOX_STATE_RX			(0x4 << 4)
-+#define MBOX_STATE_ACK			(0x8 << 4)
-+#define MBOX_ACK_CONFIG_MASK		(0x1 << 0)
-+#define MBOX_ACK_AUTOMATIC		(0x1 << 0)
-+#define MBOX_ACK_IRQ			(0x0 << 0)
-+
-+/* IPC registers */
-+#define ACK_INT_RAW_REG(i)		((i) + 0x400)
-+#define ACK_INT_MSK_REG(i)		((i) + 0x404)
-+#define ACK_INT_STAT_REG(i)		((i) + 0x408)
-+#define ACK_INT_CLR_REG(i)		((i) + 0x40c)
-+#define ACK_INT_ENA_REG(i)		((i) + 0x500)
-+#define ACK_INT_DIS_REG(i)		((i) + 0x504)
-+#define DST_INT_RAW_REG(i)		((i) + 0x420)
-+
-+
-+struct hi6220_mbox_chan {
-+
-+	/*
-+	 * Description for channel's hardware info:
-+	 *  - direction: tx or rx
-+	 *  - dst irq: peer core's irq number
-+	 *  - ack irq: local irq number
-+	 *  - slot number
-+	 */
-+	unsigned int dir, dst_irq, ack_irq;
-+	unsigned int slot;
-+
-+	struct hi6220_mbox *parent;
-+};
-+
-+struct hi6220_mbox {
-+	struct device *dev;
-+
-+	int irq;
-+
-+	/* flag of enabling tx's irq mode */
-+	bool tx_irq_mode;
-+
-+	/* region for ipc event */
-+	void __iomem *ipc;
-+
-+	/* region for mailbox */
-+	void __iomem *base;
-+
-+	unsigned int chan_num;
-+	struct hi6220_mbox_chan *mchan;
-+
-+	void *irq_map_chan[MBOX_CHAN_MAX];
-+	struct mbox_chan *chan;
-+	struct mbox_controller controller;
-+};
-+
-+static void mbox_set_state(struct hi6220_mbox *mbox,
-+			   unsigned int slot, u32 val)
++/* Returns nid in the range [0..MAX_NUMNODES-1],
++ * or NUMA_NO_NODE if no valid numa-node-id entry found
++ * or DEFAULT_NODE if no numa-node-id entry exists
++ */
++static int of_numa_prop_to_nid(const __be32 *of_numa_prop, int length)
 +{
-+	u32 status;
++	int nid;
 +
-+	status = readl(mbox->base + MBOX_MODE_REG(slot));
-+	status = (status & ~MBOX_STATE_MASK) | val;
-+	writel(status, mbox->base + MBOX_MODE_REG(slot));
++	if (!of_numa_prop)
++		return DEFAULT_NODE;
++
++	if (length != sizeof(*of_numa_prop)) {
++		pr_warn("NUMA: Invalid of_numa_prop length %d found.\n",
++				length);
++		return NUMA_NO_NODE;
++	}
++
++	nid = of_read_number(of_numa_prop, 1);
++	if (nid >= MAX_NUMNODES) {
++		pr_warn("NUMA: Invalid numa node %d found.\n", nid);
++		return NUMA_NO_NODE;
++	}
++
++	return nid;
 +}
 +
-+static void mbox_set_mode(struct hi6220_mbox *mbox,
-+			  unsigned int slot, u32 val)
++static int __init early_init_of_node_to_nid(unsigned long node)
 +{
-+	u32 mode;
++	int length;
++	const __be32 *of_numa_prop;
 +
-+	mode = readl(mbox->base + MBOX_MODE_REG(slot));
-+	mode = (mode & ~MBOX_ACK_CONFIG_MASK) | val;
-+	writel(mode, mbox->base + MBOX_MODE_REG(slot));
++	of_numa_prop = of_get_flat_dt_prop(node, "numa-node-id", &length);
++
++	return of_numa_prop_to_nid(of_numa_prop, length);
 +}
 +
-+static bool hi6220_mbox_last_tx_done(struct mbox_chan *chan)
++/*
++ * Even though we connect cpus to numa domains later in SMP
++ * init, we need to know the node ids now for all cpus.
++*/
++static int __init early_init_parse_cpu_node(unsigned long node)
 +{
-+	struct hi6220_mbox_chan *mchan = chan->con_priv;
-+	struct hi6220_mbox *mbox = mchan->parent;
-+	u32 state;
++	int nid;
++	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
 +
-+	/* Only set idle state for polling mode */
-+	BUG_ON(mbox->tx_irq_mode);
++	if (type == NULL)
++		return 0;
 +
-+	state = readl(mbox->base + MBOX_MODE_REG(mchan->slot));
-+	return ((state & MBOX_STATE_MASK) == MBOX_STATE_IDLE);
-+}
++	if (strcmp(type, "cpu") != 0)
++		return 0;
 +
-+static int hi6220_mbox_send_data(struct mbox_chan *chan, void *msg)
-+{
-+	struct hi6220_mbox_chan *mchan = chan->con_priv;
-+	struct hi6220_mbox *mbox = mchan->parent;
-+	unsigned int slot = mchan->slot;
-+	u32 *buf = msg;
-+	int i;
++	nid = early_init_of_node_to_nid(node);
++	if (nid == NUMA_NO_NODE)
++		return -EINVAL;
 +
-+	/* indicate as a TX channel */
-+	mchan->dir = MBOX_TX;
-+
-+	mbox_set_state(mbox, slot, MBOX_STATE_TX);
-+
-+	if (mbox->tx_irq_mode)
-+		mbox_set_mode(mbox, slot, MBOX_ACK_IRQ);
-+	else
-+		mbox_set_mode(mbox, slot, MBOX_ACK_AUTOMATIC);
-+
-+	for (i = 0; i < MBOX_MSG_LEN; i++)
-+		writel(buf[i], mbox->base + MBOX_DATA_REG(slot) + i * 4);
-+
-+	/* trigger remote request */
-+	writel(BIT(mchan->dst_irq), DST_INT_RAW_REG(mbox->ipc));
++	node_set(nid, numa_nodes_parsed);
 +	return 0;
 +}
 +
-+static irqreturn_t hi6220_mbox_interrupt(int irq, void *p)
++static int __init early_init_parse_memory_node(unsigned long node)
 +{
-+	struct hi6220_mbox *mbox = p;
-+	struct hi6220_mbox_chan *mchan;
-+	struct mbox_chan *chan;
-+	unsigned int state, intr_bit, i;
-+	u32 msg[MBOX_MSG_LEN];
++	const __be32 *reg, *endp;
++	int length;
++	int nid;
++	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
 +
-+	state = readl(ACK_INT_STAT_REG(mbox->ipc));
-+	if (!state) {
-+		dev_warn(mbox->dev, "%s: spurious interrupt\n",
-+			 __func__);
-+		return IRQ_HANDLED;
++	if (type == NULL)
++		return 0;
++
++	if (strcmp(type, "memory") != 0)
++		return 0;
++
++	nid = early_init_of_node_to_nid(node);
++	if (nid == NUMA_NO_NODE)
++		return -EINVAL;
++
++	reg = of_get_flat_dt_prop(node, "reg", &length);
++	endp = reg + (length / sizeof(__be32));
++
++	while ((endp - reg) >= (dt_root_addr_cells + dt_root_size_cells)) {
++		u64 base, size;
++
++		base = dt_mem_next_cell(dt_root_addr_cells, &reg);
++		size = dt_mem_next_cell(dt_root_size_cells, &reg);
++		pr_debug("NUMA:  base = %llx , node = %u\n",
++				base, nid);
++
++		if (numa_add_memblk(nid, base, size) < 0)
++			return -EINVAL;
 +	}
 +
-+	while (state) {
-+		intr_bit = __ffs(state);
-+		state &= (state - 1);
-+
-+		chan = mbox->irq_map_chan[intr_bit];
-+		if (!chan) {
-+			dev_warn(mbox->dev, "%s: unexpected irq vector %d\n",
-+				 __func__, intr_bit);
-+			continue;
-+		}
-+
-+		mchan = chan->con_priv;
-+		if (mchan->dir == MBOX_TX)
-+			mbox_chan_txdone(chan, 0);
-+		else {
-+			for (i = 0; i < MBOX_MSG_LEN; i++)
-+				msg[i] = readl(mbox->base +
-+					MBOX_DATA_REG(mchan->slot) + i * 4);
-+
-+			mbox_chan_received_data(chan, (void *)msg);
-+		}
-+
-+		/* clear IRQ source */
-+		writel(BIT(mchan->ack_irq), ACK_INT_CLR_REG(mbox->ipc));
-+		mbox_set_state(mbox, mchan->slot, MBOX_STATE_IDLE);
-+	}
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int hi6220_mbox_startup(struct mbox_chan *chan)
-+{
-+	struct hi6220_mbox_chan *mchan = chan->con_priv;
-+	struct hi6220_mbox *mbox = mchan->parent;
-+
-+	mchan->dir = 0;
-+
-+	/* enable interrupt */
-+	writel(BIT(mchan->ack_irq), ACK_INT_ENA_REG(mbox->ipc));
 +	return 0;
 +}
 +
-+static void hi6220_mbox_shutdown(struct mbox_chan *chan)
++static int __init early_init_parse_distance_map_v1(unsigned long node,
++		const char *uname)
 +{
-+	struct hi6220_mbox_chan *mchan = chan->con_priv;
-+	struct hi6220_mbox *mbox = mchan->parent;
++	const __be32 *prop_dist_matrix;
++	int length = 0, i, matrix_count;
++	int nr_size_cells = OF_ROOT_NODE_SIZE_CELLS_DEFAULT;
 +
-+	/* disable interrupt */
-+	writel(BIT(mchan->ack_irq), ACK_INT_DIS_REG(mbox->ipc));
-+	mbox->irq_map_chan[mchan->ack_irq] = NULL;
-+}
++	pr_info("NUMA: parsing numa-distance-map-v1\n");
 +
-+static struct mbox_chan_ops hi6220_mbox_ops = {
-+	.send_data    = hi6220_mbox_send_data,
-+	.startup      = hi6220_mbox_startup,
-+	.shutdown     = hi6220_mbox_shutdown,
-+	.last_tx_done = hi6220_mbox_last_tx_done,
-+};
++	prop_dist_matrix =
++		of_get_flat_dt_prop(node, "distance-matrix", &length);
 +
-+static struct mbox_chan *hi6220_mbox_xlate(struct mbox_controller *controller,
-+					   const struct of_phandle_args *spec)
-+{
-+	struct hi6220_mbox *mbox = dev_get_drvdata(controller->dev);
-+	struct hi6220_mbox_chan *mchan;
-+	struct mbox_chan *chan;
-+	unsigned int i = spec->args[0];
-+	unsigned int dst_irq = spec->args[1];
-+	unsigned int ack_irq = spec->args[2];
-+
-+	/* Bounds checking */
-+	if (i >= mbox->chan_num || dst_irq >= mbox->chan_num ||
-+	    ack_irq >= mbox->chan_num) {
-+		dev_err(mbox->dev,
-+			"Invalid channel idx %d dst_irq %d ack_irq %d\n",
-+			i, dst_irq, ack_irq);
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	/* Is requested channel free? */
-+	chan = &mbox->chan[i];
-+	if (mbox->irq_map_chan[ack_irq] == (void *)chan) {
-+		dev_err(mbox->dev, "Channel in use\n");
-+		return ERR_PTR(-EBUSY);
-+	}
-+
-+	mchan = chan->con_priv;
-+	mchan->dst_irq = dst_irq;
-+	mchan->ack_irq = ack_irq;
-+
-+	mbox->irq_map_chan[ack_irq] = (void *)chan;
-+	return chan;
-+}
-+
-+static const struct of_device_id hi6220_mbox_of_match[] = {
-+	{ .compatible = "hisilicon,hi6220-mbox", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, hi6220_mbox_of_match);
-+
-+static int hi6220_mbox_probe(struct platform_device *pdev)
-+{
-+	struct device_node *node = pdev->dev.of_node;
-+	struct device *dev = &pdev->dev;
-+	struct hi6220_mbox *mbox;
-+	struct resource *res;
-+	int i, err;
-+
-+	mbox = devm_kzalloc(dev, sizeof(*mbox), GFP_KERNEL);
-+	if (!mbox)
-+		return -ENOMEM;
-+
-+	mbox->dev = dev;
-+	mbox->chan_num = MBOX_CHAN_MAX;
-+	mbox->mchan = devm_kzalloc(dev,
-+		mbox->chan_num * sizeof(*mbox->mchan), GFP_KERNEL);
-+	if (!mbox->mchan)
-+		return -ENOMEM;
-+
-+	mbox->chan = devm_kzalloc(dev,
-+		mbox->chan_num * sizeof(*mbox->chan), GFP_KERNEL);
-+	if (!mbox->chan)
-+		return -ENOMEM;
-+
-+	mbox->irq = platform_get_irq(pdev, 0);
-+	if (mbox->irq < 0)
-+		return mbox->irq;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	mbox->ipc = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(mbox->ipc)) {
-+		dev_err(dev, "ioremap ipc failed\n");
-+		return PTR_ERR(mbox->ipc);
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	mbox->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(mbox->base)) {
-+		dev_err(dev, "ioremap buffer failed\n");
-+		return PTR_ERR(mbox->base);
-+	}
-+
-+	err = devm_request_irq(dev, mbox->irq, hi6220_mbox_interrupt, 0,
-+			dev_name(dev), mbox);
-+	if (err) {
-+		dev_err(dev, "Failed to register a mailbox IRQ handler: %d\n",
-+			err);
++	if (!length) {
++		pr_err("NUMA: failed to parse distance-matrix\n");
 +		return -ENODEV;
 +	}
 +
-+	mbox->controller.dev = dev;
-+	mbox->controller.chans = &mbox->chan[0];
-+	mbox->controller.num_chans = mbox->chan_num;
-+	mbox->controller.ops = &hi6220_mbox_ops;
-+	mbox->controller.of_xlate = hi6220_mbox_xlate;
++	matrix_count = ((length / sizeof(__be32)) / (3 * nr_size_cells));
 +
-+	for (i = 0; i < mbox->chan_num; i++) {
-+		mbox->chan[i].con_priv = &mbox->mchan[i];
-+		mbox->irq_map_chan[i] = NULL;
-+
-+		mbox->mchan[i].parent = mbox;
-+		mbox->mchan[i].slot   = i;
++	if ((matrix_count * sizeof(__be32) * 3 * nr_size_cells) !=  length) {
++		pr_warn("NUMA: invalid distance-matrix length %d\n", length);
++		return -EINVAL;
 +	}
 +
-+	/* mask and clear all interrupt vectors */
-+	writel(0x0,  ACK_INT_MSK_REG(mbox->ipc));
-+	writel(~0x0, ACK_INT_CLR_REG(mbox->ipc));
++	for (i = 0; i < matrix_count; i++) {
++		u32 nodea, nodeb, distance;
 +
-+	/* use interrupt for tx's ack */
-+	if (of_find_property(node, "hi6220,mbox-tx-noirq", NULL))
-+		mbox->tx_irq_mode = false;
-+	else
-+		mbox->tx_irq_mode = true;
++		nodea = dt_mem_next_cell(nr_size_cells, &prop_dist_matrix);
++		nodeb = dt_mem_next_cell(nr_size_cells, &prop_dist_matrix);
++		distance = dt_mem_next_cell(nr_size_cells, &prop_dist_matrix);
++		numa_set_distance(nodea, nodeb, distance);
++		pr_debug("NUMA:  distance[node%d -> node%d] = %d\n",
++				nodea, nodeb, distance);
 +
-+	if (mbox->tx_irq_mode)
-+		mbox->controller.txdone_irq = true;
-+	else {
-+		mbox->controller.txdone_poll = true;
-+		mbox->controller.txpoll_period = 5;
++		/* Set default distance of node B->A same as A->B */
++		if (nodeb > nodea)
++			numa_set_distance(nodeb, nodea, distance);
 +	}
 +
-+	err = mbox_controller_register(&mbox->controller);
-+	if (err) {
-+		dev_err(dev, "Failed to register mailbox %d\n", err);
-+		return err;
-+	}
-+
-+	platform_set_drvdata(pdev, mbox);
-+	dev_info(dev, "Mailbox enabled\n");
 +	return 0;
 +}
 +
-+static int hi6220_mbox_remove(struct platform_device *pdev)
++static int __init early_init_parse_distance_map(unsigned long node,
++		const char *uname)
 +{
-+	struct hi6220_mbox *mbox = platform_get_drvdata(pdev);
++	if (strcmp(uname, "distance-map") != 0)
++		return 0;
 +
-+	mbox_controller_unregister(&mbox->controller);
-+	return 0;
++	if (of_flat_dt_is_compatible(node, "numa-distance-map-v1"))
++		return early_init_parse_distance_map_v1(node, uname);
++
++	pr_err("NUMA: invalid distance-map device node\n");
++	return -EINVAL;
 +}
 +
-+static struct platform_driver hi6220_mbox_driver = {
-+	.driver = {
-+		.name = "hi6220-mbox",
-+		.owner = THIS_MODULE,
-+		.of_match_table = hi6220_mbox_of_match,
-+	},
-+	.probe	= hi6220_mbox_probe,
-+	.remove	= hi6220_mbox_remove,
-+};
-+
-+static int __init hi6220_mbox_init(void)
++static int __init early_init_of_scan_numa_map(unsigned long node, const char *uname,
++				     int depth, void *data)
 +{
-+	return platform_driver_register(&hi6220_mbox_driver);
-+}
-+core_initcall(hi6220_mbox_init);
++	int ret;
 +
-+static void __exit hi6220_mbox_exit(void)
++	ret = early_init_parse_cpu_node(node);
++	if (ret)
++		return ret;
++
++	ret = early_init_parse_memory_node(node);
++	if (ret)
++		return ret;
++
++	return early_init_parse_distance_map(node, uname);
++}
++
++int of_node_to_nid(struct device_node *device)
 +{
-+	platform_driver_unregister(&hi6220_mbox_driver);
-+}
-+module_exit(hi6220_mbox_exit);
++	const __be32 *of_numa_prop;
++	int length;
 +
-+MODULE_AUTHOR("Leo Yan <leo.yan@linaro.org>");
-+MODULE_DESCRIPTION("Hi6220 mailbox driver");
-+MODULE_LICENSE("GPL v2");
++	of_numa_prop = of_get_property(device, "numa-node-id", &length);
++	if (of_numa_prop)
++		return of_numa_prop_to_nid(of_numa_prop, length);
++
++	return NUMA_NO_NODE;
++}
++
++/* DT node mapping is done already early_init_of_scan_memory */
++int __init of_numa_init(void)
++{
++	return of_scan_flat_dt(early_init_of_scan_numa_map, NULL);
++}
+diff --git a/include/linux/of.h b/include/linux/of.h
+index dd10626..23e5bad 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -685,6 +685,10 @@ static inline int of_node_to_nid(struct device_node *device)
+ }
+ #endif
+ 
++#ifdef CONFIG_OF_NUMA
++extern int __init of_numa_init(void);
++#endif
++
+ static inline struct device_node *of_find_matching_node(
+ 	struct device_node *from,
+ 	const struct of_device_id *matches)
 -- 
-1.9.1
+1.8.1.4
