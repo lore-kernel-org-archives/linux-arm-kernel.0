@@ -1,103 +1,72 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 2 Feb 2016 17:22:32 +0800
-Subject: [PATCH v5 1/4] dt-bindings: mailbox: Document Hi6220 mailbox
- driver
-In-Reply-To: <CABb+yY0uY--40CJ6_U-AcbZ1cRUhs7MhiJZn_G-Suw=XKXdpjg@mail.gmail.com>
-References: <1454333687-20421-1-git-send-email-leo.yan@linaro.org>
- <1454333687-20421-2-git-send-email-leo.yan@linaro.org>
- <20160201140828.GA32412@rob-hp-laptop>
- <20160201152333.GA22872@leoy-linaro>
- <CABb+yY0uY--40CJ6_U-AcbZ1cRUhs7MhiJZn_G-Suw=XKXdpjg@mail.gmail.com>
-Message-ID: <20160202092232.GB1915@leoy-linaro>
+From: k@japko.eu (Krzysztof Adamski)
+Date: Tue, 2 Feb 2016 10:24:52 +0100
+Subject: [PATCH] pinctrl: sunxi: Add H3 R_PIO controller support
+In-Reply-To: <CAGb2v65-X2_MoRm1=wAub9Y8Vpt-f-roYUT73jDk5Fnj17zKTw@mail.gmail.com>
+References: <20160201101225.GA19687@box2.japko.eu>
+ <CAGb2v65-X2_MoRm1=wAub9Y8Vpt-f-roYUT73jDk5Fnj17zKTw@mail.gmail.com>
+Message-ID: <20160202092451.GA26944@box2.japko.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 09:46:39PM +0530, Jassi Brar wrote:
-> On Mon, Feb 1, 2016 at 8:53 PM, Leo Yan <leo.yan@linaro.org> wrote:
-> > On Mon, Feb 01, 2016 at 08:08:28AM -0600, Rob Herring wrote:
-> >> On Mon, Feb 01, 2016 at 09:34:44PM +0800, Leo Yan wrote:
+On Tue, Feb 02, 2016 at 02:25:18PM +0800, Chen-Yu Tsai wrote:
+>On Mon, Feb 1, 2016 at 6:12 PM, Krzysztof Adamski <k@japko.eu> wrote:
+>> - reg: Should contain the register physical address and length for 
+>> the
+>> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi
+>> b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> index 1524130e..745f64c 100644
+>> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+>> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> @@ -493,5 +493,17 @@
+>>                         interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
+>>                                      <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+>>                 };
+>> +
+>> +               r_pio: pinctrl at 01f02c00 {
+>> +                       compatible = "allwinner,sun8i-h3-r-pinctrl";
+>> +                       reg = <0x01f02c00 0x400>;
+>> +                       interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+>> +                       clocks = <&bus_gates 69>;
+>
+>This is probably wrong. According to other SoCs all R_ block peripherals
+>have clock gates and reset controls in the PRCM.
 
-[...]
+This is problematic. I can find information about reset and gates control for
+this peripheral on other SoCs user manuals but there is nothing about it in H3
+User Manual
+(https://www.dropbox.com/s/nkr9slo1o9x6i1z/Allwinner_H3_Datasheet_V1.1.pdf?dl=0).
 
-> >> > +Optional Properties:
-> >> > +--------------------
-> >> > +- hi6220,mbox-tx-noirq: Flag to allow the client user of this mailbox driver
-> >> > +                   to send messages without triggering a TX completion
-> >> > +                   interrupt.
-> >>
-> >> I don't think this belongs in DT. This should be a flag the client
-> >> driver sets when it sends messages.
-> >
-> > The client driver can set "tx_block = true" so use this flag indicates
-> > the client thread should be blocked until data is transmitted.
-> >
-> Yes, but the 'tx_block' feature is provided by the core. The
-> controller driver should not need to know how the client works.
-> 
-> > But low level mailbox driver can use two method to support "tx_block"
-> > mode:
-> >
-> No, as I said, provider shouldn't care about consumers..
-> 
-> > - One method is to avoid using interrupt and mailbox framework will
-> >   poll with mailbox's idle flag which is set by remote processor
-> >   automatically;
-> > - Another method is to use interrupt to notify data has been
-> >   transmitted and interrupt handler will call completion function to
-> >   wake up blocked client thread;
-> >
-> If it is possible to have either 'idle flag set' or irq generated (not
-> both) by the remote, then you may sell the hi6220,mbox-tx-noirq
-> property as a "f/w feature" ... but still not for the sake of
-> tx_block.
+Similarly, while I think I can find r_pio clock setup for A33:
+https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun8iw5.c
 
-Indeed and totally agree. MCU can support two modes for "automatic idle
-flag" or IRQ generated mode, so we can take "hi6220,mbox-tx-noirq" as a
-firmware's property.
+I can't find it for H3, though:
+https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun8iw7.c
 
-> >> > +
-> >> > +Child Nodes:
-> >> > +============
-> >> > +A child node is used for representing the actual sub-mailbox device that is
-> >> > +used for the communication between the host processor and a remote processor.
-> >> > +Each child node should have a unique node name across all the different
-> >> > +mailbox device nodes.
-> >> > +
-> >> > +Required properties:
-> >> > +--------------------
-> >> > +- hi6220,mbox-tx:  sub-mailbox descriptor property defining Tx channel
-> >> > +- hi6220,mbox-rx:  sub-mailbox descriptor property defining Rx channel
-> >> > +
-> >> > +Sub-mailbox Descriptor Data
-> >> > +---------------------------
-> >> > +Each of the above hi6220,mbox-tx and hi6220,mbox-rx properties should have 3
-> >> > +cells of data that represent the following:
-> >> > +    Cell #1 (slot_id) - mailbox slot id used either for transmitting
-> >> > +                        (hi6220,mbox-tx) or for receiving (hi6220,mbox-rx)
-> >> > +    Cell #2 (dst_irq) - irq identifier index number which used by MCU.
-> >> > +    Cell #3 (ack_irq) - irq identifier index number with generating a tx/rx
-> >> > +                        interrupt to application processor, mailbox driver
-> >> > +                        used this id to acknowledge interrupt.
-> >> > +
-> >> > +Example:
-> >> > +--------
-> >> > +
-> >> > +   mailbox: mailbox at F7510000 {
-> >> > +           #mbox-cells = <1>;
-> >> > +           compatible = "hisilicon,hi6220-mbox";
-> >> > +           reg = <0x0 0xF7510000 0x0 0x1000>, /* IPC_S */
-> >> > +                 <0x0 0x06DFF800 0x0 0x0800>; /* Mailbox */
-> >> > +           interrupt-parent = <&gic>;
-> >> > +           interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
-> >> > +           mbox_stub_clock: mbox_stub_clock {
-> >> > +                   hi6220,mbox-rx = <0 1 10>;
-> >> > +                   hi6220,mbox-tx = <1 0 11>;
-> >
-> This looks like meant for the client node...
->          mbox-names = "mbox-tx", "mbox-rx";
->          mboxes = <&mailbox 1 0 11>, <&mailbox 0 1 10>;
+Well, apart from this strange snippet:
 
-Good suggestion. Will refine with this way.
+// binder r-pio CPUS_APB0_GATE to pio-clk's gate-reset-register
+    clk = clk_get(NULL,"pio");
+    if(!clk || IS_ERR(clk))
+        printk("Error not get clk pio\n");
+    else
+    {
+        struct clk_hw *hw = __clk_get_hw(clk);
+        struct sunxi_clk_periph *periph = to_clk_periph(hw);
+        struct sunxi_clk_periph_gate *gate = &periph->gate;
+        gate->reset = sunxi_clk_cpus_base+CPUS_APB0_GATE ;
+        gate->rst_shift = 0;
+        clk_put(clk);
+    }
 
-Thanks,
-Leo Yan
+
+Which I have to admit I don't fully understand. This seems to be setting reset
+line for first pio, not for r_pio - something we don't have right now. Or am I
+wrong here?
+
+I'm new to Allwinner SoCs, any help from veterans?
+
+Also, if that proves anything, I did test this code on OrangePi PC and PL ports
+works so their clock is enabled, for sure.
+
+Best regards,
+Krzysztof Adamski
