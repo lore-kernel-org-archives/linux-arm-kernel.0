@@ -1,62 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 2 Feb 2016 16:19:44 +0000
-Subject: [PATCH v2 10/21] arm64: KVM: VHE: Split save/restore of sysregs
- shared between EL1 and EL2
-In-Reply-To: <20160202154645.GE6190@cbox>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <1453737235-16522-11-git-send-email-marc.zyngier@arm.com>
- <20160201135438.GL1478@cbox> <56B07ADD.60300@arm.com>
- <20160202154645.GE6190@cbox>
-Message-ID: <56B0D720.9000901@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 2 Feb 2016 09:20:51 -0700
+Subject: [PATCH V8 23/23] perf tools: adding coresight etm PMU record
+ capabilities
+In-Reply-To: <CANLsYkxwtqHyoQ7+Z4a+qJfTV_ZWc72_mJh12FHxVEhNYKsgjw@mail.gmail.com>
+References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
+ <1452807977-8069-24-git-send-email-mathieu.poirier@linaro.org>
+ <CANLsYkyBCFyu3Q-3jet-6rNfa3vGzWWQ3_m+PNf4Z+n6OxsscA@mail.gmail.com>
+ <20160125211048.GE22501@kernel.org> <56AB4027.2070208@intel.com>
+ <CANLsYkyFSjLmT_i7ANE2VL21Y+Nud13SvjOd1akV-e9hQcTcHA@mail.gmail.com>
+ <20160129211208.GB32225@kernel.org>
+ <CANLsYkxwtqHyoQ7+Z4a+qJfTV_ZWc72_mJh12FHxVEhNYKsgjw@mail.gmail.com>
+Message-ID: <CANLsYkysvVKoaxKJu9TYLAGJaZj9=9gMN+O6NpcDLztJNrgy+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/16 15:46, Christoffer Dall wrote:
-> On Tue, Feb 02, 2016 at 09:46:05AM +0000, Marc Zyngier wrote:
->> On 01/02/16 13:54, Christoffer Dall wrote:
->>> On Mon, Jan 25, 2016 at 03:53:44PM +0000, Marc Zyngier wrote:
->>>> A handful of system registers are still shared between EL1 and EL2,
->>>> even while using VHE. These are tpidr*_el[01], actlr_el1, sp0, elr,
->>>> and spsr.
+[...]
+
+>>> >
+>>> > Looks OK, apart from adding linux/coresight-pmu.h to the manifest, but I
+>>> > mentioned that on another patch.
+>>> >
+>>> > However there is no decoder, which begs the question, is there anything you
+>>> > can actually do with the perf.data file?  Might be a bit confusing for users
+>>> > if they can capture traces but not use perf tools on the resulting perf.data
+>>> > file?
 >>>
->>> So by shared registers you mean registers that do both have an EL0/1
->>> version as well as an EL2 version, but where accesses aren't rewritten
->>> transparently?
+>>> We are working on a decoding library in parallel to this work.
 >>
->> No, I mean that these registers do *not* have a separate banked version.
->> There is only a single set of registers, which have to be save/restored
->> the old way.
-> 
-> huh, ARMv8 clearly specifies the existence of TPIDR_EL0, TPIDR_EL1, and
-> TPIDR_EL2, for example.
-> 
-> I cannot seem to find anywhere in the VHE spec that says that the
-> TPIDR_EL2 goes away.  I'm confused now.
+>> Would be nice to be able to get both in the same patch kit, no? So that
+>> one can both record and process the traces, verifying it all works.
+>
+> We are still a few weeks away from being in a position where the
+> community can start playing with the decoding library.  I can hold off
+> on the "perf tools" patches when I queue the kernel side of the work
+> for 4.6 but since you and Adrian have already reviewed the work it
+> would be nice to have that part included as well.
+>
+> We've been playing with the perf.data files for a couple of months now
+> and things look at the right place.  This isn't surprising since we
+> are using the same framework as X86.
+>
+> I think the generation of the perf.data file should be coupled with
+> the submission of the kernel driver but would also respect a diverging
+> point of view.  Simply let me know what you prefer and I will adjust
+> V9 accordingly.
 
-Nothing goes away, but these registers do not get renamed either. For
-example, TPIDR_EL1 doesn't magically access TPIDR_EL2 when running at
-EL2+VHE, and there is no TPIDR_EL12 accessor either.
+Arnaldo,
 
-So TPIDR_EL1 is effectively "shared" between host and guest, and must be
-save/restored (note that the host kernel still uses TIPDR_EL1 even when
-running with VHE, and that KVM still uses TPIDR_EL2 to cache the current
-vcpu).
-
->>
->>>
->>> also, by sp0 do you mean sp_el0, and by elr you mean elr_el1, and by
->>> spsr you mean spsr_el1 ?
->>
->> sp0 -> sp_el0 indeed. elr and spsr really are the guest PC and PSTATE,
->> so I should really reword this commit message, it is utterly confusing.
->>
-> I guess I don't understand the definition of a 'shared' register given
-> your comments here...
-
-Does this make it clearer?
+I'm preparing V9 at this time - what's your view on the above?
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Mathieu
