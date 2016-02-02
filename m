@@ -1,55 +1,64 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 2 Feb 2016 10:19:45 +0000
-Subject: [PATCH] arm64: move back to generic
- memblock_enforce_memory_limit()
-In-Reply-To: <1454351417-23732-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <20160201180256.GJ15514@e104818-lin.cambridge.arm.com>
- <1454351417-23732-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160202101945.GA22042@localhost.localdomain>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 2 Feb 2016 11:20:32 +0100
+Subject: [PATCH v4 0/7] ARM: dts: r-car: Add BRG support for (H)SCIF
+In-Reply-To: <1454061883-4043-1-git-send-email-geert+renesas@glider.be>
+References: <1454061883-4043-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20160202102031.GD15554@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 07:30:17PM +0100, Ard Biesheuvel wrote:
->  void __init arm64_memblock_init(void)
->  {
->  	const s64 linear_region_size = -(s64)PAGE_OFFSET;
-> @@ -215,24 +180,14 @@ void __init arm64_memblock_init(void)
->  	if (memblock_end_of_DRAM() > linear_region_size)
->  		memblock_remove(0, memblock_end_of_DRAM() - linear_region_size);
->  
-> +	/*
-> +	 * Apply the memory limit if it was set. Since the kernel may be loaded
-> +	 * high up in memory, add back the kernel region that must be accessible
-> +	 * via the linear mapping.
-> +	 */
->  	if (memory_limit != (phys_addr_t)ULLONG_MAX) {
-> -		u64 kbase = round_down(__pa(_text), MIN_KIMG_ALIGN);
-> -		u64 kend = PAGE_ALIGN(__pa(_end));
-> -		u64 const sz_4g = 0x100000000UL;
-> -
-> -		/*
-> -		 * Clip memory in order of preference:
-> -		 * - above the kernel and above 4 GB
-> -		 * - between 4 GB and the start of the kernel (if the kernel
-> -		 *   is loaded high in memory)
-> -		 * - between the kernel and 4 GB (if the kernel is loaded
-> -		 *   low in memory)
-> -		 * - below 4 GB
-> -		 */
-> -		clip_mem_range(max(sz_4g, kend), ULLONG_MAX);
-> -		clip_mem_range(sz_4g, kbase);
-> -		clip_mem_range(kend, sz_4g);
-> -		clip_mem_range(0, min(kbase, sz_4g));
-> +		memblock_enforce_memory_limit(memory_limit);
-> +		memblock_add(__pa(__init_begin), (u64)(_end - __init_begin));
+On Fri, Jan 29, 2016 at 11:04:36AM +0100, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
+> 
+> This patch series adds support for the Baud Rate Generator for External
+> Clock (BRG), as found on SCIF and HSCIF, to the DTS files for all R-Car
+> Gen1, Gen2, and Gen3 SoCs. This increases the range and accuracy of
+> supported baud rates on (H)SCIF.
+> 
+> Support for the extra clocks in the DT bindings and in the driver has
+> been accepted in v4.5-rc1.  
+> 
+> Changes compared to v3:
+>   - Change one-line summary prefix to match current arm-soc practices,
+>   - Rebased,
+> 
+> Changes compared to v2:
+>   - Rename "int_clk" to "brg_int",
+>   - Add support for R-Car M1A (r8a7778) and R-Car H1 (r8a7779),
+>   - Add support for R-Car H2 (r8a7790), R-Car M2-N (r8a7793), and R-Car
+>     E2 (r8a7794),
+>   - Correct internal clock source ZS_CLK to S3D1 in patch description
+>     for r8a7795, 
+> 
+> This has been tested on r8a7778/bockw, r8a7779/marzen, r8a7791/koelsch,
+> r8a7794/alt, and r8a7795/salvator-x.
+> 
+> Dependencies:
+>   - renesas-devel-20160129-v4.5-rc1,
+>   - series "[PATCH v4 0/7] ARM: dts: R-Car: Add SCIF fallback
+>     compatibility strings",
+>   - series "[PATCH v4 00/11] ARM: dts: shmobile: Rename the serial port
+>     clock to fck",
+> 
+> Thanks for applying!
 
-Thanks, it looks much simpler now. However, loading the kernel 1GB
-higher with mem=1G fails somewhere during the KVM hyp initialisation. It
-works if I change the last line below to:
+Is it safe to apply this in the light of the dependency on
+renesas-devel-20160129-v4.5-rc1?
 
-	memblock_add(__pa(_text), (u64)(_end - _text));
-
-I can fold the change in.
-
--- 
-Catalin
+> Geert Uytterhoeven (7):
+>   ARM: dts: r8a7778: Add BRG support for SCIF
+>   ARM: dts: r8a7779: Add BRG support for SCIF
+>   ARM: dts: r8a7790: Add BRG support for (H)SCIF
+>   ARM: dts: r8a7791: Add BRG support for (H)SCIF
+>   ARM: dts: r8a7793: Add BRG support for SCIF
+>   ARM: dts: r8a7794: Add BRG support for (H)SCIF
+>   arm64: dts: r8a7795: Add BRG support for (H)SCIF
+> 
+>  arch/arm/boot/dts/r8a7778.dtsi           | 39 +++++++++++------
+>  arch/arm/boot/dts/r8a7779.dtsi           | 39 +++++++++++------
+>  arch/arm/boot/dts/r8a7790.dtsi           | 29 +++++++++----
+>  arch/arm/boot/dts/r8a7791.dtsi           | 54 +++++++++++++++--------
+>  arch/arm/boot/dts/r8a7793.dtsi           | 54 +++++++++++++++--------
+>  arch/arm/boot/dts/r8a7794.dtsi           | 54 +++++++++++++++--------
+>  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 74 ++++++++++++++++++++++----------
+>  7 files changed, 235 insertions(+), 108 deletions(-)
