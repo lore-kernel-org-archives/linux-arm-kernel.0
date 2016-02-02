@@ -1,90 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 1 Feb 2016 19:05:34 -0800
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <Pine.LNX.4.44L0.1602011844540.2869-100000@netrider.rowland.org>
-References: <20160201232833.GR19432@atomide.com>
- <Pine.LNX.4.44L0.1602011844540.2869-100000@netrider.rowland.org>
-Message-ID: <20160202030533.GT19432@atomide.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Tue, 2 Feb 2016 11:16:16 +0800
+Subject: [PATCH 02/11] crypto: sunxi-ss: prevent compilation on 64-bit
+In-Reply-To: <1454348370-3816-3-git-send-email-andre.przywara@arm.com>
+References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
+ <1454348370-3816-3-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160202031616.GA16987@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-* Alan Stern <stern@rowland.harvard.edu> [160201 15:50]:
+On Mon, Feb 01, 2016 at 05:39:21PM +0000, Andre Przywara wrote:
+> The driver for the sunxi-ss crypto engine is not entirely 64-bit safe,
+> compilation on arm64 spits some warnings.
+> The proper fix was deemed to involved [1], so since 64-bit SoCs won't
+> have this IP block we just disable this driver for 64-bit.
 > 
-> You get here only if runtime PM is disabled, right?  So the rpm_idle 
-> call won't do anything -- "disabled" means don't make any callbacks.
+> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/399988.html
+>      (and the reply)
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-Hmm sorry yes I'm confused again. Yeah it looks like calling rpm_idle
-just has a side effect that makes a difference here.
+I still use COMPILE_TEST to test compile these drivers.  So while
+I don't have a problem with this patch per se, please continue to
+ensure that it doesn't generate warnings on 64-bit platforms.
 
-> Tony, exactly what are you trying to do here?  Do you want this to 
-> invoke a runtime-PM callback in the subsystem, power domain, or driver?  
-> (Is there even a driver bound to the device when this function runs?)
-
-I guess I need to add more printks to figure out what's going on here.
-But yeah, I'm not seeing the callback happening at the interconnect
-level so hardware and PM runtime states won't match on the following
-probe after -EPROBE_DEFER.
-
-> The function's name suggests that it merely resets the data stored in 
-> dev->power without actually touching the hardware.  Is that what you 
-> really want?
-
-I guess you mean pm_runtime_set_suspended() above? I'm seeing a state
-where we now set pm_runtime_set_suspended() between failed device
-probes and the device is still active in hardware.
-
-The patch below also helps with the problem and leaves out the
-rpm_suspend() call from loop so it might give more hints.
-
-The difference here from what Rafael suggested earlier is calling
-__pm_runtime_use_autosuspend() and then not calling
-pm_runtime_set_suspended().
-
-However, it seems the below patch keeps hardware active in the
-autoidle case though, so chances are there is more that needs to
-be done here. Anyways, I'll try to debug it more tomorrow.
-
-Regards,
-
-Tony
-
-8< ------------------
---- a/drivers/base/power/runtime.c
-+++ b/drivers/base/power/runtime.c
-@@ -1425,17 +1425,25 @@ void pm_runtime_init(struct device *dev)
-  */
- void pm_runtime_reinit(struct device *dev)
- {
--	if (!pm_runtime_enabled(dev)) {
--		if (dev->power.runtime_status == RPM_ACTIVE)
-+	if (pm_runtime_enabled(dev))
-+		return;
-+
-+	if (dev->power.runtime_status == RPM_ACTIVE) {
-+		if (dev->power.use_autosuspend) {
-+			pm_runtime_set_autosuspend_delay(dev, 0);
-+			__pm_runtime_use_autosuspend(dev, false);
-+		} else {
- 			pm_runtime_set_suspended(dev);
--		if (dev->power.irq_safe) {
--			spin_lock_irq(&dev->power.lock);
--			dev->power.irq_safe = 0;
--			spin_unlock_irq(&dev->power.lock);
--			if (dev->parent)
--				pm_runtime_put(dev->parent);
- 		}
- 	}
-+
-+	if (dev->power.irq_safe) {
-+		spin_lock_irq(&dev->power.lock);
-+		dev->power.irq_safe = 0;
-+		spin_unlock_irq(&dev->power.lock);
-+		if (dev->parent)
-+			pm_runtime_put(dev->parent);
-+	}
- }
- 
- /**
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
