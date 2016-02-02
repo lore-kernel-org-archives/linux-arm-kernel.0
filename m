@@ -1,82 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 2 Feb 2016 13:03:46 -0800
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <Pine.LNX.4.44L0.1602021402250.1653-100000@iolanthe.rowland.org>
-References: <20160202185450.GY19432@atomide.com>
- <Pine.LNX.4.44L0.1602021402250.1653-100000@iolanthe.rowland.org>
-Message-ID: <20160202210345.GZ19432@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 02 Feb 2016 22:07:17 +0100
+Subject: [PATCH 01/10] serial: mvebu-uart: initial support for Armada-3700
+ serial port
+In-Reply-To: <1454436468-4241-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1454436468-4241-1-git-send-email-gregory.clement@free-electrons.com>
+ <1454436468-4241-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <5687888.WDl8xbENFR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alan Stern <stern@rowland.harvard.edu> [160202 11:17]:
-> On Tue, 2 Feb 2016, Tony Lindgren wrote:
-> > I'd like to have pm_runtime_put_sync() disable the hardware after
-> > the initial failed probe. Currently that does not happen unless
-> > pm_runtime_dont_use_autosuspend() is called before pm_runtime_put_sync().
-> 
-> pm_runtime_put_sync() doesn't do anything to the hardware if the usage
-> count was > 1, because after the decrement it's still nonzero.  Where
-> is the particular call of pm_runtime_put_sync() that you're interested
-> in, and what is the usage count when it runs?  It's not at all unusual
-> for the usage count to be > 1 during a probe.
+On Tuesday 02 February 2016 19:07:39 Gregory CLEMENT wrote:
 
-The usage count is 0 at that point, it seems the be the RPM_AUTO
-causing the issues that we set at the end of rpm_idle().
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index 39721ec4f415..b291f934d51b 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -1606,6 +1606,28 @@ config SERIAL_STM32_CONSOLE
+>  	depends on SERIAL_STM32=y
+>  	select SERIAL_CORE_CONSOLE
+>  
+> +config SERIAL_MVEBU_UART
+> +	bool "Marvell EBU serial port support"
 
-> Also, what is autosuspend_delay set to for your device?  And is 
-> runtime_auto set?
+Could this be a loadable module?
 
-It's 100 at that point, see the commented snippet below from
-omap_hsmmc_probe():
+> +config SERIAL_MVEBU_CONSOLE
+> +	bool "Console on Marvell EBU serial port"
+> +	depends on SERIAL_MVEBU_UART
 
-	pm_runtime_enable(host->dev);
-	pm_runtime_get_sync(host->dev);
-	pm_runtime_set_autosuspend_delay(host->dev, MMC_AUTOSUSPEND_DELAY);
-	/* NOTE: pm_runtime_dont_use_autosuspend(host->dev) needed here? */
-	pm_runtime_use_autosuspend(host->dev);
-	...
-	/* gets -EPROBE_DEFER */
-err_irq:
-	...
-	pm_runtime_put_sync(host->dev);
-        pm_runtime_disable(host->dev);
-	/* NOTE: suspend callback never gets called unless
-	 * pm_runtime_dont_use_autosuspend() is called
-	 * before pm_runtime_put_sync() above.
-	 */
-	 ...
+If yes, this would become 
 
-> > > Does pm_runtime_use_autosuspend() get called by the probe routine?  If 
-> > > it does, then perhaps you can get what you want by having the probe 
-> > > routine call pm_runtime_dont_use_autosuspend() whenever it's about to 
-> > > return an error -- particularly -EDEFER.
-> > 
-> > Yes so far that's the only fix that seems to work like I posted
-> > earlier. But is that the right fix though?
-> 
-> No, not really.  Ideally you would leave autosuspend turned on.  The 
-> delay would be long enough to that after -EDEFER, another probe would 
-> start before the delay expired.  But shortly after the last probe 
-> attempt, the delay would expire and the device would then be put in low 
-> power.
+	depends on SERIAL_MVEBU_UART=y
 
-But then what about the new reinit function? To me it seems that
-we should not attempt to maintain a state from the earlier failed
-probe. Or are you thinking we just skip the reinit if autosuspend
-is set?
-
-> > If we wanted to have some generic fix, it seems we would have to pass
-> > a new flag in pm_runtime_put_sync() to ignore any autosuspend
-> > configuration. But I don't know if that's what we want to or should
-> > do though?
-> 
-> I don't think so.
-
-So should we just establish a policy that pm_runtime_use_autosuspend()
-needs to be paired with pm_runtime_dont_use_autosuspend() for
-pm_runtime_put_sync() to work?
-
-Regards,
-
-Tony
+	Arnd
