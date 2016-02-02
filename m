@@ -1,279 +1,90 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 02 Feb 2016 13:39:02 -0600
-Subject: [PATCH 5/5] PCI: Remove includes of asm/pci-bridge.h
-In-Reply-To: <20160202193026.9258.7573.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-References: <20160202193026.9258.7573.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-Message-ID: <20160202193902.9258.7816.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 2 Feb 2016 11:39:08 -0800
+Subject: [PATCH] arm64: asm: Explicitly include linux/personality.h in
+ asm/page.h
+In-Reply-To: <20160202164817.GM10166@arm.com>
+References: <1453983508-20410-1-git-send-email-broonie@kernel.org>
+ <20160128124417.GE6078@sirena.org.uk>
+ <20160128141425.GA20099@e104818-lin.cambridge.arm.com>
+ <20160128144610.GA2380@ulmo> <20160202164817.GM10166@arm.com>
+Message-ID: <20160202113908.d699440a0617006c3b987129@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drivers should include asm/pci-bridge.h only when they need the arch-
-specific things provided there.  Outside of the arch/ directories, the only
-drivers that actually need things provided by asm/pci-bridge.h are the
-powerpc RPA hotplug drivers in drivers/pci/hotplug/rpa*.
+On Tue, 2 Feb 2016 16:48:18 +0000 Will Deacon <will.deacon@arm.com> wrote:
 
-Remove the includes of asm/pci-bridge.h from the other drivers, adding an
-include of linux/pci.h if necessary.
+> On Thu, Jan 28, 2016 at 03:46:10PM +0100, Thierry Reding wrote:
+> > On Thu, Jan 28, 2016 at 02:14:26PM +0000, Catalin Marinas wrote:
+> > > On Thu, Jan 28, 2016 at 12:44:17PM +0000, Mark Brown wrote:
+> > > > On Thu, Jan 28, 2016 at 12:18:28PM +0000, Mark Brown wrote:
+> > > > > asm/page.h uses READ_IMPLIES_EXEC from linux/personality.h but does not
+> > > > > explicitly include it causing build failures in -next where whatever was
+> > > > > causing it to be implicitly included has changed to remove that
+> > > > > inclusion.  Add an explicit inclusion to fix this.
+> > > > 
+> > > > Argh, sorry - this causes problems further down the line with linking
+> > > > vdso.lds due to enums getting into the linker script and upsetting the
+> > > > linker (there are several compile errors today so it was masked).
+> > > 
+> > > You can move the include further down after the #ifndef __ASSEMBLY__
+> > 
+> > Indeed, here's what I've been using to successfully complete ARM64 test
+> > builds:
+> > 
+> > --- >8 ---
+> > diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
+> > index 9b2f5a9d019d..ae615b9d9a55 100644
+> > --- a/arch/arm64/include/asm/page.h
+> > +++ b/arch/arm64/include/asm/page.h
+> > @@ -39,6 +39,7 @@
+> >  
+> >  #ifndef __ASSEMBLY__
+> >  
+> > +#include <linux/personality.h> /* for READ_IMPLIES_EXEC */
+> >  #include <asm/pgtable-types.h>
+> >  
+> >  extern void __cpu_clear_user_page(void *p, unsigned long user);
+> 
+> I see this has ended up in linux-next, but I'm not sure whether or not
+> it's actually queued someplace for 4.6. Any ideas?
+> 
+> If not, I can take it (or some derivative) through arm64 as a fix for
+> -rc3.
 
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+It's not actually needed any more because Kirill has tweaked the patch
+which triggered this build error.
+
+However I think the change still makes sense as a standalone thing -
+your call.
+
+
+From: Andrew Morton <akpm@linux-foundation.org>
+Subject: arm: arch/arm/include/asm/page.h needs personality.h
+
+VM_DATA_DEFAULT_FLAGS uses READ_IMPLIES_EXEC, so page.h should include
+personality.h to provide this.
+
+This was needed for "mm: warn about VmData over RLIMIT_DATA".
+
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Konstantin Khlebnikov <koct9i@gmail.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
 ---
- drivers/ata/pata_macio.c                   |    2 +-
- drivers/char/agp/uninorth-agp.c            |    1 -
- drivers/gpu/drm/radeon/radeon_combios.c    |    1 -
- drivers/ide/pdc202xx_new.c                 |    1 -
- drivers/ide/pmac.c                         |    1 -
- drivers/macintosh/macio_asic.c             |    1 -
- drivers/misc/cxl/pci.c                     |    1 -
- drivers/net/ethernet/sun/sungem.c          |    1 -
- drivers/net/ethernet/toshiba/spider_net.c  |    1 -
- drivers/scsi/mac53c94.c                    |    2 +-
- drivers/scsi/mesh.c                        |    2 +-
- drivers/usb/core/hcd-pci.c                 |    1 -
- drivers/video/fbdev/aty/aty128fb.c         |    1 -
- drivers/video/fbdev/aty/radeon_base.c      |    1 -
- drivers/video/fbdev/imsttfb.c              |    1 -
- drivers/video/fbdev/matrox/matroxfb_base.h |    1 -
- drivers/video/fbdev/offb.c                 |    4 ----
- sound/ppc/pmac.c                           |    1 -
- 18 files changed, 3 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/ata/pata_macio.c b/drivers/ata/pata_macio.c
-index e3d4b05..e347e7a 100644
---- a/drivers/ata/pata_macio.c
-+++ b/drivers/ata/pata_macio.c
-@@ -22,6 +22,7 @@
- #include <linux/scatterlist.h>
- #include <linux/of.h>
- #include <linux/gfp.h>
-+#include <linux/pci.h>
+ arch/arm/include/asm/page.h |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff -puN arch/arm/include/asm/page.h~arm-arch-arm-include-asm-pageh-needs-personalityh arch/arm/include/asm/page.h
+--- a/arch/arm/include/asm/page.h~arm-arch-arm-include-asm-pageh-needs-personalityh
++++ a/arch/arm/include/asm/page.h
+@@ -17,6 +17,8 @@
  
- #include <scsi/scsi.h>
- #include <scsi/scsi_host.h>
-@@ -30,7 +31,6 @@
- #include <asm/macio.h>
- #include <asm/io.h>
- #include <asm/dbdma.h>
--#include <asm/pci-bridge.h>
- #include <asm/machdep.h>
- #include <asm/pmac_feature.h>
- #include <asm/mediabay.h>
-diff --git a/drivers/char/agp/uninorth-agp.c b/drivers/char/agp/uninorth-agp.c
-index 0575544..fdced54 100644
---- a/drivers/char/agp/uninorth-agp.c
-+++ b/drivers/char/agp/uninorth-agp.c
-@@ -10,7 +10,6 @@
- #include <linux/delay.h>
- #include <linux/vmalloc.h>
- #include <asm/uninorth.h>
--#include <asm/pci-bridge.h>
- #include <asm/prom.h>
- #include <asm/pmac_feature.h>
- #include "agp.h"
-diff --git a/drivers/gpu/drm/radeon/radeon_combios.c b/drivers/gpu/drm/radeon/radeon_combios.c
-index a9b01bc..432480f 100644
---- a/drivers/gpu/drm/radeon/radeon_combios.c
-+++ b/drivers/gpu/drm/radeon/radeon_combios.c
-@@ -34,7 +34,6 @@
- #include <asm/machdep.h>
- #include <asm/pmac_feature.h>
- #include <asm/prom.h>
--#include <asm/pci-bridge.h>
- #endif /* CONFIG_PPC_PMAC */
+ #ifndef __ASSEMBLY__
  
- /* from radeon_legacy_encoder.c */
-diff --git a/drivers/ide/pdc202xx_new.c b/drivers/ide/pdc202xx_new.c
-index 9ad014a..b33646b 100644
---- a/drivers/ide/pdc202xx_new.c
-+++ b/drivers/ide/pdc202xx_new.c
-@@ -28,7 +28,6 @@
++#include <linux/personality.h>	/* For READ_IMPLIES_EXEC */
++
+ #ifndef CONFIG_MMU
  
- #ifdef CONFIG_PPC_PMAC
- #include <asm/prom.h>
--#include <asm/pci-bridge.h>
- #endif
- 
- #define DRV_NAME "pdc202xx_new"
-diff --git a/drivers/ide/pmac.c b/drivers/ide/pmac.c
-index 96a3452..7f0434f 100644
---- a/drivers/ide/pmac.c
-+++ b/drivers/ide/pmac.c
-@@ -40,7 +40,6 @@
- #include <asm/io.h>
- #include <asm/dbdma.h>
- #include <asm/ide.h>
--#include <asm/pci-bridge.h>
- #include <asm/machdep.h>
- #include <asm/pmac_feature.h>
- #include <asm/sections.h>
-diff --git a/drivers/macintosh/macio_asic.c b/drivers/macintosh/macio_asic.c
-index 4f12c6f..b6819f0 100644
---- a/drivers/macintosh/macio_asic.c
-+++ b/drivers/macintosh/macio_asic.c
-@@ -31,7 +31,6 @@
- #include <asm/macio.h>
- #include <asm/pmac_feature.h>
- #include <asm/prom.h>
--#include <asm/pci-bridge.h>
- 
- #undef DEBUG
- 
-diff --git a/drivers/misc/cxl/pci.c b/drivers/misc/cxl/pci.c
-index 4c1903f..a214032 100644
---- a/drivers/misc/cxl/pci.c
-+++ b/drivers/misc/cxl/pci.c
-@@ -19,7 +19,6 @@
- #include <linux/delay.h>
- #include <asm/opal.h>
- #include <asm/msi_bitmap.h>
--#include <asm/pci-bridge.h> /* for struct pci_controller */
- #include <asm/pnv-pci.h>
- #include <asm/io.h>
- 
-diff --git a/drivers/net/ethernet/sun/sungem.c b/drivers/net/ethernet/sun/sungem.c
-index e23a642..2437227 100644
---- a/drivers/net/ethernet/sun/sungem.c
-+++ b/drivers/net/ethernet/sun/sungem.c
-@@ -51,7 +51,6 @@
- #endif
- 
- #ifdef CONFIG_PPC_PMAC
--#include <asm/pci-bridge.h>
- #include <asm/prom.h>
- #include <asm/machdep.h>
- #include <asm/pmac_feature.h>
-diff --git a/drivers/net/ethernet/toshiba/spider_net.c b/drivers/net/ethernet/toshiba/spider_net.c
-index 3c54a2c..6761027 100644
---- a/drivers/net/ethernet/toshiba/spider_net.c
-+++ b/drivers/net/ethernet/toshiba/spider_net.c
-@@ -48,7 +48,6 @@
- #include <linux/wait.h>
- #include <linux/workqueue.h>
- #include <linux/bitops.h>
--#include <asm/pci-bridge.h>
- #include <net/checksum.h>
- 
- #include "spider_net.h"
-diff --git a/drivers/scsi/mac53c94.c b/drivers/scsi/mac53c94.c
-index 1412266..a6682c5 100644
---- a/drivers/scsi/mac53c94.c
-+++ b/drivers/scsi/mac53c94.c
-@@ -18,11 +18,11 @@
- #include <linux/spinlock.h>
- #include <linux/interrupt.h>
- #include <linux/module.h>
-+#include <linux/pci.h>
- #include <asm/dbdma.h>
- #include <asm/io.h>
- #include <asm/pgtable.h>
- #include <asm/prom.h>
--#include <asm/pci-bridge.h>
- #include <asm/macio.h>
- 
- #include <scsi/scsi.h>
-diff --git a/drivers/scsi/mesh.c b/drivers/scsi/mesh.c
-index 555367f..1753e42 100644
---- a/drivers/scsi/mesh.c
-+++ b/drivers/scsi/mesh.c
-@@ -29,6 +29,7 @@
- #include <linux/interrupt.h>
- #include <linux/reboot.h>
- #include <linux/spinlock.h>
-+#include <linux/pci.h>
- #include <asm/dbdma.h>
- #include <asm/io.h>
- #include <asm/pgtable.h>
-@@ -38,7 +39,6 @@
- #include <asm/processor.h>
- #include <asm/machdep.h>
- #include <asm/pmac_feature.h>
--#include <asm/pci-bridge.h>
- #include <asm/macio.h>
- 
- #include <scsi/scsi.h>
-diff --git a/drivers/usb/core/hcd-pci.c b/drivers/usb/core/hcd-pci.c
-index 9eb1cff..c3640f8 100644
---- a/drivers/usb/core/hcd-pci.c
-+++ b/drivers/usb/core/hcd-pci.c
-@@ -28,7 +28,6 @@
- #ifdef CONFIG_PPC_PMAC
- #include <asm/machdep.h>
- #include <asm/pmac_feature.h>
--#include <asm/pci-bridge.h>
- #include <asm/prom.h>
- #endif
- 
-diff --git a/drivers/video/fbdev/aty/aty128fb.c b/drivers/video/fbdev/aty/aty128fb.c
-index c42ce2f..0a46268 100644
---- a/drivers/video/fbdev/aty/aty128fb.c
-+++ b/drivers/video/fbdev/aty/aty128fb.c
-@@ -68,7 +68,6 @@
- #include <asm/machdep.h>
- #include <asm/pmac_feature.h>
- #include <asm/prom.h>
--#include <asm/pci-bridge.h>
- #include "../macmodes.h"
- #endif
- 
-diff --git a/drivers/video/fbdev/aty/radeon_base.c b/drivers/video/fbdev/aty/radeon_base.c
-index ce0b1d0..218339a 100644
---- a/drivers/video/fbdev/aty/radeon_base.c
-+++ b/drivers/video/fbdev/aty/radeon_base.c
-@@ -76,7 +76,6 @@
- 
- #ifdef CONFIG_PPC
- 
--#include <asm/pci-bridge.h>
- #include "../macmodes.h"
- 
- #ifdef CONFIG_BOOTX_TEXT
-diff --git a/drivers/video/fbdev/imsttfb.c b/drivers/video/fbdev/imsttfb.c
-index 9b167f7..4363c64 100644
---- a/drivers/video/fbdev/imsttfb.c
-+++ b/drivers/video/fbdev/imsttfb.c
-@@ -33,7 +33,6 @@
- #if defined(CONFIG_PPC)
- #include <linux/nvram.h>
- #include <asm/prom.h>
--#include <asm/pci-bridge.h>
- #include "macmodes.h"
- #endif
- 
-diff --git a/drivers/video/fbdev/matrox/matroxfb_base.h b/drivers/video/fbdev/matrox/matroxfb_base.h
-index 09b02cd..7a90ea2 100644
---- a/drivers/video/fbdev/matrox/matroxfb_base.h
-+++ b/drivers/video/fbdev/matrox/matroxfb_base.h
-@@ -47,7 +47,6 @@
- 
- #if defined(CONFIG_PPC_PMAC)
- #include <asm/prom.h>
--#include <asm/pci-bridge.h>
- #include "../macmodes.h"
- #endif
- 
-diff --git a/drivers/video/fbdev/offb.c b/drivers/video/fbdev/offb.c
-index 43a0a52..fb60a8f 100644
---- a/drivers/video/fbdev/offb.c
-+++ b/drivers/video/fbdev/offb.c
-@@ -28,10 +28,6 @@
- #include <linux/pci.h>
- #include <asm/io.h>
- 
--#ifdef CONFIG_PPC64
--#include <asm/pci-bridge.h>
--#endif
--
- #ifdef CONFIG_PPC32
- #include <asm/bootx.h>
- #endif
-diff --git a/sound/ppc/pmac.c b/sound/ppc/pmac.c
-index 0095a80..a5843fc 100644
---- a/sound/ppc/pmac.c
-+++ b/sound/ppc/pmac.c
-@@ -34,7 +34,6 @@
- #include "pmac.h"
- #include <sound/pcm_params.h>
- #include <asm/pmac_feature.h>
--#include <asm/pci-bridge.h>
- 
- 
- /* fixed frequency table for awacs, screamer, burgundy, DACA (44100 max) */
+ #include <asm/page-nommu.h>
+_
