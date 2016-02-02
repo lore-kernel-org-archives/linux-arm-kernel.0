@@ -1,298 +1,110 @@
-From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
-Date: Tue, 2 Feb 2016 15:39:17 +0530
-Subject: [PATCH v10 2/8] Documentation, dt, numa: dt bindings for numa.
-In-Reply-To: <1454407763-1017-1-git-send-email-gkulkarni@caviumnetworks.com>
-References: <1454407763-1017-1-git-send-email-gkulkarni@caviumnetworks.com>
-Message-ID: <1454407763-1017-3-git-send-email-gkulkarni@caviumnetworks.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 2 Feb 2016 18:09:59 +0800
+Subject: [PATCH 05/11] drivers: pinctrl: add driver for Allwinner A64 SoC
+In-Reply-To: <20160202100046.GM4652@lukather>
+References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
+ <1454348370-3816-6-git-send-email-andre.przywara@arm.com>
+ <20160201182754.GA14737@excalibur.cnev.de>
+ <56AFE0EC.8080207@arm.com> <20160202100046.GM4652@lukather>
+Message-ID: <CAGb2v66JGbuQJUh5k6guhKrN4GqMmomyBFtqgcH09Zm-pVGxPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT bindings for numa mapping of memory, cores and IOs.
+On Tue, Feb 2, 2016 at 6:00 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Andre,
+>
+> On Mon, Feb 01, 2016 at 10:49:16PM +0000, Andr? Przywara wrote:
+>> On 01/02/16 18:27, Karsten Merker wrote:
+>>
+>> Hi Karsten,
+>>
+>> thank you very much for your feedback!
+>>
+>> > On Mon, Feb 01, 2016 at 05:39:24PM +0000, Andre Przywara wrote:
+>> >> Based on the Allwinner A64 user manual and on the previous sunxi
+>> >> pinctrl drivers this introduces the pin multiplex assignments for
+>> >> the ARMv8 Allwinner A64 SoC.
+>> >> Port A is apparently used for the fixed function DRAM controller, so
+>> >> the ports start at B here (the manual mentions "n from 1 to 7", so
+>> >> not starting at 0).
+>> >>
+>> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> >> ---
+>> >>  .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
+>> >>  arch/arm64/Kconfig.platforms                       |   1 +
+>> >>  drivers/pinctrl/sunxi/Kconfig                      |   4 +
+>> >>  drivers/pinctrl/sunxi/Makefile                     |   1 +
+>> >>  drivers/pinctrl/sunxi/pinctrl-a64.c                | 606 +++++++++++++++++++++
+>> >>  5 files changed, 613 insertions(+)
+>> >>  create mode 100644 drivers/pinctrl/sunxi/pinctrl-a64.c
+>> >>
+>> >> diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+>> >> index 9213b27..9050002 100644
+>> >> --- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+>> >> +++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+>> >> @@ -21,6 +21,7 @@ Required properties:
+>> >>    "allwinner,sun9i-a80-r-pinctrl"
+>> >>    "allwinner,sun8i-a83t-pinctrl"
+>> >>    "allwinner,sun8i-h3-pinctrl"
+>> >> +  "allwinner,a64-pinctrl"
+>> >
+>> > Hello,
+>> >
+>> > on all other Allwinner SoCs we use the SoC family as part of the
+>> > compatible, as well as in the names of the Kconfig options. To
+>> > keep things consistent, I would like to propose doing the same on
+>> > Arm64, i.e. using allwinner,sun50i-a64-pinctrl instead of
+>> > allwinner,a64-pinctrl.
+>>
+>> Yes, I have been told this already. However I don't like this idea so
+>> much, for the following reasons:
+>> a) It is mostly redundant. The actual SoC (marketing) name is unique,
+>> there is no sun6i-a20 or sun7i-a23.
+>
+> At the same time, the family name is mostly valid too.
+>
+> We do share some DTSI across some SoCs already by their family name
+> (sun5i.dtsi for the A10s/A13/R8, sun8i-a23-a33.dtsi for the A23 and
+> A33, etc.)
+>
+>> b) It is not even helpful. If I got Maxime correctly, then the newer
+>> sunxi generation numbers depend on the ARM _cores_ used in the SoC,
+>> which is frankly the least interesting part from a Linux support
+>> perspective. I would see some sense if it would reflect the generation
+>> of IP blocks used, but so it is even more confusing to see that
+>> sun7i-a20 and sun8i-a23 are related, but sun8i-h3 is a completely
+>> different beast. The Allwinner marketing name tells you that, but the
+>> sunxi one does not.
+>
+> The opposite can be said too.
+>
+> The A31 is quite different from the A33, while the A83 is much closer
+> to the H3 than it is to the A80. Their marketing scheme is messy. In
+> all aspects. We have a scheme that worked, I'd really like to stick
+> with it.
+>
+>> c) It is very confusing for people not dealing with it everyday. Just
+>> because I own a BananaPi I know that the A20 is sun7i, but I am totally
+>> lost when it comes to all the other names. And even now it took me about
+>> a minute to find the appropriate Wiki page which explains part of that
+>> story.
+>> d) Most importantly ;-): It kills TAB completion, unless you know the
+>> sunxi number, which is mostly not true as pointed out in c)
+>
+> Both of these are true, but are about the DT filenames, and not the
+> compatibles. I'd agree with you on this one now that we have
+> per-vendor subfolders in boot/dts, but it was not the case before, and
+> I'm pretty sure that to anyone that is not aware of the Allwinner SoCs
+> names, having an A<number>.dtsi in arch/arm/boot/dts, it would be
+> about a Cortex-A<number>, and definitely not an SoC from some random
+> vendor.
+>
+> So, droping it in the filenames, why not. But I'd really like to keep
+> the same compatible scheme.
 
-Reviewed-by: Robert Richter <rrichter@cavium.com>
-Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
----
- Documentation/devicetree/bindings/numa.txt | 272 +++++++++++++++++++++++++++++
- 1 file changed, 272 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/numa.txt
+If we do end up dropping it from the filenames, can you (Andr?) update
+MAINTAINERS to add "arch/arm64/boot/dts/sunxi/" to the sunxi entry?
 
-diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
-new file mode 100644
-index 0000000..ec5ed7c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/numa.txt
-@@ -0,0 +1,272 @@
-+==============================================================================
-+NUMA binding description.
-+==============================================================================
-+
-+==============================================================================
-+1 - Introduction
-+==============================================================================
-+
-+Systems employing a Non Uniform Memory Access (NUMA) architecture contain
-+collections of hardware resources including processors, memory, and I/O buses,
-+that comprise what is commonly known as a NUMA node.
-+Processor accesses to memory within the local NUMA node is generally faster
-+than processor accesses to memory outside of the local NUMA node.
-+DT defines interfaces that allow the platform to convey NUMA node
-+topology information to OS.
-+
-+==============================================================================
-+2 - numa-node-id
-+==============================================================================
-+
-+For the purpose of identification, each NUMA node is associated with a unique
-+token known as a node id. For the purpose of this binding
-+a node id is a 32-bit integer.
-+
-+A device node is associated with a NUMA node by the presence of a
-+numa-node-id property which contains the node id of the device.
-+
-+Example:
-+	/* numa node 0 */
-+	numa-node-id = <0>;
-+
-+	/* numa node 1 */
-+	numa-node-id = <1>;
-+
-+==============================================================================
-+3 - distance-map
-+==============================================================================
-+
-+The device tree node distance-map describes the relative
-+distance (memory latency) between all numa nodes.
-+
-+- compatible : Should at least contain "numa-distance-map-v1".
-+
-+- distance-matrix
-+  This property defines a matrix to describe the relative distances
-+  between all numa nodes.
-+  It is represented as a list of node pairs and their relative distance.
-+
-+  Note:
-+	1. Each entry represents distance from first node to second node.
-+	The distances are equal in either direction.
-+	2. The distance from a node to self (local distance) is represented
-+	with value 10 and all internode distance should be represented with
-+	a value greater than 10.
-+	3. distance-matrix should have entries in lexicographical ascending
-+	order of nodes.
-+	4. There must be only one device node distance-map which must reside in the root node.
-+
-+Example:
-+	4 nodes connected in mesh/ring topology as below,
-+
-+		0_______20______1
-+		|               |
-+		|               |
-+		20             20
-+		|               |
-+		|               |
-+		|_______________|
-+		3       20      2
-+
-+	if relative distance for each hop is 20,
-+	then internode distance would be,
-+	      0 -> 1 = 20
-+	      1 -> 2 = 20
-+	      2 -> 3 = 20
-+	      3 -> 0 = 20
-+	      0 -> 2 = 40
-+	      1 -> 3 = 40
-+
-+     and dt presentation for this distance matrix is,
-+
-+		distance-map {
-+			 compatible = "numa-distance-map-v1";
-+			 distance-matrix = <0 0  10>,
-+					   <0 1  20>,
-+					   <0 2  40>,
-+					   <0 3  20>,
-+					   <1 0  20>,
-+					   <1 1  10>,
-+					   <1 2  20>,
-+					   <1 3  40>,
-+					   <2 0  40>,
-+					   <2 1  20>,
-+					   <2 2  10>,
-+					   <2 3  20>,
-+					   <3 0  20>,
-+					   <3 1  40>,
-+					   <3 2  20>,
-+					   <3 3  10>;
-+		};
-+
-+==============================================================================
-+4 - Example dts
-+==============================================================================
-+
-+Dual socket system consists of 2 boards connected through ccn bus and
-+each board having one socket/soc of 8 cpus, memory and pci bus.
-+
-+	memory at c00000 {
-+		device_type = "memory";
-+		reg = <0x0 0xc00000 0x0 0x80000000>;
-+		/* node 0 */
-+		numa-node-id = <0>;
-+	};
-+
-+	memory at 10000000000 {
-+		device_type = "memory";
-+		reg = <0x100 0x0 0x0 0x80000000>;
-+		/* node 1 */
-+		numa-node-id = <1>;
-+	};
-+
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x0>;
-+			enable-method = "psci";
-+			/* node 0 */
-+			numa-node-id = <0>;
-+		};
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x1>;
-+			enable-method = "psci";
-+			numa-node-id = <0>;
-+		};
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x2>;
-+			enable-method = "psci";
-+			numa-node-id = <0>;
-+		};
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x3>;
-+			enable-method = "psci";
-+			numa-node-id = <0>;
-+		};
-+		cpu at 4 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x4>;
-+			enable-method = "psci";
-+			numa-node-id = <0>;
-+		};
-+		cpu at 5 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x5>;
-+			enable-method = "psci";
-+			numa-node-id = <0>;
-+		};
-+		cpu at 6 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x6>;
-+			enable-method = "psci";
-+			numa-node-id = <0>;
-+		};
-+		cpu at 7 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x7>;
-+			enable-method = "psci";
-+			numa-node-id = <0>;
-+		};
-+		cpu at 8 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x8>;
-+			enable-method = "psci";
-+			/* node 1 */
-+			numa-node-id = <1>;
-+		};
-+		cpu at 9 {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0x9>;
-+			enable-method = "psci";
-+			numa-node-id = <1>;
-+		};
-+		cpu at a {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0xa>;
-+			enable-method = "psci";
-+			numa-node-id = <1>;
-+		};
-+		cpu at b {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0xb>;
-+			enable-method = "psci";
-+			numa-node-id = <1>;
-+		};
-+		cpu at c {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0xc>;
-+			enable-method = "psci";
-+			numa-node-id = <1>;
-+		};
-+		cpu at d {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0xd>;
-+			enable-method = "psci";
-+			numa-node-id = <1>;
-+		};
-+		cpu at e {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0xe>;
-+			enable-method = "psci";
-+			numa-node-id = <1>;
-+		};
-+		cpu at f {
-+			device_type = "cpu";
-+			compatible =  "arm,armv8";
-+			reg = <0x0 0xf>;
-+			enable-method = "psci";
-+			numa-node-id = <1>;
-+		};
-+	};
-+
-+	pcie0: pcie0 at 848000000000 {
-+		compatible = "arm,armv8";
-+		device_type = "pci";
-+		bus-range = <0 255>;
-+		#size-cells = <2>;
-+		#address-cells = <3>;
-+		reg = <0x8480 0x00000000 0 0x10000000>;  /* Configuration space */
-+		ranges = <0x03000000 0x8010 0x00000000 0x8010 0x00000000 0x70 0x00000000>;
-+		/* node 0 */
-+		numa-node-id = <0>;
-+        };
-+
-+	pcie1: pcie1 at 948000000000 {
-+		compatible = "arm,armv8";
-+		device_type = "pci";
-+		bus-range = <0 255>;
-+		#size-cells = <2>;
-+		#address-cells = <3>;
-+		reg = <0x9480 0x00000000 0 0x10000000>;  /* Configuration space */
-+		ranges = <0x03000000 0x9010 0x00000000 0x9010 0x00000000 0x70 0x00000000>;
-+		/* node 1 */
-+		numa-node-id = <1>;
-+        };
-+
-+	distance-map {
-+		compatible = "numa-distance-map-v1";
-+		distance-matrix = <0 0 10>,
-+				  <0 1 20>,
-+				  <1 1 10>;
-+	};
--- 
-1.8.1.4
+Thanks.
+ChenYu
