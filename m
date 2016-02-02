@@ -1,31 +1,55 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Tue, 2 Feb 2016 17:05:07 +0000
-Subject: [PATCH v4] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <alpine.LFD.2.20.1602011522070.32766@knanqh.ubzr>
-References: <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
- <1454349165-12249-1-git-send-email-chris.brandt@renesas.com>
- <alpine.LFD.2.20.1602011404420.32766@knanqh.ubzr>
- <SG2PR06MB0572F0EE79C00A530FA9CF398ADE0@SG2PR06MB0572.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1602011522070.32766@knanqh.ubzr>
-Message-ID: <HKXPR06MB0565EEA0ED5BB19E5CFC992B8ADF0@HKXPR06MB0565.apcprd06.prod.outlook.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue,  2 Feb 2016 17:03:26 +0000
+Subject: [PATCH v1 0/5] arm64: kernel: Add support for User Access Override
+Message-ID: <1454432611-21333-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 1 Feb 2016, Nicolas Pitre wrote:
-> The __data_loc symbol doesn't convey much to say with regards to XIP 
-> mapping.  It would be better to dedicate another symbol with a 
-> proper name instead.  Something like xiprom_start and xiprom_end perhaps.
-> This way, someone looking at the linker script won't be fooled by a 
-> hidden meaning tied to _etext or __data_loc.
+This series adds support for User Access Override (UAO; part of the ARMv8.2
+Extensions[0]). When enabled, this causes the get_user() accessors to use
+the unprivileged load/store instructions. When addr_limit is set to
+KERNEL_DS, we set the override bit allowing privileged access.
 
-In keeping with the convention that's already in the vmlinux.lds, I'm going to go with "_xiprom" and "_exiprom"
+Because the unprivileged instructions don't trip PAN, the last patch changes
+which 'alternative' values are swapped in, allowing PAN to be left enabled
+during get_user() and friends.
 
+This series can be retrieved from:
+git://linux-arm.org/linux-jm.git -b uao/v1
 
-> > Or, should we keep piling more stuff in vmlinux.lds.S?
->
-> I still think the split linker file is the way to go.
+Comments welcome,
 
-So...since I didn't hear any clapping and cheering, first I'd like to fix what I know is broken and get that in. Then go back to the splitting linker script idea.
+James
 
+[0] https://community.arm.com/groups/processors/blog/2016/01/05/armv8-a-architecture-evolution
 
-Chris
+James Morse (5):
+  kernel: cpufeature: Change read_cpuid() to use sysreg's mrs_s macro
+  arm64: add ARMv8.2 id_aa64mmfr2 boiler plate
+  arm64: kernel: Add support for User Access Override
+  arm64: cpufeature: Test 'matches' pointer to find the end of the list
+  arm64: kernel: Don't toggle PAN on systems with UAO
+
+ arch/arm64/Kconfig                   |  21 ++++++
+ arch/arm64/include/asm/alternative.h |  72 +++++++++++++++++++++
+ arch/arm64/include/asm/cpu.h         |   1 +
+ arch/arm64/include/asm/cpufeature.h  |   6 +-
+ arch/arm64/include/asm/cputype.h     |  20 +++---
+ arch/arm64/include/asm/processor.h   |   1 +
+ arch/arm64/include/asm/sysreg.h      |   7 ++
+ arch/arm64/include/asm/thread_info.h |   6 ++
+ arch/arm64/include/asm/uaccess.h     |  52 ++++++++++-----
+ arch/arm64/include/uapi/asm/ptrace.h |   1 +
+ arch/arm64/kernel/cpufeature.c       | 120 +++++++++++++++++++++++++----------
+ arch/arm64/kernel/cpuinfo.c          |  55 ++++++++--------
+ arch/arm64/kernel/process.c          |  20 ++++++
+ arch/arm64/lib/clear_user.S          |  12 ++--
+ arch/arm64/lib/copy_from_user.S      |  12 ++--
+ arch/arm64/lib/copy_in_user.S        |  20 +++---
+ arch/arm64/lib/copy_to_user.S        |  12 ++--
+ arch/arm64/mm/context.c              |   2 +-
+ arch/arm64/mm/fault.c                |  21 ++++--
+ 19 files changed, 337 insertions(+), 124 deletions(-)
+
+-- 
+2.6.2
