@@ -1,228 +1,134 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue,  2 Feb 2016 17:03:31 +0000
-Subject: [PATCH v1 5/5] arm64: kernel: Don't toggle PAN on systems with UAO
-In-Reply-To: <1454432611-21333-1-git-send-email-james.morse@arm.com>
-References: <1454432611-21333-1-git-send-email-james.morse@arm.com>
-Message-ID: <1454432611-21333-6-git-send-email-james.morse@arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 2 Feb 2016 17:15:15 +0000 (UTC)
+Subject: OMAP baseline test results for v4.5-rc2
+Message-ID: <alpine.DEB.2.02.1602021713541.20554@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a CPU supports both Privileged Access Never (PAN) and User Access
-Override (UAO), we don't need to disable/re-enable PAN round all
-copy_to_user() like calls.
 
-UAO alternatives cause these calls to use the 'unprivileged' load/store
-instructions, which are overridden to be the privileged kind when
-fs==KERNEL_DS.
+Here are some basic OMAP test results for Linux v4.5-rc2.
+Logs and other details at:
 
-This patch changes the copy_to_user() calls to have their PAN toggling
-depend on a new composite 'feature' ARM64_ALT_PAN_NOT_UAO.
+    http://www.pwsan.com/omap/testlogs/test_v4.5-rc2/20160131225233/
 
-If both features are detected, PAN will be enabled, but the copy_to_user()
-alternatives will not be applied. This means PAN will be enabled all the
-time for these functions. If only PAN is detected, the toggling will be
-enabled as normal.
 
-This will save the time taken to disable/re-enable PAN, and allow us to
-catch copy_to_user() accesses that occur with fs==KERNEL_DS.
+Test summary
+------------
 
-Futex and swp-emulation code continue to hang their PAN toggling code on
-ARM64_HAS_PAN.
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/include/asm/cpufeature.h |  3 ++-
- arch/arm64/include/asm/uaccess.h    |  8 ++++----
- arch/arm64/kernel/cpufeature.c      | 16 ++++++++++++++++
- arch/arm64/lib/clear_user.S         |  4 ++--
- arch/arm64/lib/copy_from_user.S     |  4 ++--
- arch/arm64/lib/copy_in_user.S       |  4 ++--
- arch/arm64/lib/copy_to_user.S       |  4 ++--
- arch/arm64/mm/fault.c               |  3 +++
- 8 files changed, 33 insertions(+), 13 deletions(-)
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-stk-om44,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 349e8203d16e..7ae0d90a21ed 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -31,8 +31,9 @@
- #define ARM64_WORKAROUND_CAVIUM_23154		6
- #define ARM64_WORKAROUND_834220			7
- #define ARM64_HAS_UAO				8
-+#define ARM64_ALT_PAN_NOT_UAO			9
- 
--#define ARM64_NCAPS				9
-+#define ARM64_NCAPS				10
- 
- #ifndef __ASSEMBLY__
- 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index f973bdce8410..16ba0d5c9740 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -145,7 +145,7 @@ static inline void set_fs(mm_segment_t fs)
- do {									\
- 	unsigned long __gu_val;						\
- 	__chk_user_ptr(ptr);						\
--	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,	\
-+	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_ALT_PAN_NOT_UAO,\
- 			CONFIG_ARM64_PAN));				\
- 	switch (sizeof(*(ptr))) {					\
- 	case 1:								\
-@@ -168,7 +168,7 @@ do {									\
- 		BUILD_BUG();						\
- 	}								\
- 	(x) = (__force __typeof__(*(ptr)))__gu_val;			\
--	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,	\
-+	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_ALT_PAN_NOT_UAO,\
- 			CONFIG_ARM64_PAN));				\
- } while (0)
- 
-@@ -217,7 +217,7 @@ do {									\
- do {									\
- 	__typeof__(*(ptr)) __pu_val = (x);				\
- 	__chk_user_ptr(ptr);						\
--	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,	\
-+	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_ALT_PAN_NOT_UAO,\
- 			CONFIG_ARM64_PAN));				\
- 	switch (sizeof(*(ptr))) {					\
- 	case 1:								\
-@@ -239,7 +239,7 @@ do {									\
- 	default:							\
- 		BUILD_BUG();						\
- 	}								\
--	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,	\
-+	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_ALT_PAN_NOT_UAO,\
- 			CONFIG_ARM64_PAN));				\
- } while (0)
- 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index caecc9a81b82..3456f0847a3c 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -67,6 +67,10 @@ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
- 		.width = 0,				\
- 	}
- 
-+/* meta feature for alternatives */
-+static bool __maybe_unused
-+cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry);
-+
- static struct arm64_ftr_bits ftr_id_aa64isar0[] = {
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
-@@ -671,6 +675,12 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.enable = cpu_enable_uao,
- 	},
- #endif /* CONFIG_ARM64_UAO */
-+#ifdef CONFIG_ARM64_PAN
-+	{
-+		.capability = ARM64_ALT_PAN_NOT_UAO,
-+		.matches = cpufeature_pan_not_uao,
-+	},
-+#endif /* CONFIG_ARM64_PAN */
- 	{},
- };
- 
-@@ -962,3 +972,9 @@ void cpu_enable_uao(void *__unused)
- 	asm(SET_PSTATE_UAO(1));
- }
- #endif /* CONFIG_ARM64_UAO */
-+
-+static bool __maybe_unused
-+cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry)
-+{
-+	return (cpus_have_cap(ARM64_HAS_PAN) && !cpus_have_cap(ARM64_HAS_UAO));
-+}
-diff --git a/arch/arm64/lib/clear_user.S b/arch/arm64/lib/clear_user.S
-index 3f950b677c07..5d1cad3ce6d6 100644
---- a/arch/arm64/lib/clear_user.S
-+++ b/arch/arm64/lib/clear_user.S
-@@ -33,7 +33,7 @@
-  * Alignment fixed up by hardware.
-  */
- ENTRY(__clear_user)
--ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_HAS_PAN, \
-+ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	mov	x2, x1			// save the size for fixup return
- 	subs	x1, x1, #8
-@@ -54,7 +54,7 @@ uao_user_alternative 9f, strh, sttrh, wzr, x0, 2
- 	b.mi	5f
- uao_user_alternative 9f, strb, sttrb, wzr, x0, 0
- 5:	mov	x0, #0
--ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_HAS_PAN, \
-+ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	ret
- ENDPROC(__clear_user)
-diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
-index 1d982d64f1a7..17e8306dca29 100644
---- a/arch/arm64/lib/copy_from_user.S
-+++ b/arch/arm64/lib/copy_from_user.S
-@@ -67,11 +67,11 @@
- 
- end	.req	x5
- ENTRY(__copy_from_user)
--ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_HAS_PAN, \
-+ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	add	end, x0, x2
- #include "copy_template.S"
--ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_HAS_PAN, \
-+ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	mov	x0, #0				// Nothing to copy
- 	ret
-diff --git a/arch/arm64/lib/copy_in_user.S b/arch/arm64/lib/copy_in_user.S
-index feaad1520dc1..f7292dd08c84 100644
---- a/arch/arm64/lib/copy_in_user.S
-+++ b/arch/arm64/lib/copy_in_user.S
-@@ -68,11 +68,11 @@
- 
- end	.req	x5
- ENTRY(__copy_in_user)
--ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_HAS_PAN, \
-+ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	add	end, x0, x2
- #include "copy_template.S"
--ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_HAS_PAN, \
-+ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	mov	x0, #0
- 	ret
-diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
-index 2dae2cd2c481..21faae60f988 100644
---- a/arch/arm64/lib/copy_to_user.S
-+++ b/arch/arm64/lib/copy_to_user.S
-@@ -66,11 +66,11 @@
- 
- end	.req	x5
- ENTRY(__copy_to_user)
--ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_HAS_PAN, \
-+ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	add	end, x0, x2
- #include "copy_template.S"
--ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_HAS_PAN, \
-+ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	mov	x0, #0
- 	ret
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 5ce2656b04df..5dd40909cbce 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -234,6 +234,9 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 	}
- 
- 	if (permission_fault(esr) && (addr < USER_DS)) {
-+		if (get_thread_info(regs->sp)->addr_limit == KERNEL_DS)
-+			panic("Accessing user space memory with fs=KERNEL_DS");
-+
- 		if (!search_exception_tables(regs->pc))
- 			panic("Accessing user space memory outside uaccess.h routines");
- 	}
--- 
-2.6.2
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+
+Build warnings from toolchain: uImage:
+    (none)
+
+Build warnings from toolchain: uImage+dtb:
+    (none)
+
+Build warnings from toolchain: zImage:
+    FAIL ( 1/17): multi_v7_defconfig
+
+Boot to userspace:
+    FAIL ( 1/18): 2430sdp
+    skip ( 3/18): 5912osk, 3517evm, 5430es2sbct54
+    Pass (14/18): am335xbonelt, am437xsk, am335xbone, 4430es2panda,
+		  4460pandaes, 4460varsomom, 37xxevm, 3530es3beagle,
+		  3530es31beagle, 3730beaglexm, 3730es12beaglexm,
+		  cmt3517, 5430es2uevm, 2420n800
+
+Kernel warnings during boot to userspace:
+    FAIL ( 1/18): cmt3517
+
+PM: chip retention via suspend:
+    FAIL ( 7/11): am335xbonelt, 4430es2panda, 4460pandaes,
+		  4460varsomom, 37xxevm, 2430sdp, 5430es2uevm
+    Pass ( 4/11): 3530es3beagle, 3530es31beagle, 3730beaglexm,
+		  3730es12beaglexm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 9/11): am335xbonelt, 4430es2panda, 4460pandaes,
+		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  2430sdp, 5430es2uevm
+    Pass ( 2/11): 3730beaglexm, 3730es12beaglexm
+
+PM: chip off (except CORE, due to errata) via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 2/ 4): 37xxevm, 3530es3beagle
+    Pass ( 2/ 4): 3530es31beagle, 3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    FAIL ( 3/ 4): 37xxevm, 3530es3beagle, 3530es31beagle
+    Pass ( 1/ 4): 3730es12beaglexm
+
+Kernel warnings during PM test:
+    (none)
+
+Obsolete Kconfig symbols:
+    FAIL ( 3/20): omap1_defconfig, omap2plus_defconfig,
+		  multi_v7_defconfig
+
+
+vmlinux object size
+(delta in bytes from test_v4.5-rc1 (92e963f50fc74041b5e9e744c330dca48e04f08d)):
+   text     data      bss    total  kernel
+   +473       -8      -32     +433  omap1_defconfig
+   +473        0      -32     +441  omap1_defconfig_1510innovator_only
+   +557       -8      -32     +517  omap1_defconfig_5912osk_only
+   +660     +128        0     +788  multi_v7_defconfig
+   +133      +32        0     +165  omap2plus_defconfig
+   +109      +24      -32     +101  omap2plus_defconfig_2430sdp_only
+    +41      +32        0      +73  omap2plus_defconfig_am33xx_only
+    +45      +32        0      +77  omap2plus_defconfig_am43xx_only
+    +69      +32        0     +101  omap2plus_defconfig_cpupm
+    -19      +24        0       +5  omap2plus_defconfig_dra7xx_only
+    +21       -8      -32      -19  omap2plus_defconfig_n800_multi_omap2xxx
+   +441      +24      -32     +433  omap2plus_defconfig_n800_only_a
+   +129      +24        0     +153  omap2plus_defconfig_no_pm
+   +133      +32        0     +165  omap2plus_defconfig_omap2_4_only
+    -19      +32        0      +13  omap2plus_defconfig_omap3_4_only
+    -19      +32        0      +13  omap2plus_defconfig_omap5_only
+   +376        0        0     +376  rmk_omap3430_ldp_allnoconfig
+   +257        0        0     +257  rmk_omap3430_ldp_oldconfig
+   +376        0        0     +376  rmk_omap4430_sdp_allnoconfig
+   +281        0        0     +281  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v4.5-rc1 (92e963f50fc74041b5e9e744c330dca48e04f08d))
+  avail  rsrvd   high  freed  board          kconfig
+  (no differences)
