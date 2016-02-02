@@ -1,68 +1,97 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  2 Feb 2016 12:46:26 +0000
-Subject: [PATCH 4/4] arm64: lib: patch in prfm for copy_page if requested
+Date: Tue,  2 Feb 2016 12:46:25 +0000
+Subject: [PATCH 3/4] arm64: lib: improve copy_page to deal with 128 bytes at a
+ time
 In-Reply-To: <1454417186-21828-1-git-send-email-will.deacon@arm.com>
 References: <1454417186-21828-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1454417186-21828-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1454417186-21828-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Pinski <apinski@cavium.com>
+We want to avoid lots of different copy_page implementations, settling
+for something that is "good enough" everywhere and hopefully easy to
+understand and maintain whilst we're at it.
 
-On ThunderX T88 pass 1 and pass 2, there is no hardware prefetching so
-we need to patch in explicit software prefetching instructions
+This patch reworks our copy_page implementation based on discussions
+with Cavium on the list and benchmarking on Cortex-A processors so that:
 
-Prefetching improves this code by 60% over the original code and 2x
-over the code without prefetching for the affected hardware using the
-benchmark code at https://github.com/apinski-cavium/copy_page_benchmark
+  - The loop is unrolled to copy 128 bytes per iteration
 
-Signed-off-by: Andrew Pinski <apinski@cavium.com>
+  - The reads are offset so that we read from the next 128-byte block
+    in the same iteration that we store the previous block
+
+  - Explicit prefetch instructions are removed for now, since they hurt
+    performance on CPUs with hardware prefetching
+
+  - The loop exit condition is calculated at the start of the loop
+
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/lib/copy_page.S | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm64/lib/copy_page.S | 46 ++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 38 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm64/lib/copy_page.S b/arch/arm64/lib/copy_page.S
-index 2534533ceb1d..4c1e700840b6 100644
+index 512b9a7b980e..2534533ceb1d 100644
 --- a/arch/arm64/lib/copy_page.S
 +++ b/arch/arm64/lib/copy_page.S
-@@ -18,6 +18,8 @@
- #include <linux/const.h>
- #include <asm/assembler.h>
- #include <asm/page.h>
-+#include <asm/cpufeature.h>
-+#include <asm/alternative.h>
- 
- /*
-  * Copy a page from src to dest (both are page aligned)
-@@ -27,6 +29,15 @@
+@@ -27,20 +27,50 @@
   *	x1 - src
   */
  ENTRY(copy_page)
-+alternative_if_not ARM64_HAS_NO_HW_PREFETCH
-+	nop
-+	nop
-+alternative_else
-+	# Prefetch two cache lines ahead.
-+	prfm    pldl1strm, [x1, #128]
-+	prfm    pldl1strm, [x1, #256]
-+alternative_endif
-+
- 	ldp	x2, x3, [x1]
+-	/* Assume cache line size is 64 bytes. */
+-	prfm	pldl1strm, [x1, #64]
+-1:	ldp	x2, x3, [x1]
++	ldp	x2, x3, [x1]
  	ldp	x4, x5, [x1, #16]
  	ldp	x6, x7, [x1, #32]
-@@ -41,6 +52,12 @@ ENTRY(copy_page)
- 1:
- 	subs	x18, x18, #128
- 
-+alternative_if_not ARM64_HAS_NO_HW_PREFETCH
-+	nop
-+alternative_else
-+	prfm    pldl1strm, [x1, #384]
-+alternative_endif
+ 	ldp	x8, x9, [x1, #48]
+-	add	x1, x1, #64
+-	prfm	pldl1strm, [x1, #64]
++	ldp	x10, x11, [x1, #64]
++	ldp	x12, x13, [x1, #80]
++	ldp	x14, x15, [x1, #96]
++	ldp	x16, x17, [x1, #112]
++
++	mov	x18, #(PAGE_SIZE - 128)
++	add	x1, x1, #128
++1:
++	subs	x18, x18, #128
 +
  	stnp	x2, x3, [x0]
- 	ldp	x2, x3, [x1]
++	ldp	x2, x3, [x1]
  	stnp	x4, x5, [x0, #16]
++	ldp	x4, x5, [x1, #16]
+ 	stnp	x6, x7, [x0, #32]
++	ldp	x6, x7, [x1, #32]
+ 	stnp	x8, x9, [x0, #48]
+-	add	x0, x0, #64
+-	tst	x1, #(PAGE_SIZE - 1)
+-	b.ne	1b
++	ldp	x8, x9, [x1, #48]
++	stnp	x10, x11, [x0, #64]
++	ldp	x10, x11, [x1, #64]
++	stnp	x12, x13, [x0, #80]
++	ldp	x12, x13, [x1, #80]
++	stnp	x14, x15, [x0, #96]
++	ldp	x14, x15, [x1, #96]
++	stnp	x16, x17, [x0, #112]
++	ldp	x16, x17, [x1, #112]
++
++	add	x0, x0, #128
++	add	x1, x1, #128
++
++	b.gt	1b
++
++	stnp	x2, x3, [x0]
++	stnp	x4, x5, [x0, #16]
++	stnp	x6, x7, [x0, #32]
++	stnp	x8, x9, [x0, #48]
++	stnp	x10, x11, [x0, #64]
++	stnp	x12, x13, [x0, #80]
++	stnp	x14, x15, [x0, #96]
++	stnp	x16, x17, [x0, #112]
++
+ 	ret
+ ENDPROC(copy_page)
 -- 
 2.1.4
