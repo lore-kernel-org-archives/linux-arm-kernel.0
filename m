@@ -1,147 +1,118 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 2 Feb 2016 12:35:46 -0500 (EST)
-Subject: [PATCH v5] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <1454433540-25948-1-git-send-email-chris.brandt@renesas.com>
-References: <1454349165-12249-1-git-send-email-chris.brandt@renesas.com>
- <1454433540-25948-1-git-send-email-chris.brandt@renesas.com>
-Message-ID: <alpine.LFD.2.20.1602021235120.32766@knanqh.ubzr>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Feb 2016 18:37:44 +0100
+Subject: [linux-sunxi] Re: [PATCH 05/11] drivers: pinctrl: add driver for
+ Allwinner A64 SoC
+In-Reply-To: <20160202035852.6984db63@i7>
+References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
+ <1454348370-3816-6-git-send-email-andre.przywara@arm.com>
+ <20160201182754.GA14737@excalibur.cnev.de>
+ <56AFE0EC.8080207@arm.com> <20160202035852.6984db63@i7>
+Message-ID: <20160202173744.GB4652@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2 Feb 2016, Chris Brandt wrote:
+Hi,
 
-> For an XIP build, _etext does not represent the end of the
-> binary image that needs to stay mapped into the MODULES_VADDR area.
-> Years ago, data came before text in the memory map. However,
-> now that the order is text/init/data, an XIP_KERNEL needs to map
-> up to the data location in order to keep from cutting off
-> parts of the kernel that are needed.
-> We only map up to the beginning of data because data has already been
-> copied, so there's no reason to keep it around anymore.
+On Tue, Feb 02, 2016 at 03:58:52AM +0200, Siarhei Siamashka wrote:
+> > > On Mon, Feb 01, 2016 at 05:39:24PM +0000, Andre Przywara wrote:  
+> > >> Based on the Allwinner A64 user manual and on the previous sunxi
+> > >> pinctrl drivers this introduces the pin multiplex assignments for
+> > >> the ARMv8 Allwinner A64 SoC.
+> > >> Port A is apparently used for the fixed function DRAM controller, so
+> > >> the ports start at B here (the manual mentions "n from 1 to 7", so
+> > >> not starting at 0).
+> > >>
+> > >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> > >> ---
+> > >>  .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
+> > >>  arch/arm64/Kconfig.platforms                       |   1 +
+> > >>  drivers/pinctrl/sunxi/Kconfig                      |   4 +
+> > >>  drivers/pinctrl/sunxi/Makefile                     |   1 +
+> > >>  drivers/pinctrl/sunxi/pinctrl-a64.c                | 606 +++++++++++++++++++++
+> > >>  5 files changed, 613 insertions(+)
+> > >>  create mode 100644 drivers/pinctrl/sunxi/pinctrl-a64.c
+> > >>
+> > >> diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+> > >> index 9213b27..9050002 100644
+> > >> --- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+> > >> +++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+> > >> @@ -21,6 +21,7 @@ Required properties:
+> > >>    "allwinner,sun9i-a80-r-pinctrl"
+> > >>    "allwinner,sun8i-a83t-pinctrl"
+> > >>    "allwinner,sun8i-h3-pinctrl"
+> > >> +  "allwinner,a64-pinctrl"  
+> > > 
+> > > Hello,
+> > > 
+> > > on all other Allwinner SoCs we use the SoC family as part of the
+> > > compatible, as well as in the names of the Kconfig options. To
+> > > keep things consistent, I would like to propose doing the same on
+> > > Arm64, i.e. using allwinner,sun50i-a64-pinctrl instead of
+> > > allwinner,a64-pinctrl.  
+> > 
+> > Yes, I have been told this already. However I don't like this idea so
+> > much, for the following reasons:
+> > a) It is mostly redundant. The actual SoC (marketing) name is unique,
+> > there is no sun6i-a20 or sun7i-a23.
+> > b) It is not even helpful. If I got Maxime correctly, then the newer
+> > sunxi generation numbers depend on the ARM _cores_ used in the SoC,
+> > which is frankly the least interesting part from a Linux support
+> > perspective. I would see some sense if it would reflect the generation
+> > of IP blocks used, but so it is even more confusing to see that
+> > sun7i-a20 and sun8i-a23 are related, but sun8i-h3 is a completely
+> > different beast. The Allwinner marketing name tells you that, but the
+> > sunxi one does not.
+> > c) It is very confusing for people not dealing with it everyday. Just
+> > because I own a BananaPi I know that the A20 is sun7i, but I am totally
+> > lost when it comes to all the other names. And even now it took me about
+> > a minute to find the appropriate Wiki page which explains part of that
+> > story.
+> > d) Most importantly ;-): It kills TAB completion, unless you know the
+> > sunxi number, which is mostly not true as pointed out in c)
+> > 
+> > So while I see that just a<somenumber> is not really very specific, I'd
+> > rather do away with current naming scheme for the future. In this
+> > particular case we have the vendor name as a name space identifier
+> > already, so there is no possible confusion with ARM Cortex naming, for
+> > instance.
+> > 
+> > Also as this is now moving into the arm64 world, I'd like to use the
+> > opportunity to fix things that are not really optimal, the naming is one
+> > of them.
 > 
-> This fixes the bug where you might lose the end of your kernel area
-> after page table setup is complete.
+> One of the problems is that A64 name is not unique. We have reasons
+> to believe that there are also H64 and R18 out there using exactly
+> the same die, but possibly available in different packaging (a different
+> ball grid pitch? or maybe a different set of peripherals routed to the
+> outside?). Early prototypes of the Pine64 board were using Allwinner R18
+> and the Jide Remix Mini HTPC box is using Allwinner H64.
 > 
-> Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+> The bootloader sources from Allwinner are also referring to A64 as
+> AW1689, which makes some sense because it is the chip id number that
+> is accessible for runtime identification via reading the SRAM_VER_REG
+> hardware register:
+> 
+>     http://linux-sunxi.org/SRAM_Controller_Register_Guide#SRAM_VER_REG
+> 
+> So would it be a good idea to use "aw1689" as a compatible property
+> in the DT instead of "a64"? Or maybe have "aw1689-a64" and
+> "aw1689-h64", which would be similar to the existing "sun5i-a13"
+> and "sun5i-a10s" naming convention?
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+If someone cannot find out the family name that is documented on
+several places, I'm not sure he'll find the obscure, internal code
+name.
 
+Maxime
 
-> ---
-> v5:
-> * Switched from using __data_loc to _exiprom (new symbol)
-> v4:
-> * Switched from using _edata_loc __data_loc.
-> * Made commit text more accurate.
-> v3:
-> * Removed sections.h from Kbuild
-> v2:
-> * Added change for MODULES_VADDR
-> * Moved extern to new file asm/sections.h
-> ---
->  arch/arm/include/asm/Kbuild     | 1 -
->  arch/arm/include/asm/sections.h | 8 ++++++++
->  arch/arm/kernel/module.c        | 2 +-
->  arch/arm/kernel/vmlinux.lds.S   | 2 ++
->  arch/arm/mm/mmu.c               | 8 ++++++--
->  5 files changed, 17 insertions(+), 4 deletions(-)
->  create mode 100644 arch/arm/include/asm/sections.h
-> 
-> diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
-> index 16da638..3f6616b 100644
-> --- a/arch/arm/include/asm/Kbuild
-> +++ b/arch/arm/include/asm/Kbuild
-> @@ -23,7 +23,6 @@ generic-y += preempt.h
->  generic-y += resource.h
->  generic-y += rwsem.h
->  generic-y += seccomp.h
-> -generic-y += sections.h
->  generic-y += segment.h
->  generic-y += sembuf.h
->  generic-y += serial.h
-> diff --git a/arch/arm/include/asm/sections.h b/arch/arm/include/asm/sections.h
-> new file mode 100644
-> index 0000000..803bbf2
-> --- /dev/null
-> +++ b/arch/arm/include/asm/sections.h
-> @@ -0,0 +1,8 @@
-> +#ifndef _ASM_ARM_SECTIONS_H
-> +#define _ASM_ARM_SECTIONS_H
-> +
-> +#include <asm-generic/sections.h>
-> +
-> +extern char _exiprom[];
-> +
-> +#endif	/* _ASM_ARM_SECTIONS_H */
-> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-> index efdddcb..4f14b5c 100644
-> --- a/arch/arm/kernel/module.c
-> +++ b/arch/arm/kernel/module.c
-> @@ -34,7 +34,7 @@
->   * recompiling the whole kernel when CONFIG_XIP_KERNEL is turned on/off.
->   */
->  #undef MODULES_VADDR
-> -#define MODULES_VADDR	(((unsigned long)_etext + ~PMD_MASK) & PMD_MASK)
-> +#define MODULES_VADDR	(((unsigned long)_exiprom + ~PMD_MASK) & PMD_MASK)
->  #endif
->  
->  #ifdef CONFIG_MMU
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index 8b60fde..d18e4e5 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -86,6 +86,7 @@ SECTIONS
->  
->  #ifdef CONFIG_XIP_KERNEL
->  	. = XIP_VIRT_ADDR(CONFIG_XIP_PHYS_ADDR);
-> +	_xiprom = .;			/* XIP ROM area to be mapped */
->  #else
->  	. = PAGE_OFFSET + TEXT_OFFSET;
->  #endif
-> @@ -228,6 +229,7 @@ SECTIONS
->  #endif
->  
->  #ifdef CONFIG_XIP_KERNEL
-> +	_exiprom = .;			/* End of XIP ROM area */
->  	__data_loc = ALIGN(4);		/* location in binary */
->  	. = PAGE_OFFSET + TEXT_OFFSET;
->  #else
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index 434d76f..e4b681a 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -1253,7 +1253,7 @@ static inline void prepare_page_table(void)
->  
->  #ifdef CONFIG_XIP_KERNEL
->  	/* The XIP kernel is mapped in the module area -- skip over it */
-> -	addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
-> +	addr = ((unsigned long)_exiprom + PMD_SIZE - 1) & PMD_MASK;
->  #endif
->  	for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
->  		pmd_clear(pmd_off_k(addr));
-> @@ -1335,7 +1335,7 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
->  #ifdef CONFIG_XIP_KERNEL
->  	map.pfn = __phys_to_pfn(CONFIG_XIP_PHYS_ADDR & SECTION_MASK);
->  	map.virtual = MODULES_VADDR;
-> -	map.length = ((unsigned long)_etext - map.virtual + ~SECTION_MASK) & SECTION_MASK;
-> +	map.length = ((unsigned long)_exiprom - map.virtual + ~SECTION_MASK) & SECTION_MASK;
->  	map.type = MT_ROM;
->  	create_mapping(&map);
->  #endif
-> @@ -1426,7 +1426,11 @@ static void __init kmap_init(void)
->  static void __init map_lowmem(void)
->  {
->  	struct memblock_region *reg;
-> +#ifdef CONFIG_XIP_KERNEL
-> +	phys_addr_t kernel_x_start = round_down(__pa(_sdata), SECTION_SIZE);
-> +#else
->  	phys_addr_t kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
-> +#endif
->  	phys_addr_t kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
->  
->  	/* Map all the lowmem memory banks. */
-> -- 
-> 1.9.1
-> 
-> 
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160202/70c844c1/attachment.sig>
