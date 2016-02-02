@@ -1,71 +1,298 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue,  2 Feb 2016 18:09:38 +0800
-Subject: [PATCH v6 0/4] mailbox: hisilicon: add Hi6220 mailbox driver
-Message-ID: <1454407782-24674-1-git-send-email-leo.yan@linaro.org>
+From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
+Date: Tue, 2 Feb 2016 15:39:17 +0530
+Subject: [PATCH v10 2/8] Documentation, dt, numa: dt bindings for numa.
+In-Reply-To: <1454407763-1017-1-git-send-email-gkulkarni@caviumnetworks.com>
+References: <1454407763-1017-1-git-send-email-gkulkarni@caviumnetworks.com>
+Message-ID: <1454407763-1017-3-git-send-email-gkulkarni@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi6220 mailbox supports up to 32 channels. Each channel is unidirectional
-with a maximum message size of 8 words. I/O is performed using register
-access (there is no DMA) and the cell raises an interrupt when messages
-are received.
+DT bindings for numa mapping of memory, cores and IOs.
 
-This patch series is to implement Hi6220 mailbox driver. It registers
-two channels into framework for communication with MCU, one is tx channel
-and another is rx channel. Now mailbox driver is used to send message to
-MCU to control dynamic voltage and frequency scaling for CPU, GPU and DDR.
+Reviewed-by: Robert Richter <rrichter@cavium.com>
+Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+---
+ Documentation/devicetree/bindings/numa.txt | 272 +++++++++++++++++++++++++++++
+ 1 file changed, 272 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/numa.txt
 
-Changes from v5:
-* Refine to use mailbox three specifiers for client driver, so add xlate
-  callback function in mailbox driver to support these specifiers
-* Refine document for property "hi6220,mbox-tx-noirq"
-
-Changes from v4:
-* According to Jassi's suggestion, using DT binding to register channels
-* Change to use operating-points-v2 to register operating points
-
-Changes from v3:
-* The patch series for enabling idle state for Hi6220 has reserved memory
-  regions, so this series will not include it anymore
-* Refined mailbox driver according to Jassi's suggestion;
-  Removed kfifo from mailbox driver;
-  Removed spinlock for ipc registers accessing, due every channel has its
-  own dedicated bit in ipc register and readl/writel will introduce memory
-  barrier, so don't need spinlock to protect ipc registers accessing
-* After mailbox driver is ready, can use patch 4 to enable CPU's OPPs and
-  stub clock driver; finally can enable CPUFreq driver for CPU frequency
-  scaling
-
-Changes from v2:
-* Get rid of unused memory regions from memory node in DT, and don't use
-  reserved-memory node according to Mark and Leif's suggestion; Haojian also
-  has updated UEFI for efi memory info
-
-Changes from v1:
-* Correct lock usage for SMP scenario
-
-Changes from RFC:
-* According to Jassi's review, totally remove the abstract common driver
-  layer and only commit driver dedicated for Hi6220
-* According to Paul Bolle's review, fix typo issue for Kconfig and remove
-  unnecessary dependency with OF and fix minor for mailbox driver
-* Refine a little for dts nodes
-
-
-Leo Yan (4):
-  dt-bindings: mailbox: Document Hi6220 mailbox driver
-  mailbox: Hi6220: add mailbox driver
-  arm64: dts: add mailbox node for Hi6220
-  arm64: dts: add Hi6220's stub clock node
-
- .../bindings/mailbox/hisilicon,hi6220-mailbox.txt  |  74 ++++
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  64 ++++
- drivers/mailbox/Kconfig                            |   8 +
- drivers/mailbox/Makefile                           |   2 +
- drivers/mailbox/hi6220-mailbox.c                   | 395 +++++++++++++++++++++
- 5 files changed, 543 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi6220-mailbox.txt
- create mode 100644 drivers/mailbox/hi6220-mailbox.c
-
+diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
+new file mode 100644
+index 0000000..ec5ed7c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/numa.txt
+@@ -0,0 +1,272 @@
++==============================================================================
++NUMA binding description.
++==============================================================================
++
++==============================================================================
++1 - Introduction
++==============================================================================
++
++Systems employing a Non Uniform Memory Access (NUMA) architecture contain
++collections of hardware resources including processors, memory, and I/O buses,
++that comprise what is commonly known as a NUMA node.
++Processor accesses to memory within the local NUMA node is generally faster
++than processor accesses to memory outside of the local NUMA node.
++DT defines interfaces that allow the platform to convey NUMA node
++topology information to OS.
++
++==============================================================================
++2 - numa-node-id
++==============================================================================
++
++For the purpose of identification, each NUMA node is associated with a unique
++token known as a node id. For the purpose of this binding
++a node id is a 32-bit integer.
++
++A device node is associated with a NUMA node by the presence of a
++numa-node-id property which contains the node id of the device.
++
++Example:
++	/* numa node 0 */
++	numa-node-id = <0>;
++
++	/* numa node 1 */
++	numa-node-id = <1>;
++
++==============================================================================
++3 - distance-map
++==============================================================================
++
++The device tree node distance-map describes the relative
++distance (memory latency) between all numa nodes.
++
++- compatible : Should at least contain "numa-distance-map-v1".
++
++- distance-matrix
++  This property defines a matrix to describe the relative distances
++  between all numa nodes.
++  It is represented as a list of node pairs and their relative distance.
++
++  Note:
++	1. Each entry represents distance from first node to second node.
++	The distances are equal in either direction.
++	2. The distance from a node to self (local distance) is represented
++	with value 10 and all internode distance should be represented with
++	a value greater than 10.
++	3. distance-matrix should have entries in lexicographical ascending
++	order of nodes.
++	4. There must be only one device node distance-map which must reside in the root node.
++
++Example:
++	4 nodes connected in mesh/ring topology as below,
++
++		0_______20______1
++		|               |
++		|               |
++		20             20
++		|               |
++		|               |
++		|_______________|
++		3       20      2
++
++	if relative distance for each hop is 20,
++	then internode distance would be,
++	      0 -> 1 = 20
++	      1 -> 2 = 20
++	      2 -> 3 = 20
++	      3 -> 0 = 20
++	      0 -> 2 = 40
++	      1 -> 3 = 40
++
++     and dt presentation for this distance matrix is,
++
++		distance-map {
++			 compatible = "numa-distance-map-v1";
++			 distance-matrix = <0 0  10>,
++					   <0 1  20>,
++					   <0 2  40>,
++					   <0 3  20>,
++					   <1 0  20>,
++					   <1 1  10>,
++					   <1 2  20>,
++					   <1 3  40>,
++					   <2 0  40>,
++					   <2 1  20>,
++					   <2 2  10>,
++					   <2 3  20>,
++					   <3 0  20>,
++					   <3 1  40>,
++					   <3 2  20>,
++					   <3 3  10>;
++		};
++
++==============================================================================
++4 - Example dts
++==============================================================================
++
++Dual socket system consists of 2 boards connected through ccn bus and
++each board having one socket/soc of 8 cpus, memory and pci bus.
++
++	memory at c00000 {
++		device_type = "memory";
++		reg = <0x0 0xc00000 0x0 0x80000000>;
++		/* node 0 */
++		numa-node-id = <0>;
++	};
++
++	memory at 10000000000 {
++		device_type = "memory";
++		reg = <0x100 0x0 0x0 0x80000000>;
++		/* node 1 */
++		numa-node-id = <1>;
++	};
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible =  "arm,armv8";
++			reg = <0x0 0x0>;
++			enable-method = "psci";
++			/* node 0 */
++			numa-node-id = <0>;
++		};
++		cpu at 1 {
++			device_type = "cpu";
++			compatible =  "arm,armv8";
++			reg = <0x0 0x1>;
++			enable-method = "psci";
++			numa-node-id = <0>;
++		};
++		cpu at 2 {
++			device_type = "cpu";
++			compatible =  "arm,armv8";
++			reg = <0x0 0x2>;
++			enable-method = "psci";
++			numa-node-id = <0>;
++		};
++		cpu at 3 {
++			device_type = "cpu";
++			compatible =  "arm,armv8";
++			reg = <0x0 0x3>;
++			enable-method = "psci";
++			numa-node-id = <0>;
++		};
++		cpu at 4 {
++			device_type = "cpu";
++			compatible =  "arm,armv8";
++			reg = <0x0 0x4>;
++			enable-method = "psci";
++			numa-node-id = <0>;
++		};
++		cpu at 5 {
++			device_type = "cpu";
++			compatible =  "arm,armv8";
++			reg = <0x0 0x5>;
++			enable-method = "psci";
++			numa-node-id = <0>;
++		};
++		cpu at 6 {
++			device_type = "cpu";
++			compatible =  "arm,armv8";
++			reg = <0x0 0x6>;
++			enable-method = "psci";
++			numa-node-id = <0>;
++		};
++		cpu at 7 {
++			device_type = "cpu";
++			compatible =  "arm,armv8";
++			reg = <0x0 0x7>;
++			enable-method = "psci";
++			numa-node-id = <0>;
++		};
++		cpu at 8 {
++			device_type = "cpu";
++			compatible =  "arm,armv8";
++			reg = <0x0 0x8>;
++			enable-method = "psci";
++			/* node 1 */
++			numa-node-id = <1>;
++		};
++		cpu at 9 {
++			device_type = "cpu";
++			compatible =  "arm,armv8";
++			reg = <0x0 0x9>;
++			enable-method = "psci";
++			numa-node-id = <1>;
++		};
++		cpu at a {
++			device_type = "cpu";
++			compatible =  "arm,armv8";
++			reg = <0x0 0xa>;
++			enable-method = "psci";
++			numa-node-id = <1>;
++		};
++		cpu at b {
++			device_type = "cpu";
++			compatible =  "arm,armv8";
++			reg = <0x0 0xb>;
++			enable-method = "psci";
++			numa-node-id = <1>;
++		};
++		cpu at c {
++			device_type = "cpu";
++			compatible =  "arm,armv8";
++			reg = <0x0 0xc>;
++			enable-method = "psci";
++			numa-node-id = <1>;
++		};
++		cpu at d {
++			device_type = "cpu";
++			compatible =  "arm,armv8";
++			reg = <0x0 0xd>;
++			enable-method = "psci";
++			numa-node-id = <1>;
++		};
++		cpu at e {
++			device_type = "cpu";
++			compatible =  "arm,armv8";
++			reg = <0x0 0xe>;
++			enable-method = "psci";
++			numa-node-id = <1>;
++		};
++		cpu at f {
++			device_type = "cpu";
++			compatible =  "arm,armv8";
++			reg = <0x0 0xf>;
++			enable-method = "psci";
++			numa-node-id = <1>;
++		};
++	};
++
++	pcie0: pcie0 at 848000000000 {
++		compatible = "arm,armv8";
++		device_type = "pci";
++		bus-range = <0 255>;
++		#size-cells = <2>;
++		#address-cells = <3>;
++		reg = <0x8480 0x00000000 0 0x10000000>;  /* Configuration space */
++		ranges = <0x03000000 0x8010 0x00000000 0x8010 0x00000000 0x70 0x00000000>;
++		/* node 0 */
++		numa-node-id = <0>;
++        };
++
++	pcie1: pcie1 at 948000000000 {
++		compatible = "arm,armv8";
++		device_type = "pci";
++		bus-range = <0 255>;
++		#size-cells = <2>;
++		#address-cells = <3>;
++		reg = <0x9480 0x00000000 0 0x10000000>;  /* Configuration space */
++		ranges = <0x03000000 0x9010 0x00000000 0x9010 0x00000000 0x70 0x00000000>;
++		/* node 1 */
++		numa-node-id = <1>;
++        };
++
++	distance-map {
++		compatible = "numa-distance-map-v1";
++		distance-matrix = <0 0 10>,
++				  <0 1 20>,
++				  <1 1 10>;
++	};
 -- 
-1.9.1
+1.8.1.4
