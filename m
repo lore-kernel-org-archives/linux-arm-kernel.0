@@ -1,34 +1,69 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Tue, 2 Feb 2016 16:34:44 +0000
-Subject: [PATCH] staging: goldfish: use div64_s64 instead of do_div
-In-Reply-To: <1676170.0qik6mzm6D@wuerfel>
-References: <1676170.0qik6mzm6D@wuerfel>
-Message-ID: <20160202163444.25b73816@lxorguk.ukuu.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 2 Feb 2016 08:35:36 -0800
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <CAPDyKFras1o13WBZzaZ_Snnj5TBQQFWKr=PtCjUvwe+yGPQn9w@mail.gmail.com>
+References: <20160201232833.GR19432@atomide.com>
+ <Pine.LNX.4.44L0.1602011844540.2869-100000@netrider.rowland.org>
+ <20160202030533.GT19432@atomide.com>
+ <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
+ <CAPDyKFras1o13WBZzaZ_Snnj5TBQQFWKr=PtCjUvwe+yGPQn9w@mail.gmail.com>
+Message-ID: <20160202163536.GU19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 01 Feb 2016 11:33 +0100
-Arnd Bergmann <arnd@arndb.de> wrote:
+Hi,
 
-> The goldfish nand driver divides a signed 64-bit number (loff_t)
-> in multiple places using the do_div() function. This has always
-> been unreliable but now produces a compiler warning (since 4.5-rc1):
+* Ulf Hansson <ulf.hansson@linaro.org> [160202 02:43]:
 > 
-> goldfish/goldfish_nand.c: In function 'goldfish_nand_erase':
-> goldfish/goldfish_nand.c:107:91: error: comparison of distinct pointer types lacks a cast [-Werror]
-> goldfish/goldfish_nand.c: In function 'goldfish_nand_read_oob':
-> goldfish/goldfish_nand.c:145:91: error: comparison of distinct pointer types lacks a cast [-Werror]
+> For the omap_hsmmc and likely also other omap drivers, which needs more
+> than one attempt to ->probe() (returning -EPROBE_DEFER), this commit
+> causes a regression at the PM domain level (omap hwmod).
 > 
-> This changes the code to the equivalent div_s64{,_rem} that
-> works correctly for negative numbers (which we should never
-> get here).
-> 
-> The warning has shown up on ARM allmodconfig builds after the goldfish
-> bus driver has become visible on ARM.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: bd2f348db503 ("goldfish: refactor goldfish platform configs")
+> The reason is that the drivers don't put back the device into low power
+> state while bailing out in ->probe to return -EPROBE_DEFER. This leads to
+> that pm_runtime_reinit() in driver core, is re-initializing the runtime PM
+> status from RPM_ACTIVE to RPM_SUSPENDED.
 
-Acked-by: Alan Cox <alan@linux.intel.com>
+Yup, that's the bug here. It seems that we never call the runtime_suspend
+callback at the end of a first failed device driver probe if the driver
+has set pm_runtime_use_autosuspend. Only rpm_idle runtime_idle callback
+gets called. So the device stays on.
 
-Now agree with Arnd's patch.
+This does not happen if pm_runtime_dont_use_autosuspend() is added to
+the end of the device driver probe before pm_runtime_put_sync().
+
+> The next ->probe() attempt then triggers the ->runtime_resume() callback
+> to be invoked, which means this happens two times in a row. At the PM
+> domain level (omap hwmod) this is being treated as an error and thus the
+> runtime PM status of the device isn't correctly synchronized with the
+> runtime PM core.
+
+That's a valid error though, let's not remove it. The reason why we
+call runtime_resume() twice is because runtime_suspend callback never
+gets called like I explain above.
+
+> In the end, ->probe() anyway succeeds (as the driver don't checks the
+> error code from the runtime PM APIs), but results in that the PM domain
+> always stays powered on. This because of the runtime PM core believes the
+> device is RPM_SUSPENDED.
+
+FYI, the following allows runtime_suspend callback to get called at the
+end of a failed driver probe so the hardware state matches the PM runtime
+state. Need to debug more.
+
+Regards,
+
+Tony
+
+8< ------------
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -2232,6 +2232,7 @@ err_irq:
+ 		dma_release_channel(host->tx_chan);
+ 	if (host->rx_chan)
+ 		dma_release_channel(host->rx_chan);
++	pm_runtime_dont_use_autosuspend(host->dev);
+ 	pm_runtime_put_sync(host->dev);
+ 	pm_runtime_disable(host->dev);
+ 	if (host->dbclk)
