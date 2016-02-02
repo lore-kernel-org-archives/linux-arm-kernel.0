@@ -1,118 +1,266 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 2 Feb 2016 18:37:44 +0100
-Subject: [linux-sunxi] Re: [PATCH 05/11] drivers: pinctrl: add driver for
- Allwinner A64 SoC
-In-Reply-To: <20160202035852.6984db63@i7>
+From: jenskuske@gmail.com (Jens Kuske)
+Date: Tue, 2 Feb 2016 18:40:25 +0100
+Subject: [linux-sunxi] [PATCH 10/11] arm64: dts: add Allwinner A64 SoC
+ .dtsi
+In-Reply-To: <56B0DD67.3060802@arm.com>
 References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
- <1454348370-3816-6-git-send-email-andre.przywara@arm.com>
- <20160201182754.GA14737@excalibur.cnev.de>
- <56AFE0EC.8080207@arm.com> <20160202035852.6984db63@i7>
-Message-ID: <20160202173744.GB4652@lukather>
+ <1454348370-3816-11-git-send-email-andre.przywara@arm.com>
+ <56B0D83E.5090604@gmail.com> <56B0DD67.3060802@arm.com>
+Message-ID: <56B0EA09.9030107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Feb 02, 2016 at 03:58:52AM +0200, Siarhei Siamashka wrote:
-> > > On Mon, Feb 01, 2016 at 05:39:24PM +0000, Andre Przywara wrote:  
-> > >> Based on the Allwinner A64 user manual and on the previous sunxi
-> > >> pinctrl drivers this introduces the pin multiplex assignments for
-> > >> the ARMv8 Allwinner A64 SoC.
-> > >> Port A is apparently used for the fixed function DRAM controller, so
-> > >> the ports start at B here (the manual mentions "n from 1 to 7", so
-> > >> not starting at 0).
-> > >>
-> > >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> > >> ---
-> > >>  .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
-> > >>  arch/arm64/Kconfig.platforms                       |   1 +
-> > >>  drivers/pinctrl/sunxi/Kconfig                      |   4 +
-> > >>  drivers/pinctrl/sunxi/Makefile                     |   1 +
-> > >>  drivers/pinctrl/sunxi/pinctrl-a64.c                | 606 +++++++++++++++++++++
-> > >>  5 files changed, 613 insertions(+)
-> > >>  create mode 100644 drivers/pinctrl/sunxi/pinctrl-a64.c
-> > >>
-> > >> diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-> > >> index 9213b27..9050002 100644
-> > >> --- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-> > >> +++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-> > >> @@ -21,6 +21,7 @@ Required properties:
-> > >>    "allwinner,sun9i-a80-r-pinctrl"
-> > >>    "allwinner,sun8i-a83t-pinctrl"
-> > >>    "allwinner,sun8i-h3-pinctrl"
-> > >> +  "allwinner,a64-pinctrl"  
-> > > 
-> > > Hello,
-> > > 
-> > > on all other Allwinner SoCs we use the SoC family as part of the
-> > > compatible, as well as in the names of the Kconfig options. To
-> > > keep things consistent, I would like to propose doing the same on
-> > > Arm64, i.e. using allwinner,sun50i-a64-pinctrl instead of
-> > > allwinner,a64-pinctrl.  
-> > 
-> > Yes, I have been told this already. However I don't like this idea so
-> > much, for the following reasons:
-> > a) It is mostly redundant. The actual SoC (marketing) name is unique,
-> > there is no sun6i-a20 or sun7i-a23.
-> > b) It is not even helpful. If I got Maxime correctly, then the newer
-> > sunxi generation numbers depend on the ARM _cores_ used in the SoC,
-> > which is frankly the least interesting part from a Linux support
-> > perspective. I would see some sense if it would reflect the generation
-> > of IP blocks used, but so it is even more confusing to see that
-> > sun7i-a20 and sun8i-a23 are related, but sun8i-h3 is a completely
-> > different beast. The Allwinner marketing name tells you that, but the
-> > sunxi one does not.
-> > c) It is very confusing for people not dealing with it everyday. Just
-> > because I own a BananaPi I know that the A20 is sun7i, but I am totally
-> > lost when it comes to all the other names. And even now it took me about
-> > a minute to find the appropriate Wiki page which explains part of that
-> > story.
-> > d) Most importantly ;-): It kills TAB completion, unless you know the
-> > sunxi number, which is mostly not true as pointed out in c)
-> > 
-> > So while I see that just a<somenumber> is not really very specific, I'd
-> > rather do away with current naming scheme for the future. In this
-> > particular case we have the vendor name as a name space identifier
-> > already, so there is no possible confusion with ARM Cortex naming, for
-> > instance.
-> > 
-> > Also as this is now moving into the arm64 world, I'd like to use the
-> > opportunity to fix things that are not really optimal, the naming is one
-> > of them.
+On 02/02/16 17:46, Andre Przywara wrote:
+> Hi Jens,
 > 
-> One of the problems is that A64 name is not unique. We have reasons
-> to believe that there are also H64 and R18 out there using exactly
-> the same die, but possibly available in different packaging (a different
-> ball grid pitch? or maybe a different set of peripherals routed to the
-> outside?). Early prototypes of the Pine64 board were using Allwinner R18
-> and the Jide Remix Mini HTPC box is using Allwinner H64.
+> thanks for having such an elaborate look!
 > 
-> The bootloader sources from Allwinner are also referring to A64 as
-> AW1689, which makes some sense because it is the chip id number that
-> is accessible for runtime identification via reading the SRAM_VER_REG
-> hardware register:
+> On 02/02/16 16:24, Jens Kuske wrote:
+>> Hi,
+>>
+>> On 01/02/16 18:39, Andre Przywara wrote:
+[..]
+>>> +
+>>> +		/* dummy clock until pll6 can be reused */
+>>> +		pll8: pll8_clk {
+>>> +			#clock-cells = <0>;
+>>> +			compatible = "fixed-clock";
+>>> +			clock-frequency = <1>;
+>>> +			clock-output-names = "pll8";
+>>> +		};
 > 
->     http://linux-sunxi.org/SRAM_Controller_Register_Guide#SRAM_VER_REG
-> 
-> So would it be a good idea to use "aw1689" as a compatible property
-> in the DT instead of "a64"? Or maybe have "aw1689-a64" and
-> "aw1689-h64", which would be similar to the existing "sun5i-a13"
-> and "sun5i-a10s" naming convention?
+> Since I have you (as the original author ;-) in the loop: What was again
+> the reason for this dummy clock? Can't it be modelled with the existing
+> clock drivers in Linux?
 
-If someone cannot find out the family name that is documented on
-several places, I'm not sure he'll find the obscure, internal code
-name.
+PLL6 driver had the output name "pll6" hardcoded, so we couldn't reuse
+it for "pll8". Maxime has reworked the pll6 code in the meantime, now
+pll8 can use compatible = "allwinner,sun6i-a31-pll6-clk" too:
+http://www.spinics.net/lists/linux-clk/msg06242.html
 
-Maxime
+>
+>>> +
+>>> +		cpu: cpu_clk at 01c20050 {
+>>> +			#clock-cells = <0>;
+>>> +			compatible = "allwinner,sun4i-a10-cpu-clk";
+>>> +			reg = <0x01c20050 0x4>;
+>>> +			clocks = <&osc32k>, <&osc24M>, <&pll1>, <&pll1>;
+>>> +			clock-output-names = "cpu";
+>>> +			critical-clocks = <0>;
+>>> +		};
+>>> +
+>>> +		axi: axi_clk at 01c20050 {
+>>> +			#clock-cells = <0>;
+>>> +			compatible = "allwinner,sun4i-a10-axi-clk";
+>>> +			reg = <0x01c20050 0x4>;
+>>> +			clocks = <&cpu>;
+>>> +			clock-output-names = "axi";
+>>> +		};
+>>> +
+>>> +		ahb1: ahb1_clk at 01c20054 {
+>>> +			#clock-cells = <0>;
+>>> +			compatible = "allwinner,sun6i-a31-ahb1-clk";
+>>> +			reg = <0x01c20054 0x4>;
+>>> +			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6 0>;
+>>> +			clock-output-names = "ahb1";
+>>> +		};
+>>> +
+>>> +		ahb2: ahb2_clk at 01c2005c {
+>>> +			#clock-cells = <0>;
+>>> +			compatible = "allwinner,sun8i-h3-ahb2-clk";
+>>> +			reg = <0x01c2005c 0x4>;
+>>> +			clocks = <&ahb1>, <&pll6d2>;
+>>> +			clock-output-names = "ahb2";
+>>> +		};
+>>> +
+>>> +		apb1: apb1_clk at 01c20054 {
+>>> +			#clock-cells = <0>;
+>>> +			compatible = "allwinner,sun4i-a10-apb0-clk";
+>>> +			reg = <0x01c20054 0x4>;
+>>> +			clocks = <&ahb1>;
+>>> +			clock-output-names = "apb1";
+>>> +		};
+>>> +
+>>> +		apb2: apb2_clk at 01c20058 {
+>>> +			#clock-cells = <0>;
+>>> +			compatible = "allwinner,sun4i-a10-apb1-clk";
+>>> +			reg = <0x01c20058 0x4>;
+>>> +			clocks = <&osc32k>, <&osc24M>, <&pll6 1>, <&pll6 1>;
+>>> +			clock-output-names = "apb2";
+>>> +		};
+>>> +
+>>> +		bus_gates: clk at 01c20060 {
+>>> +			#clock-cells = <1>;
+>>> +			compatible = "allwinner,a64-bus-gates-clk",
+>>> +				     "allwinner,sunxi-multi-bus-gates-clk";
+>>> +			reg = <0x01c20060 0x14>;
+>>> +			ahb1_parent {
+>>> +				clocks = <&ahb1>;
+>>> +				clock-indices = <1>, <5>,
+>>> +						<6>, <8>,
+>>> +						<9>, <10>,
+>>> +						<13>, <14>,
+>>> +						<18>, <19>,
+>>> +						<20>, <21>,
+>>> +						<23>, <24>,
+>>> +						<25>, <28>,
+>>> +						<32>, <35>,
+>>> +						<36>, <37>,
+>>> +						<40>, <43>,
+>>> +						<44>, <52>,
+>>> +						<53>, <54>,
+>>> +						<135>;
+>>> +				clock-output-names = "bus_mipidsi", "bus_ce",
+>>> +						"bus_dma", "bus_mmc0",
+>>> +						"bus_mmc1", "bus_mmc2",
+>>> +						"bus_nand", "bus_sdram",
+>>> +						"bus_ts", "bus_hstimer",
+>>> +						"bus_spi0", "bus_spi1",
+>>> +						"bus_otg", "bus_otg_ehci0",
+>>> +						"bus_ehci0", "bus_otg_ohci0",
+>>> +						"bus_ve", "bus_lcd0",
+>>> +						"bus_lcd1", "bus_deint",
+>>> +						"bus_csi", "bus_hdmi",
+>>> +						"bus_de", "bus_gpu",
+>>> +						"bus_msgbox", "bus_spinlock",
+>>> +						"bus_dbg";
+>>> +			};
+>>> +			ahb2_parent {
+>>> +				clocks = <&ahb2>;
+>>> +				clock-indices = <17>, <29>;
+>>> +				clock-output-names = "bus_gmac", "bus_ohci0";
+>>> +			};
+>>> +			apb1_parent {
+>>> +				clocks = <&apb1>;
+>>> +				clock-indices = <64>, <65>,
+>>> +						<69>, <72>,
+>>> +						<76>, <77>,
+>>> +						<78>;
+>>> +				clock-output-names = "bus_codec", "bus_spdif",
+>>> +						"bus_pio", "bus_ths",
+>>> +						"bus_i2s0", "bus_i2s1",
+>>> +						"bus_i2s2";
+>>> +			};
+>>> +			abp2_parent {
+>>> +				clocks = <&apb2>;
+>>> +				clock-indices = <96>, <97>,
+>>> +						<98>, <101>,
+>>> +						<112>, <113>,
+>>> +						<114>, <115>,
+>>> +						<116>;
+>>> +				clock-output-names = "bus_i2c0", "bus_i2c1",
+>>> +						"bus_i2c2", "bus_scr",
+>>> +						"bus_uart0", "bus_uart1",
+>>> +						"bus_uart2", "bus_uart3",
+>>> +						"bus_uart4";
+>>> +			};
+>>> +		};
+>>> +
+>>> +		mmc0_clk: clk at 01c20088 {
+>>> +			#clock-cells = <1>;
+>>> +			compatible = "allwinner,sun4i-a10-mmc-clk";
+>>
+>> The A64 MMC clocks don't seem to be fully compatible to A10. The output
+>> and sample phase control has been moved to the MMC module itself.
+>> The dividers are the same, but the additional special "outputs" are gone.
+> 
+> So from comparing the H3 and the A64 datasheet I see that this is one of
+> the rare deviations of the A64 from the H3?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160202/70c844c1/attachment.sig>
+Yeah, looks like this is new in A64, probably because it supports even
+higher card speeds now.
+
+> 
+>>> +			reg = <0x01c20088 0x4>;
+>>> +			clocks = <&osc24M>, <&pll6 0>, <&pll8>;
+>>
+>> Parents are PLL6(2x) and PLL8(2x) according to manual.
+> 
+> Indeed, thanks for pointing this out! So do we need a proper pll8 clock?
+
+The dummy would still work, but it is easy to add a real pll8 now with
+Maximes work.
+
+> 
+>>
+>>> +			clock-output-names = "mmc0",
+>>> +					     "mmc0_output",
+>>> +					     "mmc0_sample";
+>>> +		};
+>>> +
+>>> +		mmc1_clk: clk at 01c2008c {
+>>> +			#clock-cells = <1>;
+>>> +			compatible = "allwinner,sun4i-a10-mmc-clk";
+>>> +			reg = <0x01c2008c 0x4>;
+>>> +			clocks = <&osc24M>, <&pll6 0>, <&pll8>;
+>>> +			clock-output-names = "mmc1",
+>>> +					     "mmc1_output",
+>>> +					     "mmc1_sample";
+>>> +		};
+>>> +
+>>> +		mmc2_clk: clk at 01c20090 {
+>>> +			#clock-cells = <1>;
+>>> +			compatible = "allwinner,sun4i-a10-mmc-clk";
+>>> +			reg = <0x01c20090 0x4>;
+>>> +			clocks = <&osc24M>, <&pll6 0>, <&pll8>;
+>>> +			clock-output-names = "mmc2",
+>>> +					     "mmc2_output",
+>>> +					     "mmc2_sample";
+>>> +		};
+>>> +	};
+>>> +
+>>> +	regulators {
+>>> +		reg_vcc3v3: vcc3v3 {
+>>> +			compatible = "regulator-fixed";
+>>> +			regulator-name = "vcc3v3";
+>>> +			regulator-min-microvolt = <3300000>;
+>>> +			regulator-max-microvolt = <3300000>;
+>>> +		};
+>>> +	};
+>>> +
+>>> +	soc {
+>>> +		compatible = "simple-bus";
+>>> +		#address-cells = <1>;
+>>> +		#size-cells = <1>;
+>>> +		ranges;
+>>> +
+>>> +		mmc0: mmc at 01c0f000 {
+>>> +			compatible = "allwinner,sun5i-a13-mmc";
+>>> +			reg = <0x01c0f000 0x1000>;
+>>> +			clocks = <&bus_gates 8>,
+>>> +				 <&mmc0_clk 0>,
+>>
+>> Consequently, the MMC driver now has to control the output/sample phase
+>> with registers 0x140-0x148 instead of
+>>> +				 <&mmc0_clk 1>,
+>>> +				 <&mmc0_clk 2>;
+> 
+> OK, good point. I was just briefly browsing over the register
+> descriptions and missed that.
+> So it looks like I need to change the driver. Interestingly it seems to
+> work anyways ...
+
+I don't know, maybe it has sane defaults or is only relevant at higher
+clock speeds. Or Allwinners u-boot already set it.
+
+> 
+>> And there seems to be some new clock divider somewhere which I haven't
+>> found in the manual yet. The clock measured at the CLK pin is always
+>> half the expected rate (even with 24MHz as MMC clock parent, so no
+>> PLL6*2 problem).
+> 
+> Mmh, I heard about that mysterious clock doubling / halving already. Was
+> that actually causing any issues?
+
+Since it uses PLL6 * 2 now and seems to divide that by 2 somewhere
+nothing has changed in the end. One could argue that pll6 * 2 is wrong,
+but by testing with osc24MHz parent (in u-boot) it can be seen that the
+clockrate is only half of what is expected.
+
+Disclaimer: I don't know much about mmc, so maybe I've missed something
+obvious. I only did some frequency measurements on H3 vs A64 hardware
+when Siarhei asked about that in irc and now I wonder about the results.
+
+Jens
