@@ -1,31 +1,31 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 02 Feb 2016 22:29:28 +0100
-Subject: [PATCH v5 8/8] ARM: dts: rockchip: support the spi for rk3036
-In-Reply-To: <1454384453-7127-4-git-send-email-wxt@rock-chips.com>
-References: <1454384032-6794-1-git-send-email-wxt@rock-chips.com>
- <1454384453-7127-1-git-send-email-wxt@rock-chips.com>
- <1454384453-7127-4-git-send-email-wxt@rock-chips.com>
-Message-ID: <8822283.9IqfJnsVut@diego>
+From: mlangsdo@redhat.com (Mark Langsdorf)
+Date: Tue, 2 Feb 2016 15:39:11 -0600
+Subject: [RFC PATCH 0/3] arm64 initrd mapping/relocation
+In-Reply-To: <20160202180622.GP10166@arm.com>
+References: <1454435802-7604-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160202180622.GP10166@arm.com>
+Message-ID: <56B121FF.8040707@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 2. Februar 2016, 11:40:53 schrieb Caesar Wang:
-> This patch adds the needed spi node for rk3036 dts.
-> 
-> We have to use the 4 bus emmc to work if someone want to support
-> the spi devices, since the pins are re-used by emmc data[5-8] and spi.
-> In some caseswe need to support the spi devices, that will waste the
-> emmc performance.
-> 
-> Moment, the kylin/evb hasn't the spi devices to work, so maybe we need wait
-> the new required to enable in kylin/evb board.
-> 
-> Anyway, the spi should be needed land in rk3036 dts.
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+On 02/02/2016 12:06 PM, Will Deacon wrote:
+> On Tue, Feb 02, 2016 at 06:56:39PM +0100, Ard Biesheuvel wrote:
+>> After discussing in linux-efi with Mark, and on #armlinux with Will, this is
+>> a proposal for dealing with initrd memory that is potentially not covered by
+>> the linear region.
+>>
+>> Note that this will look slightly differently when some of the KASLR work gets
+>> merged, but this should only affect the way we deal with the initrd if it sits
+>> outside of the linear region.
+>>
+>> Mostly intended for discussion, not tested at all.
+>
+> Thanks Ard, this looks like a much better approach to me. Mark -- does
+> the general idea work for you too?
 
-applied to my dts32 branch for 4.6
+I'm not quite the right Mark but Mark Salter is on vacation
+and I was the one who discovered this bug. These patches
+do fix the problem and it looks like they tidy up some
+code. Will they be in v4.5-rc3?
 
-
-Thanks
-Heiko
+--Mark Langsdorf
