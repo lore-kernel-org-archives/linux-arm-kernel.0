@@ -1,25 +1,51 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Tue, 2 Feb 2016 19:13:43 +0000
-Subject: [PATCH 0/3] kallsyms: remove special handling for CONFIG_ARM
-In-Reply-To: <CAKv+Gu9VvskQ34w0niS+6AtF9hNcycfYDt_3Kp4T+WK8Vxf_dA@mail.gmail.com>
-References: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
- <HKXPR06MB0565A2CFF95AD7C000F43E6A8ADF0@HKXPR06MB0565.apcprd06.prod.outlook.com>
- <CAKv+Gu9VvskQ34w0niS+6AtF9hNcycfYDt_3Kp4T+WK8Vxf_dA@mail.gmail.com>
-Message-ID: <HKXPR06MB056547567A1B02C73A13EEFE8ADF0@HKXPR06MB0565.apcprd06.prod.outlook.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 2 Feb 2016 14:16:30 -0500 (EST)
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <20160202185450.GY19432@atomide.com>
+Message-ID: <Pine.LNX.4.44L0.1602021402250.1653-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Are you getting any warnings/errors during the build?
+On Tue, 2 Feb 2016, Tony Lindgren wrote:
 
-Nothing. The build was clean.
+> > I'm still not clear on what you want to accomplish.  It sounds like you 
+> > want to perform a runtime suspend following the last probe (if the 
+> > probe fails), and in between probes you don't really care (although it 
+> > would be preferable to avoid suspending).
+> 
+> I'd like to have pm_runtime_put_sync() disable the hardware after
+> the initial failed probe. Currently that does not happen unless
+> pm_runtime_dont_use_autosuspend() is called before pm_runtime_put_sync().
 
+pm_runtime_put_sync() doesn't do anything to the hardware if the usage
+count was > 1, because after the decrement it's still nonzero.  Where
+is the particular call of pm_runtime_put_sync() that you're interested
+in, and what is the usage count when it runs?  It's not at all unusual
+for the usage count to be > 1 during a probe.
 
-And just to be safe, I did make clean, then make xipImage and re-flashed again.
-Same result.
+Also, what is autosuspend_delay set to for your device?  And is 
+runtime_auto set?
 
+> > Does pm_runtime_use_autosuspend() get called by the probe routine?  If 
+> > it does, then perhaps you can get what you want by having the probe 
+> > routine call pm_runtime_dont_use_autosuspend() whenever it's about to 
+> > return an error -- particularly -EDEFER.
+> 
+> Yes so far that's the only fix that seems to work like I posted
+> earlier. But is that the right fix though?
 
-I'll see if I can step through and see exactly where it's dying.
-I realize that no one really care about or tests XIP_KERNEL with ARMv7 at the moment, so I'll have to figure it out that some point. I just thought I'd let you know.
+No, not really.  Ideally you would leave autosuspend turned on.  The 
+delay would be long enough to that after -EDEFER, another probe would 
+start before the delay expired.  But shortly after the last probe 
+attempt, the delay would expire and the device would then be put in low 
+power.
 
+> If we wanted to have some generic fix, it seems we would have to pass
+> a new flag in pm_runtime_put_sync() to ignore any autosuspend
+> configuration. But I don't know if that's what we want to or should
+> do though?
 
-Chris
+I don't think so.
+
+Alan Stern
