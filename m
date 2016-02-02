@@ -1,101 +1,42 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 2 Feb 2016 13:33:04 +0800
-Subject: [PATCH v2 2/2] arm/mach-imx: enable big endian mode
-In-Reply-To: <1453913976-30619-3-git-send-email-johannes@sipsolutions.net>
-References: <1453913976-30619-1-git-send-email-johannes@sipsolutions.net>
- <1453913976-30619-3-git-send-email-johannes@sipsolutions.net>
-Message-ID: <20160202053304.GA8307@tiger>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 1 Feb 2016 21:55:56 -0800
+Subject: [PATCH LINUX 0/6] Second part of xuartps fixes
+In-Reply-To: <1452562901-17848-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1452562901-17848-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <20160202055556.GD4215@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 27, 2016 at 05:59:36PM +0100, Johannes Berg wrote:
-> Enable ARM big-endian mode on mach-imx. This requires adding some
-> byte swapping in the debug functions (which otherwise hang forever)
-> and of course the secondary core bringup.
+ping? Any comments?
+
+	Thanks,
+	S?ren
+
+On Mon, 2016-01-11 at 17:41:35 -0800, Soren Brinkmann wrote:
+> Hi,
 > 
-> Tested (on top of 4.4) on i.MX6 HummingBoard quad-core (IMX6Q).
+> this is the second part of fixes for xuartps that evolved from this
+> series: https://lkml.org/lkml/2015/12/26/26.
 > 
-> The patch is pretty much as suggested by Arnd Bergmann, thanks!
+> This series, obviously, depends on the patches mentioned above. It
+> includes several minor improvements and refactoring and the refactoring
+> of the IRQ management, which prevents lock ups that could happen when
+> RX-related IRQs fired while the receiver was disabled.
 > 
-> Signed-off-by: Johannes Berg <johannes@sipsolutions.net>
-
-We conventionally use "ARM: imx: ..." as the subject for IMX platform
-patches.
-
-> ---
->  arch/arm/include/debug/imx.S | 3 +++
->  arch/arm/mach-imx/Kconfig    | 1 +
->  arch/arm/mach-imx/headsmp.S  | 2 ++
->  3 files changed, 6 insertions(+)
+> 	Thanks,
+> 	S?ren
 > 
-> diff --git a/arch/arm/include/debug/imx.S b/arch/arm/include/debug/imx.S
-> index 619d8cc1ac12..92c44760d656 100644
-> --- a/arch/arm/include/debug/imx.S
-> +++ b/arch/arm/include/debug/imx.S
-> @@ -11,6 +11,7 @@
->   *
->   */
->  
-> +#include <asm/assembler.h>
->  #include "imx-uart.h"
->  
->  /*
-> @@ -34,6 +35,7 @@
->  		.endm
->  
->  		.macro	senduart,rd,rx
-> +		ARM_BE8(rev \rd, \rd)
->  		str	\rd, [\rx, #0x40]	@ TXDATA
->  		.endm
->  
-> @@ -42,6 +44,7 @@
->  
->  		.macro	busyuart,rd,rx
->  1002:		ldr	\rd, [\rx, #0x98]	@ SR2
-> +		ARM_BE8(rev \rd, \rd)
->  		tst	\rd, #1 << 3		@ TXDC
->  		beq	1002b			@ wait until transmit done
->  		.endm
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 15df34fbdf44..607e0fedbf1c 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -9,6 +9,7 @@ menuconfig ARCH_MXC
->  	select PM_OPP if PM
->  	select SOC_BUS
->  	select SRAM
-> +	select ARCH_SUPPORTS_BIG_ENDIAN
-
-It should be added in alphabetical order.
-
-I fixed these two minor things and applied both patches.
-
-Shawn
-
->  	help
->  	  Support for Freescale MXC/iMX-based family of processors
->  
-> diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
-> index b5e976816b63..6c28d28b3c64 100644
-> --- a/arch/arm/mach-imx/headsmp.S
-> +++ b/arch/arm/mach-imx/headsmp.S
-> @@ -12,6 +12,7 @@
->  
->  #include <linux/linkage.h>
->  #include <linux/init.h>
-> +#include <asm/assembler.h>
->  
->  diag_reg_offset:
->  	.word	g_diag_reg - .
-> @@ -25,6 +26,7 @@ diag_reg_offset:
->  	.endm
->  
->  ENTRY(v7_secondary_startup)
-> +ARM_BE8(setend be)			@ go BE8 if entered LE
->  	set_diag_reg
->  	b	secondary_startup
->  ENDPROC(v7_secondary_startup)
+> S?ren Brinkmann (6):
+>   tty: xuartps: Move request_irq to after setting up the HW
+>   tty: xuartps: Refactor IRQ handling
+>   tty: xuartps: Cleanup: Reformat if-else
+>   tty: xuartps: Improve sysrq handling
+>   tty: xuartps: Remove '_OFFSET' suffix from #defines
+>   tty: xuartps: Consolidate TX handling
+> 
+>  drivers/tty/serial/xilinx_uartps.c | 460 +++++++++++++++++--------------------
+>  1 file changed, 216 insertions(+), 244 deletions(-)
+> 
 > -- 
-> 2.6.2
-> 
+> 2.7.0.3.g497ea1e
 > 
