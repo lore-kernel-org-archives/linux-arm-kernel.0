@@ -1,65 +1,151 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 2 Feb 2016 14:43:15 +0200
-Subject: [PATCH 3/5] ARM: davinci: dm365: Add dma_slave_map to edma
-In-Reply-To: <1454416997-14230-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1454416997-14230-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1454416997-14230-4-git-send-email-peter.ujfalusi@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue,  2 Feb 2016 12:46:24 +0000
+Subject: [PATCH 2/4] arm64: prefetch: add alternative pattern for CPUs without
+ a prefetcher
+In-Reply-To: <1454417186-21828-1-git-send-email-will.deacon@arm.com>
+References: <1454417186-21828-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1454417186-21828-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide the dma_slave_map to edma which will allow us to move the drivers
-to the new, simpler dmaengine API and we can remove the DMA resources also
-for the devices.
+Most CPUs have a hardware prefetcher which generally performs better
+without explicit prefetch instructions issued by software, however
+some CPUs (e.g. Cavium ThunderX) rely solely on explicit prefetch
+instructions.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+This patch adds an alternative pattern (ARM64_HAS_NO_HW_PREFETCH) to
+allow our library code to make use of explicit prefetch instructions
+during things like copy routines only when the CPU does not have the
+capability to perform the prefetching itself.
 
-FIX: dm365
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-davinci/dm365.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm64/include/asm/cpufeature.h |  3 ++-
+ arch/arm64/include/asm/cputype.h    | 17 ++++++++++++++++-
+ arch/arm64/kernel/cpu_errata.c      | 18 +++---------------
+ arch/arm64/kernel/cpufeature.c      | 17 +++++++++++++++++
+ 4 files changed, 38 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index 01843fbcc9ea..d26dc2b4339a 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -17,6 +17,7 @@
- #include <linux/serial_8250.h>
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
-+#include <linux/dmaengine.h>
- #include <linux/spi/spi.h>
- #include <linux/platform_data/edma.h>
- #include <linux/platform_data/gpio-davinci.h>
-@@ -862,9 +863,30 @@ static s8 dm365_queue_priority_mapping[][2] = {
- 	{-1, -1},
- };
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 8f271b83f910..8d56bd8550dc 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -30,8 +30,9 @@
+ #define ARM64_HAS_LSE_ATOMICS			5
+ #define ARM64_WORKAROUND_CAVIUM_23154		6
+ #define ARM64_WORKAROUND_834220			7
++#define ARM64_HAS_NO_HW_PREFETCH		8
  
-+static const struct dma_slave_map da365_edma_map[] = {
-+	{ "davinci-mcbsp.0", "tx", EDMA_FILTER_PARAM(0, 2) },
-+	{ "davinci-mcbsp.0", "rx", EDMA_FILTER_PARAM(0, 3) },
-+	{ "davinci_voicecodec", "tx", EDMA_FILTER_PARAM(0, 2) },
-+	{ "davinci_voicecodec", "rx", EDMA_FILTER_PARAM(0, 3) },
-+	{ "spi_davinci.2", "tx", EDMA_FILTER_PARAM(0, 10) },
-+	{ "spi_davinci.2", "rx", EDMA_FILTER_PARAM(0, 11) },
-+	{ "spi_davinci.1", "tx", EDMA_FILTER_PARAM(0, 14) },
-+	{ "spi_davinci.1", "rx", EDMA_FILTER_PARAM(0, 15) },
-+	{ "spi_davinci.0", "tx", EDMA_FILTER_PARAM(0, 16) },
-+	{ "spi_davinci.0", "rx", EDMA_FILTER_PARAM(0, 17) },
-+	{ "spi_davinci.3", "tx", EDMA_FILTER_PARAM(0, 18) },
-+	{ "spi_davinci.3", "rx", EDMA_FILTER_PARAM(0, 19) },
-+	{ "dm6441-mmc.0", "rx", EDMA_FILTER_PARAM(0, 26) },
-+	{ "dm6441-mmc.0", "tx", EDMA_FILTER_PARAM(0, 27) },
-+	{ "dm6441-mmc.1", "rx", EDMA_FILTER_PARAM(0, 30) },
-+	{ "dm6441-mmc.1", "tx", EDMA_FILTER_PARAM(0, 31) },
-+};
+-#define ARM64_NCAPS				8
++#define ARM64_NCAPS				9
+ 
+ #ifndef __ASSEMBLY__
+ 
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 1a5949364ed0..7540284a17fe 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -57,11 +57,22 @@
+ #define MIDR_IMPLEMENTOR(midr)	\
+ 	(((midr) & MIDR_IMPLEMENTOR_MASK) >> MIDR_IMPLEMENTOR_SHIFT)
+ 
+-#define MIDR_CPU_PART(imp, partnum) \
++#define MIDR_CPU_MODEL(imp, partnum) \
+ 	(((imp)			<< MIDR_IMPLEMENTOR_SHIFT) | \
+ 	(0xf			<< MIDR_ARCHITECTURE_SHIFT) | \
+ 	((partnum)		<< MIDR_PARTNUM_SHIFT))
+ 
++#define MIDR_CPU_MODEL_MASK (MIDR_IMPLEMENTOR_MASK | MIDR_PARTNUM_MASK | \
++			     MIDR_ARCHITECTURE_MASK)
 +
- static struct edma_soc_info dm365_edma_pdata = {
- 	.queue_priority_mapping	= dm365_queue_priority_mapping,
- 	.default_queue		= EVENTQ_3,
-+	.slave_map		= da365_edma_map,
-+	.slavecnt		= ARRAY_SIZE(da365_edma_map),
++#define MIDR_IS_CPU_MODEL_RANGE(midr, model, rv_min, rv_max)		\
++({									\
++	u32 _model = (midr) & MIDR_CPU_MODEL_MASK;			\
++	u32 rv = (midr) & (MIDR_REVISION_MASK | MIDR_VARIANT_MASK);	\
++									\
++	_model == (model) && rv >= (rv_min) && rv <= (rv_max);		\
++ })
++
+ #define ARM_CPU_IMP_ARM			0x41
+ #define ARM_CPU_IMP_APM			0x50
+ #define ARM_CPU_IMP_CAVIUM		0x43
+@@ -75,6 +86,10 @@
+ 
+ #define CAVIUM_CPU_PART_THUNDERX	0x0A1
+ 
++#define MIDR_CORTEX_A53 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
++#define MIDR_CORTEX_A57 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
++#define MIDR_THUNDERX	MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
++
+ #ifndef __ASSEMBLY__
+ 
+ /*
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index feb6b4efa641..e6bc988e8dbf 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -21,24 +21,12 @@
+ #include <asm/cputype.h>
+ #include <asm/cpufeature.h>
+ 
+-#define MIDR_CORTEX_A53 MIDR_CPU_PART(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
+-#define MIDR_CORTEX_A57 MIDR_CPU_PART(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
+-#define MIDR_THUNDERX	MIDR_CPU_PART(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
+-
+-#define CPU_MODEL_MASK (MIDR_IMPLEMENTOR_MASK | MIDR_PARTNUM_MASK | \
+-			MIDR_ARCHITECTURE_MASK)
+-
+ static bool __maybe_unused
+ is_affected_midr_range(const struct arm64_cpu_capabilities *entry)
+ {
+-	u32 midr = read_cpuid_id();
+-
+-	if ((midr & CPU_MODEL_MASK) != entry->midr_model)
+-		return false;
+-
+-	midr &= MIDR_REVISION_MASK | MIDR_VARIANT_MASK;
+-
+-	return (midr >= entry->midr_range_min && midr <= entry->midr_range_max);
++	return MIDR_IS_CPU_MODEL_RANGE(read_cpuid_id(), entry->midr_model,
++				       entry->midr_range_min,
++				       entry->midr_range_max);
+ }
+ 
+ #define MIDR_RANGE(model, min, max) \
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 5c90aa490a2b..3615d7d7c9af 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -621,6 +621,18 @@ static bool has_useable_gicv3_cpuif(const struct arm64_cpu_capabilities *entry)
+ 	return has_sre;
+ }
+ 
++static bool has_no_hw_prefetch(const struct arm64_cpu_capabilities *entry)
++{
++	u32 midr = read_cpuid_id();
++	u32 rv_min, rv_max;
++
++	/* Cavium ThunderX pass 1.x and 2.x */
++	rv_min = 0;
++	rv_max = (1 << MIDR_VARIANT_SHIFT) | MIDR_REVISION_MASK;
++
++	return MIDR_IS_CPU_MODEL_RANGE(midr, MIDR_THUNDERX, rv_min, rv_max);
++}
++
+ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "GIC system register CPU interface",
+@@ -651,6 +663,11 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.min_field_value = 2,
+ 	},
+ #endif /* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
++	{
++		.desc = "Software prefetching using PRFM",
++		.capability = ARM64_HAS_NO_HW_PREFETCH,
++		.matches = has_no_hw_prefetch,
++	},
+ 	{},
  };
  
- static struct resource edma_resources[] = {
 -- 
-2.7.0
+2.1.4
