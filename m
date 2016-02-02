@@ -1,49 +1,51 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 2 Feb 2016 17:00:43 +0000
-Subject: [PATCH v3 05/12] arm64, acpi, numa: NUMA support based on SRAT
- and SLIT
-In-Reply-To: <56B09344.4000100@linaro.org>
-References: <1453541967-3744-1-git-send-email-guohanjun@huawei.com>
- <1453541967-3744-6-git-send-email-guohanjun@huawei.com>
- <20160201180944.GV24726@rric.localdomain>
- <56B09344.4000100@linaro.org>
-Message-ID: <20160202170043.GA30358@red-moon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Feb 2016 17:58:33 +0100
+Subject: [PATCH RFC 0/2] Add a display driver to the Allwinner H3
+In-Reply-To: <20160119094907.2cc56f1ac6b120472df29aa1@free.fr>
+References: <cover.1452021349.git.moinejf@free.fr>
+ <20160106212046.GD9631@lukather>
+ <20160108181306.4a5a7370f0e3f3daa7c9e285@free.fr>
+ <20160118101827.GO4581@lukather>
+ <20160119094907.2cc56f1ac6b120472df29aa1@free.fr>
+Message-ID: <20160202165833.GY4652@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 07:30:12PM +0800, Hanjun Guo wrote:
-
-[...]
-
-> >How about the following (similar to x86)?
-> >
-> >----
-> >	if (!numa_off) {
-> >#ifdef CONFIG_ACPI_NUMA
-> >		if (!numa_init(acpi_numa_init))
-> >			return 0;
-> >#endif
-> >#ifdef CONFIG_OF_NUMA
-> >		if (!numa_init(of_numa_init))
-> >			return 0;
-> >#endif
-> >	}
-> >
-> >	return numa_init(dummy_numa_init);
-> >----
-> >
-> >Pretty straight and nice.
-> >
-> >Note: The !acpi_disabled check needs to be moved to the beginning of
-> >acpi_numa_init(). Variable ret can be removed.
+On Tue, Jan 19, 2016 at 09:49:07AM +0100, Jean-Francois Moine wrote:
+> On Mon, 18 Jan 2016 11:18:27 +0100
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 > 
-> Lorenzo suggested to remove it, Lorenzo, what's your opinion here?
+> > > Then, the DE2 sources contain only:
+> > > 
+> > > 	All Winner Tech, All Right Reserved. 2014-2015 Copyright (c)
+> > > 
+> > > Eventually, there is no copyright/author/history in the HDMI sources.
+> > 
+> > That one is nasty though :/
+> > 
+> > It seems to be a GPL violation though, so we have two solutions:
+> > 
+> > A) have a clean room implementation
+> > B) Ask allwinner to comply with the license
+> > 
+> > The former doesn't look likely to happen soon... Can you open an issue
+> > on this on their linux github repo?
+> 
+> Do you really think that I could have more luck than people of the
+> linux-sunxi or pine64 teams?
 
-I do not think it is a big deal. OF is not a fall-back for ACPI,
-which is what the code above may make us think, either you parse
-ACPI or you parse DT.
+It did work for a few issues in the past...
 
-I will have a look at the complete code to check if we can rewrite
-it differently but I would not be too worried about it.
+Maxime
 
-Lorenzo
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160202/549266c0/attachment.sig>
