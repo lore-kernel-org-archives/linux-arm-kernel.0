@@ -1,49 +1,82 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  2 Feb 2016 21:47:39 +0100
-Subject: [PATCH] video: ARM CLCD: runtime check for Versatile
-Message-ID: <1454446059-30526-1-git-send-email-linus.walleij@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 2 Feb 2016 13:03:46 -0800
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <Pine.LNX.4.44L0.1602021402250.1653-100000@iolanthe.rowland.org>
+References: <20160202185450.GY19432@atomide.com>
+ <Pine.LNX.4.44L0.1602021402250.1653-100000@iolanthe.rowland.org>
+Message-ID: <20160202210345.GZ19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current compile-time check for inversed IENB/CNTL does not
-work in multiplatform boots: as soon as versatile is included
-in the build, the IENB/CNTL is switched and breaks graphics.
-Convert this to a runtime switch.
+* Alan Stern <stern@rowland.harvard.edu> [160202 11:17]:
+> On Tue, 2 Feb 2016, Tony Lindgren wrote:
+> > I'd like to have pm_runtime_put_sync() disable the hardware after
+> > the initial failed probe. Currently that does not happen unless
+> > pm_runtime_dont_use_autosuspend() is called before pm_runtime_put_sync().
+> 
+> pm_runtime_put_sync() doesn't do anything to the hardware if the usage
+> count was > 1, because after the decrement it's still nonzero.  Where
+> is the particular call of pm_runtime_put_sync() that you're interested
+> in, and what is the usage count when it runs?  It's not at all unusual
+> for the usage count to be > 1 during a probe.
 
-Cc: stable at vger.kernel.org
-Cc: Rob Herring <robh@kernel.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Fixes: a29da136de34 ("ARM: versatile: convert to multi-platform")
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/video/fbdev/amba-clcd.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+The usage count is 0 at that point, it seems the be the RPM_AUTO
+causing the issues that we set at the end of rpm_idle().
 
-diff --git a/drivers/video/fbdev/amba-clcd.c b/drivers/video/fbdev/amba-clcd.c
-index 9362424c2340..f9ef06d0cd48 100644
---- a/drivers/video/fbdev/amba-clcd.c
-+++ b/drivers/video/fbdev/amba-clcd.c
-@@ -440,13 +440,14 @@ static int clcdfb_register(struct clcd_fb *fb)
- 		fb->off_ienb = CLCD_PL111_IENB;
- 		fb->off_cntl = CLCD_PL111_CNTL;
- 	} else {
--#ifdef CONFIG_ARCH_VERSATILE
--		fb->off_ienb = CLCD_PL111_IENB;
--		fb->off_cntl = CLCD_PL111_CNTL;
--#else
--		fb->off_ienb = CLCD_PL110_IENB;
--		fb->off_cntl = CLCD_PL110_CNTL;
--#endif
-+		if (of_machine_is_compatible("arm,versatile-ab") ||
-+		    of_machine_is_compatible("arm,versatile-pb")) {
-+			fb->off_ienb = CLCD_PL111_IENB;
-+			fb->off_cntl = CLCD_PL111_CNTL;
-+		} else {
-+			fb->off_ienb = CLCD_PL110_IENB;
-+			fb->off_cntl = CLCD_PL110_CNTL;
-+		}
- 	}
- 
- 	fb->clk = clk_get(&fb->dev->dev, NULL);
--- 
-2.4.3
+> Also, what is autosuspend_delay set to for your device?  And is 
+> runtime_auto set?
+
+It's 100 at that point, see the commented snippet below from
+omap_hsmmc_probe():
+
+	pm_runtime_enable(host->dev);
+	pm_runtime_get_sync(host->dev);
+	pm_runtime_set_autosuspend_delay(host->dev, MMC_AUTOSUSPEND_DELAY);
+	/* NOTE: pm_runtime_dont_use_autosuspend(host->dev) needed here? */
+	pm_runtime_use_autosuspend(host->dev);
+	...
+	/* gets -EPROBE_DEFER */
+err_irq:
+	...
+	pm_runtime_put_sync(host->dev);
+        pm_runtime_disable(host->dev);
+	/* NOTE: suspend callback never gets called unless
+	 * pm_runtime_dont_use_autosuspend() is called
+	 * before pm_runtime_put_sync() above.
+	 */
+	 ...
+
+> > > Does pm_runtime_use_autosuspend() get called by the probe routine?  If 
+> > > it does, then perhaps you can get what you want by having the probe 
+> > > routine call pm_runtime_dont_use_autosuspend() whenever it's about to 
+> > > return an error -- particularly -EDEFER.
+> > 
+> > Yes so far that's the only fix that seems to work like I posted
+> > earlier. But is that the right fix though?
+> 
+> No, not really.  Ideally you would leave autosuspend turned on.  The 
+> delay would be long enough to that after -EDEFER, another probe would 
+> start before the delay expired.  But shortly after the last probe 
+> attempt, the delay would expire and the device would then be put in low 
+> power.
+
+But then what about the new reinit function? To me it seems that
+we should not attempt to maintain a state from the earlier failed
+probe. Or are you thinking we just skip the reinit if autosuspend
+is set?
+
+> > If we wanted to have some generic fix, it seems we would have to pass
+> > a new flag in pm_runtime_put_sync() to ignore any autosuspend
+> > configuration. But I don't know if that's what we want to or should
+> > do though?
+> 
+> I don't think so.
+
+So should we just establish a policy that pm_runtime_use_autosuspend()
+needs to be paired with pm_runtime_dont_use_autosuspend() for
+pm_runtime_put_sync() to work?
+
+Regards,
+
+Tony
