@@ -1,59 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 2 Feb 2016 10:54:51 -0800
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <Pine.LNX.4.44L0.1602021335170.1653-100000@iolanthe.rowland.org>
-References: <20160202180555.GW19432@atomide.com>
- <Pine.LNX.4.44L0.1602021335170.1653-100000@iolanthe.rowland.org>
-Message-ID: <20160202185450.GY19432@atomide.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 2 Feb 2016 15:56:09 -0300
+Subject: [PATCH] drivers: soc: samsung: Enable COMPILE_TEST
+In-Reply-To: <1454396777-20034-1-git-send-email-k.kozlowski@samsung.com>
+References: <1454396777-20034-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <56B0FBC9.1020308@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alan Stern <stern@rowland.harvard.edu> [160202 10:44]:
-> On Tue, 2 Feb 2016, Tony Lindgren wrote:
-> 
-> > * Tony Lindgren <tony@atomide.com> [160202 08:50]:
-> > > * Alan Stern <stern@rowland.harvard.edu> [160202 08:17]:
-> > > 
-> > > > ?  pm_runtime_put_sync() _already_ does not respect the autosuspend 
-> > > > mode.  If you want to respect it, you have to call 
-> > > > pm_runtime_put_sync_autosuspend() instead.
-> > > 
-> > > I think you found the real bug there. So the right fix is to
-> > > call pm_runtime_put_sync_autosuspend() at the end of failed
-> > > probe in omap_hsmmc. Let me give that a try here.
-> > 
-> > Nope that's not it but getting closer.
-> > 
-> > The following seems to make things behave for me. Now the
-> > question is.. Does it have some undesired side effects?
-> 
-> Yes, it does.
+Hello Krzysztof,
 
-Yeah noticed..
+On 02/02/2016 04:06 AM, Krzysztof Kozlowski wrote:
+> Get some build coverage of Exynos SROM controller and PMU drivers. The
+> PMU driver depends on asm/cputype.h so its compilation is limited to ARM
+> architectures.
+>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>
 
-> I'm still not clear on what you want to accomplish.  It sounds like you 
-> want to perform a runtime suspend following the last probe (if the 
-> probe fails), and in between probes you don't really care (although it 
-> would be preferable to avoid suspending).
+Patch looks good to me.
 
-I'd like to have pm_runtime_put_sync() disable the hardware after
-the initial failed probe. Currently that does not happen unless
-pm_runtime_dont_use_autosuspend() is called before pm_runtime_put_sync().
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-> Does pm_runtime_use_autosuspend() get called by the probe routine?  If 
-> it does, then perhaps you can get what you want by having the probe 
-> routine call pm_runtime_dont_use_autosuspend() whenever it's about to 
-> return an error -- particularly -EDEFER.
-
-Yes so far that's the only fix that seems to work like I posted
-earlier. But is that the right fix though?
-
-If we wanted to have some generic fix, it seems we would have to pass
-a new flag in pm_runtime_put_sync() to ignore any autosuspend
-configuration. But I don't know if that's what we want to or should
-do though?
-
-Regards,
-
-Tony
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
