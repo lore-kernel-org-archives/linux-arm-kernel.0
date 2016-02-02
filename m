@@ -1,38 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 2 Feb 2016 14:19:47 +0100
-Subject: [PATCH 06/14] ARM: dts: sun8i-a83t: Correct low speed oscillator
- clocks
-In-Reply-To: <1454203266-4450-7-git-send-email-vishnupatekar0510@gmail.com>
-References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
- <1454203266-4450-7-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <20160202131947.GS4652@lukather>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue,  2 Feb 2016 14:19:31 +0100
+Subject: [PATCH 0/3] kallsyms: remove special handling for CONFIG_ARM
+Message-ID: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 31, 2016 at 09:20:58AM +0800, Vishnu Patekar wrote:
-> From: Chen-Yu Tsai <wens@csie.org>
-> 
-> The A83T does not have a 32.768 kHz low speed oscillator, either as
-> an external crystal or input. It has a 16 MHz RC-based (inaccurate)
-> internal oscillator, which is then divided by 512 for a clock close
-> to 32 kHz.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+This series applies on top of today's -next, and addresses an issue with
+the new kallsyms code that is queued there, that enables base relative
+kallsyms tables for all architectures (except IA-64)
 
-You should have your SoB here.
+Two issues have surfaced on ARM with the new kallsyms code:
+a) CONFIG_HAVE_TCM creates a virtual region that is too far away for the
+   relative kallsyms code to reach it;
+b) CONFIG_XIP_KERNEL=y kernel symbols are not filtered against PAGE_OFFSET,
+   as is the case for kernels that execute from RAM, resulting in symbols
+   that are out of range.
 
-Is it ok to add it?
+Since the way kallsyms deals with XIP kernels on ARM leaves some room for
+improvement regardless of the base relative changes, this series proposes
+a fix that allows the special case to be removed from the kallsyms handling
+entirely.
 
-Maxime
+Patch #1 moves the .stubs and .vectors section back into the kernel VMA, while
+preserving the guaranteed virtual offset of 4 KB. This results in all symbols
+that kallsyms sees to be in a reasonable interval.
+
+Patch #2 removes the special case for CONFIG_ARM && !CONFIG_XIP_KERNEL in the
+invocation of scripts/kallsyms
+
+Patch #3 removes the now unused --page-offset command line argument handling
+from scripts/kallsyms.c
+
+Note that we may still need to remove ARM from the list of architectures that
+support base relative kallsyms tables if we cannot fix issue a) above, but
+removing this special case seemed like an obvious improvement to me.
+
+Ard Biesheuvel (3):
+  ARM: move .vectors and .stubs sections back into the kernel VMA
+  kallsyms: remove special lower address limit for CONFIG_ARM
+  kallsyms: remove --page-offset command line option
+
+ arch/arm/kernel/entry-armv.S  |  7 +++--
+ arch/arm/kernel/vmlinux.lds.S | 15 ++++++-----
+ scripts/kallsyms.c            | 27 ++++----------------
+ scripts/link-vmlinux.sh       |  4 ---
+ 4 files changed, 16 insertions(+), 37 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160202/7ce85e61/attachment.sig>
+2.5.0
