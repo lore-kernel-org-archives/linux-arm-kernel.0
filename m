@@ -1,35 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 02 Feb 2016 22:07:17 +0100
-Subject: [PATCH 01/10] serial: mvebu-uart: initial support for Armada-3700
- serial port
-In-Reply-To: <1454436468-4241-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1454436468-4241-1-git-send-email-gregory.clement@free-electrons.com>
- <1454436468-4241-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <5687888.WDl8xbENFR@wuerfel>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 2 Feb 2016 22:11:03 +0100
+Subject: Plain DFS (no voltage scaling)
+Message-ID: <56B11B67.3090600@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 February 2016 19:07:39 Gregory CLEMENT wrote:
+Hello,
 
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index 39721ec4f415..b291f934d51b 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -1606,6 +1606,28 @@ config SERIAL_STM32_CONSOLE
->  	depends on SERIAL_STM32=y
->  	select SERIAL_CORE_CONSOLE
->  
-> +config SERIAL_MVEBU_UART
-> +	bool "Marvell EBU serial port support"
+I plan to enable the on-demand governor on the tango platform:
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/tango4-smp8758.dtsi
 
-Could this be a loadable module?
+I found the cpufreq-dt binding doc:
 
-> +config SERIAL_MVEBU_CONSOLE
-> +	bool "Console on Marvell EBU serial port"
-> +	depends on SERIAL_MVEBU_UART
+https://www.kernel.org/doc/Documentation/devicetree/bindings/cpufreq/cpufreq-dt.txt
+https://www.kernel.org/doc/Documentation/devicetree/bindings/opp/opp.txt
 
-If yes, this would become 
+Something is not clear to me:
 
-	depends on SERIAL_MVEBU_UART=y
+If my platform cannot scale the voltage, what information
+should I put in the voltage part of the DT?
 
-	Arnd
+Regards.
