@@ -1,48 +1,81 @@
-From: fan.chen@mediatek.com (Fan Chen)
-Date: Tue, 2 Feb 2016 10:17:42 +0800
-Subject: MTK mt8173-evb: mainline unstable, and big-endian boot failures
-In-Reply-To: <7hh9hrgbbh.fsf@baylibre.com>
-References: <CAOi56cVDbkAJEDWy3+DV63a=UuD7nqpUu8X7e-OjtWM-4dj_-w@mail.gmail.com>
- <7hsi1ilczm.fsf@baylibre.com>
- <CAF-23O3ps0Wt_UCmJbArpc5iJJryJKA0k_2qAyNb7op8O=UnAg@mail.gmail.com>
- <1453964180.26397.8.camel@mtksdaap41> <7hy4b8gc7q.fsf@baylibre.com>
- <1454309376.11974.3.camel@mtksdaap41> <7hh9hrgbbh.fsf@baylibre.com>
-Message-ID: <1454379462.27798.11.camel@mtksdaap41>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon,  1 Feb 2016 20:19:44 -0600
+Subject: [PATCH v3] irqchip: gicv3-its: Fix memory leak in its_free_tables()
+Message-ID: <1454379584-21772-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+The current ITS driver has a memory leak in its_free_tables(). It
+happens on tear down path of the driver when its_probe() call fails.
+its_free_tables() should free the exact number of pages that have
+been allocated, not just a single page as current code does.
 
-I just checked that the problem cannot be reproduced (tested 100 times
-with your script) after flashing new firmware which we uploaded to
-github[0] yesterday.
-This latest firmware got many fixes and also supports cluster idle, so
-we prefer testing with this new one
-Would you please test in your side? Thanks for your great help!! 
+This patch records the memory size for each ITS_BASERn at the time of
+page allocation and uses the same size information when freeing pages
+to fix the issue.
 
-[0] https://github.com/ibanezchen/evb-utils/tree/master
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+[v2]->[v3]:
+    -use order instead of alloc_size as suggested by Thomas Gleixner in v2 comments.
 
+[v1]->[v2]: 
+    -rebase on tip of https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/its-fixes-4.5&id=25ffe003bdc24492204e099fca0a467641d0fe1a
+    -refresh alloc_size value whenever page order changes. 
 
-Best regards,
-Fan
+ drivers/irqchip/irq-gic-v3-its.c | 17 +++++++++++------
+ 1 file changed, 11 insertions(+), 6 deletions(-)
 
-On Mon, 2016-02-01 at 17:17 -0800, Kevin Hilman wrote:
-> Hi Eddie,
-> 
-> Eddie Huang <eddie.huang@mediatek.com> writes:
-> 
-> [...]
-> 
-> > Thanks your patience to provide detail steps, we can reproduce this
-> > problem now. It seems something wrong in ATF, we still investigate how
-> > to fix it. We will provide you new ATF firmware once we have solution
-> 
-> Great, I'm glad you can reproduce it.  I was starting to worry it was
-> only my hardware with the problem.
-> 
-> Please let me know if there are firmware updates you'd like me to test
-> and I'll be happy to.
-> 
-> Thanks,
-> 
-> Kevin
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 3447549..0a73632 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -66,7 +66,10 @@ struct its_node {
+ 	unsigned long		phys_base;
+ 	struct its_cmd_block	*cmd_base;
+ 	struct its_cmd_block	*cmd_write;
+-	void			*tables[GITS_BASER_NR_REGS];
++	struct {
++		void		*base;
++		u32		order;
++	} tables[GITS_BASER_NR_REGS];
+ 	struct its_collection	*collections;
+ 	struct list_head	its_device_list;
+ 	u64			flags;
+@@ -807,9 +810,10 @@ static void its_free_tables(struct its_node *its)
+ 	int i;
+ 
+ 	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
+-		if (its->tables[i]) {
+-			free_page((unsigned long)its->tables[i]);
+-			its->tables[i] = NULL;
++		if (its->tables[i].base) {
++			free_pages((unsigned long)its->tables[i].base,
++				   its->tables[i].order);
++			its->tables[i].base = NULL;
+ 		}
+ 	}
+ }
+@@ -890,7 +894,8 @@ retry_alloc_baser:
+ 			goto out_free;
+ 		}
+ 
+-		its->tables[i] = base;
++		its->tables[i].base = base;
++		its->tables[i].order = order;
+ 
+ retry_baser:
+ 		val = (virt_to_phys(base) 				 |
+@@ -940,7 +945,7 @@ retry_baser:
+ 			 * something is horribly wrong...
+ 			 */
+ 			free_pages((unsigned long)base, order);
+-			its->tables[i] = NULL;
++			its->tables[i].base = NULL;
+ 
+ 			switch (psz) {
+ 			case SZ_16K:
+-- 
+Qualcomm Technologies, Inc. on behalf
+of the Qualcomm Innovation Center, Inc.  The Qualcomm Innovation Center, Inc. 
+is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
