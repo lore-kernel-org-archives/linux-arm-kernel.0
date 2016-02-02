@@ -1,63 +1,70 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 2 Feb 2016 13:43:10 -0500 (EST)
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <20160202180555.GW19432@atomide.com>
-Message-ID: <Pine.LNX.4.44L0.1602021335170.1653-100000@iolanthe.rowland.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 02 Feb 2016 10:46:29 -0800
+Subject: MTK mt8173-evb: mainline unstable, and big-endian boot failures
+In-Reply-To: <1454379462.27798.11.camel@mtksdaap41> (Fan Chen's message of
+ "Tue, 2 Feb 2016 10:17:42 +0800")
+References: <CAOi56cVDbkAJEDWy3+DV63a=UuD7nqpUu8X7e-OjtWM-4dj_-w@mail.gmail.com>
+ <7hsi1ilczm.fsf@baylibre.com>
+ <CAF-23O3ps0Wt_UCmJbArpc5iJJryJKA0k_2qAyNb7op8O=UnAg@mail.gmail.com>
+ <1453964180.26397.8.camel@mtksdaap41> <7hy4b8gc7q.fsf@baylibre.com>
+ <1454309376.11974.3.camel@mtksdaap41> <7hh9hrgbbh.fsf@baylibre.com>
+ <1454379462.27798.11.camel@mtksdaap41>
+Message-ID: <7h37tbdk6y.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2 Feb 2016, Tony Lindgren wrote:
+Hi Fan,
 
-> * Tony Lindgren <tony@atomide.com> [160202 08:50]:
-> > * Alan Stern <stern@rowland.harvard.edu> [160202 08:17]:
-> > 
-> > > ?  pm_runtime_put_sync() _already_ does not respect the autosuspend 
-> > > mode.  If you want to respect it, you have to call 
-> > > pm_runtime_put_sync_autosuspend() instead.
-> > 
-> > I think you found the real bug there. So the right fix is to
-> > call pm_runtime_put_sync_autosuspend() at the end of failed
-> > probe in omap_hsmmc. Let me give that a try here.
-> 
-> Nope that's not it but getting closer.
-> 
-> The following seems to make things behave for me. Now the
-> question is.. Does it have some undesired side effects?
+Fan Chen <fan.chen@mediatek.com> writes:
 
-Yes, it does.
+> I just checked that the problem cannot be reproduced (tested 100 times
+> with your script) after flashing new firmware which we uploaded to
+> github[0] yesterday.
 
-I'm still not clear on what you want to accomplish.  It sounds like you 
-want to perform a runtime suspend following the last probe (if the 
-probe fails), and in between probes you don't really care (although it 
-would be preferable to avoid suspending).
+Great news!
 
-Does pm_runtime_use_autosuspend() get called by the probe routine?  If 
-it does, then perhaps you can get what you want by having the probe 
-routine call pm_runtime_dont_use_autosuspend() whenever it's about to 
-return an error -- particularly -EDEFER.
+> This latest firmware got many fixes and also supports cluster idle, so
+> we prefer testing with this new one Would you please test in your
+> side? Thanks for your great help!!
 
-> > Can we add some warning to pm_runtime_put_sync() about that?
-> 
-> Probably no need for that, I misunderstood the meaning of
-> pm_runtime_put_sync_autosuspend().
-> 
-> Regards,
-> 
-> Tony
-> 
-> 8< --------------
-> --- a/drivers/base/power/runtime.c
-> +++ b/drivers/base/power/runtime.c
-> @@ -435,7 +435,7 @@ static int rpm_suspend(struct device *dev, int rpmflags)
->  		goto out;
->  
->  	/* If the autosuspend_delay time hasn't expired yet, reschedule. */
-> -	if ((rpmflags & RPM_AUTO)
-> +	if (((rpmflags & (RPM_ASYNC | RPM_AUTO)) == ((RPM_ASYNC | RPM_AUTO)))
->  	    && dev->power.runtime_status != RPM_SUSPENDING) {
->  		unsigned long expires = pm_runtime_autosuspend_expiration(dev);
+I tested the latest firmware and it's booted 20+ times in a row without
+failure, which is better than it ever did in the past, so it seems to
+have fixed the idle problem.
 
-This would prevent pm_runtime_autosuspend() from working correctly.
+I will keep an eye on the failures in kernelci.org and let you know if I
+notice any other failures.
 
-Alan Stern
+Thanks again for the updated firmware!
+
+Speaking of updated firmware, is there any chance to make the default
+version of the firmware significantly less noisy.  There is a TON of
+output from the firmware before fastboot starts which makes the logs for
+this board very noisy (same complaint on the mt8135.)
+
+Kevin
+
+>
+>
+> Best regards,
+> Fan
+>
+> On Mon, 2016-02-01 at 17:17 -0800, Kevin Hilman wrote:
+>> Hi Eddie,
+>> 
+>> Eddie Huang <eddie.huang@mediatek.com> writes:
+>> 
+>> [...]
+>> 
+>> > Thanks your patience to provide detail steps, we can reproduce this
+>> > problem now. It seems something wrong in ATF, we still investigate how
+>> > to fix it. We will provide you new ATF firmware once we have solution
+>> 
+>> Great, I'm glad you can reproduce it.  I was starting to worry it was
+>> only my hardware with the problem.
+>> 
+>> Please let me know if there are firmware updates you'd like me to test
+>> and I'll be happy to.
+>> 
+>> Thanks,
+>> 
+>> Kevin
