@@ -1,53 +1,52 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Tue, 2 Feb 2016 15:04:56 +0800
-Subject: [PATCH] iommu/dma: Map scatterlists more parsimoniously
-In-Reply-To: <CAGS+omBWFgpQQKV2=qL9G6qPbW_EL2bSjkLPq6KwQGAdHEDSHw@mail.gmail.com>
-References: <104b4682056bc5b4aa0afadd39196c03fc06555d.1447249098.git.robin.murphy@arm.com>
- <1447307229.27650.5.camel@mhfsdcap03>
- <CAGS+omBWFgpQQKV2=qL9G6qPbW_EL2bSjkLPq6KwQGAdHEDSHw@mail.gmail.com>
-Message-ID: <CAGS+omDhZPxQvyVE6DgcRXJach2euWsxPxUZPJMgyPYsyMwcfA@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 02 Feb 2016 16:06:17 +0900
+Subject: [PATCH] drivers: soc: samsung: Enable COMPILE_TEST
+Message-ID: <1454396777-20034-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 10, 2015 at 8:49 PM, Daniel Kurtz <djkurtz@chromium.org> wrote:
-> On Thu, Nov 12, 2015 at 1:47 PM, Yong Wu <yong.wu@mediatek.com> wrote:
->> On Wed, 2015-11-11 at 14:54 +0000, Robin Murphy wrote:
->>> Whilst blindly assuming the worst case for segment boundaries and
->>> aligning every segment individually is safe from the point of view
->>> of respecting the device's parameters, it is also undeniably a waste
->>> of IOVA space. Futhermore, the knock-on effects of more pages than
->
-> "Furthermore" (checkpatch actually caught this, not me ;-) )
->
->>> necessary being exposed to device access, additional overhead in page
->>> table updates and TLB invalidations, etc., are even more undesirable.
->>>
->>> Improve matters by taking the actual boundary mask into account to
->>> actively detect the cases in which we really do need to adjust a
->>> segment, and avoid wasting space in the remainder.
->>>
->>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>> ---
->>>
->>> Hi all,
->>>
->>> I've given this some brief testing on Juno with USB and (via magic
->>> PCI hacks) SATA to confirm that all the +1s and -1s at least seem to
->>> be in the right places, so I'm throwing it out now for a head-start on
->>> checking whether it also helps the media folks with the v4l portability
->>> issues they're up against (I'm confident it should). If all goes well I
->>> figure I'll repost next week based on rc1 instead of some random local
->>> development commit.
->>>
->>> Robin.
->>
->> It works well on MT8173. containing
->> VDA/VEA(VideoDecodeAccelerator/VideoEncodeAccelerator) unit test.
->>
->> Tested-by: Yong Wu <yong.wu@mediatek.com>
->
-> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+Get some build coverage of Exynos SROM controller and PMU drivers. The
+PMU driver depends on asm/cputype.h so its compilation is limited to ARM
+architectures.
 
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Did this patch get lost?
-Can we pick it up as a fix for v4.5?
+---
+The SROM driver was compile-tested on x86, x86_64, ppc64, arm, arm64 and
+mips. The PMU driver on arm and arm64.
+---
+ drivers/soc/samsung/Kconfig | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
+index 895f16934b75..e5c11ac88a38 100644
+--- a/drivers/soc/samsung/Kconfig
++++ b/drivers/soc/samsung/Kconfig
+@@ -1,17 +1,17 @@
+ #
+ # SAMSUNG SoC drivers
+ #
+-menu "Samsung SOC driver support"
++menuconfig SOC_SAMSUNG
++	bool "Samsung SoC driver support" if COMPILE_TEST
+ 
+-config SOC_SAMSUNG
+-	bool
++if SOC_SAMSUNG
+ 
+ config EXYNOS_SROM
+-	bool
+-	depends on ARM && ARCH_EXYNOS
++	bool "Exynos SROM controller driver" if COMPILE_TEST
++	depends on (ARM && ARCH_EXYNOS) || COMPILE_TEST
+ 
+ config EXYNOS_PMU
+-	bool
+-	depends on ARM && ARCH_EXYNOS
++	bool "Exynos PMU controller driver" if COMPILE_TEST
++	depends on (ARM && ARCH_EXYNOS) || ((ARM || ARM64) && COMPILE_TEST)
+ 
+-endmenu
++endif
+-- 
+1.9.1
