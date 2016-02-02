@@ -1,302 +1,73 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 2 Feb 2016 17:34:17 -0600
-Subject: [PATCH v10 3/8] dt, numa: adding numa dt binding implementation.
-In-Reply-To: <1454407763-1017-4-git-send-email-gkulkarni@caviumnetworks.com>
-References: <1454407763-1017-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1454407763-1017-4-git-send-email-gkulkarni@caviumnetworks.com>
-Message-ID: <20160202233417.GA4739@rob-hp-laptop>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 2 Feb 2016 15:39:12 -0800
+Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
+In-Reply-To: <56B077D4.3030902@gmail.com>
+References: <20160106182650.GM12777@atomide.com> <568D5F54.7040900@gmail.com>
+ <20160107180700.GN12777@atomide.com> <568EDC8D.7070205@gmail.com>
+ <20160108022619.GS12777@atomide.com> <568F4596.8020206@gmail.com>
+ <20160108075913.GN11364@pali> <569052FE.1040008@gmail.com>
+ <20160121091437.GT7192@pali> <56B077D4.3030902@gmail.com>
+Message-ID: <20160202233911.GB19432@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 03:39:18PM +0530, Ganapatrao Kulkarni wrote:
-> dt node parsing for numa topology is done using device property
-> numa-node-id and device node distance-map.
+* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160202 01:34]:
+> On 21.01.2016 11:14, Pali Roh?r wrote:
+> >On Saturday 09 January 2016 02:23:26 Ivaylo Dimitrov wrote:
+> >>The key word here is "sometimes". i.e sometimes it hapens on normal reboot,
+> >>sometimes it happens on oops.
+> >
+> >So where is problem? In omap-gpmc? mtd? onenand? or ubifs? Or in
+> >different component? Do we know at least this?
+> >
 > 
-> Reviewed-by: Robert Richter <rrichter@cavium.com>
-> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> ---
->  drivers/of/Kconfig   |  11 +++
->  drivers/of/Makefile  |   1 +
->  drivers/of/of_numa.c | 207 +++++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of.h   |   4 +
->  4 files changed, 223 insertions(+)
->  create mode 100644 drivers/of/of_numa.c
-> 
-> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-> index e2a4841..8f9cc3a 100644
-> --- a/drivers/of/Kconfig
-> +++ b/drivers/of/Kconfig
-> @@ -112,4 +112,15 @@ config OF_OVERLAY
->  	  While this option is selected automatically when needed, you can
->  	  enable it manually to improve device tree unit test coverage.
->  
-> +config OF_NUMA
-> +	bool "Device Tree NUMA support"
+> I think I made some progress on the issue, it seems I have to have *both*
+> e7b11dc7b77bfce0a351230a5feeadc1d0bba997
+> (e7b11dc7b77bfce0a351230a5feeadc1d0bba997) reverted *and*
+> HWMOD_INIT_NO_RESET restored in omap3xxx_gpmc_hwmod flags to have working
+> onenand.
 
-Does this need to be user visible?
+That is strange. This is what I get with omap2plus_defconfig and
+omap-for-v4.5/fixes-rc1 after flashing the rootfs and booting kernel
+like you suggested on irc:
 
-> +	depends on NUMA
-> +	depends on OF
-> +	depends on ARM64
+# dmesg | grep -i -e ubi -e onenand
+[    2.502899] omap2-onenand omap2-onenand: initializing on CS0, phys base 0x01000000, virtual base d0940000, freq 83 MHz
+[    2.514373] OneNAND Manufacturer: Numonyx (0x20)
+[    2.519287] Muxed OneNAND 256MB 1.8V 16-bit (0x40)
+[    2.524444] OneNAND version = 0x0031
+[    2.671966] 6 ofpart partitions found on MTD device omap2-onenand
+[    2.678436] Creating 6 MTD partitions on "omap2-onenand":
+[    3.414764] ubi0: attaching mtd5
+[    3.668212] ubi0: scanning is finished
+[    3.716552] ubi0: attached mtd5 (name "rootfs", size 251 MiB)
+[    3.722839] ubi0: PEB size: 131072 bytes (128 KiB), LEB size: 129024 bytes
+[    3.730194] ubi0: min./max. I/O unit sizes: 2048/2048, sub-page size 512
+[    3.737304] ubi0: VID header offset: 512 (aligned 512), data offset: 2048
+[    3.744537] ubi0: good PEBs: 2010, bad PEBs: 0, corrupted PEBs: 0
+[    3.751037] ubi0: user volume: 1, internal volumes: 1, max. volumes count: 128
+[    3.758697] ubi0: max/mean erase counter: 1/0, WL threshold: 4096, image sequence number: 0
+[    3.767578] ubi0: available PEBs: 0, total reserved PEBs: 2010, PEBs reserved for bad PEB handling: 40
+[    3.923980] ubi0: background thread "ubi_bgt0d" started, PID 85
+[    3.980529] UBIFS (ubi0:0): background thread "ubifs_bgt0_0" started, PID 87
+[    3.996337] UBIFS (ubi0:0): recovery needed
+[    4.079925] UBIFS (ubi0:0): recovery completed
+[    4.085876] UBIFS (ubi0:0): UBIFS: mounted UBI device 0, volume 0, name "rootfs"
+[    4.093780] UBIFS (ubi0:0): LEB size: 129024 bytes (126 KiB), min./max. I/O unit sizes: 2048 bytes/2048 bytes
+[    4.104339] UBIFS (ubi0:0): FS size: 252241920 bytes (240 MiB, 1955 LEBs), journal size 9033728 bytes (8 MiB, 71 LEBs)
+[    4.115722] UBIFS (ubi0:0): reserved for root: 4190434 bytes (4092 KiB)
+[    4.122772] UBIFS (ubi0:0): media format: w4/r0 (latest is w4/r0), UUID 8F30A88A-F605-4291-9927-00CF3A2AE119, small LPT model
+[    4.136077] VFS: Mounted root (ubifs filesystem) on device 0:15.
 
-drop this (and make sure it compiles on other arches). It will fail 
-because you also have a dependency on FDT.
+I copied over the modules to this rootfs too :) But in general onenand
+seems to behave for me.
 
-> +	default y
-> +	help
-> +	  Enable Device Tree NUMA support.
-> +	  This enables the numa mapping of cpu, memory, io and
-> +	  inter node distances using dt bindings.
-> +
->  endif # OF
-> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-> index 156c072..bee3fa9 100644
-> --- a/drivers/of/Makefile
-> +++ b/drivers/of/Makefile
-> @@ -14,5 +14,6 @@ obj-$(CONFIG_OF_MTD)	+= of_mtd.o
->  obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
->  obj-$(CONFIG_OF_RESOLVE)  += resolver.o
->  obj-$(CONFIG_OF_OVERLAY) += overlay.o
-> +obj-$(CONFIG_OF_NUMA) += of_numa.o
->  
->  obj-$(CONFIG_OF_UNITTEST) += unittest-data/
-> diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-> new file mode 100644
-> index 0000000..1142cdb
-> --- /dev/null
-> +++ b/drivers/of/of_numa.c
-> @@ -0,0 +1,207 @@
-> +/*
-> + * OF NUMA Parsing support.
-> + *
-> + * Copyright (C) 2015 Cavium Inc.
-> + * Author: Ganapatrao Kulkarni <gkulkarni@cavium.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/of.h>
-> +#include <linux/of_fdt.h>
+> Tony, shall I hardcode GPMC_CS_CONFIG4 OEONTIME to be the same as NOLO's or
+> it does not make sense?
 
-Surely you need some numa related includes.
+Not sure what is still wrong. But yeah some borderline GPMC timing
+differences could affect it.
 
-> +
-> +/* define default numa node to 0 */
-> +#define DEFAULT_NODE 0
-> +
-> +/* Returns nid in the range [0..MAX_NUMNODES-1],
-> + * or NUMA_NO_NODE if no valid numa-node-id entry found
-> + * or DEFAULT_NODE if no numa-node-id entry exists
-> + */
-> +static int of_numa_prop_to_nid(const __be32 *of_numa_prop, int length)
-> +{
-> +	int nid;
-> +
-> +	if (!of_numa_prop)
-> +		return DEFAULT_NODE;
-> +
-> +	if (length != sizeof(*of_numa_prop)) {
-> +		pr_warn("NUMA: Invalid of_numa_prop length %d found.\n",
-> +				length);
-> +		return NUMA_NO_NODE;
-> +	}
-> +
-> +	nid = of_read_number(of_numa_prop, 1);
-> +	if (nid >= MAX_NUMNODES) {
-> +		pr_warn("NUMA: Invalid numa node %d found.\n", nid);
-> +		return NUMA_NO_NODE;
-> +	}
-> +
-> +	return nid;
-> +}
-> +
-> +static int __init early_init_of_node_to_nid(unsigned long node)
-> +{
-> +	int length;
-> +	const __be32 *of_numa_prop;
-> +
-> +	of_numa_prop = of_get_flat_dt_prop(node, "numa-node-id", &length);
-> +
-> +	return of_numa_prop_to_nid(of_numa_prop, length);
-> +}
-> +
-> +/*
-> + * Even though we connect cpus to numa domains later in SMP
-> + * init, we need to know the node ids now for all cpus.
-> +*/
-> +static int __init early_init_parse_cpu_node(unsigned long node)
-> +{
-> +	int nid;
-> +	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
-> +
-> +	if (type == NULL)
-> +		return 0;
-> +
-> +	if (strcmp(type, "cpu") != 0)
-> +		return 0;
-> +
-> +	nid = early_init_of_node_to_nid(node);
-> +	if (nid == NUMA_NO_NODE)
-> +		return -EINVAL;
-> +
-> +	node_set(nid, numa_nodes_parsed);
-> +	return 0;
-> +}
-> +
-> +static int __init early_init_parse_memory_node(unsigned long node)
-> +{
-> +	const __be32 *reg, *endp;
-> +	int length;
-> +	int nid;
-> +	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
-> +
-> +	if (type == NULL)
-> +		return 0;
-> +
-> +	if (strcmp(type, "memory") != 0)
-> +		return 0;
-> +
-> +	nid = early_init_of_node_to_nid(node);
-> +	if (nid == NUMA_NO_NODE)
-> +		return -EINVAL;
-> +
-> +	reg = of_get_flat_dt_prop(node, "reg", &length);
-> +	endp = reg + (length / sizeof(__be32));
-> +
-> +	while ((endp - reg) >= (dt_root_addr_cells + dt_root_size_cells)) {
-> +		u64 base, size;
-> +
-> +		base = dt_mem_next_cell(dt_root_addr_cells, &reg);
-> +		size = dt_mem_next_cell(dt_root_size_cells, &reg);
-> +		pr_debug("NUMA:  base = %llx , node = %u\n",
-> +				base, nid);
-> +
+Regards,
 
-We already have code to parse memory nodes. Can the NUMA part be 
-combined somehow.
-
-> +		if (numa_add_memblk(nid, base, size) < 0)
-> +			return -EINVAL;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int __init early_init_parse_distance_map_v1(unsigned long node,
-> +		const char *uname)
-> +{
-> +	const __be32 *prop_dist_matrix;
-> +	int length = 0, i, matrix_count;
-> +	int nr_size_cells = OF_ROOT_NODE_SIZE_CELLS_DEFAULT;
-> +
-> +	pr_info("NUMA: parsing numa-distance-map-v1\n");
-> +
-> +	prop_dist_matrix =
-> +		of_get_flat_dt_prop(node, "distance-matrix", &length);
-> +
-> +	if (!length) {
-> +		pr_err("NUMA: failed to parse distance-matrix\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	matrix_count = ((length / sizeof(__be32)) / (3 * nr_size_cells));
-> +
-> +	if ((matrix_count * sizeof(__be32) * 3 * nr_size_cells) !=  length) {
-> +		pr_warn("NUMA: invalid distance-matrix length %d\n", length);
-> +		return -EINVAL;
-> +	}
-> +
-> +	for (i = 0; i < matrix_count; i++) {
-> +		u32 nodea, nodeb, distance;
-> +
-> +		nodea = dt_mem_next_cell(nr_size_cells, &prop_dist_matrix);
-> +		nodeb = dt_mem_next_cell(nr_size_cells, &prop_dist_matrix);
-> +		distance = dt_mem_next_cell(nr_size_cells, &prop_dist_matrix);
-> +		numa_set_distance(nodea, nodeb, distance);
-> +		pr_debug("NUMA:  distance[node%d -> node%d] = %d\n",
-> +				nodea, nodeb, distance);
-> +
-> +		/* Set default distance of node B->A same as A->B */
-> +		if (nodeb > nodea)
-> +			numa_set_distance(nodeb, nodea, distance);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int __init early_init_parse_distance_map(unsigned long node,
-> +		const char *uname)
-> +{
-> +	if (strcmp(uname, "distance-map") != 0)
-> +		return 0;
-> +
-> +	if (of_flat_dt_is_compatible(node, "numa-distance-map-v1"))
-> +		return early_init_parse_distance_map_v1(node, uname);
-> +
-> +	pr_err("NUMA: invalid distance-map device node\n");
-> +	return -EINVAL;
-> +}
-> +
-> +static int __init early_init_of_scan_numa_map(unsigned long node, const char *uname,
-> +				     int depth, void *data)
-> +{
-> +	int ret;
-> +
-> +	ret = early_init_parse_cpu_node(node);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = early_init_parse_memory_node(node);
-> +	if (ret)
-> +		return ret;
-> +
-> +	return early_init_parse_distance_map(node, uname);
-> +}
-> +
-> +int of_node_to_nid(struct device_node *device)
-> +{
-> +	const __be32 *of_numa_prop;
-> +	int length;
-> +
-> +	of_numa_prop = of_get_property(device, "numa-node-id", &length);
-> +	if (of_numa_prop)
-> +		return of_numa_prop_to_nid(of_numa_prop, length);
-> +
-> +	return NUMA_NO_NODE;
-> +}
-> +
-> +/* DT node mapping is done already early_init_of_scan_memory */
-> +int __init of_numa_init(void)
-> +{
-> +	return of_scan_flat_dt(early_init_of_scan_numa_map, NULL);
-> +}
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index dd10626..23e5bad 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -685,6 +685,10 @@ static inline int of_node_to_nid(struct device_node *device)
->  }
->  #endif
->  
-> +#ifdef CONFIG_OF_NUMA
-> +extern int __init of_numa_init(void);
-> +#endif
-
-You don't need an ifdef here unless you need an empty function.
-
-Can this be called internally by the DT code when it does the all 
-the other flat scanning instead of adding another call from arch code to 
-DT code. Ideally, the arch code would call DT code once and it would do 
-all the parsing it needs to.
-
-Rob
+Tony
