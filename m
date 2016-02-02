@@ -1,44 +1,63 @@
-From: peter@korsgaard.com (Peter Korsgaard)
-Date: Tue, 02 Feb 2016 18:42:09 +0100
-Subject: [PATCH v4 1/2] regulator: act8945a: add regulator driver for
- ACT8945A
-In-Reply-To: <20160129113518.GQ4130@sirena.org.uk> (Mark Brown's message of
- "Fri, 29 Jan 2016 12:35:18 +0100")
-References: <1453863463-30515-1-git-send-email-wenyou.yang@atmel.com>
- <1453863463-30515-2-git-send-email-wenyou.yang@atmel.com>
- <20160129001603.GM4130@sirena.org.uk>
- <B256D81BAE5131468A838E5D7A243641D63FBF8B@penmbx01>
- <20160129113518.GQ4130@sirena.org.uk>
-Message-ID: <87wpqn3t72.fsf@dell.be.48ers.dk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 2 Feb 2016 12:51:16 -0500 (EST)
+Subject: [PATCH 0/3] kallsyms: remove special handling for CONFIG_ARM
+In-Reply-To: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <alpine.LFD.2.20.1602021250200.32766@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Mark" == Mark Brown <broonie@kernel.org> writes:
+On Tue, 2 Feb 2016, Ard Biesheuvel wrote:
 
- > On Fri, Jan 29, 2016 at 01:20:08AM +0000, Yang, Wenyou wrote:
- >> > > +static const struct of_device_id act8945a_pmic_of_match[] = {
- >> > > +	{ .compatible = "active-semi,act8945a-regulator" },
- >> > > +	{ },
- >> > > +};
- >> > > +MODULE_DEVICE_TABLE(of, act8945a_pmic_of_match);
+> This series applies on top of today's -next, and addresses an issue with
+> the new kallsyms code that is queued there, that enables base relative
+> kallsyms tables for all architectures (except IA-64)
+> 
+> Two issues have surfaced on ARM with the new kallsyms code:
+> a) CONFIG_HAVE_TCM creates a virtual region that is too far away for the
+>    relative kallsyms code to reach it;
+> b) CONFIG_XIP_KERNEL=y kernel symbols are not filtered against PAGE_OFFSET,
+>    as is the case for kernels that execute from RAM, resulting in symbols
+>    that are out of range.
+> 
+> Since the way kallsyms deals with XIP kernels on ARM leaves some room for
+> improvement regardless of the base relative changes, this series proposes
+> a fix that allows the special case to be removed from the kallsyms handling
+> entirely.
+> 
+> Patch #1 moves the .stubs and .vectors section back into the kernel VMA, while
+> preserving the guaranteed virtual offset of 4 KB. This results in all symbols
+> that kallsyms sees to be in a reasonable interval.
+> 
+> Patch #2 removes the special case for CONFIG_ARM && !CONFIG_XIP_KERNEL in the
+> invocation of scripts/kallsyms
+> 
+> Patch #3 removes the now unused --page-offset command line argument handling
+> from scripts/kallsyms.c
+> 
+> Note that we may still need to remove ARM from the list of architectures that
+> support base relative kallsyms tables if we cannot fix issue a) above, but
+> removing this special case seemed like an obvious improvement to me.
 
- >> > This seems mostly OK but why do we have a compatible string here - shouldn't
- >> > the MFD be able to instantiate the regulator function without needing this?
+For those 3 patches:
 
- >> Because I got feedback from Javier for the act8945a-charger patches of this MFD series,
- >> He said missing the OF match table will cause the module autoloading broken. 
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
- >> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/398113.html
 
- >> What do you think about it?
 
- > If then device is not being loaded from the DT (and it shouldn't be, the
- > device looks like it should be instantiated directly by the MFD as it
- > can't exist separately to that MFD) an OF table will do nothing.  
-
-To add to the confusion, the regulator part of the chip is actually
-identical to act8865, so it could use the existing regulator driver /
-compatible, except that it binds to the platform bus instead of i2c.
-
--- 
-Bye, Peter Korsgaard
+> 
+> Ard Biesheuvel (3):
+>   ARM: move .vectors and .stubs sections back into the kernel VMA
+>   kallsyms: remove special lower address limit for CONFIG_ARM
+>   kallsyms: remove --page-offset command line option
+> 
+>  arch/arm/kernel/entry-armv.S  |  7 +++--
+>  arch/arm/kernel/vmlinux.lds.S | 15 ++++++-----
+>  scripts/kallsyms.c            | 27 ++++----------------
+>  scripts/link-vmlinux.sh       |  4 ---
+>  4 files changed, 16 insertions(+), 37 deletions(-)
+> 
+> -- 
+> 2.5.0
+> 
+> 
