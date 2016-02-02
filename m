@@ -1,65 +1,62 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 2 Feb 2016 11:38:05 +0100
-Subject: [PATCH v4 0/7] ARM: dts: r-car: Add BRG support for (H)SCIF
-In-Reply-To: <20160202102031.GD15554@verge.net.au>
-References: <1454061883-4043-1-git-send-email-geert+renesas@glider.be>
- <20160202102031.GD15554@verge.net.au>
-Message-ID: <CAMuHMdWjEn6RSLPOYq=zhY_gk6Lx9xTD1x1G+1igoDr=3h1R5w@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 2 Feb 2016 18:38:13 +0800
+Subject: [PATCH 2/5] clk: sunxi: Make clocks setup functions take const
+ pointer
+In-Reply-To: <1454402834-6385-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1454402834-6385-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1454402834-6385-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65O--xpjknS01QLDqDU6EWWj4pFoTmKrDjhmq0U7W5FJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Tue, Feb 2, 2016 at 11:20 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Fri, Jan 29, 2016 at 11:04:36AM +0100, Geert Uytterhoeven wrote:
->> This patch series adds support for the Baud Rate Generator for External
->> Clock (BRG), as found on SCIF and HSCIF, to the DTS files for all R-Car
->> Gen1, Gen2, and Gen3 SoCs. This increases the range and accuracy of
->> supported baud rates on (H)SCIF.
->>
->> Support for the extra clocks in the DT bindings and in the driver has
->> been accepted in v4.5-rc1.
->>
->> Changes compared to v3:
->>   - Change one-line summary prefix to match current arm-soc practices,
->>   - Rebased,
->>
->> Changes compared to v2:
->>   - Rename "int_clk" to "brg_int",
->>   - Add support for R-Car M1A (r8a7778) and R-Car H1 (r8a7779),
->>   - Add support for R-Car H2 (r8a7790), R-Car M2-N (r8a7793), and R-Car
->>     E2 (r8a7794),
->>   - Correct internal clock source ZS_CLK to S3D1 in patch description
->>     for r8a7795,
->>
->> This has been tested on r8a7778/bockw, r8a7779/marzen, r8a7791/koelsch,
->> r8a7794/alt, and r8a7795/salvator-x.
->>
->> Dependencies:
->>   - renesas-devel-20160129-v4.5-rc1,
->>   - series "[PATCH v4 0/7] ARM: dts: R-Car: Add SCIF fallback
->>     compatibility strings",
->>   - series "[PATCH v4 00/11] ARM: dts: shmobile: Rename the serial port
->>     clock to fck",
->>
->> Thanks for applying!
+On Tue, Feb 2, 2016 at 4:47 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> All the data structure that we pass to the clocks setup functions are
+> declared const, while our setup functions expects a regular pointer. This
+> was hidden by the fact that we cast a void * pointer back to these
+> structures, which made it go unnoticed.
 >
-> Is it safe to apply this in the light of the dependency on
-> renesas-devel-20160129-v4.5-rc1?
+> Fix the functions prototype.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-The dependency here (also for the other series) just means I rebased the
-series on top of renesas-devel-20160129-v4.5-rc1 + the mentioned
-series.
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-Do you have any DT changes there that are not queued for v4.6?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> ---
+>  drivers/clk/sunxi/clk-sunxi.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index 67ef94948544..a3d706f5b21c 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -616,7 +616,7 @@ static const struct mux_data sun8i_h3_ahb2_mux_data __initconst = {
+>  };
+>
+>  static struct clk * __init sunxi_mux_clk_setup(struct device_node *node,
+> -                                              struct mux_data *data)
+> +                                              const struct mux_data *data)
+>  {
+>         struct clk *clk;
+>         const char *clk_name = node->name;
+> @@ -700,7 +700,7 @@ static const struct div_data sun4i_apb0_data __initconst = {
+>  };
+>
+>  static void __init sunxi_divider_clk_setup(struct device_node *node,
+> -                                          struct div_data *data)
+> +                                          const struct div_data *data)
+>  {
+>         struct clk *clk;
+>         const char *clk_name = node->name;
+> @@ -810,7 +810,7 @@ static const struct divs_data sun6i_a31_pll6_divs_data __initconst = {
+>   */
+>
+>  static struct clk ** __init sunxi_divs_clk_setup(struct device_node *node,
+> -                                                struct divs_data *data)
+> +                                                const struct divs_data *data)
+>  {
+>         struct clk_onecell_data *clk_data;
+>         const char *parent;
+> --
+> 2.6.4
+>
