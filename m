@@ -1,80 +1,71 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  2 Feb 2016 18:27:33 +0800
-Subject: [PATCH 00/11] mfd: axp20x: Add support for AXP809 PMIC
-Message-ID: <1454408864-24112-1-git-send-email-wens@csie.org>
+Date: Tue,  2 Feb 2016 18:27:37 +0800
+Subject: [PATCH 04/11] regulator: axp20x: Remove voltage readout support for
+ switch regulators
+In-Reply-To: <1454408864-24112-1-git-send-email-wens@csie.org>
+References: <1454408864-24112-1-git-send-email-wens@csie.org>
+Message-ID: <1454408864-24112-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Switch-type regulators, such as DC1SW on AXP22X, are a secondary output
+from DCDC1. They are just an on/off switch, and the driver should not
+try to read its voltage directly from the DCDC1 control registers.
 
-This series adds support for X-Powers' AXP809 PMIC. This is the primary
-PMIC accompanying Allwinner's A80 SoC. For now, only the power button
-(PEK) and regulators are supported. These are supported using existing
-axp20x drivers. This is based on the AXP223 series v7.
+Instead, the core will pass down the voltage from the regulator supply
+chain.
 
-Patch 1 adds a MAINTAINERS entry for the X-Powers AXP PMICs. I list
-myself as the maintainer.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/regulator/axp20x-regulator.c | 14 +++-----------
+ 1 file changed, 3 insertions(+), 11 deletions(-)
 
-Patch 2 adds AXP809 to the axp20x bindings.
-
-Patch 3 adds AXP809 support to the axp20x mfd driver.
-
-Patch 4 removes voltage readout for switch outputs.
-
-Patch 5 converts AXP20X LDO4 from using voltage tables to linear voltage
-ranges. Either one works, but regulators found on later PMICs match up
-with linear ranges better.
-
-Patch 6 adds AXP809 support to the axp20x regulator driver. This patch
-depends on the previous 3 patches. It's probably easier to apply them
-together.
-
-Patch 7 adds a dtsi file for AXP809.
-
-Patch 8 enables AXP809 support on the A80 Optimus board.
-
-Patch 9 enables AXP809 support on the Cubieboard 4.
-
-Patch 10 disables the dummy regulators from sunxi-common-regulators.dtsi
-on the A80 Optimus board. These aren't used in the board DTS anymore.
-
-Patch 11 disables the dummy regulators from sunxi-common-regulators.dtsi,
-on the Cubieboard4. These aren't used in the board DTS anymore.
-
-
-Regards
-ChenYu
-
-
-Chen-Yu Tsai (11):
-  MAINTAINERS: Add entry for X-Powers AXP family PMIC drivers
-  mfd: axp20x: Add bindings for AXP809 PMIC
-  mfd: axp20x: Add support for AXP809 PMIC
-  regulator: axp20x: Remove voltage readout support for switch
-    regulators
-  regulator: axp20x: Use linear voltage ranges for AXP20X LDO4
-  regulator: axp20x: support AXP809 variant
-  ARM: dts: sunxi: Add dtsi file for AXP809 PMIC
-  ARM: dts: sun9i: a80-optimus: Add AXP809 PMIC device node and
-    regulators
-  ARM: dts: sun9i: cubieboard4: Add AXP809 PMIC device node and
-    regulators
-  ARM: dts: sun9i: a80-optimus: Disable dummy regulators vcc3v0, vcc3v3,
-    vcc5v0
-  ARM: dts: sun9i: cubieboard4: Disable dummy regulators vcc3v0, vcc3v3,
-    vcc5v0
-
- Documentation/devicetree/bindings/mfd/axp20x.txt   |  31 +++-
- MAINTAINERS                                        |   6 +
- .../dts/{sun9i-a80-cubieboard4.dts => axp809.dtsi} | 151 ++++++++++---------
- arch/arm/boot/dts/sun9i-a80-cubieboard4.dts        | 133 ++++++++++++++++-
- arch/arm/boot/dts/sun9i-a80-optimus.dts            | 133 ++++++++++++++++-
- drivers/mfd/axp20x-rsb.c                           |   1 +
- drivers/mfd/axp20x.c                               |  79 ++++++++++
- drivers/regulator/axp20x-regulator.c               | 165 ++++++++++++++-------
- include/linux/mfd/axp20x.h                         |  59 ++++++++
- 9 files changed, 623 insertions(+), 135 deletions(-)
- copy arch/arm/boot/dts/{sun9i-a80-cubieboard4.dts => axp809.dtsi} (53%)
-
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index e86d1fc2d80b..f31d238e85e8 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -78,8 +78,7 @@
+ 		.ops		= &axp20x_ops,					\
+ 	}
+ 
+-#define AXP_DESC_SW(_family, _id, _match, _supply, _min, _max, _step, _vreg,	\
+-		    _vmask, _ereg, _emask) 					\
++#define AXP_DESC_SW(_family, _id, _match, _supply, _ereg, _emask)		\
+ 	[_family##_##_id] = {							\
+ 		.name		= #_id,						\
+ 		.supply_name	= (_supply),					\
+@@ -87,12 +86,7 @@
+ 		.regulators_node = of_match_ptr("regulators"),			\
+ 		.type		= REGULATOR_VOLTAGE,				\
+ 		.id		= _family##_##_id,				\
+-		.n_voltages	= (((_max) - (_min)) / (_step) + 1),		\
+ 		.owner		= THIS_MODULE,					\
+-		.min_uV		= (_min) * 1000,				\
+-		.uV_step	= (_step) * 1000,				\
+-		.vsel_reg	= (_vreg),					\
+-		.vsel_mask	= (_vmask),					\
+ 		.enable_reg	= (_ereg),					\
+ 		.enable_mask	= (_emask),					\
+ 		.ops		= &axp20x_ops_sw,				\
+@@ -160,8 +154,6 @@ static struct regulator_ops axp20x_ops = {
+ };
+ 
+ static struct regulator_ops axp20x_ops_sw = {
+-	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
+-	.list_voltage		= regulator_list_voltage_linear,
+ 	.enable			= regulator_enable_regmap,
+ 	.disable		= regulator_disable_regmap,
+ 	.is_enabled		= regulator_is_enabled_regmap,
+@@ -196,8 +188,8 @@ static const struct regulator_desc axp22x_regulators[] = {
+ 	AXP_DESC(AXP22X, DCDC5, "dcdc5", "vin5", 1000, 2550, 50,
+ 		 AXP22X_DCDC5_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL1, BIT(5)),
+ 	/* secondary switchable output of DCDC1 */
+-	AXP_DESC_SW(AXP22X, DC1SW, "dc1sw", NULL, 1600, 3400, 100,
+-		    AXP22X_DCDC1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(7)),
++	AXP_DESC_SW(AXP22X, DC1SW, "dc1sw", NULL, AXP22X_PWR_OUT_CTRL2,
++		    BIT(7)),
+ 	/* LDO regulator internally chained to DCDC5 */
+ 	AXP_DESC(AXP22X, DC5LDO, "dc5ldo", NULL, 700, 1400, 100,
+ 		 AXP22X_DC5LDO_V_OUT, 0x7, AXP22X_PWR_OUT_CTRL1, BIT(0)),
 -- 
 2.7.0
