@@ -1,37 +1,33 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  2 Feb 2016 14:19:33 +0100
-Subject: [PATCH 2/3] kallsyms: remove special lower address limit for
- CONFIG_ARM
-In-Reply-To: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1454419174-21290-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1454419174-21290-3-git-send-email-ard.biesheuvel@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Feb 2016 14:24:21 +0100
+Subject: [PATCH] pinctrl: sunxi: H3 requires irq_read_needs_mux
+In-Reply-To: <20160202100217.GA7483@box2.japko.eu>
+References: <20160202100217.GA7483@box2.japko.eu>
+Message-ID: <20160202132421.GT4652@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we no longer emit .stubs symbols into a section VMA loaded
-at absolute address 0x1000, we can drop the ARM-specific override that
-sets a lower limit based on CONFIG_PAGE_OFFSET, below which symbols are
-filtered from the kallsyms output.
+On Tue, Feb 02, 2016 at 11:03:03AM +0100, Krzysztof Adamski wrote:
+> It seems that on H3, just like on A10, when GPIOs are configured as
+> external interrupt data registers does not contain their value.  When
+> value is read, GPIO function must be temporary switched to input for
+> reads.
+> 
+> Signed-off-by: Krzysztof Adamski <k@japko.eu>
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- scripts/link-vmlinux.sh | 4 ----
- 1 file changed, 4 deletions(-)
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-diff --git a/scripts/link-vmlinux.sh b/scripts/link-vmlinux.sh
-index aae2473301ea..b83f918c7830 100755
---- a/scripts/link-vmlinux.sh
-+++ b/scripts/link-vmlinux.sh
-@@ -82,10 +82,6 @@ kallsyms()
- 		kallsymopt="${kallsymopt} --all-symbols"
- 	fi
- 
--	if [ -n "${CONFIG_ARM}" ] && [ -z "${CONFIG_XIP_KERNEL}" ] && [ -n "${CONFIG_PAGE_OFFSET}" ]; then
--		kallsymopt="${kallsymopt} --page-offset=$CONFIG_PAGE_OFFSET"
--	fi
--
- 	if [ -n "${CONFIG_X86_64}" ] && [ -n "${CONFIG_SMP}" ]; then
- 		kallsymopt="${kallsymopt} --absolute-percpu"
- 	fi
+Thanks!
+Maxime
+
 -- 
-2.5.0
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160202/d89e8160/attachment.sig>
