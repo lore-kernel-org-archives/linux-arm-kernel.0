@@ -1,55 +1,59 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Tue,  2 Feb 2016 17:25:14 -0600
-Subject: [PATCH 0/3] Add initial support for TI's K2G SOC
-Message-ID: <1454455517-7360-1-git-send-email-fcooper@ti.com>
+Date: Tue,  2 Feb 2016 17:25:15 -0600
+Subject: [PATCH 1/3] ARM: keystone: Create new binding for K2G SoC
+In-Reply-To: <1454455517-7360-1-git-send-email-fcooper@ti.com>
+References: <1454455517-7360-1-git-send-email-fcooper@ti.com>
+Message-ID: <1454455517-7360-2-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset provides initial support for K2G the latest addition to Texas
-Instruments Keystone 2 product family. These patches are built on top of
-the latest 4.5-rc2 commit.
+From: Nishanth Menon <nm@ti.com>
 
-K2G is a A15 + C66x DSP processor built to address the needs of industrial
-communication and control, automotive and performance audio applications.
-
-Supported peripherals include MMC,USB2.0,DCAN,DSS,McASP and PCIe SS.
+K2G SoC family is the newest version of the Keystone family of processors.
 
 The technical reference manual for K2G can be found here:
 http://www.ti.com/lit/ug/spruhy8/spruhy8.pdf
 
-This patchset provides the ability to boot K2G's general purpose evm using
-a ramfs filesystem.
+Add new bindings for K2G and the K2G evm. Also document these new bindings.
 
-Additional patches will follow this series that will add support for new
-drivers that will enable additional peripherals and features
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+---
+ Documentation/devicetree/bindings/arm/keystone/keystone.txt | 5 +++++
+ arch/arm/mach-keystone/keystone.c                           | 1 +
+ 2 files changed, 6 insertions(+)
 
-K2G Bootlog on 4.5-rc2:
-http://pastebin.ubuntu.com/14861580/
-
-To show no regressions:
-K2E Bootlog: http://pastebin.ubuntu.com/14861523/
-Other Keystone 2 devices need this partial revert discussed in the below
-thread.
-http://marc.info/?l=linux-netdev&m=145444838030865&w=2
-
-This is an issue seen on the netcp driver and has nothing to do with this
-patch set.
-
-Nishanth Menon (1):
-  ARM: keystone: Create new binding for K2G SoC
-
-Vitaly Andrianov (2):
-  ARM: dts: keystone: Add Initial DT support for TI K2G SoC family
-  ARM: dts: keystone: Add minimum support for K2G evm
-
- .../devicetree/bindings/arm/keystone/keystone.txt  |  5 ++
- arch/arm/boot/dts/Makefile                         |  3 +-
- arch/arm/boot/dts/k2g-evm.dts                      | 32 ++++++++
- arch/arm/boot/dts/k2g.dtsi                         | 89 ++++++++++++++++++++++
- arch/arm/mach-keystone/keystone.c                  |  1 +
- 5 files changed, 129 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/k2g-evm.dts
- create mode 100644 arch/arm/boot/dts/k2g.dtsi
-
+diff --git a/Documentation/devicetree/bindings/arm/keystone/keystone.txt b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
+index 3090a8a..48f6703 100644
+--- a/Documentation/devicetree/bindings/arm/keystone/keystone.txt
++++ b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
+@@ -22,6 +22,8 @@ SoCs:
+    compatible = "ti,k2l", "ti,keystone"
+ - Keystone 2 Edison
+    compatible = "ti,k2e", "ti,keystone"
++- K2G
++   compatible = "ti,k2g", "ti,keystone"
+ 
+ Boards:
+ -  Keystone 2 Hawking/Kepler EVM
+@@ -32,3 +34,6 @@ Boards:
+ 
+ -  Keystone 2 Edison EVM
+    compatible = "ti,k2e-evm", "ti,k2e", "ti,keystone"
++
++-  K2G EVM
++   compatible = "ti,k2g-evm", "ti,k2g", "ti-keystone"
+diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+index c279293..55cb199 100644
+--- a/arch/arm/mach-keystone/keystone.c
++++ b/arch/arm/mach-keystone/keystone.c
+@@ -100,6 +100,7 @@ static const char *const keystone_match[] __initconst = {
+ 	"ti,k2hk",
+ 	"ti,k2e",
+ 	"ti,k2l",
++	"ti,k2g",
+ 	"ti,keystone",
+ 	NULL,
+ };
 -- 
 2.7.0
