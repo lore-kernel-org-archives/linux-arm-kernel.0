@@ -1,69 +1,29 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 2 Feb 2016 13:57:50 +0100
-Subject: [PATCH v4 0/7] ARM: dts: r-car: Add BRG support for (H)SCIF
-In-Reply-To: <CAMuHMdWjEn6RSLPOYq=zhY_gk6Lx9xTD1x1G+1igoDr=3h1R5w@mail.gmail.com>
-References: <1454061883-4043-1-git-send-email-geert+renesas@glider.be>
- <20160202102031.GD15554@verge.net.au>
- <CAMuHMdWjEn6RSLPOYq=zhY_gk6Lx9xTD1x1G+1igoDr=3h1R5w@mail.gmail.com>
-Message-ID: <20160202125749.GI15554@verge.net.au>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 2 Feb 2016 14:00:22 +0100
+Subject: [PATCH v2 1/3] Input: rotary-encoder - make use of devm_* to
+ simplify .probe and .remove
+In-Reply-To: <56B09968.9050705@zonque.org>
+References: <1454408678-6011-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1454408678-6011-2-git-send-email-u.kleine-koenig@pengutronix.de>
+ <56B09968.9050705@zonque.org>
+Message-ID: <20160202130022.GX13664@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 11:38:05AM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
+On Tue, Feb 02, 2016 at 12:56:24PM +0100, Daniel Mack wrote:
+> On 02/02/2016 11:24 AM, Uwe Kleine-K?nig wrote:
+> > For all operations called in .probe there are devm_* variants.
+> > (input_register_device is clever enough to be devm aware on its own.)
+> > This allows to get rid of the error unwind code paths in .probe and the
+> > complete .remove function.
 > 
-> On Tue, Feb 2, 2016 at 11:20 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Fri, Jan 29, 2016 at 11:04:36AM +0100, Geert Uytterhoeven wrote:
-> >> This patch series adds support for the Baud Rate Generator for External
-> >> Clock (BRG), as found on SCIF and HSCIF, to the DTS files for all R-Car
-> >> Gen1, Gen2, and Gen3 SoCs. This increases the range and accuracy of
-> >> supported baud rates on (H)SCIF.
-> >>
-> >> Support for the extra clocks in the DT bindings and in the driver has
-> >> been accepted in v4.5-rc1.
-> >>
-> >> Changes compared to v3:
-> >>   - Change one-line summary prefix to match current arm-soc practices,
-> >>   - Rebased,
-> >>
-> >> Changes compared to v2:
-> >>   - Rename "int_clk" to "brg_int",
-> >>   - Add support for R-Car M1A (r8a7778) and R-Car H1 (r8a7779),
-> >>   - Add support for R-Car H2 (r8a7790), R-Car M2-N (r8a7793), and R-Car
-> >>     E2 (r8a7794),
-> >>   - Correct internal clock source ZS_CLK to S3D1 in patch description
-> >>     for r8a7795,
-> >>
-> >> This has been tested on r8a7778/bockw, r8a7779/marzen, r8a7791/koelsch,
-> >> r8a7794/alt, and r8a7795/salvator-x.
-> >>
-> >> Dependencies:
-> >>   - renesas-devel-20160129-v4.5-rc1,
-> >>   - series "[PATCH v4 0/7] ARM: dts: R-Car: Add SCIF fallback
-> >>     compatibility strings",
-> >>   - series "[PATCH v4 00/11] ARM: dts: shmobile: Rename the serial port
-> >>     clock to fck",
-> >>
-> >> Thanks for applying!
-> >
-> > Is it safe to apply this in the light of the dependency on
-> > renesas-devel-20160129-v4.5-rc1?
-> 
-> The dependency here (also for the other series) just means I rebased the
-> series on top of renesas-devel-20160129-v4.5-rc1 + the mentioned
-> series.
+> While at it, could you also convert this over to the gpiod_* API?
 
-Thanks, I have queued these up.
+This is done in patch 3.
 
-> Do you have any DT changes there that are not queued for v4.6?
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
