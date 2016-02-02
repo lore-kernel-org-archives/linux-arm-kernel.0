@@ -1,46 +1,45 @@
 From: ping.bai@nxp.com (Bai Ping)
-Date: Tue, 2 Feb 2016 18:01:36 +0800
-Subject: [PATCH V3 3/5] ARM: dts: imx: Add basic dts support for
- imx6qp-sabreauto
+Date: Tue, 2 Feb 2016 18:01:37 +0800
+Subject: [PATCH V3 4/5] ARM: dts: imx: Add basic dts support for imx6qp-sabresd
 In-Reply-To: <1454407298-15545-1-git-send-email-ping.bai@nxp.com>
 References: <1454407298-15545-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <1454407298-15545-3-git-send-email-ping.bai@nxp.com>
+Message-ID: <1454407298-15545-4-git-send-email-ping.bai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds basic dts file for i.MX6QP-Sbreauto board.
+This patch adds dts file for imx6qp-sabresd board.
 
 Signed-off-by: Bai Ping <ping.bai@nxp.com>
 ---
 
 change for V3:
--- correct the dts list in alphabet order
--- update the copyright header for double license
+-- update the copyright header
+-- add the dtb in alphabet order
 
- arch/arm/boot/dts/Makefile             |  3 +-
- arch/arm/boot/dts/imx6qp-sabreauto.dts | 93 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/Makefile           |  3 +-
+ arch/arm/boot/dts/imx6qp-sabresd.dts | 93 ++++++++++++++++++++++++++++++++++++
  2 files changed, 95 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/imx6qp-sabreauto.dts
+ create mode 100644 arch/arm/boot/dts/imx6qp-sabresd.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index c4f42a78..3801cbd 100644
+index 3801cbd..0ad5061 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -352,7 +352,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-tx6q-1110.dtb \
+@@ -353,7 +353,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
  	imx6q-udoo.dtb \
  	imx6q-wandboard.dtb \
--	imx6q-wandboard-revb1.dtb
-+	imx6q-wandboard-revb1.dtb \
-+	imx6qp-sabreauto.dtb
+ 	imx6q-wandboard-revb1.dtb \
+-	imx6qp-sabreauto.dtb
++	imx6qp-sabreauto.dtb \
++	imx6qp-sabresd.dtb
  dtb-$(CONFIG_SOC_IMX6SL) += \
  	imx6sl-evk.dtb \
  	imx6sl-warp.dtb
-diff --git a/arch/arm/boot/dts/imx6qp-sabreauto.dts b/arch/arm/boot/dts/imx6qp-sabreauto.dts
+diff --git a/arch/arm/boot/dts/imx6qp-sabresd.dts b/arch/arm/boot/dts/imx6qp-sabresd.dts
 new file mode 100644
-index 0000000..5ce3840
+index 0000000..b234580
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx6qp-sabreauto.dts
++++ b/arch/arm/boot/dts/imx6qp-sabresd.dts
 @@ -0,0 +1,93 @@
 +/*
 + * Copyright 2016 Freescale Semiconductor, Inc.
@@ -87,42 +86,46 @@ index 0000000..5ce3840
 +/dts-v1/;
 +
 +#include "imx6qp.dtsi"
-+#include "imx6qdl-sabreauto.dtsi"
++#include "imx6qdl-sabresd.dtsi"
 +
 +/ {
-+	model = "Freescale i.MX6 Quad Plus SABRE Automotive Board";
-+	compatible = "fsl,imx6qp-sabreauto", "fsl,imx6qp";
++	model = "Freescale i.MX6 Quad Plus SABRE Smart Device Board";
++	compatible = "fsl,imx6qp-sabresd", "fsl,imx6qp";
 +};
 +
-+&i2c2 {
-+	max7322: gpio at 68 {
-+		compatible = "maxim,max7322";
-+		reg = <0x68>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
++&cpu0 {
++	arm-supply = <&sw2_reg>;
 +};
 +
 +&iomuxc {
-+	imx6qdl-sabreauto {
-+		pinctrl_enet: enetgrp {
++	imx6qdl-sabresd {
++		pinctrl_usdhc2: usdhc2grp {
 +			fsl,pins = <
-+				MX6QDL_PAD_KEY_COL1__ENET_MDIO          0x1b0b0
-+				MX6QDL_PAD_KEY_COL2__ENET_MDC           0x1b0b0
-+				MX6QDL_PAD_RGMII_TXC__RGMII_TXC         0x1b018
-+				MX6QDL_PAD_RGMII_TD0__RGMII_TD0         0x1b018
-+				MX6QDL_PAD_RGMII_TD1__RGMII_TD1         0x1b018
-+				MX6QDL_PAD_RGMII_TD2__RGMII_TD2         0x1b018
-+				MX6QDL_PAD_RGMII_TD3__RGMII_TD3         0x1b018
-+				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL   0x1b018
-+				MX6QDL_PAD_RGMII_RXC__RGMII_RXC         0x1b018
-+				MX6QDL_PAD_RGMII_RD0__RGMII_RD0         0x1b018
-+				MX6QDL_PAD_RGMII_RD1__RGMII_RD1         0x1b018
-+				MX6QDL_PAD_RGMII_RD2__RGMII_RD2         0x1b018
-+				MX6QDL_PAD_RGMII_RD3__RGMII_RD3         0x1b018
-+				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL   0x1b018
-+				MX6QDL_PAD_GPIO_16__ENET_REF_CLK        0x4001b0a8
-+				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
++				MX6QDL_PAD_SD2_CMD__SD2_CMD		0x17059
++				MX6QDL_PAD_SD2_CLK__SD2_CLK		0x10071
++				MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x17059
++				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
++				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
++				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
++				MX6QDL_PAD_NANDF_D4__SD2_DATA4		0x17059
++				MX6QDL_PAD_NANDF_D5__SD2_DATA5		0x17059
++				MX6QDL_PAD_NANDF_D6__SD2_DATA6		0x17059
++				MX6QDL_PAD_NANDF_D7__SD2_DATA7		0x17059
++			>;
++		};
++
++		pinctrl_usdhc3: usdhc3grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17059
++				MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10071
++				MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17059
++				MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
++				MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
++				MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
++				MX6QDL_PAD_SD3_DAT4__SD3_DATA4		0x17059
++				MX6QDL_PAD_SD3_DAT5__SD3_DATA5		0x17059
++				MX6QDL_PAD_SD3_DAT6__SD3_DATA6		0x17059
++				MX6QDL_PAD_SD3_DAT7__SD3_DATA7		0x17059
 +			>;
 +		};
 +	};
@@ -130,10 +133,6 @@ index 0000000..5ce3840
 +
 +&pcie {
 +	status = "disabled";
-+};
-+
-+&vgen3_reg {
-+	regulator-always-on;
 +};
 -- 
 1.9.1
