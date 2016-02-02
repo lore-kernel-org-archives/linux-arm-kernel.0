@@ -1,138 +1,72 @@
 From: ping.bai@nxp.com (Bai Ping)
-Date: Tue, 2 Feb 2016 18:01:37 +0800
-Subject: [PATCH V3 4/5] ARM: dts: imx: Add basic dts support for imx6qp-sabresd
+Date: Tue, 2 Feb 2016 18:01:38 +0800
+Subject: [PATCH V3 5/5] ARM: imx: Add msl code support for imx6qp
 In-Reply-To: <1454407298-15545-1-git-send-email-ping.bai@nxp.com>
 References: <1454407298-15545-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <1454407298-15545-4-git-send-email-ping.bai@nxp.com>
+Message-ID: <1454407298-15545-5-git-send-email-ping.bai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds dts file for imx6qp-sabresd board.
+The i.MX6QP is a different SOC, but internally we treate it as i.MX6Q
+Rev_2.0 to maximum the code reusability. The chip silicon number we
+read from the ANADIG_DIGPROG is 0x630100. This patch add code to
+identify it as i.MX6QP Rev_1.0 when print out the silicon version.
 
 Signed-off-by: Bai Ping <ping.bai@nxp.com>
 ---
 
 change for V3:
--- update the copyright header
--- add the dtb in alphabet order
+-- add comment for the revision trick code
 
- arch/arm/boot/dts/Makefile           |  3 +-
- arch/arm/boot/dts/imx6qp-sabresd.dts | 93 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 95 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/imx6qp-sabresd.dts
+ arch/arm/mach-imx/anatop.c     | 9 ++++++++-
+ arch/arm/mach-imx/mach-imx6q.c | 8 ++++++--
+ 2 files changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 3801cbd..0ad5061 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -353,7 +353,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-udoo.dtb \
- 	imx6q-wandboard.dtb \
- 	imx6q-wandboard-revb1.dtb \
--	imx6qp-sabreauto.dtb
-+	imx6qp-sabreauto.dtb \
-+	imx6qp-sabresd.dtb
- dtb-$(CONFIG_SOC_IMX6SL) += \
- 	imx6sl-evk.dtb \
- 	imx6sl-warp.dtb
-diff --git a/arch/arm/boot/dts/imx6qp-sabresd.dts b/arch/arm/boot/dts/imx6qp-sabresd.dts
-new file mode 100644
-index 0000000..b234580
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6qp-sabresd.dts
-@@ -0,0 +1,93 @@
-+/*
-+ * Copyright 2016 Freescale Semiconductor, Inc.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6qp.dtsi"
-+#include "imx6qdl-sabresd.dtsi"
-+
-+/ {
-+	model = "Freescale i.MX6 Quad Plus SABRE Smart Device Board";
-+	compatible = "fsl,imx6qp-sabresd", "fsl,imx6qp";
-+};
-+
-+&cpu0 {
-+	arm-supply = <&sw2_reg>;
-+};
-+
-+&iomuxc {
-+	imx6qdl-sabresd {
-+		pinctrl_usdhc2: usdhc2grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD2_CMD__SD2_CMD		0x17059
-+				MX6QDL_PAD_SD2_CLK__SD2_CLK		0x10071
-+				MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x17059
-+				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
-+				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
-+				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
-+				MX6QDL_PAD_NANDF_D4__SD2_DATA4		0x17059
-+				MX6QDL_PAD_NANDF_D5__SD2_DATA5		0x17059
-+				MX6QDL_PAD_NANDF_D6__SD2_DATA6		0x17059
-+				MX6QDL_PAD_NANDF_D7__SD2_DATA7		0x17059
-+			>;
-+		};
-+
-+		pinctrl_usdhc3: usdhc3grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17059
-+				MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10071
-+				MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17059
-+				MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
-+				MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
-+				MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
-+				MX6QDL_PAD_SD3_DAT4__SD3_DATA4		0x17059
-+				MX6QDL_PAD_SD3_DAT5__SD3_DATA5		0x17059
-+				MX6QDL_PAD_SD3_DAT6__SD3_DATA6		0x17059
-+				MX6QDL_PAD_SD3_DAT7__SD3_DATA7		0x17059
-+			>;
-+		};
-+	};
-+};
-+
-+&pcie {
-+	status = "disabled";
-+};
+diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
+index 231bb25..0f624d1 100644
+--- a/arch/arm/mach-imx/anatop.c
++++ b/arch/arm/mach-imx/anatop.c
+@@ -129,7 +129,14 @@ void __init imx_init_revision_from_anatop(void)
+ 
+ 	switch (digprog & 0xff) {
+ 	case 0:
+-		revision = IMX_CHIP_REVISION_1_0;
++		/*
++		 * For i.MX6QP, most of the code for i.MX6Q can be resued,
++		 * so internally, we identify it as i.MX6Q Rev 2.0
++		 */
++		if (digprog >> 8 & 0x01)
++			revision = IMX_CHIP_REVISION_2_0;
++		else
++			revision = IMX_CHIP_REVISION_1_0;
+ 		break;
+ 	case 1:
+ 		revision = IMX_CHIP_REVISION_1_1;
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 3878494b..cb27d56 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -266,8 +266,11 @@ static void __init imx6q_init_machine(void)
+ {
+ 	struct device *parent;
+ 
+-	imx_print_silicon_rev(cpu_is_imx6dl() ? "i.MX6DL" : "i.MX6Q",
+-			      imx_get_soc_revision());
++	if (cpu_is_imx6q() && imx_get_soc_revision() == IMX_CHIP_REVISION_2_0)
++		imx_print_silicon_rev("i.MX6QP", IMX_CHIP_REVISION_1_0);
++	else
++		imx_print_silicon_rev(cpu_is_imx6dl() ? "i.MX6DL" : "i.MX6Q",
++				imx_get_soc_revision());
+ 
+ 	parent = imx_soc_device_init();
+ 	if (parent == NULL)
+@@ -399,6 +402,7 @@ static void __init imx6q_init_irq(void)
+ static const char * const imx6q_dt_compat[] __initconst = {
+ 	"fsl,imx6dl",
+ 	"fsl,imx6q",
++	"fsl,imx6qp",
+ 	NULL,
+ };
+ 
 -- 
 1.9.1
