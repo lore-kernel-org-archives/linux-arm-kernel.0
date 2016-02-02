@@ -1,29 +1,44 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Feb 2016 16:23:03 +0100
-Subject: [PATCH 2/3] ARM: shmobile: enable XHCI_RCAR in defconfig
-In-Reply-To: <cover.1454409855.git.horms+renesas@verge.net.au>
-References: <cover.1454409855.git.horms+renesas@verge.net.au>
-Message-ID: <ae6b99bc6928d13856172f287ee21be2eac39673.1454409855.git.horms+renesas@verge.net.au>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 2 Feb 2016 15:30:48 +0000
+Subject: [PATCH 04/11] arm64: Introduce Allwinner SoC config option
+In-Reply-To: <56B0C95B.4040500@gmail.com>
+References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
+ <1454348370-3816-5-git-send-email-andre.przywara@arm.com>
+ <56B0C95B.4040500@gmail.com>
+Message-ID: <56B0CBA8.3020804@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/shmobile_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+Hi,
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 5208b5caacd1..b7b714c3958c 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -162,6 +162,8 @@ CONFIG_SND_SOC_RSRC_CARD=y
- CONFIG_SND_SOC_AK4642=y
- CONFIG_SND_SOC_WM8978=y
- CONFIG_USB=y
-+CONFIG_USB_XHCI_HCD=y
-+CONFIG_USB_XHCI_RCAR=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_OHCI_HCD=y
- CONFIG_USB_R8A66597_HCD=y
--- 
-2.7.0.rc3.207.g0ac5344
+On 02/02/16 15:20, Matthias Brugger wrote:
+> 
+> 
+> On 01/02/16 18:39, Andre Przywara wrote:
+>> To prepare for the Allwinner A64 SoC support, introduce a config
+>> option to allow compiling Allwinner (aka. sunxi) specific drivers
+>> for the arm64 architecture as well.
+>> This patch just defines the ARCH_SUNXI symbol to allow Allwinner
+>> specific drivers to be selected during kernel configuration.
+>> Since the MMC driver is quite essential for Linux to be useful, select
+>> it by default.
+>>
+> 
+> This mostly depends on the board you have. The rootfs could be on the
+> flash, on nfs or even on a usb stick.
+
+Yeah, could be. It's just that all boards I know of so far have either
+SD card or eMMC.
+Maybe it's better put in defconfig. I just want to avoid people getting
+disappointed when enabling Allwinner support and not being able to use
+it properly. You know that arm64 has only _one_ defconfig to rule them
+all, so compiling a special kernel with magic config options is not the
+usual drill for arm64 - for good reasons.
+
+> I don't see why MMC support should be essential for A64 SoC.
+
+So I guess I put it in defconfig then, together with the patch to
+actually enable Allwinner support by default, which I forgot in this series.
+
+Cheers,
+Andre.
