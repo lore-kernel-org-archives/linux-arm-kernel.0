@@ -1,55 +1,63 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 2 Feb 2016 12:06:12 +0100
-Subject: [PATCH v2 3/3] ARM64: dts: mt8173: Add CPU OPP, clock and
- regulator supply properties
-In-Reply-To: <20160105102455.GA30120@ubuntu>
-References: <1451197318-12418-1-git-send-email-pi-cheng.chen@linaro.org>
- <1451197318-12418-4-git-send-email-pi-cheng.chen@linaro.org>
- <20151228031340.GD3598@ubuntu> <3310024.mO5K6yH9vU@wuerfel>
- <20160105102455.GA30120@ubuntu>
-Message-ID: <56B08DA4.8070207@gmail.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Tue, 2 Feb 2016 11:08:21 +0000
+Subject: [PATCH 1/3] arm64: efistub: drop __init annotation from
+ handle_kernel_image()
+In-Reply-To: <CAKv+Gu96tdf8ZrGHDi_YKacsRF_b336Nu4Anh61j4u3Lg18BHg@mail.gmail.com>
+References: <1453979254-25374-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1453979254-25374-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160128225809.GF2571@codeblueprint.co.uk>
+ <CAKv+Gu9sE4oJrFmSK8sEjTrU8A7k53Hj1S1pTyCqyA5Gsba2Kw@mail.gmail.com>
+ <20160129160006.GD2611@codeblueprint.co.uk>
+ <CAKv+Gu96tdf8ZrGHDi_YKacsRF_b336Nu4Anh61j4u3Lg18BHg@mail.gmail.com>
+Message-ID: <20160202110821.GB2642@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 29 Jan, at 05:03:16PM, Ard Biesheuvel wrote:
+> On 29 January 2016 at 17:00, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> > On Fri, 29 Jan, at 10:36:03AM, Ard Biesheuvel wrote:
+> >> On 28 January 2016 at 23:58, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> >> >
+> >> > Would it make more sense to #undef __init in one of the arm64 efistub
+> >> > header files? I'm thinking of the case where some poor unsuspecting
+> >> > developer writes a new function and marks it as __init, and we miss it
+> >> > during review.
+> >> >
+> >>
+> >> Yes, I can add it to efistub.h, and make sure it gets included in all the files
+> >>
+> >> Should we #undef it and #define it to a string that is easily grep'ed
+> >> for, so it is easy to find the explanatory comment that goes along
+> >> with it?
+> >> E.g.,
+> >>
+> >> #define __init __init_not_supported_in_efi_stub
+> >
+> > This would produce a compilation failure if someone tags something as
+> > __init right? Looks fine to me.
+> 
+> Yes, but it makes the error message difficult to decipher, since
+> __init is printed and not what it resolves to. Locally, I tried this,
+> which seems to work:
+> 
+> #undef __init
+> #define __init __attribute__((__init_not_supported_in_efi_stub))
+> #pragma GCC diagnostic error "-Wattributes"
+> 
+> which produces
+> 
+>   CC      drivers/firmware/efi/libstub/arm-stub.o
+> /home/ard/linux-2.6/drivers/firmware/efi/libstub/arm-stub.c:24:1:
+> error: ?__init_not_supported_in_efi_stub? attribute directive ignored
+> [-Werror=attributes]
+>  {
+>  ^
+> cc1: some warnings being treated as errors
+> 
+> which is slightly dodgy, but at least puts the string right in the error message
 
+What about,
 
-On 05/01/16 11:24, Viresh Kumar wrote:
-> On 05-01-16, 11:21, Arnd Bergmann wrote:
->> On Monday 28 December 2015 08:43:40 Viresh Kumar wrote:
->>> On 27-12-15, 14:21, Pi-Cheng Chen wrote:
->>>> Add operating-points-v2, clock, and regulator supply properties
->>>> required by mt8173-cpufreq driver to enable it.
->>>>
->>>> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
->>>> ---
->>>> This patch is based on the patch[1] that adds underlying clock MUX for
->>>> MT8173 which is needed by mt8173-cpufreq driver but not yet picked.
->>>>
->>>> [1] http://article.gmane.org/gmane.linux.kernel.clk/325
->>>> ---
->>>>   arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 18 ++++++
->>>>   arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 90 +++++++++++++++++++++++++++++
->>>>   2 files changed, 108 insertions(+)
->>>
->>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->>>
->>
->> This patch is now in linux-next through Rafael's pm tree, and it breaks the
->> arm64 build:
->>
->>          arm64-defconfig
->> Error: ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:132.24-25 syntax error
->>
->>
->> Please revert.
->>
->> In the future, please send all dts changes through the proper maintainer
->> channels (-> Mattias -> arm-soc), and make sure they actually build.
->
-> Rafael has already reverted that, AFAIK, after Mark Brown reported the
-> build issue.
->
+#define __init __compiletime_error("__init not supported in EFI boot stub")
 
-Applied to v4.5-next/dts
-
-Thanks.
+?
