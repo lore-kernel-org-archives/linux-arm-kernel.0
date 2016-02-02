@@ -1,66 +1,125 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 1 Feb 2016 18:49:47 -0500 (EST)
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <20160201232833.GR19432@atomide.com>
-Message-ID: <Pine.LNX.4.44L0.1602011844540.2869-100000@netrider.rowland.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon,  1 Feb 2016 16:06:23 -0800
+Subject: [PATCH v2] recordmcount: arm: Implement make_nop
+Message-ID: <1454371583-9064-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 1 Feb 2016, Tony Lindgren wrote:
+In similar spirit to x86 and arm64 support, add a make_nop_arm()
+to replace calls to mcount with nops in sections that aren't
+traced.
 
-> Does the patch below make more sense to you where we call rpm_idle?
-> That seems to make things behave here also.
-> 
-> > > What else does __pm_runtime_use_autosuspend() set initially
-> > > that changes things here?
-> > 
-> > The usage counter, if the delay is negative.
-> 
-> Yeah I don't see any difference with those.
-> 
-> > I'll look at this in detail, but not right now, sorry.  I'm working on
-> > something else ATM and I was hoping that Ulf would be able to figure
-> > out what's going on here.
-> 
-> Yeah we need to understand what's going on here. Having the PM runtime
-> framework out of sync with the hardare is not good.. If we can't
-> figure this out we should probably revert the patch until we understand
-> it.
-> 
-> Regards,
-> 
-> Tony
-> 
-> 8< ------------
-> --- a/drivers/base/power/runtime.c
-> +++ b/drivers/base/power/runtime.c
-> @@ -1419,17 +1419,28 @@ void pm_runtime_init(struct device *dev)
->   */
->  void pm_runtime_reinit(struct device *dev)
->  {
-> -	if (!pm_runtime_enabled(dev)) {
-> -		if (dev->power.runtime_status == RPM_ACTIVE)
-> +	int (*callback)(struct device *);
-> +	int err;
-> +
-> +	if (pm_runtime_enabled(dev))
-> +		return;
-> +
-> +	if (dev->power.runtime_status == RPM_ACTIVE) {
-> +		if (dev->power.use_autosuspend) {
-> +			__pm_runtime_use_autosuspend(dev, false);
-> +			rpm_idle(dev, RPM_AUTO);
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Rabin Vincent <rabin@rab.in>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-You get here only if runtime PM is disabled, right?  So the rpm_idle 
-call won't do anything -- "disabled" means don't make any callbacks.
+Changes from v1:
+ * Replace with nops instead of pops
+ * Check for BE or LE kernel with elf headers
+ * Drop mcount style check because now we look at the previous
+   instruction to determine if it's a push (__gnu_mcount_nc) or not (mcount).
 
-Tony, exactly what are you trying to do here?  Do you want this to 
-invoke a runtime-PM callback in the subsystem, power domain, or driver?  
-(Is there even a driver bound to the device when this function runs?)
+ scripts/recordmcount.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 65 insertions(+)
 
-The function's name suggests that it merely resets the data stored in 
-dev->power without actually touching the hardware.  Is that what you 
-really want?
-
-Alan Stern
+diff --git a/scripts/recordmcount.c b/scripts/recordmcount.c
+index e167592793a7..356527cb539e 100644
+--- a/scripts/recordmcount.c
++++ b/scripts/recordmcount.c
+@@ -206,6 +206,59 @@ static int make_nop_x86(void *map, size_t const offset)
+ 	return 0;
+ }
+ 
++static unsigned char ideal_nop4_arm_le[4] = { 0x00, 0x00, 0xa0, 0xe1 }; /* mov r0, r0 */
++static unsigned char ideal_nop4_arm_be[4] = { 0xe1, 0xa0, 0x00, 0x00 }; /* mov r0, r0 */
++static unsigned char *ideal_nop4_arm;
++
++static unsigned char bl_mcount_arm_le[4] = { 0xfe, 0xff, 0xff, 0xeb }; /* bl */
++static unsigned char bl_mcount_arm_be[4] = { 0xeb, 0xff, 0xff, 0xfe }; /* bl */
++static unsigned char *bl_mcount_arm;
++
++static unsigned char push_arm_le[4] = { 0x04, 0xe0, 0x2d, 0xe5 }; /* push {lr} */
++static unsigned char push_arm_be[4] = { 0xe5, 0x2d, 0xe0, 0x04 }; /* push {lr} */
++static unsigned char *push_arm;
++
++static unsigned char ideal_nop2_thumb_le[2] = { 0x00, 0xbf }; /* nop */
++static unsigned char ideal_nop2_thumb_be[2] = { 0xbf, 0x00 }; /* nop */
++static unsigned char *ideal_nop2_thumb;
++
++static unsigned char push_bl_mcount_thumb_le[6] = { 0x00, 0xb5, 0xff, 0xf7, 0xfe, 0xff }; /* push {lr}, bl */
++static unsigned char push_bl_mcount_thumb_be[6] = { 0xb5, 0x00, 0xf7, 0xff, 0xff, 0xfe }; /* push {lr}, bl */
++static unsigned char *push_bl_mcount_thumb;
++
++static int make_nop_arm(void *map, size_t const offset)
++{
++	char *ptr;
++	int cnt = 1;
++	int nop_size;
++	size_t off = offset;
++
++	ptr = map + offset;
++	if (memcmp(ptr, bl_mcount_arm, 4) == 0) {
++		if (memcmp(ptr - 4, push_arm, 4) == 0) {
++			off -= 4;
++			cnt = 2;
++		}
++		ideal_nop = ideal_nop4_arm;
++		nop_size = 4;
++	} else if (memcmp(ptr - 2, push_bl_mcount_thumb, 6) == 0) {
++		cnt = 3;
++		nop_size = 2;
++		off -= 2;
++		ideal_nop = ideal_nop2_thumb;
++	} else
++		return -1;
++
++	/* Convert to nop */
++	ulseek(fd_map, off, SEEK_SET);
++
++	do {
++		uwrite(fd_map, ideal_nop, nop_size);
++	} while (--cnt > 0);
++
++	return 0;
++}
++
+ static unsigned char ideal_nop4_arm64[4] = {0x1f, 0x20, 0x03, 0xd5};
+ static int make_nop_arm64(void *map, size_t const offset)
+ {
+@@ -421,6 +474,11 @@ do_file(char const *const fname)
+ 			w2 = w2rev;
+ 			w8 = w8rev;
+ 		}
++		ideal_nop4_arm = ideal_nop4_arm_le;
++		bl_mcount_arm = bl_mcount_arm_le;
++		push_arm = push_arm_le;
++		ideal_nop2_thumb = ideal_nop2_thumb_le;
++		push_bl_mcount_thumb = push_bl_mcount_thumb_le;
+ 		break;
+ 	case ELFDATA2MSB:
+ 		if (*(unsigned char const *)&endian != 0) {
+@@ -429,6 +487,11 @@ do_file(char const *const fname)
+ 			w2 = w2rev;
+ 			w8 = w8rev;
+ 		}
++		ideal_nop4_arm = ideal_nop4_arm_be;
++		bl_mcount_arm = bl_mcount_arm_be;
++		push_arm = push_arm_be;
++		ideal_nop2_thumb = ideal_nop2_thumb_be;
++		push_bl_mcount_thumb = push_bl_mcount_thumb_be;
+ 		break;
+ 	}  /* end switch */
+ 	if (memcmp(ELFMAG, ehdr->e_ident, SELFMAG) != 0
+@@ -454,6 +517,8 @@ do_file(char const *const fname)
+ 		break;
+ 	case EM_ARM:	 reltype = R_ARM_ABS32;
+ 			 altmcount = "__gnu_mcount_nc";
++			 make_nop = make_nop_arm;
++			 rel_type_nop = R_ARM_NONE;
+ 			 break;
+ 	case EM_AARCH64:
+ 			reltype = R_AARCH64_ABS64;
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
