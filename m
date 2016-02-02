@@ -1,33 +1,26 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 2 Feb 2016 19:13:52 +0100
-Subject: [PATCH v3 1/2] clk: sunxi: Add sun6i/8i video support
-In-Reply-To: <CACvgo53f8Sr_dEAx_mcvjXciK01mY7TUDguOJ-HzNur-PpmMZw@mail.gmail.com>
-References: <cover.1454427223.git.moinejf@free.fr>
- <8fdfe5fe7715f19416d654964e55721b30237b38.1454427224.git.moinejf@free.fr>
- <CACvgo53f8Sr_dEAx_mcvjXciK01mY7TUDguOJ-HzNur-PpmMZw@mail.gmail.com>
-Message-ID: <20160202191352.2b21ae1c5de288e008841b1f@free.fr>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Tue, 2 Feb 2016 10:16:33 -0800
+Subject: [PATCH v3 2/4] power: reset: add reboot mode driver
+In-Reply-To: <1454407325-4804-1-git-send-email-andy.yan@rock-chips.com>
+References: <1454406981-4692-1-git-send-email-andy.yan@rock-chips.com>
+ <1454407325-4804-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <CAAtXAHeg3hmKy1YAfGaNaPnXYxJAkA4zV2J4ELyPStQUeBrZ3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2 Feb 2016 17:19:15 +0000
-Emil Velikov <emil.l.velikov@gmail.com> wrote:
+Hi Andy,
 
-> > ---
-> >  Documentation/devicetree/bindings/clock/sunxi.txt |   2 +
-> >  drivers/clk/sunxi/clk-sun6i-display.c             | 106 +++++++++++++
-> >  drivers/clk/sunxi/clk-sun6i-pll3.c                | 174 ++++++++++++++++++++++
-> >  3 files changed, 282 insertions(+)
-> >  create mode 100644 drivers/clk/sunxi/clk-sun6i-display.c
-> >  create mode 100644 drivers/clk/sunxi/clk-sun6i-pll3.c
-> >
-> Something is missing here - namely the changes to the Makefile. Does
-> this series work or did you simply forget git add ?
+looks good to me. Feel free to add my Reviewed-by
 
-Yes, the series works. I just forgot the Makefile which contains other
-changes for my kernel (thermal clock).
+On Tue, Feb 2, 2016 at 2:02 AM, Andy Yan <andy.yan@rock-chips.com> wrote:
 
-Thanks. I sent an new request.
+> This is commonly used on Android based devices, in order to
+> reboot the device into fastboot or recovery mode.
+>
+Reviewed-by: Moritz Fischer <moritz.fischer@ettus.com>
+> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Cheers,
+
+Moritz
