@@ -1,29 +1,27 @@
-From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Tue, 2 Feb 2016 15:39:57 -0600
-Subject: [RFC PATCH 0/3] arm64 initrd mapping/relocation
-In-Reply-To: <1454435802-7604-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1454435802-7604-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <56B1222D.3000604@redhat.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 02 Feb 2016 22:43:36 +0100
+Subject: [RFC PATCH] ARM: dts: rockchip: increase the mclk_fs to 512 for
+ kylin board
+In-Reply-To: <1454057361-22923-1-git-send-email-zhengxing@rock-chips.com>
+References: <1454057361-22923-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <5872159.rO8vOly5eX@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/2016 11:56 AM, Ard Biesheuvel wrote:
-> After discussing in linux-efi with Mark, and on #armlinux with Will, this is
-> a proposal for dealing with initrd memory that is potentially not covered by
-> the linear region.
->
-> Note that this will look slightly differently when some of the KASLR work gets
-> merged, but this should only affect the way we deal with the initrd if it sits
-> outside of the linear region.
->
-> Mostly intended for discussion, not tested at all.
->
-> Ard Biesheuvel (3):
->    memblock: add routine to clear the MEMBLOCK_NOMAP flag for a region
->    arm64: add the initrd region to the linear mapping explicitly
->    arm64: remove the now unneeded relocate_initrd()
+Am Freitag, 29. Januar 2016, 16:49:21 schrieb Xing Zheng:
+> If we playback the 8KHz FS audio with the 256 mclk_fs, we need the
+> mclk = 256 * 8000 = 2.048MHz, the frac div is 594 / 2.048 = 290,
+> the frac div value 0x00809015 set to the CRU_CLKSEL7_CON will cause
+> to hang.
+> 
+> We increase the mclk_fs to 512, will get the mclk = 512 * 8000 =
+> 4.096MHz, use 0x01009015 instead of 0x00809015 to work around this
+> issue. We will keep tracking it.
+> 
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 
-I discovered the original problem on AMD Seattle and these patches
-fixed it for me.
+applied to my dts32 branch for 4.6
 
-Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+
+Thanks
+Heiko
