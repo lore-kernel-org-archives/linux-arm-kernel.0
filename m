@@ -1,45 +1,42 @@
-From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Tue, 2 Feb 2016 09:42:54 +0100
-Subject: [linux-sunxi] [PATCH 02/11] crypto: sunxi-ss: prevent
- compilation on 64-bit
-In-Reply-To: <1454348370-3816-3-git-send-email-andre.przywara@arm.com>
-References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
- <1454348370-3816-3-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160202084254.GA22621@Red>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue,  2 Feb 2016 09:47:09 +0100
+Subject: [PATCH 0/5] clk: sunxi: Rework the clocks code to deal with orphans
+Message-ID: <1454402834-6385-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 05:39:21PM +0000, Andre Przywara wrote:
-> The driver for the sunxi-ss crypto engine is not entirely 64-bit safe,
-> compilation on arm64 spits some warnings.
-> The proper fix was deemed to involved [1], so since 64-bit SoCs won't
-> have this IP block we just disable this driver for 64-bit.
-> 
-> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/399988.html
->      (and the reply)
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Hi everyone,
 
-Acked-by: Corentin LABBE <clabbe.montjoie@gmail.com>
+Here is an attempt at making the whole clk-sunxi code register the
+clocks without creating any orphans by relying on CLK_OF_DECLARE.
 
-> ---
->  drivers/crypto/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-> index 07d4942..737200f 100644
-> --- a/drivers/crypto/Kconfig
-> +++ b/drivers/crypto/Kconfig
-> @@ -487,7 +487,7 @@ config CRYPTO_DEV_IMGTEC_HASH
->  
->  config CRYPTO_DEV_SUN4I_SS
->  	tristate "Support for Allwinner Security System cryptographic accelerator"
-> -	depends on ARCH_SUNXI
-> +	depends on ARCH_SUNXI && !64BIT
->  	select CRYPTO_MD5
->  	select CRYPTO_SHA1
->  	select CRYPTO_AES
-> -- 
-> 2.6.4
-> 
-> -- 
+This also has the net benefit of not having to add the SoC compatible
+to the list of compatibles that trigger the clock registration, which
+has started to be a pain.
+
+I tested this on an A13 (R8 actually), everything seems to be working
+just fine. I also tested it both with and without Heiko's patch to
+defer clk_get if the clock is orphan, and previously broke everything.
+
+Let me know what you think,
+Maxime
+
+Maxime Ripard (5):
+  clk: sunxi: Make clocks setup functions return their clock
+  clk: sunxi: Make clocks setup functions take const pointer
+  clk: sunxi: convert current clocks registration to CLK_OF_DECLARE
+  clk: sunxi: Remove old probe and protection code
+  clk: sunxi: Remove clk_register_clkdev calls
+
+ drivers/clk/sunxi/clk-a10-hosc.c         |   3 +-
+ drivers/clk/sunxi/clk-a20-gmac.c         |   2 -
+ drivers/clk/sunxi/clk-factors.c          |   7 -
+ drivers/clk/sunxi/clk-factors.h          |   1 -
+ drivers/clk/sunxi/clk-mod0.c             |   1 +
+ drivers/clk/sunxi/clk-sun6i-apb0-gates.c |   2 -
+ drivers/clk/sunxi/clk-sun9i-core.c       |   1 +
+ drivers/clk/sunxi/clk-sunxi.c            | 263 ++++++++++++++++---------------
+ 8 files changed, 135 insertions(+), 145 deletions(-)
+
+-- 
+2.6.4
