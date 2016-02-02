@@ -1,55 +1,51 @@
 From: k@japko.eu (Krzysztof Adamski)
-Date: Tue,  2 Feb 2016 22:21:52 +0100
-Subject: [PATCH v2 4/5] ARM: dts: sun8i-h3: Add R_PIO controller node to the
- dtsi
+Date: Tue,  2 Feb 2016 22:21:53 +0100
+Subject: [PATCH v2 5/5] pinctrl: sunxi: Use pin number when calling
+ sunxi_pmx_set
 In-Reply-To: <1454448113-18810-1-git-send-email-k@japko.eu>
 References: <1454448113-18810-1-git-send-email-k@japko.eu>
-Message-ID: <1454448113-18810-5-git-send-email-k@japko.eu>
+Message-ID: <1454448113-18810-6-git-send-email-k@japko.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the corresponding device node for R_PIO on H3 to the dtsi. Support
-for the controller was added in earlier commit.
+sunxi_pmx_set accepts pin number and then calculates offset by
+subtracting pin_base from it. sunxi_pinctrl_gpio_get, on the other hand,
+gets offset so we have to convert it to pin number so we won't get
+negative value in sunxi_pmx_set.
+
+This was only used on A10 so far, where there is only one GPIO chip with
+pin_base set to 0 so it didn't matter. However H3 also requires this
+workaround but have two pinmux sections, triggering problem for PL port.
 
 Signed-off-by: Krzysztof Adamski <k@japko.eu>
 ---
- .../devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt  |  1 +
- arch/arm/boot/dts/sun8i-h3.dtsi                              | 12 ++++++++++++
- 2 files changed, 13 insertions(+)
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-index 9213b27..3e56b16 100644
---- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-@@ -21,6 +21,7 @@ Required properties:
-   "allwinner,sun9i-a80-r-pinctrl"
-   "allwinner,sun8i-a83t-pinctrl"
-   "allwinner,sun8i-h3-pinctrl"
-+  "allwinner,sun8i-h3-r-pinctrl"
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index 7a2465f..9e5bac9 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -460,14 +460,17 @@ static int sunxi_pinctrl_gpio_get(struct gpio_chip *chip, unsigned offset)
+ 	u32 set_mux = pctl->desc->irq_read_needs_mux &&
+ 			test_bit(FLAG_USED_AS_IRQ, &chip->desc[offset].flags);
+ 	u32 val;
++	u32 pin;
  
- - reg: Should contain the register physical address and length for the
-   pin controller.
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index ce35e93..1593e2d 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -525,5 +525,17 @@
- 			compatible = "allwinner,sun6i-a31-clock-reset";
- 			#reset-cells = <1>;
- 		};
-+
-+		r_pio: pinctrl at 01f02c00 {
-+			compatible = "allwinner,sun8i-h3-r-pinctrl";
-+			reg = <0x01f02c00 0x400>;
-+			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&apb0_gates 0>;
-+			resets = <&apb0_reset 0>;
-+			gpio-controller;
-+			#gpio-cells = <3>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
- 	};
- };
+-	if (set_mux)
+-		sunxi_pmx_set(pctl->pctl_dev, offset, SUN4I_FUNC_INPUT);
++	if (set_mux) {
++		pin = offset + pctl->desc->pin_base;
++		sunxi_pmx_set(pctl->pctl_dev, pin, SUN4I_FUNC_INPUT);
++	}
+ 
+ 	val = (readl(pctl->membase + reg) >> index) & DATA_PINS_MASK;
+ 
+ 	if (set_mux)
+-		sunxi_pmx_set(pctl->pctl_dev, offset, SUN4I_FUNC_IRQ);
++		sunxi_pmx_set(pctl->pctl_dev, pin, SUN4I_FUNC_IRQ);
+ 
+ 	return !!val;
+ }
 -- 
 2.1.4
