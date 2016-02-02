@@ -1,102 +1,65 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 2 Feb 2016 18:35:29 +0800
-Subject: [PATCH 1/5] clk: sunxi: Make clocks setup functions return their
- clock
-In-Reply-To: <1454402834-6385-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1454402834-6385-1-git-send-email-maxime.ripard@free-electrons.com>
- <1454402834-6385-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v66CyhkM0vabbede43eAaf7WVg0Lm8w_OUKwqHnFO182uw@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 2 Feb 2016 11:38:05 +0100
+Subject: [PATCH v4 0/7] ARM: dts: r-car: Add BRG support for (H)SCIF
+In-Reply-To: <20160202102031.GD15554@verge.net.au>
+References: <1454061883-4043-1-git-send-email-geert+renesas@glider.be>
+ <20160202102031.GD15554@verge.net.au>
+Message-ID: <CAMuHMdWjEn6RSLPOYq=zhY_gk6Lx9xTD1x1G+1igoDr=3h1R5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 2, 2016 at 4:47 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The clocks registration code in clk-sunxi was most of the time not
-> returning the struct clk (or struct clk array) that was registered,
-> preventing the users of such functions to manipulate it, for example to
-> protect it.
->
-> Make them return it so that we can start using it.
+Hi Simon,
 
-Should they return error codes as well? So the CLK_OF_DECLARE setup functions
-can report errors. Or make these helper functions report errors directly?
+On Tue, Feb 2, 2016 at 11:20 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Jan 29, 2016 at 11:04:36AM +0100, Geert Uytterhoeven wrote:
+>> This patch series adds support for the Baud Rate Generator for External
+>> Clock (BRG), as found on SCIF and HSCIF, to the DTS files for all R-Car
+>> Gen1, Gen2, and Gen3 SoCs. This increases the range and accuracy of
+>> supported baud rates on (H)SCIF.
+>>
+>> Support for the extra clocks in the DT bindings and in the driver has
+>> been accepted in v4.5-rc1.
+>>
+>> Changes compared to v3:
+>>   - Change one-line summary prefix to match current arm-soc practices,
+>>   - Rebased,
+>>
+>> Changes compared to v2:
+>>   - Rename "int_clk" to "brg_int",
+>>   - Add support for R-Car M1A (r8a7778) and R-Car H1 (r8a7779),
+>>   - Add support for R-Car H2 (r8a7790), R-Car M2-N (r8a7793), and R-Car
+>>     E2 (r8a7794),
+>>   - Correct internal clock source ZS_CLK to S3D1 in patch description
+>>     for r8a7795,
+>>
+>> This has been tested on r8a7778/bockw, r8a7779/marzen, r8a7791/koelsch,
+>> r8a7794/alt, and r8a7795/salvator-x.
+>>
+>> Dependencies:
+>>   - renesas-devel-20160129-v4.5-rc1,
+>>   - series "[PATCH v4 0/7] ARM: dts: R-Car: Add SCIF fallback
+>>     compatibility strings",
+>>   - series "[PATCH v4 00/11] ARM: dts: shmobile: Rename the serial port
+>>     clock to fck",
+>>
+>> Thanks for applying!
+>
+> Is it safe to apply this in the light of the dependency on
+> renesas-devel-20160129-v4.5-rc1?
 
-ChenYu
+The dependency here (also for the other series) just means I rebased the
+series on top of renesas-devel-20160129-v4.5-rc1 + the mentioned
+series.
 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clk/sunxi/clk-sunxi.c | 16 +++++++++-------
->  1 file changed, 9 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index e460a6b0068c..67ef94948544 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -615,8 +615,8 @@ static const struct mux_data sun8i_h3_ahb2_mux_data __initconst = {
->         .shift = 0,
->  };
->
-> -static void __init sunxi_mux_clk_setup(struct device_node *node,
-> -                                      struct mux_data *data)
-> +static struct clk * __init sunxi_mux_clk_setup(struct device_node *node,
-> +                                              struct mux_data *data)
->  {
->         struct clk *clk;
->         const char *clk_name = node->name;
-> @@ -638,6 +638,8 @@ static void __init sunxi_mux_clk_setup(struct device_node *node,
->                 of_clk_add_provider(node, of_clk_src_simple_get, clk);
->                 clk_register_clkdev(clk, clk_name, NULL);
->         }
-> +
-> +       return clk;
->  }
->
->
-> @@ -722,7 +724,6 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
->  }
->
->
-> -
->  /**
->   * sunxi_gates_clk_setup() - Setup function for leaf gates on clocks
->   */
-> @@ -808,8 +809,8 @@ static const struct divs_data sun6i_a31_pll6_divs_data __initconst = {
->   *           |________________________|
->   */
->
-> -static void __init sunxi_divs_clk_setup(struct device_node *node,
-> -                                       struct divs_data *data)
-> +static struct clk ** __init sunxi_divs_clk_setup(struct device_node *node,
-> +                                                struct divs_data *data)
->  {
->         struct clk_onecell_data *clk_data;
->         const char *parent;
-> @@ -836,7 +837,7 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
->
->         clk_data = kmalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
->         if (!clk_data)
-> -               return;
-> +               return NULL;
->
->         clks = kcalloc(ndivs, sizeof(*clks), GFP_KERNEL);
->         if (!clks)
-> @@ -922,7 +923,7 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
->
->         of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
->
-> -       return;
-> +       return clks;
->
->  free_gate:
->         kfree(gate);
-> @@ -930,6 +931,7 @@ free_clks:
->         kfree(clks);
->  free_clkdata:
->         kfree(clk_data);
-> +       return NULL;
->  }
->
->
-> --
-> 2.6.4
->
+Do you have any DT changes there that are not queued for v4.6?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
