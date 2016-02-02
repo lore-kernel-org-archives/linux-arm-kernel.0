@@ -1,43 +1,78 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Wed, 3 Feb 2016 09:19:28 +1100
-Subject: [linux-sunxi] [PATCH v2 4/5] ARM: dts: sun8i-h3: Add R_PIO
- controller node to the dtsi
-In-Reply-To: <1454448113-18810-5-git-send-email-k@japko.eu>
-References: <1454448113-18810-1-git-send-email-k@japko.eu>
- <1454448113-18810-5-git-send-email-k@japko.eu>
-Message-ID: <CAGRGNgXZ2jVEFFP-Cf0ZtAa6-JbaGQwFX-+VBQe2M5f_K1mhKg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Feb 2016 23:31:15 +0100
+Subject: [PATCH v3 1/2] dt-bindings: add sun4i SPDIF transceiver bindings
+In-Reply-To: <1454424594-25208-2-git-send-email-codekipper@gmail.com>
+References: <1454424594-25208-1-git-send-email-codekipper@gmail.com>
+ <1454424594-25208-2-git-send-email-codekipper@gmail.com>
+Message-ID: <20160202223115.GE4652@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi,
 
-On Wed, Feb 3, 2016 at 8:21 AM, Krzysztof Adamski <k@japko.eu> wrote:
-> Add the corresponding device node for R_PIO on H3 to the dtsi. Support
-> for the controller was added in earlier commit.
->
-> Signed-off-by: Krzysztof Adamski <k@japko.eu>
+On Tue, Feb 02, 2016 at 03:49:53PM +0100, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+> 
+> Add devicetree bindings for the SPDIF transceiver found on
+> found on Allwinners A10 and A20 SoCs.
+> 
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 > ---
->  .../devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt  |  1 +
->  arch/arm/boot/dts/sun8i-h3.dtsi                              | 12 ++++++++++++
->  2 files changed, 13 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-> index 9213b27..3e56b16 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-> @@ -21,6 +21,7 @@ Required properties:
->    "allwinner,sun9i-a80-r-pinctrl"
->    "allwinner,sun8i-a83t-pinctrl"
->    "allwinner,sun8i-h3-pinctrl"
-> +  "allwinner,sun8i-h3-r-pinctrl"
+>  .../devicetree/bindings/sound/sun4i,spdif.txt      | 46 ++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/sun4i,spdif.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/sun4i,spdif.txt b/Documentation/devicetree/bindings/sound/sun4i,spdif.txt
+> new file mode 100644
+> index 0000000..55ed2f6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/sun4i,spdif.txt
+> @@ -0,0 +1,46 @@
+> +Allwinner Sony/Philips Digital Interface Format (S/PDIF) Controller
+> +
+> +The Allwinner S/PDIF audio block is a transceiver that allows the
+> +processor to receive and transmit digital audio via an coaxial cable or
+> +a fibre cable.
+> +
+> +Required properties:
+> +
+> +  - compatible		: should be one of the following:
+> +    - "allwinner,sun4i-a10-spdif": for the Allwinner A10 SoC
+> +
+> +  - reg			: Offset and length of the register set for the device.
+> +
+> +  - interrupts		: Contains the spdif interrupt.
+> +
+> +  - dmas		: Generic dma devicetree binding as described in
+> +			  Documentation/devicetree/bindings/dma/dma.txt.
+> +
+> +  - dma-names		: Two dmas have to be defined, "tx" and "rx".
+> +
+> +  - clocks		: Contains an entry for each entry in clock-names.
+> +
+> +  - clock-names		: Includes the following entries:
+> +	"apb"		  clock for the spdif bus.
+> +	"spdif"		  clock for spdif controller.
+> +
+> +Optional:
+> +
+> +  - spdif-in		: Enable block for capturing an SPDIF signal.
+> +
+> +  - spdif-out		: Enable block for transmitting an SPDIF signal.
 
-Shouldn't this change go in the patch that introduces the driver for
-this pinctl?
+Is that a generic property? What values can it hold?
 
 Thanks,
+Maxime
 
 -- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160202/b55261c4/attachment.sig>
