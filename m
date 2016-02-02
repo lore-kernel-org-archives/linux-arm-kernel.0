@@ -1,67 +1,96 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 2 Feb 2016 10:44:38 +0000
-Subject: [PATCH] arm64: move back to generic
- memblock_enforce_memory_limit()
-In-Reply-To: <CAKv+Gu_2JmVGpE4zvgkrX5W1nFeMLgO8C8tCLmZ9cPGrR=7Tiw@mail.gmail.com>
-References: <20160201180256.GJ15514@e104818-lin.cambridge.arm.com>
- <1454351417-23732-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160202101945.GA22042@localhost.localdomain>
- <CAKv+Gu_2JmVGpE4zvgkrX5W1nFeMLgO8C8tCLmZ9cPGrR=7Tiw@mail.gmail.com>
-Message-ID: <20160202104438.GB22042@localhost.localdomain>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 2 Feb 2016 11:44:42 +0100
+Subject: [PATCH v4 1/4] soc: mediatek: Refine scpsys to support multiple
+ platform
+In-Reply-To: <1454396212.2847.15.camel@mtksdaap41>
+References: <1453270097-53853-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1453270097-53853-2-git-send-email-jamesjj.liao@mediatek.com>
+ <56ADF556.6070402@gmail.com> <1454396212.2847.15.camel@mtksdaap41>
+Message-ID: <56B0889A.1010305@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 11:28:41AM +0100, Ard Biesheuvel wrote:
-> On 2 February 2016 at 11:19, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Mon, Feb 01, 2016 at 07:30:17PM +0100, Ard Biesheuvel wrote:
-> >>  void __init arm64_memblock_init(void)
-> >>  {
-> >>       const s64 linear_region_size = -(s64)PAGE_OFFSET;
-> >> @@ -215,24 +180,14 @@ void __init arm64_memblock_init(void)
-> >>       if (memblock_end_of_DRAM() > linear_region_size)
-> >>               memblock_remove(0, memblock_end_of_DRAM() - linear_region_size);
-> >>
-> >> +     /*
-> >> +      * Apply the memory limit if it was set. Since the kernel may be loaded
-> >> +      * high up in memory, add back the kernel region that must be accessible
-> >> +      * via the linear mapping.
-> >> +      */
-> >>       if (memory_limit != (phys_addr_t)ULLONG_MAX) {
-> >> -             u64 kbase = round_down(__pa(_text), MIN_KIMG_ALIGN);
-> >> -             u64 kend = PAGE_ALIGN(__pa(_end));
-> >> -             u64 const sz_4g = 0x100000000UL;
-> >> -
-> >> -             /*
-> >> -              * Clip memory in order of preference:
-> >> -              * - above the kernel and above 4 GB
-> >> -              * - between 4 GB and the start of the kernel (if the kernel
-> >> -              *   is loaded high in memory)
-> >> -              * - between the kernel and 4 GB (if the kernel is loaded
-> >> -              *   low in memory)
-> >> -              * - below 4 GB
-> >> -              */
-> >> -             clip_mem_range(max(sz_4g, kend), ULLONG_MAX);
-> >> -             clip_mem_range(sz_4g, kbase);
-> >> -             clip_mem_range(kend, sz_4g);
-> >> -             clip_mem_range(0, min(kbase, sz_4g));
-> >> +             memblock_enforce_memory_limit(memory_limit);
-> >> +             memblock_add(__pa(__init_begin), (u64)(_end - __init_begin));
-> >
-> > Thanks, it looks much simpler now. However, loading the kernel 1GB
-> > higher with mem=1G fails somewhere during the KVM hyp initialisation. It
-> > works if I change the last line below to:
-> >
-> >         memblock_add(__pa(_text), (u64)(_end - _text));
-> 
-> OK, that should work as well.
-> 
-> I suppose the fact that mem= loses some of its accuracy is not an
-> issue? If you need it to be exact, you should simply not load your
-> kernel outside your mem= range ...
 
-I'm not worried about accuracy. We could avoid freeing the init mem if
-the kernel is outside the memory_limit range but I don't really think
-it's worth.
 
--- 
-Catalin
+On 02/02/16 07:56, James Liao wrote:
+> Hi Matthias,
+>
+> On Sun, 2016-01-31 at 12:51 +0100, Matthias Brugger wrote:
+>> >
+>> >On 20/01/16 07:08, James Liao wrote:
+>>> > >Refine scpsys driver common code to support multiple SoC / platform.
+>>> > >
+>>> > >Signed-off-by: James Liao<jamesjj.liao@mediatek.com>
+>>> > >---
+>>> > >   drivers/soc/mediatek/mtk-scpsys.c | 418 ++++++++++++++++++++------------------
+>>> > >   drivers/soc/mediatek/mtk-scpsys.h |  55 +++++
+>>> > >   2 files changed, 270 insertions(+), 203 deletions(-)
+>>> > >   create mode 100644 drivers/soc/mediatek/mtk-scpsys.h
+>> >
+>> >In general this approach looks fine to me, comments below.
+>> >
+>>> > >
+>>> > >diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+>>> > >index 0221387..339adfc 100644
+>>> > >--- a/drivers/soc/mediatek/mtk-scpsys.c
+>>> > >+++ b/drivers/soc/mediatek/mtk-scpsys.c
+>>> > >@@ -11,29 +11,17 @@
+>>> > >    * GNU General Public License for more details.
+>>> > >    */
+>>> > >   #include <linux/clk.h>
+>>> > >-#include <linux/delay.h>
+>>> > >+#include <linux/init.h>
+>>> > >   #include <linux/io.h>
+>>> > >-#include <linux/kernel.h>
+>>> > >   #include <linux/mfd/syscon.h>
+>> >
+>> >When at it, do we need this include?
+> syscon_regmap_lookup_by_phandle() is declared in this head file.
+>
+>>> > >-#include <linux/init.h>
+>>> > >   #include <linux/of_device.h>
+>>> > >   #include <linux/platform_device.h>
+>>> > >   #include <linux/pm_domain.h>
+>>> > >-#include <linux/regmap.h>
+>>> > >-#include <linux/soc/mediatek/infracfg.h>
+>>> > >   #include <linux/regulator/consumer.h>
+>>> > >-#include <dt-bindings/power/mt8173-power.h>
+>>> > >+#include <linux/soc/mediatek/infracfg.h>
+>>> > >+
+>>> > >+#include "mtk-scpsys.h"
+>>> > >
+>>> > >-#define SPM_VDE_PWR_CON			0x0210
+>>> > >-#define SPM_MFG_PWR_CON			0x0214
+>>> > >-#define SPM_VEN_PWR_CON			0x0230
+>>> > >-#define SPM_ISP_PWR_CON			0x0238
+>>> > >-#define SPM_DIS_PWR_CON			0x023c
+>>> > >-#define SPM_VEN2_PWR_CON		0x0298
+>>> > >-#define SPM_AUDIO_PWR_CON		0x029c
+>>> > >-#define SPM_MFG_2D_PWR_CON		0x02c0
+>>> > >-#define SPM_MFG_ASYNC_PWR_CON		0x02c4
+>>> > >-#define SPM_USB_PWR_CON			0x02cc
+>> >
+>> >I would prefer to keep this defines and declare SoC specific ones where
+>> >necessary. It makes the code more readable.
+> Some register address may be reused by other modules among SoCs, so it's
+> not easy to maintain the defines when we implement multiple SoC drivers
+> in the same file. For example, offset 0x0298 is VEN2_PWR_CON on MT8173,
+> but it is MJC_PWR_CON on other chips.
+>
+
+So that sounds as if 0x0298 offset is MT8173 specific.
+I checked [VDE, MFG, VEN, IFR, ISP, DIS, DPY]_PWR_CON on mt8173, mt8135 
+and mt6589 and they all have the same offset. So it doesn't seem as if 
+the offset randomly changes for every SoC.
+
+> Furthermore, these register offsets are only used in scp_domain_data[],
+> and each element has its own power domain name. So I think it's enough
+> to know which power domain are using these registers and status bits.
+>
+
+Yes that's true, but it will make it easier for another person to 
+understand the driver, especially if he want's to implement the driver 
+for a new SoC.
+
+Regards,
+Matthias
