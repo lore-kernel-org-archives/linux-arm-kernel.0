@@ -1,62 +1,111 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 2 Feb 2016 18:38:13 +0800
-Subject: [PATCH 2/5] clk: sunxi: Make clocks setup functions take const
- pointer
-In-Reply-To: <1454402834-6385-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1454402834-6385-1-git-send-email-maxime.ripard@free-electrons.com>
- <1454402834-6385-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v65O--xpjknS01QLDqDU6EWWj4pFoTmKrDjhmq0U7W5FJw@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 2 Feb 2016 16:10:45 +0530
+Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
+In-Reply-To: <20160128183156.GH19432@atomide.com>
+References: <1452780672-14339-1-git-send-email-kishon@ti.com>
+ <1452780672-14339-4-git-send-email-kishon@ti.com>
+ <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
+ <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
+ <20160128183156.GH19432@atomide.com>
+Message-ID: <56B087AD.4000505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 2, 2016 at 4:47 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> All the data structure that we pass to the clocks setup functions are
-> declared const, while our setup functions expects a regular pointer. This
-> was hidden by the fact that we cast a void * pointer back to these
-> structures, which made it go unnoticed.
->
-> Fix the functions prototype.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi,
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+On Friday 29 January 2016 12:01 AM, Tony Lindgren wrote:
+> * Suman Anna <s-anna@ti.com> [160127 15:17]:
+>> On 01/27/2016 12:56 PM, Tony Lindgren wrote:
+>>> * Suman Anna <s-anna@ti.com> [160127 10:17]:
+>>>> On 01/27/2016 11:31 AM, Tony Lindgren wrote:
+>>>>> Why do you need another reset here? Can't you just implement PM runtime
+>>>>> in the driver and do the usual pm_runtime_put_sync followed by
+>>>>> pm_runtime_disable?
+>>>>
+>>>> The omap_hwmod_enable/disable code does not deal with hardresets (PRCM
+>>>> reset lines) and so the pm_runtime_get_sync/put_sync only end up dealing
+>>>> with clocks, and we need to invoke the reset functions separately.
+>>>> Modules with softresets in SYSCONFIG are ok, as they are dealt with
+>>>> properly.
+>>>
+>>> Hmm _reset() in omap_hwmod.c has this to call _assert_hardreset:
+>>>
+>>> 	if (oh->class->reset) {
+>>> 		r = oh->class->reset(oh);
+>>> 	} else {
+>>> 		if (oh->rst_lines_cnt > 0) {
+>>> 			for (i = 0; i < oh->rst_lines_cnt; i++)
+>>> 				_assert_hardreset(oh, oh->rst_lines[i].name);
+>>> 			return 0;
+>>> 		} else {
+>>> 			r = _ocp_softreset(oh);
+>>> 			if (r == -ENOENT)
+>>> 				r = 0;
+>>> 		}
+>>> 	}
+>>
+>> Right, hwmod code does the initial reset.
+>>
+>>> Care to explain what exactly the problem with the hwmod code not doing
+>>> the reset on init?
+>>
+>> And we only need to deassert the reset in probe. Technically, we don't
+>> need to assert first and deassert in probe, and that was a design choice
+>> made by Kishon.
+> 
+> OK so if hwmod code has already done the reset, then why would you need
+> to deassert reset in the device driver probe?
 
-> ---
->  drivers/clk/sunxi/clk-sunxi.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 67ef94948544..a3d706f5b21c 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -616,7 +616,7 @@ static const struct mux_data sun8i_h3_ahb2_mux_data __initconst = {
->  };
->
->  static struct clk * __init sunxi_mux_clk_setup(struct device_node *node,
-> -                                              struct mux_data *data)
-> +                                              const struct mux_data *data)
->  {
->         struct clk *clk;
->         const char *clk_name = node->name;
-> @@ -700,7 +700,7 @@ static const struct div_data sun4i_apb0_data __initconst = {
->  };
->
->  static void __init sunxi_divider_clk_setup(struct device_node *node,
-> -                                          struct div_data *data)
-> +                                          const struct div_data *data)
->  {
->         struct clk *clk;
->         const char *clk_name = node->name;
-> @@ -810,7 +810,7 @@ static const struct divs_data sun6i_a31_pll6_divs_data __initconst = {
->   */
->
->  static struct clk ** __init sunxi_divs_clk_setup(struct device_node *node,
-> -                                                struct divs_data *data)
-> +                                                const struct divs_data *data)
->  {
->         struct clk_onecell_data *clk_data;
->         const char *parent;
-> --
-> 2.6.4
->
+The hwmod code only asserts the reset lines and that is not enough to access
+the PCI registers. The reset lines must be de-asserted before accessing the
+PCIe registers.
+> 
+>>> And why do you need to do another reset in dra7xx_pcie_remove()?
+>>
+>> Primarily to restore the reset state back to what it was after the
+>> driver remove gets called. We cannot call deassert twice without calling
+>> a assert in between. Kishon had originally added the assert and deassert
+>> only in probe, but nothing in remove, they ought to be deassert in probe
+>> and assert in remove to match initial hardware state, and to also make
+>> it work across multiple probe/remove.
+
+right. I thought if some program like the bootloader requires the reset lines
+to be in initial hw state, then it might break on 'reboot'. So restored it back
+to the initial hw state.
+> 
+> I don't understand this part either.. Usually you just power up and init
+> the registers to a sane state in a device driver probe and on exit just
+> power down the device.
+> 
+>>>>> Basically I'm wondering how come we need these platform data callbacks
+>>>>> at all.
+>>>>
+>>>> The hardresets are controlled through the
+>>>> omap_device_assert(deassert)_hardreset functions, and since these are
+>>>> limited to mach-omap2, we are invoking them through platform data callbacks.
+>>>
+>>> Right.. But I'm wondering about the why you need to do this in the
+>>> driver at all part :)
+>>
+>> The initial reset at init time is okay, but hwmod _enable() bails out if
+>> the resets lines are asserted. This was a change made long time back, I
+>> believe to deal with the problems around the DSP enabling sequences. As
+>> such, pm_runtime_get_sync() and put_sync() do not deassert and assert
+>> the resets.
+> 
+> OK if the hwmod code does not deassert reset lines properly on enable,
+> then that sounds like a bug that should be fixed instead of adding
+> device specific work arounds.
+
+I think some devices require the reset lines to be asserted and some devices
+require it to be de-asserted and hwmod was designed when there was only the
+first type of devices. I'm not sure though.
+> 
+> Sorry to keep dragging this on a bit longer, but I think we need to
+> hear Paul's comments on this one.
+
+I agree.
+Paul, what do you think is the best way forward to perform reset?
+
+Thanks
+Kishon
