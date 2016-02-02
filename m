@@ -1,119 +1,170 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 2 Feb 2016 11:43:41 +0000
-Subject: [RFC PATCH] irq/mbigen:Fix the problem of IO remap for
- duplicated physical address in mbigen driver
-In-Reply-To: <56B08431.3000200@huawei.com>
-References: <1454327094-7848-1-git-send-email-majun258@huawei.com>
- <20160201115717.GD674@leverpostej> <56AF585E.6050005@huawei.com>
- <20160201132557.GG674@leverpostej> <56B08431.3000200@huawei.com>
-Message-ID: <20160202114340.GA28839@leverpostej>
+From: daniel@zonque.org (Daniel Mack)
+Date: Tue, 2 Feb 2016 12:56:24 +0100
+Subject: [PATCH v2 1/3] Input: rotary-encoder - make use of devm_* to
+ simplify .probe and .remove
+In-Reply-To: <1454408678-6011-2-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1454408678-6011-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1454408678-6011-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <56B09968.9050705@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 06:25:53PM +0800, majun (F) wrote:
-> Hi Mark:
-> 
-> ? 2016/2/1 21:25, Mark Rutland ??:
-> > On Mon, Feb 01, 2016 at 09:06:38PM +0800, majun (F) wrote:
-> >>
-> >>
-> >> ? 2016/2/1 19:57, Mark Rutland ??:
-> >>> On Mon, Feb 01, 2016 at 07:44:54PM +0800, MaJun wrote:
-> >>>> From: Ma Jun <majun258@huawei.com>
-> >>>>
-> >>>> For mbigen module, there is a special case that more than one mbigen 
-> >>>> device nodes use the same reg definition in DTS when these devices
-> >>>> exist in the same mbigen hardware module. 
-> >>>>
-> >>>> mbigen_dev1:intc_dev1 {
-> >>>> 	...
-> >>>> 	reg = <0x0 0xc0080000 0x0 0x10000>;
-> >>>> 	...
-> >>>> };
-> >>>>
-> >>>> mbigen_dev2:intc_dev2 {
-> >>>> 	...
-> >>>> 	reg = <0x0 0xc0080000 0x0 0x10000>;
-> >>>> 	...
-> >>>> };
-> >>>
-> >>> This doesn't sound right. If they exist in the same place, and have the
-> >>> same reg, they _are_ the same device.
-> >>>
-> >>> You'll need to explain this better.
-> >>>
-> >>
-> >> For a mbigen hardware module which connecte with several devices,
-> >> because these devices has different device ID,
-> >> I need to define a device node for each device in DTS file.
-> >>
-> >> 	mbigen
-> >> 	|
-> >> ------------------
-> >> | 	| 	|
-> >> dev1 	dev2 	dev3
-> >>
-> >> Because of register layout,the registers related with these devices
-> >> are put together, I can't split them clearly.
-> >> So, I only make these devices which connect with
-> >> same mbigen hardware module usethe same address.
-> > 
-> > This sounds like we've either mis-described the mbigen in the binding,
-> > or we're mis-describing the relationship with the devices.
-> > 
-> 
-> Sorry, I didn't express myself clearly.
-> 
-> For example, a mbigen hardware module can support several peripheral devices
-> with different device ID.
-> 
-> |-----------------------|-
-> |	mbigen		|
-> |-----------------------|-
->  |       |        |
-> dev1    dev2     dev3
-> 
-> To simplify the mbigen drvier,
-> I didn't use the whole mbigen module as a mbgien device, but use
-> the register collections(vector, trigger type,status etc.) corresponding
-> to a peripheral device as a mbigen device.
-> So, mbigen device is a logical conception or logical device.
+On 02/02/2016 11:24 AM, Uwe Kleine-K?nig wrote:
+> For all operations called in .probe there are devm_* variants.
+> (input_register_device is clever enough to be devm aware on its own.)
+> This allows to get rid of the error unwind code paths in .probe and the
+> complete .remove function.
 
->From the above, it sounds like the DT representation is not an accurate
-representation of the hardware. We should describe the _whole_ mbigen,
-not portions thereof. Trying to describe it piecemeal leads to problems
-like this one.
+While at it, could you also convert this over to the gpiod_* API?
 
-I don't understand the rationale for describing the mbigen as separate
-nodes. Above you mention that we "need to define a device node for each
-device", but I don't see why that's necessary. Why do you believe we
-need an mbigen node per client device?
 
-As far as I can tell, we should be able to map an arbitrary
-interrupt-specifier to a particular MSI (complete with device id) within
-the mbigen driver. We just need to define the full set of MSIs the
-mbigen owns.
+Thanks,
+Daniel
 
-> Now, a mbigen hardware module contains several logical mbigen device.
+
+
 > 
-> -------------------------------
-> |mgn_dev1  mgn_dev2  mgn_dev3 |
-> |-----------------------------|
->    |          |        |
-> dev1	    dev2      dev3
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  drivers/input/misc/rotary_encoder.c | 74 +++++++++++--------------------------
+>  1 file changed, 22 insertions(+), 52 deletions(-)
 > 
-> So,mgn_dev1, mgn_dev2 and mgn_dev3 exist in same mbigen hardware module,
-> and,they use the same reg address region,that is adress of mbigen hardware module.
+> diff --git a/drivers/input/misc/rotary_encoder.c b/drivers/input/misc/rotary_encoder.c
+> index 8aee71986430..386bdb5314e6 100644
+> --- a/drivers/input/misc/rotary_encoder.c
+> +++ b/drivers/input/misc/rotary_encoder.c
+> @@ -211,8 +211,8 @@ static struct rotary_encoder_platform_data *rotary_encoder_parse_dt(struct devic
+>  	if (!of_id || !np)
+>  		return NULL;
+>  
+> -	pdata = kzalloc(sizeof(struct rotary_encoder_platform_data),
+> -			GFP_KERNEL);
+> +	pdata = devm_kzalloc(dev, sizeof(struct rotary_encoder_platform_data),
+> +			     GFP_KERNEL);
+>  	if (!pdata)
+>  		return ERR_PTR(-ENOMEM);
+>  
+> @@ -277,11 +277,11 @@ static int rotary_encoder_probe(struct platform_device *pdev)
+>  		}
+>  	}
+>  
+> -	encoder = kzalloc(sizeof(struct rotary_encoder), GFP_KERNEL);
+> -	input = input_allocate_device();
+> +	encoder = devm_kzalloc(dev, sizeof(struct rotary_encoder), GFP_KERNEL);
+> +	input = devm_input_allocate_device(&pdev->dev);
+>  	if (!encoder || !input) {
+> -		err = -ENOMEM;
+> -		goto exit_free_mem;
+> +		dev_err(dev, "unable to allocate memory\n");
+> +		return -ENOMEM;
+>  	}
+>  
+>  	encoder->input = input;
+> @@ -301,16 +301,18 @@ static int rotary_encoder_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	/* request the GPIOs */
+> -	err = gpio_request_one(pdata->gpio_a, GPIOF_IN, dev_name(dev));
+> +	err = devm_gpio_request_one(dev, pdata->gpio_a,
+> +				    GPIOF_IN, dev_name(dev));
+>  	if (err) {
+>  		dev_err(dev, "unable to request GPIO %d\n", pdata->gpio_a);
+> -		goto exit_free_mem;
+> +		return err;
+>  	}
+>  
+> -	err = gpio_request_one(pdata->gpio_b, GPIOF_IN, dev_name(dev));
+> +	err = devm_gpio_request_one(dev, pdata->gpio_b,
+> +				    GPIOF_IN, dev_name(dev));
+>  	if (err) {
+>  		dev_err(dev, "unable to request GPIO %d\n", pdata->gpio_b);
+> -		goto exit_free_gpio_a;
+> +		return err;
+>  	}
+>  
+>  	encoder->irq_a = gpio_to_irq(pdata->gpio_a);
+> @@ -331,30 +333,29 @@ static int rotary_encoder_probe(struct platform_device *pdev)
+>  	default:
+>  		dev_err(dev, "'%d' is not a valid steps-per-period value\n",
+>  			pdata->steps_per_period);
+> -		err = -EINVAL;
+> -		goto exit_free_gpio_b;
+> +		return -EINVAL;
+>  	}
+>  
+> -	err = request_irq(encoder->irq_a, handler,
+> -			  IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+> -			  DRV_NAME, encoder);
+> +	err = devm_request_irq(dev, encoder->irq_a, handler,
+> +			       IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+> +			       DRV_NAME, encoder);
+>  	if (err) {
+>  		dev_err(dev, "unable to request IRQ %d\n", encoder->irq_a);
+> -		goto exit_free_gpio_b;
+> +		return err;
+>  	}
+>  
+> -	err = request_irq(encoder->irq_b, handler,
+> -			  IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+> -			  DRV_NAME, encoder);
+> +	err = devm_request_irq(dev, encoder->irq_b, handler,
+> +			       IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+> +			       DRV_NAME, encoder);
+>  	if (err) {
+>  		dev_err(dev, "unable to request IRQ %d\n", encoder->irq_b);
+> -		goto exit_free_irq_a;
+> +		return err;
+>  	}
+>  
+>  	err = input_register_device(input);
+>  	if (err) {
+>  		dev_err(dev, "failed to register input device\n");
+> -		goto exit_free_irq_b;
+> +		return err;
+>  	}
+>  
+>  	device_init_wakeup(&pdev->dev, pdata->wakeup_source);
+> @@ -362,42 +363,11 @@ static int rotary_encoder_probe(struct platform_device *pdev)
+>  	platform_set_drvdata(pdev, encoder);
+>  
+>  	return 0;
+> -
+> -exit_free_irq_b:
+> -	free_irq(encoder->irq_b, encoder);
+> -exit_free_irq_a:
+> -	free_irq(encoder->irq_a, encoder);
+> -exit_free_gpio_b:
+> -	gpio_free(pdata->gpio_b);
+> -exit_free_gpio_a:
+> -	gpio_free(pdata->gpio_a);
+> -exit_free_mem:
+> -	input_free_device(input);
+> -	kfree(encoder);
+> -	if (!dev_get_platdata(&pdev->dev))
+> -		kfree(pdata);
+> -
+> -	return err;
+>  }
+>  
+>  static int rotary_encoder_remove(struct platform_device *pdev)
+>  {
+> -	struct rotary_encoder *encoder = platform_get_drvdata(pdev);
+> -	const struct rotary_encoder_platform_data *pdata = encoder->pdata;
+> -
+>  	device_init_wakeup(&pdev->dev, false);
+> -
+> -	free_irq(encoder->irq_a, encoder);
+> -	free_irq(encoder->irq_b, encoder);
+> -	gpio_free(pdata->gpio_a);
+> -	gpio_free(pdata->gpio_b);
+> -
+> -	input_unregister_device(encoder->input);
+> -	kfree(encoder);
+> -
+> -	if (!dev_get_platdata(&pdev->dev))
+> -		kfree(pdata);
+> -
+>  	return 0;
+>  }
+>  
 > 
-> For this case, I think the question is can we map an reg address
-> region more than one time?
-
-As above, I think we've mis-described the hardware. Rather than making
-things simpler, this has resulted in problems like this one.
-
-We should not map a reg region more than once. Even if it's technically
-possible to do so, I do not believe that would be the right solution
-here. Implicitly sharing resources (e.g. portions of the mbigen control
-registers) is inevitably going to lead to more problems later on.
-
-Mark.
