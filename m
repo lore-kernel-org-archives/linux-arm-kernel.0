@@ -1,114 +1,89 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 2 Feb 2016 14:53:07 +0800
-Subject: [PATCH 1/4] ARM: dts: imx53: add ethernet PHY supply regulator
-In-Reply-To: <1453295362-18798-2-git-send-email-LW@KARO-electronics.de>
-References: <1453295362-18798-1-git-send-email-LW@KARO-electronics.de>
- <1453295362-18798-2-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20160202065306.GH8307@tiger>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 2 Feb 2016 15:53:49 +0900
+Subject: [PATCH v4 04/13] arm64: Add new hcall HVC_CALL_FUNC
+In-Reply-To: <1453977766-20907-5-git-send-email-james.morse@arm.com>
+References: <1453977766-20907-1-git-send-email-james.morse@arm.com>
+ <1453977766-20907-5-git-send-email-james.morse@arm.com>
+Message-ID: <56B0527D.8060109@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 20, 2016 at 02:09:19PM +0100, Lothar Wa?mann wrote:
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+On 01/28/2016 07:42 PM, James Morse wrote:
+> From: Geoff Levand <geoff@infradead.org>
+>
+> Add the new hcall HVC_CALL_FUNC that allows execution of a function at EL2.
+> During CPU reset the CPU must be brought to the exception level it had on
+> entry to the kernel.  The HVC_CALL_FUNC hcall will provide the mechanism
+> needed for this exception level switch.
+>
+> To allow the HVC_CALL_FUNC exception vector to work without a stack, which
+> is needed to support an hcall at CPU reset, this implementation uses
+> register x18 to store the link register across the caller provided
+> function.  This dictates that the caller provided function must preserve
+> the contents of register x18.
+>
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> Signed-off-by: James Morse <james.morse@arm.com>
 > ---
->  arch/arm/boot/dts/imx53-tx53.dtsi | 40 ++++++++++++++++++++++++++++++---------
->  1 file changed, 31 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
-> index d3e50b2..8f08389 100644
-> --- a/arch/arm/boot/dts/imx53-tx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53-tx53.dtsi
-> @@ -87,9 +87,20 @@
->  			regulator-max-microvolt = <3300000>;
->  		};
->  
-> -		reg_can_xcvr: regulator at 2 {
-> +		reg_3v3_etn: regulator at 2 {
-
-Why cannot this be added as regulator at 5 to avoid changing every node?
-
->  			compatible = "regulator-fixed";
->  			reg = <2>;
-> +			regulator-name = "ETN 3V3";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_etn_phy>;
-> +			gpio = <&gpio3 20 GPIO_ACTIVE_HIGH>;
-> +		};
+> This patch is from v13 of kexec
+>
+>   arch/arm64/include/asm/virt.h | 13 +++++++++++++
+>   arch/arm64/kernel/hyp-stub.S  | 13 ++++++++++++-
+>   2 files changed, 25 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+> index eb10368c329e..30700961f28c 100644
+> --- a/arch/arm64/include/asm/virt.h
+> +++ b/arch/arm64/include/asm/virt.h
+> @@ -45,6 +45,19 @@
+>
+>   #define HVC_SET_VECTORS 2
+>
+> +/*
+> + * HVC_CALL_FUNC - Execute a function at EL2.
+> + *
+> + * @x0: Physical address of the function to be executed.
+> + * @x1: Passed as the first argument to the function.
+> + * @x2: Passed as the second argument to the function.
+> + * @x3: Passed as the third argument to the function.
+> + *
+> + * The called function must preserve the contents of register x18.
+> + */
 > +
-> +		reg_can_xcvr: regulator at 3 {
-> +			compatible = "regulator-fixed";
-> +			reg = <3>;
->  			regulator-name = "CAN XCVR";
->  			regulator-min-microvolt = <3300000>;
->  			regulator-max-microvolt = <3300000>;
-> @@ -98,9 +109,9 @@
->  			gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
->  		};
->  
-> -		reg_usbh1_vbus: regulator at 3 {
-> +		reg_usbh1_vbus: regulator at 4 {
->  			compatible = "regulator-fixed";
-> -			reg = <3>;
-> +			reg = <4>;
->  			regulator-name = "usbh1_vbus";
->  			regulator-min-microvolt = <5000000>;
->  			regulator-max-microvolt = <5000000>;
-> @@ -110,9 +121,9 @@
->  			enable-active-high;
->  		};
->  
-> -		reg_usbotg_vbus: regulator at 4 {
-> +		reg_usbotg_vbus: regulator at 5 {
->  			compatible = "regulator-fixed";
-> -			reg = <4>;
-> +			reg = <5>;
->  			regulator-name = "usbotg_vbus";
->  			regulator-min-microvolt = <5000000>;
->  			regulator-max-microvolt = <5000000>;
-> @@ -204,13 +215,20 @@
->  	phy-mode = "rmii";
->  	phy-reset-gpios = <&gpio7 6 GPIO_ACTIVE_HIGH>;
->  	phy-handle = <&phy0>;
-> +	phy-supply = <&reg_3v3_etn>;
->  	mac-address = [000000000000]; /* placeholder; will be overwritten by bootloader */
->  	status = "okay";
->  
-> -	phy0: ethernet-phy at 0 {
-> -		interrupt-parent = <&gpio2>;
-> -		interrupts = <4>;
-> -		device_type = "ethernet-phy";
-> +	mdio {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
+> +#define HVC_CALL_FUNC 3
 > +
-> +		phy0: ethernet-phy at 0 {
-> +			compatible = "ethernet-phy-id0007.c0f1", "ethernet-phy-ieee802.3-c22";
-> +			reg = <0>;
-> +			interrupt-parent = <&gpio2>;
-> +			interrupts = <4>;
-> +		};
-
-This should be a separate change.
-
-Shawn
-
->  	};
->  };
->  
-> @@ -309,6 +327,10 @@
->  			fsl,pins = <MX53_PAD_DISP0_DAT0__GPIO4_21 0xe0>; /* Flexcan XCVR enable */
->  		};
->  
-> +		pinctrl_etn_phy: etn-phygrp {
-> +			fsl,pins = <MX53_PAD_EIM_D20__GPIO3_20 0xe0>; /* ETN PHY Power enable */
-> +		};
+>   #define BOOT_CPU_MODE_EL1	(0xe11)
+>   #define BOOT_CPU_MODE_EL2	(0xe12)
+>
+> diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+> index 017ab519aaf1..e8febe90c036 100644
+> --- a/arch/arm64/kernel/hyp-stub.S
+> +++ b/arch/arm64/kernel/hyp-stub.S
+> @@ -67,8 +67,19 @@ el1_sync:
+>   	b	2f
+>
+>   1:	cmp	x18, #HVC_SET_VECTORS
+> -	b.ne	2f
+> +	b.ne	1f
+>   	msr	vbar_el2, x0
+> +	b	2f
 > +
->  		pinctrl_ds1339: ds1339grp {
->  			fsl,pins = <MX53_PAD_DI0_PIN4__GPIO4_20 0xe0>;
->  		};
-> -- 
-> 2.1.4
-> 
-> 
+> +1:	cmp	x18, #HVC_CALL_FUNC
+
+I think we should avoid duplicated label names ("1") in a short distance.
+(I know it's Geoff's code.)
+
+-Takahiro AKASHI
+
+> +	b.ne	2f
+> +	mov	x18, lr
+> +	mov	lr, x0
+> +	mov	x0, x1
+> +	mov	x1, x2
+> +	mov	x2, x3
+> +	blr	lr
+> +	mov	lr, x18
+>
+>   2:	eret
+>   ENDPROC(el1_sync)
+>
