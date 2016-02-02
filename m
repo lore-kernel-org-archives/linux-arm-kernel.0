@@ -1,156 +1,128 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 2 Feb 2016 11:07:00 +0100
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <20160202030533.GT19432@atomide.com>
-References: <20160201232833.GR19432@atomide.com>
- <Pine.LNX.4.44L0.1602011844540.2869-100000@netrider.rowland.org>
- <20160202030533.GT19432@atomide.com>
-Message-ID: <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
+From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
+Date: Tue, 2 Feb 2016 15:39:15 +0530
+Subject: [PATCH v10 0/8] arm64, numa: Add numa support for arm64 platforms
+Message-ID: <1454407763-1017-1-git-send-email-gkulkarni@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 February 2016 at 04:05, Tony Lindgren <tony@atomide.com> wrote:
-> Hi,
->
-> * Alan Stern <stern@rowland.harvard.edu> [160201 15:50]:
->>
->> You get here only if runtime PM is disabled, right?  So the rpm_idle
->> call won't do anything -- "disabled" means don't make any callbacks.
->
-> Hmm sorry yes I'm confused again. Yeah it looks like calling rpm_idle
-> just has a side effect that makes a difference here.
->
->> Tony, exactly what are you trying to do here?  Do you want this to
->> invoke a runtime-PM callback in the subsystem, power domain, or driver?
->> (Is there even a driver bound to the device when this function runs?)
->
-> I guess I need to add more printks to figure out what's going on here.
-> But yeah, I'm not seeing the callback happening at the interconnect
-> level so hardware and PM runtime states won't match on the following
-> probe after -EPROBE_DEFER.
->
->> The function's name suggests that it merely resets the data stored in
->> dev->power without actually touching the hardware.  Is that what you
->> really want?
->
-> I guess you mean pm_runtime_set_suspended() above? I'm seeing a state
-> where we now set pm_runtime_set_suspended() between failed device
-> probes and the device is still active in hardware.
->
-> The patch below also helps with the problem and leaves out the
-> rpm_suspend() call from loop so it might give more hints.
->
-> The difference here from what Rafael suggested earlier is calling
-> __pm_runtime_use_autosuspend() and then not calling
-> pm_runtime_set_suspended().
->
-> However, it seems the below patch keeps hardware active in the
-> autoidle case though, so chances are there is more that needs to
-> be done here. Anyways, I'll try to debug it more tomorrow.
->
+v10:
+	- Incorporated review comments from Rob Herring.
+	- Moved numa binding and implementation to devicetree core.
+	- Added cleanup patch to remove redundant NODE_DATA macro from asm header files
+	- Include numa balancing support for arm64 patch in this series.
+	- Fix tile build issue reported by the kbuild robot(patch 7)
 
-Your observations is correct. The hardware will be kept active
-in-between the probe attempts (and thus also if probing fails).
-Although, that's not a regression as that's the behaviour you get from
-runtime PM, when drivers are implemented like omap_hsmmc.
+v9:	- Added cleanup patch to reuse and avoid redefinition of cpumask_of_pcibus
+	  as suggested from Will Deacon and Bjorn Helgaas.
+	- Including patch to Make pci-host-generic driver numa aware.
+	- Incorporated comment from Shannon Zhao.
 
-Instead of the suggested approaches, I think the regression should be
-fixed at the PM domain level (omap hwmod). I have attached a patch
-below, please give it try as it's untested.
+v8:
+	- Incorporated review comments of Mark Rutland and Will Deacon.
+	- Added pci helper function and macro for numa.
 
-To solve the other problem (allowing devices to become inactive
-in-between at probe failures), I see two options (not treated as
-regressions).
-1)
-Change the behaviour of pm_runtime_put_sync(), to *not* respect the
-autosuspend mode.
-I think I prefer this option, as it seems like autosuspend should be
-respected only via the asynchronous runtime PM APIs.
+v7:
+	- managing numa memory mapping using memblock.
+	- Incorporated review comments of Mark Rutland.
 
-2)
-Change the failing drivers, to before calling pm_runtime_put_sync()
-also invoke pm_runtime_dont_use_autosusend(). Or other similar
-approach.
+v6:
+	- defined and implemented the numa dt binding using
+	node property proximity and device node distance-map.
+	- renamed dt_numa to of_numa
 
-Kind regards
-Uffe
+v5:
+        - created base verion of numa.c which creates dummy numa without using dt
+          on single socket platforms. Then added patches for dt support.
+        - Incorporated review comments from Hanjun Guo.
 
-[...]
+v4:
+done changes as per Arnd review comments.
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
-Date: Tue, 2 Feb 2016 10:05:39 +0100
-Subject: [PATCH] ARM: OMAP2+: omap-device: Allow devices to be pre-enabled
+v3:
+Added changes to support numa on arm64 based platforms.
+Tested these patches on cavium's multinode(2 node topology) platform.
+In this patchset, defined and implemented dt bindings for numa mapping
+for core and memory using device node property arm,associativity.
 
-Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
-error and driver unbind") may re-initialize the runtime PM status of the
-device to RPM_SUSPENDED at driver probe failures.
+v2:
+Defined and implemented numa map for memory, cores to node and
+proximity distance matrix of nodes.
 
-For the omap_hsmmc and likely also other omap drivers, which needs more
-than one attempt to ->probe() (returning -EPROBE_DEFER), this commit
-causes a regression at the PM domain level (omap hwmod).
+v1:
+Initial patchset to support numa on arm64 platforms.
 
-The reason is that the drivers don't put back the device into low power
-state while bailing out in ->probe to return -EPROBE_DEFER. This leads to
-that pm_runtime_reinit() in driver core, is re-initializing the runtime PM
-status from RPM_ACTIVE to RPM_SUSPENDED.
+Note:
+        1. This patchset is tested for numa with dt on
+           thunderx single socket and dual socket boards.
+        2. Numa DT booting needs the dt memory nodes, which are deleted in current efi-stub,
+        hence to try numa with dt, you need to rebase with ard's patchset.
+        http://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm64-uefi-early-fdt-handling
+	3. PATCH[7,8] are not tested for other architectures.
 
-The next ->probe() attempt then triggers the ->runtime_resume() callback
-to be invoked, which means this happens two times in a row. At the PM
-domain level (omap hwmod) this is being treated as an error and thus the
-runtime PM status of the device isn't correctly synchronized with the
-runtime PM core.
+Ganapatrao Kulkarni (8):
+  arm64, numa: adding numa support for arm64 platforms.
+  Documentation, dt, numa: dt bindings for numa.
+  dt, numa: adding numa dt binding implementation.
+  arm64, numa : Enable numa dt for arm64 platforms.
+  arm64, dt, thunderx: Add initial dts for Cavium Thunderx in 2 node
+    topology.
+  arm64, mm, numa: Adding numa balancing support for arm64.
+  topology, cleanup: Avoid redefinition of cpumask_of_pcibus in asm
+    header files.
+  numa, mm, cleanup: remove redundant NODE_DATA macro from asm header
+    files.
 
-In the end, ->probe() anyway succeeds (as the driver don't checks the
-error code from the runtime PM APIs), but results in that the PM domain
-always stays powered on. This because of the runtime PM core believes the
-device is RPM_SUSPENDED.
-
-Fix this regression by allowing devices to be pre-enabled when the PM
-domain's (omap hwmod) ->runtime_resume() callback is requested to enable
-the device. In such cases, return zero to synchronize the runtime PM
-status with the runtime PM core.
-
-Fixes: 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
-error and driver unbind")
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- arch/arm/mach-omap2/omap_device.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_device.c
-b/arch/arm/mach-omap2/omap_device.c
-index 0437537..851767f 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -717,7 +717,7 @@ int omap_device_register(struct platform_device *pdev)
-  * to be accessible and ready to operate.  This generally involves
-  * enabling clocks, setting SYSCONFIG registers; and in the future may
-  * involve remuxing pins.  Device drivers should call this function
-- * indirectly via pm_runtime_get*().  Returns -EINVAL if called when
-+ * indirectly via pm_runtime_get*().  Returns zero if called when
-  * the omap_device is already enabled, or passes along the return
-  * value of _omap_device_enable_hwmods().
-  */
-@@ -728,12 +728,13 @@ int omap_device_enable(struct platform_device *pdev)
-
-        od = to_omap_device(pdev);
-
--       if (od->_state == OMAP_DEVICE_STATE_ENABLED) {
--               dev_warn(&pdev->dev,
--                        "omap_device: %s() called from invalid state %d\n",
--                        __func__, od->_state);
--               return -EINVAL;
--       }
-+       /*
-+        * From the PM domain perspective the device may already be enabled.
-+        * In such case, let's return zero to synchronize the state with the
-+        * runtime PM core.
-+       */
-+       if (od->_state == OMAP_DEVICE_STATE_ENABLED)
-+               return 0;
-
-        ret = _omap_device_enable_hwmods(od);
+ Documentation/devicetree/bindings/numa.txt      | 272 ++++++++
+ arch/arm64/Kconfig                              |  26 +
+ arch/arm64/boot/dts/cavium/Makefile             |   2 +-
+ arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts  |  83 +++
+ arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi | 806 ++++++++++++++++++++++++
+ arch/arm64/include/asm/mmzone.h                 |  10 +
+ arch/arm64/include/asm/numa.h                   |  45 ++
+ arch/arm64/include/asm/pgtable.h                |  18 +
+ arch/arm64/include/asm/topology.h               |   7 +
+ arch/arm64/kernel/pci.c                         |  10 +
+ arch/arm64/kernel/setup.c                       |   4 +
+ arch/arm64/kernel/smp.c                         |   4 +
+ arch/arm64/mm/Makefile                          |   1 +
+ arch/arm64/mm/init.c                            |  34 +-
+ arch/arm64/mm/mmu.c                             |   1 +
+ arch/arm64/mm/numa.c                            | 404 ++++++++++++
+ arch/ia64/include/asm/topology.h                |   4 -
+ arch/m32r/include/asm/mmzone.h                  |   4 +-
+ arch/metag/include/asm/mmzone.h                 |   4 +-
+ arch/metag/include/asm/topology.h               |   3 -
+ arch/powerpc/include/asm/mmzone.h               |   8 +-
+ arch/powerpc/include/asm/topology.h             |   4 -
+ arch/s390/include/asm/mmzone.h                  |   6 +-
+ arch/s390/include/asm/pci.h                     |   2 +-
+ arch/s390/include/asm/topology.h                |   1 +
+ arch/sh/include/asm/mmzone.h                    |   4 +-
+ arch/sh/include/asm/topology.h                  |   3 -
+ arch/sparc/include/asm/mmzone.h                 |   6 +-
+ arch/tile/include/asm/pci.h                     |   2 -
+ arch/tile/include/asm/topology.h                |   3 +
+ arch/x86/include/asm/mmzone.h                   |   3 +-
+ arch/x86/include/asm/mmzone_32.h                |   5 -
+ arch/x86/include/asm/mmzone_64.h                |  17 -
+ arch/x86/include/asm/pci.h                      |   2 +-
+ arch/x86/include/asm/topology.h                 |   1 +
+ drivers/of/Kconfig                              |  11 +
+ drivers/of/Makefile                             |   1 +
+ drivers/of/of_numa.c                            | 207 ++++++
+ include/asm-generic/mmzone.h                    |  24 +
+ include/asm-generic/topology.h                  |   4 +-
+ include/linux/of.h                              |   4 +
+ 41 files changed, 1986 insertions(+), 74 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/numa.txt
+ create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts
+ create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi
+ create mode 100644 arch/arm64/include/asm/mmzone.h
+ create mode 100644 arch/arm64/include/asm/numa.h
+ create mode 100644 arch/arm64/mm/numa.c
+ delete mode 100644 arch/x86/include/asm/mmzone_64.h
+ create mode 100644 drivers/of/of_numa.c
+ create mode 100644 include/asm-generic/mmzone.h
 
 -- 
-1.9.1
+1.8.1.4
