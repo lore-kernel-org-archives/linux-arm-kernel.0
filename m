@@ -1,67 +1,672 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 2 Feb 2016 11:23:48 -0500 (EST)
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <CAPDyKFras1o13WBZzaZ_Snnj5TBQQFWKr=PtCjUvwe+yGPQn9w@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1602021116510.1653-100000@iolanthe.rowland.org>
+From: jenskuske@gmail.com (Jens Kuske)
+Date: Tue, 2 Feb 2016 17:24:30 +0100
+Subject: [linux-sunxi] [PATCH 10/11] arm64: dts: add Allwinner A64 SoC
+ .dtsi
+In-Reply-To: <1454348370-3816-11-git-send-email-andre.przywara@arm.com>
+References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
+ <1454348370-3816-11-git-send-email-andre.przywara@arm.com>
+Message-ID: <56B0D83E.5090604@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2 Feb 2016, Ulf Hansson wrote:
+Hi,
 
-> That's not what we want. So I moved the checks to the actual
-> ->runtime_resume() callback in the PM domain, instead of in the
-> omap_device_enable() function. A version 2 is attached. Please give it
-> at try.
+On 01/02/16 18:39, Andre Przywara wrote:
+> The Allwinner A64 SoC is low-cost SoC with 4 ARM Cortex-A53 cores
+> and the typical tablet / TV box peripherals.
+> The Soc is based on the (32-bit) Allwinner H3 chip, sharing most of
+> the peripherals and the memory map.
+> Although the cores are proper 64-bit ones, the whole SoC is actually
+> limited to 4GB (including all the supported DRAM), so we use 32-bit
+> address and size cells. This has the nice feature of us being able to
+> reuse the DT for 32-bit kernels as well.
+> This .dtsi lists the hardware that we support so far.
 > 
-> [...]
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/sunxi.txt   |   1 +
+>  Documentation/devicetree/bindings/clock/sunxi.txt |   1 +
+>  arch/arm64/boot/dts/allwinner/a64.dtsi            | 583 ++++++++++++++++++++++
+>  3 files changed, 585 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/allwinner/a64.dtsi
 > 
-> From: Ulf Hansson <ulf.hansson@linaro.org>
-> Date: Tue, 2 Feb 2016 10:05:39 +0100
-> Subject: [PATCH V2] ARM: OMAP2+: omap-device: Allow devices to be pre-enabled
+> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+> index 980e065..4a83853 100644
+> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+> @@ -14,6 +14,7 @@ using one of the following compatible strings:
+>    allwinner,sun8i-a83t
+>    allwinner,sun8i-h3
+>    allwinner,sun9i-a80
+> +  allwinner,a64
+>  
+>  For Allwinner SoCs without any specific needs the generic fallback value of:
+>    allwinner,sunxi
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index e59f57b..44b0c6c 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -77,6 +77,7 @@ Required properties:
+>  	"allwinner,sun9i-a80-usb-mod-clk" - for usb gates + resets on A80
+>  	"allwinner,sun9i-a80-usb-phy-clk" - for usb phy gates + resets on A80
+>  	"allwinner,sun4i-a10-ve-clk" - for the Video Engine clock
+> +	"allwinner,a64-bus-gates-clk" - for the A64 multi-parent bus gates clock
+>  
+>  Required properties for all clocks:
+>  - reg : shall be the control register address for the clock.
+> diff --git a/arch/arm64/boot/dts/allwinner/a64.dtsi b/arch/arm64/boot/dts/allwinner/a64.dtsi
+> new file mode 100644
+> index 0000000..8dce10f
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/allwinner/a64.dtsi
+> @@ -0,0 +1,583 @@
+> +/*
+> + * Copyright (C) 2016 ARM Ltd.
+> + * based on the Allwinner H3 dtsi:
+> + *    Copyright (C) 2015 Jens Kuske <jenskuske@gmail.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+> +
+> +/ {
+> +	compatible = "allwinner,a64", "allwinner,sunxi";
+> +	interrupt-parent = <&gic>;
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +		serial1 = &uart1;
+> +		serial2 = &uart2;
+> +		serial3 = &uart3;
+> +		serial4 = &uart4;
+> +	};
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			device_type = "cpu";
+> +			reg = <0>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu at 1 {
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			device_type = "cpu";
+> +			reg = <1>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu at 2 {
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			device_type = "cpu";
+> +			reg = <2>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu at 3 {
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			device_type = "cpu";
+> +			reg = <3>;
+> +			enable-method = "psci";
+> +		};
+> +	};
+> +
+> +	psci {
+> +		compatible = "arm,psci-0.2", "arm,psci";
+> +		method = "smc";
+> +		cpu_suspend = <0xc4000001>;
+> +		cpu_off = <0x84000002>;
+> +		cpu_on = <0xc4000003>;
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x40000000 0>;
+> +	};
+> +
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupts = <GIC_PPI 13
+> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+> +			     <GIC_PPI 14
+> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+> +			     <GIC_PPI 11
+> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+> +			     <GIC_PPI 10
+> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+> +	};
+> +
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		osc24M: osc24M_clk {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <24000000>;
+> +			clock-output-names = "osc24M";
+> +		};
+> +
+> +		osc32k: osc32k_clk {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <32768>;
+> +			clock-output-names = "osc32k";
+> +		};
+> +
+> +		pll1: clk at 01c20000 {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun8i-a23-pll1-clk";
+> +			reg = <0x01c20000 0x4>;
+> +			clocks = <&osc24M>;
+> +			clock-output-names = "pll1";
+> +		};
+> +
+> +		pll6: clk at 01c20028 {
+> +			#clock-cells = <1>;
+> +			compatible = "allwinner,sun6i-a31-pll6-clk";
+> +			reg = <0x01c20028 0x4>;
+> +			clocks = <&osc24M>;
+> +			clock-output-names = "pll6", "pll6x2";
+> +		};
+> +
+> +		pll6d2: pll6d2_clk {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-factor-clock";
+> +			clock-div = <2>;
+> +			clock-mult = <1>;
+> +			clocks = <&pll6 0>;
+> +			clock-output-names = "pll6d2";
+> +		};
+> +
+> +		/* dummy clock until pll6 can be reused */
+> +		pll8: pll8_clk {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <1>;
+> +			clock-output-names = "pll8";
+> +		};
+> +
+> +		cpu: cpu_clk at 01c20050 {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun4i-a10-cpu-clk";
+> +			reg = <0x01c20050 0x4>;
+> +			clocks = <&osc32k>, <&osc24M>, <&pll1>, <&pll1>;
+> +			clock-output-names = "cpu";
+> +			critical-clocks = <0>;
+> +		};
+> +
+> +		axi: axi_clk at 01c20050 {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun4i-a10-axi-clk";
+> +			reg = <0x01c20050 0x4>;
+> +			clocks = <&cpu>;
+> +			clock-output-names = "axi";
+> +		};
+> +
+> +		ahb1: ahb1_clk at 01c20054 {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun6i-a31-ahb1-clk";
+> +			reg = <0x01c20054 0x4>;
+> +			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6 0>;
+> +			clock-output-names = "ahb1";
+> +		};
+> +
+> +		ahb2: ahb2_clk at 01c2005c {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun8i-h3-ahb2-clk";
+> +			reg = <0x01c2005c 0x4>;
+> +			clocks = <&ahb1>, <&pll6d2>;
+> +			clock-output-names = "ahb2";
+> +		};
+> +
+> +		apb1: apb1_clk at 01c20054 {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun4i-a10-apb0-clk";
+> +			reg = <0x01c20054 0x4>;
+> +			clocks = <&ahb1>;
+> +			clock-output-names = "apb1";
+> +		};
+> +
+> +		apb2: apb2_clk at 01c20058 {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun4i-a10-apb1-clk";
+> +			reg = <0x01c20058 0x4>;
+> +			clocks = <&osc32k>, <&osc24M>, <&pll6 1>, <&pll6 1>;
+> +			clock-output-names = "apb2";
+> +		};
+> +
+> +		bus_gates: clk at 01c20060 {
+> +			#clock-cells = <1>;
+> +			compatible = "allwinner,a64-bus-gates-clk",
+> +				     "allwinner,sunxi-multi-bus-gates-clk";
+> +			reg = <0x01c20060 0x14>;
+> +			ahb1_parent {
+> +				clocks = <&ahb1>;
+> +				clock-indices = <1>, <5>,
+> +						<6>, <8>,
+> +						<9>, <10>,
+> +						<13>, <14>,
+> +						<18>, <19>,
+> +						<20>, <21>,
+> +						<23>, <24>,
+> +						<25>, <28>,
+> +						<32>, <35>,
+> +						<36>, <37>,
+> +						<40>, <43>,
+> +						<44>, <52>,
+> +						<53>, <54>,
+> +						<135>;
+> +				clock-output-names = "bus_mipidsi", "bus_ce",
+> +						"bus_dma", "bus_mmc0",
+> +						"bus_mmc1", "bus_mmc2",
+> +						"bus_nand", "bus_sdram",
+> +						"bus_ts", "bus_hstimer",
+> +						"bus_spi0", "bus_spi1",
+> +						"bus_otg", "bus_otg_ehci0",
+> +						"bus_ehci0", "bus_otg_ohci0",
+> +						"bus_ve", "bus_lcd0",
+> +						"bus_lcd1", "bus_deint",
+> +						"bus_csi", "bus_hdmi",
+> +						"bus_de", "bus_gpu",
+> +						"bus_msgbox", "bus_spinlock",
+> +						"bus_dbg";
+> +			};
+> +			ahb2_parent {
+> +				clocks = <&ahb2>;
+> +				clock-indices = <17>, <29>;
+> +				clock-output-names = "bus_gmac", "bus_ohci0";
+> +			};
+> +			apb1_parent {
+> +				clocks = <&apb1>;
+> +				clock-indices = <64>, <65>,
+> +						<69>, <72>,
+> +						<76>, <77>,
+> +						<78>;
+> +				clock-output-names = "bus_codec", "bus_spdif",
+> +						"bus_pio", "bus_ths",
+> +						"bus_i2s0", "bus_i2s1",
+> +						"bus_i2s2";
+> +			};
+> +			abp2_parent {
+> +				clocks = <&apb2>;
+> +				clock-indices = <96>, <97>,
+> +						<98>, <101>,
+> +						<112>, <113>,
+> +						<114>, <115>,
+> +						<116>;
+> +				clock-output-names = "bus_i2c0", "bus_i2c1",
+> +						"bus_i2c2", "bus_scr",
+> +						"bus_uart0", "bus_uart1",
+> +						"bus_uart2", "bus_uart3",
+> +						"bus_uart4";
+> +			};
+> +		};
+> +
+> +		mmc0_clk: clk at 01c20088 {
+> +			#clock-cells = <1>;
+> +			compatible = "allwinner,sun4i-a10-mmc-clk";
+
+The A64 MMC clocks don't seem to be fully compatible to A10. The output
+and sample phase control has been moved to the MMC module itself.
+The dividers are the same, but the additional special "outputs" are gone.
+
+> +			reg = <0x01c20088 0x4>;
+> +			clocks = <&osc24M>, <&pll6 0>, <&pll8>;
+
+Parents are PLL6(2x) and PLL8(2x) according to manual.
+
+> +			clock-output-names = "mmc0",
+> +					     "mmc0_output",
+> +					     "mmc0_sample";
+> +		};
+> +
+> +		mmc1_clk: clk at 01c2008c {
+> +			#clock-cells = <1>;
+> +			compatible = "allwinner,sun4i-a10-mmc-clk";
+> +			reg = <0x01c2008c 0x4>;
+> +			clocks = <&osc24M>, <&pll6 0>, <&pll8>;
+> +			clock-output-names = "mmc1",
+> +					     "mmc1_output",
+> +					     "mmc1_sample";
+> +		};
+> +
+> +		mmc2_clk: clk at 01c20090 {
+> +			#clock-cells = <1>;
+> +			compatible = "allwinner,sun4i-a10-mmc-clk";
+> +			reg = <0x01c20090 0x4>;
+> +			clocks = <&osc24M>, <&pll6 0>, <&pll8>;
+> +			clock-output-names = "mmc2",
+> +					     "mmc2_output",
+> +					     "mmc2_sample";
+> +		};
+> +	};
+> +
+> +	regulators {
+> +		reg_vcc3v3: vcc3v3 {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "vcc3v3";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +		};
+> +	};
+> +
+> +	soc {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		mmc0: mmc at 01c0f000 {
+> +			compatible = "allwinner,sun5i-a13-mmc";
+> +			reg = <0x01c0f000 0x1000>;
+> +			clocks = <&bus_gates 8>,
+> +				 <&mmc0_clk 0>,
+
+Consequently, the MMC driver now has to control the output/sample phase
+with registers 0x140-0x148 instead of
+> +				 <&mmc0_clk 1>,
+> +				 <&mmc0_clk 2>;
+
+And there seems to be some new clock divider somewhere which I haven't
+found in the manual yet. The clock measured at the CLK pin is always
+half the expected rate (even with 24MHz as MMC clock parent, so no
+PLL6*2 problem).
+
+> +			clock-names = "ahb",
+> +				      "mmc",
+> +				      "output",
+> +				      "sample";
+> +			resets = <&ahb_rst 8>;
+> +			reset-names = "ahb";
+> +			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+> +			status = "disabled";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +		};
+> +
+> +		mmc1: mmc at 01c10000 {
+> +			compatible = "allwinner,sun5i-a13-mmc";
+> +			reg = <0x01c10000 0x1000>;
+> +			clocks = <&bus_gates 9>,
+> +				 <&mmc1_clk 0>,
+> +				 <&mmc1_clk 1>,
+> +				 <&mmc1_clk 2>;
+> +			clock-names = "ahb",
+> +				      "mmc",
+> +				      "output",
+> +				      "sample";
+> +			resets = <&ahb_rst 9>;
+> +			reset-names = "ahb";
+> +			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+> +			status = "disabled";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +		};
+> +
+> +		mmc2: mmc at 01c11000 {
+> +			compatible = "allwinner,sun5i-a13-mmc";
+> +			reg = <0x01c11000 0x1000>;
+> +			clocks = <&bus_gates 10>,
+> +				 <&mmc2_clk 0>,
+> +				 <&mmc2_clk 1>,
+> +				 <&mmc2_clk 2>;
+> +			clock-names = "ahb",
+> +				      "mmc",
+> +				      "output",
+> +				      "sample";
+> +			resets = <&ahb_rst 10>;
+> +			reset-names = "ahb";
+> +			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+> +			status = "disabled";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +		};
+> +
+> +		pio: pinctrl at 01c20800 {
+> +			compatible = "allwinner,a64-pinctrl";
+> +			reg = <0x01c20800 0x400>;
+> +			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&bus_gates 69>;
+> +			gpio-controller;
+> +			#gpio-cells = <3>;
+> +			interrupt-controller;
+> +			#interrupt-cells = <2>;
+> +
+> +			uart0_pins_a: uart0 at 0 {
+> +				allwinner,pins = "PB8", "PB9";
+> +				allwinner,function = "uart0";
+> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +			};
+> +
+> +			uart0_pins_b: uart0 at 1 {
+> +				allwinner,pins = "PF2", "PF3";
+> +				allwinner,function = "uart0";
+> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +			};
+> +
+> +			uart1_pins: uart1 at 0 {
+> +				allwinner,pins = "PG6", "PG7", "PG8", "PG9";
+> +				allwinner,function = "uart1";
+> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +			};
+> +
+> +			uart2_pins: uart2 at 0 {
+> +				allwinner,pins = "PB0", "PB1", "PB2", "PB3";
+> +				allwinner,function = "uart2";
+> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +			};
+> +
+> +			uart3_pins_a: uart3 at 0 {
+> +				allwinner,pins = "PD0", "PD1";
+> +				allwinner,function = "uart3";
+> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +			};
+> +
+> +			uart3_pins_b: uart3 at 1 {
+> +				allwinner,pins = "PH4", "PH5", "PH6", "PH7";
+> +				allwinner,function = "uart3";
+> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +			};
+> +
+> +			uart4_pins: uart4 at 0 {
+> +				allwinner,pins = "PD2", "PD3", "PD4", "PD5";
+> +				allwinner,function = "uart4";
+> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +			};
+> +
+> +			mmc0_pins: mmc0 at 0 {
+> +				allwinner,pins = "PF0", "PF1", "PF2", "PF3",
+> +						 "PF4", "PF5";
+> +				allwinner,function = "mmc0";
+> +				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
+> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +			};
+> +
+> +			mmc0_default_cd_pin: mmc0_cd_pin at 0 {
+> +				allwinner,pins = "PF6";
+> +				allwinner,function = "gpio_in";
+> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> +			};
+> +
+> +			mmc1_pins: mmc1 at 0 {
+> +				allwinner,pins = "PG0", "PG1", "PG2", "PG3",
+> +						 "PG4", "PG5";
+> +				allwinner,function = "mmc1";
+> +				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
+> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +			};
+> +
+> +			mmc2_pins: mmc2 at 0 {
+> +				allwinner,pins = "PC1", "PC5", "PC6", "PC8",
+> +						 "PC9", "PC10";
+> +				allwinner,function = "mmc2";
+> +				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
+> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +			};
+> +		};
+> +
+> +		ahb_rst: reset at 01c202c0 {
+> +			#reset-cells = <1>;
+> +			compatible = "allwinner,sun6i-a31-ahb1-reset";
+> +			reg = <0x01c202c0 0xc>;
+> +		};
+> +
+> +		apb1_rst: reset at 01c202d0 {
+> +			#reset-cells = <1>;
+> +			compatible = "allwinner,sun6i-a31-clock-reset";
+> +			reg = <0x01c202d0 0x4>;
+> +		};
+> +
+> +		apb2_rst: reset at 01c202d8 {
+> +			#reset-cells = <1>;
+> +			compatible = "allwinner,sun6i-a31-clock-reset";
+> +			reg = <0x01c202d8 0x4>;
+> +		};
+> +
+> +		uart0: serial at 01c28000 {
+> +			compatible = "snps,dw-apb-uart";
+> +			reg = <0x01c28000 0x400>;
+> +			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+> +			reg-shift = <2>;
+> +			reg-io-width = <4>;
+> +			clocks = <&bus_gates 112>;
+> +			resets = <&apb2_rst 16>;
+> +			reset-names = "apb2";
+
+Do we need reset-names here (and below)?
+
+> +			status = "disabled";
+> +		};
+> +
+> +		uart1: serial at 01c28400 {
+> +			compatible = "snps,dw-apb-uart";
+> +			reg = <0x01c28400 0x400>;
+> +			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+> +			reg-shift = <2>;
+> +			reg-io-width = <4>;
+> +			clocks = <&bus_gates 113>;
+> +			resets = <&apb2_rst 17>;
+> +			reset-names = "apb2";
+> +			status = "disabled";
+> +		};
+> +
+> +		uart2: serial at 01c28800 {
+> +			compatible = "snps,dw-apb-uart";
+> +			reg = <0x01c28800 0x400>;
+> +			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+> +			reg-shift = <2>;
+> +			reg-io-width = <4>;
+> +			clocks = <&bus_gates 114>;
+> +			resets = <&apb2_rst 18>;
+> +			reset-names = "apb2";
+> +			status = "disabled";
+> +		};
+> +
+> +		uart3: serial at 01c28c00 {
+> +			compatible = "snps,dw-apb-uart";
+> +			reg = <0x01c28c00 0x400>;
+> +			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
+> +			reg-shift = <2>;
+> +			reg-io-width = <4>;
+> +			clocks = <&bus_gates 115>;
+> +			resets = <&apb2_rst 19>;
+> +			reset-names = "apb2";
+> +			status = "disabled";
+> +		};
+> +
+> +		uart4: serial at 01c29000 {
+> +			compatible = "snps,dw-apb-uart";
+> +			reg = <0x01c29000 0x400>;
+> +			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
+> +			reg-shift = <2>;
+> +			reg-io-width = <4>;
+> +			clocks = <&bus_gates 116>;
+> +			resets = <&apb2_rst 20>;
+> +			reset-names = "apb2";
+> +			status = "disabled";
+> +		};
+> +
+> +		rtc: rtc at 01f00000 {
+> +			compatible = "allwinner,sun6i-a31-rtc";
+> +			reg = <0x01f00000 0x54>;
+> +			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+> +		};
+> +	};
+> +
+> +	gic: interrupt-controller@{
+> +		compatible = "arm,gic-400";
+> +		interrupt-controller;
+> +		#interrupt-cells = <3>;
+> +		#address-cells = <0>;
+> +
+> +		reg = <0x01C81000 0x1000>,
+> +		      <0x01C82000 0x2000>,
+> +		      <0x01C84000 0x2000>,
+> +		      <0x01C86000 0x2000>;
+
+Maybe lowercase hex here too.
+
+> +		interrupts = <GIC_PPI 9
+> +		      (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+> +	};
+> +};
 > 
-> Commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM states at probe
-> error and driver unbind") may re-initialize the runtime PM status of the
-> device to RPM_SUSPENDED at driver probe failures.
-> 
-> For the omap_hsmmc and likely also other omap drivers, which needs more
-> than one attempt to ->probe() (returning -EPROBE_DEFER), this commit
-> causes a regression at the PM domain level (omap hwmod).
-> 
-> The reason is that the drivers don't put back the device into low power
-> state while bailing out in ->probe to return -EPROBE_DEFER. This leads to
-> that pm_runtime_reinit() in driver core, is re-initializing the runtime PM
-> status from RPM_ACTIVE to RPM_SUSPENDED.
 
-But isn't that okay?  When the system starts up, the PM core doesn't 
-know the actual state of any device.  It just marks each device as 
-RPM_SUSPENDED and disabled as it is registered.  It's the job of 
-subsystems and drivers to make sure the stored state agrees with the 
-actual physical state.
-
-So why shouldn't pm_runtime_reinit() leave the structure the same as it 
-would be if the device had just been registered?
-
-> The next ->probe() attempt then triggers the ->runtime_resume() callback
-> to be invoked, which means this happens two times in a row. At the PM
-> domain level (omap hwmod) this is being treated as an error and thus the
-> runtime PM status of the device isn't correctly synchronized with the
-> runtime PM core.
-
-Why doesn't the same problem arise the first time the device is probed?  
-Or to put it another, why should a re-probe be any different from the 
-initial probe?
-
-> In the end, ->probe() anyway succeeds (as the driver don't checks the
-> error code from the runtime PM APIs), but results in that the PM domain
-> always stays powered on. This because of the runtime PM core believes the
-> device is RPM_SUSPENDED.
-> 
-> Fix this regression by allowing devices to be pre-enabled when the PM
-> domain's (omap hwmod) ->runtime_resume() callback is requested to enable
-> the device. In such cases, return zero to synchronize the runtime PM
-> status with the runtime PM core.
-
-Is this really the right way to fix the problem?
-
-Alan Stern
+Regards,
+Jens
