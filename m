@@ -1,70 +1,72 @@
-From: heiko.carstens@de.ibm.com (Heiko Carstens)
-Date: Tue, 2 Feb 2016 08:39:13 +0100
-Subject: [PATCH 1/5] all: s390: move wrapper infrastructure to generic
- headers
-In-Reply-To: <20160201114251.GB973@yury-N73SV>
-References: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
- <1453741047-5498-2-git-send-email-ynorov@caviumnetworks.com>
- <20160128121618.GB5418@osiris> <20160128163109.GA8529@yury-N73SV>
- <20160201114251.GB973@yury-N73SV>
-Message-ID: <20160202073913.GB3990@osiris>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 2 Feb 2016 15:49:07 +0800
+Subject: [PATCH] dts/ls1021a: add the DTS for QSPI support
+In-Reply-To: <1453970006-46509-1-git-send-email-yao.yuan@freescale.com>
+References: <1453970006-46509-1-git-send-email-yao.yuan@freescale.com>
+Message-ID: <20160202074907.GK8307@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 02:42:51PM +0300, Yury Norov wrote:
-> Hi Heiko,
+On Thu, Jan 28, 2016 at 04:33:26PM +0800, Yuan Yao wrote:
+> From: Yuan Yao <yao.yuan@nxp.com>
 > 
-> I tried this idea, and I don't like what happened.
->  - Wrappers around safe syscalls does exist. We can remove it by
->    overcomplicating __SC_COMPAT_CAST, but I don't like it.
->  - We still need to declare numerous list of new compat syscalls.
->    And it becomes even bigger, as we need to declare all compat
->    syscall versions not declared in include/linux/compat.h already.
->    (Currently - only for unsafe syscalls.)
->  - 'Weak' trick doesn't work for the whole kernel, so we'd figure out
->    some new prefix for wrapped syscalls. Or declare all non-compat
->    syscalls explicitly with SYSCALL_COMPAT_DEFINE. So the list of
->    replacements grow. And for me, it's harder to explain why we are
->    wrapping safe syscalls. Or we introduce another bunch of useless
->    wrappers (with new prefix), and have to handle it in non-compat code.
->  - With all listed above, we move all wrapper logic to non-compat
->    'include/linux/syscalls.h' header. Which is not a good idea, if it
->    doesn't benefit us much in return.
+> Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
+> ---
+> Add in v1:
+> Can merge, but the function depend on the patch:
+> https://patchwork.kernel.org/patch/8118251/
+
+Please send me dts patch only after the driver part gets applied.
+
 > 
-> > > No need to look up if a compat variant (or wrapper) exists or
-> > > sys_<syscallname> should be used instead. Also no possibility for security
-> > > bugs that could creep in because SYSCALL_DEFINE has been used instead of
-> > > SYSCALL_DEFINE_WRAP.
+> mtd: spi-nor: fsl-quadspi: add support for ls1021a
 > 
-> I thought again about it. With current version, it's very easy to
-> define whether we have wrapper or not - just by macro we use. Once
-> reviewed, this list is hardly to be changed frequently. If someone is
-> introducing new syscall, it will attract much attention, so security
-> risk is minimal.
+> LS1021a also support Freescale Quad SPI controller.
+> Add fsl-quadspi support for ls1021a chip and make SPI_FSL_QUADSPI
+> selectable for LS1021A SOC hardwares.
 > 
-> Maybe I missed some elegant implementation, and if so  I'll be happy
-> if someone'll point me out. But with what I see, I'd vote for what we
-> have now. (Plus description in docs, plus renaming new macro.)
+> ---
+>  arch/arm/boot/dts/ls1021a.dtsi | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> index 9430a99..c764fa5 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -252,6 +252,21 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		qspi: quadspi at 1550000 {
+> +			compatible = "fsl,ls1021a-qspi";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <0x0 0x1550000 0x0 0x10000>,
+> +				<0x0 0x40000000 0x0 0x4000000>;
+> +			reg-names = "QuadSPI", "QuadSPI-memory";
+> +			interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
+> +			clock-names = "qspi_en", "qspi";
+> +			clocks = <&platform_clk 1>, <&platform_clk 1>;
+> +			big-endian;
+> +			amba-base = <0x40000000>;
 
-Well, I'd like to have some proof by the compiler or linker that nothing
-went wrong. Which seems hard if only selected system call defines will be
-converted to the new defines.
+What is this property?  I cannot find it in any bindings doc.  Is it
+added by your patches on driver code?
 
-How can you tell that nothing has been forgotten?
+Shawn
 
-Also, what happens if the prototype of a system call get's changed shortly
-after it was merged. We might miss such changes and have bugs.
-
-Therefore, and to get to a solution, I think we should stick with your
-first idea, which only moves the compat_wrapper.c file.
-
-Before doing that I think you should actually revert this patch: my commit
-7681df456f97 ("s390/compat: remove superfluous compat wrappers") probably
-wasn't a very bright idea :)
-
-This again allows me to use only compat system calls in s390's system call
-table (execpt for system calls without parameters, but that can be easily
-fixed).
-
-What I still don't like is that you need to add all the protoypes. Why are
-the system call tables actually written in C and not in asm?
+> +			status = "disabled";
+> +		};
+> +
+>  		i2c0: i2c at 2180000 {
+>  			compatible = "fsl,vf610-i2c";
+>  			#address-cells = <1>;
+> -- 
+> 2.1.0.27.g96db324
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
