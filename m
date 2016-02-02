@@ -1,35 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 2 Feb 2016 10:44:07 +0100
-Subject: [PATCH 03/11] drivers: rtc: allow compilation of sun6i RTC for
- all sunxi SoCs
-In-Reply-To: <1454348370-3816-4-git-send-email-andre.przywara@arm.com>
-References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
- <1454348370-3816-4-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160202094407.GL4652@lukather>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 2 Feb 2016 09:46:05 +0000
+Subject: [PATCH v2 10/21] arm64: KVM: VHE: Split save/restore of sysregs
+ shared between EL1 and EL2
+In-Reply-To: <20160201135438.GL1478@cbox>
+References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
+ <1453737235-16522-11-git-send-email-marc.zyngier@arm.com>
+ <20160201135438.GL1478@cbox>
+Message-ID: <56B07ADD.60300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 05:39:22PM +0000, Andre Przywara wrote:
-> At the moment the "sun6i" RTC drivers depends on having two specific
-> SoC families selected.
-> The Allwinner A64 SoC has the same RTC, so extend the Kconfig option
-> to allow inclusion of the driver for all Allwinner SoCs.
+On 01/02/16 13:54, Christoffer Dall wrote:
+> On Mon, Jan 25, 2016 at 03:53:44PM +0000, Marc Zyngier wrote:
+>> A handful of system registers are still shared between EL1 and EL2,
+>> even while using VHE. These are tpidr*_el[01], actlr_el1, sp0, elr,
+>> and spsr.
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> So by shared registers you mean registers that do both have an EL0/1
+> version as well as an EL2 version, but where accesses aren't rewritten
+> transparently?
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+No, I mean that these registers do *not* have a separate banked version.
+There is only a single set of registers, which have to be save/restored
+the old way.
 
-Thanks!
-Maxime
+> 
+> also, by sp0 do you mean sp_el0, and by elr you mean elr_el1, and by
+> spsr you mean spsr_el1 ?
 
+sp0 -> sp_el0 indeed. elr and spsr really are the guest PC and PSTATE,
+so I should really reword this commit message, it is utterly confusing.
+
+> 
+>>
+>> In order to facilitate the introduction of a VHE-specific sysreg
+>> save/restore, make move the access to these registers to their
+>> own save/restore functions.
+>>
+>> No functionnal change.
+> 
+> Otherwise:
+> 
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+Thanks,
+
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160202/52e72ac3/attachment-0001.sig>
+Jazz is not dead. It just smells funny...
