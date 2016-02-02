@@ -1,97 +1,147 @@
-From: szabolcs.nagy@arm.com (Szabolcs Nagy)
-Date: Tue, 2 Feb 2016 17:31:22 +0000
-Subject: [PATCH] arm64: Add support for Half precision floating point
-In-Reply-To: <56AA470E.1020606@linaro.org>
-References: <1453823566-26742-1-git-send-email-suzuki.poulose@arm.com>
- <20160126160257.GB28238@arm.com> <56A79D17.2000009@arm.com>
- <20160126165538.GC22776@devel.intra.reserved-bit.com>
- <20160128160747.GN775@arm.com> <56AA470E.1020606@linaro.org>
-Message-ID: <56B0E7EA.9050601@arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 2 Feb 2016 12:35:46 -0500 (EST)
+Subject: [PATCH v5] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <1454433540-25948-1-git-send-email-chris.brandt@renesas.com>
+References: <1454349165-12249-1-git-send-email-chris.brandt@renesas.com>
+ <1454433540-25948-1-git-send-email-chris.brandt@renesas.com>
+Message-ID: <alpine.LFD.2.20.1602021235120.32766@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/01/16 16:51, Adhemerval Zanella wrote:
-> On 28-01-2016 14:07, Will Deacon wrote:
->> On Tue, Jan 26, 2016 at 10:25:38PM +0530, Siddhesh Poyarekar wrote:
->>> Adding Adhemerval to cc since he had volunteered to follow up on this,
->>> mainly because he had a couple of additional ideas on the kernel
->>> front.
->>>
->>> On Tue, Jan 26, 2016 at 04:21:43PM +0000, Suzuki K. Poulose wrote:
->>>> On 26/01/16 16:02, Will Deacon wrote:
->>>>> Hi Suzuki,
->>>>>
->>>>> On Tue, Jan 26, 2016 at 03:52:46PM +0000, Suzuki K Poulose wrote:
->>>>>> ARMv8.2 extensions [1] include an optional feature, which supports
->>>>>> half precision(16bit) floating point/asimd data processing
->>>>>> instructions. This patch adds support for detecting and exposing
->>>>>> the same to the userspace via HWCAPs
->>>>
->>>>
->>>>>> +#define HWCAP_FPHP		(1 << 9)
->>>>>> +#define HWCAP_ASIMDHP		(1 << 10)
->>>>>
->>>>> Where did we get to with the mrs trapping you proposed here?
->>>>>
->>>>>   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/374609.html
->>>>
->>>> We are yet to get some feedback from glibc/gcc folks. Siddhesh was looking
->>>> to make use of it [2]. But haven't heard anything back. Ramana mentioned
->>>> (in private) that they had some plans to take a look at it.
->>>
->>> I believe one of Adhemerval's ideas was similar to what I had
->>> mentioned back then, which was to provide all of the CPU information
->>> in a single file instead of having to traverse a directory structure.
->>
->> My understanding was that libc needed this information extremely early
->> on (i.e. before it could even issue system calls), and therefore such
->> an approach would be in addition to the proposal here. Am I mistaken?
+On Tue, 2 Feb 2016, Chris Brandt wrote:
+
+> For an XIP build, _etext does not represent the end of the
+> binary image that needs to stay mapped into the MODULES_VADDR area.
+> Years ago, data came before text in the memory map. However,
+> now that the order is text/init/data, an XIP_KERNEL needs to map
+> up to the data location in order to keep from cutting off
+> parts of the kernel that are needed.
+> We only map up to the beginning of data because data has already been
+> copied, so there's no reason to keep it around anymore.
 > 
-> If the idea is to use these instruction for function implementation selection
-> (iFUNC) the idea is to have on PLT resolution either by accessing it directly
-> or using a caching mechanism. x86_64 does something similar with cacheline
-> information: it issues a single cpuid and create processor information table
-> based on its information (it is also what the __builtin_supports() also
-> does).
+> This fixes the bug where you might lose the end of your kernel area
+> after page table setup is complete.
 > 
+> Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
 
-__builtin_supports is not a single cpuid on x86, it is
-a cpuid per dso with one cache per dso.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-(gcc-5 used a single cache in libgcc_s.so.1 and that
-turned out to be broken because ifunc in other dsos
-could not reliably access it.)
 
->>> The other idea was to add a vDSO function that returns this data so as
->>> to avoid (or at least reduce) the context switch latency.
->>
->> I'm not at all keen on adding a data ABI to the vDSO. I think people tried
->> similar things in the past (something on PPC?) and have horror stories
->> from that.
+> ---
+> v5:
+> * Switched from using __data_loc to _exiprom (new symbol)
+> v4:
+> * Switched from using _edata_loc __data_loc.
+> * Made commit text more accurate.
+> v3:
+> * Removed sections.h from Kbuild
+> v2:
+> * Added change for MODULES_VADDR
+> * Moved extern to new file asm/sections.h
+> ---
+>  arch/arm/include/asm/Kbuild     | 1 -
+>  arch/arm/include/asm/sections.h | 8 ++++++++
+>  arch/arm/kernel/module.c        | 2 +-
+>  arch/arm/kernel/vmlinux.lds.S   | 2 ++
+>  arch/arm/mm/mmu.c               | 8 ++++++--
+>  5 files changed, 17 insertions(+), 4 deletions(-)
+>  create mode 100644 arch/arm/include/asm/sections.h
 > 
-> In fact ppc still exports it in vDSO (include/asm/vdso_datapage.h), with
-> information like the LPAR cfg, platform, processor, {d,i}cache, etc.
-> I recall that I have see some code back at IBM that tried to use these
-> fields directly, but indeed it is not recommended.
+> diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+> index 16da638..3f6616b 100644
+> --- a/arch/arm/include/asm/Kbuild
+> +++ b/arch/arm/include/asm/Kbuild
+> @@ -23,7 +23,6 @@ generic-y += preempt.h
+>  generic-y += resource.h
+>  generic-y += rwsem.h
+>  generic-y += seccomp.h
+> -generic-y += sections.h
+>  generic-y += segment.h
+>  generic-y += sembuf.h
+>  generic-y += serial.h
+> diff --git a/arch/arm/include/asm/sections.h b/arch/arm/include/asm/sections.h
+> new file mode 100644
+> index 0000000..803bbf2
+> --- /dev/null
+> +++ b/arch/arm/include/asm/sections.h
+> @@ -0,0 +1,8 @@
+> +#ifndef _ASM_ARM_SECTIONS_H
+> +#define _ASM_ARM_SECTIONS_H
+> +
+> +#include <asm-generic/sections.h>
+> +
+> +extern char _exiprom[];
+> +
+> +#endif	/* _ASM_ARM_SECTIONS_H */
+> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+> index efdddcb..4f14b5c 100644
+> --- a/arch/arm/kernel/module.c
+> +++ b/arch/arm/kernel/module.c
+> @@ -34,7 +34,7 @@
+>   * recompiling the whole kernel when CONFIG_XIP_KERNEL is turned on/off.
+>   */
+>  #undef MODULES_VADDR
+> -#define MODULES_VADDR	(((unsigned long)_etext + ~PMD_MASK) & PMD_MASK)
+> +#define MODULES_VADDR	(((unsigned long)_exiprom + ~PMD_MASK) & PMD_MASK)
+>  #endif
+>  
+>  #ifdef CONFIG_MMU
+> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+> index 8b60fde..d18e4e5 100644
+> --- a/arch/arm/kernel/vmlinux.lds.S
+> +++ b/arch/arm/kernel/vmlinux.lds.S
+> @@ -86,6 +86,7 @@ SECTIONS
+>  
+>  #ifdef CONFIG_XIP_KERNEL
+>  	. = XIP_VIRT_ADDR(CONFIG_XIP_PHYS_ADDR);
+> +	_xiprom = .;			/* XIP ROM area to be mapped */
+>  #else
+>  	. = PAGE_OFFSET + TEXT_OFFSET;
+>  #endif
+> @@ -228,6 +229,7 @@ SECTIONS
+>  #endif
+>  
+>  #ifdef CONFIG_XIP_KERNEL
+> +	_exiprom = .;			/* End of XIP ROM area */
+>  	__data_loc = ALIGN(4);		/* location in binary */
+>  	. = PAGE_OFFSET + TEXT_OFFSET;
+>  #else
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 434d76f..e4b681a 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -1253,7 +1253,7 @@ static inline void prepare_page_table(void)
+>  
+>  #ifdef CONFIG_XIP_KERNEL
+>  	/* The XIP kernel is mapped in the module area -- skip over it */
+> -	addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
+> +	addr = ((unsigned long)_exiprom + PMD_SIZE - 1) & PMD_MASK;
+>  #endif
+>  	for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
+>  		pmd_clear(pmd_off_k(addr));
+> @@ -1335,7 +1335,7 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
+>  #ifdef CONFIG_XIP_KERNEL
+>  	map.pfn = __phys_to_pfn(CONFIG_XIP_PHYS_ADDR & SECTION_MASK);
+>  	map.virtual = MODULES_VADDR;
+> -	map.length = ((unsigned long)_etext - map.virtual + ~SECTION_MASK) & SECTION_MASK;
+> +	map.length = ((unsigned long)_exiprom - map.virtual + ~SECTION_MASK) & SECTION_MASK;
+>  	map.type = MT_ROM;
+>  	create_mapping(&map);
+>  #endif
+> @@ -1426,7 +1426,11 @@ static void __init kmap_init(void)
+>  static void __init map_lowmem(void)
+>  {
+>  	struct memblock_region *reg;
+> +#ifdef CONFIG_XIP_KERNEL
+> +	phys_addr_t kernel_x_start = round_down(__pa(_sdata), SECTION_SIZE);
+> +#else
+>  	phys_addr_t kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
+> +#endif
+>  	phys_addr_t kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
+>  
+>  	/* Map all the lowmem memory banks. */
+> -- 
+> 1.9.1
 > 
-> What I have in mind is something what ppc does with __kernel_get_syscall_map.
-> It is vDSO function that returns a vDSO internal data related to which
-> syscalls are implemented in the running kernel (through a bitmap field).
 > 
-
-fs access or vdso does not work for ifunc based dispatch
-(assuming the current ifunc implementation in glibc).
-
-(for vdso you need the AT_SYSINFO_EHDR auxval somehow and
-then implement elf symbol lookup in the ifunc resolver
-without calling any libc function. passing auxvals to the
-ifunc resolver can be done by changing the ifunc abi, but
-doing symbol lookups there is unrealistic.)
-
-in the libc (e.g. for memcpy) ifunc is a bit easier to use,
-but in user code (function-multi-versioning) ifunc is very
-limited.
-
-i wrote about the ifunc limitations here:
-https://sourceware.org/ml/libc-alpha/2015-11/msg00108.html
-see point (4) and (5).
+> 
