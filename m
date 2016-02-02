@@ -1,88 +1,76 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 2 Feb 2016 22:19:00 +0200
-Subject: [PATCH v2] pinctrl: mvebu: fix num_settings in mpp group
- assignment
-In-Reply-To: <1454366903-7038-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1453844952-28292-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1454366903-7038-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20160202201900.GA1620@darkstar.musicnaut.iki.fi>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 2 Feb 2016 21:24:41 +0100
+Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
+ v4.5-rc1
+In-Reply-To: <Pine.LNX.4.44L0.1602021112320.1653-100000@iolanthe.rowland.org>
+References: <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
+ <Pine.LNX.4.44L0.1602021112320.1653-100000@iolanthe.rowland.org>
+Message-ID: <CAPDyKFokWcLSCAh_TX-j-df_M1hN8Qw1gbQt--SyWccGCPiN5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+[...]
 
-On Mon, Feb 01, 2016 at 11:48:23PM +0100, Sebastian Hesselbarth wrote:
-> When assigning mpp settings from static mpp modes to mpp groups,
-> we do not want any groups that have no supported setting for a
-> specific Kirkwood variant. However, when there is at least a
-> single supported setting, we need to assign the number of all
-> settings in this mode to grp->num_settings as we are reusing
-> the static modes table.
-> 
-> Fixes: 0581b16b1840 ("pinctrl: mvebu: complain about missing group after checking variant")
-> Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> --
-> Changelog:
-> v1->v2:
-> - Chose a less intrusive fix by adding supp_settings variable
->   instead of looping over the settings twice.
-> 
-> Aaro, Linus,
-> 
-> I prefer this less intrusive fix in favor of v1.
-> 
-> @Aaro: Can you please test again?
+>>
+>> Your observations is correct. The hardware will be kept active
+>> in-between the probe attempts (and thus also if probing fails).
+>> Although, that's not a regression as that's the behaviour you get from
+>> runtime PM, when drivers are implemented like omap_hsmmc.
+>
+> Perhaps this is what we should do.  If probing gets deferred a few
+> times, doing runtime suspends and resumes in between will be a waste of
+> time.
 
-Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+Then you will have to distinguish between -EPROBE_DEFER and other
+errors, as I think leaving the device fully powered from a permanent
+failed probe isn't very good.
 
-A.
+Anyway, for sure it's doable by the driver, but let's try to focus on
+the regression here for now.
 
-> 
-> Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  drivers/pinctrl/mvebu/pinctrl-mvebu.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-> index e4d473811bb3..3ef798fac81b 100644
-> --- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-> +++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-> @@ -666,16 +666,19 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
->  		struct mvebu_mpp_ctrl_setting *set = &mode->settings[0];
->  		struct mvebu_pinctrl_group *grp;
->  		unsigned num_settings;
-> +		unsigned supp_settings;
->  
-> -		for (num_settings = 0; ; set++) {
-> +		for (num_settings = 0, supp_settings = 0; ; set++) {
->  			if (!set->name)
->  				break;
->  
-> +			num_settings++;
-> +
->  			/* skip unsupported settings for this variant */
->  			if (pctl->variant && !(pctl->variant & set->variant))
->  				continue;
->  
-> -			num_settings++;
-> +			supp_settings++;
->  
->  			/* find gpio/gpo/gpi settings */
->  			if (strcmp(set->name, "gpio") == 0)
-> @@ -688,7 +691,7 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
->  		}
->  
->  		/* skip modes with no settings for this variant */
-> -		if (!num_settings)
-> +		if (!supp_settings)
->  			continue;
->  
->  		grp = mvebu_pinctrl_find_group_by_pid(pctl, mode->pid);
-> -- 
-> 2.1.4
-> 
+>
+>> Instead of the suggested approaches, I think the regression should be
+>> fixed at the PM domain level (omap hwmod). I have attached a patch
+>> below, please give it try as it's untested.
+>>
+>> To solve the other problem (allowing devices to become inactive
+>> in-between at probe failures), I see two options (not treated as
+>> regressions).
+>> 1)
+>> Change the behaviour of pm_runtime_put_sync(), to *not* respect the
+>> autosuspend mode.
+>> I think I prefer this option, as it seems like autosuspend should be
+>> respected only via the asynchronous runtime PM APIs.
+>
+> ?  pm_runtime_put_sync() _already_ does not respect the autosuspend
+> mode.  If you want to respect it, you have to call
+> pm_runtime_put_sync_autosuspend() instead.
+
+Then there's a bug in the runtime PM core.
+
+>From Tony's regression report and from mine own local runtime PM test
+driver, I can see that the device doesn't get RPM_SUSPENDED (the
+->runtime_suspend() callback isn't called), even when the usage count
+is zero - when pm_runtime_put_sync() is called.
+
+To find the sequence of runtime PM commands, go ahead an have look in
+the omap_hsmmc driver. The problem occurs when the driver bails out in
+probe, when it receives -EPROBE_DEFER when fetching regulators.
+
+I have some more data to share on this problem from my runtime PM test
+driver. I will try my best to share it tomorrow.
+
+>
+>> 2)
+>> Change the failing drivers, to before calling pm_runtime_put_sync()
+>> also invoke pm_runtime_dont_use_autosusend(). Or other similar
+>> approach.
+>
+> Given the above, this seems unnecessary.
+
+Okay, so you are saying that the pm_runtime_put_sync() should idle the
+device even if autosuspend is in use. That seems reasonable, I will
+look into this problem.
+
+Kind regards
+Uffe
