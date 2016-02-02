@@ -1,62 +1,33 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 2 Feb 2016 12:11:36 +0000
-Subject: [PATCH 2/5] clk: sunxi: Make clocks setup functions take const
- pointer
-In-Reply-To: <1454402834-6385-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1454402834-6385-1-git-send-email-maxime.ripard@free-electrons.com>
- <1454402834-6385-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <56B09CF8.2020801@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 2 Feb 2016 12:17:34 +0000
+Subject: [PATCH 07/11] ARM: dts: sunxi: Add dtsi file for AXP809 PMIC
+In-Reply-To: <1454408864-24112-8-git-send-email-wens@csie.org>
+References: <1454408864-24112-1-git-send-email-wens@csie.org>
+ <1454408864-24112-8-git-send-email-wens@csie.org>
+Message-ID: <20160202121733.GO4455@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/16 08:47, Maxime Ripard wrote:
-> All the data structure that we pass to the clocks setup functions are
-> declared const, while our setup functions expects a regular pointer. This
-> was hidden by the fact that we cast a void * pointer back to these
-> structures, which made it go unnoticed.
-> 
-> Fix the functions prototype.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Tue, Feb 02, 2016 at 06:27:40PM +0800, Chen-Yu Tsai wrote:
 
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+> +		reg_dcdc1: dcdc1 {
+> +			regulator-name = "dcdc1";
+> +		};
 
-Cheers,
-Andre.
+Why is this generic DTS include specifying regulator names?
 
-> ---
->  drivers/clk/sunxi/clk-sunxi.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 67ef94948544..a3d706f5b21c 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -616,7 +616,7 @@ static const struct mux_data sun8i_h3_ahb2_mux_data __initconst = {
->  };
->  
->  static struct clk * __init sunxi_mux_clk_setup(struct device_node *node,
-> -					       struct mux_data *data)
-> +					       const struct mux_data *data)
->  {
->  	struct clk *clk;
->  	const char *clk_name = node->name;
-> @@ -700,7 +700,7 @@ static const struct div_data sun4i_apb0_data __initconst = {
->  };
->  
->  static void __init sunxi_divider_clk_setup(struct device_node *node,
-> -					   struct div_data *data)
-> +					   const struct div_data *data)
->  {
->  	struct clk *clk;
->  	const char *clk_name = node->name;
-> @@ -810,7 +810,7 @@ static const struct divs_data sun6i_a31_pll6_divs_data __initconst = {
->   */
->  
->  static struct clk ** __init sunxi_divs_clk_setup(struct device_node *node,
-> -						 struct divs_data *data)
-> +						 const struct divs_data *data)
->  {
->  	struct clk_onecell_data *clk_data;
->  	const char *parent;
-> 
+> +		reg_rtc_ldo: rtc_ldo {
+> +			/* RTC_LDO is a fixed, always-on regulator */
+> +			regulator-always-on;
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <1800000>;
+
+If the regulator itself is limited in this way there is no need to
+specify this in the DTS.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160202/f280ae6e/attachment.sig>
