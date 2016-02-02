@@ -1,66 +1,47 @@
 From: ping.bai@nxp.com (Bai Ping)
-Date: Tue, 2 Feb 2016 18:01:35 +0800
-Subject: [PATCH V3 2/5] ARM: dts: imx: Add basic dts support for imx6qp SOC
+Date: Tue, 2 Feb 2016 18:01:36 +0800
+Subject: [PATCH V3 3/5] ARM: dts: imx: Add basic dts support for
+ imx6qp-sabreauto
 In-Reply-To: <1454407298-15545-1-git-send-email-ping.bai@nxp.com>
 References: <1454407298-15545-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <1454407298-15545-2-git-send-email-ping.bai@nxp.com>
+Message-ID: <1454407298-15545-3-git-send-email-ping.bai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX6Quad Plus processor is an high performance SOC of i.MX6 family.
-It has enhanced graphics performance and increased overall memory bandwidth
-compared to i.MX6Q. Most of the design are same as i.MX6Quad/Dual, so code
-for i.MX6Quad can be resued by this chip. The revision number is identied as
-i.MX6Q Rev2.0, but actually it is a new chip, as we did many change to the
-overall architecture.
-
-This patch adds basic dtsi file support for the new i.MX6Quad Plus processor.
+This patch adds basic dts file for i.MX6QP-Sbreauto board.
 
 Signed-off-by: Bai Ping <ping.bai@nxp.com>
 ---
 
 change for V3:
---remove some device node that the driver is not ready or stable in upstream
--- update the copyright header
+-- correct the dts list in alphabet order
+-- update the copyright header for double license
 
+ arch/arm/boot/dts/Makefile             |  3 +-
+ arch/arm/boot/dts/imx6qp-sabreauto.dts | 93 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 95 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/imx6qp-sabreauto.dts
 
- arch/arm/boot/dts/imx6q.dtsi           |  2 +-
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi |  1 +
- arch/arm/boot/dts/imx6qp.dtsi          | 86 ++++++++++++++++++++++++++++++++++
- 3 files changed, 88 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/imx6qp.dtsi
-
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 0d93c0e..ddcb37b 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -22,7 +22,7 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		cpu at 0 {
-+		cpu0: cpu at 0 {
- 			compatible = "arm,cortex-a9";
- 			device_type = "cpu";
- 			reg = <0>;
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index a6d445c..f65f57b 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -238,6 +238,7 @@
- 				regulator-max-microvolt = <3300000>;
- 				regulator-boot-on;
- 				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
- 			};
- 
- 			sw3a_reg: sw3a {
-diff --git a/arch/arm/boot/dts/imx6qp.dtsi b/arch/arm/boot/dts/imx6qp.dtsi
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index c4f42a78..3801cbd 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -352,7 +352,8 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-tx6q-1110.dtb \
+ 	imx6q-udoo.dtb \
+ 	imx6q-wandboard.dtb \
+-	imx6q-wandboard-revb1.dtb
++	imx6q-wandboard-revb1.dtb \
++	imx6qp-sabreauto.dtb
+ dtb-$(CONFIG_SOC_IMX6SL) += \
+ 	imx6sl-evk.dtb \
+ 	imx6sl-warp.dtb
+diff --git a/arch/arm/boot/dts/imx6qp-sabreauto.dts b/arch/arm/boot/dts/imx6qp-sabreauto.dts
 new file mode 100644
-index 0000000..1ada714
+index 0000000..5ce3840
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx6qp.dtsi
-@@ -0,0 +1,86 @@
++++ b/arch/arm/boot/dts/imx6qp-sabreauto.dts
+@@ -0,0 +1,93 @@
 +/*
 + * Copyright 2016 Freescale Semiconductor, Inc.
 + *
@@ -103,49 +84,56 @@ index 0000000..1ada714
 + *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+#include "imx6q.dtsi"
++/dts-v1/;
++
++#include "imx6qp.dtsi"
++#include "imx6qdl-sabreauto.dtsi"
 +
 +/ {
-+	soc {
-+		ocram2: sram at 00940000 {
-+			compatible = "mmio-sram";
-+			reg = <0x00940000 0x20000>;
-+			clocks = <&clks IMX6QDL_CLK_OCRAM>;
-+		};
++	model = "Freescale i.MX6 Quad Plus SABRE Automotive Board";
++	compatible = "fsl,imx6qp-sabreauto", "fsl,imx6qp";
++};
 +
-+		ocram3: sram at 00960000 {
-+			compatible = "mmio-sram";
-+			reg = <0x00960000 0x20000>;
-+			clocks = <&clks IMX6QDL_CLK_OCRAM>;
-+		};
-+
-+		ipu1: ipu at 02400000 {
-+			compatible = "fsl,imx6qp-ipu", "fsl,imx6q-ipu";
-+			clocks = <&clks IMX6QDL_CLK_IPU1>,
-+				 <&clks IMX6QDL_CLK_IPU1_DI0>, <&clks IMX6QDL_CLK_IPU1_DI1>,
-+				 <&clks IMX6QDL_CLK_IPU1_DI0_SEL>, <&clks IMX6QDL_CLK_IPU1_DI1_SEL>,
-+				 <&clks IMX6QDL_CLK_LDB_DI0_PODF>, <&clks IMX6QDL_CLK_LDB_DI1_PODF>,
-+				 <&clks IMX6QDL_CLK_PRG0_APB>;
-+			clock-names = "bus",
-+				      "di0", "di1",
-+				      "di0_sel", "di1_sel",
-+				      "ldb_di0", "ldb_di1", "prg";
-+		};
-+
-+		ipu2: ipu at 02800000 {
-+			compatible = "fsl,imx6qp-ipu", "fsl,imx6q-ipu";
-+			clocks = <&clks IMX6QDL_CLK_IPU2>,
-+				 <&clks IMX6QDL_CLK_IPU2_DI0>, <&clks IMX6QDL_CLK_IPU2_DI1>,
-+				 <&clks IMX6QDL_CLK_IPU2_DI0_SEL>, <&clks IMX6QDL_CLK_IPU2_DI1_SEL>,
-+				 <&clks IMX6QDL_CLK_LDB_DI0_PODF>, <&clks IMX6QDL_CLK_LDB_DI1_PODF>,
-+				 <&clks IMX6QDL_CLK_PRG1_APB>;
-+			clock-names = "bus",
-+				      "di0", "di1",
-+				      "di0_sel", "di1_sel",
-+				      "ldb_di0", "ldb_di1", "prg";
-+		};
-+
++&i2c2 {
++	max7322: gpio at 68 {
++		compatible = "maxim,max7322";
++		reg = <0x68>;
++		gpio-controller;
++		#gpio-cells = <2>;
 +	};
++};
++
++&iomuxc {
++	imx6qdl-sabreauto {
++		pinctrl_enet: enetgrp {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_COL1__ENET_MDIO          0x1b0b0
++				MX6QDL_PAD_KEY_COL2__ENET_MDC           0x1b0b0
++				MX6QDL_PAD_RGMII_TXC__RGMII_TXC         0x1b018
++				MX6QDL_PAD_RGMII_TD0__RGMII_TD0         0x1b018
++				MX6QDL_PAD_RGMII_TD1__RGMII_TD1         0x1b018
++				MX6QDL_PAD_RGMII_TD2__RGMII_TD2         0x1b018
++				MX6QDL_PAD_RGMII_TD3__RGMII_TD3         0x1b018
++				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL   0x1b018
++				MX6QDL_PAD_RGMII_RXC__RGMII_RXC         0x1b018
++				MX6QDL_PAD_RGMII_RD0__RGMII_RD0         0x1b018
++				MX6QDL_PAD_RGMII_RD1__RGMII_RD1         0x1b018
++				MX6QDL_PAD_RGMII_RD2__RGMII_RD2         0x1b018
++				MX6QDL_PAD_RGMII_RD3__RGMII_RD3         0x1b018
++				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL   0x1b018
++				MX6QDL_PAD_GPIO_16__ENET_REF_CLK        0x4001b0a8
++				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
++			>;
++		};
++	};
++};
++
++&pcie {
++	status = "disabled";
++};
++
++&vgen3_reg {
++	regulator-always-on;
 +};
 -- 
 1.9.1
