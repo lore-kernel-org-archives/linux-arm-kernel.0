@@ -1,72 +1,13 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 2 Feb 2016 15:49:07 +0800
-Subject: [PATCH] dts/ls1021a: add the DTS for QSPI support
-In-Reply-To: <1453970006-46509-1-git-send-email-yao.yuan@freescale.com>
-References: <1453970006-46509-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <20160202074907.GK8307@tiger>
+From: lists.nick.betteridge@gmail.com (lists.nick.betteridge at gmail.com)
+Date: Mon, 1 Feb 2016 23:57:46 -0800 (PST)
+Subject: [PATCH 00/11] arm64: Introduce Allwinner A64 and Pine64 support
+In-Reply-To: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
+References: <1454348370-3816-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <b1250d48-a7a1-4f7f-893b-9abe3c91724e@googlegroups.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 28, 2016 at 04:33:26PM +0800, Yuan Yao wrote:
-> From: Yuan Yao <yao.yuan@nxp.com>
-> 
-> Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
-> ---
-> Add in v1:
-> Can merge, but the function depend on the patch:
-> https://patchwork.kernel.org/patch/8118251/
+Just a quick question - will there be any support for enabling booting into virtualisation mode to run xen and the like?
 
-Please send me dts patch only after the driver part gets applied.
-
-> 
-> mtd: spi-nor: fsl-quadspi: add support for ls1021a
-> 
-> LS1021a also support Freescale Quad SPI controller.
-> Add fsl-quadspi support for ls1021a chip and make SPI_FSL_QUADSPI
-> selectable for LS1021A SOC hardwares.
-> 
-> ---
->  arch/arm/boot/dts/ls1021a.dtsi | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-> index 9430a99..c764fa5 100644
-> --- a/arch/arm/boot/dts/ls1021a.dtsi
-> +++ b/arch/arm/boot/dts/ls1021a.dtsi
-> @@ -252,6 +252,21 @@
->  			status = "disabled";
->  		};
->  
-> +		qspi: quadspi at 1550000 {
-> +			compatible = "fsl,ls1021a-qspi";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0x0 0x1550000 0x0 0x10000>,
-> +				<0x0 0x40000000 0x0 0x4000000>;
-> +			reg-names = "QuadSPI", "QuadSPI-memory";
-> +			interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
-> +			clock-names = "qspi_en", "qspi";
-> +			clocks = <&platform_clk 1>, <&platform_clk 1>;
-> +			big-endian;
-> +			amba-base = <0x40000000>;
-
-What is this property?  I cannot find it in any bindings doc.  Is it
-added by your patches on driver code?
-
-Shawn
-
-> +			status = "disabled";
-> +		};
-> +
->  		i2c0: i2c at 2180000 {
->  			compatible = "fsl,vf610-i2c";
->  			#address-cells = <1>;
-> -- 
-> 2.1.0.27.g96db324
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Cheers
+Nick
