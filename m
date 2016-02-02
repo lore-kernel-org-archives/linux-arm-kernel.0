@@ -1,32 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 02 Feb 2016 22:10:49 +0100
-Subject: [PATCH] video: ARM CLCD: runtime check for Versatile
-In-Reply-To: <1454446059-30526-1-git-send-email-linus.walleij@linaro.org>
-References: <1454446059-30526-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <25978729.oSoMp4ZgxA@wuerfel>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue,  2 Feb 2016 14:13:54 -0700
+Subject: [PATCH 0/7] coresight: next v4.5-rc2 
+Message-ID: <1454447641-29153-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 February 2016 21:47:39 Linus Walleij wrote:
->         } else {
-> -#ifdef CONFIG_ARCH_VERSATILE
-> -               fb->off_ienb = CLCD_PL111_IENB;
-> -               fb->off_cntl = CLCD_PL111_CNTL;
-> -#else
-> -               fb->off_ienb = CLCD_PL110_IENB;
-> -               fb->off_cntl = CLCD_PL110_CNTL;
-> -#endif
-> +               if (of_machine_is_compatible("arm,versatile-ab") ||
-> +                   of_machine_is_compatible("arm,versatile-pb")) {
-> +                       fb->off_ienb = CLCD_PL111_IENB;
-> +                       fb->off_cntl = CLCD_PL111_CNTL;
-> +               } else {
-> +                       fb->off_ienb = CLCD_PL110_IENB;
-> +                       fb->off_cntl = CLCD_PL110_CNTL;
-> +               }
->         }
-> 
+Hi Greg,
 
-Could that be done based on the AMBA device ID instead?
+I would like to queue the following patches for 4.6, more will likely come later.
 
-	Arnd
+Thanks,
+Mathieu
+
+Mathieu Poirier (7):
+  coresight: fixing indentation problem
+  coresight: fixing lockdep error
+  coresight: coresight_unregister() function cleanup
+  coresight: release reference taken by 'bus_find_device()'
+  coresight: remove csdev's link from topology
+  coresight: removing bind/unbind options from sysfs
+  coresight: implementing 'cpu_id()' API
+
+ drivers/hwtracing/coresight/coresight-etb10.c      | 11 +----
+ drivers/hwtracing/coresight/coresight-etm3x.c      | 21 ++++----
+ drivers/hwtracing/coresight/coresight-etm4x.c      | 21 ++++----
+ drivers/hwtracing/coresight/coresight-funnel.c     | 10 +---
+ .../coresight/coresight-replicator-qcom.c          | 11 +----
+ drivers/hwtracing/coresight/coresight-replicator.c | 16 +-----
+ drivers/hwtracing/coresight/coresight-tmc.c        | 15 +-----
+ drivers/hwtracing/coresight/coresight-tpiu.c       | 10 +---
+ drivers/hwtracing/coresight/coresight.c            | 57 +++++++++++++++++++---
+ include/linux/coresight.h                          |  3 ++
+ 10 files changed, 78 insertions(+), 97 deletions(-)
+
+-- 
+2.1.4
