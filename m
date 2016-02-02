@@ -1,23 +1,32 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 2 Feb 2016 22:11:03 +0100
-Subject: Plain DFS (no voltage scaling)
-Message-ID: <56B11B67.3090600@free.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 02 Feb 2016 22:10:49 +0100
+Subject: [PATCH] video: ARM CLCD: runtime check for Versatile
+In-Reply-To: <1454446059-30526-1-git-send-email-linus.walleij@linaro.org>
+References: <1454446059-30526-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <25978729.oSoMp4ZgxA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tuesday 02 February 2016 21:47:39 Linus Walleij wrote:
+>         } else {
+> -#ifdef CONFIG_ARCH_VERSATILE
+> -               fb->off_ienb = CLCD_PL111_IENB;
+> -               fb->off_cntl = CLCD_PL111_CNTL;
+> -#else
+> -               fb->off_ienb = CLCD_PL110_IENB;
+> -               fb->off_cntl = CLCD_PL110_CNTL;
+> -#endif
+> +               if (of_machine_is_compatible("arm,versatile-ab") ||
+> +                   of_machine_is_compatible("arm,versatile-pb")) {
+> +                       fb->off_ienb = CLCD_PL111_IENB;
+> +                       fb->off_cntl = CLCD_PL111_CNTL;
+> +               } else {
+> +                       fb->off_ienb = CLCD_PL110_IENB;
+> +                       fb->off_cntl = CLCD_PL110_CNTL;
+> +               }
+>         }
+> 
 
-I plan to enable the on-demand governor on the tango platform:
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/tango4-smp8758.dtsi
+Could that be done based on the AMBA device ID instead?
 
-I found the cpufreq-dt binding doc:
-
-https://www.kernel.org/doc/Documentation/devicetree/bindings/cpufreq/cpufreq-dt.txt
-https://www.kernel.org/doc/Documentation/devicetree/bindings/opp/opp.txt
-
-Something is not clear to me:
-
-If my platform cannot scale the voltage, what information
-should I put in the voltage part of the DT?
-
-Regards.
+	Arnd
