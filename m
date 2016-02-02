@@ -1,26 +1,47 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Tue, 2 Feb 2016 18:25:31 +0100
-Subject: [PATCH v2] recordmcount: arm: Implement make_nop
-In-Reply-To: <1454371583-9064-1-git-send-email-sboyd@codeaurora.org>
-References: <1454371583-9064-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20160202172531.GA9044@debian>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 2 Feb 2016 17:26:13 +0000
+Subject: [PATCH v2 2/2] drm: sunxi: Add a basic DRM driver for Allwinner
+ DE2
+In-Reply-To: <20160202181949.d59e84a040a980abcdd69d32@free.fr>
+References: <cover.1452876522.git.moinejf@free.fr>
+ <4c40052b27f74df1342e631cb0f9ed5993861a54.1452876522.git.moinejf@free.fr>
+ <569F6C1E.8000006@arm.com> <20160202181949.d59e84a040a980abcdd69d32@free.fr>
+Message-ID: <56B0E6B5.5040708@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 04:06:23PM -0800, Stephen Boyd wrote:
-> In similar spirit to x86 and arm64 support, add a make_nop_arm()
-> to replace calls to mcount with nops in sections that aren't
-> traced.
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Rabin Vincent <rabin@rab.in>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-> 
-> Changes from v1:
->  * Replace with nops instead of pops
->  * Check for BE or LE kernel with elf headers
->  * Drop mcount style check because now we look at the previous
->    instruction to determine if it's a push (__gnu_mcount_nc) or not (mcount).
+Hi,
 
-Acked-by: Rabin Vincent <rabin@rab.in>
+On 02/02/16 17:19, Jean-Francois Moine wrote:
+> On Wed, 20 Jan 2016 11:14:38 +0000
+> Andre Przywara <andre.przywara@arm.com> wrote:
+> 
+>> I haven't looked at it in detail yet, I just tried to compile it for
+>> ARM64 to prepare for a test on the Allwinner A64.
+>>
+>> So just two things I spotted below:
+> 
+> Hi Andr?,
+> 
+> I fixed them in the v3 patch request.
+
+Thanks for that.
+
+> Have you succeeded to get video on the A64?
+
+No, but I haven't tried yet. I am tempted to give it a go, though. I
+guess this "headless Linux" term has scared some backers, who had more
+associations with Sleepy Hollow than with a serial terminal ;-)
+
+Can you sketch (or point me to) what I need to do? Just a
+simple-framebuffer DT node?
+I take it that the driver does not depend on any kind of U-Boot
+initialisation, but instead takes care of this itself?
+
+And would this pave the way for fbturbo also?
+
+Please excuse my probably silly questions, I am more of a headless
+horseman ;-)
+
+Cheers,
+Andre.
