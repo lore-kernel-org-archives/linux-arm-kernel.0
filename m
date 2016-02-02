@@ -1,56 +1,55 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 2 Feb 2016 16:24:55 -0500 (EST)
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <CAPDyKFokWcLSCAh_TX-j-df_M1hN8Qw1gbQt--SyWccGCPiN5Q@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1602021614430.1653-100000@iolanthe.rowland.org>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 2 Feb 2016 15:24:54 -0600
+Subject: [PATCH 06/10] devicetree: bindings: add DT binding for the
+ Marvell Armada 3700 SoC family
+In-Reply-To: <1454436468-4241-7-git-send-email-gregory.clement@free-electrons.com>
+References: <1454436468-4241-1-git-send-email-gregory.clement@free-electrons.com>
+ <1454436468-4241-7-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20160202212454.GA21678@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2 Feb 2016, Ulf Hansson wrote:
-
-> > ?  pm_runtime_put_sync() _already_ does not respect the autosuspend
-> > mode.  If you want to respect it, you have to call
-> > pm_runtime_put_sync_autosuspend() instead.
+On Tue, Feb 02, 2016 at 07:07:44PM +0100, Gregory CLEMENT wrote:
+> The Marvell Armada 3700 is a family of ARMv8 CA53 SoCs. This commit
+> introduces the Device Tree binding that documents the top-level
+> compatible strings for Armada 3700 based platforms.
 > 
-> Then there's a bug in the runtime PM core.
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  .../devicetree/bindings/arm/marvell/armada-37xx.txt     | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
 > 
-> From Tony's regression report and from mine own local runtime PM test
-> driver, I can see that the device doesn't get RPM_SUSPENDED (the
-> ->runtime_suspend() callback isn't called), even when the usage count
-> is zero - when pm_runtime_put_sync() is called.
+> diff --git a/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
+> new file mode 100644
+> index 000000000000..5db9f1a90da2
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
+> @@ -0,0 +1,17 @@
+> +Marvell Armada 37xx Platforms Device Tree Bindings
+> +--------------------------------------------------
+> +
+> +Boards using a SoC of the Marvell Armada 37xx family must carry the
+> +following root node property:
+> +
+> + - compatible: must contain "marvell,armada3700"
 
-Ah, yes -- I see what's going on.  pm_runtime_put_sync() calls 
-__pm_runtime_idle(), rather than __pm_runtime_suspend().  And the idle 
-routine always forces RPM_AUTO on.
+Is 3700 an actual chip? If not, please drop this. 
 
-So what I said was wrong.  pm_runtime_put_sync() respects the driver's 
-settings for autosuspend, whereas pm_runtime_put_sync_suspend() and 
-pm_runtime_put_sync_autosuspend() override the settings.
-
-> To find the sequence of runtime PM commands, go ahead an have look in
-> the omap_hsmmc driver. The problem occurs when the driver bails out in
-> probe, when it receives -EPROBE_DEFER when fetching regulators.
+> +
+> +In addition, depending on whether the Armada 3710 or Armada 3720 SoCs
+> +are being used, the following root node property must be added:
+> +
+> + - compatible: must contain either "marvell,armada3710" or
+> +   "marvell,armada3720"
+> +
+> +Example:
+> +
+> +compatible = "marvell,armada-3720-db", "marvell,armada3720", "marvell,armada3700";
+> -- 
+> 2.5.0
 > 
-> I have some more data to share on this problem from my runtime PM test
-> driver. I will try my best to share it tomorrow.
-
-> >> 2)
-> >> Change the failing drivers, to before calling pm_runtime_put_sync()
-> >> also invoke pm_runtime_dont_use_autosusend(). Or other similar
-> >> approach.
-> >
-> > Given the above, this seems unnecessary.
-> 
-> Okay, so you are saying that the pm_runtime_put_sync() should idle the
-> device even if autosuspend is in use. That seems reasonable, I will
-> look into this problem.
-
-Heh -- you are the person who did it.  :-)  See commit d66e6db28df3 
-("PM / Runtime: Respect autosuspend when idle triggers suspend").
-
-I guess the intention was that if the driver wants to specify whether 
-autosuspend should be respected, it should implement an rpm_idle 
-callback routine.
-
-Alan Stern
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
