@@ -1,49 +1,98 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  2 Feb 2016 18:56:41 +0100
-Subject: [RFC PATCH 2/3] arm64: add the initrd region to the linear mapping
- explicitly
+Date: Tue,  2 Feb 2016 18:56:42 +0100
+Subject: [RFC PATCH 3/3] arm64: remove the now unneeded relocate_initrd()
 In-Reply-To: <1454435802-7604-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1454435802-7604-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1454435802-7604-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1454435802-7604-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of going out of our way to relocate the initrd if it turns out
-to occupy memory that is not covered by the linear mapping, just add the
-initrd to the linear mapping. This puts the burden on the bootloader to
-pass initrd= and mem= options that are mutually consistent.
-
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/mm/init.c | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/setup.c | 64 --------------------
+ 1 file changed, 64 deletions(-)
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index f3b061e67bfe..5dd083161810 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -167,8 +167,20 @@ void __init arm64_memblock_init(void)
- 	 */
- 	memblock_reserve(__pa(_text), _end - _text);
- #ifdef CONFIG_BLK_DEV_INITRD
--	if (initrd_start)
--		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
-+	if (initrd_start) {
-+		u64 base = __virt_to_phys(initrd_start);
-+		u64 size = initrd_end - initrd_start;
-+
-+		/*
-+		 * The initrd needs to be accessible via the linear mapping. So
-+		 * add the memory covered by the initrd explicitly, since it may
-+		 * have been clipped or otherwise left out when we traversed the
-+		 * DT memory nodes or the UEFI memory map.
-+		 */
-+		memblock_add(base, size);
-+		memblock_clear_nomap(base, size);
-+		memblock_reserve(base, size);
-+	}
- #endif
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 8119479147db..1a8ef35b03d4 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -223,69 +223,6 @@ static void __init request_standard_resources(void)
+ 	}
+ }
  
- 	early_init_fdt_scan_reserved_mem();
+-#ifdef CONFIG_BLK_DEV_INITRD
+-/*
+- * Relocate initrd if it is not completely within the linear mapping.
+- * This would be the case if mem= cuts out all or part of it.
+- */
+-static void __init relocate_initrd(void)
+-{
+-	phys_addr_t orig_start = __virt_to_phys(initrd_start);
+-	phys_addr_t orig_end = __virt_to_phys(initrd_end);
+-	phys_addr_t ram_end = memblock_end_of_DRAM();
+-	phys_addr_t new_start;
+-	unsigned long size, to_free = 0;
+-	void *dest;
+-
+-	if (orig_end <= ram_end)
+-		return;
+-
+-	/*
+-	 * Any of the original initrd which overlaps the linear map should
+-	 * be freed after relocating.
+-	 */
+-	if (orig_start < ram_end)
+-		to_free = ram_end - orig_start;
+-
+-	size = orig_end - orig_start;
+-	if (!size)
+-		return;
+-
+-	/* initrd needs to be relocated completely inside linear mapping */
+-	new_start = memblock_find_in_range(0, PFN_PHYS(max_pfn),
+-					   size, PAGE_SIZE);
+-	if (!new_start)
+-		panic("Cannot relocate initrd of size %ld\n", size);
+-	memblock_reserve(new_start, size);
+-
+-	initrd_start = __phys_to_virt(new_start);
+-	initrd_end   = initrd_start + size;
+-
+-	pr_info("Moving initrd from [%llx-%llx] to [%llx-%llx]\n",
+-		orig_start, orig_start + size - 1,
+-		new_start, new_start + size - 1);
+-
+-	dest = (void *)initrd_start;
+-
+-	if (to_free) {
+-		memcpy(dest, (void *)__phys_to_virt(orig_start), to_free);
+-		dest += to_free;
+-	}
+-
+-	copy_from_early_mem(dest, orig_start + to_free, size - to_free);
+-
+-	if (to_free) {
+-		pr_info("Freeing original RAMDISK from [%llx-%llx]\n",
+-			orig_start, orig_start + to_free - 1);
+-		memblock_free(orig_start, to_free);
+-	}
+-}
+-#else
+-static inline void __init relocate_initrd(void)
+-{
+-}
+-#endif
+-
+ u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
+ 
+ void __init setup_arch(char **cmdline_p)
+@@ -320,7 +257,6 @@ void __init setup_arch(char **cmdline_p)
+ 	acpi_boot_table_init();
+ 
+ 	paging_init();
+-	relocate_initrd();
+ 
+ 	kasan_init();
+ 
 -- 
 2.5.0
