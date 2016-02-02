@@ -1,39 +1,43 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue,  2 Feb 2016 15:53:59 +0000
-Subject: [PATCH] arm64: futex.h: Add missing PAN toggling
-Message-ID: <1454428439-10942-1-git-send-email-james.morse@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue,  2 Feb 2016 16:55:30 +0100
+Subject: [PATCH] clk: sunxi: don't mark sun6i_ar100_data __initconst
+In-Reply-To: <1453727747-23307-11-git-send-email-wens@csie.org>
+References: <1453727747-23307-11-git-send-email-wens@csie.org>
+Message-ID: <1454428571-4040607-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-futex.h's futex_atomic_cmpxchg_inatomic() does not use the
-__futex_atomic_op() macro and needs its own PAN toggling. This was missed
-when the feature was implemented.
+The clk-sun6i-ar100 clk driver is a platform driver that may use
+deferred probing, so its probe function must not access
+__init symbols. Kbuild warns about this:
 
-Fixes: 338d4f49d6f ("arm64: kernel: Add support for Privileged Access Never")
-Signed-off-by: James Morse <james.morse@arm.com>
+WARNING: drivers/clk/sunxi/built-in.o(.text+0x15f0): Section mismatch in reference from the function sun6i_a31_ar100_clk_probe() to the (unknown reference) .init.rodata:(unknown)
+The function sun6i_a31_ar100_clk_probe() references
+the (unknown reference) __initconst (unknown).
+This is often because sun6i_a31_ar100_clk_probe lacks a __initconst
+annotation or the annotation of (unknown) is wrong.
+
+Removing the __initconst annotation avoids the warning and makes
+deferred probing work.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 3ca2377b6fed ("clk: sunxi: rewrite sun6i-ar100 using factors clk")
 ---
- arch/arm64/include/asm/futex.h | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/clk/sunxi/clk-sun6i-ar100.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
-index 007a69fc4f40..5f3ab8c1db55 100644
---- a/arch/arm64/include/asm/futex.h
-+++ b/arch/arm64/include/asm/futex.h
-@@ -121,6 +121,7 @@ futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
- 		return -EFAULT;
+diff --git a/drivers/clk/sunxi/clk-sun6i-ar100.c b/drivers/clk/sunxi/clk-sun6i-ar100.c
+index a7f5777834eb..84a187e55360 100644
+--- a/drivers/clk/sunxi/clk-sun6i-ar100.c
++++ b/drivers/clk/sunxi/clk-sun6i-ar100.c
+@@ -60,7 +60,7 @@ static const struct clk_factors_config sun6i_ar100_config = {
+ 	.pshift = 4,
+ };
  
- 	asm volatile("// futex_atomic_cmpxchg_inatomic\n"
-+ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN, CONFIG_ARM64_PAN)
- "	prfm	pstl1strm, %2\n"
- "1:	ldxr	%w1, %2\n"
- "	sub	%w3, %w1, %w4\n"
-@@ -137,6 +138,7 @@ futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
- "	.align	3\n"
- "	.quad	1b, 4b, 2b, 4b\n"
- "	.popsection\n"
-+ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN, CONFIG_ARM64_PAN)
- 	: "+r" (ret), "=&r" (val), "+Q" (*uaddr), "=&r" (tmp)
- 	: "r" (oldval), "r" (newval), "Ir" (-EFAULT)
- 	: "memory");
+-static const struct factors_data sun6i_ar100_data __initconst = {
++static const struct factors_data sun6i_ar100_data = {
+ 	.mux = 16,
+ 	.muxmask = GENMASK(1, 0),
+ 	.table = &sun6i_ar100_config,
 -- 
-2.6.2
+2.7.0
