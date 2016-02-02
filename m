@@ -1,126 +1,96 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 2 Feb 2016 11:32:29 +0000
-Subject: [PATCH 1/5] clk: sunxi: Make clocks setup functions return their
- clock
-In-Reply-To: <CAGb2v66CyhkM0vabbede43eAaf7WVg0Lm8w_OUKwqHnFO182uw@mail.gmail.com>
-References: <1454402834-6385-1-git-send-email-maxime.ripard@free-electrons.com>
- <1454402834-6385-2-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v66CyhkM0vabbede43eAaf7WVg0Lm8w_OUKwqHnFO182uw@mail.gmail.com>
-Message-ID: <56B093CD.6000806@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue,  2 Feb 2016 11:39:49 +0000
+Subject: [PATCH v2 00/10] Support for Cortex-M Prototyping System
+Message-ID: <1454413199-26573-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi,
 
-On 02/02/16 10:35, Chen-Yu Tsai wrote:
-> On Tue, Feb 2, 2016 at 4:47 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> The clocks registration code in clk-sunxi was most of the time not
->> returning the struct clk (or struct clk array) that was registered,
->> preventing the users of such functions to manipulate it, for example to
->> protect it.
->>
->> Make them return it so that we can start using it.
-> 
-> Should they return error codes as well? So the CLK_OF_DECLARE setup functions
-> can report errors. Or make these helper functions report errors directly?
+This patch series provide the basic support for running ucLinux on V2M-MPS2
+platform.
 
-Yeah, I was about the reply the same.
-It looks like we can use the ERR_PTR facility to achieve this, as it's
-already used in other parts of the clk framework.
+With these patches applied ucLinux can be run on both HW and FVP models
+with Cortex-M3/M4/M7 configurations.
 
-For instance ...
+Board description:
 
-> ChenYu
-> 
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->>  drivers/clk/sunxi/clk-sunxi.c | 16 +++++++++-------
->>  1 file changed, 9 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
->> index e460a6b0068c..67ef94948544 100644
->> --- a/drivers/clk/sunxi/clk-sunxi.c
->> +++ b/drivers/clk/sunxi/clk-sunxi.c
->> @@ -615,8 +615,8 @@ static const struct mux_data sun8i_h3_ahb2_mux_data __initconst = {
->>         .shift = 0,
->>  };
->>
->> -static void __init sunxi_mux_clk_setup(struct device_node *node,
->> -                                      struct mux_data *data)
->> +static struct clk * __init sunxi_mux_clk_setup(struct device_node *node,
->> +                                              struct mux_data *data)
->>  {
->>         struct clk *clk;
->>         const char *clk_name = node->name;
->> @@ -638,6 +638,8 @@ static void __init sunxi_mux_clk_setup(struct device_node *node,
->>                 of_clk_add_provider(node, of_clk_src_simple_get, clk);
->>                 clk_register_clkdev(clk, clk_name, NULL);
+http://infocenter.arm.com/help/topic/com.arm.doc.100112_0100_03_en/arm_versatile_express_cortex_m_prototyping_system_(v2m_mps2)_technical_reference_manual_100112_0100_03_en.pdf
 
-... here we have two functions that could fail and actually return an
-error code.
-This whole clock tree is quite complex already, so having clock
-initialisations fail without any error message is not really helping.
-Doing: "if (ret) {pr_warn(...); return ERR_PTR(ret);}" should be doable,
-I think. Or we do it in the upper layers, when we have the error reason.
+Application notes (cover Cortex-M3/M4/M7):
 
-Otherwise I like the approach!
+http://infocenter.arm.com/help/topic/com.arm.doc.dai0385a/DAI0385A_cortex_m3_on_v2m_mps2.pdf
+http://infocenter.arm.com/help/topic/com.arm.doc.dai0386a/DAI0386A_cortex_m4_on_v2m_mps2.pdf
+http://infocenter.arm.com/help/topic/com.arm.doc.dai0399a/DAI0399A_cortex_m7_on_v2m_mps2.pdf
+http://infocenter.arm.com/help/topic/com.arm.doc.dai0400a/DAI0400A_cortex_m7_on_v2m_mps2.pdf
 
-Cheers,
-Andre.
+Cortex-M System Design Kit (referenced as CMDK from documents above):
 
->>         }
->> +
->> +       return clk;
->>  }
->>
->>
->> @@ -722,7 +724,6 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
->>  }
->>
->>
->> -
->>  /**
->>   * sunxi_gates_clk_setup() - Setup function for leaf gates on clocks
->>   */
->> @@ -808,8 +809,8 @@ static const struct divs_data sun6i_a31_pll6_divs_data __initconst = {
->>   *           |________________________|
->>   */
->>
->> -static void __init sunxi_divs_clk_setup(struct device_node *node,
->> -                                       struct divs_data *data)
->> +static struct clk ** __init sunxi_divs_clk_setup(struct device_node *node,
->> +                                                struct divs_data *data)
->>  {
->>         struct clk_onecell_data *clk_data;
->>         const char *parent;
->> @@ -836,7 +837,7 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
->>
->>         clk_data = kmalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
->>         if (!clk_data)
->> -               return;
->> +               return NULL;
->>
->>         clks = kcalloc(ndivs, sizeof(*clks), GFP_KERNEL);
->>         if (!clks)
->> @@ -922,7 +923,7 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
->>
->>         of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
->>
->> -       return;
->> +       return clks;
->>
->>  free_gate:
->>         kfree(gate);
->> @@ -930,6 +931,7 @@ free_clks:
->>         kfree(clks);
->>  free_clkdata:
->>         kfree(clk_data);
->> +       return NULL;
->>  }
->>
->>
->> --
->> 2.6.4
->>
-> 
+http://infocenter.arm.com/help/topic/com.arm.doc.ddi0479c/DDI0479C_cortex_m_system_design_kit_r1p0_trm.pdf
+
+I'd be happy to hear any feedback/comments on this series!
+
+Changelog:
+  v1  -> v2:
+      - rebased on 4.5-rc2
+      - fixes for mps2-timer per Daniel and Rob (added Ack from Daniel)
+      - fixes for mps2-uart per Greg and Andy
+
+  RFC -> v1:
+      - dropped RFC tag
+      - rebased on 4.4-rc3
+      - added Acks from Rob
+      - updated mps2-timer per Daniel
+      - fixed build failures reported by 0-DAY kernel test infrastructure
+
+Thanks!
+
+Vladimir Murzin (10):
+  dt-bindings: document the MPS2 timer bindings
+  clockevents/drivers: add MPS2 Timer driver
+  dt-bindings: document the MPS2 UART bindings
+  serial: mps2-uart: add MPS2 UART driver
+  serial: mps2-uart: add support for early console
+  ARM: mps2: introduce MPS2 platform
+  ARM: mps2: add low-level debug support
+  ARM: configs: add MPS2 defconfig
+  ARM: dts: introduce MPS2 AN385/AN386
+  ARM: dts: introduce MPS2 AN399/AN400
+
+ .../devicetree/bindings/serial/arm,mps2-uart.txt   |   22 +
+ .../devicetree/bindings/timer/arm,mps2-timer.txt   |   28 +
+ arch/arm/Kconfig                                   |    8 +
+ arch/arm/Kconfig.debug                             |   12 +-
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/boot/dts/Makefile                         |    3 +
+ arch/arm/boot/dts/mps2-an385.dts                   |   90 +++
+ arch/arm/boot/dts/mps2-an399.dts                   |   92 +++
+ arch/arm/boot/dts/mps2.dtsi                        |  227 ++++++++
+ arch/arm/configs/mps2_defconfig                    |  112 ++++
+ arch/arm/include/debug/mps2.S                      |   27 +
+ arch/arm/mach-mps2/Makefile                        |    1 +
+ arch/arm/mach-mps2/Makefile.boot                   |    3 +
+ arch/arm/mach-mps2/dtmachine.c                     |   21 +
+ drivers/clocksource/Kconfig                        |    6 +
+ drivers/clocksource/Makefile                       |    1 +
+ drivers/clocksource/mps2-timer.c                   |  276 +++++++++
+ drivers/tty/serial/Kconfig                         |   13 +
+ drivers/tty/serial/Makefile                        |    1 +
+ drivers/tty/serial/mps2-uart.c                     |  614 ++++++++++++++++++++
+ include/uapi/linux/serial_core.h                   |    3 +
+ 21 files changed, 1560 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/serial/arm,mps2-uart.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/arm,mps2-timer.txt
+ create mode 100644 arch/arm/boot/dts/mps2-an385.dts
+ create mode 100644 arch/arm/boot/dts/mps2-an399.dts
+ create mode 100644 arch/arm/boot/dts/mps2.dtsi
+ create mode 100644 arch/arm/configs/mps2_defconfig
+ create mode 100644 arch/arm/include/debug/mps2.S
+ create mode 100644 arch/arm/mach-mps2/Makefile
+ create mode 100644 arch/arm/mach-mps2/Makefile.boot
+ create mode 100644 arch/arm/mach-mps2/dtmachine.c
+ create mode 100644 drivers/clocksource/mps2-timer.c
+ create mode 100644 drivers/tty/serial/mps2-uart.c
+
+-- 
+1.7.9.5
