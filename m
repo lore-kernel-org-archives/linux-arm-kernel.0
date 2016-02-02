@@ -1,157 +1,151 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Tue,  2 Feb 2016 11:33:52 +0800
-Subject: [PATCH v5 0/8] Add the family patches to support for kylin board
-Message-ID: <1454384032-6794-1-git-send-email-wxt@rock-chips.com>
+Date: Tue,  2 Feb 2016 11:40:50 +0800
+Subject: [PATCH v5 1/8] ARM: dts: rockchip: add hdmi/vop device node for rk3036
+In-Reply-To: <1454384032-6794-1-git-send-email-wxt@rock-chips.com>
+References: <1454384032-6794-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1454384453-7127-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This patch adds the needed display info for rk3036 SOCs.
 
-This series patches are based on kernel 4.5-rc1 version, also
-is based on Heiko's branch.
-(kernel/git/mmind/linux-rockchip.git -b for-next & v4.5-clk/fixes)
+The rk3036 support two overlay plane and one hwc plane,
+it supports IOMMU, and its IOMMU same as rk3288's.
+Meanwhile, add the inno hdmi for HDMI display.
 
-e.g: boot log..
-Linux version 4.5.0-rc1+ (wxt at ubuntu) ....#60 SMP Thu Jan 28 12:54:50 CST 2016
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
-1) The kylin history series patches:
-
-V0:
-https://lkml.org/lkml/2015/12/22/168
-V1:
-https://lkml.org/lkml/2015/12/17/319
-V2:
-https://lkml.org/lkml/2016/1/7/66
-V3:
-http://www.spinics.net/lists/arm-kernel/msg474796.html
-V4:
-https://lkml.org/lkml/2016/1/28/132
-
-This series patches are verified on the following github:
-https://github.com/Caesar-github/rockchip/tree/kylin/next
-
-This series has 8 patches: (8--->1)
-c455bf5 ARM: dts: rockchip: support the spi for rk3036
-41bbd5d ASoC: rt5616: add the mclk for the codec driver
-6ee2dc0 ASoC: rt5616: trivial: fix the typo
-2775e41 ASoC: rt5616: add mclk property for rt5616 document
-b4ec10b ARM: dts: rockchip: add mclk for rt5616 on kylin board
-8d272a1 ARM: dts: rockchip: add support emac for RK3036
-02e501f clk: rockchip: rk3036: fix and add node id for emac clock
-b948f42 ARM: dts: rockchip: add hdmi/vop device node for rk3036
-....
-
-This series patches can apply into Heiko for-next branch.
-(https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/log/?h=for-next)
-Also, ths ASoC can apply into Mark branch.
 ---
 
-2) This series patches have the following decriptions:
-
-PATCH[1/8]: ====> add hdmi/vop display node for rk3036
-ARM: dts: rockchip: add hdmi/vop device node for rk3036
-
-This Patch is based on Ykk's Inno HDMI V7 patches. That's verified on
-my github.
-
-bd5ed3e ARM: dts: rockchip: add hdmi/vop device node for rk3036
-438e7bd FROMLIST: dt-bindings: add document for Innosilicon HDMI on Rockchip platform
-((am from https://patchwork.kernel.org/patch/8117611/))
-ad0623b FROMLIST: drm/rockchip: hdmi: add Innosilicon HDMI support
-((am https://patchwork.kernel.org/patch/8117571/))
-
-PATCH[2/8-3/8]: Add the emac patch
-
-The emac clock is depend APLL, That shoud be incorrect.
-We should fix it on the DPLL.
-
-df91ab ARM: dts: rockchip: add support emac for RK3036
-d5c2781 clk: rockchip: rk3036: fix and add node id for emac clock
-
-That's verified on kylin board with ubuntu os.
-
-How to test and verify?
-
-You can refer to the following wiki document.
-http://rockchip.wikidot.com/linux-develop-guide
-
-PATCH[4/8-7/8]: Make the codec work on kylin board
-
-41bbd5d ASoC: rt5616: add the mclk for the codec driver
-6ee2dc0 ASoC: rt5616: trivial: fix the typo
-2775e41 ASoC: rt5616: add mclk property for rt5616 document
-b4ec10b ARM: dts: rockchip: add mclk for rt5616 on kylin board
-
-As the previous discussed on https://patchwork.kernel.org/patch/8041001/
-Move the mclk into codec driver to enable and disable.
-
-How to test and verify?
-
-You can refer to the following wiki document.
-http://rockchip.wikidot.com/linux-develop-guide
-
-PATCH[8/8]: Make the codec work on kylin board
-
-Add the spi node for rk3036 dts, that's seem not related to the kylin.
-Maybe the future will support the spi on kylin board or connect the spi devices.
-
-f0fff43 ARM: dts: rockchip: support the spi for rk3036
----
-
-Thanks your reviewing! :)
-
--
-Caesar
-
-
-Changes in v5:
-- remove unused commit content.
-- Fix the wrong word, as the Rob comments on
-  https://patchwork.kernel.org/patch/8147731/.
-- Cc the related alsa experts.
--Cc releated alsa experts.
-- Cc related alsa experts.
-- Remove the unused, as Heiko comments on https://patchwork.kernel.org/patch/8147761/
-- Modify the commit.
-
+Changes in v5: None
 Changes in v4:
 - solve the lastest conflict, picked up from
   https://patchwork.kernel.org/patch/8040961/.
-- fix the commit, pick up from the
-  https://patchwork.kernel.org/patch/7976631/.
-- The emac parent shouldn't depend on the APLL. instead of DPLL.
-- included in the kylin series patches.
-- This patch picked up from https://patchwork.kernel.org/patch/7924971/
-- Change to solve the conflict based on the Heiko's branch.
-- Make the emac parent as the DPLL.
-- AS the previous discussed by them, add the mclk for codec.
- (https://patchwork.kernel.org/patch/8041001/)
-- Add this patch included in kylin series patches.
-- Add this patch included in kylin series patches.
-- AS the previous discussed by them, add the mclk for codec.
-  (https://patchwork.kernel.org/patch/8041001/)
-- Add this patch included in kylin series patches.
 
-Caesar Wang (6):
-  ARM: dts: rockchip: add hdmi/vop device node for rk3036
-  ARM: dts: rockchip: add mclk for rt5616 on kylin board
-  ASoC: rt5616: add mclk property for rt5616 document
-  ASoC: rt5616: trivial: fix the typo
-  ASoC: rt5616: add the mclk for the codec driver
-  ARM: dts: rockchip: support the spi for rk3036
+ arch/arm/boot/dts/rk3036-kylin.dts | 12 +++++++
+ arch/arm/boot/dts/rk3036.dtsi      | 66 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 78 insertions(+)
 
-zhengxing (2):
-  clk: rockchip: rk3036: fix and add node id for emac clock
-  ARM: dts: rockchip: add support emac for RK3036
-
- Documentation/devicetree/bindings/sound/rt5616.txt |   6 +
- arch/arm/boot/dts/rk3036-evb.dts                   |  23 ++
- arch/arm/boot/dts/rk3036-kylin.dts                 |  35 ++
- arch/arm/boot/dts/rk3036.dtsi                      | 145 ++++++++
- drivers/clk/rockchip/clk-rk3036.c                  |   9 +-
- include/dt-bindings/clock/rk3036-cru.h             |   2 +
- sound/soc/codecs/rt5616.c                          | 410 +++++++++++----------
- 7 files changed, 442 insertions(+), 188 deletions(-)
-
+diff --git a/arch/arm/boot/dts/rk3036-kylin.dts b/arch/arm/boot/dts/rk3036-kylin.dts
+index 3332a7f..1037ad6 100644
+--- a/arch/arm/boot/dts/rk3036-kylin.dts
++++ b/arch/arm/boot/dts/rk3036-kylin.dts
+@@ -116,6 +116,10 @@
+ 	status = "okay";
+ };
+ 
++&hdmi {
++	status = "okay";
++};
++
+ &i2c1 {
+ 	clock-frequency = <400000>;
+ 
+@@ -369,6 +373,14 @@
+ 	status = "okay";
+ };
+ 
++&vop {
++	status = "okay";
++};
++
++&vop_mmu {
++	status = "okay";
++};
++
+ &pinctrl {
+ 	leds {
+ 		led_ctl: led-ctl {
+diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+index 7897449..7abe3e2 100644
+--- a/arch/arm/boot/dts/rk3036.dtsi
++++ b/arch/arm/boot/dts/rk3036.dtsi
+@@ -147,6 +147,42 @@
+ 		};
+ 	};
+ 
++	vop: vop at 10118000 {
++		compatible = "rockchip,rk3036-vop";
++		reg = <0x10118000 0x19c>;
++		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru ACLK_LCDC>, <&cru SCLK_LCDC>, <&cru HCLK_LCDC>;
++		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
++		resets = <&cru SRST_LCDC1_A>, <&cru SRST_LCDC1_H>, <&cru SRST_LCDC1_D>;
++		reset-names = "axi", "ahb", "dclk";
++		iommus = <&vop_mmu>;
++
++		status = "disabled";
++
++		vop_out: port {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			vop_out_hdmi: endpoint at 0 {
++				reg = <1>;
++				remote-endpoint = <&hdmi_in_vop>;
++			};
++		};
++	};
++
++	display-subsystem {
++		compatible = "rockchip,display-subsystem";
++		ports = <&vop_out>;
++	};
++
++	vop_mmu: iommu at 10118300 {
++		compatible = "rockchip,iommu";
++		reg = <0x10118300 0x100>;
++		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "vop_mmu";
++		#iommu-cells = <0>;
++		status = "disabled";
++	};
++
+ 	gic: interrupt-controller at 10139000 {
+ 		compatible = "arm,gic-400";
+ 		interrupt-controller;
+@@ -274,6 +310,27 @@
+ 		status = "disabled";
+ 	};
+ 
++	hdmi: hdmi at 20034000 {
++		compatible = "rockchip,rk3036-inno-hdmi";
++		reg = <0x20034000 0x4000>;
++		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru  PCLK_HDMI>;
++		clock-names = "pclk";
++		rockchip,grf = <&grf>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&hdmi_ctl>;
++		status = "disabled";
++
++		hdmi_in: port {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			hdmi_in_vop: endpoint at 0 {
++				reg = <0>;
++				remote-endpoint = <&vop_out_hdmi>;
++			};
++		};
++	};
++
+ 	timer: timer at 20044000 {
+ 		compatible = "rockchip,rk3036-timer", "rockchip,rk3288-timer";
+ 		reg = <0x20044000 0x20>;
+@@ -588,6 +645,15 @@
+ 			};
+ 		};
+ 
++		hdmi {
++			hdmi_ctl: hdmi-ctl {
++				rockchip,pins = <1 8  RK_FUNC_1 &pcfg_pull_none>,
++						<1 9  RK_FUNC_1 &pcfg_pull_none>,
++						<1 10 RK_FUNC_1 &pcfg_pull_none>,
++						<1 11 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
+ 		uart0 {
+ 			uart0_xfer: uart0-xfer {
+ 				rockchip,pins = <0 16 RK_FUNC_1 &pcfg_pull_default>,
 -- 
 1.9.1
