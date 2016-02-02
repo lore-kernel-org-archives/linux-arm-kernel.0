@@ -1,111 +1,122 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 2 Feb 2016 16:10:45 +0530
-Subject: [PATCH v3 3/3] pci: dra7xx: use pdata callbacks to perform reset
-In-Reply-To: <20160128183156.GH19432@atomide.com>
-References: <1452780672-14339-1-git-send-email-kishon@ti.com>
- <1452780672-14339-4-git-send-email-kishon@ti.com>
- <20160127173104.GQ19432@atomide.com> <56A90971.4020409@ti.com>
- <20160127185649.GV19432@atomide.com> <56A94FB7.6020903@ti.com>
- <20160128183156.GH19432@atomide.com>
-Message-ID: <56B087AD.4000505@ti.com>
+From: majun258@huawei.com (majun (F))
+Date: Tue, 2 Feb 2016 18:25:53 +0800
+Subject: [RFC PATCH] irq/mbigen:Fix the problem of IO remap for duplicated
+ physical address in mbigen driver
+In-Reply-To: <20160201132557.GG674@leverpostej>
+References: <1454327094-7848-1-git-send-email-majun258@huawei.com>
+ <20160201115717.GD674@leverpostej> <56AF585E.6050005@huawei.com>
+ <20160201132557.GG674@leverpostej>
+Message-ID: <56B08431.3000200@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Mark:
 
-On Friday 29 January 2016 12:01 AM, Tony Lindgren wrote:
-> * Suman Anna <s-anna@ti.com> [160127 15:17]:
->> On 01/27/2016 12:56 PM, Tony Lindgren wrote:
->>> * Suman Anna <s-anna@ti.com> [160127 10:17]:
->>>> On 01/27/2016 11:31 AM, Tony Lindgren wrote:
->>>>> Why do you need another reset here? Can't you just implement PM runtime
->>>>> in the driver and do the usual pm_runtime_put_sync followed by
->>>>> pm_runtime_disable?
+? 2016/2/1 21:25, Mark Rutland ??:
+> On Mon, Feb 01, 2016 at 09:06:38PM +0800, majun (F) wrote:
+>>
+>>
+>> ? 2016/2/1 19:57, Mark Rutland ??:
+>>> On Mon, Feb 01, 2016 at 07:44:54PM +0800, MaJun wrote:
+>>>> From: Ma Jun <majun258@huawei.com>
 >>>>
->>>> The omap_hwmod_enable/disable code does not deal with hardresets (PRCM
->>>> reset lines) and so the pm_runtime_get_sync/put_sync only end up dealing
->>>> with clocks, and we need to invoke the reset functions separately.
->>>> Modules with softresets in SYSCONFIG are ok, as they are dealt with
->>>> properly.
->>>
->>> Hmm _reset() in omap_hwmod.c has this to call _assert_hardreset:
->>>
->>> 	if (oh->class->reset) {
->>> 		r = oh->class->reset(oh);
->>> 	} else {
->>> 		if (oh->rst_lines_cnt > 0) {
->>> 			for (i = 0; i < oh->rst_lines_cnt; i++)
->>> 				_assert_hardreset(oh, oh->rst_lines[i].name);
->>> 			return 0;
->>> 		} else {
->>> 			r = _ocp_softreset(oh);
->>> 			if (r == -ENOENT)
->>> 				r = 0;
->>> 		}
->>> 	}
->>
->> Right, hwmod code does the initial reset.
->>
->>> Care to explain what exactly the problem with the hwmod code not doing
->>> the reset on init?
->>
->> And we only need to deassert the reset in probe. Technically, we don't
->> need to assert first and deassert in probe, and that was a design choice
->> made by Kishon.
-> 
-> OK so if hwmod code has already done the reset, then why would you need
-> to deassert reset in the device driver probe?
-
-The hwmod code only asserts the reset lines and that is not enough to access
-the PCI registers. The reset lines must be de-asserted before accessing the
-PCIe registers.
-> 
->>> And why do you need to do another reset in dra7xx_pcie_remove()?
->>
->> Primarily to restore the reset state back to what it was after the
->> driver remove gets called. We cannot call deassert twice without calling
->> a assert in between. Kishon had originally added the assert and deassert
->> only in probe, but nothing in remove, they ought to be deassert in probe
->> and assert in remove to match initial hardware state, and to also make
->> it work across multiple probe/remove.
-
-right. I thought if some program like the bootloader requires the reset lines
-to be in initial hw state, then it might break on 'reboot'. So restored it back
-to the initial hw state.
-> 
-> I don't understand this part either.. Usually you just power up and init
-> the registers to a sane state in a device driver probe and on exit just
-> power down the device.
-> 
->>>>> Basically I'm wondering how come we need these platform data callbacks
->>>>> at all.
+>>>> For mbigen module, there is a special case that more than one mbigen 
+>>>> device nodes use the same reg definition in DTS when these devices
+>>>> exist in the same mbigen hardware module. 
 >>>>
->>>> The hardresets are controlled through the
->>>> omap_device_assert(deassert)_hardreset functions, and since these are
->>>> limited to mach-omap2, we are invoking them through platform data callbacks.
+>>>> mbigen_dev1:intc_dev1 {
+>>>> 	...
+>>>> 	reg = <0x0 0xc0080000 0x0 0x10000>;
+>>>> 	...
+>>>> };
+>>>>
+>>>> mbigen_dev2:intc_dev2 {
+>>>> 	...
+>>>> 	reg = <0x0 0xc0080000 0x0 0x10000>;
+>>>> 	...
+>>>> };
 >>>
->>> Right.. But I'm wondering about the why you need to do this in the
->>> driver at all part :)
+>>> This doesn't sound right. If they exist in the same place, and have the
+>>> same reg, they _are_ the same device.
+>>>
+>>> You'll need to explain this better.
+>>>
 >>
->> The initial reset at init time is okay, but hwmod _enable() bails out if
->> the resets lines are asserted. This was a change made long time back, I
->> believe to deal with the problems around the DSP enabling sequences. As
->> such, pm_runtime_get_sync() and put_sync() do not deassert and assert
->> the resets.
+>> For a mbigen hardware module which connecte with several devices,
+>> because these devices has different device ID,
+>> I need to define a device node for each device in DTS file.
+>>
+>> 	mbigen
+>> 	|
+>> ------------------
+>> | 	| 	|
+>> dev1 	dev2 	dev3
+>>
+>> Because of register layout,the registers related with these devices
+>> are put together, I can't split them clearly.
+>> So, I only make these devices which connect with
+>> same mbigen hardware module usethe same address.
 > 
-> OK if the hwmod code does not deassert reset lines properly on enable,
-> then that sounds like a bug that should be fixed instead of adding
-> device specific work arounds.
-
-I think some devices require the reset lines to be asserted and some devices
-require it to be de-asserted and hwmod was designed when there was only the
-first type of devices. I'm not sure though.
+> This sounds like we've either mis-described the mbigen in the binding,
+> or we're mis-describing the relationship with the devices.
 > 
-> Sorry to keep dragging this on a bit longer, but I think we need to
-> hear Paul's comments on this one.
 
-I agree.
-Paul, what do you think is the best way forward to perform reset?
+Sorry, I didn't express myself clearly.
 
-Thanks
-Kishon
+For example, a mbigen hardware module can support several peripheral devices
+with different device ID.
+
+|-----------------------|-
+|	mbigen		|
+|-----------------------|-
+ |       |        |
+dev1    dev2     dev3
+
+To simplify the mbigen drvier,
+I didn't use the whole mbigen module as a mbgien device, but use
+the register collections(vector, trigger type,status etc.) corresponding
+to a peripheral device as a mbigen device.
+So, mbigen device is a logical conception or logical device.
+
+Now, a mbigen hardware module contains several logical mbigen device.
+
+-------------------------------
+|mgn_dev1  mgn_dev2  mgn_dev3 |
+|-----------------------------|
+   |          |        |
+dev1	    dev2      dev3
+
+So,mgn_dev1, mgn_dev2 and mgn_dev3 exist in same mbigen hardware module,
+and,they use the same reg address region,that is adress of mbigen hardware module.
+
+For this case, I think the question is can we map an reg address
+region more than one time?
+
+Thanks!
+
+> It should not be necessary to describe the same set of registers
+> repeatedly.
+> 
+>>>>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>>> -	mgn_chip->base = devm_ioremap_resource(&pdev->dev, res);
+>>>> +	mgn_chip->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+>>>
+>>> These two behaving differently doesn't seem correct either...
+>>
+>> The problem is caused by memory region check fail because of
+>> duplicated address in devm_ioremap_resource().
+> 
+> The check is sensible. Using devm_ioremap rather than
+> devm_ioremap_resource to avoid the check is not the correct solution.
+> 
+>> For mbigen special case, there is no necessary to do this check.
+> 
+> I'm not sure I fully agree.
+> 
+> Regardless, this is not the right solution; it is fragile at best.
+> 
+> Thanks,
+> Mark.
+> 
+> .
+> 
