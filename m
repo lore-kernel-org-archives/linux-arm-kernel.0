@@ -1,53 +1,38 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 2 Feb 2016 09:20:51 -0700
-Subject: [PATCH V8 23/23] perf tools: adding coresight etm PMU record
- capabilities
-In-Reply-To: <CANLsYkxwtqHyoQ7+Z4a+qJfTV_ZWc72_mJh12FHxVEhNYKsgjw@mail.gmail.com>
-References: <1452807977-8069-1-git-send-email-mathieu.poirier@linaro.org>
- <1452807977-8069-24-git-send-email-mathieu.poirier@linaro.org>
- <CANLsYkyBCFyu3Q-3jet-6rNfa3vGzWWQ3_m+PNf4Z+n6OxsscA@mail.gmail.com>
- <20160125211048.GE22501@kernel.org> <56AB4027.2070208@intel.com>
- <CANLsYkyFSjLmT_i7ANE2VL21Y+Nud13SvjOd1akV-e9hQcTcHA@mail.gmail.com>
- <20160129211208.GB32225@kernel.org>
- <CANLsYkxwtqHyoQ7+Z4a+qJfTV_ZWc72_mJh12FHxVEhNYKsgjw@mail.gmail.com>
-Message-ID: <CANLsYkysvVKoaxKJu9TYLAGJaZj9=9gMN+O6NpcDLztJNrgy+w@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Feb 2016 17:21:36 +0100
+Subject: [PATCH 10/11] ARM: dts: sun9i: a80-optimus: Disable dummy
+ regulators vcc3v0, vcc3v3, vcc5v0
+In-Reply-To: <1454408864-24112-11-git-send-email-wens@csie.org>
+References: <1454408864-24112-1-git-send-email-wens@csie.org>
+ <1454408864-24112-11-git-send-email-wens@csie.org>
+Message-ID: <20160202162136.GX4652@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+Hi,
 
->>> >
->>> > Looks OK, apart from adding linux/coresight-pmu.h to the manifest, but I
->>> > mentioned that on another patch.
->>> >
->>> > However there is no decoder, which begs the question, is there anything you
->>> > can actually do with the perf.data file?  Might be a bit confusing for users
->>> > if they can capture traces but not use perf tools on the resulting perf.data
->>> > file?
->>>
->>> We are working on a decoding library in parallel to this work.
->>
->> Would be nice to be able to get both in the same patch kit, no? So that
->> one can both record and process the traces, verifying it all works.
->
-> We are still a few weeks away from being in a position where the
-> community can start playing with the decoding library.  I can hold off
-> on the "perf tools" patches when I queue the kernel side of the work
-> for 4.6 but since you and Adrian have already reviewed the work it
-> would be nice to have that part included as well.
->
-> We've been playing with the perf.data files for a couple of months now
-> and things look at the right place.  This isn't surprising since we
-> are using the same framework as X86.
->
-> I think the generation of the perf.data file should be coupled with
-> the submission of the kernel driver but would also respect a diverging
-> point of view.  Simply let me know what you prefer and I will adjust
-> V9 accordingly.
+On Tue, Feb 02, 2016 at 06:27:43PM +0800, Chen-Yu Tsai wrote:
+> These 3 regulators are provided in sunxi-common-regulators.dtsi.
+> 3.0V/3.3V and 5.0V are commonly used voltages in Allwinner devices.
+> These dummy regulators provide a stand-in when bindings that require
+> one, but the real regulator is not supported yet.
+> 
+> Since these are no longer needed, we can disable them.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Arnaldo,
+Why not remove the include entirely then?
 
-I'm preparing V9 at this time - what's your view on the above?
+Maxime
 
-Thanks,
-Mathieu
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160202/9e51616f/attachment.sig>
