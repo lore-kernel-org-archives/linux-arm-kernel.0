@@ -1,72 +1,279 @@
-From: ping.bai@nxp.com (Bai Ping)
-Date: Tue, 2 Feb 2016 18:01:38 +0800
-Subject: [PATCH V3 5/5] ARM: imx: Add msl code support for imx6qp
-In-Reply-To: <1454407298-15545-1-git-send-email-ping.bai@nxp.com>
-References: <1454407298-15545-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <1454407298-15545-5-git-send-email-ping.bai@nxp.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Tue,  2 Feb 2016 18:02:05 +0800
+Subject: [PATCH v3 2/4] power: reset: add reboot mode driver
+In-Reply-To: <1454406981-4692-1-git-send-email-andy.yan@rock-chips.com>
+References: <1454406981-4692-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1454407325-4804-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX6QP is a different SOC, but internally we treate it as i.MX6Q
-Rev_2.0 to maximum the code reusability. The chip silicon number we
-read from the ANADIG_DIGPROG is 0x630100. This patch add code to
-identify it as i.MX6QP Rev_1.0 when print out the silicon version.
+This driver parse the reboot commands like "reboot loader"
+and "reboot recovery" to get a boot mode described in the
+device tree , then call the write interfae to store the boot
+mode in some place like special register or sram , which can
+be read by the bootloader after system reboot, then the bootloader
+can take different action according to the mode stored.
 
-Signed-off-by: Bai Ping <ping.bai@nxp.com>
+This is commonly used on Android based devices, in order to
+reboot the device into fastboot or recovery mode.
+
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+
 ---
 
-change for V3:
--- add comment for the revision trick code
+Changes in v3:
+- scan multi properities
+- add mask value for some platform which only use some bits of the register
+  to store boot mode magic value
 
- arch/arm/mach-imx/anatop.c     | 9 ++++++++-
- arch/arm/mach-imx/mach-imx6q.c | 8 ++++++--
- 2 files changed, 14 insertions(+), 3 deletions(-)
+Changes in v2:
+- move to dir drivers/power/reset/
+- make syscon-reboot-mode a generic driver
 
-diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
-index 231bb25..0f624d1 100644
---- a/arch/arm/mach-imx/anatop.c
-+++ b/arch/arm/mach-imx/anatop.c
-@@ -129,7 +129,14 @@ void __init imx_init_revision_from_anatop(void)
+Changes in v1:
+- fix the embarrassed compile warning
+- correct the maskrom magic number
+- check for the normal reboot
+
+ drivers/power/reset/Kconfig              |  16 +++++
+ drivers/power/reset/Makefile             |   2 +
+ drivers/power/reset/reboot-mode.c        | 105 +++++++++++++++++++++++++++++++
+ drivers/power/reset/reboot-mode.h        |   6 ++
+ drivers/power/reset/syscon-reboot-mode.c |  64 +++++++++++++++++++
+ 5 files changed, 193 insertions(+)
+ create mode 100644 drivers/power/reset/reboot-mode.c
+ create mode 100644 drivers/power/reset/reboot-mode.h
+ create mode 100644 drivers/power/reset/syscon-reboot-mode.c
+
+diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+index 1131cf7..2e6d873 100644
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -173,5 +173,21 @@ config POWER_RESET_ZX
+ 	help
+ 	  Reboot support for ZTE SoCs.
  
- 	switch (digprog & 0xff) {
- 	case 0:
--		revision = IMX_CHIP_REVISION_1_0;
-+		/*
-+		 * For i.MX6QP, most of the code for i.MX6Q can be resued,
-+		 * so internally, we identify it as i.MX6Q Rev 2.0
-+		 */
-+		if (digprog >> 8 & 0x01)
-+			revision = IMX_CHIP_REVISION_2_0;
-+		else
-+			revision = IMX_CHIP_REVISION_1_0;
- 		break;
- 	case 1:
- 		revision = IMX_CHIP_REVISION_1_1;
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 3878494b..cb27d56 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -266,8 +266,11 @@ static void __init imx6q_init_machine(void)
- {
- 	struct device *parent;
++config REBOOT_MODE
++	tristate
++	depends on OF
++	help
++	 This driver will help to pass the system reboot mode
++	 to bootloader
++
++config SYSCON_REBOOT_MODE
++	bool "Generic SYSCON regmap reboot mode driver"
++	select REBOOT_MODE
++	help
++	 Say y here will enable reboot mode driver. This will
++	 get reboot mode arguments and store it in SYSCON mapped
++	 register, then the bootloader can read it to take different
++	 action according to the mode.
++
+ endif
  
--	imx_print_silicon_rev(cpu_is_imx6dl() ? "i.MX6DL" : "i.MX6Q",
--			      imx_get_soc_revision());
-+	if (cpu_is_imx6q() && imx_get_soc_revision() == IMX_CHIP_REVISION_2_0)
-+		imx_print_silicon_rev("i.MX6QP", IMX_CHIP_REVISION_1_0);
-+	else
-+		imx_print_silicon_rev(cpu_is_imx6dl() ? "i.MX6DL" : "i.MX6Q",
-+				imx_get_soc_revision());
- 
- 	parent = imx_soc_device_init();
- 	if (parent == NULL)
-@@ -399,6 +402,7 @@ static void __init imx6q_init_irq(void)
- static const char * const imx6q_dt_compat[] __initconst = {
- 	"fsl,imx6dl",
- 	"fsl,imx6q",
-+	"fsl,imx6qp",
- 	NULL,
- };
- 
+diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+index 096fa67..a63865b 100644
+--- a/drivers/power/reset/Makefile
++++ b/drivers/power/reset/Makefile
+@@ -20,3 +20,5 @@ obj-$(CONFIG_POWER_RESET_SYSCON) += syscon-reboot.o
+ obj-$(CONFIG_POWER_RESET_SYSCON_POWEROFF) += syscon-poweroff.o
+ obj-$(CONFIG_POWER_RESET_RMOBILE) += rmobile-reset.o
+ obj-$(CONFIG_POWER_RESET_ZX) += zx-reboot.o
++obj-$(CONFIG_REBOOT_MODE) += reboot-mode.o
++obj-$(CONFIG_SYSCON_REBOOT_MODE) += syscon-reboot-mode.o
+diff --git a/drivers/power/reset/reboot-mode.c b/drivers/power/reset/reboot-mode.c
+new file mode 100644
+index 0000000..69ba640
+--- /dev/null
++++ b/drivers/power/reset/reboot-mode.c
+@@ -0,0 +1,105 @@
++/*
++ * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++#include <linux/device.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/reboot.h>
++#include "reboot-mode.h"
++
++#define PREFIX "mode-"
++
++struct mode_info {
++	char mode[32];
++	int magic;
++	struct list_head list;
++};
++
++struct reboot_mode_driver {
++	struct list_head head;
++	int (*write)(int magic);
++	struct notifier_block reboot_notifier;
++};
++
++static int get_reboot_mode_magic(struct reboot_mode_driver *reboot,
++				 const char *cmd)
++{
++	const char *normal = "normal";
++	int magic = 0;
++	struct mode_info *info;
++
++	if (!cmd)
++		cmd = normal;
++
++	list_for_each_entry(info, &reboot->head, list) {
++		if (!strcmp(info->mode, cmd)) {
++			magic = info->magic;
++			break;
++		}
++	}
++
++	return magic;
++}
++
++static int reboot_mode_notify(struct notifier_block *this,
++			      unsigned long mode, void *cmd)
++{
++	struct reboot_mode_driver *reboot;
++	int magic;
++
++	reboot = container_of(this, struct reboot_mode_driver, reboot_notifier);
++	magic = get_reboot_mode_magic(reboot, cmd);
++	if (magic)
++		reboot->write(magic);
++
++	return NOTIFY_DONE;
++}
++
++int reboot_mode_register(struct device *dev, int (*write)(int))
++{
++	struct reboot_mode_driver *reboot;
++	struct mode_info *info;
++	struct property *prop;
++	size_t len = strlen(PREFIX);
++	int ret;
++
++	reboot = devm_kzalloc(dev, sizeof(*reboot), GFP_KERNEL);
++	if (!reboot)
++		return -ENOMEM;
++
++	reboot->write = write;
++	INIT_LIST_HEAD(&reboot->head);
++	for_each_property_of_node(dev->of_node, prop) {
++		if (len > strlen(prop->name) || strncmp(prop->name, PREFIX, len))
++			continue;
++		info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
++		if (!info)
++			return -ENOMEM;
++		strcpy(info->mode, prop->name + len);
++		if (of_property_read_u32(dev->of_node, prop->name, &info->magic)) {
++			dev_err(dev, "reboot mode %s without magic number\n",
++				info->mode);
++			devm_kfree(dev, info);
++			continue;
++		}
++		list_add_tail(&info->list, &reboot->head);
++	}
++	reboot->reboot_notifier.notifier_call = reboot_mode_notify;
++	ret = register_reboot_notifier(&reboot->reboot_notifier);
++	if (ret)
++		dev_err(dev, "can't register reboot notifier\n");
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(reboot_mode_register);
++
++MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com");
++MODULE_DESCRIPTION("System reboot mode driver");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/power/reset/reboot-mode.h b/drivers/power/reset/reboot-mode.h
+new file mode 100644
+index 0000000..44ed34f
+--- /dev/null
++++ b/drivers/power/reset/reboot-mode.h
+@@ -0,0 +1,6 @@
++#ifndef __REBOOT_MODE_H__
++#define __REBOOT_MODE_H__
++
++int reboot_mode_register(struct device *dev, int (*write)(int));
++
++#endif
+diff --git a/drivers/power/reset/syscon-reboot-mode.c b/drivers/power/reset/syscon-reboot-mode.c
+new file mode 100644
+index 0000000..8571df3
+--- /dev/null
++++ b/drivers/power/reset/syscon-reboot-mode.c
+@@ -0,0 +1,64 @@
++/*
++ * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/reboot.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
++#include "reboot-mode.h"
++
++static struct regmap *map;
++static u32 offset;
++static u32 mask = 0xffffffff;
++
++static int syscon_reboot_mode_write(int magic)
++{
++	regmap_update_bits(map, offset, mask, magic);
++
++	return 0;
++}
++
++static int syscon_reboot_mode_probe(struct platform_device *pdev)
++{
++	int ret;
++
++	map = syscon_node_to_regmap(pdev->dev.parent->of_node);
++	if (IS_ERR(map))
++		return PTR_ERR(map);
++	if (of_property_read_u32(pdev->dev.of_node, "offset", &offset))
++		return -EINVAL;
++	of_property_read_u32(pdev->dev.of_node, "mask", &mask);
++	ret = reboot_mode_register(&pdev->dev, syscon_reboot_mode_write);
++	if (ret)
++		dev_err(&pdev->dev, "can't register reboot mode\n");
++
++	return ret;
++}
++
++static const struct of_device_id syscon_reboot_mode_of_match[] = {
++	{ .compatible = "syscon-reboot-mode" },
++	{}
++};
++
++static struct platform_driver syscon_reboot_mode_driver = {
++	.probe = syscon_reboot_mode_probe,
++	.driver = {
++		.name = "syscon-reboot-mode",
++		.of_match_table = syscon_reboot_mode_of_match,
++	},
++};
++module_platform_driver(syscon_reboot_mode_driver);
++
++MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com");
++MODULE_DESCRIPTION("SYSCON reboot mode driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
