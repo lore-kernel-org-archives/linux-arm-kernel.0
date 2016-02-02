@@ -1,71 +1,88 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 2 Feb 2016 21:07:20 +0100
-Subject: [PATCH v2 10/21] arm64: KVM: VHE: Split save/restore of sysregs
- shared between EL1 and EL2
-In-Reply-To: <56B0D720.9000901@arm.com>
-References: <1453737235-16522-1-git-send-email-marc.zyngier@arm.com>
- <1453737235-16522-11-git-send-email-marc.zyngier@arm.com>
- <20160201135438.GL1478@cbox> <56B07ADD.60300@arm.com>
- <20160202154645.GE6190@cbox> <56B0D720.9000901@arm.com>
-Message-ID: <20160202200720.GH6190@cbox>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Tue, 2 Feb 2016 22:19:00 +0200
+Subject: [PATCH v2] pinctrl: mvebu: fix num_settings in mpp group
+ assignment
+In-Reply-To: <1454366903-7038-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1453844952-28292-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1454366903-7038-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20160202201900.GA1620@darkstar.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 02, 2016 at 04:19:44PM +0000, Marc Zyngier wrote:
-> On 02/02/16 15:46, Christoffer Dall wrote:
-> > On Tue, Feb 02, 2016 at 09:46:05AM +0000, Marc Zyngier wrote:
-> >> On 01/02/16 13:54, Christoffer Dall wrote:
-> >>> On Mon, Jan 25, 2016 at 03:53:44PM +0000, Marc Zyngier wrote:
-> >>>> A handful of system registers are still shared between EL1 and EL2,
-> >>>> even while using VHE. These are tpidr*_el[01], actlr_el1, sp0, elr,
-> >>>> and spsr.
-> >>>
-> >>> So by shared registers you mean registers that do both have an EL0/1
-> >>> version as well as an EL2 version, but where accesses aren't rewritten
-> >>> transparently?
-> >>
-> >> No, I mean that these registers do *not* have a separate banked version.
-> >> There is only a single set of registers, which have to be save/restored
-> >> the old way.
-> > 
-> > huh, ARMv8 clearly specifies the existence of TPIDR_EL0, TPIDR_EL1, and
-> > TPIDR_EL2, for example.
-> > 
-> > I cannot seem to find anywhere in the VHE spec that says that the
-> > TPIDR_EL2 goes away.  I'm confused now.
-> 
-> Nothing goes away, but these registers do not get renamed either. For
-> example, TPIDR_EL1 doesn't magically access TPIDR_EL2 when running at
-> EL2+VHE, and there is no TPIDR_EL12 accessor either.
-> 
-> So TPIDR_EL1 is effectively "shared" between host and guest, and must be
-> save/restored (note that the host kernel still uses TIPDR_EL1 even when
-> running with VHE, and that KVM still uses TPIDR_EL2 to cache the current
-> vcpu).
-> 
+Hi,
 
-ok, I can understand as long as we're saying a register is shared
-between the host and the guest, but it was the "registers are shared
-between EL1 and EL2" that threw me off.
-
-> >>
-> >>>
-> >>> also, by sp0 do you mean sp_el0, and by elr you mean elr_el1, and by
-> >>> spsr you mean spsr_el1 ?
-> >>
-> >> sp0 -> sp_el0 indeed. elr and spsr really are the guest PC and PSTATE,
-> >> so I should really reword this commit message, it is utterly confusing.
-> >>
-> > I guess I don't understand the definition of a 'shared' register given
-> > your comments here...
+On Mon, Feb 01, 2016 at 11:48:23PM +0100, Sebastian Hesselbarth wrote:
+> When assigning mpp settings from static mpp modes to mpp groups,
+> we do not want any groups that have no supported setting for a
+> specific Kirkwood variant. However, when there is at least a
+> single supported setting, we need to assign the number of all
+> settings in this mode to grp->num_settings as we are reusing
+> the static modes table.
 > 
-> Does this make it clearer?
+> Fixes: 0581b16b1840 ("pinctrl: mvebu: complain about missing group after checking variant")
+> Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> --
+> Changelog:
+> v1->v2:
+> - Chose a less intrusive fix by adding supp_settings variable
+>   instead of looping over the settings twice.
 > 
-yes.  You could change the host to path it when using VHE to use
-TPIDR_EL2 if you wanted and store the vcpu pointer on the stack while
-running the guest, but there's probably no real benefit of doing so.
+> Aaro, Linus,
+> 
+> I prefer this less intrusive fix in favor of v1.
+> 
+> @Aaro: Can you please test again?
 
-I'll be shutting up now...
+Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
 
-Thanks,
--Christoffer
+A.
+
+> 
+> Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  drivers/pinctrl/mvebu/pinctrl-mvebu.c | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+> index e4d473811bb3..3ef798fac81b 100644
+> --- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+> +++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+> @@ -666,16 +666,19 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+>  		struct mvebu_mpp_ctrl_setting *set = &mode->settings[0];
+>  		struct mvebu_pinctrl_group *grp;
+>  		unsigned num_settings;
+> +		unsigned supp_settings;
+>  
+> -		for (num_settings = 0; ; set++) {
+> +		for (num_settings = 0, supp_settings = 0; ; set++) {
+>  			if (!set->name)
+>  				break;
+>  
+> +			num_settings++;
+> +
+>  			/* skip unsupported settings for this variant */
+>  			if (pctl->variant && !(pctl->variant & set->variant))
+>  				continue;
+>  
+> -			num_settings++;
+> +			supp_settings++;
+>  
+>  			/* find gpio/gpo/gpi settings */
+>  			if (strcmp(set->name, "gpio") == 0)
+> @@ -688,7 +691,7 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+>  		}
+>  
+>  		/* skip modes with no settings for this variant */
+> -		if (!num_settings)
+> +		if (!supp_settings)
+>  			continue;
+>  
+>  		grp = mvebu_pinctrl_find_group_by_pid(pctl, mode->pid);
+> -- 
+> 2.1.4
+> 
