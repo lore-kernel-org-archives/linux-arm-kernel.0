@@ -1,76 +1,75 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 2 Feb 2016 21:24:41 +0100
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <Pine.LNX.4.44L0.1602021112320.1653-100000@iolanthe.rowland.org>
-References: <CAPDyKFqQb+jtTpZbq6EvbfAk28yVkgdtiOswngNH_BjCWBDxFg@mail.gmail.com>
- <Pine.LNX.4.44L0.1602021112320.1653-100000@iolanthe.rowland.org>
-Message-ID: <CAPDyKFokWcLSCAh_TX-j-df_M1hN8Qw1gbQt--SyWccGCPiN5Q@mail.gmail.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Tue, 2 Feb 2016 23:41:56 +0300
+Subject: [PATCH 1/5] all: s390: move wrapper infrastructure to generic
+ headers
+In-Reply-To: <20160202195434.GA3397@osiris>
+References: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
+ <1453741047-5498-2-git-send-email-ynorov@caviumnetworks.com>
+ <20160128121618.GB5418@osiris> <20160128163109.GA8529@yury-N73SV>
+ <20160201114251.GB973@yury-N73SV> <20160202073913.GB3990@osiris>
+ <20160202154331.GA3003@yury-N73SV> <20160202160826.GF3990@osiris>
+ <20160202195434.GA3397@osiris>
+Message-ID: <20160202204156.GA27290@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+On Tue, Feb 02, 2016 at 08:54:34PM +0100, Heiko Carstens wrote:
+> Hi Yury,
+> 
+> On Tue, Feb 02, 2016 at 05:08:26PM +0100, Heiko Carstens wrote:
+> > See e.g. 485d52768685 ("sys_personality: change sys_personality() to accept
+> > "unsigned int" instead of u_long") would have been a candidate which could
+> > silently break architectures which need compat wrappers.
+> 
+> Ok, this example is of course wrong. But now I can claim that also somebody
+> who should know better makes these mistakes.. :)
+> 
 
->>
->> Your observations is correct. The hardware will be kept active
->> in-between the probe attempts (and thus also if probing fails).
->> Although, that's not a regression as that's the behaviour you get from
->> runtime PM, when drivers are implemented like omap_hsmmc.
->
-> Perhaps this is what we should do.  If probing gets deferred a few
-> times, doing runtime suspends and resumes in between will be a waste of
-> time.
+Yep, this is a bad example. :) Moreover, this patch is coming from year 2010,
+and it shows how stable the syscall ABI is.
 
-Then you will have to distinguish between -EPROBE_DEFER and other
-errors, as I think leaving the device fully powered from a permanent
-failed probe isn't very good.
+> > > I don't know much about s390 specifics. Maybe because of that I do not
+> > > understand completely your worries. I'm OK with both 1st and 2nd
+> > > version, but I'd choose 2nd one because it allows inlines, and we
+> > > don't need the compat_wrapper.c.
+> > 
+> > It would be only nicer if we can guarentee correctness all the time. That
+> > being said I'm about to revert my own commit :)
+> > 
+> > So if you want to go without compat_wrapper.c then we should have a
+> > solution which will do the right thing all the time without that a system
+> > call author has to know about the sign and zero extension issue some
+> > architectures face. It _will_ go wrong.
+> 
+> So I think I can summarize my point to: if you can enforce correctness, why
+> shouldn't you do it if the performance impact is only a single instruction.
 
-Anyway, for sure it's doable by the driver, but let's try to focus on
-the regression here for now.
+For aarch64 it's 5 instructions. But what's more important (if ever),
+another wrapper takes another i-cache line...
+        <compat_SyS_ftruncate>:
+        stp     x29, x30, [sp,#-16]!
+        mov     x29, sp
+        bl      d40 <do_sys_ftruncate.constprop.3>
+        ldp     x29, x30, [sp],#16
+        ret
 
->
->> Instead of the suggested approaches, I think the regression should be
->> fixed at the PM domain level (omap hwmod). I have attached a patch
->> below, please give it try as it's untested.
->>
->> To solve the other problem (allowing devices to become inactive
->> in-between at probe failures), I see two options (not treated as
->> regressions).
->> 1)
->> Change the behaviour of pm_runtime_put_sync(), to *not* respect the
->> autosuspend mode.
->> I think I prefer this option, as it seems like autosuspend should be
->> respected only via the asynchronous runtime PM APIs.
->
-> ?  pm_runtime_put_sync() _already_ does not respect the autosuspend
-> mode.  If you want to respect it, you have to call
-> pm_runtime_put_sync_autosuspend() instead.
+> 
+> However I'll try to write an addon patch to your patch series. Maybe we can
+> still get rid of compat_wrapper.c in a way which makes both of us happy.
+> Also.. the idea with the alias names for compat wrappers does seem to have
+> the disadvantage that it will pollute /proc/kallsyms for example.
+> 
+> Anyway, I'm not sure if I will be able to come up with something this week
+> though.
 
-Then there's a bug in the runtime PM core.
+Great, I'm looking forward...
 
->From Tony's regression report and from mine own local runtime PM test
-driver, I can see that the device doesn't get RPM_SUSPENDED (the
-->runtime_suspend() callback isn't called), even when the usage count
-is zero - when pm_runtime_put_sync() is called.
-
-To find the sequence of runtime PM commands, go ahead an have look in
-the omap_hsmmc driver. The problem occurs when the driver bails out in
-probe, when it receives -EPROBE_DEFER when fetching regulators.
-
-I have some more data to share on this problem from my runtime PM test
-driver. I will try my best to share it tomorrow.
-
->
->> 2)
->> Change the failing drivers, to before calling pm_runtime_put_sync()
->> also invoke pm_runtime_dont_use_autosusend(). Or other similar
->> approach.
->
-> Given the above, this seems unnecessary.
-
-Okay, so you are saying that the pm_runtime_put_sync() should idle the
-device even if autosuspend is in use. That seems reasonable, I will
-look into this problem.
-
-Kind regards
-Uffe
+My point is. Syscall ABI is so stable and so important that too much
+people are involved in development and testing of it. So automatic
+checks are almost useless, as all bugs will be found during
+development and review. I think, community is able to pay enough
+attention to review a couple of such patches per decade.
+But I'm OK with some automatic checker, if it will be :
+ - not too complicated, as complex code makes bugs by itself;
+ - not too expensive;
+ - not too ugly (my one is definitely ugly).
