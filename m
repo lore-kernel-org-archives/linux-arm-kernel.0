@@ -1,150 +1,70 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 2 Feb 2016 15:37:22 +0800
-Subject: [PATCH 14/14] ARM: dts: sun8i: Add A83T based Sinovoip Bpi-M3
- Board
-In-Reply-To: <1454203266-4450-15-git-send-email-vishnupatekar0510@gmail.com>
-References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
- <1454203266-4450-15-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <CAGb2v65BwAcT8920WXt7dBjNx4zjycw2Ea+sNZrm0aM_3JA8pA@mail.gmail.com>
+From: heiko.carstens@de.ibm.com (Heiko Carstens)
+Date: Tue, 2 Feb 2016 08:39:13 +0100
+Subject: [PATCH 1/5] all: s390: move wrapper infrastructure to generic
+ headers
+In-Reply-To: <20160201114251.GB973@yury-N73SV>
+References: <1453741047-5498-1-git-send-email-ynorov@caviumnetworks.com>
+ <1453741047-5498-2-git-send-email-ynorov@caviumnetworks.com>
+ <20160128121618.GB5418@osiris> <20160128163109.GA8529@yury-N73SV>
+ <20160201114251.GB973@yury-N73SV>
+Message-ID: <20160202073913.GB3990@osiris>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 31, 2016 at 9:21 AM, Vishnu Patekar
-<vishnupatekar0510@gmail.com> wrote:
-> This patch adds support for Sinovoip BPI-M3 A83T based board.
->
-> It has 2G LPDDR3, UART, ethernet, USB, HDMI, USB Sata, MIPI DSI,
-> mic, AP6212 Wifi, etc on it.
-> It is paired with AXP813 PMIC which is almost same as AXP818.
->
-> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
-> ---
->  arch/arm/boot/dts/Makefile                       |  1 +
->  arch/arm/boot/dts/sun8i-a83t-sinovoip-bpi-m3.dts | 88 ++++++++++++++++++++++++
->  2 files changed, 89 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun8i-a83t-sinovoip-bpi-m3.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 58e461a..c0dd016 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -694,6 +694,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
->         sun8i-a33-sinlinx-sina33.dtb \
->         sun8i-a83t-allwinner-h8homlet-v2.dtb \
->         sun8i-a83t-cubietruck-plus.dtb \
-> +       sun8i-a83t-sinovoip-bpi-m3.dtb \
->         sun8i-h3-orangepi-plus.dtb
->  dtb-$(CONFIG_MACH_SUN9I) += \
->         sun9i-a80-optimus.dtb \
-> diff --git a/arch/arm/boot/dts/sun8i-a83t-sinovoip-bpi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-sinovoip-bpi-m3.dts
-> new file mode 100644
-> index 0000000..fecc7dc
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun8i-a83t-sinovoip-bpi-m3.dts
-> @@ -0,0 +1,88 @@
-> +/*
-> + * Copyright 2015 Vishnu Patekar
+On Mon, Feb 01, 2016 at 02:42:51PM +0300, Yury Norov wrote:
+> Hi Heiko,
+> 
+> I tried this idea, and I don't like what happened.
+>  - Wrappers around safe syscalls does exist. We can remove it by
+>    overcomplicating __SC_COMPAT_CAST, but I don't like it.
+>  - We still need to declare numerous list of new compat syscalls.
+>    And it becomes even bigger, as we need to declare all compat
+>    syscall versions not declared in include/linux/compat.h already.
+>    (Currently - only for unsafe syscalls.)
+>  - 'Weak' trick doesn't work for the whole kernel, so we'd figure out
+>    some new prefix for wrapped syscalls. Or declare all non-compat
+>    syscalls explicitly with SYSCALL_COMPAT_DEFINE. So the list of
+>    replacements grow. And for me, it's harder to explain why we are
+>    wrapping safe syscalls. Or we introduce another bunch of useless
+>    wrappers (with new prefix), and have to handle it in non-compat code.
+>  - With all listed above, we move all wrapper logic to non-compat
+>    'include/linux/syscalls.h' header. Which is not a good idea, if it
+>    doesn't benefit us much in return.
+> 
+> > > No need to look up if a compat variant (or wrapper) exists or
+> > > sys_<syscallname> should be used instead. Also no possibility for security
+> > > bugs that could creep in because SYSCALL_DEFINE has been used instead of
+> > > SYSCALL_DEFINE_WRAP.
+> 
+> I thought again about it. With current version, it's very easy to
+> define whether we have wrapper or not - just by macro we use. Once
+> reviewed, this list is hardly to be changed frequently. If someone is
+> introducing new syscall, it will attract much attention, so security
+> risk is minimal.
+> 
+> Maybe I missed some elegant implementation, and if so  I'll be happy
+> if someone'll point me out. But with what I see, I'd vote for what we
+> have now. (Plus description in docs, plus renaming new macro.)
 
-2016?
+Well, I'd like to have some proof by the compiler or linker that nothing
+went wrong. Which seems hard if only selected system call defines will be
+converted to the new defines.
 
-> + * Vishnu Patekar <vishnupatekar0510@gmail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "sun8i-a83t.dtsi"
-> +#include "sunxi-common-regulators.dtsi"
-> +
-> +/ {
-> +       model = "Sinovoip BananaPi M3 v1.2";
-> +       compatible = "sinovoip,bpi-m3", "allwinner,sun8i-a83t";
-> +
-> +       aliases {
-> +               serial0 = &uart0;
-> +       };
-> +
-> +       chosen {
-> +               stdout-path = "serial0:115200n8";
-> +       };
-> +};
-> +
-> +&pio {
-> +       mmc0_cd_pin_bpi_m3: mmc0_cd_pin at 0 {
-> +               allwinner,pins = "PF6";
-> +               allwinner,function = "gpio_in";
-> +               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +               allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-> +       };
+How can you tell that nothing has been forgotten?
 
-Maybe we should just put this in the .dtsi and call it
-"mmc0_cd_pin_reference_design"?
+Also, what happens if the prototype of a system call get's changed shortly
+after it was merged. We might miss such changes and have bugs.
 
-We have something similar for sun4i-a10.
+Therefore, and to get to a solution, I think we should stick with your
+first idea, which only moves the compat_wrapper.c file.
 
-> +};
-> +
-> +&mmc0 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bpi_m3>;
-> +       vmmc-supply = <&reg_vcc3v0>;
-> +       cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
-> +       bus-width = <4>;
-> +       cd-inverted;
-> +       status = "okay";
-> +};
-> +
-> +&uart0 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&uart0_pins_b>;
-> +       status = "okay";
-> +};
-> +
-> +&r_rsb {
+Before doing that I think you should actually revert this patch: my commit
+7681df456f97 ("s390/compat: remove superfluous compat wrappers") probably
+wasn't a very bright idea :)
 
-This goes before uart0.
+This again allows me to use only compat system calls in s390's system call
+table (execpt for system calls without parameters, but that can be easily
+fixed).
 
-> +       status = "okay";
-> +};
-
-What about eMMC?
-
-
-Thanks!
-ChenYu
+What I still don't like is that you need to add all the protoypes. Why are
+the system call tables actually written in C and not in asm?
