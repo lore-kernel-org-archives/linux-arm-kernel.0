@@ -1,151 +1,52 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  2 Feb 2016 12:46:24 +0000
-Subject: [PATCH 2/4] arm64: prefetch: add alternative pattern for CPUs without
- a prefetcher
-In-Reply-To: <1454417186-21828-1-git-send-email-will.deacon@arm.com>
-References: <1454417186-21828-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1454417186-21828-3-git-send-email-will.deacon@arm.com>
+Date: Tue,  2 Feb 2016 12:46:22 +0000
+Subject: [PATCH 0/4] copy_page improvements
+Message-ID: <1454417186-21828-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most CPUs have a hardware prefetcher which generally performs better
-without explicit prefetch instructions issued by software, however
-some CPUs (e.g. Cavium ThunderX) rely solely on explicit prefetch
-instructions.
+Hi all,
 
-This patch adds an alternative pattern (ARM64_HAS_NO_HW_PREFETCH) to
-allow our library code to make use of explicit prefetch instructions
-during things like copy routines only when the CPU does not have the
-capability to perform the prefetching itself.
+This patch series aims to improve our copy_page implementation on both
+CPUs with and without hardware prefetchers. It is inspired by a previous
+patch series from Andrew, and one of the patches is lifted directly from
+there:
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/cpufeature.h |  3 ++-
- arch/arm64/include/asm/cputype.h    | 17 ++++++++++++++++-
- arch/arm64/kernel/cpu_errata.c      | 18 +++---------------
- arch/arm64/kernel/cpufeature.c      | 17 +++++++++++++++++
- 4 files changed, 38 insertions(+), 17 deletions(-)
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/399132.html
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 8f271b83f910..8d56bd8550dc 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -30,8 +30,9 @@
- #define ARM64_HAS_LSE_ATOMICS			5
- #define ARM64_WORKAROUND_CAVIUM_23154		6
- #define ARM64_WORKAROUND_834220			7
-+#define ARM64_HAS_NO_HW_PREFETCH		8
- 
--#define ARM64_NCAPS				8
-+#define ARM64_NCAPS				9
- 
- #ifndef __ASSEMBLY__
- 
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index 1a5949364ed0..7540284a17fe 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -57,11 +57,22 @@
- #define MIDR_IMPLEMENTOR(midr)	\
- 	(((midr) & MIDR_IMPLEMENTOR_MASK) >> MIDR_IMPLEMENTOR_SHIFT)
- 
--#define MIDR_CPU_PART(imp, partnum) \
-+#define MIDR_CPU_MODEL(imp, partnum) \
- 	(((imp)			<< MIDR_IMPLEMENTOR_SHIFT) | \
- 	(0xf			<< MIDR_ARCHITECTURE_SHIFT) | \
- 	((partnum)		<< MIDR_PARTNUM_SHIFT))
- 
-+#define MIDR_CPU_MODEL_MASK (MIDR_IMPLEMENTOR_MASK | MIDR_PARTNUM_MASK | \
-+			     MIDR_ARCHITECTURE_MASK)
-+
-+#define MIDR_IS_CPU_MODEL_RANGE(midr, model, rv_min, rv_max)		\
-+({									\
-+	u32 _model = (midr) & MIDR_CPU_MODEL_MASK;			\
-+	u32 rv = (midr) & (MIDR_REVISION_MASK | MIDR_VARIANT_MASK);	\
-+									\
-+	_model == (model) && rv >= (rv_min) && rv <= (rv_max);		\
-+ })
-+
- #define ARM_CPU_IMP_ARM			0x41
- #define ARM_CPU_IMP_APM			0x50
- #define ARM_CPU_IMP_CAVIUM		0x43
-@@ -75,6 +86,10 @@
- 
- #define CAVIUM_CPU_PART_THUNDERX	0x0A1
- 
-+#define MIDR_CORTEX_A53 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
-+#define MIDR_CORTEX_A57 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
-+#define MIDR_THUNDERX	MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
-+
- #ifndef __ASSEMBLY__
- 
- /*
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index feb6b4efa641..e6bc988e8dbf 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -21,24 +21,12 @@
- #include <asm/cputype.h>
- #include <asm/cpufeature.h>
- 
--#define MIDR_CORTEX_A53 MIDR_CPU_PART(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
--#define MIDR_CORTEX_A57 MIDR_CPU_PART(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
--#define MIDR_THUNDERX	MIDR_CPU_PART(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
--
--#define CPU_MODEL_MASK (MIDR_IMPLEMENTOR_MASK | MIDR_PARTNUM_MASK | \
--			MIDR_ARCHITECTURE_MASK)
--
- static bool __maybe_unused
- is_affected_midr_range(const struct arm64_cpu_capabilities *entry)
- {
--	u32 midr = read_cpuid_id();
--
--	if ((midr & CPU_MODEL_MASK) != entry->midr_model)
--		return false;
--
--	midr &= MIDR_REVISION_MASK | MIDR_VARIANT_MASK;
--
--	return (midr >= entry->midr_range_min && midr <= entry->midr_range_max);
-+	return MIDR_IS_CPU_MODEL_RANGE(read_cpuid_id(), entry->midr_model,
-+				       entry->midr_range_min,
-+				       entry->midr_range_max);
- }
- 
- #define MIDR_RANGE(model, min, max) \
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 5c90aa490a2b..3615d7d7c9af 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -621,6 +621,18 @@ static bool has_useable_gicv3_cpuif(const struct arm64_cpu_capabilities *entry)
- 	return has_sre;
- }
- 
-+static bool has_no_hw_prefetch(const struct arm64_cpu_capabilities *entry)
-+{
-+	u32 midr = read_cpuid_id();
-+	u32 rv_min, rv_max;
-+
-+	/* Cavium ThunderX pass 1.x and 2.x */
-+	rv_min = 0;
-+	rv_max = (1 << MIDR_VARIANT_SHIFT) | MIDR_REVISION_MASK;
-+
-+	return MIDR_IS_CPU_MODEL_RANGE(midr, MIDR_THUNDERX, rv_min, rv_max);
-+}
-+
- static const struct arm64_cpu_capabilities arm64_features[] = {
- 	{
- 		.desc = "GIC system register CPU interface",
-@@ -651,6 +663,11 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.min_field_value = 2,
- 	},
- #endif /* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
-+	{
-+		.desc = "Software prefetching using PRFM",
-+		.capability = ARM64_HAS_NO_HW_PREFETCH,
-+		.matches = has_no_hw_prefetch,
-+	},
- 	{},
- };
- 
+Changes from that series:
+
+  * Applies on top of mainline
+  * Inverted the capability to the more generic ARM64_HAS_NO_HW_PREFETCH
+  * Re-jigged the MIDR detection to try to keep it simple
+
+I've left copy_template alone for now, since the template really deals
+with 64 bytes per iteration, which would need changing.
+
+Andrew -- it would be helpful if you could take this for a spin on
+ThunderX to make sure it didn't screw anything up.
+
+Cheers,
+
+Will
+
+--->8
+
+Andrew Pinski (1):
+  arm64: lib: patch in prfm for copy_page if requested
+
+Will Deacon (3):
+  arm64: prefetch: don't provide spin_lock_prefetch with LSE
+  arm64: prefetch: add alternative pattern for CPUs without a prefetcher
+  arm64: lib: improve copy_page to deal with 128 bytes at a time
+
+ arch/arm64/include/asm/cpufeature.h |  3 +-
+ arch/arm64/include/asm/cputype.h    | 17 +++++++++-
+ arch/arm64/include/asm/processor.h  |  7 +++--
+ arch/arm64/kernel/cpu_errata.c      | 18 ++---------
+ arch/arm64/kernel/cpufeature.c      | 17 ++++++++++
+ arch/arm64/lib/copy_page.S          | 63 ++++++++++++++++++++++++++++++++-----
+ 6 files changed, 98 insertions(+), 27 deletions(-)
+
 -- 
 2.1.4
