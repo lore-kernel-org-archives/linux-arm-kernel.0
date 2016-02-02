@@ -1,99 +1,391 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 2 Feb 2016 14:44:26 +0800
-Subject: [PATCH 10/14] ARM: dts: sun8i-a83t: Add PRCM related clocks and
- resets
-In-Reply-To: <1454203266-4450-11-git-send-email-vishnupatekar0510@gmail.com>
-References: <1454203266-4450-1-git-send-email-vishnupatekar0510@gmail.com>
- <1454203266-4450-11-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <CAGb2v67iO-816KaLttWRRPL2f7hpfgJ1--p69tD_oOrewmOjCA@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 2 Feb 2016 15:46:13 +0900
+Subject: [PATCH v4 05/13] arm64: kvm: allows kvm cpu hotplug
+In-Reply-To: <1453977766-20907-6-git-send-email-james.morse@arm.com>
+References: <1453977766-20907-1-git-send-email-james.morse@arm.com>
+ <1453977766-20907-6-git-send-email-james.morse@arm.com>
+Message-ID: <56B050B5.2070202@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 31, 2016 at 9:21 AM, Vishnu Patekar
-<vishnupatekar0510@gmail.com> wrote:
-> This adds A83T PRCM related clocks, clock resets.
+On 01/28/2016 07:42 PM, James Morse wrote:
+> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 >
-> As a83t apb0 gates clock support is added earlier, this enables it.
-> Apart from apb0 gates, other added clocks are compatible with
-> earlier sun8i socs.
+> The current kvm implementation on arm64 does cpu-specific initialization
+> at system boot, and has no way to gracefully shutdown a core in terms of
+> kvm. This prevents kexec from rebooting the system at EL2.
 >
-> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+> This patch adds a cpu tear-down function and also puts an existing cpu-init
+> code into a separate function, kvm_arch_hardware_disable() and
+> kvm_arch_hardware_enable() respectively.
+> We don't need the arm64 specific cpu hotplug hook any more.
+>
+> Since this patch modifies common code between arm and arm64, one stub
+> definition, __cpu_reset_hyp_mode(), is added on arm side to avoid
+> compilation errors.
+>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> [Moved __kvm_hyp_reset() to use kvm_call_hyp(), instead of having its own
+>   dedicated entry point in el1_sync. Added some comments and a tlbi.]
+> Signed-off-by: James Morse <james.morse@arm.com>
 > ---
->  arch/arm/boot/dts/sun8i-a83t.dtsi | 44 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
+> This patch is from v13 of kexec, see my [changes] above.
 >
-> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> index ac96aa1..5ea20ff 100644
-> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> @@ -268,6 +268,44 @@
->                                              "mmc2_output",
->                                              "mmc2_sample";
->                 };
-> +
-> +               cpus_clk: clk at 01f01400 {
-> +                       compatible = "allwinner,sun9i-a80-cpus-clk";
-> +                       reg = <0x01f01400 0x4>;
-> +                       #clock-cells = <0>;
-> +                       clocks = <&osc16Md512>, <&osc24M>, <&pll6>, <&osc16M>;
-> +                       clock-output-names = "cpus";
-> +               };
-> +
-> +               ahb0: ahb0_clk {
-> +                       compatible = "fixed-factor-clock";
-> +                       #clock-cells = <0>;
-> +                       clock-div = <1>;
-> +                       clock-mult = <1>;
-> +                       clocks = <&cpus_clk>;
-> +                       clock-output-names = "ahb0";
-> +               };
-> +
-> +               apb0: clk at 01f0140c {
-> +                       compatible = "allwinner,sun8i-a23-apb0-clk";
-
-This is actually wrong, as it is wrong in sun9i-a80.dtsi.
-I've sent a patch series for it.
-
-Also the drivers for "allwinner,sun9i-a80-cpus-clk" and
-"allwinner,sun9i-a80-apbs-clk"
-are only compiled for CONFIG_MACH_SUN9I. Please add a patch to address this.
-
-Regards
-ChenYu
-
-> +                       reg = <0x01f0140c 0x4>;
-> +                       #clock-cells = <0>;
-> +                       clocks = <&ahb0>;
-> +                       clock-output-names = "apb0";
-> +               };
-> +
-> +               apb0_gates: clk at 01f01428 {
-> +                       compatible = "allwinner,sun8i-a83t-apb0-gates-clk";
-> +                       reg = <0x01f01428 0x4>;
-> +                       #clock-cells = <1>;
-> +                       clocks = <&apb0>;
-> +                       clock-indices = <0>, <1>,
-> +                                       <2>, <3>,
-> +                                       <4>, <6>, <7>;
-> +                       clock-output-names = "apb0_pio", "apb0_ir",
-> +                                       "apb0_timer", "apb0_rsb",
-> +                                       "apb0_uart", "apb0_i2c0", "apb0_twd";
-> +               };
->         };
+>   arch/arm/include/asm/kvm_host.h   | 10 +++-
+>   arch/arm/include/asm/kvm_mmu.h    |  1 +
+>   arch/arm/kvm/arm.c                | 98 ++++++++++++++++++++++++---------------
+>   arch/arm/kvm/mmu.c                |  5 ++
+>   arch/arm64/include/asm/kvm_host.h |  1 -
+>   arch/arm64/include/asm/kvm_mmu.h  | 19 ++++++++
+>   arch/arm64/kvm/hyp-init.S         | 42 +++++++++++++++++
+>   7 files changed, 136 insertions(+), 40 deletions(-)
 >
->         soc {
-> @@ -434,5 +472,11 @@
->                         #interrupt-cells = <3>;
->                         interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
->                 };
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index f9f27792d8ed..8af531d64771 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -220,6 +220,15 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+>   	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+>   }
+>
+> +static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
+> +					phys_addr_t phys_idmap_start)
+> +{
+> +	/*
+> +	 * TODO
+> +	 * kvm_call_reset(boot_pgd_ptr, phys_idmap_start);
+> +	 */
+> +}
 > +
-> +               apb0_reset: reset at 01f014b0 {
-> +                       reg = <0x01f014b0 0x4>;
-> +                       compatible = "allwinner,sun6i-a31-clock-reset";
-> +                       #reset-cells = <1>;
-> +               };
->         };
->  };
-> --
-> 1.9.1
+>   static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+>   {
+>   	return 0;
+> @@ -232,7 +241,6 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+>
+>   struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+>
+> -static inline void kvm_arch_hardware_disable(void) {}
+>   static inline void kvm_arch_hardware_unsetup(void) {}
+>   static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>   static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index a520b7987a29..4fd9ddb48c0f 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -66,6 +66,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
+>   phys_addr_t kvm_mmu_get_httbr(void);
+>   phys_addr_t kvm_mmu_get_boot_httbr(void);
+>   phys_addr_t kvm_get_idmap_vector(void);
+> +phys_addr_t kvm_get_idmap_start(void);
+>   int kvm_mmu_init(void);
+>   void kvm_clear_hyp_idmap(void);
+>
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index dda1959f0dde..f060567e9c0a 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -16,7 +16,6 @@
+>    * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+>    */
+>
+> -#include <linux/cpu.h>
+>   #include <linux/cpu_pm.h>
+>   #include <linux/errno.h>
+>   #include <linux/err.h>
+> @@ -65,6 +64,8 @@ static DEFINE_SPINLOCK(kvm_vmid_lock);
+>
+>   static bool vgic_present;
+>
+> +static DEFINE_PER_CPU(unsigned char, kvm_arm_hardware_enabled);
+> +
+>   static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+>   {
+>   	BUG_ON(preemptible());
+> @@ -89,11 +90,6 @@ struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void)
+>   	return &kvm_arm_running_vcpu;
+>   }
+>
+> -int kvm_arch_hardware_enable(void)
+> -{
+> -	return 0;
+> -}
+> -
+>   int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu)
+>   {
+>   	return kvm_vcpu_exiting_guest_mode(vcpu) == IN_GUEST_MODE;
+> @@ -585,7 +581,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>   		/*
+>   		 * Re-check atomic conditions
+>   		 */
+> -		if (signal_pending(current)) {
+> +		if (unlikely(!__this_cpu_read(kvm_arm_hardware_enabled))) {
+> +			/* cpu has been torn down */
+> +			ret = 0;
+> +			run->exit_reason = KVM_EXIT_FAIL_ENTRY;
+> +			run->fail_entry.hardware_entry_failure_reason
+> +					= (u64)-ENOEXEC;
+> +		} else if (signal_pending(current)) {
+>   			ret = -EINTR;
+>   			run->exit_reason = KVM_EXIT_INTR;
+>   		}
+> @@ -967,7 +969,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
+>   	}
+>   }
+>
+> -static void cpu_init_hyp_mode(void *dummy)
+> +static void cpu_init_hyp_mode(void)
+>   {
+>   	phys_addr_t boot_pgd_ptr;
+>   	phys_addr_t pgd_ptr;
+> @@ -989,36 +991,61 @@ static void cpu_init_hyp_mode(void *dummy)
+>   	kvm_arm_init_debug();
+>   }
+>
+> -static int hyp_init_cpu_notify(struct notifier_block *self,
+> -			       unsigned long action, void *cpu)
+> +static void cpu_reset_hyp_mode(void)
+>   {
+> -	switch (action) {
+> -	case CPU_STARTING:
+> -	case CPU_STARTING_FROZEN:
+> -		if (__hyp_get_vectors() == hyp_default_vectors)
+> -			cpu_init_hyp_mode(NULL);
+> -		break;
+> +	phys_addr_t boot_pgd_ptr;
+> +	phys_addr_t phys_idmap_start;
+> +
+> +	boot_pgd_ptr = kvm_mmu_get_boot_httbr();
+> +	phys_idmap_start = kvm_get_idmap_start();
+> +
+> +	__cpu_reset_hyp_mode(boot_pgd_ptr, phys_idmap_start);
+> +}
+> +
+> +int kvm_arch_hardware_enable(void)
+> +{
+> +	if (!__this_cpu_read(kvm_arm_hardware_enabled)) {
+> +		cpu_init_hyp_mode();
+> +		__this_cpu_write(kvm_arm_hardware_enabled, 1);
+>   	}
+>
+> -	return NOTIFY_OK;
+> +	return 0;
+>   }
+>
+> -static struct notifier_block hyp_init_cpu_nb = {
+> -	.notifier_call = hyp_init_cpu_notify,
+> -};
+> +void kvm_arch_hardware_disable(void)
+> +{
+> +	if (!__this_cpu_read(kvm_arm_hardware_enabled))
+> +		return;
+> +
+> +	cpu_reset_hyp_mode();
+> +	__this_cpu_write(kvm_arm_hardware_enabled, 0);
+> +}
+>
+>   #ifdef CONFIG_CPU_PM
+>   static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
+>   				    unsigned long cmd,
+>   				    void *v)
+>   {
+> -	if (cmd == CPU_PM_EXIT &&
+> -	    __hyp_get_vectors() == hyp_default_vectors) {
+> -		cpu_init_hyp_mode(NULL);
+> +	/*
+> +	 * kvm_arm_hardware_enabled is left with its old value over
+> +	 * PM_ENTER->PM_EXIT. It is used to indicate PM_EXIT should
+> +	 * re-enable hyp.
+> +	 */
+> +	switch (cmd) {
+> +	case CPU_PM_ENTER:
+> +		if (__this_cpu_read(kvm_arm_hardware_enabled))
+> +			cpu_reset_hyp_mode();
+> +
+> +		return NOTIFY_OK;
+> +	case CPU_PM_EXIT:
+> +		if (__this_cpu_read(kvm_arm_hardware_enabled))
+> +			cpu_init_hyp_mode();
+> +
+>   		return NOTIFY_OK;
+> -	}
+>
+> -	return NOTIFY_DONE;
+> +	default:
+> +		return NOTIFY_DONE;
+> +	}
+>   }
+>
+>   static struct notifier_block hyp_init_cpu_pm_nb = {
+> @@ -1122,14 +1149,20 @@ static int init_hyp_mode(void)
+>   	}
+>
+>   	/*
+> -	 * Execute the init code on each CPU.
+> +	 * Init this CPU temporarily to execute kvm_hyp_call()
+> +	 * during kvm_vgic_hyp_init().
+>   	 */
+> -	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
+> +	preempt_disable();
+> +	cpu_init_hyp_mode();
+>
+>   	/*
+>   	 * Init HYP view of VGIC
+>   	 */
+>   	err = kvm_vgic_hyp_init();
+> +
+> +	cpu_reset_hyp_mode();
+> +	preempt_enable();
+> +
+>   	switch (err) {
+>   	case 0:
+>   		vgic_present = true;
+> @@ -1213,26 +1246,15 @@ int kvm_arch_init(void *opaque)
+>   		}
+>   	}
+>
+> -	cpu_notifier_register_begin();
+> -
+>   	err = init_hyp_mode();
+>   	if (err)
+>   		goto out_err;
+>
+> -	err = __register_cpu_notifier(&hyp_init_cpu_nb);
+> -	if (err) {
+> -		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
+> -		goto out_err;
+> -	}
+> -
+> -	cpu_notifier_register_done();
+> -
+>   	hyp_cpu_pm_init();
+>
+>   	kvm_coproc_table_init();
+>   	return 0;
+>   out_err:
+> -	cpu_notifier_register_done();
+>   	return err;
+>   }
+>
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index aba61fd3697a..7a3aed62499a 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -1643,6 +1643,11 @@ phys_addr_t kvm_get_idmap_vector(void)
+>   	return hyp_idmap_vector;
+>   }
+>
+> +phys_addr_t kvm_get_idmap_start(void)
+> +{
+> +	return hyp_idmap_start;
+> +}
+> +
+>   int kvm_mmu_init(void)
+>   {
+>   	int err;
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 689d4c95e12f..7d6d75616fb5 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -332,7 +332,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+>   		     hyp_stack_ptr, vector_ptr);
+>   }
+>
+> -static inline void kvm_arch_hardware_disable(void) {}
+>   static inline void kvm_arch_hardware_unsetup(void) {}
+>   static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>   static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 736433912a1e..1d48208a904a 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -99,6 +99,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
+>   phys_addr_t kvm_mmu_get_httbr(void);
+>   phys_addr_t kvm_mmu_get_boot_httbr(void);
+>   phys_addr_t kvm_get_idmap_vector(void);
+> +phys_addr_t kvm_get_idmap_start(void);
+>   int kvm_mmu_init(void);
+>   void kvm_clear_hyp_idmap(void);
+>
+> @@ -310,5 +311,23 @@ static inline unsigned int kvm_get_vmid_bits(void)
+>   	return (cpuid_feature_extract_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
+>   }
+>
+> +void __kvm_hyp_reset(phys_addr_t boot_pgd_ptr, phys_addr_t phys_idmap_start);
+> +
+> +/*
+> + * Call reset code, and switch back to stub hyp vectors. We need to execute
+> + * __kvm_hyp_reset() from the trampoline page, we calculate its address here.
+> + */
+> +static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
+> +					phys_addr_t phys_idmap_start)
+> +{
+> +	unsigned long trampoline_hyp_reset;
+> +
+> +	trampoline_hyp_reset = TRAMPOLINE_VA +
+> +			       ((unsigned long)__kvm_hyp_reset & ~PAGE_MASK);
+> +
+> +	kvm_call_hyp((void *)trampoline_hyp_reset,
+> +		     boot_pgd_ptr, phys_idmap_start);
+> +}
+> +
+
+I want to place this definition in kvm_host.h as its counterpart, __cpu_init_hyp_mode().
+
+-Takahiro AKASHI
+
+>   #endif /* __ASSEMBLY__ */
+>   #endif /* __ARM64_KVM_MMU_H__ */
+> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+> index dc6335a7353e..d20d86c7f9d8 100644
+> --- a/arch/arm64/kvm/hyp-init.S
+> +++ b/arch/arm64/kvm/hyp-init.S
+> @@ -150,6 +150,48 @@ merged:
+>   	eret
+>   ENDPROC(__kvm_hyp_init)
+>
+> +	/*
+> +	 * x0: HYP boot pgd
+> +	 * x1: HYP phys_idmap_start
+> +	 */
+> +ENTRY(__kvm_hyp_reset)
+> +	/*
+> +	 * Retrieve lr from the stack (pushed by el1_sync()), so we can eret
+> +	 * from here.
+> +	 */
+> +	ldp	lr, xzr, [sp], #16
+> +
+> +	/* We're in trampoline code in VA, switch back to boot page tables */
+> +	msr	ttbr0_el2, x0
+> +	isb
+> +
+> +	/* Ensure the PA branch doesn't find a stale tlb entry. */
+> +	tlbi	alle2
+> +	dsb	sy
+> +
+> +	/* Branch into PA space */
+> +	adr	x0, 1f
+> +	bfi	x1, x0, #0, #PAGE_SHIFT
+> +	br	x1
+> +
+> +	/* We're now in idmap, disable MMU */
+> +1:	mrs	x0, sctlr_el2
+> +	ldr	x1, =SCTLR_ELx_FLAGS
+> +	bic	x0, x0, x1		// Clear SCTL_M and etc
+> +	msr	sctlr_el2, x0
+> +	isb
+> +
+> +	/* Invalidate the old TLBs */
+> +	tlbi	alle2
+> +	dsb	sy
+> +
+> +	/* Install stub vectors */
+> +	adr_l	x0, __hyp_stub_vectors
+> +	msr	vbar_el2, x0
+> +
+> +	eret
+> +ENDPROC(__kvm_hyp_reset)
+> +
+>   	.ltorg
+>
+>   	.popsection
 >
