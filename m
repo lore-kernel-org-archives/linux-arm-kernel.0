@@ -1,391 +1,291 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 2 Feb 2016 15:46:13 +0900
-Subject: [PATCH v4 05/13] arm64: kvm: allows kvm cpu hotplug
-In-Reply-To: <1453977766-20907-6-git-send-email-james.morse@arm.com>
-References: <1453977766-20907-1-git-send-email-james.morse@arm.com>
- <1453977766-20907-6-git-send-email-james.morse@arm.com>
-Message-ID: <56B050B5.2070202@linaro.org>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Tue, 2 Feb 2016 14:48:01 +0800
+Subject: [RFC 3/3] CMDQ: Mediatek CMDQ driver
+In-Reply-To: <CAGS+omB7d3Kq1DKNHxZJjLDmin0rpkDj1kEde3zCxTiT5-xZWw@mail.gmail.com>
+References: <1453266881-16849-1-git-send-email-hs.liao@mediatek.com>
+ <1453266881-16849-4-git-send-email-hs.liao@mediatek.com>
+ <CAGS+omBjD1pXKY_6bFbiGxa5bttvqg5zEvKevzSfoiMOy7ys6Q@mail.gmail.com>
+ <1454053150.32413.52.camel@mtksdaap41>
+ <CAGS+omBrEE21Xxh8hjcf32qfHJE0jJYvxGP6L1ihS6jcNbLvLQ@mail.gmail.com>
+ <1454070262.7401.21.camel@mtksdaap41>
+ <CAGS+omBhs7Ks7MVDsxHBBUdgF+0fmAa465HwvNiCzEe97Knt3Q@mail.gmail.com>
+ <1454292257.22270.3.camel@mtksdaap41>
+ <CAGS+omCzDisk2TfbDnWiXufWgUsCbhF_JFafaUazhSymX-MT_Q@mail.gmail.com>
+ <1454307624.22441.18.camel@mtksdaap41>
+ <CAGS+omB7d3Kq1DKNHxZJjLDmin0rpkDj1kEde3zCxTiT5-xZWw@mail.gmail.com>
+Message-ID: <1454395681.27603.13.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2016 07:42 PM, James Morse wrote:
-> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
->
-> The current kvm implementation on arm64 does cpu-specific initialization
-> at system boot, and has no way to gracefully shutdown a core in terms of
-> kvm. This prevents kexec from rebooting the system at EL2.
->
-> This patch adds a cpu tear-down function and also puts an existing cpu-init
-> code into a separate function, kvm_arch_hardware_disable() and
-> kvm_arch_hardware_enable() respectively.
-> We don't need the arm64 specific cpu hotplug hook any more.
->
-> Since this patch modifies common code between arm and arm64, one stub
-> definition, __cpu_reset_hyp_mode(), is added on arm side to avoid
-> compilation errors.
->
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> [Moved __kvm_hyp_reset() to use kvm_call_hyp(), instead of having its own
->   dedicated entry point in el1_sync. Added some comments and a tlbi.]
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
-> This patch is from v13 of kexec, see my [changes] above.
->
->   arch/arm/include/asm/kvm_host.h   | 10 +++-
->   arch/arm/include/asm/kvm_mmu.h    |  1 +
->   arch/arm/kvm/arm.c                | 98 ++++++++++++++++++++++++---------------
->   arch/arm/kvm/mmu.c                |  5 ++
->   arch/arm64/include/asm/kvm_host.h |  1 -
->   arch/arm64/include/asm/kvm_mmu.h  | 19 ++++++++
->   arch/arm64/kvm/hyp-init.S         | 42 +++++++++++++++++
->   7 files changed, 136 insertions(+), 40 deletions(-)
->
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index f9f27792d8ed..8af531d64771 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -220,6 +220,15 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
->   	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
->   }
->
-> +static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
-> +					phys_addr_t phys_idmap_start)
-> +{
-> +	/*
-> +	 * TODO
-> +	 * kvm_call_reset(boot_pgd_ptr, phys_idmap_start);
-> +	 */
-> +}
-> +
->   static inline int kvm_arch_dev_ioctl_check_extension(long ext)
->   {
->   	return 0;
-> @@ -232,7 +241,6 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
->
->   struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
->
-> -static inline void kvm_arch_hardware_disable(void) {}
->   static inline void kvm_arch_hardware_unsetup(void) {}
->   static inline void kvm_arch_sync_events(struct kvm *kvm) {}
->   static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index a520b7987a29..4fd9ddb48c0f 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -66,6 +66,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
->   phys_addr_t kvm_mmu_get_httbr(void);
->   phys_addr_t kvm_mmu_get_boot_httbr(void);
->   phys_addr_t kvm_get_idmap_vector(void);
-> +phys_addr_t kvm_get_idmap_start(void);
->   int kvm_mmu_init(void);
->   void kvm_clear_hyp_idmap(void);
->
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index dda1959f0dde..f060567e9c0a 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -16,7 +16,6 @@
->    * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
->    */
->
-> -#include <linux/cpu.h>
->   #include <linux/cpu_pm.h>
->   #include <linux/errno.h>
->   #include <linux/err.h>
-> @@ -65,6 +64,8 @@ static DEFINE_SPINLOCK(kvm_vmid_lock);
->
->   static bool vgic_present;
->
-> +static DEFINE_PER_CPU(unsigned char, kvm_arm_hardware_enabled);
-> +
->   static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
->   {
->   	BUG_ON(preemptible());
-> @@ -89,11 +90,6 @@ struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void)
->   	return &kvm_arm_running_vcpu;
->   }
->
-> -int kvm_arch_hardware_enable(void)
-> -{
-> -	return 0;
-> -}
-> -
->   int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu)
->   {
->   	return kvm_vcpu_exiting_guest_mode(vcpu) == IN_GUEST_MODE;
-> @@ -585,7 +581,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->   		/*
->   		 * Re-check atomic conditions
->   		 */
-> -		if (signal_pending(current)) {
-> +		if (unlikely(!__this_cpu_read(kvm_arm_hardware_enabled))) {
-> +			/* cpu has been torn down */
-> +			ret = 0;
-> +			run->exit_reason = KVM_EXIT_FAIL_ENTRY;
-> +			run->fail_entry.hardware_entry_failure_reason
-> +					= (u64)-ENOEXEC;
-> +		} else if (signal_pending(current)) {
->   			ret = -EINTR;
->   			run->exit_reason = KVM_EXIT_INTR;
->   		}
-> @@ -967,7 +969,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
->   	}
->   }
->
-> -static void cpu_init_hyp_mode(void *dummy)
-> +static void cpu_init_hyp_mode(void)
->   {
->   	phys_addr_t boot_pgd_ptr;
->   	phys_addr_t pgd_ptr;
-> @@ -989,36 +991,61 @@ static void cpu_init_hyp_mode(void *dummy)
->   	kvm_arm_init_debug();
->   }
->
-> -static int hyp_init_cpu_notify(struct notifier_block *self,
-> -			       unsigned long action, void *cpu)
-> +static void cpu_reset_hyp_mode(void)
->   {
-> -	switch (action) {
-> -	case CPU_STARTING:
-> -	case CPU_STARTING_FROZEN:
-> -		if (__hyp_get_vectors() == hyp_default_vectors)
-> -			cpu_init_hyp_mode(NULL);
-> -		break;
-> +	phys_addr_t boot_pgd_ptr;
-> +	phys_addr_t phys_idmap_start;
-> +
-> +	boot_pgd_ptr = kvm_mmu_get_boot_httbr();
-> +	phys_idmap_start = kvm_get_idmap_start();
-> +
-> +	__cpu_reset_hyp_mode(boot_pgd_ptr, phys_idmap_start);
-> +}
-> +
-> +int kvm_arch_hardware_enable(void)
-> +{
-> +	if (!__this_cpu_read(kvm_arm_hardware_enabled)) {
-> +		cpu_init_hyp_mode();
-> +		__this_cpu_write(kvm_arm_hardware_enabled, 1);
->   	}
->
-> -	return NOTIFY_OK;
-> +	return 0;
->   }
->
-> -static struct notifier_block hyp_init_cpu_nb = {
-> -	.notifier_call = hyp_init_cpu_notify,
-> -};
-> +void kvm_arch_hardware_disable(void)
-> +{
-> +	if (!__this_cpu_read(kvm_arm_hardware_enabled))
-> +		return;
-> +
-> +	cpu_reset_hyp_mode();
-> +	__this_cpu_write(kvm_arm_hardware_enabled, 0);
-> +}
->
->   #ifdef CONFIG_CPU_PM
->   static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
->   				    unsigned long cmd,
->   				    void *v)
->   {
-> -	if (cmd == CPU_PM_EXIT &&
-> -	    __hyp_get_vectors() == hyp_default_vectors) {
-> -		cpu_init_hyp_mode(NULL);
-> +	/*
-> +	 * kvm_arm_hardware_enabled is left with its old value over
-> +	 * PM_ENTER->PM_EXIT. It is used to indicate PM_EXIT should
-> +	 * re-enable hyp.
-> +	 */
-> +	switch (cmd) {
-> +	case CPU_PM_ENTER:
-> +		if (__this_cpu_read(kvm_arm_hardware_enabled))
-> +			cpu_reset_hyp_mode();
-> +
-> +		return NOTIFY_OK;
-> +	case CPU_PM_EXIT:
-> +		if (__this_cpu_read(kvm_arm_hardware_enabled))
-> +			cpu_init_hyp_mode();
-> +
->   		return NOTIFY_OK;
-> -	}
->
-> -	return NOTIFY_DONE;
-> +	default:
-> +		return NOTIFY_DONE;
-> +	}
->   }
->
->   static struct notifier_block hyp_init_cpu_pm_nb = {
-> @@ -1122,14 +1149,20 @@ static int init_hyp_mode(void)
->   	}
->
->   	/*
-> -	 * Execute the init code on each CPU.
-> +	 * Init this CPU temporarily to execute kvm_hyp_call()
-> +	 * during kvm_vgic_hyp_init().
->   	 */
-> -	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
-> +	preempt_disable();
-> +	cpu_init_hyp_mode();
->
->   	/*
->   	 * Init HYP view of VGIC
->   	 */
->   	err = kvm_vgic_hyp_init();
-> +
-> +	cpu_reset_hyp_mode();
-> +	preempt_enable();
-> +
->   	switch (err) {
->   	case 0:
->   		vgic_present = true;
-> @@ -1213,26 +1246,15 @@ int kvm_arch_init(void *opaque)
->   		}
->   	}
->
-> -	cpu_notifier_register_begin();
-> -
->   	err = init_hyp_mode();
->   	if (err)
->   		goto out_err;
->
-> -	err = __register_cpu_notifier(&hyp_init_cpu_nb);
-> -	if (err) {
-> -		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
-> -		goto out_err;
-> -	}
-> -
-> -	cpu_notifier_register_done();
-> -
->   	hyp_cpu_pm_init();
->
->   	kvm_coproc_table_init();
->   	return 0;
->   out_err:
-> -	cpu_notifier_register_done();
->   	return err;
->   }
->
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index aba61fd3697a..7a3aed62499a 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -1643,6 +1643,11 @@ phys_addr_t kvm_get_idmap_vector(void)
->   	return hyp_idmap_vector;
->   }
->
-> +phys_addr_t kvm_get_idmap_start(void)
-> +{
-> +	return hyp_idmap_start;
-> +}
-> +
->   int kvm_mmu_init(void)
->   {
->   	int err;
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 689d4c95e12f..7d6d75616fb5 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -332,7 +332,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
->   		     hyp_stack_ptr, vector_ptr);
->   }
->
-> -static inline void kvm_arch_hardware_disable(void) {}
->   static inline void kvm_arch_hardware_unsetup(void) {}
->   static inline void kvm_arch_sync_events(struct kvm *kvm) {}
->   static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index 736433912a1e..1d48208a904a 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -99,6 +99,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
->   phys_addr_t kvm_mmu_get_httbr(void);
->   phys_addr_t kvm_mmu_get_boot_httbr(void);
->   phys_addr_t kvm_get_idmap_vector(void);
-> +phys_addr_t kvm_get_idmap_start(void);
->   int kvm_mmu_init(void);
->   void kvm_clear_hyp_idmap(void);
->
-> @@ -310,5 +311,23 @@ static inline unsigned int kvm_get_vmid_bits(void)
->   	return (cpuid_feature_extract_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
->   }
->
-> +void __kvm_hyp_reset(phys_addr_t boot_pgd_ptr, phys_addr_t phys_idmap_start);
-> +
-> +/*
-> + * Call reset code, and switch back to stub hyp vectors. We need to execute
-> + * __kvm_hyp_reset() from the trampoline page, we calculate its address here.
-> + */
-> +static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
-> +					phys_addr_t phys_idmap_start)
-> +{
-> +	unsigned long trampoline_hyp_reset;
-> +
-> +	trampoline_hyp_reset = TRAMPOLINE_VA +
-> +			       ((unsigned long)__kvm_hyp_reset & ~PAGE_MASK);
-> +
-> +	kvm_call_hyp((void *)trampoline_hyp_reset,
-> +		     boot_pgd_ptr, phys_idmap_start);
-> +}
-> +
+On Mon, 2016-02-01 at 18:22 +0800, Daniel Kurtz wrote:
+> On Mon, Feb 1, 2016 at 2:20 PM, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
+> > On Mon, 2016-02-01 at 12:15 +0800, Daniel Kurtz wrote:
+> >> On Mon, Feb 1, 2016 at 10:04 AM, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
+> >> >
+> >> > On Fri, 2016-01-29 at 21:15 +0800, Daniel Kurtz wrote:
+> >> > > On Fri, Jan 29, 2016 at 8:24 PM, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
+> >> > > > On Fri, 2016-01-29 at 16:42 +0800, Daniel Kurtz wrote:
+> >> > > >> On Fri, Jan 29, 2016 at 3:39 PM, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
+> >> > > >> > Hi Dan,
+> >> > > >> >
+> >> > > >> > Many thanks for your comments and time.
+> >> > > >> > I reply my plan inline.
+> >> > > >> >
+> >> > > >> >
+> >> > > >> > On Thu, 2016-01-28 at 12:49 +0800, Daniel Kurtz wrote:
+> >> > > >> >> Hi HS,
+> >> > > >> >>
+> >> > > >> >> Sorry for the delay.  It is hard to find time to review a >3700 line
+> >> > > >> >> driver :-o in detail....
+> >> > > >> >>
+> >> > > >> >> Some review comments inline, although I still do not completely
+> >> > > >> >> understand how all that this driver does and how it works.
+> >> > > >> >> I'll try to find time to go through this driver in detail again next
+> >> > > >> >> time you post it for review.
+> >> > > >> >>
+> >> > > >> >> On Tue, Jan 19, 2016 at 9:14 PM,  <hs.liao@mediatek.com> wrote:
+> >> > > >> >> > From: HS Liao <hs.liao@mediatek.com>
+> >> > > >> >> >
+> >> > > >> >> > This patch is first version of Mediatek Command Queue(CMDQ) driver. The
+> >> > > >> >> > CMDQ is used to help read/write registers with critical time limitation,
+> >> > > >> >> > such as updating display configuration during the vblank. It controls
+> >> > > >> >> > Global Command Engine (GCE) hardware to achieve this requirement.
+> >> > > >> >> > Currently, CMDQ only supports display related hardwares, but we expect
+> >> > > >> >> > it can be extended to other hardwares for future requirements.
+> >> > > >> >> >
+> >> > > >> >> > Signed-off-by: HS Liao <hs.liao@mediatek.com>
+> >> > > >> >>
+> >> > > >> >> [snip]
+> >> > > >> >>
+> >> > > >> >> > diff --git a/drivers/soc/mediatek/mtk-cmdq.c b/drivers/soc/mediatek/mtk-cmdq.c
+> >> > > >> >> > new file mode 100644
+> >> > > >> >> > index 0000000..7570f00
+> >> > > >> >> > --- /dev/null
+> >> > > >> >> > +++ b/drivers/soc/mediatek/mtk-cmdq.c
+> >> > > >
+> >> > > > [snip]
+> >> > > >
+> >> > > >> >> > +static const struct cmdq_subsys g_subsys[] = {
+> >> > > >> >> > +       {0x1400, 1, "MMSYS"},
+> >> > > >> >> > +       {0x1401, 2, "DISP"},
+> >> > > >> >> > +       {0x1402, 3, "DISP"},
+> >> > > >> >>
+> >> > > >> >> This isn't going to scale.  These addresses could be different on
+> >> > > >> >> different chips.
+> >> > > >> >> Instead of a static table like this, we probably need specify to the
+> >> > > >> >> connection between gce and other devices via devicetree phandles, and
+> >> > > >> >> then use the phandles to lookup the corresponding device address
+> >> > > >> >> range.
+> >> > > >> >
+> >> > > >> > I will define them in device tree.
+> >> > > >> > E.g.
+> >> > > >> > cmdq {
+> >> > > >> >   reg_domain = 0x14000000, 0x14010000, 0x14020000
+> >> > > >> > }
+> >> > > >>
+> >> > > >> The devicetree should only model hardware relationships, not software
+> >> > > >> considerations.
+> >> > > >>
+> >> > > >> Is the hardware constraint here for using gce with various other
+> >> > > >> hardware blocks?  I think we already model this by only providing a
+> >> > > >> gce phandle in the device tree nodes for those devices that can use
+> >> > > >> gce.
+> >> > > >>
+> >> > > >> Looking at the driver closer, as far as I can tell, the whole subsys
+> >> > > >> concept is a purely software abstraction, and only used to debug the
+> >> > > >> CMDQ_CODE_WRITE command.  In fact, AFAICT, everything would work fine
+> >> > > >> if we just completely removed the 'subsys' concept, and just passed
+> >> > > >> through the raw address provided by the driver.
+> >> > > >>
+> >> > > >> So, I recommend just removing 'subsys' completely from the driver -
+> >> > > >> from this array, and in the masks.
+> >> > > >>
+> >> > > >> Instead, if there is an error on the write command, just print the
+> >> > > >> address that fails.  There are other ways to deduce the subsystem from
+> >> > > >> a physical address.
+> >> > > >>
+> >> > > >> Thanks,
+> >> > > >>
+> >> > > >> -Dan
+> >> > > >
+> >> > > > Hi Dan,
+> >> > > >
+> >> > > > Subsys is not just for debug.
+> >> > > > Its main purpose is to transfer CPU address to GCE address.
+> >> > > > Let me explain it by "write" op,
+> >> > > > I list a code segment from cmdq_rec_append_command().
+> >> > > >
+> >> > > >         case CMDQ_CODE_WRITE:
+> >> > > >                 subsys = cmdq_subsys_from_phys_addr(cqctx, arg_a);
+> >> > > >                 if (subsys < 0) {
+> >> > > >                         dev_err(dev,
+> >> > > >                                 "unsupported memory base address 0x%08x\n",
+> >> > > >                                 arg_a);
+> >> > > >                         return -EFAULT;
+> >> > > >                 }
+> >> > > >
+> >> > > >                 *cmd_ptr++ = arg_b;
+> >> > > >                 *cmd_ptr++ = (CMDQ_CODE_WRITE << CMDQ_OP_CODE_SHIFT) |
+> >> > > >                              (arg_a & CMDQ_ARG_A_WRITE_MASK) |
+> >> > > >                              ((subsys & CMDQ_SUBSYS_MASK) << CMDQ_SUBSYS_SHIFT);
+> >> > > >                 break;
+> >> > > >
+> >> > > > Subsys is mapped from physical address via cmdq_subsys_from_phys_addr(),
+> >> > > > and then it becomes part of GCE command via ((subsys & CMDQ_SUBSYS_MASK)
+> >> > > > << CMDQ_SUBSYS_SHIFT) .
+> >> > > > Only low bits of physical address are the same as GCE address.
+> >> > > > We can get it by (arg_a & CMDQ_ARG_A_WRITE_MASK).
+> >> > > > MASK is used to define how many bits are valid for this op.
+> >> > > > So, GCE address = subsys + valid low bits.
+> >> > >
+> >> > > How are these upper bits of the "GCE address" defined?
+> >> > > In other words, for a given SoC, how is the mapping between physical
+> >> > > io addresses to GCE addresses defined?
+> >> > > Is this mapping fixed by hardware?
+> >>
+> >> Please answer the detailed technical questions:
+> >>
+> >> How are these upper bits of the "GCE address" defined?
+> >
+> > A GCE command is arg_a + arg_b. Both of them have 32 bits length.
+> > arg_a is op + subsys + addr, and arg_b is value.
+> > subsys + addr is less than 32bits, so we need to map address range to
+> > subsys.
+> > The mapping rule is defined by hardware.
+> >
+> >> In other words, for a given SoC, how is the mapping between physical
+> >> io addresses to GCE addresses defined?
+> >
+> > It is (b).
+> >
+> >>
+> >> (a) Does the GCE remap a continuous device IO address range?
+> >>
+> >> AFAICT, the  defines an MT8173 specific mapping of:
+> >>
+> >> For example, the g_subsys table above seems to imply that the MT8173
+> >> gce maps all of:
+> >>   0x1400ffff:0x141fffff => 0x010000:0x1fffff
+> >>
+> >> (b) Or, are the upper 5 bits of the "gce address" significant, and via
+> >> hardware it can map a disjoint groups of device addresses into the
+> >> continuous GCE address space, and really there are 0x1f distinct 64k
+> >> mappings:
+> >>
+> >> mmsys (1) : 0x14000000:0x1400ffff => 0x010000:0x01ffff
+> >> disp  (2) : 0x14010000:0x1401ffff => 0x020000:0x02ffff
+> >> disp  (3) : 0x14020000:0x1402ffff => 0x030000:0x03ffff
+> >> ...
+> >> ???? (1f) : 0x141fffff:0x141fffff => 0x1f0000:0x1fffff
+> >>
+> >> If the mapping is fixed and continuous (a), then I think all we need
+> >> is a single dts entry for the gce node that describes how it performs
+> >> this mapping.  And then, the gce consumers can just pass in their
+> >> regular physical addresses, and the gce driver can remap them directly
+> >> to gce addresses.
+> >>
+> >> WDYT?
+> >
+> > How about this?
+> > hardware_module = <address_base subsys_id mask>;
+> > So, the result is
+> > mmsys_config_base = <0x14000000 1 0xffff0000>;
+> > disp_rdma_config_base = <0x14010000 2 0xffff0000>;
+> > disp_mutex_config_base = <0x14020000 3 0xffff0000>;
+> 
+> What uses ID 0 and 4 - 0x1f?
 
-I want to place this definition in kvm_host.h as its counterpart, __cpu_init_hyp_mode().
+Subsys is defined by GCE hardware, and other IDs are reserved currently.
 
--Takahiro AKASHI
+> According to mt8173.dtsi, here are the blocks in the address ranges above:
+> 
+> @1400:
+>   mmsys: clock-controller at 14000000
+>   ovl0: ovl at 1400c000
+>   ovl1: ovl at 1400d000
+>   rdma0: rdma at 1400e000
+>   rdma1: rdma at 1400f000
+> 
+> @1401:
+>   rdma2: rdma at 14010000
+>   wdma0: wdma at 14011000
+>   wdma1: wdma at 14012000
+>   color0: color at 14013000
+>   color1: color at 14014000
+>   aal at 14015000
+>   gamma at 14016000
+>   merge at 14017000
+>   split0: split at 14018000
+>   split1: split at 14019000
+>   ufoe at 1401a000
+>   dsi0: dsi at 1401b000
+>   dsi1: dsi at 1401c000
+>   dpi0: dpi at 1401d000
+>   pwm0: pwm at 1401e000
+>   pwm1: pwm at 1401f000
+> 
+> @1402:
+>   mutex: mutex at 14020000
+>   od at 14023000
+>   larb0: larb at 14021000
+>   smi_common: smi at 14022000
+>   hdmi0: hdmi at 14025000
+>   larb4: larb at 14027000
+> 
+> I assume that the gce will work with any of the devices in those
+> ranges, not just "mmsys", "rdma" and "mutex", right?   (Also, notice
 
->   #endif /* __ASSEMBLY__ */
->   #endif /* __ARM64_KVM_MMU_H__ */
-> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-> index dc6335a7353e..d20d86c7f9d8 100644
-> --- a/arch/arm64/kvm/hyp-init.S
-> +++ b/arch/arm64/kvm/hyp-init.S
-> @@ -150,6 +150,48 @@ merged:
->   	eret
->   ENDPROC(__kvm_hyp_init)
->
-> +	/*
-> +	 * x0: HYP boot pgd
-> +	 * x1: HYP phys_idmap_start
-> +	 */
-> +ENTRY(__kvm_hyp_reset)
-> +	/*
-> +	 * Retrieve lr from the stack (pushed by el1_sync()), so we can eret
-> +	 * from here.
-> +	 */
-> +	ldp	lr, xzr, [sp], #16
-> +
-> +	/* We're in trampoline code in VA, switch back to boot page tables */
-> +	msr	ttbr0_el2, x0
-> +	isb
-> +
-> +	/* Ensure the PA branch doesn't find a stale tlb entry. */
-> +	tlbi	alle2
-> +	dsb	sy
-> +
-> +	/* Branch into PA space */
-> +	adr	x0, 1f
-> +	bfi	x1, x0, #0, #PAGE_SHIFT
-> +	br	x1
-> +
-> +	/* We're now in idmap, disable MMU */
-> +1:	mrs	x0, sctlr_el2
-> +	ldr	x1, =SCTLR_ELx_FLAGS
-> +	bic	x0, x0, x1		// Clear SCTL_M and etc
-> +	msr	sctlr_el2, x0
-> +	isb
-> +
-> +	/* Invalidate the old TLBs */
-> +	tlbi	alle2
-> +	dsb	sy
-> +
-> +	/* Install stub vectors */
-> +	adr_l	x0, __hyp_stub_vectors
-> +	msr	vbar_el2, x0
-> +
-> +	eret
-> +ENDPROC(__kvm_hyp_reset)
-> +
->   	.ltorg
->
->   	.popsection
->
+That's right.
+
+> there are two "rdma" in the @1400 range, so rdma is really not a good
+> name for @1401)
+
+I think we can just use index.
+disp0_config_base = <0x14000000 1 0xffff0000>;
+disp1_config_base = <0x14010000 2 0xffff0000>;
+disp2_config_base = <0x14020000 3 0xffff0000>;
+
+> Further, it looks like the gce just maps a large device address range
+> starting at 0x14000000 to (21-bit) gce address 0x010000, rather than
+> 31 individually addressable 64k "subsys" blocks.  Is there a counter
+> example that I am missing?
+
+>From GCE's point of view,
+it's 32 (0x0~0x1f) individually addressable 64k "subsys" blocks.
+Currently, we don't have a counter example since all display related
+address are put together.
+
+> -Dan
+
+Thanks,
+HS Liao
+
+> >
+> >> -Dan
+> >>
+> >> >
+> >> > Yes, this mapping is fixed by hardware.
+> >> >
+> >> > > Does it vary for different SoCs?
+> >> >
+> >> > Yes, it varies for different SoCs.
+> >> >
+> >> > >
+> >> > > -Dan
+> >> > >
+> >> > > > That's why we need to know the mapping between the range of physical
+> >> > > > address and subsys.
+> >> > > > Please guide us a better way to code such requirement.
+> >> > > > Thanks for your help.
+> >> > > >
+> >> > > > Thanks,
+> >> > > > HS Liao
+> >> > > >
+> >> >
+> >> > Thanks,
+> >> > HS Liao
+> >> >
+> >
+> > Thanks,
+> > HS Liao
+> >
