@@ -1,46 +1,34 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 2 Feb 2016 17:28:33 +0100
-Subject: [PATCH 2/2] dt-bindings: Add TPO TPG110 binding
-In-Reply-To: <1454316643-3931-1-git-send-email-linus.walleij@linaro.org>
-References: <1454316643-3931-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20160202162833.GB4918@ulmo>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Tue, 2 Feb 2016 16:34:44 +0000
+Subject: [PATCH] staging: goldfish: use div64_s64 instead of do_div
+In-Reply-To: <1676170.0qik6mzm6D@wuerfel>
+References: <1676170.0qik6mzm6D@wuerfel>
+Message-ID: <20160202163444.25b73816@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 01, 2016 at 09:50:43AM +0100, Linus Walleij wrote:
-> This adds device tree bindings for the TPO TPG110 panel found
-> mounted in the Nomadik NHK8815.
+On Mon, 01 Feb 2016 11:33 +0100
+Arnd Bergmann <arnd@arndb.de> wrote:
+
+> The goldfish nand driver divides a signed 64-bit number (loff_t)
+> in multiple places using the do_div() function. This has always
+> been unreliable but now produces a compiler warning (since 4.5-rc1):
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  .../bindings/display/panel/tpo,tpg110.txt          | 47 ++++++++++++++++++++++
->  1 file changed, 47 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/panel/tpo,tpg110.txt
+> goldfish/goldfish_nand.c: In function 'goldfish_nand_erase':
+> goldfish/goldfish_nand.c:107:91: error: comparison of distinct pointer types lacks a cast [-Werror]
+> goldfish/goldfish_nand.c: In function 'goldfish_nand_read_oob':
+> goldfish/goldfish_nand.c:145:91: error: comparison of distinct pointer types lacks a cast [-Werror]
 > 
-> diff --git a/Documentation/devicetree/bindings/display/panel/tpo,tpg110.txt b/Documentation/devicetree/bindings/display/panel/tpo,tpg110.txt
-> new file mode 100644
-> index 000000000000..acbc6bef3593
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/panel/tpo,tpg110.txt
-> @@ -0,0 +1,47 @@
-> +TPO TPG110 Panel
-> +================
-> +
-> +This binding builds on the DPI bindings, adding a few properties
-> +as a superset of a DPI. See panel-dpi.txt for the required DPI
-> +bindings.
+> This changes the code to the equivalent div_s64{,_rem} that
+> works correctly for negative numbers (which we should never
+> get here).
+> 
+> The warning has shown up on ARM allmodconfig builds after the goldfish
+> bus driver has become visible on ARM.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: bd2f348db503 ("goldfish: refactor goldfish platform configs")
 
-It is unfortunate that we have these two types of bindings, one used by
-some of the legacy fbdev drivers and the other by DRM/KMS drivers. There
-isn't really much we can do about it, though, as far as I can see.
+Acked-by: Alan Cox <alan@linux.intel.com>
 
-This panel is used with an fbdev driver, right?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160202/6af19370/attachment.sig>
+Now agree with Arnd's patch.
