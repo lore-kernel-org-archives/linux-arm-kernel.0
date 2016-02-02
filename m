@@ -1,112 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 2 Feb 2016 15:46:27 -0800
-Subject: PM regression with commit 5de85b9d57ab PM runtime re-init in
- v4.5-rc1
-In-Reply-To: <Pine.LNX.4.44L0.1602021626540.1653-100000@iolanthe.rowland.org>
-References: <20160202210345.GZ19432@atomide.com>
- <Pine.LNX.4.44L0.1602021626540.1653-100000@iolanthe.rowland.org>
-Message-ID: <20160202234626.GD19432@atomide.com>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Tue, 2 Feb 2016 15:59:36 -0800
+Subject: [PATCH 0/3] Add initial support for TI's K2G SOC
+In-Reply-To: <1454455517-7360-1-git-send-email-fcooper@ti.com>
+References: <1454455517-7360-1-git-send-email-fcooper@ti.com>
+Message-ID: <56B142E8.4090301@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alan Stern <stern@rowland.harvard.edu> [160202 13:46]:
-> On Tue, 2 Feb 2016, Tony Lindgren wrote:
-> 
-> > > Also, what is autosuspend_delay set to for your device?  And is 
-> > > runtime_auto set?
-> > 
-> > It's 100 at that point, see the commented snippet below from
-> > omap_hsmmc_probe():
-> > 
-> > 	pm_runtime_enable(host->dev);
-> > 	pm_runtime_get_sync(host->dev);
-> > 	pm_runtime_set_autosuspend_delay(host->dev, MMC_AUTOSUSPEND_DELAY);
-> > 	/* NOTE: pm_runtime_dont_use_autosuspend(host->dev) needed here? */
-> > 	pm_runtime_use_autosuspend(host->dev);
-> > 	...
-> > 	/* gets -EPROBE_DEFER */
-> > err_irq:
-> > 	...
-> > 	pm_runtime_put_sync(host->dev);
-> 
-> You could try changing this to pm_runtime_put_sync_suspend().  But
-> putting pm_runtime_dont_use_autosuspend() before the put_sync seems
-> like a perfectly reasonable thing to do, especially if you feel you
-> should reverse all the changes you made at the start.
+On 2/2/2016 3:25 PM, Franklin S Cooper Jr wrote:
+> This patchset provides initial support for K2G the latest addition to Texas
+> Instruments Keystone 2 product family. These patches are built on top of
+> the latest 4.5-rc2 commit.
+>
+> K2G is a A15 + C66x DSP processor built to address the needs of industrial
+> communication and control, automotive and performance audio applications.
+>
+> Supported peripherals include MMC,USB2.0,DCAN,DSS,McASP and PCIe SS.
+>
+> The technical reference manual for K2G can be found here:
+> http://www.ti.com/lit/ug/spruhy8/spruhy8.pdf
+>
+> This patchset provides the ability to boot K2G's general purpose evm using
+> a ramfs filesystem.
+>
+> Additional patches will follow this series that will add support for new
+> drivers that will enable additional peripherals and features
+>
+> K2G Bootlog on 4.5-rc2:
+> http://pastebin.ubuntu.com/14861580/
+>
+Quick scan of the series looks fine to me. I will wait for others to
+come back for a week or so and then add to 4.6 queue.
 
-They both seem to fix the problem.
+Thanks for the series !!
 
-> >         pm_runtime_disable(host->dev);
-> > 	/* NOTE: suspend callback never gets called unless
-> > 	 * pm_runtime_dont_use_autosuspend() is called
-> > 	 * before pm_runtime_put_sync() above.
-> > 	 */
-> > 	 ...
-> > 
-> > > > > Does pm_runtime_use_autosuspend() get called by the probe routine?  If 
-> > > > > it does, then perhaps you can get what you want by having the probe 
-> > > > > routine call pm_runtime_dont_use_autosuspend() whenever it's about to 
-> > > > > return an error -- particularly -EDEFER.
-> > > > 
-> > > > Yes so far that's the only fix that seems to work like I posted
-> > > > earlier. But is that the right fix though?
-> > > 
-> > > No, not really.  Ideally you would leave autosuspend turned on.  The 
-> > > delay would be long enough to that after -EDEFER, another probe would 
-> > > start before the delay expired.  But shortly after the last probe 
-> > > attempt, the delay would expire and the device would then be put in low 
-> > > power.
-> > 
-> > But then what about the new reinit function? To me it seems that
-> > we should not attempt to maintain a state from the earlier failed
-> > probe. Or are you thinking we just skip the reinit if autosuspend
-> > is set?
-> 
-> The reinit function gets called too late to do what you want -- namely, 
-> put the hardware in a low-power state.
-
-Right, the problem is the lack of suspend on the first probe. But
-for having autosuspend timeout long enough for the next probe
-would mean that we can't reset the PM runtime state in between.
-
-> That _is_ what you want, isn't it?  The alternative is to leave
-> dev->power.rpm_status set to RPM_ACTIVE, to match the hardware's actual 
-> state.
-
-As far as I can tell things work just fine if the failed probe
-suspend the device at the end of the failed probe.
-
-> Given that the reinit function is supposed to restore the initial 
-> settings, it probably ought to call pm_runtime_dont_use_autosuspend().  
-> But that won't be enough to fix your problem.
-> 
-> > > > If we wanted to have some generic fix, it seems we would have to pass
-> > > > a new flag in pm_runtime_put_sync() to ignore any autosuspend
-> > > > configuration. But I don't know if that's what we want to or should
-> > > > do though?
-> > > 
-> > > I don't think so.
-> > 
-> > So should we just establish a policy that pm_runtime_use_autosuspend()
-> > needs to be paired with pm_runtime_dont_use_autosuspend() for
-> > pm_runtime_put_sync() to work?
-> 
-> Your understanding is slightly wrong.  pm_runtime_put_sync() _does_
-> work -- that is, it does what it's supposed to do.  The difficulty is
-> that what it's supposed to do doesn't match what you think.
-> 
-> pm_runtime_put_sync() is supposed to follow the driver's wishes.  It
-> invokes the driver's runtime_idle callback if there is one, and the
-> callback routine can start a suspend or an autosuspend.  If there is no
-> callback, it will use whatever autosuspend setting the driver has set
-> up.  If you want to override the autosuspend setting, use
-> pm_runtime_put_sync_suspend() instead.
-
-Yes.. That works too. I guess the thing to consider is if we should
-make pm_runtime_put_sync() always sync along the lines of a patch
-I posted earlier today. That could avoid quite a bit of confusion
-as already seen in this thread :)
-
-Regards,
-
-Tony
+Reagrds,
+Santosh
