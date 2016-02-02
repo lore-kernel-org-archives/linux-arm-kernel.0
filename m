@@ -1,71 +1,46 @@
 From: k@japko.eu (Krzysztof Adamski)
-Date: Tue,  2 Feb 2016 22:21:50 +0100
-Subject: [PATCH v2 2/5] dts: sun8i-h3: Add APB0 related clocks and resets
+Date: Tue,  2 Feb 2016 22:21:49 +0100
+Subject: [PATCH v2 1/5] clk: sunxi: Add apb0 gates for H3
 In-Reply-To: <1454448113-18810-1-git-send-email-k@japko.eu>
 References: <1454448113-18810-1-git-send-email-k@japko.eu>
-Message-ID: <1454448113-18810-3-git-send-email-k@japko.eu>
+Message-ID: <1454448113-18810-2-git-send-email-k@japko.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-APB0 is bearly mentioned in H3 User Manual and it is only setup in the
-Allwinners kernel dump for CIR. I have verified experimentally that the
-gate for R_PIO exists and works, though. There are probably other gates
-there but I don't know their order right now and I don't have access to
-their peripherals on my board to test them.
+This patch adds support for APB0 in H3. It seems to be compatible with
+earlier SOCs. apb0 gates controls R_ block peripherals (R_PIO, R_IR,
+etc).
 
 Signed-off-by: Krzysztof Adamski <k@japko.eu>
 ---
- arch/arm/boot/dts/sun8i-h3.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ Documentation/devicetree/bindings/clock/sunxi.txt | 1 +
+ drivers/clk/sunxi/clk-simple-gates.c              | 2 ++
+ 2 files changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 1524130e..ce35e93 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -276,6 +276,32 @@
- 			clocks = <&osc24M>, <&pll6 1>, <&pll5>;
- 			clock-output-names = "mbus";
- 		};
-+
-+		ahb0: ahb0_clk {
-+			compatible = "fixed-factor-clock";
-+			#clock-cells = <0>;
-+			clock-div = <1>;
-+			clock-mult = <1>;
-+			clocks = <&osc24M>, <&osc32k>;
-+			clock-output-names = "ahb0";
-+		};
-+
-+		apb0: clk at 01f0140c {
-+			compatible = "allwinner,sun8i-a23-apb0-clk";
-+			reg = <0x01f0140c 0x4>;
-+			#clock-cells = <0>;
-+			clocks = <&ahb0>;
-+			clock-output-names = "apb0";
-+		};
-+
-+		apb0_gates: clk at 01f01428 {
-+			compatible = "allwinner,sun8i-h3-abp0-gates-clk";
-+			reg = <0x01f01428 0x4>;
-+			#clock-cells = <1>;
-+			clocks = <&apb0>;
-+			clock-indices = <0>, <1>;
-+			clock-output-names = "apb0_pio", "apb0_ir";
-+		};
- 	};
- 
- 	soc {
-@@ -493,5 +519,11 @@
- 			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
- 		};
-+
-+		apb0_reset: reset at 01f014b0 {
-+			reg = <0x01f014b0 0x4>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			#reset-cells = <1>;
-+		};
- 	};
- };
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index e59f57b..6ee6875 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -32,6 +32,7 @@ Required properties:
+ 	"allwinner,sun8i-h3-ahb2-clk" - for the AHB2 clock on H3
+ 	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+ 	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
++	"allwinner,sun8i-h3-abp0-gates-clk" - for the APB0 gates on H3
+ 	"allwinner,sun9i-a80-ahb0-gates-clk" - for the AHB0 gates on A80
+ 	"allwinner,sun9i-a80-ahb1-gates-clk" - for the AHB1 gates on A80
+ 	"allwinner,sun9i-a80-ahb2-gates-clk" - for the AHB2 gates on A80
+diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
+index f4da52b..8a1fa3e 100644
+--- a/drivers/clk/sunxi/clk-simple-gates.c
++++ b/drivers/clk/sunxi/clk-simple-gates.c
+@@ -130,6 +130,8 @@ CLK_OF_DECLARE(sun8i_a23_apb2, "allwinner,sun8i-a23-apb2-gates-clk",
+ 	       sunxi_simple_gates_init);
+ CLK_OF_DECLARE(sun8i_a33_ahb1, "allwinner,sun8i-a33-ahb1-gates-clk",
+ 	       sunxi_simple_gates_init);
++CLK_OF_DECLARE(sun8i_h3_abp0, "allwinner,sun8i-h3-abp0-gates-clk",
++	       sunxi_simple_gates_init);
+ CLK_OF_DECLARE(sun9i_a80_ahb0, "allwinner,sun9i-a80-ahb0-gates-clk",
+ 	       sunxi_simple_gates_init);
+ CLK_OF_DECLARE(sun9i_a80_ahb1, "allwinner,sun9i-a80-ahb1-gates-clk",
 -- 
 2.1.4
