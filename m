@@ -1,134 +1,34 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 2 Feb 2016 17:15:15 +0000 (UTC)
-Subject: OMAP baseline test results for v4.5-rc2
-Message-ID: <alpine.DEB.2.02.1602021713541.20554@utopia.booyaka.com>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Tue, 2 Feb 2016 17:19:15 +0000
+Subject: [PATCH v3 1/2] clk: sunxi: Add sun6i/8i video support
+In-Reply-To: <8fdfe5fe7715f19416d654964e55721b30237b38.1454427224.git.moinejf@free.fr>
+References: <cover.1454427223.git.moinejf@free.fr>
+ <8fdfe5fe7715f19416d654964e55721b30237b38.1454427224.git.moinejf@free.fr>
+Message-ID: <CACvgo53f8Sr_dEAx_mcvjXciK01mY7TUDguOJ-HzNur-PpmMZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jean-Francois,
 
-Here are some basic OMAP test results for Linux v4.5-rc2.
-Logs and other details at:
+On 1 February 2016 at 07:43, Jean-Francois Moine <moinejf@free.fr> wrote:
+> Add the clock types which are used by the sun6i/8i families for video.
+>
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+> v3: (no change)
+> v2:
+>         - remarks from Chen-Yu Tsai
+>         - DT documentation added
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi.txt |   2 +
+>  drivers/clk/sunxi/clk-sun6i-display.c             | 106 +++++++++++++
+>  drivers/clk/sunxi/clk-sun6i-pll3.c                | 174 ++++++++++++++++++++++
+>  3 files changed, 282 insertions(+)
+>  create mode 100644 drivers/clk/sunxi/clk-sun6i-display.c
+>  create mode 100644 drivers/clk/sunxi/clk-sun6i-pll3.c
+>
+Something is missing here - namely the changes to the Makefile. Does
+this series work or did you simply forget git add ?
 
-    http://www.pwsan.com/omap/testlogs/test_v4.5-rc2/20160131225233/
-
-
-Test summary
-------------
-
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build: uImage+dtb:
-    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/omap4-var-stk-om44,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-sbc-t3517,
-		  omap2plus_defconfig/omap5-uevm,
-		  omap2plus_defconfig/omap5-sbc-t54
-
-Build: zImage:
-    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
-
-Build warnings from toolchain: uImage:
-    (none)
-
-Build warnings from toolchain: uImage+dtb:
-    (none)
-
-Build warnings from toolchain: zImage:
-    FAIL ( 1/17): multi_v7_defconfig
-
-Boot to userspace:
-    FAIL ( 1/18): 2430sdp
-    skip ( 3/18): 5912osk, 3517evm, 5430es2sbct54
-    Pass (14/18): am335xbonelt, am437xsk, am335xbone, 4430es2panda,
-		  4460pandaes, 4460varsomom, 37xxevm, 3530es3beagle,
-		  3530es31beagle, 3730beaglexm, 3730es12beaglexm,
-		  cmt3517, 5430es2uevm, 2420n800
-
-Kernel warnings during boot to userspace:
-    FAIL ( 1/18): cmt3517
-
-PM: chip retention via suspend:
-    FAIL ( 7/11): am335xbonelt, 4430es2panda, 4460pandaes,
-		  4460varsomom, 37xxevm, 2430sdp, 5430es2uevm
-    Pass ( 4/11): 3530es3beagle, 3530es31beagle, 3730beaglexm,
-		  3730es12beaglexm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 9/11): am335xbonelt, 4430es2panda, 4460pandaes,
-		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  2430sdp, 5430es2uevm
-    Pass ( 2/11): 3730beaglexm, 3730es12beaglexm
-
-PM: chip off (except CORE, due to errata) via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off (except CORE, due to errata) via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 2/ 4): 37xxevm, 3530es3beagle
-    Pass ( 2/ 4): 3530es31beagle, 3730es12beaglexm
-
-PM: chip off via dynamic idle:
-    FAIL ( 3/ 4): 37xxevm, 3530es3beagle, 3530es31beagle
-    Pass ( 1/ 4): 3730es12beaglexm
-
-Kernel warnings during PM test:
-    (none)
-
-Obsolete Kconfig symbols:
-    FAIL ( 3/20): omap1_defconfig, omap2plus_defconfig,
-		  multi_v7_defconfig
-
-
-vmlinux object size
-(delta in bytes from test_v4.5-rc1 (92e963f50fc74041b5e9e744c330dca48e04f08d)):
-   text     data      bss    total  kernel
-   +473       -8      -32     +433  omap1_defconfig
-   +473        0      -32     +441  omap1_defconfig_1510innovator_only
-   +557       -8      -32     +517  omap1_defconfig_5912osk_only
-   +660     +128        0     +788  multi_v7_defconfig
-   +133      +32        0     +165  omap2plus_defconfig
-   +109      +24      -32     +101  omap2plus_defconfig_2430sdp_only
-    +41      +32        0      +73  omap2plus_defconfig_am33xx_only
-    +45      +32        0      +77  omap2plus_defconfig_am43xx_only
-    +69      +32        0     +101  omap2plus_defconfig_cpupm
-    -19      +24        0       +5  omap2plus_defconfig_dra7xx_only
-    +21       -8      -32      -19  omap2plus_defconfig_n800_multi_omap2xxx
-   +441      +24      -32     +433  omap2plus_defconfig_n800_only_a
-   +129      +24        0     +153  omap2plus_defconfig_no_pm
-   +133      +32        0     +165  omap2plus_defconfig_omap2_4_only
-    -19      +32        0      +13  omap2plus_defconfig_omap3_4_only
-    -19      +32        0      +13  omap2plus_defconfig_omap5_only
-   +376        0        0     +376  rmk_omap3430_ldp_allnoconfig
-   +257        0        0     +257  rmk_omap3430_ldp_oldconfig
-   +376        0        0     +376  rmk_omap4430_sdp_allnoconfig
-   +281        0        0     +281  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v4.5-rc1 (92e963f50fc74041b5e9e744c330dca48e04f08d))
-  avail  rsrvd   high  freed  board          kconfig
-  (no differences)
+Regards,
+Emil
